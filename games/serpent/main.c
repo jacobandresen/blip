@@ -158,7 +158,11 @@ static void update_dead(float dt) {
 }
 
 static void update_over(void) {
-    if (blip_any_key_pressed(&ctx)) start_game();
+    if (!blip_any_key_pressed(&ctx)) return;
+#ifdef __EMSCRIPTEN__
+    if (!EM_ASM_INT({ return window.blipSpendCoin ? window.blipSpendCoin() : 1; })) return;
+#endif
+    start_game();
 }
 
 /* ---- draw ------------------------------------------------------------- */

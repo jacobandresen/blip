@@ -351,7 +351,11 @@ static void update_win(float dt) {
 }
 
 static void update_over(void) {
-    if (blip_any_key_pressed(&ctx)) start_game();
+    if (!blip_any_key_pressed(&ctx)) return;
+#ifdef __EMSCRIPTEN__
+    if (!EM_ASM_INT({ return window.blipSpendCoin ? window.blipSpendCoin() : 1; })) return;
+#endif
+    start_game();
 }
 
 /* ---- draw ------------------------------------------------------------- */
@@ -397,11 +401,23 @@ static void draw_play(void) {
 
 static void draw_title(void) {
     blip_clear(&ctx, BLIP_BLACK);
-    blip_draw_centered(&ctx, "GALACTIC",    WIN_H / 5,       5, BLIP_CYAN);
-    blip_draw_centered(&ctx, "DEFENDER",    WIN_H / 5 + 50,  5, BLIP_MAGENTA);
-    blip_draw_centered(&ctx, "30 PTS",      WIN_H / 2 - 40,  2, BLIP_MAGENTA);
-    blip_draw_centered(&ctx, "20 PTS",      WIN_H / 2 - 20,  2, BLIP_CYAN);
-    blip_draw_centered(&ctx, "10 PTS",      WIN_H / 2,       2, BLIP_GREEN);
+    blip_draw_centered(&ctx, "GALACTIC",     WIN_H / 5,      5, BLIP_CYAN);
+    blip_draw_centered(&ctx, "DEFENDER",     WIN_H / 5 + 50, 5, BLIP_MAGENTA);
+
+    /* score table — half-size sprites (16×12) left-aligned with point labels */
+    int dw = ALIEN_W / 2, dh = ALIEN_H / 2;          /* 16 × 12              */
+    int ax = blip_text_cx(&ctx, "30 PTS", 2) - dw - 8;/* flush left of text   */
+    int voff = (7 * 2 - dh) / 2;                      /* centre on 14-px row  */
+
+    int row0 = WIN_H / 2 - 40, row1 = WIN_H / 2 - 20, row2 = WIN_H / 2;
+
+    blip_draw_texture_tinted(&ctx, tex_alien[0], ax, row0 + voff, dw, dh, BLIP_MAGENTA);
+    blip_draw_texture_tinted(&ctx, tex_alien[1], ax, row1 + voff, dw, dh, BLIP_CYAN);
+    blip_draw_texture_tinted(&ctx, tex_alien[2], ax, row2 + voff, dw, dh, BLIP_GREEN);
+
+    blip_draw_centered(&ctx, "30 PTS",       row0,           2, BLIP_MAGENTA);
+    blip_draw_centered(&ctx, "20 PTS",       row1,           2, BLIP_CYAN);
+    blip_draw_centered(&ctx, "10 PTS",       row2,           2, BLIP_GREEN);
     blip_draw_centered(&ctx, "PRESS ANY KEY",WIN_H * 2 / 3,  3, BLIP_WHITE);
 }
 
