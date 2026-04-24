@@ -319,75 +319,6 @@
     }
 
     header, .divider, .game-grid, footer { position: relative; z-index: 1; }
-
-    /* ---- coin / credits ---- */
-    .insert-coin { cursor: pointer; user-select: none; }
-
-    @keyframes coin-shake {
-      0%, 100% { transform: translateX(0); }
-      20%       { transform: translateX(-5px); }
-      40%       { transform: translateX(5px); }
-      60%       { transform: translateX(-4px); }
-      80%       { transform: translateX(3px); }
-    }
-    .coin-shake { animation: coin-shake 0.28s ease !important; }
-
-    .credits-display {
-      margin-top: 14px;
-      font-size: 11px;
-      letter-spacing: 4px;
-      color: var(--cyan);
-      text-shadow: 0 0 8px var(--cyan);
-      text-transform: uppercase;
-    }
-    .credits-icons { letter-spacing: 4px; }
-
-    /* ---- mastodon badge ---- */
-    .mastodon-badge {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      z-index: 10000;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-      color: #444;
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      transition: color .2s;
-    }
-
-    .mastodon-badge:hover { color: var(--green); }
-
-    .mastodon-badge:hover .mastodon-handle { opacity: 1; transform: translateX(0); }
-
-    .mastodon-handle {
-      opacity: 0;
-      transform: translateX(6px);
-      transition: opacity .2s, transform .2s;
-      white-space: nowrap;
-      text-shadow: 0 0 8px var(--green);
-      color: var(--green);
-    }
-
-    .mastodon-avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 1px solid #222;
-      display: block;
-      transition: border-color .2s, box-shadow .2s;
-      image-rendering: auto;
-      filter: grayscale(40%) brightness(0.8);
-    }
-
-    .mastodon-badge:hover .mastodon-avatar {
-      border-color: var(--green);
-      box-shadow: 0 0 12px color-mix(in srgb, var(--green) 50%, transparent);
-      filter: none;
-    }
   </style>
 </head>
 <body>
@@ -404,10 +335,7 @@
     <div class="marquee-line" data-i18n="marquee"></div>
     <div class="arcade-title">BLIP ARCADE</div>
     <div class="arcade-sub" data-i18n="subtitle"></div>
-    <div class="insert-coin" id="insert-coin" data-i18n="insertCoin"></div>
-    <div class="credits-display" id="credits-display" style="display:none">
-      CREDITS <span id="credits-count">0</span> &nbsp;<span class="credits-icons" id="credits-icons"></span>
-    </div>
+    <div class="insert-coin" data-i18n="insertCoin"></div>
   </header>
 
   <div class="divider"></div>
@@ -451,13 +379,6 @@
     </a>
 
   </div>
-
-  <a class="mastodon-badge" href="https://mastodon.gamedev.place/@jacobandresen" target="_blank" rel="noopener">
-    <span class="mastodon-handle">@jacobandresen</span>
-    <img class="mastodon-avatar"
-         src="https://cdn.masto.host/mastodongamedevplace/accounts/avatars/109/415/513/568/161/510/original/ba0f2c84d53b9881.jpg"
-         alt="Jacob Andresen on Mastodon">
-  </a>
 
   <footer>
     <div data-i18n="footerControls"></div>
@@ -571,85 +492,6 @@
       var lang = saved || (i18n[browserLang] ? browserLang : 'en');
       applyLang(lang);
     })();
-
-    /* ------------------------------------------------------------------ */
-    /* Coin / credits                                                       */
-    /* ------------------------------------------------------------------ */
-    var MAX_COINS  = 5;
-    var coinCount  = 0;
-    var audioCtx   = null;
-
-    function getAudio() {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      return audioCtx;
-    }
-
-    function playCoinInsert() {
-      var ctx = getAudio();
-      var t   = ctx.currentTime;
-      // Two-note metallic clink (C6 → E6)
-      [{ freq: 1047, start: 0 }, { freq: 1319, start: 0.055 }].forEach(function(note) {
-        var osc  = ctx.createOscillator();
-        var gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'square';
-        osc.frequency.value = note.freq;
-        gain.gain.setValueAtTime(0.22, t + note.start);
-        gain.gain.exponentialRampToValueAtTime(0.001, t + note.start + 0.11);
-        osc.start(t + note.start);
-        osc.stop(t + note.start + 0.12);
-      });
-    }
-
-    function playNoRoom() {
-      var ctx  = getAudio();
-      var t    = ctx.currentTime;
-      // Descending buzzer — sawtooth from 200Hz → 65Hz
-      var osc  = ctx.createOscillator();
-      var gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(200, t);
-      osc.frequency.exponentialRampToValueAtTime(65, t + 0.38);
-      gain.gain.setValueAtTime(0.32, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
-      osc.start(t);
-      osc.stop(t + 0.39);
-    }
-
-    function updateCreditsDisplay() {
-      var icons = '';
-      for (var i = 0; i < MAX_COINS; i++)
-        icons += i < coinCount ? '&#x25CF;' : '&#x25CB;';
-      document.getElementById('credits-icons').innerHTML = icons;
-      document.getElementById('credits-count').textContent = coinCount;
-      document.getElementById('credits-display').style.display = coinCount > 0 ? '' : 'none';
-    }
-
-    function insertCoin() {
-      if (coinCount < MAX_COINS) {
-        coinCount++;
-        playCoinInsert();
-        updateCreditsDisplay();
-      } else {
-        playNoRoom();
-        var el = document.getElementById('insert-coin');
-        el.classList.remove('coin-shake');
-        void el.offsetWidth; // reflow to restart animation
-        el.classList.add('coin-shake');
-        el.addEventListener('animationend', function() { el.classList.remove('coin-shake'); }, { once: true });
-      }
-    }
-
-    document.getElementById('insert-coin').addEventListener('click', insertCoin);
-
-    document.addEventListener('keydown', function(e) {
-      // "5" (MAME coin key) or "c"
-      if (e.key === '5' || e.key === 'c' || e.key === 'C') insertCoin();
-    });
 
     /* ------------------------------------------------------------------ */
     /* Starfield                                                            */

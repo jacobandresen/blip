@@ -13,6 +13,12 @@
       background: #000;
     }
 
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
     /* CRT scanlines */
     body::before {
       content: '';
@@ -32,10 +38,6 @@
       image-rendering: pixelated;
       image-rendering: crisp-edges;
       outline: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform-origin: 0 0;
     }
 
     /* loading screen */
@@ -86,19 +88,15 @@
       font-family: 'Courier New', Courier, monospace;
       font-size: 10px;
       letter-spacing: 2px;
-      color: #555;
+      color: #2a2a2a;
       text-decoration: none;
       padding: 5px 9px;
-      border: 1px solid #333;
-      background: rgba(0,0,0,0.85);
+      border: 1px solid #181818;
+      background: rgba(0,0,0,0.8);
       z-index: 200;
-      transition: color .15s, border-color .15s, text-shadow .15s;
+      transition: color .15s, border-color .15s;
     }
-    #back:hover {
-      color: #32c832;
-      border-color: #32c832;
-      text-shadow: 0 0 8px #32c832;
-    }
+    #back:hover { color: #777; border-color: #444; }
   </style>
 </head>
 <body>
@@ -123,16 +121,11 @@
       var nw = canvas.width, nh = canvas.height;
       if (!nw || !nh) return;
       var scale = Math.min(window.innerWidth / nw, window.innerHeight / nh);
-      var tx = -(nw / 2);
-      var ty = -(nh / 2);
-      canvas.style.setProperty(
-        'transform',
-        'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')',
-        'important'
-      );
+      canvas.style.width  = Math.round(nw * scale) + 'px';
+      canvas.style.height = Math.round(nh * scale) + 'px';
     }
     window.addEventListener('resize', fillCanvas);
-    /* Poll until SDL sets the canvas dimensions, then scale */
+    /* Poll until SDL sets the canvas dimensions, then size it */
     var fillTimer = setInterval(function() {
       if (canvas.width && canvas.height) { fillCanvas(); clearInterval(fillTimer); }
     }, 50);
