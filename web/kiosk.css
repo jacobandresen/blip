@@ -1,0 +1,71 @@
+/* ---- Shared kiosk navigation bar ---- */
+
+.kiosk-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding: 0 14px env(safe-area-inset-bottom, 0px);
+  background: rgba(0,0,0,0.96);
+  border-top: 1px solid #1e5c1e;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  z-index: 200;
+}
+
+.kiosk-hud {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #e6dc32;
+  text-shadow: 0 0 10px #e6dc32;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.kiosk-btn {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #e6dc32;
+  text-shadow: 0 0 10px #e6dc32;
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+  padding: 9px 16px;
+  border-radius: 5px;
+  background: linear-gradient(to bottom, #172017, #0c150c);
+  border: 1px solid #2a5a2a;
+  border-bottom: 3px solid #060e06;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.75), inset 0 1px 0 rgba(50,200,50,0.08);
+  transition: box-shadow .1s, transform .1s, border-color .15s, text-shadow .15s;
+}
+.kiosk-btn:hover {
+  border-color: #3a8a3a;
+  border-bottom-color: #0a1e0a;
+  text-shadow: 0 0 10px #e6dc32;
+}
+.kiosk-btn:active {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.75), inset 0 2px 5px rgba(0,0,0,0.5);
+}
+
+.shake { animation: coin-shake 0.28s ease; }
+
+@keyframes coin-shake {
+  0%,100% { transform: translateX(0); }
+  20%     { transform: translateX(-4px); }
+  40%     { transform: translateX( 4px); }
+  60%     { transform: translateX(-3px); }
+  80%     { transform: translateX( 3px); }
+}

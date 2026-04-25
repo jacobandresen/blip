@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>BLIP ARCADE</title>
+  <link rel="stylesheet" href="kiosk.css">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -25,7 +26,7 @@
       flex-direction: column;
       align-items: center;
       min-height: 100vh;
-      padding: 0 16px 96px;
+      padding: 0 16px calc(96px + env(safe-area-inset-bottom, 0px));
       overflow-x: hidden;
     }
 
@@ -128,43 +129,6 @@
     @keyframes flicker {
       0%, 95%, 97%, 99%, 100% { opacity: 1; }
       96%, 98% { opacity: 0.7; }
-    }
-
-    /* ---- shared physical arcade button ---- */
-    .coin-btn {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 18px;
-      font-weight: 900;
-      letter-spacing: 2px;
-      color: #e6dc32;
-      text-shadow: 0 0 10px #e6dc32;
-      text-decoration: none;
-      text-transform: uppercase;
-      padding: 9px 16px;
-      border-radius: 5px;
-      background: linear-gradient(to bottom, #172017, #0c150c);
-      border: 1px solid #2a5a2a;
-      border-bottom: 3px solid #060e06;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.75), inset 0 1px 0 rgba(50,200,50,0.08);
-      transition: box-shadow .1s, transform .1s, border-color .15s, text-shadow .15s;
-      cursor: pointer;
-      user-select: none;
-      flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent;
-      white-space: nowrap;
-    }
-    .coin-btn:hover {
-      border-color: #3a8a3a;
-      border-bottom-color: #0a1e0a;
-      text-shadow: 0 0 10px #e6dc32;
-    }
-    .coin-btn:active {
-      transform: translateY(2px);
-      border-bottom-width: 1px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.75), inset 0 2px 5px rgba(0,0,0,0.5);
-    }
-    .coin-btn.coin-shake {
-      animation: coin-shake 0.28s ease !important;
     }
 
     .insert-coin {
@@ -388,22 +352,10 @@
 
     header, .divider, .game-grid, footer { position: relative; z-index: 1; }
 
-    /* ---- coin / credits ---- */
-
-    @keyframes coin-shake {
-      0%, 100% { transform: translateX(0); }
-      20%       { transform: translateX(-5px); }
-      40%       { transform: translateX(5px); }
-      60%       { transform: translateX(-4px); }
-      80%       { transform: translateX(3px); }
-    }
-    .coin-shake { animation: coin-shake 0.28s ease !important; }
-
-
     /* ---- mastodon badge ---- */
     .mastodon-badge {
       position: fixed;
-      bottom: 76px;
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
       right: 20px;
       z-index: 10000;
       display: flex;
@@ -446,34 +398,7 @@
       box-shadow: 0 0 12px color-mix(in srgb, var(--green) 50%, transparent);
       filter: none;
     }
-    /* ---- kiosk bar ---- */
-    #kiosk-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 56px;
-      background: rgba(0,0,0,0.96);
-      border-top: 1px solid #1e5c1e;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 14px;
-      z-index: 200;
-      gap: 10px;
-    }
-
-    #kiosk-coins-hud {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 18px;
-      font-weight: 900;
-      letter-spacing: 3px;
-      color: #e6dc32;
-      text-shadow: 0 0 10px #e6dc32;
-      text-transform: uppercase;
-      flex: 1;
-      white-space: nowrap;
-    }
+    #kiosk-coins-hud { flex: 1; }
 
     /* ---- realistic coin slot ---- */
     .coin-slot {
@@ -622,14 +547,15 @@
     <div style="margin-top:8px" data-i18n="footerCopy"></div>
   </footer>
 
-  <div id="kiosk-bar">
-    <span id="kiosk-coins-hud"></span>
-    <button class="coin-btn" id="kiosk-insert-btn">INSERT COIN &#x2192;</button>
+  <div id="kiosk-bar" class="kiosk-bar">
+    <span id="kiosk-coins-hud" class="kiosk-hud" data-coins-hud></span>
+    <button class="kiosk-btn" id="kiosk-insert-btn">INSERT COIN &#x2192;</button>
     <div class="coin-slot" id="kiosk-coin-slot">
       <div class="coin-slot-opening"></div>
     </div>
   </div>
 
+  <script src="kiosk.js"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Translations                                                         */
@@ -747,20 +673,7 @@
     /* ------------------------------------------------------------------ */
     /* Coin / credits                                                       */
     /* ------------------------------------------------------------------ */
-    var MAX_COINS  = 5;
-    var coinCount  = 0;
-    var audioCtx   = null;
-
-    function saveCoins() {
-      try { sessionStorage.setItem('blip-coins', coinCount); } catch(e) {}
-    }
-    function loadCoins() {
-      try {
-        var n = parseInt(sessionStorage.getItem('blip-coins') || '0', 10);
-        coinCount = isNaN(n) ? 0 : Math.min(Math.max(n, 0), MAX_COINS);
-      } catch(e) {}
-    }
-    loadCoins();
+    var audioCtx = null;
 
     function getAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -802,7 +715,7 @@
     }
 
     function updatePressStart() {
-      var key = coinCount > 0 ? 'pressStart' : 'needCoin';
+      var key = getCoins() > 0 ? 'pressStart' : 'needCoin';
       document.querySelectorAll('.press-start').forEach(function(el) {
         el.setAttribute('data-i18n', key);
         var t = i18n[currentLang];
@@ -811,10 +724,7 @@
     }
 
     function updateCreditsDisplay() {
-      var icons = '';
-      for (var i = 0; i < MAX_COINS; i++)
-        icons += i < coinCount ? '&#x25CF;' : '&#x25CB;';
-      document.getElementById('kiosk-coins-hud').innerHTML = 'COINS ' + icons;
+      updateCoinsHud();
       updatePressStart();
     }
 
@@ -833,9 +743,9 @@
     }
 
     function insertCoin() {
-      if (coinCount < MAX_COINS) {
-        coinCount++;
-        saveCoins();
+      var n = getCoins();
+      if (n < MAX_COINS) {
+        saveCoins(n + 1);
         playCoinInsert();
         updateCreditsDisplay();
         flashCoins();
@@ -843,19 +753,19 @@
         playNoRoom();
         ['insert-coin', 'kiosk-insert-btn'].forEach(function(id) {
           var el = document.getElementById(id);
-          el.classList.remove('coin-shake');
+          el.classList.remove('shake');
           void el.offsetWidth;
-          el.classList.add('coin-shake');
-          el.addEventListener('animationend', function() { el.classList.remove('coin-shake'); }, { once: true });
+          el.classList.add('shake');
+          el.addEventListener('animationend', function() { el.classList.remove('shake'); }, { once: true });
         });
       }
     }
 
     document.querySelectorAll('.card').forEach(function(card) {
       card.addEventListener('click', function(e) {
-        if (coinCount <= 0) { e.preventDefault(); return; }
-        coinCount--;
-        saveCoins();
+        var n = getCoins();
+        if (n <= 0) { e.preventDefault(); return; }
+        saveCoins(n - 1);
         updateCreditsDisplay();
       });
     });
