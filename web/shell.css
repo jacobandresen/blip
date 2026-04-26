@@ -196,8 +196,8 @@ canvas {
   position: fixed;
   bottom: calc(56px + 20px + env(safe-area-inset-bottom, 0px));
   left: 20px;
-  width: 130px;
-  height: 130px;
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
   background: radial-gradient(circle at 42% 38%, #0c170c, #050a05);
   border: 2px solid rgba(50, 200, 50, 0.35);
@@ -251,10 +251,10 @@ canvas {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 4px;
-  height: 44px;
-  margin-left: -2px;
-  margin-top: -44px;
+  width: 3px;
+  height: 32px;
+  margin-left: -1.5px;
+  margin-top: -32px;
   background: linear-gradient(to top, rgba(50,200,50,0.3), #32c832);
   border-radius: 2px 2px 0 0;
   transform-origin: bottom center;

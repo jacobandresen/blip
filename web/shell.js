@@ -194,12 +194,14 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
   if (isRally) {
     // ---- Paddle dial ----
     document.getElementById('dpad').style.display = 'none';
+    document.getElementById('btn-fire').style.display = 'none';
     var dial     = document.getElementById('paddle-dial');
     var dialHand = document.getElementById('dial-hand');
     dial.style.display = 'block';
 
-    var dialAngle      = -Math.PI / 2; // hand points up initially
-    var lastTouchAngle = null;
+    var dialAngle        = -Math.PI / 2; // hand points up initially
+    var lastTouchAngle   = null;
+    var totalDeltaAngle  = 0;
     var dialUpHeld = false, dialDownHeld = false;
 
     function touchAngleFromDial(touch) {
@@ -227,7 +229,8 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
 
     dial.addEventListener('touchstart', function (e) {
       e.preventDefault();
-      lastTouchAngle = touchAngleFromDial(e.touches[0]);
+      lastTouchAngle  = touchAngleFromDial(e.touches[0]);
+      totalDeltaAngle = 0;
       dial.classList.add('active');
     }, { passive: false });
 
@@ -240,7 +243,8 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
       if (delta < -Math.PI) delta += 2 * Math.PI;
       lastTouchAngle = a;
 
-      dialAngle += delta;
+      dialAngle       += delta;
+      totalDeltaAngle += Math.abs(delta);
       dialHand.style.transform = 'rotate(' + (dialAngle + Math.PI / 2) + 'rad)';
 
       var DEAD = 0.018;
@@ -249,7 +253,14 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
       else                    setDialDir(false, false);
     }, { passive: false });
 
-    dial.addEventListener('touchend',    function (e) { e.preventDefault(); stopDial(); }, { passive: false });
+    dial.addEventListener('touchend', function (e) {
+      e.preventDefault();
+      if (totalDeltaAngle < 0.08) {
+        injectKey(' ', 'Space', 'keydown');
+        injectKey(' ', 'Space', 'keyup');
+      }
+      stopDial();
+    }, { passive: false });
     dial.addEventListener('touchcancel', stopDial);
 
   } else {
