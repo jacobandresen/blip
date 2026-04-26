@@ -625,6 +625,63 @@
       osc.stop(t + 0.39);
     }
 
+    // ---- Ambient Atari hum ----
+    (function () {
+      var started = false;
+      function startHum() {
+        if (started) return;
+        started = true;
+        var ctx = getAudio();
+
+        // Power-supply drone: 58 Hz sawtooth → lowpass → barely audible
+        var osc = ctx.createOscillator();
+        var lpf = ctx.createBiquadFilter();
+        var gMaster = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.value = 58;
+        lpf.type = 'lowpass';
+        lpf.frequency.value = 320;
+        lpf.Q.value = 1.5;
+        gMaster.gain.value = 0;
+        osc.connect(lpf); lpf.connect(gMaster); gMaster.connect(ctx.destination);
+        osc.start();
+        gMaster.gain.linearRampToValueAtTime(0.014, ctx.currentTime + 5);
+
+        scheduleGlitch(ctx);
+      }
+
+      function scheduleGlitch(ctx) {
+        setTimeout(function () {
+          playAtariGlitch(ctx);
+          scheduleGlitch(ctx);
+        }, 12000 + Math.random() * 22000);
+      }
+
+      function playAtariGlitch(ctx) {
+        var t   = ctx.currentTime;
+        var dur = 0.03 + Math.random() * 0.09;
+        var len = Math.ceil(ctx.sampleRate * dur);
+        var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        var d   = buf.getChannelData(0);
+        for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+        var src = ctx.createBufferSource();
+        var bpf = ctx.createBiquadFilter();
+        var g   = ctx.createGain();
+        src.buffer = buf;
+        bpf.type = 'bandpass';
+        bpf.frequency.value = 150 + Math.random() * 500;
+        bpf.Q.value = 1;
+        src.connect(bpf); bpf.connect(g); g.connect(ctx.destination);
+        g.gain.setValueAtTime(0.025 + Math.random() * 0.02, t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        src.start(t); src.stop(t + dur + 0.01);
+      }
+
+      ['click', 'touchstart', 'keydown'].forEach(function (ev) {
+        document.addEventListener(ev, startHum, { once: true, passive: true });
+      });
+    }());
+
     function updatePressStart() {
       var key = getCoins() > 0 ? 'pressStart' : 'needCoin';
       document.querySelectorAll('.press-start').forEach(function(el) {
