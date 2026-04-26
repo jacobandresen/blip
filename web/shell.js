@@ -151,6 +151,8 @@ var Module = {
 // ---- Touch controls — injected as keyboard events into the WASM game ----
 
 if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+  var isRally = window.location.pathname.indexOf('/rally/') !== -1;
+
   document.getElementById('touch-pad').style.display = 'block';
 
   var held = {};
@@ -189,28 +191,91 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     });
   }
 
-  var dpad = document.getElementById('dpad');
-  dpad.addEventListener('touchstart', function (e) {
-    e.preventDefault();
-    for (var i = 0; i < e.changedTouches.length; i++) {
-      var t = e.changedTouches[i];
-      var el = document.elementFromPoint(t.clientX, t.clientY);
-      if (el && el.dataset.code) pressBtn(el);
-    }
-  }, { passive: false });
+  if (isRally) {
+    // ---- Paddle dial ----
+    document.getElementById('dpad').style.display = 'none';
+    var dial     = document.getElementById('paddle-dial');
+    var dialHand = document.getElementById('dial-hand');
+    dial.style.display = 'block';
 
-  dpad.addEventListener('touchmove', function (e) {
-    e.preventDefault();
-    releaseAll();
-    for (var i = 0; i < e.touches.length; i++) {
-      var t = e.touches[i];
-      var el = document.elementFromPoint(t.clientX, t.clientY);
-      if (el && el.dataset.code) pressBtn(el);
-    }
-  }, { passive: false });
+    var dialAngle      = -Math.PI / 2; // hand points up initially
+    var lastTouchAngle = null;
+    var dialUpHeld = false, dialDownHeld = false;
 
-  dpad.addEventListener('touchend',    function (e) { e.preventDefault(); releaseAll(); }, { passive: false });
-  dpad.addEventListener('touchcancel', releaseAll);
+    function touchAngleFromDial(touch) {
+      var r = dial.getBoundingClientRect();
+      return Math.atan2(touch.clientY - (r.top + r.height / 2),
+                        touch.clientX - (r.left + r.width / 2));
+    }
+
+    function setDialDir(up, down) {
+      if (up !== dialUpHeld) {
+        dialUpHeld = up;
+        injectKey('ArrowUp', 'ArrowUp', up ? 'keydown' : 'keyup');
+      }
+      if (down !== dialDownHeld) {
+        dialDownHeld = down;
+        injectKey('ArrowDown', 'ArrowDown', down ? 'keydown' : 'keyup');
+      }
+    }
+
+    function stopDial() {
+      setDialDir(false, false);
+      dial.classList.remove('active');
+      lastTouchAngle = null;
+    }
+
+    dial.addEventListener('touchstart', function (e) {
+      e.preventDefault();
+      lastTouchAngle = touchAngleFromDial(e.touches[0]);
+      dial.classList.add('active');
+    }, { passive: false });
+
+    dial.addEventListener('touchmove', function (e) {
+      e.preventDefault();
+      if (lastTouchAngle === null) return;
+      var a = touchAngleFromDial(e.touches[0]);
+      var delta = a - lastTouchAngle;
+      if (delta >  Math.PI) delta -= 2 * Math.PI;
+      if (delta < -Math.PI) delta += 2 * Math.PI;
+      lastTouchAngle = a;
+
+      dialAngle += delta;
+      dialHand.style.transform = 'rotate(' + (dialAngle + Math.PI / 2) + 'rad)';
+
+      var DEAD = 0.018;
+      if      (delta >  DEAD) setDialDir(false, true);
+      else if (delta < -DEAD) setDialDir(true, false);
+      else                    setDialDir(false, false);
+    }, { passive: false });
+
+    dial.addEventListener('touchend',    function (e) { e.preventDefault(); stopDial(); }, { passive: false });
+    dial.addEventListener('touchcancel', stopDial);
+
+  } else {
+    var dpad = document.getElementById('dpad');
+    dpad.addEventListener('touchstart', function (e) {
+      e.preventDefault();
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var t = e.changedTouches[i];
+        var el = document.elementFromPoint(t.clientX, t.clientY);
+        if (el && el.dataset.code) pressBtn(el);
+      }
+    }, { passive: false });
+
+    dpad.addEventListener('touchmove', function (e) {
+      e.preventDefault();
+      releaseAll();
+      for (var i = 0; i < e.touches.length; i++) {
+        var t = e.touches[i];
+        var el = document.elementFromPoint(t.clientX, t.clientY);
+        if (el && el.dataset.code) pressBtn(el);
+      }
+    }, { passive: false });
+
+    dpad.addEventListener('touchend',    function (e) { e.preventDefault(); releaseAll(); }, { passive: false });
+    dpad.addEventListener('touchcancel', releaseAll);
+  }
 
   var fire = document.getElementById('btn-fire');
   fire.addEventListener('touchstart',  function (e) { e.preventDefault(); pressBtn(fire); },  { passive: false });

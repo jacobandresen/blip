@@ -5,11 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>BLIP ARCADE</title>
+  <link rel="icon" type="image/x-icon" href="../favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+  <link rel="icon" type="image/svg+xml" href="../icon.svg">
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png">
   <!-- Must load before Emscripten so the AudioContext wrapper is in place -->
   <script src="../audio-unlock.js?v=2"></script>
   <script src="../kiosk.js?v=2"></script>
   <link rel="stylesheet" href="../kiosk.css?v=4">
-  <link rel="stylesheet" href="../shell.css?v=3">
+  <link rel="stylesheet" href="../shell.css?v=4">
 </head>
 <body>
 
@@ -39,9 +43,15 @@
     <div id="btn-fire" data-key=" " data-code="Space">FIRE</div>
   </div>
 
+  <!-- Paddle dial: rally only, touch only -->
+  <div id="paddle-dial">
+    <div id="dial-hand"></div>
+    <div id="dial-label">PADDLE</div>
+  </div>
+
   <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 
-  <script src="../shell.js?v=4"></script>
+  <script src="../shell.js?v=5"></script>
   {{{ SCRIPT }}}
 
 </body>

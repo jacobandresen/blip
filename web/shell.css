@@ -189,6 +189,94 @@ canvas {
   color: #32c832;
 }
 
+/* ---- Paddle dial (rally only) ---- */
+
+#paddle-dial {
+  display: none;
+  position: fixed;
+  bottom: calc(56px + 20px + env(safe-area-inset-bottom, 0px));
+  left: 20px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 38%, #0c170c, #050a05);
+  border: 2px solid rgba(50, 200, 50, 0.35);
+  box-shadow:
+    0 0 16px rgba(50, 200, 50, 0.12),
+    inset 0 0 24px rgba(0, 0, 0, 0.6);
+  touch-action: none;
+  user-select: none;
+  pointer-events: auto;
+  z-index: 99;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Tick marks around the rim via conic-gradient */
+#paddle-dial::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 14deg, rgba(50,200,50,0.18) 14deg 16deg,
+    transparent 16deg 44deg, rgba(50,200,50,0.18) 44deg 46deg,
+    transparent 46deg 74deg, rgba(50,200,50,0.18) 74deg 76deg,
+    transparent 76deg 104deg, rgba(50,200,50,0.18) 104deg 106deg,
+    transparent 106deg 134deg, rgba(50,200,50,0.18) 134deg 136deg,
+    transparent 136deg 164deg, rgba(50,200,50,0.18) 164deg 166deg,
+    transparent 166deg 194deg, rgba(50,200,50,0.18) 194deg 196deg,
+    transparent 196deg 224deg, rgba(50,200,50,0.18) 224deg 226deg,
+    transparent 226deg 254deg, rgba(50,200,50,0.18) 254deg 256deg,
+    transparent 256deg 284deg, rgba(50,200,50,0.18) 284deg 286deg,
+    transparent 286deg 314deg, rgba(50,200,50,0.18) 314deg 316deg,
+    transparent 316deg 344deg, rgba(50,200,50,0.18) 344deg 346deg,
+    transparent 346deg 360deg
+  );
+}
+
+/* Centre dot */
+#paddle-dial::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: rgba(50, 200, 50, 0.5);
+  box-shadow: 0 0 6px #32c832;
+}
+
+#dial-hand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 44px;
+  margin-left: -2px;
+  margin-top: -44px;
+  background: linear-gradient(to top, rgba(50,200,50,0.3), #32c832);
+  border-radius: 2px 2px 0 0;
+  transform-origin: bottom center;
+  box-shadow: 0 0 8px rgba(50,200,50,0.7);
+  transition: box-shadow .05s;
+}
+
+#paddle-dial.active #dial-hand {
+  box-shadow: 0 0 16px #32c832, 0 0 30px rgba(50,200,50,0.4);
+}
+
+#dial-label {
+  position: absolute;
+  bottom: -22px;
+  left: 0; right: 0;
+  text-align: center;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: rgba(50, 200, 50, 0.4);
+}
+
 /* Shrink controls in landscape / short screens */
 @media (max-height: 450px) {
   #dpad {

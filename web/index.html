@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>BLIP ARCADE</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <script src="audio-unlock.js"></script>
   <link rel="stylesheet" href="kiosk.css?v=4">
   <style>
@@ -193,6 +197,7 @@
     .card-serpent  { --c: var(--green);   }
     .card-bouncer  { --c: var(--cyan);    }
     .card-galactic { --c: var(--magenta); }
+    .card-rally     { --c: var(--red);     }
 
     .card::before, .card::after { border-color: var(--c); }
 
@@ -405,15 +410,15 @@
 
   <div class="game-grid">
 
-    <!-- SERPENT -->
-    <a class="card card-serpent" href="serpent/index.html">
+    <!-- RALLY -->
+    <a class="card card-rally" href="rally/index.html">
       <div class="card-shot-wrap">
-        <img class="card-shot" src="serpent/screenshot.png" alt="Serpent gameplay">
+        <img class="card-shot" src="rally/screenshot.png" alt="Rally gameplay">
       </div>
-      <div class="card-title">SERPENT</div>
-      <div class="card-genre"  data-i18n="serpentGenre"></div>
-      <div class="card-desc"   data-i18n="serpentDesc"></div>
-      <div class="card-controls" data-i18n="serpentControls"></div>
+      <div class="card-title">RALLY</div>
+      <div class="card-genre"  data-i18n="rallyGenre"></div>
+      <div class="card-desc"   data-i18n="rallyDesc"></div>
+      <div class="card-controls" data-i18n="rallyControls"></div>
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
 
@@ -438,6 +443,18 @@
       <div class="card-genre"  data-i18n="galacticGenre"></div>
       <div class="card-desc"   data-i18n="galacticDesc"></div>
       <div class="card-controls" data-i18n="galacticControls"></div>
+      <div class="press-start" data-i18n="pressStart"></div>
+    </a>
+
+    <!-- SERPENT -->
+    <a class="card card-serpent" href="serpent/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="serpent/screenshot.png" alt="Serpent gameplay">
+      </div>
+      <div class="card-title">SERPENT</div>
+      <div class="card-genre"  data-i18n="serpentGenre"></div>
+      <div class="card-desc"   data-i18n="serpentDesc"></div>
+      <div class="card-controls" data-i18n="serpentControls"></div>
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
 
@@ -490,6 +507,10 @@
         galacticDesc:     'Many alien spaceship is coming very close near now.<br>Please for shoot all before they arrive on ground.<br>Must defend Earth happening at every cost situation.',
         galacticControls: 'PUSH A/D OR ARROW &middot; SPACE KEY FOR SHOOT',
 
+        rallyGenre:        'PADDLE BATTLE GAME',
+        rallyDesc:         'First player to reach seven point is win.<br>Ball getting more fast with every hit.',
+        rallyControls:     'PUSH W/S OR ARROW &middot; ANY KEY FOR SERVE',
+
         pressStart:       'PUSH START BUTTON',
         needCoin:         'NEED COIN',
         footerControls:   'PUSH WASD OR ARROW KEY &nbsp;&mdash;&nbsp; SPACE IS FOR SHOOT OR FOR LAUNCH',
@@ -513,6 +534,10 @@
         galacticDesc:     'エイリアンの大群が迫ってくる。<br>着地する前に全滅させろ。<br>地球を守り抜け。',
         galacticControls: 'A/D または矢印 &middot; スペースで射撃',
 
+        rallyGenre:        'ピンポンゲーム',
+        rallyDesc:         '先に7点取った方が勝ち。<br>打つたびにボールは速くなる。',
+        rallyControls:     'W/S または矢印 &middot; 任意のキーでサーブ',
+
         pressStart:       'スタート',
         needCoin:         'コインが必要',
         footerControls:   'WASD または 矢印キー &nbsp;―&nbsp; スペースで撃つ・発射',
@@ -535,6 +560,10 @@
         galacticGenre:    'RUMANGRIBER',
         galacticDesc:     'Alienbølger er på vej ind.<br>Skyd dem ned inden de lander.<br>Forsvar Jorden for enhver pris.',
         galacticControls: 'A/D ELLER PILE &middot; MELLEMRUM FOR SKYD',
+
+        rallyGenre:        'BORDTENNISSPIL',
+        rallyDesc:         'F&oslash;rst til syv point vinder.<br>Bolden accelererer for hvert slag.',
+        rallyControls:     'W/S ELLER PILE &middot; VILK&Aring;RLIG TAST FOR SERV',
 
         pressStart:       'TRYK START',
         needCoin:         'INDS&AElig;T M&Oslash;NT',
