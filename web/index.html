@@ -327,7 +327,7 @@
     header, .divider, .game-grid, footer { position: relative; z-index: 1; }
 
     /* ---- mastodon badge ---- */
-    .mastodon-badge {
+    .profile-badge {
       position: fixed;
       bottom: calc(76px + env(safe-area-inset-bottom, 0px));
       left: 20px;
@@ -343,11 +343,11 @@
       transition: color .2s;
     }
 
-    .mastodon-badge:hover { color: var(--green); }
+    .profile-badge:hover { color: var(--green); }
 
-    .mastodon-badge:hover .mastodon-handle { opacity: 1; transform: translateX(0); }
+    .profile-badge:hover .profile-handle { opacity: 1; transform: translateX(0); }
 
-    .mastodon-handle {
+    .profile-handle {
       opacity: 0;
       transform: translateX(-6px);
       transition: opacity .2s, transform .2s;
@@ -356,7 +356,7 @@
       color: var(--green);
     }
 
-    .mastodon-avatar {
+    .avatar {
       width: 44px;
       height: 44px;
       border-radius: 50%;
@@ -367,7 +367,7 @@
       filter: grayscale(40%) brightness(0.8);
     }
 
-    .mastodon-badge:hover .mastodon-avatar {
+    .profile-badge:hover .avatar {
       border-color: var(--green);
       box-shadow: 0 0 12px color-mix(in srgb, var(--green) 50%, transparent);
       filter: none;
@@ -449,11 +449,16 @@
     <button class="lang-btn" data-lang="da">🇩🇰</button>
   </div>
 
-  <a class="mastodon-badge" href="https://mastodon.gamedev.place/@jacobandresen" target="_blank" rel="noopener">
-    <img class="mastodon-avatar"
-         src="https://cdn.masto.host/mastodongamedevplace/accounts/avatars/109/415/513/568/161/510/original/ba0f2c84d53b9881.jpg"
-         alt="Jacob Andresen on Mastodon">
-    <span class="mastodon-handle">@jacobandresen</span>
+  <a class="profile-badge" href="https://bsky.app/profile/jacobandresen.bsky.social" target="_blank" rel="noopener">
+    <svg class="avatar" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-label="Bluesky">
+      <rect width="64" height="64" rx="32" fill="#0c0c14"/>
+      <!-- Bluesky butterfly -->
+      <path d="M32,32 C28,22 12,16 14,26 C16,34 27,33 32,32Z" fill="#0085ff"/>
+      <path d="M32,32 C36,22 52,16 50,26 C48,34 37,33 32,32Z" fill="#0085ff"/>
+      <path d="M32,32 C26,34 10,42 15,48 C19,53 27,42 32,32Z" fill="#0085ff"/>
+      <path d="M32,32 C38,34 54,42 49,48 C45,53 37,42 32,32Z" fill="#0085ff"/>
+    </svg>
+    <span class="profile-handle">@jacobandresen.bsky.social</span>
   </a>
 
   <footer>
