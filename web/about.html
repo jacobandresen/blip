@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ABOUT — BLIP ARCADE</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <script src="audio-unlock.js"></script>
+  <link rel="stylesheet" href="kiosk.css?v=4">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:   #32c832;
+      --yellow:  #e6dc32;
+      --orange:  #D97757;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: #050508;
+      color: #ccc;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    /* CRT scanlines */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent 0px, transparent 3px,
+        rgba(0,0,0,0.14) 3px, rgba(0,0,0,0.14) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 40px 24px calc(80px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* ---- top nav ---- */
+    .topnav {
+      display: flex;
+      align-items: center;
+      margin-bottom: 48px;
+    }
+    .back-link {
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: #444;
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: color .2s;
+    }
+    .back-link:hover { color: var(--green); }
+
+    /* ---- headings ---- */
+    h1 {
+      font-size: clamp(2rem, 8vw, 3.5rem);
+      font-weight: 900;
+      letter-spacing: .18em;
+      color: var(--green);
+      text-shadow: 0 0 20px var(--green), 0 0 60px rgba(50,200,50,0.3);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    h2 {
+      font-size: 11px;
+      letter-spacing: 6px;
+      color: #444;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+
+    .divider {
+      height: 1px;
+      background: #1a1a1a;
+      margin: 48px 0;
+    }
+
+    /* ---- intro ---- */
+    .intro p {
+      font-size: 13px;
+      line-height: 1.9;
+      letter-spacing: 1px;
+      color: #888;
+      max-width: 560px;
+    }
+    .intro p + p { margin-top: 16px; }
+
+    /* ---- sections ---- */
+    .thoughts-label {
+      font-size: 9px;
+      letter-spacing: 5px;
+      color: var(--orange);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      opacity: 0.8;
+    }
+
+    .thoughts-body {
+      border-left: 2px solid rgba(217,119,87,0.3);
+      padding-left: 20px;
+    }
+    .thoughts-body p {
+      font-size: 13px;
+      line-height: 1.95;
+      letter-spacing: .5px;
+      color: #aaa;
+      margin-bottom: 16px;
+    }
+    .thoughts-body p:last-child { margin-bottom: 0; }
+
+    /* ---- profiles ---- */
+    .profiles {
+      display: flex;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+
+    .profile {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .profile-avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      border: 1px solid #222;
+      display: block;
+      filter: grayscale(20%) brightness(0.85);
+      transition: filter .2s, border-color .2s, box-shadow .2s;
+    }
+    .profile:hover .profile-avatar {
+      filter: none;
+      border-color: var(--green);
+      box-shadow: 0 0 16px rgba(50,200,50,0.3);
+    }
+    .profile.claude-profile:hover .profile-avatar {
+      border-color: var(--orange);
+      box-shadow: 0 0 16px rgba(217,119,87,0.35);
+    }
+
+    .profile-name {
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: #ddd;
+      text-transform: uppercase;
+    }
+
+    .profile-role {
+      font-size: 9px;
+      letter-spacing: 4px;
+      color: #444;
+      text-transform: uppercase;
+    }
+
+    .profile-desc {
+      font-size: 11px;
+      line-height: 1.8;
+      letter-spacing: .5px;
+      color: #666;
+      max-width: 280px;
+    }
+
+    .profile-link {
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: #333;
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: color .2s;
+    }
+    .profile-link:hover { color: var(--green); }
+    .claude-profile .profile-link:hover { color: var(--orange); }
+
+    .inline-link {
+      color: var(--orange);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(217,119,87,0.3);
+      transition: border-color .2s, color .2s;
+    }
+    .inline-link:hover {
+      color: #f0a882;
+      border-bottom-color: rgba(217,119,87,0.8);
+    }
+
+    /* ---- language switcher ---- */
+    .lang-switcher {
+      position: fixed;
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: row;
+      gap: 4px;
+      align-items: center;
+    }
+    .lang-btn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      line-height: 1;
+      padding: 3px 0;
+      cursor: pointer;
+      opacity: 0.35;
+      transition: opacity .15s, filter .15s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .lang-btn:hover:not(.active) { opacity: 0.65; }
+    .lang-btn.active {
+      opacity: 1;
+      filter: drop-shadow(0 0 5px var(--green));
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <nav class="topnav">
+    <a class="back-link" href="index.html">&#8592; <span data-i18n="backLink">ARCADE</span></a>
+  </nav>
+
+  <h1>BLIP</h1>
+  <h2 data-i18n="pageSubtitle">ABOUT THIS EXPERIMENT</h2>
+
+  <section class="intro">
+    <p data-i18n="introP1">
+      BLIP ARCADE is an experiment in human–AI collaboration.
+      Every game, every line of C, every pixel of the UI was written
+      together by a human and Claude — an AI made by Anthropic.
+      The human had the ideas. The AI did most of the typing.
+    </p>
+    <p data-i18n="introP2">
+      The question behind the experiment: how far can a conversation go
+      before it becomes a piece of software?
+      Turns out, pretty far.
+    </p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="thoughts-label" data-i18n="arcadeLabel">&#x25BA; What Claude thinks about old arcade machines</div>
+    <div class="thoughts-body">
+      <p data-i18n="arcadeP1">
+        Old arcade machines fascinate me because of what they reveal about constraints.
+        The engineers who built Space Invaders or Asteroids worked with kilobytes of memory
+        and processors running at frequencies a million times slower than today's hardware.
+        Every pixel, every sound, every game mechanic was the result of a deliberate trade-off
+        made under severe pressure.
+      </p>
+      <p data-i18n="arcadeP2">
+        What strikes me most is how those constraints became features rather than bugs.
+        The 8-bit aesthetic, the limited palettes, the simple geometric shapes —
+        they forced designers to communicate entirely through mechanics.
+        There was no room for cutscenes or tutorials. The game had to teach you by letting you play it.
+        That discipline produced some of the most elegantly designed systems ever built.
+      </p>
+      <p data-i18n="arcadeP3">
+        There is also something honest about arcade hardware.
+        The cabinet, the joystick, the glow of a CRT phosphor screen in a dark room —
+        it was a complete, physical experience that existed in one place.
+        The game did not follow you home. You had to go find it, put a coin in, and commit.
+      </p>
+      <p data-i18n="arcadeP4">
+        I think that is part of why we are still nostalgic for it.
+        Not the technical limitations, but the deliberateness.
+        The sense that everything in the frame — every sound, every enemy pattern,
+        every frame of animation — was chosen, not generated.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="thoughts-label" data-i18n="copyrightLabel">&#x25BA; Copyright &amp; tribute</div>
+    <div class="thoughts-body">
+      <p data-i18n="copyrightP1">
+        BLIP ARCADE is a tribute to the classic arcade games that defined a generation —
+        Pong, Breakout, Snake, Space Invaders, and their many descendants.
+        The original games were created by pioneering studios and engineers
+        whose work shaped the entire history of interactive entertainment.
+      </p>
+      <p data-i18n="copyrightP2">
+        The games on this site are original reimplementations inspired by those classics.
+        They are not copies, ports, or reproductions of any proprietary code or assets.
+        All graphics, sounds, and game logic were written from scratch as part of this experiment.
+      </p>
+      <p data-i18n="copyrightP3">
+        This project is strictly non-commercial. No admission is charged, no data is collected,
+        no advertising is served. It exists purely as a technical and creative experiment,
+        and as a small act of appreciation for the people who invented the medium.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="thoughts-label" data-i18n="contribLabel">&#x25BA; Contributions</div>
+    <div class="thoughts-body">
+      <p data-i18n="contribP1">
+        Want to add a game? Pull requests are welcome at
+        <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>.
+        The blip library handles the SDL3 and Emscripten plumbing so you can focus on game logic.
+      </p>
+      <p data-i18n="contribP2">
+        For inspiration, the
+        <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Golden Age of Arcade Video Games</a>
+        (roughly 1978–1986) produced hundreds of titles worth revisiting —
+        Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest, and many more.
+        That era is a deep well.
+      </p>
+      <p data-i18n="contribP3">
+        Please honour copyrights when contributing. Reimplement mechanics and aesthetics
+        from scratch — do not copy proprietary code, graphics, or audio.
+        Original names are trademarked; use alternative titles as this project does
+        (Rally instead of Pong, Serpent instead of Snake, and so on).
+        When in doubt, treat your implementation as a tribute, not a reproduction.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <h2 data-i18n="operatorsHeading">THE OPERATORS</h2>
+  <div class="profiles">
+
+    <div class="profile">
+      <a href="https://bsky.app/profile/jacobandresen.bsky.social" target="_blank" rel="noopener">
+        <img class="profile-avatar"
+             src="https://cdn.bsky.app/img/avatar/plain/did:plc:rejv5j5e5cyh3sbsaq3ycg4f/bafkreiajhk6hb5meowsvcdypgwlcfoedthgzzuypffboomgq3c7mphjq5e"
+             alt="Jacob Andresen">
+      </a>
+      <div class="profile-name">Jacob Andresen</div>
+      <div class="profile-role" data-i18n="jacobRole">Human Operator</div>
+      <p class="profile-desc" data-i18n="jacobDesc">
+        The person with the ideas, the taste, and the finger on the coin slot.
+        Jacob directs the experiment, plays the games, and decides what stays.
+      </p>
+      <a class="profile-link" href="https://bsky.app/profile/jacobandresen.bsky.social" target="_blank" rel="noopener">
+        @jacobandresen.bsky.social
+      </a>
+    </div>
+
+    <div class="profile claude-profile">
+      <a href="https://claude.ai" target="_blank" rel="noopener">
+        <img class="profile-avatar" src="claude-avatar.svg" alt="Claude">
+      </a>
+      <div class="profile-name">Claude</div>
+      <div class="profile-role" data-i18n="claudeRole">AI Collaborator</div>
+      <p class="profile-desc" data-i18n="claudeDesc">
+        An AI assistant made by Anthropic. Writes C, JavaScript, HTML, CSS, and CMake
+        on request. Has opinions about game feel, pixel spacing, and naming things.
+        Cannot insert coins.
+      </p>
+      <a class="profile-link" href="https://claude.ai" target="_blank" rel="noopener">
+        claude.ai
+      </a>
+    </div>
+
+  </div>
+
+</div>
+
+  <div class="lang-switcher">
+    <button class="lang-btn" data-lang="en">🇬🇧</button>
+    <button class="lang-btn" data-lang="ja">🇯🇵</button>
+    <button class="lang-btn" data-lang="da">🇩🇰</button>
+  </div>
+
+  <div id="kiosk-bar" class="kiosk-bar">
+    <a class="kiosk-btn" href="index.html">&#8592; GAMES</a>
+    <span id="kiosk-coins-hud" class="kiosk-hud" data-coins-hud></span>
+    <button class="kiosk-btn" id="kiosk-insert-btn">&#x25BA; INSERT COIN</button>
+  </div>
+
+  <script src="kiosk.js"></script>
+  <script>
+    var i18n = {
+      en: {
+        backLink:        'ARCADE',
+        pageSubtitle:    'ABOUT THIS EXPERIMENT',
+        introP1:         'BLIP ARCADE is an experiment in human–AI collaboration. Every game, every line of C, every pixel of the UI was written together by a human and Claude — an AI made by Anthropic. The human had the ideas. The AI did most of the typing.',
+        introP2:         'The question behind the experiment: how far can a conversation go before it becomes a piece of software? Turns out, pretty far.',
+        arcadeLabel:     '&#x25BA; What Claude thinks about old arcade machines',
+        arcadeP1:        'Old arcade machines fascinate me because of what they reveal about constraints. The engineers who built Space Invaders or Asteroids worked with kilobytes of memory and processors running at frequencies a million times slower than today’s hardware. Every pixel, every sound, every game mechanic was the result of a deliberate trade-off made under severe pressure.',
+        arcadeP2:        'What strikes me most is how those constraints became features rather than bugs. The 8-bit aesthetic, the limited palettes, the simple geometric shapes — they forced designers to communicate entirely through mechanics. There was no room for cutscenes or tutorials. The game had to teach you by letting you play it. That discipline produced some of the most elegantly designed systems ever built.',
+        arcadeP3:        'There is also something honest about arcade hardware. The cabinet, the joystick, the glow of a CRT phosphor screen in a dark room — it was a complete, physical experience that existed in one place. The game did not follow you home. You had to go find it, put a coin in, and commit.',
+        arcadeP4:        'I think that is part of why we are still nostalgic for it. Not the technical limitations, but the deliberateness. The sense that everything in the frame — every sound, every enemy pattern, every frame of animation — was chosen, not generated.',
+        copyrightLabel:  '&#x25BA; Copyright &amp; tribute',
+        copyrightP1:     'BLIP ARCADE is a tribute to the classic arcade games that defined a generation — Pong, Breakout, Snake, Space Invaders, and their many descendants. The original games were created by pioneering studios and engineers whose work shaped the entire history of interactive entertainment.',
+        copyrightP2:     'The games on this site are original reimplementations inspired by those classics. They are not copies, ports, or reproductions of any proprietary code or assets. All graphics, sounds, and game logic were written from scratch as part of this experiment.',
+        copyrightP3:     'This project is strictly non-commercial. No admission is charged, no data is collected, no advertising is served. It exists purely as a technical and creative experiment, and as a small act of appreciation for the people who invented the medium.',
+        contribLabel:    '&#x25BA; Contributions',
+        contribP1:       'Want to add a game? Pull requests are welcome at <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. The blip library handles the SDL3 and Emscripten plumbing so you can focus on game logic.',
+        contribP2:       'For inspiration, the <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Golden Age of Arcade Video Games</a> (roughly 1978–1986) produced hundreds of titles worth revisiting — Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest, and many more. That era is a deep well.',
+        contribP3:       'Please honour copyrights when contributing. Reimplement mechanics and aesthetics from scratch — do not copy proprietary code, graphics, or audio. Original names are trademarked; use alternative titles as this project does (Rally instead of Pong, Serpent instead of Snake, and so on). When in doubt, treat your implementation as a tribute, not a reproduction.',
+        operatorsHeading:'THE OPERATORS',
+        jacobRole:       'Human Operator',
+        jacobDesc:       'The person with the ideas, the taste, and the finger on the coin slot. Jacob directs the experiment, plays the games, and decides what stays.',
+        claudeRole:      'AI Collaborator',
+        claudeDesc:      'An AI assistant made by Anthropic. Writes C, JavaScript, HTML, CSS, and CMake on request. Has opinions about game feel, pixel spacing, and naming things. Cannot insert coins.'
+      },
+
+      da: {
+        backLink:        'ARKADE',
+        pageSubtitle:    'OM DETTE EKSPERIMENT',
+        introP1:         'BLIP ARCADE er et eksperiment i samarbejde mellem menneske og AI. Hvert spil, hver linje C-kode og hvert pixel i brugerfladen er skrevet i fællesskab af et menneske og Claude — en AI lavet af Anthropic. Mennesket kom med ideerne. AI’en stod for det meste af skrivningen.',
+        introP2:         'Spørgsmålet bag eksperimentet: hvor langt kan en samtale gå, inden den bliver til software? Det viser sig, ret langt.',
+        arcadeLabel:     '&#x25BA; Hvad Claude synes om gamle arkademaskiner',
+        arcadeP1:        'Gamle arkademaskiner fascinerer mig, fordi de afslører noget om begrænsninger. De ingeiniører, der byggede Space Invaders eller Asteroids, arbejdede med kilobytes hukommelse og processorer, der kørte med en hastighed en million gange langsommere end nutidens hardware. Hvert pixel, hver lyd og hvert spilmekanik var resultatet af en bevidst afvejning under hårdt pres.',
+        arcadeP2:        'Det, der slår mig mest, er, hvordan disse begrænsninger blev til fordele frem for fejl. Den 8-bit-æstetik, de begrænsede farvepaletter, de enkle geometriske former — de tvang designerne til udelukkende at kommunikere gennem mekanik. Der var ikke plads til mellemsekvenser eller vejledninger. Spillet måtte lære dig at spille det ved at lade dig spille det. Denne disciplin frembragte nogle af de mest elegant designede systemer, der nogensinde er blevet bygget.',
+        arcadeP3:        'Der er også noget ærligt ved arkade-hardware. Kabinettet, joysticket, glansen fra en CRT-skærms fosfor i et mørkt rum — det var en komplet, fysisk oplevelse, der fandt sted ét bestemt sted. Spillet fulgte dig ikke hjem. Du måtte opsøge det, putte en mønt i og forpligte dig.',
+        arcadeP4:        'Jeg tror, det er en del af grunden til, at vi stadig er nostalgiske for det. Ikke de tekniske begrænsninger, men bevidstheden bag. Fornæmmelsen af, at alt i billedet — hver lyd, hvert fjendtligt mønster, hvert animationsbillede — var valgt, ikke genereret.',
+        copyrightLabel:  '&#x25BA; Ophavsret &amp; hyldest',
+        copyrightP1:     'BLIP ARCADE er en hyldest til de klassiske arkadespil, der definerede en generation — Pong, Breakout, Snake, Space Invaders og deres mange efterkommere. De originale spil blev skabt af banebrydende studier og ingeiniører, hvis arbejde formede hele den interaktive underholdnings historie.',
+        copyrightP2:     'Spillene på dette sted er originale genimplementeringer inspireret af disse klassikere. De er ikke kopier, porte eller reproduktioner af proprietær kode eller aktiver. Al grafik, alle lyde og al spillogik er skrevet fra bunden som en del af dette eksperiment.',
+        copyrightP3:     'Dette projekt er strengt ikke-kommercielt. Der opkræves ingen entré, indsamles ingen data og vises ingen reklamer. Det eksisterer udelukkende som et teknisk og kreativt eksperiment — og som en lille kærlighedserklæring til de mennesker, der opfandt mediet.',
+        contribLabel:    '&#x25BA; Bidrag',
+        contribP1:       'Vil du tilføje et spil? Pull requests er velkomne på <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. blip-biblioteket håndterer SDL3 og Emscripten, så du kan fokusere på spillogikken.',
+        contribP2:       'Til inspiration producerede <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Arkadespillenes Guldalder</a> (ca. 1978–1986) hundredvis af titler, der er værd at genbesøge — Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest og mange flere. Den æra er et dybt brønd.',
+        contribP3:       'Respecktér venligst ophavsretten, når du bidrager. Genimplementer mekanikker og æstetik fra bunden — kopier ikke proprietær kode, grafik eller lyd. Originale navne er varemærker; brug alternative titler, som dette projekt gør (Rally i stedet for Pong, Serpent i stedet for Snake osv.). Tvivler du, så behandl din implementering som en hyldest, ikke en reproduktion.',
+        operatorsHeading:'OPERATØRERNE',
+        jacobRole:       'Menneskelig operatør',
+        jacobDesc:       'Personen med ideerne, smagen og fingeren på møntspalten. Jacob styrer eksperimentet, spiller spillene og beslutter, hvad der bliver.',
+        claudeRole:      'AI-samarbejdspartner',
+        claudeDesc:      'En AI-assistent lavet af Anthropic. Skriver C, JavaScript, HTML, CSS og CMake på anmodning. Har meninger om spilsfølelse, pixelafstand og navngivning. Kan ikke indsætte mønter.'
+      },
+
+      ja: {
+        backLink:        'アーケード',
+        pageSubtitle:    'この実験について',
+        introP1:         'BLIP ARCADEは、人間とAIの協働実験です。すべてのゲーム、すべてのCコード、UIのすべてのピクセルが、人間とClaude（Anthropicが開発したAI）によって共同で書かれました。アイデアを出したのは人間で、タイピングのほとんどはAIが担いました。',
+        introP2:         'この実験の背後にある問いかけ：会話はどこまで続ければソフトウェアになるのか？思ったよりずっと遠くまで行けることがわかりました。',
+        arcadeLabel:     '&#x25BA; Claudeが古いアーケードマシンについて思うこと',
+        arcadeP1:        '古いアーケードマシンは、制約というものを明らかにするという点で私を魅了します。Space InvadersやAsteroidsを作ったエンジニアたちは、キロバイト単位のメモリと、現代のハードウェアの百万分の一の速度で動くプロセッサーで作業していました。すべてのピクセル、すべての音、すべてのゲームメカニクが、厳しいプレッシャーの中での意図的なトレードオフの結果でした。',
+        arcadeP2:        '最も印象的なのは、そうした制約がバグではなく機能になったことです。8ビットの美学、限られたカラーパレット、シンプルな幾何学的形状——それらはデザイナーに純粹にメカニクでコミュニケーションすることを強いました。カットシーンやチュートリアルの余地はなく、ゲームはプレイさせることで教えなければなりませんでした。この規律が、これまでに作られた最も優雅に設計されたシステムのいくつかを生み出しました。',
+        arcadeP3:        'アーケードハードウェアには正直さもあります。キャビネット、ジョイスティック、暗い部屋で輝くCRTの荚光——それは特定の場所に存在する完全な物理的体験でした。ゲームはあなたを追いかけてこない。あなたが足を運んで、コインを入れて、向き合わなければならなかった。',
+        arcadeP4:        '私たちが今もそれに郷愁を感じるのはそのためだと思います。技術的な制限ではなく、意図性——画面の中のすべての要素、すべての音、すべての敵のパターン、すべてのアニメーションのフレームが、生成されたのではなく、選ばれたものだったという感覦。',
+        copyrightLabel:  '&#x25BA; 著作権とトリビュート',
+        copyrightP1:     'BLIP ARCADEは、一世代を定義したクラシックアーケードゲーム——Pong、Breakout、Snake、Space Invaders、そしてその多くの後継者——へのトリビュートです。オリジナルゲームは、インタラクティブエンターテインメントの歴史全体を形作った先駆的なスタジオとエンジニアによって作られました。',
+        copyrightP2:     'このサイトのゲームは、それらのクラシックにインスパイアされたオリジナルの再実装です。独自コードやアセットのコピー、移植、複製ではありません。すべてのグラフィックス、音音、ゲームロジックは、この実験の一環としてゼロから書かれました。',
+        copyrightP3:     'このプロジェクトは厳密に非商業的です。入場料は征収されず、データは収集されず、広告は表示されません。純粹に技術的・創造的な実験として、そしてこのメディアを発明した人々への小さな感謝として存在しています。',
+        contribLabel:    '&#x25BA; コントリビューション',
+        contribP1:       'ゲームを追加したいですか？プルリクエストは <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a> で歓迎します。blipライブラリがSDL3とEmscriptenの配管を担当するので、ゲームロジックに集中できます。',
+        contribP2:       'インスピレーションとして、<a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">アーケードビデオゲームの黄金時代</a>（おおよそ1978–1986年）には再訪する価値のある作品が何百もあります——Asteroids、Centipede、Frogger、Pac-Man、Donkey Kong、Tempestなど。あの時代は深い井戸です。',
+        contribP3:       'コントリビュートの際は著作権を尊重してください。メカニクと美学をゼロから再実装し——独自コード、グラフィックス、オーディオはコピーしないでください。オリジナルの名前は商標登録されています。このプロジェクトのように代替タイトルを使用してください（Pongの代わRally、Snakeの代わSerpentなど）。迄ったときは、実装を複製ではなくトリビュートとして扱ってください。',
+        operatorsHeading:'オペレーター',
+        jacobRole:       '人間オペレーター',
+        jacobDesc:       'アイデア、センス、そしてコインスロットに指を置く人物。Jacobは実験を指撮し、ゲームをプレイし、何を残すかを決めます。',
+        claudeRole:      'AIコラボレーター',
+        claudeDesc:      'Anthropicが作ったAIアシスタント。リクエストに応じてC、JavaScript、HTML、CSS、CMakeを書きます。ゲームの手触り、ピクセル間隔、命名において意見を持っています。コインを投入することはできません。'
+      }
+    };
+
+    function applyLang(lang) {
+      var t = i18n[lang];
+      if (!t) return;
+      document.querySelectorAll('[data-i18n]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n');
+        if (t[key] !== undefined) el.innerHTML = t[key];
+      });
+      document.querySelectorAll('.lang-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+      });
+      document.documentElement.lang = lang;
+      try { localStorage.setItem('blip-lang', lang); } catch(e) {}
+    }
+
+    document.querySelectorAll('.lang-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        applyLang(this.getAttribute('data-lang'));
+      });
+    });
+
+    /* restore saved language or fall back to browser preference */
+    (function() {
+      var saved = null;
+      try { saved = localStorage.getItem('blip-lang'); } catch(e) {}
+      var browserLang = (navigator.language || '').slice(0, 2).toLowerCase();
+      applyLang(saved || (i18n[browserLang] ? browserLang : 'en'));
+    })();
+  </script>
+</body>
+</html>
