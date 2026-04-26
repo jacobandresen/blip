@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>HISTORY — BLIP ARCADE</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <script src="audio-unlock.js"></script>
+  <link rel="stylesheet" href="kiosk.css?v=4">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:   #32c832;
+      --yellow:  #e6dc32;
+      --orange:  #D97757;
+      --cyan:    #00c8c8;
+      --magenta: #c832c8;
+      --red:     #dc3232;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: #050508;
+      color: #ccc;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent 0px, transparent 3px,
+        rgba(0,0,0,0.14) 3px, rgba(0,0,0,0.14) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 40px 24px calc(80px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .topnav {
+      display: flex;
+      align-items: center;
+      margin-bottom: 48px;
+    }
+    .back-link {
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: #444;
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: color .2s;
+    }
+    .back-link:hover { color: var(--green); }
+
+    h1 {
+      font-size: clamp(2rem, 8vw, 3.5rem);
+      font-weight: 900;
+      letter-spacing: .18em;
+      color: var(--green);
+      text-shadow: 0 0 20px var(--green), 0 0 60px rgba(50,200,50,0.3);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    h2 {
+      font-size: 11px;
+      letter-spacing: 6px;
+      color: #444;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+
+    .divider {
+      height: 1px;
+      background: #1a1a1a;
+      margin: 48px 0;
+    }
+
+    .intro p {
+      font-size: 13px;
+      line-height: 1.9;
+      letter-spacing: 1px;
+      color: #888;
+      max-width: 560px;
+    }
+    .intro p + p { margin-top: 16px; }
+
+    .section-label {
+      font-size: 9px;
+      letter-spacing: 5px;
+      color: var(--orange);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      opacity: 0.8;
+    }
+
+    .section-body {
+      border-left: 2px solid rgba(217,119,87,0.3);
+      padding-left: 20px;
+    }
+    .section-body p {
+      font-size: 13px;
+      line-height: 1.95;
+      letter-spacing: .5px;
+      color: #aaa;
+      margin-bottom: 16px;
+    }
+    .section-body p:last-child { margin-bottom: 0; }
+
+    .game-header {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+    }
+
+    .game-title {
+      font-size: clamp(1.4rem, 5vw, 2rem);
+      font-weight: 900;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .game-origin {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: #444;
+      text-transform: uppercase;
+    }
+
+    .game-section.rally    .game-title { color: var(--red);     text-shadow: 0 0 12px rgba(220,50,50,0.4); }
+    .game-section.bouncer  .game-title { color: var(--cyan);    text-shadow: 0 0 12px rgba(0,200,200,0.4); }
+    .game-section.galactic .game-title { color: var(--magenta); text-shadow: 0 0 12px rgba(200,50,200,0.4); }
+    .game-section.serpent  .game-title { color: var(--green);   text-shadow: 0 0 12px rgba(50,200,50,0.4); }
+
+    .game-section.rally    .section-body { border-left-color: rgba(220,50,50,0.3); }
+    .game-section.bouncer  .section-body { border-left-color: rgba(0,200,200,0.3); }
+    .game-section.galactic .section-body { border-left-color: rgba(200,50,200,0.3); }
+    .game-section.serpent  .section-body { border-left-color: rgba(50,200,50,0.3); }
+
+    .impl-label {
+      font-size: 9px;
+      letter-spacing: 4px;
+      color: #444;
+      text-transform: uppercase;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+
+    .impl-list {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 20px 0;
+    }
+    .impl-list li {
+      font-size: 11px;
+      line-height: 1.7;
+      letter-spacing: .5px;
+      color: #666;
+      padding: 4px 0;
+      border-bottom: 1px solid #111;
+    }
+    .impl-list li:last-child { border-bottom: none; }
+    .impl-list li::before {
+      content: '\25BA';
+      margin-right: 8px;
+      color: #333;
+    }
+
+    .inline-link {
+      color: var(--orange);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(217,119,87,0.3);
+      transition: border-color .2s, color .2s;
+    }
+    .inline-link:hover {
+      color: #f0a882;
+      border-bottom-color: rgba(217,119,87,0.8);
+    }
+
+    .game-section.rally    .inline-link { color: var(--red);     border-bottom-color: rgba(220,50,50,0.3); }
+    .game-section.rally    .inline-link:hover { color: #f07070; border-bottom-color: rgba(220,50,50,0.8); }
+    .game-section.bouncer  .inline-link { color: var(--cyan);    border-bottom-color: rgba(0,200,200,0.3); }
+    .game-section.bouncer  .inline-link:hover { color: #40e0e0; border-bottom-color: rgba(0,200,200,0.8); }
+    .game-section.galactic .inline-link { color: var(--magenta); border-bottom-color: rgba(200,50,200,0.3); }
+    .game-section.galactic .inline-link:hover { color: #e070e0; border-bottom-color: rgba(200,50,200,0.8); }
+    .game-section.serpent  .inline-link { color: var(--green);   border-bottom-color: rgba(50,200,50,0.3); }
+    .game-section.serpent  .inline-link:hover { color: #70e070; border-bottom-color: rgba(50,200,50,0.8); }
+
+    .studios { display: flex; flex-direction: column; gap: 0; }
+    .studio { padding: 20px 0; border-bottom: 1px solid #111; }
+    .studio:last-child { border-bottom: none; }
+    .studio-name {
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 5px;
+      color: #ddd;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .studio-dates {
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: #444;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .studio p {
+      font-size: 12px;
+      line-height: 1.85;
+      letter-spacing: .5px;
+      color: #777;
+    }
+
+    .lang-switcher {
+      position: fixed;
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: row;
+      gap: 4px;
+      align-items: center;
+    }
+    .lang-btn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      line-height: 1;
+      padding: 3px 0;
+      cursor: pointer;
+      opacity: 0.35;
+      transition: opacity .15s, filter .15s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .lang-btn:hover:not(.active) { opacity: 0.65; }
+    .lang-btn.active {
+      opacity: 1;
+      filter: drop-shadow(0 0 5px var(--green));
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <nav class="topnav">
+    <a class="back-link" href="index.html">&#8592; <span data-i18n="backLink">ARCADE</span></a>
+  </nav>
+
+  <h1>HISTORY</h1>
+  <h2 data-i18n="pageSubtitle">THE GAMES BEHIND THE GAMES</h2>
+
+  <section class="intro">
+    <p data-i18n="introP1">
+      The four games in BLIP ARCADE did not arrive from nowhere.
+      Each one is the shadow of a game that changed the industry —
+      designed under impossible constraints by engineers who were,
+      in many cases, inventing the medium as they went.
+    </p>
+    <p data-i18n="introP2">
+      This page traces where they came from: the studios that built them,
+      the people who designed them, and the small decisions that
+      became the foundations of an entire art form.
+    </p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="section-label" data-i18n="studiosLabel">► The studios</div>
+    <div class="section-body">
+      <div class="studios">
+
+        <div class="studio">
+          <div class="studio-name">Atari</div>
+          <div class="studio-dates" data-i18n="atariDates">Founded 1972 &mdash; Sunnyvale, California</div>
+          <p data-i18n="atariP">Nolan Bushnell and Ted Dabney founded Atari with $250 in capital and a single engineer, Allan Alcorn, whose training project — a table-tennis simulation — became Pong. In four years the company went from a rented cheese factory to the fastest-growing company in American history. Atari defined the arcade era and later the home console market with the Atari 2600. Two games in BLIP ARCADE trace their lineage directly to Atari: Rally (Pong, 1972) and Bouncer (Breakout, 1976).</p>
+        </div>
+
+        <div class="studio">
+          <div class="studio-name">Taito Corporation</div>
+          <div class="studio-dates" data-i18n="taitoDates">Founded 1953 &mdash; Tokyo, Japan</div>
+          <p data-i18n="taitoP">Taito began as a vending machine and jukebox importer. By the late 1970s it was one of the dominant forces in Japanese arcade gaming. Tomohiro Nishikado, a staff engineer with no formal game design training, spent nearly a year hand-designing the hardware and software for Space Invaders (1978). The game caused a national coin shortage in Japan and exported the arcade boom to the rest of the world. Galactic Defender in BLIP ARCADE is inspired by that work.</p>
+        </div>
+
+        <div class="studio">
+          <div class="studio-name">Gremlin Industries &amp; Nokia</div>
+          <div class="studio-dates" data-i18n="gremlinDates">1976 / 1997</div>
+          <p data-i18n="gremlinP">The snake concept was born at Gremlin Industries as Blockade (1976), a two-player arcade game where each player's trail became an obstacle. The mechanic lay dormant for two decades until Nokia engineer Taneli Armanto wrote a solo version for the Nokia 6110 in 1997. Preinstalled on hundreds of millions of handsets, Snake became one of the most widely played games in history before smartphones existed. Serpent in BLIP ARCADE follows that thread.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="section-label" data-i18n="bookLabel">► Learn more: Code the Classics</div>
+    <div class="section-body">
+      <p data-i18n="bookP1">If you want to understand the algorithms behind these games — the collision detection, the sprite rendering, the enemy AI — the best starting point is <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a> (Raspberry Pi Press, 2019), edited by Eben Upton and David Crookes.</p>
+      <p data-i18n="bookP2">The book rebuilds games like Boing! (Pong), Cavern (Manic Miner), and Infinite Bunner (Frogger) in Python, explaining every algorithmic decision along the way. It is not a nostalgic coffee-table book — it is a working technical guide with full source code for each title. A second volume followed in 2022 and is available at <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-ii" target="_blank" rel="noopener">magazine.raspberrypi.com</a>.</p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== RALLY ====== -->
+  <section class="game-section rally">
+    <div class="game-header">
+      <div class="game-title">Rally</div>
+      <div class="game-origin" data-i18n="rallyOrigin">Based on Pong &mdash; Atari, 1972</div>
+    </div>
+    <h2 style="margin-bottom:24px;" data-i18n="rallySub">THE FIRST COMMERCIALLY SUCCESSFUL ARCADE GAME</h2>
+    <div class="section-body">
+      <p data-i18n="rallyP1">Nolan Bushnell hired Allan Alcorn in 1972 as his first engineer and gave him a simple brief: build a table-tennis game as a learning exercise. Alcorn added an AI opponent, a scoring system, and a ball that changed angle based on where it struck the paddle — none of which Bushnell had asked for. The result was Pong, installed in a Sunnyvale bar called Andy Capp&#39;s Tavern. It stopped working within two days. The coin box was overflowing.</p>
+      <p data-i18n="rallyP2">Pong was not the first video game, but it was the first to reach mainstream audiences. The 1975 home version became Sears&#39; best-selling product that Christmas. Its physics model — a ball whose angle and speed vary with paddle position — remains the template for every digital table-tennis game made since.</p>
+      <div class="impl-label" data-i18n="implLabel">► Other implementations online</div>
+      <ul class="impl-list">
+        <li data-i18n="rallyImpl1"><a class="inline-link" href="https://www.ponggame.org" target="_blank" rel="noopener">ponggame.org</a> — A faithful browser-based Pong with single and two-player modes.</li>
+        <li data-i18n="rallyImpl2"><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=pong" target="_blank" rel="noopener">MIT Scratch &mdash; Pong projects</a> — Hundreds of community-built variants, many with annotated source code.</li>
+        <li data-i18n="rallyImpl3"><a class="inline-link" href="https://github.com/search?q=pong+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Pong repositories</a> — Open-source implementations in JavaScript, C, Python and more, sortable by stars.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== BOUNCER ====== -->
+  <section class="game-section bouncer">
+    <div class="game-header">
+      <div class="game-title">Bouncer</div>
+      <div class="game-origin" data-i18n="bouncerOrigin">Based on Breakout &mdash; Atari, 1976</div>
+    </div>
+    <h2 style="margin-bottom:24px;" data-i18n="bouncerSub">BUILT IN FOUR DAYS BY APPLE&#39;S FUTURE FOUNDERS</h2>
+    <div class="section-body">
+      <p data-i18n="bouncerP1">Breakout was designed by Nolan Bushnell and Steve Bristow in 1975. Bushnell offered Steve Jobs a bonus to minimise the number of chips on the board — the fewer the chips, the larger the bonus. Jobs hired his friend Steve Wozniak, who redesigned the entire circuit to use 46 chips (well below the typical 150–170) over four days of around-the-clock work. Jobs told Wozniak the bonus was $700 and paid him $350. The actual bonus was $5,000. Wozniak did not learn this until years later.</p>
+      <p data-i18n="bouncerP2">Wozniak&#39;s chip-reduction techniques proved too complex to manufacture at scale, and Atari quietly released a standard version instead. The game itself was a sensation: take Pong, add bricks, remove the second paddle. Its mechanic — clearing a field by angle and momentum — inspired Arkanoid (1986) and an entire genre of physics-based puzzle games.</p>
+      <div class="impl-label" data-i18n="implLabel">► Other implementations online</div>
+      <ul class="impl-list">
+        <li data-i18n="bouncerImpl1"><a class="inline-link" href="https://www.crazygames.com/game/breakout" target="_blank" rel="noopener">CrazyGames &mdash; Breakout</a> — Clean browser playable with multiple levels and power-ups.</li>
+        <li data-i18n="bouncerImpl2"><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=breakout" target="_blank" rel="noopener">MIT Scratch &mdash; Breakout projects</a> — Community implementations ranging from faithful recreations to creative variants.</li>
+        <li data-i18n="bouncerImpl3"><a class="inline-link" href="https://github.com/search?q=breakout+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Breakout repositories</a> — Open-source Breakout and Arkanoid clones, including full HTML5 Canvas tutorials.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== GALACTIC DEFENDER ====== -->
+  <section class="game-section galactic">
+    <div class="game-header">
+      <div class="game-title">Galactic Defender</div>
+      <div class="game-origin" data-i18n="galacticOrigin">Based on Space Invaders &mdash; Taito, 1978</div>
+    </div>
+    <h2 style="margin-bottom:24px;" data-i18n="galacticSub">THE GAME THAT CAUSED A COIN SHORTAGE</h2>
+    <div class="section-body">
+      <p data-i18n="galacticP1">Tomohiro Nishikado spent nearly a year designing the hardware and software for Space Invaders simultaneously — the existing microprocessors were not fast enough to move many objects, so he designed a custom CPU. The aliens moved faster as their numbers dwindled, an artefact of the hardware running fewer calculations per frame rather than a deliberate design decision. Players found the mechanic so compelling that Nishikado kept it.</p>
+      <p data-i18n="galacticP2">Space Invaders reached Japan in 1978 and caused a nationwide shortage of 100-yen coins. Banks had to triple production. When Atari licensed it for the 2600 in 1980, it became the first killer app for a home console — quadrupling 2600 sales. The game introduced persistent high scores, the first attempt at in-game tension through music, and the concept of a wave of enemies as a pacing mechanism.</p>
+      <div class="impl-label" data-i18n="implLabel">► Other implementations online</div>
+      <ul class="impl-list">
+        <li data-i18n="galacticImpl1"><a class="inline-link" href="https://freeinvaders.org" target="_blank" rel="noopener">freeinvaders.org</a> — Browser-based Space Invaders with optional touch controls.</li>
+        <li data-i18n="galacticImpl2"><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=space+invaders" target="_blank" rel="noopener">MIT Scratch &mdash; Space Invaders projects</a> — Dozens of community implementations, many from computer science classrooms.</li>
+        <li data-i18n="galacticImpl3"><a class="inline-link" href="https://github.com/search?q=space+invaders+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Space Invaders repositories</a> — Open-source clones in JavaScript, Rust, C++ and Python, many with full writeups.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== SERPENT ====== -->
+  <section class="game-section serpent">
+    <div class="game-header">
+      <div class="game-title">Serpent</div>
+      <div class="game-origin" data-i18n="serpentOrigin">Based on Snake &mdash; Nokia, 1997 (concept: Gremlin, 1976)</div>
+    </div>
+    <h2 style="margin-bottom:24px;" data-i18n="serpentSub">FROM ARCADE CABINET TO FOUR BILLION PHONES</h2>
+    <div class="section-body">
+      <p data-i18n="serpentP1">The snake mechanic began as Blockade, a two-player arcade game released by Gremlin Industries in 1976. Players steered trails that grew longer with each move; touching a trail meant death. The concept spread through numerous clones — Nibbler (Rock-Ola, 1982) made it a solo survival game and introduced the score-per-pellet structure that Nokia would later inherit.</p>
+      <p data-i18n="serpentP2">In 1997, Nokia engineer Taneli Armanto was tasked with creating a game for the Nokia 6110. The phone had a monochrome display, no touchscreen, and a numpad. Armanto wrote Snake in a matter of weeks. Nokia preinstalled it on the 6110 and its successors; by the early 2000s an estimated 350 million handsets carried it, making Snake one of the most distributed games in history — entirely without an app store, a download, or a purchase.</p>
+      <div class="impl-label" data-i18n="implLabel">► Other implementations online</div>
+      <ul class="impl-list">
+        <li data-i18n="serpentImpl1"><a class="inline-link" href="https://playsnake.org" target="_blank" rel="noopener">playsnake.org</a> — A clean browser Snake with a classic Nokia-style look and feel.</li>
+        <li data-i18n="serpentImpl2"><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=snake" target="_blank" rel="noopener">MIT Scratch &mdash; Snake projects</a> — The most common first-game project in computer science education, hundreds of examples.</li>
+        <li data-i18n="serpentImpl3"><a class="inline-link" href="https://github.com/search?q=snake+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Snake repositories</a> — Implementations ranging from 20-line minimal versions to AI-controlled solvers.</li>
+      </ul>
+    </div>
+  </section>
+
+</div>
+
+  <div class="lang-switcher">
+    <button class="lang-btn" data-lang="en">🇬🇧</button>
+    <button class="lang-btn" data-lang="ja">🇯🇵</button>
+    <button class="lang-btn" data-lang="da">🇩🇰</button>
+  </div>
+
+  <div id="kiosk-bar" class="kiosk-bar">
+    <a class="kiosk-btn" href="index.html">&#8592; GAMES</a>
+    <span id="kiosk-coins-hud" class="kiosk-hud" data-coins-hud></span>
+    <button class="kiosk-btn" id="kiosk-insert-btn">► INSERT COIN</button>
+  </div>
+
+  <script src="kiosk.js"></script>
+  <script>
+    var i18n = {
+
+      en: {
+        backLink:       'ARCADE',
+        pageSubtitle:   'THE GAMES BEHIND THE GAMES',
+        introP1:        'The four games in BLIP ARCADE did not arrive from nowhere. Each one is the shadow of a game that changed the industry — designed under impossible constraints by engineers who were, in many cases, inventing the medium as they went.',
+        introP2:        'This page traces where they came from: the studios that built them, the people who designed them, and the small decisions that became the foundations of an entire art form.',
+        studiosLabel:   '► The studios',
+        atariDates:     'Founded 1972 — Sunnyvale, California',
+        atariP:         'Nolan Bushnell and Ted Dabney founded Atari with $250 in capital and a single engineer, Allan Alcorn, whose training project — a table-tennis simulation — became Pong. In four years the company went from a rented cheese factory to the fastest-growing company in American history. Atari defined the arcade era and later the home console market with the Atari 2600. Two games in BLIP ARCADE trace their lineage directly to Atari: Rally (Pong, 1972) and Bouncer (Breakout, 1976).',
+        taitoDates:     'Founded 1953 — Tokyo, Japan',
+        taitoP:         'Taito began as a vending machine and jukebox importer. By the late 1970s it was one of the dominant forces in Japanese arcade gaming. Tomohiro Nishikado, a staff engineer with no formal game design training, spent nearly a year hand-designing the hardware and software for Space Invaders (1978). The game caused a national coin shortage in Japan and exported the arcade boom to the rest of the world. Galactic Defender in BLIP ARCADE is inspired by that work.',
+        gremlinDates:   '1976 / 1997',
+        gremlinP:       'The snake concept was born at Gremlin Industries as Blockade (1976), a two-player arcade game where each player\'s trail became an obstacle. The mechanic lay dormant for two decades until Nokia engineer Taneli Armanto wrote a solo version for the Nokia 6110 in 1997. Preinstalled on hundreds of millions of handsets, Snake became one of the most widely played games in history before smartphones existed. Serpent in BLIP ARCADE follows that thread.',
+        bookLabel:      '► Learn more: Code the Classics',
+        bookP1:         'If you want to understand the algorithms behind these games — the collision detection, the sprite rendering, the enemy AI — the best starting point is <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a> (Raspberry Pi Press, 2019), edited by Eben Upton and David Crookes.',
+        bookP2:         'The book rebuilds games like Boing! (Pong), Cavern (Manic Miner), and Infinite Bunner (Frogger) in Python, explaining every algorithmic decision along the way. It is not a nostalgic coffee-table book — it is a working technical guide with full source code for each title. A second volume followed in 2022 and is available at <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-ii" target="_blank" rel="noopener">magazine.raspberrypi.com</a>.',
+        rallyOrigin:    'Based on Pong — Atari, 1972',
+        rallySub:       'THE FIRST COMMERCIALLY SUCCESSFUL ARCADE GAME',
+        rallyP1:        'Nolan Bushnell hired Allan Alcorn in 1972 as his first engineer and gave him a simple brief: build a table-tennis game as a learning exercise. Alcorn added an AI opponent, a scoring system, and a ball that changed angle based on where it struck the paddle — none of which Bushnell had asked for. The result was Pong, installed in a Sunnyvale bar called Andy Capp\'s Tavern. It stopped working within two days. The coin box was overflowing.',
+        rallyP2:        'Pong was not the first video game, but it was the first to reach mainstream audiences. The 1975 home version became Sears\' best-selling product that Christmas. Its physics model — a ball whose angle and speed vary with paddle position — remains the template for every digital table-tennis game made since.',
+        implLabel:      '► Other implementations online',
+        rallyImpl1:     '<a class="inline-link" href="https://www.ponggame.org" target="_blank" rel="noopener">ponggame.org</a> — A faithful browser-based Pong with single and two-player modes.',
+        rallyImpl2:     '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=pong" target="_blank" rel="noopener">MIT Scratch — Pong projects</a> — Hundreds of community-built variants, many with annotated source code.',
+        rallyImpl3:     '<a class="inline-link" href="https://github.com/search?q=pong+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Pong repositories</a> — Open-source implementations in JavaScript, C, Python and more, sortable by stars.',
+        bouncerOrigin:  'Based on Breakout — Atari, 1976',
+        bouncerSub:     'BUILT IN FOUR DAYS BY APPLE\'S FUTURE FOUNDERS',
+        bouncerP1:      'Breakout was designed by Nolan Bushnell and Steve Bristow in 1975. Bushnell offered Steve Jobs a bonus to minimise the number of chips on the board — the fewer the chips, the larger the bonus. Jobs hired his friend Steve Wozniak, who redesigned the entire circuit to use 46 chips (well below the typical 150–170) over four days of around-the-clock work. Jobs told Wozniak the bonus was $700 and paid him $350. The actual bonus was $5,000. Wozniak did not learn this until years later.',
+        bouncerP2:      'Wozniak\'s chip-reduction techniques proved too complex to manufacture at scale, and Atari quietly released a standard version instead. The game itself was a sensation: take Pong, add bricks, remove the second paddle. Its mechanic — clearing a field by angle and momentum — inspired Arkanoid (1986) and an entire genre of physics-based puzzle games.',
+        bouncerImpl1:   '<a class="inline-link" href="https://www.crazygames.com/game/breakout" target="_blank" rel="noopener">CrazyGames — Breakout</a> — Clean browser playable with multiple levels and power-ups.',
+        bouncerImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=breakout" target="_blank" rel="noopener">MIT Scratch — Breakout projects</a> — Community implementations ranging from faithful recreations to creative variants.',
+        bouncerImpl3:   '<a class="inline-link" href="https://github.com/search?q=breakout+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Breakout repositories</a> — Open-source Breakout and Arkanoid clones, including full HTML5 Canvas tutorials.',
+        galacticOrigin: 'Based on Space Invaders — Taito, 1978',
+        galacticSub:    'THE GAME THAT CAUSED A COIN SHORTAGE',
+        galacticP1:     'Tomohiro Nishikado spent nearly a year designing the hardware and software for Space Invaders simultaneously — the existing microprocessors were not fast enough to move many objects, so he designed a custom CPU. The aliens moved faster as their numbers dwindled, an artefact of the hardware running fewer calculations per frame rather than a deliberate design decision. Players found the mechanic so compelling that Nishikado kept it.',
+        galacticP2:     'Space Invaders reached Japan in 1978 and caused a nationwide shortage of 100-yen coins. Banks had to triple production. When Atari licensed it for the 2600 in 1980, it became the first killer app for a home console — quadrupling 2600 sales. The game introduced persistent high scores, the first attempt at in-game tension through music, and the concept of a wave of enemies as a pacing mechanism.',
+        galacticImpl1:  '<a class="inline-link" href="https://freeinvaders.org" target="_blank" rel="noopener">freeinvaders.org</a> — Browser-based Space Invaders with optional touch controls.',
+        galacticImpl2:  '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=space+invaders" target="_blank" rel="noopener">MIT Scratch — Space Invaders projects</a> — Dozens of community implementations, many from computer science classrooms.',
+        galacticImpl3:  '<a class="inline-link" href="https://github.com/search?q=space+invaders+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Space Invaders repositories</a> — Open-source clones in JavaScript, Rust, C++ and Python, many with full writeups.',
+        serpentOrigin:  'Based on Snake — Nokia, 1997 (concept: Gremlin, 1976)',
+        serpentSub:     'FROM ARCADE CABINET TO FOUR BILLION PHONES',
+        serpentP1:      'The snake mechanic began as Blockade, a two-player arcade game released by Gremlin Industries in 1976. Players steered trails that grew longer with each move; touching a trail meant death. The concept spread through numerous clones — Nibbler (Rock-Ola, 1982) made it a solo survival game and introduced the score-per-pellet structure that Nokia would later inherit.',
+        serpentP2:      'In 1997, Nokia engineer Taneli Armanto was tasked with creating a game for the Nokia 6110. The phone had a monochrome display, no touchscreen, and a numpad. Armanto wrote Snake in a matter of weeks. Nokia preinstalled it on the 6110 and its successors; by the early 2000s an estimated 350 million handsets carried it, making Snake one of the most distributed games in history — entirely without an app store, a download, or a purchase.',
+        serpentImpl1:   '<a class="inline-link" href="https://playsnake.org" target="_blank" rel="noopener">playsnake.org</a> — A clean browser Snake with a classic Nokia-style look and feel.',
+        serpentImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=snake" target="_blank" rel="noopener">MIT Scratch — Snake projects</a> — The most common first-game project in computer science education, hundreds of examples.',
+        serpentImpl3:   '<a class="inline-link" href="https://github.com/search?q=snake+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Snake repositories</a> — Implementations ranging from 20-line minimal versions to AI-controlled solvers.'
+      },
+
+      da: {
+        backLink:       'ARKADE',
+        pageSubtitle:   'SPILLENE BAG SPILLENE',
+        introP1:        'De fire spil i BLIP ARCADE er ikke opstået ud af ingenting. Hvert enkelt er skyggen af et spil, der forandrede branchen — designet under umulige begrænsninger af ingeiniører, der i mange tilfælde opfandt mediet, mens de gik.',
+        introP2:        'Denne side følger sporene: studierne der byggede dem, menneskene der designede dem, og de små beslutninger der blev grundstenen i en hel kunstform.',
+        studiosLabel:   '► Studierne',
+        atariDates:     'Grundlagt 1972 — Sunnyvale, Californien',
+        atariP:         'Nolan Bushnell og Ted Dabney grundlagde Atari med 250 dollars i kapital og en enkelt ingeiniør, Allan Alcorn, hvis træningsprojekt — en bordtennissimulation — blev til Pong. På fire år gik virksomheden fra et lejet ostemarked til det hurtigst voksende selskab i amerikansk historie. Atari definerede arkadeæraen og siden hjemmekonsolmarkedet med Atari 2600. To spil i BLIP ARCADE stammer direkte fra Atari: Rally (Pong, 1972) og Bouncer (Breakout, 1976).',
+        taitoDates:     'Grundlagt 1953 — Tokyo, Japan',
+        taitoP:         'Taito begyndte som importør af automater og jukebokse. I slutningen af 1970\'erne var virksomheden en af de dominerende kræfter i japansk arkadeunderholding. Tomohiro Nishikado, en stab af ingeiniører uden formel spiluddannelse, brugte næsten et år på at designe hardwaren og softwaren til Space Invaders (1978). Spillet forårsagede en national møntmangel i Japan og eksporterede arkadebølgen til resten af verden. Galactic Defender i BLIP ARCADE er inspireret af dette arbejde.',
+        gremlinDates:   '1976 / 1997',
+        gremlinP:       'Slangekonceptet opstå hos Gremlin Industries som Blockade (1976), et to-spillers arkadespil, hvor begge spilleres stier blev til forhindringer. Mekanikken lå ubrugt i to årtier, indtil Nokia-ingeiniøren Taneli Armanto i 1997 programmerede en soloversion til Nokia 6110. Forudinstalleret på hundredvis af millioner enheder blev Snake et af historiens mest udbredte spil — før smartphones eksisterede. Serpent i BLIP ARCADE følger denne tråd.',
+        bookLabel:      '► Lær mere: Code the Classics',
+        bookP1:         'Hvis du vil forstå algoritmerne bag disse spil — kollisionsdetektering, sprite-gengivelse, fjende-AI — er det bedste udgangspunkt <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a> (Raspberry Pi Press, 2019), redigeret af Eben Upton og David Crookes.',
+        bookP2:         'Bogen genopbygger spil som Boing! (Pong), Cavern (Manic Miner) og Infinite Bunner (Frogger) i Python og forklarer alle algoritmiske beslutninger undervejs. Det er ikke en nostalgisk billedbog — det er en velfungerende teknisk guide med fuld kildekode til hvert spil. Et andet bind fulgte i 2022 og er tilgængeligt på <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-ii" target="_blank" rel="noopener">magazine.raspberrypi.com</a>.',
+        rallyOrigin:    'Baseret på Pong — Atari, 1972',
+        rallySub:       'DET FØRSTE KOMMERCIELT SUCCESRIGE ARKADESPIL',
+        rallyP1:        'Nolan Bushnell ansatte Allan Alcorn i 1972 som sin første ingeiniør og gav ham en simpel opgave: byg et bordtennisspil som øvelse. Alcorn tilføjede en AI-modstander, et pointsystem og en bold, der skiftede vinkel afhængigt af, hvor den ramte ketcheren — ingen af delene havde Bushnell bedt om. Resultatet var Pong, installeret på en bar kaldet Andy Capp\'s Tavern i Sunnyvale. Den holdt op med at virke inden for to dage. Møntkassen var fuld til randen.',
+        rallyP2:        'Pong var ikke det første videospil, men det første der nåede et bredt publikum. Hjemmeversionen fra 1975 blev Sears\' bedst sælgende produkt den jul. Dens fysikmodel — en bold hvis vinkel og hastighed varierer med ketcherens placering — er stadig skabelonen for ethvert digitalt bordtennisspil siden.',
+        implLabel:      '► Andre implementeringer online',
+        rallyImpl1:     '<a class="inline-link" href="https://www.ponggame.org" target="_blank" rel="noopener">ponggame.org</a> — En trofæst browserbaseret Pong med en og to spillere.',
+        rallyImpl2:     '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=pong" target="_blank" rel="noopener">MIT Scratch — Pong-projekter</a> — Hundredvis af community-opbyggede varianter, mange med kommenteret kildekode.',
+        rallyImpl3:     '<a class="inline-link" href="https://github.com/search?q=pong+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Pong-repositories</a> — Open source-implementeringer i JavaScript, C, Python og mere.',
+        bouncerOrigin:  'Baseret på Breakout — Atari, 1976',
+        bouncerSub:     'BYGGET PÅ FIRE DAGE AF APPLES FREMTIDIGE GRUNDLÆGGERE',
+        bouncerP1:      'Breakout blev designet af Nolan Bushnell og Steve Bristow i 1975. Bushnell tilbød Steve Jobs en bonus for at minimere antallet af chips på printet — jo færre chips, jo større bonus. Jobs hyrede sin ven Steve Wozniak, som redesignede hele kredsløbet til 46 chips (langt under de typiske 150–170) over fire dage med næsten ingen søvn. Jobs fortalte Wozniak, at bonussen var 700 dollars, og betalte ham 350. Den faktiske bonus var 5.000 dollars. Wozniak fandt ikke ud af det før år senere.',
+        bouncerP2:      'Wozniaks chipreduktionsmetoder viste sig for komplekse at fremstille i stor skala, og Atari frigav stille og roligt en standardversion i stedet. Selve spillet var en sensation: tag Pong, tilføj klodser, fjern det andet bat. Dets mekanik — rydning af et felt via vinkel og momentum — inspirerede Arkanoid (1986) og en hel genre af fysikbaserede puslespil.',
+        bouncerImpl1:   '<a class="inline-link" href="https://www.crazygames.com/game/breakout" target="_blank" rel="noopener">CrazyGames — Breakout</a> — Browservenlig med flere niveauer og powerups.',
+        bouncerImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=breakout" target="_blank" rel="noopener">MIT Scratch — Breakout-projekter</a> — Community-implementeringer fra trofæste genskabelser til kreative varianter.',
+        bouncerImpl3:   '<a class="inline-link" href="https://github.com/search?q=breakout+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Breakout-repositories</a> — Open source Breakout- og Arkanoid-kloner, herunder fulde HTML5 Canvas-vejledninger.',
+        galacticOrigin: 'Baseret på Space Invaders — Taito, 1978',
+        galacticSub:    'SPILLET DER FORÅRSAGEDE MØNTMANGEL',
+        galacticP1:     'Tomohiro Nishikado brugte næsten et år på at designe hardware og software til Space Invaders samtidigt — de eksisterende mikroprocessorer var ikke hurtige nok til at bevæge mange objekter, så han designede en specialbygget CPU. Aliens bevægede sig hurtigere, efterhånden som antallet faldt — en artefakt fra hardwaren der beregner færre operationer per frame snarere end en bevidst designbeslutning. Spillerne fandt mekanikken så overbevisende, at Nishikado beholdt den.',
+        galacticP2:     'Space Invaders nåede Japan i 1978 og forårsagede en landsomfattende mangel på 100-yen-mønter. Banker måtte tredoble produktionen. Da Atari licenserede det til 2600 i 1980, blev det den første killer app til en hjemmekonsol — og firedoblet salget af 2600. Spillet introducerede vedvarende rekorder, det første forsøg på in-game spænding via musik og konceptet med en bølge af fjender som tempogivende mekanisme.',
+        galacticImpl1:  '<a class="inline-link" href="https://freeinvaders.org" target="_blank" rel="noopener">freeinvaders.org</a> — Browserbaseret Space Invaders med valgfri touch-betjening.',
+        galacticImpl2:  '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=space+invaders" target="_blank" rel="noopener">MIT Scratch — Space Invaders-projekter</a> — Snesevis af community-implementeringer, mange fra datalogiklasser.',
+        galacticImpl3:  '<a class="inline-link" href="https://github.com/search?q=space+invaders+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Space Invaders-repositories</a> — Open source-kloner i JavaScript, Rust, C++ og Python, mange med fulde artikler.',
+        serpentOrigin:  'Baseret på Snake — Nokia, 1997 (koncept: Gremlin, 1976)',
+        serpentSub:     'FRA ARKADESKAB TIL FIRE MILLIARDER TELEFONER',
+        serpentP1:      'Slangemekanikken opstå som Blockade, et to-spillers arkadespil udgivet af Gremlin Industries i 1976. Spillerne styrede spor, der voksede med hvert træk; at røre et spor betød død. Konceptet spredte sig via adskillige kloner — Nibbler (Rock-Ola, 1982) gjorde det til et solooverlegelsesspil og introducerede point-per-kugle-strukturen, som Nokia siden arvede.',
+        serpentP2:      'I 1997 fik Nokia-ingeiniøren Taneli Armanto til opgave at lave et spil til Nokia 6110. Telefonen havde en monokrom skærm, ingen touchskærm og et numpad. Armanto programmerede Snake på få uger. Nokia forudinstallerede det på 6110 og efterfølgere; i begyndelsen af 2000\'erne bar anslået 350 millioner enheder det — og Snake blev et af historiens mest udbredte spil, helt uden app-butik, download eller køb.',
+        serpentImpl1:   '<a class="inline-link" href="https://playsnake.org" target="_blank" rel="noopener">playsnake.org</a> — En simpel browser-Snake med klassisk Nokia-stil.',
+        serpentImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=snake" target="_blank" rel="noopener">MIT Scratch — Snake-projekter</a> — Det mest almindelige førstespilsprojekt i datalogi, hundredvis af eksempler.',
+        serpentImpl3:   '<a class="inline-link" href="https://github.com/search?q=snake+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Snake-repositories</a> — Implementeringer fra minimale 20-linjers versioner til AI-styrede løsere.'
+      },
+
+      ja: {
+        backLink:       'アーケード',
+        pageSubtitle:   'ゲームの源流',
+        introP1:        'BLIP ARCADEの4つのゲームは突然生まれたわけではありません。それぞれが、業界を変えたゲームの影です——不可能な制約の中でデザインされ、多くの場合、メディアそのものを発明しながら作り上げた人々によって。',
+        introP2:        'このページでは、その出自を追います。開発したスタジオ、デザインした人々、そして一つの術形式全体の影となった小さな決断の数々を。',
+        studiosLabel:   '► スタジオ紹介',
+        atariDates:     '1972年設立 — カリフォルニア州サニーベール',
+        atariP:         'ノーラン・ブッシュネルとテッド・ダブニーは250ドルの資本とエンジニア一人、アラン・アルコーンを携えてAtariを設立しました。アルコーンの練習課題として作られた亓球シミュレーションがPongとなりました。四年間でこの会社はレンタルしたチーズ工場からアメリカ史上最も急成長した企業へと飛躍しました。Atariはアーケードゲームの時代を定義し、後にAtari 2600でホームコンソール市場も定義しました。BLIP ARCADEの2つのゲームがAtariに直接由来します：Rally（Pong、1972年）とBouncer（Breakout、1976年）。',
+        taitoDates:     '1953年設立 — 東京、日本',
+        taitoP:         'タイトーは自動販売機とジュークボックスの輸入業者として事業を始めました。1970年代後半には日本のアーケードゲーム産業の主要な勢力の一つとなっていました。正式なゲームデザインの訓練を受けていないスタッフエンジニアの西角友宮は、スペースインベーダー（1978年）のハードウェアとソフトウェアの設計に約1年を費やしました。このゲームは日本で100円硬貨の全国的な不足を引き起こし、アーケードブームを世界中へ輸出しました。BLIP ARCADEのGalactic Defenderはその作品から着想を得ています。',
+        gremlinDates:   '1976年 / 1997年',
+        gremlinP:       '蛇のコンセプトはGremlin IndustriesのBlockade（1976年）として誕生しました。プレイヤーが自分の軌跡を伸ばしながら操作する2人用アーケードゲームで、相手の軌跡に触れると負けというものでした。このメカニクは20年間眠っていましたが、1997年にNokiaのエンジニア、タネリ・アルマントがNokia 6110用にソロバージョンを制作しました。何億台ものハンドセットにプリインストールされたSnakeは、スマートフォンが存在する前から歴史上最も広くプレイされたゲームの一つになりました。BLIP ARCADEのSerpentはその系譜を受け継いでいます。',
+        bookLabel:      '► さらに学ぶ：Code the Classics',
+        bookP1:         'これらのゲームの背後にあるアルゴリズム——衝突検出、スプライト描画、敵のAI——を理解したいなら、最良の出発点は<a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a>（Raspberry Pi Press、2019年）です。エベン・アプトンとデイヴィッド・クルークス編著。',
+        bookP2:         'この本はBoing!（Pong）、Cavern（Manic Miner）、Infinite Bunner（Frogger）などのゲームをPythonで再構築し、すべてのアルゴリズム的決断を丁寧に解説しています。懐かしのコーヒーテーブル本ではありません——各タイトルの完全なソースコードを含む実用的な技術ガイドです。第2巻は2022年に刊行され、<a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-ii" target="_blank" rel="noopener">magazine.raspberrypi.com</a>から入手できます。',
+        rallyOrigin:    'Pongを原典として — Atari、1972年',
+        rallySub:       '最初の商業的に成功したアーケードゲーム',
+        rallyP1:        'ノーラン・ブッシュネルは1972年に最初のエンジニアとしてアラン・アルコーンを雇用し、シンプルな課題を与えました：練習として亓球ゲームを作りなさい。アルコーンはAI対戦相手、スコアリングシステム、そしてパドルのどこに当たったかによって角度が変わるボールを追加しました——ブッシュネルが頼んだものは何一つありませんでした。でき上がったのがPongで、サニーベールのAndy Capp\'s Tavernというバーに設置されました。2日以内に故障しました。コイン凥が湢れていたのです。',
+        rallyP2:        'Pongは最初のビデオゲームではありませんでしたが、一般大衆に届いた最初のゲームでした。1975年のホーム版はそのクリスマスにシアーズの最売れ商品になりました。その物理モデル——パドルの位置によって角度と速度が変わるボール——はそれ以降のすべてのデジタル亓球ゲームの雛形として今も屋統5です。',
+        implLabel:      '► オンラインの他の実装例',
+        rallyImpl1:     '<a class="inline-link" href="https://www.ponggame.org" target="_blank" rel="noopener">ponggame.org</a> — 1人用・2人用モードを備えた忠実なブラウザ版Pong。',
+        rallyImpl2:     '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=pong" target="_blank" rel="noopener">MIT Scratch — Pongプロジェクト</a> — コメント付きソースコードを持つものも多い、コミュニティ製 Pongバリアントが数百件。',
+        rallyImpl3:     '<a class="inline-link" href="https://github.com/search?q=pong+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Pongリポジトリ</a> — JavaScript、C、Pythonなどのオープンソース実装、スター数でソート可能。',
+        bouncerOrigin:  'Breakoutを原典として — Atari、1976年',
+        bouncerSub:     'Appleの未来の創業者たちが4日で作ったゲーム',
+        bouncerP1:      'Breakoutは1975年にノーラン・ブッシュネルとスティーブ・ブリストウによって設計されました。ブッシュネルはスティーブ・ジョブズに基板のチップ数を最小化すれば報奨金を出すと提示しました。ジョブズは友人のスティーブ・ウォズニアックを雇い、ウォズニアックは四昨奈寄騰のすえ全回路を再設計してチップ数を（通常150、170毛を大幅に下回る）46栰にまで減らしました。ジョブズは報奨金は700ドルだとウォズニアックに伝え、350ドルを支払いました。実際の報奨金は5，000ドルでした。ウォズニアックが着たのは何年も後のことでした。',
+        bouncerP2:      'ウォズニアックのチップ削減技術は大量生産には複雑すぎることが判明し、Atariは静かに標準版をリリースしました。ゲーム自体は大ヒット：Pongにブロックを加え、2枚目のパドルを除いたモノ。角度と勢いでフィールドをクリアするそのメカニクはArkanoid（1986年）と物理パズルゲームというジャンル全体を生み出しました。',
+        bouncerImpl1:   '<a class="inline-link" href="https://www.crazygames.com/game/breakout" target="_blank" rel="noopener">CrazyGames — Breakout</a> — 複数レベルとパワーアップを備えたブラウザプレイ可能版。',
+        bouncerImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=breakout" target="_blank" rel="noopener">MIT Scratch — Breakoutプロジェクト</a> — 忠実な復元からクリエイティブな派生作まで、コミュニティ実装多数。',
+        bouncerImpl3:   '<a class="inline-link" href="https://github.com/search?q=breakout+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Breakoutリポジトリ</a> — HTML5 Canvasチュートリアルを含むオープンソースのBreakout・Arkanoidクローン。',
+        galacticOrigin: 'Space Invadersを原典として — Taito、1978年',
+        galacticSub:    '硬貨不足を引き起こしたゲーム',
+        galacticP1:     '西角友宮はスペースインベーダーのハードウェアとソフトウェアの設計にぁ1年を費やしました——既存のマイクロプロセッサは多くのオブジェクトを動かすのに十分な速度がなかったため、彼は専用CPUを設計しました。エイリアンの数が減るにつれて速く動くようになりました——意図的なデザイン決断ではなく、フレームごとの計算数が減ったハードウェアの副産物でした。プレイヤーがこのメカニクを魅力的だと感じたため、西角はそのまま残しました。',
+        galacticP2:     'スペースインベーダーは1978年に日本で登場し、100円硬貨の全国的な不足を引き起こしました。銀行は生産を、3倍に増やさなければなりませんでした。Atari。1980年に2600向けにライセンスを取得すると、それはホームコンソール最初のキラーアプリとなり、2600の売上を䗽倍にしました。このゲームは永続ハイスコア、音楽によるインゲーム緊張感の最初の試み、そしてペース調整メカニズムとしての敵の「波」の概念を導入しました。',
+        galacticImpl1:  '<a class="inline-link" href="https://freeinvaders.org" target="_blank" rel="noopener">freeinvaders.org</a> — タッチコントロール対応のブラウザ版Space Invaders。',
+        galacticImpl2:  '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=space+invaders" target="_blank" rel="noopener">MIT Scratch — Space Invadersプロジェクト</a> — コンピュータサイエンスの授業からのものを多く含むコミュニティ実装。',
+        galacticImpl3:  '<a class="inline-link" href="https://github.com/search?q=space+invaders+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Space Invadersリポジトリ</a> — JavaScript、Rust、C++、Pythonのオープンソースクローン、詳細な解説付きのものも多数。',
+        serpentOrigin:  'Snakeを原典として — Nokia、1997年（コンセプト：Gremlin、1976年）',
+        serpentSub:     'アーケードキャビネットから十四億台の携帯電話へ',
+        serpentP1:      '蛇のメカニクは1976年にGremlin IndustriesがリリースしたBlockadeとして誕生しました。プレイヤーが動くごとに長くなる軌跡を操縦するゲームで、軌跡に触れると死です。このコンセプトは多くのクローンを通じて広まり——Nibbler（Rock-Ola、1982年）がそれをソロサバイバルゲームにし、Nokiaが後に継承するエサごとのスコア構造を導入しました。',
+        serpentP2:      '1997年、NokiaのエンジニアTaneli ArmantoはNokia 6110用のゲームを作る任務を与えられました。その端末はモノクロ画面で、タッチスクリーンなし、テンキーのみでした。Armantは数週間でSnakeを書き上げました。Nokiaはこれの6110と後継機にプリインストールし、2000年代初頭には推定3億5000万台が搭載していました。Snakeはアプリストアもダウンロードも購入もなしに、歴史上最も普及したゲームの一つとなりました。',
+        serpentImpl1:   '<a class="inline-link" href="https://playsnake.org" target="_blank" rel="noopener">playsnake.org</a> — クラシックなノキアスタイルのブラウザ版Snake。',
+        serpentImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=snake" target="_blank" rel="noopener">MIT Scratch — Snakeプロジェクト</a> — コンピュータサイエンス教育で最も多い入門ゲームプロジェクト、数百件の例。',
+        serpentImpl3:   '<a class="inline-link" href="https://github.com/search?q=snake+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Snakeリポジトリ</a> — 20行のミニマル版からAI制御ソルバーまで様々な実装。'
+      }
+
+    };
+
+    function applyLang(lang) {
+      var t = i18n[lang];
+      if (!t) return;
+      document.querySelectorAll('[data-i18n]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n');
+        if (t[key] !== undefined) el.innerHTML = t[key];
+      });
+      document.querySelectorAll('.lang-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+      });
+      document.documentElement.lang = lang;
+      try { localStorage.setItem('blip-lang', lang); } catch(e) {}
+    }
+
+    document.querySelectorAll('.lang-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        applyLang(this.getAttribute('data-lang'));
+      });
+    });
+
+    (function() {
+      var saved = null;
+      try { saved = localStorage.getItem('blip-lang'); } catch(e) {}
+      var browserLang = (navigator.language || '').slice(0, 2).toLowerCase();
+      applyLang(saved || (i18n[browserLang] ? browserLang : 'en'));
+    })();
+  </script>
+</body>
+</html>

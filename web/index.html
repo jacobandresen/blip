@@ -331,12 +331,20 @@
 
     header, .divider, .game-grid, footer { position: relative; z-index: 1; }
 
-    /* ---- about badge ---- */
-    .about-badge {
+    /* ---- left badge group ---- */
+    .left-badges {
       position: fixed;
       bottom: calc(76px + env(safe-area-inset-bottom, 0px));
       left: 20px;
       z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    /* ---- about badge ---- */
+    .about-badge {
       display: flex;
       align-items: center;
       gap: 10px;
@@ -370,6 +378,48 @@
       white-space: nowrap;
       text-shadow: 0 0 8px #D97757;
       color: #D97757;
+    }
+
+    /* ---- history badge ---- */
+    .history-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: #888;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: color .2s;
+    }
+    .history-badge:hover { color: var(--yellow); }
+    .history-badge:hover .history-label {
+      opacity: 1;
+      transform: translateX(0);
+      text-shadow: 0 0 8px var(--yellow);
+      color: var(--yellow);
+    }
+    .history-badge:hover .history-avatar {
+      border-color: var(--yellow);
+      box-shadow: 0 0 12px rgba(230,220,50,0.45);
+      filter: none;
+    }
+    .history-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid #222;
+      display: block;
+      transition: border-color .2s, box-shadow .2s, filter .2s;
+      filter: grayscale(20%) brightness(0.7);
+    }
+    .history-label {
+      opacity: 0;
+      transform: translateX(-6px);
+      transition: opacity .2s, transform .2s;
+      white-space: nowrap;
+      text-shadow: 0 0 8px var(--yellow);
+      color: var(--yellow);
     }
 
     /* ---- mastodon badge ---- */
@@ -507,10 +557,16 @@
     <button class="lang-btn" data-lang="da">🇩🇰</button>
   </div>
 
-  <a class="about-badge" href="about.html">
-    <img class="about-avatar" src="claude-avatar.svg" alt="About this experiment">
-    <span class="about-label">ABOUT</span>
-  </a>
+  <div class="left-badges">
+    <a class="about-badge" href="about.html">
+      <img class="about-avatar" src="claude-avatar.svg" alt="About this experiment">
+      <span class="about-label">ABOUT</span>
+    </a>
+    <a class="history-badge" href="history.html">
+      <img class="history-avatar" src="history-icon.svg" alt="Game history">
+      <span class="history-label">HISTORY</span>
+    </a>
+  </div>
 
 
   <footer>
