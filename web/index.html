@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>BLIP ARCADE</title>
-  <link rel="stylesheet" href="kiosk.css">
+  <script src="audio-unlock.js"></script>
+  <link rel="stylesheet" href="kiosk.css?v=4">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -41,7 +42,7 @@
         rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px
       );
       pointer-events: none;
-      z-index: 9999;
+      z-index: 99;
     }
 
     /* vignette */
@@ -51,7 +52,7 @@
       inset: 0;
       background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.75) 100%);
       pointer-events: none;
-      z-index: 9998;
+      z-index: 98;
     }
 
     /* ---- header ---- */
@@ -65,35 +66,34 @@
 
     /* ---- language switcher ---- */
     .lang-switcher {
-      position: absolute;
-      top: 12px;
-      right: 0;
+      position: fixed;
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+      right: 20px;
+      z-index: 10000;
       display: flex;
-      gap: 5px;
+      flex-direction: row;
+      gap: 4px;
+      align-items: center;
     }
 
     .lang-btn {
       background: none;
-      border: 1px solid #222;
-      color: #3a3a3a;
-      font-family: inherit;
-      font-size: 10px;
-      letter-spacing: 1px;
-      padding: 5px 9px;
+      border: none;
+      font-size: 22px;
+      line-height: 1;
+      padding: 3px 0;
       cursor: pointer;
-      transition: color .15s, border-color .15s, text-shadow .15s;
-      text-transform: uppercase;
+      opacity: 0.35;
+      transition: opacity .15s, filter .15s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
 
-    .lang-btn:hover:not(.active) {
-      color: #777;
-      border-color: #444;
-    }
+    .lang-btn:hover:not(.active) { opacity: 0.65; }
 
     .lang-btn.active {
-      color: var(--green);
-      border-color: var(--green);
-      text-shadow: 0 0 8px var(--green);
+      opacity: 1;
+      filter: drop-shadow(0 0 5px var(--green));
     }
 
     /* ---- header text ---- */
@@ -145,32 +145,6 @@
 
     @keyframes blink-coin { 50% { opacity: 0; } }
 
-    @keyframes coin-flash {
-      0%   {
-        color: var(--yellow);
-        text-shadow: 0 0 10px var(--yellow);
-        box-shadow: none;
-      }
-      12%  {
-        color: #fff;
-        text-shadow:
-          0 0 6px  #fff,
-          0 0 20px #fff,
-          0 0 40px var(--yellow),
-          0 0 80px var(--yellow),
-          0 0 140px var(--yellow);
-        box-shadow:
-          0 0 20px var(--yellow),
-          0 0 50px var(--yellow),
-          0 0 90px color-mix(in srgb, var(--yellow) 50%, transparent);
-      }
-      100% {
-        color: var(--yellow);
-        text-shadow: 0 0 10px var(--yellow);
-        box-shadow: none;
-      }
-    }
-    .coin-flash { animation: coin-flash 0.65s ease-out !important; }
 
     .divider {
       width: 100%;
@@ -356,7 +330,7 @@
     .mastodon-badge {
       position: fixed;
       bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-      right: 20px;
+      left: 20px;
       z-index: 10000;
       display: flex;
       align-items: center;
@@ -375,7 +349,7 @@
 
     .mastodon-handle {
       opacity: 0;
-      transform: translateX(6px);
+      transform: translateX(-6px);
       transition: opacity .2s, transform .2s;
       white-space: nowrap;
       text-shadow: 0 0 8px var(--green);
@@ -400,80 +374,20 @@
     }
     #kiosk-coins-hud { flex: 1; }
 
-    /* ---- realistic coin slot ---- */
-    .coin-slot {
-      flex-shrink: 0;
-      width: 52px;
-      height: 34px;
-      border-radius: 4px;
-      background: linear-gradient(175deg, #1e1c08 0%, #111005 50%, #090804 100%);
-      border: 2px solid #e6dc32;
-      border-top-color:    #f4f060;
-      border-bottom-color: #9a9220;
-      box-shadow:
-        0 5px 10px rgba(0,0,0,0.85),
-        inset 0  1px 0 rgba(240,236,80,0.18),
-        inset 0 -2px 4px rgba(0,0,0,0.55);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 3px;
-      padding: 3px 8px 4px;
-      cursor: pointer;
+    @keyframes konami-shake {
+      0%,100% { transform: translate(0,0); }
+      10%     { transform: translate(-10px,-6px); }
+      20%     { transform: translate(10px,6px); }
+      30%     { transform: translate(-8px,4px); }
+      40%     { transform: translate(8px,-4px); }
+      50%     { transform: translate(-6px,6px); }
+      60%     { transform: translate(6px,-6px); }
+      70%     { transform: translate(-4px,3px); }
+      80%     { transform: translate(4px,-3px); }
+      90%     { transform: translate(-2px,2px); }
     }
+    body.konami-shake { animation: konami-shake 0.55s ease; }
 
-    /* coin silhouette — circle shows exactly what shape fits into the slit */
-    .coin-slot::before {
-      content: '';
-      flex-shrink: 0;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 1.5px solid rgba(244,240,96,0.5);
-      background: rgba(0,0,0,0.45);
-      box-shadow:
-        inset 0 2px 4px rgba(0,0,0,0.95),
-        inset 0 0 6px  rgba(0,0,0,0.8),
-        0 1px 0 rgba(244,240,96,0.12);
-    }
-
-    .coin-slot-opening {
-      position: relative;
-      width: 34px;
-      height: 6px;
-      border-radius: 2px;
-      background: #000;
-      box-shadow:
-        inset 0  3px 6px  rgba(0,0,0,1),
-        inset 0 -2px 4px  rgba(0,0,0,1),
-        inset 0  0   14px rgba(0,0,0,1),
-        0 0 0 1px rgba(0,0,0,0.9);
-    }
-
-    /* rim highlight — light catching the top lip */
-    .coin-slot-opening::before {
-      content: '';
-      position: absolute;
-      top: -2px;
-      left: 3px;
-      right: 3px;
-      height: 1px;
-      background: rgba(244,240,96,0.28);
-      border-radius: 1px;
-    }
-
-    /* faint reflected glow on the slot floor */
-    .coin-slot-opening::after {
-      content: '';
-      position: absolute;
-      bottom: -2px;
-      left: 6px;
-      right: 6px;
-      height: 1px;
-      background: rgba(244,240,96,0.07);
-      border-radius: 1px;
-    }
   </style>
 </head>
 <body>
@@ -481,12 +395,6 @@
   <div class="stars" id="stars"></div>
 
   <header>
-    <div class="lang-switcher">
-      <button class="lang-btn" data-lang="en">EN</button>
-      <button class="lang-btn" data-lang="ja">日本語</button>
-      <button class="lang-btn" data-lang="da">DA</button>
-    </div>
-
     <div class="marquee-line" data-i18n="marquee"></div>
     <div class="arcade-title">BLIP ARCADE</div>
     <div class="arcade-sub" data-i18n="subtitle"></div>
@@ -526,7 +434,7 @@
       <div class="card-shot-wrap">
         <img class="card-shot" src="galactic_defender/screenshot.png" alt="Galactic Defender gameplay">
       </div>
-      <div class="card-title">GALACTIC<br>DEFENDER</div>
+      <div class="card-title">DEFENDER</div>
       <div class="card-genre"  data-i18n="galacticGenre"></div>
       <div class="card-desc"   data-i18n="galacticDesc"></div>
       <div class="card-controls" data-i18n="galacticControls"></div>
@@ -535,11 +443,17 @@
 
   </div>
 
+  <div class="lang-switcher">
+    <button class="lang-btn" data-lang="en">🇬🇧</button>
+    <button class="lang-btn" data-lang="ja">🇯🇵</button>
+    <button class="lang-btn" data-lang="da">🇩🇰</button>
+  </div>
+
   <a class="mastodon-badge" href="https://mastodon.gamedev.place/@jacobandresen" target="_blank" rel="noopener">
-    <span class="mastodon-handle">@jacobandresen</span>
     <img class="mastodon-avatar"
          src="https://cdn.masto.host/mastodongamedevplace/accounts/avatars/109/415/513/568/161/510/original/ba0f2c84d53b9881.jpg"
          alt="Jacob Andresen on Mastodon">
+    <span class="mastodon-handle">@jacobandresen</span>
   </a>
 
   <footer>
@@ -549,10 +463,7 @@
 
   <div id="kiosk-bar" class="kiosk-bar">
     <span id="kiosk-coins-hud" class="kiosk-hud" data-coins-hud></span>
-    <button class="kiosk-btn" id="kiosk-insert-btn">INSERT COIN &#x2192;</button>
-    <div class="coin-slot" id="kiosk-coin-slot">
-      <div class="coin-slot-opening"></div>
-    </div>
+    <button class="kiosk-btn" id="kiosk-insert-btn">&#x25BA; INSERT COIN</button>
   </div>
 
   <script src="kiosk.js"></script>
@@ -575,7 +486,7 @@
         bouncerDesc:      'Ball is must break all brick for become empty board.<br>Paddle must not allow ball escape to fall below.<br>Clear stage happen, next stage will arrive.',
         bouncerControls:  'PUSH A/D OR ARROW &middot; SPACE KEY FOR LAUNCH BALL',
 
-        galacticGenre:    'SPACE ALIEN ATTACK GAME',
+        galacticGenre:    'ALIEN ATTACK GAME',
         galacticDesc:     'Many alien spaceship is coming very close near now.<br>Please for shoot all before they arrive on ground.<br>Must defend Earth happening at every cost situation.',
         galacticControls: 'PUSH A/D OR ARROW &middot; SPACE KEY FOR SHOOT',
 
@@ -732,7 +643,7 @@
     updateCreditsDisplay();
 
     function flashCoins() {
-      ['insert-coin', 'kiosk-coins-hud', 'kiosk-insert-btn', 'kiosk-coin-slot'].forEach(function(id) {
+      ['insert-coin', 'kiosk-coins-hud', 'kiosk-insert-btn'].forEach(function(id) {
         var el = document.getElementById(id);
         if (!el) return;
         el.classList.remove('coin-flash');
@@ -763,20 +674,47 @@
 
     document.querySelectorAll('.card').forEach(function(card) {
       card.addEventListener('click', function(e) {
+        e.preventDefault();
         var n = getCoins();
-        if (n <= 0) { e.preventDefault(); return; }
+        if (n <= 0) { return; }
         saveCoins(n - 1);
-        updateCreditsDisplay();
+        updateCoinsHud();
+        window.location.href = card.href;
       });
     });
 
     document.getElementById('insert-coin').addEventListener('click', insertCoin);
     document.getElementById('kiosk-insert-btn').addEventListener('click', insertCoin);
-    document.getElementById('kiosk-coin-slot').addEventListener('click', insertCoin);
 
     document.addEventListener('keydown', function(e) {
       if (e.key === '5' || e.key === 'c' || e.key === 'C') insertCoin();
+      konamiCheck(e.key);
     });
+
+    var KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+    var konamiIdx = 0;
+    function konamiCheck(key) {
+      konamiIdx = (key === KONAMI[konamiIdx]) ? konamiIdx + 1 : (key === KONAMI[0] ? 1 : 0);
+      if (konamiIdx === KONAMI.length) {
+        konamiIdx = 0;
+        konamiActivate();
+      }
+    }
+    function konamiActivate() {
+      var n = getCoins();
+      var added = Math.min(5, MAX_COINS - n);
+      saveCoins(Math.min(n + 5, MAX_COINS));
+      updateCoinsHud();
+      for (var i = 0; i < added; i++) {
+        setTimeout(playCoinInsert, i * 90);
+      }
+      document.body.classList.remove('konami-shake');
+      void document.body.offsetWidth;
+      document.body.classList.add('konami-shake');
+      document.body.addEventListener('animationend', function() {
+        document.body.classList.remove('konami-shake');
+      }, { once: true });
+    }
 
     /* ------------------------------------------------------------------ */
     /* Starfield                                                            */

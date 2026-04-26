@@ -9,9 +9,48 @@ var totalDeps = 0;
 
 updateCoinsHud();
 
-if (getCoins() <= 0) overlay.classList.add('visible');
+// ---- UI audio (coin insert / no room) ----
 
-// Called from WASM on game-over — spend a coin to restart, or block if empty.
+var uiAudio = null;
+function getUiAudio() {
+  if (!uiAudio) uiAudio = new (window.AudioContext || window.webkitAudioContext)();
+  if (uiAudio.state === 'suspended') uiAudio.resume();
+  return uiAudio;
+}
+function playCoinInsert() {
+  var ctx = getUiAudio(), t = ctx.currentTime;
+  [{ freq: 1047, start: 0 }, { freq: 1319, start: 0.055 }].forEach(function (note) {
+    var osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'square'; osc.frequency.value = note.freq;
+    gain.gain.setValueAtTime(0.22, t + note.start);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + note.start + 0.11);
+    osc.start(t + note.start); osc.stop(t + note.start + 0.12);
+  });
+}
+function playNoRoom() {
+  var ctx = getUiAudio(), t = ctx.currentTime;
+  var osc = ctx.createOscillator(), gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = 'sawtooth';
+  osc.frequency.setValueAtTime(200, t);
+  osc.frequency.exponentialRampToValueAtTime(65, t + 0.38);
+  gain.gain.setValueAtTime(0.32, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+  osc.start(t); osc.stop(t + 0.39);
+}
+function flashCoinBar() {
+  ['coins-hud', 'insert-coin-btn'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('coin-flash');
+    void el.offsetWidth;
+    el.classList.add('coin-flash');
+    el.addEventListener('animationend', function () { el.classList.remove('coin-flash'); }, { once: true });
+  });
+}
+
+// Called from WASM on game-over restart — spend a coin or block if empty.
 window.blipSpendCoin = function () {
   var n = getCoins();
   if (n <= 0) {
@@ -23,18 +62,31 @@ window.blipSpendCoin = function () {
   return 1;
 };
 
+overlay.addEventListener('click', function () {
+  var n = getCoins();
+  if (n >= MAX_COINS) return;
+  saveCoins(n + 1);
+  updateCoinsHud();
+  playCoinInsert();
+  flashCoinBar();
+  overlay.classList.remove('visible');
+});
+
 document.getElementById('insert-coin-btn').addEventListener('click', function () {
   var n = getCoins();
   if (n >= MAX_COINS) {
+    playNoRoom();
     var btn = this;
     btn.classList.remove('shake');
-    void btn.offsetWidth; // force reflow to restart animation
+    void btn.offsetWidth;
     btn.classList.add('shake');
     btn.addEventListener('animationend', function () { btn.classList.remove('shake'); }, { once: true });
     return;
   }
   saveCoins(n + 1);
   updateCoinsHud();
+  playCoinInsert();
+  flashCoinBar();
   overlay.classList.remove('visible');
 });
 

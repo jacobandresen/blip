@@ -69,3 +69,20 @@
   60%     { transform: translateX(-3px); }
   80%     { transform: translateX( 3px); }
 }
+
+@keyframes coin-flash {
+  0%   { color: #e6dc32; text-shadow: 0 0 10px #e6dc32; box-shadow: none; }
+  12%  {
+    color: #fff;
+    text-shadow: 0 0 6px #fff, 0 0 20px #fff, 0 0 40px #e6dc32, 0 0 80px #e6dc32, 0 0 140px #e6dc32;
+    box-shadow: 0 0 20px #e6dc32, 0 0 50px #e6dc32, 0 0 90px rgba(230,220,50,0.5);
+  }
+  100% { color: #e6dc32; text-shadow: 0 0 10px #e6dc32; box-shadow: none; }
+}
+.coin-flash { animation: coin-flash 0.65s ease-out !important; }
+
+/* Narrow portrait phones (≤ 480 px) — shrink text so all three bar items fit */
+@media (max-width: 480px) {
+  .kiosk-btn { font-size: 13px; letter-spacing: 0; padding: 7px 10px; }
+  .kiosk-hud { font-size: 13px; letter-spacing: 1px; }
+}

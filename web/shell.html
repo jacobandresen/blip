@@ -6,10 +6,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>BLIP ARCADE</title>
   <!-- Must load before Emscripten so the AudioContext wrapper is in place -->
-  <script src="../audio-unlock.js"></script>
-  <script src="../kiosk.js"></script>
-  <link rel="stylesheet" href="../kiosk.css">
-  <link rel="stylesheet" href="../shell.css">
+  <script src="../audio-unlock.js?v=2"></script>
+  <script src="../kiosk.js?v=2"></script>
+  <link rel="stylesheet" href="../kiosk.css?v=4">
+  <link rel="stylesheet" href="../shell.css?v=3">
 </head>
 <body>
 
@@ -41,7 +41,7 @@
 
   <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
 
-  <script src="../shell.js"></script>
+  <script src="../shell.js?v=4"></script>
   {{{ SCRIPT }}}
 
 </body>

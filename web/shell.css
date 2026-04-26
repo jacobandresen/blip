@@ -103,11 +103,15 @@ canvas {
 
 #need-coin-overlay .nco-msg {
   font-family: 'Courier New', Courier, monospace;
-  font-size: 14px;
-  letter-spacing: 5px;
-  color: #e6dc32;
-  text-shadow: 0 0 10px #e6dc32;
+  font-size: clamp(1.8rem, 6vw, 3.5rem);
+  font-weight: 900;
+  letter-spacing: .18em;
   text-transform: uppercase;
+  color: #e6dc32;
+  text-shadow:
+    0 0 10px #e6dc32,
+    0 0 30px #e6dc32,
+    0 0 60px rgba(230,220,50,0.4);
   animation: blink-coin 1.1s step-end infinite;
 }
 
