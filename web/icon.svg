@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="blur1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6"  result="blur2"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2"  result="blur3"/>
+      <feMerge>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="blur1"/>
+        <feMergeNode in="blur2"/>
+        <feMergeNode in="blur3"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" fill="#050508"/>
+
+  <!-- CRT scanlines -->
+  <rect width="512" height="512" fill="url(#scan)" opacity="0.18"/>
+  <defs>
+    <pattern id="scan" x="0" y="0" width="1" height="4" patternUnits="userSpaceOnUse">
+      <rect x="0" y="3" width="1" height="1" fill="#000"/>
+    </pattern>
+  </defs>
+
+  <!-- BLIP -->
+  <text
+    x="256" y="316"
+    font-family="'Courier New', Courier, monospace"
+    font-weight="900"
+    font-size="196"
+    letter-spacing="8"
+    text-anchor="middle"
+    fill="#32c832"
+    filter="url(#glow)">BLIP</text>
+</svg>
