@@ -9,7 +9,7 @@
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <script src="audio-unlock.js"></script>
-  <link rel="stylesheet" href="kiosk.css?v=5">
+  <link rel="stylesheet" href="kiosk.css?v=6">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -468,7 +468,6 @@
       box-shadow: 0 0 12px color-mix(in srgb, var(--green) 50%, transparent);
       filter: none;
     }
-    #kiosk-coins-hud { flex: 1; }
 
     @keyframes konami-shake {
       0%,100% { transform: translate(0,0); }
@@ -576,6 +575,7 @@
 
   <div id="kiosk-bar" class="kiosk-bar">
     <span id="kiosk-coins-hud" class="kiosk-hud" data-coins-hud></span>
+    <span class="kiosk-btn kiosk-btn-active">GAMES</span>
     <button class="kiosk-btn" id="kiosk-insert-btn">&#x25BA; INSERT COIN</button>
   </div>
 
