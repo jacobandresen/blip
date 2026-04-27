@@ -107,19 +107,21 @@
 }
 
 @media (max-width: 600px) {
-  /* badges hidden by default — only surface them near the bottom of the page */
-  .left-badges {
+  /* badges hide when scrolled to the bottom to avoid crowding the kiosk bar */
+  .left-badges.near-bottom {
     opacity: 0;
     pointer-events: none;
   }
-  .left-badges.near-bottom {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  /* lang switcher hides when near the bottom to avoid crowding the kiosk bar */
+  /* lang switcher hides when near the bottom for the same reason */
   .lang-switcher.near-bottom {
     opacity: 0;
     pointer-events: none;
+  }
+  /* shrink avatars so they sit inside the card's left padding zone */
+  .about-avatar,
+  .history-avatar {
+    width: 32px;
+    height: 32px;
   }
 }
 
