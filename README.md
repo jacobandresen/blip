@@ -1,12 +1,14 @@
 # BLIP ARCADE
 
-Three classic arcade games running in the browser — an experiment in compiling C games to WebAssembly using Emscripten and SDL3.
+Four classic arcade games running in the browser — an experiment in compiling C games to WebAssembly using Emscripten and SDL3.
 
 **[Play in the browser →](https://jacobandresen.github.io/blip/)**
 
 ---
 
 ## The games
+
+**Rally** — Keep the ball in play. Don't let it past your paddle.
 
 **Serpent** — Guide the snake, eat the food, don't bite yourself.
 
