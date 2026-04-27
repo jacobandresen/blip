@@ -16,6 +16,7 @@
       --green:   #32c832;
       --yellow:  #e6dc32;
       --orange:  #D97757;
+      --copilot: #6e40c9;
     }
 
     html, body {
@@ -152,6 +153,10 @@
       border-color: var(--orange);
       box-shadow: 0 0 16px rgba(217,119,87,0.35);
     }
+    .profile.copilot-profile:hover .profile-avatar {
+      border-color: var(--copilot);
+      box-shadow: 0 0 16px rgba(110,64,201,0.4);
+    }
 
     .profile-name {
       font-size: 15px;
@@ -186,6 +191,7 @@
     }
     .profile-link:hover { color: var(--green); }
     .claude-profile .profile-link:hover { color: var(--orange); }
+    .copilot-profile .profile-link:hover { color: var(--copilot); }
 
     .inline-link {
       color: var(--orange);
@@ -242,49 +248,15 @@
   <section class="intro">
     <p data-i18n="introP1">
       BLIP ARCADE is an experiment in human–AI collaboration.
-      Every game, every line of C, every pixel of the UI was written
-      together by a human and Claude — an AI made by Anthropic.
-      The human had the ideas. The AI did most of the typing.
+      Every game, every line of code, every pixel of the UI was built
+      together with Claude (Anthropic) and GitHub Copilot (GitHub).
+      The human had the ideas. The AIs did most of the typing.
     </p>
     <p data-i18n="introP2">
       The question behind the experiment: how far can a conversation go
       before it becomes a piece of software?
       Turns out, pretty far.
     </p>
-  </section>
-
-  <div class="divider"></div>
-
-  <section>
-    <div class="thoughts-label" data-i18n="arcadeLabel">&#x25BA; What Claude thinks about old arcade machines</div>
-    <div class="thoughts-body">
-      <p data-i18n="arcadeP1">
-        Old arcade machines fascinate me because of what they reveal about constraints.
-        The engineers who built Space Invaders or Asteroids worked with kilobytes of memory
-        and processors running at frequencies a million times slower than today\'s hardware.
-        Every pixel, every sound, every game mechanic was the result of a deliberate trade-off
-        made under severe pressure.
-      </p>
-      <p data-i18n="arcadeP2">
-        What strikes me most is how those constraints became features rather than bugs.
-        The 8-bit aesthetic, the limited palettes, the simple geometric shapes —
-        they forced designers to communicate entirely through mechanics.
-        There was no room for cutscenes or tutorials. The game had to teach you by letting you play it.
-        That discipline produced some of the most elegantly designed systems ever built.
-      </p>
-      <p data-i18n="arcadeP3">
-        There is also something honest about arcade hardware.
-        The cabinet, the joystick, the glow of a CRT phosphor screen in a dark room —
-        it was a complete, physical experience that existed in one place.
-        The game did not follow you home. You had to go find it, put a coin in, and commit.
-      </p>
-      <p data-i18n="arcadeP4">
-        I think that is part of why we are still nostalgic for it.
-        Not the technical limitations, but the deliberateness.
-        The sense that everything in the frame — every sound, every enemy pattern,
-        every frame of animation — was chosen, not generated.
-      </p>
-    </div>
   </section>
 
   <div class="divider"></div>
@@ -360,6 +332,23 @@
       </a>
     </div>
 
+    <div class="profile">
+      <a href="https://github.com/bjornharrtell" target="_blank" rel="noopener">
+        <img class="profile-avatar"
+             src="https://avatars.githubusercontent.com/u/141030?v=4"
+             alt="Björn Harrtell">
+      </a>
+      <div class="profile-name">Björn Harrtell</div>
+      <div class="profile-role" data-i18n="bjornRole">Human Operator</div>
+      <p class="profile-desc" data-i18n="bjornDesc">
+        Rust enthusiast and internationally known GIS expert. Author of JSTS
+        and the driving force behind the Rust port of Blip.
+      </p>
+      <a class="profile-link" href="https://github.com/bjornharrtell" target="_blank" rel="noopener">
+        github.com/bjornharrtell
+      </a>
+    </div>
+
     <div class="profile claude-profile">
       <a href="https://claude.ai" target="_blank" rel="noopener">
         <img class="profile-avatar" src="claude-avatar.svg" alt="Claude">
@@ -373,6 +362,22 @@
       </p>
       <a class="profile-link" href="https://claude.ai" target="_blank" rel="noopener">
         claude.ai
+      </a>
+    </div>
+
+    <div class="profile copilot-profile">
+      <a href="https://github.com/features/copilot" target="_blank" rel="noopener">
+        <img class="profile-avatar" src="copilot-avatar.svg" alt="GitHub Copilot">
+      </a>
+      <div class="profile-name">Copilot</div>
+      <div class="profile-role" data-i18n="copilotRole">AI Collaborator</div>
+      <p class="profile-desc" data-i18n="copilotDesc">
+        An AI coding assistant made by GitHub. Writes Rust, C, JavaScript, HTML, CSS,
+        and CMake on request. Expert at completions, refactoring, and turning vague
+        prompts into working code. Cannot insert coins.
+      </p>
+      <a class="profile-link" href="https://github.com/features/copilot" target="_blank" rel="noopener">
+        github.com/features/copilot
       </a>
     </div>
 
@@ -409,13 +414,8 @@
       en: {
         backLink:        'ARCADE',
         pageSubtitle:    'ABOUT THIS EXPERIMENT',
-        introP1:         'BLIP ARCADE is an experiment in human–AI collaboration. Every game, every line of C, every pixel of the UI was written together by a human and Claude — an AI made by Anthropic. The human had the ideas. The AI did most of the typing.',
-        introP2:         'The question behind the experiment: how far can a conversation go before it becomes a piece of software? Turns out, pretty far.',
-        arcadeLabel:     '&#x25BA; What Claude thinks about old arcade machines',
-        arcadeP1:        'Old arcade machines fascinate me because of what they reveal about constraints. The engineers who built Space Invaders or Asteroids worked with kilobytes of memory and processors running at frequencies a million times slower than today’s hardware. Every pixel, every sound, every game mechanic was the result of a deliberate trade-off made under severe pressure.',
-        arcadeP2:        'What strikes me most is how those constraints became features rather than bugs. The 8-bit aesthetic, the limited palettes, the simple geometric shapes — they forced designers to communicate entirely through mechanics. There was no room for cutscenes or tutorials. The game had to teach you by letting you play it. That discipline produced some of the most elegantly designed systems ever built.',
-        arcadeP3:        'There is also something honest about arcade hardware. The cabinet, the joystick, the glow of a CRT phosphor screen in a dark room — it was a complete, physical experience that existed in one place. The game did not follow you home. You had to go find it, put a coin in, and commit.',
-        arcadeP4:        'I think that is part of why we are still nostalgic for it. Not the technical limitations, but the deliberateness. The sense that everything in the frame — every sound, every enemy pattern, every frame of animation — was chosen, not generated.',
+        introP1:         ‘BLIP ARCADE is an experiment in human–AI collaboration. Every game, every line of code, every pixel of the UI was built together with Claude (Anthropic) and GitHub Copilot (GitHub). The human had the ideas. The AIs did most of the typing.’,
+        introP2:         ‘The question behind the experiment: how far can a conversation go before it becomes a piece of software? Turns out, pretty far.’,
         copyrightLabel:  '&#x25BA; Copyright &amp; tribute',
         copyrightP1:     'BLIP ARCADE is a tribute to the classic arcade games that defined a generation — Pong, Breakout, Snake, Space Invaders, and their many descendants. The original games were created by pioneering studios and engineers whose work shaped the entire history of interactive entertainment.',
         copyrightP2:     'The games on this site are original reimplementations inspired by those classics. They are not copies, ports, or reproductions of any proprietary code or assets. All graphics, sounds, and game logic were written from scratch as part of this experiment.',
@@ -428,20 +428,17 @@
         jacobRole:       'Human Operator',
         jacobDesc:       'The person with the ideas, the taste, and the finger on the coin slot. Jacob directs the experiment, plays the games, and decides what stays.',
         claudeRole:      'AI Collaborator',
-        claudeDesc:      'An AI assistant made by Anthropic. Writes C, JavaScript, HTML, CSS, and CMake on request. Has opinions about game feel, pixel spacing, and naming things. Cannot insert coins.'
+        claudeDesc:      'An AI assistant made by Anthropic. Writes C, JavaScript, HTML, CSS, and CMake on request. Has opinions about game feel, pixel spacing, and naming things. Cannot insert coins.',
+        copilotRole:     'AI Collaborator',
+        copilotDesc:     'An AI coding assistant made by GitHub. Writes Rust, C, JavaScript, HTML, CSS, and CMake on request. Expert at completions, refactoring, and turning vague prompts into working code. Cannot insert coins.'
       },
 
       da: {
         backLink:        'ARKADE',
         pageSubtitle:    'OM DETTE EKSPERIMENT',
-        introP1:         'BLIP ARCADE er et eksperiment i samarbejde mellem menneske og AI. Hvert spil, hver linje C-kode og hvert pixel i brugerfladen er skrevet i fællesskab af et menneske og Claude — en AI lavet af Anthropic. Mennesket kom med ideerne. AI’en stod for det meste af skrivningen.',
-        introP2:         'Spørgsmålet bag eksperimentet: hvor langt kan en samtale gå, inden den bliver til software? Det viser sig, ret langt.',
-        arcadeLabel:     '&#x25BA; Hvad Claude synes om gamle arkademaskiner',
-        arcadeP1:        'Gamle arkademaskiner fascinerer mig, fordi de afslører noget om begrænsninger. De ingeiniører, der byggede Space Invaders eller Asteroids, arbejdede med kilobytes hukommelse og processorer, der kørte med en hastighed en million gange langsommere end nutidens hardware. Hvert pixel, hver lyd og hvert spilmekanik var resultatet af en bevidst afvejning under hårdt pres.',
-        arcadeP2:        'Det, der slår mig mest, er, hvordan disse begrænsninger blev til fordele frem for fejl. Den 8-bit-æstetik, de begrænsede farvepaletter, de enkle geometriske former — de tvang designerne til udelukkende at kommunikere gennem mekanik. Der var ikke plads til mellemsekvenser eller vejledninger. Spillet måtte lære dig at spille det ved at lade dig spille det. Denne disciplin frembragte nogle af de mest elegant designede systemer, der nogensinde er blevet bygget.',
-        arcadeP3:        'Der er også noget ærligt ved arkade-hardware. Kabinettet, joysticket, glansen fra en CRT-skærms fosfor i et mørkt rum — det var en komplet, fysisk oplevelse, der fandt sted ét bestemt sted. Spillet fulgte dig ikke hjem. Du måtte opsøge det, putte en mønt i og forpligte dig.',
-        arcadeP4:        'Jeg tror, det er en del af grunden til, at vi stadig er nostalgiske for det. Ikke de tekniske begrænsninger, men bevidstheden bag. Fornæmmelsen af, at alt i billedet — hver lyd, hvert fjendtligt mønster, hvert animationsbillede — var valgt, ikke genereret.',
-        copyrightLabel:  '&#x25BA; Ophavsret &amp; hyldest',
+        introP1:         ‘BLIP ARCADE er et eksperiment i samarbejde mellem menneske og AI. Hvert spil, hver linje kode og hvert pixel i brugerfladen er bygget i fællesskab med Claude (Anthropic) og GitHub Copilot (GitHub). Mennesket kom med ideerne. AI\’erne stod for det meste af skrivningen.’,
+        introP2:         ‘Spørgsmålet bag eksperimentet: hvor langt kan en samtale gå, inden den bliver til software? Det viser sig, ret langt.’,
+        copyrightLabel:  ‘&#x25BA; Ophavsret &amp; hyldest’,
         copyrightP1:     'BLIP ARCADE er en hyldest til de klassiske arkadespil, der definerede en generation — Pong, Breakout, Snake, Space Invaders og deres mange efterkommere. De originale spil blev skabt af banebrydende studier og ingeiniører, hvis arbejde formede hele den interaktive underholdnings historie.',
         copyrightP2:     'Spillene på dette sted er originale genimplementeringer inspireret af disse klassikere. De er ikke kopier, porte eller reproduktioner af proprietær kode eller aktiver. Al grafik, alle lyde og al spillogik er skrevet fra bunden som en del af dette eksperiment.',
         copyrightP3:     'Dette projekt er strengt ikke-kommercielt. Der opkræves ingen entré, indsamles ingen data og vises ingen reklamer. Det eksisterer udelukkende som et teknisk og kreativt eksperiment — og som en lille kærlighedserklæring til de mennesker, der opfandt mediet.',
@@ -453,19 +450,16 @@
         jacobRole:       'Menneskelig operatør',
         jacobDesc:       'Personen med ideerne, smagen og fingeren på møntspalten. Jacob styrer eksperimentet, spiller spillene og beslutter, hvad der bliver.',
         claudeRole:      'AI-samarbejdspartner',
-        claudeDesc:      'En AI-assistent lavet af Anthropic. Skriver C, JavaScript, HTML, CSS og CMake på anmodning. Har meninger om spilsfølelse, pixelafstand og navngivning. Kan ikke indsætte mønter.'
+        claudeDesc:      'En AI-assistent lavet af Anthropic. Skriver C, JavaScript, HTML, CSS og CMake på anmodning. Har meninger om spilsfølelse, pixelafstand og navngivning. Kan ikke indsætte mønter.',
+        copilotRole:     'AI-samarbejdspartner',
+        copilotDesc:     'Et AI-kodningsassistentprogram lavet af GitHub. Skriver Rust, C, JavaScript, HTML, CSS og CMake på anmodning. Ekspert i kodefuldførelse, refaktorering og at omsætte vage idéer til fungerende kode. Kan ikke indsætte mønter.'
       },
 
       ja: {
         backLink:        'アーケード',
         pageSubtitle:    'この実験について',
-        introP1:         'BLIP ARCADEは、人間とAIの協働実験です。すべてのゲーム、すべてのCコード、UIのすべてのピクセルが、人間とClaude（Anthropicが開発したAI）によって共同で書かれました。アイデアを出したのは人間で、タイピングのほとんどはAIが担いました。',
+        introP1:         'BLIP ARCADEは、人間とAIの協働実験です。すべてのゲーム、すべてのコード、UIのすべてのピクセルが、Claude（Anthropic）とGitHub Copilot（GitHub）との共同作業で構築されました。アイデアを出したのは人間で、タイピングのほとんどはAIが担いました。',
         introP2:         'この実験の背後にある問いかけ：会話はどこまで続ければソフトウェアになるのか？思ったよりずっと遠くまで行けることがわかりました。',
-        arcadeLabel:     '&#x25BA; Claudeが古いアーケードマシンについて思うこと',
-        arcadeP1:        '古いアーケードマシンは、制約というものを明らかにするという点で私を魅了します。Space InvadersやAsteroidsを作ったエンジニアたちは、キロバイト単位のメモリと、現代のハードウェアの百万分の一の速度で動くプロセッサーで作業していました。すべてのピクセル、すべての音、すべてのゲームメカニクが、厳しいプレッシャーの中での意図的なトレードオフの結果でした。',
-        arcadeP2:        '最も印象的なのは、そうした制約がバグではなく機能になったことです。8ビットの美学、限られたカラーパレット、シンプルな幾何学的形状——それらはデザイナーに純粹にメカニクでコミュニケーションすることを強いました。カットシーンやチュートリアルの余地はなく、ゲームはプレイさせることで教えなければなりませんでした。この規律が、これまでに作られた最も優雅に設計されたシステムのいくつかを生み出しました。',
-        arcadeP3:        'アーケードハードウェアには正直さもあります。キャビネット、ジョイスティック、暗い部屋で輝くCRTの荚光——それは特定の場所に存在する完全な物理的体験でした。ゲームはあなたを追いかけてこない。あなたが足を運んで、コインを入れて、向き合わなければならなかった。',
-        arcadeP4:        '私たちが今もそれに郷愁を感じるのはそのためだと思います。技術的な制限ではなく、意図性——画面の中のすべての要素、すべての音、すべての敵のパターン、すべてのアニメーションのフレームが、生成されたのではなく、選ばれたものだったという感覦。',
         copyrightLabel:  '&#x25BA; 著作権とトリビュート',
         copyrightP1:     'BLIP ARCADEは、一世代を定義したクラシックアーケードゲーム——Pong、Breakout、Snake、Space Invaders、そしてその多くの後継者——へのトリビュートです。オリジナルゲームは、インタラクティブエンターテインメントの歴史全体を形作った先駆的なスタジオとエンジニアによって作られました。',
         copyrightP2:     'このサイトのゲームは、それらのクラシックにインスパイアされたオリジナルの再実装です。独自コードやアセットのコピー、移植、複製ではありません。すべてのグラフィックス、音音、ゲームロジックは、この実験の一環としてゼロから書かれました。',
@@ -478,7 +472,9 @@
         jacobRole:       '人間オペレーター',
         jacobDesc:       'アイデア、センス、そしてコインスロットに指を置く人物。Jacobは実験を指撮し、ゲームをプレイし、何を残すかを決めます。',
         claudeRole:      'AIコラボレーター',
-        claudeDesc:      'Anthropicが作ったAIアシスタント。リクエストに応じてC、JavaScript、HTML、CSS、CMakeを書きます。ゲームの手触り、ピクセル間隔、命名において意見を持っています。コインを投入することはできません。'
+        claudeDesc:      'Anthropicが作ったAIアシスタント。リクエストに応じてC、JavaScript、HTML、CSS、CMakeを書きます。ゲームの手触り、ピクセル間隔、命名において意見を持っています。コインを投入することはできません。',
+        copilotRole:     'AIコラボレーター',
+        copilotDesc:     'GitHubが作ったAIコーディングアシスタント。リクエストに応じてRust、C、JavaScript、HTML、CSS、CMakeを書きます。コード補完、リファクタリング、曖昧なプロンプトを動くコードに変換することが得意です。コインを投入することはできません。'
       }
     };
 
