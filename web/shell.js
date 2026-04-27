@@ -1,11 +1,13 @@
+(function () {
+'use strict';
+
 var TOPBAR_H  = 56;
 
 var loader    = document.getElementById('loader');
 var barInner  = document.getElementById('bar-inner');
 var statusEl  = document.getElementById('status');
-var canvas    = document.getElementById('canvas');
+var canvas    = document.getElementById('glcanvas');
 var overlay   = document.getElementById('need-coin-overlay');
-var totalDeps = 0;
 
 updateCoinsHud();
 
@@ -90,63 +92,41 @@ document.getElementById('insert-coin-btn').addEventListener('click', function ()
   overlay.classList.remove('visible');
 });
 
-// ---- Canvas scaling — centred in the area above the topbar ----
+// ---- Canvas sizing — fill the area below the topbar; macroquad
+// renders the game with a letterboxed camera so coords stay logical.
 
 function fillCanvas() {
-  var nw = canvas.width, nh = canvas.height;
-  if (!nw || !nh) return;
   var tb = document.getElementById('topbar');
   TOPBAR_H = tb ? tb.offsetHeight : 56;
-  var avH   = window.innerHeight - TOPBAR_H;
-  var scale = Math.min(window.innerWidth / nw, avH / nh);
-  var tx    = -(nw * scale / 2);
-  var ty    = -(nh * scale / 2) - TOPBAR_H / 2;
-  canvas.style.setProperty(
-    'transform',
-    'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')',
-    'important'
-  );
+  var w = window.innerWidth;
+  var h = window.innerHeight - TOPBAR_H;
+  canvas.style.setProperty('width',  w + 'px', 'important');
+  canvas.style.setProperty('height', h + 'px', 'important');
+  canvas.style.setProperty('top',    TOPBAR_H + 'px', 'important');
+  canvas.style.setProperty('left',   '0', 'important');
+  canvas.style.setProperty('transform', 'none', 'important');
 }
 window.addEventListener('resize', fillCanvas);
-new MutationObserver(fillCanvas).observe(canvas, {
-  attributes: true, attributeFilter: ['width', 'height']
-});
+fillCanvas();
+
+function hideLoader() {
+  if (loader && loader.style.display !== 'none') {
+    loader.style.display = 'none';
+    fillCanvas();
+    canvas.focus();
+  }
+}
+
+(function waitForCanvas() {
+  if (canvas.width > 0 && canvas.height > 0) { hideLoader(); return; }
+  setTimeout(waitForCanvas, 50);
+})();
+setTimeout(hideLoader, 3000);
 
 canvas.addEventListener('webglcontextlost', function (e) {
   e.preventDefault();
   alert('WebGL context lost. Please reload the page.');
 }, false);
-
-// ---- Emscripten Module hooks ----
-
-var Module = {
-  canvas: canvas,
-  setStatus: function (text) {
-    if (!text) {
-      loader.style.display = 'none';
-      canvas.focus();
-      return;
-    }
-    var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
-    if (m) {
-      var pct = Math.round(parseInt(m[2]) / parseInt(m[4]) * 100);
-      barInner.style.width = pct + '%';
-      statusEl.textContent = 'LOADING ' + pct + '%';
-    } else {
-      statusEl.textContent = text.toUpperCase().slice(0, 24);
-    }
-  },
-  monitorRunDependencies: function (left) {
-    if (!totalDeps) totalDeps = left;
-    if (totalDeps && left) {
-      var pct = Math.round((totalDeps - left) / totalDeps * 100);
-      barInner.style.width = pct + '%';
-      statusEl.textContent = 'LOADING ' + pct + '%';
-    }
-  },
-  print:    function () {},
-  printErr: function (t) { console.warn(t); }
-};
 
 // ---- Touch controls — injected as keyboard events into the WASM game ----
 
@@ -293,3 +273,5 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
   fire.addEventListener('touchend',    function (e) { e.preventDefault(); releaseBtn(fire); }, { passive: false });
   fire.addEventListener('touchcancel', function ()  { releaseBtn(fire); });
 }
+
+})();
