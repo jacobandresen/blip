@@ -9,7 +9,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="../icon.svg">
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
-  <!-- Must load before Emscripten so the AudioContext wrapper is in place -->
+  <!-- Must load before the wasm bundle so the AudioContext wrapper is in place -->
   <script src="../audio-unlock.js?v=2"></script>
   <script src="../kiosk.js?v=4"></script>
   <link rel="stylesheet" href="../kiosk.css?v=12">
@@ -49,10 +49,12 @@
     <div id="dial-label">PADDLE</div>
   </div>
 
-  <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+  <canvas id="glcanvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
 
-  <script src="../shell.js?v=6"></script>
-  {{{ SCRIPT }}}
+  <script src="../shell.js?v=11"></script>
+  <script src="../mq_js_bundle.js?v=1"></script>
+  <script src="../blip_bridge.js?v=2"></script>
+  <script>load("index.wasm");</script>
 
 </body>
 </html>

@@ -1,1 +1,60 @@
-<!doctypehtml><html lang=en><head><meta charset=utf-8><meta content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover"name=viewport><meta content=yes name=apple-mobile-web-app-capable><title>BLIP ARCADE</title><link href=../favicon.ico rel=icon type=image/x-icon><link href=../favicon-32.png rel=icon type=image/png sizes=32x32><link href=../icon.svg rel=icon type=image/svg+xml><link href=../apple-touch-icon.png rel=apple-touch-icon><script src="../audio-unlock.js?v=2"></script><script src="../kiosk.js?v=2"></script><link href="../kiosk.css?v=8"rel=stylesheet><link href="../shell.css?v=5"rel=stylesheet></head><body><div id=loader><div id=status>LOADING</div><div id=bar-outer><div id=bar-inner></div></div></div><div id=topbar class=kiosk-bar><a class=kiosk-btn href=../index.html id=back>← GAMES</a> <span class=kiosk-hud data-coins-hud id=coins-hud></span> <button class=kiosk-btn id=insert-coin-btn>► INSERT COIN</button></div><div id=need-coin-overlay><div class=nco-msg>► INSERT COIN ◄</div></div><div id=touch-pad><div id=dpad><div id=btn-up class=dpad-btn data-code=ArrowUp data-key=ArrowUp>▲</div><div id=btn-left class=dpad-btn data-code=ArrowLeft data-key=ArrowLeft>◄</div><div id=btn-right class=dpad-btn data-code=ArrowRight data-key=ArrowRight>►</div><div id=btn-down class=dpad-btn data-code=ArrowDown data-key=ArrowDown>▼</div></div><div id=btn-fire data-code=Space data-key=" ">FIRE</div></div><div id=paddle-dial><div id=dial-hand></div><div id=dial-label>PADDLE</div></div><canvas id=canvas oncontextmenu=event.preventDefault() tabindex=-1></canvas><script src="../shell.js?v=6"></script><script src=index.js async></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>BLIP ARCADE</title>
+  <link rel="icon" type="image/x-icon" href="../favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+  <link rel="icon" type="image/svg+xml" href="../icon.svg">
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png">
+  <!-- Must load before the wasm bundle so the AudioContext wrapper is in place -->
+  <script src="../audio-unlock.js?v=2"></script>
+  <script src="../kiosk.js?v=4"></script>
+  <link rel="stylesheet" href="../kiosk.css?v=12">
+  <link rel="stylesheet" href="../shell.css?v=5">
+</head>
+<body>
+
+  <div id="loader">
+    <div id="status">LOADING</div>
+    <div id="bar-outer"><div id="bar-inner"></div></div>
+  </div>
+
+  <div id="topbar" class="kiosk-bar">
+    <a id="back" class="kiosk-btn" href="../index.html">&#8592; GAMES</a>
+    <span id="coins-hud" class="kiosk-hud" data-coins-hud></span>
+    <button id="insert-coin-btn" class="kiosk-btn">&#x25BA; INSERT COIN</button>
+  </div>
+
+  <div id="need-coin-overlay">
+    <div class="nco-msg">&#x25BA; INSERT COIN &#x25C4;</div>
+  </div>
+
+  <!-- Touch controls: shown only on touch devices -->
+  <div id="touch-pad">
+    <div id="dpad">
+      <div class="dpad-btn" id="btn-up"    data-key="ArrowUp"    data-code="ArrowUp">&#x25B2;</div>
+      <div class="dpad-btn" id="btn-left"  data-key="ArrowLeft"  data-code="ArrowLeft">&#x25C4;</div>
+      <div class="dpad-btn" id="btn-right" data-key="ArrowRight" data-code="ArrowRight">&#x25BA;</div>
+      <div class="dpad-btn" id="btn-down"  data-key="ArrowDown"  data-code="ArrowDown">&#x25BC;</div>
+    </div>
+    <div id="btn-fire" data-key=" " data-code="Space">FIRE</div>
+  </div>
+
+  <!-- Paddle dial: rally only, touch only -->
+  <div id="paddle-dial">
+    <div id="dial-hand"></div>
+    <div id="dial-label">PADDLE</div>
+  </div>
+
+  <canvas id="glcanvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
+
+  <script src="../shell.js?v=11"></script>
+  <script src="../mq_js_bundle.js?v=1"></script>
+  <script src="../blip_bridge.js?v=2"></script>
+  <script>load("index.wasm");</script>
+
+</body>
+</html>

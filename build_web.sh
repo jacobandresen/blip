@@ -1,39 +1,27 @@
 #!/usr/bin/env bash
-set -e
+# Build all four games for the wasm32-unknown-unknown target and lay them
+# out under web/<game>/ so they can be served by any static file host.
+#
+# Requires: rustup target add wasm32-unknown-unknown
+set -euo pipefail
 cd "$(dirname "$0")"
 
-FLAGS="-O2 --use-port=sdl3 -Wno-experimental -Wno-unused-parameter -lm -I lib"
-SHELL="web/shell.html"
+GAMES=(serpent bouncer galactic_defender rally)
+TARGET_DIR="target/wasm32-unknown-unknown/release"
 
-mkdir -p web/serpent web/bouncer web/galactic_defender web/rally
+echo "[build] cargo build --release --target wasm32-unknown-unknown"
+PKG_ARGS=()
+for g in "${GAMES[@]}"; do PKG_ARGS+=(-p "$g"); done
+cargo build --release --target wasm32-unknown-unknown "${PKG_ARGS[@]}"
 
-echo "[1/4] Building serpent..."
-emcc $FLAGS \
-    lib/blip.c games/serpent/main.c \
-    --preload-file games/serpent/assets@/assets \
-    --shell-file "$SHELL" \
-    -o web/serpent/index.html
+for game in "${GAMES[@]}"; do
+    out="web/$game"
+    mkdir -p "$out"
+    cp "$TARGET_DIR/$game.wasm" "$out/index.wasm"
+    cp web/shell.html "$out/index.html"
+    bytes=$(wc -c < "$out/index.wasm")
+    echo "[ok] $game -> $out/index.wasm ($bytes bytes)"
+done
 
-echo "[2/4] Building bouncer..."
-emcc $FLAGS \
-    lib/blip.c games/bouncer/main.c \
-    --preload-file games/bouncer/assets@/assets \
-    --shell-file "$SHELL" \
-    -o web/bouncer/index.html
-
-echo "[3/4] Building galactic_defender..."
-emcc $FLAGS \
-    lib/blip.c games/galactic_defender/main.c \
-    --preload-file games/galactic_defender/assets@/assets \
-    --shell-file "$SHELL" \
-    -o web/galactic_defender/index.html
-
-echo "[4/4] Building rally..."
-(cd games/rally/assets && gcc generate_assets.c -o gen_assets -lm && ./gen_assets)
-emcc $FLAGS \
-    lib/blip.c games/rally/main.c \
-    --preload-file games/rally/assets@/assets \
-    --shell-file "$SHELL" \
-    -o web/rally/index.html
-
-echo "Done. Serve web/ with: python3 -m http.server -d web 8080"
+echo
+echo "Done. Serve with: python3 -m http.server -d web 8080"
