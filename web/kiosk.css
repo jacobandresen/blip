@@ -86,3 +86,92 @@
   .kiosk-btn { font-size: 13px; letter-spacing: 0; padding: 7px 10px; }
   .kiosk-hud { font-size: 13px; letter-spacing: 1px; }
 }
+
+/* ---- Left badge group ---- */
+.left-badges {
+  position: fixed;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  left: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.about-badge,
+.history-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  transition: color .2s;
+}
+
+.about-badge   { color: #444; }
+.history-badge { color: #444; }
+
+.about-avatar,
+.history-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid #222;
+  display: block;
+  transition: border-color .2s, box-shadow .2s, filter .2s;
+}
+.about-avatar   { filter: grayscale(40%) brightness(0.8); }
+.history-avatar { filter: grayscale(20%) brightness(0.7); }
+
+.about-label,
+.history-label {
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity .2s, transform .2s;
+  white-space: nowrap;
+}
+.about-label   { text-shadow: 0 0 8px #D97757; color: #D97757; }
+.history-label { text-shadow: 0 0 8px #e6dc32; color: #e6dc32; }
+
+/* hover */
+.about-badge:hover   { color: #D97757; }
+.history-badge:hover { color: #e6dc32; }
+
+.about-badge:hover .about-label,
+.history-badge:hover .history-label {
+  opacity: 1;
+  transform: translateX(0);
+}
+.about-badge:hover .about-avatar {
+  border-color: #D97757;
+  box-shadow: 0 0 12px rgba(217,119,87,0.45);
+  filter: none;
+}
+.history-badge:hover .history-avatar {
+  border-color: #e6dc32;
+  box-shadow: 0 0 12px rgba(230,220,50,0.45);
+  filter: none;
+}
+
+/* active (current page) */
+.about-badge.active   { cursor: default; color: #D97757; }
+.history-badge.active { cursor: default; color: #e6dc32; }
+
+.about-badge.active .about-label,
+.history-badge.active .history-label {
+  opacity: 1;
+  transform: translateX(0);
+}
+.about-badge.active .about-avatar {
+  border-color: #D97757;
+  box-shadow: 0 0 12px rgba(217,119,87,0.45);
+  filter: none;
+}
+.history-badge.active .history-avatar {
+  border-color: #e6dc32;
+  box-shadow: 0 0 12px rgba(230,220,50,0.45);
+  filter: none;
+}

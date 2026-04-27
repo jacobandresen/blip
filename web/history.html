@@ -249,6 +249,7 @@
       opacity: 1;
       filter: drop-shadow(0 0 5px var(--green));
     }
+
   </style>
 </head>
 <body>
@@ -400,6 +401,17 @@
 
 </div>
 
+  <div class="left-badges">
+    <a class="about-badge" href="about.html">
+      <img class="about-avatar" src="claude-avatar.svg" alt="About this experiment">
+      <span class="about-label">ABOUT</span>
+    </a>
+    <div class="history-badge active">
+      <img class="history-avatar" src="history-icon.svg" alt="Game history">
+      <span class="history-label">HISTORY</span>
+    </div>
+  </div>
+
   <div class="lang-switcher">
     <button class="lang-btn" data-lang="en">🇬🇧</button>
     <button class="lang-btn" data-lang="ja">🇯🇵</button>
@@ -407,9 +419,9 @@
   </div>
 
   <div id="kiosk-bar" class="kiosk-bar">
-    <a class="kiosk-btn" href="index.html">&#8592; GAMES</a>
     <span id="kiosk-coins-hud" class="kiosk-hud" data-coins-hud></span>
-    <button class="kiosk-btn" id="kiosk-insert-btn">► INSERT COIN</button>
+    <a class="kiosk-btn" href="index.html">&#8592; GAMES</a>
+    <button class="kiosk-btn" id="kiosk-insert-btn">&#x25BA; INSERT COIN</button>
   </div>
 
   <script src="kiosk.js"></script>
@@ -582,6 +594,12 @@
       var browserLang = (navigator.language || '').slice(0, 2).toLowerCase();
       applyLang(saved || (i18n[browserLang] ? browserLang : 'en'));
     })();
+
+    updateCoinsHud();
+    document.getElementById('kiosk-insert-btn').addEventListener('click', insertCoin);
+    document.addEventListener('keydown', function(e) {
+      if (e.key === '5' || e.key === 'c' || e.key === 'C') insertCoin();
+    });
   </script>
 </body>
 </html>
