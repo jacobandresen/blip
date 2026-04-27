@@ -1,15 +1,16 @@
 var MAX_COINS = 5;
 
 (function () {
-  function updateBadgeVisibility() {
-    var el = document.querySelector('.left-badges');
-    if (!el) return;
+  function updateFixedOverlayVisibility() {
     var atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 60;
-    el.classList.toggle('near-bottom', atBottom);
+    var badges = document.querySelector('.left-badges');
+    if (badges) badges.classList.toggle('near-bottom', atBottom);
+    var lang = document.querySelector('.lang-switcher');
+    if (lang) lang.classList.toggle('near-bottom', atBottom);
   }
-  window.addEventListener('scroll',  updateBadgeVisibility, { passive: true });
-  window.addEventListener('resize',  updateBadgeVisibility, { passive: true });
-  document.addEventListener('DOMContentLoaded', updateBadgeVisibility);
+  window.addEventListener('scroll',  updateFixedOverlayVisibility, { passive: true });
+  window.addEventListener('resize',  updateFixedOverlayVisibility, { passive: true });
+  document.addEventListener('DOMContentLoaded', updateFixedOverlayVisibility);
 }());
 
 function getCoins() {
