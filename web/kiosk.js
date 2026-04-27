@@ -1,5 +1,17 @@
 var MAX_COINS = 5;
 
+(function () {
+  function updateBadgeVisibility() {
+    var el = document.querySelector('.left-badges');
+    if (!el) return;
+    var atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 60;
+    el.classList.toggle('near-bottom', atBottom);
+  }
+  window.addEventListener('scroll',  updateBadgeVisibility, { passive: true });
+  window.addEventListener('resize',  updateBadgeVisibility, { passive: true });
+  document.addEventListener('DOMContentLoaded', updateBadgeVisibility);
+}());
+
 function getCoins() {
   try {
     var n = parseInt(sessionStorage.getItem('blip-coins') || '0', 10);
