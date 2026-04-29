@@ -398,8 +398,8 @@
 
   <div class="lang-switcher">
     <button class="lang-btn" data-lang="en">🇬🇧</button>
-    <button class="lang-btn" data-lang="ja">🇯🇵</button>
     <button class="lang-btn" data-lang="da">🇩🇰</button>
+    <button class="lang-btn" data-lang="ja">🇯🇵</button>
   </div>
 
   <div id="kiosk-bar" class="kiosk-bar">
@@ -414,45 +414,49 @@
       en: {
         backLink:        'ARCADE',
         pageSubtitle:    'ABOUT THIS EXPERIMENT',
-        introP1:         ‘BLIP ARCADE is an experiment in human–AI collaboration. Every game, every line of code, every pixel of the UI was built together with Claude (Anthropic) and GitHub Copilot (GitHub). The human had the ideas. The AIs did most of the typing.’,
-        introP2:         ‘The question behind the experiment: how far can a conversation go before it becomes a piece of software? Turns out, pretty far.’,
+        introP1:         'BLIP ARCADE is an experiment in human–AI collaboration. Every game, every line of code, every pixel of the UI was built together with Claude (Anthropic) and GitHub Copilot (GitHub). The human had the ideas. The AIs did most of the typing.',
+        introP2:         'The question behind the experiment: how far can a conversation go before it becomes a piece of software? Turns out, pretty far.',
         copyrightLabel:  '&#x25BA; Copyright &amp; tribute',
         copyrightP1:     'BLIP ARCADE is a tribute to the classic arcade games that defined a generation — Pong, Breakout, Snake, Space Invaders, and their many descendants. The original games were created by pioneering studios and engineers whose work shaped the entire history of interactive entertainment.',
         copyrightP2:     'The games on this site are original reimplementations inspired by those classics. They are not copies, ports, or reproductions of any proprietary code or assets. All graphics, sounds, and game logic were written from scratch as part of this experiment.',
         copyrightP3:     'This project is strictly non-commercial. No admission is charged, no data is collected, no advertising is served. It exists purely as a technical and creative experiment, and as a small act of appreciation for the people who invented the medium.',
         contribLabel:    '&#x25BA; Contributions',
-        contribP1:       'Want to add a game? Pull requests are welcome at <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. The blip library handles the SDL3 and Emscripten plumbing so you can focus on game logic.',
+        contribP1:       'Want to add a game? Pull requests are welcome at <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. The blip library handles the <a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a> and Rust plumbing so you can focus on game logic.',
         contribP2:       'For inspiration, the <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Golden Age of Arcade Video Games</a> (roughly 1978–1986) produced hundreds of titles worth revisiting — Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest, and many more. That era is a deep well.',
         contribP3:       'Please honour copyrights when contributing. Reimplement mechanics and aesthetics from scratch — do not copy proprietary code, graphics, or audio. Original names are trademarked; use alternative titles as this project does (Rally instead of Pong, Serpent instead of Snake, and so on). When in doubt, treat your implementation as a tribute, not a reproduction.',
         operatorsHeading:'THE OPERATORS',
         jacobRole:       'Human Operator',
-        jacobDesc:       'The person with the ideas, the taste, and the finger on the coin slot. Jacob directs the experiment, plays the games, and decides what stays.',
+        jacobDesc:       'The person with the ideas, the taste, and the finger on the coin slot. Jacob directs the experiment, plays the games and performs random hacks on the project.',
+        bjornRole:       'Human Operator',
+        bjornDesc:       'Rust enthusiast and internationally known GIS expert. Author of JSTS and the driving force behind the Rust port of Blip.',
         claudeRole:      'AI Collaborator',
-        claudeDesc:      'An AI assistant made by Anthropic. Writes C, JavaScript, HTML, CSS, and CMake on request. Has opinions about game feel, pixel spacing, and naming things. Cannot insert coins.',
+        claudeDesc:      'An AI assistant made by Anthropic. Writes Rust, JavaScript, HTML and CSS on request. Has opinions about game feel, pixel spacing, and naming things. Cannot insert coins.',
         copilotRole:     'AI Collaborator',
-        copilotDesc:     'An AI coding assistant made by GitHub. Writes Rust, C, JavaScript, HTML, CSS, and CMake on request. Expert at completions, refactoring, and turning vague prompts into working code. Cannot insert coins.'
+        copilotDesc:     'An AI coding assistant made by GitHub. Writes Rust, JavaScript, HTML and CSS on request. Expert at completions, refactoring, and turning vague prompts into working code. Cannot insert coins.'
       },
 
       da: {
         backLink:        'ARKADE',
         pageSubtitle:    'OM DETTE EKSPERIMENT',
-        introP1:         ‘BLIP ARCADE er et eksperiment i samarbejde mellem menneske og AI. Hvert spil, hver linje kode og hvert pixel i brugerfladen er bygget i fællesskab med Claude (Anthropic) og GitHub Copilot (GitHub). Mennesket kom med ideerne. AI\’erne stod for det meste af skrivningen.’,
-        introP2:         ‘Spørgsmålet bag eksperimentet: hvor langt kan en samtale gå, inden den bliver til software? Det viser sig, ret langt.’,
-        copyrightLabel:  ‘&#x25BA; Ophavsret &amp; hyldest’,
-        copyrightP1:     'BLIP ARCADE er en hyldest til de klassiske arkadespil, der definerede en generation — Pong, Breakout, Snake, Space Invaders og deres mange efterkommere. De originale spil blev skabt af banebrydende studier og ingeiniører, hvis arbejde formede hele den interaktive underholdnings historie.',
-        copyrightP2:     'Spillene på dette sted er originale genimplementeringer inspireret af disse klassikere. De er ikke kopier, porte eller reproduktioner af proprietær kode eller aktiver. Al grafik, alle lyde og al spillogik er skrevet fra bunden som en del af dette eksperiment.',
+        introP1:         'BLIP ARCADE er et eksperiment i samarbejde mellem menneske og AI. Hvert spil, hver linje kode og hvert pixel i brugerfladen er bygget i fællesskab med Claude (Anthropic) og GitHub Copilot (GitHub). Mennesket kom med ideerne. AI\'erne stod for det meste af skrivningen.',
+        introP2:         'Spørgsmålet bag eksperimentet: hvor langt kan en samtale gå, inden den bliver til software? Det viser sig, ret langt.',
+        copyrightLabel:  '&#x25BA; Ophavsret &amp; hyldest',
+        copyrightP1:     'BLIP ARCADE er en hyldest til de klassiske arkadespil, der definerede en generation — Pong, Breakout, Snake, Space Invaders og deres mange efterkommere. De originale spil blev skabt af banebrydende studier og programmører, hvis arbejde formede hele den interaktive underholdnings historie.',
+        copyrightP2:     'Spillene på dette sted er originale genimplementeringer inspireret af disse klassikere. De er ikke kopier eller reproduktioner af proprietær kode eller aktiver. Al grafik, alle lyde og al spillogik er skrevet fra bunden som en del af dette eksperiment.',
         copyrightP3:     'Dette projekt er strengt ikke-kommercielt. Der opkræves ingen entré, indsamles ingen data og vises ingen reklamer. Det eksisterer udelukkende som et teknisk og kreativt eksperiment — og som en lille kærlighedserklæring til de mennesker, der opfandt mediet.',
         contribLabel:    '&#x25BA; Bidrag',
-        contribP1:       'Vil du tilføje et spil? Pull requests er velkomne på <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. blip-biblioteket håndterer SDL3 og Emscripten, så du kan fokusere på spillogikken.',
-        contribP2:       'Til inspiration producerede <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Arkadespillenes Guldalder</a> (ca. 1978–1986) hundredvis af titler, der er værd at genbesøge — Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest og mange flere. Den æra er et dybt brønd.',
-        contribP3:       'Respecktér venligst ophavsretten, når du bidrager. Genimplementer mekanikker og æstetik fra bunden — kopier ikke proprietær kode, grafik eller lyd. Originale navne er varemærker; brug alternative titler, som dette projekt gør (Rally i stedet for Pong, Serpent i stedet for Snake osv.). Tvivler du, så behandl din implementering som en hyldest, ikke en reproduktion.',
+        contribP1:       'Vil du tilføje et spil? Pull requests er velkomne på <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. blip-biblioteket håndterer <a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a> og Rust, så du kan fokusere på spillogikken.',
+        contribP2:       'Til inspiration producerede <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Arkadespillenes Guldalder</a> (ca. 1978–1986) hundredvis af titler, der er værd at genbesøge — Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest og mange flere. Den æra er et dybt brønd.',
+        contribP3:       'Respektér venligst ophavsretten, når du bidrager. Genimplementer mekanikker og æstetik fra bunden — kopier ikke proprietær kode, grafik eller lyd. Originale navne er varemærker; brug alternative titler, som dette projekt gør (Rally i stedet for Pong, Serpent i stedet for Snake osv.). Tvivler du, så behandl din implementering som en hyldest, ikke en reproduktion.',
         operatorsHeading:'OPERATØRERNE',
         jacobRole:       'Menneskelig operatør',
-        jacobDesc:       'Personen med ideerne, smagen og fingeren på møntspalten. Jacob styrer eksperimentet, spiller spillene og beslutter, hvad der bliver.',
+        jacobDesc:       'Personen med ideerne, smagen og fingeren på møntspalten. Jacob styrer eksperimentet, spiller spillene og laver tilfældige hacks på projektet.',
+        bjornRole:       'Menneskelig operatør',
+        bjornDesc:       'Rust-entusiast og internationalt anerkendt GIS-ekspert. Forfatter til JSTS og den drivende kraft bag Rust-porten af Blip.',
         claudeRole:      'AI-samarbejdspartner',
         claudeDesc:      'En AI-assistent lavet af Anthropic. Skriver Rust, JavaScript, HTML og CSS på anmodning. Har meninger om spilsfølelse, pixelafstand og navngivning. Kan ikke indsætte mønter.',
         copilotRole:     'AI-samarbejdspartner',
-        copilotDesc:     'Et AI-kodningsassistentprogram lavet af GitHub. Skriver Rust, JavaScript, HTML, CSS og CMake på anmodning. Ekspert i kodefuldførelse, refaktorering og at omsætte vage idéer til fungerende kode. Kan ikke indsætte mønter.'
+        copilotDesc:     'Et AI-kodningsassistentprogram lavet af GitHub. Skriver Rust, JavaScript, HTML og CSS på anmodning. Ekspert i kodefuldførelse, refaktorering og at omsætte vage idéer til fungerende kode. Kan ikke indsætte mønter.'
       },
 
       ja: {
@@ -461,20 +465,22 @@
         introP1:         'BLIP ARCADEは、人間とAIの協働実験です。すべてのゲーム、すべてのコード、UIのすべてのピクセルが、Claude（Anthropic）とGitHub Copilot（GitHub）との共同作業で構築されました。アイデアを出したのは人間で、タイピングのほとんどはAIが担いました。',
         introP2:         'この実験の背後にある問いかけ：会話はどこまで続ければソフトウェアになるのか？思ったよりずっと遠くまで行けることがわかりました。',
         copyrightLabel:  '&#x25BA; 著作権とトリビュート',
-        copyrightP1:     'BLIP ARCADEは、一世代を定義したクラシックアーケードゲーム——Pong、Breakout、Snake、Space Invaders、そしてその多くの後継者——へのトリビュートです。オリジナルゲームは、インタラクティブエンターテインメントの歴史全体を形作った先駆的なスタジオとエンジニアによって作られました。',
-        copyrightP2:     'このサイトのゲームは、それらのクラシックにインスパイアされたオリジナルの再実装です。独自コードやアセットのコピー、移植、複製ではありません。すべてのグラフィックス、音音、ゲームロジックは、この実験の一環としてゼロから書かれました。',
-        copyrightP3:     'このプロジェクトは厳密に非商業的です。入場料は征収されず、データは収集されず、広告は表示されません。純粹に技術的・創造的な実験として、そしてこのメディアを発明した人々への小さな感謝として存在しています。',
+        copyrightP1:     'BLIP ARCADEは、一世代を定義したクラシックアーケードゲーム——Pong、Breakout、Snake、Space Invaders、そしてその多くの後継者——へのトリビュートです。オリジナルゲームは、インタラクティブエンターテインメントの歴史全体を形作った先駆的なスタジオとプログラマーによって作られました。',
+        copyrightP2:     'このサイトのゲームは、それらのクラシックにインスパイアされたオリジナルの再実装です。独自コードやアセットのコピーや複製ではありません。すべてのグラフィックス、サウンド、ゲームロジックは、この実験の一環としてゼロから書かれました。',
+        copyrightP3:     'このプロジェクトは厳密に非商業的です。入場料は徴収されず、データは収集されず、広告は表示されません。純粋に技術的・創造的な実験として、そしてこのメディアを発明した人々への小さな感謝として存在しています。',
         contribLabel:    '&#x25BA; コントリビューション',
-        contribP1:       'ゲームを追加したいですか？プルリクエストは <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a> で歓迎します。blipライブラリがSDL3とEmscriptenの配管を担当するので、ゲームロジックに集中できます。',
+        contribP1:       'ゲームを追加したいですか？プルリクエストは <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a> で歓迎します。blipライブラリが<a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a>とRustの基盤を担当するので、ゲームロジックに集中できます。',
         contribP2:       'インスピレーションとして、<a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">アーケードビデオゲームの黄金時代</a>（おおよそ1978–1986年）には再訪する価値のある作品が何百もあります——Asteroids、Centipede、Frogger、Pac-Man、Donkey Kong、Tempestなど。あの時代は深い井戸です。',
-        contribP3:       'コントリビュートの際は著作権を尊重してください。メカニクと美学をゼロから再実装し——独自コード、グラフィックス、オーディオはコピーしないでください。オリジナルの名前は商標登録されています。このプロジェクトのように代替タイトルを使用してください（Pongの代わRally、Snakeの代わSerpentなど）。迄ったときは、実装を複製ではなくトリビュートとして扱ってください。',
+        contribP3:       'コントリビュートの際は著作権を尊重してください。メカニクスと美学をゼロから再実装し——独自コード、グラフィックス、オーディオはコピーしないでください。オリジナルの名前は商標登録されています。このプロジェクトのように代替タイトルを使用してください（PongのかわりにRally、SnakeのかわりにSerpentなど）。迷ったときは、実装を複製ではなくトリビュートとして扱ってください。',
         operatorsHeading:'オペレーター',
         jacobRole:       '人間オペレーター',
-        jacobDesc:       'アイデア、センス、そしてコインスロットに指を置く人物。Jacobは実験を指撮し、ゲームをプレイし、何を残すかを決めます。',
+        jacobDesc:       'アイデア、センス、そしてコインスロットに指を置く人物。Jacobは実験を指揮し、ゲームをプレイし、プロジェクトにランダムなハックを施します。',
+        bjornRole:       '人間オペレーター',
+        bjornDesc:       'Rustの愛好家で、国際的に知られたGISの専門家。JSTSの作者であり、BlipのRustポートの推進力。',
         claudeRole:      'AIコラボレーター',
-        claudeDesc:      'Anthropicが作ったAIアシスタント。リクエストに応じてC、JavaScript、HTML、CSS、CMakeを書きます。ゲームの手触り、ピクセル間隔、命名において意見を持っています。コインを投入することはできません。',
+        claudeDesc:      'Anthropicが作ったAIアシスタント。リクエストに応じてRust、JavaScript、HTML、CSSを書きます。ゲームの手触り、ピクセル間隔、命名において意見を持っています。コインを投入することはできません。',
         copilotRole:     'AIコラボレーター',
-        copilotDesc:     'GitHubが作ったAIコーディングアシスタント。リクエストに応じてRust、C、JavaScript、HTML、CSS、CMakeを書きます。コード補完、リファクタリング、曖昧なプロンプトを動くコードに変換することが得意です。コインを投入することはできません。'
+        copilotDesc:     'GitHubが作ったAIコーディングアシスタント。リクエストに応じてRust、JavaScript、HTML、CSSを書きます。コード補完、リファクタリング、曖昧なプロンプトを動くコードに変換することが得意です。コインを投入することはできません。'
       }
     };
 
