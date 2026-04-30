@@ -102,7 +102,7 @@ function fillCanvas() {
   var h = window.innerHeight - TOPBAR_H;
   canvas.style.setProperty('width',  w + 'px', 'important');
   canvas.style.setProperty('height', h + 'px', 'important');
-  canvas.style.setProperty('top',    TOPBAR_H + 'px', 'important');
+  canvas.style.setProperty('top',    '0', 'important');
   canvas.style.setProperty('left',   '0', 'important');
   canvas.style.setProperty('transform', 'none', 'important');
 }
