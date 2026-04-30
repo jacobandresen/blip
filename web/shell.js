@@ -138,19 +138,19 @@ window.addEventListener('keydown', function (e) {
   if (overlay.classList.contains('visible')) e.stopImmediatePropagation();
 }, true);
 
+function injectKey(key, code, type) {
+  if (overlay.classList.contains('visible')) return;
+  window.dispatchEvent(new KeyboardEvent(type, {
+    bubbles: true, cancelable: true, key: key, code: code
+  }));
+}
+
 if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
   var isRally = window.location.pathname.indexOf('/rally/') !== -1;
 
   document.getElementById('touch-pad').style.display = 'block';
 
   var held = {};
-
-  function injectKey(key, code, type) {
-    if (overlay.classList.contains('visible')) return;
-    window.dispatchEvent(new KeyboardEvent(type, {
-      bubbles: true, cancelable: true, key: key, code: code
-    }));
-  }
 
   function pressBtn(el) {
     var code = el.dataset.code;
@@ -276,5 +276,62 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
   fire.addEventListener('touchend',    function (e) { e.preventDefault(); releaseBtn(fire); }, { passive: false });
   fire.addEventListener('touchcancel', function ()  { releaseBtn(fire); });
 }
+
+  // ---- Gamepad support ----
+  (function () {
+    var DEADZONE = 0.25;
+    var gpHeld   = {};
+
+    var BTN_MAP = [
+      { idx: 0,  code: 'Space'       },
+      { idx: 1,  code: 'Space'       },
+      { idx: 2,  code: 'Space'       },
+      { idx: 3,  code: 'Space'       },
+      { idx: 9,  code: 'Space'       },
+      { idx: 12, code: 'ArrowUp'    },
+      { idx: 13, code: 'ArrowDown'  },
+      { idx: 14, code: 'ArrowLeft'  },
+      { idx: 15, code: 'ArrowRight' },
+    ];
+
+    function keyOf(code) { return code === 'Space' ? ' ' : code; }
+
+    var polling = false;
+
+    function poll() {
+      var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+      var pad = null;
+      for (var i = 0; i < pads.length; i++) {
+        if (pads[i] && pads[i].connected) { pad = pads[i]; break; }
+      }
+      if (!pad) { polling = false; return; }
+
+      var want = {};
+      for (var j = 0; j < BTN_MAP.length; j++) {
+        var m = BTN_MAP[j];
+        var b = pad.buttons[m.idx];
+        if (b && (b.pressed || b.value > 0.5)) want[m.code] = true;
+      }
+      var ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
+      if (ax < -DEADZONE) want['ArrowLeft']  = true;
+      if (ax >  DEADZONE) want['ArrowRight'] = true;
+      if (ay < -DEADZONE) want['ArrowUp']    = true;
+      if (ay >  DEADZONE) want['ArrowDown']  = true;
+
+      var code;
+      for (code in want) {
+        if (!gpHeld[code]) { gpHeld[code] = true;  injectKey(keyOf(code), code, 'keydown'); }
+      }
+      for (code in gpHeld) {
+        if (gpHeld[code] && !want[code]) { gpHeld[code] = false; injectKey(keyOf(code), code, 'keyup'); }
+      }
+
+      requestAnimationFrame(poll);
+    }
+
+    window.addEventListener('gamepadconnected', function () {
+      if (!polling) { polling = true; requestAnimationFrame(poll); }
+    });
+  }());
 
 })();
