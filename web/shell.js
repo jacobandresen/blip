@@ -133,17 +133,17 @@ canvas.addEventListener('webglcontextlost', function (e) {
 
 // ---- Touch controls — injected as keyboard events into the WASM game ----
 
+// Block game input while the overlay is up.
+window.addEventListener('keydown', function (e) {
+  if (overlay.classList.contains('visible')) e.stopImmediatePropagation();
+}, true);
+
 if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
   var isRally = window.location.pathname.indexOf('/rally/') !== -1;
 
   document.getElementById('touch-pad').style.display = 'block';
 
   var held = {};
-
-  // Block game input while the overlay is up.
-  window.addEventListener('keydown', function (e) {
-    if (overlay.classList.contains('visible')) e.stopImmediatePropagation();
-  }, true);
 
   function injectKey(key, code, type) {
     if (overlay.classList.contains('visible')) return;
