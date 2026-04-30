@@ -72,9 +72,9 @@ impl Blip {
 
         let mut rng = Lcg(0xdead_beef);
         // Stagger initial cooldowns so effects don't all fire at once.
-        let tear_cd   = 20.0 + rng.next() * 30.0;
-        let roll_cd   = 45.0 + rng.next() * 60.0;
-        let chroma_cd =  6.0 + rng.next() * 14.0;
+        let tear_cd   =  5.0 + rng.next() * 10.0;
+        let roll_cd   = 15.0 + rng.next() * 20.0;
+        let chroma_cd =  2.0 + rng.next() *  4.0;
 
         let b = Self {
             width, height, delta_time: 1.0 / 60.0,
@@ -152,10 +152,10 @@ impl Blip {
         } else {
             self.tear_cd -= dt;
             if self.tear_cd <= 0.0 {
-                self.tear_t  = 0.05 + self.rng.next() * 0.12;
+                self.tear_t  = 0.08 + self.rng.next() * 0.20;
                 self.tear_y  = 0.15 + self.rng.next() * 0.70;
-                self.tear_dx = (self.rng.next() - 0.5) * 28.0;
-                self.tear_cd = 15.0 + self.rng.next() * 35.0;
+                self.tear_dx = (self.rng.next() - 0.5) * 60.0;
+                self.tear_cd =  5.0 + self.rng.next() * 15.0;
             }
         }
 
@@ -166,10 +166,10 @@ impl Blip {
         } else {
             self.roll_cd -= dt;
             if self.roll_cd <= 0.0 {
-                self.roll_t   = 0.4 + self.rng.next() * 0.9;
-                self.roll_spd = 100.0 + self.rng.next() * 220.0;
+                self.roll_t   = 0.5 + self.rng.next() * 1.3;
+                self.roll_spd = 180.0 + self.rng.next() * 320.0;
                 self.roll_dy  = 0.0;
-                self.roll_cd  = 40.0 + self.rng.next() * 80.0;
+                self.roll_cd  = 15.0 + self.rng.next() * 25.0;
             }
         }
 
@@ -179,9 +179,9 @@ impl Blip {
         } else {
             self.chroma_cd -= dt;
             if self.chroma_cd <= 0.0 {
-                self.chroma_t  = 0.04 + self.rng.next() * 0.10;
-                self.chroma_dx = 2.0  + self.rng.next() * 4.0;
-                self.chroma_cd = 6.0  + self.rng.next() * 18.0;
+                self.chroma_t  = 0.06 + self.rng.next() * 0.18;
+                self.chroma_dx = 4.0  + self.rng.next() * 8.0;
+                self.chroma_cd = 2.0  + self.rng.next() *  6.0;
             }
         }
     }
