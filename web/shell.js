@@ -2,6 +2,7 @@
 'use strict';
 
 var TOPBAR_H  = 56;
+var PAD       = 10; // padding around the canvas on all sides
 
 var loader    = document.getElementById('loader');
 var barInner  = document.getElementById('bar-inner');
@@ -92,18 +93,20 @@ document.getElementById('insert-coin-btn').addEventListener('click', function ()
   overlay.classList.remove('visible');
 });
 
-// ---- Canvas sizing — fill the area below the topbar; macroquad
-// renders the game with a letterboxed camera so coords stay logical.
+// ---- Canvas sizing ----
+// The kiosk bar is position:fixed;bottom:0. We leave PAD px on each side
+// plus full clearance for the bar so it never overlaps the canvas.
 
 function fillCanvas() {
   var tb = document.getElementById('topbar');
-  TOPBAR_H = tb ? tb.offsetHeight : 56;
-  var w = window.innerWidth;
-  var h = window.innerHeight - TOPBAR_H;
+  // clamp to 56 so a mis-read of 0 before layout doesn't eat the whole screen
+  TOPBAR_H = tb ? Math.max(tb.offsetHeight, 56) : 56;
+  var w = window.innerWidth  - PAD * 2;
+  var h = window.innerHeight - TOPBAR_H - PAD * 2;
   canvas.style.setProperty('width',  w + 'px', 'important');
   canvas.style.setProperty('height', h + 'px', 'important');
-  canvas.style.setProperty('top',    '0', 'important');
-  canvas.style.setProperty('left',   '0', 'important');
+  canvas.style.setProperty('top',    PAD + 'px', 'important');
+  canvas.style.setProperty('left',   PAD + 'px', 'important');
   canvas.style.setProperty('transform', 'none', 'important');
 }
 window.addEventListener('resize', fillCanvas);
