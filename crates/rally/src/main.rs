@@ -1,8 +1,9 @@
 //! Rally (Pong vs CPU), Rust port of `games/rally/main.c` on macroquad.
 
 use blip::input::{
-    any_key_pressed, key_held, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
+    any_key_pressed, key_held, key_pressed, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
 };
+use blip::macroquad::input::KeyCode;
 use blip::macroquad::rand::rand;
 use blip::{
     play_music, play_sfx, rects_overlap, web, window_conf, Blip, BlipColor, BLIP_BLACK,
@@ -44,12 +45,16 @@ const C_HUD_LINE: BlipColor = BlipColor { r: 28.0/255.0, g: 28.0/255.0, b: 28.0/
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Serve, Play, Point, Over }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum Mode { OnePlayer, TwoPlayer }
+
 struct Game {
     lpad_y: f32, rpad_y: f32,
     ball_x: f32, ball_y: f32, ball_vx: f32, ball_vy: f32, ball_spd: f32,
     score_l: i32, score_r: i32,
     point_t: f32,
     state: State,
+    mode: Mode,
 }
 
 impl Game {
@@ -60,6 +65,7 @@ impl Game {
             score_l: 0, score_r: 0,
             point_t: 0.0,
             state: State::Title,
+            mode: Mode::OnePlayer,
         }
     }
 
@@ -102,7 +108,13 @@ struct Beeps {
 }
 
 fn update_title(g: &mut Game) {
-    if any_key_pressed() { g.start_game(); }
+    if key_pressed(KeyCode::Key2) {
+        g.mode = Mode::TwoPlayer;
+        g.start_game();
+    } else if any_key_pressed() {
+        g.mode = Mode::OnePlayer;
+        g.start_game();
+    }
 }
 
 fn update_serve(g: &mut Game, dt: f32) {
@@ -119,10 +131,15 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
     if key_held(BLIP_KEY_UP)   || key_held(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
     if key_held(BLIP_KEY_DOWN) || key_held(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
 
-    let target = g.ball_y + BALL_SZ * 0.5 - PAD_H * 0.5;
-    let diff = target - g.rpad_y;
-    let mv = AI_SPD * dt;
-    g.rpad_y += if diff > mv { mv } else if diff < -mv { -mv } else { diff };
+    if g.mode == Mode::TwoPlayer {
+        if key_held(KeyCode::I) { g.rpad_y -= PAD_SPEED * dt; }
+        if key_held(KeyCode::K) { g.rpad_y += PAD_SPEED * dt; }
+    } else {
+        let target = g.ball_y + BALL_SZ * 0.5 - PAD_H * 0.5;
+        let diff = target - g.rpad_y;
+        let mv = AI_SPD * dt;
+        g.rpad_y += if diff > mv { mv } else if diff < -mv { -mv } else { diff };
+    }
 
     g.clamp_pads();
 
@@ -220,8 +237,9 @@ fn draw_title(blip: &Blip) {
     blip.fill_rect(LPAD_X, py, PAD_W, PAD_H, C_PAD);
     blip.fill_rect(RPAD_X, py, PAD_W, PAD_H, C_PAD);
     let cy = PLAY_T + PLAY_H * 0.5;
-    blip.draw_centered("RALLY",         cy - 28.0, 5.0, BLIP_YELLOW);
-    blip.draw_centered("PRESS ANY KEY", cy + 30.0, 2.0, BLIP_GRAY);
+    blip.draw_centered("RALLY",          cy - 28.0, 5.0, BLIP_YELLOW);
+    blip.draw_centered("1 ONE PLAYER",  cy + 22.0, 2.0, BLIP_GRAY);
+    blip.draw_centered("2 TWO PLAYERS", cy + 40.0, 2.0, BLIP_GRAY);
 }
 
 fn draw_serve(blip: &Blip, g: &Game) {
@@ -251,7 +269,11 @@ fn draw_over(blip: &Blip, g: &Game) {
     draw_net(blip);
     draw_hud(blip, g.score_l, g.score_r);
     let cy = PLAY_T + PLAY_H * 0.5;
-    let msg = if g.score_l >= SCORE_WIN { "YOU WIN!" } else { "GAME OVER" };
+    let msg = if g.mode == Mode::TwoPlayer {
+        if g.score_l >= SCORE_WIN { "P1 WINS!" } else { "P2 WINS!" }
+    } else {
+        if g.score_l >= SCORE_WIN { "YOU WIN!" } else { "GAME OVER" }
+    };
     blip.draw_centered(msg,            cy - 20.0, 3.0, BLIP_YELLOW);
     blip.draw_centered("PRESS ANY KEY", cy + 24.0, 2.0, BLIP_GRAY);
 }
