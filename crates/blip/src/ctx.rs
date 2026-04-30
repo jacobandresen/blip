@@ -1,9 +1,12 @@
 //! `Blip` context: window config, frame loop, HUD, post-process overlay.
 
-use macroquad::camera::{set_camera, set_default_camera, Camera2D};
-use macroquad::color::Color;
-use macroquad::math::Rect;
-use macroquad::texture::Texture2D;
+use macroquad::camera::{set_camera, Camera2D};
+use macroquad::color::{Color, WHITE};
+use macroquad::math::{vec2, Rect};
+use macroquad::shapes::draw_rectangle;
+use macroquad::texture::{
+    draw_texture_ex, render_target, DrawTextureParams, FilterMode, RenderTarget,
+};
 use macroquad::time::get_frame_time;
 use macroquad::window::{clear_background, next_frame, screen_height, screen_width, Conf};
 
@@ -22,65 +25,261 @@ pub fn window_conf(title: &'static str, width: i32, height: i32) -> Conf {
     }
 }
 
+/// Lightweight LCG — no stdlib dependency, deterministic per-frame noise.
+struct Lcg(u32);
+impl Lcg {
+    #[inline]
+    fn next(&mut self) -> f32 {
+        self.0 = self.0.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        (self.0 >> 16) as f32 / 65_535.0
+    }
+}
+
 /// Per-game runtime state. Created once at startup, then `next_frame`'d
 /// once per tick.
 pub struct Blip {
-    pub width: i32,
-    pub height: i32,
+    pub width:      i32,
+    pub height:     i32,
     pub delta_time: f32,
+    rt:             RenderTarget,
+    rng:            Lcg,
+    // ---- glitch: horizontal tear ----
+    tear_cd:  f32, // cooldown to next tear event (seconds)
+    tear_t:   f32, // remaining duration of active tear (0 = inactive)
+    tear_y:   f32, // split point as fraction of virtual height (0..1)
+    tear_dx:  f32, // horizontal shift in virtual pixels
+    // ---- glitch: vertical roll ----
+    roll_cd:  f32,
+    roll_t:   f32,
+    roll_dy:  f32, // current vertical offset in virtual pixels
+    roll_spd: f32, // pixels per second
+    // ---- glitch: chromatic aberration ----
+    chroma_cd: f32,
+    chroma_t:  f32,
+    chroma_dx: f32, // horizontal shift in virtual pixels
 }
 
 impl Blip {
     pub fn new(width: i32, height: i32) -> Self {
-        let b = Self { width, height, delta_time: 1.0 / 60.0 };
+        let rt = render_target(width as u32, height as u32);
+        rt.texture.set_filter(FilterMode::Nearest);
+
+        let mut rng = Lcg(0xdead_beef);
+        // Stagger initial cooldowns so effects don't all fire at once.
+        let tear_cd   = 20.0 + rng.next() * 30.0;
+        let roll_cd   = 45.0 + rng.next() * 60.0;
+        let chroma_cd =  6.0 + rng.next() * 14.0;
+
+        let b = Self {
+            width, height, delta_time: 1.0 / 60.0,
+            rt, rng,
+            tear_cd,  tear_t: 0.0, tear_y: 0.5, tear_dx: 0.0,
+            roll_cd,  roll_t: 0.0, roll_dy: 0.0, roll_spd: 0.0,
+            chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
+        };
         b.apply_camera();
         b
     }
 
-    /// Install a Camera2D that maps `(0,0)-(width,height)` virtual coordinates
-    /// onto a centred letterboxed rectangle of the actual screen, so games
-    /// keep using fixed pixel coordinates regardless of the true canvas size.
+    /// Point the camera at the render target so subsequent game draws land there.
     fn apply_camera(&self) {
+        // No zoom.y flip: macroquad's Camera2D already handles RT vs screen
+        // inversion differences via its internal `invert_y` logic.
+        let mut cam = Camera2D::from_display_rect(
+            Rect::new(0.0, 0.0, self.width as f32, self.height as f32),
+        );
+        cam.render_target = Some(self.rt.clone());
+        set_camera(&cam);
+    }
+
+    /// Letterboxed screen rect `(x, y, w, h)` for the current window size.
+    fn viewport(&self) -> (f32, f32, f32, f32) {
         let sw = screen_width();
         let sh = screen_height();
-        let lw = self.width as f32;
+        let lw = self.width  as f32;
         let lh = self.height as f32;
-        if sw <= 0.0 || sh <= 0.0 { return; }
         let scale = (sw / lw).min(sh / lh);
         let vw = (lw * scale).round();
         let vh = (lh * scale).round();
         let vx = ((sw - vw) * 0.5).round();
         let vy = ((sh - vh) * 0.5).round();
-        let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, lw, lh));
-        // macroquad's display rect uses bottom-up Y; flip so (0,0) is top-left.
-        cam.zoom.y = -cam.zoom.y;
-        cam.viewport = Some((vx as i32, vy as i32, vw as i32, vh as i32));
-        set_camera(&cam);    }
-
-    /// End-of-frame: paint scanline overlay, present, refresh `delta_time`.
-    /// `target_fps` is accepted for API parity but ignored — macroquad
-    /// already paces to vsync.
-    pub async fn next_frame(&mut self, _target_fps: i32) {
-        self.draw_scanlines();
-        next_frame().await;
-        // New frame: paint the full screen black so the letterbox bars are
-        // clean, then re-install the viewport camera (handles canvas
-        // resizes between frames).
-        set_default_camera();
-        clear_background(macroquad::color::BLACK);
-        self.apply_camera();
-        let dt = get_frame_time();
-        self.delta_time = if dt > 0.1 { 0.1 } else { dt };
+        (vx, vy, vw, vh)
     }
 
-    fn draw_scanlines(&self) {
-        // Match C: 1px line every 2px, 60/255 alpha black.
-        let overlay = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
-        let w = self.width as f32;
-        let mut y = 1;
-        while y < self.height {
-            draw::draw_line(0.0, y as f32, w - 1.0, y as f32, overlay);
-            y += 2;
+    /// End-of-frame: blit the render target to screen with CRT post-process,
+    /// then reset for the next game frame.
+    pub async fn next_frame(&mut self, _target_fps: i32) {
+        // Switch to a screen-space camera.  set_default_camera() is deliberately
+        // NOT used here: it flushes the RT draws but leaves camera_matrix pointing
+        // at the RT projection.  Blit vertices are in screen pixels, so using the
+        // RT matrix clips everything when the window is larger than the game canvas.
+        {
+            let cam = Camera2D::from_display_rect(
+                Rect::new(0.0, 0.0, screen_width(), screen_height()),
+            );
+            set_camera(&cam);
+        }
+        clear_background(macroquad::color::BLACK);
+        self.draw_post_process();
+
+        next_frame().await;
+
+        // Prepare render target for the next game frame.
+        self.apply_camera();
+        clear_background(macroquad::color::BLACK);
+
+        let raw = get_frame_time();
+        self.delta_time = if raw > 0.1 { 0.1 } else { raw };
+        self.update_glitch(self.delta_time);
+    }
+
+    // ------------------------------------------------------------------ //
+    // Glitch state machine                                                 //
+    // ------------------------------------------------------------------ //
+
+    fn update_glitch(&mut self, dt: f32) {
+        let lh = self.height as f32;
+
+        // Tear
+        if self.tear_t > 0.0 {
+            self.tear_t -= dt;
+        } else {
+            self.tear_cd -= dt;
+            if self.tear_cd <= 0.0 {
+                self.tear_t  = 0.05 + self.rng.next() * 0.12;
+                self.tear_y  = 0.15 + self.rng.next() * 0.70;
+                self.tear_dx = (self.rng.next() - 0.5) * 28.0;
+                self.tear_cd = 15.0 + self.rng.next() * 35.0;
+            }
+        }
+
+        // Roll
+        if self.roll_t > 0.0 {
+            self.roll_t  -= dt;
+            self.roll_dy  = (self.roll_dy + self.roll_spd * dt) % lh;
+        } else {
+            self.roll_cd -= dt;
+            if self.roll_cd <= 0.0 {
+                self.roll_t   = 0.4 + self.rng.next() * 0.9;
+                self.roll_spd = 100.0 + self.rng.next() * 220.0;
+                self.roll_dy  = 0.0;
+                self.roll_cd  = 40.0 + self.rng.next() * 80.0;
+            }
+        }
+
+        // Chromatic aberration
+        if self.chroma_t > 0.0 {
+            self.chroma_t -= dt;
+        } else {
+            self.chroma_cd -= dt;
+            if self.chroma_cd <= 0.0 {
+                self.chroma_t  = 0.04 + self.rng.next() * 0.10;
+                self.chroma_dx = 2.0  + self.rng.next() * 4.0;
+                self.chroma_cd = 6.0  + self.rng.next() * 18.0;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ //
+    // Post-process rendering                                               //
+    // ------------------------------------------------------------------ //
+
+    fn draw_post_process(&mut self) {
+        let (vx, vy, vw, vh) = self.viewport();
+        if vw <= 0.0 || vh <= 0.0 { return; }
+
+        let lw = self.width  as f32;
+        let lh = self.height as f32;
+        let scale = vw / lw;
+
+        let roll_on   = self.roll_t  > 0.0;
+        let tear_on   = self.tear_t  > 0.0 && !roll_on; // don't combine tear + roll
+        let chroma_on = self.chroma_t > 0.0;
+
+        // Cloning the texture handle is cheap (it's just a GPU ID).
+        let tex = self.rt.texture.clone();
+
+        // ---- chromatic aberration: coloured ghost layers under main image ----
+        if chroma_on {
+            let dx = self.chroma_dx * scale;
+            draw_texture_ex(&tex, vx - dx, vy,
+                Color::new(1.0, 0.0, 0.0, 0.35),
+                DrawTextureParams { dest_size: Some(vec2(vw, vh)), ..Default::default() });
+            draw_texture_ex(&tex, vx + dx, vy,
+                Color::new(0.0, 0.4, 1.0, 0.35),
+                DrawTextureParams { dest_size: Some(vec2(vw, vh)), ..Default::default() });
+        }
+
+        // ---- main image (with roll or tear applied) ----
+        //
+        // Source-rect convention: the screen camera has y=0 at screen top,
+        // matching macroquad's game coordinate system.  Source Rect(0, a, lw, b)
+        // maps directly to game rows starting at y=a with height b.
+        if roll_on {
+            // Upper screen strip: game rows [roll_dy, lh)
+            let top_src_h = lh - self.roll_dy;
+            let top_dst_h = vh * top_src_h / lh;
+            draw_texture_ex(&tex, vx, vy, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(vw, top_dst_h)),
+                source:    Some(Rect::new(0.0, self.roll_dy, lw, top_src_h)),
+                ..Default::default()
+            });
+            // Lower screen strip: game rows [0, roll_dy) (wrapped)
+            if self.roll_dy >= 1.0 {
+                let bot_dst_h = vh - top_dst_h;
+                draw_texture_ex(&tex, vx, vy + top_dst_h, WHITE, DrawTextureParams {
+                    dest_size: Some(vec2(vw, bot_dst_h)),
+                    source:    Some(Rect::new(0.0, 0.0, lw, self.roll_dy)),
+                    ..Default::default()
+                });
+            }
+        } else if tear_on {
+            let split_lh = self.tear_y * lh;
+            let split_vh = self.tear_y * vh;
+            let tdx      = self.tear_dx * scale;
+
+            // Top strip: game rows [0, split_lh)
+            draw_texture_ex(&tex, vx, vy, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(vw, split_vh)),
+                source:    Some(Rect::new(0.0, 0.0, lw, split_lh)),
+                ..Default::default()
+            });
+            // Bottom strip: game rows [split_lh, lh), shifted horizontally
+            draw_texture_ex(&tex, vx + tdx, vy + split_vh, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(vw, vh - split_vh)),
+                source:    Some(Rect::new(0.0, split_lh, lw, lh - split_lh)),
+                ..Default::default()
+            });
+            // Bright glitch line at the split point
+            let gw = vw * (0.4 + self.rng.next() * 0.6);
+            let gh = 1.0 + (self.rng.next() * 2.0).floor();
+            let ga = 0.5 + self.rng.next() * 0.5;
+            draw_rectangle(vx, vy + split_vh - gh * 0.5, gw, gh,
+                Color::new(1.0, 1.0, 1.0, ga));
+        } else {
+            draw_texture_ex(&tex, vx, vy, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(vw, vh)),
+                ..Default::default()
+            });
+        }
+
+        // ---- CRT scanlines ----
+        let scanline = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
+        let mut sy = vy + 1.0;
+        let bottom = vy + vh;
+        while sy < bottom {
+            draw_rectangle(vx, sy, vw, 1.0, scanline);
+            sy += 2.0;
+        }
+
+        // ---- background noise ----
+        let pixel = scale.max(1.0);
+        for _ in 0..48 {
+            let nx = vx + self.rng.next() * vw;
+            let ny = vy + self.rng.next() * vh;
+            let a  = 0.02 + self.rng.next() * 0.10;
+            let v  = self.rng.next();
+            draw_rectangle(nx, ny, pixel, pixel, Color::new(v, v, v, a));
         }
     }
 
@@ -105,12 +304,12 @@ impl Blip {
         draw::fill_circle(cx, cy, r, c);
     }
     #[inline]
-    pub fn draw_texture(&self, tex: &Texture2D, x: f32, y: f32, w: f32, h: f32) {
+    pub fn draw_texture(&self, tex: &macroquad::texture::Texture2D, x: f32, y: f32, w: f32, h: f32) {
         draw::draw_texture(tex, x, y, w, h);
     }
     #[inline]
     pub fn draw_texture_tinted(
-        &self, tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, tint: Color,
+        &self, tex: &macroquad::texture::Texture2D, x: f32, y: f32, w: f32, h: f32, tint: Color,
     ) {
         draw::draw_texture_tinted(tex, x, y, w, h, tint);
     }
