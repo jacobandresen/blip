@@ -58,6 +58,8 @@ pub struct Blip {
     chroma_cd: f32,
     chroma_t:  f32,
     chroma_dx: f32, // horizontal shift in virtual pixels
+    // ---- interlaced field ----
+    interlace_field: u8, // 0 or 1, flips every frame
 }
 
 impl Blip {
@@ -82,6 +84,7 @@ impl Blip {
             tear_cd,  tear_t: 0.0, tear_y: 0.5, tear_dx: 0.0,
             roll_cd,  roll_t: 0.0, roll_dy: 0.0, roll_spd: 0.0,
             chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
+            interlace_field: 0,
         };
         b.apply_camera();
         b
@@ -137,6 +140,7 @@ impl Blip {
         let raw = get_frame_time();
         self.delta_time = if raw > 0.1 { 0.1 } else { raw };
         self.update_glitch(self.delta_time);
+        self.interlace_field ^= 1;
     }
 
     // ------------------------------------------------------------------ //
@@ -269,14 +273,19 @@ impl Blip {
             });
         }
 
-        // ---- CRT scanlines ----
-        let scanline = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
-        let mut sy = vy + 1.0;
-        let bottom = vy + vh;
-        while sy < bottom {
-            draw_rectangle(vx, sy, vw, 1.0, scanline);
-            sy += 2.0;
-        }
+        // ---- interlaced CRT scanlines ----
+        // Active field rows get a subtle CRT shadow; inactive field rows are
+        // heavily dimmed to simulate the phosphor of the opposite field fading.
+        // The active field flips every frame, producing the interlaced flicker.
+        let active   = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
+        let inactive = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.75 };
+        let bottom   = vy + vh;
+        let f0 = self.interlace_field as f32;
+        let f1 = 1.0 - f0;
+        let mut sy = vy + f0;
+        while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, active);   sy += 2.0; }
+        let mut sy = vy + f1;
+        while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, inactive); sy += 2.0; }
 
         // ---- background noise ----
         let pixel = scale.max(1.0);
