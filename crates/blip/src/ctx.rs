@@ -5,7 +5,8 @@ use macroquad::color::{Color, WHITE};
 use macroquad::math::{vec2, Rect};
 use macroquad::shapes::draw_rectangle;
 use macroquad::texture::{
-    draw_texture_ex, render_target, DrawTextureParams, FilterMode, RenderTarget,
+    draw_texture_ex, render_target_ex, DrawTextureParams, FilterMode, RenderTarget,
+    RenderTargetParams,
 };
 use macroquad::time::get_frame_time;
 use macroquad::window::{clear_background, next_frame, screen_height, screen_width, Conf};
@@ -61,7 +62,12 @@ pub struct Blip {
 
 impl Blip {
     pub fn new(width: i32, height: i32) -> Self {
-        let rt = render_target(width as u32, height as u32);
+        // sample_count=0 avoids the MSAA resolve path in miniquad, which calls
+        // glCheckFramebufferStatus — a WebGL function missing from the JS bundle.
+        let rt = render_target_ex(width as u32, height as u32, RenderTargetParams {
+            sample_count: 0,
+            ..Default::default()
+        });
         rt.texture.set_filter(FilterMode::Nearest);
 
         let mut rng = Lcg(0xdead_beef);
