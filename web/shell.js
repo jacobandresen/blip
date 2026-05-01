@@ -2,7 +2,7 @@
 'use strict';
 
 var TOPBAR_H  = 56;
-var PAD       = 10; // padding around the canvas on all sides
+var PAD       = 16; // padding around the canvas on all sides (= bezel width)
 
 var loader    = document.getElementById('loader');
 var barInner  = document.getElementById('bar-inner');

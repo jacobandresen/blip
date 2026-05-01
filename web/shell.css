@@ -3,7 +3,19 @@
 html, body {
   width: 100%; height: 100%;
   overflow: hidden;
-  background: #000;
+  /* Dark cabinet material: subtle cross-hatch texture over charcoal gradient */
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      transparent 0px, transparent 4px,
+      rgba(255,255,255,0.007) 4px, rgba(255,255,255,0.007) 5px
+    ),
+    repeating-linear-gradient(
+      45deg,
+      transparent 0px, transparent 4px,
+      rgba(255,255,255,0.007) 4px, rgba(255,255,255,0.007) 5px
+    ),
+    linear-gradient(155deg, #1d1d1d 0%, #0c0c0c 55%, #181818 100%);
   touch-action: none;
 }
 
@@ -19,6 +31,38 @@ body::before {
   );
   pointer-events: none;
   z-index: 100;
+}
+
+/* ---- Arcade cabinet bezel ---- */
+
+#arcade-bezel {
+  /* Sits exactly at the canvas edges; outer box-shadow fills the PAD frame area */
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px)); /* PAD(16) + TOPBAR(56) */
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 8;
+  background: transparent;
+
+  /* Monitor-opening trim: hairline green accent matching the game palette */
+  border: 1px solid rgba(50, 200, 80, 0.14);
+
+  box-shadow:
+    /* ① Frame body — fills the 16 px gap between this div and the window edge */
+    0 0 0 16px #141414,
+    /* ② Outer bevel: 1 px lighter strip at the frame's outer rim */
+    0 0 0 17px rgba(52, 52, 52, 0.85),
+    /* ③ Cabinet edge: darkest line at the very outside */
+    0 0 0 18px #060606,
+    /* ④ Ambient drop shadow from cabinet into the room */
+    0 0 45px rgba(0, 0, 0, 0.95),
+    /* ⑤ Phosphor glow — faint green halo bleeding from screen onto bezel */
+    0 0 22px rgba(0, 200, 60, 0.05),
+    /* ⑥ Screen recess — soft vignette darkens game edges, simulates CRT depth */
+    inset 0 0 45px rgba(0, 0, 0, 0.38);
 }
 
 canvas {
@@ -329,6 +373,6 @@ canvas {
     height: 76px;
     bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 10px);
   }
-  #paddle-dial    { left: 10px; }
-  #paddle-dial-p2 { right: 10px; }
+  #paddle-dial    { left: 16px; }
+  #paddle-dial-p2 { right: 16px; }
 }
