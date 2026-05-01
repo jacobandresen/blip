@@ -198,6 +198,41 @@
     .card-bouncer    { --c: var(--cyan);    }
     .card-galactic   { --c: var(--magenta); }
     .card-rally      { --c: var(--red);     }
+    .card-canaris    { --c: #3296c8;        }
+
+    /* ---- Danish-origin seal ---- */
+    .badge-dk {
+      position: absolute;
+      top: 14px; right: 14px;
+      font-size: 24px;
+      line-height: 1;
+      width: 52px; height: 52px;
+      border: 2px solid #c8102e;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.85);
+      box-shadow:
+        0 0 0 3px rgba(0,0,0,.85),
+        0 0 0 5px rgba(200,16,46,0.35),
+        0 0 14px rgba(200,16,46,0.35);
+      transform: rotate(-8deg);
+      z-index: 2;
+    }
+
+    /* ---- keyboard-recommended chip ---- */
+    .badge-kb {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: #7a7a7a;
+      border: 1px solid #2c2c2c;
+      padding: 3px 10px 3px 8px;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      background: rgba(255,255,255,0.02);
+    }
 
     .card::before, .card::after { border-color: var(--c); }
 
@@ -583,6 +618,20 @@
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
 
+    <!-- CANARIS -->
+    <a class="card card-canaris" href="canaris/index.html">
+      <div class="badge-dk">🇩🇰</div>
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="canaris/screenshot.png" alt="Canaris gameplay">
+      </div>
+      <div class="card-title">CANARIS</div>
+      <div class="card-genre"  data-i18n="canarisGenre"></div>
+      <div class="card-desc"   data-i18n="canarisDesc"></div>
+      <div class="badge-kb">⌨ <span data-i18n="canarisKb"></span></div>
+      <div class="card-controls" data-i18n="canarisControls"></div>
+      <div class="press-start" data-i18n="pressStart"></div>
+    </a>
+
   </div>
 
   <div class="lang-switcher">
@@ -642,6 +691,11 @@
         rallyDesc:         'First player to reach seven point is win.<br>Ball getting more fast with every hit.',
         rallyControls:     'P1 W/S OR ARROW &middot; P2 I/K &middot; ANY KEY FOR SERVE',
 
+        canarisGenre:      'PRIVATEER NAVAL GAME',
+        canarisDesc:       'Sail Kattegat as a Danish privateer captain.<br>Fire cannons, board ships, and plunder gold.<br>Dock at harbour to repair and resupply.',
+        canarisKb:         'KEYBOARD RECOMMENDED',
+        canarisControls:   'ARROW / WASD TO SAIL &middot; SPACE TO FIRE &middot; E TO BOARD',
+
         pressStart:       'PUSH START BUTTON',
         needCoin:         'NEED COIN',
         footerControls:   'PUSH WASD OR ARROW KEY &nbsp;&mdash;&nbsp; SPACE IS FOR SHOOT OR FOR LAUNCH',
@@ -669,6 +723,11 @@
         rallyDesc:         '先に7点取った方が勝ち。<br>打つたびにボールは速くなる。',
         rallyControls:     'P1 W/S または矢印 &middot; P2 I/K &middot; 任意のキーでサーブ',
 
+        canarisGenre:      'デンマーク海賊ゲーム',
+        canarisDesc:       'デンマークの私掠船長としてカテガット海峡を航海。<br>大砲を撃ち、敵船に乗り込み、金を奪え。<br>港でせんかんを修理・補給しよう。',
+        canarisKb:         'キーボード推奨',
+        canarisControls:   '矢印/WASD 操舵 &middot; スペースで射撃 &middot; E で乗船',
+
         pressStart:       'スタート',
         needCoin:         'コインが必要',
         footerControls:   'WASD または 矢印キー &nbsp;―&nbsp; スペースで撃つ・発射',
@@ -695,6 +754,11 @@
         rallyGenre:        'BORDTENNISSPIL',
         rallyDesc:         'F&oslash;rst til syv point vinder.<br>Bolden accelererer for hvert slag.',
         rallyControls:     'P1 W/S ELLER PILE &middot; P2 I/K &middot; VILK&Aring;RLIG TAST FOR SERV',
+
+        canarisGenre:      'KAPERSKIB SPIL',
+        canarisDesc:       'Sejl i Kattegat som dansk kaperkapitajn.<br>Affyr kanoner, bord fjendtlige skibe og pl&oslash;ndr guld.<br>Anl&oslash;b havn for at reparere og genopfylde.',
+        canarisKb:         'TASTATUR ANBEFALES',
+        canarisControls:   'PIL / WASD FOR AT SEJLE &middot; MELLEMRUM SKYD &middot; E BORD',
 
         pressStart:       'TRYK START',
         needCoin:         'INDS&AElig;T M&Oslash;NT',

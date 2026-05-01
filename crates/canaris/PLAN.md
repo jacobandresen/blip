@@ -168,11 +168,14 @@ Window: **480 × 540**. World width: **4 × screen = 1920** (wraps seamlessly).
 ### Pass 5 — Port / Resource Management
 *Goal: Harbour docking screen with menu-driven purchases.*
 
-- [ ] Render `port_bg` + menu panel
-- [ ] Menu items: Repair / Hire Crew / Buy Cannons / Buy Food / Set Sail
-- [ ] UP/DOWN or W/S to move cursor; Enter or Space to confirm
-- [ ] Purchase: deduct gold if sufficient, apply effect, show message
-- [ ] "Set Sail": transition back to Sea, play sea_music
+- [x] Render `port_bg` + menu panel
+- [x] Player stats strip above menu: hull bar + crew/food/guns inline
+- [x] Menu items: Repair / Hire Crew / Buy Cannons / Buy Food / Set Sail
+- [x] Unaffordable items dimmed (DARKGRAY), cost shown dimmed too
+- [x] UP/DOWN or W/S to move cursor; Enter or Space to confirm
+- [x] Purchase: deduct gold if sufficient, apply effect, show message
+- [x] Status message color-coded: green = success, red = insufficient gold
+- [x] "Set Sail": transition back to Sea, play sea_music
 
 Prices: Repair=30g, Crew=20g, Cannons=25g, Food=15g.
 
@@ -183,16 +186,19 @@ Prices: Repair=30g, Crew=20g, Cannons=25g, Food=15g.
 ### Pass 6 — HUD, Score, Level Progression, Polish
 *Goal: Full arcade loop with scoring, level scaling, death/respawn, and visual polish.*
 
-- [ ] HUD: `blip.draw_hud(score, hi_score, lives)` + second row `HULL:X  GOLD:X`
-- [ ] Score increments: sunk=200×level, boarded=150×level+loot×2, level=500×level
-- [ ] Level-up: all enemies sunk or `level_t` expires → harder enemies
-- [ ] Dead state: red flash + fade, respawn or GameOver
-- [ ] GameOver: final score, hi-score, press-any-key → Title + `web::spend_coin()`
-- [ ] Ship bob: `y = base_y + sin(time × freq) × amp`
-- [ ] Explosion scaling: grows over lifetime
-- [ ] Hit flash: white tint on `draw_texture_tinted` for `hit_flash_t` frames
-- [ ] Music transitions: sea ↔ combat ↔ port on state changes
-- [ ] All sounds wired to events
+- [x] HUD: `draw_hud_canaris` — score/hi/lives top bar + HULL/GOLD/FOOD/GUNS/LV second row
+- [x] Score increments: sunk=200×level, boarded=150×level+loot×2
+- [x] Level-up: `level_t` timer expires → level+1, spawn harder enemies
+- [x] Dead state: red flash + fade-out overlay, respawn (lives>0) or GameOver
+- [x] GameOver: final score, hi-score, press-any-key → Title + `web::spend_coin()`
+- [x] Ship bob: `sin(time × BOB_FREQ) × BOB_AMP` in sea and title screens
+- [x] Explosion scaling: grows over lifetime (`1.0 + (1-t)*0.7` multiplier)
+- [x] Hit flash: `draw_texture_tinted(tint_white())` while `hit_flash_t > 0`
+- [x] Music transitions: sea ↔ combat ↔ port on state changes
+- [x] All sounds wired to events
+- [x] Game card in `web/index.html`: Danish flag badge 🇩🇰 + keyboard badge ⌨
+- [x] `web/canaris/index.html` shell page
+- [x] `web/canaris/screenshot.png` placeholder
 
 **Verify:** Full game loop playable. Die, respawn, hit hi-score, game over, restart. WASM build works.
 

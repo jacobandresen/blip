@@ -220,6 +220,7 @@ struct Game {
     port_cursor: PortItem,
     port_msg:    &'static str,
     port_msg_t:  f32,
+    port_msg_ok: bool,
 
     score:    i32,
     hi_score: i32,
@@ -261,6 +262,7 @@ impl Game {
             port_cursor: PortItem::Repair,
             port_msg: "",
             port_msg_t: 0.0,
+            port_msg_ok: true,
             score: 0, hi_score: 0,
             lives: LIVES_START,
             level: 1, level_t: 60.0,
@@ -796,11 +798,13 @@ fn update_port(g: &mut Game, dt: f32, sfx: &Sounds) {
                         PortItem::Food    => { g.player.food = FOOD_MAX as f32; g.port_msg = "PROVISIONS STOCKED"; }
                         PortItem::Sail    => {}
                     }
-                    g.port_msg_t = 1.5;
+                    g.port_msg_t  = 1.5;
+                    g.port_msg_ok = true;
                     play_sfx(&sfx.coin_jingle);
                 } else {
-                    g.port_msg   = "NOT ENOUGH GOLD";
-                    g.port_msg_t = 1.5;
+                    g.port_msg    = "NOT ENOUGH GOLD";
+                    g.port_msg_t  = 1.5;
+                    g.port_msg_ok = false;
                 }
             }
         }
@@ -1141,34 +1145,59 @@ fn draw_boarding(blip: &Blip, g: &Game, tex: &Textures) {
 fn draw_port(blip: &Blip, g: &Game, tex: &Textures) {
     blip.draw_texture(&tex.port_bg, 0.0, HUD_H as f32, WIN_W as f32, (WIN_H - HUD_H) as f32);
 
-    // Menu panel
-    let panel_x = WIN_W as f32 * 0.15;
-    let panel_y = WIN_H as f32 * 0.55;
-    let panel_w = WIN_W as f32 * 0.7;
-    let panel_h = 180.0_f32;
+    let panel_x = WIN_W as f32 * 0.12;
+    let panel_w = WIN_W as f32 * 0.76;
+
+    // ── Player stats strip ────────────────────────────────────────────────────
+    let stats_y = 218.0_f32;
+    let stats_h = 52.0_f32;
+    blip.fill_rect(panel_x - 2.0, stats_y - 2.0, panel_w + 4.0, stats_h + 4.0, BLIP_DARKGRAY);
+    blip.fill_rect(panel_x, stats_y, panel_w, stats_h, Color::new(0.04, 0.07, 0.12, 1.0));
+
+    let hull_frac = (g.player.hull as f32 / PLAYER_HULL_MAX as f32).clamp(0.0, 1.0);
+    let hull_col  = if hull_frac > 0.5 { BLIP_GREEN } else if hull_frac > 0.25 { BLIP_YELLOW } else { BLIP_RED };
+    blip.draw_text("HULL", panel_x + 4.0, stats_y + 4.0, 1.0, BLIP_GRAY);
+    blip.draw_text(&format!("{}/{}", g.player.hull, PLAYER_HULL_MAX),
+                   panel_x + panel_w - 52.0, stats_y + 4.0, 1.0, hull_col);
+    blip.fill_rect(panel_x + 4.0, stats_y + 14.0, panel_w - 8.0, 8.0, BLIP_DARKGRAY);
+    blip.fill_rect(panel_x + 4.0, stats_y + 14.0, (panel_w - 8.0) * hull_frac, 8.0, hull_col);
+
+    let col_w = (panel_w - 8.0) / 3.0;
+    blip.draw_text(&format!("CREW {}", g.player.crew),
+                   panel_x + 4.0, stats_y + 30.0, 2.0, BLIP_CYAN);
+    blip.draw_text(&format!("FOOD {}", g.player.food as i32),
+                   panel_x + 4.0 + col_w, stats_y + 30.0, 2.0, BLIP_GREEN);
+    blip.draw_text(&format!("GUNS {}", g.player.cannons),
+                   panel_x + 4.0 + col_w * 2.0, stats_y + 30.0, 2.0, BLIP_ORANGE);
+
+    // ── Status message (between strips) ──────────────────────────────────────
+    if g.port_msg_t > 0.0 {
+        let msg_col = if g.port_msg_ok { BLIP_GREEN } else { BLIP_RED };
+        blip.draw_centered(g.port_msg, stats_y + stats_h + 8.0, 2.0, msg_col);
+    }
+
+    // ── Menu panel ────────────────────────────────────────────────────────────
+    let panel_y = stats_y + stats_h + 28.0;
+    let panel_h = 182.0_f32;
     blip.fill_rect(panel_x - 2.0, panel_y - 2.0, panel_w + 4.0, panel_h + 4.0, BLIP_CYAN);
     blip.fill_rect(panel_x, panel_y, panel_w, panel_h, BLIP_BLACK);
 
+    blip.draw_text(&format!("GOLD: {}", g.player.gold),
+                   panel_x + 8.0, panel_y + 6.0, 2.0, BLIP_YELLOW);
+
     let items = [PortItem::Repair, PortItem::Crew, PortItem::Cannons, PortItem::Food, PortItem::Sail];
     for (i, &item) in items.iter().enumerate() {
-        let iy   = panel_y + 12.0 + i as f32 * 30.0;
-        let col  = if item == g.port_cursor { BLIP_YELLOW } else { BLIP_WHITE };
-        let cursor_str = if item == g.port_cursor { "> " } else { "  " };
-        let label = format!("{}{}", cursor_str, item.label());
-        blip.draw_text(&label, panel_x + 8.0, iy, 2.0, col);
+        let iy         = panel_y + 30.0 + i as f32 * 28.0;
+        let can_afford = item == PortItem::Sail || g.player.gold >= item.cost();
+        let selected   = item == g.port_cursor;
+        let col = if selected { BLIP_YELLOW } else if can_afford { BLIP_WHITE } else { BLIP_DARKGRAY };
+        let prefix = if selected { ">" } else { " " };
+        blip.draw_text(&format!("{} {}", prefix, item.label()), panel_x + 8.0, iy, 2.0, col);
         if item != PortItem::Sail {
-            let cost_str = format!("{}G", item.cost());
-            blip.draw_text(&cost_str, panel_x + panel_w - 48.0, iy, 2.0, BLIP_YELLOW);
+            let cost_col = if can_afford { BLIP_YELLOW } else { BLIP_DARKGRAY };
+            blip.draw_text(&format!("{}G", item.cost()),
+                           panel_x + panel_w - 44.0, iy, 2.0, cost_col);
         }
-    }
-
-    // Gold display
-    let gold_str = format!("GOLD: {}",  g.player.gold);
-    blip.draw_text(&gold_str, panel_x + 8.0, panel_y + panel_h + 8.0, 2.0, BLIP_YELLOW);
-
-    // Status message
-    if g.port_msg_t > 0.0 {
-        blip.draw_centered(g.port_msg, panel_y - 18.0, 2.0, BLIP_CYAN);
     }
 
     draw_hud_canaris(blip, g);
