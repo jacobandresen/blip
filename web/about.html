@@ -17,6 +17,7 @@
       --yellow:  #e6dc32;
       --orange:  #D97757;
       --copilot: #6e40c9;
+      --danish:  #c8102e;
     }
 
     html, body {
@@ -193,6 +194,14 @@
     .claude-profile .profile-link:hover { color: var(--orange); }
     .copilot-profile .profile-link:hover { color: var(--copilot); }
 
+    .canaris-section .thoughts-label {
+      color: var(--danish);
+      opacity: 1;
+    }
+    .canaris-section .thoughts-body {
+      border-left-color: rgba(200,16,46,0.30);
+    }
+
     .inline-link {
       color: var(--orange);
       text-decoration: none;
@@ -279,6 +288,38 @@
         This project is strictly non-commercial. No admission is charged, no data is collected,
         no advertising is served. It exists purely as a technical and creative experiment,
         and as a small act of appreciation for the people who invented the medium.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="canaris-section">
+    <div class="thoughts-label" data-i18n="canarisLabel">🇩🇰 &#x25BA; Kaptajn Kaper — a game for the arcade that never was</div>
+    <div class="thoughts-body">
+      <p data-i18n="canarisP1">
+        In 1985, Danish developer Peter Ole Frederiksen released
+        <em>Kaptajn Kaper i Kattegat</em> — Captain Caper in the Kattegat — for the PC.
+        It was a peculiarly Danish game: a privateer simulator set in the strait between
+        Denmark and Sweden, mixing side-scrolling naval navigation, cannon battles,
+        boarding actions, and harbour resource management.
+        It had the bones of a great arcade game. It just never made it into a cabinet.
+      </p>
+      <p data-i18n="canarisP2">
+        The game lived its life on Danish home computers — passed between friends on
+        floppy disk, discovered by curious children, eventually forgotten by most and
+        preserved by a few. The golden age of arcade halls was in full swing that same
+        year, yet Kaptajn Kaper stayed home. Donkey Kong had a cabinet in every
+        shopping centre. Kaptajn Kaper did not.
+      </p>
+      <p data-i18n="canarisP3">
+        Canaris is our answer to a question that was never asked: what would it have
+        looked like if Peter Ole Frederiksen's privateer game had made it to the arcade?
+        The CRT screen, the coin slot, the thumping cannons — all the things the original
+        never had. This is a tribute to a small, brilliant Danish game that deserved a
+        bigger stage.
+        The original source code is preserved at
+        <a class="inline-link" href="https://github.com/kb-dk/KaptajnKaper" target="_blank" rel="noopener">github.com/kb-dk/KaptajnKaper</a>.
       </p>
     </div>
   </section>
@@ -420,6 +461,10 @@
         copyrightP1:     'BLIP ARCADE is a tribute to the classic arcade games that defined a generation — Pong, Breakout, Snake, Space Invaders, and their many descendants. The original games were created by pioneering studios and engineers whose work shaped the entire history of interactive entertainment.',
         copyrightP2:     'The games on this site are original reimplementations inspired by those classics. They are not copies, ports, or reproductions of any proprietary code or assets. All graphics, sounds, and game logic were written from scratch as part of this experiment.',
         copyrightP3:     'This project is strictly non-commercial. No admission is charged, no data is collected, no advertising is served. It exists purely as a technical and creative experiment, and as a small act of appreciation for the people who invented the medium.',
+        canarisLabel:    '🇩🇰 &#x25BA; Kaptajn Kaper — a game for the arcade that never was',
+        canarisP1:       'In 1985, Danish developer Peter Ole Frederiksen released <em>Kaptajn Kaper i Kattegat</em> — Captain Caper in the Kattegat — for the PC. It was a peculiarly Danish game: a privateer simulator set in the strait between Denmark and Sweden, mixing side-scrolling naval navigation, cannon battles, boarding actions, and harbour resource management. It had the bones of a great arcade game. It just never made it into a cabinet.',
+        canarisP2:       'The game lived its life on Danish home computers — passed between friends on floppy disk, discovered by curious children, eventually forgotten by most and preserved by a few. The golden age of arcade halls was in full swing that same year, yet Kaptajn Kaper stayed home. Donkey Kong had a cabinet in every shopping centre. Kaptajn Kaper did not.',
+        canarisP3:       'Canaris is our answer to a question that was never asked: what would it have looked like if Peter Ole Frederiksen\'s privateer game had made it to the arcade? The CRT screen, the coin slot, the thumping cannons — all the things the original never had. This is a tribute to a small, brilliant Danish game that deserved a bigger stage. The original source code is preserved at <a class="inline-link" href="https://github.com/kb-dk/KaptajnKaper" target="_blank" rel="noopener">github.com/kb-dk/KaptajnKaper</a>.',
         contribLabel:    '&#x25BA; Contributions',
         contribP1:       'Want to add a game? Pull requests are welcome at <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. The blip library handles the <a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a> and Rust plumbing so you can focus on game logic.',
         contribP2:       'For inspiration, the <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Golden Age of Arcade Video Games</a> (roughly 1978–1986) produced hundreds of titles worth revisiting — Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest, and many more. That era is a deep well.',
@@ -444,6 +489,10 @@
         copyrightP1:     'BLIP ARCADE er en hyldest til de klassiske arkadespil, der definerede en generation — Pong, Breakout, Snake, Space Invaders og deres mange efterkommere. De originale spil blev skabt af banebrydende studier og programmører, hvis arbejde formede hele den interaktive underholdnings historie.',
         copyrightP2:     'Spillene på dette sted er originale genimplementeringer inspireret af disse klassikere. De er ikke kopier eller reproduktioner af proprietær kode eller aktiver. Al grafik, alle lyde og al spillogik er skrevet fra bunden som en del af dette eksperiment.',
         copyrightP3:     'Dette projekt er strengt ikke-kommercielt. Der opkræves ingen entré, indsamles ingen data og vises ingen reklamer. Det eksisterer udelukkende som et teknisk og kreativt eksperiment — og som en lille kærlighedserklæring til de mennesker, der opfandt mediet.',
+        canarisLabel:    '🇩🇰 &#x25BA; Kaptajn Kaper — et spil til arkaden der aldrig kom',
+        canarisP1:       'I 1985 udgav den danske udvikler Peter Ole Frederiksen <em>Kaptajn Kaper i Kattegat</em> til PC. Det var et særpræget dansk spil: en kaper-simulator med handling i strædet mellem Danmark og Sverige, der blandede side-scrollende sønavigation, kanondueller, entring og ressourcestyring i havnen. Det havde skelettet til et fremragende arkadespil. Det kom bare aldrig ind i et arkadeskab.',
+        canarisP2:       'Spillet levede sit liv på danske hjemmecomputere — givet videre mellem venner på diskette, opdaget af nysgerrige børn og til sidst glemt af de fleste og bevaret af de færreste. Arkadehallernes guldalder var på sit højeste samme år, men Kaptajn Kaper blev hjemme. Donkey Kong stod i ethvert indkøbscenter. Kaptajn Kaper gjorde ikke.',
+        canarisP3:       'Canaris er vores svar på et spørgsmål, der aldrig blev stillet: hvordan ville det have set ud, hvis Peter Ole Frederiksens kaperspil var havnet i en arkade? CRT-skærmen, møntindkastet, kanonskuddenes drønen — alt det, originalen aldrig havde. Dette er en hyldest til et lille, strålende dansk spil, der fortjente en større scene. Den originale kildekode er bevaret på <a class="inline-link" href="https://github.com/kb-dk/KaptajnKaper" target="_blank" rel="noopener">github.com/kb-dk/KaptajnKaper</a>.',
         contribLabel:    '&#x25BA; Bidrag',
         contribP1:       'Vil du tilføje et spil? Pull requests er velkomne på <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. blip-biblioteket håndterer <a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a> og Rust, så du kan fokusere på spillogikken.',
         contribP2:       'Til inspiration producerede <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Arkadespillenes Guldalder</a> (ca. 1978–1986) hundredvis af titler, der er værd at genbesøge — Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest og mange flere. Den æra er et dybt brønd.',
@@ -468,6 +517,10 @@
         copyrightP1:     'BLIP ARCADEは、一世代を定義したクラシックアーケードゲーム——Pong、Breakout、Snake、Space Invaders、そしてその多くの後継者——へのトリビュートです。オリジナルゲームは、インタラクティブエンターテインメントの歴史全体を形作った先駆的なスタジオとプログラマーによって作られました。',
         copyrightP2:     'このサイトのゲームは、それらのクラシックにインスパイアされたオリジナルの再実装です。独自コードやアセットのコピーや複製ではありません。すべてのグラフィックス、サウンド、ゲームロジックは、この実験の一環としてゼロから書かれました。',
         copyrightP3:     'このプロジェクトは厳密に非商業的です。入場料は徴収されず、データは収集されず、広告は表示されません。純粋に技術的・創造的な実験として、そしてこのメディアを発明した人々への小さな感謝として存在しています。',
+        canarisLabel:    '🇩🇰 &#x25BA; カプタイン・ケーパー — 実現しなかったアーケードへの夢',
+        canarisP1:       '1985年、デンマークの開発者ピーター・オーレ・フレデリクセンは、PCゲーム <em>Kaptajn Kaper i Kattegat</em>（カテガットのカプタイン・ケーパー）をリリースしました。デンマークとスウェーデンの間の海峡を舞台にした私掠船シミュレーターで、横スクロールの航海、大砲戦、乗船戦闘、港での資源管理を組み合わせた、独特のデンマークらしいゲームでした。アーケードゲームとしての骨格を持っていました。ただ、アーケードキャビネットに入ることはありませんでした。',
+        canarisP2:       'このゲームはデンマークの家庭用コンピューターで生涯を送りました——フロッピーディスクで友人間で受け渡され、好奇心旺盛な子どもたちに発見され、やがてほとんどの人に忘れられ、わずかな人々に保存されました。同じ年、アーケードホールの黄金時代は全盛期を迎えていましたが、カプタイン・ケーパーは家に留まりました。ドンキーコングはどのショッピングセンターにもキャビネットがありました。カプタイン・ケーパーにはありませんでした。',
+        canarisP3:       'カナリスは、決して問われることのなかった問いへの答えです：ピーター・オーレ・フレデリクセンの私掠船ゲームがアーケードに登場していたら、どのように見えたでしょうか？CRTスクリーン、コインスロット、轟く大砲の音——オリジナルが持っていなかったすべてのもの。これは、もっと大きな舞台に立つ価値があった、小さな輝かしいデンマークのゲームへの贈り物です。オリジナルのソースコードは <a class="inline-link" href="https://github.com/kb-dk/KaptajnKaper" target="_blank" rel="noopener">github.com/kb-dk/KaptajnKaper</a> で保存されています。',
         contribLabel:    '&#x25BA; コントリビューション',
         contribP1:       'ゲームを追加したいですか？プルリクエストは <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a> で歓迎します。blipライブラリが<a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a>とRustの基盤を担当するので、ゲームロジックに集中できます。',
         contribP2:       'インスピレーションとして、<a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">アーケードビデオゲームの黄金時代</a>（おおよそ1978–1986年）には再訪する価値のある作品が何百もあります——Asteroids、Centipede、Frogger、Pac-Man、Donkey Kong、Tempestなど。あの時代は深い井戸です。',
