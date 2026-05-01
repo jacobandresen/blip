@@ -784,6 +784,9 @@ fn update_port(g: &mut Game, dt: f32, sfx: &Sounds) {
     if confirm {
         match g.port_cursor {
             PortItem::Sail => {
+                // Push player clear of the port trigger zone so update_sea
+                // doesn't immediately re-enter port on the next tick.
+                g.player.world_x = PORT_ANCHOR_X - PORT_SNAP - PLAYER_W - 10.0;
                 g.state = State::Sea;
                 play_music(&sfx.sea_music);
             }
