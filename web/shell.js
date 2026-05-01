@@ -140,7 +140,7 @@ window.addEventListener('keydown', function (e) {
 
 function injectKey(key, code, type) {
   if (overlay.classList.contains('visible')) return;
-  window.dispatchEvent(new KeyboardEvent(type, {
+  canvas.dispatchEvent(new KeyboardEvent(type, {
     bubbles: true, cancelable: true, key: key, code: code
   }));
 }
