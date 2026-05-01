@@ -8,14 +8,14 @@ html, body {
     repeating-linear-gradient(
       -45deg,
       transparent 0px, transparent 4px,
-      rgba(255,255,255,0.007) 4px, rgba(255,255,255,0.007) 5px
+      rgba(255,255,255,0.012) 4px, rgba(255,255,255,0.012) 5px
     ),
     repeating-linear-gradient(
       45deg,
       transparent 0px, transparent 4px,
-      rgba(255,255,255,0.007) 4px, rgba(255,255,255,0.007) 5px
+      rgba(255,255,255,0.012) 4px, rgba(255,255,255,0.012) 5px
     ),
-    linear-gradient(155deg, #1d1d1d 0%, #0c0c0c 55%, #181818 100%);
+    linear-gradient(155deg, #2e2e2e 0%, #1a1a1a 55%, #252525 100%);
   touch-action: none;
 }
 
@@ -47,20 +47,20 @@ body::before {
   z-index: 8;
   background: transparent;
 
-  /* Monitor-opening trim: hairline green accent matching the game palette */
-  border: 1px solid rgba(50, 200, 80, 0.14);
+  /* Monitor-opening trim: green accent matching the game palette */
+  border: 2px solid rgba(50, 200, 80, 0.55);
 
   box-shadow:
     /* ① Frame body — fills the 16 px gap between this div and the window edge */
-    0 0 0 16px #141414,
+    0 0 0 16px #2a2a2a,
     /* ② Outer bevel: 1 px lighter strip at the frame's outer rim */
-    0 0 0 17px rgba(52, 52, 52, 0.85),
+    0 0 0 17px rgba(68, 68, 68, 0.9),
     /* ③ Cabinet edge: darkest line at the very outside */
-    0 0 0 18px #060606,
+    0 0 0 18px #111111,
     /* ④ Ambient drop shadow from cabinet into the room */
     0 0 45px rgba(0, 0, 0, 0.95),
-    /* ⑤ Phosphor glow — faint green halo bleeding from screen onto bezel */
-    0 0 22px rgba(0, 200, 60, 0.05),
+    /* ⑤ Phosphor glow — green halo bleeding from screen onto bezel */
+    0 0 28px rgba(0, 200, 60, 0.22),
     /* ⑥ Screen recess — soft vignette darkens game edges, simulates CRT depth */
     inset 0 0 45px rgba(0, 0, 0, 0.38);
 }
