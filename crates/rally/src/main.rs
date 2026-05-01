@@ -122,6 +122,10 @@ fn update_title(g: &mut Game) {
 fn update_serve(g: &mut Game, dt: f32) {
     if key_held(BLIP_KEY_UP)   || key_held(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
     if key_held(BLIP_KEY_DOWN) || key_held(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
+    if g.mode == Mode::TwoPlayer {
+        if key_held(KeyCode::I) { g.rpad_y -= PAD_SPEED * dt; }
+        if key_held(KeyCode::K) { g.rpad_y += PAD_SPEED * dt; }
+    }
     g.clamp_pads();
     if any_key_pressed() {
         g.launch();
