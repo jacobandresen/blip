@@ -65,6 +65,17 @@ window.blipSpendCoin = function () {
   return 1;
 };
 
+// Called from WASM when game mode is chosen on the title screen.
+// mode 0 = 1-player (CPU controls right paddle), 1 = 2-player.
+window.blipSetMode = function (mode) {
+  var d = document.getElementById('paddle-dial-p2');
+  if (!d) return;
+  var isCpu = (mode === 0);
+  d.classList.toggle('cpu-mode', isCpu);
+  var label = document.getElementById('dial-label-p2');
+  if (label) label.textContent = isCpu ? 'CPU' : '2P';
+};
+
 overlay.addEventListener('click', function () {
   var n = getCoins();
   if (n >= MAX_COINS) return;

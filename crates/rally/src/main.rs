@@ -110,9 +110,11 @@ struct Beeps {
 fn update_title(g: &mut Game) {
     if key_pressed(KeyCode::Key2) {
         g.mode = Mode::TwoPlayer;
+        web::set_mode(true);
         g.start_game();
     } else if any_key_pressed() {
         g.mode = Mode::OnePlayer;
+        web::set_mode(false);
         g.start_game();
     }
 }

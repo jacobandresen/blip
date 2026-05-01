@@ -279,6 +279,31 @@ canvas {
   color: rgba(50, 200, 50, 0.4);
 }
 
+/* P2 dial — CPU mode (1-player selected) */
+
+#paddle-dial-p2.cpu-mode {
+  pointer-events: none;
+  opacity: 0.5;
+  border-color: rgba(50, 200, 50, 0.18);
+}
+
+#paddle-dial-p2.cpu-mode #dial-hand-p2 {
+  display: none;
+}
+
+/* Replace the centre dot with a chip icon */
+#paddle-dial-p2.cpu-mode::after {
+  content: '⊡';
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font-size: 22px;
+  line-height: 1;
+  color: rgba(50, 200, 50, 0.45);
+}
+
 /* Shrink controls in landscape / short screens */
 @media (max-height: 450px) {
   #dpad {
