@@ -195,15 +195,25 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     dialP1.style.display = 'block';
     dialP2.style.display = 'block';
 
-    // Tap anywhere on the canvas to send Space (start game / launch ball).
-    // stopPropagation is NOT called so macroquad still gets the event.
+    // null = title screen (no mode chosen yet); 0 = 1P; 1 = 2P.
+    var rallyMode = null;
+
+    function applyRallyMode(mode) {
+      rallyMode = mode;
+      window.blipSetMode(mode);
+    }
+
+    // Tap anywhere on the canvas = start 1P (or launch ball / any-key during play).
+    // Only update the mode indicator when we're still on the title screen.
     canvas.addEventListener('touchstart', function (e) {
       e.preventDefault();
       injectKey(' ', 'Space', 'keydown');
       injectKey(' ', 'Space', 'keyup');
+      if (rallyMode === null) applyRallyMode(0);
     }, { passive: false });
 
-    function makeDial(dialEl, handEl, upKey, upCode, downKey, downCode, tapKey, tapCode) {
+    // onTap is called when a tap gesture completes, before the key is injected.
+    function makeDial(dialEl, handEl, upKey, upCode, downKey, downCode, tapKey, tapCode, onTap) {
       var angle       = -Math.PI / 2;
       var lastAngle   = null;
       var totalDelta  = 0;
@@ -276,6 +286,7 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
         e.preventDefault();
         if (!findTouch(e.changedTouches, touchId)) return;
         if (totalDelta < 0.08) {
+          if (onTap) onTap();
           injectKey(tapKey, tapCode, 'keydown');
           injectKey(tapKey, tapCode, 'keyup');
         }
@@ -285,16 +296,19 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
       dialEl.addEventListener('touchcancel', stop);
     }
 
+    // P1 dial tap = Space = 1P mode (when still on title screen)
     makeDial(
       dialP1, document.getElementById('dial-hand'),
       'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
-      ' ', 'Space'
+      ' ', 'Space',
+      function () { if (rallyMode === null) applyRallyMode(0); }
     );
-    // P2 dial: tap sends '2' (selects 2-player on title screen)
+    // P2 dial tap = '2' = 2P mode (when still on title screen)
     makeDial(
       dialP2, document.getElementById('dial-hand-p2'),
       'i', 'KeyI', 'k', 'KeyK',
-      '2', 'Digit2'
+      '2', 'Digit2',
+      function () { if (rallyMode === null) applyRallyMode(1); }
     );
 
   } else {
