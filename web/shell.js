@@ -175,76 +175,116 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
   }
 
   if (isRally) {
-    // ---- Paddle dial ----
+    // ---- Dual paddle dials (P1 left = Arrow keys, P2 right = I/K) ----
     document.getElementById('dpad').style.display = 'none';
     document.getElementById('btn-fire').style.display = 'none';
-    var dial     = document.getElementById('paddle-dial');
-    var dialHand = document.getElementById('dial-hand');
-    dial.style.display = 'block';
 
-    var dialAngle        = -Math.PI / 2; // hand points up initially
-    var lastTouchAngle   = null;
-    var totalDeltaAngle  = 0;
-    var dialUpHeld = false, dialDownHeld = false;
+    var dialP1 = document.getElementById('paddle-dial');
+    var dialP2 = document.getElementById('paddle-dial-p2');
+    dialP1.style.display = 'block';
+    dialP2.style.display = 'block';
 
-    function touchAngleFromDial(touch) {
-      var r = dial.getBoundingClientRect();
-      return Math.atan2(touch.clientY - (r.top + r.height / 2),
-                        touch.clientX - (r.left + r.width / 2));
-    }
-
-    function setDialDir(up, down) {
-      if (up !== dialUpHeld) {
-        dialUpHeld = up;
-        injectKey('ArrowUp', 'ArrowUp', up ? 'keydown' : 'keyup');
-      }
-      if (down !== dialDownHeld) {
-        dialDownHeld = down;
-        injectKey('ArrowDown', 'ArrowDown', down ? 'keydown' : 'keyup');
-      }
-    }
-
-    function stopDial() {
-      setDialDir(false, false);
-      dial.classList.remove('active');
-      lastTouchAngle = null;
-    }
-
-    dial.addEventListener('touchstart', function (e) {
+    // Tap anywhere on the canvas to send Space (start game / launch ball).
+    // stopPropagation is NOT called so macroquad still gets the event.
+    canvas.addEventListener('touchstart', function (e) {
       e.preventDefault();
-      lastTouchAngle  = touchAngleFromDial(e.touches[0]);
-      totalDeltaAngle = 0;
-      dial.classList.add('active');
+      injectKey(' ', 'Space', 'keydown');
+      injectKey(' ', 'Space', 'keyup');
     }, { passive: false });
 
-    dial.addEventListener('touchmove', function (e) {
-      e.preventDefault();
-      if (lastTouchAngle === null) return;
-      var a = touchAngleFromDial(e.touches[0]);
-      var delta = a - lastTouchAngle;
-      if (delta >  Math.PI) delta -= 2 * Math.PI;
-      if (delta < -Math.PI) delta += 2 * Math.PI;
-      lastTouchAngle = a;
+    function makeDial(dialEl, handEl, upKey, upCode, downKey, downCode, tapKey, tapCode) {
+      var angle       = -Math.PI / 2;
+      var lastAngle   = null;
+      var totalDelta  = 0;
+      var touchId     = null;
+      var upHeld      = false;
+      var downHeld    = false;
 
-      dialAngle       += delta;
-      totalDeltaAngle += Math.abs(delta);
-      dialHand.style.transform = 'rotate(' + (dialAngle + Math.PI / 2) + 'rad)';
-
-      var DEAD = 0.018;
-      if      (delta >  DEAD) setDialDir(false, true);
-      else if (delta < -DEAD) setDialDir(true, false);
-      else                    setDialDir(false, false);
-    }, { passive: false });
-
-    dial.addEventListener('touchend', function (e) {
-      e.preventDefault();
-      if (totalDeltaAngle < 0.08) {
-        injectKey(' ', 'Space', 'keydown');
-        injectKey(' ', 'Space', 'keyup');
+      function angleFrom(touch) {
+        var r = dialEl.getBoundingClientRect();
+        return Math.atan2(touch.clientY - (r.top  + r.height / 2),
+                          touch.clientX - (r.left + r.width  / 2));
       }
-      stopDial();
-    }, { passive: false });
-    dial.addEventListener('touchcancel', stopDial);
+
+      function findTouch(list, id) {
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].identifier === id) return list[i];
+        }
+        return null;
+      }
+
+      function setDir(up, down) {
+        if (up !== upHeld) {
+          upHeld = up;
+          injectKey(upKey, upCode, up ? 'keydown' : 'keyup');
+        }
+        if (down !== downHeld) {
+          downHeld = down;
+          injectKey(downKey, downCode, down ? 'keydown' : 'keyup');
+        }
+      }
+
+      function stop() {
+        setDir(false, false);
+        dialEl.classList.remove('active');
+        lastAngle = null;
+        touchId   = null;
+      }
+
+      dialEl.addEventListener('touchstart', function (e) {
+        e.preventDefault();
+        e.stopPropagation(); // don't also fire the canvas Space handler
+        if (touchId !== null) return;
+        var t   = e.changedTouches[0];
+        touchId    = t.identifier;
+        lastAngle  = angleFrom(t);
+        totalDelta = 0;
+        dialEl.classList.add('active');
+      }, { passive: false });
+
+      dialEl.addEventListener('touchmove', function (e) {
+        e.preventDefault();
+        if (lastAngle === null) return;
+        var t = findTouch(e.touches, touchId);
+        if (!t) return;
+        var a = angleFrom(t);
+        var d = a - lastAngle;
+        if (d >  Math.PI) d -= 2 * Math.PI;
+        if (d < -Math.PI) d += 2 * Math.PI;
+        lastAngle    = a;
+        angle       += d;
+        totalDelta  += Math.abs(d);
+        handEl.style.transform = 'rotate(' + (angle + Math.PI / 2) + 'rad)';
+        var DEAD = 0.018;
+        if      (d >  DEAD) setDir(false, true);
+        else if (d < -DEAD) setDir(true, false);
+        else                setDir(false, false);
+      }, { passive: false });
+
+      dialEl.addEventListener('touchend', function (e) {
+        e.preventDefault();
+        if (!findTouch(e.changedTouches, touchId)) return;
+        if (totalDelta < 0.08) {
+          injectKey(tapKey, tapCode, 'keydown');
+          injectKey(tapKey, tapCode, 'keyup');
+        }
+        stop();
+      }, { passive: false });
+
+      dialEl.addEventListener('touchcancel', stop);
+    }
+
+    makeDial(
+      dialP1, document.getElementById('dial-hand'),
+      'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+      ' ', 'Space'
+    );
+    // P2 dial: tap sends '2' (selects 2-player on title screen)
+    makeDial(
+      dialP2, document.getElementById('dial-hand-p2'),
+      'i', 'KeyI', 'k', 'KeyK',
+      '2', 'Digit2'
+    );
 
   } else {
     var dpad = document.getElementById('dpad');

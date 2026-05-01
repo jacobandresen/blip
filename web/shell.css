@@ -189,13 +189,12 @@ canvas {
   color: #32c832;
 }
 
-/* ---- Paddle dial (rally only) ---- */
+/* ---- Paddle dials (rally only) ---- */
 
-#paddle-dial {
+#paddle-dial, #paddle-dial-p2 {
   display: none;
   position: fixed;
   bottom: calc(56px + 20px + env(safe-area-inset-bottom, 0px));
-  left: 20px;
   width: 96px;
   height: 96px;
   border-radius: 50%;
@@ -211,8 +210,11 @@ canvas {
   -webkit-tap-highlight-color: transparent;
 }
 
+#paddle-dial    { left: 20px; }
+#paddle-dial-p2 { right: 20px; }
+
 /* Tick marks around the rim via conic-gradient */
-#paddle-dial::before {
+#paddle-dial::before, #paddle-dial-p2::before {
   content: '';
   position: absolute;
   inset: 6px;
@@ -236,7 +238,7 @@ canvas {
 }
 
 /* Centre dot */
-#paddle-dial::after {
+#paddle-dial::after, #paddle-dial-p2::after {
   content: '';
   position: absolute;
   left: 50%; top: 50%;
@@ -247,7 +249,7 @@ canvas {
   box-shadow: 0 0 6px #32c832;
 }
 
-#dial-hand {
+#dial-hand, #dial-hand-p2 {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -262,11 +264,11 @@ canvas {
   transition: box-shadow .05s;
 }
 
-#paddle-dial.active #dial-hand {
+#paddle-dial.active #dial-hand, #paddle-dial-p2.active #dial-hand-p2 {
   box-shadow: 0 0 16px #32c832, 0 0 30px rgba(50,200,50,0.4);
 }
 
-#dial-label {
+#dial-label, #dial-label-p2 {
   position: absolute;
   bottom: -22px;
   left: 0; right: 0;
@@ -297,4 +299,11 @@ canvas {
     bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 12px);
     right: 12px;
   }
+  #paddle-dial, #paddle-dial-p2 {
+    width: 76px;
+    height: 76px;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 10px);
+  }
+  #paddle-dial    { left: 10px; }
+  #paddle-dial-p2 { right: 10px; }
 }
