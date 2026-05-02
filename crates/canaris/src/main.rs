@@ -54,6 +54,7 @@ const BOB_FREQ:          f32   = 1.8;
 const ENGAGEMENT_DIST:   f32   = WIN_W as f32 * 0.6;
 const PORT_ANCHOR_X:     f32   = WORLD_W * 0.75;
 const PORT_SNAP:         f32   = 30.0;
+const PORT_SAFE_RADIUS:  f32   = 400.0; // enemies don't spawn or engage within this distance of port
 
 const CANNON_SPEED:      f32   = 280.0;
 const CANNON_GRAVITY:    f32   = 60.0;
@@ -156,22 +157,24 @@ struct BoardingSlot {
 enum PortItem { Repair, Crew, Cannons, Food, Sail }
 
 impl PortItem {
+    // Order: Sail → Repair → Crew → Cannons → Food → (wrap) Sail
+    // Sail is first so the player can leave immediately with one SPACE press.
     fn next(self) -> Self {
         match self {
+            PortItem::Sail    => PortItem::Repair,
             PortItem::Repair  => PortItem::Crew,
             PortItem::Crew    => PortItem::Cannons,
             PortItem::Cannons => PortItem::Food,
             PortItem::Food    => PortItem::Sail,
-            PortItem::Sail    => PortItem::Repair,
         }
     }
     fn prev(self) -> Self {
         match self {
+            PortItem::Sail    => PortItem::Food,
             PortItem::Repair  => PortItem::Sail,
             PortItem::Crew    => PortItem::Repair,
             PortItem::Cannons => PortItem::Crew,
             PortItem::Food    => PortItem::Cannons,
-            PortItem::Sail    => PortItem::Food,
         }
     }
     fn label(self) -> &'static str {
@@ -281,7 +284,11 @@ impl Game {
     fn spawn_enemies(&mut self) {
         let hull_base = 6 + self.level * 2;
         for i in 0..MAX_ENEMIES {
-            let wx = WORLD_W * 0.3 + rand_int(0, (WORLD_W * 0.6) as i32) as f32;
+            // Reject positions inside the port safe zone so enemies never block the harbour.
+            let wx = loop {
+                let x = WORLD_W * 0.3 + rand_int(0, (WORLD_W * 0.5) as i32) as f32;
+                if (x - PORT_ANCHOR_X).abs() > PORT_SAFE_RADIUS { break x; }
+            };
             self.enemies[i] = EnemyShip {
                 active:   true,
                 world_x:  wx,
@@ -365,7 +372,7 @@ impl Game {
     }
 
     fn enter_port(&mut self) {
-        self.port_cursor = PortItem::Repair;
+        self.port_cursor = PortItem::Sail;
         self.port_msg    = "WELCOME TO PORT";
         self.port_msg_t  = 2.0;
         self.state       = State::Port;
@@ -502,9 +509,10 @@ fn update_sea(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.enemies[i].world_x = WORLD_W + rand_int(200, 800) as f32;
         }
 
-        // Check engagement
+        // Check engagement — suppress near port so the player can always dock
+        let near_port = (g.player.world_x - PORT_ANCHOR_X).abs() < PORT_SAFE_RADIUS;
         let dist = (g.enemies[i].world_x - g.player.world_x).abs();
-        if dist < ENGAGEMENT_DIST {
+        if !near_port && dist < ENGAGEMENT_DIST {
             g.enter_combat(i);
             play_music(&sfx.combat_music);
             return;
@@ -1188,7 +1196,7 @@ fn draw_port(blip: &Blip, g: &Game, tex: &Textures) {
     blip.draw_text(&format!("GOLD: {}", g.player.gold),
                    panel_x + 8.0, panel_y + 6.0, 2.0, BLIP_YELLOW);
 
-    let items = [PortItem::Repair, PortItem::Crew, PortItem::Cannons, PortItem::Food, PortItem::Sail];
+    let items = [PortItem::Sail, PortItem::Repair, PortItem::Crew, PortItem::Cannons, PortItem::Food];
     for (i, &item) in items.iter().enumerate() {
         let iy         = panel_y + 30.0 + i as f32 * 28.0;
         let can_afford = item == PortItem::Sail || g.player.gold >= item.cost();
