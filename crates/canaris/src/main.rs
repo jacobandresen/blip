@@ -798,6 +798,7 @@ fn update_port(g: &mut Game, dt: f32, sfx: &Sounds) {
     if confirm {
         match g.port_cursor {
             PortItem::Sail => {
+                g.spawn_enemies();
                 g.state = State::Sea;
                 play_music(&sfx.sea_music);
             }
