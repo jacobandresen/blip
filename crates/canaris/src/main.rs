@@ -220,10 +220,11 @@ struct Game {
     boarding_hit_slot: usize,  // index of last attacked slot (99 = none)
     boarding_hit_t:  f32,      // flash timer for that slot
 
-    port_cursor: PortItem,
-    port_msg:    &'static str,
-    port_msg_t:  f32,
-    port_msg_ok: bool,
+    port_cursor:   PortItem,
+    port_msg:      &'static str,
+    port_msg_t:    f32,
+    port_msg_ok:   bool,
+    port_leave_t:  f32,  // cooldown after leaving port; suppresses re-entry trigger
 
     score:    i32,
     hi_score: i32,
@@ -266,6 +267,7 @@ impl Game {
             port_msg: "",
             port_msg_t: 0.0,
             port_msg_ok: true,
+            port_leave_t: 0.0,
             score: 0, hi_score: 0,
             lives: LIVES_START,
             level: 1, level_t: 60.0,
@@ -492,6 +494,9 @@ fn update_sea(g: &mut Game, dt: f32, sfx: &Sounds) {
     // Hull flash
     if g.player.hit_flash_t > 0.0 { g.player.hit_flash_t -= dt; }
 
+    // Port leave cooldown
+    if g.port_leave_t > 0.0 { g.port_leave_t -= dt; }
+
     // Level timer
     g.level_t -= dt;
     if g.level_t <= 0.0 {
@@ -523,8 +528,8 @@ fn update_sea(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
-    // Port trigger
-    if (g.player.world_x - PORT_ANCHOR_X).abs() < PORT_SNAP {
+    // Port trigger (suppressed briefly after leaving so the player can sail past)
+    if g.port_leave_t <= 0.0 && (g.player.world_x - PORT_ANCHOR_X).abs() < PORT_SNAP {
         g.enter_port();
         play_music(&sfx.port_music);
         return;
@@ -796,9 +801,8 @@ fn update_port(g: &mut Game, dt: f32, sfx: &Sounds) {
     if confirm {
         match g.port_cursor {
             PortItem::Sail => {
-                // Push player clear of the port trigger zone so update_sea
-                // doesn't immediately re-enter port on the next tick.
                 g.player.world_x = PORT_ANCHOR_X - PORT_SNAP - PLAYER_W - 10.0;
+                g.port_leave_t   = 3.0;  // suppress re-entry for 3 s so player can pass port freely
                 g.state = State::Sea;
                 play_music(&sfx.sea_music);
             }
