@@ -16,7 +16,7 @@ pub mod input;
 pub mod math;
 pub mod web;
 
-pub use audio::{play_music, play_sfx, stop_music, BlipSound};
+pub use audio::{play_ambient, play_music, play_sfx, stop_ambient, stop_music, BlipSound};
 pub use color::{
     BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_DARKGRAY, BLIP_GRAY, BLIP_GREEN, BLIP_MAGENTA,
     BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,

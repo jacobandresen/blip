@@ -48,6 +48,25 @@ pub fn stop_music() {
     }
 }
 
+static CURRENT_AMBIENT: Mutex<Option<Sound>> = Mutex::new(None);
+
+/// Start (or replace) looping ambient sound at a quiet background level (0.18).
+pub fn play_ambient(s: &BlipSound) {
+    stop_ambient();
+    play_sound(s, PlaySoundParams { looped: true, volume: 0.18 });
+    if let Ok(mut guard) = CURRENT_AMBIENT.lock() {
+        *guard = Some(s.clone());
+    }
+}
+
+pub fn stop_ambient() {
+    if let Ok(mut guard) = CURRENT_AMBIENT.lock() {
+        if let Some(s) = guard.take() {
+            stop_sound(&s);
+        }
+    }
+}
+
 /// Synthesize a short sine beep and decode it into a `BlipSound`.
 /// Awaited at game startup; callers stash the returned handle and replay
 /// it via `play_sfx`. Mirrors the C `blip_play_beep(freq, duration_ms)`

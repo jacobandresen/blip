@@ -336,6 +336,38 @@ fn sea_wave() -> Vec<u8> {
     img.encode_png()
 }
 
+fn sea_wave_b() -> Vec<u8> {
+    let w: i32 = 120;
+    let h: i32 = 40;
+    let mut img = Image::new(w as u32, h as u32);
+
+    hband(&mut img, 0, w, 0, h, 10, 60, 90);
+
+    for x in 0..w {
+        let t = x as f32 / w as f32;
+        let wave1 = (t * PI * 2.0 + PI * 0.5).sin();
+        let wave2 = (t * PI * 4.0 + 1.0 + PI * 0.5).sin() * 0.4;
+        let crest_y = (h / 2) as f32 + (wave1 + wave2) * 5.0;
+        let cy = crest_y as i32;
+        img.set(x, cy.clamp(0, h - 1), 80, 160, 200);
+        img.set(x, (cy + 1).clamp(0, h - 1), 40, 110, 150);
+        if ((x as f32 * 0.3 + t * PI + PI * 0.5).sin()) > 0.7 {
+            img.set(x, cy.clamp(0, h - 1), 200, 230, 240);
+        }
+    }
+
+    for x in 0..w {
+        let t = x as f32 / w as f32;
+        let wave = (t * PI * 2.0 + 1.0 + PI * 0.5).sin();
+        let cy = (h as f32 * 0.3 + wave * 3.0) as i32;
+        img.set(x, cy.clamp(0, h - 1), 20, 80, 110);
+        img.set(x, (cy + 1).clamp(0, h - 1), 15, 65, 95);
+    }
+
+    hband(&mut img, 0, w, h - 8, h, 5, 40, 65);
+    img.encode_png()
+}
+
 fn crew_figure() -> Vec<u8> {
     let w: i32 = 12;
     let h: i32 = 20;
@@ -631,6 +663,51 @@ fn port_music() -> Vec<u8> {
     encode_pcm16_mono(&mixed)
 }
 
+fn ocean_ambience() -> Vec<u8> {
+    let total = ms_to_samples(6000.0);
+    let mut buf = vec![0i16; total];
+
+    // Continuous low-level wind noise
+    let mut rng = Lcg(0xABCD_EF01u32);
+    let wind_amp = 28000.0_f32 * 0.07;
+    for i in 0..total {
+        let r = rng.next() % 65536;
+        let v = (r as f32 - 32768.0) / 32768.0;
+        let s = (wind_amp * v) as i16;
+        let combined = buf[i] as i32 + s as i32;
+        buf[i] = combined.clamp(-32767, 32767) as i16;
+    }
+
+    // Wave crashes at t=500ms, t=2400ms, t=4600ms
+    let crash_times_ms: [f32; 3] = [500.0, 2400.0, 4600.0];
+    let crash_dur_ms = 700.0_f32;
+    let crash_n = ms_to_samples(crash_dur_ms);
+    let rise_n = (crash_n / 10).max(1);
+    let crash_amp = 28000.0_f32 * 0.55;
+
+    for &start_ms in &crash_times_ms {
+        let start = ms_to_samples(start_ms);
+        let mut rng2 = Lcg(start as u32 ^ 0x1234_5678);
+        for j in 0..crash_n {
+            let off = start + j;
+            if off >= total { break; }
+            let envelope = if j < rise_n {
+                j as f32 / rise_n as f32
+            } else {
+                let decay_t = (j - rise_n) as f32 / (crash_n - rise_n) as f32;
+                (1.0 - decay_t) * (1.0 - decay_t)
+            };
+            let r = rng2.next() % 65536;
+            let v = (r as f32 - 32768.0) / 32768.0;
+            let s = (envelope * crash_amp * v) as i32;
+            let combined = buf[off] as i32 + s;
+            buf[off] = combined.clamp(-32767, 32767) as i16;
+        }
+    }
+
+    encode_pcm16_mono(&buf)
+}
+
 // ── generate ──────────────────────────────────────────────────────────────────
 
 pub fn generate() -> Vec<Asset> {
@@ -642,7 +719,8 @@ pub fn generate() -> Vec<Asset> {
         ("images/cannonball.png",    cannonball()),
         ("images/explosion.png",     explosion()),
         ("images/port_bg.png",       port_bg()),
-        ("images/sea_wave.png",      sea_wave()),
+        ("images/sea_wave.png",       sea_wave()),
+        ("images/sea_wave_b.png",    sea_wave_b()),
         ("images/crew_figure.png",   crew_figure()),
         ("sounds/cannon_fire.wav",   cannon_fire()),
         ("sounds/explosion.wav",     explosion_sfx()),
@@ -653,6 +731,7 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/life_lost.wav",     life_lost()),
         ("sounds/sea_music.wav",     sea_music()),
         ("sounds/combat_music.wav",  combat_music()),
-        ("sounds/port_music.wav",    port_music()),
+        ("sounds/port_music.wav",     port_music()),
+        ("sounds/ocean_ambience.wav", ocean_ambience()),
     ]
 }
