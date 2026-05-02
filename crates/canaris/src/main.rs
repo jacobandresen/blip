@@ -53,7 +53,7 @@ const BOB_FREQ:          f32   = 1.8;
 
 const ENGAGEMENT_DIST:   f32   = WIN_W as f32 * 0.6;
 const PORT_ANCHOR_X:     f32   = WORLD_W * 0.75;
-const PORT_SNAP:         f32   = 30.0;
+const PORT_DOCK_RADIUS:  f32   = 80.0;  // how close the player must be to press SPACE and dock
 const PORT_SAFE_RADIUS:  f32   = 400.0; // enemies don't spawn or engage within this distance of port
 
 const CANNON_SPEED:      f32   = 280.0;
@@ -224,7 +224,6 @@ struct Game {
     port_msg:      &'static str,
     port_msg_t:    f32,
     port_msg_ok:   bool,
-    port_leave_t:  f32,  // cooldown after leaving port; suppresses re-entry trigger
 
     score:    i32,
     hi_score: i32,
@@ -267,7 +266,6 @@ impl Game {
             port_msg: "",
             port_msg_t: 0.0,
             port_msg_ok: true,
-            port_leave_t: 0.0,
             score: 0, hi_score: 0,
             lives: LIVES_START,
             level: 1, level_t: 60.0,
@@ -494,9 +492,6 @@ fn update_sea(g: &mut Game, dt: f32, sfx: &Sounds) {
     // Hull flash
     if g.player.hit_flash_t > 0.0 { g.player.hit_flash_t -= dt; }
 
-    // Port leave cooldown
-    if g.port_leave_t > 0.0 { g.port_leave_t -= dt; }
-
     // Level timer
     g.level_t -= dt;
     if g.level_t <= 0.0 {
@@ -528,8 +523,10 @@ fn update_sea(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
-    // Port trigger (suppressed briefly after leaving so the player can sail past)
-    if g.port_leave_t <= 0.0 && (g.player.world_x - PORT_ANCHOR_X).abs() < PORT_SNAP {
+    // Port docking — player must sail close and press SPACE
+    if (g.player.world_x - PORT_ANCHOR_X).abs() < PORT_DOCK_RADIUS
+        && key_pressed(BLIP_KEY_SPACE)
+    {
         g.enter_port();
         play_music(&sfx.port_music);
         return;
@@ -801,8 +798,6 @@ fn update_port(g: &mut Game, dt: f32, sfx: &Sounds) {
     if confirm {
         match g.port_cursor {
             PortItem::Sail => {
-                g.player.world_x = PORT_ANCHOR_X - PORT_SNAP - PLAYER_W - 10.0;
-                g.port_leave_t   = 3.0;  // suppress re-entry for 3 s so player can pass port freely
                 g.state = State::Sea;
                 play_music(&sfx.sea_music);
             }
@@ -997,6 +992,10 @@ fn draw_sea(blip: &Blip, g: &Game, tex: &Textures) {
     if port_sx > -20.0 && port_sx < WIN_W as f32 + 20.0 {
         blip.fill_rect(port_sx, WIN_H as f32 - 40.0, 8.0, 30.0, BLIP_YELLOW);
         blip.draw_text("PORT", port_sx - 10.0, WIN_H as f32 - 52.0, 1.0, BLIP_YELLOW);
+        let near = (g.player.world_x - PORT_ANCHOR_X).abs() < PORT_DOCK_RADIUS;
+        if near && (g.time * 2.0) as u32 % 2 == 0 {
+            blip.draw_centered("SPACE: DOCK", WIN_H as f32 - 65.0, 1.0, BLIP_YELLOW);
+        }
     }
 
     // Player
