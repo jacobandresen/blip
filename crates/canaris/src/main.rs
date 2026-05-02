@@ -460,7 +460,7 @@ fn update_sea(g: &mut Game, dt: f32, sfx: &Sounds) {
     } else {
         g.player.vx *= 1.0 - 5.0 * dt;
     }
-    g.player.world_x = clamp(g.player.world_x + g.player.vx * dt, 0.0, WORLD_W - PLAYER_W);
+    g.player.world_x = (g.player.world_x + g.player.vx * dt).rem_euclid(WORLD_W);
 
     // Vertical bob
     g.player.y = SEA_LANE_Y + (g.time * BOB_FREQ).sin() * BOB_AMP;
