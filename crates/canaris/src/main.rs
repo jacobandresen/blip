@@ -1,8 +1,8 @@
 //! Canaris – privateer arcade game inspired by Kaptajn Kaper i Kattegat (1985).
 
-use blip::input::{any_key_pressed, key_held, key_pressed, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
-                   BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
-                   BLIP_KEY_A, BLIP_KEY_D};
+use blip::input::{any_key_pressed, btn1_pressed, btn2_pressed, key_held, key_pressed,
+                   BLIP_KEY_DOWN, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_UP,
+                   BLIP_KEY_W, BLIP_KEY_A, BLIP_KEY_D};
 use blip::macroquad::prelude::{Color, ImageFormat};
 use blip::macroquad::texture::{FilterMode, Texture2D};
 use blip::macroquad::input::KeyCode;
@@ -88,7 +88,6 @@ const CREW_COST:    i32 = 20;
 const CANNON_COST:  i32 = 25;
 const FOOD_COST:    i32 = 15;
 
-const KEY_BOARD: KeyCode = KeyCode::E;
 const KEY_ENTER: KeyCode = KeyCode::Enter;
 
 // ── state machine ─────────────────────────────────────────────────────────────
@@ -594,9 +593,9 @@ fn update_sea(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
-    // Port docking — player must sail close and press SPACE
+    // Port docking — player must sail close and press Button 1
     if (g.player.world_x - PORT_ANCHOR_X).abs() < PORT_DOCK_RADIUS
-        && key_pressed(BLIP_KEY_SPACE)
+        && btn1_pressed()
     {
         g.enter_port();
         play_music(&sfx.port_music);
@@ -626,18 +625,18 @@ fn update_combat(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.player.y = clamp(g.player.y + DODGE_SPEED * dt, COMBAT_Y_MIN, COMBAT_Y_MAX);
     }
 
-    // Player fire (SPACE)
+    // Player fire (Button 1)
     g.player.reload_t -= dt;
-    if key_pressed(BLIP_KEY_SPACE) && g.player.reload_t <= 0.0 && g.player.cannons > 0 {
+    if btn1_pressed() && g.player.reload_t <= 0.0 && g.player.cannons > 0 {
         g.fire_ball(true, COMBAT_PLAYER_X + PLAYER_W, g.player.y + PLAYER_H / 2.0);
         g.player.reload_t = PLAYER_RELOAD;
         g.player.cannons -= 1;
         play_sfx(&sfx.cannon_fire);
     }
 
-    // Boarding (E) — only when ships are close in Y
+    // Boarding (Button 2) — only when ships are close in Y
     let y_gap = (g.player.y - g.enemies[pidx].combat_y).abs();
-    if key_pressed(KEY_BOARD) && y_gap < BOARD_Y_DIST {
+    if btn2_pressed() && y_gap < BOARD_Y_DIST {
         g.enter_boarding();
         return;
     }
@@ -791,8 +790,8 @@ fn update_boarding(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.time              += dt;
     if g.boarding_hit_t > 0.0 { g.boarding_hit_t -= dt; }
 
-    // ── Player action (SPACE): attack the frontmost enemy slot ──
-    if key_pressed(BLIP_KEY_SPACE) {
+    // ── Player action (Button 1): attack the frontmost enemy slot ──
+    if btn1_pressed() {
         // leftmost remaining enemy slot = the one closest to player territory
         for i in 0..BOARDING_SLOTS {
             if g.slots[i].owner == SlotOwner::Enemy {
@@ -877,7 +876,7 @@ fn update_port(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.port_cursor = g.port_cursor.next();
     }
 
-    let confirm = key_pressed(BLIP_KEY_SPACE) || key_pressed(KEY_ENTER);
+    let confirm = btn1_pressed() || key_pressed(KEY_ENTER);
     if confirm {
         match g.port_cursor {
             PortItem::Sail => {
@@ -1082,7 +1081,7 @@ fn draw_sea(blip: &Blip, g: &Game, tex: &Textures) {
         blip.draw_text("PORT", port_sx - 10.0, WIN_H as f32 - 52.0, 1.0, BLIP_YELLOW);
         let near = (g.player.world_x - PORT_ANCHOR_X).abs() < PORT_DOCK_RADIUS;
         if near && (g.time * 2.0) as u32 % 2 == 0 {
-            blip.draw_centered("SPACE: DOCK", WIN_H as f32 - 65.0, 1.0, BLIP_YELLOW);
+            blip.draw_centered("[1] DOCK", WIN_H as f32 - 65.0, 1.0, BLIP_YELLOW);
         }
     }
 
@@ -1235,12 +1234,12 @@ fn draw_combat(blip: &Blip, g: &Game, tex: &Textures) {
     let y_gap = (g.player.y - g.enemies[pidx].combat_y).abs();
     if g.player.cannons == 0 {
         if (g.time * 3.0) as u32 % 2 == 0 {
-            blip.draw_centered("NO AMMO - [E] BOARD OR RETREAT", hint_y, 1.0, BLIP_RED);
+            blip.draw_centered("NO AMMO - [2] BOARD OR RETREAT", hint_y, 1.0, BLIP_RED);
         }
     } else if y_gap < BOARD_Y_DIST {
-        blip.draw_centered("[E] BOARD  [SPACE] FIRE", hint_y, 1.0, BLIP_CYAN);
+        blip.draw_centered("[1] FIRE  [2] BOARD", hint_y, 1.0, BLIP_CYAN);
     } else {
-        blip.draw_centered("[SPACE] FIRE  [UP/DN] DODGE", hint_y, 1.0, BLIP_GRAY);
+        blip.draw_centered("[1] FIRE  [UP/DN] DODGE", hint_y, 1.0, BLIP_GRAY);
     }
 
     draw_hud_canaris(blip, g);
@@ -1347,7 +1346,7 @@ fn draw_boarding(blip: &Blip, g: &Game, tex: &Textures) {
     blip.draw_text(&format!("{}/3", e_alive), WIN_W as f32 - 44.0, tb_y + 18.0, 2.0, BLIP_RED);
 
     // Controls hint
-    blip.draw_centered("[SPACE] ATTACK", tb_y + 38.0, 2.0, BLIP_WHITE);
+    blip.draw_centered("[1] ATTACK", tb_y + 38.0, 2.0, BLIP_WHITE);
 
     draw_hud_canaris(blip, g);
 }
@@ -1424,7 +1423,7 @@ fn update_map(g: &mut Game, dt: f32, sfx: &Sounds) {
         if g.map_cursor > 0 { g.map_cursor -= 1; }
     }
 
-    if key_pressed(BLIP_KEY_SPACE) {
+    if btn1_pressed() {
         let z = &ZONES[g.map_cursor];
         g.level   = z.level_eq;
         g.level_t = 90.0;
@@ -1433,7 +1432,7 @@ fn update_map(g: &mut Game, dt: f32, sfx: &Sounds) {
         play_music(&sfx.sea_music);
     }
 
-    if key_pressed(KeyCode::Escape) || key_pressed(KEY_BOARD) {
+    if key_pressed(KeyCode::Escape) || btn2_pressed() {
         g.state = State::Port;
     }
 }
@@ -1482,7 +1481,7 @@ fn draw_map(blip: &Blip, g: &Game, tex: &Textures) {
     blip.draw_text(stars_str, 16.0, panel_y + 52.0, 1.0, BLIP_RED);
     let ships_str = format!("SHIPS   {}", z.ships);
     blip.draw_text(&ships_str, 16.0, panel_y + 68.0, 1.0, BLIP_CYAN);
-    blip.draw_text("W/S SELECT    SPACE SAIL    E BACK",
+    blip.draw_text("W/S SELECT    [1] SAIL    [2] BACK",
                    16.0, panel_y + 90.0, 1.0, BLIP_GRAY);
 
     draw_hud_canaris(blip, g);

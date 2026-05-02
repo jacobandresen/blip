@@ -66,5 +66,3 @@ python3 -m http.server -d web 8080
 ### Contributing
 The engine is open-source! We welcome contributions from the community. Please check the `CONTRIBUTING.md` file for detailed guidelines.
 
-### Support The Cause
-This project is a tribute and is not commercial. However, if you feel that monetary donation is worthwhile, you can consider contributing to the **Scleroseforeningen** via their official donation link: [Insert Donation Link Here].

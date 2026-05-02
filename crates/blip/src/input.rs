@@ -3,15 +3,24 @@
 
 use macroquad::input::{is_key_down, is_key_pressed, KeyCode};
 
-pub const BLIP_KEY_UP:    KeyCode = KeyCode::Up;
-pub const BLIP_KEY_DOWN:  KeyCode = KeyCode::Down;
-pub const BLIP_KEY_LEFT:  KeyCode = KeyCode::Left;
-pub const BLIP_KEY_RIGHT: KeyCode = KeyCode::Right;
-pub const BLIP_KEY_W:     KeyCode = KeyCode::W;
-pub const BLIP_KEY_A:     KeyCode = KeyCode::A;
-pub const BLIP_KEY_S:     KeyCode = KeyCode::S;
-pub const BLIP_KEY_D:     KeyCode = KeyCode::D;
-pub const BLIP_KEY_SPACE: KeyCode = KeyCode::Space;
+pub const BLIP_KEY_UP:      KeyCode = KeyCode::Up;
+pub const BLIP_KEY_DOWN:    KeyCode = KeyCode::Down;
+pub const BLIP_KEY_LEFT:    KeyCode = KeyCode::Left;
+pub const BLIP_KEY_RIGHT:   KeyCode = KeyCode::Right;
+pub const BLIP_KEY_W:       KeyCode = KeyCode::W;
+pub const BLIP_KEY_A:       KeyCode = KeyCode::A;
+pub const BLIP_KEY_S:       KeyCode = KeyCode::S;
+pub const BLIP_KEY_D:       KeyCode = KeyCode::D;
+pub const BLIP_KEY_SPACE:   KeyCode = KeyCode::Space;
+pub const BLIP_KEY_BUTTON2: KeyCode = KeyCode::Z;
+
+/// Atari-style Button 1 — primary fire / confirm (Space).
+#[inline]
+pub fn btn1_pressed() -> bool { is_key_pressed(BLIP_KEY_SPACE) }
+
+/// Atari-style Button 2 — secondary action (Z). Synthesized by touch btn-fire2 and gamepad B.
+#[inline]
+pub fn btn2_pressed() -> bool { is_key_pressed(BLIP_KEY_BUTTON2) }
 
 #[inline]
 pub fn key_held(key: KeyCode) -> bool {

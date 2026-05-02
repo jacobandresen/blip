@@ -340,6 +340,13 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
   fire.addEventListener('touchstart',  function (e) { e.preventDefault(); pressBtn(fire); },  { passive: false });
   fire.addEventListener('touchend',    function (e) { e.preventDefault(); releaseBtn(fire); }, { passive: false });
   fire.addEventListener('touchcancel', function ()  { releaseBtn(fire); });
+
+  var fire2 = document.getElementById('btn-fire2');
+  if (fire2) {
+    fire2.addEventListener('touchstart',  function (e) { e.preventDefault(); pressBtn(fire2); },  { passive: false });
+    fire2.addEventListener('touchend',    function (e) { e.preventDefault(); releaseBtn(fire2); }, { passive: false });
+    fire2.addEventListener('touchcancel', function ()  { releaseBtn(fire2); });
+  }
 }
 
   // ---- Gamepad support ----
@@ -348,8 +355,8 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     var gpHeld   = {};
 
     var BTN_MAP = [
-      { idx: 0,  code: 'Space'       },
-      { idx: 1,  code: 'Space'       },
+      { idx: 0,  code: 'Space'       },  // A / Cross   — Button 1
+      { idx: 1,  code: 'KeyZ'        },  // B / Circle  — Button 2
       { idx: 2,  code: 'Space'       },
       { idx: 3,  code: 'Space'       },
       { idx: 9,  code: 'Space'       },
@@ -359,7 +366,11 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
       { idx: 15, code: 'ArrowRight' },
     ];
 
-    function keyOf(code) { return code === 'Space' ? ' ' : code; }
+    function keyOf(code) {
+      if (code === 'Space') return ' ';
+      if (code === 'KeyZ')  return 'z';
+      return code;
+    }
 
     var polling = false;
 

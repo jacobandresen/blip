@@ -209,6 +209,16 @@ fn draw_board(blip: &Blip) {
         blip.draw_line(0.0, (HUD_H + r * CELL) as f32,
                        WIN_W as f32, (HUD_H + r * CELL) as f32, grid);
     }
+    // Visible wall border — shows the snake's movement boundary
+    let wall = BlipColor { r: 0.20, g: 0.42, b: 0.20, a: 1.0 };
+    let x0 = 0.0_f32;
+    let y0 = HUD_H as f32;
+    let w  = WIN_W as f32;
+    let h  = (WIN_H - HUD_H) as f32;
+    blip.fill_rect(x0,         y0,         w,   2.0, wall); // top
+    blip.fill_rect(x0,         y0 + h - 2.0, w,   2.0, wall); // bottom
+    blip.fill_rect(x0,         y0,         2.0, h,   wall); // left
+    blip.fill_rect(x0 + w - 2.0, y0,         2.0, h,   wall); // right
 }
 
 fn draw_snake(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D) {

@@ -68,6 +68,34 @@
       position: relative;
     }
 
+    /* ---- button keymap hint ---- */
+    .kbd-map {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      pointer-events: none;
+      white-space: nowrap;
+      color: var(--yellow);
+      text-shadow: none;
+      opacity: 0.2;
+      margin-right: 8px;
+      transition: opacity .25s, text-shadow .25s;
+    }
+    .kbd-map .sep { opacity: 0.5; }
+    body.win-focused .kbd-map {
+      opacity: 1;
+      text-shadow: 0 0 8px var(--yellow);
+    }
+    body:has(.card:hover) .kbd-map {
+      opacity: 1;
+      text-shadow: 0 0 10px var(--yellow);
+      animation: blink-coin 1.1s step-end infinite;
+    }
+    @media (hover: none) and (pointer: coarse) { .kbd-map { display: none; } }
+
     /* ---- language switcher ---- */
     .lang-switcher {
       position: fixed;
@@ -627,7 +655,6 @@
       <div class="card-title">CANARIS</div>
       <div class="card-genre"  data-i18n="canarisGenre"></div>
       <div class="card-desc"   data-i18n="canarisDesc"></div>
-      <div class="badge-kb">⌨ <span data-i18n="canarisKb"></span></div>
       <div class="card-controls" data-i18n="canarisControls"></div>
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
@@ -635,6 +662,11 @@
   </div>
 
   <div class="lang-switcher">
+    <div class="kbd-map">
+      [1] SPACE
+      <span class="sep">·</span>
+      [2] Z
+    </div>
     <button class="lang-btn" data-lang="en">🇬🇧</button>
     <button class="lang-btn" data-lang="ja">🇯🇵</button>
     <button class="lang-btn" data-lang="da">🇩🇰</button>
@@ -681,24 +713,23 @@
 
         bouncerGenre:     'BRICK BREAK GAME',
         bouncerDesc:      'Ball is must break all brick for become empty board.<br>Paddle must not allow ball escape to fall below.<br>Clear stage happen, next stage will arrive.',
-        bouncerControls:  'PUSH A/D OR ARROW &middot; SPACE KEY FOR LAUNCH BALL',
+        bouncerControls:  'A/D OR ARROW &middot; [1] LAUNCH',
 
         galacticGenre:    'ALIEN ATTACK GAME',
         galacticDesc:     'Many alien spaceship is coming very close near now.<br>Please for shoot all before they arrive on ground.<br>Must defend Earth happening at every cost situation.',
-        galacticControls: 'PUSH A/D OR ARROW &middot; SPACE KEY FOR SHOOT',
+        galacticControls: 'A/D OR ARROW &middot; [1] SHOOT',
 
         rallyGenre:        'PADDLE BATTLE GAME',
         rallyDesc:         'First player to reach seven point is win.<br>Ball getting more fast with every hit.',
-        rallyControls:     'P1 W/S OR ARROW &middot; P2 I/K &middot; ANY KEY FOR SERVE',
+        rallyControls:     'P1 W/S OR ARROW &middot; P2 I/K &middot; [1] SERVE',
 
         canarisGenre:      'PRIVATEER NAVAL GAME',
         canarisDesc:       'Sail Kattegat as a Danish privateer captain.<br>Fire cannons, board ships, and plunder gold.<br>Dock at harbour to repair and resupply.',
-        canarisKb:         'KEYBOARD RECOMMENDED',
-        canarisControls:   'ARROW / WASD TO SAIL &middot; SPACE TO FIRE &middot; E TO BOARD',
+        canarisControls:   'ARROW / WASD TO SAIL &middot; [1] FIRE &middot; [2] BOARD',
 
         pressStart:       'PUSH START BUTTON',
         needCoin:         'NEED COIN',
-        footerControls:   'PUSH WASD OR ARROW KEY &nbsp;&mdash;&nbsp; SPACE IS FOR SHOOT OR FOR LAUNCH',
+        footerControls:   'WASD / ARROW &nbsp;&mdash;&nbsp; [1] SHOOT OR LAUNCH',
         footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALL RIGHT IS RESERVE'
       },
 
@@ -713,24 +744,23 @@
 
         bouncerGenre:     'ブロック崩し',
         bouncerDesc:      'ボールで全てのブロックを壊せ。<br>ボールをパドルの下に落とすな。<br>全部壊してステージクリア。',
-        bouncerControls:  'A/D または矢印 &middot; スペースで発射',
+        bouncerControls:  'A/D または矢印 &middot; [1] 発射',
 
         galacticGenre:    'スペースインベーダー',
         galacticDesc:     'エイリアンの大群が迫ってくる。<br>着地する前に全滅させろ。<br>地球を守り抜け。',
-        galacticControls: 'A/D または矢印 &middot; スペースで射撃',
+        galacticControls: 'A/D または矢印 &middot; [1] 射撃',
 
         rallyGenre:        'ピンポンゲーム',
         rallyDesc:         '先に7点取った方が勝ち。<br>打つたびにボールは速くなる。',
-        rallyControls:     'P1 W/S または矢印 &middot; P2 I/K &middot; 任意のキーでサーブ',
+        rallyControls:     'P1 W/S または矢印 &middot; P2 I/K &middot; [1] サーブ',
 
         canarisGenre:      'デンマーク海賊ゲーム',
         canarisDesc:       'デンマークの私掠船長としてカテガット海峡を航海。<br>大砲を撃ち、敵船に乗り込み、金を奪え。<br>港でせんかんを修理・補給しよう。',
-        canarisKb:         'キーボード推奨',
-        canarisControls:   '矢印/WASD 操舵 &middot; スペースで射撃 &middot; E で乗船',
+        canarisControls:   '矢印/WASD 操舵 &middot; [1] 砲撃 &middot; [2] 乗船',
 
         pressStart:       'スタート',
         needCoin:         'コインが必要',
-        footerControls:   'WASD または 矢印キー &nbsp;―&nbsp; スペースで撃つ・発射',
+        footerControls:   'WASD / 矢印キー &nbsp;―&nbsp; [1] 射撃・発射',
         footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; 全権利保留'
       },
 
@@ -745,24 +775,23 @@
 
         bouncerGenre:     'KLODSBRÆKKER',
         bouncerDesc:      'Br&aelig;k alle klodser med bolden.<br>Lad ikke bolden slippe forbi dit bat.<br>Ryd banen for at avancere.',
-        bouncerControls:  'A/D ELLER PILE &middot; MELLEMRUM FOR START',
+        bouncerControls:  'A/D ELLER PILE &middot; [1] START',
 
         galacticGenre:    'RUMANGRIBER',
         galacticDesc:     'Alienbølger er på vej ind.<br>Skyd dem ned inden de lander.<br>Forsvar Jorden for enhver pris.',
-        galacticControls: 'A/D ELLER PILE &middot; MELLEMRUM FOR SKYD',
+        galacticControls: 'A/D ELLER PILE &middot; [1] SKYD',
 
         rallyGenre:        'BORDTENNISSPIL',
         rallyDesc:         'F&oslash;rst til syv point vinder.<br>Bolden accelererer for hvert slag.',
-        rallyControls:     'P1 W/S ELLER PILE &middot; P2 I/K &middot; VILK&Aring;RLIG TAST FOR SERV',
+        rallyControls:     'P1 W/S ELLER PILE &middot; P2 I/K &middot; [1] SERV',
 
         canarisGenre:      'KAPERSKIB SPIL',
         canarisDesc:       'Sejl i Kattegat som dansk kaperkapitajn.<br>Affyr kanoner, bord fjendtlige skibe og pl&oslash;ndr guld.<br>Anl&oslash;b havn for at reparere og genopfylde.',
-        canarisKb:         'TASTATUR ANBEFALES',
-        canarisControls:   'PIL / WASD FOR AT SEJLE &middot; MELLEMRUM SKYD &middot; E BORD',
+        canarisControls:   'PIL / WASD FOR AT SEJLE &middot; [1] SKYD &middot; [2] BORD',
 
         pressStart:       'TRYK START',
         needCoin:         'INDS&AElig;T M&Oslash;NT',
-        footerControls:   'WASD ELLER PILETASTER &nbsp;&mdash;&nbsp; MELLEMRUM FOR AT SKYDE ELLER AFFYRE',
+        footerControls:   'WASD / PILETASTER &nbsp;&mdash;&nbsp; [1] SKYD ELLER AFFYR',
         footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALLE RETTIGHEDER FORBEHOLDES'
       }
     };
@@ -897,6 +926,10 @@ var n = getCoins();
 
     document.getElementById('insert-coin').addEventListener('click', insertCoin);
     document.getElementById('kiosk-insert-btn').addEventListener('click', insertCoin);
+
+    window.addEventListener('focus', function () { document.body.classList.add('win-focused'); });
+    window.addEventListener('blur',  function () { document.body.classList.remove('win-focused'); });
+    if (document.hasFocus()) document.body.classList.add('win-focused');
 
     document.addEventListener('keydown', function(e) {
       if (e.key === '5' || e.key === 'c' || e.key === 'C') insertCoin();
