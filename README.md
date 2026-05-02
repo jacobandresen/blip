@@ -1,6 +1,8 @@
 # Blip Engine Arcade
 A vibrant showcase of classic arcade games powered by the open-source Blip Engine.
 
+> **Note:** This project is an experiment in AI-assisted game development. The games, engine, and supporting code were built collaboratively with AI tools.
+
 ## 👋 Welcome
 
 The Blip Engine is an open-source framework designed to provide a standardized, high-performance layer for arcade game development in Rust. By compiling games into WebAssembly, we abstract away the complexities of low-level web graphics programming, allowing developers to focus purely on game logic, state management, and fun.
@@ -19,7 +21,7 @@ This collection features several classic titles, all running within the unified 
 *   **Serpent**: Guide the snake through the maze, eat the pellet, and avoid self-collision.
 *   **Bouncer**: The ultimate brick-breaking challenge.
 *   **Galactic Defender**: Shoot down the endless swarm of invading aliens.
-*   **Canaris**: A unique and beloved classic arcade experience, a tribute from Denmark.
+*   **Canaris**: A tribute to the Danish DOS game Kaptajn Kapers (1985) — never an arcade game, but lovingly reimagined as one here.
 
 ---
 
