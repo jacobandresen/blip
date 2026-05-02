@@ -163,20 +163,36 @@ fn enemy_ship_a()  -> Vec<u8> { ship(false, true) }
 fn enemy_ship_b()  -> Vec<u8> { ship(false, false) }
 
 fn cannonball() -> Vec<u8> {
-    let w: i32 = 8;
-    let h: i32 = 8;
+    let w: i32 = 12;
+    let h: i32 = 12;
     let mut img = Image::new(w as u32, h as u32);
     let cx = w / 2;
     let cy = h / 2;
-    for dy in -2i32..=2 {
-        for dx in -2i32..=2 {
-            if dx * dx + dy * dy <= 5 {
-                img.set(cx + dx, cy + dy, 50, 50, 60);
+    // Outer heat glow (semi-transparent orange aura)
+    for dy in -5i32..=5 {
+        for dx in -5i32..=5 {
+            let r2 = dx * dx + dy * dy;
+            if r2 > 20 && r2 <= 30 {
+                img.set_rgba(cx + dx, cy + dy, 220, 120, 30, 100);
             }
         }
     }
-    // highlight pixel
-    img.set(cx - 1, cy - 1, 120, 120, 140);
+    // Iron ball body — hot orange core fading to dark iron
+    for dy in -4i32..=4 {
+        for dx in -4i32..=4 {
+            let r2 = dx * dx + dy * dy;
+            if r2 <= 20 {
+                let t = r2 as f32 / 20.0;
+                let r = (230.0 - t * 170.0) as u8;
+                let g = (100.0 - t * 70.0) as u8;
+                let b = (20.0 - t * 10.0) as u8;
+                img.set(cx + dx, cy + dy, r, g, b);
+            }
+        }
+    }
+    img.set(cx - 1, cy - 2, 255, 240, 180);
+    img.set(cx - 2, cy - 1, 255, 240, 180);
+    img.set(cx - 1, cy - 1, 255, 255, 220);
     img.encode_png()
 }
 
@@ -425,14 +441,18 @@ fn crew_figure() -> Vec<u8> {
 // ── sounds ────────────────────────────────────────────────────────────────────
 
 fn cannon_fire() -> Vec<u8> {
-    // Low-frequency noise burst with sharp attack
-    let mut buf = noise_burst(120.0, 1.0, 0.6);
-    // Add a deep thump underneath
-    let thump = sine_tone(80.0, 100.0, 0.5);
-    for (i, s) in thump.iter().enumerate() {
+    // Sharp crack (short burst) + deep thump (55 Hz body) + rumble tail
+    let mut buf = noise_burst(250.0, 1.1, 0.48);
+    let thump = sine_tone(55.0, 210.0, 0.95);
+    let crack  = sine_tone(150.0, 55.0, 0.65);
+    for (i, &s) in thump.iter().enumerate() {
         if i < buf.len() {
-            let v = buf[i] as i32 + *s as i32;
-            buf[i] = v.clamp(-32767, 32767) as i16;
+            buf[i] = (buf[i] as i32 + s as i32).clamp(-32767, 32767) as i16;
+        }
+    }
+    for (i, &s) in crack.iter().enumerate() {
+        if i < buf.len() {
+            buf[i] = (buf[i] as i32 + s as i32).clamp(-32767, 32767) as i16;
         }
     }
     encode_pcm16_mono(&buf)

@@ -26,8 +26,8 @@ const PLAYER_W: f32 = 48.0;
 const PLAYER_H: f32 = 32.0;
 const ENEMY_W:  f32 = 48.0;
 const ENEMY_H:  f32 = 32.0;
-const BALL_W:   f32 = 8.0;
-const BALL_H:   f32 = 8.0;
+const BALL_W:   f32 = 12.0;
+const BALL_H:   f32 = 12.0;
 
 // ── pools ─────────────────────────────────────────────────────────────────────
 
@@ -57,7 +57,11 @@ const PORT_DOCK_RADIUS:  f32   = 80.0;  // how close the player must be to press
 const PORT_SAFE_RADIUS:  f32   = 400.0; // enemies don't spawn or engage within this distance of port
 
 const CANNON_SPEED:      f32   = 280.0;
-const CANNON_GRAVITY:    f32   = 60.0;
+const CANNON_GRAVITY:    f32   = 200.0;
+const CANNON_ARC_VY:     f32   = 94.0;  // initial upward speed for parabolic arc
+
+const MAX_SPLASHES:      usize = 4;
+const SPLASH_TTL:        f32   = 0.55;
 const PLAYER_RELOAD:     f32   = 0.8;
 const ENEMY_RELOAD_BASE: f32   = 2.0;
 const COMBAT_PLAYER_X:   f32   = 60.0;
@@ -161,6 +165,13 @@ struct Explosion {
     ttl: f32,
 }
 
+#[derive(Copy, Clone)]
+struct Splash {
+    active: bool,
+    x: f32, y: f32,
+    ttl: f32,
+}
+
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum SlotOwner { Player, Enemy, Empty }
 
@@ -233,6 +244,7 @@ struct Game {
 
     combat_enemy_idx: usize,
     retreat_t: f32,
+    splashes: [Splash; MAX_SPLASHES],
 
     slots:           [BoardingSlot; BOARDING_SLOTS],
     boarding_t:      f32,
@@ -278,6 +290,7 @@ impl Game {
             explosions:  [Explosion { active: false, x: 0.0, y: 0.0, ttl: 0.0 }; MAX_EXPLOSIONS],
             combat_enemy_idx: 0,
             retreat_t: 0.0,
+            splashes: [Splash { active: false, x: 0.0, y: 0.0, ttl: 0.0 }; MAX_SPLASHES],
             slots: [BoardingSlot { owner: SlotOwner::Empty, hp: 0 }; BOARDING_SLOTS],
             boarding_t: 0.0,
             boarding_total_t: 0.0,
@@ -360,12 +373,22 @@ impl Game {
         }
     }
 
+    fn spawn_splash(&mut self, x: f32, y: f32) {
+        for s in self.splashes.iter_mut() {
+            if !s.active {
+                *s = Splash { active: true, x, y, ttl: SPLASH_TTL };
+                return;
+            }
+        }
+    }
+
     fn fire_ball(&mut self, from_player: bool, src_x: f32, src_y: f32) {
         let (start, end) = if from_player { (0, 2) } else { (2, MAX_CANNONBALLS) };
         for i in start..end {
             if !self.cannonballs[i].active {
                 let vx = if from_player { CANNON_SPEED } else { -CANNON_SPEED };
-                let vy = rand_int(-20, 20) as f32;
+                // Upward kick for parabolic arc; slight per-shot jitter for variety
+                let vy = -CANNON_ARC_VY + rand_int(-6, 6) as f32;
                 self.cannonballs[i] = Cannonball {
                     active: true, x: src_x, y: src_y, vx, vy, player: from_player,
                 };
@@ -632,16 +655,15 @@ fn update_combat(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.enemies[pidx].reload_t <= 0.0 {
         let reload = (ENEMY_RELOAD_BASE - g.level as f32 * 0.15).max(0.6);
         g.enemies[pidx].reload_t = reload;
-        // Aim slightly toward player Y
-        let aim_vy = (g.player.y - g.enemies[pidx].combat_y).clamp(-40.0, 40.0);
+        // Aim slightly toward player Y, base arc upward
+        let aim_vy = (g.player.y - g.enemies[pidx].combat_y).clamp(-60.0, 60.0);
         let ex = COMBAT_ENEMY_X;
         let ey = g.enemies[pidx].combat_y + ENEMY_H / 2.0;
-        // Manually spawn to pass custom vy
         for i in 2..MAX_CANNONBALLS {
             if !g.cannonballs[i].active {
                 g.cannonballs[i] = Cannonball {
                     active: true, x: ex, y: ey,
-                    vx: -CANNON_SPEED, vy: aim_vy * 0.4, player: false,
+                    vx: -CANNON_SPEED, vy: -CANNON_ARC_VY + aim_vy * 0.5, player: false,
                 };
                 break;
             }
@@ -675,9 +697,19 @@ fn update_combat(g: &mut Game, dt: f32, sfx: &Sounds) {
         let by = g.cannonballs[i].y;
         let is_player = g.cannonballs[i].player;
 
-        // Off screen → splash
-        if bx < -BALL_W || bx > WIN_W as f32 + BALL_W
-           || by < HUD_H as f32 || by > WIN_H as f32 {
+        // Above HUD (mid-arc): keep flying, gravity will bring it back
+        if by < HUD_H as f32 { continue; }
+
+        // Exits screen — spawn splash at the edge where it left
+        let off_left  = bx < -BALL_W;
+        let off_right = bx > WIN_W as f32 + BALL_W;
+        let off_bot   = by > WIN_H as f32;
+        if off_left || off_right || off_bot {
+            let sx = if off_left  { 4.0 }
+                     else if off_right { WIN_W as f32 - 4.0 }
+                     else { bx.clamp(4.0, WIN_W as f32 - 4.0) };
+            let sy = by.clamp(HUD_H as f32 + 10.0, WIN_H as f32 - 8.0);
+            g.spawn_splash(sx, sy);
             play_sfx(&sfx.splash);
             g.cannonballs[i].active = false;
             continue;
@@ -710,9 +742,12 @@ fn update_combat(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
-    // Explosions
+    // Explosions + splashes
     for e in g.explosions.iter_mut() {
         if e.active { e.ttl -= dt; if e.ttl <= 0.0 { e.active = false; } }
+    }
+    for s in g.splashes.iter_mut() {
+        if s.active { s.ttl -= dt; if s.ttl <= 0.0 { s.active = false; } }
     }
 
     // Win: enemy sunk
@@ -1128,12 +1163,37 @@ fn draw_combat(blip: &Blip, g: &Game, tex: &Textures) {
         blip.draw_texture(&tex.ball, b.x, b.y, BALL_W, BALL_H);
     }
 
-    // Explosions (scale up over lifetime)
+    // Explosions — grow from small to large then shrink
     for e in g.explosions.iter() {
         if !e.active { continue; }
         let t    = e.ttl / EXPLOSION_TTL;
-        let size = 32.0 * (1.0 + (1.0 - t) * 0.7);
+        let size = 20.0 + (1.0 - t) * 52.0; // 72 → 20 px
         blip.draw_texture(&tex.explosion, e.x - size / 2.0, e.y - size / 2.0, size, size);
+    }
+
+    // Water splashes — expanding oval rings with rising droplets
+    for s in g.splashes.iter() {
+        if !s.active { continue; }
+        let age  = 1.0 - s.ttl / SPLASH_TTL; // 0 fresh → 1 old
+        let fade = s.ttl / SPLASH_TTL;
+        let col  = Color::new(0.65, 0.88, 1.0, fade * 0.9);
+        // Two expanding rings
+        for ring in 0..2u32 {
+            let r  = (age * 22.0 + ring as f32 * 9.0).max(0.0);
+            let ry = (r * 0.42).max(1.0); // oval (wider than tall)
+            blip.fill_rect(s.x - r,      s.y - ry,        r * 2.0, 2.0, col);
+            blip.fill_rect(s.x - r,      s.y + ry - 2.0,  r * 2.0, 2.0, col);
+            blip.fill_rect(s.x - r,      s.y - ry,        2.0, ry * 2.0, col);
+            blip.fill_rect(s.x + r - 2.0,s.y - ry,        2.0, ry * 2.0, col);
+        }
+        // Upward droplets in the first half of the animation
+        if age < 0.45 {
+            let up = age * 32.0;
+            let dc = Color::new(0.8, 0.95, 1.0, fade);
+            blip.fill_rect(s.x - 1.5, s.y - up,        3.0, 5.0, dc);
+            blip.fill_rect(s.x + 6.0, s.y - up * 0.72, 2.0, 4.0, dc);
+            blip.fill_rect(s.x - 8.0, s.y - up * 0.65, 2.0, 4.0, dc);
+        }
     }
 
     // ── Bottom UI strip ──────────────────────────────────────────────────────
