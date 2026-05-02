@@ -1557,8 +1557,41 @@ async fn main() {
     play_music(&sfx.sea_music);
     play_ambient(&sfx.ocean_ambience);
 
+    let mut shot_frame: u32 = 0;
+
     loop {
         let dt = blip.delta_time;
+
+        // ── Screenshot autopilot ──────────────────────────────────────────────
+        // When BLIP_SCREENSHOT_OUT is set: skip title, enter combat, fire one
+        // cannonball, then let blip capture at frame 25.
+        if blip.screenshot_mode {
+            shot_frame += 1;
+            match shot_frame {
+                1 => {
+                    // Skip title → sea → combat immediately
+                    g.start_game();
+                    // Enemy 0 is already active from start_game/spawn_enemies;
+                    // set reload very high so it never fires during capture.
+                    g.enemies[0].reload_t = 999.0;
+                    g.enter_combat(0);
+                }
+                6 => {
+                    // Fire one cannonball with a fixed (non-random) arc
+                    g.cannonballs[0] = Cannonball {
+                        active: true,
+                        x:  COMBAT_PLAYER_X + PLAYER_W,
+                        y:  g.player.y + PLAYER_H * 0.55,
+                        vx: CANNON_SPEED,
+                        vy: -CANNON_ARC_VY,
+                        player: true,
+                    };
+                    g.player.reload_t = PLAYER_RELOAD;
+                    g.player.cannons -= 1;
+                }
+                _ => {}
+            }
+        }
 
         match g.state {
             State::Title    => update_title(&mut g, dt),

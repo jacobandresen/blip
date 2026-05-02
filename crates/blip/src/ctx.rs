@@ -61,9 +61,10 @@ pub struct Blip {
     // ---- interlaced field ----
     interlace_field: u8, // 0 or 1, flips every frame
     // ---- screenshot capture ----
-    screenshot_mode:  bool,
-    screenshot_frame: u32,
-    screenshot_path:  Option<String>,
+    pub screenshot_mode:   bool,
+    screenshot_frame:      u32,
+    screenshot_frame_target: u32,
+    screenshot_path:       Option<String>,
 }
 
 impl Blip {
@@ -83,13 +84,16 @@ impl Blip {
         let chroma_cd =  2.0 + rng.next() *  4.0;
 
         #[cfg(not(target_arch = "wasm32"))]
-        let (screenshot_mode, screenshot_path) = {
-            let path = std::env::var("BLIP_SCREENSHOT_OUT").ok();
-            let mode = path.is_some();
-            (mode, path)
+        let (screenshot_mode, screenshot_path, screenshot_frame_target) = {
+            let path   = std::env::var("BLIP_SCREENSHOT_OUT").ok();
+            let mode   = path.is_some();
+            let target = std::env::var("BLIP_SCREENSHOT_FRAME")
+                .ok().and_then(|s| s.parse().ok()).unwrap_or(25u32);
+            (mode, path, target)
         };
         #[cfg(target_arch = "wasm32")]
-        let (screenshot_mode, screenshot_path): (bool, Option<String>) = (false, None);
+        let (screenshot_mode, screenshot_path, screenshot_frame_target): (bool, Option<String>, u32) =
+            (false, None, 25);
 
         let b = Self {
             width, height, delta_time: 1.0 / 60.0,
@@ -100,6 +104,7 @@ impl Blip {
             interlace_field: 0,
             screenshot_mode,
             screenshot_frame: 0,
+            screenshot_frame_target,
             screenshot_path,
         };
         b.apply_camera();
@@ -151,7 +156,7 @@ impl Blip {
         #[cfg(not(target_arch = "wasm32"))]
         if self.screenshot_mode {
             self.screenshot_frame += 1;
-            if self.screenshot_frame >= 2 {
+            if self.screenshot_frame >= self.screenshot_frame_target {
                 if let Some(ref path) = self.screenshot_path {
                     let img = get_screen_data();
                     img.export_png(path);
