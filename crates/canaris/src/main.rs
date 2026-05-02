@@ -47,7 +47,7 @@ const PLAYER_FOOD_START: i32   = 30;
 const FOOD_MAX:          i32   = 30;
 
 const PLAYER_SPEED:      f32   = 160.0;
-const SEA_LANE_Y:        f32   = (WIN_H as f32 - HUD_H as f32) * 0.55 + HUD_H as f32;
+const SEA_LANE_Y:        f32   = (WIN_H as f32 - HUD_H as f32) * 0.38 + HUD_H as f32;
 const BOB_AMP:           f32   = 4.0;
 const BOB_FREQ:          f32   = 1.8;
 
