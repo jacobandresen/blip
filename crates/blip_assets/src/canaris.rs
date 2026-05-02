@@ -708,10 +708,58 @@ fn ocean_ambience() -> Vec<u8> {
     encode_pcm16_mono(&buf)
 }
 
+// ── kattegat map ─────────────────────────────────────────────────────────────
+
+pub fn kattegat_map() -> Vec<u8> {
+    let mut img = Image::new(480, 512);
+
+    // 1. Ocean background
+    hband(&mut img, 0, 480, 0, 512, 5, 25, 60);
+
+    // 2. Nautical grid
+    let mut y = 0;
+    while y < 512 {
+        hband(&mut img, 0, 480, y, y + 1, 18, 55, 95);
+        y += 60;
+    }
+    let mut x = 0i32;
+    while x < 480 {
+        hband(&mut img, x, x + 1, 0, 512, 18, 55, 95);
+        x += 60;
+    }
+
+    // 3. Kattegat water (slightly lighter central channel)
+    hband(&mut img, 115, 360, 0, 512, 12, 40, 80);
+
+    // 4. Denmark / Jutland (left land mass)
+    hband(&mut img, 0, 115, 100, 512, 45, 95, 50);   // main peninsula
+    hband(&mut img, 80, 140, 280, 350, 45, 95, 50);  // Funen island
+    hband(&mut img, 110, 220, 0, 120, 45, 95, 50);   // Zealand
+    hband(&mut img, 0, 100, 205, 225, 12, 40, 80);   // Limfjord inlet (water)
+
+    // 5. Sweden (right land mass)
+    hband(&mut img, 360, 480, 60, 512, 45, 95, 50);  // main coast
+    // fjord notches (clear narrow horizontal stripes to water)
+    hband(&mut img, 360, 420, 130, 142, 12, 40, 80);
+    hband(&mut img, 360, 400, 250, 260, 12, 40, 80);
+    hband(&mut img, 360, 410, 370, 380, 12, 40, 80);
+
+    // 6. Compass rose (top-right corner, simple tick marks)
+    hband(&mut img, 440, 442, 16, 36, 200, 200, 180); // N–S bar
+    hband(&mut img, 430, 450, 25, 27, 200, 200, 180); // E–W bar
+    img.set(441, 14, 240, 240, 200); // N tip
+    img.set(441, 38, 200, 200, 170); // S tip
+    img.set(428, 26, 200, 200, 170); // W tip
+    img.set(452, 26, 200, 200, 170); // E tip
+
+    img.encode_png()
+}
+
 // ── generate ──────────────────────────────────────────────────────────────────
 
 pub fn generate() -> Vec<Asset> {
     vec![
+        ("images/kattegat_map.png",  kattegat_map()),
         ("images/player_ship_a.png", player_ship_a()),
         ("images/player_ship_b.png", player_ship_b()),
         ("images/enemy_ship_a.png",  enemy_ship_a()),

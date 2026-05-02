@@ -1,61 +1,70 @@
-# BLIP ARCADE
+# Blip Engine Arcade
+A vibrant showcase of classic arcade games powered by the open-source Blip Engine.
 
-Four classic arcade games running in the browser — written in Rust on
-[macroquad](https://macroquad.rs) and compiled to WebAssembly.
+## 👋 Welcome
+
+The Blip Engine is an open-source framework designed to provide a standardized, high-performance layer for arcade game development in Rust. By compiling games into WebAssembly, we abstract away the complexities of low-level web graphics programming, allowing developers to focus purely on game logic, state management, and fun.
+
+**Blip Arcade is built as a tribute to the golden age of arcade games.** This project is not intended for commercial use.
 
 **[Play in the browser →](https://jacobandresen.github.io/blip/)**
 
 ---
 
-## The games
+## 🕹️ Game Modules
 
-**Rally** — Keep the ball in play. Don't let it past your paddle.
+This collection features several classic titles, all running within the unified Blip Engine:
 
-**Serpent** — Guide the snake, eat the food, don't bite yourself.
-
-**Bouncer** — Break every brick. Don't let the ball fall.
-
-**Galactic Defender** — Shoot the aliens before they reach the ground.
-
----
-
-## Controls
-
-| | |
-|---|---|
-| Move | WASD or arrow keys |
-| Shoot / launch | Space |
+*   **Rally**: Keep the ball in play and keep your score high.
+*   **Serpent**: Guide the snake through the maze, eat the pellet, and avoid self-collision.
+*   **Bouncer**: The ultimate brick-breaking challenge.
+*   **Galactic Defender**: Shoot down the endless swarm of invading aliens.
+*   **Canaris**: A unique and beloved classic arcade experience, a tribute from Denmark.
 
 ---
 
-## Building
+## ⚙️ Technology & Architecture
 
-Native (each game is its own crate):
+The Blip Engine ensures portability and high performance across all modules:
 
-```
-cargo run -p serpent
-cargo run -p bouncer
-cargo run -p rally
-cargo run -p galactic_defender
-```
+*   **Framework:** Blip Engine (Open-Source, Written in Rust)
+*   **Output:** The primary compiled assets are delivered via WebAssembly (WASM), ensuring fast, consistent performance in modern web browsers.
+*   **Architecture:** Game state management is separated from the core rendering loop, promoting modularity and scalability.
 
-Web (all four games at once):
+---
 
-```
-rustup target add wasm32-unknown-unknown   # one-time
+## 🚀 Getting Started
+
+### Development Setup
+To explore development or contribute:
+
+1.  **Prerequisites:** Ensure Rust and Cargo are installed.
+2.  **Build:**
+    ```bash
+    cargo build --release
+    ```
+    *This compiles the core engine and individual game modules.*
+
+### Web Distribution (Production)
+To compile all games for the web:
+
+```bash
+# Step 1: Ensure the WASM target is installed (One-time setup)
+rustup target add wasm32-unknown-unknown
+
+# Step 2: Build all games into the web directory
 ./build_web.sh
+
+# Step 3: Run a simple local server to view the compiled application
 python3 -m http.server -d web 8080
 ```
 
-The script writes `web/<game>/index.wasm` and `web/<game>/index.html`. The
-macroquad JavaScript runtime is vendored at `web/mq_js_bundle.js`.
-
 ---
 
-## About
+## 🙏 Support & Contributing
 
-Made by [Jacob Andresen](https://mastodon.gamedev.place/@jacobandresen) as an
-experiment with [macroquad](https://macroquad.rs) and Rust on
-`wasm32-unknown-unknown`.
+### Contributing
+The engine is open-source! We welcome contributions from the community. Please check the `CONTRIBUTING.md` file for detailed guidelines.
 
-Built in collaboration with [Claude](https://claude.ai) (Anthropic).
+### Support The Cause
+This project is a tribute and is not commercial. However, if you feel that monetary donation is worthwhile, you can consider contributing to the **Scleroseforeningen** via their official donation link: [Insert Donation Link Here].

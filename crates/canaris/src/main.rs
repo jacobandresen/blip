@@ -89,8 +89,25 @@ const KEY_ENTER: KeyCode = KeyCode::Enter;
 
 // ── state machine ─────────────────────────────────────────────────────────────
 
+struct MapZone {
+    name:     &'static str,
+    desc:     &'static str,
+    level_eq: i32,
+    ships:    usize,
+    map_x:    f32,
+    map_y:    f32,
+    stars:    u8,
+}
+
+const ZONES: [MapZone; 4] = [
+    MapZone { name: "DANISH COAST",      desc: "Soft targets on shallow routes", level_eq: 1,  ships: 2, map_x: 190.0, map_y: 420.0, stars: 1 },
+    MapZone { name: "KATTEGAT NARROWS",  desc: "Armed merchant convoys",         level_eq: 4,  ships: 3, map_x: 200.0, map_y: 290.0, stars: 2 },
+    MapZone { name: "SKAGERRAK PASSAGE", desc: "Royal Navy patrol routes",       level_eq: 7,  ships: 4, map_x: 210.0, map_y: 165.0, stars: 3 },
+    MapZone { name: "OPEN NORTH SEA",    desc: "Men-of-war and armed galleons",  level_eq: 11, ships: 4, map_x: 220.0, map_y:  60.0, stars: 4 },
+];
+
 #[derive(Copy, Clone, PartialEq, Eq)]
-enum State { Title, Sea, Combat, Boarding, Port, Dead, GameOver }
+enum State { Title, Sea, Combat, Boarding, Port, Map, Dead, GameOver }
 
 // ── entities ──────────────────────────────────────────────────────────────────
 
@@ -154,14 +171,14 @@ struct BoardingSlot {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-enum PortItem { Repair, Crew, Cannons, Food, Sail }
+enum PortItem { Sail, Map, Repair, Crew, Cannons, Food }
 
 impl PortItem {
-    // Order: Sail → Repair → Crew → Cannons → Food → (wrap) Sail
-    // Sail is first so the player can leave immediately with one SPACE press.
+    // Order: Sail → Map → Repair → Crew → Cannons → Food → (wrap) Sail
     fn next(self) -> Self {
         match self {
-            PortItem::Sail    => PortItem::Repair,
+            PortItem::Sail    => PortItem::Map,
+            PortItem::Map     => PortItem::Repair,
             PortItem::Repair  => PortItem::Crew,
             PortItem::Crew    => PortItem::Cannons,
             PortItem::Cannons => PortItem::Food,
@@ -171,7 +188,8 @@ impl PortItem {
     fn prev(self) -> Self {
         match self {
             PortItem::Sail    => PortItem::Food,
-            PortItem::Repair  => PortItem::Sail,
+            PortItem::Map     => PortItem::Sail,
+            PortItem::Repair  => PortItem::Map,
             PortItem::Crew    => PortItem::Repair,
             PortItem::Cannons => PortItem::Crew,
             PortItem::Food    => PortItem::Cannons,
@@ -179,20 +197,22 @@ impl PortItem {
     }
     fn label(self) -> &'static str {
         match self {
+            PortItem::Sail    => "SET SAIL",
+            PortItem::Map     => "WORLD MAP",
             PortItem::Repair  => "REPAIR HULL",
             PortItem::Crew    => "HIRE CREW",
             PortItem::Cannons => "BUY CANNONS",
             PortItem::Food    => "BUY PROVISIONS",
-            PortItem::Sail    => "SET SAIL",
         }
     }
     fn cost(self) -> i32 {
         match self {
+            PortItem::Sail    => 0,
+            PortItem::Map     => 0,
             PortItem::Repair  => REPAIR_COST,
             PortItem::Crew    => CREW_COST,
             PortItem::Cannons => CANNON_COST,
             PortItem::Food    => FOOD_COST,
-            PortItem::Sail    => 0,
         }
     }
 }
@@ -224,6 +244,7 @@ struct Game {
     port_msg:      &'static str,
     port_msg_t:    f32,
     port_msg_ok:   bool,
+    map_cursor:    usize,
 
     score:    i32,
     hi_score: i32,
@@ -262,10 +283,11 @@ impl Game {
             boarding_total_t: 0.0,
             boarding_hit_slot: 99,
             boarding_hit_t: 0.0,
-            port_cursor: PortItem::Repair,
+            port_cursor: PortItem::Sail,
             port_msg: "",
             port_msg_t: 0.0,
             port_msg_ok: true,
+            map_cursor: 0,
             score: 0, hi_score: 0,
             lives: LIVES_START,
             level: 1, level_t: 60.0,
@@ -302,6 +324,30 @@ impl Game {
                 combat_y: COMBAT_BASE_Y,
                 combat_vy: 0.0,
             };
+        }
+    }
+
+    fn spawn_enemies_n(&mut self, n: usize) {
+        let hull_base = 6 + self.level * 2;
+        for i in 0..MAX_ENEMIES {
+            if i < n {
+                let wx = loop {
+                    let x = WORLD_W * 0.3 + rand_int(0, (WORLD_W * 0.5) as i32) as f32;
+                    if (x - PORT_ANCHOR_X).abs() > PORT_SAFE_RADIUS { break x; }
+                };
+                self.enemies[i] = EnemyShip {
+                    active: true, world_x: wx,
+                    y: SEA_LANE_Y + rand_int(-10, 10) as f32,
+                    hull: hull_base, hull_max: hull_base,
+                    crew: 2 + self.level,
+                    gold_loot: 20 + rand_int(0, 30) as i32 * self.level,
+                    reload_t: rand_int(10, 30) as f32 * 0.1,
+                    anim_frame: 0, anim_t: 0.0, hit_flash_t: 0.0,
+                    combat_y: COMBAT_BASE_Y, combat_vy: 0.0,
+                };
+            } else {
+                self.enemies[i].active = false;
+            }
         }
     }
 
@@ -407,6 +453,7 @@ struct Textures {
     sea_wave:   Texture2D,
     sea_wave_b: Texture2D,
     crew:       Texture2D,
+    map_bg:     Texture2D,
 }
 
 // ── asset includes ────────────────────────────────────────────────────────────
@@ -421,6 +468,7 @@ const PORT_BG_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/ima
 const SEA_WAVE_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/sea_wave.png"));
 const SEA_WAVE_B_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/sea_wave_b.png"));
 const CREW_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/crew_figure.png"));
+const MAP_BG_PNG:     &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/kattegat_map.png"));
 
 const CANNON_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/cannon_fire.wav"));
 const EXPLODE_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/explosion.wav"));
@@ -802,6 +850,9 @@ fn update_port(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.state = State::Sea;
                 play_music(&sfx.sea_music);
             }
+            PortItem::Map => {
+                g.state = State::Map;
+            }
             item => {
                 let cost = item.cost();
                 if g.player.gold >= cost {
@@ -812,6 +863,7 @@ fn update_port(g: &mut Game, dt: f32, sfx: &Sounds) {
                         PortItem::Cannons => { g.player.cannons += 4; g.port_msg = "CANNONS LOADED"; }
                         PortItem::Food    => { g.player.food = FOOD_MAX as f32; g.port_msg = "PROVISIONS STOCKED"; }
                         PortItem::Sail    => {}
+                        PortItem::Map     => {}
                     }
                     g.port_msg_t  = 1.5;
                     g.port_msg_ok = true;
@@ -1283,20 +1335,95 @@ fn draw_port(blip: &Blip, g: &Game, tex: &Textures) {
     blip.draw_text(&format!("GOLD: {}", g.player.gold),
                    panel_x + 8.0, panel_y + 6.0, 2.0, BLIP_YELLOW);
 
-    let items = [PortItem::Sail, PortItem::Repair, PortItem::Crew, PortItem::Cannons, PortItem::Food];
+    let items = [PortItem::Sail, PortItem::Map, PortItem::Repair, PortItem::Crew, PortItem::Cannons, PortItem::Food];
     for (i, &item) in items.iter().enumerate() {
-        let iy         = panel_y + 30.0 + i as f32 * 28.0;
-        let can_afford = item == PortItem::Sail || g.player.gold >= item.cost();
+        let iy         = panel_y + 30.0 + i as f32 * 24.0;
+        let no_cost    = item == PortItem::Sail || item == PortItem::Map;
+        let can_afford = no_cost || g.player.gold >= item.cost();
         let selected   = item == g.port_cursor;
         let col = if selected { BLIP_YELLOW } else if can_afford { BLIP_WHITE } else { BLIP_DARKGRAY };
         let prefix = if selected { ">" } else { " " };
         blip.draw_text(&format!("{} {}", prefix, item.label()), panel_x + 8.0, iy, 2.0, col);
-        if item != PortItem::Sail {
+        if !no_cost {
             let cost_col = if can_afford { BLIP_YELLOW } else { BLIP_DARKGRAY };
             blip.draw_text(&format!("{}G", item.cost()),
                            panel_x + panel_w - 44.0, iy, 2.0, cost_col);
         }
     }
+
+    draw_hud_canaris(blip, g);
+}
+
+fn update_map(g: &mut Game, dt: f32, sfx: &Sounds) {
+    g.time += dt;
+
+    if key_pressed(BLIP_KEY_UP) || key_pressed(BLIP_KEY_W) {
+        if g.map_cursor + 1 < ZONES.len() { g.map_cursor += 1; }
+    }
+    if key_pressed(BLIP_KEY_DOWN) || key_pressed(BLIP_KEY_S) {
+        if g.map_cursor > 0 { g.map_cursor -= 1; }
+    }
+
+    if key_pressed(BLIP_KEY_SPACE) {
+        let z = &ZONES[g.map_cursor];
+        g.level   = z.level_eq;
+        g.level_t = 90.0;
+        g.spawn_enemies_n(z.ships);
+        g.state = State::Sea;
+        play_music(&sfx.sea_music);
+    }
+
+    if key_pressed(KeyCode::Escape) || key_pressed(KEY_BOARD) {
+        g.state = State::Port;
+    }
+}
+
+fn draw_map(blip: &Blip, g: &Game, tex: &Textures) {
+    let play_y = HUD_H as f32;
+
+    blip.draw_texture(&tex.map_bg, 0.0, play_y, WIN_W as f32, (WIN_H - HUD_H) as f32);
+
+    blip.draw_centered("KATTEGAT", play_y + 20.0, 2.0, BLIP_CYAN);
+
+    // Route line connecting adjacent zone dots
+    for i in 0..ZONES.len() - 1 {
+        let a = &ZONES[i];
+        let b = &ZONES[i + 1];
+        let lx = (a.map_x + b.map_x) * 0.5;
+        let ly = play_y + b.map_y;
+        let lh = a.map_y - b.map_y;
+        blip.fill_rect(lx, ly, 2.0, lh, Color::new(0.3, 0.5, 0.7, 0.6));
+    }
+
+    // Zone crosshair dots
+    for (i, z) in ZONES.iter().enumerate() {
+        let selected = i == g.map_cursor;
+        let blink_on = !selected || (g.time * 3.0) as u32 % 2 == 0;
+        let col = if selected { BLIP_YELLOW } else { Color::new(0.3, 0.6, 0.9, 1.0) };
+        if blink_on {
+            blip.fill_rect(z.map_x - 5.0, play_y + z.map_y - 5.0, 10.0, 10.0, col);
+            blip.fill_rect(z.map_x - 8.0, play_y + z.map_y - 1.0, 16.0, 2.0, col);
+            blip.fill_rect(z.map_x - 1.0, play_y + z.map_y - 8.0, 2.0, 16.0, col);
+        }
+    }
+
+    // Info panel
+    let panel_y = play_y + (WIN_H - HUD_H) as f32 * 0.60;
+    blip.fill_rect(8.0, panel_y, 300.0, 110.0, Color::new(0.0, 0.05, 0.15, 0.82));
+    let z = &ZONES[g.map_cursor];
+    blip.draw_text(z.name, 16.0, panel_y + 10.0, 2.0, BLIP_YELLOW);
+    blip.draw_text(z.desc, 16.0, panel_y + 34.0, 1.0, BLIP_WHITE);
+    let stars_str = match z.stars {
+        1 => "DANGER  *",
+        2 => "DANGER  **",
+        3 => "DANGER  ***",
+        _ => "DANGER  ****",
+    };
+    blip.draw_text(stars_str, 16.0, panel_y + 52.0, 1.0, BLIP_RED);
+    let ships_str = format!("SHIPS   {}", z.ships);
+    blip.draw_text(&ships_str, 16.0, panel_y + 68.0, 1.0, BLIP_CYAN);
+    blip.draw_text("W/S SELECT    SPACE SAIL    E BACK",
+                   16.0, panel_y + 90.0, 1.0, BLIP_GRAY);
 
     draw_hud_canaris(blip, g);
 }
@@ -1350,6 +1477,7 @@ async fn main() {
         sea_wave:   load_png(SEA_WAVE_PNG),
         sea_wave_b: load_png(SEA_WAVE_B_PNG),
         crew:       load_png(CREW_PNG),
+        map_bg:     load_png(MAP_BG_PNG),
     };
 
     let sfx = Sounds {
@@ -1378,6 +1506,7 @@ async fn main() {
             State::Combat   => update_combat(&mut g, dt, &sfx),
             State::Boarding => update_boarding(&mut g, dt, &sfx),
             State::Port     => update_port(&mut g, dt, &sfx),
+            State::Map      => update_map(&mut g, dt, &sfx),
             State::Dead     => update_dead(&mut g, dt, &sfx),
             State::GameOver => update_gameover(&mut g),
         }
@@ -1390,6 +1519,7 @@ async fn main() {
             State::Combat   => draw_combat(&blip, &g, &tex),
             State::Boarding => draw_boarding(&blip, &g, &tex),
             State::Port     => draw_port(&blip, &g, &tex),
+            State::Map      => draw_map(&blip, &g, &tex),
             State::Dead     => draw_dead(&blip, &g, &tex),
             State::GameOver => draw_gameover(&blip, &g),
         }
