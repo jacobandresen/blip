@@ -5,8 +5,8 @@ use macroquad::color::{Color, WHITE};
 use macroquad::math::{vec2, Rect};
 use macroquad::shapes::draw_rectangle;
 use macroquad::texture::{
-    draw_texture_ex, render_target_ex, DrawTextureParams, FilterMode, RenderTarget,
-    RenderTargetParams,
+    draw_texture_ex, get_screen_data, render_target_ex, DrawTextureParams, FilterMode,
+    RenderTarget, RenderTargetParams,
 };
 use macroquad::time::get_frame_time;
 use macroquad::window::{clear_background, next_frame, screen_height, screen_width, Conf};
@@ -60,6 +60,10 @@ pub struct Blip {
     chroma_dx: f32, // horizontal shift in virtual pixels
     // ---- interlaced field ----
     interlace_field: u8, // 0 or 1, flips every frame
+    // ---- screenshot capture ----
+    screenshot_mode:  bool,
+    screenshot_frame: u32,
+    screenshot_path:  Option<String>,
 }
 
 impl Blip {
@@ -78,6 +82,15 @@ impl Blip {
         let roll_cd   = 15.0 + rng.next() * 20.0;
         let chroma_cd =  2.0 + rng.next() *  4.0;
 
+        #[cfg(not(target_arch = "wasm32"))]
+        let (screenshot_mode, screenshot_path) = {
+            let path = std::env::var("BLIP_SCREENSHOT_OUT").ok();
+            let mode = path.is_some();
+            (mode, path)
+        };
+        #[cfg(target_arch = "wasm32")]
+        let (screenshot_mode, screenshot_path): (bool, Option<String>) = (false, None);
+
         let b = Self {
             width, height, delta_time: 1.0 / 60.0,
             rt, rng,
@@ -85,6 +98,9 @@ impl Blip {
             roll_cd,  roll_t: 0.0, roll_dy: 0.0, roll_spd: 0.0,
             chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
             interlace_field: 0,
+            screenshot_mode,
+            screenshot_frame: 0,
+            screenshot_path,
         };
         b.apply_camera();
         b
@@ -130,6 +146,19 @@ impl Blip {
         }
         clear_background(macroquad::color::BLACK);
         self.draw_post_process();
+
+        // Screenshot capture: save after frame 2 (title screen fully rendered) and exit.
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.screenshot_mode {
+            self.screenshot_frame += 1;
+            if self.screenshot_frame >= 2 {
+                if let Some(ref path) = self.screenshot_path {
+                    let img = get_screen_data();
+                    img.export_png(path);
+                }
+                std::process::exit(0);
+            }
+        }
 
         next_frame().await;
 
@@ -201,6 +230,16 @@ impl Blip {
         let lw = self.width  as f32;
         let lh = self.height as f32;
         let scale = vw / lw;
+
+        // Screenshot mode: clean 1:1 blit, all CRT effects suppressed.
+        if self.screenshot_mode {
+            let tex = self.rt.texture.clone();
+            draw_texture_ex(&tex, vx, vy, WHITE, DrawTextureParams {
+                dest_size: Some(vec2(vw, vh)),
+                ..Default::default()
+            });
+            return;
+        }
 
         let roll_on   = self.roll_t  > 0.0;
         let tear_on   = self.tear_t  > 0.0 && !roll_on; // don't combine tear + roll
