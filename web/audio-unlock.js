@@ -1,53 +1,37 @@
-// iOS Safari suspends AudioContext until a user gesture and requires
-// actually playing a buffer (not just resume()) to fully unlock hardware.
+// iOS Safari suspends AudioContext until a user gesture.
 (function () {
   var Orig = window.AudioContext || window.webkitAudioContext;
   if (!Orig) return;
 
   var ctxs = [];
 
-  function playSilentBuffer(ctx) {
-    try {
-      var buf = ctx.createBuffer(1, 1, 22050);
-      var src = ctx.createBufferSource();
-      src.buffer = buf;
-      src.connect(ctx.destination);
-      src.start(0);
-    } catch (e) {}
-  }
-
-  function tryUnlock(ctx) {
+  function tryResume(ctx) {
     if (ctx.state === 'running') return;
-    // Play the silent buffer synchronously within the gesture handler.
-    // iOS Safari requires the buffer start() call to happen directly in the
-    // gesture stack — deferring it into a resume().then() callback puts it
-    // outside that window and hardware audio stays locked.
-    playSilentBuffer(ctx);
     ctx.resume().catch(function () {});
   }
 
   function Wrapped(opts) {
     var ctx = new Orig(opts);
     ctxs.push(ctx);
-    tryUnlock(ctx);
+    tryResume(ctx);
     return ctx;
   }
   Wrapped.prototype = Orig.prototype;
   window.AudioContext = window.webkitAudioContext = Wrapped;
 
   function unlock() {
-    ctxs.forEach(tryUnlock);
+    ctxs.forEach(tryResume);
   }
 
   var EVENTS = ['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'];
 
-  // capture:true fires before any handler that calls preventDefault
+  // capture:true, passive:false — must be non-passive so iOS counts this as user activation
   EVENTS.forEach(function (e) {
-    document.addEventListener(e, unlock, { passive: true, capture: true });
+    document.addEventListener(e, unlock, { passive: false, capture: true });
   });
 
-  // Re-unlock when tab is foregrounded — iOS suspends contexts on hide
+  // Re-resume when tab is foregrounded — iOS suspends contexts on hide
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) ctxs.forEach(tryUnlock);
+    if (!document.hidden) ctxs.forEach(tryResume);
   });
 }());
