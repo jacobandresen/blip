@@ -5,7 +5,6 @@
   if (!Orig) return;
 
   var ctxs = [];
-  var unlocked = false;
 
   function playSilentBuffer(ctx) {
     try {
@@ -38,13 +37,6 @@
 
   function unlock() {
     ctxs.forEach(tryUnlock);
-    // Once all contexts are running, reduce listener overhead.
-    if (ctxs.length && ctxs.every(function (c) { return c.state === 'running'; })) {
-      unlocked = true;
-      EVENTS.forEach(function (e) {
-        document.removeEventListener(e, unlock, { capture: true });
-      });
-    }
   }
 
   var EVENTS = ['touchstart', 'touchend', 'pointerdown', 'click', 'keydown'];
