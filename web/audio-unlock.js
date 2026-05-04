@@ -19,12 +19,12 @@
 
   function tryUnlock(ctx) {
     if (ctx.state === 'running') return;
-    var p = ctx.resume();
-    if (p && p.then) {
-      p.then(function () { playSilentBuffer(ctx); }).catch(function () {});
-    } else {
-      playSilentBuffer(ctx);
-    }
+    // Play the silent buffer synchronously within the gesture handler.
+    // iOS Safari requires the buffer start() call to happen directly in the
+    // gesture stack — deferring it into a resume().then() callback puts it
+    // outside that window and hardware audio stays locked.
+    playSilentBuffer(ctx);
+    ctx.resume().catch(function () {});
   }
 
   function Wrapped(opts) {
