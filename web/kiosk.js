@@ -116,7 +116,14 @@ function insertCoin() {
 // all WASM sounds), so we resume Howler.ctx manually on any gesture and on tab refocus.
 (function () {
   function unlockAudio() {
-    if (typeof Howler !== 'undefined' && Howler.ctx && Howler.ctx.state !== 'running') {
+    if (typeof Howler === 'undefined') return;
+    if (!Howler.ctx) {
+      // Force Howler to create its AudioContext now, while inside a user gesture.
+      // On iOS, a context created outside a gesture starts suspended; inside one it starts running.
+      // Howler.volume() triggers _setupAudioContext() internally via `ctx || _()`.
+      Howler.volume();
+    }
+    if (Howler.ctx && Howler.ctx.state !== 'running') {
       Howler.ctx.resume();
     }
   }
