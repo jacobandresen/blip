@@ -1,9 +1,12 @@
-// Replaces macroquad's built-in audio plugin with Howler.js so iOS audio unlock
-// and re-unlock after backgrounding are handled automatically. Loaded after
-// mq_js_bundle.js so this register_plugin call overwrites the macroquad_audio one.
+// Replaces macroquad's built-in audio plugin with Howler.js for iOS reliability.
+// Loaded after mq_js_bundle.js so this register_plugin call overwrites the macroquad_audio one.
 
 if (typeof Howler !== 'undefined') {
   Howler.autoSuspend = false;
+  // Disable Howler's built-in unlock: it calls unload() when ctx.sampleRate !== 44100,
+  // which destroys all WASM-loaded sounds permanently (iOS often reports 48000 Hz).
+  // kiosk.js handles unlock via a permanent gesture listener instead.
+  Howler.autoUnlock = false;
 }
 
 (function () {
@@ -17,6 +20,7 @@ if (typeof Howler !== 'undefined') {
   function audio_init() {
     if (typeof Howler !== 'undefined') {
       Howler.autoSuspend = false;
+      Howler.autoUnlock = false;
     }
   }
 

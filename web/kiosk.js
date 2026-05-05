@@ -110,3 +110,19 @@ function insertCoin() {
     });
   }
 }
+
+// iOS suspends AudioContext on load and re-suspends after backgrounding.
+// Howler's autoUnlock is disabled (it calls unload() on non-44100 Hz devices, destroying
+// all WASM sounds), so we resume Howler.ctx manually on any gesture and on tab refocus.
+(function () {
+  function unlockAudio() {
+    if (typeof Howler !== 'undefined' && Howler.ctx && Howler.ctx.state !== 'running') {
+      Howler.ctx.resume();
+    }
+  }
+  document.addEventListener('touchstart', unlockAudio, { passive: true, capture: true });
+  document.addEventListener('click',      unlockAudio, { capture: true });
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) unlockAudio();
+  });
+}());
