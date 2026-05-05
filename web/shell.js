@@ -16,6 +16,7 @@ updateCoinsHud();
 
 var uiAudio = null;
 function getUiAudio() {
+  if (typeof Howler !== 'undefined' && Howler.ctx) return Howler.ctx;
   if (!uiAudio) uiAudio = new (window.AudioContext || window.webkitAudioContext)();
   if (uiAudio.state === 'suspended') uiAudio.resume();
   return uiAudio;

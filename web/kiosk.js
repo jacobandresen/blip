@@ -37,6 +37,7 @@ function updateCoinsHud() {
 var _kioskAudioCtx = null;
 
 function getKioskAudio() {
+  if (typeof Howler !== 'undefined' && Howler.ctx) return Howler.ctx;
   if (!_kioskAudioCtx) _kioskAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (_kioskAudioCtx.state === 'suspended') _kioskAudioCtx.resume();
   return _kioskAudioCtx;
