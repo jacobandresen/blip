@@ -108,7 +108,8 @@ struct Beeps {
 }
 
 fn update_title(g: &mut Game) {
-    if key_pressed(KeyCode::Key2) {
+    // Key2 = title-screen "2" option; I/K = P2 paddle dial rotation before mode is chosen
+    if key_pressed(KeyCode::Key2) || key_pressed(KeyCode::I) || key_pressed(KeyCode::K) {
         g.mode = Mode::TwoPlayer;
         web::set_mode(true);
         g.start_game();

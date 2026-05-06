@@ -217,7 +217,8 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     }, { passive: false });
 
     // onTap is called when a tap gesture completes, before the key is injected.
-    function makeDial(dialEl, handEl, upKey, upCode, downKey, downCode, tapKey, tapCode, onTap) {
+    // onInteract is called on the first touch contact (before any keys fly).
+    function makeDial(dialEl, handEl, upKey, upCode, downKey, downCode, tapKey, tapCode, onTap, onInteract) {
       var angle       = -Math.PI / 2;
       var lastAngle   = null;
       var totalDelta  = 0;
@@ -260,6 +261,7 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
         e.preventDefault();
         e.stopPropagation(); // don't also fire the canvas Space handler
         if (touchId !== null) return;
+        if (onInteract) onInteract();
         var t   = e.changedTouches[0];
         touchId    = t.identifier;
         lastAngle  = angleFrom(t);
@@ -305,6 +307,7 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
       dialP1, document.getElementById('dial-hand'),
       'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
       ' ', 'Space',
+      function () { if (rallyMode === null) applyRallyMode(0); },
       function () { if (rallyMode === null) applyRallyMode(0); }
     );
     // P2 dial tap = '2' = 2P mode (when still on title screen)
@@ -312,6 +315,7 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
       dialP2, document.getElementById('dial-hand-p2'),
       'i', 'KeyI', 'k', 'KeyK',
       '2', 'Digit2',
+      function () { if (rallyMode === null) applyRallyMode(1); },
       function () { if (rallyMode === null) applyRallyMode(1); }
     );
 
