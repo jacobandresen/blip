@@ -403,7 +403,7 @@ canvas {
 /* ---- Topbar layout override (4 items: GAMES · coins · TILT · INSERT COIN) ---- */
 
 /* coins-hud fills the middle; buttons sit naturally at the edges */
-#coins-hud { flex: 1; min-width: 0; text-align: center; }
+#coins-hud { flex: 1; min-width: 0; text-align: left; }
 
 /* ---- Tilt button ---- */
 
