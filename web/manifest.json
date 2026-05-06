@@ -1,7 +1,7 @@
 {
   "name": "BLIP ARCADE",
   "short_name": "BLIP",
-  "start_url": "/",
+  "start_url": "/blip/",
   "display": "standalone",
   "background_color": "#050508",
   "theme_color": "#050508",
