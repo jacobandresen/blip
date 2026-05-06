@@ -400,6 +400,11 @@ canvas {
   #paddle-dial-p2 { right: 16px; }
 }
 
+/* ---- Topbar layout override (4 items: GAMES · coins · TILT · INSERT COIN) ---- */
+
+/* coins-hud fills the middle; buttons sit naturally at the edges */
+#coins-hud { flex: 1; min-width: 0; text-align: center; }
+
 /* ---- Tilt button ---- */
 
 #tilt-btn { line-height: 0; padding: 9px 12px; }
