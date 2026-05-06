@@ -4,7 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BLIP">
   <title>BLIP ARCADE</title>
+  <link rel="manifest" href="../manifest.json">
   <link rel="icon" type="image/x-icon" href="../favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="../icon.svg">
@@ -42,14 +45,10 @@
     <div id="btn-fire" data-key=" " data-code="Space">FIRE</div>
   </div>
 
-  <!-- Paddle dials: rally only, touch only. P1=left, P2=right -->
+  <!-- Paddle dial: rally only, touch only -->
   <div id="paddle-dial">
     <div id="dial-hand"></div>
-    <div id="dial-label">P1</div>
-  </div>
-  <div id="paddle-dial-p2">
-    <div id="dial-hand-p2"></div>
-    <div id="dial-label-p2">2P</div>
+    <div id="dial-label">PADDLE</div>
   </div>
 
   <div id="arcade-bezel"></div>
