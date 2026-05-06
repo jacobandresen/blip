@@ -399,3 +399,17 @@ canvas {
   #paddle-dial    { left: 16px; }
   #paddle-dial-p2 { right: 16px; }
 }
+
+/* ---- Tilt button ---- */
+
+#tilt-btn { line-height: 0; padding: 9px 12px; }
+
+#tilt-btn.tilt-on {
+  color: #32c832;
+  text-shadow: 0 0 10px #32c832;
+  border-color: rgba(50, 200, 50, 0.55);
+  box-shadow:
+    0 0 14px rgba(50, 200, 50, 0.30),
+    0 4px 10px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(50, 200, 50, 0.15);
+}

@@ -355,6 +355,86 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     fire2.addEventListener('touchend',    function (e) { e.preventDefault(); releaseBtn(fire2); }, { passive: false });
     fire2.addEventListener('touchcancel', function ()  { releaseBtn(fire2); });
   }
+
+  // ---- Tilt (DeviceOrientation) controls ----
+  (function () {
+    var DEAD       = 12;   // degrees dead zone
+    var tiltActive = false;
+    var tiltBase   = null; // calibrated on first sample after enable
+    var tiltHeld   = { up: false, down: false, left: false, right: false };
+
+    function tiltKey(key, code, want, held) {
+      if (want !== held) injectKey(key, code, want ? 'keydown' : 'keyup');
+      return want;
+    }
+
+    function releaseAllTilt() {
+      if (tiltHeld.up)    injectKey('ArrowUp',    'ArrowUp',    'keyup');
+      if (tiltHeld.down)  injectKey('ArrowDown',  'ArrowDown',  'keyup');
+      if (tiltHeld.left)  injectKey('ArrowLeft',  'ArrowLeft',  'keyup');
+      if (tiltHeld.right) injectKey('ArrowRight', 'ArrowRight', 'keyup');
+      tiltHeld = { up: false, down: false, left: false, right: false };
+    }
+
+    function onOrientation(e) {
+      var g = e.gamma || 0, b = e.beta || 0;
+      if (!tiltBase) tiltBase = { g: g, b: b };
+      var dg = g - tiltBase.g, db = b - tiltBase.b;
+      if (isRally) {
+        // Left-right tilt (gamma) → P1 paddle up / down
+        tiltHeld.up   = tiltKey('ArrowUp',    'ArrowUp',    dg < -DEAD, tiltHeld.up);
+        tiltHeld.down = tiltKey('ArrowDown',  'ArrowDown',  dg >  DEAD, tiltHeld.down);
+      } else {
+        // Left-right tilt → ArrowLeft / ArrowRight
+        // Forward-back tilt (beta delta) → ArrowUp / ArrowDown
+        tiltHeld.left  = tiltKey('ArrowLeft',  'ArrowLeft',  dg < -DEAD, tiltHeld.left);
+        tiltHeld.right = tiltKey('ArrowRight', 'ArrowRight', dg >  DEAD, tiltHeld.right);
+        tiltHeld.up    = tiltKey('ArrowUp',    'ArrowUp',    db < -DEAD, tiltHeld.up);
+        tiltHeld.down  = tiltKey('ArrowDown',  'ArrowDown',  db >  DEAD, tiltHeld.down);
+      }
+    }
+
+    // Tilted phone with bilateral rotation arcs
+    var ICON = '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+      + '<rect x="6" y="3" width="8" height="14" rx="1.5" transform="rotate(-18 10 10)"/>'
+      + '<path d="M2.5,9 C2,5 5,1.5 9,1"/>'
+      + '<polyline points="7.5,0 9,1 8.5,2.5"/>'
+      + '<path d="M17.5,11 C18,15 15,18.5 11,19"/>'
+      + '<polyline points="12.5,20 11,19 11.5,17.5"/>'
+      + '</svg>';
+
+    var btn = document.createElement('button');
+    btn.id        = 'tilt-btn';
+    btn.className = 'kiosk-btn';
+    btn.title     = 'Toggle tilt controls';
+    btn.innerHTML = ICON;
+    document.getElementById('topbar').insertBefore(btn, document.getElementById('insert-coin-btn'));
+
+    btn.addEventListener('click', function () {
+      if (tiltActive) {
+        tiltActive = false;
+        tiltBase   = null;
+        btn.classList.remove('tilt-on');
+        window.removeEventListener('deviceorientation', onOrientation);
+        releaseAllTilt();
+        return;
+      }
+      function enable() {
+        tiltActive = true;
+        btn.classList.add('tilt-on');
+        window.addEventListener('deviceorientation', onOrientation);
+      }
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ requires a permission prompt on a user gesture
+        DeviceOrientationEvent.requestPermission()
+          .then(function (s) { if (s === 'granted') enable(); })
+          .catch(function () {});
+      } else {
+        enable();
+      }
+    });
+  }());
 }
 
   // ---- Gamepad support ----
