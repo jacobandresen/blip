@@ -12,6 +12,11 @@ var overlay   = document.getElementById('need-coin-overlay');
 
 updateCoinsHud();
 
+// Stop all audio when navigating away (pagehide is reliable on iOS Safari / PWA)
+window.addEventListener('pagehide', function () {
+  if (typeof Howler !== 'undefined') Howler.stop();
+});
+
 // ---- UI audio (coin insert / no room) ----
 
 var uiAudio = null;
