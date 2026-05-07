@@ -66,6 +66,11 @@
   pointer-events: none;
 }
 
+.kiosk-btn-inert {
+  cursor: default;
+  pointer-events: none;
+}
+
 .shake { animation: coin-shake 0.28s ease; }
 
 @keyframes coin-shake {
@@ -90,7 +95,6 @@
 /* Narrow portrait phones (≤ 480 px) — shrink text so all three bar items fit */
 @media (max-width: 480px) {
   .kiosk-btn { font-size: 13px; letter-spacing: 0; padding: 7px 10px; }
-  .kiosk-hud { font-size: 13px; letter-spacing: 1px; }
 }
 
 /* ---- Left badge group ---- */

@@ -116,7 +116,6 @@ canvas {
 }
 #back:active { transform: translate(-50%, calc(-50% + 2px)); }
 
-#coins-hud { flex: 1; }
 
 /* ---- Need-coin overlay ---- */
 
