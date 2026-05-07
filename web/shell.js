@@ -412,22 +412,33 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     corner.appendChild(btn);
     document.body.appendChild(corner);
 
+    function enable() {
+      tiltActive = true;
+      btn.classList.add('tilt-on');
+      window.addEventListener('deviceorientation', onOrientation);
+      try { localStorage.setItem('blip-tilt', '1'); } catch(e) {}
+    }
+
+    function disable() {
+      tiltActive = false;
+      tiltBase   = null;
+      btn.classList.remove('tilt-on');
+      window.removeEventListener('deviceorientation', onOrientation);
+      releaseAllTilt();
+      try { localStorage.setItem('blip-tilt', '0'); } catch(e) {}
+    }
+
+    var isIOS = typeof DeviceOrientationEvent !== 'undefined' &&
+                typeof DeviceOrientationEvent.requestPermission === 'function';
+
+    // Auto-enable on load if preference is set (non-iOS only; iOS requires a user gesture)
+    var savedTilt = false;
+    try { savedTilt = localStorage.getItem('blip-tilt') === '1'; } catch(e) {}
+    if (savedTilt && !isIOS) enable();
+
     btn.addEventListener('click', function () {
-      if (tiltActive) {
-        tiltActive = false;
-        tiltBase   = null;
-        btn.classList.remove('tilt-on');
-        window.removeEventListener('deviceorientation', onOrientation);
-        releaseAllTilt();
-        return;
-      }
-      function enable() {
-        tiltActive = true;
-        btn.classList.add('tilt-on');
-        window.addEventListener('deviceorientation', onOrientation);
-      }
-      if (typeof DeviceOrientationEvent !== 'undefined' &&
-          typeof DeviceOrientationEvent.requestPermission === 'function') {
+      if (tiltActive) { disable(); return; }
+      if (isIOS) {
         // iOS 13+ requires a permission prompt on a user gesture
         DeviceOrientationEvent.requestPermission()
           .then(function (s) { if (s === 'granted') enable(); })
