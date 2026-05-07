@@ -6,11 +6,11 @@
   left: 0;
   right: 0;
   height: calc(56px + env(safe-area-inset-bottom, 0px));
-  padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  padding: 0 14px env(safe-area-inset-bottom, 0px);
   background: rgba(0,0,0,0.96);
   border-top: 1px solid #1e5c1e;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   z-index: 200;
@@ -20,7 +20,7 @@
   font-family: 'Courier New', Courier, monospace;
   font-size: 18px;
   font-weight: 900;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   color: #e6dc32;
   text-shadow: 0 0 10px #e6dc32;
   text-transform: uppercase;
