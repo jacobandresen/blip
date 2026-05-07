@@ -6,11 +6,11 @@
   left: 0;
   right: 0;
   height: calc(56px + env(safe-area-inset-bottom, 0px));
-  padding: 0 14px env(safe-area-inset-bottom, 0px);
+  padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 10px);
   background: rgba(0,0,0,0.96);
   border-top: 1px solid #1e5c1e;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 10px;
   z-index: 200;
