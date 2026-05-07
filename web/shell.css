@@ -1,12 +1,16 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
+  /* overflow:hidden only on html, not body — iOS Safari anchors position:fixed
+     to the body when body has overflow:hidden, shifting fixed elements off-position */
+  overflow: hidden;
+  height: 100%;
   background-color: #000;
 }
 
-html, body {
+body {
   width: 100%; height: 100%;
-  overflow: hidden;
+  overscroll-behavior: none;
   background:
     repeating-linear-gradient(
       -45deg,
