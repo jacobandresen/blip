@@ -395,7 +395,7 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     }
 
     // Tilted phone with bilateral rotation arcs
-    var ICON = '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    var ICON = '<svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
       + '<rect x="6" y="3" width="8" height="14" rx="1.5" transform="rotate(-18 10 10)"/>'
       + '<path d="M2.5,9 C2,5 5,1.5 9,1"/>'
       + '<polyline points="7.5,0 9,1 8.5,2.5"/>'
@@ -405,10 +405,12 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
 
     var btn = document.createElement('button');
     btn.id        = 'tilt-btn';
-    btn.className = 'kiosk-btn';
     btn.title     = 'Toggle tilt controls';
     btn.innerHTML = ICON;
-    document.getElementById('topbar').insertBefore(btn, document.getElementById('insert-coin-btn'));
+    var corner = document.createElement('div');
+    corner.className = 'tilt-corner';
+    corner.appendChild(btn);
+    document.body.appendChild(corner);
 
     btn.addEventListener('click', function () {
       if (tiltActive) {

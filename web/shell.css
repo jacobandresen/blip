@@ -400,21 +400,33 @@ canvas {
   #paddle-dial-p2 { right: 16px; }
 }
 
-/* ---- Topbar layout override (4 items: GAMES · coins · TILT · INSERT COIN) ---- */
+/* ---- Tilt button corner (game pages) ---- */
 
-/* coins-hud fills the middle; buttons sit naturally at the edges */
-#coins-hud { flex: 1; min-width: 0; text-align: left; }
+.tilt-corner {
+  position: fixed;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  right: 20px;
+  z-index: 10000;
+}
 
-/* ---- Tilt button ---- */
+#tilt-btn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  padding: 3px 0;
+  cursor: pointer;
+  opacity: 0.35;
+  color: currentColor;
+  transition: opacity .15s, filter .15s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
 
-#tilt-btn { line-height: 0; padding: 9px 12px; }
+#tilt-btn:hover { opacity: 0.65; }
 
 #tilt-btn.tilt-on {
+  opacity: 1;
+  filter: drop-shadow(0 0 5px #32c832);
   color: #32c832;
-  text-shadow: 0 0 10px #32c832;
-  border-color: rgba(50, 200, 50, 0.55);
-  box-shadow:
-    0 0 14px rgba(50, 200, 50, 0.30),
-    0 4px 10px rgba(0, 0, 0, 0.75),
-    inset 0 1px 0 rgba(50, 200, 50, 0.15);
 }
