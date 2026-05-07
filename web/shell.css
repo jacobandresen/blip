@@ -417,7 +417,7 @@ canvas {
   padding: 3px 0;
   cursor: pointer;
   opacity: 0.35;
-  color: currentColor;
+  color: #fff;
   transition: opacity .15s, filter .15s;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
