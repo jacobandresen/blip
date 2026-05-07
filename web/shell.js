@@ -356,8 +356,8 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     fire2.addEventListener('touchcancel', function ()  { releaseBtn(fire2); });
   }
 
-  // ---- Tilt (DeviceOrientation) controls ----
-  (function () {
+  // ---- Tilt (DeviceOrientation) controls (not used in rally) ----
+  if (!isRally) (function () {
     var DEAD       = 12;   // degrees dead zone
     var tiltActive = false;
     var tiltBase   = null; // calibrated on first sample after enable
