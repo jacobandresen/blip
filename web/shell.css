@@ -1,5 +1,9 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html {
+  background-color: #000;
+}
+
 html, body {
   width: 100%; height: 100%;
   overflow: hidden;
@@ -107,6 +111,8 @@ canvas {
 }
 
 /* ---- Bottom bar — game-page overrides ---- */
+
+#topbar { background: #000; }
 
 #back:active { transform: translateY(2px); }
 
