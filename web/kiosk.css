@@ -40,6 +40,7 @@
   user-select: none;
   flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   white-space: nowrap;
   padding: 9px 16px;
   border-radius: 5px;
