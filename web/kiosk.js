@@ -1,5 +1,13 @@
 var MAX_COINS = 5;
 
+if ('serviceWorker' in navigator) {
+  var _manifest = document.querySelector('link[rel=manifest]');
+  if (_manifest) {
+    var _swUrl = new URL('sw.js', new URL(_manifest.href, location.href)).href;
+    navigator.serviceWorker.register(_swUrl);
+  }
+}
+
 (function () {
   function updateFixedOverlayVisibility() {
     var atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 60;
