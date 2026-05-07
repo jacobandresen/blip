@@ -404,7 +404,7 @@ canvas {
 
 .tilt-corner {
   position: fixed;
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  top: calc(10px + env(safe-area-inset-top, 0px));
   right: 20px;
   z-index: 10000;
 }
