@@ -513,4 +513,29 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     });
   }());
 
+// On iOS the soft keyboard shrinks visualViewport but not window.innerHeight.
+// Resize the initials overlay to match the visible viewport so nothing is
+// hidden behind the keyboard.
+(function () {
+  if (!window.visualViewport) return;
+  var initialsOverlay = document.getElementById('initials-overlay');
+  if (!initialsOverlay) return;
+  function syncOverlay() {
+    if (!initialsOverlay.classList.contains('visible')) return;
+    initialsOverlay.style.height = window.visualViewport.height + 'px';
+    initialsOverlay.style.top    = window.visualViewport.offsetTop + 'px';
+  }
+  function resetOverlay() {
+    initialsOverlay.style.height = '';
+    initialsOverlay.style.top    = '';
+  }
+  window.visualViewport.addEventListener('resize', syncOverlay);
+  window.visualViewport.addEventListener('scroll', syncOverlay);
+  var observer = new MutationObserver(function () {
+    if (initialsOverlay.classList.contains('visible')) syncOverlay();
+    else resetOverlay();
+  });
+  observer.observe(initialsOverlay, { attributes: true, attributeFilter: ['class'] });
+}());
+
 })();

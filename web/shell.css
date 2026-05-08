@@ -506,6 +506,21 @@ canvas {
   outline: none;
   padding: 4px 8px;
   caret-color: #e6dc32;
+  /* Prevent iOS from zooming in when the input is tapped (requires font-size >= 16px;
+     our clamp already satisfies this, but be explicit for safety). */
+  touch-action: manipulation;
+}
+
+/* Pulse the input border on touch devices to hint the user to tap it. */
+@media (hover: none) {
+  #initials-input {
+    animation: input-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes input-pulse {
+    0%, 100% { border-bottom-color: #e6dc32; box-shadow: none; }
+    50%       { border-bottom-color: #fff;   box-shadow: 0 3px 10px rgba(230,220,50,0.6); }
+  }
+  #initials-input:focus { animation: none; }
 }
 
 #initials-submit {

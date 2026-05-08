@@ -65,11 +65,15 @@ function showInitialsOverlay(game, score) {
     scoreEl.textContent = 'SCORE ' + score;
     input.value = '';
     overlay.classList.add('visible');
+    // Desktop: focus so the user can type immediately.
+    // iOS: keyboard only opens on a direct user tap — no-op but harmless.
     setTimeout(() => input.focus(), 100);
 
+    let submitted = false;
     async function submit() {
         const initials = input.value.trim().toUpperCase();
-        if (!initials) return;
+        if (!initials || submitted) return;
+        submitted = true;
         btn.disabled = true;
 
         await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
@@ -97,6 +101,8 @@ function showInitialsOverlay(game, score) {
 
     btn.onclick = submit;
     input.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+    // Auto-submit after 3 characters so the OK button needn't be tapped on mobile.
+    input.oninput = () => { if (input.value.trim().length === 3) setTimeout(submit, 120); };
 }
 
 function showLeaderboard(game, rows, newInitials, newScore) {
