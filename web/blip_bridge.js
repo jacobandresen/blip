@@ -8,7 +8,6 @@ const SUPABASE_URL     = 'https://zramohohqnhmfzhlpvok.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rc_Dp-WhasQoj7gisVbhCg_1XGspuJe';
 
 // Must match GAME_* constants in crates/blip/src/web.rs
-// Must match GAME_* constants in crates/blip/src/web.rs
 const GAME_NAMES = ['bouncer', 'serpent', 'galactic_defender', 'canaris'];
 const hiScoreCache = [0, 0, 0, 0];
 let lastFetch = 0;
@@ -52,22 +51,28 @@ async function checkTop10(game_id, score) {
 }
 
 function showInitialsOverlay(game, score) {
-    const overlay  = document.getElementById('initials-overlay');
-    const scoreEl  = document.getElementById('initials-score-val');
-    const input    = document.getElementById('initials-input');
-    const btn      = document.getElementById('initials-submit');
+    const overlay = document.getElementById('initials-overlay');
+    const form    = document.getElementById('initials-form');
+    const scoreEl = document.getElementById('initials-score-val');
+    const input   = document.getElementById('initials-input');
+    const btn     = document.getElementById('initials-submit');
     if (!overlay) return;
+
+    // reset to form view
+    form.style.display = '';
+    document.getElementById('initials-leaderboard').style.display = 'none';
 
     scoreEl.textContent = 'SCORE ' + score;
     input.value = '';
     overlay.classList.add('visible');
     setTimeout(() => input.focus(), 100);
 
-    function submit() {
+    async function submit() {
         const initials = input.value.trim().toUpperCase();
         if (!initials) return;
-        overlay.classList.remove('visible');
-        fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
+        btn.disabled = true;
+
+        await fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
             method: 'POST',
             headers: {
                 apikey: SUPABASE_ANON_KEY,
@@ -76,10 +81,45 @@ function showInitialsOverlay(game, score) {
             },
             body: JSON.stringify({ p_game: game, p_initials: initials, p_score: score }),
         }).catch(() => {});
+
+        try {
+            const res = await fetch(
+                `${SUPABASE_URL}/rest/v1/scores?game=eq.${game}&select=initials,score&order=score.desc&limit=10`,
+                { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+            );
+            const rows = await res.json();
+            showLeaderboard(game, rows, initials, score);
+        } catch (_) {
+            overlay.classList.remove('visible');
+        }
+        btn.disabled = false;
     }
 
     btn.onclick = submit;
     input.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+}
+
+function showLeaderboard(game, rows, newInitials, newScore) {
+    const form = document.getElementById('initials-form');
+    const lb   = document.getElementById('initials-leaderboard');
+    const title = document.getElementById('lb-title');
+    const list  = document.getElementById('lb-list');
+    const close = document.getElementById('lb-close');
+
+    title.textContent = game.replace(/_/g, ' ').toUpperCase();
+    list.innerHTML = rows.map((r, i) => {
+        const isNew = r.initials === newInitials && r.score === newScore;
+        return `<li class="${isNew ? 'lb-new' : ''}">` +
+            `<span class="lb-rank">${i + 1}</span>` +
+            `<span class="lb-initials">${r.initials}</span>` +
+            `<span class="lb-score">${r.score.toLocaleString()}</span>` +
+            `</li>`;
+    }).join('');
+
+    form.style.display = 'none';
+    lb.style.display = 'flex';
+
+    close.onclick = () => document.getElementById('initials-overlay').classList.remove('visible');
 }
 
 register_plugin = function (importObject) {

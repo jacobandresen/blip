@@ -277,6 +277,7 @@
 
     /* screenshot */
     .card-shot-wrap {
+      position: relative;
       width: 100%;
       aspect-ratio: 480 / 540;
       margin-bottom: 16px;
@@ -284,6 +285,21 @@
       border: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
       box-shadow: 0 0 12px color-mix(in srgb, var(--c) 15%, transparent);
       background: #000;
+    }
+
+    .hiscore-badge {
+      position: absolute;
+      bottom: 10px; right: 10px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: color-mix(in srgb, var(--c) 80%, #fff);
+      background: rgba(0,0,0,0.78);
+      padding: 3px 7px;
+      border: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
+      pointer-events: none;
     }
 
     .card-shot {
@@ -965,6 +981,34 @@ var n = getCoins();
         document.body.classList.remove('konami-shake');
       }, { once: true });
     }
+
+    /* ------------------------------------------------------------------ */
+    /* Hi-score badges on game cards                                        */
+    /* ------------------------------------------------------------------ */
+    (function () {
+      var URL = 'https://zramohohqnhmfzhlpvok.supabase.co';
+      var KEY = 'sb_publishable_rc_Dp-WhasQoj7gisVbhCg_1XGspuJe';
+      var CARD = { bouncer: 'card-bouncer', serpent: 'card-serpent',
+                   galactic_defender: 'card-galactic', canaris: 'card-canaris' };
+      fetch(URL + '/rest/v1/scores?select=game,initials,score&order=score.desc',
+            { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } })
+        .then(function(r) { return r.json(); })
+        .then(function(rows) {
+          var top = {};
+          rows.forEach(function(r) { if (!top[r.game]) top[r.game] = r; });
+          Object.keys(top).forEach(function(game) {
+            var r = top[game];
+            var card = document.querySelector('.' + CARD[game]);
+            if (!card) return;
+            var wrap = card.querySelector('.card-shot-wrap');
+            if (!wrap) return;
+            var badge = document.createElement('div');
+            badge.className = 'hiscore-badge';
+            badge.textContent = r.initials + '  ' + r.score.toLocaleString();
+            wrap.appendChild(badge);
+          });
+        }).catch(function(){});
+    })();
 
     /* ------------------------------------------------------------------ */
     /* Starfield                                                            */
