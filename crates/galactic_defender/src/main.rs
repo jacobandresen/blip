@@ -106,7 +106,7 @@ impl Game {
             explosions: [expl_default; N_EXPLOSIONS],
             shields: [shield_default; SHIELDS],
             player_x: 0.0,
-            score: 0, hi_score: 0, lives: 0, level: 1,
+            score: 0, hi_score: web::load_hi_score(web::GAME_GALACTIC_DEFENDER), lives: 0, level: 1,
             march_timer: 0.0,
             march_dir: 1,
             march_drop_next: false,
@@ -311,7 +311,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.bullets[bi].active = false;
                 let pts = match kind { 0 => 30, 1 => 20, _ => 10 };
                 g.score += pts * g.level;
-                if g.score > g.hi_score { g.hi_score = g.score; }
+                if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_GALACTIC_DEFENDER, g.hi_score); }
                 break;
             }
         }

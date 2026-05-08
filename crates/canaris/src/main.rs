@@ -300,7 +300,7 @@ impl Game {
             port_msg_t: 0.0,
             port_msg_ok: true,
             map_cursor: 0,
-            score: 0, hi_score: 0,
+            score: 0, hi_score: web::load_hi_score(web::GAME_CANARIS),
             lives: LIVES_START,
             level: 1, level_t: 60.0,
             dead_t: 0.0,
@@ -568,7 +568,7 @@ fn update_sea(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.level += 1;
         g.level_t = 60.0 + g.level as f32 * 10.0;
         g.score += 500 * g.level;
-        if g.score > g.hi_score { g.hi_score = g.score; }
+        if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_CANARIS, g.hi_score); }
         g.spawn_enemies();
     }
 
@@ -755,7 +755,7 @@ fn update_combat(g: &mut Game, dt: f32, sfx: &Sounds) {
         let loot = g.enemies[pidx].gold_loot;
         g.player.gold += loot;
         g.score += 200 * g.level;
-        if g.score > g.hi_score { g.hi_score = g.score; }
+        if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_CANARIS, g.hi_score); }
         play_sfx(&sfx.coin_jingle);
         g.spawn_explosion(COMBAT_ENEMY_X + ENEMY_W / 2.0, g.enemies[pidx].combat_y + ENEMY_H / 2.0);
         for b in g.cannonballs.iter_mut() { b.active = false; }
@@ -841,7 +841,7 @@ fn update_boarding(g: &mut Game, dt: f32, sfx: &Sounds) {
         let loot = g.enemies[idx].gold_loot * 2;
         g.player.gold += loot;
         g.score       += 150 * g.level + loot;
-        if g.score > g.hi_score { g.hi_score = g.score; }
+        if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_CANARIS, g.hi_score); }
         g.enemies[idx].active = false;
         play_sfx(&sfx.coin_jingle);
         g.state = State::Sea;

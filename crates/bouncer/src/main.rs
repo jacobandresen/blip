@@ -68,7 +68,7 @@ impl Game {
             pad_x: 0.0,
             ball_x: 0.0, ball_y: 0.0, ball_vx: 0.0, ball_vy: 0.0,
             ball_speed: BALL_SPEED_0,
-            score: 0, hi_score: 0, lives: 0, level: 1,
+            score: 0, hi_score: web::load_hi_score(web::GAME_BOUNCER), lives: 0, level: 1,
             dead_timer: 0.0,
             state: State::Title,
         }
@@ -198,7 +198,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         let kind = g.bricks[i].kind;
         g.bricks[i].alive = false;
         g.score += (BRICK_ROWS - r) * 10 * g.level;
-        if g.score > g.hi_score { g.hi_score = g.score; }
+        if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_BOUNCER, g.hi_score); }
         g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
 
         let over_x = if g.ball_vx > 0.0 { bx - (g.ball_x + BALL_W as f32) }

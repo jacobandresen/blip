@@ -63,7 +63,7 @@ impl Game {
             want_dir: Dir::Right,
             food: Cell { c: 0, r: 0 },
             score: 0,
-            hi_score: 0,
+            hi_score: web::load_hi_score(web::GAME_SERPENT),
             lives: 0,
             level: 1,
             foods_eaten: 0,
@@ -171,7 +171,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     if ate {
         play_sfx(&sfx.eat);
         g.score += 10 * g.level;
-        if g.score > g.hi_score { g.hi_score = g.score; }
+        if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_SERPENT, g.hi_score); }
         g.foods_eaten += 1;
         if g.foods_eaten >= FOODS_PER_LVL {
             g.level += 1;
