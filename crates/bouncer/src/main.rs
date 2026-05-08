@@ -97,6 +97,7 @@ impl Game {
     }
 
     fn start_game(&mut self) {
+        self.hi_score = self.hi_score.max(web::load_hi_score(web::GAME_BOUNCER));
         self.score = 0;
         self.lives = LIVES_START;
         self.level = 1;

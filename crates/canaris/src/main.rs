@@ -308,7 +308,7 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        let hi = self.hi_score;
+        let hi = self.hi_score.max(web::load_hi_score(web::GAME_CANARIS));
         *self = Game::new();
         self.hi_score = hi;
         self.state = State::Sea;

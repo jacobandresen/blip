@@ -111,6 +111,7 @@ impl Game {
     }
 
     fn start_game(&mut self) {
+        self.hi_score = self.hi_score.max(web::load_hi_score(web::GAME_SERPENT));
         self.score = 0;
         self.level = 1;
         self.foods_eaten = 0;
