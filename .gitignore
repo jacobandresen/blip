@@ -25,6 +25,13 @@ games/*/assets.stamp
 # Rust
 target/
 
+# Node
+node_modules/
+
+# Playwright output
+test-results/
+playwright-report/
+
 # Editor / OS
 .DS_Store
 *.swp

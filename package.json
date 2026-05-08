@@ -1,0 +1,12 @@
+{
+  "name": "blip",
+  "private": true,
+  "scripts": {
+    "test:unit": "node --test test/fill-canvas.test.mjs",
+    "test:e2e": "playwright test",
+    "test": "node --test test/fill-canvas.test.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

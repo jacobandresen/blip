@@ -159,3 +159,9 @@ register_plugin = function (importObject) {
 };
 
 miniquad_add_plugin({ register_plugin: register_plugin });
+
+if (new URLSearchParams(location.search).has('__blip_test')) {
+    window.__blip_test = {
+        triggerGameOver: (gameId, score) => checkTop10(gameId, score),
+    };
+}

@@ -986,28 +986,34 @@ var n = getCoins();
     /* Hi-score badges on game cards                                        */
     /* ------------------------------------------------------------------ */
     (function () {
-      var URL = 'https://zramohohqnhmfzhlpvok.supabase.co';
-      var KEY = 'sb_publishable_rc_Dp-WhasQoj7gisVbhCg_1XGspuJe';
+      var BASE = 'https://zramohohqnhmfzhlpvok.supabase.co';
+      var KEY  = 'sb_publishable_rc_Dp-WhasQoj7gisVbhCg_1XGspuJe';
+      var H    = { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } };
       var CARD = { bouncer: 'card-bouncer', serpent: 'card-serpent',
                    galactic_defender: 'card-galactic', canaris: 'card-canaris' };
-      fetch(URL + '/rest/v1/scores?select=game,initials,score&order=score.desc',
-            { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } })
-        .then(function(r) { return r.json(); })
-        .then(function(rows) {
-          var top = {};
-          rows.forEach(function(r) { if (!top[r.game]) top[r.game] = r; });
-          Object.keys(top).forEach(function(game) {
-            var r = top[game];
-            var card = document.querySelector('.' + CARD[game]);
-            if (!card) return;
-            var wrap = card.querySelector('.card-shot-wrap');
-            if (!wrap) return;
-            var badge = document.createElement('div');
-            badge.className = 'hiscore-badge';
-            badge.textContent = r.initials + '  ' + r.score.toLocaleString();
-            wrap.appendChild(badge);
-          });
-        }).catch(function(){});
+      Promise.all([
+        fetch(BASE + '/rest/v1/hi_scores?select=game,score', H).then(function(r) { return r.json(); }),
+        fetch(BASE + '/rest/v1/scores?select=game,initials,score&order=score.desc', H).then(function(r) { return r.json(); })
+      ]).then(function(results) {
+        var hiRows = results[0];
+        var lbRows = results[1];
+        var topLb = {};
+        lbRows.forEach(function(r) { if (!topLb[r.game]) topLb[r.game] = r; });
+        hiRows.forEach(function(h) {
+          if (!h.score) return;
+          var card = document.querySelector('.' + CARD[h.game]);
+          if (!card) return;
+          var wrap = card.querySelector('.card-shot-wrap');
+          if (!wrap) return;
+          var badge = document.createElement('div');
+          badge.className = 'hiscore-badge';
+          var lb = topLb[h.game];
+          badge.textContent = (lb && lb.score === h.score)
+            ? lb.initials + '  ' + h.score.toLocaleString()
+            : h.score.toLocaleString();
+          wrap.appendChild(badge);
+        });
+      }).catch(function(){});
     })();
 
     /* ------------------------------------------------------------------ */
