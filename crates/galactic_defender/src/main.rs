@@ -216,6 +216,7 @@ fn update_title(g: &mut Game) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
+    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_GALACTIC_DEFENDER));
     let shoot = key_pressed(BLIP_KEY_SPACE)
         || key_pressed(BLIP_KEY_UP)
         || key_pressed(BLIP_KEY_W);

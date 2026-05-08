@@ -132,6 +132,7 @@ fn update_title(g: &mut Game) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
+    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_SERPENT));
     if (key_pressed(BLIP_KEY_UP)    || key_pressed(BLIP_KEY_W)) && g.cur_dir != Dir::Down  { g.want_dir = Dir::Up; }
     if (key_pressed(BLIP_KEY_DOWN)  || key_pressed(BLIP_KEY_S)) && g.cur_dir != Dir::Up    { g.want_dir = Dir::Down; }
     if (key_pressed(BLIP_KEY_LEFT)  || key_pressed(BLIP_KEY_A)) && g.cur_dir != Dir::Right { g.want_dir = Dir::Left; }

@@ -147,6 +147,7 @@ fn update_launch(g: &mut Game, dt: f32) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
+    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_BOUNCER));
     paddle_input(g, dt);
 
     g.ball_x += g.ball_vx * dt;

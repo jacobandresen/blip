@@ -522,6 +522,7 @@ fn update_title(g: &mut Game, dt: f32) {
 
 fn update_sea(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.time += dt;
+    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_CANARIS));
 
     // Player movement
     if key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D) {
