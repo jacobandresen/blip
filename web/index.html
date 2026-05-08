@@ -992,11 +992,13 @@ var n = getCoins();
       var CARD = { bouncer: 'card-bouncer', serpent: 'card-serpent',
                    galactic_defender: 'card-galactic', canaris: 'card-canaris' };
       Promise.all([
-        fetch(BASE + '/rest/v1/hi_scores?select=game,score', H).then(function(r) { return r.json(); }),
-        fetch(BASE + '/rest/v1/scores?select=game,initials,score&order=score.desc', H).then(function(r) { return r.json(); })
+        fetch(BASE + '/rest/v1/hi_scores?select=game,score', H)
+          .then(function(r) { return r.ok ? r.json() : []; }).catch(function() { return []; }),
+        fetch(BASE + '/rest/v1/scores?select=game,initials,score&order=score.desc', H)
+          .then(function(r) { return r.ok ? r.json() : []; }).catch(function() { return []; })
       ]).then(function(results) {
-        var hiRows = results[0];
-        var lbRows = results[1];
+        var hiRows = Array.isArray(results[0]) ? results[0] : [];
+        var lbRows = Array.isArray(results[1]) ? results[1] : [];
         var topLb = {};
         lbRows.forEach(function(r) { if (!topLb[r.game]) topLb[r.game] = r; });
         hiRows.forEach(function(h) {
