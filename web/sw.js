@@ -1,4 +1,4 @@
-var CACHE = 'blip-v2';
+var CACHE = 'blip-v3';
 
 var ASSETS = [
   '/blip/',
@@ -60,10 +60,12 @@ self.addEventListener('activate', function(e) {
   self.clients.claim();
 });
 
-// Cache-first: strip query strings so versioned URLs (e.g. shell.js?v=18) hit cached entries
+// Cache-first for same-origin assets only. Cross-origin requests (e.g. Supabase API)
+// bypass the cache entirely so they always hit the network.
 self.addEventListener('fetch', function(e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);
+  if (url.origin !== self.location.origin) return;
   var key = url.origin + url.pathname;
   e.respondWith(
     caches.open(CACHE).then(function(cache) {
