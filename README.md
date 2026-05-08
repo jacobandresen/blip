@@ -32,6 +32,7 @@ The Blip Engine ensures portability and high performance across all modules:
 *   **Framework:** Blip Engine (Open-Source, Written in Rust)
 *   **Output:** The primary compiled assets are delivered via WebAssembly (WASM), ensuring fast, consistent performance in modern web browsers.
 *   **Architecture:** Game state management is separated from the core rendering loop, promoting modularity and scalability.
+*   **Hi-scores:** Global hi-scores are persisted across sessions and shared between players via [Supabase](https://supabase.com) (Postgres). Scores are read on page load and saved automatically when a record is beaten.
 
 ---
 
