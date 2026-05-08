@@ -15,7 +15,7 @@
   <script src="../howler.min.js"></script>
   <script src="../kiosk.js?v=4"></script>
   <link rel="stylesheet" href="../kiosk.css?v=12">
-  <link rel="stylesheet" href="../shell.css?v=9">
+  <link rel="stylesheet" href="../shell.css?v=11">
 </head>
 <body>
 
@@ -55,13 +55,31 @@
     <div id="dial-label-p2">2P</div>
   </div>
 
+  <div id="initials-overlay">
+    <!-- Step 1: enter initials -->
+    <div class="initials-box" id="initials-form">
+      <div class="initials-title">TOP 10</div>
+      <div class="initials-score" id="initials-score-val"></div>
+      <div class="initials-label">ENTER INITIALS</div>
+      <input id="initials-input" type="text" maxlength="3"
+             autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+      <button id="initials-submit" class="kiosk-btn">OK</button>
+    </div>
+    <!-- Step 2: leaderboard -->
+    <div class="initials-box lb-box" id="initials-leaderboard">
+      <div class="initials-title" id="lb-title"></div>
+      <ol class="lb-list" id="lb-list"></ol>
+      <button id="lb-close" class="kiosk-btn">CLOSE</button>
+    </div>
+  </div>
+
   <div id="arcade-bezel"></div>
   <canvas id="glcanvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
 
   <script src="../shell.js?v=18"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
-  <script src="../blip_bridge.js?v=3"></script>
+  <script src="../blip_bridge.js?v=5"></script>
   <script>load("index.wasm");</script>
 
 </body>

@@ -18,11 +18,10 @@ for game in "${GAMES[@]}"; do
     out="web/$game"
     mkdir -p "$out"
     cp "$TARGET_DIR/$game.wasm" "$out/index.wasm"
-    # Use a game-specific HTML template if one exists; otherwise copy shell.html.
-    # (rally/index.html is maintained directly in the repo)
-    tmpl="web/${game}/index.html"
-    [ -f "$tmpl" ] || tmpl="web/shell.html"
-    [ "$tmpl" != "$out/index.html" ] && cp "$tmpl" "$out/index.html"
+    # rally has a hand-maintained index.html; all other games use shell.html.
+    if [ "$game" != "rally" ]; then
+        cp "web/shell.html" "$out/index.html"
+    fi
     bytes=$(wc -c < "$out/index.wasm")
     echo "[ok] $game -> $out/index.wasm ($bytes bytes)"
 done
