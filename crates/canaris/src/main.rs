@@ -514,6 +514,7 @@ fn load_png(bytes: &'static [u8]) -> Texture2D {
 
 fn update_title(g: &mut Game, dt: f32) {
     g.time += dt;
+    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_CANARIS));
     if any_key_pressed() {
         g.start_game();
     }
@@ -925,6 +926,7 @@ fn update_dead(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_gameover(g: &mut Game) {
+    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_CANARIS));
     if any_key_pressed() {
         web::spend_coin();
         g.state = State::Title;

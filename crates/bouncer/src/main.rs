@@ -126,6 +126,7 @@ struct Sounds {
 }
 
 fn update_title(g: &mut Game) {
+    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_BOUNCER));
     if any_key_pressed() { g.start_game(); }
 }
 
@@ -242,6 +243,7 @@ fn update_win(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game) {
+    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_BOUNCER));
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
