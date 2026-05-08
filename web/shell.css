@@ -439,3 +439,79 @@ canvas {
   color: #32c832;
   box-shadow: 0 0 14px rgba(50, 200, 50, 0.4);
 }
+
+/* ---- Initials entry overlay ---- */
+
+#initials-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  background: rgba(0, 0, 0, 0.88);
+  z-index: 160;
+  align-items: center;
+  justify-content: center;
+}
+#initials-overlay.visible { display: flex; }
+
+.initials-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 40px 32px;
+}
+
+.initials-title {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: clamp(2.4rem, 10vw, 4rem);
+  font-weight: 900;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: #32c832;
+  text-shadow: 0 0 14px #32c832, 0 0 40px rgba(50,200,50,0.4);
+}
+
+.initials-score {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: clamp(1.2rem, 5vw, 1.8rem);
+  font-weight: 900;
+  letter-spacing: .14em;
+  color: #fff;
+}
+
+.initials-label {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: clamp(.8rem, 3.5vw, 1.1rem);
+  letter-spacing: .18em;
+  color: #e6dc32;
+  text-shadow: 0 0 8px #e6dc32;
+  text-transform: uppercase;
+}
+
+#initials-input {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: clamp(2rem, 9vw, 3.2rem);
+  font-weight: 900;
+  letter-spacing: .35em;
+  text-align: center;
+  text-transform: uppercase;
+  width: 6em;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid #e6dc32;
+  color: #e6dc32;
+  text-shadow: 0 0 10px #e6dc32;
+  outline: none;
+  padding: 4px 8px;
+  caret-color: #e6dc32;
+}
+
+#initials-submit {
+  margin-top: 8px;
+  padding: 10px 36px;
+  font-size: 1.1rem;
+  background: transparent;
+  border: 2px solid #e6dc32;
+  border-radius: 4px;
+}

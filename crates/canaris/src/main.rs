@@ -928,6 +928,7 @@ fn update_dead(g: &mut Game, dt: f32, sfx: &Sounds) {
 
 fn update_gameover(g: &mut Game) {
     g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_CANARIS));
+    web::game_over(web::GAME_CANARIS, g.score);
     if any_key_pressed() {
         web::spend_coin();
         g.state = State::Title;

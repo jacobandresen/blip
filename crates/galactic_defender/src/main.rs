@@ -404,6 +404,7 @@ fn update_win(g: &mut Game, dt: f32) {
 
 fn update_over(g: &mut Game) {
     g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_GALACTIC_DEFENDER));
+    web::game_over(web::GAME_GALACTIC_DEFENDER, g.score);
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();

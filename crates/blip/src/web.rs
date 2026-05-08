@@ -12,6 +12,7 @@ extern "C" {
     fn blip_set_mode(mode: i32);
     fn blip_load_hi_score(game_id: i32) -> i32;
     fn blip_save_hi_score(game_id: i32, score: i32);
+    fn blip_game_over(game_id: i32, score: i32);
 }
 
 /// Notify the kiosk shell that the player should be charged a coin.
@@ -38,6 +39,15 @@ pub fn load_hi_score(game_id: i32) -> i32 {
 pub fn save_hi_score(game_id: i32, score: i32) {
     #[cfg(target_arch = "wasm32")]
     unsafe { blip_save_hi_score(game_id, score); }
+    #[cfg(not(target_arch = "wasm32"))]
+    { let _ = (game_id, score); }
+}
+
+/// Notify the shell that a game has ended with the given score.
+/// The shell checks whether the score qualifies for the top-10 leaderboard.
+pub fn game_over(game_id: i32, score: i32) {
+    #[cfg(target_arch = "wasm32")]
+    unsafe { blip_game_over(game_id, score); }
     #[cfg(not(target_arch = "wasm32"))]
     { let _ = (game_id, score); }
 }

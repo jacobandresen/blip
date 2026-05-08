@@ -32,6 +32,56 @@ async function fetchHiScores() {
 
 fetchHiScores();
 
+// ---- Top-10 leaderboard -----------------------------------------------
+
+const lastGameOverScore = [-1, -1, -1, -1]; // debounce: only check once per game-over
+
+async function checkTop10(game_id, score) {
+    if (score <= 0) return;
+    const game = GAME_NAMES[game_id];
+    try {
+        const res = await fetch(
+            `${SUPABASE_URL}/rest/v1/scores?game=eq.${game}&select=score&order=score.desc&limit=10`,
+            { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+        );
+        if (!res.ok) return;
+        const rows = await res.json();
+        const qualifies = rows.length < 10 || score > rows[rows.length - 1].score;
+        if (qualifies) showInitialsOverlay(game, score);
+    } catch (_) {}
+}
+
+function showInitialsOverlay(game, score) {
+    const overlay  = document.getElementById('initials-overlay');
+    const scoreEl  = document.getElementById('initials-score-val');
+    const input    = document.getElementById('initials-input');
+    const btn      = document.getElementById('initials-submit');
+    if (!overlay) return;
+
+    scoreEl.textContent = 'SCORE ' + score;
+    input.value = '';
+    overlay.classList.add('visible');
+    setTimeout(() => input.focus(), 100);
+
+    function submit() {
+        const initials = input.value.trim().toUpperCase();
+        if (!initials) return;
+        overlay.classList.remove('visible');
+        fetch(`${SUPABASE_URL}/rest/v1/rpc/submit_score`, {
+            method: 'POST',
+            headers: {
+                apikey: SUPABASE_ANON_KEY,
+                Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ p_game: game, p_initials: initials, p_score: score }),
+        }).catch(() => {});
+    }
+
+    btn.onclick = submit;
+    input.onkeydown = (e) => { if (e.key === 'Enter') submit(); };
+}
+
 register_plugin = function (importObject) {
     importObject.env.blip_spend_coin = function () {
         if (typeof window.blipSpendCoin === 'function') {
@@ -46,6 +96,11 @@ register_plugin = function (importObject) {
     importObject.env.blip_load_hi_score = function (game_id) {
         if (Date.now() - lastFetch > 60000) fetchHiScores();
         return hiScoreCache[game_id] || 0;
+    };
+    importObject.env.blip_game_over = function (game_id, score) {
+        if (score === lastGameOverScore[game_id]) return;
+        lastGameOverScore[game_id] = score;
+        checkTop10(game_id, score);
     };
     importObject.env.blip_save_hi_score = function (game_id, score) {
         if (game_id < 0 || game_id >= GAME_NAMES.length) return;
