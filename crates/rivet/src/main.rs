@@ -26,6 +26,7 @@ const STEEL:    Color = Color { r: 0.18, g: 0.42, b: 0.80, a: 1.0 };
 const STEEL_LT: Color = Color { r: 0.44, g: 0.68, b: 1.00, a: 1.0 };
 const SKIN:     Color = Color { r: 1.00, g: 0.82, b: 0.60, a: 1.0 };
 const DK_BLUE:  Color = Color { r: 0.10, g: 0.20, b: 0.82, a: 1.0 };
+const PINK:     Color = Color { r: 1.00, g: 0.41, b: 0.71, a: 1.0 };
 
 // ── Platforms: (x1, y_top, x2) ───────────────────────────────────────
 // Player feet snap to y_top when landing.
@@ -373,9 +374,11 @@ fn update_barrel(b: &mut Barrel, dt: f32) {
                     if b.x + BR_W > px1 && b.x < px2
                         && prev_feet <= py && curr_feet >= py
                     {
-                        b.y    = py - BR_H;
-                        b.vy   = 0.0;
-                        b.vx   = BR_SPD;
+                        b.y  = py - BR_H;
+                        b.x  = b.x.clamp(px1, px2 - BR_W);
+                        b.vy = 0.0;
+                        // Even platforms roll right, odd roll left — natural zigzag.
+                        b.vx = if i % 2 == 0 { BR_SPD } else { -BR_SPD };
                         b.mode = BmMode::Roll(i);
                         b.lad_zone = false;
                         break;
@@ -393,11 +396,12 @@ fn update_barrel(b: &mut Barrel, dt: f32) {
 
             if b.feet() >= ly_bot {
                 b.y = ly_bot - BR_H;
-                for (i, &(_px1, py, _px2)) in PLAT.iter().enumerate() {
+                for (i, &(px1, py, px2)) in PLAT.iter().enumerate() {
                     if (py - ly_bot).abs() < 4.0 {
-                        b.mode    = BmMode::Roll(i);
-                        b.vx      = BR_SPD;
-                        b.vy      = 0.0;
+                        b.x  = b.x.clamp(px1, px2 - BR_W);
+                        b.vx = if i % 2 == 0 { BR_SPD } else { -BR_SPD };
+                        b.vy = 0.0;
+                        b.mode = BmMode::Roll(i);
                         b.lad_zone = false;
                         break;
                     }
@@ -599,6 +603,39 @@ fn draw_gorilla(blip: &Blip, throwing: bool) {
     blip.fill_rect(x + 16.0, y + 34.0, 9.0, 8.0, DK_DARK);
 }
 
+fn draw_princess(blip: &Blip) {
+    // Stands on platform 4, to the right of the gorilla.
+    let x = 190.0_f32;
+    let y = PLAT[4].1 - 30.0; // feet at platform top
+    // Hair (blonde, piled up)
+    blip.fill_rect(x + 2.0, y,        12.0, 4.0, BLIP_YELLOW);
+    blip.fill_rect(x + 4.0, y - 4.0,  8.0, 4.0, BLIP_YELLOW);
+    // Tiara
+    blip.fill_rect(x + 5.0, y - 7.0,  2.0, 3.0, BLIP_YELLOW); // center spike
+    blip.fill_rect(x + 9.0, y - 6.0,  2.0, 2.0, BLIP_YELLOW); // right spike
+    blip.fill_rect(x + 2.0, y - 6.0,  2.0, 2.0, BLIP_YELLOW); // left spike
+    // Face
+    blip.fill_rect(x + 3.0, y + 4.0,  10.0, 8.0, SKIN);
+    // Eyes
+    blip.fill_rect(x + 5.0, y + 6.0,  2.0, 2.0, BLIP_DARKGRAY);
+    blip.fill_rect(x + 9.0, y + 6.0,  2.0, 2.0, BLIP_DARKGRAY);
+    // Mouth (small smile)
+    blip.fill_rect(x + 6.0, y + 10.0, 4.0, 1.0, BLIP_DARKGRAY);
+    // Arms
+    blip.fill_rect(x,        y + 12.0, 3.0, 8.0, SKIN);
+    blip.fill_rect(x + 13.0, y + 12.0, 3.0, 8.0, SKIN);
+    // Dress bodice
+    blip.fill_rect(x + 3.0, y + 12.0, 10.0, 9.0, PINK);
+    // Skirt (wider at bottom)
+    blip.fill_rect(x + 1.0, y + 21.0, 14.0, 9.0, PINK);
+    // "HELP!" heart bubble above her
+    blip.fill_rect(x + 4.0, y - 14.0, 3.0, 3.0, BLIP_RED);
+    blip.fill_rect(x + 9.0, y - 14.0, 3.0, 3.0, BLIP_RED);
+    blip.fill_rect(x + 3.0, y - 12.0, 10.0, 4.0, BLIP_RED);
+    blip.fill_rect(x + 5.0, y - 9.0,  6.0, 3.0, BLIP_RED);
+    blip.fill_rect(x + 7.0, y - 7.0,  2.0, 2.0, BLIP_RED);
+}
+
 fn draw_player(blip: &Blip, pl: &Player, flash: f32) {
     // Flash effect when dying: blink
     if flash > 0.0 && (flash * 8.0) as i32 % 2 == 0 { return; }
@@ -660,6 +697,7 @@ fn draw_scene(blip: &Blip, g: &Game) {
     draw_platforms(blip);
     draw_ladders(blip);
     draw_gorilla(blip, g.gor_t > 0.0);
+    draw_princess(blip);
 
     for b in &g.barrels {
         if b.active { draw_barrel(blip, b); }
