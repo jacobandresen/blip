@@ -209,39 +209,44 @@ fn update_player(pl: &mut Player, dt: f32) -> bool {
             pl.x = (pl.x + vx * dt).clamp(px1, px2 - PL_W);
             pl.anim = if vx != 0.0 { (pl.anim + dt * 8.0) % 2.0 } else { 0.0 };
 
-            let jump_pressed = key_pressed(BLIP_KEY_SPACE)
-                || key_pressed(BLIP_KEY_UP)
-                || key_pressed(BLIP_KEY_W);
-            if jump_pressed {
-                pl.vy = JUMP_V;
-                pl.vx = vx;
-                pl.mode = PlMode::Air;
-                pl.scored = 0;
-                jumped = true;
-                return jumped;
-            }
-
-            // Ladder grab
+            // Ladder grab is checked before jump so Up-to-climb takes priority.
             let cx  = pl.cx();
             let py  = PLAT[pi].1;
             let dn  = key_held(BLIP_KEY_DOWN) || key_held(BLIP_KEY_S);
             let up  = key_held(BLIP_KEY_UP)   || key_held(BLIP_KEY_W);
+            let mut grabbed = false;
             for (i, &(lx, ly_top, ly_bot)) in LADS.iter().enumerate() {
                 if cx >= lx && cx <= lx + LAD_W {
-                    // Ladder top on our platform → go down
+                    // Ladder top sits on our platform → press down to enter
                     if dn && (ly_top - py).abs() < 3.0 {
-                        pl.x = lx + LAD_W * 0.5 - PL_W * 0.5;
+                        pl.x    = lx + LAD_W * 0.5 - PL_W * 0.5;
+                        pl.y    = ly_top - PL_H + 4.0; // nudge inside so top-exit check doesn't fire instantly
                         pl.mode = PlMode::Climb(i);
                         pl.anim = 0.0;
+                        grabbed = true;
                         break;
                     }
-                    // Ladder bottom on our platform → go up
+                    // Ladder bottom sits on our platform → press up to enter
                     if up && (ly_bot - py).abs() < 3.0 {
-                        pl.x = lx + LAD_W * 0.5 - PL_W * 0.5;
+                        pl.x    = lx + LAD_W * 0.5 - PL_W * 0.5;
+                        pl.y    = ly_bot - PL_H - 4.0; // nudge inside so bottom-exit check doesn't fire instantly
                         pl.mode = PlMode::Climb(i);
                         pl.anim = 0.0;
+                        grabbed = true;
                         break;
                     }
+                }
+            }
+            if !grabbed {
+                let jump_pressed = key_pressed(BLIP_KEY_SPACE)
+                    || key_pressed(BLIP_KEY_UP)
+                    || key_pressed(BLIP_KEY_W);
+                if jump_pressed {
+                    pl.vy   = JUMP_V;
+                    pl.vx   = vx;
+                    pl.mode = PlMode::Air;
+                    pl.scored = 0;
+                    jumped  = true;
                 }
             }
         }
@@ -337,16 +342,20 @@ fn update_barrel(b: &mut Barrel, dt: f32) {
             }
             if !in_zone { b.lad_zone = false; }
 
-            // Fell off platform edge → enter fall
+            // Fell off platform edge → enter fall.
+            // Nudge y down so prev_feet > py next frame and the barrel doesn't
+            // immediately snap back to the same platform via the landing check.
             if b.x + BR_W > px2 {
                 b.x    = px2 - BR_W;
+                b.y   += 3.0;
                 b.mode = BmMode::Fall;
-                b.vy   = 0.0;
-                b.vx   = 18.0; // slight forward drift
+                b.vy   = 3.0;
+                b.vx   = 18.0;
             } else if b.x < px1 {
                 b.x    = px1;
+                b.y   += 3.0;
                 b.mode = BmMode::Fall;
-                b.vy   = 0.0;
+                b.vy   = 3.0;
                 b.vx   = -18.0;
             }
         }
