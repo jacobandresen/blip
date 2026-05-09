@@ -1,4 +1,4 @@
-var CACHE = 'blip-v5';
+var CACHE = 'blip-v6';
 
 var ASSETS = [
   '/blip/',
@@ -39,6 +39,9 @@ var ASSETS = [
   '/blip/serpent/index.html',
   '/blip/serpent/index.wasm',
   '/blip/serpent/screenshot.png',
+  '/blip/rivet/index.html',
+  '/blip/rivet/index.wasm',
+  '/blip/rivet/screenshot.png',
 ];
 
 self.addEventListener('install', function(e) {
