@@ -5,6 +5,7 @@ pub const GAME_BOUNCER:          i32 = 0;
 pub const GAME_SERPENT:          i32 = 1;
 pub const GAME_GALACTIC_DEFENDER: i32 = 2;
 pub const GAME_CANARIS:          i32 = 3;
+pub const GAME_RIVET:            i32 = 4;
 
 #[cfg(target_arch = "wasm32")]
 extern "C" {

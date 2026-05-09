@@ -8,6 +8,7 @@ members = [
     "crates/galactic_defender",
     "crates/rally",
     "crates/canaris",
+    "crates/rivet",
 ]
 
 [workspace.package]

@@ -369,6 +369,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rivet"
+version = "0.1.0"
+dependencies = [
+ "blip",
+ "blip_assets",
+ "macroquad",
+]
+
+[[package]]
 name = "serpent"
 version = "0.1.0"
 dependencies = [

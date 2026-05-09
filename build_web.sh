@@ -6,7 +6,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-GAMES=(serpent bouncer galactic_defender rally canaris)
+GAMES=(serpent bouncer galactic_defender rally canaris rivet)
 TARGET_DIR="target/wasm32-unknown-unknown/release"
 
 echo "[build] cargo build --release --target wasm32-unknown-unknown"
