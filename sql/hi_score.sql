@@ -4,12 +4,13 @@ create table hi_scores (
       updated_at  timestamptz default now()
   );
 
-  -- Pre-seed all four games so reads always return a row
+  -- Pre-seed all games so reads always return a row
   insert into hi_scores (game, score) values
       ('bouncer',           0),
       ('serpent',           0),
       ('galactic_defender', 0),
-      ('canaris',           0);
+      ('canaris',           0),
+      ('rivet',             0);
 
   -- RLS: public read, no direct writes (only via the function below)
   alter table hi_scores enable row level security;

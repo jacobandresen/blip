@@ -8,8 +8,8 @@ const SUPABASE_URL     = 'https://zramohohqnhmfzhlpvok.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_rc_Dp-WhasQoj7gisVbhCg_1XGspuJe';
 
 // Must match GAME_* constants in crates/blip/src/web.rs
-const GAME_NAMES = ['bouncer', 'serpent', 'galactic_defender', 'canaris'];
-const hiScoreCache = [0, 0, 0, 0];
+const GAME_NAMES = ['bouncer', 'serpent', 'galactic_defender', 'canaris', 'rivet'];
+const hiScoreCache = [0, 0, 0, 0, 0];
 let lastFetch = 0;
 
 async function fetchHiScores() {
@@ -33,7 +33,7 @@ fetchHiScores();
 
 // ---- Top-10 leaderboard -----------------------------------------------
 
-const lastGameOverScore = [-1, -1, -1, -1]; // debounce: only check once per game-over
+const lastGameOverScore = [-1, -1, -1, -1, -1]; // debounce: only check once per game-over
 
 async function checkTop10(game_id, score) {
     if (score <= 0) return;
