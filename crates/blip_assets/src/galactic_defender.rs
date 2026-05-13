@@ -202,6 +202,54 @@ fn music() -> Vec<u8> {
     encode_pcm16_mono(&buf)
 }
 
+/// Fast D-minor pursuit riff (~5.6 s).
+fn music2() -> Vec<u8> {
+    let e = 200.0_f32;
+    let q = 400.0_f32;
+    // D4=293.66 E4=329.63 F4=349.23 G4=392 A4=440 Bb4=466.16 C5=523.25 A3=220 C4=261.63
+    let seq: &[(f32, f32)] = &[
+        // ascending run D E F G
+        (293.66, e), (329.63, e), (349.23, e), (392.00, e),
+        // peak A4 and C5
+        (440.00, q), (523.25, q),
+        // descending Bb A G F
+        (466.16, e), (440.00, e), (392.00, e), (349.23, e),
+        // settle E4 D4
+        (329.63, q), (293.66, q),
+        // low run A3 C4 D4 F4
+        (220.00, e), (261.63, e), (293.66, e), (349.23, e),
+        // high run A4 C5 Bb4 G4
+        (440.00, e), (523.25, e), (466.16, e), (392.00, e),
+        // D4 hold
+        (293.66, 800.0),
+    ];
+    let total: usize = seq.iter().map(|(_, ms)| ms_to_samples(*ms)).sum();
+    let mut buf: Vec<i16> = Vec::with_capacity(total);
+    for (f, ms) in seq { music_note(&mut buf, *f, *ms); }
+    encode_pcm16_mono(&buf)
+}
+
+/// Slow A-minor dread loop (~8.0 s).
+fn music3() -> Vec<u8> {
+    let q = 500.0_f32;
+    let h = 1000.0_f32;
+    // E4=329.63 D4=293.66 C4=261.63 A3=220 G3=196 B3=246.94 E3=164.81
+    let seq: &[(f32, f32)] = &[
+        // phrase 1: descend E4 D4 C4
+        (329.63, h), (293.66, q), (261.63, q),
+        // phrase 2: tension A3 G3 B3
+        (220.00, h), (196.00, q), (246.94, q),
+        // phrase 3: ascend C4 D4 E4
+        (261.63, h), (293.66, q), (329.63, q),
+        // phrase 4: resolve low A3 then E3
+        (220.00, h), (164.81, h),
+    ];
+    let total: usize = seq.iter().map(|(_, ms)| ms_to_samples(*ms)).sum();
+    let mut buf: Vec<i16> = Vec::with_capacity(total);
+    for (f, ms) in seq { music_note(&mut buf, *f, *ms); }
+    encode_pcm16_mono(&buf)
+}
+
 fn game_over_sfx() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let freqs = [440.0_f32, 330.0, 220.0, 110.0];
@@ -252,5 +300,7 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/march.wav",       encode_pcm16_mono(&gen_tone(220.0, 60.0, 0.4))),
         ("sounds/level_clear.wav", level_clear_sfx()),
         ("sounds/music.wav",       music()),
+        ("sounds/music2.wav",      music2()),
+        ("sounds/music3.wav",      music3()),
     ]
 }

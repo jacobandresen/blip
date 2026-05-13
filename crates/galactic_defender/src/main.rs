@@ -22,8 +22,8 @@ const PLAY_Y: i32 = HUD_H;
 const GROUND_Y: i32 = WIN_H - 32;
 
 // ---- alien grid -------------------------------------------------------
-const ALIEN_COLS: i32 = 11;
-const ALIEN_ROWS: i32 = 5;
+const ALIEN_COLS: i32 = 13; // max across all themes (theme 2 uses 13)
+const ALIEN_ROWS: i32 = 6;  // max across all themes (theme 1 uses 6)
 const ALIEN_W: i32 = 32;
 const ALIEN_H: i32 = 24;
 const ALIEN_XGAP: i32 = 4;
@@ -33,11 +33,10 @@ const ALIEN_TOTAL: usize = (ALIEN_COLS * ALIEN_ROWS) as usize;
 // ---- tuning -----------------------------------------------------------
 const PLAYER_SPEED: f32 = 200.0;
 const BULLET_SPEED: f32 = 350.0;
-const BOMB_SPEED: f32 = 140.0;
-const MARCH_START: i32 = 600;
-const MARCH_MIN: i32 = 80;
-const MARCH_DROP: f32 = 14.0;
-const MAX_BOMBS: usize = 3;
+const MARCH_START: i32 = 520;
+const MARCH_MIN: i32 = 65;
+const MARCH_DROP: f32 = 16.0;
+const MAX_BOMBS: usize = 4;
 const MAX_PLAYER_BULLETS: usize = 1;
 const SHIELD_COLS: usize = 4;
 const SHIELD_ROWS: usize = 3;
@@ -46,7 +45,9 @@ const SHIELDS: usize = 4;
 const EXPLOSION_TTL: f32 = 0.45;
 const LIVES_START: i32 = 3;
 
-const N_BULLETS: usize = MAX_PLAYER_BULLETS + MAX_BOMBS;
+const MAX_UFO_BOMBS: usize = 1;
+const UFO_BOMB_IDX: usize = MAX_PLAYER_BULLETS + MAX_BOMBS;
+const N_BULLETS: usize = MAX_PLAYER_BULLETS + MAX_BOMBS + MAX_UFO_BOMBS;
 const N_EXPLOSIONS: usize = ALIEN_TOTAL + 4;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -89,6 +90,17 @@ struct Game {
     bomb_timer: f32,
     dead_timer: f32,
     state: State,
+    active_cols: i32,
+    active_rows: i32,
+    bomb_speed: f32,
+    bomb_interval_range: (f32, f32),
+    ufo_x: f32,
+    ufo_active: bool,
+    ufo_dir: i32,
+    ufo_timer: f32,
+    ufo_bomb_timer: f32,
+    ufo_score: i32,
+    ufo_score_timer: f32,
 }
 
 impl Game {
@@ -113,6 +125,17 @@ impl Game {
             bomb_timer: 2.0,
             dead_timer: 0.0,
             state: State::Title,
+            active_cols: 11,
+            active_rows: 5,
+            bomb_speed: 140.0,
+            bomb_interval_range: (0.8, 2.5),
+            ufo_x: 0.0,
+            ufo_active: false,
+            ufo_dir: 1,
+            ufo_timer: 20.0,
+            ufo_bomb_timer: 3.0,
+            ufo_score: 0,
+            ufo_score_timer: 0.0,
         }
     }
 
@@ -123,7 +146,10 @@ impl Game {
     fn march_interval(&self) -> f32 {
         let alive = self.aliens_alive();
         if alive <= 0 { return MARCH_MIN as f32; }
-        let ms = MARCH_START * alive / ALIEN_TOTAL as i32;
+        let theme_total = (self.active_cols * self.active_rows).max(1);
+        // Each level the march is 7% faster, capping at a 50% speedup by level 8.
+        let level_scale = (1.0 - (self.level - 1) as f32 * 0.07).max(0.5);
+        let ms = (MARCH_START as f32 * alive as f32 / theme_total as f32 * level_scale) as i32;
         ms.max(MARCH_MIN) as f32
     }
 
@@ -164,18 +190,41 @@ impl Game {
     }
 
     fn init_aliens(&mut self) {
-        let row_kinds = [0_usize, 1, 1, 2, 2];
-        let grid_w = ALIEN_COLS * (ALIEN_W + ALIEN_XGAP) - ALIEN_XGAP;
+        let theme = (self.level - 1).rem_euclid(3);
+        let (rows, cols) = match theme {
+            0 => (5_i32, 11_i32),
+            1 => (6,     11),
+            _ => (3,     13),
+        };
+        self.bomb_speed = match theme { 0 => 160.0, 1 => 200.0, _ => 250.0 };
+        // Bomb intervals tighten each level (capped at level 6 equivalent).
+        let lv = ((self.level - 1) as f32).min(5.0);
+        self.bomb_interval_range = match theme {
+            0 => ((0.6 - lv * 0.04).max(0.3),  (2.0 - lv * 0.15).max(0.9)),
+            1 => ((0.5 - lv * 0.03).max(0.25), (1.5 - lv * 0.12).max(0.75)),
+            _ => ((0.35 - lv * 0.02).max(0.2), (1.0 - lv * 0.08).max(0.55)),
+        };
+        self.active_cols = cols;
+        self.active_rows = rows;
+
+        for a in self.aliens.iter_mut() { a.alive = false; }
+
+        let grid_w = cols * (ALIEN_W + ALIEN_XGAP) - ALIEN_XGAP;
         let ox = (WIN_W - grid_w) / 2;
         let oy = PLAY_Y + 40;
-        for r in 0..ALIEN_ROWS {
-            for c in 0..ALIEN_COLS {
-                let i = (r * ALIEN_COLS + c) as usize;
+        for r in 0..rows {
+            let kind: usize = match theme {
+                0 => [0, 1, 1, 2, 2][r as usize],
+                1 => [0, 1, 1, 2, 2, 2][r as usize],
+                _ => [0, 1, 2][r as usize],
+            };
+            for c in 0..cols {
+                let i = (r * cols + c) as usize;
                 self.aliens[i] = Alien {
                     x: (ox + c * (ALIEN_W + ALIEN_XGAP)) as f32,
                     y: (oy + r * (ALIEN_H + ALIEN_YGAP)) as f32,
                     alive: true,
-                    kind: row_kinds[r as usize],
+                    kind,
                     anim: 0,
                 };
             }
@@ -190,8 +239,19 @@ impl Game {
         self.bullets.iter_mut().for_each(|b| b.active = false);
         self.explosions.iter_mut().for_each(|e| e.active = false);
         self.init_aliens();
-        self.build_shields();
+        let theme = (self.level - 1).rem_euclid(3);
+        if theme != 2 {
+            self.build_shields();
+        } else {
+            for s in &mut self.shields {
+                for row in &mut s.alive { row.fill(false); }
+            }
+        }
         self.bomb_timer = 2.0;
+        self.ufo_active = false;
+        self.ufo_timer = rand_int(15, 25) as f32;
+        self.ufo_score_timer = 0.0;
+        self.bullets[UFO_BOMB_IDX].active = false;
         self.state = State::Play;
     }
 
@@ -208,6 +268,79 @@ struct Sounds {
     shoot: blip::BlipSound,
     explosion: blip::BlipSound,
     level_clear: blip::BlipSound,
+}
+
+fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
+    if g.ufo_score_timer > 0.0 { g.ufo_score_timer -= dt; }
+
+    if !g.ufo_active {
+        g.ufo_timer -= dt;
+        if g.ufo_timer <= 0.0 && g.aliens_alive() > 0 {
+            g.ufo_dir = if (rand() & 1) == 0 { 1 } else { -1 };
+            g.ufo_x = if g.ufo_dir == 1 { -32.0 } else { WIN_W as f32 };
+            g.ufo_active = true;
+            g.ufo_bomb_timer = 3.0;
+            g.bullets[UFO_BOMB_IDX].active = false;
+        }
+        return;
+    }
+
+    const UFO_Y: f32 = (PLAY_Y + 8) as f32;
+    g.ufo_x += 80.0 * g.ufo_dir as f32 * dt;
+
+    if g.ufo_x > WIN_W as f32 || g.ufo_x + 32.0 < 0.0 {
+        g.ufo_active = false;
+        g.bullets[UFO_BOMB_IDX].active = false;
+        g.ufo_timer = rand_int(15, 25) as f32;
+        return;
+    }
+
+    g.ufo_bomb_timer -= dt;
+    if g.ufo_bomb_timer <= 0.0 && !g.bullets[UFO_BOMB_IDX].active {
+        g.bullets[UFO_BOMB_IDX] = Bullet {
+            x: g.ufo_x + 12.0,
+            y: UFO_Y + 12.0,
+            active: true,
+            player: false,
+        };
+        // Only one bomb per pass
+        g.ufo_bomb_timer = f32::MAX;
+    }
+
+    for bi in 0..MAX_PLAYER_BULLETS {
+        if !g.bullets[bi].active { continue; }
+        if rects_overlap(g.bullets[bi].x, g.bullets[bi].y, 8.0, 16.0,
+                         g.ufo_x, UFO_Y, 32.0, 12.0) {
+            play_sfx(&sfx.explosion);
+            let kill_x = g.ufo_x;
+            g.spawn_explosion(kill_x, UFO_Y);
+            g.bullets[bi].active = false;
+            g.bullets[UFO_BOMB_IDX].active = false;
+            let bonus = rand_int(1, 6) * 50;
+            g.score += bonus;
+            if g.score > g.hi_score {
+                g.hi_score = g.score;
+                web::save_hi_score(web::GAME_GALACTIC_DEFENDER, g.hi_score);
+            }
+            g.ufo_score = bonus;
+            g.ufo_score_timer = 1.5;
+            g.ufo_active = false;
+            g.ufo_timer = rand_int(15, 25) as f32;
+            return;
+        }
+    }
+}
+
+fn draw_ufo(blip: &Blip, g: &Game) {
+    const UFO_Y: f32 = (PLAY_Y + 8) as f32;
+    if g.ufo_active {
+        blip.fill_rect(g.ufo_x, UFO_Y, 32.0, 12.0, BLIP_RED);
+        blip.fill_rect(g.ufo_x + 8.0, UFO_Y - 8.0, 16.0, 8.0, BLIP_CYAN);
+    }
+    if g.ufo_score_timer > 0.0 {
+        let text = format!("{} PTS", g.ufo_score);
+        blip.draw_centered(&text, UFO_Y, 2.0, BLIP_YELLOW);
+    }
 }
 
 fn update_title(g: &mut Game) {
@@ -240,7 +373,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     for b in g.bullets.iter_mut() {
         if !b.active { continue; }
-        b.y += if b.player { -BULLET_SPEED } else { BOMB_SPEED } * dt;
+        b.y += if b.player { -BULLET_SPEED } else { g.bomb_speed } * dt;
         if b.y < PLAY_Y as f32 || b.y > WIN_H as f32 { b.active = false; }
     }
 
@@ -271,12 +404,13 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.bomb_timer -= dt;
     if g.bomb_timer <= 0.0 {
         let r01 = (rand() as f32) / (u32::MAX as f32);
-        g.bomb_timer = lerp(0.8, 2.5, r01);
+        let (lo, hi) = g.bomb_interval_range;
+        g.bomb_timer = lerp(lo, hi, r01);
         let mut candidates = [0usize; ALIEN_COLS as usize];
         let mut nc = 0usize;
-        for c in 0..ALIEN_COLS {
-            for r in (0..ALIEN_ROWS).rev() {
-                let idx = (r * ALIEN_COLS + c) as usize;
+        for c in 0..g.active_cols {
+            for r in (0..g.active_rows).rev() {
+                let idx = (r * g.active_cols + c) as usize;
                 if g.aliens[idx].alive {
                     candidates[nc] = idx;
                     nc += 1;
@@ -374,6 +508,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
+    update_ufo(g, dt, sfx);
+
     if g.aliens_alive() == 0 {
         play_sfx(&sfx.level_clear);
         g.level += 1;
@@ -458,6 +594,7 @@ fn draw_play(blip: &Blip, g: &Game,
         );
     }
 
+    draw_ufo(blip, g);
     blip.draw_hud(g.score, g.hi_score, g.lives);
 }
 
@@ -514,6 +651,12 @@ const SHOOT_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets
 const EXPLOSION_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/explosion.wav"));
 const LEVEL_CLEAR_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/level_clear.wav"));
 const MUSIC_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
+const MUSIC2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
+const MUSIC3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
+
+// Loop durations in seconds — used to switch tracks at loop boundaries.
+// music: 9.6s  music2: 5.6s  music3: 8.0s
+const MUSIC_DURATIONS: [f32; 3] = [9.6, 5.6, 8.0];
 
 fn load_png(bytes: &'static [u8]) -> Texture2D {
     let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));
@@ -540,11 +683,29 @@ async fn main() {
         explosion:   blip::audio::load_sound(EXPLOSION_WAV).await,
         level_clear: blip::audio::load_sound(LEVEL_CLEAR_WAV).await,
     };
-    let music = blip::audio::load_sound(MUSIC_WAV).await;
-    play_music(&music);
+    let music = [
+        blip::audio::load_sound(MUSIC_WAV).await,
+        blip::audio::load_sound(MUSIC2_WAV).await,
+        blip::audio::load_sound(MUSIC3_WAV).await,
+    ];
+    let mut music_idx: usize = 0;
+    let mut music_timer: f32 = MUSIC_DURATIONS[0];
+    play_music(&music[0]);
 
     loop {
         let dt = blip.delta_time;
+
+        // Switch to a random different loop at each loop boundary.
+        music_timer -= dt;
+        if music_timer <= 0.0 {
+            let next = {
+                let candidate = rand_int(0, 1) as usize; // 0 or 1
+                if candidate < music_idx { candidate } else { candidate + 1 } // skip current
+            };
+            music_idx = next;
+            music_timer = MUSIC_DURATIONS[next];
+            play_music(&music[next]);
+        }
         match g.state {
             State::Title => update_title(&mut g),
             State::Play  => update_play(&mut g, dt, &sfx),

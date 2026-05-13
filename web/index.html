@@ -1015,7 +1015,8 @@ var n = getCoins();
       var KEY  = 'sb_publishable_rc_Dp-WhasQoj7gisVbhCg_1XGspuJe';
       var H    = { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } };
       var CARD = { bouncer: 'card-bouncer', serpent: 'card-serpent',
-                   galactic_defender: 'card-galactic', canaris: 'card-canaris' };
+                   galactic_defender: 'card-galactic', canaris: 'card-canaris',
+                   rivet: 'card-rivet' };
       Promise.all([
         fetch(BASE + '/rest/v1/hi_scores?select=game,score', H)
           .then(function(r) { return r.ok ? r.json() : []; }).catch(function() { return []; }),

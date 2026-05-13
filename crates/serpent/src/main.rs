@@ -51,6 +51,10 @@ struct Game {
     move_timer: f32,
     dead_timer: f32,
     state: State,
+    obstacles: [Cell; 8],
+    obstacle_count: usize,
+    active_music: i32,
+    want_track: i32,
 }
 
 impl Game {
@@ -70,6 +74,10 @@ impl Game {
             move_timer: 0.0,
             dead_timer: 0.0,
             state: State::Title,
+            obstacles: [Cell { c: 0, r: 0 }; 8],
+            obstacle_count: 0,
+            active_music: 0,
+            want_track: 0,
         }
     }
 
@@ -98,7 +106,31 @@ impl Game {
         }
     }
 
+    fn build_obstacles(&mut self) {
+        self.obstacle_count = 0;
+        let ch = COLS / 2;
+        let rh = ROWS / 2;
+        if self.level == 2 {
+            self.obstacles[0] = Cell { c: ch - 1, r: rh };
+            self.obstacles[1] = Cell { c: ch,     r: rh };
+            self.obstacles[2] = Cell { c: ch,     r: rh - 1 };
+            self.obstacles[3] = Cell { c: ch,     r: rh + 1 };
+            self.obstacle_count = 4;
+        } else if self.level >= 3 {
+            self.obstacles[0] = Cell { c: ch - 1, r: rh - 1 };
+            self.obstacles[1] = Cell { c: ch,     r: rh - 1 };
+            self.obstacles[2] = Cell { c: ch + 1, r: rh - 1 };
+            self.obstacles[3] = Cell { c: ch - 1, r: rh };
+            self.obstacles[4] = Cell { c: ch + 1, r: rh };
+            self.obstacles[5] = Cell { c: ch - 1, r: rh + 1 };
+            self.obstacles[6] = Cell { c: ch,     r: rh + 1 };
+            self.obstacles[7] = Cell { c: ch + 1, r: rh + 1 };
+            self.obstacle_count = 8;
+        }
+    }
+
     fn reset_snake(&mut self) {
+        self.build_obstacles();
         self.snake_head = 0;
         self.snake_len = 4;
         self.cur_dir = Dir::Right;
@@ -117,6 +149,7 @@ impl Game {
         self.foods_eaten = 0;
         self.lives = LIVES_START;
         self.reset_snake();
+        self.want_track = rand_int(1, 3);
         self.state = State::Play;
     }
 }
@@ -158,6 +191,11 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             if b.c == h.c && b.r == h.r { dead = true; break; }
         }
     }
+    if !dead {
+        for i in 0..g.obstacle_count {
+            if g.obstacles[i].c == h.c && g.obstacles[i].r == h.r { dead = true; break; }
+        }
+    }
     if dead {
         play_sfx(&sfx.game_over);
         g.lives -= 1;
@@ -179,6 +217,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if g.foods_eaten >= FOODS_PER_LVL {
             g.level += 1;
             g.foods_eaten = 0;
+            let next = rand_int(1, 3);
+            g.want_track = if next == g.active_music { next % 3 + 1 } else { next };
         }
         g.spawn_food();
     }
@@ -247,6 +287,15 @@ fn draw_snake(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D) {
 
 fn draw_play(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D, food: &Texture2D) {
     draw_board(blip);
+    for i in 0..g.obstacle_count {
+        let obs = g.obstacles[i];
+        blip.fill_rect(
+            (obs.c * CELL) as f32,
+            (HUD_H + obs.r * CELL) as f32,
+            CELL as f32, CELL as f32,
+            BLIP_GRAY,
+        );
+    }
     blip.draw_texture(food,
         (g.food.c * CELL) as f32,
         (HUD_H + g.food.r * CELL) as f32,
@@ -279,7 +328,9 @@ const BODY_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/
 const FOOD_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/food.png"));
 const EAT_WAV: &[u8]  = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/eat.wav"));
 const GAME_OVER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
-const MUSIC_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
+const SLITHER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/slither.wav"));
+const STALK_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/stalk.wav"));
+const FRENZY_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/frenzy.wav"));
 
 fn load_png(bytes: &'static [u8]) -> Texture2D {
     let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));
@@ -300,8 +351,12 @@ async fn main() {
         eat:       blip::audio::load_sound(EAT_WAV).await,
         game_over: blip::audio::load_sound(GAME_OVER_WAV).await,
     };
-    let music = blip::audio::load_sound(MUSIC_WAV).await;
-    play_music(&music);
+    let slither = blip::audio::load_sound(SLITHER_WAV).await;
+    let stalk   = blip::audio::load_sound(STALK_WAV).await;
+    let frenzy  = blip::audio::load_sound(FRENZY_WAV).await;
+    let tracks = [&slither, &stalk, &frenzy];
+    play_music(&slither);
+    g.active_music = 1;
 
     loop {
         let dt = blip.delta_time;
@@ -310,6 +365,12 @@ async fn main() {
             State::Play  => update_play(&mut g, dt, &sfx),
             State::Dead  => update_dead(&mut g, dt),
             State::Over  => update_over(&mut g),
+        }
+
+        if g.want_track != 0 && g.want_track != g.active_music {
+            play_music(tracks[(g.want_track - 1) as usize]);
+            g.active_music = g.want_track;
+            g.want_track = 0;
         }
 
         blip.clear(BLIP_BLACK);

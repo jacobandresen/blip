@@ -40,6 +40,15 @@ const BALL_H: i32 = 14;
 const BALL_SPEED_0: f32 = 240.0;
 const BALL_SPEED_MAX: f32 = 380.0;
 
+// ---- loot drops -------------------------------------------------------
+const MAX_DROPS: usize = 8;
+const DROP_SIZE: f32 = 14.0;
+const DROP_SPEED: f32 = 120.0;
+const EFFECT_DURATION: f32 = 8.0;
+const PAD_W_WIDE: f32 = 130.0;
+const PAD_W_NARROW: f32 = 46.0;
+const BALL_SLOW_FACTOR: f32 = 0.6;
+
 // ---- tuning -----------------------------------------------------------
 const LIVES_START: i32 = 3;
 const SPEED_INC: f32 = 18.0;
@@ -47,12 +56,24 @@ const SPEED_INC: f32 = 18.0;
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Launch, Play, Dead, Win, Over }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum DropKind { Wide, Narrow, Slow, Life }
+
+#[derive(Copy, Clone)]
+struct Drop { x: f32, y: f32, active: bool, kind: DropKind }
+
+const DEAD_DROP: Drop = Drop { x: 0.0, y: 0.0, active: false, kind: DropKind::Wide };
+
 #[derive(Copy, Clone)]
 struct Brick { kind: usize, alive: bool }
 
 struct Game {
     bricks: [Brick; BRICK_TOTAL],
+    drops: [Drop; MAX_DROPS],
     pad_x: f32,
+    pad_w: f32,
+    pad_effect_timer: f32,
+    slow_timer: f32,
     ball_x: f32, ball_y: f32,
     ball_vx: f32, ball_vy: f32,
     ball_speed: f32,
@@ -65,13 +86,24 @@ impl Game {
     fn new() -> Self {
         Self {
             bricks: [Brick { kind: 0, alive: false }; BRICK_TOTAL],
+            drops: [DEAD_DROP; MAX_DROPS],
             pad_x: 0.0,
+            pad_w: PAD_W as f32,
+            pad_effect_timer: 0.0,
+            slow_timer: 0.0,
             ball_x: 0.0, ball_y: 0.0, ball_vx: 0.0, ball_vy: 0.0,
             ball_speed: BALL_SPEED_0,
             score: 0, hi_score: web::load_hi_score(web::GAME_BOUNCER), lives: 0, level: 1,
             dead_timer: 0.0,
             state: State::Title,
         }
+    }
+
+    fn reset_drops(&mut self) {
+        self.drops = [DEAD_DROP; MAX_DROPS];
+        self.pad_w = PAD_W as f32;
+        self.pad_effect_timer = 0.0;
+        self.slow_timer = 0.0;
     }
 
     fn bricks_alive(&self) -> i32 {
@@ -82,13 +114,22 @@ impl Game {
         for r in 0..BRICK_ROWS {
             for c in 0..BRICK_COLS {
                 let i = (r * BRICK_COLS + c) as usize;
-                self.bricks[i] = Brick { kind: r as usize, alive: true };
+                let alive = match self.level {
+                    1 => true,
+                    2 => (r + c) % 2 == 0,
+                    _ => {
+                        let center_col = (BRICK_COLS - 1) / 2;
+                        let distance = (c as isize - center_col as isize).abs();
+                        distance <= 3
+                    }
+                };
+                self.bricks[i] = Brick { kind: r as usize, alive };
             }
         }
     }
 
     fn launch_ball(&mut self) {
-        self.ball_x = self.pad_x + (PAD_W / 2 - BALL_W / 2) as f32;
+        self.ball_x = self.pad_x + (self.pad_w / 2.0 - BALL_W as f32 / 2.0);
         self.ball_y = (PAD_Y - BALL_H - 2) as f32;
         let r01 = (rand() as f32) / (u32::MAX as f32);
         let angle = -1.1 + r01 * 0.2;
@@ -102,6 +143,7 @@ impl Game {
         self.lives = LIVES_START;
         self.level = 1;
         self.ball_speed = BALL_SPEED_0;
+        self.reset_drops();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
         self.build_bricks();
         self.launch_ball();
@@ -110,6 +152,7 @@ impl Game {
 
     fn next_level(&mut self) {
         self.level += 1;
+        self.reset_drops();
         self.build_bricks();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
         self.launch_ball();
@@ -134,12 +177,12 @@ fn paddle_input(g: &mut Game, dt: f32) {
     let ps = PAD_SPEED * dt;
     if key_held(BLIP_KEY_LEFT)  || key_held(BLIP_KEY_A) { g.pad_x -= ps; }
     if key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D) { g.pad_x += ps; }
-    g.pad_x = clamp(g.pad_x, 0.0, (WIN_W - PAD_W) as f32);
+    g.pad_x = clamp(g.pad_x, 0.0, WIN_W as f32 - g.pad_w);
 }
 
 fn update_launch(g: &mut Game, dt: f32) {
     paddle_input(g, dt);
-    g.ball_x = g.pad_x + (PAD_W / 2 - BALL_W / 2) as f32;
+    g.ball_x = g.pad_x + (g.pad_w / 2.0 - BALL_W as f32 / 2.0);
     g.ball_y = (PAD_Y - BALL_H - 2) as f32;
     if key_pressed(BLIP_KEY_SPACE) || key_pressed(BLIP_KEY_UP) || key_pressed(BLIP_KEY_W) {
         g.state = State::Play;
@@ -160,8 +203,24 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
     if g.ball_y < HUD_H as f32 { g.ball_y = HUD_H as f32; g.ball_vy = g.ball_vy.abs(); }
 
+    // Tick drop effects
+    if g.pad_effect_timer > 0.0 {
+        g.pad_effect_timer -= dt;
+        if g.pad_effect_timer <= 0.0 {
+            g.pad_effect_timer = 0.0;
+            g.pad_w = PAD_W as f32;
+        }
+    }
+    if g.slow_timer > 0.0 {
+        g.slow_timer -= dt;
+        if g.slow_timer < 0.0 { g.slow_timer = 0.0; }
+    }
+
+    update_drops(g, dt);
+
     if g.ball_y > WIN_H as f32 {
         play_sfx(&sfx.life_lost);
+        g.reset_drops();
         g.lives -= 1;
         if g.lives > 0 {
             g.dead_timer = 1.2;
@@ -172,19 +231,21 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         return;
     }
 
+    let active_speed = if g.slow_timer > 0.0 { g.ball_speed * BALL_SLOW_FACTOR } else { g.ball_speed };
+
     if g.ball_vy > 0.0
         && rects_overlap(
             g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32,
-            g.pad_x, PAD_Y as f32, PAD_W as f32, PAD_H as f32,
+            g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32,
         )
     {
         play_sfx(&sfx.paddle_hit);
-        let rel = (g.ball_x + BALL_W as f32 / 2.0 - g.pad_x) / PAD_W as f32;
+        let rel = (g.ball_x + BALL_W as f32 / 2.0 - g.pad_x) / g.pad_w;
         let angle = (rel - 0.5) * 2.0 * 1.2;
-        g.ball_vx = g.ball_speed * angle.sin();
-        g.ball_vy = -g.ball_speed * angle.cos();
-        if g.ball_vy.abs() < g.ball_speed * 0.3 {
-            g.ball_vy = -g.ball_speed * 0.3;
+        g.ball_vx = active_speed * angle.sin();
+        g.ball_vy = -active_speed * angle.cos();
+        if g.ball_vy.abs() < active_speed * 0.3 {
+            g.ball_vy = -active_speed * 0.3;
         }
         g.ball_y = (PAD_Y - BALL_H - 1) as f32;
     }
@@ -204,6 +265,25 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_BOUNCER, g.hi_score); }
         g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
 
+        // 30% chance to spawn a loot drop
+        if rand() % 10 < 3 {
+            let drop_x = bx + BRICK_W as f32 / 2.0 - DROP_SIZE / 2.0;
+            let drop_y = by;
+            let kind_idx = rand() % 10;
+            let drop_kind = match kind_idx {
+                0..=2 => DropKind::Wide,
+                3..=5 => DropKind::Slow,
+                6..=7 => DropKind::Narrow,
+                _     => DropKind::Life,
+            };
+            for j in 0..MAX_DROPS {
+                if !g.drops[j].active {
+                    g.drops[j] = Drop { x: drop_x, y: drop_y, active: true, kind: drop_kind };
+                    break;
+                }
+            }
+        }
+
         let over_x = if g.ball_vx > 0.0 { bx - (g.ball_x + BALL_W as f32) }
                      else { (bx + BRICK_W as f32) - g.ball_x };
         let over_y = if g.ball_vy > 0.0 { by - (g.ball_y + BALL_H as f32) }
@@ -213,8 +293,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
         let spd = (g.ball_vx * g.ball_vx + g.ball_vy * g.ball_vy).sqrt();
         if spd > 0.0 {
-            g.ball_vx = g.ball_vx / spd * g.ball_speed;
-            g.ball_vy = g.ball_vy / spd * g.ball_speed;
+            g.ball_vx = g.ball_vx / spd * active_speed;
+            g.ball_vy = g.ball_vy / spd * active_speed;
         }
 
         if kind <= 1 { play_sfx(&sfx.brick_break); }
@@ -226,6 +306,35 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         play_sfx(&sfx.win);
         g.dead_timer = 1.5;
         g.state = State::Win;
+    }
+}
+
+fn update_drops(g: &mut Game, dt: f32) {
+    for i in 0..MAX_DROPS {
+        if !g.drops[i].active { continue; }
+        g.drops[i].y += DROP_SPEED * dt;
+        if g.drops[i].y > WIN_H as f32 { g.drops[i].active = false; continue; }
+        if rects_overlap(g.drops[i].x, g.drops[i].y, DROP_SIZE, DROP_SIZE,
+                         g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32) {
+            g.drops[i].active = false;
+            let kind = g.drops[i].kind;
+            match kind {
+                DropKind::Wide => {
+                    g.pad_w = PAD_W_WIDE;
+                    g.pad_effect_timer = EFFECT_DURATION;
+                }
+                DropKind::Narrow => {
+                    g.pad_w = PAD_W_NARROW;
+                    g.pad_effect_timer = EFFECT_DURATION;
+                }
+                DropKind::Slow => {
+                    g.slow_timer = EFFECT_DURATION;
+                }
+                DropKind::Life => {
+                    g.lives += 1;
+                }
+            }
+        }
     }
 }
 
@@ -260,7 +369,40 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick:
         let by = (BRICK_OY + r * (BRICK_H + BRICK_GAP)) as f32;
         blip.draw_texture(&brick[g.bricks[i].kind], bx, by, BRICK_W as f32, BRICK_H as f32);
     }
-    blip.draw_texture(paddle, g.pad_x, PAD_Y as f32, PAD_W as f32, PAD_H as f32);
+
+    // Draw loot drops
+    let s = DROP_SIZE;
+    for i in 0..MAX_DROPS {
+        if !g.drops[i].active { continue; }
+        let x = g.drops[i].x;
+        let y = g.drops[i].y;
+        match g.drops[i].kind {
+            DropKind::Wide   => blip.draw_rect(x, y + s * 0.3, s, s * 0.4, BLIP_GREEN),
+            DropKind::Narrow => blip.draw_rect(x + s * 0.3, y, s * 0.4, s, BLIP_RED),
+            DropKind::Slow   => {
+                blip.draw_rect(x, y + s * 0.3, s, s * 0.4, BLIP_CYAN);
+                blip.draw_rect(x + s * 0.3, y, s * 0.4, s, BLIP_CYAN);
+            }
+            DropKind::Life   => {
+                blip.draw_rect(x, y + s * 0.3, s, s * 0.4, BLIP_YELLOW);
+                blip.draw_rect(x + s * 0.3, y, s * 0.4, s, BLIP_YELLOW);
+            }
+        }
+    }
+
+    // Draw active effect indicators
+    let indicator_y = (PAD_Y - 20) as f32;
+    if g.slow_timer > 0.0 {
+        blip.draw_centered("SLOW", indicator_y, 2.0, BLIP_CYAN);
+    } else if g.pad_effect_timer > 0.0 {
+        if g.pad_w > PAD_W as f32 {
+            blip.draw_centered("WIDE",   indicator_y, 2.0, BLIP_GREEN);
+        } else {
+            blip.draw_centered("NARROW", indicator_y, 2.0, BLIP_RED);
+        }
+    }
+
+    blip.draw_texture(paddle, g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32);
     blip.draw_texture(ball, g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32);
     blip.draw_hud(g.score, g.hi_score, g.lives);
 }

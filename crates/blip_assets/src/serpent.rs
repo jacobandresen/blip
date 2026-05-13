@@ -95,7 +95,7 @@ fn music_note(buf: &mut Vec<i16>, freq: f32, ms: f32) {
     }
 }
 
-fn music() -> Vec<u8> {
+fn slither() -> Vec<u8> {
     let e = 250.0;
     let seq: &[(f32, f32)] = &[
         (261.63, e), (329.63, e), (392.00, e), (440.00, e),
@@ -112,6 +112,41 @@ fn music() -> Vec<u8> {
     for (f, ms) in seq {
         music_note(&mut buf, *f, *ms);
     }
+    encode_pcm16_mono(&buf)
+}
+
+fn stalk() -> Vec<u8> {
+    let e = 180.0;
+    let seq: &[(f32, f32)] = &[
+        (220.00, e), (261.63, e), (293.66, e), (329.63, e), (349.23, e), (392.00, e),
+        (392.00, e), (349.23, e), (329.63, e), (293.66, e), (261.63, e), (220.00, e),
+        (220.00, e), (261.63, e), (293.66, e), (329.63, e), (349.23, e), (392.00, e),
+        (392.00, e), (349.23, e), (329.63, e), (293.66, e), (261.63, e), (220.00, e),
+        (220.00, e), (261.63, e), (293.66, e), (329.63, e), (349.23, e), (392.00, e),
+        (349.23, e), (329.63, e),
+    ];
+    let total: usize = seq.iter().map(|(_, ms)| ms_to_samples(*ms)).sum();
+    let mut buf: Vec<i16> = Vec::with_capacity(total);
+    for (f, ms) in seq { music_note(&mut buf, *f, *ms); }
+    encode_pcm16_mono(&buf)
+}
+
+fn frenzy() -> Vec<u8> {
+    let e = 130.0;
+    let r = 50.0;
+    let seq: &[(f32, f32)] = &[
+        (164.81, e), (174.61, e), (196.00, e), (0.0, r),
+        (164.81, e), (174.61, e), (196.00, e), (0.0, r),
+        (196.00, e), (174.61, e), (164.81, e), (0.0, r),
+        (196.00, e), (174.61, e), (164.81, e), (0.0, r),
+        (164.81, e), (174.61, e), (196.00, e), (220.00, e),
+        (246.94, e), (261.63, e), (293.66, e), (0.0, r),
+        (164.81, e), (174.61, e), (164.81, e), (174.61, e),
+        (196.00, e), (174.61, e), (164.81, e), (0.0, r),
+    ];
+    let total: usize = seq.iter().map(|(_, ms)| ms_to_samples(*ms)).sum();
+    let mut buf: Vec<i16> = Vec::with_capacity(total);
+    for (f, ms) in seq { music_note(&mut buf, *f, *ms); }
     encode_pcm16_mono(&buf)
 }
 
@@ -163,6 +198,8 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/eat.wav", eat_sfx()),
         ("sounds/move.wav", move_sfx()),
         ("sounds/game_over.wav", game_over_sfx()),
-        ("sounds/music.wav", music()),
+        ("sounds/slither.wav", slither()),
+        ("sounds/stalk.wav", stalk()),
+        ("sounds/frenzy.wav", frenzy()),
     ]
 }
