@@ -6,7 +6,7 @@ use blip::input::{
 use blip::macroquad::input::KeyCode;
 use blip::macroquad::rand::rand;
 use blip::{
-    play_music, play_sfx, rects_overlap, web, window_conf, Blip, BlipColor, BLIP_BLACK,
+    play_music, play_sfx, rects_overlap, web, window_conf, Blip, BlipColor, Timer, BLIP_BLACK,
     BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
 
@@ -52,7 +52,7 @@ struct Game {
     lpad_y: f32, rpad_y: f32,
     ball_x: f32, ball_y: f32, ball_vx: f32, ball_vy: f32, ball_spd: f32,
     score_l: i32, score_r: i32,
-    point_t: f32,
+    point_t: Timer,
     state: State,
     mode: Mode,
 }
@@ -63,7 +63,7 @@ impl Game {
             lpad_y: 0.0, rpad_y: 0.0,
             ball_x: 0.0, ball_y: 0.0, ball_vx: 0.0, ball_vy: 0.0, ball_spd: BALL_SPD0,
             score_l: 0, score_r: 0,
-            point_t: 0.0,
+            point_t: Timer::default(),
             state: State::Title,
             mode: Mode::OnePlayer,
         }
@@ -192,19 +192,18 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
         g.score_r += 1;
         play_sfx(&sfx.score_r);
         if g.score_r >= SCORE_WIN { g.state = State::Over; }
-        else { g.reset_for_serve(); g.point_t = 1.2; g.state = State::Point; }
+        else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
     }
     if g.ball_x > WIN_W as f32 {
         g.score_l += 1;
         play_sfx(&sfx.score_l);
         if g.score_l >= SCORE_WIN { g.state = State::Over; }
-        else { g.reset_for_serve(); g.point_t = 1.2; g.state = State::Point; }
+        else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
     }
 }
 
 fn update_point(g: &mut Game, dt: f32) {
-    g.point_t -= dt;
-    if g.point_t <= 0.0 { g.state = State::Serve; }
+    if g.point_t.tick(dt) { g.state = State::Serve; }
 }
 
 fn update_over(g: &mut Game) {
@@ -266,7 +265,7 @@ fn draw_point(blip: &Blip, g: &Game) {
     blip.clear(BLIP_BLACK);
     draw_net(blip);
     draw_hud(blip, g.score_l, g.score_r);
-    if (g.point_t * 6.0) as i32 % 2 == 0 {
+    if (g.point_t.remaining() * 6.0) as i32 % 2 == 0 {
         blip.draw_centered("POINT!", PLAY_T + PLAY_H * 0.5, 3.0, BLIP_YELLOW);
     }
 }

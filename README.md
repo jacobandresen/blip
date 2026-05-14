@@ -47,6 +47,7 @@ To explore development or contribute:
     cargo build --release
     ```
     *This compiles the core engine and individual game modules.*
+3.  **Library guide:** See [docs/blip.md](docs/blip.md) for a walkthrough of the blip API — what each module does, the game loop pattern, and how to get started writing a new game.
 
 ### Web Distribution (Production)
 To compile all games for the web:

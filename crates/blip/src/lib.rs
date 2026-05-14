@@ -14,6 +14,9 @@ pub mod draw;
 pub mod font;
 pub mod input;
 pub mod math;
+pub mod pool;
+pub mod session;
+pub mod timer;
 pub mod web;
 
 pub use audio::{play_ambient, play_music, play_sfx, stop_ambient, stop_music, BlipSound};
@@ -23,6 +26,9 @@ pub use color::{
 };
 pub use ctx::{window_conf, Blip};
 pub use math::{clamp, lerp, rand_int, rects_overlap};
+pub use pool::{pool_iter, pool_iter_mut, pool_spawn, Pooled};
+pub use session::{LifeResult, Session};
+pub use timer::Timer;
 
 // Re-export macroquad's color::Color as BlipColor for game code.
 pub use macroquad::color::Color as BlipColor;

@@ -10,8 +10,9 @@ use blip::macroquad::prelude::ImageFormat;
 use blip::macroquad::rand::rand;
 use blip::macroquad::texture::{FilterMode, Texture2D};
 use blip::{
-    clamp, play_music, play_sfx, rects_overlap, web, window_conf, Blip, BLIP_BLACK, BLIP_CYAN,
-    BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
+    clamp, play_music, play_sfx, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
+    window_conf, Blip, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_CYAN, BLIP_GRAY,
+    BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
 // ---- layout -----------------------------------------------------------
@@ -62,6 +63,10 @@ enum DropKind { Wide, Narrow, Slow, Life }
 #[derive(Copy, Clone)]
 struct Drop { x: f32, y: f32, active: bool, kind: DropKind }
 
+impl Pooled for Drop {
+    fn is_active(&self) -> bool { self.active }
+}
+
 const DEAD_DROP: Drop = Drop { x: 0.0, y: 0.0, active: false, kind: DropKind::Wide };
 
 #[derive(Copy, Clone)]
@@ -72,13 +77,13 @@ struct Game {
     drops: [Drop; MAX_DROPS],
     pad_x: f32,
     pad_w: f32,
-    pad_effect_timer: f32,
-    slow_timer: f32,
+    pad_effect_timer: Timer,
+    slow_timer: Timer,
     ball_x: f32, ball_y: f32,
     ball_vx: f32, ball_vy: f32,
     ball_speed: f32,
-    score: i32, hi_score: i32, lives: i32, level: i32,
-    dead_timer: f32,
+    sess: Session,
+    dead_timer: Timer,
     state: State,
 }
 
@@ -89,12 +94,12 @@ impl Game {
             drops: [DEAD_DROP; MAX_DROPS],
             pad_x: 0.0,
             pad_w: PAD_W as f32,
-            pad_effect_timer: 0.0,
-            slow_timer: 0.0,
+            pad_effect_timer: Timer::default(),
+            slow_timer: Timer::default(),
             ball_x: 0.0, ball_y: 0.0, ball_vx: 0.0, ball_vy: 0.0,
             ball_speed: BALL_SPEED_0,
-            score: 0, hi_score: web::load_hi_score(web::GAME_BOUNCER), lives: 0, level: 1,
-            dead_timer: 0.0,
+            sess: Session::new(web::GAME_BOUNCER, LIVES_START),
+            dead_timer: Timer::default(),
             state: State::Title,
         }
     }
@@ -102,8 +107,8 @@ impl Game {
     fn reset_drops(&mut self) {
         self.drops = [DEAD_DROP; MAX_DROPS];
         self.pad_w = PAD_W as f32;
-        self.pad_effect_timer = 0.0;
-        self.slow_timer = 0.0;
+        self.pad_effect_timer = Timer::default();
+        self.slow_timer = Timer::default();
     }
 
     fn bricks_alive(&self) -> i32 {
@@ -114,7 +119,7 @@ impl Game {
         for r in 0..BRICK_ROWS {
             for c in 0..BRICK_COLS {
                 let i = (r * BRICK_COLS + c) as usize;
-                let alive = match self.level {
+                let alive = match self.sess.level {
                     1 => true,
                     2 => (r + c) % 2 == 0,
                     _ => {
@@ -138,10 +143,7 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        self.hi_score = self.hi_score.max(web::load_hi_score(web::GAME_BOUNCER));
-        self.score = 0;
-        self.lives = LIVES_START;
-        self.level = 1;
+        self.sess.reset(web::GAME_BOUNCER, LIVES_START);
         self.ball_speed = BALL_SPEED_0;
         self.reset_drops();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
@@ -151,7 +153,7 @@ impl Game {
     }
 
     fn next_level(&mut self) {
-        self.level += 1;
+        self.sess.next_level();
         self.reset_drops();
         self.build_bricks();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
@@ -169,7 +171,7 @@ struct Sounds {
 }
 
 fn update_title(g: &mut Game) {
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_BOUNCER));
+    g.sess.refresh_hi(web::GAME_BOUNCER);
     if any_key_pressed() { g.start_game(); }
 }
 
@@ -190,7 +192,7 @@ fn update_launch(g: &mut Game, dt: f32) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_BOUNCER));
+    g.sess.refresh_hi(web::GAME_BOUNCER);
     paddle_input(g, dt);
 
     g.ball_x += g.ball_vx * dt;
@@ -204,34 +206,24 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.ball_y < HUD_H as f32 { g.ball_y = HUD_H as f32; g.ball_vy = g.ball_vy.abs(); }
 
     // Tick drop effects
-    if g.pad_effect_timer > 0.0 {
-        g.pad_effect_timer -= dt;
-        if g.pad_effect_timer <= 0.0 {
-            g.pad_effect_timer = 0.0;
-            g.pad_w = PAD_W as f32;
-        }
+    if g.pad_effect_timer.tick(dt) {
+        g.pad_w = PAD_W as f32;
     }
-    if g.slow_timer > 0.0 {
-        g.slow_timer -= dt;
-        if g.slow_timer < 0.0 { g.slow_timer = 0.0; }
-    }
+    g.slow_timer.tick(dt);
 
     update_drops(g, dt);
 
     if g.ball_y > WIN_H as f32 {
         play_sfx(&sfx.life_lost);
         g.reset_drops();
-        g.lives -= 1;
-        if g.lives > 0 {
-            g.dead_timer = 1.2;
-            g.state = State::Dead;
-        } else {
-            g.state = State::Over;
+        match g.sess.lose_life() {
+            LifeResult::StillAlive => { g.dead_timer.start(1.2); g.state = State::Dead; }
+            LifeResult::GameOver   => { g.state = State::Over; }
         }
         return;
     }
 
-    let active_speed = if g.slow_timer > 0.0 { g.ball_speed * BALL_SLOW_FACTOR } else { g.ball_speed };
+    let active_speed = if g.slow_timer.active() { g.ball_speed * BALL_SLOW_FACTOR } else { g.ball_speed };
 
     if g.ball_vy > 0.0
         && rects_overlap(
@@ -261,27 +253,19 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
         let kind = g.bricks[i].kind;
         g.bricks[i].alive = false;
-        g.score += (BRICK_ROWS - r) * 10 * g.level;
-        if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_BOUNCER, g.hi_score); }
+        g.sess.add_score(web::GAME_BOUNCER, (BRICK_ROWS - r) * 10 * g.sess.level);
         g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
 
         // 30% chance to spawn a loot drop
         if rand() % 10 < 3 {
             let drop_x = bx + BRICK_W as f32 / 2.0 - DROP_SIZE / 2.0;
-            let drop_y = by;
-            let kind_idx = rand() % 10;
-            let drop_kind = match kind_idx {
+            let drop_kind = match rand() % 10 {
                 0..=2 => DropKind::Wide,
                 3..=5 => DropKind::Slow,
                 6..=7 => DropKind::Narrow,
                 _     => DropKind::Life,
             };
-            for j in 0..MAX_DROPS {
-                if !g.drops[j].active {
-                    g.drops[j] = Drop { x: drop_x, y: drop_y, active: true, kind: drop_kind };
-                    break;
-                }
-            }
+            pool_spawn(&mut g.drops, Drop { x: drop_x, y: by, active: true, kind: drop_kind });
         }
 
         let over_x = if g.ball_vx > 0.0 { bx - (g.ball_x + BALL_W as f32) }
@@ -304,34 +288,32 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     if g.bricks_alive() == 0 {
         play_sfx(&sfx.win);
-        g.dead_timer = 1.5;
+        g.dead_timer.start(1.5);
         g.state = State::Win;
     }
 }
 
 fn update_drops(g: &mut Game, dt: f32) {
-    for i in 0..MAX_DROPS {
-        if !g.drops[i].active { continue; }
-        g.drops[i].y += DROP_SPEED * dt;
-        if g.drops[i].y > WIN_H as f32 { g.drops[i].active = false; continue; }
-        if rects_overlap(g.drops[i].x, g.drops[i].y, DROP_SIZE, DROP_SIZE,
+    for d in pool_iter_mut(&mut g.drops) {
+        d.y += DROP_SPEED * dt;
+        if d.y > WIN_H as f32 { d.active = false; continue; }
+        if rects_overlap(d.x, d.y, DROP_SIZE, DROP_SIZE,
                          g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32) {
-            g.drops[i].active = false;
-            let kind = g.drops[i].kind;
-            match kind {
+            d.active = false;
+            match d.kind {
                 DropKind::Wide => {
                     g.pad_w = PAD_W_WIDE;
-                    g.pad_effect_timer = EFFECT_DURATION;
+                    g.pad_effect_timer.start(EFFECT_DURATION);
                 }
                 DropKind::Narrow => {
                     g.pad_w = PAD_W_NARROW;
-                    g.pad_effect_timer = EFFECT_DURATION;
+                    g.pad_effect_timer.start(EFFECT_DURATION);
                 }
                 DropKind::Slow => {
-                    g.slow_timer = EFFECT_DURATION;
+                    g.slow_timer.start(EFFECT_DURATION);
                 }
                 DropKind::Life => {
-                    g.lives += 1;
+                    g.sess.lives += 1;
                 }
             }
         }
@@ -339,8 +321,7 @@ fn update_drops(g: &mut Game, dt: f32) {
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
-    g.dead_timer -= dt;
-    if g.dead_timer <= 0.0 {
+    if g.dead_timer.tick(dt) {
         g.pad_x = ((WIN_W - PAD_W) / 2) as f32;
         g.launch_ball();
         g.state = State::Launch;
@@ -348,13 +329,12 @@ fn update_dead(g: &mut Game, dt: f32) {
 }
 
 fn update_win(g: &mut Game, dt: f32) {
-    g.dead_timer -= dt;
-    if g.dead_timer <= 0.0 { g.next_level(); }
+    if g.dead_timer.tick(dt) { g.next_level(); }
 }
 
 fn update_over(g: &mut Game) {
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_BOUNCER));
-    web::game_over(web::GAME_BOUNCER, g.score);
+    g.sess.refresh_hi(web::GAME_BOUNCER);
+    web::game_over(web::GAME_BOUNCER, g.sess.score);
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
@@ -372,11 +352,9 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick:
 
     // Draw loot drops
     let s = DROP_SIZE;
-    for i in 0..MAX_DROPS {
-        if !g.drops[i].active { continue; }
-        let x = g.drops[i].x;
-        let y = g.drops[i].y;
-        match g.drops[i].kind {
+    for d in pool_iter(&g.drops) {
+        let (x, y) = (d.x, d.y);
+        match d.kind {
             DropKind::Wide   => blip.draw_rect(x, y + s * 0.3, s, s * 0.4, BLIP_GREEN),
             DropKind::Narrow => blip.draw_rect(x + s * 0.3, y, s * 0.4, s, BLIP_RED),
             DropKind::Slow   => {
@@ -392,9 +370,9 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick:
 
     // Draw active effect indicators
     let indicator_y = (PAD_Y - 20) as f32;
-    if g.slow_timer > 0.0 {
+    if g.slow_timer.active() {
         blip.draw_centered("SLOW", indicator_y, 2.0, BLIP_CYAN);
-    } else if g.pad_effect_timer > 0.0 {
+    } else if g.pad_effect_timer.active() {
         if g.pad_w > PAD_W as f32 {
             blip.draw_centered("WIDE",   indicator_y, 2.0, BLIP_GREEN);
         } else {
@@ -404,7 +382,7 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick:
 
     blip.draw_texture(paddle, g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32);
     blip.draw_texture(ball, g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32);
-    blip.draw_hud(g.score, g.hi_score, g.lives);
+    blip.draw_hud(g.sess.score, g.sess.hi, g.sess.lives);
 }
 
 fn draw_title(blip: &Blip) {
@@ -416,14 +394,14 @@ fn draw_title(blip: &Blip) {
 }
 
 fn draw_win(blip: &Blip, level: i32) {
-    let buf = format!("LEVEL {}", level + 1);
+    let buf = format!("LEVEL {}", level + 1);  // level just incremented in next_level
     blip.clear(BLIP_BLACK);
     blip.draw_centered("CLEARED", (WIN_H / 3) as f32, 5.0, BLIP_GREEN);
     blip.draw_centered(&buf,      (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
 }
 
 fn draw_over(blip: &Blip, score: i32) {
-    let buf = format!("SCORE {}", score);
+    let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
     blip.draw_centered("GAME OVER",     (WIN_H / 4) as f32,     5.0, BLIP_RED);
     blip.draw_centered(&buf,            (WIN_H / 2) as f32,     3.0, BLIP_WHITE);
@@ -495,8 +473,8 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip),
-            State::Win   => draw_win(&blip, g.level),
-            State::Over  => draw_over(&blip, g.score),
+            State::Win   => draw_win(&blip, g.sess.level),
+            State::Over  => draw_over(&blip, g.sess.score),
             State::Launch | State::Play | State::Dead => {
                 draw_play(&blip, &g, &paddle, &ball, &brick);
             }

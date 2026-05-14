@@ -8,7 +8,8 @@ use blip::input::{
 use blip::macroquad::color::Color;
 use blip::macroquad::rand::rand;
 use blip::{
-    play_music, play_sfx, rects_overlap, web, window_conf, Blip,
+    play_music, play_sfx, pool_iter, pool_spawn, rects_overlap, web, window_conf, Blip,
+    LifeResult, Pooled, Session, Timer,
     BLIP_BLACK, BLIP_DARKGRAY, BLIP_GREEN, BLIP_GRAY,
     BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
@@ -116,6 +117,10 @@ struct Barrel {
     lad_zone: bool, // in a ladder x-zone right now (prevents re-rolling the dice every frame)
 }
 
+impl Pooled for Barrel {
+    fn is_active(&self) -> bool { self.active }
+}
+
 impl Barrel {
     fn inactive() -> Self {
         Self {
@@ -137,14 +142,14 @@ struct Sounds {
 struct Game {
     pl:      Player,
     barrels: [Barrel; MAX_B],
-    score: i32, hi: i32, lives: i32, level: i32,
-    state: State,
-    dead_t: f32,
-    win_t:  f32,
-    throw_cd:  f32,
+    sess:    Session,
+    state:   State,
+    dead_t:    Timer,
+    win_t:     Timer,
+    throw_cd:  Timer,
     throw_int: f32,
-    gor_t: f32,   // > 0 = gorilla throw animation playing
-    flash: f32,
+    gor_t:  Timer, // active = gorilla throw animation playing
+    flash:  Timer,
 }
 
 impl Game {
@@ -152,49 +157,43 @@ impl Game {
         Self {
             pl:      Player::spawn(),
             barrels: [Barrel::inactive(); MAX_B],
-            score: 0, hi: web::load_hi_score(GAME_ID),
-            lives: LIVES_START, level: 1,
-            state: State::Title,
-            dead_t: 0.0, win_t: 0.0,
-            throw_cd: 2.5, throw_int: 2.5,
-            gor_t: 0.0, flash: 0.0,
+            sess:    Session::new(GAME_ID, LIVES_START),
+            state:   State::Title,
+            dead_t: Timer::default(), win_t: Timer::default(),
+            throw_cd: Timer::default(), throw_int: 2.5,
+            gor_t: Timer::default(), flash: Timer::default(),
         }
     }
 
     fn start(&mut self) {
-        self.hi = self.hi.max(web::load_hi_score(GAME_ID));
-        self.score = 0;
-        self.lives = LIVES_START;
-        self.level = 1;
+        self.sess.reset(GAME_ID, LIVES_START);
         self.begin_level();
         self.state = State::Play;
     }
 
     fn begin_level(&mut self) {
-        self.throw_int = (3.2 - (self.level - 1) as f32 * 0.28).max(1.2);
-        self.throw_cd  = self.throw_int * 0.6; // first barrel arrives sooner
+        self.throw_int = (3.2 - (self.sess.level - 1) as f32 * 0.28).max(1.2);
+        self.throw_cd.start(self.throw_int * 0.6); // first barrel arrives sooner
         for b in &mut self.barrels { b.active = false; }
-        self.gor_t = 0.0;
+        self.gor_t = Timer::default();
         self.pl = Player::spawn();
     }
 
     fn spawn_barrel(&mut self) {
-        if let Some(b) = self.barrels.iter_mut().find(|b| !b.active) {
-            *b = Barrel {
-                x: GOR_X + 30.0,
-                y: PLAT[4].1 - BR_H,
-                vx: BR_SPD,
-                vy: 0.0,
-                mode: BmMode::Roll(4),
-                active: true,
-                anim: 0.0,
-                lad_zone: false,
-            };
-        }
+        pool_spawn(&mut self.barrels, Barrel {
+            x: GOR_X + 30.0,
+            y: PLAT[4].1 - BR_H,
+            vx: BR_SPD,
+            vy: 0.0,
+            mode: BmMode::Roll(4),
+            active: true,
+            anim: 0.0,
+            lad_zone: false,
+        });
     }
 
     fn active_barrels(&self) -> usize {
-        self.barrels.iter().filter(|b| b.active).count()
+        pool_iter(&self.barrels).count()
     }
 }
 
@@ -413,26 +412,25 @@ fn update_barrel(b: &mut Barrel, dt: f32) {
 
 // ── State update functions ─────────────────────────────────────────────
 fn update_title(g: &mut Game) {
-    g.hi = g.hi.max(web::load_hi_score(GAME_ID));
+    g.sess.refresh_hi(GAME_ID);
     if any_key_pressed() { g.start(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    g.hi = g.hi.max(web::load_hi_score(GAME_ID));
+    g.sess.refresh_hi(GAME_ID);
 
     // Gorilla throw timer
-    g.throw_cd -= dt;
-    if g.throw_cd <= 0.0 {
-        let max_active = (2 + g.level).min(MAX_B as i32) as usize;
+    if g.throw_cd.tick(dt) {
+        let max_active = (2 + g.sess.level).min(MAX_B as i32) as usize;
         if g.active_barrels() < max_active {
-            g.gor_t    = 0.45;
-            g.throw_cd = g.throw_int;
+            g.gor_t.start(0.45);
+            g.throw_cd.start(g.throw_int);
             g.spawn_barrel();
         } else {
-            g.throw_cd = 0.8; // retry soon
+            g.throw_cd.start(0.8); // retry soon
         }
     }
-    if g.gor_t > 0.0 { g.gor_t -= dt; }
+    g.gor_t.tick(dt);
 
     // Player
     let jumped = update_player(&mut g.pl, dt);
@@ -452,14 +450,16 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         // Death collision
         if rects_overlap(px, py, PL_W, PL_H, b.x, b.y, BR_W, BR_H) {
             play_sfx(&sfx.die);
-            g.lives -= 1;
-            g.flash = 1.2;
-            if g.lives > 0 {
-                g.dead_t = 1.2;
-                g.state  = State::Dead;
-            } else {
-                web::game_over(GAME_ID, g.score);
-                g.state = State::Over;
+            g.flash.start(1.2);
+            match g.sess.lose_life() {
+                LifeResult::StillAlive => {
+                    g.dead_t.start(1.2);
+                    g.state = State::Dead;
+                }
+                LifeResult::GameOver => {
+                    web::game_over(GAME_ID, g.sess.score);
+                    g.state = State::Over;
+                }
             }
             return;
         }
@@ -474,11 +474,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                     && (bcy - g.pl.feet()).abs() < 22.0
                 {
                     g.pl.scored |= bit;
-                    g.score    += 100;
-                    if g.score > g.hi {
-                        g.hi = g.score;
-                        web::save_hi_score(GAME_ID, g.hi);
-                    }
+                    g.sess.add_score(GAME_ID, 100);
                     play_sfx(&sfx.score);
                 }
             }
@@ -489,12 +485,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     if let PlMode::Ground(pi) = g.pl.mode {
         if pi == 4 {
             play_sfx(&sfx.win);
-            g.score += 500 + g.level * 100;
-            if g.score > g.hi {
-                g.hi = g.score;
-                web::save_hi_score(GAME_ID, g.hi);
-            }
-            g.win_t = 2.2;
+            g.sess.add_score(GAME_ID, 500 + g.sess.level * 100);
+            g.win_t.start(2.2);
             g.state = State::Win;
         }
     }
@@ -502,39 +494,38 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     // Player fell off bottom
     if g.pl.y > WIN_H as f32 + 10.0 {
         play_sfx(&sfx.die);
-        g.lives -= 1;
-        g.flash  = 1.2;
-        if g.lives > 0 {
-            g.dead_t = 1.2;
-            g.state  = State::Dead;
-        } else {
-            web::game_over(GAME_ID, g.score);
-            g.state = State::Over;
+        g.flash.start(1.2);
+        match g.sess.lose_life() {
+            LifeResult::StillAlive => {
+                g.dead_t.start(1.2);
+                g.state = State::Dead;
+            }
+            LifeResult::GameOver => {
+                web::game_over(GAME_ID, g.sess.score);
+                g.state = State::Over;
+            }
         }
     }
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
-    g.dead_t -= dt;
-    g.flash  -= dt;
-    if g.dead_t <= 0.0 {
+    g.flash.tick(dt);
+    if g.dead_t.tick(dt) {
         g.pl    = Player::spawn();
-        g.flash = 0.0;
         g.state = State::Play;
     }
 }
 
 fn update_win(g: &mut Game, dt: f32) {
-    g.win_t -= dt;
-    if g.win_t <= 0.0 {
-        g.level += 1;
+    if g.win_t.tick(dt) {
+        g.sess.next_level();
         g.begin_level();
         g.state = State::Play;
     }
 }
 
 fn update_over(g: &mut Game) {
-    g.hi = g.hi.max(web::load_hi_score(GAME_ID));
+    g.sess.refresh_hi(GAME_ID);
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start();
@@ -636,9 +627,8 @@ fn draw_princess(blip: &Blip) {
     blip.fill_rect(x + 7.0, y - 7.0,  2.0, 2.0, BLIP_RED);
 }
 
-fn draw_player(blip: &Blip, pl: &Player, flash: f32) {
-    // Flash effect when dying: blink
-    if flash > 0.0 && (flash * 8.0) as i32 % 2 == 0 { return; }
+fn draw_player(blip: &Blip, pl: &Player, flash: Timer) {
+    if flash.active() && (flash.remaining() * 8.0) as i32 % 2 == 0 { return; }
 
     let x = pl.x;
     let y = pl.y;
@@ -696,16 +686,16 @@ fn draw_scene(blip: &Blip, g: &Game) {
 
     draw_platforms(blip);
     draw_ladders(blip);
-    draw_gorilla(blip, g.gor_t > 0.0);
+    draw_gorilla(blip, g.gor_t.active());
     draw_princess(blip);
 
-    for b in &g.barrels {
-        if b.active { draw_barrel(blip, b); }
+    for b in pool_iter(&g.barrels) {
+        draw_barrel(blip, b);
     }
 
     draw_player(blip, &g.pl, g.flash);
 
-    blip.draw_hud(g.score, g.hi, g.lives);
+    blip.draw_hud(g.sess.score, g.sess.hi, g.sess.lives);
 }
 
 fn draw_title(blip: &Blip, hi: i32) {
@@ -779,9 +769,9 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, g.hi),
-            State::Win   => { draw_scene(&blip, &g); draw_win(&blip, g.level); }
-            State::Over  => { draw_scene(&blip, &g); draw_over(&blip, g.score); }
+            State::Title => draw_title(&blip, g.sess.hi),
+            State::Win   => { draw_scene(&blip, &g); draw_win(&blip, g.sess.level); }
+            State::Over  => { draw_scene(&blip, &g); draw_over(&blip, g.sess.score); }
             State::Play | State::Dead => draw_scene(&blip, &g),
         }
 

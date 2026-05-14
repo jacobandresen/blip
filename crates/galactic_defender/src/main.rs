@@ -10,7 +10,8 @@ use blip::macroquad::rand::rand;
 use blip::macroquad::texture::{FilterMode, Texture2D};
 use blip::{
     clamp, lerp, play_music, play_sfx, rand_int, rects_overlap, web, window_conf, Blip,
-    BlipColor, BLIP_BLACK, BLIP_CYAN, BLIP_GREEN, BLIP_MAGENTA, BLIP_ORANGE, BLIP_RED,
+    BlipColor, LifeResult, Session, Timer,
+    BLIP_BLACK, BLIP_CYAN, BLIP_GREEN, BLIP_MAGENTA, BLIP_ORANGE, BLIP_RED,
     BLIP_WHITE, BLIP_YELLOW,
 };
 
@@ -83,12 +84,12 @@ struct Game {
     explosions: [Explosion; N_EXPLOSIONS],
     shields: [Shield; SHIELDS],
     player_x: f32,
-    score: i32, hi_score: i32, lives: i32, level: i32,
+    sess: Session,
     march_timer: f32,
     march_dir: i32,
     march_drop_next: bool,
-    bomb_timer: f32,
-    dead_timer: f32,
+    bomb_timer: Timer,
+    dead_timer: Timer,
     state: State,
     active_cols: i32,
     active_rows: i32,
@@ -97,10 +98,10 @@ struct Game {
     ufo_x: f32,
     ufo_active: bool,
     ufo_dir: i32,
-    ufo_timer: f32,
-    ufo_bomb_timer: f32,
+    ufo_timer: Timer,
+    ufo_bomb_timer: Timer,
     ufo_score: i32,
-    ufo_score_timer: f32,
+    ufo_score_timer: Timer,
 }
 
 impl Game {
@@ -118,12 +119,12 @@ impl Game {
             explosions: [expl_default; N_EXPLOSIONS],
             shields: [shield_default; SHIELDS],
             player_x: 0.0,
-            score: 0, hi_score: web::load_hi_score(web::GAME_GALACTIC_DEFENDER), lives: 0, level: 1,
+            sess: Session::new(web::GAME_GALACTIC_DEFENDER, LIVES_START),
             march_timer: 0.0,
             march_dir: 1,
             march_drop_next: false,
-            bomb_timer: 2.0,
-            dead_timer: 0.0,
+            bomb_timer: Timer::default(),
+            dead_timer: Timer::default(),
             state: State::Title,
             active_cols: 11,
             active_rows: 5,
@@ -132,10 +133,10 @@ impl Game {
             ufo_x: 0.0,
             ufo_active: false,
             ufo_dir: 1,
-            ufo_timer: 20.0,
-            ufo_bomb_timer: 3.0,
+            ufo_timer: Timer::default(),
+            ufo_bomb_timer: Timer::default(),
             ufo_score: 0,
-            ufo_score_timer: 0.0,
+            ufo_score_timer: Timer::default(),
         }
     }
 
@@ -148,7 +149,7 @@ impl Game {
         if alive <= 0 { return MARCH_MIN as f32; }
         let theme_total = (self.active_cols * self.active_rows).max(1);
         // Each level the march is 7% faster, capping at a 50% speedup by level 8.
-        let level_scale = (1.0 - (self.level - 1) as f32 * 0.07).max(0.5);
+        let level_scale = (1.0 - (self.sess.level - 1) as f32 * 0.07).max(0.5);
         let ms = (MARCH_START as f32 * alive as f32 / theme_total as f32 * level_scale) as i32;
         ms.max(MARCH_MIN) as f32
     }
@@ -190,7 +191,7 @@ impl Game {
     }
 
     fn init_aliens(&mut self) {
-        let theme = (self.level - 1).rem_euclid(3);
+        let theme = (self.sess.level - 1).rem_euclid(3);
         let (rows, cols) = match theme {
             0 => (5_i32, 11_i32),
             1 => (6,     11),
@@ -198,7 +199,7 @@ impl Game {
         };
         self.bomb_speed = match theme { 0 => 160.0, 1 => 200.0, _ => 250.0 };
         // Bomb intervals tighten each level (capped at level 6 equivalent).
-        let lv = ((self.level - 1) as f32).min(5.0);
+        let lv = ((self.sess.level - 1) as f32).min(5.0);
         self.bomb_interval_range = match theme {
             0 => ((0.6 - lv * 0.04).max(0.3),  (2.0 - lv * 0.15).max(0.9)),
             1 => ((0.5 - lv * 0.03).max(0.25), (1.5 - lv * 0.12).max(0.75)),
@@ -239,7 +240,7 @@ impl Game {
         self.bullets.iter_mut().for_each(|b| b.active = false);
         self.explosions.iter_mut().for_each(|e| e.active = false);
         self.init_aliens();
-        let theme = (self.level - 1).rem_euclid(3);
+        let theme = (self.sess.level - 1).rem_euclid(3);
         if theme != 2 {
             self.build_shields();
         } else {
@@ -247,19 +248,17 @@ impl Game {
                 for row in &mut s.alive { row.fill(false); }
             }
         }
-        self.bomb_timer = 2.0;
+        self.bomb_timer.start(2.0);
         self.ufo_active = false;
-        self.ufo_timer = rand_int(15, 25) as f32;
-        self.ufo_score_timer = 0.0;
+        self.ufo_timer.start(rand_int(15, 25) as f32);
+        self.ufo_score_timer = Timer::default();
+        self.ufo_bomb_timer = Timer::default();
         self.bullets[UFO_BOMB_IDX].active = false;
         self.state = State::Play;
     }
 
     fn start_game(&mut self) {
-        self.hi_score = self.hi_score.max(web::load_hi_score(web::GAME_GALACTIC_DEFENDER));
-        self.score = 0;
-        self.lives = LIVES_START;
-        self.level = 1;
+        self.sess.reset(web::GAME_GALACTIC_DEFENDER, LIVES_START);
         self.start_round_common();
     }
 }
@@ -271,15 +270,14 @@ struct Sounds {
 }
 
 fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
-    if g.ufo_score_timer > 0.0 { g.ufo_score_timer -= dt; }
+    g.ufo_score_timer.tick(dt);
 
     if !g.ufo_active {
-        g.ufo_timer -= dt;
-        if g.ufo_timer <= 0.0 && g.aliens_alive() > 0 {
+        if g.ufo_timer.tick(dt) && g.aliens_alive() > 0 {
             g.ufo_dir = if (rand() & 1) == 0 { 1 } else { -1 };
             g.ufo_x = if g.ufo_dir == 1 { -32.0 } else { WIN_W as f32 };
             g.ufo_active = true;
-            g.ufo_bomb_timer = 3.0;
+            g.ufo_bomb_timer.start(3.0);
             g.bullets[UFO_BOMB_IDX].active = false;
         }
         return;
@@ -291,20 +289,18 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.ufo_x > WIN_W as f32 || g.ufo_x + 32.0 < 0.0 {
         g.ufo_active = false;
         g.bullets[UFO_BOMB_IDX].active = false;
-        g.ufo_timer = rand_int(15, 25) as f32;
+        g.ufo_timer.start(rand_int(15, 25) as f32);
         return;
     }
 
-    g.ufo_bomb_timer -= dt;
-    if g.ufo_bomb_timer <= 0.0 && !g.bullets[UFO_BOMB_IDX].active {
+    // Only one bomb per pass — timer stays inactive after first fire.
+    if g.ufo_bomb_timer.tick(dt) && !g.bullets[UFO_BOMB_IDX].active {
         g.bullets[UFO_BOMB_IDX] = Bullet {
             x: g.ufo_x + 12.0,
             y: UFO_Y + 12.0,
             active: true,
             player: false,
         };
-        // Only one bomb per pass
-        g.ufo_bomb_timer = f32::MAX;
     }
 
     for bi in 0..MAX_PLAYER_BULLETS {
@@ -317,15 +313,11 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.bullets[bi].active = false;
             g.bullets[UFO_BOMB_IDX].active = false;
             let bonus = rand_int(1, 6) * 50;
-            g.score += bonus;
-            if g.score > g.hi_score {
-                g.hi_score = g.score;
-                web::save_hi_score(web::GAME_GALACTIC_DEFENDER, g.hi_score);
-            }
+            g.sess.add_score(web::GAME_GALACTIC_DEFENDER, bonus);
             g.ufo_score = bonus;
-            g.ufo_score_timer = 1.5;
+            g.ufo_score_timer.start(1.5);
             g.ufo_active = false;
-            g.ufo_timer = rand_int(15, 25) as f32;
+            g.ufo_timer.start(rand_int(15, 25) as f32);
             return;
         }
     }
@@ -337,19 +329,19 @@ fn draw_ufo(blip: &Blip, g: &Game) {
         blip.fill_rect(g.ufo_x, UFO_Y, 32.0, 12.0, BLIP_RED);
         blip.fill_rect(g.ufo_x + 8.0, UFO_Y - 8.0, 16.0, 8.0, BLIP_CYAN);
     }
-    if g.ufo_score_timer > 0.0 {
+    if g.ufo_score_timer.active() {
         let text = format!("{} PTS", g.ufo_score);
         blip.draw_centered(&text, UFO_Y, 2.0, BLIP_YELLOW);
     }
 }
 
 fn update_title(g: &mut Game) {
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_GALACTIC_DEFENDER));
+    g.sess.refresh_hi(web::GAME_GALACTIC_DEFENDER);
     if any_key_pressed() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_GALACTIC_DEFENDER));
+    g.sess.refresh_hi(web::GAME_GALACTIC_DEFENDER);
     let shoot = key_pressed(BLIP_KEY_SPACE)
         || key_pressed(BLIP_KEY_UP)
         || key_pressed(BLIP_KEY_W);
@@ -401,11 +393,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
-    g.bomb_timer -= dt;
-    if g.bomb_timer <= 0.0 {
+    if g.bomb_timer.tick(dt) {
         let r01 = (rand() as f32) / (u32::MAX as f32);
         let (lo, hi) = g.bomb_interval_range;
-        g.bomb_timer = lerp(lo, hi, r01);
+        g.bomb_timer.start(lerp(lo, hi, r01));
         let mut candidates = [0usize; ALIEN_COLS as usize];
         let mut nc = 0usize;
         for c in 0..g.active_cols {
@@ -447,8 +438,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.aliens[ai].alive = false;
                 g.bullets[bi].active = false;
                 let pts = match kind { 0 => 30, 1 => 20, _ => 10 };
-                g.score += pts * g.level;
-                if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_GALACTIC_DEFENDER, g.hi_score); }
+                g.sess.add_score(web::GAME_GALACTIC_DEFENDER, pts * g.sess.level);
                 break;
             }
         }
@@ -487,15 +477,17 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             let px = g.player_x;
             g.spawn_explosion(px, (GROUND_Y - 28) as f32);
             play_sfx(&sfx.explosion);
-            g.lives -= 1;
-            if g.lives > 0 {
-                for k in MAX_PLAYER_BULLETS..N_BULLETS {
-                    g.bullets[k].active = false;
+            match g.sess.lose_life() {
+                LifeResult::StillAlive => {
+                    for k in MAX_PLAYER_BULLETS..N_BULLETS {
+                        g.bullets[k].active = false;
+                    }
+                    g.dead_timer.start(1.5);
+                    g.state = State::Dead;
                 }
-                g.dead_timer = 1.5;
-                g.state = State::Dead;
-            } else {
-                g.state = State::Over;
+                LifeResult::GameOver => {
+                    g.state = State::Over;
+                }
             }
             return;
         }
@@ -512,8 +504,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     if g.aliens_alive() == 0 {
         play_sfx(&sfx.level_clear);
-        g.level += 1;
-        g.dead_timer = 1.5;
+        g.sess.next_level();
+        g.dead_timer.start(1.5);
         g.state = State::Win;
     }
 
@@ -526,21 +518,19 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
-    g.dead_timer -= dt;
-    if g.dead_timer <= 0.0 {
+    if g.dead_timer.tick(dt) {
         g.bullets.iter_mut().for_each(|b| b.active = false);
         g.state = State::Play;
     }
 }
 
 fn update_win(g: &mut Game, dt: f32) {
-    g.dead_timer -= dt;
-    if g.dead_timer <= 0.0 { g.start_round_common(); }
+    if g.dead_timer.tick(dt) { g.start_round_common(); }
 }
 
 fn update_over(g: &mut Game) {
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_GALACTIC_DEFENDER));
-    web::game_over(web::GAME_GALACTIC_DEFENDER, g.score);
+    g.sess.refresh_hi(web::GAME_GALACTIC_DEFENDER);
+    web::game_over(web::GAME_GALACTIC_DEFENDER, g.sess.score);
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
@@ -595,7 +585,7 @@ fn draw_play(blip: &Blip, g: &Game,
     }
 
     draw_ufo(blip, g);
-    blip.draw_hud(g.score, g.hi_score, g.lives);
+    blip.draw_hud(g.sess.score, g.sess.hi, g.sess.lives);
 }
 
 fn draw_title(blip: &Blip, alien: &[Texture2D; 3]) {
@@ -717,8 +707,8 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip, &alien),
-            State::Win   => draw_win(&blip, g.level),
-            State::Over  => draw_over(&blip, g.score),
+            State::Win   => draw_win(&blip, g.sess.level),
+            State::Over  => draw_over(&blip, g.sess.score),
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player, &alien, &explosion, &shield);
             }

@@ -1,5 +1,8 @@
-//! Web FFI: JS callbacks via `web/blip_bridge.js` plugin.
-//! On native all functions are no-ops.
+//! Web integration — thin wrappers around JavaScript calls made via `web/blip_bridge.js`.
+//!
+//! When compiled for `wasm32`, these functions call into the browser's JS environment
+//! to persist hi-scores (via Supabase) and communicate with the kiosk shell.
+//! On native builds they all do nothing, so your game logic works identically on the desktop.
 
 pub const GAME_BOUNCER:          i32 = 0;
 pub const GAME_SERPENT:          i32 = 1;

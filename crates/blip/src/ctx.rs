@@ -1,4 +1,9 @@
-//! `Blip` context: window config, frame loop, HUD, post-process overlay.
+//! The `Blip` context — the central object every game creates once and holds for its lifetime.
+//!
+//! `Blip` owns the virtual canvas (a fixed-size render target), drives the frame loop,
+//! and applies the CRT post-process effect (scanlines, glitch tears, chromatic aberration)
+//! when blitting to the real window. Games interact with it through its drawing methods
+//! and `blip.delta_time`.
 
 use macroquad::camera::{set_camera, Camera2D};
 use macroquad::color::{Color, WHITE};
@@ -15,7 +20,9 @@ use crate::color::*;
 use crate::draw;
 use crate::font;
 
-/// Build a `macroquad::Conf` matching the C `blip_init(title, w, h)` flow.
+/// Create the macroquad window configuration. Pass the result to `#[macroquad::main(conf)]`.
+/// `width` and `height` set the *virtual* canvas size — the window is resizable and will
+/// letterbox the canvas to fit.
 pub fn window_conf(title: &'static str, width: i32, height: i32) -> Conf {
     Conf {
         window_title: title.to_string(),
@@ -36,8 +43,9 @@ impl Lcg {
     }
 }
 
-/// Per-game runtime state. Created once at startup, then `next_frame`'d
-/// once per tick.
+/// The main blip runtime. Create one at the start of `main` with `Blip::new(w, h)`,
+/// then call `blip.next_frame(60).await` at the end of every game loop iteration.
+/// Read `blip.delta_time` each frame to get the elapsed seconds since the last tick.
 pub struct Blip {
     pub width:      i32,
     pub height:     i32,
@@ -136,8 +144,9 @@ impl Blip {
         (vx, vy, vw, vh)
     }
 
-    /// End-of-frame: blit the render target to screen with CRT post-process,
-    /// then reset for the next game frame.
+    /// End the current frame: blit the virtual canvas to the screen (with CRT effects),
+    /// then yield to macroquad and wait for the next frame.
+    /// Call this exactly once at the bottom of your game loop.
     pub async fn next_frame(&mut self, _target_fps: i32) {
         // Switch to a screen-space camera.  set_default_camera() is deliberately
         // NOT used here: it flushes the RT draws but leaves camera_matrix pointing
@@ -342,30 +351,37 @@ impl Blip {
         }
     }
 
-    // ----- drawing pass-throughs (kept as methods to mirror C `Blip *b`) -----
+    // ----- drawing helpers — see blip::draw and blip::font for full docs -----
 
+    /// Fill the canvas with a solid colour. Call this at the start of your draw pass.
     #[inline]
     pub fn clear(&self, c: Color) { draw::clear(c); }
+    /// Draw a solid filled rectangle.
     #[inline]
     pub fn fill_rect(&self, x: f32, y: f32, w: f32, h: f32, c: Color) {
         draw::fill_rect(x, y, w, h, c);
     }
+    /// Draw a 1-pixel outline rectangle (no fill).
     #[inline]
     pub fn draw_rect(&self, x: f32, y: f32, w: f32, h: f32, c: Color) {
         draw::draw_rect(x, y, w, h, c);
     }
+    /// Draw a 1-pixel line between two points.
     #[inline]
     pub fn draw_line(&self, x1: f32, y1: f32, x2: f32, y2: f32, c: Color) {
         draw::draw_line(x1, y1, x2, y2, c);
     }
+    /// Draw a solid filled circle. (`cx`, `cy`) is the centre, `r` is the radius.
     #[inline]
     pub fn fill_circle(&self, cx: f32, cy: f32, r: f32, c: Color) {
         draw::fill_circle(cx, cy, r, c);
     }
+    /// Draw a texture stretched to fill the given rectangle.
     #[inline]
     pub fn draw_texture(&self, tex: &macroquad::texture::Texture2D, x: f32, y: f32, w: f32, h: f32) {
         draw::draw_texture(tex, x, y, w, h);
     }
+    /// Draw a texture stretched to fill the given rectangle, multiplied by a tint colour.
     #[inline]
     pub fn draw_texture_tinted(
         &self, tex: &macroquad::texture::Texture2D, x: f32, y: f32, w: f32, h: f32, tint: Color,
@@ -374,28 +390,34 @@ impl Blip {
     }
 
     // ----- font helpers -----
+
+    /// Draw a single character at pixel position (`x`, `y`). `sz` is the pixel scale.
     #[inline]
     pub fn draw_char(&self, c: char, x: f32, y: f32, sz: f32, color: Color) {
         font::draw_char(c, x, y, sz, color);
     }
+    /// Draw a left-aligned string.
     #[inline]
     pub fn draw_text(&self, text: &str, x: f32, y: f32, sz: f32, color: Color) {
         font::draw_text(text, x, y, sz, color);
     }
+    /// Draw an integer as text — avoids a `format!` call.
     #[inline]
     pub fn draw_number(&self, n: i32, x: f32, y: f32, sz: f32, color: Color) {
         font::draw_number(n, x, y, sz, color);
     }
+    /// Return the x coordinate that would horizontally centre `text` on this canvas.
     #[inline]
     pub fn text_cx(&self, text: &str, sz: i32) -> i32 {
         font::text_cx(self.width, text, sz)
     }
+    /// Draw a string horizontally centred on this canvas.
     #[inline]
     pub fn draw_centered(&self, text: &str, y: f32, sz: f32, color: Color) {
         font::draw_centered(self.width, text, y, sz, color);
     }
 
-    /// Standard 3-field HUD: SCORE / HI / LIVES.
+    /// Draw the standard three-field HUD bar (SCORE / HI / LIVES) across the top of the canvas.
     pub fn draw_hud(&self, score: i32, hi_score: i32, lives: i32) {
         let hud_h = 28.0;
         self.fill_rect(0.0, 0.0, self.width as f32, hud_h, BLIP_BLACK);

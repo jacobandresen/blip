@@ -1,4 +1,7 @@
-//! 5×7 bitmap font, ported verbatim from `lib/blip.c`.
+//! 5×7 bitmap font — each glyph is stored as seven rows of five bits.
+//! Supported characters: digits 0-9, letters A-Z (case-insensitive), and ! : - . space.
+//! The `sz` parameter in every draw function is a pixel scale multiplier:
+//! `sz=1.0` renders at 5×7 pixels, `sz=2.0` at 10×14, `sz=3.0` at 15×21, and so on.
 
 use macroquad::color::Color;
 
@@ -65,6 +68,7 @@ fn char_to_glyph(c: char) -> Option<usize> {
     }
 }
 
+/// Draw a single character at pixel position (`x`, `y`). Unknown characters are silently skipped.
 pub fn draw_char(c: char, x: f32, y: f32, sz: f32, color: Color) {
     let Some(idx) = char_to_glyph(c) else { return };
     for row in 0..7 {
@@ -77,6 +81,7 @@ pub fn draw_char(c: char, x: f32, y: f32, sz: f32, color: Color) {
     }
 }
 
+/// Draw a left-aligned string. Each character is 6×sz pixels wide (5 pixels + 1 gap).
 pub fn draw_text(text: &str, x: f32, y: f32, sz: f32, color: Color) {
     let mut cx = x;
     for c in text.chars() {
@@ -85,14 +90,17 @@ pub fn draw_text(text: &str, x: f32, y: f32, sz: f32, color: Color) {
     }
 }
 
+/// Convenience wrapper to draw an integer without allocating a String at the call site.
 pub fn draw_number(n: i32, x: f32, y: f32, sz: f32, color: Color) {
     draw_text(&n.to_string(), x, y, sz, color);
 }
 
+/// Return the x coordinate that would centre `text` within a canvas of `width` pixels.
 pub fn text_cx(width: i32, text: &str, sz: i32) -> i32 {
     (width - text.len() as i32 * 6 * sz) / 2
 }
 
+/// Draw a horizontally centred string within a canvas of `width` pixels.
 pub fn draw_centered(width: i32, text: &str, y: f32, sz: f32, color: Color) {
     draw_text(text, text_cx(width, text, sz as i32) as f32, y, sz, color);
 }

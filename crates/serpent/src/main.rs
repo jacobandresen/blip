@@ -7,8 +7,8 @@ use blip::input::{
 use blip::macroquad::texture::{FilterMode, Texture2D};
 use blip::macroquad::prelude::ImageFormat;
 use blip::{
-    play_music, play_sfx, rand_int, web, window_conf, Blip, BlipColor, BLIP_BLACK, BLIP_GRAY,
-    BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
+    play_music, play_sfx, rand_int, web, window_conf, Blip, BlipColor, LifeResult, Session,
+    Timer, BLIP_BLACK, BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
 // ---- layout -----------------------------------------------------------
@@ -43,13 +43,10 @@ struct Game {
     cur_dir: Dir,
     want_dir: Dir,
     food: Cell,
-    score: i32,
-    hi_score: i32,
-    lives: i32,
-    level: i32,
+    sess: Session,
     foods_eaten: i32,
     move_timer: f32,
-    dead_timer: f32,
+    dead_timer: Timer,
     state: State,
     obstacles: [Cell; 8],
     obstacle_count: usize,
@@ -66,13 +63,10 @@ impl Game {
             cur_dir: Dir::Right,
             want_dir: Dir::Right,
             food: Cell { c: 0, r: 0 },
-            score: 0,
-            hi_score: web::load_hi_score(web::GAME_SERPENT),
-            lives: 0,
-            level: 1,
+            sess: Session::new(web::GAME_SERPENT, LIVES_START),
             foods_eaten: 0,
             move_timer: 0.0,
-            dead_timer: 0.0,
+            dead_timer: Timer::default(),
             state: State::Title,
             obstacles: [Cell { c: 0, r: 0 }; 8],
             obstacle_count: 0,
@@ -87,7 +81,7 @@ impl Game {
     }
 
     fn move_interval(&self) -> f32 {
-        let ms = SPEED_START - (self.level - 1) as f32 * SPEED_STEP;
+        let ms = SPEED_START - (self.sess.level - 1) as f32 * SPEED_STEP;
         if ms < SPEED_MIN { SPEED_MIN } else { ms }
     }
 
@@ -110,13 +104,13 @@ impl Game {
         self.obstacle_count = 0;
         let ch = COLS / 2;
         let rh = ROWS / 2;
-        if self.level == 2 {
+        if self.sess.level == 2 {
             self.obstacles[0] = Cell { c: ch - 1, r: rh };
             self.obstacles[1] = Cell { c: ch,     r: rh };
             self.obstacles[2] = Cell { c: ch,     r: rh - 1 };
             self.obstacles[3] = Cell { c: ch,     r: rh + 1 };
             self.obstacle_count = 4;
-        } else if self.level >= 3 {
+        } else if self.sess.level >= 3 {
             self.obstacles[0] = Cell { c: ch - 1, r: rh - 1 };
             self.obstacles[1] = Cell { c: ch,     r: rh - 1 };
             self.obstacles[2] = Cell { c: ch + 1, r: rh - 1 };
@@ -143,11 +137,8 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        self.hi_score = self.hi_score.max(web::load_hi_score(web::GAME_SERPENT));
-        self.score = 0;
-        self.level = 1;
+        self.sess.reset(web::GAME_SERPENT, LIVES_START);
         self.foods_eaten = 0;
-        self.lives = LIVES_START;
         self.reset_snake();
         self.want_track = rand_int(1, 3);
         self.state = State::Play;
@@ -160,12 +151,12 @@ struct Sounds {
 }
 
 fn update_title(g: &mut Game) {
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_SERPENT));
+    g.sess.refresh_hi(web::GAME_SERPENT);
     if any_key_pressed() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_SERPENT));
+    g.sess.refresh_hi(web::GAME_SERPENT);
     if (key_pressed(BLIP_KEY_UP)    || key_pressed(BLIP_KEY_W)) && g.cur_dir != Dir::Down  { g.want_dir = Dir::Up; }
     if (key_pressed(BLIP_KEY_DOWN)  || key_pressed(BLIP_KEY_S)) && g.cur_dir != Dir::Up    { g.want_dir = Dir::Down; }
     if (key_pressed(BLIP_KEY_LEFT)  || key_pressed(BLIP_KEY_A)) && g.cur_dir != Dir::Right { g.want_dir = Dir::Left; }
@@ -198,12 +189,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
     if dead {
         play_sfx(&sfx.game_over);
-        g.lives -= 1;
-        if g.lives > 0 {
-            g.dead_timer = 1.5;
-            g.state = State::Dead;
-        } else {
-            g.state = State::Over;
+        match g.sess.lose_life() {
+            LifeResult::StillAlive => { g.dead_timer.start(1.5); g.state = State::Dead; }
+            LifeResult::GameOver   => { g.state = State::Over; }
         }
         return;
     }
@@ -211,11 +199,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     let ate = h.c == g.food.c && h.r == g.food.r;
     if ate {
         play_sfx(&sfx.eat);
-        g.score += 10 * g.level;
-        if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_SERPENT, g.hi_score); }
+        g.sess.add_score(web::GAME_SERPENT, 10 * g.sess.level);
         g.foods_eaten += 1;
         if g.foods_eaten >= FOODS_PER_LVL {
-            g.level += 1;
+            g.sess.next_level();
             g.foods_eaten = 0;
             let next = rand_int(1, 3);
             g.want_track = if next == g.active_music { next % 3 + 1 } else { next };
@@ -229,16 +216,15 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
-    g.dead_timer -= dt;
-    if g.dead_timer <= 0.0 {
+    if g.dead_timer.tick(dt) {
         g.reset_snake();
         g.state = State::Play;
     }
 }
 
 fn update_over(g: &mut Game) {
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_SERPENT));
-    web::game_over(web::GAME_SERPENT, g.score);
+    g.sess.refresh_hi(web::GAME_SERPENT);
+    web::game_over(web::GAME_SERPENT, g.sess.score);
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
@@ -301,7 +287,7 @@ fn draw_play(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D, food: &T
         (HUD_H + g.food.r * CELL) as f32,
         CELL as f32, CELL as f32);
     draw_snake(blip, g, head, body);
-    blip.draw_hud(g.score, g.hi_score, g.lives);
+    blip.draw_hud(g.sess.score, g.sess.hi, g.sess.lives);
 }
 
 fn draw_title(blip: &Blip) {
@@ -312,7 +298,7 @@ fn draw_title(blip: &Blip) {
 }
 
 fn draw_over(blip: &Blip, score: i32) {
-    let buf = format!("SCORE {}", score);
+    let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
     blip.draw_centered("GAME OVER",     (WIN_H / 4) as f32,     5.0, BLIP_RED);
     blip.draw_centered(&buf,            (WIN_H / 2) as f32,     3.0, BLIP_WHITE);
@@ -376,7 +362,7 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip),
-            State::Over  => draw_over(&blip, g.score),
+            State::Over  => draw_over(&blip, g.sess.score),
             State::Play | State::Dead => draw_play(&blip, &g, &head, &body, &food),
         }
 
