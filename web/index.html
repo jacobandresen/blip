@@ -660,6 +660,30 @@
       text-shadow: 0 0 14px color-mix(in srgb, var(--c) 50%, transparent);
     }
     .card-library .card-title { color: var(--c); }
+    .see-how {
+      margin-top: 14px;
+      align-self: stretch;
+      background: var(--c, #d4d4d4);
+      color: #0a0a0c;
+      border: none;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      padding: 12px 14px;
+      cursor: pointer;
+      text-align: center;
+      transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.3),
+                  0 0 14px color-mix(in srgb, var(--c, #888) 35%, transparent);
+    }
+    .see-how:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.1);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.3),
+                  0 0 22px color-mix(in srgb, var(--c, #888) 60%, transparent);
+    }
+    .see-how:active { transform: translateY(0); filter: brightness(0.95); }
+
     .badge-lib {
       position: absolute;
       top: 12px; right: 12px;
@@ -1108,7 +1132,7 @@
       <div class="card-genre"  data-i18n="libraryGenre"></div>
       <div class="card-desc"   data-i18n="libraryDesc"></div>
       <div class="card-controls" data-i18n="libraryControls"></div>
-      <div class="press-start" data-i18n="seeInside"></div>
+      <button class="see-how" data-see="library" data-i18n="seeHow"></button>
     </div>
 
   </div>
@@ -1149,7 +1173,7 @@
 
   <script src="howler.min.js"></script>
   <script src="kiosk.js?v=4"></script>
-  <script src="docs.js?v=6"></script>
+  <script src="docs.js?v=11"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Translations                                                         */
@@ -1182,10 +1206,11 @@
         canarisDesc:       'Open-world sailor with scene switches.<br>Sea roam &rarr; cannon duel &rarr; boarding fight.<br>Port to repair, restock, pick the next zone.',
         canarisControls:   'ARROW / WASD TO SAIL &middot; [1] FIRE &middot; [2] BOARD',
 
-        libraryGenre:      'SHARED RUST CRATE',
-        libraryDesc:       'Every game on this cabinet sits on the same Rust library.<br>Macroquad render &middot; pooled audio &middot; web hi&#8209;scores.<br>Tap the badge to tour the modules.',
-        libraryControls:   'CARGO ADD BLIP &middot; OPEN THE SOURCE',
-        seeInside:         '&#x25BA; SEE INSIDE',
+        libraryGenre:      'CREATE YOUR OWN',
+        libraryDesc:       'Got an idea? Pair with your AI buddy (e.g. Copilot or Claude...) and ship a golden&#8209;age arcade clone this afternoon.',
+        libraryControls:   'AI&#8209;ASSISTED &middot; ONE AFTERNOON',
+        seeInside:         '&#x25BA; CREATE YOUR OWN',
+        seeHow:            '&#x25BA; SEE HOW',
 
         pressStart:       'PUSH START BUTTON',
         needCoin:         'NEED COIN',
@@ -1219,10 +1244,11 @@
         canarisDesc:       'デンマークの私掠船長としてカテガット海峡を航海。<br>大砲を撃ち、敵船に乗り込み、金を奪え。<br>港でせんかんを修理・補給しよう。',
         canarisControls:   '矢印/WASD 操舵 &middot; [1] 砲撃 &middot; [2] 乗船',
 
-        libraryGenre:      '共有ライブラリ',
-        libraryDesc:       'このアーケードの全ゲームが同じRustライブラリで動く。<br>描画・音声・ハイスコアを共有。<br>バッジを押してモジュールを見る。',
-        libraryControls:   'CARGO ADD BLIP &middot; ソースを開く',
-        seeInside:         '&#x25BA; 中を見る',
+        libraryGenre:      'じぶんで作ろう',
+        libraryDesc:       'アイデアがある？AIの相棒（CopilotやClaudeなど）と組んで、午後1回で黄金時代のアーケードを作ろう。',
+        libraryControls:   'AIと一緒に &middot; ひと午後で',
+        seeInside:         '&#x25BA; じぶんで作ろう',
+        seeHow:            '&#x25BA; やり方を見る',
 
         pressStart:       'スタート',
         needCoin:         'コインが必要',
@@ -1256,10 +1282,11 @@
         canarisDesc:       'Sejl i Kattegat som dansk kaperkapitajn.<br>Affyr kanoner, bord fjendtlige skibe og pl&oslash;ndr guld.<br>Anl&oslash;b havn for at reparere og genopfylde.',
         canarisControls:   'PIL / WASD FOR AT SEJLE &middot; [1] SKYD &middot; [2] BORD',
 
-        libraryGenre:      'F&AElig;LLES BIBLIOTEK',
-        libraryDesc:       'Alle spil i kabinettet kører på det samme Rust&#8209;bibliotek.<br>Tegning, lyd og hi&#8209;scores deles.<br>Tryk p&aring; m&aelig;rket for at se modulerne.',
-        libraryControls:   'CARGO ADD BLIP &middot; ÅBN KILDEN',
-        seeInside:         '&#x25BA; KIG IND',
+        libraryGenre:      'LAV DIT EGET',
+        libraryDesc:       'Har du en idé? Slå dig sammen med din AI&#8209;makker (fx Copilot eller Claude...) og send en guldalder&#8209;arkadeklon afsted i eftermiddag.',
+        libraryControls:   'AI&#8209;ASSISTERET &middot; ÉN EFTERMIDDAG',
+        seeInside:         '&#x25BA; LAV DIT EGET',
+        seeHow:            '&#x25BA; SE HVORDAN',
 
         pressStart:       'TRYK START',
         needCoin:         'INDS&AElig;T M&Oslash;NT',
