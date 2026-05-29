@@ -230,7 +230,6 @@
     .card-galactic   { --c: var(--magenta); }
     .card-rally      { --c: var(--red);     }
     .card-canaris    { --c: #3296c8;        }
-    .card-rivet      { --c: var(--yellow);  }
 
     /* ---- Danish-origin seal ---- */
     .badge-dk {
@@ -600,6 +599,321 @@
     }
     body.konami-shake { animation: konami-shake 0.55s ease; }
 
+    /* ════════════════════════════════════════════════════════════════════
+       SEE INSIDE — robot badge + flip-and-grow source-tour overlay
+       ════════════════════════════════════════════════════════════════════ */
+
+    .badge-see {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid var(--c, #888);
+      background: rgba(0,0,0,0.9);
+      color: var(--c, #ccc);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      z-index: 3;
+      transition: transform .18s ease, box-shadow .18s ease;
+      box-shadow: 0 0 0 3px rgba(0,0,0,.6),
+                  0 0 10px color-mix(in srgb, var(--c, #888) 45%, transparent);
+      user-select: none;
+    }
+    .badge-see:hover {
+      transform: scale(1.18) rotate(-6deg);
+      box-shadow: 0 0 0 3px rgba(0,0,0,.6),
+                  0 0 18px color-mix(in srgb, var(--c, #888) 65%, transparent);
+    }
+    .badge-see:active { transform: scale(0.96); }
+    .badge-see-label {
+      position: absolute;
+      top: 100%; left: 0;
+      margin-top: 5px;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      color: var(--c, #aaa);
+      opacity: 0;
+      transition: opacity .18s;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .card:hover .badge-see-label { opacity: 0.9; }
+
+    /* Library card — distinct from games */
+    .card-library {
+      --c: #d4d4d4;
+    }
+    .card-library .card-shot-wrap {
+      background: linear-gradient(135deg, #0a0a0c 0%, #1a1a1e 100%);
+      display: flex; align-items: center; justify-content: center;
+      min-height: 140px;
+    }
+    .card-library .lib-monogram {
+      font-size: 64px;
+      font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--c);
+      text-shadow: 0 0 14px color-mix(in srgb, var(--c) 50%, transparent);
+    }
+    .card-library .card-title { color: var(--c); }
+    .badge-lib {
+      position: absolute;
+      top: 12px; right: 12px;
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--c);
+      border: 1px solid var(--c);
+      padding: 4px 10px;
+      background: rgba(0,0,0,0.7);
+      z-index: 2;
+    }
+
+    /* ── flip-and-grow overlay ───────────────────────────────────────── */
+
+    .docs-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0);
+      backdrop-filter: blur(0px);
+      z-index: 80;
+      opacity: 0;
+      transition: opacity .35s ease, backdrop-filter .35s ease, background .35s ease;
+      pointer-events: none;
+    }
+    .docs-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(4px);
+    }
+
+    .docs-flipper {
+      position: fixed;
+      perspective: 1800px;
+      z-index: 90;
+      pointer-events: none;
+      transition: top .55s cubic-bezier(.25,1,.3,1),
+                  left .55s cubic-bezier(.25,1,.3,1),
+                  width .55s cubic-bezier(.25,1,.3,1),
+                  height .55s cubic-bezier(.25,1,.3,1);
+    }
+    .docs-flipper.open { pointer-events: auto; }
+
+    .docs-card {
+      position: absolute;
+      inset: 0;
+      transform-style: preserve-3d;
+      transform: rotateY(0deg);
+      transition: transform .55s cubic-bezier(.25,1,.3,1);
+    }
+    .docs-flipper.open .docs-card { transform: rotateY(180deg); }
+
+    .docs-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      overflow: hidden;
+    }
+    .docs-face.front {
+      border: 1px solid #1e1e1e;
+      background: #0a0a0c;
+    }
+    .docs-face.front::before, .docs-face.front::after {
+      content: '';
+      position: absolute;
+      width: 12px; height: 12px;
+      border-color: var(--c, #888);
+    }
+    .docs-face.front::before { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
+    .docs-face.front::after  { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    .docs-face.back {
+      transform: rotateY(180deg);
+      background: #07070a;
+      border: 1px solid var(--c, #444);
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.4),
+                  0 0 22px color-mix(in srgb, var(--c, #888) 25%, transparent);
+      display: flex;
+      flex-direction: column;
+      color: #d0d0d0;
+    }
+
+    .docs-head {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      border-bottom: 1px solid #1e1e22;
+      background: rgba(255,255,255,0.015);
+    }
+    .docs-head .title {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 13px;
+      color: var(--c, #fff);
+      letter-spacing: 2px;
+      flex: 1;
+    }
+    .docs-head .page-indicator {
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      color: #888;
+    }
+    .docs-close {
+      background: none;
+      border: 1px solid #2c2c2c;
+      color: #d0d0d0;
+      width: 30px; height: 30px;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      font-family: inherit;
+    }
+    .docs-close:hover { border-color: var(--c, #aaa); color: var(--c, #fff); }
+
+    .docs-body {
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+      gap: 0;
+      overflow: hidden;
+    }
+    .docs-shot {
+      background: #0a0a0e;
+      display: flex; align-items: center; justify-content: center;
+      padding: 18px;
+      border-right: 1px solid #1a1a1e;
+      overflow: hidden;
+    }
+    .docs-shot img {
+      max-width: 100%;
+      max-height: 100%;
+      image-rendering: pixelated;
+      border: 1px solid #2a2a2e;
+    }
+    .docs-shot.diagram {
+      padding: 24px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      color: var(--c, #ccc);
+      line-height: 1.9;
+      text-align: center;
+      letter-spacing: 1.5px;
+    }
+    .docs-prose {
+      padding: 22px 24px;
+      overflow-y: auto;
+      font-size: 12.5px;
+      line-height: 1.7;
+      letter-spacing: 0.3px;
+      color: #c8c8c8;
+    }
+    .docs-prose h3 {
+      margin: 0 0 10px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      color: var(--c, #fff);
+      letter-spacing: 2px;
+    }
+    .docs-prose p { margin: 0 0 14px; }
+    .docs-prose code {
+      font-family: 'Fira Code', 'Consolas', monospace;
+      background: rgba(255,255,255,0.04);
+      padding: 1px 5px;
+      font-size: 11.5px;
+      color: var(--c, #ddd);
+    }
+    .docs-prose pre {
+      background: #050507;
+      border: 1px solid #1e1e22;
+      border-left: 2px solid var(--c, #444);
+      padding: 12px 14px;
+      margin: 12px 0 16px;
+      overflow-x: auto;
+      font-family: 'Fira Code', 'Consolas', monospace;
+      font-size: 11px;
+      line-height: 1.55;
+      color: #c8c8c8;
+    }
+    .docs-prose pre .kw  { color: #c586c0; }
+    .docs-prose pre .ty  { color: #4ec9b0; }
+    .docs-prose pre .fn  { color: #dcdcaa; }
+    .docs-prose pre .str { color: #ce9178; }
+    .docs-prose pre .num { color: #b5cea8; }
+    .docs-prose pre .cmt { color: #6a9955; font-style: italic; }
+    .docs-prose .path {
+      font-size: 10px;
+      color: #6a6a6a;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+    .docs-prose .crossref {
+      display: inline-block;
+      margin-top: 6px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      color: var(--c, #aaa);
+      border: 1px solid var(--c, #444);
+      padding: 6px 10px;
+      cursor: pointer;
+      background: rgba(255,255,255,0.02);
+    }
+    .docs-prose .crossref:hover { background: color-mix(in srgb, var(--c, #888) 12%, transparent); }
+
+    .docs-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 18px;
+      border-top: 1px solid #1e1e22;
+      background: rgba(0,0,0,0.4);
+    }
+    .docs-nav button {
+      background: none;
+      border: 1px solid #2c2c2c;
+      color: #c0c0c0;
+      padding: 6px 14px;
+      cursor: pointer;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+    }
+    .docs-nav button:hover:not(:disabled) {
+      border-color: var(--c, #aaa);
+      color: var(--c, #fff);
+    }
+    .docs-nav button:disabled {
+      opacity: 0.25;
+      cursor: not-allowed;
+    }
+    .docs-dots {
+      display: flex;
+      gap: 6px;
+    }
+    .docs-dots span {
+      width: 8px; height: 8px;
+      border: 1px solid #3a3a3e;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background .18s;
+    }
+    .docs-dots span.on {
+      background: var(--c, #fff);
+      border-color: var(--c, #fff);
+    }
+
+    @media (max-width: 700px) {
+      .docs-body { grid-template-columns: 1fr; grid-template-rows: 200px 1fr; }
+      .docs-shot { border-right: none; border-bottom: 1px solid #1a1a1e; }
+      .docs-head .title { font-size: 10px; }
+    }
+
   </style>
 </head>
 <body>
@@ -618,7 +932,10 @@
   <div class="game-grid">
 
     <!-- RALLY -->
-    <a class="card card-rally" href="rally/index.html">
+    <a class="card card-rally" href="rally/index.html" data-card-id="rally">
+      <span class="badge-see" data-see="rally" title="See inside — source tour">
+        🤖<span class="badge-see-label">SEE INSIDE</span>
+      </span>
       <div class="badge-2p">2<br>PLAYER</div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="rally/screenshot.png" alt="Rally gameplay">
@@ -631,7 +948,10 @@
     </a>
 
     <!-- BOUNCER -->
-    <a class="card card-bouncer" href="bouncer/index.html">
+    <a class="card card-bouncer" href="bouncer/index.html" data-card-id="bouncer">
+      <span class="badge-see" data-see="bouncer" title="See inside — source tour">
+        🤖<span class="badge-see-label">SEE INSIDE</span>
+      </span>
       <div class="card-shot-wrap">
         <img class="card-shot" src="bouncer/screenshot.png" alt="Bouncer gameplay">
       </div>
@@ -643,7 +963,10 @@
     </a>
 
     <!-- GALACTIC DEFENDER -->
-    <a class="card card-galactic" href="galactic_defender/index.html">
+    <a class="card card-galactic" href="galactic_defender/index.html" data-card-id="galactic">
+      <span class="badge-see" data-see="galactic" title="See inside — source tour">
+        🤖<span class="badge-see-label">SEE INSIDE</span>
+      </span>
       <div class="card-shot-wrap">
         <img class="card-shot" src="galactic_defender/screenshot.png" alt="Galactic Defender gameplay">
       </div>
@@ -655,7 +978,10 @@
     </a>
 
     <!-- SERPENT -->
-    <a class="card card-serpent" href="serpent/index.html">
+    <a class="card card-serpent" href="serpent/index.html" data-card-id="serpent">
+      <span class="badge-see" data-see="serpent" title="See inside — source tour">
+        🤖<span class="badge-see-label">SEE INSIDE</span>
+      </span>
       <div class="card-shot-wrap">
         <img class="card-shot" src="serpent/screenshot.png" alt="Serpent gameplay">
       </div>
@@ -666,20 +992,11 @@
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
 
-    <!-- RIVET -->
-    <a class="card card-rivet" href="rivet/index.html">
-      <div class="card-shot-wrap">
-        <img class="card-shot" src="rivet/screenshot.png" alt="Rivet gameplay">
-      </div>
-      <div class="card-title">RIVET</div>
-      <div class="card-genre"  data-i18n="rivetGenre"></div>
-      <div class="card-desc"   data-i18n="rivetDesc"></div>
-      <div class="card-controls" data-i18n="rivetControls"></div>
-      <div class="press-start" data-i18n="pressStart"></div>
-    </a>
-
     <!-- CANARIS -->
-    <a class="card card-canaris" href="canaris/index.html">
+    <a class="card card-canaris" href="canaris/index.html" data-card-id="canaris">
+      <span class="badge-see" data-see="canaris" title="See inside — source tour">
+        🤖<span class="badge-see-label">SEE INSIDE</span>
+      </span>
       <div class="badge-dk">🇩🇰</div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="canaris/screenshot.png?v=2" alt="Canaris gameplay">
@@ -690,6 +1007,22 @@
       <div class="card-controls" data-i18n="canarisControls"></div>
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
+
+    <!-- BLIP LIBRARY -->
+    <div class="card card-library" data-card-id="library">
+      <span class="badge-see" data-see="library" title="Tour the shared library">
+        🤖<span class="badge-see-label">SEE INSIDE</span>
+      </span>
+      <div class="badge-lib">LIBRARY</div>
+      <div class="card-shot-wrap">
+        <div class="lib-monogram">{ }</div>
+      </div>
+      <div class="card-title">BLIP</div>
+      <div class="card-genre"  data-i18n="libraryGenre"></div>
+      <div class="card-desc"   data-i18n="libraryDesc"></div>
+      <div class="card-controls" data-i18n="libraryControls"></div>
+      <div class="press-start" data-i18n="seeInside"></div>
+    </div>
 
   </div>
 
@@ -729,6 +1062,7 @@
 
   <script src="howler.min.js"></script>
   <script src="kiosk.js?v=4"></script>
+  <script src="docs.js?v=1"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Translations                                                         */
@@ -741,28 +1075,30 @@
         insertCoin:       '&#x25BA; PLEASE TO INSERT COIN &#x25C4;',
 
         serpentGenre:     'SNAKE MOVING GAME',
-        serpentDesc:      'Making snake for eat thing and become large size.<br>Not to touching wall or own body is important much.<br>How much long snake you are achieve?',
+        serpentDesc:      'Grid mover &mdash; eat food to grow longer.<br>Hit a wall or your own tail and you lose a life.<br>Food count per level raises the speed.',
         serpentControls:  'PUSH WASD / ARROW KEY FOR MOVE',
 
         bouncerGenre:     'BRICK BREAK GAME',
-        bouncerDesc:      'Ball is must break all brick for become empty board.<br>Paddle must not allow ball escape to fall below.<br>Clear stage happen, next stage will arrive.',
+        bouncerDesc:      'Reflect a bouncing ball with the paddle below.<br>Break every brick to clear the stage.<br>Drop the ball and lose a life.',
         bouncerControls:  'A/D OR ARROW &middot; [1] LAUNCH',
 
         galacticGenre:    'ALIEN ATTACK GAME',
-        galacticDesc:     'Many alien spaceship is coming very close near now.<br>Please for shoot all before they arrive on ground.<br>Must defend Earth happening at every cost situation.',
+        galacticDesc:     'Fixed shooter &mdash; the alien grid marches down.<br>Hide behind shields, shoot before they land.<br>Each wave drops faster than the last.',
         galacticControls: 'A/D OR ARROW &middot; [1] SHOOT',
 
         rallyGenre:        'PADDLE BATTLE GAME',
-        rallyDesc:         'First player to reach seven point is win.<br>Ball getting more fast with every hit.',
+        rallyDesc:         'Two-paddle ping-pong &mdash; first to seven wins.<br>Where you hit the paddle bends the bounce.<br>Speed climbs with every rally.',
         rallyControls:     'P1 W/S OR ARROW &middot; P2 I/K &middot; [1] SERVE',
 
-        rivetGenre:        'CONSTRUCTION CLIMB GAME',
-        rivetDesc:         'Giant ape is throwing barrel from top of building.<br>Must climb all ladder and not get hit by rolling barrel.<br>Reach the top for winning situation.',
-        rivetControls:     'ARROW / WASD MOVE &middot; [1] JUMP',
 
         canarisGenre:      'PRIVATEER NAVAL GAME',
-        canarisDesc:       'Sail Kattegat as a Danish privateer captain.<br>Fire cannons, board ships, and plunder gold.<br>Dock at harbour to repair and resupply.',
+        canarisDesc:       'Open-world sailor with scene switches.<br>Sea roam &rarr; cannon duel &rarr; boarding fight.<br>Port to repair, restock, pick the next zone.',
         canarisControls:   'ARROW / WASD TO SAIL &middot; [1] FIRE &middot; [2] BOARD',
+
+        libraryGenre:      'SHARED RUST CRATE',
+        libraryDesc:       'Every game on this cabinet sits on the same Rust library.<br>Macroquad render &middot; pooled audio &middot; web hi&#8209;scores.<br>Tap the badge to tour the modules.',
+        libraryControls:   'CARGO ADD BLIP &middot; OPEN THE SOURCE',
+        seeInside:         '&#x25BA; SEE INSIDE',
 
         pressStart:       'PUSH START BUTTON',
         needCoin:         'NEED COIN',
@@ -791,13 +1127,15 @@
         rallyDesc:         '先に7点取った方が勝ち。<br>打つたびにボールは速くなる。',
         rallyControls:     'P1 W/S または矢印 &middot; P2 I/K &middot; [1] サーブ',
 
-        rivetGenre:        '建設現場クライムゲーム',
-        rivetDesc:         '大きなサルがビルの上からタルを投げてくる。<br>ハシゴを登ってタルをよけてトップへ。<br>転がるタルに当たったらアウト。',
-        rivetControls:     '矢印/WASD 移動 &middot; [1] ジャンプ',
 
         canarisGenre:      'デンマーク海賊ゲーム',
         canarisDesc:       'デンマークの私掠船長としてカテガット海峡を航海。<br>大砲を撃ち、敵船に乗り込み、金を奪え。<br>港でせんかんを修理・補給しよう。',
         canarisControls:   '矢印/WASD 操舵 &middot; [1] 砲撃 &middot; [2] 乗船',
+
+        libraryGenre:      '共有ライブラリ',
+        libraryDesc:       'このアーケードの全ゲームが同じRustライブラリで動く。<br>描画・音声・ハイスコアを共有。<br>バッジを押してモジュールを見る。',
+        libraryControls:   'CARGO ADD BLIP &middot; ソースを開く',
+        seeInside:         '&#x25BA; 中を見る',
 
         pressStart:       'スタート',
         needCoin:         'コインが必要',
@@ -826,13 +1164,15 @@
         rallyDesc:         'F&oslash;rst til syv point vinder.<br>Bolden accelererer for hvert slag.',
         rallyControls:     'P1 W/S ELLER PILE &middot; P2 I/K &middot; [1] SERV',
 
-        rivetGenre:        'KLATRESPIL PÅ BYGGEPLADS',
-        rivetDesc:         'Kæmpe abe kaster tønder fra toppen af bygningen.<br>Klatr op ad stiger og undg&aring; de rullende tønder.<br>N&aring; toppen for at vinde.',
-        rivetControls:     'PIL / WASD BEVÆG &middot; [1] HOP',
 
         canarisGenre:      'KAPERSKIB SPIL',
         canarisDesc:       'Sejl i Kattegat som dansk kaperkapitajn.<br>Affyr kanoner, bord fjendtlige skibe og pl&oslash;ndr guld.<br>Anl&oslash;b havn for at reparere og genopfylde.',
         canarisControls:   'PIL / WASD FOR AT SEJLE &middot; [1] SKYD &middot; [2] BORD',
+
+        libraryGenre:      'F&AElig;LLES BIBLIOTEK',
+        libraryDesc:       'Alle spil i kabinettet kører på det samme Rust&#8209;bibliotek.<br>Tegning, lyd og hi&#8209;scores deles.<br>Tryk p&aring; m&aelig;rket for at se modulerne.',
+        libraryControls:   'CARGO ADD BLIP &middot; ÅBN KILDEN',
+        seeInside:         '&#x25BA; KIG IND',
 
         pressStart:       'TRYK START',
         needCoin:         'INDS&AElig;T M&Oslash;NT',
@@ -1015,8 +1355,7 @@ var n = getCoins();
       var KEY  = 'sb_publishable_rc_Dp-WhasQoj7gisVbhCg_1XGspuJe';
       var H    = { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } };
       var CARD = { bouncer: 'card-bouncer', serpent: 'card-serpent',
-                   galactic_defender: 'card-galactic', canaris: 'card-canaris',
-                   rivet: 'card-rivet' };
+                   galactic_defender: 'card-galactic', canaris: 'card-canaris' };
       Promise.all([
         fetch(BASE + '/rest/v1/hi_scores?select=game,score', H)
           .then(function(r) { return r.ok ? r.json() : []; }).catch(function() { return []; }),

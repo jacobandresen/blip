@@ -6,8 +6,8 @@ use blip::input::{
 use blip::macroquad::input::KeyCode;
 use blip::macroquad::rand::rand;
 use blip::{
-    play_music, play_sfx, rects_overlap, web, window_conf, Blip, BlipColor, Timer, BLIP_BLACK,
-    BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
+    blip_sound, play_music, play_sfx, rects_overlap, web, window_conf, Blip, BlipColor, Timer,
+    BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
 
 // ---- layout -----------------------------------------------------------
@@ -288,7 +288,7 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("RALLY", WIN_W, WIN_H)
 }
 
-const MUSIC_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
+const MUSIC_WAV: &[u8] = blip_sound!("music.wav");
 
 #[blip::macroquad::main(conf)]
 async fn main() {

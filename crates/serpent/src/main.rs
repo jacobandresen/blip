@@ -4,11 +4,11 @@ use blip::input::{
     any_key_pressed, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
 };
-use blip::macroquad::texture::{FilterMode, Texture2D};
-use blip::macroquad::prelude::ImageFormat;
+use blip::macroquad::texture::Texture2D;
 use blip::{
-    play_music, play_sfx, rand_int, web, window_conf, Blip, BlipColor, LifeResult, Session,
-    Timer, BLIP_BLACK, BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
+    blip_image, blip_sound, load_png, play_sfx, rand_int, web, window_conf, Blip, BlipColor,
+    LifeResult, MusicTracks, Session, Timer, BLIP_BLACK, BLIP_GRAY, BLIP_GREEN, BLIP_RED,
+    BLIP_WHITE, BLIP_YELLOW,
 };
 
 // ---- layout -----------------------------------------------------------
@@ -50,8 +50,7 @@ struct Game {
     state: State,
     obstacles: [Cell; 8],
     obstacle_count: usize,
-    active_music: i32,
-    want_track: i32,
+    want_track: Option<usize>,
 }
 
 impl Game {
@@ -70,8 +69,7 @@ impl Game {
             state: State::Title,
             obstacles: [Cell { c: 0, r: 0 }; 8],
             obstacle_count: 0,
-            active_music: 0,
-            want_track: 0,
+            want_track: None,
         }
     }
 
@@ -137,10 +135,10 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        self.sess.reset(web::GAME_SERPENT, LIVES_START);
+        self.sess.reset(LIVES_START);
         self.foods_eaten = 0;
         self.reset_snake();
-        self.want_track = rand_int(1, 3);
+        self.want_track = Some(rand_int(0, 2) as usize);
         self.state = State::Play;
     }
 }
@@ -151,12 +149,12 @@ struct Sounds {
 }
 
 fn update_title(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_SERPENT);
+    g.sess.refresh_hi();
     if any_key_pressed() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    g.sess.refresh_hi(web::GAME_SERPENT);
+    g.sess.refresh_hi();
     if (key_pressed(BLIP_KEY_UP)    || key_pressed(BLIP_KEY_W)) && g.cur_dir != Dir::Down  { g.want_dir = Dir::Up; }
     if (key_pressed(BLIP_KEY_DOWN)  || key_pressed(BLIP_KEY_S)) && g.cur_dir != Dir::Up    { g.want_dir = Dir::Down; }
     if (key_pressed(BLIP_KEY_LEFT)  || key_pressed(BLIP_KEY_A)) && g.cur_dir != Dir::Right { g.want_dir = Dir::Left; }
@@ -199,13 +197,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     let ate = h.c == g.food.c && h.r == g.food.r;
     if ate {
         play_sfx(&sfx.eat);
-        g.sess.add_score(web::GAME_SERPENT, 10 * g.sess.level);
+        g.sess.add_score(10 * g.sess.level);
         g.foods_eaten += 1;
         if g.foods_eaten >= FOODS_PER_LVL {
             g.sess.next_level();
             g.foods_eaten = 0;
-            let next = rand_int(1, 3);
-            g.want_track = if next == g.active_music { next % 3 + 1 } else { next };
+            g.want_track = Some(rand_int(0, 2) as usize);
         }
         g.spawn_food();
     }
@@ -223,8 +220,8 @@ fn update_dead(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_SERPENT);
-    web::game_over(web::GAME_SERPENT, g.sess.score);
+    g.sess.refresh_hi();
+    g.sess.notify_game_over();
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
@@ -309,20 +306,14 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("SERPENT", WIN_W, WIN_H)
 }
 
-const HEAD_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/head.png"));
-const BODY_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/body.png"));
-const FOOD_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/food.png"));
-const EAT_WAV: &[u8]  = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/eat.wav"));
-const GAME_OVER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
-const SLITHER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/slither.wav"));
-const STALK_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/stalk.wav"));
-const FRENZY_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/frenzy.wav"));
-
-fn load_png(bytes: &'static [u8]) -> Texture2D {
-    let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));
-    tex.set_filter(FilterMode::Nearest);
-    tex
-}
+const HEAD_PNG: &[u8] = blip_image!("head.png");
+const BODY_PNG: &[u8] = blip_image!("body.png");
+const FOOD_PNG: &[u8] = blip_image!("food.png");
+const EAT_WAV: &[u8]  = blip_sound!("eat.wav");
+const GAME_OVER_WAV: &[u8] = blip_sound!("game_over.wav");
+const SLITHER_WAV: &[u8] = blip_sound!("slither.wav");
+const STALK_WAV:   &[u8] = blip_sound!("stalk.wav");
+const FRENZY_WAV:  &[u8] = blip_sound!("frenzy.wav");
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -337,12 +328,12 @@ async fn main() {
         eat:       blip::audio::load_sound(EAT_WAV).await,
         game_over: blip::audio::load_sound(GAME_OVER_WAV).await,
     };
-    let slither = blip::audio::load_sound(SLITHER_WAV).await;
-    let stalk   = blip::audio::load_sound(STALK_WAV).await;
-    let frenzy  = blip::audio::load_sound(FRENZY_WAV).await;
-    let tracks = [&slither, &stalk, &frenzy];
-    play_music(&slither);
-    g.active_music = 1;
+    let tracks = [
+        blip::audio::load_sound(SLITHER_WAV).await,
+        blip::audio::load_sound(STALK_WAV).await,
+        blip::audio::load_sound(FRENZY_WAV).await,
+    ];
+    let mut music = MusicTracks::start(&tracks);
 
     loop {
         let dt = blip.delta_time;
@@ -353,10 +344,8 @@ async fn main() {
             State::Over  => update_over(&mut g),
         }
 
-        if g.want_track != 0 && g.want_track != g.active_music {
-            play_music(tracks[(g.want_track - 1) as usize]);
-            g.active_music = g.want_track;
-            g.want_track = 0;
+        if let Some(idx) = g.want_track.take() {
+            music.switch_to(idx);
         }
 
         blip.clear(BLIP_BLACK);

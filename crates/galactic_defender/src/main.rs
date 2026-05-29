@@ -5,12 +5,11 @@ use blip::input::{
     any_key_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
-use blip::macroquad::prelude::ImageFormat;
 use blip::macroquad::rand::rand;
-use blip::macroquad::texture::{FilterMode, Texture2D};
+use blip::macroquad::texture::Texture2D;
 use blip::{
-    clamp, lerp, play_music, play_sfx, rand_int, rects_overlap, web, window_conf, Blip,
-    BlipColor, LifeResult, Session, Timer,
+    blip_image, blip_sound, clamp, lerp, load_png, play_sfx, rand_int, rects_overlap, web,
+    window_conf, Blip, BlipColor, LifeResult, MusicTracks, Session, Timer,
     BLIP_BLACK, BLIP_CYAN, BLIP_GREEN, BLIP_MAGENTA, BLIP_ORANGE, BLIP_RED,
     BLIP_WHITE, BLIP_YELLOW,
 };
@@ -258,7 +257,7 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        self.sess.reset(web::GAME_GALACTIC_DEFENDER, LIVES_START);
+        self.sess.reset(LIVES_START);
         self.start_round_common();
     }
 }
@@ -313,7 +312,7 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.bullets[bi].active = false;
             g.bullets[UFO_BOMB_IDX].active = false;
             let bonus = rand_int(1, 6) * 50;
-            g.sess.add_score(web::GAME_GALACTIC_DEFENDER, bonus);
+            g.sess.add_score(bonus);
             g.ufo_score = bonus;
             g.ufo_score_timer.start(1.5);
             g.ufo_active = false;
@@ -336,12 +335,12 @@ fn draw_ufo(blip: &Blip, g: &Game) {
 }
 
 fn update_title(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_GALACTIC_DEFENDER);
+    g.sess.refresh_hi();
     if any_key_pressed() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    g.sess.refresh_hi(web::GAME_GALACTIC_DEFENDER);
+    g.sess.refresh_hi();
     let shoot = key_pressed(BLIP_KEY_SPACE)
         || key_pressed(BLIP_KEY_UP)
         || key_pressed(BLIP_KEY_W);
@@ -438,7 +437,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.aliens[ai].alive = false;
                 g.bullets[bi].active = false;
                 let pts = match kind { 0 => 30, 1 => 20, _ => 10 };
-                g.sess.add_score(web::GAME_GALACTIC_DEFENDER, pts * g.sess.level);
+                g.sess.add_score(pts * g.sess.level);
                 break;
             }
         }
@@ -529,8 +528,8 @@ fn update_win(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_GALACTIC_DEFENDER);
-    web::game_over(web::GAME_GALACTIC_DEFENDER, g.sess.score);
+    g.sess.refresh_hi();
+    g.sess.notify_game_over();
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
@@ -631,28 +630,22 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("GALACTIC DEFENDER", WIN_W, WIN_H)
 }
 
-const PLAYER_SHIP_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/player_ship.png"));
-const ALIEN_SQUID_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_squid.png"));
-const ALIEN_CRAB_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_crab.png"));
-const ALIEN_OCTO_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_octopus.png"));
-const EXPLOSION_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/explosion.png"));
-const SHIELD_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/shield_block.png"));
-const SHOOT_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot.wav"));
-const EXPLOSION_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/explosion.wav"));
-const LEVEL_CLEAR_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/level_clear.wav"));
-const MUSIC_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
-const MUSIC2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
-const MUSIC3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
+const PLAYER_SHIP_PNG:  &[u8] = blip_image!("player_ship.png");
+const ALIEN_SQUID_PNG:  &[u8] = blip_image!("alien_squid.png");
+const ALIEN_CRAB_PNG:   &[u8] = blip_image!("alien_crab.png");
+const ALIEN_OCTO_PNG:   &[u8] = blip_image!("alien_octopus.png");
+const EXPLOSION_PNG:    &[u8] = blip_image!("explosion.png");
+const SHIELD_PNG:       &[u8] = blip_image!("shield_block.png");
+const SHOOT_WAV:        &[u8] = blip_sound!("shoot.wav");
+const EXPLOSION_WAV:    &[u8] = blip_sound!("explosion.wav");
+const LEVEL_CLEAR_WAV:  &[u8] = blip_sound!("level_clear.wav");
+const MUSIC_WAV:        &[u8] = blip_sound!("music.wav");
+const MUSIC2_WAV:       &[u8] = blip_sound!("music2.wav");
+const MUSIC3_WAV:       &[u8] = blip_sound!("music3.wav");
 
 // Loop durations in seconds — used to switch tracks at loop boundaries.
 // music: 9.6s  music2: 5.6s  music3: 8.0s
 const MUSIC_DURATIONS: [f32; 3] = [9.6, 5.6, 8.0];
-
-fn load_png(bytes: &'static [u8]) -> Texture2D {
-    let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));
-    tex.set_filter(FilterMode::Nearest);
-    tex
-}
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -673,14 +666,13 @@ async fn main() {
         explosion:   blip::audio::load_sound(EXPLOSION_WAV).await,
         level_clear: blip::audio::load_sound(LEVEL_CLEAR_WAV).await,
     };
-    let music = [
+    let tracks = [
         blip::audio::load_sound(MUSIC_WAV).await,
         blip::audio::load_sound(MUSIC2_WAV).await,
         blip::audio::load_sound(MUSIC3_WAV).await,
     ];
-    let mut music_idx: usize = 0;
+    let mut music = MusicTracks::start(&tracks);
     let mut music_timer: f32 = MUSIC_DURATIONS[0];
-    play_music(&music[0]);
 
     loop {
         let dt = blip.delta_time;
@@ -688,13 +680,11 @@ async fn main() {
         // Switch to a random different loop at each loop boundary.
         music_timer -= dt;
         if music_timer <= 0.0 {
-            let next = {
-                let candidate = rand_int(0, 1) as usize; // 0 or 1
-                if candidate < music_idx { candidate } else { candidate + 1 } // skip current
-            };
-            music_idx = next;
+            let cur = music.current();
+            let candidate = rand_int(0, 1) as usize; // 0 or 1
+            let next = if candidate < cur { candidate } else { candidate + 1 };
+            music.switch_to(next);
             music_timer = MUSIC_DURATIONS[next];
-            play_music(&music[next]);
         }
         match g.state {
             State::Title => update_title(&mut g),

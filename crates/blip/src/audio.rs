@@ -73,6 +73,40 @@ pub fn stop_ambient() {
     }
 }
 
+/// Helper for rotating between a fixed set of music tracks. Owns nothing — just
+/// remembers which slot is currently playing so `switch_to` becomes a no-op when
+/// the index hasn't changed. Construct with [`MusicTracks::start`] to play the
+/// first track immediately.
+pub struct MusicTracks<'a> {
+    tracks: &'a [BlipSound],
+    current: usize,
+}
+
+impl<'a> MusicTracks<'a> {
+    /// Start playing the first track in `tracks` and return a handle that can
+    /// switch to a different track later. Panics if `tracks` is empty.
+    pub fn start(tracks: &'a [BlipSound]) -> Self {
+        assert!(!tracks.is_empty(), "MusicTracks::start requires at least one track");
+        play_music(&tracks[0]);
+        Self { tracks, current: 0 }
+    }
+
+    /// Switch to track `idx`. No-op if `idx` is already playing.
+    pub fn switch_to(&mut self, idx: usize) {
+        if idx == self.current || idx >= self.tracks.len() { return; }
+        play_music(&self.tracks[idx]);
+        self.current = idx;
+    }
+
+    /// Index of the track currently playing.
+    #[inline]
+    pub fn current(&self) -> usize { self.current }
+
+    /// Number of tracks in the rotation.
+    #[inline]
+    pub fn len(&self) -> usize { self.tracks.len() }
+}
+
 /// Synthesize a sine-wave beep and return it as a `BlipSound` — no WAV file needed.
 /// `freq` is in Hz (e.g. 440.0 for concert A), `duration_ms` is the length in milliseconds.
 /// Await this at startup; the returned handle can be replayed freely with `play_sfx`.

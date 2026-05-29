@@ -9,8 +9,7 @@ create table hi_scores (
       ('bouncer',           0),
       ('serpent',           0),
       ('galactic_defender', 0),
-      ('canaris',           0),
-      ('rivet',             0);
+      ('canaris',           0);
 
   -- RLS: public read, no direct writes (only via the function below)
   alter table hi_scores enable row level security;

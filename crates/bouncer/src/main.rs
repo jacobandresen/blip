@@ -6,13 +6,12 @@ use blip::input::{
     any_key_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
-use blip::macroquad::prelude::ImageFormat;
 use blip::macroquad::rand::rand;
-use blip::macroquad::texture::{FilterMode, Texture2D};
+use blip::macroquad::texture::Texture2D;
 use blip::{
-    clamp, play_music, play_sfx, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
-    window_conf, Blip, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_CYAN, BLIP_GRAY,
-    BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
+    blip_image, blip_sound, clamp, load_png, play_music, play_sfx, pool_iter, pool_iter_mut,
+    pool_spawn, rects_overlap, web, window_conf, Blip, LifeResult, Pooled, Session, Timer,
+    BLIP_BLACK, BLIP_CYAN, BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
 // ---- layout -----------------------------------------------------------
@@ -143,7 +142,7 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        self.sess.reset(web::GAME_BOUNCER, LIVES_START);
+        self.sess.reset(LIVES_START);
         self.ball_speed = BALL_SPEED_0;
         self.reset_drops();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
@@ -171,7 +170,7 @@ struct Sounds {
 }
 
 fn update_title(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_BOUNCER);
+    g.sess.refresh_hi();
     if any_key_pressed() { g.start_game(); }
 }
 
@@ -192,7 +191,7 @@ fn update_launch(g: &mut Game, dt: f32) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    g.sess.refresh_hi(web::GAME_BOUNCER);
+    g.sess.refresh_hi();
     paddle_input(g, dt);
 
     g.ball_x += g.ball_vx * dt;
@@ -253,7 +252,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
         let kind = g.bricks[i].kind;
         g.bricks[i].alive = false;
-        g.sess.add_score(web::GAME_BOUNCER, (BRICK_ROWS - r) * 10 * g.sess.level);
+        g.sess.add_score((BRICK_ROWS - r) * 10 * g.sess.level);
         g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
 
         // 30% chance to spawn a loot drop
@@ -333,8 +332,8 @@ fn update_win(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_BOUNCER);
-    web::game_over(web::GAME_BOUNCER, g.sess.score);
+    g.sess.refresh_hi();
+    g.sess.notify_game_over();
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
@@ -412,26 +411,20 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("BOUNCER", WIN_W, WIN_H)
 }
 
-const PADDLE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/paddle.png"));
-const BALL_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ball.png"));
-const BRICK_RED_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_red.png"));
-const BRICK_ORANGE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_orange.png"));
-const BRICK_YELLOW_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_yellow.png"));
-const BRICK_GREEN_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_green.png"));
-const BRICK_BLUE_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_blue.png"));
-const BRICK_PURPLE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_purple.png"));
-const PADDLE_HIT_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/paddle_hit.wav"));
-const BRICK_HIT_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_hit.wav"));
-const BRICK_BREAK_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_break.wav"));
-const LIFE_LOST_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/life_lost.wav"));
-const WIN_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/win.wav"));
-const MUSIC_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
-
-fn load_png(bytes: &'static [u8]) -> Texture2D {
-    let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));
-    tex.set_filter(FilterMode::Nearest);
-    tex
-}
+const PADDLE_PNG: &[u8] = blip_image!("paddle.png");
+const BALL_PNG:   &[u8] = blip_image!("ball.png");
+const BRICK_RED_PNG:    &[u8] = blip_image!("brick_red.png");
+const BRICK_ORANGE_PNG: &[u8] = blip_image!("brick_orange.png");
+const BRICK_YELLOW_PNG: &[u8] = blip_image!("brick_yellow.png");
+const BRICK_GREEN_PNG:  &[u8] = blip_image!("brick_green.png");
+const BRICK_BLUE_PNG:   &[u8] = blip_image!("brick_blue.png");
+const BRICK_PURPLE_PNG: &[u8] = blip_image!("brick_purple.png");
+const PADDLE_HIT_WAV:  &[u8] = blip_sound!("paddle_hit.wav");
+const BRICK_HIT_WAV:   &[u8] = blip_sound!("brick_hit.wav");
+const BRICK_BREAK_WAV: &[u8] = blip_sound!("brick_break.wav");
+const LIFE_LOST_WAV:   &[u8] = blip_sound!("life_lost.wav");
+const WIN_WAV:         &[u8] = blip_sound!("win.wav");
+const MUSIC_WAV:       &[u8] = blip_sound!("music.wav");
 
 #[blip::macroquad::main(conf)]
 async fn main() {

@@ -189,27 +189,28 @@ These calls talk to the browser's JavaScript bridge when running as WASM. On the
 ```rust
 use blip::web;
 
-// Load the global hi-score for your game at startup:
-let hi = web::load_hi_score(web::GAME_RIVET);
+// Most games use Session, which threads game_id for you:
+let mut sess = Session::new(web::GAME_CANARIS, 3);  // 3 lives
+sess.add_score(100);          // auto-saves hi if beaten
+sess.refresh_hi();            // re-poll the global hi
+sess.notify_game_over();      // tells kiosk the session ended
 
-// Save when the player beats it:
-if score > hi { web::save_hi_score(web::GAME_RIVET, score); }
-
-// Tell the kiosk the session has ended (triggers leaderboard check):
-web::game_over(web::GAME_RIVET, score);
+// Low-level web calls are still available if you need them:
+let hi = web::load_hi_score(web::GAME_CANARIS);
+if score > hi { web::save_hi_score(web::GAME_CANARIS, score); }
+web::game_over(web::GAME_CANARIS, score);
 
 // Charge a coin when starting a new game in kiosk mode:
 web::spend_coin();
 ```
 
-Available game ID constants: `GAME_BOUNCER`, `GAME_SERPENT`, `GAME_GALACTIC_DEFENDER`, `GAME_CANARIS`, `GAME_RIVET`.
+Available game ID constants: `GAME_BOUNCER`, `GAME_SERPENT`, `GAME_GALACTIC_DEFENDER`, `GAME_CANARIS`.
 
 ---
 
 ## Running a game natively
 
 ```bash
-cargo run -p rivet
 cargo run -p rally
 cargo run -p serpent
 # etc.

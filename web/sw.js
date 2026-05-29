@@ -39,9 +39,6 @@ var ASSETS = [
   '/blip/serpent/index.html',
   '/blip/serpent/index.wasm',
   '/blip/serpent/screenshot.png',
-  '/blip/rivet/index.html',
-  '/blip/rivet/index.wasm',
-  '/blip/rivet/screenshot.png',
 ];
 
 self.addEventListener('install', function(e) {
