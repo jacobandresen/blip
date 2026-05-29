@@ -1100,6 +1100,33 @@
                 { path: 'crates/galactic_defender/src/main.rs', desc: 'Pool in use — bullet array' },
                 { path: 'crates/canaris/src/state.rs', desc: 'Pool in use — cannonballs / splashes / explosions' },
               ]) },
+          { shot: diagram('TODAY:    one small game\n+ 5 YRS:  CS or CE degree\n+10 YRS:  you build the\n          next layer'),
+            html: '<h3>STILL HUNGRY?</h3>' +
+              '<p>If poking around this code lit a fire — <strong>keep going.</strong> ' +
+              'The people who designed the compilers, operating systems, networks, GPUs, ' +
+              'and game engines that make this cabinet possible all started exactly where ' +
+              'you are right now: with a small program that did something cool.</p>' +
+              '<p>There\'s a real, serious, ridiculously fun thing you can do with this ' +
+              'energy: <strong>study computer science or computer engineering.</strong> ' +
+              'A degree teaches you the layers underneath what you just toured — how a ' +
+              '<code>match</code> becomes machine code, how a CPU pipelines instructions, ' +
+              'how a GPU shades pixels in parallel, how the internet routes packets between ' +
+              'continents. It rewires the way you see every device you touch.</p>' +
+              '<p>You don\'t have to wait for university to start. Free, real, high-quality:</p>' +
+              '<ul class="gh-files">' +
+              '  <li><a class="gh-file" href="https://cs50.harvard.edu" target="_blank" rel="noopener"><span class="gh-file-name">CS50</span><span class="gh-file-desc">Harvard\'s free intro to CS — the legendary one</span></a></li>' +
+              '  <li><a class="gh-file" href="https://ocw.mit.edu" target="_blank" rel="noopener"><span class="gh-file-name">MIT OCW</span><span class="gh-file-desc">actual MIT lectures + problem sets, free</span></a></li>' +
+              '  <li><a class="gh-file" href="https://www.nand2tetris.org" target="_blank" rel="noopener"><span class="gh-file-name">NAND2TETRIS</span><span class="gh-file-desc">build a computer from logic gates up to a working OS</span></a></li>' +
+              '  <li><a class="gh-file" href="https://www.theodinproject.com" target="_blank" rel="noopener"><span class="gh-file-name">ODIN PROJECT</span><span class="gh-file-desc">full-stack web from scratch, no fluff</span></a></li>' +
+              '  <li><a class="gh-file" href="https://adventofcode.com" target="_blank" rel="noopener"><span class="gh-file-name">ADVENT OF CODE</span><span class="gh-file-desc">25 daily puzzles every December, any language</span></a></li>' +
+              '</ul>' +
+              '<p>Then aim at a university <strong>CS, software engineering, or computer ' +
+              'engineering</strong> program. The job market is enormous, the work is ' +
+              'interesting on a Tuesday morning, and the skill transfers to whatever you end ' +
+              'up caring about next — games, robotics, music, biology, climate, space.</p>' +
+              '<p>The teenager who builds five small games and ships them on a kiosk page is ' +
+              'the teenager who walks into a CS lecture hall five years later and already ' +
+              'knows how to think. <strong>We\'ll save you a seat.</strong></p>' },
         ];
       }
     },

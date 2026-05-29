@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,17 +15,26 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="stylesheet" href="kiosk.css?v=12">
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --green:   #32c832;
-      --cyan:    #00c8c8;
-      --magenta: #c832c8;
-      --red:     #dc3232;
-      --yellow:  #e6dc32;
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
 
-    html, body { height: 100%; }
+    :root {
+      --green: #32c832;
+      --cyan: #00c8c8;
+      --magenta: #c832c8;
+      --red: #dc3232;
+      --yellow: #e6dc32;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
 
     body {
       background: #050508;
@@ -43,11 +53,9 @@
       content: '';
       position: fixed;
       inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent 0px, transparent 3px,
-        rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px
-      );
+      background: repeating-linear-gradient(0deg,
+          transparent 0px, transparent 3px,
+          rgba(0, 0, 0, 0.15) 3px, rgba(0, 0, 0, 0.15) 4px);
       pointer-events: none;
       z-index: 99;
     }
@@ -57,7 +65,7 @@
       content: '';
       position: fixed;
       inset: 0;
-      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.75) 100%);
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.75) 100%);
       pointer-events: none;
       z-index: 98;
     }
@@ -87,17 +95,27 @@
       margin-right: 8px;
       transition: opacity .25s, text-shadow .25s;
     }
-    .kbd-map .sep { opacity: 0.5; }
+
+    .kbd-map .sep {
+      opacity: 0.5;
+    }
+
     body.win-focused .kbd-map {
       opacity: 1;
       text-shadow: 0 0 8px var(--yellow);
     }
+
     body:has(.card:hover) .kbd-map {
       opacity: 1;
       text-shadow: 0 0 10px var(--yellow);
       animation: blink-coin 1.1s step-end infinite;
     }
-    @media (hover: none) and (pointer: coarse) { .kbd-map { display: none; } }
+
+    @media (hover: none) and (pointer: coarse) {
+      .kbd-map {
+        display: none;
+      }
+    }
 
     /* ---- language switcher ---- */
     .lang-switcher {
@@ -124,7 +142,9 @@
       user-select: none;
     }
 
-    .lang-btn:hover:not(.active) { opacity: 0.65; }
+    .lang-btn:hover:not(.active) {
+      opacity: 0.65;
+    }
 
     .lang-btn.active {
       opacity: 1;
@@ -148,7 +168,7 @@
       text-shadow:
         0 0 10px var(--green),
         0 0 30px var(--green),
-        0 0 60px rgba(50,200,50,0.4);
+        0 0 60px rgba(50, 200, 50, 0.4);
       animation: flicker 8s infinite;
       line-height: 1;
     }
@@ -162,8 +182,19 @@
     }
 
     @keyframes flicker {
-      0%, 95%, 97%, 99%, 100% { opacity: 1; }
-      96%, 98% { opacity: 0.7; }
+
+      0%,
+      95%,
+      97%,
+      99%,
+      100% {
+        opacity: 1;
+      }
+
+      96%,
+      98% {
+        opacity: 0.7;
+      }
     }
 
     .insert-coin {
@@ -178,7 +209,11 @@
       user-select: none;
     }
 
-    @keyframes blink-coin { 50% { opacity: 0; } }
+    @keyframes blink-coin {
+      50% {
+        opacity: 0;
+      }
+    }
 
 
     .divider {
@@ -214,38 +249,71 @@
       cursor: pointer;
     }
 
-    .card:hover { transform: translateY(-3px); }
+    .card:hover {
+      transform: translateY(-3px);
+    }
 
-    .card::before, .card::after {
+    .card::before,
+    .card::after {
       content: '';
       position: absolute;
       width: 12px;
       height: 12px;
     }
-    .card::before { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
-    .card::after  { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
 
-    .card-serpent    { --c: var(--green);   }
-    .card-bouncer    { --c: var(--cyan);    }
-    .card-galactic   { --c: var(--magenta); }
-    .card-rally      { --c: var(--red);     }
-    .card-canaris    { --c: #3296c8;        }
+    .card::before {
+      top: -1px;
+      left: -1px;
+      border-top: 2px solid;
+      border-left: 2px solid;
+    }
+
+    .card::after {
+      bottom: -1px;
+      right: -1px;
+      border-bottom: 2px solid;
+      border-right: 2px solid;
+    }
+
+    .card-serpent {
+      --c: var(--green);
+    }
+
+    .card-bouncer {
+      --c: var(--cyan);
+    }
+
+    .card-galactic {
+      --c: var(--magenta);
+    }
+
+    .card-rally {
+      --c: var(--red);
+    }
+
+    .card-canaris {
+      --c: #3296c8;
+    }
 
     /* ---- Danish-origin seal ---- */
     .badge-dk {
       position: absolute;
-      top: 14px; right: 14px;
+      top: 14px;
+      right: 14px;
       font-size: 24px;
       line-height: 1;
-      width: 52px; height: 52px;
+      width: 52px;
+      height: 52px;
       border: 2px solid #c8102e;
       border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      background: rgba(0,0,0,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.85);
       box-shadow:
-        0 0 0 3px rgba(0,0,0,.85),
-        0 0 0 5px rgba(200,16,46,0.35),
-        0 0 14px rgba(200,16,46,0.35);
+        0 0 0 3px rgba(0, 0, 0, .85),
+        0 0 0 5px rgba(200, 16, 46, 0.35),
+        0 0 14px rgba(200, 16, 46, 0.35);
       transform: rotate(-8deg);
       z-index: 2;
     }
@@ -262,15 +330,18 @@
       padding: 3px 10px 3px 8px;
       margin-bottom: 14px;
       text-transform: uppercase;
-      background: rgba(255,255,255,0.02);
+      background: rgba(255, 255, 255, 0.02);
     }
 
-    .card::before, .card::after { border-color: var(--c); }
+    .card::before,
+    .card::after {
+      border-color: var(--c);
+    }
 
     .card:hover {
       border-color: var(--c);
       box-shadow:
-        0 0 16px rgba(0,0,0,.8),
+        0 0 16px rgba(0, 0, 0, .8),
         0 0 30px color-mix(in srgb, var(--c) 20%, transparent),
         inset 0 0 20px color-mix(in srgb, var(--c) 4%, transparent);
     }
@@ -289,14 +360,15 @@
 
     .hiscore-badge {
       position: absolute;
-      bottom: 10px; right: 10px;
+      bottom: 10px;
+      right: 10px;
       font-family: 'Courier New', Courier, monospace;
       font-size: 10px;
       font-weight: 700;
       letter-spacing: 2px;
       text-transform: uppercase;
       color: color-mix(in srgb, var(--c) 80%, #fff);
-      background: rgba(0,0,0,0.78);
+      background: rgba(0, 0, 0, 0.78);
       padding: 3px 7px;
       border: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
       pointer-events: none;
@@ -366,15 +438,24 @@
       box-shadow: 0 0 10px color-mix(in srgb, var(--c) 20%, transparent);
       white-space: nowrap;
       /* Keep the badge (bottom: 12px right: 12px, 36px wide) from overlapping the text */
-      max-width: calc(100% - 60px);
+      max-width: calc(100% - 25px);
     }
 
-    @keyframes blink-start { 50% { opacity: 0.3; } }
+    @keyframes blink-start {
+      50% {
+        opacity: 0.3;
+      }
+    }
 
     @media (max-width: 520px) {
-      .card        { padding-left: 40px; }
+      .card {
+        padding-left: 40px;
+      }
+
       /* Stay left-aligned so the right-side robot badge never covers the text */
-      .press-start { align-self: flex-start; }
+      .press-start {
+        align-self: flex-start;
+      }
     }
 
     /* ---- 2-player seal ---- */
@@ -396,13 +477,13 @@
       color: var(--yellow);
       text-shadow: 0 0 6px var(--yellow);
       box-shadow:
-        0 0 0 3px rgba(0,0,0,0.85),
+        0 0 0 3px rgba(0, 0, 0, 0.85),
         0 0 0 5px color-mix(in srgb, var(--yellow) 35%, transparent),
         0 0 14px color-mix(in srgb, var(--yellow) 35%, transparent);
       transform: rotate(12deg);
       text-align: center;
       line-height: 1.3;
-      background: rgba(0,0,0,0.85);
+      background: rgba(0, 0, 0, 0.85);
       z-index: 2;
     }
 
@@ -444,11 +525,22 @@
     }
 
     @keyframes twinkle {
-      from { opacity: var(--lo); }
-      to   { opacity: var(--hi); }
+      from {
+        opacity: var(--lo);
+      }
+
+      to {
+        opacity: var(--hi);
+      }
     }
 
-    header, .divider, .game-grid, footer { position: relative; z-index: 1; }
+    header,
+    .divider,
+    .game-grid,
+    footer {
+      position: relative;
+      z-index: 1;
+    }
 
     /* ---- left badge group ---- */
     .left-badges {
@@ -474,13 +566,22 @@
       text-transform: uppercase;
       transition: color .2s;
     }
-    .about-badge:hover { color: #D97757; }
-    .about-badge:hover .about-label { opacity: 1; transform: translateX(0); }
+
+    .about-badge:hover {
+      color: #D97757;
+    }
+
+    .about-badge:hover .about-label {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
     .about-badge:hover .about-avatar {
       border-color: #D97757;
-      box-shadow: 0 0 12px rgba(217,119,87,0.45);
+      box-shadow: 0 0 12px rgba(217, 119, 87, 0.45);
       filter: none;
     }
+
     .about-avatar {
       width: 44px;
       height: 44px;
@@ -490,6 +591,7 @@
       transition: border-color .2s, box-shadow .2s, filter .2s;
       filter: grayscale(40%) brightness(0.8);
     }
+
     .about-label {
       opacity: 0;
       transform: translateX(-6px);
@@ -511,18 +613,24 @@
       text-transform: uppercase;
       transition: color .2s;
     }
-    .history-badge:hover { color: var(--yellow); }
+
+    .history-badge:hover {
+      color: var(--yellow);
+    }
+
     .history-badge:hover .history-label {
       opacity: 1;
       transform: translateX(0);
       text-shadow: 0 0 8px var(--yellow);
       color: var(--yellow);
     }
+
     .history-badge:hover .history-avatar {
       border-color: var(--yellow);
-      box-shadow: 0 0 12px rgba(230,220,50,0.45);
+      box-shadow: 0 0 12px rgba(230, 220, 50, 0.45);
       filter: none;
     }
+
     .history-avatar {
       width: 44px;
       height: 44px;
@@ -532,6 +640,7 @@
       transition: border-color .2s, box-shadow .2s, filter .2s;
       filter: grayscale(20%) brightness(0.7);
     }
+
     .history-label {
       opacity: 0;
       transform: translateX(-6px);
@@ -558,9 +667,14 @@
       transition: color .2s;
     }
 
-    .profile-badge:hover { color: var(--green); }
+    .profile-badge:hover {
+      color: var(--green);
+    }
 
-    .profile-badge:hover .profile-handle { opacity: 1; transform: translateX(0); }
+    .profile-badge:hover .profile-handle {
+      opacity: 1;
+      transform: translateX(0);
+    }
 
     .profile-handle {
       opacity: 0;
@@ -589,18 +703,52 @@
     }
 
     @keyframes konami-shake {
-      0%,100% { transform: translate(0,0); }
-      10%     { transform: translate(-10px,-6px); }
-      20%     { transform: translate(10px,6px); }
-      30%     { transform: translate(-8px,4px); }
-      40%     { transform: translate(8px,-4px); }
-      50%     { transform: translate(-6px,6px); }
-      60%     { transform: translate(6px,-6px); }
-      70%     { transform: translate(-4px,3px); }
-      80%     { transform: translate(4px,-3px); }
-      90%     { transform: translate(-2px,2px); }
+
+      0%,
+      100% {
+        transform: translate(0, 0);
+      }
+
+      10% {
+        transform: translate(-10px, -6px);
+      }
+
+      20% {
+        transform: translate(10px, 6px);
+      }
+
+      30% {
+        transform: translate(-8px, 4px);
+      }
+
+      40% {
+        transform: translate(8px, -4px);
+      }
+
+      50% {
+        transform: translate(-6px, 6px);
+      }
+
+      60% {
+        transform: translate(6px, -6px);
+      }
+
+      70% {
+        transform: translate(-4px, 3px);
+      }
+
+      80% {
+        transform: translate(4px, -3px);
+      }
+
+      90% {
+        transform: translate(-2px, 2px);
+      }
     }
-    body.konami-shake { animation: konami-shake 0.55s ease; }
+
+    body.konami-shake {
+      animation: konami-shake 0.55s ease;
+    }
 
     /* ════════════════════════════════════════════════════════════════════
        SHARE button (top-right) + toast
@@ -623,22 +771,29 @@
       cursor: pointer;
       text-transform: uppercase;
       box-shadow: 0 0 12px color-mix(in srgb, var(--yellow, #e6dc32) 35%, transparent),
-                  inset 0 0 6px rgba(0,0,0,0.5);
+        inset 0 0 6px rgba(0, 0, 0, 0.5);
       transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
     }
+
     .share-btn:hover {
       transform: translateY(-1px);
       filter: brightness(1.15);
       box-shadow: 0 0 18px color-mix(in srgb, var(--yellow, #e6dc32) 70%, transparent),
-                  inset 0 0 6px rgba(0,0,0,0.5);
+        inset 0 0 6px rgba(0, 0, 0, 0.5);
     }
-    .share-btn:active { transform: translateY(0); filter: brightness(0.9); }
+
+    .share-btn:active {
+      transform: translateY(0);
+      filter: brightness(0.9);
+    }
+
     .share-btn .share-icon {
       display: inline-block;
       transform: scaleX(-1);
       font-size: 16px;
       line-height: 1;
     }
+
     .share-toast {
       position: fixed;
       top: calc(64px + env(safe-area-inset-top, 0px));
@@ -650,13 +805,17 @@
       letter-spacing: 1.5px;
       color: #0a0a0c;
       background: var(--green, #32c832);
-      box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
       opacity: 0;
       transform: translateY(-6px);
       pointer-events: none;
       transition: opacity .25s ease, transform .25s ease;
     }
-    .share-toast.show { opacity: 1; transform: translateY(0); }
+
+    .share-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
 
     @media (max-width: 520px) {
       .share-btn {
@@ -665,8 +824,15 @@
         padding: 8px 10px;
         font-size: 9px;
       }
-      .share-btn .share-label { display: none; }
-      .share-btn .share-icon { font-size: 18px; }
+
+      .share-btn .share-label {
+        display: none;
+      }
+
+      .share-btn .share-icon {
+        font-size: 18px;
+      }
+
       .share-toast {
         top: calc(56px + env(safe-area-inset-top, 0px));
         right: calc(10px + env(safe-area-inset-right, 0px));
@@ -685,27 +851,35 @@
       height: 36px;
       border-radius: 50%;
       border: 2px solid var(--c, #888);
-      background: rgba(0,0,0,0.9);
+      background: rgba(0, 0, 0, 0.9);
       color: var(--c, #ccc);
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-size: 18px;
       line-height: 1;
       cursor: pointer;
       z-index: 3;
       transition: transform .18s ease, box-shadow .18s ease;
-      box-shadow: 0 0 0 3px rgba(0,0,0,.6),
-                  0 0 10px color-mix(in srgb, var(--c, #888) 45%, transparent);
+      box-shadow: 0 0 0 3px rgba(0, 0, 0, .6),
+        0 0 10px color-mix(in srgb, var(--c, #888) 45%, transparent);
       user-select: none;
     }
+
     .badge-see:hover {
       transform: scale(1.18) rotate(-6deg);
-      box-shadow: 0 0 0 3px rgba(0,0,0,.6),
-                  0 0 18px color-mix(in srgb, var(--c, #888) 65%, transparent);
+      box-shadow: 0 0 0 3px rgba(0, 0, 0, .6),
+        0 0 18px color-mix(in srgb, var(--c, #888) 65%, transparent);
     }
-    .badge-see:active { transform: scale(0.96); }
+
+    .badge-see:active {
+      transform: scale(0.96);
+    }
+
     .badge-see-label {
       position: absolute;
-      bottom: 100%; right: 0;
+      bottom: 100%;
+      right: 0;
       margin-bottom: 5px;
       font-size: 9px;
       letter-spacing: 1.5px;
@@ -715,17 +889,24 @@
       pointer-events: none;
       white-space: nowrap;
     }
-    .card:hover .badge-see-label { opacity: 0.9; }
+
+    .card:hover .badge-see-label {
+      opacity: 0.9;
+    }
 
     /* Library card — distinct from games */
     .card-library {
       --c: #d4d4d4;
     }
+
     .card-library .card-shot-wrap {
       background: linear-gradient(135deg, #0a0a0c 0%, #1a1a1e 100%);
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       min-height: 140px;
     }
+
     .card-library .lib-monogram {
       font-size: 64px;
       font-weight: 900;
@@ -733,7 +914,11 @@
       color: var(--c);
       text-shadow: 0 0 14px color-mix(in srgb, var(--c) 50%, transparent);
     }
-    .card-library .card-title { color: var(--c); }
+
+    .card-library .card-title {
+      color: var(--c);
+    }
+
     .see-how {
       margin-top: 14px;
       align-self: stretch;
@@ -747,26 +932,32 @@
       cursor: pointer;
       text-align: center;
       transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
-      box-shadow: 0 0 0 1px rgba(0,0,0,0.3),
-                  0 0 14px color-mix(in srgb, var(--c, #888) 35%, transparent);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3),
+        0 0 14px color-mix(in srgb, var(--c, #888) 35%, transparent);
     }
+
     .see-how:hover {
       transform: translateY(-1px);
       filter: brightness(1.1);
-      box-shadow: 0 0 0 1px rgba(0,0,0,0.3),
-                  0 0 22px color-mix(in srgb, var(--c, #888) 60%, transparent);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3),
+        0 0 22px color-mix(in srgb, var(--c, #888) 60%, transparent);
     }
-    .see-how:active { transform: translateY(0); filter: brightness(0.95); }
+
+    .see-how:active {
+      transform: translateY(0);
+      filter: brightness(0.95);
+    }
 
     .badge-lib {
       position: absolute;
-      top: 12px; right: 12px;
+      top: 12px;
+      right: 12px;
       font-size: 9px;
       letter-spacing: 2px;
       color: var(--c);
       border: 1px solid var(--c);
       padding: 4px 10px;
-      background: rgba(0,0,0,0.7);
+      background: rgba(0, 0, 0, 0.7);
       z-index: 2;
     }
 
@@ -775,17 +966,18 @@
     .docs-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0);
+      background: rgba(0, 0, 0, 0);
       backdrop-filter: blur(0px);
       z-index: 80;
       opacity: 0;
       transition: opacity .35s ease, backdrop-filter .35s ease, background .35s ease;
       pointer-events: none;
     }
+
     .docs-backdrop.open {
       opacity: 1;
       pointer-events: auto;
-      background: rgba(0,0,0,0.65);
+      background: rgba(0, 0, 0, 0.65);
       backdrop-filter: blur(4px);
     }
 
@@ -794,21 +986,27 @@
       perspective: 1800px;
       z-index: 90;
       pointer-events: none;
-      transition: top .55s cubic-bezier(.25,1,.3,1),
-                  left .55s cubic-bezier(.25,1,.3,1),
-                  width .55s cubic-bezier(.25,1,.3,1),
-                  height .55s cubic-bezier(.25,1,.3,1);
+      transition: top .55s cubic-bezier(.25, 1, .3, 1),
+        left .55s cubic-bezier(.25, 1, .3, 1),
+        width .55s cubic-bezier(.25, 1, .3, 1),
+        height .55s cubic-bezier(.25, 1, .3, 1);
     }
-    .docs-flipper.open { pointer-events: auto; }
+
+    .docs-flipper.open {
+      pointer-events: auto;
+    }
 
     .docs-card {
       position: absolute;
       inset: 0;
       transform-style: preserve-3d;
       transform: rotateY(0deg);
-      transition: transform .55s cubic-bezier(.25,1,.3,1);
+      transition: transform .55s cubic-bezier(.25, 1, .3, 1);
     }
-    .docs-flipper.open .docs-card { transform: rotateY(180deg); }
+
+    .docs-flipper.open .docs-card {
+      transform: rotateY(180deg);
+    }
 
     .docs-face {
       position: absolute;
@@ -817,25 +1015,41 @@
       -webkit-backface-visibility: hidden;
       overflow: hidden;
     }
+
     .docs-face.front {
       border: 1px solid #1e1e1e;
       background: #0a0a0c;
     }
-    .docs-face.front::before, .docs-face.front::after {
+
+    .docs-face.front::before,
+    .docs-face.front::after {
       content: '';
       position: absolute;
-      width: 12px; height: 12px;
+      width: 12px;
+      height: 12px;
       border-color: var(--c, #888);
     }
-    .docs-face.front::before { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; }
-    .docs-face.front::after  { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; }
+
+    .docs-face.front::before {
+      top: -1px;
+      left: -1px;
+      border-top: 2px solid;
+      border-left: 2px solid;
+    }
+
+    .docs-face.front::after {
+      bottom: -1px;
+      right: -1px;
+      border-bottom: 2px solid;
+      border-right: 2px solid;
+    }
 
     .docs-face.back {
       transform: rotateY(180deg);
       background: #07070a;
       border: 1px solid var(--c, #444);
-      box-shadow: 0 0 0 1px rgba(0,0,0,0.4),
-                  0 0 22px color-mix(in srgb, var(--c, #888) 25%, transparent);
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4),
+        0 0 22px color-mix(in srgb, var(--c, #888) 25%, transparent);
       display: flex;
       flex-direction: column;
       color: #d0d0d0;
@@ -847,8 +1061,9 @@
       gap: 14px;
       padding: 14px 18px;
       border-bottom: 1px solid #1e1e22;
-      background: rgba(255,255,255,0.015);
+      background: rgba(255, 255, 255, 0.015);
     }
+
     .docs-head .title {
       font-family: 'Press Start 2P', monospace;
       font-size: 13px;
@@ -856,33 +1071,40 @@
       letter-spacing: 2px;
       flex: 1;
     }
+
     .docs-head .page-indicator {
       font-size: 10px;
       letter-spacing: 1.5px;
       color: #888;
     }
+
     .docs-close {
       background: var(--c, #d4d4d4);
       border: 2px solid var(--c, #d4d4d4);
       color: #0a0a0c;
-      width: 44px; height: 44px;
+      width: 44px;
+      height: 44px;
       cursor: pointer;
       font-size: 22px;
       font-weight: 900;
       line-height: 1;
       font-family: inherit;
       border-radius: 4px;
-      box-shadow: 0 0 0 2px rgba(0,0,0,0.4),
-                  0 0 16px color-mix(in srgb, var(--c, #888) 55%, transparent);
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4),
+        0 0 16px color-mix(in srgb, var(--c, #888) 55%, transparent);
       transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
     }
+
     .docs-close:hover {
       filter: brightness(1.15);
       transform: scale(1.06);
-      box-shadow: 0 0 0 2px rgba(0,0,0,0.4),
-                  0 0 22px color-mix(in srgb, var(--c, #888) 85%, transparent);
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4),
+        0 0 22px color-mix(in srgb, var(--c, #888) 85%, transparent);
     }
-    .docs-close:active { transform: scale(0.96); }
+
+    .docs-close:active {
+      transform: scale(0.96);
+    }
 
     .docs-body {
       flex: 1;
@@ -891,19 +1113,24 @@
       gap: 0;
       overflow: hidden;
     }
+
     .docs-shot {
       background: #0a0a0e;
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       padding: 18px;
       border-right: 1px solid #1a1a1e;
       overflow: hidden;
     }
+
     .docs-shot img {
       max-width: 100%;
       max-height: 100%;
       image-rendering: pixelated;
       border: 1px solid #2a2a2e;
     }
+
     .docs-shot.diagram {
       padding: 24px;
       font-family: 'Press Start 2P', monospace;
@@ -913,6 +1140,7 @@
       text-align: center;
       letter-spacing: 1.5px;
     }
+
     .docs-prose {
       padding: 26px 30px;
       overflow-y: auto;
@@ -921,6 +1149,7 @@
       letter-spacing: 0.2px;
       color: #d4d4d4;
     }
+
     .docs-prose h3 {
       margin: 0 0 14px;
       font-family: 'Press Start 2P', monospace;
@@ -928,18 +1157,34 @@
       color: var(--c, #fff);
       letter-spacing: 2px;
     }
-    .docs-prose p { margin: 0 0 16px; }
-    .docs-prose p + p { margin-top: -4px; }
-    .docs-prose strong { color: #f0f0f0; }
-    .docs-prose em { color: #b8b8b8; font-style: normal; border-bottom: 1px dashed #444; }
+
+    .docs-prose p {
+      margin: 0 0 16px;
+    }
+
+    .docs-prose p+p {
+      margin-top: -4px;
+    }
+
+    .docs-prose strong {
+      color: #f0f0f0;
+    }
+
+    .docs-prose em {
+      color: #b8b8b8;
+      font-style: normal;
+      border-bottom: 1px dashed #444;
+    }
+
     .docs-prose code {
       font-family: 'Fira Code', 'Consolas', monospace;
-      background: rgba(255,255,255,0.05);
+      background: rgba(255, 255, 255, 0.05);
       padding: 1px 6px;
       border-radius: 3px;
       font-size: 12.5px;
       color: var(--c, #ddd);
     }
+
     .docs-prose pre {
       background: #050507;
       border: 1px solid #1e1e22;
@@ -954,12 +1199,32 @@
       line-height: 1.65;
       color: #d4d4d4;
     }
-    .docs-prose pre .kw  { color: #c586c0; }
-    .docs-prose pre .ty  { color: #4ec9b0; }
-    .docs-prose pre .fn  { color: #dcdcaa; }
-    .docs-prose pre .str { color: #ce9178; }
-    .docs-prose pre .num { color: #b5cea8; }
-    .docs-prose pre .cmt { color: #6a9955; font-style: italic; }
+
+    .docs-prose pre .kw {
+      color: #c586c0;
+    }
+
+    .docs-prose pre .ty {
+      color: #4ec9b0;
+    }
+
+    .docs-prose pre .fn {
+      color: #dcdcaa;
+    }
+
+    .docs-prose pre .str {
+      color: #ce9178;
+    }
+
+    .docs-prose pre .num {
+      color: #b5cea8;
+    }
+
+    .docs-prose pre .cmt {
+      color: #6a9955;
+      font-style: italic;
+    }
+
     .docs-prose .path {
       display: flex;
       align-items: center;
@@ -977,12 +1242,19 @@
       text-decoration: none;
       transition: color .15s, background .15s, border-color .15s;
     }
+
     .docs-prose .path:hover {
       color: var(--c, #fff);
       background: #101015;
       border-color: var(--c, #444);
     }
-    .docs-prose .path .path-file { font-family: 'Fira Code', 'Consolas', monospace; text-transform: none; letter-spacing: 0; }
+
+    .docs-prose .path .path-file {
+      font-family: 'Fira Code', 'Consolas', monospace;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
     .docs-prose .path .path-gh {
       font-family: 'Press Start 2P', monospace;
       font-size: 8px;
@@ -990,7 +1262,10 @@
       color: var(--c, #888);
       opacity: 0.75;
     }
-    .docs-prose .path:hover .path-gh { opacity: 1; }
+
+    .docs-prose .path:hover .path-gh {
+      opacity: 1;
+    }
 
     /* Inline GitHub link */
     .docs-prose .gh-inline {
@@ -1000,6 +1275,7 @@
       font-family: 'Fira Code', 'Consolas', monospace;
       font-size: 12.5px;
     }
+
     .docs-prose .gh-inline:hover {
       border-bottom-style: solid;
       background: color-mix(in srgb, var(--c, #888) 10%, transparent);
@@ -1014,6 +1290,7 @@
       flex-direction: column;
       gap: 2px;
     }
+
     .docs-prose ul.gh-files .gh-file {
       display: flex;
       align-items: baseline;
@@ -1026,28 +1303,36 @@
       text-decoration: none;
       transition: background .15s, border-color .15s, color .15s;
     }
+
     .docs-prose ul.gh-files .gh-file:hover {
       background: #14141a;
       color: var(--c, #fff);
       border-left-color: var(--c, #888);
     }
+
     .docs-prose ul.gh-files .gh-file-name {
       font-family: 'Fira Code', 'Consolas', monospace;
       font-size: 12.5px;
       color: var(--c, #fff);
       min-width: 110px;
     }
+
     .docs-prose ul.gh-files .gh-file-desc {
       font-size: 12px;
       color: #9a9a9a;
       flex: 1;
     }
+
     .docs-prose ul.gh-files .gh-file::after {
       content: '↗';
       color: #5a5a5a;
       font-size: 11px;
     }
-    .docs-prose ul.gh-files .gh-file:hover::after { color: var(--c, #ccc); }
+
+    .docs-prose ul.gh-files .gh-file:hover::after {
+      color: var(--c, #ccc);
+    }
+
     .docs-prose .crossref {
       display: inline-block;
       margin-top: 6px;
@@ -1058,9 +1343,12 @@
       border: 1px solid var(--c, #444);
       padding: 6px 10px;
       cursor: pointer;
-      background: rgba(255,255,255,0.02);
+      background: rgba(255, 255, 255, 0.02);
     }
-    .docs-prose .crossref:hover { background: color-mix(in srgb, var(--c, #888) 12%, transparent); }
+
+    .docs-prose .crossref:hover {
+      background: color-mix(in srgb, var(--c, #888) 12%, transparent);
+    }
 
     .docs-nav {
       display: flex;
@@ -1068,8 +1356,9 @@
       justify-content: space-between;
       padding: 10px 18px;
       border-top: 1px solid #1e1e22;
-      background: rgba(0,0,0,0.4);
+      background: rgba(0, 0, 0, 0.4);
     }
+
     .docs-nav button {
       background: none;
       border: 1px solid #2c2c2c;
@@ -1080,64 +1369,145 @@
       font-size: 9px;
       letter-spacing: 1.5px;
     }
+
     .docs-nav button:hover:not(:disabled) {
       border-color: var(--c, #aaa);
       color: var(--c, #fff);
     }
+
     .docs-nav button:disabled {
       opacity: 0.25;
       cursor: not-allowed;
     }
+
     .docs-dots {
       display: flex;
       gap: 6px;
     }
+
     .docs-dots span {
-      width: 8px; height: 8px;
+      width: 8px;
+      height: 8px;
       border: 1px solid #3a3a3e;
       border-radius: 50%;
       cursor: pointer;
       transition: background .18s;
     }
+
     .docs-dots span.on {
       background: var(--c, #fff);
       border-color: var(--c, #fff);
     }
 
     @media (max-width: 700px) {
-      .docs-body { grid-template-columns: 1fr; grid-template-rows: 200px 1fr; }
-      .docs-shot { border-right: none; border-bottom: 1px solid #1a1a1e; }
-      .docs-head .title { font-size: 10px; }
+      .docs-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: 200px 1fr;
+      }
+
+      .docs-shot {
+        border-right: none;
+        border-bottom: 1px solid #1a1a1e;
+      }
+
+      .docs-head .title {
+        font-size: 10px;
+      }
     }
 
     /* Small phones (iPhone SE, iPhone 12 mini, etc.) — bump readable type */
     @media (max-width: 480px) {
+
       /* Library card body */
-      .card-library .card-title       { font-size: 22px; }
-      .card-library .card-genre       { font-size: 14px; }
-      .card-library .card-desc        { font-size: 15px; line-height: 1.55; }
-      .card-library .card-controls    { font-size: 12px; }
-      .card-library .see-how          { font-size: 13px; padding: 14px 16px; }
+      .card-library .card-title {
+        font-size: 22px;
+      }
+
+      .card-library .card-genre {
+        font-size: 14px;
+      }
+
+      .card-library .card-desc {
+        font-size: 15px;
+        line-height: 1.55;
+      }
+
+      .card-library .card-controls {
+        font-size: 12px;
+      }
+
+      .card-library .see-how {
+        font-size: 13px;
+        padding: 14px 16px;
+      }
 
       /* Source-tour overlay prose + code */
-      .docs-prose                     { font-size: 16px; line-height: 1.7; padding: 20px 18px; }
-      .docs-prose h3                  { font-size: 13px; }
-      .docs-prose code                { font-size: 14px; }
-      .docs-prose pre                 { font-size: 13px; line-height: 1.6; padding: 12px 12px; }
-      .docs-prose .path               { font-size: 11px; padding: 8px 10px; }
-      .docs-prose .path .path-gh      { font-size: 9px; }
-      .docs-prose .gh-inline          { font-size: 14px; }
-      .docs-prose ul.gh-files .gh-file-name { font-size: 14px; min-width: 90px; }
-      .docs-prose ul.gh-files .gh-file-desc { font-size: 13px; }
-      .docs-prose .crossref           { font-size: 10px; }
-      .docs-head .title               { font-size: 11px; }
-      .docs-head .page-indicator      { font-size: 11px; }
-      .docs-shot.diagram              { font-size: 12px; }
-      .docs-nav button                { font-size: 10px; padding: 8px 12px; }
-    }
+      .docs-prose {
+        font-size: 16px;
+        line-height: 1.7;
+        padding: 20px 18px;
+      }
 
+      .docs-prose h3 {
+        font-size: 13px;
+      }
+
+      .docs-prose code {
+        font-size: 14px;
+      }
+
+      .docs-prose pre {
+        font-size: 13px;
+        line-height: 1.6;
+        padding: 12px 12px;
+      }
+
+      .docs-prose .path {
+        font-size: 11px;
+        padding: 8px 10px;
+      }
+
+      .docs-prose .path .path-gh {
+        font-size: 9px;
+      }
+
+      .docs-prose .gh-inline {
+        font-size: 14px;
+      }
+
+      .docs-prose ul.gh-files .gh-file-name {
+        font-size: 14px;
+        min-width: 90px;
+      }
+
+      .docs-prose ul.gh-files .gh-file-desc {
+        font-size: 13px;
+      }
+
+      .docs-prose .crossref {
+        font-size: 10px;
+      }
+
+      .docs-head .title {
+        font-size: 11px;
+      }
+
+      .docs-head .page-indicator {
+        font-size: 11px;
+      }
+
+      .docs-shot.diagram {
+        font-size: 12px;
+      }
+
+      .docs-nav button {
+        font-size: 10px;
+        padding: 8px 12px;
+      }
+    }
   </style>
 </head>
+
 <body>
 
   <div class="stars" id="stars"></div>
@@ -1169,8 +1539,8 @@
         <img class="card-shot" src="rally/screenshot.png" alt="Rally gameplay">
       </div>
       <div class="card-title">RALLY</div>
-      <div class="card-genre"  data-i18n="rallyGenre"></div>
-      <div class="card-desc"   data-i18n="rallyDesc"></div>
+      <div class="card-genre" data-i18n="rallyGenre"></div>
+      <div class="card-desc" data-i18n="rallyDesc"></div>
       <div class="card-controls" data-i18n="rallyControls"></div>
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
@@ -1184,8 +1554,8 @@
         <img class="card-shot" src="bouncer/screenshot.png" alt="Bouncer gameplay">
       </div>
       <div class="card-title">BOUNCER</div>
-      <div class="card-genre"  data-i18n="bouncerGenre"></div>
-      <div class="card-desc"   data-i18n="bouncerDesc"></div>
+      <div class="card-genre" data-i18n="bouncerGenre"></div>
+      <div class="card-desc" data-i18n="bouncerDesc"></div>
       <div class="card-controls" data-i18n="bouncerControls"></div>
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
@@ -1199,8 +1569,8 @@
         <img class="card-shot" src="galactic_defender/screenshot.png" alt="Galactic Defender gameplay">
       </div>
       <div class="card-title">DEFENDER</div>
-      <div class="card-genre"  data-i18n="galacticGenre"></div>
-      <div class="card-desc"   data-i18n="galacticDesc"></div>
+      <div class="card-genre" data-i18n="galacticGenre"></div>
+      <div class="card-desc" data-i18n="galacticDesc"></div>
       <div class="card-controls" data-i18n="galacticControls"></div>
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
@@ -1214,8 +1584,8 @@
         <img class="card-shot" src="serpent/screenshot.png" alt="Serpent gameplay">
       </div>
       <div class="card-title">SERPENT</div>
-      <div class="card-genre"  data-i18n="serpentGenre"></div>
-      <div class="card-desc"   data-i18n="serpentDesc"></div>
+      <div class="card-genre" data-i18n="serpentGenre"></div>
+      <div class="card-desc" data-i18n="serpentDesc"></div>
       <div class="card-controls" data-i18n="serpentControls"></div>
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
@@ -1230,8 +1600,8 @@
         <img class="card-shot" src="canaris/screenshot.png?v=2" alt="Canaris gameplay">
       </div>
       <div class="card-title">CANARIS</div>
-      <div class="card-genre"  data-i18n="canarisGenre"></div>
-      <div class="card-desc"   data-i18n="canarisDesc"></div>
+      <div class="card-genre" data-i18n="canarisGenre"></div>
+      <div class="card-desc" data-i18n="canarisDesc"></div>
       <div class="card-controls" data-i18n="canarisControls"></div>
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
@@ -1246,8 +1616,8 @@
         <div class="lib-monogram">{ }</div>
       </div>
       <div class="card-title">BLIP</div>
-      <div class="card-genre"  data-i18n="libraryGenre"></div>
-      <div class="card-desc"   data-i18n="libraryDesc"></div>
+      <div class="card-genre" data-i18n="libraryGenre"></div>
+      <div class="card-desc" data-i18n="libraryDesc"></div>
       <div class="card-controls" data-i18n="libraryControls"></div>
       <button class="see-how" data-see="library" data-i18n="seeHow"></button>
     </div>
@@ -1298,132 +1668,132 @@
     var i18n = {
 
       en: {
-        marquee:          '&#x25A0; &#x25A0; &#x25A0; &nbsp; WELCOME FOR PLAYER ONE IS ARRIVE HERE &nbsp; &#x25A0; &#x25A0; &#x25A0;',
-        subtitle:         'HOW MANY POINTS ARE YOU ACHIEVE?',
-        insertCoin:       '&#x25BA; PLEASE TO INSERT COIN &#x25C4;',
+        marquee: '&#x25A0; &#x25A0; &#x25A0; &nbsp; WELCOME FOR PLAYER ONE IS ARRIVE HERE &nbsp; &#x25A0; &#x25A0; &#x25A0;',
+        subtitle: 'HOW MANY POINTS ARE YOU ACHIEVE?',
+        insertCoin: '&#x25BA; PLEASE TO INSERT COIN &#x25C4;',
 
-        serpentGenre:     'SNAKE MOVING GAME',
-        serpentDesc:      'Grid mover &mdash; eat food to grow longer.<br>Hit a wall or your own tail and you lose a life.<br>Food count per level raises the speed.',
-        serpentControls:  'PUSH WASD / ARROW KEY FOR MOVE',
+        serpentGenre: 'SNAKE MOVING GAME',
+        serpentDesc: 'Grid mover &mdash; eat food to grow longer.<br>Hit a wall or your own tail and you lose a life.<br>Food count per level raises the speed.',
+        serpentControls: 'PUSH WASD / ARROW KEY FOR MOVE',
 
-        bouncerGenre:     'BRICK BREAK GAME',
-        bouncerDesc:      'Reflect a bouncing ball with the paddle below.<br>Break every brick to clear the stage.<br>Drop the ball and lose a life.',
-        bouncerControls:  'A/D OR ARROW &middot; [1] LAUNCH',
+        bouncerGenre: 'BRICK BREAK GAME',
+        bouncerDesc: 'Reflect a bouncing ball with the paddle below.<br>Break every brick to clear the stage.<br>Drop the ball and lose a life.',
+        bouncerControls: 'A/D OR ARROW &middot; [1] LAUNCH',
 
-        galacticGenre:    'ALIEN ATTACK GAME',
-        galacticDesc:     'Fixed shooter &mdash; the alien grid marches down.<br>Hide behind shields, shoot before they land.<br>Each wave drops faster than the last.',
+        galacticGenre: 'ALIEN ATTACK GAME',
+        galacticDesc: 'Fixed shooter &mdash; the alien grid marches down.<br>Hide behind shields, shoot before they land.<br>Each wave drops faster than the last.',
         galacticControls: 'A/D OR ARROW &middot; [1] SHOOT',
 
-        rallyGenre:        'PADDLE BATTLE GAME',
-        rallyDesc:         'Two-paddle ping-pong &mdash; first to seven wins.<br>Where you hit the paddle bends the bounce.<br>Speed climbs with every rally.',
-        rallyControls:     'P1 W/S OR ARROW &middot; P2 I/K &middot; [1] SERVE',
+        rallyGenre: 'PADDLE BATTLE GAME',
+        rallyDesc: 'Two-paddle ping-pong &mdash; first to seven wins.<br>Where you hit the paddle bends the bounce.<br>Speed climbs with every rally.',
+        rallyControls: 'P1 W/S OR ARROW &middot; P2 I/K &middot; [1] SERVE',
 
 
-        canarisGenre:      'PRIVATEER NAVAL GAME',
-        canarisDesc:       'Open-world sailor with scene switches.<br>Sea roam &rarr; cannon duel &rarr; boarding fight.<br>Port to repair, restock, pick the next zone.',
-        canarisControls:   'ARROW / WASD TO SAIL &middot; [1] FIRE &middot; [2] BOARD',
+        canarisGenre: 'PRIVATEER NAVAL GAME',
+        canarisDesc: 'Open-world sailor with scene switches.<br>Sea roam &rarr; cannon duel &rarr; boarding fight.<br>Port to repair, restock, pick the next zone.',
+        canarisControls: 'ARROW / WASD TO SAIL &middot; [1] FIRE &middot; [2] BOARD',
 
-        libraryGenre:      'CREATE YOUR OWN',
-        libraryDesc:       'Got an idea? Pair with your AI buddy (e.g. <a href="https://github.com/features/copilot" target="_blank" rel="noopener">Copilot</a> or <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude</a>...) and ship a golden&#8209;age arcade clone this afternoon.',
-        libraryControls:   'AI&#8209;ASSISTED &middot; ONE AFTERNOON',
-        seeInside:         '&#x25BA; CREATE YOUR OWN',
-        seeHow:            '&#x25BA; SEE HOW',
-        share:             'SHARE',
-        shareTitle:        'Blip Arcade',
-        shareText:         'Play Blip Arcade &mdash; 5 mini arcade games + a recipe to build your own with an AI buddy.',
-        shareCopied:       'LINK COPIED &#x2713;',
-        shareFailed:       'COPY FAILED',
+        libraryGenre: 'CREATE YOUR OWN',
+        libraryDesc: 'Got an idea? Pair with your AI buddy (e.g. <a href="https://github.com/features/copilot" target="_blank" rel="noopener">Copilot</a> or <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude</a>...) and ship a golden&#8209;age arcade clone this afternoon.',
+        libraryControls: 'AI&#8209;ASSISTED &middot; ONE AFTERNOON',
+        seeInside: '&#x25BA; CREATE YOUR OWN',
+        seeHow: '&#x25BA; SEE HOW',
+        share: 'SHARE',
+        shareTitle: 'Blip Arcade',
+        shareText: 'Play Blip Arcade &mdash; 5 mini arcade games + a recipe to build your own with an AI buddy.',
+        shareCopied: 'LINK COPIED &#x2713;',
+        shareFailed: 'COPY FAILED',
 
-        pressStart:       'PUSH START BUTTON',
-        needCoin:         'NEED COIN',
-        footerControls:   'WASD / ARROW &nbsp;&mdash;&nbsp; [1] SHOOT OR LAUNCH',
-        footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALL RIGHT IS RESERVE'
+        pressStart: 'PUSH START BUTTON',
+        needCoin: 'NEED COIN',
+        footerControls: 'WASD / ARROW &nbsp;&mdash;&nbsp; [1] SHOOT OR LAUNCH',
+        footerCopy: 'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALL RIGHT IS RESERVE'
       },
 
       ja: {
-        marquee:          '&#x25A0; &#x25A0; &#x25A0; &nbsp; プレイヤーワン、ようこそ &nbsp; &#x25A0; &#x25A0; &#x25A0;',
-        subtitle:         '何ポイント取れるか？',
-        insertCoin:       '&#x25BA; コインをいれてください &#x25C4;',
+        marquee: '&#x25A0; &#x25A0; &#x25A0; &nbsp; プレイヤーワン、ようこそ &nbsp; &#x25A0; &#x25A0; &#x25A0;',
+        subtitle: '何ポイント取れるか？',
+        insertCoin: '&#x25BA; コインをいれてください &#x25C4;',
 
-        serpentGenre:     'スネークゲーム',
-        serpentDesc:      'ヘビを操作してエサを食べ、どんどん成長しよう。<br>壁や自分の体にぶつかってはいけない。<br>どこまで長くなれるか？',
-        serpentControls:  'WASD / 矢印キー',
+        serpentGenre: 'スネークゲーム',
+        serpentDesc: 'ヘビを操作してエサを食べ、どんどん成長しよう。<br>壁や自分の体にぶつかってはいけない。<br>どこまで長くなれるか？',
+        serpentControls: 'WASD / 矢印キー',
 
-        bouncerGenre:     'ブロック崩し',
-        bouncerDesc:      'ボールで全てのブロックを壊せ。<br>ボールをパドルの下に落とすな。<br>全部壊してステージクリア。',
-        bouncerControls:  'A/D または矢印 &middot; [1] 発射',
+        bouncerGenre: 'ブロック崩し',
+        bouncerDesc: 'ボールで全てのブロックを壊せ。<br>ボールをパドルの下に落とすな。<br>全部壊してステージクリア。',
+        bouncerControls: 'A/D または矢印 &middot; [1] 発射',
 
-        galacticGenre:    'スペースインベーダー',
-        galacticDesc:     'エイリアンの大群が迫ってくる。<br>着地する前に全滅させろ。<br>地球を守り抜け。',
+        galacticGenre: 'スペースインベーダー',
+        galacticDesc: 'エイリアンの大群が迫ってくる。<br>着地する前に全滅させろ。<br>地球を守り抜け。',
         galacticControls: 'A/D または矢印 &middot; [1] 射撃',
 
-        rallyGenre:        'ピンポンゲーム',
-        rallyDesc:         '先に7点取った方が勝ち。<br>打つたびにボールは速くなる。',
-        rallyControls:     'P1 W/S または矢印 &middot; P2 I/K &middot; [1] サーブ',
+        rallyGenre: 'ピンポンゲーム',
+        rallyDesc: '先に7点取った方が勝ち。<br>打つたびにボールは速くなる。',
+        rallyControls: 'P1 W/S または矢印 &middot; P2 I/K &middot; [1] サーブ',
 
 
-        canarisGenre:      'デンマーク海賊ゲーム',
-        canarisDesc:       'デンマークの私掠船長としてカテガット海峡を航海。<br>大砲を撃ち、敵船に乗り込み、金を奪え。<br>港でせんかんを修理・補給しよう。',
-        canarisControls:   '矢印/WASD 操舵 &middot; [1] 砲撃 &middot; [2] 乗船',
+        canarisGenre: 'デンマーク海賊ゲーム',
+        canarisDesc: 'デンマークの私掠船長としてカテガット海峡を航海。<br>大砲を撃ち、敵船に乗り込み、金を奪え。<br>港でせんかんを修理・補給しよう。',
+        canarisControls: '矢印/WASD 操舵 &middot; [1] 砲撃 &middot; [2] 乗船',
 
-        libraryGenre:      'じぶんで作ろう',
-        libraryDesc:       'アイデアがある？AIの相棒（<a href="https://github.com/features/copilot" target="_blank" rel="noopener">Copilot</a>や<a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude</a>など）と組んで、午後1回で黄金時代のアーケードを作ろう。',
-        libraryControls:   'AIと一緒に &middot; ひと午後で',
-        seeInside:         '&#x25BA; じぶんで作ろう',
-        seeHow:            '&#x25BA; やり方を見る',
-        share:             'シェア',
-        shareTitle:        'Blip Arcade',
-        shareText:         'Blip Arcadeで遊ぼう — ミニアーケード5本＋AIの相棒と自分のゲームを作るレシピ。',
-        shareCopied:       'リンクをコピーしました &#x2713;',
-        shareFailed:       'コピー失敗',
+        libraryGenre: 'じぶんで作ろう',
+        libraryDesc: 'アイデアがある？AIの相棒（<a href="https://github.com/features/copilot" target="_blank" rel="noopener">Copilot</a>や<a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude</a>など）と組んで、午後1回で黄金時代のアーケードを作ろう。',
+        libraryControls: 'AIと一緒に &middot; ひと午後で',
+        seeInside: '&#x25BA; じぶんで作ろう',
+        seeHow: '&#x25BA; やり方を見る',
+        share: 'シェア',
+        shareTitle: 'Blip Arcade',
+        shareText: 'Blip Arcadeで遊ぼう — ミニアーケード5本＋AIの相棒と自分のゲームを作るレシピ。',
+        shareCopied: 'リンクをコピーしました &#x2713;',
+        shareFailed: 'コピー失敗',
 
-        pressStart:       'スタート',
-        needCoin:         'コインが必要',
-        footerControls:   'WASD / 矢印キー &nbsp;―&nbsp; [1] 射撃・発射',
-        footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; 全権利保留'
+        pressStart: 'スタート',
+        needCoin: 'コインが必要',
+        footerControls: 'WASD / 矢印キー &nbsp;―&nbsp; [1] 射撃・発射',
+        footerCopy: 'BLIP ARCADE &nbsp;&#x25A0;&nbsp; 全権利保留'
       },
 
       da: {
-        marquee:          '&#x25A0; &#x25A0; &#x25A0; &nbsp; VELKOMMEN SPILLER ET &nbsp; &#x25A0; &#x25A0; &#x25A0;',
-        subtitle:         'HVOR MANGE POINT KAN DU OPN&Aring;',
-        insertCoin:       '&#x25BA; INDS&AElig;T M&Oslash;NT &#x25C4;',
+        marquee: '&#x25A0; &#x25A0; &#x25A0; &nbsp; VELKOMMEN SPILLER ET &nbsp; &#x25A0; &#x25A0; &#x25A0;',
+        subtitle: 'HVOR MANGE POINT KAN DU OPN&Aring;',
+        insertCoin: '&#x25BA; INDS&AElig;T M&Oslash;NT &#x25C4;',
 
-        serpentGenre:     'SLANGEBANE',
-        serpentDesc:      'Styr slangen til at spise og vokse.<br>Undg&aring; at ramme v&aelig;ggene eller dig selv.<br>Hvor lang kan du blive?',
-        serpentControls:  'WASD / PILETASTER',
+        serpentGenre: 'SLANGEBANE',
+        serpentDesc: 'Styr slangen til at spise og vokse.<br>Undg&aring; at ramme v&aelig;ggene eller dig selv.<br>Hvor lang kan du blive?',
+        serpentControls: 'WASD / PILETASTER',
 
-        bouncerGenre:     'KLODSBRÆKKER',
-        bouncerDesc:      'Br&aelig;k alle klodser med bolden.<br>Lad ikke bolden slippe forbi dit bat.<br>Ryd banen for at avancere.',
-        bouncerControls:  'A/D ELLER PILE &middot; [1] START',
+        bouncerGenre: 'KLODSBRÆKKER',
+        bouncerDesc: 'Br&aelig;k alle klodser med bolden.<br>Lad ikke bolden slippe forbi dit bat.<br>Ryd banen for at avancere.',
+        bouncerControls: 'A/D ELLER PILE &middot; [1] START',
 
-        galacticGenre:    'RUMANGRIBER',
-        galacticDesc:     'Alienbølger er på vej ind.<br>Skyd dem ned inden de lander.<br>Forsvar Jorden for enhver pris.',
+        galacticGenre: 'RUMANGRIBER',
+        galacticDesc: 'Alienbølger er på vej ind.<br>Skyd dem ned inden de lander.<br>Forsvar Jorden for enhver pris.',
         galacticControls: 'A/D ELLER PILE &middot; [1] SKYD',
 
-        rallyGenre:        'BORDTENNISSPIL',
-        rallyDesc:         'F&oslash;rst til syv point vinder.<br>Bolden accelererer for hvert slag.',
-        rallyControls:     'P1 W/S ELLER PILE &middot; P2 I/K &middot; [1] SERV',
+        rallyGenre: 'BORDTENNISSPIL',
+        rallyDesc: 'F&oslash;rst til syv point vinder.<br>Bolden accelererer for hvert slag.',
+        rallyControls: 'P1 W/S ELLER PILE &middot; P2 I/K &middot; [1] SERV',
 
 
-        canarisGenre:      'KAPERSKIB SPIL',
-        canarisDesc:       'Sejl i Kattegat som dansk kaperkapitajn.<br>Affyr kanoner, bord fjendtlige skibe og pl&oslash;ndr guld.<br>Anl&oslash;b havn for at reparere og genopfylde.',
-        canarisControls:   'PIL / WASD FOR AT SEJLE &middot; [1] SKYD &middot; [2] BORD',
+        canarisGenre: 'KAPERSKIB SPIL',
+        canarisDesc: 'Sejl i Kattegat som dansk kaperkapitajn.<br>Affyr kanoner, bord fjendtlige skibe og pl&oslash;ndr guld.<br>Anl&oslash;b havn for at reparere og genopfylde.',
+        canarisControls: 'PIL / WASD FOR AT SEJLE &middot; [1] SKYD &middot; [2] BORD',
 
-        libraryGenre:      'LAV DIT EGET',
-        libraryDesc:       'Har du en idé? Slå dig sammen med din AI&#8209;makker (fx <a href="https://github.com/features/copilot" target="_blank" rel="noopener">Copilot</a> eller <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude</a>...) og send en guldalder&#8209;arkadeklon afsted i eftermiddag.',
-        libraryControls:   'AI&#8209;ASSISTERET &middot; ÉN EFTERMIDDAG',
-        seeInside:         '&#x25BA; LAV DIT EGET',
-        seeHow:            '&#x25BA; SE HVORDAN',
-        share:             'DEL',
-        shareTitle:        'Blip Arcade',
-        shareText:         'Spil Blip Arcade &mdash; 5 mini-arkadespil + en opskrift p&aring; at lave dit eget med en AI-makker.',
-        shareCopied:       'LINK KOPIERET &#x2713;',
-        shareFailed:       'KOPIERING MISLYKKEDES',
+        libraryGenre: 'LAV DIT EGET',
+        libraryDesc: 'Har du en idé? Slå dig sammen med din AI&#8209;makker (fx <a href="https://github.com/features/copilot" target="_blank" rel="noopener">Copilot</a> eller <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude</a>...) og send en guldalder&#8209;arkadeklon afsted i eftermiddag.',
+        libraryControls: 'AI&#8209;ASSISTERET &middot; ÉN EFTERMIDDAG',
+        seeInside: '&#x25BA; LAV DIT EGET',
+        seeHow: '&#x25BA; SE HVORDAN',
+        share: 'DEL',
+        shareTitle: 'Blip Arcade',
+        shareText: 'Spil Blip Arcade &mdash; 5 mini-arkadespil + en opskrift p&aring; at lave dit eget med en AI-makker.',
+        shareCopied: 'LINK KOPIERET &#x2713;',
+        shareFailed: 'KOPIERING MISLYKKEDES',
 
-        pressStart:       'TRYK START',
-        needCoin:         'INDS&AElig;T M&Oslash;NT',
-        footerControls:   'WASD / PILETASTER &nbsp;&mdash;&nbsp; [1] SKYD ELLER AFFYR',
-        footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALLE RETTIGHEDER FORBEHOLDES'
+        pressStart: 'TRYK START',
+        needCoin: 'INDS&AElig;T M&Oslash;NT',
+        footerControls: 'WASD / PILETASTER &nbsp;&mdash;&nbsp; [1] SKYD ELLER AFFYR',
+        footerCopy: 'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALLE RETTIGHEDER FORBEHOLDES'
       }
     };
 
@@ -1434,21 +1804,21 @@
       var t = i18n[lang];
       if (!t) return;
 
-      document.querySelectorAll('[data-i18n]').forEach(function(el) {
+      document.querySelectorAll('[data-i18n]').forEach(function (el) {
         var key = el.getAttribute('data-i18n');
         if (t[key] !== undefined) el.innerHTML = t[key];
       });
 
-      document.querySelectorAll('.lang-btn').forEach(function(btn) {
+      document.querySelectorAll('.lang-btn').forEach(function (btn) {
         btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
       });
 
       document.documentElement.lang = lang;
-      try { localStorage.setItem('blip-lang', lang); } catch(e) {}
+      try {localStorage.setItem('blip-lang', lang);} catch (e) { }
     }
 
-    document.querySelectorAll('.lang-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
+    document.querySelectorAll('.lang-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
         currentLang = this.getAttribute('data-lang');
         applyLang(currentLang);
         updatePressStart();
@@ -1457,9 +1827,9 @@
 
     /* load saved language, fall back to browser preference, then English */
     var currentLang = 'en';
-    (function() {
+    (function () {
       var saved = null;
-      try { saved = localStorage.getItem('blip-lang'); } catch(e) {}
+      try {saved = localStorage.getItem('blip-lang');} catch (e) { }
       var browserLang = (navigator.language || '').slice(0, 2).toLowerCase();
       currentLang = saved || (i18n[browserLang] ? browserLang : 'en');
       applyLang(currentLang);
@@ -1469,7 +1839,7 @@
     /* Share button — native share sheet on mobile, copy-link on desktop  */
     /* ------------------------------------------------------------------ */
     (function () {
-      var btn   = document.getElementById('share-btn');
+      var btn = document.getElementById('share-btn');
       var toast = document.getElementById('share-toast');
       if (!btn) return;
 
@@ -1483,24 +1853,24 @@
         toast.style.background = ok === false ? 'var(--red, #dc3232)' : 'var(--green, #32c832)';
         toast.classList.add('show');
         clearTimeout(toast._t);
-        toast._t = setTimeout(function () { toast.classList.remove('show'); }, 2000);
+        toast._t = setTimeout(function () {toast.classList.remove('show');}, 2000);
       }
       btn.addEventListener('click', function () {
         var t = i18n[currentLang] || i18n.en;
         var url = window.location.origin + window.location.pathname;
         var data = {
           title: strip(t.shareTitle),
-          text:  strip(t.shareText),
-          url:   url
+          text: strip(t.shareText),
+          url: url
         };
         if (navigator.share) {
-          navigator.share(data).catch(function () { /* user cancelled — no-op */ });
+          navigator.share(data).catch(function () { /* user cancelled — no-op */});
           return;
         }
         if (navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(url).then(
-            function () { flash(t.shareCopied); },
-            function () { flash(t.shareFailed, false); }
+            function () {flash(t.shareCopied);},
+            function () {flash(t.shareFailed, false);}
           );
         } else {
           // Last-resort fallback
@@ -1509,8 +1879,8 @@
           ta.style.position = 'fixed'; ta.style.opacity = '0';
           document.body.appendChild(ta);
           ta.select();
-          try { document.execCommand('copy'); flash(t.shareCopied); }
-          catch (e) { flash(t.shareFailed, false); }
+          try {document.execCommand('copy'); flash(t.shareCopied);}
+          catch (e) {flash(t.shareFailed, false);}
           document.body.removeChild(ta);
         }
       });
@@ -1552,15 +1922,15 @@
       }
 
       function playAtariGlitch(ctx) {
-        var t   = ctx.currentTime;
+        var t = ctx.currentTime;
         var dur = 0.03 + Math.random() * 0.09;
         var len = Math.ceil(ctx.sampleRate * dur);
         var buf = ctx.createBuffer(1, len, ctx.sampleRate);
-        var d   = buf.getChannelData(0);
+        var d = buf.getChannelData(0);
         for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
         var src = ctx.createBufferSource();
         var bpf = ctx.createBiquadFilter();
-        var g   = ctx.createGain();
+        var g = ctx.createGain();
         src.buffer = buf;
         bpf.type = 'bandpass';
         bpf.frequency.value = 150 + Math.random() * 500;
@@ -1572,15 +1942,15 @@
       }
 
       ['click', 'touchstart', 'keydown'].forEach(function (ev) {
-        document.addEventListener(ev, startHum, { once: true, passive: true });
+        document.addEventListener(ev, startHum, {once: true, passive: true});
       });
     }());
 
-    window.onCoinInserted = function() { updatePressStart(); };
+    window.onCoinInserted = function () {updatePressStart();};
 
     function updatePressStart() {
       var key = getCoins() > 0 ? 'pressStart' : 'needCoin';
-      document.querySelectorAll('.press-start').forEach(function(el) {
+      document.querySelectorAll('.press-start').forEach(function (el) {
         el.setAttribute('data-i18n', key);
         var t = i18n[currentLang];
         if (t && t[key] !== undefined) el.innerHTML = t[key];
@@ -1595,15 +1965,15 @@
     updatePressStart(); // initialise to "NEED COIN" on page load
     updateCreditsDisplay();
 
-    document.querySelectorAll('.card').forEach(function(card) {
-      card.addEventListener('click', function(e) {
+    document.querySelectorAll('.card').forEach(function (card) {
+      card.addEventListener('click', function (e) {
         // Let nested links/buttons (Copilot, Claude, SEE HOW, robot badge…) own their own clicks.
         if (e.target.closest('a, button, .badge-see, .see-how')) return;
         // The library card has no game to launch — docs.js handles the click separately.
         if (!card.href) return;
         e.preventDefault();
         var n = getCoins();
-        if (n <= 0) { return; }
+        if (n <= 0) {return;}
         saveCoins(n - 1);
         updateCoinsHud();
         window.location.href = card.href;
@@ -1613,17 +1983,17 @@
     document.getElementById('insert-coin').addEventListener('click', insertCoin);
     document.getElementById('kiosk-insert-btn').addEventListener('click', insertCoin);
 
-    window.addEventListener('focus', function () { document.body.classList.add('win-focused'); });
-    window.addEventListener('blur',  function () { document.body.classList.remove('win-focused'); });
+    window.addEventListener('focus', function () {document.body.classList.add('win-focused');});
+    window.addEventListener('blur', function () {document.body.classList.remove('win-focused');});
     if (document.hasFocus()) document.body.classList.add('win-focused');
 
-    document.addEventListener('keydown', function(e) {
+    document.addEventListener('keydown', function (e) {
       if (e.key === '5' || e.key === 'c' || e.key === 'C') insertCoin();
       konamiCheck(e.key);
     });
 
 
-    var KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+    var KONAMI = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
     var konamiIdx = 0;
     function konamiCheck(key) {
       konamiIdx = (key === KONAMI[konamiIdx]) ? konamiIdx + 1 : (key === KONAMI[0] ? 1 : 0);
@@ -1643,9 +2013,9 @@
       document.body.classList.remove('konami-shake');
       void document.body.offsetWidth;
       document.body.classList.add('konami-shake');
-      document.body.addEventListener('animationend', function() {
+      document.body.addEventListener('animationend', function () {
         document.body.classList.remove('konami-shake');
-      }, { once: true });
+      }, {once: true});
     }
 
     /* ------------------------------------------------------------------ */
@@ -1653,21 +2023,23 @@
     /* ------------------------------------------------------------------ */
     (function () {
       var BASE = 'https://zramohohqnhmfzhlpvok.supabase.co';
-      var KEY  = 'sb_publishable_rc_Dp-WhasQoj7gisVbhCg_1XGspuJe';
-      var H    = { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } };
-      var CARD = { bouncer: 'card-bouncer', serpent: 'card-serpent',
-                   galactic_defender: 'card-galactic', canaris: 'card-canaris' };
+      var KEY = 'sb_publishable_rc_Dp-WhasQoj7gisVbhCg_1XGspuJe';
+      var H = {headers: {apikey: KEY, Authorization: 'Bearer ' + KEY}};
+      var CARD = {
+        bouncer: 'card-bouncer', serpent: 'card-serpent',
+        galactic_defender: 'card-galactic', canaris: 'card-canaris'
+      };
       Promise.all([
         fetch(BASE + '/rest/v1/hi_scores?select=game,score', H)
-          .then(function(r) { return r.ok ? r.json() : []; }).catch(function() { return []; }),
+          .then(function (r) {return r.ok ? r.json() : [];}).catch(function () {return [];}),
         fetch(BASE + '/rest/v1/scores?select=game,initials,score&order=score.desc', H)
-          .then(function(r) { return r.ok ? r.json() : []; }).catch(function() { return []; })
-      ]).then(function(results) {
+          .then(function (r) {return r.ok ? r.json() : [];}).catch(function () {return [];})
+      ]).then(function (results) {
         var hiRows = Array.isArray(results[0]) ? results[0] : [];
         var lbRows = Array.isArray(results[1]) ? results[1] : [];
         var topLb = {};
-        lbRows.forEach(function(r) { if (!topLb[r.game]) topLb[r.game] = r; });
-        hiRows.forEach(function(h) {
+        lbRows.forEach(function (r) {if (!topLb[r.game]) topLb[r.game] = r;});
+        hiRows.forEach(function (h) {
           if (!h.score) return;
           var card = document.querySelector('.' + CARD[h.game]);
           if (!card) return;
@@ -1681,7 +2053,7 @@
             : h.score.toLocaleString();
           wrap.appendChild(badge);
         });
-      }).catch(function(){});
+      }).catch(function () { });
     })();
 
     /* ------------------------------------------------------------------ */
@@ -1692,15 +2064,16 @@
       var s = document.createElement('div');
       s.className = 'star';
       s.style.cssText = [
-        'left:'    + (Math.random() * 100) + '%',
-        'top:'     + (Math.random() * 100) + '%',
-        '--d:'     + (2 + Math.random() * 4).toFixed(1) + 's',
+        'left:' + (Math.random() * 100) + '%',
+        'top:' + (Math.random() * 100) + '%',
+        '--d:' + (2 + Math.random() * 4).toFixed(1) + 's',
         '--delay:' + (Math.random() * 4).toFixed(1) + 's',
-        '--lo:'    + (0.05 + Math.random() * 0.1).toFixed(2),
-        '--hi:'    + (0.3  + Math.random() * 0.5).toFixed(2),
+        '--lo:' + (0.05 + Math.random() * 0.1).toFixed(2),
+        '--hi:' + (0.3 + Math.random() * 0.5).toFixed(2),
       ].join(';');
       stars.appendChild(s);
     }
   </script>
 </body>
+
 </html>
