@@ -365,13 +365,16 @@
       animation: blink-start 1.3s step-end infinite;
       box-shadow: 0 0 10px color-mix(in srgb, var(--c) 20%, transparent);
       white-space: nowrap;
+      /* Keep the badge (bottom: 12px right: 12px, 36px wide) from overlapping the text */
+      max-width: calc(100% - 60px);
     }
 
     @keyframes blink-start { 50% { opacity: 0.3; } }
 
     @media (max-width: 520px) {
       .card        { padding-left: 40px; }
-      .press-start { align-self: flex-end; }
+      /* Stay left-aligned so the right-side robot badge never covers the text */
+      .press-start { align-self: flex-start; }
     }
 
     /* ---- 2-player seal ---- */
@@ -600,6 +603,69 @@
     body.konami-shake { animation: konami-shake 0.55s ease; }
 
     /* ════════════════════════════════════════════════════════════════════
+       SHARE button (top-right) + toast
+       ════════════════════════════════════════════════════════════════════ */
+    .share-btn {
+      position: fixed;
+      top: 14px;
+      right: 14px;
+      z-index: 70;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 14px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--yellow, #e6dc32);
+      background: rgba(10, 10, 14, 0.85);
+      border: 2px solid var(--yellow, #e6dc32);
+      cursor: pointer;
+      text-transform: uppercase;
+      box-shadow: 0 0 12px color-mix(in srgb, var(--yellow, #e6dc32) 35%, transparent),
+                  inset 0 0 6px rgba(0,0,0,0.5);
+      transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+    }
+    .share-btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.15);
+      box-shadow: 0 0 18px color-mix(in srgb, var(--yellow, #e6dc32) 70%, transparent),
+                  inset 0 0 6px rgba(0,0,0,0.5);
+    }
+    .share-btn:active { transform: translateY(0); filter: brightness(0.9); }
+    .share-btn .share-icon {
+      display: inline-block;
+      transform: scaleX(-1);
+      font-size: 16px;
+      line-height: 1;
+    }
+    .share-toast {
+      position: fixed;
+      top: 64px;
+      right: 14px;
+      z-index: 71;
+      padding: 10px 14px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      color: #0a0a0c;
+      background: var(--green, #32c832);
+      box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+      transition: opacity .25s ease, transform .25s ease;
+    }
+    .share-toast.show { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 520px) {
+      .share-btn { top: 10px; right: 10px; padding: 8px 10px; font-size: 9px; }
+      .share-btn .share-label { display: none; }
+      .share-btn .share-icon { font-size: 18px; }
+      .share-toast { top: 56px; right: 10px; }
+    }
+
+    /* ════════════════════════════════════════════════════════════════════
        SEE INSIDE — robot badge + flip-and-grow source-tour overlay
        ════════════════════════════════════════════════════════════════════ */
 
@@ -788,16 +854,27 @@
       color: #888;
     }
     .docs-close {
-      background: none;
-      border: 1px solid #2c2c2c;
-      color: #d0d0d0;
-      width: 30px; height: 30px;
+      background: var(--c, #d4d4d4);
+      border: 2px solid var(--c, #d4d4d4);
+      color: #0a0a0c;
+      width: 44px; height: 44px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 22px;
+      font-weight: 900;
       line-height: 1;
       font-family: inherit;
+      border-radius: 4px;
+      box-shadow: 0 0 0 2px rgba(0,0,0,0.4),
+                  0 0 16px color-mix(in srgb, var(--c, #888) 55%, transparent);
+      transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
     }
-    .docs-close:hover { border-color: var(--c, #aaa); color: var(--c, #fff); }
+    .docs-close:hover {
+      filter: brightness(1.15);
+      transform: scale(1.06);
+      box-shadow: 0 0 0 2px rgba(0,0,0,0.4),
+                  0 0 22px color-mix(in srgb, var(--c, #888) 85%, transparent);
+    }
+    .docs-close:active { transform: scale(0.96); }
 
     .docs-body {
       flex: 1;
@@ -1025,11 +1102,43 @@
       .docs-head .title { font-size: 10px; }
     }
 
+    /* Small phones (iPhone SE, iPhone 12 mini, etc.) — bump readable type */
+    @media (max-width: 480px) {
+      /* Library card body */
+      .card-library .card-title       { font-size: 22px; }
+      .card-library .card-genre       { font-size: 14px; }
+      .card-library .card-desc        { font-size: 15px; line-height: 1.55; }
+      .card-library .card-controls    { font-size: 12px; }
+      .card-library .see-how          { font-size: 13px; padding: 14px 16px; }
+
+      /* Source-tour overlay prose + code */
+      .docs-prose                     { font-size: 16px; line-height: 1.7; padding: 20px 18px; }
+      .docs-prose h3                  { font-size: 13px; }
+      .docs-prose code                { font-size: 14px; }
+      .docs-prose pre                 { font-size: 13px; line-height: 1.6; padding: 12px 12px; }
+      .docs-prose .path               { font-size: 11px; padding: 8px 10px; }
+      .docs-prose .path .path-gh      { font-size: 9px; }
+      .docs-prose .gh-inline          { font-size: 14px; }
+      .docs-prose ul.gh-files .gh-file-name { font-size: 14px; min-width: 90px; }
+      .docs-prose ul.gh-files .gh-file-desc { font-size: 13px; }
+      .docs-prose .crossref           { font-size: 10px; }
+      .docs-head .title               { font-size: 11px; }
+      .docs-head .page-indicator      { font-size: 11px; }
+      .docs-shot.diagram              { font-size: 12px; }
+      .docs-nav button                { font-size: 10px; padding: 8px 12px; }
+    }
+
   </style>
 </head>
 <body>
 
   <div class="stars" id="stars"></div>
+
+  <button id="share-btn" class="share-btn" aria-label="Share Blip Arcade">
+    <span class="share-icon">&#x21AA;</span>
+    <span class="share-label" data-i18n="share">SHARE</span>
+  </button>
+  <div id="share-toast" class="share-toast" role="status" aria-live="polite"></div>
 
   <header>
     <div class="marquee-line" data-i18n="marquee"></div>
@@ -1211,6 +1320,11 @@
         libraryControls:   'AI&#8209;ASSISTED &middot; ONE AFTERNOON',
         seeInside:         '&#x25BA; CREATE YOUR OWN',
         seeHow:            '&#x25BA; SEE HOW',
+        share:             'SHARE',
+        shareTitle:        'Blip Arcade',
+        shareText:         'Play Blip Arcade &mdash; 5 mini arcade games + a recipe to build your own with an AI buddy.',
+        shareCopied:       'LINK COPIED &#x2713;',
+        shareFailed:       'COPY FAILED',
 
         pressStart:       'PUSH START BUTTON',
         needCoin:         'NEED COIN',
@@ -1249,6 +1363,11 @@
         libraryControls:   'AIと一緒に &middot; ひと午後で',
         seeInside:         '&#x25BA; じぶんで作ろう',
         seeHow:            '&#x25BA; やり方を見る',
+        share:             'シェア',
+        shareTitle:        'Blip Arcade',
+        shareText:         'Blip Arcadeで遊ぼう — ミニアーケード5本＋AIの相棒と自分のゲームを作るレシピ。',
+        shareCopied:       'リンクをコピーしました &#x2713;',
+        shareFailed:       'コピー失敗',
 
         pressStart:       'スタート',
         needCoin:         'コインが必要',
@@ -1287,6 +1406,11 @@
         libraryControls:   'AI&#8209;ASSISTERET &middot; ÉN EFTERMIDDAG',
         seeInside:         '&#x25BA; LAV DIT EGET',
         seeHow:            '&#x25BA; SE HVORDAN',
+        share:             'DEL',
+        shareTitle:        'Blip Arcade',
+        shareText:         'Spil Blip Arcade &mdash; 5 mini-arkadespil + en opskrift p&aring; at lave dit eget med en AI-makker.',
+        shareCopied:       'LINK KOPIERET &#x2713;',
+        shareFailed:       'KOPIERING MISLYKKEDES',
 
         pressStart:       'TRYK START',
         needCoin:         'INDS&AElig;T M&Oslash;NT',
@@ -1331,6 +1455,57 @@
       var browserLang = (navigator.language || '').slice(0, 2).toLowerCase();
       currentLang = saved || (i18n[browserLang] ? browserLang : 'en');
       applyLang(currentLang);
+    })();
+
+    /* ------------------------------------------------------------------ */
+    /* Share button — native share sheet on mobile, copy-link on desktop  */
+    /* ------------------------------------------------------------------ */
+    (function () {
+      var btn   = document.getElementById('share-btn');
+      var toast = document.getElementById('share-toast');
+      if (!btn) return;
+
+      function strip(html) {
+        var d = document.createElement('div');
+        d.innerHTML = html;
+        return d.textContent || d.innerText || '';
+      }
+      function flash(msg, ok) {
+        toast.innerHTML = msg;
+        toast.style.background = ok === false ? 'var(--red, #dc3232)' : 'var(--green, #32c832)';
+        toast.classList.add('show');
+        clearTimeout(toast._t);
+        toast._t = setTimeout(function () { toast.classList.remove('show'); }, 2000);
+      }
+      btn.addEventListener('click', function () {
+        var t = i18n[currentLang] || i18n.en;
+        var url = window.location.origin + window.location.pathname;
+        var data = {
+          title: strip(t.shareTitle),
+          text:  strip(t.shareText),
+          url:   url
+        };
+        if (navigator.share) {
+          navigator.share(data).catch(function () { /* user cancelled — no-op */ });
+          return;
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url).then(
+            function () { flash(t.shareCopied); },
+            function () { flash(t.shareFailed, false); }
+          );
+        } else {
+          // Last-resort fallback
+          var ta = document.createElement('textarea');
+          ta.value = url;
+          ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try { document.execCommand('copy'); flash(t.shareCopied); }
+          catch (e) { flash(t.shareFailed, false); }
+          document.body.removeChild(ta);
+        }
+      });
     })();
 
     /* ------------------------------------------------------------------ */
