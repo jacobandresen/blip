@@ -607,9 +607,9 @@
        ════════════════════════════════════════════════════════════════════ */
     .share-btn {
       position: fixed;
-      top: 14px;
-      right: 14px;
-      z-index: 70;
+      top: calc(14px + env(safe-area-inset-top, 0px));
+      right: calc(14px + env(safe-area-inset-right, 0px));
+      z-index: 10001;
       display: inline-flex;
       align-items: center;
       gap: 8px;
@@ -641,9 +641,9 @@
     }
     .share-toast {
       position: fixed;
-      top: 64px;
-      right: 14px;
-      z-index: 71;
+      top: calc(64px + env(safe-area-inset-top, 0px));
+      right: calc(14px + env(safe-area-inset-right, 0px));
+      z-index: 10002;
       padding: 10px 14px;
       font-family: 'Press Start 2P', monospace;
       font-size: 9px;
@@ -659,10 +659,18 @@
     .share-toast.show { opacity: 1; transform: translateY(0); }
 
     @media (max-width: 520px) {
-      .share-btn { top: 10px; right: 10px; padding: 8px 10px; font-size: 9px; }
+      .share-btn {
+        top: calc(10px + env(safe-area-inset-top, 0px));
+        right: calc(10px + env(safe-area-inset-right, 0px));
+        padding: 8px 10px;
+        font-size: 9px;
+      }
       .share-btn .share-label { display: none; }
       .share-btn .share-icon { font-size: 18px; }
-      .share-toast { top: 56px; right: 10px; }
+      .share-toast {
+        top: calc(56px + env(safe-area-inset-top, 0px));
+        right: calc(10px + env(safe-area-inset-right, 0px));
+      }
     }
 
     /* ════════════════════════════════════════════════════════════════════
