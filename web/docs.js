@@ -97,7 +97,10 @@
           '<strong>You can add the sixth.</strong></p>' +
           '<p>You don\'t need to be a Rust wizard. You don\'t need to know macroquad. ' +
           'You need an <strong>idea you can describe in two sentences</strong> and a coding ' +
-          'agent / AI buddy (Copilot, Claude Code, Cursor — whatever) sitting next to you.</p>' +
+          'agent / AI buddy (' +
+          '<a class="gh-inline" href="https://github.com/features/copilot" target="_blank" rel="noopener">Copilot</a>, ' +
+          '<a class="gh-inline" href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>, ' +
+          '<a class="gh-inline" href="https://cursor.com" target="_blank" rel="noopener">Cursor</a> — whatever) sitting next to you.</p>' +
           '<p>The library does the boring stuff — window, input, audio, hi-scores, the ' +
           'web bridge. You write the <em>fun</em>. The next pages are the setup, the ' +
           'agent prompt, and a list of one-afternoon classics to start from.</p>'
@@ -106,7 +109,8 @@
         shot: diagram('AGENT INSTALLS:\n  rustup\n  cargo\n  wasm32 target\n  (you do nothing)'),
         html:
           '<h3>STEP 0 — FIRST TIME ONLY</h3>' +
-          '<p>You need a Rust toolchain and the WebAssembly target. <strong>Don\'t install ' +
+          '<p>You need some nerd stuff on your machine for this to work — a Rust toolchain ' +
+          'and the WebAssembly target. <strong>Don\'t install ' +
           'anything yourself.</strong> Open your coding agent in a fresh terminal sitting in ' +
           'the cloned repo and paste this:</p>' +
           '<pre>' +
@@ -200,7 +204,10 @@
           '<strong>Du kan tilføje det sjette.</strong></p>' +
           '<p>Du behøver ikke være Rust-troldmand. Du behøver ikke kende macroquad. ' +
           'Du skal bare have en <strong>idé du kan beskrive på to sætninger</strong> og en ' +
-          'AI-makker (Copilot, Claude Code, Cursor — hvad du nu bruger) ved siden af dig.</p>' +
+          'AI-makker (' +
+          '<a class="gh-inline" href="https://github.com/features/copilot" target="_blank" rel="noopener">Copilot</a>, ' +
+          '<a class="gh-inline" href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>, ' +
+          '<a class="gh-inline" href="https://cursor.com" target="_blank" rel="noopener">Cursor</a> — hvad du nu bruger) ved siden af dig.</p>' +
           '<p>Biblioteket klarer kedsomheden — vindue, input, lyd, highscores, web-broen. ' +
           'Du skriver det <em>sjove</em>. De næste sider er opsætningen, agent-prompten ' +
           'og en liste af eftermiddags-klassikere at starte fra.</p>'
@@ -209,7 +216,8 @@
         shot: diagram('AGENTEN INSTALLERER:\n  rustup\n  cargo\n  wasm32 target\n  (du gør ingenting)'),
         html:
           '<h3>TRIN 0 — KUN FØRSTE GANG</h3>' +
-          '<p>Du har brug for en Rust-toolchain og WebAssembly-targetet. ' +
+          '<p>Du har brug for noget nørdet kram på maskinen for at det her virker — en ' +
+          'Rust-toolchain og WebAssembly-targetet. ' +
           '<strong>Installer ikke noget selv.</strong> Åbn din kode-agent i en frisk terminal ' +
           'inde i det klonede repo og indsæt denne prompt:</p>' +
           '<pre>' +
@@ -302,7 +310,10 @@
           '<strong>6つ目はきみが追加できる。</strong></p>' +
           '<p>Rustの達人じゃなくていい。macroquadを知らなくていい。' +
           '<strong>2文で説明できるアイデア</strong>と、横で動くコーディング・' +
-          'AIの相棒（Copilot、Claude Code、Cursor — なんでもいい）があればいい。</p>' +
+          'AIの相棒（' +
+          '<a class="gh-inline" href="https://github.com/features/copilot" target="_blank" rel="noopener">Copilot</a>、' +
+          '<a class="gh-inline" href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a>、' +
+          '<a class="gh-inline" href="https://cursor.com" target="_blank" rel="noopener">Cursor</a> — なんでもいい）があればいい。</p>' +
           '<p>ライブラリが面倒なところを全部やってくれる — ウィンドウ、入力、音、' +
           'ハイスコア、ウェブ橋渡し。きみは<em>面白い部分</em>を書く。' +
           '次のページはセットアップ、エージェント・プロンプト、そして午後1回で作れる' +
@@ -312,7 +323,8 @@
         shot: diagram('エージェントが入れる：\n  rustup\n  cargo\n  wasm32 target\n  （きみは何もしない）'),
         html:
           '<h3>ステップ0 — 初回だけ</h3>' +
-          '<p>Rustのツールチェーンと、WebAssemblyのターゲットが必要だ。' +
+          '<p>これを動かすにはマシンに少しオタクっぽいものが必要だ — ' +
+          'Rustのツールチェーンと、WebAssemblyのターゲット。' +
           '<strong>自分では何もインストールしないでいい。</strong>' +
           'クローン済みのリポジトリのフォルダで、新しいターミナルからコーディング・' +
           'エージェントを開いて、このプロンプトを貼り付けよう：</p>' +
