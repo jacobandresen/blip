@@ -62,7 +62,7 @@ fn square_note(buf: &mut Vec<i16>, freq: f32, dur_ms: f32, amp: f32) {
 
 fn rest(buf: &mut Vec<i16>, dur_ms: f32) {
     let n = ms_to_samples(dur_ms);
-    buf.extend(std::iter::repeat(0i16).take(n));
+    buf.extend(std::iter::repeat_n(0i16, n));
 }
 
 // ── images ────────────────────────────────────────────────────────────────────
@@ -303,7 +303,7 @@ fn port_bg() -> Vec<u8> {
     for x in (0..w).step_by(24) {
         for i in 0..3 {
             let wx = x + i * 8;
-            let wy = 210 + (wx * 3 % 15) as i32;
+            let wy = 210 + (wx * 3 % 15);
             hband(&mut img, wx, wx + 6, wy, wy + 1, 40, 100, 120);
         }
     }

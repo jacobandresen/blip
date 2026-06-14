@@ -94,7 +94,7 @@ fn alien(kind: usize) -> Vec<u8> {
     for row in 0..5 {
         for col in 0..5 {
             if patterns[kind][row] & (1 << (4 - col)) != 0 {
-                let px_x = ox + col as i32 * 2;
+                let px_x = ox + col * 2;
                 let px_y = oy + row as i32 * 2;
                 img.set(px_x,     px_y,     r, g, b);
                 img.set(px_x + 1, px_y,     r, g, b);

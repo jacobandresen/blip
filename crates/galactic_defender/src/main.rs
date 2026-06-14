@@ -119,7 +119,7 @@ impl Game {
             explosions: [expl_default; N_EXPLOSIONS],
             shields: [shield_default; SHIELDS],
             player_x: 0.0,
-            sess: Session::new(web::GAME_GALACTIC_DEFENDER, LIVES_START),
+            sess: Session::new(LIVES_START),
             march_timer: 0.0,
             march_dir: 1,
             march_drop_next: false,
@@ -258,7 +258,7 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        self.sess.reset(web::GAME_GALACTIC_DEFENDER, LIVES_START);
+        self.sess.reset(LIVES_START);
         self.start_round_common();
     }
 }
@@ -313,7 +313,7 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.bullets[bi].active = false;
             g.bullets[UFO_BOMB_IDX].active = false;
             let bonus = rand_int(1, 6) * 50;
-            g.sess.add_score(web::GAME_GALACTIC_DEFENDER, bonus);
+            g.sess.add_score(bonus);
             g.ufo_score = bonus;
             g.ufo_score_timer.start(1.5);
             g.ufo_active = false;
@@ -336,12 +336,10 @@ fn draw_ufo(blip: &Blip, g: &Game) {
 }
 
 fn update_title(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_GALACTIC_DEFENDER);
     if any_key_pressed() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    g.sess.refresh_hi(web::GAME_GALACTIC_DEFENDER);
     let shoot = key_pressed(BLIP_KEY_SPACE)
         || key_pressed(BLIP_KEY_UP)
         || key_pressed(BLIP_KEY_W);
@@ -438,7 +436,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.aliens[ai].alive = false;
                 g.bullets[bi].active = false;
                 let pts = match kind { 0 => 30, 1 => 20, _ => 10 };
-                g.sess.add_score(web::GAME_GALACTIC_DEFENDER, pts * g.sess.level);
+                g.sess.add_score(pts * g.sess.level);
                 break;
             }
         }
@@ -529,8 +527,6 @@ fn update_win(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_GALACTIC_DEFENDER);
-    web::game_over(web::GAME_GALACTIC_DEFENDER, g.sess.score);
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
@@ -585,7 +581,7 @@ fn draw_play(blip: &Blip, g: &Game,
     }
 
     draw_ufo(blip, g);
-    blip.draw_hud(g.sess.score, g.sess.hi, g.sess.lives);
+    blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
 fn draw_title(blip: &Blip, alien: &[Texture2D; 3]) {

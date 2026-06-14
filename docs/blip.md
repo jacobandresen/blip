@@ -10,7 +10,7 @@ A friendly walkthrough of the `blip` crate for anyone who wants to build a new g
 
 - **Rendering** — draws everything to a fixed-size virtual canvas (e.g. 480×540 pixels), then scales it up with letterboxing to fit any window. A CRT post-process (scanlines, occasional glitch effects) is applied automatically.
 - **Frame pacing** — you call `blip.next_frame(60).await` once per tick; delta-time is available as `blip.delta_time`.
-- **Platform shims** — the same code runs natively and as WebAssembly. Hi-score calls go to Supabase in the browser and are no-ops on the desktop.
+- **Platform shims** — the same code runs natively and as WebAssembly. Kiosk shell calls go to the browser bridge and are no-ops on the desktop.
 
 Everything else — game logic, state, entities, physics — lives entirely in your game crate.
 
@@ -142,10 +142,10 @@ blip.draw_centered("PRESS ANY KEY", y, 2.0, BLIP_GRAY); // horizontally centred
 blip.draw_number(score, x, y, 2.0, BLIP_WHITE);         // i32 shorthand
 ```
 
-The standard HUD (SCORE / HI / LIVES across the top) is one call:
+The standard HUD (SCORE / LIVES across the top) is one call:
 
 ```rust
-blip.draw_hud(g.score, g.hi_score, g.lives);
+blip.draw_hud(g.score, g.lives);
 ```
 
 ### `blip::color` — the palette
@@ -182,40 +182,31 @@ clamp(v, 0.0, 1.0)
 lerp(a, b, 0.5)  // midpoint between a and b
 ```
 
-### `blip::web` — hi-scores and kiosk
+### `blip::web` — kiosk shell
 
 These calls talk to the browser's JavaScript bridge when running as WASM. On the desktop they do nothing, so your game logic works unchanged in both environments.
 
 ```rust
 use blip::web;
 
-// Load the global hi-score for your game at startup:
-let hi = web::load_hi_score(web::GAME_RIVET);
-
-// Save when the player beats it:
-if score > hi { web::save_hi_score(web::GAME_RIVET, score); }
-
-// Tell the kiosk the session has ended (triggers leaderboard check):
-web::game_over(web::GAME_RIVET, score);
-
 // Charge a coin when starting a new game in kiosk mode:
 web::spend_coin();
-```
 
-Available game ID constants: `GAME_BOUNCER`, `GAME_SERPENT`, `GAME_GALACTIC_DEFENDER`, `GAME_CANARIS`, `GAME_RIVET`.
+// Tell the kiosk which mode was selected (false = 1P/CPU, true = 2P):
+web::set_mode(true);
+```
 
 ---
 
 ## Running a game natively
 
 ```bash
-cargo run -p rivet
 cargo run -p rally
 cargo run -p serpent
 # etc.
 ```
 
-Native builds show a resizable window with the CRT effect. Hi-score calls are no-ops, so the game always starts from zero.
+Native builds show a resizable window with the CRT effect. The kiosk shell calls are no-ops on the desktop.
 
 ## Building for the web
 

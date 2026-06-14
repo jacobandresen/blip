@@ -43,9 +43,7 @@ fn ball() -> Vec<u8> {
             let dx = (x - cx) as f32 + 0.5;
             let dy = (y - cy) as f32 + 0.5;
             if dx * dx + dy * dy < r * r {
-                let mut shade = 1.0 - (dx * 0.2 + dy * 0.2) / r;
-                if shade < 0.5 { shade = 0.5; }
-                if shade > 1.0 { shade = 1.0; }
+                let shade = (1.0 - (dx * 0.2 + dy * 0.2) / r).clamp(0.5, 1.0);
                 let c = (200.0 + 55.0 * shade) as u8;
                 img.set(x, y, c, c, c);
             }

@@ -258,7 +258,6 @@ struct Game {
     map_cursor:    usize,
 
     score:    i32,
-    hi_score: i32,
     lives:    i32,
     level:    i32,
     level_t:  f32,
@@ -300,7 +299,7 @@ impl Game {
             port_msg_t: 0.0,
             port_msg_ok: true,
             map_cursor: 0,
-            score: 0, hi_score: web::load_hi_score(web::GAME_CANARIS),
+            score: 0,
             lives: LIVES_START,
             level: 1, level_t: 60.0,
             dead_t: 0.0,
@@ -308,9 +307,7 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        let hi = self.hi_score.max(web::load_hi_score(web::GAME_CANARIS));
         *self = Game::new();
-        self.hi_score = hi;
         self.state = State::Sea;
         self.spawn_enemies();
     }
@@ -424,8 +421,8 @@ impl Game {
         let idx = self.combat_enemy_idx;
         // Slots 0-2 = player side (left), slots 3-5 = enemy side (right).
         // HP scales with crew count so a well-crewed ship fights longer.
-        let p_hp = (self.player.crew / 3).clamp(1, 3) as i32;
-        let e_hp = (self.enemies[idx].crew / 2).clamp(1, 3) as i32;
+        let p_hp = (self.player.crew / 3).clamp(1, 3);
+        let e_hp = (self.enemies[idx].crew / 2).clamp(1, 3);
         for i in 0..3 {
             self.slots[i] = BoardingSlot { owner: SlotOwner::Player, hp: p_hp };
         }
@@ -514,7 +511,6 @@ fn load_png(bytes: &'static [u8]) -> Texture2D {
 
 fn update_title(g: &mut Game, dt: f32) {
     g.time += dt;
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_CANARIS));
     if any_key_pressed() {
         g.start_game();
     }
@@ -522,7 +518,6 @@ fn update_title(g: &mut Game, dt: f32) {
 
 fn update_sea(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.time += dt;
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_CANARIS));
 
     // Player movement
     if key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D) {
@@ -570,7 +565,6 @@ fn update_sea(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.level += 1;
         g.level_t = 60.0 + g.level as f32 * 10.0;
         g.score += 500 * g.level;
-        if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_CANARIS, g.hi_score); }
         g.spawn_enemies();
     }
 
@@ -757,7 +751,6 @@ fn update_combat(g: &mut Game, dt: f32, sfx: &Sounds) {
         let loot = g.enemies[pidx].gold_loot;
         g.player.gold += loot;
         g.score += 200 * g.level;
-        if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_CANARIS, g.hi_score); }
         play_sfx(&sfx.coin_jingle);
         g.spawn_explosion(COMBAT_ENEMY_X + ENEMY_W / 2.0, g.enemies[pidx].combat_y + ENEMY_H / 2.0);
         for b in g.cannonballs.iter_mut() { b.active = false; }
@@ -843,7 +836,6 @@ fn update_boarding(g: &mut Game, dt: f32, sfx: &Sounds) {
         let loot = g.enemies[idx].gold_loot * 2;
         g.player.gold += loot;
         g.score       += 150 * g.level + loot;
-        if g.score > g.hi_score { g.hi_score = g.score; web::save_hi_score(web::GAME_CANARIS, g.hi_score); }
         g.enemies[idx].active = false;
         play_sfx(&sfx.coin_jingle);
         g.state = State::Sea;
@@ -927,8 +919,6 @@ fn update_dead(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_gameover(g: &mut Game) {
-    g.hi_score = g.hi_score.max(web::load_hi_score(web::GAME_CANARIS));
-    web::game_over(web::GAME_CANARIS, g.score);
     if any_key_pressed() {
         web::spend_coin();
         g.state = State::Title;
@@ -955,7 +945,7 @@ fn draw_sea_bg(blip: &Blip, tex_a: &Texture2D, tex_b: &Texture2D, cam_x: f32, ti
     let tile_w = 120.0_f32;
     // Pick A or B frame at 2.5 Hz; phase offset desynchronises the two layers
     let wave_tex = |phase: f32| -> &Texture2D {
-        if ((time + phase) * 2.5) as u32 % 2 == 0 { tex_a } else { tex_b }
+        if (((time + phase) * 2.5) as u32).is_multiple_of(2) { tex_a } else { tex_b }
     };
 
     // Layer 1 — horizon waves, full colour, fastest scroll
@@ -984,7 +974,7 @@ fn draw_sea_bg(blip: &Blip, tex_a: &Texture2D, tex_b: &Texture2D, cam_x: f32, ti
 
 fn draw_sea_foreground(blip: &Blip, tex_a: &Texture2D, tex_b: &Texture2D, cam_x: f32, time: f32) {
     let tile_w = 120.0_f32;
-    let tex    = if ((time * 1.8) as u32) % 2 == 0 { tex_a } else { tex_b };
+    let tex    = if ((time * 1.8) as u32).is_multiple_of(2) { tex_a } else { tex_b };
     let offset = (cam_x * 1.15 + time * 5.0).rem_euclid(tile_w);
     let tint   = Color::new(0.7, 0.85, 1.0, 0.85);
     let fg_y   = SEA_LANE_Y + 18.0;
@@ -1029,25 +1019,21 @@ fn draw_title(blip: &Blip, g: &Game, tex: &Textures) {
     let ship_h = PLAYER_H * 2.0;
     let ship_x = WIN_W as f32 / 2.0 - ship_w / 2.0;
     let ship_y = WIN_H as f32 * 0.40 + bob;
-    let ship_t = if (g.time * (1.0 / ANIM_FRAME_DUR)) as u32 % 2 == 0 { &tex.player_a } else { &tex.player_b };
+    let ship_t = if ((g.time * (1.0 / ANIM_FRAME_DUR)) as u32).is_multiple_of(2) { &tex.player_a } else { &tex.player_b };
     blip.draw_texture(ship_t, ship_x, ship_y, ship_w, ship_h);
 
     blip.draw_centered("CANARIS",               WIN_H as f32 * 0.10, 6.0, BLIP_CYAN);
     blip.draw_centered("PRIVATEER OF KATTEGAT", WIN_H as f32 * 0.22, 2.0, BLIP_YELLOW);
 
-    if g.hi_score > 0 {
-        let hi_str = format!("BEST {}", g.hi_score);
-        blip.draw_centered(&hi_str, WIN_H as f32 * 0.63, 2.0, BLIP_YELLOW);
-    }
     // Blink "PRESS ANY KEY" at 1Hz
-    if (g.time * 2.0) as u32 % 2 == 0 {
+    if ((g.time * 2.0) as u32).is_multiple_of(2) {
         blip.draw_centered("PRESS ANY KEY",     WIN_H as f32 * 0.72, 3.0, BLIP_WHITE);
     }
     blip.draw_centered("SAIL. RAID. PLUNDER.",  WIN_H as f32 * 0.84, 2.0, BLIP_GRAY);
 }
 
 fn draw_hud_canaris(blip: &Blip, g: &Game) {
-    blip.draw_hud(g.score, g.hi_score, g.lives);
+    blip.draw_hud(g.score, g.lives);
     // Secondary stat row at y=20 (within the 28px HUD black band, below the score row)
     let y = 20.0_f32;
     let hull_col = if g.player.hull < 6 { BLIP_RED } else { BLIP_GREEN };
@@ -1084,7 +1070,7 @@ fn draw_sea(blip: &Blip, g: &Game, tex: &Textures) {
         blip.fill_rect(port_sx, WIN_H as f32 - 40.0, 8.0, 30.0, BLIP_YELLOW);
         blip.draw_text("PORT", port_sx - 10.0, WIN_H as f32 - 52.0, 1.0, BLIP_YELLOW);
         let near = (g.player.world_x - PORT_ANCHOR_X).abs() < PORT_DOCK_RADIUS;
-        if near && (g.time * 2.0) as u32 % 2 == 0 {
+        if near && ((g.time * 2.0) as u32).is_multiple_of(2) {
             blip.draw_centered("[1] DOCK", WIN_H as f32 - 65.0, 1.0, BLIP_YELLOW);
         }
     }
@@ -1237,7 +1223,7 @@ fn draw_combat(blip: &Blip, g: &Game, tex: &Textures) {
     let hint_y = rt_y + 8.0;
     let y_gap = (g.player.y - g.enemies[pidx].combat_y).abs();
     if g.player.cannons == 0 {
-        if (g.time * 3.0) as u32 % 2 == 0 {
+        if ((g.time * 3.0) as u32).is_multiple_of(2) {
             blip.draw_centered("NO AMMO - [2] BOARD OR RETREAT", hint_y, 1.0, BLIP_RED);
         }
     } else if y_gap < BOARD_Y_DIST {
@@ -1420,12 +1406,10 @@ fn draw_port(blip: &Blip, g: &Game, tex: &Textures) {
 fn update_map(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.time += dt;
 
-    if key_pressed(BLIP_KEY_UP) || key_pressed(BLIP_KEY_W) {
-        if g.map_cursor + 1 < ZONES.len() { g.map_cursor += 1; }
-    }
-    if key_pressed(BLIP_KEY_DOWN) || key_pressed(BLIP_KEY_S) {
-        if g.map_cursor > 0 { g.map_cursor -= 1; }
-    }
+    if (key_pressed(BLIP_KEY_UP) || key_pressed(BLIP_KEY_W))
+        && g.map_cursor + 1 < ZONES.len() { g.map_cursor += 1; }
+    if (key_pressed(BLIP_KEY_DOWN) || key_pressed(BLIP_KEY_S))
+        && g.map_cursor > 0 { g.map_cursor -= 1; }
 
     if btn1_pressed() {
         let z = &ZONES[g.map_cursor];
@@ -1461,7 +1445,7 @@ fn draw_map(blip: &Blip, g: &Game, tex: &Textures) {
     // Zone crosshair dots
     for (i, z) in ZONES.iter().enumerate() {
         let selected = i == g.map_cursor;
-        let blink_on = !selected || (g.time * 3.0) as u32 % 2 == 0;
+        let blink_on = !selected || ((g.time * 3.0) as u32).is_multiple_of(2);
         let col = if selected { BLIP_YELLOW } else { Color::new(0.3, 0.6, 0.9, 1.0) };
         if blink_on {
             blip.fill_rect(z.map_x - 5.0, play_y + z.map_y - 5.0, 10.0, 10.0, col);
@@ -1513,8 +1497,6 @@ fn draw_gameover(blip: &Blip, g: &Game) {
     blip.draw_centered("GAME OVER",     (WIN_H / 4) as f32,     5.0, BLIP_RED);
     let score_str = format!("SCORE {}", g.score);
     blip.draw_centered(&score_str,      (WIN_H / 2) as f32,     3.0, BLIP_WHITE);
-    let hi_str = format!("BEST  {}", g.hi_score);
-    blip.draw_centered(&hi_str,         (WIN_H / 2 + 30) as f32, 2.0, BLIP_YELLOW);
     blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, BLIP_CYAN);
 }
 

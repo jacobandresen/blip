@@ -417,8 +417,8 @@ impl Blip {
         font::draw_centered(self.width, text, y, sz, color);
     }
 
-    /// Draw the standard three-field HUD bar (SCORE / HI / LIVES) across the top of the canvas.
-    pub fn draw_hud(&self, score: i32, hi_score: i32, lives: i32) {
+    /// Draw the standard two-field HUD bar (SCORE / LIVES) across the top of the canvas.
+    pub fn draw_hud(&self, score: i32, lives: i32) {
         let hud_h = 28.0;
         self.fill_rect(0.0, 0.0, self.width as f32, hud_h, BLIP_BLACK);
         self.draw_line(
@@ -426,8 +426,6 @@ impl Blip {
         );
         self.draw_text("SCORE", 4.0, 5.0, 2.0, BLIP_YELLOW);
         self.draw_number(score, 68.0, 5.0, 2.0, BLIP_WHITE);
-        self.draw_text("HI", (self.width / 2 - 22) as f32, 5.0, 2.0, BLIP_CYAN);
-        self.draw_number(hi_score, (self.width / 2 + 8) as f32, 5.0, 2.0, BLIP_WHITE);
         self.draw_text("LIVES", (self.width - 90) as f32, 5.0, 2.0, BLIP_ORANGE);
         self.draw_number(lives, (self.width - 18) as f32, 5.0, 2.0, BLIP_WHITE);
     }

@@ -45,14 +45,11 @@ rustup target add wasm32-unknown-unknown   # one-time
 
 ### Tests
 
-Run both test suites locally before pushing:
+Run the test suite locally before pushing:
 
 ```
 node --test test/fill-canvas.test.mjs   # unit tests (canvas geometry)
-npx playwright test                     # E2E tests (hi-score badges, overlay flow)
 ```
-
-`npx playwright test` starts a local static server automatically (`python3 -m http.server -d web 8080`) and mocks all Supabase calls — no network access or credentials required.
 
 For native development:
 

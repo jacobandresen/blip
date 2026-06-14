@@ -63,7 +63,7 @@ impl Game {
             cur_dir: Dir::Right,
             want_dir: Dir::Right,
             food: Cell { c: 0, r: 0 },
-            sess: Session::new(web::GAME_SERPENT, LIVES_START),
+            sess: Session::new(LIVES_START),
             foods_eaten: 0,
             move_timer: 0.0,
             dead_timer: Timer::default(),
@@ -137,7 +137,7 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        self.sess.reset(web::GAME_SERPENT, LIVES_START);
+        self.sess.reset(LIVES_START);
         self.foods_eaten = 0;
         self.reset_snake();
         self.want_track = rand_int(1, 3);
@@ -151,12 +151,10 @@ struct Sounds {
 }
 
 fn update_title(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_SERPENT);
     if any_key_pressed() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    g.sess.refresh_hi(web::GAME_SERPENT);
     if (key_pressed(BLIP_KEY_UP)    || key_pressed(BLIP_KEY_W)) && g.cur_dir != Dir::Down  { g.want_dir = Dir::Up; }
     if (key_pressed(BLIP_KEY_DOWN)  || key_pressed(BLIP_KEY_S)) && g.cur_dir != Dir::Up    { g.want_dir = Dir::Down; }
     if (key_pressed(BLIP_KEY_LEFT)  || key_pressed(BLIP_KEY_A)) && g.cur_dir != Dir::Right { g.want_dir = Dir::Left; }
@@ -199,7 +197,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     let ate = h.c == g.food.c && h.r == g.food.r;
     if ate {
         play_sfx(&sfx.eat);
-        g.sess.add_score(web::GAME_SERPENT, 10 * g.sess.level);
+        g.sess.add_score(10 * g.sess.level);
         g.foods_eaten += 1;
         if g.foods_eaten >= FOODS_PER_LVL {
             g.sess.next_level();
@@ -223,8 +221,6 @@ fn update_dead(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_SERPENT);
-    web::game_over(web::GAME_SERPENT, g.sess.score);
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
@@ -287,7 +283,7 @@ fn draw_play(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D, food: &T
         (HUD_H + g.food.r * CELL) as f32,
         CELL as f32, CELL as f32);
     draw_snake(blip, g, head, body);
-    blip.draw_hud(g.sess.score, g.sess.hi, g.sess.lives);
+    blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
 fn draw_title(blip: &Blip) {

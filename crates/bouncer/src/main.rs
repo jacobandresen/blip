@@ -98,7 +98,7 @@ impl Game {
             slow_timer: Timer::default(),
             ball_x: 0.0, ball_y: 0.0, ball_vx: 0.0, ball_vy: 0.0,
             ball_speed: BALL_SPEED_0,
-            sess: Session::new(web::GAME_BOUNCER, LIVES_START),
+            sess: Session::new(LIVES_START),
             dead_timer: Timer::default(),
             state: State::Title,
         }
@@ -143,7 +143,7 @@ impl Game {
     }
 
     fn start_game(&mut self) {
-        self.sess.reset(web::GAME_BOUNCER, LIVES_START);
+        self.sess.reset(LIVES_START);
         self.ball_speed = BALL_SPEED_0;
         self.reset_drops();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
@@ -171,7 +171,6 @@ struct Sounds {
 }
 
 fn update_title(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_BOUNCER);
     if any_key_pressed() { g.start_game(); }
 }
 
@@ -192,7 +191,6 @@ fn update_launch(g: &mut Game, dt: f32) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    g.sess.refresh_hi(web::GAME_BOUNCER);
     paddle_input(g, dt);
 
     g.ball_x += g.ball_vx * dt;
@@ -253,7 +251,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
         let kind = g.bricks[i].kind;
         g.bricks[i].alive = false;
-        g.sess.add_score(web::GAME_BOUNCER, (BRICK_ROWS - r) * 10 * g.sess.level);
+        g.sess.add_score((BRICK_ROWS - r) * 10 * g.sess.level);
         g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
 
         // 30% chance to spawn a loot drop
@@ -333,8 +331,6 @@ fn update_win(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game) {
-    g.sess.refresh_hi(web::GAME_BOUNCER);
-    web::game_over(web::GAME_BOUNCER, g.sess.score);
     if !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
@@ -382,7 +378,7 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick:
 
     blip.draw_texture(paddle, g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32);
     blip.draw_texture(ball, g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32);
-    blip.draw_hud(g.sess.score, g.sess.hi, g.sess.lives);
+    blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
 fn draw_title(blip: &Blip) {
