@@ -1,0 +1,138 @@
+//! Meteors music — a driving four-on-the-floor techno loop.
+//! Kick + hat + a syncopated acid-style bassline + tension stabs, all synthesized.
+
+use std::f32::consts::PI;
+
+use crate::wav::{encode_pcm16_mono, env, mix_into, SAMPLE_RATE};
+use crate::Asset;
+
+const BPM: f32 = 128.0;
+const STEPS_PER_BAR: usize = 16; // 16th-note grid
+const BARS: usize = 8;
+const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
+
+/// Small deterministic PRNG — no external dependency, reproducible builds.
+struct Rng(u32);
+impl Rng {
+    fn next_f32(&mut self) -> f32 {
+        self.0 ^= self.0 << 13;
+        self.0 ^= self.0 >> 17;
+        self.0 ^= self.0 << 5;
+        (self.0 >> 8) as f32 / 16_777_216.0 // 0..1
+    }
+}
+
+fn kick(buf: &mut [i16], off: usize, vol: f32) {
+    let sr = SAMPLE_RATE as f32;
+    let n = (sr * 0.15) as usize;
+    for i in 0..n {
+        if off + i >= buf.len() { break; }
+        let t = i as f32 / sr;
+        let e = (1.0 - i as f32 / n as f32).powf(1.7);
+        let freq = 42.0 + 130.0 * (-t / 0.045).exp(); // pitch sweep 172Hz -> 42Hz
+        let s = (2.0 * PI * freq * t).sin();
+        mix_into(buf, off + i, s * e * vol * 22000.0);
+    }
+}
+
+fn hat(buf: &mut [i16], off: usize, rng: &mut Rng, vol: f32) {
+    let n = (SAMPLE_RATE as f32 * 0.045) as usize;
+    for i in 0..n {
+        if off + i >= buf.len() { break; }
+        let e = (1.0 - i as f32 / n as f32).powf(2.2);
+        let noise = rng.next_f32() * 2.0 - 1.0;
+        mix_into(buf, off + i, noise * e * vol * 11000.0);
+    }
+}
+
+/// Bassline voice — a fat two-harmonic saw-ish tone, short and punchy.
+fn bass_note(buf: &mut [i16], off: usize, freq: f32, ms: f32, vol: f32) {
+    let sr = SAMPLE_RATE as f32;
+    let n = (sr * ms / 1000.0) as usize;
+    let att = (sr * 0.003) as usize;
+    let rel = (n / 4).max(1);
+    for i in 0..n {
+        if off + i >= buf.len() { break; }
+        let t = i as f32 / sr;
+        let e = env(i, n, att.max(1), rel);
+        let w = (2.0 * PI * freq * t).sin()
+            - 0.5 * (2.0 * PI * freq * 2.0 * t).sin()
+            + 0.25 * (2.0 * PI * freq * 3.0 * t).sin();
+        mix_into(buf, off + i, w * e * vol * 13000.0);
+    }
+}
+
+/// Lead stab — brighter additive tone for the tension hits.
+fn lead_stab(buf: &mut [i16], off: usize, freq: f32, ms: f32, vol: f32) {
+    let sr = SAMPLE_RATE as f32;
+    let n = (sr * ms / 1000.0) as usize;
+    let att = (sr * 0.01) as usize;
+    let rel = (n * 3 / 4).max(1);
+    for i in 0..n {
+        if off + i >= buf.len() { break; }
+        let t = i as f32 / sr;
+        let e = env(i, n, att.max(1), rel);
+        let w = (2.0 * PI * freq * t).sin()
+            + (1.0 / 3.0) * (2.0 * PI * freq * 3.0 * t).sin()
+            + (1.0 / 5.0) * (2.0 * PI * freq * 5.0 * t).sin();
+        mix_into(buf, off + i, w * e * vol * 9000.0);
+    }
+}
+
+fn music() -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let step_ms = 60_000.0 / BPM / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize;
+    let mut buf = vec![0i16; total];
+    let mut rng = Rng(0xC0FF_EE42);
+
+    // A-phrygian bassline roots, one per 2-bar section: A1 - C2 - D2 - C2.
+    let bass_roots = [55.00_f32, 65.41, 73.42, 65.41];
+    // 16-step syncopated acid pattern: which steps trigger a bass hit.
+    const BASS_HIT: [bool; STEPS_PER_BAR] = [
+        true, false, true, false, false, true, false, true,
+        true, false, false, true, false, true, false, true,
+    ];
+    // Octave-jump accent on some hits, for movement (acid-line character).
+    const BASS_OCT: [f32; STEPS_PER_BAR] = [
+        1.0, 1.0, 2.0, 1.0, 1.0, 1.0, 1.0, 2.0,
+        1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 1.0, 1.0,
+    ];
+    // Tension stab notes cycling every 2 bars (A4, C5, D5, Bb4 — Phrygian bite).
+    let stab_notes = [440.00_f32, 523.25, 587.33, 466.16];
+
+    for step in 0..TOTAL_STEPS {
+        let bar = step / STEPS_PER_BAR;
+        let pos = step % STEPS_PER_BAR;
+        let off = step * step_samples;
+
+        // Four-on-the-floor kick.
+        if pos % 4 == 0 {
+            kick(&mut buf, off, 0.95);
+        }
+        // Off-beat closed hat, plus a 16th-note roll into the last beat of every 4th bar.
+        if pos % 4 == 2 {
+            hat(&mut buf, off, &mut rng, 0.30);
+        }
+        if bar % 4 == 3 && pos >= 12 {
+            hat(&mut buf, off, &mut rng, 0.22);
+        }
+        // Acid bassline.
+        if BASS_HIT[pos] {
+            let root = bass_roots[(bar / 2) % bass_roots.len()];
+            bass_note(&mut buf, off, root * BASS_OCT[pos], step_ms * 0.85, 0.34);
+        }
+        // Tension stab on the downbeat of every odd bar.
+        if bar % 2 == 1 && pos == 0 {
+            let note = stab_notes[(bar / 2) % stab_notes.len()];
+            lead_stab(&mut buf, off, note, step_ms * 7.0, 0.20);
+        }
+    }
+
+    encode_pcm16_mono(&buf)
+}
+
+pub fn generate() -> Vec<Asset> {
+    vec![("sounds/techno.wav", music())]
+}
