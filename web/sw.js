@@ -60,8 +60,8 @@ self.addEventListener('activate', function(e) {
   self.clients.claim();
 });
 
-// Cache-first for same-origin assets only. Cross-origin requests (e.g. Supabase API)
-// bypass the cache entirely so they always hit the network.
+// Cache-first for same-origin assets only. Cross-origin requests bypass the
+// cache entirely so they always hit the network.
 self.addEventListener('fetch', function(e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);

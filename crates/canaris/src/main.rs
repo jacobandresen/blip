@@ -229,7 +229,6 @@ impl PortItem {
 
 // ── game ──────────────────────────────────────────────────────────────────────
 
-#[allow(dead_code)]
 struct Game {
     state:   State,
     time:    f32,
@@ -446,7 +445,6 @@ impl Game {
 
 // ── assets ────────────────────────────────────────────────────────────────────
 
-#[allow(dead_code)]
 struct Sounds {
     cannon_fire:    blip::audio::BlipSound,
     explosion:      blip::audio::BlipSound,
@@ -753,6 +751,7 @@ fn update_combat(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.score += 200 * g.level;
         play_sfx(&sfx.coin_jingle);
         g.spawn_explosion(COMBAT_ENEMY_X + ENEMY_W / 2.0, g.enemies[pidx].combat_y + ENEMY_H / 2.0);
+        play_sfx(&sfx.explosion);
         for b in g.cannonballs.iter_mut() { b.active = false; }
         g.state = State::Sea;
         play_music(&sfx.sea_music);
