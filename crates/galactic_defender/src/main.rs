@@ -766,6 +766,27 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
+    // Aliens vs shields — as the formation marches down it plows straight
+    // through any barrier blocks in its path, same as the classic game.
+    for a in g.aliens.iter() {
+        if !a.alive { continue; }
+        for s in 0..SHIELDS {
+            for r in 0..SHIELD_ROWS {
+                for c in 0..SHIELD_COLS {
+                    if !g.shields[s].alive[r][c] { continue; }
+                    let bx = g.shields[s].x + (c as i32 * SHIELD_BLOCK) as f32;
+                    let by = g.shields[s].y + (r as i32 * SHIELD_BLOCK) as f32;
+                    if rects_overlap(
+                        a.x, a.y, ALIEN_W as f32, ALIEN_H as f32,
+                        bx, by, SHIELD_BLOCK as f32, SHIELD_BLOCK as f32,
+                    ) {
+                        g.shields[s].alive[r][c] = false;
+                    }
+                }
+            }
+        }
+    }
+
     // Bombs vs player
     for bi in MAX_PLAYER_BULLETS..N_BULLETS {
         if !g.bullets[bi].active { continue; }
