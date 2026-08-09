@@ -40,6 +40,36 @@ body::before {
   z-index: 100;
 }
 
+/* vignette — darkens the cabinet chassis toward the edges, same as the kiosk page */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%);
+  pointer-events: none;
+  z-index: 99;
+}
+
+/* marquee bulb strip along the very top edge of the cabinet */
+#marquee-strip {
+  position: fixed;
+  top: 5px;
+  left: 12%;
+  right: 12%;
+  height: 4px;
+  pointer-events: none;
+  z-index: 9;
+  background-image: radial-gradient(circle, #e6dc32 0 1.6px, transparent 2px);
+  background-size: 18px 4px;
+  background-repeat: repeat-x;
+  background-position: center;
+  filter: drop-shadow(0 0 4px #e6dc32);
+  animation: marquee-bulbs 1.6s steps(2, jump-none) infinite;
+}
+@keyframes marquee-bulbs {
+  50% { filter: drop-shadow(0 0 1px #e6dc32); opacity: .5; }
+}
+
 /* ---- Arcade cabinet bezel ---- */
 
 #arcade-bezel {
@@ -56,8 +86,36 @@ body::before {
   border: 1px solid rgba(50, 200, 80, 0.45);
   box-shadow:
     0 0 28px rgba(0, 180, 50, 0.15),
-    inset 0 0 18px rgba(0, 0, 0, 0.35);
+    inset 0 0 18px rgba(0, 0, 0, 0.35),
+    0 0 0 12px rgba(10, 10, 11, 0.9),
+    0 0 0 13px rgba(255, 255, 255, 0.05);
 }
+
+/* corner screws on the outer metal frame — same detail as the kiosk screen-bezel */
+.bezel-screw {
+  position: fixed;
+  z-index: 9;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #6c6c70, #101012 72%);
+  box-shadow: 0 1px 1px rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.8);
+  pointer-events: none;
+}
+.bezel-screw::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 1px;
+  background: #000;
+  transform: translate(-50%, -50%) rotate(35deg);
+}
+.bezel-screw.tl { top: 13px; left: 13px; }
+.bezel-screw.tr { top: 13px; right: 13px; }
+.bezel-screw.bl { bottom: calc(56px + 13px + env(safe-area-inset-bottom, 0px)); left: 13px; }
+.bezel-screw.br { bottom: calc(56px + 13px + env(safe-area-inset-bottom, 0px)); right: 13px; }
 
 canvas {
   display: block;
@@ -116,9 +174,31 @@ canvas {
 
 /* ---- Bottom bar — game-page overrides ---- */
 
-#topbar { background: #000; }
+#topbar {
+  background:
+    repeating-linear-gradient(180deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #0c0c0c, #000);
+}
 
 #back:active { transform: translateY(2px); }
+
+/* coin-slot notch beside the insert-coin prompt, matching the kiosk page */
+#insert-coin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+#insert-coin-btn::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 16px;
+  border-radius: 3px;
+  background: #000;
+  box-shadow: inset 0 0 0 1px rgba(230, 220, 50, 0.45),
+              0 0 6px rgba(230, 220, 50, 0.3);
+  flex-shrink: 0;
+}
 
 
 /* ---- Need-coin overlay ---- */
