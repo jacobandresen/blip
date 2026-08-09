@@ -71,10 +71,12 @@ const N_BULLETS: usize = MAX_PLAYER_BULLETS + MAX_BOMBS + MAX_UFO_BOMBS;
 const N_EXPLOSIONS: usize = ALIEN_TOTAL + 4;
 
 // ---- player death / respawn --------------------------------------------
-const DEAD_PAUSE: f32 = 2.3;         // total time in State::Dead before play resumes
+const DEAD_PAUSE: f32 = 3.6;         // total time in State::Dead before play resumes
 const DEATH_EXPLOSION_PHASE: f32 = 0.7; // seconds of that pause spent on the giant explosion
                                          // before the ship starts fading back in — the
                                          // remainder (DEAD_PAUSE - this) is the mist fade-in
+const RESPAWN_GRACE_SECS: f32 = 1.2; // once play resumes, firing stays locked out this long
+                                      // so the respawn reads as a real vulnerable moment
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Play, Dead, Win, Over }
@@ -140,6 +142,7 @@ struct Game {
     ufo_laser_x: f32,
     ufo_charge_timer: Timer,
     ufo_fire_timer: Timer,
+    respawn_grace: Timer,
 }
 
 impl Game {
@@ -185,6 +188,7 @@ impl Game {
             ufo_laser_x: 0.0,
             ufo_charge_timer: Timer::default(),
             ufo_fire_timer: Timer::default(),
+            respawn_grace: Timer::default(),
         }
     }
 
@@ -625,9 +629,11 @@ fn update_title(g: &mut Game) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    let shoot = key_pressed(BLIP_KEY_SPACE)
-        || key_pressed(BLIP_KEY_UP)
-        || key_pressed(BLIP_KEY_W);
+    g.respawn_grace.tick(dt);
+    let shoot = !g.respawn_grace.active()
+        && (key_pressed(BLIP_KEY_SPACE)
+            || key_pressed(BLIP_KEY_UP)
+            || key_pressed(BLIP_KEY_W));
 
     let moving_left = key_held(BLIP_KEY_LEFT) || key_held(BLIP_KEY_A);
     let moving_right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
@@ -829,6 +835,7 @@ fn update_dead(g: &mut Game, dt: f32) {
     }
     if g.dead_timer.tick(dt) {
         g.bullets.iter_mut().for_each(|b| b.active = false);
+        g.respawn_grace.start(RESPAWN_GRACE_SECS);
         g.state = State::Play;
     }
 }
