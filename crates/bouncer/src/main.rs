@@ -38,7 +38,7 @@ const PAD_SPEED: f32 = 280.0;
 
 const BALL_W: i32 = 14;
 const BALL_H: i32 = 14;
-const BALL_SPEED_0: f32 = 240.0;
+const BALL_SPEED_0: f32 = 210.0;
 const BALL_SPEED_MAX: f32 = 380.0;
 
 // ---- loot drops -------------------------------------------------------
@@ -262,7 +262,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         let kind = g.bricks[i].kind;
         g.bricks[i].alive = false;
         g.sess.add_score((BRICK_ROWS - r) * 10 * g.sess.level);
-        g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
+        // Ramp more gently on level 1 so the ball doesn't reach max speed
+        // before a first-time player has cleared their first wall of bricks.
+        let speed_inc = if g.sess.level <= 1 { SPEED_INC * 0.5 } else { SPEED_INC };
+        g.ball_speed = clamp(g.ball_speed + speed_inc, 0.0, BALL_SPEED_MAX);
 
         // 30% chance to spawn a loot drop
         if rand() % 10 < 3 {

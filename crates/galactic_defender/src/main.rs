@@ -192,8 +192,10 @@ impl Game {
 
     fn init_aliens(&mut self) {
         let theme = (self.sess.level - 1).rem_euclid(5);
+        // Level 1 gets a smaller formation than a later trip through theme 0,
+        // so a first-time player isn't faced with a full 5x11 wall immediately.
         let (rows, cols) = match theme {
-            0 => (5_i32, 11_i32),
+            0 => (if self.sess.level == 1 { 4 } else { 5 }, 11_i32),
             1 => (6,     11),
             2 => (3,     13),
             3 => (4,     12),
@@ -254,7 +256,8 @@ impl Game {
                 for row in &mut s.alive { row.fill(false); }
             }
         }
-        self.bomb_timer.start(2.0);
+        // Give level 1 a longer bomb-free grace period to get oriented.
+        self.bomb_timer.start(if self.sess.level == 1 { 3.5 } else { 2.0 });
         self.ufo_active = false;
         self.ufo_timer.start(rand_int(15, 25) as f32);
         self.ufo_score_timer = Timer::default();

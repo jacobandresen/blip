@@ -44,7 +44,7 @@ const HYPERSPACE_RISK: i32 = 20; // 1-in-N chance of self-destruct
 
 // ---- asteroids --------------------------------------------------------
 const MAX_ASTEROIDS: usize = 48;
-const WAVE_BASE:     i32 = 4;
+const WAVE_BASE:     i32 = 3;
 const WAVE_MAX:      i32 = 14;
 
 // ---- saucer -----------------------------------------------------------

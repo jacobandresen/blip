@@ -22,7 +22,7 @@ const MAX_LEN: usize = (COLS * ROWS) as usize;
 
 // ---- tuning -----------------------------------------------------------
 const LIVES_START: i32 = 3;
-const SPEED_START: f32 = 160.0;
+const SPEED_START: f32 = 180.0;
 const SPEED_MIN: f32 = 70.0;
 const SPEED_STEP: f32 = 10.0;
 const FOODS_PER_LVL: i32 = 5;
