@@ -468,8 +468,18 @@ async fn main() {
     let music = blip::audio::load_sound(MUSIC_WAV).await;
     play_music(&music);
 
+    let mut shot_frame: u32 = 0;
+
     loop {
         let dt = blip.delta_time;
+
+        if blip.screenshot_mode {
+            shot_frame += 1;
+            if shot_frame == 1 {
+                g.start_game();
+            }
+        }
+
         match g.state {
             State::Title  => update_title(&mut g),
             State::Launch => update_launch(&mut g, dt),

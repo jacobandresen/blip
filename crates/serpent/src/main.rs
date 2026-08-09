@@ -358,8 +358,18 @@ async fn main() {
     play_music(&slither);
     g.active_music = 1;
 
+    let mut shot_frame: u32 = 0;
+
     loop {
         let dt = blip.delta_time;
+
+        if blip.screenshot_mode {
+            shot_frame += 1;
+            if shot_frame == 1 {
+                g.start_game();
+            }
+        }
+
         match g.state {
             State::Title => update_title(&mut g),
             State::Play  => update_play(&mut g, dt, &sfx),

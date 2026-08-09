@@ -687,8 +687,17 @@ async fn main() {
     let mut music_timer: f32 = MUSIC_DURATIONS[0];
     play_music(&music[0]);
 
+    let mut shot_frame: u32 = 0;
+
     loop {
         let dt = blip.delta_time;
+
+        if blip.screenshot_mode {
+            shot_frame += 1;
+            if shot_frame == 1 {
+                g.start_game();
+            }
+        }
 
         // Switch to a random different loop at each loop boundary.
         music_timer -= dt;
