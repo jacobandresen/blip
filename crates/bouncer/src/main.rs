@@ -59,8 +59,12 @@ const SPEED_INC: f32 = 18.0;
 // faster the paddle, the sharper the curve. A stationary or slow-moving
 // paddle produces a plain straight shot.
 const SCREW_MIN_PAD_SPEED: f32 = 30.0; // below this, no spin at all
-const SCREW_MAX_SPIN_RATE: f32 = 3.2;  // radians/sec of curve at full paddle speed
-const SCREW_SPIN_DECAY: f32 = 0.55;    // spin bleeds off per second of flight
+const SCREW_MAX_SPIN_RATE: f32 = 1.3;  // radians/sec of curve at full paddle speed
+const SCREW_SPIN_DECAY: f32 = 0.9;     // spin bleeds off per second of flight
+// However hard it's spinning, never let the ball curve more than this far off
+// its post-hit direction — it should bend, not loop back on itself and start
+// heading the "wrong" way.
+const SCREW_MAX_CURVE: f32 = 0.75; // radians (~43 degrees)
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Launch, Play, Dead, Win, Over }
@@ -91,6 +95,7 @@ struct Game {
     ball_x: f32, ball_y: f32,
     ball_vx: f32, ball_vy: f32,
     ball_spin: f32,
+    ball_curve_used: f32,
     ball_speed: f32,
     sess: Session,
     dead_timer: Timer,
@@ -109,6 +114,7 @@ impl Game {
             slow_timer: Timer::default(),
             ball_x: 0.0, ball_y: 0.0, ball_vx: 0.0, ball_vy: 0.0,
             ball_spin: 0.0,
+            ball_curve_used: 0.0,
             ball_speed: BALL_SPEED_0,
             sess: Session::new(LIVES_START),
             dead_timer: Timer::default(),
@@ -163,6 +169,7 @@ impl Game {
         self.ball_vx = self.ball_speed * (angle + PI / 2.0).cos();
         self.ball_vy = -self.ball_speed;
         self.ball_spin = 0.0;
+        self.ball_curve_used = 0.0;
     }
 
     fn start_game(&mut self) {
@@ -225,7 +232,16 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     // the spin bleed off over time so the curve eases out rather than
     // looping forever.
     if g.ball_spin.abs() > 0.001 {
-        let ang = g.ball_spin * dt;
+        // Never let the accumulated curve exceed SCREW_MAX_CURVE — clamp
+        // this frame's rotation to whatever budget is left, and stop
+        // spinning entirely once it's used up.
+        let remaining = (SCREW_MAX_CURVE - g.ball_curve_used).max(0.0);
+        let mut ang = g.ball_spin * dt;
+        if ang.abs() > remaining {
+            ang = ang.signum() * remaining;
+            g.ball_spin = 0.0;
+        }
+        g.ball_curve_used += ang.abs();
         let (s, c) = ang.sin_cos();
         let (vx, vy) = (g.ball_vx, g.ball_vy);
         g.ball_vx = vx * c - vy * s;
@@ -288,6 +304,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         } else {
             0.0
         };
+        g.ball_curve_used = 0.0;
     }
 
     for i in 0..BRICK_TOTAL {
