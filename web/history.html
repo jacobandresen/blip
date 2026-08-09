@@ -140,11 +140,13 @@
     .game-section.rally    .game-title { color: var(--red);     text-shadow: 0 0 12px rgba(220,50,50,0.4); }
     .game-section.bouncer  .game-title { color: var(--cyan);    text-shadow: 0 0 12px rgba(0,200,200,0.4); }
     .game-section.galactic .game-title { color: var(--magenta); text-shadow: 0 0 12px rgba(200,50,200,0.4); }
+    .game-section.meteors  .game-title { color: var(--yellow);  text-shadow: 0 0 12px rgba(230,220,50,0.4); }
     .game-section.serpent  .game-title { color: var(--green);   text-shadow: 0 0 12px rgba(50,200,50,0.4); }
 
     .game-section.rally    .section-body { border-left-color: rgba(220,50,50,0.3); }
     .game-section.bouncer  .section-body { border-left-color: rgba(0,200,200,0.3); }
     .game-section.galactic .section-body { border-left-color: rgba(200,50,200,0.3); }
+    .game-section.meteors  .section-body { border-left-color: rgba(230,220,50,0.3); }
     .game-section.serpent  .section-body { border-left-color: rgba(50,200,50,0.3); }
 
     .impl-label {
@@ -193,6 +195,8 @@
     .game-section.bouncer  .inline-link:hover { color: #40e0e0; border-bottom-color: rgba(0,200,200,0.8); }
     .game-section.galactic .inline-link { color: var(--magenta); border-bottom-color: rgba(200,50,200,0.3); }
     .game-section.galactic .inline-link:hover { color: #e070e0; border-bottom-color: rgba(200,50,200,0.8); }
+    .game-section.meteors  .inline-link { color: var(--yellow);  border-bottom-color: rgba(230,220,50,0.3); }
+    .game-section.meteors  .inline-link:hover { color: #f0e880; border-bottom-color: rgba(230,220,50,0.8); }
     .game-section.serpent  .inline-link { color: var(--green);   border-bottom-color: rgba(50,200,50,0.3); }
     .game-section.serpent  .inline-link:hover { color: #70e070; border-bottom-color: rgba(50,200,50,0.8); }
 
@@ -379,6 +383,27 @@
 
   <div class="divider"></div>
 
+  <!-- ====== METEORS ====== -->
+  <section class="game-section meteors">
+    <div class="game-header">
+      <div class="game-title">Meteors</div>
+      <div class="game-origin" data-i18n="meteorsOrigin">Based on Asteroids &mdash; Atari, 1979</div>
+    </div>
+    <h2 style="margin-bottom:24px;" data-i18n="meteorsSub">THE GAME THAT MADE VECTOR GRAPHICS FAMOUS</h2>
+    <div class="section-body">
+      <p data-i18n="meteorsP1">Lyle Rains conceived the game as raster graphics, but lead programmer Ed Logg — working with designer Dominic Walsh — pushed for the sharp, glowing lines of a vector display instead, arguing the precision would matter for a game built entirely around aiming. Hardware engineer Howard Delman adapted the vector generator he had built for Lunar Lander, giving Asteroids a look unlike anything else in the arcade: crisp, high-contrast lines instead of blocky sprites. Its inertia-based flight — no friction, no grid, just momentum — was also a first, forcing players to learn physics that Pac-Man and Space Invaders never asked of them.</p>
+      <p data-i18n="meteorsP2">Released in November 1979, Asteroids became Atari&#39;s best-selling arcade game of all time, moving more than 70,000 cabinets and briefly dethroning Space Invaders as the highest-earning game in North American arcades. Its wraparound playfield, escalating asteroid splits, and a last-resort hyperspace jump — which carried a small chance of self-destruction — became a template the genre never really moved past. Meteors in BLIP ARCADE follows it line for line: vector outlines, momentum-based flight, and a jump button you only press when you&#39;re desperate.</p>
+      <div class="impl-label" data-i18n="implLabel">► Other implementations online</div>
+      <ul class="impl-list">
+        <li data-i18n="meteorsImpl1"><a class="inline-link" href="https://games.aarp.org/games/atari-asteroids" target="_blank" rel="noopener">AARP Games &mdash; Atari&reg; Asteroids</a> — A licensed browser version of the 1979 original.</li>
+        <li data-i18n="meteorsImpl2"><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=asteroids" target="_blank" rel="noopener">MIT Scratch &mdash; Asteroids projects</a> — Community recreations exploring vector-style movement and screen wrapping.</li>
+        <li data-i18n="meteorsImpl3"><a class="inline-link" href="https://github.com/search?q=asteroids+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Asteroids repositories</a> — Open-source clones in JavaScript, Rust, C++ and Python, sortable by stars.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
   <!-- ====== SERPENT ====== -->
   <section class="game-section serpent">
     <div class="game-header">
@@ -434,7 +459,7 @@
         introP2:        'This page traces where they came from: the studios that built them, the people who designed them, and the small decisions that became the foundations of an entire art form.',
         studiosLabel:   '► The studios',
         atariDates:     'Founded 1972 — Sunnyvale, California',
-        atariP:         'Nolan Bushnell and Ted Dabney founded Atari with $250 in capital and a single engineer, Allan Alcorn, whose training project — a table-tennis simulation — became Pong. In four years the company went from a rented cheese factory to the fastest-growing company in American history. Atari defined the arcade era and later the home console market with the Atari 2600. Two games in BLIP ARCADE trace their lineage directly to Atari: Rally (Pong, 1972) and Bouncer (Breakout, 1976).',
+        atariP:         'Nolan Bushnell and Ted Dabney founded Atari with $250 in capital and a single engineer, Allan Alcorn, whose training project — a table-tennis simulation — became Pong. In four years the company went from a rented cheese factory to the fastest-growing company in American history. Atari defined the arcade era and later the home console market with the Atari 2600. Three games in BLIP ARCADE trace their lineage directly to Atari: Rally (Pong, 1972), Bouncer (Breakout, 1976), and Meteors (Asteroids, 1979).',
         taitoDates:     'Founded 1953 — Tokyo, Japan',
         taitoP:         'Taito began as a vending machine and jukebox importer. By the late 1970s it was one of the dominant forces in Japanese arcade gaming. Tomohiro Nishikado, a staff engineer with no formal game design training, spent nearly a year hand-designing the hardware and software for Space Invaders (1978). The game caused a national coin shortage in Japan and exported the arcade boom to the rest of the world. Galactic Defender in BLIP ARCADE is inspired by that work.',
         gremlinDates:   '1976 / 1997',
@@ -470,7 +495,14 @@
         serpentP2:      'In 1997, Nokia engineer Taneli Armanto was tasked with creating a game for the Nokia 6110. The phone had a monochrome display, no touchscreen, and a numpad. Armanto wrote Snake in a matter of weeks. Nokia preinstalled it on the 6110 and its successors; by the early 2000s an estimated 350 million handsets carried it, making Snake one of the most distributed games in history — entirely without an app store, a download, or a purchase.',
         serpentImpl1:   '<a class="inline-link" href="https://playsnake.org" target="_blank" rel="noopener">playsnake.org</a> — A clean browser Snake with a classic Nokia-style look and feel.',
         serpentImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=snake" target="_blank" rel="noopener">MIT Scratch — Snake projects</a> — The most common first-game project in computer science education, hundreds of examples.',
-        serpentImpl3:   '<a class="inline-link" href="https://github.com/search?q=snake+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Snake repositories</a> — Implementations ranging from 20-line minimal versions to AI-controlled solvers.'
+        serpentImpl3:   '<a class="inline-link" href="https://github.com/search?q=snake+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Snake repositories</a> — Implementations ranging from 20-line minimal versions to AI-controlled solvers.',
+        meteorsOrigin:  'Based on Asteroids — Atari, 1979',
+        meteorsSub:     'THE GAME THAT MADE VECTOR GRAPHICS FAMOUS',
+        meteorsP1:      'Lyle Rains conceived the game as raster graphics, but lead programmer Ed Logg — working with designer Dominic Walsh — pushed for the sharp, glowing lines of a vector display instead, arguing the precision would matter for a game built entirely around aiming. Hardware engineer Howard Delman adapted the vector generator he had built for Lunar Lander, giving Asteroids a look unlike anything else in the arcade: crisp, high-contrast lines instead of blocky sprites. Its inertia-based flight — no friction, no grid, just momentum — was also a first, forcing players to learn physics that Pac-Man and Space Invaders never asked of them.',
+        meteorsP2:      'Released in November 1979, Asteroids became Atari\'s best-selling arcade game of all time, moving more than 70,000 cabinets and briefly dethroning Space Invaders as the highest-earning game in North American arcades. Its wraparound playfield, escalating asteroid splits, and a last-resort hyperspace jump — which carried a small chance of self-destruction — became a template the genre never really moved past. Meteors in BLIP ARCADE follows it line for line: vector outlines, momentum-based flight, and a jump button you only press when you\'re desperate.',
+        meteorsImpl1:   '<a class="inline-link" href="https://games.aarp.org/games/atari-asteroids" target="_blank" rel="noopener">AARP Games — Atari® Asteroids</a> — A licensed browser version of the 1979 original.',
+        meteorsImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=asteroids" target="_blank" rel="noopener">MIT Scratch — Asteroids projects</a> — Community recreations exploring vector-style movement and screen wrapping.',
+        meteorsImpl3:   '<a class="inline-link" href="https://github.com/search?q=asteroids+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Asteroids repositories</a> — Open-source clones in JavaScript, Rust, C++ and Python, sortable by stars.'
       },
 
       da: {
@@ -480,7 +512,7 @@
         introP2:        'Denne side følger sporene: studierne der byggede dem, menneskene der designede dem, og de små beslutninger der blev grundstenen i en hel kunstform.',
         studiosLabel:   '► Studierne',
         atariDates:     'Grundlagt 1972 — Sunnyvale, Californien',
-        atariP:         'Nolan Bushnell og Ted Dabney grundlagde Atari med 250 dollars i kapital og en enkelt ingeiniør, Allan Alcorn, hvis træningsprojekt — en bordtennissimulation — blev til Pong. På fire år gik virksomheden fra et lejet ostemarked til det hurtigst voksende selskab i amerikansk historie. Atari definerede arkadeæraen og siden hjemmekonsolmarkedet med Atari 2600. To spil i BLIP ARCADE stammer direkte fra Atari: Rally (Pong, 1972) og Bouncer (Breakout, 1976).',
+        atariP:         'Nolan Bushnell og Ted Dabney grundlagde Atari med 250 dollars i kapital og en enkelt ingeiniør, Allan Alcorn, hvis træningsprojekt — en bordtennissimulation — blev til Pong. På fire år gik virksomheden fra et lejet ostemarked til det hurtigst voksende selskab i amerikansk historie. Atari definerede arkadeæraen og siden hjemmekonsolmarkedet med Atari 2600. Tre spil i BLIP ARCADE stammer direkte fra Atari: Rally (Pong, 1972), Bouncer (Breakout, 1976) og Meteors (Asteroids, 1979).',
         taitoDates:     'Grundlagt 1953 — Tokyo, Japan',
         taitoP:         'Taito begyndte som importør af automater og jukebokse. I slutningen af 1970\'erne var virksomheden en af de dominerende kræfter i japansk arkadeunderholding. Tomohiro Nishikado, en stab af ingeiniører uden formel spiluddannelse, brugte næsten et år på at designe hardwaren og softwaren til Space Invaders (1978). Spillet forårsagede en national møntmangel i Japan og eksporterede arkadebølgen til resten af verden. Galactic Defender i BLIP ARCADE er inspireret af dette arbejde.',
         gremlinDates:   '1976 / 1997',
@@ -516,7 +548,14 @@
         serpentP2:      'I 1997 fik Nokia-ingeiniøren Taneli Armanto til opgave at lave et spil til Nokia 6110. Telefonen havde en monokrom skærm, ingen touchskærm og et numpad. Armanto programmerede Snake på få uger. Nokia forudinstallerede det på 6110 og efterfølgere; i begyndelsen af 2000\'erne bar anslået 350 millioner enheder det — og Snake blev et af historiens mest udbredte spil, helt uden app-butik, download eller køb.',
         serpentImpl1:   '<a class="inline-link" href="https://playsnake.org" target="_blank" rel="noopener">playsnake.org</a> — En simpel browser-Snake med klassisk Nokia-stil.',
         serpentImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=snake" target="_blank" rel="noopener">MIT Scratch — Snake-projekter</a> — Det mest almindelige førstespilsprojekt i datalogi, hundredvis af eksempler.',
-        serpentImpl3:   '<a class="inline-link" href="https://github.com/search?q=snake+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Snake-repositories</a> — Implementeringer fra minimale 20-linjers versioner til AI-styrede løsere.'
+        serpentImpl3:   '<a class="inline-link" href="https://github.com/search?q=snake+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Snake-repositories</a> — Implementeringer fra minimale 20-linjers versioner til AI-styrede løsere.',
+        meteorsOrigin:  'Baseret på Asteroids — Atari, 1979',
+        meteorsSub:     'SPILLET DER GJORDE VEKTORGRAFIK BERØMT',
+        meteorsP1:      'Lyle Rains forestillede sig spillet som rastergrafik, men chefprogrammør Ed Logg — i samarbejde med designer Dominic Walsh — pressede på for i stedet at bruge de skarpe, lysende linjer fra en vektorskærm, med den begrundelse at præcisionen ville betyde noget for et spil, der udelukkende handlede om at sigte. Hardwareingeniør Howard Delman tilpassede den vektorgenerator, han havde bygget til Lunar Lander, og gav Asteroids et udseende uden sidestykke i arkaden: skarpe, kontrastrige linjer i stedet for firkantede sprites. Spillets inertibaserede flyvning — ingen friktion, intet gitter, kun bevægelsesmængde — var også en nyskabelse, der tvang spillerne til at lære en fysik, som hverken Pac-Man eller Space Invaders nogensinde krævede.',
+        meteorsP2:      'Asteroids udkom i november 1979 og blev Ataris bedst sælgende arkadespil nogensinde med over 70.000 solgte kabinetter, og detronede kortvarigt Space Invaders som det mest indbringende spil i nordamerikanske arkader. Den ombrydende spilleflade, de eskalerende asteroide-opdelinger og et desperat hyperrum-spring — som medførte en lille risiko for selvdestruktion — blev en skabelon, genren aldrig for alvor bevægede sig væk fra. Meteors i BLIP ARCADE følger den til punkt og prikke: vektorkonturer, inertibaseret flyvning og en springknap, du kun bruger, når du er desperat.',
+        meteorsImpl1:   '<a class="inline-link" href="https://games.aarp.org/games/atari-asteroids" target="_blank" rel="noopener">AARP Games — Atari® Asteroids</a> — En officiel browserversion af originalen fra 1979.',
+        meteorsImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=asteroids" target="_blank" rel="noopener">MIT Scratch — Asteroids-projekter</a> — Community-genskabelser, der udforsker vektorbaseret bevægelse og skærmombrydning.',
+        meteorsImpl3:   '<a class="inline-link" href="https://github.com/search?q=asteroids+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Asteroids-repositories</a> — Open source-kloner i JavaScript, Rust, C++ og Python, sorterbare efter stjerner.'
       },
 
       ja: {
@@ -526,7 +565,7 @@
         introP2:        'このページでは、その出自を追います。開発したスタジオ、デザインした人々、そして一つの術形式全体の影となった小さな決断の数々を。',
         studiosLabel:   '► スタジオ紹介',
         atariDates:     '1972年設立 — カリフォルニア州サニーベール',
-        atariP:         'ノーラン・ブッシュネルとテッド・ダブニーは250ドルの資本とエンジニア一人、アラン・アルコーンを携えてAtariを設立しました。アルコーンの練習課題として作られた亓球シミュレーションがPongとなりました。四年間でこの会社はレンタルしたチーズ工場からアメリカ史上最も急成長した企業へと飛躍しました。Atariはアーケードゲームの時代を定義し、後にAtari 2600でホームコンソール市場も定義しました。BLIP ARCADEの2つのゲームがAtariに直接由来します：Rally（Pong、1972年）とBouncer（Breakout、1976年）。',
+        atariP:         'ノーラン・ブッシュネルとテッド・ダブニーは250ドルの資本とエンジニア一人、アラン・アルコーンを携えてAtariを設立しました。アルコーンの練習課題として作られた亓球シミュレーションがPongとなりました。四年間でこの会社はレンタルしたチーズ工場からアメリカ史上最も急成長した企業へと飛躍しました。Atariはアーケードゲームの時代を定義し、後にAtari 2600でホームコンソール市場も定義しました。BLIP ARCADEの3つのゲームがAtariに直接由来します：Rally（Pong、1972年）、Bouncer（Breakout、1976年）、Meteors（Asteroids、1979年）。',
         taitoDates:     '1953年設立 — 東京、日本',
         taitoP:         'タイトーは自動販売機とジュークボックスの輸入業者として事業を始めました。1970年代後半には日本のアーケードゲーム産業の主要な勢力の一つとなっていました。正式なゲームデザインの訓練を受けていないスタッフエンジニアの西角友宮は、スペースインベーダー（1978年）のハードウェアとソフトウェアの設計に約1年を費やしました。このゲームは日本で100円硬貨の全国的な不足を引き起こし、アーケードブームを世界中へ輸出しました。BLIP ARCADEのGalactic Defenderはその作品から着想を得ています。',
         gremlinDates:   '1976年 / 1997年',
@@ -562,7 +601,14 @@
         serpentP2:      '1997年、NokiaのエンジニアTaneli ArmantoはNokia 6110用のゲームを作る任務を与えられました。その端末はモノクロ画面で、タッチスクリーンなし、テンキーのみでした。Armantは数週間でSnakeを書き上げました。Nokiaはこれの6110と後継機にプリインストールし、2000年代初頭には推定3億5000万台が搭載していました。Snakeはアプリストアもダウンロードも購入もなしに、歴史上最も普及したゲームの一つとなりました。',
         serpentImpl1:   '<a class="inline-link" href="https://playsnake.org" target="_blank" rel="noopener">playsnake.org</a> — クラシックなノキアスタイルのブラウザ版Snake。',
         serpentImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=snake" target="_blank" rel="noopener">MIT Scratch — Snakeプロジェクト</a> — コンピュータサイエンス教育で最も多い入門ゲームプロジェクト、数百件の例。',
-        serpentImpl3:   '<a class="inline-link" href="https://github.com/search?q=snake+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Snakeリポジトリ</a> — 20行のミニマル版からAI制御ソルバーまで様々な実装。'
+        serpentImpl3:   '<a class="inline-link" href="https://github.com/search?q=snake+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Snakeリポジトリ</a> — 20行のミニマル版からAI制御ソルバーまで様々な実装。',
+        meteorsOrigin:  'Asteroidsを原典として — Atari、1979年',
+        meteorsSub:     'ベクターグラフィックスを有名にしたゲーム',
+        meteorsP1:      'ライル・レインズはこのゲームをラスターグラフィックスとして構想していましたが、リードプログラマーのエド・ロッグはデザイナーのドミニク・ウォルシュと共に、代わりにベクターディスプレイの鋭く輝く線を使うよう主張しました。狙いの精度がすべてを左右するゲームだったからです。ハードウェアエンジニアのハワード・デルマンはLunar Lander用に開発したベクタージェネレーターを改良し、Asteroidsに他のどのアーケードゲームとも異なる外観を与えました——ブロック状のスプライトではなく、鋭くコントラストの効いた線です。摩擦もグリッドもなく、慣性だけで動く飛行方式もまた初めての試みで、Pac-ManやSpace Invadersが一度も要求しなかった物理法則をプレイヤーに学ばせました。',
+        meteorsP2:      '1979年11月に発売されたAsteroidsは、7万台以上を売り上げAtari史上最も売れたアーケードゲームとなり、北米アーケードで最も稼いだゲームの座を一時的にSpace Invadersから奪いました。画面端をつなぐ折り返しフィールド、段階的に分裂する小惑星、そして自爆の危険を伴う最後の手段であるハイパースペースジャンプは、このジャンルがその後も抜け出せなかった定番となりました。BLIP ARCADEのMeteorsはそれを忠実に踏襲しています——ベクターの輪郭、慣性ベースの飛行、そして本当に追い詰められたときだけ押すジャンプボタン。',
+        meteorsImpl1:   '<a class="inline-link" href="https://games.aarp.org/games/atari-asteroids" target="_blank" rel="noopener">AARP Games — Atari® Asteroids</a> — 1979年オリジナルの公式ブラウザ版。',
+        meteorsImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=asteroids" target="_blank" rel="noopener">MIT Scratch — Asteroidsプロジェクト</a> — ベクター風の動きと画面ラップアラウンドを探求するコミュニティ制作版。',
+        meteorsImpl3:   '<a class="inline-link" href="https://github.com/search?q=asteroids+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Asteroidsリポジトリ</a> — JavaScript、Rust、C++、Pythonによるオープンソースのクローン。スター数で並べ替え可能。'
       }
 
     };
