@@ -45,7 +45,7 @@ const HYPERSPACE_RISK: i32 = 20; // 1-in-N chance of self-destruct
 // ---- asteroids --------------------------------------------------------
 const MAX_ASTEROIDS: usize = 48;
 const WAVE_BASE:     i32 = 4;
-const WAVE_MAX:      i32 = 11;
+const WAVE_MAX:      i32 = 14;
 
 // ---- saucer -----------------------------------------------------------
 const SAUCER_SPEED:    f32 = 90.0;
@@ -186,7 +186,8 @@ impl Game {
         self.next_life_score = EXTRA_LIFE_SCORE;
         self.bullets = [BULLET_OFF; MAX_BULLETS];
         self.saucer.active = false;
-        self.saucer_cd = rand_range(SAUCER_SPAWN_MIN, SAUCER_SPAWN_MAX);
+        let (lo, hi) = saucer_spawn_range(self.sess.level);
+        self.saucer_cd = rand_range(lo, hi);
         self.spawn_wave();
         self.respawn_ship();
         self.state = State::Play;
@@ -258,13 +259,28 @@ fn spawn_bullet(bullets: &mut [Bullet; MAX_BULLETS], x: f32, y: f32, vx: f32, vy
     pool_spawn(bullets, Bullet { active: true, x, y, vx, vy, ttl: BULLET_TTL, from_player });
 }
 
+/// Saucers spawn more often, shoot more often, and skew toward the harder
+/// "small" variant as the level climbs, so late levels keep escalating even
+/// after the asteroid count itself caps out.
+fn saucer_spawn_range(level: i32) -> (f32, f32) {
+    let lv = (level - 1).min(6) as f32;
+    ((SAUCER_SPAWN_MIN - lv * 0.6).max(4.0), (SAUCER_SPAWN_MAX - lv * 1.2).max(8.0))
+}
+
+fn saucer_fire_cooldown(level: i32) -> f32 {
+    let lv = (level - 1).min(6) as f32;
+    (SAUCER_FIRE_CD - lv * 0.12).max(0.7)
+}
+
 fn spawn_saucer(g: &mut Game) {
-    let big = g.sess.score < 5000 || rand_int(0, 2) != 0;
+    let small_prob = (0.33 + (g.sess.level - 1) as f32 * 0.05).min(0.75);
+    let big = g.sess.score < 5000 || rand_range(0.0, 1.0) > small_prob;
     let from_left = rand_int(0, 1) == 0;
     let x = if from_left { -20.0 } else { PLAY_W as f32 + 20.0 };
     let y = rand_range(PLAY_Y0 + 40.0, PLAY_Y0 + PLAY_H as f32 - 40.0);
     let vx = if from_left { SAUCER_SPEED } else { -SAUCER_SPEED };
-    g.saucer = Saucer { active: true, x, y, vx, wave_t: 0.0, fire_t: SAUCER_FIRE_CD * 0.5, big };
+    let fire_cd = saucer_fire_cooldown(g.sess.level);
+    g.saucer = Saucer { active: true, x, y, vx, wave_t: 0.0, fire_t: fire_cd * 0.5, big };
 }
 
 fn hyperspace(g: &mut Game, sfx: &Sounds) {
@@ -411,7 +427,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
             let speed = 260.0;
             spawn_bullet(&mut g.bullets, g.saucer.x, g.saucer.y, base.cos() * speed, base.sin() * speed, false);
             let _ = dist;
-            g.saucer.fire_t = SAUCER_FIRE_CD;
+            g.saucer.fire_t = saucer_fire_cooldown(g.sess.level);
         }
         if g.saucer.x < -40.0 || g.saucer.x > PLAY_W as f32 + 40.0 {
             g.saucer.active = false;
@@ -420,7 +436,8 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.saucer_cd -= dt;
         if g.saucer_cd <= 0.0 {
             spawn_saucer(g);
-            g.saucer_cd = rand_range(SAUCER_SPAWN_MIN, SAUCER_SPAWN_MAX);
+            let (lo, hi) = saucer_spawn_range(g.sess.level);
+            g.saucer_cd = rand_range(lo, hi);
         }
     }
 

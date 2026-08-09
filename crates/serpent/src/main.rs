@@ -48,7 +48,7 @@ struct Game {
     move_timer: f32,
     dead_timer: Timer,
     state: State,
-    obstacles: [Cell; 8],
+    obstacles: [Cell; 16],
     obstacle_count: usize,
     active_music: i32,
     want_track: i32,
@@ -68,7 +68,7 @@ impl Game {
             move_timer: 0.0,
             dead_timer: Timer::default(),
             state: State::Title,
-            obstacles: [Cell { c: 0, r: 0 }; 8],
+            obstacles: [Cell { c: 0, r: 0 }; 16],
             obstacle_count: 0,
             active_music: 0,
             want_track: 0,
@@ -100,26 +100,44 @@ impl Game {
         }
     }
 
-    fn build_obstacles(&mut self) {
-        self.obstacle_count = 0;
+    /// Set the obstacle field from a list of (dc, dr) offsets from the board centre.
+    fn set_obstacles(&mut self, offsets: &[(i32, i32)]) {
         let ch = COLS / 2;
         let rh = ROWS / 2;
-        if self.sess.level == 2 {
-            self.obstacles[0] = Cell { c: ch - 1, r: rh };
-            self.obstacles[1] = Cell { c: ch,     r: rh };
-            self.obstacles[2] = Cell { c: ch,     r: rh - 1 };
-            self.obstacles[3] = Cell { c: ch,     r: rh + 1 };
-            self.obstacle_count = 4;
-        } else if self.sess.level >= 3 {
-            self.obstacles[0] = Cell { c: ch - 1, r: rh - 1 };
-            self.obstacles[1] = Cell { c: ch,     r: rh - 1 };
-            self.obstacles[2] = Cell { c: ch + 1, r: rh - 1 };
-            self.obstacles[3] = Cell { c: ch - 1, r: rh };
-            self.obstacles[4] = Cell { c: ch + 1, r: rh };
-            self.obstacles[5] = Cell { c: ch - 1, r: rh + 1 };
-            self.obstacles[6] = Cell { c: ch,     r: rh + 1 };
-            self.obstacles[7] = Cell { c: ch + 1, r: rh + 1 };
-            self.obstacle_count = 8;
+        self.obstacle_count = offsets.len();
+        for (i, (dc, dr)) in offsets.iter().enumerate() {
+            self.obstacles[i] = Cell { c: ch + dc, r: rh + dr };
+        }
+    }
+
+    /// Level 1 is always obstacle-free; from level 2 on, five distinct
+    /// obstacle layouts cycle forever so the field keeps changing shape.
+    fn build_obstacles(&mut self) {
+        self.obstacle_count = 0;
+        if self.sess.level == 1 { return; }
+        match (self.sess.level - 2).rem_euclid(5) {
+            0 => self.set_obstacles(&[             // plus sign
+                (-1, 0), (0, 0), (0, -1), (0, 1),
+            ]),
+            1 => self.set_obstacles(&[             // ring
+                (-1, -1), (0, -1), (1, -1),
+                (-1, 0),           (1, 0),
+                (-1, 1),  (0, 1),  (1, 1),
+            ]),
+            2 => self.set_obstacles(&[             // two vertical walls with gaps
+                (-4, -3), (-4, -1), (-4, 1), (-4, 3),
+                (4, -3),  (4, -1),  (4, 1),  (4, 3),
+            ]),
+            3 => self.set_obstacles(&[             // four corner blocks
+                (-7, -7), (-6, -7), (-7, -6), (-6, -6),
+                (6, -7),  (7, -7),  (6, -6),  (7, -6),
+                (-7, 6),  (-6, 6),  (-7, 7),  (-6, 7),
+                (6, 6),   (7, 6),   (6, 7),   (7, 7),
+            ]),
+            _ => self.set_obstacles(&[             // scattered diagonal
+                (-8, -8), (-6, -6), (-4, -4), (4, 4), (6, 6), (8, 8),
+                (-8, 8), (-6, 6), (-4, 4), (4, -4), (6, -6), (8, -8),
+            ]),
         }
     }
 

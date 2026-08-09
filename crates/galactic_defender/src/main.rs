@@ -191,19 +191,23 @@ impl Game {
     }
 
     fn init_aliens(&mut self) {
-        let theme = (self.sess.level - 1).rem_euclid(3);
+        let theme = (self.sess.level - 1).rem_euclid(5);
         let (rows, cols) = match theme {
             0 => (5_i32, 11_i32),
             1 => (6,     11),
-            _ => (3,     13),
+            2 => (3,     13),
+            3 => (4,     12),
+            _ => (6,     9),
         };
-        self.bomb_speed = match theme { 0 => 160.0, 1 => 200.0, _ => 250.0 };
+        self.bomb_speed = match theme { 0 => 160.0, 1 => 200.0, 2 => 250.0, 3 => 220.0, _ => 280.0 };
         // Bomb intervals tighten each level (capped at level 6 equivalent).
         let lv = ((self.sess.level - 1) as f32).min(5.0);
         self.bomb_interval_range = match theme {
             0 => ((0.6 - lv * 0.04).max(0.3),  (2.0 - lv * 0.15).max(0.9)),
             1 => ((0.5 - lv * 0.03).max(0.25), (1.5 - lv * 0.12).max(0.75)),
-            _ => ((0.35 - lv * 0.02).max(0.2), (1.0 - lv * 0.08).max(0.55)),
+            2 => ((0.35 - lv * 0.02).max(0.2), (1.0 - lv * 0.08).max(0.55)),
+            3 => ((0.45 - lv * 0.03).max(0.22), (1.2 - lv * 0.10).max(0.6)),
+            _ => ((0.3 - lv * 0.02).max(0.18),  (0.85 - lv * 0.07).max(0.5)),
         };
         self.active_cols = cols;
         self.active_rows = rows;
@@ -217,7 +221,9 @@ impl Game {
             let kind: usize = match theme {
                 0 => [0, 1, 1, 2, 2][r as usize],
                 1 => [0, 1, 1, 2, 2, 2][r as usize],
-                _ => [0, 1, 2][r as usize],
+                2 => [0, 1, 2][r as usize],
+                3 => [0, 0, 1, 2][r as usize],
+                _ => [0, 0, 1, 1, 2, 2][r as usize],
             };
             for c in 0..cols {
                 let i = (r * cols + c) as usize;
@@ -240,8 +246,8 @@ impl Game {
         self.bullets.iter_mut().for_each(|b| b.active = false);
         self.explosions.iter_mut().for_each(|e| e.active = false);
         self.init_aliens();
-        let theme = (self.sess.level - 1).rem_euclid(3);
-        if theme != 2 {
+        let theme = (self.sess.level - 1).rem_euclid(5);
+        if theme != 2 && theme != 4 {
             self.build_shields();
         } else {
             for s in &mut self.shields {

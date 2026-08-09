@@ -115,17 +115,27 @@ impl Game {
         self.bricks.iter().filter(|b| b.alive).count() as i32
     }
 
+    /// Eight distinct brick layouts, cycling forever as `level` climbs so the
+    /// game doesn't settle into repeating the same pattern from level 3 on.
     fn build_bricks(&mut self) {
+        let pattern = (self.sess.level - 1).rem_euclid(8);
+        let center_col = (BRICK_COLS - 1) as f32 / 2.0;
         for r in 0..BRICK_ROWS {
             for c in 0..BRICK_COLS {
                 let i = (r * BRICK_COLS + c) as usize;
-                let alive = match self.sess.level {
-                    1 => true,
-                    2 => (r + c) % 2 == 0,
-                    _ => {
-                        let center_col = (BRICK_COLS - 1) / 2;
-                        let distance = (c as isize - center_col as isize).abs();
-                        distance <= 3
+                let dist = (c as f32 - center_col).abs();
+                let alive = match pattern {
+                    0 => true,                                            // full grid
+                    1 => (r + c) % 2 == 0,                                 // checkerboard
+                    2 => dist <= 3.0,                                      // diamond
+                    3 => dist <= (r + 1) as f32,                           // pyramid, narrow at top
+                    4 => c < 2 || c >= BRICK_COLS - 2,                     // two side pillars
+                    5 => r % 2 == 0,                                       // horizontal stripes
+                    6 => r == 0 || r == BRICK_ROWS - 1 || c == 0 || c == BRICK_COLS - 1, // hollow border
+                    _ => {                                                 // X shape
+                        let step = (BRICK_COLS - 1) as f32 / (BRICK_ROWS - 1) as f32;
+                        let target = r as f32 * step;
+                        (c as f32 - target).abs() < 1.0 || (c as f32 - (BRICK_COLS - 1) as f32 + target).abs() < 1.0
                     }
                 };
                 self.bricks[i] = Brick { kind: r as usize, alive };
