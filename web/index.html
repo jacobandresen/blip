@@ -276,6 +276,13 @@
       image-rendering: pixelated;
     }
 
+    /* Meteors is anti-aliased vector line art, not pixel-art sprites —
+       nearest-neighbor scaling turns its smooth lines into jagged noise
+       at thumbnail size, so give it a normal smooth downscale instead. */
+    .card-meteors .card-shot {
+      image-rendering: auto;
+    }
+
     .card-title {
       font-size: clamp(1rem, 3vw, 1.4rem);
       letter-spacing: .2em;
@@ -598,7 +605,7 @@
     <!-- METEORS -->
     <a class="card card-meteors" href="meteors/index.html">
       <div class="card-shot-wrap">
-        <img class="card-shot" src="meteors/screenshot.png" alt="Meteors gameplay">
+        <img class="card-shot" src="meteors/screenshot.png?v=2" alt="Meteors gameplay">
       </div>
       <div class="card-title">METEORS</div>
       <div class="card-genre"  data-i18n="meteorsGenre"></div>
