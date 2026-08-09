@@ -11,8 +11,8 @@ use blip::macroquad::rand::rand;
 use blip::macroquad::texture::{FilterMode, Texture2D};
 use blip::{
     clamp, play_music, play_sfx, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
-    window_conf, Blip, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_CYAN, BLIP_GRAY,
-    BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
+    window_conf, Blip, BlipColor, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_CYAN,
+    BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
 // ---- layout -----------------------------------------------------------
@@ -105,6 +105,7 @@ struct Game {
     ball_vx: f32, ball_vy: f32,
     ball_spin: f32,
     ball_curve_used: f32,
+    ball_roll: f32,
     ball_speed: f32,
     sess: Session,
     dead_timer: Timer,
@@ -124,6 +125,7 @@ impl Game {
             ball_x: 0.0, ball_y: 0.0, ball_vx: 0.0, ball_vy: 0.0,
             ball_spin: 0.0,
             ball_curve_used: 0.0,
+            ball_roll: 0.0,
             ball_speed: BALL_SPEED_0,
             sess: Session::new(LIVES_START),
             dead_timer: Timer::default(),
@@ -269,6 +271,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.ball_x += g.ball_vx * dt;
     g.ball_y += g.ball_vy * dt;
 
+    // Rolling rotation for the visual "spin mark" — a ball rolling along a
+    // surface turns at angular rate = linear speed / radius, driven here by
+    // the horizontal velocity so a curving (screwball) shot visibly spins
+    // faster as it bends.
+    g.ball_roll += (g.ball_vx / (BALL_W as f32 * 0.5)) * dt;
+
     if g.ball_x < 0.0 { g.ball_x = 0.0; g.ball_vx = g.ball_vx.abs(); }
     if g.ball_x + BALL_W as f32 > WIN_W as f32 {
         g.ball_x = (WIN_W - BALL_W) as f32;
@@ -303,6 +311,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         )
     {
         play_sfx(&sfx.paddle_hit);
+        let incoming_vx = g.ball_vx;
         let rel = (g.ball_x + BALL_W as f32 / 2.0 - g.pad_x) / g.pad_w;
         let angle = (rel - 0.5) * 2.0 * 1.2;
         g.ball_vx = active_speed * angle.sin();
@@ -312,12 +321,16 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
         g.ball_y = (PAD_Y - BALL_H - 1) as f32;
 
-        // Screwball: a fast-moving paddle at contact puts a curve on the
-        // ball, proportional to how fast it was moving; a slow or
-        // stationary paddle sends it out in a plain straight line.
-        g.ball_spin = if g.pad_vx.abs() > SCREW_MIN_PAD_SPEED {
-            let t = (g.pad_vx.abs() / PAD_SPEED).min(1.0);
-            g.pad_vx.signum() * t * SCREW_MAX_SPIN_RATE
+        // Screwball: friction spins the ball based on how much the paddle's
+        // surface actually slides against the ball's at the moment of
+        // contact — i.e. their *relative* horizontal velocity, not just the
+        // paddle's own speed. A paddle chasing the ball's direction (little
+        // slip) barely spins it; a paddle moving opposite the ball's
+        // incoming path (lots of slip) puts a hard curve on it.
+        let rel_vx = g.pad_vx - incoming_vx;
+        g.ball_spin = if rel_vx.abs() > SCREW_MIN_PAD_SPEED {
+            let t = (rel_vx.abs() / (PAD_SPEED + BALL_SPEED_MAX)).min(1.0);
+            rel_vx.signum() * t * SCREW_MAX_SPIN_RATE
         } else {
             0.0
         };
@@ -469,7 +482,30 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick:
     }
 
     blip.draw_texture(paddle, g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32);
+
+    // Soft drop shadow, offset toward the direction of travel, so the ball
+    // reads as rolling across the play field rather than floating over it.
+    let ball_cx = g.ball_x + BALL_W as f32 / 2.0;
+    let ball_cy = g.ball_y + BALL_H as f32 / 2.0;
+    let speed = (g.ball_vx * g.ball_vx + g.ball_vy * g.ball_vy).sqrt().max(1.0);
+    let shadow_ox = (g.ball_vx / speed) * 4.0;
+    let shadow_oy = (g.ball_vy / speed) * 4.0 + 3.0;
+    blip.fill_circle(
+        ball_cx + shadow_ox, ball_cy + shadow_oy, BALL_W as f32 * 0.42,
+        BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.35 },
+    );
+
     blip.draw_texture(ball, g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32);
+
+    // Rolling mark: a small dark fleck that orbits the ball's centre as it
+    // spins, so the roll itself is visible instead of just the shadow.
+    let (rs, rc) = g.ball_roll.sin_cos();
+    let mark_r = BALL_W as f32 * 0.28;
+    blip.fill_circle(
+        ball_cx + rc * mark_r, ball_cy + rs * mark_r * 0.6, 1.6,
+        BlipColor { r: 0.1, g: 0.1, b: 0.12, a: 0.6 },
+    );
+
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
