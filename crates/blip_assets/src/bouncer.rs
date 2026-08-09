@@ -168,36 +168,34 @@ fn music() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
+// paddle_hit and brick_hit fire on nearly every bounce — the most frequently
+// repeated sounds in the game — so they stay soft and low-key: a plain
+// low-order tone with a quick decay, no noise grit or bright high harmonics
+// that would turn grating under rapid-fire repetition.
 fn paddle_hit() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
-    let n = SAMPLE_RATE as usize / 15;
-    let mut rng = Rng(0xBA11_0001);
+    let n = SAMPLE_RATE as usize / 16;
     let mut s = Vec::with_capacity(n);
     for i in 0..n {
         let t = i as f32 / sr;
-        let e = (1.0 - i as f32 / n as f32).powf(1.4);
-        let fund = (2.0 * PI * 180.0 * t).sin();
-        let third = (2.0 * PI * 180.0 * 3.0 * t).sin() / 3.0;
-        let tick = if i < sr as usize / 400 { (rng.next_f32() * 2.0 - 1.0) * 0.25 } else { 0.0 };
-        let shaped = (fund * 0.8 + third * 0.3 + tick).tanh();
-        s.push((e * 19000.0 * shaped) as i16);
+        let e = (1.0 - i as f32 / n as f32).powf(1.8);
+        let fund = (2.0 * PI * 170.0 * t).sin();
+        let second = (2.0 * PI * 170.0 * 2.0 * t).sin() * 0.15;
+        s.push((e * 12000.0 * (fund + second)) as i16);
     }
     encode_pcm16_mono(&s)
 }
 
 fn brick_hit() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
-    let n = SAMPLE_RATE as usize / 20;
-    let mut rng = Rng(0xBA11_0002);
+    let n = SAMPLE_RATE as usize / 22;
     let mut s = Vec::with_capacity(n);
     for i in 0..n {
         let t = i as f32 / sr;
-        let e = (1.0 - i as f32 / n as f32).powf(1.6);
-        let fund = (2.0 * PI * 600.0 * t).sin();
-        let fifth = (2.0 * PI * 600.0 * 5.0 * t).sin() / 5.0;
-        let tick = if i < sr as usize / 500 { (rng.next_f32() * 2.0 - 1.0) * 0.3 } else { 0.0 };
-        let shaped = (fund * 0.75 + fifth * 0.3 + tick).tanh();
-        s.push((e * 17000.0 * shaped) as i16);
+        let e = (1.0 - i as f32 / n as f32).powf(2.0);
+        let fund = (2.0 * PI * 480.0 * t).sin();
+        let second = (2.0 * PI * 480.0 * 2.0 * t).sin() * 0.2;
+        s.push((e * 10000.0 * (fund + second)) as i16);
     }
     encode_pcm16_mono(&s)
 }
