@@ -453,64 +453,19 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
 }
 
   // ---- Gamepad support ----
+  // Polling loop lives in kiosk.js (pollGamepad, shared with the kiosk
+  // landing page); here we just turn logical button changes into the same
+  // synthetic keyboard events the touch controls use.
   (function () {
-    var DEADZONE = 0.25;
-    var gpHeld   = {};
-
-    var BTN_MAP = [
-      { idx: 0,  code: 'Space'       },  // A / Cross   — Button 1
-      { idx: 1,  code: 'KeyZ'        },  // B / Circle  — Button 2
-      { idx: 2,  code: 'Space'       },
-      { idx: 3,  code: 'Space'       },
-      { idx: 9,  code: 'Space'       },
-      { idx: 12, code: 'ArrowUp'    },
-      { idx: 13, code: 'ArrowDown'  },
-      { idx: 14, code: 'ArrowLeft'  },
-      { idx: 15, code: 'ArrowRight' },
-    ];
-
     function keyOf(code) {
       if (code === 'Space') return ' ';
       if (code === 'KeyZ')  return 'z';
       return code;
     }
-
-    var polling = false;
-
-    function poll() {
-      var pads = navigator.getGamepads ? navigator.getGamepads() : [];
-      var pad = null;
-      for (var i = 0; i < pads.length; i++) {
-        if (pads[i] && pads[i].connected) { pad = pads[i]; break; }
-      }
-      if (!pad) { polling = false; return; }
-
-      var want = {};
-      for (var j = 0; j < BTN_MAP.length; j++) {
-        var m = BTN_MAP[j];
-        var b = pad.buttons[m.idx];
-        if (b && (b.pressed || b.value > 0.5)) want[m.code] = true;
-      }
-      var ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
-      if (ax < -DEADZONE) want['ArrowLeft']  = true;
-      if (ax >  DEADZONE) want['ArrowRight'] = true;
-      if (ay < -DEADZONE) want['ArrowUp']    = true;
-      if (ay >  DEADZONE) want['ArrowDown']  = true;
-
-      var code;
-      for (code in want) {
-        if (!gpHeld[code]) { gpHeld[code] = true;  injectKey(keyOf(code), code, 'keydown'); }
-      }
-      for (code in gpHeld) {
-        if (gpHeld[code] && !want[code]) { gpHeld[code] = false; injectKey(keyOf(code), code, 'keyup'); }
-      }
-
-      requestAnimationFrame(poll);
-    }
-
-    window.addEventListener('gamepadconnected', function () {
-      if (!polling) { polling = true; requestAnimationFrame(poll); }
-    });
+    pollGamepad(
+      function (code) { injectKey(keyOf(code), code, 'keydown'); },
+      function (code) { injectKey(keyOf(code), code, 'keyup'); }
+    );
   }());
 
 })();

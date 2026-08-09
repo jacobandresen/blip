@@ -119,6 +119,66 @@ function insertCoin() {
   }
 }
 
+/* ---- Shared gamepad polling ----
+ * Polls the first connected gamepad every frame and reports logical button
+ * state changes ('ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' |
+ * 'Space' | 'KeyZ') to onDown/onUp. Used both by game pages (shell.js, which
+ * turns these into synthetic keyboard events on the game canvas) and the
+ * kiosk landing page (which uses them to move the card selection).
+ */
+function pollGamepad(onDown, onUp) {
+  var DEADZONE = 0.25;
+  var held = {};
+  var polling = false;
+
+  var BTN_MAP = [
+    { idx: 0,  code: 'Space'      },  // A / Cross   — Button 1
+    { idx: 1,  code: 'KeyZ'       },  // B / Circle  — Button 2
+    { idx: 2,  code: 'Space'      },
+    { idx: 3,  code: 'Space'      },
+    { idx: 9,  code: 'Space'      },
+    { idx: 12, code: 'ArrowUp'    },
+    { idx: 13, code: 'ArrowDown'  },
+    { idx: 14, code: 'ArrowLeft'  },
+    { idx: 15, code: 'ArrowRight' },
+  ];
+
+  function tick() {
+    var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    var pad = null;
+    for (var i = 0; i < pads.length; i++) {
+      if (pads[i] && pads[i].connected) { pad = pads[i]; break; }
+    }
+    if (!pad) { polling = false; return; }
+
+    var want = {};
+    for (var j = 0; j < BTN_MAP.length; j++) {
+      var m = BTN_MAP[j];
+      var b = pad.buttons[m.idx];
+      if (b && (b.pressed || b.value > 0.5)) want[m.code] = true;
+    }
+    var ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
+    if (ax < -DEADZONE) want['ArrowLeft']  = true;
+    if (ax >  DEADZONE) want['ArrowRight'] = true;
+    if (ay < -DEADZONE) want['ArrowUp']    = true;
+    if (ay >  DEADZONE) want['ArrowDown']  = true;
+
+    var code;
+    for (code in want) {
+      if (!held[code]) { held[code] = true; onDown(code); }
+    }
+    for (code in held) {
+      if (held[code] && !want[code]) { held[code] = false; onUp(code); }
+    }
+
+    requestAnimationFrame(tick);
+  }
+
+  window.addEventListener('gamepadconnected', function () {
+    if (!polling) { polling = true; requestAnimationFrame(tick); }
+  });
+}
+
 // iOS suspends AudioContext on load and re-suspends after backgrounding.
 // Howler's autoUnlock is disabled (it calls unload() on non-44100 Hz devices, destroying
 // all WASM sounds), so we resume Howler.ctx manually on any gesture and on tab refocus.
