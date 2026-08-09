@@ -53,7 +53,7 @@ const UFO_SPAWN_MIN: i32 = 6;       // seconds between UFO passes
 const UFO_SPAWN_MAX: i32 = 12;
 
 // ---- UFO death-laser attack --------------------------------------------
-const UFO_LASER_CHANCE: f32 = 0.8;   // odds a given UFO pass becomes the laser attack
+const UFO_LASER_CHANCE: f32 = 0.35;  // odds a given UFO pass becomes the laser attack
 const UFO_TRACK_MIN_SECS: f32 = 1.8; // always stalks at least this long...
 const UFO_TRACK_MAX_SECS: f32 = 4.0; // ...but never longer than this, win or lose
 const UFO_TRACK_SPEED: f32 = 230.0;  // px/sec chasing the player's x — faster than the
