@@ -19,7 +19,10 @@ fn gen_tone(freq: f32, dur_ms: f32, amp: f32) -> Vec<i16> {
         let mut e = 1.0_f32;
         if i < fade { e = i as f32 / fade as f32; }
         if i + fade > n { e = (n - i) as f32 / fade as f32; }
-        s.push((e * amp * 32000.0 * (2.0 * PI * freq * t).sin()) as i16);
+        let fund = (2.0 * PI * freq * t).sin();
+        let third = (2.0 * PI * freq * 3.0 * t).sin() / 3.0;
+        let shaped = (fund * 0.8 + third * 0.3).tanh();
+        s.push((e * amp * 27000.0 * shaped) as i16);
     }
     s
 }
@@ -207,7 +210,7 @@ fn techno_loop(
         }
         if bass_hit[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 0.7, 0.32);
+            bass_note(&mut buf, off, root, step_ms * 0.7, 0.46);
         }
         if bar % 2 == 1 && pos == 0 {
             lead_stab(&mut buf, off, stab_note, step_ms * 5.0, 0.18 * energy.min(1.4));
@@ -271,7 +274,7 @@ fn music3() -> Vec<u8> {
         }
         if pos == 0 {
             let root = drone_roots[(bar / 2) % drone_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 8.0, 0.30);
+            bass_note(&mut buf, off, root, step_ms * 8.0, 0.42);
         }
         if bar % 4 == 2 && pos == 8 {
             lead_stab(&mut buf, off, 220.0, step_ms * 6.0, 0.14);
@@ -292,8 +295,11 @@ fn game_over_sfx() -> Vec<u8> {
         for j in 0..seg {
             if pos >= total { break; }
             let t = j as f32 / sr;
-            let e = 1.0 - j as f32 / seg as f32;
-            buf[pos] = (e * 20000.0 * (2.0 * PI * f * t).sin()) as i16;
+            let e = (1.0 - j as f32 / seg as f32).powf(1.3);
+            let fund = (2.0 * PI * f * t).sin();
+            let third = (2.0 * PI * f * 3.0 * t).sin() / 3.0;
+            let shaped = (fund * 0.8 + third * 0.3).tanh();
+            buf[pos] = (e * 19000.0 * shaped) as i16;
             pos += 1;
         }
     }
@@ -309,8 +315,11 @@ fn level_clear_sfx() -> Vec<u8> {
     for (i, f) in freqs.iter().enumerate() {
         for j in 0..seg {
             let t = j as f32 / sr;
-            let e = 1.0 - j as f32 / seg as f32;
-            buf[i * seg + j] = (e * 20000.0 * (2.0 * PI * f * t).sin()) as i16;
+            let e = (1.0 - j as f32 / seg as f32).powf(1.3);
+            let fund = (2.0 * PI * f * t).sin();
+            let third = (2.0 * PI * f * 3.0 * t).sin() / 3.0;
+            let shaped = (fund * 0.8 + third * 0.3).tanh();
+            buf[i * seg + j] = (e * 19000.0 * shaped) as i16;
         }
     }
     encode_pcm16_mono(&buf)

@@ -116,7 +116,7 @@ fn techno_loop(
         }
         if bass_hit[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 0.7, 0.30);
+            bass_note(&mut buf, off, root, step_ms * 0.7, 0.44);
         }
         if bar % 2 == 1 && pos == 0 {
             lead_stab(&mut buf, off, stab_note, step_ms * 5.0, 0.16 * energy.min(1.3));
@@ -156,12 +156,17 @@ fn frenzy() -> Vec<u8> {
 fn eat_sfx() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let n = SAMPLE_RATE as usize / 10;
+    let mut rng = Rng(0x5EA7_0001);
     let mut s = Vec::with_capacity(n);
     for i in 0..n {
         let freq = 400.0 + 600.0 * i as f32 / n as f32;
         let t = i as f32 / sr;
-        let e = 1.0 - i as f32 / n as f32;
-        s.push((e * 22000.0 * (2.0 * PI * freq * t).sin()) as i16);
+        let e = (1.0 - i as f32 / n as f32).powf(1.3);
+        let fund = (2.0 * PI * freq * t).sin();
+        let third = (2.0 * PI * freq * 3.0 * t).sin() / 3.0;
+        let sparkle = if i < sr as usize / 300 { (rng.next_f32() * 2.0 - 1.0) * 0.2 } else { 0.0 };
+        let shaped = (fund * 0.8 + third * 0.3 + sparkle).tanh();
+        s.push((e * 22000.0 * shaped) as i16);
     }
     encode_pcm16_mono(&s)
 }
@@ -172,7 +177,10 @@ fn move_sfx() -> Vec<u8> {
     let mut s = Vec::with_capacity(n);
     for i in 0..n {
         let e = 1.0 - i as f32 / n as f32;
-        s.push((e * 5000.0 * (2.0 * PI * 200.0 * i as f32 / sr).sin()) as i16);
+        let t = i as f32 / sr;
+        let fund = (2.0 * PI * 200.0 * t).sin();
+        let second = (2.0 * PI * 200.0 * 2.0 * t).sin() * 0.3;
+        s.push((e * 5000.0 * (fund + second).tanh()) as i16);
     }
     encode_pcm16_mono(&s)
 }
@@ -186,8 +194,11 @@ fn game_over_sfx() -> Vec<u8> {
     for (i, f) in freqs.iter().enumerate() {
         for j in 0..seg {
             let t = j as f32 / sr;
-            let e = 1.0 - j as f32 / seg as f32;
-            buf[i * seg + j] = (e * 20000.0 * (2.0 * PI * f * t).sin()) as i16;
+            let e = (1.0 - j as f32 / seg as f32).powf(1.3);
+            let fund = (2.0 * PI * f * t).sin();
+            let third = (2.0 * PI * f * 3.0 * t).sin() / 3.0;
+            let shaped = (fund * 0.8 + third * 0.3).tanh();
+            buf[i * seg + j] = (e * 21000.0 * shaped) as i16;
         }
     }
     encode_pcm16_mono(&buf)

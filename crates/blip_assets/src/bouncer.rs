@@ -151,7 +151,7 @@ fn music() -> Vec<u8> {
         }
         if BASS_HIT[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 0.7, 0.30);
+            bass_note(&mut buf, off, root, step_ms * 0.7, 0.44);
         }
         // Pluck hook: three quick notes starting on the "and" of beat 3 every other bar.
         if bar % 2 == 0 && (pos == 10 || pos == 11 || pos == 12) {
@@ -171,11 +171,16 @@ fn music() -> Vec<u8> {
 fn paddle_hit() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let n = SAMPLE_RATE as usize / 15;
+    let mut rng = Rng(0xBA11_0001);
     let mut s = Vec::with_capacity(n);
     for i in 0..n {
         let t = i as f32 / sr;
-        let e = 1.0 - i as f32 / n as f32;
-        s.push((e * 18000.0 * (2.0 * PI * 180.0 * t).sin()) as i16);
+        let e = (1.0 - i as f32 / n as f32).powf(1.4);
+        let fund = (2.0 * PI * 180.0 * t).sin();
+        let third = (2.0 * PI * 180.0 * 3.0 * t).sin() / 3.0;
+        let tick = if i < sr as usize / 400 { (rng.next_f32() * 2.0 - 1.0) * 0.25 } else { 0.0 };
+        let shaped = (fund * 0.8 + third * 0.3 + tick).tanh();
+        s.push((e * 19000.0 * shaped) as i16);
     }
     encode_pcm16_mono(&s)
 }
@@ -183,11 +188,16 @@ fn paddle_hit() -> Vec<u8> {
 fn brick_hit() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let n = SAMPLE_RATE as usize / 20;
+    let mut rng = Rng(0xBA11_0002);
     let mut s = Vec::with_capacity(n);
     for i in 0..n {
         let t = i as f32 / sr;
-        let e = 1.0 - i as f32 / n as f32;
-        s.push((e * 16000.0 * (2.0 * PI * 600.0 * t).sin()) as i16);
+        let e = (1.0 - i as f32 / n as f32).powf(1.6);
+        let fund = (2.0 * PI * 600.0 * t).sin();
+        let fifth = (2.0 * PI * 600.0 * 5.0 * t).sin() / 5.0;
+        let tick = if i < sr as usize / 500 { (rng.next_f32() * 2.0 - 1.0) * 0.3 } else { 0.0 };
+        let shaped = (fund * 0.75 + fifth * 0.3 + tick).tanh();
+        s.push((e * 17000.0 * shaped) as i16);
     }
     encode_pcm16_mono(&s)
 }
@@ -195,12 +205,16 @@ fn brick_hit() -> Vec<u8> {
 fn brick_break() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let n = SAMPLE_RATE as usize / 10;
+    let mut rng = Rng(0xBA11_0003);
     let mut s = Vec::with_capacity(n);
     for i in 0..n {
         let t = i as f32 / sr;
-        let e = 1.0 - i as f32 / n as f32;
+        let e = (1.0 - i as f32 / n as f32).powf(1.3);
         let freq = 900.0 - 400.0 * i as f32 / n as f32;
-        s.push((e * 14000.0 * (2.0 * PI * freq * t).sin()) as i16);
+        let tone = (2.0 * PI * freq * t).sin();
+        let crackle = (rng.next_f32() * 2.0 - 1.0) * 0.35;
+        let shaped = (tone * 0.85 + crackle).tanh();
+        s.push((e * 15000.0 * shaped) as i16);
     }
     encode_pcm16_mono(&s)
 }
@@ -212,8 +226,11 @@ fn life_lost() -> Vec<u8> {
     for i in 0..n {
         let t = i as f32 / sr;
         let freq = 440.0 * (1.0 - 0.5 * i as f32 / n as f32);
-        let e = 1.0 - i as f32 / n as f32;
-        s.push((e * 18000.0 * (2.0 * PI * freq * t).sin()) as i16);
+        let e = (1.0 - i as f32 / n as f32).powf(1.2);
+        let fund = (2.0 * PI * freq * t).sin();
+        let detune = (2.0 * PI * freq * 1.008 * t).sin();
+        let shaped = (fund * 0.7 + detune * 0.5).tanh();
+        s.push((e * 18000.0 * shaped) as i16);
     }
     encode_pcm16_mono(&s)
 }

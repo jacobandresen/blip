@@ -54,7 +54,7 @@ fn music() -> Vec<u8> {
         // Acid bassline.
         if BASS_HIT[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root * BASS_OCT[pos], step_ms * 0.85, 0.34);
+            bass_note(&mut buf, off, root * BASS_OCT[pos], step_ms * 0.85, 0.46);
         }
         // Tension stab on the downbeat of every odd bar.
         if bar % 2 == 1 && pos == 0 {

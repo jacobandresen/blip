@@ -46,7 +46,7 @@ fn music() -> Vec<u8> {
         }
         if BASS_HIT[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 0.6, 0.34);
+            bass_note(&mut buf, off, root, step_ms * 0.6, 0.46);
         }
         if bar % 2 == 0 && pos == 0 {
             lead_stab(&mut buf, off, stab, step_ms * 3.0, 0.16);

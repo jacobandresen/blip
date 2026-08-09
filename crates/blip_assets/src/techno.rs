@@ -80,7 +80,9 @@ pub fn clap(buf: &mut [i16], off: usize, rng: &mut Rng, vol: f32) {
     }
 }
 
-/// Acid-style bass voice — a fat two-harmonic saw-ish tone, short and punchy.
+/// Acid-style bass voice — a fat two-harmonic saw-ish tone over a reinforcing
+/// sub-octave sine, short and punchy. The sub layer is what makes it read as
+/// a prominent bassline rather than a mid-range pluck.
 pub fn bass_note(buf: &mut [i16], off: usize, freq: f32, ms: f32, vol: f32) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
@@ -93,7 +95,8 @@ pub fn bass_note(buf: &mut [i16], off: usize, freq: f32, ms: f32, vol: f32) {
         let w = (2.0 * PI * freq * t).sin()
             - 0.5 * (2.0 * PI * freq * 2.0 * t).sin()
             + 0.25 * (2.0 * PI * freq * 3.0 * t).sin();
-        mix_into(buf, off + i, w * e * vol * 13000.0);
+        let sub = (2.0 * PI * freq * 0.5 * t).sin();
+        mix_into(buf, off + i, (w * 0.75 + sub * 0.55) * e * vol * 16000.0);
     }
 }
 
