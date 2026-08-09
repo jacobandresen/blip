@@ -933,7 +933,11 @@ var n = getCoins();
       }
 
       function activate() {
-        if (!navActive) return;
+        // Fire always starts the selected game — default to the first card
+        // if the player hasn't moved the selection yet, and auto-insert a
+        // coin if needed rather than silently doing nothing.
+        if (!navActive) { navActive = true; highlight(); }
+        if (getCoins() <= 0) insertCoin();
         cards[idx].click();
       }
 
