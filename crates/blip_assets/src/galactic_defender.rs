@@ -9,6 +9,10 @@ use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng, MIX_KN
 use crate::wav::{encode_pcm16_mono, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
+// Must match crates/galactic_defender/src/main.rs's ALIEN_W / ALIEN_H.
+const ALIEN_W: i32 = 40;
+const ALIEN_H: i32 = 30;
+
 fn gen_tone(freq: f32, dur_ms: f32, amp: f32) -> Vec<i16> {
     let sr = SAMPLE_RATE as f32;
     let n = ms_to_samples(dur_ms);
@@ -79,38 +83,60 @@ fn player_ship() -> Vec<u8> {
     img.encode_png()
 }
 
-fn alien(kind: usize) -> Vec<u8> {
-    let w: i32 = 32;
-    let h: i32 = 24;
+/// A gnarly, larger alien glyph — a 7x7 bitmap scaled up, with a second
+/// animation frame per kind (mandibles/claws/tentacles/legs shift) for the
+/// classic two-frame march-cycle look, just bigger and spikier than before.
+/// `frame` is 0 or 1.
+fn alien(kind: usize, frame: usize) -> Vec<u8> {
+    let w: i32 = ALIEN_W;
+    let h: i32 = ALIEN_H;
     let mut img = Image::new(w as u32, h as u32);
     let (r, g, b) = match kind {
-        0 => (255u8, 100, 255),
-        1 => (0,    220, 220),
-        _ => (100,  255, 100),
+        0 => (255u8, 80, 255),
+        1 => (0,    230, 230),
+        _ => (110,  255, 110),
     };
-    let patterns: [[u8; 5]; 3] = [
-        [0x0E, 0x1F, 0x15, 0x1F, 0x0A],
-        [0x0E, 0x1F, 0x1F, 0x0E, 0x11],
-        [0x15, 0x1F, 0x0E, 0x1F, 0x15],
-    ];
-    let ox = w / 2 - 3;
-    let oy = h / 2 - 3;
-    for row in 0..5 {
-        for col in 0..5 {
-            if patterns[kind][row] & (1 << (4 - col)) != 0 {
-                let px_x = ox + col * 2;
-                let px_y = oy + row as i32 * 2;
-                img.set(px_x,     px_y,     r, g, b);
-                img.set(px_x + 1, px_y,     r, g, b);
-                img.set(px_x,     px_y + 1, r, g, b);
-                img.set(px_x + 1, px_y + 1, r, g, b);
+    // [frame A, frame B] — rows 0..3 (head/body) stay put, rows 4..6
+    // (mandibles / claws / tentacles / legs) swap between frames.
+    let patterns: [[u8; 7]; 2] = match kind {
+        0 => [
+            // Squid: antenna twitch + legs together / legs spread.
+            [0x08, 0x1C, 0x3E, 0x6B, 0x7F, 0x5D, 0x22],
+            [0x14, 0x1C, 0x3E, 0x6B, 0x7F, 0x41, 0x41],
+        ],
+        1 => [
+            // Crab: claws pulled in / claws thrown wide open.
+            [0x00, 0x1C, 0x3E, 0x7F, 0x5D, 0x6B, 0x14],
+            [0x00, 0x1C, 0x3E, 0x7F, 0x5D, 0x41, 0x14],
+        ],
+        _ => [
+            // Octopus: tentacles alternating like a wave.
+            [0x08, 0x1C, 0x3E, 0x7F, 0x3E, 0x55, 0x2A],
+            [0x08, 0x1C, 0x3E, 0x7F, 0x3E, 0x2A, 0x55],
+        ],
+    };
+    let pattern = patterns[frame];
+    let cell = 4;
+    let ox = (w - 7 * cell) / 2;
+    let oy = (h - 7 * cell) / 2;
+    for row in 0..7 {
+        for col in 0..7 {
+            if pattern[row] & (1 << (6 - col)) != 0 {
+                let px_x = ox + col as i32 * cell;
+                let px_y = oy + row as i32 * cell;
+                for dy in 0..cell {
+                    for dx in 0..cell {
+                        img.set(px_x + dx, px_y + dy, r, g, b);
+                    }
+                }
             }
         }
     }
-    img.set(ox,     oy - 1, r, g, b);
-    img.set(ox + 8, oy - 1, r, g, b);
-    img.set(ox + 2, oy + 2, 255, 255, 255);
-    img.set(ox + 6, oy + 2, 255, 255, 255);
+    // Glowing eyes, offset slightly per frame for a menacing flicker.
+    let eye_y = oy + 3 * cell;
+    let eye_dx = if frame == 1 { 1 } else { 0 };
+    img.set(ox + cell - eye_dx,     eye_y, 255, 255, 255);
+    img.set(ox + 5 * cell + eye_dx, eye_y, 255, 255, 255);
     img.encode_png()
 }
 
@@ -327,10 +353,13 @@ fn level_clear_sfx() -> Vec<u8> {
 
 pub fn generate() -> Vec<Asset> {
     vec![
-        ("images/player_ship.png",   player_ship()),
-        ("images/alien_squid.png",   alien(0)),
-        ("images/alien_crab.png",    alien(1)),
-        ("images/alien_octopus.png", alien(2)),
+        ("images/player_ship.png",     player_ship()),
+        ("images/alien_squid_a.png",   alien(0, 0)),
+        ("images/alien_squid_b.png",   alien(0, 1)),
+        ("images/alien_crab_a.png",    alien(1, 0)),
+        ("images/alien_crab_b.png",    alien(1, 1)),
+        ("images/alien_octopus_a.png", alien(2, 0)),
+        ("images/alien_octopus_b.png", alien(2, 1)),
         ("images/bullet.png",        bullet()),
         ("images/explosion.png",     explosion()),
         ("images/shield_block.png",  shield_block()),

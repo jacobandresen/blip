@@ -23,12 +23,12 @@ const PLAY_Y: i32 = HUD_H;
 const GROUND_Y: i32 = WIN_H - 32;
 
 // ---- alien grid -------------------------------------------------------
-const ALIEN_COLS: i32 = 13; // max across all themes (theme 2 uses 13)
+const ALIEN_COLS: i32 = 10; // max across all themes (theme 2 uses 10)
 const ALIEN_ROWS: i32 = 6;  // max across all themes (theme 1 uses 6)
-const ALIEN_W: i32 = 32;
-const ALIEN_H: i32 = 24;
-const ALIEN_XGAP: i32 = 4;
-const ALIEN_YGAP: i32 = 8;
+const ALIEN_W: i32 = 40;
+const ALIEN_H: i32 = 30;
+const ALIEN_XGAP: i32 = 6;
+const ALIEN_YGAP: i32 = 10;
 const ALIEN_TOTAL: usize = (ALIEN_COLS * ALIEN_ROWS) as usize;
 
 // ---- tuning -----------------------------------------------------------
@@ -195,11 +195,11 @@ impl Game {
         // Level 1 gets a smaller formation than a later trip through theme 0,
         // so a first-time player isn't faced with a full 5x11 wall immediately.
         let (rows, cols) = match theme {
-            0 => (if self.sess.level == 1 { 4 } else { 5 }, 11_i32),
-            1 => (6,     11),
-            2 => (3,     13),
-            3 => (4,     12),
-            _ => (6,     9),
+            0 => (if self.sess.level == 1 { 4 } else { 5 }, 9_i32),
+            1 => (6,     9),
+            2 => (3,     10),
+            3 => (4,     9),
+            _ => (6,     7),
         };
         self.bomb_speed = match theme { 0 => 160.0, 1 => 200.0, 2 => 250.0, 3 => 220.0, _ => 280.0 };
         // Bomb intervals tighten each level (capped at level 6 equivalent).
@@ -542,7 +542,7 @@ fn update_over(g: &mut Game) {
 }
 
 fn draw_play(blip: &Blip, g: &Game,
-             player: &Texture2D, alien: &[Texture2D; 3],
+             player: &Texture2D, alien: &[[Texture2D; 2]; 3],
              explosion: &Texture2D, shield: &Texture2D) {
     blip.draw_line(0.0, GROUND_Y as f32, WIN_W as f32, GROUND_Y as f32, BLIP_GREEN);
 
@@ -560,13 +560,11 @@ fn draw_play(blip: &Blip, g: &Game,
         }
     }
 
-    let dim = BlipColor { r: 180.0/255.0, g: 180.0/255.0, b: 180.0/255.0, a: 1.0 };
     for a in g.aliens.iter() {
         if !a.alive { continue; }
-        let tint = if a.anim != 0 { dim } else { BLIP_WHITE };
         blip.draw_texture_tinted(
-            &alien[a.kind],
-            a.x, a.y, ALIEN_W as f32, ALIEN_H as f32, tint,
+            &alien[a.kind][a.anim as usize],
+            a.x, a.y, ALIEN_W as f32, ALIEN_H as f32, BLIP_WHITE,
         );
     }
 
@@ -593,7 +591,7 @@ fn draw_play(blip: &Blip, g: &Game,
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
-fn draw_title(blip: &Blip, alien: &[Texture2D; 3]) {
+fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3]) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("GALACTIC", (WIN_H / 5) as f32,        5.0, BLIP_CYAN);
     blip.draw_centered("DEFENDER", (WIN_H / 5 + 50) as f32,   5.0, BLIP_MAGENTA);
@@ -607,9 +605,9 @@ fn draw_title(blip: &Blip, alien: &[Texture2D; 3]) {
     let row1 = (WIN_H / 2 - 20) as f32;
     let row2 = (WIN_H / 2) as f32;
 
-    blip.draw_texture_tinted(&alien[0], ax, row0 + voff, dw, dh, BLIP_MAGENTA);
-    blip.draw_texture_tinted(&alien[1], ax, row1 + voff, dw, dh, BLIP_CYAN);
-    blip.draw_texture_tinted(&alien[2], ax, row2 + voff, dw, dh, BLIP_GREEN);
+    blip.draw_texture_tinted(&alien[0][0], ax, row0 + voff, dw, dh, BLIP_MAGENTA);
+    blip.draw_texture_tinted(&alien[1][0], ax, row1 + voff, dw, dh, BLIP_CYAN);
+    blip.draw_texture_tinted(&alien[2][0], ax, row2 + voff, dw, dh, BLIP_GREEN);
 
     blip.draw_centered("30 PTS",        row0,                 2.0, BLIP_MAGENTA);
     blip.draw_centered("20 PTS",        row1,                 2.0, BLIP_CYAN);
@@ -637,9 +635,12 @@ fn conf() -> blip::macroquad::window::Conf {
 }
 
 const PLAYER_SHIP_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/player_ship.png"));
-const ALIEN_SQUID_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_squid.png"));
-const ALIEN_CRAB_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_crab.png"));
-const ALIEN_OCTO_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_octopus.png"));
+const ALIEN_SQUID_A_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_squid_a.png"));
+const ALIEN_SQUID_B_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_squid_b.png"));
+const ALIEN_CRAB_A_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_crab_a.png"));
+const ALIEN_CRAB_B_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_crab_b.png"));
+const ALIEN_OCTO_A_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_octopus_a.png"));
+const ALIEN_OCTO_B_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_octopus_b.png"));
 const EXPLOSION_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/explosion.png"));
 const SHIELD_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/shield_block.png"));
 const SHOOT_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot.wav"));
@@ -666,9 +667,9 @@ async fn main() {
 
     let player = load_png(PLAYER_SHIP_PNG);
     let alien = [
-        load_png(ALIEN_SQUID_PNG),
-        load_png(ALIEN_CRAB_PNG),
-        load_png(ALIEN_OCTO_PNG),
+        [load_png(ALIEN_SQUID_A_PNG), load_png(ALIEN_SQUID_B_PNG)],
+        [load_png(ALIEN_CRAB_A_PNG),  load_png(ALIEN_CRAB_B_PNG)],
+        [load_png(ALIEN_OCTO_A_PNG),  load_png(ALIEN_OCTO_B_PNG)],
     ];
     let explosion = load_png(EXPLOSION_PNG);
     let shield = load_png(SHIELD_PNG);
