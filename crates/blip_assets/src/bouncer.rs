@@ -5,7 +5,8 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::wav::{encode_pcm16_mono, env, ms_to_samples, SAMPLE_RATE};
+use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng};
+use crate::wav::{encode_pcm16_mono, env, mix_into, SAMPLE_RATE};
 use crate::Asset;
 
 fn paddle() -> Vec<u8> {
@@ -84,41 +85,86 @@ fn brick(color: (u8, u8, u8)) -> Vec<u8> {
     img.encode_png()
 }
 
-fn music_note(buf: &mut Vec<i16>, freq: f32, ms: f32) {
+/// Bouncy plucked lead voice — short, springy, and a little detuned for
+/// character. Used for the melodic "bounce" hook over the tech-house groove.
+fn pluck(buf: &mut [i16], off: usize, freq: f32, ms: f32, vol: f32) {
     let sr = SAMPLE_RATE as f32;
-    let n = ms_to_samples(ms);
-    let att = 220;
-    let rel = (n / 6).max(1);
+    let n = (sr * ms / 1000.0) as usize;
+    let att = (sr * 0.002) as usize;
+    let rel = (n * 3 / 4).max(1);
     for i in 0..n {
+        if off + i >= buf.len() { break; }
         let t = i as f32 / sr;
-        let e = env(i, n, att, rel);
-        let w = if freq > 0.0 {
-            ((2.0 * PI * freq * t).sin()
-                + 0.5 * (4.0 * PI * freq * t).sin()
-                + 0.25 * (8.0 * PI * freq * t).sin())
-                / 1.75
-        } else { 0.0 };
-        buf.push((w * e * 22000.0) as i16);
+        let e = env(i, n, att.max(1), rel);
+        let w = (2.0 * PI * freq * t).sin()
+            + 0.5 * (2.0 * PI * freq * 2.003 * t).sin()
+            + 0.2 * (2.0 * PI * freq * 4.0 * t).sin();
+        mix_into(buf, off + i, w * e * vol * 12000.0);
     }
 }
 
+const BPM: f32 = 126.0;
+const STEPS_PER_BAR: usize = 16;
+const BARS: usize = 8;
+const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
+
+/// A bouncy tech-house banger: four-on-the-floor kick, backbeat claps,
+/// off-beat hats, a springy staccato bassline, and a playful pluck hook.
 fn music() -> Vec<u8> {
-    let e = 187.5_f32;
-    let seq: &[(f32, f32)] = &[
-        (523.25, e), (659.25, e), (783.99, e), (659.25, e),
-        (880.00, e), (783.99, e), (659.25, e), (587.33, e),
-        (659.25, e), (783.99, e), (880.00, e), (783.99, e),
-        (659.25, e), (587.33, e), (523.25, e), (659.25, e),
-        (783.99, e), (880.00, e), (783.99, e), (659.25, e),
-        (783.99, e), (659.25, e), (587.33, e), (523.25, e),
-        (587.33, e), (659.25, e), (783.99, e), (659.25, e),
-        (523.25, e), (392.00, e), (440.00, e), (523.25, e),
+    let sr = SAMPLE_RATE as f32;
+    let step_ms = 60_000.0 / BPM / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
+    let mut buf = vec![0i16; total];
+    let mut rng = Rng(0xB0DE_1234);
+
+    // C-major-ish bouncy bass roots, one per 2-bar section: C3 - E3 - F3 - G3.
+    let bass_roots = [130.81_f32, 164.81, 174.61, 196.00];
+    const BASS_HIT: [bool; STEPS_PER_BAR] = [
+        true, false, false, true, false, true, false, false,
+        true, false, false, true, false, true, false, true,
     ];
-    let total: usize = seq.iter().map(|(_, ms)| ms_to_samples(*ms)).sum();
-    let mut buf: Vec<i16> = Vec::with_capacity(total);
-    for (f, ms) in seq {
-        music_note(&mut buf, *f, *ms);
+    // Pluck hook cycling every 2 bars — a bright, bouncy C-major arpeggio fragment.
+    let hook_notes: [&[f32]; 4] = [
+        &[523.25, 659.25, 783.99],
+        &[659.25, 783.99, 880.00],
+        &[698.46, 880.00, 1046.50],
+        &[783.99, 659.25, 523.25],
+    ];
+
+    for step in 0..TOTAL_STEPS {
+        let bar = step / STEPS_PER_BAR;
+        let pos = step % STEPS_PER_BAR;
+        let off = step * step_samples;
+
+        if pos % 4 == 0 {
+            kick(&mut buf, off, 0.92);
+        }
+        if pos == 4 || pos == 12 {
+            clap(&mut buf, off, &mut rng, 0.55);
+        }
+        if pos % 2 == 1 {
+            hat(&mut buf, off, &mut rng, 0.24);
+        }
+        if bar % 2 == 1 && pos == 14 {
+            open_hat(&mut buf, off, &mut rng, 0.20);
+        }
+        if BASS_HIT[pos] {
+            let root = bass_roots[(bar / 2) % bass_roots.len()];
+            bass_note(&mut buf, off, root, step_ms * 0.7, 0.30);
+        }
+        // Pluck hook: three quick notes starting on the "and" of beat 3 every other bar.
+        if bar % 2 == 0 && (pos == 10 || pos == 11 || pos == 12) {
+            let notes = hook_notes[(bar / 2) % hook_notes.len()];
+            let idx = (pos - 10) as usize;
+            pluck(&mut buf, off, notes[idx], step_ms * 1.4, 0.22);
+        }
+        // Tension stab on the downbeat of every 4th bar, building energy.
+        if bar % 4 == 3 && pos == 0 {
+            lead_stab(&mut buf, off, 392.00, step_ms * 6.0, 0.18);
+        }
     }
+
     encode_pcm16_mono(&buf)
 }
 

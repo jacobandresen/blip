@@ -5,7 +5,8 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::wav::{encode_pcm16_mono, env, ms_to_samples, SAMPLE_RATE};
+use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng};
+use crate::wav::{encode_pcm16_mono, SAMPLE_RATE};
 use crate::Asset;
 
 const W: u32 = 24;
@@ -75,79 +76,81 @@ fn food() -> Vec<u8> {
     img.encode_png()
 }
 
-fn music_note(buf: &mut Vec<i16>, freq: f32, ms: f32) {
+/// Shared step-sequenced techno renderer for Serpent's three intensity tiers.
+/// `bass_hit` marks which 16th steps in the bar trigger a bass note;
+/// `bass_roots` cycle every 2 bars; hats/claps density scales with `energy`.
+fn techno_loop(
+    bpm: f32,
+    bars: usize,
+    bass_roots: &[f32],
+    bass_hit: &[bool; 16],
+    stab_note: f32,
+    energy: f32,
+    seed: u32,
+) -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
-    let n = ms_to_samples(ms);
-    let att = 110;
-    let rel = (n / 8).max(1);
-    for i in 0..n {
-        let t = i as f32 / sr;
-        let e = env(i, n, att, rel);
-        let w = if freq > 0.0 {
-            (((2.0 * PI * freq * t).sin())
-                - (1.0 / 9.0) * (6.0 * PI * freq * t).sin()
-                + (1.0 / 25.0) * (10.0 * PI * freq * t).sin())
-                / 1.08
-        } else {
-            0.0
-        };
-        buf.push((w * e * 22000.0) as i16);
+    let steps_per_bar = 16;
+    let total_steps = bars * steps_per_bar;
+    let step_ms = 60_000.0 / bpm / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
+    let mut buf = vec![0i16; total];
+    let mut rng = Rng(seed);
+
+    for step in 0..total_steps {
+        let bar = step / steps_per_bar;
+        let pos = step % steps_per_bar;
+        let off = step * step_samples;
+
+        if pos % 4 == 0 {
+            kick(&mut buf, off, 0.9);
+        }
+        if pos == 4 || pos == 12 {
+            clap(&mut buf, off, &mut rng, 0.4 * energy);
+        }
+        if pos % 2 == 1 {
+            hat(&mut buf, off, &mut rng, 0.20 * energy);
+        }
+        if energy > 1.1 && (pos == 6 || pos == 14) {
+            open_hat(&mut buf, off, &mut rng, 0.16);
+        }
+        if bass_hit[pos] {
+            let root = bass_roots[(bar / 2) % bass_roots.len()];
+            bass_note(&mut buf, off, root, step_ms * 0.7, 0.30);
+        }
+        if bar % 2 == 1 && pos == 0 {
+            lead_stab(&mut buf, off, stab_note, step_ms * 5.0, 0.16 * energy.min(1.3));
+        }
     }
+
+    encode_pcm16_mono(&buf)
 }
 
+/// Base groove — a relaxed mid-tempo techno loop for the early game.
 fn slither() -> Vec<u8> {
-    let e = 250.0;
-    let seq: &[(f32, f32)] = &[
-        (261.63, e), (329.63, e), (392.00, e), (440.00, e),
-        (392.00, e), (329.63, e), (261.63, e), (329.63, e),
-        (392.00, e), (440.00, e), (392.00, e), (329.63, e),
-        (392.00, e), (329.63, e), (261.63, e), (293.66, e),
-        (329.63, e), (392.00, e), (440.00, e), (392.00, e),
-        (329.63, e), (261.63, e), (293.66, e), (329.63, e),
-        (392.00, e), (440.00, e), (392.00, e), (329.63, e),
-        (293.66, e), (261.63, e), (196.00, e), (261.63, e),
+    const HIT: [bool; 16] = [
+        true, false, true, false, false, true, false, true,
+        true, false, false, true, false, true, false, false,
     ];
-    let total: usize = seq.iter().map(|(_, ms)| ms_to_samples(*ms)).sum();
-    let mut buf: Vec<i16> = Vec::with_capacity(total);
-    for (f, ms) in seq {
-        music_note(&mut buf, *f, *ms);
-    }
-    encode_pcm16_mono(&buf)
+    techno_loop(120.0, 8, &[130.81, 174.61, 196.00, 164.81], &HIT, 392.00, 1.0, 0x5111_7000)
 }
 
+/// Faster, darker minor-key loop — kicks in as the snake grows.
 fn stalk() -> Vec<u8> {
-    let e = 180.0;
-    let seq: &[(f32, f32)] = &[
-        (220.00, e), (261.63, e), (293.66, e), (329.63, e), (349.23, e), (392.00, e),
-        (392.00, e), (349.23, e), (329.63, e), (293.66, e), (261.63, e), (220.00, e),
-        (220.00, e), (261.63, e), (293.66, e), (329.63, e), (349.23, e), (392.00, e),
-        (392.00, e), (349.23, e), (329.63, e), (293.66, e), (261.63, e), (220.00, e),
-        (220.00, e), (261.63, e), (293.66, e), (329.63, e), (349.23, e), (392.00, e),
-        (349.23, e), (329.63, e),
+    const HIT: [bool; 16] = [
+        true, false, true, true, false, true, false, true,
+        true, false, true, false, true, true, false, true,
     ];
-    let total: usize = seq.iter().map(|(_, ms)| ms_to_samples(*ms)).sum();
-    let mut buf: Vec<i16> = Vec::with_capacity(total);
-    for (f, ms) in seq { music_note(&mut buf, *f, *ms); }
-    encode_pcm16_mono(&buf)
+    techno_loop(132.0, 8, &[123.47, 155.56, 146.83, 155.56], &HIT, 349.23, 1.25, 0x57A1_4000)
 }
 
+/// Hard, fast rave loop for high-level frenzy — dense hats, driving acid bass.
 fn frenzy() -> Vec<u8> {
-    let e = 130.0;
-    let r = 50.0;
-    let seq: &[(f32, f32)] = &[
-        (164.81, e), (174.61, e), (196.00, e), (0.0, r),
-        (164.81, e), (174.61, e), (196.00, e), (0.0, r),
-        (196.00, e), (174.61, e), (164.81, e), (0.0, r),
-        (196.00, e), (174.61, e), (164.81, e), (0.0, r),
-        (164.81, e), (174.61, e), (196.00, e), (220.00, e),
-        (246.94, e), (261.63, e), (293.66, e), (0.0, r),
-        (164.81, e), (174.61, e), (164.81, e), (174.61, e),
-        (196.00, e), (174.61, e), (164.81, e), (0.0, r),
+    const HIT: [bool; 16] = [
+        true, true, false, true, true, false, true, true,
+        false, true, true, false, true, true, false, true,
     ];
-    let total: usize = seq.iter().map(|(_, ms)| ms_to_samples(*ms)).sum();
-    let mut buf: Vec<i16> = Vec::with_capacity(total);
-    for (f, ms) in seq { music_note(&mut buf, *f, *ms); }
-    encode_pcm16_mono(&buf)
+    techno_loop(150.0, 8, &[110.00, 138.59, 123.47, 146.83], &HIT, 440.00, 1.6, 0xF6E2_9000)
 }
 
 fn eat_sfx() -> Vec<u8> {

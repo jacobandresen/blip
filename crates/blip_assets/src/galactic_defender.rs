@@ -5,7 +5,8 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::wav::{encode_pcm16_mono, env, ms_to_samples, SAMPLE_RATE};
+use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng};
+use crate::wav::{encode_pcm16_mono, ms_to_samples, SAMPLE_RATE};
 use crate::Asset;
 
 fn gen_tone(freq: f32, dur_ms: f32, amp: f32) -> Vec<i16> {
@@ -166,87 +167,117 @@ fn shield_block() -> Vec<u8> {
     img.encode_png()
 }
 
-fn music_note(buf: &mut Vec<i16>, freq: f32, ms: f32) {
+/// Shared step-sequenced techno renderer for the title and pursuit loops.
+/// `bass_hit` marks which 16th steps in the bar trigger a bass note;
+/// `bass_roots` cycle every 2 bars; hat/clap density scales with `energy`.
+fn techno_loop(
+    bpm: f32,
+    bars: usize,
+    bass_roots: &[f32],
+    bass_hit: &[bool; 16],
+    stab_note: f32,
+    energy: f32,
+    seed: u32,
+) -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
-    let n = ms_to_samples(ms);
-    let att = 440;
-    let rel = (n / 4).max(1);
-    for i in 0..n {
-        let t = i as f32 / sr;
-        let e = env(i, n, att, rel);
-        let w = if freq > 0.0 {
-            ((2.0 * PI * freq * t).sin()
-                + 0.3 * (4.0 * PI * freq * t).sin()
-                + 0.1 * (6.0 * PI * freq * t).sin())
-                / 1.4
-        } else { 0.0 };
-        buf.push((w * e * 22000.0) as i16);
+    let steps_per_bar = 16;
+    let total_steps = bars * steps_per_bar;
+    let step_ms = 60_000.0 / bpm / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
+    let mut buf = vec![0i16; total];
+    let mut rng = Rng(seed);
+
+    for step in 0..total_steps {
+        let bar = step / steps_per_bar;
+        let pos = step % steps_per_bar;
+        let off = step * step_samples;
+
+        if pos % 4 == 0 {
+            kick(&mut buf, off, 0.9);
+        }
+        if pos == 4 || pos == 12 {
+            clap(&mut buf, off, &mut rng, 0.4 * energy);
+        }
+        if pos % 2 == 1 {
+            hat(&mut buf, off, &mut rng, 0.20 * energy);
+        }
+        if energy > 1.2 && (pos == 6 || pos == 14) {
+            open_hat(&mut buf, off, &mut rng, 0.16);
+        }
+        if bass_hit[pos] {
+            let root = bass_roots[(bar / 2) % bass_roots.len()];
+            bass_note(&mut buf, off, root, step_ms * 0.7, 0.32);
+        }
+        if bar % 2 == 1 && pos == 0 {
+            lead_stab(&mut buf, off, stab_note, step_ms * 5.0, 0.18 * energy.min(1.4));
+        }
     }
+
+    encode_pcm16_mono(&buf)
 }
 
+/// Title/default loop — driving mid-tempo techno (~15.7 s @ 124 BPM, 8 bars).
 fn music() -> Vec<u8> {
-    let q = 600.0_f32;
-    let e = 300.0_f32;
-    let h = 1200.0_f32;
-    let seq: &[(f32, f32)] = &[
-        (440.00, q), (392.00, q), (349.23, q), (329.63, q),
-        (293.66, e), (329.63, e), (349.23, q), (329.63, e), (392.00, e), (440.00, q),
-        (523.25, e), (493.88, e), (440.00, q), (392.00, e), (349.23, e), (329.63, q),
-        (440.00, q), (329.63, q), (220.00, h),
+    const HIT: [bool; 16] = [
+        true, false, true, false, false, true, false, true,
+        true, false, false, true, false, true, false, true,
     ];
-    let total: usize = seq.iter().map(|(_, ms)| ms_to_samples(*ms)).sum();
-    let mut buf: Vec<i16> = Vec::with_capacity(total);
-    for (f, ms) in seq {
-        music_note(&mut buf, *f, *ms);
-    }
-    encode_pcm16_mono(&buf)
+    // A-minor roots: A2 - D3 - C3 - D3.
+    techno_loop(124.0, 8, &[110.00, 146.83, 130.81, 146.83], &HIT, 440.00, 1.0, 0xD0D0_1000)
 }
 
-/// Fast D-minor pursuit riff (~5.6 s).
+/// Fast pursuit loop — harder and denser (~13.8 s @ 142 BPM, 8 bars).
 fn music2() -> Vec<u8> {
-    let e = 200.0_f32;
-    let q = 400.0_f32;
-    // D4=293.66 E4=329.63 F4=349.23 G4=392 A4=440 Bb4=466.16 C5=523.25 A3=220 C4=261.63
-    let seq: &[(f32, f32)] = &[
-        // ascending run D E F G
-        (293.66, e), (329.63, e), (349.23, e), (392.00, e),
-        // peak A4 and C5
-        (440.00, q), (523.25, q),
-        // descending Bb A G F
-        (466.16, e), (440.00, e), (392.00, e), (349.23, e),
-        // settle E4 D4
-        (329.63, q), (293.66, q),
-        // low run A3 C4 D4 F4
-        (220.00, e), (261.63, e), (293.66, e), (349.23, e),
-        // high run A4 C5 Bb4 G4
-        (440.00, e), (523.25, e), (466.16, e), (392.00, e),
-        // D4 hold
-        (293.66, 800.0),
+    const HIT: [bool; 16] = [
+        true, true, false, true, true, false, true, true,
+        false, true, true, false, true, true, false, true,
     ];
-    let total: usize = seq.iter().map(|(_, ms)| ms_to_samples(*ms)).sum();
-    let mut buf: Vec<i16> = Vec::with_capacity(total);
-    for (f, ms) in seq { music_note(&mut buf, *f, *ms); }
-    encode_pcm16_mono(&buf)
+    // D-minor roots: D3 - F3 - Eb3 - F3.
+    techno_loop(142.0, 8, &[146.83, 174.61, 155.56, 174.61], &HIT, 523.25, 1.5, 0xD0D0_2000)
 }
 
-/// Slow A-minor dread loop (~8.0 s).
+/// Slow, dark dread loop — sparse kick, deep sub-bass drone, distant stabs
+/// (~19.5 s @ 100 BPM, 8 bars).
 fn music3() -> Vec<u8> {
-    let q = 500.0_f32;
-    let h = 1000.0_f32;
-    // E4=329.63 D4=293.66 C4=261.63 A3=220 G3=196 B3=246.94 E3=164.81
-    let seq: &[(f32, f32)] = &[
-        // phrase 1: descend E4 D4 C4
-        (329.63, h), (293.66, q), (261.63, q),
-        // phrase 2: tension A3 G3 B3
-        (220.00, h), (196.00, q), (246.94, q),
-        // phrase 3: ascend C4 D4 E4
-        (261.63, h), (293.66, q), (329.63, q),
-        // phrase 4: resolve low A3 then E3
-        (220.00, h), (164.81, h),
+    let sr = SAMPLE_RATE as f32;
+    let bpm = 100.0_f32;
+    let bars = 8;
+    let steps_per_bar = 16;
+    let total_steps = bars * steps_per_bar;
+    let step_ms = 60_000.0 / bpm / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
+    let mut buf = vec![0i16; total];
+    let mut rng = Rng(0xD0D0_3000);
+
+    // A1 - Bb1 - G1 - Bb1 sub-bass drone, one long note per bar.
+    let drone_roots = [55.00_f32, 58.27, 49.00, 58.27];
+    const KICK_HIT: [bool; 16] = [
+        true, false, false, false, false, false, true, false,
+        false, false, true, false, false, false, false, false,
     ];
-    let total: usize = seq.iter().map(|(_, ms)| ms_to_samples(*ms)).sum();
-    let mut buf: Vec<i16> = Vec::with_capacity(total);
-    for (f, ms) in seq { music_note(&mut buf, *f, *ms); }
+
+    for step in 0..total_steps {
+        let bar = step / steps_per_bar;
+        let pos = step % steps_per_bar;
+        let off = step * step_samples;
+
+        if KICK_HIT[pos] {
+            kick(&mut buf, off, 0.8);
+        }
+        if pos == 8 {
+            open_hat(&mut buf, off, &mut rng, 0.10);
+        }
+        if pos == 0 {
+            let root = drone_roots[(bar / 2) % drone_roots.len()];
+            bass_note(&mut buf, off, root, step_ms * 8.0, 0.30);
+        }
+        if bar % 4 == 2 && pos == 8 {
+            lead_stab(&mut buf, off, 220.0, step_ms * 6.0, 0.14);
+        }
+    }
+
     encode_pcm16_mono(&buf)
 }
 

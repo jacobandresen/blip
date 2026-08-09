@@ -15,6 +15,7 @@ use std::fs;
 use std::path::Path;
 
 pub mod image;
+pub mod techno;
 pub mod wav;
 
 pub mod bouncer;

@@ -641,8 +641,8 @@ const MUSIC2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets
 const MUSIC3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
 
 // Loop durations in seconds — used to switch tracks at loop boundaries.
-// music: 9.6s  music2: 5.6s  music3: 8.0s
-const MUSIC_DURATIONS: [f32; 3] = [9.6, 5.6, 8.0];
+// music: 15.73s (124 BPM techno)  music2: 13.77s (142 BPM techno)  music3: 19.45s (100 BPM dread)
+const MUSIC_DURATIONS: [f32; 3] = [15.73, 13.77, 19.45];
 
 fn load_png(bytes: &'static [u8]) -> Texture2D {
     let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));

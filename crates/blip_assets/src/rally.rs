@@ -2,52 +2,57 @@
 //!
 //! Direct port of `games/rally/assets/generate_assets.c`.
 
-use crate::wav::{encode_pcm16_mono, mix_into, SAMPLE_RATE};
+use crate::techno::{bass_note, clap, hat, kick, lead_stab, Rng};
+use crate::wav::{encode_pcm16_mono, SAMPLE_RATE};
 use crate::Asset;
 
-fn note(buf: &mut [i16], off: usize, freq: f32, ms: f32, vol: f32) {
-    let sr = SAMPLE_RATE as f32;
-    let n = (sr * ms / 1000.0) as usize;
-    let att = SAMPLE_RATE as usize / 200;
-    let rel = (n / 5).max(1);
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
-        let env = if i < att {
-            i as f32 / att as f32
-        } else if i + rel > n {
-            (n - i) as f32 / rel as f32
-        } else {
-            1.0
-        };
-        let phase = (freq * i as f32 / sr).rem_euclid(1.0);
-        let w = if phase < 0.5 { 1.0 } else { -1.0 };
-        mix_into(buf, off + i, w * env * vol * 16000.0);
-    }
-}
+const BPM: f32 = 132.0;
+const STEPS_PER_BAR: usize = 16;
+const BARS: usize = 8;
+const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
 
+/// A fast, driving arcade-rally banger: four-on-the-floor kick, backbeat
+/// claps, tight hats, and a relentless galloping bassline.
 fn music() -> Vec<u8> {
-    let bpm = 110.0_f32;
-    let beat_ms = 60_000.0 / bpm;
-    let beats = 8 * 4;
-    let total = (SAMPLE_RATE as f32 * beat_ms / 1000.0 * beats as f32) as usize
-        + SAMPLE_RATE as usize;
+    let sr = SAMPLE_RATE as f32;
+    let step_ms = 60_000.0 / BPM / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0i16; total];
+    let mut rng = Rng(0xFA57_CA12);
 
-    let bass = [82.41_f32, 110.0, 123.47, 110.0];
-    let stab = 164.81_f32;
+    // E-minor galloping roots, one per 2-bar section: E2 - A2 - B2 - A2.
+    let bass_roots = [82.41_f32, 110.0, 123.47, 110.0];
+    // Galloping 16th pattern: hit, hit, rest, hit — repeated across the bar.
+    const BASS_HIT: [bool; STEPS_PER_BAR] = [
+        true, true, false, true, true, true, false, true,
+        true, true, false, true, true, true, false, true,
+    ];
+    let stab = 164.81_f32; // B3
 
-    for b in 0..beats {
-        let bar = b / 4;
-        let beat = b % 4;
-        let off = (SAMPLE_RATE as f32 * beat_ms / 1000.0 * b as f32) as usize;
+    for step in 0..TOTAL_STEPS {
+        let bar = step / STEPS_PER_BAR;
+        let pos = step % STEPS_PER_BAR;
+        let off = step * step_samples;
 
-        note(&mut buf, off, bass[beat], beat_ms * 0.65, 0.38);
-
-        if beat == 0 && bar % 2 == 0 {
-            note(&mut buf, off, stab, beat_ms * 0.18, 0.20);
+        if pos % 4 == 0 {
+            kick(&mut buf, off, 0.95);
         }
-        if beat == 2 && bar % 2 == 1 {
-            note(&mut buf, off, stab, beat_ms * 0.12, 0.14);
+        if pos == 4 || pos == 12 {
+            clap(&mut buf, off, &mut rng, 0.45);
+        }
+        if pos % 2 == 1 {
+            hat(&mut buf, off, &mut rng, 0.22);
+        }
+        if BASS_HIT[pos] {
+            let root = bass_roots[(bar / 2) % bass_roots.len()];
+            bass_note(&mut buf, off, root, step_ms * 0.6, 0.34);
+        }
+        if bar % 2 == 0 && pos == 0 {
+            lead_stab(&mut buf, off, stab, step_ms * 3.0, 0.16);
+        }
+        if bar % 2 == 1 && pos == 8 {
+            lead_stab(&mut buf, off, stab * 1.5, step_ms * 2.0, 0.12);
         }
     }
 

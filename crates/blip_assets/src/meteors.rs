@@ -3,6 +3,7 @@
 
 use std::f32::consts::PI;
 
+use crate::techno::{bass_note, hat, kick, lead_stab, Rng};
 use crate::wav::{encode_pcm16_mono, env, mix_into, SAMPLE_RATE};
 use crate::Asset;
 
@@ -11,79 +12,11 @@ const STEPS_PER_BAR: usize = 16; // 16th-note grid
 const BARS: usize = 8;
 const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
 
-/// Small deterministic PRNG — no external dependency, reproducible builds.
-struct Rng(u32);
-impl Rng {
-    fn next_f32(&mut self) -> f32 {
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 17;
-        self.0 ^= self.0 << 5;
-        (self.0 >> 8) as f32 / 16_777_216.0 // 0..1
-    }
-}
-
-fn kick(buf: &mut [i16], off: usize, vol: f32) {
-    let sr = SAMPLE_RATE as f32;
-    let n = (sr * 0.15) as usize;
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
-        let t = i as f32 / sr;
-        let e = (1.0 - i as f32 / n as f32).powf(1.7);
-        let freq = 42.0 + 130.0 * (-t / 0.045).exp(); // pitch sweep 172Hz -> 42Hz
-        let s = (2.0 * PI * freq * t).sin();
-        mix_into(buf, off + i, s * e * vol * 22000.0);
-    }
-}
-
-fn hat(buf: &mut [i16], off: usize, rng: &mut Rng, vol: f32) {
-    let n = (SAMPLE_RATE as f32 * 0.045) as usize;
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
-        let e = (1.0 - i as f32 / n as f32).powf(2.2);
-        let noise = rng.next_f32() * 2.0 - 1.0;
-        mix_into(buf, off + i, noise * e * vol * 11000.0);
-    }
-}
-
-/// Bassline voice — a fat two-harmonic saw-ish tone, short and punchy.
-fn bass_note(buf: &mut [i16], off: usize, freq: f32, ms: f32, vol: f32) {
-    let sr = SAMPLE_RATE as f32;
-    let n = (sr * ms / 1000.0) as usize;
-    let att = (sr * 0.003) as usize;
-    let rel = (n / 4).max(1);
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
-        let t = i as f32 / sr;
-        let e = env(i, n, att.max(1), rel);
-        let w = (2.0 * PI * freq * t).sin()
-            - 0.5 * (2.0 * PI * freq * 2.0 * t).sin()
-            + 0.25 * (2.0 * PI * freq * 3.0 * t).sin();
-        mix_into(buf, off + i, w * e * vol * 13000.0);
-    }
-}
-
-/// Lead stab — brighter additive tone for the tension hits.
-fn lead_stab(buf: &mut [i16], off: usize, freq: f32, ms: f32, vol: f32) {
-    let sr = SAMPLE_RATE as f32;
-    let n = (sr * ms / 1000.0) as usize;
-    let att = (sr * 0.01) as usize;
-    let rel = (n * 3 / 4).max(1);
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
-        let t = i as f32 / sr;
-        let e = env(i, n, att.max(1), rel);
-        let w = (2.0 * PI * freq * t).sin()
-            + (1.0 / 3.0) * (2.0 * PI * freq * 3.0 * t).sin()
-            + (1.0 / 5.0) * (2.0 * PI * freq * 5.0 * t).sin();
-        mix_into(buf, off + i, w * e * vol * 9000.0);
-    }
-}
-
 fn music() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let step_ms = 60_000.0 / BPM / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
-    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize;
+    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0i16; total];
     let mut rng = Rng(0xC0FF_EE42);
 
