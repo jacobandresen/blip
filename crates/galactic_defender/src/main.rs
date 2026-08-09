@@ -51,7 +51,9 @@ const UFO_N_LIGHTS: usize = 8;
 const UFO_SPIN_STEP_MS: f32 = 70.0; // ms between chase-light frame advances
 
 // ---- UFO death-laser attack --------------------------------------------
-const UFO_LASER_CHANCE: f32 = 0.4;   // odds a given UFO pass becomes the laser attack
+const UFO_LASER_CHANCE: f32 = 0.8;   // odds a given UFO pass becomes the laser attack
+const UFO_TRACK_SECS: f32 = 2.2;     // it stalks the player before stopping to charge
+const UFO_TRACK_SPEED: f32 = 115.0;  // px/sec chasing the player's x
 const UFO_CHARGE_SECS: f32 = 1.6;    // "gnarly" charge-up before it fires
 const UFO_FIRE_SECS: f32 = 0.4;      // how long the beam itself is on screen
 const LASER_HIT_W: f32 = UFO_W;      // width of the beam's kill zone
@@ -65,7 +67,7 @@ const N_EXPLOSIONS: usize = ALIEN_TOTAL + 4;
 enum State { Title, Play, Dead, Win, Over }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-enum UfoMode { Flying, Charging, Firing }
+enum UfoMode { Flying, Tracking, Charging, Firing }
 
 #[derive(Copy, Clone)]
 struct Alien {
@@ -119,9 +121,8 @@ struct Game {
     ufo_spin_timer: f32,
     march_step: usize,
     ufo_mode: UfoMode,
-    ufo_will_laser: bool,
     laser_used_this_level: bool,
-    ufo_laser_trigger_x: f32,
+    ufo_track_timer: Timer,
     ufo_laser_x: f32,
     ufo_charge_timer: Timer,
     ufo_fire_timer: Timer,
@@ -164,9 +165,8 @@ impl Game {
             ufo_spin_timer: 0.0,
             march_step: 0,
             ufo_mode: UfoMode::Flying,
-            ufo_will_laser: false,
             laser_used_this_level: false,
-            ufo_laser_trigger_x: 0.0,
+            ufo_track_timer: Timer::default(),
             ufo_laser_x: 0.0,
             ufo_charge_timer: Timer::default(),
             ufo_fire_timer: Timer::default(),
@@ -293,7 +293,6 @@ impl Game {
         self.bomb_timer.start(if self.sess.level == 1 { 3.5 } else { 2.0 });
         self.ufo_active = false;
         self.ufo_mode = UfoMode::Flying;
-        self.ufo_will_laser = false;
         self.laser_used_this_level = false;
         self.ufo_timer.start(rand_int(15, 25) as f32);
         self.ufo_score_timer = Timer::default();
@@ -383,20 +382,19 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
             g.ufo_dir = if (rand() & 1) == 0 { 1 } else { -1 };
             g.ufo_x = if g.ufo_dir == 1 { -UFO_W } else { WIN_W as f32 };
             g.ufo_active = true;
-            g.ufo_mode = UfoMode::Flying;
             g.ufo_frame = 0;
             g.ufo_spin_timer = 0.0;
-            g.ufo_bomb_timer.start(3.0);
             g.bullets[UFO_BOMB_IDX].active = false;
             blip::play_alert(&sfx.ufo_siren);
 
             let roll = (rand() as f32) / (u32::MAX as f32);
-            g.ufo_will_laser = !g.laser_used_this_level && roll < UFO_LASER_CHANCE;
-            if g.ufo_will_laser {
-                let margin = 50.0;
-                let span = (WIN_W as f32 - margin * 2.0).max(1.0);
-                let r01 = (rand() as f32) / (u32::MAX as f32);
-                g.ufo_laser_trigger_x = margin + r01 * span;
+            if !g.laser_used_this_level && roll < UFO_LASER_CHANCE {
+                g.laser_used_this_level = true;
+                g.ufo_mode = UfoMode::Tracking;
+                g.ufo_track_timer.start(UFO_TRACK_SECS);
+            } else {
+                g.ufo_mode = UfoMode::Flying;
+                g.ufo_bomb_timer.start(3.0);
             }
         }
         return false;
@@ -409,19 +407,6 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
             if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
                 g.ufo_spin_timer = 0.0;
                 g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
-            }
-
-            if g.ufo_will_laser {
-                let reached = if g.ufo_dir == 1 { g.ufo_x >= g.ufo_laser_trigger_x }
-                              else { g.ufo_x <= g.ufo_laser_trigger_x };
-                if reached {
-                    g.ufo_mode = UfoMode::Charging;
-                    g.ufo_charge_timer.start(UFO_CHARGE_SECS);
-                    g.laser_used_this_level = true;
-                    blip::stop_alert();
-                    play_sfx(&sfx.laser_charge);
-                    return false;
-                }
             }
 
             if g.ufo_x > WIN_W as f32 || g.ufo_x + UFO_W < 0.0 {
@@ -440,6 +425,28 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
                     active: true,
                     player: false,
                 };
+            }
+        }
+        UfoMode::Tracking => {
+            // Stalk the player's x, mimicking their movement, before
+            // stopping to charge — a "being hunted" beat that gives the
+            // player extra warning before the charge-up sound even starts.
+            let target = (g.player_x + ALIEN_W as f32 / 2.0 - UFO_W / 2.0)
+                .clamp(0.0, WIN_W as f32 - UFO_W);
+            let step = UFO_TRACK_SPEED * dt;
+            g.ufo_x += (target - g.ufo_x).clamp(-step, step);
+
+            g.ufo_spin_timer += dt * 1000.0;
+            if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
+                g.ufo_spin_timer = 0.0;
+                g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
+            }
+
+            if g.ufo_track_timer.tick(dt) {
+                g.ufo_mode = UfoMode::Charging;
+                g.ufo_charge_timer.start(UFO_CHARGE_SECS);
+                blip::stop_alert();
+                play_sfx(&sfx.laser_charge);
             }
         }
         UfoMode::Charging => {
@@ -466,7 +473,6 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
                 play_sfx(&sfx.explosion);
                 g.ufo_active = false;
                 g.ufo_mode = UfoMode::Flying;
-                g.ufo_will_laser = false;
                 g.ufo_timer.start(rand_int(15, 25) as f32);
             }
         }
@@ -504,6 +510,16 @@ fn draw_ufo(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
         match g.ufo_mode {
             UfoMode::Flying => {
                 blip.draw_texture(&saucer[g.ufo_frame], g.ufo_x, UFO_Y, UFO_W, UFO_H);
+            }
+            UfoMode::Tracking => {
+                blip.draw_texture(&saucer[g.ufo_frame], g.ufo_x, UFO_Y, UFO_W, UFO_H);
+                // A faint lock-on reticle down toward the player — a quiet
+                // "it's noticed you" tell, well before the loud charge-up.
+                let cx = g.ufo_x + UFO_W / 2.0;
+                let cy = UFO_Y + UFO_H;
+                let px = g.player_x + ALIEN_W as f32 / 2.0;
+                let py = (GROUND_Y - 28) as f32;
+                blip.draw_line(cx, cy, px, py, BlipColor { r: 1.0, g: 0.3, b: 0.3, a: 0.18 });
             }
             UfoMode::Charging => {
                 // The whole ship shakes as it powers up.
