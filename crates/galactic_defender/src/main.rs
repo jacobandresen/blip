@@ -70,6 +70,11 @@ const UFO_BOMB_IDX: usize = MAX_PLAYER_BULLETS + MAX_BOMBS;
 const N_BULLETS: usize = MAX_PLAYER_BULLETS + MAX_BOMBS + MAX_UFO_BOMBS;
 const N_EXPLOSIONS: usize = ALIEN_TOTAL + 4;
 
+// ---- player death / respawn --------------------------------------------
+const DEAD_PAUSE: f32 = 1.5;         // total time in State::Dead before play resumes
+const DEATH_EXPLOSION_PHASE: f32 = 0.7; // seconds of that pause spent on the giant explosion
+                                         // before the ship starts fading back in
+
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Play, Dead, Win, Over }
 
@@ -92,7 +97,7 @@ struct Bullet {
 }
 
 #[derive(Copy, Clone)]
-struct Explosion { x: f32, y: f32, ttl: f32, active: bool }
+struct Explosion { x: f32, y: f32, ttl: f32, max_ttl: f32, scale: f32, active: bool }
 
 #[derive(Copy, Clone)]
 struct Shield {
@@ -140,7 +145,7 @@ impl Game {
     fn new() -> Self {
         let alien_default = Alien { x: 0.0, y: 0.0, alive: false, kind: 0, anim: 0 };
         let bullet_default = Bullet { x: 0.0, y: 0.0, active: false, player: false };
-        let expl_default = Explosion { x: 0.0, y: 0.0, ttl: 0.0, active: false };
+        let expl_default = Explosion { x: 0.0, y: 0.0, ttl: 0.0, max_ttl: EXPLOSION_TTL, scale: 1.0, active: false };
         let shield_default = Shield {
             x: 0.0, y: 0.0,
             alive: [[false; SHIELD_COLS]; SHIELD_ROWS],
@@ -197,11 +202,33 @@ impl Game {
     }
 
     fn spawn_explosion(&mut self, x: f32, y: f32) {
+        self.spawn_explosion_ex(x, y, EXPLOSION_TTL, 1.0);
+    }
+
+    fn spawn_explosion_ex(&mut self, x: f32, y: f32, ttl: f32, scale: f32) {
         for e in self.explosions.iter_mut() {
             if !e.active {
-                *e = Explosion { x, y, ttl: EXPLOSION_TTL, active: true };
+                *e = Explosion { x, y, ttl, max_ttl: ttl, scale, active: true };
                 return;
             }
+        }
+    }
+
+    /// A dramatic, multi-burst explosion for the player's own ship going
+    /// down — several overlapping fireballs of varying size and lifetime
+    /// around the ship's `ALIEN_W`x`ALIEN_W` box at top-left `(x, y)`,
+    /// instead of the single small alien-kill puff.
+    fn spawn_player_death(&mut self, x: f32, y: f32) {
+        const BURSTS: [(f32, f32, f32, f32); 6] = [
+            (0.0,   0.0,  2.6, 2.4),
+            (-16.0, -8.0, 1.7, 2.0),
+            (16.0,  -6.0, 1.7, 2.1),
+            (-10.0, 10.0, 1.5, 1.8),
+            (12.0,  9.0,  1.5, 1.9),
+            (0.0,   -14.0, 1.9, 2.2),
+        ];
+        for (dx, dy, scale, ttl_mul) in BURSTS {
+            self.spawn_explosion_ex(x + dx, y + dy, EXPLOSION_TTL * ttl_mul, scale);
         }
     }
 
@@ -366,11 +393,11 @@ fn fire_laser(g: &mut Game) -> bool {
     let player_hit = g.player_x < bx1 && g.player_x + ALIEN_W as f32 > bx0;
     if player_hit {
         let px = g.player_x;
-        g.spawn_explosion(px, (GROUND_Y - 28) as f32);
+        g.spawn_player_death(px, (GROUND_Y - 28) as f32);
         match g.sess.lose_life() {
             LifeResult::StillAlive => {
                 g.bullets.iter_mut().for_each(|b| b.active = false);
-                g.dead_timer.start(1.5);
+                g.dead_timer.start(DEAD_PAUSE);
                 g.state = State::Dead;
             }
             LifeResult::GameOver => {
@@ -741,14 +768,14 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         ) {
             g.bullets[bi].active = false;
             let px = g.player_x;
-            g.spawn_explosion(px, (GROUND_Y - 28) as f32);
+            g.spawn_player_death(px, (GROUND_Y - 28) as f32);
             play_sfx(&sfx.explosion);
             match g.sess.lose_life() {
                 LifeResult::StillAlive => {
                     for k in MAX_PLAYER_BULLETS..N_BULLETS {
                         g.bullets[k].active = false;
                     }
-                    g.dead_timer.start(1.5);
+                    g.dead_timer.start(DEAD_PAUSE);
                     g.state = State::Dead;
                 }
                 LifeResult::GameOver => {
@@ -791,6 +818,14 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
+    // Keep the death explosion's burst of fireballs animating through the
+    // pause instead of freezing at full brightness until play resumes.
+    for e in g.explosions.iter_mut() {
+        if e.active {
+            e.ttl -= dt;
+            if e.ttl <= 0.0 { e.active = false; }
+        }
+    }
     if g.dead_timer.tick(dt) {
         g.bullets.iter_mut().for_each(|b| b.active = false);
         g.state = State::Play;
@@ -834,8 +869,36 @@ fn draw_play(blip: &Blip, g: &Game,
         );
     }
 
-    blip.draw_texture(player, g.player_x, (GROUND_Y - 28) as f32,
-                      ALIEN_W as f32, 28.0);
+    // While dead: hide the ship through the explosion, then have it fade
+    // back in out of a dissipating mist once the respawn phase starts.
+    let (ship_alpha, mist) = if g.state == State::Dead {
+        let elapsed = (DEAD_PAUSE - g.dead_timer.remaining()).clamp(0.0, DEAD_PAUSE);
+        if elapsed <= DEATH_EXPLOSION_PHASE {
+            (0.0, 0.0)
+        } else {
+            let t = ((elapsed - DEATH_EXPLOSION_PHASE) / (DEAD_PAUSE - DEATH_EXPLOSION_PHASE))
+                .clamp(0.0, 1.0);
+            (t, 1.0 - t)
+        }
+    } else {
+        (1.0, 0.0)
+    };
+
+    if mist > 0.0 {
+        let cx = g.player_x + ALIEN_W as f32 / 2.0;
+        let cy = (GROUND_Y - 28) as f32 + 14.0;
+        blip.fill_glow_circle(
+            cx, cy, 14.0 + 22.0 * mist,
+            BlipColor { r: 0.6, g: 0.9, b: 1.0, a: mist * 0.6 },
+        );
+    }
+
+    if ship_alpha > 0.0 {
+        blip.draw_texture_tinted(
+            player, g.player_x, (GROUND_Y - 28) as f32, ALIEN_W as f32, 28.0,
+            BlipColor { r: 1.0, g: 1.0, b: 1.0, a: ship_alpha },
+        );
+    }
 
     for b in g.bullets.iter() {
         if !b.active { continue; }
@@ -845,11 +908,16 @@ fn draw_play(blip: &Blip, g: &Game,
 
     for e in g.explosions.iter() {
         if !e.active { continue; }
-        let alpha = e.ttl / EXPLOSION_TTL;
+        let alpha = (e.ttl / e.max_ttl).clamp(0.0, 1.0);
         let tc = BlipColor { r: 1.0, g: 1.0, b: 1.0, a: alpha };
+        // (e.x, e.y) is the top-left of a plain ALIEN_W box at scale 1; grow
+        // outward from that box's centre for bigger bursts so callers don't
+        // need to know about scale.
+        let sz = ALIEN_W as f32 * e.scale;
+        let grow = (sz - ALIEN_W as f32) / 2.0;
         blip.draw_texture_tinted(
             explosion,
-            e.x, e.y, ALIEN_W as f32, ALIEN_W as f32, tc,
+            e.x - grow, e.y - grow, sz, sz, tc,
         );
     }
 
