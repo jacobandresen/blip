@@ -54,9 +54,13 @@ const UFO_SPAWN_MAX: i32 = 12;
 
 // ---- UFO death-laser attack --------------------------------------------
 const UFO_LASER_CHANCE: f32 = 0.8;   // odds a given UFO pass becomes the laser attack
-const UFO_TRACK_SECS: f32 = 2.2;     // it stalks the player before stopping to charge
-const UFO_TRACK_SPEED: f32 = 115.0;  // px/sec chasing the player's x
-const UFO_CHARGE_SECS: f32 = 1.6;    // "gnarly" charge-up before it fires
+const UFO_TRACK_MIN_SECS: f32 = 1.8; // always stalks at least this long...
+const UFO_TRACK_MAX_SECS: f32 = 4.0; // ...but never longer than this, win or lose
+const UFO_TRACK_SPEED: f32 = 230.0;  // px/sec chasing the player's x — faster than the
+                                      // player (PLAYER_SPEED) so it actually catches up
+                                      // and locks on instead of just trailing behind
+const UFO_LOCK_DIST: f32 = 14.0;     // "close enough" to the player to commit to charging
+const UFO_CHARGE_SECS: f32 = 1.9;    // "gnarly" charge-up before it fires
 const UFO_FIRE_SECS: f32 = 0.4;      // how long the beam itself is on screen
 const LASER_HIT_W: f32 = UFO_W;      // width of the beam's kill zone
 
@@ -393,7 +397,7 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
             if !g.laser_used_this_level && roll < UFO_LASER_CHANCE {
                 g.laser_used_this_level = true;
                 g.ufo_mode = UfoMode::Tracking;
-                g.ufo_track_timer.start(UFO_TRACK_SECS);
+                g.ufo_track_timer.start(UFO_TRACK_MAX_SECS);
             } else {
                 g.ufo_mode = UfoMode::Flying;
                 g.ufo_bomb_timer.start(3.0);
@@ -433,6 +437,9 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
             // Stalk the player's x, mimicking their movement, before
             // stopping to charge — a "being hunted" beat that gives the
             // player extra warning before the charge-up sound even starts.
+            // It's faster than the player, so it actually catches up and
+            // commits to charging once locked on directly overhead (or, at
+            // worst, once its time runs out regardless).
             let target = (g.player_x + ALIEN_W as f32 / 2.0 - UFO_W / 2.0)
                 .clamp(0.0, WIN_W as f32 - UFO_W);
             let step = UFO_TRACK_SPEED * dt;
@@ -444,7 +451,10 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
                 g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
             }
 
-            if g.ufo_track_timer.tick(dt) {
+            let expired = g.ufo_track_timer.tick(dt);
+            let elapsed = UFO_TRACK_MAX_SECS - g.ufo_track_timer.remaining();
+            let locked_on = (g.ufo_x - target).abs() < UFO_LOCK_DIST;
+            if expired || (elapsed >= UFO_TRACK_MIN_SECS && locked_on) {
                 g.ufo_mode = UfoMode::Charging;
                 g.ufo_charge_timer.start(UFO_CHARGE_SECS);
                 blip::stop_alert();
@@ -534,19 +544,22 @@ fn draw_ufo(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
                 let cy = UFO_Y + UFO_H;
 
                 // Growing charge glow beneath it, brightening as it nears firing.
-                let glow_r = 4.0 + progress * 14.0;
+                let glow_r = 8.0 + progress * 16.0;
                 let glow_c = BlipColor {
-                    r: 1.0, g: 0.25 + progress * 0.5, b: 0.15, a: 0.5 + progress * 0.4,
+                    r: 1.0, g: 0.25 + progress * 0.5, b: 0.15, a: 0.6 + progress * 0.4,
                 };
                 blip.fill_glow_circle(cx, cy, glow_r, glow_c);
 
-                // Flickering warning line straight down — telegraphs where the
-                // beam will land so the player has a chance to dodge.
-                let flicker = ((progress * 40.0) as i32 % 2) == 0;
-                if flicker || progress > 0.75 {
-                    let warn_c = BlipColor { r: 1.0, g: 0.2, b: 0.2, a: 0.25 + progress * 0.5 };
-                    blip.draw_glow_line(cx, cy, cx, GROUND_Y as f32, warn_c);
-                }
+                // Warning line straight down, telegraphing exactly where the
+                // beam will land — always visible (never fully hidden, so it
+                // can't be missed), pulsing faster and brighter as it nears
+                // firing so the urgency escalates without ever going dark.
+                let pulse_rate = 3.0 + progress * 10.0;
+                let pulse = 0.5 + 0.5 * (progress * pulse_rate * std::f32::consts::TAU).sin();
+                let warn_c = BlipColor {
+                    r: 1.0, g: 0.2, b: 0.2, a: 0.5 + progress * 0.4 + pulse * 0.15,
+                };
+                blip.draw_glow_line(cx, cy, cx, GROUND_Y as f32, warn_c);
             }
             UfoMode::Firing => {
                 let cx = g.ufo_laser_x + UFO_W / 2.0;
