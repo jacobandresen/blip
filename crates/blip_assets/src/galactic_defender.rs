@@ -5,8 +5,8 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng};
-use crate::wav::{encode_pcm16_mono, ms_to_samples, SAMPLE_RATE};
+use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng, MIX_KNEE};
+use crate::wav::{encode_pcm16_mono, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 fn gen_tone(freq: f32, dur_ms: f32, amp: f32) -> Vec<i16> {
@@ -188,7 +188,7 @@ fn techno_loop(
     let step_ms = 60_000.0 / bpm / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0i16; total];
+    let mut buf = vec![0f32; total];
     let mut rng = Rng(seed);
 
     for step in 0..total_steps {
@@ -210,14 +210,14 @@ fn techno_loop(
         }
         if bass_hit[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 0.7, 0.46);
+            bass_note(&mut buf, off, root, step_ms * 0.7, 0.60);
         }
         if bar % 2 == 1 && pos == 0 {
             lead_stab(&mut buf, off, stab_note, step_ms * 5.0, 0.18 * energy.min(1.4));
         }
     }
 
-    encode_pcm16_mono(&buf)
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
 /// Title/default loop — driving mid-tempo techno (~15.7 s @ 124 BPM, 8 bars).
@@ -251,7 +251,7 @@ fn music3() -> Vec<u8> {
     let step_ms = 60_000.0 / bpm / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0i16; total];
+    let mut buf = vec![0f32; total];
     let mut rng = Rng(0xD0D0_3000);
 
     // A1 - Bb1 - G1 - Bb1 sub-bass drone, one long note per bar.
@@ -274,14 +274,14 @@ fn music3() -> Vec<u8> {
         }
         if pos == 0 {
             let root = drone_roots[(bar / 2) % drone_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 8.0, 0.42);
+            bass_note(&mut buf, off, root, step_ms * 8.0, 0.54);
         }
         if bar % 4 == 2 && pos == 8 {
             lead_stab(&mut buf, off, 220.0, step_ms * 6.0, 0.14);
         }
     }
 
-    encode_pcm16_mono(&buf)
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
 fn game_over_sfx() -> Vec<u8> {

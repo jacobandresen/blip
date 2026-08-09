@@ -40,6 +40,27 @@ pub fn mix_into(buf: &mut [i16], off: usize, sample: f32) {
     buf[off] = v.clamp(-32_767, 32_767) as i16;
 }
 
+/// Plain (non-clamping) add into an f32 accumulation buffer. Use this for
+/// multi-voice mixes (drums + bass + leads all landing on the same beat)
+/// where clamping per-voice, per-sample would hard-clip into harsh digital
+/// distortion; clamp once at the end instead, with `soft_limit_to_pcm16`.
+pub fn mix_into_f32(buf: &mut [f32], off: usize, sample: f32) {
+    if off >= buf.len() {
+        return;
+    }
+    buf[off] += sample;
+}
+
+/// Convert an f32 accumulation buffer to 16-bit PCM through a soft (tanh)
+/// limiter, so loud collisions between voices compress gracefully instead of
+/// flat-topping. `knee` is roughly "the level at which compression starts to
+/// bite" — signals well under it pass through close to linear.
+pub fn soft_limit_to_pcm16(buf: &[f32], knee: f32) -> Vec<i16> {
+    buf.iter()
+        .map(|&s| ((s / knee).tanh() * 31_000.0) as i16)
+        .collect()
+}
+
 /// Linear ADSR-ish envelope: attack-ramp / sustain / release-ramp.
 #[inline]
 pub fn env(i: usize, n: usize, attack: usize, release: usize) -> f32 {

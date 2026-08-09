@@ -5,8 +5,8 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng};
-use crate::wav::{encode_pcm16_mono, SAMPLE_RATE};
+use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng, MIX_KNEE};
+use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 const W: u32 = 24;
@@ -94,7 +94,7 @@ fn techno_loop(
     let step_ms = 60_000.0 / bpm / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0i16; total];
+    let mut buf = vec![0f32; total];
     let mut rng = Rng(seed);
 
     for step in 0..total_steps {
@@ -116,14 +116,14 @@ fn techno_loop(
         }
         if bass_hit[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 0.7, 0.44);
+            bass_note(&mut buf, off, root, step_ms * 0.7, 0.58);
         }
         if bar % 2 == 1 && pos == 0 {
             lead_stab(&mut buf, off, stab_note, step_ms * 5.0, 0.16 * energy.min(1.3));
         }
     }
 
-    encode_pcm16_mono(&buf)
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
 /// Base groove — a relaxed mid-tempo techno loop for the early game.

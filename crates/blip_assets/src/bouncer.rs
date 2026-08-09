@@ -5,8 +5,8 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng};
-use crate::wav::{encode_pcm16_mono, env, mix_into, SAMPLE_RATE};
+use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng, MIX_KNEE};
+use crate::wav::{encode_pcm16_mono, env, mix_into_f32, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 fn paddle() -> Vec<u8> {
@@ -87,7 +87,7 @@ fn brick(color: (u8, u8, u8)) -> Vec<u8> {
 
 /// Bouncy plucked lead voice — short, springy, and a little detuned for
 /// character. Used for the melodic "bounce" hook over the tech-house groove.
-fn pluck(buf: &mut [i16], off: usize, freq: f32, ms: f32, vol: f32) {
+fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
     let att = (sr * 0.002) as usize;
@@ -99,7 +99,7 @@ fn pluck(buf: &mut [i16], off: usize, freq: f32, ms: f32, vol: f32) {
         let w = (2.0 * PI * freq * t).sin()
             + 0.5 * (2.0 * PI * freq * 2.003 * t).sin()
             + 0.2 * (2.0 * PI * freq * 4.0 * t).sin();
-        mix_into(buf, off + i, w * e * vol * 12000.0);
+        mix_into_f32(buf, off + i, w * e * vol * 12000.0);
     }
 }
 
@@ -115,7 +115,7 @@ fn music() -> Vec<u8> {
     let step_ms = 60_000.0 / BPM / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0i16; total];
+    let mut buf = vec![0f32; total];
     let mut rng = Rng(0xB0DE_1234);
 
     // C-major-ish bouncy bass roots, one per 2-bar section: C3 - E3 - F3 - G3.
@@ -151,7 +151,7 @@ fn music() -> Vec<u8> {
         }
         if BASS_HIT[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 0.7, 0.44);
+            bass_note(&mut buf, off, root, step_ms * 0.7, 0.58);
         }
         // Pluck hook: three quick notes starting on the "and" of beat 3 every other bar.
         if bar % 2 == 0 && (pos == 10 || pos == 11 || pos == 12) {
@@ -165,7 +165,7 @@ fn music() -> Vec<u8> {
         }
     }
 
-    encode_pcm16_mono(&buf)
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
 fn paddle_hit() -> Vec<u8> {

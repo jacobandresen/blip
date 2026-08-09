@@ -2,8 +2,8 @@
 //!
 //! Direct port of `games/rally/assets/generate_assets.c`.
 
-use crate::techno::{bass_note, clap, hat, kick, lead_stab, Rng};
-use crate::wav::{encode_pcm16_mono, SAMPLE_RATE};
+use crate::techno::{bass_note, clap, hat, kick, lead_stab, Rng, MIX_KNEE};
+use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 const BPM: f32 = 132.0;
@@ -18,7 +18,7 @@ fn music() -> Vec<u8> {
     let step_ms = 60_000.0 / BPM / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0i16; total];
+    let mut buf = vec![0f32; total];
     let mut rng = Rng(0xFA57_CA12);
 
     // E-minor galloping roots, one per 2-bar section: E2 - A2 - B2 - A2.
@@ -46,7 +46,7 @@ fn music() -> Vec<u8> {
         }
         if BASS_HIT[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 0.6, 0.46);
+            bass_note(&mut buf, off, root, step_ms * 0.6, 0.60);
         }
         if bar % 2 == 0 && pos == 0 {
             lead_stab(&mut buf, off, stab, step_ms * 3.0, 0.16);
@@ -56,7 +56,7 @@ fn music() -> Vec<u8> {
         }
     }
 
-    encode_pcm16_mono(&buf)
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
 pub fn generate() -> Vec<Asset> {

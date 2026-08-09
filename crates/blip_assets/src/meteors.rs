@@ -3,8 +3,8 @@
 
 use std::f32::consts::PI;
 
-use crate::techno::{bass_note, hat, kick, lead_stab, Rng};
-use crate::wav::{encode_pcm16_mono, env, mix_into, SAMPLE_RATE};
+use crate::techno::{bass_note, hat, kick, lead_stab, Rng, MIX_KNEE};
+use crate::wav::{encode_pcm16_mono, env, mix_into, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 const BPM: f32 = 128.0;
@@ -17,7 +17,7 @@ fn music() -> Vec<u8> {
     let step_ms = 60_000.0 / BPM / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0i16; total];
+    let mut buf = vec![0f32; total];
     let mut rng = Rng(0xC0FF_EE42);
 
     // A-phrygian bassline roots, one per 2-bar section: A1 - C2 - D2 - C2.
@@ -54,7 +54,7 @@ fn music() -> Vec<u8> {
         // Acid bassline.
         if BASS_HIT[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root * BASS_OCT[pos], step_ms * 0.85, 0.46);
+            bass_note(&mut buf, off, root * BASS_OCT[pos], step_ms * 0.85, 0.60);
         }
         // Tension stab on the downbeat of every odd bar.
         if bar % 2 == 1 && pos == 0 {
@@ -63,7 +63,7 @@ fn music() -> Vec<u8> {
         }
     }
 
-    encode_pcm16_mono(&buf)
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
 /// Laser-zap fire sound: a fast downward pitch sweep with a bright buzzy
