@@ -202,11 +202,12 @@ impl Blip {
                 self.tear_t  = 0.08 + self.rng.next() * 0.20;
                 self.tear_y  = 0.15 + self.rng.next() * 0.70;
                 self.tear_dx = (self.rng.next() - 0.5) * 60.0;
-                self.tear_cd =  5.0 + self.rng.next() * 15.0;
+                self.tear_cd = 14.0 + self.rng.next() * 30.0;
             }
         }
 
-        // Roll
+        // Roll — kept rare enough that it reads as a genuine "something's
+        // wrong" moment rather than a recurring tic.
         if self.roll_t > 0.0 {
             self.roll_t  -= dt;
             self.roll_dy  = (self.roll_dy + self.roll_spd * dt) % lh;
@@ -216,7 +217,7 @@ impl Blip {
                 self.roll_t   = 0.5 + self.rng.next() * 1.3;
                 self.roll_spd = 180.0 + self.rng.next() * 320.0;
                 self.roll_dy  = 0.0;
-                self.roll_cd  = 15.0 + self.rng.next() * 25.0;
+                self.roll_cd  = 60.0 + self.rng.next() * 90.0;
             }
         }
 
@@ -228,7 +229,7 @@ impl Blip {
             if self.chroma_cd <= 0.0 {
                 self.chroma_t  = 0.06 + self.rng.next() * 0.18;
                 self.chroma_dx = 4.0  + self.rng.next() * 8.0;
-                self.chroma_cd = 2.0  + self.rng.next() *  6.0;
+                self.chroma_cd =  7.0 + self.rng.next() * 15.0;
             }
         }
     }
