@@ -81,8 +81,17 @@ impl Pooled for Drop {
 
 const DEAD_DROP: Drop = Drop { x: 0.0, y: 0.0, active: false, kind: DropKind::Wide };
 
+// Steel bricks take two hits to break; `kind` for a steel brick switches from
+// BRICK_STEEL to BRICK_STEEL_CRACKED once it's taken its first hit, so the
+// color itself shows how much damage it's absorbed.
+const BRICK_STEEL: usize = 6;
+const BRICK_STEEL_CRACKED: usize = 7;
+// Steel bricks only start showing up from this level on, so new players
+// meet the plain single-hit grid first.
+const STEEL_MIN_LEVEL: i32 = 4;
+
 #[derive(Copy, Clone)]
-struct Brick { kind: usize, alive: bool }
+struct Brick { kind: usize, hp: u8, alive: bool }
 
 struct Game {
     bricks: [Brick; BRICK_TOTAL],
@@ -105,7 +114,7 @@ struct Game {
 impl Game {
     fn new() -> Self {
         Self {
-            bricks: [Brick { kind: 0, alive: false }; BRICK_TOTAL],
+            bricks: [Brick { kind: 0, hp: 1, alive: false }; BRICK_TOTAL],
             drops: [DEAD_DROP; MAX_DROPS],
             pad_x: 0.0,
             pad_w: PAD_W as f32,
@@ -156,7 +165,15 @@ impl Game {
                         (c as f32 - target).abs() < 1.0 || (c as f32 - (BRICK_COLS - 1) as f32 + target).abs() < 1.0
                     }
                 };
-                self.bricks[i] = Brick { kind: r as usize, alive };
+                // Odds a live brick is reinforced steel, ramping up with
+                // level and capped so the grid never turns into a slog.
+                let steel_chance = ((self.sess.level - STEEL_MIN_LEVEL + 1) as f32 * 0.05)
+                    .clamp(0.0, 0.30);
+                let is_steel = alive
+                    && self.sess.level >= STEEL_MIN_LEVEL
+                    && (rand() % 1000) < (steel_chance * 1000.0) as u32;
+                let (kind, hp) = if is_steel { (BRICK_STEEL, 2) } else { (r as usize, 1) };
+                self.bricks[i] = Brick { kind, hp, alive };
             }
         }
     }
@@ -316,26 +333,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if !rects_overlap(g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32,
                           bx, by, BRICK_W as f32, BRICK_H as f32) { continue; }
 
-        let kind = g.bricks[i].kind;
-        g.bricks[i].alive = false;
-        g.sess.add_score((BRICK_ROWS - r) * 10 * g.sess.level);
-        // Ramp more gently on level 1 so the ball doesn't reach max speed
-        // before a first-time player has cleared their first wall of bricks.
-        let speed_inc = if g.sess.level <= 1 { SPEED_INC * 0.5 } else { SPEED_INC };
-        g.ball_speed = clamp(g.ball_speed + speed_inc, 0.0, BALL_SPEED_MAX);
-
-        // 30% chance to spawn a loot drop
-        if rand() % 10 < 3 {
-            let drop_x = bx + BRICK_W as f32 / 2.0 - DROP_SIZE / 2.0;
-            let drop_kind = match rand() % 10 {
-                0..=2 => DropKind::Wide,
-                3..=5 => DropKind::Slow,
-                6..=7 => DropKind::Narrow,
-                _     => DropKind::Life,
-            };
-            pool_spawn(&mut g.drops, Drop { x: drop_x, y: by, active: true, kind: drop_kind });
-        }
-
+        // Bounce off the brick regardless of whether this hit breaks it.
         let over_x = if g.ball_vx > 0.0 { bx - (g.ball_x + BALL_W as f32) }
                      else { (bx + BRICK_W as f32) - g.ball_x };
         let over_y = if g.ball_vy > 0.0 { by - (g.ball_y + BALL_H as f32) }
@@ -349,8 +347,33 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.ball_vy = g.ball_vy / spd * active_speed;
         }
 
-        if kind <= 1 { play_sfx(&sfx.brick_break); }
-        else         { play_sfx(&sfx.brick_hit); }
+        g.bricks[i].hp -= 1;
+        if g.bricks[i].hp == 0 {
+            g.bricks[i].alive = false;
+            g.sess.add_score((BRICK_ROWS - r) * 10 * g.sess.level);
+            // Ramp more gently on level 1 so the ball doesn't reach max speed
+            // before a first-time player has cleared their first wall of bricks.
+            let speed_inc = if g.sess.level <= 1 { SPEED_INC * 0.5 } else { SPEED_INC };
+            g.ball_speed = clamp(g.ball_speed + speed_inc, 0.0, BALL_SPEED_MAX);
+
+            // 30% chance to spawn a loot drop
+            if rand() % 10 < 3 {
+                let drop_x = bx + BRICK_W as f32 / 2.0 - DROP_SIZE / 2.0;
+                let drop_kind = match rand() % 10 {
+                    0..=2 => DropKind::Wide,
+                    3..=5 => DropKind::Slow,
+                    6..=7 => DropKind::Narrow,
+                    _     => DropKind::Life,
+                };
+                pool_spawn(&mut g.drops, Drop { x: drop_x, y: by, active: true, kind: drop_kind });
+            }
+            play_sfx(&sfx.brick_break);
+        } else {
+            // Steel brick survived — show the cracked texture as a warning
+            // that the next hit finishes it.
+            g.bricks[i].kind = BRICK_STEEL_CRACKED;
+            play_sfx(&sfx.brick_hit);
+        }
         break;
     }
 
@@ -406,7 +429,7 @@ fn update_over(g: &mut Game) {
     g.start_game();
 }
 
-fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick: &[Texture2D; 6]) {
+fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick: &[Texture2D; 8]) {
     for i in 0..BRICK_TOTAL {
         if !g.bricks[i].alive { continue; }
         let r = i as i32 / BRICK_COLS;
@@ -486,6 +509,8 @@ const BRICK_YELLOW_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets
 const BRICK_GREEN_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_green.png"));
 const BRICK_BLUE_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_blue.png"));
 const BRICK_PURPLE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_purple.png"));
+const BRICK_STEEL_PNG:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_steel.png"));
+const BRICK_STEEL_CRACKED_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_steel_cracked.png"));
 const PADDLE_HIT_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/paddle_hit.wav"));
 const BRICK_HIT_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_hit.wav"));
 const BRICK_BREAK_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_break.wav"));
@@ -513,6 +538,8 @@ async fn main() {
         load_png(BRICK_GREEN_PNG),
         load_png(BRICK_BLUE_PNG),
         load_png(BRICK_PURPLE_PNG),
+        load_png(BRICK_STEEL_PNG),
+        load_png(BRICK_STEEL_CRACKED_PNG),
     ];
 
     let sfx = Sounds {

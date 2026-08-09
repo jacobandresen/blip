@@ -85,6 +85,56 @@ fn brick(color: (u8, u8, u8)) -> Vec<u8> {
     img.encode_png()
 }
 
+/// Steel-plated brick: takes two hits to break. A cool, riveted metal tone
+/// keeps it visually distinct from the six single-hit color rows, and the
+/// `cracked` variant (shown after the first hit) darkens it and adds a
+/// jagged fracture so the damage — and the fact one more hit will do it — is
+/// obvious at a glance.
+fn brick_steel(cracked: bool) -> Vec<u8> {
+    let w: i32 = 72;
+    let h: i32 = 22;
+    let mut img = Image::new(w as u32, h as u32);
+    let base: (u8, u8, u8) = if cracked { (108, 122, 136) } else { (150, 170, 190) };
+    for y in 1..h - 1 {
+        for x in 1..w - 1 {
+            let mut shade = 1.0_f32;
+            if y < 3 { shade = 1.3; }
+            if y > h - 4 { shade = 0.6; }
+            if x < 2 { shade *= 1.2; }
+            if x > w - 3 { shade *= 0.7; }
+            let r = ((base.0 as f32 * shade).min(255.0)) as u8;
+            let g = ((base.1 as f32 * shade).min(255.0)) as u8;
+            let b = ((base.2 as f32 * shade).min(255.0)) as u8;
+            img.set(x, y, r, g, b);
+        }
+    }
+    // corner rivets sell the "reinforced plate" look
+    for &(rx, ry) in &[(6, 6), (w - 7, 6), (6, h - 7), (w - 7, h - 7)] {
+        img.set(rx, ry, 55, 60, 65);
+        img.set(rx + 1, ry, 225, 230, 235);
+    }
+    if cracked {
+        let mut x = 5;
+        let mut toggle = 0i32;
+        while x < w - 5 {
+            let y = (h / 2 + toggle) as i32;
+            img.set(x, y, 18, 18, 22);
+            img.set(x, (y + 1).min(h - 2), 18, 18, 22);
+            toggle = if toggle <= 0 { 3 } else { -3 };
+            x += 4;
+        }
+    }
+    for x in 0..w {
+        img.set(x, 0, 15, 15, 18);
+        img.set(x, h - 1, 15, 15, 18);
+    }
+    for y in 0..h {
+        img.set(0, y, 15, 15, 18);
+        img.set(w - 1, y, 15, 15, 18);
+    }
+    img.encode_png()
+}
+
 /// Bouncy plucked lead voice — short, springy, and a little detuned for
 /// character. Used for the melodic "bounce" hook over the tech-house groove.
 fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
@@ -264,6 +314,8 @@ pub fn generate() -> Vec<Asset> {
         ("images/brick_green.png",  brick((50,  200, 80))),
         ("images/brick_blue.png",   brick((50,  100, 220))),
         ("images/brick_purple.png", brick((160, 50,  220))),
+        ("images/brick_steel.png",         brick_steel(false)),
+        ("images/brick_steel_cracked.png", brick_steel(true)),
         ("sounds/paddle_hit.wav", paddle_hit()),
         ("sounds/brick_hit.wav",  brick_hit()),
         ("sounds/brick_break.wav", brick_break()),
