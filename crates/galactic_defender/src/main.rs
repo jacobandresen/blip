@@ -143,6 +143,7 @@ struct Game {
     ufo_charge_timer: Timer,
     ufo_fire_timer: Timer,
     respawn_grace: Timer,
+    dead_pause_total: f32,
 }
 
 impl Game {
@@ -189,6 +190,7 @@ impl Game {
             ufo_charge_timer: Timer::default(),
             ufo_fire_timer: Timer::default(),
             respawn_grace: Timer::default(),
+            dead_pause_total: DEAD_PAUSE,
         }
     }
 
@@ -403,6 +405,7 @@ fn fire_laser(g: &mut Game) -> bool {
             LifeResult::StillAlive => {
                 g.bullets.iter_mut().for_each(|b| b.active = false);
                 g.dead_timer.start(DEAD_PAUSE);
+                g.dead_pause_total = DEAD_PAUSE;
                 g.state = State::Dead;
             }
             LifeResult::GameOver => {
@@ -804,6 +807,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                         g.bullets[k].active = false;
                     }
                     g.dead_timer.start(DEAD_PAUSE);
+                    g.dead_pause_total = DEAD_PAUSE;
                     g.state = State::Dead;
                 }
                 LifeResult::GameOver => {
@@ -819,7 +823,19 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     for a in g.aliens.iter() {
         if a.alive && a.y + ALIEN_H as f32 >= GROUND_Y as f32 {
-            g.state = State::Over;
+            // The invasion reaching the ground ends the game outright, same
+            // as the classic rule — but it still plays out as a real "kill"
+            // (the giant death explosion) instead of an abrupt cut to the
+            // game-over screen. Skip straight past the mist respawn phase
+            // since there's no coming back from this one.
+            let px = g.player_x;
+            g.spawn_player_death(px, (GROUND_Y - 28) as f32);
+            play_sfx(&sfx.explosion);
+            g.sess.lives = 0;
+            g.bullets.iter_mut().for_each(|b| b.active = false);
+            g.dead_timer.start(DEATH_EXPLOSION_PHASE);
+            g.dead_pause_total = DEATH_EXPLOSION_PHASE;
+            g.state = State::Dead;
             if g.ufo_active { g.ufo_active = false; blip::stop_alert(); }
             return;
         }
@@ -856,8 +872,12 @@ fn update_dead(g: &mut Game, dt: f32) {
     }
     if g.dead_timer.tick(dt) {
         g.bullets.iter_mut().for_each(|b| b.active = false);
-        g.respawn_grace.start(RESPAWN_GRACE_SECS);
-        g.state = State::Play;
+        if g.sess.lives <= 0 {
+            g.state = State::Over;
+        } else {
+            g.respawn_grace.start(RESPAWN_GRACE_SECS);
+            g.state = State::Play;
+        }
     }
 }
 
@@ -901,11 +921,15 @@ fn draw_play(blip: &Blip, g: &Game,
     // While dead: hide the ship through the explosion, then have it fade
     // back in out of a dissipating mist once the respawn phase starts.
     let (ship_alpha, mist) = if g.state == State::Dead {
-        let elapsed = (DEAD_PAUSE - g.dead_timer.remaining()).clamp(0.0, DEAD_PAUSE);
-        if elapsed <= DEATH_EXPLOSION_PHASE {
+        // Use the pause that was actually armed, not the DEAD_PAUSE constant —
+        // the "invasion reached the ground" death only runs the short
+        // explosion phase before cutting to game over, with no respawn fade.
+        let total = g.dead_pause_total;
+        let elapsed = (total - g.dead_timer.remaining()).clamp(0.0, total);
+        if elapsed <= DEATH_EXPLOSION_PHASE || total <= DEATH_EXPLOSION_PHASE {
             (0.0, 0.0)
         } else {
-            let t = ((elapsed - DEATH_EXPLOSION_PHASE) / (DEAD_PAUSE - DEATH_EXPLOSION_PHASE))
+            let t = ((elapsed - DEATH_EXPLOSION_PHASE) / (total - DEATH_EXPLOSION_PHASE))
                 .clamp(0.0, 1.0);
             (t, 1.0 - t)
         }
