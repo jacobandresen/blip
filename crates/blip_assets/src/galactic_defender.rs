@@ -163,20 +163,29 @@ fn alien(kind: usize, frame: usize) -> Vec<u8> {
             }
         }
     }
-    // Eyes on the wide head row: a full-cell bright square (not just a single
-    // pixel) ringed by a dark socket so they read clearly against every body
-    // colour, offset slightly per frame for a menacing flicker.
+    // Eyes on the wide head row: a bright square "sclera" ringed by a dark
+    // socket (so they read clearly against every body colour) with a dark
+    // pupil in the middle — a plain white square doesn't actually look like
+    // an eye. The pupil nudges toward the socket's own offset each frame,
+    // like the eyes are darting, for a bit of menace.
     let eye_y = oy + 3 * cell;
     let eye_dx = if frame == 1 { 1 } else { 0 };
+    let eye_size = cell + 1;
     for ex in [ox + 3 * cell - eye_dx, ox + 5 * cell + eye_dx] {
-        for dy in -1..=cell {
-            for dx in -1..=cell {
+        for dy in -1..=eye_size {
+            for dx in -1..=eye_size {
                 img.set(ex + dx, eye_y + dy, 10, 10, 10);
             }
         }
-        for dy in 0..cell {
-            for dx in 0..cell {
+        for dy in 0..eye_size {
+            for dx in 0..eye_size {
                 img.set(ex + dx, eye_y + dy, 255, 255, 255);
+            }
+        }
+        let pupil_ox = 1 + eye_dx;
+        for dy in 1..=2 {
+            for dx in 0..=1 {
+                img.set(ex + pupil_ox + dx, eye_y + dy, 15, 15, 20);
             }
         }
     }
