@@ -60,6 +60,7 @@ const UFO_TRACK_SPEED: f32 = 230.0;  // px/sec chasing the player's x — faster
                                       // player (PLAYER_SPEED) so it actually catches up
                                       // and locks on instead of just trailing behind
 const UFO_LOCK_DIST: f32 = 14.0;     // "close enough" to the player to commit to charging
+const UFO_STILL_SECS: f32 = 0.4;     // player must hold still this long before it commits
 const UFO_CHARGE_SECS: f32 = 1.9;    // "gnarly" charge-up before it fires
 const UFO_FIRE_SECS: f32 = 0.4;      // how long the beam itself is on screen
 const LASER_HIT_W: f32 = UFO_W;      // width of the beam's kill zone
@@ -128,6 +129,7 @@ struct Game {
     march_step: usize,
     ufo_mode: UfoMode,
     laser_used_this_level: bool,
+    player_still_secs: f32,
     ufo_track_timer: Timer,
     ufo_laser_x: f32,
     ufo_charge_timer: Timer,
@@ -172,6 +174,7 @@ impl Game {
             march_step: 0,
             ufo_mode: UfoMode::Flying,
             laser_used_this_level: false,
+            player_still_secs: 0.0,
             ufo_track_timer: Timer::default(),
             ufo_laser_x: 0.0,
             ufo_charge_timer: Timer::default(),
@@ -437,9 +440,10 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
             // Stalk the player's x, mimicking their movement, before
             // stopping to charge — a "being hunted" beat that gives the
             // player extra warning before the charge-up sound even starts.
-            // It's faster than the player, so it actually catches up and
-            // commits to charging once locked on directly overhead (or, at
-            // worst, once its time runs out regardless).
+            // It's faster than the player, so it actually catches up, but
+            // it won't commit while the player keeps moving: it waits for
+            // them to hold still (and be locked on) before switching to
+            // Charging — or, at worst, once its time simply runs out.
             let target = (g.player_x + ALIEN_W as f32 / 2.0 - UFO_W / 2.0)
                 .clamp(0.0, WIN_W as f32 - UFO_W);
             let step = UFO_TRACK_SPEED * dt;
@@ -454,7 +458,8 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
             let expired = g.ufo_track_timer.tick(dt);
             let elapsed = UFO_TRACK_MAX_SECS - g.ufo_track_timer.remaining();
             let locked_on = (g.ufo_x - target).abs() < UFO_LOCK_DIST;
-            if expired || (elapsed >= UFO_TRACK_MIN_SECS && locked_on) {
+            let player_still = g.player_still_secs >= UFO_STILL_SECS;
+            if expired || (elapsed >= UFO_TRACK_MIN_SECS && locked_on && player_still) {
                 g.ufo_mode = UfoMode::Charging;
                 g.ufo_charge_timer.start(UFO_CHARGE_SECS);
                 blip::stop_alert();
@@ -596,10 +601,17 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         || key_pressed(BLIP_KEY_UP)
         || key_pressed(BLIP_KEY_W);
 
+    let moving_left = key_held(BLIP_KEY_LEFT) || key_held(BLIP_KEY_A);
+    let moving_right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
     let ps = PLAYER_SPEED * dt;
-    if key_held(BLIP_KEY_LEFT)  || key_held(BLIP_KEY_A) { g.player_x -= ps; }
-    if key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D) { g.player_x += ps; }
+    if moving_left { g.player_x -= ps; }
+    if moving_right { g.player_x += ps; }
     g.player_x = clamp(g.player_x, 0.0, (WIN_W - ALIEN_W) as f32);
+    if moving_left || moving_right {
+        g.player_still_secs = 0.0;
+    } else {
+        g.player_still_secs += dt;
+    }
 
     if shoot {
         if let Some(i) = g.free_bullet(true) {
