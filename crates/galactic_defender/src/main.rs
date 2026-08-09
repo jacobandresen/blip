@@ -49,6 +49,8 @@ const UFO_W: f32 = 36.0;
 const UFO_H: f32 = 20.0;
 const UFO_N_LIGHTS: usize = 8;
 const UFO_SPIN_STEP_MS: f32 = 70.0; // ms between chase-light frame advances
+const UFO_SPAWN_MIN: i32 = 6;       // seconds between UFO passes
+const UFO_SPAWN_MAX: i32 = 12;
 
 // ---- UFO death-laser attack --------------------------------------------
 const UFO_LASER_CHANCE: f32 = 0.8;   // odds a given UFO pass becomes the laser attack
@@ -294,7 +296,7 @@ impl Game {
         self.ufo_active = false;
         self.ufo_mode = UfoMode::Flying;
         self.laser_used_this_level = false;
-        self.ufo_timer.start(rand_int(15, 25) as f32);
+        self.ufo_timer.start(rand_int(UFO_SPAWN_MIN, UFO_SPAWN_MAX) as f32);
         self.ufo_score_timer = Timer::default();
         self.ufo_bomb_timer = Timer::default();
         self.bullets[UFO_BOMB_IDX].active = false;
@@ -412,7 +414,7 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
             if g.ufo_x > WIN_W as f32 || g.ufo_x + UFO_W < 0.0 {
                 g.ufo_active = false;
                 g.bullets[UFO_BOMB_IDX].active = false;
-                g.ufo_timer.start(rand_int(15, 25) as f32);
+                g.ufo_timer.start(rand_int(UFO_SPAWN_MIN, UFO_SPAWN_MAX) as f32);
                 blip::stop_alert();
                 return false;
             }
@@ -473,7 +475,7 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
                 play_sfx(&sfx.explosion);
                 g.ufo_active = false;
                 g.ufo_mode = UfoMode::Flying;
-                g.ufo_timer.start(rand_int(15, 25) as f32);
+                g.ufo_timer.start(rand_int(UFO_SPAWN_MIN, UFO_SPAWN_MAX) as f32);
             }
         }
     }
@@ -495,7 +497,7 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
                 g.ufo_score_timer.start(1.5);
                 g.ufo_active = false;
                 g.ufo_mode = UfoMode::Flying;
-                g.ufo_timer.start(rand_int(15, 25) as f32);
+                g.ufo_timer.start(rand_int(UFO_SPAWN_MIN, UFO_SPAWN_MAX) as f32);
                 blip::stop_alert();
                 return false;
             }
