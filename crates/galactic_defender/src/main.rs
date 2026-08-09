@@ -71,9 +71,10 @@ const N_BULLETS: usize = MAX_PLAYER_BULLETS + MAX_BOMBS + MAX_UFO_BOMBS;
 const N_EXPLOSIONS: usize = ALIEN_TOTAL + 4;
 
 // ---- player death / respawn --------------------------------------------
-const DEAD_PAUSE: f32 = 1.5;         // total time in State::Dead before play resumes
+const DEAD_PAUSE: f32 = 2.3;         // total time in State::Dead before play resumes
 const DEATH_EXPLOSION_PHASE: f32 = 0.7; // seconds of that pause spent on the giant explosion
-                                         // before the ship starts fading back in
+                                         // before the ship starts fading back in — the
+                                         // remainder (DEAD_PAUSE - this) is the mist fade-in
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Play, Dead, Win, Over }
