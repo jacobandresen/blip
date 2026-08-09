@@ -18,7 +18,6 @@ pub mod image;
 pub mod wav;
 
 pub mod bouncer;
-pub mod canaris;
 pub mod galactic_defender;
 pub mod meteors;
 pub mod rally;

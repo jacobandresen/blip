@@ -7,7 +7,6 @@ members = [
     "crates/bouncer",
     "crates/galactic_defender",
     "crates/rally",
-    "crates/canaris",
     "crates/meteors",
 ]
 

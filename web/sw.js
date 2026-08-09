@@ -1,4 +1,4 @@
-var CACHE = 'blip-v8';
+var CACHE = 'blip-v9';
 
 var ASSETS = [
   '/blip/',
@@ -27,9 +27,6 @@ var ASSETS = [
   '/blip/bouncer/index.html',
   '/blip/bouncer/index.wasm',
   '/blip/bouncer/screenshot.png',
-  '/blip/canaris/index.html',
-  '/blip/canaris/index.wasm',
-  '/blip/canaris/screenshot.png',
   '/blip/galactic_defender/index.html',
   '/blip/galactic_defender/index.wasm',
   '/blip/galactic_defender/screenshot.png',

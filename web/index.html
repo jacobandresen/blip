@@ -229,27 +229,7 @@
     .card-bouncer    { --c: var(--cyan);    }
     .card-galactic   { --c: var(--magenta); }
     .card-rally      { --c: var(--red);     }
-    .card-canaris    { --c: #3296c8;        }
     .card-meteors    { --c: #b4b4b4;        }
-
-    /* ---- Danish-origin seal ---- */
-    .badge-dk {
-      position: absolute;
-      top: 14px; right: 14px;
-      font-size: 24px;
-      line-height: 1;
-      width: 52px; height: 52px;
-      border: 2px solid #c8102e;
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      background: rgba(0,0,0,0.85);
-      box-shadow:
-        0 0 0 3px rgba(0,0,0,.85),
-        0 0 0 5px rgba(200,16,46,0.35),
-        0 0 14px rgba(200,16,46,0.35);
-      transform: rotate(-8deg);
-      z-index: 2;
-    }
 
     /* ---- keyboard-recommended chip ---- */
     .badge-kb {
@@ -651,19 +631,6 @@
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
 
-    <!-- CANARIS -->
-    <a class="card card-canaris" href="canaris/index.html">
-      <div class="badge-dk">🇩🇰</div>
-      <div class="card-shot-wrap">
-        <img class="card-shot" src="canaris/screenshot.png?v=2" alt="Canaris gameplay">
-      </div>
-      <div class="card-title">CANARIS</div>
-      <div class="card-genre"  data-i18n="canarisGenre"></div>
-      <div class="card-desc"   data-i18n="canarisDesc"></div>
-      <div class="card-controls" data-i18n="canarisControls"></div>
-      <div class="press-start" data-i18n="pressStart"></div>
-    </a>
-
     <!-- METEORS -->
     <a class="card card-meteors" href="meteors/index.html">
       <div class="card-shot-wrap">
@@ -741,10 +708,6 @@
         rallyDesc:         'First player to reach seven point is win.<br>Ball getting more fast with every hit.',
         rallyControls:     'P1 W/S OR ARROW &middot; P2 I/K &middot; [1] SERVE',
 
-        canarisGenre:      'PRIVATEER NAVAL GAME',
-        canarisDesc:       'Sail Kattegat as a Danish privateer captain.<br>Fire cannons, board ships, and plunder gold.<br>Dock at harbour to repair and resupply.',
-        canarisControls:   'ARROW / WASD TO SAIL &middot; [1] FIRE &middot; [2] BOARD',
-
         meteorsGenre:      'ROCK SHOOTING GAME',
         meteorsDesc:       'Spaceship is drift in field of many rock.<br>Shoot rock for break into more small piece.<br>Do not to crashing, is very dangerous choice.',
         meteorsControls:   'A/D ROTATE &middot; W THRUST &middot; [1] FIRE &middot; [2] HYPERSPACE',
@@ -776,10 +739,6 @@
         rallyDesc:         '先に7点取った方が勝ち。<br>打つたびにボールは速くなる。',
         rallyControls:     'P1 W/S または矢印 &middot; P2 I/K &middot; [1] サーブ',
 
-        canarisGenre:      'デンマーク海賊ゲーム',
-        canarisDesc:       'デンマークの私掠船長としてカテガット海峡を航海。<br>大砲を撃ち、敵船に乗り込み、金を奪え。<br>港でせんかんを修理・補給しよう。',
-        canarisControls:   '矢印/WASD 操舵 &middot; [1] 砲撃 &middot; [2] 乗船',
-
         meteorsGenre:      '隕石破壊ゲーム',
         meteorsDesc:       '宇宙船で岩石地帯を漂流する。<br>岩を撃って小さく砕け。<br>衝突は禁物、慎重に操縦せよ。',
         meteorsControls:   'A/D 回転 &middot; W 推進 &middot; [1] 発射 &middot; [2] ワープ',
@@ -810,10 +769,6 @@
         rallyGenre:        'BORDTENNISSPIL',
         rallyDesc:         'F&oslash;rst til syv point vinder.<br>Bolden accelererer for hvert slag.',
         rallyControls:     'P1 W/S ELLER PILE &middot; P2 I/K &middot; [1] SERV',
-
-        canarisGenre:      'KAPERSKIB SPIL',
-        canarisDesc:       'Sejl i Kattegat som dansk kaperkapitajn.<br>Affyr kanoner, bord fjendtlige skibe og pl&oslash;ndr guld.<br>Anl&oslash;b havn for at reparere og genopfylde.',
-        canarisControls:   'PIL / WASD FOR AT SEJLE &middot; [1] SKYD &middot; [2] BORD',
 
         meteorsGenre:      'STENSKYDNINGSSPIL',
         meteorsDesc:       'Rumskib driver i et felt af sten.<br>Skyd stenene i mindre stykker.<br>Und&aring; sammenst&oslash;d &mdash; det er farligt.',

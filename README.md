@@ -21,7 +21,6 @@ This collection features several classic titles, all running within the unified 
 *   **Serpent**: Guide the snake through the maze, eat the pellet, and avoid self-collision.
 *   **Bouncer**: The ultimate brick-breaking challenge.
 *   **Galactic Defender**: Shoot down the endless swarm of invading aliens.
-*   **Canaris**: A tribute to the Danish DOS game Kaptajn Kapers (1985) — never an arcade game, but lovingly reimagined as one here.
 *   **Meteors**: A tribute to the golden-age vector rock-shooter. Rotate, thrust, and blast a field of drifting boulders before they blast you.
 
 ---
