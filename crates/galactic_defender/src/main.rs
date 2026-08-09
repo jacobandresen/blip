@@ -45,6 +45,10 @@ const SHIELD_BLOCK: i32 = 12;
 const SHIELDS: usize = 4;
 const EXPLOSION_TTL: f32 = 0.45;
 const LIVES_START: i32 = 3;
+const UFO_W: f32 = 36.0;
+const UFO_H: f32 = 20.0;
+const UFO_N_LIGHTS: usize = 8;
+const UFO_SPIN_STEP_MS: f32 = 70.0; // ms between chase-light frame advances
 
 const MAX_UFO_BOMBS: usize = 1;
 const UFO_BOMB_IDX: usize = MAX_PLAYER_BULLETS + MAX_BOMBS;
@@ -102,6 +106,9 @@ struct Game {
     ufo_bomb_timer: Timer,
     ufo_score: i32,
     ufo_score_timer: Timer,
+    ufo_frame: usize,
+    ufo_spin_timer: f32,
+    march_step: usize,
 }
 
 impl Game {
@@ -137,6 +144,9 @@ impl Game {
             ufo_bomb_timer: Timer::default(),
             ufo_score: 0,
             ufo_score_timer: Timer::default(),
+            ufo_frame: 0,
+            ufo_spin_timer: 0.0,
+            march_step: 0,
         }
     }
 
@@ -276,6 +286,8 @@ struct Sounds {
     shoot: blip::BlipSound,
     explosion: blip::BlipSound,
     level_clear: blip::BlipSound,
+    ufo_siren: blip::BlipSound,
+    march: [blip::BlipSound; 4],
 }
 
 fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
@@ -284,29 +296,38 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
     if !g.ufo_active {
         if g.ufo_timer.tick(dt) && g.aliens_alive() > 0 {
             g.ufo_dir = if (rand() & 1) == 0 { 1 } else { -1 };
-            g.ufo_x = if g.ufo_dir == 1 { -32.0 } else { WIN_W as f32 };
+            g.ufo_x = if g.ufo_dir == 1 { -UFO_W } else { WIN_W as f32 };
             g.ufo_active = true;
+            g.ufo_frame = 0;
+            g.ufo_spin_timer = 0.0;
             g.ufo_bomb_timer.start(3.0);
             g.bullets[UFO_BOMB_IDX].active = false;
+            blip::play_alert(&sfx.ufo_siren);
         }
         return;
     }
 
     const UFO_Y: f32 = (PLAY_Y + 8) as f32;
     g.ufo_x += 80.0 * g.ufo_dir as f32 * dt;
+    g.ufo_spin_timer += dt * 1000.0;
+    if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
+        g.ufo_spin_timer = 0.0;
+        g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
+    }
 
-    if g.ufo_x > WIN_W as f32 || g.ufo_x + 32.0 < 0.0 {
+    if g.ufo_x > WIN_W as f32 || g.ufo_x + UFO_W < 0.0 {
         g.ufo_active = false;
         g.bullets[UFO_BOMB_IDX].active = false;
         g.ufo_timer.start(rand_int(15, 25) as f32);
+        blip::stop_alert();
         return;
     }
 
     // Only one bomb per pass — timer stays inactive after first fire.
     if g.ufo_bomb_timer.tick(dt) && !g.bullets[UFO_BOMB_IDX].active {
         g.bullets[UFO_BOMB_IDX] = Bullet {
-            x: g.ufo_x + 12.0,
-            y: UFO_Y + 12.0,
+            x: g.ufo_x + UFO_W / 2.0 - 2.0,
+            y: UFO_Y + UFO_H * 0.6,
             active: true,
             player: false,
         };
@@ -315,7 +336,7 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
     for bi in 0..MAX_PLAYER_BULLETS {
         if !g.bullets[bi].active { continue; }
         if rects_overlap(g.bullets[bi].x, g.bullets[bi].y, 8.0, 16.0,
-                         g.ufo_x, UFO_Y, 32.0, 12.0) {
+                         g.ufo_x, UFO_Y, UFO_W, UFO_H) {
             play_sfx(&sfx.explosion);
             let kill_x = g.ufo_x;
             g.spawn_explosion(kill_x, UFO_Y);
@@ -327,16 +348,16 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.ufo_score_timer.start(1.5);
             g.ufo_active = false;
             g.ufo_timer.start(rand_int(15, 25) as f32);
+            blip::stop_alert();
             return;
         }
     }
 }
 
-fn draw_ufo(blip: &Blip, g: &Game) {
+fn draw_ufo(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
     const UFO_Y: f32 = (PLAY_Y + 8) as f32;
     if g.ufo_active {
-        blip.fill_rect(g.ufo_x, UFO_Y, 32.0, 12.0, BLIP_RED);
-        blip.fill_rect(g.ufo_x + 8.0, UFO_Y - 8.0, 16.0, 8.0, BLIP_CYAN);
+        blip.draw_texture(&saucer[g.ufo_frame], g.ufo_x, UFO_Y, UFO_W, UFO_H);
     }
     if g.ufo_score_timer.active() {
         let text = format!("{} PTS", g.ufo_score);
@@ -379,6 +400,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.march_timer += dt * 1000.0;
     if g.march_timer >= g.march_interval() {
         g.march_timer = 0.0;
+        if g.aliens_alive() > 0 {
+            play_sfx(&sfx.march[g.march_step]);
+            g.march_step = (g.march_step + 1) % 4;
+        }
         if g.march_drop_next {
             for a in g.aliens.iter_mut() {
                 if a.alive { a.y += MARCH_DROP; }
@@ -496,6 +521,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                     g.state = State::Over;
                 }
             }
+            // The UFO stops updating once we leave State::Play, so its siren
+            // loop would otherwise keep wailing through the Dead/Over screen.
+            if g.ufo_active { g.ufo_active = false; blip::stop_alert(); }
             return;
         }
     }
@@ -503,6 +531,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     for a in g.aliens.iter() {
         if a.alive && a.y + ALIEN_H as f32 >= GROUND_Y as f32 {
             g.state = State::Over;
+            if g.ufo_active { g.ufo_active = false; blip::stop_alert(); }
             return;
         }
     }
@@ -514,6 +543,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.sess.next_level();
         g.dead_timer.start(1.5);
         g.state = State::Win;
+        if g.ufo_active { g.ufo_active = false; blip::stop_alert(); }
     }
 
     for e in g.explosions.iter_mut() {
@@ -543,7 +573,7 @@ fn update_over(g: &mut Game) {
 
 fn draw_play(blip: &Blip, g: &Game,
              player: &Texture2D, alien: &[[Texture2D; 2]; 3],
-             explosion: &Texture2D, shield: &Texture2D) {
+             explosion: &Texture2D, shield: &Texture2D, saucer: &[Texture2D; UFO_N_LIGHTS]) {
     blip.draw_line(0.0, GROUND_Y as f32, WIN_W as f32, GROUND_Y as f32, BLIP_GREEN);
 
     for s in 0..SHIELDS {
@@ -587,7 +617,7 @@ fn draw_play(blip: &Blip, g: &Game,
         );
     }
 
-    draw_ufo(blip, g);
+    draw_ufo(blip, g, saucer);
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
@@ -643,9 +673,22 @@ const ALIEN_OCTO_A_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ass
 const ALIEN_OCTO_B_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_octopus_b.png"));
 const EXPLOSION_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/explosion.png"));
 const SHIELD_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/shield_block.png"));
+const UFO_SAUCER_0_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_0.png"));
+const UFO_SAUCER_1_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_1.png"));
+const UFO_SAUCER_2_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_2.png"));
+const UFO_SAUCER_3_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_3.png"));
+const UFO_SAUCER_4_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_4.png"));
+const UFO_SAUCER_5_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_5.png"));
+const UFO_SAUCER_6_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_6.png"));
+const UFO_SAUCER_7_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_7.png"));
 const SHOOT_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot.wav"));
 const EXPLOSION_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/explosion.wav"));
 const LEVEL_CLEAR_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/level_clear.wav"));
+const UFO_SIREN_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ufo_siren.wav"));
+const MARCH1_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march1.wav"));
+const MARCH2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march2.wav"));
+const MARCH3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march3.wav"));
+const MARCH4_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march4.wav"));
 const MUSIC_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
 const MUSIC2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
 const MUSIC3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
@@ -673,11 +716,24 @@ async fn main() {
     ];
     let explosion = load_png(EXPLOSION_PNG);
     let shield = load_png(SHIELD_PNG);
+    let saucer = [
+        load_png(UFO_SAUCER_0_PNG), load_png(UFO_SAUCER_1_PNG),
+        load_png(UFO_SAUCER_2_PNG), load_png(UFO_SAUCER_3_PNG),
+        load_png(UFO_SAUCER_4_PNG), load_png(UFO_SAUCER_5_PNG),
+        load_png(UFO_SAUCER_6_PNG), load_png(UFO_SAUCER_7_PNG),
+    ];
 
     let sfx = Sounds {
         shoot:       blip::audio::load_sound(SHOOT_WAV).await,
         explosion:   blip::audio::load_sound(EXPLOSION_WAV).await,
         level_clear: blip::audio::load_sound(LEVEL_CLEAR_WAV).await,
+        ufo_siren:   blip::audio::load_sound(UFO_SIREN_WAV).await,
+        march: [
+            blip::audio::load_sound(MARCH1_WAV).await,
+            blip::audio::load_sound(MARCH2_WAV).await,
+            blip::audio::load_sound(MARCH3_WAV).await,
+            blip::audio::load_sound(MARCH4_WAV).await,
+        ],
     };
     let music = [
         blip::audio::load_sound(MUSIC_WAV).await,
@@ -725,7 +781,7 @@ async fn main() {
             State::Win   => draw_win(&blip, g.sess.level),
             State::Over  => draw_over(&blip, g.sess.score),
             State::Play | State::Dead => {
-                draw_play(&blip, &g, &player, &alien, &explosion, &shield);
+                draw_play(&blip, &g, &player, &alien, &explosion, &shield, &saucer);
             }
         }
 

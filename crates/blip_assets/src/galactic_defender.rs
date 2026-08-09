@@ -12,6 +12,9 @@ use crate::Asset;
 // Must match crates/galactic_defender/src/main.rs's ALIEN_W / ALIEN_H.
 const ALIEN_W: i32 = 36;
 const ALIEN_H: i32 = 28;
+// Must match crates/galactic_defender/src/main.rs's UFO_W / UFO_H.
+const UFO_W: i32 = 36;
+const UFO_H: i32 = 20;
 
 fn gen_tone(freq: f32, dur_ms: f32, amp: f32) -> Vec<i16> {
     let sr = SAMPLE_RATE as f32;
@@ -160,13 +163,129 @@ fn alien(kind: usize, frame: usize) -> Vec<u8> {
             }
         }
     }
-    // Glowing eyes on the wide head row, offset slightly per frame for a
-    // menacing flicker.
-    let eye_y = oy + 3 * cell + 1;
+    // Eyes on the wide head row: a full-cell bright square (not just a single
+    // pixel) ringed by a dark socket so they read clearly against every body
+    // colour, offset slightly per frame for a menacing flicker.
+    let eye_y = oy + 3 * cell;
     let eye_dx = if frame == 1 { 1 } else { 0 };
-    img.set(ox + 3 * cell - eye_dx, eye_y, 255, 255, 255);
-    img.set(ox + 5 * cell + eye_dx, eye_y, 255, 255, 255);
+    for ex in [ox + 3 * cell - eye_dx, ox + 5 * cell + eye_dx] {
+        for dy in -1..=cell {
+            for dx in -1..=cell {
+                img.set(ex + dx, eye_y + dy, 10, 10, 10);
+            }
+        }
+        for dy in 0..cell {
+            for dx in 0..cell {
+                img.set(ex + dx, eye_y + dy, 255, 255, 255);
+            }
+        }
+    }
     img.encode_png()
+}
+
+/// A flying-saucer UFO: a wide metallic disc, a glass dome, and a ring of
+/// rim lights. The disc and dome are always drawn upright (rotating the
+/// whole bitmap looks jagged with nearest-neighbour pixel-art filtering) —
+/// instead, `frame` (0..N_LIGHTS) advances the light ring by one position
+/// each call, so cycling through all `N_LIGHTS` frames in order gives a
+/// smooth, seamlessly-looping "spinning lights" illusion, classic UFO-toy
+/// style, while staying pixel-crisp.
+const UFO_N_LIGHTS: usize = 8;
+
+fn ufo_saucer(frame: usize) -> Vec<u8> {
+    let w: i32 = UFO_W;
+    let h: i32 = UFO_H;
+    let mut img = Image::new(w as u32, h as u32);
+    let cx = w as f32 / 2.0;
+    let cy = h as f32 * 0.62;
+    let disc_rx = w as f32 / 2.0 - 1.0;
+    let disc_ry = h as f32 * 0.30;
+
+    // Disc body — a squashed metallic-red ellipse with a darker underside band.
+    for y in 0..h {
+        for x in 0..w {
+            let dx = (x as f32 + 0.5 - cx) / disc_rx;
+            let dy = (y as f32 + 0.5 - cy) / disc_ry;
+            let d2 = dx * dx + dy * dy;
+            if d2 <= 1.0 {
+                if dy > 0.25 {
+                    img.set(x, y, 150, 30, 40); // shadowed underside
+                } else {
+                    img.set(x, y, 220, 60, 70);
+                }
+            }
+        }
+    }
+
+    // Dome on top.
+    let dome_cy = cy - disc_ry * 0.9;
+    let dome_r = w as f32 * 0.22;
+    for y in 0..h {
+        for x in 0..w {
+            let dx = x as f32 + 0.5 - cx;
+            let dy = y as f32 + 0.5 - dome_cy;
+            if dx * dx + dy * dy <= dome_r * dome_r && (y as f32) < cy - disc_ry * 0.35 {
+                img.set(x, y, 120, 230, 255);
+            }
+        }
+    }
+    img.set(cx as i32 - 1, (dome_cy - dome_r * 0.4) as i32, 220, 250, 255);
+
+    // Rim lights, evenly spaced and alternating colour, offset by `frame`
+    // so the ring appears to rotate as frames advance.
+    for i in 0..UFO_N_LIGHTS {
+        let idx = i + frame;
+        let a = (idx as f32 / UFO_N_LIGHTS as f32) * std::f32::consts::PI * 2.0;
+        let lx = (cx + a.cos() * disc_rx * 0.88).round() as i32;
+        let ly = (cy + a.sin() * disc_ry * 0.88).round() as i32;
+        let (r, g, b) = if idx % 2 == 0 { (255u8, 230, 60) } else { (255, 255, 255) };
+        img.set(lx, ly, r, g, b);
+        img.set(lx, ly - 1, r, g, b);
+    }
+    img.encode_png()
+}
+
+/// A wailing two-tone siren — like a European ambulance's "hi-lo" — so the
+/// UFO boss is unmistakable by ear before it's even on screen. One glide
+/// cycle (low -> high -> low) that loops seamlessly.
+fn ufo_siren() -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let n = ms_to_samples(1200.0);
+    let mut s = Vec::with_capacity(n);
+    let f_lo = 650.0_f32;
+    let f_hi = 950.0_f32;
+    let mut phase = 0.0_f32;
+    for i in 0..n {
+        let t = i as f32 / n as f32;
+        let tri = if t < 0.5 { t * 2.0 } else { 2.0 - t * 2.0 };
+        let freq = f_lo + (f_hi - f_lo) * tri;
+        phase += freq / sr;
+        let fund = (2.0 * PI * phase).sin();
+        let third = (2.0 * PI * phase * 3.0).sin() / 4.0;
+        let shaped = (fund * 0.85 + third * 0.25).tanh();
+        s.push((shaped * 20000.0) as i16);
+    }
+    encode_pcm16_mono(&s)
+}
+
+/// One ominous thumping march step — a low pitch-swept thud with a driven
+/// sub-octave layer for extra weight. Four of these at descending base
+/// frequencies (classic Space Invaders "duh-duh-duh-duh") cycle as the
+/// aliens advance.
+fn march_thump(base_freq: f32) -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let n = ms_to_samples(150.0);
+    let mut s = Vec::with_capacity(n);
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let e = (1.0 - i as f32 / n as f32).powf(1.5);
+        let freq = base_freq + base_freq * 2.5 * (-t / 0.05).exp();
+        let fund = (2.0 * PI * freq * t).sin();
+        let sub = (2.0 * PI * freq * 0.5 * t).sin();
+        let shaped = (fund * 0.75 + sub * 0.8).tanh();
+        s.push((e * 26000.0 * shaped) as i16);
+    }
+    encode_pcm16_mono(&s)
 }
 
 fn bullet() -> Vec<u8> {
@@ -392,11 +511,23 @@ pub fn generate() -> Vec<Asset> {
         ("images/bullet.png",        bullet()),
         ("images/explosion.png",     explosion()),
         ("images/shield_block.png",  shield_block()),
+        ("images/ufo_saucer_0.png",  ufo_saucer(0)),
+        ("images/ufo_saucer_1.png",  ufo_saucer(1)),
+        ("images/ufo_saucer_2.png",  ufo_saucer(2)),
+        ("images/ufo_saucer_3.png",  ufo_saucer(3)),
+        ("images/ufo_saucer_4.png",  ufo_saucer(4)),
+        ("images/ufo_saucer_5.png",  ufo_saucer(5)),
+        ("images/ufo_saucer_6.png",  ufo_saucer(6)),
+        ("images/ufo_saucer_7.png",  ufo_saucer(7)),
         ("sounds/shoot.wav",       encode_pcm16_mono(&gen_tone(880.0, 80.0, 0.6))),
         ("sounds/explosion.wav",   encode_pcm16_mono(&gen_noise(300.0, 0.8))),
         ("sounds/game_over.wav",   game_over_sfx()),
-        ("sounds/march.wav",       encode_pcm16_mono(&gen_tone(220.0, 60.0, 0.4))),
+        ("sounds/march1.wav",      march_thump(98.0)),
+        ("sounds/march2.wav",      march_thump(87.0)),
+        ("sounds/march3.wav",      march_thump(78.0)),
+        ("sounds/march4.wav",      march_thump(70.0)),
         ("sounds/level_clear.wav", level_clear_sfx()),
+        ("sounds/ufo_siren.wav",   ufo_siren()),
         ("sounds/music.wav",       music()),
         ("sounds/music2.wav",      music2()),
         ("sounds/music3.wav",      music3()),

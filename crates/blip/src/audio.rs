@@ -73,6 +73,26 @@ pub fn stop_ambient() {
     }
 }
 
+static CURRENT_ALERT: Mutex<Option<Sound>> = Mutex::new(None);
+
+/// Start looping an attention-grabbing alert sound (e.g. a boss/UFO siren)
+/// layered over the music and ambient channels — loud enough to stand out.
+pub fn play_alert(s: &BlipSound) {
+    stop_alert();
+    play_sound(s, PlaySoundParams { looped: true, volume: 0.55 });
+    if let Ok(mut guard) = CURRENT_ALERT.lock() {
+        *guard = Some(s.clone());
+    }
+}
+
+pub fn stop_alert() {
+    if let Ok(mut guard) = CURRENT_ALERT.lock() {
+        if let Some(s) = guard.take() {
+            stop_sound(&s);
+        }
+    }
+}
+
 /// Synthesize a short punchy beep and return it as a `BlipSound` — no WAV file needed.
 /// `freq` is in Hz (e.g. 440.0 for concert A), `duration_ms` is the length in milliseconds.
 /// Await this at startup; the returned handle can be replayed freely with `play_sfx`.
