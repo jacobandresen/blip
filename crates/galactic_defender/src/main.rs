@@ -50,6 +50,12 @@ const UFO_H: f32 = 20.0;
 const UFO_N_LIGHTS: usize = 8;
 const UFO_SPIN_STEP_MS: f32 = 70.0; // ms between chase-light frame advances
 
+// ---- UFO death-laser attack --------------------------------------------
+const UFO_LASER_CHANCE: f32 = 0.4;   // odds a given UFO pass becomes the laser attack
+const UFO_CHARGE_SECS: f32 = 1.6;    // "gnarly" charge-up before it fires
+const UFO_FIRE_SECS: f32 = 0.4;      // how long the beam itself is on screen
+const LASER_HIT_W: f32 = UFO_W;      // width of the beam's kill zone
+
 const MAX_UFO_BOMBS: usize = 1;
 const UFO_BOMB_IDX: usize = MAX_PLAYER_BULLETS + MAX_BOMBS;
 const N_BULLETS: usize = MAX_PLAYER_BULLETS + MAX_BOMBS + MAX_UFO_BOMBS;
@@ -57,6 +63,9 @@ const N_EXPLOSIONS: usize = ALIEN_TOTAL + 4;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Play, Dead, Win, Over }
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum UfoMode { Flying, Charging, Firing }
 
 #[derive(Copy, Clone)]
 struct Alien {
@@ -109,6 +118,13 @@ struct Game {
     ufo_frame: usize,
     ufo_spin_timer: f32,
     march_step: usize,
+    ufo_mode: UfoMode,
+    ufo_will_laser: bool,
+    laser_used_this_level: bool,
+    ufo_laser_trigger_x: f32,
+    ufo_laser_x: f32,
+    ufo_charge_timer: Timer,
+    ufo_fire_timer: Timer,
 }
 
 impl Game {
@@ -147,6 +163,13 @@ impl Game {
             ufo_frame: 0,
             ufo_spin_timer: 0.0,
             march_step: 0,
+            ufo_mode: UfoMode::Flying,
+            ufo_will_laser: false,
+            laser_used_this_level: false,
+            ufo_laser_trigger_x: 0.0,
+            ufo_laser_x: 0.0,
+            ufo_charge_timer: Timer::default(),
+            ufo_fire_timer: Timer::default(),
         }
     }
 
@@ -269,6 +292,9 @@ impl Game {
         // Give level 1 a longer bomb-free grace period to get oriented.
         self.bomb_timer.start(if self.sess.level == 1 { 3.5 } else { 2.0 });
         self.ufo_active = false;
+        self.ufo_mode = UfoMode::Flying;
+        self.ufo_will_laser = false;
+        self.laser_used_this_level = false;
         self.ufo_timer.start(rand_int(15, 25) as f32);
         self.ufo_score_timer = Timer::default();
         self.ufo_bomb_timer = Timer::default();
@@ -288,9 +314,68 @@ struct Sounds {
     level_clear: blip::BlipSound,
     ufo_siren: blip::BlipSound,
     march: [blip::BlipSound; 4],
+    laser_charge: blip::BlipSound,
+    laser_blast: blip::BlipSound,
 }
 
-fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
+const UFO_Y: f32 = (PLAY_Y + 8) as f32;
+
+/// Detonate the laser: kill every alien, shield block, and (if it's standing
+/// in the way) the player under the beam's column, with a cascade of
+/// explosions down its length. Returns `true` if the player was killed.
+fn fire_laser(g: &mut Game) -> bool {
+    let bx0 = g.ufo_laser_x + UFO_W / 2.0 - LASER_HIT_W / 2.0;
+    let bx1 = bx0 + LASER_HIT_W;
+
+    for a in g.aliens.iter_mut() {
+        if !a.alive { continue; }
+        if a.x < bx1 && a.x + ALIEN_W as f32 > bx0 {
+            a.alive = false;
+            let pts = match a.kind { 0 => 30, 1 => 20, _ => 10 };
+            g.sess.add_score(pts * g.sess.level);
+        }
+    }
+    // A dense cascade of explosions straight down the beam's path, for a
+    // "very dramatic" wipe (covers the vaporized aliens too).
+    let mut y = UFO_Y;
+    while y < GROUND_Y as f32 {
+        g.spawn_explosion(bx0 + LASER_HIT_W / 2.0 - ALIEN_W as f32 / 2.0, y);
+        y += 26.0;
+    }
+
+    for s in g.shields.iter_mut() {
+        for r in 0..SHIELD_ROWS {
+            for c in 0..SHIELD_COLS {
+                if !s.alive[r][c] { continue; }
+                let sx = s.x + (c as i32 * SHIELD_BLOCK) as f32;
+                if sx < bx1 && sx + SHIELD_BLOCK as f32 > bx0 {
+                    s.alive[r][c] = false;
+                }
+            }
+        }
+    }
+
+    let player_hit = g.player_x < bx1 && g.player_x + ALIEN_W as f32 > bx0;
+    if player_hit {
+        let px = g.player_x;
+        g.spawn_explosion(px, (GROUND_Y - 28) as f32);
+        match g.sess.lose_life() {
+            LifeResult::StillAlive => {
+                g.bullets.iter_mut().for_each(|b| b.active = false);
+                g.dead_timer.start(1.5);
+                g.state = State::Dead;
+            }
+            LifeResult::GameOver => {
+                g.state = State::Over;
+            }
+        }
+    }
+    player_hit
+}
+
+/// Returns `true` if the laser just killed the player this frame — the
+/// caller should stop processing the round immediately when that happens.
+fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
     g.ufo_score_timer.tick(dt);
 
     if !g.ufo_active {
@@ -298,66 +383,172 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.ufo_dir = if (rand() & 1) == 0 { 1 } else { -1 };
             g.ufo_x = if g.ufo_dir == 1 { -UFO_W } else { WIN_W as f32 };
             g.ufo_active = true;
+            g.ufo_mode = UfoMode::Flying;
             g.ufo_frame = 0;
             g.ufo_spin_timer = 0.0;
             g.ufo_bomb_timer.start(3.0);
             g.bullets[UFO_BOMB_IDX].active = false;
             blip::play_alert(&sfx.ufo_siren);
+
+            let roll = (rand() as f32) / (u32::MAX as f32);
+            g.ufo_will_laser = !g.laser_used_this_level && roll < UFO_LASER_CHANCE;
+            if g.ufo_will_laser {
+                let margin = 50.0;
+                let span = (WIN_W as f32 - margin * 2.0).max(1.0);
+                let r01 = (rand() as f32) / (u32::MAX as f32);
+                g.ufo_laser_trigger_x = margin + r01 * span;
+            }
         }
-        return;
+        return false;
     }
 
-    const UFO_Y: f32 = (PLAY_Y + 8) as f32;
-    g.ufo_x += 80.0 * g.ufo_dir as f32 * dt;
-    g.ufo_spin_timer += dt * 1000.0;
-    if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
-        g.ufo_spin_timer = 0.0;
-        g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
-    }
+    match g.ufo_mode {
+        UfoMode::Flying => {
+            g.ufo_x += 80.0 * g.ufo_dir as f32 * dt;
+            g.ufo_spin_timer += dt * 1000.0;
+            if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
+                g.ufo_spin_timer = 0.0;
+                g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
+            }
 
-    if g.ufo_x > WIN_W as f32 || g.ufo_x + UFO_W < 0.0 {
-        g.ufo_active = false;
-        g.bullets[UFO_BOMB_IDX].active = false;
-        g.ufo_timer.start(rand_int(15, 25) as f32);
-        blip::stop_alert();
-        return;
-    }
+            if g.ufo_will_laser {
+                let reached = if g.ufo_dir == 1 { g.ufo_x >= g.ufo_laser_trigger_x }
+                              else { g.ufo_x <= g.ufo_laser_trigger_x };
+                if reached {
+                    g.ufo_mode = UfoMode::Charging;
+                    g.ufo_charge_timer.start(UFO_CHARGE_SECS);
+                    g.laser_used_this_level = true;
+                    blip::stop_alert();
+                    play_sfx(&sfx.laser_charge);
+                    return false;
+                }
+            }
 
-    // Only one bomb per pass — timer stays inactive after first fire.
-    if g.ufo_bomb_timer.tick(dt) && !g.bullets[UFO_BOMB_IDX].active {
-        g.bullets[UFO_BOMB_IDX] = Bullet {
-            x: g.ufo_x + UFO_W / 2.0 - 2.0,
-            y: UFO_Y + UFO_H * 0.6,
-            active: true,
-            player: false,
-        };
-    }
+            if g.ufo_x > WIN_W as f32 || g.ufo_x + UFO_W < 0.0 {
+                g.ufo_active = false;
+                g.bullets[UFO_BOMB_IDX].active = false;
+                g.ufo_timer.start(rand_int(15, 25) as f32);
+                blip::stop_alert();
+                return false;
+            }
 
-    for bi in 0..MAX_PLAYER_BULLETS {
-        if !g.bullets[bi].active { continue; }
-        if rects_overlap(g.bullets[bi].x, g.bullets[bi].y, 8.0, 16.0,
-                         g.ufo_x, UFO_Y, UFO_W, UFO_H) {
-            play_sfx(&sfx.explosion);
-            let kill_x = g.ufo_x;
-            g.spawn_explosion(kill_x, UFO_Y);
-            g.bullets[bi].active = false;
-            g.bullets[UFO_BOMB_IDX].active = false;
-            let bonus = rand_int(1, 6) * 50;
-            g.sess.add_score(bonus);
-            g.ufo_score = bonus;
-            g.ufo_score_timer.start(1.5);
-            g.ufo_active = false;
-            g.ufo_timer.start(rand_int(15, 25) as f32);
-            blip::stop_alert();
-            return;
+            // Only one bomb per pass — timer stays inactive after first fire.
+            if g.ufo_bomb_timer.tick(dt) && !g.bullets[UFO_BOMB_IDX].active {
+                g.bullets[UFO_BOMB_IDX] = Bullet {
+                    x: g.ufo_x + UFO_W / 2.0 - 2.0,
+                    y: UFO_Y + UFO_H * 0.6,
+                    active: true,
+                    player: false,
+                };
+            }
+        }
+        UfoMode::Charging => {
+            // Frantic chase-light flicker while it powers up.
+            g.ufo_spin_timer += dt * 1000.0;
+            if g.ufo_spin_timer >= UFO_SPIN_STEP_MS * 0.25 {
+                g.ufo_spin_timer = 0.0;
+                g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
+            }
+            if g.ufo_charge_timer.tick(dt) {
+                g.ufo_mode = UfoMode::Firing;
+                g.ufo_fire_timer.start(UFO_FIRE_SECS);
+                g.ufo_laser_x = g.ufo_x;
+                play_sfx(&sfx.laser_blast);
+                if fire_laser(g) {
+                    return true;
+                }
+            }
+        }
+        UfoMode::Firing => {
+            if g.ufo_fire_timer.tick(dt) {
+                // The beam burns the UFO itself out.
+                g.spawn_explosion(g.ufo_x, UFO_Y);
+                play_sfx(&sfx.explosion);
+                g.ufo_active = false;
+                g.ufo_mode = UfoMode::Flying;
+                g.ufo_will_laser = false;
+                g.ufo_timer.start(rand_int(15, 25) as f32);
+            }
         }
     }
+
+    // Player bullet vs UFO — not while it's mid-beam (too late by then).
+    if g.ufo_mode != UfoMode::Firing {
+        for bi in 0..MAX_PLAYER_BULLETS {
+            if !g.bullets[bi].active { continue; }
+            if rects_overlap(g.bullets[bi].x, g.bullets[bi].y, 8.0, 16.0,
+                             g.ufo_x, UFO_Y, UFO_W, UFO_H) {
+                play_sfx(&sfx.explosion);
+                let kill_x = g.ufo_x;
+                g.spawn_explosion(kill_x, UFO_Y);
+                g.bullets[bi].active = false;
+                g.bullets[UFO_BOMB_IDX].active = false;
+                let bonus = rand_int(1, 6) * 50;
+                g.sess.add_score(bonus);
+                g.ufo_score = bonus;
+                g.ufo_score_timer.start(1.5);
+                g.ufo_active = false;
+                g.ufo_mode = UfoMode::Flying;
+                g.ufo_timer.start(rand_int(15, 25) as f32);
+                blip::stop_alert();
+                return false;
+            }
+        }
+    }
+
+    false
 }
 
 fn draw_ufo(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
-    const UFO_Y: f32 = (PLAY_Y + 8) as f32;
     if g.ufo_active {
-        blip.draw_texture(&saucer[g.ufo_frame], g.ufo_x, UFO_Y, UFO_W, UFO_H);
+        match g.ufo_mode {
+            UfoMode::Flying => {
+                blip.draw_texture(&saucer[g.ufo_frame], g.ufo_x, UFO_Y, UFO_W, UFO_H);
+            }
+            UfoMode::Charging => {
+                // The whole ship shakes as it powers up.
+                let jx = (rand() % 5) as f32 - 2.0;
+                let jy = (rand() % 3) as f32 - 1.0;
+                blip.draw_texture(&saucer[g.ufo_frame], g.ufo_x + jx, UFO_Y + jy, UFO_W, UFO_H);
+
+                let progress = 1.0 - (g.ufo_charge_timer.remaining() / UFO_CHARGE_SECS).max(0.0);
+                let cx = g.ufo_x + UFO_W / 2.0;
+                let cy = UFO_Y + UFO_H;
+
+                // Growing charge glow beneath it, brightening as it nears firing.
+                let glow_r = 4.0 + progress * 14.0;
+                let glow_c = BlipColor {
+                    r: 1.0, g: 0.25 + progress * 0.5, b: 0.15, a: 0.5 + progress * 0.4,
+                };
+                blip.fill_glow_circle(cx, cy, glow_r, glow_c);
+
+                // Flickering warning line straight down — telegraphs where the
+                // beam will land so the player has a chance to dodge.
+                let flicker = ((progress * 40.0) as i32 % 2) == 0;
+                if flicker || progress > 0.75 {
+                    let warn_c = BlipColor { r: 1.0, g: 0.2, b: 0.2, a: 0.25 + progress * 0.5 };
+                    blip.draw_glow_line(cx, cy, cx, GROUND_Y as f32, warn_c);
+                }
+            }
+            UfoMode::Firing => {
+                let cx = g.ufo_laser_x + UFO_W / 2.0;
+                let fade = (g.ufo_fire_timer.remaining() / UFO_FIRE_SECS).clamp(0.0, 1.0);
+                // Full-width flash for the first instant — the dramatic hit.
+                if fade > 0.7 {
+                    blip.fill_rect(
+                        0.0, PLAY_Y as f32, WIN_W as f32, (GROUND_Y - PLAY_Y) as f32,
+                        BlipColor { r: 1.0, g: 1.0, b: 1.0, a: (fade - 0.7) * 0.6 },
+                    );
+                }
+                // The beam: a wide hot core inside a wider red-hot glow.
+                let beam_c = BlipColor { r: 1.0, g: 0.3 + fade * 0.4, b: 0.3, a: 1.0 };
+                for off in [-10.0_f32, -5.0, 0.0, 5.0, 10.0] {
+                    blip.draw_glow_line(cx + off, UFO_Y, cx + off, GROUND_Y as f32, beam_c);
+                }
+                blip.draw_line_ex(cx - 3.0, UFO_Y, cx - 3.0, GROUND_Y as f32, 6.0, BLIP_WHITE);
+                blip.draw_line_ex(cx + 3.0, UFO_Y, cx + 3.0, GROUND_Y as f32, 6.0, BLIP_WHITE);
+            }
+        }
     }
     if g.ufo_score_timer.active() {
         let text = format!("{} PTS", g.ufo_score);
@@ -536,7 +727,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
-    update_ufo(g, dt, sfx);
+    if update_ufo(g, dt, sfx) {
+        return; // the laser just killed the player this frame
+    }
 
     if g.aliens_alive() == 0 {
         play_sfx(&sfx.level_clear);
@@ -685,6 +878,8 @@ const SHOOT_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets
 const EXPLOSION_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/explosion.wav"));
 const LEVEL_CLEAR_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/level_clear.wav"));
 const UFO_SIREN_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ufo_siren.wav"));
+const LASER_CHARGE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/laser_charge.wav"));
+const LASER_BLAST_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/laser_blast.wav"));
 const MARCH1_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march1.wav"));
 const MARCH2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march2.wav"));
 const MARCH3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march3.wav"));
@@ -734,6 +929,8 @@ async fn main() {
             blip::audio::load_sound(MARCH3_WAV).await,
             blip::audio::load_sound(MARCH4_WAV).await,
         ],
+        laser_charge: blip::audio::load_sound(LASER_CHARGE_WAV).await,
+        laser_blast:  blip::audio::load_sound(LASER_BLAST_WAV).await,
     };
     let music = [
         blip::audio::load_sound(MUSIC_WAV).await,

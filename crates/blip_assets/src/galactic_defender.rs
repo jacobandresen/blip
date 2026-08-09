@@ -6,7 +6,7 @@ use std::f32::consts::PI;
 
 use crate::image::Image;
 use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng, MIX_KNEE};
-use crate::wav::{encode_pcm16_mono, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::wav::{encode_pcm16_mono, mix_into, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 // Must match crates/galactic_defender/src/main.rs's ALIEN_W / ALIEN_H.
@@ -277,6 +277,66 @@ fn ufo_siren() -> Vec<u8> {
     encode_pcm16_mono(&s)
 }
 
+/// The UFO's death-laser "powering up" — an accelerating, ever-louder rising
+/// whine with a fast tremolo that speeds up as it approaches full charge, so
+/// the sound itself communicates urgency before the beam ever fires.
+fn laser_charge_sfx() -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let dur_ms = 1600.0;
+    let n = ms_to_samples(dur_ms);
+    let mut s = Vec::with_capacity(n);
+    let mut phase = 0.0_f32;
+    for i in 0..n {
+        let t = i as f32 / n as f32; // 0..1 progress through the charge
+        let t_sec = i as f32 / sr;
+        let freq = 160.0 + 1300.0 * t * t;
+        phase += freq / sr;
+        let fund = (2.0 * PI * phase).sin();
+        let third = (2.0 * PI * phase * 1.5).sin() * 0.3; // dissonant edge
+        let trem_rate = 6.0 + 22.0 * t; // tremolo accelerates as it charges
+        let trem = 0.7 + 0.3 * (2.0 * PI * trem_rate * t_sec).sin();
+        let amp = 0.2 + 0.8 * t;
+        let shaped = (fund * 0.8 + third * 0.3).tanh();
+        s.push((shaped * trem * amp * 22000.0) as i16);
+    }
+    encode_pcm16_mono(&s)
+}
+
+/// The laser blast itself — a bright descending zap, a heavy sub-bass thump,
+/// and a harsh noise crackle layered together for maximum "very dramatic"
+/// impact. Deliberately driven hot; a little clipping suits a superweapon.
+fn laser_blast_sfx() -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let n = ms_to_samples(550.0);
+    let mut buf = vec![0i16; n];
+    let mut rng = Rng(0x1A5E_2000);
+
+    // Bright descending zap.
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let e = (1.0 - i as f32 / n as f32).powf(1.2);
+        let freq = 2200.0 * (-t / 0.15).exp() + 220.0;
+        let w = (2.0 * PI * freq * t).sin();
+        mix_into(&mut buf, i, w * e * 16000.0);
+    }
+    // Sub-bass thump for weight.
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let e = (1.0 - i as f32 / n as f32).powf(1.6);
+        let freq = 26.0 + 70.0 * (-t / 0.08).exp();
+        let w = (2.0 * PI * freq * t).sin();
+        mix_into(&mut buf, i, w * e * 20000.0);
+    }
+    // Harsh noise crackle up front.
+    let crackle_n = n / 2;
+    for i in 0..crackle_n {
+        let e = (1.0 - i as f32 / crackle_n as f32).powf(2.0);
+        let noise = rng.next_f32() * 2.0 - 1.0;
+        mix_into(&mut buf, i, noise * e * 9000.0);
+    }
+    encode_pcm16_mono(&buf)
+}
+
 /// One ominous thumping march step — a low pitch-swept thud with a driven
 /// sub-octave layer for extra weight. Four of these at descending base
 /// frequencies (classic Space Invaders "duh-duh-duh-duh") cycle as the
@@ -537,6 +597,8 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/march4.wav",      march_thump(70.0)),
         ("sounds/level_clear.wav", level_clear_sfx()),
         ("sounds/ufo_siren.wav",   ufo_siren()),
+        ("sounds/laser_charge.wav", laser_charge_sfx()),
+        ("sounds/laser_blast.wav",  laser_blast_sfx()),
         ("sounds/music.wav",       music()),
         ("sounds/music2.wav",      music2()),
         ("sounds/music3.wav",      music3()),
