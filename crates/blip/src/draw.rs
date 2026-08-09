@@ -34,9 +34,35 @@ pub fn draw_line(x1: f32, y1: f32, x2: f32, y2: f32, c: Color) {
     mq_draw_line(x1, y1, x2, y2, 1.0, c);
 }
 
+/// Draw a line of arbitrary thickness between two points.
+#[inline]
+pub fn draw_line_ex(x1: f32, y1: f32, x2: f32, y2: f32, thickness: f32, c: Color) {
+    mq_draw_line(x1, y1, x2, y2, thickness, c);
+}
+
+/// Draw a neon-style glowing line: a soft wide halo under a bright hairline core.
+/// Use for vector silhouettes that should read as "lit up" against a black background.
+pub fn draw_glow_line(x1: f32, y1: f32, x2: f32, y2: f32, c: Color) {
+    let halo = Color { a: c.a * 0.16, ..c };
+    mq_draw_line(x1, y1, x2, y2, 6.0, halo);
+    let mid = Color { a: c.a * 0.35, ..c };
+    mq_draw_line(x1, y1, x2, y2, 2.5, mid);
+    mq_draw_line(x1, y1, x2, y2, 1.0, c);
+}
+
 /// Draw a solid filled circle. (`cx`, `cy`) is the centre.
 #[inline]
 pub fn fill_circle(cx: f32, cy: f32, r: f32, c: Color) {
+    draw_circle(cx, cy, r, c);
+}
+
+/// Draw a soft glowing circle: a faint wide halo under a bright core. Good for thruster
+/// flames, muzzle flashes, and other small neon-lit particles.
+pub fn fill_glow_circle(cx: f32, cy: f32, r: f32, c: Color) {
+    let halo = Color { a: c.a * 0.15, ..c };
+    draw_circle(cx, cy, r * 2.6, halo);
+    let mid = Color { a: c.a * 0.35, ..c };
+    draw_circle(cx, cy, r * 1.5, mid);
     draw_circle(cx, cy, r, c);
 }
 

@@ -19,3 +19,14 @@ pub const BLIP_YELLOW:   Color = rgb(230, 220,  50); // score, coins, highlights
 pub const BLIP_ORANGE:   Color = rgb(230, 130,  20); // HUD "LIVES" label, fire
 pub const BLIP_GRAY:     Color = rgb(120, 120, 120); // inactive / dim text
 pub const BLIP_DARKGRAY: Color = rgb( 50,  50,  50); // separator lines, shadows
+
+// ---- neon accents — saturated, high-voltage versions for glow effects and modern accents.
+// Use sparingly against BLIP_BLACK: a neon-outlined player ship, a synthwave horizon line,
+// a title-screen highlight. Pair with `Blip::draw_glow_line` / `fill_glow_circle` for the halo.
+pub const NEON_CYAN:    Color = rgb(  0, 255, 255); // player craft, glow trails
+pub const NEON_MAGENTA: Color = rgb(255,   0, 220); // hostiles, danger accents
+pub const NEON_PINK:    Color = rgb(255,  20, 147); // hit flashes, UI highlights
+pub const NEON_PURPLE:  Color = rgb(170,  60, 255); // horizon grids, background accents
+pub const NEON_GREEN:   Color = rgb(140, 255,  60); // pickups, go signals
+pub const NEON_ORANGE:  Color = rgb(255, 120,   0); // thrust, fire, explosions
+pub const NEON_YELLOW:  Color = rgb(255, 230,   0); // score pops, bullets

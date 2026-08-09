@@ -12,8 +12,8 @@ use blip::input::{
 use blip::macroquad::rand::gen_range;
 use blip::{
     play_music, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, web, window_conf, Blip,
-    BlipColor, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_GRAY, BLIP_MAGENTA, BLIP_RED,
-    BLIP_WHITE, BLIP_YELLOW,
+    BlipColor, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
+    NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
 };
 
 // ---- layout -------------------------------------------------------------
@@ -506,16 +506,16 @@ fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, color: BlipColor) {
     let left = (ship.x - fwd.0 * 10.0 - side.0 * 9.0, ship.y - fwd.1 * 10.0 - side.1 * 9.0);
     let right = (ship.x - fwd.0 * 10.0 + side.0 * 9.0, ship.y - fwd.1 * 10.0 + side.1 * 9.0);
     let tail = (ship.x - fwd.0 * 4.0, ship.y - fwd.1 * 4.0);
-    blip.draw_line(nose.0, nose.1, left.0, left.1, color);
-    blip.draw_line(left.0, left.1, tail.0, tail.1, color);
-    blip.draw_line(tail.0, tail.1, right.0, right.1, color);
-    blip.draw_line(right.0, right.1, nose.0, nose.1, color);
+    blip.draw_glow_line(nose.0, nose.1, left.0, left.1, color);
+    blip.draw_glow_line(left.0, left.1, tail.0, tail.1, color);
+    blip.draw_glow_line(tail.0, tail.1, right.0, right.1, color);
+    blip.draw_glow_line(right.0, right.1, nose.0, nose.1, color);
 
     if ship.thrusting {
         let flick = rand_range(0.5, 1.0);
         let flame = (ship.x - fwd.0 * (10.0 + 10.0 * flick), ship.y - fwd.1 * (10.0 + 10.0 * flick));
-        blip.draw_line(left.0, left.1, flame.0, flame.1, BLIP_YELLOW);
-        blip.draw_line(right.0, right.1, flame.0, flame.1, BLIP_YELLOW);
+        blip.draw_glow_line(left.0, left.1, flame.0, flame.1, NEON_ORANGE);
+        blip.draw_glow_line(right.0, right.1, flame.0, flame.1, NEON_ORANGE);
     }
 }
 
@@ -534,7 +534,7 @@ fn draw_asteroid(blip: &Blip, a: &Asteroid) {
         let rr = r * a.jag[idx];
         let pt = (a.x + ang.cos() * rr, a.y + ang.sin() * rr);
         if let Some(p) = prev {
-            blip.draw_line(p.0, p.1, pt.0, pt.1, BLIP_WHITE);
+            blip.draw_glow_line(p.0, p.1, pt.0, pt.1, NEON_PURPLE);
         }
         prev = Some(pt);
     }
@@ -558,7 +558,28 @@ fn draw_saucer(blip: &Blip, s: &Saucer) {
     for i in 0..pts.len() {
         let p0 = pts[i];
         let p1 = pts[(i + 1) % pts.len()];
-        blip.draw_line(p0.0, p0.1, p1.0, p1.1, BLIP_MAGENTA);
+        blip.draw_glow_line(p0.0, p0.1, p1.0, p1.1, NEON_PINK);
+    }
+}
+
+/// A receding synthwave horizon grid — used only on the title/game-over menu
+/// screens so the vector gameplay itself stays clean and readable.
+fn draw_horizon_grid(blip: &Blip, y0: f32, y1: f32) {
+    let cx = WIN_W as f32 / 2.0;
+    let rows = 7;
+    for i in 0..=rows {
+        let t = i as f32 / rows as f32;
+        let y = y0 + (y1 - y0) * t * t; // ease toward the horizon
+        let half_w = cx * (0.15 + 0.85 * t);
+        let a = 0.10 + 0.35 * t;
+        let c = BlipColor { a, ..NEON_PURPLE };
+        blip.draw_line(cx - half_w, y, cx + half_w, y, c);
+    }
+    let verges = [-1.0_f32, -0.5, 0.5, 1.0];
+    for v in verges {
+        let top = (cx + cx * 0.15 * v, y0);
+        let bot = (cx + cx * v, y1);
+        blip.draw_line(top.0, top.1, bot.0, bot.1, BlipColor { a: 0.20, ..NEON_PURPLE });
     }
 }
 
@@ -567,11 +588,11 @@ fn draw_play(blip: &Blip, g: &Game) {
     for a in pool_iter(&g.asteroids) { draw_asteroid(blip, a); }
     if g.saucer.active { draw_saucer(blip, &g.saucer); }
     for b in pool_iter(&g.bullets) {
-        let c = if b.from_player { BLIP_WHITE } else { BLIP_RED };
-        blip.fill_circle(b.x, b.y, 2.0, c);
+        let c = if b.from_player { NEON_YELLOW } else { NEON_PINK };
+        blip.fill_glow_circle(b.x, b.y, 2.0, c);
     }
     if g.ship_alive {
-        draw_ship(blip, &g.ship, g.invuln_t, BLIP_WHITE);
+        draw_ship(blip, &g.ship, g.invuln_t, NEON_CYAN);
     }
     blip.draw_hud(g.sess.score, g.sess.lives);
     let lvl = format!("LEVEL {}", g.sess.level);
@@ -580,8 +601,9 @@ fn draw_play(blip: &Blip, g: &Game) {
 
 fn draw_title(blip: &Blip) {
     blip.clear(BLIP_BLACK);
-    blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, BLIP_WHITE);
-    blip.draw_centered("PRESS ANY KEY", (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
+    draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
+    blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, NEON_CYAN);
+    blip.draw_centered("PRESS ANY KEY", (WIN_H / 2) as f32, 3.0, NEON_YELLOW);
     blip.draw_centered("ARROWS/WASD ROTATE+THRUST", (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
     blip.draw_centered("SPACE FIRE  ·  Z HYPERSPACE", (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);
 }
@@ -589,9 +611,10 @@ fn draw_title(blip: &Blip) {
 fn draw_over(blip: &Blip, score: i32) {
     let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
-    blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
+    draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
+    blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, NEON_PINK);
     blip.draw_centered(&buf, (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
-    blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
+    blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, NEON_YELLOW);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -599,6 +622,9 @@ fn conf() -> blip::macroquad::window::Conf {
 }
 
 const TECHNO_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno.wav"));
+const FIRE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/fire.wav"));
+const SHIP_EXPLOSION_WAV: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ship_explosion.wav"));
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -609,14 +635,14 @@ async fn main() {
     play_music(&techno);
 
     let mut sfx = Sounds {
-        fire:         blip::audio::beep(1100.0, 60.0).await,
+        fire:         blip::audio::load_sound(FIRE_WAV).await,
         thrust:       blip::audio::beep(90.0, 90.0).await,
         bang_large:   blip::audio::beep(120.0, 190.0).await,
         bang_medium:  blip::audio::beep(220.0, 150.0).await,
         bang_small:   blip::audio::beep(380.0, 110.0).await,
         saucer_big:   blip::audio::beep(200.0, 300.0).await,
         saucer_small: blip::audio::beep(520.0, 220.0).await,
-        ship_boom:    blip::audio::beep(80.0, 550.0).await,
+        ship_boom:    blip::audio::load_sound(SHIP_EXPLOSION_WAV).await,
         hyperspace:   blip::audio::beep(1300.0, 80.0).await,
         extra_life:   blip::audio::beep(880.0, 220.0).await,
     };

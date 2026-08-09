@@ -371,10 +371,27 @@ impl Blip {
     pub fn draw_line(&self, x1: f32, y1: f32, x2: f32, y2: f32, c: Color) {
         draw::draw_line(x1, y1, x2, y2, c);
     }
+    /// Draw a line of arbitrary thickness between two points.
+    #[inline]
+    pub fn draw_line_ex(&self, x1: f32, y1: f32, x2: f32, y2: f32, thickness: f32, c: Color) {
+        draw::draw_line_ex(x1, y1, x2, y2, thickness, c);
+    }
+    /// Draw a neon glowing line — a soft halo under a bright core. Use for vector
+    /// silhouettes (ship outlines, asteroid edges) that should read as "lit up".
+    #[inline]
+    pub fn draw_glow_line(&self, x1: f32, y1: f32, x2: f32, y2: f32, c: Color) {
+        draw::draw_glow_line(x1, y1, x2, y2, c);
+    }
     /// Draw a solid filled circle. (`cx`, `cy`) is the centre, `r` is the radius.
     #[inline]
     pub fn fill_circle(&self, cx: f32, cy: f32, r: f32, c: Color) {
         draw::fill_circle(cx, cy, r, c);
+    }
+    /// Draw a soft glowing circle — halo under a bright core. Good for thruster flames,
+    /// muzzle flashes, and explosion particles.
+    #[inline]
+    pub fn fill_glow_circle(&self, cx: f32, cy: f32, r: f32, c: Color) {
+        draw::fill_glow_circle(cx, cy, r, c);
     }
     /// Draw a texture stretched to fill the given rectangle.
     #[inline]
