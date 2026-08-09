@@ -54,6 +54,14 @@ const BALL_SLOW_FACTOR: f32 = 0.6;
 const LIVES_START: i32 = 3;
 const SPEED_INC: f32 = 18.0;
 
+// ---- screwball spin -----------------------------------------------------
+// Hitting the ball while the paddle is moving fast puts a spin on it — the
+// faster the paddle, the sharper the curve. A stationary or slow-moving
+// paddle produces a plain straight shot.
+const SCREW_MIN_PAD_SPEED: f32 = 30.0; // below this, no spin at all
+const SCREW_MAX_SPIN_RATE: f32 = 3.2;  // radians/sec of curve at full paddle speed
+const SCREW_SPIN_DECAY: f32 = 0.55;    // spin bleeds off per second of flight
+
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Launch, Play, Dead, Win, Over }
 
@@ -77,10 +85,12 @@ struct Game {
     drops: [Drop; MAX_DROPS],
     pad_x: f32,
     pad_w: f32,
+    pad_vx: f32,
     pad_effect_timer: Timer,
     slow_timer: Timer,
     ball_x: f32, ball_y: f32,
     ball_vx: f32, ball_vy: f32,
+    ball_spin: f32,
     ball_speed: f32,
     sess: Session,
     dead_timer: Timer,
@@ -94,9 +104,11 @@ impl Game {
             drops: [DEAD_DROP; MAX_DROPS],
             pad_x: 0.0,
             pad_w: PAD_W as f32,
+            pad_vx: 0.0,
             pad_effect_timer: Timer::default(),
             slow_timer: Timer::default(),
             ball_x: 0.0, ball_y: 0.0, ball_vx: 0.0, ball_vy: 0.0,
+            ball_spin: 0.0,
             ball_speed: BALL_SPEED_0,
             sess: Session::new(LIVES_START),
             dead_timer: Timer::default(),
@@ -150,6 +162,7 @@ impl Game {
         let angle = -1.1 + r01 * 0.2;
         self.ball_vx = self.ball_speed * (angle + PI / 2.0).cos();
         self.ball_vy = -self.ball_speed;
+        self.ball_spin = 0.0;
     }
 
     fn start_game(&mut self) {
@@ -185,10 +198,14 @@ fn update_title(g: &mut Game) {
 }
 
 fn paddle_input(g: &mut Game, dt: f32) {
+    let prev_x = g.pad_x;
     let ps = PAD_SPEED * dt;
     if key_held(BLIP_KEY_LEFT)  || key_held(BLIP_KEY_A) { g.pad_x -= ps; }
     if key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D) { g.pad_x += ps; }
     g.pad_x = clamp(g.pad_x, 0.0, WIN_W as f32 - g.pad_w);
+    // Actual on-screen speed this frame — reads as zero if held against a wall,
+    // even with a direction key down, since the paddle isn't really moving.
+    g.pad_vx = if dt > 0.0 { (g.pad_x - prev_x) / dt } else { 0.0 };
 }
 
 fn update_launch(g: &mut Game, dt: f32) {
@@ -202,6 +219,19 @@ fn update_launch(g: &mut Game, dt: f32) {
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     paddle_input(g, dt);
+
+    // Screwball curve: rotate the ball's velocity vector (this preserves its
+    // speed — only the direction bends) by the current spin rate, then let
+    // the spin bleed off over time so the curve eases out rather than
+    // looping forever.
+    if g.ball_spin.abs() > 0.001 {
+        let ang = g.ball_spin * dt;
+        let (s, c) = ang.sin_cos();
+        let (vx, vy) = (g.ball_vx, g.ball_vy);
+        g.ball_vx = vx * c - vy * s;
+        g.ball_vy = vx * s + vy * c;
+        g.ball_spin *= (1.0 - SCREW_SPIN_DECAY * dt).max(0.0);
+    }
 
     g.ball_x += g.ball_vx * dt;
     g.ball_y += g.ball_vy * dt;
@@ -248,6 +278,16 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.ball_vy = -active_speed * 0.3;
         }
         g.ball_y = (PAD_Y - BALL_H - 1) as f32;
+
+        // Screwball: a fast-moving paddle at contact puts a curve on the
+        // ball, proportional to how fast it was moving; a slow or
+        // stationary paddle sends it out in a plain straight line.
+        g.ball_spin = if g.pad_vx.abs() > SCREW_MIN_PAD_SPEED {
+            let t = (g.pad_vx.abs() / PAD_SPEED).min(1.0);
+            g.pad_vx.signum() * t * SCREW_MAX_SPIN_RATE
+        } else {
+            0.0
+        };
     }
 
     for i in 0..BRICK_TOTAL {
