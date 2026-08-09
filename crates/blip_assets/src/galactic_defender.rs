@@ -10,8 +10,8 @@ use crate::wav::{encode_pcm16_mono, ms_to_samples, soft_limit_to_pcm16, SAMPLE_R
 use crate::Asset;
 
 // Must match crates/galactic_defender/src/main.rs's ALIEN_W / ALIEN_H.
-const ALIEN_W: i32 = 40;
-const ALIEN_H: i32 = 30;
+const ALIEN_W: i32 = 36;
+const ALIEN_H: i32 = 28;
 
 fn gen_tone(freq: f32, dur_ms: f32, amp: f32) -> Vec<i16> {
     let sr = SAMPLE_RATE as f32;
@@ -83,10 +83,21 @@ fn player_ship() -> Vec<u8> {
     img.encode_png()
 }
 
-/// A gnarly, larger alien glyph — a 7x7 bitmap scaled up, with a second
-/// animation frame per kind (mandibles/claws/tentacles/legs shift) for the
-/// classic two-frame march-cycle look, just bigger and spikier than before.
-/// `frame` is 0 or 1.
+/// Turn a 9-character '0'/'1' string into a 9-bit row mask (MSB = leftmost).
+fn row(s: &str) -> u16 {
+    let mut v = 0u16;
+    for (i, c) in s.bytes().enumerate() {
+        if c == b'1' {
+            v |= 1 << (8 - i);
+        }
+    }
+    v
+}
+
+/// A gnarly alien glyph — a 9x8 bitmap (finer than the old 5x5/7x7 versions,
+/// so there's room for real detail at a smaller footprint), with a second
+/// animation frame per kind (mandibles / claws / tentacles shift) for the
+/// classic two-frame march-cycle look. `frame` is 0 or 1.
 fn alien(kind: usize, frame: usize) -> Vec<u8> {
     let w: i32 = ALIEN_W;
     let h: i32 = ALIEN_H;
@@ -96,34 +107,51 @@ fn alien(kind: usize, frame: usize) -> Vec<u8> {
         1 => (0,    230, 230),
         _ => (110,  255, 110),
     };
-    // [frame A, frame B] — rows 0..3 (head/body) stay put, rows 4..6
-    // (mandibles / claws / tentacles / legs) swap between frames.
-    let patterns: [[u8; 7]; 2] = match kind {
+    // [frame A, frame B] — rows 0..4 (head/eyes/mandibles) stay put, rows
+    // 5..7 (legs / claws / tentacles) swap between frames.
+    let patterns: [[u16; 8]; 2] = match kind {
         0 => [
-            // Squid: antenna twitch + legs together / legs spread.
-            [0x08, 0x1C, 0x3E, 0x6B, 0x7F, 0x5D, 0x22],
-            [0x14, 0x1C, 0x3E, 0x6B, 0x7F, 0x41, 0x41],
+            // Squid: antenna nubs, jagged toothy mandible, legs together.
+            [row("001000100"), row("001111100"), row("011111110"),
+             row("111111111"), row("110111011"), row("011111110"),
+             row("101010101"), row("000101000")],
+            // ...antenna twitch inward, legs thrown wide apart.
+            [row("000101000"), row("001111100"), row("011111110"),
+             row("111111111"), row("110111011"), row("011111110"),
+             row("100000001"), row("010000010")],
         ],
         1 => [
-            // Crab: claws pulled in / claws thrown wide open.
-            [0x00, 0x1C, 0x3E, 0x7F, 0x5D, 0x6B, 0x14],
-            [0x00, 0x1C, 0x3E, 0x7F, 0x5D, 0x41, 0x14],
+            // Crab: flat head, ridged shell, pincers tucked in close.
+            [row("000000000"), row("000111000"), row("001111100"),
+             row("011111110"), row("111111111"), row("110111011"),
+             row("010000010"), row("000101000")],
+            // ...pincers thrown wide open, gnarly.
+            [row("000000000"), row("000111000"), row("001111100"),
+             row("011111110"), row("111111111"), row("110111011"),
+             row("100000001"), row("001000100")],
         ],
         _ => [
-            // Octopus: tentacles alternating like a wave.
-            [0x08, 0x1C, 0x3E, 0x7F, 0x3E, 0x55, 0x2A],
-            [0x08, 0x1C, 0x3E, 0x7F, 0x3E, 0x2A, 0x55],
+            // Octopus: round head, tentacle skirt waving one way...
+            [row("000000000"), row("000111000"), row("001111100"),
+             row("011111110"), row("111111111"), row("011111110"),
+             row("101010101"), row("010101010")],
+            // ...and the other, for a wavy crawl.
+            [row("000000000"), row("000111000"), row("001111100"),
+             row("011111110"), row("111111111"), row("011111110"),
+             row("010101010"), row("101010101")],
         ],
     };
     let pattern = patterns[frame];
-    let cell = 4;
-    let ox = (w - 7 * cell) / 2;
-    let oy = (h - 7 * cell) / 2;
-    for row in 0..7 {
-        for col in 0..7 {
-            if pattern[row] & (1 << (6 - col)) != 0 {
-                let px_x = ox + col as i32 * cell;
-                let px_y = oy + row as i32 * cell;
+    let cell = 3;
+    let cols = 9;
+    let rows = 8;
+    let ox = (w - cols * cell) / 2;
+    let oy = (h - rows * cell) / 2;
+    for ry in 0..rows {
+        for cx in 0..cols {
+            if pattern[ry as usize] & (1 << (cols - 1 - cx)) != 0 {
+                let px_x = ox + cx * cell;
+                let px_y = oy + ry * cell;
                 for dy in 0..cell {
                     for dx in 0..cell {
                         img.set(px_x + dx, px_y + dy, r, g, b);
@@ -132,10 +160,11 @@ fn alien(kind: usize, frame: usize) -> Vec<u8> {
             }
         }
     }
-    // Glowing eyes, offset slightly per frame for a menacing flicker.
-    let eye_y = oy + 3 * cell;
+    // Glowing eyes on the wide head row, offset slightly per frame for a
+    // menacing flicker.
+    let eye_y = oy + 3 * cell + 1;
     let eye_dx = if frame == 1 { 1 } else { 0 };
-    img.set(ox + cell - eye_dx,     eye_y, 255, 255, 255);
+    img.set(ox + 3 * cell - eye_dx, eye_y, 255, 255, 255);
     img.set(ox + 5 * cell + eye_dx, eye_y, 255, 255, 255);
     img.encode_png()
 }

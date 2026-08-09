@@ -23,12 +23,12 @@ const PLAY_Y: i32 = HUD_H;
 const GROUND_Y: i32 = WIN_H - 32;
 
 // ---- alien grid -------------------------------------------------------
-const ALIEN_COLS: i32 = 10; // max across all themes (theme 2 uses 10)
+const ALIEN_COLS: i32 = 11; // max across all themes (theme 2 uses 11)
 const ALIEN_ROWS: i32 = 6;  // max across all themes (theme 1 uses 6)
-const ALIEN_W: i32 = 40;
-const ALIEN_H: i32 = 30;
-const ALIEN_XGAP: i32 = 6;
-const ALIEN_YGAP: i32 = 10;
+const ALIEN_W: i32 = 36;
+const ALIEN_H: i32 = 28;
+const ALIEN_XGAP: i32 = 5;
+const ALIEN_YGAP: i32 = 8;
 const ALIEN_TOTAL: usize = (ALIEN_COLS * ALIEN_ROWS) as usize;
 
 // ---- tuning -----------------------------------------------------------
@@ -195,11 +195,11 @@ impl Game {
         // Level 1 gets a smaller formation than a later trip through theme 0,
         // so a first-time player isn't faced with a full 5x11 wall immediately.
         let (rows, cols) = match theme {
-            0 => (if self.sess.level == 1 { 4 } else { 5 }, 9_i32),
-            1 => (6,     9),
-            2 => (3,     10),
-            3 => (4,     9),
-            _ => (6,     7),
+            0 => (if self.sess.level == 1 { 4 } else { 5 }, 10_i32),
+            1 => (6,     10),
+            2 => (3,     11),
+            3 => (4,     10),
+            _ => (6,     8),
         };
         self.bomb_speed = match theme { 0 => 160.0, 1 => 200.0, 2 => 250.0, 3 => 220.0, _ => 280.0 };
         // Bomb intervals tighten each level (capped at level 6 equivalent).
