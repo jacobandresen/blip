@@ -127,9 +127,10 @@ function insertCoin() {
  * kiosk landing page (which uses them to move the card selection).
  */
 function pollGamepad(onDown, onUp) {
+  if (!navigator.getGamepads) return;
+
   var DEADZONE = 0.25;
   var held = {};
-  var polling = false;
 
   var BTN_MAP = [
     { idx: 0,  code: 'Space'      },  // A / Cross   — Button 1
@@ -143,40 +144,47 @@ function pollGamepad(onDown, onUp) {
     { idx: 15, code: 'ArrowRight' },
   ];
 
-  function tick() {
-    var pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    var pad = null;
+  function findPad() {
+    var pads = navigator.getGamepads();
     for (var i = 0; i < pads.length; i++) {
-      if (pads[i] && pads[i].connected) { pad = pads[i]; break; }
+      if (pads[i] && pads[i].connected) return pads[i];
     }
-    if (!pad) { polling = false; return; }
+    return null;
+  }
 
-    var want = {};
-    for (var j = 0; j < BTN_MAP.length; j++) {
-      var m = BTN_MAP[j];
-      var b = pad.buttons[m.idx];
-      if (b && (b.pressed || b.value > 0.5)) want[m.code] = true;
-    }
-    var ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
-    if (ax < -DEADZONE) want['ArrowLeft']  = true;
-    if (ax >  DEADZONE) want['ArrowRight'] = true;
-    if (ay < -DEADZONE) want['ArrowUp']    = true;
-    if (ay >  DEADZONE) want['ArrowDown']  = true;
+  // Don't gate polling on the 'gamepadconnected' event — many browsers
+  // (notably Chrome on Linux) never fire it for generic/non-standard
+  // joysticks, even though navigator.getGamepads() reports them fine once
+  // a button has been pressed. Poll unconditionally instead; it's a cheap
+  // native call and requestAnimationFrame self-throttles to the display
+  // refresh rate, so there's no meaningful cost while nothing is connected.
+  function tick() {
+    var pad = findPad();
+    if (pad) {
+      var want = {};
+      for (var j = 0; j < BTN_MAP.length; j++) {
+        var m = BTN_MAP[j];
+        var b = pad.buttons[m.idx];
+        if (b && (b.pressed || b.value > 0.5)) want[m.code] = true;
+      }
+      var ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
+      if (ax < -DEADZONE) want['ArrowLeft']  = true;
+      if (ax >  DEADZONE) want['ArrowRight'] = true;
+      if (ay < -DEADZONE) want['ArrowUp']    = true;
+      if (ay >  DEADZONE) want['ArrowDown']  = true;
 
-    var code;
-    for (code in want) {
-      if (!held[code]) { held[code] = true; onDown(code); }
+      var code;
+      for (code in want) {
+        if (!held[code]) { held[code] = true; onDown(code); }
+      }
+      for (code in held) {
+        if (held[code] && !want[code]) { held[code] = false; onUp(code); }
+      }
     }
-    for (code in held) {
-      if (held[code] && !want[code]) { held[code] = false; onUp(code); }
-    }
-
     requestAnimationFrame(tick);
   }
 
-  window.addEventListener('gamepadconnected', function () {
-    if (!polling) { polling = true; requestAnimationFrame(tick); }
-  });
+  requestAnimationFrame(tick);
 }
 
 // iOS suspends AudioContext on load and re-suspends after backgrounding.
