@@ -5,7 +5,7 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng, MIX_KNEE};
+use crate::techno::{bass_note, clap, hat, kick, open_hat, sidechain_duck, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, env, mix_into_f32, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
@@ -155,11 +155,16 @@ fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
 
 const BPM: f32 = 126.0;
 const STEPS_PER_BAR: usize = 16;
-const BARS: usize = 8;
+const BARS: usize = 16;
+const LIFT_BAR: usize = BARS / 2;
 const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
 
 /// A bouncy tech-house banger: four-on-the-floor kick, backbeat claps,
-/// off-beat hats, a springy staccato bassline, and a playful pluck hook.
+/// off-beat hats, a springy staccato bassline, and one catchy pluck hook
+/// repeated every bar over a simple C-F vamp — the same riff throughout is
+/// what makes it stick, not a new melody every couple of bars. The back
+/// half (~every 30s) adds an octave-up pluck harmony and an extra open hat
+/// for a small lift.
 fn music() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let step_ms = 60_000.0 / BPM / 4.0;
@@ -167,28 +172,25 @@ fn music() -> Vec<u8> {
     let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
     let mut rng = Rng(0xB0DE_1234);
+    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 4);
 
-    // C-major-ish bouncy bass roots, one per 2-bar section: C3 - E3 - F3 - G3.
-    let bass_roots = [130.81_f32, 164.81, 174.61, 196.00];
+    // C - F, a two-chord vamp, one root every 2 bars.
+    let bass_roots = [130.81_f32, 174.61]; // C3, F3
     const BASS_HIT: [bool; STEPS_PER_BAR] = [
         true, false, false, true, false, true, false, false,
         true, false, false, true, false, true, false, true,
     ];
-    // Pluck hook cycling every 2 bars — a bright, bouncy C-major arpeggio fragment.
-    let hook_notes: [&[f32]; 4] = [
-        &[523.25, 659.25, 783.99],
-        &[659.25, 783.99, 880.00],
-        &[698.46, 880.00, 1046.50],
-        &[783.99, 659.25, 523.25],
-    ];
+    // The hook: a bright three-note pluck riff, identical every bar.
+    const HOOK: [f32; 3] = [523.25, 659.25, 783.99]; // C5 E5 G5
 
     for step in 0..TOTAL_STEPS {
         let bar = step / STEPS_PER_BAR;
         let pos = step % STEPS_PER_BAR;
         let off = step * step_samples;
+        let lifted = bar >= LIFT_BAR;
 
         if pos % 4 == 0 {
-            kick(&mut buf, off, 0.92);
+            kick_offsets.push(off);
         }
         if pos == 4 || pos == 12 {
             clap(&mut buf, off, &mut rng, 0.55);
@@ -196,23 +198,26 @@ fn music() -> Vec<u8> {
         if pos % 2 == 1 {
             hat(&mut buf, off, &mut rng, 0.24);
         }
-        if bar % 2 == 1 && pos == 14 {
+        if (bar % 2 == 1 && pos == 14) || (lifted && pos == 6) {
             open_hat(&mut buf, off, &mut rng, 0.20);
         }
         if BASS_HIT[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
             bass_note(&mut buf, off, root, step_ms * 0.7, 0.58);
         }
-        // Pluck hook: three quick notes starting on the "and" of beat 3 every other bar.
-        if bar % 2 == 0 && (pos == 10 || pos == 11 || pos == 12) {
-            let notes = hook_notes[(bar / 2) % hook_notes.len()];
-            let idx = (pos - 10) as usize;
-            pluck(&mut buf, off, notes[idx], step_ms * 1.4, 0.22);
+        // Pluck hook: three quick notes starting on the "and" of beat 3, every bar.
+        if pos == 10 || pos == 11 || pos == 12 {
+            let note = HOOK[(pos - 10) as usize];
+            pluck(&mut buf, off, note, step_ms * 1.4, 0.22);
+            if lifted {
+                pluck(&mut buf, off, note * 2.0, step_ms * 1.4, 0.12);
+            }
         }
-        // Tension stab on the downbeat of every 4th bar, building energy.
-        if bar % 4 == 3 && pos == 0 {
-            lead_stab(&mut buf, off, 392.00, step_ms * 6.0, 0.18);
-        }
+    }
+
+    sidechain_duck(&mut buf, &kick_offsets, 0.55, step_ms * 0.85);
+    for &off in &kick_offsets {
+        kick(&mut buf, off, 0.92);
     }
 
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))

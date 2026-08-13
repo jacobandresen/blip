@@ -5,7 +5,9 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng, MIX_KNEE};
+use crate::techno::{
+    bass_note, clap, hat, kick, lead_stab, open_hat, sidechain_duck, supersaw, Rng, MIX_KNEE,
+};
 use crate::wav::{encode_pcm16_mono, mix_into, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
@@ -413,82 +415,156 @@ fn shield_block() -> Vec<u8> {
     img.encode_png()
 }
 
-/// Shared step-sequenced techno renderer for the title and pursuit loops.
-/// `bass_hit` marks which 16th steps in the bar trigger a bass note;
-/// `bass_roots` cycle every 2 bars; hat/clap density scales with `energy`.
-fn techno_loop(
-    bpm: f32,
-    bars: usize,
-    bass_roots: &[f32],
-    bass_hit: &[bool; 16],
-    stab_note: f32,
-    energy: f32,
-    seed: u32,
-) -> Vec<u8> {
+/// Title/default loop — a simple, catchy trance groove at 138 BPM: one
+/// unchanging 1-bar hook riff repeated straight through over a 2-chord
+/// (Am-F) vamp, four-on-the-floor kick, and the sidechain pump. No
+/// breakdown/buildup detour — the hook is what makes it stick, and it needs
+/// to be heard right away and often. The back half (~every 30s) lifts with
+/// an octave-up harmony on the hook and a busier percussion layer, so the
+/// loop doesn't feel completely static on repeat.
+fn music() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
+    let bpm = 138.0_f32;
+    let bars = 16;
+    let lift_bar = bars / 2;
     let steps_per_bar = 16;
     let total_steps = bars * steps_per_bar;
     let step_ms = 60_000.0 / bpm / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
-    let mut rng = Rng(seed);
+    let mut rng = Rng(0xD0D0_1000);
+    let mut kick_offsets = Vec::new();
+
+    // Am - F, a two-chord vamp, one root every 2 bars.
+    let bass_roots = [110.00_f32, 87.31]; // A2, F2
+    const BASS_HIT: [bool; 16] = [
+        true, false, false, true, false, false, true, false,
+        true, false, false, true, false, true, false, false,
+    ];
+    // The hook: one 4-note riff on the beat, identical every single bar —
+    // repetition is what makes a hook catchy.
+    const HOOK: [f32; 4] = [440.00, 523.25, 659.25, 523.25]; // A4 C5 E5 C5
 
     for step in 0..total_steps {
         let bar = step / steps_per_bar;
         let pos = step % steps_per_bar;
         let off = step * step_samples;
+        let lifted = bar >= lift_bar;
 
         if pos % 4 == 0 {
-            kick(&mut buf, off, 0.9);
+            kick_offsets.push(off);
         }
         if pos == 4 || pos == 12 {
-            clap(&mut buf, off, &mut rng, 0.4 * energy);
+            clap(&mut buf, off, &mut rng, 0.42);
+        }
+        if lifted && pos == 8 {
+            clap(&mut buf, off, &mut rng, 0.30);
         }
         if pos % 2 == 1 {
-            hat(&mut buf, off, &mut rng, 0.20 * energy);
+            hat(&mut buf, off, &mut rng, 0.20);
         }
-        if energy > 1.2 && (pos == 6 || pos == 14) {
-            open_hat(&mut buf, off, &mut rng, 0.16);
+        if pos == 14 || (lifted && pos == 6) {
+            open_hat(&mut buf, off, &mut rng, 0.14);
         }
-        if bass_hit[pos] {
+        if BASS_HIT[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 0.7, 0.60);
+            bass_note(&mut buf, off, root, step_ms * 0.7, 0.58);
         }
-        if bar % 2 == 1 && pos == 0 {
-            lead_stab(&mut buf, off, stab_note, step_ms * 5.0, 0.18 * energy.min(1.4));
+        if pos % 4 == 0 {
+            supersaw(&mut buf, off, HOOK[pos / 4], step_ms * 3.5, 0.22, 8.0, 0.008);
+            if lifted {
+                supersaw(&mut buf, off, HOOK[pos / 4] * 2.0, step_ms * 3.5, 0.11, 8.0, 0.008);
+            }
         }
+    }
+
+    // Sidechain-duck the bass/hook under each kick, then lay the kicks in on
+    // top — the pumping four-on-the-floor feel of a real trance mix.
+    sidechain_duck(&mut buf, &kick_offsets, 0.55, step_ms * 0.85);
+    for &off in &kick_offsets {
+        kick(&mut buf, off, 0.9);
     }
 
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-/// Title/default loop — driving mid-tempo techno (~15.7 s @ 124 BPM, 8 bars).
-fn music() -> Vec<u8> {
-    const HIT: [bool; 16] = [
-        true, false, true, false, false, true, false, true,
-        true, false, false, true, false, true, false, true,
-    ];
-    // A-minor roots: A2 - D3 - C3 - D3.
-    techno_loop(124.0, 8, &[110.00, 146.83, 130.81, 146.83], &HIT, 440.00, 1.0, 0xD0D0_1000)
-}
-
-/// Fast pursuit loop — harder and denser (~13.8 s @ 142 BPM, 8 bars).
+/// Fast pursuit loop — the same idea, harder and faster: one driving 8th-note
+/// hook repeated every bar over a 140 BPM Dm-Bb groove. The back half
+/// (~every 30s) adds a 16th-note hat roll and an octave-up hook harmony.
 fn music2() -> Vec<u8> {
-    const HIT: [bool; 16] = [
+    let sr = SAMPLE_RATE as f32;
+    let bpm = 140.0_f32;
+    let bars = 18;
+    let lift_bar = bars / 2;
+    let steps_per_bar = 16;
+    let total_steps = bars * steps_per_bar;
+    let step_ms = 60_000.0 / bpm / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
+    let mut buf = vec![0f32; total];
+    let mut rng = Rng(0xD0D0_2000);
+    let mut kick_offsets = Vec::new();
+
+    // Dm - Bb, one root every 2 bars.
+    let bass_roots = [146.83_f32, 116.54]; // D3, Bb2
+    const BASS_HIT: [bool; 16] = [
         true, true, false, true, true, false, true, true,
         false, true, true, false, true, true, false, true,
     ];
-    // D-minor roots: D3 - F3 - Eb3 - F3.
-    techno_loop(142.0, 8, &[146.83, 174.61, 155.56, 174.61], &HIT, 523.25, 1.5, 0xD0D0_2000)
+    // The hook: one 8th-note riff, identical every bar.
+    const HOOK: [f32; 8] = [
+        587.33, 698.46, 880.00, 698.46, 587.33, 698.46, 880.00, 698.46, // D5 F5 A5 F5 ...
+    ];
+
+    for step in 0..total_steps {
+        let bar = step / steps_per_bar;
+        let pos = step % steps_per_bar;
+        let off = step * step_samples;
+        let lifted = bar >= lift_bar;
+
+        if pos % 4 == 0 {
+            kick_offsets.push(off);
+        }
+        if pos == 4 || pos == 12 {
+            clap(&mut buf, off, &mut rng, 0.5);
+        }
+        if pos % 2 == 1 || (lifted && pos % 2 == 0) {
+            hat(&mut buf, off, &mut rng, if pos % 2 == 1 { 0.26 } else { 0.14 });
+        }
+        if pos == 6 || pos == 14 {
+            open_hat(&mut buf, off, &mut rng, 0.18);
+        }
+        if BASS_HIT[pos] {
+            let root = bass_roots[(bar / 2) % bass_roots.len()];
+            bass_note(&mut buf, off, root, step_ms * 0.6, 0.62);
+        }
+        if pos % 2 == 0 {
+            supersaw(&mut buf, off, HOOK[pos / 2], step_ms * 1.7, 0.20, 5.0, 0.009);
+            if lifted {
+                supersaw(&mut buf, off, HOOK[pos / 2] * 2.0, step_ms * 1.7, 0.10, 5.0, 0.009);
+            }
+        }
+    }
+
+    sidechain_duck(&mut buf, &kick_offsets, 0.55, step_ms * 0.85);
+    for &off in &kick_offsets {
+        kick(&mut buf, off, 0.95);
+    }
+
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-/// Slow, dark dread loop — sparse kick, deep sub-bass drone, distant stabs
-/// (~19.5 s @ 100 BPM, 8 bars).
+/// Slow, dark dread loop — sparse kick, a deep sub-bass drone, and one
+/// simple two-note motif repeated every bar (the "hook", just ominous
+/// instead of uplifting) (~28.8 s @ 100 BPM, 12 bars). The back half
+/// (~every 30s) adds a wide-detune supersaw wash under the motif for extra
+/// unease.
 fn music3() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let bpm = 100.0_f32;
-    let bars = 8;
+    let bars = 12;
+    let lift_bar = bars / 2;
     let steps_per_bar = 16;
     let total_steps = bars * steps_per_bar;
     let step_ms = 60_000.0 / bpm / 4.0;
@@ -496,21 +572,26 @@ fn music3() -> Vec<u8> {
     let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
     let mut rng = Rng(0xD0D0_3000);
+    let mut kick_offsets = Vec::new();
 
-    // A1 - Bb1 - G1 - Bb1 sub-bass drone, one long note per bar.
-    let drone_roots = [55.00_f32, 58.27, 49.00, 58.27];
+    // A1 - Bb1 sub-bass drone, one long note every 2 bars.
+    let drone_roots = [55.00_f32, 58.27];
     const KICK_HIT: [bool; 16] = [
         true, false, false, false, false, false, true, false,
         false, false, true, false, false, false, false, false,
     ];
+    // The motif: a flat minor-second dyad, same every bar — dread's version
+    // of a hook, memorable because it never changes.
+    const MOTIF: [f32; 2] = [220.00, 233.08]; // A3, Bb3
 
     for step in 0..total_steps {
         let bar = step / steps_per_bar;
         let pos = step % steps_per_bar;
         let off = step * step_samples;
+        let lifted = bar >= lift_bar;
 
         if KICK_HIT[pos] {
-            kick(&mut buf, off, 0.8);
+            kick_offsets.push(off);
         }
         if pos == 8 {
             open_hat(&mut buf, off, &mut rng, 0.10);
@@ -519,9 +600,17 @@ fn music3() -> Vec<u8> {
             let root = drone_roots[(bar / 2) % drone_roots.len()];
             bass_note(&mut buf, off, root, step_ms * 8.0, 0.54);
         }
-        if bar % 4 == 2 && pos == 8 {
-            lead_stab(&mut buf, off, 220.0, step_ms * 6.0, 0.14);
+        if pos == 8 {
+            lead_stab(&mut buf, off, MOTIF[bar % 2], step_ms * 6.0, 0.14);
+            if lifted {
+                supersaw(&mut buf, off, MOTIF[bar % 2] * 2.0, step_ms * 6.0, 0.10, 400.0, 0.02);
+            }
         }
+    }
+
+    sidechain_duck(&mut buf, &kick_offsets, 0.5, step_ms * 3.0);
+    for &off in &kick_offsets {
+        kick(&mut buf, off, 0.8);
     }
 
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))

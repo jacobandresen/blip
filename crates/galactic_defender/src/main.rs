@@ -358,6 +358,7 @@ struct Sounds {
     march: [blip::BlipSound; 4],
     laser_charge: blip::BlipSound,
     laser_blast: blip::BlipSound,
+    game_over: blip::BlipSound,
 }
 
 const UFO_Y: f32 = (PLAY_Y + 8) as f32;
@@ -1048,13 +1049,14 @@ const MARCH1_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets
 const MARCH2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march2.wav"));
 const MARCH3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march3.wav"));
 const MARCH4_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march4.wav"));
+const GAME_OVER_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
 const MUSIC_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
 const MUSIC2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
 const MUSIC3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
 
 // Loop durations in seconds — used to switch tracks at loop boundaries.
-// music: 15.73s (124 BPM techno)  music2: 13.77s (142 BPM techno)  music3: 19.45s (100 BPM dread)
-const MUSIC_DURATIONS: [f32; 3] = [15.73, 13.77, 19.45];
+// music: 28.07s (138 BPM trance)  music2: 31.11s (140 BPM trance)  music3: 29.05s (100 BPM dread)
+const MUSIC_DURATIONS: [f32; 3] = [28.07, 31.11, 29.05];
 
 fn load_png(bytes: &'static [u8]) -> Texture2D {
     let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));
@@ -1095,6 +1097,7 @@ async fn main() {
         ],
         laser_charge: blip::audio::load_sound(LASER_CHARGE_WAV).await,
         laser_blast:  blip::audio::load_sound(LASER_BLAST_WAV).await,
+        game_over:    blip::audio::load_sound(GAME_OVER_WAV).await,
     };
     let music = [
         blip::audio::load_sound(MUSIC_WAV).await,
@@ -1128,12 +1131,16 @@ async fn main() {
             music_timer = MUSIC_DURATIONS[next];
             play_music(&music[next]);
         }
+        let prev_state = g.state;
         match g.state {
             State::Title => update_title(&mut g),
             State::Play  => update_play(&mut g, dt, &sfx),
             State::Dead  => update_dead(&mut g, dt),
             State::Win   => update_win(&mut g, dt),
             State::Over  => update_over(&mut g),
+        }
+        if prev_state != State::Over && g.state == State::Over {
+            play_sfx(&sfx.game_over);
         }
 
         blip.clear(BLIP_BLACK);

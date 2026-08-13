@@ -5,7 +5,7 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::techno::{bass_note, clap, hat, kick, lead_stab, open_hat, Rng, MIX_KNEE};
+use crate::techno::{bass_note, clap, hat, kick, open_hat, sidechain_duck, supersaw, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
@@ -76,51 +76,78 @@ fn food() -> Vec<u8> {
     img.encode_png()
 }
 
-/// Shared step-sequenced techno renderer for Serpent's three intensity tiers.
-/// `bass_hit` marks which 16th steps in the bar trigger a bass note;
-/// `bass_roots` cycle every 2 bars; hats/claps density scales with `energy`.
+/// Shared step-sequenced techno renderer for Serpent's three intensity
+/// tiers. `bass_hit` marks which 16th steps in the bar trigger a bass note;
+/// `bass_roots` (2 chords) alternate every 2 bars; `hook` is a 4-note riff
+/// repeated identically every bar — the same unchanging riff throughout is
+/// what makes each tier catchy rather than a new melody every few bars.
+/// Hats/claps density scales with `energy`. The back half of the loop
+/// (~every 30s) lifts with an octave-up hook harmony and a busier hat/clap
+/// layer.
 fn techno_loop(
     bpm: f32,
     bars: usize,
-    bass_roots: &[f32],
+    bass_roots: &[f32; 2],
     bass_hit: &[bool; 16],
-    stab_note: f32,
+    hook: &[f32; 4],
     energy: f32,
     seed: u32,
 ) -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let steps_per_bar = 16;
+    let lift_bar = bars / 2;
     let total_steps = bars * steps_per_bar;
     let step_ms = 60_000.0 / bpm / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
     let mut rng = Rng(seed);
+    let mut kick_offsets = Vec::with_capacity(total_steps / 4);
 
     for step in 0..total_steps {
         let bar = step / steps_per_bar;
         let pos = step % steps_per_bar;
         let off = step * step_samples;
+        let lifted = bar >= lift_bar;
 
         if pos % 4 == 0 {
-            kick(&mut buf, off, 0.9);
+            kick_offsets.push(off);
         }
         if pos == 4 || pos == 12 {
             clap(&mut buf, off, &mut rng, 0.4 * energy);
         }
+        if lifted && pos == 8 {
+            clap(&mut buf, off, &mut rng, 0.3 * energy);
+        }
         if pos % 2 == 1 {
             hat(&mut buf, off, &mut rng, 0.20 * energy);
         }
-        if energy > 1.1 && (pos == 6 || pos == 14) {
+        if (energy > 1.1 && (pos == 6 || pos == 14)) || (lifted && pos == 6) {
             open_hat(&mut buf, off, &mut rng, 0.16);
         }
         if bass_hit[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
             bass_note(&mut buf, off, root, step_ms * 0.7, 0.58);
         }
-        if bar % 2 == 1 && pos == 0 {
-            lead_stab(&mut buf, off, stab_note, step_ms * 5.0, 0.16 * energy.min(1.3));
+        if pos % 4 == 0 {
+            supersaw(&mut buf, off, hook[pos / 4], step_ms * 3.5, 0.18 * energy.min(1.3), 8.0, 0.008);
+            if lifted {
+                supersaw(
+                    &mut buf,
+                    off,
+                    hook[pos / 4] * 2.0,
+                    step_ms * 3.5,
+                    0.09 * energy.min(1.3),
+                    8.0,
+                    0.008,
+                );
+            }
         }
+    }
+
+    sidechain_duck(&mut buf, &kick_offsets, 0.55, step_ms * 0.85);
+    for &off in &kick_offsets {
+        kick(&mut buf, off, 0.9);
     }
 
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
@@ -132,7 +159,9 @@ fn slither() -> Vec<u8> {
         true, false, true, false, false, true, false, true,
         true, false, false, true, false, true, false, false,
     ];
-    techno_loop(120.0, 8, &[130.81, 174.61, 196.00, 164.81], &HIT, 392.00, 1.0, 0x5111_7000)
+    // C - F vamp; hook: C5 E5 G5 E5.
+    const HOOK: [f32; 4] = [523.25, 659.25, 783.99, 659.25];
+    techno_loop(120.0, 16, &[130.81, 174.61], &HIT, &HOOK, 1.0, 0x5111_7000)
 }
 
 /// Faster, darker minor-key loop — kicks in as the snake grows.
@@ -141,7 +170,9 @@ fn stalk() -> Vec<u8> {
         true, false, true, true, false, true, false, true,
         true, false, true, false, true, true, false, true,
     ];
-    techno_loop(132.0, 8, &[123.47, 155.56, 146.83, 155.56], &HIT, 349.23, 1.25, 0x57A1_4000)
+    // Fm - Bbm vamp; hook: F4 Ab4 C5 Ab4.
+    const HOOK: [f32; 4] = [349.23, 415.30, 523.25, 415.30];
+    techno_loop(132.0, 16, &[174.61, 233.08], &HIT, &HOOK, 1.25, 0x57A1_4000)
 }
 
 /// Hard, fast rave loop for high-level frenzy — dense hats, driving acid bass.
@@ -150,7 +181,9 @@ fn frenzy() -> Vec<u8> {
         true, true, false, true, true, false, true, true,
         false, true, true, false, true, true, false, true,
     ];
-    techno_loop(150.0, 8, &[110.00, 138.59, 123.47, 146.83], &HIT, 440.00, 1.6, 0xF6E2_9000)
+    // Am - Dm vamp; hook: A4 C5 E5 C5.
+    const HOOK: [f32; 4] = [440.00, 523.25, 659.25, 523.25];
+    techno_loop(150.0, 18, &[110.00, 146.83], &HIT, &HOOK, 1.6, 0xF6E2_9000)
 }
 
 fn eat_sfx() -> Vec<u8> {

@@ -3,13 +3,14 @@
 
 use std::f32::consts::PI;
 
-use crate::techno::{bass_note, hat, kick, lead_stab, Rng, MIX_KNEE};
+use crate::techno::{bass_note, hat, kick, sidechain_duck, supersaw, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, env, mix_into, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 const BPM: f32 = 128.0;
 const STEPS_PER_BAR: usize = 16; // 16th-note grid
-const BARS: usize = 8;
+const BARS: usize = 16;
+const LIFT_BAR: usize = BARS / 2;
 const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
 
 fn music() -> Vec<u8> {
@@ -19,9 +20,10 @@ fn music() -> Vec<u8> {
     let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
     let mut rng = Rng(0xC0FF_EE42);
+    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 4);
 
-    // A-phrygian bassline roots, one per 2-bar section: A1 - C2 - D2 - C2.
-    let bass_roots = [55.00_f32, 65.41, 73.42, 65.41];
+    // A - C, a two-chord vamp, one root every 2 bars.
+    let bass_roots = [55.00_f32, 65.41]; // A1, C2
     // 16-step syncopated acid pattern: which steps trigger a bass hit.
     const BASS_HIT: [bool; STEPS_PER_BAR] = [
         true, false, true, false, false, true, false, true,
@@ -32,35 +34,44 @@ fn music() -> Vec<u8> {
         1.0, 1.0, 2.0, 1.0, 1.0, 1.0, 1.0, 2.0,
         1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 1.0, 1.0,
     ];
-    // Tension stab notes cycling every 2 bars (A4, C5, D5, Bb4 — Phrygian bite).
-    let stab_notes = [440.00_f32, 523.25, 587.33, 466.16];
+    // The hook: a 4-note Phrygian-bite riff, identical every bar.
+    const HOOK: [f32; 4] = [440.00, 466.16, 523.25, 466.16]; // A4 Bb4 C5 Bb4
 
     for step in 0..TOTAL_STEPS {
         let bar = step / STEPS_PER_BAR;
         let pos = step % STEPS_PER_BAR;
         let off = step * step_samples;
+        let lifted = bar >= LIFT_BAR;
 
         // Four-on-the-floor kick.
         if pos % 4 == 0 {
-            kick(&mut buf, off, 0.95);
+            kick_offsets.push(off);
         }
         // Off-beat closed hat, plus a 16th-note roll into the last beat of every 4th bar.
         if pos % 4 == 2 {
             hat(&mut buf, off, &mut rng, 0.30);
         }
-        if bar % 4 == 3 && pos >= 12 {
-            hat(&mut buf, off, &mut rng, 0.22);
+        if (bar % 4 == 3 && pos >= 12) || (lifted && pos % 4 == 0) {
+            hat(&mut buf, off, &mut rng, 0.16);
         }
         // Acid bassline.
         if BASS_HIT[pos] {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
             bass_note(&mut buf, off, root * BASS_OCT[pos], step_ms * 0.85, 0.60);
         }
-        // Tension stab on the downbeat of every odd bar.
-        if bar % 2 == 1 && pos == 0 {
-            let note = stab_notes[(bar / 2) % stab_notes.len()];
-            lead_stab(&mut buf, off, note, step_ms * 7.0, 0.20);
+        // Hook riff on the downbeat of every odd bar; back half adds an
+        // octave-up harmony for a small lift (~every 30s).
+        if bar % 2 == 1 && pos % 4 == 0 {
+            supersaw(&mut buf, off, HOOK[pos / 4], step_ms * 3.5, 0.20, 8.0, 0.008);
+            if lifted {
+                supersaw(&mut buf, off, HOOK[pos / 4] * 2.0, step_ms * 3.5, 0.10, 8.0, 0.008);
+            }
         }
+    }
+
+    sidechain_duck(&mut buf, &kick_offsets, 0.55, step_ms * 0.85);
+    for &off in &kick_offsets {
+        kick(&mut buf, off, 0.95);
     }
 
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
