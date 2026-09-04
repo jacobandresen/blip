@@ -8,7 +8,7 @@ A friendly walkthrough of the `blip` crate for anyone who wants to build a new g
 
 `blip` is a thin arcade-game library built on top of [macroquad](https://macroquad.rs). It handles three things so your game code doesn't have to:
 
-- **Rendering** — draws everything to a fixed-size virtual canvas (e.g. 480×540 pixels), then scales it up with letterboxing to fit any window. A CRT post-process (scanlines, occasional glitch effects) is applied automatically.
+- **Rendering** — draws everything to a fixed-size virtual canvas (e.g. 480×540 pixels), then scales it up with letterboxing to fit any window. A CRT post-process (interlaced scanlines, occasional glitch effects, and a curved-glass shader pass — barrel distortion, phosphor bloom, corner vignette, glass glare) is applied automatically.
 - **Frame pacing** — you call `blip.next_frame(60).await` once per tick; delta-time is available as `blip.delta_time`.
 - **Platform shims** — the same code runs natively and as WebAssembly. Kiosk shell calls go to the browser bridge and are no-ops on the desktop.
 

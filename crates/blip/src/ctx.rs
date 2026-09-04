@@ -1,13 +1,17 @@
 //! The `Blip` context — the central object every game creates once and holds for its lifetime.
 //!
 //! `Blip` owns the virtual canvas (a fixed-size render target), drives the frame loop,
-//! and applies the CRT post-process effect (scanlines, glitch tears, chromatic aberration)
-//! when blitting to the real window. Games interact with it through its drawing methods
-//! and `blip.delta_time`.
+//! and applies the CRT post-process effect (scanlines, glitch tears, chromatic aberration,
+//! and a curved-glass shader pass) when blitting to the real window. Games interact with it
+//! through its drawing methods and `blip.delta_time`.
 
 use macroquad::camera::{set_camera, Camera2D};
 use macroquad::color::{Color, WHITE};
+use macroquad::material::{
+    gl_use_default_material, gl_use_material, load_material, Material, MaterialParams,
+};
 use macroquad::math::{vec2, Rect};
+use macroquad::miniquad::{ShaderSource, UniformDesc, UniformType};
 use macroquad::shapes::draw_rectangle;
 use macroquad::texture::{
     draw_texture_ex, get_screen_data, render_target_ex, DrawTextureParams, FilterMode,
@@ -43,6 +47,111 @@ impl Lcg {
     }
 }
 
+// ---------------------------------------------------------------------------- //
+// Curved-glass shader                                                           //
+// ---------------------------------------------------------------------------- //
+//
+// The flat composite (game frame + glitch + scanlines) is rendered to an
+// offscreen target, then this material blits it to the window: the image is
+// bowed into a slightly convex tube, the bright phosphor blooms into its
+// neighbours, the corners fall off into the black bezel, and a faint diagonal
+// glare sits on the "glass". GLSL ES 1.00 so it runs on WebGL 1.
+
+const CRT_VERTEX: &str = r#"#version 100
+attribute vec3 position;
+attribute vec2 texcoord;
+attribute vec4 color0;
+varying lowp vec2 uv;
+varying lowp vec4 color;
+uniform mat4 Model;
+uniform mat4 Projection;
+void main() {
+    gl_Position = Projection * Model * vec4(position, 1);
+    color = color0 / 255.0;
+    uv = texcoord;
+}
+"#;
+
+const CRT_FRAGMENT: &str = r#"#version 100
+precision mediump float;
+
+varying lowp vec2 uv;
+varying lowp vec4 color;
+
+uniform sampler2D Texture;
+uniform vec4 _Time;
+uniform vec2 ScreenSize;
+
+// Bow flat 0..1 UVs outward into a convex tube. Divisors set how strong the
+// barrel is per axis — larger is flatter. The 1.09 factor is underscan: it
+// shrinks the picture inside the curved glass so that even after the barrel
+// pushes the corners outward, the whole game screen — every edge, including the
+// top HUD row — stays visible, framed by a black rim like a real tube that
+// never quite filled its own face.
+vec2 curve(vec2 p) {
+    p = p * 2.0 - 1.0;
+    vec2 off = abs(p.yx) / vec2(13.0, 10.0);
+    p = p + p * off * off;
+    p *= 1.055;
+    return p * 0.5 + 0.5;
+}
+
+// Cheap ordered dither — breaks up 8-bit banding in the dark gradients.
+float dither(vec2 p) {
+    return fract(sin(dot(floor(p), vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+void main() {
+    // The offscreen composite is stored y-flipped relative to the screen; undo
+    // that here (a clean full flip, no half-texel offset from DrawTextureParams).
+    vec2 fuv = vec2(uv.x, 1.0 - uv.y);
+
+    vec2 cuv = curve(fuv);
+
+    // Thin soft edge where the tube meets the bezel — centred on the boundary so
+    // the outermost row/column of the game canvas is still drawn, not eaten.
+    vec2 e = smoothstep(vec2(-0.0025), vec2(0.0025), cuv)
+           * smoothstep(vec2(-0.0025), vec2(0.0025), vec2(1.0) - cuv);
+    float mask = e.x * e.y;
+
+    vec3 col = texture2D(Texture, cuv).rgb;
+
+    // ---- phosphor bloom: blur a ring of taps, keep the bright part, add back ----
+    vec2 px = 1.0 / ScreenSize;
+    vec3 b = vec3(0.0);
+    b += texture2D(Texture, cuv + vec2( 1.5,  0.5) * px * 2.0).rgb;
+    b += texture2D(Texture, cuv + vec2(-1.5, -0.5) * px * 2.0).rgb;
+    b += texture2D(Texture, cuv + vec2( 0.5, -1.5) * px * 2.0).rgb;
+    b += texture2D(Texture, cuv + vec2(-0.5,  1.5) * px * 2.0).rgb;
+    b += texture2D(Texture, cuv + vec2( 2.5,  1.5) * px * 4.0).rgb;
+    b += texture2D(Texture, cuv + vec2(-2.5, -1.5) * px * 4.0).rgb;
+    b += texture2D(Texture, cuv + vec2( 1.5, -2.5) * px * 4.0).rgb;
+    b += texture2D(Texture, cuv + vec2(-1.5,  2.5) * px * 4.0).rgb;
+    b *= 0.125;
+    col += max(b - 0.25, 0.0) * 1.4;
+
+    // ---- tube vignette (light — the corners must stay clearly readable) ----
+    float vig = cuv.x * cuv.y * (1.0 - cuv.x) * (1.0 - cuv.y);
+    vig = clamp(pow(vig * 18.0, 0.15), 0.0, 1.0);
+    col *= mix(1.0, vig, 0.45);
+
+    // ---- glare on the glass (flat fuv, so it doesn't move with the curve) ----
+    // Scaled by the pixel's own brightness so it only shows over lit phosphor —
+    // over the black background it stays exactly black and can't band.
+    float glare = smoothstep(0.7, 0.05,
+        distance(fuv * vec2(1.0, 1.3), vec2(0.32, 0.30 * 1.3)));
+    col += glare * 0.18 * dot(col, vec3(0.333));
+
+    // gentle mains-hum brightness flicker + a touch of gain
+    col *= 1.08 + 0.008 * sin(_Time.x * 10.7);
+
+    // dither the near-black gradients so the vignette doesn't step
+    col += (dither(gl_FragCoord.xy) - 0.5) * (1.0 / 255.0);
+
+    gl_FragColor = vec4(col * color.rgb * mask, 1.0);
+}
+"#;
+
 /// The main blip runtime. Create one at the start of `main` with `Blip::new(w, h)`,
 /// then call `blip.next_frame(60).await` at the end of every game loop iteration.
 /// Read `blip.delta_time` each frame to get the elapsed seconds since the last tick.
@@ -68,6 +177,11 @@ pub struct Blip {
     chroma_dx: f32, // horizontal shift in virtual pixels
     // ---- interlaced field ----
     interlace_field: u8, // 0 or 1, flips every frame
+    // ---- curved-glass shader pass ----
+    crt:         Option<Material>, // None if the shader failed to compile
+    screen_rt:   Option<RenderTarget>, // offscreen composite target, window-sized
+    screen_rt_w: i32,
+    screen_rt_h: i32,
     // ---- screenshot capture ----
     pub screenshot_mode:   bool,
     screenshot_frame:      u32,
@@ -84,6 +198,17 @@ impl Blip {
             ..Default::default()
         });
         rt.texture.set_filter(FilterMode::Nearest);
+
+        // Curved-glass post-process. If the shader fails to compile (old WebGL,
+        // driver quirks) we fall back to compositing straight to the screen.
+        let crt = load_material(
+            ShaderSource::Glsl { vertex: CRT_VERTEX, fragment: CRT_FRAGMENT },
+            MaterialParams {
+                uniforms: vec![UniformDesc::new("ScreenSize", UniformType::Float2)],
+                ..Default::default()
+            },
+        )
+        .ok();
 
         let mut rng = Lcg(0xdead_beef);
         // Stagger initial cooldowns so effects don't all fire at once.
@@ -110,6 +235,10 @@ impl Blip {
             roll_cd,  roll_t: 0.0, roll_dy: 0.0, roll_spd: 0.0,
             chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
             interlace_field: 0,
+            crt,
+            screen_rt: None,
+            screen_rt_w: 0,
+            screen_rt_h: 0,
             screenshot_mode,
             screenshot_frame: 0,
             screenshot_frame_target,
@@ -242,12 +371,10 @@ impl Blip {
         let (vx, vy, vw, vh) = self.viewport();
         if vw <= 0.0 || vh <= 0.0 { return; }
 
-        let lw = self.width  as f32;
-        let lh = self.height as f32;
-        let scale = vw / lw;
-
-        // Screenshot mode: clean 1:1 blit, all CRT effects suppressed.
-        if self.screenshot_mode {
+        // Screenshot mode: clean 1:1 blit, all CRT effects suppressed — unless
+        // BLIP_SCREENSHOT_FX is set, which keeps the full pipeline (handy for
+        // eyeballing the curved-glass shader from a headless capture).
+        if self.screenshot_mode && std::env::var_os("BLIP_SCREENSHOT_FX").is_none() {
             let tex = self.rt.texture.clone();
             draw_texture_ex(&tex, vx, vy, WHITE, DrawTextureParams {
                 dest_size: Some(vec2(vw, vh)),
@@ -255,6 +382,63 @@ impl Blip {
             });
             return;
         }
+
+        // No curved-glass material: composite straight to the screen, as before.
+        let Some(crt) = self.crt.clone() else {
+            self.composite(vx, vy, vw, vh);
+            return;
+        };
+
+        // 1. Composite the frame + glitch + scanlines flat into an offscreen
+        //    target sized to the letterboxed viewport.
+        let iw = (vw as i32).max(1);
+        let ih = (vh as i32).max(1);
+        if self.screen_rt.is_none() || self.screen_rt_w != iw || self.screen_rt_h != ih {
+            let srt = render_target_ex(iw as u32, ih as u32, RenderTargetParams {
+                sample_count: 0,
+                ..Default::default()
+            });
+            srt.texture.set_filter(FilterMode::Linear);
+            self.screen_rt   = Some(srt);
+            self.screen_rt_w = iw;
+            self.screen_rt_h = ih;
+        }
+        let srt = self.screen_rt.clone().unwrap();
+        {
+            let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, vw, vh));
+            cam.render_target = Some(srt.clone());
+            set_camera(&cam);
+        }
+        clear_background(macroquad::color::BLACK);
+        self.composite(0.0, 0.0, vw, vh);
+
+        // 2. Blit the offscreen target back to the screen through the shader,
+        //    which bows the image into a curved tube, blooms the bright
+        //    phosphor, darkens the corners and lays a soft glare on the glass.
+        {
+            let cam = Camera2D::from_display_rect(
+                Rect::new(0.0, 0.0, screen_width(), screen_height()));
+            set_camera(&cam);
+        }
+        clear_background(macroquad::color::BLACK);
+        crt.set_uniform("ScreenSize", vec2(vw, vh));
+        gl_use_material(&crt);
+        // The composite was drawn under a render-target camera whose vertical
+        // axis is inverted vs. the screen; the shader flips it back (`fuv`).
+        draw_texture_ex(&srt.texture, vx, vy, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(vw, vh)),
+            ..Default::default()
+        });
+        gl_use_default_material();
+    }
+
+    /// Composite the current game frame with the glitch effects and interlaced
+    /// scanlines, drawn into whatever target/camera is currently bound. `(vx, vy)`
+    /// is the top-left corner and `(vw, vh)` the size in that target's pixels.
+    fn composite(&mut self, vx: f32, vy: f32, vw: f32, vh: f32) {
+        let lw = self.width  as f32;
+        let lh = self.height as f32;
+        let scale = vw / lw;
 
         let roll_on   = self.roll_t  > 0.0;
         let tear_on   = self.tear_t  > 0.0 && !roll_on; // don't combine tear + roll
@@ -349,6 +533,15 @@ impl Blip {
             let a  = 0.02 + self.rng.next() * 0.10;
             let v  = self.rng.next();
             draw_rectangle(nx, ny, pixel, pixel, Color::new(v, v, v, a));
+        }
+
+        // Debug: outline the exact canvas edge so overscan can be eyeballed.
+        if std::env::var_os("BLIP_DEBUG_EDGE").is_some() {
+            let t = 2.0;
+            draw_rectangle(vx, vy, vw, t, BLIP_MAGENTA);
+            draw_rectangle(vx, vy + vh - t, vw, t, BLIP_MAGENTA);
+            draw_rectangle(vx, vy, t, vh, BLIP_MAGENTA);
+            draw_rectangle(vx + vw - t, vy, t, vh, BLIP_MAGENTA);
         }
     }
 
