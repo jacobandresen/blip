@@ -34,6 +34,10 @@ const RESPAWN_DELAY:    f32 = 1.6;
 const SAFE_RADIUS:      f32 = 110.0;
 const LIVES_START:      i32 = 3;
 const EXTRA_LIFE_SCORE: i32 = 10_000;
+// A hard floor on how long GAME OVER stays up before a key can dismiss it —
+// without this, fire/thrust still held from the fight that killed you
+// bounces straight back to the title screen unread.
+const GAME_OVER_MIN_WAIT: f32 = 2.0;
 
 // ---- weapons --------------------------------------------------------
 const MAX_BULLETS:   usize = 10;
@@ -300,7 +304,7 @@ fn kill_ship(g: &mut Game, sfx: &Sounds) {
     g.ship_alive = false;
     match g.sess.lose_life() {
         LifeResult::StillAlive => { g.respawn_t.start(RESPAWN_DELAY); g.state = State::Dead; }
-        LifeResult::GameOver   => { g.state = State::Over; }
+        LifeResult::GameOver   => { g.respawn_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
     }
 }
 
@@ -508,8 +512,9 @@ fn update_dead(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 }
 
-fn update_over(g: &mut Game) {
-    if !any_key_pressed() { return; }
+fn update_over(g: &mut Game, dt: f32) {
+    g.respawn_t.tick(dt);
+    if g.respawn_t.active() || !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -625,13 +630,15 @@ fn draw_title(blip: &Blip) {
     blip.draw_centered("SPACE FIRE  ·  Z HYPERSPACE", (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);
 }
 
-fn draw_over(blip: &Blip, score: i32) {
+fn draw_over(blip: &Blip, score: i32, waiting: bool) {
     let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
     draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, NEON_PINK);
     blip.draw_centered(&buf, (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
-    blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, NEON_YELLOW);
+    if !waiting {
+        blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, NEON_YELLOW);
+    }
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -685,12 +692,12 @@ async fn main() {
             State::Title => update_title(&mut g),
             State::Play  => update_play(&mut g, dt, &mut sfx, &mut thrust_snd_t),
             State::Dead  => update_dead(&mut g, dt, &sfx),
-            State::Over  => update_over(&mut g),
+            State::Over  => update_over(&mut g, dt),
         }
 
         match g.state {
             State::Title => draw_title(&blip),
-            State::Over  => draw_over(&blip, g.sess.score),
+            State::Over  => draw_over(&blip, g.sess.score, g.respawn_t.active()),
             State::Play | State::Dead => draw_play(&blip, &g),
         }
 

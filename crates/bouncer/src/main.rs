@@ -53,6 +53,10 @@ const BALL_SLOW_FACTOR: f32 = 0.6;
 // ---- tuning -----------------------------------------------------------
 const LIVES_START: i32 = 3;
 const SPEED_INC: f32 = 18.0;
+// A hard floor on how long GAME OVER stays up before a key can dismiss it —
+// without this, a direction/launch key still held from the rally that
+// killed you bounces straight back to the title screen unread.
+const GAME_OVER_MIN_WAIT: f32 = 2.0;
 
 // ---- screwball spin -----------------------------------------------------
 // Hitting the ball while the paddle is moving fast puts a spin on it — the
@@ -297,7 +301,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.reset_drops();
         match g.sess.lose_life() {
             LifeResult::StillAlive => { g.dead_timer.start(1.2); g.state = State::Dead; }
-            LifeResult::GameOver   => { g.state = State::Over; }
+            LifeResult::GameOver   => { g.dead_timer.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
         }
         return;
     }
@@ -435,8 +439,9 @@ fn update_win(g: &mut Game, dt: f32) {
     if g.dead_timer.tick(dt) { g.next_level(); }
 }
 
-fn update_over(g: &mut Game) {
-    if !any_key_pressed() { return; }
+fn update_over(g: &mut Game, dt: f32) {
+    g.dead_timer.tick(dt);
+    if g.dead_timer.active() || !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -524,12 +529,14 @@ fn draw_win(blip: &Blip, level: i32) {
     blip.draw_centered(&buf,      (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
 }
 
-fn draw_over(blip: &Blip, score: i32) {
+fn draw_over(blip: &Blip, score: i32, waiting: bool) {
     let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
-    blip.draw_centered("GAME OVER",     (WIN_H / 4) as f32,     5.0, BLIP_RED);
-    blip.draw_centered(&buf,            (WIN_H / 2) as f32,     3.0, BLIP_WHITE);
-    blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
+    blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
+    blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
+    if !waiting {
+        blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
+    }
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -605,14 +612,14 @@ async fn main() {
             State::Play   => update_play(&mut g, dt, &sfx),
             State::Dead   => update_dead(&mut g, dt),
             State::Win    => update_win(&mut g, dt),
-            State::Over   => update_over(&mut g),
+            State::Over   => update_over(&mut g, dt),
         }
 
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip),
             State::Win   => draw_win(&blip, g.sess.level),
-            State::Over  => draw_over(&blip, g.sess.score),
+            State::Over  => draw_over(&blip, g.sess.score, g.dead_timer.active()),
             State::Launch | State::Play | State::Dead => {
                 draw_play(&blip, &g, &paddle, &ball, &brick);
             }

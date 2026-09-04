@@ -31,6 +31,10 @@ const BALL_SPD0: f32 = 275.0;
 const BALL_INC: f32 = 15.0;
 const BALL_MAX: f32 = 450.0;
 const AI_SPD: f32 = 145.0;
+// A hard floor on how long the win/lose screen stays up before a key can
+// dismiss it — without this, a paddle key still held from the rally that
+// just ended bounces straight back to the title screen unread.
+const GAME_OVER_MIN_WAIT: f32 = 2.0;
 
 // ---- derived ----------------------------------------------------------
 const LPAD_X: f32 = PAD_OFF;
@@ -191,13 +195,13 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
     if g.ball_x + BALL_SZ < 0.0 {
         g.score_r += 1;
         play_sfx(&sfx.score_r);
-        if g.score_r >= SCORE_WIN { g.state = State::Over; }
+        if g.score_r >= SCORE_WIN { g.point_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
         else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
     }
     if g.ball_x > WIN_W as f32 {
         g.score_l += 1;
         play_sfx(&sfx.score_l);
-        if g.score_l >= SCORE_WIN { g.state = State::Over; }
+        if g.score_l >= SCORE_WIN { g.point_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
         else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
     }
 }
@@ -206,8 +210,9 @@ fn update_point(g: &mut Game, dt: f32) {
     if g.point_t.tick(dt) { g.state = State::Serve; }
 }
 
-fn update_over(g: &mut Game) {
-    if !any_key_pressed() { return; }
+fn update_over(g: &mut Game, dt: f32) {
+    g.point_t.tick(dt);
+    if g.point_t.active() || !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -280,8 +285,10 @@ fn draw_over(blip: &Blip, g: &Game) {
     } else {
         if g.score_l >= SCORE_WIN { "YOU WIN!" } else { "GAME OVER" }
     };
-    blip.draw_centered(msg,            cy - 20.0, 3.0, BLIP_YELLOW);
-    blip.draw_centered("PRESS ANY KEY", cy + 24.0, 2.0, BLIP_GRAY);
+    blip.draw_centered(msg, cy - 20.0, 3.0, BLIP_YELLOW);
+    if !g.point_t.active() {
+        blip.draw_centered("PRESS ANY KEY", cy + 24.0, 2.0, BLIP_GRAY);
+    }
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -312,7 +319,7 @@ async fn main() {
             State::Serve => update_serve(&mut g, dt),
             State::Play  => update_play(&mut g, dt, &sfx),
             State::Point => update_point(&mut g, dt),
-            State::Over  => update_over(&mut g),
+            State::Over  => update_over(&mut g, dt),
         }
         match g.state {
             State::Title => draw_title(&blip),

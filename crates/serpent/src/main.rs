@@ -26,6 +26,10 @@ const SPEED_START: f32 = 180.0;
 const SPEED_MIN: f32 = 70.0;
 const SPEED_STEP: f32 = 10.0;
 const FOODS_PER_LVL: i32 = 5;
+// A hard floor on how long GAME OVER stays up before a key can dismiss it —
+// a reflexive direction-key press right after dying would otherwise bounce
+// straight back to the title screen before the score is even readable.
+const GAME_OVER_MIN_WAIT: f32 = 2.0;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum Dir { Up, Right, Down, Left }
@@ -95,6 +99,14 @@ impl Game {
             for i in 0..self.snake_len {
                 let b = self.snake_at(i);
                 if b.c == f.c && b.r == f.r { ok = false; break; }
+            }
+            // From level 2 on the board has obstacle blocks — without this
+            // check food can land inside one and be permanently unreachable
+            // (it only ever relocates when eaten), softlocking the level.
+            if ok {
+                for i in 0..self.obstacle_count {
+                    if self.obstacles[i].c == f.c && self.obstacles[i].r == f.r { ok = false; break; }
+                }
             }
             if ok { self.food = f; return; }
         }
@@ -207,7 +219,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         play_sfx(&sfx.game_over);
         match g.sess.lose_life() {
             LifeResult::StillAlive => { g.dead_timer.start(1.5); g.state = State::Dead; }
-            LifeResult::GameOver   => { g.state = State::Over; }
+            LifeResult::GameOver   => { g.dead_timer.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
         }
         return;
     }
@@ -238,8 +250,9 @@ fn update_dead(g: &mut Game, dt: f32) {
     }
 }
 
-fn update_over(g: &mut Game) {
-    if !any_key_pressed() { return; }
+fn update_over(g: &mut Game, dt: f32) {
+    g.dead_timer.tick(dt);
+    if g.dead_timer.active() || !any_key_pressed() { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -311,12 +324,14 @@ fn draw_title(blip: &Blip) {
     blip.draw_centered("ARROW KEYS OR WASD", (WIN_H * 2 / 3) as f32,   2.0, BLIP_GRAY);
 }
 
-fn draw_over(blip: &Blip, score: i32) {
+fn draw_over(blip: &Blip, score: i32, waiting: bool) {
     let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
-    blip.draw_centered("GAME OVER",     (WIN_H / 4) as f32,     5.0, BLIP_RED);
-    blip.draw_centered(&buf,            (WIN_H / 2) as f32,     3.0, BLIP_WHITE);
-    blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
+    blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
+    blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
+    if !waiting {
+        blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
+    }
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -374,7 +389,7 @@ async fn main() {
             State::Title => update_title(&mut g),
             State::Play  => update_play(&mut g, dt, &sfx),
             State::Dead  => update_dead(&mut g, dt),
-            State::Over  => update_over(&mut g),
+            State::Over  => update_over(&mut g, dt),
         }
 
         if g.want_track != 0 && g.want_track != g.active_music {
@@ -386,7 +401,7 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip),
-            State::Over  => draw_over(&blip, g.sess.score),
+            State::Over  => draw_over(&blip, g.sess.score, g.dead_timer.active()),
             State::Play | State::Dead => draw_play(&blip, &g, &head, &body, &food),
         }
 
