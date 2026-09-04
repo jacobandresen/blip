@@ -1,8 +1,9 @@
 (function () {
 'use strict';
 
-var TOPBAR_H  = 56;
-var PAD       = 16; // padding around the canvas on all sides (= bezel width)
+var TOPBAR_H   = 56;
+var MARQUEE_H  = 28; // reserved header height once #marquee-bar exists
+var PAD        = 16; // padding around the canvas on all sides (= bezel width)
 
 var loader    = document.getElementById('loader');
 var barInner  = document.getElementById('bar-inner');
@@ -11,6 +12,23 @@ var canvas    = document.getElementById('glcanvas');
 var overlay   = document.getElementById('need-coin-overlay');
 
 updateCoinsHud();
+
+// ---- Per-game marquee + cabinet accent ----
+// Builds the backlit name sign in JS (rather than requiring it in every
+// game's HTML) so rally's hand-maintained page picks it up for free, same as
+// the shell-generated ones.
+(function () {
+  var game = (typeof blipGameFromPath === 'function') ? blipGameFromPath(window.location.pathname) : null;
+  if (!game) return;
+  document.documentElement.style.setProperty('--cab', game.accent);
+  var bar = document.createElement('div');
+  bar.id = 'marquee-bar';
+  bar.innerHTML =
+    '<span class="marquee-bulbs"></span>' +
+    '<span id="marquee-name">' + game.name + '</span>' +
+    '<span class="marquee-bulbs"></span>';
+  document.body.insertBefore(bar, document.body.firstChild);
+}());
 
 // Stop all audio when navigating away (pagehide is reliable on iOS Safari / PWA)
 window.addEventListener('pagehide', function () {
@@ -121,11 +139,13 @@ function fillCanvas() {
   var tb = document.getElementById('topbar');
   // clamp to 56 so a mis-read of 0 before layout doesn't eat the whole screen
   TOPBAR_H = tb ? Math.max(tb.offsetHeight, 56) : 56;
+  var mb = document.getElementById('marquee-bar');
+  MARQUEE_H = mb ? Math.max(mb.offsetHeight, 28) : 0;
   var w = window.innerWidth  - PAD * 2;
-  var h = window.innerHeight - TOPBAR_H - PAD * 2;
+  var h = window.innerHeight - TOPBAR_H - MARQUEE_H - PAD * 2;
   canvas.style.setProperty('width',  w + 'px', 'important');
   canvas.style.setProperty('height', h + 'px', 'important');
-  canvas.style.setProperty('top',    PAD + 'px', 'important');
+  canvas.style.setProperty('top',    (MARQUEE_H + PAD) + 'px', 'important');
   canvas.style.setProperty('left',   PAD + 'px', 'important');
   canvas.style.setProperty('transform', 'none', 'important');
 }

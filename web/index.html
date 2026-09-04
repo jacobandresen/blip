@@ -21,6 +21,7 @@
       --cyan:    #00c8c8;
       --magenta: #c832c8;
       --red:     #dc3232;
+      --blue:    #3264dc;
       --yellow:  #e6dc32;
     }
 
@@ -327,6 +328,7 @@
     .card-galactic   { --c: var(--magenta); }
     .card-rally      { --c: var(--red);     }
     .card-meteors    { --c: #b4b4b4;        }
+    .card-sky-raider { --c: var(--blue);    }
 
     /* ---- keyboard-recommended chip ---- */
     .badge-kb {
@@ -785,6 +787,18 @@
       <div class="press-start" data-i18n="pressStart"></div>
     </a>
 
+    <!-- RAIDER -->
+    <a class="card card-sky-raider" href="sky_raider/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="sky_raider/screenshot.png?v=10" alt="Raider gameplay">
+      </div>
+      <div class="card-title">RAIDER</div>
+      <div class="card-genre"  data-i18n="skyRaiderGenre"></div>
+      <div class="card-desc"   data-i18n="skyRaiderDesc"></div>
+      <div class="card-controls" data-i18n="skyRaiderControls"></div>
+      <div class="press-start" data-i18n="pressStart"></div>
+    </a>
+
   </div>
   </div>
 
@@ -823,7 +837,7 @@
   </div>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=6"></script>
+  <script src="kiosk.js?v=9"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Translations                                                         */
@@ -854,6 +868,10 @@
         meteorsGenre:      'ROCK SHOOTING GAME',
         meteorsDesc:       'Spaceship is drift in field of many rock.<br>Shoot rock for break into more small piece.<br>Do not to crashing, is very dangerous choice.',
         meteorsControls:   'A/D ROTATE &middot; W THRUST &middot; [1] FIRE &middot; [2] HYPERSPACE',
+
+        skyRaiderGenre:    'VERTICAL SKY BATTLE GAME',
+        skyRaiderDesc:     'Fighter plane is flying up sky for shooting many enemy craft.<br>Catch power capsule for become more strong gun.<br>Big boss plane is arrive after enough enemy destroy.',
+        skyRaiderControls: 'ARROW OR WASD MOVE &middot; [1] FIRE',
 
         pressStart:       'PUSH START BUTTON',
         needCoin:         'NEED COIN',
@@ -886,6 +904,10 @@
         meteorsDesc:       '宇宙船で岩石地帯を漂流する。<br>岩を撃って小さく砕け。<br>衝突は禁物、慎重に操縦せよ。',
         meteorsControls:   'A/D 回転 &middot; W 推進 &middot; [1] 発射 &middot; [2] ワープ',
 
+        skyRaiderGenre:    '空中戦闘ゲーム',
+        skyRaiderDesc:     '戦闘機で空を飛び、敵機を撃墜せよ。<br>パワーカプセルを取って武器を強化。<br>多くの敵を倒すと巨大なボス機が現れる。',
+        skyRaiderControls: '矢印またはWASD移動 &middot; [1] 発射',
+
         pressStart:       'スタート',
         needCoin:         'コインが必要',
         footerControls:   'WASD / 矢印キー &nbsp;―&nbsp; [1] 射撃・発射',
@@ -916,6 +938,10 @@
         meteorsGenre:      'STENSKYDNINGSSPIL',
         meteorsDesc:       'Rumskib driver i et felt af sten.<br>Skyd stenene i mindre stykker.<br>Und&aring; sammenst&oslash;d &mdash; det er farligt.',
         meteorsControls:   'A/D DREJ &middot; W FREMDRIFT &middot; [1] SKYD &middot; [2] HYPERSPACE',
+
+        skyRaiderGenre:    'LUFTKAMPSPIL',
+        skyRaiderDesc:     'Styr jagerflyet op gennem himlen og skyd fjendens fly.<br>Opsaml kapsler for at styrke dit v&aring;ben.<br>En k&aelig;mpe bossflyver dukker op, n&aring;r mange fjender er besejret.',
+        skyRaiderControls: 'PILE ELLER WASD &middot; [1] SKYD',
 
         pressStart:       'TRYK START',
         needCoin:         'INDS&AElig;T M&Oslash;NT',

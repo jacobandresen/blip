@@ -18,6 +18,7 @@
       --cyan:    #00c8c8;
       --magenta: #c832c8;
       --red:     #dc3232;
+      --blue:    #3264dc;
     }
 
     html, body {
@@ -142,12 +143,14 @@
     .game-section.galactic .game-title { color: var(--magenta); text-shadow: 0 0 12px rgba(200,50,200,0.4); }
     .game-section.meteors  .game-title { color: var(--yellow);  text-shadow: 0 0 12px rgba(230,220,50,0.4); }
     .game-section.serpent  .game-title { color: var(--green);   text-shadow: 0 0 12px rgba(50,200,50,0.4); }
+    .game-section.raider   .game-title { color: var(--blue);    text-shadow: 0 0 12px rgba(50,100,220,0.4); }
 
     .game-section.rally    .section-body { border-left-color: rgba(220,50,50,0.3); }
     .game-section.bouncer  .section-body { border-left-color: rgba(0,200,200,0.3); }
     .game-section.galactic .section-body { border-left-color: rgba(200,50,200,0.3); }
     .game-section.meteors  .section-body { border-left-color: rgba(230,220,50,0.3); }
     .game-section.serpent  .section-body { border-left-color: rgba(50,200,50,0.3); }
+    .game-section.raider   .section-body { border-left-color: rgba(50,100,220,0.3); }
 
     .impl-label {
       font-size: 9px;
@@ -199,6 +202,8 @@
     .game-section.meteors  .inline-link:hover { color: #f0e880; border-bottom-color: rgba(230,220,50,0.8); }
     .game-section.serpent  .inline-link { color: var(--green);   border-bottom-color: rgba(50,200,50,0.3); }
     .game-section.serpent  .inline-link:hover { color: #70e070; border-bottom-color: rgba(50,200,50,0.8); }
+    .game-section.raider   .inline-link { color: var(--blue);    border-bottom-color: rgba(50,100,220,0.3); }
+    .game-section.raider   .inline-link:hover { color: #7098f0; border-bottom-color: rgba(50,100,220,0.8); }
 
     .studios { display: flex; flex-direction: column; gap: 0; }
     .studio { padding: 20px 0; border-bottom: 1px solid #111; }
@@ -302,6 +307,12 @@
           <div class="studio-name">Gremlin Industries &amp; Nokia</div>
           <div class="studio-dates" data-i18n="gremlinDates">1976 / 1997</div>
           <p data-i18n="gremlinP">The snake concept was born at Gremlin Industries as Blockade (1976), a two-player arcade game where each player's trail became an obstacle. The mechanic lay dormant for two decades until Nokia engineer Taneli Armanto wrote a solo version for the Nokia 6110 in 1997. Preinstalled on hundreds of millions of handsets, Snake became one of the most widely played games in history before smartphones existed. Serpent in BLIP ARCADE follows that thread.</p>
+        </div>
+
+        <div class="studio">
+          <div class="studio-name">Capcom</div>
+          <div class="studio-dates" data-i18n="capcomDates">Founded 1983 &mdash; Osaka, Japan</div>
+          <p data-i18n="capcomP">Capcom grew out of Kenzo Tsujimoto&#39;s 1979 electronics venture I.R.M. Corporation and was formally established in 1983 to publish arcade software. A year later, director Yoshiki Okamoto shipped 1942 (1984) &mdash; Capcom&#39;s first game built deliberately for Western arcades, casting the studio&#39;s own home air force as the enemy so American players would be shooting the other side. It set the template for the vertical-scrolling shoot-&#39;em-up: a lone fighter climbing through wave after wave of enemy planes, a barrel-roll dodge held in reserve, and formation-flying power-ups. Raider in BLIP ARCADE takes off from that runway.</p>
         </div>
 
       </div>
@@ -423,6 +434,27 @@
     </div>
   </section>
 
+  <div class="divider"></div>
+
+  <!-- ====== RAIDER ====== -->
+  <section class="game-section raider">
+    <div class="game-header">
+      <div class="game-title">Raider</div>
+      <div class="game-origin" data-i18n="raiderOrigin">Inspired by 1942 &mdash; Capcom, 1984</div>
+    </div>
+    <h2 style="margin-bottom:24px;" data-i18n="raiderSub">THE SHOOT-&#39;EM-UP THAT PUT A JAPANESE STUDIO&#39;S OWN AIR FORCE IN THE CROSSHAIRS</h2>
+    <div class="section-body">
+      <p data-i18n="raiderP1">Yoshiki Okamoto designed 1942 as Capcom&#39;s first title built with Western arcades in mind: a lone fighter climbing alone through the Pacific sky, fighting through wave after wave of enemy planes toward Tokyo. Its signature move — holding the stick to loop the plane into a brief, screen-clearing barrel roll — became a genre fixture, alongside the trailing &quot;power plane&quot; escorts a player could collect and lose. Released in November 1984, it sold well enough to spawn 1943: The Battle of Midway two years later and the whole 194X lineage after it.</p>
+      <p data-i18n="raiderP2">Raider borrows 1942&#39;s chassis — a lone fighter climbing through wave after wave of enemy aircraft over open water — without attempting a faithful recreation of it. In its place: a coordinated-turn flight model (bank drives heading, not the other way round) instead of fixed movement paths, seven escalating bosses with bilingual name banners, a carrier launch that opens every stage, and a sea layer with drifting boats, procedurally-generated cumulus clouds, and rare turret-armed islands that shoot back.</p>
+      <div class="impl-label" data-i18n="implLabel">► Other implementations online</div>
+      <ul class="impl-list">
+        <li data-i18n="raiderImpl1"><a class="inline-link" href="https://classicgame.online/games/1942" target="_blank" rel="noopener">classicgame.online &mdash; 1942</a> — Play the 1984 original straight in the browser, no emulator setup.</li>
+        <li data-i18n="raiderImpl2"><a class="inline-link" href="https://github.com/iainbx/1942" target="_blank" rel="noopener">GitHub &mdash; iainbx/1942</a> — An HTML5/JavaScript recreation of the arcade original, fully in-browser.</li>
+        <li data-i18n="raiderImpl3"><a class="inline-link" href="https://github.com/search?q=1942+arcade+shooter&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; 1942 repositories</a> — Open-source clones and tributes across languages, sortable by stars.</li>
+      </ul>
+    </div>
+  </section>
+
 </div>
 
   <div class="left-badges">
@@ -448,7 +480,7 @@
     <button class="kiosk-btn" id="kiosk-insert-btn">&#x25BA; INSERT COIN</button>
   </div>
 
-  <script src="kiosk.js?v=6"></script>
+  <script src="kiosk.js?v=9"></script>
   <script>
     var i18n = {
 
@@ -464,6 +496,8 @@
         taitoP:         'Taito began as a vending machine and jukebox importer. By the late 1970s it was one of the dominant forces in Japanese arcade gaming. Tomohiro Nishikado, a staff engineer with no formal game design training, spent nearly a year hand-designing the hardware and software for Space Invaders (1978). The game caused a national coin shortage in Japan and exported the arcade boom to the rest of the world. Galactic Defender in BLIP ARCADE is inspired by that work.',
         gremlinDates:   '1976 / 1997',
         gremlinP:       'The snake concept was born at Gremlin Industries as Blockade (1976), a two-player arcade game where each player\'s trail became an obstacle. The mechanic lay dormant for two decades until Nokia engineer Taneli Armanto wrote a solo version for the Nokia 6110 in 1997. Preinstalled on hundreds of millions of handsets, Snake became one of the most widely played games in history before smartphones existed. Serpent in BLIP ARCADE follows that thread.',
+        capcomDates:    'Founded 1983 — Osaka, Japan',
+        capcomP:        'Capcom grew out of Kenzo Tsujimoto\'s 1979 electronics venture I.R.M. Corporation and was formally established in 1983 to publish arcade software. A year later, director Yoshiki Okamoto shipped 1942 (1984) — Capcom\'s first game built deliberately for Western arcades, casting the studio\'s own home air force as the enemy so American players would be shooting the other side. It set the template for the vertical-scrolling shoot-\'em-up: a lone fighter climbing through wave after wave of enemy planes, a barrel-roll dodge held in reserve, and formation-flying power-ups. Raider in BLIP ARCADE takes off from that runway.',
         bookLabel:      '► Learn more: Code the Classics',
         bookP1:         'If you want to understand the algorithms behind these games — the collision detection, the sprite rendering, the enemy AI — the best starting point is <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a> (Raspberry Pi Press, 2019), edited by Eben Upton and David Crookes.',
         bookP2:         'The book rebuilds games like Boing! (Pong), Cavern (Manic Miner), and Infinite Bunner (Frogger) in Python, explaining every algorithmic decision along the way. It is not a nostalgic coffee-table book — it is a working technical guide with full source code for each title. A second volume followed in 2022 and is available at <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-ii" target="_blank" rel="noopener">magazine.raspberrypi.com</a>.',
@@ -502,7 +536,14 @@
         meteorsP2:      'Released in November 1979, Asteroids became Atari\'s best-selling arcade game of all time, moving more than 70,000 cabinets and briefly dethroning Space Invaders as the highest-earning game in North American arcades. Its wraparound playfield, escalating asteroid splits, and a last-resort hyperspace jump — which carried a small chance of self-destruction — became a template the genre never really moved past. Meteors in BLIP ARCADE follows it line for line: vector outlines, momentum-based flight, and a jump button you only press when you\'re desperate.',
         meteorsImpl1:   '<a class="inline-link" href="https://games.aarp.org/games/atari-asteroids" target="_blank" rel="noopener">AARP Games — Atari® Asteroids</a> — A licensed browser version of the 1979 original.',
         meteorsImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=asteroids" target="_blank" rel="noopener">MIT Scratch — Asteroids projects</a> — Community recreations exploring vector-style movement and screen wrapping.',
-        meteorsImpl3:   '<a class="inline-link" href="https://github.com/search?q=asteroids+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Asteroids repositories</a> — Open-source clones in JavaScript, Rust, C++ and Python, sortable by stars.'
+        meteorsImpl3:   '<a class="inline-link" href="https://github.com/search?q=asteroids+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Asteroids repositories</a> — Open-source clones in JavaScript, Rust, C++ and Python, sortable by stars.',
+        raiderOrigin:   'Inspired by 1942 — Capcom, 1984',
+        raiderSub:      'THE SHOOT-\'EM-UP THAT PUT A JAPANESE STUDIO\'S OWN AIR FORCE IN THE CROSSHAIRS',
+        raiderP1:       'Yoshiki Okamoto designed 1942 as Capcom\'s first title built with Western arcades in mind: a lone fighter climbing alone through the Pacific sky, fighting through wave after wave of enemy planes toward Tokyo. Its signature move — holding the stick to loop the plane into a brief, screen-clearing barrel roll — became a genre fixture, alongside the trailing "power plane" escorts a player could collect and lose. Released in November 1984, it sold well enough to spawn 1943: The Battle of Midway two years later and the whole 194X lineage after it.',
+        raiderP2:       'Raider borrows 1942\'s chassis — a lone fighter climbing through wave after wave of enemy aircraft over open water — without attempting a faithful recreation of it. In its place: a coordinated-turn flight model (bank drives heading, not the other way round) instead of fixed movement paths, seven escalating bosses with bilingual name banners, a carrier launch that opens every stage, and a sea layer with drifting boats, procedurally-generated cumulus clouds, and rare turret-armed islands that shoot back.',
+        raiderImpl1:    '<a class="inline-link" href="https://classicgame.online/games/1942" target="_blank" rel="noopener">classicgame.online — 1942</a> — Play the 1984 original straight in the browser, no emulator setup.',
+        raiderImpl2:    '<a class="inline-link" href="https://github.com/iainbx/1942" target="_blank" rel="noopener">GitHub — iainbx/1942</a> — An HTML5/JavaScript recreation of the arcade original, fully in-browser.',
+        raiderImpl3:    '<a class="inline-link" href="https://github.com/search?q=1942+arcade+shooter&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — 1942 repositories</a> — Open-source clones and tributes across languages, sortable by stars.'
       },
 
       da: {
@@ -517,6 +558,8 @@
         taitoP:         'Taito begyndte som importør af automater og jukebokse. I slutningen af 1970\'erne var virksomheden en af de dominerende kræfter i japansk arkadeunderholding. Tomohiro Nishikado, en stab af ingeiniører uden formel spiluddannelse, brugte næsten et år på at designe hardwaren og softwaren til Space Invaders (1978). Spillet forårsagede en national møntmangel i Japan og eksporterede arkadebølgen til resten af verden. Galactic Defender i BLIP ARCADE er inspireret af dette arbejde.',
         gremlinDates:   '1976 / 1997',
         gremlinP:       'Slangemekanikken opstod i spillet Blockade (1976) hos Gremlin Industries, et to-spillers arkadespil, hvor begge spilleres stier blev til forhindringer. Mekanikken lå ubrugt i to årtier, indtil Nokia-ingeiniøren Taneli Armanto i 1997 programmerede en soloversion til Nokia 6110. Forudinstalleret på hundredvis af millioner enheder blev Snake et af historiens mest udbredte spil — før smartphones eksisterede. Serpent i BLIP ARCADE følger denne tråd.',
+        capcomDates:    'Grundlagt 1983 — Osaka, Japan',
+        capcomP:        'Capcom udsprang af Kenzo Tsujimotos elektronikvirksomhed I.R.M. Corporation fra 1979 og blev formelt stiftet i 1983 for at udgive arkadesoftware. Året efter udgav instruktør Yoshiki Okamoto 1942 (1984) — Capcoms første spil bevidst bygget til vestlige arkader, hvor studiets eget hjemlands luftvåben blev gjort til fjenden, så amerikanske spillere skød mod den anden side. Det satte skabelonen for det lodret-scrollende skydespil: et enkelt jagerfly, der kæmper sig gennem bølge på bølge af fjendtlige fly, en rulning i reserve som undvigemanøvre, og eskorterende power-ups i formation. Raider i BLIP ARCADE letter fra den samme landingsbane.',
         bookLabel:      '► Lær mere: Code the Classics',
         bookP1:         'Hvis du vil forstå algoritmerne bag disse spil — kollisionsdetektering, sprite-gengivelse, fjende-AI — er det bedste udgangspunkt <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a> (Raspberry Pi Press, 2019), redigeret af Eben Upton og David Crookes.',
         bookP2:         'Bogen genopbygger spil som Boing! (Pong), Cavern (Manic Miner) og Infinite Bunner (Frogger) i Python og forklarer alle algoritmiske beslutninger undervejs. Det er ikke en nostalgisk billedbog — det er en velfungerende teknisk guide med fuld kildekode til hvert spil. Et andet bind fulgte i 2022 og er tilgængeligt på <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-ii" target="_blank" rel="noopener">magazine.raspberrypi.com</a>.',
@@ -555,7 +598,14 @@
         meteorsP2:      'Asteroids udkom i november 1979 og blev Ataris bedst sælgende arkadespil nogensinde med over 70.000 solgte kabinetter, og detronede kortvarigt Space Invaders som det mest indbringende spil i nordamerikanske arkader. Den ombrydende spilleflade, de eskalerende asteroide-opdelinger og et desperat hyperrum-spring — som medførte en lille risiko for selvdestruktion — blev en skabelon, genren aldrig for alvor bevægede sig væk fra. Meteors i BLIP ARCADE følger den til punkt og prikke: vektorkonturer, inertibaseret flyvning og en springknap, du kun bruger, når du er desperat.',
         meteorsImpl1:   '<a class="inline-link" href="https://games.aarp.org/games/atari-asteroids" target="_blank" rel="noopener">AARP Games — Atari® Asteroids</a> — En officiel browserversion af originalen fra 1979.',
         meteorsImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=asteroids" target="_blank" rel="noopener">MIT Scratch — Asteroids-projekter</a> — Community-genskabelser, der udforsker vektorbaseret bevægelse og skærmombrydning.',
-        meteorsImpl3:   '<a class="inline-link" href="https://github.com/search?q=asteroids+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Asteroids-repositories</a> — Open source-kloner i JavaScript, Rust, C++ og Python, sorterbare efter stjerner.'
+        meteorsImpl3:   '<a class="inline-link" href="https://github.com/search?q=asteroids+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Asteroids-repositories</a> — Open source-kloner i JavaScript, Rust, C++ og Python, sorterbare efter stjerner.',
+        raiderOrigin:   'Inspireret af 1942 — Capcom, 1984',
+        raiderSub:      'SKYDESPILLET DER SATTE ET JAPANSK STUDIOS EGET LUFTVÅBEN I SIGTEKORNET',
+        raiderP1:       'Yoshiki Okamoto designede 1942 som Capcoms første titel bygget med vestlige arkader for øje: et enkelt jagerfly, der alene klatrer gennem Stillehavets himmel og kæmper sig gennem bølge på bølge af fjendtlige fly på vej mod Tokyo. Dens signaturtræk — at holde joysticket inde for at rulle flyet ind i en kort, skærmryddende barrel roll — blev et fast greb i genren, sammen med de eskorterende "power planes", man kunne opsamle og miste. Udgivet i november 1984 solgte det godt nok til at føde 1943: The Battle of Midway to år senere og hele 194X-slægten efter det.',
+        raiderP2:       'Raider låner 1942s grundopskrift — et jagerfly, der alene klatrer gennem bølge på bølge af fjendtlige fly over åbent hav — men forsøger ikke en trofast genskabelse. I stedet: en koordineret-sving-flyvemodel (krængning styrer kurs, ikke omvendt) i stedet for faste bevægelsesmønstre, syv eskalerende bosser med tosprogede navneskilte, en hangarskibsstart der indleder hvert niveau, og et havlag med sejlende både, procedurelt genererede stakskyer og sjældne tårnbevæbnede øer, der skyder igen.',
+        raiderImpl1:    '<a class="inline-link" href="https://classicgame.online/games/1942" target="_blank" rel="noopener">classicgame.online — 1942</a> — Spil originalen fra 1984 direkte i browseren, ingen emulator nødvendig.',
+        raiderImpl2:    '<a class="inline-link" href="https://github.com/iainbx/1942" target="_blank" rel="noopener">GitHub — iainbx/1942</a> — En HTML5/JavaScript-genskabelse af arkadeoriginalen, kører helt i browseren.',
+        raiderImpl3:    '<a class="inline-link" href="https://github.com/search?q=1942+arcade+shooter&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — 1942-repositories</a> — Open source-kloner og hyldestprojekter på tværs af sprog, sorterbare efter stjerner.'
       },
 
       ja: {
@@ -570,6 +620,8 @@
         taitoP:         'タイトーは自動販売機とジュークボックスの輸入業者として事業を始めました。1970年代後半には日本のアーケードゲーム産業の主要な勢力の一つとなっていました。正式なゲームデザインの訓練を受けていないスタッフエンジニアの西角友宮は、スペースインベーダー（1978年）のハードウェアとソフトウェアの設計に約1年を費やしました。このゲームは日本で100円硬貨の全国的な不足を引き起こし、アーケードブームを世界中へ輸出しました。BLIP ARCADEのGalactic Defenderはその作品から着想を得ています。',
         gremlinDates:   '1976年 / 1997年',
         gremlinP:       '蛇のコンセプトはGremlin IndustriesのBlockade（1976年）として誕生しました。プレイヤーが自分の軌跡を伸ばしながら操作する2人用アーケードゲームで、相手の軌跡に触れると負けというものでした。このメカニクは20年間眠っていましたが、1997年にNokiaのエンジニア、タネリ・アルマントがNokia 6110用にソロバージョンを制作しました。何億台ものハンドセットにプリインストールされたSnakeは、スマートフォンが存在する前から歴史上最も広くプレイされたゲームの一つになりました。BLIP ARCADEのSerpentはその系譜を受け継いでいます。',
+        capcomDates:    '1983年設立 — 大阪、日本',
+        capcomP:        'Capcomは辻本憲三が1979年に設立した電子機器会社I.R.M. Corporationから生まれ、1983年にアーケードソフトウェアを発売するために正式に設立されました。翌年、ディレクターの岡本吉起は1942（1984年）を発売しました——欧米のアーケード市場を意識して作られたCapcom初のタイトルで、スタジオ自身の祖国の空軍を敵として描き、アメリカのプレイヤーが反対側を撃つようにしたのです。縦スクロールシューティングの定型を確立しました：波状に押し寄せる敵機を突破する一機の戦闘機、温存しておく宙返り回避、そして編隊を組む僚機のパワーアップ。BLIP ARCADEのRaiderはその滑走路から飛び立ちます。',
         bookLabel:      '► さらに学ぶ：Code the Classics',
         bookP1:         'これらのゲームの背後にあるアルゴリズム——衝突検出、スプライト描画、敵のAI——を理解したいなら、最良の出発点は<a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a>（Raspberry Pi Press、2019年）です。エベン・アプトンとデイヴィッド・クルークス編著。',
         bookP2:         'この本はBoing!（Pong）、Cavern（Manic Miner）、Infinite Bunner（Frogger）などのゲームをPythonで再構築し、すべてのアルゴリズム的決断を丁寧に解説しています。懐かしのコーヒーテーブル本ではありません——各タイトルの完全なソースコードを含む実用的な技術ガイドです。第2巻は2022年に刊行され、<a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-ii" target="_blank" rel="noopener">magazine.raspberrypi.com</a>から入手できます。',
@@ -608,7 +660,14 @@
         meteorsP2:      '1979年11月に発売されたAsteroidsは、7万台以上を売り上げAtari史上最も売れたアーケードゲームとなり、北米アーケードで最も稼いだゲームの座を一時的にSpace Invadersから奪いました。画面端をつなぐ折り返しフィールド、段階的に分裂する小惑星、そして自爆の危険を伴う最後の手段であるハイパースペースジャンプは、このジャンルがその後も抜け出せなかった定番となりました。BLIP ARCADEのMeteorsはそれを忠実に踏襲しています——ベクターの輪郭、慣性ベースの飛行、そして本当に追い詰められたときだけ押すジャンプボタン。',
         meteorsImpl1:   '<a class="inline-link" href="https://games.aarp.org/games/atari-asteroids" target="_blank" rel="noopener">AARP Games — Atari® Asteroids</a> — 1979年オリジナルの公式ブラウザ版。',
         meteorsImpl2:   '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=asteroids" target="_blank" rel="noopener">MIT Scratch — Asteroidsプロジェクト</a> — ベクター風の動きと画面ラップアラウンドを探求するコミュニティ制作版。',
-        meteorsImpl3:   '<a class="inline-link" href="https://github.com/search?q=asteroids+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Asteroidsリポジトリ</a> — JavaScript、Rust、C++、Pythonによるオープンソースのクローン。スター数で並べ替え可能。'
+        meteorsImpl3:   '<a class="inline-link" href="https://github.com/search?q=asteroids+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Asteroidsリポジトリ</a> — JavaScript、Rust、C++、Pythonによるオープンソースのクローン。スター数で並べ替え可能。',
+        raiderOrigin:   '1942を原典として — Capcom、1984年',
+        raiderSub:      '日本のスタジオが自らの空軍を照準に入れたシューティングゲーム',
+        raiderP1:       '岡本吉起は1942を欧米のアーケード市場を念頭に置いて設計したCapcom初のタイトルとしてデザインしました：太平洋の空を単独で上昇する一機の戦闘機が、東京を目指して波状の敵機を突破していきます。ジョイスティックを倒し続けて画面を一掃する一時的なバレルロールに入るという代名詞的な操作は、集めては失う「パワープレーン」の僚機とともにジャンルの定番となりました。1984年11月に発売され、2年後の1943: The Battle of Midwayと、その後の194Xシリーズ全体を生み出すほどの成功を収めました。',
+        raiderP2:       'Raiderは1942の骨格——大海原の上空を単独で上昇し、波状の敵機を突破し続ける戦闘機——を借りていますが、忠実な再現は目指していません。固定された移動パターンの代わりに協調旋回の飛行モデル(バンク角が進路を決める、その逆ではない)、二か国語の名前バナーを持つ七体の段階的なボス、各ステージの幕開けとなる空母からの発艦、そして漂う船、手続き型生成された積雲、反撃してくる砲台付きの島が点在する稀な海面レイヤーを備えています。',
+        raiderImpl1:    '<a class="inline-link" href="https://classicgame.online/games/1942" target="_blank" rel="noopener">classicgame.online — 1942</a> — エミュレータ不要、ブラウザで直接1984年のオリジナルをプレイ。',
+        raiderImpl2:    '<a class="inline-link" href="https://github.com/iainbx/1942" target="_blank" rel="noopener">GitHub — iainbx/1942</a> — アーケードオリジナルのHTML5/JavaScript版、完全にブラウザ内で動作。',
+        raiderImpl3:    '<a class="inline-link" href="https://github.com/search?q=1942+arcade+shooter&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — 1942リポジトリ</a> — 複数言語によるオープンソースのクローンやオマージュ作品、スター数で並べ替え可能。'
       }
 
     };

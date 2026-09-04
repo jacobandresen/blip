@@ -1,5 +1,10 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Cabinet accent — "r, g, b" so rgba(var(--cab), a) works. shell.js overrides
+   this per game (see BLIP_GAMES in kiosk.js); this green is just the default
+   before that runs. */
+:root { --cab: 50, 200, 50; }
+
 html {
   /* overflow:hidden only on html, not body — iOS Safari anchors position:fixed
      to the body when body has overflow:hidden, shifting fixed elements off-position */
@@ -22,6 +27,9 @@ body {
       transparent 0px, transparent 4px,
       rgba(255,255,255,0.03) 4px, rgba(255,255,255,0.03) 5px
     ),
+    /* per-game wash — a hint of cabinet accent bleeding down from the marquee,
+       so each game's chassis reads as its own machine, not five green boxes */
+    radial-gradient(ellipse 70% 40% at 50% 0%, rgba(var(--cab), 0.18) 0%, transparent 70%),
     linear-gradient(155deg, #505050 0%, #3a3a3a 55%, #484848 100%);
   touch-action: none;
 }
@@ -50,15 +58,40 @@ body::after {
   z-index: 99;
 }
 
-/* marquee bulb strip along the very top edge of the cabinet */
-#marquee-strip {
+/* ---- Marquee — backlit per-game name sign, reserved above the screen ----
+   Built in shell.js (so rally's hand-maintained page gets it for free); this
+   just styles whatever it inserts. Its rendered height is what shell.js
+   reserves in fillCanvas(), so keep the 28px default here and there in sync. */
+#marquee-bar {
   position: fixed;
-  top: 5px;
-  left: 12%;
-  right: 12%;
-  height: 4px;
-  pointer-events: none;
+  top: 0; left: 0; right: 0;
+  height: 28px;
   z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+  background: linear-gradient(180deg, #101010, #000 92%);
+  border-bottom: 1px solid rgba(var(--cab), 0.35);
+  box-shadow: 0 0 16px rgba(var(--cab), 0.25), 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+#marquee-name {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 5px;
+  color: rgb(var(--cab));
+  text-shadow: 0 0 6px rgba(var(--cab), 0.9), 0 0 20px rgba(var(--cab), 0.5);
+  animation: marquee-flicker 5s ease-in-out infinite;
+}
+
+/* bulb strips flanking the name, same warm bulbs as the kiosk landing page */
+.marquee-bulbs {
+  flex: 1 1 auto;
+  max-width: 110px;
+  height: 4px;
   background-image: radial-gradient(circle, #e6dc32 0 1.6px, transparent 2px);
   background-size: 18px 4px;
   background-repeat: repeat-x;
@@ -66,15 +99,23 @@ body::after {
   filter: drop-shadow(0 0 4px #e6dc32);
   animation: marquee-bulbs 1.6s steps(2, jump-none) infinite;
 }
+.marquee-bulbs + #marquee-name + .marquee-bulbs { animation-delay: .8s; }
+
 @keyframes marquee-bulbs {
   50% { filter: drop-shadow(0 0 1px #e6dc32); opacity: .5; }
+}
+/* rare, brief flicker — a sign that's been running all night, not a strobe */
+@keyframes marquee-flicker {
+  0%, 95%, 100% { opacity: 1; }
+  96% { opacity: 0.35; }
+  97% { opacity: 0.9; }
 }
 
 /* ---- Arcade cabinet bezel ---- */
 
 #arcade-bezel {
   position: fixed;
-  top: 3px;
+  top: 31px; /* marquee (28px) + 3px */
   left: 3px;
   right: 3px;
   bottom: calc(56px + 3px + env(safe-area-inset-bottom, 0px));
@@ -83,9 +124,9 @@ body::after {
   z-index: 8;
   background: transparent;
   border-radius: 14px;
-  border: 1px solid rgba(50, 200, 80, 0.45);
+  border: 1px solid rgba(var(--cab), 0.45);
   box-shadow:
-    0 0 28px rgba(0, 180, 50, 0.15),
+    0 0 28px rgba(var(--cab), 0.15),
     inset 0 0 18px rgba(0, 0, 0, 0.35),
     0 0 0 12px rgba(10, 10, 11, 0.9),
     0 0 0 13px rgba(255, 255, 255, 0.05);
@@ -112,8 +153,8 @@ body::after {
   background: #000;
   transform: translate(-50%, -50%) rotate(35deg);
 }
-.bezel-screw.tl { top: 13px; left: 13px; }
-.bezel-screw.tr { top: 13px; right: 13px; }
+.bezel-screw.tl { top: 41px; left: 13px; } /* marquee (28px) + 13px */
+.bezel-screw.tr { top: 41px; right: 13px; }
 .bezel-screw.bl { bottom: calc(56px + 13px + env(safe-area-inset-bottom, 0px)); left: 13px; }
 .bezel-screw.br { bottom: calc(56px + 13px + env(safe-area-inset-bottom, 0px)); right: 13px; }
 
@@ -449,6 +490,11 @@ canvas {
 
 /* Shrink controls in landscape / short screens */
 @media (max-height: 450px) {
+  #marquee-bar { height: 20px; gap: 8px; }
+  #marquee-name { font-size: 10px; letter-spacing: 3px; }
+  .marquee-bulbs { max-width: 60px; }
+  #arcade-bezel { top: 23px; } /* marquee (20px) + 3px */
+  .bezel-screw.tl, .bezel-screw.tr { top: 31px; } /* marquee (20px) + 11px */
   #dpad {
     width: 99px;
     height: 99px;
@@ -518,4 +564,10 @@ canvas {
   border-color: rgba(50, 200, 50, 0.55);
   color: #32c832;
   box-shadow: 0 0 14px rgba(50, 200, 50, 0.4);
+}
+
+/* Narrow phones — DEFENDER at 5px letter-spacing is the widest name; give it room */
+@media (max-width: 380px) {
+  #marquee-name { font-size: 11px; letter-spacing: 3px; }
+  .marquee-bulbs { max-width: 40px; }
 }

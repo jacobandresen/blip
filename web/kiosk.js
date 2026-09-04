@@ -1,5 +1,28 @@
 var MAX_COINS = 5;
 
+/* ---- Per-game cabinet identity ----
+ * Shared by the kiosk landing page (card colours) and each game's shell page
+ * (marquee sign + bezel glow), so every cabinet reads as its own machine
+ * instead of five copies of the same green box. `accent` is an "r, g, b"
+ * triple so CSS can build both solid and translucent colours from one value.
+ */
+var BLIP_GAMES = {
+  serpent:            { name: 'SERPENT',  accent: '50, 200, 50'   },
+  bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200'   },
+  galactic_defender:  { name: 'DEFENDER', accent: '200, 50, 200'  },
+  rally:              { name: 'RALLY',    accent: '220, 50, 50'   },
+  meteors:            { name: 'METEORS',  accent: '180, 180, 180' },
+  sky_raider:         { name: 'RAIDER', accent: '50, 100, 220' }
+};
+
+// Pick out the game slug from a shell-page URL, e.g. "/blip/serpent/index.html"
+// or "/serpent/" both resolve to "serpent". Returns null off the game pages.
+function blipGameFromPath(pathname) {
+  var m = /\/([a-z_]+)\/(?:index\.html)?$/i.exec(pathname || '');
+  var g = m && BLIP_GAMES[m[1]];
+  return g ? { slug: m[1], name: g.name, accent: g.accent } : null;
+}
+
 if ('serviceWorker' in navigator) {
   var _manifest = document.querySelector('link[rel=manifest]');
   if (_manifest) {

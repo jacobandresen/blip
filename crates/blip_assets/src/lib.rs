@@ -23,6 +23,7 @@ pub mod galactic_defender;
 pub mod meteors;
 pub mod rally;
 pub mod serpent;
+pub mod sky_raider;
 
 pub type Asset = (&'static str, Vec<u8>);
 
