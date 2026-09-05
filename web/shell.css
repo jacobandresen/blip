@@ -65,7 +65,15 @@ body::after {
 #marquee-bar {
   position: fixed;
   top: 0; left: 0; right: 0;
-  height: 28px;
+  /* Reserve the iPhone status bar / Dynamic Island strip when installed to
+     the home screen (standalone + viewport-fit=cover render the page full
+     bleed under it): the sign draws in the 28px below the inset, and its
+     background fills up behind the clock so it reads as one lit strip.
+     shell.js's fillCanvas() measures offsetHeight, so the canvas and bezel
+     follow this taller box automatically. */
+  box-sizing: border-box;
+  height: calc(28px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
   z-index: 9;
   display: flex;
   align-items: center;
@@ -115,7 +123,7 @@ body::after {
 
 #arcade-bezel {
   position: fixed;
-  top: 31px; /* marquee (28px) + 3px */
+  top: calc(31px + env(safe-area-inset-top, 0px)); /* marquee (28px) + 3px, below the status-bar inset */
   left: 3px;
   right: 3px;
   bottom: calc(var(--topbar-h, 56px) + 3px + env(safe-area-inset-bottom, 0px));
@@ -153,8 +161,8 @@ body::after {
   background: #000;
   transform: translate(-50%, -50%) rotate(35deg);
 }
-.bezel-screw.tl { top: 41px; left: 13px; } /* marquee (28px) + 13px */
-.bezel-screw.tr { top: 41px; right: 13px; }
+.bezel-screw.tl { top: calc(41px + env(safe-area-inset-top, 0px)); left: 13px; } /* marquee (28px) + 13px */
+.bezel-screw.tr { top: calc(41px + env(safe-area-inset-top, 0px)); right: 13px; }
 .bezel-screw.bl { bottom: calc(var(--topbar-h, 56px) + 13px + env(safe-area-inset-bottom, 0px)); left: 13px; }
 .bezel-screw.br { bottom: calc(var(--topbar-h, 56px) + 13px + env(safe-area-inset-bottom, 0px)); right: 13px; }
 
@@ -391,19 +399,22 @@ canvas {
 
 /* Shrink controls in landscape / short screens */
 @media (max-height: 450px) {
-  #marquee-bar { height: 20px; gap: 8px; }
+  #marquee-bar { height: calc(20px + env(safe-area-inset-top, 0px)); gap: 8px; }
   #marquee-name { font-size: 10px; letter-spacing: 3px; }
   .marquee-bulbs { max-width: 60px; }
-  #arcade-bezel { top: 23px; } /* marquee (20px) + 3px */
-  .bezel-screw.tl, .bezel-screw.tr { top: 31px; } /* marquee (20px) + 11px */
-  #stick-base { width: 46px; height: 148px; }
-  #stick-boot { width: 34px; height: 34px; bottom: 5px; }
-  #stick-handle { bottom: 39px; } /* = boot's bottom + height, its top surface */
-  #stick-shaft { width: 7px; height: 48px; }
-  #stick-ball  { width: 22px; height: 22px; bottom: 48px; } /* = shaft height */
+  #arcade-bezel { top: calc(23px + env(safe-area-inset-top, 0px)); } /* marquee (20px) + 3px */
+  .bezel-screw.tl, .bezel-screw.tr { top: calc(31px + env(safe-area-inset-top, 0px)); } /* marquee (20px) + 11px */
+  /* Landscape still gets a real thumb target — the ball floats above the
+     bar over the game, so it can stay large even though vertical room is
+     tight; only the shaft's swing shrinks. */
+  #stick-base { width: 72px; height: 148px; }
+  #stick-boot { width: 38px; height: 38px; bottom: 5px; }
+  #stick-handle { bottom: 43px; } /* = boot's bottom + height, its top surface */
+  #stick-shaft { width: 9px; height: 40px; }
+  #stick-ball  { width: 42px; height: 42px; bottom: 40px; } /* = shaft height */
 
-  #fire-buttons { gap: 6px; }
-  .arcade-btn { width: 34px; height: 34px; }
+  #fire-buttons { gap: 10px; }
+  .arcade-btn { width: 46px; height: 46px; }
 
   #paddle-dial, #paddle-dial-p2 {
     width: 76px;

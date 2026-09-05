@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=21">
+  <link rel="stylesheet" href="kiosk.css?v=22">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -73,7 +73,7 @@
          above, not the old headroom a 3-line banner needed. Freed space
          goes to pulling the game grid up, per an explicit request to use
          the top of the page better. */
-      padding: 48px 0 12px;
+      padding: calc(48px + env(safe-area-inset-top, 0px)) 0 12px;
       position: relative;
     }
 
@@ -168,7 +168,14 @@
     .top-marquee-bar {
       position: fixed;
       top: 0; left: 0; right: 0;
-      height: 40px;
+      /* Reserve the iPhone status bar / Dynamic Island strip when the app
+         is installed to the home screen — standalone + viewport-fit=cover
+         render this page full bleed under it, which otherwise hides the
+         sign (and the BLIP ARCADE logo over its left end) behind the
+         clock. The strip draws in the 40px below the inset. */
+      box-sizing: border-box;
+      height: calc(40px + env(safe-area-inset-top, 0px));
+      padding-top: env(safe-area-inset-top, 0px);
       z-index: 9;
       display: flex;
       align-items: center;
@@ -183,7 +190,7 @@
        (same specificity, later in the cascade than kiosk.css, so this
        overrides just on this page without touching the shared rule). */
     .blip-logo {
-      height: 40px;
+      height: calc(40px + env(safe-area-inset-top, 0px));
     }
     .insert-coin {
       max-width: calc(100vw - 170px);
@@ -220,6 +227,9 @@
 
     @media (max-width: 480px) {
       .insert-coin { font-size: 10px; letter-spacing: 2px; max-width: calc(100vw - 150px); }
+      /* The kiosk bar grows to ~76px on phones to seat the bigger touch
+         controls, so lift the corner badges / language flags clear of it. */
+      .left-badges, .lang-switcher { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
     }
     @media (max-width: 380px) {
       .insert-coin { font-size: 8px; letter-spacing: 1px; max-width: calc(100vw - 130px); }

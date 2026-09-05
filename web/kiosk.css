@@ -163,15 +163,20 @@
   position: fixed;
   top: 0;
   left: 8px;
-  height: 32px;
+  /* Sit below the iPhone status bar / Dynamic Island inset (0 everywhere
+     else) so the logo stays aligned with the marquee strip it overlays
+     rather than disappearing behind the clock in home-screen mode. */
+  box-sizing: border-box;
+  height: calc(32px + env(safe-area-inset-top, 0px));
   z-index: 500;
   display: inline-flex;
   align-items: center;
   /* No visible padding beyond centring the text in the strip — but the
      box's own width (text + this gap) still gives a reasonably wide tap
      target despite the type not being huge, the same way the bar's own
-     kiosk-btn controls get their tap size from width, not height. */
-  padding: 0 8px;
+     kiosk-btn controls get their tap size from width, not height. The
+     top pad is the status-bar inset (0 off iPhone home-screen mode). */
+  padding: env(safe-area-inset-top, 0px) 8px 0;
   font-family: 'Courier New', Courier, monospace;
   font-weight: 900;
   font-size: 18px;
@@ -619,49 +624,56 @@
     inset 0 1px 0 rgba(50, 200, 50, 0.1);
 }
 
-/* Phones — the row now carries the stick and buttons too, so give up more
-   space than the 480px breakpoint above does elsewhere. The ball stays a
-   comfortable thumb target at every tier (it barely shrinks); the lean's
-   swing (shaft length) shrinks a bit faster than that so the whole stick
-   still clears the left edge without needing much horizontal padding to
-   itself, leaving that space for the bar text instead. */
+/* Phones — the deck has to be actually playable by thumb here, not a
+   scaled-down diagram of one. So the bar grows tall enough to seat a
+   full-size stick and thumb-wide buttons, and the coin readout on the
+   right gives up its type size to make room rather than squeezing the
+   controls. The ball and buttons stay at (or above) Apple's ~44px touch
+   minimum at every tier; only the shaft's swing and the hit-area width
+   shrink on the way down, so the stick still clears the left edge. */
 @media (max-width: 480px) {
-  #topbar.kiosk-bar, .kiosk-bar-main { gap: 3px; padding-left: 6px; padding-right: 6px; }
-  #topbar .kiosk-btn, .kiosk-bar-main .kiosk-btn { font-size: 10px; padding: 5px 5px; }
-  #stick-base { width: 90px; }
-  #stick-boot { width: 36px; height: 36px; }
-  #stick-handle { bottom: 24px; }
-  #stick-shaft { width: 8px; height: 34px; }
-  #stick-ball  { width: 34px; height: 34px; bottom: 34px; }
-  #fire-buttons { gap: 5px; }
-  .arcade-btn { width: 17px; height: 17px; }
+  #topbar.kiosk-bar, .kiosk-bar-main {
+    height: calc(76px + env(safe-area-inset-bottom, 0px));
+    gap: 6px; padding-left: 8px; padding-right: 8px;
+  }
+  #topbar .kiosk-btn, .kiosk-bar-main .kiosk-btn { font-size: 10px; letter-spacing: 0; padding: 5px 7px; }
+  #stick-base { width: 118px; }
+  #stick-boot { width: 50px; height: 50px; }
+  #stick-handle { bottom: 31px; }
+  #stick-shaft { width: 12px; height: 46px; }
+  #stick-ball  { width: 58px; height: 58px; bottom: 46px; }
+  #fire-buttons { gap: 12px; }
+  .arcade-btn { width: 60px; height: 60px; }
+  /* Clear the corner badges of the now-taller bar and its raised stick. */
+  .left-badges { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 }
 
-/* Smallest phones (iPhone SE/mini class) — a 2-button game plus the full
-   bar text is tight enough to need one more pass. */
+/* Smallest phones (iPhone SE/mini class) — a 2-button game plus the coin
+   readout is tight, so trim the stick's footprint and the button gap a
+   little, but keep both stick and buttons above the touch minimum. */
 @media (max-width: 380px) {
-  #topbar.kiosk-bar, .kiosk-bar-main { gap: 2px; padding-left: 4px; padding-right: 4px; }
-  #topbar .kiosk-btn, .kiosk-bar-main .kiosk-btn { font-size: 9px; padding: 4px 4px; }
-  #stick-base { width: 78px; }
-  #stick-boot { width: 32px; height: 32px; }
-  #stick-handle { bottom: 22px; }
-  #stick-shaft { width: 7px; height: 30px; }
-  #stick-ball  { width: 30px; height: 30px; bottom: 30px; }
-  #fire-buttons { gap: 4px; }
-  .arcade-btn { width: 15px; height: 15px; }
+  #topbar.kiosk-bar, .kiosk-bar-main { gap: 4px; padding-left: 6px; padding-right: 6px; }
+  #topbar .kiosk-btn, .kiosk-bar-main .kiosk-btn { font-size: 9px; padding: 4px 5px; }
+  #stick-base { width: 104px; }
+  #stick-boot { width: 46px; height: 46px; }
+  #stick-handle { bottom: 29px; }
+  #stick-shaft { width: 11px; height: 42px; }
+  #stick-ball  { width: 54px; height: 54px; bottom: 42px; }
+  #fire-buttons { gap: 9px; }
+  .arcade-btn { width: 56px; height: 56px; }
 }
 
 /* Below any current iPhone (kept as a graceful floor, not a target) */
 @media (max-width: 340px) {
-  #topbar.kiosk-bar, .kiosk-bar-main { gap: 1px; padding-left: 3px; padding-right: 3px; }
-  #topbar .kiosk-btn, .kiosk-bar-main .kiosk-btn { font-size: 8px; padding: 3px 3px; }
-  #stick-base { width: 68px; }
-  #stick-boot { width: 28px; height: 28px; }
-  #stick-handle { bottom: 20px; }
-  #stick-shaft { width: 6px; height: 26px; }
-  #stick-ball  { width: 26px; height: 26px; bottom: 26px; }
-  #fire-buttons { gap: 3px; }
-  .arcade-btn { width: 13px; height: 13px; }
+  #topbar.kiosk-bar, .kiosk-bar-main { gap: 3px; padding-left: 4px; padding-right: 4px; }
+  #topbar .kiosk-btn, .kiosk-bar-main .kiosk-btn { font-size: 8px; padding: 3px 4px; }
+  #stick-base { width: 90px; }
+  #stick-boot { width: 40px; height: 40px; }
+  #stick-handle { bottom: 26px; }
+  #stick-shaft { width: 9px; height: 38px; }
+  #stick-ball  { width: 48px; height: 48px; bottom: 38px; }
+  #fire-buttons { gap: 7px; }
+  .arcade-btn { width: 48px; height: 48px; }
 }
 
 /* ---- Left badge group ---- */
