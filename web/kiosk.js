@@ -6,12 +6,16 @@ var MAX_COINS = 5;
  * instead of five copies of the same green box. `accent` is an "r, g, b"
  * triple so CSS can build both solid and translucent colours from one value.
  */
+// `buttons` lists the on-screen arcade buttons for the shell's touch/visual
+// controls, one entry per button (key/code = what injectKey()/the keyboard
+// listener match against). Omitted = a single default fire button (Space).
 var BLIP_GAMES = {
   serpent:            { name: 'SERPENT',  accent: '50, 200, 50'   },
   bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200'   },
   galactic_defender:  { name: 'DEFENDER', accent: '200, 50, 200'  },
   rally:              { name: 'RALLY',    accent: '220, 50, 50'   },
-  meteors:            { name: 'METEORS',  accent: '180, 180, 180' },
+  meteors:            { name: 'METEORS',  accent: '180, 180, 180',
+                         buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }] },
   sky_raider:         { name: 'RAIDER', accent: '50, 100, 220' }
 };
 
@@ -20,7 +24,7 @@ var BLIP_GAMES = {
 function blipGameFromPath(pathname) {
   var m = /\/([a-z_]+)\/(?:index\.html)?$/i.exec(pathname || '');
   var g = m && BLIP_GAMES[m[1]];
-  return g ? { slug: m[1], name: g.name, accent: g.accent } : null;
+  return g ? { slug: m[1], name: g.name, accent: g.accent, buttons: g.buttons } : null;
 }
 
 if ('serviceWorker' in navigator) {

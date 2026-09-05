@@ -16,13 +16,17 @@
   z-index: 200;
 }
 
+/* These labels sit on the cabinet's physical control panel, not the tube —
+   moulded/silkscreened plastic, not lit phosphor, so the legend reads as a
+   printed engraving (a soft dark impression below, a faint highlight
+   above) instead of the screen content's glow. */
 .kiosk-hud {
   font-family: 'Courier New', Courier, monospace;
   font-size: 18px;
   font-weight: 900;
   letter-spacing: 2px;
   color: #e6dc32;
-  text-shadow: 0 0 10px #e6dc32;
+  text-shadow: 0 -1px 0 rgba(255,255,255,0.1), 0 1px 1px rgba(0,0,0,0.85);
   text-transform: uppercase;
   white-space: nowrap;
 }
@@ -33,7 +37,7 @@
   font-weight: 900;
   letter-spacing: 2px;
   color: #e6dc32;
-  text-shadow: 0 0 10px #e6dc32;
+  text-shadow: 0 -1px 0 rgba(255,255,255,0.1), 0 1px 1px rgba(0,0,0,0.85);
   text-decoration: none;
   text-transform: uppercase;
   cursor: pointer;
@@ -53,7 +57,6 @@
 .kiosk-btn:hover {
   border-color: #3a8a3a;
   border-bottom-color: #0a1e0a;
-  text-shadow: 0 0 10px #e6dc32;
 }
 .kiosk-btn:active {
   transform: translateY(2px);

@@ -191,39 +191,49 @@ function injectKey(key, code, type) {
   }));
 }
 
-if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-  var isRally = window.location.pathname.indexOf('/rally/') !== -1;
+var isRally = window.location.pathname.indexOf('/rally/') !== -1;
 
-  document.getElementById('touch-pad').style.display = 'block';
+// ---- Visual feedback: reflect the live input state — keyboard, touch, or
+// gamepad — onto the on-screen stick/buttons. Keyboard, touch, and gamepad
+// all funnel through injectKey()'s synthetic KeyboardEvent dispatched on
+// the canvas, which bubbles up to this listener exactly like a real
+// keypress would — so one listener covers every input source without the
+// stick/button code below needing to know or care which one is driving
+// it. Always wired up, not just on touch devices, so a keyboard player
+// sees their own presses reflected too.
+if (!isRally) (function () {
+  var DIR_FOR_CODE = {
+    ArrowUp: 'up', KeyW: 'up',
+    ArrowDown: 'down', KeyS: 'down',
+    ArrowLeft: 'left', KeyA: 'left',
+    ArrowRight: 'right', KeyD: 'right',
+  };
+  var held  = { up: false, down: false, left: false, right: false };
+  var stick = document.getElementById('stick-handle');
 
-  var held = {};
-
-  function pressBtn(el) {
-    var code = el.dataset.code;
-    if (held[code]) return;
-    held[code] = true;
-    el.classList.add('active');
-    injectKey(el.dataset.key, code, 'keydown');
+  function updateStick() {
+    if (!stick) return;
+    var x = (held.right ? 1 : 0) - (held.left ? 1 : 0);
+    var y = (held.down  ? 1 : 0) - (held.up   ? 1 : 0);
+    stick.style.setProperty('--dx', x);
+    stick.style.setProperty('--dy', y);
   }
 
-  function releaseBtn(el) {
-    var code = el.dataset.code;
-    if (!held[code]) return;
-    held[code] = false;
-    el.classList.remove('active');
-    injectKey(el.dataset.key, code, 'keyup');
-  }
+  document.addEventListener('keydown', function (e) { reflect(e.code, true);  });
+  document.addEventListener('keyup',   function (e) { reflect(e.code, false); });
 
-  function releaseAll() {
-    document.querySelectorAll('[data-key].active').forEach(function (el) {
-      releaseBtn(el);
-    });
+  function reflect(code, down) {
+    var dir = DIR_FOR_CODE[code];
+    if (dir) { held[dir] = down; updateStick(); return; }
+    var btn = document.querySelector('.arcade-btn[data-code="' + code + '"]');
+    if (btn) btn.classList.toggle('active', down);
   }
+}());
 
-  if (isRally) {
+if (isRally) {
+  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) (function () {
     // ---- Dual paddle dials (P1 left = Arrow keys, P2 right = I/K) ----
-    document.getElementById('dpad').style.display = 'none';
-    document.getElementById('btn-fire').style.display = 'none';
+    document.getElementById('touch-pad').style.display = 'none';
 
     var dialP1 = document.getElementById('paddle-dial');
     var dialP2 = document.getElementById('paddle-dial-p2');
@@ -349,46 +359,101 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
       function () { if (rallyMode === null) applyRallyMode(1); },
       function () { if (rallyMode === null) applyRallyMode(1); }
     );
+  }());
 
-  } else {
-    var dpad = document.getElementById('dpad');
-    dpad.addEventListener('touchstart', function (e) {
+} else {
+  // ---- Analog stick: drag with mouse, touch, or pen (Pointer Events unify
+  // all three) — this only turns drag position into ArrowUp/Down/Left/Right
+  // key state; moving the ball itself is handled by reflect()/updateStick()
+  // above, the same code path a real keypress drives. ----
+  (function () {
+    var base = document.getElementById('stick-base');
+    if (!base) return;
+
+    var DEAD = 0.35; // fraction of the base's half-width/height that triggers a direction
+    var activeId = null;
+    var wantDir = { up: false, down: false, left: false, right: false };
+    var CODE_FOR = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+
+    function setDir(dir, want) {
+      if (wantDir[dir] === want) return;
+      wantDir[dir] = want;
+      var code = CODE_FOR[dir];
+      injectKey(code, code, want ? 'keydown' : 'keyup');
+    }
+
+    function apply(e) {
+      var r = base.getBoundingClientRect();
+      var dx = (e.clientX - (r.left + r.width  / 2)) / (r.width  / 2);
+      var dy = (e.clientY - (r.top  + r.height / 2)) / (r.height / 2);
+      setDir('left',  dx < -DEAD);
+      setDir('right', dx >  DEAD);
+      setDir('up',    dy < -DEAD);
+      setDir('down',  dy >  DEAD);
+    }
+
+    function release() {
+      setDir('left', false); setDir('right', false);
+      setDir('up',   false); setDir('down',  false);
+    }
+
+    base.addEventListener('pointerdown', function (e) {
       e.preventDefault();
-      for (var i = 0; i < e.changedTouches.length; i++) {
-        var t = e.changedTouches[i];
-        var el = document.elementFromPoint(t.clientX, t.clientY);
-        if (el && el.dataset.code) pressBtn(el);
-      }
-    }, { passive: false });
-
-    dpad.addEventListener('touchmove', function (e) {
+      activeId = e.pointerId;
+      base.setPointerCapture(activeId);
+      apply(e);
+    });
+    base.addEventListener('pointermove', function (e) {
+      if (e.pointerId !== activeId) return;
       e.preventDefault();
-      releaseAll();
-      for (var i = 0; i < e.touches.length; i++) {
-        var t = e.touches[i];
-        var el = document.elementFromPoint(t.clientX, t.clientY);
-        if (el && el.dataset.code) pressBtn(el);
+      apply(e);
+    });
+    function endPointer(e) {
+      if (e.pointerId !== activeId) return;
+      activeId = null;
+      release();
+    }
+    base.addEventListener('pointerup',     endPointer);
+    base.addEventListener('pointercancel', endPointer);
+  }());
+
+  // ---- Fire buttons: one per game.buttons entry (default: just fire),
+  // built here instead of hand-written per game, so a two-button game like
+  // Meteors only has to declare it once in BLIP_GAMES (kiosk.js). ----
+  (function () {
+    var host = document.getElementById('fire-buttons');
+    if (!host) return;
+    var game = (typeof blipGameFromPath === 'function') ? blipGameFromPath(window.location.pathname) : null;
+    var specs = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
+
+    specs.forEach(function (spec) {
+      var btn = document.createElement('div');
+      btn.className = 'arcade-btn';
+      btn.dataset.key  = spec.key;
+      btn.dataset.code = spec.code;
+      btn.innerHTML = '<span class="arcade-btn-cap"></span>';
+      host.appendChild(btn);
+
+      var activeId = null;
+      btn.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        activeId = e.pointerId;
+        btn.setPointerCapture(activeId);
+        injectKey(spec.key, spec.code, 'keydown');
+      });
+      function endPointer(e) {
+        if (e.pointerId !== activeId) return;
+        activeId = null;
+        injectKey(spec.key, spec.code, 'keyup');
       }
-    }, { passive: false });
+      btn.addEventListener('pointerup',     endPointer);
+      btn.addEventListener('pointercancel', endPointer);
+    });
+  }());
+}
 
-    dpad.addEventListener('touchend',    function (e) { e.preventDefault(); releaseAll(); }, { passive: false });
-    dpad.addEventListener('touchcancel', releaseAll);
-  }
-
-  var fire = document.getElementById('btn-fire');
-  fire.addEventListener('touchstart',  function (e) { e.preventDefault(); pressBtn(fire); },  { passive: false });
-  fire.addEventListener('touchend',    function (e) { e.preventDefault(); releaseBtn(fire); }, { passive: false });
-  fire.addEventListener('touchcancel', function ()  { releaseBtn(fire); });
-
-  var fire2 = document.getElementById('btn-fire2');
-  if (fire2) {
-    fire2.addEventListener('touchstart',  function (e) { e.preventDefault(); pressBtn(fire2); },  { passive: false });
-    fire2.addEventListener('touchend',    function (e) { e.preventDefault(); releaseBtn(fire2); }, { passive: false });
-    fire2.addEventListener('touchcancel', function ()  { releaseBtn(fire2); });
-  }
-
-  // ---- Tilt (DeviceOrientation) controls (not used in rally) ----
-  if (!isRally) (function () {
+// ---- Tilt (DeviceOrientation) controls: touch devices only, not used in rally ----
+if (!isRally && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) (function () {
     var DEAD       = 12;   // degrees dead zone
     var tiltActive = false;
     var tiltBase   = null; // calibrated on first sample after enable
@@ -476,9 +541,8 @@ if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
       }
     });
   }());
-}
 
-  // ---- Gamepad support ----
+// ---- Gamepad support ----
   // Polling loop lives in kiosk.js (pollGamepad, shared with the kiosk
   // landing page); here we just turn logical button changes into the same
   // synthetic keyboard events the touch controls use.
