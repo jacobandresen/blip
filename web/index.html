@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=12">
+  <link rel="stylesheet" href="kiosk.css?v=13">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -194,7 +194,13 @@
       font-size: 14px;
       letter-spacing: 5px;
       color: var(--yellow);
-      text-shadow: 0 0 10px var(--yellow);
+      /* Same layered phosphor bloom as .arcade-title (a tight core plus two
+         wider, dimmer halos) — this is attract-mode text meant to read as
+         lit on the tube itself, not a printed/physical label. */
+      text-shadow:
+        0 0 10px var(--yellow),
+        0 0 30px var(--yellow),
+        0 0 60px rgba(230, 220, 50, 0.4);
       animation: blink-coin 1.1s step-end infinite;
       text-transform: uppercase;
       cursor: pointer;
@@ -394,6 +400,14 @@
       width: 100%;
     }
 
+    /* This copy sits inside the screen bezel, describing what's on the
+       tube — the same lit-phosphor glow as the rest of the on-screen
+       text (card-title, press-start), just dimmer since it's body copy,
+       not a headline. */
+    .card-genre, .card-desc, .card-controls {
+      text-shadow: 0 0 5px currentColor;
+    }
+
     .card-genre {
       font-size: 12px;
       font-weight: 700;
@@ -425,18 +439,38 @@
       text-align: left;
     }
 
+    /* A real control now, not just a printed prompt — an actual physical
+       start button wired to launch the game, so it gets its own press
+       feedback and a focus ring, on top of the existing blink/glow. */
     .press-start {
       font-size: 11px;
       letter-spacing: 4px;
       align-self: flex-start;
       color: var(--c);
+      background: none;
       text-shadow: 0 0 10px var(--c);
       text-transform: uppercase;
       border: 1px solid var(--c);
       padding: 8px 20px;
+      cursor: pointer;
       animation: blink-start 1.3s step-end infinite;
       box-shadow: 0 0 10px color-mix(in srgb, var(--c) 20%, transparent);
       white-space: nowrap;
+      transition: transform .08s, box-shadow .2s, opacity .2s;
+    }
+    .press-start:active { transform: translateY(2px); }
+    .press-start:focus-visible {
+      outline: 2px solid var(--c);
+      outline-offset: 3px;
+    }
+
+    /* No credits: reads as an unlit, inert button instead of an inviting
+       blink — same gate as clicking the card itself, just visible here. */
+    .press-start[aria-disabled="true"] {
+      cursor: not-allowed;
+      opacity: 0.35;
+      animation: none;
+      box-shadow: none;
     }
 
     @keyframes blink-start { 50% { opacity: 0.3; } }
@@ -475,7 +509,7 @@
       z-index: 2;
     }
 
-    .card:hover .press-start {
+    .card:hover .press-start:not([aria-disabled="true"]) {
       animation: none;
       opacity: 1;
       box-shadow:
@@ -736,7 +770,7 @@
       <div class="card-genre"  data-i18n="rallyGenre"></div>
       <div class="card-desc"   data-i18n="rallyDesc"></div>
       <div class="card-controls" data-i18n="rallyControls"></div>
-      <div class="press-start" data-i18n="pressStart"></div>
+      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
     <!-- METEORS -->
@@ -748,7 +782,7 @@
       <div class="card-genre"  data-i18n="meteorsGenre"></div>
       <div class="card-desc"   data-i18n="meteorsDesc"></div>
       <div class="card-controls" data-i18n="meteorsControls"></div>
-      <div class="press-start" data-i18n="pressStart"></div>
+      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
     <!-- BOUNCER -->
@@ -760,7 +794,7 @@
       <div class="card-genre"  data-i18n="bouncerGenre"></div>
       <div class="card-desc"   data-i18n="bouncerDesc"></div>
       <div class="card-controls" data-i18n="bouncerControls"></div>
-      <div class="press-start" data-i18n="pressStart"></div>
+      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
     <!-- GALACTIC DEFENDER -->
@@ -772,7 +806,7 @@
       <div class="card-genre"  data-i18n="galacticGenre"></div>
       <div class="card-desc"   data-i18n="galacticDesc"></div>
       <div class="card-controls" data-i18n="galacticControls"></div>
-      <div class="press-start" data-i18n="pressStart"></div>
+      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
     <!-- SERPENT -->
@@ -784,7 +818,7 @@
       <div class="card-genre"  data-i18n="serpentGenre"></div>
       <div class="card-desc"   data-i18n="serpentDesc"></div>
       <div class="card-controls" data-i18n="serpentControls"></div>
-      <div class="press-start" data-i18n="pressStart"></div>
+      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
     <!-- RAIDER -->
@@ -796,7 +830,7 @@
       <div class="card-genre"  data-i18n="skyRaiderGenre"></div>
       <div class="card-desc"   data-i18n="skyRaiderDesc"></div>
       <div class="card-controls" data-i18n="skyRaiderControls"></div>
-      <div class="press-start" data-i18n="pressStart"></div>
+      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
   </div>
@@ -837,7 +871,7 @@
   </div>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=9"></script>
+  <script src="kiosk.js?v=10"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Translations                                                         */
@@ -1051,11 +1085,17 @@
     window.onCoinInserted = function() { updatePressStart(); };
 
     function updatePressStart() {
-      var key = getCoins() > 0 ? 'pressStart' : 'needCoin';
+      var enabled = getCoins() > 0;
+      var key = enabled ? 'pressStart' : 'needCoin';
       document.querySelectorAll('.press-start').forEach(function(el) {
         el.setAttribute('data-i18n', key);
         var t = i18n[currentLang];
         if (t && t[key] !== undefined) el.innerHTML = t[key];
+        // Out of tab order and marked inert while there's no credit to
+        // spend — same gate as the card click, just visible on the button
+        // itself instead of silently doing nothing.
+        el.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+        el.tabIndex = enabled ? 0 : -1;
       });
     }
 
@@ -1067,14 +1107,39 @@
     updatePressStart(); // initialise to "NEED COIN" on page load
     updateCreditsDisplay();
 
+    // Spends one credit and launches `card`'s game — the same gate for
+    // clicking anywhere on the card and for its dedicated start button.
+    // A no-op (not a shake/sound) when broke: an unlit physical start
+    // button just doesn't do anything when you push it.
+    function attemptStart(card) {
+      var n = getCoins();
+      if (n <= 0) { return; }
+      saveCoins(n - 1);
+      updateCoinsHud();
+      window.location.href = card.href;
+    }
+
     document.querySelectorAll('.card').forEach(function(card) {
       card.addEventListener('click', function(e) {
         e.preventDefault();
-var n = getCoins();
-        if (n <= 0) { return; }
-        saveCoins(n - 1);
-        updateCoinsHud();
-        window.location.href = card.href;
+        attemptStart(card);
+      });
+
+      // The start button itself: stops the click/keypress from also
+      // bubbling up to the card's own handler above (which would otherwise
+      // spend a second credit for the same press).
+      var startBtn = card.querySelector('.press-start');
+      if (!startBtn) return;
+      startBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        attemptStart(card);
+      });
+      startBtn.addEventListener('keydown', function(e) {
+        if (e.code !== 'Space' && e.code !== 'Enter') return;
+        e.stopPropagation();
+        e.preventDefault();
+        attemptStart(card);
       });
     });
 
