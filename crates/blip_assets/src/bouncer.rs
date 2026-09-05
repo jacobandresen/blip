@@ -5,7 +5,10 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::techno::{bass_note, clap, hat, kick, open_hat, sidechain_duck, Rng, MIX_KNEE};
+use crate::techno::{
+    bass_note, clap, hat, kick, lead_stab, open_hat, riser, sidechain_duck, supersaw, Rng,
+    MIX_KNEE,
+};
 use crate::wav::{encode_pcm16_mono, env, mix_into_f32, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
@@ -223,6 +226,298 @@ fn music() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
+/// A rolling acid-house cut: faster and darker than `music()`, with a
+/// 16th-note bassline (the classic "rolling" acid motion, not held chords)
+/// under a bright, sparse `lead_stab` hook instead of `pluck` — a harder,
+/// more insistent character than the tech-house original.
+fn music2() -> Vec<u8> {
+    const BPM: f32 = 132.0;
+    const STEPS_PER_BAR: usize = 16;
+    const BARS: usize = 16;
+    const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
+    let sr = SAMPLE_RATE as f32;
+    let step_ms = 60_000.0 / BPM / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
+    let mut buf = vec![0f32; total];
+    let mut rng = Rng(0xAC1D_7734);
+    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 4);
+
+    // One bar of rolling 16ths in A minor, a fifth lower every other bar
+    // (A2 .. -> D2 ..) for a two-bar acid vamp. 0.0 = rest.
+    const ACID_A: [f32; STEPS_PER_BAR] = [
+        110.00, 0.0, 110.00, 130.81, 0.0, 110.00, 0.0, 146.83,
+        110.00, 0.0, 110.00, 98.00,  0.0, 98.00,  116.54, 0.0,
+    ];
+    const ACID_D: [f32; STEPS_PER_BAR] = [
+        73.42, 0.0, 73.42, 87.31, 0.0, 73.42, 0.0, 98.00,
+        73.42, 0.0, 73.42, 65.41, 0.0, 65.41, 77.78, 0.0,
+    ];
+    const HOOK: [f32; 3] = [880.00, 1046.50, 987.77]; // A5 C6 B5
+
+    for step in 0..TOTAL_STEPS {
+        let bar = step / STEPS_PER_BAR;
+        let pos = step % STEPS_PER_BAR;
+        let off = step * step_samples;
+
+        if pos % 4 == 0 {
+            kick_offsets.push(off);
+        }
+        if pos == 4 || pos == 12 {
+            clap(&mut buf, off, &mut rng, 0.5);
+        }
+        hat(&mut buf, off, &mut rng, if pos % 2 == 0 { 0.13 } else { 0.25 });
+        if bar % 2 == 1 && pos == 14 {
+            open_hat(&mut buf, off, &mut rng, 0.22);
+        }
+        let acid = if bar % 2 == 0 { &ACID_A } else { &ACID_D };
+        if acid[pos] > 0.0 {
+            bass_note(&mut buf, off, acid[pos], step_ms * 0.85, 0.5);
+        }
+        // Sparse hook: one stab every other bar, on the "and" of beat 2.
+        if bar % 2 == 0 && pos == 6 {
+            lead_stab(&mut buf, off, HOOK[(bar / 2) % 3], step_ms * 2.5, 0.16);
+        }
+    }
+
+    sidechain_duck(&mut buf, &kick_offsets, 0.6, step_ms * 0.8);
+    for &off in &kick_offsets {
+        kick(&mut buf, off, 0.95);
+    }
+
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+}
+
+/// A laid-back downtempo cut: half-time kick (just beats 1 and 3), long
+/// sustained chords instead of a staccato bassline, and a slow, singable
+/// `pluck` melody — the breather in the rotation, deliberately roomier and
+/// quieter than the other tracks rather than another variation on "banger".
+fn music3() -> Vec<u8> {
+    const BPM: f32 = 100.0;
+    const STEPS_PER_BAR: usize = 16;
+    const BARS: usize = 12;
+    const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
+    let sr = SAMPLE_RATE as f32;
+    let step_ms = 60_000.0 / BPM / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
+    let mut buf = vec![0f32; total];
+    let mut rng = Rng(0xC411_2022);
+    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 8);
+
+    // C - Am - F - G, one chord (as a held bass note) every bar.
+    let roots = [130.81_f32, 110.00, 87.31, 98.00]; // C3 A2 F2 G2
+    // A slow four-bar melody, one note every other bar, repeated over the
+    // four-bar progression.
+    const MELODY: [f32; 4] = [523.25, 440.00, 349.23, 392.00]; // C5 A4 F4 G4
+
+    for step in 0..TOTAL_STEPS {
+        let bar = step / STEPS_PER_BAR;
+        let pos = step % STEPS_PER_BAR;
+        let off = step * step_samples;
+
+        if pos == 0 || pos == 8 {
+            kick_offsets.push(off);
+        }
+        if pos == 12 {
+            clap(&mut buf, off, &mut rng, 0.32);
+        }
+        if pos % 4 == 2 {
+            hat(&mut buf, off, &mut rng, 0.10);
+        }
+        if pos == 0 {
+            bass_note(&mut buf, off, roots[bar % 4], step_ms * 12.0, 0.42);
+        }
+        if pos == 6 {
+            pluck(&mut buf, off, MELODY[bar % 4], step_ms * 6.0, 0.20);
+        }
+        if pos == 14 && bar % 2 == 1 {
+            pluck(&mut buf, off, MELODY[bar % 4] * 1.5, step_ms * 2.5, 0.12);
+        }
+    }
+
+    sidechain_duck(&mut buf, &kick_offsets, 0.3, step_ms * 2.0);
+    for &off in &kick_offsets {
+        kick(&mut buf, off, 0.75);
+    }
+
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+}
+
+/// A trance-leaning lift: faster and brighter than the others, a wide
+/// `supersaw` hook instead of a plucked one, open hats on every offbeat for
+/// that rushing trance hi-hat pattern, and a `riser` sweeping through the
+/// last two bars into a hard cut back to the top of the loop — the one
+/// track in the rotation built around an obvious "drop" moment.
+fn music4() -> Vec<u8> {
+    const BPM: f32 = 138.0;
+    const STEPS_PER_BAR: usize = 16;
+    const BARS: usize = 18;
+    const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
+    let sr = SAMPLE_RATE as f32;
+    let step_ms = 60_000.0 / BPM / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
+    let mut buf = vec![0f32; total];
+    let mut rng = Rng(0x7A2C_E015);
+    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 4);
+
+    // E - C, a two-chord trance vamp, one root every 2 bars.
+    let bass_roots = [82.41_f32, 65.41]; // E2, C2
+    const HOOK: [f32; 4] = [659.25, 783.99, 987.77, 880.00]; // E5 G5 B5 A5
+
+    for step in 0..TOTAL_STEPS {
+        let bar = step / STEPS_PER_BAR;
+        let pos = step % STEPS_PER_BAR;
+        let off = step * step_samples;
+        let in_lift = bar >= BARS - 2;
+
+        if pos % 4 == 0 {
+            kick_offsets.push(off);
+        }
+        if pos == 4 || pos == 12 {
+            clap(&mut buf, off, &mut rng, 0.5);
+        }
+        if pos % 2 == 1 {
+            open_hat(&mut buf, off, &mut rng, if in_lift { 0.26 } else { 0.17 });
+        }
+        if pos % 4 == 0 {
+            bass_note(&mut buf, off, bass_roots[(bar / 2) % 2], step_ms * 3.5, 0.55);
+        }
+        // Hook: four quick notes starting on beat 3, every other bar (every
+        // bar during the lift, for extra energy).
+        if bar % 2 == 0 || in_lift {
+            if pos == 8 || pos == 9 || pos == 10 || pos == 11 {
+                let note = HOOK[(pos - 8) as usize];
+                supersaw(&mut buf, off, note, step_ms * 1.4, 0.15, 8.0, 0.01);
+            }
+        }
+        if bar == BARS - 2 && pos == 0 {
+            riser(&mut buf, off, step_ms * (STEPS_PER_BAR * 2) as f32, 0.3, &mut rng);
+        }
+    }
+
+    sidechain_duck(&mut buf, &kick_offsets, 0.6, step_ms * 0.9);
+    for &off in &kick_offsets {
+        kick(&mut buf, off, 0.95);
+    }
+
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+}
+
+/// A funkier cut: the bassline lands off the beat instead of on it
+/// (syncopated, not four-on-the-floor-locked), backbeat claps every 2 and
+/// 4, and a call-and-response `pluck` hook — one short phrase answered by
+/// a second, rather than one riff repeated verbatim like `music()`'s.
+fn music5() -> Vec<u8> {
+    const BPM: f32 = 120.0;
+    const STEPS_PER_BAR: usize = 16;
+    const BARS: usize = 16;
+    const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
+    let sr = SAMPLE_RATE as f32;
+    let step_ms = 60_000.0 / BPM / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
+    let mut buf = vec![0f32; total];
+    let mut rng = Rng(0xF11C_5A11);
+    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 4);
+
+    // G mixolydian vamp: root off the beat, not on it.
+    let root = 98.00_f32; // G2
+    const BASS_HIT: [bool; 16] = [
+        false, false, true, false, false, true, false, true,
+        false, false, true, false, false, true, false, false,
+    ];
+    // Call (bar A) and response (bar B), alternating every bar.
+    const CALL:     [f32; 3] = [392.00, 493.88, 587.33]; // G4 B4 D5
+    const RESPONSE: [f32; 3] = [440.00, 523.25, 392.00]; // A4 C5 G4
+
+    for step in 0..TOTAL_STEPS {
+        let bar = step / STEPS_PER_BAR;
+        let pos = step % STEPS_PER_BAR;
+        let off = step * step_samples;
+
+        if pos % 4 == 0 {
+            kick_offsets.push(off);
+        }
+        if pos == 4 || pos == 12 {
+            clap(&mut buf, off, &mut rng, 0.55);
+        }
+        if pos % 2 == 1 {
+            hat(&mut buf, off, &mut rng, 0.20);
+        }
+        if bar % 4 == 3 && pos == 10 {
+            open_hat(&mut buf, off, &mut rng, 0.2);
+        }
+        if BASS_HIT[pos] {
+            bass_note(&mut buf, off, root * if pos == 7 || pos == 13 { 1.5 } else { 1.0 }, step_ms * 0.6, 0.55);
+        }
+        let phrase = if bar % 2 == 0 { &CALL } else { &RESPONSE };
+        if pos == 9 || pos == 10 || pos == 11 {
+            pluck(&mut buf, off, phrase[(pos - 9) as usize], step_ms * 1.3, 0.21);
+        }
+    }
+
+    sidechain_duck(&mut buf, &kick_offsets, 0.5, step_ms * 0.9);
+    for &off in &kick_offsets {
+        kick(&mut buf, off, 0.9);
+    }
+
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+}
+
+/// The moody one: a slower half-time D minor groove, sparse `lead_stab`
+/// accents instead of a running melody, a heavier sidechain pump, and
+/// noticeably more silence between hits — tension rather than a hook,
+/// so the rotation isn't six tracks all chasing the same upbeat energy.
+fn music6() -> Vec<u8> {
+    const BPM: f32 = 110.0;
+    const STEPS_PER_BAR: usize = 16;
+    const BARS: usize = 14;
+    const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
+    let sr = SAMPLE_RATE as f32;
+    let step_ms = 60_000.0 / BPM / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
+    let mut buf = vec![0f32; total];
+    let mut rng = Rng(0xDA26_7E55);
+    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 4);
+
+    // D minor - Bb, a two-chord tense vamp, one root every 2 bars.
+    let bass_roots = [73.42_f32, 58.27]; // D2, Bb1
+    const STAB: [f32; 3] = [293.66, 349.23, 311.13]; // D4 F4 D#4 (tense, not resolving)
+
+    for step in 0..TOTAL_STEPS {
+        let bar = step / STEPS_PER_BAR;
+        let pos = step % STEPS_PER_BAR;
+        let off = step * step_samples;
+
+        if pos == 0 || pos == 10 {
+            kick_offsets.push(off);
+        }
+        if pos == 8 {
+            clap(&mut buf, off, &mut rng, 0.4);
+        }
+        if pos % 4 == 2 {
+            hat(&mut buf, off, &mut rng, 0.11);
+        }
+        if pos == 0 {
+            bass_note(&mut buf, off, bass_roots[(bar / 2) % 2], step_ms * 6.0, 0.5);
+        }
+        // A stab only once every other bar — mostly space, not melody.
+        if bar % 2 == 1 && pos == 6 {
+            lead_stab(&mut buf, off, STAB[(bar / 2) % 3], step_ms * 3.0, 0.17);
+        }
+    }
+
+    sidechain_duck(&mut buf, &kick_offsets, 0.68, step_ms * 1.4);
+    for &off in &kick_offsets {
+        kick(&mut buf, off, 0.88);
+    }
+
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+}
+
 // paddle_hit and brick_hit fire on nearly every bounce — the most frequently
 // repeated sounds in the game — so they stay soft and low-key: a plain
 // low-order tone with a quick decay, no noise grit or bright high harmonics
@@ -327,5 +622,10 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/life_lost.wav",  life_lost()),
         ("sounds/win.wav",        win()),
         ("sounds/music.wav",      music()),
+        ("sounds/music2.wav",     music2()),
+        ("sounds/music3.wav",     music3()),
+        ("sounds/music4.wav",     music4()),
+        ("sounds/music5.wav",     music5()),
+        ("sounds/music6.wav",     music6()),
     ]
 }

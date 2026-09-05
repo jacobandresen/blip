@@ -211,6 +211,23 @@ function insertCoin() {
   }
 }
 
+// A quiet nudge toward the coin mechanic for first-time visitors — three
+// gentle blinks on the (now-merged) COINS/INSERT COIN button, 5s after the
+// landing page loads. Gated on #insert-coin (the big hero banner), which
+// only exists on index.html, so this never fires on history/about or the
+// game pages.
+window.addEventListener('load', function () {
+  if (!document.getElementById('insert-coin')) return;
+  var btn = document.getElementById('kiosk-insert-btn');
+  if (!btn) return;
+  setTimeout(function () {
+    btn.classList.add('coin-hint-blink');
+    btn.addEventListener('animationend', function () {
+      btn.classList.remove('coin-hint-blink');
+    }, { once: true });
+  }, 5000);
+});
+
 /* ---- Shared gamepad polling ----
  * Polls the first connected gamepad every frame and reports logical button
  * state changes ('ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' |

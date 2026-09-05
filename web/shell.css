@@ -221,8 +221,6 @@ canvas {
     linear-gradient(180deg, #0c0c0c, #000);
 }
 
-#back:active { transform: translateY(2px); }
-
 /* Coin slot + drop animation: shared with the kiosk landing/history/about
    pages' own insert-coin button, so it lives in kiosk.css (scoped to
    "#insert-coin-btn, #kiosk-insert-btn") rather than duplicated here. */

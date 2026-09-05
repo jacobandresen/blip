@@ -643,7 +643,11 @@ impl Blip {
         // margin off the true right edge is scaled with the canvas width
         // (not a fixed pixel count) so LIVES stays clear of that wedge on
         // every game's canvas size, not just the common 480px-wide one.
-        let edge_margin = (self.width as f32 * 0.05) as i32;
+        // 0.05 wasn't enough on taller/more-square canvases (Meteors
+        // 680x708, Serpent 480x508) — confirmed by rendering the actual
+        // shader, not just by inspection — so this needs more headroom
+        // than the 480x540 games it was originally tuned against.
+        let edge_margin = (self.width as f32 * 0.09) as i32;
         let lives_x = self.width - edge_margin - 24; // room for up to 2 digits
         self.draw_text("LIVES", (lives_x - 64) as f32, 5.0, 2.0, BLIP_ORANGE);
         self.draw_number(lives, lives_x as f32, 5.0, 2.0, BLIP_WHITE);

@@ -28,6 +28,14 @@ updateCoinsHud();
     '<span id="marquee-name">' + game.name + '</span>' +
     '<span class="marquee-bulbs"></span>';
   document.body.insertBefore(bar, document.body.firstChild);
+
+  var logo = document.querySelector('.blip-logo');
+  if (logo) {
+    logo.classList.add('boot');
+    logo.addEventListener('animationend', function () {
+      logo.classList.remove('boot');
+    }, { once: true });
+  }
 }());
 
 // Stop all audio when navigating away (pagehide is reliable on iOS Safari / PWA)
@@ -520,6 +528,10 @@ if (isRally) {
     if (!host) return;
     var game = (typeof blipGameFromPath === 'function') ? blipGameFromPath(window.location.pathname) : null;
     var specs = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
+    // Always render two buttons, even for a single-action game, so the
+    // panel looks and sits the same on every cabinet — the second one just
+    // duplicates the first action rather than sitting there dead.
+    if (specs.length < 2) specs = specs.concat(specs[0]);
 
     specs.forEach(function (spec) {
       var btn = document.createElement('div');

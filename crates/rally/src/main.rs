@@ -295,7 +295,15 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("RALLY", WIN_W, WIN_H)
 }
 
-const MUSIC_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
+const MUSIC_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
+const MUSIC2_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
+const MUSIC3_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
+const MUSIC4_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music4.wav"));
+const MUSIC5_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music5.wav"));
+// Precomputed durations (seconds) of each generated loop — TOTAL_STEPS *
+// step_ms / 1000 + the 0.25s tail every blip_assets track generator pads
+// onto the buffer. Kept in sync with rally.rs's music()/music2..5().
+const MUSIC_DURATIONS: [f32; 5] = [29.3388, 26.5466, 26.9167, 31.1071, 31.7246];
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -309,11 +317,28 @@ async fn main() {
         score_l: blip::audio::beep(660.0, 120.0).await,
         score_r: blip::audio::beep(110.0, 200.0).await,
     };
-    let music = blip::audio::load_sound(MUSIC_WAV).await;
-    play_music(&music);
+    let music = [
+        blip::audio::load_sound(MUSIC_WAV).await,
+        blip::audio::load_sound(MUSIC2_WAV).await,
+        blip::audio::load_sound(MUSIC3_WAV).await,
+        blip::audio::load_sound(MUSIC4_WAV).await,
+        blip::audio::load_sound(MUSIC5_WAV).await,
+    ];
+    let mut music_idx: usize = 0;
+    let mut music_timer: f32 = MUSIC_DURATIONS[0];
+    play_music(&music[0]);
 
     loop {
         let dt = blip.delta_time;
+
+        // Advance to the next loop in rotation at each track's boundary.
+        music_timer -= dt;
+        if music_timer <= 0.0 {
+            music_idx = (music_idx + 1) % music.len();
+            music_timer = MUSIC_DURATIONS[music_idx];
+            play_music(&music[music_idx]);
+        }
+
         match g.state {
             State::Title => update_title(&mut g),
             State::Serve => update_serve(&mut g, dt),

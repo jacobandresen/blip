@@ -645,7 +645,15 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("METEORS", WIN_W, WIN_H)
 }
 
-const TECHNO_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno.wav"));
+const TECHNO_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno.wav"));
+const TECHNO2_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno2.wav"));
+const TECHNO3_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno3.wav"));
+const TECHNO4_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno4.wav"));
+const TECHNO5_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno5.wav"));
+// Precomputed durations (seconds) of each generated loop — TOTAL_STEPS *
+// step_ms / 1000 + the 0.25s tail every blip_assets track generator pads
+// onto the buffer. Kept in sync with meteors.rs's music()/music2..5().
+const MUSIC_DURATIONS: [f32; 5] = [30.2444, 32.2500, 26.9123, 32.0084, 35.2468];
 const FIRE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/fire.wav"));
 const SHIP_EXPLOSION_WAV: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ship_explosion.wav"));
@@ -655,8 +663,16 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let techno = blip::audio::load_sound(TECHNO_WAV).await;
-    play_music(&techno);
+    let music = [
+        blip::audio::load_sound(TECHNO_WAV).await,
+        blip::audio::load_sound(TECHNO2_WAV).await,
+        blip::audio::load_sound(TECHNO3_WAV).await,
+        blip::audio::load_sound(TECHNO4_WAV).await,
+        blip::audio::load_sound(TECHNO5_WAV).await,
+    ];
+    let mut music_idx: usize = 0;
+    let mut music_timer: f32 = MUSIC_DURATIONS[0];
+    play_music(&music[0]);
 
     let mut sfx = Sounds {
         fire:         blip::audio::load_sound(FIRE_WAV).await,
@@ -676,6 +692,14 @@ async fn main() {
 
     loop {
         let dt = blip.delta_time;
+
+        // Advance to the next loop in rotation at each track's boundary.
+        music_timer -= dt;
+        if music_timer <= 0.0 {
+            music_idx = (music_idx + 1) % music.len();
+            music_timer = MUSIC_DURATIONS[music_idx];
+            play_music(&music[music_idx]);
+        }
 
         if blip.screenshot_mode {
             shot_frame += 1;

@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=13">
+  <link rel="stylesheet" href="kiosk.css?v=21">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -68,7 +68,12 @@
       width: 100%;
       max-width: 900px;
       text-align: center;
-      padding: 60px 0 36px;
+      /* Empty now that the marquee/subtitle text is gone (moved/removed —
+         see .top-marquee-bar) — just enough padding to clear the fixed bar
+         above, not the old headroom a 3-line banner needed. Freed space
+         goes to pulling the game grid up, per an explicit request to use
+         the top of the page better. */
+      padding: 48px 0 12px;
       position: relative;
     }
 
@@ -155,74 +160,70 @@
     }
 
     /* ---- header text ---- */
-    .marquee-line {
-      font-size: 11px;
-      letter-spacing: 4px;
-      color: #333;
-      margin-bottom: 20px;
+    /* Top marquee bar: same box a game page reserves for its backlit name
+       sign (#marquee-bar/#marquee-name in shell.css) — .blip-logo (fixed
+       top-left, kiosk.css, higher z-index) floats over its left end on
+       every page, game pages included, so reusing the same bar here reads
+       as the identical strip rather than a one-off for the landing page. */
+    .top-marquee-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 40px;
+      z-index: 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #101010, #000 92%);
+      border-bottom: 1px solid rgba(230, 220, 50, 0.35);
+      box-shadow: 0 0 16px rgba(230, 220, 50, 0.25), 0 2px 10px rgba(0, 0, 0, 0.6);
     }
-
-    .arcade-title {
-      font-size: clamp(2.4rem, 8vw, 5rem);
-      font-weight: 900;
-      letter-spacing: .18em;
-      text-transform: uppercase;
-      color: var(--green);
-      text-shadow:
-        0 0 10px var(--green),
-        0 0 30px var(--green),
-        0 0 60px rgba(50,200,50,0.4);
-      animation: flicker 8s infinite;
-      line-height: 1;
+    /* .blip-logo (kiosk.css) is a fixed 32px box matching the 28px marquee
+       bar height game pages use — this page's bar is taller, so give the
+       logo the same height here to keep it vertically centered in it
+       (same specificity, later in the cascade than kiosk.css, so this
+       overrides just on this page without touching the shared rule). */
+    .blip-logo {
+      height: 40px;
     }
-
-    .arcade-sub {
-      font-size: clamp(.9rem, 2.5vw, 1.3rem);
-      letter-spacing: .5em;
-      color: #555;
-      margin-top: 10px;
-      text-transform: uppercase;
-    }
-
-    @keyframes flicker {
-      0%, 95%, 97%, 99%, 100% { opacity: 1; }
-      96%, 98% { opacity: 0.7; }
-    }
-
     .insert-coin {
-      margin-top: 28px;
-      font-size: 14px;
+      max-width: calc(100vw - 170px);
+      font-size: 13px;
+      font-weight: 900;
       letter-spacing: 5px;
       color: var(--yellow);
-      /* Same layered phosphor bloom as .arcade-title (a tight core plus two
-         wider, dimmer halos) — this is attract-mode text meant to read as
-         lit on the tube itself, not a printed/physical label. */
+      /* A tight core plus two wider, dimmer halos — this is attract-mode
+         text meant to read as lit on the tube itself, not a printed
+         physical label. Steady, not blinking — it's a fixture, not a
+         flashing prompt. */
       text-shadow:
         0 0 10px var(--yellow),
         0 0 30px var(--yellow),
         0 0 60px rgba(230, 220, 50, 0.4);
-      animation: blink-coin 1.1s step-end infinite;
       text-transform: uppercase;
       cursor: pointer;
       user-select: none;
+      -webkit-tap-highlight-color: transparent;
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-    }
-    /* a physical coin-slot notch beside the prompt */
-    .insert-coin::before {
-      content: '';
-      display: inline-block;
-      width: 7px;
-      height: 20px;
-      border-radius: 3px;
-      background: #000;
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--yellow) 45%, transparent),
-                  0 0 6px color-mix(in srgb, var(--yellow) 30%, transparent);
-      flex-shrink: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
 
     @keyframes blink-coin { 50% { opacity: 0; } }
+
+    /* Same nudge as #kiosk-insert-btn (kiosk.css) — this element has no
+       always-on animation to fight, so it's just a plain class here. */
+    #insert-coin.coin-nudge {
+      animation: coin-nudge 0.6s ease-in-out;
+    }
+
+    @media (max-width: 480px) {
+      .insert-coin { font-size: 10px; letter-spacing: 2px; max-width: calc(100vw - 150px); }
+    }
+    @media (max-width: 380px) {
+      .insert-coin { font-size: 8px; letter-spacing: 1px; max-width: calc(100vw - 130px); }
+    }
 
 
     .divider {
@@ -230,7 +231,7 @@
       max-width: 900px;
       height: 1px;
       background: linear-gradient(to right, transparent, #222, transparent);
-      margin: 0 auto 40px;
+      margin: 0 auto 24px;
     }
 
     /* ---- screen bezel — frames the game grid like a monitor set into the
@@ -314,7 +315,7 @@
       background: #0a0a0c;
       position: relative;
       overflow: hidden;
-      transition: transform .15s, box-shadow .2s, border-color .2s;
+      transition: transform .15s, box-shadow .2s, border-color .2s, opacity .3s, filter .3s;
       cursor: pointer;
     }
 
@@ -402,8 +403,8 @@
 
     /* This copy sits inside the screen bezel, describing what's on the
        tube — the same lit-phosphor glow as the rest of the on-screen
-       text (card-title, press-start), just dimmer since it's body copy,
-       not a headline. */
+       text (card-title), just dimmer since it's body copy, not a
+       headline. */
     .card-genre, .card-desc, .card-controls {
       text-shadow: 0 0 5px currentColor;
     }
@@ -439,45 +440,17 @@
       text-align: left;
     }
 
-    /* A real control now, not just a printed prompt — an actual physical
-       start button wired to launch the game, so it gets its own press
-       feedback and a focus ring, on top of the existing blink/glow. */
-    .press-start {
-      font-size: 11px;
-      letter-spacing: 4px;
-      align-self: flex-start;
-      color: var(--c);
-      background: none;
-      text-shadow: 0 0 10px var(--c);
-      text-transform: uppercase;
-      border: 1px solid var(--c);
-      padding: 8px 20px;
-      cursor: pointer;
-      animation: blink-start 1.3s step-end infinite;
-      box-shadow: 0 0 10px color-mix(in srgb, var(--c) 20%, transparent);
-      white-space: nowrap;
-      transition: transform .08s, box-shadow .2s, opacity .2s;
+    /* No credits: the whole card reads as dimmed/unlit rather than a
+       separate "NEED COIN" label — still fully visible (and still
+       clickable, though attemptStart() no-ops when broke), just clearly
+       not the inviting, lit-up look a card with credit behind it gets. */
+    .card.no-credit {
+      opacity: 0.45;
+      filter: grayscale(35%);
     }
-    .press-start:active { transform: translateY(2px); }
-    .press-start:focus-visible {
-      outline: 2px solid var(--c);
-      outline-offset: 3px;
-    }
-
-    /* No credits: reads as an unlit, inert button instead of an inviting
-       blink — same gate as clicking the card itself, just visible here. */
-    .press-start[aria-disabled="true"] {
-      cursor: not-allowed;
-      opacity: 0.35;
-      animation: none;
-      box-shadow: none;
-    }
-
-    @keyframes blink-start { 50% { opacity: 0.3; } }
 
     @media (max-width: 520px) {
       .card        { padding-left: 40px; }
-      .press-start { align-self: flex-end; }
     }
 
     /* ---- 2-player seal ---- */
@@ -507,14 +480,6 @@
       line-height: 1.3;
       background: rgba(0,0,0,0.85);
       z-index: 2;
-    }
-
-    .card:hover .press-start:not([aria-disabled="true"]) {
-      animation: none;
-      opacity: 1;
-      box-shadow:
-        0 0 16px color-mix(in srgb, var(--c) 50%, transparent),
-        inset 0 0 8px color-mix(in srgb, var(--c) 15%, transparent);
     }
 
     /* ---- footer ---- */
@@ -587,22 +552,32 @@
     header, .divider, .game-grid, footer { position: relative; z-index: 1; }
 
     /* ---- left badge group ---- */
+    /* Lower-left corner, centred on the cabinet side rail (.cab-rail.left,
+       64px wide with its own rivet dots) rather than pinned to the raw
+       viewport edge — reads as mounted on that same panel. The rail only
+       renders at 1180px+, but centring on its width holds up fine below
+       that too, just without rivets to align with. */
     .left-badges {
       position: fixed;
       bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-      left: 20px;
+      left: 10px;
       z-index: 10000;
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
+      align-items: center;
       gap: 8px;
     }
 
     /* ---- about badge ---- */
+    /* position:relative + the label pulled out of flow (absolute) so the
+       badge's own box is exactly the 44px avatar, regardless of the label
+       text's width — otherwise "ABOUT" and "HISTORY" being different
+       lengths shifts the two avatars out of alignment under the parent's
+       align-items:center (a wider invisible label pushes its icon off
+       centre relative to the other badge's icon). */
     .about-badge {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      position: relative;
+      display: block;
       text-decoration: none;
       color: #444;
       font-size: 10px;
@@ -611,7 +586,7 @@
       transition: color .2s;
     }
     .about-badge:hover { color: #D97757; }
-    .about-badge:hover .about-label { opacity: 1; transform: translateX(0); }
+    .about-badge:hover .about-label { opacity: 1; transform: translateY(-50%) translateX(0); }
     .about-badge:hover .about-avatar {
       border-color: #D97757;
       box-shadow: 0 0 12px rgba(217,119,87,0.45);
@@ -627,8 +602,11 @@
       filter: grayscale(40%) brightness(0.8);
     }
     .about-label {
+      position: absolute;
+      left: 54px;
+      top: 50%;
       opacity: 0;
-      transform: translateX(-6px);
+      transform: translateY(-50%) translateX(-6px);
       transition: opacity .2s, transform .2s;
       white-space: nowrap;
       text-shadow: 0 0 8px #D97757;
@@ -637,9 +615,8 @@
 
     /* ---- history badge ---- */
     .history-badge {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      position: relative;
+      display: block;
       text-decoration: none;
       color: #888;
       font-size: 10px;
@@ -650,7 +627,7 @@
     .history-badge:hover { color: var(--yellow); }
     .history-badge:hover .history-label {
       opacity: 1;
-      transform: translateX(0);
+      transform: translateY(-50%) translateX(0);
       text-shadow: 0 0 8px var(--yellow);
       color: var(--yellow);
     }
@@ -669,8 +646,11 @@
       filter: grayscale(20%) brightness(0.7);
     }
     .history-label {
+      position: absolute;
+      left: 54px;
+      top: 50%;
       opacity: 0;
-      transform: translateX(-6px);
+      transform: translateY(-50%) translateX(-6px);
       transition: opacity .2s, transform .2s;
       white-space: nowrap;
       text-shadow: 0 0 8px var(--yellow);
@@ -742,16 +722,16 @@
 </head>
 <body>
 
+  <a class="blip-logo" href="index.html">BLIP ARCADE</a>
+  <div class="top-marquee-bar">
+    <div class="insert-coin" id="insert-coin" data-i18n="insertCoin"></div>
+  </div>
+
   <div class="stars" id="stars"></div>
   <div class="cab-rail left"></div>
   <div class="cab-rail right"></div>
 
-  <header>
-    <div class="marquee-line" data-i18n="marquee"></div>
-    <div class="arcade-title">BLIP ARCADE</div>
-    <div class="arcade-sub" data-i18n="subtitle"></div>
-    <div class="insert-coin" id="insert-coin" data-i18n="insertCoin"></div>
-  </header>
+  <header></header>
 
   <div class="divider"></div>
 
@@ -770,7 +750,6 @@
       <div class="card-genre"  data-i18n="rallyGenre"></div>
       <div class="card-desc"   data-i18n="rallyDesc"></div>
       <div class="card-controls" data-i18n="rallyControls"></div>
-      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
     <!-- METEORS -->
@@ -782,7 +761,6 @@
       <div class="card-genre"  data-i18n="meteorsGenre"></div>
       <div class="card-desc"   data-i18n="meteorsDesc"></div>
       <div class="card-controls" data-i18n="meteorsControls"></div>
-      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
     <!-- BOUNCER -->
@@ -794,7 +772,6 @@
       <div class="card-genre"  data-i18n="bouncerGenre"></div>
       <div class="card-desc"   data-i18n="bouncerDesc"></div>
       <div class="card-controls" data-i18n="bouncerControls"></div>
-      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
     <!-- GALACTIC DEFENDER -->
@@ -806,7 +783,6 @@
       <div class="card-genre"  data-i18n="galacticGenre"></div>
       <div class="card-desc"   data-i18n="galacticDesc"></div>
       <div class="card-controls" data-i18n="galacticControls"></div>
-      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
     <!-- SERPENT -->
@@ -818,7 +794,6 @@
       <div class="card-genre"  data-i18n="serpentGenre"></div>
       <div class="card-desc"   data-i18n="serpentDesc"></div>
       <div class="card-controls" data-i18n="serpentControls"></div>
-      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
     <!-- RAIDER -->
@@ -830,7 +805,6 @@
       <div class="card-genre"  data-i18n="skyRaiderGenre"></div>
       <div class="card-desc"   data-i18n="skyRaiderDesc"></div>
       <div class="card-controls" data-i18n="skyRaiderControls"></div>
-      <div class="press-start" data-i18n="pressStart" role="button" tabindex="-1" aria-disabled="true"></div>
     </a>
 
   </div>
@@ -875,15 +849,15 @@
         <div id="stick-ball"></div>
       </div>
     </div>
-    <span class="kiosk-btn kiosk-btn-active">&#8592; GAMES</span>
-    <button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
     <div id="fire-buttons">
       <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
+      <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
     </div>
+    <button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
   </div>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=10"></script>
+  <script src="kiosk.js?v=11"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Translations                                                         */
@@ -891,8 +865,6 @@
     var i18n = {
 
       en: {
-        marquee:          '&#x25A0; &#x25A0; &#x25A0; &nbsp; WELCOME FOR PLAYER ONE IS ARRIVE HERE &nbsp; &#x25A0; &#x25A0; &#x25A0;',
-        subtitle:         'HOW MANY POINTS ARE YOU ACHIEVE?',
         insertCoin:       '&#x25BA; PLEASE TO INSERT COIN &#x25C4;',
 
         serpentGenre:     'SNAKE MOVING GAME',
@@ -919,15 +891,11 @@
         skyRaiderDesc:     'Fighter plane is flying up sky for shooting many enemy craft.<br>Catch power capsule for become more strong gun.<br>Big boss plane is arrive after enough enemy destroy.',
         skyRaiderControls: 'ARROW OR WASD MOVE &middot; [1] FIRE',
 
-        pressStart:       'PUSH START BUTTON',
-        needCoin:         'NEED COIN',
         footerControls:   'WASD / ARROW &nbsp;&mdash;&nbsp; [1] SHOOT OR LAUNCH',
         footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALL RIGHT IS RESERVE'
       },
 
       ja: {
-        marquee:          '&#x25A0; &#x25A0; &#x25A0; &nbsp; プレイヤーワン、ようこそ &nbsp; &#x25A0; &#x25A0; &#x25A0;',
-        subtitle:         '何ポイント取れるか？',
         insertCoin:       '&#x25BA; コインをいれてください &#x25C4;',
 
         serpentGenre:     'スネークゲーム',
@@ -954,15 +922,11 @@
         skyRaiderDesc:     '戦闘機で空を飛び、敵機を撃墜せよ。<br>パワーカプセルを取って武器を強化。<br>多くの敵を倒すと巨大なボス機が現れる。',
         skyRaiderControls: '矢印またはWASD移動 &middot; [1] 発射',
 
-        pressStart:       'スタート',
-        needCoin:         'コインが必要',
         footerControls:   'WASD / 矢印キー &nbsp;―&nbsp; [1] 射撃・発射',
         footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; 全権利保留'
       },
 
       da: {
-        marquee:          '&#x25A0; &#x25A0; &#x25A0; &nbsp; VELKOMMEN SPILLER ET &nbsp; &#x25A0; &#x25A0; &#x25A0;',
-        subtitle:         'HVOR MANGE POINT KAN DU OPN&Aring;',
         insertCoin:       '&#x25BA; INDS&AElig;T M&Oslash;NT &#x25C4;',
 
         serpentGenre:     'SLANGEBANE',
@@ -989,8 +953,6 @@
         skyRaiderDesc:     'Styr jagerflyet op gennem himlen og skyd fjendens fly.<br>Opsaml kapsler for at styrke dit v&aring;ben.<br>En k&aelig;mpe bossflyver dukker op, n&aring;r mange fjender er besejret.',
         skyRaiderControls: 'PILE ELLER WASD &middot; [1] SKYD',
 
-        pressStart:       'TRYK START',
-        needCoin:         'INDS&AElig;T M&Oslash;NT',
         footerControls:   'WASD / PILETASTER &nbsp;&mdash;&nbsp; [1] SKYD ELLER AFFYR',
         footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALLE RETTIGHEDER FORBEHOLDES'
       }
@@ -1020,7 +982,6 @@
       btn.addEventListener('click', function() {
         currentLang = this.getAttribute('data-lang');
         applyLang(currentLang);
-        updatePressStart();
       });
     });
 
@@ -1038,11 +999,20 @@
     /* Coin / credits                                                       */
     /* ------------------------------------------------------------------ */
     // ---- Ambient Atari hum ----
-    (function () {
+    // Only present once there's actually a credit in the machine — silent
+    // while broke, same as a real cabinet's transformer hum meaning
+    // nothing's really "on" until it's fed. Needs a user gesture to start
+    // (autoplay policy), so it arms on the first interaction but only
+    // actually starts once coins > 0; the coin-insert click itself counts,
+    // so tryStartHum() is also called directly from onCoinInserted below
+    // rather than waiting for a second, separate interaction.
+    var tryStartHum = (function () {
       var started = false;
       function startHum() {
-        if (started) return;
         started = true;
+        ['click', 'touchstart', 'keydown'].forEach(function (ev) {
+          document.removeEventListener(ev, tryStartHumImpl);
+        });
         var ctx = getKioskAudio();
 
         // Power-supply drone: 58 Hz sawtooth → lowpass → barely audible
@@ -1089,67 +1059,119 @@
         src.start(t); src.stop(t + dur + 0.01);
       }
 
+      function tryStartHumImpl() {
+        if (started || getCoins() <= 0) return;
+        startHum();
+      }
+
       ['click', 'touchstart', 'keydown'].forEach(function (ev) {
-        document.addEventListener(ev, startHum, { once: true, passive: true });
+        document.addEventListener(ev, tryStartHumImpl, { passive: true });
       });
+
+      return tryStartHumImpl;
     }());
 
-    window.onCoinInserted = function() { updatePressStart(); };
+    // ---- Startup chime ----
+    // Plays once, the moment the machine is first fed a coin (0 → 1) — a
+    // relay thunk and a rising CRT-flyback whine settling into the ambient
+    // hum's own 58 Hz, like the cabinet is genuinely powering up. The game
+    // cards only light up once this finishes (see onCoinInserted below),
+    // not the instant the coin lands, so there's a beat of "booting up"
+    // between paying and playing rather than an instant unlock.
+    function playStartupSound(onDone) {
+      var ctx = getKioskAudio();
+      var t = ctx.currentTime;
 
-    function updatePressStart() {
+      var noiseBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.14), ctx.sampleRate);
+      var noiseData = noiseBuf.getChannelData(0);
+      for (var i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
+      var noise = ctx.createBufferSource();
+      noise.buffer = noiseBuf;
+      var noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = 'lowpass';
+      noiseFilter.frequency.setValueAtTime(2200, t);
+      noiseFilter.frequency.exponentialRampToValueAtTime(80, t + 0.14);
+      var noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.5, t);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(ctx.destination);
+      noise.start(t); noise.stop(t + 0.16);
+
+      var osc  = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(60, t + 0.06);
+      osc.frequency.exponentialRampToValueAtTime(920, t + 0.4);
+      osc.frequency.exponentialRampToValueAtTime(58, t + 0.9);
+      gain.gain.setValueAtTime(0.0001, t + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.2, t + 0.32);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(t + 0.06); osc.stop(t + 0.96);
+
+      if (typeof onDone === 'function') setTimeout(onDone, 900);
+    }
+
+    window.onCoinInserted = function() {
+      if (getCoins() === 1) {
+        // This coin just brought the machine from empty to funded — power
+        // up first, light up the cards once that finishes.
+        playStartupSound(function () {
+          updateCardDimming();
+        });
+        tryStartHum();
+      } else {
+        updateCardDimming();
+      }
+    };
+
+    // No credits: every card dims (still fully visible, just clearly
+    // unlit) instead of a separate "NEED COIN" label — same gate as the
+    // card click itself, just shown on the cards directly.
+    function updateCardDimming() {
       var enabled = getCoins() > 0;
-      var key = enabled ? 'pressStart' : 'needCoin';
-      document.querySelectorAll('.press-start').forEach(function(el) {
-        el.setAttribute('data-i18n', key);
-        var t = i18n[currentLang];
-        if (t && t[key] !== undefined) el.innerHTML = t[key];
-        // Out of tab order and marked inert while there's no credit to
-        // spend — same gate as the card click, just visible on the button
-        // itself instead of silently doing nothing.
-        el.setAttribute('aria-disabled', enabled ? 'false' : 'true');
-        el.tabIndex = enabled ? 0 : -1;
+      document.querySelectorAll('.card').forEach(function(card) {
+        card.classList.toggle('no-credit', !enabled);
       });
     }
 
     function updateCreditsDisplay() {
       updateCoinsHud();
-      updatePressStart();
+      updateCardDimming();
     }
 
-    updatePressStart(); // initialise to "NEED COIN" on page load
-    updateCreditsDisplay();
+    updateCreditsDisplay(); // initialise dimming to match coins on page load
 
-    // Spends one credit and launches `card`'s game — the same gate for
-    // clicking anywhere on the card and for its dedicated start button.
-    // A no-op (not a shake/sound) when broke: an unlit physical start
-    // button just doesn't do anything when you push it.
+    // Spends one credit and launches `card`'s game — the click handler for
+    // the whole card, now that there's no separate start button. A no-op
+    // (not a shake/sound) when broke: same as pushing an unlit physical
+    // start button.
     function attemptStart(card) {
       var n = getCoins();
-      if (n <= 0) { return; }
+      if (n <= 0) { nudgeInsertCoin(); return; }
       saveCoins(n - 1);
       updateCoinsHud();
       window.location.href = card.href;
     }
 
+    // Points a broke player at the COINS button instead of leaving the
+    // dimmed-card press feeling dead: a quick swell + flicker on both the
+    // top-bar prompt and the bottom-bar button (see .coin-nudge).
+    function nudgeInsertCoin() {
+      ['insert-coin', 'kiosk-insert-btn'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.classList.remove('coin-nudge');
+        void el.offsetWidth;
+        el.classList.add('coin-nudge');
+        el.addEventListener('animationend', function () {
+          el.classList.remove('coin-nudge');
+        }, { once: true });
+      });
+    }
+
     document.querySelectorAll('.card').forEach(function(card) {
       card.addEventListener('click', function(e) {
-        e.preventDefault();
-        attemptStart(card);
-      });
-
-      // The start button itself: stops the click/keypress from also
-      // bubbling up to the card's own handler above (which would otherwise
-      // spend a second credit for the same press).
-      var startBtn = card.querySelector('.press-start');
-      if (!startBtn) return;
-      startBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        e.preventDefault();
-        attemptStart(card);
-      });
-      startBtn.addEventListener('keydown', function(e) {
-        if (e.code !== 'Space' && e.code !== 'Enter') return;
-        e.stopPropagation();
         e.preventDefault();
         attemptStart(card);
       });

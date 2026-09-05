@@ -36,8 +36,16 @@
   font-size: 18px;
   font-weight: 900;
   letter-spacing: 2px;
-  color: #e6dc32;
-  text-shadow: 0 -1px 0 rgba(255,255,255,0.1), 0 1px 1px rgba(0,0,0,0.85);
+  /* Fluorescent, not printed-plastic: a bright near-white core so the
+     colour lives in the glow (layered text-shadow), the same recipe as
+     .blip-logo, plus a matching glow on the button's own edge so it reads
+     as a lit fixture, not just glowing text sitting on a dark button. */
+  color: #f6ffb8;
+  text-shadow:
+    0 0 4px #fff,
+    0 0 10px #e6dc32,
+    0 0 20px #e6dc32,
+    0 0 42px rgba(230, 220, 50, 0.75);
   text-decoration: none;
   text-transform: uppercase;
   cursor: pointer;
@@ -49,19 +57,52 @@
   padding: 9px 16px;
   border-radius: 5px;
   background: linear-gradient(to bottom, #172017, #0c150c);
-  border: 1px solid #2a5a2a;
+  border: 1px solid #4a9a3a;
   border-bottom: 3px solid #060e06;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.75), inset 0 1px 0 rgba(50,200,50,0.08);
+  box-shadow:
+    0 4px 10px rgba(0,0,0,0.75),
+    inset 0 1px 0 rgba(50,200,50,0.08),
+    0 0 12px rgba(230, 220, 50, 0.35),
+    0 0 26px rgba(230, 220, 50, 0.2);
   transition: box-shadow .1s, transform .1s, border-color .15s, text-shadow .15s;
+  animation: kiosk-btn-flicker 5.5s ease-in-out infinite;
 }
 .kiosk-btn:hover {
-  border-color: #3a8a3a;
+  border-color: #6acf5a;
   border-bottom-color: #0a1e0a;
 }
 .kiosk-btn:active {
   transform: translateY(2px);
   border-bottom-width: 1px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.75), inset 0 2px 5px rgba(0,0,0,0.5);
+}
+
+/* A few irregular dips rather than one steady pulse — a sign that's been
+   lit all night, the same character as .blip-logo's flicker. */
+@keyframes kiosk-btn-flicker {
+  0%, 90%, 100% { opacity: 1; }
+  91% { opacity: 0.4; }
+  92% { opacity: 0.85; }
+  93% { opacity: 0.3; }
+  94% { opacity: 1; }
+}
+
+/* Nudge: a broke player pressing a dimmed game card gets pointed at the
+   COINS button instead of a silent no-op — a quick swell + flicker on the
+   button itself, then back to its normal size/glow. ID selector so it
+   safely overrides the always-on kiosk-btn-flicker above for the
+   animation's duration regardless of stylesheet order. */
+#kiosk-insert-btn.coin-nudge,
+#insert-coin-btn.coin-nudge {
+  animation: coin-nudge 0.6s ease-in-out;
+}
+@keyframes coin-nudge {
+  0%   { transform: scale(1);   opacity: 1; }
+  25%  { transform: scale(1.3); opacity: 0.35; }
+  40%  { transform: scale(1.3); opacity: 1; }
+  55%  { transform: scale(1.3); opacity: 0.3; }
+  70%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
 }
 
 .kiosk-btn-active {
@@ -96,6 +137,107 @@
 }
 .coin-flash { animation: coin-flash 0.65s ease-out !important; }
 
+/* A quiet attention-nudge (kiosk.js, 5s after the landing page loads) —
+   deliberately understated next to .coin-flash's bright "coin accepted"
+   glow, since this one's just saying "notice me", not confirming an
+   action. */
+@keyframes coin-hint-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+.coin-hint-blink { animation: coin-hint-blink 0.55s ease-in-out 3; }
+
+/* ---- BLIP logo: lives in the same 28px top strip as the game shell's
+   marquee name (shell.css's #marquee-name — same font-size/weight/glow
+   recipe, just green instead of the per-game accent colour), and is the
+   click-target back to the kiosk that replaced the bottom bar's "GAMES"
+   button. height:28px (not just padding) so its own box matches the
+   marquee-bar's exactly on game pages, even though the two are separate
+   elements — shell.js generates the marquee dynamically, so reaching
+   into it from here isn't an option, but matching its box and text style
+   reads as the same bar regardless. On the non-game pages (no marquee)
+   it just sits at the very top the same way. z-index high enough to
+   clear the marquee (9), vignette/scanlines (98-100) and the bar itself
+   (200) — above all of them, on every page, without exception. */
+.blip-logo {
+  position: fixed;
+  top: 0;
+  left: 8px;
+  height: 32px;
+  z-index: 500;
+  display: inline-flex;
+  align-items: center;
+  /* No visible padding beyond centring the text in the strip — but the
+     box's own width (text + this gap) still gives a reasonably wide tap
+     target despite the type not being huge, the same way the bar's own
+     kiosk-btn controls get their tap size from width, not height. */
+  padding: 0 8px;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: 2px;
+  /* A few irregular dips rather than one steady pulse — reads as a
+     random flicker (a sign that's been lit all night) instead of a
+     metronome, the same character as shell.css's #marquee-name flicker
+     it now shares a bar with, just redefined here since kiosk.css (used
+     on every page, not just game ones) doesn't import shell.css. */
+  animation: blip-logo-flicker 6.5s ease-in-out infinite;
+  /* A true fluorescent-tube look needs a bright near-white core with the
+     colour living in the glow, not the glyph itself — flat green text
+     with a green shadow reads as "coloured text with a shadow", not a
+     lit tube. */
+  color: #eafff0;
+  text-decoration: none;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 4px #fff,
+    0 0 9px #32c832,
+    0 0 19px #32c832,
+    0 0 38px rgba(50, 200, 50, 0.75),
+    0 0 70px rgba(50, 200, 50, 0.4);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: text-shadow .15s, transform .08s;
+}
+.blip-logo:hover {
+  text-shadow:
+    0 0 5px #fff,
+    0 0 11px #32c832,
+    0 0 24px #32c832,
+    0 0 46px rgba(50, 200, 50, 0.85),
+    0 0 84px rgba(50, 200, 50, 0.5);
+}
+.blip-logo:active { transform: translateY(1px); }
+
+@keyframes blip-logo-flicker {
+  0%, 92%, 100% { opacity: 1; }
+  93% { opacity: 0.4; }
+  94% { opacity: 0.85; }
+  95% { opacity: 0.3; }
+  96% { opacity: 1; }
+}
+
+/* One-shot "power-on" flourish, triggered by shell.js on game pages only
+   (landing/history/about never add .boot) — a gentle double-blink settling
+   down to full size, like the sign just kicked on, then it settles into
+   its normal steady flicker above. */
+.blip-logo.boot {
+  transform-origin: left center;
+  animation: blip-logo-boot 1.8s ease-out;
+}
+@keyframes blip-logo-boot {
+  0%   { opacity: 0.3; transform: scale(1.2); }
+  25%  { opacity: 1; }
+  45%  { opacity: 0.5; }
+  65%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 380px) {
+  .blip-logo { font-size: 15px; letter-spacing: 1.5px; }
+}
+
 /* ---- Insert-coin slot + drop animation ----
    Shared by every page's insert-coin button — the game shell's
    #insert-coin-btn and the kiosk landing/history/about pages'
@@ -113,6 +255,9 @@
   align-items: center;
   gap: 8px;
   overflow: visible;
+  /* Pushed to the bar's far right (stick + fire buttons stay grouped on
+     the left — see #topbar/.kiosk-bar-main's justify-content override). */
+  margin-left: auto;
 }
 #insert-coin-btn::after,
 #kiosk-insert-btn::after {
@@ -190,6 +335,11 @@
      bars too so the bar looks identical everywhere. */
   left: 16px;
   right: 16px;
+  /* Override .kiosk-bar's space-between: stick + fire buttons sit grouped
+     together on the left (gap between them from the shared `gap`), and
+     COINS is pushed to the far right via its own margin-left:auto below —
+     rather than every control being spread evenly across the bar. */
+  justify-content: flex-start;
   border-radius: 10px 10px 0 0;
   overflow: visible;
   /* A genuine 3D tilt, not faked shading — rotated back around its own
@@ -396,6 +546,8 @@
 
 .arcade-btn {
   position: relative;
+  /* Apple's ~44px touch-target guidance — a real thumb hit-area, not just
+     a visually-sized cap. */
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -413,7 +565,11 @@
 
 .arcade-btn-cap {
   position: absolute;
-  inset: 4px;
+  /* Percentage, not a fixed px, so the bezel-to-cap ratio stays the same
+     now that .arcade-btn is half its old size (and across the smaller
+     breakpoints below it too), instead of a fixed inset eating an
+     ever-larger share of a shrinking button. */
+  inset: 9%;
   border-radius: 50%;
   /* Concave dish: an off-centre highlight catching the light on the near
      side of the depression, darkening toward the rim. */
@@ -437,19 +593,11 @@
     inset 0 -1px 2px rgba(255, 255, 255, 0.12);
 }
 
-/* The landing page's stick is decorative only (no shell.js, nothing ever
-   drags it), so it doesn't need the big thumb-sized hit-region the game
-   pages' does — shrink it and push it right, clearing the about/history
-   badges (.left-badges, fixed at left:20px right above this same bar)
-   that would otherwise sit right under the ball. #fire-buttons gets the
-   same margin mirrored on the right, so the deck reads as evenly framed
-   rather than lopsided (stick pushed in, button flush to the edge). */
-.kiosk-bar-main #stick-base { width: 64px; margin-left: 48px; }
-.kiosk-bar-main #stick-boot { width: 30px; height: 30px; }
-.kiosk-bar-main #stick-handle { bottom: 21px; }
-.kiosk-bar-main #stick-shaft { width: 6px; height: 28px; }
-.kiosk-bar-main #stick-ball  { width: 26px; height: 26px; bottom: 28px; }
-.kiosk-bar-main #fire-buttons { margin-right: 48px; }
+/* The kiosk landing/history/about bar (.kiosk-bar-main) intentionally
+   shares every dimension with the game shell's #topbar below — same
+   #stick-base/boot/handle/shaft/ball sizing, same bar padding/gap — so
+   the control deck renders identically everywhere rather than a smaller
+   decorative version on non-game pages. */
 
 /* ---- Bar text: embossed, like moulded plastic on a lit tilted panel,
    plus the compaction needed once the stick and buttons share the row
@@ -486,7 +634,7 @@
   #stick-shaft { width: 8px; height: 34px; }
   #stick-ball  { width: 34px; height: 34px; bottom: 34px; }
   #fire-buttons { gap: 5px; }
-  .arcade-btn { width: 34px; height: 34px; }
+  .arcade-btn { width: 17px; height: 17px; }
 }
 
 /* Smallest phones (iPhone SE/mini class) — a 2-button game plus the full
@@ -500,7 +648,7 @@
   #stick-shaft { width: 7px; height: 30px; }
   #stick-ball  { width: 30px; height: 30px; bottom: 30px; }
   #fire-buttons { gap: 4px; }
-  .arcade-btn { width: 30px; height: 30px; }
+  .arcade-btn { width: 15px; height: 15px; }
 }
 
 /* Below any current iPhone (kept as a graceful floor, not a target) */
@@ -513,7 +661,7 @@
   #stick-shaft { width: 6px; height: 26px; }
   #stick-ball  { width: 26px; height: 26px; bottom: 26px; }
   #fire-buttons { gap: 3px; }
-  .arcade-btn { width: 26px; height: 26px; }
+  .arcade-btn { width: 13px; height: 13px; }
 }
 
 /* ---- Left badge group ---- */

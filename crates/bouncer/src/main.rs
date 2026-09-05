@@ -559,6 +559,15 @@ const BRICK_BREAK_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/
 const LIFE_LOST_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/life_lost.wav"));
 const WIN_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/win.wav"));
 const MUSIC_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
+const MUSIC2_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
+const MUSIC3_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
+const MUSIC4_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music4.wav"));
+const MUSIC5_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music5.wav"));
+const MUSIC6_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music6.wav"));
+// Six loops in rotation instead of one, so a long session doesn't just hear
+// the same ~30s on repeat — see blip_assets::bouncer's music()..music6() for
+// what each one is (tech-house, acid, downtempo, trance, funky, dark).
+const MUSIC_DURATIONS: [f32; 6] = [30.7262, 29.3388, 29.0500, 31.5512, 32.2471, 30.7922];
 
 fn load_png(bytes: &'static [u8]) -> Texture2D {
     let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));
@@ -591,13 +600,30 @@ async fn main() {
         life_lost:   blip::audio::load_sound(LIFE_LOST_WAV).await,
         win:         blip::audio::load_sound(WIN_WAV).await,
     };
-    let music = blip::audio::load_sound(MUSIC_WAV).await;
-    play_music(&music);
+    let music = [
+        blip::audio::load_sound(MUSIC_WAV).await,
+        blip::audio::load_sound(MUSIC2_WAV).await,
+        blip::audio::load_sound(MUSIC3_WAV).await,
+        blip::audio::load_sound(MUSIC4_WAV).await,
+        blip::audio::load_sound(MUSIC5_WAV).await,
+        blip::audio::load_sound(MUSIC6_WAV).await,
+    ];
+    let mut music_idx: usize = 0;
+    let mut music_timer: f32 = MUSIC_DURATIONS[0];
+    play_music(&music[0]);
 
     let mut shot_frame: u32 = 0;
 
     loop {
         let dt = blip.delta_time;
+
+        // Advance to the next loop in rotation at each track's boundary.
+        music_timer -= dt;
+        if music_timer <= 0.0 {
+            music_idx = (music_idx + 1) % music.len();
+            music_timer = MUSIC_DURATIONS[music_idx];
+            play_music(&music[music_idx]);
+        }
 
         if blip.screenshot_mode {
             shot_frame += 1;

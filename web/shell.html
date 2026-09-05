@@ -13,11 +13,13 @@
   <link rel="icon" type="image/svg+xml" href="../icon.svg">
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
   <script src="../howler.min.js"></script>
-  <script src="../kiosk.js?v=10"></script>
-  <link rel="stylesheet" href="../kiosk.css?v=13">
+  <script src="../kiosk.js?v=11"></script>
+  <link rel="stylesheet" href="../kiosk.css?v=21">
   <link rel="stylesheet" href="../shell.css?v=16">
 </head>
 <body>
+
+  <a class="blip-logo" href="../index.html">BLIP ARCADE</a>
 
   <div id="loader">
     <div id="status">LOADING</div>
@@ -25,7 +27,7 @@
   </div>
 
   <div id="topbar" class="kiosk-bar">
-    <!-- Arcade stick: mounted flush in the bar, left of COINS — its ball
+    <!-- Arcade stick: mounted flush in the bar, left edge — its ball
          rides a shaft that rises up over the game above the bar. Always
          shown, not just on touch devices — draggable by touch/mouse
          (shell.js), and it animates to reflect keyboard and gamepad
@@ -37,11 +39,11 @@
         <div id="stick-ball"></div>
       </div>
     </div>
-    <a id="back" class="kiosk-btn" href="../index.html">&#8592; GAMES</a>
-    <button id="insert-coin-btn" class="kiosk-btn"><span data-coins-hud></span></button>
-    <!-- Fire buttons: mounted flush in the bar, right of INSERT COIN.
-         Populated by shell.js from BLIP_GAMES (one or two buttons). -->
+    <!-- Fire buttons: mounted just right of the stick (with a gap between
+         them, see kiosk.css). Populated by shell.js from BLIP_GAMES (one
+         or two buttons). -->
     <div id="fire-buttons"></div>
+    <button id="insert-coin-btn" class="kiosk-btn"><span data-coins-hud></span></button>
   </div>
 
   <div id="need-coin-overlay">
@@ -66,7 +68,7 @@
   <span class="bezel-screw br"></span>
   <canvas id="glcanvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
 
-  <script src="../shell.js?v=23"></script>
+  <script src="../shell.js?v=25"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
   <script src="../blip_bridge.js?v=7"></script>
