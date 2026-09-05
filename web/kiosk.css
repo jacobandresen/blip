@@ -96,9 +96,424 @@
 }
 .coin-flash { animation: coin-flash 0.65s ease-out !important; }
 
+/* ---- Insert-coin slot + drop animation ----
+   Shared by every page's insert-coin button — the game shell's
+   #insert-coin-btn and the kiosk landing/history/about pages'
+   #kiosk-insert-btn — so the bar looks and behaves identically
+   everywhere. The slot sits at the right-hand end of the button (after
+   the text, like a real cabinet's slot beside its label) rather than
+   between the arrow and the text. position:relative so #coin-drop-anim
+   (injected by shell.js/kiosk.js, the coin that animates into the slot on
+   a successful insert) can anchor to it precisely regardless of the
+   button's responsive padding. */
+#insert-coin-btn,
+#kiosk-insert-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  overflow: visible;
+}
+#insert-coin-btn::after,
+#kiosk-insert-btn::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 16px;
+  border-radius: 3px;
+  background: #000;
+  box-shadow: inset 0 0 0 1px rgba(230, 220, 50, 0.45),
+              0 0 6px rgba(230, 220, 50, 0.3);
+  flex-shrink: 0;
+}
+
+/* The coin: hidden at rest, dropped in front of the slot above and
+   animated straight down through it on click. --slot-x is set by
+   shell.js/kiosk.js's dropCoinAnimation() at click time, measured from
+   the button's actual padding — a fixed guess would drift off the slot's
+   real position across the responsive breakpoints, which change that
+   padding (the fallback here only covers the instant before JS runs). */
+#coin-drop-anim {
+  position: absolute;
+  top: 50%;
+  right: var(--slot-x, 4px);
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 5;
+  background: radial-gradient(circle at 34% 28%, #fff6c8 0%, #e6c832 30%, #a8791a 78%, #7a5510 100%);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.5), inset 0 0 2px rgba(255, 255, 255, 0.5);
+}
+#coin-drop-anim.dropping {
+  animation: coin-drop 0.62s cubic-bezier(.55, 0, .85, .35) both;
+}
+/* Squeezes narrower as well as shorter on the way down — a coin sliding
+   into a slot only slightly wider than itself visibly pinches at the
+   edges, not just flattens top-to-bottom, right up until it's swallowed. */
+@keyframes coin-drop {
+  0%   { opacity: 1; transform: translate(50%, -26px) rotate(-25deg) scale(1, 1); }
+  50%  { opacity: 1; transform: translate(50%, -3px) rotate(150deg) scale(0.8, 0.88); }
+  75%  { opacity: 1; transform: translate(50%, 1px) rotate(230deg) scale(0.42, 0.48); }
+  100% { opacity: 0; transform: translate(50%, 3px) rotate(255deg) scale(0.12, 0.18); }
+}
+
 /* Narrow portrait phones (≤ 480 px) — shrink text so all three bar items fit */
 @media (max-width: 480px) {
   .kiosk-btn { font-size: 13px; letter-spacing: 0; padding: 7px 10px; }
+}
+
+/* ---- Arcade control deck: stick + fire buttons, mounted in the bar ----
+   Shared by the game shell's #topbar and the kiosk landing page's own bar
+   (.kiosk-bar-main) — NOT the plain .kiosk-bar on history/about, which
+   stays a flat nav strip. Reads as a real cabinet's control panel, tilted
+   toward the player like a horizontal surface you're standing over —
+   done entirely with shading and shadows rather than an actual CSS 3D
+   transform on the interactive elements, so hit-testing (and the drag
+   math in shell.js, which measures the ball's real on-screen position)
+   stays exactly the plain 2D geometry it looks like it is, with nothing
+   for a touch or a click to misjudge. Always shown, not just on touch
+   devices: both stick and buttons animate to reflect keyboard and gamepad
+   input too (see shell.js's reflect()), so on game pages they double as a
+   live "what's being pressed" readout for keyboard players; on the
+   landing page they're purely decorative (there's no game to drive
+   them). */
+
+#topbar,
+.kiosk-bar-main {
+  --bar-tilt: 34deg;
+  /* Matches the game canvas's own left/right inset (PAD=16 in shell.js's
+     fillCanvas()) on game pages, so the deck sits exactly as wide as the
+     screen and directly under it, rather than the wider bezel-frame
+     width or a full-bleed strip. Kept the same on the kiosk/history/about
+     bars too so the bar looks identical everywhere. */
+  left: 16px;
+  right: 16px;
+  border-radius: 10px 10px 0 0;
+  overflow: visible;
+  /* A genuine 3D tilt, not faked shading — rotated back around its own
+     front (bottom) edge so it reads as a horizontal deck you're looking
+     down onto, the way a real cabinet's control panel actually sits.
+     preserve-3d so #stick-handle below can share this same 3D space
+     (partially un-tilting itself to stand up off the panel) instead of
+     being flattened into it. Real cabinet control decks are a
+     glossy-black moulded/laminate surface (reference: countless
+     Happ/Wico panels), not bare metal — so the panel itself stays black,
+     with a soft gloss highlight raking across it where the controls sit,
+     like an overhead light catching glossy plastic at an angle. That
+     highlight is also what lets the buttons cast a shadow that actually
+     shows, rather than one dark tone lost against another. */
+  transform-style: preserve-3d;
+  transform-origin: 50% 100%;
+  transform: perspective(640px) rotateX(var(--bar-tilt));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06) 0px, transparent 10px),
+    radial-gradient(ellipse 130% 70% at 50% 60%, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 45%, transparent 72%),
+    linear-gradient(0deg, #1a1c1f 0%, #0c0d0f 55%, #030304 100%);
+  border-top: 1px solid rgba(255,255,255,0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    0 -14px 28px -10px rgba(0,0,0,0.75);
+}
+
+/* ---- Stick ---- */
+
+/* The full drag hit-region: tall enough to cover the ball's floating rest
+   position above the bar, not just the boot sitting in it, so grabbing
+   the stick anywhere it's drawn works — and generously sized so it's a
+   comfortable thumb target, not a fiddly pinpoint. A real flex child of
+   the bar (not position:fixed) so it takes its place left of COINS in the
+   row; anchored to the bar's bottom edge so all of its extra height rises
+   upward, over the game, instead of being centered half above/half below
+   the bar. */
+#stick-base {
+  --dx: 0;
+  --dy: 0;
+  position: relative;
+  align-self: flex-end;
+  flex-shrink: 0;
+  width: 100px;
+  height: 210px;
+  transform-style: preserve-3d;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* A soft contact shadow on the panel below the ball — reads as "elevated
+   above the surface on a shaft" without any actual depth axis, and drifts
+   opposite the lean the same way a real raking-light shadow would. */
+#stick-base::before {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  width: 34px;
+  height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0,0,0,0.55) 0%, transparent 72%);
+  transform: translate(calc(-50% + var(--dx) * -6px), 0);
+  transition: transform 90ms ease-out;
+  pointer-events: none;
+}
+
+/* The boot: a black gate plate flush in the bar — the only part of the
+   stick with a background of its own. */
+#stick-boot {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  width: 42px;
+  height: 42px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  border-radius: 9px;
+  background: linear-gradient(155deg, #3a3a3e 0%, #1c1c1e 45%, #0b0b0c 100%);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* The restrictor gate: an octagonal cutout the shaft rides in — the
+   classic 8-way arcade mechanism. */
+#stick-boot::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  clip-path: polygon(
+    30% 0%, 70% 0%, 100% 30%, 100% 70%,
+    70% 100%, 30% 100%, 0% 70%, 0% 30%
+  );
+  background: #040404;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.14),
+    inset 0 2px 5px rgba(0, 0, 0, 0.85);
+}
+
+/* The moving part: shaft + ball together, PIVOTING from the boot toward
+   whichever direction(s) are held via the --dx/--dy custom properties
+   (each -1, 0, or 1 — shell.js sets them, it never runs a per-frame
+   animation loop). #stick-handle is a 0×0 point sitting exactly at the
+   pivot (the boot's opening); rotating IT (rather than translating the
+   ball) swings the whole rigid shaft+ball rigidly around that fixed
+   point, like a real stick leaning in its gate — the boot never moves,
+   only the top does. */
+#stick-handle {
+  position: absolute;
+  left: 50%;
+  /* The boot's vertical centre (bottom:6px + height:42px / 2), not its
+     top edge — rooted inside the gate mechanism like a real stick, not
+     hinged off the top rim of the boot. */
+  bottom: 27px;
+  width: 0;
+  height: 0;
+  /* The angle, worked from the actual rotation matrix rather than
+     guessed: rotateX(θ) sends a local "straight up" vector (0,-1,0) to
+     (0, -cosθ, -sinθ). #topbar's rotateX(bar-tilt) alone (θ=34deg) gives
+     roughly (0,-0.83,-0.56) — that negative Z is "away from the viewer,
+     into the screen", which is why the stick read as pointing at the
+     game instead of up at the player. Cancelling bar-tilt entirely here
+     would leave it dead vertical (z=0); cancelling it and then leaning
+     back the *other* way by a further fixed 9deg gives a small positive
+     Z (toward the viewer) on top of the mostly-vertical rise — a stick
+     standing up with a slight, correctly-signed perspective lean, not
+     one lying back into the cabinet. rotate(dx) is the separate
+     left/right lean, on top of this frame. transform-style here (not
+     just on #stick-base) is what makes this compose correctly in true 3D
+     instead of flattening the shaft/ball into a 2D sprite first —
+     earlier, without it, a rotateX+rotate combination here sent the
+     whole stick behind the panel in some lean states. */
+  transform: rotateX(calc(var(--bar-tilt) * -1 - 9deg)) rotate(calc(var(--dx) * 18deg));
+  transform-style: preserve-3d;
+  transition: transform 90ms ease-out;
+  pointer-events: none;
+}
+
+/* Rises from the pivot (the boot's opening) up to the ball. Tapered
+   (narrower at the top) rather than a plain rectangle — a cheap but
+   effective perspective cue, as if the rod recedes slightly from the
+   player's eye on its way up, without any real depth axis to get wrong. */
+#stick-shaft {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 12px;
+  height: 40px;
+  transform: translateX(-50%);
+  clip-path: polygon(28% 0%, 72% 0%, 100% 100%, 0% 100%);
+  background: linear-gradient(90deg, #6b6b70 0%, #d8d8dc 35%, #8c8c90 62%, #3c3c40 100%);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Caps the top of the shaft — straddling its end rather than sitting
+   flush on top of it, like a real ball-top screwed onto a rod. Sized as a
+   proper thumb target, not just a visual flourish. The extra --dy nudge
+   (on top of the lean above, which only carries left/right) is the
+   up/down half of the read: forward/back has no meaningful 2D lean, so
+   it's a small direct shift instead. */
+#stick-ball {
+  position: absolute;
+  left: 50%;
+  bottom: 40px;
+  width: 42px;
+  height: 42px;
+  /* A sphere always projects as a circle regardless of viewing angle —
+     unlike the flat shaft/boot, which correctly show the panel's tilt
+     because they genuinely are flat, the ball needs its OWN counter-
+     rotation to cancel whatever's left once it reaches here. #topbar
+     contributes +bar-tilt, #stick-handle contributes -bar-tilt - 9deg
+     (see there for the derivation), net -9deg by the time it reaches
+     this element — so +9deg fixed (not scaled by --bar-tilt, since the
+     bar-tilt terms already cancelled each other above) brings it back to
+     dead level. Position still inherits the real 3D scene (it
+     recedes/shifts with the rest of the stick); only its shape stays
+     billboarded to the camera. translateZ nudges it a hair closer to the
+     camera than the shaft tip it caps — without it the two are close
+     enough in depth, post-rotation, that the shaft's edge visibly
+     pokes through the ball instead of disappearing behind it. */
+  transform: translate(-50%, calc(50% + var(--dy) * 12px)) rotateX(9deg) translateZ(3px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 22%, #ffab9c 0%, #ff8a78 18%, #e6402c 46%, #a3170c 80%, #6e0d06 100%);
+  box-shadow:
+    0 5px 8px rgba(0, 0, 0, 0.55),
+    inset 0 -4px 7px rgba(0, 0, 0, 0.35),
+    inset 0 2px 3px rgba(255, 255, 255, 0.25);
+}
+
+/* ---- Fire buttons: flush in the bar, right of INSERT COIN ---- */
+
+#fire-buttons {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.arcade-btn {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  /* The chrome bezel ring around the cap. */
+  background: conic-gradient(from -45deg, #dfe1e4, #8a8d92 25%, #4a4c50 50%, #8a8d92 75%, #dfe1e4 100%);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6);
+}
+
+.arcade-btn-cap {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  /* Concave dish: an off-centre highlight catching the light on the near
+     side of the depression, darkening toward the rim. */
+  background: radial-gradient(circle at 38% 30%, #ff5a4a 0%, #d5241a 45%, #8f1109 100%);
+  box-shadow:
+    inset 0 -4px 6px rgba(0, 0, 0, 0.45),
+    inset 0 3px 5px rgba(255, 255, 255, 0.25);
+  transition: transform .05s, box-shadow .05s;
+}
+
+/* Second button (e.g. Meteors' hyperspace): ivory instead of red, the
+   classic two-tone competition-cabinet pairing. */
+.arcade-btn:nth-child(2) .arcade-btn-cap {
+  background: radial-gradient(circle at 38% 30%, #fbf6ea 0%, #d8cfb8 50%, #a8a08c 100%);
+}
+
+.arcade-btn.active .arcade-btn-cap {
+  transform: scale(0.92);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.6),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.12);
+}
+
+/* The landing page's stick is decorative only (no shell.js, nothing ever
+   drags it), so it doesn't need the big thumb-sized hit-region the game
+   pages' does — shrink it and push it right, clearing the about/history
+   badges (.left-badges, fixed at left:20px right above this same bar)
+   that would otherwise sit right under the ball. #fire-buttons gets the
+   same margin mirrored on the right, so the deck reads as evenly framed
+   rather than lopsided (stick pushed in, button flush to the edge). */
+.kiosk-bar-main #stick-base { width: 64px; margin-left: 48px; }
+.kiosk-bar-main #stick-boot { width: 30px; height: 30px; }
+.kiosk-bar-main #stick-handle { bottom: 21px; }
+.kiosk-bar-main #stick-shaft { width: 6px; height: 28px; }
+.kiosk-bar-main #stick-ball  { width: 26px; height: 26px; bottom: 28px; }
+.kiosk-bar-main #fire-buttons { margin-right: 48px; }
+
+/* ---- Bar text: embossed, like moulded plastic on a lit tilted panel,
+   plus the compaction needed once the stick and buttons share the row
+   with COINS / GAMES / INSERT COIN. ---- */
+#topbar.kiosk-bar,
+.kiosk-bar-main {
+  gap: 6px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+#topbar .kiosk-btn,
+.kiosk-bar-main .kiosk-btn {
+  font-size: 13px;
+  letter-spacing: 0;
+  padding: 7px 9px;
+  box-shadow:
+    0 6px 12px -2px rgba(0, 0, 0, 0.75),
+    0 2px 4px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(50, 200, 50, 0.1);
+}
+
+/* Phones — the row now carries the stick and buttons too, so give up more
+   space than the 480px breakpoint above does elsewhere. The ball stays a
+   comfortable thumb target at every tier (it barely shrinks); the lean's
+   swing (shaft length) shrinks a bit faster than that so the whole stick
+   still clears the left edge without needing much horizontal padding to
+   itself, leaving that space for the bar text instead. */
+@media (max-width: 480px) {
+  #topbar.kiosk-bar, .kiosk-bar-main { gap: 3px; padding-left: 6px; padding-right: 6px; }
+  #topbar .kiosk-btn, .kiosk-bar-main .kiosk-btn { font-size: 10px; padding: 5px 5px; }
+  #stick-base { width: 90px; }
+  #stick-boot { width: 36px; height: 36px; }
+  #stick-handle { bottom: 24px; }
+  #stick-shaft { width: 8px; height: 34px; }
+  #stick-ball  { width: 34px; height: 34px; bottom: 34px; }
+  #fire-buttons { gap: 5px; }
+  .arcade-btn { width: 34px; height: 34px; }
+}
+
+/* Smallest phones (iPhone SE/mini class) — a 2-button game plus the full
+   bar text is tight enough to need one more pass. */
+@media (max-width: 380px) {
+  #topbar.kiosk-bar, .kiosk-bar-main { gap: 2px; padding-left: 4px; padding-right: 4px; }
+  #topbar .kiosk-btn, .kiosk-bar-main .kiosk-btn { font-size: 9px; padding: 4px 4px; }
+  #stick-base { width: 78px; }
+  #stick-boot { width: 32px; height: 32px; }
+  #stick-handle { bottom: 22px; }
+  #stick-shaft { width: 7px; height: 30px; }
+  #stick-ball  { width: 30px; height: 30px; bottom: 30px; }
+  #fire-buttons { gap: 4px; }
+  .arcade-btn { width: 30px; height: 30px; }
+}
+
+/* Below any current iPhone (kept as a graceful floor, not a target) */
+@media (max-width: 340px) {
+  #topbar.kiosk-bar, .kiosk-bar-main { gap: 1px; padding-left: 3px; padding-right: 3px; }
+  #topbar .kiosk-btn, .kiosk-bar-main .kiosk-btn { font-size: 8px; padding: 3px 3px; }
+  #stick-base { width: 68px; }
+  #stick-boot { width: 28px; height: 28px; }
+  #stick-handle { bottom: 20px; }
+  #stick-shaft { width: 6px; height: 26px; }
+  #stick-ball  { width: 26px; height: 26px; bottom: 26px; }
+  #fire-buttons { gap: 3px; }
+  .arcade-btn { width: 26px; height: 26px; }
 }
 
 /* ---- Left badge group ---- */

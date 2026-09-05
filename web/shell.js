@@ -47,9 +47,44 @@ function getUiAudio() {
   if (uiAudio.state === 'suspended') uiAudio.resume();
   return uiAudio;
 }
+// A real coin makes two distinct sounds in sequence: the metallic clink
+// of it dropping through the chute (bright, inharmonic, near-instant —
+// real metal doesn't ring in tidy octaves the way a synth voice does),
+// then the register's own electronic "credit accepted" chime a beat
+// later. Modelling both, rather than just the chime alone, is what reads
+// as an actual coin rather than a UI beep.
 function playCoinInsert() {
   var ctx = getUiAudio(), t = ctx.currentTime;
-  [{ freq: 1047, start: 0 }, { freq: 1319, start: 0.055 }].forEach(function (note) {
+
+  // The clink: filtered noise for the transient "tik" of metal on metal,
+  // plus a few short inharmonic tones for the coin's own brief ring.
+  var noiseBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.045), ctx.sampleRate);
+  var noiseData = noiseBuf.getChannelData(0);
+  for (var i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
+  var noise = ctx.createBufferSource();
+  noise.buffer = noiseBuf;
+  var noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = 4200;
+  noiseFilter.Q.value = 1.1;
+  var noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.4, t);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+  noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(ctx.destination);
+  noise.start(t); noise.stop(t + 0.045);
+
+  [3000, 4550, 6100].forEach(function (freq, i) {
+    var osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = 'triangle'; osc.frequency.value = freq;
+    osc.connect(gain); gain.connect(ctx.destination);
+    var start = t + i * 0.006;
+    gain.gain.setValueAtTime(0.16 / (i + 1), start);
+    gain.gain.exponentialRampToValueAtTime(0.0008, start + 0.1);
+    osc.start(start); osc.stop(start + 0.11);
+  });
+
+  // The credit chime, arriving just after the coin lands.
+  [{ freq: 1047, start: 0.1 }, { freq: 1319, start: 0.155 }].forEach(function (note) {
     var osc = ctx.createOscillator(), gain = ctx.createGain();
     osc.connect(gain); gain.connect(ctx.destination);
     osc.type = 'square'; osc.frequency.value = note.freq;
@@ -57,6 +92,38 @@ function playCoinInsert() {
     gain.gain.exponentialRampToValueAtTime(0.001, t + note.start + 0.11);
     osc.start(t + note.start); osc.stop(t + note.start + 0.12);
   });
+}
+
+// The coin that visually drops into #insert-coin-btn's slot on a
+// successful insert — a real element (not a pseudo-element) so a class
+// toggle can animate it on demand, injected here rather than duplicated
+// across shell.html and all six per-game index.html files.
+var coinDropAnim = null;
+(function () {
+  var btn = document.getElementById('insert-coin-btn');
+  if (!btn) return;
+  coinDropAnim = document.createElement('span');
+  coinDropAnim.id = 'coin-drop-anim';
+  coinDropAnim.setAttribute('aria-hidden', 'true');
+  btn.appendChild(coinDropAnim);
+}());
+function dropCoinAnimation() {
+  if (!coinDropAnim) return;
+  // The slot (#insert-coin-btn::after) sits flush against the button's
+  // content-box edge, so its centre is padding-right + half its own 6px
+  // width in from the button's outer edge — read padding back from the
+  // computed style (it changes across the responsive breakpoints) rather
+  // than guessing a constant, so the coin actually lands on the slot
+  // instead of just somewhere near it.
+  var btn = coinDropAnim.parentElement;
+  var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
+  coinDropAnim.style.setProperty('--slot-x', (padRight + 3) + 'px');
+  coinDropAnim.classList.remove('dropping');
+  void coinDropAnim.offsetWidth;
+  coinDropAnim.classList.add('dropping');
+  coinDropAnim.addEventListener('animationend', function () {
+    coinDropAnim.classList.remove('dropping');
+  }, { once: true });
 }
 function playNoRoom() {
   var ctx = getUiAudio(), t = ctx.currentTime;
@@ -70,7 +137,7 @@ function playNoRoom() {
   osc.start(t); osc.stop(t + 0.39);
 }
 function flashCoinBar() {
-  ['coins-hud', 'insert-coin-btn'].forEach(function (id) {
+  ['insert-coin-btn'].forEach(function (id) {
     var el = document.getElementById(id);
     if (!el) return;
     el.classList.remove('coin-flash');
@@ -109,6 +176,7 @@ overlay.addEventListener('click', function () {
   saveCoins(n + 1);
   updateCoinsHud();
   playCoinInsert();
+  dropCoinAnimation();
   flashCoinBar();
   overlay.classList.remove('visible');
 });
@@ -127,6 +195,7 @@ document.getElementById('insert-coin-btn').addEventListener('click', function ()
   saveCoins(n + 1);
   updateCoinsHud();
   playCoinInsert();
+  dropCoinAnimation();
   flashCoinBar();
   overlay.classList.remove('visible');
 });
@@ -209,7 +278,12 @@ if (!isRally) (function () {
     ArrowRight: 'right', KeyD: 'right',
   };
   var held  = { up: false, down: false, left: false, right: false };
-  var stick = document.getElementById('stick-handle');
+  // Set on #stick-base (not #stick-handle) so the --dx/--dy custom
+  // properties are visible to both #stick-handle's lean AND
+  // #stick-base::before's contact-shadow drift (kiosk.css) — both are
+  // its children, but siblings of each other, so the value has to live
+  // on their shared parent to reach them both via inheritance.
+  var stick = document.getElementById('stick-base');
 
   function updateStick() {
     if (!stick) return;
@@ -233,7 +307,8 @@ if (!isRally) (function () {
 if (isRally) {
   if ('ontouchstart' in window || navigator.maxTouchPoints > 0) (function () {
     // ---- Dual paddle dials (P1 left = Arrow keys, P2 right = I/K) ----
-    document.getElementById('touch-pad').style.display = 'none';
+    document.getElementById('stick-base').style.display = 'none';
+    document.getElementById('fire-buttons').style.display = 'none';
 
     var dialP1 = document.getElementById('paddle-dial');
     var dialP2 = document.getElementById('paddle-dial-p2');
@@ -367,10 +442,13 @@ if (isRally) {
   // key state; moving the ball itself is handled by reflect()/updateStick()
   // above, the same code path a real keypress drives. ----
   (function () {
-    var base = document.getElementById('stick-base');
-    if (!base) return;
+    var base   = document.getElementById('stick-base');
+    var handle = document.getElementById('stick-handle');
+    var ball   = document.getElementById('stick-ball');
+    if (!base || !handle || !ball) return;
 
-    var DEAD = 0.35; // fraction of the base's half-width/height that triggers a direction
+    var RADIUS = 50; // px of drag from the ball's rest point that triggers a direction
+    var DEAD   = 0.35; // fraction of RADIUS
     var activeId = null;
     var wantDir = { up: false, down: false, left: false, right: false };
     var CODE_FOR = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
@@ -382,10 +460,27 @@ if (isRally) {
       injectKey(code, code, want ? 'keydown' : 'keyup');
     }
 
+    // The ball's rest position — where a player's thumb actually lands —
+    // is measured straight off the rendered ball, rather than replicated
+    // from CSS pixel values, because the stick now sits inside the bar's
+    // 3D tilt (see kiosk.css's #topbar/.kiosk-bar-main rule) with its own
+    // counter-rotation to stand upright: getBoundingClientRect() already
+    // resolves all of that (and whatever responsive breakpoint is active)
+    // to the true on-screen position, so this stays correct regardless of
+    // how the visual is built. Cached rather than read per pointer event
+    // (that would fight the ball's own lean, which is a resting-position
+    // moving target) — recomputed on resize, when the ball is at rest.
+    var restPivot = null;
+    function measurePivot() {
+      var r = ball.getBoundingClientRect();
+      restPivot = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }
+    measurePivot();
+    window.addEventListener('resize', measurePivot);
+
     function apply(e) {
-      var r = base.getBoundingClientRect();
-      var dx = (e.clientX - (r.left + r.width  / 2)) / (r.width  / 2);
-      var dy = (e.clientY - (r.top  + r.height / 2)) / (r.height / 2);
+      var dx = (e.clientX - restPivot.x) / RADIUS;
+      var dy = (e.clientY - restPivot.y) / RADIUS;
       setDir('left',  dx < -DEAD);
       setDir('right', dx >  DEAD);
       setDir('up',    dy < -DEAD);
@@ -451,96 +546,6 @@ if (isRally) {
     });
   }());
 }
-
-// ---- Tilt (DeviceOrientation) controls: touch devices only, not used in rally ----
-if (!isRally && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) (function () {
-    var DEAD       = 12;   // degrees dead zone
-    var tiltActive = false;
-    var tiltBase   = null; // calibrated on first sample after enable
-    var tiltHeld   = { up: false, down: false, left: false, right: false };
-
-    function tiltKey(key, code, want, held) {
-      if (want !== held) injectKey(key, code, want ? 'keydown' : 'keyup');
-      return want;
-    }
-
-    function releaseAllTilt() {
-      if (tiltHeld.up)    injectKey('ArrowUp',    'ArrowUp',    'keyup');
-      if (tiltHeld.down)  injectKey('ArrowDown',  'ArrowDown',  'keyup');
-      if (tiltHeld.left)  injectKey('ArrowLeft',  'ArrowLeft',  'keyup');
-      if (tiltHeld.right) injectKey('ArrowRight', 'ArrowRight', 'keyup');
-      tiltHeld = { up: false, down: false, left: false, right: false };
-    }
-
-    function onOrientation(e) {
-      var g = e.gamma || 0, b = e.beta || 0;
-      if (!tiltBase) tiltBase = { g: g, b: b };
-      var dg = g - tiltBase.g, db = b - tiltBase.b;
-      if (isRally) {
-        // Left-right tilt (gamma) → P1 paddle up / down
-        tiltHeld.up   = tiltKey('ArrowUp',    'ArrowUp',    dg < -DEAD, tiltHeld.up);
-        tiltHeld.down = tiltKey('ArrowDown',  'ArrowDown',  dg >  DEAD, tiltHeld.down);
-      } else {
-        // Left-right tilt → ArrowLeft / ArrowRight
-        // Forward-back tilt (beta delta) → ArrowUp / ArrowDown
-        tiltHeld.left  = tiltKey('ArrowLeft',  'ArrowLeft',  dg < -DEAD, tiltHeld.left);
-        tiltHeld.right = tiltKey('ArrowRight', 'ArrowRight', dg >  DEAD, tiltHeld.right);
-        tiltHeld.up    = tiltKey('ArrowUp',    'ArrowUp',    db < -DEAD, tiltHeld.up);
-        tiltHeld.down  = tiltKey('ArrowDown',  'ArrowDown',  db >  DEAD, tiltHeld.down);
-      }
-    }
-
-    // Tilted phone with bilateral rotation arcs
-    var ICON = '<svg width="28" height="28" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-      + '<rect x="6" y="3" width="8" height="14" rx="1.5" transform="rotate(-18 10 10)"/>'
-      + '<path d="M2.5,9 C2,5 5,1.5 9,1"/>'
-      + '<polyline points="7.5,0 9,1 8.5,2.5"/>'
-      + '<path d="M17.5,11 C18,15 15,18.5 11,19"/>'
-      + '<polyline points="12.5,20 11,19 11.5,17.5"/>'
-      + '</svg>';
-
-    var btn = document.createElement('button');
-    btn.id        = 'tilt-btn';
-    btn.title     = 'Toggle tilt controls';
-    btn.innerHTML = ICON;
-    document.body.appendChild(btn);
-
-    function enable() {
-      tiltActive = true;
-      btn.classList.add('tilt-on');
-      window.addEventListener('deviceorientation', onOrientation);
-      try { localStorage.setItem('blip-tilt', '1'); } catch(e) {}
-    }
-
-    function disable() {
-      tiltActive = false;
-      tiltBase   = null;
-      btn.classList.remove('tilt-on');
-      window.removeEventListener('deviceorientation', onOrientation);
-      releaseAllTilt();
-      try { localStorage.setItem('blip-tilt', '0'); } catch(e) {}
-    }
-
-    var isIOS = typeof DeviceOrientationEvent !== 'undefined' &&
-                typeof DeviceOrientationEvent.requestPermission === 'function';
-
-    // Auto-enable on load if preference is set (non-iOS only; iOS requires a user gesture)
-    var savedTilt = false;
-    try { savedTilt = localStorage.getItem('blip-tilt') === '1'; } catch(e) {}
-    if (savedTilt && !isIOS) enable();
-
-    btn.addEventListener('click', function () {
-      if (tiltActive) { disable(); return; }
-      if (isIOS) {
-        // iOS 13+ requires a permission prompt on a user gesture
-        DeviceOrientationEvent.requestPermission()
-          .then(function (s) { if (s === 'granted') enable(); })
-          .catch(function () {});
-      } else {
-        enable();
-      }
-    });
-  }());
 
 // ---- Gamepad support ----
   // Polling loop lives in kiosk.js (pollGamepad, shared with the kiosk

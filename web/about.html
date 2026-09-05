@@ -401,10 +401,22 @@
     <button class="lang-btn" data-lang="ja">🇯🇵</button>
   </div>
 
-  <div id="kiosk-bar" class="kiosk-bar">
-    <span id="kiosk-coins-hud" class="kiosk-btn kiosk-btn-inert" data-coins-hud></span>
+  <!-- Decorative arcade stick + buttons, matching the game shell's bar
+       (kiosk.css) — static here (no game to drive them), just cabinet
+       flavor so the bar looks the same on every page. -->
+  <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
+    <div id="stick-base">
+      <div id="stick-boot"></div>
+      <div id="stick-handle">
+        <div id="stick-shaft"></div>
+        <div id="stick-ball"></div>
+      </div>
+    </div>
     <a class="kiosk-btn" href="index.html">&#8592; GAMES</a>
-    <button class="kiosk-btn" id="kiosk-insert-btn">&#x25BA; INSERT COIN</button>
+    <button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
+    <div id="fire-buttons">
+      <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
+    </div>
   </div>
 
   <script src="kiosk.js?v=9"></script>

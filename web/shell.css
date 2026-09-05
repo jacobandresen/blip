@@ -223,24 +223,9 @@ canvas {
 
 #back:active { transform: translateY(2px); }
 
-/* coin-slot notch beside the insert-coin prompt, matching the kiosk page */
-#insert-coin-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-#insert-coin-btn::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 16px;
-  border-radius: 3px;
-  background: #000;
-  box-shadow: inset 0 0 0 1px rgba(230, 220, 50, 0.45),
-              0 0 6px rgba(230, 220, 50, 0.3);
-  flex-shrink: 0;
-}
-
+/* Coin slot + drop animation: shared with the kiosk landing/history/about
+   pages' own insert-coin button, so it lives in kiosk.css (scoped to
+   "#insert-coin-btn, #kiosk-insert-btn") rather than duplicated here. */
 
 /* ---- Need-coin overlay ---- */
 
@@ -250,6 +235,13 @@ canvas {
   inset: 0;
   bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px));
   background: rgba(0,0,0,0.8);
+  /* Below #topbar (z-index:200) so the stick — which, since it's mounted
+     in the bar, rises up into this overlay's screen region — stays fully
+     visible above it, the same as the bar's COINS/GAMES/INSERT COIN
+     controls (which never dim either, since the overlay's own box stops
+     right above the bar — see `bottom` above). Coins are still blocked
+     either way: injectKey() itself refuses to fire while this is
+     visible, regardless of what's drawn on top of what. */
   z-index: 150;
   align-items: center;
   justify-content: center;
@@ -270,156 +262,16 @@ canvas {
   animation: blink-coin 1.1s step-end infinite;
 }
 
-/* ---- Touch / on-screen arcade controls ---------------------------------
-   An analog stick (bottom-left) and one or two concave pushbuttons
-   (bottom-right), modelled on a genuine Happ/Wico-style cabinet control —
-   a black gate plate with a chrome-ringed red ball-top stick, and
-   chrome-bezelled concave buttons. Always shown, not just on touch
-   devices: the stick and buttons animate to reflect keyboard and gamepad
-   input too (see shell.js's reflect()), so it doubles as a live "what's
-   being pressed" readout for keyboard players. Deliberately small (see
-   the sizes below) so it reads as a control, not a second focal point
-   competing with the game itself. */
+/* ---- Touch / on-screen arcade controls ----
+   The stick and fire buttons themselves (mounted in the bar, the 3D tilt,
+   the boot/shaft/ball, the buttons) are shared with the kiosk landing
+   page's bar, so they live in kiosk.css scoped to "#topbar, .kiosk-bar-main"
+   — see the "Arcade control deck" section there. This file only keeps the
+   game-page-specific short-screen resize below (the landing page has no
+   canvas to make room for, so it doesn't need it). */
 
-#touch-pad {
-  display: block;
-  pointer-events: none;
-}
-
-/* ---- Stick ---- */
-
-#stick-base {
-  position: fixed;
-  bottom: calc(var(--topbar-h, 56px) + 14px + env(safe-area-inset-bottom, 0px));
-  left: 14px;
-  width: 84px;
-  height: 84px;
-  pointer-events: auto;
-  touch-action: none;
-  z-index: 99;
-  border-radius: 10px;
-  background: linear-gradient(155deg, #3a3a3e 0%, #1c1c1e 45%, #0b0b0c 100%);
-  box-shadow:
-    0 3px 8px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.5);
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* The restrictor gate: an octagonal cutout the ball rides in — the
-   classic 8-way arcade mechanism. Just an outline; the plate above shows
-   through as its "floor". */
-#stick-gate {
-  position: absolute;
-  inset: 9px;
-  pointer-events: none;
-  clip-path: polygon(
-    30% 0%, 70% 0%, 100% 30%, 100% 70%,
-    70% 100%, 30% 100%, 0% 70%, 0% 30%
-  );
-  background: #040404;
-  box-shadow:
-    inset 0 0 0 1.5px rgba(255, 255, 255, 0.14),
-    inset 0 2px 5px rgba(0, 0, 0, 0.85);
-}
-
-/* The moving part: shaft + ball together, translated toward whichever
-   direction(s) are held via the --dx/--dy custom properties (each -1, 0,
-   or 1 — shell.js sets them, it never runs a per-frame animation loop). */
-#stick-handle {
-  --dx: 0;
-  --dy: 0;
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 0;
-  height: 0;
-  transform: translate(calc(-50% + var(--dx) * 15px), calc(-50% + var(--dy) * 15px));
-  transition: transform 70ms ease-out;
-  pointer-events: none;
-}
-
-/* Rooted at the ball's centre (the handle's anchor point) and extending
-   down into the gate, as if the rod disappears into the panel below the
-   ball — rather than a separate shaft docked at the panel surface. */
-#stick-shaft {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 9px;
-  height: 24px;
-  transform: translateX(-50%);
-  border-radius: 4px;
-  background: linear-gradient(90deg, #6b6b70 0%, #d8d8dc 35%, #8c8c90 62%, #3c3c40 100%);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-}
-
-/* Centred over the gate at rest — a real ball-top sits over the middle of
-   the gate until pushed, not floating toward one edge. */
-#stick-ball {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 28px;
-  height: 28px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle at 34% 28%, #ff8a78 0%, #e6402c 32%, #a3170c 74%, #6e0d06 100%);
-  box-shadow:
-    0 3px 5px rgba(0, 0, 0, 0.55),
-    inset 0 -3px 5px rgba(0, 0, 0, 0.35);
-}
-
-/* ---- Fire buttons ---- */
-
-#fire-buttons {
-  position: fixed;
-  bottom: calc(var(--topbar-h, 56px) + 14px + env(safe-area-inset-bottom, 0px));
-  right: 14px;
-  display: flex;
-  gap: 12px;
-  z-index: 99;
-}
-
-.arcade-btn {
-  position: relative;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  pointer-events: auto;
-  touch-action: none;
-  cursor: pointer;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-  /* The chrome bezel ring around the cap. */
-  background: conic-gradient(from -45deg, #dfe1e4, #8a8d92 25%, #4a4c50 50%, #8a8d92 75%, #dfe1e4 100%);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.6);
-}
-
-.arcade-btn-cap {
-  position: absolute;
-  inset: 5px;
-  border-radius: 50%;
-  /* Concave dish: an off-centre highlight catching the light on the near
-     side of the depression, darkening toward the rim. */
-  background: radial-gradient(circle at 38% 30%, #ff5a4a 0%, #d5241a 45%, #8f1109 100%);
-  box-shadow:
-    inset 0 -4px 6px rgba(0, 0, 0, 0.45),
-    inset 0 3px 5px rgba(255, 255, 255, 0.25);
-  transition: transform .05s, box-shadow .05s;
-}
-
-/* Second button (e.g. Meteors' hyperspace): ivory instead of red, the
-   classic two-tone competition-cabinet pairing. */
-.arcade-btn:nth-child(2) .arcade-btn-cap {
-  background: radial-gradient(circle at 38% 30%, #fbf6ea 0%, #d8cfb8 50%, #a8a08c 100%);
-}
-
-.arcade-btn.active .arcade-btn-cap {
-  transform: scale(0.92);
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.6),
-    inset 0 -1px 2px rgba(255, 255, 255, 0.12);
+#topbar {
+  overflow: visible;
 }
 
 /* ---- Paddle dials (rally only) ---- */
@@ -438,6 +290,8 @@ canvas {
     inset 0 0 24px rgba(0, 0, 0, 0.6);
   touch-action: none;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
   pointer-events: auto;
   z-index: 99;
   -webkit-tap-highlight-color: transparent;
@@ -544,32 +398,15 @@ canvas {
   .marquee-bulbs { max-width: 60px; }
   #arcade-bezel { top: 23px; } /* marquee (20px) + 3px */
   .bezel-screw.tl, .bezel-screw.tr { top: 31px; } /* marquee (20px) + 11px */
-  #stick-base {
-    width: 68px;
-    height: 68px;
-    bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px) + 8px);
-    left: 8px;
-  }
-  #stick-gate { inset: 7px; }
-  #stick-handle {
-    transform: translate(calc(-50% + var(--dx) * 12px), calc(-50% + var(--dy) * 12px));
-  }
-  #stick-shaft { width: 7px; height: 20px; }
-  #stick-ball  { width: 22px; height: 22px; }
+  #stick-base { width: 46px; height: 148px; }
+  #stick-boot { width: 34px; height: 34px; bottom: 5px; }
+  #stick-handle { bottom: 39px; } /* = boot's bottom + height, its top surface */
+  #stick-shaft { width: 7px; height: 48px; }
+  #stick-ball  { width: 22px; height: 22px; bottom: 48px; } /* = shaft height */
 
-  #fire-buttons {
-    right: 8px;
-    gap: 8px;
-    bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px) + 8px);
-  }
-  .arcade-btn { width: 42px; height: 42px; }
+  #fire-buttons { gap: 6px; }
+  .arcade-btn { width: 34px; height: 34px; }
 
-  #tilt-btn {
-    width: 42px;
-    height: 42px;
-    bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px) + 8px);
-    right: calc(8px + (42px + 8px) * 2);
-  }
   #paddle-dial, #paddle-dial-p2 {
     width: 76px;
     height: 76px;
@@ -577,37 +414,6 @@ canvas {
   }
   #paddle-dial    { left: 16px; }
   #paddle-dial-p2 { right: 16px; }
-}
-
-/* ---- Tilt button (game pages, sits left of fire buttons) ---- */
-
-#tilt-btn {
-  position: fixed;
-  bottom: calc(var(--topbar-h, 56px) + 14px + env(safe-area-inset-bottom, 0px));
-  right: calc(14px + (54px + 12px) * 2);
-  width: 54px;
-  height: 54px;
-  z-index: 99;
-  background: rgba(255, 255, 255, 0.08);
-  border: 2px solid rgba(255, 255, 255, 0.25);
-  border-radius: 50%;
-  color: rgba(255, 255, 255, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  touch-action: none;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-  pointer-events: auto;
-  transition: background .05s, box-shadow .05s, color .15s, border-color .15s;
-}
-
-#tilt-btn.tilt-on {
-  background: rgba(50, 200, 50, 0.20);
-  border-color: rgba(50, 200, 50, 0.55);
-  color: #32c832;
-  box-shadow: 0 0 14px rgba(50, 200, 50, 0.4);
 }
 
 /* Narrow phones — DEFENDER at 5px letter-spacing is the widest name; give it room */

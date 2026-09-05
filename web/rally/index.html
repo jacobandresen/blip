@@ -25,26 +25,23 @@
   </div>
 
   <div id="topbar" class="kiosk-bar">
-    <span id="coins-hud" class="kiosk-btn kiosk-btn-inert" data-coins-hud></span>
-    <a id="back" class="kiosk-btn" href="../index.html">&#8592; GAMES</a>
-    <button id="insert-coin-btn" class="kiosk-btn">&#x25BA; INSERT COIN</button>
-  </div>
-
-  <div id="need-coin-overlay">
-    <div class="nco-msg">&#x25BA; INSERT COIN &#x25C4;</div>
-  </div>
-
-  <!-- Rally always hides #touch-pad (it uses the paddle dials below
-       instead) — kept structurally in sync with shell.html regardless. -->
-  <div id="touch-pad">
+    <!-- Rally always hides #stick-base/#fire-buttons (it uses the paddle
+         dials below instead) — kept structurally in sync with shell.html
+         regardless. -->
     <div id="stick-base">
-      <div id="stick-gate"></div>
+      <div id="stick-boot"></div>
       <div id="stick-handle">
         <div id="stick-shaft"></div>
         <div id="stick-ball"></div>
       </div>
     </div>
+    <a id="back" class="kiosk-btn" href="../index.html">&#8592; GAMES</a>
+    <button id="insert-coin-btn" class="kiosk-btn"><span data-coins-hud></span></button>
     <div id="fire-buttons"></div>
+  </div>
+
+  <div id="need-coin-overlay">
+    <div class="nco-msg">&#x25BA; INSERT COIN &#x25C4;</div>
   </div>
 
   <!-- Paddle dials: rally only, touch only. P1=left, P2=right -->

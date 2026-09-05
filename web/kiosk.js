@@ -81,10 +81,43 @@ function getKioskAudio() {
   return _kioskAudioCtx;
 }
 
+// A real coin makes two distinct sounds in sequence: the metallic clink
+// of it dropping through the chute (bright, inharmonic, near-instant —
+// real metal doesn't ring in tidy octaves the way a synth voice does),
+// then the register's own electronic "credit accepted" chime a beat
+// later. Modelling both, rather than just the chime alone, is what reads
+// as an actual coin rather than a UI beep. (Kept in sync with shell.js's
+// copy, used on the game pages.)
 function playCoinInsert() {
   var ctx = getKioskAudio();
   var t   = ctx.currentTime;
-  [{ freq: 1047, start: 0 }, { freq: 1319, start: 0.055 }].forEach(function(note) {
+
+  var noiseBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.045), ctx.sampleRate);
+  var noiseData = noiseBuf.getChannelData(0);
+  for (var i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
+  var noise = ctx.createBufferSource();
+  noise.buffer = noiseBuf;
+  var noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = 4200;
+  noiseFilter.Q.value = 1.1;
+  var noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.4, t);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+  noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(ctx.destination);
+  noise.start(t); noise.stop(t + 0.045);
+
+  [3000, 4550, 6100].forEach(function (freq, i) {
+    var osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = 'triangle'; osc.frequency.value = freq;
+    osc.connect(gain); gain.connect(ctx.destination);
+    var start = t + i * 0.006;
+    gain.gain.setValueAtTime(0.16 / (i + 1), start);
+    gain.gain.exponentialRampToValueAtTime(0.0008, start + 0.1);
+    osc.start(start); osc.stop(start + 0.11);
+  });
+
+  [{ freq: 1047, start: 0.1 }, { freq: 1319, start: 0.155 }].forEach(function(note) {
     var osc  = ctx.createOscillator();
     var gain = ctx.createGain();
     osc.connect(gain);
@@ -96,6 +129,37 @@ function playCoinInsert() {
     osc.start(t + note.start);
     osc.stop(t + note.start + 0.12);
   });
+}
+
+// The coin that visually drops into the insert-coin button's slot on a
+// successful insert (see kiosk.css's #coin-drop-anim / @keyframes
+// coin-drop). A real element rather than a pseudo-element so a class
+// toggle can animate it on demand; injected here rather than duplicated
+// across index.html/history.html/about.html.
+var coinDropAnim = null;
+(function () {
+  var btn = document.getElementById('kiosk-insert-btn');
+  if (!btn) return;
+  coinDropAnim = document.createElement('span');
+  coinDropAnim.id = 'coin-drop-anim';
+  coinDropAnim.setAttribute('aria-hidden', 'true');
+  btn.appendChild(coinDropAnim);
+}());
+function dropCoinAnimation() {
+  if (!coinDropAnim) return;
+  // See shell.js's copy of this function for why this is measured rather
+  // than a fixed guess: the slot's centre is padding-right + half its own
+  // width in from the button's edge, and that padding changes across the
+  // responsive breakpoints.
+  var btn = coinDropAnim.parentElement;
+  var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
+  coinDropAnim.style.setProperty('--slot-x', (padRight + 3) + 'px');
+  coinDropAnim.classList.remove('dropping');
+  void coinDropAnim.offsetWidth;
+  coinDropAnim.classList.add('dropping');
+  coinDropAnim.addEventListener('animationend', function () {
+    coinDropAnim.classList.remove('dropping');
+  }, { once: true });
 }
 
 function playNoRoom() {
@@ -115,7 +179,7 @@ function playNoRoom() {
 }
 
 function flashCoins() {
-  ['insert-coin', 'kiosk-coins-hud', 'kiosk-insert-btn'].forEach(function(id) {
+  ['insert-coin', 'kiosk-insert-btn'].forEach(function(id) {
     var el = document.getElementById(id);
     if (!el) return;
     el.classList.remove('coin-flash');
@@ -130,6 +194,7 @@ function insertCoin() {
   if (n < MAX_COINS) {
     saveCoins(n + 1);
     playCoinInsert();
+    dropCoinAnimation();
     updateCoinsHud();
     flashCoins();
     if (typeof window.onCoinInserted === 'function') window.onCoinInserted();

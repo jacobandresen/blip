@@ -25,28 +25,27 @@
   </div>
 
   <div id="topbar" class="kiosk-bar">
-    <span id="coins-hud" class="kiosk-btn kiosk-btn-inert" data-coins-hud></span>
-    <a id="back" class="kiosk-btn" href="../index.html">&#8592; GAMES</a>
-    <button id="insert-coin-btn" class="kiosk-btn">&#x25BA; INSERT COIN</button>
-  </div>
-
-  <div id="need-coin-overlay">
-    <div class="nco-msg">&#x25BA; INSERT COIN &#x25C4;</div>
-  </div>
-
-  <!-- Arcade stick + buttons: an on-screen Atari-style control, always
-       shown — draggable by touch/mouse (shell.js), and its ball/buttons
-       animate to reflect keyboard and gamepad input too. #fire-buttons is
-       populated by shell.js from BLIP_GAMES (one or two buttons). -->
-  <div id="touch-pad">
+    <!-- Arcade stick: mounted flush in the bar, left of COINS — its ball
+         rides a shaft that rises up over the game above the bar. Always
+         shown, not just on touch devices — draggable by touch/mouse
+         (shell.js), and it animates to reflect keyboard and gamepad
+         input too, so it doubles as a live input readout. -->
     <div id="stick-base">
-      <div id="stick-gate"></div>
+      <div id="stick-boot"></div>
       <div id="stick-handle">
         <div id="stick-shaft"></div>
         <div id="stick-ball"></div>
       </div>
     </div>
+    <a id="back" class="kiosk-btn" href="../index.html">&#8592; GAMES</a>
+    <button id="insert-coin-btn" class="kiosk-btn"><span data-coins-hud></span></button>
+    <!-- Fire buttons: mounted flush in the bar, right of INSERT COIN.
+         Populated by shell.js from BLIP_GAMES (one or two buttons). -->
     <div id="fire-buttons"></div>
+  </div>
+
+  <div id="need-coin-overlay">
+    <div class="nco-msg">&#x25BA; INSERT COIN &#x25C4;</div>
   </div>
 
   <!-- Paddle dials: rally only, touch only. P1=left, P2=right -->
