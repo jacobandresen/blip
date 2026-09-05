@@ -148,6 +148,12 @@ function fillCanvas() {
   canvas.style.setProperty('top',    (MARQUEE_H + PAD) + 'px', 'important');
   canvas.style.setProperty('left',   PAD + 'px', 'important');
   canvas.style.setProperty('transform', 'none', 'important');
+  // The touch controls (dpad, fire buttons, paddle dials — all plain CSS,
+  // positioned "bottom: calc(--topbar-h + ...)") key off this custom
+  // property instead of a hardcoded 56px, so they stay clear of the bar
+  // even when it renders taller than 56px (e.g. its content wrapping or
+  // growing on a narrow phone) instead of overlapping it.
+  document.documentElement.style.setProperty('--topbar-h', TOPBAR_H + 'px');
 }
 window.addEventListener('resize', fillCanvas);
 fillCanvas();

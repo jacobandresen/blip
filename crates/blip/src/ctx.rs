@@ -637,7 +637,15 @@ impl Blip {
         );
         self.draw_text("SCORE", 4.0, 5.0, 2.0, BLIP_YELLOW);
         self.draw_number(score, 68.0, 5.0, 2.0, BLIP_WHITE);
-        self.draw_text("LIVES", (self.width - 90) as f32, 5.0, 2.0, BLIP_ORANGE);
-        self.draw_number(lives, (self.width - 18) as f32, 5.0, 2.0, BLIP_WHITE);
+        // The curved-glass CRT post-process (CRT_FRAGMENT below) clips a
+        // wedge in each corner of the canvas — right where a naively
+        // right-aligned "self.width - <fixed px>" position lands. The
+        // margin off the true right edge is scaled with the canvas width
+        // (not a fixed pixel count) so LIVES stays clear of that wedge on
+        // every game's canvas size, not just the common 480px-wide one.
+        let edge_margin = (self.width as f32 * 0.05) as i32;
+        let lives_x = self.width - edge_margin - 24; // room for up to 2 digits
+        self.draw_text("LIVES", (lives_x - 64) as f32, 5.0, 2.0, BLIP_ORANGE);
+        self.draw_number(lives, lives_x as f32, 5.0, 2.0, BLIP_WHITE);
     }
 }

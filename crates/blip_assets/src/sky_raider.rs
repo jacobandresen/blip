@@ -10,8 +10,8 @@ use crate::wav::{encode_pcm16_mono, env, mix_into, mix_into_f32, ms_to_samples, 
 use crate::Asset;
 
 // Must match crates/sky_raider/src/main.rs's PLAYER_W / PLAYER_H.
-const PLAYER_W: i32 = 28;
-const PLAYER_H: i32 = 24;
+const PLAYER_W: i32 = 36;
+const PLAYER_H: i32 = 32;
 // Must match crates/sky_raider/src/main.rs's ENEMY_W / ENEMY_H.
 const ENEMY_W: i32 = 26;
 const ENEMY_H: i32 = 22;
@@ -22,9 +22,12 @@ const BOSS_SIZES: [(i32, i32); 7] = [
 // Must match crates/sky_raider/src/main.rs's POW_W / POW_H.
 const POW_W: i32 = 14;
 const POW_H: i32 = 14;
+// Must match crates/sky_raider/src/main.rs's HEALTH_W / HEALTH_H.
+const HEALTH_W: i32 = 14;
+const HEALTH_H: i32 = 14;
 // Must match crates/sky_raider/src/main.rs's CARRIER_W / CARRIER_H.
-const CARRIER_W: i32 = 90;
-const CARRIER_H: i32 = 130;
+const CARRIER_W: i32 = 108;
+const CARRIER_H: i32 = 190;
 // Must match crates/sky_raider/src/main.rs's BOAT_W / BOAT_H.
 const BOAT_W: i32 = 34;
 const BOAT_H: i32 = 16;
@@ -224,22 +227,32 @@ fn player_plane() -> Vec<u8> {
     let mut img = Image::new(w as u32, h as u32);
     let cx = w / 2;
     let prop_cy = 1;
-    let main_wing_y0 = (h as f32 * 0.48) as i32;
+    let main_wing_y0 = (h as f32 * 0.46) as i32;
     let main_wing_y1 = (h as f32 * 0.60) as i32;
-    let tail_wing_y0 = (h as f32 * 0.83) as i32;
-    let tail_wing_y1 = (h as f32 * 0.90) as i32;
+    let tail_wing_y0 = (h as f32 * 0.82) as i32;
+    let tail_wing_y1 = (h as f32 * 0.91) as i32;
+    let canopy_y0 = (h as f32 * 0.24) as i32;
+    let canopy_y1 = (h as f32 * 0.46) as i32;
     for y in 0..h {
         for x in 0..w {
             let from_top = y as f32 / h as f32;
-            let body_half = (1.0 + from_top * 2.0) as i32; // slim, longer-looking taper to the nose
+            let body_half = (1.0 + from_top * 2.2) as i32; // slim, longer-looking taper to the nose
             if (x - cx).abs() <= body_half && y >= 3 && y <= h - 1 {
                 img.set(x, y, 210, 214, 222);
             }
-            // main wing, roughly amidships
+            // main wing, roughly amidships — a lighter leading-edge stripe
+            // and darker wingtips give it real shape instead of a flat slab.
             if y >= main_wing_y0 && y <= main_wing_y1 {
                 let wing_half = (w as f32 * 0.48) as i32;
-                if (x - cx).abs() <= wing_half {
+                let wd = (x - cx).abs();
+                if wd <= wing_half {
                     img.set(x, y, 50, 100, 220); // BLIP_BLUE — matches the cabinet accent
+                }
+                if y == main_wing_y0 && wd <= wing_half {
+                    img.set(x, y, 96, 150, 235); // leading-edge highlight
+                }
+                if wd > wing_half - 3 && wd <= wing_half {
+                    img.set(x, y, 30, 66, 165); // wingtip shading
                 }
             }
             // small tail stabiliser near the rear
@@ -249,20 +262,31 @@ fn player_plane() -> Vec<u8> {
                     img.set(x, y, 50, 100, 220);
                 }
             }
-            // canopy
-            if (x - cx).abs() <= 2 && y >= 6 && y <= 11 {
+            // canopy, with a thin frame bar splitting it into two panes
+            if (x - cx).abs() <= 3 && y >= canopy_y0 && y <= canopy_y1 {
                 img.set(x, y, 40, 220, 255);
             }
-            // a one-pixel highlight down the spine — a cheap "rounded
-            // fuselage" shading cue instead of a flat-looking silhouette
+            if (x - cx).abs() <= 3 && y == (canopy_y0 + canopy_y1) / 2 {
+                img.set(x, y, 30, 40, 48); // canopy frame
+            }
+            // a highlight down one side of the spine and a shadow down the
+            // other — a cheap "rounded fuselage" shading cue instead of a
+            // flat-looking silhouette
             if (x - cx) == -1 && y >= 4 && y <= h - 2 {
                 img.set(x, y, 232, 236, 244);
+            }
+            if (x - cx) == 2 && y >= 4 && y <= h - 2 && body_half >= 2 {
+                img.set(x, y, 168, 174, 188);
+            }
+            // a small rudder-stripe accent right at the tail tip
+            if (x - cx).abs() <= 1 && y > tail_wing_y1 && y <= h - 1 {
+                img.set(x, y, 220, 70, 70);
             }
             // propeller: a blurred spinning disc plus a dark spinner hub at
             // the very nose — drawn after the body so it sits on top of it.
             let pdx = x - cx;
             let pdy = y - prop_cy;
-            if pdx * pdx + pdy * pdy <= 9 {
+            if pdx * pdx + pdy * pdy <= 13 {
                 img.set(x, y, 205, 205, 212);
             }
             if pdx.abs() <= 1 && pdy.abs() <= 1 {
@@ -590,24 +614,74 @@ fn powerup_capsule() -> Vec<u8> {
     img.encode_png()
 }
 
+/// Health pickup, dropped occasionally by regular fighters: a white
+/// roundel with a red cross — deliberately a different shape from the
+/// weapon capsule's diamond (and a fixed colour, not tinted by weapon
+/// tier), so the two are never mistaken for each other in the middle of
+/// a dogfight.
+fn health_pack() -> Vec<u8> {
+    let (w, h) = (HEALTH_W, HEALTH_H);
+    let mut img = Image::new(w as u32, h as u32);
+    let cx = w as f32 / 2.0;
+    let cy = h as f32 / 2.0;
+    let r = cx.min(cy) - 0.5;
+    let bar_half = r * 0.34;
+    for y in 0..h {
+        for x in 0..w {
+            let dx = x as f32 - cx;
+            let dy = y as f32 - cy;
+            if dx * dx + dy * dy <= r * r {
+                img.set(x, y, 240, 240, 236); // white roundel
+            }
+            if dx.abs() <= bar_half && dy.abs() <= r * 0.72 {
+                img.set(x, y, 220, 50, 50); // the cross's vertical bar
+            }
+            if dy.abs() <= bar_half && dx.abs() <= r * 0.72 {
+                img.set(x, y, 220, 50, 50); // the cross's horizontal bar
+            }
+        }
+    }
+    img.encode_png()
+}
+
 /// The carrier the player launches from at the start of each level: a
 /// top-down flight deck, tapered at bow and stern, with a dashed centre
-/// runway and a small island superstructure off to one side.
+/// runway, arrestor cables and elevator cutouts marked into the deck, a
+/// handful of planes parked to port, and an island superstructure — mast,
+/// lit bridge windows — off to starboard. Bigger and longer than the first
+/// version, with the extra deck real estate spent on those details instead
+/// of just scaling up a plain grey rectangle.
 fn carrier_ship() -> Vec<u8> {
     let (w, h) = (CARRIER_W, CARRIER_H);
     let mut img = Image::new(w as u32, h as u32);
     let cx = w / 2;
-    let ix0 = (w as f32 * 0.16) as i32;
-    let ix1 = (w as f32 * 0.32) as i32;
-    let iy0 = (h as f32 * 0.28) as i32;
-    let iy1 = (h as f32 * 0.50) as i32;
+
+    // Island superstructure: offset to starboard (the right), the way a
+    // real carrier's island sits beside rather than astride the runway.
+    let ix0 = (w as f32 * 0.58) as i32;
+    let ix1 = (w as f32 * 0.82) as i32;
+    let iy0 = (h as f32 * 0.30) as i32;
+    let iy1 = (h as f32 * 0.52) as i32;
+    let mast_x = (ix0 + ix1) / 2;
+    let mast_y0 = (iy0 - (h as f32 * 0.06) as i32).max(0);
+
+    // Two elevator deck cutouts, fore and aft, on the opposite (port) side
+    // from the island — just an outline, deck-coloured inside.
+    let elev_w = (w as f32 * 0.20) as i32;
+    let elev_h = (h as f32 * 0.09) as i32;
+    let elev_x0 = (w as f32 * 0.14) as i32;
+    let elev_ys = [(h as f32 * 0.22) as i32, (h as f32 * 0.66) as i32];
 
     for y in 0..h {
         let from_top = y as f32 / h as f32;
-        let bow_taper = if from_top < 0.14 { (0.14 - from_top) / 0.14 } else { 0.0 };
-        let stern_taper = if from_top > 0.90 { (from_top - 0.90) / 0.10 } else { 0.0 };
+        let bow_taper = if from_top < 0.12 { (0.12 - from_top) / 0.12 } else { 0.0 };
+        let stern_taper = if from_top > 0.91 { (from_top - 0.91) / 0.09 } else { 0.0 };
         let half_w = (w as f32 * 0.46) * (1.0 - (bow_taper + stern_taper) * 0.75);
-        let stripe = (y / 7) % 2 == 0 && from_top > 0.10 && from_top < 0.88;
+        let stripe = (y / 8) % 2 == 0 && from_top > 0.09 && from_top < 0.89;
+        // Arrestor wires: a few thin lines crossing the aft deck, just
+        // ahead of the stern taper — where the player's plane will catch
+        // one on landing, if Raider ever grows a carrier-landing sequence.
+        let arrestor = from_top > 0.74 && from_top < 0.88 && y % 6 == 0;
 
         for x in 0..w {
             let dx = (x - cx) as f32;
@@ -619,13 +693,59 @@ fn carrier_ship() -> Vec<u8> {
                 img.set(x, y, 38, 40, 44); // deck edge
             }
             if adx <= 2.0 && stripe {
-                img.set(x, y, 224, 214, 60); // dashed runway stripe
+                img.set(x, y, 224, 214, 60); // dashed runway centreline
             }
-            if dx >= ix0 as f32 && dx <= ix1 as f32 && y >= iy0 && y <= iy1 {
-                img.set(x, y, 42, 46, 52); // island superstructure
+            if arrestor && adx <= half_w - 4.0 {
+                img.set(x, y, 30, 32, 36); // arrestor cable, crossing the centreline
+            }
+        }
+
+        // Elevator outlines, drawn per-row so they land on top of the deck
+        // fill above but under the island and parked planes below.
+        for &ey0 in &elev_ys {
+            if y >= ey0 && y < ey0 + elev_h {
+                let top_or_bottom = y == ey0 || y == ey0 + elev_h - 1;
+                for x in elev_x0..(elev_x0 + elev_w).min(w) {
+                    if top_or_bottom || x == elev_x0 || x == elev_x0 + elev_w - 1 {
+                        img.set(x, y, 46, 48, 54);
+                    }
+                }
             }
         }
     }
+
+    // The island block itself, a mast rising off its roof, and a strip of
+    // lit bridge windows partway down its face.
+    for y in iy0..=iy1 {
+        for x in ix0..=ix1 {
+            img.set(x, y, 42, 46, 52);
+        }
+    }
+    for y in mast_y0..iy0 {
+        img.set(mast_x, y, 30, 32, 36);
+    }
+    let window_y = iy0 + (iy1 - iy0) / 3;
+    for x in (ix0 + 1)..ix1 {
+        if (x - ix0) % 2 == 1 {
+            img.set(x, window_y, 250, 220, 120);
+        }
+    }
+
+    // A few planes parked to port — small solid silhouettes, not full
+    // sprites, just enough to read as a working flight deck rather than an
+    // empty one.
+    let plane_w = (w as f32 * 0.10) as i32;
+    let plane_h = (h as f32 * 0.045) as i32;
+    let plane_x = (w as f32 * 0.12) as i32;
+    for frac in [0.38, 0.47, 0.56] {
+        let py0 = (h as f32 * frac) as i32;
+        for y in py0..(py0 + plane_h).min(h) {
+            for x in plane_x..(plane_x + plane_w).min(w) {
+                img.set(x, y, 58, 62, 68);
+            }
+        }
+    }
+
     img.encode_png()
 }
 
@@ -839,6 +959,30 @@ fn turret_fire_sfx() -> Vec<u8> {
     encode_pcm16_mono(&buf)
 }
 
+/// A low electrical drone for the laser barrier — looped and dynamically
+/// volume-ridden by the game itself as the player nears the beam, so it
+/// needs to loop with no audible seam: the 110Hz fundamental (and its
+/// harmonics, and the tremolo) all complete a whole number of cycles across
+/// the buffer.
+fn barrier_hum_sfx() -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let dur_ms = 400.0;
+    let n = ms_to_samples(dur_ms);
+    let f0 = 110.0_f32; // A2 — 44 whole cycles over 400ms
+    let trem_hz = 5.0_f32; // 2 whole cycles over 400ms
+    let mut s = Vec::with_capacity(n);
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let fund = (2.0 * std::f32::consts::PI * f0 * t).sin();
+        let harm = (2.0 * std::f32::consts::PI * f0 * 2.0 * t).sin() * 0.4;
+        let buzz = (2.0 * std::f32::consts::PI * f0 * 3.0 * t).sin() * 0.22;
+        let trem = 0.75 + 0.25 * (2.0 * std::f32::consts::PI * trem_hz * t).sin();
+        let shaped = ((fund + harm + buzz) * 0.5).tanh();
+        s.push((shaped * trem * 16_000.0) as i16);
+    }
+    encode_pcm16_mono(&s)
+}
+
 // ---------------------------------------------------------------------- //
 // Japanese boss name banners                                                //
 // ---------------------------------------------------------------------- //
@@ -1013,18 +1157,27 @@ fn brass_stab(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
 /// 8-bar phrase with no repeats — technically a "theme", but nothing in it
 /// actually recurred often enough to stick. A catchy tune is a *short*
 /// phrase repeated until it's memorable: here that's a 2-bar call-and-answer
-/// riff, dotted martial rhythm, that repeats four times over the loop, plus
-/// a genuine "oom-pah" accompaniment (bass drum on the beat, a chord stab
-/// on the offbeat) for the walking groove a bare bass-drum-and-snare pattern
-/// didn't have. A syncopated snare push and crescendo roll fills keep each
-/// pass from feeling like a straight loop. The second half adds a harmony
-/// layer under the same riff for a fuller "whole band" sound — the riff
-/// itself never changes, since changing the hook is how you lose it. An
-/// original composition, not a transcription of any real bugle call or march.
+/// riff, dotted martial rhythm, plus a genuine "oom-pah" accompaniment
+/// (bass drum on the beat, a chord stab on the offbeat) for the walking
+/// groove a bare bass-drum-and-snare pattern didn't have. A syncopated
+/// snare push and crescendo roll fills keep each pass from feeling like a
+/// straight loop.
+///
+/// Levels run long, so the loop needs to survive more than a couple of
+/// repeats: it's a full A-B-A' march form now, not just a straight repeat.
+/// Section A plays the riff plain, twice through (4 bars each way — call,
+/// answer, call, answer); a 4-bar bridge then drops to half-time and swaps
+/// in a legato, minor-tinged countermelody (E-D-B-A-G, the relative minor
+/// of the home G major) for the "quiet before the band comes back"; A'
+/// then restates the same riff — never changed, since changing the hook is
+/// how you lose it — twice through again, now with a harmony layer under
+/// it for the fuller "whole band" sound. Crescendo rolls mark all three
+/// section joins. An original composition, not a transcription of any real
+/// bugle call or march.
 fn music() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let bpm = 116.0_f32;
-    let bars = 16;
+    let bars = 20;
     let steps_per_bar = 16;
     let total_steps = bars * steps_per_bar;
     let step_ms = 60_000.0 / bpm / 4.0;
@@ -1046,10 +1199,41 @@ fn music() -> Vec<u8> {
     const PAH_HZ: f32 = 246.94;        // B3 — the offbeat "pah" chord stab
     const PEDAL_HZ: f32 = 98.00;       // G2 — soft sustained low drone, glues the loop together
 
+    // The bridge: a slow, legato countermelody built on the relative minor
+    // (E-G-B, the vi of G major) instead of the call/answer's I chord — a
+    // real change of scenery, not just a quieter repeat of the hook.
+    const BRIDGE: [(usize, f32); 5] = [
+        (0, 329.63), (4, 293.66), (8, 246.94), (10, 220.00), (12, 196.00),
+    ]; // E4 D4 B3 A3 G3, descending
+    const BRIDGE_START: usize = 8; // A section is bars 0..8
+    const BRIDGE_END: usize = 12;  // A' section is bars 12..bars
+
     for bar in 0..bars {
         let bar_off = (bar * steps_per_bar) * step_samples;
-        let full_band = bar >= bars / 2; // second half: the harmony layer joins in
-        let fill_bar = bar == bars / 2 - 1 || bar == bars - 1;
+        brass_stab(&mut buf, bar_off, PEDAL_HZ, step_ms * steps_per_bar as f32 * 1.05, 0.09);
+
+        if bar >= BRIDGE_START && bar < BRIDGE_END {
+            // Half-time groove: just the downbeat and a couple of quiet
+            // taps, no "pah" stab — pulls the energy back before A'
+            // brings the full band back in.
+            march_bass_drum(&mut buf, bar_off, 0.5);
+            for &pos in &[4, 12] {
+                march_snare(&mut buf, bar_off + step_samples * pos, &mut rng, 0.15);
+            }
+            if bar == BRIDGE_END - 1 {
+                for h in 0..6 {
+                    let off = bar_off + step_samples * 10 + (step_samples / 2) * h;
+                    march_snare(&mut buf, off, &mut rng, 0.20 + 0.09 * h as f32);
+                }
+            }
+            for &(step, freq) in &BRIDGE {
+                brass_stab(&mut buf, bar_off + step_samples * step, freq, step_ms * 5.0, 0.24);
+            }
+            continue;
+        }
+
+        let full_band = bar >= BRIDGE_END; // A' section: the harmony layer joins in
+        let fill_bar = bar == BRIDGE_START - 1 || bar == bars - 1;
 
         // Oom-pah: bass drum on 1 and 3 ("oom"), a short brass chord stab
         // answering on 2 and 4 ("pah") — the walking groove an EDM-style
@@ -1064,9 +1248,9 @@ fn music() -> Vec<u8> {
 
         // Snare backbeat on 2 and 4 (coincides with the "pah"), a syncopated
         // push on the "and" of 2 for a bit of swagger, and soft footfall
-        // taps on the remaining off-beats; the last bar of each half breaks
-        // into a crescendo roll instead — the classic march fill leading
-        // into the repeat.
+        // taps on the remaining off-beats; the last bar of each section
+        // breaks into a crescendo roll instead — the classic march fill
+        // leading into the next section.
         if fill_bar {
             for h in 0..6 {
                 let off = bar_off + step_samples * 10 + (step_samples / 2) * h;
@@ -1082,7 +1266,78 @@ fn music() -> Vec<u8> {
         }
 
         // The hook — call in even bars, answer in odd bars, so the 2-bar
-        // phrase repeats four times over the loop instead of playing once.
+        // phrase repeats four times over each of the A and A' sections.
+        let phrase = if bar % 2 == 0 { &CALL } else { &ANSWER };
+        for &(step, freq) in phrase {
+            let off = bar_off + step_samples * step;
+            brass_stab(&mut buf, off, freq, step_ms * 3.2, 0.42);
+            if full_band {
+                brass_stab(&mut buf, off, freq * HARMONY_RATIO, step_ms * 3.2, 0.26);
+            }
+        }
+    }
+
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+}
+
+/// A second, tighter march for the loop rotation — same instrument
+/// palette as `music()` (march bass drum, march snare, brass stabs) so it
+/// still reads as Raider's theme, but a different key, tempo, and riff so
+/// the two don't blur into one loop over a long level. Minor-key (D minor)
+/// and a notch faster, no bridge — a straight-ahead A/A' oom-pah march that
+/// answers the first track's more developed form with a punchier, more
+/// urgent one; the harmony layer still joins for the back half.
+fn music2() -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let bpm = 124.0_f32;
+    let bars = 16;
+    let steps_per_bar = 16;
+    let total_steps = bars * steps_per_bar;
+    let step_ms = 60_000.0 / bpm / 4.0;
+    let step_samples = (sr * step_ms / 1000.0) as usize;
+    let total = step_samples * total_steps + SAMPLE_RATE as usize / 3;
+    let mut buf = vec![0f32; total];
+    let mut rng = Rng(0x0B16_20E);
+
+    // The hook, in D minor this time — same dotted call-and-answer shape as
+    // the main theme's riff, transposed and re-contoured, not just pitched
+    // up, so it reads as its own tune rather than a key change of the first.
+    const CALL: [(usize, f32); 6] = [
+        (0, 293.66), (3, 349.23), (6, 440.00), (8, 587.33), (11, 440.00), (14, 349.23),
+    ]; // D4 F4 A4 D5 A4 F4 — the call, climbing
+    const ANSWER: [(usize, f32); 6] = [
+        (0, 440.00), (3, 349.23), (6, 293.66), (8, 220.00), (11, 293.66), (14, 349.23),
+    ]; // A4 F4 D4 A3 D4 F4 — the answer, resolving down then lifting back into the repeat
+    const HARMONY_RATIO: f32 = 0.6674; // a perfect fifth below (2^(-7/12))
+    const PAH_HZ: f32 = 174.61;        // F3 — the offbeat "pah" chord stab
+    const PEDAL_HZ: f32 = 73.42;       // D2 — soft sustained low drone, glues the loop together
+
+    for bar in 0..bars {
+        let bar_off = (bar * steps_per_bar) * step_samples;
+        let full_band = bar >= bars / 2; // second half: the harmony layer joins in
+        let fill_bar = bar == bars / 2 - 1 || bar == bars - 1;
+
+        march_bass_drum(&mut buf, bar_off, 0.8);
+        march_bass_drum(&mut buf, bar_off + step_samples * 8, 0.8);
+        if !fill_bar {
+            brass_stab(&mut buf, bar_off + step_samples * 4,  PAH_HZ, step_ms * 2.6, 0.22);
+            brass_stab(&mut buf, bar_off + step_samples * 12, PAH_HZ, step_ms * 2.6, 0.22);
+        }
+
+        if fill_bar {
+            for h in 0..6 {
+                let off = bar_off + step_samples * 10 + (step_samples / 2) * h;
+                march_snare(&mut buf, off, &mut rng, 0.30 + 0.09 * h as f32);
+            }
+        } else {
+            march_snare(&mut buf, bar_off + step_samples * 4,  &mut rng, 0.55);
+            march_snare(&mut buf, bar_off + step_samples * 7,  &mut rng, 0.24); // syncopated push
+            march_snare(&mut buf, bar_off + step_samples * 12, &mut rng, 0.55);
+        }
+        for &pos in &[2, 10, 14] {
+            march_snare(&mut buf, bar_off + step_samples * pos, &mut rng, 0.14);
+        }
+
         let phrase = if bar % 2 == 0 { &CALL } else { &ANSWER };
         for &(step, freq) in phrase {
             let off = bar_off + step_samples * step;
@@ -1121,6 +1376,7 @@ pub fn generate() -> Vec<Asset> {
         ("images/boss_name_ja_6.png", boss_name_ja(5)),
         ("images/boss_name_ja_7.png", boss_name_ja(6)),
         ("images/powerup.png",        powerup_capsule()),
+        ("images/health_pack.png",    health_pack()),
         ("images/carrier.png",        carrier_ship()),
         ("images/boat.png",           boat()),
         // Three distinct noise-generated cloud shapes, cycled between instances.
@@ -1133,9 +1389,13 @@ pub fn generate() -> Vec<Asset> {
         ("images/island_medium.png", island_sprite(ISLAND_SIZES[1].0, ISLAND_SIZES[1].1, 0x9A17_2DE0)),
         ("images/island_large.png",  island_sprite(ISLAND_SIZES[2].0, ISLAND_SIZES[2].1, 0x9A17_3DE0)),
         ("sounds/turret_fire.wav",    turret_fire_sfx()),
+        ("sounds/barrier_hum.wav",    barrier_hum_sfx()),
         ("sounds/shoot.wav",          encode_pcm16_mono(&shoot_sfx())),
         ("sounds/enemy_explode.wav",  encode_pcm16_mono(&gen_noise(220.0, 0.7))),
         ("sounds/player_explode.wav", encode_pcm16_mono(&gen_noise(650.0, 0.9))),
+        // A short, quieter crack for a non-lethal hit — reads as "took a
+        // glancing blow" rather than player_explode's full "you're down".
+        ("sounds/player_hit.wav",     encode_pcm16_mono(&gen_noise(130.0, 0.55))),
         ("sounds/boss_explode.wav",   encode_pcm16_mono(&gen_noise(1100.0, 1.0))),
         ("sounds/boss_warning.wav",   boss_warning_sfx()),
         // Weapon-tier pickup chimes, escalating: more notes, higher register,
@@ -1144,9 +1404,13 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/powerup3.wav",       encode_pcm16_mono(&ascending_run(&[987.77, 1479.98], 50.0, 90.0, 0.5))),
         ("sounds/powerup4.wav",       encode_pcm16_mono(&ascending_run(&[740.00, 987.77, 1318.51], 55.0, 95.0, 0.5))),
         ("sounds/max_power.wav",      max_power_sfx()),
+        // A gentle rising chime, lower and warmer than the weapon-tier
+        // chimes, for catching a health pickup.
+        ("sounds/health_pickup.wav",  encode_pcm16_mono(&ascending_run(&[392.00, 523.25, 659.25], 55.0, 90.0, 0.42))),
         ("sounds/stage_clear.wav",    stage_clear_sfx()),
         ("sounds/victory.wav",        victory_sfx()),
         ("sounds/game_over.wav",      game_over_sfx()),
         ("sounds/music.wav",          music()),
+        ("sounds/music2.wav",         music2()),
     ]
 }

@@ -118,7 +118,7 @@ body::after {
   top: 31px; /* marquee (28px) + 3px */
   left: 3px;
   right: 3px;
-  bottom: calc(56px + 3px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--topbar-h, 56px) + 3px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
   pointer-events: none;
   z-index: 8;
@@ -155,8 +155,8 @@ body::after {
 }
 .bezel-screw.tl { top: 41px; left: 13px; } /* marquee (28px) + 13px */
 .bezel-screw.tr { top: 41px; right: 13px; }
-.bezel-screw.bl { bottom: calc(56px + 13px + env(safe-area-inset-bottom, 0px)); left: 13px; }
-.bezel-screw.br { bottom: calc(56px + 13px + env(safe-area-inset-bottom, 0px)); right: 13px; }
+.bezel-screw.bl { bottom: calc(var(--topbar-h, 56px) + 13px + env(safe-area-inset-bottom, 0px)); left: 13px; }
+.bezel-screw.br { bottom: calc(var(--topbar-h, 56px) + 13px + env(safe-area-inset-bottom, 0px)); right: 13px; }
 
 canvas {
   display: block;
@@ -248,7 +248,7 @@ canvas {
   display: none;
   position: fixed;
   inset: 0;
-  bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px));
   background: rgba(0,0,0,0.8);
   z-index: 150;
   align-items: center;
@@ -279,7 +279,7 @@ canvas {
 
 #dpad {
   position: fixed;
-  bottom: calc(56px + 20px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--topbar-h, 56px) + 20px + env(safe-area-inset-bottom, 0px));
   left: 20px;
   width: 132px;
   height: 132px;
@@ -317,7 +317,7 @@ canvas {
 
 #btn-fire {
   position: fixed;
-  bottom: calc(56px + 24px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--topbar-h, 56px) + 24px + env(safe-area-inset-bottom, 0px));
   right: 24px;
   width: 72px;
   height: 72px;
@@ -346,7 +346,7 @@ canvas {
 
 #btn-fire2 {
   position: fixed;
-  bottom: calc(56px + 24px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--topbar-h, 56px) + 24px + env(safe-area-inset-bottom, 0px));
   right: calc(24px + 72px + 12px);
   width: 72px;
   height: 72px;
@@ -378,7 +378,7 @@ canvas {
 #paddle-dial, #paddle-dial-p2 {
   display: none;
   position: fixed;
-  bottom: calc(56px + 20px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--topbar-h, 56px) + 20px + env(safe-area-inset-bottom, 0px));
   width: 96px;
   height: 96px;
   border-radius: 50%;
@@ -498,7 +498,7 @@ canvas {
   #dpad {
     width: 99px;
     height: 99px;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 10px);
+    bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px) + 10px);
     left: 10px;
   }
   .dpad-btn { width: 33px; height: 33px; line-height: 33px; font-size: 13px; }
@@ -510,26 +510,26 @@ canvas {
     width: 56px;
     height: 56px;
     line-height: 56px;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 12px);
+    bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px) + 12px);
     right: 12px;
   }
   #btn-fire2 {
     width: 56px;
     height: 56px;
     line-height: 56px;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 12px);
+    bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px) + 12px);
     right: calc(12px + 56px + 10px);
   }
   #tilt-btn {
     width: 56px;
     height: 56px;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 12px);
+    bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px) + 12px);
     right: calc(12px + (56px + 10px) * 2);
   }
   #paddle-dial, #paddle-dial-p2 {
     width: 76px;
     height: 76px;
-    bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 10px);
+    bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px) + 10px);
   }
   #paddle-dial    { left: 16px; }
   #paddle-dial-p2 { right: 16px; }
@@ -539,7 +539,7 @@ canvas {
 
 #tilt-btn {
   position: fixed;
-  bottom: calc(56px + 24px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--topbar-h, 56px) + 24px + env(safe-area-inset-bottom, 0px));
   right: calc(24px + (72px + 12px) * 2);
   width: 72px;
   height: 72px;
