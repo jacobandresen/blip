@@ -406,19 +406,20 @@ if (!isRally) (function () {
 if (isRally) {
   // Rally has no 8-way stick or fire button — it's the two paddle dials
   // (touch) or the keyboard. Hide the deck's stick + buttons on every
-  // device, not just touch, so a dead joystick never sits in the bar.
+  // device, and mount the two spinner dials in their place (P1 left, P2
+  // right). They show everywhere as the cabinet's knobs; the touch spin
+  // is wired only where there's a touchscreen.
   ['stick-base', 'fire-buttons'].forEach(function (id) {
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
+  var dialP1 = document.getElementById('paddle-dial');
+  var dialP2 = document.getElementById('paddle-dial-p2');
+  if (dialP1) dialP1.style.display = 'block';
+  if (dialP2) dialP2.style.display = 'block';
 
   if ('ontouchstart' in window || navigator.maxTouchPoints > 0) (function () {
     // ---- Dual paddle dials (P1 left = Arrow keys, P2 right = I/K) ----
-
-    var dialP1 = document.getElementById('paddle-dial');
-    var dialP2 = document.getElementById('paddle-dial-p2');
-    dialP1.style.display = 'block';
-    dialP2.style.display = 'block';
 
     // null = title screen (no mode chosen yet); 0 = 1P; 1 = 2P.
     var rallyMode = null;

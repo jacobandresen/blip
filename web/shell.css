@@ -463,121 +463,148 @@ body.need-coin #insert-coin-btn {
 }
 #topbar .deck-panel { touch-action: none; }
 
-/* ---- Paddle dials (rally only) ---- */
-
+/* ---- Paddle dials (rally) ----
+   Mounted in the deck like the joystick: two spinner knobs lying on the
+   tilted .deck-panel (so they read as 3D — foreshortened to ellipses, a
+   chrome cap standing proud of the surface on translateZ, a contact
+   shadow on the panel). P1 left, P2 right. shell.js reveals them and
+   drives the touch spin (rotating #dial-hand). */
 #paddle-dial, #paddle-dial-p2 {
   display: none;
-  position: fixed;
-  bottom: calc(var(--topbar-h, 56px) + 20px + env(safe-area-inset-bottom, 0px));
-  width: 96px;
-  height: 96px;
+  position: absolute;
+  bottom: 16px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background: radial-gradient(circle at 42% 38%, #0c170c, #050a05);
-  border: 2px solid rgba(50, 200, 50, 0.35);
+  /* the housing the knob sits in, sunk into the deck */
+  background: radial-gradient(circle at 50% 40%, #313136 0%, #17171a 55%, #08080a 100%);
   box-shadow:
-    0 0 16px rgba(50, 200, 50, 0.12),
-    inset 0 0 24px rgba(0, 0, 0, 0.6);
+    0 2px 5px rgba(0, 0, 0, 0.6),
+    inset 0 2px 5px rgba(0, 0, 0, 0.75),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   pointer-events: auto;
-  z-index: 99;
   -webkit-tap-highlight-color: transparent;
+  transform-style: preserve-3d;
 }
+#paddle-dial    { left: clamp(6px, 5vw, 30px); }
+#paddle-dial-p2 { right: clamp(6px, 5vw, 30px); }
 
-#paddle-dial    { left: 20px; }
-#paddle-dial-p2 { right: 20px; }
-
-/* Tick marks around the rim via conic-gradient */
+/* soft contact shadow on the panel below the raised cap */
 #paddle-dial::before, #paddle-dial-p2::before {
   content: '';
   position: absolute;
-  inset: 6px;
+  left: 50%;
+  bottom: -3px;
+  width: 52px;
+  height: 12px;
+  transform: translateX(-50%);
   border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg 14deg, rgba(50,200,50,0.18) 14deg 16deg,
-    transparent 16deg 44deg, rgba(50,200,50,0.18) 44deg 46deg,
-    transparent 46deg 74deg, rgba(50,200,50,0.18) 74deg 76deg,
-    transparent 76deg 104deg, rgba(50,200,50,0.18) 104deg 106deg,
-    transparent 106deg 134deg, rgba(50,200,50,0.18) 134deg 136deg,
-    transparent 136deg 164deg, rgba(50,200,50,0.18) 164deg 166deg,
-    transparent 166deg 194deg, rgba(50,200,50,0.18) 194deg 196deg,
-    transparent 196deg 224deg, rgba(50,200,50,0.18) 224deg 226deg,
-    transparent 226deg 254deg, rgba(50,200,50,0.18) 254deg 256deg,
-    transparent 256deg 284deg, rgba(50,200,50,0.18) 284deg 286deg,
-    transparent 286deg 314deg, rgba(50,200,50,0.18) 314deg 316deg,
-    transparent 316deg 344deg, rgba(50,200,50,0.18) 344deg 346deg,
-    transparent 346deg 360deg
-  );
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.5) 0%, transparent 72%);
+  pointer-events: none;
 }
 
-/* Centre dot */
-#paddle-dial::after, #paddle-dial-p2::after {
+/* the raised knob body — brushed-chrome rim, lifted off the deck plane */
+.dial-cap {
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  transform: translateZ(5px);
+  background: conic-gradient(from -50deg, #e4e6e9, #8a8d92 24%, #45474b 50%, #8a8d92 76%, #e4e6e9 100%);
+  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.55);
+}
+
+/* the turning top: knurled grip + a domed centre + a pointer groove.
+   shell.js sets transform:rotate() here, so nothing else may set transform. */
+#dial-hand, #dial-hand-p2 {
+  position: absolute;
+  inset: 2.5px;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(from 0deg, #3c3c40 0 5deg, #212124 5deg 10deg),
+    radial-gradient(circle at 42% 34%, #4c4c50 0%, #1d1d20 60%, #101012 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 3px 5px rgba(255, 255, 255, 0.12),
+    inset 0 -4px 7px rgba(0, 0, 0, 0.55);
+  transform-origin: 50% 50%;
+  transition: box-shadow .05s;
+}
+/* pointer groove — points to 12 o'clock at rotate(0), in the cabinet accent */
+#dial-hand::before, #dial-hand-p2::before {
   content: '';
   position: absolute;
-  left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: rgba(50, 200, 50, 0.5);
-  box-shadow: 0 0 6px #32c832;
+  left: 50%;
+  top: 4px;
+  width: 4px;
+  height: 42%;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background: rgb(var(--cab));
+  box-shadow: 0 0 6px rgba(var(--cab), 0.85);
 }
-
-#dial-hand, #dial-hand-p2 {
+/* domed centre hub */
+#dial-hand::after, #dial-hand-p2::after {
+  content: '';
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 3px;
-  height: 32px;
-  margin-left: -1.5px;
-  margin-top: -32px;
-  background: linear-gradient(to top, rgba(50,200,50,0.3), #32c832);
-  border-radius: 2px 2px 0 0;
-  transform-origin: bottom center;
-  box-shadow: 0 0 8px rgba(50,200,50,0.7);
-  transition: box-shadow .05s;
+  width: 34%;
+  height: 34%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #58585c, #232326 70%, #141416);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-#paddle-dial.active #dial-hand, #paddle-dial-p2.active #dial-hand-p2 {
-  box-shadow: 0 0 16px #32c832, 0 0 30px rgba(50,200,50,0.4);
+#paddle-dial.active #dial-hand,
+#paddle-dial-p2.active #dial-hand-p2 {
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--cab), 0.5),
+    inset 0 3px 5px rgba(255, 255, 255, 0.14),
+    inset 0 -4px 7px rgba(0, 0, 0, 0.55),
+    0 0 12px rgba(var(--cab), 0.4);
 }
 
 #dial-label, #dial-label-p2 {
   position: absolute;
-  bottom: -22px;
-  left: 0; right: 0;
+  top: -13px;
+  left: 0;
+  right: 0;
   text-align: center;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 9px;
-  letter-spacing: 3px;
-  color: rgba(50, 200, 50, 0.4);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 6px;
+  letter-spacing: 1px;
+  color: rgba(var(--cab), 0.8);
+  text-shadow: 0 0 6px rgba(var(--cab), 0.5);
+  -webkit-font-smoothing: none;
+  pointer-events: none;
 }
 
-/* P2 dial — CPU mode (1-player selected) */
-
+/* P2 dial — CPU mode (1-player selected): the knob goes dark and dead,
+   a chip glyph in place of the pointer. */
 #paddle-dial-p2.cpu-mode {
   pointer-events: none;
-  opacity: 0.5;
-  border-color: rgba(50, 200, 50, 0.18);
 }
-
-#paddle-dial-p2.cpu-mode #dial-hand-p2 {
-  display: none;
+#paddle-dial-p2.cpu-mode .dial-cap {
+  background: conic-gradient(from -50deg, #4a4a4e, #2c2c30 50%, #4a4a4e);
+  filter: grayscale(1) brightness(0.7);
 }
-
-/* Replace the centre dot with a chip icon */
-#paddle-dial-p2.cpu-mode::after {
-  content: '⊡';
+#paddle-dial-p2.cpu-mode #dial-hand-p2 { opacity: 0.35; }
+#paddle-dial-p2.cpu-mode #dial-hand-p2::before { display: none; }
+#paddle-dial-p2.cpu-mode #dial-hand-p2::after {
+  content: 'CPU';
   width: auto;
   height: auto;
-  border-radius: 0;
   background: none;
   box-shadow: none;
-  font-size: 22px;
-  line-height: 1;
-  color: rgba(50, 200, 50, 0.45);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 7px;
+  color: rgba(var(--cab), 0.5);
+  -webkit-font-smoothing: none;
 }
 
 /* Shrink controls in landscape / short screens */
@@ -599,13 +626,7 @@ body.need-coin #insert-coin-btn {
   #fire-buttons { gap: 10px; }
   .arcade-btn { width: 46px; height: 46px; }
 
-  #paddle-dial, #paddle-dial-p2 {
-    width: 76px;
-    height: 76px;
-    bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px) + 10px);
-  }
-  #paddle-dial    { left: 16px; }
-  #paddle-dial-p2 { right: 16px; }
+  #paddle-dial, #paddle-dial-p2 { width: 48px; height: 48px; bottom: 8px; }
 }
 
 /* Phones — a fatter marquee strip so the BLIP logo and coin slot over its

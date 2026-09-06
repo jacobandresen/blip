@@ -16,7 +16,7 @@
   <script src="../howler.min.js"></script>
   <script src="../kiosk.js?v=14"></script>
   <link rel="stylesheet" href="../kiosk.css?v=30">
-  <link rel="stylesheet" href="../shell.css?v=25">
+  <link rel="stylesheet" href="../shell.css?v=27">
 </head>
 <body>
 
@@ -44,6 +44,16 @@
       </div>
     </div>
     <div id="fire-buttons"></div>
+    <!-- Paddle dials: mounted in the deck like the stick — two spinner
+         knobs on the tilted panel, P1 left / P2 right. -->
+    <div id="paddle-dial">
+      <div class="dial-cap"><div id="dial-hand"></div></div>
+      <div id="dial-label">P1</div>
+    </div>
+    <div id="paddle-dial-p2">
+      <div class="dial-cap"><div id="dial-hand-p2"></div></div>
+      <div id="dial-label-p2">2P</div>
+    </div>
    </div>
   </div>
 
@@ -55,20 +65,10 @@
     </div>
   </div>
 
-  <!-- Paddle dials: rally only, touch only. P1=left, P2=right -->
-  <div id="paddle-dial">
-    <div id="dial-hand"></div>
-    <div id="dial-label">P1</div>
-  </div>
-  <div id="paddle-dial-p2">
-    <div id="dial-hand-p2"></div>
-    <div id="dial-label-p2">2P</div>
-  </div>
-
   <div id="arcade-bezel"></div>
   <canvas id="glcanvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
 
-  <script src="../shell.js?v=32"></script>
+  <script src="../shell.js?v=33"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
   <script src="../blip_bridge.js?v=3"></script>
