@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>CONTROLS — BLIP ARCADE</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="kiosk.css?v=26">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:   #32c832;
+      --yellow:  #e6dc32;
+      --orange:  #D97757;
+    }
+
+    html, body {
+      min-height: 100%;
+      background: #050508;
+      color: #ccc;
+      font-family: 'Courier New', Courier, monospace;
+    }
+    /* No rubber-band overscroll, so the fixed bottom bar stays pinned. */
+    html { overscroll-behavior: none; }
+
+    /* CRT scanlines */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent 0px, transparent 3px,
+        rgba(0,0,0,0.14) 3px, rgba(0,0,0,0.14) 4px
+      );
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      /* Top pad clears the fixed BLIP ARCADE logo / coin button. */
+      padding: calc(72px + env(safe-area-inset-top, 0px)) 24px calc(80px + env(safe-area-inset-bottom, 0px));
+    }
+
+    h1 {
+      font-size: clamp(2rem, 8vw, 3.5rem);
+      font-weight: 900;
+      letter-spacing: .18em;
+      color: var(--green);
+      text-shadow: 0 0 20px var(--green), 0 0 60px rgba(50,200,50,0.3);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    h2 {
+      font-size: 11px;
+      letter-spacing: 6px;
+      color: #444;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+
+    .divider {
+      height: 1px;
+      background: #1a1a1a;
+      margin: 44px 0;
+    }
+
+    .section-label {
+      font-size: 9px;
+      letter-spacing: 5px;
+      color: var(--green);
+      text-transform: uppercase;
+      margin-bottom: 18px;
+      opacity: 0.85;
+    }
+
+    .section-body {
+      border-left: 2px solid rgba(50,200,50,0.28);
+      padding-left: 20px;
+    }
+    .section-body p {
+      font-size: 13px;
+      line-height: 1.95;
+      letter-spacing: .5px;
+      color: #aaa;
+      margin-bottom: 14px;
+    }
+    .section-body p:last-child { margin-bottom: 0; }
+
+    /* key / control table */
+    .keytable {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 2px 0 16px;
+    }
+    .keytable td {
+      padding: 8px 0;
+      border-bottom: 1px solid #161616;
+      vertical-align: top;
+      line-height: 1.7;
+    }
+    .keytable tr:last-child td { border-bottom: 0; }
+    .keytable td:first-child {
+      color: #667;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-size: 10px;
+      width: 38%;
+      padding-right: 18px;
+      white-space: nowrap;
+    }
+    .keytable td:last-child { color: #bbb; font-size: 12px; letter-spacing: .5px; }
+
+    kbd {
+      display: inline-block;
+      font-family: inherit;
+      font-size: 11px;
+      line-height: 1.4;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid #333;
+      border-bottom-width: 2px;
+      border-radius: 3px;
+      padding: 0 6px;
+      margin: 1px;
+      color: #e0e0e0;
+      white-space: nowrap;
+    }
+
+    .inline-link {
+      color: var(--green);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(50,200,50,0.3);
+      transition: border-color .2s, color .2s;
+    }
+    .inline-link:hover {
+      color: #7be07b;
+      border-bottom-color: rgba(50,200,50,0.8);
+    }
+
+    /* ---- language switcher ---- */
+    .lang-switcher {
+      position: fixed;
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+      right: 20px;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column-reverse;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    .lang-btn {
+      background: none;
+      border: none;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+      opacity: 0.35;
+      transition: opacity .15s, filter .15s;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .lang-btn:hover:not(.active) { opacity: 0.65; }
+    .lang-btn.active {
+      opacity: 1;
+      filter: drop-shadow(0 0 5px var(--green));
+    }
+
+    /* Match the badge avatars, which shrink at this width (kiosk.css). */
+    @media (max-width: 600px) {
+      .lang-btn { width: 32px; height: 32px; font-size: 22px; }
+    }
+
+    /* The kiosk bar grows to ~76px on phones (bigger touch controls), so
+       lift the language flags clear of it. */
+    @media (max-width: 480px) {
+      .lang-switcher { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+    }
+
+  </style>
+</head>
+<body>
+
+<a class="blip-logo" href="index.html">BLIP ARCADE</a>
+<!-- Coin slot: top-right corner, mirroring the BLIP ARCADE logo. -->
+<button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
+
+<div class="page">
+
+  <h1 data-i18n="pageTitle">CONTROLS</h1>
+  <h2 data-i18n="pageSubtitle">HOW TO PLAY ON PC AND MOBILE</h2>
+
+  <section>
+    <div class="section-label" data-i18n="kbLabel">&#x25BA; Keyboard</div>
+    <div class="section-body">
+      <p data-i18n="kbIntro">
+        Every game runs on the keyboard. Each one also prints its own key
+        hints on its card here and on its title screen, but the layout is
+        the same across the arcade:
+      </p>
+      <table class="keytable">
+        <tr><td data-i18n="kbMoveLabel">Move / aim</td><td data-i18n="kbMoveKeys"><kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td></tr>
+        <tr><td data-i18n="kbFire1Label">Button 1 — fire / launch / serve</td><td data-i18n="kbFire1Keys"><kbd>Space</kbd></td></tr>
+        <tr><td data-i18n="kbFire2Label">Button 2 — second action</td><td data-i18n="kbFire2Keys"><kbd>Z</kbd> <span style="color:#666">(Meteors hyperspace only)</span></td></tr>
+        <tr><td data-i18n="kbCoinLabel">Insert coin</td><td data-i18n="kbCoinKeys"><kbd>5</kbd> or <kbd>C</kbd></td></tr>
+      </table>
+      <p data-i18n="kbPerGame">
+        Per game: <b>Serpent</b> steers with WASD / arrows. <b>Bouncer</b>,
+        <b>Defender</b> and <b>Raider</b> move with A/D or the arrows and
+        fire with Space. <b>Meteors</b> rotates with A/D, thrusts with W,
+        fires with Space and jumps to hyperspace with Z. <b>Rally</b> is
+        two-player on one keyboard: player&nbsp;1 uses W/S or &uarr;/&darr;,
+        player&nbsp;2 uses I/K, and Space serves.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="section-label" data-i18n="padLabel">&#x25BA; Gamepad</div>
+    <div class="section-body">
+      <p data-i18n="padBody">
+        A connected controller is picked up automatically. The left stick
+        or D-pad moves, the bottom face button (A / &times;) is Button&nbsp;1,
+        and the right face button (B / &#9711;) is Button&nbsp;2. The
+        on-screen stick and buttons light up to mirror whatever the pad is
+        doing.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="section-label" data-i18n="touchLabel">&#x25BA; Touch — phone &amp; tablet</div>
+    <div class="section-body">
+      <p data-i18n="touchIntro">
+        On a touch screen the cabinet's control deck sits along the bottom
+        of every game:
+      </p>
+      <table class="keytable">
+        <tr><td data-i18n="touchStickLabel">Joystick (left)</td><td data-i18n="touchStickBody">Drag the ball-top in any of 8 directions to move or aim. Let go to centre it.</td></tr>
+        <tr><td data-i18n="touchBtnLabel">Fire buttons (right)</td><td data-i18n="touchBtnBody">Tap for Button&nbsp;1; a second button appears for games that use one (Meteors).</td></tr>
+        <tr><td data-i18n="touchCoinLabel">Coin slot</td><td data-i18n="touchCoinBody">The <b>COINS</b> panel in the top-right corner. Tap it to drop a credit — up to 5 held at once.</td></tr>
+      </table>
+      <p data-i18n="touchNote">
+        The deck also animates under keyboard and gamepad input, so on a
+        laptop it doubles as a live read-out of what is being pressed.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="section-label" data-i18n="dialLabel">&#x25BA; The dial — Rally only</div>
+    <div class="section-body">
+      <p data-i18n="dialBody">
+        Rally puts away the joystick and gives each player a rotary dial
+        instead — player&nbsp;1 on the left, player&nbsp;2 on the right.
+        Twist a dial with your thumb like a real knob and your bat slides
+        with it; spin it faster and the bat moves faster. On the title
+        screen, tap the left dial to start a 1-player game against the
+        computer, or the right dial for two players.
+      </p>
+      <p data-i18n="dialHistory">
+        <b>Why a dial?</b> The original <i>Pong</i> (Atari, 1972) was
+        played exactly this way. Allan Alcorn built it as a warm-up
+        exercise set by Nolan Bushnell, and wired each player's bat to a
+        single potentiometer knob mounted in the cabinet — you turned it
+        to slide your paddle up and down, and that was the whole control
+        scheme. The first machine, dropped into
+        <a class="inline-link" href="history.html">Andy Capp's Tavern</a>
+        in Sunnyvale, jammed within days because its coin box had
+        overflowed. The dial here is a small tribute to that knob.
+      </p>
+    </div>
+  </section>
+
+</div>
+
+  <div class="left-badges">
+    <div class="controls-badge active">
+      <img class="controls-avatar" src="controls-icon.svg" alt="Controls">
+      <span class="controls-label">CONTROLS</span>
+    </div>
+    <a class="about-badge" href="about.html">
+      <img class="about-avatar" src="claude-avatar.svg" alt="About this experiment">
+      <span class="about-label">ABOUT</span>
+    </a>
+    <a class="history-badge" href="history.html">
+      <img class="history-avatar" src="history-icon.svg" alt="Game history">
+      <span class="history-label">HISTORY</span>
+    </a>
+  </div>
+
+  <div class="lang-switcher">
+    <button class="lang-btn" data-lang="en">&#127468;&#127463;</button>
+    <button class="lang-btn" data-lang="da">&#127465;&#127472;</button>
+    <button class="lang-btn" data-lang="ja">&#127471;&#127477;</button>
+  </div>
+
+  <!-- Decorative arcade stick + buttons, matching the game shell's bar
+       (kiosk.css) — static here, just cabinet flavor. -->
+  <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
+   <div class="deck-panel">
+    <div id="stick-base">
+      <div id="stick-boot"></div>
+      <div id="stick-handle">
+        <div id="stick-shaft"></div>
+        <div id="stick-ball"></div>
+      </div>
+    </div>
+    <div id="fire-buttons">
+      <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
+      <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
+    </div>
+   </div>
+  </div>
+
+  <script src="kiosk.js?v=13"></script>
+  <script>
+    var i18n = {
+      en: {
+        pageTitle:       'CONTROLS',
+        pageSubtitle:    'HOW TO PLAY ON PC AND MOBILE',
+
+        kbLabel:         '&#x25BA; Keyboard',
+        kbIntro:         'Every game runs on the keyboard. Each one also prints its own key hints on its card here and on its title screen, but the layout is the same across the arcade:',
+        kbMoveLabel:     'Move / aim',
+        kbMoveKeys:      '<kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>',
+        kbFire1Label:    'Button 1 — fire / launch / serve',
+        kbFire1Keys:     '<kbd>Space</kbd>',
+        kbFire2Label:    'Button 2 — second action',
+        kbFire2Keys:     '<kbd>Z</kbd> <span style="color:#666">(Meteors hyperspace only)</span>',
+        kbCoinLabel:     'Insert coin',
+        kbCoinKeys:      '<kbd>5</kbd> or <kbd>C</kbd>',
+        kbPerGame:       'Per game: <b>Serpent</b> steers with WASD / arrows. <b>Bouncer</b>, <b>Defender</b> and <b>Raider</b> move with A/D or the arrows and fire with Space. <b>Meteors</b> rotates with A/D, thrusts with W, fires with Space and jumps to hyperspace with Z. <b>Rally</b> is two-player on one keyboard: player&nbsp;1 uses W/S or &uarr;/&darr;, player&nbsp;2 uses I/K, and Space serves.',
+
+        padLabel:        '&#x25BA; Gamepad',
+        padBody:         'A connected controller is picked up automatically. The left stick or D-pad moves, the bottom face button (A / &times;) is Button&nbsp;1, and the right face button (B / &#9711;) is Button&nbsp;2. The on-screen stick and buttons light up to mirror whatever the pad is doing.',
+
+        touchLabel:      '&#x25BA; Touch — phone &amp; tablet',
+        touchIntro:      'On a touch screen the cabinet\'s control deck sits along the bottom of every game:',
+        touchStickLabel: 'Joystick (left)',
+        touchStickBody:  'Drag the ball-top in any of 8 directions to move or aim. Let go to centre it.',
+        touchBtnLabel:   'Fire buttons (right)',
+        touchBtnBody:    'Tap for Button&nbsp;1; a second button appears for games that use one (Meteors).',
+        touchCoinLabel:  'Coin slot',
+        touchCoinBody:   'The <b>COINS</b> panel in the top-right corner. Tap it to drop a credit — up to 5 held at once.',
+        touchNote:       'The deck also animates under keyboard and gamepad input, so on a laptop it doubles as a live read-out of what is being pressed.',
+
+        dialLabel:       '&#x25BA; The dial — Rally only',
+        dialBody:        'Rally puts away the joystick and gives each player a rotary dial instead — player&nbsp;1 on the left, player&nbsp;2 on the right. Twist a dial with your thumb like a real knob and your bat slides with it; spin it faster and the bat moves faster. On the title screen, tap the left dial to start a 1-player game against the computer, or the right dial for two players.',
+        dialHistory:     '<b>Why a dial?</b> The original <i>Pong</i> (Atari, 1972) was played exactly this way. Allan Alcorn built it as a warm-up exercise set by Nolan Bushnell, and wired each player\'s bat to a single potentiometer knob mounted in the cabinet — you turned it to slide your paddle up and down, and that was the whole control scheme. The first machine, dropped into <a class="inline-link" href="history.html">Andy Capp\'s Tavern</a> in Sunnyvale, jammed within days because its coin box had overflowed. The dial here is a small tribute to that knob.'
+      },
+
+      da: {
+        pageTitle:       'KONTROLLER',
+        pageSubtitle:    'SÅDAN SPILLER DU PÅ PC OG MOBIL',
+
+        kbLabel:         '&#x25BA; Tastatur',
+        kbIntro:         'Alle spil kan styres med tastaturet. Hvert spil viser også sine egne tastehints på kortet her og på titelskærmen, men layoutet er det samme i hele arkaden:',
+        kbMoveLabel:     'Bevæg / sigt',
+        kbMoveKeys:      '<kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> eller <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>',
+        kbFire1Label:    'Knap 1 — skyd / start / serv',
+        kbFire1Keys:     '<kbd>Mellemrum</kbd>',
+        kbFire2Label:    'Knap 2 — anden handling',
+        kbFire2Keys:     '<kbd>Z</kbd> <span style="color:#666">(kun Meteors hyperspace)</span>',
+        kbCoinLabel:     'Indsæt mønt',
+        kbCoinKeys:      '<kbd>5</kbd> eller <kbd>C</kbd>',
+        kbPerGame:       'Per spil: <b>Serpent</b> styres med WASD / piletaster. <b>Bouncer</b>, <b>Defender</b> og <b>Raider</b> bevæges med A/D eller piletasterne og skyder med mellemrum. <b>Meteors</b> drejer med A/D, giver fremdrift med W, skyder med mellemrum og hopper i hyperspace med Z. <b>Rally</b> er to spillere på ét tastatur: spiller&nbsp;1 bruger W/S eller &uarr;/&darr;, spiller&nbsp;2 bruger I/K, og mellemrum server.',
+
+        padLabel:        '&#x25BA; Controller',
+        padBody:         'En tilsluttet controller registreres automatisk. Venstre pind eller D-pad bevæger, den nederste knap (A / &times;) er Knap&nbsp;1, og den højre knap (B / &#9711;) er Knap&nbsp;2. Den viste pind og knapperne lyser op og spejler, hvad controlleren gør.',
+
+        touchLabel:      '&#x25BA; Berøring — telefon &amp; tablet',
+        touchIntro:      'På en berøringsskærm sidder kabinettets kontrolpanel langs bunden af hvert spil:',
+        touchStickLabel: 'Joystick (venstre)',
+        touchStickBody:  'Træk kuglen i en af 8 retninger for at bevæge eller sigte. Slip for at centrere den.',
+        touchBtnLabel:   'Skydeknapper (højre)',
+        touchBtnBody:    'Tryk for Knap&nbsp;1; en knap mere dukker op til spil, der bruger den (Meteors).',
+        touchCoinLabel:  'Møntspalte',
+        touchCoinBody:   '<b>COINS</b>-panelet i øverste højre hjørne. Tryk for at kaste en kredit i — op til 5 ad gangen.',
+        touchNote:       'Panelet animerer også ved tastatur- og controller-input, så på en bærbar fungerer det som en levende visning af, hvad der trykkes på.',
+
+        dialLabel:       '&#x25BA; Drejeknappen — kun Rally',
+        dialBody:        'Rally lægger joysticket væk og giver i stedet hver spiller en drejeknap — spiller&nbsp;1 til venstre, spiller&nbsp;2 til højre. Drej knappen med tommelfingeren som en rigtig knap, og bat\'en glider med; drej hurtigere, og bat\'en bevæger sig hurtigere. På titelskærmen: tryk på venstre knap for et 1-spiller-spil mod computeren, eller højre knap for to spillere.',
+        dialHistory:     '<b>Hvorfor en drejeknap?</b> Den oprindelige <i>Pong</i> (Atari, 1972) blev spillet præcis sådan. Allan Alcorn byggede den som en opvarmningsøvelse stillet af Nolan Bushnell og forbandt hver spillers bat til én potentiometerknap monteret i kabinettet — du drejede den for at føre din paddle op og ned, og det var hele styringen. Den første maskine, sat op på <a class="inline-link" href="history.html">Andy Capp\'s Tavern</a> i Sunnyvale, gik i stå efter få dage, fordi møntboksen var løbet over. Drejeknappen her er en lille hyldest til den knap.'
+      },
+
+      ja: {
+        pageTitle:       'そうさ',
+        pageSubtitle:    'PCとモバイルでの遊びかた',
+
+        kbLabel:         '&#x25BA; キーボード',
+        kbIntro:         'すべてのゲームはキーボードで操作できます。各ゲームはカードとタイトル画面にも独自のキー説明を表示しますが、配置はアーケード全体で共通です。',
+        kbMoveLabel:     '移動 / 照準',
+        kbMoveKeys:      '<kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> または <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>',
+        kbFire1Label:    'ボタン1 — 発射 / 開始 / サーブ',
+        kbFire1Keys:     '<kbd>スペース</kbd>',
+        kbFire2Label:    'ボタン2 — 第2アクション',
+        kbFire2Keys:     '<kbd>Z</kbd> <span style="color:#666">（Meteorsのワープのみ）</span>',
+        kbCoinLabel:     'コイン投入',
+        kbCoinKeys:      '<kbd>5</kbd> または <kbd>C</kbd>',
+        kbPerGame:       'ゲーム別：<b>Serpent</b>はWASD／矢印で操縦。<b>Bouncer</b>、<b>Defender</b>、<b>Raider</b>はA/Dまたは矢印で移動し、スペースで発射。<b>Meteors</b>はA/Dで回転、Wで推進、スペースで発射、Zでワープ。<b>Rally</b>は1台のキーボードで2人プレイ：プレイヤー&nbsp;1はW/Sまたは&uarr;/&darr;、プレイヤー&nbsp;2はI/K、スペースでサーブ。',
+
+        padLabel:        '&#x25BA; ゲームパッド',
+        padBody:         '接続したコントローラーは自動で認識されます。左スティックまたは方向キーで移動、下のフェイスボタン（A／&times;）がボタン&nbsp;1、右のフェイスボタン（B／&#9711;）がボタン&nbsp;2です。画面上のスティックとボタンは、パッドの入力に合わせて光ります。',
+
+        touchLabel:      '&#x25BA; タッチ — スマホ＆タブレット',
+        touchIntro:      'タッチ画面では、筐体のコントロールデッキが各ゲームの下部に並びます。',
+        touchStickLabel: 'ジョイスティック（左）',
+        touchStickBody:  'ボールトップを8方向のいずれかにドラッグして移動・照準します。離すと中央に戻ります。',
+        touchBtnLabel:   '発射ボタン（右）',
+        touchBtnBody:    'タップでボタン&nbsp;1。使用するゲーム（Meteors）では2つ目のボタンが現れます。',
+        touchCoinLabel:  'コイン投入口',
+        touchCoinBody:   '右上の<b>COINS</b>パネル。タップでクレジットを投入します（最大5枚まで保持）。',
+        touchNote:       'デッキはキーボードやゲームパッドの入力でも動くので、ノートPCでは「今どこが押されているか」のライブ表示にもなります。',
+
+        dialLabel:       '&#x25BA; ダイヤル — Rallyのみ',
+        dialBody:        'Rallyはジョイスティックをしまい、代わりに各プレイヤーに回転ダイヤルを与えます — プレイヤー&nbsp;1が左、プレイヤー&nbsp;2が右。本物のつまみのように親指でダイヤルを回すとバットが一緒に動き、速く回すほど速く動きます。タイトル画面で左ダイヤルをタップするとコンピューター相手の1人プレイ、右ダイヤルで2人プレイが始まります。',
+        dialHistory:     '<b>なぜダイヤル？</b> 元祖<i>Pong</i>（Atari、1972年）はまさにこの方式でした。Allan AlcornがNolan Bushnellから与えられた練習課題として作り、各プレイヤーのバットを筐体に取り付けた1つのポテンショメーターのつまみに配線しました。それを回してパドルを上下させる——それが操作のすべてでした。サニーベールの<a class="inline-link" href="history.html">Andy Capp\'s Tavern</a>に置かれた最初の1台は、数日でコインボックスがあふれて動かなくなりました。ここのダイヤルは、そのつまみへのささやかなオマージュです。'
+      }
+    };
+
+    function applyLang(lang) {
+      var t = i18n[lang];
+      if (!t) return;
+      document.querySelectorAll('[data-i18n]').forEach(function(el) {
+        var key = el.getAttribute('data-i18n');
+        if (t[key] !== undefined) el.innerHTML = t[key];
+      });
+      document.querySelectorAll('.lang-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+      });
+      document.documentElement.lang = lang;
+      try { localStorage.setItem('blip-lang', lang); } catch(e) {}
+    }
+
+    document.querySelectorAll('.lang-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        applyLang(this.getAttribute('data-lang'));
+      });
+    });
+
+    (function() {
+      var saved = null;
+      try { saved = localStorage.getItem('blip-lang'); } catch(e) {}
+      var browserLang = (navigator.language || '').slice(0, 2).toLowerCase();
+      applyLang(saved || (i18n[browserLang] ? browserLang : 'en'));
+    })();
+
+    updateCoinsHud();
+    document.getElementById('kiosk-insert-btn').addEventListener('click', insertCoin);
+    document.addEventListener('keydown', function(e) {
+      if (e.key === '5' || e.key === 'c' || e.key === 'C') insertCoin();
+    });
+  </script>
+</body>
+</html>

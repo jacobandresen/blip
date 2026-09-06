@@ -455,8 +455,11 @@ if (isRally) {
     var ball   = document.getElementById('stick-ball');
     if (!base || !handle || !ball) return;
 
-    var RADIUS = 50; // px of drag from the ball's rest point that triggers a direction
-    var DEAD   = 0.35; // fraction of RADIUS
+    // Small throw so a short thumb-flick registers immediately — a
+    // direction fires once the drag passes DEAD * RADIUS (~9px), not after
+    // a big deliberate push. Anything past RADIUS is already full tilt.
+    var RADIUS = 30; // px of drag from the ball's rest point that triggers a direction
+    var DEAD   = 0.30; // fraction of RADIUS
     var activeId = null;
     var wantDir = { up: false, down: false, left: false, right: false };
     var CODE_FOR = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
@@ -468,27 +471,20 @@ if (isRally) {
       injectKey(code, code, want ? 'keydown' : 'keyup');
     }
 
-    // The ball's rest position — where a player's thumb actually lands —
-    // is measured straight off the rendered ball, rather than replicated
-    // from CSS pixel values, because the stick now sits inside the bar's
-    // 3D tilt (see kiosk.css's #topbar/.kiosk-bar-main rule) with its own
-    // counter-rotation to stand upright: getBoundingClientRect() already
-    // resolves all of that (and whatever responsive breakpoint is active)
-    // to the true on-screen position, so this stays correct regardless of
-    // how the visual is built. Cached rather than read per pointer event
-    // (that would fight the ball's own lean, which is a resting-position
-    // moving target) — recomputed on resize, when the ball is at rest.
-    var restPivot = null;
-    function measurePivot() {
-      var r = ball.getBoundingClientRect();
-      restPivot = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-    }
-    measurePivot();
-    window.addEventListener('resize', measurePivot);
+    // Floating pivot: wherever the thumb first lands becomes "centre", and
+    // the drag is measured from there — not from the ball's fixed rest
+    // position. The hit-region is tall (it has to cover the ball floating
+    // above the bar), so an absolute pivot made a thumb resting anywhere
+    // but the exact ball centre read as a hard direction the instant it
+    // touched down. This is the standard mobile virtual-stick feel: grab
+    // anywhere, push from there. The ball itself still leans to show the
+    // direction (via reflect()/updateStick()), it just no longer has to be
+    // the thing you aim for.
+    var pivot = null;
 
     function apply(e) {
-      var dx = (e.clientX - restPivot.x) / RADIUS;
-      var dy = (e.clientY - restPivot.y) / RADIUS;
+      var dx = (e.clientX - pivot.x) / RADIUS;
+      var dy = (e.clientY - pivot.y) / RADIUS;
       setDir('left',  dx < -DEAD);
       setDir('right', dx >  DEAD);
       setDir('up',    dy < -DEAD);
@@ -504,7 +500,8 @@ if (isRally) {
       e.preventDefault();
       activeId = e.pointerId;
       base.setPointerCapture(activeId);
-      apply(e);
+      pivot = { x: e.clientX, y: e.clientY };
+      // No direction yet — the first move off this point is what steers.
     });
     base.addEventListener('pointermove', function (e) {
       if (e.pointerId !== activeId) return;

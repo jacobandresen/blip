@@ -196,6 +196,7 @@ function insertCoin() {
     playCoinInsert();
     dropCoinAnimation();
     updateCoinsHud();
+    updateCoinBeckon();
     flashCoins();
     if (typeof window.onCoinInserted === 'function') window.onCoinInserted();
   } else {
@@ -211,21 +212,16 @@ function insertCoin() {
   }
 }
 
-// A quiet nudge toward the coin mechanic for first-time visitors — three
-// gentle blinks on the corner COINS button, 5s after the landing page
-// loads. Gated on .game-grid, which only exists on index.html, so this
-// never fires on history/about or the game pages.
-window.addEventListener('load', function () {
+// Point first-time (and broke) visitors at the coin slot: while the
+// landing page shows zero credits, the corner COINS button throbs
+// (.needs-coin, kiosk.css) from the moment the page loads until the first
+// coin goes in. Gated on .game-grid, which only exists on index.html.
+function updateCoinBeckon() {
   if (!document.querySelector('.game-grid')) return;
   var btn = document.getElementById('kiosk-insert-btn');
-  if (!btn) return;
-  setTimeout(function () {
-    btn.classList.add('coin-hint-blink');
-    btn.addEventListener('animationend', function () {
-      btn.classList.remove('coin-hint-blink');
-    }, { once: true });
-  }, 5000);
-});
+  if (btn) btn.classList.toggle('needs-coin', getCoins() <= 0);
+}
+window.addEventListener('load', updateCoinBeckon);
 
 /* ---- Shared gamepad polling ----
  * Polls the first connected gamepad every frame and reports logical button

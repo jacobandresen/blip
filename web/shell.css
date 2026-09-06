@@ -74,7 +74,11 @@ body::after {
   box-sizing: border-box;
   height: calc(28px + env(safe-area-inset-top, 0px));
   padding-top: env(safe-area-inset-top, 0px);
-  z-index: 9;
+  /* Above the CRT scanline (100) and vignette (99) overlays — the backlit
+     sign is physical cabinet hardware sitting above the tube, not screen
+     content, so it stays crisp and lit rather than getting washed dark by
+     the vignette's edge falloff. Same reasoning as .blip-logo (z 500). */
+  z-index: 201;
   display: flex;
   align-items: center;
   justify-content: center;

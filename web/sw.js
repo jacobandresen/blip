@@ -1,10 +1,11 @@
-var CACHE = "blip-v46";
+var CACHE = "blip-v47";
 
 var ASSETS = [
   "/blip/",
   "/blip/index.html",
   "/blip/about.html",
   "/blip/history.html",
+  "/blip/controls.html",
   "/blip/manifest.json",
   "/blip/kiosk.css",
   "/blip/kiosk.js",
@@ -24,6 +25,7 @@ var ASSETS = [
   "/blip/claude-avatar.svg",
   "/blip/copilot-avatar.svg",
   "/blip/history-icon.svg",
+  "/blip/controls-icon.svg",
   "/blip/bouncer/index.html",
   "/blip/bouncer/index.wasm",
   "/blip/bouncer/screenshot.png",
