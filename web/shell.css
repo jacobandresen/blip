@@ -1,5 +1,16 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Press Start 2P — the same 5×7-ish blocky pixel look the games draw their
+   own text in (crates/blip/src/font.rs), used for the INSERT COIN attract
+   screen so it reads as part of the CRT, not a web overlay. SIL OFL, see
+   press-start-2p-OFL.txt. */
+@font-face {
+  font-family: 'Press Start 2P';
+  src: url('press-start-2p.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
 /* Cabinet accent — "r, g, b" so rgba(var(--cab), a) works. shell.js overrides
    this per game (see BLIP_GAMES in kiosk.js); this green is just the default
    before that runs. */
@@ -295,48 +306,73 @@ canvas {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: clamp(14px, 4.5vw, 34px) clamp(14px, 5vw, 56px);
+  gap: 13px;
+  padding: clamp(16px, 5vw, 36px) clamp(14px, 6vw, 60px);
   max-width: 100%;
-  font-family: 'Courier New', Courier, monospace;
+  /* Same blocky pixel font the games render in — Courier is the fallback
+     only until the woff2 loads. */
+  font-family: 'Press Start 2P', 'Courier New', monospace;
   text-transform: uppercase;
   text-align: center;
   white-space: nowrap;
+  /* Kill sub-pixel antialiasing so the glyphs stay hard-edged like the
+     game's fill_rect pixels. */
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeSpeed;
   border-top: 2px solid rgba(230, 220, 50, 0.55);
   border-bottom: 2px solid rgba(230, 220, 50, 0.55);
   box-shadow:
     0 -1px 0 rgba(230, 220, 50, 0.25),
     0 1px 0 rgba(230, 220, 50, 0.25),
     inset 0 0 60px rgba(230, 220, 50, 0.06);
+  /* Slow, irregular CRT rendering flicker across the whole panel. */
+  animation: crt-flicker 5.3s linear infinite;
 }
 
 #need-coin-overlay .nco-msg {
-  font-size: clamp(17px, 6vw, 42px);
-  font-weight: 900;
-  letter-spacing: .12em;
+  font-size: clamp(13px, 4.4vw, 30px);
+  line-height: 1.1;
   color: #ffef8a;
   text-shadow:
-    0 0 4px #fff,
-    0 0 14px #e6dc32,
-    0 0 34px #e6dc32,
-    0 0 72px rgba(230, 220, 50, 0.55);
+    0 0 3px #fff,
+    0 0 10px #e6dc32,
+    0 0 26px #e6dc32,
+    0 0 56px rgba(230, 220, 50, 0.5);
   animation: blink-coin 1.15s step-end infinite;
 }
 
 #need-coin-overlay .nco-sub {
-  font-size: clamp(9px, 2.6vw, 13px);
-  font-weight: 700;
-  letter-spacing: .24em;
-  color: rgba(230, 220, 50, 0.78);
-  text-shadow: 0 0 10px rgba(230, 220, 50, 0.35);
+  font-size: clamp(7px, 2.1vw, 11px);
+  line-height: 1.6;
+  color: rgba(230, 220, 50, 0.8);
+  text-shadow: 0 0 8px rgba(230, 220, 50, 0.35);
 }
 
 #need-coin-overlay .nco-credit {
-  font-size: clamp(9px, 2.6vw, 13px);
-  font-weight: 700;
-  letter-spacing: .24em;
+  font-size: clamp(7px, 2.1vw, 11px);
+  line-height: 1.6;
   color: #32c832;
-  text-shadow: 0 0 10px rgba(50, 200, 50, 0.5);
+  text-shadow: 0 0 8px rgba(50, 200, 50, 0.5);
+}
+
+/* A tube that's never perfectly steady — small brightness dips at
+   irregular intervals, a couple of them sharp. Not a strobe. */
+@keyframes crt-flicker {
+  0%, 100% { opacity: 1; }
+  3%   { opacity: 0.96; }
+  6%   { opacity: 1; }
+  11%  { opacity: 0.9; }
+  13%  { opacity: 1; }
+  24%  { opacity: 0.98; }
+  38%  { opacity: 0.85; }
+  40%  { opacity: 1; }
+  52%  { opacity: 0.97; }
+  67%  { opacity: 0.93; }
+  69%  { opacity: 1; }
+  83%  { opacity: 0.99; }
+  88%  { opacity: 0.88; }
+  90%  { opacity: 1; }
 }
 
 /* While the "insert coin to continue" overlay is up (shell.js mirrors it
