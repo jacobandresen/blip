@@ -1162,6 +1162,7 @@
       }
       saveCoins(n - 1);
       updateCoinsHud();
+      if (window.clearBadgePin) window.clearBadgePin();
       window.location.href = card.href;
     }
 
@@ -1242,29 +1243,64 @@
       konamiCheck(e.key);
     });
 
-    /* Attract-mode reveal: the corner badges + language flags stay hidden
-       until the page has been left alone for 10s, then fade in. Any
-       interaction hides them and restarts the clock. */
+    /* Attract-mode reveal for the corner badges + language flags:
+       - hidden by default; fade in after 10s untouched, hide again on any
+         deliberate interaction.
+       - once one of them has actually been used (a badge or a flag
+         clicked), they PIN visible for 3 minutes — surviving the trip out
+         to about/history/controls and back (sessionStorage) — so you can
+         move between the info pages without the 10s wait each time.
+       - starting a game clears the pin (see attemptStart). */
+    window.clearBadgePin = function () {
+      try { sessionStorage.removeItem('blip-badge-pin'); } catch (e) {}
+    };
     (function () {
       var badges = document.querySelector('.left-badges');
       var flags  = document.querySelector('.lang-switcher');
       if (!badges && !flags) return;
-      var IDLE_MS = 10000;
-      var timer = null;
+      var IDLE_MS = 10000, PIN_MS = 180000, KEY = 'blip-badge-pin';
+      var idleTimer = null, pinTimer = null;
+
+      function pinnedUntil() {
+        try { return +sessionStorage.getItem(KEY) || 0; } catch (e) { return 0; }
+      }
+      function isPinned() { return Date.now() < pinnedUntil(); }
       function toggle(on) {
         if (badges) badges.classList.toggle('idle-reveal', on);
         if (flags)  flags.classList.toggle('idle-reveal', on);
       }
-      function poke() {
-        toggle(false);
-        clearTimeout(timer);
-        timer = setTimeout(function () { toggle(true); }, IDLE_MS);
+      function armIdle() {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(function () { toggle(true); }, IDLE_MS);
       }
-      // Deliberate actions only — a mouse just moving toward a revealed
-      // badge to click it must not make it vanish first.
+      function armPinRevert() {
+        clearTimeout(pinTimer);
+        var ms = pinnedUntil() - Date.now();
+        if (ms > 0) pinTimer = setTimeout(function () { toggle(false); armIdle(); }, ms);
+      }
+      function pin() {
+        try { sessionStorage.setItem(KEY, Date.now() + PIN_MS); } catch (e) {}
+        clearTimeout(idleTimer);
+        toggle(true);
+        armPinRevert();
+      }
+      function poke() {
+        if (isPinned()) return;   // pinned — interaction doesn't dismiss
+        toggle(false);
+        armIdle();
+      }
+
+      // Deliberate actions only — a mouse moving toward a revealed badge
+      // to click it must not make it vanish first.
       ['pointerdown', 'keydown', 'wheel', 'touchstart', 'touchmove', 'scroll']
         .forEach(function (ev) { window.addEventListener(ev, poke, { passive: true }); });
-      poke();
+
+      // Using a badge or a flag pins the set.
+      document.querySelectorAll('.left-badges a, .lang-btn')
+        .forEach(function (el) { el.addEventListener('click', pin); });
+
+      if (isPinned()) { toggle(true); armPinRevert(); }
+      else { toggle(false); armIdle(); }
     }());
 
 
