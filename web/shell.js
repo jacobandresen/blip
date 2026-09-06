@@ -545,27 +545,38 @@ if (isRally) {
     var bar = document.getElementById('topbar');
     if (!base || !bar) return;
 
-    // A comfortable throw with hysteresis: a direction ENGAGES once the
-    // drag is past ON px from the pivot, and only DISENGAGES back inside
-    // OFF px. The gap between the two stops it chattering on/off when your
-    // thumb hovers near the threshold, and lets small drift while you hold
-    // a direction not drop it — the "gets stuck / too twitchy" complaints.
-    var ON  = 22; // px from pivot to start moving — a deliberate push
-    var OFF = 13; // px to stop (must be < ON)
+    // Radial virtual-stick model (distance to engage, angle to steer):
+    // once the thumb is past ENGAGE px from the pivot, the *angle* of the
+    // push decides the direction — so switching from up to right is a
+    // quarter-turn arc, not a full drag back through centre and out again.
+    // A near-straight push stays a clean 4-way move; the second axis only
+    // joins in once you're more than DIAG deg off a cardinal, so you don't
+    // catch an accidental diagonal (Serpent turns, paddle nudges).
+    var ENGAGE = 16;  // px from pivot before any direction registers
+    var RELEASE = 9;  // px to fall back to neutral (< ENGAGE, hysteresis)
+    var MAX_R = 46;   // pivot slides to stay within this — keeps reversals tight
+    var DIAG = 27;    // deg off a cardinal before the 2nd axis engages
+    var DIAG_HYST = 9; // deg of stickiness once an axis is on (no edge stutter)
     var activeId = null;
+    var engaged = false;
     var wantDir = { up: false, down: false, left: false, right: false };
     var CODE_FOR = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+    var AXES = [
+      { dir: 'right', ax:  1, ay:  0 },
+      { dir: 'left',  ax: -1, ay:  0 },
+      { dir: 'down',  ax:  0, ay:  1 },
+      { dir: 'up',    ax:  0, ay: -1 }
+    ];
 
     function setDir(dir, want) {
       if (wantDir[dir] === want) return;
       wantDir[dir] = want;
+      // A short tick on each fresh engage — a felt detent so you know the
+      // direction caught without looking down from the game. No-op on iOS
+      // Safari (no Vibration API), a light buzz on Android.
+      if (want && navigator.vibrate) { try { navigator.vibrate(7); } catch (e) {} }
       var code = CODE_FOR[dir];
       injectKey(code, code, want ? 'keydown' : 'keyup');
-    }
-    // one axis with hysteresis: v is the signed offset in px
-    function axis(negDir, posDir, v) {
-      setDir(negDir, wantDir[negDir] ? v < -OFF : v < -ON);
-      setDir(posDir, wantDir[posDir] ? v >  OFF : v >  ON);
     }
 
     // Floating pivot: wherever the thumb first lands becomes "centre", and
@@ -580,13 +591,42 @@ if (isRally) {
     var pivot = null;
 
     function apply(e) {
-      axis('left', 'right', e.clientX - pivot.x);
-      axis('up',   'down',  e.clientY - pivot.y);
+      var dx = e.clientX - pivot.x;
+      var dy = e.clientY - pivot.y;
+      var dist = Math.sqrt(dx * dx + dy * dy);
+
+      // Slide the pivot to trail the thumb by at most MAX_R, so a long
+      // drag doesn't bank slack the player then has to unwind to reverse.
+      if (dist > MAX_R) {
+        var k = 1 - MAX_R / dist;
+        pivot.x += dx * k;
+        pivot.y += dy * k;
+        dx = e.clientX - pivot.x;
+        dy = e.clientY - pivot.y;
+        dist = MAX_R;
+      }
+
+      engaged = engaged ? dist > RELEASE : dist > ENGAGE;
+      if (!engaged) {
+        setDir('left', false); setDir('right', false);
+        setDir('up',   false); setDir('down',  false);
+        return;
+      }
+
+      var ux = dx / dist, uy = dy / dist;
+      for (var i = 0; i < AXES.length; i++) {
+        var a = AXES[i];
+        var dot = Math.max(-1, Math.min(1, ux * a.ax + uy * a.ay));
+        var offDeg = Math.acos(dot) * 180 / Math.PI;
+        var limit = (90 - DIAG) + (wantDir[a.dir] ? DIAG_HYST : 0);
+        setDir(a.dir, offDeg < limit);
+      }
     }
 
     function release() {
       activeId = null;
       pivot = null;
+      engaged = false;
       setDir('left', false); setDir('right', false);
       setDir('up',   false); setDir('down',  false);
       window.removeEventListener('pointermove', onMove, true);
