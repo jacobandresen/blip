@@ -36,6 +36,10 @@ if ('serviceWorker' in navigator) {
 }
 
 (function () {
+  // The about / history / controls pages (they carry a .page wrapper) keep
+  // the corner badges + flags visible the whole time — don't fade them
+  // near the bottom there. This only trims them on the landing page.
+  if (document.querySelector('.page')) return;
   function updateFixedOverlayVisibility() {
     var atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 60;
     var badges = document.querySelector('.left-badges');
