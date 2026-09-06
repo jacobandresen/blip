@@ -584,7 +584,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 #topbar,
 .kiosk-bar-main {
-  --bar-tilt: 34deg;
+  --bar-tilt: 44deg;
   /* Matches the game canvas's own left/right inset (PAD=16 in shell.js's
      fillCanvas()) on game pages, so the deck sits exactly as wide as the
      screen and directly under it, rather than the wider bezel-frame
@@ -730,8 +730,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   height: 0;
   /* The angle, worked from the actual rotation matrix rather than
      guessed: rotateX(θ) sends a local "straight up" vector (0,-1,0) to
-     (0, -cosθ, -sinθ). #topbar's rotateX(bar-tilt) alone (θ=34deg) gives
-     roughly (0,-0.83,-0.56) — that negative Z is "away from the viewer,
+     (0, -cosθ, -sinθ). #topbar's rotateX(bar-tilt) alone (θ=44deg) gives
+     roughly (0,-0.72,-0.69) — that negative Z is "away from the viewer,
      into the screen", which is why the stick read as pointing at the
      game instead of up at the player. Cancelling bar-tilt entirely here
      would leave it dead vertical (z=0); cancelling it and then leaning

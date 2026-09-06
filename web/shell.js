@@ -364,6 +364,15 @@ if (!isRally) (function () {
     var y = (held.down  ? 1 : 0) - (held.up   ? 1 : 0);
     stick.style.setProperty('--dx', x);
     stick.style.setProperty('--dy', y);
+    // A translucent arrow flicks out of the gate in whatever direction is
+    // engaged — a "got it" readout so you can see the stick has caught the
+    // push without looking away from the game. atan2 in screen space:
+    // (1,0) = right = 0deg, (0,1) = down = 90deg.
+    var engaged = x !== 0 || y !== 0;
+    if (engaged) {
+      stick.style.setProperty('--stick-angle', (Math.atan2(y, x) * 180 / Math.PI).toFixed(1) + 'deg');
+    }
+    stick.classList.toggle('stick-engaged', engaged);
   }
 
   document.addEventListener('keydown', function (e) { reflect(e.code, true);  });
