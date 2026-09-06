@@ -197,7 +197,14 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  animation: crt-flicker 4.1s linear infinite, crt-buzz 0.11s steps(2) infinite;
+  /* Opacity-only flicker: a compositor-thread animation that needs no
+     repaint, so it can't tear or drop frames the way the old
+     brightness()-filter + sub-pixel translate "buzz" did on mobile GPUs.
+     will-change keeps it on its own layer for the life of the overlay. */
+  animation: crt-flicker 4.1s linear infinite;
+  will-change: opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 #need-coin-overlay.visible { display: flex; }
 #need-coin-overlay::before {   /* scanlines raked over the whole screen */
@@ -249,28 +256,26 @@
   text-shadow: 0 0 8px rgba(50, 200, 50, 0.5);
 }
 @keyframes blink-coin { 50% { opacity: 0; } }
+/* Irregular brightness dips only — the darkest points stand in for the old
+   brightness() surges, which cost a full-screen filter repaint per frame
+   for very little extra effect. Never drops far enough to hide the panel. */
 @keyframes crt-flicker {
-  0%, 100% { opacity: 1;    filter: brightness(1); }
-  4%   { opacity: 0.92; }
+  0%, 100% { opacity: 1; }
+  4%   { opacity: 0.93; }
   6%   { opacity: 1; }
-  12%  { opacity: 0.78; filter: brightness(0.85); }
-  14%  { opacity: 1;    filter: brightness(1.15); }
-  16%  { opacity: 1;    filter: brightness(1); }
+  12%  { opacity: 0.8; }
+  14%  { opacity: 1; }
   27%  { opacity: 0.95; }
   29%  { opacity: 1; }
-  40%  { opacity: 0.62; filter: brightness(0.7); }
-  42%  { opacity: 1;    filter: brightness(1); }
+  40%  { opacity: 0.68; }
+  42%  { opacity: 1; }
   55%  { opacity: 0.9; }
   57%  { opacity: 1; }
-  70%  { opacity: 0.82; }
+  70%  { opacity: 0.83; }
   72%  { opacity: 1; }
   85%  { opacity: 0.97; }
-  90%  { opacity: 0.7;  filter: brightness(0.8); }
-  92%  { opacity: 1;    filter: brightness(1); }
-}
-@keyframes crt-buzz {
-  0%   { transform: translateY(0); }
-  100% { transform: translateY(0.5px); }
+  90%  { opacity: 0.74; }
+  92%  { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   #need-coin-overlay,
@@ -623,6 +628,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   transform-style: preserve-3d;
   transform-origin: 50% 100%;
   transform: perspective(640px) rotateX(var(--bar-tilt));
+  /* The panel transform is static (only the stick's children animate), so
+     a fixed compositor layer here means the tilt is rasterised once, not
+     re-composited as siblings move over it — and hidden backfaces can't
+     flash through during the stick's lean transition. */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.06) 0px, transparent 10px),
     radial-gradient(ellipse 130% 70% at 50% 60%, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 45%, transparent 72%),
@@ -747,6 +758,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   transform: rotateX(calc(var(--bar-tilt) * -1 - 9deg)) rotate(calc(var(--dx) * 18deg));
   transform-style: preserve-3d;
   transition: transform 90ms ease-out;
+  /* This is the one element in the deck that actually animates — tell the
+     compositor up front so the lean doesn't trigger a layer rebuild (and
+     a one-frame flash) each time a direction engages. */
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
   pointer-events: none;
 }
 
@@ -792,7 +809,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
      camera than the shaft tip it caps — without it the two are close
      enough in depth, post-rotation, that the shaft's edge visibly
      pokes through the ball instead of disappearing behind it. */
-  transform: translate(-50%, calc(50% + var(--dy) * 12px)) rotateX(9deg) translateZ(3px);
+  transform: translate(-50%, calc(50% + var(--dy) * 12px)) rotateX(9deg) translateZ(6px);
   border-radius: 50%;
   background: radial-gradient(circle at 34% 22%, #ffab9c 0%, #ff8a78 18%, #e6402c 46%, #a3170c 80%, #6e0d06 100%);
   box-shadow:

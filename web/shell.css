@@ -339,15 +339,19 @@ canvas {
   border-style: solid;
   /* points along +X (right) at angle 0 — matches atan2(y, x) in shell.js */
   border-width: 13px 0 13px 20px;
-  border-color: transparent transparent transparent rgba(var(--cab), 0.6);
+  border-color: transparent transparent transparent rgba(var(--cab), 0.72);
   transform-origin: 0 50%;
-  /* rotate to the engaged direction, then shoot out past the ball */
-  transform: rotate(var(--stick-angle, -90deg)) translateX(60px);
-  filter: drop-shadow(0 0 7px rgba(var(--cab), 0.85));
+  /* translateZ pins the arrow just above the boot/shaft in the deck's
+     shared 3D space, so it never z-fights or pops behind them mid-tilt;
+     flat + no filter keeps it a single cheap quad the compositor can move
+     without a repaint (a drop-shadow filter inside preserve-3d is a known
+     iOS flicker source). rotate to the engaged direction, then shoot out
+     past the ball. */
+  transform: translateZ(2px) rotate(var(--stick-angle, -90deg)) translateX(60px);
+  transform-style: flat;
   opacity: 0;
   transition: opacity 130ms ease-out;
   pointer-events: none;
-  z-index: 2;
 }
 #stick-base.stick-engaged::after { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
