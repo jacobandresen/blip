@@ -83,16 +83,18 @@ uniform vec4 _Time;
 uniform vec2 ScreenSize;
 
 // Bow flat 0..1 UVs outward into a convex tube. Divisors set how strong the
-// barrel is per axis — larger is flatter. The 1.09 factor is underscan: it
-// shrinks the picture inside the curved glass so that even after the barrel
-// pushes the corners outward, the whole game screen — every edge, including the
-// top HUD row — stays visible, framed by a black rim like a real tube that
-// never quite filled its own face.
+// barrel is per axis — larger is flatter; kept gentle so the corners don't
+// bow far. The >1 factor is underscan: it shrinks the picture inside the
+// curved glass so that even after the barrel pushes the corners outward, the
+// whole game screen — every edge and corner, including the top HUD row —
+// stays well inside the visible area, framed by a black rim like a real tube
+// that never quite filled its own face. Tuned so the four corners of the
+// game land at ~96% of the way out, never clipped by the mask below.
 vec2 curve(vec2 p) {
     p = p * 2.0 - 1.0;
-    vec2 off = abs(p.yx) / vec2(13.0, 10.0);
+    vec2 off = abs(p.yx) / vec2(16.0, 14.0);
     p = p + p * off * off;
-    p *= 1.055;
+    p *= 1.075;
     return p * 0.5 + 0.5;
 }
 
@@ -108,11 +110,13 @@ void main() {
 
     vec2 cuv = curve(fuv);
 
-    // Thin soft edge where the tube meets the bezel — centred on the boundary so
-    // the outermost row/column of the game canvas is still drawn, not eaten.
-    vec2 e = smoothstep(vec2(-0.0025), vec2(0.0025), cuv)
-           * smoothstep(vec2(-0.0025), vec2(0.0025), vec2(1.0) - cuv);
-    float mask = e.x * e.y;
+    // Soft edge where the tube meets the bezel. The fade runs from the exact
+    // 0..1 boundary OUTWARD only, so every pixel of the game — right into the
+    // corners — is drawn at full weight and only the black rim past the edge
+    // is feathered.
+    vec2 lo = smoothstep(vec2(-0.006), vec2(0.0), cuv);
+    vec2 hi = smoothstep(vec2(-0.006), vec2(0.0), vec2(1.0) - cuv);
+    float mask = lo.x * lo.y * hi.x * hi.y;
 
     vec3 col = texture2D(Texture, cuv).rgb;
 
@@ -130,10 +134,13 @@ void main() {
     b *= 0.125;
     col += max(b - 0.25, 0.0) * 1.4;
 
-    // ---- tube vignette (light — the corners must stay clearly readable) ----
-    float vig = cuv.x * cuv.y * (1.0 - cuv.x) * (1.0 - cuv.y);
-    vig = clamp(pow(vig * 18.0, 0.15), 0.0, 1.0);
-    col *= mix(1.0, vig, 0.45);
+    // ---- tube vignette ----
+    // Radial, not a corner-crushing edge product: full brightness across the
+    // whole picture, only the last sliver near the glass edge eased down a
+    // little, so HUD text and action in the corners stay clearly readable.
+    float d = distance(cuv, vec2(0.5, 0.5));
+    float vig = 1.0 - smoothstep(0.62, 1.02, d) * 0.42;
+    col *= vig;
 
     // ---- glare on the glass (flat fuv, so it doesn't move with the curve) ----
     // Scaled by the pixel's own brightness so it only shows over lit phosphor —
