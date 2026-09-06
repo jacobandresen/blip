@@ -283,6 +283,9 @@ canvas {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  /* The whole attract screen flickers like an un-synced tube: a constant
+     fine buzz plus slower, deeper brightness dips and the odd frame drop. */
+  animation: crt-flicker 4.1s linear infinite, crt-buzz 0.11s steps(2) infinite;
 }
 #need-coin-overlay.visible { display: flex; }
 /* CRT scanlines across the whole attract screen — the body's own scanline
@@ -326,8 +329,8 @@ canvas {
     0 -1px 0 rgba(230, 220, 50, 0.25),
     0 1px 0 rgba(230, 220, 50, 0.25),
     inset 0 0 60px rgba(230, 220, 50, 0.06);
-  /* Slow, irregular CRT rendering flicker across the whole panel. */
-  animation: crt-flicker 5.3s linear infinite;
+  /* The flicker lives on #need-coin-overlay so the dim + scanlines + panel
+     all pulse together as one screen. */
 }
 
 #need-coin-overlay .nco-msg {
@@ -356,23 +359,40 @@ canvas {
   text-shadow: 0 0 8px rgba(50, 200, 50, 0.5);
 }
 
-/* A tube that's never perfectly steady — small brightness dips at
-   irregular intervals, a couple of them sharp. Not a strobe. */
+/* A tube that's never quite steady — irregular brightness dips, a couple
+   of them deep, and one near-black frame-drop each cycle. Not a strobe:
+   the fast crt-buzz below carries the constant hum, this is the drift. */
 @keyframes crt-flicker {
-  0%, 100% { opacity: 1; }
-  3%   { opacity: 0.96; }
+  0%, 100% { opacity: 1;    filter: brightness(1); }
+  4%   { opacity: 0.92; }
   6%   { opacity: 1; }
-  11%  { opacity: 0.9; }
-  13%  { opacity: 1; }
-  24%  { opacity: 0.98; }
-  38%  { opacity: 0.85; }
-  40%  { opacity: 1; }
-  52%  { opacity: 0.97; }
-  67%  { opacity: 0.93; }
-  69%  { opacity: 1; }
-  83%  { opacity: 0.99; }
-  88%  { opacity: 0.88; }
-  90%  { opacity: 1; }
+  12%  { opacity: 0.78; filter: brightness(0.85); }
+  14%  { opacity: 1;    filter: brightness(1.15); }
+  16%  { opacity: 1;    filter: brightness(1); }
+  27%  { opacity: 0.95; }
+  29%  { opacity: 1; }
+  40%  { opacity: 0.62; filter: brightness(0.7); }
+  42%  { opacity: 1;    filter: brightness(1); }
+  55%  { opacity: 0.9; }
+  57%  { opacity: 1; }
+  70%  { opacity: 0.82; }
+  72%  { opacity: 1; }
+  85%  { opacity: 0.97; }
+  90%  { opacity: 0.7;  filter: brightness(0.8); }
+  92%  { opacity: 1;    filter: brightness(1); }
+}
+
+/* The constant tube buzz — a tiny 2-frame sub-pixel vertical unsteadiness.
+   (Brightness lives in crt-flicker only, so the two animations don't
+   fight over `filter`.) */
+@keyframes crt-buzz {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(0.5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #need-coin-overlay,
+  #need-coin-overlay .nco-msg { animation: none; }
 }
 
 /* While the "insert coin to continue" overlay is up (shell.js mirrors it
