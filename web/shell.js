@@ -210,9 +210,16 @@ document.getElementById('insert-coin-btn').addEventListener('click', function ()
 
 // Mirror the overlay's visibility onto <body> so CSS can key off it
 // (body.need-coin flashes the top-right coin button, kiosk.css/shell.css)
-// without every show/hide site having to know.
+// without every show/hide site having to know. Also: the moment the
+// overlay closes (a coin just went in), hand keyboard focus back to the
+// game canvas so the title screen's "PRESS ANY KEY" responds to a real
+// keypress — the coin click/tap left focus on the button or the body.
+var overlayWasVisible = overlay.classList.contains('visible');
 new MutationObserver(function () {
-  document.body.classList.toggle('need-coin', overlay.classList.contains('visible'));
+  var vis = overlay.classList.contains('visible');
+  document.body.classList.toggle('need-coin', vis);
+  if (overlayWasVisible && !vis && canvas) { try { canvas.focus(); } catch (e) {} }
+  overlayWasVisible = vis;
 }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
 
 // Landing on a game page with no credits — a fresh session, a shared deep
