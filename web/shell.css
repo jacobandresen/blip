@@ -264,27 +264,79 @@ canvas {
   /* A heavy dim, not a blackout — the game (or attract-mode title) stays
      visible as a ghost behind it, so the screen reads as "paused, waiting
      for a coin" rather than "off". */
-  background: rgba(4, 4, 6, 0.8);
+  background: rgba(4, 4, 6, 0.82);
   /* Below #topbar (z-index:200) so the stick stays visible above it, and
      below the coin button (z-index:500) so that keeps flashing brightly
      on top. Input is blocked regardless: injectKey() bails while visible. */
   z-index: 150;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 #need-coin-overlay.visible { display: flex; }
+/* CRT scanlines across the whole attract screen — the body's own scanline
+   layer sits behind this overlay, so redraw them on top for the "the
+   game's still running under here" arcade feel. */
+#need-coin-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0 2px, rgba(0, 0, 0, 0.28) 2px 4px);
+  pointer-events: none;
+}
 
-/* Classic attract-mode caption — readable but calm; the loud call to
-   action is the coin button flashing in the corner (body.need-coin). */
-#need-coin-overlay .nco-msg {
+/* Attract-mode panel: the classic arcade stack — ▶ INSERT COIN ◀ big and
+   blinking, "1 COIN 1 PLAY" and "CREDIT 0" underneath, framed by a thin
+   lit rule top and bottom. */
+#need-coin-overlay .nco-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: clamp(14px, 4.5vw, 34px) clamp(14px, 5vw, 56px);
+  max-width: 100%;
   font-family: 'Courier New', Courier, monospace;
-  font-size: clamp(14px, 4.5vw, 20px);
-  font-weight: 900;
-  letter-spacing: .22em;
   text-transform: uppercase;
-  color: #e6dc32;
-  text-shadow: 0 0 8px #e6dc32, 0 0 26px rgba(230, 220, 50, 0.5);
-  animation: blink-coin 1.4s step-end infinite;
+  text-align: center;
+  white-space: nowrap;
+  border-top: 2px solid rgba(230, 220, 50, 0.55);
+  border-bottom: 2px solid rgba(230, 220, 50, 0.55);
+  box-shadow:
+    0 -1px 0 rgba(230, 220, 50, 0.25),
+    0 1px 0 rgba(230, 220, 50, 0.25),
+    inset 0 0 60px rgba(230, 220, 50, 0.06);
+}
+
+#need-coin-overlay .nco-msg {
+  font-size: clamp(17px, 6vw, 42px);
+  font-weight: 900;
+  letter-spacing: .12em;
+  color: #ffef8a;
+  text-shadow:
+    0 0 4px #fff,
+    0 0 14px #e6dc32,
+    0 0 34px #e6dc32,
+    0 0 72px rgba(230, 220, 50, 0.55);
+  animation: blink-coin 1.15s step-end infinite;
+}
+
+#need-coin-overlay .nco-sub {
+  font-size: clamp(9px, 2.6vw, 13px);
+  font-weight: 700;
+  letter-spacing: .24em;
+  color: rgba(230, 220, 50, 0.78);
+  text-shadow: 0 0 10px rgba(230, 220, 50, 0.35);
+}
+
+#need-coin-overlay .nco-credit {
+  font-size: clamp(9px, 2.6vw, 13px);
+  font-weight: 700;
+  letter-spacing: .24em;
+  color: #32c832;
+  text-shadow: 0 0 10px rgba(50, 200, 50, 0.5);
 }
 
 /* While the "insert coin to continue" overlay is up (shell.js mirrors it
