@@ -1284,7 +1284,12 @@
         toggle(true);
         armPinRevert();
       }
-      function poke() {
+      function poke(e) {
+        // A press ON a badge or flag must never hide them — otherwise the
+        // pointerdown pulls pointer-events:none out from under the click
+        // and the navigation is lost.
+        if (e && e.target && e.target.closest &&
+            e.target.closest('.left-badges, .lang-switcher')) return;
         if (isPinned()) return;   // pinned — interaction doesn't dismiss
         toggle(false);
         armIdle();
