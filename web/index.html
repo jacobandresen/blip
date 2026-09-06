@@ -507,7 +507,7 @@
 
     /* Attract-mode: the corner badges (CONTROLS / ABOUT / HISTORY) and the
        language flags stay hidden until the front page has sat untouched
-       for 30s, then fade in — the page's own JS toggles .idle-reveal, any
+       for 10s, then fade in — the page's own JS toggles .idle-reveal, any
        interaction takes it away again. */
     .left-badges,
     .lang-switcher {
@@ -1243,13 +1243,13 @@
     });
 
     /* Attract-mode reveal: the corner badges + language flags stay hidden
-       until the page has been left alone for 30s, then fade in. Any
+       until the page has been left alone for 10s, then fade in. Any
        interaction hides them and restarts the clock. */
     (function () {
       var badges = document.querySelector('.left-badges');
       var flags  = document.querySelector('.lang-switcher');
       if (!badges && !flags) return;
-      var IDLE_MS = 30000;
+      var IDLE_MS = 10000;
       var timer = null;
       function toggle(on) {
         if (badges) badges.classList.toggle('idle-reveal', on);
