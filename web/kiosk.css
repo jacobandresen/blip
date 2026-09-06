@@ -348,24 +348,34 @@
      bars too so the bar looks identical everywhere. */
   left: 16px;
   right: 16px;
-  /* Override .kiosk-bar's space-between: the stick + fire buttons sit as
-     one centered group (a wide gap between them from the shared `gap`),
-     rather than spread to the bar's edges or pinned to one side. */
-  justify-content: center;
-  border-radius: 10px 10px 0 0;
   overflow: visible;
-  /* A genuine 3D tilt, not faked shading — rotated back around its own
-     front (bottom) edge so it reads as a horizontal deck you're looking
-     down onto, the way a real cabinet's control panel actually sits.
-     preserve-3d so #stick-handle below can share this same 3D space
-     (partially un-tilting itself to stand up off the panel) instead of
-     being flattened into it. Real cabinet control decks are a
-     glossy-black moulded/laminate surface (reference: countless
-     Happ/Wico panels), not bare metal — so the panel itself stays black,
-     with a soft gloss highlight raking across it where the controls sit,
-     like an overhead light catching glossy plastic at an angle. That
-     highlight is also what lets the buttons cast a shadow that actually
-     shows, rather than one dark tone lost against another. */
+  /* The fixed bar itself carries NO transform — iOS Safari mis-positions
+     (and clips the lower edge of) a `position: fixed` element that also
+     has a transform / preserve-3d, especially in a home-screen PWA. The
+     3D-tilted control-deck surface is .deck-panel, an absolutely-
+     positioned child, so the tilt never touches the fixed box. */
+  background: none;
+  border-top: 0;
+  box-shadow: none;
+}
+
+/* The visible control deck: the glossy-black moulded panel, tilted back
+   around its own front (bottom) edge so it reads as a horizontal surface
+   you're looking down onto — a genuine 3D rotate, not faked shading.
+   preserve-3d so #stick-handle can share this 3D space (partially
+   un-tilting to stand up off the panel). It fills the fixed bar exactly
+   (inset:0) but keeps the transform off the fixed ancestor. */
+.kiosk-bar > .deck-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  /* stick + fire buttons as one centered group, a wide gap between them */
+  justify-content: center;
+  gap: 44px;
+  padding: 0 10px env(safe-area-inset-bottom, 0px);
+  overflow: visible;
+  border-radius: 10px 10px 0 0;
   transform-style: preserve-3d;
   transform-origin: 50% 100%;
   transform: perspective(640px) rotateX(var(--bar-tilt));
@@ -607,20 +617,10 @@
 
 /* The kiosk landing/history/about bar (.kiosk-bar-main) intentionally
    shares every dimension with the game shell's #topbar below — same
-   #stick-base/boot/handle/shaft/ball sizing, same bar padding/gap — so
+   #stick-base/boot/handle/shaft/ball sizing, same deck padding/gap — so
    the control deck renders identically everywhere rather than a smaller
-   decorative version on non-game pages. */
-
-/* The bar carries only the stick and fire buttons now (the coin slot moved
-   up to the top-right corner), centered as a group — the `gap` is the
-   open space between the stick and the buttons, wide enough that a thumb
-   on one never brushes the other. */
-#topbar.kiosk-bar,
-.kiosk-bar-main {
-  gap: 44px;
-  padding-left: 10px;
-  padding-right: 10px;
-}
+   decorative version on non-game pages. The base .deck-panel rule above
+   holds the shared gap/padding; the tiers below only shrink them. */
 
 /* Phones — the deck has to be actually playable by thumb here, not a
    scaled-down diagram of one. So the bar grows tall enough to seat a
@@ -630,10 +630,8 @@
    minimum at every tier; only the shaft's swing and the hit-area width
    shrink on the way down, so the stick still clears the left edge. */
 @media (max-width: 480px) {
-  #topbar.kiosk-bar, .kiosk-bar-main {
-    height: calc(76px + env(safe-area-inset-bottom, 0px));
-    gap: 32px; padding-left: 8px; padding-right: 8px;
-  }
+  #topbar.kiosk-bar, .kiosk-bar-main { height: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .kiosk-bar > .deck-panel { gap: 32px; padding-left: 8px; padding-right: 8px; }
   #insert-coin-btn, #kiosk-insert-btn { font-size: 10px; letter-spacing: 0; padding: 4px 7px; gap: 5px; }
   #stick-base { width: 118px; }
   #stick-boot { width: 50px; height: 50px; }
@@ -652,7 +650,7 @@
    readout is tight, so trim the stick's footprint and the button gap a
    little, but keep both stick and buttons above the touch minimum. */
 @media (max-width: 380px) {
-  #topbar.kiosk-bar, .kiosk-bar-main { gap: 24px; padding-left: 6px; padding-right: 6px; }
+  .kiosk-bar > .deck-panel { gap: 24px; padding-left: 6px; padding-right: 6px; }
   #insert-coin-btn, #kiosk-insert-btn { font-size: 9px; padding: 4px 6px; gap: 4px; }
   #stick-base { width: 104px; }
   #stick-boot { width: 46px; height: 46px; }
@@ -665,7 +663,7 @@
 
 /* Below any current iPhone (kept as a graceful floor, not a target) */
 @media (max-width: 340px) {
-  #topbar.kiosk-bar, .kiosk-bar-main { gap: 16px; padding-left: 4px; padding-right: 4px; }
+  .kiosk-bar > .deck-panel { gap: 16px; padding-left: 4px; padding-right: 4px; }
   #insert-coin-btn, #kiosk-insert-btn { font-size: 8px; padding: 3px 5px; gap: 3px; }
   #stick-base { width: 90px; }
   #stick-boot { width: 40px; height: 40px; }

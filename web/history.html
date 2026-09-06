@@ -7,7 +7,7 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=24">
+  <link rel="stylesheet" href="kiosk.css?v=25">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -27,6 +27,8 @@
       color: #ccc;
       font-family: 'Courier New', Courier, monospace;
     }
+    /* No rubber-band overscroll, so the fixed bottom bar stays pinned. */
+    html { overscroll-behavior: none; }
 
     body::before {
       content: '';
@@ -472,6 +474,7 @@
        (kiosk.css) — static here (no game to drive them), just cabinet
        flavor so the bar looks the same on every page. -->
   <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
+   <div class="deck-panel">
     <div id="stick-base">
       <div id="stick-boot"></div>
       <div id="stick-handle">
@@ -483,6 +486,7 @@
       <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
       <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
     </div>
+   </div>
   </div>
 
   <script src="kiosk.js?v=12"></script>

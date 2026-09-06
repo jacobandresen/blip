@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
   <script src="../howler.min.js"></script>
   <script src="../kiosk.js?v=12"></script>
-  <link rel="stylesheet" href="../kiosk.css?v=24">
+  <link rel="stylesheet" href="../kiosk.css?v=25">
   <link rel="stylesheet" href="../shell.css?v=17">
 </head>
 <body>
@@ -31,7 +31,12 @@
     <div id="bar-outer"><div id="bar-inner"></div></div>
   </div>
 
+  <!-- The fixed bar is a plain (untransformed) box; .deck-panel is the
+       3D-tilted control surface inside it. Keeping the tilt off the
+       position:fixed element is what stops iOS Safari clipping the bar's
+       lower edge / floating it off the bottom in a home-screen PWA. -->
   <div id="topbar" class="kiosk-bar">
+   <div class="deck-panel">
     <!-- Arcade stick: mounted flush in the bar, left edge — its ball
          rides a shaft that rises up over the game above the bar. Always
          shown, not just on touch devices — draggable by touch/mouse
@@ -48,6 +53,7 @@
          them, see kiosk.css). Populated by shell.js from BLIP_GAMES (one
          or two buttons). -->
     <div id="fire-buttons"></div>
+   </div>
   </div>
 
   <div id="need-coin-overlay">

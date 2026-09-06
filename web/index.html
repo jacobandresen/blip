@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=24">
+  <link rel="stylesheet" href="kiosk.css?v=25">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -26,6 +26,9 @@
     }
 
     html, body { height: 100%; }
+    /* Kill rubber-band overscroll so the fixed bottom bar can't appear to
+       peel off the bottom edge during a bounce on iOS. */
+    html { overflow-x: hidden; overscroll-behavior: none; }
 
     body {
       background: #050508;
@@ -36,7 +39,7 @@
       align-items: center;
       min-height: 100vh;
       padding: 0 16px calc(96px + env(safe-area-inset-bottom, 0px));
-      overflow-x: hidden;
+      overscroll-behavior: none;
     }
 
     /* CRT overlay */
@@ -823,6 +826,7 @@
        (kiosk.css) — static here (no game to drive them), just cabinet
        flavor for the landing page's own control deck. -->
   <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
+   <div class="deck-panel">
     <div id="stick-base">
       <div id="stick-boot"></div>
       <div id="stick-handle">
@@ -834,6 +838,7 @@
       <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
       <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
     </div>
+   </div>
   </div>
 
   <script src="howler.min.js"></script>
