@@ -512,12 +512,12 @@ canvas {
    the screen edges (matches the bigger joystick + fire buttons the tablet
    tier in kiosk.css gives the deck). Same gate as there. */
 @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
-  #paddle-dial, #paddle-dial-p2 { width: 150px; height: 150px; bottom: 14px; }
+  #paddle-dial, #paddle-dial-p2 { width: 124px; height: 124px; bottom: 12px; }
   #paddle-dial    { left: max(10px, env(safe-area-inset-left, 0px)); }
   #paddle-dial-p2 { right: max(10px, env(safe-area-inset-right, 0px)); }
-  #paddle-dial::before, #paddle-dial-p2::before { width: 132px; height: 26px; bottom: -5px; }
-  .dial-cap { transform: translateZ(12px); }
-  #dial-label, #dial-label-p2 { top: -22px; font-size: 12px; letter-spacing: 3px; }
+  #paddle-dial::before, #paddle-dial-p2::before { width: 110px; height: 22px; bottom: -4px; }
+  .dial-cap { transform: translateZ(10px); }
+  #dial-label, #dial-label-p2 { top: -19px; font-size: 11px; letter-spacing: 2px; }
 }
 
 /* Narrow phones — DEFENDER at 5px letter-spacing is the widest name; give it room */

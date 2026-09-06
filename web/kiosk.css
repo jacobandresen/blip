@@ -940,21 +940,21 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    either orientation, so a desktop window this wide (mouse, fine pointer)
    keeps the compact deck, and a phone in landscape (short) doesn't match. */
 @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
-  #topbar.kiosk-bar, .kiosk-bar-main { height: calc(128px + env(safe-area-inset-bottom, 0px)); }
-  .kiosk-bar > .deck-panel { gap: clamp(80px, 12vw, 220px); padding-left: 16px; padding-right: 16px; }
-  #stick-base { width: 214px; height: 280px; }
-  #stick-base::before { width: 60px; height: 16px; }
-  #stick-boot { width: 92px; height: 92px; }
-  #stick-boot::before { inset: 8px; }
-  #stick-handle { bottom: 52px; }
-  #stick-shaft { width: 22px; height: 92px; }
-  #stick-ball  { width: 104px; height: 104px; bottom: 92px; }
-  #fire-buttons { gap: 28px; }
-  .arcade-btn { width: 104px; height: 104px; }
-  /* Clear the corner badges / flags of the now much taller deck (index.html
+  #topbar.kiosk-bar, .kiosk-bar-main { height: calc(112px + env(safe-area-inset-bottom, 0px)); }
+  .kiosk-bar > .deck-panel { gap: clamp(64px, 10vw, 180px); padding-left: 16px; padding-right: 16px; }
+  #stick-base { width: 194px; height: 252px; }
+  #stick-base::before { width: 52px; height: 14px; }
+  #stick-boot { width: 78px; height: 78px; }
+  #stick-boot::before { inset: 7px; }
+  #stick-handle { bottom: 45px; }
+  #stick-shaft { width: 18px; height: 78px; }
+  #stick-ball  { width: 90px; height: 90px; bottom: 78px; }
+  #fire-buttons { gap: 24px; }
+  .arcade-btn { width: 92px; height: 92px; }
+  /* Clear the corner badges / flags of the taller deck (index.html
      re-states .lang-switcher for itself). */
   .left-badges,
-  .lang-switcher { bottom: calc(156px + env(safe-area-inset-bottom, 0px)); }
+  .lang-switcher { bottom: calc(138px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* ---- Left badge group — CONTROLS / ABOUT / HISTORY ----
