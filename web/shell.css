@@ -508,6 +508,18 @@ canvas {
   #dial-label, #dial-label-p2 { top: -15px; font-size: 8px; letter-spacing: 2px; }
 }
 
+/* iPad / tablet — the paddle dials go up to ~2.5x, one under each thumb at
+   the screen edges (matches the bigger joystick + fire buttons the tablet
+   tier in kiosk.css gives the deck). Same gate as there. */
+@media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
+  #paddle-dial, #paddle-dial-p2 { width: 150px; height: 150px; bottom: 14px; }
+  #paddle-dial    { left: max(10px, env(safe-area-inset-left, 0px)); }
+  #paddle-dial-p2 { right: max(10px, env(safe-area-inset-right, 0px)); }
+  #paddle-dial::before, #paddle-dial-p2::before { width: 132px; height: 26px; bottom: -5px; }
+  .dial-cap { transform: translateZ(12px); }
+  #dial-label, #dial-label-p2 { top: -22px; font-size: 12px; letter-spacing: 3px; }
+}
+
 /* Narrow phones — DEFENDER at 5px letter-spacing is the widest name; give it room */
 @media (max-width: 380px) {
   #marquee-name { font-size: 11px; letter-spacing: 3px; }

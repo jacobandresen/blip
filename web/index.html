@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=34">
+  <link rel="stylesheet" href="kiosk.css?v=35">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -601,6 +601,15 @@
       90%     { transform: translate(-2px,2px); }
     }
     body.konami-shake { animation: konami-shake 0.55s ease; }
+
+    /* iPad / tablet — kiosk.css gives the deck a much taller bar and 2x
+       controls here; lift this page's own corner clusters clear of it.
+       (kiosk.css already bumps .left-badges + .lang-switcher, but this
+       page's inline .lang-switcher / .profile-badge win on specificity.) */
+    @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
+      .lang-switcher,
+      .profile-badge { bottom: calc(156px + env(safe-area-inset-bottom, 0px)); }
+    }
 
   </style>
 </head>

@@ -932,6 +932,31 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .arcade-btn { width: 48px; height: 48px; }
 }
 
+/* iPad / tablet — the deck is a real two-handed control surface here: a
+   wide screen held by its edges, both thumbs on the panel. So the stick,
+   the fire buttons (and the rally dials, in shell.css) go to roughly twice
+   their desktop size — bigger than the phone tier — and spread apart to
+   the edges. Gated on a coarse pointer AND a tablet-sized viewport in
+   either orientation, so a desktop window this wide (mouse, fine pointer)
+   keeps the compact deck, and a phone in landscape (short) doesn't match. */
+@media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
+  #topbar.kiosk-bar, .kiosk-bar-main { height: calc(128px + env(safe-area-inset-bottom, 0px)); }
+  .kiosk-bar > .deck-panel { gap: clamp(80px, 12vw, 220px); padding-left: 16px; padding-right: 16px; }
+  #stick-base { width: 214px; height: 280px; }
+  #stick-base::before { width: 60px; height: 16px; }
+  #stick-boot { width: 92px; height: 92px; }
+  #stick-boot::before { inset: 8px; }
+  #stick-handle { bottom: 52px; }
+  #stick-shaft { width: 22px; height: 92px; }
+  #stick-ball  { width: 104px; height: 104px; bottom: 92px; }
+  #fire-buttons { gap: 28px; }
+  .arcade-btn { width: 104px; height: 104px; }
+  /* Clear the corner badges / flags of the now much taller deck (index.html
+     re-states .lang-switcher for itself). */
+  .left-badges,
+  .lang-switcher { bottom: calc(156px + env(safe-area-inset-bottom, 0px)); }
+}
+
 /* ---- Left badge group — CONTROLS / ABOUT / HISTORY ----
    One definition, shared identically by the front page and the info
    pages so a badge doesn't shift by a pixel when you open one. Lower-left
