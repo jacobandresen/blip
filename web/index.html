@@ -505,6 +505,22 @@
       gap: 8px;
     }
 
+    /* Attract-mode: the corner badges (CONTROLS / ABOUT / HISTORY) and the
+       language flags stay hidden until the front page has sat untouched
+       for 30s, then fade in — the page's own JS toggles .idle-reveal, any
+       interaction takes it away again. */
+    .left-badges,
+    .lang-switcher {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .7s ease;
+    }
+    .left-badges.idle-reveal,
+    .lang-switcher.idle-reveal {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
     /* ---- about badge ---- */
     /* position:relative + the label pulled out of flow (absolute) so the
        badge's own box is exactly the 44px avatar, regardless of the label
@@ -1225,6 +1241,31 @@
       if (e.key === '5' || e.key === 'c' || e.key === 'C') insertCoin();
       konamiCheck(e.key);
     });
+
+    /* Attract-mode reveal: the corner badges + language flags stay hidden
+       until the page has been left alone for 30s, then fade in. Any
+       interaction hides them and restarts the clock. */
+    (function () {
+      var badges = document.querySelector('.left-badges');
+      var flags  = document.querySelector('.lang-switcher');
+      if (!badges && !flags) return;
+      var IDLE_MS = 30000;
+      var timer = null;
+      function toggle(on) {
+        if (badges) badges.classList.toggle('idle-reveal', on);
+        if (flags)  flags.classList.toggle('idle-reveal', on);
+      }
+      function poke() {
+        toggle(false);
+        clearTimeout(timer);
+        timer = setTimeout(function () { toggle(true); }, IDLE_MS);
+      }
+      // Deliberate actions only — a mouse just moving toward a revealed
+      // badge to click it must not make it vanish first.
+      ['pointerdown', 'keydown', 'wheel', 'touchstart', 'touchmove', 'scroll']
+        .forEach(function (ev) { window.addEventListener(ev, poke, { passive: true }); });
+      poke();
+    }());
 
 
     var KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
