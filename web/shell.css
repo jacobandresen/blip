@@ -155,7 +155,12 @@ body::after {
   pointer-events: none;
   z-index: 8;
   background: transparent;
-  border-radius: 14px;
+  /* Kept shallow: at a big radius the matching clip-path on <canvas> below
+     takes a visible rounded bite out of the top corners of the playfield
+     (Sky Raider's HUD / top-edge action sits right there). 9px here / 6px
+     on the canvas (they sit 3px apart, so the rounds stay concentric)
+     still softens the corner against the bezel without eating game pixels. */
+  border-radius: 9px;
   border: 1px solid rgba(var(--cab), 0.45);
   box-shadow:
     0 0 28px rgba(var(--cab), 0.15),
@@ -200,7 +205,10 @@ canvas {
   left: 50%;
   transform-origin: 0 0;
   touch-action: none;
-  clip-path: inset(3px round 14px);
+  /* 3px trims edge overscan; the round is deliberately small so it doesn't
+     clip a visible wedge out of the top corners of the game (see the
+     matching note on #arcade-bezel's radius above). */
+  clip-path: inset(3px round 6px);
 }
 
 /* ---- Loading screen ---- */
