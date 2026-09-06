@@ -13,13 +13,18 @@
   <link rel="icon" type="image/svg+xml" href="../icon.svg">
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
   <script src="../howler.min.js"></script>
-  <script src="../kiosk.js?v=11"></script>
-  <link rel="stylesheet" href="../kiosk.css?v=22">
+  <script src="../kiosk.js?v=12"></script>
+  <link rel="stylesheet" href="../kiosk.css?v=23">
   <link rel="stylesheet" href="../shell.css?v=17">
 </head>
 <body>
 
   <a class="blip-logo" href="../index.html">BLIP ARCADE</a>
+
+  <!-- Coin slot: fixed in the top-right corner of the cabinet's top panel,
+       mirroring the BLIP ARCADE logo at top-left — the physical slot you
+       feed, up on the panel, not down on the control deck. -->
+  <button id="insert-coin-btn" class="kiosk-btn"><span data-coins-hud></span></button>
 
   <div id="loader">
     <div id="status">LOADING</div>
@@ -43,7 +48,6 @@
          them, see kiosk.css). Populated by shell.js from BLIP_GAMES (one
          or two buttons). -->
     <div id="fire-buttons"></div>
-    <button id="insert-coin-btn" class="kiosk-btn"><span data-coins-hud></span></button>
   </div>
 
   <div id="need-coin-overlay">

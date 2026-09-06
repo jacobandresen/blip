@@ -212,12 +212,11 @@ function insertCoin() {
 }
 
 // A quiet nudge toward the coin mechanic for first-time visitors — three
-// gentle blinks on the (now-merged) COINS/INSERT COIN button, 5s after the
-// landing page loads. Gated on #insert-coin (the big hero banner), which
-// only exists on index.html, so this never fires on history/about or the
-// game pages.
+// gentle blinks on the corner COINS button, 5s after the landing page
+// loads. Gated on .game-grid, which only exists on index.html, so this
+// never fires on history/about or the game pages.
 window.addEventListener('load', function () {
-  if (!document.getElementById('insert-coin')) return;
+  if (!document.querySelector('.game-grid')) return;
   var btn = document.getElementById('kiosk-insert-btn');
   if (!btn) return;
   setTimeout(function () {

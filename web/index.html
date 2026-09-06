@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=22">
+  <link rel="stylesheet" href="kiosk.css?v=23">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -192,47 +192,17 @@
     .blip-logo {
       height: calc(40px + env(safe-area-inset-top, 0px));
     }
-    .insert-coin {
-      max-width: calc(100vw - 170px);
-      font-size: 13px;
-      font-weight: 900;
-      letter-spacing: 5px;
-      color: var(--yellow);
-      /* A tight core plus two wider, dimmer halos — this is attract-mode
-         text meant to read as lit on the tube itself, not a printed
-         physical label. Steady, not blinking — it's a fixture, not a
-         flashing prompt. */
-      text-shadow:
-        0 0 10px var(--yellow),
-        0 0 30px var(--yellow),
-        0 0 60px rgba(230, 220, 50, 0.4);
-      text-transform: uppercase;
-      cursor: pointer;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-      display: inline-flex;
-      align-items: center;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
+    /* This page's top strip is 40px (vs the game shell's 28px), so drop the
+       corner coin button to sit centered in it, level with the logo. */
+    #kiosk-insert-btn {
+      top: calc(env(safe-area-inset-top, 0px) + 7px);
     }
-
     @keyframes blink-coin { 50% { opacity: 0; } }
 
-    /* Same nudge as #kiosk-insert-btn (kiosk.css) — this element has no
-       always-on animation to fight, so it's just a plain class here. */
-    #insert-coin.coin-nudge {
-      animation: coin-nudge 0.6s ease-in-out;
-    }
-
     @media (max-width: 480px) {
-      .insert-coin { font-size: 10px; letter-spacing: 2px; max-width: calc(100vw - 150px); }
       /* The kiosk bar grows to ~76px on phones to seat the bigger touch
          controls, so lift the corner badges / language flags clear of it. */
       .left-badges, .lang-switcher { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
-    }
-    @media (max-width: 380px) {
-      .insert-coin { font-size: 8px; letter-spacing: 1px; max-width: calc(100vw - 130px); }
     }
 
 
@@ -733,9 +703,10 @@
 <body>
 
   <a class="blip-logo" href="index.html">BLIP ARCADE</a>
-  <div class="top-marquee-bar">
-    <div class="insert-coin" id="insert-coin" data-i18n="insertCoin"></div>
-  </div>
+  <div class="top-marquee-bar"></div>
+  <!-- Coin slot: top-right corner of the cabinet panel, mirroring the
+       BLIP ARCADE logo at top-left. -->
+  <button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
 
   <div class="stars" id="stars"></div>
   <div class="cab-rail left"></div>
@@ -863,11 +834,10 @@
       <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
       <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
     </div>
-    <button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
   </div>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=11"></script>
+  <script src="kiosk.js?v=12"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Translations                                                         */
@@ -875,8 +845,6 @@
     var i18n = {
 
       en: {
-        insertCoin:       '&#x25BA; PLEASE TO INSERT COIN &#x25C4;',
-
         serpentGenre:     'SNAKE MOVING GAME',
         serpentDesc:      'Making snake for eat thing and become large size.<br>Not to touching wall or own body is important much.<br>How much long snake you are achieve?',
         serpentControls:  'PUSH WASD / ARROW KEY FOR MOVE',
@@ -906,7 +874,6 @@
       },
 
       ja: {
-        insertCoin:       '&#x25BA; コインをいれてください &#x25C4;',
 
         serpentGenre:     'スネークゲーム',
         serpentDesc:      'ヘビを操作してエサを食べ、どんどん成長しよう。<br>壁や自分の体にぶつかってはいけない。<br>どこまで長くなれるか？',
@@ -937,7 +904,6 @@
       },
 
       da: {
-        insertCoin:       '&#x25BA; INDS&AElig;T M&Oslash;NT &#x25C4;',
 
         serpentGenre:     'SLANGEBANE',
         serpentDesc:      'Styr slangen til at spise og vokse.<br>Undg&aring; at ramme v&aelig;ggene eller dig selv.<br>Hvor lang kan du blive?',
@@ -1164,11 +1130,11 @@
       window.location.href = card.href;
     }
 
-    // Points a broke player at the COINS button instead of leaving the
-    // dimmed-card press feeling dead: a quick swell + flicker on both the
-    // top-bar prompt and the bottom-bar button (see .coin-nudge).
+    // Points a broke player at the COINS button in the top-right corner
+    // instead of leaving the dimmed-card press feeling dead: a quick swell
+    // + flicker on the button (see .coin-nudge).
     function nudgeInsertCoin() {
-      ['insert-coin', 'kiosk-insert-btn'].forEach(function (id) {
+      ['kiosk-insert-btn'].forEach(function (id) {
         var el = document.getElementById(id);
         if (!el) return;
         el.classList.remove('coin-nudge');
@@ -1187,7 +1153,6 @@
       });
     });
 
-    document.getElementById('insert-coin').addEventListener('click', insertCoin);
     document.getElementById('kiosk-insert-btn').addEventListener('click', insertCoin);
 
     // ---- Card navigation: keyboard arrows + joystick/gamepad ----
