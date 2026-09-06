@@ -7,7 +7,7 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=23">
+  <link rel="stylesheet" href="kiosk.css?v=24">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -42,24 +42,10 @@
     .page {
       max-width: 720px;
       margin: 0 auto;
-      padding: 40px 24px calc(80px + env(safe-area-inset-bottom, 0px));
+      /* Top pad clears the fixed BLIP ARCADE logo / coin button (which is
+         the way back to the arcade now that the text back-link is gone). */
+      padding: calc(72px + env(safe-area-inset-top, 0px)) 24px calc(80px + env(safe-area-inset-bottom, 0px));
     }
-
-    /* ---- top nav ---- */
-    .topnav {
-      display: flex;
-      align-items: center;
-      margin-bottom: 48px;
-    }
-    .back-link {
-      font-size: 11px;
-      letter-spacing: 4px;
-      color: #444;
-      text-decoration: none;
-      text-transform: uppercase;
-      transition: color .2s;
-    }
-    .back-link:hover { color: var(--green); }
 
     /* ---- headings ---- */
     h1 {
@@ -248,10 +234,6 @@
 
 <div class="page">
 
-  <nav class="topnav">
-    <a class="back-link" href="index.html">&#8592; <span data-i18n="backLink">ARCADE</span></a>
-  </nav>
-
   <h1>BLIP</h1>
   <h2 data-i18n="pageSubtitle">ABOUT THIS EXPERIMENT</h2>
 
@@ -433,7 +415,6 @@
   <script>
     var i18n = {
       en: {
-        backLink:        'ARCADE',
         pageSubtitle:    'ABOUT THIS EXPERIMENT',
         introP1:         'BLIP ARCADE is an experiment in human–AI collaboration. Every game, every line of code, every pixel of the UI was built together with Claude (Anthropic) and GitHub Copilot (GitHub). The human had the ideas. The AIs did most of the typing.',
         introP2:         'The question behind the experiment: how far can a conversation go before it becomes a piece of software? Turns out, pretty far.',
@@ -457,7 +438,6 @@
       },
 
       da: {
-        backLink:        'ARKADE',
         pageSubtitle:    'OM DETTE EKSPERIMENT',
         introP1:         'BLIP ARCADE er et eksperiment i samarbejde mellem menneske og AI. Hvert spil, hver linje kode og hvert pixel i brugerfladen er bygget i fællesskab med Claude (Anthropic) og GitHub Copilot (GitHub). Mennesket kom med ideerne. AI\'erne stod for det meste af skrivningen.',
         introP2:         'Spørgsmålet bag eksperimentet: hvor langt kan en samtale gå, inden den bliver til software? Det viser sig, ret langt.',
@@ -481,7 +461,6 @@
       },
 
       ja: {
-        backLink:        'アーケード',
         pageSubtitle:    'この実験について',
         introP1:         'BLIP ARCADEは、人間とAIの協働実験です。すべてのゲーム、すべてのコード、UIのすべてのピクセルが、Claude（Anthropic）とGitHub Copilot（GitHub）との共同作業で構築されました。アイデアを出したのは人間で、タイピングのほとんどはAIが担いました。',
         introP2:         'この実験の背後にある問いかけ：会話はどこまで続ければソフトウェアになるのか？思ったよりずっと遠くまで行けることがわかりました。',

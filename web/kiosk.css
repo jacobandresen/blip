@@ -348,11 +348,10 @@
      bars too so the bar looks identical everywhere. */
   left: 16px;
   right: 16px;
-  /* Override .kiosk-bar's space-between: stick + fire buttons sit grouped
-     together on the left (gap between them from the shared `gap`), and
-     COINS is pushed to the far right via its own margin-left:auto below —
-     rather than every control being spread evenly across the bar. */
-  justify-content: flex-start;
+  /* Override .kiosk-bar's space-between: the stick + fire buttons sit as
+     one centered group (a wide gap between them from the shared `gap`),
+     rather than spread to the bar's edges or pinned to one side. */
+  justify-content: center;
   border-radius: 10px 10px 0 0;
   overflow: visible;
   /* A genuine 3D tilt, not faked shading — rotated back around its own
@@ -613,11 +612,12 @@
    decorative version on non-game pages. */
 
 /* The bar carries only the stick and fire buttons now (the coin slot moved
-   up to the top-right corner), so it just needs its own tighter padding —
-   the deck sits flush to both edges. */
+   up to the top-right corner), centered as a group — the `gap` is the
+   open space between the stick and the buttons, wide enough that a thumb
+   on one never brushes the other. */
 #topbar.kiosk-bar,
 .kiosk-bar-main {
-  gap: 6px;
+  gap: 44px;
   padding-left: 10px;
   padding-right: 10px;
 }
@@ -632,7 +632,7 @@
 @media (max-width: 480px) {
   #topbar.kiosk-bar, .kiosk-bar-main {
     height: calc(76px + env(safe-area-inset-bottom, 0px));
-    gap: 6px; padding-left: 8px; padding-right: 8px;
+    gap: 32px; padding-left: 8px; padding-right: 8px;
   }
   #insert-coin-btn, #kiosk-insert-btn { font-size: 10px; letter-spacing: 0; padding: 4px 7px; gap: 5px; }
   #stick-base { width: 118px; }
@@ -652,7 +652,7 @@
    readout is tight, so trim the stick's footprint and the button gap a
    little, but keep both stick and buttons above the touch minimum. */
 @media (max-width: 380px) {
-  #topbar.kiosk-bar, .kiosk-bar-main { gap: 4px; padding-left: 6px; padding-right: 6px; }
+  #topbar.kiosk-bar, .kiosk-bar-main { gap: 24px; padding-left: 6px; padding-right: 6px; }
   #insert-coin-btn, #kiosk-insert-btn { font-size: 9px; padding: 4px 6px; gap: 4px; }
   #stick-base { width: 104px; }
   #stick-boot { width: 46px; height: 46px; }
@@ -665,7 +665,7 @@
 
 /* Below any current iPhone (kept as a graceful floor, not a target) */
 @media (max-width: 340px) {
-  #topbar.kiosk-bar, .kiosk-bar-main { gap: 3px; padding-left: 4px; padding-right: 4px; }
+  #topbar.kiosk-bar, .kiosk-bar-main { gap: 16px; padding-left: 4px; padding-right: 4px; }
   #insert-coin-btn, #kiosk-insert-btn { font-size: 8px; padding: 3px 5px; gap: 3px; }
   #stick-base { width: 90px; }
   #stick-boot { width: 40px; height: 40px; }

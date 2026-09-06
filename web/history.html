@@ -7,7 +7,7 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=23">
+  <link rel="stylesheet" href="kiosk.css?v=24">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -44,23 +44,10 @@
     .page {
       max-width: 720px;
       margin: 0 auto;
-      padding: 40px 24px calc(80px + env(safe-area-inset-bottom, 0px));
+      /* Top pad clears the fixed BLIP ARCADE logo / coin button (which is
+         the way back to the arcade now that the text back-link is gone). */
+      padding: calc(72px + env(safe-area-inset-top, 0px)) 24px calc(80px + env(safe-area-inset-bottom, 0px));
     }
-
-    .topnav {
-      display: flex;
-      align-items: center;
-      margin-bottom: 48px;
-    }
-    .back-link {
-      font-size: 11px;
-      letter-spacing: 4px;
-      color: #444;
-      text-decoration: none;
-      text-transform: uppercase;
-      transition: color .2s;
-    }
-    .back-link:hover { color: var(--green); }
 
     h1 {
       font-size: clamp(2rem, 8vw, 3.5rem);
@@ -273,10 +260,6 @@
 <button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
 
 <div class="page">
-
-  <nav class="topnav">
-    <a class="back-link" href="index.html">&#8592; <span data-i18n="backLink">ARCADE</span></a>
-  </nav>
 
   <h1>HISTORY</h1>
   <h2 data-i18n="pageSubtitle">THE GAMES BEHIND THE GAMES</h2>
@@ -507,7 +490,6 @@
     var i18n = {
 
       en: {
-        backLink:       'ARCADE',
         pageSubtitle:   'THE GAMES BEHIND THE GAMES',
         introP1:        'The games in BLIP ARCADE did not arrive from nowhere. Each one is the shadow of a game that changed the industry — designed under impossible constraints by engineers who were, in many cases, inventing the medium as they went.',
         introP2:        'This page traces where they came from: the studios that built them, the people who designed them, and the small decisions that became the foundations of an entire art form.',
@@ -569,7 +551,6 @@
       },
 
       da: {
-        backLink:       'ARKADE',
         pageSubtitle:   'SPILLENE BAG SPILLENE',
         introP1:        'Spillene i BLIP ARCADE er ikke opstået ud af ingenting. Hvert enkelt er skyggen af et spil, der forandrede branchen — designet under umulige begrænsninger af ingeiniører, der i mange tilfælde opfandt mediet, mens de gik.',
         introP2:        'Denne side følger sporene: studierne der byggede dem, menneskene der designede dem, og de små beslutninger der blev grundstenen i en hel kunstform.',
@@ -631,7 +612,6 @@
       },
 
       ja: {
-        backLink:       'アーケード',
         pageSubtitle:   'ゲームの源流',
         introP1:        'BLIP ARCADEの4つのゲームは突然生まれたわけではありません。それぞれが、業界を変えたゲームの影です——不可能な制約の中でデザインされ、多くの場合、メディアそのものを発明しながら作り上げた人々によって。',
         introP2:        'このページでは、その出自を追います。開発したスタジオ、デザインした人々、そして一つの術形式全体の影となった小さな決断の数々を。',
