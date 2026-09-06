@@ -1035,13 +1035,13 @@
 
     updateCreditsDisplay(); // initialise dimming to match coins on page load
 
-    // Spends one credit and launches `card`'s game — the click handler for
-    // the whole card, now that there's no separate start button. A no-op
-    // (not a shake/sound) when broke: same as pushing an unlit physical
-    // start button.
+    // Opens `card`'s game — the click handler for the whole card. Needs a
+    // credit but does NOT spend it here: the credit rides along to the
+    // game page (same sessionStorage) so it's actually there to play with,
+    // and the game itself charges it (on continue after a game over). A
+    // no-op with a nudge when broke, like pushing an unlit start button.
     function attemptStart(card) {
-      var n = getCoins();
-      if (n <= 0) {
+      if (getCoins() <= 0) {
         nudgeInsertCoin();
         card.classList.remove('rejected');
         void card.offsetWidth;
@@ -1051,8 +1051,6 @@
         }, { once: true });
         return;
       }
-      saveCoins(n - 1);
-      updateCoinsHud();
       if (window.clearBadgePin) window.clearBadgePin();
       try { sessionStorage.setItem('blip-last-game', (card.getAttribute('href') || '').split('/')[0]); } catch (e) {}
       window.location.href = card.href;
