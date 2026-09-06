@@ -208,6 +208,20 @@ document.getElementById('insert-coin-btn').addEventListener('click', function ()
   overlay.classList.remove('visible');
 });
 
+// Mirror the overlay's visibility onto <body> so CSS can key off it
+// (body.need-coin flashes the top-right coin button, kiosk.css/shell.css)
+// without every show/hide site having to know.
+new MutationObserver(function () {
+  document.body.classList.toggle('need-coin', overlay.classList.contains('visible'));
+}).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+
+// Landing on a game page with no credits — a fresh session, a shared deep
+// link — is walking up to a cold cabinet: you put a coin in before you
+// play. Same overlay the in-game "continue?" prompt uses; it blocks
+// injectKey() until a coin goes in, so the title screen can't be started
+// for free.
+if (getCoins() <= 0) overlay.classList.add('visible');
+
 // ---- Canvas sizing ----
 // The kiosk bar is position:fixed;bottom:0. We leave PAD px on each side
 // plus full clearance for the bar so it never overlaps the canvas.
@@ -451,14 +465,21 @@ if (isRally) {
   // above, the same code path a real keypress drives. ----
   (function () {
     var base   = document.getElementById('stick-base');
-    var handle = document.getElementById('stick-handle');
-    var ball   = document.getElementById('stick-ball');
-    if (!base || !handle || !ball) return;
+    var fire   = document.getElementById('fire-buttons');
+    // Bind the drag to #topbar, not #stick-base: #stick-base sits inside
+    // the deck's 3D tilt (.deck-panel's rotateX), which leaves small,
+    // maddening seams in its hit-test where a touch lands "on" the stick
+    // visually but misses the element. #topbar carries no transform and is
+    // the common ancestor of the stick and the buttons, so a pointerdown
+    // anywhere on the deck bubbles to it cleanly — we then just ask "is
+    // this touch in the stick half or the button half?".
+    var bar = document.getElementById('topbar');
+    if (!base || !bar) return;
 
     // Small throw so a short thumb-flick registers immediately — a
     // direction fires once the drag passes DEAD * RADIUS (~9px), not after
     // a big deliberate push. Anything past RADIUS is already full tilt.
-    var RADIUS = 30; // px of drag from the ball's rest point that triggers a direction
+    var RADIUS = 30; // px of drag from the pivot that triggers a direction
     var DEAD   = 0.30; // fraction of RADIUS
     var activeId = null;
     var wantDir = { up: false, down: false, left: false, right: false };
@@ -496,14 +517,26 @@ if (isRally) {
       setDir('up',   false); setDir('down',  false);
     }
 
-    base.addEventListener('pointerdown', function (e) {
+    // A touch belongs to the stick unless it landed on (or right of) the
+    // fire buttons. Measured per press so it tracks the responsive layout.
+    function isStickTouch(e) {
+      if (fire && e.target && e.target.closest && e.target.closest('#fire-buttons')) return false;
+      if (fire) {
+        var fr = fire.getBoundingClientRect();
+        if (fr.width && e.clientX >= fr.left - 6) return false;
+      }
+      return true;
+    }
+
+    bar.addEventListener('pointerdown', function (e) {
+      if (activeId !== null || !isStickTouch(e)) return;
       e.preventDefault();
       activeId = e.pointerId;
-      base.setPointerCapture(activeId);
+      bar.setPointerCapture(activeId);
       pivot = { x: e.clientX, y: e.clientY };
       // No direction yet — the first move off this point is what steers.
     });
-    base.addEventListener('pointermove', function (e) {
+    bar.addEventListener('pointermove', function (e) {
       if (e.pointerId !== activeId) return;
       e.preventDefault();
       apply(e);
@@ -513,8 +546,8 @@ if (isRally) {
       activeId = null;
       release();
     }
-    base.addEventListener('pointerup',     endPointer);
-    base.addEventListener('pointercancel', endPointer);
+    bar.addEventListener('pointerup',     endPointer);
+    bar.addEventListener('pointercancel', endPointer);
   }());
 
   // ---- Fire buttons: one per game.buttons entry (default: just fire),

@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=26">
+  <link rel="stylesheet" href="kiosk.css?v=27">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -144,47 +144,8 @@
       .lang-btn { width: 32px; height: 32px; font-size: 22px; }
     }
 
-    /* ---- header text ---- */
-    /* Top marquee bar: same box a game page reserves for its backlit name
-       sign (#marquee-bar/#marquee-name in shell.css) — .blip-logo (fixed
-       top-left, kiosk.css, higher z-index) floats over its left end on
-       every page, game pages included, so reusing the same bar here reads
-       as the identical strip rather than a one-off for the landing page. */
-    .top-marquee-bar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      /* Reserve the iPhone status bar / Dynamic Island strip when the app
-         is installed to the home screen — standalone + viewport-fit=cover
-         render this page full bleed under it, which otherwise hides the
-         sign (and the BLIP ARCADE logo over its left end) behind the
-         clock. The strip draws in the 40px below the inset. */
-      box-sizing: border-box;
-      height: calc(40px + env(safe-area-inset-top, 0px));
-      padding-top: env(safe-area-inset-top, 0px);
-      /* Above the CRT scanline (99) and vignette (98) overlays so the sign
-         stays lit rather than washed dark by the vignette's edge, matching
-         .blip-logo (z 500) which floats over its left end. */
-      z-index: 201;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(180deg, #101010, #000 92%);
-      border-bottom: 1px solid rgba(230, 220, 50, 0.35);
-      box-shadow: 0 0 16px rgba(230, 220, 50, 0.25), 0 2px 10px rgba(0, 0, 0, 0.6);
-    }
-    /* .blip-logo (kiosk.css) is a fixed 32px box matching the 28px marquee
-       bar height game pages use — this page's bar is taller, so give the
-       logo the same height here to keep it vertically centered in it
-       (same specificity, later in the cascade than kiosk.css, so this
-       overrides just on this page without touching the shared rule). */
-    .blip-logo {
-      height: calc(40px + env(safe-area-inset-top, 0px));
-    }
-    /* Match the coin button to the taller logo on this page — same height,
-       same top:0, same 8px edge gap, so the two frame the strip evenly. */
-    #kiosk-insert-btn {
-      height: calc(40px + env(safe-area-inset-top, 0px));
-    }
+    /* .top-marquee-bar + the logo/coin-slot height match live in kiosk.css
+       now, shared identically with about / controls / history. */
 
     @media (max-width: 480px) {
       /* The kiosk bar grows to ~76px on phones to seat the bigger touch

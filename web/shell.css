@@ -244,32 +244,45 @@ canvas {
   position: fixed;
   inset: 0;
   bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px));
-  background: rgba(0,0,0,0.8);
-  /* Below #topbar (z-index:200) so the stick — which, since it's mounted
-     in the bar, rises up into this overlay's screen region — stays fully
-     visible above it, the same as the bar's COINS/GAMES/INSERT COIN
-     controls (which never dim either, since the overlay's own box stops
-     right above the bar — see `bottom` above). Coins are still blocked
-     either way: injectKey() itself refuses to fire while this is
-     visible, regardless of what's drawn on top of what. */
+  /* A heavy dim, not a blackout — the game (or attract-mode title) stays
+     visible as a ghost behind it, so the screen reads as "paused, waiting
+     for a coin" rather than "off". */
+  background: rgba(4, 4, 6, 0.8);
+  /* Below #topbar (z-index:200) so the stick stays visible above it, and
+     below the coin button (z-index:500) so that keeps flashing brightly
+     on top. Input is blocked regardless: injectKey() bails while visible. */
   z-index: 150;
   align-items: center;
   justify-content: center;
 }
 #need-coin-overlay.visible { display: flex; }
 
+/* Classic attract-mode caption — readable but calm; the loud call to
+   action is the coin button flashing in the corner (body.need-coin). */
 #need-coin-overlay .nco-msg {
   font-family: 'Courier New', Courier, monospace;
-  font-size: clamp(1.8rem, 6vw, 3.5rem);
+  font-size: clamp(14px, 4.5vw, 20px);
   font-weight: 900;
-  letter-spacing: .18em;
+  letter-spacing: .22em;
   text-transform: uppercase;
   color: #e6dc32;
-  text-shadow:
-    0 0 10px #e6dc32,
-    0 0 30px #e6dc32,
-    0 0 60px rgba(230,220,50,0.4);
-  animation: blink-coin 1.1s step-end infinite;
+  text-shadow: 0 0 8px #e6dc32, 0 0 26px rgba(230, 220, 50, 0.5);
+  animation: blink-coin 1.4s step-end infinite;
+}
+
+/* While the "insert coin to continue" overlay is up (shell.js mirrors it
+   onto body.need-coin), the top-right coin button lifts into a lit key and
+   flashes hard — it sits at z-index 500, above the z-150 overlay, so it
+   stays bright while the rest dims: the one thing still worth tapping.
+   @keyframes coin-beckon is defined in kiosk.css, which loads first. */
+body.need-coin #insert-coin-btn {
+  border: 1px solid #6acf5a;
+  border-radius: 4px;
+  background: linear-gradient(to bottom, #172017, #0c150c);
+  color: #f6ffb8;
+  text-shadow: 0 0 4px #fff, 0 0 14px #e6dc32, 0 0 30px #e6dc32;
+  animation: coin-beckon 0.55s ease-in-out infinite;
+  transform-origin: 100% 0;
 }
 
 /* ---- Touch / on-screen arcade controls ----
@@ -282,7 +295,11 @@ canvas {
 
 #topbar {
   overflow: visible;
+  /* The whole deck drives game input (shell.js binds the stick drag to
+     #topbar) — no browser gesture should ever start from a touch on it. */
+  touch-action: none;
 }
+#topbar .deck-panel { touch-action: none; }
 
 /* ---- Paddle dials (rally only) ---- */
 
