@@ -909,17 +909,17 @@
         osc2.type = 'sine';
         osc2.frequency.value = 120;
         lpf.type = 'lowpass';
-        lpf.frequency.value = 400;
+        lpf.frequency.value = 520;
         lpf.Q.value = 1.4;
         gMaster.gain.value = 0;
         var g2 = ctx.createGain();
-        g2.gain.value = 0.35;
+        g2.gain.value = 0.5;
         osc.connect(lpf);
         osc2.connect(g2); g2.connect(lpf);
         lpf.connect(gMaster); gMaster.connect(ctx.destination);
         osc.start();
         osc2.start();
-        gMaster.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 2.5);
+        gMaster.gain.linearRampToValueAtTime(0.11, ctx.currentTime + 2);
 
         scheduleGlitch(ctx);
       }

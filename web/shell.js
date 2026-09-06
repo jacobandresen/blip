@@ -296,14 +296,14 @@ if (getCoins() <= 0) overlay.classList.add('visible');
     var out = ctx.createGain();
     osc.type = 'sawtooth'; osc.frequency.value = 58;
     osc2.type = 'sine';    osc2.frequency.value = 120;
-    g2.gain.value = 0.35;
-    lpf.type = 'lowpass'; lpf.frequency.value = 400; lpf.Q.value = 1.4;
+    g2.gain.value = 0.5;
+    lpf.type = 'lowpass'; lpf.frequency.value = 520; lpf.Q.value = 1.4;
     out.gain.value = 0;
     osc.connect(lpf);
     osc2.connect(g2); g2.connect(lpf);
     lpf.connect(out); out.connect(ctx.destination);
     osc.start(); osc2.start();
-    out.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 2.5);
+    out.gain.linearRampToValueAtTime(0.11, ctx.currentTime + 2);
   }
   function arm() { if (ready()) start(); }
   ['pointerdown', 'touchstart', 'keydown'].forEach(function (ev) {
