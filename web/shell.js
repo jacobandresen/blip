@@ -476,11 +476,13 @@ if (isRally) {
     var bar = document.getElementById('topbar');
     if (!base || !bar) return;
 
-    // Small throw so a short thumb-flick registers immediately — a
-    // direction fires once the drag passes DEAD * RADIUS (~9px), not after
-    // a big deliberate push. Anything past RADIUS is already full tilt.
-    var RADIUS = 30; // px of drag from the pivot that triggers a direction
-    var DEAD   = 0.30; // fraction of RADIUS
+    // A comfortable throw with hysteresis: a direction ENGAGES once the
+    // drag is past ON px from the pivot, and only DISENGAGES back inside
+    // OFF px. The gap between the two stops it chattering on/off when your
+    // thumb hovers near the threshold, and lets small drift while you hold
+    // a direction not drop it — the "gets stuck / too twitchy" complaints.
+    var ON  = 22; // px from pivot to start moving — a deliberate push
+    var OFF = 13; // px to stop (must be < ON)
     var activeId = null;
     var wantDir = { up: false, down: false, left: false, right: false };
     var CODE_FOR = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
@@ -490,6 +492,11 @@ if (isRally) {
       wantDir[dir] = want;
       var code = CODE_FOR[dir];
       injectKey(code, code, want ? 'keydown' : 'keyup');
+    }
+    // one axis with hysteresis: v is the signed offset in px
+    function axis(negDir, posDir, v) {
+      setDir(negDir, wantDir[negDir] ? v < -OFF : v < -ON);
+      setDir(posDir, wantDir[posDir] ? v >  OFF : v >  ON);
     }
 
     // Floating pivot: wherever the thumb first lands becomes "centre", and
@@ -504,17 +511,18 @@ if (isRally) {
     var pivot = null;
 
     function apply(e) {
-      var dx = (e.clientX - pivot.x) / RADIUS;
-      var dy = (e.clientY - pivot.y) / RADIUS;
-      setDir('left',  dx < -DEAD);
-      setDir('right', dx >  DEAD);
-      setDir('up',    dy < -DEAD);
-      setDir('down',  dy >  DEAD);
+      axis('left', 'right', e.clientX - pivot.x);
+      axis('up',   'down',  e.clientY - pivot.y);
     }
 
     function release() {
+      activeId = null;
+      pivot = null;
       setDir('left', false); setDir('right', false);
       setDir('up',   false); setDir('down',  false);
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onEnd, true);
+      window.removeEventListener('pointercancel', onEnd, true);
     }
 
     // A touch belongs to the stick unless it landed on (or right of) the
@@ -528,26 +536,41 @@ if (isRally) {
       return true;
     }
 
-    bar.addEventListener('pointerdown', function (e) {
-      if (activeId !== null || !isStickTouch(e)) return;
-      e.preventDefault();
-      activeId = e.pointerId;
-      bar.setPointerCapture(activeId);
-      pivot = { x: e.clientX, y: e.clientY };
-      // No direction yet — the first move off this point is what steers.
-    });
-    bar.addEventListener('pointermove', function (e) {
-      if (e.pointerId !== activeId) return;
+    function onMove(e) {
+      if (e.pointerId !== activeId || !pivot) return;
       e.preventDefault();
       apply(e);
-    });
-    function endPointer(e) {
-      if (e.pointerId !== activeId) return;
-      activeId = null;
-      release();
     }
-    bar.addEventListener('pointerup',     endPointer);
-    bar.addEventListener('pointercancel', endPointer);
+    function onEnd(e) {
+      // Any up/cancel for our pointer ends the drag. Don't be fussy about
+      // the id on a cancel — iOS fires pointercancel with a mismatched (or
+      // reused) id when a second finger lands or it steals the gesture,
+      // and a missed release is exactly the "stuck moving forever" bug.
+      if (e.type === 'pointercancel' || e.pointerId === activeId) release();
+    }
+
+    bar.addEventListener('pointerdown', function (e) {
+      // Heal any stuck state from a swallowed release before starting.
+      if (activeId !== null) release();
+      if (!isStickTouch(e)) return;
+      e.preventDefault();
+      activeId = e.pointerId;
+      pivot = { x: e.clientX, y: e.clientY };
+      // Listen on window (not via setPointerCapture): capture is silently
+      // dropped by iOS in enough situations that relying on it is what let
+      // the stick get stuck. Window listeners always see the up/cancel.
+      window.addEventListener('pointermove', onMove, true);
+      window.addEventListener('pointerup', onEnd, true);
+      window.addEventListener('pointercancel', onEnd, true);
+      // No direction yet — the first move off this point is what steers.
+    });
+
+    // Last-resort safety nets: if the page loses focus or is hidden mid-
+    // drag (a call comes in, you switch apps), let go of everything.
+    window.addEventListener('blur', release);
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) release();
+    });
   }());
 
   // ---- Fire buttons: one per game.buttons entry (default: just fire),

@@ -11,6 +11,23 @@ html {
   overflow: hidden;
   height: 100%;
   background-color: #000;
+  /* A game page has nothing to select or copy — kill the iOS text loupe,
+     the selection handles and the copy/look-up callout that a drag or a
+     long-press on the joystick would otherwise pop up. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* No browser gesture (double-tap zoom, pan, long-press menu) starts from a
+   touch on the deck or the canvas — every touch there is game input. */
+#topbar, #topbar *, canvas {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -444,6 +461,15 @@ body.need-coin #insert-coin-btn {
   }
   #paddle-dial    { left: 16px; }
   #paddle-dial-p2 { right: 16px; }
+}
+
+/* Phones — a fatter marquee strip so the BLIP logo and coin slot over its
+   ends are easy thumb targets (kiosk.css bumps those to a 46px box). The
+   bezel and top screws follow it down. */
+@media (max-width: 480px) {
+  #marquee-bar { height: calc(44px + env(safe-area-inset-top, 0px)); }
+  #arcade-bezel { top: calc(47px + env(safe-area-inset-top, 0px)); } /* marquee 44 + 3 */
+  .bezel-screw.tl, .bezel-screw.tr { top: calc(56px + env(safe-area-inset-top, 0px)); }
 }
 
 /* Narrow phones — DEFENDER at 5px letter-spacing is the widest name; give it room */

@@ -313,8 +313,34 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   height: calc(40px + env(safe-area-inset-top, 0px));
 }
 
+/* Phones — a fat top strip so the logo and coin slot are easy thumb
+   targets, and the logo drops to just "BLIP" so it never runs into the
+   game name centred in the marquee next to it. The bigger box height is
+   also stated for the sub-pages' .top-marquee-bar (see there) so all top
+   bars stay the same size. */
+@media (max-width: 480px) {
+  .blip-logo .ba-rest { display: none; }
+  .blip-logo {
+    height: calc(46px + env(safe-area-inset-top, 0px));
+    font-size: 22px;
+    letter-spacing: 2px;
+    padding-left: 12px;
+    padding-right: 14px;
+  }
+  #insert-coin-btn,
+  #kiosk-insert-btn {
+    height: calc(46px + env(safe-area-inset-top, 0px));
+    font-size: 13px;
+  }
+  .top-marquee-bar { height: calc(46px + env(safe-area-inset-top, 0px)); }
+  body:has(.top-marquee-bar) .blip-logo,
+  body:has(.top-marquee-bar) #kiosk-insert-btn {
+    height: calc(46px + env(safe-area-inset-top, 0px));
+  }
+}
+
 @media (max-width: 380px) {
-  .blip-logo { font-size: 15px; letter-spacing: 1.5px; }
+  .blip-logo { font-size: 20px; letter-spacing: 1.5px; }
 }
 
 /* ---- Insert-coin slot + drop animation ----
@@ -736,7 +762,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 @media (max-width: 480px) {
   #topbar.kiosk-bar, .kiosk-bar-main { height: calc(76px + env(safe-area-inset-bottom, 0px)); }
   .kiosk-bar > .deck-panel { gap: 32px; padding-left: 8px; padding-right: 8px; }
-  #insert-coin-btn, #kiosk-insert-btn { font-size: 10px; letter-spacing: 0; padding: 4px 7px; gap: 5px; }
   #stick-base { width: 118px; }
   #stick-boot { width: 50px; height: 50px; }
   #stick-handle { bottom: 31px; }
@@ -755,7 +780,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    little, but keep both stick and buttons above the touch minimum. */
 @media (max-width: 380px) {
   .kiosk-bar > .deck-panel { gap: 24px; padding-left: 6px; padding-right: 6px; }
-  #insert-coin-btn, #kiosk-insert-btn { font-size: 9px; padding: 4px 6px; gap: 4px; }
   #stick-base { width: 104px; }
   #stick-boot { width: 46px; height: 46px; }
   #stick-handle { bottom: 29px; }
@@ -768,7 +792,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* Below any current iPhone (kept as a graceful floor, not a target) */
 @media (max-width: 340px) {
   .kiosk-bar > .deck-panel { gap: 16px; padding-left: 4px; padding-right: 4px; }
-  #insert-coin-btn, #kiosk-insert-btn { font-size: 8px; padding: 3px 5px; gap: 3px; }
   #stick-base { width: 90px; }
   #stick-boot { width: 40px; height: 40px; }
   #stick-handle { bottom: 26px; }
