@@ -35,6 +35,29 @@ updateCoinsHud();
     logo.addEventListener('animationend', function () {
       logo.classList.remove('boot');
     }, { once: true });
+
+    // After 30s of no input, a "> MORE GAMES" nudge fades in under the
+    // logo (.logo-hint, styled in shell.css) — the logo is the way back
+    // to the cabinet's game grid. Any input hides it and restarts the
+    // clock: pointer/touch for taps, and keydown in the capture phase so
+    // it also catches the on-screen controls and gamepad (injectKey()
+    // dispatches bubbling keydowns on the canvas).
+    var hint = document.createElement('span');
+    hint.className = 'logo-hint';
+    hint.setAttribute('aria-hidden', 'true');
+    hint.textContent = '> MORE GAMES';
+    logo.appendChild(hint);
+    var hintTimer = null;
+    function hintIdle() {
+      logo.classList.remove('show-hint');
+      clearTimeout(hintTimer);
+      hintTimer = setTimeout(function () { logo.classList.add('show-hint'); }, 30000);
+    }
+    ['pointerdown', 'touchstart'].forEach(function (ev) {
+      window.addEventListener(ev, hintIdle, { passive: true });
+    });
+    document.addEventListener('keydown', hintIdle, true);
+    hintIdle();
   }
 }());
 

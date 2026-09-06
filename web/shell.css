@@ -253,6 +253,43 @@ canvas {
   transition: width .12s linear;
 }
 
+/* ---- "MORE GAMES" nudge on the BLIP logo ----
+   shell.js appends .logo-hint inside .blip-logo and toggles .show-hint
+   after 30s of no input on a game page. Tucked just under the logo box
+   (top: 100% - a hair) so it never sits on top of the wordmark. Retro
+   terminal look: the games' pixel font, phosphor green, a blinking
+   caret. pointer-events:none — the whole logo <a> is already the link. */
+.blip-logo .logo-hint {
+  position: absolute;
+  left: 3px;
+  top: calc(100% - 6px);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 7px;
+  line-height: 1;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  text-transform: none;
+  color: #5cf05c;
+  text-shadow: 0 0 5px #32c832, 0 0 12px rgba(50, 200, 50, 0.55);
+  -webkit-font-smoothing: none;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition: opacity .45s ease, transform .45s ease;
+}
+.blip-logo .logo-hint::after {
+  content: '_';
+  margin-left: 2px;
+  animation: blink-coin 0.9s step-end infinite;
+}
+.blip-logo.show-hint .logo-hint {
+  opacity: 1;
+  transform: translateY(0);
+}
+@media (max-width: 480px) {
+  .blip-logo .logo-hint { font-size: 6px; top: calc(100% - 9px); }
+}
+
 /* ---- Bottom bar — game-page overrides ---- */
 
 #topbar {
