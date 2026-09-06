@@ -12,6 +12,11 @@ register_plugin = function (importObject) {
             window.blipSetMode(mode);
         }
     };
+    importObject.env.blip_paddles = function (left, right) {
+        if (typeof window.blipPaddles === 'function') {
+            window.blipPaddles(left, right);
+        }
+    };
 };
 
 miniquad_add_plugin({ register_plugin: register_plugin });

@@ -201,6 +201,21 @@ window.blipSetMode = function (mode) {
   if (label) label.textContent = isCpu ? 'CPU' : '2P';
 };
 
+// Called from WASM (rally) every frame with the two paddle positions
+// (0 = top of travel … 1 = bottom). Spins the on-screen dials to match —
+// so they turn under keyboard play on the desktop, and the P2 dial turns
+// on its own while the CPU plays it.
+(function () {
+  var h1 = document.getElementById('dial-hand');
+  var h2 = document.getElementById('dial-hand-p2');
+  // Full paddle travel ≈ 1½ turns of the knob, geared like a real spinner.
+  var SWEEP = 3 * Math.PI;
+  window.blipPaddles = function (left, right) {
+    if (h1) h1.style.transform = 'rotate(' + ((left  - 0.5) * SWEEP) + 'rad)';
+    if (h2) h2.style.transform = 'rotate(' + ((right - 0.5) * SWEEP) + 'rad)';
+  };
+}());
+
 overlay.addEventListener('click', function () {
   var n = getCoins();
   if (n >= MAX_COINS) return;
@@ -503,7 +518,9 @@ if (isRally) {
         lastAngle    = a;
         angle       += d;
         totalDelta  += Math.abs(d);
-        handEl.style.transform = 'rotate(' + (angle + Math.PI / 2) + 'rad)';
+        // The knob's visible rotation is driven by window.blipPaddles from
+        // the game (so it tracks the actual paddle, not the raw gesture);
+        // here we only translate the spin into up/down key state.
         var DEAD = 0.018;
         if      (d >  DEAD) setDir(false, true);
         else if (d < -DEAD) setDir(true, false);

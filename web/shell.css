@@ -584,27 +584,19 @@ body.need-coin #insert-coin-btn {
   pointer-events: none;
 }
 
-/* P2 dial — CPU mode (1-player selected): the knob goes dark and dead,
-   a chip glyph in place of the pointer. */
+/* P2 dial — CPU mode (1-player selected): you can't grab it, and the
+   chrome goes cool/desaturated, but it still turns (window.blipPaddles
+   spins it to the CPU's paddle) with a dimmer pointer so you can watch
+   the computer play it. The label reads CPU (set in shell.js). */
 #paddle-dial-p2.cpu-mode {
   pointer-events: none;
 }
 #paddle-dial-p2.cpu-mode .dial-cap {
-  background: conic-gradient(from -50deg, #4a4a4e, #2c2c30 50%, #4a4a4e);
-  filter: grayscale(1) brightness(0.7);
+  background: conic-gradient(from -50deg, #b9bcc2, #6d7076 24%, #3a3c40 50%, #6d7076 76%, #b9bcc2);
 }
-#paddle-dial-p2.cpu-mode #dial-hand-p2 { opacity: 0.35; }
-#paddle-dial-p2.cpu-mode #dial-hand-p2::before { display: none; }
-#paddle-dial-p2.cpu-mode #dial-hand-p2::after {
-  content: 'CPU';
-  width: auto;
-  height: auto;
-  background: none;
-  box-shadow: none;
-  font-family: 'Press Start 2P', 'Courier New', monospace;
-  font-size: 7px;
-  color: rgba(var(--cab), 0.5);
-  -webkit-font-smoothing: none;
+#paddle-dial-p2.cpu-mode #dial-hand-p2::before {
+  background: rgba(var(--cab), 0.55);
+  box-shadow: 0 0 4px rgba(var(--cab), 0.4);
 }
 
 /* Shrink controls in landscape / short screens */
@@ -640,6 +632,16 @@ body.need-coin #insert-coin-btn {
      strip's ends leave no room for them, and the left strip was running
      into the logo. The centred game name alone reads fine. */
   #marquee-bar .marquee-bulbs { display: none; }
+
+  /* Rally dials roughly double on a phone — like the joystick ball, they
+     rise up out of the deck over the game so they can be a real thumb
+     target without needing a taller bar. */
+  #paddle-dial, #paddle-dial-p2 { width: 104px; height: 104px; bottom: 12px; }
+  #paddle-dial    { left: max(4px, env(safe-area-inset-left, 0px)); }
+  #paddle-dial-p2 { right: max(4px, env(safe-area-inset-right, 0px)); }
+  #paddle-dial::before, #paddle-dial-p2::before { width: 92px; height: 18px; bottom: -4px; }
+  .dial-cap { transform: translateZ(9px); }
+  #dial-label, #dial-label-p2 { top: -15px; font-size: 8px; letter-spacing: 2px; }
 }
 
 /* Narrow phones — DEFENDER at 5px letter-spacing is the widest name; give it room */

@@ -346,6 +346,16 @@ async fn main() {
             State::Point => update_point(&mut g, dt),
             State::Over  => update_over(&mut g, dt),
         }
+
+        // Feed the two paddle positions to the shell so it can spin the
+        // on-screen dials to match — the human paddle(s) and, in 1-player
+        // mode, the CPU's.
+        let span = PAD_YMAX - PAD_YMIN;
+        web::paddles(
+            ((g.lpad_y - PAD_YMIN) / span).clamp(0.0, 1.0),
+            ((g.rpad_y - PAD_YMIN) / span).clamp(0.0, 1.0),
+        );
+
         match g.state {
             State::Title => draw_title(&blip),
             State::Serve => draw_serve(&blip, &g),

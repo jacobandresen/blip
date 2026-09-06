@@ -8,6 +8,7 @@
 extern "C" {
     fn blip_spend_coin();
     fn blip_set_mode(mode: i32);
+    fn blip_paddles(left: f32, right: f32);
 }
 
 /// Notify the kiosk shell that the player should be charged a coin.
@@ -22,4 +23,14 @@ pub fn set_mode(two_player: bool) {
     unsafe { blip_set_mode(if two_player { 1 } else { 0 }); }
     #[cfg(not(target_arch = "wasm32"))]
     let _ = two_player;
+}
+
+/// Report the two paddle positions (each 0.0 = top … 1.0 = bottom of travel)
+/// so the shell can spin the on-screen paddle dials to match — including the
+/// CPU's paddle in 1-player mode. Rally-only; a no-op everywhere else.
+pub fn paddles(left: f32, right: f32) {
+    #[cfg(target_arch = "wasm32")]
+    unsafe { blip_paddles(left, right); }
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = (left, right);
 }
