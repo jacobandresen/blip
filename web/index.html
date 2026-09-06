@@ -12,7 +12,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=28">
+  <link rel="stylesheet" href="kiosk.css?v=29">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -139,10 +139,14 @@
       filter: drop-shadow(0 0 5px var(--green));
     }
 
-    /* Match the badge avatars, which shrink at this width (kiosk.css). */
+    /* Keep the flags and the corner badges the same size here as on the
+       about / history / controls pages (kiosk.css shrinks them at this
+       width). */
     @media (max-width: 600px) {
       .lang-btn { width: 32px; height: 32px; font-size: 22px; }
     }
+    /* Badge avatar shrink lives after the .*-avatar base rules below, so a
+       later plain rule can't beat this @media one. */
 
     /* .top-marquee-bar + the logo/coin-slot height match live in kiosk.css
        now, shared identically with about / controls / history. */
@@ -288,6 +292,31 @@
         0 0 16px rgba(0,0,0,.8),
         0 0 30px color-mix(in srgb, var(--c) 20%, transparent),
         inset 0 0 20px color-mix(in srgb, var(--c) 4%, transparent);
+    }
+
+    /* The game you're currently in (last one started, JS adds .card-active
+       on return) glows in its own accent colour like a lit cabinet, and
+       keeps glowing even when you're out of credits. */
+    .card.card-active {
+      border-color: var(--c);
+      animation: card-active-glow 2.6s ease-in-out infinite;
+    }
+    .card.card-active.no-credit { opacity: 1; filter: none; }
+    @keyframes card-active-glow {
+      0%, 100% {
+        box-shadow:
+          0 0 16px rgba(0,0,0,.8),
+          0 0 18px color-mix(in srgb, var(--c) 45%, transparent),
+          0 0 46px color-mix(in srgb, var(--c) 26%, transparent),
+          inset 0 0 20px color-mix(in srgb, var(--c) 8%, transparent);
+      }
+      50% {
+        box-shadow:
+          0 0 16px rgba(0,0,0,.8),
+          0 0 30px color-mix(in srgb, var(--c) 80%, transparent),
+          0 0 78px color-mix(in srgb, var(--c) 48%, transparent),
+          inset 0 0 30px color-mix(in srgb, var(--c) 15%, transparent);
+      }
     }
 
     /* screenshot */
@@ -661,6 +690,17 @@
       box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 4px 14px rgba(0,0,0,0.6);
     }
 
+    /* Phones — same avatar size as the about / history / controls pages
+       (kiosk.css). After the 44px bases above so it actually wins. */
+    @media (max-width: 600px) {
+      .controls-avatar,
+      .about-avatar,
+      .history-avatar { width: 32px; height: 32px; }
+      .controls-label,
+      .about-label,
+      .history-label { left: 42px; }
+    }
+
     /* ---- mastodon badge ---- */
     .profile-badge {
       position: fixed;
@@ -1000,9 +1040,10 @@
     /* Coin / credits                                                       */
     /* ------------------------------------------------------------------ */
     // ---- Ambient Atari hum ----
-    // Only present once there's actually a credit in the machine — silent
-    // while broke, same as a real cabinet's transformer hum meaning
-    // nothing's really "on" until it's fed. Needs a user gesture to start
+    // Clearly present once there's a credit in the machine — a real
+    // cabinet's transformer hum, meaning the thing is powered and waiting.
+    // Silent while broke (nothing's "on" until it's fed). Needs a user
+    // gesture to start
     // (autoplay policy), so it arms on the first interaction but only
     // actually starts once coins > 0; the coin-insert click itself counts,
     // so tryStartHum() is also called directly from onCoinInserted below
@@ -1016,19 +1057,29 @@
         });
         var ctx = getKioskAudio();
 
-        // Power-supply drone: 58 Hz sawtooth → lowpass → barely audible
+        // Power-supply drone: 58 Hz sawtooth → lowpass, plus its mains-ish
+        // 120 Hz overtone — a low hum that's clearly there without being a
+        // nuisance. Fades up over a couple of seconds like it's warming up.
         var osc = ctx.createOscillator();
+        var osc2 = ctx.createOscillator();
         var lpf = ctx.createBiquadFilter();
         var gMaster = ctx.createGain();
         osc.type = 'sawtooth';
         osc.frequency.value = 58;
+        osc2.type = 'sine';
+        osc2.frequency.value = 120;
         lpf.type = 'lowpass';
-        lpf.frequency.value = 320;
-        lpf.Q.value = 1.5;
+        lpf.frequency.value = 400;
+        lpf.Q.value = 1.4;
         gMaster.gain.value = 0;
-        osc.connect(lpf); lpf.connect(gMaster); gMaster.connect(ctx.destination);
+        var g2 = ctx.createGain();
+        g2.gain.value = 0.35;
+        osc.connect(lpf);
+        osc2.connect(g2); g2.connect(lpf);
+        lpf.connect(gMaster); gMaster.connect(ctx.destination);
         osc.start();
-        gMaster.gain.linearRampToValueAtTime(0.014, ctx.currentTime + 5);
+        osc2.start();
+        gMaster.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 2.5);
 
         scheduleGlitch(ctx);
       }
@@ -1163,8 +1214,19 @@
       saveCoins(n - 1);
       updateCoinsHud();
       if (window.clearBadgePin) window.clearBadgePin();
+      try { sessionStorage.setItem('blip-last-game', (card.getAttribute('href') || '').split('/')[0]); } catch (e) {}
       window.location.href = card.href;
     }
+
+    /* Light up the card of the game you're currently in (last started). */
+    (function () {
+      try {
+        var last = sessionStorage.getItem('blip-last-game');
+        if (!last) return;
+        var el = document.querySelector('.card[href^="' + last + '/"]');
+        if (el) el.classList.add('card-active');
+      } catch (e) {}
+    }());
 
     // Points a broke player at the COINS button in the top-right corner
     // instead of leaving the dimmed-card press feeling dead: a quick swell

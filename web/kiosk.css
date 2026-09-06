@@ -825,13 +825,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     opacity: 0;
     pointer-events: none;
   }
-  /* shrink avatars so they sit inside the card's left padding zone */
-  .controls-avatar,
-  .about-avatar,
-  .history-avatar {
-    width: 32px;
-    height: 32px;
-  }
 }
 
 .lang-switcher { transition: opacity .3s; }
@@ -866,6 +859,16 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 .controls-avatar { filter: grayscale(35%) brightness(0.8); }
 .about-avatar    { filter: grayscale(40%) brightness(0.8); }
 .history-avatar  { filter: grayscale(20%) brightness(0.7); }
+
+/* Phones — smaller avatars so they sit inside a game card's left padding
+   zone on the landing page. Must come after the 44px base above (a plain
+   rule later in the file would otherwise beat an @media one). Kept the
+   same on index / about / history / controls. */
+@media (max-width: 600px) {
+  .controls-avatar,
+  .about-avatar,
+  .history-avatar { width: 32px; height: 32px; }
+}
 
 .controls-label,
 .about-label,
