@@ -1,3 +1,14 @@
+/* Kill the browser's double-tap-to-zoom across every page. An iPad fires
+   it on fast repeated taps — rapid fire on the buttons, quick taps on the
+   game cards — and jumps the viewport mid-play. `manipulation` leaves
+   ordinary scrolling and pinch-to-zoom (accessibility) untouched; it only
+   drops the non-standard double-tap gesture. Set on <html> so it also
+   covers elements that don't declare their own touch-action; the deck
+   controls and canvas set the stricter `touch-action: none` themselves. */
+html {
+  touch-action: manipulation;
+}
+
 /* ---- Shared kiosk navigation bar ---- */
 
 .kiosk-bar {
