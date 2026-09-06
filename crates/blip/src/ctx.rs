@@ -182,6 +182,17 @@ pub struct Blip {
     screen_rt:   Option<RenderTarget>, // offscreen composite target, window-sized
     screen_rt_w: i32,
     screen_rt_h: i32,
+    // ---- adaptive render quality ----
+    // An old iPad's GPU can't sustain the full CRT pass (the curved-glass
+    // shader's bloom taps, then a rectangle per scanline in the composite).
+    // We watch the frame time and step the effects down a level at a time
+    // if it stays bad — then stay there. No device sniffing: this also
+    // catches thermal throttling and Low Power Mode.
+    //   0 = full   1 = no curved-glass shader   2 = also no scanlines/noise
+    fx_level:      u8,
+    fx_settle:     u8,  // frames to ignore after startup / a level change
+    fx_slow_accum: f32, // seconds run slow at the current level
+    fx_frame_ema:  f32, // smoothed frame time, seconds
     // ---- screenshot capture ----
     pub screenshot_mode:   bool,
     screenshot_frame:      u32,
@@ -239,6 +250,10 @@ impl Blip {
             screen_rt: None,
             screen_rt_w: 0,
             screen_rt_h: 0,
+            fx_level: 0,
+            fx_settle: 45, // ~0.75s of warmup (asset decode, shader compile, JIT)
+            fx_slow_accum: 0.0,
+            fx_frame_ema: 1.0 / 60.0,
             screenshot_mode,
             screenshot_frame: 0,
             screenshot_frame_target,
@@ -311,8 +326,54 @@ impl Blip {
 
         let raw = get_frame_time();
         self.delta_time = if raw > 0.1 { 0.1 } else { raw };
+        self.update_fx_level(raw);
         self.update_glitch(self.delta_time);
         self.interlace_field ^= 1;
+    }
+
+    /// Watch the frame time and drop a level of CRT effects if the device
+    /// clearly can't keep up. Latches down — never steps back up — so it
+    /// can't oscillate between quality levels mid-game.
+    fn update_fx_level(&mut self, raw_ft: f32) {
+        // Dev / testing override: BLIP_FX=0|1|2 pins the level (native only).
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(v) = std::env::var_os("BLIP_FX")
+            .and_then(|s| s.to_string_lossy().trim().parse::<u8>().ok())
+        {
+            self.fx_level = v.min(2);
+            return;
+        }
+
+        if self.fx_level >= 2 { return; }
+        if self.fx_settle > 0 { self.fx_settle -= 1; return; }
+        // Ignore a zero reading or a one-off hitch (tab switch, GC pause).
+        let ft = raw_ft;
+        if !(ft > 0.0005 && ft < 0.1) { return; }
+
+        // Smoothed frame time, ~0.4s time constant at 60fps.
+        self.fx_frame_ema += (ft - self.fx_frame_ema) * 0.08;
+
+        // 16.7ms = 60fps. Trip once we're sustained below ~50fps; the worse
+        // it's running, the less jank we sit through before acting.
+        if self.fx_frame_ema > 0.020 {
+            self.fx_slow_accum += ft;
+            let trip = if self.fx_frame_ema > 0.030 { 0.8 } else { 1.8 };
+            if self.fx_slow_accum > trip {
+                self.fx_level += 1;
+                self.fx_slow_accum = 0.0;
+                self.fx_frame_ema = 1.0 / 60.0;
+                self.fx_settle = 30;
+                // Free the offscreen composite target — the shader pass that
+                // needed it is off now.
+                if self.fx_level >= 1 {
+                    self.screen_rt   = None;
+                    self.screen_rt_w = 0;
+                    self.screen_rt_h = 0;
+                }
+            }
+        } else {
+            self.fx_slow_accum = (self.fx_slow_accum - ft).max(0.0);
+        }
     }
 
     // ------------------------------------------------------------------ //
@@ -383,8 +444,10 @@ impl Blip {
             return;
         }
 
-        // No curved-glass material: composite straight to the screen, as before.
-        let Some(crt) = self.crt.clone() else {
+        // No curved-glass material (old WebGL / driver quirk), or the
+        // adaptive quality has switched it off on a slow device: composite
+        // straight to the screen.
+        let Some(crt) = self.crt.clone().filter(|_| self.fx_level == 0) else {
             self.composite(vx, vy, vw, vh);
             return;
         };
@@ -515,24 +578,28 @@ impl Blip {
         // Active field rows get a subtle CRT shadow; inactive field rows are
         // heavily dimmed to simulate the phosphor of the opposite field fading.
         // The active field flips every frame, producing the interlaced flicker.
-        let active   = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
-        let inactive = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.75 };
-        let bottom   = vy + vh;
-        let f0 = self.interlace_field as f32;
-        let f1 = 1.0 - f0;
-        let mut sy = vy + f0;
-        while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, active);   sy += 2.0; }
-        let mut sy = vy + f1;
-        while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, inactive); sy += 2.0; }
+        // This is a rectangle per screen row — the composite's biggest cost —
+        // so the lowest quality level drops it (and the noise) entirely.
+        if self.fx_level < 2 {
+            let active   = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
+            let inactive = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.75 };
+            let bottom   = vy + vh;
+            let f0 = self.interlace_field as f32;
+            let f1 = 1.0 - f0;
+            let mut sy = vy + f0;
+            while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, active);   sy += 2.0; }
+            let mut sy = vy + f1;
+            while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, inactive); sy += 2.0; }
 
-        // ---- background noise ----
-        let pixel = scale.max(1.0);
-        for _ in 0..48 {
-            let nx = vx + self.rng.next() * vw;
-            let ny = vy + self.rng.next() * vh;
-            let a  = 0.02 + self.rng.next() * 0.10;
-            let v  = self.rng.next();
-            draw_rectangle(nx, ny, pixel, pixel, Color::new(v, v, v, a));
+            // ---- background noise ----
+            let pixel = scale.max(1.0);
+            for _ in 0..48 {
+                let nx = vx + self.rng.next() * vw;
+                let ny = vy + self.rng.next() * vh;
+                let a  = 0.02 + self.rng.next() * 0.10;
+                let v  = self.rng.next();
+                draw_rectangle(nx, ny, pixel, pixel, Color::new(v, v, v, a));
+            }
         }
 
         // Debug: outline the exact canvas edge so overscan can be eyeballed.
