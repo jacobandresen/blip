@@ -256,9 +256,8 @@ var overlayWasVisible = overlay.classList.contains('visible');
 new MutationObserver(function () {
   var vis = overlay.classList.contains('visible');
   document.body.classList.toggle('need-coin', vis);
-  if (overlayWasVisible && !vis) {
-    if (canvas) { try { canvas.focus(); } catch (e) {} }
-    if (window.__armHum) window.__armHum();   // coin just went in — power up the hum
+  if (overlayWasVisible && !vis && canvas) {
+    try { canvas.focus(); } catch (e) {}
   }
   overlayWasVisible = vis;
 }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
@@ -270,49 +269,9 @@ new MutationObserver(function () {
 // for free.
 if (getCoins() <= 0) overlay.classList.add('visible');
 
-// ---- Ambient Atari hum ----
-// The cabinet's transformer drone — clearly present while a game is
-// running, the same as on the landing page (index.html has its own copy;
-// duplicated here since a game page doesn't load that script). Autoplay
-// policy means it has to wait for a gesture, so it arms on the first
-// interaction and starts once there's a credit in / the coin overlay is
-// down. Once running it stays for the life of the page.
-(function () {
-  var started = false;
-  function ready() {
-    return !overlay.classList.contains('visible') && getCoins() > 0;
-  }
-  function start() {
-    if (started) return;
-    started = true;
-    ['pointerdown', 'touchstart', 'keydown'].forEach(function (ev) {
-      window.removeEventListener(ev, arm);
-    });
-    var ctx = getUiAudio();
-    var osc = ctx.createOscillator();
-    var osc2 = ctx.createOscillator();
-    var g2 = ctx.createGain();
-    var lpf = ctx.createBiquadFilter();
-    var out = ctx.createGain();
-    osc.type = 'sawtooth'; osc.frequency.value = 58;
-    osc2.type = 'sine';    osc2.frequency.value = 120;
-    g2.gain.value = 0.5;
-    lpf.type = 'lowpass'; lpf.frequency.value = 520; lpf.Q.value = 1.4;
-    out.gain.value = 0;
-    osc.connect(lpf);
-    osc2.connect(g2); g2.connect(lpf);
-    lpf.connect(out); out.connect(ctx.destination);
-    osc.start(); osc2.start();
-    out.gain.linearRampToValueAtTime(0.11, ctx.currentTime + 2);
-  }
-  function arm() { if (ready()) start(); }
-  ['pointerdown', 'touchstart', 'keydown'].forEach(function (ev) {
-    window.addEventListener(ev, arm, { passive: true });
-  });
-  // A coin inserted via the overlay/button is itself the gesture — kick it
-  // off there too rather than waiting for a separate second interaction.
-  window.__armHum = arm;
-}());
+// (No ambient cabinet hum on a game page — while a game is running its
+// own audio is the whole soundscape. The transformer drone lives only on
+// the landing page, index.html, where the machine is idling in attract.)
 
 // ---- Canvas sizing ----
 // The kiosk bar is position:fixed;bottom:0. We leave PAD px on each side

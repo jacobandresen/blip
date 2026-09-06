@@ -1,15 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Press Start 2P — the same 5×7-ish blocky pixel look the games draw their
-   own text in (crates/blip/src/font.rs), used for the INSERT COIN attract
-   screen so it reads as part of the CRT, not a web overlay. SIL OFL, see
-   press-start-2p-OFL.txt. */
-@font-face {
-  font-family: 'Press Start 2P';
-  src: url('press-start-2p.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
-}
+/* @font-face for Press Start 2P (the games' pixel-font look) lives in
+   kiosk.css now — loaded first on every page. */
 
 /* Cabinet accent — "r, g, b" so rgba(var(--cab), a) works. shell.js overrides
    this per game (see BLIP_GAMES in kiosk.js); this green is just the default
@@ -302,149 +294,13 @@ canvas {
    pages' own insert-coin button, so it lives in kiosk.css (scoped to
    "#insert-coin-btn, #kiosk-insert-btn") rather than duplicated here. */
 
-/* ---- Need-coin overlay ---- */
-
+/* ---- Need-coin / INSERT COIN attract overlay ----
+   The overlay itself, its panel, the CRT flicker and the coin-button
+   flash all live in kiosk.css now (the front page uses the same attract
+   screen on startup). This is just the game-page tweak: stop the dim
+   above the deck so the joystick stays visible over it. */
 #need-coin-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
   bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px));
-  /* A heavy dim, not a blackout — the game (or attract-mode title) stays
-     visible as a ghost behind it, so the screen reads as "paused, waiting
-     for a coin" rather than "off". */
-  background: rgba(4, 4, 6, 0.82);
-  /* Below #topbar (z-index:200) so the stick stays visible above it, and
-     below the coin button (z-index:500) so that keeps flashing brightly
-     on top. Input is blocked regardless: injectKey() bails while visible. */
-  z-index: 150;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  /* The whole attract screen flickers like an un-synced tube: a constant
-     fine buzz plus slower, deeper brightness dips and the odd frame drop. */
-  animation: crt-flicker 4.1s linear infinite, crt-buzz 0.11s steps(2) infinite;
-}
-#need-coin-overlay.visible { display: flex; }
-/* CRT scanlines across the whole attract screen — the body's own scanline
-   layer sits behind this overlay, so redraw them on top for the "the
-   game's still running under here" arcade feel. */
-#need-coin-overlay::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent 0 2px, rgba(0, 0, 0, 0.28) 2px 4px);
-  pointer-events: none;
-}
-
-/* Attract-mode panel: the classic arcade stack — ▶ INSERT COIN ◀ big and
-   blinking, "1 COIN 1 PLAY" and "CREDIT 0" underneath, framed by a thin
-   lit rule top and bottom. */
-#need-coin-overlay .nco-panel {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 13px;
-  padding: clamp(16px, 5vw, 36px) clamp(14px, 6vw, 60px);
-  max-width: 100%;
-  /* Same blocky pixel font the games render in — Courier is the fallback
-     only until the woff2 loads. */
-  font-family: 'Press Start 2P', 'Courier New', monospace;
-  text-transform: uppercase;
-  text-align: center;
-  white-space: nowrap;
-  /* Kill sub-pixel antialiasing so the glyphs stay hard-edged like the
-     game's fill_rect pixels. */
-  -webkit-font-smoothing: none;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeSpeed;
-  border-top: 2px solid rgba(230, 220, 50, 0.55);
-  border-bottom: 2px solid rgba(230, 220, 50, 0.55);
-  box-shadow:
-    0 -1px 0 rgba(230, 220, 50, 0.25),
-    0 1px 0 rgba(230, 220, 50, 0.25),
-    inset 0 0 60px rgba(230, 220, 50, 0.06);
-  /* The flicker lives on #need-coin-overlay so the dim + scanlines + panel
-     all pulse together as one screen. */
-}
-
-#need-coin-overlay .nco-msg {
-  font-size: clamp(13px, 4.4vw, 30px);
-  line-height: 1.1;
-  color: #ffef8a;
-  text-shadow:
-    0 0 3px #fff,
-    0 0 10px #e6dc32,
-    0 0 26px #e6dc32,
-    0 0 56px rgba(230, 220, 50, 0.5);
-  animation: blink-coin 1.15s step-end infinite;
-}
-
-#need-coin-overlay .nco-sub {
-  font-size: clamp(7px, 2.1vw, 11px);
-  line-height: 1.6;
-  color: rgba(230, 220, 50, 0.8);
-  text-shadow: 0 0 8px rgba(230, 220, 50, 0.35);
-}
-
-#need-coin-overlay .nco-credit {
-  font-size: clamp(7px, 2.1vw, 11px);
-  line-height: 1.6;
-  color: #32c832;
-  text-shadow: 0 0 8px rgba(50, 200, 50, 0.5);
-}
-
-/* A tube that's never quite steady — irregular brightness dips, a couple
-   of them deep, and one near-black frame-drop each cycle. Not a strobe:
-   the fast crt-buzz below carries the constant hum, this is the drift. */
-@keyframes crt-flicker {
-  0%, 100% { opacity: 1;    filter: brightness(1); }
-  4%   { opacity: 0.92; }
-  6%   { opacity: 1; }
-  12%  { opacity: 0.78; filter: brightness(0.85); }
-  14%  { opacity: 1;    filter: brightness(1.15); }
-  16%  { opacity: 1;    filter: brightness(1); }
-  27%  { opacity: 0.95; }
-  29%  { opacity: 1; }
-  40%  { opacity: 0.62; filter: brightness(0.7); }
-  42%  { opacity: 1;    filter: brightness(1); }
-  55%  { opacity: 0.9; }
-  57%  { opacity: 1; }
-  70%  { opacity: 0.82; }
-  72%  { opacity: 1; }
-  85%  { opacity: 0.97; }
-  90%  { opacity: 0.7;  filter: brightness(0.8); }
-  92%  { opacity: 1;    filter: brightness(1); }
-}
-
-/* The constant tube buzz — a tiny 2-frame sub-pixel vertical unsteadiness.
-   (Brightness lives in crt-flicker only, so the two animations don't
-   fight over `filter`.) */
-@keyframes crt-buzz {
-  0%   { transform: translateY(0); }
-  100% { transform: translateY(0.5px); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #need-coin-overlay,
-  #need-coin-overlay .nco-msg { animation: none; }
-}
-
-/* While the "insert coin to continue" overlay is up (shell.js mirrors it
-   onto body.need-coin), the top-right coin button lifts into a lit key and
-   flashes hard — it sits at z-index 500, above the z-150 overlay, so it
-   stays bright while the rest dims: the one thing still worth tapping.
-   @keyframes coin-beckon is defined in kiosk.css, which loads first. */
-body.need-coin #insert-coin-btn {
-  border: 1px solid #6acf5a;
-  border-radius: 4px;
-  background: linear-gradient(to bottom, #172017, #0c150c);
-  color: #f6ffb8;
-  text-shadow: 0 0 4px #fff, 0 0 14px #e6dc32, 0 0 30px #e6dc32;
-  animation: coin-beckon 0.55s ease-in-out infinite;
-  transform-origin: 100% 0;
 }
 
 /* ---- Touch / on-screen arcade controls ----

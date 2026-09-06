@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=31">
+  <link rel="stylesheet" href="kiosk.css?v=32">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -612,6 +612,16 @@
        BLIP ARCADE logo at top-left. -->
   <button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
 
+  <!-- Attract screen: shown on startup while the machine is on 0 credits.
+       Tap it (or the flashing COINS button) to drop a coin in. -->
+  <div id="need-coin-overlay">
+    <div class="nco-panel">
+      <div class="nco-msg">INSERT COIN</div>
+      <div class="nco-sub">1 Coin&nbsp;&nbsp;1 Play</div>
+      <div class="nco-credit">Credit&nbsp;&nbsp;0</div>
+    </div>
+  </div>
+
   <div class="stars" id="stars"></div>
   <div class="cab-rail left"></div>
   <div class="cab-rail right"></div>
@@ -1005,6 +1015,9 @@
     }
 
     window.onCoinInserted = function() {
+      // The attract screen drops the instant the coin lands — that's the
+      // payoff for inserting it. The cards still wait for the power-up.
+      updateNeedCoinOverlay();
       if (getCoins() === 1) {
         // This coin just brought the machine from empty to funded — power
         // up first, light up the cards once that finishes.
@@ -1025,7 +1038,23 @@
       document.querySelectorAll('.card').forEach(function(card) {
         card.classList.toggle('no-credit', !enabled);
       });
+      updateNeedCoinOverlay();
     }
+
+    // The full-screen INSERT COIN attract overlay: up on startup and any
+    // time the machine sits on zero credits, gone the moment a coin drops.
+    // Tapping anywhere on it drops a coin (same as the corner COINS button).
+    function updateNeedCoinOverlay() {
+      var broke = getCoins() <= 0;
+      var ov = document.getElementById('need-coin-overlay');
+      if (ov) ov.classList.toggle('visible', broke);
+      document.body.classList.toggle('need-coin', broke);
+    }
+
+    (function () {
+      var ov = document.getElementById('need-coin-overlay');
+      if (ov) ov.addEventListener('click', function () { insertCoin(); });
+    }());
 
     function updateCreditsDisplay() {
       updateCoinsHud();
