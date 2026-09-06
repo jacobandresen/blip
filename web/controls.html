@@ -8,7 +8,7 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=30">
+  <link rel="stylesheet" href="kiosk.css?v=31">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -185,7 +185,7 @@
     /* The kiosk bar grows to ~76px on phones (bigger touch controls), so
        lift the language flags clear of it. */
     @media (max-width: 480px) {
-      .lang-switcher { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+      .lang-switcher { bottom: calc(102px + env(safe-area-inset-bottom, 0px)); }
     }
 
   </style>

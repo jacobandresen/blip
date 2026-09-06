@@ -760,33 +760,33 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    minimum at every tier; only the shaft's swing and the hit-area width
    shrink on the way down, so the stick still clears the left edge. */
 @media (max-width: 480px) {
-  #topbar.kiosk-bar, .kiosk-bar-main { height: calc(76px + env(safe-area-inset-bottom, 0px)); }
-  .kiosk-bar > .deck-panel { gap: 32px; padding-left: 8px; padding-right: 8px; }
-  #stick-base { width: 118px; }
-  #stick-boot { width: 50px; height: 50px; }
-  #stick-handle { bottom: 31px; }
-  #stick-shaft { width: 12px; height: 46px; }
-  #stick-ball  { width: 58px; height: 58px; bottom: 46px; }
+  #topbar.kiosk-bar, .kiosk-bar-main { height: calc(82px + env(safe-area-inset-bottom, 0px)); }
+  .kiosk-bar > .deck-panel { gap: 46px; padding-left: 6px; padding-right: 6px; }
+  #stick-base { width: 122px; }
+  #stick-boot { width: 54px; height: 54px; }
+  #stick-handle { bottom: 33px; }
+  #stick-shaft { width: 13px; height: 50px; }
+  #stick-ball  { width: 66px; height: 66px; bottom: 50px; }
   #fire-buttons { gap: 12px; }
-  .arcade-btn { width: 60px; height: 60px; }
+  .arcade-btn { width: 66px; height: 66px; }
   /* Clear the corner badges / language flags of the now-taller bar and its
      raised stick (index.html re-states this for its own .lang-switcher). */
   .left-badges,
-  .lang-switcher { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .lang-switcher { bottom: calc(102px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* Smallest phones (iPhone SE/mini class) — a 2-button game plus the coin
    readout is tight, so trim the stick's footprint and the button gap a
    little, but keep both stick and buttons above the touch minimum. */
 @media (max-width: 380px) {
-  .kiosk-bar > .deck-panel { gap: 24px; padding-left: 6px; padding-right: 6px; }
-  #stick-base { width: 104px; }
-  #stick-boot { width: 46px; height: 46px; }
-  #stick-handle { bottom: 29px; }
-  #stick-shaft { width: 11px; height: 42px; }
-  #stick-ball  { width: 54px; height: 54px; bottom: 42px; }
+  .kiosk-bar > .deck-panel { gap: 34px; padding-left: 5px; padding-right: 5px; }
+  #stick-base { width: 108px; }
+  #stick-boot { width: 50px; height: 50px; }
+  #stick-handle { bottom: 31px; }
+  #stick-shaft { width: 12px; height: 46px; }
+  #stick-ball  { width: 60px; height: 60px; bottom: 46px; }
   #fire-buttons { gap: 9px; }
-  .arcade-btn { width: 56px; height: 56px; }
+  .arcade-btn { width: 60px; height: 60px; }
 }
 
 /* Below any current iPhone (kept as a graceful floor, not a target) */

@@ -636,10 +636,10 @@ body.need-coin #insert-coin-btn {
   /* Rally dials roughly double on a phone — like the joystick ball, they
      rise up out of the deck over the game so they can be a real thumb
      target without needing a taller bar. */
-  #paddle-dial, #paddle-dial-p2 { width: 104px; height: 104px; bottom: 12px; }
-  #paddle-dial    { left: max(4px, env(safe-area-inset-left, 0px)); }
-  #paddle-dial-p2 { right: max(4px, env(safe-area-inset-right, 0px)); }
-  #paddle-dial::before, #paddle-dial-p2::before { width: 92px; height: 18px; bottom: -4px; }
+  #paddle-dial, #paddle-dial-p2 { width: 118px; height: 118px; bottom: 12px; }
+  #paddle-dial    { left: max(2px, env(safe-area-inset-left, 0px)); }
+  #paddle-dial-p2 { right: max(2px, env(safe-area-inset-right, 0px)); }
+  #paddle-dial::before, #paddle-dial-p2::before { width: 104px; height: 20px; bottom: -4px; }
   .dial-cap { transform: translateZ(9px); }
   #dial-label, #dial-label-p2 { top: -15px; font-size: 8px; letter-spacing: 2px; }
 }
