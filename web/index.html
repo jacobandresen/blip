@@ -908,8 +908,9 @@
         var ctx = getKioskAudio();
 
         // Power-supply drone: 58 Hz sawtooth → lowpass, plus its mains-ish
-        // 120 Hz overtone — a low hum that's clearly there without being a
-        // nuisance. Fades up over a couple of seconds like it's warming up.
+        // 120 Hz overtone — a low hum kept just at the threshold of notice,
+        // felt more than heard. Fades up over a couple of seconds like it's
+        // warming up.
         var osc = ctx.createOscillator();
         var osc2 = ctx.createOscillator();
         var lpf = ctx.createBiquadFilter();
@@ -923,13 +924,13 @@
         lpf.Q.value = 1.4;
         gMaster.gain.value = 0;
         var g2 = ctx.createGain();
-        g2.gain.value = 0.5;
+        g2.gain.value = 0.32;
         osc.connect(lpf);
         osc2.connect(g2); g2.connect(lpf);
         lpf.connect(gMaster); gMaster.connect(ctx.destination);
         osc.start();
         osc2.start();
-        gMaster.gain.linearRampToValueAtTime(0.11, ctx.currentTime + 2);
+        gMaster.gain.linearRampToValueAtTime(0.055, ctx.currentTime + 2);
 
         scheduleGlitch(ctx);
       }
@@ -956,7 +957,7 @@
         bpf.frequency.value = 150 + Math.random() * 500;
         bpf.Q.value = 1;
         src.connect(bpf); bpf.connect(g); g.connect(ctx.destination);
-        g.gain.setValueAtTime(0.025 + Math.random() * 0.02, t);
+        g.gain.setValueAtTime(0.014 + Math.random() * 0.012, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + dur);
         src.start(t); src.stop(t + dur + 0.01);
       }
