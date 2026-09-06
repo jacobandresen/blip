@@ -801,50 +801,47 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .arcade-btn { width: 48px; height: 48px; }
 }
 
-/* ---- Left badge group ---- */
+/* ---- Left badge group — CONTROLS / ABOUT / HISTORY ----
+   One definition, shared identically by the front page and the info
+   pages so a badge doesn't shift by a pixel when you open one. Lower-left
+   corner, centred on the cabinet side rail (.cab-rail.left, 64px). Each
+   badge's box is exactly its 44px avatar (label pulled out of flow), so
+   the different label lengths never nudge the icons out of a column. */
 .left-badges {
   position: fixed;
   bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-  left: 20px;
+  left: 10px;
   z-index: 10000;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   transition: opacity .3s;
 }
+.lang-switcher { transition: opacity .3s; }
 
 @media (max-width: 600px) {
-  /* badges hide when scrolled to the bottom to avoid crowding the kiosk bar */
-  .left-badges.near-bottom {
-    opacity: 0;
-    pointer-events: none;
-  }
-  /* lang switcher hides when near the bottom for the same reason */
+  /* badges + flags hide when scrolled to the bottom of the landing page
+     (kiosk.js only arms this there) to avoid crowding the kiosk bar */
+  .left-badges.near-bottom,
   .lang-switcher.near-bottom {
     opacity: 0;
     pointer-events: none;
   }
 }
 
-.lang-switcher { transition: opacity .3s; }
-
 .controls-badge,
 .about-badge,
 .history-badge {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  position: relative;
+  display: block;
   text-decoration: none;
+  color: #444;
   font-size: 10px;
   letter-spacing: 2px;
   text-transform: uppercase;
   transition: color .2s;
 }
-
-.controls-badge { color: #444; }
-.about-badge    { color: #444; }
-.history-badge  { color: #444; }
 
 .controls-avatar,
 .about-avatar,
@@ -861,20 +858,24 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 .history-avatar  { filter: grayscale(20%) brightness(0.7); }
 
 /* Phones — smaller avatars so they sit inside a game card's left padding
-   zone on the landing page. Must come after the 44px base above (a plain
-   rule later in the file would otherwise beat an @media one). Kept the
-   same on index / about / history / controls. */
+   zone on the landing page. After the 44px base so this @media wins. */
 @media (max-width: 600px) {
   .controls-avatar,
   .about-avatar,
   .history-avatar { width: 32px; height: 32px; }
+  .controls-label,
+  .about-label,
+  .history-label { left: 42px; }
 }
 
 .controls-label,
 .about-label,
 .history-label {
+  position: absolute;
+  left: 54px;
+  top: 50%;
   opacity: 0;
-  transform: translateX(-6px);
+  transform: translateY(-50%) translateX(-6px);
   transition: opacity .2s, transform .2s;
   white-space: nowrap;
   /* Solid backing so the revealed label stays legible over page text. */
@@ -887,55 +888,29 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 .about-label    { text-shadow: 0 0 8px #D97757; color: #D97757; }
 .history-label  { text-shadow: 0 0 8px #e6dc32; color: #e6dc32; }
 
-/* hover */
-.controls-badge:hover { color: #32c832; }
-.about-badge:hover    { color: #D97757; }
-.history-badge:hover  { color: #e6dc32; }
+/* hover + active (current page) both reveal the label and light the ring */
+.controls-badge:hover, .controls-badge.active { color: #32c832; }
+.about-badge:hover,    .about-badge.active    { color: #D97757; }
+.history-badge:hover,  .history-badge.active  { color: #e6dc32; }
+.controls-badge.active, .about-badge.active, .history-badge.active { cursor: default; }
 
-.controls-badge:hover .controls-label,
-.about-badge:hover .about-label,
-.history-badge:hover .history-label {
+.controls-badge:hover .controls-label, .controls-badge.active .controls-label,
+.about-badge:hover .about-label,       .about-badge.active .about-label,
+.history-badge:hover .history-label,   .history-badge.active .history-label {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateY(-50%) translateX(0);
 }
-.controls-badge:hover .controls-avatar {
+.controls-badge:hover .controls-avatar, .controls-badge.active .controls-avatar {
   border-color: #32c832;
   box-shadow: 0 0 12px rgba(50,200,50,0.45);
   filter: none;
 }
-.about-badge:hover .about-avatar {
+.about-badge:hover .about-avatar, .about-badge.active .about-avatar {
   border-color: #D97757;
   box-shadow: 0 0 12px rgba(217,119,87,0.45);
   filter: none;
 }
-.history-badge:hover .history-avatar {
-  border-color: #e6dc32;
-  box-shadow: 0 0 12px rgba(230,220,50,0.45);
-  filter: none;
-}
-
-/* active (current page) */
-.controls-badge.active { cursor: default; color: #32c832; }
-.about-badge.active    { cursor: default; color: #D97757; }
-.history-badge.active  { cursor: default; color: #e6dc32; }
-
-.controls-badge.active .controls-label,
-.about-badge.active .about-label,
-.history-badge.active .history-label {
-  opacity: 1;
-  transform: translateX(0);
-}
-.controls-badge.active .controls-avatar {
-  border-color: #32c832;
-  box-shadow: 0 0 12px rgba(50,200,50,0.45);
-  filter: none;
-}
-.about-badge.active .about-avatar {
-  border-color: #D97757;
-  box-shadow: 0 0 12px rgba(217,119,87,0.45);
-  filter: none;
-}
-.history-badge.active .history-avatar {
+.history-badge:hover .history-avatar, .history-badge.active .history-avatar {
   border-color: #e6dc32;
   box-shadow: 0 0 12px rgba(230,220,50,0.45);
   filter: none;

@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=29">
+  <link rel="stylesheet" href="kiosk.css?v=30">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -146,17 +146,11 @@
     @media (max-width: 600px) {
       .lang-btn { width: 32px; height: 32px; font-size: 22px; }
     }
-    /* Badge avatar shrink lives after the .*-avatar base rules below, so a
-       later plain rule can't beat this @media one. */
 
-    /* .top-marquee-bar + the logo/coin-slot height match live in kiosk.css
-       now, shared identically with about / controls / history. */
-
-    @media (max-width: 480px) {
-      /* The kiosk bar grows to ~76px on phones to seat the bigger touch
-         controls, so lift the corner badges / language flags clear of it. */
-      .left-badges, .lang-switcher { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
-    }
+    /* .top-marquee-bar, the logo/coin-slot heights, the .left-badges
+       position + the <=480px bottom-lift for the badges and flags all
+       live in kiosk.css now, shared identically with about / controls /
+       history. */
 
 
     .divider {
@@ -287,7 +281,7 @@
 
     .card::before, .card::after { border-color: var(--c); }
 
-    .card:hover, .card-focused {
+    .card:hover {
       border-color: var(--c);
       box-shadow:
         0 0 16px rgba(0,0,0,.8),
@@ -295,13 +289,17 @@
         inset 0 0 20px color-mix(in srgb, var(--c) 4%, transparent);
     }
 
-    /* The game you're currently in (last one started, JS adds .card-active
-       on return) glows in its own accent colour like a lit cabinet, and
-       keeps glowing even when you're out of credits. */
+    /* Full fluorescent glow on the card you're focused on — the one the
+       arrow keys / joystick have selected (.card-focused) and the game
+       you're currently in (.card-active, last one started, JS adds it on
+       return). Its own accent colour, breathing like a lit cabinet, and
+       it stays lit even when you're out of credits. */
+    .card.card-focused,
     .card.card-active {
       border-color: var(--c);
       animation: card-active-glow 2.6s ease-in-out infinite;
     }
+    .card.card-focused.no-credit,
     .card.card-active.no-credit { opacity: 1; filter: none; }
     @keyframes card-active-glow {
       0%, 100% {
@@ -519,21 +517,10 @@
     header, .divider, .game-grid, footer { position: relative; z-index: 1; }
 
     /* ---- left badge group ---- */
-    /* Lower-left corner, centred on the cabinet side rail (.cab-rail.left,
-       64px wide with its own rivet dots) rather than pinned to the raw
-       viewport edge — reads as mounted on that same panel. The rail only
-       renders at 1180px+, but centring on its width holds up fine below
-       that too, just without rivets to align with. */
-    .left-badges {
-      position: fixed;
-      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-      left: 10px;
-      z-index: 10000;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
+    /* Position + badge styling all live in kiosk.css, shared byte-for-byte
+       with the about / history / controls pages so nothing shifts when you
+       open one. The one thing that's front-page-only is the attract-mode
+       hide below. */
 
     /* Attract-mode: the corner badges (CONTROLS / ABOUT / HISTORY) and the
        language flags stay hidden until the front page has sat untouched
@@ -551,156 +538,8 @@
       pointer-events: auto;
     }
 
-    /* ---- about badge ---- */
-    /* position:relative + the label pulled out of flow (absolute) so the
-       badge's own box is exactly the 44px avatar, regardless of the label
-       text's width — otherwise "ABOUT" and "HISTORY" being different
-       lengths shifts the two avatars out of alignment under the parent's
-       align-items:center (a wider invisible label pushes its icon off
-       centre relative to the other badge's icon). */
-    .about-badge {
-      position: relative;
-      display: block;
-      text-decoration: none;
-      color: #444;
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      transition: color .2s;
-    }
-    .about-badge:hover { color: #D97757; }
-    .about-badge:hover .about-label { opacity: 1; transform: translateY(-50%) translateX(0); }
-    .about-badge:hover .about-avatar {
-      border-color: #D97757;
-      box-shadow: 0 0 12px rgba(217,119,87,0.45);
-      filter: none;
-    }
-    .about-avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 1px solid #222;
-      display: block;
-      transition: border-color .2s, box-shadow .2s, filter .2s;
-      filter: grayscale(40%) brightness(0.8);
-    }
-    .about-label {
-      position: absolute;
-      left: 54px;
-      top: 50%;
-      opacity: 0;
-      transform: translateY(-50%) translateX(-6px);
-      transition: opacity .2s, transform .2s;
-      white-space: nowrap;
-      text-shadow: 0 0 8px #D97757;
-      color: #D97757;
-    }
-
-    /* ---- history badge ---- */
-    .history-badge {
-      position: relative;
-      display: block;
-      text-decoration: none;
-      color: #888;
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      transition: color .2s;
-    }
-    .history-badge:hover { color: var(--yellow); }
-    .history-badge:hover .history-label {
-      opacity: 1;
-      transform: translateY(-50%) translateX(0);
-      text-shadow: 0 0 8px var(--yellow);
-      color: var(--yellow);
-    }
-    .history-badge:hover .history-avatar {
-      border-color: var(--yellow);
-      box-shadow: 0 0 12px rgba(230,220,50,0.45);
-      filter: none;
-    }
-    .history-avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 1px solid #222;
-      display: block;
-      transition: border-color .2s, box-shadow .2s, filter .2s;
-      filter: grayscale(20%) brightness(0.7);
-    }
-    .history-label {
-      position: absolute;
-      left: 54px;
-      top: 50%;
-      opacity: 0;
-      transform: translateY(-50%) translateX(-6px);
-      transition: opacity .2s, transform .2s;
-      white-space: nowrap;
-      text-shadow: 0 0 8px var(--yellow);
-      color: var(--yellow);
-    }
-
-    /* ---- controls badge ---- */
-    .controls-badge {
-      position: relative;
-      display: block;
-      text-decoration: none;
-      color: #444;
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      transition: color .2s;
-    }
-    .controls-badge:hover { color: var(--green); }
-    .controls-badge:hover .controls-label {
-      opacity: 1;
-      transform: translateY(-50%) translateX(0);
-    }
-    .controls-badge:hover .controls-avatar {
-      border-color: var(--green);
-      box-shadow: 0 0 12px rgba(50,200,50,0.45);
-      filter: none;
-    }
-    .controls-avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 1px solid #222;
-      display: block;
-      transition: border-color .2s, box-shadow .2s, filter .2s;
-      filter: grayscale(35%) brightness(0.8);
-    }
-    .controls-label {
-      position: absolute;
-      left: 54px;
-      top: 50%;
-      opacity: 0;
-      transform: translateY(-50%) translateX(-6px);
-      transition: opacity .2s, transform .2s;
-      white-space: nowrap;
-      text-shadow: 0 0 8px var(--green);
-      color: var(--green);
-    }
-
-    /* Solid backing so the revealed label stays legible over the game grid
-       text it floats across. */
-    .controls-label, .about-label, .history-label {
-      padding: 4px 9px;
-      border-radius: 3px;
-      background: rgba(5, 5, 8, 0.92);
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 4px 14px rgba(0,0,0,0.6);
-    }
-
-    /* Phones — same avatar size as the about / history / controls pages
-       (kiosk.css). After the 44px bases above so it actually wins. */
-    @media (max-width: 600px) {
-      .controls-avatar,
-      .about-avatar,
-      .history-avatar { width: 32px; height: 32px; }
-      .controls-label,
-      .about-label,
-      .history-label { left: 42px; }
-    }
+    /* about / history / controls badge styling: all in kiosk.css now,
+       shared identically with those pages. */
 
     /* ---- mastodon badge ---- */
     .profile-badge {
@@ -1258,12 +1097,22 @@
     (function () {
       var cards = Array.prototype.slice.call(document.querySelectorAll('.card'));
       if (!cards.length) return;
-      var idx = 0;
+      // Start the selection on the game you're currently in (last started),
+      // so the first arrow press steps away from there.
+      var lastGame = null;
+      try { lastGame = sessionStorage.getItem('blip-last-game'); } catch (e) {}
+      var activeIdx = lastGame ? cards.findIndex(function (c) {
+        return (c.getAttribute('href') || '').indexOf(lastGame + '/') === 0;
+      }) : -1;
+      var idx = activeIdx >= 0 ? activeIdx : 0;
       var navActive = false;
 
       function highlight() {
         cards.forEach(function (c, i) {
           c.classList.toggle('card-focused', navActive && i === idx);
+          // Once you're navigating, the focus glow is the only glow —
+          // hand it over from the "last played" card.
+          if (navActive) c.classList.remove('card-active');
         });
       }
 
