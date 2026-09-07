@@ -768,7 +768,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
      whole stick behind the panel in some lean states. */
   transform: rotateX(calc(var(--bar-tilt) * -1 - 9deg)) rotate(calc(var(--dx) * 18deg));
   transform-style: preserve-3d;
-  transition: transform 90ms ease-out;
+  /* Short enough that the lean tracks the thumb rather than trailing it —
+     the input key already fired on the frame the direction engaged, so a
+     slow visual catch-up here is what would read as lag. Still eased, not
+     instant, so a hard flick still looks like a sprung stick and not a
+     teleport. */
+  transition: transform 55ms ease-out;
   /* This is the one element in the deck that actually animates — tell the
      compositor up front so the lean doesn't trigger a layer rebuild (and
      a one-frame flash) each time a direction engages. */

@@ -548,8 +548,17 @@ if (isRally) {
     var MAX_R = 46;   // pivot slides to stay within this — keeps reversals tight
     var DIAG = 27;    // deg off a cardinal before the 2nd axis engages
     var DIAG_HYST = 9; // deg of stickiness once an axis is on (no edge stutter)
+    // "within N deg of this cardinal" is tested as "dot product with the axis
+    // > cos(N)" — cos is monotonic on 0..180deg, so the comparison is the same
+    // one, minus an acos per axis per move. Precomputed here since DIAG and the
+    // hysteresis band are constant.
+    var COS_DIAG      = Math.cos((90 - DIAG) * Math.PI / 180);
+    var COS_DIAG_HYST = Math.cos((90 - DIAG + DIAG_HYST) * Math.PI / 180);
     var activeId = null;
     var engaged = false;
+    var pendingMove = null; // a move that arrived faster than ~120 Hz, held for the trailing flush
+    var moveRaf = 0;
+    var nextMoveOk = 0;     // performance.now() before which a move is deferred, not applied inline
     var wantDir = { up: false, down: false, left: false, right: false };
     var CODE_FOR = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
     var AXES = [
@@ -562,12 +571,16 @@ if (isRally) {
     function setDir(dir, want) {
       if (wantDir[dir] === want) return;
       wantDir[dir] = want;
+      // Fire the key first — it's the gameplay-critical half — then the
+      // haptic. navigator.vibrate() is a synchronous bridge call that can
+      // cost a couple of ms on some Android browsers; behind injectKey() that
+      // never lands in front of the input.
+      var code = CODE_FOR[dir];
+      injectKey(code, code, want ? 'keydown' : 'keyup');
       // A short tick on each fresh engage — a felt detent so you know the
       // direction caught without looking down from the game. No-op on iOS
       // Safari (no Vibration API), a light buzz on Android.
       if (want && navigator.vibrate) { try { navigator.vibrate(7); } catch (e) {} }
-      var code = CODE_FOR[dir];
-      injectKey(code, code, want ? 'keydown' : 'keyup');
     }
 
     // Floating pivot: wherever the thumb first lands becomes "centre", and
@@ -607,10 +620,11 @@ if (isRally) {
       var ux = dx / dist, uy = dy / dist;
       for (var i = 0; i < AXES.length; i++) {
         var a = AXES[i];
-        var dot = Math.max(-1, Math.min(1, ux * a.ax + uy * a.ay));
-        var offDeg = Math.acos(dot) * 180 / Math.PI;
-        var limit = (90 - DIAG) + (wantDir[a.dir] ? DIAG_HYST : 0);
-        setDir(a.dir, offDeg < limit);
+        var dot = ux * a.ax + uy * a.ay;
+        // Wider acceptance cone once this axis is already on (hysteresis) =
+        // a lower cosine threshold to fall back out of.
+        var thr = wantDir[a.dir] ? COS_DIAG_HYST : COS_DIAG;
+        setDir(a.dir, dot > thr);
       }
     }
 
@@ -618,6 +632,9 @@ if (isRally) {
       activeId = null;
       pivot = null;
       engaged = false;
+      if (moveRaf) { cancelAnimationFrame(moveRaf); moveRaf = 0; }
+      pendingMove = null;
+      nextMoveOk = 0;
       setDir('left', false); setDir('right', false);
       setDir('up',   false); setDir('down',  false);
       window.removeEventListener('pointermove', onMove, true);
@@ -636,10 +653,26 @@ if (isRally) {
       return true;
     }
 
+    // apply() is pure arithmetic on the cached pivot — no layout reads — so a
+    // virtual stick should run it the instant the move lands, not a frame
+    // later. The only thing worth throttling is a pointer that reports faster
+    // than the screen can show it (a 1 kHz mouse, a coalesced touch burst):
+    // past ~one 120 Hz frame the extra passes can't change what the eye or the
+    // game's once-per-frame input poll sees, so those collapse into a single
+    // trailing rAF flush. preventDefault still runs synchronously on every
+    // move — it has to, to hold off the page scroll/refresh gesture.
+    function flushMove() {
+      moveRaf = 0;
+      var e = pendingMove;
+      pendingMove = null;
+      if (e && pivot && e.pointerId === activeId) { nextMoveOk = performance.now() + 8; apply(e); }
+    }
     function onMove(e) {
       if (e.pointerId !== activeId || !pivot) return;
       e.preventDefault();
-      apply(e);
+      pendingMove = e;
+      if (performance.now() >= nextMoveOk) flushMove();
+      else if (!moveRaf) moveRaf = requestAnimationFrame(flushMove);
     }
     function onEnd(e) {
       // Any up/cancel for our pointer ends the drag. Don't be fussy about
