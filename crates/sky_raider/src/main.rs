@@ -81,14 +81,16 @@ const BOSS_INTRO_TIME: f32 = 1.3;
 // Size must match blip_assets' CARRIER_W / CARRIER_H.
 const CARRIER_W: i32 = 108;
 const CARRIER_H: i32 = 190;
-const LAUNCH_TIME: f32 = 4.4;
+const LAUNCH_TIME: f32 = 3.8;
 // The plane starts down on the deck at the very bottom edge and climbs to
-// LAUNCH_END_Y — up in the playfield — where control is handed over. The
-// first LAUNCH_ROLL_FRAC of the sequence is the engine spinning up and the
-// plane barely rolling; the rest is the climb, easing into altitude.
+// LAUNCH_END_Y — up in the playfield — where full control is handed over.
+// The first LAUNCH_ROLL_FRAC of the sequence is a brief engine-spin-up
+// roll (no steering); after that you can already jink left/right while
+// the climb itself stays on rails until you reach altitude.
 const LAUNCH_START_Y: f32 = (WIN_H - 6) as f32;
 const LAUNCH_END_Y: f32 = (WIN_H - 175) as f32;
-const LAUNCH_ROLL_FRAC: f32 = 0.24;
+const LAUNCH_ROLL_FRAC: f32 = 0.1;
+const LAUNCH_DECK_FRAC: f32 = 0.08; // share of the vertical travel spent creeping on the deck
 const PROP_MAX_VOLUME: f32 = 0.45;
 
 // ---- power-up -----------------------------------------------------------
@@ -601,6 +603,7 @@ impl Game {
         // player_y / ship_y / launch_climb from here.
         self.player_x = ((WIN_W - PLAYER_W) / 2) as f32;
         self.player_y = LAUNCH_START_Y;
+        self.player_bank = 0.0;
         self.ship_y = (WIN_H - CARRIER_H / 2) as f32;
         self.launch_climb = 0.0;
         self.launch_timer.start(LAUNCH_TIME);
@@ -1060,32 +1063,47 @@ fn update_title(g: &mut Game) {
 
 /// Carrier launch: the plane sits down on the deck at the bottom edge,
 /// the engine spins up, and it climbs away up into the playfield while the
-/// carrier falls away below. No input, no hazards — a short cinematic beat
-/// at the top of every level; control is handed over once it reaches
-/// altitude (LAUNCH_END_Y). The engine-start one-shot and the looped
-/// propeller drone are started on the state transition (see the main
-/// loop); this drives the propeller's volume and cuts it at hand-off.
+/// carrier falls away below. A brief no-steering roll while the engine
+/// catches, then you can jink left/right during the climb; the climb
+/// itself stays on rails and full control lands once it reaches altitude
+/// (LAUNCH_END_Y). No hazards, no firing. The engine-start one-shot and
+/// the looped propeller drone are started on the state transition (see
+/// the main loop); this drives the propeller's volume and cuts it at
+/// hand-off.
 fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
     update_background(g, dt);
 
     let done = g.launch_timer.tick(dt);
     let k = (1.0 - g.launch_timer.remaining() / LAUNCH_TIME).clamp(0.0, 1.0);
 
-    // Two-phase curve: creep forward on the deck (covering only ~16% of the
-    // vertical travel) while the engine catches, then a strong climb that
-    // eases into the target altitude.
+    // Two-phase curve: a brief creep forward on the deck while the engine
+    // catches, then a strong climb easing into the target altitude.
+    let d = LAUNCH_DECK_FRAC;
     let climb = if k < LAUNCH_ROLL_FRAC {
         let p = k / LAUNCH_ROLL_FRAC;
-        0.16 * p * p
+        d * p * p
     } else {
         let p = (k - LAUNCH_ROLL_FRAC) / (1.0 - LAUNCH_ROLL_FRAC);
-        0.16 + 0.84 * (1.0 - (1.0 - p).powi(3))
+        d + (1.0 - d) * (1.0 - (1.0 - p).powi(3))
     };
     g.launch_climb = climb;
 
-    g.player_x = ((WIN_W - PLAYER_W) / 2) as f32;
     g.player_y = LAUNCH_START_Y + (LAUNCH_END_Y - LAUNCH_START_Y) * climb;
     g.ship_y = (WIN_H - CARRIER_H / 2) as f32 + climb * (CARRIER_H as f32 * 1.9);
+
+    // Steering: locked to centre through the spin-up roll, then left/right
+    // is live for the rest of the climb (vertical stays on the rail).
+    if k < LAUNCH_ROLL_FRAC {
+        g.player_x = ((WIN_W - PLAYER_W) / 2) as f32;
+    } else {
+        let left  = key_held(BLIP_KEY_LEFT)  || key_held(BLIP_KEY_A);
+        let right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
+        if left  { g.player_x -= PLAYER_SPEED * dt; }
+        if right { g.player_x += PLAYER_SPEED * dt; }
+        g.player_x = clamp(g.player_x, 0.0, (WIN_W - PLAYER_W) as f32);
+        let target_bank = if left && !right { -0.30 } else if right && !left { 0.30 } else { 0.0 };
+        g.player_bank += (target_bank - g.player_bank) * (dt * 9.0).min(1.0);
+    }
 
     // Propeller: swells in as the engine catches, holds through the climb,
     // and ducks away over the last stretch so the hand-off isn't an abrupt
@@ -1098,8 +1116,7 @@ fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     if done {
         stop_sound(&sfx.propeller);
-        g.player_x = ((WIN_W - PLAYER_W) / 2) as f32;
-        g.player_y = LAUNCH_END_Y;
+        g.player_y = LAUNCH_END_Y; // leave player_x wherever the climb was steered to
         g.launch_climb = 1.0;
         g.respawn_grace.start(0.4); // a beat of invulnerability as the fight starts
         g.state = State::Play;
@@ -1629,8 +1646,12 @@ fn draw_launch(
     let ph = PLAYER_H as f32 * scale;
     let px = g.player_x + (PLAYER_W as f32 - pw) / 2.0;
     let py = g.player_y + (PLAYER_H as f32 - ph) / 2.0;
-    draw_shadow(player_tex, px, py, pw, ph, 0.0);
-    blip.draw_texture(player_tex, px, py, pw, ph);
+    draw_shadow(player_tex, px, py, pw, ph, g.player_bank);
+    draw_texture_ex(player_tex, px, py, BLIP_WHITE, DrawTextureParams {
+        dest_size: Some(vec2(pw, ph)),
+        rotation: g.player_bank,
+        ..Default::default()
+    });
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
