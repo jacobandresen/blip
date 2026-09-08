@@ -543,11 +543,16 @@ if (isRally) {
     // A near-straight push stays a clean 4-way move; the second axis only
     // joins in once you're more than DIAG deg off a cardinal, so you don't
     // catch an accidental diagonal (Serpent turns, paddle nudges).
-    var ENGAGE = 16;  // px from pivot before any direction registers
-    var RELEASE = 9;  // px to fall back to neutral (< ENGAGE, hysteresis)
-    var MAX_R = 46;   // pivot slides to stay within this — keeps reversals tight
-    var DIAG = 27;    // deg off a cardinal before the 2nd axis engages
-    var DIAG_HYST = 9; // deg of stickiness once an axis is on (no edge stutter)
+    // Defaults, per-game overridden from BLIP_GAMES[slug].stick (kiosk.js) —
+    // e.g. Raider runs a smaller dead zone and stickier diagonals.
+    var _sg = (typeof blipGameFromPath === 'function'
+                && blipGameFromPath(window.location.pathname)) || {};
+    var _st = _sg.stick || {};
+    var ENGAGE = _st.engage  != null ? _st.engage  : 16; // px from pivot before any direction registers
+    var RELEASE = _st.release != null ? _st.release : 9; // px to fall back to neutral (< ENGAGE, hysteresis)
+    var MAX_R = _st.maxR      != null ? _st.maxR    : 46; // pivot slides to stay within this — keeps reversals tight
+    var DIAG = _st.diag       != null ? _st.diag    : 27; // deg off a cardinal before the 2nd axis engages
+    var DIAG_HYST = _st.diagHyst != null ? _st.diagHyst : 9; // deg of stickiness once an axis is on (no edge stutter)
     // "within N deg of this cardinal" is tested as "dot product with the axis
     // > cos(N)" — cos is monotonic on 0..180deg, so the comparison is the same
     // one, minus an acos per axis per move. Precomputed here since DIAG and the
