@@ -473,11 +473,11 @@ canvas {
   /* Landscape still gets a real thumb target — the ball floats above the
      bar over the game, so it can stay large even though vertical room is
      tight; only the shaft's swing shrinks. */
-  #stick-base { width: 72px; height: 148px; --throw: 10px; }
-  #stick-boot { width: 38px; height: 38px; bottom: 16px; }
-  #stick-handle { bottom: 44px; } /* ball-centre height above the bar edge */
-  #stick-shaft { width: 15px; height: 15px; bottom: -4px; }
-  #stick-ball  { width: 42px; height: 42px; bottom: 0; }
+  #stick-base { width: 72px; height: 148px; }
+  #stick-boot { width: 38px; height: 38px; bottom: 5px; }
+  #stick-handle { bottom: 43px; } /* = boot's bottom + height, its top surface */
+  #stick-shaft { width: 9px; height: 30px; }
+  #stick-ball  { width: 42px; height: 42px; bottom: 30px; }
 
   #fire-buttons { gap: 10px; }
   .arcade-btn { width: 46px; height: 46px; }
