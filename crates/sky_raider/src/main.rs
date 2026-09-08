@@ -81,7 +81,15 @@ const BOSS_INTRO_TIME: f32 = 1.3;
 // Size must match blip_assets' CARRIER_W / CARRIER_H.
 const CARRIER_W: i32 = 108;
 const CARRIER_H: i32 = 190;
-const LAUNCH_TIME: f32 = 5.2;
+const LAUNCH_TIME: f32 = 4.4;
+// The plane starts down on the deck at the very bottom edge and climbs to
+// LAUNCH_END_Y — up in the playfield — where control is handed over. The
+// first LAUNCH_ROLL_FRAC of the sequence is the engine spinning up and the
+// plane barely rolling; the rest is the climb, easing into altitude.
+const LAUNCH_START_Y: f32 = (WIN_H - 6) as f32;
+const LAUNCH_END_Y: f32 = (WIN_H - 175) as f32;
+const LAUNCH_ROLL_FRAC: f32 = 0.24;
+const PROP_MAX_VOLUME: f32 = 0.45;
 
 // ---- power-up -----------------------------------------------------------
 const MAX_POWERUPS: usize = 2;
@@ -365,6 +373,7 @@ struct Game {
     player_bank: f32,   // cosmetic roll while strafing — eased toward a target, not instant
     ship_y: f32,        // carrier position during the launch sequence
     launch_timer: Timer,
+    launch_climb: f32,  // 0..1 progress up the launch climb — drives the plane's grow-in scale
     weapon_level: i32,
     health: i32,
     bullets: [Bullet; MAX_PLAYER_BULLETS],
@@ -490,6 +499,7 @@ impl Game {
             player_bank: 0.0,
             ship_y: (WIN_H + CARRIER_H) as f32,
             launch_timer: Timer::default(),
+            launch_climb: 0.0,
             weapon_level: 1,
             health: PLAYER_HEALTH_MAX,
             bullets: [dead_bullet; MAX_PLAYER_BULLETS],
@@ -586,11 +596,13 @@ impl Game {
         if !self.island_timer.active() { self.island_timer.start(ISLAND_MIN_INTERVAL); }
         if !self.barrier_timer.active() { self.barrier_timer.start(BARRIER_MIN_INTERVAL); }
 
-        // Launch sequence: parked on the carrier deck, climbing away from it
-        // into the fight. update_launch() drives player_x/ship_y from here.
+        // Launch sequence: down on the carrier deck at the bottom edge,
+        // climbing away from it up into the fight. update_launch() drives
+        // player_y / ship_y / launch_climb from here.
         self.player_x = ((WIN_W - PLAYER_W) / 2) as f32;
-        self.player_y = (WIN_H - 60) as f32;
+        self.player_y = LAUNCH_START_Y;
         self.ship_y = (WIN_H - CARRIER_H / 2) as f32;
+        self.launch_climb = 0.0;
         self.launch_timer.start(LAUNCH_TIME);
         self.state = State::Launch;
     }
@@ -628,6 +640,10 @@ struct Sounds {
     turret_fire: blip::BlipSound,
     // Looped and volume-ridden live by update_barrier() — not a one-shot.
     barrier_hum: blip::BlipSound,
+    // Carrier launch: a one-shot engine crank/catch, plus a seamless
+    // propeller loop update_launch() fades in and out around it.
+    engine_start: blip::BlipSound,
+    propeller: blip::BlipSound,
 }
 
 fn spawn_boat(g: &mut Game) {
@@ -1042,25 +1058,58 @@ fn update_title(g: &mut Game) {
     if any_key_pressed() { g.start_game(); }
 }
 
-/// Carrier launch: the plane climbs from the deck up to its normal starting
-/// height while the ship falls away behind/below it. No input, no hazards —
-/// a short cinematic beat at the top of every level.
-fn update_launch(g: &mut Game, dt: f32) {
+/// Carrier launch: the plane sits down on the deck at the bottom edge,
+/// the engine spins up, and it climbs away up into the playfield while the
+/// carrier falls away below. No input, no hazards — a short cinematic beat
+/// at the top of every level; control is handed over once it reaches
+/// altitude (LAUNCH_END_Y). The engine-start one-shot and the looped
+/// propeller drone are started on the state transition (see the main
+/// loop); this drives the propeller's volume and cuts it at hand-off.
+fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
     update_background(g, dt);
 
     let done = g.launch_timer.tick(dt);
     let k = (1.0 - g.launch_timer.remaining() / LAUNCH_TIME).clamp(0.0, 1.0);
-    let eased = 1.0 - (1.0 - k) * (1.0 - k); // ease-out: quick start, gentle settle
 
-    let start_y = (WIN_H - 60) as f32;
-    g.player_y = start_y + (PLAYER_MAX_Y - start_y) * eased;
-    g.ship_y = (WIN_H - CARRIER_H / 2) as f32 + eased * (CARRIER_H as f32 * 1.4);
+    // Two-phase curve: creep forward on the deck (covering only ~16% of the
+    // vertical travel) while the engine catches, then a strong climb that
+    // eases into the target altitude.
+    let climb = if k < LAUNCH_ROLL_FRAC {
+        let p = k / LAUNCH_ROLL_FRAC;
+        0.16 * p * p
+    } else {
+        let p = (k - LAUNCH_ROLL_FRAC) / (1.0 - LAUNCH_ROLL_FRAC);
+        0.16 + 0.84 * (1.0 - (1.0 - p).powi(3))
+    };
+    g.launch_climb = climb;
+
+    g.player_x = ((WIN_W - PLAYER_W) / 2) as f32;
+    g.player_y = LAUNCH_START_Y + (LAUNCH_END_Y - LAUNCH_START_Y) * climb;
+    g.ship_y = (WIN_H - CARRIER_H / 2) as f32 + climb * (CARRIER_H as f32 * 1.9);
+
+    // Propeller: swells in as the engine catches, holds through the climb,
+    // and ducks away over the last stretch so the hand-off isn't an abrupt
+    // cut.
+    let mut prop = smoothstep01(k / (LAUNCH_ROLL_FRAC * 1.3)) * PROP_MAX_VOLUME;
+    if k > 0.9 {
+        prop *= (1.0 - k) / 0.1;
+    }
+    set_sound_volume(&sfx.propeller, prop);
 
     if done {
-        g.player_y = PLAYER_MAX_Y;
+        stop_sound(&sfx.propeller);
+        g.player_x = ((WIN_W - PLAYER_W) / 2) as f32;
+        g.player_y = LAUNCH_END_Y;
+        g.launch_climb = 1.0;
         g.respawn_grace.start(0.4); // a beat of invulnerability as the fight starts
         g.state = State::Play;
     }
+}
+
+/// Hermite smoothstep clamped to 0..1.
+fn smoothstep01(x: f32) -> f32 {
+    let x = x.clamp(0.0, 1.0);
+    x * x * (3.0 - 2.0 * x)
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
@@ -1571,8 +1620,17 @@ fn draw_launch(
     let carrier_y = g.ship_y - CARRIER_H as f32 / 2.0;
     draw_shadow(carrier_tex, carrier_x, carrier_y, CARRIER_W as f32, CARRIER_H as f32, 0.0);
     blip.draw_texture(carrier_tex, carrier_x, carrier_y, CARRIER_W as f32, CARRIER_H as f32);
-    draw_shadow(player_tex, g.player_x, g.player_y, PLAYER_W as f32, PLAYER_H as f32, 0.0);
-    blip.draw_texture(player_tex, g.player_x, g.player_y, PLAYER_W as f32, PLAYER_H as f32);
+
+    // The plane grows from a bit under full size to full size as it climbs
+    // toward the camera — a cheap fake-perspective cue that it started
+    // further "down" and is flying up into the play area.
+    let scale = 0.72 + 0.28 * g.launch_climb;
+    let pw = PLAYER_W as f32 * scale;
+    let ph = PLAYER_H as f32 * scale;
+    let px = g.player_x + (PLAYER_W as f32 - pw) / 2.0;
+    let py = g.player_y + (PLAYER_H as f32 - ph) / 2.0;
+    draw_shadow(player_tex, px, py, pw, ph, 0.0);
+    blip.draw_texture(player_tex, px, py, pw, ph);
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
@@ -1883,6 +1941,8 @@ const VICTORY_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/asse
 const GAME_OVER_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
 const TURRET_FIRE_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/turret_fire.wav"));
 const BARRIER_HUM_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/barrier_hum.wav"));
+const ENGINE_START_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine_start.wav"));
+const PROPELLER_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/propeller.wav"));
 const MUSIC_WAV:          &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
 const MUSIC2_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
 // music: 40.25s (150 BPM rock, E minor, verse/chorus/solo)  music2: 22.07s (176 BPM drop-D thrash)
@@ -1937,6 +1997,8 @@ async fn main() {
         game_over:      blip::audio::load_sound(GAME_OVER_WAV).await,
         turret_fire:    blip::audio::load_sound(TURRET_FIRE_WAV).await,
         barrier_hum:    blip::audio::load_sound(BARRIER_HUM_WAV).await,
+        engine_start:   blip::audio::load_sound(ENGINE_START_WAV).await,
+        propeller:      blip::audio::load_sound(PROPELLER_WAV).await,
     };
     // Two loops in rotation instead of one, so a long level doesn't just
     // hear the same ~40s of march on repeat — see MUSIC_DURATIONS.
@@ -1971,7 +2033,7 @@ async fn main() {
         let prev_state = g.state;
         match g.state {
             State::Title  => update_title(&mut g),
-            State::Launch => update_launch(&mut g, dt),
+            State::Launch => update_launch(&mut g, dt, &sfx),
             State::Play   => update_play(&mut g, dt, &sfx),
             State::Dead   => update_dead(&mut g, dt),
             State::Win    => update_win(&mut g, dt),
@@ -1980,6 +2042,13 @@ async fn main() {
         }
         if prev_state != State::Win  && g.state == State::Win  { play_sfx(&sfx.stage_clear); }
         if prev_state != State::Over && g.state == State::Over { play_sfx(&sfx.game_over); }
+        if prev_state != State::Launch && g.state == State::Launch {
+            // Kick off the carrier launch: the engine-start one-shot, and
+            // the propeller loop underneath it (silent to begin with —
+            // update_launch() rides its volume up as the engine catches).
+            play_sfx(&sfx.engine_start);
+            play_sound(&sfx.propeller, PlaySoundParams { looped: true, volume: 0.0 });
+        }
 
         blip.clear(BLIP_BLACK);
         match g.state {

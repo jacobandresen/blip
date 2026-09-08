@@ -966,6 +966,99 @@ fn turret_fire_sfx() -> Vec<u8> {
 /// needs to loop with no audible seam: the 110Hz fundamental (and its
 /// harmonics, and the tremolo) all complete a whole number of cycles across
 /// the buffer.
+/// Hermite smoothstep, clamped to 0..1 — used to ramp the engine's pitch
+/// and blade-chop rate through the start-up without any corners.
+fn smooth01(x: f32) -> f32 {
+    let x = x.clamp(0.0, 1.0);
+    x * x * (3.0 - 2.0 * x)
+}
+
+/// The carrier launch, in one shot: the electric starter motor whirring
+/// up, the engine catching with a couple of uneven chugs, then the prop
+/// spinning up and settling into an idle. ~1.9s; played once as the
+/// launch sequence begins, with `propeller_sfx` looping underneath it and
+/// on through the climb.
+fn engine_start_sfx() -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let dur_s = 1.9_f32;
+    let n = ms_to_samples(dur_s * 1000.0);
+    let mut rng = Lcg(0x0E17_0011);
+    let mut s = vec![0f32; n];
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let k = i as f32 / n as f32;
+
+        // Starter motor: a low buzz with a fast amplitude wobble (the
+        // electric crank), fading out as the engine takes over.
+        let starter_env = (1.0 - (k / 0.62).min(1.0)).powf(1.4);
+        let crank_f = 52.0 + 12.0 * k;
+        let crank_wob = 0.6 + 0.4 * (2.0 * PI * 9.0 * t).sin();
+        let crank_noise = ((rng.next() % 4096) as f32 / 4096.0 - 0.5) * 0.5;
+        let starter = ((2.0 * PI * crank_f * t).sin() * crank_wob + crank_noise) * starter_env * 0.5;
+
+        // The engine: pitch and blade-chop rate ramp up from a lumpy
+        // catch to a steady idle over the second half of the clip.
+        let eng_env = (k / 0.30).min(1.0);
+        let spin = smooth01((k - 0.22) / 0.62);
+        let f0 = 34.0 + 46.0 * spin;
+        let chop_hz = 5.0 + 20.0 * spin;
+        let chop = 0.4 + 0.6 * ((2.0 * PI * chop_hz * t).sin() * 0.5 + 0.5).powf(1.7);
+        let tone = (2.0 * PI * f0 * t).sin()
+            + 0.5 * (2.0 * PI * f0 * 2.0 * t).sin()
+            + 0.25 * (2.0 * PI * f0 * 3.0 * t).sin();
+        let engine = (tone * 0.4).tanh() * chop * eng_env * 0.9;
+
+        // Two or three uneven "chug" thumps as the cylinders first fire.
+        let mut chug = 0.0f32;
+        for &(ct, cv) in &[(0.60_f32, 0.9_f32), (0.76, 0.7), (0.88, 0.5)] {
+            let d = t - ct * dur_s;
+            if (0.0..0.10).contains(&d) {
+                let ce = (1.0 - d / 0.10).powf(1.5);
+                chug += (2.0 * PI * 44.0 * d).sin() * ce * cv;
+            }
+        }
+
+        s[i] = starter + engine + chug * 0.55;
+    }
+    let f = ms_to_samples(8.0);
+    for i in 0..f {
+        let g = i as f32 / f as f32;
+        s[i] *= g;
+        s[n - 1 - i] *= g;
+    }
+    let pcm: Vec<i16> = s.iter().map(|&v| (v.tanh() * 24_000.0) as i16).collect();
+    encode_pcm16_mono(&pcm)
+}
+
+/// The propeller drone — a short seamless loop the game plays (looped,
+/// volume-ridden) all through the carrier climb. Purely harmonic (a
+/// sawtooth-ish stack on an 78 Hz fundamental under a sharpened blade-chop
+/// tremolo), so every component completes a whole number of cycles across
+/// the 500 ms buffer and it loops with no click — no noise layer, which
+/// couldn't loop cleanly anyway; the grit comes from waveshaping instead.
+fn propeller_sfx() -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let n = ms_to_samples(500.0); // 22050 samples
+    let f0 = 78.0_f32;            // 39 cycles / 500 ms
+    let chop_hz = 24.0_f32;       // 12 cycles / 500 ms
+    let mut s = Vec::with_capacity(n);
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let tone = (2.0 * PI * f0 * t).sin()
+            + 0.55 * (2.0 * PI * f0 * 2.0 * t).sin()
+            + 0.30 * (2.0 * PI * f0 * 3.0 * t).sin()
+            + 0.17 * (2.0 * PI * f0 * 4.0 * t).sin()
+            + 0.08 * (2.0 * PI * f0 * 6.0 * t).sin();
+        // Blade chop: a tremolo sharpened so it "thwacks" without ever
+        // fully closing.
+        let chop_raw = (2.0 * PI * chop_hz * t).sin() * 0.5 + 0.5;
+        let chop = 0.5 + 0.5 * chop_raw.powf(1.6);
+        s.push((tone * 0.3).tanh() * chop);
+    }
+    let pcm: Vec<i16> = s.iter().map(|&v| (v * 20_000.0) as i16).collect();
+    encode_pcm16_mono(&pcm)
+}
+
 fn barrier_hum_sfx() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let dur_ms = 400.0;
@@ -1734,6 +1827,8 @@ pub fn generate() -> Vec<Asset> {
         ("images/island_large.png",  island_sprite(ISLAND_SIZES[2].0, ISLAND_SIZES[2].1, 0x9A17_3DE0)),
         ("sounds/turret_fire.wav",    turret_fire_sfx()),
         ("sounds/barrier_hum.wav",    barrier_hum_sfx()),
+        ("sounds/engine_start.wav",   engine_start_sfx()),
+        ("sounds/propeller.wav",      propeller_sfx()),
         ("sounds/shoot.wav",          encode_pcm16_mono(&shoot_sfx())),
         ("sounds/enemy_explode.wav",  encode_pcm16_mono(&gen_noise(220.0, 0.7))),
         ("sounds/player_explode.wav", encode_pcm16_mono(&gen_noise(650.0, 0.9))),
