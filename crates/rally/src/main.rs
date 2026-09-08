@@ -261,12 +261,12 @@ fn draw_title(blip: &Blip) {
     blip.fill_rect(RPAD_X, py, PAD_W, PAD_H, C_PAD);
     let cy = PLAY_T + PLAY_H * 0.5;
     blip.draw_centered("RALLY", cy - 34.0, 5.0, BLIP_YELLOW);
-    // Each line names one dial and the mode spinning it starts, so the
-    // 1P / 2P choice is the control itself, not a menu. (The touch dials
-    // sit left / right on the deck under their P1 / 2P labels; on the
-    // keyboard "left dial" is W/S or the arrows, "right dial" is I/K.)
-    blip.draw_centered("SPIN LEFT DIAL: 1 PLAYER",   cy + 14.0, 2.0, BLIP_WHITE);
-    blip.draw_centered("SPIN RIGHT DIAL: 2 PLAYERS", cy + 36.0, 2.0, BLIP_WHITE);
+    // The 1P / 2P choice is the control itself, not a menu: each line
+    // names a paddle (both are drawn on screen) and the mode you get by
+    // moving it. "Move" covers both inputs — spin that side's dial, or
+    // press its keys (left = W/S or arrows, right = I/K).
+    blip.draw_centered("MOVE LEFT PADDLE: 1 PLAYER",   cy + 14.0, 2.0, BLIP_WHITE);
+    blip.draw_centered("MOVE RIGHT PADDLE: 2 PLAYERS", cy + 36.0, 2.0, BLIP_WHITE);
 }
 
 fn draw_serve(blip: &Blip, g: &Game) {
@@ -303,7 +303,7 @@ fn draw_over(blip: &Blip, g: &Game) {
     };
     blip.draw_centered(msg, cy - 20.0, 3.0, BLIP_YELLOW);
     if !g.point_t.active() {
-        blip.draw_centered("SPIN A DIAL TO PLAY AGAIN", cy + 24.0, 2.0, BLIP_GRAY);
+        blip.draw_centered("MOVE A PADDLE TO PLAY AGAIN", cy + 24.0, 2.0, BLIP_GRAY);
     }
 }
 
