@@ -643,9 +643,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   inset: 0;
   display: flex;
   align-items: center;
-  /* stick + fire buttons as one centered group, a wide gap between them */
+  /* stick + fire buttons as one centered group, a wide gap between them —
+     wide enough that a thumb on the stick and a thumb on fire don't
+     collide over the middle of the deck */
   justify-content: center;
-  gap: 44px;
+  gap: 58px;
   padding: 0 10px env(safe-area-inset-bottom, 0px);
   overflow: visible;
   border-radius: 10px 10px 0 0;
@@ -908,7 +910,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    shrink on the way down, so the stick still clears the left edge. */
 @media (max-width: 480px) {
   #topbar.kiosk-bar, .kiosk-bar-main { height: calc(82px + env(safe-area-inset-bottom, 0px)); }
-  .kiosk-bar > .deck-panel { gap: 46px; padding-left: 6px; padding-right: 6px; }
+  .kiosk-bar > .deck-panel { gap: 64px; padding-left: 6px; padding-right: 6px; }
   #stick-base { width: 122px; --throw: 14px; }
   #stick-boot { width: 54px; height: 54px; bottom: 22px; }
   #stick-handle { bottom: 58px; }
@@ -926,7 +928,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    readout is tight, so trim the stick's footprint and the button gap a
    little, but keep both stick and buttons above the touch minimum. */
 @media (max-width: 380px) {
-  .kiosk-bar > .deck-panel { gap: 34px; padding-left: 5px; padding-right: 5px; }
+  .kiosk-bar > .deck-panel { gap: 48px; padding-left: 5px; padding-right: 5px; }
   #stick-base { width: 108px; --throw: 13px; }
   #stick-boot { width: 50px; height: 50px; bottom: 20px; }
   #stick-handle { bottom: 54px; }
@@ -938,7 +940,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* Below any current iPhone (kept as a graceful floor, not a target) */
 @media (max-width: 340px) {
-  .kiosk-bar > .deck-panel { gap: 16px; padding-left: 4px; padding-right: 4px; }
+  .kiosk-bar > .deck-panel { gap: 28px; padding-left: 4px; padding-right: 4px; }
   #stick-base { width: 90px; --throw: 10px; }
   #stick-boot { width: 40px; height: 40px; bottom: 16px; }
   #stick-handle { bottom: 45px; }
@@ -957,7 +959,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    keeps the compact deck, and a phone in landscape (short) doesn't match. */
 @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
   #topbar.kiosk-bar, .kiosk-bar-main { height: calc(112px + env(safe-area-inset-bottom, 0px)); }
-  .kiosk-bar > .deck-panel { gap: clamp(64px, 10vw, 180px); padding-left: 16px; padding-right: 16px; }
+  .kiosk-bar > .deck-panel { gap: clamp(96px, 15vw, 240px); padding-left: 16px; padding-right: 16px; }
   #stick-base { width: 194px; height: 252px; --throw: 22px; }
   #stick-base::before { width: 52px; height: 14px; }
   #stick-boot { width: 78px; height: 78px; bottom: 34px; }
