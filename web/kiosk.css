@@ -691,20 +691,24 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* A soft contact shadow on the panel below the ball — reads as "elevated
-   above the surface on a shaft" without any actual depth axis, and drifts
-   opposite the lean the same way a real raking-light shadow would. */
+/* The joystick's shadow cast down onto the deck — a soft ellipse under
+   the ball that reads as "raised off the surface on a shaft". It slides
+   with the lean the way a shadow under an overhead light would, and grows
+   a touch as the stick leans further out. Flat in the deck plane, so it
+   foreshortens with the panel and stays on the surface. */
 #stick-base::before {
   content: '';
   position: absolute;
-  bottom: 2px;
+  bottom: 3px;
   left: 50%;
-  width: 34px;
-  height: 10px;
+  width: 66px;
+  height: 22px;
   border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(0,0,0,0.55) 0%, transparent 72%);
-  transform: translate(calc(-50% + var(--dx) * -6px), 0);
-  transition: transform 90ms ease-out;
+  background: radial-gradient(ellipse,
+    rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.45) 40%, rgba(0,0,0,0.16) 64%, transparent 80%);
+  filter: blur(2px);
+  transform: translate(calc(-50% + var(--dx) * 11px), calc(var(--dy) * 6px));
+  transition: transform 55ms ease-out;
   pointer-events: none;
 }
 
@@ -840,9 +844,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   border-radius: 50%;
   background: radial-gradient(circle at 34% 22%, #ffab9c 0%, #ff8a78 18%, #e6402c 46%, #a3170c 80%, #6e0d06 100%);
   box-shadow:
-    0 5px 8px rgba(0, 0, 0, 0.55),
-    inset 0 -4px 7px rgba(0, 0, 0, 0.35),
-    inset 0 2px 3px rgba(255, 255, 255, 0.25);
+    0 6px 10px rgba(0, 0, 0, 0.5),
+    0 14px 22px rgba(0, 0, 0, 0.35),
+    inset 0 -5px 9px rgba(0, 0, 0, 0.4),
+    inset 0 3px 4px rgba(255, 255, 255, 0.3);
 }
 
 /* ---- Fire buttons: flush in the bar, right of INSERT COIN ---- */
@@ -852,6 +857,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   align-items: center;
   flex-shrink: 0;
   gap: 8px;
+  transform-style: preserve-3d;
 }
 
 .arcade-btn {
@@ -868,9 +874,19 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
-  /* The chrome bezel ring around the cap. */
-  background: conic-gradient(from -45deg, #dfe1e4, #8a8d92 25%, #4a4c50 50%, #8a8d92 75%, #dfe1e4 100%);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6);
+  /* The polished-chrome bezel ring the cap is set into. */
+  background: conic-gradient(from -50deg, #eceef1, #9a9ea6 20%, #33363b 50%, #9a9ea6 80%, #eceef1 100%);
+  /* Stands proud of the deck (translateZ toward the camera) with a real
+     drop shadow beneath — it's a button you push, not a decal. */
+  transform: translateZ(6px);
+  transform-style: preserve-3d;
+  box-shadow:
+    0 4px 7px rgba(0, 0, 0, 0.6),
+    0 10px 16px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.55);
+  transition: transform .06s ease-out, box-shadow .06s ease-out;
 }
 
 .arcade-btn-cap {
@@ -879,28 +895,44 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
      now that .arcade-btn is half its old size (and across the smaller
      breakpoints below it too), instead of a fixed inset eating an
      ever-larger share of a shrinking button. */
-  inset: 9%;
+  inset: 12%;
   border-radius: 50%;
-  /* Concave dish: an off-centre highlight catching the light on the near
-     side of the depression, darkening toward the rim. */
-  background: radial-gradient(circle at 38% 30%, #ff5a4a 0%, #d5241a 45%, #8f1109 100%);
+  transform: translateZ(3px);   /* the cap crowns above the bezel rim */
+  /* Convex dome: a tight specular hot-spot up-left where the light hits,
+     rolling through the body colour to a dark far rim. */
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #ff6a58 0%, #e5361f 44%, #a3160b 78%, #6b0c05 100%);
   box-shadow:
-    inset 0 -4px 6px rgba(0, 0, 0, 0.45),
-    inset 0 3px 5px rgba(255, 255, 255, 0.25);
-  transition: transform .05s, box-shadow .05s;
+    0 1px 2px rgba(0,0,0,0.45),
+    inset 0 3px 4px rgba(255,255,255,0.4),
+    inset 0 -5px 8px rgba(0,0,0,0.45);
+  transition: transform .06s ease-out, box-shadow .06s ease-out;
 }
 
 /* Second button (e.g. Meteors' hyperspace): ivory instead of red, the
    classic two-tone competition-cabinet pairing. */
 .arcade-btn:nth-child(2) .arcade-btn-cap {
-  background: radial-gradient(circle at 38% 30%, #fbf6ea 0%, #d8cfb8 50%, #a8a08c 100%);
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.15) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #fffdf6 0%, #e7ddc6 46%, #b6ab90 80%, #8b8270 100%);
 }
 
-.arcade-btn.active .arcade-btn-cap {
-  transform: scale(0.92);
+/* Pressed: the whole button sinks toward the deck and the cap dishes in. */
+.arcade-btn.active {
+  transform: translateZ(1px);
   box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.6),
-    inset 0 -1px 2px rgba(255, 255, 255, 0.12);
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.2);
+}
+.arcade-btn.active .arcade-btn-cap {
+  transform: translateZ(1px) scale(0.94);
+  box-shadow:
+    inset 0 4px 7px rgba(0, 0, 0, 0.55),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.14);
 }
 
 /* The kiosk landing/history/about bar (.kiosk-bar-main) intentionally
