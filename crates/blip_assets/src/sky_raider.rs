@@ -5,8 +5,10 @@
 //! game itself, so no sprites are needed for those here.
 
 use crate::image::Image;
+use std::f32::consts::PI;
+
 use crate::techno::{Rng, MIX_KNEE};
-use crate::wav::{encode_pcm16_mono, env, mix_into, mix_into_f32, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::wav::{encode_pcm16_mono, mix_into, mix_into_f32, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 // Must match crates/sky_raider/src/main.rs's PLAYER_W / PLAYER_H.
@@ -1085,268 +1087,610 @@ fn boss_name_ja(tier: usize) -> Vec<u8> {
 }
 
 // ---------------------------------------------------------------------- //
-// Music                                                                    //
+// Music — rock                                                             //
 // ---------------------------------------------------------------------- //
+//
+// Raider's theme is a rock instrumental now, not the parade-ground march
+// it grew out of: a distorted rhythm-guitar riff, a live drum kit with a
+// cracking backbeat, a picked bass welded to the riff root, and a lead
+// guitar that steps out for a full solo in the middle. Like the march, it
+// is deliberately NOT assembled from the shared `techno.rs`
+// kick/clap/supersaw toolkit every other blip game's music is built from
+// — Raider carries its own voices (`power_chord`, `lead_guitar`, and a
+// rock kit) so it still reads as its own band on the jukebox rather than
+// "the EDM games, plus one".
+//
+// Every guitar voice runs the signal chain a real rig has: a raw
+// oscillator (detuned saws for the rhythm, a saw/square blend for the
+// lead) driven hard into a `tanh` clipper — the amp — then a one-pole
+// low-pass — the speaker cabinet — to roll the fizz off the top. Voices
+// mix into a shared f32 buffer that's soft-limited once at the end, so a
+// chord, a kick and the bass all landing on the downbeat compress
+// gracefully instead of hard-clipping.
 
-/// Military march bass drum — a dry, almost-unpitched low thump (unlike the
-/// other games' shared `techno::kick`, which glides down in pitch and clicks
-/// on the attack). The character of an actual marching-band bass drum, not
-/// a synth kick — one of the two things (with `march_snare`) that gives
-/// Raider's theme its own identity instead of sharing the kick/clap/hat
-/// drum kit every other game's music is built from.
-fn march_bass_drum(buf: &mut [f32], off: usize, vol: f32) {
+/// Rock kick — tight and dry with a hard beater click, tuned to punch
+/// through a wall of distorted guitar. Shorter and with far less "boom"
+/// than `techno::kick`; the click, not the body, is what stays audible
+/// once the amps are going.
+fn rock_kick(buf: &mut [f32], off: usize, vol: f32) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.11) as usize;
+    let click_n = (sr * 0.004) as usize;
     for i in 0..n {
         if off + i >= buf.len() { break; }
         let t = i as f32 / sr;
-        let e = (1.0 - i as f32 / n as f32).powf(2.4);
-        let body = (2.0 * std::f32::consts::PI * 58.0 * t).sin().tanh();
-        mix_into_f32(buf, off + i, body * e * vol * 19_000.0);
+        let e = (1.0 - i as f32 / n as f32).powf(2.1);
+        let freq = 48.0 + 95.0 * (-t / 0.028).exp(); // 143 Hz -> 48 Hz, fast
+        let body = (2.0 * PI * freq * t).sin();
+        let click = if i < click_n {
+            let ce = 1.0 - i as f32 / click_n as f32;
+            let cn = ((i as u32).wrapping_mul(2_654_435_761) as f32 / u32::MAX as f32) * 2.0 - 1.0;
+            cn * ce * 0.8
+        } else {
+            0.0
+        };
+        mix_into_f32(buf, off + i, (body * 1.5 + click).tanh() * e * vol * 20_000.0);
     }
 }
 
-/// Military snare — a short, dry, sharp noise crack with a little tonal body
-/// under it, tighter and higher-pitched than the other games' soft, washy
-/// `techno::clap`. Reused at low volume for the steady footfall taps between
-/// backbeats, and layered into `march_roll` for fills.
-fn march_snare(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
+/// Rock snare — a bright noise crack over two tuned shell modes, with a
+/// real ringing decay (unlike the dry, choked `march_snare`): this is the
+/// backbeat the whole groove leans on, so it needs to carry.
+fn rock_snare(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
     let sr = SAMPLE_RATE as f32;
-    let n = (sr * 0.075) as usize;
+    let n = (sr * 0.15) as usize;
+    let mut prev = 0.0f32;
     for i in 0..n {
         if off + i >= buf.len() { break; }
         let t = i as f32 / sr;
-        let e = (1.0 - i as f32 / n as f32).powf(1.6);
-        let noise = rng.next_f32() * 2.0 - 1.0;
-        let body = (2.0 * std::f32::consts::PI * 200.0 * t).sin() * 0.3;
-        mix_into_f32(buf, off + i, (noise * 0.85 + body) * e * vol * 12_000.0);
+        let e = (1.0 - i as f32 / n as f32).powf(1.5);
+        let white = rng.next_f32() * 2.0 - 1.0;
+        let hp = white - prev; // crude 1st-order highpass -> "snap"
+        prev = white;
+        let shell = ((2.0 * PI * 185.0 * t).sin() + 0.6 * (2.0 * PI * 331.0 * t).sin()) * 0.3;
+        mix_into_f32(buf, off + i, ((hp * 0.9 + shell) * e).tanh() * vol * 14_000.0);
     }
 }
 
-/// Brass fanfare stab — additive harmonics (a falling-amplitude stack, not
-/// the other games' supersaw pads) driven into gentle saturation for a
-/// buzzy, brassy edge on the attack. Used both for the bugle-call melody
-/// itself and, at low volume with a long sustain, as the soft pedal drone
-/// under the whole piece.
-fn brass_stab(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
+/// Hi-hat / ride tick — bright filtered noise. `open` swaps the tight
+/// closed-hat blip for a longer, washier decay.
+fn rock_hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32, open: bool) {
+    let n = (SAMPLE_RATE as f32 * if open { 0.19 } else { 0.038 }) as usize;
+    let mut prev = 0.0f32;
+    for i in 0..n {
+        if off + i >= buf.len() { break; }
+        let e = (1.0 - i as f32 / n as f32).powf(if open { 1.4 } else { 3.2 });
+        let white = rng.next_f32() * 2.0 - 1.0;
+        let hp = white - prev;
+        prev = white;
+        mix_into_f32(buf, off + i, hp * e * vol * 7_000.0);
+    }
+}
+
+/// Crash cymbal — a long noise wash with a couple of inharmonic partials
+/// for shimmer. Marks the top of a section.
+fn crash(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
+    let sr = SAMPLE_RATE as f32;
+    let n = (sr * 0.85) as usize;
+    let mut prev = 0.0f32;
+    for i in 0..n {
+        if off + i >= buf.len() { break; }
+        let t = i as f32 / sr;
+        let e = (1.0 - i as f32 / n as f32).powf(1.7);
+        let white = rng.next_f32() * 2.0 - 1.0;
+        let hp = white - 0.7 * prev;
+        prev = white;
+        let shimmer = 0.15 * ((2.0 * PI * 5_300.0 * t).sin() + (2.0 * PI * 7_100.0 * t).sin());
+        mix_into_f32(buf, off + i, (hp * 0.85 + shimmer) * e * vol * 6_500.0);
+    }
+}
+
+/// Distorted rhythm-guitar power chord: root + fifth + octave, each a pair
+/// of very slightly detuned saws, summed and driven through the
+/// amp/cabinet chain. `palm` picks the articulation — `true` chokes it
+/// into a short, dark palm-muted chug; `false` lets it ring open and
+/// bright.
+fn power_chord(buf: &mut [f32], off: usize, root: f32, ms: f32, vol: f32, palm: bool) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
-    let att = ((sr * 0.012) as usize).max(1);
-    let rel = (n / 5).max(1);
+    if n == 0 { return; }
+    let att = (sr * 0.0018) as usize + 1;
+    let decay_pow = if palm { 2.6 } else { 0.7 };
+    let drive = if palm { 7.5 } else { 11.0 };
+    let cutoff = if palm { 2_500.0 } else { 3_400.0 };
+    let alpha = 1.0 - (-2.0 * PI * cutoff / sr).exp();
+    // root, fifth (3:2), octave — the fifth kept a touch quieter so the
+    // chord has a root rather than a hollow parallel-fifths drone.
+    const IVL: [(f32, f32); 3] = [(1.0, 1.0), (1.5, 0.7), (2.0, 0.9)];
+    const DETUNE: f32 = 0.004;
+    let mut ph = [0.0f32; 6];
+    let mut lp = 0.0f32;
     for i in 0..n {
         if off + i >= buf.len() { break; }
-        let t = i as f32 / sr;
-        let e = env(i, n, att, rel);
-        let mut tone = 0.0;
-        for (k, amp) in [(1.0, 1.0), (2.0, 0.55), (3.0, 0.38), (4.0, 0.22), (5.0, 0.12)] {
-            tone += (2.0 * std::f32::consts::PI * freq * k * t).sin() * amp;
+        let a = if i < att {
+            i as f32 / att as f32
+        } else {
+            (1.0 - (i - att) as f32 / (n - att).max(1) as f32).powf(decay_pow)
+        };
+        let mut raw = 0.0f32;
+        let mut k = 0;
+        for &(mult, w) in &IVL {
+            for d in [-1.0f32, 1.0] {
+                let f = root * mult * (1.0 + d * DETUNE);
+                ph[k] += f / sr;
+                ph[k] -= ph[k].floor();
+                raw += (2.0 * ph[k] - 1.0) * w;
+                k += 1;
+            }
         }
-        let driven = (tone * 0.32).tanh();
-        mix_into_f32(buf, off + i, driven * e * vol * 16_000.0);
+        let driven = (raw / 5.0 * drive).tanh();
+        lp += alpha * (driven - lp);
+        mix_into_f32(buf, off + i, lp * a * vol * 15_000.0);
     }
 }
 
-/// A militaristic march fanfare over an oom-pah drum pattern — deliberately
-/// NOT built from the shared techno.rs toolkit every other game's music
-/// uses (no four-on-the-floor kick, no supersaw pads, no claps or hi-hats):
-/// a dry march bass drum, a real snare crack, and brass stabs, all built
-/// only from the notes of one major triad — the way an actual valveless
-/// bugle is limited to the harmonic series.
+/// Lead guitar for the solo — a driven saw/square blend with a delayed
+/// finger vibrato, an optional pick-attack bend up into the target pitch,
+/// and a slight volume swell toward the tail that stands in for a held
+/// note blooming into amp feedback. `bend` is how many semitones the note
+/// slides up from on the attack (0.0 = struck clean).
+fn lead_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, bend: f32) {
+    let sr = SAMPLE_RATE as f32;
+    let n = (sr * ms / 1000.0) as usize;
+    if n == 0 { return; }
+    let att = (sr * 0.006) as usize + 1;
+    let bend_from = 2f32.powf(-bend / 12.0);
+    let bend_n = ((sr * 0.065) as usize).max(1);
+    let alpha = 1.0 - (-2.0 * PI * 3_200.0 / sr).exp();
+    let mut ph = 0.0f32;
+    let mut lp = 0.0f32;
+    for i in 0..n {
+        if off + i >= buf.len() { break; }
+        let t = i as f32 / sr;
+        let prog = i as f32 / n as f32;
+        let a = if i < att {
+            i as f32 / att as f32
+        } else {
+            let body = (1.0 - prog).powf(0.45);
+            let bloom = 1.0 + 0.55 * prog.powf(3.0);
+            (body * bloom).min(1.35)
+        };
+        let vib_on = ((t - 0.11) / 0.06).clamp(0.0, 1.0);
+        let vib = 1.0 + vib_on * 0.014 * (2.0 * PI * 5.7 * t).sin();
+        let b = if i < bend_n {
+            let f = i as f32 / bend_n as f32;
+            bend_from + (1.0 - bend_from) * (f * f) // ease-in, like a finger push
+        } else {
+            1.0
+        };
+        let f = freq * vib * b;
+        ph += f / sr;
+        ph -= ph.floor();
+        let saw = 2.0 * ph - 1.0;
+        let sq = if ph < 0.5 { 1.0 } else { -1.0 };
+        let driven = ((saw * 0.7 + sq * 0.3) * 6.0).tanh();
+        lp += alpha * (driven - lp);
+        let sing = 0.12 * (2.0 * PI * 2.0 * f * t).sin(); // octave-up edge
+        mix_into_f32(buf, off + i, (lp + sing) * a * vol * 12_000.0);
+    }
+}
+
+/// Picked electric bass — a mildly overdriven saw with a reinforcing sine
+/// at the fundamental, locked to the rhythm-guitar root. Medium decay, a
+/// little pick grit; sits under the guitars without fighting them.
+fn bass_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
+    let sr = SAMPLE_RATE as f32;
+    let n = (sr * ms / 1000.0) as usize;
+    if n == 0 { return; }
+    let att = (sr * 0.003) as usize + 1;
+    let alpha = 1.0 - (-2.0 * PI * 1_700.0 / sr).exp();
+    let mut ph = 0.0f32;
+    let mut lp = 0.0f32;
+    for i in 0..n {
+        if off + i >= buf.len() { break; }
+        let t = i as f32 / sr;
+        let a = if i < att {
+            i as f32 / att as f32
+        } else {
+            (1.0 - (i - att) as f32 / (n - att).max(1) as f32).powf(1.4)
+        };
+        ph += freq / sr;
+        ph -= ph.floor();
+        let driven = ((2.0 * ph - 1.0) * 2.3).tanh();
+        lp += alpha * (driven - lp);
+        let sub = (2.0 * PI * freq * t).sin();
+        mix_into_f32(buf, off + i, (lp * 0.8 + sub * 0.5) * a * vol * 16_000.0);
+    }
+}
+
+/// Guitar dive bomb — the whammy-bar drop that ends a solo: pitch craters
+/// from `freq` toward nothing while the note blooms once and then chokes.
+fn dive_bomb(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
+    let sr = SAMPLE_RATE as f32;
+    let n = (sr * ms / 1000.0) as usize;
+    if n == 0 { return; }
+    let alpha = 1.0 - (-2.0 * PI * 2_600.0 / sr).exp();
+    let mut ph = 0.0f32;
+    let mut lp = 0.0f32;
+    for i in 0..n {
+        if off + i >= buf.len() { break; }
+        let prog = i as f32 / n as f32;
+        let f = (freq * (1.0 - prog).powf(2.2)).max(18.0);
+        let e = (1.0 - prog).powf(1.3) * (1.0 + 0.4 * prog);
+        ph += f / sr;
+        ph -= ph.floor();
+        let saw = 2.0 * ph - 1.0;
+        let sq = if ph < 0.5 { 1.0 } else { -1.0 };
+        let driven = ((saw * 0.6 + sq * 0.4) * 7.0).tanh();
+        lp += alpha * (driven - lp);
+        mix_into_f32(buf, off + i, lp * e * vol * 12_000.0);
+    }
+}
+
+/// One in-bar step of the core rock beat: kick on 1, the "and" of 2, 3 and
+/// the "and" of 4; snare backbeat on 2 and 4; straight 8th-note hats, with
+/// an open hat lifting the last off-beat. `busy` doubles the hats to 16ths
+/// for the higher-energy solo section.
+fn rock_beat_step(buf: &mut [f32], off: usize, pos: usize, rng: &mut Rng, busy: bool) {
+    const KICK: [bool; 16] = [
+        true, false, false, false, false, false, true, false,
+        true, false, false, false, false, false, true, false,
+    ];
+    if KICK[pos] {
+        rock_kick(buf, off, 0.9);
+    }
+    if pos == 4 || pos == 12 {
+        rock_snare(buf, off, rng, 0.6);
+    }
+    if busy || pos % 2 == 0 {
+        rock_hat(buf, off, rng, if pos % 4 == 0 { 0.22 } else { 0.16 }, false);
+    }
+    if pos == 14 {
+        rock_hat(buf, off, rng, 0.16, true);
+    }
+}
+
+/// A one-bar snare fill: rising 16th-note hits across the back half of the
+/// bar, capped with a crash on the downbeat that follows (left to the
+/// caller). The march form's crescendo roll, re-scored for a kit.
+fn drum_fill(buf: &mut [f32], bar_off: usize, step_samples: usize, rng: &mut Rng) {
+    for h in 0..8 {
+        let off = bar_off + step_samples * (8 + h);
+        rock_snare(buf, off, rng, 0.22 + 0.055 * h as f32);
+    }
+}
+
+/// The main Raider theme: a driving rock instrumental in E minor.
 ///
-/// The first version of this track played one long, through-composed
-/// 8-bar phrase with no repeats — technically a "theme", but nothing in it
-/// actually recurred often enough to stick. A catchy tune is a *short*
-/// phrase repeated until it's memorable: here that's a 2-bar call-and-answer
-/// riff, dotted martial rhythm, plus a genuine "oom-pah" accompaniment
-/// (bass drum on the beat, a chord stab on the offbeat) for the walking
-/// groove a bare bass-drum-and-snare pattern didn't have. A syncopated
-/// snare push and crescendo roll fills keep each pass from feeling like a
-/// straight loop.
-///
-/// Levels run long, so the loop needs to survive more than a couple of
-/// repeats: it's a full A-B-A' march form now, not just a straight repeat.
-/// Section A plays the riff plain, twice through (4 bars each way — call,
-/// answer, call, answer); a 4-bar bridge then drops to half-time and swaps
-/// in a legato, minor-tinged countermelody (E-D-B-A-G, the relative minor
-/// of the home G major) for the "quiet before the band comes back"; A'
-/// then restates the same riff — never changed, since changing the hook is
-/// how you lose it — twice through again, now with a harmony layer under
-/// it for the fuller "whole band" sound. Crescendo rolls mark all three
-/// section joins. An original composition, not a transcription of any real
-/// bugle call or march.
+/// Form is intro / verse / chorus / guitar solo / chorus, looped. The
+/// verse is a palm-muted gallop riff on the open low E with a short
+/// minor-triad answer at the top of every second bar — the hook, and it
+/// never changes, because changing the hook is how you lose it. The
+/// chorus opens up: rung-out power chords walking Em–C–G–D under a
+/// held, singing lead line. The solo takes eight bars over the gallop
+/// (the last four moving through the chorus changes for somewhere to go),
+/// climbs a pentatonic run to a bent-and-held high note, and drops off a
+/// dive bomb straight back into the last chorus. An original composition.
 fn music() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
-    let bpm = 116.0_f32;
-    let bars = 20;
-    let steps_per_bar = 16;
-    let total_steps = bars * steps_per_bar;
-    let step_ms = 60_000.0 / bpm / 4.0;
+    let bpm = 150.0_f32;
+    let steps_per_bar = 16usize;
+    let step_ms = 60_000.0 / bpm / 4.0; // 16th note = 100 ms
     let step_samples = (sr * step_ms / 1000.0) as usize;
-    let total = step_samples * total_steps + SAMPLE_RATE as usize / 3;
+
+    // intro(1) + verse(8) + chorus(4) + solo(8) + chorus(4)
+    const INTRO: usize = 1;
+    const VERSE: usize = INTRO + 8;
+    const CHORUS: usize = VERSE + 4;
+    const SOLO: usize = CHORUS + 8;
+    const BARS: usize = SOLO + 4; // 25
+
+    let total_steps = BARS * steps_per_bar;
+    let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
-    let mut rng = Rng(0x0B16_10E);
+    let mut rng = Rng(0x5217_9111);
 
-    // The hook: a 2-bar call-and-answer riff, dotted rhythm (quick notes on
-    // the "and"s, not just on the beat — the martial "snap"), built only
-    // from a G major triad. (step, freq) pairs within the bar.
-    const CALL: [(usize, f32); 6] = [
-        (0, 392.00), (3, 493.88), (6, 587.33), (8, 783.99), (11, 587.33), (14, 493.88),
-    ]; // G4 B4 D5 G5 D5 B4 — the call, climbing
-    const ANSWER: [(usize, f32); 6] = [
-        (0, 587.33), (3, 493.88), (6, 392.00), (8, 293.66), (11, 392.00), (14, 493.88),
-    ]; // D5 B4 G4 D4 G4 B4 — the answer, resolving down then lifting back into the repeat
-    const HARMONY_RATIO: f32 = 0.6674; // a perfect fifth below (2^(-7/12))
-    const PAH_HZ: f32 = 246.94;        // B3 — the offbeat "pah" chord stab
-    const PEDAL_HZ: f32 = 98.00;       // G2 — soft sustained low drone, glues the loop together
+    // E minor. Low roots for the rhythm guitar and bass.
+    const E2: f32 = 82.41;
+    const G2: f32 = 98.00;
+    const A2: f32 = 110.00;
+    const B2: f32 = 123.47;
+    const C3: f32 = 130.81;
+    const D3: f32 = 146.83;
 
-    // The bridge: a slow, legato countermelody built on the relative minor
-    // (E-G-B, the vi of G major) instead of the call/answer's I chord — a
-    // real change of scenery, not just a quieter repeat of the hook.
-    const BRIDGE: [(usize, f32); 5] = [
-        (0, 329.63), (4, 293.66), (8, 246.94), (10, 220.00), (12, 196.00),
-    ]; // E4 D4 B3 A3 G3, descending
-    const BRIDGE_START: usize = 8; // A section is bars 0..8
-    const BRIDGE_END: usize = 12;  // A' section is bars 12..bars
+    // The verse hook: a 2-bar phrase, (step-in-phrase, root, dur-in-steps,
+    // palm-muted?). Gallop of open-E chugs, then the triad answer.
+    const RIFF: [(usize, f32, f32, bool); 20] = [
+        (0, E2, 1.3, true), (2, E2, 1.3, true), (3, E2, 1.3, true),
+        (4, E2, 1.3, true), (6, E2, 1.3, true), (7, E2, 1.3, true),
+        (8, E2, 1.3, true), (10, E2, 1.3, true), (11, E2, 1.3, true),
+        (12, G2, 2.0, false), (14, A2, 2.0, false),
+        (16, E2, 1.3, true), (18, E2, 1.3, true), (19, E2, 1.3, true),
+        (20, E2, 1.3, true), (22, E2, 1.3, true), (23, E2, 1.3, true),
+        (24, B2, 2.0, false), (26, A2, 2.0, false), (30, E2, 4.0, false),
+    ];
+    // Bass under the verse — root notes, a little detached.
+    const RIFF_BASS: [(usize, f32); 11] = [
+        (0, E2), (4, E2), (8, E2), (12, G2), (14, A2),
+        (16, E2), (20, E2), (24, B2), (26, A2), (28, G2), (30, E2),
+    ];
 
-    for bar in 0..bars {
-        let bar_off = (bar * steps_per_bar) * step_samples;
-        brass_stab(&mut buf, bar_off, PEDAL_HZ, step_ms * steps_per_bar as f32 * 1.05, 0.09);
+    // Chorus changes, one chord per bar, plus the lead line sitting on top.
+    const CHORDS: [f32; 4] = [E2, C3, G2, D3]; // Em - C - G - D
+    const CH_LEAD: [(f32, f32); 4] = [
+        (493.88, 0.0),  // B4
+        (523.25, 0.0),  // C5
+        (587.33, 0.0),  // D5
+        (493.88, 2.0),  // B4, bent up
+    ];
 
-        if bar >= BRIDGE_START && bar < BRIDGE_END {
-            // Half-time groove: just the downbeat and a couple of quiet
-            // taps, no "pah" stab — pulls the energy back before A'
-            // brings the full band back in.
-            march_bass_drum(&mut buf, bar_off, 0.5);
-            for &pos in &[4, 12] {
-                march_snare(&mut buf, bar_off + step_samples * pos, &mut rng, 0.15);
-            }
-            if bar == BRIDGE_END - 1 {
-                for h in 0..6 {
-                    let off = bar_off + step_samples * 10 + (step_samples / 2) * h;
-                    march_snare(&mut buf, off, &mut rng, 0.20 + 0.09 * h as f32);
-                }
-            }
-            for &(step, freq) in &BRIDGE {
-                brass_stab(&mut buf, bar_off + step_samples * step, freq, step_ms * 5.0, 0.24);
-            }
-            continue;
+    // The solo, as (absolute-step-from-solo-start, freq, dur-in-steps, bend).
+    const LEAD: [(usize, f32, f32, f32); 34] = [
+        // bar 0 — pickup, then bend up a tone into a held D5
+        (0, 440.00, 2.0, 0.0), (2, 493.88, 2.0, 0.0), (4, 587.33, 12.0, 2.0),
+        // bar 1 — pentatonic run down
+        (16, 659.25, 2.0, 0.0), (18, 587.33, 2.0, 0.0), (20, 493.88, 2.0, 0.0),
+        (22, 440.00, 2.0, 0.0), (24, 392.00, 2.0, 0.0), (26, 329.63, 6.0, 0.0),
+        // bar 2 — call, ending on a bent E5
+        (32, 493.88, 3.0, 0.0), (35, 587.33, 3.0, 0.0), (38, 659.25, 10.0, 2.0),
+        // bar 3 — answer
+        (48, 587.33, 3.0, 0.0), (51, 493.88, 3.0, 0.0), (54, 440.00, 3.0, 0.0),
+        (57, 493.88, 7.0, 0.0),
+        // bar 4 — fast run up the scale to a bent A5
+        (64, 329.63, 1.0, 0.0), (65, 392.00, 1.0, 0.0), (66, 440.00, 1.0, 0.0),
+        (67, 493.88, 1.0, 0.0), (68, 587.33, 1.0, 0.0), (69, 659.25, 1.0, 0.0),
+        (70, 783.99, 1.0, 0.0), (71, 880.00, 8.0, 1.0),
+        // bar 5 — rhythmic top-note phrase
+        (80, 659.25, 2.0, 0.0), (82, 659.25, 2.0, 0.0), (84, 783.99, 2.0, 0.0),
+        (86, 659.25, 2.0, 0.0), (88, 587.33, 2.0, 0.0), (90, 493.88, 6.0, 0.0),
+        // bar 6 — climax: a huge held bent B5, vibrato and feedback bloom
+        (96, 987.77, 16.0, 2.0),
+        // bar 7 — resolve down (the dive bomb is placed separately)
+        (112, 880.00, 2.0, 0.0), (114, 783.99, 2.0, 0.0), (116, 659.25, 2.0, 0.0),
+    ];
+
+    for step in 0..total_steps {
+        let bar = step / steps_per_bar;
+        let pos = step % steps_per_bar;
+        let off = step * step_samples;
+        let bar_off = bar * steps_per_bar * step_samples;
+
+        let in_intro = bar < INTRO;
+        let in_verse = (INTRO..VERSE).contains(&bar);
+        let in_chorus = (VERSE..CHORUS).contains(&bar) || (SOLO..BARS).contains(&bar);
+        let in_solo = (CHORUS..SOLO).contains(&bar);
+
+        // Section-top crash.
+        if pos == 0 && (bar == VERSE || bar == CHORUS || bar == SOLO || bar == BARS - 4) {
+            crash(&mut buf, off, &mut rng, 0.5);
         }
 
-        let full_band = bar >= BRIDGE_END; // A' section: the harmony layer joins in
-        let fill_bar = bar == BRIDGE_START - 1 || bar == bars - 1;
-
-        // Oom-pah: bass drum on 1 and 3 ("oom"), a short brass chord stab
-        // answering on 2 and 4 ("pah") — the walking groove an EDM-style
-        // kick/bass pair gives the other games' tracks, done the marching-
-        // band way instead.
-        march_bass_drum(&mut buf, bar_off, 0.8);
-        march_bass_drum(&mut buf, bar_off + step_samples * 8, 0.8);
-        if !fill_bar {
-            brass_stab(&mut buf, bar_off + step_samples * 4,  PAH_HZ, step_ms * 2.6, 0.22);
-            brass_stab(&mut buf, bar_off + step_samples * 12, PAH_HZ, step_ms * 2.6, 0.22);
-        }
-
-        // Snare backbeat on 2 and 4 (coincides with the "pah"), a syncopated
-        // push on the "and" of 2 for a bit of swagger, and soft footfall
-        // taps on the remaining off-beats; the last bar of each section
-        // breaks into a crescendo roll instead — the classic march fill
-        // leading into the next section.
-        if fill_bar {
-            for h in 0..6 {
-                let off = bar_off + step_samples * 10 + (step_samples / 2) * h;
-                march_snare(&mut buf, off, &mut rng, 0.30 + 0.09 * h as f32);
+        // ---- Drums ----
+        if in_intro {
+            // count-in fill only
+            if pos >= 8 {
+                rock_snare(&mut buf, off, &mut rng, 0.20 + 0.05 * (pos - 8) as f32);
             }
         } else {
-            march_snare(&mut buf, bar_off + step_samples * 4,  &mut rng, 0.55);
-            march_snare(&mut buf, bar_off + step_samples * 7,  &mut rng, 0.24); // syncopated push
-            march_snare(&mut buf, bar_off + step_samples * 12, &mut rng, 0.55);
-        }
-        for &pos in &[2, 10, 14] {
-            march_snare(&mut buf, bar_off + step_samples * pos, &mut rng, 0.14);
-        }
-
-        // The hook — call in even bars, answer in odd bars, so the 2-bar
-        // phrase repeats four times over each of the A and A' sections.
-        let phrase = if bar % 2 == 0 { &CALL } else { &ANSWER };
-        for &(step, freq) in phrase {
-            let off = bar_off + step_samples * step;
-            brass_stab(&mut buf, off, freq, step_ms * 3.2, 0.42);
-            if full_band {
-                brass_stab(&mut buf, off, freq * HARMONY_RATIO, step_ms * 3.2, 0.26);
+            let last_of_section = (in_verse && bar == VERSE - 1)
+                || (in_solo && bar == SOLO - 1)
+                || (in_chorus && (bar == CHORUS - 1 || bar == BARS - 1));
+            if last_of_section {
+                if pos == 0 {
+                    drum_fill(&mut buf, bar_off, step_samples, &mut rng);
+                }
+                // keep the kick pulse under the fill
+                if pos == 0 || pos == 8 {
+                    rock_kick(&mut buf, off, 0.85);
+                }
+            } else {
+                rock_beat_step(&mut buf, off, pos, &mut rng, in_solo);
             }
         }
+
+        // ---- Rhythm guitar + bass ----
+        if in_intro {
+            if pos == 0 {
+                power_chord(&mut buf, off, E2, step_ms * 16.0, 0.42, false);
+                bass_guitar(&mut buf, off, E2, step_ms * 14.0, 0.5);
+            }
+        } else if in_verse {
+            let phase_step = ((bar - INTRO) % 2) * steps_per_bar + pos;
+            for &(s, root, dur, palm) in &RIFF {
+                if s == phase_step {
+                    power_chord(&mut buf, off, root, step_ms * dur, if palm { 0.5 } else { 0.44 }, palm);
+                }
+            }
+            for &(s, root) in &RIFF_BASS {
+                if s == phase_step {
+                    bass_guitar(&mut buf, off, root, step_ms * 3.0, 0.5);
+                }
+            }
+        } else if in_chorus {
+            let ch = if bar < SOLO { bar - VERSE } else { bar - SOLO };
+            let root = CHORDS[ch % 4];
+            if pos == 0 {
+                power_chord(&mut buf, off, root, step_ms * 15.5, 0.5, false);
+            }
+            if pos == 8 {
+                power_chord(&mut buf, off, root, step_ms * 7.5, 0.42, false);
+            }
+            if pos % 2 == 0 {
+                bass_guitar(&mut buf, off, root, step_ms * 1.7, 0.5);
+            }
+            if pos == 0 {
+                let (f, bnd) = CH_LEAD[ch % 4];
+                lead_guitar(&mut buf, off, f, step_ms * 12.0, 0.42, bnd);
+            }
+        } else if in_solo {
+            // gallop under the solo; last four bars walk the chorus changes
+            let sbar = bar - CHORUS;
+            let root = if sbar < 4 { E2 } else { CHORDS[(sbar - 4) % 4] };
+            const GALLOP: [usize; 12] = [0, 2, 3, 4, 6, 7, 8, 10, 11, 12, 14, 15];
+            if GALLOP.contains(&pos) {
+                power_chord(&mut buf, off, root, step_ms * 1.3, 0.42, true);
+            }
+            if pos == 0 || pos == 4 || pos == 8 || pos == 12 {
+                bass_guitar(&mut buf, off, root, step_ms * 3.0, 0.48);
+            }
+        }
+
+        // ---- Lead solo ----
+        if in_solo {
+            let solo_step = (bar - CHORUS) * steps_per_bar + pos;
+            for &(s, f, dur, bend) in &LEAD {
+                if s == solo_step {
+                    lead_guitar(&mut buf, off, f, step_ms * dur, 0.6, bend);
+                }
+            }
+            if solo_step == 120 {
+                dive_bomb(&mut buf, off, 659.25, step_ms * 7.0, 0.55);
+            }
+        }
+    }
+
+    // A soft sustained low-E drone under the whole piece, glueing the loop.
+    for bar in 0..BARS {
+        let bar_off = bar * steps_per_bar * step_samples;
+        power_chord(&mut buf, bar_off, E2, step_ms * steps_per_bar as f32 * 1.02, 0.06, false);
     }
 
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-/// A second, tighter march for the loop rotation — same instrument
-/// palette as `music()` (march bass drum, march snare, brass stabs) so it
-/// still reads as Raider's theme, but a different key, tempo, and riff so
-/// the two don't blur into one loop over a long level. Minor-key (D minor)
-/// and a notch faster, no bridge — a straight-ahead A/A' oom-pah march that
-/// answers the first track's more developed form with a punchier, more
-/// urgent one; the harmony layer still joins for the back half.
+/// The second loop in Raider's rotation — same band, harder and faster: a
+/// drop-D thrash riff in D minor at 176 BPM, tremolo-picked chugs with a
+/// chromatic breakdown accent, straight 8th-note kicks underneath, and a
+/// shred solo that ends on a screaming pinch harmonic and a dive bomb.
+/// No chorus, no let-up: one relentless riff either side of the solo, so
+/// over a long level it answers the main theme's developed form with a
+/// pure adrenaline hit.
 fn music2() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
-    let bpm = 124.0_f32;
-    let bars = 16;
-    let steps_per_bar = 16;
-    let total_steps = bars * steps_per_bar;
+    let bpm = 176.0_f32;
+    let steps_per_bar = 16usize;
     let step_ms = 60_000.0 / bpm / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
-    let total = step_samples * total_steps + SAMPLE_RATE as usize / 3;
+
+    const INTRO: usize = 1;
+    const RIFF_A: usize = INTRO + 6;
+    const SOLO: usize = RIFF_A + 6;
+    const BARS: usize = SOLO + 3; // 16
+
+    let total_steps = BARS * steps_per_bar;
+    let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
-    let mut rng = Rng(0x0B16_20E);
+    let mut rng = Rng(0x5217_9222);
 
-    // The hook, in D minor this time — same dotted call-and-answer shape as
-    // the main theme's riff, transposed and re-contoured, not just pitched
-    // up, so it reads as its own tune rather than a key change of the first.
-    const CALL: [(usize, f32); 6] = [
-        (0, 293.66), (3, 349.23), (6, 440.00), (8, 587.33), (11, 440.00), (14, 349.23),
-    ]; // D4 F4 A4 D5 A4 F4 — the call, climbing
-    const ANSWER: [(usize, f32); 6] = [
-        (0, 440.00), (3, 349.23), (6, 293.66), (8, 220.00), (11, 293.66), (14, 349.23),
-    ]; // A4 F4 D4 A3 D4 F4 — the answer, resolving down then lifting back into the repeat
-    const HARMONY_RATIO: f32 = 0.6674; // a perfect fifth below (2^(-7/12))
-    const PAH_HZ: f32 = 174.61;        // F3 — the offbeat "pah" chord stab
-    const PEDAL_HZ: f32 = 73.42;       // D2 — soft sustained low drone, glues the loop together
+    const D2: f32 = 73.42;
+    const EB2: f32 = 77.78;
+    const F2: f32 = 87.31;
+    const C3: f32 = 130.81;
 
-    for bar in 0..bars {
-        let bar_off = (bar * steps_per_bar) * step_samples;
-        let full_band = bar >= bars / 2; // second half: the harmony layer joins in
-        let fill_bar = bar == bars / 2 - 1 || bar == bars - 1;
+    // 1-bar drop-D riff: tremolo chug on the low D, then a
+    // chromatic F–D–C–D–Eb–D breakdown accent.
+    const RIFF: [(usize, f32, f32, bool); 15] = [
+        (0, D2, 1.1, true), (1, D2, 1.1, true), (2, D2, 1.1, true), (3, D2, 1.1, true),
+        (4, D2, 1.1, true), (5, D2, 1.1, true), (6, D2, 1.1, true), (7, D2, 1.1, true),
+        (8, F2, 2.0, false), (10, D2, 1.1, true), (11, C3, 1.5, false), (12, D2, 1.1, true),
+        (13, EB2, 1.3, false), (14, D2, 1.1, true), (15, D2, 1.1, true),
+    ];
 
-        march_bass_drum(&mut buf, bar_off, 0.8);
-        march_bass_drum(&mut buf, bar_off + step_samples * 8, 0.8);
-        if !fill_bar {
-            brass_stab(&mut buf, bar_off + step_samples * 4,  PAH_HZ, step_ms * 2.6, 0.22);
-            brass_stab(&mut buf, bar_off + step_samples * 12, PAH_HZ, step_ms * 2.6, 0.22);
+    // The shred solo, (absolute-step-from-solo-start, freq, dur-in-steps, bend).
+    const LEAD: [(usize, f32, f32, f32); 28] = [
+        // bar 0 — bend up into a held D5
+        (0, 440.00, 2.0, 0.0), (2, 523.25, 2.0, 0.0), (4, 587.33, 10.0, 2.0),
+        // bar 1 — fast run down D minor pentatonic
+        (16, 587.33, 1.0, 0.0), (17, 523.25, 1.0, 0.0), (18, 440.00, 1.0, 0.0),
+        (19, 392.00, 1.0, 0.0), (20, 349.23, 1.0, 0.0), (21, 293.66, 1.0, 0.0),
+        (22, 349.23, 2.0, 0.0), (24, 293.66, 8.0, 0.0),
+        // bar 2 — bend up into a held F5
+        (32, 440.00, 2.0, 0.0), (34, 587.33, 2.0, 0.0), (36, 698.46, 10.0, 3.0),
+        // bar 3 — tremolo alternation, then a held D5
+        (48, 587.33, 1.0, 0.0), (49, 698.46, 1.0, 0.0), (50, 587.33, 1.0, 0.0),
+        (51, 698.46, 1.0, 0.0), (52, 880.00, 1.0, 0.0), (53, 698.46, 1.0, 0.0),
+        (54, 587.33, 1.0, 0.0), (55, 440.00, 2.0, 0.0), (57, 587.33, 7.0, 0.0),
+        // bar 4 — pinch-harmonic screams way up top
+        (64, 880.00, 6.0, 1.0), (70, 1174.66, 6.0, 2.0),
+        // bar 5 — descend into the dive (placed separately)
+        (80, 1174.66, 1.0, 0.0), (81, 880.00, 1.0, 0.0), (82, 698.46, 1.0, 0.0),
+    ];
+
+    for step in 0..total_steps {
+        let bar = step / steps_per_bar;
+        let pos = step % steps_per_bar;
+        let off = step * step_samples;
+        let bar_off = bar * steps_per_bar * step_samples;
+
+        let in_intro = bar < INTRO;
+        let in_solo = (RIFF_A..SOLO).contains(&bar);
+        let last_bar = bar == RIFF_A - 1 || bar == SOLO - 1 || bar == BARS - 1;
+
+        if pos == 0 && (bar == INTRO || bar == RIFF_A || bar == SOLO) {
+            crash(&mut buf, off, &mut rng, 0.5);
         }
 
-        if fill_bar {
-            for h in 0..6 {
-                let off = bar_off + step_samples * 10 + (step_samples / 2) * h;
-                march_snare(&mut buf, off, &mut rng, 0.30 + 0.09 * h as f32);
+        // ---- Drums: straight 8th kicks, backbeat, busy hats ----
+        if in_intro {
+            if pos >= 8 {
+                rock_snare(&mut buf, off, &mut rng, 0.22 + 0.05 * (pos - 8) as f32);
+            }
+        } else if last_bar {
+            if pos == 0 {
+                drum_fill(&mut buf, bar_off, step_samples, &mut rng);
+            }
+            if pos % 4 == 0 {
+                rock_kick(&mut buf, off, 0.85);
             }
         } else {
-            march_snare(&mut buf, bar_off + step_samples * 4,  &mut rng, 0.55);
-            march_snare(&mut buf, bar_off + step_samples * 7,  &mut rng, 0.24); // syncopated push
-            march_snare(&mut buf, bar_off + step_samples * 12, &mut rng, 0.55);
-        }
-        for &pos in &[2, 10, 14] {
-            march_snare(&mut buf, bar_off + step_samples * pos, &mut rng, 0.14);
+            if pos % 2 == 0 {
+                rock_kick(&mut buf, off, 0.88);
+            }
+            if pos == 4 || pos == 12 {
+                rock_snare(&mut buf, off, &mut rng, 0.6);
+            }
+            rock_hat(&mut buf, off, &mut rng, if pos % 4 == 0 { 0.2 } else { 0.14 }, false);
         }
 
-        let phrase = if bar % 2 == 0 { &CALL } else { &ANSWER };
-        for &(step, freq) in phrase {
-            let off = bar_off + step_samples * step;
-            brass_stab(&mut buf, off, freq, step_ms * 3.2, 0.42);
-            if full_band {
-                brass_stab(&mut buf, off, freq * HARMONY_RATIO, step_ms * 3.2, 0.26);
+        // ---- Rhythm guitar + bass ----
+        if in_intro {
+            if pos == 0 {
+                power_chord(&mut buf, off, D2, step_ms * 16.0, 0.42, false);
+                bass_guitar(&mut buf, off, D2, step_ms * 14.0, 0.5);
+            }
+        } else if !last_bar || in_solo {
+            for &(s, root, dur, palm) in &RIFF {
+                if s == pos {
+                    power_chord(&mut buf, off, root, step_ms * dur, if palm { 0.5 } else { 0.44 }, palm);
+                }
+            }
+            if pos % 2 == 0 {
+                bass_guitar(&mut buf, off, D2, step_ms * 1.4, 0.5);
+            }
+        } else {
+            // the fill bar still needs the downbeat chord
+            if pos == 0 {
+                power_chord(&mut buf, off, D2, step_ms * 4.0, 0.48, false);
             }
         }
-        brass_stab(&mut buf, bar_off, PEDAL_HZ, step_ms * steps_per_bar as f32 * 1.05, 0.09);
+
+        // ---- Lead ----
+        if in_solo {
+            let solo_step = (bar - RIFF_A) * steps_per_bar + pos;
+            for &(s, f, dur, bend) in &LEAD {
+                if s == solo_step {
+                    lead_guitar(&mut buf, off, f, step_ms * dur, 0.6, bend);
+                }
+            }
+            if solo_step == 83 {
+                dive_bomb(&mut buf, off, 587.33, step_ms * 12.0, 0.55);
+            }
+        }
+    }
+
+    for bar in 0..BARS {
+        let bar_off = bar * steps_per_bar * step_samples;
+        power_chord(&mut buf, bar_off, D2, step_ms * steps_per_bar as f32 * 1.02, 0.06, false);
     }
 
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))

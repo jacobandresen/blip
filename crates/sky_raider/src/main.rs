@@ -1885,8 +1885,8 @@ const TURRET_FIRE_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/asse
 const BARRIER_HUM_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/barrier_hum.wav"));
 const MUSIC_WAV:          &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
 const MUSIC2_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
-// music: 41.71s (116 BPM march, A-B-A' form)  music2: 31.30s (124 BPM march, minor key)
-const MUSIC_DURATIONS: [f32; 2] = [41.71, 31.30];
+// music: 40.25s (150 BPM rock, E minor, verse/chorus/solo)  music2: 22.07s (176 BPM drop-D thrash)
+const MUSIC_DURATIONS: [f32; 2] = [40.25, 22.07];
 
 fn load_png(bytes: &'static [u8]) -> Texture2D {
     let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));
