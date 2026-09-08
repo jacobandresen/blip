@@ -745,9 +745,10 @@
     <div style="margin-top:8px" data-i18n="footerCopy"></div>
   </footer>
 
-  <!-- Decorative arcade stick + buttons, matching the game shell's bar
-       (kiosk.css) — static here (no game to drive them), just cabinet
-       flavor for the landing page's own control deck. -->
+  <!-- The landing page's own arcade stick + buttons, matching the game
+       shell's bar (kiosk.css). On touch these drive the game selection:
+       push the stick to step through the cards, press fire to open the
+       lit one (wired in the card-navigation block below). -->
   <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
    <div class="deck-panel">
     <div id="stick-base">
@@ -1183,6 +1184,88 @@
         },
         function () {}
       );
+
+      // ---- The landing page's own arcade stick + buttons drive the same
+      // selection: push the stick to step through the games (with key-style
+      // auto-repeat while held), press a fire button to open the one that's
+      // lit. The stick leans via the --dx/--dy custom properties the deck
+      // CSS already reads, same as the game shell's. ----
+      (function () {
+        var bar  = document.getElementById('kiosk-bar');
+        var base = document.getElementById('stick-base');
+        var fire = document.getElementById('fire-buttons');
+        if (bar && base) {
+          var ENGAGE = 15, RELEASE = 8, MAX_LEAN = 34;
+          var pivot = null, activeId = null, dir = 0, repeatT = null;
+
+          function lean(x, y) {
+            base.style.setProperty('--dx', Math.max(-1, Math.min(1, x / MAX_LEAN)));
+            base.style.setProperty('--dy', Math.max(-1, Math.min(1, y / MAX_LEAN)));
+          }
+          function setDir(d) {
+            if (d === dir) return;
+            dir = d;
+            clearTimeout(repeatT);
+            if (d !== 0) {
+              move(d);
+              repeatT = setTimeout(function tick() {
+                move(dir);
+                repeatT = setTimeout(tick, 150);
+              }, 340);
+            }
+          }
+          function apply(e) {
+            var dx = e.clientX - pivot.x, dy = e.clientY - pivot.y;
+            var along = Math.abs(dy) >= Math.abs(dx) ? dy : dx; // whichever axis is pushed harder
+            var mag = Math.abs(along);
+            var engaged = dir !== 0 ? mag > RELEASE : mag > ENGAGE;
+            setDir(engaged ? (along < 0 ? -1 : 1) : 0);
+            lean(dx, dy);
+          }
+          function release() {
+            activeId = null; pivot = null;
+            setDir(0); lean(0, 0);
+            window.removeEventListener('pointermove', onMove, true);
+            window.removeEventListener('pointerup', release, true);
+            window.removeEventListener('pointercancel', release, true);
+          }
+          function onMove(e) {
+            if (e.pointerId === activeId && pivot) { e.preventDefault(); apply(e); }
+          }
+          bar.addEventListener('pointerdown', function (e) {
+            // Stick half only — the right half is the fire buttons.
+            if (fire && e.target.closest && e.target.closest('#fire-buttons')) return;
+            if (fire) {
+              var r = fire.getBoundingClientRect();
+              if (r.width && e.clientX >= r.left - 6) return;
+            }
+            if (activeId !== null) release();
+            e.preventDefault();
+            activeId = e.pointerId;
+            pivot = { x: e.clientX, y: e.clientY };
+            window.addEventListener('pointermove', onMove, true);
+            window.addEventListener('pointerup', release, true);
+            window.addEventListener('pointercancel', release, true);
+          });
+          window.addEventListener('blur', release);
+          document.addEventListener('visibilitychange', function () {
+            if (document.hidden) release();
+          });
+        }
+
+        if (fire) {
+          fire.querySelectorAll('.arcade-btn').forEach(function (btn) {
+            btn.addEventListener('pointerdown', function (e) {
+              e.preventDefault();
+              btn.classList.add('active');
+              activate();
+            });
+            ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
+              btn.addEventListener(ev, function () { btn.classList.remove('active'); });
+            });
+          });
+        }
+      }());
     }());
 
     document.addEventListener('keydown', function(e) {
