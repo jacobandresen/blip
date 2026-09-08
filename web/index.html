@@ -289,6 +289,20 @@
         inset 0 0 20px color-mix(in srgb, var(--c) 4%, transparent);
     }
 
+    /* Out of credits: the card's corner brackets (its "power light") go
+       dark, and it doesn't light up or lift on hover — an unlit cabinet
+       stays unlit even under the cursor. The focused / currently-playing
+       card is exempt: it keeps its glow (see .card-focused rules below). */
+    .card.no-credit:not(.card-focused):not(.card-active)::before,
+    .card.no-credit:not(.card-focused):not(.card-active)::after {
+      border-color: #333;
+    }
+    .card.no-credit:not(.card-focused):not(.card-active):hover {
+      transform: none;
+      border-color: #1e1e1e;
+      box-shadow: none;
+    }
+
     /* Full fluorescent glow on the card you're focused on — the one the
        arrow keys / joystick have selected (.card-focused) and the game
        you're currently in (.card-active, last one started, JS adds it on
@@ -396,22 +410,22 @@
       text-align: left;
     }
 
-    /* No credits: the whole card reads as dimmed/unlit rather than a
-       separate "NEED COIN" label — still fully visible (and still
-       clickable, though attemptStart() no-ops when broke), just clearly
-       not the inviting, lit-up look a card with credit behind it gets. */
+    /* No credits: the cards read as unlit rather than a separate "NEED
+       COIN" label — dimmed and desaturated so it's clear at a glance the
+       cabinet isn't powered up, but not so far you can't make out every
+       game. Still clickable (attemptStart() no-ops with a nudge when broke). */
     .card.no-credit {
-      opacity: 0.4;
-      filter: grayscale(45%);
+      opacity: 0.55;
+      filter: grayscale(60%) brightness(0.62);
     }
     /* Pressing a dark card while broke: it drops almost out entirely for a
        beat — a dead, unlit "nothing happens here, put a coin in" thunk —
        then eases back to its resting dim. */
     .card.rejected { animation: card-reject 0.55s ease-out; }
     @keyframes card-reject {
-      0%   { opacity: 0.4;  filter: grayscale(45%); }
-      22%  { opacity: 0.05; filter: grayscale(90%) brightness(0.35); transform: scale(0.98); }
-      100% { opacity: 0.4;  filter: grayscale(45%); }
+      0%   { opacity: 0.55; filter: grayscale(60%) brightness(0.62); }
+      22%  { opacity: 0.05; filter: grayscale(90%) brightness(0.28); transform: scale(0.97); }
+      100% { opacity: 0.55; filter: grayscale(60%) brightness(0.62); }
     }
 
     @media (max-width: 520px) {
@@ -620,16 +634,6 @@
   <!-- Coin slot: top-right corner of the cabinet panel, mirroring the
        BLIP ARCADE logo at top-left. -->
   <button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
-
-  <!-- Attract screen: shown on startup while the machine is on 0 credits.
-       Tap it (or the flashing COINS button) to drop a coin in. -->
-  <div id="need-coin-overlay">
-    <div class="nco-panel">
-      <div class="nco-msg">INSERT COIN</div>
-      <div class="nco-sub">1 Coin&nbsp;&nbsp;1 Play</div>
-      <div class="nco-credit">Credit&nbsp;&nbsp;0</div>
-    </div>
-  </div>
 
   <div class="stars" id="stars"></div>
   <div class="cab-rail left"></div>
@@ -1025,9 +1029,9 @@
     }
 
     window.onCoinInserted = function() {
-      // The attract screen drops the instant the coin lands — that's the
-      // payoff for inserting it. The cards still wait for the power-up.
-      updateNeedCoinOverlay();
+      // The corner button stops flashing the instant the coin lands — that's
+      // the payoff for inserting it. The cards still wait for the power-up.
+      updateCoinLock();
       if (getCoins() === 1) {
         // This coin just brought the machine from empty to funded — power
         // up first, light up the cards once that finishes.
@@ -1040,31 +1044,25 @@
       }
     };
 
-    // No credits: every card dims (still fully visible, just clearly
-    // unlit) instead of a separate "NEED COIN" label — same gate as the
-    // card click itself, just shown on the cards directly.
+    // No credits: every card reads as unlit (still fully visible — just a
+    // light dim + desaturate) instead of a separate "NEED COIN" label —
+    // same gate as the card click itself, shown on the cards directly.
     function updateCardDimming() {
       var enabled = getCoins() > 0;
       document.querySelectorAll('.card').forEach(function(card) {
         card.classList.toggle('no-credit', !enabled);
       });
-      updateNeedCoinOverlay();
+      updateCoinLock();
     }
 
-    // The full-screen INSERT COIN attract overlay: up on startup and any
-    // time the machine sits on zero credits, gone the moment a coin drops.
-    // Tapping anywhere on it drops a coin (same as the corner COINS button).
-    function updateNeedCoinOverlay() {
-      var broke = getCoins() <= 0;
-      var ov = document.getElementById('need-coin-overlay');
-      if (ov) ov.classList.toggle('visible', broke);
-      document.body.classList.toggle('need-coin', broke);
+    // No full-screen INSERT COIN attract overlay on the landing page — the
+    // game grid stays visible (dimmed) and the flashing COINS button in the
+    // corner is the "put a coin in" cue. Just mirrors the broke state onto
+    // <body> so that button knows to flash. (The per-game shell still shows
+    // the overlay when you deep-link straight to a game with no credit.)
+    function updateCoinLock() {
+      document.body.classList.toggle('need-coin', getCoins() <= 0);
     }
-
-    (function () {
-      var ov = document.getElementById('need-coin-overlay');
-      if (ov) ov.addEventListener('click', function () { insertCoin(); });
-    }());
 
     function updateCreditsDisplay() {
       updateCoinsHud();
