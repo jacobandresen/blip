@@ -81,7 +81,11 @@ const BOSS_INTRO_TIME: f32 = 1.3;
 // Size must match blip_assets' CARRIER_W / CARRIER_H.
 const CARRIER_W: i32 = 108;
 const CARRIER_H: i32 = 190;
-const LAUNCH_TIME: f32 = 3.8;
+const LAUNCH_TIME: f32 = 3.2;
+// Part-way up the climb the opening wave is scrambled in from the top edge
+// and starts flying (no firing yet) — so control lands with planes already
+// in the sky and diving, not an empty screen.
+const LAUNCH_WAVE_AT: f32 = 0.5;
 // The plane starts down on the deck at the very bottom edge and climbs to
 // LAUNCH_END_Y — up in the playfield — where full control is handed over.
 // The first LAUNCH_ROLL_FRAC of the sequence is a brief engine-spin-up
@@ -376,6 +380,7 @@ struct Game {
     ship_y: f32,        // carrier position during the launch sequence
     launch_timer: Timer,
     launch_climb: f32,  // 0..1 progress up the launch climb — drives the plane's grow-in scale
+    launch_wave_up: bool, // opening wave already scrambled in for this launch
     weapon_level: i32,
     health: i32,
     bullets: [Bullet; MAX_PLAYER_BULLETS],
@@ -502,6 +507,7 @@ impl Game {
             ship_y: (WIN_H + CARRIER_H) as f32,
             launch_timer: Timer::default(),
             launch_climb: 0.0,
+            launch_wave_up: false,
             weapon_level: 1,
             health: PLAYER_HEALTH_MAX,
             bullets: [dead_bullet; MAX_PLAYER_BULLETS],
@@ -606,6 +612,7 @@ impl Game {
         self.player_bank = 0.0;
         self.ship_y = (WIN_H - CARRIER_H / 2) as f32;
         self.launch_climb = 0.0;
+        self.launch_wave_up = false;
         self.launch_timer.start(LAUNCH_TIME);
         self.state = State::Launch;
     }
@@ -782,6 +789,13 @@ fn update_islands(g: &mut Game, dt: f32, sfx: &Sounds) {
 /// they spawned with never drifts. A lone plane instead gets its own random
 /// value, so solo spawns still look varied.
 fn spawn_enemy(g: &mut Game, kind: EnemyKind, x: f32, formation_angle: Option<f32>) {
+    spawn_enemy_at(g, kind, x, -(ENEMY_H as f32), formation_angle);
+}
+
+/// As `spawn_enemy`, but with an explicit starting `y` — the opening wave
+/// scrambles planes in from just above the top edge, same as normal, but
+/// this also lets the launch pre-place them.
+fn spawn_enemy_at(g: &mut Game, kind: EnemyKind, x: f32, y: f32, formation_angle: Option<f32>) {
     let mut fire_timer = Timer::default();
     if kind != EnemyKind::Weaver {
         fire_timer.start(0.6 + rand01() * 1.2);
@@ -797,8 +811,26 @@ fn spawn_enemy(g: &mut Game, kind: EnemyKind, x: f32, formation_angle: Option<f3
     // Weavers randomly get to duck through a cloud on the way past.
     let can_hide = kind != EnemyKind::Ace && rand01() < 0.4;
     pool_spawn(&mut g.enemies, Enemy {
-        x, y: -(ENEMY_H as f32), heading: 0.0, bank: 0.0, active: true, kind, t: 0.0, flight_quirk, fire_timer, can_hide,
+        x, y, heading: 0.0, bank: 0.0, active: true, kind, t: 0.0, flight_quirk, fire_timer, can_hide,
     });
+}
+
+/// The opening wave — a spread of planes scrambled in from the top edge at
+/// the tail of the carrier launch, so the fight is already joined the
+/// moment control lands. Staggered across the width and in depth; a couple
+/// sit low, near where the player takes over.
+fn spawn_opening_wave(g: &mut Game) {
+    let lo = ENEMY_EDGE_MARGIN;
+    let hi = (WIN_W - ENEMY_W) as f32 - ENEMY_EDGE_MARGIN;
+    for &(fx, y, kind) in &[
+        (0.16_f32, -20.0_f32, EnemyKind::Grunt),
+        (0.50, -60.0, EnemyKind::Weaver),
+        (0.84, -30.0, EnemyKind::Grunt),
+        (0.34, -95.0, EnemyKind::Grunt),
+        (0.66, -80.0, EnemyKind::Weaver),
+    ] {
+        spawn_enemy_at(g, kind, lo + fx * (hi - lo), y, None);
+    }
 }
 
 /// One spawner tick: usually a lone plane, occasionally a coordinated
@@ -835,7 +867,7 @@ fn spawn_wave_tick(g: &mut Game) {
     }
 }
 
-fn update_enemies(g: &mut Game, dt: f32) {
+fn update_enemies(g: &mut Game, dt: f32, allow_fire: bool) {
     let player_x = g.player_x;
     let player_y = g.player_y;
     for i in 0..MAX_ENEMIES {
@@ -903,7 +935,7 @@ fn update_enemies(g: &mut Game, dt: f32) {
             g.enemies[i].active = false;
             continue;
         }
-        if g.enemies[i].kind != EnemyKind::Weaver && g.enemies[i].fire_timer.tick(dt) {
+        if allow_fire && g.enemies[i].kind != EnemyKind::Weaver && g.enemies[i].fire_timer.tick(dt) {
             let (ex, ey, kind) = (g.enemies[i].x, g.enemies[i].y, g.enemies[i].kind);
             pool_spawn(&mut g.enemy_bullets, Bullet {
                 x: ex + ENEMY_W as f32 / 2.0 - ENEMY_BULLET_W / 2.0,
@@ -1066,10 +1098,11 @@ fn update_title(g: &mut Game) {
 /// carrier falls away below. A brief no-steering roll while the engine
 /// catches, then you can jink left/right during the climb; the climb
 /// itself stays on rails and full control lands once it reaches altitude
-/// (LAUNCH_END_Y). No hazards, no firing. The engine-start one-shot and
-/// the looped propeller drone are started on the state transition (see
-/// the main loop); this drives the propeller's volume and cuts it at
-/// hand-off.
+/// (LAUNCH_END_Y). No hazards. Part-way up, the opening wave is scrambled
+/// in and starts flying (but holds its fire) so the sky isn't empty at
+/// hand-off. The engine-start one-shot and the looped propeller drone are
+/// started on the state transition (see the main loop); this drives the
+/// propeller's volume and cuts it at hand-off.
 fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
     update_background(g, dt);
 
@@ -1114,11 +1147,24 @@ fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
     set_sound_volume(&sfx.propeller, prop);
 
+    // Scramble the opening wave once the climb is well under way, then let
+    // it fly in from the top edge for the rest of the launch — no firing
+    // yet (allow_fire = false), so it's a sky full of diving planes to
+    // meet, not a volley of bullets the instant control lands.
+    if !g.launch_wave_up && k >= LAUNCH_WAVE_AT {
+        spawn_opening_wave(g);
+        g.launch_wave_up = true;
+    }
+    if g.launch_wave_up {
+        update_enemies(g, dt, false);
+    }
+
     if done {
         stop_sound(&sfx.propeller);
         g.player_y = LAUNCH_END_Y; // leave player_x wherever the climb was steered to
         g.launch_climb = 1.0;
         g.respawn_grace.start(0.4); // a beat of invulnerability as the fight starts
+        g.spawn_timer.start(0.6);   // next wave hard on the heels of the opening one
         g.state = State::Play;
     }
 }
@@ -1185,7 +1231,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
     update_background(g, dt);
 
-    update_enemies(g, dt);
+    update_enemies(g, dt, true);
     update_boss(g, dt);
     update_islands(g, dt, sfx);
     update_barrier(g, dt, sfx);
@@ -1626,13 +1672,33 @@ fn draw_islands(blip: &Blip, g: &Game, island_tex: &[Texture2D; 3]) {
 
 fn draw_launch(
     blip: &Blip, g: &Game,
-    player_tex: &Texture2D, carrier_tex: &Texture2D, boat_tex: &Texture2D, cloud_tex: &[Texture2D; 3],
-    island_tex: &[Texture2D; 3],
+    player_tex: &Texture2D, enemy_tex: &[Texture2D; 3], carrier_tex: &Texture2D, boat_tex: &Texture2D,
+    cloud_tex: &[Texture2D; 3], island_tex: &[Texture2D; 3],
 ) {
     draw_sea(blip, g);
     draw_boats(blip, g, boat_tex);
     draw_islands(blip, g, island_tex);
     draw_clouds(blip, g, cloud_tex);
+
+    // The opening wave, already streaming in from the top while the player
+    // is still climbing — shadows first, then the sprites, same as
+    // draw_play.
+    let enemy_tex_of = |e: &Enemy| match e.kind {
+        EnemyKind::Grunt => &enemy_tex[0],
+        EnemyKind::Weaver => &enemy_tex[1],
+        EnemyKind::Ace => &enemy_tex[2],
+    };
+    for e in pool_iter(&g.enemies) {
+        draw_shadow(enemy_tex_of(e), e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, e.heading);
+    }
+    for e in pool_iter(&g.enemies) {
+        draw_texture_ex(enemy_tex_of(e), e.x, e.y, BLIP_WHITE, DrawTextureParams {
+            dest_size: Some(vec2(ENEMY_W as f32, ENEMY_H as f32)),
+            rotation: e.heading,
+            ..Default::default()
+        });
+    }
+
     let carrier_x = ((WIN_W - CARRIER_W) / 2) as f32;
     let carrier_y = g.ship_y - CARRIER_H as f32 / 2.0;
     draw_shadow(carrier_tex, carrier_x, carrier_y, CARRIER_W as f32, CARRIER_H as f32, 0.0);
@@ -2074,7 +2140,7 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title  => draw_title(&blip, &player_tex),
-            State::Launch => draw_launch(&blip, &g, &player_tex, &carrier_tex, &boat_tex, &cloud_tex, &island_tex),
+            State::Launch => draw_launch(&blip, &g, &player_tex, &enemy_tex, &carrier_tex, &boat_tex, &cloud_tex, &island_tex),
             State::Win    => draw_win(&blip, g.sess.level),
             State::Won    => draw_won(&blip, g.sess.score),
             State::Over   => draw_over(&blip, g.sess.score, g.over_timer.active()),
