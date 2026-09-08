@@ -10,13 +10,12 @@ var MAX_COINS = 5;
 // controls, one entry per button (key/code = what injectKey()/the keyboard
 // listener match against). Omitted = a single default fire button (Space).
 //
-// `stick` overrides the touch analog-stick geometry for that game (shell.js
+// `stick` overrides the touch 8-way-stick geometry for that game (shell.js
 // defaults if absent). Fields, all optional: engage/release (px from the
-// floating pivot to catch / drop a direction), maxR (how far the pivot is
-// allowed to trail the thumb — smaller = a shorter unwind to stop or
-// reverse), diag (deg off a cardinal before the 2nd axis joins, so a push
-// reads as 4-way until it's clearly diagonal) and diagHyst (deg the
-// diagonal band widens by once caught, so it doesn't stutter on the edge).
+// floating pivot to catch a gate detent / fall back to neutral), maxR (how
+// far the pivot is allowed to trail the thumb — smaller = a shorter unwind
+// to stop or reverse), and hyst (deg past the 22.5deg midline the thumb
+// must rotate before the lock jumps to the next detent — the notch).
 var BLIP_GAMES = {
   serpent:            { name: 'SERPENT',  accent: '50, 200, 50'   },
   bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200'   },
@@ -25,13 +24,12 @@ var BLIP_GAMES = {
   meteors:            { name: 'METEORS',  accent: '180, 180, 180',
                          buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }] },
   // Raider is a bullet-weaving shooter — fine adjustments, not broad
-  // sweeps. Smaller dead zone so a light nudge already steers; a long
-  // pivot leash so the thumb-to-direction mapping stays put instead of
-  // creeping (re-centring then reliably neutralises, no phantom drift);
-  // diagonals catch sooner and hold harder so a held dodge doesn't drop
-  // to a single axis mid-weave.
+  // sweeps. Smaller dead zone so a light nudge already catches a detent; a
+  // long pivot leash so the map stays put instead of creeping (re-centring
+  // then reliably neutralises); a firmer notch so a held dodge doesn't
+  // slip a detent mid-weave.
   sky_raider:         { name: 'RAIDER', accent: '50, 100, 220',
-                         stick: { engage: 11, release: 6, maxR: 58, diag: 20, diagHyst: 14 } }
+                         stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } }
 };
 
 // Pick out the game slug from a shell-page URL, e.g. "/blip/serpent/index.html"

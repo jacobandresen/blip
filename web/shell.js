@@ -391,6 +391,10 @@ if (!isRally) (function () {
     if (!stick) return;
     var x = (held.right ? 1 : 0) - (held.left ? 1 : 0);
     var y = (held.down  ? 1 : 0) - (held.up   ? 1 : 0);
+    // Normalise a diagonal so the ball's throw to a corner of the gate is
+    // the same as to a flat edge — 8 evenly-spaced detents, not 4 near and
+    // 4 far. (The CSS reads --dx/--dy as the ball's offset from centre.)
+    if (x && y) { x *= 0.7071; y *= 0.7071; }
     stick.style.setProperty('--dx', x);
     stick.style.setProperty('--dy', y);
   }
@@ -548,10 +552,11 @@ if (isRally) {
   }());
 
 } else {
-  // ---- Analog stick: drag with mouse, touch, or pen (Pointer Events unify
-  // all three) — this only turns drag position into ArrowUp/Down/Left/Right
-  // key state; moving the ball itself is handled by reflect()/updateStick()
-  // above, the same code path a real keypress drives. ----
+  // ---- 8-way stick: drag with mouse, touch, or pen (Pointer Events unify
+  // all three) — this only turns the drag angle into locked
+  // ArrowUp/Down/Left/Right key state; moving the ball itself is handled by
+  // reflect()/updateStick() above, the same code path a real keypress
+  // drives. ----
   (function () {
     var base   = document.getElementById('stick-base');
     var fire   = document.getElementById('fire-buttons');
@@ -565,55 +570,60 @@ if (isRally) {
     var bar = document.getElementById('topbar');
     if (!base || !bar) return;
 
-    // Radial virtual-stick model (distance to engage, angle to steer):
-    // once the thumb is past ENGAGE px from the pivot, the *angle* of the
-    // push decides the direction — so switching from up to right is a
-    // quarter-turn arc, not a full drag back through centre and out again.
-    // A near-straight push stays a clean 4-way move; the second axis only
-    // joins in once you're more than DIAG deg off a cardinal, so you don't
-    // catch an accidental diagonal (Serpent turns, paddle nudges).
-    // Defaults, per-game overridden from BLIP_GAMES[slug].stick (kiosk.js) —
-    // e.g. Raider runs a smaller dead zone and stickier diagonals.
+    // 8-way restrictor-gate model: past ENGAGE px the push snaps to the
+    // nearest of the 8 gate directions and *locks* there. It stays locked
+    // until the thumb rotates clear past the midline into the neighbouring
+    // detent (the extra HYST degrees are the notch — no chatter on the
+    // boundary). Arrow keys are only ever emitted for a locked direction:
+    // there is no partial / in-between state that dribbles events while you
+    // sweep from one direction to another.
+    // Defaults, per-game overridden from BLIP_GAMES[slug].stick (kiosk.js).
     var _sg = (typeof blipGameFromPath === 'function'
                 && blipGameFromPath(window.location.pathname)) || {};
     var _st = _sg.stick || {};
-    var ENGAGE = _st.engage  != null ? _st.engage  : 16; // px from pivot before any direction registers
-    var RELEASE = _st.release != null ? _st.release : 9; // px to fall back to neutral (< ENGAGE, hysteresis)
+    var ENGAGE = _st.engage  != null ? _st.engage  : 16; // px from pivot before the stick catches a detent
+    var RELEASE = _st.release != null ? _st.release : 9;  // px to fall back to neutral (< ENGAGE, hysteresis)
     var MAX_R = _st.maxR      != null ? _st.maxR    : 46; // pivot slides to stay within this — keeps reversals tight
-    var DIAG = _st.diag       != null ? _st.diag    : 27; // deg off a cardinal before the 2nd axis engages
-    var DIAG_HYST = _st.diagHyst != null ? _st.diagHyst : 9; // deg of stickiness once an axis is on (no edge stutter)
-    // "within N deg of this cardinal" is tested as "dot product with the axis
-    // > cos(N)" — cos is monotonic on 0..180deg, so the comparison is the same
-    // one, minus an acos per axis per move. Precomputed here since DIAG and the
-    // hysteresis band are constant.
-    var COS_DIAG      = Math.cos((90 - DIAG) * Math.PI / 180);
-    var COS_DIAG_HYST = Math.cos((90 - DIAG + DIAG_HYST) * Math.PI / 180);
+    var HYST = _st.hyst       != null ? _st.hyst    : 8;  // deg past the 22.5deg midline before the lock jumps detent
     var activeId = null;
     var engaged = false;
+    var lockDeg = null;    // the locked gate angle (0 = up, clockwise), or null when neutral
     var pendingMove = null; // a move that arrived faster than ~120 Hz, held for the trailing flush
     var moveRaf = 0;
     var nextMoveOk = 0;     // performance.now() before which a move is deferred, not applied inline
     var wantDir = { up: false, down: false, left: false, right: false };
     var CODE_FOR = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
-    var AXES = [
-      { dir: 'right', ax:  1, ay:  0 },
-      { dir: 'left',  ax: -1, ay:  0 },
-      { dir: 'down',  ax:  0, ay:  1 },
-      { dir: 'up',    ax:  0, ay: -1 }
-    ];
+    // Which arrows each of the 8 gate detents holds down.
+    var GATE_KEYS = {
+      0:   ['up'],            45:  ['up', 'right'],
+      90:  ['right'],         135: ['down', 'right'],
+      180: ['down'],          225: ['down', 'left'],
+      270: ['left'],          315: ['up', 'left']
+    };
 
     function setDir(dir, want) {
       if (wantDir[dir] === want) return;
       wantDir[dir] = want;
-      // Fire the key first — it's the gameplay-critical half — then the
-      // haptic. navigator.vibrate() is a synchronous bridge call that can
-      // cost a couple of ms on some Android browsers; behind injectKey() that
-      // never lands in front of the input.
       var code = CODE_FOR[dir];
       injectKey(code, code, want ? 'keydown' : 'keyup');
-      // A felt detent on each fresh engage (see feedbackTick): a Vibration
-      // buzz on Android, a sub-bass speaker tick on iOS.
-      if (want) feedbackTick();
+    }
+
+    // Lock the stick to gate angle `deg` (a multiple of 45) or null for
+    // neutral, and reconcile the four arrow keys with that detent in one
+    // atomic step — so passing through a direction on the way to another
+    // never leaks a stray keydown/keyup pair.
+    function setLock(deg) {
+      if (deg === lockDeg) return;
+      lockDeg = deg;
+      var keys = deg === null ? [] : GATE_KEYS[deg];
+      var changed = false;
+      ['up', 'down', 'left', 'right'].forEach(function (dir) {
+        var want = keys.indexOf(dir) !== -1;
+        if (wantDir[dir] !== want) { changed = true; setDir(dir, want); }
+      });
+      // A felt detent every time it clicks into a live direction — a
+      // Vibration buzz on Android, a sub-bass speaker tick on iOS.
+      if (deg !== null && changed) feedbackTick();
     }
 
     // Floating pivot: wherever the thumb first lands becomes "centre", and
@@ -644,21 +654,21 @@ if (isRally) {
       }
 
       engaged = engaged ? dist > RELEASE : dist > ENGAGE;
-      if (!engaged) {
-        setDir('left', false); setDir('right', false);
-        setDir('up',   false); setDir('down',  false);
-        return;
-      }
+      if (!engaged) { setLock(null); return; }
 
-      var ux = dx / dist, uy = dy / dist;
-      for (var i = 0; i < AXES.length; i++) {
-        var a = AXES[i];
-        var dot = ux * a.ax + uy * a.ay;
-        // Wider acceptance cone once this axis is already on (hysteresis) =
-        // a lower cosine threshold to fall back out of.
-        var thr = wantDir[a.dir] ? COS_DIAG_HYST : COS_DIAG;
-        setDir(a.dir, dot > thr);
+      // Angle of the push, 0 = straight up, increasing clockwise.
+      var ang = Math.atan2(dx, -dy) * 180 / Math.PI;
+      if (ang < 0) ang += 360;
+
+      var next;
+      if (lockDeg === null) {
+        next = (Math.round(ang / 45) % 8) * 45;
+      } else {
+        // Signed rotation away from the current detent, -180..180.
+        var off = ((ang - lockDeg + 540) % 360) - 180;
+        next = Math.abs(off) > 22.5 + HYST ? (Math.round(ang / 45) % 8) * 45 : lockDeg;
       }
+      setLock(next);
     }
 
     function release() {
@@ -668,8 +678,7 @@ if (isRally) {
       if (moveRaf) { cancelAnimationFrame(moveRaf); moveRaf = 0; }
       pendingMove = null;
       nextMoveOk = 0;
-      setDir('left', false); setDir('right', false);
-      setDir('up',   false); setDir('down',  false);
+      setLock(null); // drop every arrow the current detent was holding
       window.removeEventListener('pointermove', onMove, true);
       window.removeEventListener('pointerup', onEnd, true);
       window.removeEventListener('pointercancel', onEnd, true);
