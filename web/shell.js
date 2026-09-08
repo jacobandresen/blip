@@ -78,6 +78,35 @@ function getUiAudio() {
   if (uiAudio.state === 'suspended') uiAudio.resume();
   return uiAudio;
 }
+
+// ---- Touch control feedback ----
+// A felt "detent" the instant a control catches, so you know it registered
+// without looking down from the game. Android gets a real Vibration-API
+// buzz. iOS Safari has no Vibration API (and never has) and no web access
+// to the Taptic Engine, so there it falls back to a ~40 ms sub-bass burst
+// through the speaker — more felt-in-the-hand than heard. Only ever fires
+// on a touch device; a no-op under a mouse or on the coin overlay.
+var HAS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+function feedbackTick() {
+  if (!HAS_TOUCH || overlay.classList.contains('visible')) return;
+  if (navigator.vibrate) {
+    try { if (navigator.vibrate(7)) return; } catch (e) {}
+  }
+  try {
+    var ctx = getUiAudio();
+    if (!ctx) return;
+    var t = ctx.currentTime;
+    var osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(55, t + 0.026);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.2, t + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t); osc.stop(t + 0.055);
+  } catch (e) {}
+}
 // A real coin makes two distinct sounds in sequence: the metallic clink
 // of it dropping through the chute (bright, inharmonic, near-instant —
 // real metal doesn't ring in tidy octaves the way a synth voice does),
@@ -582,10 +611,9 @@ if (isRally) {
       // never lands in front of the input.
       var code = CODE_FOR[dir];
       injectKey(code, code, want ? 'keydown' : 'keyup');
-      // A short tick on each fresh engage — a felt detent so you know the
-      // direction caught without looking down from the game. No-op on iOS
-      // Safari (no Vibration API), a light buzz on Android.
-      if (want && navigator.vibrate) { try { navigator.vibrate(7); } catch (e) {} }
+      // A felt detent on each fresh engage (see feedbackTick): a Vibration
+      // buzz on Android, a sub-bass speaker tick on iOS.
+      if (want) feedbackTick();
     }
 
     // Floating pivot: wherever the thumb first lands becomes "centre", and
@@ -738,6 +766,7 @@ if (isRally) {
         activeId = e.pointerId;
         btn.setPointerCapture(activeId);
         injectKey(spec.key, spec.code, 'keydown');
+        feedbackTick(); // same felt detent as the stick
       });
       function endPointer(e) {
         if (e.pointerId !== activeId) return;
