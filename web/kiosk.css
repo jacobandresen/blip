@@ -608,7 +608,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 #topbar,
 .kiosk-bar-main {
-  --bar-tilt: 48deg;
+  --bar-tilt: 56deg;
   /* Matches the game canvas's own left/right inset (PAD=16 in shell.js's
      fillCanvas()) on game pages, so the deck sits exactly as wide as the
      screen and directly under it, rather than the wider bezel-frame
@@ -641,7 +641,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   /* stick + fire buttons as one centered group, a wide gap between them —
      wide enough two thumbs don't collide over the middle of the deck */
   justify-content: center;
-  gap: 58px;
+  gap: 52px;
   padding: 0 10px env(safe-area-inset-bottom, 0px);
   overflow: visible;
   border-radius: 10px 10px 0 0;
@@ -855,9 +855,13 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 #fire-buttons {
   display: flex;
   align-items: center;
+  /* Anchored to the bar's bottom edge with its bulk going upward, like
+     the stick's gate — so the button caps never project below the
+     viewport edge and clip on a short screen. */
+  align-self: flex-end;
+  margin-bottom: 12px;
   flex-shrink: 0;
   gap: 8px;
-  transform-style: preserve-3d;
 }
 
 .arcade-btn {
@@ -874,15 +878,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
-  /* The polished-chrome bezel ring the cap is set into. */
+  /* The polished-chrome bezel ring the cap is set into — the depth is all
+     in the shadows/gradients (no translateZ: it'd project the button off
+     the bottom edge of the deck on a short screen). */
   background: conic-gradient(from -50deg, #eceef1, #9a9ea6 20%, #33363b 50%, #9a9ea6 80%, #eceef1 100%);
-  /* Stands proud of the deck (translateZ toward the camera) with a real
-     drop shadow beneath — it's a button you push, not a decal. */
-  transform: translateZ(6px);
-  transform-style: preserve-3d;
   box-shadow:
-    0 4px 7px rgba(0, 0, 0, 0.6),
-    0 10px 16px rgba(0, 0, 0, 0.4),
+    0 3px 6px rgba(0, 0, 0, 0.6),
     inset 0 0 0 1px rgba(0, 0, 0, 0.4),
     inset 0 2px 2px rgba(255, 255, 255, 0.35),
     inset 0 -3px 4px rgba(0, 0, 0, 0.55);
@@ -897,7 +898,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
      ever-larger share of a shrinking button. */
   inset: 12%;
   border-radius: 50%;
-  transform: translateZ(3px);   /* the cap crowns above the bezel rim */
   /* Convex dome: a tight specular hot-spot up-left where the light hits,
      rolling through the body colour to a dark far rim. */
   background:
@@ -920,16 +920,15 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     radial-gradient(circle at 50% 44%, #fffdf6 0%, #e7ddc6 46%, #b6ab90 80%, #8b8270 100%);
 }
 
-/* Pressed: the whole button sinks toward the deck and the cap dishes in. */
+/* Pressed: the button flattens toward the deck and the cap dishes in. */
 .arcade-btn.active {
-  transform: translateZ(1px);
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.6),
     inset 0 0 0 1px rgba(0, 0, 0, 0.4),
     inset 0 -2px 3px rgba(255, 255, 255, 0.2);
 }
 .arcade-btn.active .arcade-btn-cap {
-  transform: translateZ(1px) scale(0.94);
+  transform: scale(0.94);
   box-shadow:
     inset 0 4px 7px rgba(0, 0, 0, 0.55),
     inset 0 -2px 3px rgba(255, 255, 255, 0.14);
@@ -951,7 +950,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    shrink on the way down, so the stick still clears the left edge. */
 @media (max-width: 480px) {
   #topbar.kiosk-bar, .kiosk-bar-main { height: calc(82px + env(safe-area-inset-bottom, 0px)); }
-  .kiosk-bar > .deck-panel { gap: 64px; padding-left: 6px; padding-right: 6px; }
+  .kiosk-bar > .deck-panel { gap: 56px; padding-left: 6px; padding-right: 6px; }
   #stick-base { width: 122px; }
   #stick-boot { width: 54px; height: 54px; }
   #stick-handle { bottom: 33px; }
@@ -969,7 +968,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    readout is tight, so trim the stick's footprint and the button gap a
    little, but keep both stick and buttons above the touch minimum. */
 @media (max-width: 380px) {
-  .kiosk-bar > .deck-panel { gap: 48px; padding-left: 5px; padding-right: 5px; }
+  .kiosk-bar > .deck-panel { gap: 40px; padding-left: 5px; padding-right: 5px; }
   #stick-base { width: 108px; }
   #stick-boot { width: 50px; height: 50px; }
   #stick-handle { bottom: 31px; }
@@ -981,7 +980,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* Below any current iPhone (kept as a graceful floor, not a target) */
 @media (max-width: 340px) {
-  .kiosk-bar > .deck-panel { gap: 28px; padding-left: 4px; padding-right: 4px; }
+  .kiosk-bar > .deck-panel { gap: 22px; padding-left: 4px; padding-right: 4px; }
   #stick-base { width: 90px; }
   #stick-boot { width: 40px; height: 40px; }
   #stick-handle { bottom: 26px; }
@@ -1000,7 +999,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    keeps the compact deck, and a phone in landscape (short) doesn't match. */
 @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
   #topbar.kiosk-bar, .kiosk-bar-main { height: calc(112px + env(safe-area-inset-bottom, 0px)); }
-  .kiosk-bar > .deck-panel { gap: clamp(96px, 15vw, 240px); padding-left: 16px; padding-right: 16px; }
+  .kiosk-bar > .deck-panel { gap: clamp(84px, 13vw, 210px); padding-left: 16px; padding-right: 16px; }
   #stick-base { width: 194px; height: 252px; }
   #stick-base::before { width: 52px; height: 14px; }
   #stick-boot { width: 78px; height: 78px; }
