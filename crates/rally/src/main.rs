@@ -111,13 +111,25 @@ struct Beeps {
     score_r: blip::BlipSound, // 110 Hz / 200 ms (CPU scored)
 }
 
+/// A spin of a paddle dial this frame — the touch dials inject these same
+/// up/down keys (P1: arrows, P2: I/K), and on the keyboard the paddle keys
+/// are the dial. This is what "ROTATE DIAL TO START" listens for.
+fn p1_dial_spun() -> bool {
+    key_pressed(BLIP_KEY_UP) || key_pressed(BLIP_KEY_DOWN)
+        || key_pressed(BLIP_KEY_W) || key_pressed(BLIP_KEY_S)
+}
+fn p2_dial_spun() -> bool {
+    key_pressed(KeyCode::I) || key_pressed(KeyCode::K)
+}
+
 fn update_title(g: &mut Game) {
-    // Key2 = title-screen "2" option; I/K = P2 paddle dial rotation before mode is chosen
-    if key_pressed(KeyCode::Key2) || key_pressed(KeyCode::I) || key_pressed(KeyCode::K) {
+    // Spin the P2 dial (or press "2") for a two-player game; spin your own
+    // dial for one player against the CPU.
+    if key_pressed(KeyCode::Key2) || p2_dial_spun() {
         g.mode = Mode::TwoPlayer;
         web::set_mode(true);
         g.start_game();
-    } else if any_key_pressed() {
+    } else if p1_dial_spun() {
         g.mode = Mode::OnePlayer;
         web::set_mode(false);
         g.start_game();
@@ -212,7 +224,7 @@ fn update_point(g: &mut Game, dt: f32) {
 
 fn update_over(g: &mut Game, dt: f32) {
     g.point_t.tick(dt);
-    if g.point_t.active() || !any_key_pressed() { return; }
+    if g.point_t.active() || !(p1_dial_spun() || p2_dial_spun()) { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -248,9 +260,9 @@ fn draw_title(blip: &Blip) {
     blip.fill_rect(LPAD_X, py, PAD_W, PAD_H, C_PAD);
     blip.fill_rect(RPAD_X, py, PAD_W, PAD_H, C_PAD);
     let cy = PLAY_T + PLAY_H * 0.5;
-    blip.draw_centered("RALLY",          cy - 28.0, 5.0, BLIP_YELLOW);
-    blip.draw_centered("1 ONE PLAYER",  cy + 22.0, 2.0, BLIP_GRAY);
-    blip.draw_centered("2 TWO PLAYERS", cy + 40.0, 2.0, BLIP_GRAY);
+    blip.draw_centered("RALLY",                cy - 28.0, 5.0, BLIP_YELLOW);
+    blip.draw_centered("ROTATE DIAL TO START", cy + 22.0, 2.0, BLIP_GRAY);
+    blip.draw_centered("2  TWO PLAYERS",       cy + 40.0, 2.0, BLIP_GRAY);
 }
 
 fn draw_serve(blip: &Blip, g: &Game) {
@@ -287,7 +299,7 @@ fn draw_over(blip: &Blip, g: &Game) {
     };
     blip.draw_centered(msg, cy - 20.0, 3.0, BLIP_YELLOW);
     if !g.point_t.active() {
-        blip.draw_centered("PRESS ANY KEY", cy + 24.0, 2.0, BLIP_GRAY);
+        blip.draw_centered("ROTATE DIAL TO START", cy + 24.0, 2.0, BLIP_GRAY);
     }
 }
 

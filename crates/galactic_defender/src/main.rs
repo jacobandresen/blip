@@ -2,7 +2,7 @@
 //! `games/galactic_defender/main.c` on macroquad.
 
 use blip::input::{
-    any_key_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
+    btn1_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::prelude::ImageFormat;
@@ -634,7 +634,7 @@ fn draw_ufo(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
 }
 
 fn update_title(g: &mut Game) {
-    if any_key_pressed() { g.start_game(); }
+    if btn1_pressed() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
@@ -895,7 +895,7 @@ fn update_win(g: &mut Game, dt: f32) {
 
 fn update_over(g: &mut Game, dt: f32) {
     g.dead_timer.tick(dt);
-    if g.dead_timer.active() || !any_key_pressed() { return; }
+    if g.dead_timer.active() || !btn1_pressed() { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -1008,7 +1008,7 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3]) {
     blip.draw_centered("30 PTS",        row0,                 2.0, BLIP_MAGENTA);
     blip.draw_centered("20 PTS",        row1,                 2.0, BLIP_CYAN);
     blip.draw_centered("10 PTS",        row2,                 2.0, BLIP_GREEN);
-    blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, BLIP_WHITE);
+    blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_WHITE);
 }
 
 fn draw_win(blip: &Blip, level: i32) {
@@ -1024,7 +1024,7 @@ fn draw_over(blip: &Blip, score: i32, waiting: bool) {
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
     blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
     if !waiting {
-        blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
+        blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
     }
 }
 

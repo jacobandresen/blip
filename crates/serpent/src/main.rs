@@ -1,7 +1,7 @@
 //! Serpent (Snake), Rust port of `games/serpent/main.c` on macroquad.
 
 use blip::input::{
-    any_key_pressed, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
+    btn1_pressed, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::texture::{FilterMode, Texture2D};
@@ -181,7 +181,7 @@ struct Sounds {
 }
 
 fn update_title(g: &mut Game) {
-    if any_key_pressed() { g.start_game(); }
+    if btn1_pressed() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
@@ -252,7 +252,7 @@ fn update_dead(g: &mut Game, dt: f32) {
 
 fn update_over(g: &mut Game, dt: f32) {
     g.dead_timer.tick(dt);
-    if g.dead_timer.active() || !any_key_pressed() { return; }
+    if g.dead_timer.active() || !btn1_pressed() { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -320,7 +320,7 @@ fn draw_play(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D, food: &T
 fn draw_title(blip: &Blip) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("SERPENT",            (WIN_H / 4) as f32,       6.0, BLIP_GREEN);
-    blip.draw_centered("PRESS ANY KEY",      (WIN_H / 2) as f32,       3.0, BLIP_WHITE);
+    blip.draw_centered("PRESS FIRE",         (WIN_H / 2) as f32,       3.0, BLIP_WHITE);
     blip.draw_centered("ARROW KEYS OR WASD", (WIN_H * 2 / 3) as f32,   2.0, BLIP_GRAY);
 }
 
@@ -330,7 +330,7 @@ fn draw_over(blip: &Blip, score: i32, waiting: bool) {
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
     blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
     if !waiting {
-        blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
+        blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
     }
 }
 

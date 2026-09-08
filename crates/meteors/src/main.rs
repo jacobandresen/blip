@@ -6,7 +6,7 @@
 use std::f32::consts::PI;
 
 use blip::input::{
-    any_key_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
+    btn1_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
     BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::rand::gen_range;
@@ -318,7 +318,7 @@ fn award(g: &mut Game, sfx: &Sounds, pts: i32) {
 }
 
 fn update_title(g: &mut Game) {
-    if any_key_pressed() { g.start_game(); }
+    if btn1_pressed() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) {
@@ -514,7 +514,7 @@ fn update_dead(g: &mut Game, dt: f32, sfx: &Sounds) {
 
 fn update_over(g: &mut Game, dt: f32) {
     g.respawn_t.tick(dt);
-    if g.respawn_t.active() || !any_key_pressed() { return; }
+    if g.respawn_t.active() || !btn1_pressed() { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -625,7 +625,7 @@ fn draw_title(blip: &Blip) {
     blip.clear(BLIP_BLACK);
     draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
     blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, NEON_CYAN);
-    blip.draw_centered("PRESS ANY KEY", (WIN_H / 2) as f32, 3.0, NEON_YELLOW);
+    blip.draw_centered("PRESS FIRE", (WIN_H / 2) as f32, 3.0, NEON_YELLOW);
     blip.draw_centered("ARROWS/WASD ROTATE+THRUST", (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
     blip.draw_centered("SPACE FIRE  ·  Z HYPERSPACE", (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);
 }
@@ -637,7 +637,7 @@ fn draw_over(blip: &Blip, score: i32, waiting: bool) {
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, NEON_PINK);
     blip.draw_centered(&buf, (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
     if !waiting {
-        blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, NEON_YELLOW);
+        blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, NEON_YELLOW);
     }
 }
 

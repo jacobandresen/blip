@@ -1,7 +1,7 @@
 //! Raider — a 1942-style vertical dogfighting shoot-'em-up.
 
 use blip::input::{
-    any_key_pressed, key_held, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
+    btn1_pressed, key_held, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::audio::{play_sound, set_sound_volume, stop_sound, PlaySoundParams};
@@ -1090,7 +1090,7 @@ fn update_boss(g: &mut Game, dt: f32) {
 }
 
 fn update_title(g: &mut Game) {
-    if any_key_pressed() { g.start_game(); }
+    if btn1_pressed() { g.start_game(); }
 }
 
 /// Carrier launch: the plane sits down on the deck at the bottom edge,
@@ -1483,7 +1483,7 @@ fn update_win(g: &mut Game, dt: f32) {
 }
 
 fn update_won(g: &mut Game) {
-    if !any_key_pressed() { return; }
+    if !btn1_pressed() { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -1493,7 +1493,7 @@ fn update_over(g: &mut Game, dt: f32) {
     // OVER_MIN_WAIT has to actually elapse before any key can dismiss this —
     // otherwise the fire button still held down from the fight that killed
     // you bounces straight back to the title screen.
-    if g.over_timer.active() || !any_key_pressed() { return; }
+    if g.over_timer.active() || !btn1_pressed() { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -1932,7 +1932,7 @@ fn draw_title(blip: &Blip, player_tex: &Texture2D) {
     blip.draw_centered("RAIDER", (WIN_H / 4) as f32, 5.0, BLIP_BLUE);
     let px = (WIN_W as f32 - PLAYER_W as f32 * 2.0) / 2.0;
     blip.draw_texture(player_tex, px, (WIN_H / 2 - 70) as f32, PLAYER_W as f32 * 2.0, PLAYER_H as f32 * 2.0);
-    blip.draw_centered("PRESS ANY KEY",       (WIN_H * 2 / 3) as f32,      3.0, BLIP_WHITE);
+    blip.draw_centered("PRESS FIRE",          (WIN_H * 2 / 3) as f32,      3.0, BLIP_WHITE);
     blip.draw_centered("ARROWS OR WASD MOVE", (WIN_H * 2 / 3 + 22) as f32, 2.0, BLIP_GRAY);
     blip.draw_centered("SPACE TO FIRE",       (WIN_H * 2 / 3 + 40) as f32, 2.0, BLIP_GRAY);
     blip.draw_centered("CATCH CAPSULE POWER UP", (WIN_H * 2 / 3 + 58) as f32, 2.0, BLIP_GRAY);
@@ -1951,7 +1951,7 @@ fn draw_won(blip: &Blip, score: i32) {
     blip.draw_centered("YOU WON!!",           (WIN_H / 4) as f32,      6.0, BLIP_YELLOW);
     blip.draw_centered("ALL 7 WAVES CLEARED", (WIN_H / 2 - 20) as f32, 2.5, BLIP_GREEN);
     blip.draw_centered(&buf,                  (WIN_H / 2 + 14) as f32, 3.0, BLIP_WHITE);
-    blip.draw_centered("PRESS ANY KEY",       (WIN_H * 2 / 3) as f32,  3.0, BLIP_CYAN);
+    blip.draw_centered("PRESS FIRE",          (WIN_H * 2 / 3) as f32,  3.0, BLIP_CYAN);
 }
 
 fn draw_over(blip: &Blip, score: i32, waiting: bool) {
@@ -1962,7 +1962,7 @@ fn draw_over(blip: &Blip, score: i32, waiting: bool) {
     // Only invite a key press once OVER_MIN_WAIT has actually elapsed — the
     // prompt would otherwise be a lie, since input is ignored until then.
     if !waiting {
-        blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
+        blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
     }
 }
 

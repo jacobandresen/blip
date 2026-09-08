@@ -3,7 +3,7 @@
 use std::f32::consts::PI;
 
 use blip::input::{
-    any_key_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
+    btn1_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::prelude::ImageFormat;
@@ -224,7 +224,7 @@ struct Sounds {
 }
 
 fn update_title(g: &mut Game) {
-    if any_key_pressed() { g.start_game(); }
+    if btn1_pressed() { g.start_game(); }
 }
 
 fn paddle_input(g: &mut Game, dt: f32) {
@@ -441,7 +441,7 @@ fn update_win(g: &mut Game, dt: f32) {
 
 fn update_over(g: &mut Game, dt: f32) {
     g.dead_timer.tick(dt);
-    if g.dead_timer.active() || !any_key_pressed() { return; }
+    if g.dead_timer.active() || !btn1_pressed() { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -517,7 +517,7 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick:
 fn draw_title(blip: &Blip) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("BOUNCER",                 (WIN_H / 4) as f32,         6.0, BLIP_CYAN);
-    blip.draw_centered("PRESS ANY KEY",           (WIN_H / 2) as f32,         3.0, BLIP_WHITE);
+    blip.draw_centered("PRESS FIRE",              (WIN_H / 2) as f32,         3.0, BLIP_WHITE);
     blip.draw_centered("LEFT RIGHT ARROW OR AD",  (WIN_H * 2 / 3) as f32,     2.0, BLIP_GRAY);
     blip.draw_centered("SPACE TO LAUNCH",         (WIN_H * 2 / 3 + 20) as f32, 2.0, BLIP_GRAY);
 }
@@ -535,7 +535,7 @@ fn draw_over(blip: &Blip, score: i32, waiting: bool) {
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
     blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
     if !waiting {
-        blip.draw_centered("PRESS ANY KEY", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
+        blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
     }
 }
 
