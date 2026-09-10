@@ -210,17 +210,71 @@
   }
 
   function releaseAll() {
+    _tBtns.forEach(function (g) { g._pend = false; g.release(); });
+    if (_tDpad) { _tDpad._pend = false; _tDpad.clear(); }
     Object.keys(held).forEach(function (n) { if (held[n]) set(n, false); });
   }
+
+  /* ------------------------------------------------------------------ */
+  /* Touch-list authority                                                */
+  /* ------------------------------------------------------------------ */
+  // On a touch screen the browser can fire a spurious `pointercancel` on a
+  // finger that is still physically down — it happens constantly when one
+  // thumb holds fire while the other works the d-pad hard, and the old code
+  // read that cancel as "released", so continued fire kept dropping.
+  // `TouchEvent.touches` is the one list that always reflects reality, so
+  // the face buttons and the d-pad resolve their held state from it here;
+  // pointer events only drive the press *edge* (feedback + capture) and the
+  // mouse path. A `pointercancel` is now ignored outright.
+
+  var _tBtns = [];    // { el, on, press, release, _pend }
+  var _tDpad = null;  // { pad, calc, clear, _pend }
+
+  function _hit(r, x, y, m) {
+    return x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m;
+  }
+  // Releases are deferred one frame: iOS cancels every active touch when a
+  // multi-touch gesture starts moving, then re-fires touchstart for the
+  // fingers still down. Waiting a frame lets that restart land, so a
+  // still-held button never blinks off.
+  function _defer(o, fn) {
+    if (o._pend) return;
+    o._pend = true;
+    requestAnimationFrame(function () { if (o._pend) { o._pend = false; fn(); } });
+  }
+  function _syncTouches(list) {
+    var i, j, g, r, t;
+    for (i = 0; i < _tBtns.length; i++) {
+      g = _tBtns[i];
+      r = g.el.getBoundingClientRect();
+      if (!r.width) continue;
+      for (t = null, j = 0; j < list.length; j++) {
+        if (_hit(r, list[j].clientX, list[j].clientY, 14)) { t = list[j]; break; }
+      }
+      if (t) { g._pend = false; g.press(); }
+      else if (g.on) _defer(g, g.release);
+    }
+    if (_tDpad) {
+      r = _tDpad.pad.getBoundingClientRect();
+      for (t = null, j = 0; r.width && j < list.length; j++) {
+        if (_hit(r, list[j].clientX, list[j].clientY, 4)) { t = list[j]; break; }
+      }
+      if (t) { _tDpad._pend = false; _tDpad.calc(t); }
+      else if (r.width) _defer(_tDpad, _tDpad.clear);
+    }
+  }
+  ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) { _syncTouches(e.touches); }, { passive: true });
+  });
 
   /* ------------------------------------------------------------------ */
   /* Binders — connect a source surface to set()                         */
   /* ------------------------------------------------------------------ */
 
   // Any container of elements carrying data-blip="<logical name>" (may list
-  // several, space-separated). Discrete press / release, with the pointer
-  // captured so a slide off the cap still releases cleanly. A d-pad cross
-  // is bound with bindDpad() instead (mark its hub data-blip="dpad").
+  // several, space-separated). Press / release; on a touch device the live
+  // touch list (above) is the authority, on a mouse the pointer events are.
+  // A d-pad cross is bound with bindDpad() instead.
   function bindButtons(root) {
     if (!root) return;
     if (roots.indexOf(root) === -1) roots.push(root);
@@ -235,21 +289,31 @@
       // logical name picks it otherwise (face for buttons, dpad for a d-pad
       // segment bound individually).
       var kind = el.getAttribute('data-blip-kind');
-      var pid = null;
-      el.addEventListener('pointerdown', function (e) {
-        e.preventDefault();
-        pid = e.pointerId;
-        try { el.setPointerCapture(pid); } catch (x) {}
+      var grp = { el: el, on: false };
+      grp.press = function () {
+        if (grp.on) return;
+        grp.on = true;
         if (kind) { click(kind); names.forEach(function (n) { set(n, true, { silentClick: true }); }); }
         else      { names.forEach(function (n) { set(n, true); }); }
-      });
-      function up(e) {
-        if (pid !== null && e.pointerId !== pid) return;
-        pid = null;
+      };
+      grp.release = function () {
+        if (!grp.on) return;
+        grp.on = false;
         names.forEach(function (n) { set(n, false); });
-      }
-      el.addEventListener('pointerup', up);
-      el.addEventListener('pointercancel', up);
+      };
+      _tBtns.push(grp);
+      el.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        try { el.setPointerCapture(e.pointerId); } catch (x) {}
+        grp.press();
+      });
+      el.addEventListener('pointerup', function (e) {
+        // touch releases are owned by _syncTouches (a real lift comes with
+        // a touchend that drops the finger from the list); the mouse has no
+        // such list, so honour its up directly.
+        if (e.pointerType !== 'touch') grp.release();
+      });
+      // pointercancel: deliberately not handled — see "Touch-list authority".
     })(els[i]);
   }
 
@@ -273,6 +337,7 @@
       set(n, on);
       if (segs[n]) segs[n].classList.toggle('blip-pressed', on);
     }
+    // e is a PointerEvent or a Touch — both carry clientX / clientY.
     function calc(e) {
       var r = pad.getBoundingClientRect();
       var nx = (e.clientX - (r.left + r.width  / 2)) / (r.width  / 2);
@@ -281,18 +346,17 @@
       put('right', nx >  dead);
       put('up',    ny < -dead);
       put('down',  ny >  dead);
+      pad.classList.add('blip-touched');
     }
     function clear() {
       ['up', 'down', 'left', 'right'].forEach(function (n) { put(n, false); });
       pad.classList.remove('blip-touched');
     }
+    _tDpad = { pad: pad, calc: calc, clear: clear, _pend: false };
     pad.addEventListener('pointerdown', function (e) {
       e.preventDefault();
       pid = e.pointerId;
       try { pad.setPointerCapture(pid); } catch (x) {}
-      // whole cross glows while a thumb is on it — so an engaged arm never
-      // looks like it's floating away from a dark centre
-      pad.classList.add('blip-touched');
       calc(e);
     });
     pad.addEventListener('pointermove', function (e) {
@@ -300,13 +364,13 @@
       e.preventDefault();
       calc(e);
     });
-    function end(e) {
-      if (e.type !== 'pointercancel' && e.pointerId !== pid) return;
+    pad.addEventListener('pointerup', function (e) {
+      if (e.pointerId !== pid) return;
       pid = null;
-      clear();
-    }
-    pad.addEventListener('pointerup', end);
-    pad.addEventListener('pointercancel', end);
+      // touch: _syncTouches owns the (deferred) clear; mouse: clear now
+      if (e.pointerType !== 'touch') clear();
+    });
+    // pointercancel: deliberately not handled — see "Touch-list authority".
   }
 
   // The rally rotary dial: a knob you spin with a thumb. Each frame's
