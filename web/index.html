@@ -765,8 +765,8 @@
    </div>
 
    <!-- Super Nintendo pad — the deck's default. On the kiosk it drives
-        the game selection: d-pad steps the cards, A / B / Y / X / START
-        open the lit one, SELECT jumps back to the top of the grid. -->
+        the game selection: the d-pad steps the cards, A / B open the lit
+        one. -->
    <div id="snes-pad" aria-hidden="true">
     <span class="snes-cord" aria-hidden="true"></span>
     <div class="snes-shell">
@@ -776,12 +776,6 @@
         <span class="snes-dp-seg dp-down"  data-blip="down"  data-blip-nopress></span>
         <span class="snes-dp-seg dp-left"  data-blip="left"  data-blip-nopress></span>
         <span class="snes-dp-hub"></span>
-      </div>
-      <div class="snes-mid">
-        <button type="button" class="snes-menu-btn snes-select" data-blip="select" data-blip-kind="menu" aria-label="Select"></button>
-        <button type="button" class="snes-menu-btn snes-start"  data-blip="start"  data-blip-kind="menu" aria-label="Start"></button>
-        <span class="snes-menu-label snes-label-select">SELECT</span>
-        <span class="snes-menu-label snes-label-start">START</span>
       </div>
       <div class="snes-face">
         <button type="button" class="snes-btn snes-b" data-blip="button1" aria-label="Button B"><span></span></button>
@@ -1298,8 +1292,7 @@
 
       // ---- The SNES pad drives the same selection, through BlipController.
       // d-pad steps the cards (with key-style auto-repeat while held);
-      // A / B / Y / X / L / R / START open the lit card; SELECT jumps back
-      // to the top of the grid. ----
+      // A / B open the lit card. ----
       (function () {
         var pad = document.getElementById('snes-pad');
         if (!pad || typeof BlipController === 'undefined') return;
@@ -1324,11 +1317,6 @@
             if (name === 'up' || name === 'left')  { navHold(down ? -1 : 0); return; }
             if (name === 'down' || name === 'right') { navHold(down ? 1 : 0); return; }
             if ((name === 'button1' || name === 'button2') && down) activate();
-          },
-          onStart:  function () { activate(); },
-          onSelect: function () {
-            navActive = false; idx = 0; highlight();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
           }
         });
         BlipController.bindButtons(pad);

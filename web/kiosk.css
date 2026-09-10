@@ -955,11 +955,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    .deck-panel, not a child, so nothing is inside the 3D rotateX: the
    d-pad drag and the button taps hit-test as plain 2D.
 
-   Not going for photoreal — clean and legible. D-pad left; two round
-   face buttons (B and A, side by side with a wide gap) on the right;
-   small SELECT / START in the middle; L / R tabs on the outer edges.
+   Not going for photoreal — clean and legible. A big d-pad on the left;
+   two round face buttons (B and A, side by side with a wide gap) on the
+   right; nothing in the middle (no SELECT / START — A / B cover the
+   title-screen "press fire", the BLIP logo is the trip back to the grid).
    Atari palette: matte-black body, both face buttons the Atari "Fuji"
-   red, red menu buttons, a red d-pad flash on press. */
+   red, a red d-pad flash on press. */
 
 :root[data-controls="pad"] #stick-base,
 :root[data-controls="pad"] #fire-buttons { display: none !important; }
@@ -989,8 +990,28 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-#snes-pad .snes-cord,
-#snes-pad .snes-wordmark { display: none; }
+#snes-pad .snes-cord { display: none; }
+
+/* A faint moulded "BLIP" debossed into the empty middle of the panel —
+   just enough to read as a brand mark, never enough to compete with the
+   controls. Absolutely centred, so it's out of the d-pad / A-B flex row. */
+#snes-pad .snes-wordmark {
+  position: absolute;
+  left: 46%;   /* the middle of the gap between the d-pad and A / B */
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: rgba(255, 255, 255, 0.028);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.04);
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Below ~360px the gap between the d-pad and A / B is too tight to seat
+   the mark without it crowding a button — drop it there. */
+@media (max-width: 359px) { #snes-pad .snes-wordmark { display: none; } }
 
 /* the panel face — moulded black plastic. Reads as a raised, lit surface:
    a bright top edge catching the screen glow, a soft pool of overhead
@@ -1019,7 +1040,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px var(--sf-edge) env(safe-area-inset-bottom, 0px);
+  /* lift the controls clear of both edges — on a phone with no home-
+     indicator inset the d-pad would otherwise sit right on the glass. */
+  padding: 8px var(--sf-edge) calc(env(safe-area-inset-bottom, 0px) + 7px);
 }
 /* a recessed "mounting plate" under the A / B buttons — a subtle darker
    inset so the buttons sit IN the surface, not on it (the d-pad has its
@@ -1046,7 +1069,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 #snes-pad .snes-dpad::before {   /* shallow round recess behind the cross */
   content: '';
   position: absolute;
-  inset: -9%;
+  inset: -5%;
   border-radius: 50%;
   background: radial-gradient(circle at 50% 40%, #262626, #131313 60%, #0a0a0a);
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -1158,50 +1181,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
-/* ---- SELECT / START — small pills, centred in the panel ---- */
-#snes-pad .snes-mid {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) rotate(-16deg);
-  display: flex;
-  gap: 8px;
-  pointer-events: none;
-}
-#snes-pad .snes-menu-btn {
-  width: 34px;
-  height: 13px;
-  margin: 0; padding: 0;
-  border: 1px solid rgba(0, 0, 0, 0.5);
-  border-radius: 999px;
-  pointer-events: auto;
-  touch-action: none;
-  cursor: pointer;
-  background: linear-gradient(180deg, #e8562e, #c62b20 55%, #8f1c15);
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.28);
-  -webkit-tap-highlight-color: transparent;
-  transition: filter .05s, box-shadow .05s;
-}
-#snes-pad .snes-menu-btn.blip-pressed {
-  filter: brightness(1.35);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 7px rgba(232, 86, 46, 0.8);
-}
-#snes-pad .snes-menu-label {
-  position: absolute;
-  top: 130%;
-  font-family: 'Courier New', Courier, monospace;
-  font-weight: 900;
-  font-size: 6px;
-  letter-spacing: 1px;
-  color: rgba(210, 200, 180, 0.75);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
-  pointer-events: none;
-  white-space: nowrap;
-}
-#snes-pad .snes-label-select { left: 20%;  transform: translateX(-50%); }
-#snes-pad .snes-label-start  { right: 20%; transform: translateX(50%); }
-
-#snes-pad .snes-shoulder { display: none; }   /* L / R dropped */
+/* SELECT / START, L / R — all dropped. A / B do the title-screen "press
+   fire"; the BLIP logo goes back to the grid. */
+#snes-pad .snes-mid,
+#snes-pad .snes-shoulder { display: none; }
 
 /* ---- The subtle "back to the joystick" toggle ----
    Sits just ABOVE the control bar at the far-left edge, clear of the
@@ -1239,51 +1222,55 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 #control-toggle .ct-what::before { content: 'joystick'; }
 :root[data-controls="stick"] #control-toggle .ct-what::before { content: 'pad'; }
 
-/* Phones — thumb-sized buttons (iPhone 8 and up). The bar grows to seat
-   them; the d-pad and the diamond sit near the two edges so a thumb never
-   has to reach across the middle of the screen. */
+/* Phones — thumb-sized controls (iPhone 8 and up). The bar grows to seat
+   them; the d-pad and the A/B pair sit hard against the two edges (the
+   middle is empty now), so a thumb never reaches across the screen. With
+   SELECT / START gone the d-pad claims that room — a big cross that's
+   easy to hit without looking. */
 @media (max-width: 560px) {
   :root[data-controls="pad"] #topbar.kiosk-bar,
   :root[data-controls="pad"] .kiosk-bar-main {
-    height: calc(98px + env(safe-area-inset-bottom, 0px));
+    height: calc(112px + env(safe-area-inset-bottom, 0px));
   }
   #snes-pad {
     --sf-btn: 52px;
     --sf-gap: 30px;   /* room for a big thumb between A and B */
-    --sf-dpad: 82px;
+    --sf-dpad: 90px;
     --sf-edge: 20px;
   }
-  #snes-pad .snes-menu-btn { width: 40px; height: 15px; }
 }
 
-/* Small phones (iPhone SE / mini) — trim a little, stay above ~44px. */
+/* Small phones (iPhone SE / mini) — trim the face buttons and edges, but
+   keep the d-pad big; it's the control you steer with. */
 @media (max-width: 380px) {
-  #snes-pad { --sf-btn: 46px; --sf-gap: 22px; --sf-dpad: 72px; --sf-edge: 14px; }
+  #snes-pad { --sf-btn: 46px; --sf-gap: 22px; --sf-dpad: 86px; --sf-edge: 14px; }
 }
 
 /* Tablet — a bigger two-handed surface. */
 @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
   :root[data-controls="pad"] #topbar.kiosk-bar,
   :root[data-controls="pad"] .kiosk-bar-main {
-    height: calc(128px + env(safe-area-inset-bottom, 0px));
+    height: calc(134px + env(safe-area-inset-bottom, 0px));
   }
   #snes-pad {
     --sf-btn: 64px;
     --sf-gap: 40px;
-    --sf-dpad: 108px;
+    --sf-dpad: 110px;
     --sf-edge: clamp(28px, 7vw, 80px);
   }
-  #snes-pad .snes-menu-btn { width: 46px; height: 17px; }
 }
 
-/* Short / landscape — compact so it doesn't eat the playfield. */
+/* Short / landscape — compact so it doesn't eat the playfield. The bar is
+   too shallow here for the portrait breathing room, so trim the shell
+   padding back down. */
 @media (max-height: 450px) {
   :root[data-controls="pad"] #topbar.kiosk-bar,
   :root[data-controls="pad"] .kiosk-bar-main {
     height: calc(66px + env(safe-area-inset-bottom, 0px));
   }
-  #snes-pad { --sf-btn: 40px; --sf-gap: 18px; --sf-dpad: 52px; --sf-edge: 14px; }
-  #snes-pad .snes-menu-btn { height: 11px; }
+  #snes-pad { --sf-btn: 40px; --sf-gap: 18px; --sf-dpad: 54px; --sf-edge: 14px; }
+  #snes-pad .snes-shell { padding: 3px var(--sf-edge) calc(env(safe-area-inset-bottom, 0px) + 3px); }
+  #snes-pad .snes-wordmark { display: none; }
 }
 
 /* The kiosk landing/history/about bar (.kiosk-bar-main) intentionally

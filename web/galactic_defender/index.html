@@ -72,7 +72,9 @@
         taps + the d-pad drag hit-test as plain 2D. shell.js wires it
         through BlipController; #control-toggle (and the saved
         'blip-controls' pref) swaps back to the joystick above. Buttons:
-        d-pad, A / B, SELECT (arcade menu), START. -->
+        a big d-pad on the left, A / B on the right. No SELECT / START —
+        A / B double as the title-screen "press fire", the BLIP logo is
+        the way back to the arcade grid. -->
    <div id="snes-pad" aria-hidden="true">
     <span class="snes-cord" aria-hidden="true"></span>
     <div class="snes-shell">
@@ -82,12 +84,6 @@
         <span class="snes-dp-seg dp-down"  data-blip="down"  data-blip-nopress></span>
         <span class="snes-dp-seg dp-left"  data-blip="left"  data-blip-nopress></span>
         <span class="snes-dp-hub"></span>
-      </div>
-      <div class="snes-mid">
-        <button type="button" class="snes-menu-btn snes-select" data-blip="select" data-blip-kind="menu" aria-label="Select — arcade menu"></button>
-        <button type="button" class="snes-menu-btn snes-start"  data-blip="start"  data-blip-kind="menu" aria-label="Start"></button>
-        <span class="snes-menu-label snes-label-select">SELECT</span>
-        <span class="snes-menu-label snes-label-start">START</span>
       </div>
       <div class="snes-face">
         <button type="button" class="snes-btn snes-b" data-blip="button1" aria-label="Button B"><span></span></button>
