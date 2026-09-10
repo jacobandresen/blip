@@ -250,14 +250,20 @@ fn update_launch(g: &mut Game, dt: f32) {
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     paddle_input(g, dt);
 
-    // Screwball curve: rotate the ball's velocity vector (this preserves its
-    // speed — only the direction bends) by the current spin rate, then let
-    // the spin bleed off over time so the curve eases out rather than
-    // looping forever.
+    if g.pad_effect_timer.tick(dt) { g.pad_w = PAD_W as f32; }
+    g.slow_timer.tick(dt);
+    update_drops(g, dt);
+
+    let active_speed = if g.slow_timer.active() {
+        g.ball_speed * BALL_SLOW_FACTOR
+    } else {
+        g.ball_speed
+    };
+
+    // ---- screwball curve: rotate the velocity vector (speed preserved) by
+    //      the current spin rate, capped at SCREW_MAX_CURVE, spin bleeding
+    //      off over time so the curve eases out instead of looping ----
     if g.ball_spin.abs() > 0.001 {
-        // Never let the accumulated curve exceed SCREW_MAX_CURVE — clamp
-        // this frame's rotation to whatever budget is left, and stop
-        // spinning entirely once it's used up.
         let remaining = (SCREW_MAX_CURVE - g.ball_curve_used).max(0.0);
         let mut ang = g.ball_spin * dt;
         if ang.abs() > remaining {
@@ -272,106 +278,170 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.ball_spin *= (1.0 - SCREW_SPIN_DECAY * dt).max(0.0);
     }
 
-    g.ball_x += g.ball_vx * dt;
-    g.ball_y += g.ball_vy * dt;
-
-    // Rolling rotation for the visual "spin mark" — a ball rolling along a
-    // surface turns at angular rate = linear speed / radius, driven here by
-    // the horizontal velocity so a curving (screwball) shot visibly spins
-    // faster as it bends.
+    // Rolling-mark spin (visual only): angular rate = speed / radius, driven
+    // by the horizontal component so a curving shot visibly spins faster.
     g.ball_roll += (g.ball_vx / (BALL_W as f32 * 0.5)) * dt;
 
-    if g.ball_x < 0.0 { g.ball_x = 0.0; g.ball_vx = g.ball_vx.abs(); }
-    if g.ball_x + BALL_W as f32 > WIN_W as f32 {
-        g.ball_x = (WIN_W - BALL_W) as f32;
+    // ---- integrate in substeps so a fast ball can't tunnel through a brick,
+    //      the seam between two bricks, or the paddle in a single frame ----
+    let speed = g.ball_vx.hypot(g.ball_vy).max(1.0);
+    let substeps = ((speed * dt / (BALL_W as f32 * 0.4)).ceil() as i32).clamp(1, 8);
+    let sdt = dt / substeps as f32;
+
+    for _ in 0..substeps {
+        g.ball_x += g.ball_vx * sdt;
+        g.ball_y += g.ball_vy * sdt;
+
+        ball_walls(g);
+        ball_paddle(g, active_speed, sfx);
+        ball_bricks(g, active_speed, sfx);
+
+        if g.ball_y > WIN_H as f32 {
+            play_sfx(&sfx.life_lost);
+            g.reset_drops();
+            match g.sess.lose_life() {
+                LifeResult::StillAlive => { g.dead_timer.start(1.2); g.state = State::Dead; }
+                LifeResult::GameOver => {
+                    g.dead_timer.start(GAME_OVER_MIN_WAIT);
+                    g.state = State::Over;
+                    web::report_score(g.sess.score);
+                }
+            }
+            return;
+        }
+    }
+
+    if g.bricks_alive() == 0 {
+        play_sfx(&sfx.win);
+        g.dead_timer.start(1.5);
+        g.state = State::Win;
+    }
+}
+
+/// The ball as a circle: centre and radius.
+#[inline]
+fn ball_circle(g: &Game) -> (f32, f32, f32) {
+    let r = BALL_W as f32 / 2.0;
+    (g.ball_x + r, g.ball_y + r, r)
+}
+
+/// Left / right / top walls. The overshoot past the wall is reflected back
+/// rather than clamped flat, so no speed is lost to the ball "sticking".
+fn ball_walls(g: &mut Game) {
+    if g.ball_x < 0.0 {
+        g.ball_x = -g.ball_x;
+        g.ball_vx = g.ball_vx.abs();
+    }
+    let right = (WIN_W - BALL_W) as f32;
+    if g.ball_x > right {
+        g.ball_x = 2.0 * right - g.ball_x;
         g.ball_vx = -g.ball_vx.abs();
     }
-    if g.ball_y < HUD_H as f32 { g.ball_y = HUD_H as f32; g.ball_vy = g.ball_vy.abs(); }
-
-    // Tick drop effects
-    if g.pad_effect_timer.tick(dt) {
-        g.pad_w = PAD_W as f32;
+    let top = HUD_H as f32;
+    if g.ball_y < top {
+        g.ball_y = 2.0 * top - g.ball_y;
+        g.ball_vy = g.ball_vy.abs();
     }
-    g.slow_timer.tick(dt);
+}
 
-    update_drops(g, dt);
-
-    if g.ball_y > WIN_H as f32 {
-        play_sfx(&sfx.life_lost);
-        g.reset_drops();
-        match g.sess.lose_life() {
-            LifeResult::StillAlive => { g.dead_timer.start(1.2); g.state = State::Dead; }
-            LifeResult::GameOver   => {
-                g.dead_timer.start(GAME_OVER_MIN_WAIT);
-                g.state = State::Over;
-                web::report_score(g.sess.score);
-            }
-        }
+fn ball_paddle(g: &mut Game, speed: f32, sfx: &Sounds) {
+    if g.ball_vy <= 0.0 {
         return;
     }
-
-    let active_speed = if g.slow_timer.active() { g.ball_speed * BALL_SLOW_FACTOR } else { g.ball_speed };
-
-    if g.ball_vy > 0.0
-        && rects_overlap(
-            g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32,
-            g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32,
-        )
-    {
-        play_sfx(&sfx.paddle_hit);
-        let incoming_vx = g.ball_vx;
-        let rel = (g.ball_x + BALL_W as f32 / 2.0 - g.pad_x) / g.pad_w;
-        let angle = (rel - 0.5) * 2.0 * 1.2;
-        g.ball_vx = active_speed * angle.sin();
-        g.ball_vy = -active_speed * angle.cos();
-        if g.ball_vy.abs() < active_speed * 0.3 {
-            g.ball_vy = -active_speed * 0.3;
-        }
-        g.ball_y = (PAD_Y - BALL_H - 1) as f32;
-
-        // Screwball: friction spins the ball based on how much the paddle's
-        // surface actually slides against the ball's at the moment of
-        // contact — i.e. their *relative* horizontal velocity, not just the
-        // paddle's own speed. A paddle chasing the ball's direction (little
-        // slip) barely spins it; a paddle moving opposite the ball's
-        // incoming path (lots of slip) puts a hard curve on it.
-        let rel_vx = g.pad_vx - incoming_vx;
-        g.ball_spin = if rel_vx.abs() > SCREW_MIN_PAD_SPEED {
-            let t = (rel_vx.abs() / (PAD_SPEED + BALL_SPEED_MAX)).min(1.0);
-            rel_vx.signum() * t * SCREW_MAX_SPIN_RATE
-        } else {
-            0.0
-        };
-        g.ball_curve_used = 0.0;
+    if !rects_overlap(
+        g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32,
+        g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32,
+    ) {
+        return;
     }
+    play_sfx(&sfx.paddle_hit);
+    let incoming_vx = g.ball_vx;
+
+    // Where it landed across the face, -1 (left tip) .. +1 (right tip). The
+    // classic "aim by where you hit" english, plus a slice of the paddle's
+    // own sideways speed carried into the ball the way a moving bat drags it.
+    let rel = ((g.ball_x + BALL_W as f32 / 2.0 - g.pad_x) / g.pad_w - 0.5) * 2.0;
+    let steer = rel.clamp(-1.0, 1.0) * 1.15; // radians
+    let nvx = speed * steer.sin() + g.pad_vx * 0.18;
+    let mut nvy = -(speed * steer.cos()).abs();
+    if nvy > -speed * 0.32 {
+        nvy = -speed * 0.32; // keep it from grazing along just over the paddle
+    }
+    // Renormalise: the english + paddle drag changed |v|; the ball's speed
+    // stays exactly on the ramp.
+    let m = (nvx * nvx + nvy * nvy).sqrt().max(1.0);
+    g.ball_vx = nvx / m * speed;
+    g.ball_vy = nvy / m * speed;
+    g.ball_y = (PAD_Y - BALL_H) as f32 - 0.5;
+
+    // Screwball spin from the slip between the paddle's surface and the
+    // ball's — their *relative* horizontal velocity, not the paddle's alone.
+    let rel_vx = g.pad_vx - incoming_vx;
+    g.ball_spin = if rel_vx.abs() > SCREW_MIN_PAD_SPEED {
+        let t = (rel_vx.abs() / (PAD_SPEED + BALL_SPEED_MAX)).min(1.0);
+        rel_vx.signum() * t * SCREW_MAX_SPIN_RATE
+    } else {
+        0.0
+    };
+    g.ball_curve_used = 0.0;
+}
+
+/// Circle-vs-rectangle against the brick grid — one contact per call. The
+/// bounce normal is the direction from the closest point on the brick to the
+/// ball's centre, so a glancing hit on a brick's corner deflects along the
+/// real diagonal instead of snapping to a pure horizontal / vertical bounce.
+fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
+    let (cx, cy, rad) = ball_circle(g);
 
     for i in 0..BRICK_TOTAL {
-        if !g.bricks[i].alive { continue; }
-        let r = i as i32 / BRICK_COLS;
-        let c = i as i32 % BRICK_COLS;
-        let bx = (BRICK_OX + c * (BRICK_W + BRICK_GAP)) as f32;
-        let by = (BRICK_OY + r * (BRICK_H + BRICK_GAP)) as f32;
-        if !rects_overlap(g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32,
-                          bx, by, BRICK_W as f32, BRICK_H as f32) { continue; }
-
-        // Bounce off the brick regardless of whether this hit breaks it.
-        let over_x = if g.ball_vx > 0.0 { bx - (g.ball_x + BALL_W as f32) }
-                     else { (bx + BRICK_W as f32) - g.ball_x };
-        let over_y = if g.ball_vy > 0.0 { by - (g.ball_y + BALL_H as f32) }
-                     else { (by + BRICK_H as f32) - g.ball_y };
-        if over_x.abs() < over_y.abs() { g.ball_vx = -g.ball_vx; }
-        else                            { g.ball_vy = -g.ball_vy; }
-
-        let spd = (g.ball_vx * g.ball_vx + g.ball_vy * g.ball_vy).sqrt();
-        if spd > 0.0 {
-            g.ball_vx = g.ball_vx / spd * active_speed;
-            g.ball_vy = g.ball_vy / spd * active_speed;
+        if !g.bricks[i].alive {
+            continue;
         }
+        let row = i as i32 / BRICK_COLS;
+        let col = i as i32 % BRICK_COLS;
+        let bx = (BRICK_OX + col * (BRICK_W + BRICK_GAP)) as f32;
+        let by = (BRICK_OY + row * (BRICK_H + BRICK_GAP)) as f32;
+
+        let px = cx.clamp(bx, bx + BRICK_W as f32);
+        let py = cy.clamp(by, by + BRICK_H as f32);
+        let (dx, dy) = (cx - px, cy - py);
+        let d2 = dx * dx + dy * dy;
+        if d2 >= rad * rad {
+            continue;
+        }
+
+        let d = d2.sqrt();
+        let (nx, ny) = if d > 0.001 {
+            (dx / d, dy / d)
+        } else {
+            // centre buried in the brick — eject along the shallowest axis
+            let ox = (cx - bx).min(bx + BRICK_W as f32 - cx);
+            let oy = (cy - by).min(by + BRICK_H as f32 - cy);
+            if ox < oy {
+                (if cx < bx + BRICK_W as f32 / 2.0 { -1.0 } else { 1.0 }, 0.0)
+            } else {
+                (0.0, if cy < by + BRICK_H as f32 / 2.0 { -1.0 } else { 1.0 })
+            }
+        };
+
+        // reflect about the contact normal, then lift the ball clear of the
+        // brick and put its speed back exactly on the ramp
+        let vn = g.ball_vx * nx + g.ball_vy * ny;
+        if vn < 0.0 {
+            g.ball_vx -= 2.0 * vn * nx;
+            g.ball_vy -= 2.0 * vn * ny;
+        }
+        let pen = rad - d + 0.5;
+        g.ball_x += nx * pen;
+        g.ball_y += ny * pen;
+        let m = g.ball_vx.hypot(g.ball_vy).max(1.0);
+        g.ball_vx = g.ball_vx / m * speed;
+        g.ball_vy = g.ball_vy / m * speed;
 
         g.bricks[i].hp -= 1;
         if g.bricks[i].hp == 0 {
             g.bricks[i].alive = false;
-            g.sess.add_score((BRICK_ROWS - r) * 10 * g.sess.level);
+            g.sess.add_score((BRICK_ROWS - row) * 10 * g.sess.level);
             // Same ramp on every level, so the ball plays identically no
             // matter how far the player has gotten.
             g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
@@ -383,24 +453,18 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                     0..=2 => DropKind::Wide,
                     3..=5 => DropKind::Slow,
                     6..=7 => DropKind::Narrow,
-                    _     => DropKind::Life,
+                    _ => DropKind::Life,
                 };
                 pool_spawn(&mut g.drops, Drop { x: drop_x, y: by, active: true, kind: drop_kind });
             }
             play_sfx(&sfx.brick_break);
         } else {
-            // Steel brick survived — show the cracked texture as a warning
-            // that the next hit finishes it.
+            // Steel brick survived — the cracked texture warns the next hit
+            // finishes it.
             g.bricks[i].kind = BRICK_STEEL_CRACKED;
             play_sfx(&sfx.brick_hit);
         }
-        break;
-    }
-
-    if g.bricks_alive() == 0 {
-        play_sfx(&sfx.win);
-        g.dead_timer.start(1.5);
-        g.state = State::Win;
+        return;
     }
 }
 
@@ -518,24 +582,10 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick:
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
-fn draw_hi(blip: &Blip, hi: &web::HighScore, y: f32) {
-    if hi.score > 0 {
-        blip.draw_centered(&hi.label("HI"), y, 2.0, BLIP_YELLOW);
-    }
-}
-
-fn draw_best(blip: &Blip, score: i32, hi: &web::HighScore, y: f32) {
-    if score > 0 && score >= hi.score {
-        blip.draw_centered("NEW BEST!", y, 2.0, BLIP_GREEN);
-    } else if hi.score > 0 {
-        blip.draw_centered(&hi.label("BEST"), y, 2.0, BLIP_GRAY);
-    }
-}
-
 fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("BOUNCER",                 (WIN_H / 4) as f32,         6.0, BLIP_CYAN);
-    draw_hi(blip, hi, (WIN_H / 4 + 40) as f32);
+    blip.draw_hi(hi, (WIN_H / 4 + 40) as f32, BLIP_YELLOW);
     blip.draw_centered("PRESS FIRE",              (WIN_H / 2) as f32,         3.0, BLIP_WHITE);
     blip.draw_centered("LEFT RIGHT ARROW OR AD",  (WIN_H * 2 / 3) as f32,     2.0, BLIP_GRAY);
     blip.draw_centered("SPACE TO LAUNCH",         (WIN_H * 2 / 3 + 20) as f32, 2.0, BLIP_GRAY);
@@ -553,7 +603,7 @@ fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
     blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
-    draw_best(blip, score, hi, (WIN_H / 2 + 28) as f32);
+    blip.draw_best(score, hi, (WIN_H / 2 + 28) as f32, BLIP_GREEN);
     if !waiting {
         blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
     }

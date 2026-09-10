@@ -11,7 +11,7 @@ use blip::macroquad::texture::{FilterMode, Texture2D};
 use blip::{
     clamp, lerp, play_music, play_sfx, rand_int, rects_overlap, web, window_conf, Blip,
     BlipColor, LifeResult, Session, Timer,
-    BLIP_BLACK, BLIP_CYAN, BLIP_GRAY, BLIP_GREEN, BLIP_MAGENTA, BLIP_ORANGE, BLIP_RED,
+    BLIP_BLACK, BLIP_CYAN, BLIP_GREEN, BLIP_MAGENTA, BLIP_ORANGE, BLIP_RED,
     BLIP_WHITE, BLIP_YELLOW,
 };
 
@@ -991,25 +991,11 @@ fn draw_play(blip: &Blip, g: &Game,
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
-fn draw_hi(blip: &Blip, hi: &web::HighScore, y: f32) {
-    if hi.score > 0 {
-        blip.draw_centered(&hi.label("HI"), y, 2.0, BLIP_YELLOW);
-    }
-}
-
-fn draw_best(blip: &Blip, score: i32, hi: &web::HighScore, y: f32) {
-    if score > 0 && score >= hi.score {
-        blip.draw_centered("NEW BEST!", y, 2.0, BLIP_GREEN);
-    } else if hi.score > 0 {
-        blip.draw_centered(&hi.label("BEST"), y, 2.0, BLIP_GRAY);
-    }
-}
-
 fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("GALACTIC", (WIN_H / 5) as f32,        5.0, BLIP_CYAN);
     blip.draw_centered("DEFENDER", (WIN_H / 5 + 50) as f32,   5.0, BLIP_MAGENTA);
-    draw_hi(blip, hi, (WIN_H / 5 + 84) as f32);
+    blip.draw_hi(hi, (WIN_H / 5 + 84) as f32, BLIP_YELLOW);
 
     let dw = (ALIEN_W / 2) as f32;
     let dh = (ALIEN_H / 2) as f32;
@@ -1042,7 +1028,7 @@ fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
     blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
-    draw_best(blip, score, hi, (WIN_H / 2 + 28) as f32);
+    blip.draw_best(score, hi, (WIN_H / 2 + 28) as f32, BLIP_GREEN);
     if !waiting {
         blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
     }

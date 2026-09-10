@@ -259,6 +259,22 @@ fn wrap(v: f32, lo: f32, hi: f32) -> f32 {
     if v < lo { v + span } else if v >= hi { v - span } else { v }
 }
 
+/// Did the segment `p0 -> p1` pass within `r` of `(cx, cy)` at any point? Used
+/// for bullet hits: a fast bullet covers several of its own widths per frame,
+/// so a point test at the frame's end lets it punch straight through a small
+/// rock. Testing the whole swept path closes that gap.
+fn seg_hits_circle(x0: f32, y0: f32, x1: f32, y1: f32, cx: f32, cy: f32, r: f32) -> bool {
+    let (dx, dy) = (x1 - x0, y1 - y0);
+    let len2 = dx * dx + dy * dy;
+    let t = if len2 > 1e-6 {
+        (((cx - x0) * dx + (cy - y0) * dy) / len2).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let (ex, ey) = (cx - (x0 + t * dx), cy - (y0 + t * dy));
+    ex * ex + ey * ey <= r * r
+}
+
 fn spawn_bullet(bullets: &mut [Bullet; MAX_BULLETS], x: f32, y: f32, vx: f32, vy: f32, from_player: bool) {
     pool_spawn(bullets, Bullet { active: true, x, y, vx, vy, ttl: BULLET_TTL, from_player });
 }
@@ -369,9 +385,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
     if g.ship_alive && g.invuln_t <= 0.0 {
         for bi in 0..MAX_BULLETS {
             if !g.bullets[bi].active || g.bullets[bi].from_player { continue; }
-            let dx = g.bullets[bi].x - g.ship.x;
-            let dy = g.bullets[bi].y - g.ship.y;
-            if dx * dx + dy * dy <= SHIP_RADIUS * SHIP_RADIUS {
+            let (bx, by) = (g.bullets[bi].x, g.bullets[bi].y);
+            let (px, py) = (bx - g.bullets[bi].vx * dt, by - g.bullets[bi].vy * dt);
+            if seg_hits_circle(px, py, bx, by, g.ship.x, g.ship.y, SHIP_RADIUS) {
                 g.bullets[bi].active = false;
                 kill_ship(g, sfx);
                 break;
@@ -453,12 +469,11 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     for bi in 0..MAX_BULLETS {
         if !g.bullets[bi].active || !g.bullets[bi].from_player { continue; }
         let (bx, by) = (g.bullets[bi].x, g.bullets[bi].y);
+        let (px, py) = (bx - g.bullets[bi].vx * dt, by - g.bullets[bi].vy * dt);
         for ai in 0..MAX_ASTEROIDS {
             if !g.asteroids[ai].active { continue; }
             let r = g.asteroids[ai].size.radius();
-            let dx = bx - g.asteroids[ai].x;
-            let dy = by - g.asteroids[ai].y;
-            if dx * dx + dy * dy <= r * r {
+            if seg_hits_circle(px, py, bx, by, g.asteroids[ai].x, g.asteroids[ai].y, r) {
                 g.bullets[bi].active = false;
                 let (ax, ay, size) = (g.asteroids[ai].x, g.asteroids[ai].y, g.asteroids[ai].size);
                 g.asteroids[ai].active = false;
@@ -478,10 +493,10 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.saucer.active {
         for bi in 0..MAX_BULLETS {
             if !g.bullets[bi].active || !g.bullets[bi].from_player { continue; }
-            let dx = g.bullets[bi].x - g.saucer.x;
-            let dy = g.bullets[bi].y - g.saucer.y;
+            let (bx, by) = (g.bullets[bi].x, g.bullets[bi].y);
+            let (px, py) = (bx - g.bullets[bi].vx * dt, by - g.bullets[bi].vy * dt);
             let r = if g.saucer.big { 16.0 } else { 9.0 };
-            if dx * dx + dy * dy <= r * r {
+            if seg_hits_circle(px, py, bx, by, g.saucer.x, g.saucer.y, r) {
                 g.bullets[bi].active = false;
                 g.saucer.active = false;
                 award(g, sfx, if g.saucer.big { 200 } else { 1000 });
@@ -625,25 +640,11 @@ fn draw_play(blip: &Blip, g: &Game) {
     blip.draw_text(&lvl, 4.0, WIN_H as f32 - 18.0, 1.5, BLIP_GRAY);
 }
 
-fn draw_hi(blip: &Blip, hi: &web::HighScore, y: f32) {
-    if hi.score > 0 {
-        blip.draw_centered(&hi.label("HI"), y, 2.0, NEON_YELLOW);
-    }
-}
-
-fn draw_best(blip: &Blip, score: i32, hi: &web::HighScore, y: f32) {
-    if score > 0 && score >= hi.score {
-        blip.draw_centered("NEW BEST!", y, 2.0, NEON_CYAN);
-    } else if hi.score > 0 {
-        blip.draw_centered(&hi.label("BEST"), y, 2.0, BLIP_GRAY);
-    }
-}
-
 fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
     blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, NEON_CYAN);
-    draw_hi(blip, hi, (WIN_H / 4) as f32 + 44.0);
+    blip.draw_hi(hi, (WIN_H / 4) as f32 + 44.0, NEON_YELLOW);
     blip.draw_centered("PRESS FIRE", (WIN_H / 2) as f32, 3.0, NEON_YELLOW);
     blip.draw_centered("ARROWS/WASD ROTATE+THRUST", (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
     blip.draw_centered("SPACE FIRE  ·  Z HYPERSPACE", (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);
@@ -655,7 +656,7 @@ fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
     draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, NEON_PINK);
     blip.draw_centered(&buf, (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
-    draw_best(blip, score, hi, (WIN_H / 2) as f32 + 28.0);
+    blip.draw_best(score, hi, (WIN_H / 2) as f32 + 28.0, NEON_CYAN);
     if !waiting {
         blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, NEON_YELLOW);
     }

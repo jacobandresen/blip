@@ -7,7 +7,7 @@ use blip::input::{
 use blip::macroquad::texture::{FilterMode, Texture2D};
 use blip::macroquad::prelude::ImageFormat;
 use blip::{
-    play_music, play_sfx, rand_int, web, window_conf, Blip, BlipColor, LifeResult, Session,
+    lerp, play_music, play_sfx, rand_int, web, window_conf, Blip, BlipColor, LifeResult, Session,
     Timer, BLIP_BLACK, BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
@@ -284,22 +284,30 @@ fn draw_board(blip: &Blip) {
 }
 
 fn draw_snake(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D) {
+    // Slide each segment from the cell it left toward the cell it's entering,
+    // by how far through the current step-tick we are, so the snake glides
+    // instead of jumping a whole cell at a time. Pure rendering — the game
+    // logic stays on its clean integer grid.
+    let f = (g.move_timer / g.move_interval()).clamp(0.0, 1.0);
+    let seg_px = |i: usize| -> (f32, f32) {
+        let cur = g.snake_at(i);
+        let prev = if i + 1 < g.snake_len {
+            g.snake_at(i + 1)
+        } else {
+            // the tail: extrapolate the cell one step back along the body
+            let ahead = g.snake_at(i - 1);
+            Cell { c: 2 * cur.c - ahead.c, r: 2 * cur.r - ahead.r }
+        };
+        let x = lerp(prev.c as f32, cur.c as f32, f) * CELL as f32;
+        let y = HUD_H as f32 + lerp(prev.r as f32, cur.r as f32, f) * CELL as f32;
+        (x, y)
+    };
     for i in (1..g.snake_len).rev() {
-        let b = g.snake_at(i);
-        blip.draw_texture_tinted(
-            body,
-            (b.c * CELL) as f32,
-            (HUD_H + b.r * CELL) as f32,
-            CELL as f32, CELL as f32, BLIP_WHITE,
-        );
+        let (x, y) = seg_px(i);
+        blip.draw_texture_tinted(body, x, y, CELL as f32, CELL as f32, BLIP_WHITE);
     }
-    let h = g.snake_at(0);
-    blip.draw_texture_tinted(
-        head,
-        (h.c * CELL) as f32,
-        (HUD_H + h.r * CELL) as f32,
-        CELL as f32, CELL as f32, BLIP_WHITE,
-    );
+    let (x, y) = seg_px(0);
+    blip.draw_texture_tinted(head, x, y, CELL as f32, CELL as f32, BLIP_WHITE);
 }
 
 fn draw_play(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D, food: &Texture2D) {
@@ -321,24 +329,10 @@ fn draw_play(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D, food: &T
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
-fn draw_hi(blip: &Blip, hi: &web::HighScore, y: f32) {
-    if hi.score > 0 {
-        blip.draw_centered(&hi.label("HI"), y, 2.0, BLIP_YELLOW);
-    }
-}
-
-fn draw_best(blip: &Blip, score: i32, hi: &web::HighScore, y: f32) {
-    if score > 0 && score >= hi.score {
-        blip.draw_centered("NEW BEST!", y, 2.0, BLIP_GREEN);
-    } else if hi.score > 0 {
-        blip.draw_centered(&hi.label("BEST"), y, 2.0, BLIP_GRAY);
-    }
-}
-
 fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("SERPENT",            (WIN_H / 4) as f32,       6.0, BLIP_GREEN);
-    draw_hi(blip, hi, (WIN_H / 4 + 40) as f32);
+    blip.draw_hi(hi, (WIN_H / 4 + 40) as f32, BLIP_YELLOW);
     blip.draw_centered("PRESS FIRE",         (WIN_H / 2) as f32,       3.0, BLIP_WHITE);
     blip.draw_centered("ARROW KEYS OR WASD", (WIN_H * 2 / 3) as f32,   2.0, BLIP_GRAY);
 }
@@ -348,7 +342,7 @@ fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
     blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
-    draw_best(blip, score, hi, (WIN_H / 2 + 28) as f32);
+    blip.draw_best(score, hi, (WIN_H / 2 + 28) as f32, BLIP_GREEN);
     if !waiting {
         blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
     }
