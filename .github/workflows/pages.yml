@@ -22,6 +22,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # web/blip_config.js is git-ignored; write it from repo secrets so the
+      # Supabase URL + anon key live only in the deployed site, not the repo.
+      # Missing secrets → blank config → the leaderboard just stays disabled.
+      - name: Inject Supabase config
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          printf "window.BLIP_SUPABASE = { url: '%s', anonKey: '%s' };\n" \
+            "$SUPABASE_URL" "$SUPABASE_ANON_KEY" > web/blip_config.js
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
         with:

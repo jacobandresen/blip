@@ -702,28 +702,84 @@ impl Blip {
         font::draw_centered(self.width, text, y, sz, color);
     }
 
-    /// Draw the standard two-field HUD bar (SCORE / LIVES) across the top of the canvas.
+    /// Draw the standard three-field HUD bar across the top of the canvas:
+    /// SCORE (left), the leading high score and its holder (centre, e.g.
+    /// `HI 180940 JACOB` — the name in a fluorescent glow), and LIVES
+    /// (right). The centre field is drawn only when a high score is known
+    /// (it comes from the kiosk shell — see [`crate::web::high_score`], and
+    /// is absent on native builds) and is sized and clipped to stay in the
+    /// clear gap between the SCORE and LIVES clusters.
     pub fn draw_hud(&self, score: i32, lives: i32) {
         let hud_h = 28.0;
         self.fill_rect(0.0, 0.0, self.width as f32, hud_h, BLIP_BLACK);
         self.draw_line(
             0.0, hud_h - 1.0, self.width as f32, hud_h - 1.0, BLIP_DARKGRAY,
         );
+
+        // ---- SCORE, left ----
         self.draw_text("SCORE", 4.0, 5.0, 2.0, BLIP_YELLOW);
         self.draw_number(score, 68.0, 5.0, 2.0, BLIP_WHITE);
+        // right edge of the SCORE cluster: label + one digit-cell per digit
+        let score_digits = score.max(0).to_string().len().max(1) as f32;
+        let score_right = 68.0 + score_digits * 12.0;
+
+        // ---- LIVES, right ----
         // The curved-glass CRT post-process (CRT_FRAGMENT below) clips a
         // wedge in each corner of the canvas — right where a naively
         // right-aligned "self.width - <fixed px>" position lands. The
         // margin off the true right edge is scaled with the canvas width
         // (not a fixed pixel count) so LIVES stays clear of that wedge on
         // every game's canvas size, not just the common 480px-wide one.
-        // 0.05 wasn't enough on taller/more-square canvases (Meteors
-        // 680x708, Serpent 480x508) — confirmed by rendering the actual
-        // shader, not just by inspection — so this needs more headroom
-        // than the 480x540 games it was originally tuned against.
         let edge_margin = (self.width as f32 * 0.09) as i32;
         let lives_x = self.width - edge_margin - 24; // room for up to 2 digits
-        self.draw_text("LIVES", (lives_x - 64) as f32, 5.0, 2.0, BLIP_ORANGE);
+        let lives_left = (lives_x - 64) as f32;
+        self.draw_text("LIVES", lives_left, 5.0, 2.0, BLIP_ORANGE);
         self.draw_number(lives, lives_x as f32, 5.0, 2.0, BLIP_WHITE);
+
+        // ---- HI <score> <NAME>, centred in the gap ----
+        let hi = crate::web::high_score();
+        if hi.score <= 0 {
+            return;
+        }
+        let lo = score_right + 16.0;
+        let avail = lives_left - 16.0 - lo;
+        if avail < 44.0 {
+            return; // no clear room (tiny canvas or a very long live score)
+        }
+
+        let head = format!("HI {} ", hi.score); // trailing space sits before the name
+        let mut name: String = hi.name.chars().take(12).collect();
+        let width_of =
+            |n: &str, sz: f32| (head.chars().count() + n.chars().count()) as f32 * 6.0 * sz;
+
+        // Shrink the text, then trim the name, until the whole label fits.
+        let mut sz = 1.5_f32;
+        while width_of(&name, sz) > avail {
+            if sz > 1.0 {
+                sz -= 0.1;
+            } else if name.chars().count() > 3 {
+                name.pop();
+            } else {
+                break;
+            }
+        }
+        let head_str = head.trim_end();
+        if head_str.chars().count() as f32 * 6.0 * sz > avail {
+            return; // even "HI <score>" alone won't fit without crowding
+        }
+
+        let cw = 6.0 * sz;
+        let total_w = width_of(&name, sz);
+        let x0 = lo + (avail - total_w).max(0.0) / 2.0;
+        self.draw_text(head_str, x0, 7.0, sz, BLIP_WHITE);
+        if !name.is_empty() {
+            font::draw_text_glow(
+                &name,
+                x0 + head.chars().count() as f32 * cw,
+                7.0,
+                sz,
+                NEON_CYAN,
+            );
+        }
     }
 }

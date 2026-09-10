@@ -304,7 +304,11 @@ fn kill_ship(g: &mut Game, sfx: &Sounds) {
     g.ship_alive = false;
     match g.sess.lose_life() {
         LifeResult::StillAlive => { g.respawn_t.start(RESPAWN_DELAY); g.state = State::Dead; }
-        LifeResult::GameOver   => { g.respawn_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
+        LifeResult::GameOver   => {
+            g.respawn_t.start(GAME_OVER_MIN_WAIT);
+            g.state = State::Over;
+            web::report_score(g.sess.score);
+        }
     }
 }
 
@@ -621,21 +625,37 @@ fn draw_play(blip: &Blip, g: &Game) {
     blip.draw_text(&lvl, 4.0, WIN_H as f32 - 18.0, 1.5, BLIP_GRAY);
 }
 
-fn draw_title(blip: &Blip) {
+fn draw_hi(blip: &Blip, hi: &web::HighScore, y: f32) {
+    if hi.score > 0 {
+        blip.draw_centered(&hi.label("HI"), y, 2.0, NEON_YELLOW);
+    }
+}
+
+fn draw_best(blip: &Blip, score: i32, hi: &web::HighScore, y: f32) {
+    if score > 0 && score >= hi.score {
+        blip.draw_centered("NEW BEST!", y, 2.0, NEON_CYAN);
+    } else if hi.score > 0 {
+        blip.draw_centered(&hi.label("BEST"), y, 2.0, BLIP_GRAY);
+    }
+}
+
+fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
     blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, NEON_CYAN);
+    draw_hi(blip, hi, (WIN_H / 4) as f32 + 44.0);
     blip.draw_centered("PRESS FIRE", (WIN_H / 2) as f32, 3.0, NEON_YELLOW);
     blip.draw_centered("ARROWS/WASD ROTATE+THRUST", (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
     blip.draw_centered("SPACE FIRE  ·  Z HYPERSPACE", (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);
 }
 
-fn draw_over(blip: &Blip, score: i32, waiting: bool) {
+fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
     let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
     draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, NEON_PINK);
     blip.draw_centered(&buf, (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
+    draw_best(blip, score, hi, (WIN_H / 2) as f32 + 28.0);
     if !waiting {
         blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, NEON_YELLOW);
     }
@@ -720,8 +740,8 @@ async fn main() {
         }
 
         match g.state {
-            State::Title => draw_title(&blip),
-            State::Over  => draw_over(&blip, g.sess.score, g.respawn_t.active()),
+            State::Title => draw_title(&blip, &web::high_score()),
+            State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.respawn_t.active()),
             State::Play | State::Dead => draw_play(&blip, &g),
         }
 
