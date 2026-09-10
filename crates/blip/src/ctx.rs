@@ -82,19 +82,17 @@ uniform sampler2D Texture;
 uniform vec4 _Time;
 uniform vec2 ScreenSize;
 
-// Bow flat 0..1 UVs outward into a convex tube. Divisors set how strong the
-// barrel is per axis — larger is flatter; kept gentle so the corners don't
-// bow far. The >1 factor is underscan: it shrinks the picture inside the
-// curved glass so that even after the barrel pushes the corners outward, the
-// whole game screen — every edge and corner, including the top HUD row —
-// stays well inside the visible area, framed by a black rim like a real tube
-// that never quite filled its own face. Tuned so the four corners of the
-// game land at ~96% of the way out, never clipped by the mask below.
+// Bow flat 0..1 UVs outward into a convex tube. Divisors set the barrel
+// strength per axis (larger = flatter). The <1 scale then pulls the whole
+// picture back in just enough that the barrel-pushed CORNERS land inside
+// the sampling range — so the full game area, right into every corner and
+// the top HUD row, stays visible with only a hairline black rim, instead
+// of a black wedge biting out each corner.
 vec2 curve(vec2 p) {
     p = p * 2.0 - 1.0;
-    vec2 off = abs(p.yx) / vec2(16.0, 14.0);
+    vec2 off = abs(p.yx) / vec2(12.0, 11.0);
     p = p + p * off * off;
-    p *= 1.075;
+    p *= 0.99;
     return p * 0.5 + 0.5;
 }
 
@@ -711,30 +709,30 @@ impl Blip {
     /// clear gap between the SCORE and LIVES clusters.
     pub fn draw_hud(&self, score: i32, lives: i32) {
         let hud_h = 28.0;
+        // Text baseline: low enough in the bar that the curved-glass shader's
+        // barrel doesn't bow the top row off the top edge near the corners.
+        let ty = 7.0;
         self.fill_rect(0.0, 0.0, self.width as f32, hud_h, BLIP_BLACK);
         self.draw_line(
             0.0, hud_h - 1.0, self.width as f32, hud_h - 1.0, BLIP_DARKGRAY,
         );
 
         // ---- SCORE, left ----
-        self.draw_text("SCORE", 4.0, 5.0, 2.0, BLIP_YELLOW);
-        self.draw_number(score, 68.0, 5.0, 2.0, BLIP_WHITE);
+        self.draw_text("SCORE", 4.0, ty, 2.0, BLIP_YELLOW);
+        self.draw_number(score, 68.0, ty, 2.0, BLIP_WHITE);
         // right edge of the SCORE cluster: label + one digit-cell per digit
         let score_digits = score.max(0).to_string().len().max(1) as f32;
         let score_right = 68.0 + score_digits * 12.0;
 
         // ---- LIVES, right ----
-        // The curved-glass CRT post-process (CRT_FRAGMENT below) clips a
-        // wedge in each corner of the canvas — right where a naively
-        // right-aligned "self.width - <fixed px>" position lands. The
-        // margin off the true right edge is scaled with the canvas width
-        // (not a fixed pixel count) so LIVES stays clear of that wedge on
-        // every game's canvas size, not just the common 480px-wide one.
-        let edge_margin = (self.width as f32 * 0.09) as i32;
+        // Inset from the true right edge — the curved-glass shader keeps a
+        // hairline black rim, and a right-aligned readout should clear it on
+        // every game's canvas width, not just the common 480px one.
+        let edge_margin = (self.width as f32 * 0.085) as i32;
         let lives_x = self.width - edge_margin - 24; // room for up to 2 digits
         let lives_left = (lives_x - 64) as f32;
-        self.draw_text("LIVES", lives_left, 5.0, 2.0, BLIP_ORANGE);
-        self.draw_number(lives, lives_x as f32, 5.0, 2.0, BLIP_WHITE);
+        self.draw_text("LIVES", lives_left, ty, 2.0, BLIP_ORANGE);
+        self.draw_number(lives, lives_x as f32, ty, 2.0, BLIP_WHITE);
 
         // ---- HI <score> <NAME>, centred in the gap ----
         let hi = crate::web::high_score();
@@ -771,15 +769,33 @@ impl Blip {
         let cw = 6.0 * sz;
         let total_w = width_of(&name, sz);
         let x0 = lo + (avail - total_w).max(0.0) / 2.0;
-        self.draw_text(head_str, x0, 7.0, sz, BLIP_WHITE);
+        self.draw_text(head_str, x0, ty, sz, BLIP_WHITE);
         if !name.is_empty() {
             font::draw_text_glow(
                 &name,
                 x0 + head.chars().count() as f32 * cw,
-                7.0,
+                ty,
                 sz,
                 NEON_CYAN,
             );
+        }
+    }
+
+    /// Centred `HI 12345 NAME` line for a title screen — drawn only when the
+    /// leaderboard has a score. `color` is the game's own accent.
+    pub fn draw_hi(&self, hi: &crate::web::HighScore, y: f32, color: Color) {
+        if hi.score > 0 {
+            self.draw_centered(&hi.label("HI"), y, 2.0, color);
+        }
+    }
+
+    /// Centred end-of-game line: `NEW BEST!` in `new_color` when this run beat
+    /// (or tied) the leaderboard, otherwise `BEST 12345 NAME` in grey.
+    pub fn draw_best(&self, score: i32, hi: &crate::web::HighScore, y: f32, new_color: Color) {
+        if score > 0 && score >= hi.score {
+            self.draw_centered("NEW BEST!", y, 2.0, new_color);
+        } else if hi.score > 0 {
+            self.draw_centered(&hi.label("BEST"), y, 2.0, BLIP_GRAY);
         }
     }
 }

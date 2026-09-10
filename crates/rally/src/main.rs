@@ -151,6 +151,9 @@ fn update_serve(g: &mut Game, dt: f32) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
+    let dt = dt.max(1e-4);
+    let (lpy0, rpy0) = (g.lpad_y, g.rpad_y);
+
     if key_held(BLIP_KEY_UP)   || key_held(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
     if key_held(BLIP_KEY_DOWN) || key_held(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
 
@@ -166,56 +169,85 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
 
     g.clamp_pads();
 
-    g.ball_x += g.ball_vx * dt;
-    g.ball_y += g.ball_vy * dt;
+    // How fast each paddle is actually travelling this frame — a paddle that's
+    // moving when the ball meets it throws the ball, the way a real bat does.
+    let lpad_vy = (g.lpad_y - lpy0) / dt;
+    let rpad_vy = (g.rpad_y - rpy0) / dt;
 
-    if g.ball_y <= PLAY_T {
-        g.ball_y = PLAY_T;
-        g.ball_vy = g.ball_vy.abs();
-        play_sfx(&sfx.wall);
-    }
-    if g.ball_y + BALL_SZ >= PLAY_B {
-        g.ball_y = PLAY_B - BALL_SZ;
-        g.ball_vy = -g.ball_vy.abs();
-        play_sfx(&sfx.wall);
-    }
+    // Integrate in substeps so a fast ball can't skip past a paddle or clip
+    // through a wall inside one frame (worst case: a frame-rate dip).
+    let speed = g.ball_vx.hypot(g.ball_vy).max(1.0);
+    let substeps = ((speed * dt / (BALL_SZ * 0.5)).ceil() as i32).clamp(1, 8);
+    let sdt = dt / substeps as f32;
 
-    if g.ball_vx < 0.0
-        && rects_overlap(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ,
-                         LPAD_X, g.lpad_y, PAD_W, PAD_H)
-    {
-        g.ball_x = LPAD_X + PAD_W;
-        let rel = (g.ball_y + BALL_SZ * 0.5 - g.lpad_y) / PAD_H - 0.5;
-        g.ball_spd = (g.ball_spd + BALL_INC).min(BALL_MAX);
-        g.ball_vx =  g.ball_spd * (rel * 1.1).cos();
-        g.ball_vy =  g.ball_spd * (rel * 1.1).sin();
-        play_sfx(&sfx.hit_l);
-    }
+    for _ in 0..substeps {
+        g.ball_x += g.ball_vx * sdt;
+        g.ball_y += g.ball_vy * sdt;
 
-    if g.ball_vx > 0.0
-        && rects_overlap(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ,
-                         RPAD_X, g.rpad_y, PAD_W, PAD_H)
-    {
-        g.ball_x = RPAD_X - BALL_SZ;
-        let rel = (g.ball_y + BALL_SZ * 0.5 - g.rpad_y) / PAD_H - 0.5;
-        g.ball_spd = (g.ball_spd + BALL_INC).min(BALL_MAX);
-        g.ball_vx = -g.ball_spd * (rel * 1.1).cos();
-        g.ball_vy =  g.ball_spd * (rel * 1.1).sin();
-        play_sfx(&sfx.hit_r);
-    }
+        // Walls: reflect the overshoot rather than clamping it flat, so the
+        // bounce keeps its full speed instead of shaving a sliver off.
+        if g.ball_y < PLAY_T {
+            g.ball_y = 2.0 * PLAY_T - g.ball_y;
+            g.ball_vy = g.ball_vy.abs();
+            play_sfx(&sfx.wall);
+        }
+        if g.ball_y + BALL_SZ > PLAY_B {
+            g.ball_y = 2.0 * (PLAY_B - BALL_SZ) - g.ball_y;
+            g.ball_vy = -g.ball_vy.abs();
+            play_sfx(&sfx.wall);
+        }
 
-    if g.ball_x + BALL_SZ < 0.0 {
-        g.score_r += 1;
-        play_sfx(&sfx.score_r);
-        if g.score_r >= SCORE_WIN { g.point_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
-        else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
+        if g.ball_vx < 0.0
+            && rects_overlap(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ,
+                             LPAD_X, g.lpad_y, PAD_W, PAD_H)
+        {
+            g.ball_x = LPAD_X + PAD_W;
+            let py = g.lpad_y;
+            bounce_paddle(g, py, lpad_vy, 1.0);
+            play_sfx(&sfx.hit_l);
+        }
+
+        if g.ball_vx > 0.0
+            && rects_overlap(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ,
+                             RPAD_X, g.rpad_y, PAD_W, PAD_H)
+        {
+            g.ball_x = RPAD_X - BALL_SZ;
+            let py = g.rpad_y;
+            bounce_paddle(g, py, rpad_vy, -1.0);
+            play_sfx(&sfx.hit_r);
+        }
+
+        if g.ball_x + BALL_SZ < 0.0 {
+            g.score_r += 1;
+            play_sfx(&sfx.score_r);
+            if g.score_r >= SCORE_WIN { g.point_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
+            else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
+            return;
+        }
+        if g.ball_x > WIN_W as f32 {
+            g.score_l += 1;
+            play_sfx(&sfx.score_l);
+            if g.score_l >= SCORE_WIN { g.point_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
+            else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
+            return;
+        }
     }
-    if g.ball_x > WIN_W as f32 {
-        g.score_l += 1;
-        play_sfx(&sfx.score_l);
-        if g.score_l >= SCORE_WIN { g.point_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
-        else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
-    }
+}
+
+/// Reflect the ball off a paddle: aim by where it struck the face, step the
+/// speed up a notch, then fold in a quarter of the paddle's own vertical
+/// speed so a moving paddle curls the return. `dir` is +1 when the ball
+/// should leave to the right (left paddle), -1 for the right paddle.
+fn bounce_paddle(g: &mut Game, pad_y: f32, pad_vy: f32, dir: f32) {
+    let rel = ((g.ball_y + BALL_SZ * 0.5 - pad_y) / PAD_H - 0.5).clamp(-0.5, 0.5);
+    g.ball_spd = (g.ball_spd + BALL_INC).min(BALL_MAX);
+    let a = rel * 1.1;
+    g.ball_vx = dir * g.ball_spd * a.cos();
+    g.ball_vy = g.ball_spd * a.sin() + pad_vy * 0.25;
+    // Renormalise so |v| stays exactly on the speed ramp after the english.
+    let m = g.ball_vx.hypot(g.ball_vy).max(1.0);
+    g.ball_vx = g.ball_vx / m * g.ball_spd;
+    g.ball_vy = g.ball_vy / m * g.ball_spd;
 }
 
 fn update_point(g: &mut Game, dt: f32) {
