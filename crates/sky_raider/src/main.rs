@@ -24,9 +24,12 @@ const HUD_H: i32 = 28;
 // ---- player ---------------------------------------------------------------
 const PLAYER_W: i32 = 36;
 const PLAYER_H: i32 = 32;
-const PLAYER_SPEED: f32 = 220.0;
+const PLAYER_SPEED: f32 = 252.0; // a touch quicker — the d-pad is digital, so response has to carry it
 const PLAYER_MIN_Y: f32 = (HUD_H + 150) as f32; // player stays out of the HUD band
-const PLAYER_MAX_Y: f32 = (WIN_H - 40) as f32;
+// Kept well clear of the bottom edge so the on-screen control pad (which
+// rises over the lowest ~15% of the playfield on a touch screen) can never
+// hide the plane behind it.
+const PLAYER_MAX_Y: f32 = (WIN_H - 88) as f32;
 
 // ---- weapons ----------------------------------------------------------
 // Five weapon tiers, one per power-up capsule caught: wider spreads, faster
@@ -56,13 +59,13 @@ const ENEMY_BANK_GAIN: f32 = 1.3;  // how sharply bank responds to heading error
 const ENEMY_BANK_DAMPING: f32 = 0.55;
 const ENEMY_TURN_G: f32 = 120.0;   // tuned coordinated-turn constant: turn_rate = G*tan(bank)/speed
 const ENEMY_EDGE_MARGIN: f32 = 18.0; // keeps flight paths clear of the corners — see update_enemies()
-const ENEMY_BULLET_SPEED: f32 = 220.0;
+const ENEMY_BULLET_SPEED: f32 = 188.0; // slower — readable and dodgeable on a d-pad
 const ENEMY_BULLET_W: f32 = 4.0;
 const ENEMY_BULLET_H: f32 = 10.0;
 const MAX_ENEMY_BULLETS: usize = 22;
 // Waves are *much* longer than the original tuning — see wave_target_for()
 // / spawn_interval_range() for the exact per-level curve.
-const WAVE_KILL_BASE: i32 = 165; // 3x the previous tuning — levels run a lot longer
+const WAVE_KILL_BASE: i32 = 120; // long waves, but not a slog to the boss
 const SPAWN_MIN: f32 = 0.29;
 const SPAWN_MAX: f32 = 0.66;
 
@@ -81,7 +84,7 @@ const BOSS_INTRO_TIME: f32 = 1.3;
 // Size must match blip_assets' CARRIER_W / CARRIER_H.
 const CARRIER_W: i32 = 108;
 const CARRIER_H: i32 = 190;
-const LAUNCH_TIME: f32 = 3.2;
+const LAUNCH_TIME: f32 = 2.6; // shorter rails — full control lands sooner
 // Part-way up the climb the opening wave is scrambled in from the top edge
 // and starts flying (no firing yet) — so control lands with planes already
 // in the sky and diving, not an empty screen.
@@ -111,7 +114,7 @@ const POW_SPEED: f32 = 90.0;
 // back, falling the same way a weapon power-up does.
 const PLAYER_HEALTH_MAX: i32 = 5;
 const HEALTH_RESTORE: i32 = 2;
-const HEALTH_DROP_CHANCE: f32 = 0.035;
+const HEALTH_DROP_CHANCE: f32 = 0.06;
 const HEALTH_W: f32 = 14.0;
 const HEALTH_H: f32 = 14.0;
 const MAX_HEALTH_PICKUPS: usize = 1;
@@ -119,7 +122,7 @@ const MAX_HEALTH_PICKUPS: usize = 1;
 // same respawn-grace timer (and its blink) that already gates hazard
 // collisions — otherwise a single burst of overlapping bullets could burn
 // through the whole health bar in one frame.
-const HIT_GRACE: f32 = 0.9;
+const HIT_GRACE: f32 = 1.15;
 
 // ---- background: sea, sky, boats -------------------------------------------
 // The world below the dogfight: an ocean scrolling past underneath (both the
@@ -186,7 +189,7 @@ const MAX_POWER_BANNER_TIME: f32 = 1.6;
 // ---- tuning -------------------------------------------------------------
 const LIVES_START: i32 = 3;
 const DEAD_PAUSE: f32 = 1.6;
-const RESPAWN_GRACE: f32 = 1.0;
+const RESPAWN_GRACE: f32 = 1.5;
 const WIN_PAUSE: f32 = 2.2;
 // A hard floor on how long GAME OVER stays up before a key can dismiss it —
 // without this, a player still mashing fire from the fight that killed them
@@ -414,7 +417,7 @@ struct Game {
 }
 
 fn wave_target_for(level: i32) -> i32 {
-    (WAVE_KILL_BASE + (level - 1) * 21).min(330)
+    (WAVE_KILL_BASE + (level - 1) * 16).min(240)
 }
 
 fn spawn_interval_range(level: i32) -> (f32, f32) {
@@ -1450,12 +1453,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
         if hit {
             g.health -= 1;
-            // Every hit costs a weapon tier too, not just health — getting
-            // clipped stings twice, and it gives a reason to stay cautious
-            // even at max power instead of just tanking hits with it.
-            if g.weapon_level > 1 {
+            // A non-fatal clip knocks the gun down one tier — never below 2,
+            // so a good run isn't gutted by one mistake and the lost tier is
+            // easy to catch straight back. A fatal hit leaves the weapon
+            // alone (losing the life is punishment enough).
+            if g.health > 0 && g.weapon_level > 2 {
                 g.weapon_level -= 1;
-                g.spawn_explosion(px + PLAYER_W as f32 / 2.0, py + PLAYER_H as f32 / 2.0, 0.9, BLIP_GRAY);
             }
             if g.health > 0 {
                 // Still flying: a flinch of invulnerability (with the usual
@@ -1932,9 +1935,9 @@ fn draw_title(blip: &Blip, player_tex: &Texture2D) {
     blip.draw_centered("RAIDER", (WIN_H / 4) as f32, 5.0, BLIP_BLUE);
     let px = (WIN_W as f32 - PLAYER_W as f32 * 2.0) / 2.0;
     blip.draw_texture(player_tex, px, (WIN_H / 2 - 70) as f32, PLAYER_W as f32 * 2.0, PLAYER_H as f32 * 2.0);
-    blip.draw_centered("PRESS FIRE",          (WIN_H * 2 / 3) as f32,      3.0, BLIP_WHITE);
-    blip.draw_centered("ARROWS OR WASD MOVE", (WIN_H * 2 / 3 + 22) as f32, 2.0, BLIP_GRAY);
-    blip.draw_centered("SPACE TO FIRE",       (WIN_H * 2 / 3 + 40) as f32, 2.0, BLIP_GRAY);
+    blip.draw_centered("PRESS FIRE / START",     (WIN_H * 2 / 3) as f32,      3.0, BLIP_WHITE);
+    blip.draw_centered("D-PAD / ARROWS  MOVE",   (WIN_H * 2 / 3 + 22) as f32, 2.0, BLIP_GRAY);
+    blip.draw_centered("B / A / SPACE  FIRE",    (WIN_H * 2 / 3 + 40) as f32, 2.0, BLIP_GRAY);
     blip.draw_centered("CATCH CAPSULE POWER UP", (WIN_H * 2 / 3 + 58) as f32, 2.0, BLIP_GRAY);
 }
 

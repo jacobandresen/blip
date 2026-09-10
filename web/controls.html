@@ -8,7 +8,7 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=41">
+  <link rel="stylesheet" href="kiosk.css?v=51">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -245,20 +245,29 @@
   <div class="divider"></div>
 
   <section>
-    <div class="section-label" data-i18n="touchLabel">&#x25BA; Touch — phone &amp; tablet</div>
+    <div class="section-label" data-i18n="touchLabel">&#x25BA; Touch — the control pad</div>
     <div class="section-body">
       <p data-i18n="touchIntro">
-        On a touch screen the cabinet's control deck sits along the bottom
-        of every game:
+        On a touch screen the cabinet's control deck is a pad — a d-pad,
+        two red buttons, and SELECT / START — mounted along the bottom of
+        every game. Every button gives a soft click as you press it:
       </p>
       <table class="keytable">
-        <tr><td data-i18n="touchStickLabel">Joystick (left)</td><td data-i18n="touchStickBody">Drag the ball-top in any of 8 directions to move or aim. Let go to centre it.</td></tr>
-        <tr><td data-i18n="touchBtnLabel">Fire buttons (right)</td><td data-i18n="touchBtnBody">Tap for Button&nbsp;1; a second button appears for games that use one (Meteors).</td></tr>
+        <tr><td data-i18n="touchDpadLabel">D-pad (left)</td><td data-i18n="touchDpadBody">Press or roll your thumb across it to move or aim in any of 8 directions. Let go to stop.</td></tr>
+        <tr><td data-i18n="touchABLabel">The two red buttons</td><td data-i18n="touchABBody">Fire / launch / serve. Both do the same thing, so either thumb works. (In Meteors the right one is hyperspace instead.)</td></tr>
+        <tr><td data-i18n="touchStartLabel">START</td><td data-i18n="touchStartBody">Starts the game on the title screen, or serves the ball — the same as pressing a fire button.</td></tr>
+        <tr><td data-i18n="touchSelectLabel">SELECT</td><td data-i18n="touchSelectBody">Jumps straight back to the arcade's game grid — the way out to pick another cabinet.</td></tr>
         <tr><td data-i18n="touchCoinLabel">Coin slot</td><td data-i18n="touchCoinBody">The <b>COINS</b> panel in the top-right corner. Tap it to drop a credit — up to 5 held at once.</td></tr>
       </table>
       <p data-i18n="touchNote">
-        The deck also animates under keyboard and gamepad input, so on a
+        The pad lights up under keyboard and gamepad input too, so on a
         laptop it doubles as a live read-out of what is being pressed.
+      </p>
+      <p data-i18n="touchToggle">
+        Prefer the classic arcade stick? The small <b>&#9654; joystick</b>
+        toggle in the bottom-left corner swaps the pad for an 8-way
+        restrictor-gate joystick and two fire buttons. Your choice is
+        remembered across every game.
       </p>
     </div>
   </section>
@@ -329,9 +338,34 @@
       <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
     </div>
    </div>
+
+   <div id="snes-pad" aria-hidden="true">
+    <span class="snes-cord" aria-hidden="true"></span>
+    <div class="snes-shell">
+      <div class="snes-dpad">
+        <span class="snes-dp-seg dp-up"    data-blip="up"    data-blip-nopress></span>
+        <span class="snes-dp-seg dp-right" data-blip="right" data-blip-nopress></span>
+        <span class="snes-dp-seg dp-down"  data-blip="down"  data-blip-nopress></span>
+        <span class="snes-dp-seg dp-left"  data-blip="left"  data-blip-nopress></span>
+        <span class="snes-dp-hub"></span>
+      </div>
+      <div class="snes-mid">
+        <button type="button" class="snes-menu-btn snes-select" data-blip="select" data-blip-kind="menu" aria-label="Select"></button>
+        <button type="button" class="snes-menu-btn snes-start"  data-blip="start"  data-blip-kind="menu" aria-label="Start"></button>
+        <span class="snes-menu-label snes-label-select">SELECT</span>
+        <span class="snes-menu-label snes-label-start">START</span>
+      </div>
+      <div class="snes-face">
+        <button type="button" class="snes-btn snes-b" data-blip="button1" aria-label="Button B"><span></span></button>
+        <button type="button" class="snes-btn snes-a" data-blip="button1" aria-label="Button A"><span></span></button>
+      </div>
+      <span class="snes-wordmark" aria-hidden="true">BLIP</span>
+    </div>
+   </div>
   </div>
 
-  <script src="kiosk.js?v=16"></script>
+  <script src="kiosk.js?v=17"></script>
+  <script src="blip_controller.js?v=3"></script>
   <script>
     var i18n = {
       en: {
@@ -351,17 +385,22 @@
         kbPerGame:       'Per game: <b>Serpent</b> steers with WASD / arrows. <b>Bouncer</b>, <b>Defender</b> and <b>Raider</b> move with A/D or the arrows and fire with Space. <b>Meteors</b> rotates with A/D, thrusts with W, fires with Space and jumps to hyperspace with Z. <b>Rally</b> is two-player on one keyboard: player&nbsp;1 uses W/S or &uarr;/&darr;, player&nbsp;2 uses I/K, and Space serves.',
 
         padLabel:        '&#x25BA; Gamepad',
-        padBody:         'A connected controller is picked up automatically. The left stick or D-pad moves, the bottom face button (A / &times;) is Button&nbsp;1, and the right face button (B / &#9711;) is Button&nbsp;2. The on-screen stick and buttons light up to mirror whatever the pad is doing.',
+        padBody:         'A connected controller is picked up automatically. The left stick or D-pad moves, the bottom face button (A / &times;) is Button&nbsp;1, the right face button (B / &#9711;) is Button&nbsp;2, Start starts the game and Back / Select returns to the arcade\'s game grid. The on-screen pad lights up to mirror whatever the controller is doing.',
 
-        touchLabel:      '&#x25BA; Touch — phone &amp; tablet',
-        touchIntro:      'On a touch screen the cabinet\'s control deck sits along the bottom of every game:',
-        touchStickLabel: 'Joystick (left)',
-        touchStickBody:  'Drag the ball-top in any of 8 directions to move or aim. Let go to centre it.',
-        touchBtnLabel:   'Fire buttons (right)',
-        touchBtnBody:    'Tap for Button&nbsp;1; a second button appears for games that use one (Meteors).',
+        touchLabel:      '&#x25BA; Touch — the control pad',
+        touchIntro:      'On a touch screen the cabinet\'s control deck is a pad — a d-pad, two red buttons, and SELECT / START — mounted along the bottom of every game. Every button gives a soft click as you press it:',
+        touchDpadLabel:  'D-pad (left)',
+        touchDpadBody:   'Press or roll your thumb across it to move or aim in any of 8 directions. Let go to stop.',
+        touchABLabel:    'The two red buttons',
+        touchABBody:     'Fire / launch / serve. Both do the same thing, so either thumb works. (In Meteors the right one is hyperspace instead.)',
+        touchStartLabel: 'START',
+        touchStartBody:  'Starts the game on the title screen, or serves the ball — the same as pressing a fire button.',
+        touchSelectLabel:'SELECT',
+        touchSelectBody: 'Jumps straight back to the arcade\'s game grid — the way out to pick another cabinet.',
         touchCoinLabel:  'Coin slot',
         touchCoinBody:   'The <b>COINS</b> panel in the top-right corner. Tap it to drop a credit — up to 5 held at once.',
-        touchNote:       'The deck also animates under keyboard and gamepad input, so on a laptop it doubles as a live read-out of what is being pressed.',
+        touchNote:       'The pad lights up under keyboard and gamepad input too, so on a laptop it doubles as a live read-out of what is being pressed.',
+        touchToggle:     'Prefer a joystick? The small <b>&#9654; JOYSTICK</b> toggle in the bottom-left corner of every game swaps the pad for a classic 8-way restrictor-gate stick and two fire buttons — and back again. Your choice is remembered across the whole arcade.',
 
         dialLabel:       '&#x25BA; The dial — Rally only',
         dialBody:        'Rally puts away the joystick and gives each player a rotary dial instead — player&nbsp;1 on the left, player&nbsp;2 on the right. Twist a dial with your thumb like a real knob and your bat slides with it; spin it faster and the bat moves faster. On the title screen, tap the left dial to start a 1-player game against the computer, or the right dial for two players.',
@@ -385,17 +424,22 @@
         kbPerGame:       'Per spil: <b>Serpent</b> styres med WASD / piletaster. <b>Bouncer</b>, <b>Defender</b> og <b>Raider</b> bevæges med A/D eller piletasterne og skyder med mellemrum. <b>Meteors</b> drejer med A/D, giver fremdrift med W, skyder med mellemrum og hopper i hyperspace med Z. <b>Rally</b> er to spillere på ét tastatur: spiller&nbsp;1 bruger W/S eller &uarr;/&darr;, spiller&nbsp;2 bruger I/K, og mellemrum server.',
 
         padLabel:        '&#x25BA; Controller',
-        padBody:         'En tilsluttet controller registreres automatisk. Venstre pind eller D-pad bevæger, den nederste knap (A / &times;) er Knap&nbsp;1, og den højre knap (B / &#9711;) er Knap&nbsp;2. Den viste pind og knapperne lyser op og spejler, hvad controlleren gør.',
+        padBody:         'En tilsluttet controller registreres automatisk. Venstre pind eller D-pad bevæger, den nederste knap (A / &times;) er Knap&nbsp;1, den højre knap (B / &#9711;) er Knap&nbsp;2, Start starter spillet, og Back / Select går tilbage til arkadens spiloversigt. Den viste pad lyser op og spejler, hvad controlleren gør.',
 
-        touchLabel:      '&#x25BA; Berøring — telefon &amp; tablet',
-        touchIntro:      'På en berøringsskærm sidder kabinettets kontrolpanel langs bunden af hvert spil:',
-        touchStickLabel: 'Joystick (venstre)',
-        touchStickBody:  'Træk kuglen i en af 8 retninger for at bevæge eller sigte. Slip for at centrere den.',
-        touchBtnLabel:   'Skydeknapper (højre)',
-        touchBtnBody:    'Tryk for Knap&nbsp;1; en knap mere dukker op til spil, der bruger den (Meteors).',
+        touchLabel:      '&#x25BA; Berøring — kontrol-pad\'en',
+        touchIntro:      'På en berøringsskærm er kabinettets kontrolpanel en pad — et retningskors, to røde knapper og SELECT / START — monteret langs bunden af hvert spil. Hver knap giver et blødt klik, når du trykker:',
+        touchDpadLabel:  'D-pad (venstre)',
+        touchDpadBody:   'Tryk eller rul tommelfingeren hen over den for at bevæge eller sigte i en af 8 retninger. Slip for at stoppe.',
+        touchABLabel:    'De to røde knapper',
+        touchABBody:     'Skyd / start / serv. Begge gør det samme, så begge tommelfingre virker. (I Meteors er den højre hyperspace i stedet.)',
+        touchStartLabel: 'START',
+        touchStartBody:  'Starter spillet på titelskærmen eller server bolden — det samme som at trykke på en skydeknap.',
+        touchSelectLabel:'SELECT',
+        touchSelectBody: 'Hopper direkte tilbage til arkadens spiloversigt — vejen ud til at vælge et andet kabinet.',
         touchCoinLabel:  'Møntspalte',
         touchCoinBody:   '<b>COINS</b>-panelet i øverste højre hjørne. Tryk for at kaste en kredit i — op til 5 ad gangen.',
-        touchNote:       'Panelet animerer også ved tastatur- og controller-input, så på en bærbar fungerer det som en levende visning af, hvad der trykkes på.',
+        touchNote:       'Pad\'en lyser også op ved tastatur- og controller-input, så på en bærbar fungerer den som en levende visning af, hvad der trykkes på.',
+        touchToggle:     'Foretrækker du et joystick? Den lille <b>&#9654; JOYSTICK</b>-knap i nederste venstre hjørne af hvert spil skifter pad\'en ud med et klassisk 8-vejs joystick og to skydeknapper — og tilbage igen. Dit valg huskes i hele arkaden.',
 
         dialLabel:       '&#x25BA; Drejeknappen — kun Rally',
         dialBody:        'Rally lægger joysticket væk og giver i stedet hver spiller en drejeknap — spiller&nbsp;1 til venstre, spiller&nbsp;2 til højre. Drej knappen med tommelfingeren som en rigtig knap, og bat\'en glider med; drej hurtigere, og bat\'en bevæger sig hurtigere. På titelskærmen: tryk på venstre knap for et 1-spiller-spil mod computeren, eller højre knap for to spillere.',
@@ -419,17 +463,22 @@
         kbPerGame:       'ゲーム別：<b>Serpent</b>はWASD／矢印で操縦。<b>Bouncer</b>、<b>Defender</b>、<b>Raider</b>はA/Dまたは矢印で移動し、スペースで発射。<b>Meteors</b>はA/Dで回転、Wで推進、スペースで発射、Zでワープ。<b>Rally</b>は1台のキーボードで2人プレイ：プレイヤー&nbsp;1はW/Sまたは&uarr;/&darr;、プレイヤー&nbsp;2はI/K、スペースでサーブ。',
 
         padLabel:        '&#x25BA; ゲームパッド',
-        padBody:         '接続したコントローラーは自動で認識されます。左スティックまたは方向キーで移動、下のフェイスボタン（A／&times;）がボタン&nbsp;1、右のフェイスボタン（B／&#9711;）がボタン&nbsp;2です。画面上のスティックとボタンは、パッドの入力に合わせて光ります。',
+        padBody:         '接続したコントローラーは自動で認識されます。左スティックまたは方向キーで移動、下のフェイスボタン（A／&times;）がボタン&nbsp;1、右のフェイスボタン（B／&#9711;）がボタン&nbsp;2、Startでゲーム開始、Back／Selectでアーケードのゲーム一覧に戻ります。画面上のパッドは、コントローラーの入力に合わせて光ります。',
 
-        touchLabel:      '&#x25BA; タッチ — スマホ＆タブレット',
-        touchIntro:      'タッチ画面では、筐体のコントロールデッキが各ゲームの下部に並びます。',
-        touchStickLabel: 'ジョイスティック（左）',
-        touchStickBody:  'ボールトップを8方向のいずれかにドラッグして移動・照準します。離すと中央に戻ります。',
-        touchBtnLabel:   '発射ボタン（右）',
-        touchBtnBody:    'タップでボタン&nbsp;1。使用するゲーム（Meteors）では2つ目のボタンが現れます。',
+        touchLabel:      '&#x25BA; タッチ — コントロールパッド',
+        touchIntro:      'タッチ画面では、筐体のコントロールデッキはパッド（十字キー、赤いボタン2つ、SELECT／START）で、各ゲームの下部に取り付けられています。押すたびにボタンがカチッと鳴ります。',
+        touchDpadLabel:  '十字キー（左）',
+        touchDpadBody:   '押すか、親指を滑らせて8方向に移動・照準します。離すと止まります。',
+        touchABLabel:    '赤いボタン2つ',
+        touchABBody:     '発射／開始／サーブ。2つとも同じ働きなので、どちらの親指でも使えます。（Meteorsでは右側がワープになります。）',
+        touchStartLabel: 'START',
+        touchStartBody:  'タイトル画面でゲームを開始、またはボールをサーブします — 発射ボタンと同じです。',
+        touchSelectLabel:'SELECT',
+        touchSelectBody: 'アーケードのゲーム一覧にすぐ戻ります — 別の筐体を選ぶための出口です。',
         touchCoinLabel:  'コイン投入口',
         touchCoinBody:   '右上の<b>COINS</b>パネル。タップでクレジットを投入します（最大5枚まで保持）。',
-        touchNote:       'デッキはキーボードやゲームパッドの入力でも動くので、ノートPCでは「今どこが押されているか」のライブ表示にもなります。',
+        touchNote:       'パッドはキーボードやゲームパッドの入力でも光るので、ノートPCでは「今どこが押されているか」のライブ表示にもなります。',
+        touchToggle:     'ジョイスティック派ですか？各ゲームの左下にある小さな<b>&#9654; JOYSTICK</b>トグルで、パッドを昔ながらの8方向レバーと発射ボタン2つに切り替えられます（戻すのも同じ）。選択はアーケード全体で記憶されます。',
 
         dialLabel:       '&#x25BA; ダイヤル — Rallyのみ',
         dialBody:        'Rallyはジョイスティックをしまい、代わりに各プレイヤーに回転ダイヤルを与えます — プレイヤー&nbsp;1が左、プレイヤー&nbsp;2が右。本物のつまみのように親指でダイヤルを回すとバットが一緒に動き、速く回すほど速く動きます。タイトル画面で左ダイヤルをタップするとコンピューター相手の1人プレイ、右ダイヤルで2人プレイが始まります。',
@@ -469,6 +518,19 @@
     document.addEventListener('keydown', function(e) {
       if (e.key === '5' || e.key === 'c' || e.key === 'C') insertCoin();
     });
+
+    // The deck's pad is just cabinet flavour here (no game to drive), but
+    // the buttons still click + light on tap. The joystick toggle lives on
+    // the game pages (see the "Prefer a joystick?" note above).
+    (function () {
+      var pad = document.getElementById('snes-pad');
+      if (pad && typeof BlipController !== 'undefined') {
+        BlipController.init({ buttons: [{ key: ' ', code: 'Space' }], kioskHref: 'index.html' });
+        BlipController.bindButtons(pad);
+        BlipController.bindDpad(pad.querySelector('.snes-dpad'));
+        BlipController.registerVisual(pad);
+      }
+    }());
   </script>
 </body>
 </html>

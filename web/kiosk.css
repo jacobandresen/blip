@@ -927,11 +927,363 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset 0 0 0 1px rgba(0, 0, 0, 0.4),
     inset 0 -2px 3px rgba(255, 255, 255, 0.2);
 }
-.arcade-btn.active .arcade-btn-cap {
+.arcade-btn.active .arcade-btn-cap,
+.arcade-btn.blip-pressed .arcade-btn-cap {
   transform: scale(0.94);
   box-shadow:
     inset 0 4px 7px rgba(0, 0, 0, 0.55),
     inset 0 -2px 3px rgba(255, 255, 255, 0.14);
+}
+.arcade-btn.blip-pressed {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.2);
+}
+
+/* ======================================================================
+   Super Nintendo control pad — the default on-screen controller
+   ======================================================================
+   Swapped in for the arcade joystick + fire buttons (a subtle
+   #control-toggle flips back to the stick; the choice persists in
+   localStorage as `blip-controls`, applied as <html data-controls>).
+
+   A flat control panel that FILLS the bottom bar (#topbar / .kiosk-bar-main)
+   and never rises above it — the bar just grows tall enough to seat
+   thumb-sized buttons, and shell.js's fillCanvas() shrinks the canvas to
+   match, so the pad never overlaps the game. It's a sibling of
+   .deck-panel, not a child, so nothing is inside the 3D rotateX: the
+   d-pad drag and the button taps hit-test as plain 2D.
+
+   Not going for photoreal — clean and legible. D-pad left; two round
+   face buttons (B and A, side by side with a wide gap) on the right;
+   small SELECT / START in the middle; L / R tabs on the outer edges.
+   Atari palette: matte-black body, both face buttons the Atari "Fuji"
+   red, red menu buttons, a red d-pad flash on press. */
+
+:root[data-controls="pad"] #stick-base,
+:root[data-controls="pad"] #fire-buttons { display: none !important; }
+:root[data-controls="stick"] #snes-pad { display: none !important; }
+
+/* In pad mode the bar seats the controller — taller than the stick's bar.
+   fillCanvas() measures #topbar and reserves it, so nothing overlaps. The
+   panel is a physical thing tilted toward the player, so it throws a soft
+   shadow UP onto the screen above it. */
+:root[data-controls="pad"] #topbar.kiosk-bar,
+:root[data-controls="pad"] .kiosk-bar-main {
+  height: calc(78px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -16px 26px -8px rgba(0, 0, 0, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.9);
+}
+
+#snes-pad {
+  --sf-btn: 42px;   /* face-button (A / B) diameter */
+  --sf-gap: 18px;   /* space between A and B */
+  --sf-dpad: 58px;  /* d-pad cross bounding box */
+  --sf-edge: clamp(18px, 5vw, 46px);  /* inset of the d-pad / buttons from the edges */
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;                 /* only the buttons take input */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+#snes-pad .snes-cord,
+#snes-pad .snes-wordmark { display: none; }
+
+/* the panel face — moulded black plastic. Reads as a raised, lit surface:
+   a bright top edge catching the screen glow, a soft pool of overhead
+   light down the middle, edges + bottom falling into shadow, and a fine
+   grain so it isn't a dead flat fill. */
+#snes-pad .snes-shell {
+  position: absolute;
+  inset: 0;
+  border-radius: 13px 13px 0 0;
+  background:
+    /* faint moulding grain */
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px),
+    /* overhead light pool */
+    radial-gradient(ellipse 70% 120% at 50% 8%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 38%, transparent 68%),
+    /* edge vignette */
+    radial-gradient(ellipse 120% 150% at 50% 40%, transparent 40%, rgba(0,0,0,0.45) 100%),
+    /* base tone, lighter at top */
+    linear-gradient(180deg, #2b2b2c 0%, #1c1c1d 34%, #141415 62%, #0b0b0c 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),      /* lit top edge */
+    inset 0 3px 1px -1px rgba(224, 60, 49, 0.28), /* warm accent under it */
+    inset 0 -14px 22px rgba(0, 0, 0, 0.6),        /* deep shade toward the player */
+    inset 6px 0 14px -6px rgba(0, 0, 0, 0.55),    /* left edge shade */
+    inset -6px 0 14px -6px rgba(0, 0, 0, 0.55),   /* right edge shade */
+    inset 0 0 0 1px rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px var(--sf-edge) env(safe-area-inset-bottom, 0px);
+}
+/* a recessed "mounting plate" under the A / B buttons — a subtle darker
+   inset so the buttons sit IN the surface, not on it (the d-pad has its
+   own round recess, .snes-dpad::before) */
+#snes-pad .snes-face::before {
+  content: '';
+  position: absolute;
+  inset: -26% -16%;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+}
+
+/* ---- D-pad — a clean black plus (two overlapping arm bars), no rotation ---- */
+#snes-pad .snes-dpad {
+  position: relative;
+  flex: none;
+  width: var(--sf-dpad);
+  height: var(--sf-dpad);
+  pointer-events: auto;
+  touch-action: none;
+}
+#snes-pad .snes-dpad::before {   /* shallow round recess behind the cross */
+  content: '';
+  position: absolute;
+  inset: -9%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #262626, #131313 60%, #0a0a0a);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+#snes-pad .snes-dp-seg {
+  position: absolute;
+  background: linear-gradient(180deg, #45454a, #2c2c30 55%, #1c1c1f);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(0, 0, 0, 0.6);
+  transition: filter .05s, box-shadow .05s, background .05s;
+}
+#snes-pad .snes-dp-seg.dp-up    { left: 32%; right: 32%; top: 2%;  bottom: 50%; border-radius: 5px 5px 0 0; }
+#snes-pad .snes-dp-seg.dp-down  { left: 32%; right: 32%; top: 50%; bottom: 2%;  border-radius: 0 0 5px 5px; }
+#snes-pad .snes-dp-seg.dp-left  { top: 32%; bottom: 32%; left: 2%;  right: 50%; border-radius: 5px 0 0 5px; }
+#snes-pad .snes-dp-seg.dp-right { top: 32%; bottom: 32%; left: 50%; right: 2%;  border-radius: 0 5px 5px 0; }
+#snes-pad .snes-dp-hub {         /* just hides the seam where the arms cross */
+  position: absolute;
+  left: 34%; right: 34%; top: 34%; bottom: 34%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #45454a, #2c2c30 55%, #1c1c1f);
+}
+#snes-pad .snes-dp-hub::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 34%; height: 34%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+}
+#snes-pad .snes-dp-seg.blip-pressed {
+  background: linear-gradient(180deg, #f08a3a, #e4342b 55%, #a51c14);
+  box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.45), 0 0 9px rgba(228, 52, 43, 0.75);
+}
+/* Whole cross glows while a thumb is on the d-pad (or a direction key is
+   held) — the engaged arm stays bright, but the centre + the other arms
+   pick up a dim warm cast so nothing looks like it's floating alone. */
+#snes-pad .snes-dpad.blip-touched .snes-dp-seg,
+#snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-seg {
+  background: linear-gradient(180deg, #8a5a3a, #5c3a2c 55%, #3c2620);
+}
+#snes-pad .snes-dpad.blip-touched .snes-dp-seg.blip-pressed,
+#snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-seg.blip-pressed {
+  background: linear-gradient(180deg, #f08a3a, #e4342b 55%, #a51c14);
+}
+#snes-pad .snes-dpad.blip-touched .snes-dp-hub,
+#snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-hub {
+  background: linear-gradient(180deg, #c56a3a, #9c4326 55%, #7a2f1c);
+  box-shadow: inset 0 1px 1px rgba(255, 210, 180, 0.25), 0 0 7px rgba(228, 100, 43, 0.5);
+}
+
+/* ---- Face buttons — just B and A, side by side with a big gap ---- */
+#snes-pad .snes-face {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sf-gap);
+  height: var(--sf-btn);
+  pointer-events: none;
+}
+#snes-pad .snes-x,
+#snes-pad .snes-y { display: none; }   /* dropped */
+
+/* A and B: the Atari 2600 CX40 button — a plain, unlabelled, low-domed
+   matte-red button sitting proud of a black moulded collar that's
+   recessed into the panel. No lettering (an Atari stick had none). */
+#snes-pad .snes-btn {
+  position: relative;
+  flex: none;
+  width: var(--sf-btn);
+  height: var(--sf-btn);
+  margin: 0; padding: 0;
+  border: 0;
+  border-radius: 50%;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* the black collar, sunk into the panel */
+  background: radial-gradient(circle at 50% 40%, #262626 0%, #121212 62%, #080808 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.85),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.07);
+  transition: transform .05s, filter .05s;
+}
+/* the red button cap — proud of the collar, low broad dome, matte */
+#snes-pad .snes-btn > span {
+  position: absolute;
+  inset: 13%;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 46% 30%, rgba(255, 210, 200, 0.4) 0%, rgba(255, 210, 200, 0) 44%),
+    radial-gradient(circle at 50% 62%, #c22a1f 0%, #d8352a 40%, #cc3225 70%, #a81d12 100%);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 200, 190, 0.28),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.3),
+    0 2px 3px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  transition: transform .05s, box-shadow .05s, filter .05s;
+}
+#snes-pad .snes-btn.blip-pressed > span {
+  transform: scale(0.94);
+  filter: brightness(0.82);
+  box-shadow:
+    inset 0 5px 9px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 2px rgba(255, 200, 190, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* ---- SELECT / START — small pills, centred in the panel ---- */
+#snes-pad .snes-mid {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(-16deg);
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+#snes-pad .snes-menu-btn {
+  width: 34px;
+  height: 13px;
+  margin: 0; padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 999px;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+  background: linear-gradient(180deg, #e8562e, #c62b20 55%, #8f1c15);
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  -webkit-tap-highlight-color: transparent;
+  transition: filter .05s, box-shadow .05s;
+}
+#snes-pad .snes-menu-btn.blip-pressed {
+  filter: brightness(1.35);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 7px rgba(232, 86, 46, 0.8);
+}
+#snes-pad .snes-menu-label {
+  position: absolute;
+  top: 130%;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 900;
+  font-size: 6px;
+  letter-spacing: 1px;
+  color: rgba(210, 200, 180, 0.75);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  white-space: nowrap;
+}
+#snes-pad .snes-label-select { left: 20%;  transform: translateX(-50%); }
+#snes-pad .snes-label-start  { right: 20%; transform: translateX(50%); }
+
+#snes-pad .snes-shoulder { display: none; }   /* L / R dropped */
+
+/* ---- The subtle "back to the joystick" toggle ----
+   Sits just ABOVE the control bar at the far-left edge, clear of the
+   d-pad (which is inside the bar) — it's a tiny pixel-font tag, not a
+   control surface, so a sliver over the game corner is fine. The
+   fallback height clears the info pages' corner badges; on a game page
+   --topbar-h is the real (pad-mode) bar height. */
+#control-toggle {
+  position: fixed;
+  left: 8px;
+  bottom: calc(var(--topbar-h, 118px) + env(safe-area-inset-bottom, 0px) + 6px);
+  z-index: 205;
+  margin: 0;
+  padding: 3px 6px;
+  border: 1px solid rgba(120, 130, 120, 0.3);
+  border-radius: 3px;
+  background: rgba(6, 8, 6, 0.72);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 6px;
+  line-height: 1.5;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(150, 165, 150, 0.72);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: none;
+  opacity: 0.55;
+  transition: opacity .2s, color .2s, border-color .2s;
+}
+#control-toggle:hover {
+  opacity: 1;
+  color: #7be07b;
+  border-color: rgba(50, 200, 50, 0.5);
+}
+#control-toggle .ct-what::before { content: 'joystick'; }
+:root[data-controls="stick"] #control-toggle .ct-what::before { content: 'pad'; }
+
+/* Phones — thumb-sized buttons (iPhone 8 and up). The bar grows to seat
+   them; the d-pad and the diamond sit near the two edges so a thumb never
+   has to reach across the middle of the screen. */
+@media (max-width: 560px) {
+  :root[data-controls="pad"] #topbar.kiosk-bar,
+  :root[data-controls="pad"] .kiosk-bar-main {
+    height: calc(98px + env(safe-area-inset-bottom, 0px));
+  }
+  #snes-pad {
+    --sf-btn: 52px;
+    --sf-gap: 30px;   /* room for a big thumb between A and B */
+    --sf-dpad: 82px;
+    --sf-edge: 20px;
+  }
+  #snes-pad .snes-menu-btn { width: 40px; height: 15px; }
+}
+
+/* Small phones (iPhone SE / mini) — trim a little, stay above ~44px. */
+@media (max-width: 380px) {
+  #snes-pad { --sf-btn: 46px; --sf-gap: 22px; --sf-dpad: 72px; --sf-edge: 14px; }
+}
+
+/* Tablet — a bigger two-handed surface. */
+@media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
+  :root[data-controls="pad"] #topbar.kiosk-bar,
+  :root[data-controls="pad"] .kiosk-bar-main {
+    height: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+  #snes-pad {
+    --sf-btn: 64px;
+    --sf-gap: 40px;
+    --sf-dpad: 108px;
+    --sf-edge: clamp(28px, 7vw, 80px);
+  }
+  #snes-pad .snes-menu-btn { width: 46px; height: 17px; }
+}
+
+/* Short / landscape — compact so it doesn't eat the playfield. */
+@media (max-height: 450px) {
+  :root[data-controls="pad"] #topbar.kiosk-bar,
+  :root[data-controls="pad"] .kiosk-bar-main {
+    height: calc(66px + env(safe-area-inset-bottom, 0px));
+  }
+  #snes-pad { --sf-btn: 40px; --sf-gap: 18px; --sf-dpad: 52px; --sf-edge: 14px; }
+  #snes-pad .snes-menu-btn { height: 11px; }
 }
 
 /* The kiosk landing/history/about bar (.kiosk-bar-main) intentionally
