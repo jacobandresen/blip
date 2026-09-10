@@ -1,5 +1,30 @@
 var MAX_COINS = 5;
 
+/* ---- On-screen controller choice ----
+ * The deck shows the Super Nintendo pad by default; a subtle
+ * #control-toggle flips it back to the classic arcade joystick. The
+ * choice is one word in localStorage ('pad' | 'stick') and is applied as
+ * <html data-controls> as early as possible so neither control flashes
+ * before its CSS decides which is visible. Shared by every page's deck. */
+(function () {
+  var m = 'pad';
+  try { m = localStorage.getItem('blip-controls') || 'pad'; } catch (e) {}
+  document.documentElement.setAttribute('data-controls', m === 'stick' ? 'stick' : 'pad');
+}());
+
+function blipControls() {
+  return document.documentElement.getAttribute('data-controls') === 'stick' ? 'stick' : 'pad';
+}
+
+function blipSetControls(mode) {
+  mode = (mode === 'stick') ? 'stick' : 'pad';
+  try { localStorage.setItem('blip-controls', mode); } catch (e) {}
+  document.documentElement.setAttribute('data-controls', mode);
+  if (typeof window.onBlipControlsChange === 'function') {
+    try { window.onBlipControlsChange(mode); } catch (e) {}
+  }
+}
+
 /* ---- Per-game cabinet identity ----
  * Shared by the kiosk landing page (card colours) and each game's shell page
  * (marquee sign + bezel glow), so every cabinet reads as its own machine
@@ -256,9 +281,12 @@ function pollGamepad(onDown, onUp) {
   var BTN_MAP = [
     { idx: 0,  code: 'Space'      },  // A / Cross   — Button 1
     { idx: 1,  code: 'KeyZ'       },  // B / Circle  — Button 2
-    { idx: 2,  code: 'Space'      },
-    { idx: 3,  code: 'Space'      },
-    { idx: 9,  code: 'Space'      },
+    { idx: 2,  code: 'KeyZ'       },  // X / Square  — Button 2
+    { idx: 3,  code: 'Space'      },  // Y / Triangle— Button 1
+    { idx: 4,  code: 'KeyZ'       },  // L shoulder  — Button 2
+    { idx: 5,  code: 'KeyZ'       },  // R shoulder  — Button 2
+    { idx: 8,  code: 'Select'     },  // Select / Back — arcade menu
+    { idx: 9,  code: 'Start'      },  // Start / Options — start the game
     { idx: 12, code: 'ArrowUp'    },
     { idx: 13, code: 'ArrowDown'  },
     { idx: 14, code: 'ArrowLeft'  },

@@ -348,252 +348,188 @@ canvas.addEventListener('webglcontextlost', function (e) {
   alert('WebGL context lost. Please reload the page.');
 }, false);
 
-// ---- Touch controls — injected as keyboard events into the WASM game ----
+// ---- On-screen controls ----
+// The deck shows one of two controllers — the Super Nintendo pad (the
+// default) or the classic arcade joystick + fire buttons — and BOTH,
+// plus a physical keyboard and a physical gamepad, funnel through
+// BlipController (blip_controller.js). It turns every logical press into
+// the same synthetic KeyboardEvent on #glcanvas the old touch code used,
+// so the WASM games are untouched. The rally paddle dials go through the
+// library's bindDial().
 
-// Block game input while the overlay is up.
+var isRally = window.location.pathname.indexOf('/rally/') !== -1;
+
+// Block the real keyboard from reaching the game while the coin wall is up.
 window.addEventListener('keydown', function (e) {
   if (overlay.classList.contains('visible')) e.stopImmediatePropagation();
 }, true);
 
-function injectKey(key, code, type) {
-  if (overlay.classList.contains('visible')) return;
-  canvas.dispatchEvent(new KeyboardEvent(type, {
-    bubbles: true, cancelable: true, key: key, code: code
-  }));
-}
+(function () {
+  var game = (typeof blipGameFromPath === 'function')
+    ? blipGameFromPath(window.location.pathname) : null;
+  var buttonSpecs = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
+  var primary = buttonSpecs[0] || { key: ' ', code: 'Space' };
 
-var isRally = window.location.pathname.indexOf('/rally/') !== -1;
+  function coinGated() { return overlay.classList.contains('visible'); }
+  function dispatch(spec, type) {
+    canvas.dispatchEvent(new KeyboardEvent(type, {
+      bubbles: true, cancelable: true, key: spec.key, code: spec.code
+    }));
+  }
+  // START taps the primary action — the title screen's "PRESS FIRE", the
+  // serve, the launch. SELECT leaves for the arcade's game grid (the trip
+  // the BLIP logo makes) and is allowed even off the coin wall.
+  function tapPrimary() {
+    if (coinGated()) return;
+    dispatch(primary, 'keydown');
+    dispatch(primary, 'keyup');
+  }
+  function goToKiosk() { window.location.href = '../index.html'; }
 
-// ---- Visual feedback: reflect the live input state — keyboard, touch, or
-// gamepad — onto the on-screen stick/buttons. Keyboard, touch, and gamepad
-// all funnel through injectKey()'s synthetic KeyboardEvent dispatched on
-// the canvas, which bubbles up to this listener exactly like a real
-// keypress would — so one listener covers every input source without the
-// stick/button code below needing to know or care which one is driving
-// it. Always wired up, not just on touch devices, so a keyboard player
-// sees their own presses reflected too.
-if (!isRally) (function () {
-  var DIR_FOR_CODE = {
-    ArrowUp: 'up', KeyW: 'up',
-    ArrowDown: 'down', KeyS: 'down',
-    ArrowLeft: 'left', KeyA: 'left',
-    ArrowRight: 'right', KeyD: 'right',
-  };
-  var held  = { up: false, down: false, left: false, right: false };
-  // Set on #stick-base (not #stick-handle) so the --dx/--dy custom
-  // properties are visible to both #stick-handle's lean AND
-  // #stick-base::before's contact-shadow drift (kiosk.css) — both are
-  // its children, but siblings of each other, so the value has to live
-  // on their shared parent to reach them both via inheritance.
+  // Live input state -> the joystick ball's lean. The SNES pad lights its
+  // own buttons (inside the library); this is the stick half — the ball
+  // leans to whatever's held, whether that's the stick's own drag, the
+  // keyboard, or the gamepad.
   var stick = document.getElementById('stick-base');
-
-  function updateStick() {
+  var held = { up: false, down: false, left: false, right: false };
+  function leanStick() {
     if (!stick) return;
     var x = (held.right ? 1 : 0) - (held.left ? 1 : 0);
     var y = (held.down  ? 1 : 0) - (held.up   ? 1 : 0);
-    // Normalise a diagonal so the ball's throw to a corner of the gate is
-    // the same as to a flat edge — 8 evenly-spaced detents, not 4 near and
-    // 4 far. (The CSS reads --dx/--dy as the ball's offset from centre.)
     if (x && y) { x *= 0.7071; y *= 0.7071; }
     stick.style.setProperty('--dx', x);
     stick.style.setProperty('--dy', y);
   }
-
-  document.addEventListener('keydown', function (e) { reflect(e.code, true);  });
-  document.addEventListener('keyup',   function (e) { reflect(e.code, false); });
-
-  function reflect(code, down) {
-    var dir = DIR_FOR_CODE[code];
-    if (dir) { held[dir] = down; updateStick(); return; }
-    var btn = document.querySelector('.arcade-btn[data-code="' + code + '"]');
-    if (btn) btn.classList.toggle('active', down);
+  function reflectInput(name, down) {
+    if (Object.prototype.hasOwnProperty.call(held, name)) { held[name] = down; leanStick(); }
   }
-}());
 
-if (isRally) {
-  // Rally has no 8-way stick or fire button — it's the two paddle dials
-  // (touch) or the keyboard. Hide the deck's stick + buttons on every
-  // device, and mount the two spinner dials in their place (P1 left, P2
-  // right). They show everywhere as the cabinet's knobs; the touch spin
-  // is wired only where there's a touchscreen.
-  ['stick-base', 'fire-buttons'].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (el) el.style.display = 'none';
+  BlipController.init({
+    canvas: canvas,
+    buttons: buttonSpecs,
+    gate: coinGated,
+    feedback: feedbackTick,
+    onInput: reflectInput,
+    onStart: tapPrimary,
+    onSelect: goToKiosk
   });
-  var dialP1 = document.getElementById('paddle-dial');
-  var dialP2 = document.getElementById('paddle-dial-p2');
-  if (dialP1) dialP1.style.display = 'block';
-  if (dialP2) dialP2.style.display = 'block';
+  BlipController.bindKeyboard();
+  BlipController.bindGamepad(pollGamepad);
 
-  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) (function () {
-    // ---- Dual paddle dials (P1 left = Arrow keys, P2 right = I/K) ----
+  // ---- Rally: hide both deck controllers, run the paddle dials ----
+  if (isRally) {
+    ['stick-base', 'fire-buttons', 'snes-pad'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    var ct = document.getElementById('control-toggle');
+    if (ct) ct.style.display = 'none';
 
-    // null = title screen (no mode chosen yet); 0 = 1P; 1 = 2P.
-    var rallyMode = null;
+    var dialP1 = document.getElementById('paddle-dial');
+    var dialP2 = document.getElementById('paddle-dial-p2');
+    if (dialP1) dialP1.style.display = 'block';
+    if (dialP2) dialP2.style.display = 'block';
 
-    function applyRallyMode(mode) {
-      rallyMode = mode;
-      window.blipSetMode(mode);
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+      var rallyMode = null;               // null = title, 0 = 1P, 1 = 2P
+      var applyMode = function (m) { rallyMode = m; window.blipSetMode(m); };
+
+      // A tap on the canvas (not on a dial) = Space — start 1P / launch /
+      // any-key during a rally.
+      canvas.addEventListener('touchstart', function (e) {
+        if (e.target && e.target.closest && e.target.closest('#paddle-dial, #paddle-dial-p2')) return;
+        e.preventDefault();
+        if (!coinGated()) { dispatch({ key: ' ', code: 'Space' }, 'keydown'); dispatch({ key: ' ', code: 'Space' }, 'keyup'); }
+        if (rallyMode === null) applyMode(0);
+      }, { passive: false });
+
+      BlipController.bindDial(dialP1, {
+        up:   { key: 'ArrowUp',   code: 'ArrowUp' },
+        down: { key: 'ArrowDown', code: 'ArrowDown' },
+        tap:  { key: ' ', code: 'Space' },
+        onTap:      function () { if (rallyMode === null) applyMode(0); },
+        onInteract: function () { if (rallyMode === null) applyMode(0); }
+      });
+      BlipController.bindDial(dialP2, {
+        up:   { key: 'i', code: 'KeyI' },
+        down: { key: 'k', code: 'KeyK' },
+        tap:  { key: '2', code: 'Digit2' },
+        onTap:      function () { if (rallyMode === null) applyMode(1); },
+        onInteract: function () { if (rallyMode === null) applyMode(1); }
+      });
     }
+    return;
+  }
 
-    // Tap anywhere on the canvas = start 1P (or launch ball / any-key during play).
-    // Only update the mode indicator when we're still on the title screen.
-    canvas.addEventListener('touchstart', function (e) {
-      e.preventDefault();
-      injectKey(' ', 'Space', 'keydown');
-      injectKey(' ', 'Space', 'keyup');
-      if (rallyMode === null) applyRallyMode(0);
-    }, { passive: false });
-
-    // onTap is called when a tap gesture completes, before the key is injected.
-    // onInteract is called on the first touch contact (before any keys fly).
-    function makeDial(dialEl, handEl, upKey, upCode, downKey, downCode, tapKey, tapCode, onTap, onInteract) {
-      var angle       = -Math.PI / 2;
-      var lastAngle   = null;
-      var totalDelta  = 0;
-      var touchId     = null;
-      var upHeld      = false;
-      var downHeld    = false;
-
-      function angleFrom(touch) {
-        var r = dialEl.getBoundingClientRect();
-        return Math.atan2(touch.clientY - (r.top  + r.height / 2),
-                          touch.clientX - (r.left + r.width  / 2));
-      }
-
-      function findTouch(list, id) {
-        for (var i = 0; i < list.length; i++) {
-          if (list[i].identifier === id) return list[i];
-        }
-        return null;
-      }
-
-      function setDir(up, down) {
-        if (up !== upHeld) {
-          upHeld = up;
-          injectKey(upKey, upCode, up ? 'keydown' : 'keyup');
-        }
-        if (down !== downHeld) {
-          downHeld = down;
-          injectKey(downKey, downCode, down ? 'keydown' : 'keyup');
-        }
-      }
-
-      function stop() {
-        setDir(false, false);
-        dialEl.classList.remove('active');
-        lastAngle = null;
-        touchId   = null;
-      }
-
-      dialEl.addEventListener('touchstart', function (e) {
-        e.preventDefault();
-        e.stopPropagation(); // don't also fire the canvas Space handler
-        if (touchId !== null) return;
-        if (onInteract) onInteract();
-        var t   = e.changedTouches[0];
-        touchId    = t.identifier;
-        lastAngle  = angleFrom(t);
-        totalDelta = 0;
-        dialEl.classList.add('active');
-      }, { passive: false });
-
-      dialEl.addEventListener('touchmove', function (e) {
-        e.preventDefault();
-        if (lastAngle === null) return;
-        var t = findTouch(e.touches, touchId);
-        if (!t) return;
-        var a = angleFrom(t);
-        var d = a - lastAngle;
-        if (d >  Math.PI) d -= 2 * Math.PI;
-        if (d < -Math.PI) d += 2 * Math.PI;
-        lastAngle    = a;
-        angle       += d;
-        totalDelta  += Math.abs(d);
-        // The knob's visible rotation is driven by window.blipPaddles from
-        // the game (so it tracks the actual paddle, not the raw gesture);
-        // here we only translate the spin into up/down key state.
-        var DEAD = 0.018;
-        if      (d >  DEAD) setDir(false, true);
-        else if (d < -DEAD) setDir(true, false);
-        else                setDir(false, false);
-      }, { passive: false });
-
-      dialEl.addEventListener('touchend', function (e) {
-        e.preventDefault();
-        if (!findTouch(e.changedTouches, touchId)) return;
-        if (totalDelta < 0.08) {
-          if (onTap) onTap();
-          injectKey(tapKey, tapCode, 'keydown');
-          injectKey(tapKey, tapCode, 'keyup');
-        }
-        stop();
-      }, { passive: false });
-
-      dialEl.addEventListener('touchcancel', stop);
+  // ---- The game pad ----
+  var pad = document.getElementById('snes-pad');
+  if (pad) {
+    // A and B are both Button 1 (fire) — but a two-action game (Meteors'
+    // hyperspace) has no shoulder buttons to put the second action on, so
+    // A becomes Button 2 there. B stays fire.
+    if (buttonSpecs[1] && buttonSpecs[1].code !== buttonSpecs[0].code) {
+      var aBtn = pad.querySelector('.snes-a');
+      if (aBtn) aBtn.setAttribute('data-blip', 'button2');
     }
+    BlipController.bindButtons(pad);                        // A / B, SELECT / START
+    BlipController.bindDpad(pad.querySelector('.snes-dpad')); // the d-pad cross
+    BlipController.registerVisual(pad);                     // keyboard lights it too
+  }
 
-    // P1 dial tap = Space = 1P mode (when still on title screen)
-    makeDial(
-      dialP1, document.getElementById('dial-hand'),
-      'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
-      ' ', 'Space',
-      function () { if (rallyMode === null) applyRallyMode(0); },
-      function () { if (rallyMode === null) applyRallyMode(0); }
-    );
-    // P2 dial tap = '2' = 2P mode (when still on title screen)
-    makeDial(
-      dialP2, document.getElementById('dial-hand-p2'),
-      'i', 'KeyI', 'k', 'KeyK',
-      '2', 'Digit2',
-      function () { if (rallyMode === null) applyRallyMode(1); },
-      function () { if (rallyMode === null) applyRallyMode(1); }
-    );
+  // ---- The subtle toggle back to the joystick (and back again) ----
+  var toggle = document.getElementById('control-toggle');
+  if (toggle) {
+    toggle.addEventListener('click', function () {
+      blipSetControls(blipControls() === 'stick' ? 'pad' : 'stick');
+    });
+  }
+  window.onBlipControlsChange = function () {
+    BlipController.releaseAll();
+    held.up = held.down = held.left = held.right = false;
+    leanStick();
+  };
+
+  // ---- Fire buttons (joystick mode): one per game.buttons entry, built
+  // here and wired through the library exactly like the SNES face buttons.
+  (function () {
+    var host = document.getElementById('fire-buttons');
+    if (!host) return;
+    var names = ['button1', buttonSpecs[1] ? 'button2' : 'button1'];
+    names.forEach(function (n) {
+      var btn = document.createElement('div');
+      btn.className = 'arcade-btn';
+      btn.setAttribute('data-blip', n);
+      btn.innerHTML = '<span class="arcade-btn-cap"></span>';
+      host.appendChild(btn);
+    });
+    BlipController.bindButtons(host);
+    BlipController.registerVisual(host);
   }());
 
-} else {
-  // ---- 8-way stick: drag with mouse, touch, or pen (Pointer Events unify
-  // all three) — this only turns the drag angle into locked
-  // ArrowUp/Down/Left/Right key state; moving the ball itself is handled by
-  // reflect()/updateStick() above, the same code path a real keypress
-  // drives. ----
+  // ---- The 8-way restrictor-gate joystick ----
+  // Its drag is bound to #topbar (which carries no transform), not
+  // #stick-base (inside .deck-panel's 3D rotateX) — so hit-testing is the
+  // plain 2D geometry it looks like. It only turns a locked gate direction
+  // into up/down/left/right key state via BlipController.set(); the ball's
+  // lean is reflectInput()'s job, the same path a keypress drives.
   (function () {
-    var base   = document.getElementById('stick-base');
-    var fire   = document.getElementById('fire-buttons');
-    // Bind the drag to #topbar, not #stick-base: #stick-base sits inside
-    // the deck's 3D tilt (.deck-panel's rotateX), which leaves small,
-    // maddening seams in its hit-test where a touch lands "on" the stick
-    // visually but misses the element. #topbar carries no transform and is
-    // the common ancestor of the stick and the buttons, so a pointerdown
-    // anywhere on the deck bubbles to it cleanly — we then just ask "is
-    // this touch in the stick half or the button half?".
-    var bar = document.getElementById('topbar');
+    var base = document.getElementById('stick-base');
+    var fire = document.getElementById('fire-buttons');
+    var bar  = document.getElementById('topbar');
     if (!base || !bar) return;
 
-    // 8-way restrictor-gate model: past ENGAGE px the push snaps to the
-    // nearest of the 8 gate directions and *locks* there. It stays locked
-    // until the thumb rotates clear past the midline into the neighbouring
-    // detent (the extra HYST degrees are the notch — no chatter on the
-    // boundary). Arrow keys are only ever emitted for a locked direction:
-    // there is no partial / in-between state that dribbles events while you
-    // sweep from one direction to another.
-    // Defaults, per-game overridden from BLIP_GAMES[slug].stick (kiosk.js).
-    var _sg = (typeof blipGameFromPath === 'function'
-                && blipGameFromPath(window.location.pathname)) || {};
-    var _st = _sg.stick || {};
-    var ENGAGE = _st.engage  != null ? _st.engage  : 16; // px from pivot before the stick catches a detent
-    var RELEASE = _st.release != null ? _st.release : 9;  // px to fall back to neutral (< ENGAGE, hysteresis)
-    var MAX_R = _st.maxR      != null ? _st.maxR    : 46; // pivot slides to stay within this — keeps reversals tight
-    var HYST = _st.hyst       != null ? _st.hyst    : 8;  // deg past the 22.5deg midline before the lock jumps detent
+    var _st = (game && game.stick) || {};
+    var ENGAGE  = _st.engage  != null ? _st.engage  : 16;
+    var RELEASE = _st.release != null ? _st.release : 9;
+    var MAX_R   = _st.maxR    != null ? _st.maxR    : 46;
+    var HYST    = _st.hyst    != null ? _st.hyst    : 8;
     var activeId = null;
     var engaged = false;
-    var lockDeg = null;    // the locked gate angle (0 = up, clockwise), or null when neutral
-    var pendingMove = null; // a move that arrived faster than ~120 Hz, held for the trailing flush
+    var lockDeg = null;
+    var pendingMove = null;
     var moveRaf = 0;
-    var nextMoveOk = 0;     // performance.now() before which a move is deferred, not applied inline
+    var nextMoveOk = 0;
     var wantDir = { up: false, down: false, left: false, right: false };
-    var CODE_FOR = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
-    // Which arrows each of the 8 gate detents holds down.
     var GATE_KEYS = {
       0:   ['up'],            45:  ['up', 'right'],
       90:  ['right'],         135: ['down', 'right'],
@@ -604,88 +540,50 @@ if (isRally) {
     function setDir(dir, want) {
       if (wantDir[dir] === want) return;
       wantDir[dir] = want;
-      var code = CODE_FOR[dir];
-      injectKey(code, code, want ? 'keydown' : 'keyup');
+      BlipController.set(dir, want);
     }
-
-    // Lock the stick to gate angle `deg` (a multiple of 45) or null for
-    // neutral, and reconcile the four arrow keys with that detent in one
-    // atomic step — so passing through a direction on the way to another
-    // never leaks a stray keydown/keyup pair.
     function setLock(deg) {
       if (deg === lockDeg) return;
       lockDeg = deg;
       var keys = deg === null ? [] : GATE_KEYS[deg];
-      var changed = false;
       ['up', 'down', 'left', 'right'].forEach(function (dir) {
-        var want = keys.indexOf(dir) !== -1;
-        if (wantDir[dir] !== want) { changed = true; setDir(dir, want); }
+        setDir(dir, keys.indexOf(dir) !== -1);
       });
-      // A felt detent every time it clicks into a live direction — a
-      // Vibration buzz on Android, a sub-bass speaker tick on iOS.
-      if (deg !== null && changed) feedbackTick();
     }
 
-    // Floating pivot: wherever the thumb first lands becomes "centre", and
-    // the drag is measured from there — not from the ball's fixed rest
-    // position. The hit-region is tall (it has to cover the ball floating
-    // above the bar), so an absolute pivot made a thumb resting anywhere
-    // but the exact ball centre read as a hard direction the instant it
-    // touched down. This is the standard mobile virtual-stick feel: grab
-    // anywhere, push from there. The ball itself still leans to show the
-    // direction (via reflect()/updateStick()), it just no longer has to be
-    // the thing you aim for.
     var pivot = null;
-
     function apply(e) {
       var dx = e.clientX - pivot.x;
       var dy = e.clientY - pivot.y;
       var dist = Math.sqrt(dx * dx + dy * dy);
-
-      // Slide the pivot to trail the thumb by at most MAX_R, so a long
-      // drag doesn't bank slack the player then has to unwind to reverse.
       if (dist > MAX_R) {
         var k = 1 - MAX_R / dist;
-        pivot.x += dx * k;
-        pivot.y += dy * k;
-        dx = e.clientX - pivot.x;
-        dy = e.clientY - pivot.y;
+        pivot.x += dx * k; pivot.y += dy * k;
+        dx = e.clientX - pivot.x; dy = e.clientY - pivot.y;
         dist = MAX_R;
       }
-
       engaged = engaged ? dist > RELEASE : dist > ENGAGE;
       if (!engaged) { setLock(null); return; }
-
-      // Angle of the push, 0 = straight up, increasing clockwise.
       var ang = Math.atan2(dx, -dy) * 180 / Math.PI;
       if (ang < 0) ang += 360;
-
       var next;
       if (lockDeg === null) {
         next = (Math.round(ang / 45) % 8) * 45;
       } else {
-        // Signed rotation away from the current detent, -180..180.
         var off = ((ang - lockDeg + 540) % 360) - 180;
         next = Math.abs(off) > 22.5 + HYST ? (Math.round(ang / 45) % 8) * 45 : lockDeg;
       }
       setLock(next);
     }
-
     function release() {
-      activeId = null;
-      pivot = null;
-      engaged = false;
+      activeId = null; pivot = null; engaged = false;
       if (moveRaf) { cancelAnimationFrame(moveRaf); moveRaf = 0; }
-      pendingMove = null;
-      nextMoveOk = 0;
-      setLock(null); // drop every arrow the current detent was holding
+      pendingMove = null; nextMoveOk = 0;
+      setLock(null);
       window.removeEventListener('pointermove', onMove, true);
       window.removeEventListener('pointerup', onEnd, true);
       window.removeEventListener('pointercancel', onEnd, true);
     }
-
-    // A touch belongs to the stick unless it landed on (or right of) the
-    // fire buttons. Measured per press so it tracks the responsive layout.
     function isStickTouch(e) {
       if (fire && e.target && e.target.closest && e.target.closest('#fire-buttons')) return false;
       if (fire) {
@@ -694,19 +592,9 @@ if (isRally) {
       }
       return true;
     }
-
-    // apply() is pure arithmetic on the cached pivot — no layout reads — so a
-    // virtual stick should run it the instant the move lands, not a frame
-    // later. The only thing worth throttling is a pointer that reports faster
-    // than the screen can show it (a 1 kHz mouse, a coalesced touch burst):
-    // past ~one 120 Hz frame the extra passes can't change what the eye or the
-    // game's once-per-frame input poll sees, so those collapse into a single
-    // trailing rAF flush. preventDefault still runs synchronously on every
-    // move — it has to, to hold off the page scroll/refresh gesture.
     function flushMove() {
       moveRaf = 0;
-      var e = pendingMove;
-      pendingMove = null;
+      var e = pendingMove; pendingMove = null;
       if (e && pivot && e.pointerId === activeId) { nextMoveOk = performance.now() + 8; apply(e); }
     }
     function onMove(e) {
@@ -717,91 +605,25 @@ if (isRally) {
       else if (!moveRaf) moveRaf = requestAnimationFrame(flushMove);
     }
     function onEnd(e) {
-      // Any up/cancel for our pointer ends the drag. Don't be fussy about
-      // the id on a cancel — iOS fires pointercancel with a mismatched (or
-      // reused) id when a second finger lands or it steals the gesture,
-      // and a missed release is exactly the "stuck moving forever" bug.
       if (e.type === 'pointercancel' || e.pointerId === activeId) release();
     }
-
     bar.addEventListener('pointerdown', function (e) {
-      // Heal any stuck state from a swallowed release before starting.
+      if (blipControls() !== 'stick') return;   // pad mode — deck is the SNES pad
       if (activeId !== null) release();
       if (!isStickTouch(e)) return;
       e.preventDefault();
       activeId = e.pointerId;
       pivot = { x: e.clientX, y: e.clientY };
-      // Listen on window (not via setPointerCapture): capture is silently
-      // dropped by iOS in enough situations that relying on it is what let
-      // the stick get stuck. Window listeners always see the up/cancel.
       window.addEventListener('pointermove', onMove, true);
       window.addEventListener('pointerup', onEnd, true);
       window.addEventListener('pointercancel', onEnd, true);
-      // No direction yet — the first move off this point is what steers.
     });
-
-    // Last-resort safety nets: if the page loses focus or is hidden mid-
-    // drag (a call comes in, you switch apps), let go of everything.
     window.addEventListener('blur', release);
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) release();
     });
   }());
+}());
 
-  // ---- Fire buttons: one per game.buttons entry (default: just fire),
-  // built here instead of hand-written per game, so a two-button game like
-  // Meteors only has to declare it once in BLIP_GAMES (kiosk.js). ----
-  (function () {
-    var host = document.getElementById('fire-buttons');
-    if (!host) return;
-    var game = (typeof blipGameFromPath === 'function') ? blipGameFromPath(window.location.pathname) : null;
-    var specs = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
-    // Always render two buttons, even for a single-action game, so the
-    // panel looks and sits the same on every cabinet — the second one just
-    // duplicates the first action rather than sitting there dead.
-    if (specs.length < 2) specs = specs.concat(specs[0]);
-
-    specs.forEach(function (spec) {
-      var btn = document.createElement('div');
-      btn.className = 'arcade-btn';
-      btn.dataset.key  = spec.key;
-      btn.dataset.code = spec.code;
-      btn.innerHTML = '<span class="arcade-btn-cap"></span>';
-      host.appendChild(btn);
-
-      var activeId = null;
-      btn.addEventListener('pointerdown', function (e) {
-        e.preventDefault();
-        activeId = e.pointerId;
-        btn.setPointerCapture(activeId);
-        injectKey(spec.key, spec.code, 'keydown');
-        feedbackTick(); // same felt detent as the stick
-      });
-      function endPointer(e) {
-        if (e.pointerId !== activeId) return;
-        activeId = null;
-        injectKey(spec.key, spec.code, 'keyup');
-      }
-      btn.addEventListener('pointerup',     endPointer);
-      btn.addEventListener('pointercancel', endPointer);
-    });
-  }());
-}
-
-// ---- Gamepad support ----
-  // Polling loop lives in kiosk.js (pollGamepad, shared with the kiosk
-  // landing page); here we just turn logical button changes into the same
-  // synthetic keyboard events the touch controls use.
-  (function () {
-    function keyOf(code) {
-      if (code === 'Space') return ' ';
-      if (code === 'KeyZ')  return 'z';
-      return code;
-    }
-    pollGamepad(
-      function (code) { injectKey(keyOf(code), code, 'keydown'); },
-      function (code) { injectKey(keyOf(code), code, 'keyup'); }
-    );
-  }());
 
 })();

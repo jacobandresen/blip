@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=41">
+  <link rel="stylesheet" href="kiosk.css?v=51">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -763,10 +763,38 @@
       <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
     </div>
    </div>
+
+   <!-- Super Nintendo pad — the deck's default. On the kiosk it drives
+        the game selection: d-pad steps the cards, A / B / Y / X / START
+        open the lit one, SELECT jumps back to the top of the grid. -->
+   <div id="snes-pad" aria-hidden="true">
+    <span class="snes-cord" aria-hidden="true"></span>
+    <div class="snes-shell">
+      <div class="snes-dpad">
+        <span class="snes-dp-seg dp-up"    data-blip="up"    data-blip-nopress></span>
+        <span class="snes-dp-seg dp-right" data-blip="right" data-blip-nopress></span>
+        <span class="snes-dp-seg dp-down"  data-blip="down"  data-blip-nopress></span>
+        <span class="snes-dp-seg dp-left"  data-blip="left"  data-blip-nopress></span>
+        <span class="snes-dp-hub"></span>
+      </div>
+      <div class="snes-mid">
+        <button type="button" class="snes-menu-btn snes-select" data-blip="select" data-blip-kind="menu" aria-label="Select"></button>
+        <button type="button" class="snes-menu-btn snes-start"  data-blip="start"  data-blip-kind="menu" aria-label="Start"></button>
+        <span class="snes-menu-label snes-label-select">SELECT</span>
+        <span class="snes-menu-label snes-label-start">START</span>
+      </div>
+      <div class="snes-face">
+        <button type="button" class="snes-btn snes-b" data-blip="button1" aria-label="Button B"><span></span></button>
+        <button type="button" class="snes-btn snes-a" data-blip="button1" aria-label="Button A"><span></span></button>
+      </div>
+      <span class="snes-wordmark" aria-hidden="true">BLIP</span>
+    </div>
+   </div>
   </div>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=16"></script>
+  <script src="kiosk.js?v=17"></script>
+  <script src="blip_controller.js?v=3"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Translations                                                         */
@@ -1233,6 +1261,7 @@
             if (e.pointerId === activeId && pivot) { e.preventDefault(); apply(e); }
           }
           bar.addEventListener('pointerdown', function (e) {
+            if (blipControls() !== 'stick') return;   // pad mode — deck shows the SNES pad
             // Stick half only — the right half is the fire buttons.
             if (fire && e.target.closest && e.target.closest('#fire-buttons')) return;
             if (fire) {
@@ -1265,6 +1294,46 @@
             });
           });
         }
+      }());
+
+      // ---- The SNES pad drives the same selection, through BlipController.
+      // d-pad steps the cards (with key-style auto-repeat while held);
+      // A / B / Y / X / L / R / START open the lit card; SELECT jumps back
+      // to the top of the grid. ----
+      (function () {
+        var pad = document.getElementById('snes-pad');
+        if (!pad || typeof BlipController === 'undefined') return;
+
+        var navDir = 0, repeatT = null;
+        function navHold(d) {
+          if (d === navDir) return;
+          navDir = d;
+          clearTimeout(repeatT);
+          if (d !== 0) {
+            move(d);
+            repeatT = setTimeout(function tick() {
+              move(navDir);
+              repeatT = setTimeout(tick, 150);
+            }, 340);
+          }
+        }
+
+        BlipController.init({
+          buttons: [{ key: ' ', code: 'Space' }],
+          onInput: function (name, down) {
+            if (name === 'up' || name === 'left')  { navHold(down ? -1 : 0); return; }
+            if (name === 'down' || name === 'right') { navHold(down ? 1 : 0); return; }
+            if ((name === 'button1' || name === 'button2') && down) activate();
+          },
+          onStart:  function () { activate(); },
+          onSelect: function () {
+            navActive = false; idx = 0; highlight();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        });
+        BlipController.bindButtons(pad);
+        BlipController.bindDpad(pad.querySelector('.snes-dpad'));
+        BlipController.registerVisual(pad);
       }());
     }());
 
