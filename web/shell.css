@@ -525,3 +525,140 @@ canvas {
   #marquee-name { font-size: 11px; letter-spacing: 3px; }
   .marquee-bulbs { max-width: 40px; }
 }
+
+/* ---- High-score board + name prompt (web/blip_scores.js) ----
+   A modal panel over the game canvas at game-over: the top-10 for this
+   cabinet, or a one-field "enter your name" the first time. Styled to sit
+   with the CRT / pixel-font look of the games themselves. */
+.blip-hs-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;   /* over the INSERT COIN attract overlay (150), under the coin button (500) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+.blip-hs-panel {
+  width: min(92vw, 340px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 18px 18px 16px;
+  border: 2px solid rgba(120, 220, 255, 0.5);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #0b1016 0%, #05070a 100%);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 12px 40px rgba(0, 0, 0, 0.6),
+              inset 0 0 24px rgba(60, 160, 220, 0.09);
+  color: #cfe6ef;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  text-align: center;
+}
+.blip-hs-panel.wide { width: min(94vw, 380px); }
+.blip-hs-title {
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: #ffd94a;
+  text-shadow: 0 0 8px rgba(255, 200, 60, 0.5);
+  margin-bottom: 10px;
+}
+.blip-hs-sub {
+  font-size: 8px;
+  line-height: 1.6;
+  letter-spacing: 1px;
+  color: #7fa6b5;
+  margin: 8px 0;
+}
+.blip-hs-err {
+  min-height: 12px;
+  margin: 6px 0 2px;
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #ff6b6b;
+}
+.blip-hs-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 10px 8px;
+  border: 2px solid rgba(120, 220, 255, 0.4);
+  border-radius: 4px;
+  background: #04070b;
+  color: #eafff8;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-align: center;
+  text-transform: uppercase;
+}
+.blip-hs-input:focus { outline: none; border-color: #ffd94a; }
+.blip-hs-code {
+  margin: 10px 0 2px;
+  padding: 12px 8px;
+  border: 2px dashed rgba(120, 220, 255, 0.55);
+  border-radius: 4px;
+  background: #04070b;
+  color: #eafff8;
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 4px;
+  text-align: center;
+  word-break: break-all;
+  text-shadow: 0 0 8px rgba(120, 220, 255, 0.55);
+}
+.blip-hs-list {
+  list-style: none;
+  margin: 8px 0 4px;
+  padding: 0;
+  text-align: left;
+}
+.blip-hs-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 4px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  border-bottom: 1px solid rgba(120, 220, 255, 0.12);
+}
+.blip-hs-item .hs-rank { width: 22px; color: #7fa6b5; flex: none; }
+.blip-hs-item .hs-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.blip-hs-item .hs-score { color: #ffd94a; flex: none; }
+.blip-hs-item.me { color: #6dffa8; }
+.blip-hs-item.me .hs-rank, .blip-hs-item.me .hs-score { color: #6dffa8; }
+.blip-hs-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+}
+.blip-hs-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: 2px solid rgba(120, 220, 255, 0.5);
+  border-radius: 4px;
+  background: #10202c;
+  color: #eafff8;
+  font-family: inherit;
+  font-size: 9px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.blip-hs-btn:hover { background: #16303f; }
+.blip-hs-btn:disabled { opacity: 0.5; }
+.blip-hs-btn.ghost { background: transparent; border-color: rgba(120, 220, 255, 0.25); color: #7fa6b5; }
+
+@media (max-width: 380px) {
+  .blip-hs-title { font-size: 11px; }
+  .blip-hs-item { font-size: 8px; }
+  .blip-hs-code { font-size: 12px; letter-spacing: 2px; }
+}

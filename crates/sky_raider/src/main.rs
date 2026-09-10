@@ -1930,9 +1930,24 @@ fn draw_bottom_hud(blip: &Blip, g: &Game, player_tex: &Texture2D) {
     blip.fill_rect(bar_x, bar_y, bar_w * hp_frac, bar_h, hp_color);
 }
 
-fn draw_title(blip: &Blip, player_tex: &Texture2D) {
+fn draw_hi(blip: &Blip, hi: &web::HighScore, y: f32) {
+    if hi.score > 0 {
+        blip.draw_centered(&hi.label("HI"), y, 2.0, BLIP_YELLOW);
+    }
+}
+
+fn draw_best(blip: &Blip, score: i32, hi: &web::HighScore, y: f32) {
+    if score > 0 && score >= hi.score {
+        blip.draw_centered("NEW BEST!", y, 2.0, BLIP_GREEN);
+    } else if hi.score > 0 {
+        blip.draw_centered(&hi.label("BEST"), y, 2.0, BLIP_GRAY);
+    }
+}
+
+fn draw_title(blip: &Blip, player_tex: &Texture2D, hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("RAIDER", (WIN_H / 4) as f32, 5.0, BLIP_BLUE);
+    draw_hi(blip, hi, (WIN_H / 4 + 40) as f32);
     let px = (WIN_W as f32 - PLAYER_W as f32 * 2.0) / 2.0;
     blip.draw_texture(player_tex, px, (WIN_H / 2 - 70) as f32, PLAYER_W as f32 * 2.0, PLAYER_H as f32 * 2.0);
     blip.draw_centered("PRESS FIRE / START",     (WIN_H * 2 / 3) as f32,      3.0, BLIP_WHITE);
@@ -1948,20 +1963,22 @@ fn draw_win(blip: &Blip, level: i32) {
     blip.draw_centered(&buf,          (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
 }
 
-fn draw_won(blip: &Blip, score: i32) {
+fn draw_won(blip: &Blip, score: i32, hi: &web::HighScore) {
     let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
     blip.draw_centered("YOU WON!!",           (WIN_H / 4) as f32,      6.0, BLIP_YELLOW);
     blip.draw_centered("ALL 7 WAVES CLEARED", (WIN_H / 2 - 20) as f32, 2.5, BLIP_GREEN);
     blip.draw_centered(&buf,                  (WIN_H / 2 + 14) as f32, 3.0, BLIP_WHITE);
+    draw_best(blip, score, hi, (WIN_H / 2 + 40) as f32);
     blip.draw_centered("PRESS FIRE",          (WIN_H * 2 / 3) as f32,  3.0, BLIP_CYAN);
 }
 
-fn draw_over(blip: &Blip, score: i32, waiting: bool) {
+fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
     let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
     blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
+    draw_best(blip, score, hi, (WIN_H / 2 + 28) as f32);
     // Only invite a key press once OVER_MIN_WAIT has actually elapsed — the
     // prompt would otherwise be a lie, since input is ignored until then.
     if !waiting {
@@ -2132,6 +2149,11 @@ async fn main() {
         }
         if prev_state != State::Win  && g.state == State::Win  { play_sfx(&sfx.stage_clear); }
         if prev_state != State::Over && g.state == State::Over { play_sfx(&sfx.game_over); }
+        if (prev_state != State::Over && g.state == State::Over)
+            || (prev_state != State::Won && g.state == State::Won)
+        {
+            web::report_score(g.sess.score);
+        }
         if prev_state != State::Launch && g.state == State::Launch {
             // Kick off the carrier launch: the engine-start one-shot, and
             // the propeller loop underneath it (silent to begin with —
@@ -2142,11 +2164,11 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title  => draw_title(&blip, &player_tex),
+            State::Title  => draw_title(&blip, &player_tex, &web::high_score()),
             State::Launch => draw_launch(&blip, &g, &player_tex, &enemy_tex, &carrier_tex, &boat_tex, &cloud_tex, &island_tex),
             State::Win    => draw_win(&blip, g.sess.level),
-            State::Won    => draw_won(&blip, g.sess.score),
-            State::Over   => draw_over(&blip, g.sess.score, g.over_timer.active()),
+            State::Won    => draw_won(&blip, g.sess.score, &web::high_score()),
+            State::Over   => draw_over(&blip, g.sess.score, &web::high_score(), g.over_timer.active()),
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player_tex, &enemy_tex, &boss_tex, &powerup_tex, &health_tex, &boss_name_ja_tex, &boat_tex, &cloud_tex, &island_tex);
             }

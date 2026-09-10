@@ -219,6 +219,46 @@ window.blipSpendCoin = function () {
   return 1;
 };
 
+// Called from WASM the moment a game ends (game-over or won). Hands the
+// final score to the shared high-score board; a no-op beyond updating the
+// local best if no backend is configured (web/blip_config.js).
+window.blipGameOver = function (score) {
+  if (!window.blipScores) return;
+  var game = (typeof blipGameFromPath === 'function')
+    ? blipGameFromPath(window.location.pathname) : null;
+  window.blipScores.onGameOver(game ? game.slug : null, score);
+};
+
+// Called from WASM (title / game-over screens) to show the leading score
+// and who holds it. Prefers the leaderboard #1 that blip_scores.js caches
+// in 'blip-top-<slug>'; falls back to this browser's own best
+// ('blip-best-<slug>') tagged with the claimed handle ('blip-handle').
+function blipTopEntry() {
+  var game = (typeof blipGameFromPath === 'function')
+    ? blipGameFromPath(window.location.pathname) : null;
+  if (!game) return null;
+  try {
+    var raw = localStorage.getItem('blip-top-' + game.slug);
+    if (raw) {
+      var o = JSON.parse(raw);
+      if (o && (o.score | 0) > 0) return { score: o.score | 0, name: o.handle || '' };
+    }
+  } catch (e) {}
+  try {
+    var best = parseInt(localStorage.getItem('blip-best-' + game.slug) || '0', 10) || 0;
+    if (best > 0) return { score: best, name: localStorage.getItem('blip-handle') || '' };
+  } catch (e) {}
+  return null;
+}
+window.blipHighScore = function () {
+  var t = blipTopEntry();
+  return t ? t.score : 0;
+};
+window.blipHighName = function () {
+  var t = blipTopEntry();
+  return t && t.name ? String(t.name).toUpperCase().slice(0, 14) : '';
+};
+
 // Called from WASM when game mode is chosen on the title screen.
 // mode 0 = 1-player (CPU controls right paddle), 1 = 2-player.
 window.blipSetMode = function (mode) {

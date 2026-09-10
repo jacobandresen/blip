@@ -219,7 +219,11 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         play_sfx(&sfx.game_over);
         match g.sess.lose_life() {
             LifeResult::StillAlive => { g.dead_timer.start(1.5); g.state = State::Dead; }
-            LifeResult::GameOver   => { g.dead_timer.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
+            LifeResult::GameOver   => {
+                g.dead_timer.start(GAME_OVER_MIN_WAIT);
+                g.state = State::Over;
+                web::report_score(g.sess.score);
+            }
         }
         return;
     }
@@ -317,18 +321,34 @@ fn draw_play(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D, food: &T
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
-fn draw_title(blip: &Blip) {
+fn draw_hi(blip: &Blip, hi: &web::HighScore, y: f32) {
+    if hi.score > 0 {
+        blip.draw_centered(&hi.label("HI"), y, 2.0, BLIP_YELLOW);
+    }
+}
+
+fn draw_best(blip: &Blip, score: i32, hi: &web::HighScore, y: f32) {
+    if score > 0 && score >= hi.score {
+        blip.draw_centered("NEW BEST!", y, 2.0, BLIP_GREEN);
+    } else if hi.score > 0 {
+        blip.draw_centered(&hi.label("BEST"), y, 2.0, BLIP_GRAY);
+    }
+}
+
+fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("SERPENT",            (WIN_H / 4) as f32,       6.0, BLIP_GREEN);
+    draw_hi(blip, hi, (WIN_H / 4 + 40) as f32);
     blip.draw_centered("PRESS FIRE",         (WIN_H / 2) as f32,       3.0, BLIP_WHITE);
     blip.draw_centered("ARROW KEYS OR WASD", (WIN_H * 2 / 3) as f32,   2.0, BLIP_GRAY);
 }
 
-fn draw_over(blip: &Blip, score: i32, waiting: bool) {
+fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
     let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
     blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
     blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
+    draw_best(blip, score, hi, (WIN_H / 2 + 28) as f32);
     if !waiting {
         blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
     }
@@ -400,8 +420,8 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip),
-            State::Over  => draw_over(&blip, g.sess.score, g.dead_timer.active()),
+            State::Title => draw_title(&blip, &web::high_score()),
+            State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
             State::Play | State::Dead => draw_play(&blip, &g, &head, &body, &food),
         }
 

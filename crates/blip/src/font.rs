@@ -1,5 +1,5 @@
 //! 5×7 bitmap font — each glyph is stored as seven rows of five bits.
-//! Supported characters: digits 0-9, letters A-Z (case-insensitive), and ! : - . space.
+//! Supported characters: digits 0-9, letters A-Z (case-insensitive), and ! : - . ( ) space.
 //! The `sz` parameter in every draw function is a pixel scale multiplier:
 //! `sz=1.0` renders at 5×7 pixels, `sz=2.0` at 10×14, `sz=3.0` at 15×21, and so on.
 
@@ -7,10 +7,10 @@ use macroquad::color::Color;
 
 use crate::draw::fill_rect;
 
-/// 41 glyphs × 7 rows. Bits 4-0 of each row = columns left→right.
+/// 43 glyphs × 7 rows. Bits 4-0 of each row = columns left→right.
 /// Index 0-9 = digits, 10-35 = A-Z, 36 = ' ', 37 = '!', 38 = ':',
-/// 39 = '-', 40 = '.'.
-pub const FONT: [[u8; 7]; 41] = [
+/// 39 = '-', 40 = '.', 41 = '(', 42 = ')'.
+pub const FONT: [[u8; 7]; 43] = [
     /* 0 */ [0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E],
     /* 1 */ [0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E],
     /* 2 */ [0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F],
@@ -52,6 +52,8 @@ pub const FONT: [[u8; 7]; 41] = [
     /* : */ [0x00, 0x04, 0x04, 0x00, 0x04, 0x04, 0x00],
     /* - */ [0x00, 0x00, 0x00, 0x1F, 0x00, 0x00, 0x00],
     /* . */ [0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x04],
+    /* ( */ [0x02, 0x04, 0x08, 0x08, 0x08, 0x04, 0x02],
+    /* ) */ [0x08, 0x04, 0x02, 0x02, 0x02, 0x04, 0x08],
 ];
 
 fn char_to_glyph(c: char) -> Option<usize> {
@@ -64,6 +66,8 @@ fn char_to_glyph(c: char) -> Option<usize> {
         ':' => Some(38),
         '-' => Some(39),
         '.' => Some(40),
+        '(' => Some(41),
+        ')' => Some(42),
         _ => None,
     }
 }
@@ -88,6 +92,23 @@ pub fn draw_text(text: &str, x: f32, y: f32, sz: f32, color: Color) {
         draw_char(c, cx, y, sz, color);
         cx += 6.0 * sz;
     }
+}
+
+/// Draw a string as a lit neon tube: a tight one-pixel halo in `c` around a
+/// crisp near-white core, so it reads as "glowing" without smearing at
+/// small sizes (the CRT post-process widens the bloom). Costs ~10× a plain
+/// [`draw_text`] — keep it for short accent strings (a name, a label).
+pub fn draw_text_glow(text: &str, x: f32, y: f32, sz: f32, c: Color) {
+    let halo = Color { a: c.a * 0.5, ..c };
+    for (dx, dy) in [
+        (-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0),
+        (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0),
+    ] {
+        draw_text(text, x + dx, y + dy, sz, halo);
+    }
+    // core: mostly white with a wash of the neon colour so the tint reads
+    let core = Color { r: (c.r + 2.0) / 3.0, g: (c.g + 2.0) / 3.0, b: (c.b + 2.0) / 3.0, a: 1.0 };
+    draw_text(text, x, y, sz, core);
 }
 
 /// Convenience wrapper to draw an integer without allocating a String at the call site.

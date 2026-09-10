@@ -28,6 +28,15 @@ target/
 # Node
 node_modules/
 
+# Local secrets / env
+.env
+.env.local
+
+# Supabase project URL + anon key — never committed; the GitHub Pages
+# deploy writes this from repo secrets (see .github/workflows/pages.yml).
+# Copy web/blip_config.example.js to it for local testing against Supabase.
+web/blip_config.js
+
 # Playwright output
 test-results/
 playwright-report/
