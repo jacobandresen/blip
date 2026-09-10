@@ -253,6 +253,11 @@ canvas {
   transition: width .12s linear;
 }
 
+/* On a game page the logo is the only touch route back to the grid, and
+   it sits in the top-left corner well away from where the thumbs rest —
+   so give it a fuller vertical tap box than the 32px it uses elsewhere. */
+.blip-logo { height: calc(48px + env(safe-area-inset-top, 0px)); }
+
 /* ---- "MORE GAMES" nudge on the BLIP logo ----
    shell.js appends .logo-hint inside .blip-logo and toggles .show-hint
    after 30s of no input on a game page. Tucked just under the logo box

@@ -216,6 +216,12 @@ html {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  /* every tap here is "insert coin" — never a double-tap zoom */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   /* Opacity-only flicker: a compositor-thread animation that needs no
      repaint, so it can't tear or drop frames the way the old
      brightness()-filter + sub-pixel translate "buzz" did on mobile GPUs.
@@ -972,7 +978,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    shadow UP onto the screen above it. */
 :root[data-controls="pad"] #topbar.kiosk-bar,
 :root[data-controls="pad"] .kiosk-bar-main {
-  height: calc(78px + env(safe-area-inset-bottom, 0px));
+  height: calc(82px + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -16px 26px -8px rgba(0, 0, 0, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.9);
 }
 
@@ -1040,9 +1046,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* lift the controls clear of both edges — on a phone with no home-
-     indicator inset the d-pad would otherwise sit right on the glass. */
-  padding: 8px var(--sf-edge) calc(env(safe-area-inset-bottom, 0px) + 7px);
+  /* lift the controls clear of both edges — on a phone / Android with no
+     home-indicator inset the d-pad would otherwise sit ~7px off the glass;
+     11px gives it real breathing room there (the inset adds ~34px on a
+     notched iPhone on top of this). */
+  padding: 7px var(--sf-edge) calc(env(safe-area-inset-bottom, 0px) + 11px);
 }
 /* a recessed "mounting plate" under the A / B buttons — a subtle darker
    inset so the buttons sit IN the surface, not on it (the d-pad has its
@@ -1181,24 +1189,34 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
+/* On a two-action game (Meteors) shell.js tags .snes-a as button2 — it is
+   NOT a duplicate fire, so its cap goes cool blue: the two buttons must
+   read as doing different things. B stays the red fire button. */
+#snes-pad .snes-a[data-blip~="button2"] > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(215, 238, 255, 0.45) 0%, rgba(215, 238, 255, 0) 44%),
+    radial-gradient(circle at 50% 62%, #2f79cf 0%, #3a8ce0 40%, #2f7ac8 70%, #1b4f9e 100%);
+}
+
 /* SELECT / START, L / R — all dropped. A / B do the title-screen "press
    fire"; the BLIP logo goes back to the grid. */
 #snes-pad .snes-mid,
 #snes-pad .snes-shoulder { display: none; }
 
 /* ---- The subtle "back to the joystick" toggle ----
-   Sits just ABOVE the control bar at the far-left edge, clear of the
-   d-pad (which is inside the bar) — it's a tiny pixel-font tag, not a
-   control surface, so a sliver over the game corner is fine. The
-   fallback height clears the info pages' corner badges; on a game page
-   --topbar-h is the real (pad-mode) bar height. */
+   Sits just ABOVE the control bar, horizontally centred — over the pad's
+   empty middle, so it's clear of both the d-pad (bottom-left) and the
+   A/B thumb (bottom-right) rather than sitting in the left thumb's path.
+   A tiny pixel-font tag, not a control surface. --topbar-h is the real
+   (pad-mode) bar height on a game page. */
 #control-toggle {
   position: fixed;
-  left: 8px;
-  bottom: calc(var(--topbar-h, 118px) + env(safe-area-inset-bottom, 0px) + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--topbar-h, 118px) + env(safe-area-inset-bottom, 0px) + 5px);
   z-index: 205;
   margin: 0;
-  padding: 3px 6px;
+  padding: 8px 12px;   /* a real tap target; the type stays 6px */
   border: 1px solid rgba(120, 130, 120, 0.3);
   border-radius: 3px;
   background: rgba(6, 8, 6, 0.72);
@@ -1230,7 +1248,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 @media (max-width: 560px) {
   :root[data-controls="pad"] #topbar.kiosk-bar,
   :root[data-controls="pad"] .kiosk-bar-main {
-    height: calc(112px + env(safe-area-inset-bottom, 0px));
+    height: calc(114px + env(safe-area-inset-bottom, 0px));
   }
   #snes-pad {
     --sf-btn: 52px;

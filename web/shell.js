@@ -1,6 +1,18 @@
 (function () {
 'use strict';
 
+// ---- Zoom lock ----------------------------------------------------------
+// Every touch on a game page is game input, never a browser gesture.
+// `body { touch-action: none }` (shell.css) already kills single-finger
+// pan and double-tap zoom everywhere on the page — including a rapid mash
+// on the fire button. The one thing that leaves open is iOS Safari's
+// pinch: it ignores user-scalable=no and can start a page zoom from a
+// two-finger 'gesture' (a thumb held on fire + a thumb on the d-pad
+// drifting apart reads as one). Swallow those events outright.
+['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) {
+  document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
+});
+
 var TOPBAR_H   = 56;
 var MARQUEE_H  = 28; // reserved header height once #marquee-bar exists
 var PAD        = 16; // padding around the canvas on all sides (= bezel width)
@@ -36,12 +48,13 @@ updateCoinsHud();
       logo.classList.remove('boot');
     }, { once: true });
 
-    // After 30s of no input, a "> MORE GAMES" nudge fades in under the
-    // logo (.logo-hint, styled in shell.css) — the logo is the way back
-    // to the cabinet's game grid. Any input hides it and restarts the
-    // clock: pointer/touch for taps, and keydown in the capture phase so
-    // it also catches the on-screen controls and gamepad (injectKey()
-    // dispatches bubbling keydowns on the canvas).
+    // After ~12s of no input, a "> MORE GAMES" nudge fades in under the
+    // logo (.logo-hint, styled in shell.css) — the logo is the only way
+    // back to the cabinet's game grid on touch, so the reminder shouldn't
+    // be a slow one. Any input hides it and restarts the clock:
+    // pointer/touch for taps, and keydown in the capture phase so it also
+    // catches the on-screen controls and gamepad (injectKey() dispatches
+    // bubbling keydowns on the canvas).
     var hint = document.createElement('span');
     hint.className = 'logo-hint';
     hint.setAttribute('aria-hidden', 'true');
@@ -51,13 +64,19 @@ updateCoinsHud();
     function hintIdle() {
       logo.classList.remove('show-hint');
       clearTimeout(hintTimer);
-      hintTimer = setTimeout(function () { logo.classList.add('show-hint'); }, 30000);
+      hintTimer = setTimeout(function () { logo.classList.add('show-hint'); }, 12000);
     }
     ['pointerdown', 'touchstart'].forEach(function (ev) {
       window.addEventListener(ev, hintIdle, { passive: true });
     });
     document.addEventListener('keydown', hintIdle, true);
     hintIdle();
+    // a finished game is the moment you're most likely to want out — surface
+    // the way back right away instead of waiting the idle-out.
+    window.addEventListener('blip-game-over', function () {
+      clearTimeout(hintTimer);
+      hintTimer = setTimeout(function () { logo.classList.add('show-hint'); }, 2500);
+    });
   }
 }());
 
@@ -223,6 +242,7 @@ window.blipSpendCoin = function () {
 // final score to the shared high-score board; a no-op beyond updating the
 // local best if no backend is configured (web/blip_config.js).
 window.blipGameOver = function (score) {
+  window.dispatchEvent(new Event('blip-game-over'));   // nudges the "MORE GAMES" hint
   if (!window.blipScores) return;
   var game = (typeof blipGameFromPath === 'function')
     ? blipGameFromPath(window.location.pathname) : null;
