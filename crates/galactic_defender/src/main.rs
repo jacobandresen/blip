@@ -2,7 +2,7 @@
 //! `games/galactic_defender/main.c` on macroquad.
 
 use blip::input::{
-    btn1_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
+    btn1_pressed, key_held, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::prelude::ImageFormat;
@@ -639,10 +639,14 @@ fn update_title(g: &mut Game) {
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.respawn_grace.tick(dt);
+    // Hold to fire, the way the real cabinet's button worked — a new shot
+    // goes out the instant the previous one clears. MAX_PLAYER_BULLETS = 1
+    // is the rate limit, so this can't be spammed; it just spares the
+    // player from re-tapping.
     let shoot = !g.respawn_grace.active()
-        && (key_pressed(BLIP_KEY_SPACE)
-            || key_pressed(BLIP_KEY_UP)
-            || key_pressed(BLIP_KEY_W));
+        && (key_held(BLIP_KEY_SPACE)
+            || key_held(BLIP_KEY_UP)
+            || key_held(BLIP_KEY_W));
 
     let moving_left = key_held(BLIP_KEY_LEFT) || key_held(BLIP_KEY_A);
     let moving_right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
