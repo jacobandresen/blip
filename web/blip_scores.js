@@ -147,6 +147,14 @@
       var ok = el('button', 'blip-hs-btn', row); ok.type = 'button'; ok.textContent = 'OK';
       var skip = el('button', 'blip-hs-btn ghost', row); skip.type = 'button'; skip.textContent = 'SKIP';
 
+      // Shown only after a name comes back TAKEN — the taker might be you,
+      // on a new device or a cleared browser. Enter the recovery code to
+      // take the name (and its scores) back.
+      var mineRow = el('div', 'blip-hs-row', m.panel);
+      mineRow.style.display = 'none';   // .blip-hs-row's flex would beat [hidden]
+      var mineBtn = el('button', 'blip-hs-btn ghost', mineRow);
+      mineBtn.type = 'button'; mineBtn.textContent = 'THAT NAME IS MINE';
+
       function close(val) { m.wrap.remove(); resolve(val); }
       function submit() {
         var v = input.value.trim();
@@ -163,7 +171,9 @@
             }
             close(res.handle);
           } else if (res && res.reason === 'taken') {
-            err.textContent = 'TAKEN — try another'; ok.disabled = false;
+            err.textContent = v.toUpperCase() + ' is taken';
+            mineRow.style.display = '';
+            ok.disabled = false;
           } else {
             err.textContent = 'could not save that name'; ok.disabled = false;
           }
@@ -171,6 +181,11 @@
       }
       ok.addEventListener('click', submit);
       skip.addEventListener('click', function () { close(null); });
+      // open the code prompt on top; if it restores a name, we're done,
+      // otherwise it just closes and this prompt is still here to try another
+      mineBtn.addEventListener('click', function () {
+        promptRestore(input.value.trim()).then(function (h) { if (h) close(h); });
+      });
       input.addEventListener('keydown', function (e) {
         e.stopPropagation();
         if (e.key === 'Enter') submit();
@@ -181,12 +196,18 @@
   }
 
   // ---- UI: restore a name from a code ------------------------------
-  function promptRestore() {
+  // `forName` (optional) is a handle to name in the copy — passed when the
+  // player hit "that's my name" on a TAKEN result.
+  function promptRestore(forName) {
+    forName = (forName || '').trim();
     return new Promise(function (resolve) {
       var m = modal();
-      el('div', 'blip-hs-title', m.panel).textContent = 'RESTORE A NAME';
+      el('div', 'blip-hs-title', m.panel).textContent =
+        forName ? 'RESTORE ' + forName.toUpperCase() : 'RESTORE A NAME';
       el('div', 'blip-hs-sub', m.panel).textContent =
-        'enter the recovery code you saved when you claimed the name';
+        forName
+          ? 'enter the recovery code you saved for ' + forName.toUpperCase()
+          : 'enter the recovery code you saved when you claimed the name';
       var input = document.createElement('input');
       input.className = 'blip-hs-input';
       input.maxLength = 20;
