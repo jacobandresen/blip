@@ -585,7 +585,8 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick:
 fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("BOUNCER",                 (WIN_H / 4) as f32,         6.0, BLIP_CYAN);
-    blip.draw_hi(hi, (WIN_H / 4 + 40) as f32, BLIP_YELLOW);
+    // BOUNCER is sz=6 (42px tall) — clear its bottom by a real margin.
+    blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
     blip.draw_centered("PRESS FIRE",              (WIN_H / 2) as f32,         3.0, BLIP_WHITE);
     blip.draw_centered("LEFT RIGHT ARROW OR AD",  (WIN_H * 2 / 3) as f32,     2.0, BLIP_GRAY);
     blip.draw_centered("SPACE TO LAUNCH",         (WIN_H * 2 / 3 + 20) as f32, 2.0, BLIP_GRAY);

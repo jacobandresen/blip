@@ -644,7 +644,8 @@ fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
     blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, NEON_CYAN);
-    blip.draw_hi(hi, (WIN_H / 4) as f32 + 44.0, NEON_YELLOW);
+    // METEORS is sz=6 (42px tall) — clear its bottom by a real margin.
+    blip.draw_hi(hi, (WIN_H / 4) as f32 + 50.0, NEON_YELLOW);
     blip.draw_centered("PRESS FIRE", (WIN_H / 2) as f32, 3.0, NEON_YELLOW);
     blip.draw_centered("ARROWS/WASD ROTATE+THRUST", (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
     blip.draw_centered("SPACE FIRE  ·  Z HYPERSPACE", (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);

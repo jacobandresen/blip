@@ -287,8 +287,24 @@ fn draw_snake(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D) {
     // Slide each segment from the cell it left toward the cell it's entering,
     // by how far through the current step-tick we are, so the snake glides
     // instead of jumping a whole cell at a time. Pure rendering — the game
-    // logic stays on its clean integer grid.
-    let f = (g.move_timer / g.move_interval()).clamp(0.0, 1.0);
+    // logic stays on its clean integer grid. Only while actually moving,
+    // though: the fatal tick returns before ever touching move_timer again,
+    // so once dead it sits stalled at whatever tiny fraction it was on — and
+    // rendering that fraction would show the snake still gliding in *toward*
+    // its last cell, a step short of the wall or body it hit. Dead freezes
+    // it fully arrived instead, right on the edge it died against.
+    let f = if g.state == State::Play {
+        (g.move_timer / g.move_interval()).clamp(0.0, 1.0)
+    } else {
+        1.0
+    };
+    // Death flash: blink the whole snake red/white for as long as
+    // dead_timer is counting down — the classic arcade "you got hit" tell.
+    let tint = if g.state == State::Dead && (g.dead_timer.remaining() / 0.12) as i32 % 2 == 0 {
+        BLIP_RED
+    } else {
+        BLIP_WHITE
+    };
     let seg_px = |i: usize| -> (f32, f32) {
         let cur = g.snake_at(i);
         let prev = if i + 1 < g.snake_len {
@@ -304,10 +320,10 @@ fn draw_snake(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D) {
     };
     for i in (1..g.snake_len).rev() {
         let (x, y) = seg_px(i);
-        blip.draw_texture_tinted(body, x, y, CELL as f32, CELL as f32, BLIP_WHITE);
+        blip.draw_texture_tinted(body, x, y, CELL as f32, CELL as f32, tint);
     }
     let (x, y) = seg_px(0);
-    blip.draw_texture_tinted(head, x, y, CELL as f32, CELL as f32, BLIP_WHITE);
+    blip.draw_texture_tinted(head, x, y, CELL as f32, CELL as f32, tint);
 }
 
 fn draw_play(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D, food: &Texture2D) {
@@ -332,7 +348,8 @@ fn draw_play(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D, food: &T
 fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("SERPENT",            (WIN_H / 4) as f32,       6.0, BLIP_GREEN);
-    blip.draw_hi(hi, (WIN_H / 4 + 40) as f32, BLIP_YELLOW);
+    // SERPENT is sz=6 (42px tall) — clear its bottom by a real margin.
+    blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
     blip.draw_centered("PRESS FIRE",         (WIN_H / 2) as f32,       3.0, BLIP_WHITE);
     blip.draw_centered("ARROW KEYS OR WASD", (WIN_H * 2 / 3) as f32,   2.0, BLIP_GRAY);
 }
