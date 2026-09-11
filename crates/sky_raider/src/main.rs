@@ -1936,10 +1936,7 @@ fn draw_title(blip: &Blip, player_tex: &Texture2D, hi: &web::HighScore) {
     blip.draw_hi(hi, (WIN_H / 4 + 40) as f32, BLIP_YELLOW);
     let px = (WIN_W as f32 - PLAYER_W as f32 * 2.0) / 2.0;
     blip.draw_texture(player_tex, px, (WIN_H / 2 - 70) as f32, PLAYER_W as f32 * 2.0, PLAYER_H as f32 * 2.0);
-    blip.draw_centered("PRESS FIRE / START",     (WIN_H * 2 / 3) as f32,      3.0, BLIP_WHITE);
-    blip.draw_centered("D-PAD / ARROWS  MOVE",   (WIN_H * 2 / 3 + 22) as f32, 2.0, BLIP_GRAY);
-    blip.draw_centered("B / A / SPACE  FIRE",    (WIN_H * 2 / 3 + 40) as f32, 2.0, BLIP_GRAY);
-    blip.draw_centered("CATCH CAPSULE POWER UP", (WIN_H * 2 / 3 + 58) as f32, 2.0, BLIP_GRAY);
+    blip.draw_centered("PRESS FIRE TO START", (WIN_H * 2 / 3) as f32, 3.0, BLIP_WHITE);
 }
 
 fn draw_win(blip: &Blip, level: i32) {
