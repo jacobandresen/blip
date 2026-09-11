@@ -13,11 +13,22 @@ below](#the-bluetooth-constraint-read-this-first) is why the plan doesn't
 literally use the Web Bluetooth API for the game traffic, and what it
 does instead to still deliver that.
 
+**Scope decision: same room only.** Two devices within Bluetooth-tethering
+or shared-WiFi range of each other — not two players in different
+locations. This is a deliberate v1 limit, not a fallback: it means every
+connection uses direct WebRTC host candidates and **no TURN relay is ever
+needed**, which keeps the "no server, no ongoing cost, no third party
+touching gameplay traffic" pitch intact. Revisit only if remote play is
+explicitly wanted later (see the old NAT/TURN trade-off this ruled out,
+folded into [Signaling](#signaling-how-the-two-phones-find-each-other-before-the-datachannel-exists)
+below).
+
 Non-goals for v1: more than two players, spectators, reconnect-after-drop
-mid-rally (a dropped connection ends the match), any game but Rally.
-Rally is the only game already built with a "two-player" concept
-([`Mode::TwoPlayer`](../crates/rally/src/main.rs)) — everything else here
-generalizes once Rally proves it out.
+mid-rally (a dropped connection ends the match), any game but Rally, and
+— per the scope decision above — play between devices that aren't in the
+same room. Rally is the only game already built with a "two-player"
+concept ([`Mode::TwoPlayer`](../crates/rally/src/main.rs)) — everything
+else here generalizes once Rally proves it out.
 
 ## The Bluetooth constraint — read this first
 
@@ -98,7 +109,13 @@ WebRTC needs a brief handshake (SDP offer/answer + ICE candidates)
 *before* any peer-to-peer traffic can flow, and that handshake has to
 travel over some channel that already exists — which, by definition,
 isn't the DataChannel we're trying to set up. Two options, worth building
-in this order:
+in this order.
+
+Both connect with host (local) ICE candidates only, per the same-room
+[scope decision](#goal) — a STUN server can still be added cheaply later
+for the odd double-NAT home network, but **no TURN relay**, ever, in
+scope: that would mean game traffic transiting a server, which is
+exactly what "same room only" is choosing not to pay for.
 
 1. **Supabase Realtime as a signaling relay (build first).** BLIP already
    has a Supabase project wired up for high scores
@@ -205,7 +222,7 @@ the architecture doesn't need a rewrite of Rally itself:
    match smoothly.
 4. **Guest input back to the host.** Wire `blip_net.js`'s synthetic
    KeyboardEvents from the guest's real touch/keyboard input, confirm a
-   full remote match plays end-to-end.
+   full two-device match plays end-to-end.
 5. **UX pass.** Title-screen entry point, room-code / QR pairing screens,
    "opponent disconnected" handling, a rematch button that re-uses the
    existing connection instead of re-pairing.
@@ -214,14 +231,6 @@ the architecture doesn't need a rewrite of Rally itself:
 
 ## Open questions
 
-- **NAT/TURN.** Two phones on the same WiFi or Bluetooth PAN connect
-  directly (host candidates, no relay needed). Two phones on *different*
-  networks (one's on cellular, playing "remotely") need STUN at minimum,
-  likely TURN behind carrier-grade NAT — a TURN relay is a real
-  (small-dollar) hosting cost and pulls game traffic through a server
-  again, which cuts against the "no server needed" pitch. Decide whether
-  same-room-only is an acceptable v1 scope limit (recommended) before
-  building for the general case.
 - **Cheating.** A guest's browser console can just send fabricated
   `{t:'input'}` messages. Fine for a casual arcade cabinet game between
   two people in the same room; would need host-side input sanity checks
