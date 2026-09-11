@@ -304,29 +304,49 @@ window.addEventListener('load', updateCoinBeckon);
       var ctx = getKioskAudio();
       var t = ctx.currentTime;
 
-      var buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.14), ctx.sampleRate);
-      var data = buf.getChannelData(0);
-      for (var i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
-      var noise = ctx.createBufferSource();
-      noise.buffer = buf;
-      var filt = ctx.createBiquadFilter();
-      filt.type = 'highpass';
-      filt.frequency.value = 2400;
-      var ng = ctx.createGain();
-      ng.gain.setValueAtTime(0.5, t);
-      ng.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
-      noise.connect(filt); filt.connect(ng); ng.connect(ctx.destination);
-      noise.start(t); noise.stop(t + 0.14);
+      // A crackle burst (filtered noise), sharper and louder than the
+      // coin sfx's — this has to carry across a whole room, not just
+      // confirm a tap.
+      function crackle(start, dur, gain) {
+        var buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
+        var data = buf.getChannelData(0);
+        for (var i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+        var noise = ctx.createBufferSource();
+        noise.buffer = buf;
+        var filt = ctx.createBiquadFilter();
+        filt.type = 'highpass';
+        filt.frequency.value = 2200;
+        var ng = ctx.createGain();
+        ng.gain.setValueAtTime(gain, start);
+        ng.gain.exponentialRampToValueAtTime(0.001, start + dur);
+        noise.connect(filt); filt.connect(ng); ng.connect(ctx.destination);
+        noise.start(start); noise.stop(start + dur);
+      }
+      crackle(t, 0.16, 0.65);
+      crackle(t + 0.22, 0.09, 0.4);   // a second, smaller sputter as it flickers back
+      crackle(t + 0.36, 0.06, 0.25);
 
+      // The main arc: a fast descending sawtooth sweep, shriek to thud.
       var osc = ctx.createOscillator();
       var og = ctx.createGain();
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(2600, t);
-      osc.frequency.exponentialRampToValueAtTime(80, t + 0.17);
-      og.gain.setValueAtTime(0.22, t);
-      og.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
+      osc.frequency.setValueAtTime(3200, t);
+      osc.frequency.exponentialRampToValueAtTime(70, t + 0.2);
+      og.gain.setValueAtTime(0.3, t);
+      og.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
       osc.connect(og); og.connect(ctx.destination);
-      osc.start(t); osc.stop(t + 0.2);
+      osc.start(t); osc.stop(t + 0.23);
+
+      // A low undertone thump, like the sign's transformer took the hit.
+      var thump = ctx.createOscillator();
+      var tg = ctx.createGain();
+      thump.type = 'triangle';
+      thump.frequency.setValueAtTime(110, t);
+      thump.frequency.exponentialRampToValueAtTime(45, t + 0.3);
+      tg.gain.setValueAtTime(0.28, t + 0.02);
+      tg.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+      thump.connect(tg); tg.connect(ctx.destination);
+      thump.start(t + 0.02); thump.stop(t + 0.33);
     }
 
     function zap() {
@@ -340,7 +360,7 @@ window.addEventListener('load', updateCoinBeckon);
         logo.classList.remove('lg-surge');
       };
       el.addEventListener('animationend', done, { once: true });
-      setTimeout(done, 500); // in case the tab was hidden mid-animation and it never fired
+      setTimeout(done, 900); // in case the tab was hidden mid-animation and it never fired
     }
 
     // Seldom: the next strike lands 45s-3min out, so it reads as a rare
