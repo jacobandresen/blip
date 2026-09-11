@@ -229,6 +229,94 @@ the architecture doesn't need a rewrite of Rally itself:
 6. **(Optional) QR-code signaling** as the offline alternative to
    Supabase Realtime, once the above is solid.
 
+## Testing
+
+The same-room decision above is what makes this automatable at all: two
+headless Chromium instances on the same CI runner *are* "two devices in
+the same room" as far as WebRTC's host ICE candidates are concerned — no
+real network, no real Bluetooth, no phones needed to test the logic.
+Three tiers, cheapest and most deterministic first:
+
+1. **Pure-logic unit tests — `node:test`, no browser.** Everything that
+   doesn't touch a real `RTCPeerConnection` gets extracted into a plain
+   function and tested the way
+   [`test/fill-canvas.test.mjs`](../test/fill-canvas.test.mjs) already
+   does for the canvas-scaling math: give it inputs, assert the output.
+   Concretely: the wire-format encode/decode (`{t:'input',...}` /
+   `{t:'state',...}`) round-trips byte-for-byte; the room-code
+   generator/validator (format, collision odds, expiry); any
+   interpolation math added later for guest-side smoothing between state
+   packets. Fast, zero flakiness, run on every `npm test`.
+2. **Rust unit tests — `cargo test`, no wasm/browser.** The
+   `blip_net_state`/`blip_net_apply_state` struct layout gets a
+   round-trip test (`pack(state)` then `unpack(bytes)` equals the
+   original, byte order and all) compiled for the host target, the same
+   way the rest of the workspace's crates already build and run under
+   plain `cargo test` — no wasm32 target, no browser, sub-second.
+3. **Headless two-browser integration tests — a CDP harness, committed
+   this time.** Every touch-control playtest done for this project so far
+   used a hand-rolled Chrome DevTools Protocol client (raw WebSocket,
+   `Input.dispatchTouchEvent` + `Runtime.evaluate`, no Puppeteer/
+   Playwright dependency) — but always as a throwaway script in a
+   scratch directory, never committed. This is worth landing as a real
+   `test/` file this time (a small `test/lib/cdp.mjs` plus e.g.
+   `test/multiplayer.mjs`, following the existing `test/highscores.mjs`
+   convention of a script `npm run test:*` can invoke), since — unlike
+   the one-off playtests — this needs to keep passing as the feature
+   evolves. It extends the same one-browser technique to *two* Chromium
+   instances instead of one:
+   - Launch two `chromium --headless --disable-gpu --no-sandbox
+     --remote-debugging-port=<A|B>` processes, each navigating to the
+     Rally page.
+   - Drive the pairing flow via `Runtime.evaluate` on each (fill in the
+     room code, or exercise a test-only shortcut that skips Realtime
+     entirely and swaps SDP directly between the two `Runtime.evaluate`
+     contexts via the Node test script — cheaper and more deterministic
+     than actually round-tripping through Supabase in CI, and still
+     exercises the exact same `RTCPeerConnection` code path).
+   - Poll `pc.connectionState` on both sides via `Runtime.evaluate` until
+     `'connected'` (with a timeout — a real assertion, not a sleep) and
+     confirm `RTCDataChannel.readyState === 'open'`.
+   - Drive the guest's on-screen dial with a synthetic
+     `Input.dispatchTouchEvent`, then poll the host's game state (via a
+     debug hook in the same spirit as `window.blipZapLogo()` — e.g.
+     `window.__blipNetState()`, only defined when a `?debugnet=1` query
+     param or `BLIP_TEST` flag is present, so it never ships silently)
+     and assert the paddle position moved.
+   - Kill both processes explicitly between runs (`pkill -9 chromium` or
+     equivalent) rather than trusting them to exit cleanly — two
+     headless instances at once is already double the memory pressure of
+     the single-instance playtests, which have themselves been prone to
+     running out of memory under repeated launches in a constrained
+     environment; use `--disable-dev-shm-usage` and a bounded
+     `--js-flags=--max-old-space-size=<N>` on each.
+
+   Watch for one specific headless gotcha before trusting a red result:
+   Chrome hides local ICE candidates behind a `.local` mDNS hostname by
+   default (a privacy feature), which can fail to resolve inside a
+   locked-down CI network namespace even though the two processes are on
+   the same host. Launch with `--disable-features=WebRtcHideLocalIpsWithMdns`
+   for these tests specifically if connections mysteriously never leave
+   `checking` state.
+
+**CI.** None of this repo's tests run in CI today — `.github/workflows/`
+only has the Pages deploy. Add a `.github/workflows/test.yml` (`cargo
+test`, `npm test`, then the CDP harness with a chromium install step —
+e.g. `browser-actions/setup-chrome`, or `apt-get install chromium`,
+either works on `ubuntu-latest`) that runs on every PR. Worth doing
+regardless of this feature, but this is the point where it stops being
+optional: a flaky two-peer connection test that only a human remembers to
+run by hand won't get run.
+
+**What automated tests can't cover:** that Bluetooth tethering between
+two *real* phones actually produces a working IP link on a given
+OS/carrier — that's a manual hardware checklist item (per-platform,
+run once per OS release rather than per-PR), not something a CI runner
+with no Bluetooth radio can exercise. The three tiers above prove the
+WebRTC/signaling/game-sync logic is correct; real-hardware Bluetooth
+pairing is a separate, manual gate before calling that specific path
+shippable.
+
 ## Open questions
 
 - **Cheating.** A guest's browser console can just send fabricated
