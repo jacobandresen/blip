@@ -265,6 +265,101 @@ function updateCoinBeckon() {
 }
 window.addEventListener('load', updateCoinBeckon);
 
+/* ---- BLIP logo overcharge glitch ----
+ * A seldom, random electrical fault on the wordmark: one letter of "BLIP"
+ * arcs like it's taken a surge, the rest of the sign flickers as if power
+ * got diverted, with a matching zap/crackle on the speaker. Purely a
+ * decorative flourish — every page carries the logo (kiosk.js is loaded
+ * on all of them), so this one setup covers the whole site.
+ * Deferred to 'load': kiosk.js sits in <head> on the game-shell pages, so
+ * .blip-logo doesn't exist in the DOM yet at parse time. */
+(function () {
+  var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  if (reduceMotion) return; // no schedule at all — this is pure motion, nothing informational
+
+  window.addEventListener('load', function () {
+    var logo = document.querySelector('.blip-logo');
+    if (!logo || !logo.firstChild || logo.firstChild.nodeType !== Node.TEXT_NODE) return;
+
+    // Split the "BLIP" text node (before the .ba-rest " ARCADE" span) into
+    // one span per letter, so a single one can be singled out. "BLIP" is
+    // the part of the wordmark that's always visible (ba-rest hides on
+    // phones), so that's the pool the random strike is drawn from.
+    var letters = logo.firstChild.textContent.split('');
+    var frag = document.createDocumentFragment();
+    letters.forEach(function (ch) {
+      var span = document.createElement('span');
+      span.className = 'lg-ch';
+      span.textContent = ch;
+      frag.appendChild(span);
+    });
+    logo.replaceChild(frag, logo.firstChild);
+    var chars = logo.querySelectorAll('.lg-ch');
+    if (!chars.length) return;
+
+    // An electrical crackle (filtered noise burst) under a fast descending
+    // zap (a sawtooth sweeping from a shriek down to a thud) — the same
+    // procedural-audio recipe as playCoinInsert/playNoRoom above.
+    function playZap() {
+      var ctx = getKioskAudio();
+      var t = ctx.currentTime;
+
+      var buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.14), ctx.sampleRate);
+      var data = buf.getChannelData(0);
+      for (var i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+      var noise = ctx.createBufferSource();
+      noise.buffer = buf;
+      var filt = ctx.createBiquadFilter();
+      filt.type = 'highpass';
+      filt.frequency.value = 2400;
+      var ng = ctx.createGain();
+      ng.gain.setValueAtTime(0.5, t);
+      ng.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+      noise.connect(filt); filt.connect(ng); ng.connect(ctx.destination);
+      noise.start(t); noise.stop(t + 0.14);
+
+      var osc = ctx.createOscillator();
+      var og = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(2600, t);
+      osc.frequency.exponentialRampToValueAtTime(80, t + 0.17);
+      og.gain.setValueAtTime(0.22, t);
+      og.gain.exponentialRampToValueAtTime(0.001, t + 0.19);
+      osc.connect(og); og.connect(ctx.destination);
+      osc.start(t); osc.stop(t + 0.2);
+    }
+
+    function zap() {
+      if (document.hidden) return;
+      var el = chars[Math.floor(Math.random() * chars.length)];
+      logo.classList.add('lg-surge');
+      el.classList.add('lg-zap');
+      playZap();
+      var done = function () {
+        el.classList.remove('lg-zap');
+        logo.classList.remove('lg-surge');
+      };
+      el.addEventListener('animationend', done, { once: true });
+      setTimeout(done, 500); // in case the tab was hidden mid-animation and it never fired
+    }
+
+    // Seldom: the next strike lands 45s-3min out, so it reads as a rare
+    // fault rather than a tic. Re-armed after every strike (and skipped,
+    // then re-armed, while the tab is hidden) rather than on a fixed
+    // interval — running it down while backgrounded would otherwise fire
+    // a burst of overdue zaps the moment the tab regains focus.
+    function scheduleNext() {
+      var delay = 45000 + Math.random() * 135000;
+      setTimeout(function () {
+        if (document.hidden) { scheduleNext(); return; }
+        zap();
+        scheduleNext();
+      }, delay);
+    }
+    scheduleNext();
+  });
+}());
+
 /* ---- Shared gamepad polling ----
  * Polls the first connected gamepad every frame and reports logical button
  * state changes ('ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' |

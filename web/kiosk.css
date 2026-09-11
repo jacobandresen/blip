@@ -429,6 +429,62 @@ body:has(.game-grid) .blip-logo {
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* ---- Overcharge glitch — a seldom, random electrical fault on one letter
+   of the wordmark (kiosk.js splits "BLIP" into these spans and picks one).
+   `steps()` rather than easing so it reads as electrical stutter, not a
+   smooth fade. .lg-surge (on .blip-logo itself, only while a letter is
+   struck) makes the rest of the sign flicker too, like the surge briefly
+   stole their power. */
+.blip-logo .lg-ch {
+  position: relative;
+  display: inline-block;
+}
+.blip-logo.lg-surge .lg-ch {
+  animation: lg-dim 0.4s steps(2, end);
+}
+.blip-logo .lg-ch.lg-zap {
+  animation: lg-letter-zap 0.4s steps(2, end);
+}
+.blip-logo .lg-ch.lg-zap::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 10px;
+  height: 22px;
+  margin-left: -5px;
+  /* a small jagged bolt, drawn rather than an image asset */
+  background: linear-gradient(180deg, #fff 0%, #bdf3ff 45%, #4ad8ff 100%);
+  clip-path: polygon(55% 0%, 15% 55%, 45% 55%, 5% 100%, 85% 40%, 50% 40%);
+  filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 8px #4ad8ff) drop-shadow(0 0 16px rgba(74, 216, 255, 0.8));
+  animation: lg-bolt 0.4s steps(2, end);
+  pointer-events: none;
+}
+@keyframes lg-letter-zap {
+  0%, 100% { color: inherit; }
+  15%, 55% { color: #fff; text-shadow: 0 0 6px #fff, 0 0 16px #8eefff, 0 0 32px #4ad8ff; }
+  35%, 75% { color: inherit; }
+  90% { color: #fff; text-shadow: 0 0 6px #fff, 0 0 16px #8eefff; }
+}
+@keyframes lg-dim {
+  0%, 100% { opacity: 1; }
+  20% { opacity: 0.2; }
+  40% { opacity: 1; }
+  60% { opacity: 0.35; }
+  80% { opacity: 1; }
+}
+@keyframes lg-bolt {
+  0%, 100% { opacity: 0; transform: scaleY(0.4); }
+  15%, 55% { opacity: 1; transform: scaleY(1); }
+  35%, 75% { opacity: 0; }
+  90% { opacity: 0.8; transform: scaleY(0.7); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blip-logo.lg-surge .lg-ch,
+  .blip-logo .lg-ch.lg-zap,
+  .blip-logo .lg-ch.lg-zap::after { animation: none; }
+}
+
 /* ---- Top marquee strip — the lit sign box the BLIP ARCADE logo (left)
    and the coin slot (right) sit in. Identical on the front page, about,
    controls and history. Game pages use shell.js's #marquee-bar instead
