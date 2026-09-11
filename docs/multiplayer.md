@@ -276,6 +276,29 @@ anything); the test now pads with the modal's own dark background color
 instead of white, so it no longer accidentally supplies the quiet zone
 the app should be responsible for.
 
+The quiet-zone fix alone did not resolve a second real-hardware report of
+"still nothing" — the underlying cause of that one is still unconfirmed
+(candidates: a screen-to-camera moiré/module-size problem from the QR
+encoding a full SDP with embedded ICE candidates at a fairly high QR
+version, an `NotAllowedError`/permission issue on that device, or
+something else entirely). Since the fake-camera test only proves the
+happy path (a clean, well-lit, correctly-framed code decodes), it can't
+diagnose a *specific* failed attempt after the fact — there's no log to
+go back and read. So `blip_qr.js`'s `scan()` now reports live status
+(`onStatus(state, detail)`: opening → streaming → a continuously updating
+frame count and "no code found yet"/"N possible codes in view", or a
+specific camera-permission/hardware error) instead of staying silent
+until it either works or times out, and draws on-screen markers: a green
+box around a confirmed decode (from jsQR's own `location`), or a yellow
+circle around anything a lightweight reimplementation of jsQR's own
+finder-pattern ratio check (1:1:3:1:1 dark:light:dark:light:dark run
+lengths, scanned per-row against a single global threshold — coarser than
+jsQR's real per-region adaptive one, so it flags more false positives,
+but it's cheap and only ever drives a cosmetic marker) thinks might be a
+QR pattern *before* a full decode succeeds. The next real-hardware report
+should come with what the status line actually said, which narrows the
+remaining possibilities a lot faster than "still nothing" did.
+
 ## Open questions
 
 - **Cheating.** A guest's browser console can just send fabricated
