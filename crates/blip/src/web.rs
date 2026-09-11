@@ -12,6 +12,9 @@ extern "C" {
     fn blip_game_over(score: i32);
     fn blip_high_score() -> i32;
     fn blip_high_name(ptr: *mut u8, cap: i32) -> i32;
+    fn blip_net_role() -> i32;
+    fn blip_net_send(ptr: *const u8, len: i32);
+    fn blip_net_poll(ptr: *mut u8, cap: i32) -> i32;
 }
 
 /// Notify the kiosk shell that the player should be charged a coin.
@@ -104,6 +107,66 @@ pub fn high_score() -> HighScore {
                 }
             }
             _ => HighScore::default(),
+        }
+    }
+}
+
+/// Generic two-device-multiplayer transport (see `docs/multiplayer.md`).
+/// Deliberately game-agnostic here — a game defines its own wire format
+/// (Rally's is `crates/rally/src/net.rs`) and just hands this raw bytes.
+/// The signaling, `RTCPeerConnection` and `RTCDataChannel` all live in
+/// `web/blip_net.js`; Rust never sees any of that, only a byte pipe.
+pub mod net {
+    /// Which role, if any, the pairing UI wants this instance to start as
+    /// once the title screen sees it: `0` = no request yet (keep waiting /
+    /// stay on the normal local menu), `1` = host, `2` = guest. A game
+    /// polls this once per Title-state frame; there's no "take"/clear
+    /// step needed because a game only polls while still on its title
+    /// screen, and never returns to it mid-match (see `docs/multiplayer.md`
+    /// Phase 5 for the rematch case this doesn't yet cover).
+    pub fn role() -> i32 {
+        #[cfg(target_arch = "wasm32")]
+        unsafe {
+            super::blip_net_role()
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            // Dev hook for native testing: BLIP_NET_ROLE=1 (host) or 2 (guest).
+            std::env::var("BLIP_NET_ROLE")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0)
+        }
+    }
+
+    /// Send a blob of bytes out over the active connection (host -> guest
+    /// state, in Rally's case). A no-op if nothing is connected — the JS
+    /// side is responsible for dropping bytes it has nowhere to send.
+    pub fn send(bytes: &[u8]) {
+        #[cfg(target_arch = "wasm32")]
+        unsafe {
+            super::blip_net_send(bytes.as_ptr(), bytes.len() as i32);
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let _ = bytes;
+        }
+    }
+
+    /// Copy the most recent inbound packet (if any arrived since the last
+    /// poll) into `buf`, returning the byte count — `0` if nothing new.
+    /// Call once per frame; a game that misses a poll just sees the next
+    /// one, there's no queue to fall behind on (only the latest packet is
+    /// ever kept — see `web/blip_net.js`).
+    pub fn poll(buf: &mut [u8]) -> usize {
+        #[cfg(target_arch = "wasm32")]
+        unsafe {
+            super::blip_net_poll(buf.as_mut_ptr(), buf.len() as i32).max(0) as usize
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let _ = buf;
+            0
         }
     }
 }
