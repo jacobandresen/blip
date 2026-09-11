@@ -260,6 +260,22 @@ distance, screen glare, real permission prompts). The three tiers above
 prove the connection/signaling/game-sync logic itself is correct; those
 two remain manual, real-hardware checks.
 
+This gap wasn't hypothetical: the very first real-hardware attempt hit
+"nothing happens when I point the camera at the QR code" — `blip_qr.js`'s
+`render()` drew the modules edge-to-edge with no light margin around
+them, so the code sat directly against the pairing modal's own dark
+background with no [quiet
+zone](https://en.wikipedia.org/wiki/QR_code#Quiet_zone) at all. jsQR (like
+most real scanners) can fail to even *locate* a code with no quiet zone,
+rather than just decode it less reliably — invisible to the fake-camera
+test above, since that test pads every frame with its own margin before
+handing it to the fake device, which papered over the exact bug a real
+camera hit immediately. Fixed by drawing a real 4-module white margin
+into the canvas itself (so it survives a screenshot, a video frame,
+anything); the test now pads with the modal's own dark background color
+instead of white, so it no longer accidentally supplies the quiet zone
+the app should be responsible for.
+
 ## Open questions
 
 - **Cheating.** A guest's browser console can just send fabricated
