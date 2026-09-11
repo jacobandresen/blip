@@ -1,10 +1,11 @@
 /* Pure wire-format logic for two-device Rally (docs/multiplayer.md).
- * No DOM, no WebRTC, no Supabase — just encode/decode and validation, so
- * it can be unit-tested from plain Node (test/multiplayer-proto.test.mjs)
- * as well as loaded as a browser <script> by blip_net.js. The binary
- * host-state packet has its own format, owned by the Rust side
- * (crates/rally/src/net.rs) — this file only covers the guest -> host
- * input messages and the room-code text players type at each other.
+ * No DOM, no WebRTC — just encode/decode, so it can be unit-tested from
+ * plain Node (test/multiplayer-proto.test.mjs) as well as loaded as a
+ * browser <script> by blip_net.js. The binary host-state packet has its
+ * own format, owned by the Rust side (crates/rally/src/net.rs) — this
+ * file only covers the guest -> host input messages (the offer/answer
+ * SDP that goes through QR codes is passed around as plain strings, no
+ * framing needed).
  *
  * Dual-mode export: a plain global in a browser (`<script>` has no
  * `module`), a CommonJS export under Node (for the test file) — same
@@ -14,31 +15,6 @@
   'use strict';
 
   var PROTO_VERSION = 1;
-
-  // ---- room codes ----------------------------------------------------
-  // Short enough to read aloud / type on a phone keyboard in a hurry;
-  // digits only (no ambiguous letter/number mix like the recovery codes
-  // need to guard against — a room code is worthless to anyone the
-  // instant the match starts, so there's no brute-force concern to design
-  // around here, just typos).
-  var ROOM_CODE_LEN = 4;
-  var ROOM_CODE_RE = /^[0-9]{4}$/;
-
-  /** A random 4-digit room code, zero-padded (e.g. "0042"). */
-  function genRoomCode() {
-    var n = Math.floor(Math.random() * 10000);
-    return String(n).padStart(ROOM_CODE_LEN, '0');
-  }
-
-  /** Normalize a player's typed-in code: strip whitespace, digits only. */
-  function normalizeRoomCode(raw) {
-    return String(raw == null ? '' : raw).replace(/\D/g, '').slice(0, ROOM_CODE_LEN);
-  }
-
-  /** True for a well-formed 4-digit code (after normalizing). */
-  function isValidRoomCode(raw) {
-    return ROOM_CODE_RE.test(normalizeRoomCode(raw));
-  }
 
   // ---- guest -> host input messages -----------------------------------
   // Plain JSON, tagged with a version from day one since this is exactly
@@ -78,10 +54,6 @@
 
   var api = {
     PROTO_VERSION: PROTO_VERSION,
-    ROOM_CODE_LEN: ROOM_CODE_LEN,
-    genRoomCode: genRoomCode,
-    normalizeRoomCode: normalizeRoomCode,
-    isValidRoomCode: isValidRoomCode,
     encodeInput: encodeInput,
     decodeInput: decodeInput,
     encodeBye: encodeBye,

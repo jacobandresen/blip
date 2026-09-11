@@ -1,13 +1,13 @@
 /* Two-device Rally networking (docs/multiplayer.md).
  *
- * Signaling: a private Supabase Realtime Broadcast channel named
- * "blip-room-<4-digit code>" (RLS-scoped to that prefix — see
- * supabase/migrations/20260911120000_multiplayer_signaling.sql), used
- * only to trade one SDP offer and one SDP answer ("vanilla"/non-trickle
- * ICE: each side waits for its own candidate gathering to finish before
- * sending, so there's no separate candidate-exchange message type to
- * race against). Abandoned the instant the DataChannel opens — no
- * gameplay traffic ever touches Supabase.
+ * Signaling: QR codes only. The offer/answer SDP travels as a QR code
+ * shown on one screen and scanned by the other's camera ("vanilla"/
+ * non-trickle ICE: each side waits for its own candidate gathering to
+ * finish before rendering its code, so there's no separate candidate-
+ * exchange round to race against, and each side only ever needs to show
+ * one code). No network of any kind is involved in pairing — this file
+ * has no camera or QR-drawing code itself, that's web/blip_qr.js and
+ * web/blip_net_ui.js's job; this only knows SDP strings in and out.
  *
  * Transport once connected: one unreliable/unordered RTCDataChannel,
  * both directions —
@@ -27,15 +27,12 @@
 (function () {
   'use strict';
 
-  var ROOM_PREFIX = 'blip-room-';
   var ICE_GATHER_TIMEOUT_MS = 2500;   // vanilla ICE: cap how long we wait to bundle candidates
-  var CONNECT_TIMEOUT_MS = 30000;     // give up and report a clear status rather than hang forever
+  var CONNECT_TIMEOUT_MS = 60000;     // give up and report a clear status rather than hang forever
+                                       // (generous: two camera scans take longer than typing a code)
 
-  var CFG = window.BLIP_SUPABASE || {};
   var proto = window.BlipNetProto;
 
-  var sb = null;               // this module's own Supabase client (signaling only)
-  var channel = null;          // the Realtime channel for the current pairing attempt
   var pc = null;               // RTCPeerConnection
   var dc = null;               // RTCDataChannel
   var role = 0;                // 0 none, 1 host, 2 guest — what blipNetRole() reports
@@ -50,27 +47,8 @@
     }
   }
 
-  function ensureClient() {
-    if (sb) return sb;
-    if (!CFG.url || !CFG.anonKey || !window.supabase) return null;
-    // Deliberately not the leaderboard's client/session (blip_scores.js) —
-    // signaling needs no identity, just the anon role the RLS policy
-    // grants on the blip-room- topic prefix.
-    sb = window.supabase.createClient(CFG.url, CFG.anonKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    return sb;
-  }
-
   function clearConnectTimer() {
     if (connectTimer) { clearTimeout(connectTimer); connectTimer = null; }
-  }
-
-  function cleanupChannel() {
-    if (channel) {
-      try { sb.removeChannel(channel); } catch (e) {}
-      channel = null;
-    }
   }
 
   /** Wait for ICE gathering to finish (or time out) so the SDP we send is
@@ -131,7 +109,6 @@
       log('dc.open', roleValue);
       clearConnectTimer();
       role = roleValue;
-      cleanupChannel(); // signaling's done its job
       if (roleValue === 2) attachGuestInputCapture();
       status('connected');
     });
@@ -161,92 +138,9 @@
     });
   }
 
-  // ---- host side ---------------------------------------------------------
+  // ---- host side: generate an offer, hand it to the UI to render as a QR ----
 
-  function host(onStatus) {
-    onStatusCb = onStatus;
-    var client = ensureClient();
-    if (!client) { status('unavailable'); return; }
-    var code = proto.genRoomCode();
-
-    pc = newPeerConnection();
-    var channelObj = pc.createDataChannel('rally', { ordered: false, maxRetransmits: 0 });
-    wireDataChannel(channelObj, 1);
-
-    channel = client.channel(ROOM_PREFIX + code, { config: { private: true, broadcast: { self: false } } });
-    channel.on('broadcast', { event: 'signal' }, function (msg) {
-      var payload = msg.payload || {};
-      if (payload.kind === 'answer' && pc) {
-        pc.setRemoteDescription({ type: 'answer', sdp: payload.sdp }).catch(function () { status('failed'); });
-      }
-    });
-    channel.subscribe(function (subStatus) {
-      if (subStatus !== 'SUBSCRIBED') return;
-      pc.createOffer()
-        .then(function (offer) { return pc.setLocalDescription(offer); })
-        .then(function () { return waitForIceGathering(pc); })
-        .then(function () {
-          channel.send({
-            type: 'broadcast', event: 'signal',
-            payload: { kind: 'offer', sdp: pc.localDescription.sdp },
-          });
-          status('waiting', code);
-        })
-        .catch(function () { status('failed'); });
-    });
-
-    clearConnectTimer();
-    connectTimer = setTimeout(function () { status('timeout'); cancel(); }, CONNECT_TIMEOUT_MS);
-    return code;
-  }
-
-  // ---- guest side ----------------------------------------------------------
-
-  function join(rawCode, onStatus) {
-    onStatusCb = onStatus;
-    var code = proto.normalizeRoomCode(rawCode);
-    if (!proto.isValidRoomCode(code)) { status('bad_code'); return; }
-    var client = ensureClient();
-    if (!client) { status('unavailable'); return; }
-
-    pc = newPeerConnection();
-    pc.addEventListener('datachannel', function (e) { wireDataChannel(e.channel, 2); });
-
-    channel = client.channel(ROOM_PREFIX + code, { config: { private: true, broadcast: { self: false } } });
-    channel.on('broadcast', { event: 'signal' }, function (msg) {
-      var payload = msg.payload || {};
-      if (payload.kind !== 'offer' || !pc) return;
-      pc.setRemoteDescription({ type: 'offer', sdp: payload.sdp })
-        .then(function () { return pc.createAnswer(); })
-        .then(function (answer) { return pc.setLocalDescription(answer); })
-        .then(function () { return waitForIceGathering(pc); })
-        .then(function () {
-          channel.send({
-            type: 'broadcast', event: 'signal',
-            payload: { kind: 'answer', sdp: pc.localDescription.sdp },
-          });
-          status('answering');
-        })
-        .catch(function () { status('failed'); });
-    });
-    channel.subscribe(function (subStatus) {
-      if (subStatus === 'SUBSCRIBED') status('waiting');
-    });
-
-    clearConnectTimer();
-    connectTimer = setTimeout(function () { status('timeout'); cancel(); }, CONNECT_TIMEOUT_MS);
-  }
-
-  // ---- QR-code signaling (fully offline — docs/multiplayer.md's Phase 6) ----
-  // No Supabase, no network at all: the offer/answer SDP travels as a QR
-  // code shown on one screen and scanned by the other's camera. Same
-  // vanilla-ICE wait-for-gathering-then-send shape as the Realtime path
-  // above, just with the "send" step replaced by "hand back to the UI to
-  // render" and the "receive" step replaced by "the UI hands us what it
-  // scanned/typed". This file has no camera or QR-drawing code at all —
-  // that's blip_net_ui.js's job; this only knows SDP strings in and out.
-
-  function hostQR(onOffer, onStatus) {
+  function host(onOffer, onStatus) {
     onStatusCb = onStatus;
     pc = newPeerConnection();
     var channelObj = pc.createDataChannel('rally', { ordered: false, maxRetransmits: 0 });
@@ -264,15 +158,15 @@
     connectTimer = setTimeout(function () { status('timeout'); cancel(); }, CONNECT_TIMEOUT_MS);
   }
 
-  /** Host: call once the guest's answer QR has been scanned (or its text
-   * pasted/typed as a fallback). */
+  /** Host: call once the guest's answer QR has been scanned. */
   function submitAnswer(sdp) {
     if (!pc) return;
     pc.setRemoteDescription({ type: 'answer', sdp: sdp }).catch(function () { status('failed'); });
   }
 
-  /** Guest: `offerSdp` is whatever was scanned from the host's QR code. */
-  function joinQR(offerSdp, onAnswer, onStatus) {
+  // ---- guest side: `offerSdp` is whatever was scanned from the host's QR ----
+
+  function join(offerSdp, onAnswer, onStatus) {
     onStatusCb = onStatus;
     pc = newPeerConnection();
     pc.addEventListener('datachannel', function (e) { wireDataChannel(e.channel, 2); });
@@ -341,7 +235,6 @@
 
   function cancel() {
     clearConnectTimer();
-    cleanupChannel();
     detachGuestInputCapture();
     if (dc) { try { dc.close(); } catch (e) {} dc = null; }
     if (pc) { try { pc.close(); } catch (e) {} pc = null; }
@@ -361,10 +254,7 @@
     return s;
   };
 
-  window.BlipNet = {
-    host: host, join: join, cancel: cancel,
-    hostQR: hostQR, joinQR: joinQR, submitAnswer: submitAnswer,
-  };
+  window.BlipNet = { host: host, join: join, submitAnswer: submitAnswer, cancel: cancel };
   // Debug/test introspection only — test/multiplayer.mjs and manual
   // console debugging. Not part of the public API.
   window.__blipNetDebug = function () {

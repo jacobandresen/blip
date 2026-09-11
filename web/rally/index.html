@@ -95,19 +95,16 @@
 
   <script src="../blip_controller.js?v=4"></script>
   <script src="../shell.js?v=48"></script>
-  <!-- Two-device play (docs/multiplayer.md): its own Supabase client
-       (signaling only — no shared session with the leaderboard's). -->
-  <script src="../vendor/supabase.js?v=1"></script>
-  <script src="../blip_config.js?v=1"></script>
-  <!-- QR pairing (fully offline fallback — docs/multiplayer.md Phase 6).
-       Both vendored, both before blip_net_ui.js: it checks window.BlipQR
-       at load time to decide whether to offer the QR option at all. -->
+  <!-- Two-device play (docs/multiplayer.md): QR-code pairing only, no
+       network/Supabase involved. Both vendored libs load before
+       blip_net_ui.js: it checks window.BlipQR at load time and drops the
+       whole PLAY NEARBY feature if either failed to load. -->
   <script src="../vendor/qrcode.js?v=1"></script>
   <script src="../vendor/jsQR.js?v=1"></script>
   <script src="../blip_qr.js?v=1"></script>
-  <script src="../blip_net_proto.js?v=1"></script>
-  <script src="../blip_net.js?v=2"></script>
-  <script src="../blip_net_ui.js?v=3"></script>
+  <script src="../blip_net_proto.js?v=2"></script>
+  <script src="../blip_net.js?v=3"></script>
+  <script src="../blip_net_ui.js?v=4"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
   <script src="../blip_bridge.js?v=11"></script>

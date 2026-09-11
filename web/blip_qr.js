@@ -1,5 +1,6 @@
-/* QR-code rendering + camera scanning for the offline pairing path
- * (web/blip_net.js's hostQR/joinQR, wired up by web/blip_net_ui.js).
+/* QR-code rendering + camera scanning for two-device pairing (the only
+ * signaling path — see docs/multiplayer.md), wired up by
+ * web/blip_net.js's host()/join() and web/blip_net_ui.js's modal.
  *
  * Two small vendored libraries do the actual work — this file is just the
  * glue between them and the DOM:
@@ -8,8 +9,8 @@
  *   web/vendor/jsQR.js   — cozmo/jsQR (Apache-2.0), decodes a QR code out
  *     of raw pixel data.
  * Only defines window.BlipQR when both loaded — blip_net_ui.js checks for
- * that before offering the QR option at all, so a missing/blocked vendor
- * script degrades to "no QR button" rather than a broken one.
+ * that before showing PLAY NEARBY at all, so a missing/blocked vendor
+ * script degrades to "no multiplayer button" rather than a broken one.
  */
 (function () {
   'use strict';
