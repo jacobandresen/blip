@@ -1933,7 +1933,8 @@ fn draw_bottom_hud(blip: &Blip, g: &Game, player_tex: &Texture2D) {
 fn draw_title(blip: &Blip, player_tex: &Texture2D, hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("RAIDER", (WIN_H / 4) as f32, 5.0, BLIP_BLUE);
-    blip.draw_hi(hi, (WIN_H / 4 + 40) as f32, BLIP_YELLOW);
+    // RAIDER is sz=5 (35px tall) — clear its bottom by a real margin.
+    blip.draw_hi(hi, (WIN_H / 4 + 43) as f32, BLIP_YELLOW);
     let px = (WIN_W as f32 - PLAYER_W as f32 * 2.0) / 2.0;
     blip.draw_texture(player_tex, px, (WIN_H / 2 - 70) as f32, PLAYER_W as f32 * 2.0, PLAYER_H as f32 * 2.0);
     blip.draw_centered("PRESS FIRE TO START", (WIN_H * 2 / 3) as f32, 3.0, BLIP_WHITE);

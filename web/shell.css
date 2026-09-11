@@ -255,8 +255,25 @@ canvas {
 
 /* On a game page the logo is the only touch route back to the grid, and
    it sits in the top-left corner well away from where the thumbs rest —
-   so give it a fuller vertical tap box than the 32px it uses elsewhere. */
-.blip-logo { height: calc(48px + env(safe-area-inset-top, 0px)); }
+   so give it a fuller vertical tap box than the 32px it uses elsewhere.
+   #insert-coin-btn has to grow to match: kiosk.css never sizes it past
+   46px, so left alone here it stayed short while the logo grew, and the
+   two — meant to read as one continuous bar (see kiosk.css) — went out
+   of vertical alignment. */
+.blip-logo,
+#insert-coin-btn { height: calc(52px + env(safe-area-inset-top, 0px)); }
+
+/* A little more room than the kiosk pages use: a game page's top bar only
+   carries these two elements (no card grid competing for space), so let
+   them sit further off the screen edge and, for the coin slot's own drawn
+   border, further off their own edge too. */
+.blip-logo { left: 14px; }
+#insert-coin-btn {
+  right: calc(env(safe-area-inset-right, 0px) + 14px);
+  padding-left: 12px;
+  padding-right: 12px;
+  gap: 9px;
+}
 
 /* ---- "MORE GAMES" nudge on the BLIP logo ----
    shell.js appends .logo-hint inside .blip-logo and toggles .show-hint

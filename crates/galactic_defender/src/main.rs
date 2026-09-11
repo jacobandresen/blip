@@ -995,7 +995,9 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
     blip.draw_centered("GALACTIC", (WIN_H / 5) as f32,        5.0, BLIP_CYAN);
     blip.draw_centered("DEFENDER", (WIN_H / 5 + 50) as f32,   5.0, BLIP_MAGENTA);
-    blip.draw_hi(hi, (WIN_H / 5 + 84) as f32, BLIP_YELLOW);
+    // DEFENDER (the lower title line) is sz=5 (35px tall) — clear its
+    // bottom by a real margin.
+    blip.draw_hi(hi, (WIN_H / 5 + 93) as f32, BLIP_YELLOW);
 
     let dw = (ALIEN_W / 2) as f32;
     let dh = (ALIEN_H / 2) as f32;
