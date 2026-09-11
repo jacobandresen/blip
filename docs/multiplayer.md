@@ -1,4 +1,4 @@
-# Two-device multiplayer ("via Bluetooth")
+# Two-device multiplayer
 
 Status: **planning** — nothing built yet. This is the design doc to work
 from; see [Phasing](#phasing) for where to start.
