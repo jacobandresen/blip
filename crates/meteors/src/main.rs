@@ -636,8 +636,16 @@ fn draw_play(blip: &Blip, g: &Game) {
         draw_ship(blip, &g.ship, g.invuln_t, NEON_CYAN);
     }
     blip.draw_hud(g.sess.score, g.sess.lives);
+    // The shell clips the canvas 3 *screen* pixels in on every edge (see
+    // shell.css's `canvas { clip-path: inset(3px round 6px) }`, shared by
+    // every game). That's a couple of game-units for the 480-wide games,
+    // but meteors' canvas is 680 units wide — packed into the same screen
+    // width, each game-unit maps to fewer screen pixels, so the same 3px
+    // clip eats noticeably more of *this* game's own coordinate space.
+    // x=4 used to land inside that clipped strip, cutting the left couple
+    // of letters off "LEVEL n"; x=12 clears it with room to spare.
     let lvl = format!("LEVEL {}", g.sess.level);
-    blip.draw_text(&lvl, 4.0, WIN_H as f32 - 18.0, 1.5, BLIP_GRAY);
+    blip.draw_text(&lvl, 12.0, WIN_H as f32 - 18.0, 1.5, BLIP_GRAY);
 }
 
 fn draw_title(blip: &Blip, hi: &web::HighScore) {

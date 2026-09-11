@@ -24,6 +24,7 @@
   // to survive the modal closing, not get torn down by it.
   function dismissModal() {
     if (modalEl) { modalEl.remove(); modalEl = null; }
+    if (stopActiveScan) { stopActiveScan(); stopActiveScan = null; }
   }
   // The CLOSE button / an abort: dismiss AND actually cancel — there's no
   // live connection worth keeping in either case (canceling is a no-op if
@@ -65,6 +66,41 @@
     joinBtn.type = 'button';
     joinBtn.textContent = 'JOIN';
     joinBtn.addEventListener('click', function () { showJoinForm(body, panel); });
+
+    // The WiFi/Realtime path above needs both phones to reach the internet
+    // for a moment to trade the offer/answer (see docs/multiplayer.md).
+    // This one needs neither WiFi nor a signal — the SDP travels as a QR
+    // code between the two cameras — but costs two camera scans instead of
+    // typing a 4-digit code.
+    if (window.BlipQR) {
+      var qrLink = el('button', 'blip-hs-btn ghost', body);
+      qrLink.type = 'button';
+      qrLink.style.cssText = 'margin-top:10px;width:100%;';
+      qrLink.textContent = 'NO WIFI? PAIR VIA QR CODE';
+      qrLink.addEventListener('click', function () { showQrChoice(body, panel); });
+    }
+  }
+
+  function showQrChoice(body, panel) {
+    clear(body);
+    el('div', 'blip-hs-sub', body).textContent =
+      'No network needed — just point each phone’s camera at the other’s screen when asked.';
+    var row = el('div', 'blip-hs-row', body);
+    var hostBtn = el('button', 'blip-hs-btn', row);
+    hostBtn.type = 'button';
+    hostBtn.textContent = 'HOST';
+    hostBtn.addEventListener('click', function () { showHostQR(body, panel); });
+
+    var joinBtn = el('button', 'blip-hs-btn', row);
+    joinBtn.type = 'button';
+    joinBtn.textContent = 'JOIN';
+    joinBtn.addEventListener('click', function () { showJoinQR(body, panel); });
+
+    var back = el('button', 'blip-hs-btn ghost', body);
+    back.type = 'button';
+    back.style.cssText = 'margin-top:10px;width:100%;';
+    back.textContent = 'BACK';
+    back.addEventListener('click', function () { showChoice(body, panel); });
   }
 
   function statusText(s, detail) {
@@ -130,6 +166,84 @@
     }
     go.addEventListener('click', submit);
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+  }
+
+  // ---- QR-code pairing (no network at all — see web/blip_net.js) --------
+
+  function showHostQR(body, panel) {
+    clear(body);
+    var canvas = el('canvas', '', body);
+    canvas.style.cssText = 'display:block;position:static;top:auto;left:auto;transform:none;clip-path:none;'+'touch-action:auto;margin:10px auto;width:200px;height:200px;'+'image-rendering:pixelated;border-radius:4px;';
+    var msg = el('div', 'blip-hs-sub', body);
+    msg.textContent = 'Generating code…';
+
+    window.BlipNet.hostQR(function (offerSdp) {
+      window.BlipQR.render(canvas, offerSdp);
+      msg.textContent = 'Have your friend tap JOIN → SCAN, then point their camera at this code.';
+      showScanButton(body, panel, 'SCAN THEIR ANSWER', function (text) {
+        window.BlipNet.submitAnswer(text);
+      });
+    }, function (s) {
+      if (s === 'connected') { setTimeout(dismissModal, 600); return; }
+      if (s === 'failed' || s === 'timeout') {
+        setTimeout(function () { if (modalEl) showQrChoice(body, panel); }, 1500);
+      }
+    });
+  }
+
+  function showJoinQR(body, panel) {
+    clear(body);
+    el('div', 'blip-hs-sub', body).textContent = 'Point your camera at the host’s code.';
+    showScanButton(body, panel, 'SCAN HOST’S CODE', function (offerSdp) {
+      clear(body);
+      var canvas = el('canvas', '', body);
+      canvas.style.cssText = 'display:block;position:static;top:auto;left:auto;transform:none;clip-path:none;'+'touch-action:auto;margin:10px auto;width:200px;height:200px;'+'image-rendering:pixelated;border-radius:4px;';
+      var msg = el('div', 'blip-hs-sub', body);
+      msg.textContent = 'Generating your answer…';
+      window.BlipNet.joinQR(offerSdp, function (answerSdp) {
+        window.BlipQR.render(canvas, answerSdp);
+        msg.textContent = 'Show this to your friend — have them tap SCAN THEIR ANSWER.';
+      }, function (s) {
+        msg.textContent = statusText(s);
+        if (s === 'connected') { setTimeout(dismissModal, 600); return; }
+        if (s === 'failed' || s === 'timeout') {
+          setTimeout(function () { if (modalEl) showQrChoice(body, panel); }, 1500);
+        }
+      });
+    }, true);
+  }
+
+  var stopActiveScan = null;
+
+  /** A button that, once tapped, opens the camera and scans for one QR
+   * code — `onScanned(text)` fires once, after which the camera stops
+   * itself. `autoStart` skips the button and opens the camera immediately
+   * (the guest's very first step has nothing else to tap first). */
+  function showScanButton(body, panel, label, onScanned, autoStart) {
+    var holder = el('div', '', body);
+    function startScanning() {
+      clear(holder);
+      var video = el('video', '', holder);
+      video.setAttribute('playsinline', '');
+      video.setAttribute('muted', '');
+      video.muted = true;
+      video.style.cssText = 'display:block;position:static;margin:10px auto;width:220px;height:220px;object-fit:cover;border-radius:4px;background:#000;';
+      var err = el('div', 'blip-hs-err', holder);
+      stopActiveScan = window.BlipQR.scan(video, function (text, scanErr) {
+        stopActiveScan = null;
+        if (scanErr) { err.textContent = 'Camera unavailable — check permissions.'; return; }
+        clear(holder);
+        onScanned(text);
+      });
+    }
+    if (autoStart) {
+      startScanning();
+    } else {
+      var btn = el('button', 'blip-hs-btn', holder);
+      btn.type = 'button';
+      btn.textContent = label;
+      btn.addEventListener('click', function () { startScanning(); }, { once: true });
+    }
   }
 
   window.addEventListener('DOMContentLoaded', function () {

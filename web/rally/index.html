@@ -99,9 +99,15 @@
        (signaling only — no shared session with the leaderboard's). -->
   <script src="../vendor/supabase.js?v=1"></script>
   <script src="../blip_config.js?v=1"></script>
+  <!-- QR pairing (fully offline fallback — docs/multiplayer.md Phase 6).
+       Both vendored, both before blip_net_ui.js: it checks window.BlipQR
+       at load time to decide whether to offer the QR option at all. -->
+  <script src="../vendor/qrcode.js?v=1"></script>
+  <script src="../vendor/jsQR.js?v=1"></script>
+  <script src="../blip_qr.js?v=1"></script>
   <script src="../blip_net_proto.js?v=1"></script>
-  <script src="../blip_net.js?v=1"></script>
-  <script src="../blip_net_ui.js?v=1"></script>
+  <script src="../blip_net.js?v=2"></script>
+  <script src="../blip_net_ui.js?v=2"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
   <script src="../blip_bridge.js?v=11"></script>
