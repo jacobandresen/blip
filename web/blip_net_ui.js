@@ -86,7 +86,10 @@
   }
 
   function qrCanvas(parent) {
-    var canvas = el('canvas', '', parent);
+    // Classed (not just typed) so test/multiplayer.mjs and the scan
+    // preview's own overlay canvas below can never be confused for one
+    // another — both are `<canvas>` elements inside the same panel.
+    var canvas = el('canvas', 'blip-qr-canvas', parent);
     // Neutralize shell.css's bare `canvas { position:fixed; clip-path:...
     // }` rule — meant only for the game's own #glcanvas, but a bare tag
     // selector catches every canvas on the page, including this one.
@@ -95,6 +98,44 @@
       'touch-action:auto;margin:10px auto;width:240px;height:240px;' +
       'image-rendering:pixelated;border-radius:4px;';
     return canvas;
+  }
+
+  /** Turn window.BlipQR's scan status callback into a human-readable line —
+   * "write feedback when something happens" instead of silence while
+   * nothing has decoded yet. */
+  function scanStatusText(state, detail) {
+    switch (state) {
+      case 'opening': return 'Opening camera…';
+      case 'streaming':
+        return 'Camera on' + (detail.width ? ' (' + detail.width + '×' + detail.height + ')' : '') + ' — point it at the code.';
+      case 'buffering': return 'Camera opened, waiting for its first frame…';
+      case 'scanning': {
+        var bits = [detail.frames + ' frame' + (detail.frames === 1 ? '' : 's') + ' scanned'];
+        bits.push(detail.candidates > 0
+          ? detail.candidates + ' possible code' + (detail.candidates === 1 ? '' : 's') + ' in view (circled below)'
+          : 'no code found yet');
+        if (detail.decodeError) bits.push('decode hiccup: ' + detail.decodeError);
+        return bits.join(' · ');
+      }
+      case 'found': return 'Got it!';
+      case 'play-error':
+        return 'Camera opened but would not start playing' + (detail.message ? ' (' + detail.message + ')' : '') + '.';
+      case 'unsupported': return 'This browser has no camera API available.';
+      default: return '';
+    }
+  }
+
+  /** Turn a getUserMedia() rejection into a specific, actionable message
+   * instead of the old one-size-fits-all "Camera unavailable". */
+  function scanErrorMessage(err) {
+    var name = err && err.name;
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      return 'Camera permission denied — allow camera access for this site (check the address bar / browser settings) and try again.';
+    }
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return 'No camera found on this device.';
+    if (name === 'NotReadableError') return 'Camera is busy or unavailable — another app may be using it.';
+    if (name === 'OverconstrainedError') return 'No camera on this device matched what was requested.';
+    return 'Camera unavailable' + (err && err.message ? ': ' + err.message : '') + '.';
   }
 
   function showHostQR(body, panel) {
@@ -148,17 +189,32 @@
     var holder = el('div', '', body);
     function startScanning() {
       clear(holder);
-      var video = el('video', '', holder);
+      var wrap = el('div', '', holder);
+      wrap.style.cssText = 'position:relative;width:220px;height:220px;margin:10px auto;';
+      var video = el('video', '', wrap);
       video.setAttribute('playsinline', '');
       video.setAttribute('muted', '');
       video.muted = true;
-      video.style.cssText = 'display:block;position:static;margin:10px auto;width:220px;height:220px;object-fit:cover;border-radius:4px;background:#000;';
+      video.style.cssText = 'display:block;position:absolute;inset:0;width:220px;height:220px;object-fit:cover;border-radius:4px;background:#000;';
+      // Drawn on top of the video by blip_qr.js's scan() — a green box on
+      // a confirmed decode, yellow circles on whatever its finder-pattern
+      // heuristic currently thinks might be a code ("mark it if you see
+      // it"). Classed apart from .blip-qr-canvas (the rendered-code
+      // canvas) so nothing querying for one can pick up the other.
+      var overlay = el('canvas', 'blip-scan-overlay', wrap);
+      overlay.width = 220;
+      overlay.height = 220;
+      overlay.style.cssText = 'display:block;position:absolute;inset:0;width:220px;height:220px;pointer-events:none;';
+      var status = el('div', 'blip-hs-sub blip-scan-status', holder);
+      status.textContent = 'Opening camera…';
       var err = el('div', 'blip-hs-err', holder);
-      stopActiveScan = window.BlipQR.scan(video, function (text, scanErr) {
+      stopActiveScan = window.BlipQR.scan(video, overlay, function (text, scanErr) {
         stopActiveScan = null;
-        if (scanErr) { err.textContent = 'Camera unavailable — check permissions.'; return; }
+        if (scanErr) { err.textContent = scanErrorMessage(scanErr); return; }
         clear(holder);
         onScanned(text);
+      }, function (state, detail) {
+        status.textContent = scanStatusText(state, detail);
       });
     }
     if (autoStart) {

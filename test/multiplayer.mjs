@@ -136,7 +136,7 @@ const READ_RIGHT_FRACTION = `(function () {
 // size so "ready" actually means "has a real code in it", not just
 // "the element exists".
 const QR_READY = `(function(){
-  var c = document.querySelector('.blip-hs-panel canvas');
+  var c = document.querySelector('.blip-hs-panel canvas.blip-qr-canvas');
   return !!(c && c.width > 50 && c.width === c.height);
 })()`;
 
@@ -155,7 +155,7 @@ async function loadRally(cdp) {
 }
 
 async function grabQrPng(cdp, outPath) {
-  const b64 = await evaluate(cdp, "document.querySelector('.blip-hs-panel canvas').toDataURL('image/png').split(',')[1]");
+  const b64 = await evaluate(cdp, "document.querySelector('.blip-hs-panel canvas.blip-qr-canvas').toDataURL('image/png').split(',')[1]");
   await writeFile(outPath, Buffer.from(b64, 'base64'));
 }
 
