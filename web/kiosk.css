@@ -1330,6 +1330,34 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 #control-toggle .ct-what::before { content: 'joystick'; }
 :root[data-controls="stick"] #control-toggle .ct-what::before { content: 'pad'; }
 
+/* ---- Rally only: "PLAY NEARBY" two-device pairing entry point ----
+   web/blip_net_ui.js. Same subtle pill treatment and slot as
+   #control-toggle above — rally hides that one (it uses the paddle dials,
+   not the joystick/pad toggle), leaving this spot free. */
+#net-play-btn {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--topbar-h, 118px) + env(safe-area-inset-bottom, 0px) + 5px);
+  z-index: 205;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(120, 220, 255, 0.35);
+  border-radius: 3px;
+  background: rgba(6, 8, 6, 0.72);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 6px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(150, 210, 230, 0.8);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: none;
+  opacity: 0.7;
+  transition: opacity .2s, color .2s, border-color .2s;
+}
+#net-play-btn:hover { opacity: 1; color: #7fe0ff; border-color: rgba(120, 220, 255, 0.6); }
+
 /* Phones — thumb-sized controls (iPhone 8 and up). The bar grows to seat
    them; the d-pad and the A/B pair sit hard against the two edges (the
    middle is empty now), so a thumb never reaches across the screen. With

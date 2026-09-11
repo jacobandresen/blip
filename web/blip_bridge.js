@@ -40,6 +40,35 @@ register_plugin = function (importObject) {
         new Uint8Array(wasm_memory.buffer, ptr, n).set(bytes.subarray(0, n));
         return n;
     };
+    // Two-device multiplayer (docs/multiplayer.md, web/blip_net.js).
+    importObject.env.blip_net_role = function () {
+        if (typeof window.blipNetRole === 'function') {
+            return window.blipNetRole() | 0;
+        }
+        return 0;
+    };
+    // Rust hands us a buffer it already wrote `len` bytes into (its own
+    // packed state, see crates/rally/src/net.rs) — copy them OUT of wasm
+    // memory before handing off to blipNetSend, since that may hold onto
+    // them past this call and wasm memory can move/grow on the next
+    // allocation.
+    importObject.env.blip_net_send = function (ptr, len) {
+        len = len | 0;
+        if (len <= 0 || typeof window.blipNetSend !== 'function') return;
+        var bytes = new Uint8Array(wasm_memory.buffer, ptr, len).slice();
+        window.blipNetSend(bytes);
+    };
+    // Mirror of blip_high_name's pattern: Rust hands us a scratch buffer,
+    // we write the latest inbound state packet (if any) into it.
+    importObject.env.blip_net_poll = function (ptr, cap) {
+        cap = cap | 0;
+        if (cap <= 0 || typeof window.blipNetPoll !== 'function') return 0;
+        var data = window.blipNetPoll();
+        if (!data || !data.length) return 0;
+        var n = Math.min(data.length, cap);
+        new Uint8Array(wasm_memory.buffer, ptr, n).set(data.subarray(0, n));
+        return n;
+    };
 };
 
 miniquad_add_plugin({ register_plugin: register_plugin });

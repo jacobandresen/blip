@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
   <script src="../howler.min.js"></script>
   <script src="../kiosk.js?v=20"></script>
-  <link rel="stylesheet" href="../kiosk.css?v=55">
+  <link rel="stylesheet" href="../kiosk.css?v=56">
   <link rel="stylesheet" href="../shell.css?v=42">
 </head>
 <body>
@@ -78,6 +78,9 @@
   </div>
 
   <button type="button" id="control-toggle" aria-label="Switch on-screen controller">&#9654;&nbsp;<span class="ct-what"></span></button>
+  <!-- Two-device play (docs/multiplayer.md) — web/blip_net_ui.js builds
+       the pairing modal on demand; see there for HOST / JOIN. -->
+  <button type="button" id="net-play-btn">PLAY NEARBY</button>
 
   <div id="need-coin-overlay">
     <div class="nco-panel">
@@ -92,9 +95,16 @@
 
   <script src="../blip_controller.js?v=4"></script>
   <script src="../shell.js?v=48"></script>
+  <!-- Two-device play (docs/multiplayer.md): its own Supabase client
+       (signaling only — no shared session with the leaderboard's). -->
+  <script src="../vendor/supabase.js?v=1"></script>
+  <script src="../blip_config.js?v=1"></script>
+  <script src="../blip_net_proto.js?v=1"></script>
+  <script src="../blip_net.js?v=1"></script>
+  <script src="../blip_net_ui.js?v=1"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
-  <script src="../blip_bridge.js?v=10"></script>
+  <script src="../blip_bridge.js?v=11"></script>
   <script>load("index.wasm");</script>
 
 </body>
