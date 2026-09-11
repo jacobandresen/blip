@@ -40,7 +40,7 @@
     var panel = el('div', 'blip-hs-panel', modalEl);
     el('div', 'blip-hs-title', panel).textContent = 'PLAY NEARBY';
     var sub = el('div', 'blip-hs-sub', panel);
-    sub.textContent = 'Both phones need to be on the same WiFi (or Bluetooth-tethered to each other).';
+    sub.textContent = 'Both phones need to be on the same WiFi.';
 
     var body = el('div', '', panel);
     showChoice(body, panel);

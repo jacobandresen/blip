@@ -1,79 +1,32 @@
 # Two-device multiplayer
 
-Status: **planning** — nothing built yet. This is the design doc to work
-from; see [Phasing](#phasing) for where to start.
+Status: **shipped** (Rally only) — WebRTC + Supabase Realtime signaling,
+QR-code signaling as the offline alternative. See [Phasing](#phasing) for
+how it was built up, and [Testing](#testing) for how it's covered.
 
 ## Goal
 
 Let two players on two separate phones play a head-to-head round (Rally
 first) against each other, without either of them needing a shared
 account, a login, or — ideally — a live internet connection once the
-match has started. "Via Bluetooth" is the ask; [the constraint
-below](#the-bluetooth-constraint-read-this-first) is why the plan doesn't
-literally use the Web Bluetooth API for the game traffic, and what it
-does instead to still deliver that.
+match has started.
 
-**Scope decision: same room only.** Two devices within Bluetooth-tethering
-or shared-WiFi range of each other — not two players in different
-locations. This is a deliberate v1 limit, not a fallback: it means every
-connection uses direct WebRTC host candidates and **no TURN relay is ever
-needed**, which keeps the "no server, no ongoing cost, no third party
-touching gameplay traffic" pitch intact. Revisit only if remote play is
-explicitly wanted later (see the old NAT/TURN trade-off this ruled out,
-folded into [Signaling](#signaling-how-the-two-phones-find-each-other-before-the-datachannel-exists)
+**Scope decision: same room only.** Two devices on the same WiFi network
+— not two players in different locations. This is a deliberate v1 limit,
+not a fallback: it means every connection uses direct WebRTC host
+candidates and **no TURN relay is ever needed**, which keeps the "no
+server, no ongoing cost, no third party touching gameplay traffic" pitch
+intact. Revisit only if remote play is explicitly wanted later (see the
+old NAT/TURN trade-off this ruled out, folded into
+[Signaling](#signaling-how-the-two-phones-find-each-other-before-the-datachannel-exists)
 below).
 
 Non-goals for v1: more than two players, spectators, reconnect-after-drop
 mid-rally (a dropped connection ends the match), any game but Rally, and
-— per the scope decision above — play between devices that aren't in the
-same room. Rally is the only game already built with a "two-player"
+— per the scope decision above — play between devices that aren't on the
+same network. Rally is the only game already built with a "two-player"
 concept ([`Mode::TwoPlayer`](../crates/rally/src/main.rs)) — everything
 else here generalizes once Rally proves it out.
-
-## The Bluetooth constraint — read this first
-
-The Web Bluetooth API (`navigator.bluetooth`, what a web page can
-actually call) only lets a browser act as a GATT **central** — the side
-that scans for and connects to a peripheral. There is no standard,
-shipped API for a web page to **advertise as a peripheral** so a *second*
-web page could find and connect to *it*. Two browser tabs cannot pair
-with each other over Web Bluetooth; one side would have to be a real BLE
-peripheral device (a fitness band, a keyboard, a microcontroller — not a
-phone running Chrome). This isn't a permissions or flag issue, it's the
-shape of the spec. Confirm this hasn't changed before starting
-([caniuse: Web Bluetooth](https://caniuse.com/web-bluetooth),
-[spec](https://webbluetoothcg.github.io/web-bluetooth/)) — but as of
-today, phone-to-phone Web Bluetooth between two plain web pages isn't
-possible.
-
-So "multiplayer via Bluetooth" between two phones running BLIP as a
-website has to mean one of two things:
-
-**A. Bluetooth as the network link, WebRTC as the transport.** Most
-phones can turn on Bluetooth tethering (a Bluetooth PAN) between two
-devices, which is an ordinary IP link once it's up — the browser doesn't
-know or care that Bluetooth is underneath it. [WebRTC
-DataChannel](https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel)
-works over any IP path, so it works here too. This needs **zero new
-browser APIs** — it's the same WebRTC code whether the two phones share
-WiFi, a Bluetooth PAN, or a USB-tethered link. The Bluetooth part is a
-manual OS-settings step for the players, not something BLIP's code
-drives (there's no web API to switch on Bluetooth tethering for them).
-
-**B. A native BLE peripheral, for real.** BLIP would need a native or
-hybrid shell (Capacitor, say) using the platform's BLE peripheral APIs
-directly, bypassing the browser entirely for the networking. This is a
-materially bigger project — a second build target, app-store-adjacent
-distribution concerns, and it stops being "just a website." Worth
-knowing about, not worth building for a first pass.
-
-**Recommendation: build A.** It delivers the actual thing a player
-wants — *play a friend standing next to you, without needing a shared
-WiFi network or a server relaying every move* — while staying inside the
-web platform BLIP already lives on. Bluetooth tethering is the literal
-answer to "via Bluetooth" for the player who has no WiFi to share; WebRTC
-also works unmodified over plain WiFi for everyone else, which is the
-common case in practice (two phones on the same home/venue network).
 
 ## Architecture
 
@@ -95,21 +48,24 @@ problems a "both sides simulate" (lockstep) design would hit:
   (`blip.delta_time`, not a fixed tick), which is exactly what lockstep
   needs to *not* have.
 
-The cost is input latency for the guest — their paddle move takes one
-network round-trip to show up. On a same-room WebRTC link (WiFi or
-Bluetooth PAN) that's typically single-digit-to-low-double-digit
-milliseconds, fine for Rally's paddle speed. Revisit if it ever feels
-laggy; client-side prediction on the guest (move the local paddle
-optimistically, reconcile against the next host state) is the standard
-fix and can be layered in later without changing the wire format.
+WebRTC's DataChannel is the natural fit for the transport itself: a
+direct peer-to-peer link once the two phones are on the same WiFi, no
+server relaying gameplay traffic, and no new browser APIs beyond what's
+already used for the leaderboard's networking. The cost is input latency
+for the guest — their paddle move takes one network round-trip to show
+up. On a same-room WiFi link that's typically single-digit-to-
+low-double-digit milliseconds, fine for Rally's paddle speed. Revisit if
+it ever feels laggy; client-side prediction on the guest (move the local
+paddle optimistically, reconcile against the next host state) is the
+standard fix and can be layered in later without changing the wire
+format.
 
 ### Signaling: how the two phones find each other before the DataChannel exists
 
 WebRTC needs a brief handshake (SDP offer/answer + ICE candidates)
 *before* any peer-to-peer traffic can flow, and that handshake has to
 travel over some channel that already exists — which, by definition,
-isn't the DataChannel we're trying to set up. Two options, worth building
-in this order.
+isn't the DataChannel we're trying to set up. Two options, both shipped:
 
 Both connect with host (local) ICE candidates only, per the same-room
 [scope decision](#goal) — a STUN server can still be added cheaply later
@@ -117,30 +73,26 @@ for the odd double-NAT home network, but **no TURN relay**, ever, in
 scope: that would mean game traffic transiting a server, which is
 exactly what "same room only" is choosing not to pay for.
 
-1. **Supabase Realtime as a signaling relay (build first).** BLIP already
-   has a Supabase project wired up for high scores
-   ([`docs/highscores.md`](highscores.md)) — its
-   [Realtime](https://supabase.com/docs/guides/realtime) channels can
-   carry the handful of small JSON messages (offer, answer, ICE
-   candidates) a WebRTC handshake needs. Host creates a short numeric
-   room code, publishes its offer to a channel named for that code, guest
-   types the code in and subscribes to the same channel. Needs a moment
-   of real internet on *both* phones to complete pairing; once the
-   DataChannel opens, gameplay no longer touches Supabase (or the
-   internet) at all — so a Bluetooth-tethered pair with no other
-   connectivity would need to pair *before* switching off shared WiFi, or
-   pair over the Bluetooth link's own quick handshake with option 2
-   below.
-2. **QR-code signaling (fully offline, build second if wanted).** Host
+1. **Supabase Realtime as a signaling relay** (`web/blip_net.js`'s
+   `host()`/`join()`). BLIP already has a Supabase project wired up for
+   high scores ([`docs/highscores.md`](highscores.md)) — its
+   [Realtime](https://supabase.com/docs/guides/realtime) channels carry
+   the handful of small JSON messages (offer, answer) a WebRTC handshake
+   needs. Host creates a short numeric room code, publishes its offer to
+   a channel named for that code, guest types the code in and subscribes
+   to the same channel. Needs a moment of real internet on *both* phones
+   to complete pairing; once the DataChannel opens, gameplay no longer
+   touches Supabase (or the internet) at all.
+2. **QR-code signaling** (`hostQR()`/`joinQR()`, the "NO WIFI? PAIR VIA QR
+   CODE" option) — for when reaching Supabase isn't an option. Host
    renders its SDP offer as a QR code; guest scans it with the camera,
    generates an answer, shows *that* as a QR code; host scans it back.
-   Zero network needed for pairing at all — genuinely works with
-   Bluetooth (or nothing) as the only link between the two phones. Keep
-   the offer ICE-candidate-free host-only (no STUN/TURN gathering,
-   `iceTransportPolicy` limited to local candidates) so the payload fits
-   comfortably in one QR code; STUN/TURN aren't needed anyway for two
-   devices on the same local link. Clunkier UX (two camera scans) —
-   why it's the second build, not the first.
+   Zero network needed for pairing at all. Both sides wait for their own
+   ICE gathering to finish before rendering the code ("vanilla ICE" — no
+   separate candidate-exchange round to race against), which keeps the
+   payload to one QR code per side; verified this fits and decodes
+   correctly at realistic SDP sizes and well beyond (see
+   [Testing](#testing)).
 
 Either way, once `RTCPeerConnection` reports `connected` and the
 DataChannel's `open` event fires, signaling is done and out of the
@@ -160,136 +112,97 @@ this will need to evolve:
   is the right config for this either way (`ordered: false,
   maxRetransmits: 0` — a dropped/late input sample should be superseded
   by the next one, not retried).
-- **Host → guest, every rendered frame (or throttled, e.g. 30Hz)**:
-  `{ t: 'state', ballX, ballY, ballVx, ballVy, lpadY, rpadY, scoreL,
-  scoreR }`. Same unreliable/unordered channel — a skipped state frame is
-  invisible once the next one arrives.
-- **Either direction, once**: `{ t: 'bye' }` on an intentional quit, so
-  the other side can show "opponent left" instead of just timing out.
+- **Host → guest, every rendered frame**: a fixed 36-byte binary packet
+  (`crates/rally/src/net.rs`'s `NetState`) — phase, ball xy/velocity,
+  both paddle y's, both scores. Same unreliable/unordered channel — a
+  skipped state frame is invisible once the next one arrives.
 
 ### Where this plugs into the existing code
-
-This is the part worth doing early, because it's the part that proves
-the architecture doesn't need a rewrite of Rally itself:
 
 - **Guest input in → the game, unchanged.** `blip_controller.js`'s
   synthetic-KeyboardEvent pipeline is already how the on-screen dial and
   physical keyboard both reach the WASM side (`is_key_down`/
   `is_key_pressed` in `crates/blip/src/input.rs` never know or care where
-  the KeyboardEvent came from). A new tiny module (`blip_net.js`, say)
-  that dispatches the *same* synthetic
-  `keydown`/`keyup` for `I`/`K` (rally's P2 keys) whenever a `{t:'input'}`
-  message arrives needs **no Rust changes at all** on the guest-acts-as-
-  host-input side, or on a host that's just running normal local
-  `Mode::TwoPlayer`.
-- **Host state out → new FFI, unavoidable.** Nothing today exports
-  per-frame game state out of the WASM sandbox — `web.rs`'s existing
-  exports (`blip_high_score`, `blip_game_over`, …) are all one-shot
-  events, not a per-frame stream. This needs a new export, e.g.
-  `blip_net_state(ptr, cap) -> len` that Rally's own `update_play`/
-  `draw_play` writes a small fixed struct into (ball/paddle/scores as
-  `f32`/`i32`), read from JS once a frame and forwarded over the
-  DataChannel when this device is hosting. Scoped to `rally` only for
-  v1 — don't generalize the struct shape until a second game needs it.
-- **Guest render-only mode → small new `Game` branch in `rally/main.rs`.**
-  A `Mode::NetGuest` (alongside the existing `OnePlayer`/`TwoPlayer`) that
-  skips `update_play`'s simulation entirely and instead copies the latest
-  net state (received via a new `blip_net_apply_state(ptr, len)` import,
-  the mirror of the export above) straight into `Game`'s fields before
-  drawing. `draw_play` doesn't change at all — it already just reads
-  `Game`'s fields.
-- **Title screen → a third option.** Today `update_title` offers 1P
-  (press your own dial) or 2P (press "2"/spin P2's dial). Add a "PLAY
-  ONLINE" (or "PLAY NEARBY") entry that hands off to the JS pairing UI
-  (room code or QR) before `start_game()` ever runs, then calls into a
-  `blip_set_net_role(host: bool)`-style import so `Game` knows which of
-  the three modes it's in for the rest of the match.
+  the KeyboardEvent came from). `blip_net.js` dispatches the *same*
+  synthetic `keydown`/`keyup` for `I`/`K` (rally's P2 keys) whenever a
+  `{t:'input'}` message arrives — no Rust changes needed on the
+  guest-acts-as-host-input side, or on a host that's just running normal
+  local `Mode::TwoPlayer`.
+- **Host state out / guest state in → three small FFI imports**, mirroring
+  the existing `web.rs` pattern (`blip_paddles`, `blip_high_name`) rather
+  than adding new wasm exports: `blip_net_role()`, `blip_net_send(ptr,
+  len)`, `blip_net_poll(ptr, cap)`. A `NetRole` (`None`/`Host`/`Guest`)
+  alongside `rally/main.rs`'s existing `Mode`; a guest never runs
+  `update_play`'s simulation at all, just copies the latest polled packet
+  into `Game`'s fields — `draw_play` doesn't change, it already just
+  reads those fields.
+- **Title screen.** A "PLAY NEARBY" entry point opens the pairing modal
+  (`blip_net_ui.js`) before `start_game()` ever runs; once paired,
+  `update_title` picks up the role via `blip_net_role()` and starts a
+  normal `Mode::TwoPlayer` match.
 
 ## Phasing
 
-1. **Signaling + connection only, no gameplay.** Two browser tabs (or
-   phones) exchange a room code via Supabase Realtime, establish an
-   `RTCPeerConnection` + DataChannel, and ping-pong a counter over it.
-   Prove this works over WiFi, then over a Bluetooth-tethered pair, before
-   touching Rally at all. This is the riskiest, least-code-reused part —
-   isolate it first.
-2. **One-way state stream.** Wire the `blip_net_state` export on a host
-   running normal local `Mode::TwoPlayer`, stream it to a guest tab that
-   just logs it — confirms the FFI shape and frame rate before any
-   rendering is on the line.
-3. **Guest rendering.** Add `Mode::NetGuest`, point `draw_play` at the
-   received state, confirm a spectator-mode guest tracks a host's local
-   match smoothly.
-4. **Guest input back to the host.** Wire `blip_net.js`'s synthetic
-   KeyboardEvents from the guest's real touch/keyboard input, confirm a
-   full two-device match plays end-to-end.
-5. **UX pass.** Title-screen entry point, room-code / QR pairing screens,
-   "opponent disconnected" handling, a rematch button that re-uses the
-   existing connection instead of re-pairing.
-6. **(Optional) QR-code signaling** as the offline alternative to
-   Supabase Realtime, once the above is solid.
+Built in this order:
+
+1. **Signaling + connection only, no gameplay.** Two browser tabs
+   exchange a room code via Supabase Realtime, establish an
+   `RTCPeerConnection` + DataChannel, and confirm it opens. This was the
+   riskiest, least-code-reused part — isolated first.
+2. **One-way state stream.** The `blip_net_send`/`blip_net_poll` FFI on a
+   host running normal local `Mode::TwoPlayer`, confirming the wire
+   format and frame rate before any rendering was on the line.
+3. **Guest rendering.** `Mode::NetGuest`, pointing `draw_play` at the
+   received state.
+4. **Guest input back to the host.** `blip_net.js`'s synthetic
+   KeyboardEvents from the guest's real touch/keyboard input — a full
+   two-device match playing end-to-end.
+5. **UX pass.** Title-screen entry point, room-code pairing screen,
+   "opponent disconnected" handling.
+6. **QR-code signaling** as the offline alternative to Supabase Realtime.
+
+Still open: a rematch button that re-uses the existing connection instead
+of re-pairing.
 
 ## Testing
 
 The same-room decision above is what makes this automatable at all: two
 headless Chromium instances on the same CI runner *are* "two devices in
 the same room" as far as WebRTC's host ICE candidates are concerned — no
-real network, no real Bluetooth, no phones needed to test the logic.
-Three tiers, cheapest and most deterministic first:
+real network, no phones needed to test the connection logic. Three tiers,
+cheapest and most deterministic first:
 
-1. **Pure-logic unit tests — `node:test`, no browser.** Everything that
-   doesn't touch a real `RTCPeerConnection` gets extracted into a plain
-   function and tested the way
-   [`test/fill-canvas.test.mjs`](../test/fill-canvas.test.mjs) already
-   does for the canvas-scaling math: give it inputs, assert the output.
-   Concretely: the wire-format encode/decode (`{t:'input',...}` /
-   `{t:'state',...}`) round-trips byte-for-byte; the room-code
-   generator/validator (format, collision odds, expiry); any
-   interpolation math added later for guest-side smoothing between state
-   packets. Fast, zero flakiness, run on every `npm test`.
-2. **Rust unit tests — `cargo test`, no wasm/browser.** The
-   `blip_net_state`/`blip_net_apply_state` struct layout gets a
-   round-trip test (`pack(state)` then `unpack(bytes)` equals the
-   original, byte order and all) compiled for the host target, the same
-   way the rest of the workspace's crates already build and run under
-   plain `cargo test` — no wasm32 target, no browser, sub-second.
-3. **Headless two-browser integration tests — a CDP harness, committed
-   this time.** Every touch-control playtest done for this project so far
-   used a hand-rolled Chrome DevTools Protocol client (raw WebSocket,
-   `Input.dispatchTouchEvent` + `Runtime.evaluate`, no Puppeteer/
-   Playwright dependency) — but always as a throwaway script in a
-   scratch directory, never committed. This is worth landing as a real
-   `test/` file this time (a small `test/lib/cdp.mjs` plus e.g.
-   `test/multiplayer.mjs`, following the existing `test/highscores.mjs`
-   convention of a script `npm run test:*` can invoke), since — unlike
-   the one-off playtests — this needs to keep passing as the feature
-   evolves. It extends the same one-browser technique to *two* Chromium
-   instances instead of one:
-   - Launch two `chromium --headless --disable-gpu --no-sandbox
-     --remote-debugging-port=<A|B>` processes, each navigating to the
-     Rally page.
-   - Drive the pairing flow via `Runtime.evaluate` on each (fill in the
-     room code, or exercise a test-only shortcut that skips Realtime
-     entirely and swaps SDP directly between the two `Runtime.evaluate`
-     contexts via the Node test script — cheaper and more deterministic
-     than actually round-tripping through Supabase in CI, and still
-     exercises the exact same `RTCPeerConnection` code path).
-   - Poll `pc.connectionState` on both sides via `Runtime.evaluate` until
-     `'connected'` (with a timeout — a real assertion, not a sleep) and
-     confirm `RTCDataChannel.readyState === 'open'`.
-   - Drive the guest's on-screen dial with a synthetic
-     `Input.dispatchTouchEvent`, then poll the host's game state (via a
-     debug hook in the same spirit as `window.blipZapLogo()` — e.g.
-     `window.__blipNetState()`, only defined when a `?debugnet=1` query
-     param or `BLIP_TEST` flag is present, so it never ships silently)
-     and assert the paddle position moved.
-   - Kill both processes explicitly between runs (`pkill -9 chromium` or
-     equivalent) rather than trusting them to exit cleanly — two
-     headless instances at once is already double the memory pressure of
-     the single-instance playtests, which have themselves been prone to
-     running out of memory under repeated launches in a constrained
-     environment; use `--disable-dev-shm-usage` and a bounded
-     `--js-flags=--max-old-space-size=<N>` on each.
+1. **Pure-logic unit tests — `node:test`, no browser.**
+   [`test/multiplayer-proto.test.mjs`](../test/multiplayer-proto.test.mjs) —
+   the wire-format encode/decode (`{t:'input',...}`) round-trips
+   byte-for-byte; the room-code generator/validator (format, zero-padding,
+   normalization). Follows the same pattern
+   [`test/fill-canvas.test.mjs`](../test/fill-canvas.test.mjs) already set:
+   give it inputs, assert the output. Fast, zero flakiness, run on every
+   `npm test`.
+2. **Rust unit tests — `cargo test`, no wasm/browser.**
+   `crates/rally/src/net.rs`'s own `#[cfg(test)]` module — the
+   `NetState` struct's byte layout round-trips (`pack` then `unpack`
+   equals the original), including NaN/infinity and wrong-length inputs,
+   compiled for the host target — no wasm32 target, no browser,
+   sub-second.
+3. **Headless two-browser integration tests — a committed CDP harness.**
+   [`test/lib/cdp.mjs`](../test/lib/cdp.mjs) (a hand-rolled Chrome
+   DevTools Protocol client — raw WebSocket, `Runtime.evaluate` +
+   `Input.dispatchTouchEvent`, no Puppeteer/Playwright dependency) plus
+   [`test/multiplayer.mjs`](../test/multiplayer.mjs), which launches two
+   real headless Chromium instances, has one host and the other join over
+   the real Supabase Realtime signaling, and drives real input across the
+   real DataChannel to confirm both sides agree on the resulting paddle
+   position. `npm run test:multiplayer`.
+
+   Two real bugs surfaced by this harness during development: the pairing
+   modal's own "close" path was tearing down the connection it had just
+   made (fixed in `blip_net_ui.js`), and Chrome's background-tab
+   throttling was killing an already-open DataChannel within about a
+   second in headless mode (fixed with
+   `--disable-backgrounding-occluded-windows` and friends in
+   `test/lib/cdp.mjs`'s launch flags).
 
    Watch for one specific headless gotcha before trusting a red result:
    Chrome hides local ICE candidates behind a `.local` mDNS hostname by
@@ -298,6 +211,15 @@ Three tiers, cheapest and most deterministic first:
    the same host. Launch with `--disable-features=WebRtcHideLocalIpsWithMdns`
    for these tests specifically if connections mysteriously never leave
    `checking` state.
+
+   The QR-signaling path has its own real-camera-equivalent check: Chrome
+   can feed a specific video file into `getUserMedia` in headless mode
+   (`--use-fake-device-for-media-stream
+   --use-file-for-fake-video-capture=<file>.y4m`), so a rendered QR code
+   from one instance's canvas can be piped through ffmpeg into a video
+   file the other instance's fake camera reads — exercising the real
+   `getUserMedia` → `<video>` → canvas-sampling → jsQR decode path on both
+   sides, not just the plain encode/decode round-trip.
 
 **CI.** None of this repo's tests run in CI today — `.github/workflows/`
 only has the Pages deploy. Add a `.github/workflows/test.yml` (`cargo
@@ -308,14 +230,15 @@ regardless of this feature, but this is the point where it stops being
 optional: a flaky two-peer connection test that only a human remembers to
 run by hand won't get run.
 
-**What automated tests can't cover:** that Bluetooth tethering between
-two *real* phones actually produces a working IP link on a given
-OS/carrier — that's a manual hardware checklist item (per-platform,
-run once per OS release rather than per-PR), not something a CI runner
-with no Bluetooth radio can exercise. The three tiers above prove the
-WebRTC/signaling/game-sync logic is correct; real-hardware Bluetooth
-pairing is a separate, manual gate before calling that specific path
-shippable.
+**What automated tests can't fully cover:** real WiFi conditions (signal
+quality, and — the actual cause of at least one real-world pairing
+failure seen so far — routers that block device-to-device traffic between
+their own clients, a common "AP/client isolation" setting with no
+software workaround from BLIP's side), and a QR code held up to an actual
+phone camera rather than fed through Chrome's fake-camera device (focus
+distance, screen glare, real permission prompts). The three tiers above
+prove the connection/signaling/game-sync logic itself is correct; those
+two remain manual, real-hardware checks.
 
 ## Open questions
 
@@ -324,11 +247,6 @@ shippable.
   two people in the same room; would need host-side input sanity checks
   (e.g. reject an input rate above what's physically possible) if this
   ever mattered more.
-- **iOS Safari.** WebRTC is supported; Bluetooth tethering as a
-  *peripheral* (the phone being tethered *to*) has historically been
-  spottier on iOS than Android. Test the actual PAN link on real
-  hardware before promising it works everywhere — the WiFi path is the
-  fallback either way.
 
 ## Related
 
