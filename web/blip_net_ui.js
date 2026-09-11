@@ -92,7 +92,7 @@
     // selector catches every canvas on the page, including this one.
     canvas.style.cssText =
       'display:block;position:static;top:auto;left:auto;transform:none;clip-path:none;' +
-      'touch-action:auto;margin:10px auto;width:200px;height:200px;' +
+      'touch-action:auto;margin:10px auto;width:240px;height:240px;' +
       'image-rendering:pixelated;border-radius:4px;';
     return canvas;
   }

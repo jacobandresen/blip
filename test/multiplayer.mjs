@@ -61,8 +61,13 @@ function sh(cmd, args) {
  * held up to a screen would actually frame it — jsQR needs that light
  * border around the finder patterns to detect them reliably. */
 async function writeQrVideo(pngPath, outPath) {
+  // The PNG is exactly what web/blip_qr.js's render() draws — quiet zone
+  // included, no extra help from this test. The dark pad around it (the
+  // pairing modal's own panel color, not white) is what a camera aimed at
+  // a real phone actually sees surrounding the code: the code's own quiet
+  // zone against the modal background, not a page of white paper.
   await sh('ffmpeg', ['-y', '-loop', '1', '-i', pngPath,
-    '-vf', 'scale=380:380:flags=neighbor,pad=480:480:(ow-iw)/2:(oh-ih)/2:white',
+    '-vf', 'scale=440:440:flags=neighbor,pad=480:480:(ow-iw)/2:(oh-ih)/2:#0b1016',
     '-t', '8', '-pix_fmt', 'yuv420p', outPath]);
 }
 async function writeBlankVideo(outPath) {

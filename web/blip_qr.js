@@ -16,28 +16,41 @@
   'use strict';
   if (typeof qrcode !== 'function' || typeof jsQR !== 'function') return;
 
-  /** Draw `text` as a QR code onto `canvas`. Low error-correction — the
-   * two screens involved are only ever a few inches apart under the
-   * scanning phone's own camera, not a printed code exposed to real wear,
-   * so capacity (fitting a full SDP, ICE candidates included) matters
-   * more here than damage tolerance. Auto type-number (0) picks the
-   * smallest QR version the text actually fits in. */
+  // The QR spec requires a "quiet zone" — a plain light margin at least 4
+  // modules wide around the code — for a scanner to reliably even find
+  // the finder patterns in the first place, let alone decode. Skipping it
+  // was the actual cause of "nothing happens when I point the camera at
+  // it": drawing the modules edge-to-edge left the code sitting directly
+  // against the pairing modal's own dark background with no light border
+  // at all, which jsQR (like most real QR scanners) can fail to detect
+  // against entirely rather than just decode less reliably.
+  var QUIET_ZONE_MODULES = 4;
+
+  /** Draw `text` as a QR code onto `canvas`, quiet zone included. Low
+   * error-correction — the two screens involved are only ever a few
+   * inches apart under the scanning phone's own camera, not a printed
+   * code exposed to real wear, so capacity (fitting a full SDP, ICE
+   * candidates included) matters more here than damage tolerance. Auto
+   * type-number (0) picks the smallest QR version the text actually fits
+   * in. */
   function render(canvas, text) {
     var qr = qrcode(0, 'L');
     qr.addData(text);
     qr.make();
     var count = qr.getModuleCount();
-    var cell = Math.max(2, Math.floor(240 / count));
-    var size = cell * count;
+    var totalModules = count + QUIET_ZONE_MODULES * 2;
+    var cell = Math.max(2, Math.floor(300 / totalModules));
+    var size = cell * totalModules;
+    var offset = QUIET_ZONE_MODULES * cell;
     canvas.width = size;
     canvas.height = size;
     var ctx = canvas.getContext('2d');
     ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, size, size); // also paints the quiet zone itself
     ctx.fillStyle = '#000';
     for (var r = 0; r < count; r++) {
       for (var c = 0; c < count; c++) {
-        if (qr.isDark(r, c)) ctx.fillRect(c * cell, r * cell, cell, cell);
+        if (qr.isDark(r, c)) ctx.fillRect(offset + c * cell, offset + r * cell, cell, cell);
       }
     }
   }
