@@ -145,8 +145,8 @@ export async function launch(port, extraArgs = []) {
     '--disable-background-timer-throttling',
     `--remote-debugging-port=${port}`,
     '--js-flags=--max-old-space-size=192',
-    'about:blank',
     ...extraArgs,
+    'about:blank',
   ], { stdio: 'ignore' });
   const cdp = await connect(port);
   await cdp.send('Page.enable');

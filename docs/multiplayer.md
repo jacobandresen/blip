@@ -1,8 +1,11 @@
 # Two-device multiplayer
 
-Status: **shipped** (Rally only) — WebRTC + Supabase Realtime signaling,
-QR-code signaling as the offline alternative. See [Phasing](#phasing) for
-how it was built up, and [Testing](#testing) for how it's covered.
+Status: **shipped** (Rally only) — WebRTC, QR-code signaling only. A
+Supabase Realtime relay existed briefly as a second signaling path but
+was dropped in favor of settling on one well-tested path rather than
+maintaining two (see [Signaling](#signaling-how-the-two-phones-find-each-other-before-the-datachannel-exists)).
+See [Phasing](#phasing) for how it was built up, and
+[Testing](#testing) for how it's covered.
 
 ## Goal
 
@@ -65,38 +68,41 @@ format.
 WebRTC needs a brief handshake (SDP offer/answer + ICE candidates)
 *before* any peer-to-peer traffic can flow, and that handshake has to
 travel over some channel that already exists — which, by definition,
-isn't the DataChannel we're trying to set up. Two options, both shipped:
+isn't the DataChannel we're trying to set up.
 
-Both connect with host (local) ICE candidates only, per the same-room
+**QR codes, exclusively** (`web/blip_net.js`'s `host()`/`join()`, wired up
+by `web/blip_net_ui.js`'s "PLAY NEARBY" modal). Host renders its SDP
+offer as a QR code; guest scans it with the camera, generates an answer,
+shows *that* as a QR code; host scans it back. Zero network needed for
+pairing at all — no server, no account, nothing to reach before the two
+phones can even see each other. Both sides wait for their own ICE
+gathering to finish before rendering the code ("vanilla ICE" — no
+separate candidate-exchange round to race against), which keeps the
+payload to one QR code per side; verified this fits and decodes
+correctly at realistic SDP sizes and well beyond, and — the part worth
+actually proving rather than assuming — that a real `getUserMedia` camera
+capture can decode one (see [Testing](#testing)).
+
+A Supabase Realtime relay (a short numeric room code typed on the other
+phone, publishing the offer/answer as broadcast messages) was built and
+shipped first, then **dropped**: maintaining two signaling paths for one
+feature wasn't worth it once QR alone proved reliable, and QR has a real
+edge the room-code path never had — it needs no internet on either
+phone, not even for a moment. If Realtime signaling is ever wanted back
+(e.g. a lower-friction option for players comfortable typing a code), the
+migration that granted it access is reverted
+(`supabase/migrations/20260911140000_drop_multiplayer_signaling.sql`) —
+re-adding the original grant is a one-migration change, not a redesign.
+
+Direct host (local) ICE candidates only, per the same-room
 [scope decision](#goal) — a STUN server can still be added cheaply later
 for the odd double-NAT home network, but **no TURN relay**, ever, in
 scope: that would mean game traffic transiting a server, which is
 exactly what "same room only" is choosing not to pay for.
 
-1. **Supabase Realtime as a signaling relay** (`web/blip_net.js`'s
-   `host()`/`join()`). BLIP already has a Supabase project wired up for
-   high scores ([`docs/highscores.md`](highscores.md)) — its
-   [Realtime](https://supabase.com/docs/guides/realtime) channels carry
-   the handful of small JSON messages (offer, answer) a WebRTC handshake
-   needs. Host creates a short numeric room code, publishes its offer to
-   a channel named for that code, guest types the code in and subscribes
-   to the same channel. Needs a moment of real internet on *both* phones
-   to complete pairing; once the DataChannel opens, gameplay no longer
-   touches Supabase (or the internet) at all.
-2. **QR-code signaling** (`hostQR()`/`joinQR()`, the "NO WIFI? PAIR VIA QR
-   CODE" option) — for when reaching Supabase isn't an option. Host
-   renders its SDP offer as a QR code; guest scans it with the camera,
-   generates an answer, shows *that* as a QR code; host scans it back.
-   Zero network needed for pairing at all. Both sides wait for their own
-   ICE gathering to finish before rendering the code ("vanilla ICE" — no
-   separate candidate-exchange round to race against), which keeps the
-   payload to one QR code per side; verified this fits and decodes
-   correctly at realistic SDP sizes and well beyond (see
-   [Testing](#testing)).
-
-Either way, once `RTCPeerConnection` reports `connected` and the
-DataChannel's `open` event fires, signaling is done and out of the
-picture for the rest of the match.
+Once `RTCPeerConnection` reports `connected` and the DataChannel's `open`
+event fires, signaling is done and out of the picture for the rest of the
+match.
 
 ### Wire format
 
@@ -159,7 +165,15 @@ Built in this order:
    two-device match playing end-to-end.
 5. **UX pass.** Title-screen entry point, room-code pairing screen,
    "opponent disconnected" handling.
-6. **QR-code signaling** as the offline alternative to Supabase Realtime.
+6. **QR-code signaling** added as a second, offline path alongside the
+   room-code one.
+7. **Settled on QR-only.** Dropped the Supabase Realtime relay (host/join
+   room codes, the RLS grant, the room-code proto helpers and their
+   tests) once QR alone proved reliable end to end — one signaling path
+   to maintain instead of two, and QR's "no internet at all" property is
+   strictly better for this feature's actual pitch. `test/multiplayer.mjs`
+   was rewritten around QR as the sole, real path (see
+   [Testing](#testing)) rather than kept as a second suite.
 
 Still open: a rematch button that re-uses the existing connection instead
 of re-pairing.
@@ -175,8 +189,7 @@ cheapest and most deterministic first:
 1. **Pure-logic unit tests — `node:test`, no browser.**
    [`test/multiplayer-proto.test.mjs`](../test/multiplayer-proto.test.mjs) —
    the wire-format encode/decode (`{t:'input',...}`) round-trips
-   byte-for-byte; the room-code generator/validator (format, zero-padding,
-   normalization). Follows the same pattern
+   byte-for-byte. Follows the same pattern
    [`test/fill-canvas.test.mjs`](../test/fill-canvas.test.mjs) already set:
    give it inputs, assert the output. Fast, zero flakiness, run on every
    `npm test`.
@@ -186,49 +199,56 @@ cheapest and most deterministic first:
    equals the original), including NaN/infinity and wrong-length inputs,
    compiled for the host target — no wasm32 target, no browser,
    sub-second.
-3. **Headless two-browser integration tests — a committed CDP harness.**
+3. **Headless two-browser integration test — a committed CDP harness,
+   real camera decode both directions, requires `ffmpeg` too.**
    [`test/lib/cdp.mjs`](../test/lib/cdp.mjs) (a hand-rolled Chrome
-   DevTools Protocol client — raw WebSocket, `Runtime.evaluate` +
-   `Input.dispatchTouchEvent`, no Puppeteer/Playwright dependency) plus
+   DevTools Protocol client — raw WebSocket, `Runtime.evaluate`, no
+   Puppeteer/Playwright dependency) plus
    [`test/multiplayer.mjs`](../test/multiplayer.mjs), which launches two
-   real headless Chromium instances, has one host and the other join over
-   the real Supabase Realtime signaling, and drives real input across the
-   real DataChannel to confirm both sides agree on the resulting paddle
-   position. `npm run test:multiplayer`.
-
-   Two real bugs surfaced by this harness during development: the pairing
-   modal's own "close" path was tearing down the connection it had just
-   made (fixed in `blip_net_ui.js`), and Chrome's background-tab
-   throttling was killing an already-open DataChannel within about a
-   second in headless mode (fixed with
-   `--disable-backgrounding-occluded-windows` and friends in
-   `test/lib/cdp.mjs`'s launch flags).
-
-   Watch for one specific headless gotcha before trusting a red result:
-   Chrome hides local ICE candidates behind a `.local` mDNS hostname by
-   default (a privacy feature), which can fail to resolve inside a
-   locked-down CI network namespace even though the two processes are on
-   the same host. Launch with `--disable-features=WebRtcHideLocalIpsWithMdns`
-   for these tests specifically if connections mysteriously never leave
-   `checking` state.
-
-   The QR-signaling path has its own real-camera-equivalent check: Chrome
-   can feed a specific video file into `getUserMedia` in headless mode
+   real headless Chromium instances and pairs them the same way two real
+   phones would — not a shortcut through the SDP strings. Chrome can feed
+   a specific video file into `getUserMedia` in headless mode
    (`--use-fake-device-for-media-stream
-   --use-file-for-fake-video-capture=<file>.y4m`), so a rendered QR code
-   from one instance's canvas can be piped through ffmpeg into a video
-   file the other instance's fake camera reads — exercising the real
-   `getUserMedia` → `<video>` → canvas-sampling → jsQR decode path on both
-   sides, not just the plain encode/decode round-trip.
+   --use-file-for-fake-video-capture=<file>.y4m`): the test renders the
+   host's real offer QR, pipes it through `ffmpeg` into a video file, and
+   points the guest's fake camera at it, so the guest's JOIN button
+   actually opens a (fake) camera, samples (fake) video frames, and
+   decodes a real QR code with jsQR — then does the same in reverse for
+   the host scanning the guest's answer. Confirmed passing on 6
+   consecutive runs. `npm run test:multiplayer`.
+
+   Real bugs this harness (and its ad hoc predecessor, before it was
+   committed) surfaced during development: the pairing modal's own
+   "close" path was tearing down the connection it had just made (fixed
+   in `blip_net_ui.js`); Chrome's background-tab throttling was killing
+   an already-open DataChannel within about a second in headless mode
+   (fixed with `--disable-backgrounding-occluded-windows` and friends in
+   `test/lib/cdp.mjs`'s launch flags); a stray bare `canvas {...}` rule in
+   shell.css (meant only for the game's own `#glcanvas`) was hijacking the
+   QR `<canvas>` via `position:fixed`, pushing it off the modal entirely
+   (fixed by overriding those properties inline on the QR canvas
+   specifically); and a test-readiness check that treated HTML's own
+   default 300×150 canvas size as "the QR is ready" caught the placeholder
+   canvas instead of the rendered code (fixed by checking for a *square*
+   canvas above a minimum size instead).
+
+   Watch for one specific headless gotcha before trusting a red result on
+   the connection itself: Chrome hides local ICE candidates behind a
+   `.local` mDNS hostname by default (a privacy feature), which can fail
+   to resolve inside a locked-down CI network namespace even though the
+   two processes are on the same host. Launch with
+   `--disable-features=WebRtcHideLocalIpsWithMdns` for these tests
+   specifically if connections mysteriously never leave `checking` state.
 
 **CI.** None of this repo's tests run in CI today — `.github/workflows/`
 only has the Pages deploy. Add a `.github/workflows/test.yml` (`cargo
 test`, `npm test`, then the CDP harness with a chromium install step —
 e.g. `browser-actions/setup-chrome`, or `apt-get install chromium`,
-either works on `ubuntu-latest`) that runs on every PR. Worth doing
-regardless of this feature, but this is the point where it stops being
-optional: a flaky two-peer connection test that only a human remembers to
-run by hand won't get run.
+either works on `ubuntu-latest` — plus `ffmpeg`, already preinstalled on
+GitHub-hosted runners) that runs on every PR. Worth doing regardless of
+this feature, but this is the point where it stops being optional: a
+flaky two-peer connection test that only a human remembers to run by hand
+won't get run.
 
 **What automated tests can't fully cover:** real WiFi conditions (signal
 quality, and — the actual cause of at least one real-world pairing
@@ -250,5 +270,7 @@ two remain manual, real-hardware checks.
 
 ## Related
 
-[High scores via Supabase](highscores.md) — the Realtime channel this
-plan proposes reusing for signaling lives on the same project.
+[High scores via Supabase](highscores.md) — a separate feature on the
+same Supabase project. Multiplayer no longer depends on Supabase at all
+(see [Signaling](#signaling-how-the-two-phones-find-each-other-before-the-datachannel-exists));
+this project is the only remaining reason Rally's page ever touched it.
