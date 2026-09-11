@@ -237,6 +237,59 @@
     connectTimer = setTimeout(function () { status('timeout'); cancel(); }, CONNECT_TIMEOUT_MS);
   }
 
+  // ---- QR-code signaling (fully offline — docs/multiplayer.md's Phase 6) ----
+  // No Supabase, no network at all: the offer/answer SDP travels as a QR
+  // code shown on one screen and scanned by the other's camera. Same
+  // vanilla-ICE wait-for-gathering-then-send shape as the Realtime path
+  // above, just with the "send" step replaced by "hand back to the UI to
+  // render" and the "receive" step replaced by "the UI hands us what it
+  // scanned/typed". This file has no camera or QR-drawing code at all —
+  // that's blip_net_ui.js's job; this only knows SDP strings in and out.
+
+  function hostQR(onOffer, onStatus) {
+    onStatusCb = onStatus;
+    pc = newPeerConnection();
+    var channelObj = pc.createDataChannel('rally', { ordered: false, maxRetransmits: 0 });
+    wireDataChannel(channelObj, 1);
+    pc.createOffer()
+      .then(function (offer) { return pc.setLocalDescription(offer); })
+      .then(function () { return waitForIceGathering(pc); })
+      .then(function () {
+        onOffer(pc.localDescription.sdp);
+        status('waiting');
+      })
+      .catch(function () { status('failed'); });
+
+    clearConnectTimer();
+    connectTimer = setTimeout(function () { status('timeout'); cancel(); }, CONNECT_TIMEOUT_MS);
+  }
+
+  /** Host: call once the guest's answer QR has been scanned (or its text
+   * pasted/typed as a fallback). */
+  function submitAnswer(sdp) {
+    if (!pc) return;
+    pc.setRemoteDescription({ type: 'answer', sdp: sdp }).catch(function () { status('failed'); });
+  }
+
+  /** Guest: `offerSdp` is whatever was scanned from the host's QR code. */
+  function joinQR(offerSdp, onAnswer, onStatus) {
+    onStatusCb = onStatus;
+    pc = newPeerConnection();
+    pc.addEventListener('datachannel', function (e) { wireDataChannel(e.channel, 2); });
+    pc.setRemoteDescription({ type: 'offer', sdp: offerSdp })
+      .then(function () { return pc.createAnswer(); })
+      .then(function (answer) { return pc.setLocalDescription(answer); })
+      .then(function () { return waitForIceGathering(pc); })
+      .then(function () {
+        onAnswer(pc.localDescription.sdp);
+        status('answering');
+      })
+      .catch(function () { status('failed'); });
+
+    clearConnectTimer();
+    connectTimer = setTimeout(function () { status('timeout'); cancel(); }, CONNECT_TIMEOUT_MS);
+  }
+
   // ---- guest's own input -> the host ---------------------------------------
 
   var guestKeyDownHandler = null;
@@ -308,7 +361,10 @@
     return s;
   };
 
-  window.BlipNet = { host: host, join: join, cancel: cancel };
+  window.BlipNet = {
+    host: host, join: join, cancel: cancel,
+    hostQR: hostQR, joinQR: joinQR, submitAnswer: submitAnswer,
+  };
   // Debug/test introspection only — test/multiplayer.mjs and manual
   // console debugging. Not part of the public API.
   window.__blipNetDebug = function () {
