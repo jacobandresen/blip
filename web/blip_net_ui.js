@@ -785,7 +785,13 @@
           termPrint((scanErr && scanErr.name ? scanErr.name + ': ' : '') + msg, 'err');
           return;
         }
-        termPrint('decode OK', 'ok');
+        // What was actually parsed, not just "OK" — the same byte/route
+        // summary the caller (showHostQR/showJoinQR) prints again once it
+        // knows whether this was an offer or an answer, but available
+        // here immediately, right at the moment a candidate pattern
+        // turned into real decoded data.
+        var candidates = (text.match(/a=candidate:/g) || []).length;
+        termPrint('decode OK — parsed ' + text.length + ' bytes, ' + candidates + ' ice candidate(s)', 'ok');
         clear(holder);
         onScanned(text);
       }, function (state, detail) {
@@ -805,6 +811,13 @@
             if (detail.decodeError) termPrint('decode exception: ' + detail.decodeError, 'err');
             break;
           }
+          case 'found':
+            // The candidate pattern actually decoded, right here — the
+            // 'decode OK' line above fires ~150ms later (blip_qr.js holds
+            // the confirmation box on screen for a beat first), so this
+            // is the frame it really happened on.
+            termPrint('frame ' + detail.frames + ': candidate pattern decoded successfully', 'ok');
+            break;
           case 'play-error':
             termPrint('camera stream would not play' + (detail.message ? ': ' + detail.message : ''), 'err');
             break;

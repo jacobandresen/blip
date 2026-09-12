@@ -568,6 +568,15 @@ canvas {
   width: min(92vw, 340px);
   max-height: calc(100vh - 32px);
   overflow-y: auto;
+  /* Still scrollable (tall content — a long score list, or JACK IN's QR +
+     status bar + terminal stack on a short/landscape screen — needs
+     somewhere to go), just never a visible scrollbar track: this is a
+     fixed kiosk panel, not a document, and a system scrollbar bar reads
+     as a bug in that context. Same call already made for
+     .blip-net-term-log below (there via overflow:hidden instead, since
+     that one never needs to actually be dragged back through). */
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* legacy Edge/IE */
   box-sizing: border-box;
   padding: 18px 18px 16px;
   border: 2px solid rgba(120, 220, 255, 0.5);
@@ -579,6 +588,7 @@ canvas {
   font-family: 'Press Start 2P', 'Courier New', monospace;
   text-align: center;
 }
+.blip-hs-panel::-webkit-scrollbar { display: none; } /* Chrome/Safari/Edge */
 .blip-hs-panel.wide { width: min(94vw, 380px); }
 .blip-hs-title {
   font-size: 13px;
@@ -689,7 +699,14 @@ canvas {
    distinct low-level console bolted onto the side of the UI, not part
    of its regular chrome. Real monospace (not the pixel arcade font) so
    it actually reads like a terminal. */
-.blip-net-modal { flex-direction: column; gap: 12px; overflow-y: auto; }
+.blip-net-modal {
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.blip-net-modal::-webkit-scrollbar { display: none; }
 .blip-net-term {
   width: min(92vw, 340px);
   display: flex;
@@ -779,7 +796,12 @@ canvas {
    NOT the terminal's red/orange — this is regular UI, not the hacker
    console bolted onto the side of it. */
 .blip-net-status {
-  width: min(92vw, 340px);
+  /* 100%, NOT a vw-based width — unlike .blip-hs-panel/.blip-net-term,
+     this sits nested inside the panel's own padding, so sizing it off
+     the viewport (92vw) instead of its actual parent overflowed the
+     panel's right edge on a narrow phone. */
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -803,6 +825,7 @@ canvas {
 .blip-net-status.err .blip-net-status-dot { background: #ff6b6b; box-shadow: 0 0 6px rgba(255, 107, 107, 0.8); }
 .blip-net-status-text {
   flex: 1;
+  min-width: 0; /* flexbox default (auto) refuses to shrink below content size, forcing CHECK out past the panel edge */
   font-family: 'Courier New', monospace;
   font-size: 10px;
   line-height: 1.4;
