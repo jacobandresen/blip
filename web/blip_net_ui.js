@@ -582,6 +582,28 @@
     joinBtn.addEventListener('click', function () { showJoinQR(body, panel); });
   }
 
+  /** The QR/scan square is the single biggest thing in the panel — sizing
+   * it off width alone (the old `max-width:100%` safety net) is fine on a
+   * narrow *portrait* phone, but does nothing on a *landscape* or just
+   * short window, where the real constraint is height: a fixed 280px
+   * square plus the status bar/CLOSE row underneath it can overflow the
+   * panel's own max-height (calc(100vh - 32px)) with nothing on screen to
+   * suggest there's more below (the panel deliberately hides its own
+   * scrollbar — see .blip-hs-panel in shell.css — so an overflow here
+   * isn't just ugly, it's undiscoverable). Considering *both* budgets
+   * directly in JS (rather than reaching for CSS `aspect-ratio` +
+   * `max-height` tricks on a fixed-width box) keeps this simple and
+   * exactly predictable. Recomputed fresh each time a QR/scan screen is
+   * shown, not on resize — nobody rotates their phone mid-scan. Floor of
+   * 140 — small, but a code held close to the camera is still real cargo
+   * space for an SDP; see docs/multiplayer.md on why bigger is generally
+   * better for an *old* camera specifically, when there's room for it. */
+  function codeAreaSize(preferred) {
+    var byHeight = window.innerHeight * 0.40;
+    var byWidth = window.innerWidth * 0.78;
+    return Math.max(140, Math.round(Math.min(preferred, byHeight, byWidth)));
+  }
+
   function qrCanvas(parent) {
     // Classed (not just typed) so test/multiplayer.mjs and the scan
     // preview's own overlay canvas below can never be confused for one
@@ -590,13 +612,10 @@
     // Neutralize shell.css's bare `canvas { position:fixed; clip-path:...
     // }` rule — meant only for the game's own #glcanvas, but a bare tag
     // selector catches every canvas on the page, including this one.
-    // `max-width:100%` + `height:auto` (the canvas's own width/height
-    // *attributes*, set by render() below, are always square, so this
-    // keeps it square) caps growth back down on a phone too narrow to fit
-    // 280px inside the panel's own padding, rather than overflowing it.
+    var size = codeAreaSize(280);
     canvas.style.cssText =
       'display:block;position:static;top:auto;left:auto;transform:none;clip-path:none;' +
-      'touch-action:auto;margin:10px auto;width:280px;max-width:100%;height:auto;' +
+      'touch-action:auto;margin:10px auto;width:' + size + 'px;height:' + size + 'px;' +
       'image-rendering:pixelated;border-radius:4px;';
     return canvas;
   }
@@ -631,7 +650,7 @@
       wrap.className = 'blip-net-status' + (kind ? ' ' + kind : '');
     }
     set(initialText, initialKind);
-    return { set: set };
+    return { set: set, el: wrap };
   }
 
   /** Turn a getUserMedia() rejection into a specific, actionable message
@@ -668,9 +687,10 @@
         termPrint('answer scanned: ' + text.length + ' bytes', 'ok');
         printCandidates(text);
         termPrint('applying remote description...');
+        status.el.style.display = ''; // hidden by hideEls below, while the camera view had the screen
         status.set('✓ answer scanned (' + text.length + ' bytes, ' + candidates2 + ' route(s)) — connecting…', 'ok');
         window.BlipNet.submitAnswer(text);
-      });
+      }, false, [canvas, status.el]);
     }, function (s) {
       termPrint(signalText(s) + ' (signal: ' + s + ')', signalKind(s));
       // 'waiting'/'answering' are just process states already covered by
@@ -741,15 +761,23 @@
   /** A button that, once tapped, opens the camera and scans for one QR
    * code — `onScanned(text)` fires once, after which the camera stops
    * itself. `autoStart` skips the button and opens the camera immediately
-   * (the guest's very first step has nothing else to tap first). */
-  function showScanButton(body, panel, label, onScanned, autoStart) {
+   * (the guest's very first step has nothing else to tap first).
+   * `hideEls` (optional): elements to hide the moment scanning actually
+   * starts — the host's "SCAN THEIR ANSWER" step reuses the same `body`
+   * its own offer QR + status bar are still sitting in (useful right up
+   * until this point, dead weight once the camera view takes over), and
+   * on a short/landscape screen that's real vertical space worth taking
+   * back rather than pushing the CLOSE button below the fold. */
+  function showScanButton(body, panel, label, onScanned, autoStart, hideEls) {
     var holder = el('div', '', body);
     function startScanning() {
+      if (hideEls) hideEls.forEach(function (e) { if (e) e.style.display = 'none'; });
       clear(holder);
-      // max-width:100% safety net — the box shrinks on a narrow screen
-      // rather than overflowing the panel.
+      // codeAreaSize() (same helper qrCanvas() uses) accounts for a short/
+      // landscape viewport, not just a narrow one — a fixed 260px square
+      // here was the other half of the overflow this fixes.
       var wrap = el('div', '', holder);
-      wrap.style.cssText = 'position:relative;width:260px;max-width:100%;aspect-ratio:1/1;margin:10px auto;';
+      wrap.style.cssText = 'position:relative;width:' + codeAreaSize(260) + 'px;aspect-ratio:1/1;margin:10px auto;';
       var video = el('video', '', wrap);
       video.setAttribute('playsinline', '');
       video.setAttribute('muted', '');
@@ -762,12 +790,11 @@
       // for one can pick up the other.
       var overlay = el('canvas', 'blip-scan-overlay', wrap);
       overlay.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
-      // wrap's size can shrink below 260px on a narrow screen (max-width:
-      // 100% above) — size the overlay's own bitmap to match whatever it
-      // actually rendered at, not the 260px we asked for, or
-      // blip_qr.js's marker math (which maps a point onto `overlay.width`
-      // / `overlay.height`) would place every marker off by the
-      // difference.
+      // wrap's size can be less than 260px (codeAreaSize() above) — size
+      // the overlay's own bitmap to match whatever it actually rendered
+      // at, not the 260px we asked for, or blip_qr.js's marker math
+      // (which maps a point onto `overlay.width`/`overlay.height`) would
+      // place every marker off by the difference.
       var wrapRect = wrap.getBoundingClientRect();
       overlay.width = Math.max(1, Math.round(wrapRect.width));
       overlay.height = Math.max(1, Math.round(wrapRect.height));

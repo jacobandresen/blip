@@ -455,6 +455,44 @@ printed once the DataChannel has genuinely opened, right alongside the
 real `connected` signal — never a startup banner, always an actual
 result.
 
+Testing a spread of host/guest screen-size combinations (not just the
+same size on both ends — a real pairing is two different phones) surfaced
+a layout bug the same-size e2e test never could: on a short or landscape
+screen, the CHECK button, status bar, and even the CLOSE button could
+scroll out of view with **no visual indication anything was cut off** —
+worse than the plain scrollbar it replaced, not better. Root cause was
+three compounding issues, not one:
+
+- The QR/scan square was sized off viewport *width* alone
+  (`max-width:100%`) — fine in portrait, does nothing in landscape, where
+  height is the actual constraint. `codeAreaSize()` (`web/blip_net_ui.js`)
+  now considers both.
+- The host's "SCAN THEIR ANSWER" step reuses the same panel its own offer
+  QR + status bar are still sitting in — useful right up until that point,
+  dead weight once the camera view takes over. `showScanButton()` now
+  takes an optional list of elements to hide the moment scanning actually
+  starts, reclaiming that space.
+- The real root cause: `.blip-hs-panel` and `.blip-net-term` are flex
+  children of `.blip-net-modal`, and any flex child with its own
+  `overflow` gets an *automatic flex-shrink minimum of 0* — not its
+  content size. On a screen too short for both, flexbox was silently
+  squeezing the panel **below its own `max-height`**, clipping real
+  content invisibly (the scrollbar's hidden). `flex-shrink: 0` on both
+  fixed that — which then exposed a second layer: `.blip-hs-modal`'s
+  `justify-content: center`, centering the now-correctly-sized *overflowing*
+  stack, split the overflow evenly above **and below** the viewport, and
+  content pushed off the *top* of a centered scroller is unreachable by
+  scrolling down at all (`scrollTop` can't go negative). `.blip-net-modal`
+  now overrides to `justify-content: flex-start` so any overflow is only
+  ever at the bottom, where scrolling can actually reach it.
+
+Verified with a headless CDP matrix pairing eight different host/guest
+screen-size combinations (including a 480×320 landscape phone, the
+tightest case found) — full connect plus a real bidirectional
+`BlipNet.ping()` round trip on every combination, alongside explicit
+`getBoundingClientRect()` checks that the status bar, CHECK button, and
+CLOSE button are always fully on-screen with zero scrolling required.
+
 ### Hardening pass
 
 A dedicated pass over this whole feature ("harden it, trim what you can,

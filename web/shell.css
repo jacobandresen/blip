@@ -577,6 +577,20 @@ canvas {
      that one never needs to actually be dragged back through). */
   scrollbar-width: none;      /* Firefox */
   -ms-overflow-style: none;   /* legacy Edge/IE */
+  /* .blip-net-modal (JACK IN) makes this a flex child alongside the
+     terminal — any element with its own `overflow` gets an automatic
+     flex min-height of 0 (not its content size), so without this,
+     flexbox silently squeezes the panel *below* its own max-height (and
+     below what its content needs) to make room for its sibling, on any
+     screen too short for both. That shrink is real clipping — content
+     genuinely goes missing, invisible since the panel hides its own
+     scrollbar — not just the ordinary "needs to scroll" case max-height/
+     overflow-y:auto are actually meant to handle. flex-shrink:0 makes
+     the panel always render at its natural size (however much of that
+     max-height it actually needs); if anything gets pushed out of view
+     on an extreme screen it's the terminal below it, not the controls a
+     player actually has to tap. */
+  flex-shrink: 0;
   box-sizing: border-box;
   padding: 18px 18px 16px;
   border: 2px solid rgba(120, 220, 255, 0.5);
@@ -703,6 +717,14 @@ canvas {
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
+  /* .blip-hs-modal's own justify-content:center is fine while everything
+     fits, but centering an *overflowing* flex container splits the
+     overflow evenly above AND below the viewport — and content pushed
+     off the top edge of a centered scroller is unreachable by scrolling
+     down (scrollTop can't go negative to reach it). flex-start keeps the
+     whole stack anchored to the top instead, so any overflow is only
+     ever at the bottom, where overflow-y:auto can actually reach it. */
+  justify-content: flex-start;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -717,6 +739,14 @@ canvas {
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 10px 30px rgba(0, 0, 0, 0.55),
               inset 0 0 24px rgba(228, 52, 43, 0.07);
   overflow: hidden;
+  /* Same flex-min-height-0 issue as .blip-hs-panel above (this `overflow`
+     is what triggers it) — without this, a screen too short for both the
+     panel and this terminal squeezes the terminal's fixed-height log area
+     down below its own content instead of the panel keeping its full,
+     natural size and the terminal simply scrolling out of view (the
+     .blip-net-modal wrapper's own overflow-y:auto) on the most extreme
+     screens. */
+  flex-shrink: 0;
   font-family: 'Courier New', monospace;
 }
 .blip-net-term-bar {
