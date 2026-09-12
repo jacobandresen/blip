@@ -412,6 +412,77 @@ network) — a `stats` candidate-pair line only exists once ICE has
 already started checking it, several seconds later at best, timed out
 at worst.
 
+### Hardening pass
+
+A dedicated pass over this whole feature ("harden it, trim what you can,
+close potential loopholes, avoid uncertainties, 100% unit tests on all
+combinations") rather than a specific bug report. What it found and
+changed:
+
+- **Stale-attempt races in `web/blip_net.js`.** `host()`/`join()`'s
+  promise chains and `wireDataChannel()`'s event handlers all closed over
+  the *mutable* `pc`/`dc` module variables rather than the specific
+  RTCPeerConnection/RTCDataChannel object each was created for. If a
+  caller ever started a second `host()`/`join()` (or called `cancel()`)
+  while an earlier attempt's promise or event was still in flight — the
+  JACK IN console's `host`/`join` commands can trigger exactly this, back
+  to back — the *stale* attempt's callback could still fire, misreporting
+  status (or worse, mutating `role`/`latestState`) for whatever attempt
+  is now actually current. Every promise `.then()`/`.catch()` and every
+  DataChannel event handler now checks `peer !== pc` / `channelObj !==
+  dc` first and bails out silently if superseded — the same guard
+  `newPeerConnection()`'s own `connectionstatechange` listener already
+  used, just applied consistently everywhere. `host()`/`join()` also now
+  call `cancel()` unconditionally at their own start, so they're safe to
+  call at any time regardless of what a caller did or didn't clean up
+  first — no more zombie RTCPeerConnections left running in the
+  background. Verified with a stress test that rapid-fires
+  `host`/`host`/`join`/`host` back to back with no `cancel()` in between:
+  the final live state cleanly reflects only the last call, with a real
+  offer QR rendered and no corrupted status.
+- **`web/blip_qr.js`'s `scan()` could fire `onScanned` for an already-
+  abandoned attempt** — a decode landing (or a camera-permission
+  rejection arriving) in the same tick the caller's own `stop()` had
+  already been invoked (closing the pairing modal right as a decode
+  lands, say) would still hand the caller a result it never asked for
+  any more. Both paths now check whether the scan was already stopped
+  before firing.
+- **`render()`'s vendored QR encoder throws a bare string** (not an
+  `Error`) if the text overflows even the largest QR version — wrapped
+  into a real `Error` so every caller gets one consistent, catchable
+  failure shape.
+- **A missing `web/blip_sdp_slim.js` or `web/blip_qr_heuristic.js`
+  script no longer takes anything else down with it** — both are now
+  read defensively (`window.BlipSdpSlim && ...`) with a harmless
+  fallback (pass-through / "never flags a candidate") instead of an
+  unguarded property access throwing at module-load time.
+- **Trimmed dead code**: `encodeBye`/`decodeBye`
+  (`web/blip_net_proto.js`) were designed but never actually wired into
+  any message handler or ever sent anywhere — removed, with a test
+  guarding against them quietly reappearing unused. The `a=candidate:`
+  line-parsing logic that used to be duplicated between
+  `blip_sdp_slim.js`'s own filtering and `blip_net_ui.js`'s
+  `printCandidates()` is now one shared, tested `parseCandidateLine()`.
+- **Extracted the pure pixel math** behind the finder-candidate
+  heuristic (`findFinderCandidate`, `mapToDisplay`) out of `blip_qr.js`
+  into `web/blip_qr_heuristic.js` — no DOM/canvas dependency, so it has
+  real unit tests (`test/qr-heuristic.test.mjs`) the same way
+  `blip_sdp_slim.js` and `blip_net_proto.js` do, instead of only being
+  reachable through a live camera.
+- **Test coverage**: every pure, DOM/WebRTC-independent piece of this
+  feature — `slimSdpForQr`/`parseCandidateLine`, `encodeInput`/
+  `decodeInput`, `findFinderCandidate`/`mapToDisplay`/`luma`, plus the
+  Rust wire format (`crates/rally/src/net.rs`, already thoroughly
+  tested) — now has unit tests covering every branch: both boundaries of
+  the finder heuristic's dark-fraction acceptance window (0.25 and 0.75)
+  from both sides, malformed/too-short/wrong-prefix candidate lines,
+  non-string input, flat/near-flat frames, square-vs-non-square frames,
+  and more. The remaining DOM/WebRTC glue — `host()`/`join()`/`cancel()`,
+  `scan()`/`render()` themselves — stays covered by the real two-device
+  e2e suite (genuine camera capture, genuine RTCPeerConnection, no
+  mocking) rather than being made to look unit-testable at the cost of
+  actually testing anything real.
+
 ## Open questions
 
 - **Cheating.** A guest's browser console can just send fabricated

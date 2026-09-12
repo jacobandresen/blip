@@ -84,8 +84,11 @@
 
   // Candidate-trimming logic lives in web/blip_sdp_slim.js (dual Node/
   // browser export, like blip_net_proto.js) so it has real unit tests —
-  // see test/sdp-slim.test.mjs.
-  var slimSdpForQr = window.BlipSdpSlim.slimSdpForQr;
+  // see test/sdp-slim.test.mjs. Falls back to a pass-through (no
+  // slimming, but no hard crash either) if that script failed to load —
+  // script tag order guarantees it normally won't, but this module
+  // shouldn't go completely dark over it.
+  var slimSdpForQr = (window.BlipSdpSlim && window.BlipSdpSlim.slimSdpForQr) || function (sdp) { return sdp; };
 
   function newPeerConnection() {
     // No STUN/TURN: the same-room scope decision (docs/multiplayer.md)
@@ -110,7 +113,15 @@
   function wireDataChannel(channelObj, roleValue) {
     dc = channelObj;
     dc.binaryType = 'arraybuffer';
+    // Every handler below checks `channelObj !== dc` first: a delayed
+    // event from a channel that a newer host()/join()/cancel() has since
+    // superseded (`dc` now points elsewhere, or is null) must not mutate
+    // shared state (`role`, `latestState`) or report status for
+    // whatever attempt *is* current — the same staleness host()/join()
+    // guard against on their own promise chains, just for events instead
+    // of promises.
     dc.addEventListener('open', function () {
+      if (channelObj !== dc) return;
       log('dc.open', roleValue);
       clearConnectTimer();
       role = roleValue;
@@ -118,6 +129,7 @@
       status('connected');
     });
     dc.addEventListener('close', function () {
+      if (channelObj !== dc) return;
       log('dc.close', '');
       role = 0;
       latestState = null;
@@ -125,9 +137,11 @@
       status('disconnected');
     });
     dc.addEventListener('error', function (e) {
+      if (channelObj !== dc) return;
       log('dc.error', (e.error && (e.error.message || e.error)) || '');
     });
     dc.addEventListener('message', function (e) {
+      if (channelObj !== dc) return;
       if (typeof e.data === 'string') {
         // Guest -> host input, only meaningful on the host.
         var input = proto.decodeInput(e.data);
@@ -146,47 +160,89 @@
   // ---- host side: generate an offer, hand it to the UI to render as a QR ----
 
   function host(onOffer, onStatus) {
+    // A caller that starts a fresh host()/join() without ever cancelling
+    // the previous attempt (the JACK IN console's `host`/`join` commands
+    // can do exactly this, back to back) would otherwise leak the old
+    // RTCPeerConnection: its `pc`/`dc` never get replaced by anything
+    // that closes them, just overwritten below, and its own event
+    // listeners and in-flight promises keep running against a `pc`
+    // variable that now points somewhere else entirely (see the `peer
+    // !== pc` guards below — this is the same class of staleness, just
+    // upstream of it). Cancelling unconditionally here makes host()/
+    // join() safe to call at any time, regardless of what a caller did
+    // or didn't clean up first.
+    cancel();
     onStatusCb = onStatus;
-    pc = newPeerConnection();
-    var channelObj = pc.createDataChannel('rally', { ordered: false, maxRetransmits: 0 });
+    var peer = newPeerConnection();
+    pc = peer;
+    var channelObj = peer.createDataChannel('rally', { ordered: false, maxRetransmits: 0 });
     wireDataChannel(channelObj, 1);
-    pc.createOffer()
-      .then(function (offer) { return pc.setLocalDescription(offer); })
-      .then(function () { return waitForIceGathering(pc); })
+    peer.createOffer()
+      .then(function (offer) { return peer.setLocalDescription(offer); })
+      .then(function () { return waitForIceGathering(peer); })
       .then(function () {
-        onOffer(slimSdpForQr(pc.localDescription.sdp));
+        // This specific attempt may have been superseded (a newer
+        // host()/join() call, or an explicit cancel()) while the promise
+        // chain above was still in flight — `pc` would then point at a
+        // different attempt entirely (or be null). Reporting success/
+        // failure for an attempt nobody is listening for any more would
+        // just misattribute it to whatever *is* current.
+        if (peer !== pc) return;
+        onOffer(slimSdpForQr(peer.localDescription.sdp));
         status('waiting');
       })
-      .catch(function () { status('failed'); });
+      .catch(function () {
+        if (peer !== pc) return;
+        status('failed');
+      });
 
-    clearConnectTimer();
-    connectTimer = setTimeout(function () { status('timeout'); cancel(); }, CONNECT_TIMEOUT_MS);
+    connectTimer = setTimeout(function () {
+      if (peer !== pc) return;
+      status('timeout');
+      cancel();
+    }, CONNECT_TIMEOUT_MS);
   }
 
   /** Host: call once the guest's answer QR has been scanned. */
   function submitAnswer(sdp) {
-    if (!pc) return;
-    pc.setRemoteDescription({ type: 'answer', sdp: sdp }).catch(function () { status('failed'); });
+    var peer = pc;
+    if (!peer) return;
+    peer.setRemoteDescription({ type: 'answer', sdp: sdp }).catch(function () {
+      if (peer !== pc) return; // superseded/cancelled while this was in flight
+      status('failed');
+    });
   }
 
   // ---- guest side: `offerSdp` is whatever was scanned from the host's QR ----
 
   function join(offerSdp, onAnswer, onStatus) {
+    cancel(); // see host()'s comment on why this is unconditional
     onStatusCb = onStatus;
-    pc = newPeerConnection();
-    pc.addEventListener('datachannel', function (e) { wireDataChannel(e.channel, 2); });
-    pc.setRemoteDescription({ type: 'offer', sdp: offerSdp })
-      .then(function () { return pc.createAnswer(); })
-      .then(function (answer) { return pc.setLocalDescription(answer); })
-      .then(function () { return waitForIceGathering(pc); })
+    var peer = newPeerConnection();
+    pc = peer;
+    peer.addEventListener('datachannel', function (e) {
+      if (peer !== pc) return;
+      wireDataChannel(e.channel, 2);
+    });
+    peer.setRemoteDescription({ type: 'offer', sdp: offerSdp })
+      .then(function () { return peer.createAnswer(); })
+      .then(function (answer) { return peer.setLocalDescription(answer); })
+      .then(function () { return waitForIceGathering(peer); })
       .then(function () {
-        onAnswer(slimSdpForQr(pc.localDescription.sdp));
+        if (peer !== pc) return; // see host()'s matching comment
+        onAnswer(slimSdpForQr(peer.localDescription.sdp));
         status('answering');
       })
-      .catch(function () { status('failed'); });
+      .catch(function () {
+        if (peer !== pc) return;
+        status('failed');
+      });
 
-    clearConnectTimer();
-    connectTimer = setTimeout(function () { status('timeout'); cancel(); }, CONNECT_TIMEOUT_MS);
+    connectTimer = setTimeout(function () {
+      if (peer !== pc) return;
+      status('timeout');
+      cancel();
+    }, CONNECT_TIMEOUT_MS);
   }
 
   // ---- guest's own input -> the host ---------------------------------------

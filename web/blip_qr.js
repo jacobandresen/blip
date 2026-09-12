@@ -32,11 +32,19 @@
    * code exposed to real wear, so capacity (fitting a full SDP, ICE
    * candidates included) matters more here than damage tolerance. Auto
    * type-number (0) picks the smallest QR version the text actually fits
-   * in. */
+   * in — the one way this can still fail is `text` overflowing even the
+   * largest QR version (2,953 bytes at this error-correction level), in
+   * which case the vendored encoder throws a bare *string* (not an
+   * `Error`); wrapped into a real `Error` here so every caller gets one
+   * consistent, catchable failure shape instead of two different ones. */
   function render(canvas, text) {
     var qr = qrcode(0, 'L');
     qr.addData(text);
-    qr.make();
+    try {
+      qr.make();
+    } catch (e) {
+      throw new Error('QR encode failed: ' + e);
+    }
     var count = qr.getModuleCount();
     var totalModules = count + QUIET_ZONE_MODULES * 2;
     var cell = Math.max(2, Math.floor(400 / totalModules));
@@ -82,60 +90,19 @@
   // candidates to chase, and its size is a feature, not a compromise: a
   // small high-contrast false positive (an icon, a line of text) never
   // reaches the size a candidate is required to be here.
-  var FINDER_SCAN_DIM = 200;        // downsample target, applied to the already-square-cropped frame (see scan())
-  var FINDER_BOX_FRACTION = 0.7;    // the checked region's side, as a fraction of the frame — comfortably over half
-
-  function luma(data, i) {
-    return 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-  }
-
-  /** `frame` is expected to already be cropped to a square and downsampled
-   * (see scan()'s own crop + finderCanvas). Returns one candidate — the
-   * big centered box itself — when it looks QR-like, or `null`. "Looks
-   * QR-like" here just means real contrast, *and* a plausible dark/light
-   * mix (a QR code is roughly half dark modules, half light — a region
-   * that's almost entirely one or the other, like a plain wall with a
-   * bright reflection on it, has contrast but isn't a plausible code). */
-  function findFinderCandidate(frame) {
-    var data = frame.data, w = frame.width, h = frame.height;
-    var boxSide = Math.round(Math.min(w, h) * FINDER_BOX_FRACTION);
-    var x0 = Math.floor((w - boxSide) / 2);
-    var y0 = Math.floor((h - boxSide) / 2);
-    var STEP = 4;
-    var lo = 255, hi = 0, dark = 0, total = 0;
-    for (var y = y0; y < y0 + boxSide; y += STEP) {
-      for (var x = x0; x < x0 + boxSide; x += STEP) {
-        var l = luma(data, (y * w + x) * 4);
-        if (l < lo) lo = l;
-        if (l > hi) hi = l;
-        total++;
-      }
-    }
-    if (hi - lo < 40) return null; // near-flat (lens cap, darkness, a blank wall) — nothing to find
-    var threshold = (lo + hi) / 2;
-    for (var y2 = y0; y2 < y0 + boxSide; y2 += STEP) {
-      for (var x2 = x0; x2 < x0 + boxSide; x2 += STEP) {
-        if (luma(data, (y2 * w + x2) * 4) < threshold) dark++;
-      }
-    }
-    var darkFraction = dark / total;
-    if (darkFraction < 0.25 || darkFraction > 0.75) return null;
-    return { x: x0 + boxSide / 2, y: y0 + boxSide / 2, side: boxSide };
-  }
+  //
+  // The actual pixel math (findFinderCandidate) and the marker-overlay
+  // coordinate math (mapToDisplay) both live in web/blip_qr_heuristic.js —
+  // pure functions with no DOM/canvas dependency, so they have real unit
+  // tests (test/qr-heuristic.test.mjs) the same way blip_sdp_slim.js and
+  // blip_net_proto.js do. Falls back to "never flags a candidate" (not a
+  // hard crash) if that script failed to load — this feature is cosmetic;
+  // losing it shouldn't take pairing down with it.
+  var FINDER_SCAN_DIM = 200; // downsample target, applied to the already-square-cropped frame (see scan())
+  var findFinderCandidate = (window.BlipQrHeuristic && window.BlipQrHeuristic.findFinderCandidate) || function () { return null; };
+  var mapToDisplay = (window.BlipQrHeuristic && window.BlipQrHeuristic.mapToDisplay) || function (px, py) { return { x: px, y: py }; };
 
   // ---- marker overlay --------------------------------------------------------
-  //
-  // scan() below crops the camera frame to a centered square before handing
-  // it to either jsQR or findFinderCandidate() — the same square
-  // `object-fit: cover` already crops the <video> element itself to when
-  // filling its own square CSS box (see scan()'s own comment) — so a point
-  // in that cropped frame maps onto the overlay canvas (sized to match
-  // that same box) with nothing more than a uniform scale; no per-axis
-  // offset math needed.
-  function mapToDisplay(px, py, side, dispSide) {
-    var scale = dispSide / side;
-    return { x: px * scale, y: py * scale };
-  }
 
   function drawMarkers(overlay, side, found, candidate) {
     var octx = overlay.getContext('2d');
@@ -243,7 +210,16 @@
           var found = code.data;
           // Let the confirmation box actually show for one beat before the
           // camera tears down out from under it.
-          setTimeout(function () { stop(); onScanned(found, null); }, 150);
+          setTimeout(function () {
+            // The caller's own stop() (returned below) can fire during this
+            // beat — closing the pairing modal right as a decode lands, say
+            // — in which case this scan has already been abandoned and
+            // firing onScanned for it now would hand the caller a result it
+            // never asked for any more.
+            if (stopped) return;
+            stop();
+            onScanned(found, null);
+          }, 150);
           return;
         }
         // Downsample the (already-cropped) frame for the heuristic — see
@@ -299,6 +275,11 @@
         raf = requestAnimationFrame(tick);
       })
       .catch(function (err) {
+        // Same staleness concern as the decode-success beat above: if the
+        // caller already called the returned stop() while getUserMedia was
+        // still pending (closed the modal before the permission prompt was
+        // even answered, say), this rejection is for an abandoned attempt.
+        if (stopped) return;
         stopped = true;
         report('camera-error', { name: err && err.name, message: err && err.message });
         onScanned(null, err);

@@ -418,17 +418,18 @@
    * exchanged, without waiting for a `stats` candidate-pair line that
    * only exists once ICE has actually started checking it. */
   function printCandidates(sdp) {
+    // Same parser slimSdpForQr() uses to decide what to keep — one
+    // tested place for `a=candidate:` line syntax instead of two
+    // untested, independently-drifting copies of it.
+    var parseCandidateLine = window.BlipSdpSlim && window.BlipSdpSlim.parseCandidateLine;
+    if (typeof parseCandidateLine !== 'function') return;
     var any = false;
     sdp.split(/\r\n|\n/).forEach(function (line) {
-      if (line.indexOf('a=candidate:') !== 0) return;
+      var candidate = parseCandidateLine(line);
+      if (!candidate) return;
       any = true;
-      var parts = line.split(' ');
-      var proto = parts[2] || '?';
-      var address = parts[4] || '?';
-      var port = parts[5] || '?';
-      var typIndex = parts.indexOf('typ');
-      var type = typIndex >= 0 ? parts[typIndex + 1] : '?';
-      termPrint('  candidate: ' + type + ' ' + proto + ' ' + address + ':' + port, undefined, true);
+      termPrint('  candidate: ' + (candidate.type || '?') + ' ' + (candidate.protocol || '?') + ' ' +
+        (candidate.address || '?') + ':' + (candidate.port || '?'), undefined, true);
     });
     if (!any) termPrint('  (no candidates in this SDP)', 'err', true);
   }

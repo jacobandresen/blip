@@ -2,8 +2,8 @@
   "name": "blip",
   "private": true,
   "scripts": {
-    "test:unit": "node --test test/fill-canvas.test.mjs test/multiplayer-proto.test.mjs test/sdp-slim.test.mjs",
-    "test": "node --test test/fill-canvas.test.mjs test/multiplayer-proto.test.mjs test/sdp-slim.test.mjs",
+    "test:unit": "node --test test/fill-canvas.test.mjs test/multiplayer-proto.test.mjs test/sdp-slim.test.mjs test/qr-heuristic.test.mjs",
+    "test": "node --test test/fill-canvas.test.mjs test/multiplayer-proto.test.mjs test/sdp-slim.test.mjs test/qr-heuristic.test.mjs",
     "test:highscores": "node test/highscores.mjs",
     "test:multiplayer": "node test/multiplayer.mjs",
     "supabase": "supabase"
