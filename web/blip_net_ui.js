@@ -30,6 +30,12 @@
   if (!window.BlipNet || !window.BlipNetProto || !window.BlipQR) return;
 
   var modalEl = null;
+  // Set once by openModal(), read by the `host`/`join` commands below —
+  // the same `body`/`panel` showChoice()'s HOST/JOIN buttons already
+  // close over, so typing the command runs the exact same code as
+  // tapping the button, not a re-implementation of it.
+  var modalBody = null;
+  var modalPanel = null;
 
   function el(tag, className, parent) {
     var e = document.createElement(tag);
@@ -225,6 +231,22 @@
     ls: { desc: 'list files in the current directory', run: simulateLs },
     ps: { desc: 'list running processes', run: simulatePs },
     top: { desc: 'show live resource usage', run: simulateTop },
+    host: {
+      desc: 'start hosting — same as tapping HOST',
+      run: function () {
+        if (!modalBody || !modalPanel) { termPrint('no active session', 'err', true); return; }
+        if (stopActiveScan) { stopActiveScan(); stopActiveScan = null; }
+        showHostQR(modalBody, modalPanel);
+      },
+    },
+    join: {
+      desc: 'scan a host’s code — same as tapping JOIN',
+      run: function () {
+        if (!modalBody || !modalPanel) { termPrint('no active session', 'err', true); return; }
+        if (stopActiveScan) { stopActiveScan(); stopActiveScan = null; }
+        showJoinQR(modalBody, modalPanel);
+      },
+    },
   };
 
   function runCommand(raw) {
@@ -411,6 +433,8 @@
     el('div', 'blip-hs-title', panel).textContent = 'JACK IN';
 
     var body = el('div', '', panel);
+    modalBody = body;
+    modalPanel = panel;
     showChoice(body, panel);
 
     var row = el('div', 'blip-hs-row', panel);
