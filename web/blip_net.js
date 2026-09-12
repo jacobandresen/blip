@@ -82,6 +82,11 @@
     if (stateLog.length > STATE_LOG_MAX) stateLog.shift();
   }
 
+  // Candidate-trimming logic lives in web/blip_sdp_slim.js (dual Node/
+  // browser export, like blip_net_proto.js) so it has real unit tests —
+  // see test/sdp-slim.test.mjs.
+  var slimSdpForQr = window.BlipSdpSlim.slimSdpForQr;
+
   function newPeerConnection() {
     // No STUN/TURN: the same-room scope decision (docs/multiplayer.md)
     // means direct host candidates are always expected to suffice.
@@ -149,7 +154,7 @@
       .then(function (offer) { return pc.setLocalDescription(offer); })
       .then(function () { return waitForIceGathering(pc); })
       .then(function () {
-        onOffer(pc.localDescription.sdp);
+        onOffer(slimSdpForQr(pc.localDescription.sdp));
         status('waiting');
       })
       .catch(function () { status('failed'); });
@@ -175,7 +180,7 @@
       .then(function (answer) { return pc.setLocalDescription(answer); })
       .then(function () { return waitForIceGathering(pc); })
       .then(function () {
-        onAnswer(pc.localDescription.sdp);
+        onAnswer(slimSdpForQr(pc.localDescription.sdp));
         status('answering');
       })
       .catch(function () { status('failed'); });
