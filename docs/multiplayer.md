@@ -398,6 +398,20 @@ Verified with a deliberately busy, high-resolution synthetic test pattern
 at most 1, every time, with the real two-device e2e decode test still
 passing throughout.
 
+With a scan finally succeeding, the next question was a stalled
+handshake past that point ("it does not succeed... but nothing happens
+on the server") — was one side actually applying what it decoded? The
+console now prints every `a=candidate:` line's real connection info
+(type, protocol, address:port) right when an offer/answer is generated
+*or* scanned (`printCandidates()`, `web/blip_net_ui.js`) — not just the
+byte count the surrounding "offer ready"/"offer scanned" line already
+carried. Lets a candidate's actual address get eyeballed directly at
+the exact moment it was exchanged (an mDNS-hidden `*.local` name, an
+unexpected IPv6 literal, a candidate that's plainly on the wrong
+network) — a `stats` candidate-pair line only exists once ICE has
+already started checking it, several seconds later at best, timed out
+at worst.
+
 ## Open questions
 
 - **Cheating.** A guest's browser console can just send fabricated
