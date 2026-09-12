@@ -1,4 +1,4 @@
-/* Rally-only "PLAY NEARBY" pairing UI — the modal on top of web/blip_net.js.
+/* Rally-only "JACK IN" pairing UI — the modal on top of web/blip_net.js.
  * QR-code pairing only (see docs/multiplayer.md) — no network involved in
  * pairing at all, just two camera scans. Reuses the .blip-hs-* modal
  * classes (shell.css) that blip_scores.js's name/recovery prompts already
@@ -15,6 +15,12 @@
  * were actually tried and whether their connectivity checks got a
  * response, so a "timeout" comes with an actual diagnosis instead of
  * just the word. See termPrint()/reportFailureDiagnosis() below.
+ *
+ * It also takes real input — type 'help' at its prompt for the command
+ * list. `status`/`stats` are on-demand copies of the same real data the
+ * auto-telemetry above prints; `ls`/`ps`/`top` are simulated (there's no
+ * real filesystem/process table behind a browser tab to show). See
+ * COMMANDS/runCommand() below.
  */
 (function () {
   'use strict';
@@ -50,7 +56,31 @@
     termPromptUserEl = el('span', '', prompt);
     termPromptUserEl.textContent = 'blip';
     prompt.appendChild(document.createTextNode(':~$ '));
-    el('span', 'cursor', prompt).textContent = '_';
+    var typed = el('span', 'blip-net-term-typed', prompt);
+    el('span', 'blip-net-term-cursor', prompt);
+    // A real <input> is what actually captures keystrokes (and, on a
+    // phone, is what opens the keyboard when tapped) — but it's never
+    // shown itself. It's parked off-screen; `typed` above mirrors its
+    // value so what's on screen is plain terminal text with a blinking
+    // block cursor, not a form field with a border/focus ring/native
+    // caret. Tapping anywhere on the prompt line focuses it, same as
+    // clicking into a real terminal.
+    var input = el('input', 'blip-net-term-input', prompt);
+    input.type = 'text';
+    input.autocomplete = 'off';
+    input.autocapitalize = 'off';
+    input.spellcheck = false;
+    input.setAttribute('aria-label', 'debug console command');
+    input.addEventListener('input', function () { typed.textContent = input.value; });
+    input.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter') return;
+      var raw = input.value;
+      input.value = '';
+      typed.textContent = '';
+      runCommand(raw);
+    });
+    prompt.addEventListener('click', function () { input.focus(); });
+    termLogEl.addEventListener('click', function () { input.focus(); });
     return term;
   }
 
@@ -67,12 +97,17 @@
 
   /** Print one line to the terminal. `kind`: 'cmd' (a typed command, no
    * timestamp), 'ok' (success/milestone), 'err' (failure), or omitted for
-   * plain info output. */
-  function termPrint(text, kind) {
+   * plain info output. `bare` drops the `[t.ts]` prefix an info/ok/err
+   * line would otherwise get — for a typed command's own output, which
+   * should read like real stdout (no per-line timestamp), not like the
+   * auto-generated connection telemetry above it. */
+  function termPrint(text, kind, bare) {
     if (!termLogEl) return;
     var line = el('div', 'blip-net-term-line' + (kind ? ' ' + kind : ''), termLogEl);
     if (kind === 'cmd') {
       line.textContent = '$ ' + text;
+    } else if (bare) {
+      line.textContent = text;
     } else {
       line.textContent = '[' + ((Date.now() - termStartedAt) / 1000).toFixed(2) + 's] ' + text;
     }
@@ -82,6 +117,128 @@
       if (first) termLogEl.removeChild(first);
     }
     termLogEl.scrollTop = termLogEl.scrollHeight;
+  }
+
+  function padRight(s, n) {
+    s = String(s);
+    while (s.length < n) s += ' ';
+    return s;
+  }
+
+  // ---- typed commands -------------------------------------------------------
+  // A small, honest debug console bolted onto the pairing terminal: `help`
+  // lists what's here, `status`/`stats` are the SAME real data the
+  // auto-telemetry above already prints (just on demand), and `ls`/`ps`/
+  // `top` are simulated — a bit of decoration consistent with the rest of
+  // this thing looking like a shell, not a genuine filesystem/process
+  // table (there isn't one to show).
+
+  function printCommandList() {
+    termPrint('available commands:', undefined, true);
+    Object.keys(COMMANDS).sort().forEach(function (name) {
+      termPrint('  ' + padRight(name, 8) + COMMANDS[name].desc, undefined, true);
+    });
+  }
+
+  function simulateLs() {
+    var files = ['offer.sdp', 'answer.sdp', 'ice-candidates.log', 'session.pid', 'blip-net.sock'];
+    termPrint(files.join('  '), undefined, true);
+  }
+
+  function simulatePs() {
+    var role = 'blip';
+    if (typeof window.__blipNetDebug === 'function') {
+      var d = window.__blipNetDebug();
+      if (d.role === 1) role = 'host';
+      else if (d.role === 2) role = 'guest';
+    }
+    var rows = [
+      ['PID', 'USER', 'COMMAND'],
+      ['1', role, 'blip-net-agent'],
+      ['42', role, 'ice-checker'],
+      ['57', role, 'qr-scanner'],
+      ['88', role, 'datachannel-mux'],
+    ];
+    rows.forEach(function (r) {
+      termPrint(padRight(r[0], 6) + padRight(r[1], 8) + r[2], undefined, true);
+    });
+  }
+
+  function zeroPad(n) { return n < 10 ? '0' + n : String(n); }
+
+  function simulateTop() {
+    var now = new Date();
+    var clock = zeroPad(now.getHours()) + ':' + zeroPad(now.getMinutes()) + ':' + zeroPad(now.getSeconds());
+    termPrint('top - ' + clock + ' up 0 min,  1 user,  load average: 0.31, 0.24, 0.19', undefined, true);
+    termPrint('Tasks:   4 total,   1 running,   3 sleeping', undefined, true);
+    termPrint('%CPU:  2.8 us,  0.6 sy,  0.0 ni, 96.6 id', undefined, true);
+    termPrint('', undefined, true);
+    termPrint(padRight('PID', 6) + padRight('USER', 8) + padRight('%CPU', 7) + padRight('%MEM', 7) + 'COMMAND', undefined, true);
+    [['1', 'blip', '2.1', '1.2', 'blip-net-agent'],
+     ['42', 'blip', '0.9', '0.3', 'ice-checker'],
+     ['57', 'blip', '0.2', '0.1', 'qr-scanner']].forEach(function (r) {
+      termPrint(padRight(r[0], 6) + padRight(r[1], 8) + padRight(r[2], 7) + padRight(r[3], 7) + r[4], undefined, true);
+    });
+  }
+
+  var COMMANDS = {
+    help: { desc: 'list available commands', run: function () { printCommandList(); } },
+    man: {
+      desc: 'man <cmd> for details, or this list',
+      run: function (args) {
+        if (!args.length) { printCommandList(); return; }
+        var name = args[0].toLowerCase();
+        var cmd = COMMANDS[name];
+        if (!cmd) { termPrint('no manual entry for ' + name, 'err', true); return; }
+        termPrint(name.toUpperCase() + '(1)', undefined, true);
+        termPrint('    ' + cmd.desc, undefined, true);
+      },
+    },
+    clear: {
+      desc: 'clear this console',
+      run: function () { if (termLogEl) clear(termLogEl); termLineCount = 0; },
+    },
+    status: {
+      desc: 'real connection state: role, RTCPeerConnection, DataChannel',
+      run: function () {
+        if (typeof window.__blipNetDebug !== 'function') { termPrint('__blipNetDebug unavailable', 'err', true); return; }
+        var d = window.__blipNetDebug();
+        var roleName = d.role === 1 ? 'host' : (d.role === 2 ? 'guest' : 'none');
+        termPrint('role: ' + roleName, undefined, true);
+        termPrint('pc.connectionState: ' + d.pcConnectionState, undefined, true);
+        termPrint('pc.iceConnectionState: ' + d.pcIceConnectionState, undefined, true);
+        termPrint('datachannel.readyState: ' + d.dcState, undefined, true);
+      },
+    },
+    stats: {
+      desc: 'real ICE candidate-pair stats, right now',
+      run: function () {
+        if (typeof window.__blipNetStats !== 'function') { termPrint('__blipNetStats unavailable', 'err', true); return; }
+        window.__blipNetStats().then(function (pairs) {
+          if (!pairs || !pairs.length) { termPrint('no candidate pairs yet', undefined, true); return; }
+          pairs.forEach(function (p) {
+            termPrint('candidate-pair ' + pairSummary(p), p.state === 'succeeded' ? 'ok' : (p.state === 'failed' ? 'err' : undefined), true);
+          });
+        });
+      },
+    },
+    ls: { desc: 'list files in the current directory', run: simulateLs },
+    ps: { desc: 'list running processes', run: simulatePs },
+    top: { desc: 'show live resource usage', run: simulateTop },
+  };
+
+  function runCommand(raw) {
+    var trimmed = (raw || '').trim();
+    if (!trimmed) return;
+    termPrint(trimmed, 'cmd');
+    var parts = trimmed.split(/\s+/);
+    var name = parts[0].toLowerCase();
+    var cmd = COMMANDS[name];
+    if (!cmd) {
+      termPrint('command not found: ' + name + ' — type \'help\' for a list', 'err', true);
+      return;
+    }
+    cmd.run(parts.slice(1));
   }
 
   // A low-level heartbeat straight off window.__blipNetDebug() (blip_net.js's
@@ -251,7 +408,7 @@
     if (modalEl) return;
     modalEl = el('div', 'blip-hs-modal blip-net-modal', document.body);
     var panel = el('div', 'blip-hs-panel', modalEl);
-    el('div', 'blip-hs-title', panel).textContent = 'PLAY NEARBY';
+    el('div', 'blip-hs-title', panel).textContent = 'JACK IN';
 
     var body = el('div', '', panel);
     showChoice(body, panel);
@@ -264,7 +421,7 @@
 
     buildTerminal(modalEl);
     termReset();
-    termPrint('blip-net signaling console — idle, awaiting operator');
+    termPrint('jacking in..');
   }
 
   function showChoice(body, panel) {
