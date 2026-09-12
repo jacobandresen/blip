@@ -359,7 +359,10 @@ already prints, `clear` empties the log, and `man <cmd>` gives one
 command's description. `ls`/`ps`/`top` are simulated (there's no real
 filesystem or process table behind a browser tab) — decoration in
 keeping with the console looking like a shell, not a claim that a real
-one is running underneath.
+one is running underneath. `host`/`join` are not decoration, though —
+they call the exact same `showHostQR()`/`showJoinQR()` the HOST/JOIN
+buttons do (same `body`/`panel` DOM references, captured once when the
+modal opens), so pairing can be driven entirely from the keyboard.
 
 ## Open questions
 
