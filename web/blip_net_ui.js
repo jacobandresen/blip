@@ -10,8 +10,11 @@
  * No hand-holding prose in the dialog itself — instead a terminal-style
  * console (.blip-net-term, styled in shell.css) stacked below the panel
  * prints what's actually happening: SDP sizes, ICE candidate counts,
- * RTCPeerConnection/DataChannel state, camera + scan progress. See
- * termPrint() below.
+ * RTCPeerConnection/DataChannel state, camera + scan progress, and —
+ * straight off RTCPeerConnection.getStats() — which ICE candidate pairs
+ * were actually tried and whether their connectivity checks got a
+ * response, so a "timeout" comes with an actual diagnosis instead of
+ * just the word. See termPrint()/reportFailureDiagnosis() below.
  */
 (function () {
   'use strict';
@@ -88,7 +91,6 @@
   var debugPollTimer = null;
   var lastDebugSnapshot = null;
   function startDebugPoll() {
-    stopDebugPoll();
     lastDebugSnapshot = null;
     debugPollTimer = setInterval(function () {
       if (typeof window.__blipNetDebug !== 'function') return;
@@ -111,6 +113,116 @@
     if (debugPollTimer) { clearInterval(debugPollTimer); debugPollTimer = null; }
   }
 
+  // The actual ICE connectivity-check attempts, straight off
+  // RTCPeerConnection.getStats() (window.__blipNetStats(), blip_net.js) —
+  // pc.iceConnectionState alone says checks are happening, not which
+  // candidate pairs, what kind (host/srflx/relay), or whether a check's
+  // request ever got a response. Slower than the debug poll above
+  // (getStats() is heavier) and only prints a pair when its summary
+  // string actually changes.
+  var statsPollTimer = null;
+  var lastPairsKey = null;
+  // The most recent *non-empty* pairs snapshot — kept because Chrome can
+  // (and, observed firsthand while building this, does) hand back an
+  // empty getStats() report for a pair that has already moved to
+  // 'failed', right as pc.connectionState itself flips to 'failed'. A
+  // live re-query made right at that moment can come back with nothing
+  // to show, even though the poller below saw the real pair a second
+  // earlier — reportFailureDiagnosis() falls back to this rather than
+  // wrongly concluding no candidates were ever exchanged at all.
+  var lastKnownPairs = null;
+  function pairSummary(p) {
+    return p.local + ' <-> ' + p.remote + ': ' + p.state +
+      (p.nominated ? ' nominated' : '') + ' (req ' + p.requestsSent + '/resp ' + p.responsesReceived + ')';
+  }
+  function startStatsPoll() {
+    lastPairsKey = null;
+    lastKnownPairs = null;
+    statsPollTimer = setInterval(function () {
+      if (typeof window.__blipNetStats !== 'function') return;
+      window.__blipNetStats().then(function (pairs) {
+        if (!pairs || !pairs.length) return;
+        lastKnownPairs = pairs;
+        var key = pairs.map(pairSummary).join('|');
+        if (key === lastPairsKey) return;
+        lastPairsKey = key;
+        pairs.forEach(function (p) {
+          termPrint('candidate-pair ' + pairSummary(p), p.state === 'succeeded' ? 'ok' : (p.state === 'failed' ? 'err' : undefined));
+        });
+      });
+    }, 1500);
+  }
+  function stopStatsPoll() {
+    if (statsPollTimer) { clearInterval(statsPollTimer); statsPollTimer = null; }
+    lastPairsKey = null;
+  }
+
+  // Just so a long, quiet "checking" doesn't read as a frozen dialog — a
+  // periodic "still here" line counting down to blip_net.js's own
+  // CONNECT_TIMEOUT_MS.
+  var heartbeatTimer = null;
+  var connectDeadline = 0;
+  function startHeartbeat() {
+    var timeoutMs = (window.BlipNet && window.BlipNet.CONNECT_TIMEOUT_MS) || 60000;
+    connectDeadline = Date.now() + timeoutMs;
+    heartbeatTimer = setInterval(function () {
+      var remaining = Math.max(0, Math.round((connectDeadline - Date.now()) / 1000));
+      termPrint('still waiting for a connection — ' + remaining + 's until timeout');
+    }, 5000);
+  }
+  function stopHeartbeat() {
+    if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+  }
+
+  function startTelemetry() {
+    stopTelemetry();
+    startDebugPoll();
+    startStatsPoll();
+    startHeartbeat();
+  }
+  function stopTelemetry() {
+    stopDebugPoll();
+    stopStatsPoll();
+    stopHeartbeat();
+  }
+
+  /** Printed once, right when a connection attempt gives up ('failed' or
+   * 'timeout') — turns whatever candidate-pair stats are left into an
+   * actual explanation instead of leaving "signal: timeout" to speak for
+   * itself. Grounded in getStats() numbers, not a guess: a pair that sent
+   * connectivity-check requests and got zero responses back means
+   * something between the two devices is dropping that traffic — the two
+   * indistinguishable-from-JS causes are a router's "client/AP isolation"
+   * setting (blocks devices from reaching each other directly; common on
+   * guest/public WiFi) and an OS-level firewall on either device blocking
+   * inbound UDP, so both get named rather than picking one. */
+  function reportFailureDiagnosis() {
+    if (typeof window.__blipNetStats !== 'function') { termPrint('no getStats() available for a diagnosis', 'err'); return; }
+    window.__blipNetStats().then(function (pairs) {
+      if (!pairs || !pairs.length) pairs = lastKnownPairs; // see lastKnownPairs' own comment above
+      if (!pairs || !pairs.length) {
+        termPrint('diagnosis: no ICE candidate pairs ever formed — the two devices never received usable candidates from each other (a signaling problem, not a network one).', 'err');
+        return;
+      }
+      var succeeded = pairs.some(function (p) { return p.state === 'succeeded' || p.nominated; });
+      if (succeeded) {
+        termPrint('diagnosis: a candidate pair actually connected — whatever failed came after that (the DataChannel itself, most likely). Worth just trying again.', 'err');
+        return;
+      }
+      var checked = pairs.filter(function (p) { return p.requestsSent > 0; });
+      var neverResponded = checked.filter(function (p) { return p.responsesReceived === 0; });
+      if (checked.length && neverResponded.length === checked.length) {
+        termPrint('diagnosis: ' + neverResponded.length + '/' + pairs.length +
+          ' candidate pair(s) sent connectivity checks and got zero responses back — ' +
+          'something between the two devices is dropping that traffic.', 'err');
+        termPrint('likely cause: the WiFi’s "client/AP isolation" setting (blocks devices from reaching each other directly — common on guest/public networks), or an OS-level firewall on either phone blocking inbound UDP.', 'err');
+        return;
+      }
+      termPrint('diagnosis: ' + pairs.length + ' candidate pair(s) tried, none succeeded (' +
+        pairs.map(function (p) { return p.state; }).join(', ') + ') — the devices could not reach each other on this network.', 'err');
+    });
+  }
+
   function signalKind(s) {
     if (s === 'connected') return 'ok';
     if (s === 'failed' || s === 'timeout') return 'err';
@@ -123,7 +235,7 @@
   // (a match just connected and is about to start) needs the DataChannel
   // to survive the modal closing, not get torn down by it.
   function dismissModal() {
-    stopDebugPoll();
+    stopTelemetry();
     if (modalEl) { modalEl.remove(); modalEl = null; }
     if (stopActiveScan) { stopActiveScan(); stopActiveScan = null; }
   }
@@ -207,7 +319,7 @@
     termSetUser('host@blip');
     termPrint('blip-pair --host --signal=qr', 'cmd');
     termPrint('generating local session description...');
-    startDebugPoll();
+    startTelemetry();
 
     window.BlipNet.host(function (offerSdp) {
       window.BlipQR.render(canvas, offerSdp);
@@ -221,9 +333,10 @@
       });
     }, function (s) {
       termPrint('signal: ' + s, signalKind(s));
-      if (s === 'connected') { stopDebugPoll(); setTimeout(dismissModal, 600); return; }
+      if (s === 'connected') { stopTelemetry(); setTimeout(dismissModal, 600); return; }
       if (s === 'failed' || s === 'timeout') {
-        stopDebugPoll();
+        reportFailureDiagnosis();
+        stopTelemetry();
         setTimeout(function () { if (modalEl) showChoice(body, panel); }, 1500);
       }
     });
@@ -233,7 +346,7 @@
     clear(body);
     termSetUser('guest@blip');
     termPrint('blip-pair --join --signal=qr', 'cmd');
-    startDebugPoll();
+    startTelemetry();
     showScanButton(body, panel, 'SCAN HOST’S CODE', function (offerSdp) {
       var candidates = (offerSdp.match(/a=candidate:/g) || []).length;
       termPrint('offer scanned: ' + offerSdp.length + ' bytes, ' + candidates + ' ice candidate(s)', 'ok');
@@ -245,9 +358,10 @@
         termPrint('answer ready: ' + answerSdp.length + ' bytes — show it to your host', 'ok');
       }, function (s) {
         termPrint('signal: ' + s, signalKind(s));
-        if (s === 'connected') { stopDebugPoll(); setTimeout(dismissModal, 600); return; }
+        if (s === 'connected') { stopTelemetry(); setTimeout(dismissModal, 600); return; }
         if (s === 'failed' || s === 'timeout') {
-          stopDebugPoll();
+          reportFailureDiagnosis();
+          stopTelemetry();
           setTimeout(function () { if (modalEl) showChoice(body, panel); }, 1500);
         }
       });

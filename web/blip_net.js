@@ -259,7 +259,10 @@
     return s;
   };
 
-  window.BlipNet = { host: host, join: join, submitAnswer: submitAnswer, cancel: cancel };
+  window.BlipNet = {
+    host: host, join: join, submitAnswer: submitAnswer, cancel: cancel,
+    CONNECT_TIMEOUT_MS: CONNECT_TIMEOUT_MS, // blip_net_ui.js's terminal needs this to show a countdown
+  };
   // Debug/test introspection only — test/multiplayer.mjs and manual
   // console debugging. Not part of the public API.
   window.__blipNetDebug = function () {
@@ -273,5 +276,47 @@
       pcConnectionState: pc && pc.connectionState,
       pcIceConnectionState: pc && pc.iceConnectionState,
     };
+  };
+  // A "timeout" (or a long, quiet "checking") is otherwise a black box —
+  // pc.iceConnectionState alone says *that* candidates are being checked,
+  // not what they are or why none of them are succeeding (same-WiFi
+  // "client/AP isolation" — a router refusing to let its own clients talk
+  // directly to each other — is the single most common real-world cause;
+  // see docs/multiplayer.md). RTCPeerConnection.getStats() has the actual
+  // local/remote candidate-pair attempts and their outcome. Async (hence
+  // separate from the synchronous __blipNetDebug() above) and
+  // best-effort: resolves `null` rather than throwing if getStats() itself
+  // isn't available or the connection has already closed.
+  window.__blipNetStats = function () {
+    if (!pc || typeof pc.getStats !== 'function') return Promise.resolve(null);
+    return pc.getStats().then(function (report) {
+      var candidates = {};
+      report.forEach(function (s) {
+        if (s.type === 'local-candidate' || s.type === 'remote-candidate') candidates[s.id] = s;
+      });
+      function describe(c) {
+        if (!c) return '?';
+        return [c.candidateType, c.protocol, (c.address || c.ip || '?') + ':' + (c.port != null ? c.port : '?')]
+          .filter(Boolean).join(' ');
+      }
+      var pairs = [];
+      report.forEach(function (s) {
+        if (s.type !== 'candidate-pair') return;
+        pairs.push({
+          state: s.state,
+          nominated: !!s.nominated,
+          local: describe(candidates[s.localCandidateId]),
+          remote: describe(candidates[s.remoteCandidateId]),
+          // Whether a connectivity check actually got a response is the
+          // difference between "still trying" and "something is dropping
+          // this traffic" — not populated on every pair (e.g. one still
+          // 'waiting' has sent nothing yet), so default to 0 rather than
+          // leaving it undefined for the UI's arithmetic/display.
+          requestsSent: s.requestsSent || 0,
+          responsesReceived: s.responsesReceived || 0,
+        });
+      });
+      return pairs;
+    }).catch(function () { return null; });
   };
 }());
