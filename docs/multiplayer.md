@@ -71,7 +71,7 @@ travel over some channel that already exists — which, by definition,
 isn't the DataChannel we're trying to set up.
 
 **QR codes, exclusively** (`web/blip_net.js`'s `host()`/`join()`, wired up
-by `web/blip_net_ui.js`'s "PLAY NEARBY" modal). Host renders its SDP
+by `web/blip_net_ui.js`'s "JACK IN" modal). Host renders its SDP
 offer as a QR code; guest scans it with the camera, generates an answer,
 shows *that* as a QR code; host scans it back. Zero network needed for
 pairing at all — no server, no account, nothing to reach before the two
@@ -142,7 +142,7 @@ this will need to evolve:
   `update_play`'s simulation at all, just copies the latest polled packet
   into `Game`'s fields — `draw_play` doesn't change, it already just
   reads those fields.
-- **Title screen.** A "PLAY NEARBY" entry point opens the pairing modal
+- **Title screen.** A "JACK IN" entry point opens the pairing modal
   (`blip_net_ui.js`) before `start_game()` ever runs; once paired,
   `update_title` picks up the role via `blip_net_role()` and starts a
   normal `Mode::TwoPlayer` match.
@@ -333,7 +333,7 @@ Once QR scanning itself stopped being the question, the next real-hardware
 report was a bare "it just timed out" after both codes scanned fine — the
 signaling worked, something about the actual peer-to-peer connection
 didn't, and `status('timeout')` alone gives no way to tell why. The
-PLAY NEARBY terminal (`web/blip_net_ui.js`, see below) now diagnoses this
+JACK IN terminal (`web/blip_net_ui.js`, see below) now diagnoses this
 directly off `RTCPeerConnection.getStats()`
 (`window.__blipNetStats()`, `web/blip_net.js`): every ICE candidate pair
 actually attempted, its local/remote candidate type and address, and —
@@ -350,6 +350,16 @@ scan feeding `blip_net.js` a hand-built offer whose one ICE candidate
 points at `10.255.255.1` (a non-routable test address) reliably
 reproduces the exact "requests sent, zero responses" shape and prints the
 same diagnosis a real isolated/firewalled network would.
+
+The console also takes real input, not just prints — its prompt is a
+genuine (if off-screen) `<input>`, so typing `help` at it lists a small
+set of debug commands: `status`/`stats` are on-demand copies of the same
+real `__blipNetDebug()`/`__blipNetStats()` data the auto-telemetry above
+already prints, `clear` empties the log, and `man <cmd>` gives one
+command's description. `ls`/`ps`/`top` are simulated (there's no real
+filesystem or process table behind a browser tab) — decoration in
+keeping with the console looking like a shell, not a claim that a real
+one is running underneath.
 
 ## Open questions
 

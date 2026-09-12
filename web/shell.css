@@ -714,7 +714,12 @@ canvas {
 .blip-net-term-log {
   flex: none;
   height: 120px;
-  overflow-y: auto;
+  /* No visible scrollbar — this is a live readout, not a document to
+     scroll back through. termPrint() (web/blip_net_ui.js) always pins
+     scrollTop to the bottom, so hidden overflow still shows exactly the
+     latest lines; older ones just clip off the top instead of a
+     scrollbar appearing to reach them. */
+  overflow-y: hidden;
   padding: 8px 10px;
   font-size: 10px;
   line-height: 1.6;
@@ -725,20 +730,46 @@ canvas {
 .blip-net-term-line.err { color: #ff4b3e; text-shadow: 0 0 6px rgba(255, 60, 40, 0.6); }
 .blip-net-term-prompt {
   flex: none;
+  display: flex;
+  align-items: center;
   padding: 6px 10px 8px;
   font-size: 10px;
   color: #ffb15e;
   border-top: 1px solid rgba(228, 52, 43, 0.25);
+  white-space: nowrap;
+  cursor: text; /* clicking anywhere on the row focuses the (hidden) input, like a real terminal */
+  overflow: hidden;
 }
-.blip-net-term-prompt .cursor {
+.blip-net-term-typed { white-space: pre; }
+/* A blinking solid block, not a thin caret — reads as a real terminal
+   cursor, not a form field being edited. */
+.blip-net-term-cursor {
   display: inline-block;
-  background: #ff8a5b;
-  color: transparent;
-  width: 7px;
+  width: 0.6em;
+  height: 1.1em;
   margin-left: 1px;
+  background: #ff8a5b;
+  vertical-align: text-bottom;
   animation: blip-term-blink 1s steps(1) infinite;
 }
 @keyframes blip-term-blink { 50% { opacity: 0; } }
+/* type('help') for the list of debug commands (web/blip_net_ui.js's
+   runCommand()) — this <input> is what actually captures keystrokes
+   (and, on a phone, is what opens the keyboard) but is never itself
+   shown; .blip-net-term-typed above mirrors its value. Parked off-screen
+   rather than just visually hidden so there's no residual form-field
+   chrome (border, focus ring, native caret) anywhere in the prompt row. */
+.blip-net-term-input {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  opacity: 0;
+}
 
 @media (max-width: 380px) {
   .blip-hs-title { font-size: 11px; }
