@@ -364,6 +364,40 @@ they call the exact same `showHostQR()`/`showJoinQR()` the HOST/JOIN
 buttons do (same `body`/`panel` DOM references, captured once when the
 modal opens), so pairing can be driven entirely from the keyboard.
 
+The console's own frame-count line turned out to carry the next real bug:
+"it does not succeed in scanning the QR code" plus "candidate patterns in
+view . A lot (500+)" pointed straight at the finder-pattern heuristic
+above — designed to be a lightweight, cosmetic hint, but its row+column
+run-length scan ran at the camera's full native resolution (which can now
+be up to 1920x1920 — see the getUserMedia resolution change), and in a
+real, visually busy scene (background detail, on-screen text, camera
+sensor noise) that combination flagged *hundreds* of false positives a
+frame. Multiplied by hundreds of overlay shapes to draw and hundreds of
+entries for an O(n²) clustering step, every single animation frame, this
+was very likely why scanning failed outright on real hardware rather than
+just showing a noisy overlay — the phone was spending its time on the
+heuristic instead of on decoding or on drawing a smooth-enough preview to
+frame the shot with.
+
+Replaced with something that leans directly on the pairing UX itself
+("rely on the QR code taking out most of the camera screen"): rather
+than hunting for a small feature (a finder pattern is only a fraction of
+a whole code) that could be anywhere in frame, `blip_qr.js` now crops the
+camera capture to a centered *square* first — the same crop
+`object-fit: cover` already applies to the preview `<video>` itself, so
+this only ever discards content the user can't even see — and checks
+whether the one big centered region a code filling most of that square
+would occupy (a hit region has to be at least half the frame, and square,
+to count at all) has real QR-like contrast in it: enough range between
+light and dark, and roughly half-and-half of each (not a mostly-uniform
+region with one small high-contrast detail off to the side). At most one
+candidate, ever — a hard structural guarantee (a single square region,
+not a list to cap), not a tuned threshold that happens to usually work.
+Verified with a deliberately busy, high-resolution synthetic test pattern
+(the exact combination that produced 500+ before this fix): now reports
+at most 1, every time, with the real two-device e2e decode test still
+passing throughout.
+
 ## Open questions
 
 - **Cheating.** A guest's browser console can just send fabricated
