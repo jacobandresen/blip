@@ -408,6 +408,31 @@
     return undefined;
   }
 
+  /** Print each `a=candidate:` line in `sdp` (an offer or answer, either
+   * just generated or just scanned) as one readable line — real
+   * connection info (type, protocol, address:port), not just the byte
+   * count the surrounding "offer ready"/"offer scanned" line already
+   * gives. Lets a real ICE candidate's address get eyeballed directly —
+   * e.g. an mDNS-hidden `*.local` name, an unexpected IPv6 literal, or a
+   * candidate on the wrong network entirely — right at the point it was
+   * exchanged, without waiting for a `stats` candidate-pair line that
+   * only exists once ICE has actually started checking it. */
+  function printCandidates(sdp) {
+    var any = false;
+    sdp.split(/\r\n|\n/).forEach(function (line) {
+      if (line.indexOf('a=candidate:') !== 0) return;
+      any = true;
+      var parts = line.split(' ');
+      var proto = parts[2] || '?';
+      var address = parts[4] || '?';
+      var port = parts[5] || '?';
+      var typIndex = parts.indexOf('typ');
+      var type = typIndex >= 0 ? parts[typIndex + 1] : '?';
+      termPrint('  candidate: ' + type + ' ' + proto + ' ' + address + ':' + port, undefined, true);
+    });
+    if (!any) termPrint('  (no candidates in this SDP)', 'err', true);
+  }
+
   // ---- modal shell -----------------------------------------------------------
 
   // Dismiss the modal WITHOUT touching the connection — the success path
@@ -506,9 +531,11 @@
       window.BlipQR.render(canvas, offerSdp);
       var candidates = (offerSdp.match(/a=candidate:/g) || []).length;
       termPrint('offer ready: ' + offerSdp.length + ' bytes, ' + candidates + ' ice candidate(s)', 'ok');
+      printCandidates(offerSdp);
       termPrint('qr rendered — waiting for peer to scan it');
       showScanButton(body, panel, 'SCAN THEIR ANSWER', function (text) {
         termPrint('answer scanned: ' + text.length + ' bytes', 'ok');
+        printCandidates(text);
         termPrint('applying remote description...');
         window.BlipNet.submitAnswer(text);
       });
@@ -531,12 +558,14 @@
     showScanButton(body, panel, 'SCAN HOST’S CODE', function (offerSdp) {
       var candidates = (offerSdp.match(/a=candidate:/g) || []).length;
       termPrint('offer scanned: ' + offerSdp.length + ' bytes, ' + candidates + ' ice candidate(s)', 'ok');
+      printCandidates(offerSdp);
       clear(body);
       var canvas = qrCanvas(body);
       termPrint('generating answer...');
       window.BlipNet.join(offerSdp, function (answerSdp) {
         window.BlipQR.render(canvas, answerSdp);
         termPrint('answer ready: ' + answerSdp.length + ' bytes — show it to your host', 'ok');
+        printCandidates(answerSdp);
       }, function (s) {
         termPrint('signal: ' + s, signalKind(s));
         if (s === 'connected') { stopTelemetry(); setTimeout(dismissModal, 600); return; }
