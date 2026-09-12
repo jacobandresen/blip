@@ -40,6 +40,8 @@
   var connectTimer = null;
   var keyState = { KeyI: false, KeyK: false }; // guest's own tracked input, for edge-triggered dispatch
   var onStatusCb = null;
+  var pendingPings = {};        // id -> { sentAt, cb, timer } — in-flight ping() calls awaiting their pong
+  var pingSeq = 0;
 
   function status(s, detail) {
     if (typeof onStatusCb === 'function') {
@@ -143,6 +145,24 @@
     dc.addEventListener('message', function (e) {
       if (channelObj !== dc) return;
       if (typeof e.data === 'string') {
+        // App-level ping/pong (see ping() below) — either side can send
+        // one, so check for both regardless of role. Checked before
+        // decodeInput since they're disjoint `t` values on the same wire.
+        var ping = proto.decodePing(e.data);
+        if (ping) {
+          try { dc.send(proto.encodePong(ping.id)); } catch (e2) { /* best-effort reply */ }
+          return;
+        }
+        var pong = proto.decodePong(e.data);
+        if (pong) {
+          var waiting = pendingPings[pong.id];
+          if (waiting) { // no entry: a late reply to a ping we already gave up on — ignore it
+            delete pendingPings[pong.id];
+            clearTimeout(waiting.timer);
+            waiting.cb(Date.now() - waiting.sentAt, null);
+          }
+          return;
+        }
         // Guest -> host input, only meaningful on the host.
         var input = proto.decodeInput(e.data);
         if (input) {
@@ -294,9 +314,48 @@
     }));
   }
 
+  /** A round trip over the already-open DataChannel — proof the *other
+   * device's page* is actually receiving and replying right now, not just
+   * that RTCPeerConnection/DataChannel state says 'connected' (that can
+   * stay true for a peer whose tab has since been backgrounded/killed, or
+   * a channel that's technically open but silently wedged). Used by the
+   * JACK IN console's CHECK button/`ping` command
+   * (web/blip_net_ui.js) — a manual, on-demand answer to "is the other
+   * side actually still there", separate from the connect-time telemetry
+   * that only runs while a connection is still being established.
+   * `onResult(rttMs, errorReason)`: exactly one fires, `errorReason` is
+   * `null` only on success. */
+  function ping(onResult, timeoutMs) {
+    if (!dc || dc.readyState !== 'open') { onResult(null, 'not connected'); return; }
+    var id = 'p' + (++pingSeq) + '-' + Date.now();
+    var timer = setTimeout(function () {
+      if (!pendingPings[id]) return;
+      delete pendingPings[id];
+      onResult(null, 'timeout');
+    }, timeoutMs || 3000);
+    pendingPings[id] = { sentAt: Date.now(), cb: onResult, timer: timer };
+    try {
+      dc.send(proto.encodePing(id));
+    } catch (e) {
+      clearTimeout(timer);
+      delete pendingPings[id];
+      onResult(null, 'send failed');
+    }
+  }
+
+  function clearPendingPings() {
+    Object.keys(pendingPings).forEach(function (id) {
+      var p = pendingPings[id];
+      clearTimeout(p.timer);
+      delete pendingPings[id];
+      p.cb(null, 'cancelled');
+    });
+  }
+
   function cancel() {
     clearConnectTimer();
     detachGuestInputCapture();
+    clearPendingPings();
     if (dc) { try { dc.close(); } catch (e) {} dc = null; }
     if (pc) { try { pc.close(); } catch (e) {} pc = null; }
     role = 0;
@@ -316,7 +375,7 @@
   };
 
   window.BlipNet = {
-    host: host, join: join, submitAnswer: submitAnswer, cancel: cancel,
+    host: host, join: join, submitAnswer: submitAnswer, cancel: cancel, ping: ping,
     CONNECT_TIMEOUT_MS: CONNECT_TIMEOUT_MS, // blip_net_ui.js's terminal needs this to show a countdown
   };
   // Debug/test introspection only — test/multiplayer.mjs and manual

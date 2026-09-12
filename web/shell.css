@@ -771,9 +771,68 @@ canvas {
   opacity: 0;
 }
 
+/* The glanceable info bar under the QR/scan area (web/blip_net_ui.js's
+   statusBar()) — plain language, big enough to actually read, so
+   "was that code scanned right" / "are we connected" never requires
+   parsing the terminal's small scrolling monospace below it. Cyan/yellow
+   (the same modal-chrome palette .blip-hs-* already uses), deliberately
+   NOT the terminal's red/orange — this is regular UI, not the hacker
+   console bolted onto the side of it. */
+.blip-net-status {
+  width: min(92vw, 340px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 auto;
+  padding: 8px 10px;
+  border: 2px solid rgba(120, 220, 255, 0.35);
+  border-radius: 4px;
+  background: rgba(16, 32, 44, 0.6);
+  box-sizing: border-box;
+}
+.blip-net-status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7fa6b5;
+  box-shadow: 0 0 6px rgba(127, 166, 181, 0.8);
+}
+.blip-net-status.wait .blip-net-status-dot { background: #ffd94a; box-shadow: 0 0 6px rgba(255, 217, 74, 0.8); }
+.blip-net-status.ok .blip-net-status-dot { background: #6dffa8; box-shadow: 0 0 6px rgba(109, 255, 168, 0.8); }
+.blip-net-status.err .blip-net-status-dot { background: #ff6b6b; box-shadow: 0 0 6px rgba(255, 107, 107, 0.8); }
+.blip-net-status-text {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.5px;
+  color: #cfe6ef;
+  text-align: left;
+  word-break: break-word;
+}
+.blip-net-status.ok .blip-net-status-text { color: #6dffa8; }
+.blip-net-status.err .blip-net-status-text { color: #ff6b6b; }
+.blip-net-status-check {
+  flex: none;
+  padding: 6px 8px;
+  border: 2px solid rgba(120, 220, 255, 0.5);
+  border-radius: 4px;
+  background: #10202c;
+  color: #eafff8;
+  font-family: inherit;
+  font-size: 8px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.blip-net-status-check:hover { background: #16303f; }
+.blip-net-status-check:disabled { opacity: 0.5; }
+
 @media (max-width: 380px) {
   .blip-hs-title { font-size: 11px; }
   .blip-hs-item { font-size: 8px; }
   .blip-hs-code { font-size: 12px; letter-spacing: 2px; }
   .blip-net-term-log { height: 96px; }
+  .blip-net-status-text { font-size: 9px; }
 }

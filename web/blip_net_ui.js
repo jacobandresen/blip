@@ -14,7 +14,13 @@
  * straight off RTCPeerConnection.getStats() — which ICE candidate pairs
  * were actually tried and whether their connectivity checks got a
  * response, so a "timeout" comes with an actual diagnosis instead of
- * just the word. See termPrint()/reportFailureDiagnosis() below.
+ * just the word. Every raw status/state value is printed alongside a
+ * plain-language line, not instead of it (signalText(), pairSummary()),
+ * and describeConnectivity() answers "do we know anything yet?"/"does
+ * this look like the network is blocking us?" continuously while a
+ * connection is stuck (the heartbeat, every 5s) and on demand (the
+ * `stats` command) — not just once it's too late to matter, at the very
+ * end (reportFailureDiagnosis()). See termPrint() below.
  *
  * It also takes real input — type 'help' at its prompt for the command
  * list. `status`/`stats` are on-demand copies of the same real data the
@@ -222,10 +228,22 @@
         if (typeof window.__blipNetStats !== 'function') { termPrint('__blipNetStats unavailable', 'err', true); return; }
         window.__blipNetStats().then(function (pairs) {
           if (!pairs || !pairs.length) { termPrint('no candidate pairs yet', undefined, true); return; }
+          // The same plain-language read the heartbeat prints every 5s
+          // while waiting — on demand here too, so `stats` answers "are
+          // we missing info?" / "is the network blocking us?" directly
+          // instead of leaving the reader to interpret req/resp numbers.
+          var info = describeConnectivity(pairs);
+          termPrint(info.text, info.kind, true);
           pairs.forEach(function (p) {
             termPrint('candidate-pair ' + pairSummary(p), p.state === 'succeeded' ? 'ok' : (p.state === 'failed' ? 'err' : undefined), true);
           });
         });
+      },
+    },
+    check: {
+      desc: 'check the connection right now (pings the peer if connected)',
+      run: function () {
+        checkConnection(function (text, kind) { termPrint(text, kind, true); });
       },
     },
     ls: { desc: 'list files in the current directory', run: simulateLs },
@@ -336,9 +354,38 @@
     lastPairsKey = null;
   }
 
+  /** A live, one-line, plain-language read of "what do we actually know
+   * right now" from whatever candidate-pair stats exist — the same two
+   * questions worth asking the whole time a connection is stuck, not
+   * just once it's given up: do we have anything to go on yet, and does
+   * what we have look like the network is blocking this. Shared between
+   * the heartbeat below (prints it every 5s while waiting) and
+   * reportFailureDiagnosis() (the fuller version once an attempt
+   * actually gives up), so the two can never disagree with each other —
+   * one honest classification, read at two different times. */
+  function describeConnectivity(pairs) {
+    if (!pairs || !pairs.length) {
+      return { text: 'no connectivity info yet (still exchanging candidates)', kind: undefined };
+    }
+    var succeeded = pairs.some(function (p) { return p.state === 'succeeded' || p.nominated; });
+    if (succeeded) return { text: 'a route was found, connecting…', kind: 'ok' };
+    var checked = pairs.filter(function (p) { return p.requestsSent > 0; });
+    var neverResponded = checked.filter(function (p) { return p.responsesReceived === 0; });
+    if (checked.length && neverResponded.length === checked.length) {
+      return {
+        text: neverResponded.length + '/' + pairs.length + ' route(s) tried, 0 responses back — ' +
+          'looks like something is blocking device-to-device traffic',
+        kind: 'err',
+      };
+    }
+    return { text: pairs.length + ' route(s) still being checked…', kind: undefined };
+  }
+
   // Just so a long, quiet "checking" doesn't read as a frozen dialog — a
   // periodic "still here" line counting down to blip_net.js's own
-  // CONNECT_TIMEOUT_MS.
+  // CONNECT_TIMEOUT_MS, alongside describeConnectivity()'s live read of
+  // what's actually known so far (updates as ICE learns more; reads "no
+  // connectivity info yet" until the first candidate pair shows up).
   var heartbeatTimer = null;
   var connectDeadline = 0;
   function startHeartbeat() {
@@ -346,7 +393,8 @@
     connectDeadline = Date.now() + timeoutMs;
     heartbeatTimer = setInterval(function () {
       var remaining = Math.max(0, Math.round((connectDeadline - Date.now()) / 1000));
-      termPrint('still waiting for a connection — ' + remaining + 's until timeout');
+      var info = describeConnectivity(lastKnownPairs);
+      termPrint(remaining + 's until timeout — ' + info.text, info.kind);
     }, 5000);
   }
   function stopHeartbeat() {
@@ -368,33 +416,34 @@
   /** Printed once, right when a connection attempt gives up ('failed' or
    * 'timeout') — turns whatever candidate-pair stats are left into an
    * actual explanation instead of leaving "signal: timeout" to speak for
-   * itself. Grounded in getStats() numbers, not a guess: a pair that sent
-   * connectivity-check requests and got zero responses back means
-   * something between the two devices is dropping that traffic — the two
-   * indistinguishable-from-JS causes are a router's "client/AP isolation"
-   * setting (blocks devices from reaching each other directly; common on
-   * guest/public WiFi) and an OS-level firewall on either device blocking
-   * inbound UDP, so both get named rather than picking one. */
+   * itself, built on the exact same classification describeConnectivity()
+   * has been printing every 5s of the wait (so this is never a surprise —
+   * "no info yet"/"looks blocked" should already have shown up in the
+   * heartbeat above whatever this line ends up saying). Grounded in
+   * getStats() numbers, not a guess: a pair that sent connectivity-check
+   * requests and got zero responses back means something between the two
+   * devices is dropping that traffic — several real causes look
+   * identical from here (a router's "client/AP isolation" setting, a
+   * VPN active on either device routing "local" traffic through a
+   * remote tunnel instead, an OS-level firewall blocking inbound UDP),
+   * so all of them get named rather than guessing at just one. */
   function reportFailureDiagnosis() {
-    if (typeof window.__blipNetStats !== 'function') { termPrint('no getStats() available for a diagnosis', 'err'); return; }
+    if (typeof window.__blipNetStats !== 'function') { termPrint('diagnosis: no getStats() available to explain this', 'err'); return; }
     window.__blipNetStats().then(function (pairs) {
       if (!pairs || !pairs.length) pairs = lastKnownPairs; // see lastKnownPairs' own comment above
       if (!pairs || !pairs.length) {
-        termPrint('diagnosis: no ICE candidate pairs ever formed — the two devices never received usable candidates from each other (a signaling problem, not a network one).', 'err');
+        termPrint('diagnosis: no ICE candidate pairs ever formed — missing info, not a network block. ' +
+          'The two devices never received usable candidates from each other in the first place (a signaling problem).', 'err');
         return;
       }
-      var succeeded = pairs.some(function (p) { return p.state === 'succeeded' || p.nominated; });
-      if (succeeded) {
+      var info = describeConnectivity(pairs);
+      if (info.kind === 'ok') {
         termPrint('diagnosis: a candidate pair actually connected — whatever failed came after that (the DataChannel itself, most likely). Worth just trying again.', 'err');
         return;
       }
-      var checked = pairs.filter(function (p) { return p.requestsSent > 0; });
-      var neverResponded = checked.filter(function (p) { return p.responsesReceived === 0; });
-      if (checked.length && neverResponded.length === checked.length) {
-        termPrint('diagnosis: ' + neverResponded.length + '/' + pairs.length +
-          ' candidate pair(s) sent connectivity checks and got zero responses back — ' +
-          'something between the two devices is dropping that traffic.', 'err');
-        termPrint('likely cause: the WiFi’s "client/AP isolation" setting (blocks devices from reaching each other directly — common on guest/public networks), or an OS-level firewall on either phone blocking inbound UDP.', 'err');
+      if (info.kind === 'err') {
+        termPrint('diagnosis: ' + info.text + '.', 'err');
+        termPrint('likely cause: the WiFi’s "client/AP isolation" setting (blocks devices from reaching each other directly — common on guest/public networks), a VPN active on either device (routes "local" traffic through a remote tunnel instead — easy to overlook, worth turning off and retrying), or an OS-level firewall on either device blocking inbound UDP.', 'err');
         return;
       }
       termPrint('diagnosis: ' + pairs.length + ' candidate pair(s) tried, none succeeded (' +
@@ -402,10 +451,56 @@
     });
   }
 
+  /** The CHECK button (in the info bar under the QR/scan area) and the
+   * `check` console command both call this — an on-demand answer to "can
+   * I actually reach the other side right now", not just a status label.
+   * Once the DataChannel is open it's a real ping/pong round trip
+   * (window.BlipNet.ping(), blip_net.js) — proof the other page is still
+   * there and responding, not just that WebRTC's own state says
+   * 'connected'. Before that (still exchanging/checking ICE candidates)
+   * there's no channel to ping yet, so it falls back to the same
+   * describeConnectivity() read of getStats() the heartbeat already
+   * prints — "do we know anything yet" / "does this look blocked" — just
+   * fetched fresh instead of waiting for the next 5s tick.
+   * `report(text, kind)` fires exactly once with the result. */
+  function checkConnection(report) {
+    report('checking…', undefined);
+    var debug = typeof window.__blipNetDebug === 'function' ? window.__blipNetDebug() : null;
+    if (debug && debug.dcState === 'open' && window.BlipNet && typeof window.BlipNet.ping === 'function') {
+      window.BlipNet.ping(function (rtt, err) {
+        if (rtt != null) report('peer reached — ' + Math.round(rtt) + 'ms round trip', 'ok');
+        else report('no response from peer (' + err + ')', 'err');
+      });
+      return;
+    }
+    if (typeof window.__blipNetStats !== 'function') { report('nothing to check yet', undefined); return; }
+    window.__blipNetStats().then(function (pairs) {
+      var info = describeConnectivity(pairs);
+      report(info.text, info.kind);
+    });
+  }
+
   function signalKind(s) {
     if (s === 'connected') return 'ok';
     if (s === 'failed' || s === 'timeout') return 'err';
     return undefined;
+  }
+
+  /** blip_net.js's raw status strings ('waiting', 'answering', …) are
+   * exactly what a real WebRTC signaling flow calls these states, but
+   * they don't say what to actually *do* about one — printed alongside
+   * the raw value (never replacing it) so both the plain meaning and
+   * the exact wire term are always on screen together. */
+  function signalText(s) {
+    switch (s) {
+      case 'waiting': return 'waiting for the other device to scan this code';
+      case 'answering': return 'code scanned — now connecting to the host';
+      case 'connected': return 'connected!';
+      case 'disconnected': return 'disconnected';
+      case 'failed': return 'connection failed';
+      case 'timeout': return 'gave up — nobody connected in time';
+      default: return s;
+    }
   }
 
   /** Print each `a=candidate:` line in `sdp` (an offer or answer, either
@@ -471,7 +566,6 @@
 
     buildTerminal(modalEl);
     termReset();
-    termPrint('jacking in..');
   }
 
   function showChoice(body, panel) {
@@ -507,6 +601,39 @@
     return canvas;
   }
 
+  /** A plain-language, glanceable status line under the QR/scan area —
+   * classed apart from the terminal below it (.blip-net-term) so it's the
+   * one thing you don't have to read tiny scrolling monospace to get:
+   * did the code I just showed get scanned, did the one I just scanned
+   * parse, are we connected. `set(text, kind)` ('ok'/'err'/'wait'/
+   * undefined) updates it; a CHECK button on the right runs
+   * checkConnection() on demand (a real ping/pong once connected, an ICE
+   * stats read before that) and prints the result both here and to the
+   * terminal, so tapping it never requires typing `check` at the prompt
+   * to get the same answer. */
+  function statusBar(parent, initialText, initialKind) {
+    var wrap = el('div', 'blip-net-status', parent);
+    var dot = el('span', 'blip-net-status-dot', wrap);
+    var text = el('span', 'blip-net-status-text', wrap);
+    var checkBtn = el('button', 'blip-net-status-check', wrap);
+    checkBtn.type = 'button';
+    checkBtn.textContent = 'CHECK';
+    checkBtn.addEventListener('click', function () {
+      checkBtn.disabled = true;
+      checkConnection(function (t, kind) {
+        checkBtn.disabled = false;
+        set(t, kind);
+        termPrint('check: ' + t, kind, true);
+      });
+    });
+    function set(t, kind) {
+      text.textContent = t;
+      wrap.className = 'blip-net-status' + (kind ? ' ' + kind : '');
+    }
+    set(initialText, initialKind);
+    return { set: set };
+  }
+
   /** Turn a getUserMedia() rejection into a specific, actionable message
    * instead of one generic "Camera unavailable". */
   function scanErrorMessage(err) {
@@ -523,6 +650,7 @@
   function showHostQR(body, panel) {
     clear(body);
     var canvas = qrCanvas(body);
+    var status = statusBar(body, 'generating your code…', 'wait');
     termSetUser('host@blip');
     termPrint('blip-pair --host --signal=qr', 'cmd');
     termPrint('generating local session description...');
@@ -534,15 +662,32 @@
       termPrint('offer ready: ' + offerSdp.length + ' bytes, ' + candidates + ' ice candidate(s)', 'ok');
       printCandidates(offerSdp);
       termPrint('qr rendered — waiting for peer to scan it');
+      status.set('showing code — waiting for the other device to scan it', 'wait');
       showScanButton(body, panel, 'SCAN THEIR ANSWER', function (text) {
+        var candidates2 = (text.match(/a=candidate:/g) || []).length;
         termPrint('answer scanned: ' + text.length + ' bytes', 'ok');
         printCandidates(text);
         termPrint('applying remote description...');
+        status.set('✓ answer scanned (' + text.length + ' bytes, ' + candidates2 + ' route(s)) — connecting…', 'ok');
         window.BlipNet.submitAnswer(text);
       });
     }, function (s) {
-      termPrint('signal: ' + s, signalKind(s));
-      if (s === 'connected') { stopTelemetry(); setTimeout(dismissModal, 600); return; }
+      termPrint(signalText(s) + ' (signal: ' + s + ')', signalKind(s));
+      // 'waiting'/'answering' are just process states already covered by
+      // the richer messages above (qr rendered / answer scanned) — only
+      // the terminal outcomes are worth overwriting that with.
+      if (s === 'connected' || s === 'failed' || s === 'timeout' || s === 'disconnected') {
+        status.set(signalText(s), signalKind(s));
+      }
+      if (s === 'connected') {
+        // Only ever printed once the DataChannel has actually opened —
+        // never as a startup banner (that read as success before the
+        // connection was even attempted, which is exactly backwards).
+        termPrint('jacking in.. success', 'ok', true);
+        stopTelemetry();
+        setTimeout(dismissModal, 600);
+        return;
+      }
       if (s === 'failed' || s === 'timeout') {
         reportFailureDiagnosis();
         stopTelemetry();
@@ -556,20 +701,32 @@
     termSetUser('guest@blip');
     termPrint('blip-pair --join --signal=qr', 'cmd');
     startTelemetry();
+    var scanStatus = statusBar(body, 'point your camera at the host’s code', 'wait');
     showScanButton(body, panel, 'SCAN HOST’S CODE', function (offerSdp) {
       var candidates = (offerSdp.match(/a=candidate:/g) || []).length;
       termPrint('offer scanned: ' + offerSdp.length + ' bytes, ' + candidates + ' ice candidate(s)', 'ok');
       printCandidates(offerSdp);
       clear(body);
       var canvas = qrCanvas(body);
+      var status = statusBar(body,
+        '✓ host code scanned (' + offerSdp.length + ' bytes, ' + candidates + ' route(s)) — generating your code…', 'ok');
       termPrint('generating answer...');
       window.BlipNet.join(offerSdp, function (answerSdp) {
         window.BlipQR.render(canvas, answerSdp);
         termPrint('answer ready: ' + answerSdp.length + ' bytes — show it to your host', 'ok');
         printCandidates(answerSdp);
+        status.set('showing your code — waiting for the host to scan it', 'wait');
       }, function (s) {
-        termPrint('signal: ' + s, signalKind(s));
-        if (s === 'connected') { stopTelemetry(); setTimeout(dismissModal, 600); return; }
+        termPrint(signalText(s) + ' (signal: ' + s + ')', signalKind(s));
+        if (s === 'connected' || s === 'failed' || s === 'timeout' || s === 'disconnected') {
+          status.set(signalText(s), signalKind(s));
+        }
+        if (s === 'connected') {
+          termPrint('jacking in.. success', 'ok', true);
+          stopTelemetry();
+          setTimeout(dismissModal, 600);
+          return;
+        }
         if (s === 'failed' || s === 'timeout') {
           reportFailureDiagnosis();
           stopTelemetry();
@@ -589,7 +746,7 @@
     var holder = el('div', '', body);
     function startScanning() {
       clear(holder);
-      // max-width:100% safety net — the box shrinks on a narrow phone
+      // max-width:100% safety net — the box shrinks on a narrow screen
       // rather than overflowing the panel.
       var wrap = el('div', '', holder);
       wrap.style.cssText = 'position:relative;width:260px;max-width:100%;aspect-ratio:1/1;margin:10px auto;';
@@ -605,7 +762,7 @@
       // for one can pick up the other.
       var overlay = el('canvas', 'blip-scan-overlay', wrap);
       overlay.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
-      // wrap's size can shrink below 260px on a narrow phone (max-width:
+      // wrap's size can shrink below 260px on a narrow screen (max-width:
       // 100% above) — size the overlay's own bitmap to match whatever it
       // actually rendered at, not the 260px we asked for, or
       // blip_qr.js's marker math (which maps a point onto `overlay.width`

@@ -340,12 +340,15 @@ actually attempted, its local/remote candidate type and address, and —
 the detail that actually distinguishes causes — whether its connectivity
 checks got a response back. A pair that sent checks and got zero
 responses means something between the two devices is dropping that
-traffic; from JavaScript there's no way to tell *which* of the two usual
-suspects it is, so the diagnosis names both: the WiFi's own
+traffic; from JavaScript there's no way to tell *which* of the usual
+suspects it is, so the diagnosis names all of them: the WiFi's own
 "client/AP isolation" setting (see the paragraph above — a router
 refusing to let its own clients reach each other directly, common on
-guest/public networks) and an OS-level firewall on either phone blocking
-inbound UDP. Verified with a real (if synthetic) failure: a mocked camera
+guest/public networks), a VPN active on either device (routes "local"
+traffic through a remote tunnel instead of directly — easy to overlook,
+and an increasingly common real-world cause of exactly this symptom),
+and an OS-level firewall on either device blocking inbound UDP.
+Verified with a real (if synthetic) failure: a mocked camera
 scan feeding `blip_net.js` a hand-built offer whose one ICE candidate
 points at `10.255.255.1` (a non-routable test address) reliably
 reproduces the exact "requests sent, zero responses" shape and prints the
@@ -411,6 +414,46 @@ unexpected IPv6 literal, a candidate that's plainly on the wrong
 network) — a `stats` candidate-pair line only exists once ICE has
 already started checking it, several seconds later at best, timed out
 at worst.
+
+All of the above is real information, but it's in a tiny, fast-scrolling
+monospace log — great for a developer staring at it, not for "did that
+actually work" at a glance mid-pairing. Two changes address that
+directly:
+
+- A plain-language **status bar** (`statusBar()`, `web/blip_net_ui.js`)
+  sits right under the QR/scan area, big enough to actually read, and
+  tracks the pairing state in the same words the terminal already prints
+  (`signalText()`) — plus, crucially, it's the *first* place a completed
+  scan gets confirmed: the moment a code is decoded, the bar reads
+  "✓ host code scanned (1402 bytes, 2 route(s)) — …" rather than the scan
+  UI just silently vanishing and a new screen appearing in its place.
+  Deliberately narrow about which transitions get to overwrite that
+  confirmation: `waiting`/`answering` are just process states the richer
+  scan/QR messages already cover, so only the terminal outcomes
+  (`connected`/`failed`/`timeout`/`disconnected`) replace it.
+- A **CHECK button** inside that same bar (and a matching `check` console
+  command) answers "can I actually reach the other side *right now*" on
+  demand, without waiting for the next 5s heartbeat tick. Before the
+  DataChannel opens it's the same `describeConnectivity()` read of
+  `getStats()` the heartbeat already prints; once it's open, CHECK
+  becomes a real app-level ping/pong round trip
+  (`window.BlipNet.ping()`, `web/blip_net.js`, wire format in
+  `blip_net_proto.js`'s `encodePing`/`decodePing`/`encodePong`/
+  `decodePong`) — proof the *other page's JS* is still receiving and
+  replying, not just that `RTCPeerConnection`/`DataChannel` state says
+  "connected" (that can stay true for a peer whose tab has since been
+  backgrounded or killed). `ping()` times out and reports cleanly rather
+  than hanging if nothing ever answers, and every pending ping is failed
+  out immediately by `cancel()` so a torn-down connection never leaves
+  one waiting forever.
+
+Both were driven by the same underlying nudge: the console used to print
+a "jacking in.." banner the instant the modal opened, before HOST/JOIN
+was even picked — read, on a failed attempt, as a lie (it claimed
+success before anything had actually happened). It's now only ever
+printed once the DataChannel has genuinely opened, right alongside the
+real `connected` signal — never a startup banner, always an actual
+result.
 
 ### Hardening pass
 

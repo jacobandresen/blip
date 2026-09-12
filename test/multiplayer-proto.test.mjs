@@ -67,3 +67,46 @@ test('the module never exports the removed bye-message functions', () => {
   assert.equal(proto.encodeBye, undefined);
   assert.equal(proto.decodeBye, undefined);
 });
+
+// ---- app-level ping/pong (the JACK IN "CHECK" button/console command) ----
+
+test('encodePing/decodePing round-trips an id', () => {
+  const wire = proto.encodePing('p1');
+  assert.equal(typeof wire, 'string');
+  assert.deepEqual(proto.decodePing(wire), { id: 'p1' });
+});
+
+test('encodePong/decodePong round-trips an id', () => {
+  const wire = proto.encodePong('p1');
+  assert.deepEqual(proto.decodePong(wire), { id: 'p1' });
+});
+
+test('encodePing/encodePong coerce a non-string id to a string', () => {
+  assert.deepEqual(proto.decodePing(proto.encodePing(42)), { id: '42' });
+  assert.deepEqual(proto.decodePong(proto.encodePong(42)), { id: '42' });
+});
+
+test('encodePing/encodePong output carries the current protocol version', () => {
+  assert.equal(JSON.parse(proto.encodePing('p1')).v, proto.PROTO_VERSION);
+  assert.equal(JSON.parse(proto.encodePong('p1')).v, proto.PROTO_VERSION);
+});
+
+test('decodePing/decodePong reject malformed or foreign JSON without throwing', () => {
+  assert.equal(proto.decodePing('not json'), null);
+  assert.equal(proto.decodePing(''), null);
+  assert.equal(proto.decodePing(undefined), null);
+  assert.equal(proto.decodePong('not json'), null);
+});
+
+test('decodePing/decodePong reject the wrong message type, id shape, or version', () => {
+  assert.equal(proto.decodePing(proto.encodeInput(true, false)), null); // an input packet, not a ping
+  assert.equal(proto.decodePing(proto.encodePong('p1')), null); // a pong, not a ping
+  assert.equal(proto.decodePong(proto.encodePing('p1')), null); // a ping, not a pong
+  assert.equal(proto.decodePing(JSON.stringify({ v: 1, t: 'ping', id: 7 })), null); // id not a string
+  assert.equal(proto.decodePing(JSON.stringify({ v: 2, t: 'ping', id: 'p1' })), null); // wrong version
+});
+
+test('decodeInput still rejects a ping/pong packet (distinct t)', () => {
+  assert.equal(proto.decodeInput(proto.encodePing('p1')), null);
+  assert.equal(proto.decodeInput(proto.encodePong('p1')), null);
+});
