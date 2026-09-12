@@ -679,8 +679,70 @@ canvas {
 .blip-hs-btn:disabled { opacity: 0.5; }
 .blip-hs-btn.ghost { background: transparent; border-color: rgba(120, 220, 255, 0.25); color: #7fa6b5; }
 
+/* PLAY NEARBY only: a hacker-terminal readout stacked below the pairing
+   panel (web/blip_net_ui.js) — real technical output from blip_net.js /
+   blip_qr.js (SDP sizes, ICE/DataChannel state, camera + scan progress)
+   in place of the plain-English hand-holding the dialog used to carry.
+   Deliberately in BLIP's Atari palette (matte black + Fuji red/orange,
+   same family as the on-screen game pad in kiosk.css) rather than the
+   cyan/yellow the rest of the modal system uses — this reads as a
+   distinct low-level console bolted onto the side of the UI, not part
+   of its regular chrome. Real monospace (not the pixel arcade font) so
+   it actually reads like a terminal. */
+.blip-net-modal { flex-direction: column; gap: 12px; overflow-y: auto; }
+.blip-net-term {
+  width: min(92vw, 340px);
+  display: flex;
+  flex-direction: column;
+  border: 2px solid rgba(228, 52, 43, 0.45);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #0e0605 0%, #050302 100%);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 10px 30px rgba(0, 0, 0, 0.55),
+              inset 0 0 24px rgba(228, 52, 43, 0.07);
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+}
+.blip-net-term-bar {
+  flex: none;
+  padding: 6px 10px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #f08a3a;
+  background: rgba(228, 52, 43, 0.14);
+  border-bottom: 1px solid rgba(228, 52, 43, 0.3);
+}
+.blip-net-term-log {
+  flex: none;
+  height: 120px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.blip-net-term-line { color: #b5673c; white-space: pre-wrap; word-break: break-all; }
+.blip-net-term-line.cmd { color: #ffb15e; text-shadow: 0 0 6px rgba(240, 138, 58, 0.45); }
+.blip-net-term-line.ok { color: #ff8a5b; text-shadow: 0 0 6px rgba(228, 52, 43, 0.5); }
+.blip-net-term-line.err { color: #ff4b3e; text-shadow: 0 0 6px rgba(255, 60, 40, 0.6); }
+.blip-net-term-prompt {
+  flex: none;
+  padding: 6px 10px 8px;
+  font-size: 10px;
+  color: #ffb15e;
+  border-top: 1px solid rgba(228, 52, 43, 0.25);
+}
+.blip-net-term-prompt .cursor {
+  display: inline-block;
+  background: #ff8a5b;
+  color: transparent;
+  width: 7px;
+  margin-left: 1px;
+  animation: blip-term-blink 1s steps(1) infinite;
+}
+@keyframes blip-term-blink { 50% { opacity: 0; } }
+
 @media (max-width: 380px) {
   .blip-hs-title { font-size: 11px; }
   .blip-hs-item { font-size: 8px; }
   .blip-hs-code { font-size: 12px; letter-spacing: 2px; }
+  .blip-net-term-log { height: 96px; }
 }
