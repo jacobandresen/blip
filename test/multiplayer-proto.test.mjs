@@ -60,15 +60,10 @@ test('decodeInput returns exactly { up, down } and ignores extra fields', () => 
   assert.equal(back.extra, undefined);
 });
 
-// ---- bye messages --------------------------------------------------------
-
-test('encodeBye/decodeBye round-trips', () => {
-  assert.equal(proto.decodeBye(proto.encodeBye()), true);
-});
-
-test('decodeBye rejects everything that is not a bye packet', () => {
-  assert.equal(proto.decodeBye(proto.encodeInput(true, false)), false);
-  assert.equal(proto.decodeBye('not json'), false);
-  assert.equal(proto.decodeBye('null'), false);
-  assert.equal(proto.decodeBye(JSON.stringify({ v: 2, t: 'bye' })), false); // wrong version
+test('the module never exports the removed bye-message functions', () => {
+  // encodeBye/decodeBye were designed but never actually wired into
+  // blip_net.js's message handling or ever sent anywhere — dead code,
+  // trimmed. This just guards against it quietly reappearing unused.
+  assert.equal(proto.encodeBye, undefined);
+  assert.equal(proto.decodeBye, undefined);
 });

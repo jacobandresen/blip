@@ -1,4 +1,4 @@
-var CACHE = "blip-v142";
+var CACHE = "blip-v143";
 
 var ASSETS = [
   "/blip/",
@@ -21,6 +21,7 @@ var ASSETS = [
   "/blip/blip_net.js",
   "/blip/blip_net_ui.js",
   "/blip/blip_qr.js",
+  "/blip/blip_qr_heuristic.js",
   "/blip/vendor/supabase.js",
   "/blip/vendor/qrcode.js",
   "/blip/vendor/jsQR.js",

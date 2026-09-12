@@ -42,22 +42,10 @@
     return { up: !!obj.up, down: !!obj.down };
   }
 
-  /** A "someone's leaving" notice — either direction, harmless if unsent. */
-  function encodeBye() {
-    return JSON.stringify({ v: PROTO_VERSION, t: 'bye' });
-  }
-  function decodeBye(raw) {
-    var obj;
-    try { obj = JSON.parse(raw); } catch (e) { return false; }
-    return !!obj && obj.v === PROTO_VERSION && obj.t === 'bye';
-  }
-
   var api = {
     PROTO_VERSION: PROTO_VERSION,
     encodeInput: encodeInput,
-    decodeInput: decodeInput,
-    encodeBye: encodeBye,
-    decodeBye: decodeBye
+    decodeInput: decodeInput
   };
 
   if (typeof module !== 'undefined' && module.exports) {
