@@ -553,6 +553,19 @@
     var panel = el('div', 'blip-hs-panel', modalEl);
     el('div', 'blip-hs-title', panel).textContent = 'JACK IN';
 
+    // Outside `body` (not cleared by showChoice()/showHostQR()/
+    // showJoinQR()) so it stays up across every step, not just the one
+    // it happened to render during.
+    var cameraWarn = el('div', 'blip-hs-err', panel);
+    var thisModal = modalEl;
+    checkForCamera(function (hasCamera) {
+      if (modalEl !== thisModal) return; // closed (or reopened) while this was in flight
+      if (hasCamera) return;
+      cameraWarn.textContent = 'no camera detected on this device — HOST and JOIN both need one ' +
+        '(each side scans the other’s code back)';
+      if (termLogEl) termPrint('no camera detected on this device (enumerateDevices found no videoinput)', 'err', true);
+    });
+
     var body = el('div', '', panel);
     modalBody = body;
     modalPanel = panel;
@@ -664,6 +677,27 @@
     if (name === 'NotReadableError') return 'Camera is busy or unavailable — another app may be using it.';
     if (name === 'OverconstrainedError') return 'No camera on this device matched what was requested.';
     return 'Camera unavailable' + (err && err.message ? ': ' + err.message : '') + '.';
+  }
+
+  /** Both HOST and JOIN eventually need a working camera — QR-only
+   * signaling means the SDP travels both directions, so even the host
+   * (after showing its own offer code) still has to scan the guest's
+   * answer code back. There's no camera-free path through this feature
+   * at all. Without this check, a device with no camera (a desktop with
+   * no webcam, say) only finds that out several steps in, after already
+   * tapping HOST or JOIN and a SCAN button — this answers it upfront,
+   * before the user wastes a step on a pairing that can never complete.
+   * `cb(true)` (assume a camera exists) if the check itself can't run —
+   * a missed warning is a minor inconvenience; a *wrong* one would block
+   * a real camera that just couldn't be enumerated this way. */
+  function checkForCamera(cb) {
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== 'function') {
+      cb(true);
+      return;
+    }
+    navigator.mediaDevices.enumerateDevices()
+      .then(function (devices) { cb(devices.some(function (d) { return d.kind === 'videoinput'; })); })
+      .catch(function () { cb(true); });
   }
 
   function showHostQR(body, panel) {

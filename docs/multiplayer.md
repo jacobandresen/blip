@@ -493,6 +493,27 @@ tightest case found) — full connect plus a real bidirectional
 `getBoundingClientRect()` checks that the status bar, CHECK button, and
 CLOSE button are always fully on-screen with zero scrolling required.
 
+That same testing pass also turned up a real device without a camera at
+all (a desktop with no webcam) — which, it turns out, this feature has no
+way to actually support: QR-only signaling means the SDP travels *both*
+directions, so even HOST needs a working camera eventually (to scan the
+guest's answer code back), not just JOIN. There was previously no way to
+find that out except by tapping HOST or JOIN and getting several steps
+into a pairing that could never finish. `openModal()` now checks
+`navigator.mediaDevices.enumerateDevices()` for a `videoinput` up front
+and prints a plain warning — in the panel itself and the terminal — the
+moment the modal opens, before either button is even tapped. It's a
+warning, not a hard block (HOST's own first step doesn't need a camera,
+only its second one does), and it fails open — a device the check itself
+can't run on is assumed to have a camera, so a false "you have no camera"
+is never shown, only a possible missed warning on an unusual browser.
+Verified two ways: a headless Chromium launched *without* the fake-camera
+flag (so `enumerateDevices()` returns zero real `videoinput` entries, the
+same as the actual cameraless desktop that prompted this) shows the
+warning immediately and still lets HOST proceed through its first step;
+the normal fake-camera e2e test (which always has one) confirms the
+warning stays silent and pairing is untouched when a camera is present.
+
 ### Hardening pass
 
 A dedicated pass over this whole feature ("harden it, trim what you can,
