@@ -2,11 +2,16 @@
  * QR-code pairing only (see docs/multiplayer.md) — no network involved in
  * pairing at all, just two camera scans. Reuses the .blip-hs-* modal
  * classes (shell.css) that blip_scores.js's name/recovery prompts already
- * use elsewhere, so this needed no new CSS beyond the QR canvas/video
- * sizing below. Kept separate from blip_net.js: that file is pure
+ * use elsewhere. Kept separate from blip_net.js: that file is pure
  * networking (and is what test/multiplayer.mjs drives directly, headless,
  * with no DOM UI in the way); this one is just the on-screen wiring
  * around it.
+ *
+ * No hand-holding prose in the dialog itself — instead a terminal-style
+ * console (.blip-net-term, styled in shell.css) stacked below the panel
+ * prints what's actually happening: SDP sizes, ICE candidate counts,
+ * RTCPeerConnection/DataChannel state, camera + scan progress. See
+ * termPrint() below.
  */
 (function () {
   'use strict';
@@ -24,10 +29,101 @@
     return e;
   }
 
+  function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+  // ---- the terminal --------------------------------------------------------
+
+  var termLogEl = null;
+  var termPromptUserEl = null;
+  var termLineCount = 0;
+  var TERM_MAX_LINES = 80;
+  var termStartedAt = 0;
+
+  function buildTerminal(parent) {
+    var term = el('div', 'blip-net-term', parent);
+    el('div', 'blip-net-term-bar', term).textContent = 'blip-net — signaling console';
+    termLogEl = el('div', 'blip-net-term-log', term);
+    var prompt = el('div', 'blip-net-term-prompt', term);
+    termPromptUserEl = el('span', '', prompt);
+    termPromptUserEl.textContent = 'blip';
+    prompt.appendChild(document.createTextNode(':~$ '));
+    el('span', 'cursor', prompt).textContent = '_';
+    return term;
+  }
+
+  function termReset() {
+    if (termLogEl) clear(termLogEl);
+    termLineCount = 0;
+    termStartedAt = Date.now();
+    if (termPromptUserEl) termPromptUserEl.textContent = 'blip';
+  }
+
+  function termSetUser(name) {
+    if (termPromptUserEl) termPromptUserEl.textContent = name;
+  }
+
+  /** Print one line to the terminal. `kind`: 'cmd' (a typed command, no
+   * timestamp), 'ok' (success/milestone), 'err' (failure), or omitted for
+   * plain info output. */
+  function termPrint(text, kind) {
+    if (!termLogEl) return;
+    var line = el('div', 'blip-net-term-line' + (kind ? ' ' + kind : ''), termLogEl);
+    if (kind === 'cmd') {
+      line.textContent = '$ ' + text;
+    } else {
+      line.textContent = '[' + ((Date.now() - termStartedAt) / 1000).toFixed(2) + 's] ' + text;
+    }
+    termLineCount++;
+    if (termLineCount > TERM_MAX_LINES) {
+      var first = termLogEl.firstChild;
+      if (first) termLogEl.removeChild(first);
+    }
+    termLogEl.scrollTop = termLogEl.scrollHeight;
+  }
+
+  // A low-level heartbeat straight off window.__blipNetDebug() (blip_net.js's
+  // own debug/test introspection hook) — real RTCPeerConnection/DataChannel
+  // state, not anything synthesized here, printed only when it actually
+  // changes.
+  var debugPollTimer = null;
+  var lastDebugSnapshot = null;
+  function startDebugPoll() {
+    stopDebugPoll();
+    lastDebugSnapshot = null;
+    debugPollTimer = setInterval(function () {
+      if (typeof window.__blipNetDebug !== 'function') return;
+      var d = window.__blipNetDebug();
+      if (lastDebugSnapshot) {
+        if (d.pcConnectionState !== lastDebugSnapshot.pcConnectionState) {
+          termPrint('pc.connectionState -> ' + d.pcConnectionState);
+        }
+        if (d.pcIceConnectionState !== lastDebugSnapshot.pcIceConnectionState) {
+          termPrint('pc.iceConnectionState -> ' + d.pcIceConnectionState);
+        }
+        if (d.dcState !== lastDebugSnapshot.dcState) {
+          termPrint('datachannel.readyState -> ' + d.dcState, d.dcState === 'open' ? 'ok' : undefined);
+        }
+      }
+      lastDebugSnapshot = d;
+    }, 350);
+  }
+  function stopDebugPoll() {
+    if (debugPollTimer) { clearInterval(debugPollTimer); debugPollTimer = null; }
+  }
+
+  function signalKind(s) {
+    if (s === 'connected') return 'ok';
+    if (s === 'failed' || s === 'timeout') return 'err';
+    return undefined;
+  }
+
+  // ---- modal shell -----------------------------------------------------------
+
   // Dismiss the modal WITHOUT touching the connection — the success path
   // (a match just connected and is about to start) needs the DataChannel
   // to survive the modal closing, not get torn down by it.
   function dismissModal() {
+    stopDebugPoll();
     if (modalEl) { modalEl.remove(); modalEl = null; }
     if (stopActiveScan) { stopActiveScan(); stopActiveScan = null; }
   }
@@ -41,11 +137,9 @@
 
   function openModal() {
     if (modalEl) return;
-    modalEl = el('div', 'blip-hs-modal', document.body);
+    modalEl = el('div', 'blip-hs-modal blip-net-modal', document.body);
     var panel = el('div', 'blip-hs-panel', modalEl);
     el('div', 'blip-hs-title', panel).textContent = 'PLAY NEARBY';
-    var sub = el('div', 'blip-hs-sub', panel);
-    sub.textContent = 'No WiFi needed to pair — just point each phone’s camera at the other’s screen when asked. (The phones do still need to be able to reach each other once paired — usually: same WiFi.)';
 
     var body = el('div', '', panel);
     showChoice(body, panel);
@@ -55,9 +149,11 @@
     close.type = 'button';
     close.textContent = 'CLOSE';
     close.addEventListener('click', closeModal);
-  }
 
-  function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+    buildTerminal(modalEl);
+    termReset();
+    termPrint('blip-net signaling console — idle, awaiting operator');
+  }
 
   function showChoice(body, panel) {
     clear(body);
@@ -73,18 +169,6 @@
     joinBtn.addEventListener('click', function () { showJoinQR(body, panel); });
   }
 
-  function statusText(s) {
-    switch (s) {
-      case 'waiting':  return 'Waiting for your friend to scan…';
-      case 'answering': return 'Connecting…';
-      case 'connected': return 'Connected! Starting…';
-      case 'disconnected': return 'Disconnected.';
-      case 'failed': return 'Could not connect. Make sure both phones can reach each other and try again.';
-      case 'timeout': return 'Nobody scanned in time.';
-      default: return '';
-    }
-  }
-
   function qrCanvas(parent) {
     // Classed (not just typed) so test/multiplayer.mjs and the scan
     // preview's own overlay canvas below can never be confused for one
@@ -93,13 +177,10 @@
     // Neutralize shell.css's bare `canvas { position:fixed; clip-path:...
     // }` rule — meant only for the game's own #glcanvas, but a bare tag
     // selector catches every canvas on the page, including this one.
-    // Bigger than it used to be (240px) — a real camera resolves modules
-    // more reliably the bigger the code renders on screen, for the same
-    // module count. `max-width:100%` + `height:auto` (the canvas's own
-    // width/height *attributes*, set by render() below, are always
-    // square, so this keeps it square) caps that growth back down on a
-    // phone too narrow to fit 280px inside the panel's own padding,
-    // rather than overflowing it.
+    // `max-width:100%` + `height:auto` (the canvas's own width/height
+    // *attributes*, set by render() below, are always square, so this
+    // keeps it square) caps growth back down on a phone too narrow to fit
+    // 280px inside the panel's own padding, rather than overflowing it.
     canvas.style.cssText =
       'display:block;position:static;top:auto;left:auto;transform:none;clip-path:none;' +
       'touch-action:auto;margin:10px auto;width:280px;max-width:100%;height:auto;' +
@@ -107,33 +188,8 @@
     return canvas;
   }
 
-  /** Turn window.BlipQR's scan status callback into a human-readable line —
-   * "write feedback when something happens" instead of silence while
-   * nothing has decoded yet. */
-  function scanStatusText(state, detail) {
-    switch (state) {
-      case 'opening': return 'Opening camera…';
-      case 'streaming':
-        return 'Camera on' + (detail.width ? ' (' + detail.width + '×' + detail.height + ')' : '') + ' — point it at the code.';
-      case 'buffering': return 'Camera opened, waiting for its first frame…';
-      case 'scanning': {
-        var bits = [detail.frames + ' frame' + (detail.frames === 1 ? '' : 's') + ' scanned'];
-        bits.push(detail.candidates > 0
-          ? detail.candidates + ' possible code' + (detail.candidates === 1 ? '' : 's') + ' in view (circled below)'
-          : 'no code found yet');
-        if (detail.decodeError) bits.push('decode hiccup: ' + detail.decodeError);
-        return bits.join(' · ');
-      }
-      case 'found': return 'Got it!';
-      case 'play-error':
-        return 'Camera opened but would not start playing' + (detail.message ? ' (' + detail.message + ')' : '') + '.';
-      case 'unsupported': return 'This browser has no camera API available.';
-      default: return '';
-    }
-  }
-
   /** Turn a getUserMedia() rejection into a specific, actionable message
-   * instead of the old one-size-fits-all "Camera unavailable". */
+   * instead of one generic "Camera unavailable". */
   function scanErrorMessage(err) {
     var name = err && err.name;
     if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
@@ -148,18 +204,26 @@
   function showHostQR(body, panel) {
     clear(body);
     var canvas = qrCanvas(body);
-    var msg = el('div', 'blip-hs-sub', body);
-    msg.textContent = 'Generating code…';
+    termSetUser('host@blip');
+    termPrint('blip-pair --host --signal=qr', 'cmd');
+    termPrint('generating local session description...');
+    startDebugPoll();
 
     window.BlipNet.host(function (offerSdp) {
       window.BlipQR.render(canvas, offerSdp);
-      msg.textContent = 'Have your friend tap JOIN, then point their camera at this code.';
+      var candidates = (offerSdp.match(/a=candidate:/g) || []).length;
+      termPrint('offer ready: ' + offerSdp.length + ' bytes, ' + candidates + ' ice candidate(s)', 'ok');
+      termPrint('qr rendered — waiting for peer to scan it');
       showScanButton(body, panel, 'SCAN THEIR ANSWER', function (text) {
+        termPrint('answer scanned: ' + text.length + ' bytes', 'ok');
+        termPrint('applying remote description...');
         window.BlipNet.submitAnswer(text);
       });
     }, function (s) {
-      if (s === 'connected') { setTimeout(dismissModal, 600); return; }
+      termPrint('signal: ' + s, signalKind(s));
+      if (s === 'connected') { stopDebugPoll(); setTimeout(dismissModal, 600); return; }
       if (s === 'failed' || s === 'timeout') {
+        stopDebugPoll();
         setTimeout(function () { if (modalEl) showChoice(body, panel); }, 1500);
       }
     });
@@ -167,19 +231,23 @@
 
   function showJoinQR(body, panel) {
     clear(body);
-    el('div', 'blip-hs-sub', body).textContent = 'Point your camera at the host’s code.';
+    termSetUser('guest@blip');
+    termPrint('blip-pair --join --signal=qr', 'cmd');
+    startDebugPoll();
     showScanButton(body, panel, 'SCAN HOST’S CODE', function (offerSdp) {
+      var candidates = (offerSdp.match(/a=candidate:/g) || []).length;
+      termPrint('offer scanned: ' + offerSdp.length + ' bytes, ' + candidates + ' ice candidate(s)', 'ok');
       clear(body);
       var canvas = qrCanvas(body);
-      var msg = el('div', 'blip-hs-sub', body);
-      msg.textContent = 'Generating your answer…';
+      termPrint('generating answer...');
       window.BlipNet.join(offerSdp, function (answerSdp) {
         window.BlipQR.render(canvas, answerSdp);
-        msg.textContent = 'Show this to your friend — have them tap SCAN THEIR ANSWER.';
+        termPrint('answer ready: ' + answerSdp.length + ' bytes — show it to your host', 'ok');
       }, function (s) {
-        msg.textContent = statusText(s);
-        if (s === 'connected') { setTimeout(dismissModal, 600); return; }
+        termPrint('signal: ' + s, signalKind(s));
+        if (s === 'connected') { stopDebugPoll(); setTimeout(dismissModal, 600); return; }
         if (s === 'failed' || s === 'timeout') {
+          stopDebugPoll();
           setTimeout(function () { if (modalEl) showChoice(body, panel); }, 1500);
         }
       });
@@ -196,9 +264,8 @@
     var holder = el('div', '', body);
     function startScanning() {
       clear(holder);
-      // Same max-width:100% safety net as qrCanvas() above — 260px is
-      // roomier than the old 220px but must still give way on a narrow
-      // phone instead of overflowing the panel.
+      // max-width:100% safety net — the box shrinks on a narrow phone
+      // rather than overflowing the panel.
       var wrap = el('div', '', holder);
       wrap.style.cssText = 'position:relative;width:260px;max-width:100%;aspect-ratio:1/1;margin:10px auto;';
       var video = el('video', '', wrap);
@@ -208,9 +275,9 @@
       video.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:4px;background:#000;';
       // Drawn on top of the video by blip_qr.js's scan() — a green box on
       // a confirmed decode, yellow circles on whatever its finder-pattern
-      // heuristic currently thinks might be a code ("mark it if you see
-      // it"). Classed apart from .blip-qr-canvas (the rendered-code
-      // canvas) so nothing querying for one can pick up the other.
+      // heuristic currently thinks might be a code. Classed apart from
+      // .blip-qr-canvas (the rendered-code canvas) so nothing querying
+      // for one can pick up the other.
       var overlay = el('canvas', 'blip-scan-overlay', wrap);
       overlay.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
       // wrap's size can shrink below 260px on a narrow phone (max-width:
@@ -222,16 +289,49 @@
       var wrapRect = wrap.getBoundingClientRect();
       overlay.width = Math.max(1, Math.round(wrapRect.width));
       overlay.height = Math.max(1, Math.round(wrapRect.height));
-      var status = el('div', 'blip-hs-sub blip-scan-status', holder);
-      status.textContent = 'Opening camera…';
+      // Still a real error surface (not hand-holding prose) — kept for
+      // test/multiplayer.mjs, which reads it to detect a failed scan.
       var err = el('div', 'blip-hs-err', holder);
+
+      termPrint('camera: opening (facingMode=environment, 1920x1920 ideal)');
+      var lastCandidates = -1;
       stopActiveScan = window.BlipQR.scan(video, overlay, function (text, scanErr) {
         stopActiveScan = null;
-        if (scanErr) { err.textContent = scanErrorMessage(scanErr); return; }
+        if (scanErr) {
+          var msg = scanErrorMessage(scanErr);
+          err.textContent = msg;
+          termPrint((scanErr && scanErr.name ? scanErr.name + ': ' : '') + msg, 'err');
+          return;
+        }
+        termPrint('decode OK', 'ok');
         clear(holder);
         onScanned(text);
       }, function (state, detail) {
-        status.textContent = scanStatusText(state, detail);
+        switch (state) {
+          case 'streaming':
+            termPrint('camera stream acquired' + (detail.width ? ' (' + detail.width + 'x' + detail.height + ')' : ''), 'ok');
+            break;
+          case 'scanning': {
+            var changed = detail.candidates !== lastCandidates;
+            var heartbeat = detail.frames % 40 === 0;
+            if (changed || heartbeat) {
+              lastCandidates = detail.candidates;
+              termPrint('frame ' + detail.frames + ': ' +
+                (detail.candidates > 0 ? detail.candidates + ' candidate pattern(s) in view' : 'no pattern detected'),
+                detail.candidates > 0 ? 'ok' : undefined);
+            }
+            if (detail.decodeError) termPrint('decode exception: ' + detail.decodeError, 'err');
+            break;
+          }
+          case 'play-error':
+            termPrint('camera stream would not play' + (detail.message ? ': ' + detail.message : ''), 'err');
+            break;
+          case 'unsupported':
+            termPrint('getUserMedia unavailable in this browser', 'err');
+            break;
+          default:
+            break;
+        }
       });
     }
     if (autoStart) {
