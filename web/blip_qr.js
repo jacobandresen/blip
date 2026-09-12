@@ -61,116 +61,106 @@
   // public hook for "I can see a QR-like pattern but haven't read it yet",
   // which is exactly the feedback asked for ("can you mark the QR if you
   // see it?") so a real scanning attempt isn't just silence until it either
-  // works or times out. So this reimplements the coarse first step of
-  // jsQR's own locator (web/vendor/jsQR.js's `locate()`): scan rows for the
-  // classic 1:1:3:1:1 dark:light:dark:light:dark run-length ratio that
-  // marks a QR finder pattern, using a single global brightness threshold
-  // instead of jsQR's own per-region adaptive one, and without jsQR's
-  // column cross-check or quad-matching across rows. That makes it cheaper
-  // and noticeably less precise than the real decoder — it WILL flag
-  // things that aren't actually QR codes sometimes — but it only ever
-  // drives a "maybe here" marker, never the actual pairing decision, so
-  // false positives cost nothing but a stray yellow circle for a frame or
-  // two.
-  var FINDER_ROW_STRIDE = 4; // scan every 4th row — plenty dense at normal scanning distance, far cheaper than every row
+  // works or times out.
+  //
+  // An earlier version of this hunted for small-scale finder-pattern
+  // features (the 1:1:3:1:1 dark:light:dark:light:dark run-length ratio
+  // jsQR's own locate() looks for) scattered anywhere in the frame. Out in
+  // the real world that flagged *hundreds* of false positives a frame —
+  // ordinary background detail, on-screen text, and camera sensor noise
+  // all produce small-scale matches — expensive enough (hundreds of
+  // overlay shapes to draw, hundreds of entries for an O(n²) clustering
+  // step, every single animation frame) to be a real suspect for scanning
+  // failing outright rather than just showing a noisy overlay.
+  //
+  // This leans on the same assumption pairing already does: two phones
+  // held close, the code framed to fill most of the screen it's shown on.
+  // Rather than hunting for a small feature that could be anywhere, check
+  // whether the one big *centered* region a code that size would actually
+  // occupy — comfortably at least half the frame — has real QR-like
+  // contrast in it. One region to check, not a fistful of small
+  // candidates to chase, and its size is a feature, not a compromise: a
+  // small high-contrast false positive (an icon, a line of text) never
+  // reaches the size a candidate is required to be here.
+  var FINDER_SCAN_DIM = 200;        // downsample target, applied to the already-square-cropped frame (see scan())
+  var FINDER_BOX_FRACTION = 0.7;    // the checked region's side, as a fraction of the frame — comfortably over half
 
   function luma(data, i) {
     return 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
   }
 
-  function findFinderCandidates(frame) {
+  /** `frame` is expected to already be cropped to a square and downsampled
+   * (see scan()'s own crop + finderCanvas). Returns one candidate — the
+   * big centered box itself — when it looks QR-like, or `null`. "Looks
+   * QR-like" here just means real contrast, *and* a plausible dark/light
+   * mix (a QR code is roughly half dark modules, half light — a region
+   * that's almost entirely one or the other, like a plain wall with a
+   * bright reflection on it, has contrast but isn't a plausible code). */
+  function findFinderCandidate(frame) {
     var data = frame.data, w = frame.width, h = frame.height;
-    var lo = 255, hi = 0;
-    for (var sy = 0; sy < h; sy += FINDER_ROW_STRIDE * 3) {
-      for (var sx = 0; sx < w; sx += 5) {
-        var l = luma(data, (sy * w + sx) * 4);
+    var boxSide = Math.round(Math.min(w, h) * FINDER_BOX_FRACTION);
+    var x0 = Math.floor((w - boxSide) / 2);
+    var y0 = Math.floor((h - boxSide) / 2);
+    var STEP = 4;
+    var lo = 255, hi = 0, dark = 0, total = 0;
+    for (var y = y0; y < y0 + boxSide; y += STEP) {
+      for (var x = x0; x < x0 + boxSide; x += STEP) {
+        var l = luma(data, (y * w + x) * 4);
         if (l < lo) lo = l;
         if (l > hi) hi = l;
+        total++;
       }
     }
-    if (hi - lo < 40) return []; // near-flat frame (lens cap, darkness, blank wall) — nothing to find, don't even try
+    if (hi - lo < 40) return null; // near-flat (lens cap, darkness, a blank wall) — nothing to find
     var threshold = (lo + hi) / 2;
-    var hits = [];
-    for (var y = 0; y < h; y += FINDER_ROW_STRIDE) {
-      var runs = [0, 0, 0, 0, 0];
-      var runLen = 0;
-      var lastDark = false;
-      for (var x = 0; x <= w; x++) {
-        var dark = x < w && luma(data, (y * w + x) * 4) < threshold;
-        if (x === 0) { lastDark = dark; runLen = 1; continue; }
-        if (dark === lastDark) { runLen++; continue; }
-        runs = [runs[1], runs[2], runs[3], runs[4], runLen];
-        runLen = 1;
-        lastDark = dark;
-        var avg = (runs[0] + runs[1] + runs[2] + runs[3] + runs[4]) / 7; // 1+1+3+1+1 = 7 units total
-        if (avg >= 1 &&
-            Math.abs(runs[0] - avg) < avg && Math.abs(runs[1] - avg) < avg &&
-            Math.abs(runs[2] - 3 * avg) < 3 * avg &&
-            Math.abs(runs[3] - avg) < avg && Math.abs(runs[4] - avg) < avg &&
-            !dark // a finder pattern is bordered in light, so we should be back on a light run now
-        ) {
-          hits.push({ x: x - runs[3] - runs[4] - runs[2] / 2, y: y });
-        }
+    for (var y2 = y0; y2 < y0 + boxSide; y2 += STEP) {
+      for (var x2 = x0; x2 < x0 + boxSide; x2 += STEP) {
+        if (luma(data, (y2 * w + x2) * 4) < threshold) dark++;
       }
     }
-    // Several adjacent scan rows will each fire on the same real finder
-    // square — cluster nearby hits into one marker rather than a smear of
-    // them.
-    var clusters = [];
-    hits.forEach(function (p) {
-      var c = null;
-      for (var i = 0; i < clusters.length; i++) {
-        if (Math.abs(clusters[i].x - p.x) < 24 && Math.abs(clusters[i].y - p.y) < 24) { c = clusters[i]; break; }
-      }
-      if (c) { c.x = (c.x * c.n + p.x) / (c.n + 1); c.y = (c.y * c.n + p.y) / (c.n + 1); c.n++; }
-      else clusters.push({ x: p.x, y: p.y, n: 1 });
-    });
-    return clusters.filter(function (c) { return c.n >= 3; });
+    var darkFraction = dark / total;
+    if (darkFraction < 0.25 || darkFraction > 0.75) return null;
+    return { x: x0 + boxSide / 2, y: y0 + boxSide / 2, side: boxSide };
   }
 
   // ---- marker overlay --------------------------------------------------------
   //
-  // Points from jsQR's `location` and from findFinderCandidates() above are
-  // both in the *captured frame's* native pixel space (the video's own
-  // width/height). The <video> itself is shown with `object-fit: cover`,
-  // which crops-and-scales rather than stretching, so mapping a frame point
-  // onto the overlay canvas — sized to the video's on-screen CSS box — has
-  // to replicate that same crop math or every marker would land in the
-  // wrong spot.
-  function coverMap(px, py, nativeW, nativeH, dispW, dispH) {
-    var scale = Math.max(dispW / nativeW, dispH / nativeH);
-    var offX = (dispW - nativeW * scale) / 2;
-    var offY = (dispH - nativeH * scale) / 2;
-    return { x: px * scale + offX, y: py * scale + offY };
+  // scan() below crops the camera frame to a centered square before handing
+  // it to either jsQR or findFinderCandidate() — the same square
+  // `object-fit: cover` already crops the <video> element itself to when
+  // filling its own square CSS box (see scan()'s own comment) — so a point
+  // in that cropped frame maps onto the overlay canvas (sized to match
+  // that same box) with nothing more than a uniform scale; no per-axis
+  // offset math needed.
+  function mapToDisplay(px, py, side, dispSide) {
+    var scale = dispSide / side;
+    return { x: px * scale, y: py * scale };
   }
 
-  function drawMarkers(overlay, nativeW, nativeH, found, candidates) {
+  function drawMarkers(overlay, side, found, candidate) {
     var octx = overlay.getContext('2d');
-    var dispW = overlay.width, dispH = overlay.height;
-    octx.clearRect(0, 0, dispW, dispH);
+    var dispSide = overlay.width; // overlay is always square — see blip_net_ui.js
+    octx.clearRect(0, 0, overlay.width, overlay.height);
     if (found) {
       var corners = [found.topLeftCorner, found.topRightCorner, found.bottomRightCorner, found.bottomLeftCorner];
       octx.strokeStyle = '#3ecf5a';
       octx.lineWidth = 3;
       octx.beginPath();
       corners.forEach(function (c, i) {
-        var m = coverMap(c.x, c.y, nativeW, nativeH, dispW, dispH);
+        var m = mapToDisplay(c.x, c.y, side, dispSide);
         if (i === 0) octx.moveTo(m.x, m.y); else octx.lineTo(m.x, m.y);
       });
       octx.closePath();
       octx.stroke();
       return;
     }
-    if (!candidates.length) return;
+    if (!candidate) return;
+    var topLeft = mapToDisplay(candidate.x - candidate.side / 2, candidate.y - candidate.side / 2, side, dispSide);
+    var boxSize = (candidate.side / side) * dispSide;
     octx.strokeStyle = '#e8c547';
     octx.lineWidth = 2;
-    octx.setLineDash([4, 3]);
-    candidates.forEach(function (c) {
-      var m = coverMap(c.x, c.y, nativeW, nativeH, dispW, dispH);
-      octx.beginPath();
-      octx.arc(m.x, m.y, 16, 0, Math.PI * 2);
-      octx.stroke();
-    });
+    octx.setLineDash([6, 4]);
+    octx.strokeRect(topLeft.x, topLeft.y, boxSize, boxSize);
     octx.setLineDash([]);
   }
 
@@ -183,8 +173,8 @@
    * caller can turn into a specific message.
    *
    * `overlayCanvas` (optional) gets a live green box drawn on a confirmed
-   * decode, or yellow circles on whatever findFinderCandidates() above
-   * currently thinks might be a QR pattern — "mark it if you see it".
+   * decode, or a dashed yellow square over whatever findFinderCandidate()
+   * above currently thinks might be a QR pattern — "mark it if you see it".
    * `onStatus(state, detail)` (optional) fires continuously as scanning
    * progresses ('opening', 'streaming', 'buffering', 'scanning', 'found',
    * 'play-error', 'unsupported') so the caller can show live text instead
@@ -202,6 +192,12 @@
     var startedAt = Date.now();
     var scratch = document.createElement('canvas');
     var sctx = scratch.getContext('2d', { willReadFrequently: true });
+    // The finder-candidate heuristic's own downsampled working copy —
+    // deliberately a *second*, small canvas rather than reusing `scratch`
+    // at its (cropped, but still often much larger) size — see
+    // findFinderCandidate()'s comment on why.
+    var finderCanvas = document.createElement('canvas');
+    var fctx = finderCanvas.getContext('2d', { willReadFrequently: true });
 
     function report(state, detail) {
       if (typeof onStatus === 'function') {
@@ -222,15 +218,27 @@
       if (stopped) return;
       if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && videoEl.videoWidth) {
         var nativeW = videoEl.videoWidth, nativeH = videoEl.videoHeight;
-        scratch.width = nativeW;
-        scratch.height = nativeH;
-        sctx.drawImage(videoEl, 0, 0, nativeW, nativeH);
-        var frame = sctx.getImageData(0, 0, nativeW, nativeH);
+        // Crop to the largest centered *square* — the same crop
+        // `object-fit: cover` already applies to the <video> element
+        // itself when filling its own square CSS box (see
+        // web/blip_net_ui.js's scan-preview markup), and the same "the
+        // code fills the screen" assumption findFinderCandidate() leans
+        // on. Scanning the full, wider/taller raw camera frame would
+        // waste effort on — and risk false-flagging — content the user
+        // can't even see in their own preview. A QR code is square, too,
+        // so a square capture is the natural fit either way.
+        var side = Math.min(nativeW, nativeH);
+        var offsetX = Math.floor((nativeW - side) / 2);
+        var offsetY = Math.floor((nativeH - side) / 2);
+        scratch.width = side;
+        scratch.height = side;
+        sctx.drawImage(videoEl, offsetX, offsetY, side, side, 0, 0, side, side);
+        var frame = sctx.getImageData(0, 0, side, side);
         frames++;
         var code = null, decodeErr = null;
         try { code = jsQR(frame.data, frame.width, frame.height); } catch (e) { decodeErr = e; /* a torn frame — just try the next one */ }
         if (code && code.data) {
-          if (overlayCanvas) drawMarkers(overlayCanvas, nativeW, nativeH, code.location, []);
+          if (overlayCanvas) drawMarkers(overlayCanvas, side, code.location, null);
           report('found', { frames: frames });
           var found = code.data;
           // Let the confirmation box actually show for one beat before the
@@ -238,13 +246,25 @@
           setTimeout(function () { stop(); onScanned(found, null); }, 150);
           return;
         }
-        var candidates = findFinderCandidates(frame);
-        if (overlayCanvas) drawMarkers(overlayCanvas, nativeW, nativeH, null, candidates);
+        // Downsample the (already-cropped) frame for the heuristic — see
+        // findFinderCandidate()'s own comment for why a small fixed size
+        // beats scanning at native resolution.
+        var fscale = Math.min(1, FINDER_SCAN_DIM / side);
+        var smallSide = Math.max(1, Math.round(side * fscale));
+        finderCanvas.width = smallSide;
+        finderCanvas.height = smallSide;
+        fctx.drawImage(videoEl, offsetX, offsetY, side, side, 0, 0, smallSide, smallSide);
+        var smallFrame = fctx.getImageData(0, 0, smallSide, smallSide);
+        var candidate = findFinderCandidate(smallFrame);
+        if (candidate) {
+          candidate = { x: candidate.x / fscale, y: candidate.y / fscale, side: candidate.side / fscale };
+        }
+        if (overlayCanvas) drawMarkers(overlayCanvas, side, null, candidate);
         report('scanning', {
           frames: frames,
           width: nativeW,
           height: nativeH,
-          candidates: candidates.length,
+          candidates: candidate ? 1 : 0,
           elapsedMs: Date.now() - startedAt,
           decodeError: decodeErr ? String((decodeErr && decodeErr.message) || decodeErr) : null,
         });
