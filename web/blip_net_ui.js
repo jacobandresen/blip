@@ -93,9 +93,16 @@
     // Neutralize shell.css's bare `canvas { position:fixed; clip-path:...
     // }` rule — meant only for the game's own #glcanvas, but a bare tag
     // selector catches every canvas on the page, including this one.
+    // Bigger than it used to be (240px) — a real camera resolves modules
+    // more reliably the bigger the code renders on screen, for the same
+    // module count. `max-width:100%` + `height:auto` (the canvas's own
+    // width/height *attributes*, set by render() below, are always
+    // square, so this keeps it square) caps that growth back down on a
+    // phone too narrow to fit 280px inside the panel's own padding,
+    // rather than overflowing it.
     canvas.style.cssText =
       'display:block;position:static;top:auto;left:auto;transform:none;clip-path:none;' +
-      'touch-action:auto;margin:10px auto;width:240px;height:240px;' +
+      'touch-action:auto;margin:10px auto;width:280px;max-width:100%;height:auto;' +
       'image-rendering:pixelated;border-radius:4px;';
     return canvas;
   }
@@ -189,22 +196,32 @@
     var holder = el('div', '', body);
     function startScanning() {
       clear(holder);
+      // Same max-width:100% safety net as qrCanvas() above — 260px is
+      // roomier than the old 220px but must still give way on a narrow
+      // phone instead of overflowing the panel.
       var wrap = el('div', '', holder);
-      wrap.style.cssText = 'position:relative;width:220px;height:220px;margin:10px auto;';
+      wrap.style.cssText = 'position:relative;width:260px;max-width:100%;aspect-ratio:1/1;margin:10px auto;';
       var video = el('video', '', wrap);
       video.setAttribute('playsinline', '');
       video.setAttribute('muted', '');
       video.muted = true;
-      video.style.cssText = 'display:block;position:absolute;inset:0;width:220px;height:220px;object-fit:cover;border-radius:4px;background:#000;';
+      video.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:4px;background:#000;';
       // Drawn on top of the video by blip_qr.js's scan() — a green box on
       // a confirmed decode, yellow circles on whatever its finder-pattern
       // heuristic currently thinks might be a code ("mark it if you see
       // it"). Classed apart from .blip-qr-canvas (the rendered-code
       // canvas) so nothing querying for one can pick up the other.
       var overlay = el('canvas', 'blip-scan-overlay', wrap);
-      overlay.width = 220;
-      overlay.height = 220;
-      overlay.style.cssText = 'display:block;position:absolute;inset:0;width:220px;height:220px;pointer-events:none;';
+      overlay.style.cssText = 'display:block;position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
+      // wrap's size can shrink below 260px on a narrow phone (max-width:
+      // 100% above) — size the overlay's own bitmap to match whatever it
+      // actually rendered at, not the 260px we asked for, or
+      // blip_qr.js's marker math (which maps a point onto `overlay.width`
+      // / `overlay.height`) would place every marker off by the
+      // difference.
+      var wrapRect = wrap.getBoundingClientRect();
+      overlay.width = Math.max(1, Math.round(wrapRect.width));
+      overlay.height = Math.max(1, Math.round(wrapRect.height));
       var status = el('div', 'blip-hs-sub blip-scan-status', holder);
       status.textContent = 'Opening camera…';
       var err = el('div', 'blip-hs-err', holder);

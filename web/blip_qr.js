@@ -39,7 +39,7 @@
     qr.make();
     var count = qr.getModuleCount();
     var totalModules = count + QUIET_ZONE_MODULES * 2;
-    var cell = Math.max(2, Math.floor(300 / totalModules));
+    var cell = Math.max(2, Math.floor(400 / totalModules));
     var size = cell * totalModules;
     var offset = QUIET_ZONE_MODULES * cell;
     canvas.width = size;
@@ -260,7 +260,14 @@
       return stop;
     }
     report('opening');
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    // `ideal` (not `exact`) — a camera below this just gives its best,
+    // never fails the request over it. Many browsers otherwise default to
+    // a fairly low capture resolution (640x480-ish) unless asked for more,
+    // which hands jsQR far fewer real pixels to find a small/dense code
+    // in than the camera is actually capable of.
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1920 } },
+    })
       .then(function (s) {
         if (stopped) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
         stream = s;

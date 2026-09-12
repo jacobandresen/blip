@@ -299,6 +299,36 @@ QR pattern *before* a full decode succeeds. The next real-hardware report
 should come with what the status line actually said, which narrows the
 remaining possibilities a lot faster than "still nothing" did.
 
+Before that report came back, "it just failed on my old iPad" pointed
+straight at the QR being too dense/small to resolve rather than a
+diagnosable error — the one real lever that matters most for an *old*
+camera specifically. Three changes address that directly:
+
+- **`web/blip_sdp_slim.js`** trims the SDP's `a=candidate:` lines to
+  `typ host` only (no STUN/TURN configured, so nothing else should
+  appear anyway), drops literal IPv6 addresses (kept: plain IPv4 and
+  Chrome/Safari's `*.local` mDNS-hidden hostnames — both privacy-hiding
+  and a real address, unlike an IPv6 literal, are perfectly usable),
+  and caps the result at 4. A clean test VM's single network interface
+  never shows the difference, but a real laptop with a VPN adapter, a
+  virtualization bridge, or an IPv6 address alongside the IPv4 one can
+  advertise several times that many — every one of them is another
+  `a=candidate:` line in the QR code, pushing it to a denser version
+  with smaller modules. Unit-tested directly (`test/sdp-slim.test.mjs`)
+  since the multi-candidate case isn't reproducible in the single-NIC
+  e2e environment.
+- The code itself renders bigger on screen (240px → 280px for the
+  offer/answer QR, 220px → 260px for the camera-scan preview), with a
+  `max-width:100%` / measured-overlay-bitmap safety net so it still
+  fits a narrow phone rather than overflowing the pairing modal.
+- `blip_qr.js` now asks `getUserMedia` for `{width:{ideal:1920},
+  height:{ideal:1920}}` instead of leaving resolution unspecified —
+  several browsers otherwise default to a fairly low capture resolution
+  (routinely 640×480) unless asked for more, handing jsQR far fewer
+  real pixels than the camera is actually capable of. `ideal` (not
+  `exact`) means a camera below this just gives its best; the request
+  never fails over it.
+
 ## Open questions
 
 - **Cheating.** A guest's browser console can just send fabricated
