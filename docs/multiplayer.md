@@ -329,6 +329,28 @@ camera specifically. Three changes address that directly:
   `exact`) means a camera below this just gives its best; the request
   never fails over it.
 
+Once QR scanning itself stopped being the question, the next real-hardware
+report was a bare "it just timed out" after both codes scanned fine — the
+signaling worked, something about the actual peer-to-peer connection
+didn't, and `status('timeout')` alone gives no way to tell why. The
+PLAY NEARBY terminal (`web/blip_net_ui.js`, see below) now diagnoses this
+directly off `RTCPeerConnection.getStats()`
+(`window.__blipNetStats()`, `web/blip_net.js`): every ICE candidate pair
+actually attempted, its local/remote candidate type and address, and —
+the detail that actually distinguishes causes — whether its connectivity
+checks got a response back. A pair that sent checks and got zero
+responses means something between the two devices is dropping that
+traffic; from JavaScript there's no way to tell *which* of the two usual
+suspects it is, so the diagnosis names both: the WiFi's own
+"client/AP isolation" setting (see the paragraph above — a router
+refusing to let its own clients reach each other directly, common on
+guest/public networks) and an OS-level firewall on either phone blocking
+inbound UDP. Verified with a real (if synthetic) failure: a mocked camera
+scan feeding `blip_net.js` a hand-built offer whose one ICE candidate
+points at `10.255.255.1` (a non-routable test address) reliably
+reproduces the exact "requests sent, zero responses" shape and prints the
+same diagnosis a real isolated/firewalled network would.
+
 ## Open questions
 
 - **Cheating.** A guest's browser console can just send fabricated
