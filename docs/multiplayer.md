@@ -250,6 +250,30 @@ this feature, but this is the point where it stops being optional: a
 flaky two-peer connection test that only a human remembers to run by hand
 won't get run.
 
+4. **Two real Android emulators, real Chrome-for-Android, no kernel
+   modules.** [`test/multiplayer-android.mjs`](../test/multiplayer-android.mjs),
+   backed by [`scripts/lib/android-emulator.sh`](../scripts/lib/android-emulator.sh)
+   (also usable standalone — see
+   [`scripts/setup-android-multiplayer-test.sh`](../scripts/setup-android-multiplayer-test.sh)
+   for a manual two-AVD setup). Tier 3 above proves the pairing logic
+   against desktop Chromium's fake-camera flags; this tier proves the
+   same flow against real Android + Chrome-for-Android, where none of
+   those flags exist. The emulator's `-camera-back imagefile:<path>` mode
+   streams a host-filesystem PNG as the device's camera feed, re-read
+   fresh on every `getUserMedia()` call — no `v4l2loopback` kernel module,
+   no root, no physical webcam. See
+   [`docs/android-multiplayer-test-plan.md`](android-multiplayer-test-plan.md)
+   for the full validation behind that mechanism and why alternatives
+   (a kernel module; the emulator's virtual-scene "poster" feature) were
+   ruled out. `npm run test:multiplayer:android`.
+
+   Requires Linux + `/dev/kvm` (hardware-accelerated emulation) — the test
+   skips itself, rather than failing, when that's not available, so
+   `npm test` stays green on a machine that never asked for this. The
+   Android SDK, platform tools, emulator, and a system image are
+   installed automatically into `$ANDROID_SDK_ROOT` (default
+   `~/Android/Sdk`) on first run if missing.
+
 **What automated tests can't fully cover:** real WiFi conditions (signal
 quality, and — the actual cause of at least one real-world pairing
 failure seen so far — routers that block device-to-device traffic between

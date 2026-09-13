@@ -31,15 +31,38 @@ function httpJSON(port, path) {
 }
 
 /** Connect to a Chromium instance already listening on `--remote-debugging-port=port`
- * (retries for a few seconds — the process needs a moment to open the port). */
-export async function connect(port) {
+ * (retries for a few seconds — the process needs a moment to open the port).
+ *
+ * `matchUrl`, if given, picks the *most recently opened* page target whose
+ * `url` contains that substring instead of just the first page target —
+ * needed once there's more than one tab open. Chrome-for-Android in
+ * particular tends to accumulate one tab per `am start
+ * android.intent.action.VIEW` call rather than reusing the existing one;
+ * older matching tabs can be backgrounded/frozen (and backgrounded tabs
+ * get camera-permission requests auto-denied), so the newest match is the
+ * one actually in the foreground. See `connectAndroid` below. */
+export async function connect(port, matchUrl) {
   let list;
   for (let i = 0; i < 50; i++) {
-    try { list = await httpJSON(port, '/json/list'); break; } catch { await sleep(200); }
+    try {
+      list = await httpJSON(port, '/json/list');
+      if (matchUrl && !list.some((t) => t.type === 'page' && t.url?.includes(matchUrl))) {
+        list = null; // keep polling until the matching tab shows up
+      }
+      if (list) break;
+    } catch { /* keep polling */ }
+    await sleep(200);
   }
-  if (!list) throw new Error(`chromium never opened its debugger port ${port}`);
-  const page = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl);
-  if (!page) throw new Error(`no page target on port ${port}`);
+  if (!list) throw new Error(`chromium never opened its debugger port ${port}` + (matchUrl ? ` (waiting for tab matching "${matchUrl}")` : ''));
+  const matches = matchUrl
+    ? list.filter((t) => t.type === 'page' && t.url?.includes(matchUrl) && t.webSocketDebuggerUrl)
+    : list.filter((t) => t.type === 'page' && t.webSocketDebuggerUrl);
+  if (!matches.length) throw new Error(`no matching page target on port ${port}`);
+  // `/json/list`'s order isn't reliably chronological, but target ids are
+  // assigned incrementally as tabs are created — the highest one is the
+  // most recently opened, and therefore the one actually in the
+  // foreground when duplicates pile up (see the doc comment above).
+  const page = matches.reduce((a, b) => (parseInt(b.id, 10) > parseInt(a.id, 10) ? b : a));
   const u = new URL(page.webSocketDebuggerUrl);
 
   return new Promise((resolve, reject) => {
@@ -156,6 +179,26 @@ export async function launch(port, extraArgs = []) {
 
 export function killAll(procs) {
   for (const p of procs) { try { p.kill('SIGKILL'); } catch {} }
+}
+
+/**
+ * Attach CDP to a page already open in Chrome-for-Android, no extra Chrome
+ * flags needed (remote debugging is on by default; it's exposed over an
+ * abstract Unix domain socket rather than a TCP port). `adb forward` bridges
+ * that socket to a local TCP port on the host, which then speaks the exact
+ * same `/json/list` + WebSocket protocol as desktop Chromium — see
+ * docs/android-multiplayer-test-plan.md.
+ *
+ * `urlIncludes` is required here (unlike `connect`) because a real Chrome
+ * instance always has other tabs (at minimum its New Tab Page).
+ */
+export async function connectAndroid({ adb, serial, localPort, urlIncludes }) {
+  await new Promise((resolve, reject) => {
+    const p = spawn(adb, ['-s', serial, 'forward', `tcp:${localPort}`, 'localabstract:chrome_devtools_remote'], { stdio: 'ignore' });
+    p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`adb forward exited ${code}`))));
+    p.on('error', reject);
+  });
+  return connect(localPort, urlIncludes);
 }
 
 /** `Runtime.evaluate` with `returnByValue` + `awaitPromise`, throwing on a

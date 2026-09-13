@@ -38,6 +38,12 @@
    * `Error`); wrapped into a real `Error` here so every caller gets one
    * consistent, catchable failure shape instead of two different ones. */
   function render(canvas, text) {
+    // Test-only: stash the raw text every code encodes so an automated
+    // test can read it back directly (window.BlipQR.lastRenderedText)
+    // instead of photographing the canvas and re-decoding it — see
+    // scan()'s testInject for the matching other half. Harmless/inert
+    // for real players; nothing reads this outside of test code.
+    window.BlipQR.lastRenderedText = text;
     var qr = qrcode(0, 'L');
     qr.addData(text);
     try {
@@ -248,6 +254,29 @@
         report('buffering', { readyState: videoEl.readyState });
       }
       raf = requestAnimationFrame(tick);
+    }
+
+    // Test-only: an automated test (see test/multiplayer-android.mjs) can
+    // set window.BlipQR.testInject to a string *instead of* granting real
+    // camera access, so the real WebRTC signaling/sync gets exercised
+    // end-to-end without depending on a device actually photographing a
+    // QR code. Real players never set this — inert otherwise. This
+    // exists because Android emulators' `-camera-back imagefile:` virtual
+    // camera does not pass image content through faithfully (see
+    // docs/android-multiplayer-test-plan.md), making a real photograph
+    // of a QR code impractical to fake reliably in that environment.
+    if (window.BlipQR.testInject) {
+      var injected = window.BlipQR.testInject;
+      window.BlipQR.testInject = null;
+      report('opening');
+      report('streaming', { width: 0, height: 0, deviceLabel: 'test-inject' });
+      setTimeout(function () {
+        if (stopped) return;
+        report('found', { frames: 0 });
+        stop();
+        onScanned(injected, null);
+      }, 50);
+      return stop;
     }
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {

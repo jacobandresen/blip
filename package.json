@@ -6,6 +6,7 @@
     "test": "node --test test/fill-canvas.test.mjs test/multiplayer-proto.test.mjs test/sdp-slim.test.mjs test/qr-heuristic.test.mjs",
     "test:highscores": "node test/highscores.mjs",
     "test:multiplayer": "node test/multiplayer.mjs",
+    "test:multiplayer:android": "node test/multiplayer-android.mjs",
     "supabase": "supabase"
   },
   "devDependencies": {
