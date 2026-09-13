@@ -35,6 +35,7 @@ export const boot = (name, port, logfile, camera) => run(['boot', name, String(p
 export const waitForBoot = (serial, maxTries) => run(['wait-for-boot', serial, ...(maxTries ? [String(maxTries)] : [])]);
 export const skipSetupWizard = (serial) => run(['skip-setup-wizard', serial]);
 export const openUrlDismissOnboarding = (serial, url) => run(['open', serial, url]);
+export const resetChrome = (serial) => run(['reset-chrome', serial]);
 export const reversePort = (serial, port) => run(['reverse-port', serial, String(port)]);
 export const forwardDevtools = (serial, localPort) => run(['forward-devtools', serial, String(localPort)]);
 export const grantCameraPermission = (serial) => run(['grant-camera-permission', serial]);

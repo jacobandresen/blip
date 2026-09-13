@@ -222,7 +222,21 @@ android_emulator_open_url_dismiss_onboarding() {
   # because CDP has to pick one of them (see test/lib/cdp.mjs's connect).
   if ((dismissed_any == 1)); then
     "$adb" -s "$serial" shell am start -a android.intent.action.VIEW -d "$url" com.android.chrome >/dev/null
+    # Chrome needs a short transition after first-run activity dismissal
+    # before the requested tab becomes debuggable.
+    sleep 3
   fi
+}
+
+# android_emulator_reset_chrome <serial> -- stop Chrome before a fresh
+# browser-driven test run. Keep Chrome's first-run state: clearing the app
+# data here makes every run race the onboarding activity and DevTools startup.
+android_emulator_reset_chrome() {
+  local serial="$1"
+  local adb
+  adb="$(android_emulator_adb)"
+  "$adb" -s "$serial" shell am force-stop com.android.chrome >/dev/null 2>&1 || true
+  sleep 1
 }
 
 # android_emulator_grant_camera_permission <serial>
@@ -304,6 +318,9 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   open)
     android_emulator_open_url_dismiss_onboarding "$1" "$2"
     ;;
+  reset-chrome)
+    android_emulator_reset_chrome "$1"
+    ;;
   reverse-port)
     android_emulator_reverse_port "$1" "$2"
     ;;
@@ -328,6 +345,7 @@ Commands:
   wait-for-boot <serial>             block until emulator-<port> is booted
   skip-setup-wizard <serial>         skip Android's first-boot wizard
   open <serial> <url>                open <url> in Chrome, dismiss onboarding
+  reset-chrome <serial>              clear Chrome tabs and app state
   reverse-port <serial> <port>       adb reverse tcp:<port> for a serial
   forward-devtools <serial> <port>   adb forward tcp:<port> to Chrome's CDP socket
   grant-camera-permission <serial>   tap through Chrome + OS camera prompts, if shown

@@ -73,10 +73,10 @@ isn't the DataChannel we're trying to set up.
 **QR codes, exclusively** (`web/blip_net.js`'s `host()`/`join()`, wired up
 by `web/blip_net_ui.js`'s "JACK IN" modal). Host renders its SDP
 offer as a QR code; guest scans it with the camera, generates an answer,
-shows *that* as a QR code; host scans it back. Zero network needed for
-pairing at all — no server, no account, nothing to reach before the two
-phones can even see each other. Both sides wait for their own ICE
-gathering to finish before rendering the code ("vanilla ICE" — no
+shows *that* as a QR code; host scans it back. No network service,
+account, or room service is needed before the two phones can see each
+other. Both sides use local host candidates and wait for gathering to
+finish before rendering the code ("vanilla ICE" — no
 separate candidate-exchange round to race against), which keeps the
 payload to one QR code per side; verified this fits and decodes
 correctly at realistic SDP sizes and well beyond, and — the part worth
@@ -87,18 +87,16 @@ A Supabase Realtime relay (a short numeric room code typed on the other
 phone, publishing the offer/answer as broadcast messages) was built and
 shipped first, then **dropped**: maintaining two signaling paths for one
 feature wasn't worth it once QR alone proved reliable, and QR has a real
-edge the room-code path never had — it needs no internet on either
-phone, not even for a moment. If Realtime signaling is ever wanted back
+edge the room-code path never had — it needs no internet or signaling
+service on either phone. If Realtime signaling is ever wanted back
 (e.g. a lower-friction option for players comfortable typing a code), the
 migration that granted it access is reverted
 (`supabase/migrations/20260911140000_drop_multiplayer_signaling.sql`) —
 re-adding the original grant is a one-migration change, not a redesign.
 
 Direct host (local) ICE candidates only, per the same-room
-[scope decision](#goal) — a STUN server can still be added cheaply later
-for the odd double-NAT home network, but **no TURN relay**, ever, in
-scope: that would mean game traffic transiting a server, which is
-exactly what "same room only" is choosing not to pay for.
+[scope decision](#goal). **No STUN or TURN relay** is used: pairing and
+gameplay remain entirely offline and direct.
 
 Once `RTCPeerConnection` reports `connected` and the DataChannel's `open`
 event fires, signaling is done and out of the picture for the rest of the
@@ -329,8 +327,8 @@ diagnosable error — the one real lever that matters most for an *old*
 camera specifically. Three changes address that directly:
 
 - **`web/blip_sdp_slim.js`** trims the SDP's `a=candidate:` lines to
-  `typ host` only (no STUN/TURN configured, so nothing else should
-  appear anyway), drops literal IPv6 addresses (kept: plain IPv4 and
+  `typ host` only (no STUN/TURN configured), drops literal IPv6 addresses
+  (kept: plain IPv4 and
   Chrome/Safari's `*.local` mDNS-hidden hostnames — both privacy-hiding
   and a real address, unlike an IPv6 literal, are perfectly usable),
   and caps the result at 4. A clean test VM's single network interface

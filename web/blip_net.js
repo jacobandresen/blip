@@ -5,8 +5,8 @@
  * non-trickle ICE: each side waits for its own candidate gathering to
  * finish before rendering its code, so there's no separate candidate-
  * exchange round to race against, and each side only ever needs to show
- * one code). No network of any kind is involved in pairing — this file
- * has no camera or QR-drawing code itself, that's web/blip_qr.js and
+ * one code). No network service is involved in pairing; this file has no
+ * camera or QR-drawing code itself, that's web/blip_qr.js and
  * web/blip_net_ui.js's job; this only knows SDP strings in and out.
  *
  * Transport once connected: one unreliable/unordered RTCDataChannel,
@@ -27,7 +27,7 @@
 (function () {
   'use strict';
 
-  var ICE_GATHER_TIMEOUT_MS = 2500;   // vanilla ICE: cap how long we wait to bundle candidates
+  var ICE_GATHER_TIMEOUT_MS = 10000;  // mobile browsers can take several seconds to gather ICE
   var CONNECT_TIMEOUT_MS = 60000;     // give up and report a clear status rather than hang forever
                                        // (generous: two camera scans take longer than typing a code)
 
@@ -77,6 +77,10 @@
     });
   }
 
+  function hasIceCandidates(sdp) {
+    return typeof sdp === 'string' && /(?:^|\r?\n)a=candidate:/.test(sdp);
+  }
+
   var stateLog = [];
   var STATE_LOG_MAX = 40;
   function log(tag, val) {
@@ -93,8 +97,8 @@
   var slimSdpForQr = (window.BlipSdpSlim && window.BlipSdpSlim.slimSdpForQr) || function (sdp) { return sdp; };
 
   function newPeerConnection() {
-    // No STUN/TURN: the same-room scope decision (docs/multiplayer.md)
-    // means direct host candidates are always expected to suffice.
+    // Local host candidates only: pairing must work without internet and
+    // gameplay must never be relayed through a server.
     var peer = new RTCPeerConnection({ iceServers: [] });
     peer.addEventListener('connectionstatechange', function () {
       log('connectionState', peer.connectionState);
@@ -208,7 +212,13 @@
         // failure for an attempt nobody is listening for any more would
         // just misattribute it to whatever *is* current.
         if (peer !== pc) return;
-        onOffer(slimSdpForQr(peer.localDescription.sdp));
+        var sdp = peer.localDescription && peer.localDescription.sdp;
+        if (!hasIceCandidates(sdp)) {
+          status('failed', { reason: 'no ICE candidates were gathered' });
+          cancel();
+          return;
+        }
+        onOffer(slimSdpForQr(sdp));
         status('waiting');
       })
       .catch(function () {
@@ -238,6 +248,10 @@
   function join(offerSdp, onAnswer, onStatus) {
     cancel(); // see host()'s comment on why this is unconditional
     onStatusCb = onStatus;
+    if (!hasIceCandidates(offerSdp)) {
+      status('failed', { reason: 'the scanned offer has no ICE candidates' });
+      return;
+    }
     var peer = newPeerConnection();
     pc = peer;
     peer.addEventListener('datachannel', function (e) {
@@ -250,7 +264,13 @@
       .then(function () { return waitForIceGathering(peer); })
       .then(function () {
         if (peer !== pc) return; // see host()'s matching comment
-        onAnswer(slimSdpForQr(peer.localDescription.sdp));
+        var sdp = peer.localDescription && peer.localDescription.sdp;
+        if (!hasIceCandidates(sdp)) {
+          status('failed', { reason: 'no ICE candidates were gathered' });
+          cancel();
+          return;
+        }
+        onAnswer(slimSdpForQr(sdp));
         status('answering');
       })
       .catch(function () {
@@ -406,8 +426,13 @@
     if (!pc || typeof pc.getStats !== 'function') return Promise.resolve(null);
     return pc.getStats().then(function (report) {
       var candidates = {};
+      var localCandidates = [];
+      var remoteCandidates = [];
       report.forEach(function (s) {
-        if (s.type === 'local-candidate' || s.type === 'remote-candidate') candidates[s.id] = s;
+        if (s.type === 'local-candidate' || s.type === 'remote-candidate') {
+          candidates[s.id] = s;
+          (s.type === 'local-candidate' ? localCandidates : remoteCandidates).push(s);
+        }
       });
       function describe(c) {
         if (!c) return '?';
@@ -431,7 +456,21 @@
           responsesReceived: s.responsesReceived || 0,
         });
       });
-      return pairs;
+      function types(list) {
+        var found = {};
+        list.forEach(function (c) { if (c.candidateType) found[c.candidateType] = true; });
+        return Object.keys(found);
+      }
+      return {
+        localCandidateCount: localCandidates.length,
+        remoteCandidateCount: remoteCandidates.length,
+        localCandidateTypes: types(localCandidates),
+        remoteCandidateTypes: types(remoteCandidates),
+        pairs: pairs,
+        connectionState: pc && pc.connectionState,
+        iceConnectionState: pc && pc.iceConnectionState,
+        dataChannelState: dc && dc.readyState,
+      };
     }).catch(function () { return null; });
   };
 }());

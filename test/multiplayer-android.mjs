@@ -1,14 +1,18 @@
-// Two-*Android-emulator* end-to-end test for Rally pairing
+// Single-*Android-emulator* end-to-end test for Rally pairing
 // (docs/multiplayer.md, docs/android-multiplayer-test-plan.md).
 //
 // test/multiplayer.mjs already proves the pairing logic itself against
 // two headless Chromium instances with Chrome's own fake-camera flags.
-// This test proves the same flow against two real Chrome-for-Android
-// instances, running inside real (if emulated) Android — a different
-// WebView/renderer, different touch/permission plumbing, no
-// `--use-fake-device-for-media-stream` flag available at all.
+// This test proves the same flow against real Chrome-for-Android — a
+// different WebView/renderer, different touch/permission plumbing, no
+// `--use-fake-device-for-media-stream` flag available at all — by
+// opening the host and guest in two independent Android emulators.
 //
-// It does NOT use the emulator's camera at all. `-camera-back
+// Two independent renderers are required for the gameplay assertions:
+// Chrome may throttle a background tab even while its DataChannel remains
+// open, which can make pairing pass while the WASM game loop is stopped.
+//
+// This also does NOT use the emulator's camera at all. `-camera-back
 // imagefile:<path>` (the kernel-module-free mechanism designed in
 // docs/android-multiplayer-test-plan.md) turned out not to pass image
 // content through faithfully: measured with a calibration image (colored
@@ -39,7 +43,7 @@
 // Run: npm run test:multiplayer:android
 
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -51,18 +55,25 @@ import * as avd from './lib/android-emulator.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.join(__dirname, '..', 'web');
+const REPORT_DIR = path.join(__dirname, '..', 'docs', 'images', 'android-multiplayer');
 const PORT = 8099; // distinct from dev (8080) and the desktop test (8098)
 
 const HOST_AVD = 'blip_host';
 const GUEST_AVD = 'blip_guest';
-const HOST_PORT = 5554; // -> serial emulator-5554
-const GUEST_PORT = 5556; // -> serial emulator-5556
+const HOST_PORT = 5554;
+const GUEST_PORT = 5556;
 const HOST_SERIAL = `emulator-${HOST_PORT}`;
 const GUEST_SERIAL = `emulator-${GUEST_PORT}`;
 const HOST_CDP_PORT = 9541;
 const GUEST_CDP_PORT = 9542;
 
-const RALLY_URL = `http://127.0.0.1:${PORT}/rally/index.html`;
+// Two different URLs (not two devices) give the host and guest each
+// their own Chrome tab — `am start` on an already-running URL just
+// refocuses the existing tab instead of opening a new one, so the query
+// string also doubles as how connectAndroid's urlIncludes tells the two
+// tabs' CDP targets apart.
+const HOST_URL = `http://127.0.0.1:${PORT}/rally/index.html?role=host`;
+const GUEST_URL = `http://127.0.0.1:${PORT}/rally/index.html?role=guest`;
 
 // Skip (not fail) on a machine that can't run this: no KVM means the
 // emulator would run unusably slowly (or not at all) via pure software
@@ -101,24 +112,44 @@ before(async () => {
   await new Promise((resolve) => server.listen(PORT, '127.0.0.1', resolve));
 
   await avd.ensureSdk();
-  await Promise.all([avd.createAvdIfMissing(HOST_AVD), avd.createAvdIfMissing(GUEST_AVD)]);
   await Promise.all([
-    avd.boot(HOST_AVD, HOST_PORT, path.join(tmpDir, 'host.log')),
-    avd.boot(GUEST_AVD, GUEST_PORT, path.join(tmpDir, 'guest.log')),
+    avd.createAvdIfMissing(HOST_AVD),
+    avd.createAvdIfMissing(GUEST_AVD),
   ]);
-  await Promise.all([avd.waitForBoot(HOST_SERIAL), avd.waitForBoot(GUEST_SERIAL)]);
-  await Promise.all([avd.skipSetupWizard(HOST_SERIAL), avd.skipSetupWizard(GUEST_SERIAL)]);
-  await Promise.all([avd.reversePort(HOST_SERIAL, PORT), avd.reversePort(GUEST_SERIAL, PORT)]);
   await Promise.all([
-    avd.openUrlDismissOnboarding(HOST_SERIAL, RALLY_URL),
-    avd.openUrlDismissOnboarding(GUEST_SERIAL, RALLY_URL),
+    avd.boot(HOST_AVD, HOST_PORT, path.join(tmpDir, 'host-android.log')),
+    avd.boot(GUEST_AVD, GUEST_PORT, path.join(tmpDir, 'guest-android.log')),
   ]);
-  await Promise.all([avd.forwardDevtools(HOST_SERIAL, HOST_CDP_PORT), avd.forwardDevtools(GUEST_SERIAL, GUEST_CDP_PORT)]);
+  await Promise.all([
+    avd.waitForBoot(HOST_SERIAL),
+    avd.waitForBoot(GUEST_SERIAL),
+  ]);
+  await Promise.all([
+    avd.skipSetupWizard(HOST_SERIAL),
+    avd.skipSetupWizard(GUEST_SERIAL),
+    avd.reversePort(HOST_SERIAL, PORT),
+    avd.reversePort(GUEST_SERIAL, PORT),
+  ]);
+  await Promise.all([
+    avd.resetChrome(HOST_SERIAL),
+    avd.resetChrome(GUEST_SERIAL),
+  ]);
+  await Promise.all([
+    avd.openUrlDismissOnboarding(HOST_SERIAL, HOST_URL),
+    avd.openUrlDismissOnboarding(GUEST_SERIAL, GUEST_URL),
+  ]);
+  await Promise.all([
+    avd.forwardDevtools(HOST_SERIAL, HOST_CDP_PORT),
+    avd.forwardDevtools(GUEST_SERIAL, GUEST_CDP_PORT),
+  ]);
 });
 
 after(async () => {
   if (canRun) {
-    await Promise.allSettled([avd.kill(HOST_SERIAL), avd.kill(GUEST_SERIAL)]);
+    await Promise.allSettled([
+      avd.kill(HOST_SERIAL),
+      avd.kill(GUEST_SERIAL),
+    ]);
   }
   if (server) await new Promise((resolve) => server.close(resolve));
 });
@@ -161,10 +192,27 @@ async function injectNextScan(cdp, text) {
   await evaluate(cdp, `window.BlipQR.testInject = ${JSON.stringify(text)}`);
 }
 
-test('two real Android emulators: QR-only Rally pairing over Chrome-for-Android', { skip: skipReason }, async (t) => {
+async function readScanError(cdp) {
+  return evaluate(cdp, `(function () {
+    var errors = document.querySelectorAll('.blip-hs-err');
+    return errors.length ? errors[errors.length - 1].textContent || '' : '';
+  })()`);
+}
+
+async function captureReportScreenshot(cdp, name) {
+  await mkdir(REPORT_DIR, { recursive: true });
+  await cdp.send('Page.bringToFront');
+  const shot = await Promise.race([
+    cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: false }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`timed out capturing ${name}`)), 10000)),
+  ]);
+  await writeFile(path.join(REPORT_DIR, `${name}.png`), Buffer.from(shot.data, 'base64'));
+}
+
+test('two Chrome-for-Android tabs: QR-only Rally pairing', { skip: skipReason }, async (t) => {
   const adbBin = avd.adbPath();
-  const host = await connectAndroid({ adb: adbBin, serial: HOST_SERIAL, localPort: HOST_CDP_PORT, urlIncludes: `127.0.0.1:${PORT}/rally/` });
-  const guest = await connectAndroid({ adb: adbBin, serial: GUEST_SERIAL, localPort: GUEST_CDP_PORT, urlIncludes: `127.0.0.1:${PORT}/rally/` });
+  const host = await connectAndroid({ adb: adbBin, serial: HOST_SERIAL, localPort: HOST_CDP_PORT, urlIncludes: `127.0.0.1:${PORT}/rally/index.html?role=host` });
+  const guest = await connectAndroid({ adb: adbBin, serial: GUEST_SERIAL, localPort: GUEST_CDP_PORT, urlIncludes: `127.0.0.1:${PORT}/rally/index.html?role=guest` });
   await host.send('Page.enable'); await host.send('Runtime.enable');
   await guest.send('Page.enable'); await guest.send('Runtime.enable');
 
@@ -186,12 +234,10 @@ test('two real Android emulators: QR-only Rally pairing over Chrome-for-Android'
     await evaluate(guest, "Array.from(document.querySelectorAll('.blip-hs-btn')).find(function(b){return b.textContent==='JOIN';}).click()");
     const outcome = await (async () => {
       for (let i = 0; i < 100; i++) {
-        const err = await evaluate(guest, "(document.querySelector('.blip-hs-err')||{}).textContent || ''");
-        if (err) return { ok: false, err };
         if (await evaluate(guest, QR_READY)) return { ok: true };
         await sleep(200);
       }
-      return { ok: false, err: 'timed out waiting for a decode' };
+      return { ok: false, err: await readScanError(guest) || 'timed out waiting for a decode' };
     })();
     assert.ok(outcome.ok, `guest never decoded the offer QR: ${outcome.err}`);
     const answerText = await readRenderedText(guest);
@@ -205,9 +251,25 @@ test('two real Android emulators: QR-only Rally pairing over Chrome-for-Android'
     const guestRole = await waitFor(guest, 'window.blipNetRole()', 20000);
     assert.equal(hostRole, 1, 'host should report role 1 once its DataChannel opens');
     assert.equal(guestRole, 2, 'guest should report role 2 once its DataChannel opens');
+    await captureReportScreenshot(host, '01-paired-host');
+    await captureReportScreenshot(guest, '01-paired-guest');
   });
 
   await t.test('the match actually starts on both devices', async () => {
+    // Pairing puts Rally into Serve.  The authoritative host still needs the
+    // same launch gesture as a local match before it enters Play and streams
+    // moving state to the guest.
+    await evaluate(host, `
+      document.getElementById('glcanvas').dispatchEvent(new KeyboardEvent('keydown', {
+        bubbles: true, cancelable: true, key: ' ', code: 'Space',
+      }));
+    `);
+    await sleep(250);
+    await evaluate(host, `
+      document.getElementById('glcanvas').dispatchEvent(new KeyboardEvent('keyup', {
+        bubbles: true, cancelable: true, key: ' ', code: 'Space',
+      }));
+    `);
     const hostFrac = await waitFor(host, `(${READ_RIGHT_FRACTION}) > 0.3`, 15000);
     const guestFrac = await waitFor(guest, `(${READ_RIGHT_FRACTION}) > 0.3`, 15000);
     assert.ok(hostFrac, 'host paddle never left the Title-screen position');
@@ -237,6 +299,8 @@ test('two real Android emulators: QR-only Rally pairing over Chrome-for-Android'
     assert.ok(hostAfter < before, `host should have actually simulated the remote input (was ${before}, now ${hostAfter})`);
     assert.ok(Math.abs(guestAfter - hostAfter) < 0.05,
       `host and guest should agree on the settled paddle position (host ${hostAfter}, guest ${guestAfter})`);
+    await captureReportScreenshot(host, '02-synchronized-host');
+    await captureReportScreenshot(guest, '02-synchronized-guest');
   });
 
   await t.test('a clean disconnect is observed on both sides', async () => {

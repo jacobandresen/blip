@@ -226,15 +226,19 @@
       desc: 'real ICE candidate-pair stats, right now',
       run: function () {
         if (typeof window.__blipNetStats !== 'function') { termPrint('__blipNetStats unavailable', 'err', true); return; }
-        window.__blipNetStats().then(function (pairs) {
-          if (!pairs || !pairs.length) { termPrint('no candidate pairs yet', undefined, true); return; }
+        window.__blipNetStats().then(function (stats) {
+          if (!stats) { termPrint('ICE stats unavailable', 'err', true); return; }
+          termPrint('local candidates: ' + stats.localCandidateCount + ' (' +
+            (stats.localCandidateTypes.join(', ') || 'none') + ')', undefined, true);
+          termPrint('remote candidates: ' + stats.remoteCandidateCount + ' (' +
+            (stats.remoteCandidateTypes.join(', ') || 'none') + ')', undefined, true);
           // The same plain-language read the heartbeat prints every 5s
           // while waiting — on demand here too, so `stats` answers "are
           // we missing info?" / "is the network blocking us?" directly
           // instead of leaving the reader to interpret req/resp numbers.
-          var info = describeConnectivity(pairs);
+          var info = describeConnectivity(stats);
           termPrint(info.text, info.kind, true);
-          pairs.forEach(function (p) {
+          stats.pairs.forEach(function (p) {
             termPrint('candidate-pair ' + pairSummary(p), p.state === 'succeeded' ? 'ok' : (p.state === 'failed' ? 'err' : undefined), true);
           });
         });
@@ -327,23 +331,24 @@
   // to show, even though the poller below saw the real pair a second
   // earlier — reportFailureDiagnosis() falls back to this rather than
   // wrongly concluding no candidates were ever exchanged at all.
-  var lastKnownPairs = null;
+  var lastKnownStats = null;
   function pairSummary(p) {
     return p.local + ' <-> ' + p.remote + ': ' + p.state +
       (p.nominated ? ' nominated' : '') + ' (req ' + p.requestsSent + '/resp ' + p.responsesReceived + ')';
   }
   function startStatsPoll() {
     lastPairsKey = null;
-    lastKnownPairs = null;
+    lastKnownStats = null;
     statsPollTimer = setInterval(function () {
       if (typeof window.__blipNetStats !== 'function') return;
-      window.__blipNetStats().then(function (pairs) {
-        if (!pairs || !pairs.length) return;
-        lastKnownPairs = pairs;
-        var key = pairs.map(pairSummary).join('|');
+      window.__blipNetStats().then(function (stats) {
+        if (!stats) return;
+        lastKnownStats = stats;
+        var key = stats.localCandidateCount + '/' + stats.remoteCandidateCount + '|' +
+          stats.pairs.map(pairSummary).join('|');
         if (key === lastPairsKey) return;
         lastPairsKey = key;
-        pairs.forEach(function (p) {
+        stats.pairs.forEach(function (p) {
           termPrint('candidate-pair ' + pairSummary(p), p.state === 'succeeded' ? 'ok' : (p.state === 'failed' ? 'err' : undefined));
         });
       });
@@ -363,9 +368,28 @@
    * reportFailureDiagnosis() (the fuller version once an attempt
    * actually gives up), so the two can never disagree with each other —
    * one honest classification, read at two different times. */
-  function describeConnectivity(pairs) {
-    if (!pairs || !pairs.length) {
-      return { text: 'no connectivity info yet (still exchanging candidates)', kind: undefined };
+  function describeConnectivity(stats) {
+    if (!stats) {
+      return { text: 'ICE stats unavailable (the peer connection may already be closed)', kind: undefined };
+    }
+    if (!stats.localCandidateCount) {
+      return {
+        text: 'no local ICE candidates gathered — this device has no usable network route',
+        kind: 'err',
+      };
+    }
+    if (!stats.remoteCandidateCount) {
+      return {
+        text: 'no remote ICE candidates received — the offer/answer exchange is incomplete or unusable',
+        kind: 'err',
+      };
+    }
+    var pairs = stats.pairs || [];
+    if (!pairs.length) {
+      return {
+        text: 'candidates exist on both sides, but no compatible candidate pairs formed',
+        kind: 'err',
+      };
     }
     var succeeded = pairs.some(function (p) { return p.state === 'succeeded' || p.nominated; });
     if (succeeded) return { text: 'a route was found, connecting…', kind: 'ok' };
@@ -375,6 +399,13 @@
       return {
         text: neverResponded.length + '/' + pairs.length + ' route(s) tried, 0 responses back — ' +
           'looks like something is blocking device-to-device traffic',
+        kind: 'err',
+      };
+    }
+    var failed = pairs.filter(function (p) { return p.state === 'failed'; });
+    if (failed.length === pairs.length) {
+      return {
+        text: pairs.length + ' route(s) were checked but all failed — addresses may be unreachable or incompatible',
         kind: 'err',
       };
     }
@@ -393,7 +424,7 @@
     connectDeadline = Date.now() + timeoutMs;
     heartbeatTimer = setInterval(function () {
       var remaining = Math.max(0, Math.round((connectDeadline - Date.now()) / 1000));
-      var info = describeConnectivity(lastKnownPairs);
+      var info = describeConnectivity(lastKnownStats);
       termPrint(remaining + 's until timeout — ' + info.text, info.kind);
     }, 5000);
   }
@@ -429,25 +460,39 @@
    * so all of them get named rather than guessing at just one. */
   function reportFailureDiagnosis() {
     if (typeof window.__blipNetStats !== 'function') { termPrint('diagnosis: no getStats() available to explain this', 'err'); return; }
-    window.__blipNetStats().then(function (pairs) {
-      if (!pairs || !pairs.length) pairs = lastKnownPairs; // see lastKnownPairs' own comment above
-      if (!pairs || !pairs.length) {
-        termPrint('diagnosis: no ICE candidate pairs ever formed — missing info, not a network block. ' +
-          'The two devices never received usable candidates from each other in the first place (a signaling problem).', 'err');
+    window.__blipNetStats().then(function (stats) {
+      if (!stats) stats = lastKnownStats; // see lastKnownStats' own comment above
+      if (!stats) {
+        termPrint('diagnosis: ICE stats unavailable — the peer connection closed before its candidates could be inspected.', 'err');
         return;
       }
-      var info = describeConnectivity(pairs);
+      var info = describeConnectivity(stats);
       if (info.kind === 'ok') {
-        termPrint('diagnosis: a candidate pair actually connected — whatever failed came after that (the DataChannel itself, most likely). Worth just trying again.', 'err');
+        termPrint('diagnosis: ICE found a route, so the failure happened after connectivity checks — inspect the DataChannel state and retry.', 'err');
+        return;
+      }
+      termPrint('diagnosis: ' + info.text + '.', 'err');
+      termPrint('candidate inventory: local ' + stats.localCandidateCount + ' (' +
+        (stats.localCandidateTypes.join(', ') || 'none') + '), remote ' +
+        stats.remoteCandidateCount + ' (' +
+        (stats.remoteCandidateTypes.join(', ') || 'none') + ').', 'err');
+      if (!stats.localCandidateCount) {
+        termPrint('likely cause: Wi-Fi is disabled, the device has no active interface, or a VPN/privacy setting prevented local candidates from being exposed.', 'err');
+        return;
+      }
+      if (!stats.remoteCandidateCount) {
+        termPrint('likely cause: the scanned SDP was incomplete, damaged, or generated before the other device had gathered candidates.', 'err');
+        return;
+      }
+      if (!stats.pairs.length) {
+        termPrint('likely cause: candidate addresses or protocols are incompatible, often due to IPv4/IPv6 differences or an unusable mDNS/virtual-interface address.', 'err');
         return;
       }
       if (info.kind === 'err') {
-        termPrint('diagnosis: ' + info.text + '.', 'err');
         termPrint('likely cause: the WiFi’s "client/AP isolation" setting (blocks devices from reaching each other directly — common on guest/public networks), a VPN active on either device (routes "local" traffic through a remote tunnel instead — easy to overlook, worth turning off and retrying), or an OS-level firewall on either device blocking inbound UDP.', 'err');
         return;
       }
-      termPrint('diagnosis: ' + pairs.length + ' candidate pair(s) tried, none succeeded (' +
-        pairs.map(function (p) { return p.state; }).join(', ') + ') — the devices could not reach each other on this network.', 'err');
+      termPrint('likely cause: ICE is still checking routes; wait for the timeout, then retry on the same local network.', 'err');
     });
   }
 
@@ -474,8 +519,8 @@
       return;
     }
     if (typeof window.__blipNetStats !== 'function') { report('nothing to check yet', undefined); return; }
-    window.__blipNetStats().then(function (pairs) {
-      var info = describeConnectivity(pairs);
+    window.__blipNetStats().then(function (stats) {
+      var info = describeConnectivity(stats);
       report(info.text, info.kind);
     });
   }
@@ -725,8 +770,11 @@
         status.set('✓ answer scanned (' + text.length + ' bytes, ' + candidates2 + ' route(s)) — connecting…', 'ok');
         window.BlipNet.submitAnswer(text);
       }, false, [canvas, status.el]);
-    }, function (s) {
+    }, function (s, detail) {
       termPrint(signalText(s) + ' (signal: ' + s + ')', signalKind(s));
+      if (s === 'failed' && detail && detail.reason) {
+        termPrint('reason: ' + detail.reason, 'err');
+      }
       // 'waiting'/'answering' are just process states already covered by
       // the richer messages above (qr rendered / answer scanned) — only
       // the terminal outcomes are worth overwriting that with.
@@ -770,8 +818,11 @@
         termPrint('answer ready: ' + answerSdp.length + ' bytes — show it to your host', 'ok');
         printCandidates(answerSdp);
         status.set('showing your code — waiting for the host to scan it', 'wait');
-      }, function (s) {
+      }, function (s, detail) {
         termPrint(signalText(s) + ' (signal: ' + s + ')', signalKind(s));
+        if (s === 'failed' && detail && detail.reason) {
+          termPrint('reason: ' + detail.reason, 'err');
+        }
         if (s === 'connected' || s === 'failed' || s === 'timeout' || s === 'disconnected') {
           status.set(signalText(s), signalKind(s));
         }
