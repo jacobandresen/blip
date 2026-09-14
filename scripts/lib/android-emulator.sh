@@ -125,16 +125,34 @@ android_emulator_create_avd_if_missing() {
 # emulator's back camera stream exactly that image file's contents on every
 # fresh getUserMedia() call — no v4l2loopback/kernel module, no root, no
 # host webcam required. See docs/android-multiplayer-test-plan.md.
+#
+# Per-instance resource caps: an AVD's own config.ini defaults to 2 vCPUs
+# / 1536M RAM — fine for one instance, but two side by side on a 4-core
+# host ask for every core with zero headroom left for the host OS, adb,
+# this test rig's own scripts, or Chrome's own worker threads. That
+# oversubscription measurably contributes to CDP calls hanging and the
+# WebGL canvas-paint-freeze rig limitation under load. -cores/-memory
+# below cap each instance at 1 vCPU / 1024M by default (so two together
+# ask for 2 cores / 2GB, not 4 cores / 3GB+) — override per-run on a
+# beefier host via BLIP_EMU_CORES/BLIP_EMU_MEMORY if the default is too
+# conservative. Measured on a 4-core host: load average roughly halved
+# (~15 -> ~8) with the cap in place. Not a full fix — QEMU/SwiftShader's
+# own worker threads still scale off the host's core count regardless of
+# the guest vCPU cap, so occasional CDP hangs remain possible; retry
+# logic around a CDP connection attempt is the real safety net for that.
 android_emulator_boot() {
   local name="$1" port="$2" logfile="${3:-/tmp/${name}-emulator.log}"
   local camera="${4:-none}"
   local emulator
   emulator="$(android_emulator_bin)"
-  _ae_log "Booting $name on emulator-$port (log: $logfile, camera-back: $camera)"
+  local cores="${BLIP_EMU_CORES:-1}"
+  local memory="${BLIP_EMU_MEMORY:-1024}"
+  _ae_log "Booting $name on emulator-$port (log: $logfile, camera-back: $camera, ${cores} core / ${memory}M)"
   "$emulator" -avd "$name" \
     -port "$port" \
     -no-window -no-audio -no-boot-anim -no-snapshot \
     -gpu swiftshader_indirect \
+    -cores "$cores" -memory "$memory" \
     -camera-back "$camera" -camera-front none \
     >"$logfile" 2>&1 &
   echo $!
