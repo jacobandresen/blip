@@ -157,6 +157,39 @@ void main() {
 }
 "#;
 
+// Interlaced scanlines, folded into the main-image blit's own fragment
+// shader instead of one `draw_rectangle` per screen row (the previous
+// approach — see git history — which could mean several hundred extra
+// draw calls a frame on a tall window, by far composite()'s biggest
+// cost). Reuses CRT_VERTEX: same plain passthrough, no extra attributes.
+const SCANLINE_FRAGMENT: &str = r#"#version 100
+precision mediump float;
+
+varying lowp vec2 uv;
+varying lowp vec4 color;
+
+uniform sampler2D Texture;
+uniform float InterlaceField; // 0.0 or 1.0, flips every frame (Blip::interlace_field)
+
+void main() {
+    vec3 col = texture2D(Texture, uv).rgb;
+
+    // Every physical row alternates between a light shadow (this frame's
+    // "active" field) and a heavy dim (the opposite field's phosphor
+    // fading) — swapping which is which each frame produces the
+    // interlaced flicker. mod(gl_FragCoord.y, 2.0) picks the row parity;
+    // comparing it against InterlaceField picks which tier applies. The
+    // caller (composite()) feeds this an already-corrected InterlaceField
+    // value — see its `offscreen_target` doc comment — so this formula
+    // itself doesn't need to know which of the two render targets is bound.
+    float parity = mod(floor(gl_FragCoord.y), 2.0);
+    float dim = (parity == InterlaceField) ? 0.25 : (1.0 - 60.0 / 255.0);
+    col *= dim;
+
+    gl_FragColor = vec4(col * color.rgb, 1.0);
+}
+"#;
+
 /// The main blip runtime. Create one at the start of `main` with `Blip::new(w, h)`,
 /// then call `blip.next_frame(60).await` at the end of every game loop iteration.
 /// Read `blip.delta_time` each frame to get the elapsed seconds since the last tick.
@@ -184,6 +217,9 @@ pub struct Blip {
     interlace_field: u8, // 0 or 1, flips every frame
     // ---- curved-glass shader pass ----
     crt:         Option<Material>, // None if the shader failed to compile
+    // Scanline dimming shader (see SCANLINE_FRAGMENT) — None falls back to
+    // the old per-row draw_rectangle loop, same pattern as `crt` above.
+    scanline:    Option<Material>,
     screen_rt:   Option<RenderTarget>, // offscreen composite target, window-sized
     screen_rt_w: i32,
     screen_rt_h: i32,
@@ -226,6 +262,15 @@ impl Blip {
         )
         .ok();
 
+        let scanline = load_material(
+            ShaderSource::Glsl { vertex: CRT_VERTEX, fragment: SCANLINE_FRAGMENT },
+            MaterialParams {
+                uniforms: vec![UniformDesc::new("InterlaceField", UniformType::Float1)],
+                ..Default::default()
+            },
+        )
+        .ok();
+
         let mut rng = Lcg(0xdead_beef);
         // Stagger initial cooldowns so effects don't all fire at once.
         let tear_cd   =  5.0 + rng.next() * 10.0;
@@ -252,6 +297,7 @@ impl Blip {
             chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
             interlace_field: 0,
             crt,
+            scanline,
             screen_rt: None,
             screen_rt_w: 0,
             screen_rt_h: 0,
@@ -453,7 +499,7 @@ impl Blip {
         // adaptive quality has switched it off on a slow device: composite
         // straight to the screen.
         let Some(crt) = self.crt.clone().filter(|_| self.fx_level == 0) else {
-            self.composite(vx, vy, vw, vh);
+            self.composite(vx, vy, vw, vh, false);
             return;
         };
 
@@ -478,7 +524,7 @@ impl Blip {
             set_camera(&cam);
         }
         clear_background(macroquad::color::BLACK);
-        self.composite(0.0, 0.0, vw, vh);
+        self.composite(0.0, 0.0, vw, vh, true);
 
         // 2. Blit the offscreen target back to the screen through the shader,
         //    which bows the image into a curved tube, blooms the bright
@@ -503,7 +549,16 @@ impl Blip {
     /// Composite the current game frame with the glitch effects and interlaced
     /// scanlines, drawn into whatever target/camera is currently bound. `(vx, vy)`
     /// is the top-left corner and `(vw, vh)` the size in that target's pixels.
-    fn composite(&mut self, vx: f32, vy: f32, vw: f32, vh: f32) {
+    /// `offscreen_target` must be true when the currently-bound target is an
+    /// FBO (the curved-glass pass's offscreen composite) rather than the
+    /// default window framebuffer. `gl_FragCoord.y`'s row parity comes out
+    /// with the opposite sense in each case (confirmed empirically — a
+    /// pixel-level before/after screenshot diff against the original
+    /// per-row `draw_rectangle` version matched almost exactly, within a
+    /// handful of pixels of the shader's own time-based dither noise, only
+    /// once each path used the parity sense this flag selects), so the
+    /// scanline shader's dimming lands on the same physical rows either way.
+    fn composite(&mut self, vx: f32, vy: f32, vw: f32, vh: f32, offscreen_target: bool) {
         let lw = self.width  as f32;
         let lh = self.height as f32;
         let scale = vw / lw;
@@ -526,11 +581,26 @@ impl Blip {
                 DrawTextureParams { dest_size: Some(vec2(vw, vh)), ..Default::default() });
         }
 
-        // ---- main image (with roll or tear applied) ----
+        // ---- main image (with roll or tear applied), scanlines folded in ----
         //
         // Source-rect convention: the screen camera has y=0 at screen top,
         // matching macroquad's game coordinate system.  Source Rect(0, a, lw, b)
         // maps directly to game rows starting at y=a with height b.
+        //
+        // The interlaced-scanline dimming (SCANLINE_FRAGMENT) is applied as
+        // the material for whichever draw call(s) below paint the main
+        // image — one shader pass instead of a rectangle per screen row.
+        // gl_FragCoord is screen-space, so it dims correctly regardless of
+        // whether that's one draw (the plain case) or several (roll/tear's
+        // split strips): every physical pixel gets the same treatment no
+        // matter which draw call happened to touch it.
+        let scanline_shader_active = self.fx_level < 2 && self.scanline.is_some();
+        if scanline_shader_active {
+            let scanline = self.scanline.as_ref().unwrap();
+            let field = if offscreen_target { self.interlace_field } else { 1 - self.interlace_field };
+            scanline.set_uniform("InterlaceField", field as f32);
+            gl_use_material(scanline);
+        }
         if roll_on {
             // Upper screen strip: game rows [roll_dy, lh)
             let top_src_h = lh - self.roll_dy;
@@ -566,7 +636,10 @@ impl Blip {
                 source:    Some(Rect::new(0.0, split_lh, lw, lh - split_lh)),
                 ..Default::default()
             });
-            // Bright glitch line at the split point
+            // Bright glitch line at the split point — plain color, not the
+            // scanline-shaded texture, so reset first (its own alpha needs
+            // to blend normally; SCANLINE_FRAGMENT doesn't handle that).
+            if scanline_shader_active { gl_use_default_material(); }
             let gw = vw * (0.4 + self.rng.next() * 0.6);
             let gh = 1.0 + (self.rng.next() * 2.0).floor();
             let ga = 0.5 + self.rng.next() * 0.5;
@@ -578,14 +651,17 @@ impl Blip {
                 ..Default::default()
             });
         }
+        if scanline_shader_active { gl_use_default_material(); }
 
-        // ---- interlaced CRT scanlines ----
-        // Active field rows get a subtle CRT shadow; inactive field rows are
-        // heavily dimmed to simulate the phosphor of the opposite field fading.
-        // The active field flips every frame, producing the interlaced flicker.
-        // This is a rectangle per screen row — the composite's biggest cost —
-        // so the lowest quality level drops it (and the noise) entirely.
-        if self.fx_level < 2 {
+        // ---- interlaced CRT scanlines: fallback path ----
+        // Only reached if the scanline shader above failed to compile (old
+        // WebGL, driver quirk — same fallback pattern as `crt`). Active field
+        // rows get a subtle CRT shadow; inactive field rows are heavily
+        // dimmed to simulate the phosphor of the opposite field fading. The
+        // active field flips every frame, producing the interlaced flicker.
+        // This is a rectangle per screen row, so the lowest quality level
+        // drops it entirely rather than paying that cost.
+        if self.fx_level < 2 && self.scanline.is_none() {
             let active   = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
             let inactive = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.75 };
             let bottom   = vy + vh;
@@ -595,8 +671,10 @@ impl Blip {
             while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, active);   sy += 2.0; }
             let mut sy = vy + f1;
             while sy < bottom { draw_rectangle(vx, sy, vw, 1.0, inactive); sy += 2.0; }
+        }
 
-            // ---- background noise ----
+        // ---- background noise ----
+        if self.fx_level < 2 {
             let pixel = scale.max(1.0);
             for _ in 0..48 {
                 let nx = vx + self.rng.next() * vw;
