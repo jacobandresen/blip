@@ -61,8 +61,32 @@
   var termStartedAt = 0;
 
   function buildTerminal(parent) {
-    var term = el('div', 'blip-net-term', parent);
-    el('div', 'blip-net-term-bar', term).textContent = 'blip-net — signaling console';
+    // Starts collapsed — real diagnostics for the rare case pairing
+    // actually goes wrong, not something worth showing by default over a
+    // plain HOST/JOIN choice. Telemetry (startTelemetry()'s pollers,
+    // termPrint() itself) runs exactly the same either way; this only
+    // ever hides/shows the DOM, so nothing is lost by collapsing it —
+    // expanding later still shows everything that happened while closed.
+    var term = el('div', 'blip-net-term collapsed', parent);
+    var bar = el('div', 'blip-net-term-bar', term);
+    bar.setAttribute('role', 'button');
+    bar.tabIndex = 0;
+    bar.setAttribute('aria-expanded', 'false');
+    var barLabel = el('span', '', bar);
+    barLabel.textContent = 'blip-net — signaling console';
+    var chevron = el('span', 'blip-net-term-chevron', bar);
+    chevron.textContent = '▸';
+    function toggleTerm() {
+      var collapsed = term.classList.toggle('collapsed');
+      chevron.textContent = collapsed ? '▸' : '▾';
+      bar.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
+    bar.addEventListener('click', toggleTerm);
+    bar.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      toggleTerm();
+    });
     termLogEl = el('div', 'blip-net-term-log', term);
     var prompt = el('div', 'blip-net-term-prompt', term);
     termPromptUserEl = el('span', '', prompt);
@@ -420,6 +444,7 @@
   var heartbeatTimer = null;
   var connectDeadline = 0;
   function startHeartbeat() {
+    stopHeartbeat(); // guard against ever double-scheduling if a caller starts this twice
     var timeoutMs = (window.BlipNet && window.BlipNet.CONNECT_TIMEOUT_MS) || 60000;
     connectDeadline = Date.now() + timeoutMs;
     heartbeatTimer = setInterval(function () {
@@ -432,11 +457,22 @@
     if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
   }
 
+  // Deliberately NOT part of startTelemetry() below — the heartbeat's
+  // countdown only means something once a real connection attempt is
+  // actually running blip_net.js's own CONNECT_TIMEOUT_MS clock. HOST
+  // starts one the moment the modal opens (window.BlipNet.host() is
+  // called immediately), but JOIN doesn't call window.BlipNet.join()
+  // until *after* a real camera scan succeeds — which, on a slow real
+  // device, can itself take longer than the old code waited to start
+  // this countdown. Starting it early made the heartbeat print "0s until
+  // timeout" while the guest was still just pointing their camera at a
+  // code, before any real attempt had begun — indistinguishable from an
+  // actual timeout. Each of showHostQR()/showJoinQR() now calls
+  // startHeartbeat() itself, right when it calls host()/join().
   function startTelemetry() {
     stopTelemetry();
     startDebugPoll();
     startStatsPoll();
-    startHeartbeat();
   }
   function stopTelemetry() {
     stopDebugPoll();
@@ -753,6 +789,7 @@
     termPrint('blip-pair --host --signal=qr', 'cmd');
     termPrint('generating local session description...');
     startTelemetry();
+    startHeartbeat(); // host() below is called immediately — its connect timer starts now too
 
     window.BlipNet.host(function (offerSdp) {
       window.BlipQR.render(canvas, offerSdp);
@@ -813,6 +850,7 @@
       var status = statusBar(body,
         '✓ host code scanned (' + offerSdp.length + ' bytes, ' + candidates + ' route(s)) — generating your code…', 'ok');
       termPrint('generating answer...');
+      startHeartbeat(); // join() below is called now — this is the real start of its connect timer, not whenever JOIN was tapped
       window.BlipNet.join(offerSdp, function (answerSdp) {
         window.BlipQR.render(canvas, answerSdp);
         termPrint('answer ready: ' + answerSdp.length + ' bytes — show it to your host', 'ok');

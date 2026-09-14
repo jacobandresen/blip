@@ -751,13 +751,32 @@ canvas {
 }
 .blip-net-term-bar {
   flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 6px 10px;
   font-size: 10px;
   letter-spacing: 1px;
   color: #f08a3a;
   background: rgba(228, 52, 43, 0.14);
   border-bottom: 1px solid rgba(228, 52, 43, 0.3);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
+.blip-net-term-chevron { flex: none; }
+/* Collapsed by default (web/blip_net_ui.js's buildTerminal()) — real
+   diagnostics for the rare case pairing actually goes wrong, not
+   something worth showing over a plain HOST/JOIN choice by default.
+   Only the bar (tap/Enter/Space to expand) stays visible; termPrint()
+   keeps appending to the hidden log regardless, so expanding later still
+   shows everything that happened while it was closed. */
+.blip-net-term.collapsed .blip-net-term-log,
+.blip-net-term.collapsed .blip-net-term-prompt {
+  display: none;
+}
+.blip-net-term.collapsed .blip-net-term-bar { border-bottom: none; }
 .blip-net-term-log {
   flex: none;
   height: 120px;
