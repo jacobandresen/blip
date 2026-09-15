@@ -43,7 +43,7 @@ function httpJSON(port, path) {
  * older matching tabs can be backgrounded/frozen (and backgrounded tabs
  * get camera-permission requests auto-denied), so the newest match is the
  * one actually in the foreground. See `connectAndroid` below. */
-export async function connect(port, matchUrl) {
+export async function connect(port, matchUrl, { commandTimeoutMs = 10000 } = {}) {
   let list;
   for (let i = 0; i < 50; i++) {
     try {
@@ -115,7 +115,7 @@ export async function connect(port, matchUrl) {
           const timer = setTimeout(() => {
             waiters.delete(mid);
             rejectCall(new Error(`timed out waiting for CDP command ${method}`));
-          }, 10000);
+          }, commandTimeoutMs);
           waiters.set(mid, { resolveCall, rejectCall, timer });
         });
       },
@@ -223,7 +223,7 @@ export async function connectAndroid({ adb, serial, localPort, urlIncludes }) {
     p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`adb forward exited ${code}`))));
     p.on('error', reject);
   });
-  return connect(localPort, urlIncludes);
+  return connect(localPort, urlIncludes, { commandTimeoutMs: 30000 });
 }
 
 /** `Runtime.evaluate` with `returnByValue` + `awaitPromise`, throwing on a
