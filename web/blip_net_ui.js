@@ -256,6 +256,9 @@
             (stats.localCandidateTypes.join(', ') || 'none') + ')', undefined, true);
           termPrint('remote candidates: ' + stats.remoteCandidateCount + ' (' +
             (stats.remoteCandidateTypes.join(', ') || 'none') + ')', undefined, true);
+          if (stats.remoteSdpCandidateCount) {
+            termPrint('remote SDP candidates: ' + stats.remoteSdpCandidateCount, undefined, true);
+          }
           // The same plain-language read the heartbeat prints every 5s
           // while waiting — on demand here too, so `stats` answers "are
           // we missing info?" / "is the network blocking us?" directly
@@ -403,8 +406,15 @@
       };
     }
     if (!stats.remoteCandidateCount) {
+      if (stats.remoteSdpCandidateCount > 0) {
+        return {
+          text: 'remote SDP contains ' + stats.remoteSdpCandidateCount +
+            ' candidate(s), but this browser has not exposed them in ICE stats yet',
+          kind: 'err',
+        };
+      }
       return {
-        text: 'no remote ICE candidates received — the offer/answer exchange is incomplete or unusable',
+        text: 'no remote ICE candidates in the scanned SDP — the offer/answer exchange is incomplete or unusable',
         kind: 'err',
       };
     }

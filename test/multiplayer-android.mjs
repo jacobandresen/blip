@@ -67,11 +67,7 @@ const GUEST_SERIAL = `emulator-${GUEST_PORT}`;
 const HOST_CDP_PORT = 9541;
 const GUEST_CDP_PORT = 9542;
 
-// Two different URLs (not two devices) give the host and guest each
-// their own Chrome tab — `am start` on an already-running URL just
-// refocuses the existing tab instead of opening a new one, so the query
-// string also doubles as how connectAndroid's urlIncludes tells the two
-// tabs' CDP targets apart.
+// The query strings let CDP select the intended page target on each device.
 const HOST_URL = `http://127.0.0.1:${PORT}/rally/index.html?role=host`;
 const GUEST_URL = `http://127.0.0.1:${PORT}/rally/index.html?role=guest`;
 
@@ -112,6 +108,7 @@ before(async () => {
   await new Promise((resolve) => server.listen(PORT, '127.0.0.1', resolve));
 
   await avd.ensureSdk();
+  await avd.startAdb();
   await Promise.all([
     avd.createAvdIfMissing(HOST_AVD),
     avd.createAvdIfMissing(GUEST_AVD),
@@ -135,13 +132,15 @@ before(async () => {
     avd.resetChrome(GUEST_SERIAL),
   ]);
   await Promise.all([
-    avd.openUrlDismissOnboarding(HOST_SERIAL, HOST_URL),
-    avd.openUrlDismissOnboarding(GUEST_SERIAL, GUEST_URL),
-  ]);
-  await Promise.all([
     avd.forwardDevtools(HOST_SERIAL, HOST_CDP_PORT),
     avd.forwardDevtools(GUEST_SERIAL, GUEST_CDP_PORT),
   ]);
+  // Forward the persistent Chrome debugging sockets before navigation. This
+  // avoids racing adb's forwarding setup against Chrome startup.
+  await avd.openUrlDismissOnboarding(HOST_SERIAL, HOST_URL);
+  await sleep(2000);
+  await avd.openUrlDismissOnboarding(GUEST_SERIAL, GUEST_URL);
+  await sleep(3000);
 });
 
 after(async () => {
@@ -199,6 +198,26 @@ async function readScanError(cdp) {
   })()`);
 }
 
+async function debugPage(cdp) {
+  return evaluate(cdp, `(function () {
+    var errors = Array.from(document.querySelectorAll('.blip-hs-err'))
+      .map(function (e) { return e.textContent || ''; }).filter(Boolean);
+    return {
+      url: location.href,
+      ready: document.readyState,
+      panel: !!document.querySelector('.blip-hs-panel'),
+      qr: !!document.querySelector('.blip-hs-panel canvas.blip-qr-canvas'),
+      errors: errors,
+      role: typeof window.blipNetRole === 'function' ? window.blipNetRole() : null,
+      net: typeof window.__blipNetDebug === 'function' ? window.__blipNetDebug() : null,
+    };
+  })()`);
+}
+
+function phase(name, detail) {
+  console.error(`[android-multiplayer] ${name}${detail ? `: ${detail}` : ''}`);
+}
+
 async function captureReportScreenshot(cdp, name) {
   await mkdir(REPORT_DIR, { recursive: true });
   const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error(`timed out capturing ${name}`)), 10000));
@@ -210,16 +229,26 @@ async function captureReportScreenshot(cdp, name) {
   await writeFile(path.join(REPORT_DIR, `${name}.png`), Buffer.from(shot.data, 'base64'));
 }
 
-test('two Chrome-for-Android tabs: QR-only Rally pairing', { skip: skipReason }, async (t) => {
+test('two Android emulators: QR-only Rally pairing', { skip: skipReason }, async (t) => {
   const adbBin = avd.adbPath();
+  phase('connecting host CDP');
   const host = await connectAndroid({ adb: adbBin, serial: HOST_SERIAL, localPort: HOST_CDP_PORT, urlIncludes: `127.0.0.1:${PORT}/rally/index.html?role=host` });
+  phase('connecting guest CDP');
   const guest = await connectAndroid({ adb: adbBin, serial: GUEST_SERIAL, localPort: GUEST_CDP_PORT, urlIncludes: `127.0.0.1:${PORT}/rally/index.html?role=guest` });
+  phase('enabling CDP');
   await host.send('Page.enable'); await host.send('Runtime.enable');
   await guest.send('Page.enable'); await guest.send('Runtime.enable');
+  await host.send('Page.bringToFront');
+  await guest.send('Page.bringToFront');
 
-  await Promise.all([loadRally(host), loadRally(guest)]);
+  phase('loading host page');
+  await loadRally(host);
+  phase('loading guest page');
+  await loadRally(guest);
+  phase('pages loaded', JSON.stringify({ host: await debugPage(host), guest: await debugPage(guest) }));
 
   await t.test('host generates an offer and renders it as a QR code', async () => {
+    phase('host offer: starting');
     await evaluate(host, "document.getElementById('net-play-btn').click()");
     await evaluate(host, "Array.from(document.querySelectorAll('.blip-hs-btn')).find(function(b){return b.textContent==='HOST';}).click()");
     await waitFor(host, QR_READY, 8000);
@@ -228,9 +257,11 @@ test('two Chrome-for-Android tabs: QR-only Rally pairing', { skip: skipReason },
     const offerText = await readRenderedText(host);
     assert.ok(offerText, 'host never rendered an offer QR with real text');
     await injectNextScan(guest, offerText);
+    phase('host offer: ready');
   });
 
   await t.test('guest "scans" the offer (test-injected) and renders an answer QR', async () => {
+    phase('guest offer: opening JOIN');
     await evaluate(guest, "document.getElementById('net-play-btn').click()");
     await evaluate(guest, "Array.from(document.querySelectorAll('.blip-hs-btn')).find(function(b){return b.textContent==='JOIN';}).click()");
     const outcome = await (async () => {
@@ -240,18 +271,22 @@ test('two Chrome-for-Android tabs: QR-only Rally pairing', { skip: skipReason },
       }
       return { ok: false, err: await readScanError(guest) || 'timed out waiting for a decode' };
     })();
+    phase('guest offer: result', JSON.stringify({ outcome, page: await debugPage(guest) }));
     assert.ok(outcome.ok, `guest never decoded the offer QR: ${outcome.err}`);
     const answerText = await readRenderedText(guest);
     assert.ok(answerText, 'guest never rendered an answer QR with real text');
     await injectNextScan(host, answerText);
+    phase('guest answer: ready');
   });
 
   await t.test('host "scans" the answer (test-injected) and the DataChannel opens on both sides', async () => {
+    phase('host answer: opening SCAN');
     await evaluate(host, "Array.from(document.querySelectorAll('.blip-hs-btn')).find(function(b){return b.textContent.indexOf('SCAN')!==-1;}).click()");
     const hostRole = await waitFor(host, 'window.blipNetRole()', 20000);
     const guestRole = await waitFor(guest, 'window.blipNetRole()', 20000);
     assert.equal(hostRole, 1, 'host should report role 1 once its DataChannel opens');
     assert.equal(guestRole, 2, 'guest should report role 2 once its DataChannel opens');
+    phase('datachannel: open');
     await captureReportScreenshot(host, '01-paired-host');
     await captureReportScreenshot(guest, '01-paired-guest');
   });

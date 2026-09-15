@@ -38,6 +38,7 @@
   var role = 0;                // 0 none, 1 host, 2 guest — what blipNetRole() reports
   var latestState = null;      // most recent inbound state packet (guest), consumed by blipNetPoll
   var connectTimer = null;
+  var remoteSdpCandidateCount = 0;
   var keyState = { KeyI: false, KeyK: false }; // guest's own tracked input, for edge-triggered dispatch
   var onStatusCb = null;
   var pendingPings = {};        // id -> { sentAt, cb, timer } — in-flight ping() calls awaiting their pong
@@ -270,6 +271,7 @@
       cancel();
       return;
     }
+    remoteSdpCandidateCount = checked.candidates;
     peer.setRemoteDescription({ type: 'answer', sdp: checked.sdp }).catch(function () {
       if (peer !== pc) return; // superseded/cancelled while this was in flight
       status('failed');
@@ -287,6 +289,7 @@
       status('failed', { reason: checkedOffer.reason });
       return;
     }
+    remoteSdpCandidateCount = checkedOffer.candidates;
     var peer = newPeerConnection();
     pc = peer;
     peer.addEventListener('datachannel', function (e) {
@@ -423,6 +426,7 @@
     if (pc) { try { pc.close(); } catch (e) {} pc = null; }
     role = 0;
     latestState = null;
+    remoteSdpCandidateCount = 0;
   }
 
   // ---- bridge globals (see web/blip_bridge.js) ------------------------------
@@ -509,6 +513,7 @@
         remoteCandidateCount: remoteCandidates.length,
         localCandidateTypes: types(localCandidates),
         remoteCandidateTypes: types(remoteCandidates),
+        remoteSdpCandidateCount: remoteSdpCandidateCount,
         pairs: pairs,
         connectionState: pc && pc.connectionState,
         iceConnectionState: pc && pc.iceConnectionState,

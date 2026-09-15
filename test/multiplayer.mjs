@@ -187,7 +187,10 @@ test('two-device Rally: QR-only pairing, real camera decode both directions, inp
     // no button to click, just wait for either a decode or an error.
     const outcome = await (async () => {
       for (let i = 0; i < 100; i++) {
-        const err = await evaluate(guest, "(document.querySelector('.blip-hs-err')||{}).textContent || ''");
+        const err = await evaluate(guest, `(function () {
+          var errors = document.querySelectorAll('.blip-hs-err');
+          return errors.length ? errors[errors.length - 1].textContent || '' : '';
+        })()`);
         if (err) return { ok: false, err };
         if (await evaluate(guest, QR_READY)) return { ok: true };
         await sleep(200);

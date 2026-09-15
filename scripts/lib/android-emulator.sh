@@ -48,6 +48,11 @@ android_emulator_sdkmanager() { echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/b
 android_emulator_avdmanager() { echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/avdmanager"; }
 android_emulator_bin() { echo "${ANDROID_SDK_ROOT}/emulator/emulator"; }
 android_emulator_adb() { echo "${ANDROID_SDK_ROOT}/platform-tools/adb"; }
+android_emulator_start_adb() {
+  local adb
+  adb="$(android_emulator_adb)"
+  "$adb" start-server >/dev/null
+}
 
 # Installs the Android command-line tools (if `sdkmanager` isn't already
 # present), then platform-tools, the emulator package, and a system image.
@@ -318,6 +323,9 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   cmd="${1:-}"
   shift || true
   case "$cmd" in
+  start-adb)
+    android_emulator_start_adb
+    ;;
   ensure-sdk)
     android_emulator_ensure_sdk
     ;;
@@ -356,6 +364,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 Usage: $0 <command> [args]
 
 Commands:
+  start-adb                           start the shared ADB daemon
   ensure-sdk                         install SDK + emulator + system image
   create-avd <name>                  create an AVD if it doesn't exist
   boot <name> <port> [log] [cam]      boot an AVD headless, print its PID

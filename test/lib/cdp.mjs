@@ -20,13 +20,15 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function httpJSON(port, path) {
   return new Promise((resolve, reject) => {
-    http.get({ host: '127.0.0.1', port, path }, (r) => {
+    const req = http.get({ host: '127.0.0.1', port, path }, (r) => {
       let body = '';
       r.on('data', (d) => { body += d; });
       r.on('end', () => {
         try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
       });
-    }).on('error', reject);
+    });
+    req.setTimeout(3000, () => req.destroy(new Error(`timed out reading CDP http://${port}${path}`)));
+    req.on('error', reject);
   });
 }
 
@@ -62,7 +64,14 @@ export async function connect(port, matchUrl) {
   // assigned incrementally as tabs are created — the highest one is the
   // most recently opened, and therefore the one actually in the
   // foreground when duplicates pile up (see the doc comment above).
-  const page = matches.reduce((a, b) => (parseInt(b.id, 10) > parseInt(a.id, 10) ? b : a));
+  // Chromium page ids are hexadecimal-looking strings, not decimal
+  // counters. Using base 10 makes ids beginning with a letter become NaN,
+  // so duplicate Android tabs could select an old, frozen renderer.
+  const page = matches.reduce((a, b) => {
+    const aId = Number.parseInt(a.id, 16);
+    const bId = Number.parseInt(b.id, 16);
+    return Number.isFinite(aId) && Number.isFinite(bId) && bId > aId ? b : a;
+  });
   const u = new URL(page.webSocketDebuggerUrl);
 
   return new Promise((resolve, reject) => {
@@ -100,7 +109,13 @@ export async function connect(port, matchUrl) {
         const masked = Buffer.alloc(n);
         for (let i = 0; i < n; i++) masked[i] = payload[i] ^ mask[i % 4];
         sock.write(Buffer.concat([hdr, mask, masked]));
-        return new Promise((resolveCall, rejectCall) => waiters.set(mid, { resolveCall, rejectCall }));
+        return new Promise((resolveCall, rejectCall) => {
+          const timer = setTimeout(() => {
+            waiters.delete(mid);
+            rejectCall(new Error(`timed out waiting for CDP command ${method}`));
+          }, 10000);
+          waiters.set(mid, { resolveCall, rejectCall, timer });
+        });
       },
       /** `fn(method, params)` fires for every CDP event (not call replies). */
       on(fn) { listeners.push(fn); },
@@ -130,6 +145,7 @@ export async function connect(port, matchUrl) {
         if (msg.id && waiters.has(msg.id)) {
           const w = waiters.get(msg.id);
           waiters.delete(msg.id);
+          clearTimeout(w.timer);
           if (msg.error) w.rejectCall(new Error(msg.error.message + ' :: ' + JSON.stringify(msg.error.data || '')));
           else w.resolveCall(msg.result);
         } else if (msg.method) {

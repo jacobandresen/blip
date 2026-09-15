@@ -26,6 +26,7 @@ function run(args, { background = false } = {}) {
 }
 
 export const ensureSdk = () => run(['ensure-sdk']);
+export const startAdb = () => run(['start-adb']);
 export const createAvdIfMissing = (name) => run(['create-avd', name]);
 // Boots the AVD in its own backgrounded process (the shell script itself
 // starts the emulator with a trailing `&` and immediately returns its
