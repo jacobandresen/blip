@@ -61,16 +61,18 @@ export async function connect(port, matchUrl) {
     : list.filter((t) => t.type === 'page' && t.webSocketDebuggerUrl);
   if (!matches.length) throw new Error(`no matching page target on port ${port}`);
   // `/json/list`'s order isn't reliably chronological, but target ids are
-  // assigned incrementally as tabs are created — the highest one is the
-  // most recently opened, and therefore the one actually in the
-  // foreground when duplicates pile up (see the doc comment above).
-  // Chromium page ids are hexadecimal-looking strings, not decimal
-  // counters. Using base 10 makes ids beginning with a letter become NaN,
-  // so duplicate Android tabs could select an old, frozen renderer.
+  // assigned incrementally as tabs are created. Chromium uses hexadecimal-
+  // looking ids; use BigInt so long ids are compared without precision loss.
+  // If a browser uses a non-hex id, retain the endpoint's ordering rather
+  // than accidentally treating every candidate as NaN.
+  function targetRank(id) {
+    const hex = String(id || '').replace(/^page_/, '').replace(/-/g, '');
+    return /^[0-9a-f]+$/i.test(hex) ? BigInt(`0x${hex}`) : null;
+  }
   const page = matches.reduce((a, b) => {
-    const aId = Number.parseInt(a.id, 16);
-    const bId = Number.parseInt(b.id, 16);
-    return Number.isFinite(aId) && Number.isFinite(bId) && bId > aId ? b : a;
+    const aId = targetRank(a.id);
+    const bId = targetRank(b.id);
+    return aId !== null && bId !== null && bId > aId ? b : a;
   });
   const u = new URL(page.webSocketDebuggerUrl);
 
