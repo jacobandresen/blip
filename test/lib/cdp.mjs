@@ -131,6 +131,10 @@ export async function connect(port, matchUrl) {
         if (i < 0) return;
         buf = buf.subarray(i + 4);
         shook = true;
+        // The socket timeout only protects the HTTP/WebSocket handshake.
+        // Leaving it armed kills an otherwise healthy Android target while
+        // the other emulator is being initialized.
+        sock.setTimeout(0);
         resolve(api);
       }
       while (buf.length >= 2) {
