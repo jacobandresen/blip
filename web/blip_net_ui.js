@@ -610,6 +610,24 @@
     if (!any) termPrint('  (no candidates in this SDP)', 'err', true);
   }
 
+  function printConnectionTarget(sdp, label) {
+    var parseCandidateLine = window.BlipSdpSlim && window.BlipSdpSlim.parseCandidateLine;
+    if (typeof parseCandidateLine !== 'function') return;
+    var target = null;
+    sdp.split(/\r\n|\n/).some(function (line) {
+      var candidate = parseCandidateLine(line);
+      if (!candidate) return false;
+      target = candidate;
+      return true;
+    });
+    if (!target) {
+      termPrint(label + ': unavailable (no remote ICE candidate)', 'err', true);
+      return;
+    }
+    termPrint(label + ': ' + (target.address || '?') + ':' + (target.port || '?') +
+      ' (' + (target.protocol || '?') + ', ' + (target.type || '?') + ')', undefined, true);
+  }
+
   // ---- modal shell -----------------------------------------------------------
 
   // Dismiss the modal WITHOUT touching the connection — the success path
@@ -802,6 +820,7 @@
         var candidates2 = (text.match(/a=candidate:/g) || []).length;
         termPrint('answer scanned: ' + text.length + ' bytes', 'ok');
         printCandidates(text);
+        printConnectionTarget(text, 'connection target');
         termPrint('applying remote description...');
         status.el.style.display = ''; // hidden by hideEls below, while the camera view had the screen
         status.set('✓ answer scanned (' + text.length + ' bytes, ' + candidates2 + ' route(s)) — connecting…', 'ok');
@@ -845,6 +864,7 @@
       var candidates = (offerSdp.match(/a=candidate:/g) || []).length;
       termPrint('offer scanned: ' + offerSdp.length + ' bytes, ' + candidates + ' ice candidate(s)', 'ok');
       printCandidates(offerSdp);
+      printConnectionTarget(offerSdp, 'host target');
       clear(body);
       var canvas = qrCanvas(body);
       var status = statusBar(body,

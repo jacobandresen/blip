@@ -74,6 +74,9 @@ export async function connect(port, matchUrl) {
         `Sec-WebSocket-Key: ${key}\r\nSec-WebSocket-Version: 13\r\n\r\n`
       );
     });
+    sock.setTimeout(10000, () => {
+      sock.destroy(new Error(`timed out connecting to CDP target ${u.pathname}`));
+    });
     let buf = Buffer.alloc(0);
     let shook = false;
     let id = 0;

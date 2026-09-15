@@ -201,10 +201,11 @@ async function readScanError(cdp) {
 
 async function captureReportScreenshot(cdp, name) {
   await mkdir(REPORT_DIR, { recursive: true });
-  await cdp.send('Page.bringToFront');
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error(`timed out capturing ${name}`)), 10000));
+  await Promise.race([cdp.send('Page.bringToFront'), timeout]);
   const shot = await Promise.race([
     cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: false }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error(`timed out capturing ${name}`)), 10000)),
+    timeout,
   ]);
   await writeFile(path.join(REPORT_DIR, `${name}.png`), Buffer.from(shot.data, 'base64'));
 }

@@ -98,6 +98,10 @@ Direct host (local) ICE candidates only, per the same-room
 [scope decision](#goal). **No STUN or TURN relay** is used: pairing and
 gameplay remain entirely offline and direct.
 
+Scanned SDP is normalized and rejected before ICE starts if it is empty,
+invalid, or contains no candidates. The terminal reports the exact signaling
+stage instead of waiting for an ICE timeout.
+
 Once `RTCPeerConnection` reports `connected` and the DataChannel's `open`
 event fires, signaling is done and out of the picture for the rest of the
 match.

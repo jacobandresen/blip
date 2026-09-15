@@ -77,8 +77,26 @@
     });
   }
 
+  function normalizeSdp(sdp) {
+    return typeof sdp === 'string' ? sdp.trim().replace(/\r\n?/g, '\n') : '';
+  }
+
+  function candidateCount(sdp) {
+    var normalized = normalizeSdp(sdp);
+    return normalized ? (normalized.match(/(?:^|\n)a=candidate:/g) || []).length : 0;
+  }
+
+  function validateSdp(sdp) {
+    var normalized = normalizeSdp(sdp);
+    if (!normalized) return { sdp: '', reason: 'scanned code was empty' };
+    if (!/^v=0(?:\n|$)/.test(normalized)) return { sdp: normalized, reason: 'scanned code is not valid SDP' };
+    var candidates = candidateCount(normalized);
+    if (!candidates) return { sdp: normalized, reason: 'scanned SDP has no ICE candidates' };
+    return { sdp: normalized, candidates: candidates };
+  }
+
   function hasIceCandidates(sdp) {
-    return typeof sdp === 'string' && /(?:^|\r?\n)a=candidate:/.test(sdp);
+    return candidateCount(sdp) > 0;
   }
 
   var stateLog = [];
@@ -218,7 +236,15 @@
           cancel();
           return;
         }
-        onOffer(slimSdpForQr(sdp));
+        var qrSdp = slimSdpForQr(sdp);
+        var qrCheck = validateSdp(qrSdp);
+        if (qrCheck.reason) {
+          status('failed', { reason: 'offer became invalid after QR compaction: ' + qrCheck.reason });
+          cancel();
+          return;
+        }
+        log('offerCandidates', qrCheck.candidates);
+        onOffer(qrCheck.sdp);
         status('waiting');
       })
       .catch(function () {
@@ -237,7 +263,14 @@
   function submitAnswer(sdp) {
     var peer = pc;
     if (!peer) return;
-    peer.setRemoteDescription({ type: 'answer', sdp: sdp }).catch(function () {
+    var checked = validateSdp(sdp);
+    log('remoteAnswerCandidates', checked.candidates || 0);
+    if (checked.reason) {
+      status('failed', { reason: checked.reason });
+      cancel();
+      return;
+    }
+    peer.setRemoteDescription({ type: 'answer', sdp: checked.sdp }).catch(function () {
       if (peer !== pc) return; // superseded/cancelled while this was in flight
       status('failed');
     });
@@ -248,8 +281,10 @@
   function join(offerSdp, onAnswer, onStatus) {
     cancel(); // see host()'s comment on why this is unconditional
     onStatusCb = onStatus;
-    if (!hasIceCandidates(offerSdp)) {
-      status('failed', { reason: 'the scanned offer has no ICE candidates' });
+    var checkedOffer = validateSdp(offerSdp);
+    log('remoteOfferCandidates', checkedOffer.candidates || 0);
+    if (checkedOffer.reason) {
+      status('failed', { reason: checkedOffer.reason });
       return;
     }
     var peer = newPeerConnection();
@@ -258,7 +293,7 @@
       if (peer !== pc) return;
       wireDataChannel(e.channel, 2);
     });
-    peer.setRemoteDescription({ type: 'offer', sdp: offerSdp })
+    peer.setRemoteDescription({ type: 'offer', sdp: checkedOffer.sdp })
       .then(function () { return peer.createAnswer(); })
       .then(function (answer) { return peer.setLocalDescription(answer); })
       .then(function () { return waitForIceGathering(peer); })
@@ -270,7 +305,15 @@
           cancel();
           return;
         }
-        onAnswer(slimSdpForQr(sdp));
+        var qrSdp = slimSdpForQr(sdp);
+        var qrCheck = validateSdp(qrSdp);
+        if (qrCheck.reason) {
+          status('failed', { reason: 'answer became invalid after QR compaction: ' + qrCheck.reason });
+          cancel();
+          return;
+        }
+        log('answerCandidates', qrCheck.candidates);
+        onAnswer(qrCheck.sdp);
         status('answering');
       })
       .catch(function () {
