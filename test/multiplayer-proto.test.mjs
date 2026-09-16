@@ -68,7 +68,7 @@ test('the module never exports the removed bye-message functions', () => {
   assert.equal(proto.decodeBye, undefined);
 });
 
-// ---- app-level ping/pong (the JACK IN "CHECK" button/console command) ----
+// ---- app-level ping/pong diagnostic ----------------------------------------
 
 test('encodePing/decodePing round-trips an id', () => {
   const wire = proto.encodePing('p1');

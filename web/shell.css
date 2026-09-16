@@ -568,28 +568,10 @@ canvas {
   width: min(92vw, 340px);
   max-height: calc(100vh - 32px);
   overflow-y: auto;
-  /* Still scrollable (tall content — a long score list, or JACK IN's QR +
-     status bar + terminal stack on a short/landscape screen — needs
-     somewhere to go), just never a visible scrollbar track: this is a
-     fixed kiosk panel, not a document, and a system scrollbar bar reads
-     as a bug in that context. Same call already made for
-     .blip-net-term-log below (there via overflow:hidden instead, since
-     that one never needs to actually be dragged back through). */
+  /* Still scrollable for tall content, but keep the scrollbar out of the
+     fixed kiosk panel. */
   scrollbar-width: none;      /* Firefox */
   -ms-overflow-style: none;   /* legacy Edge/IE */
-  /* .blip-net-modal (JACK IN) makes this a flex child alongside the
-     terminal — any element with its own `overflow` gets an automatic
-     flex min-height of 0 (not its content size), so without this,
-     flexbox silently squeezes the panel *below* its own max-height (and
-     below what its content needs) to make room for its sibling, on any
-     screen too short for both. That shrink is real clipping — content
-     genuinely goes missing, invisible since the panel hides its own
-     scrollbar — not just the ordinary "needs to scroll" case max-height/
-     overflow-y:auto are actually meant to handle. flex-shrink:0 makes
-     the panel always render at its natural size (however much of that
-     max-height it actually needs); if anything gets pushed out of view
-     on an extreme screen it's the terminal below it, not the controls a
-     player actually has to tap. */
   flex-shrink: 0;
   box-sizing: border-box;
   padding: 18px 18px 16px;
@@ -703,163 +685,25 @@ canvas {
 .blip-hs-btn:disabled { opacity: 0.5; }
 .blip-hs-btn.ghost { background: transparent; border-color: rgba(120, 220, 255, 0.25); color: #7fa6b5; }
 
-/* PLAY NEARBY only: a hacker-terminal readout stacked below the pairing
-   panel (web/blip_net_ui.js) — real technical output from blip_net.js /
-   blip_qr.js (SDP sizes, ICE/DataChannel state, camera + scan progress)
-   in place of the plain-English hand-holding the dialog used to carry.
-   Deliberately in BLIP's Atari palette (matte black + Fuji red/orange,
-   same family as the on-screen game pad in kiosk.css) rather than the
-   cyan/yellow the rest of the modal system uses — this reads as a
-   distinct low-level console bolted onto the side of the UI, not part
-   of its regular chrome. Real monospace (not the pixel arcade font) so
-   it actually reads like a terminal. */
+/* PLAY NEARBY pairing modal. */
 .blip-net-modal {
-  flex-direction: column;
-  gap: 12px;
   overflow-y: auto;
-  /* .blip-hs-modal's own justify-content:center is fine while everything
-     fits, but centering an *overflowing* flex container splits the
-     overflow evenly above AND below the viewport — and content pushed
-     off the top edge of a centered scroller is unreachable by scrolling
-     down (scrollTop can't go negative to reach it). flex-start keeps the
-     whole stack anchored to the top instead, so any overflow is only
-     ever at the bottom, where overflow-y:auto can actually reach it. */
-  justify-content: flex-start;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 .blip-net-modal::-webkit-scrollbar { display: none; }
-.blip-net-term {
-  width: min(92vw, 340px);
-  display: flex;
-  flex-direction: column;
-  border: 2px solid rgba(228, 52, 43, 0.45);
-  border-radius: 6px;
-  background: linear-gradient(180deg, #0e0605 0%, #050302 100%);
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 10px 30px rgba(0, 0, 0, 0.55),
-              inset 0 0 24px rgba(228, 52, 43, 0.07);
-  overflow: hidden;
-  /* Same flex-min-height-0 issue as .blip-hs-panel above (this `overflow`
-     is what triggers it) — without this, a screen too short for both the
-     panel and this terminal squeezes the terminal's fixed-height log area
-     down below its own content instead of the panel keeping its full,
-     natural size and the terminal simply scrolling out of view (the
-     .blip-net-modal wrapper's own overflow-y:auto) on the most extreme
-     screens. */
-  flex-shrink: 0;
-  font-family: 'Courier New', monospace;
-}
-.blip-net-term-bar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 10px;
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: #f08a3a;
-  background: rgba(228, 52, 43, 0.14);
-  border-bottom: 1px solid rgba(228, 52, 43, 0.3);
-  cursor: pointer;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-.blip-net-term-chevron { flex: none; }
-/* Collapsed by default (web/blip_net_ui.js's buildTerminal()) — real
-   diagnostics for the rare case pairing actually goes wrong, not
-   something worth showing over a plain HOST/JOIN choice by default.
-   Only the bar (tap/Enter/Space to expand) stays visible; termPrint()
-   keeps appending to the hidden log regardless, so expanding later still
-   shows everything that happened while it was closed. */
-.blip-net-term.collapsed .blip-net-term-log,
-.blip-net-term.collapsed .blip-net-term-prompt {
-  display: none;
-}
-.blip-net-term.collapsed .blip-net-term-bar { border-bottom: none; }
-.blip-net-term-log {
-  flex: none;
-  height: 120px;
-  /* No visible scrollbar — this is a live readout, not a document to
-     scroll back through. termPrint() (web/blip_net_ui.js) always pins
-     scrollTop to the bottom, so hidden overflow still shows exactly the
-     latest lines; older ones just clip off the top instead of a
-     scrollbar appearing to reach them. */
-  overflow-y: hidden;
-  padding: 8px 10px;
-  font-size: 10px;
-  line-height: 1.6;
-}
-.blip-net-term-line { color: #b5673c; white-space: pre-wrap; word-break: break-all; }
-.blip-net-term-line.cmd { color: #ffb15e; text-shadow: 0 0 6px rgba(240, 138, 58, 0.45); }
-.blip-net-term-line.ok { color: #ff8a5b; text-shadow: 0 0 6px rgba(228, 52, 43, 0.5); }
-.blip-net-term-line.err { color: #ff4b3e; text-shadow: 0 0 6px rgba(255, 60, 40, 0.6); }
-.blip-net-term-prompt {
-  flex: none;
-  display: flex;
-  align-items: center;
-  padding: 6px 10px 8px;
-  font-size: 10px;
-  color: #ffb15e;
-  border-top: 1px solid rgba(228, 52, 43, 0.25);
-  white-space: nowrap;
-  cursor: text; /* clicking anywhere on the row focuses the (hidden) input, like a real terminal */
-  overflow: hidden;
-}
-.blip-net-term-typed { white-space: pre; }
-/* A blinking solid block, not a thin caret — reads as a real terminal
-   cursor, not a form field being edited. */
-.blip-net-term-cursor {
-  display: inline-block;
-  width: 0.6em;
-  height: 1.1em;
-  margin-left: 1px;
-  background: #ff8a5b;
-  vertical-align: text-bottom;
-  animation: blip-term-blink 1s steps(1) infinite;
-}
-@keyframes blip-term-blink { 50% { opacity: 0; } }
-/* type('help') for the list of debug commands (web/blip_net_ui.js's
-   runCommand()) — this <input> is what actually captures keystrokes
-   (and, on a phone, is what opens the keyboard) but is never itself
-   shown; .blip-net-term-typed above mirrors its value. Parked off-screen
-   rather than just visually hidden so there's no residual form-field
-   chrome (border, focus ring, native caret) anywhere in the prompt row. */
-.blip-net-term-input {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-  width: 10px;
-  height: 10px;
-  padding: 0;
-  margin: 0;
-  border: 0;
-  opacity: 0;
-}
-
-/* The glanceable info bar under the QR/scan area (web/blip_net_ui.js's
-   statusBar()) — plain language, big enough to actually read, so
-   "was that code scanned right" / "are we connected" never requires
-   parsing the terminal's small scrolling monospace below it. Cyan/yellow
-   (the same modal-chrome palette .blip-hs-* already uses), deliberately
-   NOT the terminal's red/orange — this is regular UI, not the hacker
-   console bolted onto the side of it. */
+/* One short status line under the QR or camera preview. */
 .blip-net-status {
-  /* 100%, NOT a vw-based width — unlike .blip-hs-panel/.blip-net-term,
-     this sits nested inside the panel's own padding, so sizing it off
-     the viewport (92vw) instead of its actual parent overflowed the
-     panel's right edge on a narrow phone. */
   width: 100%;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 auto;
+  margin: 0 auto 2px;
   padding: 8px 10px;
   border: 2px solid rgba(120, 220, 255, 0.35);
   border-radius: 4px;
   background: rgba(16, 32, 44, 0.6);
-  box-sizing: border-box;
 }
 .blip-net-status-dot {
   flex: none;
@@ -874,8 +718,8 @@ canvas {
 .blip-net-status.err .blip-net-status-dot { background: #ff6b6b; box-shadow: 0 0 6px rgba(255, 107, 107, 0.8); }
 .blip-net-status-text {
   flex: 1;
-  min-width: 0; /* flexbox default (auto) refuses to shrink below content size, forcing CHECK out past the panel edge */
-  font-family: 'Courier New', monospace;
+  min-width: 0;
+  font-family: inherit;
   font-size: 10px;
   line-height: 1.4;
   letter-spacing: 0.5px;
@@ -885,26 +729,10 @@ canvas {
 }
 .blip-net-status.ok .blip-net-status-text { color: #6dffa8; }
 .blip-net-status.err .blip-net-status-text { color: #ff6b6b; }
-.blip-net-status-check {
-  flex: none;
-  padding: 6px 8px;
-  border: 2px solid rgba(120, 220, 255, 0.5);
-  border-radius: 4px;
-  background: #10202c;
-  color: #eafff8;
-  font-family: inherit;
-  font-size: 8px;
-  letter-spacing: 1px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.blip-net-status-check:hover { background: #16303f; }
-.blip-net-status-check:disabled { opacity: 0.5; }
 
 @media (max-width: 380px) {
   .blip-hs-title { font-size: 11px; }
   .blip-hs-item { font-size: 8px; }
   .blip-hs-code { font-size: 12px; letter-spacing: 2px; }
-  .blip-net-term-log { height: 96px; }
   .blip-net-status-text { font-size: 9px; }
 }

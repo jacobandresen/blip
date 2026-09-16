@@ -11,10 +11,8 @@
  * only affects what gets *transmitted* in the code; the RTCPeerConnection
  * that generated the SDP keeps its own full candidate set regardless.
  *
- * Also exports parseCandidateLine() — the one place `a=candidate:` line
- * syntax gets parsed, reused by web/blip_net_ui.js's printCandidates() so
- * that parsing exists (and is unit-tested) in exactly one spot instead of
- * being duplicated between here and there.
+ * Also exports parseCandidateLine() so candidate filtering and tests share
+ * one parser instead of duplicating the SDP syntax handling.
  *
  * Pure string logic, no DOM/WebRTC types touched — dual-exported (Node
  * for test/sdp-slim.test.mjs, `window.BlipSdpSlim` in the browser) the
@@ -25,9 +23,8 @@
 
   var DEFAULT_MAX_CANDIDATES = 4;
 
-  /** Parse one SDP line as an `a=candidate:` line — the exact fields
-   * slimSdpForQr's own filtering and blip_net_ui.js's printCandidates()
-   * both need out of it:
+  /** Parse one SDP line as an `a=candidate:` line — the fields
+   * slimSdpForQr needs for filtering:
    *   a=candidate:<foundation> <component> <protocol> <priority> <address> <port> typ <type> ...
    * Returns `null` for anything that isn't a well-formed candidate line
    * (wrong prefix, or too few fields to have a usable address/port) —

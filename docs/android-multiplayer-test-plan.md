@@ -1,6 +1,6 @@
 # Android multiplayer test
 
-Runs Rally JACK IN between two independent Android 34 emulators running
+Runs Rally PLAY NEARBY between two independent Android 34 emulators running
 Chrome-for-Android. QR scanning is replaced by `window.BlipQR.testInject`;
 WebRTC, ICE, DataChannel, and game state synchronization are real.
 

@@ -29,7 +29,7 @@
 
   var ICE_GATHER_TIMEOUT_MS = 10000;  // mobile browsers can take several seconds to gather ICE
   var CONNECT_TIMEOUT_MS = 60000;     // give up and report a clear status rather than hang forever
-                                       // (generous: two camera scans take longer than typing a code)
+                                       // (generous: two camera scans can take a while)
 
   var proto = window.BlipNetProto;
 
@@ -79,7 +79,9 @@
   }
 
   function normalizeSdp(sdp) {
-    return typeof sdp === 'string' ? sdp.trim().replace(/\r\n?/g, '\n') : '';
+    if (typeof sdp !== 'string') return '';
+    var normalized = sdp.trim().replace(/\r\n?|\n/g, '\r\n');
+    return normalized ? normalized + '\r\n' : '';
   }
 
   function candidateCount(sdp) {
@@ -90,7 +92,7 @@
   function validateSdp(sdp) {
     var normalized = normalizeSdp(sdp);
     if (!normalized) return { sdp: '', reason: 'scanned code was empty' };
-    if (!/^v=0(?:\n|$)/.test(normalized)) return { sdp: normalized, reason: 'scanned code is not valid SDP' };
+    if (!/^v=0(?:\r\n|$)/.test(normalized)) return { sdp: normalized, reason: 'scanned code is not valid SDP' };
     var candidates = candidateCount(normalized);
     if (!candidates) return { sdp: normalized, reason: 'scanned SDP has no ICE candidates' };
     return { sdp: normalized, candidates: candidates };
@@ -101,9 +103,11 @@
   }
 
   var stateLog = [];
-  var STATE_LOG_MAX = 40;
+  var STATE_LOG_MAX = 20;
   function log(tag, val) {
-    stateLog.push(Date.now() + ' ' + tag + '=' + val);
+    var text = val === '' || val == null ? '' : String(val);
+    if (text.length > 80) text = text.slice(0, 80);
+    stateLog.push(tag + (text ? ':' + text : ''));
     if (stateLog.length > STATE_LOG_MAX) stateLog.shift();
   }
 
@@ -130,7 +134,7 @@
       log('iceConnectionState', peer.iceConnectionState);
     });
     peer.addEventListener('icecandidateerror', function (e) {
-      log('icecandidateerror', (e.errorText || '') + ' ' + (e.url || ''));
+      log('ice-error', e.errorText || 'unknown');
     });
     return peer;
   }
@@ -204,8 +208,7 @@
 
   function host(onOffer, onStatus) {
     // A caller that starts a fresh host()/join() without ever cancelling
-    // the previous attempt (the JACK IN console's `host`/`join` commands
-    // can do exactly this, back to back) would otherwise leak the old
+    // the previous attempt would otherwise leak the old
     // RTCPeerConnection: its `pc`/`dc` never get replaced by anything
     // that closes them, just overwritten below, and its own event
     // listeners and in-flight promises keep running against a `pc`
@@ -248,9 +251,11 @@
         onOffer(qrCheck.sdp);
         status('waiting');
       })
-      .catch(function () {
+      .catch(function (e) {
         if (peer !== pc) return;
-        status('failed');
+        var reason = e && (e.message || String(e)) || 'offer setup failed';
+        log('offer-error', reason);
+        status('failed', { reason: reason });
       });
 
     connectTimer = setTimeout(function () {
@@ -319,9 +324,11 @@
         onAnswer(qrCheck.sdp);
         status('answering');
       })
-      .catch(function () {
+      .catch(function (e) {
         if (peer !== pc) return;
-        status('failed');
+        var reason = e && (e.message || String(e)) || 'answer setup failed';
+        log('answer-error', reason);
+        status('failed', { reason: reason });
       });
 
     connectTimer = setTimeout(function () {
@@ -343,10 +350,8 @@
   }
   function attachGuestInputCapture() {
     var canvas = document.getElementById('glcanvas');
-    log('attachGuestInputCapture.canvasFound', !!canvas);
     if (!canvas) return;
     guestKeyDownHandler = function (e) {
-      log('guestKeyDown', e.code);
       if (e.code === 'KeyI' || e.code === 'KeyK') {
         if (!keyState[e.code]) { keyState[e.code] = true; sendGuestInput(); }
       }
@@ -380,15 +385,9 @@
     }));
   }
 
-  /** A round trip over the already-open DataChannel — proof the *other
-   * device's page* is actually receiving and replying right now, not just
-   * that RTCPeerConnection/DataChannel state says 'connected' (that can
-   * stay true for a peer whose tab has since been backgrounded/killed, or
-   * a channel that's technically open but silently wedged). Used by the
-   * JACK IN console's CHECK button/`ping` command
-   * (web/blip_net_ui.js) — a manual, on-demand answer to "is the other
-   * side actually still there", separate from the connect-time telemetry
-   * that only runs while a connection is still being established.
+  /** A round trip over the already-open DataChannel — proof the other
+   * page is receiving and replying, not just that WebRTC says
+   * 'connected'. Kept as a small diagnostic hook for tests and tools.
    * `onResult(rttMs, errorReason)`: exactly one fires, `errorReason` is
    * `null` only on success. */
   function ping(onResult, timeoutMs) {
@@ -443,7 +442,7 @@
 
   window.BlipNet = {
     host: host, join: join, submitAnswer: submitAnswer, cancel: cancel, ping: ping,
-    CONNECT_TIMEOUT_MS: CONNECT_TIMEOUT_MS, // blip_net_ui.js's terminal needs this to show a countdown
+    CONNECT_TIMEOUT_MS: CONNECT_TIMEOUT_MS,
   };
   // Debug/test introspection only — test/multiplayer.mjs and manual
   // console debugging. Not part of the public API.

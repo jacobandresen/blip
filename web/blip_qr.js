@@ -256,7 +256,8 @@
       raf = requestAnimationFrame(tick);
     }
 
-    // Test-only: an automated test (see test/multiplayer-android.mjs) can
+    // Test-only: automated tests (see test/multiplayer.mjs and
+    // test/multiplayer-android.mjs) can
     // set window.BlipQR.testInject to a string *instead of* granting real
     // camera access, so the real WebRTC signaling/sync gets exercised
     // end-to-end without depending on a device actually photographing a

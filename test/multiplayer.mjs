@@ -1,8 +1,9 @@
 // End-to-end test for two-device Rally (docs/multiplayer.md): QR-code
 // pairing is the *only* signaling path (no Realtime relay, no network of
-// any kind involved in pairing), so this test proves the real thing a
-// player does — point a camera at the other phone's screen — actually
-// works, not just that the SDP math round-trips.
+// any kind involved in pairing). By default this test injects the exact text
+// that the other side rendered into the scan hook, so it also runs on a
+// machine with no camera. Set BLIP_MULTIPLAYER_REAL_CAMERA=1 to exercise the
+// real fake-camera/jsQR path instead.
 //
 // Chrome can feed a specific video file into `getUserMedia` in headless
 // mode (`--use-fake-device-for-media-stream
@@ -15,13 +16,13 @@
 // pointed at a physical screen; every line of code between `getUserMedia`
 // and a decoded SDP string runs for real.
 //
-// Requires: `chromium` (or `$BLIP_CHROMIUM`) and `ffmpeg` on PATH, and
-// ./build_web.sh already having produced web/rally/index.wasm.
+// Both modes require `chromium` (or `$BLIP_CHROMIUM`) and a built
+// web/rally/index.wasm. Real-camera mode additionally requires `ffmpeg`.
 //
 // Run: npm run test:multiplayer
 
 import { createServer } from 'node:http';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, rm, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
@@ -74,17 +75,22 @@ async function writeBlankVideo(outPath) {
   await sh('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'color=white:s=480x480:d=2', '-pix_fmt', 'yuv420p', outPath]);
 }
 
-async function launchWithCamera(port, camFile) {
+async function launchBrowser(port, camFile) {
   const bin = process.env.BLIP_CHROMIUM || 'chromium';
-  const proc = spawn(bin, [
+  const args = [
     '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
     '--disable-features=WebRtcHideLocalIpsWithMdns',
     '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
-    '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', // auto-grant the camera prompt
-    `--use-file-for-fake-video-capture=${camFile}`,
-    `--remote-debugging-port=${port}`, '--js-flags=--max-old-space-size=192',
-    'about:blank',
-  ], { stdio: 'ignore' });
+  ];
+  if (camFile) {
+    args.push(
+      '--use-fake-device-for-media-stream',
+      '--use-fake-ui-for-media-stream',
+      `--use-file-for-fake-video-capture=${camFile}`,
+    );
+  }
+  args.push(`--remote-debugging-port=${port}`, '--js-flags=--max-old-space-size=192', 'about:blank');
+  const proc = spawn(bin, args, { stdio: 'ignore' });
   const cdp = await connect(port);
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
@@ -113,6 +119,7 @@ before(async () => {
 after(async () => {
   killAll(procs);
   await new Promise((resolve) => server.close(resolve));
+  if (tmpDir) await rm(tmpDir, { recursive: true, force: true });
 });
 
 /** The dial hand's rotation encodes the paddle fraction — see
@@ -159,13 +166,28 @@ async function grabQrPng(cdp, outPath) {
   await writeFile(outPath, Buffer.from(b64, 'base64'));
 }
 
-test('two-device Rally: QR-only pairing, real camera decode both directions, input+state sync', async (t) => {
-  const hostCam = path.join(tmpDir, 'host_cam.y4m');
-  const guestCam = path.join(tmpDir, 'guest_cam.y4m');
-  await Promise.all([writeBlankVideo(hostCam), writeBlankVideo(guestCam)]);
+async function readRenderedText(cdp) {
+  const text = await evaluate(cdp, 'window.BlipQR.lastRenderedText');
+  if (typeof text !== 'string' || !text) throw new Error('QR renderer did not expose its test payload');
+  return text;
+}
 
-  const hostChrome = await launchWithCamera(HOST_DEBUG_PORT, hostCam);
-  const guestChrome = await launchWithCamera(GUEST_DEBUG_PORT, guestCam);
+async function injectNextScan(cdp, text) {
+  if (typeof text !== 'string' || !text) throw new Error('cannot inject an empty scan payload');
+  await evaluate(cdp, `window.BlipQR.testInject = ${JSON.stringify(text)}`);
+}
+
+const useRealCamera = process.env.BLIP_MULTIPLAYER_REAL_CAMERA === '1';
+
+test(`two-device Rally: QR-only pairing, ${useRealCamera ? 'real camera decode' : 'camera-free scan injection'}, input+state sync`, async (t) => {
+  const hostCam = useRealCamera ? path.join(tmpDir, 'host_cam.y4m') : null;
+  const guestCam = useRealCamera ? path.join(tmpDir, 'guest_cam.y4m') : null;
+  if (useRealCamera) {
+    await Promise.all([writeBlankVideo(hostCam), writeBlankVideo(guestCam)]);
+  }
+
+  const hostChrome = await launchBrowser(HOST_DEBUG_PORT, hostCam);
+  const guestChrome = await launchBrowser(GUEST_DEBUG_PORT, guestCam);
   procs = [hostChrome.proc, guestChrome.proc];
   const host = hostChrome.cdp;
   const guest = guestChrome.cdp;
@@ -176,15 +198,19 @@ test('two-device Rally: QR-only pairing, real camera decode both directions, inp
     await evaluate(host, "document.getElementById('net-play-btn').click()");
     await evaluate(host, "Array.from(document.querySelectorAll('.blip-hs-btn')).find(function(b){return b.textContent==='HOST';}).click()");
     await waitFor(host, QR_READY, 8000);
-    await grabQrPng(host, path.join(tmpDir, 'offer.png'));
-    await writeQrVideo(path.join(tmpDir, 'offer.png'), guestCam);
+    if (useRealCamera) {
+      await grabQrPng(host, path.join(tmpDir, 'offer.png'));
+      await writeQrVideo(path.join(tmpDir, 'offer.png'), guestCam);
+    } else {
+      await injectNextScan(guest, await readRenderedText(host));
+    }
   });
 
-  await t.test('guest scans the offer with its (fake) camera and renders an answer QR', async () => {
+  await t.test('guest receives the offer and renders an answer QR', async () => {
     await evaluate(guest, "document.getElementById('net-play-btn').click()");
     await evaluate(guest, "Array.from(document.querySelectorAll('.blip-hs-btn')).find(function(b){return b.textContent==='JOIN';}).click()");
-    // JOIN auto-starts the camera scan (see blip_net_ui.js's showJoinQR) —
-    // no button to click, just wait for either a decode or an error.
+    // JOIN auto-starts scanning (see blip_net_ui.js's showJoinQR) — in
+    // injected mode the test hook resolves this without opening a camera.
     const outcome = await (async () => {
       for (let i = 0; i < 100; i++) {
         const err = await evaluate(guest, `(function () {
@@ -192,17 +218,24 @@ test('two-device Rally: QR-only pairing, real camera decode both directions, inp
           return errors.length ? errors[errors.length - 1].textContent || '' : '';
         })()`);
         if (err) return { ok: false, err };
+        if (await evaluate(guest, "!!Array.from(document.querySelectorAll('.blip-hs-btn')).find(function(b){return b.textContent==='HOST';})")) {
+          return { ok: false, err: 'returned to choice screen' };
+        }
         if (await evaluate(guest, QR_READY)) return { ok: true };
         await sleep(200);
       }
       return { ok: false, err: 'timed out waiting for a decode' };
     })();
-    assert.ok(outcome.ok, `guest never decoded the offer QR: ${outcome.err}`);
-    await grabQrPng(guest, path.join(tmpDir, 'answer.png'));
-    await writeQrVideo(path.join(tmpDir, 'answer.png'), hostCam);
+    assert.ok(outcome.ok, `guest never received the offer QR: ${outcome.err}`);
+    if (useRealCamera) {
+      await grabQrPng(guest, path.join(tmpDir, 'answer.png'));
+      await writeQrVideo(path.join(tmpDir, 'answer.png'), hostCam);
+    } else {
+      await injectNextScan(host, await readRenderedText(guest));
+    }
   });
 
-  await t.test('host scans the answer with its (fake) camera and the DataChannel opens on both sides', async () => {
+  await t.test('host receives the answer and the DataChannel opens on both sides', async () => {
     await evaluate(host, "Array.from(document.querySelectorAll('.blip-hs-btn')).find(function(b){return b.textContent.indexOf('SCAN')!==-1;}).click()");
     const hostRole = await waitFor(host, 'window.blipNetRole()', 15000);
     const guestRole = await waitFor(guest, 'window.blipNetRole()', 15000);

@@ -178,7 +178,7 @@ export async function renderTextToPng(cdp, text, outPath) {
 }
 
 /** Call window.BlipQR.scan() directly against a hidden <video>/<canvas>
- * pair, bypassing the JACK IN modal entirely — the QR-image-robustness
+ * pair, bypassing the PLAY NEARBY modal entirely — the QR-image-robustness
  * tests only care whether jsQR can decode a given camera frame, not
  * whether the surrounding pairing UI works, so this skips straight to
  * the real decode call instead of clicking through HOST/JOIN. Resolves
