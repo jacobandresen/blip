@@ -29,6 +29,140 @@
 
   var ICE_GATHER_TIMEOUT_MS = 10000;  // mobile browsers can take several seconds to gather ICE
   var CONNECT_TIMEOUT_MS = 60000;     // give up and report a clear status rather than hang forever
+
+  // A DataChannel peer is untrusted: pairing is a QR code anyone in the
+  // room can photograph, and nothing authenticates the far side
+  // afterwards. These bound what a peer can spend on our behalf. The
+  // wire-format limits live in blip_net_proto.js; these are the ones
+  // that need the connection's own context (role, timing).
+
+  /** Largest binary frame we will keep. The state packet is 36 bytes
+   * (NET_STATE_LEN in crates/rally/src/net.rs) and Rust rejects anything
+   * that is not exactly that, so this is not validation — it stops a
+   * peer from making us allocate a copy of an arbitrarily large buffer
+   * every frame. Deliberately ~100x the real packet so a future field
+   * cannot silently trip it. */
+  var MAX_STATE_BYTES = 4096;
+
+  /** Largest payload this side will ever put on the wire.
+   *
+   * Not a policy about peers — a guard against ourselves. Measured on
+   * WebKit: sending a 1MB frame closes the sender's own DataChannel,
+   * silently. `send()` returns normally, nothing throws, and the channel
+   * is simply gone a moment later; 256KB goes through fine. There is no
+   * catch block that can recover from that because there is no
+   * exception, so the only defence is not to make the call.
+   *
+   * Nothing blip sends comes anywhere near this — a state packet is 36
+   * bytes and an input message about 50 — so the cap costs nothing today.
+   * It exists so that a future field, or a bug that hands the wrong
+   * buffer to net_send, degrades into a dropped message instead of a
+   * connection that dies for reasons nobody can see. */
+  var MAX_SEND_BYTES = 64 * 1024;
+
+  function payloadSize(payload) {
+    if (typeof payload === 'string') return payload.length;
+    if (payload && typeof payload.byteLength === 'number') return payload.byteLength;
+    return 0;
+  }
+
+  /** The single way this module puts anything on the wire. */
+  function safeSend(payload) {
+    if (!dc || dc.readyState !== 'open') return false;
+    var size = payloadSize(payload);
+    if (size > MAX_SEND_BYTES) {
+      log('send-too-large', size);
+      return false;
+    }
+    try {
+      dc.send(payload);
+      return true;
+    } catch (e) {
+      log('send-failed', (e && e.message) || String(e));
+      return false;
+    }
+  }
+
+  /** Pongs we will emit per second. Every ping obliges a reply, which
+   * makes an unbounded flood an easy way to keep the other device's main
+   * thread busy. Real usage is a developer typing a diagnostic, a few
+   * per minute at most. */
+  /** How long ICE may sit in 'checking' before we say something.
+   *
+   * Pairing over a blocked network is the one failure that looks exactly
+   * like success right up until it doesn't: both codes scan, both sides
+   * report progress, and then nothing happens for the full connect
+   * timeout. The most common cause is not a bug at all but the network —
+   * guest/corporate WiFi with client isolation (the access point refuses
+   * to pass traffic between its own clients), or a VPN routing LAN
+   * traffic off to somewhere else. Neither is visible from inside the
+   * page, and neither is something retrying will fix, so the one useful
+   * thing to do is say so while the player is still watching. */
+  var ICE_SLOW_HINT_MS = 8000;
+
+  /** Reason string for "ICE ran and nothing got through". Matched by
+   * blip_net_ui.js to choose a message about the network rather than a
+   * generic failure — see signalText there. */
+  var NET_BLOCKED_REASON = 'the devices cannot reach each other on this network';
+
+  var iceFailed = false;
+  var blockedHintTimer = null;
+
+  /** True when this attempt is ending without ever having carried a
+   * packet. Engines disagree about how a dead path is reported: Chromium
+   * takes iceConnectionState to 'disconnected' and connectionState to
+   * 'failed', never using ICE's own 'failed' state at all, so keying off
+   * that one state alone misses the common case. What is unambiguous is
+   * the combination — the DataChannel never opened (role is still 0) and
+   * ICE never reached a connected state — and that is exactly the
+   * blocked-network situation regardless of which state machine noticed
+   * first. Guarded on role so a mid-match 'disconnected' blip, which is
+   * a different thing entirely, is not mistaken for it. */
+  function neverConnected(peer) {
+    return role === 0 &&
+      peer.iceConnectionState !== 'connected' &&
+      peer.iceConnectionState !== 'completed';
+  }
+
+  function clearBlockedHint() {
+    if (blockedHintTimer) {
+      clearTimeout(blockedHintTimer);
+      blockedHintTimer = null;
+    }
+  }
+
+  function startBlockedHint(peer) {
+    clearBlockedHint();
+    blockedHintTimer = setTimeout(function () {
+      if (peer !== pc) return;  // a superseded attempt
+      if (role !== 0) return;   // already connected; nothing to warn about
+      status('checking-slow');
+    }, ICE_SLOW_HINT_MS);
+  }
+
+  var MAX_PONGS_PER_SEC = 10;
+  var pongWindowStart = 0;
+  var pongsInWindow = 0;
+  // Counters exist so the limit is observable: "the channel survived a
+  // flood" is true of an unlimited responder too, so a test cannot tell
+  // the rate limit from its absence without them.
+  var pongsSent = 0;
+  var pongsDropped = 0;
+
+  function pongBudgetAvailable() {
+    var now = Date.now();
+    if (now - pongWindowStart >= 1000) {
+      pongWindowStart = now;
+      pongsInWindow = 0;
+    }
+    pongsInWindow++;
+    if (pongsInWindow <= MAX_PONGS_PER_SEC) {
+      pongsSent++;
+      return true;
+    }
+    pongsDropped++;
+    return false;
+  }
                                        // (generous: two camera scans can take a while)
 
   var proto = window.BlipNetProto;
@@ -186,11 +320,30 @@
       log('connectionState', peer.connectionState);
       if (peer !== pc) return; // a stale/aborted attempt's events, ignore
       if (peer.connectionState === 'failed' || peer.connectionState === 'closed') {
-        status('failed');
+        // Same underlying cause when ICE already gave up — pass the
+        // reason on so this doesn't overwrite a specific message with a
+        // generic one.
+        status('failed', (iceFailed || neverConnected(peer)) ? { reason: NET_BLOCKED_REASON } : undefined);
       }
     });
     peer.addEventListener('iceconnectionstatechange', function () {
       log('iceConnectionState', peer.iceConnectionState);
+      if (peer !== pc) return; // a stale/aborted attempt's events, ignore
+      var st = peer.iceConnectionState;
+      if (st === 'checking') {
+        startBlockedHint(peer);
+      } else if (st === 'connected' || st === 'completed') {
+        clearBlockedHint();
+      } else if (st === 'failed' || (st === 'disconnected' && role === 0)) {
+        // ICE tried every candidate pair and none of them got a packet
+        // through. The descriptions were exchanged fine (they came off a
+        // QR code, not the network), so this is the network itself.
+        // 'disconnected' counts here only before anything connected —
+        // see neverConnected() on why both states have to be handled.
+        clearBlockedHint();
+        iceFailed = true;
+        status('failed', { reason: NET_BLOCKED_REASON });
+      }
     });
     peer.addEventListener('icecandidateerror', function (e) {
       log('ice-error', e.errorText || 'unknown');
@@ -236,7 +389,12 @@
         // decodeInput since they're disjoint `t` values on the same wire.
         var ping = proto.decodePing(e.data);
         if (ping) {
-          try { dc.send(proto.encodePong(ping.id)); } catch (e2) { /* best-effort reply */ }
+          // Dropped rather than queued once the budget is spent: a pong
+          // is only useful if it is prompt, so a late one has no value
+          // to a legitimate pinger and a backlog is exactly what a
+          // flooder wants us to build.
+          if (!pongBudgetAvailable()) return;
+          safeSend(proto.encodePong(ping.id)); // best-effort reply
           return;
         }
         var pong = proto.decodePong(e.data);
@@ -249,16 +407,34 @@
           }
           return;
         }
-        // Guest -> host input, only meaningful on the host.
+        // Guest -> host input. Acted on *only* by the host: this
+        // synthesises real keydown/keyup events into the page, so
+        // honouring it in either direction would let whichever peer felt
+        // like it drive the other player's paddle. The direction of this
+        // message is part of the protocol, not a convention.
         var input = proto.decodeInput(e.data);
-        if (input) {
+        if (input && roleValue === 1) {
           dispatchKey('KeyI', input.up);
           dispatchKey('KeyK', input.down);
         }
         return;
       }
-      // Host -> guest state, only meaningful on the guest. e.data is an
+      // Host -> guest state. Mirror of the input rule above: only the
+      // guest renders someone else's simulation, so only the guest keeps
+      // this. On the host the field is never read, and storing it would
+      // just be a buffer a peer can grow at will. e.data is an
       // ArrayBuffer (binaryType set above) — hand blipNetPoll a view.
+      if (roleValue !== 2) return;
+      // Type-checked, not just size-checked. `binaryType` is set to
+      // 'arraybuffer' above, but that is a request about how *we* decode
+      // frames, not a guarantee about what arrives: a Blob (or anything
+      // else) has no numeric byteLength, `undefined > MAX_STATE_BYTES`
+      // is false, and the size check alone would wave it through into a
+      // Uint8Array that silently comes out empty. An empty state packet
+      // is worse than no packet - it is the wrong length, so Rust drops
+      // it, and the guest's view freezes with no error anywhere.
+      if (!(e.data instanceof ArrayBuffer)) return;
+      if (e.data.byteLength === 0 || e.data.byteLength > MAX_STATE_BYTES) return;
       latestState = new Uint8Array(e.data);
     });
   }
@@ -324,7 +500,10 @@
 
     connectTimer = setTimeout(function () {
       if (peer !== pc) return;
-      status('timeout');
+      // A timeout with ICE still unfinished is the blocked-network case
+      // arriving the slow way: nothing failed loudly, nothing connected.
+      status('timeout', peer.iceConnectionState !== 'connected' &&
+        peer.iceConnectionState !== 'completed' ? { reason: NET_BLOCKED_REASON } : undefined);
       cancel();
     }, CONNECT_TIMEOUT_MS);
   }
@@ -407,7 +586,10 @@
 
     connectTimer = setTimeout(function () {
       if (peer !== pc) return;
-      status('timeout');
+      // A timeout with ICE still unfinished is the blocked-network case
+      // arriving the slow way: nothing failed loudly, nothing connected.
+      status('timeout', peer.iceConnectionState !== 'connected' &&
+        peer.iceConnectionState !== 'completed' ? { reason: NET_BLOCKED_REASON } : undefined);
       cancel();
     }, CONNECT_TIMEOUT_MS);
   }
@@ -419,7 +601,7 @@
 
   function sendGuestInput() {
     if (dc && dc.readyState === 'open') {
-      dc.send(proto.encodeInput(keyState.KeyI, keyState.KeyK));
+      safeSend(proto.encodeInput(keyState.KeyI, keyState.KeyK));
     }
   }
   function attachGuestInputCapture() {
@@ -473,9 +655,7 @@
       onResult(null, 'timeout');
     }, timeoutMs || 3000);
     pendingPings[id] = { sentAt: Date.now(), cb: onResult, timer: timer };
-    try {
-      dc.send(proto.encodePing(id));
-    } catch (e) {
+    if (!safeSend(proto.encodePing(id))) {
       clearTimeout(timer);
       delete pendingPings[id];
       onResult(null, 'send failed');
@@ -493,6 +673,8 @@
 
   function cancel() {
     clearConnectTimer();
+    clearBlockedHint();
+    iceFailed = false;
     detachGuestInputCapture();
     clearPendingPings();
     if (dc) { try { dc.close(); } catch (e) {} dc = null; }
@@ -506,7 +688,7 @@
 
   window.blipNetRole = function () { return role; };
   window.blipNetSend = function (bytes) {
-    if (dc && dc.readyState === 'open') dc.send(bytes);
+    safeSend(bytes);
   };
   window.blipNetPoll = function () {
     var s = latestState;
@@ -518,6 +700,17 @@
     host: host, join: join, submitAnswer: submitAnswer, cancel: cancel, ping: ping,
     CONNECT_TIMEOUT_MS: CONNECT_TIMEOUT_MS,
   };
+  // Test-only: send an arbitrary payload down the open DataChannel,
+  // bypassing the encoders. The direction rules above (a host ignoring
+  // inbound state, a guest ignoring inbound input) cannot otherwise be
+  // tested from the outside, because every legitimate send path already
+  // obeys them — proving they hold needs a way to send something a
+  // well-behaved peer never would. Inert for players: nothing in the UI
+  // calls it, and it does nothing without an open channel.
+  window.__blipNetSendRaw = function (payload) {
+    if (!dc || dc.readyState !== 'open') return false;
+    try { dc.send(payload); return true; } catch (e) { return false; }
+  };
   // Debug/test introspection only — test/multiplayer.mjs and manual
   // console debugging. Not part of the public API.
   window.__blipNetDebug = function () {
@@ -526,6 +719,8 @@
       hasDc: !!dc,
       dcState: dc && dc.readyState,
       keyState: { KeyI: keyState.KeyI, KeyK: keyState.KeyK },
+      pongsSent: pongsSent,
+      pongsDropped: pongsDropped,
       latestStateLen: latestState ? latestState.length : 0,
       log: stateLog,
       pcConnectionState: pc && pc.connectionState,

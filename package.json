@@ -9,6 +9,9 @@
     "test:multiplayer:webkit": "node --test test/multiplayer-webkit.mjs",
     "test:multiplayer:cross": "BLIP_HOST_ENGINE=chromium BLIP_GUEST_ENGINE=webkit node --test test/multiplayer-webkit.mjs && BLIP_HOST_ENGINE=webkit BLIP_GUEST_ENGINE=chromium node --test test/multiplayer-webkit.mjs",
     "test:multiplayer:ios": "node --test test/multiplayer-ios.mjs",
+    "test:multiplayer:blocked": "node --test test/multiplayer-blocked.mjs",
+    "test:multiplayer:hardening": "node --test test/multiplayer-hardening.mjs",
+    "test:qr": "node --test test/qr-scannability.mjs",
     "test:multiplayer:android": "node test/multiplayer-android.mjs",
     "supabase": "supabase"
   },

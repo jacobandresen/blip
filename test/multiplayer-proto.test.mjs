@@ -110,3 +110,86 @@ test('decodeInput still rejects a ping/pong packet (distinct t)', () => {
   assert.equal(proto.decodeInput(proto.encodePing('p1')), null);
   assert.equal(proto.decodeInput(proto.encodePong('p1')), null);
 });
+
+// ---- hardening: the decoders' side of an untrusted peer ------------------
+// Pairing is a QR code anyone in the room can photograph and nothing
+// authenticates the peer afterwards, so every function above is parsing
+// hostile input by default. These pin the limits that make that safe.
+
+test('parsing is refused above MAX_PACKET_CHARS, before JSON.parse runs', () => {
+  const pad = 'x'.repeat(proto.MAX_PACKET_CHARS);
+  const huge = JSON.stringify({ v: proto.PROTO_VERSION, t: 'input', up: true, pad });
+  assert.ok(huge.length > proto.MAX_PACKET_CHARS);
+  assert.equal(proto.decodeInput(huge), null);
+  assert.equal(proto.decodePing(huge), null);
+  assert.equal(proto.decodePong(huge), null);
+});
+
+test('a packet right at the size limit is still accepted', () => {
+  // The cap must bound abuse without clipping a legitimate packet, so
+  // pin both sides of the boundary, not just the rejecting one.
+  const base = { v: proto.PROTO_VERSION, t: 'input', up: true, down: false, pad: '' };
+  const pad = 'x'.repeat(proto.MAX_PACKET_CHARS - JSON.stringify(base).length);
+  const wire = JSON.stringify({ ...base, pad });
+  assert.equal(wire.length, proto.MAX_PACKET_CHARS);
+  assert.deepEqual(proto.decodeInput(wire), { up: true, down: false });
+});
+
+test('an oversized ping id is refused, so a pong cannot be used to amplify', () => {
+  const id = 'x'.repeat(proto.MAX_ID_CHARS + 1);
+  assert.equal(proto.decodePing(JSON.stringify({ v: proto.PROTO_VERSION, t: 'ping', id })), null);
+  assert.equal(proto.decodePong(JSON.stringify({ v: proto.PROTO_VERSION, t: 'pong', id })), null);
+  const ok = 'x'.repeat(proto.MAX_ID_CHARS);
+  assert.deepEqual(proto.decodePing(JSON.stringify({ v: proto.PROTO_VERSION, t: 'ping', id: ok })), { id: ok });
+});
+
+test('an empty ping id is refused', () => {
+  assert.equal(proto.decodePing(JSON.stringify({ v: proto.PROTO_VERSION, t: 'ping', id: '' })), null);
+});
+
+test('ids this module generates fit well inside the accepted length', () => {
+  // Guards the cap against the generator: shortening MAX_ID_CHARS below
+  // what encodePing produces would make every real ping undecodable.
+  const id = 'p999-' + Date.now();
+  assert.deepEqual(proto.decodePing(proto.encodePing(id)), { id });
+  assert.ok(id.length < proto.MAX_ID_CHARS);
+});
+
+test('arrays and primitives are not packets', () => {
+  for (const raw of ['[]', '[{"v":1,"t":"input"}]', '1', '"input"', 'true', 'null']) {
+    assert.equal(proto.decodeInput(raw), null, raw);
+    assert.equal(proto.decodePing(raw), null, raw);
+  }
+});
+
+test('non-string input is refused without throwing', () => {
+  for (const raw of [undefined, null, 42, {}, [], new ArrayBuffer(8)]) {
+    assert.equal(proto.decodeInput(raw), null);
+    assert.equal(proto.decodePing(raw), null);
+    assert.equal(proto.decodePong(raw), null);
+  }
+});
+
+test('a __proto__ key in a packet cannot reach Object.prototype', () => {
+  // JSON.parse makes __proto__ an ordinary own property rather than
+  // invoking the setter, and nothing here spreads or merges the parsed
+  // object. This pins that, because the day someone "simplifies" a
+  // decoder into an object spread is the day it stops being true.
+  const raw = '{"v":1,"t":"input","up":true,"__proto__":{"polluted":"yes"}}';
+  assert.deepEqual(proto.decodeInput(raw), { up: true, down: false });
+  assert.equal({}.polluted, undefined);
+  assert.equal(Object.prototype.polluted, undefined);
+});
+
+test('decoders never throw, whatever the payload', () => {
+  const nasty = [
+    '{', '}', '[', 'undefined', 'NaN', '{"v":1,"t":"input","up":{"toString":1}}',
+    '{"v":"1","t":"input"}', '{"v":1}', '{"t":"input"}', ' ', '{"v":1,"t":"ping","id":null}',
+    '{"v":1,"t":"ping","id":{}}', '{"v":1,"t":"ping","id":["a"]}', '{"v":1.0000001,"t":"input"}',
+  ];
+  for (const raw of nasty) {
+    assert.doesNotThrow(() => proto.decodeInput(raw), raw);
+    assert.doesNotThrow(() => proto.decodePing(raw), raw);
+    assert.doesNotThrow(() => proto.decodePong(raw), raw);
+  }
+});

@@ -607,6 +607,20 @@ canvas {
   letter-spacing: 1px;
   color: #ff6b6b;
 }
+/* A code that was drawn but is too small for another phone's camera to
+   resolve. Amber, not red: the attempt has not failed, but this is
+   almost certainly why nothing is scanning. See renderCode() in
+   web/blip_net_ui.js. */
+.blip-qr-warn {
+  display: none;
+  margin: 4px auto 2px;
+  max-width: 92%;
+  font-size: 8px;
+  line-height: 1.5;
+  letter-spacing: 1px;
+  color: #ffd94a;
+  text-align: center;
+}
 .blip-hs-input {
   width: 100%;
   box-sizing: border-box;

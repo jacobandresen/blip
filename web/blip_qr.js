@@ -26,7 +26,21 @@
   // against entirely rather than just decode less reliably.
   var QUIET_ZONE_MODULES = 4;
 
-  /** Draw `text` as a QR code onto `canvas`, quiet zone included. Low
+  /** On-screen CSS pixels per module below which we stop claiming the
+   * code is scannable.
+   *
+   * Nothing about the *bitmap* needs this — an exactly-rendered QR
+   * decodes from a pristine image down to one pixel per module. It is
+   * the physical size on glass that matters: another phone's camera has
+   * to resolve each module across a few of its own sensor pixels, from a
+   * hand's distance, on a screen that may be dim or reflecting. Two CSS
+   * pixels per module is the conventional floor for a code meant to be
+   * photographed off a display, and a code below it should be reported
+   * as unscannable rather than drawn and silently hoped for. */
+  var MIN_CSS_PX_PER_MODULE = 2;
+
+  /**
+   * Draw `text` as a QR code onto `canvas`, quiet zone included. Low
    * error-correction — the two screens involved are only ever a few
    * inches apart under the scanning phone's own camera, not a printed
    * code exposed to real wear, so capacity (fitting a full SDP, ICE
@@ -36,8 +50,29 @@
    * largest QR version (2,953 bytes at this error-correction level), in
    * which case the vendored encoder throws a bare *string* (not an
    * `Error`); wrapped into a real `Error` here so every caller gets one
-   * consistent, catchable failure shape instead of two different ones. */
-  function render(canvas, text) {
+   * consistent, catchable failure shape instead of two different ones.
+   *
+   * `opts.fitCssPx` is the width of the box the code has to live in. Pass
+   * it: without it the code is drawn on a fixed ~400px grid and left for
+   * CSS to scale to whatever size it is displayed at, and *that scaling
+   * is what breaks QR codes*. A module is a handful of pixels; resampling
+   * the bitmap by a fractional factor merges and drops whole module rows,
+   * and the damage is not gradual — it either decodes or it does not,
+   * unpredictably, depending on how the ratio happens to land. Measured
+   * across the plausible on-screen size range, 51-78% of sizes failed to
+   * decode, including the default the pairing modal used.
+   *
+   * So the cell size is chosen to fill the available box in *device*
+   * pixels, and the canvas is then given an explicit CSS size of exactly
+   * bitmap / devicePixelRatio. One module is a whole number of device
+   * pixels, the browser resamples nothing, and decoding stops being a
+   * lottery.
+   *
+   * Returns a description of what was drawn, including whether it is big
+   * enough to be scannable — the caller is expected to tell the player
+   * when it is not (see renderCode in blip_net_ui.js).
+   */
+  function render(canvas, text, opts) {
     // Test-only: stash the raw text every code encodes so an automated
     // test can read it back directly (window.BlipQR.lastRenderedText)
     // instead of photographing the canvas and re-decoding it — see
@@ -53,11 +88,27 @@
     }
     var count = qr.getModuleCount();
     var totalModules = count + QUIET_ZONE_MODULES * 2;
-    var cell = Math.max(2, Math.floor(400 / totalModules));
+    var fitCssPx = opts && opts.fitCssPx > 0 ? opts.fitCssPx : 0;
+    var dpr = (opts && opts.dpr) || (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+    var cell, cssPx;
+    if (fitCssPx) {
+      // Whole device pixels per module, as many as the box allows.
+      cell = Math.max(1, Math.floor((fitCssPx * dpr) / totalModules));
+      cssPx = (cell * totalModules) / dpr;
+    } else {
+      // Legacy path: no box given, so no CSS size is set either and the
+      // caller inherits the old fixed-grid behaviour.
+      cell = Math.max(2, Math.floor(400 / totalModules));
+      cssPx = cell * totalModules;
+    }
     var size = cell * totalModules;
     var offset = QUIET_ZONE_MODULES * cell;
     canvas.width = size;
     canvas.height = size;
+    if (fitCssPx) {
+      canvas.style.width = cssPx + 'px';
+      canvas.style.height = cssPx + 'px';
+    }
     var ctx = canvas.getContext('2d');
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, size, size); // also paints the quiet zone itself
@@ -67,6 +118,16 @@
         if (qr.isDark(r, c)) ctx.fillRect(offset + c * cell, offset + r * cell, cell, cell);
       }
     }
+    var info = {
+      modules: totalModules,
+      deviceCellPx: cell,
+      bitmapPx: size,
+      cssPx: cssPx,
+      cssPxPerModule: cssPx / totalModules,
+      scannable: (cssPx / totalModules) >= MIN_CSS_PX_PER_MODULE
+    };
+    window.BlipQR.lastRender = info; // diagnostics + tests
+    return info;
   }
 
   // ---- "do I see something QR-shaped yet?" heuristic ------------------------
@@ -318,5 +379,5 @@
     return stop;
   }
 
-  window.BlipQR = { render: render, scan: scan };
+  window.BlipQR = { render: render, scan: scan, MIN_CSS_PX_PER_MODULE: MIN_CSS_PX_PER_MODULE };
 }());

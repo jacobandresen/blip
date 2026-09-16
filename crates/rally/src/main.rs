@@ -11,7 +11,7 @@ use blip::{
     play_music, play_sfx, rects_overlap, web, window_conf, Blip, BlipColor, Timer, BLIP_BLACK,
     BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
-use net::{pack_state, unpack_state, NetState, NET_STATE_LEN};
+use net::{pack_state, sanitize_state, unpack_state, Limits, NetState, NET_STATE_LEN};
 
 // ---- layout -----------------------------------------------------------
 const WIN_W: i32 = 480;
@@ -34,6 +34,20 @@ const BALL_SPD0: f32 = 275.0;
 const BALL_INC: f32 = 15.0;
 const BALL_MAX: f32 = 450.0;
 const AI_SPD: f32 = 145.0;
+/// Bounds a guest applies to an inbound host packet (see
+/// `net::sanitize_state`). Deliberately looser than the values a healthy
+/// host actually sends: a ball is legitimately a little past the edge on
+/// the frame it scores, and velocity carries a margin over `BALL_MAX`,
+/// so this rejects the impossible without second-guessing the merely
+/// unusual.
+const NET_LIMITS: Limits = Limits {
+    x_min: -4.0 * BALL_SZ,
+    x_max: WIN_W as f32 + 4.0 * BALL_SZ,
+    y_min: PLAY_T - 4.0 * BALL_SZ,
+    y_max: PLAY_B + 4.0 * BALL_SZ,
+    speed_max: 2.0 * BALL_MAX,
+    score_max: SCORE_WIN,
+};
 // A hard floor on how long the win/lose screen stays up before a key can
 // dismiss it — without this, a paddle key still held from the rally that
 // just ended bounces straight back to the title screen unread.
@@ -209,7 +223,11 @@ fn update_net_guest(g: &mut Game) {
     if n != NET_STATE_LEN {
         return;
     }
-    let Some(s) = unpack_state(&buf) else { return };
+    let Some(raw) = unpack_state(&buf) else { return };
+    // The host is believed, so what it says has to be believable first —
+    // see net::sanitize_state. A rejected packet is treated exactly like
+    // a garbled one: keep the last good frame.
+    let Some(s) = sanitize_state(&raw, &NET_LIMITS) else { return };
     let Some(state) = State::from_phase(s.phase) else { return };
     g.state = state;
     g.ball_x = s.ball_x;
