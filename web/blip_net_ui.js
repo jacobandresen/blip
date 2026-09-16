@@ -204,7 +204,7 @@
       if (!renderCode(canvas, offerSdp, status)) return;
       status.set('Show this code to the other phone.', 'wait');
       showScanButton(body, 'SCAN ANSWER', function (answerSdp) {
-        status.set('Connecting…', 'wait');
+        status.set('✓ Answer scanned. Contacting client…', 'active');
         window.BlipNet.submitAnswer(answerSdp);
       }, false, [canvas], function (err) {
         status.set(scanErrorMessage(err), 'err');
@@ -227,7 +227,7 @@
 
       window.BlipNet.join(offerSdp, function (answerSdp) {
         if (!renderCode(canvas, answerSdp, status)) return;
-        status.set('Show this code to the host.', 'wait');
+        status.set('✓ Host code scanned. Show this code to the host.', 'ok');
       }, function (state, detail) {
         showConnectionResult(status, body, state, detail);
       });

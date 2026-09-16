@@ -714,6 +714,11 @@ canvas {
   box-shadow: 0 0 6px rgba(127, 166, 181, 0.8);
 }
 .blip-net-status.wait .blip-net-status-dot { background: #ffd94a; box-shadow: 0 0 6px rgba(255, 217, 74, 0.8); }
+.blip-net-status.active .blip-net-status-dot {
+  background: #ffd94a;
+  box-shadow: 0 0 6px rgba(255, 217, 74, 0.8);
+  animation: blip-net-status-pulse 1s ease-in-out infinite;
+}
 .blip-net-status.ok .blip-net-status-dot { background: #6dffa8; box-shadow: 0 0 6px rgba(109, 255, 168, 0.8); }
 .blip-net-status.err .blip-net-status-dot { background: #ff6b6b; box-shadow: 0 0 6px rgba(255, 107, 107, 0.8); }
 .blip-net-status-text {
@@ -728,7 +733,12 @@ canvas {
   word-break: break-word;
 }
 .blip-net-status.ok .blip-net-status-text { color: #6dffa8; }
+.blip-net-status.active .blip-net-status-text { color: #ffd94a; }
 .blip-net-status.err .blip-net-status-text { color: #ff6b6b; }
+
+@keyframes blip-net-status-pulse {
+  50% { opacity: 0.35; transform: scale(0.7); }
+}
 
 @media (max-width: 380px) {
   .blip-hs-title { font-size: 11px; }

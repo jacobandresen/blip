@@ -23,9 +23,11 @@ The title screen's **PLAY NEARBY** button opens a small pairing modal:
 JOIN opens the camera automatically. HOST only needs the extra scan action
 because it must first leave its offer visible for the other device. The
 modal shows one short status line for the current action or result:
-`Creating code…`, `Point at the code.`, `Connecting…`, `Connected`, or a
-short retry message. Camera permission, missing-camera, and invalid-code
-errors are stated directly. **CLOSE** cancels the current attempt.
+`Creating code…`, `Point at the code.`, `Host code scanned`, `Contacting
+client…`, `Connected`, or a short retry message. A green check confirms a
+code was scanned; the host's amber status dot pulses while it contacts the
+client. Camera permission, missing-camera, and invalid-code errors are stated
+directly. **CLOSE** cancels the current attempt.
 
 ## Architecture
 
