@@ -16,6 +16,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connect, evaluate, waitFor, sleep, killAll } from './cdp.mjs';
+import { chromiumBinary } from './chromium-binary.mjs';
 
 export { evaluate, waitFor, sleep, killAll };
 
@@ -52,6 +53,14 @@ export function createFileServer() {
 // slow) means dozens of ports, and a shared counter is simpler and safer
 // than each test file/section picking its own range and hoping they never
 // collide.
+// Software GL rather than no GL: Rally is a macroquad/WebGL game, and
+// `--disable-gpu` leaves headless Chrome on macOS with no WebGL context
+// at all, so the wasm never starts, the paddle dials never move, and
+// every state-sync assertion fails on a game that was never running.
+// SwiftShader renders in software, so it behaves the same on a CI box
+// with no GPU as on a developer's Mac.
+const HEADLESS_GL = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
+
 let nextPort = 9531;
 export function allocPorts(n = 1) {
   const start = nextPort;
@@ -93,9 +102,9 @@ export async function writeBlankVideo(outPath) {
  * shows a QR code to an already-running "camera" mid-test rather than
  * needing to know the code's content before the browser even starts. */
 export async function launchWithCamera(port, camFile) {
-  const bin = process.env.BLIP_CHROMIUM || 'chromium';
+  const bin = chromiumBinary();
   const proc = spawn(bin, [
-    '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
+    '--headless=new', ...HEADLESS_GL, '--no-sandbox', '--disable-dev-shm-usage',
     '--disable-features=WebRtcHideLocalIpsWithMdns',
     '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
     '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream',
@@ -115,9 +124,9 @@ export async function launchWithCamera(port, camFile) {
  * checkForCamera()'s own comment in web/blip_net_ui.js for why that check
  * exists at all. */
 export async function launchWithNoCamera(port) {
-  const bin = process.env.BLIP_CHROMIUM || 'chromium';
+  const bin = chromiumBinary();
   const proc = spawn(bin, [
-    '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
+    '--headless=new', ...HEADLESS_GL, '--no-sandbox', '--disable-dev-shm-usage',
     `--remote-debugging-port=${port}`, '--js-flags=--max-old-space-size=192',
     'about:blank',
   ], { stdio: 'ignore' });
@@ -146,8 +155,15 @@ export const READ_RIGHT_FRACTION = `(function () {
 })()`;
 
 export async function loadRally(cdp) {
+  return loadRallyAt(cdp, `http://127.0.0.1:${HTTP_PORT}`);
+}
+
+/** Same as loadRally() but against an explicit origin. A real phone
+ * can't reach the harness on 127.0.0.1 — the iOS guest loads the very
+ * same server over the Mac's LAN address instead. */
+export async function loadRallyAt(cdp, origin) {
   await evaluate(cdp, 'true'); // ensure Runtime is ready before navigating
-  await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/rally/index.html` });
+  await cdp.send('Page.navigate', { url: `${origin}/rally/index.html` });
   await waitFor(cdp, "document.readyState === 'complete'", 15000);
   await waitFor(cdp, "typeof window.BlipNet === 'object' && typeof window.BlipQR === 'object'", 15000);
   // The coin wall: shell.js swallows every keydown while it's up — dismiss

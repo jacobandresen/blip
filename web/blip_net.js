@@ -119,6 +119,65 @@
   // shouldn't go completely dark over it.
   var slimSdpForQr = (window.BlipSdpSlim && window.BlipSdpSlim.slimSdpForQr) || function (sdp) { return sdp; };
 
+  // WebKit can decline to produce any ICE candidate at all for a page
+  // that has never been granted media-capture permission, when it has no
+  // other way to offer one privately. Real iOS Safari usually does have
+  // one — it emits an mDNS `<uuid>.local` host candidate, which hides the
+  // LAN address instead of withholding it — but a WebKit build with no
+  // mDNS responder (headless WebKit, as used by
+  // test/multiplayer-webkit.mjs) emits nothing rather than expose a raw
+  // IP. blip configures no ICE servers by design (pairing must work with
+  // no internet, and gameplay must never be relayed), so there is no
+  // STUN fallback to fall back to, and an unreachable STUN entry does not
+  // help: it is the media grant WebKit gates on, not the presence of a
+  // server.
+  //
+  // The failure is silent and total where it happens: iceGatheringState
+  // never leaves 'gathering', the local description carries no
+  // a=candidate lines, and host() gives up after the gather timeout.
+  //
+  // Taking the camera permission first costs the player nothing: both
+  // pairing roles open the camera moments later anyway to scan a code,
+  // so this only moves the prompt earlier. The stream is stopped the
+  // instant it arrives — the permission is the point, not the video.
+  // Best-effort by construction: a denial, or no mediaDevices at all
+  // (iOS exposes none outside a secure context), resolves like a grant,
+  // so pairing proceeds and reports its real outcome through the
+  // existing "no ICE candidates" status rather than inventing a second
+  // failure mode.
+  var mediaWarmUp = null;
+  var mediaWarmUpResult = null;
+  function warmUpIceMedia() {
+    if (mediaWarmUp) return mediaWarmUp;
+    var md = navigator.mediaDevices;
+    var remember = function (r) { mediaWarmUpResult = r; return r; };
+    if (!md || !md.getUserMedia) {
+      mediaWarmUp = Promise.resolve(remember('unavailable'));
+      return mediaWarmUp;
+    }
+    mediaWarmUp = md.getUserMedia({ video: true }).then(function (stream) {
+      stream.getTracks().forEach(function (t) { t.stop(); });
+      return remember('granted');
+    }, function (e) {
+      return remember('denied:' + ((e && e.name) || 'unknown'));
+    });
+    return mediaWarmUp;
+  }
+
+  /** Gathering produced nothing. On WebKit that has one overwhelmingly
+   * likely cause — the media permission warm-up above was refused, so
+   * the engine withheld every candidate — and saying so is the
+   * difference between a player who can fix it and one staring at
+   * "Could not connect". Anything else (no network at all, an interface
+   * with no usable address) keeps the plain reason. */
+  function noCandidateReason() {
+    var denied = typeof mediaWarmUpResult === 'string' &&
+      (mediaWarmUpResult.indexOf('denied') === 0 || mediaWarmUpResult === 'unavailable');
+    return denied
+      ? 'no ICE candidates were gathered — this browser needs camera access to connect'
+      : 'no ICE candidates were gathered';
+  }
+
   function newPeerConnection() {
     // Local host candidates only: pairing must work without internet and
     // gameplay must never be relayed through a server.
@@ -223,7 +282,12 @@
     pc = peer;
     var channelObj = peer.createDataChannel('rally', { ordered: false, maxRetransmits: 0 });
     wireDataChannel(channelObj, 1);
-    peer.createOffer()
+    // Started before the promise chain, so it still runs inside the
+    // transient user activation from the HOST tap — iOS Safari rejects a
+    // getUserMedia() that has drifted out of the gesture. See
+    // warmUpIceMedia() for why hosting needs it at all.
+    warmUpIceMedia()
+      .then(function () { return peer.createOffer(); })
       .then(function (offer) { return peer.setLocalDescription(offer); })
       .then(function () { return waitForIceGathering(peer); })
       .then(function () {
@@ -236,7 +300,7 @@
         if (peer !== pc) return;
         var sdp = peer.localDescription && peer.localDescription.sdp;
         if (!hasIceCandidates(sdp)) {
-          status('failed', { reason: 'no ICE candidates were gathered' });
+          status('failed', { reason: noCandidateReason() });
           cancel();
           return;
         }
@@ -301,7 +365,17 @@
       if (peer !== pc) return;
       wireDataChannel(e.channel, 2);
     });
-    peer.setRemoteDescription({ type: 'offer', sdp: checkedOffer.sdp })
+    // Same WebKit ICE gate as host() — see warmUpIceMedia(). The guest
+    // reaches here from the scanner's own decode callback, and
+    // blip_qr.js stops the camera *before* invoking it, so there is no
+    // live stream to preempt. In the real flow the permission the
+    // scanner already obtained makes this resolve instantly without a
+    // second prompt; it matters when join() is reached some other way
+    // (a test's injected scan, or a future paste-the-code path), where
+    // no camera was ever opened and WebKit would otherwise gather
+    // nothing at all.
+    warmUpIceMedia()
+      .then(function () { return peer.setRemoteDescription({ type: 'offer', sdp: checkedOffer.sdp }); })
       .then(function () { return peer.createAnswer(); })
       .then(function (answer) { return peer.setLocalDescription(answer); })
       .then(function () { return waitForIceGathering(peer); })
@@ -309,7 +383,7 @@
         if (peer !== pc) return; // see host()'s matching comment
         var sdp = peer.localDescription && peer.localDescription.sdp;
         if (!hasIceCandidates(sdp)) {
-          status('failed', { reason: 'no ICE candidates were gathered' });
+          status('failed', { reason: noCandidateReason() });
           cancel();
           return;
         }

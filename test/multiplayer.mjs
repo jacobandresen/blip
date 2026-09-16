@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { connect, evaluate, waitFor, sleep, killAll } from './lib/cdp.mjs';
+import { chromiumBinary } from './lib/chromium-binary.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.join(__dirname, '..', 'web');
@@ -76,9 +77,10 @@ async function writeBlankVideo(outPath) {
 }
 
 async function launchBrowser(port, camFile) {
-  const bin = process.env.BLIP_CHROMIUM || 'chromium';
+  const bin = chromiumBinary();
   const args = [
-    '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
+    '--headless=new', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
+    '--no-sandbox', '--disable-dev-shm-usage',
     '--disable-features=WebRtcHideLocalIpsWithMdns',
     '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
   ];

@@ -15,6 +15,7 @@ import http from 'node:http';
 import net from 'node:net';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { chromiumBinary } from './chromium-binary.mjs';
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -171,10 +172,13 @@ export async function connect(port, matchUrl, { commandTimeoutMs = 10000 } = {})
  * multiplayer test's whole point) don't starve the host.
  */
 export async function launch(port, extraArgs = []) {
-  const bin = process.env.BLIP_CHROMIUM || 'chromium';
+  const bin = chromiumBinary();
   const proc = spawn(bin, [
     '--headless=new',
-    '--disable-gpu',
+    // Software WebGL, not none — see HEADLESS_GL in
+    // test/lib/multiplayer-harness.mjs for why a GPU-less headless
+    // Chrome silently breaks every wasm-game assertion.
+    '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
     '--no-sandbox',
     '--disable-dev-shm-usage',
     // Chrome hides local ICE candidates behind a per-instance `.local`
