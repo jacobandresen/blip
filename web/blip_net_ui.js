@@ -40,6 +40,14 @@
       if (detail && detail.reason && detail.reason.indexOf('scanned') !== -1) {
         return 'Invalid code. Try again.';
       }
+      // WebKit can withhold every ICE candidate from a page that was
+      // refused camera access — see warmUpIceMedia() in blip_net.js.
+      // Without this line that failure is indistinguishable from a dead
+      // network, and the one thing the player could actually do about it
+      // goes unsaid.
+      if (detail && detail.reason && detail.reason.indexOf('camera access') !== -1) {
+        return 'Allow camera access to connect.';
+      }
       return 'Could not connect. Try again.';
     }
     return state === 'answering' ? 'Connecting…' : 'Waiting…';

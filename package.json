@@ -6,11 +6,15 @@
     "test": "node --test test/fill-canvas.test.mjs test/multiplayer-proto.test.mjs test/sdp-slim.test.mjs test/qr-heuristic.test.mjs",
     "test:highscores": "node test/highscores.mjs",
     "test:multiplayer": "node test/multiplayer.mjs",
+    "test:multiplayer:webkit": "node --test test/multiplayer-webkit.mjs",
+    "test:multiplayer:cross": "BLIP_HOST_ENGINE=chromium BLIP_GUEST_ENGINE=webkit node --test test/multiplayer-webkit.mjs && BLIP_HOST_ENGINE=webkit BLIP_GUEST_ENGINE=chromium node --test test/multiplayer-webkit.mjs",
+    "test:multiplayer:ios": "node --test test/multiplayer-ios.mjs",
     "test:multiplayer:android": "node test/multiplayer-android.mjs",
     "supabase": "supabase"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.116.0",
+    "playwright": "^1.63.0",
     "supabase": "^2.117.0"
   }
 }
