@@ -25,10 +25,9 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { launchEngine } from './lib/engine.mjs';
 import { pairOverQr } from './lib/pairing.mjs';
 import {
-  createFileServer, HTTP_PORT, loadRally, READ_RIGHT_FRACTION,
+  openPage, openPair, HTTP_PORT, loadRally, READ_RIGHT_FRACTION,
   openModal, clickHsBtn, getStatusText, pollUntil, QR_READY,
   evaluate, waitFor, sleep,
 } from './lib/multiplayer-harness.mjs';
@@ -37,21 +36,7 @@ const HOST_ENGINE = process.env.BLIP_HOST_ENGINE || 'webkit';
 const GUEST_ENGINE = process.env.BLIP_GUEST_ENGINE || 'webkit';
 
 test(`two-device Rally over WebRTC: host=${HOST_ENGINE} guest=${GUEST_ENGINE}`, async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-
-  const hostBrowser = await launchEngine(HOST_ENGINE);
-  const guestBrowser = await launchEngine(GUEST_ENGINE);
-  const host = hostBrowser.cdp;
-  const guest = guestBrowser.cdp;
-
-  t.after(async () => {
-    await hostBrowser.browser.close().catch(() => {});
-    await guestBrowser.browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
-
-  await Promise.all([loadRally(host), loadRally(guest)]);
+  const { host, guest } = await openPair(t, HOST_ENGINE, GUEST_ENGINE);
 
   let paired;
 
@@ -69,7 +54,17 @@ test(`two-device Rally over WebRTC: host=${HOST_ENGINE} guest=${GUEST_ENGINE}`, 
     assert.notEqual(paired.offer, paired.answer, 'offer and answer must differ');
     for (const [label, text] of [['offer', paired.offer], ['answer', paired.answer]]) {
       assert.ok(text.length > 40, `${label} payload looks empty (${text.length} bytes)`);
-      assert.match(text, /candidate/i, `${label} carries no ICE candidate`);
+      // The QR carries the compact form, not raw SDP (see packForQr in
+      // web/blip_sdp_slim.js) — the whole point of which is that it does
+      // *not* contain SDP boilerplate. What must be true is that it is
+      // the compact format and names at least one reachable route.
+      assert.ok(text.startsWith('B1|'), `${label} is not a compact payload: ${text.slice(0, 40)}`);
+      const routes = text.split('|')[5] || '';
+      assert.ok(/[^:]+:\d+/.test(routes), `${label} carries no route: ${JSON.stringify(routes)}`);
+      // The compact form exists to keep the code scannable; if it ever
+      // grows back toward SDP size, the QR quietly gets harder to scan.
+      assert.ok(text.length < 400,
+        `${label} is ${text.length} bytes — the compact payload should be ~100`);
     }
   });
 
@@ -170,16 +165,9 @@ test(`two-device Rally over WebRTC: host=${HOST_ENGINE} guest=${GUEST_ENGINE}`, 
 // either outcome specifically produces a test that fails on its own
 // engine's coin flip, so this accepts both and rejects only the hang.
 test('WebKit: refusing the camera never leaves hosting stuck without a message', async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
   // No 'camera' in permissions — getUserMedia is refused, exactly as it
   // is for a player who taps "Don't Allow".
-  const hostBrowser = await launchEngine('webkit', { permissions: [] });
-  const host = hostBrowser.cdp;
-  t.after(async () => {
-    await hostBrowser.browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
+  const { cdp: host } = await openPage(t, 'webkit', { permissions: [] });
 
   await loadRally(host);
   assert.equal(await evaluate(host, `

@@ -674,6 +674,20 @@ canvas {
 }
 .blip-ice-state { flex: 0 0 auto; color: #667; }
 
+/* What a successful scan actually read. Green, and phrased as evidence
+   ("host code · 2 routes · 538 bytes") rather than a bare tick — the
+   only place the scanned content is visible to a human. */
+.blip-scan-result {
+  display: none;
+  margin: 6px auto 2px;
+  max-width: 96%;
+  font-size: 8px;
+  line-height: 1.6;
+  letter-spacing: 1px;
+  color: #6dffa8;
+  text-align: center;
+}
+
 .blip-hs-input {
   width: 100%;
   box-sizing: border-box;

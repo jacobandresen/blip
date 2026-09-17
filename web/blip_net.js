@@ -252,6 +252,10 @@
   // script tag order guarantees it normally won't, but this module
   // shouldn't go completely dark over it.
   var slimSdpForQr = (window.BlipSdpSlim && window.BlipSdpSlim.slimSdpForQr) || function (sdp) { return sdp; };
+  // Compact codec (see blip_sdp_slim.js). Identity fallbacks so a missing
+  // module degrades to sending plain SDP rather than breaking pairing.
+  var packForQr = (window.BlipSdpSlim && window.BlipSdpSlim.packForQr) || function (sdp) { return sdp; };
+  var unpackFromQr = (window.BlipSdpSlim && window.BlipSdpSlim.unpackFromQr) || function (text) { return text; };
 
   // WebKit can decline to produce any ICE candidate at all for a page
   // that has never been granted media-capture permission, when it has no
@@ -649,7 +653,7 @@
           return;
         }
         log('offerCandidates', qrCheck.candidates);
-        onOffer(qrCheck.sdp);
+        onOffer(packForQr(qrCheck.sdp));
         status('waiting');
       })
       .catch(function (e) {
@@ -673,7 +677,7 @@
   function submitAnswer(sdp) {
     var peer = pc;
     if (!peer) return;
-    var checked = validateSdp(sdp);
+    var checked = validateSdp(unpackFromQr(sdp));
     log('remoteAnswerCandidates', checked.candidates || 0);
     if (checked.reason) {
       status('failed', { reason: checked.reason });
@@ -692,7 +696,7 @@
   function join(offerSdp, onAnswer, onStatus) {
     cancel(); // see host()'s comment on why this is unconditional
     onStatusCb = onStatus;
-    var checkedOffer = validateSdp(offerSdp);
+    var checkedOffer = validateSdp(unpackFromQr(offerSdp));
     log('remoteOfferCandidates', checkedOffer.candidates || 0);
     if (checkedOffer.reason) {
       status('failed', { reason: checkedOffer.reason });
@@ -747,7 +751,7 @@
           return;
         }
         log('answerCandidates', qrCheck.candidates);
-        onAnswer(qrCheck.sdp);
+        onAnswer(packForQr(qrCheck.sdp));
         status('answering');
       })
       .catch(function (e) {

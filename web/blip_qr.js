@@ -39,12 +39,54 @@
    * as unscannable rather than drawn and silently hoped for. */
   var MIN_CSS_PX_PER_MODULE = 2;
 
+  /** Strongest first. H tolerates ~30% damage but holds the least data;
+   * L holds the most and tolerates least. The compact pairing payload
+   * (~98 bytes, see blip_sdp_slim.js) fits comfortably at H, which is
+   * why the list is tried in this order rather than the other way. */
+  var ECC_LEVELS = ['H', 'Q', 'M', 'L'];
+
+  /** Rasterise a candidate code at one pixel per module and read it back
+   * with the same decoder the camera path uses. Cheap — a code this size
+   * is a ~60x60 bitmap — and it is the only way to be *sure* the encoder
+   * produced something readable rather than something merely plausible. */
+  function decodesBack(qr, text) {
+    try {
+      var n = qr.getModuleCount();
+      var quiet = 4;
+      var side = n + quiet * 2;
+      var probe = document.createElement('canvas');
+      probe.width = side;
+      probe.height = side;
+      var pctx = probe.getContext('2d');
+      pctx.fillStyle = '#fff';
+      pctx.fillRect(0, 0, side, side);
+      pctx.fillStyle = '#000';
+      for (var r = 0; r < n; r++) {
+        for (var c = 0; c < n; c++) {
+          if (qr.isDark(r, c)) pctx.fillRect(quiet + c, quiet + r, 1, 1);
+        }
+      }
+      var img = pctx.getImageData(0, 0, side, side);
+      var got = jsQR(img.data, side, side);
+      return !!(got && got.data === text);
+    } catch (e) {
+      return false;
+    }
+  }
+
+
   /**
    * Draw `text` as a QR code onto `canvas`, quiet zone included. Low
-   * error-correction — the two screens involved are only ever a few
-   * inches apart under the scanning phone's own camera, not a printed
-   * code exposed to real wear, so capacity (fitting a full SDP, ICE
-   * candidates included) matters more here than damage tolerance. Auto
+   * Highest error correction (~30% recoverable), which the compact
+   * payload pays for outright.
+   * The payload got small enough to afford it: dropping TCP candidates
+   * and optional candidate attributes (blip_sdp_slim.js) took a typical
+   * offer from ~538 bytes of SDP to a ~98-byte compact form
+   * (blip_sdp_slim.js), which is 53 modules at level H against the 89 it
+   * used to take at M — fewer modules *and* double the damage tolerance.
+   * Both axes improve at once: bigger modules for the camera to resolve,
+   * and more tolerance of the glare, angle and hand-shake that a code
+   * photographed off a glowing screen actually suffers. Auto
    * type-number (0) picks the smallest QR version the text actually fits
    * in — the one way this can still fail is `text` overflowing even the
    * largest QR version (2,953 bytes at this error-correction level), in
@@ -79,14 +121,45 @@
     // scan()'s testInject for the matching other half. Harmless/inert
     // for real players; nothing reads this outside of test code.
     window.BlipQR.lastRenderedText = text;
-    var qr = qrcode(0, 'L');
-    qr.addData(text);
-    try {
-      qr.make();
-    } catch (e) {
-      throw new Error('QR encode failed: ' + e);
+
+    // Strongest error correction the payload will actually fit in, and
+    // *verified* rather than assumed.
+    //
+    // Two failure modes make this necessary. A QR's capacity depends on
+    // its correction level — about 1273 bytes at H against 2953 at L —
+    // and the vendored encoder does not reliably reject a payload that
+    // overflows the level it was given: it returns a code of far too few
+    // modules which looks perfectly plausible and cannot be decoded by
+    // anything. Silently displaying such a code is the worst outcome
+    // available, because it is indistinguishable to the player from a
+    // camera that is not working.
+    //
+    // So each level is tried from strongest down, and the winner is
+    // whichever one this very routine can read back out of its own
+    // rendered pixels. That makes the guarantee concrete: a code this
+    // function returns has been decoded at least once, here, before
+    // anybody points a camera at it.
+    var qr = null;
+    var eccUsed = null;
+    var count = 0;
+    for (var li = 0; li < ECC_LEVELS.length; li++) {
+      var attempt = qrcode(0, ECC_LEVELS[li]);
+      attempt.addData(text);
+      try {
+        attempt.make();
+      } catch (e) {
+        continue; // does not fit at this level — try a weaker one
+      }
+      if (!decodesBack(attempt, text)) continue;
+      qr = attempt;
+      eccUsed = ECC_LEVELS[li];
+      count = attempt.getModuleCount();
+      break;
     }
-    var count = qr.getModuleCount();
+    if (!qr) {
+      throw new Error('QR encode failed: payload of ' + text.length +
+        ' bytes could not be encoded into a readable code at any error-correction level');
+    }
     var totalModules = count + QUIET_ZONE_MODULES * 2;
     var fitCssPx = opts && opts.fitCssPx > 0 ? opts.fitCssPx : 0;
     var dpr = (opts && opts.dpr) || (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
@@ -119,6 +192,7 @@
       }
     }
     var info = {
+      ecc: eccUsed,
       modules: totalModules,
       deviceCellPx: cell,
       bitmapPx: size,
@@ -171,7 +245,43 @@
 
   // ---- marker overlay --------------------------------------------------------
 
-  function drawMarkers(overlay, side, found, candidate) {
+  /** Corner brackets and a travelling sweep line, drawn on every frame
+   * whether or not anything has been seen yet.
+   *
+   * Without this the overlay was simply blank until a QR-shaped thing
+   * appeared, so a camera that was running perfectly looked identical to
+   * one that had failed to start — and the natural reading of a blank
+   * box is "this is broken", not "keep looking". The sweep is driven by
+   * the frame counter rather than a timer, so it only moves while frames
+   * are genuinely being processed: if it is moving, scanning is
+   * happening, and if it freezes the scan has stalled. */
+  function drawReticle(octx, dispSide, frames) {
+    var inset = Math.round(dispSide * 0.08);
+    var len = Math.round(dispSide * 0.16);
+    octx.strokeStyle = 'rgba(120, 220, 255, 0.85)';
+    octx.lineWidth = 3;
+    octx.beginPath();
+    [[inset, inset, 1, 1], [dispSide - inset, inset, -1, 1],
+     [inset, dispSide - inset, 1, -1], [dispSide - inset, dispSide - inset, -1, -1]]
+      .forEach(function (c) {
+        octx.moveTo(c[0] + c[2] * len, c[1]);
+        octx.lineTo(c[0], c[1]);
+        octx.lineTo(c[0], c[1] + c[3] * len);
+      });
+    octx.stroke();
+
+    // Travels down the box and back, one full pass per ~120 frames.
+    var phase = (frames % 240) / 120;
+    var y = inset + (phase <= 1 ? phase : 2 - phase) * (dispSide - inset * 2);
+    var grad = octx.createLinearGradient(0, y - 12, 0, y + 12);
+    grad.addColorStop(0, 'rgba(120, 220, 255, 0)');
+    grad.addColorStop(0.5, 'rgba(120, 220, 255, 0.55)');
+    grad.addColorStop(1, 'rgba(120, 220, 255, 0)');
+    octx.fillStyle = grad;
+    octx.fillRect(inset, y - 12, dispSide - inset * 2, 24);
+  }
+
+  function drawMarkers(overlay, side, found, candidate, frames) {
     var octx = overlay.getContext('2d');
     var dispSide = overlay.width; // overlay is always square — see blip_net_ui.js
     octx.clearRect(0, 0, overlay.width, overlay.height);
@@ -188,6 +298,7 @@
       octx.stroke();
       return;
     }
+    drawReticle(octx, dispSide, frames || 0);
     if (!candidate) return;
     var topLeft = mapToDisplay(candidate.x - candidate.side / 2, candidate.y - candidate.side / 2, side, dispSide);
     var boxSize = (candidate.side / side) * dispSide;
@@ -302,7 +413,7 @@
         if (candidate) {
           candidate = { x: candidate.x / fscale, y: candidate.y / fscale, side: candidate.side / fscale };
         }
-        if (overlayCanvas) drawMarkers(overlayCanvas, side, null, candidate);
+        if (overlayCanvas) drawMarkers(overlayCanvas, side, null, candidate, frames);
         report('scanning', {
           frames: frames,
           width: nativeW,

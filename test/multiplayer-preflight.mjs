@@ -21,23 +21,16 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { launchEngine } from './lib/engine.mjs';
 import { hostShowsOffer, injectNextScan } from './lib/pairing.mjs';
 import {
-  createFileServer, HTTP_PORT, loadRally, blockAllCandidates,
+  openPage, openPair, HTTP_PORT, loadRally, rewriteRoutes,
   openModal, clickHsBtn, getStatusText, pollUntil, evaluate, waitFor, sleep, QR_READY,
 } from './lib/multiplayer-harness.mjs';
 
 const ENGINE = process.env.BLIP_HOST_ENGINE || 'chromium';
 
 test(`the WebRTC loopback probe (${ENGINE})`, async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const { browser, cdp } = await launchEngine(ENGINE);
-  t.after(async () => {
-    await browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
+  const { browser, cdp } = await openPage(t, ENGINE);
   await loadRally(cdp);
 
   await t.test('succeeds on a working browser, and actually moves a message', async () => {
@@ -56,13 +49,7 @@ test(`the WebRTC loopback probe (${ENGINE})`, async (t) => {
 });
 
 test(`a device without WebRTC is told immediately, not after the connect timeout (${ENGINE})`, async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const { browser, cdp } = await launchEngine(ENGINE);
-  t.after(async () => {
-    await browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
+  const { browser, cdp } = await openPage(t, ENGINE);
   await loadRally(cdp);
 
   // Taken away before anything has run, so nothing is cached — the same
@@ -79,18 +66,7 @@ test(`a device without WebRTC is told immediately, not after the connect timeout
 });
 
 test(`the guest reports a different-network pairing early (${ENGINE})`, async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const hostBrowser = await launchEngine(ENGINE);
-  const guestBrowser = await launchEngine(ENGINE);
-  const host = hostBrowser.cdp;
-  const guest = guestBrowser.cdp;
-  t.after(async () => {
-    await hostBrowser.browser.close().catch(() => {});
-    await guestBrowser.browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
-  await Promise.all([loadRally(host), loadRally(guest)]);
+  const { host, guest } = await openPair(t, ENGINE, ENGINE);
 
   // The guest must have gathered its own addresses for the comparison to
   // mean anything; without them the check stays quiet by design.
@@ -106,23 +82,12 @@ test(`the guest reports a different-network pairing early (${ENGINE})`, async (t
   // Every candidate moved to a reserved address in a subnet the guest is
   // certainly not on — what a hotspot, guest VLAN or VPN looks like.
   //
-  // Not blockAllCandidates(): that rewrites only the UDP candidates, and
-  // the remaining TCP one still carries a real address from this machine
-  // — which both browsers share, since both are running on it. The check
-  // is deliberately conservative and goes quiet the moment *any* subnet
-  // matches, so a partial rewrite proves nothing.
-  const foreign = offer.split(/\r\n/).map((line) => {
-    if (line.indexOf('a=candidate:') !== 0) return line;
-    return line.replace(/\b\d{1,3}(\.\d{1,3}){3}\b/g, '10.255.255.7');
-  }).join('\r\n');
-  // Only the candidate lines matter — looksLikeDifferentNetwork() reads
-  // nothing else. The session-level `c=IN IP4 ...` line keeps a real
-  // address and is correctly ignored.
-  const foreignCandidates = foreign.split(/\r\n/).filter((l) => l.indexOf('a=candidate:') === 0);
-  assert.ok(foreignCandidates.length > 0, 'the rewritten offer has no candidates left');
-  for (const line of foreignCandidates) {
-    assert.doesNotMatch(line, /192\.168\.|169\.254\./, `a local address survived the rewrite: ${line}`);
-  }
+  // A subnet the guest is certainly not on — what a hotspot, guest VLAN
+  // or VPN looks like. rewriteRoutes understands both payload shapes, so
+  // this keeps working whichever form the QR happens to carry.
+  const foreign = rewriteRoutes(offer, '10.255.255.7');
+  assert.notEqual(foreign, offer, 'the rewrite changed nothing — wrong payload shape?');
+
   await injectNextScan(guest, foreign);
   await openModal(guest);
   await clickHsBtn(guest, 'JOIN');

@@ -16,6 +16,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { connect, evaluate, waitFor, sleep, killAll } from './cdp.mjs';
+import { launchEngine } from './engine.mjs';
 import { chromiumBinary } from './chromium-binary.mjs';
 
 export { evaluate, waitFor, sleep, killAll };
@@ -29,6 +30,32 @@ const MIME = {
   '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png',
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
 };
+
+/** Start a server and resolve once it is actually listening.
+ *
+ * The obvious `new Promise((r) => server.listen(port, r))` has no error
+ * path: if the port is taken, 'error' fires, the callback never runs,
+ * and the promise never settles. Under `node --test` that surfaces as a
+ * suite producing *no output at all* and hanging until something kills
+ * it — the worst possible failure mode, and one that looks like a
+ * device or network problem rather than a stray process holding a port.
+ * (It was a stray process holding a port.) */
+export function listenOn(server, port) {
+  return new Promise((resolve, reject) => {
+    const onError = (err) => {
+      server.removeListener('listening', onListening);
+      reject(new Error(`could not listen on port ${port}: ${err.code || err.message}` +
+        (err.code === 'EADDRINUSE' ? ' — another server (or a previous test run) is holding it' : '')));
+    };
+    const onListening = () => {
+      server.removeListener('error', onError);
+      resolve(server);
+    };
+    server.once('error', onError);
+    server.once('listening', onListening);
+    server.listen(port);
+  });
+}
 
 export function createFileServer() {
   return createServer(async (req, res) => {
@@ -45,27 +72,6 @@ export function createFileServer() {
       res.end('not found');
     }
   });
-}
-
-// Every test in this suite that needs a debug port pulls the next one
-// from here instead of hard-coding one — dozens of small, independent
-// Chrome launches (one full 2-device pairing per test would be needlessly
-// slow) means dozens of ports, and a shared counter is simpler and safer
-// than each test file/section picking its own range and hoping they never
-// collide.
-// Software GL rather than no GL: Rally is a macroquad/WebGL game, and
-// `--disable-gpu` leaves headless Chrome on macOS with no WebGL context
-// at all, so the wasm never starts, the paddle dials never move, and
-// every state-sync assertion fails on a game that was never running.
-// SwiftShader renders in software, so it behaves the same on a CI box
-// with no GPU as on a developer's Mac.
-const HEADLESS_GL = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'];
-
-let nextPort = 9531;
-export function allocPorts(n = 1) {
-  const start = nextPort;
-  nextPort += n;
-  return n === 1 ? start : Array.from({ length: n }, (_, i) => start + i);
 }
 
 export function sh(cmd, args) {
@@ -94,46 +100,6 @@ export async function writeQrVideo(pngPath, outPath, vf) {
 }
 export async function writeBlankVideo(outPath) {
   await sh('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'color=white:s=480x480:d=2', '-pix_fmt', 'yuv420p', outPath]);
-}
-
-/** A headless Chromium fed a fake camera from `camFile` (a .y4m video —
- * see writeQrVideo/writeBlankVideo). The file can be *rewritten* after
- * launch (ffmpeg overwrites it, Chrome keeps reading) — that's how a test
- * shows a QR code to an already-running "camera" mid-test rather than
- * needing to know the code's content before the browser even starts. */
-export async function launchWithCamera(port, camFile) {
-  const bin = chromiumBinary();
-  const proc = spawn(bin, [
-    '--headless=new', ...HEADLESS_GL, '--no-sandbox', '--disable-dev-shm-usage',
-    '--disable-features=WebRtcHideLocalIpsWithMdns',
-    '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
-    '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream',
-    `--use-file-for-fake-video-capture=${camFile}`,
-    `--remote-debugging-port=${port}`, '--js-flags=--max-old-space-size=192',
-    'about:blank',
-  ], { stdio: 'ignore' });
-  const cdp = await connect(port);
-  await cdp.send('Page.enable');
-  await cdp.send('Runtime.enable');
-  return { proc, cdp };
-}
-
-/** No fake-device flag at all — `enumerateDevices()` reports zero
- * `videoinput`s, the same as a real desktop with no webcam. Used for the
- * "no camera on this device" upfront-warning test; see
- * checkForCamera()'s own comment in web/blip_net_ui.js for why that check
- * exists at all. */
-export async function launchWithNoCamera(port) {
-  const bin = chromiumBinary();
-  const proc = spawn(bin, [
-    '--headless=new', ...HEADLESS_GL, '--no-sandbox', '--disable-dev-shm-usage',
-    `--remote-debugging-port=${port}`, '--js-flags=--max-old-space-size=192',
-    'about:blank',
-  ], { stdio: 'ignore' });
-  const cdp = await connect(port);
-  await cdp.send('Page.enable');
-  await cdp.send('Runtime.enable');
-  return { proc, cdp };
 }
 
 export const QR_READY = `(function(){
@@ -258,13 +224,67 @@ export function makeSyntheticOfferSdp(candidateCount = 4) {
  * networks: the candidates are real enough to start ICE checks, just
  * unreachable, which is exactly what "something between the two devices
  * is dropping this traffic" looks like from getStats(). */
-export function blockAllCandidates(sdp) {
-  return sdp.split(/\r\n/).map((line) => {
+/** A file server plus one browser, both torn down automatically.
+ *
+ * Every browser-driven suite opened with the same eight lines: make a
+ * server, listen, launch, and register a t.after that closes both. That
+ * is where the EADDRINUSE hang came from — one of those copies wrapped
+ * listen() in a promise with no error path, and a stray process holding
+ * the port turned into a suite that produced no output and never
+ * finished. Written once, that class of bug has one place to live. */
+export async function openPage(t, engine = 'chromium', opts = {}) {
+  const server = createFileServer();
+  await listenOn(server, HTTP_PORT);
+  const handle = await launchEngine(engine, opts);
+  t.after(async () => {
+    await handle.browser.close().catch(() => {});
+    await new Promise((r) => server.close(r));
+  });
+  return { ...handle, server };
+}
+
+/** Two browsers with Rally already loaded on both — the shape almost
+ * every multiplayer test needs before it can do anything interesting. */
+export async function openPair(t, hostEngine = 'chromium', guestEngine = 'chromium') {
+  const server = createFileServer();
+  await listenOn(server, HTTP_PORT);
+  const hostBrowser = await launchEngine(hostEngine);
+  const guestBrowser = await launchEngine(guestEngine);
+  t.after(async () => {
+    await hostBrowser.browser.close().catch(() => {});
+    await guestBrowser.browser.close().catch(() => {});
+    await new Promise((r) => server.close(r));
+  });
+  await Promise.all([loadRally(hostBrowser.cdp), loadRally(guestBrowser.cdp)]);
+  return { host: hostBrowser.cdp, guest: guestBrowser.cdp, hostBrowser, guestBrowser, server };
+}
+
+export function rewriteRoutes(payload, address) {
+  // Handles both payload shapes, because the pairing QR carries the
+  // compact form (`B1|ufrag|pwd|fp|setup|host:port,...`, see packForQr in
+  // web/blip_sdp_slim.js) while the SDP path still exists as a fallback.
+  // A rewriter that knew only about `a=candidate:` lines would quietly
+  // do nothing to a compact payload — which is not a failing test but a
+  // *passing* one that has stopped testing anything, since the
+  // connection then succeeds and every "blocked" assertion inverts.
+  if (payload.startsWith('B1|')) {
+    const parts = payload.split('|');
+    parts[5] = (parts[5] || '').split(',').filter(Boolean).map((route) => {
+      const at = route.lastIndexOf(':');
+      return `${address}:${route.slice(at + 1)}`;
+    }).join(',');
+    return parts.join('|');
+  }
+  return payload.split(/\r\n/).map((line) => {
     if (line.indexOf('a=candidate:') !== 0) return line;
     const parts = line.split(' ');
-    if ((parts[2] || '').toLowerCase() === 'udp') parts[4] = '10.255.255.1';
+    if ((parts[2] || '').toLowerCase() === 'udp') parts[4] = address;
     return parts.join(' ');
   }).join('\r\n');
+}
+
+export function blockAllCandidates(payload) {
+  return rewriteRoutes(payload, '10.255.255.1');
 }
 
 export async function clickHsBtn(cdp, label) {

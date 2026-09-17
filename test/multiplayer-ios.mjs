@@ -44,7 +44,7 @@ import {
   startInspectorBridge, connectDevice, requireAwakeDevice, lanAddress, INSPECTOR_PORT,
 } from './lib/ios-device.mjs';
 import {
-  createFileServer, HTTP_PORT, loadRally, loadRallyAt, READ_RIGHT_FRACTION,
+  createFileServer, listenOn, HTTP_PORT, loadRally, loadRallyAt, READ_RIGHT_FRACTION,
   evaluate, waitFor, sleep,
 } from './lib/multiplayer-harness.mjs';
 
@@ -75,7 +75,7 @@ test('two-device Rally: Mac hosts, a real iPhone joins over WiFi', async (t) => 
   }
 
   const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
+  await listenOn(server, HTTP_PORT);
   const origin = `http://${lanAddress()}:${HTTP_PORT}`;
 
   const guest = await connectDevice();
@@ -143,7 +143,13 @@ test('two-device Rally: Mac hosts, a real iPhone joins over WiFi', async (t) => 
     assert.equal(dbg.dcState, 'open', `phone DataChannel is ${dbg.dcState}`);
     assert.ok(['connected', 'completed'].includes(dbg.pcIceConnectionState),
       `phone ICE state is ${dbg.pcIceConnectionState}`);
-    assert.match(paired.answer, /typ host/, 'the phone offered no host candidate');
+    // The QR payload is the compact form (packForQr in
+    // web/blip_sdp_slim.js), so the route appears as host:port rather
+    // than an SDP candidate line.
+    assert.ok(paired.answer.startsWith('B1|'),
+      `the phone's answer is not a compact payload: ${paired.answer.slice(0, 40)}`);
+    assert.match(paired.answer.split('|')[5] || '', /[^:]+:\d+/,
+      'the phone offered no reachable route');
   });
 
   await t.test('the match starts on both devices', async () => {

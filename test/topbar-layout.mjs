@@ -28,8 +28,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { launchEngine } from './lib/engine.mjs';
-import { createFileServer, HTTP_PORT, WEB_DIR, evaluate, waitFor, sleep } from './lib/multiplayer-harness.mjs';
+import { openPage, HTTP_PORT, WEB_DIR, evaluate, waitFor, sleep } from './lib/multiplayer-harness.mjs';
 
 const ENGINE = process.env.BLIP_TOPBAR_ENGINE || 'chromium';
 
@@ -112,13 +111,7 @@ function sidewaysOverflow(m) {
 }
 
 test(`the BLIP logo and COINS button stay inside the top bar (${ENGINE})`, async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const { browser, page, cdp } = await launchEngine(ENGINE);
-  t.after(async () => {
-    await browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
+  const { browser, page, cdp } = await openPage(t, ENGINE);
 
   assert.ok(GAME_PAGES.length > 0, 'found no built game pages to check');
 
