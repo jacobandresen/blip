@@ -44,11 +44,50 @@ const VIEWPORTS = [
 // candidates means a longer SDP, which means more modules in the same box.
 const PAYLOADS = [4, 8, 12];
 
-/** Screenshot the live canvas element and decode those exact pixels. */
+/** Nothing may be painted on top of the code.
+ *
+ * The page is a CRT cabinet: scanlines, a vignette, and an occasional
+ * electrical "overcharge" glitch on the wordmark. All of those sit below
+ * the pairing modal today (z-index 100, 99 and on the logo itself,
+ * against the modal's 300), so none of them reaches the code. That is a
+ * fact about current z-indexes, not a guarantee — raising a decorative
+ * overlay above 300, or adding a new one without thinking about it,
+ * would print scanlines straight across the QR. A camera would then see
+ * a code that looks right to a human and will not decode.
+ *
+ * Checked by hit-testing rather than by reading z-indexes, so it holds
+ * however the stacking is achieved. */
+const NOTHING_OVER_THE_CODE = `(function () {
+  var c = document.querySelector('.blip-hs-panel canvas.blip-qr-canvas');
+  if (!c) return { ok: false, why: 'no canvas' };
+  var b = c.getBoundingClientRect();
+  var pts = [
+    [b.left + 4, b.top + 4], [b.right - 4, b.top + 4],
+    [b.left + b.width / 2, b.top + b.height / 2],
+    [b.left + 4, b.bottom - 4], [b.right - 4, b.bottom - 4]
+  ];
+  for (var i = 0; i < pts.length; i++) {
+    var top = document.elementFromPoint(pts[i][0], pts[i][1]);
+    if (top !== c) {
+      return { ok: false, why: 'covered by <' + (top ? top.tagName.toLowerCase() +
+        '.' + (top.className || '').toString().trim() : 'nothing') + '> at point ' + i };
+    }
+  }
+  return { ok: true };
+})()`;
+
+/** Screenshot and decode what a camera would actually see.
+ *
+ * Deliberately the whole viewport, not the canvas element: an element
+ * screenshot renders that element in isolation, so anything composited
+ * *over* it -- a scanline overlay, a glitch effect, a translucent panel --
+ * is invisible to the test while being exactly what ruins the scan in
+ * real life. The camera sees the composite, so the test decodes the
+ * composite. */
 async function decodeOnScreen(page, cdp) {
   const el = await page.$('.blip-hs-panel canvas.blip-qr-canvas');
   assert.ok(el, 'no QR canvas on screen');
-  const png = (await el.screenshot({ type: 'png' })).toString('base64');
+  const png = (await page.screenshot({ type: 'png' })).toString('base64');
   // Decoded back inside the page so jsQR sees the screenshot's own
   // pixels, at the size they were captured.
   return evaluate(cdp, `
@@ -104,6 +143,9 @@ test(`the QR code on screen decodes (${ENGINE})`, async (t) => {
           `bitmap ${info.bitmapPx}px displayed at ${info.cssPx} CSS px x${dpr} — fractional scaling`);
         assert.equal(info.bitmapPx % info.modules, 0,
           `bitmap ${info.bitmapPx}px is not a whole number of ${info.modules} modules`);
+
+        const clear = await evaluate(cdp, NOTHING_OVER_THE_CODE);
+        assert.ok(clear.ok, `something is painted over the QR code: ${clear.why}`);
 
         const shot = await decodeOnScreen(page, cdp);
 

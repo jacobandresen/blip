@@ -49,6 +49,9 @@
 
   function signalText(state, detail) {
     if (state === 'connected') return 'Connected';
+    if (state === 'network-mismatch') {
+      return 'These devices look like they are on different networks.';
+    }
     if (state === 'checking-slow') {
       return 'Still connecting… if this network blocks device-to-device traffic, it won\'t.';
     }
@@ -67,15 +70,137 @@
         return 'Allow camera access to connect.';
       }
       if (isBlocked(detail)) return blockedText();
+      // A local fault, found by the loopback probe before any code was
+      // scanned — nothing about the other device or the network can fix
+      // it, so the message must not suggest retrying.
+      if (detail && detail.reason && detail.reason.indexOf('WebRTC could not open') !== -1) {
+        return 'WebRTC is blocked on this device. Check browser or policy settings.';
+      }
       return 'Could not connect. Try again.';
     }
     return state === 'answering' ? 'Connecting…' : 'Waiting…';
+  }
+
+  /** A persistent note about the *network*, separate from the status
+   * line. The status line is overwritten by the next thing that happens
+   * — and for the guest, the very next thing is "✓ Host code scanned",
+   * about a second later — so a warning left there is gone before it can
+   * be read. This one stays up until the attempt ends, which is what a
+   * player needs when the message is "these two devices cannot reach
+   * each other". Styled amber like the QR size warning: not a failure
+   * yet, but the reason it is about to be one. */
+  function netWarning(body, text) {
+    var warn = body.blipNetWarnEl;
+    if (!warn) {
+      // Its own class, not the QR size warning's. Both can be on screen
+      // at once — a guest on a different network whose panel is also too
+      // small for a scannable code — and sharing a class means
+      // querySelector returns whichever happens to come first, which is
+      // a trap for anything (tests included) trying to read one of them.
+      warn = el('div', 'blip-net-warn', body);
+      body.blipNetWarnEl = warn;
+    }
+    warn.textContent = text || '';
+    warn.style.display = text ? 'block' : 'none';
+  }
+
+  /* ---- Live ICE candidate list ----------------------------------------
+   *
+   * While the two devices try to reach each other, every candidate pair
+   * they are testing is shown, colour-coded: green for a path being
+   * attempted or already working, red for one that has been ruled out,
+   * dim for one still queued. Until now this phase was a single line of
+   * text for up to a minute, which gave the player nothing to act on and
+   * no way to tell a slow network from a dead one.
+   *
+   * It doubles as the fastest diagnosis available for the common
+   * network faults: every pair red means something is dropping
+   * device-to-device traffic (client isolation, a VPN), while no pairs
+   * at all means the two sides never exchanged usable candidates.
+   */
+  var iceWatch = null;
+
+  function iceRowText(pair) {
+    // The remote end is the informative half — the address this device is
+    // trying to reach. The local one is always us.
+    return pair.remote || '?';
+  }
+
+  /** green attempted//succeeded, red ruled out, dim still queued. */
+  function iceRowKind(pair) {
+    if (pair.state === 'succeeded') return 'ok';
+    if (pair.state === 'failed') return 'err';
+    if (pair.state === 'in-progress') {
+      // In progress but nothing has ever answered is what a blocked path
+      // looks like right up until ICE admits it, so show the doubt.
+      return (pair.requestsSent > 2 && pair.responsesReceived === 0) ? 'err' : 'ok';
+    }
+    return 'idle'; // waiting / frozen — queued, not yet tried
+  }
+
+  function renderIceList(container, stats) {
+    clear(container);
+    if (!stats || !stats.pairs || !stats.pairs.length) {
+      container.style.display = 'none';
+      return;
+    }
+    container.style.display = 'block';
+    // One row per remote address, not per pair. A device with two local
+    // interfaces produces a pair per interface against the same remote,
+    // which renders as the same address listed twice — indistinguishable
+    // from a bug. The player's question is "can this device be reached",
+    // so collapse to the most advanced state any path to it has managed.
+    var rank = { succeeded: 3, 'in-progress': 2, failed: 1 };
+    var best = {};
+    stats.pairs.forEach(function (p) {
+      var key = p.remote || '?';
+      var prev = best[key];
+      if (!prev || (rank[p.state] || 0) > (rank[prev.state] || 0)) best[key] = p;
+    });
+    Object.keys(best).map(function (k) { return best[k]; }).forEach(function (pair) {
+      var row = el('div', 'blip-ice-row', container);
+      el('span', 'blip-ice-dot ' + iceRowKind(pair), row);
+      var label = el('span', 'blip-ice-addr', row);
+      label.textContent = iceRowText(pair);
+      var st = el('span', 'blip-ice-state', row);
+      st.textContent = pair.state === 'in-progress' ? 'trying' :
+        pair.state === 'succeeded' ? 'connected' :
+        pair.state === 'failed' ? 'blocked' : pair.state;
+    });
+  }
+
+  function startIceWatch(body) {
+    stopIceWatch();
+    var container = el('div', 'blip-ice-list', body);
+    container.style.display = 'none';
+    iceWatch = setInterval(function () {
+      if (!window.BlipNet || typeof window.BlipNet.iceStats !== 'function') return;
+      window.BlipNet.iceStats().then(function (stats) {
+        if (!iceWatch || !container.isConnected) return;
+        renderIceList(container, stats);
+      }, function () { /* stats are best-effort diagnostics */ });
+    }, 700);
+  }
+
+  function stopIceWatch() {
+    if (iceWatch) {
+      clearInterval(iceWatch);
+      iceWatch = null;
+    }
   }
 
   function showConnectionResult(status, body, state, detail) {
     // A mid-attempt hint: update the line, then stand back. It must not
     // dismiss the modal or bounce the player to the choice screen, both
     // of which the terminal states below do.
+    if (state === 'network-mismatch') {
+      // Both: the status line for whoever is looking right now, and a
+      // persistent line that survives the next status update.
+      status.set(signalText(state, detail), signalKind(state));
+      netWarning(body, 'These devices look like they are on different networks — ' +
+        'put both on the same WiFi, without guest mode, a hotspot or a VPN.');
+      return;
+    }
     if (state === 'checking-slow') {
       status.set(signalText(state, detail), signalKind(state));
       return;
@@ -85,8 +210,14 @@
 
     status.set(signalText(state, detail), signalKind(state));
     if (state === 'connected') {
+      stopIceWatch();
       setTimeout(dismissModal, 500);
       return;
+    }
+    if (state === 'failed' || state === 'timeout' || state === 'disconnected') {
+      // Left on screen deliberately: the final state of every pair is
+      // the explanation for the failure the player is being shown.
+      stopIceWatch();
     }
     if (state === 'failed' || state === 'timeout') {
       // Returning to the choice screen wipes this message, so a message
@@ -102,6 +233,7 @@
   }
 
   function dismissModal() {
+    stopIceWatch();
     if (stopActiveScan) {
       stopActiveScan();
       stopActiveScan = null;
@@ -177,15 +309,24 @@
     var parent = canvas.parentNode;
     var avail = parent && parent.clientWidth ? parent.clientWidth : 0;
     if (!avail) return codeAreaSize(280);
-    // Width only. Viewport *height* deliberately does not constrain this:
-    // the panel scrolls vertically (.blip-hs-panel has overflow-y: auto),
-    // so a code taller than a short landscape window costs the player a
-    // scroll, while a code shrunk to fit that window costs them the
-    // ability to scan it at all. Horizontal space is the real limit,
-    // because nothing scrolls sideways.
+    // Bounded by height as well as width, because the panel scrolls
+    // (.blip-hs-panel has overflow-y: auto) and a scrolled code is not a
+    // smaller code — it is a *clipped* one. A camera has to see the
+    // whole symbol at once, finder patterns and quiet zone included, so
+    // a code whose bottom is below the fold cannot be scanned at all,
+    // however large the visible part is. That is strictly worse than
+    // shrinking it.
+    //
+    // The height budget leaves room for the panel's other contents (the
+    // title, the status line, the SCAN button). Where what is left is
+    // too small to scan, the code is still drawn and the player is told
+    // — see renderCode() — which is the honest outcome on a screen that
+    // genuinely cannot show one.
+    //
     // Capped so a very wide panel does not produce a needlessly huge
     // code; beyond this, extra size buys no scanning reliability.
-    return Math.max(120, Math.min(Math.floor(avail), 420));
+    var byHeight = window.innerHeight - 160;
+    return Math.max(120, Math.min(Math.floor(avail), Math.floor(byHeight), 420));
   }
 
   function qrCanvas(parent) {
@@ -301,10 +442,44 @@
     };
   };
 
-  function handleScanStatus(status, state) {
+  /** What to say while the camera is actually running.
+   *
+   * blip_qr.js reports 'scanning' on every animation frame, with how
+   * long it has been looking and whether anything QR-shaped is in view.
+   * None of that reached the screen: the line said "Point at the code."
+   * and then never changed again, so a scan that was working perfectly
+   * looked identical to one that had died. The commonest reaction to
+   * that is to assume the code is not being picked up and give up —
+   * usually while holding the phone too far away for the modules to
+   * resolve, which is the one thing the player could have fixed.
+   *
+   * The advice escalates with time rather than dumping it all at once,
+   * because the first seconds of a normal scan need no advice at all. */
+  function scanningText(detail) {
+    if (detail && detail.candidates > 0) return 'Code in view — hold steady…';
+    var seconds = Math.floor(((detail && detail.elapsedMs) || 0) / 1000);
+    if (seconds >= 15) return 'Still looking — move closer, or add light.';
+    if (seconds >= 6) return 'Looking — fill the frame with the code.';
+    return 'Looking for a code…';
+  }
+
+  function handleScanStatus(status, state, detail) {
     if (state === 'opening') status.set('Opening camera…', 'wait');
+    if (state === 'buffering') status.set('Starting camera…', 'wait');
     if (state === 'streaming') status.set('Point at the code.', 'wait');
-    if (state === 'found') status.set('Code found…', 'wait');
+    if (state === 'scanning') {
+      // 'active' is the pulsing dot the host already uses while it works
+      // — the point is that the player can see this is running.
+      //
+      // Guarded against rewriting the same string 60 times a second:
+      // 'scanning' arrives every frame, and only the text is news.
+      var text = scanningText(detail);
+      if (status.lastScanText !== text) {
+        status.lastScanText = text;
+        status.set(text, 'active');
+      }
+    }
+    if (state === 'found') status.set('Code found…', 'ok');
     if (state === 'play-error' || state === 'unsupported') {
       status.set('Camera unavailable.', 'err');
     }
@@ -318,13 +493,14 @@
     window.BlipNet.host(function (offerSdp) {
       if (!renderCode(canvas, offerSdp, status)) return;
       status.set('Show this code to the other phone.', 'wait');
+      startIceWatch(body);
       showScanButton(body, 'SCAN ANSWER', function (answerSdp) {
         status.set('✓ Answer scanned. Contacting client…', 'active');
         window.BlipNet.submitAnswer(answerSdp);
       }, false, [canvas], function (err) {
         status.set(scanErrorMessage(err), 'err');
-      }, function (state) {
-        handleScanStatus(status, state);
+      }, function (state, detail) {
+        handleScanStatus(status, state, detail);
       });
     }, function (state, detail) {
       showConnectionResult(status, body, state, detail);
@@ -343,13 +519,14 @@
       window.BlipNet.join(offerSdp, function (answerSdp) {
         if (!renderCode(canvas, answerSdp, status)) return;
         status.set('✓ Host code scanned. Show this code to the host.', 'ok');
+        startIceWatch(body);
       }, function (state, detail) {
         showConnectionResult(status, body, state, detail);
       });
     }, true, [], function (err) {
       scanStatus.set(scanErrorMessage(err), 'err');
-    }, function (state) {
-      handleScanStatus(scanStatus, state);
+    }, function (state, detail) {
+      handleScanStatus(scanStatus, state, detail);
     });
   }
 

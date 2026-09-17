@@ -12,6 +12,9 @@
     "test:multiplayer:blocked": "node --test test/multiplayer-blocked.mjs",
     "test:multiplayer:hardening": "node --test test/multiplayer-hardening.mjs",
     "test:qr": "node --test test/qr-scannability.mjs",
+    "test:multiplayer:preflight": "node --test test/multiplayer-preflight.mjs",
+    "test:multiplayer:visibility": "node --test test/multiplayer-visibility.mjs",
+    "test:topbar": "node --test test/topbar-layout.mjs",
     "test:multiplayer:android": "node test/multiplayer-android.mjs",
     "supabase": "supabase"
   },

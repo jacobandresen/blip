@@ -211,6 +211,8 @@ every state-sync assertion fails against a game that was never running.
 npm run test:multiplayer:hardening   # a hostile peer on a live connection
 npm run test:multiplayer:blocked     # what the player sees when traffic is blocked
 npm run test:qr                      # can the code on screen actually be scanned
+npm run test:multiplayer:preflight   # the loopback probe and the subnet check
+npm run test:multiplayer:visibility  # scanning feedback and the live ICE list
 ```
 
 `test/multiplayer-proto.test.mjs` covers the wire format in isolation (no
@@ -396,6 +398,87 @@ Amber, not red: the attempt has not failed, and the code may still scan.
 But it is almost certainly why nothing is happening, and without the line
 the player has no way to tell that from a bad camera. The warning clears
 again once there is room — a stale warning is its own bug.
+
+## Telling the player what is happening
+
+Three of this feature's failures used to be indistinguishable from it
+working, which is the worst property a failure can have. Each now shows
+its working.
+
+### Before anything is scanned: the loopback probe
+
+`BlipNet.preflight()` connects two `RTCPeerConnection`s inside the page
+and sends one DataChannel message between them. The traffic never leaves
+the machine, so it is expected to succeed anywhere WebRTC functions at
+all; a failure means the problem is local and total — disabled by policy
+or an extension, a build without SCTP, or an engine that yields no ICE
+candidates. It runs alongside the real attempt from the moment HOST or
+JOIN is pressed, and reports in about 70ms, so a device that cannot do
+this at all says so before the player points a camera at anything:
+
+> WebRTC is blocked on this device. Check browser or policy settings.
+
+Cached per page load — the answer cannot change, and the probe is not
+free. It also collects this device's own addresses, which is what makes
+the next check possible.
+
+### On scanning: are these devices even on the same network?
+
+The guest is the only side holding both sets of candidates, so it is the
+only one that can notice the two devices are nowhere near each other. If
+no candidate in the scanned offer shares a /24 with any local address,
+it says so **immediately** — measured at ~300ms, against a 60-second
+connect timeout:
+
+> These devices look like they are on different networks — put both on
+> the same WiFi, without guest mode, a hotspot or a VPN.
+
+Deliberately a warning, not a failure: two devices on different /24s can
+still route to each other, so a mismatch is suggestive rather than
+conclusive. It also stays quiet unless *both* sides published plain IPv4
+host candidates — mDNS `.local` candidates carry no address to compare,
+and guessing would be worse than silence. It is rendered as a persistent
+line rather than a status update, because the status line is overwritten
+about a second later by "✓ Host code scanned".
+
+### While scanning: the camera is working, and here is what to try
+
+`blip_qr.js` reports progress on every animation frame — how long it has
+been looking, and whether anything QR-shaped is in view. None of it used
+to reach the screen: the line read `Point at the code.` and then never
+changed, so a scan running perfectly looked exactly like one that had
+died. The natural conclusion is that the code is not being picked up,
+usually while holding the phone too far away for the modules to resolve
+— the one thing the player could have fixed.
+
+Now the indicator pulses (the same `active` state the host uses) and the
+advice escalates, because the first seconds of a normal scan need none:
+
+| | |
+| --- | --- |
+| a code is in view | `Code in view — hold steady…` |
+| under 6s | `Looking for a code…` |
+| 6s | `Looking — fill the frame with the code.` |
+| 15s | `Still looking — move closer, or add light.` |
+
+### While connecting: the candidate pairs, in colour
+
+Every candidate pair the two devices are testing is listed live, one row
+per remote address, colour-coded:
+
+- **green** — being attempted, or already carrying traffic
+- **red** — ruled out; nothing got through this path
+- **dim** — queued, not yet tried
+
+Rows collapse by remote address rather than showing one per local
+interface, since a machine with two interfaces otherwise lists the same
+address twice, which reads as a bug. The most advanced state any path to
+that address reached is the one shown.
+
+This is also the fastest diagnosis available for the two common network
+faults: every row red means something is dropping device-to-device
+traffic, and no rows at all means the two sides never exchanged usable
+candidates.
 
 ## When the network blocks the traffic
 

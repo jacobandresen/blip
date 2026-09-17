@@ -312,6 +312,166 @@
       : 'no ICE candidates were gathered';
   }
 
+  /** How long the loopback probe may take before we call it a failure. */
+  var PREFLIGHT_TIMEOUT_MS = 4000;
+
+  /** Reason strings the UI matches on (see signalText in blip_net_ui.js). */
+  var NO_WEBRTC_REASON = 'WebRTC could not open a connection on this device';
+  var DIFFERENT_NETWORK_REASON = 'the two devices look like they are on different networks';
+
+  var preflight = null;       // cached promise — the answer cannot change mid-session
+  var localAddresses = [];    // IPv4 literals this device gathered, for the subnet check
+
+  function candidateAddress(candidateStr) {
+    // "candidate:<foundation> <component> <proto> <priority> <address> <port> typ ..."
+    var parts = String(candidateStr || '').split(' ');
+    return parts.length > 4 ? parts[4] : '';
+  }
+
+  function isIpv4Literal(addr) {
+    return /^\d{1,3}(\.\d{1,3}){3}$/.test(addr);
+  }
+
+  function subnetOf(addr) {
+    return addr.split('.').slice(0, 3).join('.'); // /24 is the useful granularity for a home LAN
+  }
+
+  /**
+   * Prove the WebRTC data path works here *before* asking the player to
+   * point a camera at anything.
+   *
+   * Two RTCPeerConnections in this very page, connected to each other,
+   * with one DataChannel message actually sent and received — a probe
+   * that is expected to succeed on any working setup, since the traffic
+   * never leaves the machine. When it fails, the cause is local and
+   * total: WebRTC disabled by enterprise policy or an extension, a
+   * browser build without SCTP, or an engine that will not produce a
+   * single ICE candidate (the WebKit case warmUpIceMedia() addresses).
+   *
+   * Running it up front turns the worst failure mode — scan a code, wait
+   * a minute, get a generic error — into an immediate, accurate message.
+   * It also collects this device's own addresses, which is what lets
+   * join() notice the two devices are not on the same network.
+   *
+   * Cached: the answer cannot change within a page load, and the probe
+   * is not free.
+   */
+  function preflightWebRtc() {
+    if (preflight) return preflight;
+    preflight = new Promise(function (resolve) {
+      if (typeof RTCPeerConnection !== 'function') {
+        resolve({ ok: false, reason: NO_WEBRTC_REASON, detail: 'no RTCPeerConnection' });
+        return;
+      }
+      var a = null, b = null, done = false, timer = null;
+      var addresses = [];
+
+      function finish(result) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        localAddresses = addresses;
+        // Close both: this probe must not leave sockets or a live
+        // connection behind for the real attempt to trip over.
+        try { if (a) a.close(); } catch (e) {}
+        try { if (b) b.close(); } catch (e) {}
+        resolve(result);
+      }
+
+      try {
+        a = new RTCPeerConnection({ iceServers: [] });
+        b = new RTCPeerConnection({ iceServers: [] });
+      } catch (e) {
+        finish({ ok: false, reason: NO_WEBRTC_REASON, detail: 'construction threw: ' + ((e && e.message) || e) });
+        return;
+      }
+
+      timer = setTimeout(function () {
+        finish({ ok: false, reason: NO_WEBRTC_REASON, detail: 'loopback probe timed out', addresses: addresses });
+      }, PREFLIGHT_TIMEOUT_MS);
+
+      a.addEventListener('icecandidate', function (e) {
+        if (!e.candidate) return;
+        var addr = candidateAddress(e.candidate.candidate);
+        if (isIpv4Literal(addr) && addresses.indexOf(addr) === -1) addresses.push(addr);
+        b.addIceCandidate(e.candidate).catch(function () { /* the probe is best-effort */ });
+      });
+      b.addEventListener('icecandidate', function (e) {
+        if (e.candidate) a.addIceCandidate(e.candidate).catch(function () {});
+      });
+      b.addEventListener('datachannel', function (e) {
+        e.channel.addEventListener('message', function (ev) {
+          finish({ ok: ev.data === 'blip-probe', reason: null, addresses: addresses });
+        });
+      });
+
+      var probe = a.createDataChannel('blip-probe');
+      probe.addEventListener('open', function () {
+        try { probe.send('blip-probe'); } catch (e) {
+          finish({ ok: false, reason: NO_WEBRTC_REASON, detail: 'probe send failed' });
+        }
+      });
+
+      a.createOffer()
+        .then(function (o) { return a.setLocalDescription(o); })
+        .then(function () { return b.setRemoteDescription(a.localDescription); })
+        .then(function () { return b.createAnswer(); })
+        .then(function (ans) { return b.setLocalDescription(ans); })
+        .then(function () { return a.setRemoteDescription(b.localDescription); })
+        .catch(function (e) {
+          finish({ ok: false, reason: NO_WEBRTC_REASON, detail: 'negotiation failed: ' + ((e && e.message) || e) });
+        });
+    });
+    return preflight;
+  }
+
+  /**
+   * Do the scanned code's candidates look like they are even reachable
+   * from here?
+   *
+   * Reported as a warning rather than a failure, deliberately. Two
+   * devices on different /24s can still route to each other, so treating
+   * a mismatch as fatal would break legitimate setups. But the common
+   * real case — one device on the WiFi, the other on a guest network, a
+   * hotspot, or a VPN — is otherwise indistinguishable from "it is just
+   * taking a while", right up until the connect timeout.
+   *
+   * Only claims a mismatch when both sides published plain IPv4 host
+   * candidates; mDNS (.local) candidates carry no address to compare, so
+   * the check stays quiet rather than guessing.
+   */
+  function looksLikeDifferentNetwork(remoteSdp) {
+    if (!localAddresses.length) return false;
+    var remote = [];
+    String(remoteSdp || '').split(/\r\n|\n/).forEach(function (line) {
+      if (line.indexOf('a=candidate:') !== 0) return;
+      var addr = candidateAddress(line.slice('a='.length));
+      if (isIpv4Literal(addr)) remote.push(addr);
+    });
+    if (!remote.length) return false;
+    var mine = {};
+    localAddresses.forEach(function (a) { mine[subnetOf(a)] = true; });
+    for (var i = 0; i < remote.length; i++) {
+      if (mine[subnetOf(remote[i])]) return false; // a shared subnet — plausible
+    }
+    return true;
+  }
+
+  /** Run the probe alongside the real attempt and report a local
+   * WebRTC failure the moment it is known, rather than letting the
+   * player scan a code that was never going to work. Guarded on `peer`
+   * so a superseded attempt stays silent. */
+  function reportPreflight(peer) {
+    preflightWebRtc().then(function (r) {
+      if (peer !== pc) return;
+      log('preflight', r.ok ? ('ok ' + (r.addresses || []).join(',')) : (r.detail || 'failed'));
+      if (!r.ok) {
+        status('failed', { reason: NO_WEBRTC_REASON });
+        cancel();
+      }
+    });
+  }
+
   function newPeerConnection() {
     // Local host candidates only: pairing must work without internet and
     // gameplay must never be relayed through a server.
@@ -456,6 +616,7 @@
     onStatusCb = onStatus;
     var peer = newPeerConnection();
     pc = peer;
+    reportPreflight(peer); // earliest possible word on a local WebRTC fault
     var channelObj = peer.createDataChannel('rally', { ordered: false, maxRetransmits: 0 });
     wireDataChannel(channelObj, 1);
     // Started before the promise chain, so it still runs inside the
@@ -540,6 +701,18 @@
     remoteSdpCandidateCount = checkedOffer.candidates;
     var peer = newPeerConnection();
     pc = peer;
+    reportPreflight(peer);
+    // The guest is the first side holding *both* sets of candidates, so
+    // it is the only one that can notice the two devices are not on the
+    // same network — and it can say so immediately, instead of after the
+    // connect timeout.
+    preflightWebRtc().then(function () {
+      if (peer !== pc) return;
+      if (looksLikeDifferentNetwork(checkedOffer.sdp)) {
+        log('network-mismatch', localAddresses.join(','));
+        status('network-mismatch', { reason: DIFFERENT_NETWORK_REASON });
+      }
+    });
     peer.addEventListener('datachannel', function (e) {
       if (peer !== pc) return;
       wireDataChannel(e.channel, 2);
@@ -698,6 +871,11 @@
 
   window.BlipNet = {
     host: host, join: join, submitAnswer: submitAnswer, cancel: cancel, ping: ping,
+    preflight: preflightWebRtc,
+    // Public because the pairing modal shows the candidate pairs while
+    // it connects — see the ICE list in blip_net_ui.js. Same data the
+    // __blipNetStats debug hook returns.
+    iceStats: function () { return window.__blipNetStats(); },
     CONNECT_TIMEOUT_MS: CONNECT_TIMEOUT_MS,
   };
   // Test-only: send an arbitrary payload down the open DataChannel,
