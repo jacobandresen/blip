@@ -23,11 +23,10 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { launchEngine } from './lib/engine.mjs';
 import { hostShowsOffer, guestAnswersOffer, hostTakesAnswer } from './lib/pairing.mjs';
 import {
-  createFileServer, HTTP_PORT, loadRally, openModal, clickHsBtn, getStatusText,
-  launchWithCamera, writeBlankVideo, blockAllCandidates, pollUntil, evaluate, sleep,
+  openPage, openPair, HTTP_PORT, loadRally, openModal, clickHsBtn, getStatusText,
+  writeBlankVideo, blockAllCandidates, pollUntil, evaluate, sleep,
 } from './lib/multiplayer-harness.mjs';
 
 const ENGINE = process.env.BLIP_HOST_ENGINE || 'chromium';
@@ -39,13 +38,10 @@ test('scanning shows that it is running, and says what to try', async (t) => {
   // is exactly the state that used to look identical to a dead scan.
   await writeBlankVideo(cam);
 
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const { proc, cdp } = await launchWithCamera(9781, cam);
-  t.after(async () => {
-    proc.kill();
-    await new Promise((r) => server.close(r));
-  });
+  // openPage takes a camFile and applies the fake-camera flags itself,
+  // so the page, its server and their teardown are handled in one place
+  // rather than assembled here.
+  const { cdp } = await openPage(t, 'chromium', { camFile: cam });
 
   await loadRally(cdp);
   await openModal(cdp);
@@ -88,18 +84,7 @@ test('scanning shows that it is running, and says what to try', async (t) => {
 });
 
 test('the candidate pairs are shown on screen while connecting', async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const hostBrowser = await launchEngine(ENGINE);
-  const guestBrowser = await launchEngine(ENGINE);
-  const host = hostBrowser.cdp;
-  const guest = guestBrowser.cdp;
-  t.after(async () => {
-    await hostBrowser.browser.close().catch(() => {});
-    await guestBrowser.browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
-  await Promise.all([loadRally(host), loadRally(guest)]);
+  const { host, guest } = await openPair(t, ENGINE, ENGINE);
 
   const readRows = () => evaluate(host, `(function () {
     return Array.prototype.map.call(document.querySelectorAll('.blip-ice-row'), function (r) {

@@ -530,6 +530,23 @@
     });
   }
 
+  /** What was actually decoded, in one line.
+   *
+   * "✓ scanned" alone leaves the player trusting a claim. Naming what
+   * came off the code — which half of the exchange it was, how many
+   * routes it carries, how big it was — is the difference between a
+   * reassurance and evidence, and it is the only place the scanned
+   * content is ever visible to a human. It also makes a wrong scan
+   * (a stale code, the device's own code) obvious instead of silent. */
+  function scanSummary(text) {
+    if (typeof text !== 'string' || !text) return 'empty code';
+    var candidates = (text.match(/(?:^|\n)a=candidate:/g) || []).length;
+    var kind = text.indexOf('a=setup:actpass') !== -1 ? 'host code'
+      : (text.indexOf('a=setup:active') !== -1 ? 'answer code' : 'code');
+    return '\u2713 ' + kind + ' \u00b7 ' + candidates + ' route' + (candidates === 1 ? '' : 's') +
+      ' \u00b7 ' + text.length + ' bytes';
+  }
+
   function showScanButton(body, label, onScanned, autoStart, hideEls, onScanError, onScanStatus) {
     var holder = el('div', '', body);
 
@@ -563,13 +580,42 @@
       overlay.height = Math.max(1, Math.round(rect.height));
 
       var error = el('div', 'blip-hs-err', holder);
+
+      // A scan that never decodes otherwise runs forever, looking
+      // identical to one about to succeed. After this long the honest
+      // thing is to say it is not working and offer the action that
+      // might fix it, rather than let the player keep holding a phone up
+      // to a code that is not being read.
+      var GIVE_UP_MS = 25000;
+      var stuckTimer = setTimeout(function () {
+        if (!stopActiveScan) return; // already decoded or errored
+        error.textContent = 'Not reading this code. Fill the frame with it, add light, or retry.';
+        var retry = el('button', 'blip-hs-btn', holder);
+        retry.type = 'button';
+        retry.textContent = 'RETRY SCAN';
+        retry.addEventListener('click', function () {
+          if (stopActiveScan) { stopActiveScan(); stopActiveScan = null; }
+          startScanning();
+        }, { once: true });
+      }, GIVE_UP_MS);
+
       stopActiveScan = window.BlipQR.scan(video, overlay, function (text, scanErr) {
         stopActiveScan = null;
+        clearTimeout(stuckTimer);
         if (scanErr) {
           error.textContent = scanErrorMessage(scanErr);
           if (onScanError) onScanError(scanErr);
           return;
         }
+        // Shown on `body`, not `holder` — holder is cleared on the next
+        // line, and this has to outlive the screen that produced it.
+        var result = body.blipScanResultEl;
+        if (!result) {
+          result = el('div', 'blip-scan-result', body);
+          body.blipScanResultEl = result;
+        }
+        result.textContent = scanSummary(text);
+        result.style.display = 'block';
         clear(holder);
         onScanned(text);
       }, function (state, detail) {

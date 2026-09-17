@@ -23,10 +23,9 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { launchEngine } from './lib/engine.mjs';
 import { hostShowsOffer, guestAnswersOffer, hostTakesAnswer, injectNextScan } from './lib/pairing.mjs';
 import {
-  createFileServer, HTTP_PORT, loadRally, blockAllCandidates,
+  openPair, HTTP_PORT, blockAllCandidates, rewriteRoutes,
   getStatusText, clickHsBtn, pollUntil, evaluate, waitFor,
 } from './lib/multiplayer-harness.mjs';
 
@@ -34,23 +33,16 @@ const HOST_ENGINE = process.env.BLIP_HOST_ENGINE || 'chromium';
 const GUEST_ENGINE = process.env.BLIP_GUEST_ENGINE || 'chromium';
 
 test('a blocked network is reported, not left to time out in silence', async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const hostBrowser = await launchEngine(HOST_ENGINE);
-  const guestBrowser = await launchEngine(GUEST_ENGINE);
-  const host = hostBrowser.cdp;
-  const guest = guestBrowser.cdp;
-  t.after(async () => {
-    await hostBrowser.browser.close().catch(() => {});
-    await guestBrowser.browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
-
-  await Promise.all([loadRally(host), loadRally(guest)]);
+  const { host, guest } = await openPair(t, HOST_ENGINE, GUEST_ENGINE);
 
   await t.test('pairing still completes — the codes exchange fine, only the traffic is blocked', async () => {
     const offer = await hostShowsOffer(host);
-    assert.match(offer, /candidate/, 'offer carried no candidates to block');
+    // Shape-agnostic: the payload may be the compact form or plain SDP,
+    // and what matters is only that it names routes this test can move
+    // somewhere unreachable. Matching the literal word "candidate" tied
+    // this to the SDP shape and broke silently when the payload changed.
+    assert.notEqual(rewriteRoutes(offer, '10.255.255.1'), offer,
+      `the offer names no routes to block: ${offer.slice(0, 80)}`);
 
     // Both directions: the offer carries the host's candidates and the
     // answer carries the guest's, so blocking one still leaves a usable

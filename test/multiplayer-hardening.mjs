@@ -15,10 +15,9 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { launchEngine } from './lib/engine.mjs';
 import { pairOverQr } from './lib/pairing.mjs';
 import {
-  createFileServer, HTTP_PORT, loadRally, READ_RIGHT_FRACTION,
+  openPair, HTTP_PORT, READ_RIGHT_FRACTION,
   evaluate, waitFor, sleep,
 } from './lib/multiplayer-harness.mjs';
 
@@ -34,19 +33,7 @@ const stateLen = (cdp) => evaluate(cdp, 'window.__blipNetDebug().latestStateLen'
 const dcState = (cdp) => evaluate(cdp, 'window.__blipNetDebug().dcState');
 
 test(`multiplayer hardening against a hostile peer (${HOST_ENGINE} host, ${GUEST_ENGINE} guest)`, async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const hostBrowser = await launchEngine(HOST_ENGINE);
-  const guestBrowser = await launchEngine(GUEST_ENGINE);
-  const host = hostBrowser.cdp;
-  const guest = guestBrowser.cdp;
-  t.after(async () => {
-    await hostBrowser.browser.close().catch(() => {});
-    await guestBrowser.browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
-
-  await Promise.all([loadRally(host), loadRally(guest)]);
+  const { host, guest } = await openPair(t, HOST_ENGINE, GUEST_ENGINE);
   const paired = await pairOverQr(host, guest);
   assert.equal(paired.hostRole, 1);
   assert.equal(paired.guestRole, 2);

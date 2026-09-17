@@ -22,9 +22,8 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { launchEngine } from './lib/engine.mjs';
 import {
-  createFileServer, HTTP_PORT, loadRally, openModal, clickHsBtn,
+  openPage, openPair, HTTP_PORT, loadRally, openModal, clickHsBtn,
   makeSyntheticOfferSdp, QR_READY, evaluate, waitFor,
 } from './lib/multiplayer-harness.mjs';
 
@@ -108,13 +107,7 @@ async function decodeOnScreen(page, cdp) {
 }
 
 test(`the QR code on screen decodes (${ENGINE})`, async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const { browser, page, cdp } = await launchEngine(ENGINE);
-  t.after(async () => {
-    await browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
+  const { browser, page, cdp } = await openPage(t, ENGINE);
 
   for (const vp of VIEWPORTS) {
     for (const candidates of PAYLOADS) {
@@ -167,13 +160,7 @@ test(`the QR code on screen decodes (${ENGINE})`, async (t) => {
 });
 
 test(`an unscannably small code always warns, and a normal one never does (${ENGINE})`, async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const { browser, cdp } = await launchEngine(ENGINE);
-  t.after(async () => {
-    await browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
+  const { browser, cdp } = await openPage(t, ENGINE);
 
   await loadRally(cdp);
   await openModal(cdp);
@@ -215,13 +202,7 @@ test(`an unscannably small code always warns, and a normal one never does (${ENG
 // work every time, ship it, and get "the camera doesn't work" reports
 // from everyone whose SDP happened to be a different length.
 test('fractional scaling is what breaks QR codes, and integer scaling is what fixes it', async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const { browser, cdp } = await launchEngine(ENGINE);
-  t.after(async () => {
-    await browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
+  const { browser, cdp } = await openPage(t, ENGINE);
   await loadRally(cdp);
 
   for (const candidates of [4, 8]) {
@@ -292,13 +273,7 @@ test('fractional scaling is what breaks QR codes, and integer scaling is what fi
 // cannot be *located* at all rather than merely decoding poorly -- the
 // camera sees something that looks right to a human and reports nothing.
 test('the rendered code keeps a light quiet zone on all four sides', async (t) => {
-  const server = createFileServer();
-  await new Promise((r) => server.listen(HTTP_PORT, r));
-  const { browser, cdp } = await launchEngine(ENGINE);
-  t.after(async () => {
-    await browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
-  });
+  const { browser, cdp } = await openPage(t, ENGINE);
   await loadRally(cdp);
 
   const edges = await evaluate(cdp, `(function () {
