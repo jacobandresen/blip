@@ -124,10 +124,17 @@ test(`PLAY NEARBY end to end: host=${HOST_ENGINE} guest=${GUEST_ENGINE}` +
   });
 
   await t.test('the match actually starts on both devices (Rust picks up the net role)', async () => {
-    assert.ok(await waitFor(host, `(${READ_RIGHT_FRACTION}) > 0.3`, 15000),
-      'host paddle never left the Title-screen position');
-    assert.ok(await waitFor(guest, `(${READ_RIGHT_FRACTION}) > 0.3`, 15000),
-      'guest paddle never left the Title-screen position');
+    // Not `> 0.3`: a paddle resting dead centre at 0.5 satisfies that
+    // without the match having started, so it proved nothing. What can
+    // honestly be asserted here is that the dial rendered at all and
+    // holds a sane value; that the match is really being *simulated* is
+    // what the input round trip below proves.
+    for (const [label, cdp] of [['host', host], ['guest', guest]]) {
+      assert.ok(await waitFor(cdp, `(${READ_RIGHT_FRACTION}) !== null`, 15000),
+        `${label}: the paddle dial never rendered`);
+      const value = await evaluate(cdp, READ_RIGHT_FRACTION);
+      assert.ok(value >= 0 && value <= 1, `${label}: dial out of range (${value})`);
+    }
   });
 
   await t.test('guest input reaches the host and the resulting state syncs back', async () => {

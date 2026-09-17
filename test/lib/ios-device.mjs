@@ -15,7 +15,7 @@
 //   Settings > Apps > Safari > Advanced > Remote Automation   -> on
 // and the device must be unlocked and trusted for this Mac.
 
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { networkInterfaces } from 'node:os';
 import { connect, evaluate, sleep } from './cdp.mjs';
 
@@ -45,7 +45,11 @@ export async function startInspectorBridge(port = INSPECTOR_PORT) {
     await listTargets(port);
     return null; // already running
   } catch { /* not up yet */ }
+  return spawnBridge(port);
+}
 
+/** Start a bridge and wait for it to serve, however one is needed. */
+async function spawnBridge(port) {
   const proc = spawn('pymobiledevice3', ['webinspector', 'cdp'], {
     stdio: 'ignore',
     env: { ...process.env, PATH: `${process.env.HOME}/.local/bin:${process.env.PATH}` },
@@ -107,6 +111,34 @@ export async function requireAwakeDevice(cdp) {
       'wake and unlock it. The harness takes a Screen Wake Lock as its first step so it stays awake ' +
       'for the rest of the run; see test/lib/ios-wakelock.mjs.');
   }
+}
+
+/** Ensure a bridge is running *and* that the device answers through it.
+ *
+ * The bridge goes stale. Once the phone has slept underneath it, every
+ * connection through that process keeps timing out even after the device
+ * is awake and healthy again — `ideviceinfo` answers, the page is still
+ * listed, and evaluating anything on it hangs forever. Restarting the
+ * bridge fixes it instantly, which is the whole diagnosis: the fault is
+ * in the relay, not the phone, and it is invisible from the symptoms.
+ *
+ * So a bridge that will not carry a `1 + 1` is replaced rather than
+ * trusted. Returns the process to clean up (or null if an external
+ * bridge is doing the work), plus whether the device answers at all.
+ */
+export async function ensureLiveBridge(port = INSPECTOR_PORT) {
+  let proc = await startInspectorBridge(port);
+  if (await deviceAnswers(port)) return { proc, alive: true };
+
+  // Stale relay, or genuinely absent phone — tell them apart by trying a
+  // fresh one. Kills an external bridge too: a wedged bridge is not a
+  // resource worth preserving.
+  if (proc) proc.kill();
+  try { execSync(`pkill -f 'webinspector cdp' || true`, { stdio: 'ignore' }); } catch { /* best effort */ }
+  await sleep(1500);
+  proc = await spawnBridge(port).catch(() => null);
+  if (!proc) return { proc: null, alive: false };
+  return { proc, alive: await deviceAnswers(port) };
 }
 
 /** Is there a phone here that will actually answer?
