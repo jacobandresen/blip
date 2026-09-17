@@ -4,7 +4,8 @@
 use std::f32::consts::PI;
 
 use crate::techno::{
-    bass_note, clap, hat, kick, lead_stab, open_hat, riser, sidechain_duck, supersaw, Rng,
+    bass_note, clap, hat, kick, lead_stab, lift_fill, open_hat, phrase_note, riser,
+    sidechain_duck, supersaw, Rng,
     MIX_KNEE,
 };
 use crate::wav::{encode_pcm16_mono, env, mix_into, soft_limit_to_pcm16, SAMPLE_RATE};
@@ -65,12 +66,16 @@ fn music() -> Vec<u8> {
         // Hook riff on the downbeat of every odd bar; back half adds an
         // octave-up harmony for a small lift (~every 30s).
         if bar % 2 == 1 && pos % 4 == 0 {
-            supersaw(&mut buf, off, HOOK[pos / 4], step_ms * 3.5, 0.20, 8.0, 0.008);
+            supersaw(&mut buf, off, phrase_note(&HOOK, bar, pos / 4), step_ms * 3.5, 0.20, 8.0, 0.008);
             if lifted {
-                supersaw(&mut buf, off, HOOK[pos / 4] * 2.0, step_ms * 3.5, 0.10, 8.0, 0.008);
+                supersaw(&mut buf, off, phrase_note(&HOOK, bar, pos / 4) * 2.0, step_ms * 3.5, 0.10, 8.0, 0.008);
             }
         }
     }
+
+    // One bar of climbing hats before the lift, so the busier half
+    // arrives as a change rather than as the loop restarting.
+    lift_fill(&mut buf, (LIFT_BAR - 1) * 16 * step_samples, step_samples, &mut rng, 0.24);
 
     sidechain_duck(&mut buf, &kick_offsets, 0.55, step_ms * 0.85);
     for &off in &kick_offsets {

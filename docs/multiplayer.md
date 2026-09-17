@@ -130,6 +130,50 @@ active` candidates on port 9, which can only pair with a *passive* TCP
 candidate that neither side ever offers, so they are routes guaranteed to
 fail taking up payload to say so.
 
+### Scanning: decode small, binarise on a miss
+
+The scan loop used to hand jsQR the raw camera frame, and the camera was
+asked for up to 1920 square. jsQR's cost is linear in pixels and it runs
+on the main thread, so that is ~115ms per frame on a fast desktop (7.5ms
+to copy the pixels out, 108ms to decode) — an 8fps ceiling before the
+game loop, the preview and the overlay have had a turn, and a phone is
+several times slower again. That is what a scan that "never reads it"
+actually was: the preview stutters, the code cannot be held steady, and
+every frame it *is* held costs a tenth of a second to look at.
+
+Measured over 24 capture frames spanning how much of the frame the code
+fills (60% down to 20%) crossed with dim, blurred and noisy:
+
+| decode size | plain | + Otsu | ms/frame |
+| --- | --- | --- | --- |
+| 320 | 13/24 | 18/24 | 12 |
+| **400** | 14/24 | **21/24** | **19** |
+| 640 | 20/24 | 21/24 | 56 |
+| 1024 | 15/24 | 21/24 | 156 |
+
+21/24 is the ceiling; 640, 800 and 1024 all reach it and none goes past
+it. So a bigger frame buys nothing but time. And Otsu binarisation is not
+a last resort — at 400 it is the whole difference between 14 and 21,
+because a scaled-down frame gives jsQR grey mush where a binarised one
+gives it clean module edges.
+
+The loop therefore decodes at 400 and binarises the moment plain decoding
+misses: the same decode rate as the 1024 configuration at an eighth of
+the cost. Plain is still tried first, because on a frame that *does*
+decode it is marginally cheaper than binarise-then-decode.
+
+Other filters were measured and rejected. Over a 54-frame corpus,
+contrast stretching read 35 against plain's 34 — inside the noise. Gamma
+correction read 21, *worse* than doing nothing. Sauvola local
+thresholding, which the literature recommends for uneven illumination,
+added a single frame for three times Otsu's cost. Only Otsu shipped.
+
+`test/qr-scannability.mjs` guards both halves: that binarising still
+reads frames plain decoding cannot, and that decoding at the shipped size
+stays several times cheaper than decoding the raw frame — asserted as a
+ratio, since a millisecond budget is a property of the machine running
+the test rather than of the code.
+
 ### The renderer checks its own work
 
 A QR's capacity depends on its correction level — about 1273 bytes at H
