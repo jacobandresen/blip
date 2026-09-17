@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 const proto = require('../web/blip_net_proto.js');
@@ -191,5 +192,36 @@ test('decoders never throw, whatever the payload', () => {
     assert.doesNotThrow(() => proto.decodeInput(raw), raw);
     assert.doesNotThrow(() => proto.decodePing(raw), raw);
     assert.doesNotThrow(() => proto.decodePong(raw), raw);
+  }
+});
+
+// ---- the browser half of the dual-mode export ----------------------------
+// Every module under web/ ends with the same idiom: attach to
+// `module.exports` under Node, or to `window` in a browser. Node tests only
+// ever take the first branch, so the second — the one that actually ships,
+// and the only one a player's browser runs — was the sole uncovered code in
+// all three pure-logic modules.
+//
+// Evaluating the source with no `module` in scope and a stand-in `window`
+// takes the browser path for real, which both covers it and checks the
+// thing that matters: that loading the file as a plain <script> puts the
+// expected API on the global.
+test('each shipped module attaches its API to window when loaded as a script', () => {
+  const cases = [
+    ['blip_net_proto.js', 'BlipNetProto', ['encodeInput', 'decodeInput', 'encodePing', 'decodePong']],
+    ['blip_sdp_slim.js', 'BlipSdpSlim', ['slimSdpForQr', 'parseCandidateLine', 'packForQr', 'unpackFromQr']],
+    ['blip_qr_heuristic.js', 'BlipQrHeuristic', []],
+  ];
+  for (const [file, globalName, expected] of cases) {
+    const src = readFileSync(new URL(`../web/${file}`, import.meta.url), 'utf8');
+    const fakeWindow = {};
+    // No `module` parameter, so `typeof module` is 'undefined' inside and
+    // the browser branch is the one that runs.
+    new Function('window', src)(fakeWindow);
+    assert.ok(fakeWindow[globalName], `${file} did not define window.${globalName}`);
+    for (const fn of expected) {
+      assert.equal(typeof fakeWindow[globalName][fn], 'function',
+        `window.${globalName}.${fn} missing after loading ${file} as a script`);
+    }
   }
 });

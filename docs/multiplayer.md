@@ -168,7 +168,7 @@ The pairing harness is:
 npm run test:multiplayer
 ```
 
-By default, `test/multiplayer.mjs` launches two Chromium instances and
+By default, `test/multiplayer-pairing.mjs` launches two Chromium instances and
 injects the exact payload rendered into each QR code into the other side's
 test-only scan hook. This avoids requiring a physical or fake camera while still exercising the
 pairing UI, SDP validation, WebRTC connection, and game protocol. It requires
@@ -186,7 +186,7 @@ does not invalidate the camera-free signaling test.
 
 ### Engine coverage
 
-`test/multiplayer.mjs` runs Chromium on both sides. The second device in
+`test/multiplayer-pairing.mjs` runs Chromium on both sides. The second device in
 this feature is usually a phone, and on iOS every browser is WebKit, so
 that half is covered separately by Playwright's WebKit:
 

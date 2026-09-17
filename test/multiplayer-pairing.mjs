@@ -1,7 +1,13 @@
-// Two-device Rally multiplayer across real browser *engines*, driven by
-// Playwright.
+// PLAY NEARBY, end to end: the whole two-player Rally flow that a pair of
+// real people actually perform, across real browser *engines*.
 //
-// Why this exists alongside test/multiplayer.mjs: that suite runs
+// This is the authoritative proof that two-device Rally works. One device
+// taps PLAY NEARBY and HOST, the other taps JOIN, the codes are exchanged,
+// a DataChannel opens directly between them, the match starts on both, one
+// player's input is simulated by the other and syncs back, and the
+// disconnect is clean.
+//
+// Why this exists alongside test/multiplayer-pairing.mjs: that suite runs
 // Chromium on both sides. But the second device in the shipped feature
 // is usually a phone, and on iOS every browser is WebKit — so the half
 // of this feature most likely to be used was, until this file, covered
@@ -16,32 +22,72 @@
 //   BLIP_HOST_ENGINE=chromium BLIP_GUEST_ENGINE=webkit    (desktop Chrome <-> iPhone)
 //   BLIP_HOST_ENGINE=webkit   BLIP_GUEST_ENGINE=chromium  (Mac Safari <-> Android Chrome)
 //
-// Signaling uses the scan-injection hook, for the reason spelled out in
-// test/lib/pairing.mjs: the QR *payload* still makes the full round trip
-// through render, validation, and applyDescription — only the optics are
-// skipped. Camera decode itself is covered on Chromium by
-// test/multiplayer.mjs's BLIP_MULTIPLAYER_REAL_CAMERA mode; WebKit has no
-// fake-camera equivalent to drive headlessly.
+// Signalling runs in either of two modes:
+//
+//   default                         the scanned payload goes through
+//                                   blip_qr.js's test hook, so the real
+//                                   SDP, validation and WebRTC all run and
+//                                   only the camera optics are skipped.
+//   BLIP_MULTIPLAYER_REAL_CAMERA=1  the rendered canvas is turned into a
+//                                   video and played through getUserMedia,
+//                                   so jsQR genuinely decodes a picture of
+//                                   the code. Chromium only — WebKit has no
+//                                   fake-camera equivalent to drive
+//                                   headlessly.
+//
+// That second mode used to be a whole separate file which re-implemented
+// the file server, the MIME table, loadRally, QR_READY, the launch flags
+// and the pairing dance in order to vary one step. It is a parameter now.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pairOverQr } from './lib/pairing.mjs';
+import path from 'node:path';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { pairOverQr, injectDelivery } from './lib/pairing.mjs';
 import {
   openPage, openPair, HTTP_PORT, loadRally, READ_RIGHT_FRACTION,
+  grabQrPng, writeQrVideo, writeBlankVideo,
   openModal, clickHsBtn, getStatusText, pollUntil, QR_READY,
   evaluate, waitFor, sleep,
 } from './lib/multiplayer-harness.mjs';
 
-const HOST_ENGINE = process.env.BLIP_HOST_ENGINE || 'webkit';
-const GUEST_ENGINE = process.env.BLIP_GUEST_ENGINE || 'webkit';
+const REAL_CAMERA = process.env.BLIP_MULTIPLAYER_REAL_CAMERA === '1';
+// The fake camera is a Chromium flag, so camera mode pins both sides to it.
+const HOST_ENGINE = REAL_CAMERA ? 'chromium' : (process.env.BLIP_HOST_ENGINE || 'webkit');
+const GUEST_ENGINE = REAL_CAMERA ? 'chromium' : (process.env.BLIP_GUEST_ENGINE || 'webkit');
 
-test(`two-device Rally over WebRTC: host=${HOST_ENGINE} guest=${GUEST_ENGINE}`, async (t) => {
-  const { host, guest } = await openPair(t, HOST_ENGINE, GUEST_ENGINE);
+test(`PLAY NEARBY end to end: host=${HOST_ENGINE} guest=${GUEST_ENGINE}` +
+     `${REAL_CAMERA ? ', real camera decode' : ''}`, async (t) => {
+  // In camera mode each side needs a video file its fake camera reads
+  // from. The file is rewritten mid-test to "show" a code to an
+  // already-running camera, which is how a code that does not exist yet
+  // at launch time gets in front of one.
+  const dir = REAL_CAMERA ? mkdtempSync(path.join(tmpdir(), 'blip-pair-')) : null;
+  const cams = REAL_CAMERA
+    ? { host: path.join(dir, 'host.y4m'), guest: path.join(dir, 'guest.y4m') }
+    : null;
+  if (REAL_CAMERA) {
+    await Promise.all([writeBlankVideo(cams.host), writeBlankVideo(cams.guest)]);
+  }
+
+  const { host, guest } = await openPair(t, HOST_ENGINE, GUEST_ENGINE, REAL_CAMERA
+    ? { host: { camFile: cams.host }, guest: { camFile: cams.guest } }
+    : {});
+
+  // Delivery: hand the payload to the scan hook, or photograph it.
+  const deliver = REAL_CAMERA
+    ? async (targetCdp, _text, fromCdp) => {
+      const png = path.join(dir, `${targetCdp === host ? 'host' : 'guest'}.png`);
+      await grabQrPng(fromCdp, png);
+      await writeQrVideo(png, targetCdp === host ? cams.host : cams.guest);
+    }
+    : injectDelivery;
 
   let paired;
 
   await t.test('the QR exchange completes and the DataChannel opens on both sides', async () => {
-    paired = await pairOverQr(host, guest);
+    paired = await pairOverQr(host, guest, { deliver, connectTimeoutMs: REAL_CAMERA ? 45000 : 30000 });
     assert.equal(paired.hostRole, 1, 'host should report role 1 once its DataChannel opens');
     assert.equal(paired.guestRole, 2, 'guest should report role 2 once its DataChannel opens');
   });
@@ -98,7 +144,7 @@ test(`two-device Rally over WebRTC: host=${HOST_ENGINE} guest=${GUEST_ENGINE}`, 
     // only what the host simulates and sends back. Then release fast:
     // both paddles are in continuous motion while the key is held, so a
     // comparison taken mid-motion catches the two sides one round trip
-    // apart by construction. (Same reasoning as test/multiplayer.mjs.)
+    // apart by construction. (Same reasoning as test/multiplayer-pairing.mjs.)
     await press('keydown');
     await waitFor(guest, `(${READ_RIGHT_FRACTION}) < ${before} - 0.03`, 10000);
     await press('keyup');

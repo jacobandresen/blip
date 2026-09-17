@@ -41,7 +41,7 @@ import { startSafariDriver, connectSafari } from './lib/safari-webdriver.mjs';
 import { pairOverQr } from './lib/pairing.mjs';
 import { acquireWakeLock, wakeLockStatus } from './lib/ios-wakelock.mjs';
 import {
-  startInspectorBridge, connectDevice, requireAwakeDevice, lanAddress, INSPECTOR_PORT,
+  startInspectorBridge, connectDevice, deviceAnswers, requireAwakeDevice, lanAddress, INSPECTOR_PORT,
 } from './lib/ios-device.mjs';
 import {
   createFileServer, listenOn, HTTP_PORT, loadRally, loadRallyAt, READ_RIGHT_FRACTION,
@@ -50,14 +50,30 @@ import {
 
 const HOST_ENGINE = process.env.BLIP_IOS_HOST || 'webkit';
 
-async function deviceAvailable() {
-  try {
-    const res = await fetch(`http://127.0.0.1:${INSPECTOR_PORT}/json`, { signal: AbortSignal.timeout(3000) });
-    return (await res.json()).length > 0;
-  } catch { return false; }
+/** Nothing in this suite may hang.
+ *
+ * A sleeping phone does not refuse calls, it accepts them and never
+ * answers — and over plain HTTP the page cannot hold a Screen Wake Lock
+ * to prevent that (navigator.wakeLock is secure-context only), so the
+ * device *will* re-lock mid-run on a managed profile. Without a ceiling
+ * that surfaces as a suite producing no output whatsoever until
+ * something external kills it, which is indistinguishable from a
+ * harness bug and tells the reader nothing. */
+const SUITE_DEADLINE_MS = Number(process.env.BLIP_IOS_DEADLINE_MS || 150000);
+
+function withDeadline(promise, ms, what) {
+  let timer;
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(
+        `${what} exceeded ${ms}ms — the phone has almost certainly re-locked. ` +
+        'Wake it and re-run; see this file\'s header on why the wake lock cannot help over plain HTTP.')), ms);
+    }),
+  ]);
 }
 
-test('two-device Rally: Mac hosts, a real iPhone joins over WiFi', async (t) => {
+test('two-device Rally: Mac hosts, a real iPhone joins over WiFi', { timeout: SUITE_DEADLINE_MS + 30000 }, async (t) => {
   let bridge = null;
   try {
     bridge = await startInspectorBridge();
@@ -65,12 +81,16 @@ test('two-device Rally: Mac hosts, a real iPhone joins over WiFi', async (t) => 
     t.skip(`no iOS inspector bridge: ${e.message}`);
     return;
   }
-  if (!await deviceAvailable()) {
-    // Kill it here rather than leaning on t.after, which is not
-    // registered until further down: skipping must not leak the bridge
-    // process this test just started.
+  // Asked before anything else is started, and it asks the device to
+  // *answer* rather than merely to be listed — see deviceAnswers(). A
+  // phone that is attached but asleep is a skip, not a two-minute
+  // timeout followed by a process that will not exit.
+  if (!await deviceAnswers()) {
+    // Killed here rather than in t.after, which is not registered until
+    // further down: skipping must not leak the bridge this just started.
     if (bridge) bridge.kill();
-    t.skip('no inspectable Safari page on an attached iPhone — see this file\'s header for setup');
+    t.skip('no iPhone answering on the inspector — attach one, unlock it, and open Safari ' +
+      '(see this file\'s header for the one-time setup)');
     return;
   }
 
@@ -78,8 +98,8 @@ test('two-device Rally: Mac hosts, a real iPhone joins over WiFi', async (t) => 
   await listenOn(server, HTTP_PORT);
   const origin = `http://${lanAddress()}:${HTTP_PORT}`;
 
-  const guest = await connectDevice();
-  await requireAwakeDevice(guest);
+  const guest = await withDeadline(connectDevice(), 45000, 'attaching to the phone');
+  await withDeadline(requireAwakeDevice(guest), 25000, 'waking check');
 
   let hostHandle, host, safariProc;
   if (HOST_ENGINE === 'safari') {
@@ -102,7 +122,7 @@ test('two-device Rally: Mac hosts, a real iPhone joins over WiFi', async (t) => 
     // First, before anything slow: a managed iPhone re-locks on the
     // profile's timer, and a locked phone stops answering the inspector
     // mid-test in a way that looks like an unrelated timeout.
-    await loadRallyAt(guest, origin);
+    await withDeadline(loadRallyAt(guest, origin), 60000, 'loading Rally on the phone');
     const got = await acquireWakeLock(guest);
     t.diagnostic(`wake lock: ${got} ${JSON.stringify(await wakeLockStatus(guest))}`);
 
@@ -168,7 +188,7 @@ test('two-device Rally: Mac hosts, a real iPhone joins over WiFi', async (t) => 
 
     // The phone renders only what the Mac simulates and sends back, so
     // the phone's own view moving is proof of a full WiFi round trip.
-    // Released as soon as that lands — see test/multiplayer.mjs on why a
+    // Released as soon as that lands — see test/multiplayer-pairing.mjs on why a
     // mid-motion comparison between the two sides is flaky by design.
     await press('keydown');
     await waitFor(guest, `(${READ_RIGHT_FRACTION}) < ${before} - 0.03`, 15000);

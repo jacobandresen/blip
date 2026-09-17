@@ -302,3 +302,55 @@ test('unpack never throws, whatever it is handed', () => {
     assert.doesNotThrow(() => unpackFromQr(raw), JSON.stringify(raw));
   }
 });
+
+// ---- the refusal paths ---------------------------------------------------
+// Every branch below is a case where packing must decline rather than
+// produce a payload that rebuilds into something subtly different. They are
+// cheap to write and they are exactly the paths that never run in a healthy
+// pairing, so nothing else would ever exercise them.
+
+test('a ufrag containing the separator refuses to pack', () => {
+  // Same hazard as the ice-pwd case, on the other field: a separator in a
+  // value shifts every later field on the way back.
+  const sdp = offerSdp([HOST_CAND]).replace('a=ice-ufrag:srqd', 'a=ice-ufrag:sr|qd');
+  assert.equal(packForQr(sdp), sdp);
+});
+
+test('a candidate address containing a separator or comma refuses to pack', () => {
+  // Contrived for an IP, but mDNS names are arbitrary strings from the
+  // browser, and the route list is comma-delimited.
+  for (const addr of ['192.168|0.1', '192.168,0.1']) {
+    const line = `a=candidate:1 1 udp 2113937151 ${addr} 33124 typ host`;
+    const sdp = offerSdp([line]);
+    assert.equal(packForQr(sdp), sdp, `should have declined for ${addr}`);
+  }
+});
+
+test('a malformed fingerprint refuses to pack rather than encode garbage', () => {
+  const sdp = offerSdp([HOST_CAND]).replace(/a=fingerprint:sha-256 [^\r]*/, 'a=fingerprint:sha-256 ZZ:ZZ:ZZ');
+  assert.equal(packForQr(sdp), sdp);
+});
+
+test('an unknown DTLS setup role refuses to pack', () => {
+  const sdp = offerSdp([HOST_CAND], 'holdconn');
+  assert.equal(packForQr(sdp), sdp);
+});
+
+test('a candidate with no protocol field is not mistaken for UDP', () => {
+  // parseCandidateLine returns what it can from a short line; the slimmer
+  // must not treat a missing protocol as "keep it".
+  const short = 'a=candidate:1 1';
+  const out = slimSdpForQr(sdpWith([short]));
+  assert.ok(out.indexOf(short) !== -1, 'an unparseable line should pass through untouched');
+});
+
+test('unpack rejects a route with no port separator', () => {
+  const fp = 'A'.repeat(43);
+  assert.equal(unpackFromQr(`B1|u|p|${fp}|a|noporthere`), '');
+});
+
+test('unpack rejects a fingerprint of the wrong length', () => {
+  // 43 base64 chars is 32 bytes; anything else is not a sha-256 fingerprint
+  // and would rebuild into an SDP the browser rejects far from here.
+  assert.equal(unpackFromQr('B1|u|p|QUJD|a|1.2.3.4:1'), '');
+});

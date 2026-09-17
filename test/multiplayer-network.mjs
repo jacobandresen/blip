@@ -21,9 +21,9 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hostShowsOffer, injectNextScan } from './lib/pairing.mjs';
+import { hostShowsOffer, guestAnswersOffer, hostTakesAnswer, injectNextScan } from './lib/pairing.mjs';
 import {
-  openPage, openPair, HTTP_PORT, loadRally, rewriteRoutes,
+  openPage, openPair, HTTP_PORT, loadRally, rewriteRoutes, blockAllCandidates,
   openModal, clickHsBtn, getStatusText, pollUntil, evaluate, waitFor, sleep, QR_READY,
 } from './lib/multiplayer-harness.mjs';
 
@@ -132,4 +132,71 @@ test(`the guest reports a different-network pairing early (${ENGINE})`, async (t
   assert.match(both.qr, /too small to scan/i);
   assert.match(both.net, /different networks/i);
   assert.equal(both.count, 2, 'expected exactly one warning of each kind');
+});
+
+// ---- the network refusing to carry the traffic ---------------------------
+//
+// Folded in from what used to be a separate file: it shares this suite's
+// subject (what the player is told when the network, not the code, is the
+// problem), its setup, and its helpers. Two files meant two copies of the
+// same pairing dance to reach the interesting moment.
+//
+// This is the failure that looks most like success. Both codes scan, both
+// sides report progress, and the SDP exchange completes perfectly --
+// because it happened through a camera, not the network. Then nothing. The
+// usual causes are not bugs: guest or corporate WiFi with client isolation,
+// or a VPN routing LAN traffic elsewhere.
+
+test('a blocked network is reported, not left to time out in silence', async (t) => {
+  const { host, guest } = await openPair(t, ENGINE, ENGINE);
+
+  await t.test('pairing still completes — the codes exchange fine, only the traffic is blocked', async () => {
+    const offer = await hostShowsOffer(host);
+    // Shape-agnostic: the payload may be the compact form or plain SDP,
+    // and what matters is only that it names routes this test can move
+    // somewhere unreachable. Matching the literal word "candidate" tied
+    // this to the SDP shape and broke silently when the payload changed.
+    assert.notEqual(rewriteRoutes(offer, '10.255.255.1'), offer,
+      `the offer names no routes to block: ${offer.slice(0, 80)}`);
+
+    // Both directions: the offer carries the host's candidates and the
+    // answer carries the guest's, so blocking one still leaves a usable
+    // pair. This is the whole point — no pair may work.
+    const answer = await guestAnswersOffer(guest, blockAllCandidates(offer));
+    await hostTakesAnswer(host, blockAllCandidates(answer));
+
+    // Neither side should ever report a role: a role is set on
+    // DataChannel open, and nothing can open here.
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.equal(await evaluate(host, 'window.blipNetRole()'), 0);
+    assert.equal(await evaluate(guest, 'window.blipNetRole()'), 0);
+  });
+
+  await t.test('the player is told something is wrong while still watching, not after a minute', async () => {
+    // The hint fires after ICE_SLOW_HINT_MS (8s) in 'checking'. Without
+    // it, this screen says "Contacting client…" for the full 60-second
+    // connect timeout with no indication anything is amiss.
+    const text = await pollUntil(async () => {
+      const s = await getStatusText(host);
+      return s && /Still connecting|Blocked by this network/.test(s) ? s : null;
+    }, 25000, 500);
+    t.diagnostic(`host status after the block: ${JSON.stringify(text)}`);
+    assert.match(text, /Still connecting|Blocked by this network/);
+  });
+
+  await t.test('the final message names the network, and does not just say "try again"', async () => {
+    // Either route gets here: ICE reaching 'failed', or the connect
+    // timeout expiring with ICE still unfinished. Both are the same
+    // situation and both must produce the same actionable message.
+    // Sampled quickly: the modal returns to the choice screen a few
+    // seconds after a terminal status, taking the status element with it.
+    const text = await pollUntil(async () => {
+      const s = await getStatusText(host);
+      return s && /Blocked by this network/.test(s) ? s : null;
+    }, 60000, 250);
+    assert.match(text, /Blocked by this network/);
+    assert.match(text, /WiFi|VPN/, 'the message should say what to change');
+    assert.doesNotMatch(text, /^Could not connect\. Try again\.$/,
+      'a blocked network must not be reported as a generic failure — retrying cannot fix it');
+  });
 });
