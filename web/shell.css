@@ -6,7 +6,19 @@
 /* Cabinet accent — "r, g, b" so rgba(var(--cab), a) works. shell.js overrides
    this per game (see BLIP_GAMES in kiosk.js); this green is just the default
    before that runs. */
-:root { --cab: 50, 200, 50; }
+:root {
+  --cab: 50, 200, 50;
+  /* Height of the backlit marquee strip, and therefore of the BLIP logo
+     and coin slot that sit over its two ends. One variable because the
+     three are a single piece of cabinet trim: the logo and slot are
+     mounted *on* the strip, so a strip height the elements don't share
+     leaves them hanging below it, over the game. They had drifted apart
+     at every breakpoint — the strip was 28/20/44px while both elements
+     were a flat 52px — so on a desktop the logo and COINS button hung
+     24px below the lit strip, and 32px below it on a short screen.
+     Redefined per breakpoint below; never hardcode it in two places. */
+  --marquee-h: 28px;
+}
 
 html {
   /* overflow:hidden only on html, not body — iOS Safari anchors position:fixed
@@ -92,7 +104,7 @@ body::after {
      shell.js's fillCanvas() measures offsetHeight, so the canvas and bezel
      follow this taller box automatically. */
   box-sizing: border-box;
-  height: calc(28px + env(safe-area-inset-top, 0px));
+  height: calc(var(--marquee-h) + env(safe-area-inset-top, 0px));
   padding-top: env(safe-area-inset-top, 0px);
   /* Above the CRT scanline (100) and vignette (99) overlays — the backlit
      sign is physical cabinet hardware sitting above the tube, not screen
@@ -253,15 +265,16 @@ canvas {
   transition: width .12s linear;
 }
 
-/* On a game page the logo is the only touch route back to the grid, and
-   it sits in the top-left corner well away from where the thumbs rest —
-   so give it a fuller vertical tap box than the 32px it uses elsewhere.
-   #insert-coin-btn has to grow to match: kiosk.css never sizes it past
-   46px, so left alone here it stayed short while the logo grew, and the
-   two — meant to read as one continuous bar (see kiosk.css) — went out
-   of vertical alignment. */
+/* The logo and coin slot sit over the two ends of the marquee strip and
+   read as part of it, so they are exactly as tall as it is — no more.
+   They previously took a flat 52px for a fuller tap target, which was
+   taller than the strip at every breakpoint and left both of them
+   hanging below it over the game. The tap target is still a comfortable
+   one where it matters: --marquee-h is 44px on phones, which is the
+   usual 44px minimum, and a desktop pointer does not need the height.
+   Width carries the rest of the target on both (see kiosk.css). */
 .blip-logo,
-#insert-coin-btn { height: calc(52px + env(safe-area-inset-top, 0px)); }
+#insert-coin-btn { height: calc(var(--marquee-h) + env(safe-area-inset-top, 0px)); }
 
 /* A little more room than the kiosk pages use: a game page's top bar only
    carries these two elements (no card grid competing for space), so let
@@ -487,7 +500,8 @@ canvas {
 
 /* Shrink controls in landscape / short screens */
 @media (max-height: 450px) {
-  #marquee-bar { height: calc(20px + env(safe-area-inset-top, 0px)); gap: 8px; }
+  :root { --marquee-h: 20px; }
+  #marquee-bar { gap: 8px; }
   #marquee-name { font-size: 10px; letter-spacing: 3px; }
   .marquee-bulbs { max-width: 60px; }
   #arcade-bezel { top: calc(23px + env(safe-area-inset-top, 0px)); } /* marquee (20px) + 3px */
@@ -511,7 +525,7 @@ canvas {
    ends are easy thumb targets (kiosk.css bumps those to a 46px box). The
    bezel and top screws follow it down. */
 @media (max-width: 480px) {
-  #marquee-bar { height: calc(44px + env(safe-area-inset-top, 0px)); }
+  :root { --marquee-h: 44px; }
   #arcade-bezel { top: calc(47px + env(safe-area-inset-top, 0px)); } /* marquee 44 + 3 */
   .bezel-screw.tl, .bezel-screw.tr { top: calc(56px + env(safe-area-inset-top, 0px)); }
   /* Drop the flanking bulb dots — the BLIP logo and coin slot over the
@@ -611,7 +625,8 @@ canvas {
    resolve. Amber, not red: the attempt has not failed, but this is
    almost certainly why nothing is scanning. See renderCode() in
    web/blip_net_ui.js. */
-.blip-qr-warn {
+.blip-qr-warn,
+.blip-net-warn {
   display: none;
   margin: 4px auto 2px;
   max-width: 92%;
@@ -621,6 +636,44 @@ canvas {
   color: #ffd94a;
   text-align: center;
 }
+/* Live ICE candidate list in the pairing modal — one row per candidate
+   pair the two devices are testing. Colour is the whole point: green for
+   a path being attempted or already carrying traffic, red for one that
+   has been ruled out, dim for one still queued. All red means something
+   is dropping device-to-device traffic; see the blocked-network note in
+   docs/multiplayer.md. */
+.blip-ice-list {
+  margin: 6px auto 2px;
+  max-width: 96%;
+  text-align: left;
+  font-size: 7px;
+  line-height: 1.9;
+  letter-spacing: 0.5px;
+}
+.blip-ice-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.blip-ice-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #556;
+}
+.blip-ice-dot.ok  { background: #5cd65c; box-shadow: 0 0 5px rgba(92, 214, 92, 0.8); }
+.blip-ice-dot.err { background: #ff6b6b; box-shadow: 0 0 5px rgba(255, 107, 107, 0.8); }
+.blip-ice-dot.idle { background: #556; }
+.blip-ice-addr {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #9fb4bf;
+}
+.blip-ice-state { flex: 0 0 auto; color: #667; }
+
 .blip-hs-input {
   width: 100%;
   box-sizing: border-box;
