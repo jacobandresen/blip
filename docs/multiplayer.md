@@ -93,6 +93,57 @@ Because the peers can exchange `.local` candidates, both devices must be
 able to resolve mDNS on the shared network. This is the same class of
 requirement as the client/AP isolation note below.
 
+### The compact QR payload
+
+A datachannel offer is ~538 bytes of SDP, of which only ~98 are facts the
+far side cannot derive. The rest — version, origin, bundle group, media
+line, sctp port — is boilerplate identical on both ends of every pairing.
+
+So the code carries only the irreducible part, and the SDP is rebuilt on
+arrival (`packForQr` / `unpackFromQr` in `web/blip_sdp_slim.js`):
+
+```
+B1|ufrag|pwd|fingerprint-b64|setup|host:port,host:port
+```
+
+The fingerprint travels as base64 of its 32 raw bytes rather than 95
+characters of colon-separated hex. That buys both halves of "easier to
+scan" at once:
+
+| | payload | modules | error correction |
+| --- | --- | --- | --- |
+| full SDP | 538 B | 89 | M (~15% recoverable) |
+| compact | **98 B** | **53** | **H (~30%)** |
+
+Modules 1.7x larger *and* double the damage tolerance at the same
+physical size, which is what survives dim light, glare and an unsteady
+hand.
+
+Anything without the `B1|` marker is treated as plain SDP and passed
+through, so a payload this codec did not produce is never silently
+reinterpreted. If a required field is missing, or a value contains the
+separator, packing declines and sends the SDP unchanged rather than
+rebuilding into something subtly wrong.
+
+TCP candidates are dropped before any of this: Chrome offers `tcptype
+active` candidates on port 9, which can only pair with a *passive* TCP
+candidate that neither side ever offers, so they are routes guaranteed to
+fail taking up payload to say so.
+
+### The renderer checks its own work
+
+A QR's capacity depends on its correction level — about 1273 bytes at H
+against 2953 at L — and the vendored encoder does **not** reliably reject
+a payload that overflows the level it was given. It returns a code of far
+too few modules which looks entirely plausible and cannot be decoded by
+anything. Displaying that is the worst outcome available: to the player
+it is indistinguishable from a broken camera.
+
+So `render()` tries H, Q, M, L in turn and accepts a level only if it can
+decode its own rendered pixels back with jsQR. A code it returns has been
+read at least once, in this process, before anybody points a camera at
+it.
+
 ### iOS needs HTTPS for the camera
 
 iOS Safari exposes `navigator.mediaDevices` **only in a secure context**.
@@ -149,131 +200,128 @@ The browser protocol in `web/blip_net_proto.js` uses a small tagged payload:
 
 ## Testing
 
-Run the browser-independent tests with:
+Browser-independent unit tests (wire protocol, compact codec, QR
+scan-region heuristic, candidate trimming, canvas geometry):
 
 ```sh
-npm test
+npm test            # 83 tests, no browser
+cargo test -p rally # the host-state packet and its validation
 ```
 
-They cover the wire protocol, QR scan-region heuristic, SDP candidate
-trimming, and canvas geometry. Rust networking tests are run with:
+Everything else drives real browser engines through Playwright. The
+Chromium-based suites fall back to Playwright's Chromium when none is on
+`PATH`, so they run on macOS as well as a Linux CI box, and headless
+Chrome is launched with SwiftShader rather than `--disable-gpu` (Rally is
+a WebGL game; with no GL context the wasm never starts and every
+assertion tests a game that was never running).
+
+### The main proof: PLAY NEARBY, end to end
 
 ```sh
-cargo test -p rally
-```
-
-The pairing harness is:
-
-```sh
-npm run test:multiplayer
-```
-
-By default, `test/multiplayer-pairing.mjs` launches two Chromium instances and
-injects the exact payload rendered into each QR code into the other side's
-test-only scan hook. This avoids requiring a physical or fake camera while still exercising the
-pairing UI, SDP validation, WebRTC connection, and game protocol. It requires
-Chromium and a built `web/rally/index.wasm`.
-
-To run the additional real fake-camera/jsQR path, use:
-
-```sh
-BLIP_MULTIPLAYER_REAL_CAMERA=1 npm run test:multiplayer
-```
-
-That mode renders each QR into a video file and feeds it through
-`getUserMedia`; it requires `ffmpeg`. A camera failure in this optional mode
-does not invalidate the camera-free signaling test.
-
-### Engine coverage
-
-`test/multiplayer-pairing.mjs` runs Chromium on both sides. The second device in
-this feature is usually a phone, and on iOS every browser is WebKit, so
-that half is covered separately by Playwright's WebKit:
-
-```sh
-npm run test:multiplayer:webkit   # WebKit <-> WebKit
+npm run test:multiplayer          # WebKit <-> WebKit (default)
 npm run test:multiplayer:cross    # Chromium <-> WebKit, both directions
+npm run test:multiplayer:camera   # real jsQR decode through a fake camera
 ```
+
+`test/multiplayer-pairing.mjs` is the authoritative proof that two-player
+Rally works: PLAY NEARBY, HOST on one device and JOIN on the other, codes
+exchanged, a DataChannel open directly between them, the match live on
+both, one player's input simulated by the other and synced back, then a
+clean disconnect.
 
 `BLIP_HOST_ENGINE` / `BLIP_GUEST_ENGINE` (`chromium`, `webkit`,
-`firefox`) select the pairing. These need no machine-level setup:
-Playwright's browsers are a devDependency, and the Chromium-based tests
-fall back to Playwright's Chromium when none is on `PATH`, so the suite
-runs on macOS as well as on a Linux CI box.
+`firefox`) select the pairing, so every combination is covered in both
+roles. WebKit matters because the second device is usually a phone, and
+on iOS every browser is WebKit.
 
-Headless Chrome is launched with SwiftShader rather than `--disable-gpu`.
-Rally is a WebGL game; with no GL context the wasm never starts, and
-every state-sync assertion fails against a game that was never running.
+Signalling runs in either of two modes. By default the scanned payload
+goes through `blip_qr.js`'s test hook, so the real SDP, validation and
+WebRTC all run and only the camera optics are skipped. With
+`BLIP_MULTIPLAYER_REAL_CAMERA=1` the rendered canvas becomes a video
+played through `getUserMedia`, so jsQR genuinely decodes a picture of the
+code — Chromium only, as WebKit has no fake-camera equivalent to drive
+headlessly.
 
-### Hardening, QR and blocked-network suites
+### The rest
 
 ```sh
 npm run test:multiplayer:hardening   # a hostile peer on a live connection
-npm run test:multiplayer:blocked     # what the player sees when traffic is blocked
-npm run test:qr                      # can the code on screen actually be scanned
-npm run test:multiplayer:preflight   # the loopback probe and the subnet check
+npm run test:multiplayer:network     # loopback probe, subnet check, blocked traffic
 npm run test:multiplayer:visibility  # scanning feedback and the live ICE list
+npm run test:qr                      # can the code on screen actually be scanned
+npm run test:topbar                  # the logo and coin slot stay inside the bar
 ```
-
-`test/multiplayer-proto.test.mjs` covers the wire format in isolation (no
-browser). `test/multiplayer-hardening.mjs` covers the rules that need a
-live connection to mean anything — direction, size caps, the pong budget
-— and every check ends by confirming the connection still carries a real
-match, because hardening that quietly broke the channel would be worse
-than the hole it closed.
 
 `test/qr-scannability.mjs` screenshots the canvas **through the real
 compositor** and decodes those pixels, across four viewports and three
-payload sizes. It also keeps the defect itself as an executable
-demonstration: one test asserts that the old fixed-grid-plus-CSS-scale
-approach still loses codes, and reports the percentage it loses.
+payload sizes — every other test reads the payload from
+`BlipQR.lastRenderedText` or via `toDataURL()`, and neither ever looks at
+the pixels a phone would photograph. It also keeps the original defect as
+an executable demonstration, asserting that the old fixed-grid approach
+still loses codes and reporting the percentage.
 
-Both take `BLIP_HOST_ENGINE`/`BLIP_GUEST_ENGINE` (and `BLIP_QR_ENGINE`),
-so every combination of Chromium and WebKit is covered in both roles.
+`test/multiplayer-hardening.mjs` ends every check by confirming the
+connection still carries a real match: hardening that quietly broke the
+channel would be worse than the hole it closed, and a test that only
+asserted "the bad thing was ignored" could not tell the two apart.
 
 ### On a real iPhone
 
 ```sh
-npm run test:multiplayer:ios      # Mac hosts in WebKit, the phone joins over WiFi
+npm run test:multiplayer:ios
 ```
 
-The one test where the guest is real hardware — real iOS Safari, real
-WebRTC, real WiFi between the peers. It skips (rather than fails) when
-no phone is attached. Setup:
+The one suite where the guest is real hardware — real iOS Safari, real
+WebRTC, real WiFi between the peers. **Verified on an iPhone 13 (iOS
+26.6): 8/8.** Input on the phone moved the paddle the Mac was simulating
+and the two agreed to the last decimal place.
+
+It skips, rather than fails, when no phone answers. Setup:
 
 - iPhone attached over USB and trusted by this Mac.
 - Settings > Apps > Safari > Advanced > **Web Inspector** and **Remote
   Automation**, both on.
 - `uv tool install pymobiledevice3` — the bridge is started automatically.
 
-iOS has no adb and no CDP; the equivalent is the WebKit remote
-inspector, which since iOS 17 sits behind Apple's RemoteXPC tunnel.
+iOS has no adb and no CDP; the equivalent is the WebKit remote inspector,
+which since iOS 17 sits behind Apple's RemoteXPC tunnel.
 `pymobiledevice3 webinspector cdp` re-exposes it as an ordinary CDP
-endpoint on localhost, so `test/lib/cdp.mjs` drives a phone with the
-same `connect()`/`evaluate()` it uses for desktop Chrome.
+endpoint on localhost, so `test/lib/cdp.mjs` drives a phone with the same
+`connect()`/`evaluate()` it uses for desktop Chrome.
 (`ios_webkit_debug_proxy` no longer works for this — it fails during the
 TLS handshake and reports no targets.)
 
-A sleeping phone keeps listing its inspector target long after it stops
-answering on it, so the harness takes a Screen Wake Lock on the page as
-its first step (`test/lib/ios-wakelock.mjs`). That keeps a managed
-device awake without needing Auto-Lock set to Never, which an MDM
-profile may forbid.
+Two things about that bridge are worth knowing, because both cost hours
+before they were understood:
+
+- **It goes stale.** Once the phone has slept underneath it, every
+  connection through that process times out even after the device is
+  awake and healthy — `ideviceinfo` answers, the page is still listed,
+  and evaluating anything on it hangs. Restarting the bridge fixes it
+  instantly. `ensureLiveBridge()` now replaces a bridge that will not
+  carry a `1 + 1` rather than trusting it.
+- **The socket keeps node alive.** Left open, the suite *finishes* and
+  then hangs forever with its output still buffered, which reads as
+  "the tests stalled" when in fact they had all passed. It is closed on
+  teardown.
+
+A sleeping phone also cannot be prevented: `navigator.wakeLock` is
+secure-context only, so over plain HTTP the harness cannot hold the
+screen on (see "iOS needs HTTPS for the camera" above). The run reports
+that rather than pretending otherwise.
 
 `BLIP_IOS_HOST=safari` drives the real Safari.app as host via
 `safaridriver` instead of Playwright's WebKit; that additionally needs
 `sudo safaridriver --enable` and Develop > Allow Remote Automation.
 
-The Android harness provides an additional real Chrome-for-Android path when
-Linux, `/dev/kvm`, the Android SDK, and an emulator are available:
+### Android
 
 ```sh
 npm run test:multiplayer:android
 ```
 
-Automated tests cannot reproduce every real-phone camera condition (focus,
-glare, permissions, or QR moiré), nor WiFi access-point isolation. Those
-remain hardware/network checks outside the browser harness.
+Real Chrome for Android in two emulators. Requires Linux and `/dev/kvm`,
+and skips itself cleanly everywhere else.
 
 ## Hardening
 
