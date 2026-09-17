@@ -1,7 +1,7 @@
 // Single-*Android-emulator* end-to-end test for Rally pairing
 // (docs/multiplayer.md, docs/android-multiplayer-test-plan.md).
 //
-// test/multiplayer.mjs already proves the pairing logic itself against
+// test/multiplayer-pairing.mjs already proves the pairing logic itself against
 // two headless Chromium instances with Chrome's own fake-camera flags.
 // This test proves the same flow against real Chrome-for-Android — a
 // different WebView/renderer, different touch/permission plumbing, no
@@ -153,7 +153,7 @@ after(async () => {
   if (server) await new Promise((resolve) => server.close(resolve));
 });
 
-// Same read-back trick test/multiplayer.mjs uses: the dial hand's
+// Same read-back trick test/multiplayer-pairing.mjs uses: the dial hand's
 // rotation encodes the paddle fraction (window.blipPaddles in shell.js).
 const READ_RIGHT_FRACTION = `(function () {
   var el = document.getElementById('dial-hand-p2');

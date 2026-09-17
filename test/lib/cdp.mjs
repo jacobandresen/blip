@@ -1,6 +1,6 @@
 // Minimal Chrome DevTools Protocol client over a raw WebSocket — no
 // puppeteer/playwright dependency, just Node's own `net`/`http`/`crypto`.
-// Used by test/multiplayer.mjs (and any future headless browser test) to
+// Used by test/multiplayer-pairing.mjs (and any future headless browser test) to
 // drive real Chromium instances directly: navigate, run JS via
 // Runtime.evaluate, dispatch synthetic input, and get real page/console
 // errors back, all over the same protocol DevTools itself uses.

@@ -109,6 +109,33 @@ export async function requireAwakeDevice(cdp) {
   }
 }
 
+/** Is there a phone here that will actually answer?
+ *
+ * Listing a target proves nothing: a sleeping device keeps advertising
+ * its pages long after it has stopped responding on them, and every
+ * call then accepts and never completes. Worse, the half-open socket
+ * keeps node alive, so even a per-call deadline leaves the process
+ * hanging after the tests themselves have given up.
+ *
+ * So the question is asked once, cheaply, with its own socket that is
+ * closed either way, before any server or browser is started. A phone
+ * that cannot answer a `1+1` is a phone this suite should skip, not
+ * one it should spend two minutes timing out against. */
+export async function deviceAnswers(port = INSPECTOR_PORT, timeoutMs = 8000) {
+  let cdp = null;
+  try {
+    const targets = await listTargets(port);
+    if (!targets.length) return false;
+    cdp = await withDeadline(connect(port, undefined, { commandTimeoutMs: timeoutMs }), timeoutMs, 'attach');
+    await withDeadline(evaluate(cdp, '1 + 1'), timeoutMs, 'probe');
+    return true;
+  } catch {
+    return false;
+  } finally {
+    try { if (cdp && cdp.close) cdp.close(); } catch { /* best effort */ }
+  }
+}
+
 export async function connectDevice(port = INSPECTOR_PORT) {
   await waitForSafariTarget(port);
   // Generous per-command: every round trip crosses USB and the

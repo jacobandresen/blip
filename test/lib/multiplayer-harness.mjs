@@ -1,5 +1,5 @@
 // Shared plumbing for the multiplayer QR/WebRTC test suite
-// (test/multiplayer.mjs). Split out so several independent `describe()`
+// (test/multiplayer-pairing.mjs). Split out so several independent `describe()`
 // groups — QR-image robustness, protocol rejection of bad content, camera
 // failure paths, network-blocked diagnosis, the full two-device pairing,
 // and timing variants — can each launch just the headless Chromium
@@ -7,7 +7,7 @@
 // full two-device dance the original single end-to-end test did.
 //
 // Every helper here drives the *real* code path (real `getUserMedia`,
-// real jsQR decode, real RTCPeerConnection) — see test/multiplayer.mjs's
+// real jsQR decode, real RTCPeerConnection) — see test/multiplayer-pairing.mjs's
 // own file header for why that distinction matters for this feature.
 
 import { createServer } from 'node:http';
@@ -108,7 +108,7 @@ export const QR_READY = `(function(){
 })()`;
 
 /** The dial hand's rotation encodes the paddle fraction — see
- * shell.js's `window.blipPaddles`. See test/multiplayer.mjs's original
+ * shell.js's `window.blipPaddles`. See test/multiplayer-pairing.mjs's original
  * comment on why reading the live DOM (rather than intercepting a
  * callback) is the injection-free way to observe both sides. */
 export const READ_RIGHT_FRACTION = `(function () {
@@ -245,11 +245,11 @@ export async function openPage(t, engine = 'chromium', opts = {}) {
 
 /** Two browsers with Rally already loaded on both — the shape almost
  * every multiplayer test needs before it can do anything interesting. */
-export async function openPair(t, hostEngine = 'chromium', guestEngine = 'chromium') {
+export async function openPair(t, hostEngine = 'chromium', guestEngine = 'chromium', opts = {}) {
   const server = createFileServer();
   await listenOn(server, HTTP_PORT);
-  const hostBrowser = await launchEngine(hostEngine);
-  const guestBrowser = await launchEngine(guestEngine);
+  const hostBrowser = await launchEngine(hostEngine, opts.host || {});
+  const guestBrowser = await launchEngine(guestEngine, opts.guest || {});
   t.after(async () => {
     await hostBrowser.browser.close().catch(() => {});
     await guestBrowser.browser.close().catch(() => {});

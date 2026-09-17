@@ -1,7 +1,7 @@
 // The HOST / JOIN / SCAN ANSWER dance, as one reusable routine.
 //
-// test/multiplayer.mjs has driven this inline since it was the only
-// caller. It now has two more — test/multiplayer-webkit.mjs (two
+// test/multiplayer-pairing.mjs has driven this inline since it was the only
+// caller. It now has two more — test/multiplayer-pairing.mjs (two
 // Playwright engines, including cross-engine WebKit<->Chromium) and
 // test/multiplayer-ios.mjs (a real iPhone over the WebKit inspector) —
 // and the steps are identical for all of them, because every one of
@@ -29,6 +29,16 @@ export async function injectNextScan(cdp, text) {
   await evaluate(cdp, `window.BlipQR.testInject = ${JSON.stringify(text)}`);
 }
 
+/** How a rendered code reaches the other device's scanner.
+ *
+ * The default hands the payload straight to blip_qr.js's test hook, so
+ * the real SDP, validation and WebRTC all run while the camera optics
+ * are skipped. The camera mode passes a real video of the real canvas
+ * through getUserMedia instead — same steps, one more real layer — which
+ * is why this is a parameter rather than two copies of the dance.
+ */
+export const injectDelivery = (targetCdp, text) => injectNextScan(targetCdp, text);
+
 /** HOST: open the modal, take the host role, wait for the offer QR, and
  * return the payload it encodes. */
 export async function hostShowsOffer(cdp, timeoutMs = 20000) {
@@ -42,13 +52,13 @@ export async function hostShowsOffer(cdp, timeoutMs = 20000) {
  * scan), feed it `offerText`, and return the answer payload it renders
  * back. Surfaces the modal's own error line rather than a bare timeout —
  * "SDP rejected" and "never decoded" are different failures. */
-export async function guestAnswersOffer(cdp, offerText, timeoutMs = 25000) {
+export async function guestAnswersOffer(cdp, offerText, { deliver = injectDelivery, from = null, timeoutMs = 25000 } = {}) {
   await openModal(cdp);
   // Injected *before* JOIN, not after: blip_qr.js's scan() reads
   // window.BlipQR.testInject once, synchronously, at the top of the
   // call, and JOIN starts that scan immediately. Setting it afterwards
   // leaves the scan waiting on a camera that will never see a code.
-  await injectNextScan(cdp, offerText);
+  await deliver(cdp, offerText, from);
   await clickHsBtn(cdp, 'JOIN');
   const deadline = Date.now() + timeoutMs;
   for (;;) {
@@ -62,17 +72,17 @@ export async function guestAnswersOffer(cdp, offerText, timeoutMs = 25000) {
 }
 
 /** SCAN ANSWER on the host, completing signaling. */
-export async function hostTakesAnswer(cdp, answerText) {
-  await injectNextScan(cdp, answerText);
+export async function hostTakesAnswer(cdp, answerText, { deliver = injectDelivery, from = null } = {}) {
+  await deliver(cdp, answerText, from);
   await clickHsBtn(cdp, 'SCAN');
 }
 
 /** The whole exchange. Resolves once both sides report a net role,
  * which is what "the DataChannel opened" looks like from the page. */
-export async function pairOverQr(host, guest, { connectTimeoutMs = 30000 } = {}) {
+export async function pairOverQr(host, guest, { connectTimeoutMs = 30000, deliver = injectDelivery } = {}) {
   const offer = await hostShowsOffer(host);
-  const answer = await guestAnswersOffer(guest, offer);
-  await hostTakesAnswer(host, answer);
+  const answer = await guestAnswersOffer(guest, offer, { deliver, from: host });
+  await hostTakesAnswer(host, answer, { deliver, from: guest });
   const hostRole = await waitFor(host, 'window.blipNetRole()', connectTimeoutMs);
   const guestRole = await waitFor(guest, 'window.blipNetRole()', connectTimeoutMs);
   return { offer, answer, hostRole, guestRole };
