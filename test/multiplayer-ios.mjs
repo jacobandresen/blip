@@ -41,7 +41,7 @@ import { startSafariDriver, connectSafari } from './lib/safari-webdriver.mjs';
 import { pairOverQr } from './lib/pairing.mjs';
 import { acquireWakeLock, wakeLockStatus } from './lib/ios-wakelock.mjs';
 import {
-  startInspectorBridge, connectDevice, deviceAnswers, requireAwakeDevice, lanAddress, INSPECTOR_PORT,
+  ensureLiveBridge, connectDevice, requireAwakeDevice, lanAddress, INSPECTOR_PORT,
 } from './lib/ios-device.mjs';
 import {
   createFileServer, listenOn, HTTP_PORT, loadRally, loadRallyAt, READ_RIGHT_FRACTION,
@@ -74,18 +74,14 @@ function withDeadline(promise, ms, what) {
 }
 
 test('two-device Rally: Mac hosts, a real iPhone joins over WiFi', { timeout: SUITE_DEADLINE_MS + 30000 }, async (t) => {
-  let bridge = null;
-  try {
-    bridge = await startInspectorBridge();
-  } catch (e) {
-    t.skip(`no iOS inspector bridge: ${e.message}`);
-    return;
-  }
+  // A stale bridge is indistinguishable from a sleeping phone from out
+  // here, and restarting it is the fix — see ensureLiveBridge().
+  const { proc: bridge, alive } = await ensureLiveBridge();
   // Asked before anything else is started, and it asks the device to
   // *answer* rather than merely to be listed — see deviceAnswers(). A
   // phone that is attached but asleep is a skip, not a two-minute
   // timeout followed by a process that will not exit.
-  if (!await deviceAnswers()) {
+  if (!alive) {
     // Killed here rather than in t.after, which is not registered until
     // further down: skipping must not leak the bridge this just started.
     if (bridge) bridge.kill();
@@ -114,6 +110,12 @@ test('two-device Rally: Mac hosts, a real iPhone joins over WiFi', { timeout: SU
     if (hostHandle) await hostHandle.browser.close().catch(() => {});
     if (host && host.close) await host.close().catch(() => {});
     if (safariProc) safariProc.kill();
+    // The socket to the phone keeps the event loop alive on its own, so
+    // without this the suite *finishes* and then hangs forever with its
+    // output still buffered — which reads as "the tests stalled" when in
+    // fact they had all passed. Closed before the bridge, since it is a
+    // connection through it.
+    if (guest && guest.close) guest.close();
     if (bridge) bridge.kill();
     await new Promise((r) => server.close(r));
   });
@@ -172,9 +174,19 @@ test('two-device Rally: Mac hosts, a real iPhone joins over WiFi', { timeout: SU
       'the phone offered no reachable route');
   });
 
-  await t.test('the match starts on both devices', async () => {
-    assert.ok(await waitFor(host, `(${READ_RIGHT_FRACTION}) > 0.3`, 20000), 'Mac never left the title screen');
-    assert.ok(await waitFor(guest, `(${READ_RIGHT_FRACTION}) > 0.3`, 20000), 'phone never left the title screen');
+  await t.test('the match is live on both devices', async () => {
+    // `> 0.3` used to be the check, which a paddle resting dead centre at
+    // 0.5 satisfies without the match having started at all — it proved
+    // nothing. What it can honestly assert is that the dial exists and
+    // carries a rotation, i.e. the Rust side is rendering. That the match
+    // is really being *simulated* is proved by the input round trip below,
+    // which is the assertion that would actually fail if it were not.
+    for (const [label, cdp] of [['Mac', host], ['phone', guest]]) {
+      const frac = await waitFor(cdp, `(${READ_RIGHT_FRACTION}) !== null`, 20000);
+      assert.ok(frac, `${label}: the paddle dial never rendered`);
+      const value = await evaluate(cdp, READ_RIGHT_FRACTION);
+      assert.ok(value >= 0 && value <= 1, `${label}: dial out of range (${value})`);
+    }
   });
 
   await t.test('input on the phone moves the paddle the Mac is simulating', async () => {
