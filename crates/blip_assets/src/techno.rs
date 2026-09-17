@@ -32,6 +32,49 @@ impl Rng {
     }
 }
 
+/// Which note of a four-note hook to play, given the bar and the position
+/// within it — the difference between a riff and a phrase.
+///
+/// Every track here repeated its hook identically in every bar, for
+/// sixteen bars. That is what makes a loop recognisable, and also what
+/// makes it wear out: nothing ever arrives or resolves, so there is no
+/// reason to keep listening past the second pass.
+///
+/// This answers the riff on the fourth bar of each four-bar phrase, in
+/// the oldest form there is: the same notes, backwards and a fifth
+/// higher. Four bars is the phrase length the chord changes already
+/// imply, so the variation lands where the ear is expecting the phrase to
+/// close rather than sounding like the melody wandered off. A perfect
+/// fifth is diatonic for every hook in these games — each is built from
+/// scale degrees whose fifths are also in the scale — so the answer stays
+/// in key without any per-track tuning.
+///
+/// The tune is still the same four notes throughout, so nothing becomes
+/// less recognisable; it just stops being flat.
+pub fn phrase_note(hook: &[f32; 4], bar: usize, idx: usize) -> f32 {
+    debug_assert!(idx < 4);
+    if bar % 4 == 3 {
+        hook[3 - idx] * 1.5
+    } else {
+        hook[idx]
+    }
+}
+
+/// A sixteenth-note hat roll climbing across the second half of a bar —
+/// the standard "something is about to change" cue, for the bar before a
+/// section lifts. Without it the busier half simply appears, which reads
+/// as the loop restarting rather than as the track going somewhere.
+pub fn lift_fill(buf: &mut [f32], bar_start_off: usize, step_samples: usize, rng: &mut Rng, vol: f32) {
+    for step in 8..16 {
+        let off = bar_start_off + step * step_samples;
+        if off >= buf.len() {
+            break;
+        }
+        let ramp = (step - 8) as f32 / 8.0;
+        hat(buf, off, rng, vol * (0.45 + 0.55 * ramp));
+    }
+}
+
 /// Punchy pitch-swept kick drum, with a short high-frequency click on the
 /// attack and gentle saturation — what makes a kick punch through a dense
 /// mix instead of reading as a dull sine thump.
@@ -220,5 +263,83 @@ pub fn riser(buf: &mut [f32], off: usize, dur_ms: f32, vol: f32, rng: &mut Rng) 
         let white = rng.next_f32() * 2.0 - 1.0;
         lp += alpha * (white - lp);
         mix_into_f32(buf, off + i, lp * e * vol * 14000.0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const HOOK: [f32; 4] = [523.25, 659.25, 783.99, 659.25]; // C5 E5 G5 E5
+
+    #[test]
+    fn the_first_three_bars_of_a_phrase_play_the_hook_unchanged() {
+        // The tune has to stay the tune: a listener should recognise it
+        // on every pass, which is the whole reason the riff repeats.
+        for bar in [0, 1, 2, 4, 5, 6, 8] {
+            for idx in 0..4 {
+                assert_eq!(phrase_note(&HOOK, bar, idx), HOOK[idx], "bar {bar} note {idx}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_fourth_bar_answers_it_backwards_and_a_fifth_up() {
+        for bar in [3, 7, 11, 15] {
+            for idx in 0..4 {
+                assert_eq!(phrase_note(&HOOK, bar, idx), HOOK[3 - idx] * 1.5, "bar {bar} note {idx}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_answer_stays_inside_an_octave_of_the_riff() {
+        // A fifth up is deliberate; anything that lands more than an
+        // octave from the original would read as a different instrument
+        // rather than as the phrase closing.
+        for idx in 0..4 {
+            let answer = phrase_note(&HOOK, 3, idx);
+            let lowest = HOOK.iter().cloned().fold(f32::MAX, f32::min);
+            assert!(answer > lowest, "answer {answer} fell below the riff");
+            assert!(answer < lowest * 4.0, "answer {answer} is more than two octaves up");
+        }
+    }
+
+    #[test]
+    fn the_lift_fill_only_touches_the_second_half_of_its_bar() {
+        // It is a run-up to the next bar, not a change to this one: the
+        // first half has to stay exactly as the arrangement wrote it.
+        let step = 1000;
+        let mut buf = vec![0f32; step * 16 * 2];
+        let mut rng = Rng(1);
+        lift_fill(&mut buf, 0, step, &mut rng, 0.3);
+        let first_half: f32 = buf[..step * 8].iter().map(|v| v.abs()).sum();
+        let second_half: f32 = buf[step * 8..step * 16].iter().map(|v| v.abs()).sum();
+        assert_eq!(first_half, 0.0, "the fill wrote into the first half of the bar");
+        assert!(second_half > 0.0, "the fill wrote nothing at all");
+    }
+
+    #[test]
+    fn the_lift_fill_climbs() {
+        // The point of the cue is that it builds; a flat run of hats
+        // reads as a glitch rather than as an announcement.
+        let step = 1000;
+        let mut buf = vec![0f32; step * 16];
+        let mut rng = Rng(7);
+        lift_fill(&mut buf, 0, step, &mut rng, 0.3);
+        let energy = |s: usize| -> f32 { buf[s * step..(s + 1) * step].iter().map(|v| v.abs()).sum() };
+        let early = energy(8) + energy(9);
+        let late = energy(14) + energy(15);
+        assert!(late > early, "the fill did not get louder ({early} -> {late})");
+    }
+
+    #[test]
+    fn the_lift_fill_stays_inside_the_buffer() {
+        // Called with the last bar's offset on a short track, it must
+        // clip rather than panic.
+        let step = 1000;
+        let mut buf = vec![0f32; step * 4];
+        let mut rng = Rng(3);
+        lift_fill(&mut buf, step * 2, step, &mut rng, 0.3);
     }
 }

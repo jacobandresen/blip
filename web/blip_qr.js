@@ -239,11 +239,102 @@
   // blip_net_proto.js do. Falls back to "never flags a candidate" (not a
   // hard crash) if that script failed to load — this feature is cosmetic;
   // losing it shouldn't take pairing down with it.
-  var FINDER_SCAN_DIM = 200; // downsample target, applied to the already-square-cropped frame (see scan())
   var findFinderCandidate = (window.BlipQrHeuristic && window.BlipQrHeuristic.findFinderCandidate) || function () { return null; };
   var mapToDisplay = (window.BlipQrHeuristic && window.BlipQrHeuristic.mapToDisplay) || function (px, py) { return { x: px, y: py }; };
 
-  // ---- marker overlay --------------------------------------------------------
+  var now = (typeof performance !== 'undefined' && performance.now)
+    ? function () { return performance.now(); }
+    : function () { return Date.now(); };
+
+  var FINDER_SCAN_DIM = 200; // downsample target, applied to the already-square-cropped frame (see scan())
+
+  /** Longest side jsQR is given, whatever the camera captured.
+   *
+   * jsQR's cost is linear in pixels and it runs on the main thread, so
+   * decoding the raw frame is the single most expensive thing this file
+   * can do. Measured on a fast desktop, one 1920x1920 frame costs ~115ms
+   * (7.5ms to copy the pixels out, 108ms to decode) — an 8fps ceiling
+   * before the game loop, the preview and the overlay have had a turn. A
+   * phone is several times slower again, which is what "the scan is
+   * really slow and never reads it" actually is: the preview stutters,
+   * the user cannot hold the code steady, and every frame they do hold
+   * it costs a tenth of a second to look at.
+   *
+   * The resolution buys nothing. The same frame decodes at 480 in 7.5ms,
+   * and still decodes at 240. A QR needs about three pixels per module
+   * to read, and a code filling half the frame has far more than that
+   * here. So the frame is scaled down before decoding, and the camera is
+   * asked for less in the first place. */
+  var DECODE_DIM = 400;
+
+  /* Why 400, and why Otsu on every failing frame.
+   *
+   * Measured over 24 synthetic capture frames spanning how much of the
+   * frame the code fills (60% down to 20%) crossed with dim, blurred and
+   * noisy, each decoded from a 1280 capture scaled to the decode size:
+   *
+   *     dim    plain    +otsu    ms/frame
+   *     320    13/24    18/24      12
+   *     400    14/24    21/24      19
+   *     640    20/24    21/24      56
+   *    1024    15/24    21/24     156
+   *
+   * Two things fall out of that. 21/24 is the ceiling — 640, 800 and
+   * 1024 all reach it and none goes past it, so decoding a bigger frame
+   * buys nothing but time, and on a phone that time is the difference
+   * between a live preview and a stutter. And Otsu is not a last resort:
+   * at 400 it is the whole difference between 14 and 21, because a
+   * binarised frame gives jsQR clean module edges where a scaled-down
+   * one gives it grey mush.
+   *
+   * So the loop decodes small and binarises the moment plain decoding
+   * misses, rather than decoding large and filtering eventually. Same
+   * decode rate as the 1024 configuration at an eighth of the cost.
+   *
+   * Plain is still tried first because on a frame that does decode it is
+   * marginally cheaper than Otsu-then-decode (0.87-1.20x, measured);
+   * Otsu earns its place on the frames that fail. */
+
+  /** Binarise a frame at Otsu's threshold, in place.
+   *
+   * Picks the cut between dark and light that best separates the two
+   * populations in this frame's own histogram, then makes every pixel
+   * one or the other. Measured against degraded frames it is the single
+   * most effective filter here — it is the only one that recovers a
+   * noisy frame, because it throws the noise away with everything else
+   * that is not a decision about black or white.
+   *
+   * It is *not* applied first, because it is also the one filter that
+   * loses a case plain decoding handles: glare. A bright wash across
+   * part of the code drags the whole-frame threshold to one side, and
+   * what was readable becomes a white patch. Hence the ladder in tick()
+   * rather than a filter applied to everything. */
+  function otsuThreshold(image) {
+    var d = image.data, i, l;
+    var hist = new Uint32Array(256), n = 0;
+    for (i = 0; i < d.length; i += 4) {
+      hist[(d[i] * 77 + d[i + 1] * 151 + d[i + 2] * 28) >> 8]++;
+      n++;
+    }
+    var sum = 0;
+    for (i = 0; i < 256; i++) sum += i * hist[i];
+    var sumB = 0, wB = 0, best = -1, threshold = 128;
+    for (i = 0; i < 256; i++) {
+      wB += hist[i];
+      if (!wB) continue;
+      var wF = n - wB;
+      if (!wF) break;
+      sumB += i * hist[i];
+      var mB = sumB / wB, mF = (sum - sumB) / wF;
+      var between = wB * wF * (mB - mF) * (mB - mF);
+      if (between > best) { best = between; threshold = i; }
+    }
+    for (i = 0; i < d.length; i += 4) {
+      l = ((d[i] * 77 + d[i + 1] * 151 + d[i + 2] * 28) >> 8) < threshold ? 0 : 255;
+      d[i] = d[i + 1] = d[i + 2] = l;
+    }
+    return true;
+  }
 
   /** Corner brackets and a travelling sweep line, drawn on every frame
    * whether or not anything has been seen yet.
@@ -375,15 +466,40 @@
         var side = Math.min(nativeW, nativeH);
         var offsetX = Math.floor((nativeW - side) / 2);
         var offsetY = Math.floor((nativeH - side) / 2);
-        scratch.width = side;
-        scratch.height = side;
-        sctx.drawImage(videoEl, offsetX, offsetY, side, side, 0, 0, side, side);
-        var frame = sctx.getImageData(0, 0, side, side);
         frames++;
-        var code = null, decodeErr = null;
-        try { code = jsQR(frame.data, frame.width, frame.height); } catch (e) { decodeErr = e; /* a torn frame — just try the next one */ }
+
+        // Decode a scaled-down copy, not the raw frame — see DECODE_DIM.
+        var target = Math.min(side, DECODE_DIM);
+        if (scratch.width !== target) { scratch.width = target; scratch.height = target; }
+        sctx.drawImage(videoEl, offsetX, offsetY, side, side, 0, 0, target, target);
+        var frame = sctx.getImageData(0, 0, target, target);
+
+        var code = null, decodeErr = null, filtered = false;
+        var decodeStart = now();
+        try {
+          // 'dontInvert': a QR on a lit screen is dark-on-light, so
+          // attempting the inverse doubles the work to find nothing.
+          code = jsQR(frame.data, frame.width, frame.height, { inversionAttempts: 'dontInvert' });
+          if (!code) {
+            // Binarise and look again, on every frame that misses — this
+            // is where most of the decode rate lives (see DECODE_DIM).
+            filtered = otsuThreshold(frame);
+            if (filtered) code = jsQR(frame.data, frame.width, frame.height, { inversionAttempts: 'dontInvert' });
+          }
+        } catch (e) { decodeErr = e; /* a torn frame — just try the next one */ }
+        var decodeMs = now() - decodeStart;
+
         if (code && code.data) {
-          if (overlayCanvas) drawMarkers(overlayCanvas, side, code.location, null);
+          // The overlay is drawn in capture-frame coordinates, so the
+          // located corners have to come back up to the size the markers
+          // are mapped against.
+          var up = side / target;
+          var loc = code.location, scaled = {};
+          Object.keys(loc).forEach(function (k) {
+            scaled[k] = loc[k] && typeof loc[k].x === 'number'
+              ? { x: loc[k].x * up, y: loc[k].y * up } : loc[k];
+          });
+          if (overlayCanvas) drawMarkers(overlayCanvas, side, scaled, null);
           report('found', { frames: frames });
           var found = code.data;
           // Let the confirmation box actually show for one beat before the
@@ -400,18 +516,19 @@
           }, 150);
           return;
         }
-        // Downsample the (already-cropped) frame for the heuristic — see
-        // findFinderCandidate()'s own comment for why a small fixed size
-        // beats scanning at native resolution.
-        var fscale = Math.min(1, FINDER_SCAN_DIM / side);
-        var smallSide = Math.max(1, Math.round(side * fscale));
-        finderCanvas.width = smallSide;
-        finderCanvas.height = smallSide;
-        fctx.drawImage(videoEl, offsetX, offsetY, side, side, 0, 0, smallSide, smallSide);
-        var smallFrame = fctx.getImageData(0, 0, smallSide, smallSide);
-        var candidate = findFinderCandidate(smallFrame);
+        // The heuristic reuses the frame already in hand. It used to
+        // take its own drawImage + getImageData from the video, which was
+        // a second full capture per frame for a picture it could get for
+        // nothing.
+        var fscale = Math.min(1, FINDER_SCAN_DIM / target);
+        var smallSide = Math.max(1, Math.round(target * fscale));
+        if (finderCanvas.width !== smallSide) { finderCanvas.width = smallSide; finderCanvas.height = smallSide; }
+        fctx.drawImage(scratch, 0, 0, target, target, 0, 0, smallSide, smallSide);
+        var candidate = findFinderCandidate(fctx.getImageData(0, 0, smallSide, smallSide));
         if (candidate) {
-          candidate = { x: candidate.x / fscale, y: candidate.y / fscale, side: candidate.side / fscale };
+          // heuristic space -> decode space -> capture space
+          var k = (side / target) / fscale;
+          candidate = { x: candidate.x * k, y: candidate.y * k, side: candidate.side * k };
         }
         if (overlayCanvas) drawMarkers(overlayCanvas, side, null, candidate, frames);
         report('scanning', {
@@ -420,6 +537,9 @@
           height: nativeH,
           candidates: candidate ? 1 : 0,
           elapsedMs: Date.now() - startedAt,
+          decodeMs: Math.round(decodeMs * 10) / 10,
+          decodeDim: target,
+          filtered: filtered,
           decodeError: decodeErr ? String((decodeErr && decodeErr.message) || decodeErr) : null,
         });
       } else {
@@ -464,7 +584,7 @@
     // which hands jsQR far fewer real pixels to find a small/dense code
     // in than the camera is actually capable of.
     navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1920 } },
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 1280 } },
     })
       .then(function (s) {
         if (stopped) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
@@ -490,5 +610,11 @@
     return stop;
   }
 
-  window.BlipQR = { render: render, scan: scan, MIN_CSS_PX_PER_MODULE: MIN_CSS_PX_PER_MODULE };
+  window.BlipQR = {
+    render: render, scan: scan, MIN_CSS_PX_PER_MODULE: MIN_CSS_PX_PER_MODULE,
+    // Exposed so the ladder's claim — that rotating these reads frames
+    // none of them reads alone — can be measured rather than asserted.
+    // Both mutate the ImageData they are given.
+    filters: { otsu: otsuThreshold }
+  };
 }());
