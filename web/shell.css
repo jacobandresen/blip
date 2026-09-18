@@ -600,6 +600,19 @@ canvas {
 }
 .blip-hs-panel::-webkit-scrollbar { display: none; } /* Chrome/Safari/Edge */
 .blip-hs-panel.wide { width: min(94vw, 380px); }
+
+/* While a code is on screen it is the only thing that matters, so the
+   panel stops being a tidy 340px card and becomes as big as the screen
+   allows. A QR is scanned by another phone's camera from a hand's
+   distance: every extra pixel of code is more pixels per module for that
+   camera to resolve, which is the difference between reading it at a
+   glance and hunting for the angle that works. Square-ish, because the
+   code is square and height is what usually runs out first. */
+.blip-hs-panel.showing-code {
+  width: min(96vw, 96vh);
+  max-width: min(96vw, 96vh);
+  padding: 10px 10px 8px;
+}
 .blip-hs-title {
   font-size: 13px;
   letter-spacing: 2px;

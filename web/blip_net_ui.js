@@ -24,6 +24,11 @@
 
   function clear(node) {
     while (node.firstChild) node.removeChild(node.firstChild);
+    // Clearing a body is exactly when its screen changes, so this is the
+    // one place the grown-for-a-code panel has to shrink back. Doing it
+    // at each caller would mean remembering it at every future one.
+    var panel = node && node.closest ? node.closest('.blip-hs-panel') : null;
+    if (panel) panel.classList.remove('showing-code');
   }
 
   function signalKind(state) {
@@ -325,8 +330,14 @@
     //
     // Capped so a very wide panel does not produce a needlessly huge
     // code; beyond this, extra size buys no scanning reliability.
-    var byHeight = window.innerHeight - 160;
-    return Math.max(120, Math.min(Math.floor(avail), Math.floor(byHeight), 420));
+    // Room for the panel's other contents (title, status line, buttons).
+    var byHeight = window.innerHeight - 150;
+    // The cap is generous now rather than tidy: a code is scanned from a
+    // hand's distance by another phone's camera, so its size on glass is
+    // the single biggest thing deciding whether that camera reads it
+    // quickly. Beyond ~900px the returns really do stop, and the module
+    // grid stays whole-pixel either way (see render()).
+    return Math.max(120, Math.min(Math.floor(avail), Math.floor(byHeight), 900));
   }
 
   function qrCanvas(parent) {
@@ -403,8 +414,17 @@
       });
   }
 
+  /** Grow the panel around a code, and shrink it again afterwards. */
+  function showingCode(canvas, on) {
+    var panel = canvas && canvas.closest ? canvas.closest('.blip-hs-panel') : null;
+    if (!panel) return;
+    if (on) panel.classList.add('showing-code');
+    else panel.classList.remove('showing-code');
+  }
+
   function renderCode(canvas, text, status) {
     try {
+      showingCode(canvas, true);
       var info = window.BlipQR.render(canvas, text, { fitCssPx: canvas.blipFitCssPx || codeBoxWidth(canvas) });
       // Said out loud rather than left to the player to deduce from a
       // scan that never lands. At this size the other phone's camera
