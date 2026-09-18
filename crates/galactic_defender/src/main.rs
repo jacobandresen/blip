@@ -637,6 +637,26 @@ fn update_title(g: &mut Game) {
     if btn1_pressed() { g.start_game(); }
 }
 
+/// The colour that identifies an alien kind, and therefore what it scores.
+///
+/// The title screen has always drawn the three kinds in magenta, cyan and
+/// green — it is how the player is taught which is which, and the row
+/// order on that screen is the scoring order: 30, 20, 10. In play every
+/// alien was then drawn white, so the code the title screen teaches was
+/// never honoured where it mattered, and the three kinds were told apart
+/// only by silhouette: a handful of pixels different, at this size, in a
+/// dense grid, while they are moving.
+///
+/// Same colours, same order, so the title screen is now a legend for the
+/// game rather than a separate picture.
+fn alien_color(kind: usize) -> BlipColor {
+    match kind {
+        0 => BLIP_MAGENTA, // squid   — 30 points
+        1 => BLIP_CYAN,    // crab    — 20 points
+        _ => BLIP_GREEN,   // octopus — 10 points
+    }
+}
+
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.respawn_grace.tick(dt);
     // Hold to fire, the way the real cabinet's button worked — a new shot
@@ -927,7 +947,7 @@ fn draw_play(blip: &Blip, g: &Game,
         if !a.alive { continue; }
         blip.draw_texture_tinted(
             &alien[a.kind][a.anim as usize],
-            a.x, a.y, ALIEN_W as f32, ALIEN_H as f32, BLIP_WHITE,
+            a.x, a.y, ALIEN_W as f32, ALIEN_H as f32, alien_color(a.kind),
         );
     }
 
@@ -1008,9 +1028,9 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
     let row1 = (WIN_H / 2 - 20) as f32;
     let row2 = (WIN_H / 2) as f32;
 
-    blip.draw_texture_tinted(&alien[0][0], ax, row0 + voff, dw, dh, BLIP_MAGENTA);
-    blip.draw_texture_tinted(&alien[1][0], ax, row1 + voff, dw, dh, BLIP_CYAN);
-    blip.draw_texture_tinted(&alien[2][0], ax, row2 + voff, dw, dh, BLIP_GREEN);
+    blip.draw_texture_tinted(&alien[0][0], ax, row0 + voff, dw, dh, alien_color(0));
+    blip.draw_texture_tinted(&alien[1][0], ax, row1 + voff, dw, dh, alien_color(1));
+    blip.draw_texture_tinted(&alien[2][0], ax, row2 + voff, dw, dh, alien_color(2));
 
     blip.draw_centered("30 PTS",        row0,                 2.0, BLIP_MAGENTA);
     blip.draw_centered("20 PTS",        row1,                 2.0, BLIP_CYAN);
