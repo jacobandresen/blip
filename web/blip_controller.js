@@ -387,7 +387,11 @@
     if (!dialEl) return;
     opts2 = opts2 || {};
     var dead = opts2.dead != null ? opts2.dead : 0.018;
+    // How long a direction keeps being held after the finger stops
+    // moving. See the accumulator in pointermove for why this exists.
+    var IDLE_RELEASE_MS = opts2.idleMs != null ? opts2.idleMs : 70;
     var last = null, pid = null, total = 0, upHeld = false, downHeld = false;
+    var acc = 0, idleTimer = null;
 
     function angleAt(x, y) {
       var r = dialEl.getBoundingClientRect();
@@ -397,7 +401,8 @@
       if (u !== upHeld)   { upHeld = u;   if (u) click('dpad'); emitKey(opts2.up,   u ? 'keydown' : 'keyup'); }
       if (d !== downHeld) { downHeld = d; if (d) click('dpad'); emitKey(opts2.down, d ? 'keydown' : 'keyup'); }
     }
-    function stop() { dir(false, false); dialEl.classList.remove('active'); last = null; pid = null; }
+    function clearIdle() { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } }
+    function stop() { clearIdle(); dir(false, false); dialEl.classList.remove('active'); last = null; pid = null; acc = 0; }
 
     dialEl.addEventListener('pointerdown', function (e) {
       e.preventDefault();
@@ -418,9 +423,26 @@
       if (d < -Math.PI) d += 2 * Math.PI;
       last = a;
       total += Math.abs(d);
-      if      (d >  dead) dir(false, true);
-      else if (d < -dead) dir(true, false);
-      else                dir(false, false);
+
+      // Rotation is *accumulated* rather than thresholded per event.
+      //
+      // Testing each event's own delta against the dead zone threw away
+      // every rotation slower than one dead zone per pointermove — which
+      // is precisely the careful, deliberate turn a player makes when
+      // lining the paddle up, so fine adjustment did nothing at all while
+      // a fast flick worked. Worse, one small delta mid-turn released the
+      // key, so even a steady turn stuttered.
+      //
+      // Accumulating means a slow turn still crosses the threshold, just
+      // later; the direction is then held until the finger actually stops
+      // (IDLE_RELEASE_MS) or reverses. Fast turns are unchanged, because
+      // they cross the threshold on the first event as they always did.
+      acc += d;
+      if (acc > dead) { acc = 0; dir(false, true); }
+      else if (acc < -dead) { acc = 0; dir(true, false); }
+
+      clearIdle();
+      idleTimer = setTimeout(function () { idleTimer = null; acc = 0; dir(false, false); }, IDLE_RELEASE_MS);
     });
     function end(e) {
       if (e.type !== 'pointercancel' && e.pointerId !== pid) return;

@@ -40,6 +40,9 @@ impl Rng {
 /// makes it wear out: nothing ever arrives or resolves, so there is no
 /// reason to keep listening past the second pass.
 ///
+/// Works for a hook of any length — these games run three, four and
+/// eight note riffs.
+///
 /// This answers the riff on the fourth bar of each four-bar phrase, in
 /// the oldest form there is: the same notes, backwards and a fifth
 /// higher. Four bars is the phrase length the chord changes already
@@ -51,10 +54,10 @@ impl Rng {
 ///
 /// The tune is still the same four notes throughout, so nothing becomes
 /// less recognisable; it just stops being flat.
-pub fn phrase_note(hook: &[f32; 4], bar: usize, idx: usize) -> f32 {
-    debug_assert!(idx < 4);
+pub fn phrase_note(hook: &[f32], bar: usize, idx: usize) -> f32 {
+    debug_assert!(idx < hook.len());
     if bar % 4 == 3 {
-        hook[3 - idx] * 1.5
+        hook[hook.len() - 1 - idx] * 1.5
     } else {
         hook[idx]
     }

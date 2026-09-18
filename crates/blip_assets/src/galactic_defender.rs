@@ -6,7 +6,7 @@ use std::f32::consts::PI;
 
 use crate::image::Image;
 use crate::techno::{
-    bass_note, clap, hat, kick, lead_stab, open_hat, sidechain_duck, supersaw, Rng, MIX_KNEE,
+    bass_note, clap, hat, kick, lead_stab, open_hat, phrase_note, sidechain_duck, supersaw, Rng, MIX_KNEE,
 };
 use crate::wav::{encode_pcm16_mono, mix_into, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
@@ -472,9 +472,9 @@ fn music() -> Vec<u8> {
             bass_note(&mut buf, off, root, step_ms * 0.7, 0.58);
         }
         if pos % 4 == 0 {
-            supersaw(&mut buf, off, HOOK[pos / 4], step_ms * 3.5, 0.22, 8.0, 0.008);
+            supersaw(&mut buf, off, phrase_note(&HOOK, bar, pos / 4), step_ms * 3.5, 0.22, 8.0, 0.008);
             if lifted {
-                supersaw(&mut buf, off, HOOK[pos / 4] * 2.0, step_ms * 3.5, 0.11, 8.0, 0.008);
+                supersaw(&mut buf, off, phrase_note(&HOOK, bar, pos / 4) * 2.0, step_ms * 3.5, 0.11, 8.0, 0.008);
             }
         }
     }
@@ -540,9 +540,9 @@ fn music2() -> Vec<u8> {
             bass_note(&mut buf, off, root, step_ms * 0.6, 0.62);
         }
         if pos % 2 == 0 {
-            supersaw(&mut buf, off, HOOK[pos / 2], step_ms * 1.7, 0.20, 5.0, 0.009);
+            supersaw(&mut buf, off, phrase_note(&HOOK, bar, pos / 2), step_ms * 1.7, 0.20, 5.0, 0.009);
             if lifted {
-                supersaw(&mut buf, off, HOOK[pos / 2] * 2.0, step_ms * 1.7, 0.10, 5.0, 0.009);
+                supersaw(&mut buf, off, phrase_note(&HOOK, bar, pos / 2) * 2.0, step_ms * 1.7, 0.10, 5.0, 0.009);
             }
         }
     }

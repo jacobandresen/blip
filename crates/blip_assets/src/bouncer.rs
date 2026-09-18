@@ -6,7 +6,7 @@ use std::f32::consts::PI;
 
 use crate::image::Image;
 use crate::techno::{
-    bass_note, clap, hat, kick, lead_stab, open_hat, riser, sidechain_duck, supersaw, Rng,
+    bass_note, clap, hat, kick, lead_stab, open_hat, phrase_note, riser, sidechain_duck, supersaw, Rng,
     MIX_KNEE,
 };
 use crate::wav::{encode_pcm16_mono, env, mix_into_f32, soft_limit_to_pcm16, SAMPLE_RATE};
@@ -388,7 +388,7 @@ fn music4() -> Vec<u8> {
         // bar during the lift, for extra energy).
         if bar % 2 == 0 || in_lift {
             if pos == 8 || pos == 9 || pos == 10 || pos == 11 {
-                let note = HOOK[(pos - 8) as usize];
+                let note = phrase_note(&HOOK, bar, (pos - 8) as usize);
                 supersaw(&mut buf, off, note, step_ms * 1.4, 0.15, 8.0, 0.01);
             }
         }
