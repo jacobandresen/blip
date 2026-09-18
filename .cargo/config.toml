@@ -1,0 +1,15 @@
+# macroquad's browser bindings are supplied by JavaScript, not by the linker.
+#
+# canvas_width, console_log, audio_init, glBindVertexArray and the rest are
+# implemented in web/mq_js_bundle.js and bound when the module is
+# instantiated. To wasm-ld they are simply undefined symbols.
+#
+# Rust used to pass --allow-undefined for wasm32-unknown-unknown and
+# stopped, so these now fail the link with "undefined symbol: canvas_width"
+# and a wall of GL names. --import-undefined restores the behaviour these
+# bindings need: undefined *function* symbols become WebAssembly imports,
+# which is exactly what the JS runtime then satisfies.
+#
+# See: https://blog.rust-lang.org/2026/04/04/changes-to-webassembly-targets-and-handling-undefined-symbols/
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=--import-undefined"]
