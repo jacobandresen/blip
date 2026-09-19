@@ -554,12 +554,17 @@ window.addEventListener('keydown', function (e) {
   (function () {
     var host = document.getElementById('fire-buttons');
     if (!host) return;
-    var names = ['button1', buttonSpecs[1] ? 'button2' : 'button1'];
-    names.forEach(function (n) {
+    // One cap per button the game declares — two for most of them, four
+    // for a fighting game that wants a kick per height. A game that
+    // declares none still gets the single primary cap.
+    var specs = buttonSpecs.length ? buttonSpecs : [primary];
+    specs.forEach(function (spec, i) {
       var btn = document.createElement('div');
       btn.className = 'arcade-btn';
-      btn.setAttribute('data-blip', n);
-      btn.innerHTML = '<span class="arcade-btn-cap"></span>';
+      btn.setAttribute('data-blip', 'button' + (i + 1));
+      if (spec.label) btn.setAttribute('aria-label', spec.label);
+      btn.innerHTML = '<span class="arcade-btn-cap"></span>'
+        + (spec.label ? '<span class="arcade-btn-label">' + spec.label + '</span>' : '');
       host.appendChild(btn);
     });
     BlipController.bindButtons(host);

@@ -45,6 +45,10 @@
   };
 
   var keymap = null;              // logical name -> { key, code }
+  var ARROW_NAME = {
+    ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
+    ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right'
+  };
   var held   = {};                // logical name -> bool
   var roots  = [];                // containers holding [data-blip] elements, for visual reflect
 
@@ -53,16 +57,35 @@
   /* ------------------------------------------------------------------ */
 
   function buildKeymap(buttons) {
-    var b0 = (buttons && buttons[0]) || { key: ' ', code: 'Space' };
-    var b1 = (buttons && buttons[1]) || b0;
-    return {
+    var list = (buttons && buttons.length) ? buttons : [{ key: ' ', code: 'Space' }];
+    var map = {
       up:      { key: 'ArrowUp',    code: 'ArrowUp' },
       down:    { key: 'ArrowDown',  code: 'ArrowDown' },
       left:    { key: 'ArrowLeft',  code: 'ArrowLeft' },
-      right:   { key: 'ArrowRight', code: 'ArrowRight' },
-      button1: { key: b0.key, code: b0.code },
-      button2: { key: b1.key, code: b1.code }
+      right:   { key: 'ArrowRight', code: 'ArrowRight' }
     };
+    // One logical name per button the game declares, however many that
+    // is. Two was enough until a fighting game wanted a kick per height;
+    // nothing below cares how long the list is.
+    for (var i = 0; i < list.length; i++) {
+      map['button' + (i + 1)] = { key: list[i].key, code: list[i].code };
+    }
+    // A one-button game still answers to button2, because the SNES pad
+    // folds Y / X / L / R onto it whatever the game asked for.
+    if (!map.button2) map.button2 = map.button1;
+    return map;
+  }
+
+  /* Which logical name a physical key code belongs to. The arrows are
+     fixed; the action keys are whatever this game declared, so the
+     deck lights the right cap when a keyboard player presses one. */
+  function nameForCode(code) {
+    if (ARROW_NAME[code]) return ARROW_NAME[code];
+    if (!keymap) return null;
+    for (var n in keymap) {
+      if (n.indexOf('button') === 0 && keymap[n] && keymap[n].code === code) return n;
+    }
+    return null;
   }
 
   function injectKey(spec, type) {
@@ -460,32 +483,25 @@
   // the game (macroquad reads it straight); this just leans the on-screen
   // stick / lights the on-screen pad so the deck doubles as an input
   // read-out for a keyboard player.
-  var KEY_NAME = {
-    ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
-    ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
-    Space: 'button1', KeyZ: 'button2'
-  };
   function bindKeyboard() {
     document.addEventListener('keydown', function (e) {
-      var n = KEY_NAME[e.code]; if (n) set(n, true, { silent: true });
+      var n = nameForCode(e.code); if (n) set(n, true, { silent: true });
     });
     document.addEventListener('keyup', function (e) {
-      var n = KEY_NAME[e.code]; if (n) set(n, false, { silent: true });
+      var n = nameForCode(e.code); if (n) set(n, false, { silent: true });
     });
   }
 
   // Physical gamepad — kiosk.js's pollGamepad() reports logical codes
   // (ArrowUp… / Space / KeyZ / Start / Select); fold them onto our names
   // and drive the game for real (not silent).
-  var GP_NAME = {
-    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
-    Space: 'button1', KeyZ: 'button2', Start: 'start', Select: 'select'
-  };
+  var GP_EXTRA = { Start: 'start', Select: 'select' };
   function bindGamepad(poll) {
     if (typeof poll !== 'function') return;
+    function name(code) { return GP_EXTRA[code] || nameForCode(code); }
     poll(
-      function (code) { var n = GP_NAME[code]; if (n) set(n, true); },
-      function (code) { var n = GP_NAME[code]; if (n) set(n, false); }
+      function (code) { var n = name(code); if (n) set(n, true); },
+      function (code) { var n = name(code); if (n) set(n, false); }
     );
   }
 

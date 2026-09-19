@@ -18,6 +18,11 @@ pub const BLIP_KEY_D:       KeyCode = KeyCode::D;
 // Action buttons
 pub const BLIP_KEY_SPACE:   KeyCode = KeyCode::Space;  // primary fire / jump / confirm
 pub const BLIP_KEY_BUTTON2: KeyCode = KeyCode::Z;       // secondary action
+// Two more action keys, for the rare game that needs a row of them —
+// brawler puts a kick height on each. Z, X, C sit in a row on the
+// keyboard the way a cabinet's kick buttons sit in a row on the deck.
+pub const BLIP_KEY_X:       KeyCode = KeyCode::X;
+pub const BLIP_KEY_C:       KeyCode = KeyCode::C;
 
 /// Primary fire / jump / confirm — true only on the frame the key goes down.
 #[inline]

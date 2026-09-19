@@ -15,6 +15,17 @@ pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
 }
 
 /// Random integer in the inclusive range `[lo, hi]`.
+/// Seed the random number generator.
+///
+/// Exposed for tests. The generator behind `rand_int` is global and
+/// shared, so a simulation test that does not seed it is not measuring
+/// what it thinks it is: its result depends on how much randomness the
+/// tests running beside it happened to draw first, and it passes or
+/// fails by coincidence.
+pub fn rand_seed(seed: u64) {
+    rand::srand(seed);
+}
+
 pub fn rand_int(lo: i32, hi: i32) -> i32 {
     if hi <= lo {
         return lo;

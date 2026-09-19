@@ -1016,6 +1016,47 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     radial-gradient(circle at 50% 44%, #fffdf6 0%, #e7ddc6 46%, #b6ab90 80%, #8b8270 100%);
 }
 
+/* Three or more caps means a fighting deck: red for the punch and a
+   blue row for the kicks, which is the colour split every Street
+   Fighter cabinet used. They darken left to right, so the row reads as
+   an order — low, mid, high — before the legends are read at all. */
+.arcade-btn:nth-child(n+3) ~ .arcade-btn:nth-child(2) .arcade-btn-cap,
+.arcade-btn:nth-child(2):not(:last-child) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #7fc4ff 0%, #2f86d8 44%, #14508c 78%, #0a2e52 100%);
+}
+.arcade-btn:nth-child(3) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #5aa8ef 0%, #1f6bbd 44%, #0e3d72 78%, #072342 100%);
+}
+.arcade-btn:nth-child(4) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #3d8cd6 0%, #14539c 44%, #092c57 78%, #04182f 100%);
+}
+
+/* The legend under each cap. A four-button deck is only easy to use if
+   the deck says what the buttons do without the player leaving the
+   fight to find out. */
+.arcade-btn-label {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  margin-top: 3px;
+  font: 700 8px/1 'Courier New', monospace;
+  letter-spacing: 0.06em;
+  color: rgba(226, 232, 240, 0.72);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 /* Pressed: the button flattens toward the deck and the cap dishes in. */
 .arcade-btn.active {
   box-shadow:

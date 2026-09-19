@@ -29,7 +29,7 @@ pub use color::{
     NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
 };
 pub use ctx::{window_conf, Blip};
-pub use math::{clamp, lerp, rand_int, rects_overlap};
+pub use math::{clamp, lerp, rand_int, rects_overlap, rand_seed};
 pub use pool::{pool_iter, pool_iter_mut, pool_spawn, Pooled};
 pub use session::{LifeResult, Session};
 pub use timer::Timer;
