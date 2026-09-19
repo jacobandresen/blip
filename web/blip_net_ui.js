@@ -24,9 +24,23 @@
 
   function clear(node) {
     while (node.firstChild) node.removeChild(node.firstChild);
-    // Clearing a body is exactly when its screen changes, so this is the
-    // one place the grown-for-a-code panel has to shrink back. Doing it
-    // at each caller would mean remembering it at every future one.
+  }
+
+  /** Clear a container *and* give up the panel's grown-for-a-code size.
+   *
+   * Only for the handful of places that replace one screen of the modal
+   * with another. This used to live in clear() itself, on the reasoning
+   * that clearing a body is exactly when its screen changes — but the
+   * ICE list re-renders through clear() too, every 700ms, and it is not
+   * a screen change. Its first tick therefore snapped the panel back to
+   * 340px while a 671px code was still on it, and the code was cropped
+   * to the panel from that moment on: the player saw a QR with its right
+   * edge and one finder pattern sliced off, which no camera can read.
+   *
+   * So the shrink is named and called deliberately, and clear() went
+   * back to being what it says it is. */
+  function clearScreen(node) {
+    clear(node);
     var panel = node && node.closest ? node.closest('.blip-hs-panel') : null;
     if (panel) panel.classList.remove('showing-code');
   }
@@ -143,13 +157,32 @@
     return 'idle'; // waiting / frozen — queued, not yet tried
   }
 
-  function renderIceList(container, stats) {
+  /** The list before ICE has anything to report.
+   *
+   * Not an empty box, and above all not `display: none`: the list sits
+   * under the code, and a box that appears when the first candidate
+   * arrives is 60px of new content pushing the panel taller a second
+   * after the code was sized to it. The code then either loses its
+   * bottom or has to be redrawn while a camera is pointed at it. So the
+   * space is held from the start, and held by something worth reading —
+   * this is also the only screen that says the connection is being
+   * attempted at all while ICE is still gathering. */
+  function iceListPlaceholder(container) {
     clear(container);
+    // Named for the network, not for "looking" — the scan screen's own
+    // status line already says "Looking for a code…", and on the host
+    // both are on screen at the same time. Two lines a second apart
+    // saying the same word about different things is a puzzle the player
+    // does not need.
+    el('div', 'blip-ice-empty', container).textContent = 'Checking network routes…';
+  }
+
+  function renderIceList(container, stats) {
     if (!stats || !stats.pairs || !stats.pairs.length) {
-      container.style.display = 'none';
+      iceListPlaceholder(container);
       return;
     }
-    container.style.display = 'block';
+    clear(container);
     // One row per remote address, not per pair. A device with two local
     // interfaces produces a pair per interface against the same remote,
     // which renders as the same address listed twice — indistinguishable
@@ -177,7 +210,7 @@
   function startIceWatch(body) {
     stopIceWatch();
     var container = el('div', 'blip-ice-list', body);
-    container.style.display = 'none';
+    iceListPlaceholder(container);
     iceWatch = setInterval(function () {
       if (!window.BlipNet || typeof window.BlipNet.iceStats !== 'function') return;
       window.BlipNet.iceStats().then(function (stats) {
@@ -279,7 +312,7 @@
   }
 
   function showChoice(body) {
-    clear(body);
+    clearScreen(body);
     var row = el('div', 'blip-hs-row', body);
 
     var host = el('button', 'blip-hs-btn', row);
@@ -299,45 +332,36 @@
     return Math.max(140, Math.round(Math.min(preferred, byHeight, byWidth)));
   }
 
-  /** The width a QR code actually has to work with, as a hard limit.
+  /** The box a QR code gets to fill — the first guess at it.
    *
-   * Distinct from codeAreaSize()'s preferred size because the QR can
-   * only grow in whole modules: a 145-module code in a 280px box has to
-   * choose between 145px and 290px, and the difference between those two
-   * is the difference between unscannable and comfortable. Measuring the
-   * panel the code actually sits in, rather than assuming 280, is what
-   * lets it take the second option whenever the room is really there.
+   * Measured from the panel rather than assumed, because the code can
+   * only grow in whole modules: a 57-module code in a 280px box has to
+   * choose between 228px and 285px, and that is the difference between
+   * hunting for the angle that works and reading it at a glance.
    *
-   * Falls back to the preferred size when the element has not been laid
+   * Only the width here is exact. The height is a budget — the panel's
+   * other contents do not exist yet when this is called — and a budget
+   * is a guess, so shrinkToFit() measures the real layout afterwards and
+   * takes back whatever this gave away too generously. Being a little
+   * too large here is therefore cheap; being too small is not, because
+   * nothing grows the code again.
+   *
+   * Falls back to a viewport fraction when the element has not been laid
    * out yet (clientWidth 0), which is the safe direction to be wrong in. */
   function codeBoxWidth(canvas) {
     var parent = canvas.parentNode;
     var avail = parent && parent.clientWidth ? parent.clientWidth : 0;
     if (!avail) return codeAreaSize(280);
-    // Bounded by height as well as width, because the panel scrolls
-    // (.blip-hs-panel has overflow-y: auto) and a scrolled code is not a
-    // smaller code — it is a *clipped* one. A camera has to see the
-    // whole symbol at once, finder patterns and quiet zone included, so
-    // a code whose bottom is below the fold cannot be scanned at all,
-    // however large the visible part is. That is strictly worse than
-    // shrinking it.
-    //
-    // The height budget leaves room for the panel's other contents (the
-    // title, the status line, the SCAN button). Where what is left is
-    // too small to scan, the code is still drawn and the player is told
-    // — see renderCode() — which is the honest outcome on a screen that
-    // genuinely cannot show one.
-    //
-    // Capped so a very wide panel does not produce a needlessly huge
-    // code; beyond this, extra size buys no scanning reliability.
-    // Room for the panel's other contents (title, status line, buttons).
+    // Room for the title, the status line, the route list and the
+    // buttons. Where what is left is too small to scan, the code is
+    // still drawn and the player is told — see drawCode() — which is
+    // the honest outcome on a screen that genuinely cannot show one.
     var byHeight = window.innerHeight - 150;
-    // The cap is generous now rather than tidy: a code is scanned from a
+    // The cap is generous rather than tidy: a code is scanned from a
     // hand's distance by another phone's camera, so its size on glass is
-    // the single biggest thing deciding whether that camera reads it
-    // quickly. Beyond ~900px the returns really do stop, and the module
-    // grid stays whole-pixel either way (see render()).
-    return Math.max(120, Math.min(Math.floor(avail), Math.floor(byHeight), 900));
+    // the single biggest thing deciding whether that camera reads it.
+    // Beyond ~900px the returns really do stop.
+    return Math.max(MIN_CODE_PX, Math.min(Math.floor(avail), Math.floor(byHeight), 900));
   }
 
   function qrCanvas(parent) {
@@ -414,31 +438,140 @@
       });
   }
 
-  /** Grow the panel around a code, and shrink it again afterwards. */
-  function showingCode(canvas, on) {
+  var TOO_SMALL_TEXT = 'This code is too small to scan reliably — make the window taller, ' +
+    'or show it on a larger screen.';
+
+  /** The smallest box a code is ever asked to fit.
+   *
+   * Well below scannable, and deliberately: this is not a size anything
+   * aims for, it is the point at which shrinking is called off. A code
+   * this small is already being labelled unscannable, and making it
+   * smaller still would only take away the one thing left — something
+   * for the player to point a camera at while they make the window
+   * bigger. */
+  var MIN_CODE_PX = 120;
+
+  /** Re-render smaller until the panel stops scrolling.
+   *
+   * The height a code may take was a guess — viewport minus a constant
+   * for the title, status line and buttons. Guesses about other people's
+   * content are wrong by exactly the amount that matters: the panel
+   * overflowed by 55-115px at every desktop size, so it scrolled, and
+   * what fell below the fold was the SCAN ANSWER button the host has to
+   * press to finish pairing. Scroll the panel at all and half the code
+   * goes out of view with it.
+   *
+   * Measuring is exact where arithmetic was not: render, ask the panel
+   * whether it now overflows, and if it does give the code that much
+   * less and render again. Two passes are enough in practice — the code
+   * snaps to whole modules, so each pass removes at least one module row
+   * — and the loop is bounded regardless.
+   */
+  function shrinkToFit(canvas, text, info) {
+    var panel = canvas.closest ? canvas.closest('.blip-hs-panel') : null;
+    if (!panel || !info) return info;
+    for (var pass = 0; pass < 3; pass++) {
+      var overflow = panel.scrollHeight - panel.clientHeight;
+      if (overflow <= 0) break;
+      // Shrinking stops at the point it stops buying anything. Below the
+      // scannable threshold the code cannot be read at any size, so
+      // trading more of it away does not make the screen work — it just
+      // makes the useless code smaller, and on a window short enough to
+      // reach here the panel still overflows afterwards. Leave it as
+      // large as it was, keep the "too small to scan" line up, and let
+      // the panel scroll to its CLOSE button.
+      if (!info.scannable) break;
+      // At least one module smaller, whatever the overflow. The code
+      // snaps to a whole number of pixels per module, so asking for
+      // "3px less" usually lands on the same cell size and renders the
+      // identical code — the loop then spends its passes discovering
+      // that nothing changed, and the panel is still 3px too tall. One
+      // module is the smallest step that is guaranteed to be a step.
+      var perModule = Math.max(1, info.cssPxPerModule);
+      var next = Math.max(MIN_CODE_PX, Math.floor(Math.min(info.cssPx - overflow, info.cssPx - perModule)));
+      if (next >= info.cssPx) break; // already at the floor
+      info = window.BlipQR.render(canvas, text, { fitCssPx: next });
+    }
+    return info;
+  }
+
+  /** Grow the panel around a code. Giving the size back again is
+   * clearScreen()'s job, at the one moment it can be right: when this
+   * screen is replaced by another. */
+  function growPanelForCode(canvas) {
     var panel = canvas && canvas.closest ? canvas.closest('.blip-hs-panel') : null;
-    if (!panel) return;
-    if (on) panel.classList.add('showing-code');
-    else panel.classList.remove('showing-code');
+    if (panel) panel.classList.add('showing-code');
+  }
+
+  /** Draw `text` into `canvas`, sized to the panel it sits in.
+   *
+   * The one place a code is drawn. renderCode() wraps it for the first
+   * draw of a new payload (where a failure means the pairing cannot go
+   * on) and redrawCode() for putting a code back that was already on
+   * screen (where it can). */
+  function drawCode(canvas, text) {
+    // Which payload this canvas is currently showing. The deferred refit
+    // below reads it back and stands down if a newer code has since been
+    // drawn — otherwise it could re-render the canvas with the *previous*
+    // payload, replacing the new code with the old one at whatever moment
+    // the panel happened to settle.
+    canvas.blipCodeText = text;
+    growPanelForCode(canvas);
+    var info = window.BlipQR.render(canvas, text, { fitCssPx: canvas.blipFitCssPx || codeBoxWidth(canvas) });
+    info = shrinkToFit(canvas, text, info);
+    // Said out loud rather than left to the player to deduce from a scan
+    // that never lands. At this size the other phone's camera cannot
+    // resolve the modules, and every other part of the UI would look
+    // like it was working.
+    codeWarning(canvas, info.scannable ? '' : TOO_SMALL_TEXT);
+
+    // One correction, once, after the caller has finished building the
+    // screen — the code is drawn before the status line and the SCAN
+    // button exist, so the panel cannot yet know how tall it will be.
+    // Two frames is after layout has settled for the whole screen. It
+    // earns its keep: without it three of the seven viewports in
+    // test/qr-scannability.mjs's fit test overflow again.
+    //
+    // Deliberately not a ResizeObserver. Watching the panel and
+    // re-rendering whenever it changes puts an open-ended asynchronous
+    // redraw into the UI: the code could be replaced at any moment,
+    // including while a player already has a camera pointed at it. The
+    // late-arriving content that made an observer look necessary was the
+    // ICE list, and that is fixed where it belongs — the list holds its
+    // height from the start, so rows appearing no longer move anything.
+    if (canvas.blipFitCssPx) return; // a test pinned the size; leave it pinned
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        if (!canvas.isConnected || canvas.blipCodeText !== text) return;
+        var refit = shrinkToFit(canvas, text, info);
+        codeWarning(canvas, refit.scannable ? '' : TOO_SMALL_TEXT);
+      });
+    });
   }
 
   function renderCode(canvas, text, status) {
     try {
-      showingCode(canvas, true);
-      var info = window.BlipQR.render(canvas, text, { fitCssPx: canvas.blipFitCssPx || codeBoxWidth(canvas) });
-      // Said out loud rather than left to the player to deduce from a
-      // scan that never lands. At this size the other phone's camera
-      // cannot resolve the modules, and every other part of the UI would
-      // look like it was working.
-      codeWarning(canvas, info.scannable ? '' :
-        'This code is too small to scan reliably — make the window taller, ' +
-        'or show it on a larger screen.');
+      drawCode(canvas, text);
       return true;
     } catch (err) {
       status.set('Code unavailable. Try again.', 'err');
       window.BlipNet.cancel();
       return false;
     }
+  }
+
+  /** Put a code back on screen after something else borrowed the space —
+   * the camera, which hides the code while it runs.
+   *
+   * It has to be re-drawn rather than merely un-hidden: the panel shrank
+   * to camera size while the code was away, and a canvas restored at its
+   * old width is a code wider than the panel, which is a code with its
+   * edge cropped off. Deliberately does not cancel the pairing if this
+   * throws — this exact payload has already rendered once, and the
+   * pairing it belongs to is still perfectly good. */
+  function redrawCode(canvas) {
+    if (!canvas || !canvas.blipCodeText) return;
+    try { drawCode(canvas, canvas.blipCodeText); } catch (err) { /* it drew once */ }
   }
 
   // Test-only, same convention as window.__blipNetDebug /
@@ -506,7 +639,7 @@
   }
 
   function showHostQR(body) {
-    clear(body);
+    clearScreen(body);
     var canvas = qrCanvas(body);
     var status = statusBar(body, 'Creating code…', 'wait');
 
@@ -515,6 +648,15 @@
       status.set('Show this code to the other phone.', 'wait');
       startIceWatch(body);
       showScanButton(body, 'SCAN ANSWER', function (answerSdp) {
+        // Both players tapping HOST is the commonest way to get this
+        // wrong, and it used to end in "Could not connect. Try again."
+        // a second later — a verdict on the network for what is
+        // actually a two-word instruction. The code says which half of
+        // the exchange it is, so say it.
+        if (codeRole(answerSdp) === 'host') {
+          status.set('That is a host code. The other phone should tap JOIN.', 'err');
+          return 'retry';
+        }
         status.set('✓ Answer scanned. Contacting client…', 'active');
         window.BlipNet.submitAnswer(answerSdp);
       }, false, [canvas], function (err) {
@@ -528,11 +670,17 @@
   }
 
   function showJoinQR(body) {
-    clear(body);
+    clearScreen(body);
     var scanStatus = statusBar(body, 'Scan the host code.', 'wait');
 
     showScanButton(body, 'SCAN HOST CODE', function (offerSdp) {
-      clear(body);
+      // The mirror image: two players who both tapped JOIN, or one who
+      // scanned the answer their own device produced a moment ago.
+      if (codeRole(offerSdp) === 'answer') {
+        scanStatus.set('That is an answer code. The other phone should tap HOST.', 'err');
+        return 'retry';
+      }
+      clearScreen(body);
       var canvas = qrCanvas(body);
       var status = statusBar(body, 'Creating answer…', 'wait');
 
@@ -558,13 +706,57 @@
    * reassurance and evidence, and it is the only place the scanned
    * content is ever visible to a human. It also makes a wrong scan
    * (a stale code, the device's own code) obvious instead of silent. */
-  function scanSummary(text) {
-    if (typeof text !== 'string' || !text) return 'empty code';
-    var candidates = (text.match(/(?:^|\n)a=candidate:/g) || []).length;
-    var kind = text.indexOf('a=setup:actpass') !== -1 ? 'host code'
-      : (text.indexOf('a=setup:active') !== -1 ? 'answer code' : 'code');
-    return '\u2713 ' + kind + ' \u00b7 ' + candidates + ' route' + (candidates === 1 ? '' : 's') +
-      ' \u00b7 ' + text.length + ' bytes';
+  /** Which half of the exchange a scanned payload is, or null if it is
+   * not a pairing code at all.
+   *
+   * Reads the compact form first, because that is what every code
+   * carries now: `B1|ufrag|pwd|fp|setup|host:port,...` (packForQr in
+   * web/blip_sdp_slim.js). The SDP shapes below are the fallback path's,
+   * kept because packForQr passes an SDP through whole when it cannot
+   * represent it. */
+  function codeRole(text) {
+    if (typeof text !== 'string' || !text) return null;
+    if (text.slice(0, 3) === 'B1|') {
+      var parts = text.split('|');
+      if (parts.length !== 6 || !parts[5]) return null;
+      return parts[4] === 'a' ? 'host' : (parts[4] === 'c' ? 'answer' : null);
+    }
+    if (text.indexOf('a=setup:actpass') !== -1) return 'host';
+    if (text.indexOf('a=setup:active') !== -1) return 'answer';
+    return null;
+  }
+
+  var ROLE_NAMES = { host: 'host code', answer: 'answer code' };
+
+  function codeRoutes(text) {
+    if (text.slice(0, 3) === 'B1|') {
+      return (text.split('|')[5] || '').split(',').filter(Boolean).length;
+    }
+    return (text.match(/(?:^|\n)a=candidate:/g) || []).length;
+  }
+
+  /** The one-line verdict on a scanned code: what to say, and whether it
+   * is good news.
+   *
+   * Both come out of the same call on purpose. They were two decisions —
+   * the wording here, the colour at the call site — each asking "is this
+   * a pairing code?" in its own way, which is two chances to disagree
+   * and print a green tick over a red failure. */
+  function describeScan(text) {
+    if (typeof text !== 'string' || !text) return { line: '\u2717 empty code', ok: false };
+    var role = codeRole(text);
+    // No tick for something that is not a pairing code. A player who
+    // photographs a poster, a URL, a boarding pass — anything with a QR
+    // on it — used to get a green "\u2713 code \u00b7 0 routes" above a
+    // status line saying the code was invalid, which is two answers to
+    // the same question.
+    if (!role) return { line: '\u2717 not a pairing code \u00b7 ' + text.length + ' bytes', ok: false };
+    var routes = codeRoutes(text);
+    return {
+      line: '\u2713 ' + ROLE_NAMES[role] + ' \u00b7 ' + routes + ' route' +
+        (routes === 1 ? '' : 's') + ' \u00b7 ' + text.length + ' bytes',
+      ok: true
+    };
   }
 
   function showScanButton(body, label, onScanned, autoStart, hideEls, onScanError, onScanStatus) {
@@ -576,7 +768,7 @@
           if (node) node.style.display = 'none';
         });
       }
-      clear(holder);
+      clearScreen(holder);
 
       var size = codeAreaSize(260);
       var wrap = el('div', '', holder);
@@ -634,24 +826,47 @@
           result = el('div', 'blip-scan-result', body);
           body.blipScanResultEl = result;
         }
-        result.textContent = scanSummary(text);
+        // Green is for a code that is what it should be; anything else
+        // gets the red treatment, so this line cannot read as success
+        // while the status line underneath reports a failure.
+        var verdict = describeScan(text);
+        result.textContent = verdict.line;
+        result.className = 'blip-scan-result' + (verdict.ok ? '' : ' bad');
         result.style.display = 'block';
         clear(holder);
-        onScanned(text);
+        // A caller returning 'retry' means "I read that code and it is
+        // the wrong one" — a mistake the player can fix on the spot, so
+        // the screen goes back to how it was with the button armed
+        // again, rather than tearing the pairing down.
+        if (onScanned(text) === 'retry') offerButton();
       }, function (state, detail) {
         if (onScanStatus) onScanStatus(state, detail || {});
       });
+    }
+
+    /** The idle state of this control: whatever the scan hid is visible
+     * again, and one button offering to (re)start the camera. */
+    function offerButton() {
+      if (hideEls) {
+        hideEls.forEach(function (node) {
+          if (!node) return;
+          node.style.display = '';
+          // Re-drawn, not just un-hidden — see redrawCode().
+          redrawCode(node);
+        });
+      }
+      clear(holder);
+      var button = el('button', 'blip-hs-btn', holder);
+      button.type = 'button';
+      button.textContent = label;
+      button.addEventListener('click', startScanning, { once: true });
     }
 
     if (autoStart) {
       startScanning();
       return;
     }
-
-    var button = el('button', 'blip-hs-btn', holder);
-    button.type = 'button';
-    button.textContent = label;
-    button.addEventListener('click', startScanning, { once: true });
+    offerButton();
   }
 
   window.addEventListener('DOMContentLoaded', function () {

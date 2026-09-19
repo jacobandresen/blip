@@ -24,6 +24,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   openPage, openPair, HTTP_PORT, loadRally, openModal, clickHsBtn,
+  sleep,
   makeSyntheticOfferSdp, QR_READY, evaluate, waitFor,
 } from './lib/multiplayer-harness.mjs';
 
@@ -39,9 +40,85 @@ const VIEWPORTS = [
   { name: 'phone landscape (short)', width: 700, height: 360 },
 ];
 
-// Candidate counts spanning what a real offer/answer carries; more
-// candidates means a longer SDP, which means more modules in the same box.
-const PAYLOADS = [4, 8, 12];
+// What the QR actually carries, at the sizes it actually reaches.
+//
+// This used to be candidate counts fed through makeSyntheticOfferSdp,
+// i.e. full SDPs of 700-1600 bytes. Nothing produces those any more: the
+// payload has been the compact form since packForQr landed, and a real
+// offer is ~98 bytes. Testing the old shape meant asserting that a
+// 181-module code decodes from a screenshot at 3 px/module — which it
+// does, most of the time, which is the worst kind of test.
+//
+// One deliberately oversized entry stays, because the fallback path is
+// real: if packForQr cannot represent an SDP it sends it whole, and the
+// product's answer to a code too dense for the space is to say so rather
+// than to draw something unreadable. That case is asserted on the
+// warning, not on a decode.
+const COMPACT = 'B1|fLxh|Y4Z1LNXyMkO5W5epGtUyvNPW|' +
+  'lVgLDrPGlx1kiCLaD5hvOkbmnKiOsZTkvpTQmjRNvrA|a|192.168.0.162:63857';
+const PAYLOADS = [
+  { name: 'compact offer', text: COMPACT },
+  { name: 'compact, two routes', text: COMPACT + ',192.168.0.9:51000' },
+  { name: 'compact, four routes', text: COMPACT + ',192.168.0.9:51000,10.0.0.5:40404,172.16.3.7:44444' },
+];
+
+/** A camera frame, built in the page, shared by the tests below.
+ *
+ * `capture(src, d)` paints a rendered code onto a 1280-square capture —
+ * the size the scan loop's camera constraints ask for — at `fill` of the
+ * frame, and can then abuse it the way a room does: `blur` for autofocus
+ * that has not settled, `glare` for a reflection across the screen,
+ * `patch` for something covering part of the code (centred, because a
+ * blob over a corner takes out a finder or the alignment pattern and a
+ * code that cannot be *located* cannot be corrected at any level — that
+ * measures jsQR, not error correction).
+ *
+ * `readsAt(cap, dim, text)` decodes it the way tick() actually does:
+ * downscale, plain decode, and Otsu on a miss. Measuring against plain
+ * decoding alone would be measuring a loop this project does not ship.
+ *
+ * One definition rather than one per test: these frames are the evidence
+ * behind two shipped decisions (the error-correction level, and the
+ * occasional larger decode), and evidence that quietly differs between
+ * tests — a different frame size here, a different default distance
+ * there — is not comparable across them.
+ */
+const CAMERA_SIM = `
+  var CAPTURE = 1280;
+  function capture(src, d) {
+    var c = document.createElement('canvas'); c.width = CAPTURE; c.height = CAPTURE;
+    var x = c.getContext('2d');
+    x.fillStyle = '#0b1016'; x.fillRect(0, 0, CAPTURE, CAPTURE);
+    var size = Math.round(CAPTURE * (d.fill || 0.5)), off = Math.round((CAPTURE - size) / 2);
+    if (d.blur) x.filter = 'blur(' + d.blur + 'px)';
+    x.drawImage(src, off, off, size, size);
+    x.filter = 'none';
+    if (d.glare) {
+      var g = x.createLinearGradient(off, off, off + size, off + size);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.5, 'rgba(255,255,255,' + d.glare + ')');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = g; x.fillRect(off, off, size, size);
+    }
+    if (d.patch) {
+      var side = Math.round(size * Math.sqrt(d.patch)), at = Math.round((size - side) / 2);
+      x.fillStyle = '#0b1016';
+      x.fillRect(off + at, off + at, side, side);
+    }
+    return c;
+  }
+  function readsAt(cap, dim, text) {
+    var t = document.createElement('canvas'); t.width = dim; t.height = dim;
+    var x = t.getContext('2d', { willReadFrequently: true });
+    x.drawImage(cap, 0, 0, CAPTURE, CAPTURE, 0, 0, dim, dim);
+    var img = x.getImageData(0, 0, dim, dim);
+    var r = jsQR(img.data, dim, dim, { inversionAttempts: 'dontInvert' });
+    if (r && r.data === text) return true;
+    window.BlipQR.filters.otsu(img);
+    r = jsQR(img.data, dim, dim, { inversionAttempts: 'dontInvert' });
+    return !!(r && r.data === text);
+  }
+`;
 
 /** Nothing may be painted on top of the code.
  *
@@ -110,8 +187,8 @@ test(`the QR code on screen decodes (${ENGINE})`, async (t) => {
   const { browser, page, cdp } = await openPage(t, ENGINE);
 
   for (const vp of VIEWPORTS) {
-    for (const candidates of PAYLOADS) {
-      await t.test(`${vp.name} ${vp.width}x${vp.height}, ${candidates} ICE candidates`, async () => {
+    for (const payload of PAYLOADS) {
+      await t.test(`${vp.name} ${vp.width}x${vp.height}, ${payload.name}`, async () => {
         await page.setViewportSize({ width: vp.width, height: vp.height });
         await loadRally(cdp);
         await openModal(cdp);
@@ -120,12 +197,22 @@ test(`the QR code on screen decodes (${ENGINE})`, async (t) => {
 
         // Re-render the real on-screen canvas with a payload of known
         // size, through the same call and the same box the modal uses.
-        const sdp = makeSyntheticOfferSdp(candidates);
+        const sdp = payload.text;
         // Through the modal's own render path, so the warning behaviour
-        // under test is the one players actually get.
+        // under test is the one players actually get — but at a pinned
+        // size, so nothing moves while the screenshot is taken.
+        //
+        // The live screen refits itself as the status line, the SCAN
+        // button and the ICE list arrive (see watchPanelFit), which is
+        // right for a player and wrong for a decode measurement: it
+        // re-renders the canvas asynchronously, and a screenshot can
+        // catch it mid-resize. Pinning the box is the documented way to
+        // opt out. The unpinned, real-flow sizing is covered by its own
+        // test at the end of this file.
         const res = await evaluate(cdp, `(function () {
           var c = document.querySelector('.blip-hs-panel canvas.blip-qr-canvas');
-          return window.__blipRenderCodeForTest(c, ${JSON.stringify(sdp)});
+          var box = c.parentNode.clientWidth;
+          return window.__blipRenderCodeForTest(c, ${JSON.stringify(sdp)}, box);
         })()`);
         const info = res.render;
 
@@ -324,6 +411,11 @@ test('the rendered code keeps a light quiet zone on all four sides', async (t) =
 // the noise -- gamma scored *worse* than doing nothing, and Sauvola local
 // thresholding added one frame for three times Otsu's cost. Only Otsu
 // shipped. This is the test that it is worth its pass.
+//
+// Builds its own frames rather than using CAMERA_SIM above, on purpose:
+// its 640-square frame at 55% fill is the geometry those published
+// numbers were measured on, and re-measuring the same claim against a
+// different frame would quietly stop being a check on it.
 test(`binarising reads frames plain decoding cannot (${ENGINE})`, async (t) => {
   const { cdp } = await openPage(t, ENGINE);
   await loadRally(cdp);
@@ -442,4 +534,237 @@ test(`decoding stays cheap enough for a phone (${ENGINE})`, async (t) => {
   assert.ok(result.raw.ms / result.shipped.ms > 2,
     `decoding small is only ${(result.raw.ms / result.shipped.ms).toFixed(1)}x cheaper than decoding the raw ` +
     'frame — if that gap has closed, the scan loop is probably decoding at full resolution again');
+});
+
+// The code must fit the panel it is shown in — the whole code, and the
+// controls under it.
+//
+// This is the case the rest of this file could not see. Every test above
+// re-renders through `__blipRenderCodeForTest`, which sets the box size
+// explicitly, so none of them exercised the sizing the real HOST screen
+// actually computes. When the panel was allowed to grow to most of the
+// screen, it overflowed by 55-115px at every desktop size: the panel
+// scrolled, the SCAN ANSWER button the host must press went below the
+// fold, and scrolling to reach it took half the code out of view.
+//
+// The sizing is awkward because the panel's height is not known once. The
+// code is rendered before the status line and the button exist, and the
+// live ICE list appears later still as candidates are gathered. So this
+// drives the real flow, waits for all of that to land, and then asks the
+// only question that matters.
+test(`the whole code and its controls fit the panel (${ENGINE})`, async (t) => {
+  const { cdp, page } = await openPage(t, ENGINE);
+
+  // Browser viewports, not screen sizes: a MacBook's window is shorter
+  // than its display once the menu bar, tab strip and dock are taken out.
+  const VIEWPORTS = [
+    { name: 'macbook, windowed', width: 1512, height: 860 },
+    { name: 'macbook, short', width: 1512, height: 760 },
+    { name: 'macbook air', width: 1440, height: 780 },
+    { name: 'desktop', width: 1280, height: 800 },
+    { name: '1366 laptop', width: 1366, height: 700 },
+    { name: 'iPhone portrait', width: 390, height: 844 },
+    { name: 'iPad', width: 820, height: 1180 },
+  ];
+
+  for (const vp of VIEWPORTS) {
+    await t.test(`${vp.name} ${vp.width}x${vp.height}`, async () => {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await loadRally(cdp);
+      await openModal(cdp);
+      await clickHsBtn(cdp, 'HOST');
+      await waitFor(cdp, QR_READY, 20000);
+      // The ICE list is the last thing to arrive; give it a beat.
+      await sleep(1500);
+
+      const m = await evaluate(cdp, `(function () {
+        var c = document.querySelector('.blip-hs-panel canvas.blip-qr-canvas');
+        var p = document.querySelector('.blip-hs-panel');
+        if (!c || !p) return null;
+        var cb = c.getBoundingClientRect(), pb = p.getBoundingClientRect();
+        // Both axes. The panel clips horizontally as readily as it does
+        // vertically, and a code missing its right-hand column has lost
+        // a finder pattern — it is not a smaller code, it is not a code.
+        var vis = {
+          left: pb.left + p.clientLeft, top: pb.top + p.clientTop,
+          right: pb.left + p.clientLeft + p.clientWidth,
+          bottom: pb.top + p.clientTop + p.clientHeight
+        };
+        function overlap(aLo, aHi, bLo, bHi) { return Math.max(0, Math.min(aHi, bHi) - Math.max(aLo, bLo)); }
+        var insidePanel = overlap(cb.top, cb.bottom, vis.top, vis.bottom) *
+          overlap(cb.left, cb.right, vis.left, vis.right);
+        var insideView = overlap(cb.top, cb.bottom, 0, window.innerHeight) *
+          overlap(cb.left, cb.right, 0, window.innerWidth);
+        var area = cb.width * cb.height;
+        return {
+          code: Math.round(cb.width),
+          panelOverflow: p.scrollHeight - p.clientHeight,
+          panelOverflowX: p.scrollWidth - p.clientWidth,
+          inPanelPct: Math.round(100 * insidePanel / area),
+          inViewportPct: Math.round(100 * insideView / area),
+          scannable: window.BlipQR.lastRender.scannable,
+          pxPerModule: window.BlipQR.lastRender.cssPxPerModule
+        };
+      })()`);
+
+      assert.ok(m, 'no code on screen after pressing HOST');
+      t.diagnostic(`${vp.name}: ${m.code}px, ${m.pxPerModule.toFixed(1)} px/module, ` +
+        `overflow ${m.panelOverflow}px`);
+
+      assert.equal(m.inPanelPct, 100,
+        `${m.inPanelPct}% of the code is inside the panel — the rest is clipped`);
+      assert.equal(m.inViewportPct, 100,
+        `${m.inViewportPct}% of the code is on screen — the rest is off the viewport`);
+      assert.ok(m.panelOverflowX <= 0,
+        `the panel scrolls sideways by ${m.panelOverflowX}px — the code is wider than the ` +
+        'panel it is drawn in, so its edge is cropped');
+      assert.ok(m.panelOverflow <= 0,
+        `the panel scrolls by ${m.panelOverflow}px, so the controls under the code are below ` +
+        'the fold and reaching them scrolls the code out of view');
+
+      // Fitting by shrinking to nothing would satisfy everything above.
+      assert.ok(m.scannable,
+        `the code was shrunk to ${m.pxPerModule.toFixed(1)} px/module, below what a camera can read`);
+    });
+  }
+});
+
+// Error correction costs modules, and modules cost camera pixels.
+//
+// The encoder keeps the first level that fits and reads back, so the
+// order of that list decides what every player photographs. Starting it
+// at H — the strongest — is the intuitive choice and measurably the
+// wrong one: at a fixed size on glass a stronger level is a *denser*
+// code, and density, not damage, is what defeats a phone camera reading
+// another phone's screen.
+//
+// This is the measurement that decided it, cut down to the four cases
+// that separate H from Q. It is here so that "surely stronger is safer"
+// cannot quietly put H back.
+//
+// It does not adjudicate Q against M — on the full corpus those two tie
+// at 12 frames of 14 and differ only in which ones they drop, which is
+// an argument about the *loop* (Q's failures are the ones the periodic
+// larger decode recovers) rather than about the levels. That reasoning
+// lives with ECC_LEVELS in web/blip_qr.js, next to the list it explains.
+test(`the error-correction level is chosen for the camera, not for damage (${ENGINE})`, async (t) => {
+  const { cdp } = await openPage(t, ENGINE);
+  await loadRally(cdp);
+
+  const result = await evaluate(cdp, `(function () {
+    ${CAMERA_SIM}
+    var TEXT = ${JSON.stringify(COMPACT)};
+
+    function draw(level, box) {
+      var qr = qrcode(0, level);
+      qr.addData(TEXT); qr.make();
+      var count = qr.getModuleCount(), total = count + 8;
+      var cell = Math.max(1, Math.floor(box / total)), size = cell * total;
+      var c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      var x = c.getContext('2d');
+      x.fillStyle = '#fff'; x.fillRect(0, 0, size, size);
+      x.fillStyle = '#000';
+      for (var r = 0; r < count; r++) for (var q = 0; q < count; q++)
+        if (qr.isDark(r, q)) x.fillRect(4 * cell + q * cell, 4 * cell + r * cell, cell, cell);
+      return { canvas: c, modules: total };
+    }
+
+    // The code covers the same fraction of the frame at every level —
+    // same screen, same distance — which is exactly why a denser code
+    // arrives with fewer camera pixels per module.
+    var CASES = [
+      { n: 'far (25% of frame)', d: { fill: 0.25 } },
+      { n: 'far + blur', d: { fill: 0.25, blur: 2 } },
+      { n: 'covered 10%', d: { patch: 0.10 } },
+      { n: 'covered 10% + far', d: { patch: 0.10, fill: 0.35 } }
+    ];
+
+    var out = {};
+    ['H', 'Q'].forEach(function (level) {
+      var drawn = draw(level, 488); // the desktop code's real size
+      var read = [];
+      CASES.forEach(function (c) {
+        // Best of two: these frames are deterministic apart from the
+        // blur path's rounding, which the repeat covers.
+        if (readsAt(capture(drawn.canvas, c.d), 400, TEXT) ||
+            readsAt(capture(drawn.canvas, c.d), 400, TEXT)) read.push(c.n);
+      });
+      out[level] = { modules: drawn.modules, read: read };
+    });
+    out.shipped = window.BlipQR.render(document.createElement('canvas'), TEXT, { fitCssPx: 488, dpr: 1 });
+    return out;
+  })()`);
+
+  t.diagnostic(`H: ${result.H.modules} modules, read ${result.H.read.length}/4 [${result.H.read}]`);
+  t.diagnostic(`Q: ${result.Q.modules} modules, read ${result.Q.read.length}/4 [${result.Q.read}]`);
+
+  assert.ok(result.Q.modules < result.H.modules,
+    'Q should need fewer modules than H — if not, this whole trade-off has changed');
+  assert.ok(result.Q.read.length > result.H.read.length,
+    `H read ${result.H.read.length} of these frames and Q read ${result.Q.read.length} — ` +
+    'the denser code is no longer the worse one, so the level order deserves re-measuring');
+  assert.equal(result.shipped.ecc, 'Q',
+    `a realistic payload rendered at ECC ${result.shipped.ecc}; the modal ships the first ` +
+    'level in BlipQR\'s list that fits, and the measurement above says that should be Q');
+});
+
+// Why the scan loop decodes one frame in four at a larger size.
+//
+// Decoding small is what makes the preview smooth, and for most frames
+// it is also enough — see DECODE_DIM's table in web/blip_qr.js. But
+// "enough" was measured over frames where the code fills 60-20% of the
+// view and is dim, blurred or noisy. Two things outside that corpus are
+// ordinary in real use and need the pixels: a code that fills only a
+// fifth of the frame, and one with a reflection across it, where Otsu's
+// whole-frame threshold is actively the wrong tool.
+//
+// This asserts the trade is real in both directions: the larger decode
+// reads frames the small one misses, and it is not just "bigger is
+// better" — full resolution loses the glare frame that 640 recovers.
+test(`the occasional larger decode reads frames the small one cannot (${ENGINE})`, async (t) => {
+  const { cdp } = await openPage(t, ENGINE);
+  await loadRally(cdp);
+
+  const result = await evaluate(cdp, `(function () {
+    ${CAMERA_SIM}
+    var TEXT = ${JSON.stringify(COMPACT)};
+    var src = document.createElement('canvas');
+    window.BlipQR.render(src, TEXT, { fitCssPx: 488, dpr: 1 });
+
+    var d = window.BlipQR.decode;
+    var CASES = {
+      'held back (20% of frame)': { fill: 0.20 },
+      'reflection across the code': { fill: 0.5, glare: 0.75 },
+      'ordinary (50% of frame)': { fill: 0.5 }
+    };
+    var out = { sizes: d, cases: {} };
+    Object.keys(CASES).forEach(function (name) {
+      var cap = capture(src, CASES[name]);
+      out.cases[name] = {
+        small: readsAt(cap, d.dim, TEXT),
+        far: readsAt(cap, d.far, TEXT),
+        full: readsAt(cap, CAPTURE, TEXT)
+      };
+    });
+    return out;
+  })()`);
+
+  t.diagnostic(`decode sizes: ${JSON.stringify(result.sizes)}`);
+  for (const [name, r] of Object.entries(result.cases)) {
+    t.diagnostic(`${name}: ${result.sizes.dim}px ${r.small ? 'read' : 'missed'}, ` +
+      `${result.sizes.far}px ${r.far ? 'read' : 'missed'}, full ${r.full ? 'read' : 'missed'}`);
+  }
+
+  assert.ok(result.sizes.far > result.sizes.dim, 'the larger decode is not larger');
+  assert.ok(result.sizes.every >= 2,
+    'decoding every frame at the larger size would cost the preview its frame rate');
+
+  const rescued = Object.entries(result.cases).filter(([, r]) => r.far && !r.small).map(([n]) => n);
+  assert.ok(rescued.length > 0,
+    'no frame needed the larger decode — if that is really true the loop can drop it and ' +
+    'run cheaper, but check the corpus before believing it');
+
+  assert.ok(result.cases['ordinary (50% of frame)'].small,
+    'the common case must still read at the small size, or the loop is paying 3x on every frame');
 });

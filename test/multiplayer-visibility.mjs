@@ -23,9 +23,9 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { hostShowsOffer, guestAnswersOffer, hostTakesAnswer } from './lib/pairing.mjs';
+import { hostShowsOffer, guestAnswersOffer, hostTakesAnswer, injectNextScan } from './lib/pairing.mjs';
 import {
-  openPage, openPair, HTTP_PORT, loadRally, openModal, clickHsBtn, getStatusText,
+  openPage, openPair, HTTP_PORT, loadRally, openModal, clickHsBtn, getStatusText, waitFor,
   writeBlankVideo, blockAllCandidates, pollUntil, evaluate, sleep,
 } from './lib/multiplayer-harness.mjs';
 
@@ -160,4 +160,143 @@ test('the candidate pairs are shown on screen while connecting', async (t) => {
     assert.equal(kindFor('5555'), 'err',
       'a path with many requests and no replies should read red, not green');
   });
+});
+
+// What a scan actually read, in one line.
+//
+// The scan-result line is the only place in the UI that shows the
+// *content* of a code rather than an assurance about it — which half of
+// the exchange it was, how many routes it carries, how big it was. That
+// is the difference between "✓ scanned" (a claim) and evidence, and it
+// is what makes a wrong scan — a stale code, the device's own code —
+// visible instead of silent.
+//
+// It is also the kind of line that rots without anyone noticing, and it
+// did: it parsed raw SDP, the payload became the compact `B1|…` form,
+// and from then on every real scan in the product reported "code · 0
+// routes". Nothing failed. The evidence just quietly stopped being
+// evidence, and read like a failure to anyone who looked at it.
+test('the scan result says what was actually read', async (t) => {
+  const { host, guest } = await openPair(t, ENGINE, ENGINE);
+
+  const offer = await hostShowsOffer(host);
+  const answer = await guestAnswersOffer(guest, offer);
+  await hostTakesAnswer(host, answer);
+
+  const line = await pollUntil(async () => evaluate(host, `(function () {
+    var el = document.querySelector('.blip-scan-result');
+    return el && el.offsetHeight > 0 ? el.textContent : null;
+  })()`), 10000, 150);
+
+  t.diagnostic(`host scan result: ${JSON.stringify(line)} for a ${answer.length}-byte payload`);
+
+  // The half of the exchange it was. A host that has just scanned
+  // something calling itself a host code is scanning the wrong screen.
+  assert.match(line, /answer code/,
+    `the host scanned an answer and the line called it something else: ${line}`);
+  // Routes, and not zero — the compact payload always carries at least
+  // one, and zero here is the exact symptom of a summary that no longer
+  // understands the format it is being handed.
+  const routes = Number((line.match(/(\d+) routes?/) || [])[1]);
+  assert.ok(routes > 0, `the line reports ${routes} routes for a payload carrying real ones: ${line}`);
+  assert.equal(routes, answer.split('|')[5].split(',').filter(Boolean).length,
+    'the route count does not match what the payload actually carries');
+  assert.match(line, new RegExp(`${answer.length} bytes`),
+    `the byte count does not match the ${answer.length}-byte payload: ${line}`);
+});
+
+// Scanning the wrong half of the exchange.
+//
+// Two players both tapping HOST is the commonest way to get this wrong,
+// and the least self-explanatory: each one has a code, each one has a
+// SCAN button, and the screens look exactly like a pairing that is going
+// well. What used to happen is that the scan succeeded, the offer was
+// submitted where an answer belonged, WebRTC refused it, and a second
+// later the player was told "Could not connect. Try again." — a verdict
+// on their network for what is really a two-word instruction.
+//
+// The payload says which half it is. These pin that the UI reads it,
+// says so, and leaves the pairing standing so the mistake can be fixed
+// on the spot rather than started over.
+test('a code scanned into the wrong half says so, and can be retried', async (t) => {
+  const { host, guest } = await openPair(t, ENGINE, ENGINE);
+
+  const hostCode = await hostShowsOffer(host);
+  const otherHostCode = await hostShowsOffer(guest); // both players tapped HOST
+
+  await injectNextScan(host, otherHostCode);
+  await clickHsBtn(host, 'SCAN ANSWER');
+
+  const screen = await pollUntil(async () => evaluate(host, `(function () {
+    var p = document.querySelector('.blip-hs-panel');
+    var s = document.querySelector('.blip-net-status-text');
+    var c = p && p.querySelector('canvas.blip-qr-canvas');
+    var status = s && s.offsetHeight > 0 ? s.textContent : '';
+    if (!/host code/i.test(status)) return null;
+    var fits = null;
+    if (c && c.offsetHeight) {
+      var cb = c.getBoundingClientRect(), pb = p.getBoundingClientRect();
+      fits = cb.right <= pb.left + p.clientLeft + p.clientWidth + 0.5 &&
+             cb.bottom <= pb.top + p.clientTop + p.clientHeight + 0.5;
+    }
+    return {
+      status: status,
+      codeShown: !!(c && c.offsetHeight),
+      codeFits: fits,
+      buttons: Array.prototype.map.call(p.querySelectorAll('.blip-hs-btn'), function (b) { return b.textContent; })
+    };
+  })()`), 10000, 200);
+
+  t.diagnostic(`host after scanning another host code: ${JSON.stringify(screen)}`);
+
+  // Names what was scanned and what to do about it — not "try again".
+  assert.match(screen.status, /host code/i);
+  assert.match(screen.status, /JOIN/,
+    'the message should say which button the other phone needs, since that is the whole fix');
+  // The pairing is untouched: the host's own code is still up, still
+  // whole, and the scan can simply be repeated.
+  assert.ok(screen.codeShown, 'the host code vanished — it is still valid and still needed');
+  assert.equal(screen.codeFits, true,
+    'the restored code does not fit its panel, so it came back at the size it had before the ' +
+    'camera shrank the panel — a cropped code, which no camera can read');
+  assert.ok(screen.buttons.some((b) => /SCAN ANSWER/.test(b)),
+    'no way to scan again after a wrong code — the only way out is to start the pairing over');
+
+  // Scanning the right code afterwards still works: the retry is real,
+  // not just a button that looks like one.
+  //
+  // The other player has to back out of HOST first, which is exactly
+  // what the message just told them to do.
+  await clickHsBtn(guest, 'CLOSE');
+  await sleep(300);
+  await openModal(guest);
+  const answer = await guestAnswersOffer(guest, hostCode);
+  await injectNextScan(host, answer);
+  await clickHsBtn(host, 'SCAN ANSWER');
+  const opened = await waitFor(host, `(function () {
+    var d = window.__blipNetDebug && window.__blipNetDebug();
+    return !!(d && d.dcState === 'open');
+  })()`, 20000);
+  assert.ok(opened, 'the pairing did not complete after recovering from a wrong scan');
+});
+
+test('a code that is not a pairing code is not reported as one', async (t) => {
+  const { host } = await openPair(t, ENGINE, ENGINE);
+  await hostShowsOffer(host);
+
+  await injectNextScan(host, 'https://example.com/some-other-qr-code');
+  await clickHsBtn(host, 'SCAN ANSWER');
+
+  const seen = await pollUntil(async () => evaluate(host, `(function () {
+    var r = document.querySelector('.blip-scan-result');
+    return r && r.offsetHeight > 0 ? { text: r.textContent, cls: r.className } : null;
+  })()`), 10000, 200);
+
+  t.diagnostic(`scan result for a non-pairing QR: ${JSON.stringify(seen)}`);
+  // The line reports what was read. A tick and a route count for a
+  // random QR off a poster is the UI agreeing with itself that a failure
+  // succeeded, one line above a status saying the code was invalid.
+  assert.doesNotMatch(seen.text, /✓/, 'a non-pairing code was reported with a tick');
+  assert.match(seen.text, /not a pairing code/i);
+  assert.match(seen.cls, /bad/, 'the line is still styled as a success');
 });

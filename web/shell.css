@@ -656,6 +656,18 @@ canvas {
    is dropping device-to-device traffic; see the blocked-network note in
    docs/multiplayer.md. */
 .blip-ice-list {
+  /* Reserve the height its rows will need, so they do not change the
+     panel's size when they appear. The code above is sized to the space
+     left over, and a list that grows after that would either push the
+     code off the fold or force it to be re-rendered smaller while the
+     player is looking at it. Four rows is more paths than a home network
+     produces; beyond that the list scrolls rather than the panel.
+
+     Fixed rather than reserved-then-grown, and never display:none —
+     the list is on screen from the moment the code is, carrying a
+     placeholder line until ICE has something to say. */
+  height: 62px;
+  overflow-y: auto;
   margin: 6px auto 2px;
   max-width: 96%;
   text-align: left;
@@ -686,6 +698,9 @@ canvas {
   color: #9fb4bf;
 }
 .blip-ice-state { flex: 0 0 auto; color: #667; }
+/* Holds the list's place while ICE is still gathering — see
+   iceListPlaceholder() in web/blip_net_ui.js. */
+.blip-ice-empty { color: #667; }
 
 /* What a successful scan actually read. Green, and phrased as evidence
    ("host code · 2 routes · 538 bytes") rather than a bare tick — the
@@ -700,6 +715,11 @@ canvas {
   color: #6dffa8;
   text-align: center;
 }
+
+/* ...and the same line when what was scanned is not a pairing code at
+   all. Green there would be the UI agreeing with itself that a failure
+   succeeded. */
+.blip-scan-result.bad { color: #ff6b6b; }
 
 .blip-hs-input {
   width: 100%;
@@ -832,6 +852,12 @@ canvas {
 
 @keyframes blip-net-status-pulse {
   50% { opacity: 0.35; transform: scale(0.7); }
+}
+
+/* A window this short has no spare 60px: the reservation above would be
+   taken straight out of the code. One row, and the list scrolls. */
+@media (max-height: 520px) {
+  .blip-ice-list { height: 24px; }
 }
 
 @media (max-width: 380px) {

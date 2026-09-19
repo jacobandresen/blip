@@ -118,7 +118,15 @@ test(`the guest reports a different-network pairing early (${ENGINE})`, async (t
   await waitFor(guest, QR_READY, 20000);
   const both = await evaluate(guest, `(function () {
     var c = document.querySelector('.blip-hs-panel canvas.blip-qr-canvas');
-    window.__blipRenderCodeForTest(c, window.BlipQR.lastRenderedText, 120);
+    // Derived, not pinned: "too small to scan" is a px-per-module
+    // threshold, so the box that provokes it depends on how many modules
+    // the payload happens to need. A literal 120px was a box that was
+    // 1.97 px/module at the module count of the day and 2.1 — i.e. no
+    // warning, i.e. a failing test — the moment the encoder chose a
+    // level with four fewer modules. Ask for half the threshold and the
+    // intent survives whatever the code is made of.
+    var modules = window.BlipQR.lastRender.modules;
+    window.__blipRenderCodeForTest(c, window.BlipQR.lastRenderedText, Math.floor(modules));
     var q = document.querySelector('.blip-qr-warn');
     var n = document.querySelector('.blip-net-warn');
     return { qr: q ? q.textContent : null, net: n ? n.textContent : null,

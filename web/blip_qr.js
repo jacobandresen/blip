@@ -39,11 +39,36 @@
    * as unscannable rather than drawn and silently hoped for. */
   var MIN_CSS_PX_PER_MODULE = 2;
 
-  /** Strongest first. H tolerates ~30% damage but holds the least data;
-   * L holds the most and tolerates least. The compact pairing payload
-   * (~98 bytes, see blip_sdp_slim.js) fits comfortably at H, which is
-   * why the list is tried in this order rather than the other way. */
-  var ECC_LEVELS = ['H', 'Q', 'M', 'L'];
+  /** Tried in order, first one that fits and reads back wins. Weaker
+   * levels hold more data, so this is also the capacity fallback.
+   *
+   * It starts at Q rather than H, which is not the obvious choice and
+   * was not the original one. Error correction is not free at a fixed
+   * size on glass: a stronger level needs more modules for the same
+   * payload, and more modules across an unchanged screen area means
+   * fewer *camera* pixels per module for the phone trying to read it.
+   * This payload is ~98 bytes, which is 61 modules at H against 57 at Q
+   * and 45 at L.
+   *
+   * Measured over 14 simulated camera frames — distance, blur, dim
+   * light, glare, low contrast, and an occluding blob over the data
+   * region — decoded exactly as tick() does, plain then Otsu on a miss:
+   * H read 11, Q 12, M 12, L 11, the same at every size the modal
+   * ships. H and L are simply worse. Q and M tie on the count and differ
+   * in *what* they drop: Q loses the far-away and glare frames, M loses
+   * the occluded ones.
+   *
+   * Q, because the loop already answers Q's weakness and nothing
+   * answers M's. Every frame Q misses here is one the periodic larger
+   * decode reads (see DECODE_DIM_FAR, and the test that pins it);
+   * nothing in the loop recovers a code with part of it covered — that
+   * is what the error correction itself is for.
+   *
+   * Damage tolerance was still the wrong thing to *maximise*. A code on
+   * a screen is not torn or smudged; it is photographed too far away, in
+   * bad light, by a camera that has to resolve every module. See "Error
+   * correction is not free" in docs/multiplayer.md. */
+  var ECC_LEVELS = ['Q', 'M', 'L'];
 
   /** Rasterise a candidate code at one pixel per module and read it back
    * with the same decoder the camera path uses. Cheap — a code this size
@@ -295,6 +320,26 @@
    * marginally cheaper than Otsu-then-decode (0.87-1.20x, measured);
    * Otsu earns its place on the frames that fail. */
 
+  /** ...except every few frames, which decode larger.
+   *
+   * The table above says 640 reaches the same 21/24 as 400 and costs
+   * three times as much, and that is true of that corpus. It is not true
+   * of every frame. Re-measured over a wider one, two cases decode at
+   * 640 and not at 400: a code filling only 20% of the frame (a phone
+   * held back, or a small code on a big screen), and one with a bright
+   * reflection across it — where Otsu's whole-frame threshold is exactly
+   * the wrong tool and the extra resolution is what saves it.
+   *
+   * Paying 3x on every frame to catch those would cost the preview its
+   * frame rate, which is the feedback that tells a player they are
+   * pointing the camera in the right place. Paying it on one frame in
+   * four costs about a third more per frame on average and still reaches
+   * those cases within a fraction of a second of holding the camera
+   * still — and holding it still is what a player does when the preview
+   * is running smoothly. */
+  var DECODE_DIM_FAR = 640;
+  var FAR_DECODE_EVERY = 4;
+
   /** Binarise a frame at Otsu's threshold, in place.
    *
    * Picks the cut between dark and light that best separates the two
@@ -426,8 +471,19 @@
     var raf = null;
     var frames = 0;
     var startedAt = Date.now();
-    var scratch = document.createElement('canvas');
-    var sctx = scratch.getContext('2d', { willReadFrequently: true });
+    // One canvas per decode size, rather than one resized back and forth.
+    // The loop alternates between DECODE_DIM and DECODE_DIM_FAR, and
+    // assigning .width reallocates the backing store every time.
+    var scratches = {};
+    function scratchAt(dim) {
+      var c = scratches[dim];
+      if (!c) {
+        c = scratches[dim] = document.createElement('canvas');
+        c.width = c.height = dim;
+        c.blipCtx = c.getContext('2d', { willReadFrequently: true });
+      }
+      return c;
+    }
     // The finder-candidate heuristic's own downsampled working copy —
     // deliberately a *second*, small canvas rather than reusing `scratch`
     // at its (cropped, but still often much larger) size — see
@@ -468,9 +524,11 @@
         var offsetY = Math.floor((nativeH - side) / 2);
         frames++;
 
-        // Decode a scaled-down copy, not the raw frame — see DECODE_DIM.
-        var target = Math.min(side, DECODE_DIM);
-        if (scratch.width !== target) { scratch.width = target; scratch.height = target; }
+        // Decode a scaled-down copy, not the raw frame — see DECODE_DIM,
+        // and DECODE_DIM_FAR for why every fourth frame is decoded
+        // bigger than the rest.
+        var target = Math.min(side, frames % FAR_DECODE_EVERY === 0 ? DECODE_DIM_FAR : DECODE_DIM);
+        var scratch = scratchAt(target), sctx = scratch.blipCtx;
         sctx.drawImage(videoEl, offsetX, offsetY, side, side, 0, 0, target, target);
         var frame = sctx.getImageData(0, 0, target, target);
 
@@ -612,6 +670,10 @@
 
   window.BlipQR = {
     render: render, scan: scan, MIN_CSS_PX_PER_MODULE: MIN_CSS_PX_PER_MODULE,
+    // The decode loop's sizes, exposed so a test can measure the claim
+    // behind them — that the occasional larger decode reads frames the
+    // small one cannot — instead of restating the numbers.
+    decode: { dim: DECODE_DIM, far: DECODE_DIM_FAR, every: FAR_DECODE_EVERY },
     // Exposed so the ladder's claim — that rotating these reads frames
     // none of them reads alone — can be measured rather than asserted.
     // Both mutate the ImageData they are given.

@@ -162,6 +162,30 @@ misses: the same decode rate as the 1024 configuration at an eighth of
 the cost. Plain is still tried first, because on a frame that *does*
 decode it is marginally cheaper than binarise-then-decode.
 
+#### …except one frame in four
+
+"A bigger frame buys nothing" is true of that corpus and not of every
+frame. Two cases outside it are ordinary in real use and do need the
+pixels:
+
+| frame | 400 | 640 | full 1280 |
+|---|---|---|---|
+| held back, code fills 20% of view | missed | **read** | read |
+| reflection across the code | missed | **read** | missed |
+| ordinary, code fills 50% | read | read | read |
+
+The glare row is the interesting one, and the reason this is not simply
+"decode bigger". Otsu picks one threshold for the whole frame, so a
+bright wash drags it to one side and eats the code; at 640 there is
+enough resolution for plain decoding to succeed before Otsu is reached,
+while at full resolution jsQR loses it again.
+
+So every fourth frame is decoded at 640 instead of 400. On average that
+is about a third more work per frame rather than three times as much,
+which keeps the preview smooth — and the preview is the feedback that
+tells a player they are pointing the camera in the right place. A player
+holding still gets the larger decode within a fraction of a second.
+
 Other filters were measured and rejected. Over a 54-frame corpus,
 contrast stretching read 35 against plain's 34 — inside the noise. Gamma
 correction read 21, *worse* than doing nothing. Sauvola local
@@ -474,9 +498,85 @@ the size — was always the problem.
 The box is measured from the container rather than assumed, because the
 code can only grow in whole modules: a 145-module code in a 280px box
 must choose between 145px and 290px, and that is the difference between
-unscannable and comfortable. Only width constrains it — the panel scrolls
-vertically, so a code taller than a short landscape window costs a
-scroll, while one shrunk to fit costs the ability to scan at all.
+unscannable and comfortable.
+
+### Fitting the panel
+
+While a code is up, the panel stops being a 340px card and grows to
+`min(96vw, 96vh)` (`.blip-hs-panel.showing-code`), because size on glass
+is the single biggest thing deciding whether the other phone's camera
+reads it. Two rules keep that from backfiring:
+
+- **The code never outgrows the panel it is drawn in.** Height is
+  budgeted up front, and then `shrinkToFit()` measures the laid-out panel
+  and re-renders a module smaller while it still overflows. A code the
+  panel crops has lost a finder pattern and cannot be scanned at all,
+  which is strictly worse than a smaller one — and a code that merely
+  pushes the SCAN ANSWER button below the fold is nearly as bad, since
+  scrolling to reach the button takes the code out of view.
+- **Nothing arrives late enough to change the layout under it.** The
+  panel grows exactly once, when the code is drawn, and shrinks exactly
+  once, when that screen is replaced (`clearScreen()`). The live ICE list
+  is on screen from the start with a fixed height and a placeholder line,
+  rather than appearing when the first candidate lands and pushing 60px
+  of content into a panel whose code was sized without it.
+
+Both are asserted through the real HOST flow — not a pinned render box —
+in *the whole code and its controls fit the panel* in
+`test/qr-scannability.mjs`, on both axes.
+
+Shrinking stops once the code is already below the scannable threshold:
+past that point it cannot be read at any size, so giving away more of it
+buys nothing. On a window that short the panel scrolls to its CLOSE
+button and the warning below explains why.
+
+### Error correction is not free
+
+The encoder tries error-correction levels in order and keeps the first
+that both fits and decodes back out of its own pixels. That list used to
+start at H, the strongest — which is the intuitive choice and the wrong
+one.
+
+Correction is paid for in modules. The ~98-byte pairing payload is 61
+modules at H, 57 at Q and 45 at L, and those modules are spread over the
+same patch of screen either way. More modules means fewer *camera*
+pixels per module for the phone trying to read it, and the scan loop
+decodes a 400px downscale of its frame, so the squeeze is real.
+
+Measured over 14 simulated camera frames — distance, blur, dim light,
+glare, low contrast, and an occluding blob over the data region —
+decoded exactly as the scan loop does it, plain then Otsu on a miss.
+Same result at every size the modal ships:
+
+| Level | Modules | Frames read | What it drops |
+|---|---|---|---|
+| H | 61 | 11/14 | far 25%, far + blur, glare |
+| Q | 57 | **12/14** | far 20%, glare |
+| M | 49 | **12/14** | covered 10%, covered 10% + far |
+| L | 45 | 11/14 | covered 5%, 10%, 10% + far |
+
+H and L are simply worse. Q and M tie on the count, so the count is not
+what decides it — *what each one drops* is. Q loses frames to distance
+and glare; M loses them to something covering the code.
+
+Q wins because the loop already answers Q's weakness and nothing answers
+M's. Both frames Q drops are ones the periodic 640 decode reads (see
+"…except one frame in four" under *Scanning*, above); nothing in the
+loop recovers a code with a piece missing — that is what the error
+correction itself is for. So the list starts at Q and continues M, L as
+the capacity fallback for an oversized payload, since weaker levels hold
+more data.
+
+The general point survives the tie: damage tolerance was the wrong thing
+to *maximise*. A code on a screen is not torn or smudged. It is
+photographed too far away, in bad light, by a camera that has to resolve
+every module — and every module added to resist damage makes that
+harder.
+
+(One caveat worth knowing if this is ever re-measured: an occlusion over
+a corner kills the code at *every* level, because it takes out a finder
+or the alignment pattern and a code that cannot be located cannot be
+corrected. Only damage to the data region measures error correction.)
 
 ### When it cannot be made scannable
 
