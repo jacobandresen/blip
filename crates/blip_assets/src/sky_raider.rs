@@ -299,6 +299,43 @@ fn player_plane() -> Vec<u8> {
     img.encode_png()
 }
 
+/// Body and wing colours for an enemy kind.
+///
+/// Chosen against the sky these planes are seen on, not in isolation.
+///
+/// The sea/sky gradient runs from rgb(25,61,117) at the horizon down to
+/// rgb(7,28,76) close up (see draw_sea() in the game). The drab-green
+/// grunt used to be rgb(90,130,90), which is 2.4:1 against the top of
+/// that gradient — and its wings, shaded 35 *darker*, came out at
+/// 1.45:1. The wings are the widest part of the silhouette and the first
+/// thing a player picks out of the sky; at 1.45:1 there was nothing
+/// there to pick out. Touching an enemy costs HP, so a plane you cannot
+/// see is not difficulty, it is a tax on the player.
+///
+/// Every kind now clears 3:1 against both ends of the gradient, body and
+/// wing, which is the floor the WCAG non-text contrast guidance uses for
+/// a shape whose form has to be recognised. Pinned by
+/// enemy_planes_are_visible_against_the_sky() below — which calls this,
+/// so the numbers it checks are the ones actually painted.
+///
+/// The wings are lit from above rather than shaded: they catch the sky.
+/// Darkening them was what pushed the widest surfaces below the floor,
+/// and a top surface brighter than the fuselage is what a plane seen
+/// from above actually looks like.
+fn enemy_colors(kind: usize) -> ((u8, u8, u8), (u8, u8, u8)) {
+    let body: (u8, u8, u8) = match kind {
+        0 => (125, 175, 115),
+        1 => (205, 158, 68),
+        _ => (245, 105, 95),
+    };
+    let wing = (
+        body.0.saturating_add(38),
+        body.1.saturating_add(38),
+        body.2.saturating_add(38),
+    );
+    (body, wing)
+}
+
 /// Enemy fighter, nose pointing down (diving toward the player) — the same
 /// main-wing + tail-stabiliser silhouette as the player, recoloured per
 /// kind, front-to-back layout mirrored (tail near the top, nose/propeller
@@ -308,12 +345,7 @@ fn enemy_plane(kind: usize) -> Vec<u8> {
     let (w, h) = (ENEMY_W, ENEMY_H);
     let mut img = Image::new(w as u32, h as u32);
     let cx = w / 2;
-    let (r, g, b): (u8, u8, u8) = match kind {
-        0 => (90, 130, 90),
-        1 => (200, 150, 60),
-        _ => (225, 45, 45),
-    };
-    let (dr, dg, db) = (r.saturating_sub(35), g.saturating_sub(35), b.saturating_sub(35));
+    let ((r, g, b), (wr, wg, wb)) = enemy_colors(kind);
     let prop_cy = h - 2;
     let tail_wing_y0 = (h as f32 * 0.08) as i32;
     let tail_wing_y1 = (h as f32 * 0.16) as i32;
@@ -332,14 +364,14 @@ fn enemy_plane(kind: usize) -> Vec<u8> {
             if y >= tail_wing_y0 && y <= tail_wing_y1 {
                 let wing_half = (w as f32 * 0.24) as i32;
                 if (x - cx).abs() <= wing_half {
-                    img.set(x, y, dr, dg, db);
+                    img.set(x, y, wr, wg, wb);
                 }
             }
             // main wing, roughly amidships
             if y >= main_wing_y0 && y <= main_wing_y1 {
                 let wing_half = (w as f32 * 0.46) as i32;
                 if (x - cx).abs() <= wing_half {
-                    img.set(x, y, dr, dg, db);
+                    img.set(x, y, wr, wg, wb);
                 }
             }
             // cockpit, between the main wing and the nose
@@ -1852,4 +1884,100 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/music.wav",          music()),
         ("sounds/music2.wav",         music2()),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The sea/sky gradient the planes are seen against — the two ends of
+    /// it, from draw_sea() in crates/sky_raider/src/main.rs. Duplicated
+    /// rather than shared because the game does not depend on this crate
+    /// at runtime; if the gradient there changes, this test is the thing
+    /// that should start failing.
+    const SKY_HORIZON: (u8, u8, u8) = (25, 61, 117);
+    const SKY_NEAR: (u8, u8, u8) = (7, 28, 76);
+
+    /// Relative luminance, as WCAG defines it.
+    fn luminance((r, g, b): (u8, u8, u8)) -> f64 {
+        fn channel(v: u8) -> f64 {
+            let c = v as f64 / 255.0;
+            if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+        }
+        0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+    }
+
+    fn contrast(a: (u8, u8, u8), b: (u8, u8, u8)) -> f64 {
+        let (la, lb) = (luminance(a), luminance(b));
+        let (hi, lo) = if la > lb { (la, lb) } else { (lb, la) };
+        (hi + 0.05) / (lo + 0.05)
+    }
+
+    /// An enemy you cannot see is not a hard enemy.
+    ///
+    /// Raider is a weaving game: the player reads a sky full of diving
+    /// planes and threads between them, and contact costs HP. That only
+    /// works if the planes are *there* to be read. The drab-green grunt —
+    /// the commonest enemy in the game — used to sit at 2.4:1 against the
+    /// horizon with wings at 1.45:1, against a player plane at 4.8:1 and
+    /// clouds at 9:1. The hardest thing on screen to see was the thing
+    /// you had to see.
+    ///
+    /// 3:1 is the floor WCAG sets for a graphical object whose shape
+    /// carries meaning. It is not a style rule — it is the line below
+    /// which the sprite stops being a shape and becomes a smudge.
+    #[test]
+    fn enemy_planes_are_visible_against_the_sky() {
+        for kind in 0..3 {
+            let (body, wing) = enemy_colors(kind);
+            for (what, color) in [("body", body), ("wing", wing)] {
+                for (where_, sky) in [("horizon", SKY_HORIZON), ("near", SKY_NEAR)] {
+                    let c = contrast(color, sky);
+                    assert!(
+                        c >= 3.0,
+                        "enemy kind {kind}'s {what} is {c:.2}:1 against the {where_} sky \
+                         — below the 3:1 floor, so the plane reads as a smudge rather than \
+                         a shape a player can weave between"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The wings are the widest surface and the first thing picked out of
+    /// the sky, so they must not be the dimmest part of the plane. They
+    /// were: shading them 35 darker than the fuselage is what put the
+    /// grunt's at 1.45:1.
+    #[test]
+    fn a_planes_wings_are_no_darker_than_its_fuselage() {
+        for kind in 0..3 {
+            let (body, wing) = enemy_colors(kind);
+            assert!(
+                luminance(wing) >= luminance(body),
+                "enemy kind {kind}'s wings are darker than its body, which hides the widest \
+                 part of the silhouette against the sky"
+            );
+        }
+    }
+
+    /// Each kind still has to be tellable from the others at a glance —
+    /// the weaver dodges, the ace always drops a power-up, and a player
+    /// reacts to which is which before reading anything else.
+    #[test]
+    fn the_three_enemy_kinds_stay_distinguishable_from_each_other() {
+        let colors: Vec<_> = (0..3).map(|k| enemy_colors(k).0).collect();
+        for a in 0..colors.len() {
+            for b in (a + 1)..colors.len() {
+                let (x, y) = (colors[a], colors[b]);
+                let far_apart = (x.0 as i32 - y.0 as i32).abs()
+                    + (x.1 as i32 - y.1 as i32).abs()
+                    + (x.2 as i32 - y.2 as i32).abs();
+                assert!(
+                    far_apart >= 120,
+                    "enemy kinds {a} and {b} are within {far_apart} of each other — lifting them \
+                     out of the sky must not flatten them into each other"
+                );
+            }
+        }
+    }
 }

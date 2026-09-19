@@ -65,6 +65,38 @@ const UFO_CHARGE_SECS: f32 = 1.9;    // "gnarly" charge-up before it fires
 const UFO_FIRE_SECS: f32 = 0.4;      // how long the beam itself is on screen
 const LASER_HIT_W: f32 = UFO_W;      // width of the beam's kill zone
 
+// ---- the mothership -----------------------------------------------------
+// Every fifth level ends with one instead of simply ending.
+//
+// The five formation themes cycle forever, and past level 5 the only thing
+// that changes is how fast they march — the game gets harder without ever
+// getting *different*, and clearing a level stops meaning anything. The
+// mothership is the thing a run is aiming at: it arrives when the last
+// alien of a boss level dies, it takes real damage to bring down, and it
+// is the one enemy that shoots back in volleys.
+//
+// Deliberately built out of parts that already exist: the saucer art drawn
+// large, the alien bomb pool (empty by then — the formation it belonged to
+// is dead), the existing bomb/player and bomb/shield collisions, and the
+// existing explosion pool. The only genuinely new things are its health
+// and its firing pattern.
+const BOSS_EVERY: i32 = 5;            // every fifth level ends with one
+const BOSS_SCALE: f32 = 2.6;          // times the ordinary saucer
+const BOSS_W: f32 = UFO_W * BOSS_SCALE;
+const BOSS_H: f32 = UFO_H * BOSS_SCALE;
+const BOSS_Y: f32 = (PLAY_Y + 46) as f32;
+const BOSS_SWAY: f32 = 26.0;          // how far it rises and falls as it crosses
+const BOSS_HP_BASE: i32 = 16;         // first mothership, level 5
+const BOSS_HP_STEP: i32 = 8;          // each one after that
+const BOSS_SPEED_BASE: f32 = 78.0;
+const BOSS_SPEED_STEP: f32 = 14.0;
+const BOSS_VOLLEY_MIN: f32 = 1.05;    // seconds between volleys, first mothership
+const BOSS_VOLLEY_FLOOR: f32 = 0.42;  // however many it takes, never faster than this
+const BOSS_VOLLEY_STEP: f32 = 0.09;   // taken off the gap per mothership
+const BOSS_HIT_SCORE: i32 = 10;       // per hit, so chipping it down is itself worth points
+const BOSS_KILL_SCORE: i32 = 500;     // x level, on top
+const BOSS_FLASH: f32 = 0.08;         // how long it glows white after a hit
+
 const MAX_UFO_BOMBS: usize = 1;
 const UFO_BOMB_IDX: usize = MAX_PLAYER_BULLETS + MAX_BOMBS;
 const N_BULLETS: usize = MAX_PLAYER_BULLETS + MAX_BOMBS + MAX_UFO_BOMBS;
@@ -148,6 +180,17 @@ struct Game {
     ufo_fire_timer: Timer,
     respawn_grace: Timer,
     dead_pause_total: f32,
+    boss_active: bool,
+    /// Set once this level's mothership has been dealt with, so clearing
+    /// the formation does not summon a second one.
+    boss_done: bool,
+    boss_hp: i32,
+    boss_hp_max: i32,
+    boss_x: f32,
+    boss_dir: i32,
+    boss_phase: f32,
+    boss_fire: Timer,
+    boss_flash: f32,
 }
 
 impl Game {
@@ -195,6 +238,15 @@ impl Game {
             ufo_fire_timer: Timer::default(),
             respawn_grace: Timer::default(),
             dead_pause_total: DEAD_PAUSE,
+            boss_active: false,
+            boss_done: false,
+            boss_hp: 0,
+            boss_hp_max: 0,
+            boss_x: 0.0,
+            boss_dir: 1,
+            boss_phase: 0.0,
+            boss_fire: Timer::default(),
+            boss_flash: 0.0,
         }
     }
 
@@ -345,7 +397,47 @@ impl Game {
         self.ufo_score_timer = Timer::default();
         self.ufo_bomb_timer = Timer::default();
         self.bullets[UFO_BOMB_IDX].active = false;
+        // A mothership belongs to the level that summoned it. Losing a
+        // life mid-fight re-runs this, so the fight restarts with the
+        // formation already dead — see update_play()'s win check.
+        self.boss_active = false;
+        self.boss_done = false;
+        self.boss_flash = 0.0;
         self.state = State::Play;
+    }
+
+    fn is_boss_level(&self) -> bool { self.sess.level % BOSS_EVERY == 0 }
+
+    /// How many motherships deep this run is — the first is 1.
+    fn boss_number(&self) -> i32 { (self.sess.level / BOSS_EVERY).max(1) }
+
+    fn spawn_boss(&mut self) {
+        let n = self.boss_number();
+        self.boss_hp_max = BOSS_HP_BASE + BOSS_HP_STEP * (n - 1);
+        self.boss_hp = self.boss_hp_max;
+        self.boss_dir = if (rand() & 1) == 0 { 1 } else { -1 };
+        self.boss_x = if self.boss_dir == 1 { -BOSS_W } else { WIN_W as f32 };
+        self.boss_phase = 0.0;
+        self.boss_active = true;
+        // Comes in shooting, but not instantly: the player has just
+        // cleared a formation and needs the moment it takes to read what
+        // has arrived before the first volley lands.
+        self.boss_fire.start(1.4);
+    }
+
+    fn boss_speed(&self) -> f32 {
+        BOSS_SPEED_BASE + BOSS_SPEED_STEP * (self.boss_number() - 1) as f32
+    }
+
+    fn boss_volley_gap(&self) -> f32 {
+        let gap = BOSS_VOLLEY_MIN - BOSS_VOLLEY_STEP * (self.boss_number() - 1) as f32;
+        if gap < BOSS_VOLLEY_FLOOR { BOSS_VOLLEY_FLOOR } else { gap }
+    }
+
+    fn boss_y(&self) -> f32 {
+        // Rides a slow sine as it crosses, so its bombs do not all start
+        // from the same height and the silhouette never sits still.
+        BOSS_Y + (self.boss_phase.sin()) * BOSS_SWAY
     }
 
     fn start_game(&mut self) {
@@ -657,6 +749,87 @@ fn alien_color(kind: usize) -> BlipColor {
     }
 }
 
+/// The mothership: cross, sway, and drop volleys.
+///
+/// Its bombs go into the alien bomb pool, which is free by the time it
+/// arrives — the formation that owned those slots is what summoned it.
+/// That means its shots are the same bombs the player already knows: same
+/// speed, same look, already handled by the bomb/player and bomb/shield
+/// collisions. A boss that shot something new would need all of that
+/// written twice, and would teach the player a second set of rules in the
+/// one fight where they have least attention to spare.
+fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
+    if !g.boss_active { return; }
+
+    if g.boss_flash > 0.0 {
+        g.boss_flash -= dt;
+        if g.boss_flash < 0.0 { g.boss_flash = 0.0; }
+    }
+
+    g.boss_phase += dt * 1.6;
+    g.boss_x += g.boss_speed() * g.boss_dir as f32 * dt;
+    // Turns at the walls rather than flying off: this one does not get to
+    // leave. The ordinary UFO is a bonus that passes by; the mothership is
+    // the level.
+    if g.boss_x < 0.0 { g.boss_x = 0.0; g.boss_dir = 1; }
+    if g.boss_x + BOSS_W > WIN_W as f32 { g.boss_x = WIN_W as f32 - BOSS_W; g.boss_dir = -1; }
+
+    g.ufo_spin_timer += dt * 1000.0;
+    if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
+        g.ufo_spin_timer = 0.0;
+        g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
+    }
+
+    if g.boss_fire.tick(dt) {
+        // Three bombs: one under each wingtip and one under the middle.
+        // Fired from where the ship actually is, so its sway is something
+        // the player can read the volley off rather than noise.
+        let y = g.boss_y() + BOSS_H;
+        let xs = [g.boss_x + BOSS_W * 0.18, g.boss_x + BOSS_W * 0.5, g.boss_x + BOSS_W * 0.82];
+        for x in xs {
+            if let Some(i) = g.free_bullet(false) {
+                g.bullets[i] = Bullet { x, y, active: true, player: false };
+            }
+        }
+        play_sfx(&sfx.shoot);
+        g.boss_fire.start(g.boss_volley_gap());
+    }
+}
+
+/// Player shots against the mothership.
+///
+/// Only the player's own bullet slots are looked at — free_bullet() hands
+/// those out from the front of the array and bombs from behind it, so a
+/// shot that could hurt the mothership can only be in this range.
+fn boss_take_hits(g: &mut Game, sfx: &Sounds) {
+    if !g.boss_active { return; }
+    let (bx, by) = (g.boss_x, g.boss_y());
+    for i in 0..MAX_PLAYER_BULLETS {
+        if !g.bullets[i].active { continue; }
+        let (x, y) = (g.bullets[i].x, g.bullets[i].y);
+        if x < bx || x > bx + BOSS_W || y < by || y > by + BOSS_H { continue; }
+        g.bullets[i].active = false;
+        g.boss_hp -= 1;
+        g.boss_flash = BOSS_FLASH;
+        g.sess.add_score(BOSS_HIT_SCORE);
+        // The puff goes where the shot landed, not at the centre: it is
+        // the only feedback saying a hit registered at all, and a boss
+        // that swallows shots silently reads as invulnerable.
+        g.spawn_explosion_ex(x - 8.0, y - 8.0, EXPLOSION_TTL * 0.7, 1.0);
+        play_sfx(&sfx.explosion);
+        if g.boss_hp <= 0 {
+            g.boss_active = false;
+            g.boss_done = true;
+            g.sess.add_score(BOSS_KILL_SCORE * g.sess.level);
+            g.spawn_player_death(bx + BOSS_W / 2.0 - ALIEN_W as f32 / 2.0, by + BOSS_H / 2.0);
+            g.spawn_explosion_ex(bx + BOSS_W * 0.2, by, EXPLOSION_TTL * 2.0, 2.2);
+            g.spawn_explosion_ex(bx + BOSS_W * 0.8, by + BOSS_H * 0.5, EXPLOSION_TTL * 2.2, 2.4);
+            blip::stop_alert();
+            return;
+        }
+    }
+}
+
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.respawn_grace.tick(dt);
     // Hold to fire, the way the real cabinet's button worked — a new shot
@@ -876,12 +1049,26 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         return; // the laser just killed the player this frame
     }
 
-    if g.aliens_alive() == 0 {
-        play_sfx(&sfx.level_clear);
-        g.sess.next_level();
-        g.dead_timer.start(1.5);
-        g.state = State::Win;
+    update_boss(g, dt, sfx);
+    boss_take_hits(g, sfx);
+
+    if g.aliens_alive() == 0 && !g.boss_active {
+        // Whichever way this goes the ordinary UFO's pass is over: the
+        // level has ended, or a mothership is taking the sky and two
+        // sirens and two saucers at once is a fight nobody can read.
         if g.ufo_active { g.ufo_active = false; blip::stop_alert(); }
+
+        // On a boss level the formation is the doorway, not the level.
+        if g.is_boss_level() && !g.boss_done {
+            g.bullets[UFO_BOMB_IDX].active = false;
+            g.spawn_boss();
+            blip::play_alert(&sfx.ufo_siren);
+        } else {
+            play_sfx(&sfx.level_clear);
+            g.sess.next_level();
+            g.dead_timer.start(1.5);
+            g.state = State::Win;
+        }
     }
 
     for e in g.explosions.iter_mut() {
@@ -924,6 +1111,44 @@ fn update_over(g: &mut Game, dt: f32) {
     g.start_game();
 }
 
+/// The mothership, and how much of it is left.
+///
+/// The health bar is the whole reason this fight reads as a fight. Without
+/// it a player firing into a ship that does not visibly change has no way
+/// to tell "slowly winning" from "doing nothing", and the honest reading
+/// of an enemy that will not die is that it cannot be killed. The bar is
+/// drawn under the ship rather than in the HUD so it is inside the same
+/// glance as the thing it describes.
+fn draw_boss(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
+    if !g.boss_active { return; }
+    let (x, y) = (g.boss_x, g.boss_y());
+
+    // White for a moment on every hit — at this size a small puff at the
+    // impact point is easy to lose against the hull.
+    let tint = if g.boss_flash > 0.0 {
+        BlipColor { r: 1.0, g: 1.0, b: 1.0, a: 1.0 }
+    } else {
+        // Reddens as it goes: a second reading of the same number the bar
+        // carries, for the player whose eyes are on the ship.
+        let hurt = 1.0 - (g.boss_hp as f32 / g.boss_hp_max.max(1) as f32);
+        BlipColor { r: 1.0, g: 1.0 - hurt * 0.55, b: 1.0 - hurt * 0.65, a: 1.0 }
+    };
+    blip.draw_texture_tinted(&saucer[g.ufo_frame], x, y, BOSS_W, BOSS_H, tint);
+
+    let frac = (g.boss_hp as f32 / g.boss_hp_max.max(1) as f32).clamp(0.0, 1.0);
+    let (bw, bh) = (BOSS_W, 4.0);
+    let by = y + BOSS_H + 4.0;
+    blip.fill_rect(x, by, bw, bh, BlipColor { r: 0.25, g: 0.05, b: 0.05, a: 1.0 });
+    let bar = if frac > 0.5 {
+        BlipColor { r: 0.35, g: 0.95, b: 0.4, a: 1.0 }
+    } else if frac > 0.22 {
+        BlipColor { r: 1.0, g: 0.82, b: 0.2, a: 1.0 }
+    } else {
+        BlipColor { r: 1.0, g: 0.3, b: 0.25, a: 1.0 }
+    };
+    blip.fill_rect(x, by, bw * frac, bh, bar);
+}
+
 fn draw_play(blip: &Blip, g: &Game,
              player: &Texture2D, alien: &[[Texture2D; 2]; 3],
              explosion: &Texture2D, shield: &Texture2D, saucer: &[Texture2D; UFO_N_LIGHTS]) {
@@ -950,6 +1175,8 @@ fn draw_play(blip: &Blip, g: &Game,
             a.x, a.y, ALIEN_W as f32, ALIEN_H as f32, alien_color(a.kind),
         );
     }
+
+    draw_boss(blip, g, saucer);
 
     // While dead: hide the ship through the explosion, then have it fade
     // back in out of a dissipating mist once the respawn phase starts.
@@ -1193,5 +1420,115 @@ async fn main() {
         }
 
         blip.next_frame(60).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at_level(level: i32) -> Game {
+        let mut g = Game::new();
+        g.sess.reset(LIVES_START);
+        g.sess.level = level;
+        g
+    }
+
+    #[test]
+    fn a_mothership_ends_every_fifth_level_and_no_others() {
+        for level in 1..=20 {
+            let g = at_level(level);
+            assert_eq!(
+                g.is_boss_level(), level % 5 == 0,
+                "level {level} disagrees about whether it ends with a mothership"
+            );
+        }
+    }
+
+    #[test]
+    fn each_mothership_is_tougher_than_the_last() {
+        // The point of the fight is that it is the thing a run is aiming
+        // at. If the fifth one is no harder than the first, the levels
+        // between them have not been climbing toward anything.
+        let mut prev = None;
+        for level in [5, 10, 15, 20, 25] {
+            let mut g = at_level(level);
+            g.spawn_boss();
+            let now = (g.boss_hp, g.boss_speed(), g.boss_volley_gap());
+            if let Some((hp, speed, gap)) = prev {
+                assert!(now.0 > hp, "level {level}'s mothership has no more health than the last");
+                assert!(now.1 > speed, "level {level}'s mothership is no faster than the last");
+                assert!(now.2 <= gap, "level {level}'s mothership fires no harder than the last");
+            }
+            prev = Some(now);
+        }
+    }
+
+    #[test]
+    fn the_volley_never_becomes_unsurvivable() {
+        // Deep runs must stay a fight rather than a wall: the gap between
+        // volleys has a floor, so the difficulty curve flattens instead
+        // of eventually firing every frame.
+        let mut g = at_level(500);
+        g.spawn_boss();
+        assert!(
+            g.boss_volley_gap() >= BOSS_VOLLEY_FLOOR,
+            "the volley gap fell through its floor at level 500 ({}s)", g.boss_volley_gap()
+        );
+    }
+
+    #[test]
+    fn a_mothership_starts_at_full_health_and_on_screen() {
+        let mut g = at_level(10);
+        g.spawn_boss();
+        assert!(g.boss_active);
+        assert_eq!(g.boss_hp, g.boss_hp_max);
+        // It flies in from whichever side it starts on, so it is allowed
+        // to begin off-screen — but only by its own width, or it spends
+        // the first seconds of the fight invisible.
+        assert!(
+            g.boss_x >= -BOSS_W && g.boss_x <= WIN_W as f32,
+            "the mothership started {} px out, off its own entry", g.boss_x
+        );
+    }
+
+    #[test]
+    fn a_mothership_hangs_above_the_player_not_on_top_of_them() {
+        let mut g = at_level(5);
+        g.spawn_boss();
+        for _ in 0..600 {
+            g.boss_phase += 0.05;
+            let y = g.boss_y();
+            assert!(y >= PLAY_Y as f32, "the mothership rode up into the HUD ({y})");
+            assert!(
+                y + BOSS_H < (GROUND_Y - 40) as f32,
+                "the mothership sank onto the player's own line ({y})"
+            );
+        }
+    }
+
+    #[test]
+    fn a_dead_mothership_does_not_come_back_on_the_same_level() {
+        // Clearing the formation is what summons one. Once it is down,
+        // that check keeps passing every frame until the level ends, and
+        // without boss_done the level would summon a fresh mothership
+        // forever — a level that cannot be finished.
+        let mut g = at_level(5);
+        g.spawn_boss();
+        g.boss_active = false;
+        g.boss_done = true;
+        assert!(g.is_boss_level() && g.boss_done,
+            "nothing records that this level's mothership has already been dealt with");
+    }
+
+    #[test]
+    fn a_new_level_forgets_the_last_mothership() {
+        let mut g = at_level(5);
+        g.spawn_boss();
+        g.boss_done = true;
+        g.sess.next_level();
+        g.start_round_common();
+        assert!(!g.boss_active, "the old mothership survived into the next level");
+        assert!(!g.boss_done, "the next boss level would be skipped entirely");
     }
 }
