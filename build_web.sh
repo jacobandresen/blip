@@ -30,7 +30,7 @@ if command -v rustup >/dev/null 2>&1; then
 fi
 
 
-GAMES=(serpent bouncer galactic_defender rally meteors sky_raider)
+GAMES=(serpent bouncer galactic_defender rally meteors sky_raider brawler)
 TARGET_DIR="target/wasm32-unknown-unknown/release"
 
 echo "[build] cargo build --release --target wasm32-unknown-unknown"

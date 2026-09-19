@@ -53,6 +53,12 @@ var BLIP_GAMES = {
   // long pivot leash so the map stays put instead of creeping (re-centring
   // then reliably neutralises); a firmer notch so a held dodge doesn't
   // slip a detent mid-weave.
+  // A fighting game needs its two attack buttons on the deck, and a
+  // stick that answers immediately: blocking is holding back, so a
+  // sloppy neutral is a dropped guard. Tight dead zone, short leash.
+  brawler:            { name: 'BRAWLER', accent: '220, 60, 40',
+                         buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }],
+                         stick: { engage: 10, release: 6, maxR: 54, hyst: 10 } },
   sky_raider:         { name: 'RAIDER', accent: '50, 100, 220',
                          stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } }
 };

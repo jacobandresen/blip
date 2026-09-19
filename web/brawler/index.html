@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="google" content="notranslate">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BLIP">
+  <title>BLIP ARCADE</title>
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" type="image/x-icon" href="../favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+  <link rel="icon" type="image/svg+xml" href="../icon.svg">
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png">
+  <script src="../howler.min.js"></script>
+  <script src="../kiosk.js?v=20"></script>
+  <link rel="stylesheet" href="../kiosk.css?v=56">
+  <link rel="stylesheet" href="../shell.css?v=48">
+</head>
+<body>
+
+  <a class="blip-logo" href="../index.html">BLIP<span class="ba-rest">&nbsp;ARCADE</span></a>
+
+  <!-- Coin slot: fixed in the top-right corner of the cabinet's top panel,
+       mirroring the BLIP ARCADE logo at top-left — the physical slot you
+       feed, up on the panel, not down on the control deck. -->
+  <button id="insert-coin-btn" class="kiosk-btn"><span data-coins-hud></span></button>
+
+  <div id="loader">
+    <div id="status">LOADING</div>
+    <div id="bar-outer"><div id="bar-inner"></div></div>
+  </div>
+
+  <!-- The fixed bar is a plain (untransformed) box; .deck-panel is the
+       3D-tilted control surface inside it. Keeping the tilt off the
+       position:fixed element is what stops iOS Safari clipping the bar's
+       lower edge / floating it off the bottom in a home-screen PWA. -->
+  <div id="topbar" class="kiosk-bar">
+   <div class="deck-panel">
+    <!-- Arcade stick: mounted flush in the bar, left edge — its ball
+         rides a shaft that rises up over the game above the bar. Always
+         shown, not just on touch devices — draggable by touch/mouse
+         (shell.js), and it animates to reflect keyboard and gamepad
+         input too, so it doubles as a live input readout. -->
+    <div id="stick-base">
+      <div id="stick-boot"></div>
+      <div id="stick-handle">
+        <div id="stick-shaft"></div>
+        <div id="stick-ball"></div>
+      </div>
+    </div>
+    <!-- Fire buttons: mounted just right of the stick (with a gap between
+         them, see kiosk.css). Populated by shell.js from BLIP_GAMES (one
+         or two buttons). -->
+    <div id="fire-buttons"></div>
+    <!-- Paddle dials: rally only. Mounted in the deck like the stick —
+         two spinner knobs on the tilted panel, P1 left / P2 right.
+         shell.js reveals them and wires the touch spin. -->
+    <div id="paddle-dial">
+      <div class="dial-cap"><div id="dial-hand"></div></div>
+      <div id="dial-label">P1</div>
+    </div>
+    <div id="paddle-dial-p2">
+      <div class="dial-cap"><div id="dial-hand-p2"></div></div>
+      <div id="dial-label-p2">2P</div>
+    </div>
+   </div>
+
+   <!-- The game pad — the deck's default controller. A sibling of
+        .deck-panel (not a child), so none of it is inside the 3D tilt:
+        taps + the d-pad drag hit-test as plain 2D. shell.js wires it
+        through BlipController; #control-toggle (and the saved
+        'blip-controls' pref) swaps back to the joystick above. Buttons:
+        a big d-pad on the left, A / B on the right. No SELECT / START —
+        A / B double as the title-screen "press fire", the BLIP logo is
+        the way back to the arcade grid. -->
+   <div id="snes-pad" aria-hidden="true">
+    <span class="snes-cord" aria-hidden="true"></span>
+    <div class="snes-shell">
+      <div class="snes-dpad">
+        <span class="snes-dp-seg dp-up"    data-blip="up"    data-blip-nopress></span>
+        <span class="snes-dp-seg dp-right" data-blip="right" data-blip-nopress></span>
+        <span class="snes-dp-seg dp-down"  data-blip="down"  data-blip-nopress></span>
+        <span class="snes-dp-seg dp-left"  data-blip="left"  data-blip-nopress></span>
+        <span class="snes-dp-hub"></span>
+      </div>
+      <div class="snes-face">
+        <button type="button" class="snes-btn snes-b" data-blip="button1" aria-label="Button B"><span></span></button>
+        <button type="button" class="snes-btn snes-a" data-blip="button1" aria-label="Button A"><span></span></button>
+      </div>
+      <span class="snes-wordmark" aria-hidden="true">BLIP</span>
+    </div>
+   </div>
+  </div>
+
+  <!-- Subtle: flip the deck back to the classic arcade joystick. -->
+  <button type="button" id="control-toggle" aria-label="Switch on-screen controller">&#9654;&nbsp;<span class="ct-what"></span></button>
+
+  <div id="need-coin-overlay">
+    <div class="nco-panel">
+      <div class="nco-msg">INSERT COIN</div>
+      <div class="nco-sub">1 Coin  1 Play</div>
+      <div class="nco-credit">Credit&#160;&#160;0</div>
+    </div>
+  </div>
+
+  <!-- #marquee-bar (per-game backlit name sign) is injected by shell.js -->
+  <div id="arcade-bezel"></div>
+  <span class="bezel-screw tl"></span>
+  <span class="bezel-screw tr"></span>
+  <span class="bezel-screw bl"></span>
+  <span class="bezel-screw br"></span>
+  <canvas id="glcanvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
+
+  <script src="../blip_controller.js?v=4"></script>
+  <script src="../vendor/supabase.js?v=1"></script>
+  <script src="../blip_config.js?v=1"></script>
+  <script src="../blip_scores.js?v=4"></script>
+  <script src="../shell.js?v=48"></script>
+  <script src="../mq_js_bundle.js?v=1"></script>
+  <script src="../howler_audio_plugin.js"></script>
+  <script src="../blip_bridge.js?v=11"></script>
+  <script>load("index.wasm");</script>
+
+</body>
+</html>

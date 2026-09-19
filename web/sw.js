@@ -1,4 +1,4 @@
-var CACHE = "blip-v163";
+var CACHE = "blip-v164";
 
 var ASSETS = [
   "/blip/",
@@ -54,6 +54,9 @@ var ASSETS = [
   "/blip/meteors/index.html",
   "/blip/meteors/index.wasm",
   "/blip/meteors/screenshot.png",
+  "/blip/brawler/index.html",
+  "/blip/brawler/index.wasm",
+  "/blip/brawler/screenshot.png",
   "/blip/sky_raider/index.html",
   "/blip/sky_raider/index.wasm",
   "/blip/sky_raider/screenshot.png",

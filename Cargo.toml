@@ -5,6 +5,7 @@ members = [
     "crates/blip_assets",
     "crates/serpent",
     "crates/bouncer",
+    "crates/brawler",
     "crates/galactic_defender",
     "crates/rally",
     "crates/meteors",

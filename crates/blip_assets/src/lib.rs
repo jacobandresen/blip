@@ -19,6 +19,7 @@ pub mod techno;
 pub mod wav;
 
 pub mod bouncer;
+pub mod brawler;
 pub mod galactic_defender;
 pub mod meteors;
 pub mod rally;
