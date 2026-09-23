@@ -45,7 +45,8 @@ fn draw_stage(blip: &Blip, g: &Game) {
     // A hit shakes the whole picture, which is most of what selling an
     // impact means when the fighters themselves are simple shapes.
     let shake = if g.shake > 0.0 { (g.shake * 60.0).sin() * g.shake * 30.0 } else { 0.0 };
-    if g.stage == 0 { draw_dock(blip, shake, g.now); } else { draw_temple(blip, shake, g.now); }
+    if g.stage == 0 { draw_dock(blip, shake, g.now, g.shake); }
+    else { draw_temple(blip, shake, g.now, g.shake); }
 
     draw_floor(blip, g.stage, shake);
 }
@@ -85,85 +86,344 @@ fn draw_floor(blip: &Blip, stage: usize, shake: f32) {
         blend(near, BLIP_WHITE, 0.35));
 }
 
-/// THE DOCKS — sunset, water, cranes, crates.
-fn draw_dock(blip: &Blip, shake: f32, t: f32) {
-    let bands = 12;
-    let h = FLOOR_Y / bands as f32;
-    for i in 0..bands {
-        let k = i as f32 / (bands - 1) as f32;
-        let c = BlipColor {
-            r: 0.95 - 0.55 * k, g: 0.45 - 0.22 * k, b: 0.30 + 0.18 * k, a: 1.0,
-        };
-        blip.fill_rect(0.0, i as f32 * h + shake, WIN_W as f32, h + 1.0, c);
-    }
-    // Sun low over the water.
-    blip.fill_circle(500.0, 190.0 + shake, 46.0, BlipColor { r: 1.0, g: 0.85, b: 0.45, a: 0.9 });
-    // Cranes: verticals with a jib, far enough back to read as skyline.
-    for (x, hgt) in [(90.0f32, 150.0f32), (160.0, 110.0), (560.0, 130.0)] {
-        let base = FLOOR_Y - 64.0 + shake;
-        let c = BlipColor { r: 0.18, g: 0.12, b: 0.14, a: 1.0 };
-        blip.fill_rect(x, base - hgt, 7.0, hgt, c);
-        blip.fill_rect(x - 26.0, base - hgt, 70.0, 6.0, c);
-        blip.draw_line(x + 3.0, base - hgt + 6.0, x + 40.0, base - hgt + 34.0, c);
-    }
-    // Water, with a moving glitter line — and then the quay in front of
-    // it. The fighters stand on the planks; drawing the sea right up to
-    // the floor line put them ankle-deep in it.
-    blip.fill_rect(0.0, FLOOR_Y - 64.0 + shake, WIN_W as f32, 36.0,
-        BlipColor { r: 0.20, g: 0.26, b: 0.40, a: 1.0 });
-    for i in 0..16 {
-        let x = ((i as f32 * 53.0) + (t * 18.0) % 53.0) % WIN_W as f32;
-        let y = FLOOR_Y - 58.0 + ((i * 7) % 24) as f32 + shake;
-        blip.fill_rect(x, y, 18.0, 1.5, BlipColor { r: 1.0, g: 0.8, b: 0.6, a: 0.28 });
-    }
-    blip.fill_rect(0.0, FLOOR_Y - 28.0 + shake, WIN_W as f32, 28.0,
-        BlipColor { r: 0.33, g: 0.24, b: 0.17, a: 1.0 });
-    for i in 0..22 {
-        let x = i as f32 * 30.0;
-        blip.draw_line(x, FLOOR_Y - 28.0 + shake, x, FLOOR_Y + shake,
-            BlipColor { r: 0.22, g: 0.15, b: 0.10, a: 1.0 });
-    }
-    // Crates stacked at the edges — the only thing telling you where the
-    // corner is before you are in it.
-    for (x, n) in [(2.0f32, 2), (604.0, 3)] {
-        for i in 0..n {
-            let y = FLOOR_Y - 24.0 * (i + 1) as f32 + shake;
-            blip.fill_rect(x, y, 34.0, 24.0, BlipColor { r: 0.42, g: 0.29, b: 0.16, a: 1.0 });
-            blip.draw_rect(x, y, 34.0, 24.0, BlipColor { r: 0.22, g: 0.15, b: 0.08, a: 1.0 });
+/// Deterministic scatter: the same crowd every frame, without storing
+/// one. `k` indexes the thing being placed, `salt` separates two uses.
+fn scatter(k: usize, salt: u32) -> f32 {
+    let mut h = (k as u32).wrapping_mul(2654435761).wrapping_add(salt);
+    h ^= h >> 15;
+    h = h.wrapping_mul(2246822519);
+    h ^= h >> 13;
+    (h % 1024) as f32 / 1024.0
+}
+
+/// Distance, as a colour. Anything far off is seen through the same air
+/// the sky is, so it loses contrast toward the sky rather than simply
+/// getting darker — which is most of what separates a backdrop with
+/// depth in it from a set of cut-outs at different heights.
+fn hazed(c: BlipColor, sky: BlipColor, k: f32) -> BlipColor { blend(c, sky, k) }
+
+/// A row of onlookers.
+///
+/// Silhouettes, because a crowd this size is a shape and a rhythm and
+/// not faces — and because anything detailed behind the fighters is
+/// competing with them. Small, dense and overlapping: spaced out and
+/// full height they read as a picket fence, and at the fighters' own
+/// head height they read as a third and fourth fighter.
+///
+/// They bob out of step, and a hit big enough to shake the screen puts
+/// them on their feet, which is the cheapest thing in this file that
+/// says the fight is being watched.
+fn draw_crowd(blip: &Blip, ground: f32, h: f32, c: BlipColor, t: f32, salt: u32, n: usize,
+              hype: f32) {
+    // At this size the bodies merge into one mass and the only thing
+    // that makes it a crowd is the line along the top of it. Drawn as
+    // separate whole figures they came out as a row of chess pawns —
+    // evenly spaced, all one width, heads as wide as their shoulders.
+    // `hype` is how recently something landed: they come up off
+    // their seats for it.
+    let h = h * (1.0 + 0.30 * hype);
+    let mass = ground - h * 0.42;
+    blip.fill_rect(0.0, mass, WIN_W as f32, ground - mass, shade(c, 0.88));
+    for i in 0..n {
+        let sx = scatter(i, salt);
+        let x = -10.0 + (i as f32 + 0.5 + (sx - 0.5) * 1.1) * (WIN_W as f32 + 20.0) / n as f32;
+        let tall = h * (0.76 + 0.48 * scatter(i, salt ^ 0x5bd1));
+        let bob = ((t * 2.6 + sx * 9.1).sin()).max(0.0) * 1.6;
+        let top = ground - tall + bob;
+        let cc = shade(c, 0.80 + 0.40 * scatter(i, salt ^ 0x77));
+        // Shoulders twice the width of a head, which is the proportion
+        // that reads as a person at any size.
+        let sh = tall * 0.21;
+        let neck = top + tall * 0.23;
+        blip.fill_rect(x - sh, neck, sh * 2.0, mass - neck + 2.0, cc);
+        blip.fill_circle(x, top + tall * 0.13, tall * 0.108, cc);
+        // A few of them with their arms up, and more of them when
+        // something has just landed.
+        if scatter(i, salt ^ 0x1f) < 0.20 + 0.55 * hype {
+            let up = tall * (0.30 + 0.10 * ((t * 5.0 + sx * 7.0).sin()));
+            blip.fill_rect(x - sh - 1.5, neck - up, 2.6, up + 2.0, cc);
+            blip.fill_rect(x + sh - 1.1, neck - up * 0.86, 2.6, up + 2.0, cc);
         }
     }
 }
 
-/// THE TEMPLE — night, moon, pillars, hanging banners.
-fn draw_temple(blip: &Blip, shake: f32, t: f32) {
-    blip.fill_rect(0.0, shake, WIN_W as f32, FLOOR_Y,
-        BlipColor { r: 0.06, g: 0.07, b: 0.14, a: 1.0 });
-    blip.fill_circle(120.0, 96.0 + shake, 34.0, BlipColor { r: 0.90, g: 0.92, b: 0.82, a: 0.95 });
-    blip.fill_circle(108.0, 88.0 + shake, 30.0, BlipColor { r: 0.06, g: 0.07, b: 0.14, a: 1.0 });
-    for i in 0..40 {
-        let x = ((i * 79) % WIN_W as usize) as f32;
-        let y = ((i * 43) % 220) as f32 + 10.0 + shake;
-        let tw = 0.5 + 0.5 * ((t * 1.7 + i as f32).sin());
-        blip.fill_rect(x, y, 1.6, 1.6, BlipColor { r: 0.9, g: 0.95, b: 1.0, a: 0.25 + 0.35 * tw });
+/// THE DOCKS — sunset over a working harbour.
+///
+/// Built in layers, far to near: sky, cloud, skyline, the far wharf and
+/// the people on it, water, then the quay the fight is on. Each layer
+/// is hazed toward the sky by how far off it is, which is what makes it
+/// a distance rather than a stack of cut-outs.
+///
+/// The band the fighters occupy is deliberately the quiet one. A
+/// backdrop competes with them at exactly the height they are, so the
+/// detail goes above their heads or below their knees and what is left
+/// behind them is flat water.
+fn draw_dock(blip: &Blip, shake: f32, t: f32, hit: f32) {
+    let hit = (hit / 0.16).clamp(0.0, 1.0);
+    const HORIZON: f32 = 250.0;
+    let sky_at = |k: f32| BlipColor {
+        r: 0.99 - 0.76 * k, g: 0.52 - 0.40 * k, b: 0.34 + 0.06 * k, a: 1.0,
+    };
+    let bands = 16;
+    let h = HORIZON / bands as f32;
+    for i in 0..bands {
+        let k = i as f32 / (bands - 1) as f32;
+        blip.fill_rect(0.0, i as f32 * h + shake, WIN_W as f32, h + 1.0, sky_at(1.0 - k));
     }
-    // Pillars, and the roof line they hold up.
-    let stone = BlipColor { r: 0.20, g: 0.19, b: 0.24, a: 1.0 };
-    let stone_lit = BlipColor { r: 0.30, g: 0.29, b: 0.35, a: 1.0 };
-    blip.fill_rect(0.0, 40.0 + shake, WIN_W as f32, 22.0, stone);
+    let low = sky_at(0.0);
+    // Everything below the gradient, before the near layers cover it.
+    // Without this the strip between the horizon and the quay is
+    // whatever the frame was cleared to, which is black.
+    blip.fill_rect(0.0, HORIZON + shake, WIN_W as f32, FLOOR_Y - HORIZON, low);
+
+    // Sun, with the haze around it that a sun near the horizon has.
+    let (sun_x, sun_y) = (486.0, 196.0 + shake);
+    for r in [74.0f32, 58.0, 46.0] {
+        blip.fill_circle(sun_x, sun_y, r,
+            BlipColor { r: 1.0, g: 0.78, b: 0.42, a: 0.16 });
+    }
+    blip.fill_circle(sun_x, sun_y, 38.0, BlipColor { r: 1.0, g: 0.88, b: 0.55, a: 1.0 });
+
+    // Cloud, in flat lit bars. Anything softer at this palette turns to
+    // mud against the gradient behind it.
+    for i in 0..7 {
+        let sx = scatter(i, 0x10c);
+        let y = 74.0 + sx * 120.0 + shake;
+        let w = 90.0 + scatter(i, 0x20c) * 150.0;
+        let x = (t * (3.0 + sx * 4.0) + sx * 900.0) % (WIN_W as f32 + 260.0) - 130.0;
+        let lit = 1.0 - ((y - shake) / 200.0).clamp(0.0, 1.0);
+        let c = blend(BlipColor { r: 0.62, g: 0.34, b: 0.42, a: 0.85 },
+                      BlipColor { r: 1.0, g: 0.80, b: 0.58, a: 0.85 }, lit);
+        blip.fill_rect(x, y, w, 7.0, c);
+        blip.fill_rect(x + 22.0, y + 7.0, w * 0.6, 5.0, shade(c, 0.9));
+    }
+
+    // Far skyline: warehouses and gantries, well hazed.
+    let far = hazed(BlipColor { r: 0.26, g: 0.16, b: 0.22, a: 1.0 }, low, 0.55);
+    for i in 0..9 {
+        let sx = scatter(i, 0x31);
+        let w = 34.0 + sx * 56.0;
+        let x = i as f32 * 74.0 - 20.0;
+        let hh = 20.0 + scatter(i, 0x32) * 34.0;
+        blip.fill_rect(x, HORIZON - hh + shake, w, hh, far);
+        // Sawtooth warehouse roofs.
+        for j in 0..(w as usize / 14) {
+            let rx = x + j as f32 * 14.0;
+            blip.fill_rect(rx, HORIZON - hh - 5.0 + shake, 8.0, 5.0, far);
+        }
+    }
+    // Gantry cranes: a tower, a jib out over the water, and the cable
+    // under it. Three legs and a bar read as a pylon; the jib is what
+    // makes it a crane.
+    let crane = hazed(BlipColor { r: 0.17, g: 0.10, b: 0.15, a: 1.0 }, low, 0.30);
+    for (x, hgt, dir) in [(96.0f32, 118.0f32, 1.0f32), (238.0, 92.0, 1.0), (566.0, 106.0, -1.0)] {
+        let base = HORIZON + 4.0 + shake;
+        let top = base - hgt;
+        blip.fill_rect(x - 3.0, top, 6.0, hgt, crane);
+        blip.fill_rect(x - 16.0, base - 8.0, 32.0, 8.0, crane);
+        blip.draw_line(x, base, x - dir * 16.0, top + 14.0, crane);
+        // Jib and the hook hanging off it.
+        blip.fill_rect(x.min(x + dir * 62.0), top, 62.0, 5.0, crane);
+        blip.draw_line(x + dir * 54.0, top + 5.0, x + dir * 54.0, top + 30.0, crane);
+        blip.fill_rect(x + dir * 50.0, top + 30.0, 9.0, 6.0, crane);
+        blip.draw_line(x, top, x + dir * 24.0, top - 16.0, crane);
+        blip.draw_line(x + dir * 24.0, top - 16.0, x + dir * 60.0, top, crane);
+    }
+
+    // A moored ship, because a dock with nothing tied up at it is a
+    // sea wall.
+    let hull = hazed(BlipColor { r: 0.22, g: 0.24, b: 0.34, a: 1.0 }, low, 0.22);
+    blip.fill_rect(300.0, HORIZON - 26.0 + shake, 186.0, 26.0, hull);
+    blip.fill_rect(300.0, HORIZON - 30.0 + shake, 186.0, 5.0,
+        blend(hull, BLIP_WHITE, 0.25));
+    blip.fill_rect(352.0, HORIZON - 54.0 + shake, 58.0, 24.0, shade(hull, 1.15));
+    blip.fill_rect(392.0, HORIZON - 72.0 + shake, 7.0, 20.0, shade(hull, 0.8));
+    for i in 0..6 {
+        let c = if i % 2 == 0 { BlipColor { r: 0.55, g: 0.30, b: 0.22, a: 1.0 } }
+                else { BlipColor { r: 0.26, g: 0.42, b: 0.40, a: 1.0 } };
+        blip.fill_rect(414.0 + i as f32 * 12.0, HORIZON - 42.0 + shake, 11.0, 12.0,
+            hazed(c, low, 0.3));
+    }
+
+    // The far wharf, and the dockers watching from it.
+    let wharf = hazed(BlipColor { r: 0.30, g: 0.20, b: 0.20, a: 1.0 }, low, 0.18);
+    draw_crowd(blip, HORIZON + 8.0 + shake, 29.0,
+        hazed(BlipColor { r: 0.15, g: 0.09, b: 0.13, a: 1.0 }, low, 0.16),
+        t, 0x9e3, 34, hit);
+    blip.fill_rect(0.0, HORIZON + 4.0 + shake, WIN_W as f32, 10.0, wharf);
+
+    // Water: flat, dark, and the quietest thing on screen, because it
+    // is what sits directly behind the fighters.
+    let sea = BlipColor { r: 0.17, g: 0.22, b: 0.36, a: 1.0 };
+    blip.fill_rect(0.0, HORIZON + 14.0 + shake, WIN_W as f32, 72.0, sea);
+    // The sun's road on the water, and ripples crossing it.
+    for i in 0..13 {
+        let k = i as f32 / 12.0;
+        let y = HORIZON + 18.0 + k * 62.0 + shake;
+        let w = 16.0 + k * 54.0 + (t * 2.0 + i as f32).sin() * 5.0;
+        blip.fill_rect(sun_x - w * 0.5, y, w, 2.5,
+            BlipColor { r: 1.0, g: 0.80, b: 0.52, a: 0.30 - 0.16 * k });
+    }
+    for i in 0..22 {
+        let sx = scatter(i, 0x5ea);
+        let y = HORIZON + 20.0 + sx * 58.0 + shake;
+        let x = ((i as f32 * 61.0) + t * (7.0 + sx * 9.0)) % (WIN_W as f32 + 60.0) - 30.0;
+        blip.fill_rect(x, y, 14.0 + sx * 20.0, 1.5,
+            BlipColor { r: 0.62, g: 0.74, b: 0.92, a: 0.16 });
+    }
+
+    // The quay wall the fighters stand on top of, with its bollards and
+    // the tyres hung over the edge.
+    let quay = BlipColor { r: 0.31, g: 0.22, b: 0.16, a: 1.0 };
+    blip.fill_rect(0.0, FLOOR_Y - 30.0 + shake, WIN_W as f32, 30.0, quay);
+    blip.fill_rect(0.0, FLOOR_Y - 32.0 + shake, WIN_W as f32, 3.0, blend(quay, BLIP_WHITE, 0.22));
+    for i in 0..22 {
+        blip.draw_line(i as f32 * 30.0, FLOOR_Y - 29.0 + shake, i as f32 * 30.0,
+            FLOOR_Y + shake, shade(quay, 0.72));
+    }
     for i in 0..5 {
-        let x = 40.0 + i as f32 * 140.0;
-        blip.fill_rect(x, 62.0 + shake, 26.0, FLOOR_Y - 62.0, stone);
-        blip.fill_rect(x, 62.0 + shake, 6.0, FLOOR_Y - 62.0, stone_lit);
+        let x = 54.0 + i as f32 * 136.0;
+        blip.fill_circle(x, FLOOR_Y - 14.0 + shake, 7.0, shade(quay, 0.55));
+        blip.fill_circle(x, FLOOR_Y - 14.0 + shake, 3.5, sea);
     }
-    // Banners that move a little, so the place is not a photograph.
-    for i in 0..3 {
-        let x = 110.0 + i as f32 * 200.0;
+    for (x, n) in [(2.0f32, 2), (598.0, 3)] {
+        for i in 0..n {
+            let y = FLOOR_Y - 26.0 * (i + 1) as f32 + shake;
+            let c = BlipColor { r: 0.44, g: 0.30, b: 0.17, a: 1.0 };
+            blip.fill_rect(x, y, 38.0, 26.0, c);
+            blip.fill_rect(x, y, 38.0, 4.0, blend(c, BLIP_WHITE, 0.2));
+            blip.draw_rect(x, y, 38.0, 26.0, shade(c, 0.5));
+        }
+    }
+}
+
+/// THE TEMPLE — night, under a roof, with the mountain behind it.
+///
+/// Same build as the docks: sky, cloud, mountains, the colonnade and
+/// the people between it, then the terrace the fight is on. The light
+/// here comes from the lanterns rather than the sky, which is what
+/// gives a night stage anything to look at.
+fn draw_temple(blip: &Blip, shake: f32, t: f32, hit: f32) {
+    let hit = (hit / 0.16).clamp(0.0, 1.0);
+    const HORIZON: f32 = 262.0;
+    let sky_at = |k: f32| BlipColor {
+        r: 0.05 + 0.13 * k, g: 0.06 + 0.13 * k, b: 0.13 + 0.17 * k, a: 1.0,
+    };
+    let bands = 14;
+    let h = HORIZON / bands as f32;
+    for i in 0..bands {
+        let k = i as f32 / (bands - 1) as f32;
+        blip.fill_rect(0.0, i as f32 * h + shake, WIN_W as f32, h + 1.0, sky_at(k));
+    }
+    let low = sky_at(1.0);
+    blip.fill_rect(0.0, HORIZON + shake, WIN_W as f32, FLOOR_Y - HORIZON, low);
+
+    for i in 0..52 {
+        let sx = scatter(i, 0x2a);
+        let x = sx * WIN_W as f32;
+        let y = scatter(i, 0x2b) * 210.0 + 8.0 + shake;
+        let tw = 0.5 + 0.5 * ((t * 1.7 + sx * 30.0).sin());
+        let r = 0.8 + scatter(i, 0x2c) * 1.2;
+        blip.fill_circle(x, y, r,
+            BlipColor { r: 0.9, g: 0.95, b: 1.0, a: 0.20 + 0.40 * tw });
+    }
+
+    // Moon, with its glow and the cloud that drifts over it.
+    let (mx, my) = (143.0, 92.0 + shake);
+    for r in [46.0f32, 34.0] {
+        blip.fill_circle(mx, my, r, BlipColor { r: 0.75, g: 0.82, b: 0.95, a: 0.10 });
+    }
+    blip.fill_circle(mx, my, 26.0, BlipColor { r: 0.92, g: 0.94, b: 0.86, a: 1.0 });
+    blip.fill_circle(mx - 10.0, my - 7.0, 23.0, sky_at(0.28));
+    for i in 0..5 {
+        let sx = scatter(i, 0x40);
+        let y = 60.0 + sx * 96.0 + shake;
+        let w = 110.0 + scatter(i, 0x41) * 170.0;
+        let x = (t * (2.0 + sx * 3.0) + sx * 800.0) % (WIN_W as f32 + 300.0) - 150.0;
+        blip.fill_rect(x, y, w, 6.0, BlipColor { r: 0.20, g: 0.21, b: 0.31, a: 0.7 });
+    }
+
+    // Mountains, in two ranges so there is a distance between them.
+    for (base, amp, k, step) in [(HORIZON - 52.0, 66.0f32, 0.66f32, 128.0f32),
+                                 (HORIZON - 26.0, 44.0, 0.44, 96.0)] {
+        let c = hazed(BlipColor { r: 0.10, g: 0.11, b: 0.20, a: 1.0 }, low, k);
+        let n = (WIN_W as f32 / step) as usize + 2;
+        for i in 0..n {
+            let x = i as f32 * step - 40.0;
+            let pk = amp * (0.55 + 0.45 * scatter(i, if k > 0.5 { 0x51 } else { 0x52 }));
+            // A peak drawn as a stack of shrinking bars: at this size a
+            // triangle and a staircase are the same picture.
+            let rows = 9;
+            for r in 0..rows {
+                let f = r as f32 / rows as f32;
+                let w = step * 0.95 * (1.0 - f);
+                blip.fill_rect(x + step * 0.75 - w * 0.5, base + shake - pk * f - pk / rows as f32,
+                    w, pk / rows as f32 + 1.0, c);
+            }
+        }
+    }
+
+    // The roof over the whole stage, and the rafters holding it up.
+    let stone = BlipColor { r: 0.19, g: 0.18, b: 0.24, a: 1.0 };
+    let lit = BlipColor { r: 0.31, g: 0.29, b: 0.37, a: 1.0 };
+    let tile = BlipColor { r: 0.14, g: 0.13, b: 0.19, a: 1.0 };
+    blip.fill_rect(0.0, 30.0 + shake, WIN_W as f32, 20.0, tile);
+    for i in 0..27 {
+        blip.fill_rect(i as f32 * 24.0, 30.0 + shake, 20.0, 20.0, shade(tile, 1.3));
+        blip.fill_rect(i as f32 * 24.0, 46.0 + shake, 20.0, 4.0, shade(tile, 0.7));
+    }
+    blip.fill_rect(0.0, 50.0 + shake, WIN_W as f32, 7.0, lit);
+    for i in 0..14 {
+        blip.fill_rect(10.0 + i as f32 * 46.0, 57.0 + shake, 12.0, 16.0, stone);
+    }
+
+    // Colonnade, and the onlookers standing between the pillars.
+    draw_crowd(blip, HORIZON + 6.0 + shake, 32.0,
+        BlipColor { r: 0.20, g: 0.20, b: 0.29, a: 1.0 }, t, 0x77a, 30, hit);
+    for i in 0..5 {
+        let x = 22.0 + i as f32 * 146.0;
+        blip.fill_rect(x, 57.0 + shake, 30.0, HORIZON - 45.0, stone);
+        blip.fill_rect(x, 57.0 + shake, 7.0, HORIZON - 45.0, lit);
+        // Capital and base, which is what stops a pillar being a bar.
+        blip.fill_rect(x - 5.0, 57.0 + shake, 40.0, 9.0, lit);
+        blip.fill_rect(x - 5.0, HORIZON + 4.0 + shake, 40.0, 10.0, lit);
+        blip.fill_rect(x - 3.0, HORIZON + 14.0 + shake, 36.0, 6.0, shade(stone, 0.8));
+    }
+
+    // Banners between the pillars, and the lanterns that light them.
+    for i in 0..4 {
+        let x = 96.0 + i as f32 * 146.0;
         let sway = (t * 1.1 + i as f32).sin() * 3.0;
-        blip.fill_rect(x + sway, 62.0 + shake, 22.0, 120.0,
-            BlipColor { r: 0.62, g: 0.12, b: 0.16, a: 1.0 });
-        blip.fill_rect(x + 8.0 + sway, 84.0 + shake, 6.0, 60.0,
+        blip.fill_rect(x + sway, 73.0 + shake, 24.0, 118.0,
+            BlipColor { r: 0.60, g: 0.11, b: 0.16, a: 1.0 });
+        blip.fill_rect(x + 8.0 + sway, 95.0 + shake, 8.0, 62.0,
             BlipColor { r: 0.95, g: 0.85, b: 0.5, a: 0.9 });
+        blip.fill_rect(x - 2.0 + sway, 73.0 + shake, 28.0, 5.0,
+            BlipColor { r: 0.30, g: 0.26, b: 0.20, a: 1.0 });
     }
+    for i in 0..5 {
+        let x = 22.0 + i as f32 * 146.0 + 15.0;
+        let sway = (t * 1.4 + i as f32 * 1.9).sin() * 2.2;
+        let y = 82.0 + shake;
+        blip.draw_line(x, 66.0 + shake, x + sway, y, BlipColor { r: 0.25, g: 0.22, b: 0.18, a: 1.0 });
+        let flick = 0.86 + 0.14 * ((t * 9.0 + i as f32 * 2.1).sin());
+        blip.fill_glow_circle(x + sway, y + 9.0, 22.0,
+            BlipColor { r: 1.0, g: 0.72, b: 0.32, a: 0.16 * flick });
+        blip.fill_circle(x + sway, y + 9.0, 8.0,
+            BlipColor { r: 0.95, g: 0.40, b: 0.25, a: 1.0 });
+        blip.fill_circle(x + sway, y + 8.0, 5.0,
+            BlipColor { r: 1.0, g: 0.85 * flick, b: 0.5, a: 1.0 });
+    }
+
+    // The terrace wall under the colonnade, down to the floor.
+    let wall = BlipColor { r: 0.15, g: 0.15, b: 0.20, a: 1.0 };
+    blip.fill_rect(0.0, HORIZON + 20.0 + shake, WIN_W as f32, FLOOR_Y - HORIZON - 20.0, wall);
+    for i in 0..13 {
+        let x = i as f32 * 50.0;
+        blip.fill_rect(x + 2.0, HORIZON + 24.0 + shake, 46.0, 20.0, shade(wall, 1.25));
+        blip.fill_rect(x + 27.0, HORIZON + 46.0 + shake, 46.0, 20.0, shade(wall, 1.12));
+    }
+    blip.fill_rect(0.0, HORIZON + 20.0 + shake, WIN_W as f32, 3.0, lit);
 }
 
 // ---- anatomy -------------------------------------------------------------
