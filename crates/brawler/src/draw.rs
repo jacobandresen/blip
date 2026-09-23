@@ -262,18 +262,16 @@ const SHIN: f32 = 29.0;
 const UARM: f32 = 24.0;
 const FARM: f32 = 21.0;
 
-/// Joint heights for a fighter standing, and for one crouching. The
-/// crouch numbers put the top of the head at `CROUCH_H`, because the
-/// crouch that ducks a jab is the crouch you can see.
-// The canon: a figure is seven to seven and a half heads tall, the hip
-// joint sits at half of that, and trunk plus head make up four heads.
-// At a hundred and twenty pixels that is a sixteen-pixel head, hips at
-// fifty-eight, and shoulders at ninety-five.
-const HIP_U: f32 = 58.0;
-const NECK_U: f32 = 95.0;
+/// Joint heights standing and crouching. Two each — hips and head —
+/// because the spine between them is one bone; see `neck_of`. The
+/// crouch numbers put the top of the head at `CROUCH_H`.
+/// Hips low, because a fighter waiting is sunk into their legs. At 58
+/// the hip sat exactly a leg's length from the ankles and the solver
+/// clamped both legs dead straight — see
+/// `a_waiting_fighter_has_their_knees_bent`.
+const HIP_U: f32 = 53.0;
 const HEAD_U: f32 = 109.0;
 const C_HIP: f32 = 31.0;
-const C_NECK: f32 = 53.0;
 const C_HEAD: f32 = 64.0;
 
 fn shade(c: BlipColor, k: f32) -> BlipColor {
@@ -398,18 +396,26 @@ fn part(blip: &Blip, a: V, b: V, r1: f32, r2: f32, c: BlipColor, ink: BlipColor)
     // Perpendicular, pointed up-screen: the light is always overhead.
     let (mut nx, mut ny) = (-dy / d, dx / d);
     if ny > 0.0 { nx = -nx; ny = -ny; }
-    let lit = blend(c, BLIP_WHITE, 0.20);
-    let dark = shade(c, 0.74);
-    stroke(blip, V(a.0 - nx * r1 * 0.46, a.1 - ny * r1 * 0.46),
-                 V(b.0 - nx * r2 * 0.46, b.1 - ny * r2 * 0.46), r1 * 0.44, r2 * 0.44, dark);
-    stroke(blip, V(a.0 + nx * r1 * 0.42, a.1 + ny * r1 * 0.42),
-                 V(b.0 + nx * r2 * 0.42, b.1 + ny * r2 * 0.42), r1 * 0.40, r2 * 0.40, lit);
+    // Three flat tones with hard steps between them. A soft ramp
+    // averages to one mid tone the moment the figure is small or
+    // moving; a hard step is a line the eye can find at speed.
+    let lit = blend(c, BLIP_WHITE, 0.34);
+    let dark = shade(c, 0.60);
+    stroke(blip, V(a.0 - nx * r1 * 0.42, a.1 - ny * r1 * 0.42),
+                 V(b.0 - nx * r2 * 0.42, b.1 - ny * r2 * 0.42), r1 * 0.50, r2 * 0.50, dark);
+    stroke(blip, V(a.0 + nx * r1 * 0.56, a.1 + ny * r1 * 0.56),
+                 V(b.0 + nx * r2 * 0.56, b.1 + ny * r2 * 0.56), r1 * 0.30, r2 * 0.30, lit);
 }
 
 fn blob(blip: &Blip, at: V, r: f32, c: BlipColor, ink: BlipColor) {
     blip.fill_circle(at.0, at.1, r + 1.7, ink);
     blip.fill_circle(at.0, at.1, r, c);
-    blip.fill_circle(at.0 - r * 0.28, at.1 - r * 0.32, r * 0.5, blend(c, BLIP_WHITE, 0.18));
+    // Shadow under, highlight over, both flat — the same three-tone
+    // treatment the limbs get in `part`, so a head and an arm are lit
+    // by the same sun.
+    blip.fill_circle(at.0 + r * 0.22, at.1 + r * 0.30, r * 0.72, shade(c, 0.60));
+    blip.fill_circle(at.0, at.1, r * 0.80, c);
+    blip.fill_circle(at.0 - r * 0.30, at.1 - r * 0.34, r * 0.46, blend(c, BLIP_WHITE, 0.30));
 }
 
 /// How far a two-bone limb can fold.
@@ -466,187 +472,109 @@ fn solve(root: V, want: V, l1: f32, l2: f32, shut: f32, toward: V, floor: f32) -
     (if score(one) >= score(two) { one } else { two }, end)
 }
 
-// ---- cloth ---------------------------------------------------------------
-
-/// Where a hanging piece of cloth ends up.
-///
-/// Not a simulation with state, but not a decoration either: a closed
-/// form of the two forces that actually shape a hanging panel. Gravity
-/// pulls it along `hang`, and its own inertia leaves it behind whatever
-/// it is pinned to — each node further from the pin lagging more than
-/// the last, because it has more cloth between it and the anchor to
-/// take up the slack.
-///
-/// That second term is the whole point. A gi that keeps its shape
-/// through a roundhouse is painted on; one that snaps out flat behind
-/// the leg and takes a moment to fall back is a garment with a body
-/// inside it. The lag is quadratic in the distance along the panel,
-/// which is what gives the trailing edge its whip.
-///
-/// Every segment is renormalised to its own length afterwards, so the
-/// cloth swings but never stretches — the same rule the bones live by.
-fn drape(anchor: V, hang: (f32, f32), len: f32, vel: V, t: f32, phase: f32) -> [V; 4] {
-    let mut out = [anchor; 4];
-    let seg = len / 3.0;
-    let (px, py) = (-hang.1, hang.0); // across the panel
-    for i in 1..4 {
-        let k = i as f32 / 3.0;
-        // Inertia: the far edge is still where the body used to be.
-        let lag = k * k * 0.85;
-        // And a little life of its own, so a standing fighter's gi is
-        // not a plank.
-        let flutter = (t * 6.5 + phase + k * 2.6).sin() * 1.5 * k;
-        let prev = out[i - 1];
-        let want = V(prev.0 + hang.0 * seg - vel.0 * lag + px * flutter,
-                     prev.1 + hang.1 * seg - vel.1 * lag + py * flutter);
-        let d = dist(prev, want).max(0.001);
-        out[i] = V(prev.0 + (want.0 - prev.0) / d * seg, prev.1 + (want.1 - prev.1) / d * seg);
-    }
-    out
-}
-
-/// Draw a draped panel as a tapered run through its nodes.
-fn panel(blip: &Blip, nodes: &[V; 4], r1: f32, r2: f32, c: BlipColor, ink: BlipColor) {
-    for i in 0..3 {
-        let a = i as f32 / 3.0;
-        let b = (i + 1) as f32 / 3.0;
-        part(blip, nodes[i], nodes[i + 1], r1 + (r2 - r1) * a, r1 + (r2 - r1) * b, c, ink);
-    }
-}
-
 // ---- parts ---------------------------------------------------------------
+//
+// One rule about how much of a body to draw, and it is not "as much as
+// possible".
+//
+// Each part earns its place by changing the outline. At a hundred and
+// twenty pixels a calf that swells below the knee does not; a foot that
+// sticks out behind the ankle does. This was about ninety pieces — legs
+// in three sections, feet in four, eight three-part cloth panels with
+// their own inertia — and is about sixty now.
 
-fn draw_leg(blip: &Blip, h: &Hide, hip: V, knee: V, ankle: V, fwd: f32, ground: f32,
-            vel: V, t: f32) {
+/// The line a hanging piece of cloth takes.
+///
+/// Pinned at one end and swinging a little. Was a four-node chain with
+/// quadratic lag fed by posing the whole fighter a second time each
+/// frame to difference the joints; nothing at this scale could see it.
+fn hang(blip: &Blip, h: &Hide, at: V, dir: (f32, f32), len: f32, sway: f32,
+        r1: f32, r2: f32, c: BlipColor) {
+    let (px, py) = (-dir.1, dir.0);
+    let end = V(at.0 + dir.0 * len + px * sway, at.1 + dir.1 * len + py * sway);
+    part(blip, at, end, r1, r2, c, h.ink());
+}
+
+fn draw_leg(blip: &Blip, h: &Hide, hip: V, knee: V, ankle: V, fwd: f32, ground: f32, t: f32) {
     let b = h.bulk;
     let ink = h.ink();
     let skin = h.c(h.skin);
     let cloth = h.c(h.cloth);
 
-    h.cut(blip, &[(hip, 10.6 * h.bulk), (knee, 8.8 * h.bulk),
-                  (ankle, if h.build == Build::Bare { 6.4 } else { 8.0 } * h.bulk)]);
+    h.cut(blip, &[(hip, 10.6 * b), (knee, 8.8 * b),
+                  (ankle, if h.build == Build::Bare { 6.4 } else { 8.0 } * b)]);
 
-    // The leg itself: thigh, calf, ankle. The calf is drawn as its own
-    // short run so it can bulge — a leg that thins evenly from hip to
-    // toe is a cone.
-    // A leg, in the proportions a leg has: the thigh is the thickest
-    // part of a person's limb and it narrows by a third before the
-    // knee, the knee itself is bone and narrow, the calf swells again
-    // just below it, and the ankle is barely wider than the bone.
-    // Drawn at anything like an even width the whole thing is a pipe.
-    part(blip, hip, knee, 8.4 * b, 4.8 * b, skin, ink);
-    let calf = along(knee, ankle, 0.26);
-    part(blip, knee, calf, 4.8 * b, 5.4 * b, skin, ink);
-    part(blip, calf, ankle, 5.4 * b, 2.5 * b, skin, ink);
+    // Two bones, two strokes. The thigh is the thickest part of a
+    // person and narrows by a third to the knee; below the knee the
+    // leg runs to an ankle barely wider than the bone in it. The calf
+    // used to get a third stroke of its own to bulge in the middle,
+    // which is true of a leg and invisible on a leg twenty-nine pixels
+    // long.
+    part(blip, hip, knee, 9.4 * b, 5.3 * b, skin, ink);
+    part(blip, knee, ankle, 6.2 * b, 3.0 * b, skin, ink);
 
-    // What they are wearing over it.
-    //
-    // A gi covers the leg. The trousers used to stop halfway down the
-    // shin, leaving the lower half of every leg a bare tube — the
-    // fighter looked undressed from the knee down. They run to the
-    // ankle now.
-    //
-    // But the cloth on the leg *follows the leg*. There is a bone under
-    // it and a bone is stiff: a thigh is one straight thing, a shin is
-    // one straight thing, and they meet at a knee that bends. Drawing
-    // the trouser as a hanging chain over the shin — which is what a
-    // simulated panel does — put a curve in the middle of the shinbone
-    // and made the leg look boneless. So the cloth on the bone is drawn
-    // on the bone, and only what hangs *past* it is free to swing.
-    let (hem, boot) = match h.build {
-        Build::Gi => (0.86, 0.0),
-        Build::Bare => (0.30, 0.60),
-        Build::Suit => (0.94, 0.0),
+    // What they are wearing over it, drawn *on the bone*: a thigh is
+    // one straight thing and a shin is one straight thing, and cloth
+    // stretched over them is straight too. Only what hangs past the
+    // ankle is free.
+    let hem = match h.build {
+        Build::Gi => 0.86,
+        Build::Bare => 0.30,
+        Build::Suit => 0.94,
     };
     let hem_at = along(knee, ankle, hem);
-    // The trouser follows the leg under it and narrows with it. Cut
-    // straight, it made both legs into columns and undid the taper the
-    // leg had just been given.
-    part(blip, hip, knee, 9.6 * b, 6.4 * b, cloth, ink);
-    part(blip, knee, hem_at, 6.4 * b, if h.build == Build::Gi { 6.0 } else { 5.0 } * b,
+    part(blip, hip, knee, 10.6 * b, 7.0 * b, cloth, ink);
+    part(blip, knee, hem_at, 7.0 * b, if h.build == Build::Gi { 6.6 } else { 5.5 } * b,
         cloth, ink);
-    if h.build == Build::Gi {
-        // The loose hem, and only the hem: a short flare hanging off
-        // the end of the trouser leg that trails when the leg swings
-        // out and falls back over the ankle when it stops.
-        let (dx, dy) = unit(knee, ankle);
-        let nodes = drape(hem_at, (dx, dy), 9.0, vel, t, ankle.0 * 0.08);
-        panel(blip, &nodes, 6.2 * b, 4.6 * b, cloth, ink);
-    }
-    // A fold line down the front of the leg, so a white trouser against
-    // a white jacket is still two garments.
-    if h.build != Build::Bare {
-        stroke(blip, along(hip, knee, 0.35), along(knee, hem_at, 0.7), 1.2, 1.0,
-            shade(cloth, 0.78));
-    }
-    if boot > 0.0 {
-        part(blip, along(knee, ankle, boot), ankle, 4.4 * b, 3.2 * b, h.c(h.trim), ink);
-    }
-    if h.build == Build::Suit {
+    match h.build {
+        // The loose hem of a gi trouser, trailing off the ankle.
+        Build::Gi => {
+            let (dx, dy) = unit(knee, ankle);
+            hang(blip, h, hem_at, (dx, dy), 9.0, (t * 5.0 + ankle.0 * 0.1).sin() * 1.4,
+                6.2 * b, 4.6 * b, cloth);
+        }
+        // Heavy boots.
+        Build::Bare => {
+            part(blip, along(knee, ankle, 0.60), ankle, 4.4 * b, 3.2 * b, h.c(h.trim), ink);
+        }
         // Wrapped shins: a band at the hem, which is where the eye
-        // looks for a joint between cloth and skin.
-        stroke(blip, along(knee, ankle, hem - 0.12), hem_at, 6.4 * b, 6.2 * b, h.c(h.trim));
+        // looks for the joint between cloth and skin.
+        Build::Suit => {
+            stroke(blip, along(knee, ankle, hem - 0.12), hem_at, 6.4 * b, 6.2 * b, h.c(h.trim));
+        }
     }
 
-    // The foot.
-    //
-    // It was one tapered stroke, and one stroke is a shoe-shaped blob:
-    // no ankle, no heel, no toes. A foot is four things and they are
-    // all visible from the side even at this size — the ankle is
-    // narrow, the heel sticks out *behind* the leg, the instep arches
-    // forward and down from the ankle, and the toes are a separate,
-    // thinner piece past the ball. Leave any of them out and the leg
-    // ends in a wedge.
-    //
-    // Planted, the foot lies along the floor; off the ground it points
-    // along the shin, which is what makes a kick land with a foot
-    // rather than with the end of a line.
+    // The foot: sole and toes. The sole has to reach behind the ankle,
+    // because a heel is what a person balances on, and the toes have to
+    // be their own piece or a kick lands with the end of a line.
+    // Planted it lies along the floor, off the ground along the shin.
     let flat = ankle.1 > ground - 7.0;
-    let (foot_c, toe_c) = match h.build {
-        // Boot leather, not boot polish. Painted in the fighter's full
-        // accent the two feet were one bright lump with no edge between
-        // them — the accent belongs on the belt and the headband, where
-        // there is only one of it.
-        Build::Bare => (shade(h.c(h.trim), 0.72), shade(h.c(h.trim), 0.62)),
-        _ => (skin, skin),
-    };
     let boot = h.build == Build::Bare;
-    // Direction the foot points, and the one square to it (its "up").
+    let foot_c = if boot { shade(h.c(h.trim), 0.72) } else { skin };
     let (fx, fy, ux, uy) = if flat {
         (fwd, 0.0, 0.0, -1.0)
     } else {
-        let d = dist(knee, ankle).max(0.001);
-        let (dx, dy) = ((ankle.0 - knee.0) / d, (ankle.1 - knee.1) / d);
+        let (dx, dy) = unit(knee, ankle);
         (dx, dy, dy, -dx)
     };
-    // Ankle: the narrowest part of the whole leg, and the reason the
-    // calf above it reads as a calf.
     let ank = if flat { V(ankle.0, ground - 6.5 * b) } else { ankle };
     let at = |along: f32, up: f32| V(ank.0 + fx * along + ux * up, ank.1 + fy * along + uy * up);
-    // A foot is about a seventh of a person long, and it is longer in
-    // front of the ankle than behind it.
+    // A foot is about a seventh of a person long on a real person, and
+    // a fifth of one on a fighting-game sprite. The hands and the feet
+    // are drawn big here for the same reason they are drawn big there:
+    // they are what hits you. An arcade sprite puts weight into the
+    // ends of the limbs — big gloves, big boots — so that the thing
+    // the player has to read and the thing that does the damage are
+    // the largest, clearest shapes on the figure. Drawn to life scale
+    // they disappear at the end of a leg and a kick lands with a point.
     let fb = if boot { b * 0.92 } else { b };
-    let heel = at(-4.2 * fb, -3.0 * fb);
-    let ball = at(6.2 * fb, -4.8 * fb);
-    let tip = at(10.6 * fb, -4.4 * fb);
-    // The sole, heel to ball, and the instep arching down onto it from
-    // the ankle. Two strokes, drawn as one piece — an earlier version
-    // put a separate blob on the heel and two nicks in the toes, and at
-    // this size that is not detail, it is a handful of pebbles where
-    // the foot should be.
-    part(blip, heel, ball, 3.2 * fb, 2.5 * fb, foot_c, ink);
-    part(blip, at(-1.2 * fb, -0.5 * fb), ball, 3.4 * fb, 2.5 * fb, foot_c, ink);
-    // Toes: past the ball, thinner, and tapering to nothing.
-    part(blip, ball, tip, if boot { 2.5 } else { 2.3 } * b, 1.3 * b, toe_c, ink);
-    if !boot {
-        // One crease where the toes leave the ball. One is detail; two
-        // is a rendering of a foot with the toes counted.
-        let p = along(ball, tip, 0.3);
-        stroke(blip, V(p.0 + ux * 1.7 * b, p.1 + uy * 1.7 * b), p, 0.7, 0.7, shade(toe_c, 0.62));
-    }
+    let ball = at(7.4 * fb, -5.4 * fb);
+    part(blip, at(-5.2 * fb, -3.2 * fb), ball, 3.9 * fb, 3.1 * fb, foot_c, ink);
+    part(blip, ball, at(12.6 * fb, -4.9 * fb), if boot { 3.1 } else { 2.9 } * b, 1.7 * b,
+        foot_c, ink);
 }
 
-fn draw_arm(blip: &Blip, h: &Hide, shoulder: V, elbow: V, hand: V, open: bool, vel: V, t: f32) {
+fn draw_arm(blip: &Blip, h: &Hide, shoulder: V, elbow: V, hand: V, open: bool, t: f32) {
     let b = h.bulk;
     let ink = h.ink();
     let skin = h.c(h.skin);
@@ -654,50 +582,38 @@ fn draw_arm(blip: &Blip, h: &Hide, shoulder: V, elbow: V, hand: V, open: bool, v
 
     // Cut the whole arm out of the body behind it first, in one piece,
     // so the separation follows the arm rather than each segment of it.
-    let (ax0, ay0) = unit(shoulder, elbow);
-    let b0 = h.bulk;
+    let (ax, ay) = unit(shoulder, elbow);
     let sleeve = if h.build == Build::Bare { 6.6 } else { 7.4 };
     h.cut(blip, &[
-        (V(shoulder.0 - ax0 * 3.0, shoulder.1 - ay0 * 3.0), (sleeve + 1.6) * b0),
-        (elbow, 6.4 * b0),
-        (hand, 6.0 * b0),
+        (V(shoulder.0 - ax * 3.0, shoulder.1 - ay * 3.0), (sleeve + 1.6) * b),
+        (elbow, 6.4 * b),
+        (hand, 6.0 * b),
     ]);
 
-    // The deltoid: a cap of muscle sitting over the top of the joint,
-    // drawn before the arm and overlapping the torso.
-    //
-    // Without it the upper arm is a tube that begins in mid-air beside
-    // the chest, and the whole limb reads as stuck on rather than
-    // grown from. The shoulder is the one joint where the limb and the
-    // body are the same piece of flesh, and the drawing has to say so.
-    let (ax, ay) = unit(shoulder, elbow);
-    blob(blip, V(shoulder.0 - ax * 1.5, shoulder.1 - ay * 1.5), 6.6 * b, skin, ink);
+    // The deltoid: a cap of muscle over the top of the joint, drawn
+    // before the arm and overlapping the torso. Without it the upper
+    // arm is a tube beginning in mid-air beside the chest, and the
+    // limb reads as stuck on rather than grown from. The shoulder is
+    // the one joint where the limb and the body are the same piece of
+    // flesh, and the drawing has to say so.
+    blob(blip, V(shoulder.0 - ax * 1.5, shoulder.1 - ay * 1.5), 7.0 * b, skin, ink);
 
-    // Same again for the arm: the biceps is the thick part, the elbow
-    // is bone, the forearm swells just below it and runs down to a
-    // wrist barely wider than the bone in it.
-    part(blip, shoulder, elbow, 6.4 * b, 4.2 * b, skin, ink);
-    let brawn = along(elbow, hand, 0.28);
-    part(blip, elbow, brawn, 4.2 * b, 4.6 * b, skin, ink);
-    part(blip, brawn, hand, 4.6 * b, 2.9 * b, skin, ink);
-    // The sleeve. A gi sleeve is cut wide and reaches past the elbow —
-    // these fighters are dressed, and an arm that is a bare tube from
-    // the shoulder down looks it. The cuff hangs off the end rather
-    // than gripping the arm, so it swings when the arm does.
+    // Two bones, two strokes — as with the leg, and for the same
+    // reason: the forearm's swell below the elbow is real and is four
+    // pixels wide.
+    part(blip, shoulder, elbow, 7.2 * b, 4.7 * b, skin, ink);
+    part(blip, elbow, hand, 5.2 * b, 3.3 * b, skin, ink);
+
+    // The sleeve.
     match h.build {
         Build::Gi => {
-            part(blip, V(shoulder.0 - ax * 2.0, shoulder.1 - ay * 2.0),
-                 along(shoulder, elbow, 0.86), 7.0 * b, 5.0 * b, cloth, ink);
-            // The cuff, and only the cuff, hangs free — the sleeve
-            // above it is stretched over a stiff upper arm.
             let cuff = along(shoulder, elbow, 0.86);
-            let (dx, dy) = unit(shoulder, elbow);
-            let nodes = drape(cuff, (dx * 0.5, dy * 0.5 + 0.7), 8.0, vel, t, shoulder.0 * 0.1);
-            panel(blip, &nodes, 6.0 * b, 4.2 * b, cloth, ink);
-            // A seam down the sleeve, which is what stops a white
-            // sleeve on a white jacket being one shape.
-            stroke(blip, along(shoulder, elbow, 0.2), along(shoulder, elbow, 0.8),
-                1.1, 0.9, shade(cloth, 0.78));
+            part(blip, V(shoulder.0 - ax * 2.0, shoulder.1 - ay * 2.0), cuff,
+                 7.0 * b, 5.0 * b, cloth, ink);
+            // Only the cuff hangs free; the sleeve above it is
+            // stretched over a stiff upper arm.
+            hang(blip, h, cuff, (ax * 0.5, ay * 0.5 + 0.7), 5.5,
+                (t * 5.0 + shoulder.0 * 0.1).sin() * 1.4, 5.4 * b, 3.4 * b, cloth);
         }
         Build::Suit => {
             // A one-piece suit covers the whole arm to the wrist.
@@ -706,7 +622,7 @@ fn draw_arm(blip: &Blip, h: &Hide, shoulder: V, elbow: V, hand: V, open: bool, v
             part(blip, elbow, along(elbow, hand, 0.72), 5.2 * b, 4.0 * b, cloth, ink);
         }
         // Bare arms are the point of being bare — but the shoulder
-        // still gets a strap so the torso and the arm are not one
+        // still gets a strap, so the torso and the arm are not one
         // uninterrupted field of skin.
         Build::Bare => {
             stroke(blip, V(shoulder.0 - ax * 3.0, shoulder.1 - ay * 3.0),
@@ -714,19 +630,18 @@ fn draw_arm(blip: &Blip, h: &Hide, shoulder: V, elbow: V, hand: V, open: bool, v
         }
     }
 
-    // Wrist wrap, then the fist on the end of it.
-    stroke(blip, along(elbow, hand, 0.74), along(elbow, hand, 0.92), 3.4 * b, 3.7 * b, h.c(h.trim));
-    let (fx, fy) = unit(elbow, hand);
+    // Wrist wrap, then the hand on the end of it.
+    stroke(blip, along(elbow, hand, 0.74), along(elbow, hand, 0.92), 3.4 * b, 3.7 * b,
+        h.c(h.trim));
     if open {
         // A palm: flatter and longer than a fist, because a grab and a
         // punch are not the same thing and the picture should say which.
-        part(blip, hand, V(hand.0 + fx * 6.0, hand.1 + fy * 6.0), 4.0 * b, 3.2 * b, skin, ink);
+        let (fx, fy) = unit(elbow, hand);
+        part(blip, hand, V(hand.0 + fx * 7.4, hand.1 + fy * 7.4), 5.0 * b, 4.0 * b, skin, ink);
     } else {
-        blob(blip, hand, 5.0 * b, skin, ink);
-        // One knuckle line, which is all it takes at this size.
-        stroke(blip, V(hand.0 + fx * 3.4 - fy * 2.6, hand.1 + fy * 3.4 + fx * 2.6),
-               V(hand.0 + fx * 3.4 + fy * 2.6, hand.1 + fy * 3.4 - fx * 2.6),
-               1.1, 1.1, shade(skin, 0.7));
+        // The fist, drawn a size up. It is the business end of half the
+        // move list and it wants to be the boldest shape on the arm.
+        blob(blip, hand, 6.4 * b, skin, ink);
     }
 }
 
@@ -735,80 +650,99 @@ fn draw_arm(blip: &Blip, h: &Hide, shoulder: V, elbow: V, hand: V, open: bool, v
 /// legs share one origin walks like a pair of compasses.
 fn draw_pelvis(blip: &Blip, h: &Hide, a: V, b: V) {
     let body = if h.build == Build::Bare { h.c(h.skin) } else { h.c(h.cloth) };
-    part(blip, a, b, 9.0 * h.bulk, 9.0 * h.bulk, body, h.ink());
+    part(blip, a, b, 9.4 * h.bulk, 9.4 * h.bulk, body, h.ink());
 }
 
-fn draw_torso(blip: &Blip, h: &Hide, hip: V, neck: V, vel: V, t: f32) {
+fn draw_torso(blip: &Blip, h: &Hide, hip: V, neck: V) {
     let b = h.bulk;
     let ink = h.ink();
     let bare = h.build == Build::Bare;
     let body = if bare { h.c(h.skin) } else { h.c(h.cloth) };
-    let waist = along(hip, neck, 0.30);
     let chest = along(hip, neck, 0.76);
 
     // The trunk is a ribcage, not a pair of shoulders.
     //
-    // Widening this capsule to a shoulder's width made the whole torso
-    // that wide — a barrel from armpit to hip that swallowed both arms
+    // Widening this capsule to a shoulder's width makes the whole torso
+    // that wide — a barrel from armpit to hip that swallows both arms
     // and the neck with them. Shoulder width is ribcage *plus two
     // deltoids*, and the deltoids are part of the arms; they are drawn
     // there, outside this, which is where they are on a person.
     //
-    // The top stops short of the neck joint so there is a neck to see.
-    part(blip, hip, waist, 9.6 * b, 8.2 * b, body, ink);
-    part(blip, waist, chest, 8.2 * b, 11.4 * b, body, ink);
-    part(blip, chest, along(chest, neck, 0.72), 11.4 * b, 6.0 * b, body, ink);
+    // The taper is steeper than a real torso's. A ribcage is barely
+    // wider than a pelvis on a person; on a fighting sprite it is a
+    // good deal wider, because the wedge is doing the work of saying
+    // "this is a heavyweight" at a size where no muscle can be drawn.
+    part(blip, hip, chest, 8.8 * b, 12.6 * b, body, ink);
+    part(blip, chest, along(chest, neck, 0.72), 12.6 * b, 6.4 * b, body, ink);
 
-    // What is worn over the chest.
+    let belt_a = along(hip, neck, 0.28);
+    let belt_b = along(hip, neck, 0.40);
+    let waist = along(belt_a, belt_b, 0.4);
+
+    // The open gi is what says karate rather than pyjamas: bare
+    // sternum down the middle, lapel crossing it to the belt.
     match h.build {
         Build::Gi => {
-            // Open jacket: bare sternum down the middle, with the two
-            // lapels crossing over it to the belt. This is the one
-            // marking that says karate rather than pyjamas.
-            let v = along(chest, neck, 0.25);
-            let low = along(waist, chest, 0.5);
-            stroke(blip, v, low, 4.2 * b, 1.8 * b, h.c(h.skin));
-            part(blip, along(chest, neck, 0.55), low, 2.4, 1.8, shade(body, 0.70), shade(body, 0.52));
+            let v = along(chest, neck, 0.30);
+            let low = along(waist, chest, 0.42);
+            stroke(blip, v, low, 4.6 * b, 2.0 * b, h.c(h.skin));
+            part(blip, along(chest, neck, 0.58), low, 2.6, 1.9,
+                shade(body, 0.70), shade(body, 0.52));
         }
         Build::Bare => {
-            // Collarbone, pectoral crease and a stomach line. Three
-            // marks, and a bare chest stops being a slab of colour.
+            // Collarbone and the crease under the pectoral. Two marks,
+            // and a bare chest stops being a slab of colour.
             let dark = shade(body, 0.70);
-            stroke(blip, along(chest, neck, 0.15), along(chest, neck, 0.55), 1.8, 1.4, dark);
-            stroke(blip, along(waist, chest, 0.68), along(chest, neck, 0.2), 1.9, 1.5, dark);
-            stroke(blip, along(waist, chest, 0.25), along(waist, chest, 0.62), 1.5, 1.2, shade(body, 0.80));
+            stroke(blip, along(chest, neck, 0.18), along(chest, neck, 0.58), 1.9, 1.5, dark);
+            stroke(blip, along(waist, chest, 0.70), along(chest, neck, 0.22), 2.0, 1.6, dark);
         }
         Build::Suit => {
-            stroke(blip, along(waist, chest, 0.2), along(chest, neck, 0.4), 2.2, 1.8, h.c(h.trim));
+            stroke(blip, along(waist, chest, 0.2), along(chest, neck, 0.45), 2.4, 1.9,
+                h.c(h.trim));
         }
     }
 
-    let belt_a = along(hip, neck, 0.16);
-    let belt_b = along(hip, neck, 0.28);
+}
 
-    // The jacket below the belt: two panels hanging off the waist,
-    // front and back. They are most of a gi's silhouette and all of its
-    // movement — the thing that flares when the hips turn.
-    if h.build != Build::Bare {
-        let waist = along(belt_a, belt_b, 0.4);
-        for (side, len, phase) in [(1.0f32, 21.0f32, 0.0f32), (-1.0, 18.0, 2.1)] {
-            let root = V(waist.0 + side * 6.5 * b, waist.1 + 1.0);
-            let nodes = drape(root, (side * 0.18, 1.0), len, vel, t, phase);
-            panel(blip, &nodes, 5.2 * b, 3.4 * b, body, ink);
-        }
+/// The gi skirt and the belt over it, drawn after the legs.
+///
+/// All three pieces stack the way they do on a person: jacket over the
+/// thighs, belt over the jacket. Drawn with the torso — before the
+/// legs — the belt went behind the near thigh and vanished, and the
+/// skirt went with it.
+fn draw_skirt(blip: &Blip, h: &Hide, hip: V, neck: V, t: f32) {
+    let b = h.bulk;
+    let ink = h.ink();
+    let belt_a = along(hip, neck, 0.28);
+    let belt_b = along(hip, neck, 0.40);
+    let waist = along(belt_a, belt_b, 0.4);
+
+    // One piece, flaring: a panel each side of the waist with a gap
+    // between them reads as two tubes dangling off the fighter.
+    if h.build == Build::Gi {
+        let body = h.c(h.cloth);
+        let sway = (t * 3.4).sin() * 1.3;
+        let top = along(hip, neck, 0.33);
+        hang(blip, h, top, (0.0, 1.0), 17.0, sway, 8.8 * b, 10.2 * b, body);
+        let hem = V(top.0 + sway, top.1 + 17.0);
+        stroke(blip, along(top, hem, 0.3), hem, 1.4, 1.1, shade(body, 0.66));
     }
 
-    part(blip, belt_a, belt_b, 9.0 * b, 8.6 * b, h.belt(), ink);
-    // The knot, and the two ends hanging off it. They hang, swing and
-    // settle on their own: the one part of a fighter that is still
-    // moving after the fighter has stopped, which is the cheapest thing
-    // on screen that says there is gravity in this picture.
-    let knot = V(along(belt_a, belt_b, 0.5).0 + (neck.0 - hip.0).signum() * 2.0,
-                 along(belt_a, belt_b, 0.5).1);
-    for (dx, len, phase) in [(-2.4f32, 15.0f32, 0.7f32), (2.4, 12.0, 3.3)] {
-        let nodes = drape(V(knot.0 + dx, knot.1), (0.0, 1.0), len, vel, t, phase);
-        panel(blip, &nodes, 2.3 * b, 1.5 * b, h.belt(), ink);
-    }
+    // A band across the body, not a capsule down it. Drawn along the
+    // spine it is as tall as it is wide whatever its radius, which
+    // behind the legs looked like a belt and in front of them like a
+    // slab over both thighs.
+    let (sx, sy) = unit(hip, neck);
+    let (px, py) = (-sy, sx);
+    let w = 8.8 * b;
+    part(blip, V(waist.0 - px * w, waist.1 - py * w),
+               V(waist.0 + px * w, waist.1 + py * w), 3.4 * b, 3.4 * b, h.belt(), ink);
+    // One end hanging off the knot, not two. Two of anything dangling
+    // off the middle of a fighter reads as a pair of objects stuck on
+    // them, whatever the two things actually are.
+    let knot = V(waist.0 + (neck.0 - hip.0).signum() * 2.0, waist.1 + 1.0);
+    hang(blip, h, knot, (0.0, 1.0), 9.0, (t * 4.6).sin() * 1.4,
+        1.8 * b, 0.9 * b, h.belt());
 }
 
 fn draw_head(blip: &Blip, h: &Hide, rig: Rig, head: V, neck: V, t: f32) {
@@ -816,45 +750,57 @@ fn draw_head(blip: &Blip, h: &Hide, rig: Rig, head: V, neck: V, t: f32) {
     let ink = h.ink();
     let skin = h.c(h.skin);
     let hair = h.c(h.hair);
-    // A heavyweight gets a bigger head as well as bigger arms. Scaling
-    // only the limbs with `bulk` builds a bodybuilder with a pin for a
-    // skull, which reads as a toy rather than as a large man.
-    let r = 7.6 + 2.2 * (h.bulk - 1.0);
 
-    // Neck first, so the head sits on it rather than beside it.
-    // The neck, drawn long enough to be a neck. A head sitting
-    // straight on the shoulders is a head on a snowman.
-    part(blip, neck, V(head.0 - fw * 1.3, head.1 + 5.2), 4.4, 3.8, skin, ink);
+    // Six heads tall, not the classical seven and a half: arcade
+    // sprites trade anatomy for a skull big enough to carry a face.
+    // Every offset below is a multiple of `r` so the head scales whole.
+    let r = 9.8 + 2.2 * (h.bulk - 1.0);
 
-    // Skull, then the jaw hung off the front of it.
+    // Neck first, so the head sits on it rather than beside it. Drawn
+    // long enough to be a neck, and thick: a fighter's neck is a slab
+    // of trapezius, and a head this size on a stalk is a lollipop.
+    part(blip, neck, V(head.0 - fw * 0.17 * r, head.1 + 0.68 * r), 5.6, 4.7, skin, ink);
+
+    // Skull, then the jaw hung off the front of it. The jaw is most of
+    // what makes a profile male and all of what makes it set.
     blob(blip, head, r, skin, ink);
-    part(blip, V(head.0 + fw * 0.4, head.1 + 1.0), V(head.0 + fw * 3.8, head.1 + 4.6), 5.0, 3.3, skin, ink);
-    blip.fill_circle(head.0 - fw * 2.5, head.1 + 1.0, 1.7, shade(skin, 0.78));
+    part(blip, V(head.0 + fw * 0.05 * r, head.1 + 0.13 * r),
+         V(head.0 + fw * 0.50 * r, head.1 + 0.61 * r), 0.66 * r, 0.43 * r, skin, ink);
 
-    // Hair, as a handful of overlapping lumps around the back and top.
-    for (dx, dy, rr) in [(-3.4f32, -5.4f32, 4.5f32), (-5.9, -2.0, 4.0), (0.6, -6.6, 4.2),
-                         (4.0, -5.3, 3.2), (-6.8, 1.6, 2.9)] {
-        blip.fill_circle(head.0 + fw * dx, head.1 + dy, rr, hair);
-    }
+    // Hair: two lumps, both *behind* the band.
+    //
+    // They used to sit high and forward, and between them, the band
+    // and a brow drawn in the same colour, the top two thirds of the
+    // head was one brown mass with an eye under it. A head is worth
+    // making bigger only if the extra pixels go to the face; spent on
+    // more hair they buy a larger blob.
+    blip.fill_circle(head.0 - fw * 0.40 * r, head.1 - 0.68 * r, 0.58 * r, hair);
+    blip.fill_circle(head.0 - fw * 0.82 * r, head.1 - 0.02 * r, 0.52 * r, hair);
 
-    // Headband, and two ties trailing behind it. The ties are the
-    // cheapest motion on the whole fighter and do more for "this is
-    // alive" than anything else here.
-    let band_a = V(head.0 - fw * 6.3, head.1 - 1.8);
-    let band_b = V(head.0 + fw * 5.8, head.1 - 2.9);
-    stroke(blip, band_a, band_b, 2.1, 1.9, h.c(h.trim));
+    // Headband at the hairline, and one tie trailing behind it. Thin.
+    // At a quarter of the head's radius the tie was a red wedge wider
+    // than the skull it was tied to — the single loudest shape on the
+    // fighter, attached to the one part that most needed to read
+    // clearly.
+    let band_a = V(head.0 - fw * 0.86 * r, head.1 - 0.40 * r);
+    stroke(blip, band_a, V(head.0 + fw * 0.70 * r, head.1 - 0.52 * r),
+        0.22 * r, 0.19 * r, h.c(h.trim));
     let sway = (t * 5.5).sin() * 3.0;
-    stroke(blip, band_a, V(head.0 - fw * 18.0, head.1 + 1.0 + sway), 2.0, 1.0, h.c(h.trim));
-    stroke(blip, band_a, V(head.0 - fw * 14.0, head.1 + 6.4 - sway * 0.7), 1.8, 0.9, h.c(h.trim));
+    stroke(blip, band_a, V(head.0 - fw * 2.0 * r, head.1 + 0.26 * r + sway),
+        0.15 * r, 0.06 * r, h.c(h.trim));
 
     // A face: brow, eye, nose, mouth. Four marks, and the head stops
-    // being a ball.
-    stroke(blip, V(head.0 + fw * 1.6, head.1 - 1.7), V(head.0 + fw * 5.2, head.1 - 1.3), 1.1, 0.9, hair);
-    blip.fill_circle(head.0 + fw * 3.6, head.1 + 0.4, 1.4, BLIP_WHITE);
-    blip.fill_circle(head.0 + fw * 4.2, head.1 + 0.5, 0.9, INK);
-    blip.fill_circle(head.0 + fw * 5.9, head.1 + 1.3, 1.6, skin);
-    stroke(blip, V(head.0 + fw * 3.9, head.1 + 3.8), V(head.0 + fw * 5.6, head.1 + 3.5), 0.9, 0.8,
-        shade(skin, 0.5));
+    // being a ball. The brow is the one doing the work — a fighter
+    // looks at the person they are fighting, and a heavy brow over a
+    // small eye is the whole of that at this size. The nose is on the
+    // list because it is not a feature here, it is the profile.
+    stroke(blip, V(head.0 + fw * 0.24 * r, head.1 - 0.16 * r),
+           V(head.0 + fw * 0.74 * r, head.1 - 0.10 * r), 0.13 * r, 0.10 * r, hair);
+    blip.fill_circle(head.0 + fw * 0.56 * r, head.1 + 0.14 * r, 0.16 * r, INK);
+    blip.fill_circle(head.0 + fw * 0.82 * r, head.1 + 0.22 * r, 0.20 * r, skin);
+    stroke(blip, V(head.0 + fw * 0.52 * r, head.1 + 0.56 * r),
+           V(head.0 + fw * 0.76 * r, head.1 + 0.52 * r), 0.11 * r, 0.10 * r,
+           shade(skin, 0.5));
 }
 
 // ---- poses ---------------------------------------------------------------
@@ -863,7 +809,6 @@ fn draw_head(blip: &Blip, h: &Hide, rig: Rig, head: V, neck: V, t: f32) {
 #[derive(Copy, Clone)]
 pub(crate) struct Pose {
     hip: P,
-    neck: P,
     head: P,
     lead_hand: P,
     rear_hand: P,
@@ -879,7 +824,6 @@ impl Pose {
     fn to(self, o: Pose, k: f32) -> Pose {
         Pose {
             hip: self.hip.to(o.hip, k),
-            neck: self.neck.to(o.neck, k),
             head: self.head.to(o.head, k),
             lead_hand: self.lead_hand.to(o.lead_hand, k),
             rear_hand: self.rear_hand.to(o.rear_hand, k),
@@ -888,6 +832,22 @@ impl Pose {
             open: if k < 0.5 { self.open } else { o.open },
         }
     }
+}
+
+/// The neck, derived rather than posed: the spine is one bone, and the
+/// neck rides most of the way up it and a little behind. Square to the
+/// spine, so the shoulders stay behind the chin upright and rotate with
+/// the body in a lean.
+const SPINE: f32 = 0.73;
+const SHOULDERS_BACK: f32 = 2.4;
+
+fn neck_of(q: &Pose) -> P {
+    let (dx, du) = (q.head.f - q.hip.f, q.head.u - q.hip.u);
+    let len = (dx * dx + du * du).sqrt().max(0.001);
+    let (ux, uu) = (dx / len, du / len);
+    // Square to the spine, pointing back along the body.
+    p(q.hip.f + ux * len * SPINE - uu * SHOULDERS_BACK,
+      q.hip.u + uu * len * SPINE + ux * SHOULDERS_BACK)
 }
 
 /// The stance: weight back, knees bent, both hands up, side on.
@@ -918,8 +878,12 @@ fn stance(breath: f32) -> Pose {
     let roll = -breath;
     Pose {
         hip: p(breath * 1.2, HIP_U - 1.0 + bob * 0.9),
-        neck: p(-3.5 + roll * 1.1, NECK_U - 0.6 + bob * 0.7),
-        head: p(-1.5 + roll * 1.6, HEAD_U - 0.4 + bob * 0.6),
+        // Chin forward. A fighter on guard leans into the fight: the
+        // head comes out over the front foot while the shoulders stay
+        // back behind it, and since the shoulders are set back off the
+        // spine by a fixed amount (see `neck_of`) moving the head
+        // forward is the whole of that shape.
+        head: p(2.0 + roll * 1.6, HEAD_U - 0.4 + bob * 0.6),
         // A guard, measured off a photograph of one rather than
         // guessed at: both fists up by the jaw, the upper arms hanging
         // almost straight down and the elbows tucked in at the ribs, so
@@ -935,12 +899,22 @@ fn stance(breath: f32) -> Pose {
         // thirteen — level with the jaw, the guard simply deletes the
         // head. Dropping them a little keeps the shape of a guard and
         // leaves a face to read it on.
-        lead_hand: p(22.0 + breath * 1.4, 90.0 + bob * 1.2),
-        rear_hand: p(11.0 + breath * 0.8, 94.0 + bob * 0.9),
+        // Lead fist out and low, only the rear one up. Held as a
+        // boxer's guard — both fists at the jaw — the forearms lie
+        // straight across the chest and cover the jacket, the belt and
+        // every read that depends on which way the body is turned.
+        lead_hand: p(35.0 + breath * 1.4, 77.0 + bob * 1.2),
+        rear_hand: p(12.0 + breath * 0.8, 76.0 + bob * 0.9),
         // The feet stay planted. Weight moving between them is the
         // point; feet sliding about is a fighter who has lost it.
-        lead_foot: p(19.0, 0.0),
-        rear_foot: p(-21.0, 0.0),
+        //
+        // Wide, though. A fighting stance is a good deal wider than
+        // shoulders — something like two fifths of the fighter's own
+        // height between the feet — and it is the base the low hips
+        // above are sitting on. Narrow feet under bent knees is a
+        // squat; wide feet under bent knees is a guard.
+        lead_foot: p(24.0, 0.0),
+        rear_foot: p(-22.0, 0.0),
         open: false,
     }
 }
@@ -948,28 +922,49 @@ fn stance(breath: f32) -> Pose {
 fn crouched(breath: f32) -> Pose {
     Pose {
         hip: p(-2.0, C_HIP + breath * 0.4),
-        neck: p(-1.0, C_NECK + breath * 0.4),
         head: p(1.5, C_HEAD + breath * 0.4),
-        lead_hand: p(17.0, 43.0 + breath * 0.6),
-        rear_hand: p(5.0, 36.0),
+        lead_hand: p(26.0, 38.0 + breath * 0.6),
+        rear_hand: p(8.0, 31.0),
         lead_foot: p(18.0, 0.0),
         rear_foot: p(-19.0, 0.0),
         open: false,
     }
 }
 
-/// Off the ground: knees come up, arms come in. A jump drawn with the
-/// legs left hanging is a fighter who has been lifted rather than one
-/// who has jumped.
-fn airborne_pose() -> Pose {
+/// Off the ground, posed from vertical speed rather than a timer:
+/// legs trailing at take-off, tucked at the apex, reaching down on the
+/// way in. Reading it off `vy` means every jump height gets the right
+/// shape without knowing how long it lasts.
+fn airborne_pose(vy: f32) -> Pose {
+    // +1 rising as hard as a jump ever rises, 0 at the apex, -1 falling.
+    let r = (-vy / -JUMP_VY).clamp(-1.0, 1.0);
+    let rise = r.max(0.0);
+    let fall = (-r).max(0.0);
+    // Weightlessness, peaking at the top of the arc. Eased, because the
+    // tuck is a thing the body does, not a thing the parabola does.
+    let tuck = 1.0 - r.abs();
+    let tuck = tuck * tuck * (3.0 - 2.0 * tuck);
     Pose {
-        hip: p(-2.0, 50.0),
-        neck: p(-5.0, 90.0),
-        head: p(-3.0, 101.0),
-        lead_hand: p(11.0, 80.0),
-        rear_hand: p(-7.0, 86.0),
-        lead_foot: p(16.0, 21.0),
-        rear_foot: p(-12.0, 27.0),
+        hip: p(-2.0 + 2.0 * fall, 48.0 + 4.0 * tuck),
+        // Chin down and forward on the way up, head coming back over
+        // the shoulders on the way down to spot the landing.
+        head: p(-3.0 - 4.0 * rise + 3.0 * fall, 99.0 + 3.0 * tuck),
+        // The arms threw the jump: still swung up and out at take-off,
+        // in tight at the apex, and reaching out for balance on the
+        // way down.
+        //
+        // Both hands stay well clear of their own shoulders, which is
+        // not a matter of taste. The elbow is a hinge with a stop in
+        // it, and a hand asked to sit closer to the shoulder than a
+        // folded arm can reach gets pushed back out to the nearest
+        // legal distance along whatever direction it happened to be —
+        // a direction that spins wildly for a small change in a target
+        // that close. That is what the old held jump pose asked for,
+        // and it only looked still because nothing about it moved.
+        lead_hand: p(24.0 + 2.0 * rise + 6.0 * fall, 68.0 + 14.0 * rise - 2.0 * fall),
+        rear_hand: p(8.0 + 2.0 * rise + 2.0 * fall, 60.0 + 16.0 * rise - 4.0 * fall),
+        lead_foot: p(14.0 + 4.0 * tuck + 6.0 * fall, 8.0 + 24.0 * tuck),
+        rear_foot: p(-16.0 + 6.0 * tuck + 2.0 * fall, 4.0 + 24.0 * tuck),
         open: false,
     }
 }
@@ -992,7 +987,6 @@ fn floored() -> Pose {
     // person lying down rather than as a dropped bundle.
     Pose {
         hip: p(8.0, 13.0),
-        neck: p(-26.0, 12.0),
         head: p(-43.0, 9.5),
         // Both arms lie down the body toward the feet, and neither goes
         // out past the head.
@@ -1003,11 +997,11 @@ fn floored() -> Pose {
         // find is the head. One arm along the side, one bent across the
         // chest: nothing crosses.
         lead_hand: p(30.0, 8.0),
-        rear_hand: p(14.0, 24.0),
+        rear_hand: p(8.0, 26.0),
         // The near knee up. It is the only thing above the body line
         // and it is doing most of the work: without it the silhouette
         // is a horizontal bar, and a horizontal bar is not a person.
-        lead_foot: p(14.0, 10.0),
+        lead_foot: p(26.0, 6.0),
         rear_foot: p(62.0, 8.0),
         open: false,
     }
@@ -1063,7 +1057,17 @@ fn extension(f: &Fighter, m: &MoveData) -> f32 {
         1.0
     } else {
         let k = ((f.t - end) / (m.recovery * F).max(0.0001)).clamp(0.0, 1.0);
-        (1.0 - k * k * 0.9 - k * 0.1).max(0.0)
+        // Back, and a little past: the muscles that pulled the limb
+        // home are still pulling when it arrives. Mirrors the coil.
+        const SNAP: f32 = 0.6;
+        let back = (k / SNAP).min(1.0);
+        let home = 1.0 - back * back * (3.0 - 2.0 * back);
+        let settle = if k > 0.45 {
+            -0.10 * (std::f32::consts::PI * (k - 0.45) / 0.55).sin()
+        } else {
+            0.0
+        };
+        home + settle
     }
 }
 
@@ -1132,18 +1136,32 @@ fn kick_curve(ext: f32) -> f32 {
 /// How far the foot reaches past the ankle. Poses that aim a kick have
 /// to aim the *ankle* short by this much, or the toes end up out past
 /// the hitbox and the attack is drawn reaching further than it reaches.
-const FOOT: f32 = 10.0;
+/// It tracks the toe in `draw_leg`, and the two have to move together.
+const FOOT: f32 = 12.6;
+
+/// The same thing for a punch: how far the front of the fist is past
+/// the wrist joint that carries it. Hands and feet are drawn big here
+/// — see `draw_leg` — and big enough that the overhang stopped being a
+/// rounding error: Brutus's fist stuck six pixels out past the end of
+/// his own jab, which is the game lying about its range in the one
+/// direction a player cannot forgive.
+const FIST: f32 = 6.4;
 
 fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
-    let tip = p(BODY_W / 2.0 + m.reach, m.height);
-    // Where the ankle goes for a kick: the toes carry it the rest.
-    let toe_tip = p(tip.f - FOOT, tip.u);
+    let end = p(BODY_W / 2.0 + m.reach, m.height);
+    // Aim the *joint* short by however far the hand or foot drawn on
+    // it sticks out past it, so the picture ends exactly where the
+    // hitbox does. Both scale with the fighter, because the drawing
+    // does: a heavyweight's fist is a heavyweight's fist.
+    let bulk = f.arch().bulk;
+    let tip = p(end.f - FIST * bulk, end.u);
+    let toe_tip = p(end.f - FOOT * bulk, end.u);
 
     // What the body does, rather than which button produced it: a
     // fighter's jumping punch and their standing punch are the same
     // shoulder doing the same thing, and Kestrel's special is a kick
     // whatever the move table calls it.
-    enum Shape { Punch(bool), CrouchPunch, Kick(bool, f32), Sweep, Throw, Bolt, Rush }
+    enum Shape { Punch(bool), CrouchPunch, Kick(bool, f32), Fly, Sweep, Throw, Bolt, Rush }
     let shape = match f.mv {
         MoveId::Jab => Shape::Punch(false),
         MoveId::JumpPunch => Shape::Punch(true),
@@ -1156,6 +1174,7 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
         MoveId::Kick => Shape::Kick(false, 1.0),
         MoveId::HighKick => Shape::Kick(false, 1.25),
         MoveId::JumpKick => Shape::Kick(true, 1.0),
+        MoveId::FlyingKick => Shape::Fly,
         MoveId::Sweep => Shape::Sweep,
         MoveId::Throw => Shape::Throw,
         MoveId::Special => match f.arch().special {
@@ -1173,18 +1192,21 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
         // reaches as far as the hitbox says it does.
         Shape::Punch(air) => {
             q.hip.f += 5.0 * ext;
-            q.neck.f += if air { 10.0 } else { 18.0 } * ext;
-            q.head.f += if air { 8.0 } else { 15.0 } * ext;
+            // The shoulder turning over, which with one spine is the
+            // head going with it. It used to be written as the neck
+            // travelling further than the head — the boxer's trick of
+            // punching past your own chin — and what is left of that
+            // now is the fixed set-back of the shoulders.
+            q.head.f += if air { 12.0 } else { 22.0 } * ext;
             if !air {
                 q.lead_foot.f += 5.0 * ext;
                 q.rear_foot.f -= 3.0 * ext;
             }
-            q.rear_hand = q.rear_hand.to(p(6.0, q.rear_hand.u + 6.0), ext);
+            q.rear_hand = q.rear_hand.to(p(q.rear_hand.f - 4.0, q.rear_hand.u - 22.0), ext);
             q.lead_hand = q.lead_hand.to(tip, ext);
         }
         Shape::CrouchPunch => {
-            q.neck.f += 15.0 * ext;
-            q.head.f += 11.0 * ext;
+            q.head.f += 17.0 * ext;
             q.lead_hand = q.lead_hand.to(tip, ext);
             q.rear_hand.f += 3.0 * ext;
         }
@@ -1212,9 +1234,8 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             let k = KICK;
             let back = if air { k.air_lean } else { 1.0 } * lift;
             q.hip = p(q.hip.f + k.hip_drive * ext, q.hip.u + k.hip_rise * ext);
-            q.neck.f -= k.lean * ext * back;
-            q.neck.u -= 1.0 * ext;
-            q.head.f -= k.lean * 1.3 * ext * back;
+            q.head.f -= k.lean * 1.25 * ext * back;
+            q.head.u -= 1.4 * ext;
             // The support foot travels in under the raised hips. It has
             // to: the leg standing on it is only as long as it is, and
             // leaving it behind was what stretched the *standing* leg
@@ -1245,8 +1266,22 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             // across and behind the hips as counterweight — not held
             // at the chest. A kick thrown with the hands still up is a
             // kick nobody put their body into.
-            q.lead_hand = q.lead_hand.to(p(2.0, 60.0), ext);
-            q.rear_hand = q.rear_hand.to(p(-18.0, 68.0), ext);
+            q.lead_hand = q.lead_hand.to(p(30.0, 62.0), ext);
+            q.rear_hand = q.rear_hand.to(p(-4.0, 44.0), ext);
+        }
+        // Laid out behind the leg: hips driven forward, the kicking
+        // leg straight at the target and the other tucked under, with
+        // the shoulders back as counterweight. A jump kick chambers
+        // and snaps; this one commits the whole body and holds it.
+        Shape::Fly => {
+            q.hip = p(q.hip.f + 8.0 * ext, q.hip.u + 3.0 * ext);
+            q.head = p(q.head.f - 12.0 * ext, q.head.u - 3.0 * ext);
+            // The support leg folds up under the hips and stays there.
+            q.rear_foot = p(-16.0 - 4.0 * ext, 26.0 + 10.0 * ext);
+            q.lead_foot = q.lead_foot.to(toe_tip, ext);
+            // One arm forward for the line, one back for the balance.
+            q.lead_hand = q.lead_hand.to(p(30.0, 62.0), ext);
+            q.rear_hand = q.rear_hand.to(p(-20.0, 58.0), ext);
         }
         // Down on the back leg, one hand on the floor, the front leg
         // laid out flat along it.
@@ -1257,20 +1292,20 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             // boards — but with the hip that low the folded rear leg
             // had nowhere to put that knee except through the floor.
             q.hip = p(hip_f * ext, C_HIP + 3.0 * ext);
-            q.neck = p(q.neck.f - 5.0 * ext, C_NECK - 5.0 * ext);
-            q.head = p(q.head.f + 1.0 * ext, C_HEAD - 6.0 * ext);
+            // Head down and back: the shoulders drop away from the
+            // leg that is going out, which is the counterweight.
+            q.head = p(q.head.f - 4.0 * ext, C_HEAD - 7.0 * ext);
             q.rear_foot = p(-3.0, 2.0);
             q.lead_foot = q.lead_foot.to(toe_tip, ext);
-            q.rear_hand = q.rear_hand.to(p(-23.0, 4.0), ext);
-            q.lead_hand = q.lead_hand.to(p(6.0, 40.0), ext);
+            q.rear_hand = q.rear_hand.to(p(-26.0, 6.0), ext);
+            q.lead_hand = q.lead_hand.to(p(34.0, 44.0), ext);
         }
         // Both hands out, low and open. A throw drawn as a punch is the
         // game lying about the one move a guard cannot stop.
         Shape::Throw => {
             q.open = true;
             q.hip.f += 4.0 * ext;
-            q.neck.f += 7.0 * ext;
-            q.head.f += 6.0 * ext;
+            q.head.f += 8.0 * ext;
             q.lead_foot.f += 7.0 * ext;
             q.lead_hand = q.lead_hand.to(p(tip.f, tip.u + 6.0), ext);
             q.rear_hand = q.rear_hand.to(p(tip.f - 6.0, tip.u - 8.0), ext);
@@ -1288,27 +1323,24 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             if ext < 0.55 {
                 let k = ext / 0.55;
                 q.lead_hand = q.lead_hand.to(charge, k);
-                q.rear_hand = q.rear_hand.to(p(charge.f - 5.0, charge.u - 7.0), k);
-                q.neck.f -= 5.0 * k;
-                q.head.f -= 4.0 * k;
+                q.rear_hand = q.rear_hand.to(p(charge.f + 5.0, charge.u - 9.0), k);
+                q.head.f -= 6.0 * k;
             } else {
                 let k = (ext - 0.55) / 0.45;
                 q.lead_hand = charge.to(out, k);
-                q.rear_hand = p(charge.f - 5.0, charge.u - 7.0).to(p(out.f - 9.0, out.u - 8.0), k);
-                q.neck.f += -5.0 + 11.0 * k;
-                q.head.f += -4.0 + 9.0 * k;
+                q.rear_hand = p(charge.f + 5.0, charge.u - 9.0).to(p(out.f - 18.0, out.u - 10.0), k);
+                q.head.f += -6.0 + 14.0 * k;
             }
         }
         // A charge behind a straight right: the whole body goes with it,
         // which is what the forward velocity in update() is doing.
         Shape::Rush => {
             q.hip = p(8.0 * ext, HIP_U - 5.0 * ext);
-            q.neck.f += 16.0 * ext;
-            q.head.f += 14.0 * ext;
+            q.head.f += 20.0 * ext;
             q.lead_foot = p(15.0 + 17.0 * ext, 5.0 * ext);
             q.rear_foot.f -= 11.0 * ext;
             q.lead_hand = q.lead_hand.to(tip, ext);
-            q.rear_hand = q.rear_hand.to(p(-17.0, 68.0), ext);
+            q.rear_hand = q.rear_hand.to(p(-6.0, 50.0), ext);
         }
     }
 }
@@ -1331,6 +1363,11 @@ pub(crate) fn pose_of(now: f32, f: &Fighter, idx: usize) -> Pose {
     was.mv = f.prev_mv;
     was.t = f.prev_t;
     was.blend = 0.0;
+    // Put them back on the ground they were on: `airborne` reads `y`,
+    // and `y` here is where they are now, so a landing used to blend a
+    // guard into a guard and drop the whole shape of the jump.
+    was.y = if f.prev_air { FLOOR_Y - 1.0 } else { FLOOR_Y };
+    was.vy = f.prev_vy;
     let k = (1.0 - f.blend).clamp(0.0, 1.0);
     pose_now(now, &was, idx).to(q, k * k * (3.0 - 2.0 * k))
 }
@@ -1354,12 +1391,11 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
             let k = (f.t / 0.22).clamp(0.0, 1.0);
             let mut air = stance(0.0);
             air.hip = p(-6.0, 48.0);
-            air.neck = p(-26.0, 62.0);
             air.head = p(-40.0, 62.0);
             air.lead_foot = p(30.0, 44.0);
-            air.rear_foot = p(10.0, 30.0);
-            air.lead_hand = p(-18.0, 70.0);
-            air.rear_hand = p(-34.0, 54.0);
+            air.rear_foot = p(22.0, 24.0);
+            air.lead_hand = p(-8.0, 82.0);
+            air.rear_hand = p(-30.0, 66.0);
             // Falling: quick at first as the legs are swept, then the
             // landing itself, which is the fastest part of it.
             return air.to(down, k * k);
@@ -1370,8 +1406,8 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
             // of a fighter being winched.
             let k = ((f.t - 0.85) / 0.30).clamp(0.0, 1.0);
             let mut up = crouched(0.0);
-            up.rear_hand = p(-18.0, 5.0);
-            up.lead_hand = p(10.0, 38.0);
+            up.rear_hand = p(22.0, 16.0);
+            up.lead_hand = p(28.0, 34.0);
             up.rear_foot = p(-10.0, 0.0);
             return down.to(up, (k * 1.8).min(1.0)).to(stance(0.0), (k - 0.55).max(0.0) / 0.45);
         }
@@ -1389,7 +1425,7 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
             && matches!(f.prev_mv, MoveId::CrouchJab | MoveId::Sweep))
         || (f.act == Act::Hitstun && f.prev_act == Act::Block && f.crouch_block);
     let mut q = if f.airborne() {
-        airborne_pose()
+        airborne_pose(f.vy)
     } else if low {
         crouched(breath)
     } else {
@@ -1405,38 +1441,78 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
             let (s, c) = (ph.sin(), ph.cos());
             q.lead_foot = p(15.0 + 11.0 * s, (9.0 * c).max(0.0));
             q.rear_foot = p(-17.0 - 11.0 * s, (-9.0 * c).max(0.0));
-            q.hip.u -= 1.4 + 1.4 * (2.0 * ph).cos();
-            q.neck.u -= 1.0 + 1.0 * (2.0 * ph).cos();
-            q.head.u -= 1.0 + 1.0 * (2.0 * ph).cos();
-            q.lead_hand.f += 3.0 * c;
-            q.rear_hand.f -= 2.5 * c;
+            // The whole body drops twice per stride, as each leg takes
+            // the weight and gives under it.
+            let sink = 1.4 + 1.4 * (2.0 * ph).cos();
+            q.hip.u -= sink;
+            q.head.u -= sink * 0.7;
+            // Shoulders turn against the hips. This is the whole
+            // difference between walking and being wheeled: the pelvis
+            // leads the stride and the ribcage answers it a beat late,
+            // and a torso carried squarely along on two moving legs
+            // reads as a mannequin on a trolley however good the legs
+            // are.
+            q.hip.f += 1.4 * s;
+            q.head.f -= 1.0 * s;
+            // Arms opposite the leg on their own side — contralateral,
+            // the way every walking animal on earth is put together.
+            // They used to swing a quarter cycle out of phase with the
+            // feet, which is neither with the legs nor against them.
+            q.lead_hand.f -= 2.6 * s;
+            q.rear_hand.f += 2.2 * s;
+            // And the hands ride the shoulders down. Left at a fixed
+            // height while the neck bobbed under them, the arms
+            // lengthened and shortened a little with every step.
+            q.lead_hand.u -= sink * 0.7;
+            q.rear_hand.u -= sink * 0.7;
         }
         // Turtled up: weight off the front foot, shoulder raised, both
         // forearms stacked in front of the head or the belly.
         Act::Block => {
+            // A guard is held, not welded. Every joint here was an
+            // absolute, which meant a blocking fighter stopped
+            // breathing — the one pose in the game a player looks at
+            // for whole seconds at a time was the only one that was
+            // perfectly still.
+            let b = breath;
             if f.crouch_block {
-                q.lead_hand = p(16.0, 46.0);
-                q.rear_hand = p(11.0, 34.0);
-                q.neck.f -= 4.0;
+                q.lead_hand = p(25.0, 41.0 + b * 0.7);
+                q.rear_hand = p(11.0, 31.0 + b * 0.5);
                 q.head.f -= 4.0;
             } else {
-                q.hip = p(-4.0, HIP_U - 2.0);
-                q.neck = p(-8.0, NECK_U - 2.0);
-                q.head = p(-7.0, HEAD_U - 2.0);
-                q.lead_foot = p(11.0, 0.0);
-                q.rear_foot = p(-20.0, 0.0);
-                q.lead_hand = p(15.0, 93.0);
-                q.rear_hand = p(11.0, 80.0);
+                q.hip = p(-4.0, HIP_U - 2.0 + b * 0.6);
+                q.head = p(-8.0 - b * 0.7, HEAD_U - 2.0 + b * 0.4);
+                q.lead_hand = p(23.0 + b * 0.6, 88.0 + b * 0.8);
+                q.rear_hand = p(12.0 + b * 0.4, 74.0 + b * 0.6);
+                // Retreating is a walk. Holding away is both the block
+                // and the back-step, so this pose is what a fighter
+                // giving ground is drawn in — with the feet pinned it
+                // was a slide. The phase is where they are, not how
+                // long they have held it, so a fighter blocking on the
+                // spot keeps their feet still for free.
+                let ph = f.x * 0.085;
+                let (st, ct) = (ph.sin(), ph.cos());
+                let sink = 1.0 + (2.0 * ph).cos();
+                q.lead_foot = p(11.0 + 9.0 * st, (7.0 * ct).max(0.0));
+                q.rear_foot = p(-20.0 - 9.0 * st, (-7.0 * ct).max(0.0));
+                q.hip.u -= sink;
+                q.head.u -= sink * 0.7;
+                q.lead_hand.u -= sink * 0.7;
+                q.rear_hand.u -= sink * 0.7;
             }
         }
         // Snapped back off the blow: head first, then the shoulders,
         // with the back foot skidding out to catch it.
         Act::Hitstun => {
-            let k = (1.0 - f.t * 6.0).clamp(0.3, 1.0);
+            // A sag that holds for the stun, plus a ring that is the
+            // actual whiplash. The ring is zero at contact and gone in
+            // a fifth of a second, so stun timing is untouched.
+            let sag = (1.0 - f.t * 6.0).clamp(0.30, 1.0);
+            let ring = 0.32 * (-f.t * 8.0).exp() * ((f.t * 30.0).cos() - 1.0);
+            let k = sag + ring;
             let drop = if low { 0.5 } else { 1.0 };
             q.hip = p(q.hip.f - 6.0 * k, q.hip.u - 3.0 * k);
-            q.neck = p(q.neck.f - 14.0 * k * drop, q.neck.u - 2.0);
-            q.head = p(q.head.f - 21.0 * k * drop, q.head.u - 1.0);
+            q.head = p(q.head.f - 24.0 * k * drop, q.head.u - 1.6);
             q.lead_foot = p(q.lead_foot.f - 10.0, 0.0);
             q.rear_foot = p(q.rear_foot.f - 6.0, 0.0);
             // The guard is knocked aside rather than teleported: the
@@ -1471,23 +1547,22 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
             let sweep = raise * raise * (3.0 - 2.0 * raise);
             let bob = ((t - 0.6).max(0.0) * 2.2).sin() * 1.8;
 
-            q.neck = p(-3.5 + 2.5 * settle, NECK_U + 1.0 * settle);
             // And they look up at it, which is what a person does.
-            q.head = p(-1.5 + 1.0 * settle - 2.0 * sweep,
-                       HEAD_U + 1.0 * settle + 1.5 * sweep + bob * 0.3);
+            q.head = p(-1.5 + 2.0 * settle - 2.0 * sweep,
+                       HEAD_U + 1.2 * settle + 1.5 * sweep + bob * 0.3);
             q.hip = p(0.0, HIP_U + 1.0 * settle);
             q.lead_foot = p(16.0 - 3.0 * settle, 0.0);
             q.rear_foot = p(-21.0 + 4.0 * settle, 0.0);
             // Rear hand comes to rest on the hip.
-            q.rear_hand = q.rear_hand.to(p(-9.0, 64.0), settle);
+            q.rear_hand = q.rear_hand.to(p(-4.0, 46.0), settle);
             // Lead arm: guard, then down and back to load the swing,
             // then up and forward. The dip is what makes it a swing
             // rather than a hand appearing in the air.
-            let load = p(6.0, 64.0);
+            let load = p(20.0, 58.0);
             // Far enough forward that the whole arm clears the head.
             // Raised closer in, the sleeve crossed the face and the
             // celebration was performed by a man with no head.
-            let up = p(33.0, 124.0 + bob);
+            let up = p(36.0, 120.0 + bob);
             q.lead_hand = if raise <= 0.0 {
                 q.lead_hand.to(load, settle)
             } else {
@@ -1497,7 +1572,6 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
         // Lost: down on the back knee, head hanging.
         Act::Defeat => {
             q.hip = p(-4.0, 31.0);
-            q.neck = p(3.0, 59.0);
             q.head = p(9.0, 67.0);
             q.lead_foot = p(15.0, 0.0);
             q.rear_foot = p(-15.0, 2.0);
@@ -1506,6 +1580,31 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
         }
         _ => {}
     }
+    // The knees taking a landing: hips sink under the momentum and
+    // push back out, fast down and slower up. Drawn over whatever they
+    // do next, but not over an attack, which owns its own hips.
+    if f.land > 0.0 && !f.airborne()
+        && matches!(f.act, Act::Idle | Act::Walk | Act::Crouch | Act::Block) {
+        let k = 1.0 - (f.land / LAND_ABSORB).clamp(0.0, 1.0);
+        // Peaks about a third of the way in and eases out of it, so the
+        // compression is quick and the push back up is not.
+        // A fighter who lands into a crouch has already spent most of
+        // the give they had: the hips are half as high to begin with
+        // and there is nowhere for the folded rear leg to put its knee
+        // except through the boards.
+        let room = if low { 0.3 } else { 1.0 };
+        let dip = (std::f32::consts::PI * k).sin() * (1.0 - k) * f.land_force * room;
+        q.hip.u -= 9.0 * dip;
+        q.head.u -= 6.5 * dip;
+        // The guard rides down with the shoulders rather than hanging
+        // in the air while the body drops out from under it.
+        q.lead_hand.u -= 6.0 * dip;
+        q.rear_hand.u -= 6.0 * dip;
+        // And the stance widens a little as the weight arrives on it.
+        q.lead_foot.f += 2.0 * dip;
+        q.rear_foot.f -= 2.0 * dip;
+    }
+
     // No foot goes through the floor. The coil at the start of an
     // attack extrapolates back past the pose it starts from, which for
     // a foot already standing on the boards means below them.
@@ -1638,7 +1737,7 @@ impl Skeleton {
 /// their shadow.
 pub(crate) fn skeleton(rig: Rig, q: &Pose) -> Skeleton {
     let hip = rig.at(q.hip);
-    let neck = rig.at(q.neck);
+    let neck = rig.at(neck_of(q));
     let head = rig.at(q.head);
 
     // Sockets hang off the spine and turn with it. Fixed screen-space
@@ -1654,7 +1753,11 @@ pub(crate) fn skeleton(rig: Rig, q: &Pose) -> Skeleton {
     };
     // Sockets sit well out from the spine: it is the distance between
     // them, plus the deltoid on each, that makes a fighter's shoulders.
-    let (sh_lead, sh_rear) = socket(neck, 7.0, -5.0);
+    // Wide, because the top-heavy V from shoulders to waist is the
+    // second thing after the head that separates a fighting-game
+    // sprite from a figure study — those fighters are drawn as a
+    // wedge, and the wedge is what carries the silhouette.
+    let (sh_lead, sh_rear) = socket(neck, 8.6, -8.5);
     let (hip_lead, hip_rear) = socket(hip, 4.5, 0.0);
 
     // Parallax on the far side.
@@ -1702,13 +1805,28 @@ pub(crate) fn skeleton(rig: Rig, q: &Pose) -> Skeleton {
         solve(root, want, THIGH * b, SHIN * b, KNEE_SHUT, anterior, rig.ground)
     };
     let arm_at = |root: V, want: V| {
-        // Above the shoulder the elbow goes behind, never below: driving
-        // it below a raised shoulder folds the arm back through its own
-        // socket, which is the most wrong a body can look and was on
-        // screen every time somebody won a round.
-        let raised = want.1 < root.1;
-        let bias = if raised { V(-rig.fwd * 0.9, 0.15) } else { V(-rig.fwd * 0.45, 0.9) };
-        solve(root, want, UARM * b, FARM * b, ELBOW_SHUT, bias, rig.ground)
+        // The elbow breaks to the back of the arm — and "the back of
+        // the arm" turns with the arm, exactly as the knee's forward
+        // does above.
+        //
+        // This was a fixed direction, mostly straight down, and a fixed
+        // direction is a tie waiting to happen: the two solutions are
+        // mirror images about the shoulder-to-hand line, so a bias
+        // lying near that line scores them almost equally and a pixel
+        // of movement anywhere flips the whole forearm to the other
+        // side. A rear hand tucked down across the chest — a jump
+        // kick, a sweep, a knockdown — sits right on that tie, and the
+        // elbow swapped between winging out behind the back and
+        // tucking in front for no reason the pose could name. Squaring
+        // the bias to the arm makes it maximally far from the tie at
+        // every angle instead of at most of them.
+        // The elbow trails the hand, turning with the arm: behind it
+        // hanging, below a punch, above one cocked back. One rule at
+        // every angle — any "is the arm raised" test is a cliff the
+        // forearm snaps across mid-swing. See `no_elbow_sticks_out_behind_the_back`.
+        let (dx, dy) = unit(root, want);
+        let posterior = V(-dy * rig.fwd, dx * rig.fwd);
+        solve(root, want, UARM * b, FARM * b, ELBOW_SHUT, posterior, rig.ground)
     };
 
     let (knee_lead, ankle_lead) = leg_at(hip_lead, rig.at(q.lead_foot));
@@ -1823,38 +1941,23 @@ fn pose_and_draw_lit(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f3
     stroke(blip, V(f.x - sw, FLOOR_Y + shift), V(f.x + sw, FLOOR_Y + shift), 3.0, 3.0,
         BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.34 * (1.0 - 0.55 * lift) });
 
+    // One solve per fighter. The cloth wanted a second pose four
+    // frames back to difference the joints, which cost eight.
     let k = skeleton(rig, &q);
+    let t = now + i as f32;
 
-    // What each part of the body just did, for the cloth to lag behind.
-    //
-    // No stored state: the pose is a pure function of the action timer,
-    // so posing the same fighter a few frames earlier and subtracting
-    // gives the real velocity of every joint. The gi then answers to
-    // the actual motion of the limb it is hanging on rather than to a
-    // sine wave that happens to look busy.
-    let mut old = f;
-    old.t = (f.t - 4.0 * F).max(0.0);
-    let k0 = skeleton(rig, &pose_of(now, &old, i));
-    // Grounded walking moves x directly rather than through a velocity,
-    // so the body's own travel has to be added back by hand.
-    let travel = if f.act == Act::Walk { f.facing * a.walk * 4.0 * F } else { 0.0 };
-    let vel = |a: V, b: V| V((a.0 - b.0 + travel) * 0.55, (a.1 - b.1) * 0.55);
-
-    draw_leg(blip, &far, k.hip_rear, k.knee_rear, k.ankle_rear, rig.fwd, rig.ground,
-        vel(k.knee_rear, k0.knee_rear), now);
+    draw_leg(blip, &far, k.hip_rear, k.knee_rear, k.ankle_rear, rig.fwd, rig.ground, t);
     draw_pelvis(blip, &hide, k.hip_rear, k.hip_lead);
-    draw_torso(blip, &hide, k.hip, k.neck, vel(k.hip, k0.hip), now);
+    draw_torso(blip, &hide, k.hip, k.neck);
     // The far arm goes on after the chest but *before* the head: it is
     // in front of the ribs and behind the face. Drawn after the head it
     // wiped the face out every time the guard came up, which at this
     // size is most of the time.
-    draw_arm(blip, &far, k.sh_rear, k.elbow_rear, k.hand_rear, q.open,
-        vel(k.elbow_rear, k0.elbow_rear), now);
-    draw_head(blip, &hide, rig, k.head, k.neck, now + i as f32);
-    draw_leg(blip, &near, k.hip_lead, k.knee_lead, k.ankle_lead, rig.fwd, rig.ground,
-        vel(k.knee_lead, k0.knee_lead), now);
-    draw_arm(blip, &near, k.sh_lead, k.elbow_lead, k.hand_lead, q.open,
-        vel(k.elbow_lead, k0.elbow_lead), now);
+    draw_arm(blip, &far, k.sh_rear, k.elbow_rear, k.hand_rear, q.open, t);
+    draw_head(blip, &hide, rig, k.head, k.neck, t);
+    draw_leg(blip, &near, k.hip_lead, k.knee_lead, k.ankle_lead, rig.fwd, rig.ground, t);
+    draw_skirt(blip, &hide, k.hip, k.neck, t);
+    draw_arm(blip, &near, k.sh_lead, k.elbow_lead, k.hand_lead, q.open, t);
 }
 
 fn draw_fight(blip: &Blip, g: &Game) {
@@ -2011,9 +2114,12 @@ fn draw_title(blip: &Blip) {
     blip.draw_centered("BRAWLER", 78.0, 7.0, BLIP_YELLOW);
     blip.draw_centered("TWO FIGHTERS ENTER", 132.0, 2.0, BLIP_WHITE);
 
-    blip.draw_centered("ARROWS  MOVE AND GUARD", 196.0, 2.0, dim);
-    blip.draw_centered("SPACE  PUNCH", 226.0, 2.0, dim);
-    blip.draw_centered("Z X C  KICK LOW MID HIGH", 256.0, 2.0, hot);
+    blip.draw_centered("ARROWS  MOVE AND GUARD", 192.0, 2.0, dim);
+    blip.draw_centered("SPACE  PUNCH", 218.0, 2.0, dim);
+    blip.draw_centered("Z X C  KICK LOW MID HIGH", 244.0, 2.0, hot);
+    // The two modifiers. Neither is discoverable by pressing buttons,
+    // and the flying kick is the only way across the stage.
+    blip.draw_centered("DOWN+KICK SWEEP   UP+KICK FLY", 270.0, 2.0, hot);
 
     blip.draw_centered("PRESS FIRE", 320.0, 3.0, BLIP_WHITE);
 }
@@ -2077,7 +2183,7 @@ fn draw_select(blip: &Blip, g: &Game) {
 #[cfg(feature = "gallery")]
 pub fn draw_gallery(blip: &Blip, now: f32) {
     blip.clear(BlipColor { r: 0.15, g: 0.16, b: 0.21, a: 1.0 });
-    let acts: [(&str, Act, MoveId); 17] = [
+    let acts: [(&str, Act, MoveId); 18] = [
         ("JAB", Act::Attack, MoveId::Jab),
         ("LOW KICK", Act::Attack, MoveId::LowKick),
         ("KICK", Act::Attack, MoveId::Kick),
@@ -2087,6 +2193,7 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
         ("THROW", Act::Attack, MoveId::Throw),
         ("SPECIAL", Act::Attack, MoveId::Special),
         ("JUMP KICK", Act::Attack, MoveId::JumpKick),
+        ("FLYING KICK", Act::Attack, MoveId::FlyingKick),
         ("JUMP PUNCH", Act::Attack, MoveId::JumpPunch),
         ("IDLE", Act::Idle, MoveId::Jab),
         ("WALK", Act::Walk, MoveId::Jab),
@@ -2105,8 +2212,15 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
     // lands on whatever it had drifted to, and comparing a change to
     // the frame before it becomes guesswork.
     use std::sync::atomic::{AtomicUsize, Ordering};
-    static AT: AtomicUsize = AtomicUsize::new(0);
+    static AT: AtomicUsize = AtomicUsize::new(usize::MAX);
     static WHO: AtomicUsize = AtomicUsize::new(0);
+    // BLIP_POSE / BLIP_WHO aim a capture at one cell from the command
+    // line; with BLIP_SCREENSHOT_OUT the sheet can be photographed.
+    if AT.load(Ordering::Relaxed) == usize::MAX {
+        let env = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<usize>().ok());
+        AT.store(env("BLIP_POSE").unwrap_or(0), Ordering::Relaxed);
+        WHO.store(env("BLIP_WHO").unwrap_or(0), Ordering::Relaxed);
+    }
     if blip::input::key_pressed(BLIP_KEY_RIGHT) { AT.fetch_add(1, Ordering::Relaxed); }
     if blip::input::key_pressed(BLIP_KEY_LEFT) { AT.fetch_add(acts.len() - 1, Ordering::Relaxed); }
     if blip::input::key_pressed(BLIP_KEY_UP) { WHO.fetch_add(1, Ordering::Relaxed); }
@@ -2142,6 +2256,13 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
         };
         if matches!(mv, MoveId::JumpKick | MoveId::JumpPunch) && act == Act::Attack {
             f.y = FLOOR_Y - 46.0;
+        }
+        // The flying kick is drawn along its own arc, since the pose is
+        // read off vertical speed and a still one says nothing.
+        if mv == MoveId::FlyingKick && act == Act::Attack {
+            let k = k as f32 / 4.0;
+            f.y = FLOOR_Y - 44.0 * (1.0 - (2.0 * k - 1.0).powi(2));
+            f.vy = FLY_VY * (1.0 - 2.0 * k);
         }
         if act == Act::Walk { f.x = x + (now * 60.0) % 24.0; }
         blip.draw_line(x - 60.0, FLOOR_Y, x + 74.0, FLOOR_Y,

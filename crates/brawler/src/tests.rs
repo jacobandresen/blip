@@ -1196,7 +1196,7 @@ fn every_pose() -> Vec<(String, Fighter)> {
     let mut out = Vec::new();
     let moves = [MoveId::Jab, MoveId::LowKick, MoveId::Kick, MoveId::HighKick,
                  MoveId::CrouchJab, MoveId::Sweep, MoveId::JumpPunch, MoveId::JumpKick,
-                 MoveId::Special, MoveId::Throw];
+                 MoveId::FlyingKick, MoveId::Special, MoveId::Throw];
     for who in 0..FIGHTERS.len() {
         for act in [Act::Idle, Act::Walk, Act::Crouch, Act::Block, Act::Hitstun,
                     Act::Knockdown, Act::Victory, Act::Defeat] {
@@ -1215,10 +1215,32 @@ fn every_pose() -> Vec<(String, Fighter)> {
                     c.crouch_block = true;
                     out.push((format!("{} crouch-block t={:.2}", FIGHTERS[who].name, c.t), c));
                 }
+                // The knees giving under a landing is drawn on top of
+                // whatever the fighter does next, so it has to satisfy
+                // the anatomy rules in every one of those actions too.
+                if matches!(act, Act::Idle | Act::Walk | Act::Crouch | Act::Block) {
+                    let mut l = f;
+                    l.land = LAND_ABSORB * (1.0 - step as f32 / 11.0);
+                    l.land_force = 1.0;
+                    out.push((format!("{} {:?} landing land={:.3}",
+                        FIGHTERS[who].name, act, l.land), l));
+                }
             }
         }
+        // The whole jump, take-off to touchdown. The airborne pose is
+        // read off vertical speed rather than off a clock, so the way
+        // to cover it is to fly the arc: rising hard, apex, falling.
+        for step in 0..12 {
+            let k = step as f32 / 11.0;
+            let mut f = Fighter::new(who, 300.0, 1.0);
+            f.act = Act::Air;
+            f.vy = JUMP_VY * (1.0 - 2.0 * k);
+            f.y = FLOOR_Y - 120.0 * (1.0 - (1.0 - 2.0 * k).powi(2)).max(0.02);
+            f.t = k * 0.7;
+            out.push((format!("{} Air vy={:.0}", FIGHTERS[who].name, f.vy), f));
+        }
         for mv in moves {
-            let air = matches!(mv, MoveId::JumpPunch | MoveId::JumpKick);
+            let air = matches!(mv, MoveId::JumpPunch | MoveId::JumpKick | MoveId::FlyingKick);
             for step in 0..16 {
                 let mut f = Fighter::new(who, 300.0, 1.0);
                 f.act = Act::Attack;
@@ -1329,12 +1351,15 @@ fn what_you_see_is_what_can_hit_you() {
                     | MoveId::Sweep);
                 // The tip is the end of the foot or the front of the
                 // fist, not the joint behind it.
+                // Both scale with the fighter, because the drawn foot
+                // and the drawn fist do.
+                let bulk = FIGHTERS[who].bulk;
                 let tip = if leg {
                     let (dx, dy) = (k.ankle_lead.0 - k.knee_lead.0, k.ankle_lead.1 - k.knee_lead.1);
                     let d = (dx * dx + dy * dy).sqrt().max(0.001);
-                    k.ankle_lead.0 + dx / d * 11.0
+                    k.ankle_lead.0 + dx / d * 12.6 * bulk
                 } else {
-                    k.hand_lead.0 + 5.0
+                    k.hand_lead.0 + 6.4 * bulk
                 };
                 let far = hx + hw;
                 let short = far - tip;
@@ -1438,6 +1463,16 @@ fn knees_bend_forwards_and_elbows_bend_backwards() {
                 bad.push(format!("{label}: {name} bends backwards"));
             }
         }
+        // The other half of the name. An elbow goes to the back of the
+        // arm while the hand is below the shoulder it hangs from; above
+        // that the arm turns over, so a raised one is skipped.
+        for (name, j, a, b) in [("elbow-lead", k.elbow_lead, k.sh_lead, k.hand_lead),
+                                ("elbow-rear", k.elbow_rear, k.sh_rear, k.hand_rear)] {
+            if b.1 < a.1 + 6.0 { continue; }
+            if side(j, a, b) * -want < -1.5 {
+                bad.push(format!("{label}: {name} bends forwards"));
+            }
+        }
     }
     assert!(bad.is_empty(), "joints bending the wrong way:\n  {}", bad.join("\n  "));
 }
@@ -1455,13 +1490,19 @@ fn nothing_teleports_between_one_frame_and_the_next() {
     // frame rate and watch every joint. Nothing may move further in one
     // frame than a body part can.
     let _sim = simulating(0x5EED05);
-    let script: [(Act, MoveId, f32); 9] = [
+    let script: [(Act, MoveId, f32); 11] = [
         (Act::Idle, MoveId::Jab, 0.20),
         (Act::Attack, MoveId::Kick, 0.55),
         (Act::Idle, MoveId::Jab, 0.10),
         (Act::Attack, MoveId::HighKick, 0.70),
         (Act::Block, MoveId::Jab, 0.20),
         (Act::Attack, MoveId::Sweep, 0.60),
+        // A jump comes out of a neutral stance, because that is the
+        // only thing it can come out of: you cannot jump out of a
+        // sweep's recovery, and a script that pretends you can is
+        // measuring a handover the game never performs.
+        (Act::Idle, MoveId::Jab, 0.12),
+        (Act::Air, MoveId::Jab, 0.80),
         (Act::Hitstun, MoveId::Jab, 0.30),
         (Act::Knockdown, MoveId::Jab, 1.20),
         (Act::Victory, MoveId::Jab, 0.80),
@@ -1470,12 +1511,19 @@ fn nothing_teleports_between_one_frame_and_the_next() {
     let mut over: Vec<String> = vec![];
     for who in 0..FIGHTERS.len() {
         let mut f = Fighter::new(who, 300.0, 1.0);
-        let mut last: Option<[(&'static str, draw::V); 6]> = None;
+        let mut last: Option<[(&'static str, draw::V); 10]> = None;
         for (act, mv, secs) in script {
             f.act = act;
             f.mv = mv;
             f.t = 0.0;
             f.stun = secs;
+            // Air is not a pose but an arc: give it the velocity a
+            // jump actually starts with and let advance() fly it,
+            // through the apex and down onto the landing.
+            if act == Act::Air {
+                f.vy = JUMP_VY * f.arch().jump_scale;
+                f.y -= 0.5;
+            }
             let frames = (secs / F) as i32;
             let mut held = 0.0f32;
             for _ in 0..frames {
@@ -1485,15 +1533,25 @@ fn nothing_teleports_between_one_frame_and_the_next() {
                 // and resets the timer with it. Hold both, or the run
                 // restarts the action mid-script and the "teleport"
                 // being measured is the test's own doing.
-                if f.act != act {
+                // A jump is the one leg of the script that is allowed
+                // to end on its own: it finishes by landing, and the
+                // landing — the touchdown, the handover to standing and
+                // the give in the knees after it — is exactly the part
+                // worth watching.
+                if f.act != act && !(act == Act::Air && !f.airborne()) {
                     f.act = act;
                     f.t = held;
                     f.shown = act;
                     f.blend = 0.0;
                 }
                 let k = bones_of(&f);
+                // Knees and elbows too: a two-bone solve has two mirror
+                // answers, and near a tie the joint swaps sides while
+                // the hand it belongs to does not move at all.
                 let now = [("hand-lead", k.hand_lead), ("hand-rear", k.hand_rear),
                            ("ankle-lead", k.ankle_lead), ("ankle-rear", k.ankle_rear),
+                           ("elbow-lead", k.elbow_lead), ("elbow-rear", k.elbow_rear),
+                           ("knee-lead", k.knee_lead), ("knee-rear", k.knee_rear),
                            ("head", k.head), ("hip", k.hip)];
                 if let Some(prev) = last {
                     // Being hit is allowed to snap: a guard knocked
@@ -1534,4 +1592,378 @@ fn nothing_teleports_between_one_frame_and_the_next() {
     // picture in between, on the frame it lands.
     assert!(over.is_empty(), "limbs teleporting:\n  {}\n(worst overall: {})",
         over.join("\n  "), worst.1);
+}
+
+
+
+#[test]
+fn a_waiting_fighter_has_their_knees_bent() {
+    // Straight knees read as standing in a queue. It went wrong in a
+    // way nothing else here could see: the hip sat a leg's length from
+    // the ankles, the solver clamped both legs straight because that
+    // was the closest it could legally get, and every length, hinge
+    // and balance rule still passed.
+    let mut bad = vec![];
+    for who in 0..FIGHTERS.len() {
+        for act in [Act::Idle, Act::Walk, Act::Block] {
+            let mut f = Fighter::new(who, 300.0, 1.0);
+            f.act = act;
+            let k = bones_of(&f);
+            for (name, hip, knee, ankle) in
+                [("lead", k.hip_lead, k.knee_lead, k.ankle_lead),
+                 ("rear", k.hip_rear, k.knee_rear, k.ankle_rear)] {
+                let (ax, ay) = (hip.0 - knee.0, hip.1 - knee.1);
+                let (bx, by) = (ankle.0 - knee.0, ankle.1 - knee.1);
+                let la = (ax * ax + ay * ay).sqrt().max(0.001);
+                let lb = (bx * bx + by * by).sqrt().max(0.001);
+                let ang = ((ax * bx + ay * by) / (la * lb)).clamp(-1.0, 1.0).acos();
+                // 180 degrees is a locked leg. A guard bends the knee
+                // well past twenty.
+                let bend = 180.0 - ang.to_degrees();
+                if bend < 20.0 {
+                    bad.push(format!("{} {:?}: {name} knee bent only {bend:.0} degrees",
+                        FIGHTERS[who].name, act));
+                }
+            }
+        }
+    }
+    assert!(bad.is_empty(), "fighters standing to attention:\n  {}", bad.join("\n  "));
+}
+
+#[test]
+fn no_limb_is_folded_up_to_nothing() {
+    // A two-bone limb stops being posable before it stops being legal.
+    // As the target nears the fold limit the joint stops answering to
+    // it and swings out along the bias instead, and a pixel at the hand
+    // throws it a long way. The rear guard hand, parked at 1.07x the
+    // minimum, put the far elbow through the fighter's own chest.
+    let shut = |l1: f32, l2: f32, c: f32| (l1 * l1 + l2 * l2 - 2.0 * l1 * l2 * c.cos()).sqrt();
+    let arm_min = shut(24.0, 21.0, 0.61);
+    let leg_min = shut(30.0, 29.0, 0.52);
+    let mut bad = vec![];
+    for (label, f) in every_pose() {
+        let k = bones_of(&f);
+        for (name, root, end, min) in
+            [("arm-lead", k.sh_lead, k.hand_lead, arm_min),
+             ("arm-rear", k.sh_rear, k.hand_rear, arm_min),
+             ("leg-lead", k.hip_lead, k.ankle_lead, leg_min),
+             ("leg-rear", k.hip_rear, k.ankle_rear, leg_min)] {
+            let d = ((end.0 - root.0).powi(2) + (end.1 - root.1).powi(2)).sqrt();
+            if d < min * 1.25 {
+                bad.push(format!("{label}: {name} folded to {d:.0}px, \
+                    against a {min:.0}px limit ({:.2}x)", d / min));
+            }
+        }
+    }
+    assert!(bad.is_empty(), "limbs folded to the point the joint is guesswork:\n  {}",
+        bad.join("\n  "));
+}
+
+#[test]
+#[ignore = "diagnostic"]
+fn dump_folds() {
+    let shut = |l1: f32, l2: f32, c: f32| (l1 * l1 + l2 * l2 - 2.0 * l1 * l2 * c.cos()).sqrt();
+    let amin = shut(24.0, 21.0, 0.61);
+    let mut worst: std::collections::BTreeMap<String, (f32, String)> = Default::default();
+    for (label, f) in every_pose() {
+        let k = bones_of(&f);
+        let g = f.y;
+        let pose = |v: draw::V| (v.0 - f.x, g - v.1);
+        for (name, root, end) in [("arm-lead", k.sh_lead, k.hand_lead),
+                                  ("arm-rear", k.sh_rear, k.hand_rear),
+                                  ("leg-lead", k.hip_lead, k.ankle_lead),
+                                  ("leg-rear", k.hip_rear, k.ankle_rear)] {
+            let d = ((end.0 - root.0).powi(2) + (end.1 - root.1).powi(2)).sqrt();
+            let fam = if label.contains("Knockdown") { label.split_whitespace().skip(1).collect::<Vec<_>>().join(" ") } else { label.split_whitespace().nth(1).unwrap_or("?").to_string() };
+            let key = format!("{fam} {name}");
+            let e = worst.entry(key).or_insert((99.0, String::new()));
+            if d / amin < e.0 {
+                let (sf, su) = pose(root);
+                let (hf, hu) = pose(end);
+                *e = (d / amin, format!("shoulder=({sf:5.1},{su:5.1}) hand=({hf:5.1},{hu:5.1}) \
+                    d={d:4.1} [{label}]"));
+            }
+        }
+    }
+    for (k, (r, s)) in worst {
+        if r < 1.30 { println!("{r:.2}x {k:16} {s}"); }
+    }
+}
+
+#[test]
+#[ignore = "diagnostic"]
+fn dump_wings() {
+    let mut rows: Vec<(f32, String)> = vec![];
+    for (label, f) in every_pose() {
+        let k = bones_of(&f);
+        for (n, sh, el, hd) in [("lead", k.sh_lead, k.elbow_lead, k.hand_lead),
+                                ("rear", k.sh_rear, k.elbow_rear, k.hand_rear)] {
+            let back = (sh.0 - el.0) * f.facing;
+            let hand_back = (sh.0 - hd.0) * f.facing;
+            rows.push((back - hand_back.max(0.0), format!("back={back:5.1} hand={hand_back:5.1}  {n} {label}")));
+        }
+    }
+    rows.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    for (d, s) in rows.iter().take(18) { println!("{d:5.1}  {s}"); }
+}
+
+#[test]
+fn no_elbow_sticks_out_behind_the_back() {
+    // A side-on rig has nowhere to put the elbow of an arm folded
+    // across the body, so it projects it backwards and the upper arm
+    // reads as a plank bolted to the shoulder.
+    let mut bad = vec![];
+    for (label, f) in every_pose() {
+        if f.act == Act::Knockdown { continue; }
+        let k = bones_of(&f);
+        for (n, sh, el, hd) in [("lead", k.sh_lead, k.elbow_lead, k.hand_lead),
+                                ("rear", k.sh_rear, k.elbow_rear, k.hand_rear)] {
+            let back = (sh.0 - el.0) * f.facing;
+            let hand = ((sh.0 - hd.0) * f.facing).max(0.0);
+            if back - hand > 19.0 {
+                bad.push(format!("{label}: {n} elbow {:.0}px behind its shoulder, \
+                    hand only {hand:.0}px", back));
+            }
+        }
+    }
+    assert!(bad.is_empty(), "elbows winging out behind the back:\n  {}", bad.join("\n  "));
+}
+
+#[test]
+fn a_fighter_has_two_arms_two_legs_and_one_torso() {
+    // Near and far limbs have to be far enough apart to be counted, and
+    // close enough not to read as someone else's. Both failures have
+    // happened: a guard that put the two fists in one place, and a fist
+    // parked beside the skull that read as a second head.
+    let mut bad = vec![];
+    for (label, f) in every_pose() {
+        // A body rolling up off the floor passes its own limbs across
+        // each other, which is what getting up is.
+        if f.act == Act::Knockdown { continue; }
+        let k = bones_of(&f);
+        let gap = |a: draw::V, b: draw::V| ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt();
+        if gap(k.hand_lead, k.hand_rear) < 6.0 {
+            bad.push(format!("{label}: the two fists are in the same place"));
+        }
+        if gap(k.ankle_lead, k.ankle_rear) < 6.0 {
+            bad.push(format!("{label}: the two feet are in the same place"));
+        }
+        // Nothing but the head belongs on the head. A hand over the
+        // face deletes the one part a player has to find.
+        let head_r = 9.8 + 2.2 * (FIGHTERS[f.who].bulk - 1.0);
+        for (n, h) in [("lead", k.hand_lead), ("rear", k.hand_rear)] {
+            if gap(h, k.head) < head_r + 2.0 {
+                bad.push(format!("{label}: the {n} fist is drawn over the head"));
+            }
+        }
+    }
+    assert!(bad.is_empty(), "limbs that cannot be counted:\n  {}", bad.join("\n  "));
+}
+
+#[test]
+fn a_fighter_fits_inside_their_own_hurtbox() {
+    // The box the rules judge and the body the player aims at have to
+    // be the same object, near enough.
+    let mut bad = vec![];
+    for (label, f) in every_pose() {
+        if matches!(f.act, Act::Knockdown | Act::Attack) { continue; }
+        let k = bones_of(&f);
+        let top = f.y - f.height();
+        let head_r = 9.8 + 2.2 * (FIGHTERS[f.who].bulk - 1.0);
+        if k.head.1 - head_r < top - 6.0 {
+            bad.push(format!("{label}: the head is {:.0}px above the hurtbox",
+                top - (k.head.1 - head_r)));
+        }
+    }
+    assert!(bad.is_empty(), "bodies outside their own box:\n  {}", bad.join("\n  "));
+}
+
+#[test]
+fn a_fighter_who_covers_ground_takes_steps() {
+    // Both directions, because they are drawn by different code.
+    // Retreating is a block — holding away is the block and the
+    // back-step at once — and the block pose had both feet pinned, so
+    // a fighter giving ground slid backwards without moving a foot.
+    for (name, inp, toward) in [
+        ("forward", Input { right: true, ..Default::default() }, 1.0f32),
+        ("backward", back_input(1.0, false), -1.0),
+    ] {
+        let mut f = at(0, 300.0, 1.0);
+        let start = f.x;
+        let (mut lo, mut hi) = (f32::MAX, f32::MIN);
+        let mut lifted = false;
+        for _ in 0..40 {
+            apply_input(&mut f, inp, false, F);
+            advance(&mut f, F);
+            let k = bones_of(&f);
+            // Where the near foot is relative to the body it hangs off.
+            let step = k.ankle_lead.0 - f.x;
+            lo = lo.min(step);
+            hi = hi.max(step);
+            if k.ankle_lead.1 < FLOOR_Y - 3.0 { lifted = true; }
+        }
+        let moved = (f.x - start) * toward;
+        assert!(moved > 30.0, "{name}: covered only {moved:.0}px of ground");
+        assert!(hi - lo > 8.0,
+            "{name}: the near foot moved {:.0}px against the body over a \
+             {moved:.0}px walk — that is a slide, not a step", hi - lo);
+        assert!(lifted, "{name}: the near foot never left the floor");
+    }
+}
+
+#[test]
+fn a_fighter_blocking_on_the_spot_keeps_still() {
+    // The other half of the same mechanism: the gait is driven by where
+    // the fighter is, so standing and guarding must not shuffle.
+    let mut f = at(0, 300.0, 1.0);
+    let mut last: Option<draw::V> = None;
+    for i in 0..30 {
+        // Holding away while crouching blocks without retreating.
+        apply_input(&mut f, back_input(1.0, true), false, F);
+        advance(&mut f, F);
+        let k = bones_of(&f);
+        // Skip the handover out of the idle stance, which is a real
+        // move and is meant to be seen.
+        if i < 8 { last = Some(k.ankle_lead); continue; }
+        if let Some(p) = last {
+            let d = ((k.ankle_lead.0 - p.0).powi(2) + (k.ankle_lead.1 - p.1).powi(2)).sqrt();
+            assert!(d < 1.0, "a fighter guarding in place shuffled {d:.1}px");
+        }
+        last = Some(k.ankle_lead);
+    }
+}
+
+#[test]
+fn a_flying_kick_crosses_ground_no_other_move_can() {
+    let mut f = at(0, 200.0, 1.0);
+    f.start_attack(MoveId::FlyingKick);
+    let (start, mut peak) = (f.x, 0.0f32);
+    let mut frames = 0;
+    while f.airborne() && frames < 120 {
+        advance(&mut f, F);
+        peak = peak.max(FLOOR_Y - f.y);
+        frames += 1;
+    }
+    let travel = f.x - start;
+    assert!(travel > 110.0, "a flying kick covered only {travel:.0}px");
+    // Flatter than a jump, or it is just a jump-in.
+    let mut j = at(0, 200.0, 1.0);
+    j.vy = JUMP_VY;
+    j.y -= 0.5;
+    let mut jump_peak = 0.0f32;
+    for _ in 0..120 {
+        advance(&mut j, F);
+        jump_peak = jump_peak.max(FLOOR_Y - j.y);
+    }
+    assert!(peak < jump_peak * 0.75,
+        "the flying kick rose {peak:.0}px against a jump's {jump_peak:.0} — that is a jump");
+}
+
+#[test]
+fn a_flying_kick_must_be_blocked_standing() {
+    let m = move_data(MoveId::FlyingKick);
+    assert!(blocks(m.level, false), "a flying kick should be stopped by a standing guard");
+    assert!(!blocks(m.level, true), "crouching should not stop a flying kick");
+}
+
+#[test]
+fn a_blocked_flying_kick_is_a_free_punish() {
+    // The whole cost of the move. Every other air attack is cancelled
+    // by landing, which is what makes a blocked jump-in safe; this one
+    // keeps its recovery, so blocking it buys a turn.
+    let mut a = at(0, 240.0, 1.0);
+    let mut d = at(0, 330.0, -1.0);
+    a.start_attack(MoveId::FlyingKick);
+    let hold = back_input(-1.0, false);
+    let mut blocked = false;
+    for _ in 0..90 {
+        if !blocked {
+            let (_, b, _) = resolve_hit(&mut a, &mut d, hold);
+            blocked |= b;
+        }
+        advance(&mut a, F);
+        advance(&mut d, F);
+        if blocked && !a.airborne() { break; }
+    }
+    assert!(blocked, "the flying kick never reached a standing guard");
+    // On the floor again, still stuck in it.
+    assert!(!a.free(), "the attacker was free the moment they landed");
+    let mut lag = 0;
+    while !a.free() && lag < 60 { advance(&mut a, F); lag += 1; }
+    assert!(lag >= 10, "only {lag} frames of landing lag — that is not a punish");
+    assert!(d.free() || d.act == Act::Block,
+        "the defender should be out of blockstun before the attacker recovers");
+}
+
+#[test]
+#[ignore = "diagnostic"]
+fn dump_flying_kick() {
+    let mut f = at(0, 200.0, 1.0);
+    f.start_attack(MoveId::FlyingKick);
+    let (start, mut peak, mut frames) = (f.x, 0.0f32, 0);
+    while f.airborne() && frames < 120 {
+        advance(&mut f, F);
+        peak = peak.max(FLOOR_Y - f.y);
+        frames += 1;
+    }
+    println!("travel {:.0}px  airtime {frames}f  peak {peak:.0}px", f.x - start);
+    let mut lag = 0;
+    while !f.free() && lag < 90 { advance(&mut f, F); lag += 1; }
+    println!("landing lag {lag}f");
+    for mv in [MoveId::Jab, MoveId::Kick, MoveId::HighKick, MoveId::Sweep, MoveId::JumpKick,
+               MoveId::FlyingKick] {
+        let m = move_data(mv);
+        println!("{mv:?}: startup {} active {} recovery {} dmg {} reach {} level {:?}",
+            m.startup, m.active, m.recovery, m.damage, m.reach, m.level);
+    }
+}
+
+#[test]
+fn the_cpu_throws_the_flying_kick_too() {
+    // End to end: the plan has to survive being turned into an input
+    // and read back as a move. A wrong button here is silent — the CPU
+    // just never uses it — and the move becomes a player-only tool.
+    let _sim = simulating(0x5EED07);
+    let mut seen = 0;
+    for pick in 0..3 {
+        for foe in 0..2 {
+            let mut g = Game::new();
+            g.pick = pick;
+            g.start_match(foe);
+            g.state = State::Fight;
+            g.difficulty = 1.0;
+            // Out of everyone's reach, which is the gap this move is for.
+            g.p[0].x = 120.0;
+            g.p[1].x = 520.0;
+            for _ in 0..3000 {
+                if g.p[0].health <= 0 || g.p[1].health <= 0 { break; }
+                g.cpu_delay -= F;
+                if g.cpu_delay <= 0.0 {
+                    g.cpu_plan = cpu_think(&mut g);
+                    g.cpu_delay = 0.38 - 0.18 * g.difficulty;
+                }
+                let c_in = cpu_input(&g);
+                // The player holds their ground and does nothing, so
+                // the CPU keeps having to solve the same problem.
+                let ins = [Input::default(), c_in];
+                for i in 0..2 {
+                    let other = g.p[1 - i].x;
+                    if g.p[i].free() && !g.p[i].airborne() {
+                        g.p[i].facing = if other >= g.p[i].x { 1.0 } else { -1.0 };
+                    }
+                    apply_input(&mut g.p[i], ins[i], false, F);
+                    advance(&mut g.p[i], F);
+                    g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
+                }
+                if g.p[1].act == Act::Attack && g.p[1].mv == MoveId::FlyingKick { seen += 1; }
+                // Reset the gap so the CPU faces the approach problem
+                // again rather than settling into close range.
+                if (g.p[1].x - g.p[0].x).abs() < 120.0 && g.p[1].free() {
+                    g.p[0].x = 120.0;
+                    g.p[1].x = 520.0;
+                }
+            }
+        }
+    }
+    assert!(seen > 0, "the CPU never threw a flying kick in six approaches");
 }

@@ -70,6 +70,12 @@ const CROUCH_H: f32 = 74.0;
 // ---- physics -------------------------------------------------------------
 const GRAVITY: f32 = 1500.0;
 const JUMP_VY: f32 = -600.0;
+/// The flying kick's arc: lower than a jump and much faster forward.
+const FLY_VY: f32 = -372.0;
+const FLY_SPEED: f32 = 300.0;
+/// What is left of the move once the feet touch. A jump attack is
+/// cancelled by landing; this is the one that is not.
+const FLY_LAND_LAG: f32 = 16.0 * F;
 /// Air control is deliberately absent: the direction held at take-off is
 /// the whole commitment. A jump you can steer mid-air turns every jump-in
 /// into a guess the defender cannot answer, which is exactly the
@@ -80,7 +86,8 @@ const AIR_DRIFT: f32 = 180.0;
 enum Level { Low, Mid, Overhead }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-enum MoveId { Jab, LowKick, Kick, HighKick, CrouchJab, Sweep, JumpPunch, JumpKick, Special, Throw }
+enum MoveId { Jab, LowKick, Kick, HighKick, CrouchJab, Sweep, JumpPunch, JumpKick, FlyingKick,
+    Special, Throw }
 
 /// One attack, in frames.
 ///
@@ -160,6 +167,23 @@ fn move_data(id: MoveId) -> MoveData {
         MoveId::Sweep     => mv(10.0, 4.0, 22.0, 13,  0.0,  12.0, 72.0, 18.0, 16.0, Level::Low,      true),
         MoveId::JumpPunch => mv(4.0,  8.0,  2.0,  9,  15.0, 9.0,  52.0, 34.0, 14.0, Level::Overhead, false),
         MoveId::JumpKick  => mv(6.0, 10.0,  2.0, 13,  17.0, 10.0, 66.0, 14.0, 16.0, Level::Overhead, false),
+        // The flying kick: the only attack that closes a screen's worth
+        // of ground on its own, and the only one whose cost is paid
+        // after it is over.
+        //
+        // Every other jump attack is cancelled by touching the floor,
+        // which is what makes a jump-in safe when it is blocked. This
+        // one is not — see the landing in `advance` — so it is thrown
+        // from outside the opponent's reach and lands inside it, and a
+        // guard it does not beat is a free heavy punish. That is the
+        // trade: the move that answers a turtle is also the move that
+        // loses the round to one who saw it coming.
+        //
+        // No knockdown, for the same reason the high kick has none: an
+        // overhead that also puts you on the floor stops being a way in
+        // and starts being a win condition.
+        MoveId::FlyingKick => mv(7.0, 16.0, 20.0, 15, 19.0, 11.0, 76.0, 24.0, 18.0,
+                                 Level::Overhead, false),
         // Specials differ per fighter; this is the shape they share.
         MoveId::Special   => mv(11.0, 6.0, 26.0, 16,  20.0, 12.0, 74.0, 70.0, 18.0, Level::Mid,      true),
         // The throw. Short, unblockable, and brutal if it misses: 20
@@ -295,20 +319,46 @@ struct Fighter {
     // So the drawing keeps its own short memory: the action it was in a
     // few frames ago, that action's timer frozen at the handover, and
     // how much of it is still showing. See draw::pose_of().
-    /// The action last seen, for spotting the change.
+    /// The action last seen, for spotting the change, and the move and
+    /// timer it was carrying when it was last seen.
     shown: Act,
     shown_t: f32,
+    shown_mv: MoveId,
+    /// Whether the last-seen action was off the ground, and how fast.
+    /// The airborne pose is read off vertical speed, so remembering the
+    /// action without the speed remembers nothing.
+    shown_air: bool,
+    shown_vy: f32,
     prev_act: Act,
     prev_mv: MoveId,
     prev_t: f32,
-    /// 1.0 the frame the action changed, falling to 0 over `POSE_BLEND`.
+    prev_air: bool,
+    prev_vy: f32,
+    /// 1.0 the frame the action changed, falling to 0 over `blend_len`.
     blend: f32,
+    /// How long this handover gets: `POSE_BLEND`, or longer for
+    /// standing up and landing.
+    blend_len: f32,
+    /// Seconds left of the give in the knees after a landing, and how
+    /// hard the landing was. Drawing state only — nothing in the rules
+    /// sees it, so a landing is still actionable on the touchdown frame.
+    land: f32,
+    land_force: f32,
 }
 
 /// How long a pose takes to hand over to the next one. Four frames:
 /// long enough that nothing teleports, short enough that a jab still
 /// lands on the frame the rules say it does.
 pub(crate) const POSE_BLEND: f32 = 4.0 * F;
+
+/// How long the knees take to absorb a landing and push back out of it.
+pub(crate) const LAND_ABSORB: f32 = 12.0 * F;
+
+/// How long getting up off the haunches takes. Dropping into a crouch
+/// is gravity and is quick; standing up is not. Hitboxes still change
+/// on the frame the action does — this is only how long the picture
+/// takes to agree.
+pub(crate) const RISE_BLEND: f32 = 9.0 * F;
 
 impl Fighter {
     fn new(who: usize, x: f32, facing: f32) -> Self {
@@ -319,16 +369,21 @@ impl Fighter {
             crouch_block: false, stun: 0.0, rounds: 0,
             cancel_t: 0.0, chained: false, combo: 0,
             buffered: None, buffer_t: 0.0,
-            shown: Act::Idle, shown_t: 0.0,
+            shown: Act::Idle, shown_t: 0.0, shown_mv: MoveId::Jab,
+            shown_air: false, shown_vy: 0.0, prev_air: false, prev_vy: 0.0,
             prev_act: Act::Idle, prev_mv: MoveId::Jab, prev_t: 0.0, blend: 0.0,
+            blend_len: POSE_BLEND, land: 0.0, land_force: 0.0,
         }
     }
 
     fn arch(&self) -> Archetype { FIGHTERS[self.who] }
     fn airborne(&self) -> bool { self.y < FLOOR_Y - 0.01 }
-    fn crouching(&self) -> bool {
-        self.act == Act::Crouch || (self.act == Act::Block && self.crouch_block)
-            || (self.act == Act::Attack && matches!(self.mv, MoveId::CrouchJab | MoveId::Sweep))
+    fn crouching(&self) -> bool { Self::is_low(self.act, self.mv, self.crouch_block) }
+    /// Whether an action is played from down on the haunches. Off
+    /// `self` so the drawing can ask about a past action too.
+    fn is_low(act: Act, mv: MoveId, crouch_block: bool) -> bool {
+        act == Act::Crouch || (act == Act::Block && crouch_block)
+            || (act == Act::Attack && matches!(mv, MoveId::CrouchJab | MoveId::Sweep))
     }
     fn height(&self) -> f32 { if self.crouching() { CROUCH_H } else { STAND_H } }
 
@@ -373,6 +428,13 @@ impl Fighter {
         self.t = 0.0;
         self.hit_done = false;
         self.cancel_t = 0.0;
+        // The flying kick launches itself: a flatter, faster arc than a
+        // jump, so it crosses ground rather than gaining height.
+        if id == MoveId::FlyingKick && !self.airborne() {
+            self.vy = FLY_VY * self.arch().jump_scale;
+            self.vx = self.facing * FLY_SPEED;
+            self.y -= 0.5;
+        }
     }
 
     /// Is this fighter inside the window where a landed light attack can
@@ -627,6 +689,11 @@ fn pressed_move(f: &Fighter, inp: Input, close: bool) -> Option<MoveId> {
     // Crouching turns any kick into the sweep, which keeps "down plus a
     // kick" meaning one thing whichever kick button found it.
     if inp.down && inp.any_kick() { return Some(MoveId::Sweep); }
+    // Up plus a kick is the flying kick, and it is checked before the
+    // jump below so the two cannot both happen. Holding a direction is
+    // already how the sweep is aimed, so this needs no motion and no
+    // button the cabinet does not have.
+    if inp.up && inp.any_kick() { return Some(MoveId::FlyingKick); }
     if inp.kick_low { return Some(MoveId::LowKick); }
     if inp.kick { return Some(MoveId::Kick); }
     if inp.kick_high { return Some(MoveId::HighKick); }
@@ -751,19 +818,7 @@ fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
 
 /// Advance one fighter's physics and action timer.
 fn advance(f: &mut Fighter, dt: f32) {
-    // Spot the handover before anything else moves. `shown_t` still
-    // holds the old action's timer at this point, because `f.t` was
-    // reset when the action changed.
-    if f.act != f.shown {
-        f.prev_act = f.shown;
-        f.prev_t = f.shown_t;
-        f.blend = 1.0;
-        f.shown = f.act;
-    } else {
-        f.prev_mv = f.mv;
-    }
-    f.shown_t = f.t;
-    if f.blend > 0.0 { f.blend = (f.blend - dt / POSE_BLEND).max(0.0); }
+    if f.land > 0.0 { f.land = (f.land - dt).max(0.0); }
 
     f.t += dt;
     if f.cancel_t > 0.0 { f.cancel_t -= dt; }
@@ -774,11 +829,24 @@ fn advance(f: &mut Fighter, dt: f32) {
         f.x += f.vx * dt;
         if f.y >= FLOOR_Y {
             f.y = FLOOR_Y;
+            // How hard they arrived, for the drawing.
+            f.land = LAND_ABSORB;
+            f.land_force = (f.vy / -JUMP_VY).clamp(0.25, 1.0);
             f.vy = 0.0;
             f.vx = 0.0;
             // Landing cancels an air attack: the attack was the jump's
-            // one commitment and it ends with the jump.
-            if f.act == Act::Air || f.act == Act::Attack { f.act = Act::Idle; f.t = 0.0; }
+            // one commitment and it ends with the jump. The flying kick
+            // is the exception — its recovery plays out on the ground,
+            // which is the entire price of the distance it covered.
+            if f.act == Act::Attack && f.mv == MoveId::FlyingKick {
+                let m = f.scaled(move_data(f.mv));
+                let total = (m.startup + m.active + m.recovery) * F;
+                f.t = f.t.min(total - FLY_LAND_LAG);
+                f.hit_done = true; // it stops being an attack on contact with the floor
+            } else if f.act == Act::Air || f.act == Act::Attack {
+                f.act = Act::Idle;
+                f.t = 0.0;
+            }
         }
     }
 
@@ -805,6 +873,44 @@ fn advance(f: &mut Fighter, dt: f32) {
         }
         _ => {}
     }
+
+    note_handover(f, dt);
+}
+
+/// Spot one action becoming another and freeze what the drawing needs
+/// to keep showing the old one.
+///
+/// Runs at the *end* of `advance`, and that is the point: a jump ends
+/// when the feet touch, an attack when recovery runs out, hitstun when
+/// the timer does — all inside `advance`. Looking at the top of the
+/// next frame drew the frame it happened on with no blend at all.
+fn note_handover(f: &mut Fighter, dt: f32) {
+    if f.act != f.shown {
+        let was_low = Fighter::is_low(f.shown, f.shown_mv, f.crouch_block);
+        f.prev_act = f.shown;
+        f.prev_t = f.shown_t;
+        // Freeze the move with the action it belonged to. Assigned on
+        // every unchanged frame, it was overwritten one frame after
+        // each handover, so blends collapsed to the target on frame two.
+        f.prev_mv = f.shown_mv;
+        f.prev_air = f.shown_air;
+        f.prev_vy = f.shown_vy;
+        f.blend = 1.0;
+        // Getting up is the slow direction, and a landing is the same
+        // kind of event: the feet arrive, the body takes a moment.
+        let landed = f.land >= LAND_ABSORB;
+        f.blend_len = if (was_low && !f.crouching()) || landed { RISE_BLEND } else { POSE_BLEND };
+        f.shown = f.act;
+    } else {
+        // `shown_t` has to keep the *old* action's final timer until
+        // the handover has been noted, so it is only refreshed on the
+        // frames where nothing changed.
+        f.shown_t = f.t;
+        f.shown_mv = f.mv;
+        f.shown_air = f.airborne();
+        f.shown_vy = f.vy;
+    }
+    if f.blend > 0.0 { f.blend = (f.blend - dt / f.blend_len).max(0.0); }
 }
 
 /// Is this fighter untouchable right now? Only on the way up from a
@@ -996,7 +1102,19 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
         // Jumping in is only worth it from outside their reach; jumping
         // into a poke is a free knockdown for them, and the CPU used to
         // spend a third of every round on the floor learning that.
-        if dist > foe_range * 1.3 && roll() < 0.10 + 0.14 * g.difficulty { return CpuPlan::Jump; }
+        if dist > foe_range * 1.3 && roll() < 0.10 + 0.14 * g.difficulty {
+            // Two ways in, sharing one budget. The flying kick has to
+            // be in the CPU's hands or the answer to being out-ranged
+            // is a tool only the player has — but it is an overhead
+            // added to a kit that already has two, and handed out on
+            // top of the jump-in rather than instead of it, it stopped
+            // a crouch-blocker surviving a round at all.
+            return if roll() < 0.35 {
+                CpuPlan::Attack(MoveId::FlyingKick)
+            } else {
+                CpuPlan::Jump
+            };
+        }
         // Out-ranged: standing outside your own reach and inside theirs
         // is the worst place on the stage, and walking out of it in a
         // straight line just means eating the poke on the way. A
@@ -1010,8 +1128,9 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
         // are most of the answer rather than an occasional flourish.
         if dist < foe_range * 1.15 && foe_range > kick_range * 1.1 {
             return match roll() {
-                r if r < 0.42 => CpuPlan::Attack(MoveId::Special),
-                r if r < 0.60 => CpuPlan::Jump,
+                r if r < 0.34 => CpuPlan::Attack(MoveId::Special),
+                r if r < 0.48 => CpuPlan::Jump,
+                r if r < 0.60 => CpuPlan::Attack(MoveId::FlyingKick),
                 r if r < 0.88 => CpuPlan::Approach,
                 _ => CpuPlan::Block,
             };
@@ -1112,6 +1231,7 @@ fn cpu_input(g: &Game) -> Input {
             MoveId::Kick => inp.kick = true,
             MoveId::HighKick => inp.kick_high = true,
             MoveId::Sweep => { inp.down = true; inp.kick = true; }
+            MoveId::FlyingKick => { inp.up = true; inp.kick = true; }
             MoveId::CrouchJab => { inp.down = true; inp.punch = true; }
             MoveId::Special => inp.special = true,
             // A throw is a punch thrown from close enough; cpu_think()
@@ -1167,7 +1287,7 @@ fn player_input(g: &mut Game) -> Input {
 /// decide whether there is a gi to crack.
 fn is_kick(f: &Fighter) -> bool {
     matches!(f.mv, MoveId::LowKick | MoveId::Kick | MoveId::HighKick | MoveId::Sweep
-        | MoveId::JumpKick)
+        | MoveId::JumpKick | MoveId::FlyingKick)
         || (f.mv == MoveId::Special && f.arch().special == Special::TalonKick)
 }
 
