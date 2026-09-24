@@ -27,9 +27,9 @@ mod draw;
 
 use blip::macroquad::input::KeyCode;
 use blip::input::{key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_C,
-    BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_H, BLIP_KEY_J, BLIP_KEY_K,
-    BLIP_KEY_L, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP,
-    BLIP_KEY_W, BLIP_KEY_X};
+    BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_I, BLIP_KEY_J, BLIP_KEY_K,
+    BLIP_KEY_LEFT, BLIP_KEY_R, BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_T,
+    BLIP_KEY_U, BLIP_KEY_UP, BLIP_KEY_W, BLIP_KEY_X};
 use blip::{clamp, play_music, play_sfx, rand_int, rects_overlap, web, window_conf, Blip,
     BlipColor, Session, Timer, BLIP_BLACK, BLIP_WHITE, BLIP_YELLOW};
 
@@ -110,8 +110,8 @@ const AIR_DRIFT: f32 = 180.0;
 enum Level { Low, Mid, Overhead }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-enum MoveId { Jab, LowKick, HighKick, CrouchJab, Sweep, JumpPunch, JumpKick, FlyingKick,
-    Special, Throw }
+enum MoveId { LowPunch, HighPunch, LowKick, HighKick, Sweep, JumpPunch, JumpKick,
+    FlyingKick, Special, Throw }
 
 /// One attack, in frames.
 ///
@@ -158,7 +158,19 @@ const fn mv(startup: f32, active: f32, recovery: f32, damage: i32, hitstun: f32,
 /// the jumper out of the air rather than to block correctly.
 fn move_data(id: MoveId) -> MoveData {
     match id {
-        MoveId::Jab       => mv(4.0,  3.0,  7.0,  6,  13.0, 8.0,  54.0, 80.0, 14.0, Level::Mid,      false),
+        // Four normals, in a square: punch or kick, low or high. A
+        // punch is the fast, short one at its height and a kick is the
+        // slow, long one, so at every height there is something to open
+        // with and something to commit to — and at neither height is
+        // there anything a single guard covers.
+        //
+        // The high punch is the quickest overhead in the game and does
+        // the least for it. That is the trade: eleven frames is barely
+        // readable, so it has to be worth almost nothing when it lands,
+        // or holding down-back stops being a decision and starts being
+        // a mistake nobody can avoid making.
+        MoveId::LowPunch  => mv(5.0,  3.0,  9.0,  5,  12.0, 7.0,  48.0, 30.0, 14.0, Level::Low,      false),
+        MoveId::HighPunch => mv(11.0, 3.0, 16.0,  9,  16.0, 10.0, 50.0, 92.0, 14.0, Level::Overhead, false),
         // Two kick heights, and they are the argument: low has to be
         // crouch-blocked, high has to be blocked standing, and there is
         // nothing in between to cover both. A middle kick used to sit
@@ -185,7 +197,6 @@ fn move_data(id: MoveId) -> MoveData {
         // is what a leg that goes to head height can actually cover,
         // and the move earns its keep by being an overhead instead.
         MoveId::HighKick  => mv(14.0, 5.0, 22.0, 17,  22.0, 13.0, 62.0, 98.0, 18.0, Level::Overhead, false),
-        MoveId::CrouchJab => mv(5.0,  3.0,  8.0,  5,  12.0, 7.0,  52.0, 44.0, 14.0, Level::Mid,      false),
         MoveId::Sweep     => mv(10.0, 4.0, 22.0, 13,  0.0,  12.0, 72.0, 18.0, 16.0, Level::Low,      true),
         MoveId::JumpPunch => mv(4.0,  8.0,  2.0,  9,  15.0, 9.0,  52.0, 34.0, 14.0, Level::Overhead, false),
         MoveId::JumpKick  => mv(6.0, 10.0,  2.0, 13,  17.0, 10.0, 66.0, 14.0, 16.0, Level::Overhead, false),
@@ -394,13 +405,13 @@ impl Fighter {
         Fighter {
             who, x, y: FLOOR_Y, vy: 0.0, vx: 0.0, facing,
             health: FIGHTERS[who].health,
-            act: Act::Idle, t: 0.0, mv: MoveId::Jab, hit_done: false, hit_clean: false,
+            act: Act::Idle, t: 0.0, mv: MoveId::LowPunch, hit_done: false, hit_clean: false,
             crouch_block: false, stun: 0.0, rounds: 0,
             cancel_t: 0.0, chained: false, combo: 0,
             buffered: None, buffer_t: 0.0,
-            shown: Act::Idle, shown_t: 0.0, shown_mv: MoveId::Jab,
+            shown: Act::Idle, shown_t: 0.0, shown_mv: MoveId::LowPunch,
             shown_air: false, shown_vy: 0.0, prev_air: false, prev_vy: 0.0,
-            prev_act: Act::Idle, prev_mv: MoveId::Jab, prev_t: 0.0, blend: 0.0,
+            prev_act: Act::Idle, prev_mv: MoveId::LowPunch, prev_t: 0.0, blend: 0.0,
             blend_len: POSE_BLEND, land: 0.0, land_force: 0.0,
         }
     }
@@ -418,7 +429,7 @@ impl Fighter {
     /// `self` so the drawing can ask about a past action too.
     fn is_low(act: Act, mv: MoveId, crouch_block: bool) -> bool {
         act == Act::Crouch || (act == Act::Block && crouch_block)
-            || (act == Act::Attack && matches!(mv, MoveId::CrouchJab | MoveId::Sweep))
+            || (act == Act::Attack && matches!(mv, MoveId::Sweep))
     }
     fn height(&self) -> f32 {
         if self.act == Act::Knockdown { PRONE_H }
@@ -753,7 +764,8 @@ struct Input {
     right: bool,
     up: bool,
     down: bool,
-    punch: bool,
+    punch_low: bool,
+    punch_high: bool,
     /// The two kick heights, one button each.
     kick_low: bool,
     kick_high: bool,
@@ -764,6 +776,7 @@ impl Input {
     /// Any kick button at all. Used where the height does not matter:
     /// the special, and reading a kick while airborne.
     fn any_kick(self) -> bool { self.kick_low || self.kick_high }
+    fn any_punch(self) -> bool { self.punch_low || self.punch_high }
 }
 
 /// Apply one fighter's intent. Movement, jumping, crouching, blocking and
@@ -779,7 +792,7 @@ fn pressed_move(f: &Fighter, inp: Input, close: bool) -> Option<MoveId> {
 
 fn air_move(f: &Fighter, inp: Input) -> Option<MoveId> {
     {
-        if inp.punch { return Some(MoveId::JumpPunch); }
+        if inp.any_punch() { return Some(MoveId::JumpPunch); }
         // Any kick button in the air is the jump kick. Height is a
         // ground decision — in the air the arc already decided it.
         // The exception is a kick still held with up, early enough in
@@ -800,8 +813,13 @@ fn grounded_move(inp: Input, close: bool) -> Option<MoveId> {
     // all this cabinet has, so the throw cannot have its own; proximity
     // is how the arcade originals did it too, and it makes the move
     // discoverable by walking in and pressing what you already know.
-    if inp.punch && close && !inp.down { return Some(MoveId::Throw); }
-    if inp.punch { return Some(if inp.down { MoveId::CrouchJab } else { MoveId::Jab }); }
+    if inp.any_punch() && close && !inp.down { return Some(MoveId::Throw); }
+    // Crouching turns a punch into the low one, the way it turns a
+    // kick into the sweep: down plus a button means one thing whichever
+    // button found it.
+    if inp.down && inp.any_punch() { return Some(MoveId::LowPunch); }
+    if inp.punch_low { return Some(MoveId::LowPunch); }
+    if inp.punch_high { return Some(MoveId::HighPunch); }
     // Crouching turns any kick into the sweep, which keeps "down plus a
     // kick" meaning one thing whichever kick button found it.
     if inp.down && inp.any_kick() { return Some(MoveId::Sweep); }
@@ -1091,7 +1109,7 @@ fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: Input) -> (
     let damage = ((m.damage as f32) * combo_scale(defender.combo)).round().max(1.0) as i32;
     defender.combo += 1;
     // A light attack that lands buys the right to follow it up.
-    if matches!(attacker.mv, MoveId::Jab | MoveId::CrouchJab) && !attacker.chained {
+    if matches!(attacker.mv, MoveId::LowPunch) && !attacker.chained {
         attacker.cancel_t = CANCEL_WINDOW;
     }
     defender.health = (defender.health - damage).max(0);
@@ -1176,7 +1194,7 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
     // it is the high kick now and the CPU closes a little more before
     // it commits.
     let kick_range = attack_range(&me, MoveId::HighKick);
-    let jab_range = attack_range(&me, MoveId::Jab);
+    let jab_range = attack_range(&me, MoveId::LowPunch);
     // The high kick is the shortest of the three, because a leg going
     // to head height spends its length going up. Throwing it from mid
     // kick range is throwing it at nothing, and a CPU that spends its
@@ -1214,11 +1232,11 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
         // measured: it hands a rushing opponent free ground and the CPU
         // stops winning those rounds at all.)
         if dist <= THROW_RANGE { return CpuPlan::Attack(MoveId::Throw); }
-        if dist < jab_range { return CpuPlan::Attack(MoveId::Jab); }
+        if dist < jab_range { return CpuPlan::Attack(MoveId::LowPunch); }
     }
     // They committed to something slow and it missed: take the turn.
     if foe.act == Act::Attack && foe.hit_done && dist < kick_range && roll() < 0.5 + 0.4 * g.difficulty {
-        return CpuPlan::Attack(MoveId::Jab);
+        return CpuPlan::Attack(MoveId::LowPunch);
     }
 
     // Read the guard. This is the game's own rock-paper-scissors played
@@ -1342,7 +1360,7 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
     // stopped guarding at close range entirely. A match arm that can
     // never be taken is a rule that has been deleted by arithmetic.
     match r {
-        _ if r < fast_share * 0.6 => CpuPlan::Attack(MoveId::Jab),
+        _ if r < fast_share * 0.6 => CpuPlan::Attack(MoveId::LowPunch),
         _ if r < fast_share => CpuPlan::Attack(MoveId::LowKick),
         _ if r < fast_share + 0.20 => CpuPlan::Attack(MoveId::Sweep),
         // The share the middle kick held goes to the choice it used to
@@ -1386,17 +1404,17 @@ fn cpu_input(g: &Game) -> Input {
             }
         }
         CpuPlan::Attack(id) => match id {
-            MoveId::Jab => inp.punch = true,
+            MoveId::LowPunch => inp.punch_low = true,
+            MoveId::HighPunch => inp.punch_high = true,
             MoveId::LowKick => inp.kick_low = true,
             MoveId::HighKick => inp.kick_high = true,
             MoveId::Sweep => { inp.down = true; inp.kick_low = true; }
             MoveId::FlyingKick => { inp.up = true; inp.kick_high = true; }
-            MoveId::CrouchJab => { inp.down = true; inp.punch = true; }
             MoveId::Special => inp.special = true,
             // A throw is a punch thrown from close enough; cpu_think()
             // only asks for one when it is already that close.
-            MoveId::Throw => inp.punch = true,
-            _ => inp.punch = true,
+            MoveId::Throw => inp.punch_low = true,
+            _ => inp.punch_low = true,
         },
     }
     inp
@@ -1406,12 +1424,16 @@ fn cpu_input(g: &Game) -> Input {
 
 /// The keys one player answers to.
 ///
-/// Two people at one keyboard need two clusters that never overlap, so
-/// the split is the one a keyboard already has: the left player drives
-/// with W A S D and hits with F G H, the right player drives with the
-/// arrows and hits with J K L. Each has a hand either side of the line
-/// a touch typist's hands already sit on, and neither reaches across
-/// the other.
+/// Four attacks want a square, not a row: punches in the left column,
+/// kicks in the right, high on the top row and low on the bottom, so
+/// the buttons are laid out the way the move list is.
+///
+/// Two people at one keyboard need two such squares that never
+/// overlap, so the split is the one a keyboard already has. The left
+/// player drives with W A S D and hits with R T over F G; the right
+/// player drives with the arrows and hits with U I over J K. Each has
+/// a hand either side of the line a touch typist's hands already sit
+/// on, and neither reaches across the other.
 ///
 /// Playing alone, player one also answers to everything the cabinet
 /// has — the arrows, and the two deck buttons — because a stick and
@@ -1426,7 +1448,8 @@ struct Pad {
     down: &'static [KeyCode],
     left: &'static [KeyCode],
     right: &'static [KeyCode],
-    punch: &'static [KeyCode],
+    punch_low: &'static [KeyCode],
+    punch_high: &'static [KeyCode],
     kick_low: &'static [KeyCode],
     kick_high: &'static [KeyCode],
 }
@@ -1436,11 +1459,12 @@ static P1_ALONE: Pad = Pad {
     down: &[BLIP_KEY_S, BLIP_KEY_DOWN],
     left: &[BLIP_KEY_A, BLIP_KEY_LEFT],
     right: &[BLIP_KEY_D, BLIP_KEY_RIGHT],
-    punch: &[BLIP_KEY_F, BLIP_KEY_SPACE],
-    // The cabinet's own kick button is the low one, because it is the
-    // poke you open with.
+    // The cabinet has one punch button and one kick button, and they
+    // are the low ones, because those are the pokes you open with.
+    punch_low: &[BLIP_KEY_F, BLIP_KEY_SPACE],
+    punch_high: &[BLIP_KEY_R, BLIP_KEY_C],
     kick_low: &[BLIP_KEY_G, BLIP_KEY_BUTTON2],
-    kick_high: &[BLIP_KEY_H, BLIP_KEY_X, BLIP_KEY_C],
+    kick_high: &[BLIP_KEY_T, BLIP_KEY_X],
 };
 
 static P1_SHARING: Pad = Pad {
@@ -1448,9 +1472,10 @@ static P1_SHARING: Pad = Pad {
     down: &[BLIP_KEY_S],
     left: &[BLIP_KEY_A],
     right: &[BLIP_KEY_D],
-    punch: &[BLIP_KEY_F],
+    punch_low: &[BLIP_KEY_F],
+    punch_high: &[BLIP_KEY_R],
     kick_low: &[BLIP_KEY_G],
-    kick_high: &[BLIP_KEY_H],
+    kick_high: &[BLIP_KEY_T],
 };
 
 static P2: Pad = Pad {
@@ -1458,9 +1483,10 @@ static P2: Pad = Pad {
     down: &[BLIP_KEY_DOWN],
     left: &[BLIP_KEY_LEFT],
     right: &[BLIP_KEY_RIGHT],
-    punch: &[BLIP_KEY_J],
+    punch_low: &[BLIP_KEY_J],
+    punch_high: &[BLIP_KEY_U],
     kick_low: &[BLIP_KEY_K],
-    kick_high: &[BLIP_KEY_L],
+    kick_high: &[BLIP_KEY_I],
 };
 
 fn pad(mode: Mode, who: usize) -> &'static Pad {
@@ -1484,11 +1510,12 @@ fn human_input(g: &mut Game, who: usize) -> Input {
     inp.right = any_held(k.right);
     inp.up = any_held(k.up);
     inp.down = any_held(k.down);
-    let punch = any_pressed(k.punch);
-    // Which kick button was pressed is the height — the whole control
-    // scheme for attack height, so a player never has to remember a
-    // motion to aim one.
+    // Which button was pressed is the height — the whole control scheme
+    // for attack height, so a player never has to remember a motion to
+    // aim one.
+    let (plo, phi) = (any_pressed(k.punch_low), any_pressed(k.punch_high));
     let (low, high) = (any_pressed(k.kick_low), any_pressed(k.kick_high));
+    let punch = plo || phi;
     if punch { g.punch_at[who] = g.now; }
     if low || high { g.kick_at[who] = g.now; }
     // Both buttons inside a short window is the special. Two buttons is
@@ -1503,7 +1530,8 @@ fn human_input(g: &mut Game, who: usize) -> Input {
         g.punch_at[who] = -1.0;
         g.kick_at[who] = -1.0;
     } else {
-        inp.punch = punch;
+        inp.punch_low = plo;
+        inp.punch_high = phi;
         inp.kick_low = low;
         inp.kick_high = high;
     }
@@ -2058,7 +2086,8 @@ fn menu_step(g: &mut Game, who: usize, back: bool) -> bool {
 /// The same, for a player's confirm — any of their attack buttons.
 fn menu_fire(g: &mut Game, who: usize) -> bool {
     let k = pad(g.mode, who);
-    let held = any_held(k.punch) || any_held(k.kick_low) || any_held(k.kick_high);
+    let held = any_held(k.punch_low) || any_held(k.punch_high)
+        || any_held(k.kick_low) || any_held(k.kick_high);
     let slot = &mut g.sel_fire[who];
     let fired = held && !*slot;
     *slot = held;

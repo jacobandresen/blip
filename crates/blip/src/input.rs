@@ -33,6 +33,12 @@ pub const BLIP_KEY_H:       KeyCode = KeyCode::H;
 pub const BLIP_KEY_J:       KeyCode = KeyCode::J;
 pub const BLIP_KEY_K:       KeyCode = KeyCode::K;
 pub const BLIP_KEY_L:       KeyCode = KeyCode::L;
+// The row above each of those, for a game wanting a two-by-two block
+// of buttons per player rather than a row of three.
+pub const BLIP_KEY_R:       KeyCode = KeyCode::R;
+pub const BLIP_KEY_T:       KeyCode = KeyCode::T;
+pub const BLIP_KEY_U:       KeyCode = KeyCode::U;
+pub const BLIP_KEY_I:       KeyCode = KeyCode::I;
 
 /// Primary fire / jump / confirm — true only on the frame the key goes down.
 #[inline]

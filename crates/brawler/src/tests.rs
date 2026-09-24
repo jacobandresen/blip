@@ -124,7 +124,7 @@ fn the_slow_moves_are_the_punishable_ones() {
     // The core trade of the whole game: reach and damage are paid for in
     // recovery. If a move were both long and safe there would be nothing
     // to think about.
-    let jab = move_data(MoveId::Jab);
+    let jab = move_data(MoveId::LowPunch);
     // The low kick is the poke this is about: longer than a jab and
     // slower to recover from, with the sweep costing more than either.
     let kick = move_data(MoveId::LowKick);
@@ -141,7 +141,7 @@ fn the_slow_moves_are_the_punishable_ones() {
 fn hitstun_always_exceeds_blockstun() {
     // Otherwise blocking would be worse than being hit, and the game
     // would reward standing still and eating everything.
-    for id in [MoveId::Jab, MoveId::LowKick, MoveId::HighKick, MoveId::CrouchJab,
+    for id in [MoveId::LowPunch, MoveId::LowKick, MoveId::HighKick, MoveId::HighPunch,
                MoveId::JumpPunch, MoveId::JumpKick, MoveId::FlyingKick, MoveId::Special] {
         let m = move_data(id);
         assert!(m.hitstun > m.blockstun, "{id:?} punishes blocking more than getting hit");
@@ -158,7 +158,7 @@ fn you_cannot_act_while_you_are_busy() {
     f.start_attack(MoveId::Sweep);
     let before = f.mv;
     let mut jab = Input::default();
-    jab.punch = true;
+    jab.punch_low = true;
     apply_input(&mut f, jab, false, F);
     assert_eq!(f.mv, before, "an attack was cancelled into another attack");
     assert_eq!(f.act, Act::Attack);
@@ -352,7 +352,7 @@ fn the_cpu_plays_through_the_same_input_struct_as_the_player() {
         g.cpu_plan = plan;
         let inp = cpu_input(&g);
         let touched = inp.left || inp.right || inp.up || inp.down
-            || inp.punch || inp.any_kick() || inp.special;
+            || inp.any_punch() || inp.any_kick() || inp.special;
         assert!(touched, "{plan:?} produced no input at all");
     }
 }
@@ -436,7 +436,7 @@ fn every_special_is_something_the_shared_table_cannot_do() {
     assert!(base.damage > move_data(MoveId::LowKick).damage);
     // And it costs more to miss than anything else in the table, which
     // is the only thing keeping it from being the whole game.
-    for id in [MoveId::Jab, MoveId::LowKick, MoveId::HighKick, MoveId::CrouchJab,
+    for id in [MoveId::LowPunch, MoveId::LowKick, MoveId::HighKick, MoveId::HighPunch,
                MoveId::Sweep, MoveId::Throw, MoveId::FlyingKick] {
         assert!(base.recovery > move_data(id).recovery,
             "a special recovers faster than a {id:?} — it has to be punishable or it \
@@ -492,7 +492,7 @@ fn two_fighters_left_alone_actually_hurt_each_other() {
         let mut b = Input::default();
         a.right = true;
         b.left = true;
-        if frame % 24 < 2 { a.punch = true; }
+        if frame % 24 < 2 { a.punch_low = true; }
         if frame % 30 < 2 { b.kick_low = true; }
         [a, b]
     };
@@ -542,7 +542,7 @@ fn nobody_gets_stuck_in_a_state_they_cannot_leave() {
     // — a state machine with a dead end is a game that freezes.
     let mut mash = |frame: usize, _p: &[Fighter; 2]| {
         let mut a = Input::default();
-        a.punch = frame % 3 == 0;
+        a.punch_low = frame % 3 == 0;
         a.kick_high = frame % 5 == 0;
         a.down = frame % 7 < 3;
         a.up = frame % 31 == 0;
@@ -679,18 +679,18 @@ fn an_attack_pressed_during_recovery_comes_out_when_recovery_ends() {
     let total = (sweep.startup + sweep.active + sweep.recovery) * F;
 
     let mut punch = Input::default();
-    punch.punch = true;
+    punch.punch_low = true;
     // Press with a few frames of recovery still to run.
     f.t = total - 4.0 * F;
     apply_input(&mut f, punch, false, F);
     assert_eq!(f.mv, MoveId::Sweep, "the press interrupted the sweep");
-    assert_eq!(f.buffered, Some(MoveId::Jab), "the press was thrown away");
+    assert_eq!(f.buffered, Some(MoveId::LowPunch), "the press was thrown away");
 
     // Let the sweep finish, then hold nothing at all.
     for _ in 0..5 { advance(&mut f, F); }
     apply_input(&mut f, Input::default(), false, F);
     assert_eq!(f.act, Act::Attack, "the buffered punch never came out");
-    assert_eq!(f.mv, MoveId::Jab);
+    assert_eq!(f.mv, MoveId::LowPunch);
 }
 
 #[test]
@@ -701,7 +701,7 @@ fn a_buffered_attack_is_forgotten_if_it_waits_too_long() {
     f.act = Act::Hitstun;
     f.stun = 1.0;
     let mut punch = Input::default();
-    punch.punch = true;
+    punch.punch_low = true;
     apply_input(&mut f, punch, false, F);
     assert!(f.buffered.is_some());
 
@@ -856,7 +856,7 @@ fn fight_round(pick: usize, foe_index: usize, style: fn(usize, &[Fighter; 2]) ->
 fn rusher(frame: usize, p: &[Fighter; 2]) -> Input {
     let mut i = Input::default();
     if p[1].x > p[0].x { i.right = true; } else { i.left = true; }
-    i.punch = frame % 8 < 2;
+    i.punch_low = frame % 8 < 2;
     i
 }
 
@@ -1082,7 +1082,7 @@ fn a_landed_jab_can_be_cancelled_into_something_heavier() {
     // move rather than the big one.
     let mut atk = at(0, 280.0, 1.0);
     let mut def = at(1, 320.0, -1.0);
-    wind_to_active(&mut atk, MoveId::Jab);
+    wind_to_active(&mut atk, MoveId::LowPunch);
     let (dmg, _, _) = resolve_hit(&mut atk, &mut def, Input::default());
     assert!(dmg > 0);
     assert!(atk.can_cancel(), "a landed jab opened no follow-up window");
@@ -1095,17 +1095,18 @@ fn a_landed_jab_can_be_cancelled_into_something_heavier() {
 }
 
 #[test]
-fn a_blocked_jab_buys_nothing() {
+fn a_blocked_poke_buys_nothing() {
     // Pressing buttons into a guard must not be a combo. If it were,
     // blocking would be the losing option at every range.
     let mut atk = at(0, 280.0, 1.0);
     let mut def = at(1, 320.0, -1.0);
-    wind_to_active(&mut atk, MoveId::Jab);
+    wind_to_active(&mut atk, MoveId::LowPunch);
     let mut back = Input::default();
     back.right = true; // away from the attacker on the left
+    back.down = true;  // and low, because the low punch is low
     let (_, blocked, _) = resolve_hit(&mut atk, &mut def, back);
     assert!(blocked);
-    assert!(!atk.can_cancel(), "a blocked jab opened a follow-up window");
+    assert!(!atk.can_cancel(), "a blocked poke opened a follow-up window");
 }
 
 #[test]
@@ -1114,15 +1115,15 @@ fn a_chain_cannot_chain_again() {
     // the hitstun it causes, which is an infinite, which is not a game.
     let mut atk = at(0, 280.0, 1.0);
     let mut def = at(1, 320.0, -1.0);
-    wind_to_active(&mut atk, MoveId::Jab);
+    wind_to_active(&mut atk, MoveId::LowPunch);
     resolve_hit(&mut atk, &mut def, Input::default());
     let mut jab = Input::default();
-    jab.punch = true;
+    jab.punch_low = true;
     apply_input(&mut atk, jab, false, F);          // the one cancel
     assert!(atk.chained);
 
     def.hit_done = false;
-    wind_to_active(&mut atk, MoveId::Jab);
+    wind_to_active(&mut atk, MoveId::LowPunch);
     atk.chained = true; // as start_attack would have left it
     let mut def2 = at(1, 320.0, -1.0);
     resolve_hit(&mut atk, &mut def2, Input::default());
@@ -1192,19 +1193,25 @@ fn a_throw_only_comes_out_from_throw_range() {
     // player must still get the move they expect.
     let f = at(0, 300.0, 1.0);
     let mut punch = Input::default();
-    punch.punch = true;
+    punch.punch_low = true;
     assert_eq!(pressed_move(&f, punch, true), Some(MoveId::Throw));
-    assert_eq!(pressed_move(&f, punch, false), Some(MoveId::Jab));
-    // And crouching punch is never a throw — you cannot throw from down.
+    assert_eq!(pressed_move(&f, punch, false), Some(MoveId::LowPunch));
+    // And crouching punch is never a throw — you cannot throw from
+    // down. Holding down asks for the low one whichever punch button
+    // found it, the same way it asks for the sweep.
     punch.down = true;
-    assert_eq!(pressed_move(&f, punch, true), Some(MoveId::CrouchJab));
+    assert_eq!(pressed_move(&f, punch, true), Some(MoveId::LowPunch));
+    let mut high = Input::default();
+    high.punch_high = true;
+    high.down = true;
+    assert_eq!(pressed_move(&f, high, false), Some(MoveId::LowPunch));
 }
 
 #[test]
 fn a_whiffed_throw_is_the_worst_thing_you_can_do() {
     // It has to be, or throwing would simply be correct at close range.
     let throw = move_data(MoveId::Throw);
-    for id in [MoveId::Jab, MoveId::LowKick, MoveId::CrouchJab] {
+    for id in [MoveId::LowPunch, MoveId::LowKick, MoveId::HighPunch] {
         assert!(throw.recovery > move_data(id).recovery,
             "a missed throw recovers faster than a {id:?}");
     }
@@ -1226,8 +1233,8 @@ fn a_whiffed_throw_is_the_worst_thing_you_can_do() {
 /// Every pose the game can put a fighter in, as (label, fighter state).
 fn every_pose() -> Vec<(String, Fighter)> {
     let mut out = Vec::new();
-    let moves = [MoveId::Jab, MoveId::LowKick, MoveId::HighKick,
-                 MoveId::CrouchJab, MoveId::Sweep, MoveId::JumpPunch, MoveId::JumpKick,
+    let moves = [MoveId::LowPunch, MoveId::LowKick, MoveId::HighKick,
+                 MoveId::HighPunch, MoveId::Sweep, MoveId::JumpPunch, MoveId::JumpKick,
                  MoveId::FlyingKick, MoveId::Special, MoveId::Throw];
     for who in 0..FIGHTERS.len() {
         for act in [Act::Idle, Act::Walk, Act::Crouch, Act::Block, Act::Hitstun,
@@ -1368,8 +1375,8 @@ fn what_you_see_is_what_can_hit_you() {
     // as far as a body reaches, and move ranges that sit inside that.
     let mut bad = vec![];
     for who in 0..FIGHTERS.len() {
-        for mv in [MoveId::Jab, MoveId::LowKick, MoveId::HighKick,
-                   MoveId::CrouchJab, MoveId::Sweep, MoveId::Throw] {
+        for mv in [MoveId::LowPunch, MoveId::LowKick, MoveId::HighKick,
+                   MoveId::HighPunch, MoveId::Sweep, MoveId::Throw] {
             let mut f = Fighter::new(who, 300.0, 1.0);
             f.act = Act::Attack;
             f.mv = mv;
@@ -1523,21 +1530,21 @@ fn nothing_teleports_between_one_frame_and_the_next() {
     // frame than a body part can.
     let _sim = simulating(0x5EED05);
     let script: [(Act, MoveId, f32); 11] = [
-        (Act::Idle, MoveId::Jab, 0.20),
+        (Act::Idle, MoveId::LowPunch, 0.20),
         (Act::Attack, MoveId::HighKick, 0.55),
-        (Act::Idle, MoveId::Jab, 0.10),
+        (Act::Idle, MoveId::LowPunch, 0.10),
         (Act::Attack, MoveId::HighKick, 0.70),
-        (Act::Block, MoveId::Jab, 0.20),
+        (Act::Block, MoveId::LowPunch, 0.20),
         (Act::Attack, MoveId::Sweep, 0.60),
         // A jump comes out of a neutral stance, because that is the
         // only thing it can come out of: you cannot jump out of a
         // sweep's recovery, and a script that pretends you can is
         // measuring a handover the game never performs.
-        (Act::Idle, MoveId::Jab, 0.12),
-        (Act::Air, MoveId::Jab, 0.80),
-        (Act::Hitstun, MoveId::Jab, 0.30),
-        (Act::Knockdown, MoveId::Jab, 1.20),
-        (Act::Victory, MoveId::Jab, 0.80),
+        (Act::Idle, MoveId::LowPunch, 0.12),
+        (Act::Air, MoveId::LowPunch, 0.80),
+        (Act::Hitstun, MoveId::LowPunch, 0.30),
+        (Act::Knockdown, MoveId::LowPunch, 1.20),
+        (Act::Victory, MoveId::LowPunch, 0.80),
     ];
     let mut worst = (0.0f32, String::new());
     let mut over: Vec<String> = vec![];
@@ -1942,7 +1949,7 @@ fn dump_flying_kick() {
     let mut lag = 0;
     while !f.free() && lag < 90 { advance(&mut f, F); lag += 1; }
     println!("landing lag {lag}f");
-    for mv in [MoveId::Jab, MoveId::LowKick, MoveId::HighKick, MoveId::Sweep, MoveId::JumpKick,
+    for mv in [MoveId::LowPunch, MoveId::LowKick, MoveId::HighKick, MoveId::Sweep, MoveId::JumpKick,
                MoveId::FlyingKick] {
         let m = move_data(mv);
         println!("{mv:?}: startup {} active {} recovery {} dmg {} reach {} level {:?}",
@@ -2289,23 +2296,32 @@ fn a_fighter_on_the_floor_is_only_as_tall_as_they_are_drawn() {
 }
 
 #[test]
-fn no_guard_height_covers_every_kick() {
-    // The reason the middle kick was dropped. It was a mid — stopped
-    // by either guard — so against the kicks a player could pick a
-    // stance and hold it all round. What is left has to force the
-    // choice: for each guard there is a kick it does not stop, and
-    // there is no kick that both guards stop.
-    let kicks = [MoveId::LowKick, MoveId::HighKick, MoveId::Sweep,
-                 MoveId::JumpKick, MoveId::FlyingKick];
+fn no_guard_height_covers_any_normal() {
+    // The reason the middle kick was dropped, now extended to the
+    // punches: every normal is low or overhead, so there is nothing a
+    // player can hold a single stance against. The mid was the move
+    // that let you pick a guard and keep it.
+    let normals = [MoveId::LowPunch, MoveId::HighPunch, MoveId::LowKick, MoveId::HighKick,
+                   MoveId::Sweep, MoveId::JumpKick, MoveId::JumpPunch, MoveId::FlyingKick];
     for crouch in [false, true] {
-        assert!(kicks.iter().any(|&k| !blocks(move_data(k).level, crouch)),
-            "a fighter holding {} blocks every kick in the game",
+        assert!(normals.iter().any(|&k| !blocks(move_data(k).level, crouch)),
+            "a fighter holding {} blocks every normal in the game",
             if crouch { "down-back" } else { "back" });
     }
-    for k in kicks {
+    for k in normals {
         let m = move_data(k);
         assert!(!(blocks(m.level, false) && blocks(m.level, true)),
             "{k:?} is stopped by either guard — that is the move that was dropped");
+    }
+    // And at each height there is a fast, short one and a slow, long
+    // one, so the height is a question and the commitment is another.
+    for (fast, slow) in [(MoveId::LowPunch, MoveId::LowKick),
+                         (MoveId::HighPunch, MoveId::HighKick)] {
+        let (f, s) = (move_data(fast), move_data(slow));
+        assert!(f.startup < s.startup, "{fast:?} should come out before {slow:?}");
+        assert!(f.reach < s.reach, "{fast:?} should not out-reach {slow:?}");
+        assert!(f.damage < s.damage, "{fast:?} should not out-damage {slow:?}");
+        assert!(f.recovery < s.recovery, "{fast:?} should cost less to miss than {slow:?}");
     }
 }
 
@@ -2383,7 +2399,8 @@ fn the_two_players_share_no_keys() {
     // typing.
     let keys = |p: &Pad| {
         let mut v: Vec<String> = Vec::new();
-        for set in [p.up, p.down, p.left, p.right, p.punch, p.kick_low, p.kick_high] {
+        for set in [p.up, p.down, p.left, p.right, p.punch_low, p.punch_high,
+                    p.kick_low, p.kick_high] {
             v.extend(set.iter().map(|k| format!("{k:?}")));
         }
         v
@@ -2400,7 +2417,7 @@ fn the_two_players_share_no_keys() {
         let before = sorted.len();
         sorted.dedup();
         assert_eq!(sorted.len(), before, "{name} has a key bound twice");
-        assert_eq!(before, 7, "{name} should have seven controls, has {before}");
+        assert_eq!(before, 8, "{name} should have eight controls, has {before}");
     }
     // Sharing takes the arrows and the deck buttons off player one;
     // alone, they get everything back.
@@ -2617,7 +2634,7 @@ fn brawlers(who: usize, frame: usize, p: &[Fighter; 2]) -> Input {
     if (foe.x - me.x).abs() > 80.0 {
         if toward_right { i.right = true; } else { i.left = true; }
     } else if phase % 37 < 4 {
-        i.punch = true;
+        i.punch_low = true;
     } else if phase % 37 < 8 {
         i.kick_low = true;
     } else if phase % 37 < 11 {

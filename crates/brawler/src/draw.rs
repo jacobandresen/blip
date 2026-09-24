@@ -1421,11 +1421,10 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
     // fighter's jumping punch and their standing punch are the same
     // shoulder doing the same thing, and Kestrel's special is a kick
     // whatever the move table calls it.
-    enum Shape { Punch(bool), CrouchPunch, Kick(bool, f32), Fly, Sweep, Throw, Bolt, Rush }
+    enum Shape { Punch(bool), Kick(bool, f32), Fly, Sweep, Throw, Bolt, Rush }
     let shape = match f.mv {
-        MoveId::Jab => Shape::Punch(false),
+        MoveId::LowPunch | MoveId::HighPunch => Shape::Punch(false),
         MoveId::JumpPunch => Shape::Punch(true),
-        MoveId::CrouchJab => Shape::CrouchPunch,
         // Both heights are the same kick; the move's own `height` is
         // what aims it, so nothing here has to know the difference. The
         // high one leans further back, because a kick at head height
@@ -1463,11 +1462,6 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             }
             q.rear_hand = q.rear_hand.to(p(q.rear_hand.f - 4.0, q.rear_hand.u - 22.0), ext);
             q.lead_hand = q.lead_hand.to(tip, ext);
-        }
-        Shape::CrouchPunch => {
-            q.head.f += 17.0 * ext;
-            q.lead_hand = q.lead_hand.to(tip, ext);
-            q.rear_hand.f += 3.0 * ext;
         }
         // The roundhouse. Knee up first, then the shin unfolds into the
         // target while the torso falls back as a counterweight and the
@@ -1689,7 +1683,7 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
     let low = f.crouching()
         || (f.act == Act::Hitstun && matches!(f.prev_act, Act::Crouch))
         || (f.act == Act::Hitstun && f.prev_act == Act::Attack
-            && matches!(f.prev_mv, MoveId::CrouchJab | MoveId::Sweep))
+            && matches!(f.prev_mv, MoveId::Sweep))
         || (f.act == Act::Hitstun && f.prev_act == Act::Block && f.crouch_block);
     let mut q = if f.airborne() {
         airborne_pose(f.vy)
@@ -1880,6 +1874,61 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
         q.rear_foot.u = q.rear_foot.u.max(0.0);
     }
     q
+}
+
+/// The whole fighter, smeared by whatever actually moved.
+///
+/// The idea is borrowed from Eulerian video magnification, which does
+/// not blur a picture: it takes the difference between now and a
+/// moment ago, amplifies *that*, and adds it back. Everything still
+/// stays still; only what changed is drawn again.
+///
+/// Applied to a skeleton it falls out almost for free. Pose the same
+/// fighter a few frames back, walk the bones in pairs, and draw a past
+/// bone only in proportion to how far it has travelled since. A torso
+/// crossing the stage at three hundred pixels a second lays down a
+/// faint body-length streak; the shin snapping out of the chamber lays
+/// down a bright one; a hand that has not moved contributes nothing
+/// and stays sharp. That is what a photograph of a fast kick looks
+/// like — a readable body with one limb smeared off the front of it.
+fn draw_smear(blip: &Blip, f: &Fighter, now: f32, shift: f32, i: usize, c: BlipColor) {
+    let here = skeleton(Rig::upright(f.x, f.y + shift, f.facing, f.facing),
+        &pose_of(now, f, i));
+    for step in 1..=5 {
+        let back = step as f32 * 2.2 * F;
+        if f.t < back { break; }
+        let mut old = *f;
+        old.t = f.t - back;
+        // Where they were, not just what they were doing: this move
+        // carries the whole body forward, and a smear drawn on the spot
+        // is a fighter vibrating rather than travelling.
+        old.x = f.x - f.vx * back;
+        old.y = f.y - f.vy * back + 0.5 * GRAVITY * back * back;
+        let then = skeleton(Rig::upright(old.x, old.y + shift, old.facing, old.facing),
+            &pose_of(now - back, &old, i));
+        // Older ghosts are fainter, and the whole thing fades out over
+        // the move's last frames so it does not hang about after the
+        // fighter has stopped.
+        let age = 1.0 - (step - 1) as f32 / 5.0;
+        for (a0, b0, a1, b1, r) in [
+            (here.hip, here.neck, then.hip, then.neck, 9.0f32),
+            (here.hip_lead, here.knee_lead, then.hip_lead, then.knee_lead, 7.0),
+            (here.knee_lead, here.ankle_lead, then.knee_lead, then.ankle_lead, 5.5),
+            (here.hip_rear, here.knee_rear, then.hip_rear, then.knee_rear, 6.0),
+            (here.knee_rear, here.ankle_rear, then.knee_rear, then.ankle_rear, 4.5),
+            (here.sh_lead, here.elbow_lead, then.sh_lead, then.elbow_lead, 5.5),
+            (here.elbow_lead, here.hand_lead, then.elbow_lead, then.hand_lead, 4.5),
+            (here.sh_rear, here.elbow_rear, then.sh_rear, then.elbow_rear, 5.0),
+            (here.elbow_rear, here.hand_rear, then.elbow_rear, then.hand_rear, 4.0),
+        ] {
+            // How far this bone went. Nothing below a couple of pixels
+            // is motion — it is the pose breathing.
+            let moved = (dist(a0, a1) + dist(b0, b1)) * 0.5;
+            if moved < 3.0 { continue; }
+            let lit = ((moved - 3.0) / 34.0).clamp(0.0, 1.0) * age;
+            stroke(blip, a1, b1, r, r * 0.72, BlipColor { a: 0.25 * lit, ..c });
+        }
+    }
 }
 
 /// Where the striking limb was a few frames ago, smeared behind it.
@@ -2171,7 +2220,14 @@ fn pose_and_draw_lit(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f3
     // The smear takes the colour of what is moving, washed most of the
     // way to white. Drawn in the fighter's accent it reads as a ribbon
     // trailing off them rather than as the limb itself, a frame ago.
-    draw_trail(blip, &f, now, rig, i, blend(rgb(a.color), BLIP_WHITE, 0.55));
+    // The flying kick is the fastest thing on the stage — a whole body
+    // crossing a hundred and fifty pixels — so it gets the whole body
+    // smeared rather than the one limb every other attack gets.
+    if f.act == Act::Attack && f.mv == MoveId::FlyingKick {
+        draw_smear(blip, &f, now, shift, i, blend(rgb(a.color), BLIP_WHITE, 0.62));
+    } else {
+        draw_trail(blip, &f, now, rig, i, blend(rgb(a.color), BLIP_WHITE, 0.55));
+    }
 
     // Dust off the boards where a body lands. Knockdowns are the one
     // moment the floor is part of the fight.
@@ -2501,6 +2557,60 @@ fn draw_title(blip: &Blip, g: &Game) {
         BlipColor { r: 0.95, g: 0.88, b: 0.60, a: 1.0 });
 }
 
+/// One player's controls, drawn as the deck of a cabinet: a ball-top
+/// stick and four buttons in the same square the move list is in.
+///
+/// Punches in the left column and kicks in the right, high on the top
+/// row and low on the bottom — the buttons are laid out the way the
+/// moves are, so a player reads the panel once and knows where every
+/// attack lives. Each button carries the key that presses it, because
+/// there is no stick on a keyboard and the letters are the whole map.
+fn draw_deck(blip: &Blip, x: f32, y: f32, tag: &str, col: BlipColor, stick: &str,
+             keys: [&str; 4]) {
+    const W: f32 = 196.0;
+    const H: f32 = 74.0;
+    let metal = BlipColor { r: 0.15, g: 0.15, b: 0.19, a: 1.0 };
+    let edge = BlipColor { r: 0.34, g: 0.34, b: 0.42, a: 1.0 };
+    let ink = BlipColor { r: 0.06, g: 0.06, b: 0.08, a: 1.0 };
+    blip.fill_rect(x, y, W, H, metal);
+    blip.draw_rect(x, y, W, H, edge);
+    blip.fill_rect(x, y, W, 2.0, blend(metal, BLIP_WHITE, 0.18));
+    blip.draw_text(tag, x + 6.0, y + 5.0, 2.0, col);
+
+    // The stick: a dust washer, a shaft and a ball on top of it.
+    let (sx, sy) = (x + 40.0, y + 40.0);
+    blip.fill_circle(sx, sy, 17.0, shade(metal, 0.62));
+    blip.fill_circle(sx, sy, 13.0, shade(metal, 1.5));
+    blip.fill_rect(sx - 3.0, sy - 22.0, 6.0, 22.0, BlipColor { r: 0.75, g: 0.76, b: 0.82, a: 1.0 });
+    blip.fill_circle(sx, sy - 24.0, 9.0, ink);
+    blip.fill_circle(sx, sy - 24.0, 7.5, col);
+    blip.fill_circle(sx - 2.5, sy - 26.5, 3.0, blend(col, BLIP_WHITE, 0.45));
+    // The keys the stick is: it is the movement, so it carries the
+    // label rather than a column of text somewhere else on the screen.
+    let label = BlipColor { r: 0.72, g: 0.74, b: 0.82, a: 1.0 };
+    blip.draw_text(stick, sx - text_w(stick, 1.0) / 2.0, y + 60.0, 1.0, label);
+
+    // Four buttons: punch column, kick column; high row, low row.
+    let punch = BlipColor { r: 0.95, g: 0.78, b: 0.22, a: 1.0 };
+    let kick = BlipColor { r: 0.38, g: 0.80, b: 0.95, a: 1.0 };
+    let (bx, by) = (x + 92.0, y + 22.0);
+    blip.draw_text("P", bx - 3.0, y + 8.0, 1.0, punch);
+    blip.draw_text("K", bx + 37.0, y + 8.0, 1.0, kick);
+    for (i, key) in keys.iter().enumerate() {
+        let (cx, cy) = (bx + (i % 2) as f32 * 40.0, by + (i / 2) as f32 * 26.0);
+        // High is the lit one of the pair, low the sunk one — the same
+        // pairing the move list makes, said in brightness.
+        let base = if i % 2 == 0 { punch } else { kick };
+        let face = if i < 2 { base } else { shade(base, 0.55) };
+        blip.fill_circle(cx, cy, 12.0, ink);
+        blip.fill_circle(cx, cy, 10.0, face);
+        blip.fill_circle(cx - 3.0, cy - 3.5, 4.0, blend(face, BLIP_WHITE, 0.35));
+        blip.draw_text(key, cx - text_w(key, 2.0) / 2.0, cy - 7.0, 2.0, ink);
+    }
+    blip.draw_text("HI", bx - 30.0, by - 4.0, 1.0, label);
+    blip.draw_text("LO", bx - 30.0, by + 22.0, 1.0, label);
+}
+
 fn draw_select(blip: &Blip, g: &Game) {
     let versus = g.mode == Mode::Versus;
     blip.draw_centered(if versus { "CHOOSE YOUR FIGHTERS" } else { "CHOOSE YOUR FIGHTER" },
@@ -2553,7 +2663,7 @@ fn draw_select(blip: &Blip, g: &Game) {
                 blip.draw_text(if who_i == 0 { "P1" } else { "P2" }, tx, 64.0, 2.0, c);
                 if g.locked[who_i] {
                     blip.draw_text("READY", tx.min(x + 150.0 - 6.0 - text_w("READY", 1.0)),
-                        262.0, 1.0, c);
+                        250.0, 1.0, c);
                 }
             }
         }
@@ -2563,7 +2673,7 @@ fn draw_select(blip: &Blip, g: &Game) {
         let stats = [("PWR", a.power / 1.4), ("SPD", a.walk / 150.0),
                      ("HP ", a.health as f32 / 120.0)];
         for (r, (label, v)) in stats.iter().enumerate() {
-            let sy = 278.0 + r as f32 * 13.0;
+            let sy = 266.0 + r as f32 * 13.0;
             blip.draw_text(label, x + 8.0, sy, 1.0, BlipColor { r: 0.7, g: 0.7, b: 0.8, a: 1.0 });
             blip.fill_rect(x + 40.0, sy, 100.0 * v.clamp(0.0, 1.0), 7.0, rgb(a.trim));
             blip.draw_rect(x + 40.0, sy, 100.0, 7.0,
@@ -2572,19 +2682,23 @@ fn draw_select(blip: &Blip, g: &Game) {
     }
 
     if versus {
-        // Two clusters, either side of the split a keyboard already
-        // has, so neither player reaches across the other.
-        blip.draw_text("P1", 18.0, 330.0, 2.0, p1c);
-        blip.draw_text("W A S D  MOVE    F G H  PUNCH KICKS", 48.0, 330.0, 1.0,
-            BlipColor { r: 0.80, g: 0.72, b: 0.76, a: 1.0 });
-        blip.draw_text("P2", 18.0, 348.0, 2.0, p2c);
-        blip.draw_text("ARROWS   MOVE    J K L  PUNCH KICKS", 48.0, 348.0, 1.0,
-            BlipColor { r: 0.74, g: 0.78, b: 0.88, a: 1.0 });
-        blip.draw_centered("SAME FIGHTER TWICE IS NOT ALLOWED", 366.0, 1.0,
-            BlipColor { r: 0.62, g: 0.62, b: 0.70, a: 1.0 });
+        // A deck each, either side of the split a keyboard already has,
+        // so neither player reaches across the other. Drawn rather than
+        // listed: four buttons in a square is a picture, and a picture
+        // of the deck is what a player is looking for.
+        draw_deck(blip, 24.0, 304.0, "P1", p1c, "W A S D", ["R", "T", "F", "G"]);
+        draw_deck(blip, 420.0, 304.0, "P2", p2c, "ARROWS", ["U", "I", "J", "K"]);
+        blip.draw_centered("PUNCH AND", 316.0, 1.0,
+            BlipColor { r: 0.66, g: 0.66, b: 0.74, a: 1.0 });
+        blip.draw_centered("KICK TOGETHER", 328.0, 1.0,
+            BlipColor { r: 0.66, g: 0.66, b: 0.74, a: 1.0 });
+        blip.draw_centered("IS THE SPECIAL", 340.0, 1.0,
+            BlipColor { r: 0.66, g: 0.66, b: 0.74, a: 1.0 });
+        blip.draw_centered("NO TWO THE SAME", 358.0, 1.0,
+            BlipColor { r: 0.55, g: 0.55, b: 0.62, a: 1.0 });
         let waiting = !g.locked[0] || !g.locked[1];
-        blip.draw_centered(if waiting { "BOTH PLAYERS PRESS TO LOCK IN" } else { "FIGHT" },
-            384.0, 2.0, BLIP_WHITE);
+        blip.draw_centered(if waiting { "PRESS TO LOCK IN" } else { "FIGHT" },
+            380.0, 2.0, BLIP_WHITE);
     } else {
         let a = FIGHTERS[g.pick];
         let s = format!("SPECIAL: {}    PUNCH AND KICK", a.special_name);
@@ -2609,23 +2723,23 @@ fn draw_select(blip: &Blip, g: &Game) {
 pub fn draw_gallery(blip: &Blip, now: f32) {
     blip.clear(BlipColor { r: 0.15, g: 0.16, b: 0.21, a: 1.0 });
     let acts: [(&str, Act, MoveId); 17] = [
-        ("JAB", Act::Attack, MoveId::Jab),
+        ("LOW PUNCH", Act::Attack, MoveId::LowPunch),
+        ("HIGH PUNCH", Act::Attack, MoveId::HighPunch),
         ("LOW KICK", Act::Attack, MoveId::LowKick),
         ("HIGH KICK", Act::Attack, MoveId::HighKick),
         ("SWEEP", Act::Attack, MoveId::Sweep),
-        ("LOW JAB", Act::Attack, MoveId::CrouchJab),
         ("THROW", Act::Attack, MoveId::Throw),
         ("SPECIAL", Act::Attack, MoveId::Special),
         ("JUMP KICK", Act::Attack, MoveId::JumpKick),
         ("FLYING KICK", Act::Attack, MoveId::FlyingKick),
         ("JUMP PUNCH", Act::Attack, MoveId::JumpPunch),
-        ("IDLE", Act::Idle, MoveId::Jab),
-        ("WALK", Act::Walk, MoveId::Jab),
-        ("CROUCH", Act::Crouch, MoveId::Jab),
-        ("BLOCK", Act::Block, MoveId::Jab),
-        ("HITSTUN", Act::Hitstun, MoveId::Jab),
-        ("KNOCKDOWN", Act::Knockdown, MoveId::Jab),
-        ("VICTORY", Act::Victory, MoveId::Jab),
+        ("IDLE", Act::Idle, MoveId::LowPunch),
+        ("WALK", Act::Walk, MoveId::LowPunch),
+        ("CROUCH", Act::Crouch, MoveId::LowPunch),
+        ("BLOCK", Act::Block, MoveId::LowPunch),
+        ("HITSTUN", Act::Hitstun, MoveId::LowPunch),
+        ("KNOCKDOWN", Act::Knockdown, MoveId::LowPunch),
+        ("VICTORY", Act::Victory, MoveId::LowPunch),
     ];
     // One move at a time, five frames of it across the screen. A pose
     // is only ever half the question — the other half is what it is on
@@ -2687,6 +2801,7 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
             let k = k as f32 / 4.0;
             f.y = FLOOR_Y - 44.0 * (1.0 - (2.0 * k - 1.0).powi(2));
             f.vy = FLY_VY * (1.0 - 2.0 * k);
+            f.vx = f.facing * FLY_SPEED;
         }
         if act == Act::Walk { f.x = x + (now * 60.0) % 24.0; }
         blip.draw_line(x - 60.0, FLOOR_Y, x + 74.0, FLOOR_Y,
