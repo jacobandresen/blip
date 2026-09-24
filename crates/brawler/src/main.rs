@@ -30,7 +30,9 @@ use blip::input::{key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_
     BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_I, BLIP_KEY_J, BLIP_KEY_K,
     BLIP_KEY_LEFT, BLIP_KEY_R, BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_T,
     BLIP_KEY_U, BLIP_KEY_UP, BLIP_KEY_W, BLIP_KEY_X};
-use blip::{clamp, play_music, play_sfx, rand_int, rects_overlap, web, window_conf, Blip,
+use blip::audio::play_sfx_volume;
+use blip::{clamp, play_music, play_sfx, rand_int, rects_overlap, web,
+    window_conf, Blip,
     BlipColor, Session, Timer, BLIP_BLACK, BLIP_WHITE, BLIP_YELLOW};
 
 // ---- stage ---------------------------------------------------------------
@@ -1601,8 +1603,17 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
     let close = (g.p[1].x - g.p[0].x).abs() <= THROW_RANGE;
     apply_input(&mut g.p[0], p_in, close, dt);
     apply_input(&mut g.p[1], c_in, close, dt);
+    let was_air = [g.p[0].airborne(), g.p[1].airborne()];
     advance(&mut g.p[0], dt);
     advance(&mut g.p[1], dt);
+    // Boots on boards. A jump is the one thing in the game that used to
+    // happen in silence from take-off to landing, and the touchdown is
+    // where a player finds out they are on the ground again.
+    for i in 0..2 {
+        if was_air[i] && !g.p[i].airborne() {
+            play_sfx_volume(&sfx.land, 0.35 + 0.5 * g.p[i].land_force);
+        }
+    }
 
     for i in 0..2 {
         g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
@@ -1681,7 +1692,18 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
                 play_sfx(&sfx.block);
                 push_apart(&mut g.p, 6.0);
             } else {
-                play_sfx(if knock || dmg >= 12 { &sfx.hit_heavy } else { &sfx.hit_light });
+                // The combo counter on the receiving end picks the
+                // light hit, so a chain climbs. A knockdown gets the
+                // crunch and the crowd with it.
+                if knock {
+                    play_sfx(&sfx.crunch);
+                    play_sfx_volume(&sfx.cheer, 0.5);
+                } else if dmg >= 12 {
+                    play_sfx(&sfx.hit_heavy);
+                } else {
+                    let step = (g.p[d].combo.max(1) as usize - 1).min(2);
+                    play_sfx(&sfx.hit_light[step]);
+                }
                 // A knockdown throws them clear — landing one used to
                 // leave the attacker standing over the wakeup, which is
                 // not a reward but a coin flip against invulnerability.
@@ -1737,7 +1759,7 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.p[d].act = Act::Hitstun;
             g.p[d].stun = 18.0 * F;
             g.p[d].t = 0.0;
-            play_sfx(&sfx.hit_light);
+            play_sfx(&sfx.hit_light[0]);
             g.shake = 0.08;
             if d == 1 { g.sess.add_score(dmg * 10); }
         }
@@ -1763,7 +1785,10 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
             // either fighter reaches two, and a draw takes both there.
             RoundResult::Draw => { g.p[0].rounds += 1; g.p[1].rounds += 1; }
         }
-        if ko { play_sfx(&sfx.ko); }
+        if ko {
+            play_sfx(&sfx.ko);
+            play_sfx_volume(&sfx.roar, 0.75);
+        }
         g.banner = if ko { "K.O." } else { "TIME UP" };
         g.state = State::RoundEnd;
         g.phase.start(2.2);
@@ -1933,8 +1958,14 @@ fn update_match_end(g: &mut Game, dt: f32) {
 
 // ---- assets --------------------------------------------------------------
 
-const HIT_LIGHT_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_light.wav"));
+const HIT_LIGHT_WAV: [&[u8]; 3] = [
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_light.wav")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_light2.wav")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_light3.wav")),
+];
 const HIT_HEAVY_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_heavy.wav"));
+const CRUNCH_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/crunch.wav"));
+const LAND_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/land.wav"));
 const WHOOSH_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/whoosh.wav"));
 const GI_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/gi.wav"));
 const BLOCK_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/block.wav"));
@@ -1948,8 +1979,18 @@ const PROJECTILE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/s
 // couple of hundred lines, so the game builds its own at startup.
 
 struct Sounds {
-    hit_light: blip::BlipSound,
+    /// Three light hits at rising pitch. A combo picks the next one up,
+    /// so a chain sounds like it is climbing rather than like the same
+    /// hit played four times.
+    hit_light: [blip::BlipSound; 3],
     hit_heavy: blip::BlipSound,
+    /// A body hitting boards. The biggest thing that happens in a
+    /// round, and it used to share a sound with an ordinary heavy.
+    crunch: blip::BlipSound,
+    land: blip::BlipSound,
+    /// The crowd that has been drawn watching every round in silence.
+    cheer: blip::BlipSound,
+    roar: blip::BlipSound,
     whoosh: blip::BlipSound,
     /// Cloth snapping taut, played on the frame a leg unfolds.
     gi: blip::BlipSound,
@@ -1967,8 +2008,18 @@ async fn main() {
     let mut g = Game::new();
 
     let sfx = Sounds {
-        hit_light: blip::audio::load_sound(HIT_LIGHT_WAV).await,
+        hit_light: [
+            blip::audio::load_sound(HIT_LIGHT_WAV[0]).await,
+            blip::audio::load_sound(HIT_LIGHT_WAV[1]).await,
+            blip::audio::load_sound(HIT_LIGHT_WAV[2]).await,
+        ],
         hit_heavy: blip::audio::load_sound(HIT_HEAVY_WAV).await,
+        crunch: blip::audio::load_sound(CRUNCH_WAV).await,
+        land: blip::audio::load_sound(LAND_WAV).await,
+        // Built here rather than shipped, like the music: see
+        // blip_assets::brawler::crowd_wav.
+        cheer: blip::audio::load_sound(&blip_assets::brawler::crowd_wav(false)).await,
+        roar: blip::audio::load_sound(&blip_assets::brawler::crowd_wav(true)).await,
         whoosh: blip::audio::load_sound(WHOOSH_WAV).await,
         gi: blip::audio::load_sound(GI_WAV).await,
         block: blip::audio::load_sound(BLOCK_WAV).await,

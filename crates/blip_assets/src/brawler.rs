@@ -60,6 +60,62 @@ fn whoosh(ms: f32, vol: f32, seed: u32) -> Vec<i16> {
     soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
 
+/// A crowd, all at once.
+///
+/// Thirty-odd people are already drawn watching every round and until
+/// now they made no noise whatsoever, which is a strange thing for a
+/// crowd to do at the exact moment somebody hits the floor. Built the
+/// way a cheer actually sounds: a wide band of noise that swells and
+/// falls, with a slow wobble across it so it reads as many voices
+/// rather than as one long hiss, and no pitch in it at all — a pitched
+/// cheer is a chord, and a chord is a different sound entirely.
+fn crowd(ms: f32, vol: f32, seed: u32) -> Vec<i16> {
+    let n = ms_to_samples(ms);
+    let mut buf = vec![0.0f32; n];
+    let mut rng = Rng(seed);
+    let mut lp = 0.0f32;
+    let mut hp = 0.0f32;
+    for (i, out) in buf.iter_mut().enumerate() {
+        let t = i as f32 / n as f32;
+        // Up fast, down slow: a room reacting, then settling.
+        let e = if t < 0.16 { t / 0.16 } else { (1.0 - (t - 0.16) / 0.84).powf(1.7) };
+        let noise = rng.next_f32() * 2.0 - 1.0;
+        // Open enough to stay a cheer. Filtered down to a narrow band
+        // it came out as a rumble — measurably lower in pitch than a
+        // punch, which is not what a room full of people sounds like.
+        lp += (noise - lp) * 0.78;
+        hp += (lp - hp) * 0.020;
+        let voices = lp - hp;
+        // Several slow wobbles at once — individual voices coming and
+        // going out of the mass.
+        let w = 1.0
+            + 0.22 * (t * 37.0).sin()
+            + 0.15 * (t * 23.0 + 1.7).sin()
+            + 0.10 * (t * 61.0 + 0.4).sin();
+        *out = voices * w * e * vol * 5200.0;
+    }
+    soft_limit_to_pcm16(&buf, MIX_KNEE)
+}
+
+/// Boots hitting boards. Shorter and woodier than a body landing on
+/// them — mostly the box the floor is, with a click of heel on top.
+fn land(seed: u32) -> Vec<i16> {
+    let ms = 130.0;
+    let n = ms_to_samples(ms);
+    let mut buf = vec![0.0f32; n];
+    let mut rng = Rng(seed);
+    let mut phase = 0.0f32;
+    for (i, out) in buf.iter_mut().enumerate() {
+        let t = i as f32 / n as f32;
+        let e = env(i, n, ms_to_samples(0.6), ms_to_samples(ms * 0.9));
+        let f = 132.0 * (1.0 - 0.36 * t);
+        phase += 2.0 * std::f32::consts::PI * f / SAMPLE_RATE as f32;
+        let click = (rng.next_f32() * 2.0 - 1.0) * (1.0 - t).powf(9.0);
+        *out = (phase.sin() * 0.82 + click * 0.5) * e * 8000.0;
+    }
+    soft_limit_to_pcm16(&buf, MIX_KNEE)
+}
+
 /// Cloth snapping taut — the sound a gi makes when a leg goes out fast.
 ///
 /// The `whoosh` above is air moving: low, soft-edged, and it says "an
@@ -435,10 +491,39 @@ pub fn theme_wav(which: usize) -> Vec<u8> {
     }
 }
 
+/// The crowd, built at startup rather than baked in.
+///
+/// Two and a half seconds of it is a quarter of a megabyte of PCM —
+/// more than the rest of the game's sound put together, and a third
+/// again on the wasm a player downloads — for a noise that is a few
+/// lines of filtered noise. The music already lives this way for the
+/// same reason; see the note by the other assets in the game.
+pub fn crowd_wav(long: bool) -> Vec<u8> {
+    let s = if long { crowd(1600.0, 1.0, 0xFEED) } else { crowd(900.0, 0.85, 0xC0DE) };
+    encode_pcm16_mono(&s)
+}
+
 pub fn generate() -> Vec<Asset> {
     vec![
-        ("sounds/hit_light.wav", encode_pcm16_mono(&impact(110.0, 0.25, 520.0, 0.8, 0x11))),
-        ("sounds/hit_heavy.wav", encode_pcm16_mono(&impact(220.0, 0.6, 300.0, 1.0, 0x22))),
+        // Three light hits at rising pitch, not one played over and
+        // over. A combo is the most satisfying thing in a fighting
+        // game and the only thing that ever sold it was the counter in
+        // the corner; the sound went flat while the numbers climbed.
+        // Each hit of a chain takes the next one up, so a four-hit
+        // string *sounds* like it is going somewhere.
+        // The pitched share climbs with the pitch. Raising the
+        // frequency alone did nothing audible: a light hit is three
+        // quarters hiss, and a sine buried under that much noise can
+        // be moved four hundred hertz without anyone hearing it move.
+        ("sounds/hit_light.wav",  encode_pcm16_mono(&impact(110.0, 0.30, 520.0, 0.80, 0x11))),
+        ("sounds/hit_light2.wav", encode_pcm16_mono(&impact(102.0, 0.46, 700.0, 0.85, 0x1b))),
+        ("sounds/hit_light3.wav", encode_pcm16_mono(&impact(94.0, 0.62, 940.0, 0.90, 0x2f))),
+        ("sounds/hit_heavy.wav",  encode_pcm16_mono(&impact(220.0, 0.6, 300.0, 1.0, 0x22))),
+        // A knockdown is the biggest thing that happens in a round and
+        // it shared its sound with an ordinary heavy hit. Lower, longer
+        // and almost all thump: the sound of someone hitting boards.
+        ("sounds/crunch.wav",    encode_pcm16_mono(&impact(340.0, 0.78, 190.0, 1.0, 0x5a))),
+        ("sounds/land.wav",      encode_pcm16_mono(&land(0x71))),
         ("sounds/whoosh.wav",    encode_pcm16_mono(&whoosh(150.0, 0.7, 0x33))),
         ("sounds/gi.wav",        encode_pcm16_mono(&gi_snap(0x6C1D))),
         ("sounds/block.wav",     encode_pcm16_mono(&block_sfx())),

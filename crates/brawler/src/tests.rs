@@ -3021,3 +3021,271 @@ fn sweat_arrives_with_the_damage() {
         assert_eq!(draw::exertion(&f), 1.0);
     }
 }
+
+// ---- ten rounds of looking at it ----------------------------------------
+//
+// Every one of these measures the drawing rather than the rules: what a
+// player can actually see and tell apart at sixty pixels tall. They are
+// diagnostics — run with `--ignored` — and the ones that found something
+// have a real assertion next to them further down.
+
+/// Worst offenders first, with the label, so a number leads somewhere.
+fn report(title: &str, mut rows: Vec<(f32, String)>) {
+    rows.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+    println!("--- {title} ({} samples)", rows.len());
+    for (v, what) in rows.iter().take(8) { println!("    {v:8.2}  {what}"); }
+}
+
+#[test]
+#[ignore = "diagnostic, not an assertion"]
+fn diag_round_6_is_any_leg_curled_up_behind_the_back() {
+    // A foot that is both behind the hip and high off the floor is a leg
+    // folded up behind the fighter — the single thing that most makes a
+    // figure read as a bundle rather than a person.
+    let mut rows = Vec::new();
+    for (name, f) in every_pose() {
+        let k = bones_of(&f);
+        for (side, ankle, knee) in [("lead", k.ankle_lead, k.knee_lead),
+                                    ("rear", k.ankle_rear, k.knee_rear)] {
+            let behind = (k.hip.0 - ankle.0) * f.facing;
+            let up = f.y - ankle.1;
+            if behind > 0.0 && up > 0.0 {
+                rows.push((behind.min(up), format!("{name} {side} foot {behind:.0}px behind, {up:.0}px up")));
+            }
+            let kbehind = (k.hip.0 - knee.0) * f.facing;
+            if kbehind > 0.0 {
+                rows.push((kbehind * 0.5, format!("{name} {side} knee {kbehind:.0}px behind the hip")));
+            }
+        }
+    }
+    report("legs behind the back", rows.clone());
+    // One worst case per pose name, so eight lines cover eight poses
+    // instead of eight frames of one.
+    let mut best: std::collections::BTreeMap<String, (f32, String)> = Default::default();
+    for (v, what) in rows {
+        let key = what.split(" t=").next().unwrap_or(&what).to_string();
+        let e = best.entry(key).or_insert((0.0, String::new()));
+        if v > e.0 { *e = (v, what); }
+    }
+    report("worst frame of each pose", best.into_values().collect());
+}
+
+#[test]
+#[ignore = "diagnostic, not an assertion"]
+fn diag_round_7_can_the_two_of_anything_be_told_apart() {
+    // Two arms and two legs only read as two if they are drawn apart.
+    let mut rows = Vec::new();
+    for (name, f) in every_pose() {
+        let k = bones_of(&f);
+        rows.push((-dist2(k.ankle_lead, k.ankle_rear), format!("{name} feet")));
+        rows.push((-dist2(k.hand_lead, k.hand_rear), format!("{name} hands")));
+    }
+    rows.iter_mut().for_each(|r| r.0 = -r.0);
+    rows.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    println!("--- limbs drawn on top of each other (closest first)");
+    for (v, what) in rows.iter().take(8) { println!("    {v:8.2}  {what}"); }
+}
+
+#[test]
+#[ignore = "diagnostic, not an assertion"]
+fn diag_round_8_is_the_head_ever_swallowed() {
+    // A face is four marks on a ten-pixel ball. Anything drawn over it
+    // and the fighter has no face at all.
+    let mut rows = Vec::new();
+    for (name, f) in every_pose() {
+        let k = bones_of(&f);
+        let r = 11.0 * FIGHTERS[f.who].bulk;
+        for (what, at) in [("chest", k.neck), ("lead hand", k.hand_lead),
+                           ("rear hand", k.hand_rear), ("lead knee", k.knee_lead),
+                           ("rear knee", k.knee_rear), ("hip", k.hip)] {
+            let d = dist2(k.head, at);
+            if d < r { rows.push((r - d, format!("{name}: {what} is {d:.0}px into the head"))); }
+        }
+    }
+    report("things drawn over the face", rows);
+}
+
+#[test]
+#[ignore = "diagnostic, not an assertion"]
+fn diag_round_9_how_tall_is_a_fighter_really() {
+    // A crouch that folds to nothing and a jump that curls into a ball
+    // are the same bug: the silhouette stops being a person.
+    let mut rows = Vec::new();
+    for (name, f) in every_pose() {
+        let k = bones_of(&f);
+        let xs = [k.head.0, k.hip.0, k.ankle_lead.0, k.ankle_rear.0, k.hand_lead.0, k.hand_rear.0];
+        let ys = [k.head.1, k.hip.1, k.ankle_lead.1, k.ankle_rear.1, k.hand_lead.1, k.hand_rear.1];
+        let w = xs.iter().cloned().fold(f32::MIN, f32::max) - xs.iter().cloned().fold(f32::MAX, f32::min);
+        let h = ys.iter().cloned().fold(f32::MIN, f32::max) - ys.iter().cloned().fold(f32::MAX, f32::min);
+        rows.push((w / h.max(1.0), format!("{name}: {w:.0} wide by {h:.0} tall")));
+    }
+    report("widest against their own height", rows);
+}
+
+#[test]
+#[ignore = "diagnostic, not an assertion"]
+fn diag_round_10_does_the_background_compete_with_the_fight() {
+    // Not geometry: how much ink the stage spends. Counted as the number
+    // of separate things drawn behind the fighters, because every one of
+    // them is something the eye has to rule out.
+    println!("counted by hand from draw_dock / draw_temple — see the test below");
+}
+
+fn dist2(a: draw::V, b: draw::V) -> f32 {
+    ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt()
+}
+
+#[test]
+fn no_leg_is_curled_up_behind_the_back() {
+    // A foot that is a long way behind the hip *and* a long way above
+    // the floor is a heel pulled up to the backside. One leg doing that
+    // turns the whole figure into a bundle — it was what made every air
+    // attack read as a ball rather than as a person in the air.
+    //
+    // Either on its own is fine and both are real: a trailing leg
+    // streams out behind a flying kick, and a chambered knee comes up
+    // high in front. It is the product of the two that is the fold, so
+    // that is what is bounded.
+    let mut bad = Vec::new();
+    for (name, f) in every_pose() {
+        let k = bones_of(&f);
+        for (side, ankle) in [("lead", k.ankle_lead), ("rear", k.ankle_rear)] {
+            let behind = (k.hip.0 - ankle.0) * f.facing;
+            let up = f.y - ankle.1;
+            if behind.min(up) > 24.0 {
+                bad.push(format!("{name}: {side} foot is {behind:.0}px behind the hip \
+                    and {up:.0}px off the floor"));
+            }
+        }
+    }
+    bad.dedup();
+    assert!(bad.is_empty(), "legs folded up behind the back:\n  {}",
+        bad.iter().take(6).cloned().collect::<Vec<_>>().join("\n  "));
+}
+
+// ---- what a fight sounds like -------------------------------------------
+
+/// Every sample of a mono 16-bit WAV, as floats.
+fn wav_samples(wav: &[u8]) -> Vec<f32> {
+    wav[44..].chunks_exact(2)
+        .map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0)
+        .collect()
+}
+
+/// How high a sound sits, as zero crossings per second. Crude against a
+/// real spectrum and exactly right for the question asked of it: is
+/// this one brighter than that one.
+fn brightness(wav: &[u8]) -> f32 {
+    let s = wav_samples(wav);
+    let crossings = s.windows(2).filter(|w| (w[0] < 0.0) != (w[1] < 0.0)).count();
+    crossings as f32 / (s.len() as f32 / 44_100.0).max(0.001)
+}
+
+/// How much energy a sound carries at one frequency — one bin of a
+/// discrete Fourier transform, done the direct way. Forty of these is a
+/// coarse spectrum, which is all any question here needs.
+fn bin(s: &[f32], hz: f32) -> f32 {
+    let w = 2.0 * std::f32::consts::PI * hz / 44_100.0;
+    let (mut re, mut im) = (0.0f32, 0.0f32);
+    for (i, x) in s.iter().enumerate() {
+        re += x * (w * i as f32).cos();
+        im += x * (w * i as f32).sin();
+    }
+    (re * re + im * im).sqrt() / s.len() as f32
+}
+
+/// The frequency a sound sits on, and how much it stands out from the
+/// rest of the spectrum.
+///
+/// Zero crossings were tried first and they cannot answer this: a hit
+/// here is two thirds hiss, and noise crosses zero so often that it
+/// swamps whatever the thump is doing — measured that way, three hits
+/// whose thump climbs four hundred hertz come out *falling*, because
+/// the one with the most pitch in it has the least noise.
+fn dominant(wav: &[u8], lo: f32, hi: f32) -> (f32, f32) {
+    let s = wav_samples(wav);
+    let n = 40;
+    let bins: Vec<(f32, f32)> = (0..n)
+        .map(|i| {
+            let hz = lo * (hi / lo).powf(i as f32 / (n - 1) as f32);
+            (hz, bin(&s, hz))
+        })
+        .collect();
+    let mean = bins.iter().map(|b| b.1).sum::<f32>() / n as f32;
+    let peak = bins.iter().cloned().fold((0.0, 0.0), |a, b| if b.1 > a.1 { b } else { a });
+    (peak.0, peak.1 / mean.max(1e-9))
+}
+
+fn asset(name: &str) -> Vec<u8> {
+    blip_assets::brawler::generate().into_iter()
+        .find(|(n, _)| n.ends_with(name))
+        .unwrap_or_else(|| panic!("no asset {name}")).1
+}
+
+#[test]
+fn a_combo_climbs_as_it_lands() {
+    // The counter in the corner was the only thing that said a chain
+    // was going anywhere; the sound stayed flat while the numbers went
+    // up. Three light hits, each brighter than the last, and the combo
+    // picks which one — so a four-hit string is audibly a four-hit
+    // string.
+    let b: Vec<f32> = ["hit_light.wav", "hit_light2.wav", "hit_light3.wav"]
+        .iter().map(|n| dominant(&asset(n), 150.0, 1600.0).0).collect();
+    assert!(b[1] > b[0] * 1.15 && b[2] > b[1] * 1.15,
+        "the three light hits do not climb: {b:?}");
+}
+
+#[test]
+fn a_body_hitting_the_floor_does_not_sound_like_a_jab() {
+    // A knockdown is the biggest thing that happens in a round and it
+    // used to share its sound with an ordinary heavy hit.
+    let jab = asset("hit_light.wav");
+    let heavy = asset("hit_heavy.wav");
+    let crunch = asset("crunch.wav");
+    assert_ne!(crunch, heavy, "a knockdown still plays the heavy hit");
+    // Lower than both, and longer than both: that is what makes it read
+    // as weight rather than as speed.
+    let (c_hz, _) = dominant(&crunch, 80.0, 1600.0);
+    let (h_hz, _) = dominant(&heavy, 80.0, 1600.0);
+    assert!(c_hz < h_hz,
+        "the crunch ({c_hz:.0}Hz) is not lower than a heavy hit ({h_hz:.0}Hz)");
+    assert!(brightness(&crunch) < brightness(&jab) * 0.9,
+        "the crunch is nearly as bright as a jab");
+    assert!(wav_seconds(&crunch) > wav_seconds(&heavy) * 1.2,
+        "the crunch is no longer than a heavy hit");
+}
+
+#[test]
+fn the_crowd_reacts_for_longer_than_it_takes_to_notice() {
+    // Thirty-odd onlookers have been drawn watching every round in
+    // silence. A cheer that is over before the eye reaches them is the
+    // same as no cheer.
+    let cheer = blip_assets::brawler::crowd_wav(false);
+    let roar = blip_assets::brawler::crowd_wav(true);
+    assert!(wav_seconds(&cheer) > 0.6, "the knockdown cheer is {:.2}s", wav_seconds(&cheer));
+    assert!(wav_seconds(&roar) > wav_seconds(&cheer) * 1.5,
+        "a KO gets no more of a reaction than a knockdown");
+    // It has to be a room, not a chord: noise is flat, so no one
+    // frequency in it should stand far above its neighbours the way a
+    // hit's thump does.
+    let (_, crowd_peak) = dominant(&roar, 200.0, 4000.0);
+    let (_, hit_peak) = dominant(&asset("hit_heavy.wav"), 200.0, 4000.0);
+    assert!(crowd_peak < hit_peak,
+        "the crowd has a pitch in it ({crowd_peak:.1}x over flat, against a hit's \
+         {hit_peak:.1}x) — that is a chord, not a room");
+    // And it must not clip: it plays under a hit and a bell.
+    let peak = wav_samples(&roar).iter().fold(0.0f32, |m, s| m.max(s.abs()));
+    assert!(peak < 0.99, "the crowd clips at {peak:.3}");
+}
+
+#[test]
+fn building_the_crowd_is_quick_enough_to_do_at_startup() {
+    // Synthesised on the device rather than shipped — a quarter of a
+    // megabyte that never crosses the wire — which is only a good trade
+    // if the player does not wait for it.
+    let t = std::time::Instant::now();
+    std::hint::black_box(blip_assets::brawler::crowd_wav(false));
+    std::hint::black_box(blip_assets::brawler::crowd_wav(true));
+    let ms = t.elapsed().as_millis();
+    assert!(ms < 400, "the crowd took {ms}ms to build");
+}

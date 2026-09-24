@@ -41,12 +41,33 @@ pub fn draw(blip: &Blip, g: &Game) {
 /// floor is the same flat line in both, at the same height, with the
 /// same walls. A stage that changed the fight would make the ladder's
 /// difficulty a matter of where you were standing.
+/// How far the backdrop is pushed back behind the fight.
+///
+/// Both stages were built in layers, each hazed toward its own sky by
+/// how far off it is — and then every one of those layers was drawn at
+/// full strength anyway, because "far off" was decided per layer and
+/// nothing decided how far off the *whole backdrop* was from the
+/// fighters standing in front of it. The result: cranes, warehouses,
+/// a lit skyline and thirty-odd onlookers, all at the same contrast as
+/// two men hitting each other, in the same band of the screen.
+///
+/// One scrim of its own air over the lot of it fixes that in a single
+/// pass, the way distance actually works. Nothing is removed; it is
+/// just behind something now.
+const HAZE: f32 = 0.34;
+
 fn draw_stage(blip: &Blip, g: &Game) {
     // A hit shakes the whole picture, which is most of what selling an
     // impact means when the fighters themselves are simple shapes.
     let shake = if g.shake > 0.0 { (g.shake * 60.0).sin() * g.shake * 30.0 } else { 0.0 };
-    if g.stage == 0 { draw_dock(blip, shake, g.now, g.shake); }
-    else { draw_temple(blip, shake, g.now, g.shake); }
+    let air = if g.stage == 0 {
+        draw_dock(blip, shake, g.now, g.shake);
+        BlipColor { r: 0.40, g: 0.17, b: 0.20, a: HAZE }
+    } else {
+        draw_temple(blip, shake, g.now, g.shake);
+        BlipColor { r: 0.07, g: 0.07, b: 0.13, a: HAZE }
+    };
+    blip.fill_rect(0.0, 0.0, WIN_W as f32, FLOOR_Y + shake, air);
 
     draw_floor(blip, g.stage, shake);
 }
@@ -555,7 +576,12 @@ const INK: BlipColor = BlipColor { r: 0.07, g: 0.06, b: 0.09, a: 1.0 };
 /// What the lit floor looks like with a fighter standing in the way of
 /// the light. Opaque, and a little cooler than the boards it falls on —
 /// a shadow takes its colour from the sky, not from the thing casting it.
-const SHADOW: BlipColor = BlipColor { r: 0.17, g: 0.14, b: 0.16, a: 1.0 };
+/// Opaque, not translucent: the silhouette is drawn as a dozen
+/// overlapping strokes, and any alpha on it doubles up wherever two
+/// limbs cross, so a see-through shadow comes out blotched exactly
+/// where the body is thickest. Lightened instead — a cast shadow is a
+/// patch of floor with less light on it, not a hole in the floor.
+const SHADOW: BlipColor = BlipColor { r: 0.23, g: 0.17, b: 0.18, a: 1.0 };
 
 /// How a fighter is coloured and clothed, already shaded for the limb
 /// being drawn.
@@ -909,6 +935,62 @@ fn draw_leg(blip: &Blip, h: &Hide, hip: V, knee: V, ankle: V, fwd: f32, ground: 
         foot_c, ink);
 }
 
+/// A fist, and an open hand, drawn as hands.
+///
+/// They were both a ball: `blob()` at a size up for a fist, a stubby
+/// capsule for a palm. At sixty pixels tall that is the single thing
+/// the eye goes to on half the move list — a punch is a fist arriving —
+/// and a ball on the end of a stick is what makes a figure read as a
+/// doll. Three shapes are enough to fix it: a squared block for the
+/// hand itself, a row of knuckles across the face it hits with, and a
+/// thumb laid over the front. None of them is more than a few pixels;
+/// all of them are aligned to the forearm, so the knuckles always face
+/// the way the punch is going.
+fn draw_fist(blip: &Blip, h: &Hide, wrist: V, hand: V, b: f32) {
+    let skin = h.c(h.skin);
+    let ink = h.ink();
+    let (fx, fy) = unit(wrist, hand);
+    let (px, py) = (-fy, fx);              // across the hand
+    let at = |f: f32, a: f32| V(hand.0 + fx * f * b + px * a * b,
+                                hand.1 + fy * f * b + py * a * b);
+
+    // The block of the hand: knuckle end forward, heel of the hand back
+    // toward the wrist, and a shade wider than it is long.
+    part(blip, at(-3.2, 0.0), at(2.0, 0.0), 5.4 * b, 6.2 * b, skin, ink);
+
+    // Two marks on top of it, and neither of them outlined. Anything
+    // drawn on a fist with an ink edge of its own cuts the fist into
+    // pieces — at six pixels across, an outline around a thumb is most
+    // of the thumb. So: one bright band where the knuckles are, one
+    // darker bar for the thumb folded over them, both as bare strokes
+    // that read as the same piece of flesh changing shape.
+    stroke(blip, at(2.9, -3.0), at(2.9, 3.0), 2.2 * b, 2.2 * b,
+           blend(skin, BLIP_WHITE, 0.32));
+    stroke(blip, at(-1.8, 3.6), at(2.4, 1.8), 2.2 * b, 1.8 * b, shade(skin, 0.74));
+}
+
+/// An open hand: a palm and three fingers, because a grab and a punch
+/// are not the same thing and the picture has to say which.
+fn draw_palm(blip: &Blip, h: &Hide, wrist: V, hand: V, b: f32) {
+    let skin = h.c(h.skin);
+    let ink = h.ink();
+    let (fx, fy) = unit(wrist, hand);
+    let (px, py) = (-fy, fx);
+    let at = |f: f32, a: f32| V(hand.0 + fx * f * b + px * a * b,
+                                hand.1 + fy * f * b + py * a * b);
+
+    // Fingers first, so the palm's outline closes over the end of them
+    // and the hand is one silhouette with three splits in it rather
+    // than four outlined objects touching.
+    for (f, a) in [(6.6, -3.0), (7.4, 0.0), (6.4, 3.0)] {
+        part(blip, at(1.0, a * 0.5), at(f, a), 2.2 * b, 1.8 * b, skin, ink);
+    }
+    part(blip, at(-3.0, 0.0), at(1.6, 0.0), 5.0 * b, 5.8 * b, skin, ink);
+    // The thumb out to the side, which is the whole of what makes a
+    // hand a hand rather than a mitten. Unoutlined, as on the fist.
+    stroke(blip, at(-1.2, 3.2), at(1.8, 5.2), 2.2 * b, 1.8 * b, shade(skin, 0.80));
+}
+
 fn draw_arm(blip: &Blip, h: &Hide, shoulder: V, elbow: V, hand: V, open: bool, t: f32) {
     let b = h.bulk;
     let ink = h.ink();
@@ -968,16 +1050,8 @@ fn draw_arm(blip: &Blip, h: &Hide, shoulder: V, elbow: V, hand: V, open: bool, t
     // Wrist wrap, then the hand on the end of it.
     stroke(blip, along(elbow, hand, 0.74), along(elbow, hand, 0.92), 3.4 * b, 3.7 * b,
         h.c(h.trim));
-    if open {
-        // A palm: flatter and longer than a fist, because a grab and a
-        // punch are not the same thing and the picture should say which.
-        let (fx, fy) = unit(elbow, hand);
-        part(blip, hand, V(hand.0 + fx * 7.4, hand.1 + fy * 7.4), 5.0 * b, 4.0 * b, skin, ink);
-    } else {
-        // The fist, drawn a size up. It is the business end of half the
-        // move list and it wants to be the boldest shape on the arm.
-        blob(blip, hand, 6.4 * b, skin, ink);
-    }
+    if open { draw_palm(blip, h, elbow, hand, b); }
+    else { draw_fist(blip, h, elbow, hand, b); }
 }
 
 /// The pelvis: a short bar between the two hip sockets. Without it the
@@ -1611,6 +1685,13 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             if !air {
                 q.lead_foot.f += 5.0 * ext;
                 q.rear_foot.f -= 3.0 * ext;
+            } else {
+                // The hip drives forward under a jumping punch, and the
+                // feet have to go with it — left where the jump put
+                // them they finish a foot behind the fighter and high,
+                // which is a pair of legs folded up behind the back.
+                q.lead_foot = p(q.hip.f + 14.0, q.lead_foot.u);
+                q.rear_foot = p(q.hip.f - 10.0, q.rear_foot.u.min(24.0));
             }
             q.rear_hand = q.rear_hand.to(p(q.rear_hand.f - 4.0, q.rear_hand.u - 22.0), ext);
             q.lead_hand = q.lead_hand.to(tip, ext);
@@ -1652,7 +1733,10 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             if !air {
                 q.rear_foot = p(-18.0 + (q.hip.f - k.plant - -18.0) * ext, 0.0);
             } else {
-                q.rear_foot = p(q.rear_foot.f, 30.0);
+                // Tucked under the hip, not folded behind it: the knee
+                // comes up in front and the shin hangs from it, which
+                // is what a trailing leg does in the air.
+                q.rear_foot = p(q.hip.f - 7.0, 26.0);
             }
             // Knee up to hip height, shin hanging down off it, foot
             // under the knee. Folding the foot up level with the hip
@@ -1689,8 +1773,16 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             // everything and holds it there.
             q.hip = p(q.hip.f + 21.0 * ext, q.hip.u + 7.0 * ext);
             q.head = p(q.head.f - 22.0 * ext, q.head.u - 13.0 * ext);
-            // The support leg folds up under the hips and stays there.
-            q.rear_foot = p(-14.0 - 6.0 * ext, 30.0 + 12.0 * ext);
+            // The trailing leg streams out behind, nearly straight.
+            //
+            // It used to fold up: at full extension the foot sat forty
+            // pixels behind the hip and forty above it, which is a heel
+            // pulled to the backside — the one shape that makes a
+            // figure read as a bundle instead of a person, and the
+            // thing that made every air attack look like a ball. A
+            // trailing leg is allowed to be behind the fighter or high,
+            // and not both. See `no_leg_is_curled_up_behind_the_back`.
+            q.rear_foot = p(q.hip.f - 24.0 - 10.0 * ext, 14.0 + 4.0 * ext);
             q.lead_foot = q.lead_foot.to(toe_tip, ext);
             // One arm forward along the line, one back for balance.
             q.lead_hand = q.lead_hand.to(p(32.0, 70.0), ext);
@@ -2452,16 +2544,16 @@ fn pose_and_draw_lit(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f3
             ground: FLOOR_Y + shift,
             fwd: f.facing,
             face: f.facing,
-            squash: -0.30,
-            skew: light * 0.62,
+            squash: -0.24,
+            skew: light * 0.42,
             rise: FLOOR_Y - f.y,
         };
         draw_shadow(blip, shadow, &q, a.bulk, SHADOW);
     }
     let lift = ((FLOOR_Y - f.y) / 120.0).clamp(0.0, 1.0);
     let sw = 19.0 * a.bulk * (1.0 - 0.5 * lift);
-    stroke(blip, V(f.x - sw, FLOOR_Y + shift), V(f.x + sw, FLOOR_Y + shift), 3.0, 3.0,
-        BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.34 * (1.0 - 0.55 * lift) });
+    stroke(blip, V(f.x - sw, FLOOR_Y + shift), V(f.x + sw, FLOOR_Y + shift), 2.6, 2.6,
+        BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.30 * (1.0 - 0.55 * lift) });
 
     // One solve per fighter. The cloth wanted a second pose four
     // frames back to difference the joints, which cost eight.
