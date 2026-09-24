@@ -429,6 +429,13 @@ window.addEventListener('keydown', function (e) {
     ? blipGameFromPath(window.location.pathname) : null;
   var buttonSpecs = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
   var primary = buttonSpecs[0] || { key: ' ', code: 'Space' };
+  // A two-player cabinet seats two stations. The deck is built for both
+  // up front and the second one stays hidden until the game says a
+  // second player has joined (blip_set_mode -> window.blipSetMode).
+  var twoUp = !!(game && game.players === 2);
+  var root = document.documentElement;
+  if (twoUp) root.setAttribute('data-players', '1');
+  if (buttonSpecs.length >= 4) root.setAttribute('data-caps', '4');
 
   function coinGated() { return overlay.classList.contains('visible'); }
   function dispatch(spec, type) {
@@ -450,23 +457,41 @@ window.addEventListener('keydown', function (e) {
   // own buttons (inside the library); this is the stick half — the ball
   // leans to whatever's held, whether that's the stick's own drag, the
   // keyboard, or the gamepad.
-  var stick = document.getElementById('stick-base');
-  var held = { up: false, down: false, left: false, right: false };
-  function leanStick() {
-    if (!stick) return;
-    var x = (held.right ? 1 : 0) - (held.left ? 1 : 0);
-    var y = (held.down  ? 1 : 0) - (held.up   ? 1 : 0);
+  // One entry per station: the stick element, the four logical names its
+  // gate drives, and what each of them is currently doing.
+  var stations = [
+    { stick: document.getElementById('stick-base'),
+      fire:  document.getElementById('fire-buttons'),
+      dirs:  { up: 'up', down: 'down', left: 'left', right: 'right' },
+      caps:  function (i) { return 'button' + (i + 1); },
+      held:  {} },
+    { stick: document.getElementById('stick-base-p2'),
+      fire:  document.getElementById('fire-buttons-p2'),
+      dirs:  { up: 'p2up', down: 'p2down', left: 'p2left', right: 'p2right' },
+      caps:  function (i) { return 'p2button' + (i + 1); },
+      held:  {} }
+  ];
+  if (!twoUp) stations.length = 1;
+  function leanStick(st) {
+    if (!st.stick) return;
+    var x = (st.held[st.dirs.right] ? 1 : 0) - (st.held[st.dirs.left] ? 1 : 0);
+    var y = (st.held[st.dirs.down]  ? 1 : 0) - (st.held[st.dirs.up]   ? 1 : 0);
     if (x && y) { x *= 0.7071; y *= 0.7071; }
-    stick.style.setProperty('--dx', x);
-    stick.style.setProperty('--dy', y);
+    st.stick.style.setProperty('--dx', x);
+    st.stick.style.setProperty('--dy', y);
   }
   function reflectInput(name, down) {
-    if (Object.prototype.hasOwnProperty.call(held, name)) { held[name] = down; leanStick(); }
+    stations.forEach(function (st) {
+      for (var d in st.dirs) {
+        if (st.dirs[d] === name) { st.held[name] = down; leanStick(st); return; }
+      }
+    });
   }
 
   BlipController.init({
     canvas: canvas,
     buttons: buttonSpecs,
+    keys: (game && game.keys) || null,
     gate: coinGated,
     feedback: feedbackTick,
     onInput: reflectInput,
@@ -522,19 +547,40 @@ window.addEventListener('keydown', function (e) {
   }
 
   // ---- The game pad ----
-  var pad = document.getElementById('snes-pad');
-  if (pad) {
-    // A and B are both Button 1 (fire) — but a two-action game (Meteors'
-    // hyperspace) has no shoulder buttons to put the second action on, so
-    // A becomes Button 2 there. B stays fire.
-    if (buttonSpecs[1] && buttonSpecs[1].code !== buttonSpecs[0].code) {
-      var aBtn = pad.querySelector('.snes-a');
-      if (aBtn) aBtn.setAttribute('data-blip', 'button2');
+  // One pad per station, wired to that station's logical names. A pad's
+  // face carries A / B for most games; a game that declares four buttons
+  // (a fighter) gets four caps in a square instead, laid out and
+  // lettered the same way as the arcade deck's.
+  stations.forEach(function (st, who) {
+    var pad = document.getElementById(who ? 'snes-pad-p2' : 'snes-pad');
+    if (!pad) return;
+    var face = pad.querySelector('.snes-face');
+    if (buttonSpecs.length >= 4 && face) {
+      face.classList.add('four');
+      face.innerHTML = '';
+      buttonSpecs.forEach(function (spec, i) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'snes-btn cap' + (i + 1);
+        b.setAttribute('data-blip', st.caps(i));
+        if (spec.label) b.setAttribute('aria-label', spec.label);
+        b.innerHTML = '<span></span>'
+          + (spec.label ? '<i class="snes-legend">' + spec.label + '</i>' : '');
+        face.appendChild(b);
+      });
+    } else if (who === 0) {
+      // A and B are both Button 1 (fire) — but a two-action game
+      // (Meteors' hyperspace) has no shoulder buttons to put the second
+      // action on, so A becomes Button 2 there. B stays fire.
+      if (buttonSpecs[1] && buttonSpecs[1].code !== buttonSpecs[0].code) {
+        var aBtn = pad.querySelector('.snes-a');
+        if (aBtn) aBtn.setAttribute('data-blip', 'button2');
+      }
     }
-    BlipController.bindButtons(pad);                        // A / B, SELECT / START
-    BlipController.bindDpad(pad.querySelector('.snes-dpad')); // the d-pad cross
-    BlipController.registerVisual(pad);                     // keyboard lights it too
-  }
+    BlipController.bindButtons(pad);
+    BlipController.bindDpad(pad.querySelector('.snes-dpad'), { names: st.dirs });
+    BlipController.registerVisual(pad);
+  });
 
   // ---- The subtle toggle back to the joystick (and back again) ----
   var toggle = document.getElementById('control-toggle');
@@ -545,41 +591,54 @@ window.addEventListener('keydown', function (e) {
   }
   window.onBlipControlsChange = function () {
     BlipController.releaseAll();
-    held.up = held.down = held.left = held.right = false;
-    leanStick();
+    stations.forEach(function (st) { st.held = {}; leanStick(st); });
+  };
+
+  // Called from WASM (brawler) when the mode is chosen: 1 = two players,
+  // so the second station appears on the deck.
+  if (twoUp) window.blipSetMode = function (two) {
+    root.setAttribute('data-players', two ? '2' : '1');
+    BlipController.releaseAll();
+    stations.forEach(function (st) { st.held = {}; leanStick(st); });
+    if (typeof fillCanvas === 'function') fillCanvas();
   };
 
   // ---- Fire buttons (joystick mode): one per game.buttons entry, built
   // here and wired through the library exactly like the SNES face buttons.
-  (function () {
-    var host = document.getElementById('fire-buttons');
-    if (!host) return;
-    // One cap per button the game declares — two for most of them, four
-    // for a fighting game that wants a kick per height. A game that
-    // declares none still gets the single primary cap.
-    var specs = buttonSpecs.length ? buttonSpecs : [primary];
+  // One cap per button the game declares — two for most of them, four
+  // for a fighting game that wants a punch and a kick per height. A game
+  // that declares none still gets the single primary cap. Four caps sit
+  // in a square rather than a row (see .fire-buttons.four in kiosk.css),
+  // and carry their legend ON the cap, because the square leaves no room
+  // under the top row for one.
+  var specs = buttonSpecs.length ? buttonSpecs : [primary];
+  stations.forEach(function (st) {
+    if (!st.fire) return;
+    if (specs.length >= 4) st.fire.classList.add('four');
     specs.forEach(function (spec, i) {
       var btn = document.createElement('div');
-      btn.className = 'arcade-btn';
-      btn.setAttribute('data-blip', 'button' + (i + 1));
+      btn.className = 'arcade-btn' + (specs.length >= 4 ? ' lettered' : '');
+      btn.setAttribute('data-blip', st.caps(i));
       if (spec.label) btn.setAttribute('aria-label', spec.label);
       btn.innerHTML = '<span class="arcade-btn-cap"></span>'
         + (spec.label ? '<span class="arcade-btn-label">' + spec.label + '</span>' : '');
-      host.appendChild(btn);
+      st.fire.appendChild(btn);
     });
-    BlipController.bindButtons(host);
-    BlipController.registerVisual(host);
-  }());
+    BlipController.bindButtons(st.fire);
+    BlipController.registerVisual(st.fire);
+  });
 
   // ---- The 8-way restrictor-gate joystick ----
-  // Its drag is bound to #topbar (which carries no transform), not
-  // #stick-base (inside .deck-panel's 3D rotateX) — so hit-testing is the
-  // plain 2D geometry it looks like. It only turns a locked gate direction
-  // into up/down/left/right key state via BlipController.set(); the ball's
-  // lean is reflectInput()'s job, the same path a keypress drives.
-  (function () {
-    var base = document.getElementById('stick-base');
-    var fire = document.getElementById('fire-buttons');
+  // Its drag is bound to #topbar (which carries no transform), not the
+  // stick base (inside .deck-panel's 3D rotateX) — so hit-testing is the
+  // plain 2D geometry it looks like. It only turns a locked gate
+  // direction into key state via BlipController.set(); the ball's lean is
+  // reflectInput()'s job, the same path a keypress drives. One of these
+  // per station, each with its own pointer and its own lock, so two
+  // players can work their sticks at the same time.
+  stations.forEach(function (st, who) {
+    var base = st.stick;
+    var fire = st.fire;
     var bar  = document.getElementById('topbar');
     if (!base || !bar) return;
 
@@ -605,7 +664,7 @@ window.addEventListener('keydown', function (e) {
     function setDir(dir, want) {
       if (wantDir[dir] === want) return;
       wantDir[dir] = want;
-      BlipController.set(dir, want);
+      BlipController.set(st.dirs[dir], want);
     }
     function setLock(deg) {
       if (deg === lockDeg) return;
@@ -649,11 +708,19 @@ window.addEventListener('keydown', function (e) {
       window.removeEventListener('pointerup', onEnd, true);
       window.removeEventListener('pointercancel', onEnd, true);
     }
+    // Whose half of the deck the touch landed in, and then: is it the
+    // stick's side of that half rather than the caps'. Station two's deck
+    // is mirrored, so its stick is the outboard (right) side of its half.
     function isStickTouch(e) {
-      if (fire && e.target && e.target.closest && e.target.closest('#fire-buttons')) return false;
+      if (base.getBoundingClientRect().width === 0) return false;
+      if (stations.length > 1) {
+        var br = bar.getBoundingClientRect();
+        if ((e.clientX < br.left + br.width / 2) !== (who === 0)) return false;
+      }
+      if (fire && e.target && e.target.closest && e.target.closest('.fire-buttons')) return false;
       if (fire) {
         var fr = fire.getBoundingClientRect();
-        if (fr.width && e.clientX >= fr.left - 6) return false;
+        if (fr.width && (who === 0 ? e.clientX >= fr.left - 6 : e.clientX <= fr.right + 6)) return false;
       }
       return true;
     }
@@ -687,7 +754,7 @@ window.addEventListener('keydown', function (e) {
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) release();
     });
-  }());
+  });
 }());
 
 

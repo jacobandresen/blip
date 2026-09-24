@@ -726,7 +726,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* The visible control deck: the glossy-black moulded panel, tilted back
    around its own front (bottom) edge so it reads as a horizontal surface
    you're looking down onto — a genuine 3D rotate, not faked shading.
-   preserve-3d so #stick-handle can share this 3D space (partially
+   preserve-3d so .stick-handle can share this 3D space (partially
    un-tilting to stand up off the panel). It fills the fixed bar exactly
    (inset:0) but keeps the transform off the fixed ancestor. */
 .kiosk-bar > .deck-panel {
@@ -770,7 +770,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    row; anchored to the bar's bottom edge so all of its extra height rises
    upward, over the game, instead of being centered half above/half below
    the bar. */
-#stick-base {
+.stick-base {
   --dx: 0;
   --dy: 0;
   position: relative;
@@ -792,7 +792,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    with the lean the way a shadow under an overhead light would, and grows
    a touch as the stick leans further out. Flat in the deck plane, so it
    foreshortens with the panel and stays on the surface. */
-#stick-base::before {
+.stick-base::before {
   content: '';
   position: absolute;
   bottom: 3px;
@@ -810,7 +810,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* The boot: a black gate plate flush in the bar — the only part of the
    stick with a background of its own. */
-#stick-boot {
+.stick-boot {
   position: absolute;
   bottom: 6px;
   left: 50%;
@@ -828,7 +828,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* The restrictor gate: an octagonal cutout the shaft rides in — the
    classic 8-way arcade mechanism. */
-#stick-boot::before {
+.stick-boot::before {
   content: '';
   position: absolute;
   inset: 5px;
@@ -845,12 +845,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* The moving part: shaft + ball together, PIVOTING from the boot toward
    whichever direction(s) are held via the --dx/--dy custom properties
    (each -1, 0, or 1 — shell.js sets them, it never runs a per-frame
-   animation loop). #stick-handle is a 0×0 point sitting exactly at the
+   animation loop). .stick-handle is a 0×0 point sitting exactly at the
    pivot (the boot's opening); rotating IT (rather than translating the
    ball) swings the whole rigid shaft+ball rigidly around that fixed
    point, like a real stick leaning in its gate — the boot never moves,
    only the top does. */
-#stick-handle {
+.stick-handle {
   position: absolute;
   left: 50%;
   /* The boot's vertical centre (bottom:6px + height:42px / 2), not its
@@ -871,7 +871,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
      standing up with a slight, correctly-signed perspective lean, not
      one lying back into the cabinet. rotate(dx) is the separate
      left/right lean, on top of this frame. transform-style here (not
-     just on #stick-base) is what makes this compose correctly in true 3D
+     just on .stick-base) is what makes this compose correctly in true 3D
      instead of flattening the shaft/ball into a 2D sprite first —
      earlier, without it, a rotateX+rotate combination here sent the
      whole stick behind the panel in some lean states. */
@@ -898,7 +898,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    (narrower at the top) rather than a plain rectangle — a cheap but
    effective perspective cue, as if the rod recedes slightly from the
    player's eye on its way up, without any real depth axis to get wrong. */
-#stick-shaft {
+.stick-shaft {
   position: absolute;
   left: 50%;
   bottom: 0;
@@ -916,7 +916,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    (on top of the lean above, which only carries left/right) is the
    up/down half of the read: forward/back has no meaningful 2D lean, so
    it's a small direct shift instead. */
-#stick-ball {
+.stick-ball {
   position: absolute;
   left: 50%;
   bottom: 30px;
@@ -926,7 +926,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
      unlike the flat shaft/boot, which correctly show the panel's tilt
      because they genuinely are flat, the ball needs its OWN counter-
      rotation to cancel whatever's left once it reaches here. #topbar
-     contributes +bar-tilt, #stick-handle contributes -bar-tilt - 9deg
+     contributes +bar-tilt, .stick-handle contributes -bar-tilt - 9deg
      (see there for the derivation), net -9deg by the time it reaches
      this element — so +9deg fixed (not scaled by --bar-tilt, since the
      bar-tilt terms already cancelled each other above) brings it back to
@@ -948,7 +948,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* ---- Fire buttons: flush in the bar, right of INSERT COIN ---- */
 
-#fire-buttons {
+.fire-buttons {
   display: flex;
   align-items: center;
   /* Anchored to the bar's bottom edge with its bulk going upward, like
@@ -1099,9 +1099,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    Atari palette: matte-black body, both face buttons the Atari "Fuji"
    red, a red d-pad flash on press. */
 
-:root[data-controls="pad"] #stick-base,
-:root[data-controls="pad"] #fire-buttons { display: none !important; }
-:root[data-controls="stick"] #snes-pad { display: none !important; }
+:root[data-controls="pad"] .stick-base,
+:root[data-controls="pad"] .fire-buttons { display: none !important; }
+:root[data-controls="stick"] .snes-pad { display: none !important; }
 
 /* In pad mode the bar seats the controller — taller than the stick's bar.
    fillCanvas() measures #topbar and reserves it, so nothing overlaps. The
@@ -1113,7 +1113,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   box-shadow: 0 -16px 26px -8px rgba(0, 0, 0, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.9);
 }
 
-#snes-pad {
+.snes-pad {
   --sf-btn: 42px;   /* face-button (A / B) diameter */
   --sf-gap: 18px;   /* space between A and B */
   --sf-dpad: 58px;  /* d-pad cross bounding box */
@@ -1127,12 +1127,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-#snes-pad .snes-cord { display: none; }
+.snes-pad .snes-cord { display: none; }
 
 /* A faint moulded "BLIP" debossed into the empty middle of the panel —
    just enough to read as a brand mark, never enough to compete with the
    controls. Absolutely centred, so it's out of the d-pad / A-B flex row. */
-#snes-pad .snes-wordmark {
+.snes-pad .snes-wordmark {
   position: absolute;
   left: 46%;   /* the middle of the gap between the d-pad and A / B */
   top: 50%;
@@ -1148,13 +1148,13 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 /* Below ~360px the gap between the d-pad and A / B is too tight to seat
    the mark without it crowding a button — drop it there. */
-@media (max-width: 359px) { #snes-pad .snes-wordmark { display: none; } }
+@media (max-width: 359px) { .snes-pad .snes-wordmark { display: none; } }
 
 /* the panel face — moulded black plastic. Reads as a raised, lit surface:
    a bright top edge catching the screen glow, a soft pool of overhead
    light down the middle, edges + bottom falling into shadow, and a fine
    grain so it isn't a dead flat fill. */
-#snes-pad .snes-shell {
+.snes-pad .snes-shell {
   position: absolute;
   inset: 0;
   border-radius: 13px 13px 0 0;
@@ -1186,7 +1186,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* a recessed "mounting plate" under the A / B buttons — a subtle darker
    inset so the buttons sit IN the surface, not on it (the d-pad has its
    own round recess, .snes-dpad::before) */
-#snes-pad .snes-face::before {
+.snes-pad .snes-face::before {
   content: '';
   position: absolute;
   inset: -26% -16%;
@@ -1197,7 +1197,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 
 /* ---- D-pad — a clean black plus (two overlapping arm bars), no rotation ---- */
-#snes-pad .snes-dpad {
+.snes-pad .snes-dpad {
   position: relative;
   flex: none;
   width: var(--sf-dpad);
@@ -1205,7 +1205,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   pointer-events: auto;
   touch-action: none;
 }
-#snes-pad .snes-dpad::before {   /* shallow round recess behind the cross */
+.snes-pad .snes-dpad::before {   /* shallow round recess behind the cross */
   content: '';
   position: absolute;
   inset: -5%;
@@ -1213,23 +1213,23 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   background: radial-gradient(circle at 50% 40%, #262626, #131313 60%, #0a0a0a);
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.1);
 }
-#snes-pad .snes-dp-seg {
+.snes-pad .snes-dp-seg {
   position: absolute;
   background: linear-gradient(180deg, #45454a, #2c2c30 55%, #1c1c1f);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(0, 0, 0, 0.6);
   transition: filter .05s, box-shadow .05s, background .05s;
 }
-#snes-pad .snes-dp-seg.dp-up    { left: 32%; right: 32%; top: 2%;  bottom: 50%; border-radius: 5px 5px 0 0; }
-#snes-pad .snes-dp-seg.dp-down  { left: 32%; right: 32%; top: 50%; bottom: 2%;  border-radius: 0 0 5px 5px; }
-#snes-pad .snes-dp-seg.dp-left  { top: 32%; bottom: 32%; left: 2%;  right: 50%; border-radius: 5px 0 0 5px; }
-#snes-pad .snes-dp-seg.dp-right { top: 32%; bottom: 32%; left: 50%; right: 2%;  border-radius: 0 5px 5px 0; }
-#snes-pad .snes-dp-hub {         /* just hides the seam where the arms cross */
+.snes-pad .snes-dp-seg.dp-up    { left: 32%; right: 32%; top: 2%;  bottom: 50%; border-radius: 5px 5px 0 0; }
+.snes-pad .snes-dp-seg.dp-down  { left: 32%; right: 32%; top: 50%; bottom: 2%;  border-radius: 0 0 5px 5px; }
+.snes-pad .snes-dp-seg.dp-left  { top: 32%; bottom: 32%; left: 2%;  right: 50%; border-radius: 5px 0 0 5px; }
+.snes-pad .snes-dp-seg.dp-right { top: 32%; bottom: 32%; left: 50%; right: 2%;  border-radius: 0 5px 5px 0; }
+.snes-pad .snes-dp-hub {         /* just hides the seam where the arms cross */
   position: absolute;
   left: 34%; right: 34%; top: 34%; bottom: 34%;
   border-radius: 2px;
   background: linear-gradient(180deg, #45454a, #2c2c30 55%, #1c1c1f);
 }
-#snes-pad .snes-dp-hub::after {
+.snes-pad .snes-dp-hub::after {
   content: '';
   position: absolute;
   left: 50%; top: 50%;
@@ -1238,29 +1238,29 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.45);
 }
-#snes-pad .snes-dp-seg.blip-pressed {
+.snes-pad .snes-dp-seg.blip-pressed {
   background: linear-gradient(180deg, #f08a3a, #e4342b 55%, #a51c14);
   box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.45), 0 0 9px rgba(228, 52, 43, 0.75);
 }
 /* Whole cross glows while a thumb is on the d-pad (or a direction key is
    held) — the engaged arm stays bright, but the centre + the other arms
    pick up a dim warm cast so nothing looks like it's floating alone. */
-#snes-pad .snes-dpad.blip-touched .snes-dp-seg,
-#snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-seg {
+.snes-pad .snes-dpad.blip-touched .snes-dp-seg,
+.snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-seg {
   background: linear-gradient(180deg, #8a5a3a, #5c3a2c 55%, #3c2620);
 }
-#snes-pad .snes-dpad.blip-touched .snes-dp-seg.blip-pressed,
-#snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-seg.blip-pressed {
+.snes-pad .snes-dpad.blip-touched .snes-dp-seg.blip-pressed,
+.snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-seg.blip-pressed {
   background: linear-gradient(180deg, #f08a3a, #e4342b 55%, #a51c14);
 }
-#snes-pad .snes-dpad.blip-touched .snes-dp-hub,
-#snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-hub {
+.snes-pad .snes-dpad.blip-touched .snes-dp-hub,
+.snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-hub {
   background: linear-gradient(180deg, #c56a3a, #9c4326 55%, #7a2f1c);
   box-shadow: inset 0 1px 1px rgba(255, 210, 180, 0.25), 0 0 7px rgba(228, 100, 43, 0.5);
 }
 
 /* ---- Face buttons — just B and A, side by side with a big gap ---- */
-#snes-pad .snes-face {
+.snes-pad .snes-face {
   position: relative;
   flex: none;
   display: flex;
@@ -1269,13 +1269,13 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   height: var(--sf-btn);
   pointer-events: none;
 }
-#snes-pad .snes-x,
-#snes-pad .snes-y { display: none; }   /* dropped */
+.snes-pad .snes-x,
+.snes-pad .snes-y { display: none; }   /* dropped */
 
 /* A and B: the Atari 2600 CX40 button — a plain, unlabelled, low-domed
    matte-red button sitting proud of a black moulded collar that's
    recessed into the panel. No lettering (an Atari stick had none). */
-#snes-pad .snes-btn {
+.snes-pad .snes-btn {
   position: relative;
   flex: none;
   width: var(--sf-btn);
@@ -1296,7 +1296,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   transition: transform .05s, filter .05s;
 }
 /* the red button cap — proud of the collar, low broad dome, matte */
-#snes-pad .snes-btn > span {
+.snes-pad .snes-btn > span {
   position: absolute;
   inset: 13%;
   border-radius: 50%;
@@ -1311,7 +1311,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     0 0 0 1px rgba(0, 0, 0, 0.4);
   transition: transform .05s, box-shadow .05s, filter .05s;
 }
-#snes-pad .snes-btn.blip-pressed > span {
+.snes-pad .snes-btn.blip-pressed > span {
   transform: scale(0.94);
   filter: brightness(0.82);
   box-shadow:
@@ -1323,7 +1323,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* On a two-action game (Meteors) shell.js tags .snes-a as button2 — it is
    NOT a duplicate fire, so its cap goes cool blue: the two buttons must
    read as doing different things. B stays the red fire button. */
-#snes-pad .snes-a[data-blip~="button2"] > span {
+.snes-pad .snes-a[data-blip~="button2"] > span {
   background:
     radial-gradient(circle at 46% 30%, rgba(215, 238, 255, 0.45) 0%, rgba(215, 238, 255, 0) 44%),
     radial-gradient(circle at 50% 62%, #2f79cf 0%, #3a8ce0 40%, #2f7ac8 70%, #1b4f9e 100%);
@@ -1331,8 +1331,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* SELECT / START, L / R — all dropped. A / B do the title-screen "press
    fire"; the BLIP logo goes back to the grid. */
-#snes-pad .snes-mid,
-#snes-pad .snes-shoulder { display: none; }
+.snes-pad .snes-mid,
+.snes-pad .snes-shoulder { display: none; }
 
 /* ---- The subtle "back to the joystick" toggle ----
    Sits just ABOVE the control bar, horizontally centred — over the pad's
@@ -1409,7 +1409,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-controls="pad"] .kiosk-bar-main {
     height: calc(114px + env(safe-area-inset-bottom, 0px));
   }
-  #snes-pad {
+  .snes-pad {
     --sf-btn: 52px;
     --sf-gap: 30px;   /* room for a big thumb between A and B */
     --sf-dpad: 90px;
@@ -1420,7 +1420,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* Small phones (iPhone SE / mini) — trim the face buttons and edges, but
    keep the d-pad big; it's the control you steer with. */
 @media (max-width: 380px) {
-  #snes-pad { --sf-btn: 46px; --sf-gap: 22px; --sf-dpad: 86px; --sf-edge: 14px; }
+  .snes-pad { --sf-btn: 46px; --sf-gap: 22px; --sf-dpad: 86px; --sf-edge: 14px; }
 }
 
 /* Tablet — a bigger two-handed surface. */
@@ -1429,7 +1429,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-controls="pad"] .kiosk-bar-main {
     height: calc(134px + env(safe-area-inset-bottom, 0px));
   }
-  #snes-pad {
+  .snes-pad {
     --sf-btn: 64px;
     --sf-gap: 40px;
     --sf-dpad: 110px;
@@ -1445,14 +1445,14 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-controls="pad"] .kiosk-bar-main {
     height: calc(66px + env(safe-area-inset-bottom, 0px));
   }
-  #snes-pad { --sf-btn: 40px; --sf-gap: 18px; --sf-dpad: 54px; --sf-edge: 14px; }
-  #snes-pad .snes-shell { padding: 3px var(--sf-edge) calc(env(safe-area-inset-bottom, 0px) + 3px); }
-  #snes-pad .snes-wordmark { display: none; }
+  .snes-pad { --sf-btn: 40px; --sf-gap: 18px; --sf-dpad: 54px; --sf-edge: 14px; }
+  .snes-pad .snes-shell { padding: 3px var(--sf-edge) calc(env(safe-area-inset-bottom, 0px) + 3px); }
+  .snes-pad .snes-wordmark { display: none; }
 }
 
 /* The kiosk landing/history/about bar (.kiosk-bar-main) intentionally
    shares every dimension with the game shell's #topbar below — same
-   #stick-base/boot/handle/shaft/ball sizing, same deck padding/gap — so
+   .stick-base/boot/handle/shaft/ball sizing, same deck padding/gap — so
    the control deck renders identically everywhere rather than a smaller
    decorative version on non-game pages. The base .deck-panel rule above
    holds the shared gap/padding; the tiers below only shrink them. */
@@ -1467,12 +1467,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 @media (max-width: 480px) {
   #topbar.kiosk-bar, .kiosk-bar-main { height: calc(82px + env(safe-area-inset-bottom, 0px)); }
   .kiosk-bar > .deck-panel { gap: 56px; padding-left: 6px; padding-right: 6px; }
-  #stick-base { width: 122px; }
-  #stick-boot { width: 54px; height: 54px; }
-  #stick-handle { bottom: 33px; }
-  #stick-shaft { width: 13px; height: 37px; }
-  #stick-ball  { width: 66px; height: 66px; bottom: 37px; }
-  #fire-buttons { gap: 12px; }
+  .stick-base { width: 122px; }
+  .stick-boot { width: 54px; height: 54px; }
+  .stick-handle { bottom: 33px; }
+  .stick-shaft { width: 13px; height: 37px; }
+  .stick-ball  { width: 66px; height: 66px; bottom: 37px; }
+  .fire-buttons { gap: 12px; }
   .arcade-btn { width: 66px; height: 66px; }
   /* Clear the corner badges / language flags of the now-taller bar and its
      raised stick (index.html re-states this for its own .lang-switcher). */
@@ -1485,24 +1485,24 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    little, but keep both stick and buttons above the touch minimum. */
 @media (max-width: 380px) {
   .kiosk-bar > .deck-panel { gap: 40px; padding-left: 5px; padding-right: 5px; }
-  #stick-base { width: 108px; }
-  #stick-boot { width: 50px; height: 50px; }
-  #stick-handle { bottom: 31px; }
-  #stick-shaft { width: 12px; height: 34px; }
-  #stick-ball  { width: 60px; height: 60px; bottom: 34px; }
-  #fire-buttons { gap: 9px; }
+  .stick-base { width: 108px; }
+  .stick-boot { width: 50px; height: 50px; }
+  .stick-handle { bottom: 31px; }
+  .stick-shaft { width: 12px; height: 34px; }
+  .stick-ball  { width: 60px; height: 60px; bottom: 34px; }
+  .fire-buttons { gap: 9px; }
   .arcade-btn { width: 60px; height: 60px; }
 }
 
 /* Below any current iPhone (kept as a graceful floor, not a target) */
 @media (max-width: 340px) {
   .kiosk-bar > .deck-panel { gap: 22px; padding-left: 4px; padding-right: 4px; }
-  #stick-base { width: 90px; }
-  #stick-boot { width: 40px; height: 40px; }
-  #stick-handle { bottom: 26px; }
-  #stick-shaft { width: 9px; height: 28px; }
-  #stick-ball  { width: 48px; height: 48px; bottom: 28px; }
-  #fire-buttons { gap: 7px; }
+  .stick-base { width: 90px; }
+  .stick-boot { width: 40px; height: 40px; }
+  .stick-handle { bottom: 26px; }
+  .stick-shaft { width: 9px; height: 28px; }
+  .stick-ball  { width: 48px; height: 48px; bottom: 28px; }
+  .fire-buttons { gap: 7px; }
   .arcade-btn { width: 48px; height: 48px; }
 }
 
@@ -1516,14 +1516,14 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
   #topbar.kiosk-bar, .kiosk-bar-main { height: calc(112px + env(safe-area-inset-bottom, 0px)); }
   .kiosk-bar > .deck-panel { gap: clamp(84px, 13vw, 210px); padding-left: 16px; padding-right: 16px; }
-  #stick-base { width: 194px; height: 252px; }
-  #stick-base::before { width: 52px; height: 14px; }
-  #stick-boot { width: 78px; height: 78px; }
-  #stick-boot::before { inset: 7px; }
-  #stick-handle { bottom: 45px; }
-  #stick-shaft { width: 18px; height: 58px; }
-  #stick-ball  { width: 90px; height: 90px; bottom: 58px; }
-  #fire-buttons { gap: 24px; }
+  .stick-base { width: 194px; height: 252px; }
+  .stick-base::before { width: 52px; height: 14px; }
+  .stick-boot { width: 78px; height: 78px; }
+  .stick-boot::before { inset: 7px; }
+  .stick-handle { bottom: 45px; }
+  .stick-shaft { width: 18px; height: 58px; }
+  .stick-ball  { width: 90px; height: 90px; bottom: 58px; }
+  .fire-buttons { gap: 24px; }
   .arcade-btn { width: 92px; height: 92px; }
   /* Clear the corner badges / flags of the taller deck (index.html
      re-states .lang-switcher for itself). */
@@ -1644,4 +1644,169 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   border-color: #e6dc32;
   box-shadow: 0 0 12px rgba(230,220,50,0.45);
   filter: none;
+}
+
+/* ======================================================================
+   Two-player deck — a second control station
+   ======================================================================
+   A cabinet with a 2-PLAYER badge on it has two stations on the panel,
+   so the deck builds both up front and reveals the second one when the
+   game reports a second player (blip_set_mode -> <html data-players>).
+   Station two is mirrored: its caps sit inboard and its stick outboard,
+   the way a real two-player panel faces each deck toward its player. */
+/* Anchored to the panel's front edge, like the stick was when it was a
+   direct child of it — everything tall (the stick's shaft, a square of
+   caps) then grows upward over the game instead of half of it dropping
+   off the bottom of the screen. */
+.deck-side {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  align-self: flex-end;
+  gap: 18px;
+}
+
+/* Silkscreened station number, printed on the panel between the stick
+   and the caps — it lies in the deck plane, so the 3D tilt foreshortens
+   it exactly like the rest of the moulding. */
+.deck-tag {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 7px;
+  letter-spacing: 2px;
+  color: rgba(226, 232, 240, 0.34);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+/* One station until the game says otherwise. */
+#deck-p2, .snes-pad.mirrored, :root:not([data-players="2"]) .deck-tag { display: none; }
+:root[data-players="2"] #deck-p2 { display: flex; }
+:root[data-players="2"][data-controls="pad"] .snes-pad.mirrored { display: block; }
+
+/* Two stations share the panel's width: each pad takes half of the bar,
+   and the sticks pull their gaps in so both fit on a phone. */
+:root[data-players="2"] .kiosk-bar > .deck-panel { gap: clamp(8px, 3vw, 34px); }
+:root[data-players="2"] .deck-side { gap: clamp(6px, 2vw, 16px); }
+:root[data-players="2"] .snes-pad { width: 50%; --sf-edge: clamp(6px, 2.5vw, 22px); }
+:root[data-players="2"] #snes-pad { right: 50%; }
+:root[data-players="2"] .snes-pad.mirrored { left: 50%; }
+.snes-pad.mirrored .snes-shell { flex-direction: row-reverse; }
+.snes-pad.mirrored .snes-wordmark { display: none; }
+
+/* ---- Four caps: the fighting deck ----
+   Punches on the top row, kicks under them; light on the left, heavy on
+   the right. The square leaves no room under the top row for a legend,
+   so the legend is printed ON the cap. */
+
+.fire-buttons.four {
+  display: grid;
+  grid-template-columns: repeat(2, 44px);
+  gap: 7px;
+}
+.arcade-btn.lettered .arcade-btn-label {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  transform: none;
+  display: grid;
+  place-items: center;
+  font: 700 9px/1 'Courier New', monospace;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+/* Red punches, blue kicks — the split every Street Fighter cabinet used.
+   The heavy of each pair is the darker cap, so the square reads as two
+   pairs before a legend is read at all. */
+.fire-buttons.four .arcade-btn:nth-child(1) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #ff6a58 0%, #e5361f 44%, #a3160b 78%, #6b0c05 100%);
+}
+.fire-buttons.four .arcade-btn:nth-child(2) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.1) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #d04434 0%, #ad2010 44%, #720c04 78%, #470702 100%);
+}
+.fire-buttons.four .arcade-btn:nth-child(3) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #7fc4ff 0%, #2f86d8 44%, #14508c 78%, #0a2e52 100%);
+}
+.fire-buttons.four .arcade-btn:nth-child(4) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.1) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #4a93d8 0%, #175ea6 44%, #0a3466 78%, #041d3b 100%);
+}
+
+/* The pad's face carries the same square. Four caps need more panel than
+   two, so the pad-mode bar grows to seat them. */
+:root[data-caps="4"] .snes-pad { --sf-btn: 34px; --sf-gap: 9px; --sf-dpad: 52px; }
+:root[data-controls="pad"][data-caps="4"] #topbar.kiosk-bar,
+:root[data-controls="pad"][data-caps="4"] .kiosk-bar-main {
+  height: calc(116px + env(safe-area-inset-bottom, 0px));
+}
+.snes-pad .snes-face.four {
+  display: grid;
+  grid-template-columns: repeat(2, var(--sf-btn));
+  gap: 7px var(--sf-gap);
+  height: auto;
+}
+.snes-pad .snes-face.four::before { inset: -12% -12%; border-radius: 16px; }
+.snes-pad .snes-legend {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 700 8px/1 'Courier New', monospace;
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+.snes-pad .snes-btn.cap2 > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(255, 210, 200, 0.34) 0%, rgba(255, 210, 200, 0) 44%),
+    radial-gradient(circle at 50% 62%, #97241a 0%, #ac2b20 40%, #a0261c 70%, #78120a 100%);
+}
+.snes-pad .snes-btn.cap3 > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(215, 238, 255, 0.45) 0%, rgba(215, 238, 255, 0) 44%),
+    radial-gradient(circle at 50% 62%, #2f79cf 0%, #3a8ce0 40%, #2f7ac8 70%, #1b4f9e 100%);
+}
+.snes-pad .snes-btn.cap4 > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(215, 238, 255, 0.35) 0%, rgba(215, 238, 255, 0) 44%),
+    radial-gradient(circle at 50% 62%, #1f568f 0%, #26669f 40%, #1e548a 70%, #113663 100%);
+}
+
+/* A square of caps is twice as deep as a row of them, so the joystick
+   deck grows to seat it instead of pushing the bottom row off the front
+   edge of the panel. */
+:root[data-controls="stick"][data-caps="4"] #topbar.kiosk-bar,
+:root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
+  height: calc(78px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Two stations on a phone: everything comes in a size, and the gap
+   between the stations stays wider than the gap inside one — otherwise
+   eight caps in a row read as one player's deck. */
+:root[data-players="2"] .snes-pad .snes-wordmark { display: none; }
+
+@media (max-width: 620px) {
+  :root[data-players="2"] .kiosk-bar > .deck-panel { gap: clamp(14px, 5vw, 34px); }
+  :root[data-players="2"] .fire-buttons.four { grid-template-columns: repeat(2, 37px); gap: 5px; }
+  :root[data-players="2"] .arcade-btn { width: 37px; height: 37px; }
+  :root[data-players="2"] .arcade-btn.lettered .arcade-btn-label { font-size: 8px; }
+  :root[data-players="2"] .stick-base { width: 64px; }
+  :root[data-players="2"] .stick-boot { width: 40px; height: 40px; }
+  :root[data-players="2"] .stick-shaft { width: 10px; }
+  :root[data-players="2"] .stick-ball { width: 46px; height: 46px; }
+  :root[data-players="2"] .stick-base::before { width: 44px; }
+  :root[data-players="2"] .deck-tag { font-size: 6px; }
 }

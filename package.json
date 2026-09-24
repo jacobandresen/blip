@@ -15,6 +15,7 @@
     "test:multiplayer:visibility": "node --test test/multiplayer-visibility.mjs",
     "test:topbar": "node --test test/topbar-layout.mjs",
     "test:controls": "node --test test/controls.mjs",
+    "test:deck": "node --test test/two-player-deck.mjs",
     "test:multiplayer:android": "node test/multiplayer-android.mjs",
     "supabase": "supabase"
   },

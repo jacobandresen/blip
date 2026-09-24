@@ -31,7 +31,10 @@
 (function () {
   'use strict';
 
-  var DIR = { up: 1, down: 1, left: 1, right: 1 };
+  // Directional names — the click flavour depends on it. A second
+  // player's stick carries the same four under a p2 prefix.
+  var DIR = { up: 1, down: 1, left: 1, right: 1,
+              p2up: 1, p2down: 1, p2left: 1, p2right: 1 };
 
   var cfg = {
     canvas: null,       // where synthetic KeyboardEvents go (null = don't inject)
@@ -56,7 +59,7 @@
   /* Key map — arrows are fixed, the two action buttons come per-game     */
   /* ------------------------------------------------------------------ */
 
-  function buildKeymap(buttons) {
+  function buildKeymap(buttons, extra) {
     var list = (buttons && buttons.length) ? buttons : [{ key: ' ', code: 'Space' }];
     var map = {
       up:      { key: 'ArrowUp',    code: 'ArrowUp' },
@@ -73,6 +76,10 @@
     // A one-button game still answers to button2, because the SNES pad
     // folds Y / X / L / R onto it whatever the game asked for.
     if (!map.button2) map.button2 = map.button1;
+    // Anything else the game names itself — a second player's stick and
+    // buttons (p2up … p2button4), or its own keys for player one's
+    // directions when the arrows belong to player two.
+    for (var n in extra) { if (extra[n]) map[n] = extra[n]; }
     return map;
   }
 
@@ -80,12 +87,13 @@
      fixed; the action keys are whatever this game declared, so the
      deck lights the right cap when a keyboard player presses one. */
   function nameForCode(code) {
-    if (ARROW_NAME[code]) return ARROW_NAME[code];
-    if (!keymap) return null;
-    for (var n in keymap) {
-      if (n.indexOf('button') === 0 && keymap[n] && keymap[n].code === code) return n;
+    // What this game declared wins over the default arrows: in a game
+    // where the arrows are player two's, ArrowUp must light player two's
+    // stick, not player one's.
+    for (var n in keymap || {}) {
+      if (keymap[n] && keymap[n].code === code) return n;
     }
-    return null;
+    return ARROW_NAME[code] || null;
   }
 
   function injectKey(spec, type) {
@@ -234,7 +242,7 @@
 
   function releaseAll() {
     _tBtns.forEach(function (g) { g._pend = false; g.release(); });
-    if (_tDpad) { _tDpad._pend = false; _tDpad.clear(); }
+    _tDpads.forEach(function (d) { d._pend = false; d.clear(); });
     Object.keys(held).forEach(function (n) { if (held[n]) set(n, false); });
   }
 
@@ -251,7 +259,7 @@
   // mouse path. A `pointercancel` is now ignored outright.
 
   var _tBtns = [];    // { el, on, press, release, _pend }
-  var _tDpad = null;  // { pad, calc, clear, _pend }
+  var _tDpads = [];   // one { pad, calc, clear, _pend } per bound d-pad
 
   function _hit(r, x, y, m) {
     return x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m;
@@ -277,13 +285,14 @@
       if (t) { g._pend = false; g.press(); }
       else if (g.on) _defer(g, g.release);
     }
-    if (_tDpad) {
-      r = _tDpad.pad.getBoundingClientRect();
+    for (i = 0; i < _tDpads.length; i++) {
+      var dp = _tDpads[i];
+      r = dp.pad.getBoundingClientRect();
       for (t = null, j = 0; r.width && j < list.length; j++) {
         if (_hit(r, list[j].clientX, list[j].clientY, 4)) { t = list[j]; break; }
       }
-      if (t) { _tDpad._pend = false; _tDpad.calc(t); }
-      else if (r.width) _defer(_tDpad, _tDpad.clear);
+      if (t) { dp._pend = false; dp.calc(t); }
+      else if (r.width) _defer(dp, dp.clear);
     }
   }
   ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(function (ev) {
@@ -348,6 +357,9 @@
     if (!pad) return;
     o = o || {};
     var dead = o.dead != null ? o.dead : 0.32;
+    // Which logical name each arm drives — a second player's cross runs
+    // the same four arms under its own names.
+    var names = o.names || { up: 'up', down: 'down', left: 'left', right: 'right' };
     var pid = null;
     // Light the matching d-pad arm (.dp-up … .dp-right inside `pad`) the
     // instant a direction engages — a local, precise reflection that
@@ -357,7 +369,7 @@
       segs[n] = pad.querySelector('.dp-' + n);
     });
     function put(n, on) {
-      set(n, on);
+      set(names[n], on);
       if (segs[n]) segs[n].classList.toggle('blip-pressed', on);
     }
     // e is a PointerEvent or a Touch — both carry clientX / clientY.
@@ -375,7 +387,7 @@
       ['up', 'down', 'left', 'right'].forEach(function (n) { put(n, false); });
       pad.classList.remove('blip-touched');
     }
-    _tDpad = { pad: pad, calc: calc, clear: clear, _pend: false };
+    _tDpads.push({ pad: pad, calc: calc, clear: clear, _pend: false });
     pad.addEventListener('pointerdown', function (e) {
       e.preventDefault();
       pid = e.pointerId;
@@ -517,7 +529,7 @@
       });
       if (opts.feedback !== undefined) cfg.feedback = opts.feedback;
       if (opts.click !== undefined) cfg.click = !!opts.click;
-      keymap = buildKeymap(opts.buttons);
+      keymap = buildKeymap(opts.buttons, opts.keys);
       return this;
     },
     set: set,

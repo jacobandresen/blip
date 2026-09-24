@@ -1838,6 +1838,9 @@ fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
             }
             if m[0].fire {
                 g.mode = if g.menu == 0 { Mode::Solo } else { Mode::Versus };
+                // The cabinet's deck seats a second controller for a
+                // second player, so it has to be told when there is one.
+                web::set_mode(g.mode == Mode::Versus);
                 g.state = State::Select;
                 g.pick = 0;
                 g.pick2 = FIGHTERS.len() - 1;
@@ -2043,6 +2046,7 @@ async fn main() {
                 let m = read_menu(&mut g);
                 if !g.phase.active() && (m[0].fire || m[1].fire) {
                     g = Game::new();
+                    web::set_mode(false);
                 }
             }
         }

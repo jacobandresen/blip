@@ -29,7 +29,6 @@ pub fn draw(blip: &Blip, g: &Game) {
         _ => {
             draw_stage(blip, g);
             draw_fight(blip, g);
-            draw_decks(blip, g);
             draw_hud(blip, g);
             draw_banner(blip, g);
         }
@@ -2567,61 +2566,6 @@ fn draw_title(blip: &Blip, g: &Game) {
 /// button was the high kick, which is the moment they need it. Only in
 /// versus: alone there is nobody to remind.
 ///
-/// Laid over the boards rather than taking a strip out of the stage,
-/// so the fight keeps the whole screen and the panel keeps out of the
-/// way of it.
-fn draw_decks(blip: &Blip, g: &Game) {
-    if g.mode != Mode::Versus { return; }
-    const TOP: f32 = 356.0;
-    blip.fill_rect(0.0, TOP, WIN_W as f32, WIN_H as f32 - TOP,
-        BlipColor { r: 0.04, g: 0.04, b: 0.06, a: 0.80 });
-    blip.fill_rect(0.0, TOP, WIN_W as f32, 1.0,
-        BlipColor { r: 0.36, g: 0.36, b: 0.44, a: 0.9 });
-    let p1c = BlipColor { r: 1.0, g: 0.35, b: 0.35, a: 1.0 };
-    let p2c = BlipColor { r: 0.40, g: 0.72, b: 1.0, a: 1.0 };
-    draw_mini_deck(blip, 6.0, TOP + 2.0, "P1", p1c, ["R", "T", "F", "G"]);
-    draw_mini_deck(blip, 466.0, TOP + 2.0, "P2", p2c, ["U", "I", "J", "K"]);
-}
-
-/// The deck at the size it can be while still being read at a glance:
-/// a stick, and four buttons in the square the move list is in.
-fn draw_mini_deck(blip: &Blip, x: f32, y: f32, tag: &str, col: BlipColor, keys: [&str; 4]) {
-    let ink = BlipColor { r: 0.05, g: 0.05, b: 0.07, a: 1.0 };
-    let metal = BlipColor { r: 0.17, g: 0.17, b: 0.21, a: 1.0 };
-    blip.draw_text(tag, x, y + 14.0, 2.0, col);
-
-    // Stick.
-    let (sx, sy) = (x + 44.0, y + 28.0);
-    blip.fill_circle(sx, sy, 11.0, shade(metal, 0.7));
-    blip.fill_circle(sx, sy, 8.0, shade(metal, 1.5));
-    blip.fill_rect(sx - 2.0, sy - 14.0, 4.0, 14.0,
-        BlipColor { r: 0.75, g: 0.76, b: 0.82, a: 1.0 });
-    blip.fill_circle(sx, sy - 16.0, 6.5, ink);
-    blip.fill_circle(sx, sy - 16.0, 5.0, col);
-
-    // Four buttons: punch column, kick column; high row, low row.
-    let punch = BlipColor { r: 0.95, g: 0.78, b: 0.22, a: 1.0 };
-    let kick = BlipColor { r: 0.38, g: 0.80, b: 0.95, a: 1.0 };
-    // Forty-four pixels of panel has to hold a column header, two rows
-    // of buttons and their edges, so every one of these is measured
-    // rather than eyeballed.
-    let (bx, by) = (x + 88.0, y + 14.0);
-    for (i, key) in keys.iter().enumerate() {
-        let (cx, cy) = (bx + (i % 2) as f32 * 26.0, by + (i / 2) as f32 * 16.0);
-        let base = if i % 2 == 0 { punch } else { kick };
-        let face = if i < 2 { base } else { shade(base, 0.55) };
-        blip.fill_circle(cx, cy, 9.0, ink);
-        blip.fill_circle(cx, cy, 7.5, face);
-        blip.draw_text(key, cx - text_w(key, 1.0) / 2.0, cy - 3.5, 1.0, ink);
-    }
-    let label = BlipColor { r: 0.70, g: 0.72, b: 0.80, a: 1.0 };
-    blip.draw_text("HI", bx - 24.0, by - 3.0, 1.0, label);
-    blip.draw_text("LO", bx - 24.0, by + 13.0, 1.0, label);
-    blip.draw_text("P", bx - 3.0, by - 12.0, 1.0, punch);
-    blip.draw_text("K", bx + 23.0, by - 12.0, 1.0, kick);
-}
-
-
 fn draw_select(blip: &Blip, g: &Game) {
     let versus = g.mode == Mode::Versus;
     blip.draw_centered(if versus { "CHOOSE YOUR FIGHTERS" } else { "CHOOSE YOUR FIGHTER" },

@@ -57,14 +57,32 @@ var BLIP_GAMES = {
   // that answers immediately: blocking is holding back, so a sloppy
   // neutral is a dropped guard. Tight dead zone, short leash.
   //
-  // Four caps, laid out the way a Street Fighter cabinet lays out its
-  // six: punch first, then the kicks in a row from low to high, so the
-  // button's position on the deck *is* the height it kicks at.
+  // Four caps in a square, the way a Street Fighter cabinet stacks its
+  // six: punches on the top row, kicks under them, light on the left and
+  // heavy on the right — so a cap's place on the deck IS what it throws.
+  //
+  // `keys` names the second station's stick and caps (p2…), and gives
+  // player one WASD so the arrows can be player two's alone. `players: 2`
+  // is what makes the shell build the second deck at all; the game
+  // reveals it (blip_set_mode) when a second player joins.
   brawler:            { name: 'BRAWLER', accent: '220, 60, 40',
-                         buttons: [{ key: ' ', code: 'Space', label: 'PUNCH' },
-                                   { key: 'z', code: 'KeyZ',  label: 'LOW' },
-                                   { key: 'x', code: 'KeyX',  label: 'MID' },
-                                   { key: 'c', code: 'KeyC',  label: 'HIGH' }],
+                         players: 2,
+                         buttons: [{ key: 'f', code: 'KeyF', label: 'LP' },
+                                   { key: 'r', code: 'KeyR', label: 'HP' },
+                                   { key: 'g', code: 'KeyG', label: 'LK' },
+                                   { key: 't', code: 'KeyT', label: 'HK' }],
+                         keys: { up:    { key: 'w', code: 'KeyW' },
+                                 down:  { key: 's', code: 'KeyS' },
+                                 left:  { key: 'a', code: 'KeyA' },
+                                 right: { key: 'd', code: 'KeyD' },
+                                 p2up:    { key: 'ArrowUp',    code: 'ArrowUp' },
+                                 p2down:  { key: 'ArrowDown',  code: 'ArrowDown' },
+                                 p2left:  { key: 'ArrowLeft',  code: 'ArrowLeft' },
+                                 p2right: { key: 'ArrowRight', code: 'ArrowRight' },
+                                 p2button1: { key: 'j', code: 'KeyJ' },
+                                 p2button2: { key: 'u', code: 'KeyU' },
+                                 p2button3: { key: 'k', code: 'KeyK' },
+                                 p2button4: { key: 'i', code: 'KeyI' } },
                          stick: { engage: 10, release: 6, maxR: 54, hyst: 10 } },
   sky_raider:         { name: 'RAIDER', accent: '50, 100, 220',
                          stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } }
@@ -75,7 +93,8 @@ var BLIP_GAMES = {
 function blipGameFromPath(pathname) {
   var m = /\/([a-z_]+)\/(?:index\.html)?$/i.exec(pathname || '');
   var g = m && BLIP_GAMES[m[1]];
-  return g ? { slug: m[1], name: g.name, accent: g.accent, buttons: g.buttons, stick: g.stick } : null;
+  return g ? { slug: m[1], name: g.name, accent: g.accent, buttons: g.buttons,
+               keys: g.keys, players: g.players || 1, stick: g.stick } : null;
 }
 
 if ('serviceWorker' in navigator) {
