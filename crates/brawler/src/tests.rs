@@ -2572,56 +2572,57 @@ fn versus_bout(g: &mut Game, style: fn(usize, usize, &[Fighter; 2]) -> Input) ->
     let mut frames = 0usize;
     while frames < 60 * 240 {
         frames += 1;
-        match g.state {
-            State::RoundIntro => { if g.phase.tick(F) { g.state = State::Fight; } }
-            State::RoundEnd => update_round_end(g, F),
-            State::MatchEnd => { update_match_end(g, F); }
-            State::Over | State::Won => break,
-            State::Fight => {
-                if g.hitstop > 0.0 { g.hitstop -= F; continue; }
-                g.clock -= F;
-                let ins = [style(0, frames, &g.p), style(1, frames, &g.p)];
-                for i in 0..2 {
-                    let other = g.p[1 - i].x;
-                    if g.p[i].free() && !g.p[i].airborne() {
-                        g.p[i].facing = if other >= g.p[i].x { 1.0 } else { -1.0 };
-                    }
-                    let close = (g.p[1].x - g.p[0].x).abs() <= THROW_RANGE;
-                    apply_input(&mut g.p[i], ins[i], close, F);
-                    advance(&mut g.p[i], F);
-                    g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
-                }
-                separate(&mut g.p);
-                for i in 0..2 {
-                    let (a, d) = if i == 0 { (0, 1) } else { (1, 0) };
-                    let (dmg, _, _) = {
-                        let mut atk = g.p[a];
-                        let mut def = g.p[d];
-                        let r = resolve_hit(&mut atk, &mut def, ins[d]);
-                        g.p[a] = atk;
-                        g.p[d] = def;
-                        r
-                    };
-                    let _ = dmg;
-                }
-                // Round over?
-                if g.p[0].health <= 0 || g.p[1].health <= 0 || g.clock <= 0.0 {
-                    g.result = if g.p[0].health == g.p[1].health { RoundResult::Draw }
-                        else if g.p[0].health > g.p[1].health { RoundResult::P1 }
-                        else { RoundResult::P2 };
-                    match g.result {
-                        RoundResult::P1 => { g.p[0].rounds += 1; }
-                        RoundResult::P2 => { g.p[1].rounds += 1; }
-                        RoundResult::Draw => { g.p[0].rounds += 1; g.p[1].rounds += 1; }
-                    }
-                    g.state = State::RoundEnd;
-                    g.phase.start(0.2);
-                }
-            }
-            _ => break,
-        }
+        if !step_versus(g, frames, style) { break; }
     }
     (frames, [g.p[0].rounds, g.p[1].rounds])
+}
+
+/// One frame of a versus match. Returns false once the match is over.
+fn step_versus(g: &mut Game, frames: usize, style: fn(usize, usize, &[Fighter; 2]) -> Input) -> bool {
+    match g.state {
+        State::RoundIntro => { if g.phase.tick(F) { g.state = State::Fight; } }
+        State::RoundEnd => update_round_end(g, F),
+        State::MatchEnd => { update_match_end(g, F); }
+        State::Over | State::Won => return false,
+        State::Fight => {
+            if g.hitstop > 0.0 { g.hitstop -= F; return true; }
+            g.clock -= F;
+            let ins = [style(0, frames, &g.p), style(1, frames, &g.p)];
+            for i in 0..2 {
+                let other = g.p[1 - i].x;
+                if g.p[i].free() && !g.p[i].airborne() {
+                    g.p[i].facing = if other >= g.p[i].x { 1.0 } else { -1.0 };
+                }
+                let close = (g.p[1].x - g.p[0].x).abs() <= THROW_RANGE;
+                apply_input(&mut g.p[i], ins[i], close, F);
+                advance(&mut g.p[i], F);
+                g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
+            }
+            separate(&mut g.p);
+            for i in 0..2 {
+                let (a, d) = if i == 0 { (0, 1) } else { (1, 0) };
+                let mut atk = g.p[a];
+                let mut def = g.p[d];
+                let _ = resolve_hit(&mut atk, &mut def, ins[d]);
+                g.p[a] = atk;
+                g.p[d] = def;
+            }
+            if g.p[0].health <= 0 || g.p[1].health <= 0 || g.clock <= 0.0 {
+                g.result = if g.p[0].health == g.p[1].health { RoundResult::Draw }
+                    else if g.p[0].health > g.p[1].health { RoundResult::P1 }
+                    else { RoundResult::P2 };
+                match g.result {
+                    RoundResult::P1 => { g.p[0].rounds += 1; }
+                    RoundResult::P2 => { g.p[1].rounds += 1; }
+                    RoundResult::Draw => { g.p[0].rounds += 1; g.p[1].rounds += 1; }
+                }
+                g.state = State::RoundEnd;
+                g.phase.start(0.2);
+            }
+        }
+        _ => return false,
+    }
+    true
 }
 
 /// Two humans who both actually fight.
@@ -2773,4 +2774,250 @@ fn a_versus_result_reports_a_winner_not_a_score() {
     // Nothing was scored, and nothing should claim to have been.
     assert_eq!(g.sess.score, 0, "a versus match reported a score");
     assert!(g.p[1].rounds > g.p[0].rounds, "the result lost track of who won");
+}
+
+// ---- playtest diagnostics (run with --ignored) ---------------------------
+
+#[test]
+#[ignore = "diagnostic, not an assertion"]
+fn diag_round_1_how_long_before_a_press_becomes_a_hit() {
+    // Ease of use is mostly this number: press the button, how many
+    // frames until the fighter is actually threatening.
+    for mv in [MoveId::LowPunch, MoveId::HighPunch, MoveId::LowKick,
+               MoveId::HighKick, MoveId::Sweep, MoveId::FlyingKick] {
+        let d = move_data(mv);
+        println!("{mv:?}: startup {} active {} recovery {}", d.startup, d.active, d.recovery);
+    }
+    // And how often a press during recovery survives to become a move.
+    let mut kept = 0;
+    let mut tried = 0;
+    for press_on in 0..40 {
+        let mut f = at(0, 200.0, 1.0);
+        f.act = Act::Attack;
+        f.mv = MoveId::HighKick;
+        f.t = 0.0;
+        let mut saw_punch = false;
+        for k in 0..70 {
+            let mut inp = Input::default();
+            if k == press_on { inp.punch_low = true; }
+            apply_input(&mut f, inp, false, F);
+            advance(&mut f, F);
+            if f.act == Act::Attack && f.mv == MoveId::LowPunch { saw_punch = true; }
+        }
+        tried += 1;
+        if saw_punch { kept += 1; }
+    }
+    println!("presses during a high kick that still came out: {kept}/{tried}");
+}
+
+#[test]
+#[ignore = "diagnostic, not an assertion"]
+fn diag_round_2_does_the_planted_foot_skate() {
+    // A walking fighter's planted foot should stay where it was put.
+    // Measure it in world pixels: the foot that is down, frame to frame.
+    let mut f = at(0, 120.0, 1.0);
+    let mut inp = Input::default();
+    inp.right = true;
+    // Each foot, tracked on its own: while it is on the floor, how far
+    // does it travel in world space? A planted foot should not travel.
+    let mut worst = [0.0f32; 2];
+    let mut slid = [0.0f32; 2];
+    let mut prev: [Option<f32>; 2] = [None, None];
+    let mut body = 0.0f32;
+    let mut down_n = [0usize; 2];
+    let x0 = f.x;
+    for k in 0..240 {
+        apply_input(&mut f, inp, false, F);
+        advance(&mut f, F);
+        let rig = draw::Rig::upright(f.x, f.y, f.facing, f.facing);
+        let s = draw::skeleton(rig, &draw::pose_of(k as f32 * F, &f, 0));
+        let feet = [(s.ankle_lead.0, s.ankle_lead.1), (s.ankle_rear.0, s.ankle_rear.1)];
+        for (i, (fx, fy)) in feet.iter().enumerate() {
+            // On the floor: within a pixel of the ground line.
+            if (*fy - f.y).abs() < 2.5 {
+                down_n[i] += 1;
+                if let Some(px) = prev[i] {
+                    let d = (fx - px).abs();
+                    worst[i] = worst[i].max(d);
+                    slid[i] += d;
+                }
+                prev[i] = Some(*fx);
+            } else {
+                prev[i] = None;
+            }
+        }
+        body = f.x - x0;
+    }
+    println!("body travelled {body:.0}px; planted feet slid {:.0}px / {:.0}px \
+        (worst single frame {:.2} / {:.2}); frames down {:?}", slid[0], slid[1], worst[0], worst[1], down_n);
+}
+
+#[test]
+#[ignore = "diagnostic, not an assertion"]
+fn diag_round_3_how_much_of_the_round_is_spent_on_top_of_each_other() {
+    let _sim = simulating(0x51C3);
+    let mut g = at_versus_select();
+    lock(&mut g, 0);
+    lock(&mut g, 1);
+    let mut close = 0usize;
+    let mut total = 0usize;
+    let mut idle = 0usize;
+    for frame in 0..(60 * 60) {
+        if g.state != State::Fight && g.state != State::RoundIntro { }
+        if g.state == State::Fight {
+            total += 1;
+            let gap = (g.p[1].x - g.p[0].x).abs();
+            if gap < 46.0 { close += 1; }
+            if g.p[0].act == Act::Idle && g.p[1].act == Act::Idle { idle += 1; }
+        }
+        step_versus(&mut g, frame, brawlers);
+        if matches!(g.state, State::Over | State::Won) { break; }
+    }
+    println!("frames nose to nose: {close}/{total}, both idle: {idle}/{total}");
+}
+
+#[test]
+#[ignore = "diagnostic, not an assertion"]
+fn diag_round_4_is_a_waiting_fighter_visibly_alive() {
+    // Peak-to-peak travel of every joint over one breath, in pixels.
+    let f = at(0, 200.0, 1.0);
+    let mut lo = [f32::MAX; 6];
+    let mut hi = [f32::MIN; 6];
+    for k in 0..200 {
+        let rig = draw::Rig::upright(f.x, f.y, f.facing, f.facing);
+        let s = draw::skeleton(rig, &draw::pose_of(k as f32 * 0.01, &f, 0));
+        let vals = [s.hip.1, s.head.1, s.hand_lead.1, s.hand_rear.1, s.head.0, s.hip.0];
+        for i in 0..6 { lo[i] = lo[i].min(vals[i]); hi[i] = hi[i].max(vals[i]); }
+    }
+    let names = ["hip y", "head y", "lead hand y", "rear hand y", "head x", "hip x"];
+    for i in 0..6 { println!("{}: {:.2}px", names[i], hi[i] - lo[i]); }
+}
+
+#[test]
+#[ignore = "diagnostic, not an assertion"]
+fn diag_round_5_how_fast_does_a_fighter_answer_the_stick() {
+    // Forward to backward, and the frames it takes.
+    let mut f = at(0, 200.0, 1.0);
+    let mut fwd = Input::default(); fwd.right = true;
+    let mut back = Input::default(); back.left = true;
+    for _ in 0..30 { apply_input(&mut f, fwd, false, F); advance(&mut f, F); }
+    let x0 = f.x;
+    let mut turned = None;
+    for k in 0..30 {
+        apply_input(&mut f, back, false, F);
+        advance(&mut f, F);
+        if f.x < x0 - 0.01 && turned.is_none() { turned = Some(k); }
+    }
+    println!("frames from forward to actually moving back: {turned:?}");
+    println!("walk {} back_walk {}", f.arch().walk, f.arch().back_walk);
+}
+
+// ---- the walk, the breath and the sweat ---------------------------------
+
+#[test]
+fn a_planted_foot_stays_where_it_was_put() {
+    // The whole point of the step cycle: while a foot is on the floor
+    // it slides backwards at exactly the speed the fighter walks
+    // forwards, so in the world it does not move at all. Get the two
+    // constants out of step and the fighter moonwalks — which is what
+    // it did, to the tune of a quarter of every step.
+    let mut worst: f32 = 0.0;
+    let mut planted = 0;
+    let mut x = 0.0f32;
+    let mut prev: Option<f32> = None;
+    while x < 400.0 {
+        x += 132.0 * F; // RYUKA's walk speed
+        let ph = x * draw::STRIDE;
+        let (off, lift) = draw::foot_cycle(ph, 9.0);
+        if lift > 0.0 { prev = None; continue; }
+        planted += 1;
+        if let Some(p) = prev { worst = worst.max((x + off - p).abs()); }
+        prev = Some(x + off);
+    }
+    assert!(planted > 60, "the foot is hardly ever down: {planted} frames");
+    assert!(worst < 0.05, "a planted foot slid {worst:.2}px in one frame");
+}
+
+#[test]
+fn a_step_is_a_step_and_not_a_hop() {
+    // The swinging foot has to leave the floor and come back to it,
+    // once, and travel forward twice as far as it slid back — anything
+    // else and the two halves of the cycle do not meet.
+    let mut up = 0;
+    let mut high: f32 = 0.0;
+    let mut lo: f32 = f32::MAX;
+    let mut hi: f32 = f32::MIN;
+    for k in 0..400 {
+        let ph = k as f32 * std::f32::consts::TAU / 400.0;
+        let (off, lift) = draw::foot_cycle(ph, 9.0);
+        if lift > 0.01 { up += 1; }
+        high = high.max(lift);
+        lo = lo.min(off);
+        hi = hi.max(off);
+    }
+    assert!((150..250).contains(&up), "the foot is off the floor {up}/400 of the time");
+    assert!((high - 9.0).abs() < 0.2, "the foot lifts {high:.1}px, not the 9 it was asked for");
+    assert!((hi - draw::STEP).abs() < 0.1 && (lo + draw::STEP).abs() < 0.1,
+        "the step runs {lo:.1}..{hi:.1}, not -{0}..{0}", draw::STEP);
+    // Continuous across the seam, or the foot teleports once a stride.
+    let a = draw::foot_cycle(-0.0001, 9.0);
+    let b = draw::foot_cycle(0.0001, 9.0);
+    assert!((a.0 - b.0).abs() < 0.1 && (a.1 - b.1).abs() < 0.1,
+        "the foot jumps at the top of the cycle: {a:?} to {b:?}");
+}
+
+#[test]
+fn a_fighter_who_has_been_hit_breathes_harder() {
+    // Breathing is the only thing on screen that says a round has been
+    // going on, so it has to get deeper as the fighter runs down.
+    let fresh = at(0, 200.0, 1.0);
+    let mut spent = fresh;
+    spent.health = 1;
+    let swing = |f: &Fighter| {
+        let (mut lo, mut hi) = (f32::MAX, f32::MIN);
+        for k in 0..400 {
+            let b = draw::breath_of(k as f32 * 0.01, f, 0);
+            lo = lo.min(b); hi = hi.max(b);
+        }
+        hi - lo
+    };
+    assert!(swing(&spent) > swing(&fresh) * 1.4,
+        "a spent fighter breathes {:.2} against a fresh one's {:.2}",
+        swing(&spent), swing(&fresh));
+    // And it is still a breath, not a seizure.
+    assert!(swing(&spent) < 4.0, "the chest is heaving {:.2}", swing(&spent));
+}
+
+#[test]
+fn two_fighters_never_breathe_in_step() {
+    // Two figures rising and falling together read as one animation
+    // played twice, which is the single easiest way to make a fight
+    // look cheap.
+    let f = at(0, 200.0, 1.0);
+    let mut apart: f32 = 0.0;
+    for k in 0..200 {
+        let t = k as f32 * 0.01;
+        apart = apart.max((draw::breath_of(t, &f, 0) - draw::breath_of(t, &f, 1)).abs());
+    }
+    assert!(apart > 0.5, "the two fighters breathe together: {apart:.2} apart at most");
+}
+
+#[test]
+fn sweat_arrives_with_the_damage() {
+    // Nobody is sweating on the first frame of the first round, and
+    // everybody is by the time their bar is nearly out.
+    for who in 0..FIGHTERS.len() {
+        let mut f = at(who, 200.0, 1.0);
+        assert_eq!(draw::exertion(&f), 0.0, "{} starts the round wet", FIGHTERS[who].name);
+        f.health = FIGHTERS[who].health / 2;
+        let half = draw::exertion(&f);
+        assert!((half - 0.5).abs() < 0.02, "{} at half health reads {half:.2}",
+            FIGHTERS[who].name);
+        f.health = 0;
+        assert!((draw::exertion(&f) - 1.0).abs() < 0.001);
+        // Below zero is a fighter who has already lost, and nothing is
+        // allowed to run off the end of the scale.
+        f.health = -40;
+        assert_eq!(draw::exertion(&f), 1.0);
+    }
 }

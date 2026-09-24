@@ -572,6 +572,13 @@ struct Hide {
     tone: f32,
     /// Blown toward white for the frames a hit is frozen on.
     flash: f32,
+    /// One breath, -1 to 1. The ribcage is the only part of a fighter
+    /// big enough to show it, so the number has to reach the drawing
+    /// and not stop at the skeleton.
+    breath: f32,
+    /// How hard this fighter is working, 0 to 1. Sweat, and how deep
+    /// the breathing under it is.
+    sweat: f32,
     /// Whether this limb is in front of the body and needs an edge
     /// cutting round it. A white sleeve crossing a white jacket has no
     /// silhouette of its own: the ordinary hairline outline vanishes
@@ -626,6 +633,74 @@ impl Hide {
             Build::Gi => self.c(BlipColor { r: 0.13, g: 0.12, b: 0.15, a: 1.0 }),
             _ => self.c(self.trim),
         }
+    }
+}
+
+/// Sweat: a wet sheen of beads, and the ones that run off.
+///
+/// A fighter who has taken half a health bar should look like they have
+/// been in a fight, and there is nothing else on a sixty-pixel figure
+/// that can say so — the face is four marks and the body is one colour.
+/// Beads catch the light, so they are drawn as highlights rather than
+/// as a colour: a pale core over a darker rim, which is what a droplet
+/// on skin is.
+const WET: BlipColor = BlipColor { r: 0.82, g: 0.92, b: 1.0, a: 0.92 };
+
+fn bead(blip: &Blip, x: f32, y: f32, r: f32, a: f32) {
+    if a <= 0.02 { return; }
+    // The rim is a hint, not a ring. At this size a bead is two or
+    // three pixels across, and a dark edge as wide again turns three
+    // beads on a jaw into one pale mass with a beard's outline.
+    blip.fill_circle(x, y + r * 0.45, r * 0.9,
+        BlipColor { r: 0.30, g: 0.44, b: 0.58, a: a * 0.30 });
+    blip.fill_circle(x, y, r, BlipColor { a: a * WET.a, ..WET });
+}
+
+/// Beads standing on the skin, and the ones running off it.
+///
+/// `spots` are where they can stand, in pixels from `at` and already
+/// scaled to the part they are on — a hand-placed list rather than a
+/// scatter, because on a ten-pixel face a random cluster lands on the
+/// eye and reads as a bruise. How wet the fighter is decides how many
+/// of the spots are occupied. Nothing here is stored: a bead's whole
+/// life is a function of the clock.
+fn sweat_beads(blip: &Blip, at: V, fw: f32, spots: &[(f32, f32)], t: f32, wet: f32, salt: u32) {
+    if wet < 0.12 { return; }
+    let n = ((1.0 + wet * spots.len() as f32).round() as usize).min(spots.len());
+    let cycle = 2.4;
+    for j in 0..n {
+        let k = j as u32 + salt;
+        // Beads take their turn rather than rolling dice for it. Left
+        // to a random phase each, three of them on a ten-pixel jaw come
+        // up together often enough to merge into one pale mass, which
+        // reads as a beard. Evenly spaced in time, there is almost
+        // always exactly one bead on the chin — which is what a chin
+        // dripping actually looks like.
+        let u = (t / cycle + (j as f32 + scatter(5, salt)) / n as f32).fract();
+        // Gather, stand, run off. It is only on the skin for half its
+        // turn; the rest of the cycle that spot is dry.
+        let run = ((u - 0.38) / 0.16).max(0.0).min(1.0);
+        // How wet a fighter is decides how MANY beads there are, not
+        // how faint each one is. A sheen made of half-transparent dots
+        // is a sheen nobody can see at this size; a bead is a bead.
+        let a = (0.62 + 0.38 * wet) * (u * 12.0).min(1.0) * (1.0 - run * run);
+        let (sx, sy) = spots[j];
+        bead(blip, at.0 + fw * sx, at.1 + sy + run * 16.0, 1.1 + 0.5 * scatter(4, k), a);
+    }
+}
+
+/// Sweat knocked off a fighter by a blow. Thrown the way the blow went,
+/// arcing and falling — the one moment the sheen becomes a spray.
+fn sweat_spray(blip: &Blip, f: &Fighter, at: V, shift: f32) {
+    if f.act != Act::Hitstun || f.t > 0.30 { return; }
+    let k = (1.0 - f.t / 0.30).max(0.0);
+    let away = -f.facing;
+    for j in 0..7u32 {
+        let sp = 60.0 + scatter(1, j) * 150.0;
+        let up = 40.0 + scatter(2, j) * 130.0;
+        let x = at.0 + away * sp * f.t + (scatter(3, j) - 0.5) * 10.0;
+        let y = at.1 - up * f.t + GRAVITY * 0.5 * f.t * f.t + (scatter(4, j) - 0.5) * 8.0;
+        bead(blip, x, (y + shift).min(FLOOR_Y + shift), 1.0 + scatter(5, j), k * 0.95);
     }
 }
 
@@ -913,7 +988,7 @@ fn draw_pelvis(blip: &Blip, h: &Hide, a: V, b: V) {
     part(blip, a, b, 9.4 * h.bulk, 9.4 * h.bulk, body, h.ink());
 }
 
-fn draw_torso(blip: &Blip, h: &Hide, hip: V, neck: V) {
+fn draw_torso(blip: &Blip, h: &Hide, hip: V, neck: V, t: f32) {
     let b = h.bulk;
     let ink = h.ink();
     let bare = h.build == Build::Bare;
@@ -932,8 +1007,19 @@ fn draw_torso(blip: &Blip, h: &Hide, hip: V, neck: V) {
     // wider than a pelvis on a person; on a fighting sprite it is a
     // good deal wider, because the wedge is doing the work of saying
     // "this is a heavyweight" at a size where no muscle can be drawn.
-    part(blip, hip, chest, 8.8 * b, 12.6 * b, body, ink);
-    part(blip, chest, along(chest, neck, 0.72), 12.6 * b, 6.4 * b, body, ink);
+    // Breathing, where it can actually be seen. The waist barely moves
+    // and the ribcage does all of it — a chest that fills and empties,
+    // rather than a whole body scaled up and down, which is a balloon.
+    // Half a pixel at rest and closer to two when the fighter is spent,
+    // which is the difference between a figure standing there and one
+    // getting its wind back.
+    let swell = 1.0 + (0.055 + 0.075 * h.sweat) * h.breath;
+    // And the shoulders ride up on it. Drawn, not posed: the neck is
+    // where the skeleton put it, the top of the chest just reaches a
+    // little further toward it on the way in.
+    let top = along(chest, neck, 0.72 + 0.05 * h.breath);
+    part(blip, hip, chest, 8.8 * b, 12.6 * b * swell, body, ink);
+    part(blip, chest, top, 12.6 * b * swell, 6.4 * b, body, ink);
 
     let belt_a = along(hip, neck, 0.28);
     let belt_b = along(hip, neck, 0.40);
@@ -962,6 +1048,13 @@ fn draw_torso(blip: &Blip, h: &Hide, hip: V, neck: V) {
         }
     }
 
+    // And on the chest, over whatever is worn on it: the one broad
+    // piece of a fighter, and so the one that can carry more than a
+    // couple of beads.
+    sweat_beads(blip, along(hip, neck, 0.60), 1.0, &[
+        (-2.0 * b, -5.0 * b), (4.0 * b, -1.0 * b), (-5.0 * b, 3.0 * b),
+        (2.0 * b, 6.0 * b), (6.0 * b, 4.0 * b),
+    ], t + 0.7, h.sweat * 0.8, 27);
 }
 
 /// The gi skirt and the belt over it, drawn after the legs.
@@ -1049,6 +1142,7 @@ fn draw_head(blip: &Blip, h: &Hide, rig: Rig, head: V, neck: V, t: f32) {
     stroke(blip, band_a, V(head.0 - fw * 2.0 * r, head.1 + 0.26 * r + sway),
         0.15 * r, 0.06 * r, h.c(h.trim));
 
+
     // A face: brow, eye, nose, mouth. Four marks, and the head stops
     // being a ball. The brow is the one doing the work — a fighter
     // looks at the person they are fighting, and a heavy brow over a
@@ -1061,6 +1155,20 @@ fn draw_head(blip: &Blip, h: &Hide, rig: Rig, head: V, neck: V, t: f32) {
     stroke(blip, V(head.0 + fw * 0.52 * r, head.1 + 0.56 * r),
            V(head.0 + fw * 0.76 * r, head.1 + 0.52 * r), 0.11 * r, 0.10 * r,
            shade(skin, 0.5));
+
+    // Sweat, last of all: it stands on the face, so it goes on over the
+    // face. Drawn before it, the brow and the eye painted straight back
+    // over every bead and the fighter stayed bone dry.
+    sweat_beads(blip, head, fw, &[
+        // Low on the head, and nowhere near the brow. A bead sitting
+        // still up there reads as a stud on the headband — the face is
+        // four marks wide and anything added to it joins them. Down on
+        // the jaw a bead has somewhere to go: it gathers, runs off the
+        // chin and falls, and falling is what makes it sweat.
+        (0.44 * r, 0.62 * r),    // the point of the chin
+        (0.10 * r, 0.74 * r),    // under the jaw
+        (-0.36 * r, 0.52 * r),   // behind it, under the ear
+    ], t, h.sweat, 11);
 }
 
 // ---- poses ---------------------------------------------------------------
@@ -1098,6 +1206,40 @@ impl Pose {
 /// neck rides most of the way up it and a little behind. Square to the
 /// spine, so the shoulders stay behind the chin upright and rotate with
 /// the body in a lean.
+/// One foot through one step, as (how far forward of its base, how far
+/// off the floor).
+///
+/// The old cycle was a sine on both, which puts the foot at its
+/// rearmost travelling backwards *fast* — exactly when it is supposed
+/// to be standing still on the ground. Measured, the lead foot slid a
+/// quarter of the distance the fighter walked: a moonwalk under a good
+/// pair of legs.
+///
+/// A foot is planted for half the cycle and swinging for the other
+/// half. While it is planted it slides backwards at exactly the speed
+/// the body moves forwards, which is what standing on it means, and
+/// that is what fixes the skate: `STEP` is tied to `STRIDE` so the two
+/// cancel. While it swings it lifts, goes forward twice as fast, and
+/// eases in and out of both ends so it does not snap.
+///
+/// The stride is as long as the rear leg can reach and no longer: at
+/// the back of its step that leg is nearly straight, and a step past
+/// that is a leg the solver has to stretch — which it will not, so the
+/// foot simply stops short of where the pose asked for it and the
+/// skate comes back by another door.
+pub(crate) const STRIDE: f32 = 0.1208;  // radians of cycle per pixel travelled
+pub(crate) const STEP: f32 = 13.0;      // = (2*PI/STRIDE) / 4, or the foot skates
+pub(crate) fn foot_cycle(ph: f32, lift: f32) -> (f32, f32) {
+    let u = (ph / std::f32::consts::TAU).rem_euclid(1.0);
+    if u < 0.5 {
+        (STEP * (1.0 - 4.0 * u), 0.0)
+    } else {
+        let k = (u - 0.5) * 2.0;
+        let e = k * k * (3.0 - 2.0 * k);
+        (-STEP + 2.0 * STEP * e, lift * (k * std::f32::consts::PI).sin())
+    }
+}
+
 const SPINE: f32 = 0.73;
 const SHOULDERS_BACK: f32 = 2.4;
 
@@ -1137,6 +1279,13 @@ fn stance(breath: f32) -> Pose {
     let bob = (breath * 2.0).clamp(-1.0, 1.0);
     let roll = -breath;
     Pose {
+        // The skeleton's part of the breath stays exactly as small as
+        // it was. An attack is posed from this stance and solved onto
+        // an arm already at full stretch, so a shoulder rocked one
+        // pixel too far costs the fist that pixel — see
+        // `what_you_see_is_what_can_hit_you`. The breathing a player
+        // actually sees is the ribcage in `draw_torso`, which swells
+        // and empties without moving a single joint.
         hip: p(breath * 1.2, HIP_U - 1.0 + bob * 0.9),
         // Chin forward. A fighter on guard leans into the fight: the
         // head comes out over the front foot while the shoulders stay
@@ -1163,8 +1312,11 @@ fn stance(breath: f32) -> Pose {
         // boxer's guard — both fists at the jaw — the forearms lie
         // straight across the chest and cover the jacket, the belt and
         // every read that depends on which way the body is turned.
-        lead_hand: p(35.0 + breath * 1.4, 77.0 + bob * 1.2),
-        rear_hand: p(12.0 + breath * 0.8, 76.0 + bob * 0.9),
+        // Up and down, not in and out. How far the lead fist sits from
+        // the body is the reach every attack is measured against, and
+        // breathing is not allowed a vote in it.
+        lead_hand: p(35.0 + breath * 1.4, 77.0 + bob * 2.0),
+        rear_hand: p(12.0 + breath * 0.8, 76.0 + bob * 1.6),
         // The feet stay planted. Weight moving between them is the
         // point; feet sliding about is a fighter who has lost it.
         //
@@ -1633,10 +1785,33 @@ pub(crate) fn pose_of(now: f32, f: &Fighter, idx: usize) -> Pose {
     pose_now(now, &was, idx).to(q, k * k * (3.0 - 2.0 * k))
 }
 
+/// How hard this fighter is working: nothing at all at full health,
+/// everything when there is almost none left.
+pub(crate) fn exertion(f: &Fighter) -> f32 {
+    let max = FIGHTERS[f.who].health.max(1) as f32;
+    (1.0 - f.health as f32 / max).clamp(0.0, 1.0)
+}
+
+/// One breath, -1 to 1 — and then some.
+///
+/// The slow cycle is the breath itself. On top of it is a faster,
+/// shallower ripple that only exists once the fighter is hurt: the
+/// short catch in the chest of someone who has stopped getting enough
+/// air. Both run at fixed rates and grow in *amplitude* with exertion
+/// rather than in speed, because a rate that depends on health jumps
+/// the phase on the frame a blow lands, and a chest that skips is
+/// worse than one that never hurries.
+pub(crate) fn breath_of(now: f32, f: &Fighter, idx: usize) -> f32 {
+    let hard = exertion(f);
+    let slow = (now * 2.6 + idx as f32 * 2.3).sin();
+    let pant = (now * 7.4 + idx as f32 * 1.1).sin();
+    (slow * (1.0 + 0.55 * hard) + pant * 0.42 * hard).clamp(-1.6, 1.6)
+}
+
 fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
     // One slow cycle per fighter, offset so two of them on screen are
     // never breathing in step.
-    let breath = (now * 2.6 + idx as f32 * 2.3).sin();
+    let breath = breath_of(now, f, idx);
 
     if f.act == Act::Knockdown {
         // Thrown down, still, and then up again. Landing and rising are
@@ -1698,10 +1873,16 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
         // walking fighter's feet do not skate: the phase is where they
         // are, not how long they have been walking.
         Act::Walk => {
-            let ph = f.x * 0.085;
-            let (s, c) = (ph.sin(), ph.cos());
-            q.lead_foot = p(15.0 + 11.0 * s, (9.0 * c).max(0.0));
-            q.rear_foot = p(-17.0 - 11.0 * s, (-9.0 * c).max(0.0));
+            let ph = f.x * f.facing * STRIDE;
+            let s = ph.sin();
+            // The two feet are half a cycle apart: one plants as the
+            // other leaves. Their bases are far enough apart that a
+            // fighter's feet never cross — this is a stance being
+            // carried forward, not a stroll.
+            let (lf, ll) = foot_cycle(ph, 9.0);
+            let (rf, rl) = foot_cycle(ph + std::f32::consts::PI, 8.0);
+            q.lead_foot = p(18.0 + lf, ll);
+            q.rear_foot = p(-16.0 + rf, rl);
             // The whole body drops twice per stride, as each leg takes
             // the weight and gives under it.
             let sink = 1.4 + 1.4 * (2.0 * ph).cos();
@@ -1751,11 +1932,12 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
                 // was a slide. The phase is where they are, not how
                 // long they have held it, so a fighter blocking on the
                 // spot keeps their feet still for free.
-                let ph = f.x * 0.085;
-                let (st, ct) = (ph.sin(), ph.cos());
+                let ph = f.x * f.facing * STRIDE;
                 let sink = 1.0 + (2.0 * ph).cos();
-                q.lead_foot = p(11.0 + 9.0 * st, (7.0 * ct).max(0.0));
-                q.rear_foot = p(-20.0 - 9.0 * st, (-7.0 * ct).max(0.0));
+                let (lf, ll) = foot_cycle(ph, 7.0);
+                let (rf, rl) = foot_cycle(ph + std::f32::consts::PI, 6.0);
+                q.lead_foot = p(14.0 + lf, ll);
+                q.rear_foot = p(-17.0 + rf, rl);
                 q.hip.u -= sink;
                 q.head.u -= sink * 0.7;
                 q.lead_hand.u -= sink * 0.7;
@@ -2177,6 +2359,21 @@ fn draw_fighter(blip: &Blip, g: &Game, i: usize) {
     // is: a shadow that disagrees with the only light in the picture is
     // worse than no shadow.
     let light = if g.stage == 0 { -1.0 } else { 1.0 };
+
+    // Two players, two fighters, and in the middle of an exchange they
+    // are inside each other most of the time (measured: four frames in
+    // five). A mark on the boards under each one, in that player's own
+    // colour, is how you find yours — it is under the feet, so it is
+    // never hidden by the fighter standing on it or by the one standing
+    // on top of them.
+    if g.mode == Mode::Versus {
+        let c = if i == 0 { BlipColor { r: 1.0, g: 0.35, b: 0.35, a: 0.55 } }
+                else { BlipColor { r: 0.40, g: 0.72, b: 1.0, a: 0.55 } };
+        let f = &g.p[i];
+        let w = 21.0 * f.arch().bulk;
+        stroke(blip, V(f.x - w, FLOOR_Y + shake + 2.0), V(f.x + w, FLOOR_Y + shake + 2.0),
+            2.2, 2.2, c);
+    }
     pose_and_draw_lit(blip, &g.p[i], g.now, shake, g.hitstop, i, light);
 }
 
@@ -2212,6 +2409,8 @@ fn pose_and_draw_lit(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f3
         bulk: a.bulk,
         tone: 1.0,
         flash,
+        breath: breath_of(now, &f, i),
+        sweat: exertion(&f),
         front: false,
     };
     let far = hide.far();
@@ -2271,7 +2470,7 @@ fn pose_and_draw_lit(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f3
 
     draw_leg(blip, &far, k.hip_rear, k.knee_rear, k.ankle_rear, rig.fwd, rig.ground, t);
     draw_pelvis(blip, &hide, k.hip_rear, k.hip_lead);
-    draw_torso(blip, &hide, k.hip, k.neck);
+    draw_torso(blip, &hide, k.hip, k.neck, t);
     // The far arm goes on after the chest but *before* the head: it is
     // in front of the ribs and behind the face. Drawn after the head it
     // wiped the face out every time the guard came up, which at this
@@ -2281,6 +2480,10 @@ fn pose_and_draw_lit(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f3
     draw_leg(blip, &near, k.hip_lead, k.knee_lead, k.ankle_lead, rig.fwd, rig.ground, t);
     draw_skirt(blip, &hide, k.hip, k.neck, t);
     draw_arm(blip, &near, k.sh_lead, k.elbow_lead, k.hand_lead, q.open, t);
+
+    // Sweat knocked loose, over everything: it is in the air in front
+    // of the fighter, not on them.
+    sweat_spray(blip, &f, k.head, shift);
 }
 
 fn draw_fight(blip: &Blip, g: &Game) {
@@ -2735,6 +2938,11 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
         f.act = act;
         f.mv = mv;
         f.y = FLOOR_Y;
+        // Half a health bar down the left-hand cells and nearly out on
+        // the right: the sheet is for looking at how a fighter is
+        // drawn, and sweat and the depth of their breathing are part of
+        // that. A sheet of fighters at full health never shows either.
+        f.health = (FIGHTERS[who].health as f32 * (0.62 - 0.13 * k as f32)) as i32;
         f.t = match act {
             // Sampled inside the startup, because the startup is where
             // the shape of a move is decided and the part a defender
