@@ -2440,7 +2440,9 @@ fn draw_title(blip: &Blip, g: &Game) {
     // on screen — which is the only way a neon sign ever reads.
     draw_temple(blip, 0.0, now, 0.0);
     draw_floor(blip, 1, 0.0);
-    for (i, (x, face)) in [(118.0f32, 1.0f32), (522.0, -1.0)].iter().enumerate() {
+    // Out at the edges, leaving the middle band clear for the control
+    // rows, which are the reason anybody looks at this screen twice.
+    for (i, (x, face)) in [(62.0f32, 1.0f32), (578.0, -1.0)].iter().enumerate() {
         let mut f = Fighter::new(if i == 0 { 0 } else { 1 }, *x, *face);
         f.act = Act::Idle;
         pose_and_draw_lit(blip, &f, now, 0.0, 0.0, i, 1.0);
@@ -2453,15 +2455,15 @@ fn draw_title(blip: &Blip, g: &Game) {
     for (r, a) in [(150.0f32, 0.045f32), (96.0, 0.05)] {
         blip.fill_glow_circle(320.0, 72.0, r, BlipColor { a: a * glow, ..sign });
     }
-    neon(blip, "BRAWLER", 38.0, 9.0, sign, glow);
-    neon(blip, "TWO FIGHTERS ENTER", 124.0, 2.0,
+    neon(blip, "BRAWLER", 30.0, 9.0, sign, glow);
+    neon(blip, "TWO FIGHTERS ENTER", 112.0, 2.0,
         BlipColor { r: 0.35, g: 0.95, b: 1.0, a: 1.0 }, tube(now, 2.1));
 
     // The mode, chosen on a stick and one button because that is all a
     // cabinet has. The line you are on is lit; the other is glass.
     let dark = BlipColor { r: 0.42, g: 0.30, b: 0.46, a: 1.0 };
     for (i, label) in ["1 PLAYER", "2 PLAYERS"].iter().enumerate() {
-        let y = 180.0 + i as f32 * 42.0;
+        let y = 148.0 + i as f32 * 38.0;
         if g.menu == i {
             neon(blip, label, y, 3.0, BlipColor { r: 1.0, g: 0.85, b: 0.25, a: 1.0 },
                 0.62 + 0.38 * (now * 3.4).sin().max(0.0));
@@ -2470,9 +2472,33 @@ fn draw_title(blip: &Blip, g: &Game) {
         }
     }
 
-    let dim = BlipColor { r: 0.70, g: 0.74, b: 0.84, a: 1.0 };
-    blip.draw_centered("W S OR ARROWS  CHOOSE", 264.0, 2.0, dim);
-    blip.draw_centered("F OR SPACE  START", 288.0, 2.0, dim);
+    // Both players' controls, on the screen where you decide how many
+    // players there are. The two rows are padded to the same width so
+    // the columns line up without a table: at six pixels a character,
+    // aligning by eye is aligning.
+    let dim = BlipColor { r: 0.74, g: 0.78, b: 0.86, a: 1.0 };
+    let p1c = BlipColor { r: 1.0, g: 0.35, b: 0.35, a: 1.0 };
+    let p2c = BlipColor { r: 0.40, g: 0.72, b: 1.0, a: 1.0 };
+    const ROWS: [(&str, &str, bool); 2] = [
+        ("P1", "W A S D   F PUNCH   G LOW  H HIGH", true),
+        ("P2", "ARROWS    J PUNCH   K LOW  L HIGH", false),
+    ];
+    let x = (WIN_W as f32 - 37.0 * 12.0) / 2.0;
+    for (i, (tag, body, one)) in ROWS.iter().enumerate() {
+        let y = 236.0 + i as f32 * 24.0;
+        // Player two greys out on the one-player line: the row is still
+        // there to say the mode exists, without claiming those keys do
+        // anything in the game you are about to start.
+        let live = *one || g.menu == 1;
+        let tint = if live { 1.0 } else { 0.45 };
+        let col = if *one { p1c } else { p2c };
+        blip.draw_text(tag, x, y, 2.0, BlipColor { a: tint, ..col });
+        blip.draw_text(body, x + 48.0, y, 2.0, BlipColor { a: tint, ..dim });
+    }
+
+    blip.draw_centered("PUNCH AND KICK TOGETHER  SPECIAL", 292.0, 1.0, dim);
+    blip.draw_centered("W S CHOOSE     F OR SPACE START", 314.0, 2.0,
+        BlipColor { r: 0.95, g: 0.88, b: 0.60, a: 1.0 });
 }
 
 fn draw_select(blip: &Blip, g: &Game) {
