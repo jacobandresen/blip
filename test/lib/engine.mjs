@@ -1,60 +1,37 @@
 // Launches a browser engine through Playwright and hands back a
-// CDP-shaped handle, so the helpers in test/lib/multiplayer-harness.mjs
+// CDP-shaped handle, so the helpers in test/lib/harness.mjs
 // — which reach the page only through cdp.mjs's `evaluate()`, i.e. only
 // through `cdp.send('Runtime.evaluate', { expression })` — can drive
 // WebKit and Firefox as well as Chromium, unchanged.
 //
-// WebKit is the point of this file. The guest half of two-device
-// multiplayer runs on iOS Safari, which is WebKit, and until now the
-// whole multiplayer suite ran on Chromium only: WebKit's
-// RTCPeerConnection, its SDP output, and its getUserMedia were never
-// exercised by any test. Playwright's WebKit is the same engine, runs
-// headless, and needs none of the machine-level setup real Safari
-// automation does (`sudo safaridriver --enable` plus the Develop menu's
-// "Allow Remote Automation"), so it runs unattended in CI.
+// Playwright's WebKit and Firefox are the same engines the phones and
+// desktops run, need none of the machine-level setup real Safari
+// automation does, and run unattended in CI — so a layout or an input
+// path can be checked on all three rather than on Chromium alone.
 
 import { chromium, webkit, firefox } from 'playwright';
 
 const ENGINES = { chromium, webkit, firefox };
 
-/** Chromium's fake-camera flags have no WebKit equivalent; a WebKit run
- * gets a real (empty) media stack and must use scan injection. */
-export function supportsFakeCamera(engineName) {
-  return engineName === 'chromium';
-}
-
 /**
  * @param {'chromium'|'webkit'|'firefox'} engineName
- * @param {{ camFile?: string|null, headless?: boolean, permissions?: string[] }} opts
+ * @param {{ headless?: boolean }} opts
  */
-export async function launchEngine(engineName, { camFile = null, headless = true, permissions = ['camera'] } = {}) {
+export async function launchEngine(engineName, { headless = true } = {}) {
   const engine = ENGINES[engineName];
   if (!engine) throw new Error(`unknown engine ${engineName}`);
 
   const args = [];
   if (engineName === 'chromium') {
-    // Same flags test/lib/multiplayer-harness.mjs passes its own
-    // Chromium — mDNS obfuscation off so host candidates carry real
-    // LAN IPs, and background throttling off so a headless page that
-    // isn't "visible" keeps running the game loop.
-    args.push('--disable-features=WebRtcHideLocalIpsWithMdns',
-      '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
-      '--disable-background-timer-throttling');
-    if (camFile) {
-      args.push('--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream',
-        `--use-file-for-fake-video-capture=${camFile}`);
-    }
+    // Same flag test/lib/harness.mjs passes its own Chromium:
+    // background throttling off, so a headless page that is never
+    // "visible" keeps running the game loop.
+    args.push('--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding', '--disable-background-timer-throttling');
   }
 
   const browser = await engine.launch({ headless, args });
-  // Camera permission is granted by default because it is granted in the
-  // real flow too: both pairing roles open the camera to scan a code,
-  // and on WebKit the permission is additionally what unblocks ICE
-  // gathering entirely (see warmUpIceMedia() in web/blip_net.js). A test
-  // that withheld it would be testing a player who tapped "Don't Allow".
-  const browser_context = await browser.newContext({ permissions });
-  const context = browser_context;
-  const page = await context.newPage();
+  const page = await (await browser.newContext()).newPage();
   return { browser, page, cdp: wrapPage(page, engineName) };
 }
 

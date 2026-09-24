@@ -16,7 +16,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, HTTP_PORT, evaluate, waitFor, sleep } from './lib/multiplayer-harness.mjs';
+import { openPage, HTTP_PORT, evaluate, waitFor, sleep } from './lib/harness.mjs';
 
 const ENGINE = process.env.BLIP_DECK_ENGINE || 'chromium';
 

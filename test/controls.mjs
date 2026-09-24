@@ -14,7 +14,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, loadRally, evaluate } from './lib/multiplayer-harness.mjs';
+import { openPage, loadRally, evaluate } from './lib/harness.mjs';
 
 const ENGINE = process.env.BLIP_CONTROLS_ENGINE || 'chromium';
 

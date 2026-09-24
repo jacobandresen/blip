@@ -28,7 +28,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
-import { openPage, HTTP_PORT, WEB_DIR, evaluate, waitFor, sleep } from './lib/multiplayer-harness.mjs';
+import { openPage, HTTP_PORT, WEB_DIR, evaluate, waitFor, sleep } from './lib/harness.mjs';
 
 const ENGINE = process.env.BLIP_TOPBAR_ENGINE || 'chromium';
 

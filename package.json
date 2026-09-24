@@ -2,22 +2,14 @@
   "name": "blip",
   "private": true,
   "scripts": {
-    "test:unit": "node --test test/fill-canvas.test.mjs test/multiplayer-proto.test.mjs test/sdp-slim.test.mjs test/qr-heuristic.test.mjs",
-    "test": "node --test test/fill-canvas.test.mjs test/multiplayer-proto.test.mjs test/sdp-slim.test.mjs test/qr-heuristic.test.mjs",
+    "test:unit": "node --test test/fill-canvas.test.mjs",
+    "test": "node --test test/fill-canvas.test.mjs",
     "test:highscores": "node test/highscores.mjs",
-    "test:multiplayer": "node --test test/multiplayer-pairing.mjs",
-    "test:multiplayer:cross": "BLIP_HOST_ENGINE=chromium BLIP_GUEST_ENGINE=webkit node --test test/multiplayer-pairing.mjs && BLIP_HOST_ENGINE=webkit BLIP_GUEST_ENGINE=chromium node --test test/multiplayer-pairing.mjs",
-    "test:multiplayer:camera": "BLIP_MULTIPLAYER_REAL_CAMERA=1 node --test test/multiplayer-pairing.mjs",
-    "test:multiplayer:network": "node --test test/multiplayer-network.mjs",
-    "test:multiplayer:ios": "node --test test/multiplayer-ios.mjs",
-    "test:multiplayer:hardening": "node --test test/multiplayer-hardening.mjs",
-    "test:qr": "node --test test/qr-scannability.mjs",
-    "test:multiplayer:visibility": "node --test test/multiplayer-visibility.mjs",
     "test:topbar": "node --test test/topbar-layout.mjs",
     "test:controls": "node --test test/controls.mjs",
     "test:deck": "node --test test/two-player-deck.mjs",
-    "test:multiplayer:android": "node test/multiplayer-android.mjs",
-    "supabase": "supabase"
+    "supabase": "supabase",
+    "test:web": "node --test --test-concurrency=1 test/fill-canvas.test.mjs test/topbar-layout.mjs test/controls.mjs test/two-player-deck.mjs"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.116.0",

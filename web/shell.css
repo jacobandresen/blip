@@ -634,93 +634,6 @@ canvas {
   letter-spacing: 1px;
   color: #ff6b6b;
 }
-/* A code that was drawn but is too small for another phone's camera to
-   resolve. Amber, not red: the attempt has not failed, but this is
-   almost certainly why nothing is scanning. See renderCode() in
-   web/blip_net_ui.js. */
-.blip-qr-warn,
-.blip-net-warn {
-  display: none;
-  margin: 4px auto 2px;
-  max-width: 92%;
-  font-size: 8px;
-  line-height: 1.5;
-  letter-spacing: 1px;
-  color: #ffd94a;
-  text-align: center;
-}
-/* Live ICE candidate list in the pairing modal — one row per candidate
-   pair the two devices are testing. Colour is the whole point: green for
-   a path being attempted or already carrying traffic, red for one that
-   has been ruled out, dim for one still queued. All red means something
-   is dropping device-to-device traffic; see the blocked-network note in
-   docs/multiplayer.md. */
-.blip-ice-list {
-  /* Reserve the height its rows will need, so they do not change the
-     panel's size when they appear. The code above is sized to the space
-     left over, and a list that grows after that would either push the
-     code off the fold or force it to be re-rendered smaller while the
-     player is looking at it. Four rows is more paths than a home network
-     produces; beyond that the list scrolls rather than the panel.
-
-     Fixed rather than reserved-then-grown, and never display:none —
-     the list is on screen from the moment the code is, carrying a
-     placeholder line until ICE has something to say. */
-  height: 62px;
-  overflow-y: auto;
-  margin: 6px auto 2px;
-  max-width: 96%;
-  text-align: left;
-  font-size: 7px;
-  line-height: 1.9;
-  letter-spacing: 0.5px;
-}
-.blip-ice-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-.blip-ice-dot {
-  flex: 0 0 auto;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #556;
-}
-.blip-ice-dot.ok  { background: #5cd65c; box-shadow: 0 0 5px rgba(92, 214, 92, 0.8); }
-.blip-ice-dot.err { background: #ff6b6b; box-shadow: 0 0 5px rgba(255, 107, 107, 0.8); }
-.blip-ice-dot.idle { background: #556; }
-.blip-ice-addr {
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: #9fb4bf;
-}
-.blip-ice-state { flex: 0 0 auto; color: #667; }
-/* Holds the list's place while ICE is still gathering — see
-   iceListPlaceholder() in web/blip_net_ui.js. */
-.blip-ice-empty { color: #667; }
-
-/* What a successful scan actually read. Green, and phrased as evidence
-   ("host code · 2 routes · 538 bytes") rather than a bare tick — the
-   only place the scanned content is visible to a human. */
-.blip-scan-result {
-  display: none;
-  margin: 6px auto 2px;
-  max-width: 96%;
-  font-size: 8px;
-  line-height: 1.6;
-  letter-spacing: 1px;
-  color: #6dffa8;
-  text-align: center;
-}
-
-/* ...and the same line when what was scanned is not a pairing code at
-   all. Green there would be the UI agreeing with itself that a failure
-   succeeded. */
-.blip-scan-result.bad { color: #ff6b6b; }
-
 .blip-hs-input {
   width: 100%;
   box-sizing: border-box;
@@ -735,9 +648,7 @@ canvas {
   letter-spacing: 3px;
   text-align: center;
   text-transform: uppercase;
-}
-.blip-hs-input:focus { outline: none; border-color: #ffd94a; }
-.blip-hs-code {
+}.blip-hs-input:focus { outline: none; border-color: #ffd94a; }.blip-hs-code {
   margin: 10px 0 2px;
   padding: 12px 8px;
   border: 2px dashed rgba(120, 220, 255, 0.55);
@@ -750,14 +661,12 @@ canvas {
   text-align: center;
   word-break: break-all;
   text-shadow: 0 0 8px rgba(120, 220, 255, 0.55);
-}
-.blip-hs-list {
+}.blip-hs-list {
   list-style: none;
   margin: 8px 0 4px;
   padding: 0;
   text-align: left;
-}
-.blip-hs-item {
+}.blip-hs-item {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -765,24 +674,17 @@ canvas {
   font-size: 9px;
   letter-spacing: 1px;
   border-bottom: 1px solid rgba(120, 220, 255, 0.12);
-}
-.blip-hs-item .hs-rank { width: 22px; color: #7fa6b5; flex: none; }
-.blip-hs-item .hs-name {
+}.blip-hs-item .hs-rank { width: 22px; color: #7fa6b5; flex: none; }.blip-hs-item .hs-name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.blip-hs-item .hs-score { color: #ffd94a; flex: none; }
-.blip-hs-item.me { color: #6dffa8; }
-.blip-hs-item.me .hs-rank, .blip-hs-item.me .hs-score { color: #6dffa8; }
-.blip-hs-row {
+}.blip-hs-item .hs-score { color: #ffd94a; flex: none; }.blip-hs-item.me { color: #6dffa8; }.blip-hs-item.me .hs-rank, .blip-hs-item.me .hs-score { color: #6dffa8; }.blip-hs-row {
   display: flex;
   gap: 8px;
   justify-content: center;
   margin-top: 12px;
-}
-.blip-hs-btn {
+}.blip-hs-btn {
   flex: 1;
   padding: 10px 8px;
   border: 2px solid rgba(120, 220, 255, 0.5);
@@ -799,70 +701,8 @@ canvas {
 .blip-hs-btn:disabled { opacity: 0.5; }
 .blip-hs-btn.ghost { background: transparent; border-color: rgba(120, 220, 255, 0.25); color: #7fa6b5; }
 
-/* PLAY NEARBY pairing modal. */
-.blip-net-modal {
-  overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.blip-net-modal::-webkit-scrollbar { display: none; }
-/* One short status line under the QR or camera preview. */
-.blip-net-status {
-  width: 100%;
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 auto 2px;
-  padding: 8px 10px;
-  border: 2px solid rgba(120, 220, 255, 0.35);
-  border-radius: 4px;
-  background: rgba(16, 32, 44, 0.6);
-}
-.blip-net-status-dot {
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #7fa6b5;
-  box-shadow: 0 0 6px rgba(127, 166, 181, 0.8);
-}
-.blip-net-status.wait .blip-net-status-dot { background: #ffd94a; box-shadow: 0 0 6px rgba(255, 217, 74, 0.8); }
-.blip-net-status.active .blip-net-status-dot {
-  background: #ffd94a;
-  box-shadow: 0 0 6px rgba(255, 217, 74, 0.8);
-  animation: blip-net-status-pulse 1s ease-in-out infinite;
-}
-.blip-net-status.ok .blip-net-status-dot { background: #6dffa8; box-shadow: 0 0 6px rgba(109, 255, 168, 0.8); }
-.blip-net-status.err .blip-net-status-dot { background: #ff6b6b; box-shadow: 0 0 6px rgba(255, 107, 107, 0.8); }
-.blip-net-status-text {
-  flex: 1;
-  min-width: 0;
-  font-family: inherit;
-  font-size: 10px;
-  line-height: 1.4;
-  letter-spacing: 0.5px;
-  color: #cfe6ef;
-  text-align: left;
-  word-break: break-word;
-}
-.blip-net-status.ok .blip-net-status-text { color: #6dffa8; }
-.blip-net-status.active .blip-net-status-text { color: #ffd94a; }
-.blip-net-status.err .blip-net-status-text { color: #ff6b6b; }
-
-@keyframes blip-net-status-pulse {
-  50% { opacity: 0.35; transform: scale(0.7); }
-}
-
-/* A window this short has no spare 60px: the reservation above would be
-   taken straight out of the code. One row, and the list scrolls. */
-@media (max-height: 520px) {
-  .blip-ice-list { height: 24px; }
-}
-
 @media (max-width: 380px) {
   .blip-hs-title { font-size: 11px; }
   .blip-hs-item { font-size: 8px; }
   .blip-hs-code { font-size: 12px; letter-spacing: 2px; }
-  .blip-net-status-text { font-size: 9px; }
 }

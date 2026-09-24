@@ -1,6 +1,5 @@
 //! Rally (Pong vs CPU), Rust port of `games/rally/main.c` on macroquad.
 
-mod net;
 
 use blip::input::{
     any_key_pressed, key_held, key_pressed, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
@@ -11,7 +10,6 @@ use blip::{
     play_music, play_sfx, rects_overlap, web, window_conf, Blip, BlipColor, Timer, BLIP_BLACK,
     BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
-use net::{pack_state, sanitize_state, unpack_state, Limits, NetState, NET_STATE_LEN};
 
 // ---- layout -----------------------------------------------------------
 const WIN_W: i32 = 480;
@@ -34,20 +32,6 @@ const BALL_SPD0: f32 = 275.0;
 const BALL_INC: f32 = 15.0;
 const BALL_MAX: f32 = 450.0;
 const AI_SPD: f32 = 145.0;
-/// Bounds a guest applies to an inbound host packet (see
-/// `net::sanitize_state`). Deliberately looser than the values a healthy
-/// host actually sends: a ball is legitimately a little past the edge on
-/// the frame it scores, and velocity carries a margin over `BALL_MAX`,
-/// so this rejects the impossible without second-guessing the merely
-/// unusual.
-const NET_LIMITS: Limits = Limits {
-    x_min: -4.0 * BALL_SZ,
-    x_max: WIN_W as f32 + 4.0 * BALL_SZ,
-    y_min: PLAY_T - 4.0 * BALL_SZ,
-    y_max: PLAY_B + 4.0 * BALL_SZ,
-    speed_max: 2.0 * BALL_MAX,
-    score_max: SCORE_WIN,
-};
 // A hard floor on how long the win/lose screen stays up before a key can
 // dismiss it — without this, a paddle key still held from the rally that
 // just ended bounces straight back to the title screen unread.
@@ -66,39 +50,8 @@ const C_HUD_LINE: BlipColor = BlipColor { r: 28.0/255.0, g: 28.0/255.0, b: 28.0/
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Serve, Play, Point, Over }
 
-impl State {
-    /// The ordinal `net::NetState.phase` uses on the wire. Title is never
-    /// sent (a guest only exists once a match is already under way).
-    fn to_phase(self) -> i32 {
-        match self {
-            State::Title => -1,
-            State::Serve => 0,
-            State::Play => 1,
-            State::Point => 2,
-            State::Over => 3,
-        }
-    }
-    fn from_phase(p: i32) -> Option<State> {
-        match p {
-            0 => Some(State::Serve),
-            1 => Some(State::Play),
-            2 => Some(State::Point),
-            3 => Some(State::Over),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum Mode { OnePlayer, TwoPlayer }
-
-/// Two-device play (see `docs/multiplayer.md`). `None` is every existing
-/// local mode, unchanged. A `Host` plays a completely normal local
-/// `Mode::TwoPlayer` match — the only difference is it also streams its
-/// state out every frame — while a `Guest` never simulates anything at
-/// all: its whole `Game` is just whatever the host last sent.
-#[derive(Copy, Clone, PartialEq, Eq)]
-enum NetRole { None, Host, Guest }
 
 struct Game {
     lpad_y: f32, rpad_y: f32,
@@ -107,7 +60,6 @@ struct Game {
     point_t: Timer,
     state: State,
     mode: Mode,
-    net_role: NetRole,
 }
 
 impl Game {
@@ -119,7 +71,6 @@ impl Game {
             point_t: Timer::default(),
             state: State::Title,
             mode: Mode::OnePlayer,
-            net_role: NetRole::None,
         }
     }
 
@@ -173,30 +124,6 @@ fn p2_dial_spun() -> bool {
 }
 
 fn update_title(g: &mut Game) {
-    // A two-device match, requested through the JS pairing UI (room code /
-    // QR — see web/blip_net.js), takes priority over the normal local
-    // menu. Both roles play as a plain Mode::TwoPlayer match: a host reads
-    // the remote paddle exactly like a local P2 (see update_play's net
-    // push below), and a guest never reaches update_play's simulation at
-    // all (see the main loop's dispatch).
-    match web::net::role() {
-        1 => {
-            g.mode = Mode::TwoPlayer;
-            g.net_role = NetRole::Host;
-            web::set_mode(true);
-            g.start_game();
-            return;
-        }
-        2 => {
-            g.mode = Mode::TwoPlayer;
-            g.net_role = NetRole::Guest;
-            web::set_mode(true);
-            g.start_game();
-            return;
-        }
-        _ => {}
-    }
-
     // Spin the P2 dial (or press "2") for a two-player game; spin your own
     // dial for one player against the CPU.
     if key_pressed(KeyCode::Key2) || p2_dial_spun() {
@@ -210,35 +137,6 @@ fn update_title(g: &mut Game) {
     }
 }
 
-/// A guest's entire "simulation": pull whatever the host last sent and
-/// copy it straight into `Game`'s fields, including which state we're
-/// nominally in (the top-level dispatch in `main` uses `g.state` for
-/// *drawing* exactly the same as any local match, so `draw_serve` /
-/// `draw_play` / `draw_point` / `draw_over` don't need to know or care
-/// that they're mirroring a remote match). Missing/garbled packets are
-/// dropped silently — just keep showing the last good frame.
-fn update_net_guest(g: &mut Game) {
-    let mut buf = [0u8; NET_STATE_LEN];
-    let n = web::net::poll(&mut buf);
-    if n != NET_STATE_LEN {
-        return;
-    }
-    let Some(raw) = unpack_state(&buf) else { return };
-    // The host is believed, so what it says has to be believable first —
-    // see net::sanitize_state. A rejected packet is treated exactly like
-    // a garbled one: keep the last good frame.
-    let Some(s) = sanitize_state(&raw, &NET_LIMITS) else { return };
-    let Some(state) = State::from_phase(s.phase) else { return };
-    g.state = state;
-    g.ball_x = s.ball_x;
-    g.ball_y = s.ball_y;
-    g.ball_vx = s.ball_vx;
-    g.ball_vy = s.ball_vy;
-    g.lpad_y = s.lpad_y;
-    g.rpad_y = s.rpad_y;
-    g.score_l = s.score_l;
-    g.score_r = s.score_r;
-}
 
 fn update_serve(g: &mut Game, dt: f32) {
     if key_held(BLIP_KEY_UP)   || key_held(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
@@ -422,10 +320,6 @@ fn draw_point(blip: &Blip, g: &Game) {
     blip.clear(BLIP_BLACK);
     draw_net(blip);
     draw_hud(blip, g.score_l, g.score_r);
-    // Blinks off host's own point_t counting down; a guest's is never
-    // armed (its whole Game is mirrored, not simulated — see
-    // update_net_guest), so remaining() reads 0 and this is just steady
-    // on instead of blinking. Harmless — still reads as "POINT!".
     if (g.point_t.remaining() * 6.0) as i32 % 2 == 0 {
         blip.draw_centered("POINT!", PLAY_T + PLAY_H * 0.5, 3.0, BLIP_YELLOW);
     }
@@ -442,11 +336,7 @@ fn draw_over(blip: &Blip, g: &Game) {
         if g.score_l >= SCORE_WIN { "YOU WIN!" } else { "GAME OVER" }
     };
     blip.draw_centered(msg, cy - 20.0, 3.0, BLIP_YELLOW);
-    // A guest's own update_over never runs (see the main loop's net-guest
-    // branch) — a "press to restart" prompt would be a dead end for them,
-    // since there's no local restart to trigger. Host and every local
-    // match still get the normal prompt once point_t's grace period ends.
-    if g.net_role != NetRole::Guest && !g.point_t.active() {
+    if !g.point_t.active() {
         blip.draw_centered("MOVE A PADDLE TO PLAY AGAIN", cy + 24.0, 2.0, BLIP_GRAY);
     }
 }
@@ -499,33 +389,12 @@ async fn main() {
             play_music(&music[music_idx]);
         }
 
-        // A guest never simulates — see update_net_guest's own doc comment
-        // — for every state past Title, which is the one place role
-        // itself gets decided (see update_title).
-        if g.net_role == NetRole::Guest && g.state != State::Title {
-            update_net_guest(&mut g);
-        } else {
-            match g.state {
-                State::Title => update_title(&mut g),
-                State::Serve => update_serve(&mut g, dt),
-                State::Play  => update_play(&mut g, dt, &sfx),
-                State::Point => update_point(&mut g, dt),
-                State::Over  => update_over(&mut g, dt),
-            }
-        }
-
-        // Host: stream the just-updated state out every frame so a
-        // connected guest's update_net_guest above has a fresh packet to
-        // pull. A no-op with nobody guesting — blip_net.js just drops
-        // bytes it has nowhere to send.
-        if g.net_role == NetRole::Host && g.state != State::Title {
-            let s = NetState {
-                phase: g.state.to_phase(),
-                ball_x: g.ball_x, ball_y: g.ball_y, ball_vx: g.ball_vx, ball_vy: g.ball_vy,
-                lpad_y: g.lpad_y, rpad_y: g.rpad_y,
-                score_l: g.score_l, score_r: g.score_r,
-            };
-            web::net::send(&pack_state(&s));
+        match g.state {
+            State::Title => update_title(&mut g),
+            State::Serve => update_serve(&mut g, dt),
+            State::Play  => update_play(&mut g, dt, &sfx),
+            State::Point => update_point(&mut g, dt),
+            State::Over  => update_over(&mut g, dt),
         }
 
         // Feed the two paddle positions to the shell so it can spin the
