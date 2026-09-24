@@ -29,6 +29,7 @@ pub fn draw(blip: &Blip, g: &Game) {
         _ => {
             draw_stage(blip, g);
             draw_fight(blip, g);
+            draw_decks(blip, g);
             draw_hud(blip, g);
             draw_banner(blip, g);
         }
@@ -2557,59 +2558,69 @@ fn draw_title(blip: &Blip, g: &Game) {
         BlipColor { r: 0.95, g: 0.88, b: 0.60, a: 1.0 });
 }
 
-/// One player's controls, drawn as the deck of a cabinet: a ball-top
-/// stick and four buttons in the same square the move list is in.
+/// Both players' decks, along the bottom of the screen while they are
+/// fighting.
 ///
-/// Punches in the left column and kicks in the right, high on the top
-/// row and low on the bottom — the buttons are laid out the way the
-/// moves are, so a player reads the panel once and knows where every
-/// attack lives. Each button carries the key that presses it, because
-/// there is no stick on a keyboard and the letters are the whole map.
-fn draw_deck(blip: &Blip, x: f32, y: f32, tag: &str, col: BlipColor, stick: &str,
-             keys: [&str; 4]) {
-    const W: f32 = 196.0;
-    const H: f32 = 74.0;
-    let metal = BlipColor { r: 0.15, g: 0.15, b: 0.19, a: 1.0 };
-    let edge = BlipColor { r: 0.34, g: 0.34, b: 0.42, a: 1.0 };
-    let ink = BlipColor { r: 0.06, g: 0.06, b: 0.08, a: 1.0 };
-    blip.fill_rect(x, y, W, H, metal);
-    blip.draw_rect(x, y, W, H, edge);
-    blip.fill_rect(x, y, W, 2.0, blend(metal, BLIP_WHITE, 0.18));
-    blip.draw_text(tag, x + 6.0, y + 5.0, 2.0, col);
+/// This is where a control panel is actually wanted. On the select
+/// screen it is read once and then the screen is gone; down here it is
+/// in the corner of the eye at the moment somebody has forgotten which
+/// button was the high kick, which is the moment they need it. Only in
+/// versus: alone there is nobody to remind.
+///
+/// Laid over the boards rather than taking a strip out of the stage,
+/// so the fight keeps the whole screen and the panel keeps out of the
+/// way of it.
+fn draw_decks(blip: &Blip, g: &Game) {
+    if g.mode != Mode::Versus { return; }
+    const TOP: f32 = 356.0;
+    blip.fill_rect(0.0, TOP, WIN_W as f32, WIN_H as f32 - TOP,
+        BlipColor { r: 0.04, g: 0.04, b: 0.06, a: 0.80 });
+    blip.fill_rect(0.0, TOP, WIN_W as f32, 1.0,
+        BlipColor { r: 0.36, g: 0.36, b: 0.44, a: 0.9 });
+    let p1c = BlipColor { r: 1.0, g: 0.35, b: 0.35, a: 1.0 };
+    let p2c = BlipColor { r: 0.40, g: 0.72, b: 1.0, a: 1.0 };
+    draw_mini_deck(blip, 6.0, TOP + 2.0, "P1", p1c, ["R", "T", "F", "G"]);
+    draw_mini_deck(blip, 466.0, TOP + 2.0, "P2", p2c, ["U", "I", "J", "K"]);
+}
 
-    // The stick: a dust washer, a shaft and a ball on top of it.
-    let (sx, sy) = (x + 40.0, y + 40.0);
-    blip.fill_circle(sx, sy, 17.0, shade(metal, 0.62));
-    blip.fill_circle(sx, sy, 13.0, shade(metal, 1.5));
-    blip.fill_rect(sx - 3.0, sy - 22.0, 6.0, 22.0, BlipColor { r: 0.75, g: 0.76, b: 0.82, a: 1.0 });
-    blip.fill_circle(sx, sy - 24.0, 9.0, ink);
-    blip.fill_circle(sx, sy - 24.0, 7.5, col);
-    blip.fill_circle(sx - 2.5, sy - 26.5, 3.0, blend(col, BLIP_WHITE, 0.45));
-    // The keys the stick is: it is the movement, so it carries the
-    // label rather than a column of text somewhere else on the screen.
-    let label = BlipColor { r: 0.72, g: 0.74, b: 0.82, a: 1.0 };
-    blip.draw_text(stick, sx - text_w(stick, 1.0) / 2.0, y + 60.0, 1.0, label);
+/// The deck at the size it can be while still being read at a glance:
+/// a stick, and four buttons in the square the move list is in.
+fn draw_mini_deck(blip: &Blip, x: f32, y: f32, tag: &str, col: BlipColor, keys: [&str; 4]) {
+    let ink = BlipColor { r: 0.05, g: 0.05, b: 0.07, a: 1.0 };
+    let metal = BlipColor { r: 0.17, g: 0.17, b: 0.21, a: 1.0 };
+    blip.draw_text(tag, x, y + 14.0, 2.0, col);
+
+    // Stick.
+    let (sx, sy) = (x + 44.0, y + 28.0);
+    blip.fill_circle(sx, sy, 11.0, shade(metal, 0.7));
+    blip.fill_circle(sx, sy, 8.0, shade(metal, 1.5));
+    blip.fill_rect(sx - 2.0, sy - 14.0, 4.0, 14.0,
+        BlipColor { r: 0.75, g: 0.76, b: 0.82, a: 1.0 });
+    blip.fill_circle(sx, sy - 16.0, 6.5, ink);
+    blip.fill_circle(sx, sy - 16.0, 5.0, col);
 
     // Four buttons: punch column, kick column; high row, low row.
     let punch = BlipColor { r: 0.95, g: 0.78, b: 0.22, a: 1.0 };
     let kick = BlipColor { r: 0.38, g: 0.80, b: 0.95, a: 1.0 };
-    let (bx, by) = (x + 92.0, y + 22.0);
-    blip.draw_text("P", bx - 3.0, y + 8.0, 1.0, punch);
-    blip.draw_text("K", bx + 37.0, y + 8.0, 1.0, kick);
+    // Forty-four pixels of panel has to hold a column header, two rows
+    // of buttons and their edges, so every one of these is measured
+    // rather than eyeballed.
+    let (bx, by) = (x + 88.0, y + 14.0);
     for (i, key) in keys.iter().enumerate() {
-        let (cx, cy) = (bx + (i % 2) as f32 * 40.0, by + (i / 2) as f32 * 26.0);
-        // High is the lit one of the pair, low the sunk one — the same
-        // pairing the move list makes, said in brightness.
+        let (cx, cy) = (bx + (i % 2) as f32 * 26.0, by + (i / 2) as f32 * 16.0);
         let base = if i % 2 == 0 { punch } else { kick };
         let face = if i < 2 { base } else { shade(base, 0.55) };
-        blip.fill_circle(cx, cy, 12.0, ink);
-        blip.fill_circle(cx, cy, 10.0, face);
-        blip.fill_circle(cx - 3.0, cy - 3.5, 4.0, blend(face, BLIP_WHITE, 0.35));
-        blip.draw_text(key, cx - text_w(key, 2.0) / 2.0, cy - 7.0, 2.0, ink);
+        blip.fill_circle(cx, cy, 9.0, ink);
+        blip.fill_circle(cx, cy, 7.5, face);
+        blip.draw_text(key, cx - text_w(key, 1.0) / 2.0, cy - 3.5, 1.0, ink);
     }
-    blip.draw_text("HI", bx - 30.0, by - 4.0, 1.0, label);
-    blip.draw_text("LO", bx - 30.0, by + 22.0, 1.0, label);
+    let label = BlipColor { r: 0.70, g: 0.72, b: 0.80, a: 1.0 };
+    blip.draw_text("HI", bx - 24.0, by - 3.0, 1.0, label);
+    blip.draw_text("LO", bx - 24.0, by + 13.0, 1.0, label);
+    blip.draw_text("P", bx - 3.0, by - 12.0, 1.0, punch);
+    blip.draw_text("K", bx + 23.0, by - 12.0, 1.0, kick);
 }
+
 
 fn draw_select(blip: &Blip, g: &Game) {
     let versus = g.mode == Mode::Versus;
@@ -2686,19 +2697,22 @@ fn draw_select(blip: &Blip, g: &Game) {
         // so neither player reaches across the other. Drawn rather than
         // listed: four buttons in a square is a picture, and a picture
         // of the deck is what a player is looking for.
-        draw_deck(blip, 24.0, 304.0, "P1", p1c, "W A S D", ["R", "T", "F", "G"]);
-        draw_deck(blip, 420.0, 304.0, "P2", p2c, "ARROWS", ["U", "I", "J", "K"]);
-        blip.draw_centered("PUNCH AND", 316.0, 1.0,
+        // Just the movement here, and a reminder of the two rules a
+        // player cannot find by pressing buttons. The button panel
+        // lives at the bottom of the fight, where it is wanted.
+        blip.draw_text("P1", 40.0, 322.0, 2.0, p1c);
+        blip.draw_text("W A S D", 72.0, 322.0, 2.0,
+            BlipColor { r: 0.80, g: 0.74, b: 0.78, a: 1.0 });
+        blip.draw_text("P2", 400.0, 322.0, 2.0, p2c);
+        blip.draw_text("ARROWS", 432.0, 322.0, 2.0,
+            BlipColor { r: 0.76, g: 0.80, b: 0.88, a: 1.0 });
+        blip.draw_centered("PUNCH AND KICK TOGETHER IS THE SPECIAL", 348.0, 1.0,
             BlipColor { r: 0.66, g: 0.66, b: 0.74, a: 1.0 });
-        blip.draw_centered("KICK TOGETHER", 328.0, 1.0,
-            BlipColor { r: 0.66, g: 0.66, b: 0.74, a: 1.0 });
-        blip.draw_centered("IS THE SPECIAL", 340.0, 1.0,
-            BlipColor { r: 0.66, g: 0.66, b: 0.74, a: 1.0 });
-        blip.draw_centered("NO TWO THE SAME", 358.0, 1.0,
+        blip.draw_centered("NO TWO THE SAME", 364.0, 1.0,
             BlipColor { r: 0.55, g: 0.55, b: 0.62, a: 1.0 });
         let waiting = !g.locked[0] || !g.locked[1];
         blip.draw_centered(if waiting { "PRESS TO LOCK IN" } else { "FIGHT" },
-            380.0, 2.0, BLIP_WHITE);
+            382.0, 2.0, BLIP_WHITE);
     } else {
         let a = FIGHTERS[g.pick];
         let s = format!("SPECIAL: {}    PUNCH AND KICK", a.special_name);
