@@ -734,11 +734,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   inset: 0;
   display: flex;
   align-items: center;
-  /* stick + fire buttons as one centered group, a wide gap between them —
-     wide enough two thumbs don't collide over the middle of the deck */
-  justify-content: center;
-  gap: 52px;
-  padding: 0 10px env(safe-area-inset-bottom, 0px);
+  /* One station per player, each filling its share of the panel; the
+     stick and the caps are pushed to the two ends of that share (see
+     .deck-side), so the deck matches the game pad's layout exactly. */
+  justify-content: space-between;
+  gap: 0;
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
   overflow: visible;
   border-radius: 10px 10px 0 0;
   transform-style: preserve-3d;
@@ -1652,18 +1653,31 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    A cabinet with a 2-PLAYER badge on it has two stations on the panel,
    so the deck builds both up front and reveals the second one when the
    game reports a second player (blip_set_mode -> <html data-players>).
-   Station two is mirrored: its caps sit inboard and its stick outboard,
-   the way a real two-player panel faces each deck toward its player. */
+   Both stations are the same deck: stick on the left, buttons on the
+   right, pushed as far apart as the panel allows. Mirroring the second
+   one put its buttons under the thumb the first one steers with, which
+   is two different controllers on one machine. */
 /* Anchored to the panel's front edge, like the stick was when it was a
    direct child of it — everything tall (the stick's shaft, a square of
    caps) then grows upward over the game instead of half of it dropping
-   off the bottom of the screen. */
+   off the bottom of the screen.
+   
+   A station fills its share of the panel and pushes the stick to one
+   end of it and the caps to the other, which is what the game pad does
+   (its shell has always been a space-between row) and what a cabinet
+   does. Held as a centred pair with a gap in the middle, the two were
+   under one hand and the deck read as a different controller depending
+   on which one you had chosen. */
 .deck-side {
   position: relative;
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: flex-end;
   align-self: flex-end;
-  gap: 18px;
+  justify-content: space-between;
+  padding: 0 var(--sf-edge, clamp(18px, 5vw, 46px));
+  gap: 12px;
 }
 
 /* Silkscreened station number, printed on the panel between the stick
@@ -1683,19 +1697,19 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 
 /* One station until the game says otherwise. */
-#deck-p2, .snes-pad.mirrored, :root:not([data-players="2"]) .deck-tag { display: none; }
+#deck-p2, .snes-pad.second, :root:not([data-players="2"]) .deck-tag { display: none; }
 :root[data-players="2"] #deck-p2 { display: flex; }
-:root[data-players="2"][data-controls="pad"] .snes-pad.mirrored { display: block; }
+:root[data-players="2"][data-controls="pad"] .snes-pad.second { display: block; }
 
 /* Two stations share the panel's width: each pad takes half of the bar,
    and the sticks pull their gaps in so both fit on a phone. */
-:root[data-players="2"] .kiosk-bar > .deck-panel { gap: clamp(8px, 3vw, 34px); }
-:root[data-players="2"] .deck-side { gap: clamp(6px, 2vw, 16px); }
+:root[data-players="2"] .deck-side {
+  gap: clamp(6px, 2vw, 16px);
+  padding: 0 clamp(4px, 2vw, 18px);
+}
 :root[data-players="2"] .snes-pad { width: 50%; --sf-edge: clamp(6px, 2.5vw, 22px); }
 :root[data-players="2"] #snes-pad { right: 50%; }
-:root[data-players="2"] .snes-pad.mirrored { left: 50%; }
-.snes-pad.mirrored .snes-shell { flex-direction: row-reverse; }
-.snes-pad.mirrored .snes-wordmark { display: none; }
+:root[data-players="2"] .snes-pad.second { left: 50%; }
 
 /* ---- Four caps: the fighting deck ----
    Punches on the top row, kicks under them; light on the left, heavy on
@@ -1799,7 +1813,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-players="2"] .snes-pad .snes-wordmark { display: none; }
 
 @media (max-width: 620px) {
-  :root[data-players="2"] .kiosk-bar > .deck-panel { gap: clamp(14px, 5vw, 34px); }
   :root[data-players="2"] .fire-buttons.four { grid-template-columns: repeat(2, 37px); gap: 5px; }
   :root[data-players="2"] .arcade-btn { width: 37px; height: 37px; }
   :root[data-players="2"] .arcade-btn.lettered .arcade-btn-label { font-size: 8px; }
@@ -1810,3 +1823,145 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-players="2"] .stick-base::before { width: 44px; }
   :root[data-players="2"] .deck-tag { font-size: 6px; }
 }
+
+/* ======================================================================
+   Landscape on a phone — the deck moves into the letterbox
+   ======================================================================
+   Turned sideways there is no height to spare: the control strip is a
+   third of the screen and what is left over is a slot. But the games
+   draw a 5:4 picture, and a 5:4 picture in a 2:1 screen leaves a wide
+   black gutter down each side doing nothing — which is exactly where a
+   pair of thumbs already are when a phone is held in two hands.
+
+   So sideways the bar stops being a bar. It becomes the whole screen,
+   transparent, with the stick (or the cross) down in the left gutter
+   and the buttons down in the right one. shell.js stops reserving any
+   height for it, so the picture gets the full height of the screen. */
+
+/* [data-controls] is carried only to out-weigh the two rules above that
+   set a bar height per controller — sideways there is no bar to have a
+   height, and the taller of them would otherwise win. */
+:root[data-layout="landscape"][data-controls] #topbar.kiosk-bar {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: auto;
+  padding: 0;
+  background: none;
+  border-top: 0;
+  box-shadow: none;
+  pointer-events: none;   /* the controls take input; the gap does not */
+}
+
+/* No tilted panel sideways: the deck is not a surface you are looking
+   down onto any more, it is two controls sitting over the picture. The
+   3D rotate also pushed anything tall off the bottom of a short screen,
+   which is every phone in landscape. */
+:root[data-layout="landscape"] .kiosk-bar > .deck-panel {
+  transform: none;
+  background: none;
+  border-top: 0;
+  box-shadow: none;
+  align-items: flex-end;
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
+}
+:root[data-layout="landscape"] .deck-side,
+:root[data-layout="landscape"] .stick-base,
+:root[data-layout="landscape"] .fire-buttons,
+:root[data-layout="landscape"] .snes-btn,
+:root[data-layout="landscape"] .arcade-btn,
+:root[data-layout="landscape"] .snes-dpad { pointer-events: auto; }
+
+/* The gutter is as wide as the picture's own letterbox: half of what is
+   left over when a 5:4 picture is fitted into the screen. The controls
+   live inside it, hard against the outside edge. */
+:root[data-layout="landscape"] .deck-side {
+  padding: 0 max(10px, env(safe-area-inset-left, 0px)) 8px;
+}
+
+/* The pad, sideways: the shell stops being a moulded panel across the
+   bottom and becomes the same two controls in the same two gutters. */
+:root[data-layout="landscape"] .snes-pad .snes-shell {
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  align-items: flex-end;
+  padding: 0 max(10px, env(safe-area-inset-left, 0px))
+             calc(env(safe-area-inset-bottom, 0px) + 10px);
+}
+:root[data-layout="landscape"] .snes-pad .snes-wordmark,
+:root[data-layout="landscape"] .snes-pad .snes-cord { display: none; }
+
+/* Bigger, because there is room now: a gutter is a hundred-odd pixels
+   wide and a thumb is not smaller in landscape. */
+:root[data-layout="landscape"] .snes-pad { --sf-btn: 40px; --sf-gap: 12px; --sf-dpad: 76px; }
+:root[data-layout="landscape"] .stick-base { width: 86px; height: 150px; }
+:root[data-layout="landscape"] .stick-boot { width: 46px; height: 46px; bottom: 6px; }
+:root[data-layout="landscape"] .stick-handle { bottom: 46px; }
+:root[data-layout="landscape"] .stick-shaft { width: 11px; height: 34px; }
+:root[data-layout="landscape"] .stick-ball { width: 52px; height: 52px; bottom: 34px; }
+
+/* Two players, sideways: a station per gutter, and the whole middle of
+   the screen is the fight. This is the one layout where two people
+   sharing one phone actually works — they are holding an end each.
+
+   Each station stays the row it is everywhere else (stick left, caps
+   right) and simply shrinks to fit a gutter, rather than stacking into
+   a column: a column climbs halfway up the screen and puts the caps
+   somewhere no thumb is. */
+:root[data-layout="landscape"][data-players="2"] .deck-side {
+  flex: 0 0 auto;
+  gap: 8px;
+  padding: 0 max(6px, env(safe-area-inset-left, 0px)) 8px;
+}
+:root[data-layout="landscape"][data-players="2"] .fire-buttons.four {
+  grid-template-columns: repeat(2, 34px);
+  gap: 5px;
+}
+:root[data-layout="landscape"][data-players="2"] .arcade-btn { width: 34px; height: 34px; }
+:root[data-layout="landscape"][data-players="2"] .stick-base { width: 62px; }
+:root[data-layout="landscape"][data-players="2"] .stick-boot { width: 38px; height: 38px; }
+:root[data-layout="landscape"][data-players="2"] .stick-ball { width: 42px; height: 42px; }
+:root[data-layout="landscape"][data-players="2"] .stick-shaft { width: 9px; }
+
+/* Two pads, one per gutter. Each keeps its cross on the left and its
+   caps on the right; they are just half a screen apart instead of
+   shoulder to shoulder. */
+:root[data-layout="landscape"][data-players="2"] .snes-pad { --sf-btn: 33px; --sf-dpad: 62px; --sf-gap: 8px; }
+:root[data-layout="landscape"][data-players="2"] .snes-pad .snes-shell {
+  padding: 0 max(6px, env(safe-area-inset-left, 0px))
+             calc(env(safe-area-inset-bottom, 0px) + 8px);
+  justify-content: flex-start;
+  gap: 10px;
+}
+:root[data-layout="landscape"][data-players="2"] .snes-pad.second .snes-shell {
+  justify-content: flex-end;
+}
+:root[data-layout="landscape"] .deck-tag { bottom: 0; }
+
+/* The toggle back to the joystick goes with the deck: sideways there is
+   no bar under it to sit above, so it sits in the middle of the screen's
+   bottom edge, between the two gutters where nothing else is. */
+:root[data-layout="landscape"] #control-toggle,
+:root[data-layout="landscape"] #net-play-btn {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+}
+
+/* Rally's spinners, sideways. The knobs are the whole controller, and
+   the gutter is a good deal wider than the strip they used to share
+   with the coin slot — so they get the size a thumb wants, down at the
+   bottom corners where the hands already are. */
+:root[data-layout="landscape"] #paddle-dial,
+:root[data-layout="landscape"] #paddle-dial-p2 {
+  width: 96px;
+  height: 96px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+}
+:root[data-layout="landscape"] #paddle-dial    { left: max(8px, env(safe-area-inset-left, 0px)); }
+:root[data-layout="landscape"] #paddle-dial-p2 { right: max(8px, env(safe-area-inset-right, 0px)); }
+:root[data-layout="landscape"] #paddle-dial::before,
+:root[data-layout="landscape"] #paddle-dial-p2::before { width: 88px; height: 18px; }
+:root[data-layout="landscape"] #dial-label,
+:root[data-layout="landscape"] #dial-label-p2 { top: -14px; font-size: 8px; }
+:root[data-layout="landscape"] #paddle-dial,
+:root[data-layout="landscape"] #paddle-dial-p2 { pointer-events: auto; }

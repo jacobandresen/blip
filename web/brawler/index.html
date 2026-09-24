@@ -58,11 +58,12 @@
      </div>
      <div class="fire-buttons" id="fire-buttons"></div>
     </div>
-    <!-- Station two mirrors station one, buttons inboard, the way a
-         two-player cabinet faces its decks toward the middle. -->
-    <div class="deck-side mirrored" id="deck-p2">
+    <!-- Station two is built exactly like station one, not mirrored:
+         stick on the left, buttons on the right. A player's hands do
+         not swap over because they are sitting on the other side of a
+         cabinet, and the two decks have to be the same deck. -->
+    <div class="deck-side" id="deck-p2">
      <span class="deck-tag">2P</span>
-     <div class="fire-buttons" id="fire-buttons-p2"></div>
      <div class="stick-base" id="stick-base-p2">
        <div class="stick-boot"></div>
        <div class="stick-handle">
@@ -70,6 +71,7 @@
          <div class="stick-ball"></div>
        </div>
      </div>
+     <div class="fire-buttons" id="fire-buttons-p2"></div>
     </div>
     <!-- Paddle dials: rally only. Mounted in the deck like the stick —
          two spinner knobs on the tilted panel, P1 left / P2 right.
@@ -89,8 +91,9 @@
         taps + the d-pad drag hit-test as plain 2D. shell.js wires it
         through BlipController; #control-toggle (and the saved
         'blip-controls' pref) swaps back to the joystick above. Buttons:
-        a big d-pad on the left, A / B on the right — a game that
-        declares four (a fighter) gets four caps in a square instead.
+        a big d-pad on the left, the buttons on the right, as far
+        apart as the panel allows — a game that declares four (a
+        fighter) gets four caps in a square instead.
         No SELECT / START — the face buttons double as the title-screen
         "press fire", the BLIP logo is the way back to the arcade grid.
         Pad two is hidden until the game reports a second player. -->
@@ -111,7 +114,7 @@
       <span class="snes-wordmark" aria-hidden="true">BLIP</span>
     </div>
    </div>
-   <div class="snes-pad mirrored" id="snes-pad-p2" aria-hidden="true">
+   <div class="snes-pad second" id="snes-pad-p2" aria-hidden="true">
     <div class="snes-shell">
       <div class="snes-dpad">
         <span class="snes-dp-seg dp-up"    data-blip="p2up"    data-blip-nopress></span>

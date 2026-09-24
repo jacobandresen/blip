@@ -366,10 +366,31 @@ if (getCoins() <= 0) overlay.classList.add('visible');
 // The kiosk bar is position:fixed;bottom:0. We leave PAD px on each side
 // plus full clearance for the bar so it never overlaps the canvas.
 
+// A phone turned on its side.
+//
+// Upright, the deck is a strip across the bottom and the picture sits
+// above it. Turned sideways there is no room for that: the strip is a
+// third of the screen's height, and what is left is a letterbox. But a
+// 5:4 picture in a 2:1 screen leaves a wide black gutter down each
+// side doing nothing at all — so in landscape the deck moves INTO the
+// gutters. The controls flank the picture, the picture gets the whole
+// height, and nothing is given up for either.
+function landscape() {
+  return window.innerHeight <= 520 && window.innerWidth > window.innerHeight * 1.25;
+}
+function applyLayout() {
+  document.documentElement.setAttribute('data-layout', landscape() ? 'landscape' : 'upright');
+}
+applyLayout();
+
 function fillCanvas() {
+  applyLayout();
   var tb = document.getElementById('topbar');
-  // clamp to 56 so a mis-read of 0 before layout doesn't eat the whole screen
-  TOPBAR_H = tb ? Math.max(tb.offsetHeight, 56) : 56;
+  // Sideways the deck overlays the picture's own letterbox, so it takes
+  // no height at all.
+  TOPBAR_H = landscape() ? 0
+    // clamp to 56 so a mis-read of 0 before layout doesn't eat the whole screen
+    : (tb ? Math.max(tb.offsetHeight, 56) : 56);
   var mb = document.getElementById('marquee-bar');
   MARQUEE_H = mb ? Math.max(mb.offsetHeight, 28) : 0;
   var w = window.innerWidth  - PAD * 2;
@@ -387,6 +408,7 @@ function fillCanvas() {
   document.documentElement.style.setProperty('--topbar-h', TOPBAR_H + 'px');
 }
 window.addEventListener('resize', fillCanvas);
+window.addEventListener('orientationchange', function () { setTimeout(fillCanvas, 60); });
 fillCanvas();
 
 function hideLoader() {
@@ -709,8 +731,9 @@ window.addEventListener('keydown', function (e) {
       window.removeEventListener('pointercancel', onEnd, true);
     }
     // Whose half of the deck the touch landed in, and then: is it the
-    // stick's side of that half rather than the caps'. Station two's deck
-    // is mirrored, so its stick is the outboard (right) side of its half.
+    // stick's side of that half rather than the caps'. Both stations are
+    // laid out the same way — stick left, caps right — so "left of this
+    // station's caps" is the whole test on either of them.
     function isStickTouch(e) {
       if (base.getBoundingClientRect().width === 0) return false;
       if (stations.length > 1) {
@@ -720,7 +743,7 @@ window.addEventListener('keydown', function (e) {
       if (fire && e.target && e.target.closest && e.target.closest('.fire-buttons')) return false;
       if (fire) {
         var fr = fire.getBoundingClientRect();
-        if (fr.width && (who === 0 ? e.clientX >= fr.left - 6 : e.clientX <= fr.right + 6)) return false;
+        if (fr.width && e.clientX >= fr.left - 6) return false;
       }
       return true;
     }
