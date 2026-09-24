@@ -4,6 +4,30 @@ pub const SAMPLE_RATE: u32 = 44_100;
 
 /// Encode a buffer of i16 mono samples at `SAMPLE_RATE` as a WAV file.
 pub fn encode_pcm16_mono(samples: &[i16]) -> Vec<u8> {
+    encode_at(samples, SAMPLE_RATE)
+}
+
+/// The same, at half the rate, for music.
+///
+/// Music is the only thing here long enough for its size to matter: a
+/// sound effect is a tenth of a second and a loop is several seconds,
+/// and the two stage themes were most of the game's download. Halving
+/// the rate halves the bytes, and a taiko and a plucked string have
+/// nothing above eleven kilohertz to lose — which buys twice the loop
+/// for the same money, and a loop twice as long is the cheapest
+/// variety there is.
+///
+/// Averaging each pair before dropping one of them is the low-pass
+/// that stops whatever *is* up there folding back down as aliasing.
+pub fn encode_pcm16_music(samples: &[i16]) -> Vec<u8> {
+    let half: Vec<i16> = samples
+        .chunks(2)
+        .map(|c| if c.len() == 2 { ((c[0] as i32 + c[1] as i32) / 2) as i16 } else { c[0] })
+        .collect();
+    encode_at(&half, SAMPLE_RATE / 2)
+}
+
+fn encode_at(samples: &[i16], rate: u32) -> Vec<u8> {
     let n = samples.len();
     let data_bytes = (n * 2) as u32;
     let mut out = Vec::with_capacity(44 + n * 2);
@@ -14,8 +38,8 @@ pub fn encode_pcm16_mono(samples: &[i16]) -> Vec<u8> {
     out.extend_from_slice(&16u32.to_le_bytes());
     out.extend_from_slice(&1u16.to_le_bytes()); // PCM
     out.extend_from_slice(&1u16.to_le_bytes()); // mono
-    out.extend_from_slice(&SAMPLE_RATE.to_le_bytes());
-    out.extend_from_slice(&(SAMPLE_RATE * 2).to_le_bytes()); // byte rate
+    out.extend_from_slice(&rate.to_le_bytes());
+    out.extend_from_slice(&(rate * 2).to_le_bytes()); // byte rate
     out.extend_from_slice(&2u16.to_le_bytes()); // block align
     out.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
     out.extend_from_slice(b"data");

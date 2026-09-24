@@ -25,8 +25,10 @@
 
 mod draw;
 
-use blip::input::{btn1_pressed, btn2_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_C,
-    BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_UP,
+use blip::macroquad::input::KeyCode;
+use blip::input::{key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_C,
+    BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_H, BLIP_KEY_J, BLIP_KEY_K,
+    BLIP_KEY_L, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP,
     BLIP_KEY_W, BLIP_KEY_X};
 use blip::{clamp, play_music, play_sfx, rand_int, rects_overlap, web, window_conf, Blip,
     BlipColor, Session, Timer, BLIP_BLACK, BLIP_WHITE, BLIP_YELLOW};
@@ -66,6 +68,11 @@ const ROUNDS_TO_WIN: i32 = 2;
 const BODY_W: f32 = 30.0;
 const STAND_H: f32 = 120.0;
 const CROUCH_H: f32 = 74.0;
+/// How tall a fighter on their back is. They are drawn flat — the
+/// highest thing on them is the knee they have pulled up — while the
+/// box stayed at full standing height, so a flying kick sailing over a
+/// prone body still connected with the air above it.
+const PRONE_H: f32 = 34.0;
 
 // ---- physics -------------------------------------------------------------
 const GRAVITY: f32 = 1500.0;
@@ -75,7 +82,24 @@ const FLY_VY: f32 = -372.0;
 const FLY_SPEED: f32 = 300.0;
 /// What is left of the move once the feet touch. A jump attack is
 /// cancelled by landing; this is the one that is not.
+///
+/// Two of them, because the blow connects in the air and the recovery
+/// is paid on the ground, and the flight in between is time the
+/// defender spends in hitstun and the attacker spends committed. At
+/// one flat cost the move was nineteen frames *minus on hit*: landing
+/// it handed the opponent a free turn, which is a move nobody should
+/// ever throw. Connecting buys most of the landing back; being blocked
+/// does not, and that is where the whole risk of it lives.
 const FLY_LAND_LAG: f32 = 16.0 * F;
+const FLY_HIT_LAG: f32 = 4.0 * F;
+/// How long into a jump the flying kick is still available.
+///
+/// Pressing up and kick "together" is never the same frame for a
+/// human, and up jumps on the frame it is seen — so asking for both at
+/// once asked for a one-frame window, and the move was unreachable in
+/// practice. A kick inside this window levels the jump off into the
+/// flying kick; after it, a kick is the ordinary jump kick.
+const FLY_WINDOW: f32 = 6.0 * F;
 /// Air control is deliberately absent: the direction held at take-off is
 /// the whole commitment. A jump you can steer mid-air turns every jump-in
 /// into a guess the defender cannot answer, which is exactly the
@@ -86,7 +110,7 @@ const AIR_DRIFT: f32 = 180.0;
 enum Level { Low, Mid, Overhead }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-enum MoveId { Jab, LowKick, Kick, HighKick, CrouchJab, Sweep, JumpPunch, JumpKick, FlyingKick,
+enum MoveId { Jab, LowKick, HighKick, CrouchJab, Sweep, JumpPunch, JumpKick, FlyingKick,
     Special, Throw }
 
 /// One attack, in frames.
@@ -135,20 +159,18 @@ const fn mv(startup: f32, active: f32, recovery: f32, damage: i32, hitstun: f32,
 fn move_data(id: MoveId) -> MoveData {
     match id {
         MoveId::Jab       => mv(4.0,  3.0,  7.0,  6,  13.0, 8.0,  54.0, 80.0, 14.0, Level::Mid,      false),
-        // The three kick heights, which are the arcade's short, forward
-        // and roundhouse, and the same trade three times over: the
-        // lower and faster it is, the less it does and the less it
-        // costs to miss.
+        // Two kick heights, and they are the argument: low has to be
+        // crouch-blocked, high has to be blocked standing, and there is
+        // nothing in between to cover both. A middle kick used to sit
+        // here — a plain mid the guard stopped either way — and it was
+        // the answer to every question the other two asked. Taking it
+        // out is what makes the height of a kick a decision rather than
+        // a preference.
         //
-        // The high kick is an *overhead* — it has to be blocked
-        // standing. That is the whole reason it exists: without it a
-        // crouching opponent has only the sweep to fear and can hold
-        // down-back all round. The low kick is genuinely low and must
-        // be crouch-blocked, but unlike the sweep it does not knock
-        // down and is safe if it is blocked, so it is the poke you
-        // open with rather than the one you commit to.
+        // The low kick is fast and safe on block, so it is the poke you
+        // open with. The high kick is slow, is an overhead, and is
+        // punishable, so it is the one you commit to.
         MoveId::LowKick   => mv(6.0,  3.0, 10.0,  7,  14.0, 9.0,  58.0, 26.0, 14.0, Level::Low,      false),
-        MoveId::Kick      => mv(9.0,  4.0, 15.0, 12,  18.0, 11.0, 74.0, 68.0, 16.0, Level::Mid,      false),
         // No knockdown on the high kick. It was given one, and a
         // seventeen-damage overhead that also puts you on the floor is
         // not a mix-up, it is a win condition: a crouch-blocker went
@@ -182,7 +204,10 @@ fn move_data(id: MoveId) -> MoveData {
         // No knockdown, for the same reason the high kick has none: an
         // overhead that also puts you on the floor stops being a way in
         // and starts being a win condition.
-        MoveId::FlyingKick => mv(7.0, 16.0, 20.0, 15, 19.0, 11.0, 76.0, 24.0, 18.0,
+        // The blow lands level with the hips, not below them. At 24 the
+        // leg ran downhill out of a reclining body, which is a stomp;
+        // a flying kick is a straight line from the hip to the heel.
+        MoveId::FlyingKick => mv(7.0, 16.0, 20.0, 15, 19.0, 11.0, 76.0, 42.0, 18.0,
                                  Level::Overhead, false),
         // Specials differ per fighter; this is the shape they share.
         MoveId::Special   => mv(11.0, 6.0, 26.0, 16,  20.0, 12.0, 74.0, 70.0, 18.0, Level::Mid,      true),
@@ -284,6 +309,10 @@ struct Fighter {
     /// One attack, one hit. Without this an active window of 4 frames
     /// would land 4 times.
     hit_done: bool,
+    /// Whether this attack actually dealt damage, as opposed to being
+    /// blocked. Only the flying kick reads it, to decide how much of
+    /// its landing it has to pay for.
+    hit_clean: bool,
     crouch_block: bool,
     stun: f32,
     rounds: i32,
@@ -365,7 +394,7 @@ impl Fighter {
         Fighter {
             who, x, y: FLOOR_Y, vy: 0.0, vx: 0.0, facing,
             health: FIGHTERS[who].health,
-            act: Act::Idle, t: 0.0, mv: MoveId::Jab, hit_done: false,
+            act: Act::Idle, t: 0.0, mv: MoveId::Jab, hit_done: false, hit_clean: false,
             crouch_block: false, stun: 0.0, rounds: 0,
             cancel_t: 0.0, chained: false, combo: 0,
             buffered: None, buffer_t: 0.0,
@@ -378,6 +407,12 @@ impl Fighter {
 
     fn arch(&self) -> Archetype { FIGHTERS[self.who] }
     fn airborne(&self) -> bool { self.y < FLOOR_Y - 0.01 }
+    /// Seconds until the feet touch, from where they are and how fast
+    /// they are moving. Solves the same fall `advance` integrates.
+    fn air_time(&self) -> f32 {
+        let d = (FLOOR_Y - self.y).max(0.0);
+        ((-self.vy + (self.vy * self.vy + 2.0 * GRAVITY * d).sqrt()) / GRAVITY).max(0.0)
+    }
     fn crouching(&self) -> bool { Self::is_low(self.act, self.mv, self.crouch_block) }
     /// Whether an action is played from down on the haunches. Off
     /// `self` so the drawing can ask about a past action too.
@@ -385,7 +420,11 @@ impl Fighter {
         act == Act::Crouch || (act == Act::Block && crouch_block)
             || (act == Act::Attack && matches!(mv, MoveId::CrouchJab | MoveId::Sweep))
     }
-    fn height(&self) -> f32 { if self.crouching() { CROUCH_H } else { STAND_H } }
+    fn height(&self) -> f32 {
+        if self.act == Act::Knockdown { PRONE_H }
+        else if self.crouching() { CROUCH_H }
+        else { STAND_H }
+    }
 
     /// The box that can be hit. Deliberately the same box the fighter is
     /// drawn in: a hurtbox that does not match the picture is how a
@@ -427,13 +466,28 @@ impl Fighter {
         self.mv = id;
         self.t = 0.0;
         self.hit_done = false;
+        self.hit_clean = false;
         self.cancel_t = 0.0;
-        // The flying kick launches itself: a flatter, faster arc than a
-        // jump, so it crosses ground rather than gaining height.
-        if id == MoveId::FlyingKick && !self.airborne() {
-            self.vy = FLY_VY * self.arch().jump_scale;
+        // The flying kick sets its own arc: flatter and faster than a
+        // jump, so it crosses ground rather than gaining height. Thrown
+        // a few frames into a jump it levels that jump off into the
+        // same arc, which is what the move looks like anyway.
+        if id == MoveId::FlyingKick {
+            let launch = FLY_VY * self.arch().jump_scale;
+            if self.airborne() {
+                // Thrown a few frames into a jump, it has to reach the
+                // same height it would off the floor, or the same move
+                // is a flat dart one time and a lob the next. So the
+                // rise already spent counts against the arc: whatever
+                // is left of it is all they get.
+                let peak = launch * launch / (2.0 * GRAVITY);
+                let risen = (FLOOR_Y - self.y).max(0.0);
+                self.vy = -(2.0 * GRAVITY * (peak - risen).max(0.0)).sqrt();
+            } else {
+                self.vy = launch;
+                self.y -= 0.5;
+            }
             self.vx = self.facing * FLY_SPEED;
-            self.y -= 0.5;
         }
     }
 
@@ -462,12 +516,28 @@ enum State { Title, Select, RoundIntro, Fight, RoundEnd, MatchEnd, Over, Won }
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum RoundResult { P1, P2, Draw }
 
+/// One player against the ladder, or two against each other.
+///
+/// The difference runs deeper than who moves the second fighter: a
+/// solo run is a ladder with a score and a difficulty curve, and a
+/// versus match is one match that ends with a winner. They share the
+/// round, and nothing else.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+enum Mode { Solo, Versus }
+
 struct Game {
     state: State,
     sess: Session,
     p: [Fighter; 2],
     bolts: [Bolt; 4],
+    mode: Mode,
     pick: usize,
+    /// Player two's fighter, and whether each player has committed to
+    /// their choice. Nobody fights until both have.
+    pick2: usize,
+    locked: [bool; 2],
+    /// Which line of the title menu is highlighted.
+    menu: usize,
     /// Which of the other two fighters this match is against, 0 then 1.
     opponent_index: usize,
     stage: usize,
@@ -498,14 +568,16 @@ struct Game {
     cpu_delay: f32,
     cpu_plan: CpuPlan,
     /// Held so a punch and a kick pressed together read as one input
-    /// rather than two — see read_special().
-    punch_at: f32,
-    kick_at: f32,
+    /// rather than two — see read_special(). One per player: shared,
+    /// each player's punch armed the other player's special.
+    punch_at: [f32; 2],
+    kick_at: [f32; 2],
     now: f32,
-    /// Select-screen edge detection. Separate from the button
-    /// timestamps above because a menu step and a punch are not the same
-    /// event, and sharing the slots made each one eat the other's.
-    sel_held: [bool; 2],
+    /// Menu edge detection, per player and per direction. A menu step
+    /// and a punch are not the same event, and sharing the slots made
+    /// each one eat the other's.
+    sel_held: [[bool; 2]; 2],
+    sel_fire: [bool; 2],
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -518,7 +590,11 @@ impl Game {
             sess: Session::new(1),
             p: [Fighter::new(0, 200.0, 1.0), Fighter::new(1, 440.0, -1.0)],
             bolts: [Bolt { x: 0.0, y: 0.0, vx: 0.0, owner: 0, active: false, damage: 0 }; 4],
+            mode: Mode::Solo,
             pick: 0,
+            pick2: 1,
+            locked: [false; 2],
+            menu: 0,
             opponent_index: 0,
             stage: 0,
             round: 1,
@@ -535,11 +611,24 @@ impl Game {
             difficulty: 0.0,
             cpu_delay: 0.0,
             cpu_plan: CpuPlan::Wait,
-            punch_at: -1.0,
-            kick_at: -1.0,
+            punch_at: [-1.0; 2],
+            kick_at: [-1.0; 2],
             now: 0.0,
-            sel_held: [false; 2],
+            sel_held: [[false; 2]; 2],
+            sel_fire: [false; 2],
         }
+    }
+
+    fn picked(&self, who: usize) -> usize {
+        if who == 0 { self.pick } else { self.pick2 }
+    }
+    fn set_pick(&mut self, who: usize, v: usize) {
+        if who == 0 { self.pick = v; } else { self.pick2 = v; }
+    }
+    /// Has the *other* player already locked this fighter? Two players
+    /// cannot bring the same fighter to the same fight.
+    fn taken_by_other(&self, who: usize, at: usize) -> bool {
+        self.mode == Mode::Versus && self.locked[1 - who] && self.picked(1 - who) == at
     }
 
     /// The two fighters the player did not pick, in order — the ladder.
@@ -550,6 +639,21 @@ impl Game {
             if i != self.pick { out[n] = i; n += 1; }
         }
         out
+    }
+
+    /// Two players, one match, no ladder and no difficulty dial.
+    fn start_versus(&mut self) {
+        self.mode = Mode::Versus;
+        self.opponent_index = 0;
+        // Each fighter's own stage would be arbitrary with nobody
+        // climbing anything, so the pick decides it: choose the same
+        // fighter twice in a row and you get the same fight twice.
+        self.stage = (self.pick + self.pick2) % 2;
+        self.difficulty = 0.0;
+        self.p[0] = Fighter::new(self.pick, 200.0, 1.0);
+        self.p[1] = Fighter::new(self.pick2, 440.0, -1.0);
+        self.round = 1;
+        self.start_round();
     }
 
     fn start_match(&mut self, opponent_index: usize) {
@@ -650,11 +754,8 @@ struct Input {
     up: bool,
     down: bool,
     punch: bool,
-    /// The three kick heights, one per button. `kick` is the middle one
-    /// — the plain kick the game had before there were three — so every
-    /// rule written in terms of "a kick" still means what it meant.
+    /// The two kick heights, one button each.
     kick_low: bool,
-    kick: bool,
     kick_high: bool,
     special: bool,
 }
@@ -662,7 +763,7 @@ struct Input {
 impl Input {
     /// Any kick button at all. Used where the height does not matter:
     /// the special, and reading a kick while airborne.
-    fn any_kick(self) -> bool { self.kick_low || self.kick || self.kick_high }
+    fn any_kick(self) -> bool { self.kick_low || self.kick_high }
 }
 
 /// Apply one fighter's intent. Movement, jumping, crouching, blocking and
@@ -672,13 +773,28 @@ impl Input {
 /// is standing. One place decides, so a buffered press and a live one
 /// can never disagree about what was asked for.
 fn pressed_move(f: &Fighter, inp: Input, close: bool) -> Option<MoveId> {
-    if f.airborne() {
+    if f.airborne() { return air_move(f, inp); }
+    grounded_move(inp, close)
+}
+
+fn air_move(f: &Fighter, inp: Input) -> Option<MoveId> {
+    {
         if inp.punch { return Some(MoveId::JumpPunch); }
         // Any kick button in the air is the jump kick. Height is a
         // ground decision — in the air the arc already decided it.
-        if inp.any_kick() { return Some(MoveId::JumpKick); }
+        // The exception is a kick still held with up, early enough in
+        // the jump to turn it into a flying kick; see FLY_WINDOW.
+        if inp.any_kick() {
+            if inp.up && f.act == Act::Air && f.t < FLY_WINDOW {
+                return Some(MoveId::FlyingKick);
+            }
+            return Some(MoveId::JumpKick);
+        }
         return None;
     }
+}
+
+fn grounded_move(inp: Input, close: bool) -> Option<MoveId> {
     if inp.special { return Some(MoveId::Special); }
     // Standing punch, right up against them, is a throw. Two buttons is
     // all this cabinet has, so the throw cannot have its own; proximity
@@ -695,7 +811,6 @@ fn pressed_move(f: &Fighter, inp: Input, close: bool) -> Option<MoveId> {
     // button the cabinet does not have.
     if inp.up && inp.any_kick() { return Some(MoveId::FlyingKick); }
     if inp.kick_low { return Some(MoveId::LowKick); }
-    if inp.kick { return Some(MoveId::Kick); }
     if inp.kick_high { return Some(MoveId::HighKick); }
     None
 }
@@ -754,7 +869,23 @@ fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
     // press one. Landing still ends whatever came out (see advance()),
     // which is what keeps this to one attack per jump.
     if f.airborne() && f.act == Act::Air {
-        if let Some(id) = pressed_move(f, inp, close) { f.start_attack(id); }
+        if let Some(id) = air_move(f, inp) {
+            // An attack whose startup outlasts the fall never becomes
+            // live: the feet touch first and landing ends it, so the
+            // press is simply eaten. Measured at the last five frames
+            // of every jump. Hold it for the ground instead, which is
+            // what the buffer is for — and resolve it as the grounded
+            // move, because a jump kick performed standing up is not
+            // what anybody asked for.
+            // Plus a couple of frames, or it comes out on exactly the
+            // frame the feet touch and is cancelled having hit nothing.
+            if f.air_time() >= (move_data(id).startup + 2.0) * F {
+                f.start_attack(id);
+            } else if let Some(g) = grounded_move(inp, close) {
+                f.buffered = Some(g);
+                f.buffer_t = BUFFER;
+            }
+        }
         return;
     }
 
@@ -841,7 +972,16 @@ fn advance(f: &mut Fighter, dt: f32) {
             if f.act == Act::Attack && f.mv == MoveId::FlyingKick {
                 let m = f.scaled(move_data(f.mv));
                 let total = (m.startup + m.active + m.recovery) * F;
-                f.t = f.t.min(total - FLY_LAND_LAG);
+                // A floor when it was blocked or whiffed — at least
+                // this much left to pay. A ceiling when it connected —
+                // at most this much, because otherwise the move's own
+                // recovery is the binding cost and shortening the
+                // landing changes nothing.
+                f.t = if f.hit_clean {
+                    f.t.max(total - FLY_HIT_LAG)
+                } else {
+                    f.t.min(total - FLY_LAND_LAG)
+                };
                 f.hit_done = true; // it stops being an attack on contact with the floor
             } else if f.act == Act::Air || f.act == Act::Attack {
                 f.act = Act::Idle;
@@ -955,10 +1095,24 @@ fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: Input) -> (
         attacker.cancel_t = CANCEL_WINDOW;
     }
     defender.health = (defender.health - damage).max(0);
+    attacker.hit_clean = true;
+    // A flying kick that lands in a body stops flying, which is what
+    // hitting something solid does — and it is what closes the gap
+    // between the blow landing and the attacker being able to act.
+    // Connecting early in the flight used to mean the defender's
+    // hitstun ran out while the attacker was still in the air, so the
+    // move was nineteen frames minus on hit. A *blocked* one carries
+    // on through: being shoved past a guard you failed to beat is how
+    // you end up standing in front of it to be punished.
+    if attacker.mv == MoveId::FlyingKick {
+        attacker.vx = 0.0;
+        attacker.vy = attacker.vy.max(0.0);
+    }
     if m.knockdown || defender.airborne() {
         defender.act = Act::Knockdown;
         defender.t = 0.0;
         defender.vy = 0.0;
+        defender.vx = 0.0;
         defender.y = FLOOR_Y;
     } else {
         defender.act = Act::Hitstun;
@@ -1017,7 +1171,11 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
     // spent entire rounds walking toward an opponent it was already
     // close enough to hit, taking the whole fight in the face. It threw
     // five attacks in twenty seconds.
-    let kick_range = attack_range(&me, MoveId::Kick);
+    // The yardstick for "in kicking range". It was the middle kick,
+    // which reached further than either of the two that are left, so
+    // it is the high kick now and the CPU closes a little more before
+    // it commits.
+    let kick_range = attack_range(&me, MoveId::HighKick);
     let jab_range = attack_range(&me, MoveId::Jab);
     // The high kick is the shortest of the three, because a leg going
     // to head height spends its length going up. Throwing it from mid
@@ -1025,13 +1183,13 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
     // turns on attacks that cannot connect runs the clock out while
     // looking busy.
     let high_range = attack_range(&me, MoveId::HighKick);
-    let foe_range = attack_range(&foe, MoveId::Kick);
+    let foe_range = attack_range(&foe, MoveId::HighKick);
 
 
     // React to what they are doing, before deciding what to do.
     if foe.airborne() && dist < kick_range * 1.4 {
         return if roll() < 0.4 + 0.5 * g.difficulty {
-            CpuPlan::Attack(MoveId::Kick) // meet them on the way down
+            CpuPlan::Attack(MoveId::HighKick) // meet them on the way down
         } else {
             CpuPlan::Block
         };
@@ -1158,12 +1316,12 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
     let r = if nearly_out || stalling { roll() * 0.7 } else { roll() };
 
     if dist >= jab_range {
-        // At the edge of its reach: long pokes only.
-        // At the edge of its reach: long pokes only, which rules the
-        // high kick out entirely.
+        // At the edge of its reach: long pokes only. With the middle
+        // kick gone the sweep is the only thing that genuinely reaches
+        // out here, so it takes the share that used to be split.
         return match r {
-            _ if r < 0.40 => CpuPlan::Attack(MoveId::Kick),
-            _ if r < 0.60 => CpuPlan::Attack(MoveId::Sweep),
+            _ if r < 0.44 => CpuPlan::Attack(MoveId::Sweep),
+            _ if r < 0.58 => CpuPlan::Attack(MoveId::LowKick),
             _ if r < 0.72 => CpuPlan::Attack(MoveId::Special),
             _ if r < 0.94 => CpuPlan::Approach,
             _ => CpuPlan::Block,
@@ -1186,14 +1344,16 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
     match r {
         _ if r < fast_share * 0.6 => CpuPlan::Attack(MoveId::Jab),
         _ if r < fast_share => CpuPlan::Attack(MoveId::LowKick),
-        _ if r < fast_share + 0.16 => CpuPlan::Attack(MoveId::Sweep),
-        _ if r < fast_share + 0.30 => CpuPlan::Attack(MoveId::Kick),
-        _ if r < fast_share + 0.37 => {
+        _ if r < fast_share + 0.20 => CpuPlan::Attack(MoveId::Sweep),
+        // The share the middle kick held goes to the choice it used to
+        // let the CPU avoid: low or high, and the guard can only be in
+        // one place.
+        _ if r < fast_share + 0.34 => {
             if dist < high_range { CpuPlan::Attack(MoveId::HighKick) }
-            else { CpuPlan::Attack(MoveId::Kick) }
+            else { CpuPlan::Attack(MoveId::LowKick) }
         }
-        _ if r < fast_share + 0.47 => CpuPlan::Attack(MoveId::Special),
-        _ if r < fast_share + 0.56 => CpuPlan::Attack(MoveId::Throw),
+        _ if r < fast_share + 0.44 => CpuPlan::Attack(MoveId::Special),
+        _ if r < fast_share + 0.53 => CpuPlan::Attack(MoveId::Throw),
         _ if r < 0.94 => CpuPlan::Block,
         _ => CpuPlan::Retreat,
     }
@@ -1219,7 +1379,7 @@ fn cpu_input(g: &Game) -> Input {
                 // Already committed — throw the overhead. A jump-in that
                 // never attacks is just a fighter volunteering to be hit
                 // out of the air.
-                inp.kick = true;
+                inp.kick_high = true;
             } else {
                 inp.up = true;
                 if me.facing > 0.0 { inp.right = true; } else { inp.left = true; }
@@ -1228,10 +1388,9 @@ fn cpu_input(g: &Game) -> Input {
         CpuPlan::Attack(id) => match id {
             MoveId::Jab => inp.punch = true,
             MoveId::LowKick => inp.kick_low = true,
-            MoveId::Kick => inp.kick = true,
             MoveId::HighKick => inp.kick_high = true,
-            MoveId::Sweep => { inp.down = true; inp.kick = true; }
-            MoveId::FlyingKick => { inp.up = true; inp.kick = true; }
+            MoveId::Sweep => { inp.down = true; inp.kick_low = true; }
+            MoveId::FlyingKick => { inp.up = true; inp.kick_high = true; }
             MoveId::CrouchJab => { inp.down = true; inp.punch = true; }
             MoveId::Special => inp.special = true,
             // A throw is a punch thrown from close enough; cpu_think()
@@ -1245,36 +1404,107 @@ fn cpu_input(g: &Game) -> Input {
 
 // ---- update --------------------------------------------------------------
 
-fn player_input(g: &mut Game) -> Input {
+/// The keys one player answers to.
+///
+/// Two people at one keyboard need two clusters that never overlap, so
+/// the split is the one a keyboard already has: the left player drives
+/// with W A S D and hits with F G H, the right player drives with the
+/// arrows and hits with J K L. Each has a hand either side of the line
+/// a touch typist's hands already sit on, and neither reaches across
+/// the other.
+///
+/// Playing alone, player one also answers to everything the cabinet
+/// has — the arrows, and the two deck buttons — because a stick and
+/// two buttons is all a cabinet is, and a one-player game has nobody
+/// to take the arrows away for.
+///
+/// Stated once. The fight, the title menu and the select screen all
+/// read it, and each used to spell the alias rule out again and could
+/// get it wrong on its own.
+struct Pad {
+    up: &'static [KeyCode],
+    down: &'static [KeyCode],
+    left: &'static [KeyCode],
+    right: &'static [KeyCode],
+    punch: &'static [KeyCode],
+    kick_low: &'static [KeyCode],
+    kick_high: &'static [KeyCode],
+}
+
+static P1_ALONE: Pad = Pad {
+    up: &[BLIP_KEY_W, BLIP_KEY_UP],
+    down: &[BLIP_KEY_S, BLIP_KEY_DOWN],
+    left: &[BLIP_KEY_A, BLIP_KEY_LEFT],
+    right: &[BLIP_KEY_D, BLIP_KEY_RIGHT],
+    punch: &[BLIP_KEY_F, BLIP_KEY_SPACE],
+    // The cabinet's own kick button is the low one, because it is the
+    // poke you open with.
+    kick_low: &[BLIP_KEY_G, BLIP_KEY_BUTTON2],
+    kick_high: &[BLIP_KEY_H, BLIP_KEY_X, BLIP_KEY_C],
+};
+
+static P1_SHARING: Pad = Pad {
+    up: &[BLIP_KEY_W],
+    down: &[BLIP_KEY_S],
+    left: &[BLIP_KEY_A],
+    right: &[BLIP_KEY_D],
+    punch: &[BLIP_KEY_F],
+    kick_low: &[BLIP_KEY_G],
+    kick_high: &[BLIP_KEY_H],
+};
+
+static P2: Pad = Pad {
+    up: &[BLIP_KEY_UP],
+    down: &[BLIP_KEY_DOWN],
+    left: &[BLIP_KEY_LEFT],
+    right: &[BLIP_KEY_RIGHT],
+    punch: &[BLIP_KEY_J],
+    kick_low: &[BLIP_KEY_K],
+    kick_high: &[BLIP_KEY_L],
+};
+
+fn pad(mode: Mode, who: usize) -> &'static Pad {
+    // Who comes first. Matching on the mode first handed player two
+    // player one's keys whenever the game was in one-player mode,
+    // which is every screen before the mode has been chosen.
+    match (who, mode) {
+        (1, _) => &P2,
+        (_, Mode::Solo) => &P1_ALONE,
+        _ => &P1_SHARING,
+    }
+}
+
+fn any_held(keys: &[KeyCode]) -> bool { keys.iter().any(|k| key_held(*k)) }
+fn any_pressed(keys: &[KeyCode]) -> bool { keys.iter().any(|k| key_pressed(*k)) }
+
+fn human_input(g: &mut Game, who: usize) -> Input {
+    let k = pad(g.mode, who);
     let mut inp = Input::default();
-    inp.left = key_held(BLIP_KEY_LEFT) || key_held(BLIP_KEY_A);
-    inp.right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
-    inp.up = key_held(BLIP_KEY_UP) || key_held(BLIP_KEY_W);
-    inp.down = key_held(BLIP_KEY_DOWN) || key_held(BLIP_KEY_S);
-    let punch = btn1_pressed();
-    // Three kick buttons in a row, low to high, the way a cabinet lays
-    // out its kicks. Which one was pressed is the height; the row is the
-    // whole control scheme for attack height, so a player never has to
-    // remember a motion to aim one.
-    let (low, mid, high) = (btn2_pressed(), key_pressed(BLIP_KEY_X), key_pressed(BLIP_KEY_C));
-    let kick = low || mid || high;
-    if punch { g.punch_at = g.now; }
-    if kick { g.kick_at = g.now; }
+    inp.left = any_held(k.left);
+    inp.right = any_held(k.right);
+    inp.up = any_held(k.up);
+    inp.down = any_held(k.down);
+    let punch = any_pressed(k.punch);
+    // Which kick button was pressed is the height — the whole control
+    // scheme for attack height, so a player never has to remember a
+    // motion to aim one.
+    let (low, high) = (any_pressed(k.kick_low), any_pressed(k.kick_high));
+    if punch { g.punch_at[who] = g.now; }
+    if low || high { g.kick_at[who] = g.now; }
     // Both buttons inside a short window is the special. Two buttons is
     // all this cabinet has, so the special cannot be a quarter-circle;
     // it is the one input a player can reliably hit on a stick with two
     // buttons, and it stays out of the way of every other move.
-    let together = (g.punch_at - g.kick_at).abs() <= 0.08
-        && g.now - g.punch_at.max(g.kick_at) <= 0.08
-        && g.punch_at > 0.0 && g.kick_at > 0.0;
+    let (pa, ka) = (g.punch_at[who], g.kick_at[who]);
+    let together = (pa - ka).abs() <= 0.08 && g.now - pa.max(ka) <= 0.08
+        && pa > 0.0 && ka > 0.0;
     if together {
         inp.special = true;
-        g.punch_at = -1.0;
-        g.kick_at = -1.0;
+        g.punch_at[who] = -1.0;
+        g.kick_at[who] = -1.0;
     } else {
         inp.punch = punch;
         inp.kick_low = low;
-        inp.kick = mid;
         inp.kick_high = high;
     }
     inp
@@ -1286,7 +1516,7 @@ fn player_input(g: &mut Game) -> Input {
 /// question to decide which limb to throw, and the sound asks it to
 /// decide whether there is a gi to crack.
 fn is_kick(f: &Fighter) -> bool {
-    matches!(f.mv, MoveId::LowKick | MoveId::Kick | MoveId::HighKick | MoveId::Sweep
+    matches!(f.mv, MoveId::LowKick | MoveId::HighKick | MoveId::Sweep
         | MoveId::JumpKick | MoveId::FlyingKick)
         || (f.mv == MoveId::Special && f.arch().special == Special::TalonKick)
 }
@@ -1313,14 +1543,14 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     g.clock -= dt;
 
-    let p_in = player_input(g);
+    let p_in = human_input(g, 0);
 
     // A plan runs for its delay, *except* when the world changes under
     // it: coming out of a hit, or being attacked at close range, is
     // exactly when a human would think again, and a CPU that waits out
     // its timer through a flurry of jabs is a heavy bag.
     let jolted = g.p[1].act == Act::Hitstun
-        || (g.p[0].act == Act::Attack && (g.p[0].x - g.p[1].x).abs() < attack_range(&g.p[0], MoveId::Kick));
+        || (g.p[0].act == Act::Attack && (g.p[0].x - g.p[1].x).abs() < attack_range(&g.p[0], MoveId::HighKick));
     g.cpu_delay -= dt;
     if g.cpu_delay <= 0.0 || (jolted && g.cpu_delay < 0.12) {
         g.cpu_plan = cpu_think(g);
@@ -1328,7 +1558,9 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
         // dial that actually matters, far more than damage numbers.
         g.cpu_delay = 0.38 - 0.18 * g.difficulty + (rand_int(0, 12) as f32) * 0.01;
     }
-    let c_in = cpu_input(g);
+    // In versus the second fighter answers to a person, and the CPU's
+    // plan is never consulted.
+    let c_in = if g.mode == Mode::Versus { human_input(g, 1) } else { cpu_input(g) };
 
     // Face each other whenever both are free to turn.
     for i in 0..2 {
@@ -1360,6 +1592,11 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
         if f.act == Act::Attack && is_kick(&f) {
             let at = f.scaled(move_data(f.mv)).startup * F * KICK_SNAP;
             if f.t >= at && f.t - dt < at { play_sfx(&sfx.gi); }
+        }
+        // And the leap itself. The one move that crosses the stage was
+        // the only one that made no sound leaving the ground.
+        if f.act == Act::Attack && f.mv == MoveId::FlyingKick && f.t <= dt {
+            play_sfx(&sfx.whoosh);
         }
     }
 
@@ -1510,20 +1747,140 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_round_end(g: &mut Game, dt: f32) {
+    // Keep the fighters running. The round ends by assigning Victory
+    // and Defeat outright and then only ticking a timer, so nothing
+    // moved for the whole two seconds: a fighter who landed the
+    // killing blow in mid-air hung there in the sky striking a pose,
+    // and the victory animation — which is a function of the action
+    // timer — never played at all, because the timer never advanced.
+    for i in 0..2 {
+        advance(&mut g.p[i], dt);
+        g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
+    }
+    if g.shake > 0.0 { g.shake -= dt; }
     if !g.phase.tick(dt) { return; }
     let (a, b) = (g.p[0].rounds, g.p[1].rounds);
     if a >= ROUNDS_TO_WIN || b >= ROUNDS_TO_WIN {
         g.state = State::MatchEnd;
         g.phase.start(2.4);
-        g.banner = if a > b { "WINNER" } else if b > a { "YOU LOSE" } else { "DRAW GAME" };
+        g.banner = if g.mode == Mode::Versus {
+            if a > b { "PLAYER 1 WINS" } else if b > a { "PLAYER 2 WINS" } else { "DRAW GAME" }
+        } else if a > b { "WINNER" } else if b > a { "YOU LOSE" } else { "DRAW GAME" };
     } else {
         g.round += 1;
         g.start_round();
     }
 }
 
+/// One player's menu intent this frame, already debounced.
+///
+/// The menus take this rather than reading the keyboard, so the whole
+/// front of the game — mode, both cursors, the lock-in and the rule
+/// that two players cannot bring the same fighter — can be driven by a
+/// test. A flow that can only be exercised by a person with two hands
+/// on a keyboard is a flow that never gets exercised.
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
+struct MenuIn { back: bool, fwd: bool, fire: bool }
+
+/// What a menu transition asked to be heard. Returned rather than
+/// played, for the same reason.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+enum Cue { Step, Confirm }
+
+fn read_menu(g: &mut Game) -> [MenuIn; 2] {
+    let mut out = [MenuIn::default(); 2];
+    for who in 0..2 {
+        out[who] = MenuIn {
+            back: menu_step(g, who, true),
+            fwd: menu_step(g, who, false),
+            fire: menu_fire(g, who),
+        };
+    }
+    out
+}
+
+fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
+    match g.state {
+        State::Title => {
+            // The title is where the mode is chosen, on a stick and one
+            // button, because that is all a cabinet has.
+            if m[0].back || m[0].fwd {
+                g.menu = 1 - g.menu;
+                return Some(Cue::Step);
+            }
+            if m[0].fire {
+                g.mode = if g.menu == 0 { Mode::Solo } else { Mode::Versus };
+                g.state = State::Select;
+                g.pick = 0;
+                g.pick2 = FIGHTERS.len() - 1;
+                g.locked = [false; 2];
+                return Some(Cue::Confirm);
+            }
+            None
+        }
+        State::Select => {
+            let versus = g.mode == Mode::Versus;
+            let players = if versus { 2 } else { 1 };
+            let mut cue = None;
+            for who in 0..players {
+                if g.locked[who] { continue; }
+                let n = FIGHTERS.len();
+                // A cursor steps over a fighter the other player has
+                // already taken rather than stopping on one it is not
+                // allowed to confirm.
+                for (step, moved) in [(n - 1, m[who].back), (1, m[who].fwd)] {
+                    if !moved { continue; }
+                    let mut at = g.picked(who);
+                    for _ in 0..n {
+                        at = (at + step) % n;
+                        if !g.taken_by_other(who, at) { break; }
+                    }
+                    g.set_pick(who, at);
+                    cue = Some(Cue::Step);
+                }
+                if m[who].fire && !g.taken_by_other(who, g.picked(who)) {
+                    g.locked[who] = true;
+                    // Move the other player off it if they were sitting
+                    // there. Their cursor was legal a moment ago and is
+                    // not any more, and a cursor parked on something it
+                    // can no longer confirm is a player pressing a
+                    // button that does nothing and being told nothing.
+                    let other = 1 - who;
+                    if versus && !g.locked[other] && g.picked(other) == g.picked(who) {
+                        let mut at = g.picked(other);
+                        for _ in 0..n {
+                            at = (at + 1) % n;
+                            if !g.taken_by_other(other, at) { break; }
+                        }
+                        g.set_pick(other, at);
+                    }
+                    cue = Some(Cue::Confirm);
+                }
+            }
+            if (0..players).all(|w| g.locked[w]) {
+                web::spend_coin();
+                g.sess.reset(1);
+                g.p[0].rounds = 0;
+                g.p[1].rounds = 0;
+                if versus { g.start_versus(); } else { g.start_match(0); }
+                cue = Some(Cue::Confirm);
+            }
+            cue
+        }
+        _ => None,
+    }
+}
+
 fn update_match_end(g: &mut Game, dt: f32) {
     if !g.phase.tick(dt) { return; }
+    // Versus is one match. There is no ladder to climb and no score to
+    // report — the result is the whole of it — so it goes back to the
+    // title for the next pair.
+    if g.mode == Mode::Versus {
+        g.state = State::Over;
+        g.phase.start(1.2);
+        return;
+    }
     let won = g.p[0].rounds > g.p[1].rounds;
     if !won {
         web::report_score(g.sess.score);
@@ -1553,8 +1910,11 @@ const BLOCK_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds
 const BELL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bell.wav"));
 const KO_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ko.wav"));
 const PROJECTILE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/projectile.wav"));
-const MUSIC_DOCK_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music_dock.wav"));
-const MUSIC_TEMPLE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music_temple.wav"));
+// The music is not here. Every other asset is baked into the binary,
+// but a theme long enough not to repeat inside a forty-five second
+// round is about a megabyte of PCM and there are three of them — more
+// than the whole rest of the game. The code that synthesises one is a
+// couple of hundred lines, so the game builds its own at startup.
 
 struct Sounds {
     hit_light: blip::BlipSound,
@@ -1585,11 +1945,18 @@ async fn main() {
         ko: blip::audio::load_sound(KO_WAV).await,
         projectile: blip::audio::load_sound(PROJECTILE_WAV).await,
     };
-    let music = [
-        blip::audio::load_sound(MUSIC_DOCK_WAV).await,
-        blip::audio::load_sound(MUSIC_TEMPLE_WAV).await,
-    ];
-    let mut playing_stage = usize::MAX;
+    // Built here rather than shipped: see the note where the other
+    // assets are declared.
+    let mut music = Vec::with_capacity(3);
+    for i in 0..3 {
+        let wav = blip_assets::brawler::theme_wav(i);
+        music.push(blip::audio::load_sound(&wav).await);
+    }
+    /// Which loop is playing. The title and select screens have one of
+    /// their own — they were silent, and silence in front of a noisy
+    /// game reads as something not having loaded.
+    const SELECT_TRACK: usize = 2;
+    let mut playing_track = usize::MAX;
     let mut shot_frame: u32 = 0;
 
     loop {
@@ -1610,27 +1977,27 @@ async fn main() {
                 g.p[1].x = 370.0;
                 g.p[1].health = (FIGHTERS[g.p[1].who].health as f32 * 0.55) as i32;
                 g.p[0].health = (FIGHTERS[g.p[0].who].health as f32 * 0.8) as i32;
+                g.clock = ROUND_SECS * 0.72;
             }
-            if shot_frame == 16 { g.p[0].start_attack(MoveId::Kick); }
+            // Hold the opponent standing still. Left to itself the CPU
+            // ducks, and a high kick sails over a crouching fighter
+            // exactly as it should — correct, and a card with nobody
+            // hitting anybody on it. Walking it in instead put the two
+            // of them inside each other.
+            g.cpu_plan = CpuPlan::Wait;
+            g.cpu_delay = 99.0;
+            // The card is taken at BLIP_SCREENSHOT_FRAME=30: by then the
+            // kick has landed, the hitstop flash has passed — it washes
+            // the fighter it is on nearly white, which is right in
+            // motion and wrong in a still — and the spark is still up.
+            if shot_frame == 4 { g.p[0].start_attack(MoveId::HighKick); }
         }
 
         match g.state {
-            State::Title => {
-                if btn1_pressed() || btn2_pressed() {
-                    g.state = State::Select;
-                    g.pick = 0;
-                }
-            }
-            State::Select => {
-                if key_pressed_once(&mut g, true) { g.pick = (g.pick + FIGHTERS.len() - 1) % FIGHTERS.len(); }
-                if key_pressed_once(&mut g, false) { g.pick = (g.pick + 1) % FIGHTERS.len(); }
-                if btn1_pressed() || btn2_pressed() {
-                    web::spend_coin();
-                    g.sess.reset(1);
-                    g.p[0].rounds = 0;
-                    g.p[1].rounds = 0;
-                    g.start_match(0);
-                    play_sfx(&sfx.bell);
+            State::Title | State::Select => {
+                let m = read_menu(&mut g);
+                if let Some(cue) = update_menus(&mut g, m) {
+                    play_sfx(if cue == Cue::Step { &sfx.block } else { &sfx.bell });
                 }
             }
             State::RoundIntro => {
@@ -1644,16 +2011,25 @@ async fn main() {
             State::MatchEnd => update_match_end(&mut g, dt),
             State::Over | State::Won => {
                 g.phase.tick(dt);
-                if !g.phase.active() && (btn1_pressed() || btn2_pressed()) {
+                // Either player can take it back to the title.
+                let m = read_menu(&mut g);
+                if !g.phase.active() && (m[0].fire || m[1].fire) {
                     g = Game::new();
                 }
             }
         }
 
-        if matches!(g.state, State::RoundIntro | State::Fight | State::RoundEnd) {
-            if playing_stage != g.stage {
-                play_music(&music[g.stage]);
-                playing_stage = g.stage;
+        let want = match g.state {
+            State::Title | State::Select => Some(SELECT_TRACK),
+            State::RoundIntro | State::Fight | State::RoundEnd | State::MatchEnd => {
+                Some(g.stage)
+            }
+            _ => None,
+        };
+        if let Some(track) = want {
+            if playing_track != track {
+                play_music(&music[track]);
+                playing_track = track;
             }
         }
 
@@ -1665,16 +2041,28 @@ async fn main() {
 
 /// Select-screen stepping, debounced by hand: on this screen a held
 /// direction should move one step and wait, not slide through the roster.
-fn key_pressed_once(g: &mut Game, up: bool) -> bool {
-    let held = if up {
-        key_held(BLIP_KEY_UP) || key_held(BLIP_KEY_W) || key_held(BLIP_KEY_LEFT) || key_held(BLIP_KEY_A)
-    } else {
-        key_held(BLIP_KEY_DOWN) || key_held(BLIP_KEY_S) || key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D)
-    };
-    let slot = &mut g.sel_held[usize::from(!up)];
+/// A menu step for one player, debounced by hand: on these screens a
+/// held direction must move the cursor once, not sixty times a second.
+/// `who` picks whose keys are read, so two cursors can live on one
+/// screen without either seeing the other's.
+fn menu_step(g: &mut Game, who: usize, back: bool) -> bool {
+    let k = pad(g.mode, who);
+    let held = if back { any_held(k.left) || any_held(k.up) }
+               else { any_held(k.right) || any_held(k.down) };
+    let slot = &mut g.sel_held[who][usize::from(!back)];
     let stepped = held && !*slot;
     *slot = held;
     stepped
+}
+
+/// The same, for a player's confirm — any of their attack buttons.
+fn menu_fire(g: &mut Game, who: usize) -> bool {
+    let k = pad(g.mode, who);
+    let held = any_held(k.punch) || any_held(k.kick_low) || any_held(k.kick_high);
+    let slot = &mut g.sel_fire[who];
+    let fired = held && !*slot;
+    *slot = held;
+    fired
 }
 
 #[cfg(test)]

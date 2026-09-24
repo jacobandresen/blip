@@ -12,6 +12,9 @@ gallery = []
 [dependencies]
 macroquad = { workspace = true }
 blip = { workspace = true }
+# Also a runtime dependency: the themes are synthesised on the device
+# rather than shipped as PCM. See blip_assets::brawler::theme_wav.
+blip_assets = { workspace = true }
 
 [build-dependencies]
 blip_assets = { workspace = true }

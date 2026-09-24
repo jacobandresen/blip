@@ -24,7 +24,7 @@ pub fn draw(blip: &Blip, g: &Game) {
     { draw_gallery(blip, g.now); return; }
     #[allow(unreachable_code)]
     match g.state {
-        State::Title => draw_title(blip),
+        State::Title => draw_title(blip, g),
         State::Select => draw_select(blip, g),
         _ => {
             draw_stage(blip, g);
@@ -1426,12 +1426,11 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
         MoveId::Jab => Shape::Punch(false),
         MoveId::JumpPunch => Shape::Punch(true),
         MoveId::CrouchJab => Shape::CrouchPunch,
-        // All three heights are the same kick; the move's own `height`
-        // is what aims it, so nothing here has to know about the
-        // difference. The high one leans a shade further back, because
-        // a kick at head height needs more counterweight.
+        // Both heights are the same kick; the move's own `height` is
+        // what aims it, so nothing here has to know the difference. The
+        // high one leans further back, because a kick at head height
+        // needs more counterweight.
         MoveId::LowKick => Shape::Kick(false, 0.7),
-        MoveId::Kick => Shape::Kick(false, 1.0),
         MoveId::HighKick => Shape::Kick(false, 1.25),
         MoveId::JumpKick => Shape::Kick(true, 1.0),
         MoveId::FlyingKick => Shape::Fly,
@@ -1451,13 +1450,13 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
         // body steps into it — which is also the only way the fist
         // reaches as far as the hitbox says it does.
         Shape::Punch(air) => {
-            q.hip.f += 5.0 * ext;
+            q.hip.f += if air { 12.0 } else { 5.0 } * ext;
             // The shoulder turning over, which with one spine is the
             // head going with it. It used to be written as the neck
             // travelling further than the head — the boxer's trick of
             // punching past your own chin — and what is left of that
             // now is the fixed set-back of the shoulders.
-            q.head.f += if air { 12.0 } else { 22.0 } * ext;
+            q.head.f += if air { 24.0 } else { 22.0 } * ext;
             if !air {
                 q.lead_foot.f += 5.0 * ext;
                 q.rear_foot.f -= 3.0 * ext;
@@ -1493,7 +1492,10 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
         Shape::Kick(air, lift) => {
             let k = KICK;
             let back = if air { k.air_lean } else { 1.0 } * lift;
-            q.hip = p(q.hip.f + k.hip_drive * ext, q.hip.u + k.hip_rise * ext);
+            // Airborne there is no support leg to drive over, so the
+            // hips go further: a jump kick's reach is all body travel.
+            let drive = if air { k.hip_drive + 9.0 } else { k.hip_drive };
+            q.hip = p(q.hip.f + drive * ext, q.hip.u + k.hip_rise * ext);
             q.head.f -= k.lean * 1.25 * ext * back;
             q.head.u -= 1.4 * ext;
             // The support foot travels in under the raised hips. It has
@@ -1534,14 +1536,19 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
         // the shoulders back as counterweight. A jump kick chambers
         // and snaps; this one commits the whole body and holds it.
         Shape::Fly => {
-            q.hip = p(q.hip.f + 8.0 * ext, q.hip.u + 3.0 * ext);
-            q.head = p(q.head.f - 12.0 * ext, q.head.u - 3.0 * ext);
+            // Laid out behind the leg rather than sitting up behind it:
+            // hips driven forward and high, shoulders dropped back, so
+            // hip and heel make one line and the body is the shaft of
+            // it. A jump kick chambers and snaps; this one commits
+            // everything and holds it there.
+            q.hip = p(q.hip.f + 21.0 * ext, q.hip.u + 7.0 * ext);
+            q.head = p(q.head.f - 22.0 * ext, q.head.u - 13.0 * ext);
             // The support leg folds up under the hips and stays there.
-            q.rear_foot = p(-16.0 - 4.0 * ext, 26.0 + 10.0 * ext);
+            q.rear_foot = p(-14.0 - 6.0 * ext, 30.0 + 12.0 * ext);
             q.lead_foot = q.lead_foot.to(toe_tip, ext);
-            // One arm forward for the line, one back for the balance.
-            q.lead_hand = q.lead_hand.to(p(30.0, 62.0), ext);
-            q.rear_hand = q.rear_hand.to(p(-20.0, 58.0), ext);
+            // One arm forward along the line, one back for balance.
+            q.lead_hand = q.lead_hand.to(p(32.0, 70.0), ext);
+            q.rear_hand = q.rear_hand.to(p(-28.0, 40.0), ext);
         }
         // Down on the back leg, one hand on the floor, the front leg
         // laid out flat along it.
@@ -2339,6 +2346,29 @@ fn draw_banner(blip: &Blip, g: &Game) {
         }
         State::RoundEnd => blip.draw_centered(g.banner, cy, 5.0, BLIP_YELLOW),
         State::MatchEnd => blip.draw_centered(g.banner, cy, 4.0, BLIP_YELLOW),
+        State::Over if g.mode == Mode::Versus => {
+            // Two people played a match; one of them won it. "GAME
+            // OVER" and a score belong to a run against the ladder and
+            // say nothing at all about what just happened here.
+            let (a, b) = (g.p[0].rounds, g.p[1].rounds);
+            let (text, col) = if a > b {
+                ("PLAYER 1 WINS", BlipColor { r: 1.0, g: 0.35, b: 0.35, a: 1.0 })
+            } else if b > a {
+                ("PLAYER 2 WINS", BlipColor { r: 0.40, g: 0.72, b: 1.0, a: 1.0 })
+            } else {
+                ("DRAW GAME", BLIP_YELLOW)
+            };
+            // On a plate, because the result sits over two fighters
+            // still standing on the stage and yellow on a sunset is
+            // not text, it is a smudge.
+            blip.fill_rect(0.0, cy - 18.0, WIN_W as f32, 122.0,
+                BlipColor { r: 0.02, g: 0.02, b: 0.05, a: 0.78 });
+            blip.draw_centered(text, cy, 4.0, col);
+            blip.draw_centered(&format!("{a} - {b}"), cy + 46.0, 3.0, BLIP_WHITE);
+            if !g.phase.active() {
+                blip.draw_centered("PRESS TO PLAY AGAIN", cy + 84.0, 2.0, BLIP_YELLOW);
+            }
+        }
         State::Over => {
             blip.draw_centered("GAME OVER", cy, 5.0, BlipColor { r: 0.95, g: 0.3, b: 0.3, a: 1.0 });
             let s = format!("SCORE {}", g.sess.score);
@@ -2368,37 +2398,109 @@ fn draw_banner(blip: &Blip, g: &Game) {
 /// wanted: the two lines under the roster on the select screen, read
 /// while choosing, and the round-start reminder of the one move that is
 /// genuinely invisible.
-fn draw_title(blip: &Blip) {
-    let dim = BlipColor { r: 0.74, g: 0.77, b: 0.84, a: 1.0 };
-    let hot = BlipColor { r: 0.95, g: 0.85, b: 0.4, a: 1.0 };
-    blip.draw_centered("BRAWLER", 78.0, 7.0, BLIP_YELLOW);
-    blip.draw_centered("TWO FIGHTERS ENTER", 132.0, 2.0, BLIP_WHITE);
+/// Text as a lit tube.
+///
+/// blip's own `draw_text_glow` is a one-pixel halo, which is right for
+/// a label and disappears entirely under a logo six times the size. So
+/// this blooms outward in the tube's colour over several passes, lays
+/// the glass down fattened by a fraction of a glyph pixel, and puts a
+/// near-white core inside it — which is what a fluorescent tube is:
+/// you do not see the colour, you see white gas through coloured glass
+/// with the colour thrown onto everything around it.
+fn neon(blip: &Blip, text: &str, y: f32, sz: f32, c: BlipColor, lit: f32) {
+    let x = blip.text_cx(text, sz as i32) as f32;
+    const RING: [(f32, f32); 8] = [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0),
+                                   (-0.7, -0.7), (0.7, -0.7), (-0.7, 0.7), (0.7, 0.7)];
+    for (r, a) in [(1.05f32, 0.09f32), (0.7, 0.13), (0.42, 0.20)] {
+        let col = BlipColor { a: a * lit, ..c };
+        for (dx, dy) in RING {
+            blip.draw_text(text, x + dx * r * sz, y + dy * r * sz, sz, col);
+        }
+    }
+    let glass = BlipColor { a: lit, ..c };
+    for (dx, dy) in RING {
+        blip.draw_text(text, x + dx * 0.3 * sz, y + dy * 0.3 * sz, sz, glass);
+    }
+    blip.draw_text(text, x, y, sz, BlipColor { a: lit, ..blend(c, BLIP_WHITE, 0.78) });
+}
 
-    blip.draw_centered("ARROWS  MOVE AND GUARD", 192.0, 2.0, dim);
-    blip.draw_centered("SPACE  PUNCH", 218.0, 2.0, dim);
-    blip.draw_centered("Z X C  KICK LOW MID HIGH", 244.0, 2.0, hot);
-    // The two modifiers. Neither is discoverable by pressing buttons,
-    // and the flying kick is the only way across the stage.
-    blip.draw_centered("DOWN+KICK SWEEP   UP+KICK FLY", 270.0, 2.0, hot);
+/// A tube's flicker: mains hum, and the odd dropout of one that is on
+/// its way out. Both are what makes a sign read as lit rather than as
+/// coloured text.
+fn tube(t: f32, phase: f32) -> f32 {
+    let hum = 0.93 + 0.07 * ((t * 9.3 + phase).sin() * 0.6 + (t * 23.0).sin() * 0.4);
+    let stutter = ((t * 0.83 + phase).sin() * (t * 7.7).sin()).abs();
+    if stutter > 0.97 { hum * 0.42 } else { hum }
+}
 
-    blip.draw_centered("PRESS FIRE", 320.0, 3.0, BLIP_WHITE);
+fn draw_title(blip: &Blip, g: &Game) {
+    let now = g.now;
+    // A night stage behind it, the two fighters squaring off on it, and
+    // the whole thing knocked back so the sign is the brightest object
+    // on screen — which is the only way a neon sign ever reads.
+    draw_temple(blip, 0.0, now, 0.0);
+    draw_floor(blip, 1, 0.0);
+    for (i, (x, face)) in [(118.0f32, 1.0f32), (522.0, -1.0)].iter().enumerate() {
+        let mut f = Fighter::new(if i == 0 { 0 } else { 1 }, *x, *face);
+        f.act = Act::Idle;
+        pose_and_draw_lit(blip, &f, now, 0.0, 0.0, i, 1.0);
+    }
+    blip.fill_rect(0.0, 0.0, WIN_W as f32, WIN_H as f32,
+        BlipColor { r: 0.02, g: 0.01, b: 0.08, a: 0.72 });
+
+    let sign = BlipColor { r: 1.0, g: 0.16, b: 0.38, a: 1.0 };
+    let glow = tube(now, 0.0);
+    for (r, a) in [(150.0f32, 0.045f32), (96.0, 0.05)] {
+        blip.fill_glow_circle(320.0, 72.0, r, BlipColor { a: a * glow, ..sign });
+    }
+    neon(blip, "BRAWLER", 38.0, 9.0, sign, glow);
+    neon(blip, "TWO FIGHTERS ENTER", 124.0, 2.0,
+        BlipColor { r: 0.35, g: 0.95, b: 1.0, a: 1.0 }, tube(now, 2.1));
+
+    // The mode, chosen on a stick and one button because that is all a
+    // cabinet has. The line you are on is lit; the other is glass.
+    let dark = BlipColor { r: 0.42, g: 0.30, b: 0.46, a: 1.0 };
+    for (i, label) in ["1 PLAYER", "2 PLAYERS"].iter().enumerate() {
+        let y = 180.0 + i as f32 * 42.0;
+        if g.menu == i {
+            neon(blip, label, y, 3.0, BlipColor { r: 1.0, g: 0.85, b: 0.25, a: 1.0 },
+                0.62 + 0.38 * (now * 3.4).sin().max(0.0));
+        } else {
+            blip.draw_centered(label, y, 3.0, dark);
+        }
+    }
+
+    let dim = BlipColor { r: 0.70, g: 0.74, b: 0.84, a: 1.0 };
+    blip.draw_centered("W S OR ARROWS  CHOOSE", 264.0, 2.0, dim);
+    blip.draw_centered("F OR SPACE  START", 288.0, 2.0, dim);
 }
 
 fn draw_select(blip: &Blip, g: &Game) {
-    blip.draw_centered("CHOOSE YOUR FIGHTER", 46.0, 3.0, BLIP_YELLOW);
+    let versus = g.mode == Mode::Versus;
+    blip.draw_centered(if versus { "CHOOSE YOUR FIGHTERS" } else { "CHOOSE YOUR FIGHTER" },
+        30.0, 3.0, BLIP_YELLOW);
+    let p1c = BlipColor { r: 1.0, g: 0.35, b: 0.35, a: 1.0 };
+    let p2c = BlipColor { r: 0.40, g: 0.72, b: 1.0, a: 1.0 };
     for (i, a) in FIGHTERS.iter().enumerate() {
         let x = 70.0 + i as f32 * 180.0;
-        let picked = i == g.pick;
-        let box_c = if picked { rgb(a.trim) } else { BlipColor { r: 0.3, g: 0.3, b: 0.35, a: 1.0 } };
-        blip.draw_rect(x, 96.0, 150.0, 190.0, box_c);
-        if picked { blip.draw_rect(x - 2.0, 94.0, 154.0, 194.0, box_c); }
+        // Who is on this fighter, and have they committed to it.
+        let on1 = g.pick == i;
+        let on2 = versus && g.pick2 == i;
+        let picked = on1 || on2;
+        let box_c = if on1 && on2 { BLIP_WHITE }
+            else if on1 && versus { p1c }
+            else if on2 { p2c }
+            else if picked { rgb(a.trim) }
+            else { BlipColor { r: 0.3, g: 0.3, b: 0.35, a: 1.0 } };
+        blip.draw_rect(x, 84.0, 150.0, 190.0, box_c);
+        if picked { blip.draw_rect(x - 2.0, 82.0, 154.0, 194.0, box_c); }
 
         // The fighter, standing in their box, drawn by the same code
         // that draws them in a match. A select screen that shows
         // something other than what you are about to control is an
         // advertisement, not a choice.
         let cx = x + 75.0;
-        let ground = 268.0;
+        let ground = 256.0;
         let mut who = Fighter::new(i, cx, 1.0);
         who.y = FLOOR_Y;
         // Everyone stands in their fighting stance. The winner's pose
@@ -2409,29 +2511,66 @@ fn draw_select(blip: &Blip, g: &Game) {
         who.facing = 1.0;
         pose_and_draw(blip, &who, g.now, ground - FLOOR_Y, 0.0, i);
 
-        blip.draw_text(a.name, cx - text_w(a.name, 2.0) / 2.0, 102.0, 2.0,
+        blip.draw_text(a.name, cx - text_w(a.name, 2.0) / 2.0, 90.0, 2.0,
             if picked { BLIP_WHITE } else { BlipColor { r: 0.6, g: 0.6, b: 0.66, a: 1.0 } });
+
+        // Whose cursor is here, and whether it is still moving. A
+        // locked choice says so, because in versus the other player is
+        // waiting on it and needs to know they are the hold-up.
+        if versus {
+            for (who_i, on, col, tx) in [(0usize, on1, p1c, x + 6.0),
+                                         (1, on2, p2c, x + 150.0 - 6.0 - text_w("P2", 2.0))] {
+                if !on { continue; }
+                let lit = if g.locked[who_i] { 1.0 }
+                    else { 0.45 + 0.55 * (g.now * 5.0).sin().max(0.0) };
+                let c = BlipColor { a: lit, ..col };
+                blip.draw_text(if who_i == 0 { "P1" } else { "P2" }, tx, 64.0, 2.0, c);
+                if g.locked[who_i] {
+                    blip.draw_text("READY", tx.min(x + 150.0 - 6.0 - text_w("READY", 1.0)),
+                        262.0, 1.0, c);
+                }
+            }
+        }
 
         // The three numbers that actually differ, as bars — a player
         // choosing between archetypes needs the trade, not a biography.
-        let stats = [("PWR", a.power / 1.4), ("SPD", a.walk / 150.0), ("HP ", a.health as f32 / 120.0)];
+        let stats = [("PWR", a.power / 1.4), ("SPD", a.walk / 150.0),
+                     ("HP ", a.health as f32 / 120.0)];
         for (r, (label, v)) in stats.iter().enumerate() {
-            let sy = 272.0 + r as f32 * 14.0;
+            let sy = 278.0 + r as f32 * 13.0;
             blip.draw_text(label, x + 8.0, sy, 1.0, BlipColor { r: 0.7, g: 0.7, b: 0.8, a: 1.0 });
             blip.fill_rect(x + 40.0, sy, 100.0 * v.clamp(0.0, 1.0), 7.0, rgb(a.trim));
-            blip.draw_rect(x + 40.0, sy, 100.0, 7.0, BlipColor { r: 0.3, g: 0.3, b: 0.36, a: 1.0 });
+            blip.draw_rect(x + 40.0, sy, 100.0, 7.0,
+                BlipColor { r: 0.3, g: 0.3, b: 0.36, a: 1.0 });
         }
     }
-    let a = FIGHTERS[g.pick];
-    let s = format!("SPECIAL: {}    PUNCH + KICK", a.special_name);
-    blip.draw_centered(&s, 330.0, 2.0, rgb(a.trim));
-    // The two rules a player cannot find by pressing buttons, put where
-    // there is nothing else to do but read them.
-    blip.draw_centered("GUARD HIGH OR LOW TO MATCH THE ATTACK", 356.0, 1.0,
-        BlipColor { r: 0.74, g: 0.77, b: 0.84, a: 1.0 });
-    blip.draw_centered("WALK IN CLOSE AND PUNCH TO THROW", 372.0, 1.0,
-        BlipColor { r: 0.74, g: 0.77, b: 0.84, a: 1.0 });
-    blip.draw_centered("PRESS FIRE TO START", 388.0, 2.0, BLIP_WHITE);
+
+    if versus {
+        // Two clusters, either side of the split a keyboard already
+        // has, so neither player reaches across the other.
+        blip.draw_text("P1", 18.0, 330.0, 2.0, p1c);
+        blip.draw_text("W A S D  MOVE    F G H  PUNCH KICKS", 48.0, 330.0, 1.0,
+            BlipColor { r: 0.80, g: 0.72, b: 0.76, a: 1.0 });
+        blip.draw_text("P2", 18.0, 348.0, 2.0, p2c);
+        blip.draw_text("ARROWS   MOVE    J K L  PUNCH KICKS", 48.0, 348.0, 1.0,
+            BlipColor { r: 0.74, g: 0.78, b: 0.88, a: 1.0 });
+        blip.draw_centered("SAME FIGHTER TWICE IS NOT ALLOWED", 366.0, 1.0,
+            BlipColor { r: 0.62, g: 0.62, b: 0.70, a: 1.0 });
+        let waiting = !g.locked[0] || !g.locked[1];
+        blip.draw_centered(if waiting { "BOTH PLAYERS PRESS TO LOCK IN" } else { "FIGHT" },
+            384.0, 2.0, BLIP_WHITE);
+    } else {
+        let a = FIGHTERS[g.pick];
+        let s = format!("SPECIAL: {}    PUNCH AND KICK", a.special_name);
+        blip.draw_centered(&s, 326.0, 2.0, rgb(a.trim));
+        // The two rules a player cannot find by pressing buttons, put
+        // where there is nothing else to do but read them.
+        blip.draw_centered("GUARD HIGH OR LOW TO MATCH THE ATTACK", 350.0, 1.0,
+            BlipColor { r: 0.74, g: 0.77, b: 0.84, a: 1.0 });
+        blip.draw_centered("WALK IN CLOSE AND PUNCH TO THROW", 366.0, 1.0,
+            BlipColor { r: 0.74, g: 0.77, b: 0.84, a: 1.0 });
+        blip.draw_centered("PRESS FIRE TO START", 384.0, 2.0, BLIP_WHITE);
+    }
 }
 
 // ---- pose gallery (development only) -------------------------------------
@@ -2443,10 +2582,9 @@ fn draw_select(blip: &Blip, g: &Game) {
 #[cfg(feature = "gallery")]
 pub fn draw_gallery(blip: &Blip, now: f32) {
     blip.clear(BlipColor { r: 0.15, g: 0.16, b: 0.21, a: 1.0 });
-    let acts: [(&str, Act, MoveId); 18] = [
+    let acts: [(&str, Act, MoveId); 17] = [
         ("JAB", Act::Attack, MoveId::Jab),
         ("LOW KICK", Act::Attack, MoveId::LowKick),
-        ("KICK", Act::Attack, MoveId::Kick),
         ("HIGH KICK", Act::Attack, MoveId::HighKick),
         ("SWEEP", Act::Attack, MoveId::Sweep),
         ("LOW JAB", Act::Attack, MoveId::CrouchJab),

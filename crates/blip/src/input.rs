@@ -23,6 +23,16 @@ pub const BLIP_KEY_BUTTON2: KeyCode = KeyCode::Z;       // secondary action
 // keyboard the way a cabinet's kick buttons sit in a row on the deck.
 pub const BLIP_KEY_X:       KeyCode = KeyCode::X;
 pub const BLIP_KEY_C:       KeyCode = KeyCode::C;
+// Two home-row clusters, for a game two people play at one keyboard.
+// F-G-H and J-K-L sit either side of the split a touch typist's hands
+// already make, so the player on the left and the player on the right
+// each get three buttons without reaching across each other.
+pub const BLIP_KEY_F:       KeyCode = KeyCode::F;
+pub const BLIP_KEY_G:       KeyCode = KeyCode::G;
+pub const BLIP_KEY_H:       KeyCode = KeyCode::H;
+pub const BLIP_KEY_J:       KeyCode = KeyCode::J;
+pub const BLIP_KEY_K:       KeyCode = KeyCode::K;
+pub const BLIP_KEY_L:       KeyCode = KeyCode::L;
 
 /// Primary fire / jump / confirm — true only on the frame the key goes down.
 #[inline]

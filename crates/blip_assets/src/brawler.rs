@@ -13,7 +13,8 @@
 //! makes.
 
 use crate::techno::{Rng, MIX_KNEE};
-use crate::wav::{encode_pcm16_mono, env, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::wav::{encode_pcm16_mono, encode_pcm16_music, env, ms_to_samples,
+    soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 /// A short noise burst through a falling band — the body of every impact
@@ -251,55 +252,190 @@ fn degree(root: f32, step: i32) -> f32 {
     root * 2.0f32.powf((d + 12.0 * oct as f32) / 12.0)
 }
 
-/// Two bars of a stage's loop.
+/// A theme, built from four-bar phrases.
 ///
-/// Taiko on the pulse, rim on the off-beats, a koto line over the top
-/// and a low string holding the root underneath. The melody is written
-/// as scale degrees rather than frequencies, so it cannot leave the
-/// scale by accident — which is how a tune stops sounding like the
+/// Sequenced rather than looped. A four-bar loop is seven seconds, and
+/// a round is forty-five: you hear it round six times and by the third
+/// you are listening to the seam instead of the fight. `order` names
+/// which phrase plays in each slot, so eight slots of four bars is a
+/// theme longer than the round it plays under — which is the only
+/// arrangement you never hear repeat.
+///
+/// Phrases are scale degrees, not frequencies, so a tune cannot leave
+/// the scale by accident — which is how it stops sounding like the
 /// place it is supposed to be.
-fn music(bpm: f32, root: f32, melody: &[i32]) -> Vec<i16> {
+fn theme(bpm: f32, root: f32, phrases: &[&[i32]], bass: &[&[i32]], order: &[usize],
+         drive: f32) -> Vec<i16> {
     let step = (SAMPLE_RATE as f32 * 60.0 / bpm / 4.0) as usize; // 16ths
-    let steps = 2 * 16;
-    let n = step * steps + ms_to_samples(600.0);
+    let bars = 4 * order.len();
+    let steps = bars * 16;
+    // Room past the end for the last notes to ring out in, which is
+    // then folded back onto the top — see `wrap_tail`.
+    let body = step * steps;
+    let n = body + ms_to_samples(900.0);
     let mut buf = vec![0.0f32; n];
     let mut rng = Rng(0x9E3B);
     let beat_ms = 60.0 * 1000.0 / bpm;
     for s in 0..steps {
         let off = s * step;
-        // The pulse: a heavy taiko on one and three, a lighter one
-        // answering off the middle of the bar.
-        if s % 8 == 0 { taiko(&mut buf, off, 96.0, 1.0, &mut rng); }
-        if s % 16 == 12 { taiko(&mut buf, off, 122.0, 0.6, &mut rng); }
-        if s % 4 == 2 { rim(&mut buf, off, 0.5, &mut rng); }
-        if s % 8 == 7 { rim(&mut buf, off, 0.32, &mut rng); }
-        // The koto line.
-        let note = melody[s % melody.len()];
-        if note > -90 {
-            pluck(&mut buf, off, degree(root, note), beat_ms * 1.6, 0.85, &mut rng);
+        let slot = s / 64;                 // which four-bar phrase
+        let melody = phrases[order[slot] % phrases.len()];
+        let line = bass[order[slot] % bass.len()];
+        let within = s % 64;               // step inside the phrase
+        let bar = within / 16;
+        let b = s % 16;
+        // Each phrase has a quiet bar, and a whole phrase now and then
+        // is quiet throughout — a theme with no let-up in it has
+        // nothing to come back from.
+        let hush = order[slot] == 3;
+        let lull = bar == 2 || hush;
+        let last_bar = bar == 3;
+        let last_slot = slot + 1 == order.len();
+
+        // The pulse: a heavy taiko on one, an answer past the middle.
+        if b == 0 {
+            taiko(&mut buf, off, 96.0, if bar == 0 && !hush { 1.0 } else { 0.8 }, &mut rng);
         }
-        // A low string holding the root under the bar.
-        if s % 16 == 0 {
-            pluck(&mut buf, off, degree(root, 0) * 0.5, beat_ms * 4.0, 0.5, &mut rng);
+        if b == 8 && !lull { taiko(&mut buf, off, 104.0, 0.7, &mut rng); }
+        if b == 12 && bar % 2 == 1 && !hush { taiko(&mut buf, off, 122.0, 0.6, &mut rng); }
+        // Every phrase fills into the next one; the last one fills
+        // hardest, because that is the seam back to the top.
+        if last_bar && matches!(b, 10 | 12 | 14) {
+            let g = if last_slot { 0.7 } else { 0.5 } + 0.15 * drive;
+            taiko(&mut buf, off, 92.0 + (b as f32 - 10.0) * 14.0, g, &mut rng);
+        }
+        // Rim on the off-beats, denser on a driving stage.
+        if b % 4 == 2 && !(lull && b == 10) { rim(&mut buf, off, 0.5, &mut rng); }
+        if b % 8 == 7 && !hush { rim(&mut buf, off, 0.32, &mut rng); }
+        if drive > 0.5 && b % 4 == 3 && !lull { rim(&mut buf, off, 0.18, &mut rng); }
+
+        // The koto line.
+        let note = melody[within % melody.len()];
+        if note > -90 {
+            let gain = if lull { 0.62 } else { 0.85 };
+            pluck(&mut buf, off, degree(root, note), beat_ms * 1.6, gain, &mut rng);
+            // Doubled an octave up on the last bar of a phrase, so the
+            // tune has a top to it once every four bars.
+            if last_bar && b == 0 {
+                pluck(&mut buf, off, degree(root, note + 5), beat_ms * 1.2, 0.4, &mut rng);
+            }
+        }
+
+        // The bass walks a note a bar.
+        if b == 0 {
+            let d = line[bar % line.len()];
+            pluck(&mut buf, off, degree(root, d) * 0.5, beat_ms * 3.6, 0.55, &mut rng);
+        }
+        if b == 10 && !lull {
+            let d = line[bar % line.len()];
+            pluck(&mut buf, off, degree(root, d + 2) * 0.5, beat_ms * 1.2, 0.3, &mut rng);
         }
     }
-    soft_limit_to_pcm16(&buf, MIX_KNEE)
+    wrap_tail(&mut buf, body);
+    soft_limit_to_pcm16(&buf[..body], MIX_KNEE)
+}
+
+/// Fold what rings out past the end of the loop onto the beginning.
+///
+/// The buffer was the loop *plus* six hundred milliseconds for the
+/// tails to decay in, and the whole thing was handed to the player set
+/// to repeat — so every four seconds the music stopped dead, faded to
+/// nothing and started again. A drum that carries over a bar line has
+/// to carry over the loop point too, because for a loop they are the
+/// same line.
+fn wrap_tail(buf: &mut [f32], body: usize) {
+    for i in body..buf.len() {
+        buf[i - body] += buf[i];
+    }
 }
 
 
-pub fn generate() -> Vec<Asset> {
-    // Two stages, two loops — the only thing that makes a location
-    // sound like somewhere rather than a backdrop. Both sit on
-    // hirajōshi; the docks take it fast and low on the drum, the temple
-    // slower and higher up the scale, which is most of the difference
-    // between a working waterfront and somewhere people are quiet.
+/// The three themes, synthesised on demand.
+///
+/// Not baked into the binary like everything else here. A theme long
+/// enough not to repeat inside a round is a megabyte of PCM, times
+/// three, and the whole game is under two — but the *code* that makes
+/// one is a couple of hundred lines. So the game calls this at startup
+/// and builds its own music, which costs a fraction of a second on the
+/// device and nothing at all to download.
+///
+/// 0 and 1 are the two stages; 2 is the select screen.
+pub fn theme_wav(which: usize) -> Vec<u8> {
+    // Everything sits on hirajōshi and differs in the three things that
+    // make a place sound like itself: how fast, how low, how busy. The
+    // docks take it fast and hard on the drum; the temple slower and
+    // higher up the scale with room between the notes; the select
+    // screen sits between them and stays out of the way.
     //
-    // -99 is a rest.
+    // Four-bar phrases, sequenced. -99 is a rest.
     const R: i32 = -99;
-    let dock = [0, R, R, 2, 1, R, 0, R, 3, R, 2, R, 0, R, R, 1,
-                4, R, 3, R, 2, R, R, 0, 1, R, 0, R, R, 2, R, R];
-    let temple = [3, R, R, R, 2, R, 4, R, 3, R, R, 1, 0, R, R, R,
-                  1, R, 2, R, R, 3, R, 2, 0, R, R, R, R, R, 1, R];
+
+    // -- the docks ------------------------------------------------------
+    let d_a = [0, R, R, 2, 1, R, 0, R, 3, R, 2, R, 0, R, R, 1,
+               4, R, 3, R, 2, R, R, 0, 1, R, 0, R, R, 2, R, R,
+               0, R, R, 2, 1, R, 0, R, 3, R, 4, R, 3, R, R, 2,
+               4, R, 5, R, 4, R, 3, R, 2, R, R, 1, 0, R, R, R];
+    let d_b = [2, R, 3, R, 4, R, R, 3, 2, R, R, 4, 5, R, R, R,
+               4, R, 3, R, 2, R, 1, R, 0, R, R, 2, 1, R, R, R,
+               3, R, R, 4, 5, R, 4, R, 3, R, R, 2, 1, R, 2, R,
+               0, R, 1, R, 2, R, R, 3, 2, R, 1, R, 0, R, R, R];
+    let d_c = [5, R, R, R, 4, R, R, R, 3, R, R, R, 2, R, R, R,
+               4, R, R, 3, R, R, 2, R, R, R, 1, R, R, R, R, R,
+               0, R, R, 1, 2, R, R, 3, 4, R, R, R, 3, R, R, R,
+               2, R, R, R, 1, R, R, R, 0, R, R, R, R, R, R, R];
+    let d_d = [0, R, R, R, R, R, 2, R, R, R, 1, R, R, R, R, R,
+               0, R, R, R, R, R, R, R, 2, R, R, R, R, R, R, R,
+               3, R, R, R, R, R, 2, R, R, R, R, R, 1, R, R, R,
+               0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R];
+
+    // -- the temple -----------------------------------------------------
+    let t_a = [3, R, R, R, 2, R, 4, R, 3, R, R, 1, 0, R, R, R,
+               1, R, 2, R, R, 3, R, 2, 0, R, R, R, R, R, 1, R,
+               3, R, R, R, 4, R, R, 3, 5, R, R, 4, 3, R, R, R,
+               2, R, R, 1, R, R, 2, R, 0, R, R, R, R, R, R, R];
+    let t_b = [5, R, R, 4, R, R, 3, R, R, R, 4, R, 5, R, R, R,
+               4, R, R, R, 3, R, R, 2, R, R, 3, R, R, R, R, R,
+               2, R, R, 3, 4, R, R, 5, R, R, 4, R, 3, R, R, R,
+               1, R, R, R, 2, R, R, R, 0, R, R, R, R, R, R, R];
+    let t_c = [0, R, R, R, 1, R, R, R, 2, R, R, R, 3, R, R, R,
+               2, R, R, 1, R, R, 0, R, R, R, R, R, 1, R, R, R,
+               4, R, R, R, 3, R, R, R, 2, R, R, 1, R, R, R, R,
+               0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R];
+    let t_d = [3, R, R, R, R, R, R, R, 2, R, R, R, R, R, R, R,
+               1, R, R, R, R, R, R, R, 0, R, R, R, R, R, R, R,
+               2, R, R, R, R, R, R, R, 1, R, R, R, R, R, R, R,
+               0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R];
+
+    // -- the select screen ----------------------------------------------
+    let s_a = [0, R, R, R, 3, R, 2, R, R, R, 1, R, 0, R, R, R,
+               2, R, R, R, 1, R, R, 0, R, R, R, R, 3, R, R, R,
+               4, R, R, 3, R, R, 2, R, R, R, 3, R, 4, R, R, R,
+               2, R, R, R, 0, R, R, 1, R, R, R, R, R, R, R, R];
+    let s_b = [3, R, R, R, 4, R, R, R, 5, R, R, 4, 3, R, R, R,
+               2, R, R, 3, R, R, 4, R, R, R, 3, R, R, R, R, R,
+               1, R, R, R, 2, R, R, 1, 0, R, R, R, R, R, 2, R,
+               1, R, R, R, R, R, 0, R, R, R, R, R, R, R, R, R];
+
+    // A note a bar under each, so the ground moves.
+    let b0 = [0, 0, 3, 2];
+    let b1 = [2, 3, 4, 2];
+    let b2 = [0, 4, 3, 0];
+    let b3 = [0, 0, 0, 0];
+
+    // Eight slots of four bars: a rondo, so the tune keeps coming back
+    // without the piece repeating. Slot 3 is the hushed one.
+    let order = [0usize, 1, 0, 3, 2, 1, 0, 1];
+    match which {
+        0 => encode_pcm16_music(&theme(132.0, 293.66,
+            &[&d_a, &d_b, &d_c, &d_d], &[&b0, &b1, &b2, &b3], &order, 1.0)),
+        1 => encode_pcm16_music(&theme(108.0, 220.0,
+            &[&t_a, &t_b, &t_c, &t_d], &[&b0, &b1, &b2, &b3], &order, 0.2)),
+        _ => encode_pcm16_music(&theme(118.0, 246.94,
+            &[&s_a, &s_b], &[&b2, &b0], &[0, 1, 0, 1], 0.0)),
+    }
+}
+
+pub fn generate() -> Vec<Asset> {
     vec![
         ("sounds/hit_light.wav", encode_pcm16_mono(&impact(110.0, 0.25, 520.0, 0.8, 0x11))),
         ("sounds/hit_heavy.wav", encode_pcm16_mono(&impact(220.0, 0.6, 300.0, 1.0, 0x22))),
@@ -309,7 +445,5 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/bell.wav",      encode_pcm16_mono(&bell())),
         ("sounds/ko.wav",        encode_pcm16_mono(&ko())),
         ("sounds/projectile.wav", encode_pcm16_mono(&projectile())),
-        ("sounds/music_dock.wav", encode_pcm16_mono(&music(132.0, 293.66, &dock))),
-        ("sounds/music_temple.wav", encode_pcm16_mono(&music(108.0, 220.0, &temple))),
     ]
 }

@@ -18,7 +18,12 @@ pub type BlipSound = Sound;
 
 /// Decode a WAV byte slice into a `BlipSound`. Must be awaited at startup —
 /// do not call this inside the game loop.
-pub async fn load_sound(bytes: &'static [u8]) -> BlipSound {
+/// The bytes only have to live as long as the call: they are decoded
+/// into the audio engine here, so a caller that synthesises its own
+/// audio can hand over a buffer it is about to drop. Every other
+/// caller passes `include_bytes!`, which is why this used to ask for
+/// `&'static` it never needed.
+pub async fn load_sound(bytes: &[u8]) -> BlipSound {
     load_sound_from_bytes(bytes)
         .await
         .expect("blip::audio::load_sound: decode failed")
