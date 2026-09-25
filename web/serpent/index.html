@@ -84,19 +84,10 @@
       <div class="dial-cap"><div id="dial-hand-p2"></div></div>
       <div id="dial-label-p2">2P</div>
     </div>
-   </div>
-
-   <!-- The game pad — the deck's default controller. A sibling of
-        .deck-panel (not a child), so none of it is inside the 3D tilt:
-        taps + the d-pad drag hit-test as plain 2D. shell.js wires it
-        through BlipController; #control-toggle (and the saved
-        'blip-controls' pref) swaps back to the joystick above. Buttons:
-        a big d-pad on the left, the buttons on the right, as far
-        apart as the panel allows — a game that declares four (a
-        fighter) gets four caps in a square instead.
-        No SELECT / START — the face buttons double as the title-screen
-        "press fire", the BLIP logo is the way back to the arcade grid.
-        Pad two is hidden until the game reports a second player. -->
+   <!-- The game pad, inside .deck-panel so it shares the joystick
+        deck's coordinate system: same tilt, same origin, so switching
+        controller moves nothing under the thumb. Cross on the left,
+        caps on the right. -->
    <div class="snes-pad" id="snes-pad" aria-hidden="true">
     <span class="snes-cord" aria-hidden="true"></span>
     <div class="snes-shell">
@@ -128,6 +119,8 @@
       <span class="deck-tag" data-second>2P</span>
     </div>
    </div>
+   </div>
+
   </div>
 
   <!-- Subtle: flip the deck back to the classic arcade joystick. -->

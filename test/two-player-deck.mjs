@@ -523,10 +523,22 @@ test(`a phone on its side puts the controls beside the picture (${ENGINE})`, asy
     const bar = await evaluate(cdp,
       "Math.round(document.getElementById('topbar').getBoundingClientRect().height)");
     assert.ok(bar > 60, `the deck collapsed in portrait: ${bar}px`);
-    // The canvas stops above the deck rather than running under it.
-    assert.ok(g.canvas.y + g.canvas.h <= PORTRAIT.height - bar + 2,
-      `the picture runs ${Math.round(g.canvas.y + g.canvas.h)}px down, under a deck at `
-      + `${PORTRAIT.height - bar}`);
+    // The canvas stops above what the deck DRAWS. It may run up behind
+    // the empty top of a station's box, which is only there to give the
+    // ball room to float.
+    const drawn = await evaluate(cdp, `(function () {
+      var top = innerHeight;
+      document.querySelectorAll('#topbar .stick-ball, #topbar .stick-boot, '
+        + '#topbar .fire-buttons, #topbar .snes-dpad, #topbar .snes-face')
+        .forEach(function (e) {
+          var r = e.getBoundingClientRect();
+          if (r.height > 0 && r.top < top) top = r.top;
+        });
+      return top;
+    })()`);
+    assert.ok(g.canvas.y + g.canvas.h <= drawn + 2,
+      `the picture runs ${Math.round(g.canvas.y + g.canvas.h)}px down, under a deck `
+      + `drawn from ${Math.round(drawn)}`);
   });
 });
 
@@ -848,10 +860,16 @@ test(`the deck never laps over the picture (${ENGINE})`, async (t) => {
   const GAMES = ['bouncer', 'serpent', 'brawler', 'meteors', 'rally', 'sky_raider'];
   const EXTENT = `(function () {
     var c = document.getElementById('glcanvas').getBoundingClientRect();
-    var bar = document.getElementById('topbar');
-    var top = bar.getBoundingClientRect().top;
+    // Seeded from the bottom of the screen: every control is INSIDE the
+    // bar, so seeding with the bar's own top means nothing can lower it
+    // and the whole bar reads as covered.
+    var top = innerHeight;
+    // The parts that are DRAWN. A station's box is three caps tall to
+    // give the ball room to float and only its bottom third is inked,
+    // so the picture is allowed to run up behind the empty part.
     var parts = document.querySelectorAll(
-      '#topbar .stick-base, #topbar .fire-buttons, #topbar .snes-pad, ' +
+      '#topbar .stick-ball, #topbar .stick-boot, #topbar .fire-buttons, ' +
+      '#topbar .snes-dpad, #topbar .snes-face, ' +
       '#topbar #paddle-dial, #topbar #paddle-dial-p2');
     for (var i = 0; i < parts.length; i++) {
       var r = parts[i].getBoundingClientRect();

@@ -380,17 +380,30 @@ applyLayout();
 /** How much of the screen's bottom the deck covers: its bar, plus
  * anything drawn outside it. */
 function deckCover(bar) {
-  var top = bar.getBoundingClientRect().top;
+  // Start from the bottom of the screen, not from the bar's own top:
+  // every drawn control is INSIDE the bar, so seeding this with the bar
+  // meant nothing could ever lower it and the whole bar got reserved.
+  var top = window.innerHeight;
+  // The parts that are DRAWN, not the boxes holding them: the stick's
+  // base is three caps tall to give the ball room to float and only its
+  // bottom third is ever inked, so reserving the box gave the deck 46px
+  // of empty screen and the pad 78.
   var parts = document.querySelectorAll(
-    '#topbar .stick-base, #topbar .fire-buttons, #topbar .snes-pad, ' +
+    '#topbar .stick-ball, #topbar .stick-boot, #topbar .fire-buttons, ' +
+    '#topbar .snes-dpad, #topbar .snes-face, ' +
     '#topbar #paddle-dial, #topbar #paddle-dial-p2');
   for (var i = 0; i < parts.length; i++) {
     var r = parts[i].getBoundingClientRect();
     if (r.height > 0 && r.top < top) top = r.top;
   }
-  return Math.ceil(window.innerHeight - top);
+  // A few pixels of margin: the ball rises as the stick leans. If the
+  // deck has not been built yet there is nothing to measure, so fall
+  // back to the bar.
+  if (top >= window.innerHeight) return Math.ceil(bar.offsetHeight);
+  return Math.ceil(window.innerHeight - top) + 10;
 }
 
+var lastFit = '';
 function fillCanvas() {
   applyLayout();
   var tb = document.getElementById('topbar');
@@ -419,9 +432,40 @@ function fillCanvas() {
   // growing on a narrow phone) instead of overlapping it.
   document.documentElement.style.setProperty('--topbar-h', TOPBAR_H + 'px');
 }
+
+/** Re-fit only when something actually changed. The deck is watched by
+ * a ResizeObserver and fillCanvas writes --topbar-h, which the deck's
+ * own children read — so an unguarded re-fit can feed itself and the
+ * picture flickers between two sizes. */
+function refit() {
+  var key = [window.innerWidth, window.innerHeight, TOPBAR_H, MARQUEE_H,
+             canvas.style.width, canvas.style.height].join('|');
+  fillCanvas();
+  var now = [window.innerWidth, window.innerHeight, TOPBAR_H, MARQUEE_H,
+             canvas.style.width, canvas.style.height].join('|');
+  if (now === key) return;
+  lastFit = now;
+}
 window.addEventListener('resize', fillCanvas);
 window.addEventListener('orientationchange', function () { setTimeout(fillCanvas, 60); });
 fillCanvas();
+
+// Re-fit whenever the deck changes shape rather than at a handful of
+// guessed moments. The bar is built in pieces — the marquee arrives
+// separately, the caps are added by the block below, a controller
+// switch changes the height — and every one of those used to need its
+// own fillCanvas() call, with a race left over wherever one was missed.
+if (typeof ResizeObserver === 'function') {
+  var deckWatch = new ResizeObserver(function () { refit(); });
+  // The bar's own height is fixed in CSS, so watching it alone never
+  // fires for the thing that actually moves the deck's drawn edge: the
+  // caps, which go from nothing to full size when the deck is built.
+  ['#topbar', '#marquee-bar', '#fire-buttons', '#fire-buttons-p2',
+   '#snes-pad .snes-face', '#snes-pad .snes-dpad'].forEach(function (sel) {
+    var el = document.querySelector(sel);
+    if (el) deckWatch.observe(el);
+  });
+}
 
 function hideLoader() {
   if (loader && loader.style.display !== 'none') {
@@ -700,6 +744,16 @@ window.addEventListener('keydown', function (e) {
     BlipController.bindButtons(st.fire);
     BlipController.registerVisual(st.fire);
   });
+
+  // The deck is built now, so the picture can be fitted to what it
+  // actually covers. fillCanvas() ran at load, before any of these caps
+  // existed, and fell back to reserving the whole bar. Once more after
+  // the frame settles, because the marquee bar is injected separately
+  // and changes the height above the picture as well.
+  if (typeof fillCanvas === 'function') {
+    fillCanvas();
+    requestAnimationFrame(fillCanvas);
+  }
 
   // ---- The 8-way restrictor-gate joystick ----
   // Its drag is bound to #topbar (which carries no transform), not the

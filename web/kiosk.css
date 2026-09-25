@@ -1839,10 +1839,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* The pad's face carries the same square. Four caps need more panel than
    two, so the pad-mode bar grows to seat them. */
 :root[data-caps="4"] .snes-pad { --sf-btn: 34px; --sf-gap: 9px; --sf-dpad: 52px; }
-:root[data-controls="pad"][data-caps="4"] #topbar.kiosk-bar,
-:root[data-controls="pad"][data-caps="4"] .kiosk-bar-main {
-  height: calc(152px + env(safe-area-inset-bottom, 0px));
-}
+
 .snes-pad .snes-face.four {
   display: grid;
   grid-template-columns: repeat(2, var(--sf-btn));
@@ -2224,12 +2221,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
     height: calc(200px + env(safe-area-inset-bottom, 0px));
   }
-  :root[data-controls="pad"] #topbar.kiosk-bar,
-  :root[data-controls="pad"] .kiosk-bar-main,
-  :root[data-controls="pad"][data-caps="4"] #topbar.kiosk-bar,
-  :root[data-controls="pad"][data-caps="4"] .kiosk-bar-main {
-    height: calc(184px + env(safe-area-inset-bottom, 0px));
-  }
+
 
   /* The washer stays well under the ball. Scaled up with everything
      else it became a black disc as wide as the ball-top sitting on it,
@@ -2670,4 +2662,74 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-players="1"]:not([data-open]) #deck-p2 .arcade-btn,
 :root[data-players="1"]:not([data-open]) #deck-p2 .stick-base {
   pointer-events: none;
+}
+
+/* ---- One deck, two controllers ----
+   The pad is inside .deck-panel now, so it shares the joystick deck's
+   tilt and origin. Everything below sizes it off --cap, the same length
+   the joystick deck is built from, so the cross matches the stick and
+   the caps match the caps — and a thumb does not move when you switch. */
+:root[data-caps="4"] .snes-pad {
+  --sf-btn: var(--cap);
+  --sf-gap: calc(var(--cap) * 0.2);
+  --sf-dpad: calc(var(--cap) * 1.17);
+  --sf-edge: 0px;
+}
+:root[data-caps="4"] .snes-pad .snes-shell {
+  align-items: flex-end;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+/* The cross and the caps sit in a .deck-side-shaped row of their own, so
+   they land where the stick and its caps land. */
+:root[data-caps="4"] .snes-pad .snes-dpad,
+:root[data-caps="4"] .snes-pad .snes-face {
+  margin-bottom: 20px;
+}
+:root[data-caps="4"] .snes-pad .snes-dpad { margin-bottom: 26px; }
+
+/* Both controllers get the same bar. They are the same deck now, so a
+   separate pad height only made the picture jump on the way between. */
+:root[data-caps="4"][data-controls="pad"] #topbar.kiosk-bar,
+:root[data-caps="4"][data-controls="pad"] .kiosk-bar-main {
+  height: calc(152px + env(safe-area-inset-bottom, 0px));
+}
+:root[data-caps="4"][data-controls="stick"] #topbar.kiosk-bar,
+:root[data-caps="4"][data-controls="stick"] .kiosk-bar-main {
+  height: calc(152px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Only the controller on show names its stations. Both decks are in the
+   panel now, and the hidden one's tags were still painting. */
+:root[data-controls="pad"] .deck-side .deck-tag { display: none; }
+:root[data-controls="stick"] .snes-pad .deck-tag { display: none; }
+
+/* The pad's caps are the same red as the joystick deck's. */
+:root[data-caps="4"] .snes-pad .snes-btn.cap1 > span,
+:root[data-caps="4"] .snes-pad .snes-btn.cap3 > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(255, 210, 200, 0.42) 0%, rgba(255, 210, 200, 0) 44%),
+    radial-gradient(circle at 50% 62%, #e8503c 0%, #d8352a 40%, #b4241a 70%, #7d1109 100%);
+}
+:root[data-caps="4"] .snes-pad .snes-btn.cap2 > span,
+:root[data-caps="4"] .snes-pad .snes-btn.cap4 > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(255, 210, 200, 0.34) 0%, rgba(255, 210, 200, 0) 44%),
+    radial-gradient(circle at 50% 62%, #bc3a2a 0%, #a8261b 40%, #841409 70%, #560b04 100%);
+}
+
+/* The tag paints over the deck, not under it. It is a sibling of the
+   caps and comes first in the DOM, so the mounting plate was drawn on
+   top of it and cut it in half. */
+.deck-tag { z-index: 3; }
+/* In the gap between the stick and the caps, level with them. There is
+   no room above: the square of caps reaches within a few pixels of the
+   panel's own top edge, so a tag put there is cut in half by it. */
+:root[data-caps="4"] .deck-tag {
+  bottom: calc(var(--cap) * 1.05);
+  /* Measured from the left of the station, not 50% of it: the caps are
+     twice the stick's width, so the station's midpoint falls inside
+     them and the tag landed on the LK cap. */
+  left: calc(var(--cap) * 1.25);
 }

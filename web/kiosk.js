@@ -594,7 +594,9 @@ function pollGamepad(onDown, onUp) {
       var mark = pad2.querySelector('.snes-wordmark');
       if (mark) mark.remove();
       pad2.querySelector('.snes-shell').appendChild(tag('2P', true));
-      pad.parentNode.insertBefore(pad2, pad.nextSibling);
+      // Both pads live inside the panel, with the joystick deck.
+      if (pad.parentNode !== panel) panel.appendChild(pad);
+      panel.appendChild(pad2);
       var shell1 = pad.querySelector('.snes-shell');
       if (shell1) shell1.appendChild(tag('1P', false));
     }
