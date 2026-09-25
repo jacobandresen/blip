@@ -946,58 +946,72 @@ fn draw_leg(blip: &Blip, h: &Hide, hip: V, knee: V, ankle: V, fwd: f32, ground: 
 /// thumb laid over the front. None of them is more than a few pixels;
 /// all of them are aligned to the forearm, so the knuckles always face
 /// the way the punch is going.
+/// Every piece of a hand as one silhouette: all the ink first, then all
+/// the skin over it. Drawn piece by piece with `part`, each capsule
+/// carries its own outline and cuts the ones it overlaps, so a hand
+/// made of four shapes comes out looking like four shapes.
+fn lumps(blip: &Blip, pieces: &[(V, V, f32, f32)], c: BlipColor, ink: BlipColor) {
+    for (a, b, r1, r2) in pieces { stroke(blip, *a, *b, r1 + 1.7, r2 + 1.7, ink); }
+    for (a, b, r1, r2) in pieces { stroke(blip, *a, *b, *r1, *r2, c); }
+}
+
+/// A fist, seen from the side — which is the only way it is ever seen
+/// here, because the fighters are drawn in pure profile.
+///
+/// That is the thing the first three attempts got wrong. A fist drawn
+/// with its knuckles in a row across the front is a fist seen from the
+/// *front*, and putting one on a figure in profile gives you a pair of
+/// prongs: a claw. In profile you do not see four knuckles. You see one
+/// squared corner where the middle knuckle turns, the curled fingers
+/// stacked behind and below it, and the thumb laid across them.
+///
+/// Built the way the references build it (see the note in the commit):
+/// a mitten, with a triangular knuckle mass at the top front, a
+/// rectangular thumb jutting from the wrist at about forty-five
+/// degrees, and an upside-down Y of creases between the two for the
+/// folds of the finger digits.
 fn draw_fist(blip: &Blip, h: &Hide, wrist: V, hand: V, b: f32) {
     let skin = h.c(h.skin);
     let ink = h.ink();
     let (fx, fy) = unit(wrist, hand);
-    let (px, py) = (-fy, fx);              // across the hand
+    // Across the hand in the picture plane: negative is the back of the
+    // hand (the knuckle side), positive is the palm, which is where the
+    // fingers curl to and the thumb lies over them.
+    let (px, py) = (-fy, fx);
     let at = |f: f32, a: f32| V(hand.0 + fx * f * b + px * a * b,
                                 hand.1 + fy * f * b + py * a * b);
 
-    // What separates a fist from a mitten is that its leading edge is
-    // lumpy. A smooth convex outline with a highlight on it is a glove
-    // however it is shaded, which is what this used to be.
-    //
-    // It cannot be four knuckles, or even three. The whole hand is
-    // eleven pixels across; three lobes across eleven pixels put the
-    // valleys between them under a pixel deep, and the ink outline —
-    // which is nearly two — fills them straight back in. Two lobes is
-    // what the size will carry, and two lobes is enough: the deep split
-    // on a real fist is the one in the middle, and a front edge with
-    // one notch in it reads as fingers where a smooth one never will.
-    let heel_a = at(-3.6, 0.0);
-    let heel_b = at(-0.6, 0.0);
-    let (k_lo, k_hi) = (at(1.5, -2.5), at(1.5, 2.5));
-    let kr = 3.3 * b;
+    lumps(blip, &[
+        // The back of the hand: a flat slab from the wrist to the
+        // knuckles, and the top edge of the whole shape.
+        (at(-5.0, -1.4), at(2.0, -1.9), 2.5 * b, 2.3 * b),
+        // The knuckle mass, standing across the front face rather than
+        // along the hand. That is what squares off the top front corner
+        // — the one corner the whole shape is read from, and the thing
+        // a rounded lump here cannot say.
+        (at(2.5, -1.9), at(2.5, 0.6), 2.3 * b, 2.2 * b),
+        // The fingers, curled under and back toward the palm.
+        (at(0.2, 2.1), at(2.2, 1.9), 2.4 * b, 2.3 * b),
+    ], skin, ink);
 
-    blip.fill_circle(k_lo.0, k_lo.1, kr + 1.7, ink);
-    blip.fill_circle(k_hi.0, k_hi.1, kr + 1.7, ink);
-    part(blip, heel_a, heel_b, 4.2 * b, 4.8 * b, skin, ink);
-    blip.fill_circle(k_lo.0, k_lo.1, kr, skin);
-    blip.fill_circle(k_hi.0, k_hi.1, kr, skin);
+    // The folds between the digits: an upside-down Y where the curled
+    // fingers meet the knuckles. Two strokes, a shade darker, and they
+    // are what stop the finger mass reading as one lump of dough.
+    let crease = shade(skin, 0.64);
+    stroke(blip, at(4.0, 0.7), at(1.5, 1.2), 0.55 * b, 0.5 * b, crease);
+    stroke(blip, at(1.5, 1.2), at(1.9, 3.4), 0.5 * b, 0.45 * b, crease);
 
-    // The split, cut in rather than drawn on: a short ink wedge into
-    // the front edge where the two lobes meet, so the notch survives
-    // the outline instead of being bridged by it.
-    stroke(blip, at(4.2, 0.0), at(2.0, 0.0), 0.7 * b, 0.5 * b, ink);
+    // Light along the top of the hand and over the knuckle that lands.
+    stroke(blip, at(-2.0, -3.0), at(2.4, -3.0), 1.1 * b, 1.3 * b,
+           blend(skin, BLIP_WHITE, 0.30));
 
-    // The thumb, laid across the front of the fingers on the near side:
-    // two segments with a bend between them, because one straight bar
-    // is a strap and a bent one is a digit.
-    //
-    // It is LIGHTER than the fingers behind it, not darker. A thumb
-    // wrapped over a fist is the nearest thing on the hand and catches
-    // the most light; shading it down to separate it is the reflex, and
-    // it is backwards — three darker marks on an eleven-pixel hand come
-    // out as one brown smudge, which is what this looked like. One lit
-    // shape over a plain one separates cleanly and costs nothing.
-    let (base, bend, tip) = (at(-2.8, 3.2), at(0.4, 3.6), at(2.6, 2.0));
-    let thumb = blend(skin, BLIP_WHITE, 0.22);
-    stroke(blip, base, bend, 2.2 * b, 2.1 * b, thumb);
-    stroke(blip, bend, tip, 2.1 * b, 1.5 * b, thumb);
-    // And one shadow under it — the only dark mark inside the hand, so
-    // it is unambiguously the thumb's own edge.
-    stroke(blip, at(-2.6, 1.4), at(1.4, 1.7), 0.7 * b, 0.6 * b, shade(skin, 0.64));
+    // The thumb: a bar off the wrist at about forty-five degrees, laid
+    // across the front of the fingers. Lighter than them, because it is
+    // the nearest thing on the hand — and with no ink edge of its own,
+    // since at this size an outline round a thumb is most of it.
+    stroke(blip, at(-3.2, 0.4), at(0.4, 3.0), 1.9 * b, 1.6 * b,
+           blend(skin, BLIP_WHITE, 0.20));
+    stroke(blip, at(-3.0, -0.9), at(0.0, 1.6), 0.55 * b, 0.55 * b, shade(skin, 0.62));
 }
 
 /// An open hand: a palm and three fingers, because a grab and a punch
@@ -1082,7 +1096,7 @@ fn draw_arm(blip: &Blip, h: &Hide, shoulder: V, elbow: V, hand: V, open: bool, t
     // short of the hand: a thick band running right up to a fist is the
     // cuff of a boxing glove, which is the one thing these hands must
     // not look like.
-    stroke(blip, along(elbow, hand, 0.70), along(elbow, hand, 0.86), 3.0 * b, 3.2 * b,
+    stroke(blip, along(elbow, hand, 0.54), along(elbow, hand, 0.74), 3.0 * b, 3.2 * b,
         h.c(h.trim));
     if open { draw_palm(blip, h, elbow, hand, b); }
     else { draw_fist(blip, h, elbow, hand, b); }
