@@ -454,10 +454,44 @@ window.addEventListener('keydown', function (e) {
   // A two-player cabinet seats two stations. The deck is built for both
   // up front and the second one stays hidden until the game says a
   // second player has joined (blip_set_mode -> window.blipSetMode).
-  var twoUp = !!(game && game.players === 2);
+  // One cabinet, one control panel.
+  //
+  // Every page gets the same deck: two stations, each a stick and four
+  // caps. A game that uses fewer simply leaves the spare caps dead,
+  // which is what a real cabinet does — the panel is the machine's, not
+  // the game's, and a JAMMA board that reads one button still sits
+  // behind six. Rally is the only exception; it has spinners instead of
+  // a stick and hides all of this (see the rally branch below).
+  var twoUp = !isRally;
   var root = document.documentElement;
-  if (twoUp) root.setAttribute('data-players', '1');
-  if (buttonSpecs.length >= 4) root.setAttribute('data-caps', '4');
+  if (twoUp) {
+    // '1' is the resting state for every deck: one player in play,
+    // station two present and dead. Brawler moves it from there when
+    // somebody joins; a game with no second player never does, which
+    // leaves its second station exactly as dead as it should be.
+    root.setAttribute('data-players', '1');
+    root.setAttribute('data-caps', '4');
+  }
+  /// How many caps a station has, whatever this game happens to read,
+  /// and what each of them is wired to. Declared up here because both
+  /// the pad's face and the joystick deck's caps are built from it, and
+  /// the pad is built first — read before it was assigned, `specs[i]`
+  /// threw and the deck came out with no buttons at all.
+  var CAPS = 4;
+  var specs = buttonSpecs.length ? buttonSpecs : [primary];
+  // A one-button game still gets two live caps, because the pad's A and
+  // B have always both been fire and a single live button on a deck of
+  // four is a worse deal on a phone than the pair it replaces. Anything
+  // past what the game reads is a blank.
+  if (specs.length < 2) specs = [specs[0], specs[0]];
+  // Only a game that actually seats two players wires station two. On
+  // every other cabinet it is panel furniture: the same stick and the
+  // same four caps, blank and connected to nothing. Wiring them to
+  // names the game has never heard of works — the controller drops a
+  // name it has no key for — but it is dead by accident rather than by
+  // construction, and "by accident" is not something to leave in a
+  // control panel.
+  function specsFor(who) { return who === 1 && !(game && game.players === 2) ? [] : specs; }
 
   function coinGated() { return overlay.classList.contains('visible'); }
   function dispatch(spec, type) {
@@ -592,26 +626,22 @@ window.addEventListener('keydown', function (e) {
     var pad = document.getElementById(who ? 'snes-pad-p2' : 'snes-pad');
     if (!pad) return;
     var face = pad.querySelector('.snes-face');
-    if (buttonSpecs.length >= 4 && face) {
+    if (face) {
       face.classList.add('four');
       face.innerHTML = '';
-      buttonSpecs.forEach(function (spec, i) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'snes-btn cap' + (i + 1);
-        b.setAttribute('data-blip', st.caps(i));
-        if (spec.label) b.setAttribute('aria-label', spec.label);
-        b.innerHTML = '<span></span>'
-          + (spec.label ? '<i class="snes-legend">' + spec.label + '</i>' : '');
-        face.appendChild(b);
-      });
-    } else if (who === 0) {
-      // A and B are both Button 1 (fire) — but a two-action game
-      // (Meteors' hyperspace) has no shoulder buttons to put the second
-      // action on, so A becomes Button 2 there. B stays fire.
-      if (buttonSpecs[1] && buttonSpecs[1].code !== buttonSpecs[0].code) {
-        var aBtn = pad.querySelector('.snes-a');
-        if (aBtn) aBtn.setAttribute('data-blip', 'button2');
+      var mine = specsFor(who);
+      for (var i = 0; i < CAPS; i++) {
+        var spec = mine[i];
+        var cap = document.createElement('button');
+        cap.type = 'button';
+        cap.className = 'snes-btn cap' + (i + 1) + (spec ? '' : ' spare');
+        if (spec) {
+          cap.setAttribute('data-blip', st.caps(i));
+          if (spec.label) cap.setAttribute('aria-label', spec.label);
+        }
+        cap.innerHTML = '<span></span>'
+          + (spec && spec.label ? '<i class="snes-legend">' + spec.label + '</i>' : '');
+        face.appendChild(cap);
       }
     }
     BlipController.bindButtons(pad);
@@ -655,27 +685,29 @@ window.addEventListener('keydown', function (e) {
     if (typeof fillCanvas === 'function') fillCanvas();
   };
 
-  // ---- Fire buttons (joystick mode): one per game.buttons entry, built
-  // here and wired through the library exactly like the SNES face buttons.
-  // One cap per button the game declares — two for most of them, four
-  // for a fighting game that wants a punch and a kick per height. A game
-  // that declares none still gets the single primary cap. Four caps sit
-  // in a square rather than a row (see .fire-buttons.four in kiosk.css),
-  // and carry their legend ON the cap, because the square leaves no room
-  // under the top row for one.
-  var specs = buttonSpecs.length ? buttonSpecs : [primary];
-  stations.forEach(function (st) {
+  // ---- Fire buttons (joystick mode) ----
+  // Four caps in a square on every station of every deck, wired through
+  // the library exactly like the pad's face buttons. A cap past what
+  // this game declares is left with no logical name at all, so it looks
+  // like a button, presses like a button and does nothing — which is
+  // what the unused buttons on a cabinet do. The legends go ON the cap,
+  // because the square leaves no room under the top row for one.
+  stations.forEach(function (st, who) {
     if (!st.fire) return;
-    if (specs.length >= 4) st.fire.classList.add('four');
-    specs.forEach(function (spec, i) {
+    st.fire.classList.add('four');
+    var mine = specsFor(who);
+    for (var i = 0; i < CAPS; i++) {
+      var spec = mine[i];
       var btn = document.createElement('div');
-      btn.className = 'arcade-btn' + (specs.length >= 4 ? ' lettered' : '');
-      btn.setAttribute('data-blip', st.caps(i));
-      if (spec.label) btn.setAttribute('aria-label', spec.label);
+      btn.className = 'arcade-btn lettered' + (spec ? '' : ' spare');
+      if (spec) {
+        btn.setAttribute('data-blip', st.caps(i));
+        if (spec.label) btn.setAttribute('aria-label', spec.label);
+      }
       btn.innerHTML = '<span class="arcade-btn-cap"></span>'
-        + (spec.label ? '<span class="arcade-btn-label">' + spec.label + '</span>' : '');
+        + (spec && spec.label ? '<span class="arcade-btn-label">' + spec.label + '</span>' : '');
       st.fire.appendChild(btn);
-    });
+    }
     BlipController.bindButtons(st.fire);
     BlipController.registerVisual(st.fire);
   });

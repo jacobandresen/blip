@@ -944,7 +944,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
      camera than the shaft tip it caps — without it the two are close
      enough in depth, post-rotation, that the shaft's edge visibly
      pokes through the ball instead of disappearing behind it. */
-  transform: translate(-50%, calc(50% + var(--dy) * 8px)) rotateX(calc(9deg + var(--dy) * 12deg)) translateZ(6px);
+  /* 22%, not 50%. Centred on the top of the shaft, a ball as wide as
+     this one is swallows the entire shaft — which is why the stick read
+     as a ball sitting straight on the dust washer with a grey nub
+     showing between them. Sitting ON the shaft instead leaves the top
+     third of it out in the open, which is where the chrome is. */
+  transform: translate(-50%, calc(22% + var(--dy) * 8px)) rotateX(calc(9deg + var(--dy) * 12deg)) translateZ(6px);
   border-radius: 50%;
   background: radial-gradient(circle at 34% 22%, #ffab9c 0%, #ff8a78 18%, #e6402c 46%, #a3170c 80%, #6e0d06 100%);
   box-shadow:
@@ -1499,7 +1504,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .stick-base { width: 194px; height: 252px; }
   .stick-base::before { width: 52px; height: 14px; }
   .stick-boot { width: 78px; height: 78px; }
-  .stick-boot::before { inset: 7px; }
+
   .stick-handle { bottom: 45px; }
   .stick-shaft { width: 18px; height: 58px; }
   .stick-ball  { width: 90px; height: 90px; bottom: 58px; }
@@ -1647,8 +1652,15 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    does. Held as a centred pair with a gap in the middle, the two were
    under one hand and the deck read as a different controller depending
    on which one you had chosen. */
+/* preserve-3d, or the stick inside it is flattened into a 2D sprite
+   before the panel's own tilt is applied — see the note on
+   .stick-handle, which is where that was worked out the first time.
+   The kiosk's deck has no .deck-side wrapper, so it kept composing in
+   true 3D while the game page quietly stopped: same markup, same
+   stylesheet, two different joysticks. */
 .deck-side {
   position: relative;
+  transform-style: preserve-3d;
   flex: 1 1 0;
   min-width: 0;
   display: flex;
@@ -1688,15 +1700,24 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    not take any — in a one-player game the arrow keys are player one's
    own, so a live second stick would be a second way to move your own
    fighter, sitting under the other player's hand. */
-:root[data-players="1"] #deck-p2,
-:root[data-players="1"] .snes-pad.second {
+/* Dimmed on the PARTS, not on the station.
+   `opacity` on an element makes it its own stacking context, and a
+   stacking context ends a preserve-3d chain — so dimming the station
+   flattened the stick inside it, and player two's ball-top came out as
+   an ellipse next to player one's sphere. The leaves have no 3D
+   children of their own, so they can carry it. */
+:root[data-players="1"] #deck-p2 .stick-boot,
+:root[data-players="1"] #deck-p2 .stick-shaft,
+:root[data-players="1"] #deck-p2 .stick-ball,
+:root[data-players="1"] #deck-p2 .fire-buttons,
+:root[data-players="1"] #deck-p2 .deck-tag,
+:root[data-players="1"] .snes-pad.second .snes-shell {
   opacity: 0.30;
   filter: saturate(0.35);
 }
 /* Dead to the touch, aimed at the controls rather than at the panel
    they sit on: `pointer-events: none` on a parent does NOT disable a
-   child that sets `auto`, and every button on the pad sets `auto`. A
-   rule on the pad alone would have looked right and done nothing. */
+   child that sets `auto`, and every button on the pad sets `auto`. */
 :root[data-players="1"]:not([data-open]) #deck-p2,
 :root[data-players="1"]:not([data-open]) .snes-pad.second .snes-btn,
 :root[data-players="1"]:not([data-open]) .snes-pad.second .snes-dpad,
@@ -1704,13 +1725,15 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   pointer-events: none;
 }
 
-/* Except on the title screen, where the second station is lit, live and
-   asking to be used: reaching for it is how a second player joins, and
-   a control nobody can touch cannot be reached for. Halfway bright —
-   clearly not in play yet, clearly not switched off either — and its
-   tag reads JOIN. */
-:root[data-players="1"][data-open] #deck-p2,
-:root[data-players="1"][data-open] .snes-pad.second {
+/* On the title screen the second station is lit, live and asking to be
+   used: reaching for it is how a second player joins, and a control
+   nobody can touch cannot be reached for. */
+:root[data-players="1"][data-open] #deck-p2 .stick-boot,
+:root[data-players="1"][data-open] #deck-p2 .stick-shaft,
+:root[data-players="1"][data-open] #deck-p2 .stick-ball,
+:root[data-players="1"][data-open] #deck-p2 .fire-buttons,
+:root[data-players="1"][data-open] #deck-p2 .deck-tag,
+:root[data-players="1"][data-open] .snes-pad.second .snes-shell {
   filter: none;
   animation: deck-join 2.4s ease-in-out infinite;
 }
@@ -1719,8 +1742,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   50%      { opacity: 0.94; }
 }
 @media (prefers-reduced-motion: reduce) {
-  :root[data-players="1"][data-open] #deck-p2,
-  :root[data-players="1"][data-open] .snes-pad.second {
+  :root[data-players="1"][data-open] #deck-p2 .stick-boot,
+  :root[data-players="1"][data-open] #deck-p2 .stick-shaft,
+  :root[data-players="1"][data-open] #deck-p2 .stick-ball,
+  :root[data-players="1"][data-open] #deck-p2 .fire-buttons,
+  :root[data-players="1"][data-open] #deck-p2 .deck-tag,
+  :root[data-players="1"][data-open] .snes-pad.second .snes-shell {
     animation: none;
     opacity: 0.8;
   }
@@ -1887,14 +1914,20 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   }
   :root[data-players] .stick-base { width: var(--stick-w); }
   :root[data-players] .stick-boot {
-    width: calc(var(--stick-w) * 0.86);
-    height: calc(var(--stick-w) * 0.86);
+    width: calc(var(--stick-w) * 1.08);
+    height: calc(var(--stick-w) * 1.08);
   }
   :root[data-players] .stick-shaft { width: 10px; }
+  /* The ball and the washer are allowed to be wider than the base they
+     stand in — the base is a drag region, not a footprint, and the
+     empty panel either side of it is exactly where a ball-top's
+     overhang goes. Held to the base's own width they came out as a
+     lollipop: a small head on a long thin stick. */
   :root[data-players] .stick-ball {
-    width: calc(var(--stick-w) * 0.98);
-    height: calc(var(--stick-w) * 0.98);
+    width: calc(var(--stick-w) * 1.24);
+    height: calc(var(--stick-w) * 1.24);
   }
+  :root[data-players] .stick-shaft { height: 26px; }
   :root[data-players] .stick-base::before { width: calc(var(--stick-w) * 0.9); }
   :root[data-players] .deck-tag { font-size: 6px; }
 }
@@ -2247,4 +2280,177 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    into the deck and one hanging off the end of it. */
 @media (max-width: 400px) {
   .fire-buttons.four::before { left: 0; right: 0; }
+}
+
+/* ---- Round one: the stick is a ball on a shaft in a washer ----
+   Three parts, and each of them has to be the part it is. */
+
+/* The washer: a rubber ring, lit around its rim, with the shaft's hole
+   the only actually black thing in it. Built as a ring rather than a
+   filled disc — a dark disc with a gradient on it reads as a hole in
+   the panel, and at a slight angle the gradient's stops came out
+   looking octagonal. */
+.stick-boot {
+  /* The hole is the shaft's hole and nothing more. Taken any wider —
+     and 22% of the washer was already more than twice the shaft — the
+     dark core stops being a hole for the shaft and becomes a hole in
+     the panel, which is what this kept coming out as. */
+  background:
+    radial-gradient(circle at 50% 44%,
+      #000 0%, #030304 11%,
+      #1d1d22 17%, #33333b 30%,
+      #4b4b56 48%, #5d5d69 64%, #3a3a43 82%, #17171b 100%);
+  box-shadow:
+    0 3px 7px rgba(0, 0, 0, 0.7),
+    inset 0 3px 5px rgba(0, 0, 0, 0.85),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.13),
+    0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+/* The shaft: a rod, not a wedge. The clip-path tapered it toward the
+   top, which is a stick seen from a long way above — from the player's
+   side it is a straight cylinder, and the only thing that says "metal"
+   is a hard bright line down it with a dark side past the turn. */
+.stick-shaft {
+  clip-path: none;
+  border-radius: 40% 40% 12% 12% / 18% 18% 6% 6%;
+  background: linear-gradient(90deg,
+    #24242a 0%, #5c5e66 12%, #b9bcc6 30%, #ffffff 42%,
+    #d2d5dd 52%, #8a8c95 68%, #4a4c54 84%, #1c1c21 100%);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.75),
+    inset 0 -6px 8px -4px rgba(0, 0, 0, 0.5);
+}
+
+/* The gate opening, not a gate plate.
+   The octagonal restrictor was drawn 5px inside the dust washer, which
+   is to say it covered all of it: a solid black octagon where the
+   rubber should be, with the washer's own shading hidden underneath.
+   On a real stick the gate is down inside the housing and what you see
+   from above is the opening the shaft swings in — a small dark recess
+   in the middle of the washer, about as wide as the throw needs. */
+.stick-boot::before {
+  inset: 28%;
+  background: radial-gradient(circle at 50% 40%, #0c0c0f 0%, #050506 60%, #0a0a0d 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    inset 0 3px 5px rgba(0, 0, 0, 0.9);
+}
+
+/* ---- Round two: shadows ----
+   Everything on this panel was lit and nothing was casting. The one
+   shadow that existed was a small soft patch parked under the washer,
+   which is where a shadow cannot be: the light pool on this deck comes
+   from above and behind, so what the ball throws lands in FRONT of the
+   stick and slides with the lean. */
+.stick-base::before {
+  width: 120%;
+  height: 30%;
+  bottom: -2%;
+  background: radial-gradient(ellipse,
+    rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.5) 38%,
+    rgba(0, 0, 0, 0.18) 62%, transparent 78%);
+  filter: blur(4px);
+  /* It moves further than the ball does and the other way up: a shadow
+     cast by an overhead light runs out ahead of whatever is leaning. */
+  transform: translate(calc(-50% + var(--dx) * 16px), calc(var(--dy) * -9px));
+}
+
+/* And the caps sit on something, so they drop something. A tight dark
+   contact patch right under the rim, and a wider soft one past it. */
+.arcade-btn {
+  box-shadow:
+    0 3px 5px rgba(0, 0, 0, 0.75),
+    0 8px 16px -4px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.55);
+}
+.arcade-btn.blip-pressed,
+.arcade-btn.active {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.8),
+    0 3px 7px -3px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.2);
+}
+
+/* ---- Round three: reflections ----
+   The deck is moulded gloss black. A gloss surface under a lit red ball
+   carries a smear of it, and under a row of coloured caps carries those
+   — faint, stretched along the surface and fading with distance, which
+   is the cheapest thing that says "this is polished" and the one thing
+   the panel had none of. */
+.stick-base::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 78%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 0%,
+    rgba(255, 96, 72, 0.46) 0%, rgba(214, 60, 40, 0.22) 45%, transparent 76%);
+  filter: blur(3px);
+  transform: translate(calc(-50% + var(--dx) * 9px), 18%);
+  transition: transform 55ms ease-out;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Each cap's own reflection, pooled on the panel just below its rim and
+   taking that cap's colour. currentColor is set per cap below, so one
+   rule serves a red row and a blue one. */
+.arcade-btn::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 82%;
+  height: 46%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 0%,
+    currentColor 0%, transparent 72%);
+  /* Faint, but not so faint it may as well not be there: on a panel
+     this dark a reflection at three tenths is invisible and at nine is
+     a lamp. */
+  opacity: 0.52;
+  filter: blur(2.5px);
+  pointer-events: none;
+  z-index: -1;
+}
+.fire-buttons.four .arcade-btn:nth-child(1),
+.fire-buttons.four .arcade-btn:nth-child(2) { color: #e5361f; }
+.fire-buttons.four .arcade-btn:nth-child(3),
+.fire-buttons.four .arcade-btn:nth-child(4) { color: #2f86d8; }
+.fire-buttons .arcade-btn { color: #e5361f; }
+
+/* ---- Spare caps ----
+   The panel is the machine's, so every deck carries the same four caps
+   per station whatever the game behind it reads. The ones this game
+   does not read are still buttons — same size, same place, same rim,
+   because a cabinet does not grow and shrink its panel per cartridge —
+   but they are unlit: a dark moulded blank instead of a coloured
+   plunger. That is what an unused button on a real panel looks like,
+   and on a phone, where two players can mean ten controls under eight
+   thumbs, it is also the thing that tells you at a glance which four of
+   them are yours to hit. */
+.fire-buttons.four .arcade-btn.spare .arcade-btn-cap,
+.arcade-btn.spare .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 16%, transparent 34%),
+    radial-gradient(circle at 50% 44%, #4b4d53 0%, #33353a 44%, #212327 78%, #16171a 100%);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    inset 0 3px 4px rgba(255, 255, 255, 0.12),
+    inset 0 -5px 8px rgba(0, 0, 0, 0.5);
+}
+.arcade-btn.spare { opacity: 0.92; }
+.arcade-btn.spare::after { display: none; }   /* nothing lit, nothing reflected */
+
+.snes-pad .snes-btn.spare > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 44%),
+    radial-gradient(circle at 50% 62%, #3d3f45 0%, #4a4c52 40%, #35373c 70%, #1e1f23 100%);
 }

@@ -71,9 +71,9 @@ const PRESS = (sel, dir) => `(function () {
 const DECK_NAMES = `(function () {
   function names(root) {
     if (!root) return null;
-    return Array.prototype.map.call(root.querySelectorAll('[data-blip]'), function (el) {
-      return el.getAttribute('data-blip');
-    });
+    return Array.prototype.map.call(
+      root.querySelectorAll('.arcade-btn, .snes-btn, [data-blip]'),
+      function (el) { return el.getAttribute('data-blip'); });
   }
   return {
     stickCaps: names(document.getElementById('fire-buttons')),
@@ -93,8 +93,12 @@ const LIVE = (sel) => `(function () {
   var r = el.getBoundingClientRect();
   if (!(r.width > 0 && r.height > 0)) return false;
   // Opacity, not pointer-events: a pad sets pointer-events none on
-  // itself by design and lets only its buttons take input.
-  return parseFloat(getComputedStyle(el).opacity) > 0.9;
+  // itself by design and lets only its buttons take input. And read it
+  // off a LEAF — the dim is applied to the station's parts rather than
+  // the station, because opacity on the station would flatten the
+  // preserve-3d chain and squash the stick inside it.
+  var leaf = el.querySelector('.fire-buttons, .snes-shell') || el;
+  return parseFloat(getComputedStyle(leaf).opacity) > 0.9;
 })()`;
 
 const VISIBLE = (sel) => `(function () {
@@ -252,15 +256,26 @@ test(`brawler's deck seats two players (${ENGINE})`, async (t) => {
 test(`a one-player cabinet still has one station (${ENGINE})`, async (t) => {
   const { cdp } = await openPage(t, ENGINE);
 
-  await t.test('serpent builds no second station and no second pad', async () => {
+  await t.test('serpent gets the same panel, with the spare caps dead', async () => {
+    // The panel belongs to the machine, not to the game: serpent reads
+    // one button and still sits behind the cabinet's four, the way a
+    // JAMMA board does. What it must not do is WIRE them — a cap past
+    // what the game reads carries no logical name at all.
     await loadGame(cdp, 'serpent', 'stick');
-    assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), false);
-    assert.equal(await evaluate(cdp, "document.documentElement.hasAttribute('data-players')"), false);
+    assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), true,
+      'the cabinet lost its second station on a one-player game');
+    assert.equal(await evaluate(cdp, LIVE('#deck-p2')), false,
+      'a game with no second player has a live second station');
     const deck = await evaluate(cdp, DECK_NAMES);
-    assert.deepEqual(deck.stickCaps, ['button1']);
-    // The markup is there on every page — it just must never be wired
-    // to anything on a cabinet that seats one.
-    assert.deepEqual(deck.stickCaps2, []);
+    assert.equal(deck.stickCaps.length, 4, 'the deck does not have four caps');
+    // Two live (the pad's A and B have always both been fire), two blank.
+    assert.deepEqual(deck.stickCaps.filter(Boolean), ['button1', 'button2']);
+    assert.equal(await evaluate(cdp,
+      "document.querySelectorAll('#fire-buttons .arcade-btn.spare').length"), 2,
+      'the caps serpent does not read are not marked spare');
+    assert.equal(await evaluate(cdp,
+      "document.querySelectorAll('#fire-buttons-p2 .arcade-btn[data-blip]').length"), 0,
+      "player two's caps are wired on a game with no player two");
   });
 
   await t.test("serpent's one cap still fires", async () => {
@@ -405,21 +420,46 @@ test(`a phone on its side puts the controls beside the picture (${ENGINE})`, asy
     }
   });
 
-  await t.test('a one-player deck still spreads its one station', async () => {
-    // A cabinet with one station has nothing to be apart FROM, so its
-    // stick and buttons go to the two ends of the panel instead — the
-    // layout the game pad has always had.
-    for (const [controls, steer, hit] of
-         [['stick', '#stick-base', '#fire-buttons'],
-          ['pad', '#snes-pad .snes-dpad', '#snes-pad .snes-face']]) {
-      const g = await geometry(cdp, 'serpent', controls, PORTRAIT, 1);
-      const by = (sel) => g.controls.find((x) => x.sel === sel);
-      const a = by(steer), b = by(hit);
-      if (!a || !b) continue;   // serpent draws one cap; the pad has both
-      assert.ok(a.b.r <= b.b.x, `${controls}: the stick is not left of the buttons`);
-      const edge = g.deck.w * 0.3;
-      assert.ok(a.b.x - g.deck.x < edge && g.deck.r - b.b.r < edge,
-        `${controls}: the one station is not spread across the panel`);
+  await t.test('every page carries the same deck', async () => {
+    // One cabinet, one control panel. The front page, the info pages
+    // and every game except rally show the identical deck — same bar,
+    // same stick, same two stations of four caps — and a game that
+    // reads fewer simply leaves the spares blank. It had drifted: the
+    // landing page had one station and two buttons, each game had as
+    // many caps as it declared, and nothing compared them.
+    const PAGES = ['index.html', 'about.html', 'serpent/index.html',
+                   'meteors/index.html', 'brawler/index.html'];
+    const shape = async (page) => {
+      await cdp.page.setViewportSize({ width: 1280, height: 800 });
+      await evaluate(cdp, 'true');
+      await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/${page}` });
+      await waitFor(cdp, "document.readyState === 'complete'", 15000);
+      await waitFor(cdp, "document.querySelectorAll('.arcade-btn').length > 0", 15000);
+      await sleep(250);
+      return evaluate(cdp, `(function () {
+        var bar = document.querySelector('#topbar, #kiosk-bar, .kiosk-bar');
+        var ball = document.querySelector('.stick-ball').getBoundingClientRect();
+        var cap = document.querySelector('.arcade-btn').getBoundingClientRect();
+        return {
+          barH: Math.round(bar.getBoundingClientRect().height),
+          caps: document.querySelectorAll('.arcade-btn').length,
+          sticks: document.querySelectorAll('.stick-base').length,
+          ball: [Math.round(ball.width), Math.round(ball.height)],
+          cap: [Math.round(cap.width), Math.round(cap.height)],
+        };
+      })()`);
+    };
+    const first = await shape(PAGES[0]);
+    assert.equal(first.caps, 8, `${PAGES[0]}: ${first.caps} caps, not two stations of four`);
+    assert.equal(first.sticks, 2, `${PAGES[0]}: ${first.sticks} sticks, not two`);
+    // A ball-top is a sphere. It renders as an ellipse the moment
+    // something in its ancestry ends the preserve-3d chain, which is
+    // how this last went wrong on one page and not the others.
+    assert.ok(Math.abs(first.ball[0] - first.ball[1]) <= 2,
+      `${PAGES[0]}: the ball renders ${first.ball.join('x')} — the 3D chain is broken`);
+    for (const page of PAGES.slice(1)) {
+      const g = await shape(page);
+      assert.deepEqual(g, first, `${page} does not have the same deck as ${PAGES[0]}`);
     }
   });
 

@@ -509,3 +509,111 @@ function pollGamepad(onDown, onUp) {
     if (!document.hidden) unlockAudio();
   });
 }());
+
+/* ---- One cabinet panel, on every page ----
+ * The deck is the machine's, not the game's: the same stick, the same
+ * four caps and the same two stations behind every screen, with a game
+ * that reads fewer simply leaving the spares dead. On a game page the
+ * shell builds that from the markup in shell.html. The landing page and
+ * the info pages carry their own copy of the deck and had drifted to a
+ * single station with two buttons, so they get the rest of it built for
+ * them here rather than in four hand-maintained copies.
+ *
+ * Only pages with no game canvas: a game page has shell.js, which owns
+ * its deck and wires every cap to the game. */
+(function () {
+  function tag(text, second) {
+    var el = document.createElement('span');
+    el.className = 'deck-tag';
+    if (second) el.setAttribute('data-second', '');
+    el.textContent = text;
+    return el;
+  }
+  function cap(spare) {
+    var el = document.createElement('div');
+    el.className = 'arcade-btn lettered' + (spare ? ' spare' : '');
+    el.innerHTML = '<span class="arcade-btn-cap"></span>';
+    return el;
+  }
+  function build() {
+    if (document.getElementById('glcanvas')) return;     // a game page
+    var panel = document.querySelector('.deck-panel');
+    var base = document.getElementById('stick-base');
+    var fire = document.getElementById('fire-buttons');
+    if (!panel || !base || !fire || document.getElementById('deck-p2')) return;
+
+    // Station one: wrap what is already there.
+    var one = document.createElement('div');
+    one.className = 'deck-side';
+    one.id = 'deck-p1';
+    panel.insertBefore(one, base);
+    one.appendChild(tag('1P', false));
+    one.appendChild(base);
+    one.appendChild(fire);
+    fire.classList.add('four');
+    var live = fire.querySelectorAll('.arcade-btn').length;
+    Array.prototype.forEach.call(fire.querySelectorAll('.arcade-btn'), function (b) {
+      b.classList.add('lettered');
+    });
+    while (fire.querySelectorAll('.arcade-btn').length < 4) fire.appendChild(cap(true));
+
+    // Station two: the same again, dead, and named as such.
+    var two = one.cloneNode(true);
+    two.id = 'deck-p2';
+    two.querySelector('.deck-tag').replaceWith(tag('2P', true));
+    two.querySelector('.stick-base').id = 'stick-base-p2';
+    two.querySelector('.fire-buttons').id = 'fire-buttons-p2';
+    Array.prototype.forEach.call(two.querySelectorAll('[id]'), function (el) {
+      if (el.id !== 'stick-base-p2' && el.id !== 'fire-buttons-p2') el.removeAttribute('id');
+    });
+    Array.prototype.forEach.call(two.querySelectorAll('.arcade-btn'), function (b) {
+      b.classList.add('spare');
+    });
+    panel.insertBefore(two, one.nextSibling);
+
+    // The pad's face gets the same four, and the pad the same second.
+    var pad = document.getElementById('snes-pad');
+    if (pad) {
+      var face = pad.querySelector('.snes-face');
+      if (face) {
+        face.classList.add('four');
+        var n = face.querySelectorAll('.snes-btn').length;
+        Array.prototype.forEach.call(face.querySelectorAll('.snes-btn'), function (b, i) {
+          b.className = 'snes-btn cap' + (i + 1);
+        });
+        for (var i = n; i < 4; i++) {
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'snes-btn cap' + (i + 1) + ' spare';
+          b.innerHTML = '<span></span>';
+          face.appendChild(b);
+        }
+      }
+      var pad2 = pad.cloneNode(true);
+      pad2.id = 'snes-pad-p2';
+      pad2.classList.add('second');
+      Array.prototype.forEach.call(pad2.querySelectorAll('[data-blip]'), function (el) {
+        el.removeAttribute('data-blip');
+      });
+      Array.prototype.forEach.call(pad2.querySelectorAll('.snes-btn'), function (b) {
+        b.classList.add('spare');
+      });
+      var mark = pad2.querySelector('.snes-wordmark');
+      if (mark) mark.remove();
+      pad2.querySelector('.snes-shell').appendChild(tag('2P', true));
+      pad.parentNode.insertBefore(pad2, pad.nextSibling);
+      var shell1 = pad.querySelector('.snes-shell');
+      if (shell1) shell1.appendChild(tag('1P', false));
+    }
+
+    var root = document.documentElement;
+    root.setAttribute('data-caps', '4');
+    root.setAttribute('data-players', '1');
+    void live;
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', build);
+  } else {
+    build();
+  }
+}());
