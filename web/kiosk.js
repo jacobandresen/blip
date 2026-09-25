@@ -510,17 +510,10 @@ function pollGamepad(onDown, onUp) {
   });
 }());
 
-/* ---- One cabinet panel, on every page ----
- * The deck is the machine's, not the game's: the same stick, the same
- * four caps and the same two stations behind every screen, with a game
- * that reads fewer simply leaving the spares dead. On a game page the
- * shell builds that from the markup in shell.html. The landing page and
- * the info pages carry their own copy of the deck and had drifted to a
- * single station with two buttons, so they get the rest of it built for
- * them here rather than in four hand-maintained copies.
- *
- * Only pages with no game canvas: a game page has shell.js, which owns
- * its deck and wires every cap to the game. */
+/* One cabinet panel, on every page. The landing and info pages carry
+ * their own copy of the deck and had drifted to a single station with
+ * two buttons; the rest is built here rather than in four hand-
+ * maintained copies. Game pages have shell.js, which owns its own. */
 (function () {
   function tag(text, second) {
     var el = document.createElement('span');

@@ -67,3 +67,19 @@ returned PNG / WAV bytes into `$OUT_DIR/assets/{images,sounds}/`. The game's
 `main.rs` embeds those bytes via `include_bytes!(concat!(env!("OUT_DIR"), ...))`,
 so wasm builds carry every asset inside the single `index.wasm` and need no
 separate preload step.
+
+## Comments
+
+Keep them short. A comment earns its place by saying something the code
+cannot: the measured number behind a constant, the constraint that rules
+out the obvious alternative, the failure that a rule is there to prevent.
+
+- One to three lines. A block longer than that is almost always narrative.
+- State the fact, not the story. "At 320px two stations fit `--cap: 32`
+  and no further" — not an account of how that was discovered.
+- No round-by-round history, no "this used to be X", no restating what
+  the next line plainly does.
+- Delete a comment that has become an anecdote rather than a reason.
+
+The same goes for commit messages: say what changed and why, not the
+path taken to get there.

@@ -366,15 +366,9 @@ if (getCoins() <= 0) overlay.classList.add('visible');
 // The kiosk bar is position:fixed;bottom:0. We leave PAD px on each side
 // plus full clearance for the bar so it never overlaps the canvas.
 
-// A phone turned on its side.
-//
-// Upright, the deck is a strip across the bottom and the picture sits
-// above it. Turned sideways there is no room for that: the strip is a
-// third of the screen's height, and what is left is a letterbox. But a
-// 5:4 picture in a 2:1 screen leaves a wide black gutter down each
-// side doing nothing at all — so in landscape the deck moves INTO the
-// gutters. The controls flank the picture, the picture gets the whole
-// height, and nothing is given up for either.
+// Sideways the deck would take a third of the screen's height. A 5:4
+// picture in a 2:1 screen leaves a wide gutter down each side doing
+// nothing, so the deck moves into the gutters instead.
 function landscape() {
   return window.innerHeight <= 520 && window.innerWidth > window.innerHeight * 1.25;
 }
@@ -454,43 +448,27 @@ window.addEventListener('keydown', function (e) {
   // A two-player cabinet seats two stations. The deck is built for both
   // up front and the second one stays hidden until the game says a
   // second player has joined (blip_set_mode -> window.blipSetMode).
-  // One cabinet, one control panel.
-  //
-  // Every page gets the same deck: two stations, each a stick and four
-  // caps. A game that uses fewer simply leaves the spare caps dead,
-  // which is what a real cabinet does — the panel is the machine's, not
-  // the game's, and a JAMMA board that reads one button still sits
-  // behind six. Rally is the only exception; it has spinners instead of
-  // a stick and hides all of this (see the rally branch below).
+  // One cabinet, one control panel: every page gets two stations of a
+  // stick and four caps, and a game that reads fewer leaves the spares
+  // dead. Rally is the exception — spinners, see its branch below.
   var twoUp = !isRally;
   var root = document.documentElement;
   if (twoUp) {
-    // '1' is the resting state for every deck: one player in play,
-    // station two present and dead. Brawler moves it from there when
-    // somebody joins; a game with no second player never does, which
-    // leaves its second station exactly as dead as it should be.
+    // '1' is the resting state: one player, station two present and
+    // dead. Only a game with a second player moves off it.
     root.setAttribute('data-players', '1');
     root.setAttribute('data-caps', '4');
   }
-  /// How many caps a station has, whatever this game happens to read,
-  /// and what each of them is wired to. Declared up here because both
-  /// the pad's face and the joystick deck's caps are built from it, and
-  /// the pad is built first — read before it was assigned, `specs[i]`
-  /// threw and the deck came out with no buttons at all.
+  // Declared here because the pad's face is built before the joystick
+  // deck's caps and both read it.
   var CAPS = 4;
   var specs = buttonSpecs.length ? buttonSpecs : [primary];
-  // A one-button game still gets two live caps, because the pad's A and
-  // B have always both been fire and a single live button on a deck of
-  // four is a worse deal on a phone than the pair it replaces. Anything
-  // past what the game reads is a blank.
+  // A one-button game still gets two live caps: the pad's A and B have
+  // always both been fire.
   if (specs.length < 2) specs = [specs[0], specs[0]];
-  // Only a game that actually seats two players wires station two. On
-  // every other cabinet it is panel furniture: the same stick and the
-  // same four caps, blank and connected to nothing. Wiring them to
-  // names the game has never heard of works — the controller drops a
-  // name it has no key for — but it is dead by accident rather than by
-  // construction, and "by accident" is not something to leave in a
-  // control panel.
+  // Only a game that seats two players wires station two; elsewhere it
+  // is panel furniture. Wiring it to names the game has never heard of
+  // also does nothing, but by accident rather than by construction.
   function specsFor(who) { return who === 1 && !(game && game.players === 2) ? [] : specs; }
 
   function coinGated() { return overlay.classList.contains('visible'); }
@@ -536,12 +514,9 @@ window.addEventListener('keydown', function (e) {
     st.stick.style.setProperty('--dx', x);
     st.stick.style.setProperty('--dy', y);
   }
-  // Which station a logical name belongs to — and, in a one-player
-  // game, player two's stick belongs to nobody. The arrow keys are
-  // player ONE's own in one-player mode (see P1_ALONE in the game), so
-  // an arrow press must lean player one's stick. Left to the name alone
-  // it leaned the dead second one instead, which is the deck reporting
-  // the wrong player's input on the wrong half of the panel.
+  // In a one-player game the arrows are player ONE's own (P1_ALONE in
+  // the game), so an arrow press has to lean player one's stick — by
+  // name alone it leaned the dead second one.
   var versus = false;
   function reflectInput(name, down) {
     stations.forEach(function (st, who) {
@@ -663,13 +638,9 @@ window.addEventListener('keydown', function (e) {
 
   // Called from WASM (brawler) when the mode is chosen: 1 = two players,
   // so the second station appears on the deck.
-  // 0 = one player, 1 = two, 2 = the title screen of a machine that
-  // takes two: the second station is lit and waiting for somebody to
-  // touch it. That third state is the whole reason "touch the second
-  // stick to join" can work — in a one-player GAME the second station
-  // has to be dead to the touch, because the arrow keys are player
-  // one's own there and a live second stick would be a second way to
-  // move your own fighter.
+  // 0 = one player, 1 = two, 2 = title screen with the second station
+  // lit and waiting. The third state is what makes "touch it to join"
+  // possible: in a one-player game it has to be dead to the touch.
   if (twoUp) window.blipSetMode = function (code) {
     var open = code === 2;
     versus = code === 1;
@@ -686,12 +657,9 @@ window.addEventListener('keydown', function (e) {
   };
 
   // ---- Fire buttons (joystick mode) ----
-  // Four caps in a square on every station of every deck, wired through
-  // the library exactly like the pad's face buttons. A cap past what
-  // this game declares is left with no logical name at all, so it looks
-  // like a button, presses like a button and does nothing — which is
-  // what the unused buttons on a cabinet do. The legends go ON the cap,
-  // because the square leaves no room under the top row for one.
+  // Four caps in a square per station. A cap past what the game
+  // declares gets no logical name, so it does nothing. Legends go ON
+  // the cap; the square leaves no room under the top row.
   stations.forEach(function (st, who) {
     if (!st.fire) return;
     st.fire.classList.add('four');

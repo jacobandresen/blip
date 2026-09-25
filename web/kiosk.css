@@ -1888,7 +1888,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    square now, so every page needs the bar for it. */
 :root[data-controls="stick"][data-caps="4"] #topbar.kiosk-bar,
 :root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
-  height: calc(142px + env(safe-area-inset-bottom, 0px));
+  height: calc(152px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Two stations on a phone: everything comes in a size, and the gap
@@ -2121,13 +2121,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset -6px 0 14px -6px rgba(0, 0, 0, 0.55);
 }
 
-/* ---- A phone's deck lies flatter ----
-   The panel is tilted back 56 degrees so it reads as a surface you are
-   looking down onto, which is right on a desk and ruinous on a phone:
-   a 37px button projects to 17px of screen. Measured, that is what a
-   thumb was being offered. The tilt comes down to something a hand-held
-   cabinet would actually be held at, which nearly doubles every control
-   without taking a single pixel of width from the game. */
+/* The tilt is a projection: at 56deg a 37px button renders 17px tall.
+   Flatter on a phone, which nearly doubles every control's height. */
 
 @media (max-height: 450px) {
   #topbar, .kiosk-bar-main { --bar-tilt: 20deg; }
@@ -2179,10 +2174,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 
-/* The ball: a hard specular near the top left where the room light is,
-   the body colour through the middle, and a rim of bounced light along
-   the bottom edge — the last of those is what stops a sphere reading as
-   a flat disc with a gradient on it. */
+/* The ball: a hard specular, and a rim of bounced light underneath —
+   without that last one a sphere reads as a disc with a gradient. */
 .stick-ball {
   background:
     radial-gradient(circle at 30% 18%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 16%),
@@ -2195,21 +2188,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset 0 3px 4px rgba(255, 255, 255, 0.28);
 }
 
-/* ---- The caps, as arcade buttons ----
-   A real one is nearly all plunger: a translucent dome in a thin rim,
-   not a small dome in a wide grey ring. The ring came down and the
-   plunger came up to meet it. */
+/* A real cap is nearly all plunger in a thin rim. */
 .arcade-btn { background: conic-gradient(from -50deg, #d8dade, #8c9098 18%, #2a2c30 50%, #8c9098 82%, #d8dade 100%); }
 .arcade-btn-cap { inset: 8%; }
 
-/* ---- A big touch screen ----
-   Everything above sizes the deck for a phone held in two hands, and
-   then stops at 620px — so a wall-mounted touch panel got the desktop
-   deck: full 56-degree tilt, mouse-sized caps, and a 78px bar. Played
-   on one, the controls came out as leaning ellipses about twenty
-   pixels tall. A finger is the same size on a big screen as on a small
-   one; the difference is that here there is room to do something about
-   it. */
+/* A finger is the same size on a big screen as on a small one — but
+   here there is room. Keyed on the pointer, not the viewport width. */
 @media (pointer: coarse) and (min-width: 621px) {
   :root[data-players] {
     --cap: clamp(56px, 5.6vw, 92px);
@@ -2293,14 +2277,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .fire-buttons.four::before { left: 0; right: 0; }
 }
 
-/* ---- Round one: the stick is a ball on a shaft in a washer ----
-   Three parts, and each of them has to be the part it is. */
-
-/* The washer: a rubber ring, lit around its rim, with the shaft's hole
-   the only actually black thing in it. Built as a ring rather than a
-   filled disc — a dark disc with a gradient on it reads as a hole in
-   the panel, and at a slight angle the gradient's stops came out
-   looking octagonal. */
+/* The washer: a rubber ring, lit at the rim. A filled dark disc reads
+   as a hole in the panel rather than as the cup the shaft stands in. */
 .stick-boot {
   /* The hole is the shaft's hole and nothing more. Taken any wider —
      and 22% of the washer was already more than twice the shaft — the
@@ -2318,10 +2296,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     0 0 0 1px rgba(0, 0, 0, 0.6);
 }
 
-/* The shaft: a rod, not a wedge. The clip-path tapered it toward the
-   top, which is a stick seen from a long way above — from the player's
-   side it is a straight cylinder, and the only thing that says "metal"
-   is a hard bright line down it with a dark side past the turn. */
+/* The shaft: a cylinder, not a taper. One hard bright line down it and
+   a dark side past the turn is the whole of what says "metal". */
 .stick-shaft {
   clip-path: none;
   border-radius: 40% 40% 12% 12% / 18% 18% 6% 6%;
@@ -2348,12 +2324,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset 0 3px 5px rgba(0, 0, 0, 0.9);
 }
 
-/* ---- Round two: shadows ----
-   Everything on this panel was lit and nothing was casting. The one
-   shadow that existed was a small soft patch parked under the washer,
-   which is where a shadow cannot be: the light pool on this deck comes
-   from above and behind, so what the ball throws lands in FRONT of the
-   stick and slides with the lean. */
+/* The light is above and behind, so the ball's shadow lands in front
+   of the stick and slides further than the ball does. */
 .stick-base::before {
   width: 120%;
   height: 30%;
@@ -2367,8 +2339,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   transform: translate(calc(-50% + var(--dx) * 16px), calc(var(--dy) * -9px));
 }
 
-/* And the caps sit on something, so they drop something. A tight dark
-   contact patch right under the rim, and a wider soft one past it. */
+/* A tight contact patch under the rim. */
 .arcade-btn {
   box-shadow:
     0 3px 5px rgba(0, 0, 0, 0.75),
@@ -2386,12 +2357,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset 0 -2px 3px rgba(255, 255, 255, 0.2);
 }
 
-/* ---- Round three: reflections ----
-   The deck is moulded gloss black. A gloss surface under a lit red ball
-   carries a smear of it, and under a row of coloured caps carries those
-   — faint, stretched along the surface and fading with distance, which
-   is the cheapest thing that says "this is polished" and the one thing
-   the panel had none of. */
+/* Gloss black carries a smear of what stands on it. */
 .stick-base::after {
   content: '';
   position: absolute;
@@ -2436,16 +2402,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 .fire-buttons.four .arcade-btn:nth-child(4) { color: #2f86d8; }
 .fire-buttons .arcade-btn { color: #e5361f; }
 
-/* ---- Spare caps ----
-   The panel is the machine's, so every deck carries the same four caps
-   per station whatever the game behind it reads. The ones this game
-   does not read are still buttons — same size, same place, same rim,
-   because a cabinet does not grow and shrink its panel per cartridge —
-   but they are unlit: a dark moulded blank instead of a coloured
-   plunger. That is what an unused button on a real panel looks like,
-   and on a phone, where two players can mean ten controls under eight
-   thumbs, it is also the thing that tells you at a glance which four of
-   them are yours to hit. */
+/* Every deck carries four caps per station whatever the game reads.
+   The ones it does not read are unlit blanks — same size and place,
+   which is both what a real panel looks like and how you tell at a
+   glance which are yours. */
 .fire-buttons.four .arcade-btn.spare .arcade-btn-cap,
 .arcade-btn.spare .arcade-btn-cap {
   background:
@@ -2466,24 +2426,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     radial-gradient(circle at 50% 62%, #3d3f45 0%, #4a4c52 40%, #35373c 70%, #1e1f23 100%);
 }
 
-/* ---- The caps are IN the panel, not above it ----
-   Three things were saying otherwise, and they compounded.
-
-   A long soft drop shadow is a hover shadow: an object well clear of
-   the surface behind it. A button pressed through a panel has a tight
-   dark contact line under its rim and nothing else.
-
-   A reflection pooled under each cap was worse, because a reflection
-   implies a polished floor BELOW the thing reflected — which is only
-   true of something standing above it. The ball-top genuinely does
-   stand above the panel, so it keeps its own; the caps do not, so
-   theirs go.
-
-   And the mounting plate read as a tile laid on top: it was lighter
-   than the panel and carried an outer highlight along its bottom edge,
-   which is exactly how a raised edge catches the light. A recess is
-   darker than what surrounds it, shadowed along its top edge where the
-   light cannot reach, and lit along the inside of its bottom one. */
+/* Three things make a cap hover: a long drop shadow, a reflection
+   pooled under it (which implies a floor below, so it is standing on
+   something), and a plate lighter than the panel. A recess is darker,
+   shadowed along its top edge and lit inside its bottom one. The ball
+   does stand above the panel, so it keeps its reflection. */
 .arcade-btn {
   box-shadow:
     0 2px 3px rgba(0, 0, 0, 0.8),
@@ -2516,3 +2463,140 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 
 
+
+/* The legend goes above the controls. At the bottom it landed on top
+   of the caps' own row once they became a square. */
+.deck-tag {
+  top: 3px;
+  bottom: auto;
+}
+.snes-pad .deck-tag {
+  top: 4px;
+  bottom: auto;
+}
+:root[data-layout="landscape"] .deck-tag { top: auto; bottom: 0; }
+
+/* And the square lifts clear of the panel's front edge, so the recess
+   it sits in has a lip below it rather than running off the end. */
+.fire-buttons.four { margin-bottom: 20px; }
+
+/* The stick's box is mostly empty air above the ball, so bottom-
+   aligning the boxes does not centre what is drawn in them. */
+.stick-base { margin-bottom: 14px; }
+
+@media (max-width: 620px) {
+  /* The phone's stick and caps already line up: both are sized off the
+     same --stick-w / --cap clamps. */
+  :root[data-players] .stick-base { margin-bottom: 0; }
+}
+
+/* ======================================================================
+   Real proportions, and Atari colours
+   ======================================================================
+   Measured against the numbers a real panel is drilled to: 30mm buttons
+   on 36mm centres, and a 35mm ball-top. So the spacing between caps is
+   a fifth of a cap, and the ball is 1.17 caps across — not a free
+   number. Ours were 1.56 caps on a big touch screen and 0.95 on a
+   desktop, which is why the same deck read as a beach ball on one and a
+   marble on the other.
+
+   Everything below hangs off one length, --cap, so the deck keeps those
+   ratios at every size and only the scale changes. */
+:root[data-caps="4"] { --cap: 46px; }
+
+:root[data-caps="4"] .arcade-btn { width: var(--cap); height: var(--cap); }
+:root[data-caps="4"] .fire-buttons.four {
+  grid-template-columns: repeat(2, var(--cap));
+  gap: calc(var(--cap) * 0.2);                 /* 36mm centres on 30mm caps */
+}
+:root[data-caps="4"] .stick-ball {
+  width: calc(var(--cap) * 1.17);              /* a 35mm ball on 30mm caps */
+  height: calc(var(--cap) * 1.17);
+}
+:root[data-caps="4"] .stick-boot {
+  width: calc(var(--cap) * 1.12);
+  height: calc(var(--cap) * 1.12);
+}
+:root[data-caps="4"] .stick-shaft {
+  width: calc(var(--cap) * 0.21);
+  height: calc(var(--cap) * 0.62);
+}
+:root[data-caps="4"] .stick-handle { bottom: calc(var(--cap) * 0.46); }
+/* The base is a drag region, not a footprint: the ball is allowed to
+   overhang it and the gate hit-test is "left of this station's caps",
+   not this box. Holding it to the ball's width cost the caps room they
+   could not spare with two stations on a 320px phone. */
+:root[data-caps="4"] .stick-base {
+  width: calc(var(--cap) * 1.05);
+  height: calc(var(--cap) * 3.4);
+}
+:root[data-caps="4"] .stick-base::before { width: calc(var(--cap) * 1.2); }
+/* Stick centre to the nearest cap centre: the panel standard is 59-95mm
+   from a 30mm button, so a shade over two caps. */
+:root[data-caps="4"] .deck-side { gap: calc(var(--cap) * 0.5); }
+
+@media (pointer: coarse) and (min-width: 621px) {
+  :root[data-caps="4"] { --cap: 62px; }
+}
+@media (max-width: 620px) {
+  :root[data-caps="4"] { --cap: clamp(38px, 10.6vw, 50px); }
+}
+
+/* ---- Atari caps ----
+   The Atari palette: saturated plastic on a matte black panel, in the
+   order the rainbow ran on the machines themselves. Warm across the top
+   row for the punches, cool along the bottom for the kicks, so the pair
+   a cap belongs to is still the first thing read. */
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(1) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #ff7a5e 0%, #e03c31 44%, #a21409 78%, #6b0a04 100%);
+}
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(2) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #ffb066 0%, #f07e26 44%, #b04f06 78%, #6d2f02 100%);
+}
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(3) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #7fe0d8 0%, #24a39b 44%, #0c5d59 78%, #05332f 100%);
+}
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(4) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #7fb8ff 0%, #2170c4 44%, #0d3b78 78%, #051e42 100%);
+}
+/* The ball-top is the Atari CX40's red, the one everybody has held. */
+:root[data-caps="4"] .stick-ball {
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 16%),
+    radial-gradient(circle at 34% 24%, #ff9078 0%, #f0523c 22%, #d6291a 52%, #97130a 82%, #5c0904 100%);
+}
+
+/* The pad is a sibling of the tilted panel, not a child, so the two
+   controllers lay out in different coordinate systems. Anchor both to
+   the panel's front edge by the same fraction of --cap. */
+:root[data-caps="4"] .snes-pad .snes-shell {
+  align-items: flex-end;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--cap) * 0.30);
+}
+:root[data-caps="4"] .snes-pad .snes-dpad,
+:root[data-caps="4"] .snes-pad .snes-face { margin-bottom: calc(var(--cap) * 0.22); }
+
+/* Two stations of four caps on a 320px phone is the tightest the deck
+   ever gets, and the proportions above pushed it four pixels over the
+   panel's right edge. The ratios stay; the scale comes down, which is
+   the whole reason they are ratios. */
+@media (max-width: 620px) {
+  :root[data-caps="4"] { --cap: clamp(32px, 9vw, 50px); }
+  :root[data-caps="4"] .deck-side { gap: calc(var(--cap) * 0.34); }
+}
+
+/* At 320px two stations fit --cap: 32 and no further, which at 26deg
+   renders 25.8px tall. Width cannot buy that back; flattening the tilt
+   can, because the tilt is what the height is being lost to. */
+@media (max-width: 400px) {
+  #topbar, .kiosk-bar-main { --bar-tilt: 12deg; }
+  :root[data-caps="4"] { --cap: clamp(32px, 9vw, 50px); }
+}
