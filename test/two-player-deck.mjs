@@ -403,3 +403,78 @@ test(`a phone on its side puts the controls beside the picture (${ENGINE})`, asy
       + `${PORTRAIT.height - bar}`);
   });
 });
+
+// ---- the deck answers the title screen ----------------------------------
+//
+// Choosing between one player and two is a question, and the answer a
+// player is looking for is whether a second stick appears in front of
+// them. Told only once the choice is confirmed, the deck is reporting
+// history; told on the select screen, it has answered a question
+// nobody is asking any more. So the game reports the mode as the
+// cursor lands on it.
+//
+// This drives the real wasm — a coin in the slot and a key on the
+// keyboard — because the thing being tested is whether the game calls
+// out at the right moment, and calling window.blipSetMode by hand would
+// test only that the page still listens.
+
+async function bootGame(cdp, controls) {
+  await loadGame(cdp, 'brawler', controls);
+  await waitFor(cdp, "document.getElementById('loader').style.display === 'none'", 20000);
+  // The coin wall goes up on a cold cabinet; the title screen does not
+  // read a key until it comes down.
+  await evaluate(cdp, `(function () {
+    var o = document.getElementById('need-coin-overlay');
+    if (o && o.classList.contains('visible')) o.click();
+    return true;
+  })()`);
+  await sleep(800);
+}
+
+/** Hold a key long enough for the game to sample a frame with it down. */
+async function tap(cdp, key) {
+  await cdp.page.keyboard.down(key);
+  await sleep(140);
+  await cdp.page.keyboard.up(key);
+  await sleep(320);
+}
+
+const PLAYERS = "document.documentElement.getAttribute('data-players')";
+
+test(`the deck answers the title screen straight away (${ENGINE})`, async (t) => {
+  const { cdp } = await openPage(t, ENGINE);
+
+  for (const controls of ['stick', 'pad']) {
+    // Which element *is* station two depends on which controller is
+    // on: the joystick deck hides its pads and the pad deck hides its
+    // sticks, so asking after the wrong one asks after something that
+    // is deliberately not there.
+    const station2 = controls === 'stick' ? '#deck-p2' : '#snes-pad-p2';
+    await t.test(`${controls}: the second station arrives with the cursor`, async () => {
+      await bootGame(cdp, controls);
+      assert.equal(await evaluate(cdp, PLAYERS), '1',
+        'the cabinet started with two stations on the deck');
+
+      // The title menu is two entries; either direction moves between
+      // them, and both of them have to be answered.
+      await tap(cdp, 'KeyD');
+      assert.equal(await evaluate(cdp, PLAYERS), '2',
+        'the cursor reached 2 PLAYERS and no second station appeared');
+      assert.equal(await evaluate(cdp, VISIBLE(station2)), true,
+        `the second station is reported but ${station2} is not on the deck`);
+
+      await tap(cdp, 'KeyD');
+      assert.equal(await evaluate(cdp, PLAYERS), '1',
+        'the cursor went back to 1 PLAYER and the second station stayed');
+      assert.equal(await evaluate(cdp, VISIBLE(station2)), false);
+
+      // And the choice survives being confirmed: the select screen and
+      // the match that follows keep whatever the title said.
+      await tap(cdp, 'KeyA');
+      assert.equal(await evaluate(cdp, PLAYERS), '2');
+      await tap(cdp, 'KeyF');           // player one's low punch: confirm
+      assert.equal(await evaluate(cdp, PLAYERS), '2',
+        'confirming 2 PLAYERS took the second station away again');
+    });
+  }
+});

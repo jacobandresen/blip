@@ -1859,12 +1859,18 @@ fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
             // button, because that is all a cabinet has.
             if m[0].back || m[0].fwd {
                 g.menu = 1 - g.menu;
+                // The second station appears on the deck the moment the
+                // cursor lands on 2 PLAYERS, not when it is confirmed.
+                // A player choosing between one and two is asking what
+                // two looks like, and the answer is a second stick
+                // arriving in front of them — after the fact it is a
+                // surprise, and on the select screen it is too late to
+                // be an answer at all.
+                web::set_mode(g.menu == 1);
                 return Some(Cue::Step);
             }
             if m[0].fire {
                 g.mode = if g.menu == 0 { Mode::Solo } else { Mode::Versus };
-                // The cabinet's deck seats a second controller for a
-                // second player, so it has to be told when there is one.
                 web::set_mode(g.mode == Mode::Versus);
                 g.state = State::Select;
                 g.pick = 0;
