@@ -833,3 +833,42 @@ test(`a second player joins by reaching for their own stick (${ENGINE})`, async 
     await ctx.close();
   }
 });
+
+test(`the deck never laps over the picture (${ENGINE})`, async (t) => {
+  // fillCanvas() reserved the height of the deck's BAR, but the stick's
+  // ball floats above that bar by design and the caps sit proud of it.
+  // On a taller deck the overhang reached far enough into the picture
+  // to hide Bouncer's bat.
+  const { cdp } = await openPage(t, ENGINE);
+  const GAMES = ['bouncer', 'serpent', 'brawler', 'meteors', 'rally', 'sky_raider'];
+  const EXTENT = `(function () {
+    var c = document.getElementById('glcanvas').getBoundingClientRect();
+    var bar = document.getElementById('topbar');
+    var top = bar.getBoundingClientRect().top;
+    var parts = document.querySelectorAll(
+      '#topbar .stick-base, #topbar .fire-buttons, #topbar .snes-pad, ' +
+      '#topbar #paddle-dial, #topbar #paddle-dial-p2');
+    for (var i = 0; i < parts.length; i++) {
+      var r = parts[i].getBoundingClientRect();
+      if (r.height > 0 && r.top < top) top = r.top;
+    }
+    return { canvasBot: c.bottom, deckTop: top, canvasH: c.height };
+  })()`;
+
+  for (const controls of ['stick', 'pad']) {
+    for (const [w, h] of [[1280, 900], [390, 844], [320, 568]]) {
+      await t.test(`${controls} @ ${w}x${h}`, async () => {
+        for (const game of GAMES) {
+          await cdp.page.setViewportSize({ width: w, height: h });
+          await loadGame(cdp, game, controls);
+          await sleep(250);
+          const g = await evaluate(cdp, EXTENT);
+          assert.ok(g.canvasH > 0, `${game}: the canvas has no height`);
+          assert.ok(g.canvasBot <= g.deckTop + 1,
+            `${game} ${controls} @ ${w}: the picture runs to `
+            + `${Math.round(g.canvasBot)} and the deck starts at ${Math.round(g.deckTop)}`);
+        }
+      });
+    }
+  }
+});

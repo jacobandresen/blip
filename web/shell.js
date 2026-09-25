@@ -377,14 +377,32 @@ function applyLayout() {
 }
 applyLayout();
 
+/** How much of the screen's bottom the deck covers: its bar, plus
+ * anything drawn outside it. */
+function deckCover(bar) {
+  var top = bar.getBoundingClientRect().top;
+  var parts = document.querySelectorAll(
+    '#topbar .stick-base, #topbar .fire-buttons, #topbar .snes-pad, ' +
+    '#topbar #paddle-dial, #topbar #paddle-dial-p2');
+  for (var i = 0; i < parts.length; i++) {
+    var r = parts[i].getBoundingClientRect();
+    if (r.height > 0 && r.top < top) top = r.top;
+  }
+  return Math.ceil(window.innerHeight - top);
+}
+
 function fillCanvas() {
   applyLayout();
   var tb = document.getElementById('topbar');
   // Sideways the deck overlays the picture's own letterbox, so it takes
   // no height at all.
-  TOPBAR_H = landscape() ? 0
-    // clamp to 56 so a mis-read of 0 before layout doesn't eat the whole screen
-    : (tb ? Math.max(tb.offsetHeight, 56) : 56);
+  //
+  // Upright, reserve what the deck actually COVERS, not the height of
+  // its bar: the stick's ball floats above the bar by design and the
+  // caps sit proud of it, so a bar-height reservation let the deck lap
+  // over the bottom of the picture — far enough on a taller deck to
+  // hide Bouncer's bat.
+  TOPBAR_H = landscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
   var mb = document.getElementById('marquee-bar');
   MARQUEE_H = mb ? Math.max(mb.offsetHeight, 28) : 0;
   var w = window.innerWidth  - PAD * 2;
@@ -634,6 +652,9 @@ window.addEventListener('keydown', function (e) {
   window.onBlipControlsChange = function () {
     BlipController.releaseAll();
     stations.forEach(function (st) { st.held = {}; leanStick(st); });
+    // The two controllers are different heights, so the picture has to
+    // be re-fitted or it keeps the other one's reservation.
+    if (typeof fillCanvas === 'function') fillCanvas();
   };
 
   // Called from WASM (brawler) when the mode is chosen: 1 = two players,

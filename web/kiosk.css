@@ -2600,3 +2600,49 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   #topbar, .kiosk-bar-main { --bar-tilt: 12deg; }
   :root[data-caps="4"] { --cap: clamp(32px, 9vw, 50px); }
 }
+
+/* The plate hugs the caps. Sized off a percentage of the block it grew
+   with the square and read as a black box laid on the panel. */
+:root[data-caps="4"] .fire-buttons.four::before {
+  inset: calc(var(--cap) * -0.18) calc(var(--cap) * -0.16);
+  border-radius: calc(var(--cap) * 0.42);
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+:root[data-caps="4"] .snes-pad .snes-face.four::before {
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Red caps. The four-colour Atari rainbow was a lot of colour for a
+   panel; the CX40's red is the Atari everybody remembers. The heavy of
+   each pair is the darker cap. */
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(1) .arcade-btn-cap,
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(3) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #ff7a5e 0%, #e03c31 44%, #a21409 78%, #6b0a04 100%);
+}
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(2) .arcade-btn-cap,
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(4) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.1) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #d8503c 0%, #b32a1e 44%, #7d0f06 78%, #4d0703 100%);
+}
+
+/* The ball sits on top of the shaft, so its offset has to follow the
+   shaft's height. Left at a fixed value it dropped down over it. */
+:root[data-caps="4"] .stick-ball { bottom: calc(var(--cap) * 0.62); }
+
+/* The tag sits just above the caps. The station's box is three caps
+   tall to give the ball room to float, so its top is well clear of the
+   panel and a tag pinned there lands on the game. */
+:root[data-caps="4"] .deck-tag {
+  top: auto;
+  bottom: calc(var(--cap) * 2.6);
+}
+:root[data-layout="landscape"][data-caps="4"] .deck-tag { top: auto; bottom: 0; }
