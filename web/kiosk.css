@@ -744,7 +744,14 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   border-radius: 10px 10px 0 0;
   transform-style: preserve-3d;
   transform-origin: 50% 100%;
-  transform: perspective(640px) rotateX(var(--bar-tilt));
+  /* The lens scales with the panel.
+     A fixed 640px perspective is a portrait lens on a phone's deck and
+     a fisheye on a wall-mounted one: at 1280px wide it stretched the
+     outer stations sideways, leaned the buttons off their own axis and
+     flattened the ball-top into a disc. Tying it to the viewport keeps
+     the same mild foreshortening at every size — at phone width it
+     works out at almost exactly the 640px this was tuned to. */
+  transform: perspective(180vw) rotateX(var(--bar-tilt));
   /* The panel transform is static (only the stick's children animate), so
      a fixed compositor layer here means the tilt is rasterised once, not
      re-composited as siblings move over it — and hidden backfaces can't
@@ -2044,7 +2051,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    thumb was being offered. The tilt comes down to something a hand-held
    cabinet would actually be held at, which nearly doubles every control
    without taking a single pixel of width from the game. */
-@media (max-width: 620px) {
+@media (max-width: 620px), (pointer: coarse) {
   #topbar, .kiosk-bar-main { --bar-tilt: 26deg; }
 }
 @media (max-height: 450px) {
@@ -2119,3 +2126,60 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    plunger came up to meet it. */
 .arcade-btn { background: conic-gradient(from -50deg, #d8dade, #8c9098 18%, #2a2c30 50%, #8c9098 82%, #d8dade 100%); }
 .arcade-btn-cap { inset: 8%; }
+
+/* ---- A big touch screen ----
+   Everything above sizes the deck for a phone held in two hands, and
+   then stops at 620px — so a wall-mounted touch panel got the desktop
+   deck: full 56-degree tilt, mouse-sized caps, and a 78px bar. Played
+   on one, the controls came out as leaning ellipses about twenty
+   pixels tall. A finger is the same size on a big screen as on a small
+   one; the difference is that here there is room to do something about
+   it. */
+@media (pointer: coarse) and (min-width: 621px) {
+  :root[data-players] {
+    --cap: clamp(56px, 5.6vw, 92px);
+    --stick-w: clamp(60px, 6.4vw, 104px);
+  }
+  /* One station or two, the caps are sized for a hand — and the grid
+     has to be told, or the columns stay at the mouse-sized 44px and
+     four 64px caps overlap inside them. */
+  .fire-buttons.four {
+    grid-template-columns: repeat(2, 64px);
+    gap: 16px;
+  }
+  .deck-side { gap: 26px; }
+  .arcade-btn { width: 64px; height: 64px; }
+  .arcade-btn.lettered .arcade-btn-label { font-size: 12px; }
+  /* `:root[data-players] .snes-pad` sets these a size down so two
+     stations fit a phone, and out-specifies a bare `.snes-pad` — so
+     the big-screen sizes have to be written at the same weight or the
+     phone's numbers win on a wall panel. */
+  .snes-pad,
+  :root[data-players] .snes-pad { --sf-btn: 62px; --sf-gap: 24px; --sf-dpad: 104px; }
+  .snes-pad .snes-legend { font-size: 12px; }
+  :root[data-players] .snes-pad .snes-face.four { gap: 18px var(--sf-gap); }
+
+  :root[data-controls="stick"] #topbar.kiosk-bar,
+  :root[data-controls="stick"] .kiosk-bar-main,
+  :root[data-controls="stick"][data-caps="4"] #topbar.kiosk-bar,
+  :root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
+    height: calc(164px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-controls="pad"] #topbar.kiosk-bar,
+  :root[data-controls="pad"] .kiosk-bar-main,
+  :root[data-controls="pad"][data-caps="4"] #topbar.kiosk-bar,
+  :root[data-controls="pad"][data-caps="4"] .kiosk-bar-main {
+    height: calc(184px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* The washer stays well under the ball. Scaled up with everything
+     else it became a black disc as wide as the ball-top sitting on it,
+     which reads as a hole in the panel rather than as the rubber cup
+     the shaft comes out of. */
+  .stick-base { width: 130px; height: 250px; }
+  .stick-boot { width: 76px; height: 76px; bottom: 10px; }
+  .stick-handle { bottom: 48px; }
+  .stick-shaft { width: 19px; height: 66px; }
+  .stick-ball { width: 100px; height: 100px; bottom: 66px; }
+  .stick-base::before { width: 84px; }
+}

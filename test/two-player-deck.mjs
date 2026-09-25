@@ -632,3 +632,55 @@ test(`a thumb gets a real target on a small phone (${ENGINE})`, async (t) => {
       `the caps are ${Math.round(gapX)}px apart across and ${Math.round(gapY)}px down`);
   });
 });
+
+test(`a big touch screen gets a deck sized for a finger (${ENGINE})`, async (t) => {
+  // The regression this guards against was found by playing on one.
+  // Everything that sizes the deck for a thumb was keyed on the screen
+  // being SMALL, so a wall-mounted touch panel — which is neither small
+  // nor a mouse — got the desktop deck: the full 56-degree tilt, caps
+  // meant for a pointer, and a 78px bar. What a finger was offered
+  // there was a leaning ellipse about twenty pixels tall.
+  const { cdp } = await openPage(t, ENGINE);
+  const browser = cdp.page.context().browser();
+
+  for (const [w, h, what] of [[1024, 768, 'tablet'], [1280, 800, 'touch monitor'],
+                              [1920, 1080, 'wall panel']]) {
+    for (const controls of ['stick', 'pad']) {
+      const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true });
+      const page = await ctx.newPage();
+      await page.addInitScript((m) => {
+        try { localStorage.setItem('blip-controls', m); } catch (e) {}
+      }, controls);
+      await page.goto(`http://127.0.0.1:${HTTP_PORT}/brawler/index.html`);
+      await page.waitForTimeout(1600);
+      await page.evaluate(() => window.blipSetMode(1));
+      await page.waitForTimeout(250);
+      const g = await page.evaluate(() => {
+        const all = (s) => Array.prototype.map.call(document.querySelectorAll(s), (el) => {
+          const r = el.getBoundingClientRect();
+          return { w: r.width, h: r.height };
+        }).filter((r) => r.w > 0);
+        return {
+          coarse: matchMedia('(pointer: coarse)').matches,
+          caps: all('#fire-buttons .arcade-btn').concat(all('#snes-pad .snes-btn')),
+        };
+      });
+      const where = `${what} ${controls}`;
+      assert.ok(g.coarse, `${where}: the test is not emulating a touch screen`);
+      assert.equal(g.caps.length, 4, `${where}: found ${g.caps.length} caps`);
+      for (const c of g.caps) {
+        // Apple's 44pt, which there is plenty of room for at this size.
+        assert.ok(c.w >= 44 && c.h >= 44,
+          `${where}: a cap renders ${Math.round(c.w)}x${Math.round(c.h)}`);
+        // And round, not a leaning ellipse: the panel's perspective was
+        // a fixed 640px whatever it was looking at, which on a 1248px
+        // deck is a fisheye — it stretched the outer stations sideways
+        // and tipped the buttons off their own axis.
+        assert.ok(Math.max(c.w, c.h) / Math.min(c.w, c.h) < 1.35,
+          `${where}: a cap renders ${Math.round(c.w)}x${Math.round(c.h)} — `
+          + 'the lens is distorting it');
+      }
+      await ctx.close();
+    }
+  }
+});
