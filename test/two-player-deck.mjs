@@ -420,6 +420,42 @@ test(`a phone on its side puts the controls beside the picture (${ENGINE})`, asy
     }
   });
 
+  await t.test('the caps sit inside the panel, not over it', async () => {
+    // The square of caps is twice as deep as the single row the deck
+    // used to carry, and the bar heights that allowed for it were
+    // written inside the phone and touch-screen media queries — so an
+    // ordinary desktop browser, which is neither, kept the bar built
+    // for one row and the top row of caps began sixteen pixels ABOVE
+    // the panel's own top edge. Buttons hovering over the bar.
+    for (const [page, w, h] of [['index.html', 1280, 900],
+                                ['brawler/index.html', 1280, 900],
+                                ['brawler/index.html', 390, 844],
+                                ['serpent/index.html', 768, 700]]) {
+      await cdp.page.setViewportSize({ width: w, height: h });
+      await evaluate(cdp, 'true');
+      await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/${page}` });
+      await waitFor(cdp, "document.readyState === 'complete'", 15000);
+      await waitFor(cdp, "document.querySelectorAll('.arcade-btn').length > 0", 15000);
+      await sleep(250);
+      const g = await evaluate(cdp, `(function () {
+        var panel = document.querySelector('.deck-panel').getBoundingClientRect();
+        // Whichever controller is on: the joystick deck's caps, or the
+        // pad's. The other one is display:none and reports a zero rect,
+        // which would read as a cap at the top of the screen.
+        var caps = Array.prototype.map.call(
+          document.querySelectorAll('.fire-buttons .arcade-btn, .snes-face .snes-btn'),
+          function (el) { var r = el.getBoundingClientRect(); return { y: r.top, h: r.height }; })
+          .filter(function (c) { return c.h > 0; });
+        return { panelTop: panel.top, panelBot: panel.bottom, n: caps.length,
+                 top: Math.min.apply(null, caps.map(function (c) { return c.y; })) };
+      })()`);
+      assert.ok(g.n >= 4, `${page} @ ${w}: only ${g.n} caps are on screen`);
+      assert.ok(g.top >= g.panelTop + 6,
+        `${page} @ ${w}: the caps start at ${Math.round(g.top)}, `
+        + `above the panel's top edge at ${Math.round(g.panelTop)}`);
+    }
+  });
+
   await t.test('every page carries the same deck', async () => {
     // One cabinet, one control panel. The front page, the info pages
     // and every game except rally show the identical deck — same bar,

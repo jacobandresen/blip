@@ -704,7 +704,14 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 #topbar,
 .kiosk-bar-main {
-  --bar-tilt: 56deg;
+  /* One angle everywhere. 56 degrees was the desk-panel look for a
+     mouse and 26 the one a finger needs, and keeping both meant the
+     deck was two different shapes depending on what you were pointing
+     with — different proportions, different heights, and a separate set
+     of overflow bugs each. 26 reads as a panel tilted toward you at
+     every size, and it is the one the stick, the caps and the shadows
+     were all drawn against. */
+  --bar-tilt: 26deg;
   /* Matches the game canvas's own left/right inset (PAD=16 in shell.js's
      fillCanvas()) on game pages, so the deck sits exactly as wide as the
      screen and directly under it, rather than the wider bezel-frame
@@ -1834,7 +1841,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-caps="4"] .snes-pad { --sf-btn: 34px; --sf-gap: 9px; --sf-dpad: 52px; }
 :root[data-controls="pad"][data-caps="4"] #topbar.kiosk-bar,
 :root[data-controls="pad"][data-caps="4"] .kiosk-bar-main {
-  height: calc(116px + env(safe-area-inset-bottom, 0px));
+  height: calc(152px + env(safe-area-inset-bottom, 0px));
 }
 .snes-pad .snes-face.four {
   display: grid;
@@ -1872,10 +1879,16 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* A square of caps is twice as deep as a row of them, so the joystick
    deck grows to seat it instead of pushing the bottom row off the front
-   edge of the panel. */
+   edge of the panel.
+
+   124, not 78. Seventy-eight was enough for the single row this deck
+   used to have; the square is twice as deep, and at 78 its top row
+   began sixteen pixels ABOVE the panel's own top edge — buttons
+   hovering over the bar with nothing behind them. Every page shows the
+   square now, so every page needs the bar for it. */
 :root[data-controls="stick"][data-caps="4"] #topbar.kiosk-bar,
 :root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
-  height: calc(78px + env(safe-area-inset-bottom, 0px));
+  height: calc(142px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Two stations on a phone: everything comes in a size, and the gap
@@ -2115,9 +2128,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    thumb was being offered. The tilt comes down to something a hand-held
    cabinet would actually be held at, which nearly doubles every control
    without taking a single pixel of width from the game. */
-@media (max-width: 620px), (pointer: coarse) {
-  #topbar, .kiosk-bar-main { --bar-tilt: 26deg; }
-}
+
 @media (max-height: 450px) {
   #topbar, .kiosk-bar-main { --bar-tilt: 20deg; }
 }
@@ -2454,3 +2465,54 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     radial-gradient(circle at 46% 30%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 44%),
     radial-gradient(circle at 50% 62%, #3d3f45 0%, #4a4c52 40%, #35373c 70%, #1e1f23 100%);
 }
+
+/* ---- The caps are IN the panel, not above it ----
+   Three things were saying otherwise, and they compounded.
+
+   A long soft drop shadow is a hover shadow: an object well clear of
+   the surface behind it. A button pressed through a panel has a tight
+   dark contact line under its rim and nothing else.
+
+   A reflection pooled under each cap was worse, because a reflection
+   implies a polished floor BELOW the thing reflected — which is only
+   true of something standing above it. The ball-top genuinely does
+   stand above the panel, so it keeps its own; the caps do not, so
+   theirs go.
+
+   And the mounting plate read as a tile laid on top: it was lighter
+   than the panel and carried an outer highlight along its bottom edge,
+   which is exactly how a raised edge catches the light. A recess is
+   darker than what surrounds it, shadowed along its top edge where the
+   light cannot reach, and lit along the inside of its bottom one. */
+.arcade-btn {
+  box-shadow:
+    0 2px 3px rgba(0, 0, 0, 0.8),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.45),
+    inset 0 2px 2px rgba(255, 255, 255, 0.32),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.55);
+}
+.arcade-btn.blip-pressed,
+.arcade-btn.active {
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.45),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.18);
+}
+.arcade-btn::after { display: none; }
+
+.fire-buttons.four::before {
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(0, 0, 0, 0.9),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.07);
+}
+.snes-pad .snes-face.four::before {
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(0, 0, 0, 0.9),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.07);
+}
+
+
