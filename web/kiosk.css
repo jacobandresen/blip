@@ -2646,3 +2646,28 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   bottom: calc(var(--cap) * 2.6);
 }
 :root[data-layout="landscape"][data-caps="4"] .deck-tag { top: auto; bottom: 0; }
+
+/* A cabinet's second station looks the same whether anybody is at it or
+   not — same place, same panel, same caps. In a one-player game it is
+   only inert. (The title screen still pulses it; that is an invitation,
+   not a state.) */
+:root[data-players="1"] #deck-p2 .stick-boot,
+:root[data-players="1"] #deck-p2 .stick-shaft,
+:root[data-players="1"] #deck-p2 .stick-ball,
+:root[data-players="1"] #deck-p2 .fire-buttons,
+:root[data-players="1"] #deck-p2 .deck-tag,
+:root[data-players="1"] .snes-pad.second .snes-shell {
+  opacity: 1;
+  filter: none;
+}
+:root[data-players="1"]:not([data-open]) #deck-p2 .deck-tag,
+:root[data-players="1"]:not([data-open]) .snes-pad.second .deck-tag {
+  opacity: 0.55;
+}
+
+/* Aimed at the controls: .arcade-btn sets pointer-events:auto for
+   itself, and a parent's `none` does not override a child that does. */
+:root[data-players="1"]:not([data-open]) #deck-p2 .arcade-btn,
+:root[data-players="1"]:not([data-open]) #deck-p2 .stick-base {
+  pointer-events: none;
+}

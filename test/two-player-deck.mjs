@@ -92,13 +92,12 @@ const LIVE = (sel) => `(function () {
   if (!el) return null;
   var r = el.getBoundingClientRect();
   if (!(r.width > 0 && r.height > 0)) return false;
-  // Opacity, not pointer-events: a pad sets pointer-events none on
-  // itself by design and lets only its buttons take input. And read it
-  // off a LEAF — the dim is applied to the station's parts rather than
-  // the station, because opacity on the station would flatten the
-  // preserve-3d chain and squash the stick inside it.
-  var leaf = el.querySelector('.fire-buttons, .snes-shell') || el;
-  return parseFloat(getComputedStyle(leaf).opacity) > 0.9;
+  // An idle station looks exactly like a live one — same place, same
+  // panel, same caps — so "live" is whether it takes input, not how it
+  // is painted.
+  var ctrl = el.querySelector('.arcade-btn, .snes-btn');
+  if (!ctrl) return false;
+  return getComputedStyle(ctrl).pointerEvents !== 'none';
 })()`;
 
 const VISIBLE = (sel) => `(function () {
@@ -117,8 +116,10 @@ test(`brawler's deck seats two players (${ENGINE})`, async (t) => {
     // be able to see that before choosing anything.
     assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), true,
       'a two-player cabinet is showing only one station');
-    assert.equal(await evaluate(cdp, LIVE('#deck-p2')), false,
-      'station two is live before a second player joined');
+    // A cold cabinet comes up on its title screen, where station two is
+    // deliberately live: reaching for it is how a second player joins.
+    assert.equal(await evaluate(cdp, LIVE('#deck-p2')), true,
+      'station two cannot be reached for on the title screen');
 
     await evaluate(cdp, 'window.blipSetMode(1)');
     await sleep(120);
@@ -585,13 +586,17 @@ test(`the deck answers the title screen straight away (${ENGINE})`, async (t) =>
       await tap(cdp, 'KeyD');
       assert.equal(await evaluate(cdp, PLAYERS), '2',
         'the cursor reached 2 PLAYERS and no second station appeared');
-      assert.equal(await evaluate(cdp, LIVE(station2)), true,
-        `the second station is reported but ${station2} is not in play`);
+      assert.equal(await evaluate(cdp,
+        "document.querySelector('.deck-tag[data-second]').textContent"), '2P',
+        'the cursor reached 2 PLAYERS and the station still reads otherwise');
 
       await tap(cdp, 'KeyD');
       assert.equal(await evaluate(cdp, PLAYERS), '1',
         'the cursor went back to 1 PLAYER and the second station stayed');
-      assert.equal(await evaluate(cdp, LIVE(station2)), false);
+      // Still on the title, so still open and still reachable — what
+      // changes is that it is advertising again rather than taken.
+      assert.equal(await evaluate(cdp,
+        "document.querySelector('.deck-tag[data-second]').textContent"), 'JOIN');
 
       // And the choice survives being confirmed: the select screen and
       // the match that follows keep whatever the title said.
