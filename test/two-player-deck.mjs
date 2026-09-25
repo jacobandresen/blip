@@ -555,6 +555,8 @@ const TARGETS = `(function () {
     vw: innerWidth,
     scrollW: document.documentElement.scrollWidth,
     bar: box('#topbar'),
+    sides: [box('#deck-p1'), box('#deck-p2'), box('#snes-pad'), box('#snes-pad-p2')]
+      .filter(Boolean),
     caps: all('#fire-buttons .arcade-btn').concat(all('#snes-pad .snes-btn')),
     caps2: all('#fire-buttons-p2 .arcade-btn').concat(all('#snes-pad-p2 .snes-btn')),
     stick: box('#stick-base') || box('#snes-pad .snes-dpad')
@@ -608,6 +610,15 @@ test(`a thumb gets a real target on a small phone (${ENGINE})`, async (t) => {
         for (const c of g.caps.concat(g.caps2)) {
           assert.ok(c.x >= g.bar.x - 2 && c.r <= g.bar.r + 2,
             `${what}: a cap at ${Math.round(c.x)}..${Math.round(c.r)} is outside `
+            + `the panel (${Math.round(g.bar.x)}..${Math.round(g.bar.r)})`);
+        }
+        // The whole station, not just the caps in it. A station is
+        // wider than its controls — padding, and the recessed plate the
+        // caps are set into — and it is that margin, not the caps, that
+        // has run off the end of the panel every time this has broken.
+        for (const st of g.sides) {
+          assert.ok(st.x >= g.bar.x - 2 && st.r <= g.bar.r + 2,
+            `${what}: a station at ${Math.round(st.x)}..${Math.round(st.r)} overflows `
             + `the panel (${Math.round(g.bar.x)}..${Math.round(g.bar.r)})`);
         }
       }
