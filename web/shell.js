@@ -502,10 +502,25 @@ window.addEventListener('keydown', function (e) {
     st.stick.style.setProperty('--dx', x);
     st.stick.style.setProperty('--dy', y);
   }
+  // Which station a logical name belongs to — and, in a one-player
+  // game, player two's stick belongs to nobody. The arrow keys are
+  // player ONE's own in one-player mode (see P1_ALONE in the game), so
+  // an arrow press must lean player one's stick. Left to the name alone
+  // it leaned the dead second one instead, which is the deck reporting
+  // the wrong player's input on the wrong half of the panel.
+  var versus = false;
   function reflectInput(name, down) {
-    stations.forEach(function (st) {
+    stations.forEach(function (st, who) {
+      if (who === 1 && !versus) return;
       for (var d in st.dirs) {
         if (st.dirs[d] === name) { st.held[name] = down; leanStick(st); return; }
+      }
+      if (who === 0 && !versus && stations[1]) {
+        for (var e in stations[1].dirs) {
+          if (stations[1].dirs[e] === name) {
+            st.held[st.dirs[e]] = down; leanStick(st); return;
+          }
+        }
       }
     });
   }
@@ -619,7 +634,12 @@ window.addEventListener('keydown', function (e) {
   // Called from WASM (brawler) when the mode is chosen: 1 = two players,
   // so the second station appears on the deck.
   if (twoUp) window.blipSetMode = function (two) {
-    root.setAttribute('data-players', two ? '2' : '1');
+    versus = !!two;
+    root.setAttribute('data-players', versus ? '2' : '1');
+    // The second station is on the panel either way; what changes is
+    // whether anybody is sitting at it.
+    Array.prototype.forEach.call(document.querySelectorAll('.deck-tag[data-second]'),
+      function (el) { el.textContent = versus ? '2P' : 'CPU'; });
     BlipController.releaseAll();
     stations.forEach(function (st) { st.held = {}; leanStick(st); });
     if (typeof fillCanvas === 'function') fillCanvas();

@@ -1668,20 +1668,54 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   pointer-events: none;
 }
 
-/* One station until the game says otherwise. */
-#deck-p2, .snes-pad.second, :root:not([data-players="2"]) .deck-tag { display: none; }
-:root[data-players="2"] #deck-p2 { display: flex; }
-:root[data-players="2"][data-controls="pad"] .snes-pad.second { display: block; }
+/* A cabinet with two stations has two stations in a one-player game as
+   well — that is what the empty half of an arcade panel looks like, and
+   it is how a player finds out the machine takes two before they have
+   chosen anything. `data-players` says whether the second one is in
+   play; it does not decide whether it exists. */
+#deck-p2, .snes-pad.second, :root:not([data-players]) .deck-tag { display: none; }
+:root[data-players] #deck-p2 { display: flex; }
+:root[data-players][data-controls="pad"] .snes-pad.second { display: block; }
+
+/* One player: station two is there, dimmed, and takes no input. It must
+   not take any — in a one-player game the arrow keys are player one's
+   own, so a live second stick would be a second way to move your own
+   fighter, sitting under the other player's hand. */
+:root[data-players="1"] #deck-p2,
+:root[data-players="1"] .snes-pad.second {
+  opacity: 0.30;
+  pointer-events: none;
+  filter: saturate(0.35);
+}
 
 /* Two stations share the panel's width: each pad takes half of the bar,
    and the sticks pull their gaps in so both fit on a phone. */
-:root[data-players="2"] .deck-side {
-  gap: clamp(6px, 2vw, 16px);
-  padding: 0 clamp(4px, 2vw, 18px);
+/* One player's stick and their caps belong together, and the other
+   player's belong somewhere else. Each station was filling half the
+   panel and pushing its own two controls to the ends of that half,
+   which put player one's caps right up against player two's stick with
+   the daylight in the wrong place — inside a station instead of
+   between them. Compact groups, hard against the two outside edges. */
+:root[data-players] .deck-side {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  gap: clamp(10px, 3vw, 22px);
+  padding: 0 clamp(4px, 2.5vw, 26px);
 }
-:root[data-players="2"] .snes-pad { width: 50%; --sf-edge: clamp(6px, 2.5vw, 22px); }
-:root[data-players="2"] #snes-pad { right: 50%; }
-:root[data-players="2"] .snes-pad.second { left: 50%; }
+:root[data-players] .snes-pad { width: 50%; --sf-edge: clamp(6px, 2.5vw, 22px); }
+:root[data-players] #snes-pad { right: 50%; }
+:root[data-players] .snes-pad.second { left: 50%; }
+/* Cross and caps together, hard against this station's outside edge,
+   so the gap in the middle of the panel is the gap between players.
+   And a size down, because a station's own controls at full size fill
+   its half of the bar exactly — leaving nothing to separate the two
+   players with, which is the whole point of grouping them. */
+:root[data-players] .snes-pad { --sf-btn: 36px; --sf-gap: 10px; --sf-dpad: 52px; }
+:root[data-players] .snes-pad .snes-shell {
+  justify-content: flex-start;
+  gap: clamp(10px, 3.5vw, 26px);
+}
+:root[data-players] .snes-pad.second .snes-shell { justify-content: flex-end; }
 
 /* ---- Four caps: the fighting deck ----
    Punches on the top row, kicks under them; light on the left, heavy on
@@ -1782,18 +1816,18 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* Two stations on a phone: everything comes in a size, and the gap
    between the stations stays wider than the gap inside one — otherwise
    eight caps in a row read as one player's deck. */
-:root[data-players="2"] .snes-pad .snes-wordmark { display: none; }
+:root[data-players] .snes-pad .snes-wordmark { display: none; }
 
 @media (max-width: 620px) {
-  :root[data-players="2"] .fire-buttons.four { grid-template-columns: repeat(2, 37px); gap: 5px; }
-  :root[data-players="2"] .arcade-btn { width: 37px; height: 37px; }
-  :root[data-players="2"] .arcade-btn.lettered .arcade-btn-label { font-size: 8px; }
-  :root[data-players="2"] .stick-base { width: 64px; }
-  :root[data-players="2"] .stick-boot { width: 40px; height: 40px; }
-  :root[data-players="2"] .stick-shaft { width: 10px; }
-  :root[data-players="2"] .stick-ball { width: 46px; height: 46px; }
-  :root[data-players="2"] .stick-base::before { width: 44px; }
-  :root[data-players="2"] .deck-tag { font-size: 6px; }
+  :root[data-players] .fire-buttons.four { grid-template-columns: repeat(2, 37px); gap: 5px; }
+  :root[data-players] .arcade-btn { width: 37px; height: 37px; }
+  :root[data-players] .arcade-btn.lettered .arcade-btn-label { font-size: 8px; }
+  :root[data-players] .stick-base { width: 64px; }
+  :root[data-players] .stick-boot { width: 40px; height: 40px; }
+  :root[data-players] .stick-shaft { width: 10px; }
+  :root[data-players] .stick-ball { width: 46px; height: 46px; }
+  :root[data-players] .stick-base::before { width: 44px; }
+  :root[data-players] .deck-tag { font-size: 6px; }
 }
 
 /* ======================================================================
@@ -1881,32 +1915,32 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    right) and simply shrinks to fit a gutter, rather than stacking into
    a column: a column climbs halfway up the screen and puts the caps
    somewhere no thumb is. */
-:root[data-layout="landscape"][data-players="2"] .deck-side {
+:root[data-layout="landscape"][data-players] .deck-side {
   flex: 0 0 auto;
   gap: 8px;
   padding: 0 max(6px, env(safe-area-inset-left, 0px)) 8px;
 }
-:root[data-layout="landscape"][data-players="2"] .fire-buttons.four {
+:root[data-layout="landscape"][data-players] .fire-buttons.four {
   grid-template-columns: repeat(2, 34px);
   gap: 5px;
 }
-:root[data-layout="landscape"][data-players="2"] .arcade-btn { width: 34px; height: 34px; }
-:root[data-layout="landscape"][data-players="2"] .stick-base { width: 62px; }
-:root[data-layout="landscape"][data-players="2"] .stick-boot { width: 38px; height: 38px; }
-:root[data-layout="landscape"][data-players="2"] .stick-ball { width: 42px; height: 42px; }
-:root[data-layout="landscape"][data-players="2"] .stick-shaft { width: 9px; }
+:root[data-layout="landscape"][data-players] .arcade-btn { width: 34px; height: 34px; }
+:root[data-layout="landscape"][data-players] .stick-base { width: 62px; }
+:root[data-layout="landscape"][data-players] .stick-boot { width: 38px; height: 38px; }
+:root[data-layout="landscape"][data-players] .stick-ball { width: 42px; height: 42px; }
+:root[data-layout="landscape"][data-players] .stick-shaft { width: 9px; }
 
 /* Two pads, one per gutter. Each keeps its cross on the left and its
    caps on the right; they are just half a screen apart instead of
    shoulder to shoulder. */
-:root[data-layout="landscape"][data-players="2"] .snes-pad { --sf-btn: 33px; --sf-dpad: 62px; --sf-gap: 8px; }
-:root[data-layout="landscape"][data-players="2"] .snes-pad .snes-shell {
+:root[data-layout="landscape"][data-players] .snes-pad { --sf-btn: 33px; --sf-dpad: 62px; --sf-gap: 8px; }
+:root[data-layout="landscape"][data-players] .snes-pad .snes-shell {
   padding: 0 max(6px, env(safe-area-inset-left, 0px))
              calc(env(safe-area-inset-bottom, 0px) + 8px);
   justify-content: flex-start;
   gap: 10px;
 }
-:root[data-layout="landscape"][data-players="2"] .snes-pad.second .snes-shell {
+:root[data-layout="landscape"][data-players] .snes-pad.second .snes-shell {
   justify-content: flex-end;
 }
 :root[data-layout="landscape"] .deck-tag { bottom: 0; }
@@ -1936,3 +1970,38 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-layout="landscape"] #dial-label-p2 { top: -14px; font-size: 8px; }
 :root[data-layout="landscape"] #paddle-dial,
 :root[data-layout="landscape"] #paddle-dial-p2 { pointer-events: auto; }
+
+/* The station tag on a pad sits on the panel itself, low and central
+   over that station's own half, so the two halves are named the same
+   way in both controllers. */
+.snes-pad .deck-tag {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 3px);
+  transform: translateX(-50%);
+}
+
+/* One panel, two stations — not two panels.
+   Each pad is half the bar and each was drawing its own moulded shell,
+   so the two met in the middle with a rounded corner, a lit top edge
+   and an edge shadow on each side of the join. That seam is what made
+   a perfectly good gap between the control groups read as two consoles
+   jammed together. The halves keep their outer corner and their outer
+   edge shade and lose the ones that face each other, and the deck
+   becomes one continuous surface with a player at each end of it. */
+:root[data-players] #snes-pad .snes-shell {
+  border-radius: 13px 0 0 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 3px 1px -1px rgba(224, 60, 49, 0.28),
+    inset 0 -14px 22px rgba(0, 0, 0, 0.6),
+    inset 6px 0 14px -6px rgba(0, 0, 0, 0.55);
+}
+:root[data-players] .snes-pad.second .snes-shell {
+  border-radius: 0 13px 0 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 3px 1px -1px rgba(224, 60, 49, 0.28),
+    inset 0 -14px 22px rgba(0, 0, 0, 0.6),
+    inset -6px 0 14px -6px rgba(0, 0, 0, 0.55);
+}

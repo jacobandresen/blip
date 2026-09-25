@@ -83,6 +83,20 @@ const DECK_NAMES = `(function () {
   };
 })()`;
 
+/** Whether a station is in play, as opposed to merely on the panel.
+ * A two-player cabinet shows both stations in a one-player game too —
+ * that is what the empty half of an arcade panel looks like — so the
+ * question is never "is it there" but "is anybody at it". */
+const LIVE = (sel) => `(function () {
+  var el = document.querySelector(${JSON.stringify(sel)});
+  if (!el) return null;
+  var r = el.getBoundingClientRect();
+  if (!(r.width > 0 && r.height > 0)) return false;
+  // Opacity, not pointer-events: a pad sets pointer-events none on
+  // itself by design and lets only its buttons take input.
+  return parseFloat(getComputedStyle(el).opacity) > 0.9;
+})()`;
+
 const VISIBLE = (sel) => `(function () {
   var el = document.querySelector(${JSON.stringify(sel)});
   if (!el) return null;
@@ -93,22 +107,30 @@ const VISIBLE = (sel) => `(function () {
 test(`brawler's deck seats two players (${ENGINE})`, async (t) => {
   const { cdp } = await openPage(t, ENGINE);
 
-  await t.test('station two stays off the deck until the game says there is one', async () => {
+  await t.test('station two is always on the panel, and comes alive with a player', async () => {
     await loadGame(cdp, 'brawler', 'stick');
-    assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), false,
-      'the second station is on the deck before a second player joined');
+    // There from the start: the machine takes two, and a player should
+    // be able to see that before choosing anything.
+    assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), true,
+      'a two-player cabinet is showing only one station');
+    assert.equal(await evaluate(cdp, LIVE('#deck-p2')), false,
+      'station two is live before a second player joined');
 
     await evaluate(cdp, 'window.blipSetMode(1)');
     await sleep(120);
-    assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), true,
-      'the second station never appeared after the game reported two players');
+    assert.equal(await evaluate(cdp, LIVE('#deck-p2')), true,
+      'station two never came alive after the game reported two players');
     assert.equal(await evaluate(cdp, VISIBLE('#stick-base-p2')), true);
     assert.equal(await evaluate(cdp, VISIBLE('#fire-buttons-p2')), true);
 
     await evaluate(cdp, 'window.blipSetMode(0)');
     await sleep(120);
-    assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), false,
-      'the second station stayed on the deck after the game went back to one player');
+    assert.equal(await evaluate(cdp, LIVE('#deck-p2')), false,
+      'station two stayed live after the game went back to one player');
+    // And it says who is at it, rather than leaving an idle stick
+    // claiming to be a second player.
+    assert.equal(await evaluate(cdp,
+      "document.querySelector('#deck-p2 .deck-tag').textContent"), 'CPU');
   });
 
   await t.test('each station has four caps, and the two share no logical name', async () => {
@@ -343,34 +365,61 @@ test(`a phone on its side puts the controls beside the picture (${ENGINE})`, asy
     }
   });
 
-  await t.test('the stick and the buttons sit at opposite ends of a station', async () => {
-    // Whichever controller is on, the layout is the same one: the thing
-    // you steer with on the left, the things you hit with on the right,
-    // as far apart as the deck allows. They used to be a centred pair
-    // on the stick deck and edge to edge on the pad, which is two
-    // different controllers on one machine.
+  await t.test("each player's controls are together, and the players are apart", async () => {
+    // Two rules, and the second is the one that keeps getting broken.
+    // Within a station the stick is on the left and the buttons on the
+    // right, whichever controller is on — the deck must not be two
+    // different controllers depending on which you picked. Between the
+    // stations there is a gap, and it has to be bigger than any gap
+    // inside one: with each station spread across its own half of the
+    // panel, player one's buttons ended up against player two's stick
+    // and the daylight was in the wrong place.
     for (const size of [PORTRAIT, LANDSCAPE]) {
-      for (const [controls, steer, hit] of
-           [['stick', '#stick-base', '#fire-buttons'],
-            ['pad', '#snes-pad .snes-dpad', '#snes-pad .snes-face']]) {
-        const g = await geometry(cdp, 'brawler', controls, size, 1);
-        const by = (s) => g.controls.find((c) => c.sel === s);
-        const a = by(steer), b = by(hit);
-        assert.ok(a && b, `${controls} @ ${size.width}: a control is missing`);
-        assert.ok(a.b.r <= b.b.x,
-          `${controls} @ ${size.width}: the stick (${Math.round(a.b.x)}..${Math.round(a.b.r)}) `
-          + `is not left of the buttons (${Math.round(b.b.x)}..${Math.round(b.b.r)})`);
-        // Apart, and specifically apart at the ENDS of the deck rather
-        // than merely in order: each control hugs its own edge, which
-        // is what makes the two controllers the same controller.
-        const edge = g.deck.w * 0.3;
-        assert.ok(a.b.x - g.deck.x < edge,
-          `${controls} @ ${size.width}: the stick sits ${Math.round(a.b.x - g.deck.x)}px `
-          + `in from the left of a ${Math.round(g.deck.w)}px deck`);
-        assert.ok(g.deck.r - b.b.r < edge,
-          `${controls} @ ${size.width}: the buttons sit ${Math.round(g.deck.r - b.b.r)}px `
-          + `in from the right of a ${Math.round(g.deck.w)}px deck`);
+      for (const [controls, steer, hit, steer2, hit2] of
+           [['stick', '#stick-base', '#fire-buttons', '#stick-base-p2', '#fire-buttons-p2'],
+            ['pad', '#snes-pad .snes-dpad', '#snes-pad .snes-face',
+             '#snes-pad-p2 .snes-dpad', '#snes-pad-p2 .snes-face']]) {
+        const g = await geometry(cdp, 'brawler', controls, size, 2);
+        const at = (sel) => {
+          const c = g.controls.find((x) => x.sel === sel);
+          assert.ok(c, `${controls} @ ${size.width}: ${sel} is missing`);
+          return c.b;
+        };
+        const where = `${controls} @ ${size.width}`;
+        const [a, b, c, d] = [at(steer), at(hit), at(steer2), at(hit2)];
+        // Stick left of buttons, on both stations. Compared by centre,
+        // because a stick's hit-box is wider than the stick drawn in it
+        // and the two boxes are allowed to touch.
+        const mid = (r) => r.x + r.w / 2;
+        assert.ok(mid(a) < mid(b), `${where}: player one's stick is not left of their buttons`);
+        assert.ok(mid(c) < mid(d), `${where}: player two's stick is not left of their buttons`);
+        // Player one entirely left of player two.
+        assert.ok(b.r <= c.x, `${where}: the two stations overlap`);
+        // And the gap between them beats the gap inside either.
+        const between = c.x - b.r;
+        const inside = Math.max(b.x - a.r, d.x - c.r);
+        assert.ok(between > inside * 1.4 && between > 24,
+          `${where}: ${Math.round(between)}px between the players against `
+          + `${Math.round(inside)}px inside a station — the daylight is in the wrong place`);
       }
+    }
+  });
+
+  await t.test('a one-player deck still spreads its one station', async () => {
+    // A cabinet with one station has nothing to be apart FROM, so its
+    // stick and buttons go to the two ends of the panel instead — the
+    // layout the game pad has always had.
+    for (const [controls, steer, hit] of
+         [['stick', '#stick-base', '#fire-buttons'],
+          ['pad', '#snes-pad .snes-dpad', '#snes-pad .snes-face']]) {
+      const g = await geometry(cdp, 'serpent', controls, PORTRAIT, 1);
+      const by = (sel) => g.controls.find((x) => x.sel === sel);
+      const a = by(steer), b = by(hit);
+      if (!a || !b) continue;   // serpent draws one cap; the pad has both
+      assert.ok(a.b.r <= b.b.x, `${controls}: the stick is not left of the buttons`);
+      const edge = g.deck.w * 0.3;
+      assert.ok(a.b.x - g.deck.x < edge && g.deck.r - b.b.r < edge,
+        `${controls}: the one station is not spread across the panel`);
     }
   });
 
@@ -460,13 +509,13 @@ test(`the deck answers the title screen straight away (${ENGINE})`, async (t) =>
       await tap(cdp, 'KeyD');
       assert.equal(await evaluate(cdp, PLAYERS), '2',
         'the cursor reached 2 PLAYERS and no second station appeared');
-      assert.equal(await evaluate(cdp, VISIBLE(station2)), true,
-        `the second station is reported but ${station2} is not on the deck`);
+      assert.equal(await evaluate(cdp, LIVE(station2)), true,
+        `the second station is reported but ${station2} is not in play`);
 
       await tap(cdp, 'KeyD');
       assert.equal(await evaluate(cdp, PLAYERS), '1',
         'the cursor went back to 1 PLAYER and the second station stayed');
-      assert.equal(await evaluate(cdp, VISIBLE(station2)), false);
+      assert.equal(await evaluate(cdp, LIVE(station2)), false);
 
       // And the choice survives being confirmed: the select screen and
       // the match that follows keep whatever the title said.
