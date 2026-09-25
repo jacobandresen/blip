@@ -695,3 +695,65 @@ test(`a big touch screen gets a deck sized for a finger (${ENGINE})`, async (t) 
     }
   }
 });
+
+test(`a second player joins by reaching for their own stick (${ENGINE})`, async (t) => {
+  // The whole point is that this works by TOUCH, so it is tested by
+  // touch: a real tap on the second station's own button, on a real
+  // touch context, against the real wasm. The Rust side has its own
+  // tests for the menu logic; what is checked here is the part that
+  // only exists in the page — that the second station is reachable at
+  // all while the title is up. It is dead to the touch during a
+  // one-player match, deliberately, and that very nearly made this
+  // impossible.
+  const { cdp } = await openPage(t, ENGINE);
+  const browser = cdp.page.context().browser();
+
+  for (const controls of ['stick', 'pad']) {
+    const ctx = await browser.newContext({ viewport: { width: 900, height: 800 }, hasTouch: true });
+    const page = await ctx.newPage();
+    await page.addInitScript((m) => {
+      try { localStorage.setItem('blip-controls', m); } catch (e) {}
+    }, controls);
+    await page.goto(`http://127.0.0.1:${HTTP_PORT}/brawler/index.html`);
+    await page.waitForFunction(() => document.getElementById('loader').style.display === 'none',
+      null, { timeout: 20000 });
+    await page.evaluate(() => {
+      const o = document.getElementById('need-coin-overlay');
+      if (o && o.classList.contains('visible')) o.click();
+    });
+    // The cabinet reports itself as soon as it is up; wait for that
+    // rather than for a guessed number of milliseconds.
+    await page.waitForFunction(
+      () => document.documentElement.hasAttribute('data-open'), null, { timeout: 20000 });
+
+    const state = () => page.evaluate(() => ({
+      players: document.documentElement.getAttribute('data-players'),
+      open: document.documentElement.hasAttribute('data-open'),
+      tag: (document.querySelector('.deck-tag[data-second]') || {}).textContent,
+    }));
+
+    let s = await state();
+    assert.equal(s.players, '1', `${controls}: the title screen is already two players`);
+    assert.ok(s.open, `${controls}: the second station is not open on the title screen`);
+    assert.equal(s.tag, 'JOIN', `${controls}: the second station reads "${s.tag}"`);
+
+    const sel = controls === 'stick'
+      ? '#fire-buttons-p2 .arcade-btn' : '#snes-pad-p2 .snes-btn';
+    const box = await (await page.$(sel)).boundingBox();
+    // The deck reports itself as soon as the page is up, which is
+    // before the wasm has finished building its three themes and
+    // started reading input — so tap until it takes, the way a player
+    // would, rather than once at a guessed moment.
+    const deadline = Date.now() + 15000;
+    do {
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      await page.waitForTimeout(350);
+      s = await state();
+    } while (s.players !== '2' && Date.now() < deadline);
+    assert.equal(s.players, '2',
+      `${controls}: player two touched their own button and did not join`);
+    assert.ok(!s.open, `${controls}: the second station is still advertising for a player`);
+    assert.equal(s.tag, '2P');
+    await ctx.close();
+  }
+});

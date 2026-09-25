@@ -840,6 +840,10 @@ fn grounded_move(inp: Input, close: bool) -> Option<MoveId> {
 /// fires an attack the player has forgotten asking for.
 const BUFFER: f32 = 10.0 * F;
 
+/// What the shell is told while the title screen is up: a cabinet with
+/// its second station lit and nobody at it yet. See `blip::web::set_players`.
+const TITLE_OPEN: i32 = 2;
+
 /// A blocked special still costs the blocker a sixth of its damage.
 ///
 /// Normals chip for nothing; only specials do. Without it two players
@@ -1855,6 +1859,19 @@ fn read_menu(g: &mut Game) -> [MenuIn; 2] {
 fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
     match g.state {
         State::Title => {
+            // Player two announcing themselves IS the choice.
+            //
+            // A cabinet has never asked player one to select two-player
+            // mode on behalf of somebody standing next to them; the
+            // second player reaches for their own stick and the machine
+            // works out the rest. They cannot toggle it back off again,
+            // because the place being given up in that direction is
+            // theirs and nobody else is asking.
+            if g.menu == 0 && (m[1].back || m[1].fwd || m[1].fire) {
+                g.menu = 1;
+                web::set_mode(true);
+                return Some(Cue::Step);
+            }
             // The title is where the mode is chosen, on a stick and one
             // button, because that is all a cabinet has.
             if m[0].back || m[0].fwd {
@@ -1866,10 +1883,13 @@ fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
                 // arriving in front of them — after the fact it is a
                 // surprise, and on the select screen it is too late to
                 // be an answer at all.
-                web::set_mode(g.menu == 1);
+                web::set_players(if g.menu == 1 { 1 } else { TITLE_OPEN });
                 return Some(Cue::Step);
             }
-            if m[0].fire {
+            // Once the second station is claimed, either player may
+            // start the match — player two has as much right to it as
+            // the player who put the coin in.
+            if m[0].fire || (g.menu == 1 && m[1].fire) {
                 g.mode = if g.menu == 0 { Mode::Solo } else { Mode::Versus };
                 web::set_mode(g.mode == Mode::Versus);
                 g.state = State::Select;
@@ -2013,6 +2033,12 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
+    // Say so before anything slow happens. The three themes are
+    // synthesised below and take a second or two; told after that, the
+    // cabinet spends its whole loading screen claiming to be a
+    // one-player machine with a dead second station.
+    web::set_players(TITLE_OPEN);
+
     let sfx = Sounds {
         hit_light: [
             blip::audio::load_sound(HIT_LIGHT_WAV[0]).await,
@@ -2103,7 +2129,7 @@ async fn main() {
                 let m = read_menu(&mut g);
                 if !g.phase.active() && (m[0].fire || m[1].fire) {
                     g = Game::new();
-                    web::set_mode(false);
+                    web::set_players(TITLE_OPEN);
                 }
             }
         }

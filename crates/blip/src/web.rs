@@ -22,10 +22,24 @@ pub fn spend_coin() {
 
 /// Notify the kiosk shell which game mode was selected (0 = 1P/CPU, 1 = 2P).
 pub fn set_mode(two_player: bool) {
+    set_players(i32::from(two_player));
+}
+
+/// The same channel, with the one extra state a cabinet actually has.
+///
+/// `0` is one player, `1` is two — and `2` is the attract/title screen
+/// of a machine that takes two: the second station is lit and waiting
+/// for somebody to touch it, which is neither of the other two. Without
+/// it the shell has to treat the title as a one-player game, and a
+/// one-player game is the case where the second station must be dead to
+/// the touch (in one-player mode the arrow keys are player one's own,
+/// so a live second stick is a second way to move your own fighter).
+/// Which would make "touch the second stick to join" impossible.
+pub fn set_players(code: i32) {
     #[cfg(target_arch = "wasm32")]
-    unsafe { blip_set_mode(if two_player { 1 } else { 0 }); }
+    unsafe { blip_set_mode(code); }
     #[cfg(not(target_arch = "wasm32"))]
-    let _ = two_player;
+    let _ = code;
 }
 
 /// Report the two paddle positions (each 0.0 = top … 1.0 = bottom of travel)

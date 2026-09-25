@@ -633,13 +633,23 @@ window.addEventListener('keydown', function (e) {
 
   // Called from WASM (brawler) when the mode is chosen: 1 = two players,
   // so the second station appears on the deck.
-  if (twoUp) window.blipSetMode = function (two) {
-    versus = !!two;
+  // 0 = one player, 1 = two, 2 = the title screen of a machine that
+  // takes two: the second station is lit and waiting for somebody to
+  // touch it. That third state is the whole reason "touch the second
+  // stick to join" can work — in a one-player GAME the second station
+  // has to be dead to the touch, because the arrow keys are player
+  // one's own there and a live second stick would be a second way to
+  // move your own fighter.
+  if (twoUp) window.blipSetMode = function (code) {
+    var open = code === 2;
+    versus = code === 1;
     root.setAttribute('data-players', versus ? '2' : '1');
+    if (open) root.setAttribute('data-open', '');
+    else root.removeAttribute('data-open');
     // The second station is on the panel either way; what changes is
     // whether anybody is sitting at it.
     Array.prototype.forEach.call(document.querySelectorAll('.deck-tag[data-second]'),
-      function (el) { el.textContent = versus ? '2P' : 'CPU'; });
+      function (el) { el.textContent = versus ? '2P' : (open ? 'JOIN' : 'CPU'); });
     BlipController.releaseAll();
     stations.forEach(function (st) { st.held = {}; leanStick(st); });
     if (typeof fillCanvas === 'function') fillCanvas();

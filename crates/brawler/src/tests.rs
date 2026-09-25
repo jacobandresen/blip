@@ -3289,3 +3289,70 @@ fn building_the_crowd_is_quick_enough_to_do_at_startup() {
     let ms = t.elapsed().as_millis();
     assert!(ms < 400, "the crowd took {ms}ms to build");
 }
+
+// ---- player two joins by reaching for their own stick -------------------
+
+#[test]
+fn player_two_touching_anything_chooses_two_players() {
+    // A cabinet has never asked player one to select two-player mode on
+    // behalf of somebody standing next to them. The second player
+    // reaches for their own stick and the machine works out the rest.
+    for (what, m2) in [("their stick forward", press(false, true, false)),
+                       ("their stick back", press(true, false, false)),
+                       ("a button", press(false, false, true))] {
+        let mut g = Game::new();
+        assert_eq!(g.menu, 0, "the title does not start on 1 PLAYER");
+        let cue = update_menus(&mut g, [NOTHING, m2]);
+        assert_eq!(g.menu, 1, "player two used {what} and the cabinet ignored them");
+        assert_eq!(cue, Some(Cue::Step), "claiming the second slot made no sound");
+        assert_eq!(g.state, State::Title, "player two's first touch started the match");
+    }
+}
+
+#[test]
+fn player_two_cannot_give_the_second_slot_back() {
+    // The place being given up in that direction is theirs, and nobody
+    // else is asking for it — so their stick only ever selects two
+    // players. Player one keeps the toggle.
+    let mut g = Game::new();
+    update_menus(&mut g, [NOTHING, press(false, true, false)]);
+    assert_eq!(g.menu, 1);
+    for _ in 0..4 {
+        update_menus(&mut g, [NOTHING, press(false, true, false)]);
+        assert_eq!(g.menu, 1, "player two waggled their stick out of the game");
+    }
+    // Player one still can.
+    update_menus(&mut g, [press(false, true, false), NOTHING]);
+    assert_eq!(g.menu, 0, "player one lost the toggle");
+}
+
+#[test]
+fn either_player_starts_the_match_once_the_second_slot_is_claimed() {
+    // Player two has as much right to the start button as the player
+    // who put the coin in — but only once they are actually in.
+    let mut g = Game::new();
+    // Before they have joined, their fire is the join, not a start.
+    update_menus(&mut g, [NOTHING, press(false, false, true)]);
+    assert_eq!(g.state, State::Title, "player two's join also started the match");
+    assert_eq!(g.menu, 1);
+    // And now it starts it.
+    let cue = update_menus(&mut g, [NOTHING, press(false, false, true)]);
+    assert_eq!(g.state, State::Select, "player two could not start the match they joined");
+    assert_eq!(g.mode, Mode::Versus);
+    assert_eq!(cue, Some(Cue::Confirm));
+}
+
+#[test]
+fn a_solo_player_is_never_dragged_into_two_player_mode() {
+    // Player one working the title on their own has to be able to reach
+    // 1 PLAYER and start there, with the second station sitting
+    // untouched beside them.
+    let mut g = Game::new();
+    update_menus(&mut g, [press(false, true, false), NOTHING]);
+    assert_eq!(g.menu, 1);
+    update_menus(&mut g, [press(false, true, false), NOTHING]);
+    assert_eq!(g.menu, 0);
+    update_menus(&mut g, [press(false, false, true), NOTHING]);
+    assert_eq!(g.state, State::Select);
+    assert_eq!(g.mode, Mode::Solo, "a solo player was put into a versus match");
+}

@@ -1691,8 +1691,39 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-players="1"] #deck-p2,
 :root[data-players="1"] .snes-pad.second {
   opacity: 0.30;
-  pointer-events: none;
   filter: saturate(0.35);
+}
+/* Dead to the touch, aimed at the controls rather than at the panel
+   they sit on: `pointer-events: none` on a parent does NOT disable a
+   child that sets `auto`, and every button on the pad sets `auto`. A
+   rule on the pad alone would have looked right and done nothing. */
+:root[data-players="1"]:not([data-open]) #deck-p2,
+:root[data-players="1"]:not([data-open]) .snes-pad.second .snes-btn,
+:root[data-players="1"]:not([data-open]) .snes-pad.second .snes-dpad,
+:root[data-players="1"]:not([data-open]) .snes-pad.second .snes-dp-seg {
+  pointer-events: none;
+}
+
+/* Except on the title screen, where the second station is lit, live and
+   asking to be used: reaching for it is how a second player joins, and
+   a control nobody can touch cannot be reached for. Halfway bright —
+   clearly not in play yet, clearly not switched off either — and its
+   tag reads JOIN. */
+:root[data-players="1"][data-open] #deck-p2,
+:root[data-players="1"][data-open] .snes-pad.second {
+  filter: none;
+  animation: deck-join 2.4s ease-in-out infinite;
+}
+@keyframes deck-join {
+  0%, 100% { opacity: 0.58; }
+  50%      { opacity: 0.94; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-players="1"][data-open] #deck-p2,
+  :root[data-players="1"][data-open] .snes-pad.second {
+    animation: none;
+    opacity: 0.8;
+  }
 }
 
 /* Two stations share the panel's width: each pad takes half of the bar,
