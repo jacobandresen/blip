@@ -1819,14 +1819,45 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-players] .snes-pad .snes-wordmark { display: none; }
 
 @media (max-width: 620px) {
-  :root[data-players] .fire-buttons.four { grid-template-columns: repeat(2, 37px); gap: 5px; }
-  :root[data-players] .arcade-btn { width: 37px; height: 37px; }
+  /* Two stations on a phone, sized off the screen rather than off a
+     fixed number. Flattening the deck's tilt gave every control back
+     most of its height and, with it, most of its width — enough that
+     two stations at the old numbers ran off the right-hand edge at
+     375px. These scale, so they fit a 320px phone and grow to the old
+     size by the time there is room for it. */
+  :root[data-players] {
+    /* The caps get the width, because the stick's box is mostly air:
+       its ball floats above the panel and is allowed to overhang, and
+       the drag region is "everything left of this station's caps"
+       rather than the box itself (see isStickTouch in shell.js). So the
+       stick is sized to its boot and the rest goes to the thing you
+       actually have to hit. */
+    --cap: clamp(38px, 10.6vw, 50px);
+    --stick-w: clamp(36px, 9.4vw, 48px);
+  }
+  :root[data-players] .fire-buttons.four {
+    grid-template-columns: repeat(2, var(--cap));
+    /* Real space between the caps. Four circles a few pixels apart is
+       one target with lines on it as far as a thumb is concerned. */
+    gap: clamp(5px, 1.8vw, 10px);
+  }
+  :root[data-players] .arcade-btn { width: var(--cap); height: var(--cap); }
   :root[data-players] .arcade-btn.lettered .arcade-btn-label { font-size: 8px; }
-  :root[data-players] .stick-base { width: 64px; }
-  :root[data-players] .stick-boot { width: 40px; height: 40px; }
+  :root[data-players] .deck-side {
+    gap: clamp(6px, 2vw, 14px);
+    padding: 0 clamp(2px, 1vw, 10px);
+  }
+  :root[data-players] .stick-base { width: var(--stick-w); }
+  :root[data-players] .stick-boot {
+    width: calc(var(--stick-w) * 0.86);
+    height: calc(var(--stick-w) * 0.86);
+  }
   :root[data-players] .stick-shaft { width: 10px; }
-  :root[data-players] .stick-ball { width: 46px; height: 46px; }
-  :root[data-players] .stick-base::before { width: 44px; }
+  :root[data-players] .stick-ball {
+    width: calc(var(--stick-w) * 0.98);
+    height: calc(var(--stick-w) * 0.98);
+  }
+  :root[data-players] .stick-base::before { width: calc(var(--stick-w) * 0.9); }
   :root[data-players] .deck-tag { font-size: 6px; }
 }
 
@@ -2005,3 +2036,86 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset 0 -14px 22px rgba(0, 0, 0, 0.6),
     inset -6px 0 14px -6px rgba(0, 0, 0, 0.55);
 }
+
+/* ---- A phone's deck lies flatter ----
+   The panel is tilted back 56 degrees so it reads as a surface you are
+   looking down onto, which is right on a desk and ruinous on a phone:
+   a 37px button projects to 17px of screen. Measured, that is what a
+   thumb was being offered. The tilt comes down to something a hand-held
+   cabinet would actually be held at, which nearly doubles every control
+   without taking a single pixel of width from the game. */
+@media (max-width: 620px) {
+  #topbar, .kiosk-bar-main { --bar-tilt: 26deg; }
+}
+@media (max-height: 450px) {
+  #topbar, .kiosk-bar-main { --bar-tilt: 20deg; }
+}
+
+/* The joystick deck on a phone gets a taller bar to seat a taller
+   square of caps. It costs the game a little height and buys the caps
+   about a third of their size back — which on a control you are meant
+   to hit without looking is the better end of that trade. */
+@media (max-width: 620px) {
+  :root[data-controls="stick"][data-caps="4"] #topbar.kiosk-bar,
+  :root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
+    height: calc(100px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ---- The stick, as a stick ----
+   Flattening the deck made every part of it twice the size it was, and
+   at that size the shorthand showed: the dust washer was a rounded
+   black square that read as a hole in the panel, the shaft was a stub
+   mostly hidden inside it, and the ball sat down in the cup instead of
+   standing proud of it. All three are what a ball-top actually is. */
+
+/* The dust washer: a round rubber cup sunk into the panel, with a lip
+   catching the light and the shaft's hole dark inside it. It lies flat,
+   so the deck's own tilt foreshortens it into the ellipse it should be
+   without any help. */
+.stick-boot {
+  border-radius: 50%;
+  /* Mostly rubber, with only the shaft's hole actually black. Taken
+     wider, the dark core stops being a hole for the shaft and becomes a
+     hole in the panel. */
+  background:
+    radial-gradient(circle at 50% 44%,
+      #040405 0%, #08080a 20%, #24242a 38%, #3c3c44 62%, #4e4e58 80%, #1a1a1e 100%);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.65),
+    inset 0 2px 3px rgba(0, 0, 0, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.10),
+    0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+/* The shaft: a chromed rod, not a grey wedge. One bright band down the
+   left of centre where the light runs along it, and a dark side beyond
+   the turn — which is the whole of what makes a cylinder read as metal. */
+.stick-shaft {
+  background: linear-gradient(90deg,
+    #4a4a50 0%, #9ea0a8 22%, #f2f4f8 38%, #c6c8d0 52%, #74767e 72%, #2e2e34 100%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+/* The ball: a hard specular near the top left where the room light is,
+   the body colour through the middle, and a rim of bounced light along
+   the bottom edge — the last of those is what stops a sphere reading as
+   a flat disc with a gradient on it. */
+.stick-ball {
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 16%),
+    radial-gradient(circle at 34% 24%, #ff9c8c 0%, #f46b56 22%, #d9351f 52%, #9c1409 82%, #5f0b05 100%);
+  box-shadow:
+    0 6px 10px rgba(0, 0, 0, 0.5),
+    0 14px 22px rgba(0, 0, 0, 0.35),
+    inset 0 -7px 10px rgba(0, 0, 0, 0.45),
+    inset 0 -9px 7px -6px rgba(255, 150, 130, 0.5),
+    inset 0 3px 4px rgba(255, 255, 255, 0.28);
+}
+
+/* ---- The caps, as arcade buttons ----
+   A real one is nearly all plunger: a translucent dome in a thin rim,
+   not a small dome in a wide grey ring. The ring came down and the
+   plunger came up to meet it. */
+.arcade-btn { background: conic-gradient(from -50deg, #d8dade, #8c9098 18%, #2a2c30 50%, #8c9098 82%, #d8dade 100%); }
+.arcade-btn-cap { inset: 8%; }

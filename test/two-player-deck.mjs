@@ -527,3 +527,108 @@ test(`the deck answers the title screen straight away (${ENGINE})`, async (t) =>
     });
   }
 });
+
+// ---- what a thumb is actually offered ----------------------------------
+//
+// The deck is a panel tilted back so it reads as a surface you are
+// looking down onto, and the tilt is a projection: what the CSS calls a
+// 37px button, a thumb finds as 17px of screen. That is the number that
+// matters and it was never being measured, so it went unnoticed for as
+// long as the tilt did. These measure the rendered geometry — the same
+// rectangles the touch code hit-tests against.
+
+const TARGETS = `(function () {
+  function box(sel) {
+    var el = document.querySelector(sel);
+    if (!el) return null;
+    var r = el.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) return null;
+    return { x: r.left, y: r.top, w: r.width, h: r.height, r: r.right, b: r.bottom };
+  }
+  function all(sel) {
+    return Array.prototype.map.call(document.querySelectorAll(sel), function (el) {
+      var r = el.getBoundingClientRect();
+      return { x: r.left, y: r.top, w: r.width, h: r.height, r: r.right, b: r.bottom };
+    }).filter(function (r) { return r.w > 0 && r.h > 0; });
+  }
+  return {
+    vw: innerWidth,
+    scrollW: document.documentElement.scrollWidth,
+    bar: box('#topbar'),
+    caps: all('#fire-buttons .arcade-btn').concat(all('#snes-pad .snes-btn')),
+    caps2: all('#fire-buttons-p2 .arcade-btn').concat(all('#snes-pad-p2 .snes-btn')),
+    stick: box('#stick-base') || box('#snes-pad .snes-dpad')
+  };
+})()`;
+
+const PHONES = [
+  { name: 'iPhone SE', width: 320, height: 568 },
+  { name: 'iPhone 8', width: 375, height: 667 },
+  { name: 'iPhone 13', width: 390, height: 844 },
+];
+
+test(`a thumb gets a real target on a small phone (${ENGINE})`, async (t) => {
+  const { cdp } = await openPage(t, ENGINE);
+
+  await t.test('every cap is big enough to hit without looking', async () => {
+    for (const phone of PHONES) {
+      for (const controls of ['stick', 'pad']) {
+        for (const players of [1, 2]) {
+          await cdp.page.setViewportSize({ width: phone.width, height: phone.height });
+          await loadGame(cdp, 'brawler', controls);
+          await evaluate(cdp, `window.blipSetMode(${players === 2 ? 1 : 0})`);
+          await sleep(250);
+          const g = await evaluate(cdp, TARGETS);
+          const what = `${phone.name} ${controls} ${players}P`;
+          assert.equal(g.caps.length, 4, `${what}: found ${g.caps.length} caps, not four`);
+          for (const c of g.caps) {
+            // 28px is what the projection allows on the narrowest phone
+            // with two stations on the panel. It is short of Apple's 44,
+            // and the touch code's own ±14px of slop covers the rest —
+            // but it is nearly double the 17px the tilt used to leave,
+            // and that is the regression being guarded here.
+            assert.ok(c.w >= 30 && c.h >= 28,
+              `${what}: a cap renders ${Math.round(c.w)}x${Math.round(c.h)}`);
+          }
+        }
+      }
+    }
+  });
+
+  await t.test('nothing on the deck runs off the panel', async () => {
+    for (const phone of PHONES) {
+      for (const controls of ['stick', 'pad']) {
+        await cdp.page.setViewportSize({ width: phone.width, height: phone.height });
+        await loadGame(cdp, 'brawler', controls);
+        await evaluate(cdp, 'window.blipSetMode(1)');
+        await sleep(250);
+        const g = await evaluate(cdp, TARGETS);
+        const what = `${phone.name} ${controls}`;
+        assert.equal(g.scrollW, g.vw, `${what}: the page scrolls sideways`);
+        for (const c of g.caps.concat(g.caps2)) {
+          assert.ok(c.x >= g.bar.x - 2 && c.r <= g.bar.r + 2,
+            `${what}: a cap at ${Math.round(c.x)}..${Math.round(c.r)} is outside `
+            + `the panel (${Math.round(g.bar.x)}..${Math.round(g.bar.r)})`);
+        }
+      }
+    }
+  });
+
+  await t.test('two caps never share a thumb', async () => {
+    // The touch code grants each button ±14px of slop, which is what
+    // makes a small target forgiving — and would make two of them
+    // ambiguous if they sat closer than that. The gap between adjacent
+    // caps has to be worth having.
+    await cdp.page.setViewportSize(PHONES[0]);
+    await loadGame(cdp, 'brawler', 'stick');
+    await evaluate(cdp, 'window.blipSetMode(1)');
+    await sleep(250);
+    const g = await evaluate(cdp, TARGETS);
+    const rows = g.caps.slice().sort((a, b) => a.y - b.y);
+    const gapY = rows[2].y - rows[0].b;
+    const cols = g.caps.slice().sort((a, b) => a.x - b.x);
+    const gapX = cols[2].x - cols[0].r;
+    assert.ok(gapX >= 4 && gapY >= 4,
+      `the caps are ${Math.round(gapX)}px apart across and ${Math.round(gapY)}px down`);
+  });
+});
