@@ -1726,25 +1726,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-players] #deck-p2 { display: flex; }
 :root[data-players][data-controls="pad"] .snes-pad.second { display: block; }
 
-/* One player: station two is there, dimmed, and takes no input. It must
-   not take any — in a one-player game the arrow keys are player one's
-   own, so a live second stick would be a second way to move your own
-   fighter, sitting under the other player's hand. */
-/* Dimmed on the PARTS, not on the station.
-   `opacity` on an element makes it its own stacking context, and a
-   stacking context ends a preserve-3d chain — so dimming the station
-   flattened the stick inside it, and player two's ball-top came out as
-   an ellipse next to player one's sphere. The leaves have no 3D
-   children of their own, so they can carry it. */
-:root[data-players="1"] #deck-p2 .stick-boot,
-:root[data-players="1"] #deck-p2 .stick-shaft,
-:root[data-players="1"] #deck-p2 .stick-ball,
-:root[data-players="1"] #deck-p2 .fire-buttons,
-:root[data-players="1"] #deck-p2 .deck-tag,
-:root[data-players="1"] .snes-pad.second .snes-shell {
-  opacity: 0.30;
-  filter: saturate(0.35);
-}
 /* Dead to the touch, aimed at the controls rather than at the panel
    they sit on: `pointer-events: none` on a parent does NOT disable a
    child that sets `auto`, and every button on the pad sets `auto`. */
@@ -1753,34 +1734,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-players="1"]:not([data-open]) .snes-pad.second .snes-dpad,
 :root[data-players="1"]:not([data-open]) .snes-pad.second .snes-dp-seg {
   pointer-events: none;
-}
-
-/* On the title screen the second station is lit, live and asking to be
-   used: reaching for it is how a second player joins, and a control
-   nobody can touch cannot be reached for. */
-:root[data-players="1"][data-open] #deck-p2 .stick-boot,
-:root[data-players="1"][data-open] #deck-p2 .stick-shaft,
-:root[data-players="1"][data-open] #deck-p2 .stick-ball,
-:root[data-players="1"][data-open] #deck-p2 .fire-buttons,
-:root[data-players="1"][data-open] #deck-p2 .deck-tag,
-:root[data-players="1"][data-open] .snes-pad.second .snes-shell {
-  filter: none;
-  animation: deck-join 2.4s ease-in-out infinite;
-}
-@keyframes deck-join {
-  0%, 100% { opacity: 0.58; }
-  50%      { opacity: 0.94; }
-}
-@media (prefers-reduced-motion: reduce) {
-  :root[data-players="1"][data-open] #deck-p2 .stick-boot,
-  :root[data-players="1"][data-open] #deck-p2 .stick-shaft,
-  :root[data-players="1"][data-open] #deck-p2 .stick-ball,
-  :root[data-players="1"][data-open] #deck-p2 .fire-buttons,
-  :root[data-players="1"][data-open] #deck-p2 .deck-tag,
-  :root[data-players="1"][data-open] .snes-pad.second .snes-shell {
-    animation: none;
-    opacity: 0.8;
-  }
 }
 
 /* Two stations share the panel's width: each pad takes half of the bar,
@@ -2662,24 +2615,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 :root[data-layout="landscape"][data-caps="4"] .deck-tag { top: auto; bottom: 0; }
 
-/* A cabinet's second station looks the same whether anybody is at it or
-   not — same place, same panel, same caps. In a one-player game it is
-   only inert. (The title screen still pulses it; that is an invitation,
-   not a state.) */
-:root[data-players="1"] #deck-p2 .stick-boot,
-:root[data-players="1"] #deck-p2 .stick-shaft,
-:root[data-players="1"] #deck-p2 .stick-ball,
-:root[data-players="1"] #deck-p2 .fire-buttons,
-:root[data-players="1"] #deck-p2 .deck-tag,
-:root[data-players="1"] .snes-pad.second .snes-shell {
-  opacity: 1;
-  filter: none;
-}
-:root[data-players="1"]:not([data-open]) #deck-p2 .deck-tag,
-:root[data-players="1"]:not([data-open]) .snes-pad.second .deck-tag {
-  opacity: 0.55;
-}
-
 /* Aimed at the controls: .arcade-btn sets pointer-events:auto for
    itself, and a parent's `none` does not override a child that does. */
 :root[data-players="1"]:not([data-open]) #deck-p2 .arcade-btn,
@@ -2755,22 +2690,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
      twice the stick's width, so the station's midpoint falls inside
      them and the tag landed on the LK cap. */
   left: calc(var(--cap) * 1.25);
-}
-
-/* A game that never seats two (data-seats="1") dims station two: nobody
-   can join, so looking like the live station only misleads. Brawler's
-   idle station keeps the look above; a second player can still sit down.
-   On the pad it is the controls that dim: the shell is half the panel. */
-:root[data-seats="1"]:not([data-open]) #deck-p2 .stick-boot,
-:root[data-seats="1"]:not([data-open]) #deck-p2 .stick-shaft,
-:root[data-seats="1"]:not([data-open]) #deck-p2 .stick-ball,
-:root[data-seats="1"]:not([data-open]) #deck-p2 .fire-buttons,
-:root[data-seats="1"]:not([data-open]) #deck-p2 .deck-tag,
-:root[data-seats="1"]:not([data-open]) .snes-pad.second .snes-dpad,
-:root[data-seats="1"]:not([data-open]) .snes-pad.second .snes-face,
-:root[data-seats="1"]:not([data-open]) .snes-pad.second .deck-tag {
-  opacity: 0.30;
-  filter: saturate(0.35);
 }
 
 /* ---- Small phones: keep the thumbs apart ----
@@ -2915,3 +2834,69 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   grid-template-columns: var(--sf-btn);
   gap: 12px 0;
 }
+
+/* ---- Station lamps ----
+   A P1 and a P2 lamp on the panel's top edge, over their own station.
+   P1 is lit whenever the deck is live (out while the coin wall is up);
+   P2 is lit when a second player is in, and pulses on the title screen
+   where a second player can join. Station two is otherwise drawn like
+   station one: nothing on the deck is dimmed. The lamps replace the
+   silkscreened tags. */
+.deck-tag { display: none !important; }
+
+.kiosk-bar > .deck-panel::before,
+.kiosk-bar > .deck-panel::after {
+  --lamp: 74, 222, 128;
+  --on: 1;
+  position: absolute;
+  top: 5px;
+  z-index: 6;
+  height: 10px;
+  padding-left: 15px;
+  font: 7px/10px 'Press Start 2P', 'Courier New', monospace;
+  letter-spacing: 1px;
+  pointer-events: none;
+  color: rgba(226, 232, 240, calc(0.3 + 0.5 * var(--on)));
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+  /* the lamp: a dark lens that fills with light when on */
+  background:
+    radial-gradient(circle at 50% 50%,
+      rgba(var(--lamp), var(--on)) 0 2.2px,
+      rgba(var(--lamp), calc(var(--on) * 0.35)) 3px,
+      rgba(0, 0, 0, 0.55) 3.6px 4.6px,
+      transparent 5px)
+    no-repeat 0 50% / 10px 10px;
+  filter: drop-shadow(0 0 calc(var(--on) * 3px) rgba(var(--lamp), 0.9));
+}
+.kiosk-bar > .deck-panel::before { content: 'P1'; left: 25%; transform: translateX(-50%); }
+.kiosk-bar > .deck-panel::after {
+  content: 'P2';
+  left: 75%;
+  transform: translateX(-50%);
+  --lamp: 56, 189, 248;
+  --on: 0;
+}
+
+:root:has(#need-coin-overlay.visible) .kiosk-bar > .deck-panel::before { --on: 0; }
+:root[data-pad="active"] .kiosk-bar > .deck-panel::before { color: #86efac; }
+:root[data-players="2"] .kiosk-bar > .deck-panel::after { --on: 1; }
+:root[data-players="1"][data-open] .kiosk-bar > .deck-panel::after {
+  animation: lamp-join 1.2s ease-in-out infinite;
+}
+@property --on { syntax: '<number>'; inherits: true; initial-value: 1; }
+@keyframes lamp-join { 0%, 100% { --on: 0.15; } 50% { --on: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-players="1"][data-open] .kiosk-bar > .deck-panel::after { animation: none; --on: 1; }
+}
+
+/* One seat on a phone: station one owns the bar, so its lamp sits in the
+   clear middle and station two's is gone with the station. */
+@media (max-width: 560px) {
+  :root[data-layout="upright"][data-seats="1"] .kiosk-bar > .deck-panel::before { left: 50%; }
+  :root[data-layout="upright"][data-seats="1"] .kiosk-bar > .deck-panel::after { display: none; }
+}
+
+/* Sideways the panel is the whole screen: lamps go over the two gutters. */
+:root[data-layout="landscape"] .kiosk-bar > .deck-panel::before { left: max(14px, env(safe-area-inset-left, 0px)); top: 56px; transform: none; }
+:root[data-layout="landscape"] .kiosk-bar > .deck-panel::after { left: auto; right: max(14px, env(safe-area-inset-right, 0px)); top: 56px; transform: none; }
+:root[data-layout="landscape"][data-seats="1"] .kiosk-bar > .deck-panel::after { display: none; }
