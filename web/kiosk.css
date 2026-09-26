@@ -866,6 +866,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    point, like a real stick leaning in its gate — the boot never moves,
    only the top does. */
 .stick-handle {
+  /* Backward lean of the standing stick. Perspective slides anything above
+     the deck plane sideways away from the panel centre, so a large lean
+     parks the ball off the shaft's foot. */
+  --lean: 3deg;
   position: absolute;
   left: 50%;
   /* The boot's vertical centre (bottom:6px + height:42px / 2), not its
@@ -891,7 +895,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
      earlier, without it, a rotateX+rotate combination here sent the
      whole stick behind the panel in some lean states. */
   transform:
-    rotateX(calc(var(--bar-tilt) * -1 - 9deg + var(--dy) * -12deg))
+    rotateX(calc(var(--bar-tilt) * -1 - var(--lean) + var(--dy) * -12deg))
     rotate(calc(var(--dx) * 18deg));
   transform-style: preserve-3d;
   /* Short enough that the lean tracks the thumb rather than trailing it —
@@ -937,7 +941,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 
 /* Ball-top: glossy red bakelite. The sphere billboards to the camera (it
-   projects as a circle at any tilt), so it cancels the 9deg lean the
+   projects as a circle at any tilt), so it cancels the --lean the
    handle leaves it with; translateZ keeps the shaft tip from poking through. */
 .stick-ball {
   position: absolute;
@@ -945,7 +949,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   bottom: 30px;
   width: 42px;
   height: 42px;
-  transform: translate(-50%, calc(22% + var(--dy) * 8px)) rotateX(calc(9deg + var(--dy) * 12deg)) translateZ(6px);
+  transform: translate(-50%, calc(22% + var(--dy) * 8px)) rotateX(calc(var(--lean) + var(--dy) * 12deg)) translateZ(3px);
   border-radius: 50%;
   background:
     radial-gradient(circle at 50% 108%, rgba(255, 120, 100, 0.55) 0%, transparent 42%),
@@ -2489,7 +2493,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   width: calc(var(--cap) * 0.21);
   height: calc(var(--cap) * 0.62);
 }
-:root[data-caps="4"] .stick-handle { bottom: calc(var(--cap) * 0.46); }
+:root[data-caps="4"] .stick-handle { bottom: calc(6px + var(--cap) * 0.56); } /* boot centre */
 /* The base is a drag region, not a footprint: the ball is allowed to
    overhang it and the gate hit-test is "left of this station's caps",
    not this box. Holding it to the ball's width cost the caps room they
