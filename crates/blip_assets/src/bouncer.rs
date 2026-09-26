@@ -160,6 +160,104 @@ fn brick(color: (u8, u8, u8)) -> Vec<u8> {
     img.encode_png()
 }
 
+/// Falling pickups: glossy capsules, drawn at 56x32 and shown at half size.
+/// Good ones are smooth and cool/bright with a plain icon; the bad one is
+/// red with hazard stripes, so it reads by pattern as well as by colour.
+#[derive(Copy, Clone, PartialEq)]
+enum Pickup { Wide, Narrow, Slow, Life }
+
+fn in_tri(p: (f32, f32), a: (f32, f32), b: (f32, f32), c: (f32, f32)) -> bool {
+    let s = |p: (f32, f32), q: (f32, f32), r: (f32, f32)| (p.0 - r.0) * (q.1 - r.1) - (q.0 - r.0) * (p.1 - r.1);
+    let (d1, d2, d3) = (s(p, a, b), s(p, b, c), s(p, c, a));
+    !((d1 < 0.0 || d2 < 0.0 || d3 < 0.0) && (d1 > 0.0 || d2 > 0.0 || d3 > 0.0))
+}
+
+fn in_bar(p: (f32, f32), x0: f32, x1: f32, half: f32) -> bool {
+    p.0 >= x0 && p.0 <= x1 && p.1.abs() <= half
+}
+
+/// Icon coverage at `p`, relative to the capsule centre (y down).
+fn pickup_icon(kind: Pickup, p: (f32, f32)) -> bool {
+    // Arrow along x from `tail` to `tip`: 3-thick shaft, 6-long 9-tall head.
+    let arrow = |tail: f32, tip: f32, p: (f32, f32)| {
+        let head = tip - (tip - tail).signum() * 6.0;
+        in_bar(p, tail.min(head), tail.max(head), 1.5)
+            || in_tri(p, (tip, 0.0), (head, -4.5), (head, 4.5))
+    };
+    match kind {
+        Pickup::Wide => arrow(0.0, -13.0, p) || arrow(0.0, 13.0, p),
+        Pickup::Narrow => arrow(-14.0, -2.5, p) || arrow(14.0, 2.5, p),
+        Pickup::Slow => {
+            let r = p.0.hypot(p.1);
+            (7.6..=10.0).contains(&r)
+                || (p.0.abs() <= 1.3 && (-7.0..=1.0).contains(&p.1))
+                || (p.1.abs() <= 1.3 && (-1.0..=5.0).contains(&p.0))
+        }
+        Pickup::Life => {
+            let (x, y) = (p.0 / 9.5, -(p.1 + 1.0) / 9.5);
+            let q = x * x + y * y - 1.0;
+            q * q * q - x * x * y * y * y <= 0.0
+        }
+    }
+}
+
+fn pickup(kind: Pickup) -> Vec<u8> {
+    let (w, h) = (56i32, 32i32);
+    let mut img = Image::new(w as u32, h as u32);
+    let r = h as f32 / 2.0 - 1.0;
+    let (cx, cy) = (w as f32 / 2.0, h as f32 / 2.0);
+    let (top, bot): ((f32, f32, f32), (f32, f32, f32)) = match kind {
+        Pickup::Wide => ((0.45, 0.95, 0.5), (0.05, 0.5, 0.2)),
+        Pickup::Slow => ((0.5, 0.78, 1.0), (0.05, 0.28, 0.75)),
+        Pickup::Life => ((1.0, 0.9, 0.4), (0.85, 0.5, 0.0)),
+        Pickup::Narrow => ((1.0, 0.4, 0.35), (0.6, 0.03, 0.05)),
+    };
+    const N: i32 = 3;
+    for py in 0..h {
+        for px in 0..w {
+            let (mut cr, mut cg, mut cb, mut cov) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+            for sy in 0..N {
+                for sx in 0..N {
+                    let x = px as f32 + (sx as f32 + 0.5) / N as f32;
+                    let y = py as f32 + (sy as f32 + 0.5) / N as f32;
+                    // Distance to the capsule's core segment.
+                    let nx = x.clamp(r + 1.0, w as f32 - r - 1.0);
+                    let d = (x - nx).hypot(y - cy) - r;
+                    if d > 0.0 { continue; }
+                    let t = ((y - (cy - r)) / (2.0 * r)).clamp(0.0, 1.0);
+                    let mut c = (
+                        top.0 + (bot.0 - top.0) * t,
+                        top.1 + (bot.1 - top.1) * t,
+                        top.2 + (bot.2 - top.2) * t,
+                    );
+                    if kind == Pickup::Narrow && ((x + y) / 7.0).floor() as i32 % 2 == 0 {
+                        c = (c.0 * 0.28, c.1 * 0.28, c.2 * 0.28);
+                    }
+                    // Gloss strip along the top edge, fading toward the ends.
+                    let inner = (x - cx).abs() / (w as f32 / 2.0 - r);
+                    if (y - cy + r) > 3.0 && (y - cy + r) < 9.5 && inner < 1.0 {
+                        let k = 0.4 * (1.0 - inner * inner);
+                        c = (c.0 + (1.0 - c.0) * k, c.1 + (1.0 - c.1) * k, c.2 + (1.0 - c.2) * k);
+                    }
+                    if d > -1.8 { c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35); }
+                    let p = (x - cx, y - cy);
+                    let sh = (p.0 - 1.4, p.1 - 1.6);
+                    if pickup_icon(kind, sh) { c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35); }
+                    if pickup_icon(kind, p) {
+                        c = if kind == Pickup::Life { (0.85, 0.08, 0.15) } else { (1.0, 1.0, 1.0) };
+                    }
+                    cr += c.0; cg += c.1; cb += c.2; cov += 1.0;
+                }
+            }
+            if cov > 0.0 {
+                let k = |v: f32| (v / cov * 255.0).min(255.0) as u8;
+                img.set_rgba(px, py, k(cr), k(cg), k(cb), (cov / (N * N) as f32 * 255.0) as u8);
+            }
+        }
+    }
+    img.encode_png()
+}
+
 /// Steel-plated brick: takes two hits to break. A cool, riveted metal tone
 /// keeps it visually distinct from the six single-hit color rows, and the
 /// `cracked` variant (shown after the first hit) darkens it and adds a
@@ -743,6 +841,10 @@ pub fn generate() -> Vec<Asset> {
     vec![
         ("images/paddle.png", paddle()),
         ("images/ball.png", ball()),
+        ("images/drop_wide.png", pickup(Pickup::Wide)),
+        ("images/drop_narrow.png", pickup(Pickup::Narrow)),
+        ("images/drop_slow.png", pickup(Pickup::Slow)),
+        ("images/drop_life.png", pickup(Pickup::Life)),
         ("images/ball_shade.png", ball_shade()),
         ("images/brick_red.png",    brick((220, 60, 60))),
         ("images/brick_orange.png", brick((220, 140, 40))),

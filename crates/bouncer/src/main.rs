@@ -45,7 +45,8 @@ const BALL_SPEED_MAX: f32 = 420.0;
 
 // ---- loot drops -------------------------------------------------------
 const MAX_DROPS: usize = 8;
-const DROP_SIZE: f32 = 14.0;
+const DROP_W: f32 = 32.0;
+const DROP_H: f32 = 18.0;
 const DROP_SPEED: f32 = 120.0;
 const EFFECT_DURATION: f32 = 8.0;
 const PAD_W_WIDE: f32 = 130.0;
@@ -514,7 +515,7 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
 
             // 30% chance to spawn a loot drop
             if rand() % 10 < 3 {
-                let drop_x = bx + BRICK_W as f32 / 2.0 - DROP_SIZE / 2.0;
+                let drop_x = bx + BRICK_W as f32 / 2.0 - DROP_W / 2.0;
                 let drop_kind = match rand() % 10 {
                     0..=2 => DropKind::Wide,
                     3..=5 => DropKind::Slow,
@@ -538,7 +539,7 @@ fn update_drops(g: &mut Game, dt: f32) {
     for d in pool_iter_mut(&mut g.drops) {
         d.y += DROP_SPEED * dt;
         if d.y > WIN_H as f32 { d.active = false; continue; }
-        if rects_overlap(d.x, d.y, DROP_SIZE, DROP_SIZE,
+        if rects_overlap(d.x, d.y, DROP_W, DROP_H,
                          g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32) {
             d.active = false;
             match d.kind {
@@ -580,7 +581,7 @@ fn update_over(g: &mut Game, dt: f32) {
     g.start_game();
 }
 
-fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 8]) {
+fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 8], drops: &[Texture2D; 4]) {
     for i in 0..BRICK_TOTAL {
         if !g.bricks[i].alive { continue; }
         let r = i as i32 / BRICK_COLS;
@@ -590,22 +591,10 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
         blip.draw_texture(&brick[g.bricks[i].kind], bx, by, BRICK_W as f32, BRICK_H as f32);
     }
 
-    // Draw loot drops
-    let s = DROP_SIZE;
+    // Pickups sway as they fall.
     for d in pool_iter(&g.drops) {
-        let (x, y) = (d.x, d.y);
-        match d.kind {
-            DropKind::Wide   => blip.draw_rect(x, y + s * 0.3, s, s * 0.4, BLIP_GREEN),
-            DropKind::Narrow => blip.draw_rect(x + s * 0.3, y, s * 0.4, s, BLIP_RED),
-            DropKind::Slow   => {
-                blip.draw_rect(x, y + s * 0.3, s, s * 0.4, BLIP_CYAN);
-                blip.draw_rect(x + s * 0.3, y, s * 0.4, s, BLIP_CYAN);
-            }
-            DropKind::Life   => {
-                blip.draw_rect(x, y + s * 0.3, s, s * 0.4, BLIP_YELLOW);
-                blip.draw_rect(x + s * 0.3, y, s * 0.4, s, BLIP_YELLOW);
-            }
-        }
+        let phase = d.y * 0.045 + d.x;
+        blip.draw_texture_cell(&drops[d.kind as usize], 0, 1, 0, 1, d.x, d.y, DROP_W, DROP_H, phase.sin() * 0.16);
     }
 
     // Draw active effect indicators
@@ -675,6 +664,12 @@ fn conf() -> blip::macroquad::window::Conf {
 }
 
 const PADDLE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/paddle.png"));
+const DROP_PNGS: [&[u8]; 4] = [
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_wide.png")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_narrow.png")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_slow.png")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_life.png")),
+];
 const BALL_SHADE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ball_shade.png"));
 const BALL_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ball.png"));
 const BRICK_RED_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_red.png"));
@@ -736,6 +731,11 @@ async fn main() {
     let paddle = load_png(PADDLE_PNG);
     let ball = load_png(BALL_PNG);
     ball.set_filter(FilterMode::Linear);
+    let drops = DROP_PNGS.map(|b| {
+        let t = load_png(b);
+        t.set_filter(FilterMode::Linear);
+        t
+    });
     let ball_shade = load_png(BALL_SHADE_PNG);
     ball_shade.set_filter(FilterMode::Linear);
     let brick = [
@@ -786,6 +786,9 @@ async fn main() {
             shot_frame += 1;
             if shot_frame == 1 {
                 g.start_game();
+                for (i, kind) in [DropKind::Wide, DropKind::Narrow, DropKind::Slow, DropKind::Life].into_iter().enumerate() {
+                    pool_spawn(&mut g.drops, Drop { x: 90.0 + i as f32 * 90.0, y: 250.0 + i as f32 * 25.0, active: true, kind });
+                }
             }
         }
 
@@ -804,7 +807,7 @@ async fn main() {
             State::Win   => draw_win(&blip, g.sess.level),
             State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
             State::Launch | State::Play | State::Dead => {
-                draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick);
+                draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick, &drops);
             }
         }
 
