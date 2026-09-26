@@ -2729,7 +2729,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    A game that never seats two (data-seats="1") now gives station one the
    whole bar and drops the dead station and its unused caps. Sizes are
    visual; touches also get 12-14px of slop (blip_controller.js). */
-@media (max-width: 560px) {
+@media all {
   :root[data-layout="upright"][data-controls="pad"][data-players="1"] #topbar.kiosk-bar,
   :root[data-layout="upright"][data-controls="pad"][data-players="1"] .kiosk-bar-main {
     height: calc(128px + env(safe-area-inset-bottom, 0px));
@@ -2757,7 +2757,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* A fighter seats two, so both stations stay; they just use what the
    half-width bar has (caps 2x2), and the bar grows to seat the taller cross. */
-@media (max-width: 560px) {
+@media all {
   :root[data-layout="upright"][data-controls="pad"][data-players="2"] #topbar.kiosk-bar,
   :root[data-layout="upright"][data-controls="pad"][data-players="2"] .kiosk-bar-main {
     height: calc(128px + env(safe-area-inset-bottom, 0px));
@@ -2777,7 +2777,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* Same for the joystick deck: one station, bigger caps (and, since every
    deck dimension hangs off --cap, a bigger stick), no unused caps. */
-@media (max-width: 560px) {
+@media all {
   :root[data-layout="upright"][data-controls="stick"][data-players="1"][data-caps="4"] { --cap: 54px; }
   :root[data-layout="upright"][data-controls="stick"][data-players="1"] #topbar.kiosk-bar,
   :root[data-layout="upright"][data-controls="stick"][data-players="1"] .kiosk-bar-main {
@@ -2875,10 +2875,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-players="1"][data-open] .kiosk-bar > .deck-panel::after { animation: none; --on: 1; }
 }
 
-/* One seat on a phone: station one owns the bar, so its lamp sits in the
-   clear middle and station two's is gone with the station. */
-@media (max-width: 560px) {
-  :root[data-layout="upright"][data-players="1"] .kiosk-bar > .deck-panel::before { left: 50%; }
+/* One player: station two, and its lamp, are gone. */
+@media all {
   :root[data-layout="upright"][data-players="1"] .kiosk-bar > .deck-panel::after { display: none; }
 }
 
@@ -2933,7 +2931,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    the thumbs. Everything is centred on the bar's vertical middle; --ctl-cx
    is the cross / base centre measured from the station's left edge and
    --ctl-pr the caps' right margin. */
-@media (max-width: 560px) {
+@media all {
   :root[data-layout="upright"][data-caps="4"] { --ctl-cx: 40px; --ctl-pr: 10px; }
   :root[data-layout="upright"][data-caps="4"][data-players="1"] { --ctl-cx: 64px; --ctl-pr: 22px; }
 
@@ -2971,7 +2969,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* Caps the same size and spacing as the pad's (58 / 22 alone, 42 / 8 with
    two stations, shrinking with the pad). */
-@media (max-width: 560px) {
+@media all {
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="1"] { --cap: 54px; }
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] { --cap: 40px; }
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="1"] :is(#topbar, #kiosk-bar) .fire-buttons.four { gap: 8px 22px; }
@@ -2986,7 +2984,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* Two stations share 171px on a 375px phone: sizes tuned so cross + caps fit
    a half with a little air, in both controllers. */
-@media (max-width: 560px) {
+@media all {
   :root[data-layout="upright"][data-caps="4"][data-players="2"] { --ctl-cx: 36px; --ctl-pr: 6px; }
   :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad { --sf-btn: 40px; --sf-dpad: 60px; }
 }
@@ -3007,7 +3005,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    deck, so the size is a share of what one station (half the bar) has
    left after its margins; --cap, --dpad and the stick's boot (1.12 cap)
    all derive from it. */
-@media (max-width: 560px) {
+@media all {
   :root[data-layout="upright"][data-caps="4"][data-controls][data-players] {
     --cap: clamp(32px, calc(0.29 * (50vw - 40px)), 54px);
     --dpad: clamp(46px, calc(0.42 * (50vw - 40px)), 92px);
@@ -3025,4 +3023,17 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players] :is(#topbar, #kiosk-bar) .fire-buttons.four {
     gap: 8px;
   }
+}
+
+/* One deck at every width: on a wide screen the panel is a centred slab the
+   size of a big phone's, so the equipment sits where it does everywhere. */
+:root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel {
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+}
+/* Stick base as wide as the cross, so the two controllers' caps line up. */
+:root[data-layout="upright"][data-caps="4"] .stick-base { width: var(--dpad, var(--boot)); margin: 0; }
+:root[data-layout="upright"][data-caps="4"] .deck-side {
+  padding-left: calc(var(--ctl-cx) - var(--dpad, var(--boot)) / 2);
 }
