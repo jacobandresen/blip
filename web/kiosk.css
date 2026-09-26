@@ -2998,10 +2998,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    all derive from it. */
 @media all {
   :root[data-layout="upright"][data-caps="4"][data-controls][data-players] {
-    --cap: clamp(32px, calc(0.29 * (50vw - 57px)), 54px);
-    --dpad: clamp(46px, calc(0.42 * (50vw - 57px)), 92px);
+    --cap: clamp(32px, calc(0.29 * (50vw - 63px)), 54px);
+    --dpad: clamp(46px, calc(0.42 * (50vw - 63px)), 92px);
     --ctl-cx: calc(6px + var(--dpad) / 2);
-    --ctl-pr: 10px;
+    --ctl-pr: 16px;
   }
   :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players] :is(#snes-pad, #snes-pad-p2) {
     --sf-btn: var(--cap);
@@ -3091,3 +3091,25 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 /* no reflection puddle: the two controllers now share one plain part */
 :is(#topbar, #kiosk-bar) .arcade-btn::after { display: none; }
+
+/* A slimmer plate behind the caps, so the group has air to the panel's corner
+   (the right margin above is wider too). */
+:is(#topbar, #kiosk-bar) .fire-buttons.four::before {
+  inset: calc(var(--cap) * -0.10) calc(var(--cap) * -0.09);
+  border-radius: calc(var(--cap) * 0.36);
+}
+:is(#topbar, #kiosk-bar) .snes-face.four::before {
+  inset: calc(var(--cap) * -0.10) calc(var(--cap) * -0.09);
+  border-radius: calc(var(--cap) * 0.36);
+}
+
+/* Lamps go under their controller: level with each other, centred on the
+   cross / stick base, in the panel's lower part. */
+:root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel::before,
+:root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel::after {
+  top: calc(50% + var(--dpad) / 2 + 6px);
+}
+:root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel::before { left: var(--ctl-cx); }
+:root[data-layout="upright"][data-caps="4"][data-players="2"] .kiosk-bar > .deck-panel::after {
+  left: calc(50% + var(--ctl-cx) + var(--mid) / 2);
+}
