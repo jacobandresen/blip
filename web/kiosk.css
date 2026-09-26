@@ -2329,24 +2329,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset 0 -2px 3px rgba(255, 255, 255, 0.2);
 }
 
-/* Gloss black carries a smear of what stands on it. */
-.stick-base::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 78%;
-  height: 22%;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at 50% 0%,
-    rgba(255, 96, 72, 0.46) 0%, rgba(214, 60, 40, 0.22) 45%, transparent 76%);
-  filter: blur(3px);
-  transform: translate(calc(-50% + var(--dx) * 9px), 18%);
-  transition: transform 55ms ease-out;
-  pointer-events: none;
-  z-index: -1;
-}
-
 /* Each cap's own reflection, pooled on the panel just below its rim and
    taking that cap's colour. currentColor is set per cap below, so one
    rule serves a red row and a blue one. */
@@ -2904,3 +2886,43 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-layout="landscape"] .kiosk-bar > .deck-panel::before { left: max(14px, env(safe-area-inset-left, 0px)); top: 56px; transform: none; }
 :root[data-layout="landscape"] .kiosk-bar > .deck-panel::after { left: auto; right: max(14px, env(safe-area-inset-right, 0px)); top: 56px; transform: none; }
 :root[data-layout="landscape"][data-seats="1"] .kiosk-bar > .deck-panel::after { display: none; }
+
+/* ---- Joystick base: symmetric, and centred in the bar ---- */
+
+/* The washer holds a rubber gaiter, drawn flat in the deck plane so the
+   whole ring is visible (anything of the upright boot below the pivot line
+   would be cut off by the deck itself). A short cone of the same rubber
+   rises with the shaft and leans with it. */
+.stick-boot::before {
+  clip-path: none;
+  border-radius: 50%;
+  inset: 19%;
+  background: radial-gradient(circle at 44% 38%, #5a5a63 0%, #393940 34%, #1c1c21 66%, #08080a 100%);
+  box-shadow:
+    0 0 0 1.5px #030304,
+    inset 0 2px 3px rgba(255, 255, 255, 0.10),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.6);
+}
+.stick-handle::before {
+  left: calc(var(--boot, 50px) * -0.15);
+  width: calc(var(--boot, 50px) * 0.30);
+  height: calc(var(--boot, 50px) * 0.26);
+  bottom: 0;
+  border-radius: 0;
+  clip-path: polygon(24% 0, 76% 0, 100% 100%, 0 100%);
+  background: linear-gradient(90deg, #17171b 0%, #4a4a52 34%, #2a2a30 62%, #0e0e11 100%);
+  box-shadow: none;
+}
+
+/* Upright: the boot's centre is the bar's vertical centre. The base fills
+   the bar's height instead of towering over it; the ball and shaft rise
+   from the pivot and may overlap the game. */
+:root[data-caps="4"] { --boot: calc(var(--cap) * 1.12); }
+:root[data-layout="upright"][data-caps="4"] .deck-side { align-self: stretch; }
+:root[data-layout="upright"][data-caps="4"] .stick-base { height: 100%; }
+:root[data-layout="upright"][data-caps="4"] .stick-boot { bottom: calc(50% - var(--boot) / 2); }
+:root[data-layout="upright"][data-caps="4"] .stick-handle { bottom: 50%; }
+:root[data-layout="upright"][data-caps="4"] .stick-base::before {
+  bottom: calc(50% - var(--boot) / 2 - 6px);
+  height: calc(var(--boot) * 0.5);
+}

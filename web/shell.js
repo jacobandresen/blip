@@ -389,15 +389,16 @@ function deckCover(bar) {
   // bottom third is ever inked, so reserving the box gave the deck 46px
   // of empty screen and the pad 78.
   var parts = document.querySelectorAll(
-    '#topbar .stick-ball, #topbar .stick-boot, #topbar .fire-buttons, ' +
+    '#topbar .stick-boot, #topbar .fire-buttons, ' +
     '#topbar .snes-dpad, #topbar .snes-face, ' +
     '#topbar #paddle-dial, #topbar #paddle-dial-p2');
   for (var i = 0; i < parts.length; i++) {
     var r = parts[i].getBoundingClientRect();
     if (r.height > 0 && r.top < top) top = r.top;
   }
-  // A few pixels of margin: the ball rises as the stick leans. If the
-  // deck has not been built yet there is nothing to measure, so fall
+  // A few pixels of margin. The ball is left out on purpose: it floats
+  // over the game, and the picture should not shrink to make room for it.
+  // If the deck has not been built yet there is nothing to measure, so fall
   // back to the bar.
   if (top >= window.innerHeight) return Math.ceil(bar.offsetHeight);
   return Math.ceil(window.innerHeight - top) + 10;
