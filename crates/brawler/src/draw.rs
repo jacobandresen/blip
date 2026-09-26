@@ -598,9 +598,8 @@ struct Hide {
     tone: f32,
     /// Blown toward white for the frames a hit is frozen on.
     flash: f32,
-    /// One breath, -1 to 1. The ribcage is the only part of a fighter
-    /// big enough to show it, so the number has to reach the drawing
-    /// and not stop at the skeleton.
+    /// One breath, -1..1: a slow cycle plus a faster ripple that grows with exertion. Rates are fixed
+    /// and only amplitude changes, so a blow landing never skips the phase.
     breath: f32,
     /// How hard this fighter is working, 0 to 1. Sweat, and how deep
     /// the breathing under it is.
@@ -1324,31 +1323,7 @@ impl Pose {
     }
 }
 
-/// The neck, derived rather than posed: the spine is one bone, and the
-/// neck rides most of the way up it and a little behind. Square to the
-/// spine, so the shoulders stay behind the chin upright and rotate with
-/// the body in a lean.
-/// One foot through one step, as (how far forward of its base, how far
-/// off the floor).
-///
-/// The old cycle was a sine on both, which puts the foot at its
-/// rearmost travelling backwards *fast* — exactly when it is supposed
-/// to be standing still on the ground. Measured, the lead foot slid a
-/// quarter of the distance the fighter walked: a moonwalk under a good
-/// pair of legs.
-///
-/// A foot is planted for half the cycle and swinging for the other
-/// half. While it is planted it slides backwards at exactly the speed
-/// the body moves forwards, which is what standing on it means, and
-/// that is what fixes the skate: `STEP` is tied to `STRIDE` so the two
-/// cancel. While it swings it lifts, goes forward twice as fast, and
-/// eases in and out of both ends so it does not snap.
-///
-/// The stride is as long as the rear leg can reach and no longer: at
-/// the back of its step that leg is nearly straight, and a step past
-/// that is a leg the solver has to stretch — which it will not, so the
-/// foot simply stops short of where the pose asked for it and the
-/// skate comes back by another door.
+/// The neck, derived from the spine: most of the way up and a little behind, square to it.
 pub(crate) const STRIDE: f32 = 0.1208;  // radians of cycle per pixel travelled
 pub(crate) const STEP: f32 = 13.0;      // = (2*PI/STRIDE) / 4, or the foot skates
 pub(crate) fn foot_cycle(ph: f32, lift: f32) -> (f32, f32) {
@@ -1362,6 +1337,7 @@ pub(crate) fn foot_cycle(ph: f32, lift: f32) -> (f32, f32) {
     }
 }
 
+/// The neck, derived from the spine: most of the way up and a little behind, square to it.
 const SPINE: f32 = 0.73;
 const SHOULDERS_BACK: f32 = 2.4;
 
@@ -1369,84 +1345,20 @@ fn neck_of(q: &Pose) -> P {
     let (dx, du) = (q.head.f - q.hip.f, q.head.u - q.hip.u);
     let len = (dx * dx + du * du).sqrt().max(0.001);
     let (ux, uu) = (dx / len, du / len);
-    // Square to the spine, pointing back along the body.
     p(q.hip.f + ux * len * SPINE - uu * SHOULDERS_BACK,
       q.hip.u + uu * len * SPINE + ux * SHOULDERS_BACK)
 }
 
-/// The stance: weight back, knees bent, both hands up, side on.
-///
-/// This is the frame the whole game departs from and returns to, so it
-/// is worth being fussy about. A fighter stands side-on with the lead
-/// foot forward and the rear foot turned out; the hands are at chin
-/// height, the lead one further out. Everything else below is this,
-/// moved.
-/// The stance, with `breath` running from -1 to 1 over one slow cycle.
-///
-/// A fighter waiting is never still. The weight rocks between the feet,
-/// the knees give and take it, the shoulders roll against the hips and
-/// the guard drifts — all of it small, none of it in phase. Driving
-/// every part off one sine wave makes a figure bob like a float on
-/// water; offsetting them is what turns it into someone breathing.
+/// The stance: weight back, knees bent, both hands up, side on. Everything departs from and returns to this.
+/// `breath` runs -1..1 over one slow cycle; each part follows it at its own phase and scale, so it reads as breathing, not a bobbing float.
 fn stance(breath: f32) -> Pose {
-    // `breath` is one slow cycle. Everything here is driven off it at a
-    // different phase and a different scale, because a figure whose
-    // parts all rise and fall together is a float bobbing on water.
-    //
-    // The bounce runs at twice the breath: a fighter's knees give and
-    // take the weight faster than they breathe. The shoulders roll
-    // against the hips rather than with them, which is what a torso
-    // does when the weight shifts under it. And the guard drifts on its
-    // own, slowest of all, because hands held up get heavy.
     let bob = (breath * 2.0).clamp(-1.0, 1.0);
     let roll = -breath;
     Pose {
-        // The skeleton's part of the breath stays exactly as small as
-        // it was. An attack is posed from this stance and solved onto
-        // an arm already at full stretch, so a shoulder rocked one
-        // pixel too far costs the fist that pixel — see
-        // `what_you_see_is_what_can_hit_you`. The breathing a player
-        // actually sees is the ribcage in `draw_torso`, which swells
-        // and empties without moving a single joint.
         hip: p(breath * 1.2, HIP_U - 1.0 + bob * 0.9),
-        // Chin forward. A fighter on guard leans into the fight: the
-        // head comes out over the front foot while the shoulders stay
-        // back behind it, and since the shoulders are set back off the
-        // spine by a fixed amount (see `neck_of`) moving the head
-        // forward is the whole of that shape.
         head: p(2.0 + roll * 1.6, HEAD_U - 0.4 + bob * 0.6),
-        // A guard, measured off a photograph of one rather than
-        // guessed at: both fists up by the jaw, the upper arms hanging
-        // almost straight down and the elbows tucked in at the ribs, so
-        // the forearms finish near vertical. That shape is what makes
-        // it read as a guard — hands held out in front at chest height,
-        // which is what this was, is a man offering to shake hands.
-        //
-        // The near fist sits a little lower and further forward than
-        // the far one, so that two fists can be told from one.
-        // Fists just below the jaw and forward of it, not level with
-        // it. A real guard puts them beside the face, but a face seen
-        // from the side is fifteen pixels wide and a forearm is
-        // thirteen — level with the jaw, the guard simply deletes the
-        // head. Dropping them a little keeps the shape of a guard and
-        // leaves a face to read it on.
-        // Lead fist out and low, only the rear one up. Held as a
-        // boxer's guard — both fists at the jaw — the forearms lie
-        // straight across the chest and cover the jacket, the belt and
-        // every read that depends on which way the body is turned.
-        // Up and down, not in and out. How far the lead fist sits from
-        // the body is the reach every attack is measured against, and
-        // breathing is not allowed a vote in it.
         lead_hand: p(35.0 + breath * 1.4, 77.0 + bob * 2.0),
         rear_hand: p(12.0 + breath * 0.8, 76.0 + bob * 1.6),
-        // The feet stay planted. Weight moving between them is the
-        // point; feet sliding about is a fighter who has lost it.
-        //
-        // Wide, though. A fighting stance is a good deal wider than
-        // shoulders — something like two fifths of the fighter's own
-        // height between the feet — and it is the base the low hips
-        // above are sitting on. Narrow feet under bent knees is a
-        // squat; wide feet under bent knees is a guard.
         lead_foot: p(24.0, 0.0),
         rear_foot: p(-22.0, 0.0),
         open: false,
@@ -1470,31 +1382,14 @@ fn crouched(breath: f32) -> Pose {
 /// way in. Reading it off `vy` means every jump height gets the right
 /// shape without knowing how long it lasts.
 fn airborne_pose(vy: f32) -> Pose {
-    // +1 rising as hard as a jump ever rises, 0 at the apex, -1 falling.
     let r = (-vy / -JUMP_VY).clamp(-1.0, 1.0);
     let rise = r.max(0.0);
     let fall = (-r).max(0.0);
-    // Weightlessness, peaking at the top of the arc. Eased, because the
-    // tuck is a thing the body does, not a thing the parabola does.
     let tuck = 1.0 - r.abs();
     let tuck = tuck * tuck * (3.0 - 2.0 * tuck);
     Pose {
         hip: p(-2.0 + 2.0 * fall, 48.0 + 4.0 * tuck),
-        // Chin down and forward on the way up, head coming back over
-        // the shoulders on the way down to spot the landing.
         head: p(-3.0 - 4.0 * rise + 3.0 * fall, 99.0 + 3.0 * tuck),
-        // The arms threw the jump: still swung up and out at take-off,
-        // in tight at the apex, and reaching out for balance on the
-        // way down.
-        //
-        // Both hands stay well clear of their own shoulders, which is
-        // not a matter of taste. The elbow is a hinge with a stop in
-        // it, and a hand asked to sit closer to the shoulder than a
-        // folded arm can reach gets pushed back out to the nearest
-        // legal distance along whatever direction it happened to be —
-        // a direction that spins wildly for a small change in a target
-        // that close. That is what the old held jump pose asked for,
-        // and it only looked still because nothing about it moved.
         lead_hand: p(24.0 + 2.0 * rise + 6.0 * fall, 68.0 + 14.0 * rise - 2.0 * fall),
         rear_hand: p(8.0 + 2.0 * rise + 2.0 * fall, 60.0 + 16.0 * rise - 4.0 * fall),
         lead_foot: p(14.0 + 4.0 * tuck + 6.0 * fall, 8.0 + 24.0 * tuck),
@@ -1505,36 +1400,11 @@ fn airborne_pose(vy: f32) -> Pose {
 
 /// Flat on the floor, head away from whoever put them there.
 fn floored() -> Pose {
-    // Flat out, head away from whoever put them there.
-    //
-    // Everything is low: a head resting on boards has its centre one
-    // head-radius off them, not twenty pixels up. And the limbs are
-    // deliberately spread *in height* — near arm on the floor, far arm
-    // across the chest, far leg out along the ground, near knee up.
-    // Laid at one height they stacked into a heap of white capsules
-    // with no readable head, arms or legs in it, which is what a body
-    // on the floor must never be: the one frame where the player needs
-    // to see at a glance that somebody is down.
-    //
-    // The raised knee is doing most of the work. It is the only part
-    // above the body line, so it is what makes the silhouette read as a
-    // person lying down rather than as a dropped bundle.
     Pose {
         hip: p(8.0, 13.0),
         head: p(-43.0, 9.5),
-        // Both arms lie down the body toward the feet, and neither goes
-        // out past the head.
-        //
-        // The arms are drawn after the head — they are in front of it —
-        // so an arm flung out over the skull simply erases the face,
-        // and the one part of a downed fighter a player must be able to
-        // find is the head. One arm along the side, one bent across the
-        // chest: nothing crosses.
         lead_hand: p(30.0, 8.0),
         rear_hand: p(8.0, 26.0),
-        // The near knee up. It is the only thing above the body line
-        // and it is doing most of the work: without it the silhouette
-        // is a horizontal bar, and a horizontal bar is not a person.
         lead_foot: p(26.0, 6.0),
         rear_foot: p(62.0, 8.0),
         open: false,
@@ -1548,51 +1418,16 @@ fn extension(f: &Fighter, m: &MoveData) -> f32 {
     let end = start + m.active * F;
     if f.t < start {
         let k = (f.t / start.max(0.0001)).clamp(0.0, 1.0);
-        // Anticipation.
-        //
-        // Nothing a body does starts from rest and goes straight where
-        // it is going. A punch draws back before it goes out, a kick
-        // settles onto the support foot before the other leg leaves the
-        // floor — the coil is what the blow is thrown *from*, and it is
-        // also what a defender reads. Without it every attack began at
-        // dead stop and accelerated forward, which is how a machine
-        // moves, not a person.
-        //
-        // So the first third of the startup runs slightly *negative*:
-        // the pose extrapolates back past the guard, the body loads,
-        // and only then does it uncoil. It returns to zero exactly
-        // where the drive begins, so nothing jumps.
         const COIL: f32 = 0.28;
         if k < COIL {
             return -0.16 * (std::f32::consts::PI * k / COIL).sin();
         }
         let k = (k - COIL) / (1.0 - COIL);
-        // Ease in: the hand accelerates rather than sliding out at a
-        // constant rate, which is the whole difference between a punch
-        // and an extending pole.
-        //
-        // Accelerate out of the coil and ease off as the joint locks,
-        // which is what a limb thrown to full extension does — it
-        // cannot arrive at speed, the knee stops it.
-        //
-        // It has to reach exactly 1.0 as the startup ends. It used to
-        // stop at 0.82 and jump to full on the first active frame: the
-        // leg covered the last fifth of a roundhouse in one frame,
-        // fifty pixels of foot with no picture in between, on the frame
-        // the blow lands. That single discontinuity was most of what
-        // made the kick look wrong — the eye never saw the leg arrive,
-        // only that it had.
-        //
-        // Squaring it instead put all the speed at the end and the foot
-        // moved half again as fast as a real one can, so it is eased at
-        // both ends now.
         k * k * (3.0 - 2.0 * k)
     } else if f.t <= end {
         1.0
     } else {
         let k = ((f.t - end) / (m.recovery * F).max(0.0001)).clamp(0.0, 1.0);
-        // Back, and a little past: the muscles that pulled the limb
-        // home are still pulling when it arrives. Mirrors the coil.
         const SNAP: f32 = 0.6;
         let back = (k / SNAP).min(1.0);
         let home = 1.0 - back * back * (3.0 - 2.0 * back);
@@ -1606,11 +1441,6 @@ fn extension(f: &Fighter, m: &MoveData) -> f32 {
 }
 
 /// Every number a kick is made of, in one place.
-///
-/// These are the knobs. Pulled out of the pose code so the shape of a
-/// kick can be argued about by changing eight numbers and looking at
-/// it, rather than by reading an animation routine and guessing which
-/// of its constants is the one making the leg look wrong.
 struct KickShape {
     /// How far the hips drive forward over the support foot.
     hip_drive: f32,
@@ -1637,72 +1467,41 @@ const KICK: KickShape = KickShape {
     lean: 17.0,
     air_lean: 0.3,
     plant: 5.0,
-    // Far enough forward that the solved knee comes up *level with the
-    // hip* rather than hanging below it. The knee is not placed, it is
-    // solved from the foot, so this number is the only way to raise it.
     knee_lead: 16.0,
     chamber: 31.0,
     chamber_air: 25.0,
 };
 
-/// Where a kick is in its two halves, as 0..1 for the chamber and then
-/// 1..2 for the extension.
-///
-/// A kick is not one motion at one speed. The knee comes up fast and
-/// then waits — that wait is the frame the defender is reading — and
-/// the shin snaps out of it. Driving both halves off the same even ramp
-/// gives a leg that unfolds at a constant rate, which is a mechanism
-/// opening, not a person kicking.
+/// Kick progress: 0..1 for the chamber, 1..2 for the extension. The knee comes up fast and waits (the frame a defender reads), then the shin snaps out.
 fn kick_curve(ext: f32) -> f32 {
     const SPLIT: f32 = KICK_SNAP;
     if ext < SPLIT {
-        // Up fast, easing out into the held chamber.
         let k = ext / SPLIT;
         1.0 - (1.0 - k) * (1.0 - k)
     } else {
-        // Out hard, accelerating all the way to contact.
         let k = (ext - SPLIT) / (1.0 - SPLIT);
         1.0 + k * k
     }
 }
 
 /// The pose an attack is in, `ext` of the way through it.
-/// How far the foot reaches past the ankle. Poses that aim a kick have
-/// to aim the *ankle* short by this much, or the toes end up out past
-/// the hitbox and the attack is drawn reaching further than it reaches.
-/// It tracks the toe in `draw_leg`, and the two have to move together.
+/// How far the foot reaches past the ankle. Kicks aim the ankle short by this much, or the toes
+/// overshoot the hitbox; keep in step with the toe in `draw_leg`.
 const FOOT: f32 = 12.6;
 
-/// The same thing for a punch: how far the front of the fist is past
-/// the wrist joint that carries it. Hands and feet are drawn big here
-/// — see `draw_leg` — and big enough that the overhang stopped being a
-/// rounding error: Brutus's fist stuck six pixels out past the end of
-/// his own jab, which is the game lying about its range in the one
-/// direction a player cannot forgive.
+/// Same for a punch: how far the fist front is past the wrist, so a jab never draws longer than its range.
 const FIST: f32 = 6.4;
 
 fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
     let end = p(BODY_W / 2.0 + m.reach, m.height);
-    // Aim the *joint* short by however far the hand or foot drawn on
-    // it sticks out past it, so the picture ends exactly where the
-    // hitbox does. Both scale with the fighter, because the drawing
-    // does: a heavyweight's fist is a heavyweight's fist.
     let bulk = f.arch().bulk;
     let tip = p(end.f - FIST * bulk, end.u);
     let toe_tip = p(end.f - FOOT * bulk, end.u);
 
-    // What the body does, rather than which button produced it: a
-    // fighter's jumping punch and their standing punch are the same
-    // shoulder doing the same thing, and Kestrel's special is a kick
-    // whatever the move table calls it.
     enum Shape { Punch(bool), Kick(bool, f32), Fly, Sweep, Throw, Bolt, Rush }
     let shape = match f.mv {
         MoveId::LowPunch | MoveId::HighPunch => Shape::Punch(false),
         MoveId::JumpPunch => Shape::Punch(true),
-        // Both heights are the same kick; the move's own `height` is
-        // what aims it, so nothing here has to know the difference. The
-        // high one leans further back, because a kick at head height
-        // needs more counterweight.
         MoveId::LowKick => Shape::Kick(false, 0.7),
         MoveId::HighKick => Shape::Kick(false, 1.25),
         MoveId::JumpKick => Shape::Kick(true, 1.0),
@@ -1712,86 +1511,36 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
         MoveId::Special => match f.arch().special {
             Special::ChiBolt => Shape::Bolt,
             Special::BullRush => Shape::Rush,
-            // A rising kick: the same roundhouse, thrown higher and
-            // with more of the body going up behind it.
             Special::TalonKick => Shape::Kick(false, 1.25),
         },
     };
 
     match shape {
-        // A straight lead punch. The shoulder turns over and the whole
-        // body steps into it — which is also the only way the fist
-        // reaches as far as the hitbox says it does.
         Shape::Punch(air) => {
             q.hip.f += if air { 12.0 } else { 5.0 } * ext;
-            // The shoulder turning over, which with one spine is the
-            // head going with it. It used to be written as the neck
-            // travelling further than the head — the boxer's trick of
-            // punching past your own chin — and what is left of that
-            // now is the fixed set-back of the shoulders.
             q.head.f += if air { 24.0 } else { 22.0 } * ext;
             if !air {
                 q.lead_foot.f += 5.0 * ext;
                 q.rear_foot.f -= 3.0 * ext;
             } else {
-                // The hip drives forward under a jumping punch, and the
-                // feet have to go with it — left where the jump put
-                // them they finish a foot behind the fighter and high,
-                // which is a pair of legs folded up behind the back.
                 q.lead_foot = p(q.hip.f + 14.0, q.lead_foot.u);
                 q.rear_foot = p(q.hip.f - 10.0, q.rear_foot.u.min(24.0));
             }
             q.rear_hand = q.rear_hand.to(p(q.rear_hand.f - 4.0, q.rear_hand.u - 22.0), ext);
             q.lead_hand = q.lead_hand.to(tip, ext);
         }
-        // The roundhouse. Knee up first, then the shin unfolds into the
-        // target while the torso falls back as a counterweight and the
-        // arms swing across. Without the chamber the leg sweeps out
-        // from the hip in one piece, and a leg that does that is not a
-        // leg.
-        // A roundhouse. Three sprite sheets were laid side by side for
-        // this — Ryu and Ken from the arcade original and Chun-Li from
-        // Super — and where they agree is what is drawn here.
-        //
-        // All three: the support leg goes dead straight and near
-        // vertical with the foot under the hips, the hips rise slightly
-        // rather than dropping, the chamber puts the knee at hip height
-        // with the shin hanging *down* off it, the extended leg keeps a
-        // little bend at the knee, and both arms stay in tight — one
-        // across the chest, one at the chin. Where they disagree is how
-        // far the torso falls back: Ryu commits about forty degrees,
-        // Ken twenty-five, Chun-Li barely twenty on the mid kick. The
-        // numbers below take the middle of that, which is what stops
-        // the pose looking either like a falling man or like a kick
-        // thrown from a bus queue.
         Shape::Kick(air, lift) => {
             let k = KICK;
             let back = if air { k.air_lean } else { 1.0 } * lift;
-            // Airborne there is no support leg to drive over, so the
-            // hips go further: a jump kick's reach is all body travel.
             let drive = if air { k.hip_drive + 9.0 } else { k.hip_drive };
             q.hip = p(q.hip.f + drive * ext, q.hip.u + k.hip_rise * ext);
             q.head.f -= k.lean * 1.25 * ext * back;
             q.head.u -= 1.4 * ext;
-            // The support foot travels in under the raised hips. It has
-            // to: the leg standing on it is only as long as it is, and
-            // leaving it behind was what stretched the *standing* leg
-            // by a fifth and made the whole move read as toppling over
-            // on a stilt.
             if !air {
                 q.rear_foot = p(-18.0 + (q.hip.f - k.plant - -18.0) * ext, 0.0);
             } else {
-                // Tucked under the hip, not folded behind it: the knee
-                // comes up in front and the shin hangs from it, which
-                // is what a trailing leg does in the air.
                 q.rear_foot = p(q.hip.f - 7.0, 26.0);
             }
-            // Knee up to hip height, shin hanging down off it, foot
-            // under the knee. Folding the foot up level with the hip
-            // instead lays the shin flat along the thigh, and two limb
-            // segments on top of each other are one shape — the leg
-            // stops being legible as a leg at exactly the moment a
-            // defender has to read which one is coming.
             let chamber = p(q.hip.f + k.knee_lead, if air { k.chamber_air } else { k.chamber });
             let kc = kick_curve(ext);
             q.lead_foot = if kc < 1.0 {
@@ -1799,62 +1548,26 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             } else {
                 chamber.to(toe_tip, kc - 1.0)
             };
-            // Arms in, not flung back. All three sheets keep the guard
-            // up through the whole kick; only the lead arm crosses.
-            // The arms drop and trail. In every photograph of a
-            // roundhouse the guard is *down* — both arms hanging
-            // across and behind the hips as counterweight — not held
-            // at the chest. A kick thrown with the hands still up is a
-            // kick nobody put their body into.
             q.lead_hand = q.lead_hand.to(p(30.0, 62.0), ext);
             q.rear_hand = q.rear_hand.to(p(-4.0, 44.0), ext);
         }
-        // Laid out behind the leg: hips driven forward, the kicking
-        // leg straight at the target and the other tucked under, with
-        // the shoulders back as counterweight. A jump kick chambers
-        // and snaps; this one commits the whole body and holds it.
         Shape::Fly => {
-            // Laid out behind the leg rather than sitting up behind it:
-            // hips driven forward and high, shoulders dropped back, so
-            // hip and heel make one line and the body is the shaft of
-            // it. A jump kick chambers and snaps; this one commits
-            // everything and holds it there.
             q.hip = p(q.hip.f + 21.0 * ext, q.hip.u + 7.0 * ext);
             q.head = p(q.head.f - 22.0 * ext, q.head.u - 13.0 * ext);
-            // The trailing leg streams out behind, nearly straight.
-            //
-            // It used to fold up: at full extension the foot sat forty
-            // pixels behind the hip and forty above it, which is a heel
-            // pulled to the backside — the one shape that makes a
-            // figure read as a bundle instead of a person, and the
-            // thing that made every air attack look like a ball. A
-            // trailing leg is allowed to be behind the fighter or high,
-            // and not both. See `no_leg_is_curled_up_behind_the_back`.
             q.rear_foot = p(q.hip.f - 24.0 - 10.0 * ext, 14.0 + 4.0 * ext);
             q.lead_foot = q.lead_foot.to(toe_tip, ext);
-            // One arm forward along the line, one back for balance.
             q.lead_hand = q.lead_hand.to(p(32.0, 70.0), ext);
             q.rear_hand = q.rear_hand.to(p(-28.0, 40.0), ext);
         }
-        // Down on the back leg, one hand on the floor, the front leg
-        // laid out flat along it.
         Shape::Sweep => {
             let hip_f = (tip.f - 52.0).clamp(2.0, 28.0);
-            // The hip does not sink as far as it used to. A sweep is
-            // nearly a kneel and the back knee comes down to the
-            // boards — but with the hip that low the folded rear leg
-            // had nowhere to put that knee except through the floor.
             q.hip = p(hip_f * ext, C_HIP + 3.0 * ext);
-            // Head down and back: the shoulders drop away from the
-            // leg that is going out, which is the counterweight.
             q.head = p(q.head.f - 4.0 * ext, C_HEAD - 7.0 * ext);
             q.rear_foot = p(-3.0, 2.0);
             q.lead_foot = q.lead_foot.to(toe_tip, ext);
             q.rear_hand = q.rear_hand.to(p(-26.0, 6.0), ext);
             q.lead_hand = q.lead_hand.to(p(34.0, 44.0), ext);
         }
-        // Both hands out, low and open. A throw drawn as a punch is the
-        // game lying about the one move a guard cannot stop.
         Shape::Throw => {
             q.open = true;
             q.hip.f += 4.0 * ext;
@@ -1864,9 +1577,6 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             q.rear_hand = q.rear_hand.to(p(tip.f - 6.0, tip.u - 8.0), ext);
         }
         Shape::Bolt => {
-            // Drawn from the hip and pushed out on both palms. The
-            // hands do not have to reach the hitbox here because the
-            // bolt carries it — see the spawn in update().
             q.open = true;
             q.hip = p(2.0, 51.0);
             q.lead_foot = p(21.0, 0.0);
@@ -1885,8 +1595,6 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
                 q.head.f += -6.0 + 14.0 * k;
             }
         }
-        // A charge behind a straight right: the whole body goes with it,
-        // which is what the forward velocity in update() is doing.
         Shape::Rush => {
             q.hip = p(8.0 * ext, HIP_U - 5.0 * ext);
             q.head.f += 20.0 * ext;
@@ -1899,15 +1607,8 @@ fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
 }
 
 /// The pose a fighter is in this frame.
-/// The pose a fighter is drawn in, including the tail of the one they
-/// were in a moment ago.
-///
-/// Actions change on a single frame — a guard becomes a chambered kick
-/// between one picture and the next — and a drawing that follows them
-/// exactly teleports. Everything below hands over across four frames
-/// instead, eased at both ends, which costs nothing in the rules (the
-/// hitbox still appears on the frame the move says) and is most of the
-/// difference between a figure that moves and a figure that cuts.
+/// The pose a fighter is drawn in, including the tail of the one before it: actions change on
+/// one frame, so the hand-over is eased across four frames (the hitbox still follows the move).
 pub(crate) fn pose_of(now: f32, f: &Fighter, idx: usize) -> Pose {
     let q = pose_now(now, f, idx);
     if f.blend <= 0.0 { return q; }
@@ -1916,9 +1617,6 @@ pub(crate) fn pose_of(now: f32, f: &Fighter, idx: usize) -> Pose {
     was.mv = f.prev_mv;
     was.t = f.prev_t;
     was.blend = 0.0;
-    // Put them back on the ground they were on: `airborne` reads `y`,
-    // and `y` here is where they are now, so a landing used to blend a
-    // guard into a guard and drop the whole shape of the jump.
     was.y = if f.prev_air { FLOOR_Y - 1.0 } else { FLOOR_Y };
     was.vy = f.prev_vy;
     let k = (1.0 - f.blend).clamp(0.0, 1.0);
@@ -1948,23 +1646,23 @@ pub(crate) fn breath_of(now: f32, f: &Fighter, idx: usize) -> f32 {
     (slow * (1.0 + 0.55 * hard) + pant * 0.42 * hard).clamp(-1.6, 1.6)
 }
 
+/// Time into a fall if this fighter is down: knocked down, or beaten by KO
+/// (who stays flat instead of kneeling; a time-up loser kneels).
+fn down_time(f: &Fighter) -> Option<f32> {
+    match f.act {
+        Act::Knockdown => Some(f.t),
+        Act::Defeat if f.health <= 0 => Some(f.t.min(0.6)),
+        _ => None,
+    }
+}
+
 fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
-    // One slow cycle per fighter, offset so two of them on screen are
-    // never breathing in step.
     let breath = breath_of(now, f, idx);
 
-    if f.act == Act::Knockdown {
-        // Thrown down, still, and then up again. Landing and rising are
-        // both blends rather than cuts, because a body that teleports
-        // between two poses is the one thing on screen a player cannot
-        // unsee.
+    if let Some(t) = down_time(f) {
         let down = floored();
-        if f.t < 0.22 {
-            // Off their feet. The hips go first and the legs come up
-            // after them, so it reads as being taken off the ground
-            // rather than as lying down on purpose — and the head is
-            // already falling while the feet are still in the air.
-            let k = (f.t / 0.22).clamp(0.0, 1.0);
+        if t < 0.22 {
+            let k = (t / 0.22).clamp(0.0, 1.0);
             let mut air = stance(0.0);
             air.hip = p(-6.0, 48.0);
             air.head = p(-40.0, 62.0);
@@ -1972,15 +1670,10 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
             air.rear_foot = p(22.0, 24.0);
             air.lead_hand = p(-8.0, 82.0);
             air.rear_hand = p(-30.0, 66.0);
-            // Falling: quick at first as the legs are swept, then the
-            // landing itself, which is the fastest part of it.
             return air.to(down, k * k);
         }
-        if f.t > 0.85 {
-            // Up onto one hand first, then onto the feet. The hand on
-            // the floor is what makes it a fighter getting up instead
-            // of a fighter being winched.
-            let k = ((f.t - 0.85) / 0.30).clamp(0.0, 1.0);
+        if t > 0.85 {
+            let k = ((t - 0.85) / 0.30).clamp(0.0, 1.0);
             let mut up = crouched(0.0);
             up.rear_hand = p(22.0, 16.0);
             up.lead_hand = p(28.0, 34.0);
@@ -1990,11 +1683,6 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
         return down;
     }
 
-    // Hitstun has no crouch of its own, so a fighter swept out of a
-    // crouch used to stand bolt upright on the frame the blow landed
-    // and then fold over — the body rose two feet and fell again inside
-    // a tenth of a second. Being hit while low keeps you low, which is
-    // both what happens and what the picture needs.
     let low = f.crouching()
         || (f.act == Act::Hitstun && matches!(f.prev_act, Act::Crouch))
         || (f.act == Act::Hitstun && f.prev_act == Act::Attack
@@ -2009,53 +1697,25 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
     };
 
     match f.act {
-        // Feet cycle with the ground rather than with the clock, so a
-        // walking fighter's feet do not skate: the phase is where they
-        // are, not how long they have been walking.
         Act::Walk => {
             let ph = f.x * f.facing * STRIDE;
             let s = ph.sin();
-            // The two feet are half a cycle apart: one plants as the
-            // other leaves. Their bases are far enough apart that a
-            // fighter's feet never cross — this is a stance being
-            // carried forward, not a stroll.
             let (lf, ll) = foot_cycle(ph, 9.0);
             let (rf, rl) = foot_cycle(ph + std::f32::consts::PI, 8.0);
             q.lead_foot = p(18.0 + lf, ll);
             q.rear_foot = p(-16.0 + rf, rl);
-            // The whole body drops twice per stride, as each leg takes
-            // the weight and gives under it.
             let sink = 1.4 + 1.4 * (2.0 * ph).cos();
             q.hip.u -= sink;
             q.head.u -= sink * 0.7;
-            // Shoulders turn against the hips. This is the whole
-            // difference between walking and being wheeled: the pelvis
-            // leads the stride and the ribcage answers it a beat late,
-            // and a torso carried squarely along on two moving legs
-            // reads as a mannequin on a trolley however good the legs
-            // are.
             q.hip.f += 1.4 * s;
             q.head.f -= 1.0 * s;
-            // Arms opposite the leg on their own side — contralateral,
-            // the way every walking animal on earth is put together.
-            // They used to swing a quarter cycle out of phase with the
-            // feet, which is neither with the legs nor against them.
             q.lead_hand.f -= 2.6 * s;
             q.rear_hand.f += 2.2 * s;
-            // And the hands ride the shoulders down. Left at a fixed
-            // height while the neck bobbed under them, the arms
-            // lengthened and shortened a little with every step.
             q.lead_hand.u -= sink * 0.7;
             q.rear_hand.u -= sink * 0.7;
         }
-        // Turtled up: weight off the front foot, shoulder raised, both
-        // forearms stacked in front of the head or the belly.
+        // Turtled up: weight off the front foot, forearms stacked before head or belly.
         Act::Block => {
-            // A guard is held, not welded. Every joint here was an
-            // absolute, which meant a blocking fighter stopped
-            // breathing — the one pose in the game a player looks at
-            // for whole seconds at a time was the only one that was
-            // perfectly still.
             let b = breath;
             if f.crouch_block {
                 q.lead_hand = p(25.0, 41.0 + b * 0.7);
@@ -2066,12 +1726,6 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
                 q.head = p(-8.0 - b * 0.7, HEAD_U - 2.0 + b * 0.4);
                 q.lead_hand = p(23.0 + b * 0.6, 88.0 + b * 0.8);
                 q.rear_hand = p(12.0 + b * 0.4, 74.0 + b * 0.6);
-                // Retreating is a walk. Holding away is both the block
-                // and the back-step, so this pose is what a fighter
-                // giving ground is drawn in — with the feet pinned it
-                // was a slide. The phase is where they are, not how
-                // long they have held it, so a fighter blocking on the
-                // spot keeps their feet still for free.
                 let ph = f.x * f.facing * STRIDE;
                 let sink = 1.0 + (2.0 * ph).cos();
                 let (lf, ll) = foot_cycle(ph, 7.0);
@@ -2084,12 +1738,8 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
                 q.rear_hand.u -= sink * 0.7;
             }
         }
-        // Snapped back off the blow: head first, then the shoulders,
-        // with the back foot skidding out to catch it.
+        // Snapped back off the blow: head first, back foot skidding out.
         Act::Hitstun => {
-            // A sag that holds for the stun, plus a ring that is the
-            // actual whiplash. The ring is zero at contact and gone in
-            // a fifth of a second, so stun timing is untouched.
             let sag = (1.0 - f.t * 6.0).clamp(0.30, 1.0);
             let ring = 0.32 * (-f.t * 8.0).exp() * ((f.t * 30.0).cos() - 1.0);
             let k = sag + ring;
@@ -2098,8 +1748,6 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
             q.head = p(q.head.f - 24.0 * k * drop, q.head.u - 1.6);
             q.lead_foot = p(q.lead_foot.f - 10.0, 0.0);
             q.rear_foot = p(q.rear_foot.f - 6.0, 0.0);
-            // The guard is knocked aside rather than teleported: the
-            // hands are pushed off wherever they already were.
             q.lead_hand = p(q.lead_hand.f - 9.0, q.lead_hand.u - 5.0);
             q.rear_hand = p(q.rear_hand.f - 13.0, q.rear_hand.u - 9.0);
         }
@@ -2108,43 +1756,21 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
             let ext = extension(f, &m);
             attack_pose(&mut q, f, &m, ext);
         }
-        // Won.
-        //
-        // Three beats rather than a held pose: the guard comes down and
-        // the fighter straightens, then the arm sweeps up, then it is
-        // held and breathing. A victory that is simply *on* the frame
-        // the round ends is a fighter who was already celebrating.
-        //
-        // The arm goes up and *forward*, not straight up. Raised
-        // vertically it was drawn through the head — the fist came out
-        // above the skull and the face was behind the sleeve, so the
-        // whole figure read as headless with a pole through it. A real
-        // arm raised in celebration swings out away from the head, and
-        // the only "out" a side view has is forward.
+        // Won: guard drops, the arm sweeps up and forward (raised straight it hides the face), then held.
         Act::Victory => {
             let t = f.t;
             let settle = (t / 0.30).clamp(0.0, 1.0);
             let raise = ((t - 0.26) / 0.34).clamp(0.0, 1.0);
-            // Ease the sweep, and let the hand trail the elbow by
-            // arriving later than the shoulder does.
             let sweep = raise * raise * (3.0 - 2.0 * raise);
             let bob = ((t - 0.6).max(0.0) * 2.2).sin() * 1.8;
 
-            // And they look up at it, which is what a person does.
             q.head = p(-1.5 + 2.0 * settle - 2.0 * sweep,
                        HEAD_U + 1.2 * settle + 1.5 * sweep + bob * 0.3);
             q.hip = p(0.0, HIP_U + 1.0 * settle);
             q.lead_foot = p(16.0 - 3.0 * settle, 0.0);
             q.rear_foot = p(-21.0 + 4.0 * settle, 0.0);
-            // Rear hand comes to rest on the hip.
             q.rear_hand = q.rear_hand.to(p(-4.0, 46.0), settle);
-            // Lead arm: guard, then down and back to load the swing,
-            // then up and forward. The dip is what makes it a swing
-            // rather than a hand appearing in the air.
             let load = p(20.0, 58.0);
-            // Far enough forward that the whole arm clears the head.
-            // Raised closer in, the sleeve crossed the face and the
-            // celebration was performed by a man with no head.
             let up = p(36.0, 120.0 + bob);
             q.lead_hand = if raise <= 0.0 {
                 q.lead_hand.to(load, settle)
@@ -2152,45 +1778,35 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
                 load.to(up, sweep)
             };
         }
-        // Lost: down on the back knee, head hanging.
         Act::Defeat => {
-            q.hip = p(-4.0, 31.0);
-            q.head = p(9.0, 67.0);
-            q.lead_foot = p(15.0, 0.0);
-            q.rear_foot = p(-15.0, 2.0);
-            q.lead_hand = p(17.0, 27.0);
-            q.rear_hand = p(-2.0, 15.0);
+            let fall = |from: f32, len: f32| {
+                let k = ((f.t - from) / len).clamp(0.0, 1.0);
+                k * k * (3.0 - 2.0 * k)
+            };
+            let (hips, slump) = (fall(0.0, 0.55), fall(0.2, 0.8));
+            let heave = (f.t * 2.4).sin() * slump;
+            q.hip = q.hip.to(p(-4.0, 30.0), hips);
+            q.head = q.head.to(p(25.0, 72.0 + heave * 0.8), slump);
+            q.lead_foot = q.lead_foot.to(p(22.0, 0.0), hips);
+            q.rear_foot = q.rear_foot.to(p(-34.0, 3.0), hips);
+            q.lead_hand = q.lead_hand.to(p(28.0, 28.0), slump);
+            q.rear_hand = q.rear_hand.to(p(0.0, 18.0 + heave * 0.5), slump);
         }
         _ => {}
     }
-    // The knees taking a landing: hips sink under the momentum and
-    // push back out, fast down and slower up. Drawn over whatever they
-    // do next, but not over an attack, which owns its own hips.
     if f.land > 0.0 && !f.airborne()
         && matches!(f.act, Act::Idle | Act::Walk | Act::Crouch | Act::Block) {
         let k = 1.0 - (f.land / LAND_ABSORB).clamp(0.0, 1.0);
-        // Peaks about a third of the way in and eases out of it, so the
-        // compression is quick and the push back up is not.
-        // A fighter who lands into a crouch has already spent most of
-        // the give they had: the hips are half as high to begin with
-        // and there is nowhere for the folded rear leg to put its knee
-        // except through the boards.
         let room = if low { 0.3 } else { 1.0 };
         let dip = (std::f32::consts::PI * k).sin() * (1.0 - k) * f.land_force * room;
         q.hip.u -= 9.0 * dip;
         q.head.u -= 6.5 * dip;
-        // The guard rides down with the shoulders rather than hanging
-        // in the air while the body drops out from under it.
         q.lead_hand.u -= 6.0 * dip;
         q.rear_hand.u -= 6.0 * dip;
-        // And the stance widens a little as the weight arrives on it.
         q.lead_foot.f += 2.0 * dip;
         q.rear_foot.f -= 2.0 * dip;
     }
 
-    // No foot goes through the floor. The coil at the start of an
-    // attack extrapolates back past the pose it starts from, which for
-    // a foot already standing on the boards means below them.
     if !f.airborne() && f.act != Act::Knockdown {
         q.lead_foot.u = q.lead_foot.u.max(0.0);
         q.rear_foot.u = q.rear_foot.u.max(0.0);
@@ -2198,21 +1814,8 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
     q
 }
 
-/// The whole fighter, smeared by whatever actually moved.
-///
-/// The idea is borrowed from Eulerian video magnification, which does
-/// not blur a picture: it takes the difference between now and a
-/// moment ago, amplifies *that*, and adds it back. Everything still
-/// stays still; only what changed is drawn again.
-///
-/// Applied to a skeleton it falls out almost for free. Pose the same
-/// fighter a few frames back, walk the bones in pairs, and draw a past
-/// bone only in proportion to how far it has travelled since. A torso
-/// crossing the stage at three hundred pixels a second lays down a
-/// faint body-length streak; the shin snapping out of the chamber lays
-/// down a bright one; a hand that has not moved contributes nothing
-/// and stays sharp. That is what a photograph of a fast kick looks
-/// like — a readable body with one limb smeared off the front of it.
+/// The whole fighter, smeared by what moved: pose the fighter a few frames back and draw each
+/// past bone in proportion to how far it has travelled since. Fast limbs streak, still ones stay sharp.
 fn draw_smear(blip: &Blip, f: &Fighter, now: f32, shift: f32, i: usize, c: BlipColor) {
     let here = skeleton(Rig::upright(f.x, f.y + shift, f.facing, f.facing),
         &pose_of(now, f, i));
@@ -2253,14 +1856,7 @@ fn draw_smear(blip: &Blip, f: &Fighter, now: f32, shift: f32, i: usize, c: BlipC
     }
 }
 
-/// Where the striking limb was a few frames ago, smeared behind it.
-///
-/// A blow that crosses sixty pixels in four frames is, at sixty frames
-/// a second, three pictures of a limb in three places — and the eye
-/// reads three pictures of a limb in three places as three limbs. The
-/// smear is what turns them back into one limb moving fast, and it is
-/// the single cheapest thing on this screen that makes an attack feel
-/// like it was thrown rather than extruded.
+/// Where the striking limb was a few frames ago, so a fast blow reads as one limb, not three.
 fn draw_trail(blip: &Blip, f: &Fighter, now: f32, rig: Rig, i: usize, trim: BlipColor) {
     if f.act != Act::Attack { return; }
     let m = f.scaled(move_data(f.mv));
@@ -2282,18 +1878,8 @@ fn draw_trail(blip: &Blip, f: &Fighter, now: f32, rig: Rig, i: usize, trim: Blip
     }
 }
 
-/// The fighter, flattened onto the floor.
-///
-/// Not a soft ellipse under the feet: the same skeleton, run through
-/// the same joint solver, projected by a rig with the height squashed
-/// and sheared toward the light. So the shadow kicks when the fighter
-/// kicks, and slides away and shrinks when they jump, because it *is*
-/// the fighter — there is one pose, and both drawings are made from it.
-///
-/// Drawn opaque rather than translucent. A shadow assembled from a
-/// dozen overlapping translucent strokes darkens wherever two limbs
-/// cross, which is the one thing real shadows never do; an opaque
-/// silhouette in a fixed colour has no seams in it at all.
+/// The fighter, flattened onto the floor: the same skeleton and solver, squashed and sheared
+/// toward the light, drawn opaque so overlapping limbs leave no seams.
 fn draw_shadow(blip: &Blip, rig: Rig, q: &Pose, bulk: f32, c: BlipColor) {
     let k = skeleton(rig, q);
     let b = bulk;
@@ -2312,13 +1898,8 @@ fn draw_shadow(blip: &Blip, rig: Rig, q: &Pose, bulk: f32, c: BlipColor) {
     blip.fill_circle(k.head.0, k.head.1, 7.5 * b, c);
 }
 
-/// Every joint of one fighter, in screen coordinates, after the solver
-/// has had its say.
-///
-/// This is the single answer to "where is this body". The fighter, the
-/// shadow and the motion smear are all drawn from it, and the anatomy
-/// tests are run against it — so if a knee is in the wrong place it is
-/// in the wrong place in exactly one function, and a test can say so.
+/// Every joint of one fighter in screen coordinates, after the solver. The fighter, shadow and
+/// smear are all drawn from it and the anatomy tests run against it.
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct Skeleton {
     pub hip: V,
@@ -2533,7 +2114,7 @@ fn pose_and_draw_lit(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f3
                      light: f32) {
     let f = *f;
     let a = f.arch();
-    let prone = f.act == Act::Knockdown && f.t < 0.9;
+    let prone = down_time(&f).is_some_and(|t| t < 0.9);
 
     let rig = Rig::upright(f.x, f.y + shift, f.facing, if prone { -f.facing } else { f.facing });
 
@@ -2570,8 +2151,8 @@ fn pose_and_draw_lit(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f3
 
     // Dust off the boards where a body lands. Knockdowns are the one
     // moment the floor is part of the fight.
-    if f.act == Act::Knockdown && f.t < 0.26 {
-        let k = (1.0 - f.t / 0.26).max(0.0);
+    if let Some(t) = down_time(&f).filter(|t| *t < 0.26) {
+        let k = (1.0 - t / 0.26).max(0.0);
         for j in 0..5 {
             let dx = (j as f32 - 2.0) * 13.0 - f.facing * 14.0;
             let rise = (1.0 - k) * 16.0;
@@ -3027,7 +2608,7 @@ fn draw_select(blip: &Blip, g: &Game) {
 #[cfg(feature = "gallery")]
 pub fn draw_gallery(blip: &Blip, now: f32) {
     blip.clear(BlipColor { r: 0.15, g: 0.16, b: 0.21, a: 1.0 });
-    let acts: [(&str, Act, MoveId); 17] = [
+    let acts: [(&str, Act, MoveId); 19] = [
         ("LOW PUNCH", Act::Attack, MoveId::LowPunch),
         ("HIGH PUNCH", Act::Attack, MoveId::HighPunch),
         ("LOW KICK", Act::Attack, MoveId::LowKick),
@@ -3045,6 +2626,8 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
         ("HITSTUN", Act::Hitstun, MoveId::LowPunch),
         ("KNOCKDOWN", Act::Knockdown, MoveId::LowPunch),
         ("VICTORY", Act::Victory, MoveId::LowPunch),
+        ("DEFEAT", Act::Defeat, MoveId::LowPunch),
+        ("KO", Act::Defeat, MoveId::LowPunch),
     ];
     // One move at a time, five frames of it across the screen. A pose
     // is only ever half the question — the other half is what it is on
@@ -3087,6 +2670,7 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
         // drawn, and sweat and the depth of their breathing are part of
         // that. A sheet of fighters at full health never shows either.
         f.health = (FIGHTERS[who].health as f32 * (0.62 - 0.13 * k as f32)) as i32;
+        if label == "KO" { f.health = 0; }
         f.t = match act {
             // Sampled inside the startup, because the startup is where
             // the shape of a move is decided and the part a defender

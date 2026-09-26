@@ -1782,8 +1782,10 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
             else if g.p[0].health > g.p[1].health { RoundResult::P1 }
             else { RoundResult::P2 };
         match g.result {
-            RoundResult::P1 => { g.p[0].rounds += 1; g.p[1].act = Act::Defeat; g.p[0].act = Act::Victory; }
-            RoundResult::P2 => { g.p[1].rounds += 1; g.p[0].act = Act::Defeat; g.p[1].act = Act::Victory; }
+            RoundResult::P1 => { g.p[0].rounds += 1; g.p[1].act = Act::Defeat; g.p[0].act = Act::Victory;
+                g.p[0].t = 0.0; g.p[1].t = 0.0; }
+            RoundResult::P2 => { g.p[1].rounds += 1; g.p[0].act = Act::Defeat; g.p[1].act = Act::Victory;
+                g.p[0].t = 0.0; g.p[1].t = 0.0; }
             // A double KO gives the round to both, the way the cabinets
             // did. It cannot loop forever: the match ends as soon as
             // either fighter reaches two, and a draw takes both there.
