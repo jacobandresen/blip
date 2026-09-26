@@ -1699,6 +1699,25 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    it is how a player finds out the machine takes two before they have
    chosen anything. `data-players` says whether the second one is in
    play; it does not decide whether it exists. */
+/* Gamepad lamp on station one's tag (data-pad, set by pollGamepad):
+   dim when a pad is connected, lit while it is in use. */
+:root[data-pad] #deck-p1 .deck-tag::after,
+:root[data-pad] #snes-pad .deck-tag::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 2px;
+  vertical-align: 1px;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, 0.35);
+}
+:root[data-pad="active"] #deck-p1 .deck-tag::after,
+:root[data-pad="active"] #snes-pad .deck-tag::after {
+  background: #4ade80;
+  box-shadow: 0 0 4px #4ade80;
+}
+
 #deck-p2, .snes-pad.second, :root:not([data-players]) .deck-tag { display: none; }
 :root[data-players] #deck-p2 { display: flex; }
 :root[data-players][data-controls="pad"] .snes-pad.second { display: block; }

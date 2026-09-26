@@ -895,3 +895,35 @@ test(`the deck never laps over the picture (${ENGINE})`, async (t) => {
     }
   }
 });
+
+// A physical pad has nothing on screen of its own, so station one's tag
+// carries a lamp: dim when a pad is connected, lit once it is used.
+test(`a gamepad lights station one's lamp (${ENGINE})`, async (t) => {
+  const { cdp } = await openPage(t, ENGINE);
+  await loadGame(cdp, 'serpent', 'stick');
+
+  const PAD = (pressed) => `(function () {
+    var pad = { id: 'test pad', connected: true, axes: [0, 0],
+      buttons: Array.from({ length: 16 }, function (_, i) {
+        return { pressed: ${pressed} && i === 0, value: 0 };
+      }) };
+    navigator.getGamepads = function () { return [pad]; };
+    return true;
+  })()`;
+  const STATE = `document.documentElement.getAttribute('data-pad')`;
+  const LAMP = `getComputedStyle(document.querySelector('#deck-p1 .deck-tag'), '::after').content`;
+
+  assert.equal(await evaluate(cdp, STATE), null, 'a lamp is on with no pad connected');
+
+  await evaluate(cdp, PAD(false));
+  await waitFor(cdp, `${STATE} === 'idle'`, 2000);
+  assert.notEqual(await evaluate(cdp, LAMP), 'none', 'a connected pad draws no lamp');
+
+  await evaluate(cdp, PAD(true));
+  await waitFor(cdp, `${STATE} === 'active'`, 2000);
+  await evaluate(cdp, PAD(false));
+
+  await evaluate(cdp, `navigator.getGamepads = function () { return [null]; }, true`);
+  await waitFor(cdp, `${STATE} === null`, 2000);
+  assert.equal(await evaluate(cdp, LAMP), 'none', 'the lamp outlived the pad');
+});

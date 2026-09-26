@@ -458,8 +458,21 @@ function pollGamepad(onDown, onUp) {
   // a button has been pressed. Poll unconditionally instead; it's a cheap
   // native call and requestAnimationFrame self-throttles to the display
   // refresh rate, so there's no meaningful cost while nothing is connected.
+  // Station one's lamp: off with no pad, dim when one is connected but
+  // untouched for IDLE_MS, lit while it is in use.
+  var IDLE_MS = 10000;
+  var root = document.documentElement;
+  var lastInput = -Infinity, lamp = '';
+  function setLamp(state) {
+    if (state === lamp) return;
+    lamp = state;
+    if (state) root.setAttribute('data-pad', state);
+    else root.removeAttribute('data-pad');
+  }
+
   function tick() {
     var pad = findPad();
+    if (!pad) setLamp('');
     if (pad) {
       var want = {};
       for (var j = 0; j < BTN_MAP.length; j++) {
@@ -473,6 +486,9 @@ function pollGamepad(onDown, onUp) {
       if (ay < -DEADZONE) want['ArrowUp']    = true;
       if (ay >  DEADZONE) want['ArrowDown']  = true;
 
+      var now = performance.now();
+      for (var any in want) { lastInput = now; break; }
+      setLamp(now - lastInput < IDLE_MS ? 'active' : 'idle');
       var code;
       for (code in want) {
         if (!held[code]) { held[code] = true; onDown(code); }
