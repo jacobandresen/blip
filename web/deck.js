@@ -51,11 +51,11 @@
     return who === 0 && i < 2 ? 'button1' : null;
   }
 
+  // Caps carry no lettering (a label is kept as the accessible name only).
   function stickCap(st, who, i) {
     var spec = specFor(who, i), name = spec && capName(st, who, i);
     var b = el('div', 'arcade-btn lettered' + (spec ? '' : ' spare'),
-      '<span class="arcade-btn-cap"></span>' +
-      (spec && spec.label ? '<span class="arcade-btn-label">' + spec.label + '</span>' : ''));
+      '<span class="arcade-btn-cap"></span>');
     if (name && game) b.setAttribute('data-blip', name);
     if (spec && spec.label) b.setAttribute('aria-label', spec.label);
     return b;
@@ -63,9 +63,7 @@
   function padCap(st, who, i) {
     var spec = specFor(who, i), name = spec && capName(st, who, i);
     var b = el('button', 'snes-btn cap' + (i + 1) + (spec ? '' : ' spare'),
-      '<span></span>' +
-      (spec && spec.label ? '<i class="snes-legend">' + spec.label + '</i>' : ''),
-      { type: 'button' });
+      '<span></span>', { type: 'button' });
     if (name) b.setAttribute('data-blip', name);
     if (spec && spec.label) b.setAttribute('aria-label', spec.label);
     return b;
