@@ -2730,46 +2730,46 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    whole bar and drops the dead station and its unused caps. Sizes are
    visual; touches also get 12-14px of slop (blip_controller.js). */
 @media (max-width: 560px) {
-  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #topbar.kiosk-bar,
-  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] .kiosk-bar-main {
+  :root[data-layout="upright"][data-controls="pad"][data-players="1"] #topbar.kiosk-bar,
+  :root[data-layout="upright"][data-controls="pad"][data-players="1"] .kiosk-bar-main {
     height: calc(128px + env(safe-area-inset-bottom, 0px));
   }
-  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad-p2 { display: none; }
-  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad {
+  :root[data-layout="upright"][data-controls="pad"][data-players="1"] #snes-pad-p2 { display: none; }
+  :root[data-layout="upright"][data-controls="pad"][data-players="1"] #snes-pad {
     left: 0;
     right: 0;
     width: 100%;
-    --sf-btn: 58px;
+    --sf-btn: 54px;
     --sf-gap: 22px;
     --sf-dpad: 92px;
     --sf-edge: 28px;
   }
-  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad .snes-shell {
+  :root[data-layout="upright"][data-controls="pad"][data-players="1"] #snes-pad .snes-shell {
     justify-content: space-between;
   }
-  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad .snes-btn.spare,
-  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad .deck-tag { display: none; }
-  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad .snes-face.four {
+  :root[data-layout="upright"][data-controls="pad"][data-players="1"] #snes-pad .snes-btn.spare,
+  :root[data-layout="upright"][data-controls="pad"][data-players="1"] #snes-pad .deck-tag { display: none; }
+  :root[data-layout="upright"][data-controls="pad"][data-players="1"] #snes-pad .snes-face.four {
     grid-template-columns: repeat(2, var(--sf-btn));
-    gap: 0 var(--sf-gap);
+    gap: 8px var(--sf-gap);
   }
 }
 
 /* A fighter seats two, so both stations stay; they just use what the
    half-width bar has (caps 2x2), and the bar grows to seat the taller cross. */
 @media (max-width: 560px) {
-  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) #topbar.kiosk-bar,
-  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .kiosk-bar-main {
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] #topbar.kiosk-bar,
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .kiosk-bar-main {
     height: calc(128px + env(safe-area-inset-bottom, 0px));
   }
-  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad {
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad {
     --sf-btn: 42px;
     --sf-gap: 8px;
     --sf-dpad: 66px;
   }
 }
 @media (max-width: 360px) {
-  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad {
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad {
     --sf-btn: 38px;
     --sf-dpad: 60px;
   }
@@ -2778,21 +2778,21 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* Same for the joystick deck: one station, bigger caps (and, since every
    deck dimension hangs off --cap, a bigger stick), no unused caps. */
 @media (max-width: 560px) {
-  :root[data-layout="upright"][data-controls="stick"][data-seats="1"][data-caps="4"] { --cap: 56px; }
-  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] #topbar.kiosk-bar,
-  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] .kiosk-bar-main {
+  :root[data-layout="upright"][data-controls="stick"][data-players="1"][data-caps="4"] { --cap: 54px; }
+  :root[data-layout="upright"][data-controls="stick"][data-players="1"] #topbar.kiosk-bar,
+  :root[data-layout="upright"][data-controls="stick"][data-players="1"] .kiosk-bar-main {
     height: calc(128px + env(safe-area-inset-bottom, 0px));
   }
-  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] #deck-p2,
-  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] #deck-p1 .arcade-btn.spare,
-  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] #deck-p1 .deck-tag { display: none; }
-  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] #deck-p1 .fire-buttons.four {
+  :root[data-layout="upright"][data-controls="stick"][data-players="1"] #deck-p2,
+  :root[data-layout="upright"][data-controls="stick"][data-players="1"] #deck-p1 .arcade-btn.spare,
+  :root[data-layout="upright"][data-controls="stick"][data-players="1"] #deck-p1 .deck-tag { display: none; }
+  :root[data-layout="upright"][data-controls="stick"][data-players="1"] #deck-p1 .fire-buttons.four {
     grid-template-columns: repeat(2, var(--cap));
-    gap: 12px;
+    gap: 8px 22px;
   }
 }
 @media (max-width: 340px) {
-  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad {
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad {
     --sf-btn: 34px;
     --sf-gap: 6px;
     --sf-dpad: 52px;
@@ -2801,22 +2801,22 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* Landscape, one seat: cross under the left thumb, the two live caps
    stacked under the right, each in its own gutter. */
-:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad-p2 { display: none; }
-:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad {
+:root[data-layout="landscape"][data-controls="pad"][data-players="1"] #snes-pad-p2 { display: none; }
+:root[data-layout="landscape"][data-controls="pad"][data-players="1"] #snes-pad {
   left: 0;
   right: 0;
   width: 100%;
   --sf-btn: 52px;
   --sf-dpad: 84px;
 }
-:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad .snes-shell {
+:root[data-layout="landscape"][data-controls="pad"][data-players="1"] #snes-pad .snes-shell {
   flex-direction: row;
   align-items: flex-end;
   justify-content: space-between;
 }
-:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad .snes-btn.spare,
-:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad .deck-tag { display: none; }
-:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad .snes-face.four {
+:root[data-layout="landscape"][data-controls="pad"][data-players="1"] #snes-pad .snes-btn.spare,
+:root[data-layout="landscape"][data-controls="pad"][data-players="1"] #snes-pad .deck-tag { display: none; }
+:root[data-layout="landscape"][data-controls="pad"][data-players="1"] #snes-pad .snes-face.four {
   grid-template-columns: var(--sf-btn);
   gap: 12px 0;
 }
@@ -2878,14 +2878,14 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* One seat on a phone: station one owns the bar, so its lamp sits in the
    clear middle and station two's is gone with the station. */
 @media (max-width: 560px) {
-  :root[data-layout="upright"][data-seats="1"] .kiosk-bar > .deck-panel::before { left: 50%; }
-  :root[data-layout="upright"][data-seats="1"] .kiosk-bar > .deck-panel::after { display: none; }
+  :root[data-layout="upright"][data-players="1"] .kiosk-bar > .deck-panel::before { left: 50%; }
+  :root[data-layout="upright"][data-players="1"] .kiosk-bar > .deck-panel::after { display: none; }
 }
 
 /* Sideways the panel is the whole screen: lamps go over the two gutters. */
 :root[data-layout="landscape"] .kiosk-bar > .deck-panel::before { left: max(14px, env(safe-area-inset-left, 0px)); top: 56px; transform: none; }
 :root[data-layout="landscape"] .kiosk-bar > .deck-panel::after { left: auto; right: max(14px, env(safe-area-inset-right, 0px)); top: 56px; transform: none; }
-:root[data-layout="landscape"][data-seats="1"] .kiosk-bar > .deck-panel::after { display: none; }
+:root[data-layout="landscape"][data-players="1"] .kiosk-bar > .deck-panel::after { display: none; }
 
 /* ---- Joystick base: symmetric, and centred in the bar ---- */
 
@@ -2935,11 +2935,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    --ctl-pr the caps' right margin. */
 @media (max-width: 560px) {
   :root[data-layout="upright"][data-caps="4"] { --ctl-cx: 40px; --ctl-pr: 10px; }
-  :root[data-layout="upright"][data-caps="4"][data-seats="1"] { --ctl-cx: 64px; --ctl-pr: 22px; }
+  :root[data-layout="upright"][data-caps="4"][data-players="1"] { --ctl-cx: 64px; --ctl-pr: 22px; }
 
   /* Same bar height in both modes, so the middle is the same screen row. */
-  :root[data-layout="upright"][data-controls="stick"]:not([data-seats="1"]) #topbar.kiosk-bar,
-  :root[data-layout="upright"][data-controls="stick"]:not([data-seats="1"]) .kiosk-bar-main {
+  :root[data-layout="upright"][data-controls="stick"][data-players="2"] #topbar.kiosk-bar,
+  :root[data-layout="upright"][data-controls="stick"][data-players="2"] .kiosk-bar-main {
     height: calc(128px + env(safe-area-inset-bottom, 0px));
   }
 
@@ -2972,30 +2972,30 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* Caps the same size and spacing as the pad's (58 / 22 alone, 42 / 8 with
    two stations, shrinking with the pad). */
 @media (max-width: 560px) {
-  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-seats="1"] { --cap: 58px; }
-  :root[data-layout="upright"][data-controls="stick"][data-caps="4"]:not([data-seats="1"]) { --cap: 40px; }
-  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-seats="1"] #topbar .fire-buttons.four { gap: 0 22px; }
-  :root[data-layout="upright"][data-controls="stick"][data-caps="4"]:not([data-seats="1"]) #topbar .fire-buttons.four { gap: 7px 8px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="1"] { --cap: 54px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] { --cap: 40px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="1"] #topbar .fire-buttons.four { gap: 8px 22px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] #topbar .fire-buttons.four { gap: 7px 8px; }
 }
 @media (max-width: 360px) {
-  :root[data-layout="upright"][data-controls="stick"][data-caps="4"]:not([data-seats="1"]) { --cap: 38px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] { --cap: 38px; }
 }
 @media (max-width: 340px) {
-  :root[data-layout="upright"][data-controls="stick"][data-caps="4"]:not([data-seats="1"]) { --cap: 34px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] { --cap: 34px; }
 }
 
 /* Two stations share 171px on a 375px phone: sizes tuned so cross + caps fit
    a half with a little air, in both controllers. */
 @media (max-width: 560px) {
-  :root[data-layout="upright"][data-caps="4"]:not([data-seats="1"]) { --ctl-cx: 36px; --ctl-pr: 6px; }
-  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad { --sf-btn: 40px; --sf-dpad: 60px; }
+  :root[data-layout="upright"][data-caps="4"][data-players="2"] { --ctl-cx: 36px; --ctl-pr: 6px; }
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad { --sf-btn: 40px; --sf-dpad: 60px; }
 }
 @media (max-width: 360px) {
-  :root[data-layout="upright"][data-caps="4"]:not([data-seats="1"]) { --ctl-cx: 34px; }
-  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad { --sf-btn: 38px; --sf-dpad: 56px; }
+  :root[data-layout="upright"][data-caps="4"][data-players="2"] { --ctl-cx: 34px; }
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad { --sf-btn: 38px; --sf-dpad: 56px; }
 }
 @media (max-width: 340px) {
-  :root[data-layout="upright"][data-caps="4"]:not([data-seats="1"]) { --ctl-cx: 31px; --ctl-pr: 5px; }
-  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad { --sf-btn: 34px; --sf-dpad: 52px; --sf-gap: 6px; }
-  :root[data-layout="upright"][data-controls="stick"][data-caps="4"]:not([data-seats="1"]) #topbar .fire-buttons.four { gap: 7px 6px; }
+  :root[data-layout="upright"][data-caps="4"][data-players="2"] { --ctl-cx: 31px; --ctl-pr: 5px; }
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad { --sf-btn: 34px; --sf-dpad: 52px; --sf-gap: 6px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] #topbar .fire-buttons.four { gap: 7px 6px; }
 }
