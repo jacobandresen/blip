@@ -2805,3 +2805,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   bottom: 0;
   height: auto;
 }
+
+/* The pad's controls only fill the bottom ~95px of the 152px bar it shared
+   with the joystick deck (whose ball floats higher), leaving a dead band
+   of panel above the caps. */
+:root[data-caps="4"][data-controls="pad"][data-layout="upright"] #topbar.kiosk-bar,
+:root[data-caps="4"][data-controls="pad"][data-layout="upright"] .kiosk-bar-main {
+  height: calc(118px + env(safe-area-inset-bottom, 0px));
+}
