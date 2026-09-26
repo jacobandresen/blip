@@ -1348,15 +1348,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
-/* On a two-action game (Meteors) shell.js tags .snes-a as button2 — it is
-   NOT a duplicate fire, so its cap goes cool blue: the two buttons must
-   read as doing different things. B stays the red fire button. */
-.snes-pad .snes-a[data-blip~="button2"] > span {
-  background:
-    radial-gradient(circle at 46% 30%, rgba(215, 238, 255, 0.45) 0%, rgba(215, 238, 255, 0) 44%),
-    radial-gradient(circle at 50% 62%, #2f79cf 0%, #3a8ce0 40%, #2f7ac8 70%, #1b4f9e 100%);
-}
-
 /* SELECT / START, L / R — all dropped. A / B do the title-screen "press
    fire"; the BLIP logo goes back to the grid. */
 .snes-pad .snes-mid,
@@ -3051,3 +3042,52 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] #snes-pad-p2 .snes-shell {
   padding-left: calc(var(--ctl-cx) - var(--dpad) / 2 + var(--mid) / 2);
 }
+
+/* ---- One button, on both controllers ----
+   The joystick deck's chrome-ringed caps and the pad's matte-in-a-collar
+   buttons are now the same part: a gunmetal lip (dimmer than chrome) around
+   a dark collar, with a glossy red dome that keeps a soft highlight and a
+   matte underside. Sizes already come from the same --cap. */
+:is(#topbar, #kiosk-bar) :is(.arcade-btn, .snes-btn) {
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #0b0b0c 0 66%, transparent 67%),
+    conic-gradient(from -50deg, #8d9098, #4a4d54 28%, #212327 52%, #4a4d54 78%, #8d9098 100%);
+  box-shadow:
+    0 3px 5px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.22),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.55);
+  transition: transform .05s, box-shadow .05s, filter .05s;
+}
+:is(#topbar, #kiosk-bar) :is(.arcade-btn .arcade-btn-cap, .snes-btn > span) {
+  position: absolute;
+  inset: 11%;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.08) 16%, transparent 34%),
+    radial-gradient(circle at 50% 46%, #ee5a48 0%, #d63a2a 46%, #a51c10 80%, #6a0f07 100%);
+  box-shadow:
+    0 2px 3px rgba(0, 0, 0, 0.5),
+    inset 0 2px 2px rgba(255, 255, 255, 0.16),
+    inset 0 -4px 6px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(0, 0, 0, 0.45);
+  transition: transform .05s, box-shadow .05s, filter .05s;
+}
+:is(#topbar, #kiosk-bar) :is(.arcade-btn.blip-pressed .arcade-btn-cap, .arcade-btn.active .arcade-btn-cap, .snes-btn.blip-pressed > span) {
+  transform: scale(0.94);
+  filter: brightness(0.82);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    inset 0 4px 7px rgba(0, 0, 0, 0.5),
+    inset 0 -1px 2px rgba(255, 190, 180, 0.15);
+}
+/* a second action (Meteors' hyperspace) has a cool-blue cap on both */
+:is(#topbar, #kiosk-bar) :is(.arcade-btn, .snes-btn).alt :is(.arcade-btn-cap, span) {
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.08) 16%, transparent 34%),
+    radial-gradient(circle at 50% 46%, #5aa2ee 0%, #2f76d0 46%, #1a4f9e 80%, #0d2c60 100%);
+}
+/* no reflection puddle: the two controllers now share one plain part */
+:is(#topbar, #kiosk-bar) .arcade-btn::after { display: none; }

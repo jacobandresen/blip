@@ -58,6 +58,7 @@
       '<span class="arcade-btn-cap"></span>');
     if (name && game) b.setAttribute('data-blip', name);
     if (spec && spec.label) b.setAttribute('aria-label', spec.label);
+    if (buttons.length === 2 && i === 1) b.classList.add('alt');
     return b;
   }
   function padCap(st, who, i) {
@@ -66,6 +67,9 @@
       '<span></span>', { type: 'button' });
     if (name) b.setAttribute('data-blip', name);
     if (spec && spec.label) b.setAttribute('aria-label', spec.label);
+    // A game with two different actions (Meteors: fire / hyperspace) gets a
+    // blue second cap; a one-button game's two caps are both fire.
+    if (buttons.length === 2 && i === 1) b.classList.add('alt');
     return b;
   }
 
