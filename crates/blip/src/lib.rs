@@ -20,7 +20,7 @@ pub mod timer;
 pub mod web;
 
 pub use audio::{
-    play_alert, play_ambient, play_music, play_sfx, stop_alert, stop_ambient, stop_music,
+    play_alert, play_ambient, play_music, play_sfx, play_sfx_volume, stop_alert, stop_ambient, stop_music,
     BlipSound,
 };
 pub use color::{
