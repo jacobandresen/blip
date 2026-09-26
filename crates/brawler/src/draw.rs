@@ -861,6 +861,12 @@ fn draw_leg(blip: &Blip, h: &Hide, hip: V, knee: V, ankle: V, fwd: f32, ground: 
     let skin = h.c(h.skin);
     let cloth = h.c(h.cloth);
 
+    // Planted: the leg ends at the ankle joint, sole exactly on the boards
+    // (heel bottom + outline = 8.8 below the joint). Nothing is drawn under it.
+    let flat = ankle.1 > ground - 8.8 * b;
+    let joint = if flat { V(ankle.0, ground - 8.8 * b) } else { ankle };
+    let ankle = joint;
+
     h.cut(blip, &[(hip, 10.6 * b), (knee, 8.8 * b),
                   (ankle, if h.build == Build::Bare { 6.4 } else { 8.0 } * b)]);
 
@@ -889,8 +895,10 @@ fn draw_leg(blip: &Blip, h: &Hide, hip: V, knee: V, ankle: V, fwd: f32, ground: 
     match h.build {
         // The loose hem of a gi trouser, trailing off the ankle.
         Build::Gi => {
+            // The hem stops at the ankle; it never trails below the foot.
             let (dx, dy) = unit(knee, ankle);
-            hang(blip, h, hem_at, (dx, dy), 9.0, (t * 5.0 + ankle.0 * 0.1).sin() * 1.4,
+            let reach = dist(hem_at, ankle) + 1.0;
+            hang(blip, h, hem_at, (dx, dy), reach, (t * 5.0 + ankle.0 * 0.1).sin() * 0.8,
                 6.2 * b, 4.6 * b, cloth);
         }
         // Heavy boots.
@@ -904,20 +912,30 @@ fn draw_leg(blip: &Blip, h: &Hide, hip: V, knee: V, ankle: V, fwd: f32, ground: 
         }
     }
 
-    // The foot: sole and toes. The sole has to reach behind the ankle,
-    // because a heel is what a person balances on, and the toes have to
-    // be their own piece or a kick lands with the end of a line.
-    // Planted it lies along the floor, off the ground along the shin.
-    let flat = ankle.1 > ground - 7.0;
+    // Foot: heel behind the ankle, toes as their own piece. Flat when planted;
+    // off the ground it follows the shin.
     let boot = h.build == Build::Bare;
     let foot_c = if boot { shade(h.c(h.trim), 0.72) } else { skin };
     let (fx, fy, ux, uy) = if flat {
         (fwd, 0.0, 0.0, -1.0)
     } else {
+        // Walking: the toes stay forward and the heel peels up, pitching
+        // the foot about the ball. A kick (ankle well off the ground) aligns
+        // the foot with the shin instead; blend between the two.
+        let lift = ground - ankle.1;
+        let sgn = fwd.signum();
+        let pitch = ((lift - 8.8 * b) / 12.0).clamp(0.0, 0.9);
+        let (ps, pc) = (pitch.sin(), pitch.cos());
+        let (tf, tu) = ((sgn * pc, ps), (sgn * ps, -pc));
         let (dx, dy) = unit(knee, ankle);
-        (dx, dy, dy, -dx)
+        let k = ((lift - 22.0) / 12.0).clamp(0.0, 1.0);
+        let k = k * k * (3.0 - 2.0 * k);
+        let norm = |x: f32, y: f32| { let m = x.hypot(y).max(1e-3); (x / m, y / m) };
+        let (fx, fy) = norm(tf.0 + (dx - tf.0) * k, tf.1 + (dy - tf.1) * k);
+        let (ux, uy) = norm(tu.0 + (dy - tu.0) * k, tu.1 + (-dx - tu.1) * k);
+        (fx, fy, ux, uy)
     };
-    let ank = if flat { V(ankle.0, ground - 6.5 * b) } else { ankle };
+    let ank = ankle;
     let at = |along: f32, up: f32| V(ank.0 + fx * along + ux * up, ank.1 + fy * along + uy * up);
     // A foot is about a seventh of a person long on a real person, and
     // a fifth of one on a fighting-game sprite. The hands and the feet
