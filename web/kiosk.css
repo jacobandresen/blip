@@ -3007,10 +3007,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    all derive from it. */
 @media all {
   :root[data-layout="upright"][data-caps="4"][data-controls][data-players] {
-    --cap: clamp(32px, calc(0.29 * (50vw - 40px)), 54px);
-    --dpad: clamp(46px, calc(0.42 * (50vw - 40px)), 92px);
+    --cap: clamp(32px, calc(0.29 * (50vw - 57px)), 54px);
+    --dpad: clamp(46px, calc(0.42 * (50vw - 57px)), 92px);
     --ctl-cx: calc(6px + var(--dpad) / 2);
-    --ctl-pr: 6px;
+    --ctl-pr: 10px;
   }
   :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players] :is(#snes-pad, #snes-pad-p2) {
     --sf-btn: var(--cap);
@@ -3036,4 +3036,18 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-layout="upright"][data-caps="4"] .stick-base { width: var(--dpad, var(--boot)); margin: 0; }
 :root[data-layout="upright"][data-caps="4"] .deck-side {
   padding-left: calc(var(--ctl-cx) - var(--dpad, var(--boot)) / 2);
+}
+
+/* Two players share one small screen: keep a clear channel between P1's caps
+   and P2's cross so neither thumb lands on the other's controls. The size
+   formula above always reserves it (so the equipment is the same size in
+   one-player mode); it is only laid out when P2 is on the deck. */
+:root[data-layout="upright"][data-caps="4"][data-players="2"] { --mid: 26px; }
+:root[data-layout="upright"][data-caps="4"][data-players="2"] #deck-p1,
+:root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] #snes-pad .snes-shell {
+  padding-right: calc(var(--ctl-pr) + var(--mid) / 2);
+}
+:root[data-layout="upright"][data-caps="4"][data-players="2"] #deck-p2,
+:root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] #snes-pad-p2 .snes-shell {
+  padding-left: calc(var(--ctl-cx) - var(--dpad) / 2 + var(--mid) / 2);
 }
