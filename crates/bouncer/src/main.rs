@@ -38,7 +38,8 @@ const PAD_SPEED: f32 = 280.0;
 
 const BALL_W: i32 = 18;
 const BALL_H: i32 = 18;
-const BALL_FRAMES: u32 = 16; // must match blip_assets::bouncer
+const BALL_YAW_N: u32 = 12; // sheet layout: must match blip_assets::bouncer
+const BALL_PITCH_N: u32 = 19;
 const BALL_SPEED_0: f32 = 240.0;
 const BALL_SPEED_MAX: f32 = 420.0;
 
@@ -110,7 +111,7 @@ struct Game {
     ball_vx: f32, ball_vy: f32,
     ball_spin: f32,
     ball_curve_used: f32,
-    ball_roll: f32,
+    ball_rot: Mat3, // orientation of the ball's surface pattern in view space
     ball_speed: f32,
     sess: Session,
     dead_timer: Timer,
@@ -130,7 +131,7 @@ impl Game {
             ball_x: 0.0, ball_y: 0.0, ball_vx: 0.0, ball_vy: 0.0,
             ball_spin: 0.0,
             ball_curve_used: 0.0,
-            ball_roll: 0.0,
+            ball_rot: MAT3_ID,
             ball_speed: BALL_SPEED_0,
             sess: Session::new(LIVES_START),
             dead_timer: Timer::default(),
@@ -193,6 +194,7 @@ impl Game {
         self.ball_vx = self.ball_speed * (angle + PI / 2.0).cos();
         self.ball_vy = -self.ball_speed;
         self.ball_spin = 0.0;
+        self.ball_rot = mat_mul(&rot_x(0.5), &rot_y(rand_f() * 6.28));
         self.ball_curve_used = 0.0;
     }
 
@@ -281,7 +283,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     // Rolling-mark spin (visual only): angular rate = speed / radius, driven
     // by the horizontal component so a curving shot visibly spins faster.
-    g.ball_roll += (g.ball_vx / (BALL_W as f32 * 0.5)) * dt;
+    roll_ball(g, dt);
 
     // ---- integrate in substeps so a fast ball can't tunnel through a brick,
     //      the seam between two bricks, or the paddle in a single frame ----
@@ -317,6 +319,59 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.dead_timer.start(1.5);
         g.state = State::Win;
     }
+}
+
+type Mat3 = [[f32; 3]; 3];
+const MAT3_ID: Mat3 = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+
+fn mat_mul(a: &Mat3, b: &Mat3) -> Mat3 {
+    let mut o = [[0.0; 3]; 3];
+    for i in 0..3 { for j in 0..3 { for k in 0..3 { o[i][j] += a[i][k] * b[k][j]; } } }
+    o
+}
+fn rot_x(t: f32) -> Mat3 { let (s, c) = t.sin_cos(); [[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]] }
+fn rot_y(t: f32) -> Mat3 { let (s, c) = t.sin_cos(); [[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]] }
+fn rand_f() -> f32 { (rand() % 10_000) as f32 / 10_000.0 }
+
+/// Rolls the ball without slipping: its surface drifts along the velocity
+/// (axis = view-normal x v), plus the screwball spin about the view axis.
+fn roll_ball(g: &mut Game, dt: f32) {
+    let r = BALL_W as f32 * 0.5;
+    let w = [-g.ball_vy / r, g.ball_vx / r, g.ball_spin * 2.0];
+    let ang = (w[0] * w[0] + w[1] * w[1] + w[2] * w[2]).sqrt() * dt;
+    if ang < 1e-6 { return; }
+    let m = ang / dt;
+    let (n0, n1, n2) = (w[0] / m, w[1] / m, w[2] / m);
+    let (s, c) = ang.sin_cos();
+    let t = 1.0 - c;
+    let d: Mat3 = [
+        [c + n0 * n0 * t,      n0 * n1 * t - n2 * s, n0 * n2 * t + n1 * s],
+        [n1 * n0 * t + n2 * s, c + n1 * n1 * t,      n1 * n2 * t - n0 * s],
+        [n2 * n0 * t - n1 * s, n2 * n1 * t + n0 * s, c + n2 * n2 * t],
+    ];
+    g.ball_rot = mat_mul(&d, &g.ball_rot);
+    // Re-orthonormalise the rows so float drift never skews the sphere.
+    let m = &mut g.ball_rot;
+    for i in 0..3 {
+        for j in 0..i {
+            let dot: f32 = (0..3).map(|k| m[i][k] * m[j][k]).sum();
+            for k in 0..3 { m[i][k] -= dot * m[j][k]; }
+        }
+        let len = m[i].iter().map(|v| v * v).sum::<f32>().sqrt();
+        for k in 0..3 { m[i][k] /= len; }
+    }
+}
+
+/// Split the orientation into sheet cell (yaw, pitch) and a roll angle:
+/// R = Rz(roll) * Rx(pitch) * Ry(yaw).
+fn ball_pose(m: &Mat3) -> (u32, u32, f32) {
+    let pitch = m[2][1].clamp(-1.0, 1.0).asin();
+    let yaw = (-m[2][0]).atan2(m[2][2]);
+    let roll = m[1][0].atan2(m[0][0]) - (pitch.sin() * yaw.sin()).atan2(yaw.cos());
+    let period = 2.0 * PI / 3.0;
+    let col = ((yaw.rem_euclid(period) / period * BALL_YAW_N as f32).round() as u32) % BALL_YAW_N;
+    let row = (((pitch + PI / 2.0) / PI * (BALL_PITCH_N - 1) as f32).round() as u32).min(BALL_PITCH_N - 1);
+    (col, row, roll)
 }
 
 /// The ball as a circle: centre and radius.
@@ -515,7 +570,7 @@ fn update_over(g: &mut Game, dt: f32) {
     g.start_game();
 }
 
-fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick: &[Texture2D; 8]) {
+fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 8]) {
     for i in 0..BRICK_TOTAL {
         if !g.bricks[i].alive { continue; }
         let r = i as i32 / BRICK_COLS;
@@ -569,10 +624,10 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick:
         BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.35 },
     );
 
-    // Strip period is a third of a turn (the panel pattern repeats every 120°).
-    let period = 2.0 * PI / 3.0;
-    let frame = (g.ball_roll.rem_euclid(period) / period * BALL_FRAMES as f32) as u32 % BALL_FRAMES;
-    blip.draw_texture_frame(ball, frame, BALL_FRAMES, g.ball_x - 1.0, g.ball_y - 1.0, BALL_W as f32 + 2.0, BALL_H as f32 + 2.0);
+    let (col, row, roll) = ball_pose(&g.ball_rot);
+    let (bx, by, bs) = (g.ball_x - 1.0, g.ball_y - 1.0, BALL_W as f32 + 2.0);
+    blip.draw_texture_cell(ball, col, BALL_YAW_N, row, BALL_PITCH_N, bx, by, bs, bs, roll);
+    blip.draw_texture(shade, bx, by, bs, bs);
 
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
@@ -610,6 +665,7 @@ fn conf() -> blip::macroquad::window::Conf {
 }
 
 const PADDLE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/paddle.png"));
+const BALL_SHADE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ball_shade.png"));
 const BALL_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ball.png"));
 const BRICK_RED_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_red.png"));
 const BRICK_ORANGE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_orange.png"));
@@ -649,6 +705,8 @@ async fn main() {
     let paddle = load_png(PADDLE_PNG);
     let ball = load_png(BALL_PNG);
     ball.set_filter(FilterMode::Linear);
+    let ball_shade = load_png(BALL_SHADE_PNG);
+    ball_shade.set_filter(FilterMode::Linear);
     let brick = [
         load_png(BRICK_RED_PNG),
         load_png(BRICK_ORANGE_PNG),
@@ -714,10 +772,35 @@ async fn main() {
             State::Win   => draw_win(&blip, g.sess.level),
             State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
             State::Launch | State::Play | State::Dead => {
-                draw_play(&blip, &g, &paddle, &ball, &brick);
+                draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick);
             }
         }
 
         blip.next_frame(60).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rot_z(t: f32) -> Mat3 { let (s, c) = t.sin_cos(); [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]] }
+
+    #[test]
+    fn pose_decomposition_reconstructs_orientation() {
+        let r = mat_mul(&rot_z(0.7), &mat_mul(&rot_x(0.4), &rot_y(1.1)));
+        let pitch = r[2][1].asin();
+        let yaw = (-r[2][0]).atan2(r[2][2]);
+        let roll = r[1][0].atan2(r[0][0]) - (pitch.sin() * yaw.sin()).atan2(yaw.cos());
+        assert!((pitch - 0.4).abs() < 1e-4 && (yaw - 1.1).abs() < 1e-4 && (roll - 0.7).abs() < 1e-4);
+    }
+
+    #[test]
+    fn rolling_right_drifts_surface_right() {
+        let mut g = Game::new();
+        g.ball_vx = 100.0;
+        roll_ball(&mut g, 0.05);
+        // The view-facing point (0,0,1) should move toward +x.
+        assert!(g.ball_rot[0][2] > 0.0 && g.ball_rot[1][2].abs() < 1e-4);
     }
 }

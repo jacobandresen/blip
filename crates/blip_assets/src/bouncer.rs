@@ -35,63 +35,96 @@ fn paddle() -> Vec<u8> {
     img.encode_png()
 }
 
-/// Frames in the roll strip; the game picks one from the ball's roll phase.
-pub const BALL_FRAMES: u32 = 16;
+/// Ball sheet layout: columns step the yaw through one panel-pair period
+/// (120°), rows step the pitch from -90° to +90°. The game applies the
+/// third axis (roll) by rotating the sprite.
+pub const BALL_YAW_N: u32 = 12;
+pub const BALL_PITCH_N: u32 = 19;
 const BALL_PX: u32 = 36;
+const SS: i32 = 3;
 
-/// A lit sphere with six red/white panels, one strip frame per roll step.
+/// Unit-sphere point under a view-space pixel, or None outside the disc.
+fn sphere_point(px: i32, py: i32, sx: i32, sy: i32) -> Option<(f32, f32, f32)> {
+    let n = (BALL_PX as i32 * SS) as f32;
+    let x = ((px * SS + sx) as f32 + 0.5) / n * 2.0 - 1.0;
+    let y = ((py * SS + sy) as f32 + 0.5) / n * 2.0 - 1.0;
+    let d2 = x * x + y * y;
+    if d2 >= 1.0 { None } else { Some((x, y, (1.0 - d2).sqrt())) }
+}
+
+/// Six red/white panels with white pole caps, unlit. Frame (col, row) shows
+/// the ball at yaw `col`, pitch `row`; lighting lives in `ball_shade`.
 fn ball() -> Vec<u8> {
     let n = BALL_PX as i32;
-    let mut img = Image::new(BALL_PX * BALL_FRAMES, BALL_PX);
-    let tilt: f32 = 0.45; // pole toward the viewer so the caps read
-    let (ts, tc) = tilt.sin_cos();
-    let light = { let (x, y, z) = (-0.5f32, -0.6, 0.62); let m = (x * x + y * y + z * z).sqrt(); (x / m, y / m, z / m) };
-    let half = (light.0, light.1, light.2 + 1.0);
-    let hm = (half.0 * half.0 + half.1 * half.1 + half.2 * half.2).sqrt();
-    let half = (half.0 / hm, half.1 / hm, half.2 / hm);
-    const SS: i32 = 3;
-    for f in 0..BALL_FRAMES as i32 {
-        let phase = f as f32 / BALL_FRAMES as f32 * 2.0 * PI / 6.0 * 2.0;
-        for py in 0..n {
-            for px in 0..n {
-                let (mut r, mut g, mut b, mut cov) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
-                for sy in 0..SS {
-                    for sx in 0..SS {
-                        let x = ((px * SS + sx) as f32 + 0.5) / (n * SS) as f32 * 2.0 - 1.0;
-                        let y = ((py * SS + sy) as f32 + 0.5) / (n * SS) as f32 * 2.0 - 1.0;
-                        let d2 = x * x + y * y;
-                        if d2 >= 1.0 { continue; }
-                        let z = (1.0 - d2).sqrt();
-                        // Undo the tilt, then the roll, to find the surface point.
-                        let (y1, z1) = (y * tc + z * ts, -y * ts + z * tc);
-                        let (s_, c_) = phase.sin_cos();
-                        let (x2, z2) = (x * c_ + z1 * s_, -x * s_ + z1 * c_);
-                        let lon = x2.atan2(z2);
-                        let panel = ((lon + PI) / (PI / 3.0)).floor() as i32;
-                        let cap = y1.abs() > 0.88;
-                        let seam = ((lon + PI) / (PI / 3.0)).fract();
-                        let on_seam = !cap && (seam < 0.025 || seam > 0.975);
-                        let (mut cr, mut cg, mut cb) = if cap || panel % 2 == 0 {
-                            (0.96, 0.95, 0.9)
-                        } else {
-                            (0.88, 0.16, 0.12)
-                        };
-                        if on_seam { cr *= 0.7; cg *= 0.7; cb *= 0.7; }
-                        let diff = (x * light.0 + y * light.1 + z * light.2).max(0.0);
-                        let spec = (x * half.0 + y * half.1 + z * half.2).max(0.0).powf(40.0);
-                        let rim = (1.0 - z).powf(2.0) * 0.25;
-                        let lit = 0.32 + 0.78 * diff - rim;
-                        r += (cr * lit + spec * 0.85).min(1.0);
-                        g += (cg * lit + spec * 0.85).min(1.0);
-                        b += (cb * lit + spec * 0.85).min(1.0);
-                        cov += 1.0;
+    let mut img = Image::new(BALL_PX * BALL_YAW_N, BALL_PX * BALL_PITCH_N);
+    for row in 0..BALL_PITCH_N as i32 {
+        let beta = -PI / 2.0 + row as f32 * PI / (BALL_PITCH_N - 1) as f32;
+        let (sb, cb) = beta.sin_cos();
+        for col in 0..BALL_YAW_N as i32 {
+            let alpha = col as f32 * (2.0 * PI / 3.0) / BALL_YAW_N as f32;
+            let (sa, ca) = alpha.sin_cos();
+            for py in 0..n {
+                for px in 0..n {
+                    let (mut r, mut g, mut b, mut cov) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+                    for sy in 0..SS {
+                        for sx in 0..SS {
+                            let Some((x, y, z)) = sphere_point(px, py, sx, sy) else { continue };
+                            // Into pattern space: Ry(-alpha) * Rx(-beta).
+                            let (y1, z1) = (y * cb + z * sb, -y * sb + z * cb);
+                            let (x2, z2) = (x * ca - z1 * sa, x * sa + z1 * ca);
+                            let t = (x2.atan2(z2) + PI) / (PI / 3.0);
+                            let cap = y1.abs() > 0.88;
+                            let seam = t.fract();
+                            let (mut cr, mut cg, mut cb_) = if cap || t.floor() as i32 % 2 == 0 {
+                                (0.97, 0.96, 0.92)
+                            } else {
+                                (0.9, 0.17, 0.13)
+                            };
+                            if !cap && (seam < 0.025 || seam > 0.975) {
+                                cr *= 0.7; cg *= 0.7; cb_ *= 0.7;
+                            }
+                            r += cr; g += cg; b += cb_; cov += 1.0;
+                        }
+                    }
+                    if cov > 0.0 {
+                        let k = |v: f32| (v / cov * 255.0) as u8;
+                        let a = (cov / (SS * SS) as f32 * 255.0) as u8;
+                        img.set_rgba(col * n + px, row * n + py, k(r), k(g), k(b), a);
                     }
                 }
-                if cov > 0.0 {
-                    let k = |v: f32| (v / cov * 255.0) as u8;
-                    let a = (cov / (SS * SS) as f32 * 255.0) as u8;
-                    img.set_rgba(f * n + px, py, k(r), k(g), k(b), a);
+            }
+        }
+    }
+    img.encode_png()
+}
+
+/// Fixed lighting overlay (shadow + specular) drawn over the rolling pattern.
+fn ball_shade() -> Vec<u8> {
+    let n = BALL_PX as i32;
+    let mut img = Image::new(BALL_PX, BALL_PX);
+    let light = { let (x, y, z) = (-0.5f32, -0.6, 0.62); let m = (x * x + y * y + z * z).sqrt(); (x / m, y / m, z / m) };
+    let half = { let (x, y, z) = (light.0, light.1, light.2 + 1.0); let m = (x * x + y * y + z * z).sqrt(); (x / m, y / m, z / m) };
+    for py in 0..n {
+        for px in 0..n {
+            let (mut a_sum, mut c_sum, mut cov) = (0.0f32, 0.0f32, 0.0f32);
+            for sy in 0..SS {
+                for sx in 0..SS {
+                    let Some((x, y, z)) = sphere_point(px, py, sx, sy) else { continue };
+                    let diff = (x * light.0 + y * light.1 + z * light.2).max(0.0);
+                    let spec = ((x * half.0 + y * half.1 + z * half.2).max(0.0).powf(40.0) * 0.85).min(1.0);
+                    let lit = (0.32 + 0.78 * diff - (1.0 - z).powf(2.0) * 0.25).clamp(0.0, 1.0);
+                    // Black at (1-lit), then white at `spec` over it, as one grey layer.
+                    let a = 1.0 - lit * (1.0 - spec);
+                    a_sum += a;
+                    c_sum += spec; // colour * alpha
+                    cov += 1.0;
                 }
+            }
+            if cov > 0.0 {
+                let a = a_sum / cov;
+                let c = if a > 0.0 { (c_sum / cov / a).min(1.0) } else { 0.0 };
+                let v = (c * 255.0) as u8;
+                img.set_rgba(px, py, v, v, v, (a * cov / (SS * SS) as f32 * 255.0) as u8);
             }
         }
     }
@@ -647,6 +680,7 @@ pub fn generate() -> Vec<Asset> {
     vec![
         ("images/paddle.png", paddle()),
         ("images/ball.png", ball()),
+        ("images/ball_shade.png", ball_shade()),
         ("images/brick_red.png",    brick((220, 60, 60))),
         ("images/brick_orange.png", brick((220, 140, 40))),
         ("images/brick_yellow.png", brick((200, 200, 50))),

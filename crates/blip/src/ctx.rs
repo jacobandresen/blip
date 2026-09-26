@@ -742,12 +742,14 @@ impl Blip {
     pub fn draw_texture(&self, tex: &macroquad::texture::Texture2D, x: f32, y: f32, w: f32, h: f32) {
         draw::draw_texture(tex, x, y, w, h);
     }
-    /// Draw one frame of a horizontal sprite strip into the given rectangle.
+    /// Draw one cell of a sprite sheet, rotated about its centre.
     #[inline]
-    pub fn draw_texture_frame(
-        &self, tex: &macroquad::texture::Texture2D, frame: u32, frames: u32, x: f32, y: f32, w: f32, h: f32,
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_texture_cell(
+        &self, tex: &macroquad::texture::Texture2D, col: u32, cols: u32, row: u32, rows: u32,
+        x: f32, y: f32, w: f32, h: f32, rotation: f32,
     ) {
-        draw::draw_texture_frame(tex, frame, frames, x, y, w, h);
+        draw::draw_texture_cell(tex, col, cols, row, rows, x, y, w, h, rotation);
     }
     /// Draw a texture stretched to fill the given rectangle, multiplied by a tint colour.
     #[inline]

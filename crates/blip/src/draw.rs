@@ -89,9 +89,14 @@ pub fn draw_texture_tinted(tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, tint
     );
 }
 
-/// Draw frame `frame` of a horizontal strip of `frames` equal-width frames.
-pub fn draw_texture_frame(tex: &Texture2D, frame: u32, frames: u32, x: f32, y: f32, w: f32, h: f32) {
-    let fw = tex.width() / frames as f32;
+/// Draw cell (`col`, `row`) of a `cols` x `rows` sprite sheet, rotated by
+/// `rotation` radians (clockwise) about its centre.
+#[allow(clippy::too_many_arguments)]
+pub fn draw_texture_cell(
+    tex: &Texture2D, col: u32, cols: u32, row: u32, rows: u32,
+    x: f32, y: f32, w: f32, h: f32, rotation: f32,
+) {
+    let (cw, ch) = (tex.width() / cols as f32, tex.height() / rows as f32);
     draw_texture_ex(
         tex,
         x,
@@ -99,7 +104,8 @@ pub fn draw_texture_frame(tex: &Texture2D, frame: u32, frames: u32, x: f32, y: f
         macroquad::color::WHITE,
         DrawTextureParams {
             dest_size: Some(vec2(w, h)),
-            source: Some(Rect::new(fw * frame as f32, 0.0, fw, tex.height())),
+            source: Some(Rect::new(cw * col as f32, ch * row as f32, cw, ch)),
+            rotation,
             ..Default::default()
         },
     );
