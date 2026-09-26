@@ -2926,3 +2926,76 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   bottom: calc(50% - var(--boot) / 2 - 6px);
   height: calc(var(--boot) * 0.5);
 }
+
+/* ---- One place for the controls, whichever controller is showing ----
+   Upright phones: the joystick's base and the d-pad share a centre, and
+   the caps sit in the same spot in both, so switching moves nothing under
+   the thumbs. Everything is centred on the bar's vertical middle; --ctl-cx
+   is the cross / base centre measured from the station's left edge and
+   --ctl-pr the caps' right margin. */
+@media (max-width: 560px) {
+  :root[data-layout="upright"][data-caps="4"] { --ctl-cx: 40px; --ctl-pr: 10px; }
+  :root[data-layout="upright"][data-caps="4"][data-seats="1"] { --ctl-cx: 64px; --ctl-pr: 22px; }
+
+  /* Same bar height in both modes, so the middle is the same screen row. */
+  :root[data-layout="upright"][data-controls="stick"]:not([data-seats="1"]) #topbar.kiosk-bar,
+  :root[data-layout="upright"][data-controls="stick"]:not([data-seats="1"]) .kiosk-bar-main {
+    height: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Pad: centred in the bar, cross centre at --ctl-cx. */
+  :root[data-layout="upright"][data-caps="4"] .snes-pad .snes-shell {
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--ctl-pr) env(safe-area-inset-bottom, 0px) calc(var(--ctl-cx) - var(--sf-dpad) / 2);
+  }
+  :root[data-layout="upright"][data-caps="4"] .snes-pad .snes-dpad,
+  :root[data-layout="upright"][data-caps="4"] .snes-pad .snes-face { margin-bottom: 0; }
+
+  /* The pad fills the panel edge to edge; the stations must too. */
+  :root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel { padding-left: 0; padding-right: 0; gap: 0; }
+
+  /* Joystick: the same, with the base as wide as its boot so the boot's
+     centre is the base's centre. */
+  :root[data-layout="upright"][data-caps="4"] .deck-side {
+    flex: 1 1 0;
+    justify-content: space-between;
+    padding: 0 var(--ctl-pr) 0 calc(var(--ctl-cx) - var(--boot) / 2);
+  }
+  :root[data-layout="upright"][data-caps="4"] .stick-base { width: var(--boot); }
+  :root[data-layout="upright"][data-caps="4"] .deck-side .fire-buttons {
+    align-self: center;
+    margin: 0;
+  }
+}
+
+/* Caps the same size and spacing as the pad's (58 / 22 alone, 42 / 8 with
+   two stations, shrinking with the pad). */
+@media (max-width: 560px) {
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-seats="1"] { --cap: 58px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"]:not([data-seats="1"]) { --cap: 40px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-seats="1"] #topbar .fire-buttons.four { gap: 0 22px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"]:not([data-seats="1"]) #topbar .fire-buttons.four { gap: 7px 8px; }
+}
+@media (max-width: 360px) {
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"]:not([data-seats="1"]) { --cap: 38px; }
+}
+@media (max-width: 340px) {
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"]:not([data-seats="1"]) { --cap: 34px; }
+}
+
+/* Two stations share 171px on a 375px phone: sizes tuned so cross + caps fit
+   a half with a little air, in both controllers. */
+@media (max-width: 560px) {
+  :root[data-layout="upright"][data-caps="4"]:not([data-seats="1"]) { --ctl-cx: 36px; --ctl-pr: 6px; }
+  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad { --sf-btn: 40px; --sf-dpad: 60px; }
+}
+@media (max-width: 360px) {
+  :root[data-layout="upright"][data-caps="4"]:not([data-seats="1"]) { --ctl-cx: 34px; }
+  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad { --sf-btn: 38px; --sf-dpad: 56px; }
+}
+@media (max-width: 340px) {
+  :root[data-layout="upright"][data-caps="4"]:not([data-seats="1"]) { --ctl-cx: 31px; --ctl-pr: 5px; }
+  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad { --sf-btn: 34px; --sf-dpad: 52px; --sf-gap: 6px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"]:not([data-seats="1"]) #topbar .fire-buttons.four { gap: 7px 6px; }
+}
