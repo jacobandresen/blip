@@ -38,6 +38,7 @@ const PAD_SPEED: f32 = 280.0;
 
 const BALL_W: i32 = 18;
 const BALL_H: i32 = 18;
+const BALL_FRAMES: u32 = 16; // must match blip_assets::bouncer
 const BALL_SPEED_0: f32 = 240.0;
 const BALL_SPEED_MAX: f32 = 420.0;
 
@@ -568,16 +569,10 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, brick:
         BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.35 },
     );
 
-    blip.draw_texture(ball, g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32);
-
-    // Rolling mark: a small dark fleck that orbits the ball's centre as it
-    // spins, so the roll itself is visible instead of just the shadow.
-    let (rs, rc) = g.ball_roll.sin_cos();
-    let mark_r = BALL_W as f32 * 0.28;
-    blip.fill_circle(
-        ball_cx + rc * mark_r, ball_cy + rs * mark_r * 0.6, 1.6,
-        BlipColor { r: 0.1, g: 0.1, b: 0.12, a: 0.6 },
-    );
+    // Strip period is a third of a turn (the panel pattern repeats every 120°).
+    let period = 2.0 * PI / 3.0;
+    let frame = (g.ball_roll.rem_euclid(period) / period * BALL_FRAMES as f32) as u32 % BALL_FRAMES;
+    blip.draw_texture_frame(ball, frame, BALL_FRAMES, g.ball_x - 1.0, g.ball_y - 1.0, BALL_W as f32 + 2.0, BALL_H as f32 + 2.0);
 
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
@@ -653,6 +648,7 @@ async fn main() {
 
     let paddle = load_png(PADDLE_PNG);
     let ball = load_png(BALL_PNG);
+    ball.set_filter(FilterMode::Linear);
     let brick = [
         load_png(BRICK_RED_PNG),
         load_png(BRICK_ORANGE_PNG),

@@ -33,6 +33,8 @@ const ALIEN_TOTAL: usize = (ALIEN_COLS * ALIEN_ROWS) as usize;
 
 // ---- tuning -----------------------------------------------------------
 const PLAYER_SPEED: f32 = 200.0;
+const PLAYER_ACCEL: f32 = 2200.0;
+const PLAYER_BRAKE: f32 = 3200.0;
 const BULLET_SPEED: f32 = 350.0;
 const MARCH_START: i32 = 520;
 const MARCH_MIN: i32 = 65;
@@ -150,6 +152,7 @@ struct Game {
     explosions: [Explosion; N_EXPLOSIONS],
     shields: [Shield; SHIELDS],
     player_x: f32,
+    player_vx: f32,
     sess: Session,
     march_timer: f32,
     march_dir: i32,
@@ -208,6 +211,7 @@ impl Game {
             explosions: [expl_default; N_EXPLOSIONS],
             shields: [shield_default; SHIELDS],
             player_x: 0.0,
+            player_vx: 0.0,
             sess: Session::new(LIVES_START),
             march_timer: 0.0,
             march_dir: 1,
@@ -377,6 +381,7 @@ impl Game {
 
     fn start_round_common(&mut self) {
         self.player_x = ((WIN_W - ALIEN_W) / 2) as f32;
+        self.player_vx = 0.0;
         self.bullets.iter_mut().for_each(|b| b.active = false);
         self.explosions.iter_mut().for_each(|e| e.active = false);
         self.init_aliens();
@@ -843,10 +848,15 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     let moving_left = key_held(BLIP_KEY_LEFT) || key_held(BLIP_KEY_A);
     let moving_right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
-    let ps = PLAYER_SPEED * dt;
-    if moving_left { g.player_x -= ps; }
-    if moving_right { g.player_x += ps; }
-    g.player_x = clamp(g.player_x, 0.0, (WIN_W - ALIEN_W) as f32);
+    // The cannon has mass: it spools up to full speed and brakes over ~0.08s.
+    let dir = moving_right as i32 - moving_left as i32;
+    let target = dir as f32 * PLAYER_SPEED;
+    let rate = if dir == 0 || target * g.player_vx < 0.0 { PLAYER_BRAKE } else { PLAYER_ACCEL } * dt;
+    g.player_vx += clamp(target - g.player_vx, -rate, rate);
+    g.player_x += g.player_vx * dt;
+    let max_x = (WIN_W - ALIEN_W) as f32;
+    if g.player_x < 0.0 || g.player_x > max_x { g.player_vx = 0.0; }
+    g.player_x = clamp(g.player_x, 0.0, max_x);
     if moving_left || moving_right {
         g.player_still_secs = 0.0;
     } else {
@@ -1178,33 +1188,19 @@ fn draw_play(blip: &Blip, g: &Game,
 
     draw_boss(blip, g, saucer);
 
-    // While dead: hide the ship through the explosion, then have it fade
-    // back in out of a dissipating mist once the respawn phase starts.
-    let (ship_alpha, mist) = if g.state == State::Dead {
-        // Use the pause that was actually armed, not the DEAD_PAUSE constant —
-        // the "invasion reached the ground" death only runs the short
-        // explosion phase before cutting to game over, with no respawn fade.
+    // Hidden through the explosion, then fades back in for the respawn.
+    let ship_alpha = if g.state == State::Dead {
+        // dead_pause_total, not DEAD_PAUSE: the invasion death has no respawn fade.
         let total = g.dead_pause_total;
         let elapsed = (total - g.dead_timer.remaining()).clamp(0.0, total);
         if elapsed <= DEATH_EXPLOSION_PHASE || total <= DEATH_EXPLOSION_PHASE {
-            (0.0, 0.0)
+            0.0
         } else {
-            let t = ((elapsed - DEATH_EXPLOSION_PHASE) / (total - DEATH_EXPLOSION_PHASE))
-                .clamp(0.0, 1.0);
-            (t, 1.0 - t)
+            ((elapsed - DEATH_EXPLOSION_PHASE) / (total - DEATH_EXPLOSION_PHASE)).clamp(0.0, 1.0)
         }
     } else {
-        (1.0, 0.0)
+        1.0
     };
-
-    if mist > 0.0 {
-        let cx = g.player_x + ALIEN_W as f32 / 2.0;
-        let cy = (GROUND_Y - 28) as f32 + 14.0;
-        blip.fill_glow_circle(
-            cx, cy, 14.0 + 22.0 * mist,
-            BlipColor { r: 0.6, g: 0.9, b: 1.0, a: mist * 0.6 },
-        );
-    }
 
     if ship_alpha > 0.0 {
         blip.draw_texture_tinted(

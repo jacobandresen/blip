@@ -48,6 +48,7 @@ const HYPERSPACE_RISK: i32 = 20; // 1-in-N chance of self-destruct
 
 // ---- asteroids --------------------------------------------------------
 const MAX_ASTEROIDS: usize = 48;
+const MAX_DEBRIS:    usize = 96;
 const WAVE_BASE:     i32 = 3;
 const WAVE_MAX:      i32 = 14;
 
@@ -121,6 +122,23 @@ const ASTEROID_OFF: Asteroid = Asteroid {
     size: ASize::Large, rot: 0.0, spin: 0.0, jag: [1.0; 10],
 };
 
+/// A tumbling line shard thrown off by an explosion; fades out over `ttl0`.
+#[derive(Copy, Clone)]
+struct Debris {
+    active: bool,
+    x: f32, y: f32,
+    vx: f32, vy: f32,
+    rot: f32, spin: f32,
+    len: f32,
+    ttl: f32, ttl0: f32,
+    color: BlipColor,
+}
+impl Pooled for Debris { fn is_active(&self) -> bool { self.active } }
+const DEBRIS_OFF: Debris = Debris {
+    active: false, x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, rot: 0.0, spin: 0.0,
+    len: 0.0, ttl: 0.0, ttl0: 1.0, color: BLIP_WHITE,
+};
+
 #[derive(Copy, Clone)]
 struct Saucer {
     active: bool,
@@ -140,6 +158,7 @@ struct Game {
     respawn_t: Timer,
     bullets: [Bullet; MAX_BULLETS],
     asteroids: [Asteroid; MAX_ASTEROIDS],
+    debris: [Debris; MAX_DEBRIS],
     saucer: Saucer,
     saucer_cd: f32,
     sess: Session,
@@ -157,6 +176,7 @@ impl Game {
             respawn_t: Timer::default(),
             bullets: [BULLET_OFF; MAX_BULLETS],
             asteroids: [ASTEROID_OFF; MAX_ASTEROIDS],
+            debris: [DEBRIS_OFF; MAX_DEBRIS],
             saucer: Saucer { active: false, x: 0.0, y: 0.0, vx: 0.0, wave_t: 0.0, fire_t: 0.0, big: true },
             saucer_cd: 12.0,
             sess: Session::new(LIVES_START),
@@ -189,6 +209,7 @@ impl Game {
         self.sess.reset(LIVES_START);
         self.next_life_score = EXTRA_LIFE_SCORE;
         self.bullets = [BULLET_OFF; MAX_BULLETS];
+        self.debris = [DEBRIS_OFF; MAX_DEBRIS];
         self.saucer.active = false;
         let (lo, hi) = saucer_spawn_range(self.sess.level);
         self.saucer_cd = rand_range(lo, hi);
@@ -234,23 +255,46 @@ fn spawn_asteroid(g: &mut Game, x: f32, y: f32, size: ASize) {
     let (smin, smax) = size.speed_range();
     let speed = rand_range(smin, smax);
     let dir = rand_range(0.0, PI * 2.0);
+    spawn_asteroid_v(g, x, y, size, dir.cos() * speed, dir.sin() * speed);
+}
+
+fn spawn_asteroid_v(g: &mut Game, x: f32, y: f32, size: ASize, vx: f32, vy: f32) {
     let mut jag = [1.0f32; 10];
     for j in jag.iter_mut() { *j = rand_range(0.75, 1.25); }
     pool_spawn(&mut g.asteroids, Asteroid {
         active: true, x, y,
-        vx: dir.cos() * speed, vy: dir.sin() * speed,
+        vx, vy,
         size, rot: rand_range(0.0, PI * 2.0),
         spin: rand_range(-1.5, 1.5),
         jag,
     });
 }
 
-fn split_asteroid(g: &mut Game, x: f32, y: f32, size: ASize) {
+/// Fragments leave along opposite sides of a random axis, on top of the
+/// parent's velocity (plus a share of the impactor's), so momentum carries through.
+fn split_asteroid(g: &mut Game, x: f32, y: f32, size: ASize, pvx: f32, pvy: f32) {
     let Some(child) = size.child() else { return };
-    for _ in 0..2 {
-        let ox = rand_range(-6.0, 6.0);
-        let oy = rand_range(-6.0, 6.0);
-        spawn_asteroid(g, x + ox, y + oy, child);
+    let axis = rand_range(0.0, PI * 2.0);
+    let (ax, ay) = (axis.cos(), axis.sin());
+    let (smin, smax) = child.speed_range();
+    for sign in [1.0_f32, -1.0] {
+        let kick = rand_range(smin, smax) * 0.6;
+        spawn_asteroid_v(g, x + ax * sign * 6.0, y + ay * sign * 6.0, child,
+            pvx + ax * sign * kick, pvy + ay * sign * kick);
+    }
+}
+
+fn burst(g: &mut Game, x: f32, y: f32, vx: f32, vy: f32, n: usize, len: f32, speed: f32, color: BlipColor) {
+    for _ in 0..n {
+        let dir = rand_range(0.0, PI * 2.0);
+        let sp = rand_range(0.25, 1.0) * speed;
+        let ttl = rand_range(0.5, 1.1);
+        pool_spawn(&mut g.debris, Debris {
+            active: true, x, y,
+            vx: vx * 0.5 + dir.cos() * sp, vy: vy * 0.5 + dir.sin() * sp,
+            rot: rand_range(0.0, PI * 2.0), spin: rand_range(-6.0, 6.0),
+            len: len * rand_range(0.5, 1.0), ttl, ttl0: ttl, color,
+        });
     }
 }
 
@@ -318,6 +362,8 @@ fn kill_ship(g: &mut Game, sfx: &Sounds) {
     if !g.ship_alive { return; }
     play_sfx(&sfx.ship_boom);
     g.ship_alive = false;
+    let (sx, sy, svx, svy) = (g.ship.x, g.ship.y, g.ship.vx, g.ship.vy);
+    burst(g, sx, sy, svx, svy, 7, 12.0, 110.0, NEON_CYAN);
     match g.sess.lose_life() {
         LifeResult::StillAlive => { g.respawn_t.start(RESPAWN_DELAY); g.state = State::Dead; }
         LifeResult::GameOver   => {
@@ -356,6 +402,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
                 *thrust_snd_t = 0.18;
             }
         }
+        // Light drag; a frictionless hull is unforgiving to steer.
+        let drag = (-0.35 * dt).exp();
+        g.ship.vx *= drag;
+        g.ship.vy *= drag;
         let speed = (g.ship.vx * g.ship.vx + g.ship.vy * g.ship.vy).sqrt();
         if speed > SHIP_MAX_SPEED {
             let s = SHIP_MAX_SPEED / speed;
@@ -401,9 +451,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
             let dx = g.ship.x - g.asteroids[ai].x;
             let dy = g.ship.y - g.asteroids[ai].y;
             if dx * dx + dy * dy <= (r + SHIP_RADIUS) * (r + SHIP_RADIUS) {
-                let (ax, ay, size) = (g.asteroids[ai].x, g.asteroids[ai].y, g.asteroids[ai].size);
+                let a = g.asteroids[ai];
                 g.asteroids[ai].active = false;
-                split_asteroid(g, ax, ay, size);
+                burst(g, a.x, a.y, a.vx, a.vy, 6, a.size.radius() * 0.5, 70.0, NEON_PURPLE);
+                split_asteroid(g, a.x, a.y, a.size, a.vx, a.vy);
                 kill_ship(g, sfx);
                 break;
             }
@@ -415,6 +466,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
         let dy = g.ship.y - g.saucer.y;
         if dx * dx + dy * dy <= (r + SHIP_RADIUS) * (r + SHIP_RADIUS) {
             g.saucer.active = false;
+            let (sx, sy) = (g.saucer.x, g.saucer.y);
+            burst(g, sx, sy, g.saucer.vx, 0.0, 6, r, 90.0, NEON_PINK);
             kill_ship(g, sfx);
         }
     }
@@ -428,6 +481,14 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
         if b.ttl <= 0.0 || b.x < 0.0 || b.x > PLAY_W as f32 || b.y < PLAY_Y0 || b.y > PLAY_Y0 + PLAY_H as f32 {
             b.active = false;
         }
+    }
+
+    for d in pool_iter_mut(&mut g.debris) {
+        d.x += d.vx * dt;
+        d.y += d.vy * dt;
+        d.rot += d.spin * dt;
+        d.ttl -= dt;
+        if d.ttl <= 0.0 { d.active = false; }
     }
 
     for a in pool_iter_mut(&mut g.asteroids) {
@@ -444,13 +505,11 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
         if g.saucer.fire_t <= 0.0 && g.ship_alive {
             let dx = g.ship.x - g.saucer.x;
             let dy = g.ship.y - g.saucer.y;
-            let dist = (dx * dx + dy * dy).sqrt().max(1.0);
             let spread = if g.saucer.big { 0.35 } else { 0.04 };
             let jitter = rand_range(-spread, spread);
             let base = dy.atan2(dx) + jitter;
             let speed = 260.0;
             spawn_bullet(&mut g.bullets, g.saucer.x, g.saucer.y, base.cos() * speed, base.sin() * speed, false);
-            let _ = dist;
             g.saucer.fire_t = saucer_fire_cooldown(g.sess.level);
         }
         if g.saucer.x < -40.0 || g.saucer.x > PLAY_W as f32 + 40.0 {
@@ -475,15 +534,19 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
             let r = g.asteroids[ai].size.radius();
             if seg_hits_circle(px, py, bx, by, g.asteroids[ai].x, g.asteroids[ai].y, r) {
                 g.bullets[bi].active = false;
-                let (ax, ay, size) = (g.asteroids[ai].x, g.asteroids[ai].y, g.asteroids[ai].size);
+                let a = g.asteroids[ai];
+                let size = a.size;
+                // A share of the bullet's momentum goes into the fragments.
+                let (pvx, pvy) = (a.vx + g.bullets[bi].vx * 0.04, a.vy + g.bullets[bi].vy * 0.04);
                 g.asteroids[ai].active = false;
+                burst(g, a.x, a.y, a.vx, a.vy, 5, size.radius() * 0.5, 60.0, NEON_PURPLE);
                 award(g, sfx, size.points());
                 match size {
                     ASize::Large  => play_sfx(&sfx.bang_large),
                     ASize::Medium => play_sfx(&sfx.bang_medium),
                     ASize::Small  => play_sfx(&sfx.bang_small),
                 }
-                split_asteroid(g, ax, ay, size);
+                split_asteroid(g, a.x, a.y, size, pvx, pvy);
                 break;
             }
         }
@@ -499,6 +562,8 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
             if seg_hits_circle(px, py, bx, by, g.saucer.x, g.saucer.y, r) {
                 g.bullets[bi].active = false;
                 g.saucer.active = false;
+                let (sx, sy, svx) = (g.saucer.x, g.saucer.y, g.saucer.vx);
+                burst(g, sx, sy, svx, 0.0, 6, r, 90.0, NEON_PINK);
                 award(g, sfx, if g.saucer.big { 200 } else { 1000 });
                 if g.saucer.big { play_sfx(&sfx.saucer_big); } else { play_sfx(&sfx.saucer_small); }
                 break;
@@ -564,11 +629,6 @@ fn draw_asteroid(blip: &Blip, a: &Asteroid) {
     let n = a.jag.len();
     let r = a.size.radius();
     let mut prev: Option<(f32, f32)> = None;
-    let first_pt = {
-        let ang = a.rot;
-        let rr = r * a.jag[0];
-        (a.x + ang.cos() * rr, a.y + ang.sin() * rr)
-    };
     for i in 0..=n {
         let idx = i % n;
         let ang = a.rot + (idx as f32 / n as f32) * PI * 2.0;
@@ -579,7 +639,6 @@ fn draw_asteroid(blip: &Blip, a: &Asteroid) {
         }
         prev = Some(pt);
     }
-    let _ = first_pt;
 }
 
 fn draw_saucer(blip: &Blip, s: &Saucer) {
@@ -627,6 +686,12 @@ fn draw_horizon_grid(blip: &Blip, y0: f32, y1: f32) {
 fn draw_play(blip: &Blip, g: &Game) {
     blip.clear(BLIP_BLACK);
     for a in pool_iter(&g.asteroids) { draw_asteroid(blip, a); }
+    for d in pool_iter(&g.debris) {
+        let (s, c) = d.rot.sin_cos();
+        let h = d.len * 0.5;
+        let col = BlipColor { a: d.ttl / d.ttl0, ..d.color };
+        blip.draw_line(d.x - c * h, d.y - s * h, d.x + c * h, d.y + s * h, col);
+    }
     if g.saucer.active { draw_saucer(blip, &g.saucer); }
     for b in pool_iter(&g.bullets) {
         let c = if b.from_player { NEON_YELLOW } else { NEON_PINK };
@@ -636,14 +701,7 @@ fn draw_play(blip: &Blip, g: &Game) {
         draw_ship(blip, &g.ship, g.invuln_t, NEON_CYAN);
     }
     blip.draw_hud(g.sess.score, g.sess.lives);
-    // The shell clips the canvas 3 *screen* pixels in on every edge (see
-    // shell.css's `canvas { clip-path: inset(3px round 6px) }`, shared by
-    // every game). That's a couple of game-units for the 480-wide games,
-    // but meteors' canvas is 680 units wide — packed into the same screen
-    // width, each game-unit maps to fewer screen pixels, so the same 3px
-    // clip eats noticeably more of *this* game's own coordinate space.
-    // x=4 used to land inside that clipped strip, cutting the left couple
-    // of letters off "LEVEL n"; x=12 clears it with room to spare.
+    // x=12 clears the shell's 3px canvas clip, which eats more of this wider canvas's units.
     let lvl = format!("LEVEL {}", g.sess.level);
     blip.draw_text(&lvl, 12.0, WIN_H as f32 - 18.0, 1.5, BLIP_GRAY);
 }

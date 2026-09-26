@@ -742,6 +742,13 @@ impl Blip {
     pub fn draw_texture(&self, tex: &macroquad::texture::Texture2D, x: f32, y: f32, w: f32, h: f32) {
         draw::draw_texture(tex, x, y, w, h);
     }
+    /// Draw one frame of a horizontal sprite strip into the given rectangle.
+    #[inline]
+    pub fn draw_texture_frame(
+        &self, tex: &macroquad::texture::Texture2D, frame: u32, frames: u32, x: f32, y: f32, w: f32, h: f32,
+    ) {
+        draw::draw_texture_frame(tex, frame, frames, x, y, w, h);
+    }
     /// Draw a texture stretched to fill the given rectangle, multiplied by a tint colour.
     #[inline]
     pub fn draw_texture_tinted(

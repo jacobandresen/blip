@@ -301,10 +301,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     if key_pressed(BLIP_KEY_LEFT)  || key_pressed(BLIP_KEY_A) { g.queue_turn(Dir::Left); }
     if key_pressed(BLIP_KEY_RIGHT) || key_pressed(BLIP_KEY_D) { g.queue_turn(Dir::Right); }
 
-    // Counted down in real time rather than in steps. The snake speeds up
-    // as the level climbs, so a bonus measured in steps would quietly get
-    // *longer* to reach exactly as the game got harder — the deadline has
-    // to be the same six seconds whatever speed the snake is doing.
+    // Real time, not steps: the deadline must not stretch as the snake speeds up.
     if g.bonus_active() {
         g.bonus_ttl -= dt;
         if g.bonus_ttl < 0.0 { g.bonus_ttl = 0.0; }
@@ -348,9 +345,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         return;
     }
 
-    // The bonus is taken before the level check below, so a bonus grabbed
-    // on the same step that finishes a level still scores at the level it
-    // was offered on rather than the next one.
+    // Before the level check so it scores at the level it was offered on.
     if g.bonus_active() && h == g.bonus {
         play_sfx(&sfx.eat);
         g.sess.add_score(BONUS_VALUE * g.sess.level);
@@ -362,10 +357,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         play_sfx(&sfx.eat);
         g.sess.add_score(10 * g.sess.level);
         g.foods_eaten += 1;
-        // `foods_eaten` restarts at every level (five foods to a level),
-        // so this is one bonus per level, on the third food — far enough
-        // in that the snake has some length to manage, far enough from
-        // the level change that the two events do not land together.
+        // One bonus per level, mid-level, away from the level change.
         if g.foods_eaten % BONUS_EVERY == 0 && !g.bonus_active() { g.spawn_bonus(); }
         if g.foods_eaten >= FOODS_PER_LVL {
             g.sess.next_level();
@@ -418,22 +410,14 @@ fn draw_board(blip: &Blip) {
 }
 
 fn draw_snake(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D) {
-    // Slide each segment from the cell it left toward the cell it's entering,
-    // by how far through the current step-tick we are, so the snake glides
-    // instead of jumping a whole cell at a time. Pure rendering — the game
-    // logic stays on its clean integer grid. Only while actually moving,
-    // though: the fatal tick returns before ever touching move_timer again,
-    // so once dead it sits stalled at whatever tiny fraction it was on — and
-    // rendering that fraction would show the snake still gliding in *toward*
-    // its last cell, a step short of the wall or body it hit. Dead freezes
-    // it fully arrived instead, right on the edge it died against.
+    // Glide between cells by step progress; frozen fully arrived once dead
+    // (move_timer stalls mid-step on the fatal tick).
     let f = if g.state == State::Play {
         (g.move_timer / g.move_interval()).clamp(0.0, 1.0)
     } else {
         1.0
     };
-    // Death flash: blink the whole snake red/white for as long as
-    // dead_timer is counting down — the classic arcade "you got hit" tell.
+    // Death flash.
     let tint = if g.state == State::Dead && (g.dead_timer.remaining() / 0.12) as i32 % 2 == 0 {
         BLIP_RED
     } else {
@@ -480,25 +464,16 @@ fn draw_play(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D, food: &T
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
-/// The timed bonus: a gold star that shrinks as its clock runs out, and
-/// blinks for the last two seconds.
-///
-/// The countdown is drawn into the piece itself rather than put in the
-/// HUD, because the decision it drives — go for it, or keep working the
-/// board — is made while looking at the snake, not at the score. A number
-/// at the top of the screen would be a number nobody reads in time.
+/// The timed bonus: shrinks with its clock (drawn in-world, where the
+/// go-for-it decision is made) and blinks for the last two seconds.
 fn draw_bonus(blip: &Blip, g: &Game) {
     if !g.bonus_active() { return; }
-    // Blink out at the end. Off for the shorter part of each cycle, so the
-    // thing spends most of its last seconds visible and still findable —
-    // a 50/50 blink reads as gone half the time.
+    // Off for only a third of each cycle so it stays findable.
     let expiring = g.bonus_ttl <= BONUS_WARN;
     if expiring && (g.bonus_ttl * 6.0) as i32 % 3 == 0 { return; }
 
     let cx = (g.bonus.c * CELL) as f32 + CELL as f32 / 2.0;
     let cy = (HUD_H + g.bonus.r * CELL) as f32 + CELL as f32 / 2.0;
-    // Shrinks with the clock, but never below half — the target still has
-    // to be worth aiming at on the step you finally reach it.
     let life = g.bonus_ttl / BONUS_TTL;
     let r = CELL as f32 * (0.26 + 0.20 * life);
     let gold = BlipColor { r: 1.0, g: 0.84, b: 0.20, a: 1.0 };

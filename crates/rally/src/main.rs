@@ -32,9 +32,7 @@ const BALL_SPD0: f32 = 275.0;
 const BALL_INC: f32 = 15.0;
 const BALL_MAX: f32 = 450.0;
 const AI_SPD: f32 = 145.0;
-// A hard floor on how long the win/lose screen stays up before a key can
-// dismiss it — without this, a paddle key still held from the rally that
-// just ended bounces straight back to the title screen unread.
+// Keys held from the last rally must not dismiss the win/lose screen unread.
 const GAME_OVER_MIN_WAIT: f32 = 2.0;
 
 // ---- derived ----------------------------------------------------------
@@ -60,6 +58,7 @@ struct Game {
     point_t: Timer,
     state: State,
     mode: Mode,
+    ai_err: f32, // where on its face the CPU meets the ball, re-rolled each volley
 }
 
 impl Game {
@@ -71,6 +70,7 @@ impl Game {
             point_t: Timer::default(),
             state: State::Title,
             mode: Mode::OnePlayer,
+            ai_err: 0.0,
         }
     }
 
@@ -163,16 +163,20 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
         if key_held(KeyCode::I) { g.rpad_y -= PAD_SPEED * dt; }
         if key_held(KeyCode::K) { g.rpad_y += PAD_SPEED * dt; }
     } else {
-        let target = g.ball_y + BALL_SZ * 0.5 - PAD_H * 0.5;
+        // Tracks the ball only while it is coming; otherwise drifts to centre.
+        let target = if g.ball_vx > 0.0 {
+            g.ball_y + BALL_SZ * 0.5 - PAD_H * 0.5 + g.ai_err
+        } else {
+            PLAY_T + PLAY_H * 0.5 - PAD_H * 0.5
+        };
         let diff = target - g.rpad_y;
-        let mv = AI_SPD * dt;
+        let mv = AI_SPD * dt * if g.ball_vx > 0.0 { 1.0 } else { 0.5 };
         g.rpad_y += if diff > mv { mv } else if diff < -mv { -mv } else { diff };
     }
 
     g.clamp_pads();
 
-    // How fast each paddle is actually travelling this frame — a paddle that's
-    // moving when the ball meets it throws the ball, the way a real bat does.
+    // Paddle velocity this frame; a moving paddle throws the ball.
     let lpad_vy = (g.lpad_y - lpy0) / dt;
     let rpad_vy = (g.rpad_y - rpy0) / dt;
 
@@ -186,8 +190,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
         g.ball_x += g.ball_vx * sdt;
         g.ball_y += g.ball_vy * sdt;
 
-        // Walls: reflect the overshoot rather than clamping it flat, so the
-        // bounce keeps its full speed instead of shaving a sliver off.
+        // Reflect the overshoot rather than clamp, so no speed is shaved off.
         if g.ball_y < PLAY_T {
             g.ball_y = 2.0 * PLAY_T - g.ball_y;
             g.ball_vy = g.ball_vy.abs();
@@ -250,6 +253,9 @@ fn bounce_paddle(g: &mut Game, pad_y: f32, pad_vy: f32, dir: f32) {
     let m = g.ball_vx.hypot(g.ball_vy).max(1.0);
     g.ball_vx = g.ball_vx / m * g.ball_spd;
     g.ball_vy = g.ball_vy / m * g.ball_spd;
+    if dir > 0.0 {
+        g.ai_err = (rand() % 1000) as f32 / 1000.0 * PAD_H * 0.7 - PAD_H * 0.35;
+    }
 }
 
 fn update_point(g: &mut Game, dt: f32) {
@@ -295,10 +301,7 @@ fn draw_title(blip: &Blip) {
     blip.fill_rect(RPAD_X, py, PAD_W, PAD_H, C_PAD);
     let cy = PLAY_T + PLAY_H * 0.5;
     blip.draw_centered("RALLY", cy - 34.0, 5.0, BLIP_YELLOW);
-    // The 1P / 2P choice is the control itself, not a menu: each line
-    // names a paddle (both are drawn on screen) and the mode you get by
-    // moving it. "Move" covers both inputs — spin that side's dial, or
-    // press its keys (left = W/S or arrows, right = I/K).
+    // Moving a paddle (dial or keys) picks the mode; there is no menu.
     blip.draw_centered("MOVE LEFT PADDLE: 1 PLAYER",   cy + 14.0, 2.0, BLIP_WHITE);
     blip.draw_centered("MOVE RIGHT PADDLE: 2 PLAYERS", cy + 36.0, 2.0, BLIP_WHITE);
 }

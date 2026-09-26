@@ -35,27 +35,66 @@ fn paddle() -> Vec<u8> {
     img.encode_png()
 }
 
+/// Frames in the roll strip; the game picks one from the ball's roll phase.
+pub const BALL_FRAMES: u32 = 16;
+const BALL_PX: u32 = 36;
+
+/// A lit sphere with six red/white panels, one strip frame per roll step.
 fn ball() -> Vec<u8> {
-    let w: i32 = 16;
-    let h: i32 = 16;
-    let mut img = Image::new(w as u32, h as u32);
-    let cx = w / 2;
-    let cy = h / 2;
-    let r = w as f32 / 2.0 - 1.0;
-    for y in 0..h {
-        for x in 0..w {
-            let dx = (x - cx) as f32 + 0.5;
-            let dy = (y - cy) as f32 + 0.5;
-            if dx * dx + dy * dy < r * r {
-                let shade = (1.0 - (dx * 0.2 + dy * 0.2) / r).clamp(0.5, 1.0);
-                let c = (200.0 + 55.0 * shade) as u8;
-                img.set(x, y, c, c, c);
+    let n = BALL_PX as i32;
+    let mut img = Image::new(BALL_PX * BALL_FRAMES, BALL_PX);
+    let tilt: f32 = 0.45; // pole toward the viewer so the caps read
+    let (ts, tc) = tilt.sin_cos();
+    let light = { let (x, y, z) = (-0.5f32, -0.6, 0.62); let m = (x * x + y * y + z * z).sqrt(); (x / m, y / m, z / m) };
+    let half = (light.0, light.1, light.2 + 1.0);
+    let hm = (half.0 * half.0 + half.1 * half.1 + half.2 * half.2).sqrt();
+    let half = (half.0 / hm, half.1 / hm, half.2 / hm);
+    const SS: i32 = 3;
+    for f in 0..BALL_FRAMES as i32 {
+        let phase = f as f32 / BALL_FRAMES as f32 * 2.0 * PI / 6.0 * 2.0;
+        for py in 0..n {
+            for px in 0..n {
+                let (mut r, mut g, mut b, mut cov) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+                for sy in 0..SS {
+                    for sx in 0..SS {
+                        let x = ((px * SS + sx) as f32 + 0.5) / (n * SS) as f32 * 2.0 - 1.0;
+                        let y = ((py * SS + sy) as f32 + 0.5) / (n * SS) as f32 * 2.0 - 1.0;
+                        let d2 = x * x + y * y;
+                        if d2 >= 1.0 { continue; }
+                        let z = (1.0 - d2).sqrt();
+                        // Undo the tilt, then the roll, to find the surface point.
+                        let (y1, z1) = (y * tc + z * ts, -y * ts + z * tc);
+                        let (s_, c_) = phase.sin_cos();
+                        let (x2, z2) = (x * c_ + z1 * s_, -x * s_ + z1 * c_);
+                        let lon = x2.atan2(z2);
+                        let panel = ((lon + PI) / (PI / 3.0)).floor() as i32;
+                        let cap = y1.abs() > 0.88;
+                        let seam = ((lon + PI) / (PI / 3.0)).fract();
+                        let on_seam = !cap && (seam < 0.025 || seam > 0.975);
+                        let (mut cr, mut cg, mut cb) = if cap || panel % 2 == 0 {
+                            (0.96, 0.95, 0.9)
+                        } else {
+                            (0.88, 0.16, 0.12)
+                        };
+                        if on_seam { cr *= 0.7; cg *= 0.7; cb *= 0.7; }
+                        let diff = (x * light.0 + y * light.1 + z * light.2).max(0.0);
+                        let spec = (x * half.0 + y * half.1 + z * half.2).max(0.0).powf(40.0);
+                        let rim = (1.0 - z).powf(2.0) * 0.25;
+                        let lit = 0.32 + 0.78 * diff - rim;
+                        r += (cr * lit + spec * 0.85).min(1.0);
+                        g += (cg * lit + spec * 0.85).min(1.0);
+                        b += (cb * lit + spec * 0.85).min(1.0);
+                        cov += 1.0;
+                    }
+                }
+                if cov > 0.0 {
+                    let k = |v: f32| (v / cov * 255.0) as u8;
+                    let a = (cov / (SS * SS) as f32 * 255.0) as u8;
+                    img.set_rgba(f * n + px, py, k(r), k(g), k(b), a);
+                }
             }
         }
     }
-    img.set(cx - 2, cy - 2, 255, 255, 255);
-    img.set(cx - 1, cy - 2, 255, 255, 255);
-    img.set(cx - 2, cy - 1, 255, 255, 255);
     img.encode_png()
 }
 

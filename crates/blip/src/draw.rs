@@ -7,7 +7,7 @@ use macroquad::shapes::{
     draw_circle, draw_line as mq_draw_line, draw_rectangle, draw_rectangle_lines,
 };
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
-use macroquad::math::vec2;
+use macroquad::math::{vec2, Rect};
 use macroquad::window::clear_background;
 
 /// Fill the entire canvas with a solid colour.
@@ -86,5 +86,21 @@ pub fn draw_texture_tinted(tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, tint
         y,
         tint,
         DrawTextureParams { dest_size: Some(vec2(w, h)), ..Default::default() },
+    );
+}
+
+/// Draw frame `frame` of a horizontal strip of `frames` equal-width frames.
+pub fn draw_texture_frame(tex: &Texture2D, frame: u32, frames: u32, x: f32, y: f32, w: f32, h: f32) {
+    let fw = tex.width() / frames as f32;
+    draw_texture_ex(
+        tex,
+        x,
+        y,
+        macroquad::color::WHITE,
+        DrawTextureParams {
+            dest_size: Some(vec2(w, h)),
+            source: Some(Rect::new(fw * frame as f32, 0.0, fw, tex.height())),
+            ..Default::default()
+        },
     );
 }

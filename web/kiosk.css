@@ -909,61 +909,65 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   pointer-events: none;
 }
 
-/* Rises from the pivot (the boot's opening) up to the ball. Tapered
-   (narrower at the top) rather than a plain rectangle — a cheap but
-   effective perspective cue, as if the rod recedes slightly from the
-   player's eye on its way up, without any real depth axis to get wrong. */
+/* Rubber dust skirt where the shaft leaves the gate; it leans with the stick. */
+.stick-handle::before {
+  content: '';
+  position: absolute;
+  left: -15px;
+  bottom: -7px;
+  width: 30px;
+  height: 17px;
+  border-radius: 50% 50% 40% 40% / 90% 90% 30% 30%;
+  background: radial-gradient(ellipse at 40% 25%, #4a4a4f 0%, #1d1d20 55%, #08080a 100%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.18), 0 2px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* Chrome rod, tapered slightly toward the top for perspective. Hard-edged
+   highlight and dark reflection bands read as a polished cylinder. */
 .stick-shaft {
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: 12px;
+  width: 11px;
   height: 30px;
   transform: translateX(-50%);
   clip-path: polygon(28% 0%, 72% 0%, 100% 100%, 0% 100%);
-  background: linear-gradient(90deg, #6b6b70 0%, #d8d8dc 35%, #8c8c90 62%, #3c3c40 100%);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  background: linear-gradient(90deg,
+    #2c2c30 0%, #8e9096 14%, #f4f5f7 30%, #b9bbc0 46%, #5c5e64 66%, #1f2023 84%, #74767c 100%);
 }
 
-/* Caps the top of the shaft — straddling its end rather than sitting
-   flush on top of it, like a real ball-top screwed onto a rod. Sized as a
-   proper thumb target, not just a visual flourish. The extra --dy nudge
-   (on top of the lean above, which only carries left/right) is the
-   up/down half of the read: forward/back has no meaningful 2D lean, so
-   it's a small direct shift instead. */
+/* Ball-top: glossy red bakelite. The sphere billboards to the camera (it
+   projects as a circle at any tilt), so it cancels the 9deg lean the
+   handle leaves it with; translateZ keeps the shaft tip from poking through. */
 .stick-ball {
   position: absolute;
   left: 50%;
   bottom: 30px;
   width: 42px;
   height: 42px;
-  /* A sphere always projects as a circle regardless of viewing angle —
-     unlike the flat shaft/boot, which correctly show the panel's tilt
-     because they genuinely are flat, the ball needs its OWN counter-
-     rotation to cancel whatever's left once it reaches here. #topbar
-     contributes +bar-tilt, .stick-handle contributes -bar-tilt - 9deg
-     (see there for the derivation), net -9deg by the time it reaches
-     this element — so +9deg fixed (not scaled by --bar-tilt, since the
-     bar-tilt terms already cancelled each other above) brings it back to
-     dead level. Position still inherits the real 3D scene (it
-     recedes/shifts with the rest of the stick); only its shape stays
-     billboarded to the camera. translateZ nudges it a hair closer to the
-     camera than the shaft tip it caps — without it the two are close
-     enough in depth, post-rotation, that the shaft's edge visibly
-     pokes through the ball instead of disappearing behind it. */
-  /* 22%, not 50%. Centred on the top of the shaft, a ball as wide as
-     this one is swallows the entire shaft — which is why the stick read
-     as a ball sitting straight on the dust washer with a grey nub
-     showing between them. Sitting ON the shaft instead leaves the top
-     third of it out in the open, which is where the chrome is. */
   transform: translate(-50%, calc(22% + var(--dy) * 8px)) rotateX(calc(9deg + var(--dy) * 12deg)) translateZ(6px);
   border-radius: 50%;
-  background: radial-gradient(circle at 34% 22%, #ffab9c 0%, #ff8a78 18%, #e6402c 46%, #a3170c 80%, #6e0d06 100%);
+  background:
+    radial-gradient(circle at 50% 108%, rgba(255, 120, 100, 0.55) 0%, transparent 42%),
+    radial-gradient(circle at 36% 28%, #ff6d58 0%, #e0301f 30%, #a5150b 62%, #560a05 100%);
   box-shadow:
     0 6px 10px rgba(0, 0, 0, 0.5),
-    0 14px 22px rgba(0, 0, 0, 0.35),
-    inset 0 -5px 9px rgba(0, 0, 0, 0.4),
-    inset 0 3px 4px rgba(255, 255, 255, 0.3);
+    0 14px 22px rgba(0, 0, 0, 0.3),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(60, 0, 0, 0.35);
+}
+
+/* Window-shaped specular glint plus a faint secondary on the lower rim. */
+.stick-ball::after {
+  content: '';
+  position: absolute;
+  left: 17%;
+  top: 11%;
+  width: 40%;
+  height: 26%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.45) 45%, transparent 75%);
+  transform: rotate(-32deg);
 }
 
 /* ---- Fire buttons: flush in the bar, right of INSERT COIN ---- */

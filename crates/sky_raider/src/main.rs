@@ -25,6 +25,8 @@ const HUD_H: i32 = 28;
 const PLAYER_W: i32 = 36;
 const PLAYER_H: i32 = 32;
 const PLAYER_SPEED: f32 = 252.0; // a touch quicker — the d-pad is digital, so response has to carry it
+const PLAYER_ACCEL: f32 = 2600.0;
+const PLAYER_BRAKE: f32 = 3400.0;
 const PLAYER_MIN_Y: f32 = (HUD_H + 150) as f32; // player stays out of the HUD band
 // Kept well clear of the bottom edge so the on-screen control pad (which
 // rises over the lowest ~15% of the playfield on a touch screen) can never
@@ -379,6 +381,8 @@ fn boss_size(tier: usize) -> (f32, f32) {
 struct Game {
     player_x: f32,
     player_y: f32,
+    player_vx: f32,
+    player_vy: f32,
     player_bank: f32,   // cosmetic roll while strafing — eased toward a target, not instant
     ship_y: f32,        // carrier position during the launch sequence
     launch_timer: Timer,
@@ -506,6 +510,8 @@ impl Game {
         Self {
             player_x: ((WIN_W - PLAYER_W) / 2) as f32,
             player_y: PLAYER_MAX_Y,
+            player_vx: 0.0,
+            player_vy: 0.0,
             player_bank: 0.0,
             ship_y: (WIN_H + CARRIER_H) as f32,
             launch_timer: Timer::default(),
@@ -613,6 +619,8 @@ impl Game {
         self.player_x = ((WIN_W - PLAYER_W) / 2) as f32;
         self.player_y = LAUNCH_START_Y;
         self.player_bank = 0.0;
+        self.player_vx = 0.0;
+        self.player_vy = 0.0;
         self.ship_y = (WIN_H - CARRIER_H / 2) as f32;
         self.launch_climb = 0.0;
         self.launch_wave_up = false;
@@ -1188,16 +1196,28 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     let right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
     let up    = key_held(BLIP_KEY_UP)    || key_held(BLIP_KEY_W);
     let down  = key_held(BLIP_KEY_DOWN)  || key_held(BLIP_KEY_S);
-    if left  { g.player_x -= PLAYER_SPEED * dt; }
-    if right { g.player_x += PLAYER_SPEED * dt; }
-    if up    { g.player_y -= PLAYER_SPEED * dt; }
-    if down  { g.player_y += PLAYER_SPEED * dt; }
-    g.player_x = clamp(g.player_x, 0.0, (WIN_W - PLAYER_W) as f32);
-    g.player_y = clamp(g.player_y, PLAYER_MIN_Y, PLAYER_MAX_Y);
+    // Spool up and brake over ~0.1s so the plane has weight; diagonals are
+    // normalised so they are no faster than the axes.
+    let dx = right as i32 as f32 - left as i32 as f32;
+    let dy = down as i32 as f32 - up as i32 as f32;
+    let norm = if dx != 0.0 && dy != 0.0 { std::f32::consts::FRAC_1_SQRT_2 } else { 1.0 };
+    let steer = |v: f32, dir: f32| {
+        let target = dir * norm * PLAYER_SPEED;
+        let rate = if dir == 0.0 || target * v < 0.0 { PLAYER_BRAKE } else { PLAYER_ACCEL } * dt;
+        v + clamp(target - v, -rate, rate)
+    };
+    g.player_vx = steer(g.player_vx, dx);
+    g.player_vy = steer(g.player_vy, dy);
+    g.player_x += g.player_vx * dt;
+    g.player_y += g.player_vy * dt;
+    let (max_x, max_y) = ((WIN_W - PLAYER_W) as f32, PLAYER_MAX_Y);
+    if g.player_x < 0.0 || g.player_x > max_x { g.player_vx = 0.0; }
+    if g.player_y < PLAYER_MIN_Y || g.player_y > max_y { g.player_vy = 0.0; }
+    g.player_x = clamp(g.player_x, 0.0, max_x);
+    g.player_y = clamp(g.player_y, PLAYER_MIN_Y, max_y);
 
-    // Roll into a strafe, the way the original 1942's plane does — eased
-    // toward the target tilt rather than snapping, so it reads as banking.
-    let target_bank = if left && !right { -0.30 } else if right && !left { 0.30 } else { 0.0 };
+    // Bank follows lateral velocity.
+    let target_bank = g.player_vx / PLAYER_SPEED * 0.30;
     g.player_bank += (target_bank - g.player_bank) * (dt * 9.0).min(1.0);
 
     // ---- firing ----
