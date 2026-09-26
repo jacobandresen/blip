@@ -2999,3 +2999,30 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad { --sf-btn: 34px; --sf-dpad: 52px; --sf-gap: 6px; }
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] :is(#topbar, #kiosk-bar) .fire-buttons.four { gap: 7px 6px; }
 }
+
+/* ---- One set of equipment, on every deck screen ----
+   The caps, cross and stick are the same size on the landing page, in a
+   one-player game and in a two-player match, so it reads as the same
+   physical panel. Two stations must fit side by side on the narrowest
+   deck, so the size is a share of what one station (half the bar) has
+   left after its margins; --cap, --dpad and the stick's boot (1.12 cap)
+   all derive from it. */
+@media (max-width: 560px) {
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players] {
+    --cap: clamp(32px, calc(0.29 * (50vw - 40px)), 54px);
+    --dpad: clamp(46px, calc(0.42 * (50vw - 40px)), 92px);
+    --ctl-cx: calc(6px + var(--dpad) / 2);
+    --ctl-pr: 6px;
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players] :is(#snes-pad, #snes-pad-p2) {
+    --sf-btn: var(--cap);
+    --sf-dpad: var(--dpad);
+    --sf-gap: 8px;
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players] :is(#snes-pad, #snes-pad-p2) .snes-face.four {
+    gap: 8px;
+  }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players] :is(#topbar, #kiosk-bar) .fire-buttons.four {
+    gap: 8px;
+  }
+}

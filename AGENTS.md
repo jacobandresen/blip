@@ -19,7 +19,8 @@ change will be overwritten the next time the project is built.
 | Styles (layout, touch controls, topbar, loading screen) | `web/shell.css` |
 | JavaScript (canvas scaling, touch controls, coin handling) | `web/shell.js` |
 | Shared nav bar styles (`.kiosk-bar`, `.kiosk-btn`, `.kiosk-hud`) | `web/kiosk.css` |
-| Shared coin state (`getCoins`, `saveCoins`, `updateCoinsHud`) | `web/kiosk.js` |
+| Shared coin state (`getCoins`, `saveCoins`, `updateCoinsHud`), layout rule | `web/kiosk.js` |
+| Bottom control deck markup (stations, stick, pad, caps) — one builder for every page | `web/deck.js` |
 | Kiosk / landing page | `web/index.html` |
 | Wasm <-> JS bridge (`blip_spend_coin`) | `web/blip_bridge.js` |
 | macroquad JS runtime (vendored, do not edit) | `web/mq_js_bundle.js` |

@@ -490,40 +490,11 @@
        (kiosk.css) — static here (no game to drive them), just cabinet
        flavor so the bar looks the same on every page. -->
   <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
-   <div class="deck-panel">
-    <div id="stick-base" class="stick-base">
-      <div id="stick-boot" class="stick-boot"></div>
-      <div id="stick-handle" class="stick-handle">
-        <div id="stick-shaft" class="stick-shaft"></div>
-        <div id="stick-ball" class="stick-ball"></div>
-      </div>
-    </div>
-    <div id="fire-buttons" class="fire-buttons">
-      <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
-      <div class="arcade-btn"><span class="arcade-btn-cap"></span></div>
-    </div>
-   </div>
-
-   <div id="snes-pad" class="snes-pad" aria-hidden="true">
-    <span class="snes-cord" aria-hidden="true"></span>
-    <div class="snes-shell">
-      <div class="snes-dpad">
-        <span class="snes-dp-seg dp-up"    data-blip="up"    data-blip-nopress></span>
-        <span class="snes-dp-seg dp-right" data-blip="right" data-blip-nopress></span>
-        <span class="snes-dp-seg dp-down"  data-blip="down"  data-blip-nopress></span>
-        <span class="snes-dp-seg dp-left"  data-blip="left"  data-blip-nopress></span>
-        <span class="snes-dp-hub"></span>
-      </div>
-      <div class="snes-face">
-        <button type="button" class="snes-btn snes-b" data-blip="button1" aria-label="Button B"><span></span></button>
-        <button type="button" class="snes-btn snes-a" data-blip="button1" aria-label="Button A"><span></span></button>
-      </div>
-      <span class="snes-wordmark" aria-hidden="true">BLIP</span>
-    </div>
-   </div>
+   <div class="deck-panel"></div>
   </div>
+  <script src="deck.js?v=1"></script>
 
-  <script src="kiosk.js?v=24"></script>
+  <script src="kiosk.js?v=25"></script>
   <script src="blip_controller.js?v=4"></script>
   <script>
     var i18n = {

@@ -505,33 +505,11 @@ window.addEventListener('keydown', function (e) {
     ? blipGameFromPath(window.location.pathname) : null;
   var buttonSpecs = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
   var primary = buttonSpecs[0] || { key: ' ', code: 'Space' };
-  // A two-player cabinet seats two stations. The deck is built for both
-  // up front and the second one stays hidden until the game says a
-  // second player has joined (blip_set_mode -> window.blipSetMode).
-  // One cabinet, one control panel: every page gets two stations of a
-  // stick and four caps, and a game that reads fewer leaves the spares
-  // dead. Rally is the exception — spinners, see its branch below.
+  // deck.js has built the deck (two stations, stick and pad each, caps from
+  // BLIP_GAMES) and set data-players / data-caps / data-seats. Rally has
+  // dials instead of the stick and pad, and hides them below.
   var twoUp = !isRally;
   var root = document.documentElement;
-  if (twoUp) {
-    // '1' is the resting state: one player, station two present and
-    // dead. Only a game with a second player moves off it.
-    root.setAttribute('data-players', '1');
-    root.setAttribute('data-caps', '4');
-    // A game that never seats two: station two is furniture, and dimmed.
-    if (!(game && game.players === 2)) root.setAttribute('data-seats', '1');
-  }
-  // Declared here because the pad's face is built before the joystick
-  // deck's caps and both read it.
-  var CAPS = 4;
-  var specs = buttonSpecs.length ? buttonSpecs : [primary];
-  // A one-button game still gets two live caps: the pad's A and B have
-  // always both been fire.
-  if (specs.length < 2) specs = [specs[0], specs[0]];
-  // Only a game that seats two players wires station two; elsewhere it
-  // is panel furniture. Wiring it to names the game has never heard of
-  // also does nothing, but by accident rather than by construction.
-  function specsFor(who) { return who === 1 && !(game && game.players === 2) ? [] : specs; }
 
   function coinGated() { return overlay.classList.contains('visible'); }
   function dispatch(spec, type) {
@@ -655,32 +633,10 @@ window.addEventListener('keydown', function (e) {
   }
 
   // ---- The game pad ----
-  // One pad per station, wired to that station's logical names. A pad's
-  // face carries A / B for most games; a game that declares four buttons
-  // (a fighter) gets four caps in a square instead, laid out and
-  // lettered the same way as the arcade deck's.
+  // One pad per station (built by deck.js), wired to that station's names.
   stations.forEach(function (st, who) {
     var pad = document.getElementById(who ? 'snes-pad-p2' : 'snes-pad');
     if (!pad) return;
-    var face = pad.querySelector('.snes-face');
-    if (face) {
-      face.classList.add('four');
-      face.innerHTML = '';
-      var mine = specsFor(who);
-      for (var i = 0; i < CAPS; i++) {
-        var spec = mine[i];
-        var cap = document.createElement('button');
-        cap.type = 'button';
-        cap.className = 'snes-btn cap' + (i + 1) + (spec ? '' : ' spare');
-        if (spec) {
-          cap.setAttribute('data-blip', st.caps(i));
-          if (spec.label) cap.setAttribute('aria-label', spec.label);
-        }
-        cap.innerHTML = '<span></span>'
-          + (spec && spec.label ? '<i class="snes-legend">' + spec.label + '</i>' : '');
-        face.appendChild(cap);
-      }
-    }
     BlipController.bindButtons(pad);
     BlipController.bindDpad(pad.querySelector('.snes-dpad'), { names: st.dirs });
     BlipController.registerVisual(pad);
@@ -722,25 +678,10 @@ window.addEventListener('keydown', function (e) {
   };
 
   // ---- Fire buttons (joystick mode) ----
-  // Four caps in a square per station. A cap past what the game
-  // declares gets no logical name, so it does nothing. Legends go ON
-  // the cap; the square leaves no room under the top row.
-  stations.forEach(function (st, who) {
+  // The caps were built by deck.js; a cap the game does not declare has no
+  // logical name and does nothing.
+  stations.forEach(function (st) {
     if (!st.fire) return;
-    st.fire.classList.add('four');
-    var mine = specsFor(who);
-    for (var i = 0; i < CAPS; i++) {
-      var spec = mine[i];
-      var btn = document.createElement('div');
-      btn.className = 'arcade-btn lettered' + (spec ? '' : ' spare');
-      if (spec) {
-        btn.setAttribute('data-blip', st.caps(i));
-        if (spec.label) btn.setAttribute('aria-label', spec.label);
-      }
-      btn.innerHTML = '<span class="arcade-btn-cap"></span>'
-        + (spec && spec.label ? '<span class="arcade-btn-label">' + spec.label + '</span>' : '');
-      st.fire.appendChild(btn);
-    }
     BlipController.bindButtons(st.fire);
     BlipController.registerVisual(st.fire);
   });
