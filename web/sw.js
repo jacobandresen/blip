@@ -57,7 +57,11 @@ var ASSETS = [
 self.addEventListener("install", function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (cache) {
-      return cache.addAll(ASSETS);
+      // cache: 'reload' skips the HTTP cache (Pages serves max-age=600), or a
+      // new version can install the previous version's files.
+      return cache.addAll(ASSETS.map(function (u) {
+        return new Request(u, { cache: "reload" });
+      }));
     }),
   );
   self.skipWaiting();
