@@ -520,6 +520,8 @@ window.addEventListener('keydown', function (e) {
     // dead. Only a game with a second player moves off it.
     root.setAttribute('data-players', '1');
     root.setAttribute('data-caps', '4');
+    // A game that never seats two: station two is furniture, and dimmed.
+    if (!(game && game.players === 2)) root.setAttribute('data-seats', '1');
   }
   // Declared here because the pad's face is built before the joystick
   // deck's caps and both read it.

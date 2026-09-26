@@ -2752,3 +2752,19 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
      them and the tag landed on the LK cap. */
   left: calc(var(--cap) * 1.25);
 }
+
+/* A game that never seats two (data-seats="1") dims station two: nobody
+   can join, so looking like the live station only misleads. Brawler's
+   idle station keeps the look above; a second player can still sit down.
+   On the pad it is the controls that dim: the shell is half the panel. */
+:root[data-seats="1"]:not([data-open]) #deck-p2 .stick-boot,
+:root[data-seats="1"]:not([data-open]) #deck-p2 .stick-shaft,
+:root[data-seats="1"]:not([data-open]) #deck-p2 .stick-ball,
+:root[data-seats="1"]:not([data-open]) #deck-p2 .fire-buttons,
+:root[data-seats="1"]:not([data-open]) #deck-p2 .deck-tag,
+:root[data-seats="1"]:not([data-open]) .snes-pad.second .snes-dpad,
+:root[data-seats="1"]:not([data-open]) .snes-pad.second .snes-face,
+:root[data-seats="1"]:not([data-open]) .snes-pad.second .deck-tag {
+  opacity: 0.30;
+  filter: saturate(0.35);
+}

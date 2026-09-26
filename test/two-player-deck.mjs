@@ -277,6 +277,19 @@ test(`a one-player cabinet still has one station (${ENGINE})`, async (t) => {
     assert.equal(await evaluate(cdp,
       "document.querySelectorAll('#fire-buttons-p2 .arcade-btn[data-blip]').length"), 0,
       "player two's caps are wired on a game with no player two");
+    // Nobody can ever sit there, so it must not look like somebody could.
+    assert.equal(await evaluate(cdp,
+      "getComputedStyle(document.querySelector('#deck-p2 .stick-ball')).opacity"), '0.3',
+      'a game with no player two paints station two as live');
+  });
+
+  await t.test("brawler's idle station two is not dimmed", async () => {
+    await loadGame(cdp, 'brawler', 'stick');
+    await evaluate(cdp, 'window.blipSetMode(0)');
+    await sleep(120);
+    assert.equal(await evaluate(cdp,
+      "getComputedStyle(document.querySelector('#deck-p2 .stick-ball')).opacity"), '1',
+      "brawler's second station is dimmed although a player can join");
   });
 
   await t.test("serpent's one cap still fires", async () => {
