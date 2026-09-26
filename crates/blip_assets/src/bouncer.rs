@@ -12,25 +12,62 @@ use crate::techno::{
 use crate::wav::{encode_pcm16_mono, env, mix_into_f32, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
+/// Bat cap width in source pixels; the game stretches only the slice
+/// between the caps, so the ends keep their shape at any bat width.
+pub const PADDLE_CAP: u32 = 12;
+
+/// Brushed-steel bar (drawn 2x) with a glossy blue top face and dark rubber
+/// bumpers at both ends.
 fn paddle() -> Vec<u8> {
-    let w: i32 = 120;
-    let h: i32 = 20;
+    let (w, h) = (120i32, 24i32);
     let mut img = Image::new(w as u32, h as u32);
-    for y in 0..h {
-        for x in 0..w {
-            let mut in_corner = false;
-            if (x < 2 || x >= w - 2) && (y < 2 || y >= h - 2) { in_corner = true; }
-            if x < 1 || x >= w - 1 { in_corner = true; }
-            if in_corner { continue; }
-            let t = y as f32 / h as f32;
-            let r = 50u8;
-            let g = (100.0 + 100.0 * (1.0 - t)) as u8;
-            let b = (200.0 + 55.0 * (1.0 - t)) as u8;
-            img.set(x, y, r, g, b);
+    let r = 9.0f32;
+    let cap = PADDLE_CAP as f32;
+    const N: i32 = 3;
+    for py in 0..h {
+        for px in 0..w {
+            let (mut cr, mut cg, mut cb, mut cov) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+            for sy in 0..N {
+                for sx in 0..N {
+                    let x = px as f32 + (sx as f32 + 0.5) / N as f32;
+                    let y = py as f32 + (sy as f32 + 0.5) / N as f32;
+                    // Rounded-rectangle distance (negative inside).
+                    let qx = (x - w as f32 / 2.0).abs() - (w as f32 / 2.0 - r);
+                    let qy = (y - h as f32 / 2.0).abs() - (h as f32 / 2.0 - r);
+                    let d = qx.max(0.0).hypot(qy.max(0.0)) + qx.max(qy).min(0.0) - r;
+                    if d > 0.0 { continue; }
+                    let t = y / h as f32;
+                    let end = x < cap || x > w as f32 - cap;
+                    let mut c = if end {
+                        // Rubber: near-black with a soft top sheen.
+                        let v = 0.16 - 0.08 * t + 0.14 * (1.0 - (t * 3.0).min(1.0));
+                        (v, v, v * 1.1)
+                    } else if t < 0.5 {
+                        // Lit top face: light steel-blue fading to mid blue.
+                        let k = t / 0.5;
+                        (0.62 - 0.4 * k, 0.86 - 0.36 * k, 1.0 - 0.18 * k)
+                    } else {
+                        // Rounded underside: darkening navy.
+                        let k = (t - 0.5) / 0.5;
+                        (0.22 - 0.17 * k, 0.5 - 0.36 * k, 0.82 - 0.5 * k)
+                    };
+                    // Specular line just under the top edge, on the body only.
+                    if !end && (2.2..4.2).contains(&y) {
+                        c = (c.0 + (1.0 - c.0) * 0.7, c.1 + (1.0 - c.1) * 0.7, c.2 + (1.0 - c.2) * 0.7);
+                    }
+                    // Seam where the bumper meets the bar.
+                    if (x - cap).abs() < 0.9 || (x - (w as f32 - cap)).abs() < 0.9 {
+                        c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35);
+                    }
+                    if d > -1.3 { c = (0.05, 0.07, 0.12); }
+                    cr += c.0; cg += c.1; cb += c.2; cov += 1.0;
+                }
+            }
+            if cov > 0.0 {
+                let k = |v: f32| (v / cov * 255.0).clamp(0.0, 255.0) as u8;
+                img.set_rgba(px, py, k(cr), k(cg), k(cb), (cov / (N * N) as f32 * 255.0) as u8);
+            }
         }
-    }
-    for x in 4..w - 4 {
-        img.set(x, 2, 150, 220, 255);
     }
     img.encode_png()
 }

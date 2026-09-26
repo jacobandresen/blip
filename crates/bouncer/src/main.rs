@@ -45,6 +45,7 @@ const BALL_SPEED_MAX: f32 = 420.0;
 
 // ---- loot drops -------------------------------------------------------
 const MAX_DROPS: usize = 8;
+const PADDLE_CAP: u32 = 12; // must match blip_assets::bouncer
 const DROP_W: f32 = 32.0;
 const DROP_H: f32 = 18.0;
 const DROP_SPEED: f32 = 120.0;
@@ -112,6 +113,8 @@ struct Game {
     ball_vx: f32, ball_vy: f32,
     ball_spin: f32,
     ball_curve_used: f32,
+    pad_kick: f32,   // recoil depth (px) from the last ball strike, on a damped spring
+    pad_kick_v: f32,
     ball_rot: Mat3, // orientation of the ball's surface pattern in view space
     ball_speed: f32,
     sess: Session,
@@ -132,6 +135,8 @@ impl Game {
             ball_x: 0.0, ball_y: 0.0, ball_vx: 0.0, ball_vy: 0.0,
             ball_spin: 0.0,
             ball_curve_used: 0.0,
+            pad_kick: 0.0,
+            pad_kick_v: 0.0,
             ball_rot: MAT3_ID,
             ball_speed: BALL_SPEED_0,
             sess: Session::new(LIVES_START),
@@ -260,6 +265,10 @@ fn update_launch(g: &mut Game, dt: f32) {
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     paddle_input(g, dt);
+
+    // Recoil spring, ~5 Hz and well damped: one dip, no bounce.
+    g.pad_kick_v += (-1000.0 * g.pad_kick - 28.0 * g.pad_kick_v) * dt;
+    g.pad_kick += g.pad_kick_v * dt;
 
     if g.pad_effect_timer.tick(dt) { g.pad_w = PAD_W as f32; }
     g.slow_timer.tick(dt);
@@ -422,6 +431,7 @@ fn ball_paddle(g: &mut Game, speed: f32, sfx: &Sounds) {
         return;
     }
     play_variant(&sfx.paddle_hit, speed);
+    g.pad_kick_v = 40.0 + 70.0 * (speed / BALL_SPEED_MAX).min(1.0);
     let incoming_vx = g.ball_vx;
 
     // Where it landed across the face, -1 (left tip) .. +1 (right tip). The
@@ -609,7 +619,13 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
         }
     }
 
-    blip.draw_texture(paddle, g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32);
+    // Left cap, stretched middle, right cap: the ends keep their shape at any width.
+    let (cap, py) = (PADDLE_CAP as f32, PAD_Y as f32 + g.pad_kick);
+    let (sw, cap_w) = (paddle.width(), PADDLE_CAP as f32 * 0.5);
+    let ph = PAD_H as f32;
+    blip.draw_texture_region(paddle, 0.0, 0.0, cap, 24.0, g.pad_x, py, cap_w, ph);
+    blip.draw_texture_region(paddle, cap, 0.0, sw - 2.0 * cap, 24.0, g.pad_x + cap_w, py, g.pad_w - 2.0 * cap_w, ph);
+    blip.draw_texture_region(paddle, sw - cap, 0.0, cap, 24.0, g.pad_x + g.pad_w - cap_w, py, cap_w, ph);
 
     // Soft drop shadow, offset toward the direction of travel, so the ball
     // reads as rolling across the play field rather than floating over it.
@@ -729,6 +745,7 @@ async fn main() {
     let mut g = Game::new();
 
     let paddle = load_png(PADDLE_PNG);
+    paddle.set_filter(FilterMode::Linear);
     let ball = load_png(BALL_PNG);
     ball.set_filter(FilterMode::Linear);
     let drops = DROP_PNGS.map(|b| {

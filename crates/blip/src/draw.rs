@@ -110,3 +110,21 @@ pub fn draw_texture_cell(
         },
     );
 }
+
+/// Draw the `(sx, sy, sw, sh)` pixel region of a texture into the given rectangle.
+#[allow(clippy::too_many_arguments)]
+pub fn draw_texture_region(
+    tex: &Texture2D, sx: f32, sy: f32, sw: f32, sh: f32, x: f32, y: f32, w: f32, h: f32,
+) {
+    draw_texture_ex(
+        tex,
+        x,
+        y,
+        macroquad::color::WHITE,
+        DrawTextureParams {
+            dest_size: Some(vec2(w, h)),
+            source: Some(Rect::new(sx, sy, sw, sh)),
+            ..Default::default()
+        },
+    );
+}

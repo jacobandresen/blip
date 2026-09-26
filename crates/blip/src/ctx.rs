@@ -742,6 +742,15 @@ impl Blip {
     pub fn draw_texture(&self, tex: &macroquad::texture::Texture2D, x: f32, y: f32, w: f32, h: f32) {
         draw::draw_texture(tex, x, y, w, h);
     }
+    /// Draw a pixel region of a texture into the given rectangle.
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_texture_region(
+        &self, tex: &macroquad::texture::Texture2D, sx: f32, sy: f32, sw: f32, sh: f32,
+        x: f32, y: f32, w: f32, h: f32,
+    ) {
+        draw::draw_texture_region(tex, sx, sy, sw, sh, x, y, w, h);
+    }
     /// Draw one cell of a sprite sheet, rotated about its centre.
     #[inline]
     #[allow(clippy::too_many_arguments)]
