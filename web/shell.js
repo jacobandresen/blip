@@ -369,12 +369,9 @@ if (getCoins() <= 0) overlay.classList.add('visible');
 // Sideways the deck would take a third of the screen's height. A 5:4
 // picture in a 2:1 screen leaves a wide gutter down each side doing
 // nothing, so the deck moves into the gutters instead.
-function landscape() {
-  return window.innerHeight <= 520 && window.innerWidth > window.innerHeight * 1.25;
-}
-function applyLayout() {
-  document.documentElement.setAttribute('data-layout', landscape() ? 'landscape' : 'upright');
-}
+// One layout rule for every page: kiosk.js.
+function landscape() { return blipLandscape(); }
+function applyLayout() { blipApplyLayout(); }
 applyLayout();
 
 /** How much of the screen's bottom the deck covers: its bar, plus

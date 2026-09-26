@@ -12,6 +12,19 @@ var MAX_COINS = 5;
   document.documentElement.setAttribute('data-controls', m === 'stick' ? 'stick' : 'pad');
 }());
 
+/* ---- Layout: upright or landscape ----
+ * One rule for every page's deck, applied as <html data-layout> and kept
+ * current on resize, so the landing page and a game lay the bar out alike. */
+function blipLandscape() {
+  return window.innerHeight <= 520 && window.innerWidth > window.innerHeight * 1.25;
+}
+function blipApplyLayout() {
+  document.documentElement.setAttribute('data-layout', blipLandscape() ? 'landscape' : 'upright');
+}
+blipApplyLayout();
+window.addEventListener('resize', blipApplyLayout);
+window.addEventListener('orientationchange', blipApplyLayout);
+
 function blipControls() {
   return document.documentElement.getAttribute('data-controls') === 'stick' ? 'stick' : 'pad';
 }

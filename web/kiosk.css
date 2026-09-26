@@ -2974,8 +2974,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 @media (max-width: 560px) {
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="1"] { --cap: 54px; }
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] { --cap: 40px; }
-  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="1"] #topbar .fire-buttons.four { gap: 8px 22px; }
-  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] #topbar .fire-buttons.four { gap: 7px 8px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="1"] :is(#topbar, #kiosk-bar) .fire-buttons.four { gap: 8px 22px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] :is(#topbar, #kiosk-bar) .fire-buttons.four { gap: 7px 8px; }
 }
 @media (max-width: 360px) {
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] { --cap: 38px; }
@@ -2997,5 +2997,5 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 @media (max-width: 340px) {
   :root[data-layout="upright"][data-caps="4"][data-players="2"] { --ctl-cx: 31px; --ctl-pr: 5px; }
   :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad { --sf-btn: 34px; --sf-dpad: 52px; --sf-gap: 6px; }
-  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] #topbar .fire-buttons.four { gap: 7px 6px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] :is(#topbar, #kiosk-bar) .fire-buttons.four { gap: 7px 6px; }
 }
