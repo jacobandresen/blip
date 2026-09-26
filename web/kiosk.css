@@ -2768,3 +2768,40 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   opacity: 0.30;
   filter: saturate(0.35);
 }
+
+/* ---- Small phones: keep the thumbs apart ----
+   Upright, station one's cross and caps were packed into one group at
+   the left edge, ~13px apart at 375px. The caps go to the station's
+   inner edge instead: cross under the left thumb, caps under the right. */
+@media (max-width: 420px) {
+  :root[data-layout="upright"] .snes-pad:not(.second) .snes-shell {
+    justify-content: space-between;
+    padding-right: clamp(8px, 3vw, 16px);
+  }
+  :root[data-layout="upright"] #deck-p1 { flex: 1 1 0; justify-content: space-between; }
+}
+
+/* Sideways on a 16:9 phone the gutter is ~100px, and cross + caps side
+   by side are ~145px, which laps onto the picture. Stack them instead:
+   caps above, cross at the bottom corner. */
+@media (max-aspect-ratio: 2/1) {
+  :root[data-layout="landscape"] .snes-pad .snes-shell,
+  :root[data-layout="landscape"] .deck-side {
+    flex-direction: column-reverse;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  :root[data-layout="landscape"][data-players] .snes-pad.second .snes-shell,
+  :root[data-layout="landscape"] #deck-p2 { align-items: flex-end; justify-content: flex-start; }
+  :root[data-layout="landscape"][data-caps="4"] .deck-tag { bottom: 5px; }
+}
+
+/* The per-caps bar heights above out-weigh the landscape rule, which left
+   the deck a 152px strip pinned to the top of the screen. Stretch it over
+   the whole height so the controls sit in the bottom corners. */
+:root[data-layout="landscape"][data-caps][data-controls] #topbar.kiosk-bar {
+  top: 0;
+  bottom: 0;
+  height: auto;
+}
