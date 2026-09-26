@@ -273,26 +273,54 @@
     o._pend = true;
     requestAnimationFrame(function () { if (o._pend) { o._pend = false; fn(); } });
   }
+  // Slop past a control's edge that still counts as touching it. A thumb
+  // is bigger than the cap it is aiming at, but each touch belongs to ONE
+  // control: the one whose edge is nearest (0 inside it), so neighbouring
+  // caps, or a cap beside a cross, never both fire.
+  var BTN_SLOP = 12, DPAD_SLOP = 14;
+  function _edgeDist(r, x, y) {
+    var dx = Math.max(r.left - x, 0, x - r.right);
+    var dy = Math.max(r.top - y, 0, y - r.bottom);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
   function _syncTouches(list) {
-    var i, j, g, r, t;
-    for (i = 0; i < _tBtns.length; i++) {
-      g = _tBtns[i];
-      r = g.el.getBoundingClientRect();
-      if (!r.width) continue;
-      for (t = null, j = 0; j < list.length; j++) {
-        if (_hit(r, list[j].clientX, list[j].clientY, 14)) { t = list[j]; break; }
+    var i, j, r, x, y, d, best, bestD, bestC;
+    var brects = [], drects = [];
+    var bDown = [], dTouch = [];
+    for (i = 0; i < _tBtns.length; i++) brects[i] = _tBtns[i].el.getBoundingClientRect();
+    for (i = 0; i < _tDpads.length; i++) drects[i] = _tDpads[i].pad.getBoundingClientRect();
+    for (j = 0; j < list.length; j++) {
+      x = list[j].clientX; y = list[j].clientY;
+      best = null; bestD = Infinity; bestC = Infinity;
+      for (i = 0; i < brects.length; i++) {
+        r = brects[i];
+        if (!r.width) continue;
+        d = _edgeDist(r, x, y);
+        if (d > BTN_SLOP) continue;
+        var c = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+        if (d < bestD || (d === bestD && c < bestC)) { bestD = d; bestC = c; best = { b: i }; }
       }
-      if (t) { g._pend = false; g.press(); }
-      else if (g.on) _defer(g, g.release);
+      for (i = 0; i < drects.length; i++) {
+        r = drects[i];
+        if (!r.width) continue;
+        d = _edgeDist(r, x, y);
+        if (d > DPAD_SLOP) continue;
+        var c2 = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+        if (d < bestD || (d === bestD && c2 < bestC)) { bestD = d; bestC = c2; best = { p: i }; }
+      }
+      if (!best) continue;
+      if (best.b !== undefined) bDown[best.b] = true;
+      else if (!dTouch[best.p]) dTouch[best.p] = list[j];
+    }
+    for (i = 0; i < _tBtns.length; i++) {
+      if (!brects[i].width) continue;
+      if (bDown[i]) { _tBtns[i]._pend = false; _tBtns[i].press(); }
+      else if (_tBtns[i].on) _defer(_tBtns[i], _tBtns[i].release);
     }
     for (i = 0; i < _tDpads.length; i++) {
       var dp = _tDpads[i];
-      r = dp.pad.getBoundingClientRect();
-      for (t = null, j = 0; r.width && j < list.length; j++) {
-        if (_hit(r, list[j].clientX, list[j].clientY, 4)) { t = list[j]; break; }
-      }
-      if (t) { dp._pend = false; dp.calc(t); }
-      else if (r.width) _defer(dp, dp.clear);
+      if (dTouch[i]) { dp._pend = false; dp.calc(dTouch[i]); }
+      else if (drects[i].width) _defer(dp, dp.clear);
     }
   }
   ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(function (ev) {
@@ -337,7 +365,10 @@
       el.addEventListener('pointerdown', function (e) {
         e.preventDefault();
         try { el.setPointerCapture(e.pointerId); } catch (x) {}
-        grp.press();
+        // A touch is resolved (nearest control wins) by _syncTouches on the
+        // touchstart that follows; pressing the element under the finger
+        // here would light a neighbour the touch is not nearest to.
+        if (e.pointerType !== 'touch') grp.press();
       });
       el.addEventListener('pointerup', function (e) {
         // touch releases are owned by _syncTouches (a real lift comes with
@@ -392,12 +423,12 @@
       e.preventDefault();
       pid = e.pointerId;
       try { pad.setPointerCapture(pid); } catch (x) {}
-      calc(e);
+      if (e.pointerType !== 'touch') calc(e);
     });
     pad.addEventListener('pointermove', function (e) {
       if (e.pointerId !== pid) return;
       e.preventDefault();
-      calc(e);
+      if (e.pointerType !== 'touch') calc(e);
     });
     pad.addEventListener('pointerup', function (e) {
       if (e.pointerId !== pid) return;

@@ -2817,3 +2817,101 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-caps="4"][data-controls="pad"][data-layout="upright"] .kiosk-bar-main {
   height: calc(118px + env(safe-area-inset-bottom, 0px));
 }
+
+/* ---- Thumb-sized controls on phones (upright) ----
+   Every game seats two stations, so on a phone each got half the bar:
+   34px caps and a 52px cross, with a dead second station beside them.
+   A game that never seats two (data-seats="1") now gives station one the
+   whole bar and drops the dead station and its unused caps. Sizes are
+   visual; touches also get 12-14px of slop (blip_controller.js). */
+@media (max-width: 560px) {
+  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #topbar.kiosk-bar,
+  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] .kiosk-bar-main {
+    height: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad-p2 { display: none; }
+  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad {
+    left: 0;
+    right: 0;
+    width: 100%;
+    --sf-btn: 58px;
+    --sf-gap: 22px;
+    --sf-dpad: 92px;
+    --sf-edge: 28px;
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad .snes-shell {
+    justify-content: space-between;
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad .snes-btn.spare,
+  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad .deck-tag { display: none; }
+  :root[data-layout="upright"][data-controls="pad"][data-seats="1"] #snes-pad .snes-face.four {
+    grid-template-columns: repeat(2, var(--sf-btn));
+    gap: 0 var(--sf-gap);
+  }
+}
+
+/* A fighter seats two, so both stations stay; they just use what the
+   half-width bar has (caps 2x2), and the bar grows to seat the taller cross. */
+@media (max-width: 560px) {
+  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) #topbar.kiosk-bar,
+  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .kiosk-bar-main {
+    height: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad {
+    --sf-btn: 42px;
+    --sf-gap: 8px;
+    --sf-dpad: 66px;
+  }
+}
+@media (max-width: 360px) {
+  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad {
+    --sf-btn: 38px;
+    --sf-dpad: 60px;
+  }
+}
+
+/* Same for the joystick deck: one station, bigger caps (and, since every
+   deck dimension hangs off --cap, a bigger stick), no unused caps. */
+@media (max-width: 560px) {
+  :root[data-layout="upright"][data-controls="stick"][data-seats="1"][data-caps="4"] { --cap: 56px; }
+  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] #topbar.kiosk-bar,
+  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] .kiosk-bar-main {
+    height: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] #deck-p2,
+  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] #deck-p1 .arcade-btn.spare,
+  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] #deck-p1 .deck-tag { display: none; }
+  :root[data-layout="upright"][data-controls="stick"][data-seats="1"] #deck-p1 .fire-buttons.four {
+    grid-template-columns: repeat(2, var(--cap));
+    gap: 12px;
+  }
+}
+@media (max-width: 340px) {
+  :root[data-layout="upright"][data-controls="pad"]:not([data-seats="1"]) .snes-pad {
+    --sf-btn: 34px;
+    --sf-gap: 6px;
+    --sf-dpad: 52px;
+  }
+}
+
+/* Landscape, one seat: cross under the left thumb, the two live caps
+   stacked under the right, each in its own gutter. */
+:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad-p2 { display: none; }
+:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad {
+  left: 0;
+  right: 0;
+  width: 100%;
+  --sf-btn: 52px;
+  --sf-dpad: 84px;
+}
+:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad .snes-shell {
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad .snes-btn.spare,
+:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad .deck-tag { display: none; }
+:root[data-layout="landscape"][data-controls="pad"][data-seats="1"] #snes-pad .snes-face.four {
+  grid-template-columns: var(--sf-btn);
+  gap: 12px 0;
+}
