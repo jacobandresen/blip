@@ -59,6 +59,7 @@ struct Game {
     state: State,
     mode: Mode,
     ai_err: f32, // where on its face the CPU meets the ball, re-rolled each volley
+    serve_dir: f32, // +1 serves to the right paddle; the loser of a point receives
 }
 
 impl Game {
@@ -71,6 +72,7 @@ impl Game {
             state: State::Title,
             mode: Mode::OnePlayer,
             ai_err: 0.0,
+            serve_dir: 1.0,
         }
     }
 
@@ -92,13 +94,14 @@ impl Game {
     fn launch(&mut self) {
         let r = (rand() % 10000) as f32 / 10000.0 - 0.5;
         let a = r * 0.77;
-        self.ball_vx = self.ball_spd * a.cos();
+        self.ball_vx = self.serve_dir * self.ball_spd * a.cos();
         self.ball_vy = self.ball_spd * a.sin();
     }
 
     fn start_game(&mut self) {
         self.score_l = 0;
         self.score_r = 0;
+        self.serve_dir = if rand() % 2 == 0 { 1.0 } else { -1.0 };
         self.reset_for_serve();
         self.state = State::Serve;
     }
@@ -224,6 +227,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
 
         if g.ball_x + BALL_SZ < 0.0 {
             g.score_r += 1;
+            g.serve_dir = -1.0;
             play_sfx(&sfx.score_r);
             if g.score_r >= SCORE_WIN { g.point_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
             else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
@@ -231,6 +235,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
         }
         if g.ball_x > WIN_W as f32 {
             g.score_l += 1;
+            g.serve_dir = 1.0;
             play_sfx(&sfx.score_l);
             if g.score_l >= SCORE_WIN { g.point_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
             else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
