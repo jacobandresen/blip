@@ -170,21 +170,86 @@ fn victory_sfx() -> Vec<u8> {
 /// full-auto, so it needs to be gentle and a little varied, not a shrill tone
 /// hit over and over.
 fn shoot_sfx() -> Vec<i16> {
+    // One round from a wing gun: a bright noise crack, a low body thump
+    // and a breech click, all gone in ~90ms so autofire reads as a rattle.
     let sr = SAMPLE_RATE as f32;
-    let dur_ms = 70.0;
-    let n = ms_to_samples(dur_ms);
-    let (f0, f1) = (560.0, 220.0); // sweeps down over the note's length
-    let mut s = Vec::with_capacity(n);
-    let mut phase = 0.0f32;
-    for i in 0..n {
-        let k = i as f32 / n as f32;
-        let freq = f0 + (f1 - f0) * k;
-        phase += freq / sr;
-        let env = (1.0 - k).powf(1.6); // fast decay, no click since it starts at full volume smoothly
-        let wave = (2.0 * std::f32::consts::PI * phase).sin();
-        s.push((env * 0.32 * 27000.0 * wave) as i16);
+    let n = ms_to_samples(95.0);
+    let mut rng = Rng(0x5A0F_7E11);
+    let mut buf = vec![0.0f32; n];
+    let (mut lp, mut hp_prev, mut phase) = (0.0f32, 0.0f32, 0.0f32);
+    for (i, out) in buf.iter_mut().enumerate() {
+        let t = i as f32 / sr;
+        let w = rng.next_f32() * 2.0 - 1.0;
+        // crack: high-passed noise, a few ms long
+        let hp = w - hp_prev;
+        hp_prev = w;
+        let crack = hp * (-t / 0.006).exp();
+        // blast: low-passed noise under it, a little longer
+        lp += (w - lp) * 0.32;
+        let blast = lp * (-t / 0.022).exp();
+        // thump: 150 -> 60 Hz, very short
+        phase += (60.0 + 90.0 * (-t / 0.012).exp()) / sr;
+        // saturated so its harmonics carry on a phone speaker
+        let thump = ((2.0 * PI * phase).sin() * 3.0).tanh() * (-t / 0.018).exp();
+        // breech click ~28ms in
+        let ct = t - 0.028;
+        let click = if ct > 0.0 { (2.0 * PI * 2400.0 * ct).sin() * (-ct / 0.0025).exp() } else { 0.0 };
+        *out = (crack * 0.18 + blast * 1.6 + thump * 0.55 + click * 0.12) * 20_000.0;
     }
-    s
+    soft_limit_to_pcm16(&buf, MIX_KNEE)
+}
+
+/// A round striking the fuselage: a sharp tick, a short metallic ring from
+/// two inharmonic partials, and a dull knock underneath.
+fn hit_sfx() -> Vec<i16> {
+    let sr = SAMPLE_RATE as f32;
+    let n = ms_to_samples(160.0);
+    let mut rng = Rng(0x417C_0DE5);
+    let mut buf = vec![0.0f32; n];
+    for (i, out) in buf.iter_mut().enumerate() {
+        let t = i as f32 / sr;
+        let w = rng.next_f32() * 2.0 - 1.0;
+        let tick = w * (-t / 0.004).exp();
+        let ring = ((2.0 * PI * 1180.0 * t).sin() + 0.6 * (2.0 * PI * 1730.0 * t).sin()) * (-t / 0.035).exp();
+        let knock = (2.0 * PI * 180.0 * t).sin() * (-t / 0.02).exp();
+        *out = (tick * 0.35 + ring * 0.35 + knock * 0.8) * 20_000.0;
+    }
+    soft_limit_to_pcm16(&buf, MIX_KNEE)
+}
+
+/// An explosion: a punchy low boom that drops in pitch, a low-passed rumble
+/// whose filter closes as it dies, and debris crackle scattered through the
+/// tail. `boom_hz` sets the size; `crackle` how much debris.
+fn explosion_sfx(dur_ms: f32, amp: f32, boom_hz: f32, crackle: f32, seed: u32) -> Vec<i16> {
+    let sr = SAMPLE_RATE as f32;
+    let n = ms_to_samples(dur_ms);
+    let dur = dur_ms / 1000.0;
+    let mut rng = Rng(seed | 1);
+    let mut buf = vec![0.0f32; n];
+    let (mut lp1, mut lp2, mut phase) = (0.0f32, 0.0f32, 0.0f32);
+    let mut crack_env = 0.0f32;
+    for (i, out) in buf.iter_mut().enumerate() {
+        let t = i as f32 / sr;
+        let k = t / dur;
+        let attack = (t / 0.004).min(1.0);
+        let decay = (1.0 - k).max(0.0).powf(1.8) * (-t / (dur * 0.45)).exp();
+        let w = rng.next_f32() * 2.0 - 1.0;
+        // rumble: two-pole low-pass, cutoff sliding down as it fades
+        let cut = 0.30 * (1.0 - k * 0.85) + 0.02;
+        lp1 += (w - lp1) * cut;
+        lp2 += (lp1 - lp2) * cut;
+        // boom: pitch falls from boom_hz toward a third of it
+        phase += boom_hz * (0.33 + 0.67 * (-t / 0.09).exp()) / sr;
+        let boom = ((2.0 * PI * phase).sin() * 3.0).tanh() * (-t / (dur * 0.25)).exp();
+        // debris: sparse random crackles, fewer as it settles
+        if rng.next_f32() < crackle * 0.0009 * (1.0 - k) { crack_env = 1.0; }
+        crack_env *= 0.93;
+        let debris = lp1 * crack_env;
+        // the first few ms carry the blast front
+        let blast = lp1 * (-t / 0.012).exp();
+        *out = (lp2 * 3.2 * decay + boom * 0.7 * decay + debris * 0.9 + blast * 1.2) * attack * amp * 22_000.0;
+    }
+    soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
 
 /// Descending 3-tone "power-down" sting for game over.
@@ -1862,12 +1927,12 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/engine_start.wav",   engine_start_sfx()),
         ("sounds/propeller.wav",      propeller_sfx()),
         ("sounds/shoot.wav",          encode_pcm16_mono(&shoot_sfx())),
-        ("sounds/enemy_explode.wav",  encode_pcm16_mono(&gen_noise(220.0, 0.7))),
-        ("sounds/player_explode.wav", encode_pcm16_mono(&gen_noise(650.0, 0.9))),
+        ("sounds/enemy_explode.wav",  encode_pcm16_mono(&explosion_sfx(520.0, 0.8, 95.0, 1.0, 0xE1E1))),
+        ("sounds/player_explode.wav", encode_pcm16_mono(&explosion_sfx(1100.0, 1.0, 70.0, 1.6, 0x9A7E))),
         // A short, quieter crack for a non-lethal hit — reads as "took a
         // glancing blow" rather than player_explode's full "you're down".
-        ("sounds/player_hit.wav",     encode_pcm16_mono(&gen_noise(130.0, 0.55))),
-        ("sounds/boss_explode.wav",   encode_pcm16_mono(&gen_noise(1100.0, 1.0))),
+        ("sounds/player_hit.wav",     encode_pcm16_mono(&hit_sfx())),
+        ("sounds/boss_explode.wav",   encode_pcm16_mono(&explosion_sfx(1900.0, 1.0, 55.0, 2.4, 0xB055))),
         ("sounds/boss_warning.wav",   boss_warning_sfx()),
         // Weapon-tier pickup chimes, escalating: more notes, higher register,
         // and a proper fanfare (with a harmony note) for the last one.
