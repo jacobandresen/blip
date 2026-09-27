@@ -209,7 +209,7 @@ impl Game {
         if self.sess.level == 1 { return; }
         match (self.sess.level - 2).rem_euclid(5) {
             0 => self.set_obstacles(&[             // plus sign
-                (-1, 0), (0, 0), (0, -1), (0, 1),
+                (-1, 0), (0, 0), (1, 0), (0, -1), (0, 1),
             ]),
             1 => self.set_obstacles(&[             // ring
                 (-1, -1), (0, -1), (1, -1),
@@ -270,8 +270,15 @@ impl Game {
         // A bonus left over from the life just lost would be counting down
         // against a snake that was not on the board when it appeared.
         self.bonus_ttl = 0.0;
+        // The middle row runs through the plus and the ring, and the ring
+        // closes round the head: pick the nearest row with the snake and
+        // its first six steps clear of obstacles.
+        let row = [0, 2, -2, 4, -4, 6, -6].iter().map(|d| ROWS / 2 + d)
+            .find(|&r| (COLS / 2 - 3..=COLS / 2 + 6)
+                .all(|c| !self.obstacles[..self.obstacle_count].contains(&Cell { c, r })))
+            .unwrap_or(ROWS / 2);
         for i in 0..self.snake_len {
-            self.snake[i] = Cell { c: COLS / 2 - i as i32, r: ROWS / 2 };
+            self.snake[i] = Cell { c: COLS / 2 - i as i32, r: row };
         }
         self.spawn_food();
         self.move_timer = 0.0;
