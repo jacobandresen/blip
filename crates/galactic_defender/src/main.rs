@@ -835,6 +835,21 @@ fn boss_take_hits(g: &mut Game, sfx: &Sounds) {
     }
 }
 
+/// A bomb (drawn 4x12) against the ship's wedge, not
+/// its 36x28 box: the box's top corners are empty sky, and a bomb through
+/// them used to cost a life.
+fn bomb_hits_ship(bx: f32, by: f32, px: f32) -> bool {
+    let top = (GROUND_Y - 28) as f32;
+    let tip = by + 12.0;
+    if tip < top || by > GROUND_Y as f32 { return false; }
+    // The wedge's half-width at the bomb's lowest row inside the ship
+    // (sprite: 1px at the top to 16 of 32 at the base, drawn 36 wide).
+    let row = (tip.min(GROUND_Y as f32) - top) / 28.0;
+    let half = (1.0 + row * 15.0) * ALIEN_W as f32 / 32.0;
+    let dx = (bx + 2.0 - (px + ALIEN_W as f32 / 2.0)).abs();
+    dx <= half.max(3.0) + 2.0
+}
+
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.respawn_grace.tick(dt);
     // Hold to fire, the way the real cabinet's button worked — a new shot
@@ -1006,10 +1021,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     // Bombs vs player
     for bi in MAX_PLAYER_BULLETS..N_BULLETS {
         if !g.bullets[bi].active { continue; }
-        if rects_overlap(
-            g.bullets[bi].x, g.bullets[bi].y, 8.0, 16.0,
-            g.player_x, (GROUND_Y - 28) as f32, ALIEN_W as f32, 28.0,
-        ) {
+        if bomb_hits_ship(g.bullets[bi].x, g.bullets[bi].y, g.player_x) {
             g.bullets[bi].active = false;
             let px = g.player_x;
             g.spawn_player_death(px, (GROUND_Y - 28) as f32);
