@@ -224,7 +224,7 @@ fn gun_burst(guns: usize, seed: u32) -> Vec<i16> {
     for g in 0..guns {
         let delay = if g == 0 { 0 } else { (rng.next_f32() * pad as f32) as usize };
         let pitch = 0.9 + rng.next_f32() * 0.2;
-        let shot = gun_report(seed.wrapping_add(g as u32 * 0x9E37_79B9), pitch);
+        let shot = gun_report(seed.wrapping_add((g as u32).wrapping_mul(0x9E37_79B9)), pitch);
         for (i, v) in shot.iter().enumerate() { mix[delay + i] += v * 16_000.0; }
     }
     soft_limit_to_pcm16(&mix, MIX_KNEE)
