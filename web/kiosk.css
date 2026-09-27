@@ -3149,3 +3149,34 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 3px);
   padding: 5px 10px;
 }
+
+/* ---- Thumb-sized on a phone ----
+   Upright on a touch phone there is only ever one station (two players
+   play sideways, see #rotate-hint), so the equipment is sized off the whole
+   width instead of half of it: at 375px the cross was 52px and the caps
+   36px, under a thumb's reach. The bar grows to seat the bigger cross. */
+@media (pointer: coarse) and (max-width: 520px) {
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players="1"] {
+    --cap: clamp(44px, 14vw, 62px);
+    --dpad: clamp(84px, 30vw, 124px);
+    --ctl-cx: calc(10px + var(--dpad) / 2);
+    --ctl-pr: 16px;
+  }
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players="1"] :is(#topbar, .kiosk-bar-main) {
+    height: calc(var(--dpad) + 46px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="1"] :is(#snes-pad, #snes-pad-p2) .snes-face.four,
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="1"] :is(#topbar, #kiosk-bar) .fire-buttons.four {
+    gap: 10px;
+  }
+}
+
+/* Two players sideways: a station per gutter, each as big as a thumb
+   wants; the picture is fitted between them (fillCanvas). */
+:root[data-layout="landscape"][data-players="2"] .snes-pad { --sf-btn: 46px; --sf-dpad: 96px; --sf-gap: 10px; }
+:root[data-layout="landscape"][data-players="2"] .snes-pad .snes-face.four { gap: 8px; }
+:root[data-layout="landscape"][data-players="2"] .fire-buttons.four { grid-template-columns: repeat(2, 44px); gap: 8px; }
+:root[data-layout="landscape"][data-players="2"] .arcade-btn { width: 44px; height: 44px; }
+:root[data-layout="landscape"][data-players="2"] .stick-base { width: 80px; }
+:root[data-layout="landscape"][data-players="2"] .stick-boot { width: 48px; height: 48px; }
+:root[data-layout="landscape"][data-players="2"] .stick-ball { width: 52px; height: 52px; }

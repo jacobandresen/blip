@@ -703,7 +703,31 @@ window.addEventListener('keydown', function (e) {
     BlipController.releaseAll();
     stations.forEach(function (st) { st.held = {}; leanStick(st); });
     if (typeof fillCanvas === 'function') fillCanvas();
+    rotateHint();
   };
+
+  // Two players on a touch phone play sideways, a station per side with
+  // controls a thumb can use; upright there is room for one. The page cannot
+  // turn an iPhone, so it asks (and locks the orientation where allowed).
+  var hint = null, hintDismissed = false;
+  function rotateHint() {
+    var want = versus && !hintDismissed && !landscape() && matchMedia('(pointer: coarse)').matches;
+    if (want && !hint) {
+      hint = document.createElement('div');
+      hint.id = 'rotate-hint';
+      hint.innerHTML = '<div class="rh-phone"></div><div class="rh-text">TURN SIDEWAYS<br>FOR 2 PLAYERS</div>' +
+        '<button type="button" class="rh-stay">PLAY UPRIGHT</button>';
+      hint.querySelector('.rh-stay').addEventListener('click', function () {
+        hintDismissed = true;
+        rotateHint();
+      });
+      document.body.appendChild(hint);
+      try { screen.orientation.lock('landscape').catch(function () {}); } catch (e) {}
+    }
+    if (hint) hint.classList.toggle('show', want);
+    if (!versus) hintDismissed = false;
+  }
+  window.addEventListener('resize', rotateHint);
 
   // ---- Fire buttons (joystick mode) ----
   // The caps were built by deck.js; a cap the game does not declare has no
