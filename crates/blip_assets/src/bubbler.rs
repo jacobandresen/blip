@@ -60,7 +60,7 @@ fn note(buf: &mut [f32], start: usize, len: usize, midi: i32, vol: f32, v: Voice
         let vib = if let Voice::Lead = v { 1.0 + 0.004 * (2.0 * PI * 5.5 * t).sin() * (t / 0.15).min(1.0) } else { 1.0 };
         ph += f * vib / SR;
         let s = match v {
-            Voice::Lead => pulse(ph, 0.25),
+            Voice::Lead => pulse(ph, 0.5) * 0.55 + (2.0 * PI * ph).sin() * 0.45,
             Voice::Bass => tri(ph) * 0.8 + pulse(ph, 0.5) * 0.2,
             Voice::Arp => pulse(ph, 0.125),
             Voice::Bell => (2.0 * PI * ph).sin() + 0.35 * (2.0 * PI * ph * 2.0).sin() + 0.15 * (2.0 * PI * ph * 3.01).sin(),
@@ -164,9 +164,9 @@ fn theme(bpm: f32) -> Vec<u8> {
             if n >= 0 {
                 let mut len = 1;
                 while k + len < 8 && lead[b][k + len] == H { len += 1; }
-                note(&mut buf, b0 + k * eighth, len * eighth - eighth / 6, n, 0.30, Voice::Lead);
+                note(&mut buf, b0 + k * eighth, len * eighth - eighth / 6, n - 12, 0.30, Voice::Lead);
                 // a harmony a third below in the second half, bell-soft
-                if b >= 8 { note(&mut buf, b0 + k * eighth, len * eighth, n - 4, 0.10, Voice::Bell); }
+                if b >= 8 { note(&mut buf, b0 + k * eighth, len * eighth, n - 16, 0.10, Voice::Bell); }
                 k += len;
             } else { k += 1; }
         }
@@ -179,16 +179,16 @@ fn theme(bpm: f32) -> Vec<u8> {
             }
             // arpeggio in sixteenths, an octave above middle
             for s in 0..8 {
-                let n = root + 24 + iv[s % 3] + if s % 6 >= 3 { 12 } else { 0 };
-                note(&mut buf, h0 + s * eighth / 2, eighth / 2, n, 0.07, Voice::Arp);
+                let n = root + 12 + iv[s % 3] + if s % 6 >= 3 { 12 } else { 0 };
+                note(&mut buf, h0 + s * eighth / 2, eighth / 2, n, 0.06, Voice::Arp);
             }
         }
         // drums
         for beat in 0..4 {
             let t0 = b0 + beat * 2 * eighth;
             if beat % 2 == 0 { kick(&mut buf, t0, 0.55); } else { snare(&mut buf, t0, &mut rng, 0.32); }
-            hat(&mut buf, t0 + eighth, &mut rng, 0.12);
-            hat(&mut buf, t0, &mut rng, 0.07);
+            hat(&mut buf, t0 + eighth, &mut rng, 0.08);
+            hat(&mut buf, t0, &mut rng, 0.045);
         }
         if b % 4 == 3 {
             // a snare fill into the next phrase
