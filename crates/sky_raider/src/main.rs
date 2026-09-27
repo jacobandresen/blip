@@ -1,7 +1,7 @@
 //! Raider — a 1942-style vertical dogfighting shoot-'em-up.
 
 use blip::input::{
-    btn1_pressed, key_held, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
+    btn1_pressed, key_active, key_held, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::audio::{play_sound, set_sound_volume, stop_sound, PlaySoundParams};
@@ -1192,10 +1192,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.max_power_banner.tick(dt);
 
     // ---- movement ----
-    let left  = key_held(BLIP_KEY_LEFT)  || key_held(BLIP_KEY_A);
-    let right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
-    let up    = key_held(BLIP_KEY_UP)    || key_held(BLIP_KEY_W);
-    let down  = key_held(BLIP_KEY_DOWN)  || key_held(BLIP_KEY_S);
+    let left  = key_active(BLIP_KEY_LEFT)  || key_active(BLIP_KEY_A);
+    let right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
+    let up    = key_active(BLIP_KEY_UP)    || key_active(BLIP_KEY_W);
+    let down  = key_active(BLIP_KEY_DOWN)  || key_active(BLIP_KEY_S);
     // Spool up and brake over ~0.1s so the plane has weight; diagonals are
     // normalised so they are no faster than the axes.
     let dx = right as i32 as f32 - left as i32 as f32;
@@ -1222,7 +1222,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     // ---- firing ----
     g.fire_cd.tick(dt);
-    if key_held(BLIP_KEY_SPACE) && !g.fire_cd.active() && !g.respawn_grace.active() {
+    if key_active(BLIP_KEY_SPACE) && !g.fire_cd.active() && !g.respawn_grace.active() {
         g.fire_cd.start(weapon_cooldown(g.weapon_level));
         let bx = g.player_x + PLAYER_W as f32 / 2.0 - BULLET_W / 2.0;
         for &dx in weapon_spread(g.weapon_level) {

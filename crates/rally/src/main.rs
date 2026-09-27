@@ -2,7 +2,7 @@
 
 
 use blip::input::{
-    any_key_pressed, key_held, key_pressed, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
+    any_key_pressed, key_active, key_pressed, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::input::KeyCode;
 use blip::macroquad::rand::rand;
@@ -139,11 +139,11 @@ fn update_title(g: &mut Game) {
 
 
 fn update_serve(g: &mut Game, dt: f32) {
-    if key_held(BLIP_KEY_UP)   || key_held(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
-    if key_held(BLIP_KEY_DOWN) || key_held(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
+    if key_active(BLIP_KEY_UP)   || key_active(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
+    if key_active(BLIP_KEY_DOWN) || key_active(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
     if g.mode == Mode::TwoPlayer {
-        if key_held(KeyCode::I) { g.rpad_y -= PAD_SPEED * dt; }
-        if key_held(KeyCode::K) { g.rpad_y += PAD_SPEED * dt; }
+        if key_active(KeyCode::I) { g.rpad_y -= PAD_SPEED * dt; }
+        if key_active(KeyCode::K) { g.rpad_y += PAD_SPEED * dt; }
     }
     g.clamp_pads();
     if any_key_pressed() {
@@ -156,12 +156,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
     let dt = dt.max(1e-4);
     let (lpy0, rpy0) = (g.lpad_y, g.rpad_y);
 
-    if key_held(BLIP_KEY_UP)   || key_held(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
-    if key_held(BLIP_KEY_DOWN) || key_held(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
+    if key_active(BLIP_KEY_UP)   || key_active(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
+    if key_active(BLIP_KEY_DOWN) || key_active(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
 
     if g.mode == Mode::TwoPlayer {
-        if key_held(KeyCode::I) { g.rpad_y -= PAD_SPEED * dt; }
-        if key_held(KeyCode::K) { g.rpad_y += PAD_SPEED * dt; }
+        if key_active(KeyCode::I) { g.rpad_y -= PAD_SPEED * dt; }
+        if key_active(KeyCode::K) { g.rpad_y += PAD_SPEED * dt; }
     } else {
         // Tracks the ball only while it is coming; otherwise drifts to centre.
         let target = if g.ball_vx > 0.0 {

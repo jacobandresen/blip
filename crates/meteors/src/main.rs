@@ -6,7 +6,7 @@
 use std::f32::consts::PI;
 
 use blip::input::{
-    btn1_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
+    btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
     BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::rand::gen_range;
@@ -396,10 +396,10 @@ fn update_title(g: &mut Game) {
 
 fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) {
     if g.ship_alive {
-        if key_held(BLIP_KEY_LEFT)  || key_held(BLIP_KEY_A) { g.ship.angle -= SHIP_TURN_RATE * dt; }
-        if key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D) { g.ship.angle += SHIP_TURN_RATE * dt; }
+        if key_active(BLIP_KEY_LEFT)  || key_active(BLIP_KEY_A) { g.ship.angle -= SHIP_TURN_RATE * dt; }
+        if key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D) { g.ship.angle += SHIP_TURN_RATE * dt; }
 
-        g.ship.thrusting = key_held(BLIP_KEY_UP) || key_held(BLIP_KEY_W);
+        g.ship.thrusting = key_active(BLIP_KEY_UP) || key_active(BLIP_KEY_W);
         if g.ship.thrusting {
             g.ship.vx += g.ship.angle.sin() * SHIP_ACCEL * dt;
             g.ship.vy -= g.ship.angle.cos() * SHIP_ACCEL * dt;
@@ -423,7 +423,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
         g.ship.y = wrap(g.ship.y + g.ship.vy * dt, PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
 
         g.fire_cd -= dt;
-        if key_held(BLIP_KEY_SPACE) && g.fire_cd <= 0.0 {
+        if key_active(BLIP_KEY_SPACE) && g.fire_cd <= 0.0 {
             let vx = g.ship.angle.sin() * BULLET_SPEED + g.ship.vx * 0.3;
             let vy = -g.ship.angle.cos() * BULLET_SPEED + g.ship.vy * 0.3;
             spawn_bullet(&mut g.bullets, g.ship.x, g.ship.y, vx, vy, true);

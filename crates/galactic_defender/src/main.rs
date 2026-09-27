@@ -2,7 +2,7 @@
 //! `games/galactic_defender/main.c` on macroquad.
 
 use blip::input::{
-    btn1_pressed, key_held, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
+    btn1_pressed, key_active, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::prelude::ImageFormat;
@@ -857,12 +857,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     // is the rate limit, so this can't be spammed; it just spares the
     // player from re-tapping.
     let shoot = !g.respawn_grace.active()
-        && (key_held(BLIP_KEY_SPACE)
-            || key_held(BLIP_KEY_UP)
-            || key_held(BLIP_KEY_W));
+        && (key_active(BLIP_KEY_SPACE)
+            || key_active(BLIP_KEY_UP)
+            || key_active(BLIP_KEY_W));
 
-    let moving_left = key_held(BLIP_KEY_LEFT) || key_held(BLIP_KEY_A);
-    let moving_right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
+    let moving_left = key_active(BLIP_KEY_LEFT) || key_active(BLIP_KEY_A);
+    let moving_right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
     // The cannon has mass: it spools up to full speed and brakes over ~0.08s.
     let dir = moving_right as i32 - moving_left as i32;
     let target = dir as f32 * PLAYER_SPEED;

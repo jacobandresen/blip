@@ -54,6 +54,13 @@ pub fn key_held(key: KeyCode) -> bool {
     is_key_down(key)
 }
 
+/// Held, or pressed this frame: a touch tap shorter than a frame (down and
+/// up between two frames) is never "held", and would otherwise be lost.
+#[inline]
+pub fn key_active(key: KeyCode) -> bool {
+    is_key_down(key) || is_key_pressed(key)
+}
+
 /// True only on the single frame the key first goes down — good for jumping or firing.
 #[inline]
 pub fn key_pressed(key: KeyCode) -> bool {

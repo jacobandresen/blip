@@ -3,7 +3,7 @@
 use std::f32::consts::PI;
 
 use blip::input::{
-    btn1_pressed, key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
+    btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::prelude::ImageFormat;
@@ -282,8 +282,8 @@ fn paddle_input(g: &mut Game, dt: f32) {
     }
     g.dash_t = (g.dash_t - dt).max(0.0);
     let dash = 1.0 + DASH_BOOST * g.dash_t / DASH_SECS;
-    let left = key_held(BLIP_KEY_LEFT) || key_held(BLIP_KEY_A);
-    let right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
+    let left = key_active(BLIP_KEY_LEFT) || key_active(BLIP_KEY_A);
+    let right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
     if left  { g.pad_x -= PAD_SPEED * dt * if g.dash_dir < 0.0 { dash } else { 1.0 }; }
     if right { g.pad_x += PAD_SPEED * dt * if g.dash_dir > 0.0 { dash } else { 1.0 }; }
     g.pad_x = clamp(g.pad_x, 0.0, WIN_W as f32 - g.pad_w);
