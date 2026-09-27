@@ -56,7 +56,11 @@ const BALL_SLOW_FACTOR: f32 = 0.6;
 
 // ---- tuning -----------------------------------------------------------
 const LIVES_START: i32 = 3;
-const SPEED_INC: f32 = 18.0;
+// Per brick. At 18 the ball hit its cap after 10 of 60 bricks and stayed
+// there for the rest of the game; at 7 the cap arrives about halfway through.
+const SPEED_INC: f32 = 7.0;
+// Taken off the ramp when a life is lost, so the new ball is catchable.
+const SPEED_LIFE_RELIEF: f32 = 60.0;
 // A hard floor on how long GAME OVER stays up before a key can dismiss it —
 // without this, a direction/launch key still held from the rally that
 // killed you bounces straight back to the title screen unread.
@@ -196,9 +200,12 @@ impl Game {
         self.ball_x = self.pad_x + (self.pad_w / 2.0 - BALL_W as f32 / 2.0);
         self.ball_y = (PAD_Y - BALL_H - 2) as f32;
         let r01 = (rand() as f32) / (u32::MAX as f32);
-        let angle = -1.1 + r01 * 0.2;
-        self.ball_vx = self.ball_speed * (angle + PI / 2.0).cos();
-        self.ball_vy = -self.ball_speed;
+        // 36-43 degrees off vertical, either side, at exactly the ramp's
+        // speed (the old (sin, 1) vector served a third too fast).
+        let side = if rand() % 2 == 0 { 1.0 } else { -1.0 };
+        let (s, c) = (0.62 + r01 * 0.12).sin_cos();
+        self.ball_vx = side * self.ball_speed * s;
+        self.ball_vy = -self.ball_speed * c;
         self.ball_spin = 0.0;
         self.ball_rot = mat_mul(&rot_x(0.5), &rot_y(rand_f() * 6.28));
         self.ball_curve_used = 0.0;
@@ -216,6 +223,7 @@ impl Game {
 
     fn next_level(&mut self) {
         self.sess.next_level();
+        self.ball_speed = BALL_SPEED_0;
         self.reset_drops();
         self.build_bricks();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
@@ -574,6 +582,7 @@ fn update_drops(g: &mut Game, dt: f32) {
 
 fn update_dead(g: &mut Game, dt: f32) {
     if g.dead_timer.tick(dt) {
+        g.ball_speed = (g.ball_speed - SPEED_LIFE_RELIEF).max(BALL_SPEED_0);
         g.pad_x = ((WIN_W - PAD_W) / 2) as f32;
         g.launch_ball();
         g.state = State::Launch;
@@ -825,6 +834,10 @@ async fn main() {
             State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
             State::Launch | State::Play | State::Dead => {
                 draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick, &drops);
+                // The ball waits on the paddle after every lost life; say so.
+                if g.state == State::Launch && (blip::macroquad::time::get_time() * 2.0) as i64 % 2 == 0 {
+                    blip.draw_centered("PRESS FIRE", (PAD_Y - 90) as f32, 3.0, BLIP_WHITE);
+                }
             }
         }
 
