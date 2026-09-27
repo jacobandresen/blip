@@ -10,7 +10,7 @@ use blip::macroquad::prelude::ImageFormat;
 use blip::macroquad::rand::rand;
 use blip::macroquad::texture::{draw_texture_ex, DrawTextureParams, FilterMode, Texture2D};
 use blip::{
-    clamp, play_music, play_sfx, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
+    clamp, play_music, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
     window_conf, Blip, BlipColor, LifeResult, Pooled, Session, Timer,
     BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_GRAY, BLIP_GREEN, BLIP_ORANGE, BLIP_RED, BLIP_WHITE,
     BLIP_YELLOW,
@@ -34,15 +34,13 @@ const PLAYER_MIN_Y: f32 = (HUD_H + 150) as f32; // player stays out of the HUD b
 const PLAYER_MAX_Y: f32 = (WIN_H - 88) as f32;
 
 // ---- weapons ----------------------------------------------------------
-// Five weapon tiers, one per power-up capsule caught: wider spreads, faster
-// fire, and (from tier 3 up) bigger, glowing bullets. See weapon_spread(),
-// weapon_cooldown(), and weapon_bullet_visual() below, which are what
-// actually define each tier — these are just the shared building blocks.
+// Five weapon tiers, one per power-up capsule caught: more guns, heavier
+// rounds and faster fire. weapon_guns() and weapon_cooldown() define them.
 const MAX_WEAPON_LEVEL: i32 = 5;
 const BULLET_SPEED: f32 = 420.0;
-const BULLET_W: f32 = 4.0;
 const BULLET_H: f32 = 10.0;
-const MAX_PLAYER_BULLETS: usize = 72; // headroom for tier 5's 7-way rapid spread
+const MAX_PLAYER_BULLETS: usize = 112; // tier 5: 8 rounds every 0.11s, ~1.3s in flight
+const MAX_CASINGS: usize = 24;
 
 // ---- enemies ------------------------------------------------------------
 const ENEMY_W: i32 = 26;
@@ -208,6 +206,21 @@ enum EnemyKind { Grunt, Weaver, Ace }
 #[derive(Copy, Clone)]
 struct Bullet { x: f32, y: f32, active: bool }
 impl Pooled for Bullet {
+    fn is_active(&self) -> bool { self.active }
+}
+
+/// A player round: centred on x, drifting sideways at vx (the spray), with
+/// its calibre r (drawn radius; the hit box is 2r + 2 wide).
+#[derive(Copy, Clone)]
+struct Round { x: f32, y: f32, vx: f32, r: f32, active: bool }
+impl Pooled for Round {
+    fn is_active(&self) -> bool { self.active }
+}
+
+/// A spent brass casing kicked out of the guns, tumbling away and fading.
+#[derive(Copy, Clone)]
+struct Casing { x: f32, y: f32, vx: f32, vy: f32, rot: f32, ttl: f32, active: bool }
+impl Pooled for Casing {
     fn is_active(&self) -> bool { self.active }
 }
 
@@ -390,7 +403,12 @@ struct Game {
     launch_wave_up: bool, // opening wave already scrambled in for this launch
     weapon_level: i32,
     health: i32,
-    bullets: [Bullet; MAX_PLAYER_BULLETS],
+    bullets: [Round; MAX_PLAYER_BULLETS],
+    casings: [Casing; MAX_CASINGS],
+    /// Muzzle flash left on the guns, seconds.
+    muzzle_t: f32,
+    /// Alternates the casing ejection side, burst by burst.
+    eject_left: bool,
     enemy_bullets: [Bullet; MAX_ENEMY_BULLETS],
     enemies: [Enemy; MAX_ENEMIES],
     explosions: [Explosion; MAX_EXPLOSIONS],
@@ -439,13 +457,15 @@ fn rand01() -> f32 {
 // easy to tune as one coherent ladder.
 
 /// Bullet spawn offsets from the player's centreline, one shot's worth.
-fn weapon_spread(level: i32) -> &'static [f32] {
+/// (rounds per burst, fan width in px, calibre radius) for a tier. Rounds
+/// leave evenly across the fan and splay outward with their offset.
+fn weapon_guns(level: i32) -> (usize, f32, f32) {
     match level {
-        1 => &[0.0],
-        2 => &[-12.0, 0.0, 12.0],
-        3 => &[-22.0, -10.0, 0.0, 10.0, 22.0],
-        4 => &[-24.0, -12.0, 0.0, 12.0, 24.0],
-        _ => &[-30.0, -20.0, -10.0, 0.0, 10.0, 20.0, 30.0], // 5: full barrage
+        1 => (2, 14.0, 2.0),
+        2 => (3, 24.0, 2.4),
+        3 => (5, 40.0, 2.8),
+        4 => (6, 52.0, 3.3),
+        _ => (8, 64.0, 3.9),
     }
 }
 
@@ -468,18 +488,6 @@ fn weapon_tier_color(level: i32) -> BlipColor {
         3 => BLIP_CYAN,
         4 => BLIP_ORANGE,
         _ => BlipColor::new(1.0, 0.85, 0.25, 1.0), // 5: gold
-    }
-}
-
-/// (visual width scale, use a glowing circle instead of a plain rect).
-/// Higher tiers get chunkier, glowing bolts — a plain rect stops reading as
-/// "more powerful" past a certain size, a glow keeps escalating.
-fn weapon_bullet_visual(level: i32) -> (f32, bool) {
-    match level {
-        1 | 2 => (1.0, false),
-        3 => (1.2, false),
-        4 => (1.4, true),
-        _ => (1.8, true), // 5
     }
 }
 
@@ -519,7 +527,10 @@ impl Game {
             launch_wave_up: false,
             weapon_level: 1,
             health: PLAYER_HEALTH_MAX,
-            bullets: [dead_bullet; MAX_PLAYER_BULLETS],
+            bullets: [Round { x: 0.0, y: 0.0, vx: 0.0, r: 0.0, active: false }; MAX_PLAYER_BULLETS],
+            casings: [Casing { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, rot: 0.0, ttl: 0.0, active: false }; MAX_CASINGS],
+            muzzle_t: 0.0,
+            eject_left: false,
             enemy_bullets: [dead_bullet; MAX_ENEMY_BULLETS],
             enemies: [dead_enemy; MAX_ENEMIES],
             explosions: [dead_explosion; MAX_EXPLOSIONS],
@@ -596,6 +607,7 @@ impl Game {
         self.weapon_level = 1;
         self.health = PLAYER_HEALTH_MAX;
         for b in self.bullets.iter_mut() { b.active = false; }
+        for c in self.casings.iter_mut() { c.active = false; }
         for b in self.enemy_bullets.iter_mut() { b.active = false; }
         for e in self.enemies.iter_mut() { e.active = false; }
         for p in self.powerups.iter_mut() { p.active = false; }
@@ -644,7 +656,7 @@ impl Game {
 }
 
 struct Sounds {
-    shoot: blip::BlipSound,
+    shoot: [blip::BlipSound; 3],
     enemy_explode: blip::BlipSound,
     player_explode: blip::BlipSound,
     player_hit: blip::BlipSound,
@@ -1224,17 +1236,47 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.fire_cd.tick(dt);
     if key_active(BLIP_KEY_SPACE) && !g.fire_cd.active() && !g.respawn_grace.active() {
         g.fire_cd.start(weapon_cooldown(g.weapon_level));
-        let bx = g.player_x + PLAYER_W as f32 / 2.0 - BULLET_W / 2.0;
-        for &dx in weapon_spread(g.weapon_level) {
-            pool_spawn(&mut g.bullets, Bullet { x: bx + dx, y: g.player_y, active: true });
+        let (n, fan, r) = weapon_guns(g.weapon_level);
+        let cx = g.player_x + PLAYER_W as f32 / 2.0;
+        for i in 0..n {
+            let dx = if n > 1 { (i as f32 / (n - 1) as f32 - 0.5) * fan } else { 0.0 };
+            // Guns are not lasers: each round leaves a little off true.
+            pool_spawn(&mut g.bullets, Round {
+                x: cx + dx + (rand01() - 0.5) * 3.0,
+                y: g.player_y + rand01() * 6.0,
+                vx: dx * 2.2 + (rand01() - 0.5) * 28.0 + g.player_vx * 0.15,
+                r,
+                active: true,
+            });
         }
-        play_sfx(&sfx.shoot);
+        g.muzzle_t = 0.05;
+        g.eject_left = !g.eject_left;
+        let side = if g.eject_left { -1.0 } else { 1.0 };
+        pool_spawn(&mut g.casings, Casing {
+            x: cx + side * 6.0, y: g.player_y + PLAYER_H as f32 * 0.45,
+            vx: side * (70.0 + rand01() * 50.0) + g.player_vx * 0.5,
+            vy: 20.0 + rand01() * 40.0,
+            rot: rand01() * 3.0, ttl: 0.45, active: true,
+        });
+        let take = &sfx.shoot[(rand() % sfx.shoot.len() as u32) as usize];
+        play_sfx_volume(take, 0.75 + 0.05 * g.weapon_level as f32);
+    }
+    g.muzzle_t = (g.muzzle_t - dt).max(0.0);
+    for c in pool_iter_mut(&mut g.casings) {
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+        c.vy += SEA_SCROLL_SPEED * 3.0 * dt;
+        c.vx *= 1.0 - 2.5 * dt;
+        c.rot += 14.0 * dt;
+        c.ttl -= dt;
+        if c.ttl <= 0.0 { c.active = false; }
     }
 
     // ---- simple movement (no cross-entity reads) ----
     for b in pool_iter_mut(&mut g.bullets) {
         b.y -= BULLET_SPEED * dt;
-        if b.y < -BULLET_H { b.active = false; }
+        b.x += b.vx * dt;
+        if b.y < -BULLET_H || b.x < -10.0 || b.x > WIN_W as f32 + 10.0 { b.active = false; }
     }
     for b in pool_iter_mut(&mut g.enemy_bullets) {
         b.y += ENEMY_BULLET_SPEED * dt;
@@ -1278,12 +1320,13 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     // ---- player bullets vs enemies / boss ----
     for bi in 0..MAX_PLAYER_BULLETS {
         if !g.bullets[bi].active { continue; }
-        let (bx, by) = (g.bullets[bi].x, g.bullets[bi].y);
+        let bw = g.bullets[bi].r * 2.0 + 2.0;
+        let (bx, by) = (g.bullets[bi].x - bw / 2.0, g.bullets[bi].y);
         let mut consumed = false;
         for ei in 0..MAX_ENEMIES {
             if !g.enemies[ei].active { continue; }
             let (ex, ey) = (g.enemies[ei].x, g.enemies[ei].y);
-            if rects_overlap(bx, by, BULLET_W, BULLET_H, ex, ey, ENEMY_W as f32, ENEMY_H as f32) {
+            if rects_overlap(bx, by, bw, BULLET_H, ex, ey, ENEMY_W as f32, ENEMY_H as f32) {
                 let kind = g.enemies[ei].kind;
                 g.enemies[ei].active = false;
                 g.spawn_explosion(ex + ENEMY_W as f32 / 2.0, ey + ENEMY_H as f32 / 2.0, 1.0, EXPLOSION_ORANGE);
@@ -1305,7 +1348,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             continue;
         }
         let (bossw, bossh) = boss_size(g.boss.tier);
-        if g.boss.active && rects_overlap(bx, by, BULLET_W, BULLET_H, g.boss.x, g.boss.y, bossw, bossh) {
+        if g.boss.active && rects_overlap(bx, by, bw, BULLET_H, g.boss.x, g.boss.y, bossw, bossh) {
             g.bullets[bi].active = false;
             g.boss.hp -= 1;
             g.spawn_explosion(bx, by, 0.6, EXPLOSION_ORANGE);
@@ -1339,7 +1382,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             for boi in 0..MAX_BOATS {
                 if !g.boats[boi].active { continue; }
                 let (boat_x, boat_y) = (g.boats[boi].x, g.boats[boi].y);
-                if rects_overlap(bx, by, BULLET_W, BULLET_H, boat_x, boat_y, BOAT_W as f32, BOAT_H as f32) {
+                if rects_overlap(bx, by, bw, BULLET_H, boat_x, boat_y, BOAT_W as f32, BOAT_H as f32) {
                     g.bullets[bi].active = false;
                     g.boats[boi].active = false;
                     g.spawn_explosion(boat_x + BOAT_W as f32 / 2.0, boat_y + BOAT_H as f32 / 2.0, 1.3, EXPLOSION_ORANGE);
@@ -1357,7 +1400,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 if !g.islands[isi].active { continue; }
                 let (iw, ih) = ISLAND_SIZES[g.islands[isi].size as usize];
                 let (ix, iy) = (g.islands[isi].x, g.islands[isi].y);
-                if rects_overlap(bx, by, BULLET_W, BULLET_H, ix, iy, iw as f32, ih as f32) {
+                if rects_overlap(bx, by, bw, BULLET_H, ix, iy, iw as f32, ih as f32) {
                     g.bullets[bi].active = false;
                     g.islands[isi].hp -= 1;
                     g.spawn_explosion(bx, by, 0.5, EXPLOSION_ORANGE);
@@ -1380,7 +1423,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         // beam itself not being able to hurt the player yet either).
         if g.bullets[bi].active && g.barrier.active && !g.barrier.warmup.active() {
             let (mx, my) = (g.barrier.motor_x - MOTOR_W / 2.0, BARRIER_Y - MOTOR_H / 2.0);
-            if rects_overlap(bx, by, BULLET_W, BULLET_H, mx, my, MOTOR_W, MOTOR_H) {
+            if rects_overlap(bx, by, bw, BULLET_H, mx, my, MOTOR_W, MOTOR_H) {
                 g.bullets[bi].active = false;
                 g.barrier.hp -= 1;
                 g.spawn_explosion(bx, by, 0.6, EXPLOSION_ORANGE);
@@ -1861,17 +1904,34 @@ fn draw_play(
     for b in pool_iter(&g.turret_bullets) {
         blip.fill_glow_circle(b.x + TURRET_BULLET_W / 2.0, b.y + TURRET_BULLET_H / 2.0, 4.5, BLIP_ORANGE);
     }
-    // Bullet look escalates with the current weapon tier: wider, brighter,
-    // and glowing instead of a flat rect from tier 4 up.
+    // Rounds: a hot head with a tracer streak behind it along its path,
+    // coloured and sized by the tier that fired it.
     let bcolor = weapon_tier_color(g.weapon_level);
-    let (bscale, bglow) = weapon_bullet_visual(g.weapon_level);
-    let bw = BULLET_W * bscale;
+    let trail = BlipColor::new(bcolor.r, bcolor.g * 0.8, bcolor.b * 0.5, 0.45);
+    let hot = BlipColor::new(1.0, 0.97, 0.85, 1.0);
     for b in pool_iter(&g.bullets) {
-        let (cx, cy) = (b.x + BULLET_W / 2.0, b.y + BULLET_H / 2.0);
-        if bglow {
-            blip.fill_glow_circle(cx, cy, bw * 1.1, bcolor);
-        } else {
-            blip.fill_rect(cx - bw / 2.0, b.y, bw, BULLET_H, bcolor);
+        let len = 10.0 + b.r * 3.0;
+        let k = len / BULLET_SPEED;
+        blip.draw_line_ex(b.x - b.vx * k, b.y + len, b.x, b.y, b.r * 1.1, trail);
+        blip.fill_circle(b.x, b.y, b.r, bcolor);
+        blip.fill_circle(b.x, b.y - b.r * 0.3, b.r * 0.5, hot);
+    }
+    // Spent brass, tumbling off the wings.
+    for c in pool_iter(&g.casings) {
+        let a = (c.ttl / 0.45).clamp(0.0, 1.0);
+        let (s, co) = c.rot.sin_cos();
+        blip.draw_line_ex(c.x - co * 2.2, c.y - s * 2.2, c.x + co * 2.2, c.y + s * 2.2, 1.8,
+            BlipColor::new(0.86, 0.66, 0.26, a));
+    }
+    // Muzzle flash at each gun for a frame or three after a burst.
+    if g.muzzle_t > 0.0 && g.state == State::Play {
+        let (n, fan, r) = weapon_guns(g.weapon_level);
+        let cx = g.player_x + PLAYER_W as f32 / 2.0;
+        let a = g.muzzle_t / 0.05;
+        for i in 0..n {
+            let dx = if n > 1 { (i as f32 / (n - 1) as f32 - 0.5) * fan } else { 0.0 };
+            blip.fill_glow_circle(cx + dx, g.player_y + 2.0, r * 1.6 * a + 1.0,
+                BlipColor::new(1.0, 0.85, 0.45, a));
         }
     }
 
@@ -2036,7 +2096,11 @@ const BOSS_NAME_JA_PNGS: [&[u8]; 7] = [
     include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_name_ja_7.png")),
 ];
 
-const SHOOT_WAV:          &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot.wav"));
+const SHOOT_WAV: [&[u8]; 3] = [
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot1.wav")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot2.wav")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot3.wav")),
+];
 const ENEMY_EXPLODE_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/enemy_explode.wav"));
 const PLAYER_EXPLODE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/player_explode.wav"));
 const PLAYER_HIT_WAV:     &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/player_hit.wav"));
@@ -2090,7 +2154,11 @@ async fn main() {
     let island_tex = ISLAND_PNGS.map(load_png);
 
     let sfx = Sounds {
-        shoot:          blip::audio::load_sound(SHOOT_WAV).await,
+        shoot: [
+            blip::audio::load_sound(SHOOT_WAV[0]).await,
+            blip::audio::load_sound(SHOOT_WAV[1]).await,
+            blip::audio::load_sound(SHOOT_WAV[2]).await,
+        ],
         enemy_explode:  blip::audio::load_sound(ENEMY_EXPLODE_WAV).await,
         player_explode: blip::audio::load_sound(PLAYER_EXPLODE_WAV).await,
         player_hit:     blip::audio::load_sound(PLAYER_HIT_WAV).await,

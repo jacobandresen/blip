@@ -169,34 +169,50 @@ fn victory_sfx() -> Vec<u8> {
 /// rather than a flat repeated beep — this fires many times a second at
 /// full-auto, so it needs to be gentle and a little varied, not a shrill tone
 /// hit over and over.
-fn shoot_sfx() -> Vec<i16> {
-    // One round from a wing gun: a bright noise crack, a low body thump
-    // and a breech click, all gone in ~90ms so autofire reads as a rattle.
+/// One report from a wing gun. A near-instant, overdriven crack of
+/// band-passed noise (the muzzle blast), a short saturated body, the bolt
+/// cycling twice, and two early reflections off the airframe. `pitch`
+/// and `seed` make the takes differ, so autofire is a rattle of shots
+/// rather than one sample on a loop.
+fn gun_report(seed: u32, pitch: f32) -> Vec<i16> {
     let sr = SAMPLE_RATE as f32;
-    let n = ms_to_samples(95.0);
-    let mut rng = Rng(0x5A0F_7E11);
-    let mut buf = vec![0.0f32; n];
-    let (mut lp, mut hp_prev, mut phase) = (0.0f32, 0.0f32, 0.0f32);
-    for (i, out) in buf.iter_mut().enumerate() {
+    let n = ms_to_samples(120.0);
+    let mut rng = Rng(seed | 1);
+    let mut dry = vec![0.0f32; n];
+    let (mut lo, mut bp_lo, mut bp_hi, mut phase) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+    for (i, out) in dry.iter_mut().enumerate() {
         let t = i as f32 / sr;
         let w = rng.next_f32() * 2.0 - 1.0;
-        // crack: high-passed noise, a few ms long
-        let hp = w - hp_prev;
-        hp_prev = w;
-        let crack = hp * (-t / 0.006).exp();
-        // blast: low-passed noise under it, a little longer
-        lp += (w - lp) * 0.32;
-        let blast = lp * (-t / 0.022).exp();
-        // thump: 150 -> 60 Hz, very short
-        phase += (60.0 + 90.0 * (-t / 0.012).exp()) / sr;
-        // saturated so its harmonics carry on a phone speaker
-        let thump = ((2.0 * PI * phase).sin() * 3.0).tanh() * (-t / 0.018).exp();
-        // breech click ~28ms in
-        let ct = t - 0.028;
-        let click = if ct > 0.0 { (2.0 * PI * 2400.0 * ct).sin() * (-ct / 0.0025).exp() } else { 0.0 };
-        *out = (crack * 0.18 + blast * 1.6 + thump * 0.55 + click * 0.12) * 20_000.0;
+        // crack: noise band-passed round 1.5-5 kHz, driven hard, ~4ms
+        bp_hi += (w - bp_hi) * 0.55 * pitch.min(1.2);
+        bp_lo += (bp_hi - bp_lo) * 0.18;
+        let crack = ((bp_hi - bp_lo) * 6.0).tanh() * (-t / 0.004).exp();
+        // body: low-passed blast, ~25ms
+        lo += (w - lo) * 0.09 * pitch;
+        let body = (lo * 5.0).tanh() * (-t / 0.025).exp();
+        // thump: 180 -> 90 Hz, saturated so a phone speaker keeps it
+        phase += pitch * (90.0 + 90.0 * (-t / 0.01).exp()) / sr;
+        let thump = ((2.0 * PI * phase).sin() * 4.0).tanh() * (-t / 0.02).exp();
+        // bolt: two short metallic clacks
+        let mut bolt = 0.0;
+        for (at, amp) in [(0.022f32, 1.0f32), (0.034, 0.6)] {
+            let ct = t - at / pitch;
+            if ct > 0.0 { bolt += amp * (2.0 * PI * 2900.0 * pitch * ct).sin() * (-ct / 0.0018).exp(); }
+        }
+        *out = crack * 1.0 + body * 0.7 + thump * 0.55 + bolt * 0.12;
     }
-    soft_limit_to_pcm16(&buf, MIX_KNEE)
+    // Early reflections, darker than the direct sound.
+    let mut buf = dry.clone();
+    for (ms, g) in [(14.0f32, 0.30f32), (27.0, 0.16)] {
+        let d = ms_to_samples(ms);
+        let mut lp = 0.0f32;
+        for i in d..n {
+            lp += (dry[i - d] - lp) * 0.25;
+            buf[i] += lp * g;
+        }
+    }
+    let scaled: Vec<f32> = buf.iter().map(|v| v * 21_000.0).collect();
+    soft_limit_to_pcm16(&scaled, MIX_KNEE)
 }
 
 /// A round striking the fuselage: a sharp tick, a short metallic ring from
@@ -1926,7 +1942,9 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/barrier_hum.wav",    barrier_hum_sfx()),
         ("sounds/engine_start.wav",   engine_start_sfx()),
         ("sounds/propeller.wav",      propeller_sfx()),
-        ("sounds/shoot.wav",          encode_pcm16_mono(&shoot_sfx())),
+        ("sounds/shoot1.wav",         encode_pcm16_mono(&gun_report(0x5A0F_7E11, 1.0))),
+        ("sounds/shoot2.wav",         encode_pcm16_mono(&gun_report(0x1D2E_3F41, 0.93))),
+        ("sounds/shoot3.wav",         encode_pcm16_mono(&gun_report(0x7C6B_5A49, 1.07))),
         ("sounds/enemy_explode.wav",  encode_pcm16_mono(&explosion_sfx(520.0, 0.8, 95.0, 1.0, 0xE1E1))),
         ("sounds/player_explode.wav", encode_pcm16_mono(&explosion_sfx(1100.0, 1.0, 70.0, 1.6, 0x9A7E))),
         // A short, quieter crack for a non-lethal hit — reads as "took a
