@@ -12,7 +12,7 @@
 //! So what is left here is what cannot be drawn: the noises a fight
 //! makes.
 
-use crate::techno::{Rng, MIX_KNEE};
+use crate::techno::{tame, warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, encode_pcm16_music, env, ms_to_samples,
     soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
@@ -243,6 +243,7 @@ fn projectile() -> Vec<i16> {
 /// and it sounds like catgut rather than like a synthesiser, which no
 /// amount of enveloping a sine wave ever will.
 fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut Rng) {
+    let freq = tame(freq);
     let period = (SAMPLE_RATE as f32 / freq).max(2.0) as usize;
     let n = ms_to_samples(ms).min(buf.len().saturating_sub(off));
     let mut line: Vec<f32> = (0..period).map(|_| rng.next_f32() * 2.0 - 1.0).collect();
@@ -388,6 +389,7 @@ fn theme(bpm: f32, root: f32, phrases: &[&[i32]], bass: &[&[i32]], order: &[usiz
         }
     }
     wrap_tail(&mut buf, body);
+    warm(&mut buf[..body]);
     soft_limit_to_pcm16(&buf[..body], MIX_KNEE)
 }
 

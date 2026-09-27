@@ -2,7 +2,7 @@
 //!
 //! Direct port of `games/rally/assets/generate_assets.c`.
 
-use crate::techno::{
+use crate::techno::{warm, 
     bass_note, clap, hat, kick, lead_stab, lift_fill, open_hat, phrase_note, riser,
     sidechain_duck, supersaw, Rng,
     MIX_KNEE,
@@ -78,6 +78,7 @@ fn music() -> Vec<u8> {
         kick(&mut buf, off, 0.95);
     }
 
+    warm(&mut buf);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -134,6 +135,7 @@ fn music2() -> Vec<u8> {
         kick(&mut buf, off, 0.95);
     }
 
+    warm(&mut buf);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -185,6 +187,7 @@ fn music3() -> Vec<u8> {
         kick(&mut buf, off, 0.75);
     }
 
+    warm(&mut buf);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -243,6 +246,7 @@ fn music4() -> Vec<u8> {
         kick(&mut buf, off, 0.95);
     }
 
+    warm(&mut buf);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -303,6 +307,7 @@ fn music5() -> Vec<u8> {
         kick(&mut buf, off, 0.9);
     }
 
+    warm(&mut buf);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 

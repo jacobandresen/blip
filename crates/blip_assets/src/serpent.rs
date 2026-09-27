@@ -5,7 +5,7 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::techno::{
+use crate::techno::{warm, 
     bass_note, clap, hat, kick, lift_fill, open_hat, phrase_note, sidechain_duck, supersaw, Rng,
     MIX_KNEE,
 };
@@ -167,6 +167,7 @@ fn techno_loop(
         kick(&mut buf, off, 0.9);
     }
 
+    warm(&mut buf);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 

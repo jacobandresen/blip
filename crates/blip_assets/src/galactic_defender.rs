@@ -5,7 +5,7 @@
 use std::f32::consts::PI;
 
 use crate::image::Image;
-use crate::techno::{
+use crate::techno::{warm, 
     bass_note, clap, hat, kick, lead_stab, open_hat, phrase_note, sidechain_duck, supersaw, Rng, MIX_KNEE,
 };
 use crate::wav::{encode_pcm16_mono, mix_into, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
@@ -486,6 +486,7 @@ fn music() -> Vec<u8> {
         kick(&mut buf, off, 0.9);
     }
 
+    warm(&mut buf);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -552,6 +553,7 @@ fn music2() -> Vec<u8> {
         kick(&mut buf, off, 0.95);
     }
 
+    warm(&mut buf);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -613,6 +615,7 @@ fn music3() -> Vec<u8> {
         kick(&mut buf, off, 0.8);
     }
 
+    warm(&mut buf);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 

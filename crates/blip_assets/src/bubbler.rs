@@ -5,7 +5,7 @@
 
 use std::f32::consts::PI;
 
-use crate::techno::{Rng, MIX_KNEE};
+use crate::techno::{warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, encode_pcm16_music, soft_limit_to_pcm16, SAMPLE_RATE};
 
 const SR: f32 = SAMPLE_RATE as f32;
@@ -202,6 +202,7 @@ fn theme(bpm: f32) -> Vec<u8> {
     // Fold the tail back onto the start so the loop has no seam.
     let tail = buf.split_off(total);
     for (i, v) in tail.iter().enumerate() { buf[i] += v; }
+    warm(&mut buf);
     let scaled: Vec<f32> = buf.iter().map(|v| v * 21_000.0).collect();
     encode_pcm16_music(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
 }
@@ -224,8 +225,8 @@ pub fn jingle_wav(which: usize) -> Vec<u8> {
         if n >= 0 {
             let mut len = 1;
             while k + len < notes.len() && notes[k + len] == H { len += 1; }
-            note(&mut buf, k * st, len * st, n, 0.34, voice);
-            note(&mut buf, k * st, len * st, n - 12, 0.12, Voice::Bell);
+            note(&mut buf, k * st, len * st, n - 12, 0.34, voice);
+            note(&mut buf, k * st, len * st, n - 24, 0.12, Voice::Bell);
             k += len;
         } else { k += 1; }
     }

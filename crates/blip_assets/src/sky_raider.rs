@@ -7,7 +7,7 @@
 use crate::image::Image;
 use std::f32::consts::PI;
 
-use crate::techno::{Rng, MIX_KNEE};
+use crate::techno::{tame, warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, mix_into, mix_into_f32, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
@@ -1678,6 +1678,8 @@ fn power_chord(buf: &mut [f32], off: usize, root: f32, ms: f32, vol: f32, palm: 
 /// note blooming into amp feedback. `bend` is how many semitones the note
 /// slides up from on the attack (0.0 = struck clean).
 fn lead_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, bend: f32) {
+    let mut freq = freq;
+    while freq > 660.0 { freq *= 0.5; } // an octave down until it sings, not screams
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
     if n == 0 { return; }
@@ -1749,6 +1751,7 @@ fn bass_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
 /// Guitar dive bomb — the whammy-bar drop that ends a solo: pitch craters
 /// from `freq` toward nothing while the note blooms once and then chokes.
 fn dive_bomb(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
+    let (freq, vol) = (tame(freq), vol * 0.6);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
     if n == 0 { return; }
@@ -1998,6 +2001,7 @@ fn music() -> Vec<u8> {
         power_chord(&mut buf, bar_off, E2, step_ms * steps_per_bar as f32 * 1.02, 0.06, false);
     }
 
+    warm(&mut buf);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -2136,6 +2140,7 @@ fn music2() -> Vec<u8> {
         power_chord(&mut buf, bar_off, D2, step_ms * steps_per_bar as f32 * 1.02, 0.06, false);
     }
 
+    warm(&mut buf);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 

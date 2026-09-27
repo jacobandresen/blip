@@ -81,6 +81,30 @@ pub fn lift_fill(buf: &mut [f32], bar_start_off: usize, step_samples: usize, rng
 /// Punchy pitch-swept kick drum, with a short high-frequency click on the
 /// attack and gentle saturation — what makes a kick punch through a dense
 /// mix instead of reading as a dull sine thump.
+/// Keep a melodic voice out of the shrill register: anything above A4 drops
+/// by octaves, so a tune keeps its shape but sits where it is easy on the
+/// ears (and on a phone speaker).
+pub fn tame(freq: f32) -> f32 {
+    let mut f = freq;
+    while f > 440.0 { f *= 0.5; }
+    f
+}
+
+/// The master warmth for a music track: two gentle low-pass poles round
+/// 3 kHz take the fizz off hats, saws and noise without dulling the tune.
+pub fn warm(buf: &mut [f32]) {
+    let a = 1.0 - (-2.0 * PI * 3000.0 / SAMPLE_RATE as f32).exp();
+    let (mut l1, mut l2) = (0.0f32, 0.0f32);
+    for v in buf.iter_mut() {
+        l1 += a * (*v - l1);
+        l2 += a * (l1 - l2);
+        *v = l2;
+    }
+}
+
+/// Darken a noise sample: a one-pole low-pass state, stepped per sample.
+fn dark(lp: &mut f32, x: f32, a: f32) -> f32 { *lp += a * (x - *lp); *lp }
+
 pub fn kick(buf: &mut [f32], off: usize, vol: f32) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.15) as usize;
@@ -108,22 +132,24 @@ pub fn kick(buf: &mut [f32], off: usize, vol: f32) {
 /// Closed hi-hat — short, bright noise tick.
 pub fn hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
     let n = (SAMPLE_RATE as f32 * 0.045) as usize;
+    let mut lp = 0.0;
     for i in 0..n {
         if off + i >= buf.len() { break; }
         let e = (1.0 - i as f32 / n as f32).powf(2.2);
-        let noise = rng.next_f32() * 2.0 - 1.0;
-        mix_into_f32(buf, off + i, noise * e * vol * 11000.0);
+        let noise = dark(&mut lp, rng.next_f32() * 2.0 - 1.0, 0.35);
+        mix_into_f32(buf, off + i, noise * e * vol * 6500.0);
     }
 }
 
 /// Open hi-hat — longer decay, washier than the closed hat.
 pub fn open_hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
     let n = (SAMPLE_RATE as f32 * 0.16) as usize;
+    let mut lp = 0.0;
     for i in 0..n {
         if off + i >= buf.len() { break; }
         let e = (1.0 - i as f32 / n as f32).powf(1.3);
-        let noise = rng.next_f32() * 2.0 - 1.0;
-        mix_into_f32(buf, off + i, noise * e * vol * 9000.0);
+        let noise = dark(&mut lp, rng.next_f32() * 2.0 - 1.0, 0.3);
+        mix_into_f32(buf, off + i, noise * e * vol * 5000.0);
     }
 }
 
@@ -137,7 +163,7 @@ pub fn clap(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
             if off + s + i >= buf.len() { break; }
             let e = (1.0 - i as f32 / burst_n as f32).powf(1.8);
             let noise = rng.next_f32() * 2.0 - 1.0;
-            mix_into_f32(buf, off + s + i, noise * e * vol * 9000.0);
+            mix_into_f32(buf, off + s + i, noise * e * vol * 6000.0);
         }
     }
     // Tail wash so the clap doesn't cut off too abruptly.
@@ -163,7 +189,7 @@ pub fn bass_note(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
     let n = (sr * ms / 1000.0) as usize;
     let att = (sr * 0.003) as usize;
     let rel = (n / 4).max(1);
-    let cutoff_hi = (freq * 16.0).min(sr * 0.45);
+    let cutoff_hi = (freq * 8.0).min(2400.0);
     let cutoff_lo = freq * 2.2;
     let mut lp = 0f32;
     let mut phase = 0f32;
@@ -207,17 +233,19 @@ pub fn sidechain_duck(buf: &mut [f32], kick_offsets: &[usize], depth: f32, relea
 
 /// Bright additive lead/stab voice, for hooks and tension hits.
 pub fn lead_stab(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
+    let freq = tame(freq);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
-    let att = (sr * 0.01) as usize;
+    let att = (sr * 0.02) as usize;
     let rel = (n * 3 / 4).max(1);
     for i in 0..n {
         if off + i >= buf.len() { break; }
         let t = i as f32 / sr;
         let e = env(i, n, att.max(1), rel);
+        // sine and a soft octave: round, not buzzy
         let w = (2.0 * PI * freq * t).sin()
-            + (1.0 / 3.0) * (2.0 * PI * freq * 3.0 * t).sin()
-            + (1.0 / 5.0) * (2.0 * PI * freq * 5.0 * t).sin();
+            + 0.3 * (2.0 * PI * freq * 2.0 * t).sin()
+            + 0.08 * (2.0 * PI * freq * 3.0 * t).sin();
         mix_into_f32(buf, off + i, w * e * vol * 9000.0);
     }
 }
@@ -228,6 +256,9 @@ pub fn lead_stab(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
 /// swelling breakdown pad. `detune` is the spread as a fraction of `freq`
 /// (0.006-0.01 is a classic supersaw width; wider gets dissonant/chorusy).
 pub fn supersaw(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, att_ms: f32, detune: f32) {
+    let freq = tame(freq);
+    let a = 1.0 - (-2.0 * PI * (freq * 4.0).min(1800.0) / SAMPLE_RATE as f32).exp();
+    let (mut l1, mut l2) = (0.0f32, 0.0f32);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
     let att = ((sr * att_ms / 1000.0) as usize).max(1);
@@ -245,7 +276,9 @@ pub fn supersaw(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, att_m
             s += 2.0 * *ph - 1.0;
         }
         s /= SPREAD.len() as f32;
-        mix_into_f32(buf, off + i, s * e * vol * 16000.0);
+        l1 += a * (s - l1);
+        l2 += a * (l1 - l2);
+        mix_into_f32(buf, off + i, l2 * e * vol * 17000.0);
     }
 }
 
@@ -261,11 +294,11 @@ pub fn riser(buf: &mut [f32], off: usize, dur_ms: f32, vol: f32, rng: &mut Rng) 
         if off + i >= buf.len() { break; }
         let frac = i as f32 / n as f32;
         let e = frac.powf(1.5);
-        let cutoff = 200.0 + 9000.0 * frac.powf(1.8);
+        let cutoff = 200.0 + 2600.0 * frac.powf(1.8);
         let alpha = (1.0 - (-2.0 * PI * cutoff / sr).exp()).clamp(0.0, 1.0);
         let white = rng.next_f32() * 2.0 - 1.0;
         lp += alpha * (white - lp);
-        mix_into_f32(buf, off + i, lp * e * vol * 14000.0);
+        mix_into_f32(buf, off + i, lp * e * vol * 9000.0);
     }
 }
 
