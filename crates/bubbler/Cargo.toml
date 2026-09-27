@@ -1,0 +1,12 @@
+[package]
+name = "bubbler"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+macroquad = { workspace = true }
+blip = { workspace = true }
+# The music and effects are synthesised on the device (blip_assets::bubbler).
+blip_assets = { workspace = true }

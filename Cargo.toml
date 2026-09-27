@@ -6,6 +6,7 @@ members = [
     "crates/serpent",
     "crates/bouncer",
     "crates/brawler",
+    "crates/bubbler",
     "crates/galactic_defender",
     "crates/rally",
     "crates/meteors",

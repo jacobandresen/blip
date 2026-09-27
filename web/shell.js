@@ -691,9 +691,9 @@ window.addEventListener('keydown', function (e) {
   // lit and waiting. The third state is what makes "touch it to join"
   // possible: in a one-player game it has to be dead to the touch.
   if (twoUp) window.blipSetMode = function (code) {
-    var open = code === 2;
+    open = code === 2;
     versus = code === 1;
-    root.setAttribute('data-players', versus ? '2' : '1');
+    applyPlayers();
     if (open) root.setAttribute('data-open', '');
     else root.removeAttribute('data-open');
     // The second station is on the panel either way; what changes is
@@ -709,6 +709,15 @@ window.addEventListener('keydown', function (e) {
   // Two players on a touch phone play sideways, a station per side with
   // controls a thumb can use; upright there is room for one. The page cannot
   // turn an iPhone, so it asks (and locks the orientation where allowed).
+  // Sideways on a touch screen a cabinet waiting for a second player lays
+  // out both stations, so there is somewhere for them to press to join.
+  var open = false;
+  function applyPlayers() {
+    var both = versus || (open && landscape() && matchMedia('(pointer: coarse)').matches);
+    root.setAttribute('data-players', both ? '2' : '1');
+  }
+  window.addEventListener('resize', applyPlayers);
+
   var hint = null, hintDismissed = false;
   function rotateHint() {
     var want = versus && !hintDismissed && !landscape() && matchMedia('(pointer: coarse)').matches;

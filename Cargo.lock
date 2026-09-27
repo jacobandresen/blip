@@ -77,6 +77,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bubbler"
+version = "0.1.0"
+dependencies = [
+ "blip",
+ "blip_assets",
+ "macroquad",
+]
+
+[[package]]
 name = "bytemuck"
 version = "1.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

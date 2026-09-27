@@ -3180,3 +3180,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-layout="landscape"][data-players="2"] .stick-base { width: 80px; }
 :root[data-layout="landscape"][data-players="2"] .stick-boot { width: 48px; height: 48px; }
 :root[data-layout="landscape"][data-players="2"] .stick-ball { width: 52px; height: 52px; }
+/* Sideways every cap on show should do something: a two-button game's
+   spares only look like more buttons to press. */
+:root[data-layout="landscape"] :is(.snes-btn, .arcade-btn).spare { display: none; }

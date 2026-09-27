@@ -97,6 +97,23 @@ var BLIP_GAMES = {
                                  p2button3: { key: 'k', code: 'KeyK' },
                                  p2button4: { key: 'i', code: 'KeyI' } },
                          stick: { engage: 10, release: 6, maxR: 54, hyst: 10 } },
+  // A tribute to Bubble Bobble. Two caps: bubble (fire) and jump; up
+  // jumps too. Like Brawler, player one is WASD so the arrows are player
+  // two's, who drops in with their own bubble or jump.
+  bubbler:            { name: 'BUBBLER', accent: '120, 210, 255',
+                         players: 2,
+                         buttons: [{ key: 'f', code: 'KeyF', label: 'BUBBLE' },
+                                   { key: 'g', code: 'KeyG', label: 'JUMP' }],
+                         keys: { up:    { key: 'w', code: 'KeyW' },
+                                 down:  { key: 's', code: 'KeyS' },
+                                 left:  { key: 'a', code: 'KeyA' },
+                                 right: { key: 'd', code: 'KeyD' },
+                                 p2up:    { key: 'ArrowUp',    code: 'ArrowUp' },
+                                 p2down:  { key: 'ArrowDown',  code: 'ArrowDown' },
+                                 p2left:  { key: 'ArrowLeft',  code: 'ArrowLeft' },
+                                 p2right: { key: 'ArrowRight', code: 'ArrowRight' },
+                                 p2button1: { key: 'j', code: 'KeyJ' },
+                                 p2button2: { key: 'k', code: 'KeyK' } } },
   sky_raider:         { name: 'RAIDER', accent: '50, 100, 220',
                          stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } }
 };
