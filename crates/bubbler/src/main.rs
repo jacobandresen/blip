@@ -1218,7 +1218,6 @@ fn draw_title(blip: &Blip, g: &Game, hi: &web::HighScore) {
         }
         blip.draw_text(&s, x, 88.0 + bob, sz, hue);
     }
-    blip.draw_centered("A TRIBUTE TO BUBBLE BOBBLE", 148.0, 1.5, rgba(1.0, 0.85, 0.95, 0.9));
     // the two of them, bouncing
     for (i, x) in [170.0f32, 310.0].iter().enumerate() {
         let hop = ((t * 3.2 + i as f32 * 1.6).sin()).max(0.0);
