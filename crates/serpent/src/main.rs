@@ -28,12 +28,8 @@ const SPEED_STEP: f32 = 10.0;
 const FOODS_PER_LVL: i32 = 5;
 
 // ---- bonus fruit --------------------------------------------------------
-// Ordinary food is not a decision: it sits there until eaten, so the only
-// question is which way round the board to go, and a careful player never
-// has a reason to hurry. The bonus is the opposite — it is worth five
-// ordinary foods, it is somewhere else, and it is leaving. Whether to go
-// for it is the first real choice the game asks, and the answer changes
-// with how long the snake has got.
+// Worth five foods, somewhere else, and leaving: whether to go for it is the
+// game's first real choice.
 const BONUS_EVERY: i32 = 3;      // which food of the level brings one out
 const BONUS_TTL: f32 = 6.0;      // seconds on the board
 const BONUS_WARN: f32 = 2.0;     // when it starts flashing out
@@ -57,19 +53,10 @@ impl Dir {
     }
 }
 
-/// How many turns may be held ahead of the snake.
-///
-/// One is not enough, and that is the whole reason this exists. The
-/// snake steps every 180ms at its slowest and 70ms at its fastest, but
-/// a player rounding a corner presses *two* directions in one human
-/// gesture — right, then down — far faster than that. With a single
-/// slot the second press overwrote the first, the snake never turned
-/// right, and it drove into the wall the player had just steered away
-/// from. The press was not mistimed; it was thrown away.
-///
-/// Two is the number that matches the gesture. Three would let a
-/// player queue a path the snake has not visibly committed to yet,
-/// which is a different game.
+/// How many turns may be held ahead of the snake. Rounding a corner is two
+/// presses in one gesture (right, then down), faster than a 180ms step; with
+/// one slot the second overwrote the first. Three would let a player queue a
+/// path the snake has not visibly committed to.
 const TURN_QUEUE: usize = 2;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -137,11 +124,8 @@ impl Game {
         if ms < SPEED_MIN { SPEED_MIN } else { ms }
     }
 
-    /// Is this cell clear of the snake and the obstacle field?
-    ///
-    /// From level 2 on the board has obstacle blocks — without this check
-    /// food can land inside one and be permanently unreachable (it only
-    /// ever relocates when eaten), softlocking the level.
+    /// Clear of the snake and the obstacles (from level 2), or food could
+    /// land in a block and be unreachable.
     fn cell_is_free(&self, f: Cell) -> bool {
         for i in 0..self.snake_len {
             let b = self.snake_at(i);
@@ -165,20 +149,14 @@ impl Game {
 
     fn bonus_active(&self) -> bool { self.bonus_ttl > 0.0 }
 
-    /// Put a bonus somewhere the snake has to travel to reach.
-    ///
-    /// Deliberately not just "any free cell": a bonus that lands under the
-    /// snake's nose is worth five foods for no decision at all, which is
-    /// the one outcome that makes the rest of the board pointless. Tries
-    /// for somewhere a third of the board away, and settles for anywhere
-    /// free rather than spinning if the board is nearly full.
+    /// Put a bonus somewhere the snake must travel to: aim for a third of the
+    /// board away, and settle for any free cell only if the board is nearly
+    /// full.
     fn spawn_bonus(&mut self) {
         let head = self.snake_at(0);
         let far_enough = (COLS + ROWS) / 3;
-        // Two passes: somewhere worth travelling to, and then — only if
-        // the board is too full to offer one — anywhere at all. The
-        // second pass exists so a late, long-snake level still gets its
-        // bonus instead of silently skipping it.
+        // Two passes: worth travelling to, then anywhere, so a long-snake
+        // level still gets its bonus.
         for relaxed in [false, true] {
             for _ in 0..64 {
                 let b = Cell { c: rand_int(0, COLS - 1), r: rand_int(0, ROWS - 1) };
@@ -233,16 +211,9 @@ impl Game {
         }
     }
 
-    /// Remember a turn the player asked for, if it is one the snake can
-    /// actually take.
-    ///
-    /// Validated against the *last direction queued* rather than the one
-    /// the snake is travelling in right now. Those differ exactly when a
-    /// turn is already waiting, and checking the wrong one is how a
-    /// queue lets a player double back into their own neck: travelling
-    /// right, queue up, then queue left — "left" is not the reverse of
-    /// "right"'s successor, it is the reverse of nothing, and both turns
-    /// are legal in sequence.
+    /// Queue a turn if the snake can take it, checked against the last
+    /// direction queued, not the current one: otherwise up then left from
+    /// travelling right is a U-turn into its own neck.
     fn queue_turn(&mut self, dir: Dir) {
         let last = if self.turns_len == 0 { self.cur_dir } else { self.turns[self.turns_len - 1] };
         if dir == last || dir == last.opposite() { return; }
@@ -595,10 +566,8 @@ mod tests {
         g
     }
 
-    /// One move step, exactly as update_play() takes it: the turn comes
-    /// off the queue and becomes the direction travelled from now on.
-    /// Calling take_turn() alone would not commit it, and a test that
-    /// did so would be asserting against a snake that never turned.
+    /// One move step as update_play() takes it: the turn comes off the queue
+    /// and becomes the direction.
     fn step(g: &mut Game) -> Dir {
         g.cur_dir = g.take_turn();
         g.cur_dir
@@ -606,11 +575,7 @@ mod tests {
 
     #[test]
     fn a_corner_taken_faster_than_one_step_keeps_both_turns() {
-        // The defect this queue exists for. Travelling right, the player
-        // rounds a corner with one gesture — down, then left — well
-        // inside a single 180ms step. With a single slot the "down" was
-        // overwritten and never happened: the snake carried straight on
-        // into whatever the player was steering around.
+        // Down then left inside one step must both happen.
         let mut g = running();
         g.queue_turn(Dir::Down);
         g.queue_turn(Dir::Left);
@@ -622,12 +587,8 @@ mod tests {
 
     #[test]
     fn a_queued_turn_cannot_double_back_into_the_neck() {
-        // The bug a queue introduces if it validates against the
-        // direction the snake is travelling in *now* rather than the
-        // last one queued. Travelling right: "up" is legal, and then
-        // "left" is legal against `cur_dir` (right) while being an
-        // immediate reversal of the "up" that will have happened by
-        // then. Taken in sequence that is a U-turn into its own neck.
+        // Travelling right, up then down: the second is a reversal of the
+        // first and must be refused.
         let mut g = running();
         g.queue_turn(Dir::Up);
         g.queue_turn(Dir::Down);

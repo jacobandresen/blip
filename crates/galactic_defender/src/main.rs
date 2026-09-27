@@ -68,20 +68,11 @@ const UFO_FIRE_SECS: f32 = 0.4;      // how long the beam itself is on screen
 const LASER_HIT_W: f32 = UFO_W;      // width of the beam's kill zone
 
 // ---- the mothership -----------------------------------------------------
-// Every fifth level ends with one instead of simply ending.
-//
-// The five formation themes cycle forever, and past level 5 the only thing
-// that changes is how fast they march — the game gets harder without ever
-// getting *different*, and clearing a level stops meaning anything. The
-// mothership is the thing a run is aiming at: it arrives when the last
-// alien of a boss level dies, it takes real damage to bring down, and it
-// is the one enemy that shoots back in volleys.
-//
-// Deliberately built out of parts that already exist: the saucer art drawn
-// large, the alien bomb pool (empty by then — the formation it belonged to
-// is dead), the existing bomb/player and bomb/shield collisions, and the
-// existing explosion pool. The only genuinely new things are its health
-// and its firing pattern.
+// Every fifth level ends with one: the themes cycle, so without it the game
+// only gets faster, never different. It arrives when the last alien of a boss
+// level dies, takes real damage, and fires volleys. Built from existing
+// parts: the saucer art drawn large, the (by then empty) alien bomb pool with
+// its collisions, and the explosion pool.
 const BOSS_EVERY: i32 = 5;            // every fifth level ends with one
 const BOSS_SCALE: f32 = 2.6;          // times the ordinary saucer
 const BOSS_W: f32 = UFO_W * BOSS_SCALE;
@@ -110,10 +101,10 @@ const DEATH_EXPLOSION_PHASE: f32 = 0.7; // seconds of that pause spent on the gi
                                          // before the ship starts fading back in — the
                                          // remainder (DEAD_PAUSE - this) is the mist fade-in
 const RESPAWN_GRACE_SECS: f32 = 1.2; // once play resumes, firing stays locked out this long
-                                      // so the respawn reads as a real vulnerable moment
-// A hard floor on how long GAME OVER stays up before a key can dismiss it —
-// without this, the fire button still held from the fight that killed you
-// bounces straight back to the title screen unread.
+                                      // How long GAME OVER stays before a key
+                                      // can dismiss it, so the fire button
+                                      // still held from the fight does not
+                                      // skip it.
 const GAME_OVER_MIN_WAIT: f32 = 2.0;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -281,10 +272,8 @@ impl Game {
         }
     }
 
-    /// A dramatic, multi-burst explosion for the player's own ship going
-    /// down — several overlapping fireballs of varying size and lifetime
-    /// around the ship's `ALIEN_W`x`ALIEN_W` box at top-left `(x, y)`,
-    /// instead of the single small alien-kill puff.
+    /// The player ship's death: several overlapping fireballs round its
+    /// `ALIEN_W`x`ALIEN_W` box at `(x, y)`.
     fn spawn_player_death(&mut self, x: f32, y: f32) {
         const BURSTS: [(f32, f32, f32, f32); 6] = [
             (0.0,   0.0,  2.6, 2.4),
@@ -575,13 +564,9 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
             }
         }
         UfoMode::Tracking => {
-            // Stalk the player's x, mimicking their movement, before
-            // stopping to charge — a "being hunted" beat that gives the
-            // player extra warning before the charge-up sound even starts.
-            // It's faster than the player, so it actually catches up, but
-            // it won't commit while the player keeps moving: it waits for
-            // them to hold still (and be locked on) before switching to
-            // Charging — or, at worst, once its time simply runs out.
+            // Stalk the player's x before charging, a hunted beat that warns
+            // before the charge sound. Faster than the player, it commits
+            // only once they hold still (locked on) or its time runs out.
             let target = (g.player_x + ALIEN_W as f32 / 2.0 - UFO_W / 2.0)
                 .clamp(0.0, WIN_W as f32 - UFO_W);
             let step = UFO_TRACK_SPEED * dt;
@@ -693,10 +678,8 @@ fn draw_ufo(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
                 };
                 blip.fill_glow_circle(cx, cy, glow_r, glow_c);
 
-                // Warning line straight down, telegraphing exactly where the
-                // beam will land — always visible (never fully hidden, so it
-                // can't be missed), pulsing faster and brighter as it nears
-                // firing so the urgency escalates without ever going dark.
+                // Warning line down to where the beam will land: always
+                // visible, pulsing faster and brighter as it nears firing.
                 let pulse_rate = 3.0 + progress * 10.0;
                 let pulse = 0.5 + 0.5 * (progress * pulse_rate * std::f32::consts::TAU).sin();
                 let warn_c = BlipColor {
@@ -734,18 +717,8 @@ fn update_title(g: &mut Game) {
     if btn1_pressed() { g.start_game(); }
 }
 
-/// The colour that identifies an alien kind, and therefore what it scores.
-///
-/// The title screen has always drawn the three kinds in magenta, cyan and
-/// green — it is how the player is taught which is which, and the row
-/// order on that screen is the scoring order: 30, 20, 10. In play every
-/// alien was then drawn white, so the code the title screen teaches was
-/// never honoured where it mattered, and the three kinds were told apart
-/// only by silhouette: a handful of pixels different, at this size, in a
-/// dense grid, while they are moving.
-///
-/// Same colours, same order, so the title screen is now a legend for the
-/// game rather than a separate picture.
+/// An alien kind's colour, and so its score: magenta 30, cyan 20, green 10,
+/// the same as the title screen's legend.
 fn alien_color(kind: usize) -> BlipColor {
     match kind {
         0 => BLIP_MAGENTA, // squid   — 30 points
@@ -754,15 +727,9 @@ fn alien_color(kind: usize) -> BlipColor {
     }
 }
 
-/// The mothership: cross, sway, and drop volleys.
-///
-/// Its bombs go into the alien bomb pool, which is free by the time it
-/// arrives — the formation that owned those slots is what summoned it.
-/// That means its shots are the same bombs the player already knows: same
-/// speed, same look, already handled by the bomb/player and bomb/shield
-/// collisions. A boss that shot something new would need all of that
-/// written twice, and would teach the player a second set of rules in the
-/// one fight where they have least attention to spare.
+/// The mothership: cross, sway, drop volleys. Its bombs use the alien bomb
+/// pool, free by then, so they are the bombs the player already knows, with
+/// the existing collisions.
 fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
     if !g.boss_active { return; }
 
@@ -801,11 +768,8 @@ fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 }
 
-/// Player shots against the mothership.
-///
-/// Only the player's own bullet slots are looked at — free_bullet() hands
-/// those out from the front of the array and bombs from behind it, so a
-/// shot that could hurt the mothership can only be in this range.
+/// Player shots against the mothership: only the player's slots, which
+/// free_bullet() hands out from the front of the array (bombs from the back).
 fn boss_take_hits(g: &mut Game, sfx: &Sounds) {
     if !g.boss_active { return; }
     let (bx, by) = (g.boss_x, g.boss_y());
@@ -835,9 +799,8 @@ fn boss_take_hits(g: &mut Game, sfx: &Sounds) {
     }
 }
 
-/// A bomb (drawn 4x12) against the ship's wedge, not
-/// its 36x28 box: the box's top corners are empty sky, and a bomb through
-/// them used to cost a life.
+/// A bomb (drawn 4x12) against the ship's wedge, not its 36x28 box, whose top
+/// corners are empty sky.
 fn bomb_hits_ship(bx: f32, by: f32, px: f32) -> bool {
     let top = (GROUND_Y - 28) as f32;
     let tip = by + 12.0;
@@ -852,10 +815,8 @@ fn bomb_hits_ship(bx: f32, by: f32, px: f32) -> bool {
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.respawn_grace.tick(dt);
-    // Hold to fire, the way the real cabinet's button worked — a new shot
-    // goes out the instant the previous one clears. MAX_PLAYER_BULLETS = 1
-    // is the rate limit, so this can't be spammed; it just spares the
-    // player from re-tapping.
+    // Hold to fire, like the cabinet: a new shot goes as soon as the last
+    // clears; MAX_PLAYER_BULLETS = 1 is the rate limit.
     let shoot = !g.respawn_grace.active()
         && (key_active(BLIP_KEY_SPACE)
             || key_active(BLIP_KEY_UP)
@@ -1049,11 +1010,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     for a in g.aliens.iter() {
         if a.alive && a.y + ALIEN_H as f32 >= GROUND_Y as f32 {
-            // The invasion reaching the ground ends the game outright, same
-            // as the classic rule — but it still plays out as a real "kill"
-            // (the giant death explosion) instead of an abrupt cut to the
-            // game-over screen. Skip straight past the mist respawn phase
-            // since there's no coming back from this one.
+            // The invasion landing ends the game outright, but as a real
+            // death explosion, and skips the respawn.
             let px = g.player_x;
             g.spawn_player_death(px, (GROUND_Y - 28) as f32);
             play_sfx(&sfx.explosion);
@@ -1133,14 +1091,8 @@ fn update_over(g: &mut Game, dt: f32) {
     g.start_game();
 }
 
-/// The mothership, and how much of it is left.
-///
-/// The health bar is the whole reason this fight reads as a fight. Without
-/// it a player firing into a ship that does not visibly change has no way
-/// to tell "slowly winning" from "doing nothing", and the honest reading
-/// of an enemy that will not die is that it cannot be killed. The bar is
-/// drawn under the ship rather than in the HUD so it is inside the same
-/// glance as the thing it describes.
+/// The mothership and its health bar, drawn under the ship so it is in the
+/// same glance: without it, slowly winning looks like doing nothing.
 fn draw_boss(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
     if !g.boss_active { return; }
     let (x, y) = (g.boss_x, g.boss_y());
@@ -1517,10 +1469,8 @@ mod tests {
 
     #[test]
     fn a_dead_mothership_does_not_come_back_on_the_same_level() {
-        // Clearing the formation is what summons one. Once it is down,
-        // that check keeps passing every frame until the level ends, and
-        // without boss_done the level would summon a fresh mothership
-        // forever — a level that cannot be finished.
+        // Once the mothership is down the formation-cleared check keeps
+        // passing; without boss_done the level would summon one forever.
         let mut g = at_level(5);
         g.spawn_boss();
         g.boss_active = false;

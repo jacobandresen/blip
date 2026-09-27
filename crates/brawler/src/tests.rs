@@ -1,10 +1,5 @@
-//! The rules, pinned.
-//!
-//! A fighting game is mostly invisible: what a player feels as "that
-//! should have hit" is a number in a table. These tests are where the
-//! numbers are held to what the game claims about itself — that blocking
-//! is a choice with a wrong answer, that slow moves are punishable, that
-//! a knockdown is not a free second hit.
+//! The rules, pinned: blocking is a choice with a wrong answer, slow moves
+//! are punishable, a knockdown is not a free second hit.
 
 use super::*;
 
@@ -436,16 +431,13 @@ fn the_projectile_pool_cannot_be_overrun() {
 
 #[test]
 fn every_special_is_something_the_shared_table_cannot_do() {
-    // If a special were just another poke, the fighters would differ
-    // only in colour. Each one has to break a rule the normals obey:
-    // the bolt leaves the fighter behind, the rush crosses the stage,
-    // the talon kick goes airborne.
+    // Each special breaks a rule the normals obey (the bolt leaves the
+    // fighter, the rush crosses the stage, the talon kick goes airborne), or
+    // fighters differ only in colour.
     let base = move_data(MoveId::Special);
     assert!(base.knockdown, "a special that does not knock down is just a slow kick");
-    // It beats the pokes for damage — it is not what you throw to
-    // win an exchange, it is what you throw to end one. The high kick
-    // out-damages it and is meant to: that is a fourteen-frame overhead
-    // you have to read, where this comes out in eleven and knocks down.
+    // It out-damages the pokes (it ends an exchange); the high kick
+    // out-damages it and is meant to, a 14-frame overhead you must read.
     assert!(base.damage > move_data(MoveId::LowKick).damage);
     // And it costs more to miss than anything else in the table, which
     // is the only thing keeping it from being the whole game.
@@ -724,10 +716,8 @@ fn a_buffered_attack_is_forgotten_if_it_waits_too_long() {
 
 #[test]
 fn a_buffered_move_remembers_the_stance_it_was_asked_for_in() {
-    // Pressing down+kick during recovery is a sweep, and must still be
-    // a sweep when it comes out — resolving it later against whatever
-    // the stick happens to be doing would hand the player a move they
-    // did not ask for.
+    // Down+kick pressed in recovery is a sweep when it comes out, whatever
+    // the stick does meanwhile.
     let mut f = at(0, 200.0, 1.0);
     f.start_attack(MoveId::HighKick);
     let mut low = Input::default();
@@ -766,14 +756,9 @@ fn a_knockdown_throws_the_two_fighters_apart() {
 
 // ---- balance, measured ---------------------------------------------------
 
-/// A whole round, fought headlessly: the CPU against a scripted player,
-/// reported as numbers rather than as a feeling.
-///
-/// Tuning a fighting game by playing it is how you tune it for the one
-/// person who has played it a hundred times. This runs the real CPU
-/// against three deliberately crude opponents — a rusher, a turtle, a
-/// poker — because how a game treats players who are *not* good at it is
-/// most of whether it is fun.
+/// A whole round fought headlessly, the real CPU against a crude rusher,
+/// turtle or poker, reported as numbers: how the game treats players who are
+/// not good at it is most of whether it is fun.
 struct RoundStats {
     seconds: f32,
     player_health: i32,
@@ -783,17 +768,9 @@ struct RoundStats {
     timed_out: bool,
 }
 
-/// Every test that runs the CPU has to take this first.
-///
-/// The CPU's choices come out of a random number generator that is
-/// global to the process, and `cargo test` runs tests in parallel — so
-/// two simulations running at once draw from the same stream, in an
-/// order that depends on thread scheduling. The balance tests were
-/// passing and failing by coincidence, which is worse than not having
-/// them: a red run told you nothing and a green one told you less.
-///
-/// Holding this lock serialises them, and seeding inside it makes each
-/// one start from the same place every time.
+/// Every test that runs the CPU takes this first: the RNG is process-global
+/// and `cargo test` runs in parallel, so without the lock (and a seed inside
+/// it) the balance tests pass or fail by scheduling.
 static SIMULATION: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn simulating(seed: u64) -> std::sync::MutexGuard<'static, ()> {
@@ -881,12 +858,8 @@ fn turtle(_frame: usize, p: &[Fighter; 2]) -> Input {
     i
 }
 
-/// Keeps its distance, blocks low, punishes what it sees miss, and pokes
-/// from the edge of its range — roughly what the game is asking for.
-///
-/// It crouch-blocks rather than standing, because standing into sweeps
-/// is a blind spot the game is designed to punish, and a "good player"
-/// model with that hole in it measures the hole rather than the game.
+/// Keeps its distance, crouch-blocks (standing into sweeps is a hole the game
+/// punishes), punishes whiffs, and pokes from range.
 fn poker(frame: usize, p: &[Fighter; 2]) -> Input {
     let mut i = Input::default();
     let dist = (p[1].x - p[0].x).abs();
@@ -897,11 +870,8 @@ fn poker(frame: usize, p: &[Fighter; 2]) -> Input {
     // are two distinct fields of a local struct.
     let (fwd, back) = unsafe { (&mut *fwd, &mut *back) };
 
-    // The safe poke is the yardstick, and since the middle kick was
-    // dropped that is the low one. Measured out on a high kick — a
-    // fourteen-frame overhead with twenty-two frames of recovery — the
-    // poker threw its most punishable move as its jab and went from
-    // winning a round 100-0 to losing it 0-90.
+    // The safe poke is the yardstick: the low kick. (Poking with the high
+    // kick made the poker throw its most punishable move as its jab.)
     let my_kick = attack_range(&p[0], MoveId::LowKick);
     let whiffed = p[1].act == Act::Attack && p[1].hit_done;
 
@@ -915,10 +885,8 @@ fn poker(frame: usize, p: &[Fighter; 2]) -> Input {
         i.down = true;
         i.kick_low = true;                  // and mix in a low
     } else {
-        // Otherwise hold guard — and *change* which guard. Held low
-        // for the whole round it ate every high kick: with no middle
-        // kick left there is nothing a single guard covers, which is
-        // the entire point of dropping it.
+        // Otherwise hold guard, and change which: one guard held all round
+        // ate every high kick.
         *back = true;
         i.down = frame % 96 < 52;
     }
@@ -927,18 +895,10 @@ fn poker(frame: usize, p: &[Fighter; 2]) -> Input {
 
 #[test]
 fn every_round_is_decided_by_something_that_happened() {
-    // A round may run the clock out — a defensive fight is a legitimate
-    // fight, and the count is meant to be pressure. What it may never
-    // do is *often* end with both fighters largely untouched, because
-    // that is the signature of a stalemate the rules cannot break: two
-    // players holding back at each other until the arithmetic picks one.
-    //
-    // Sampled across several seeds and asserted as a rate. One seed is
-    // a coin flip: every change to how a fighter moves reshuffles a
-    // chaotic simulation, and a single round drifting over the line
-    // said nothing about whether the game had got worse. Measured over
-    // 180 rounds the rate held at 2-3% either side of a change that
-    // moved one seeded round from a draw to a loss.
+    // A round may run the clock out, but must not often end with both
+    // fighters largely untouched: that is a stalemate the rules cannot break.
+    // Asserted as a rate over several seeds, since one seed is a coin flip in
+    // a chaotic simulation (the rate held at 2-3% over 180 rounds).
     let styles: [(&str, fn(usize, &[Fighter; 2]) -> Input); 3] =
         [("rusher", rusher), ("poker", poker), ("turtle", turtle)];
     let mut stalemates = vec![];
@@ -1231,17 +1191,10 @@ fn a_whiffed_throw_is_the_worst_thing_you_can_do() {
 }
 
 // ---- anatomy -------------------------------------------------------------
-//
-// The fighters are drawn from a skeleton, and a skeleton can be checked.
-// These walk every pose of every fighter across the whole of its
-// animation and assert the things a body cannot do: bones do not change
-// length, hinges do not fold past shut or bend backwards, and nothing
-// ends up underneath the floor it is standing on.
-//
-// This is the difference between "the kick looked wrong in that
-// screenshot" and "the kick is wrong, here is which joint, at which
-// frame". A drawing bug you can only see is a drawing bug you will
-// reintroduce.
+// The fighters are drawn from a skeleton, and a skeleton can be checked:
+// every pose of every fighter across its animation, asserting that bones keep
+// their length, hinges neither over-fold nor bend backwards, and nothing
+// sinks through the floor. A failure names the joint and the frame.
 
 /// Every pose the game can put a fighter in, as (label, fighter state).
 fn every_pose() -> Vec<(String, Fighter)> {
@@ -1375,17 +1328,10 @@ fn nothing_is_drawn_underneath_the_floor() {
 
 #[test]
 fn what_you_see_is_what_can_hit_you() {
-    // The rule the whole drawing is built on: the limb a player can see
-    // coming is the thing that will hit them. So on every active frame
-    // of every attack, the striking hand or foot has to be *inside* its
-    // own hitbox, and not far from the end of it.
-    //
-    // Two ways to break this, and both have happened here. Letting the
-    // bones stretch to reach the box put the fighter on a support leg a
-    // fifth longer than the one it kicked with. Refusing to stretch
-    // them left the foot short of the box, so an attack landed from
-    // further away than it looked. What is left is a body that reaches
-    // as far as a body reaches, and move ranges that sit inside that.
+    // The limb a player sees coming is what hits them: on every active frame
+    // the striking hand or foot is inside its hitbox and near its end.
+    // (Stretching bones to reach broke the support leg; refusing left the
+    // foot short.)
     let mut bad = vec![];
     for who in 0..FIGHTERS.len() {
         for mv in [MoveId::LowPunch, MoveId::LowKick, MoveId::HighKick,
@@ -1401,10 +1347,8 @@ fn what_you_see_is_what_can_hit_you() {
                 let k = bones_of(&f);
                 let leg = matches!(mv, MoveId::LowKick | MoveId::HighKick
                     | MoveId::Sweep);
-                // The tip is the end of the foot or the front of the
-                // fist, not the joint behind it.
-                // Both scale with the fighter, because the drawn foot
-                // and the drawn fist do.
+                // The tip is the end of the foot or the front of the fist,
+                // scaled with the fighter like the drawing.
                 let bulk = FIGHTERS[who].bulk;
                 let tip = if leg {
                     let (dx, dy) = (k.ankle_lead.0 - k.knee_lead.0, k.ankle_lead.1 - k.knee_lead.1);
@@ -1452,15 +1396,9 @@ fn why_is_that_matchup_quiet() {
 
 #[test]
 fn a_standing_fighter_is_standing_on_something() {
-    // Weight over the feet. A body whose mass is outside the ground it
-    // is standing on is a body falling over, and a pose that reads as
-    // falling over reads as wrong even to someone who could not say
-    // why.
-    //
-    // Attacks get a wider allowance, because leaning past your own feet
-    // is exactly what throwing a punch is — you are falling forward and
-    // the recovery frames are you catching yourself. What is not
-    // allowed is standing, walking or guarding off balance.
+    // Weight over the feet, or the pose reads as falling. Attacks get a wider
+    // allowance (a punch is falling forward); standing, walking and guarding
+    // do not.
     let mut bad = vec![];
     for (label, f) in every_pose() {
         if f.airborne() || matches!(f.act, Act::Knockdown | Act::Defeat) { continue; }
@@ -1489,10 +1427,8 @@ fn a_standing_fighter_is_standing_on_something() {
 
 #[test]
 fn knees_bend_forwards_and_elbows_bend_backwards() {
-    // A hinge has a direction as well as a limit. The length and range
-    // tests above are both satisfied by a leg with the knee on the
-    // wrong side of it — which is a leg on backwards, and the most
-    // obviously inhuman thing a drawing of a person can do.
+    // A hinge has a direction as well as a limit: a knee on the wrong side
+    // passes the length and range tests.
     let mut bad = vec![];
     for (label, f) in every_pose() {
         // A fighter on their back has no meaningful forward, and their
@@ -1531,16 +1467,10 @@ fn knees_bend_forwards_and_elbows_bend_backwards() {
 
 #[test]
 fn nothing_teleports_between_one_frame_and_the_next() {
-    // The complaint that is hardest to pin down is "the animation looks
-    // strange", and most of the time what is behind it is not a bad
-    // pose but a missing one: an action changes, the drawing follows on
-    // the same frame, and a limb crosses half the screen between two
-    // pictures. The eye reads that as a different fighter, not as the
-    // same fighter moving.
-    //
-    // So: drive one through a realistic run of actions at the real
-    // frame rate and watch every joint. Nothing may move further in one
-    // frame than a body part can.
+    // "The animation looks strange" is usually a missing in-between: an
+    // action changes and a limb crosses half the screen in a frame. Drive a
+    // fighter through a realistic run at the real frame rate; no joint may
+    // move further in a frame than a body part can.
     let _sim = simulating(0x5EED05);
     let script: [(Act, MoveId, f32); 11] = [
         (Act::Idle, MoveId::LowPunch, 0.20),
@@ -1549,10 +1479,7 @@ fn nothing_teleports_between_one_frame_and_the_next() {
         (Act::Attack, MoveId::HighKick, 0.70),
         (Act::Block, MoveId::LowPunch, 0.20),
         (Act::Attack, MoveId::Sweep, 0.60),
-        // A jump comes out of a neutral stance, because that is the
-        // only thing it can come out of: you cannot jump out of a
-        // sweep's recovery, and a script that pretends you can is
-        // measuring a handover the game never performs.
+        // A jump comes out of a neutral stance, as it must in the game.
         (Act::Idle, MoveId::LowPunch, 0.12),
         (Act::Air, MoveId::LowPunch, 0.80),
         (Act::Hitstun, MoveId::LowPunch, 0.30),
@@ -1581,15 +1508,9 @@ fn nothing_teleports_between_one_frame_and_the_next() {
             for _ in 0..frames {
                 advance(&mut f, F);
                 held += F;
-                // advance() ends an action when its own clock runs out
-                // and resets the timer with it. Hold both, or the run
-                // restarts the action mid-script and the "teleport"
-                // being measured is the test's own doing.
-                // A jump is the one leg of the script that is allowed
-                // to end on its own: it finishes by landing, and the
-                // landing — the touchdown, the handover to standing and
-                // the give in the knees after it — is exactly the part
-                // worth watching.
+                // advance() ends an action when its clock runs out, so hold
+                // both or the test restarts actions itself. A jump may end by
+                // landing: the touchdown is part of what is watched.
                 if f.act != act && !(act == Act::Air && !f.airborne()) {
                     f.act = act;
                     f.t = held;
@@ -1606,10 +1527,9 @@ fn nothing_teleports_between_one_frame_and_the_next() {
                            ("knee-lead", k.knee_lead), ("knee-rear", k.knee_rear),
                            ("head", k.head), ("hip", k.hip)];
                 if let Some(prev) = last {
-                    // Being hit is allowed to snap: a guard knocked
-                    // aside is the fastest thing that happens to a
-                    // body, and softening it would cost the hit its
-                    // impact. Everything else has to travel.
+                    // Being hit may snap (a guard knocked aside is the
+                    // fastest thing that happens to a body); everything else
+                    // must travel.
                     let limit = match act {
                         Act::Hitstun => 70.0,
                         // The peak of a kick's whip, where the shin is
@@ -1637,11 +1557,8 @@ fn nothing_teleports_between_one_frame_and_the_next() {
             }
         }
     }
-    // A foot at the fast end of a kick covers about fifteen pixels a
-    // frame; thirty is not a limb moving, it is a cut. This is the test
-    // that caught the roundhouse arriving fifty pixels in a single
-    // frame — the leg covering the last fifth of the kick with no
-    // picture in between, on the frame it lands.
+    // A kick's foot covers about fifteen pixels a frame at speed; thirty is a
+    // cut (this caught a roundhouse arriving fifty in one frame).
     assert!(over.is_empty(), "limbs teleporting:\n  {}\n(worst overall: {})",
         over.join("\n  "), worst.1);
 }
@@ -1650,11 +1567,9 @@ fn nothing_teleports_between_one_frame_and_the_next() {
 
 #[test]
 fn a_waiting_fighter_has_their_knees_bent() {
-    // Straight knees read as standing in a queue. It went wrong in a
-    // way nothing else here could see: the hip sat a leg's length from
-    // the ankles, the solver clamped both legs straight because that
-    // was the closest it could legally get, and every length, hinge
-    // and balance rule still passed.
+    // Standing, walking and guarding with bent knees: a hip a leg's length
+    // from the ankles clamped both legs straight while every other rule
+    // passed.
     let mut bad = vec![];
     for who in 0..FIGHTERS.len() {
         for act in [Act::Idle, Act::Walk, Act::Block] {
@@ -1684,11 +1599,9 @@ fn a_waiting_fighter_has_their_knees_bent() {
 
 #[test]
 fn no_limb_is_folded_up_to_nothing() {
-    // A two-bone limb stops being posable before it stops being legal.
-    // As the target nears the fold limit the joint stops answering to
-    // it and swings out along the bias instead, and a pixel at the hand
-    // throws it a long way. The rear guard hand, parked at 1.07x the
-    // minimum, put the far elbow through the fighter's own chest.
+    // A two-bone limb stops being posable before it stops being legal: near
+    // the fold limit the joint swings along the bias, and a rear guard hand
+    // at 1.07x the minimum put the elbow through the chest.
     let shut = |l1: f32, l2: f32, c: f32| (l1 * l1 + l2 * l2 - 2.0 * l1 * l2 * c.cos()).sqrt();
     let arm_min = shut(24.0, 21.0, 0.61);
     let leg_min = shut(30.0, 29.0, 0.52);
@@ -1783,10 +1696,9 @@ fn no_elbow_sticks_out_behind_the_back() {
 
 #[test]
 fn a_fighter_has_two_arms_two_legs_and_one_torso() {
-    // Near and far limbs have to be far enough apart to be counted, and
-    // close enough not to read as someone else's. Both failures have
-    // happened: a guard that put the two fists in one place, and a fist
-    // parked beside the skull that read as a second head.
+    // Near and far limbs far enough apart to count, close enough not to read
+    // as someone else's (two fists in one place, or a fist by the skull
+    // reading as a second head).
     let mut bad = vec![];
     for (label, f) in every_pose() {
         // A body rolling up off the floor passes its own limbs across
@@ -1832,10 +1744,8 @@ fn a_fighter_fits_inside_their_own_hurtbox() {
 
 #[test]
 fn a_fighter_who_covers_ground_takes_steps() {
-    // Both directions, because they are drawn by different code.
-    // Retreating is a block — holding away is the block and the
-    // back-step at once — and the block pose had both feet pinned, so
-    // a fighter giving ground slid backwards without moving a foot.
+    // Both directions, drawn by different code: retreating is the block pose,
+    // which must not slide with both feet pinned.
     for (name, inp, toward) in [
         ("forward", Input { right: true, ..Default::default() }, 1.0f32),
         ("backward", back_input(1.0, false), -1.0),
@@ -2022,11 +1932,9 @@ fn the_cpu_throws_the_flying_kick_too() {
 
 #[test]
 fn a_kick_pressed_in_the_air_always_comes_out() {
-    // Pressing attack and getting nothing is the worst thing a
-    // fighting game can do, and a jump used to do it twice: the flying
-    // kick needed up and kick on the same frame, and a kick pressed in
-    // the last five frames of a jump had a startup longer than the
-    // fall left, so the feet touched first and landing threw it away.
+    // Pressing attack in a jump must always produce one: the flying kick
+    // within its window, and a late kick buffered rather than eaten by
+    // landing.
     for k in 0..50 {
         for hold_up in [false, true] {
             let mut f = at(0, 300.0, 1.0);
@@ -2122,10 +2030,8 @@ fn fly_advantage(gap: f32, guard: bool) -> i32 {
 
 #[test]
 fn landing_a_flying_kick_keeps_your_turn() {
-    // A move that is minus on hit is a move nobody should ever throw.
-    // This one was nineteen frames minus: it connects in the air and
-    // pays its recovery on the ground, and the flight in between was
-    // time the defender spent recovering from the hit.
+    // A flying kick that hits must not leave the attacker minus: it pays
+    // recovery on the ground after the defender's hitstun.
     for gap in [60.0f32, 100.0, 140.0, 175.0] {
         let adv = fly_advantage(gap, false);
         assert!(adv >= 0, "a flying kick that hit at gap {gap} left the attacker \
@@ -2171,10 +2077,8 @@ fn crouching_under_a_flying_kick_does_not_work() {
 
 #[test]
 fn a_flying_kick_can_be_met_in_the_air() {
-    // The answer to it is to hit them out of it, so that has to work.
-    // The no-slide check is a guard rather than a bug it caught: the
-    // momentum is cleared on knockdown, and grounded fighters skip the
-    // physics step anyway, so it takes both going wrong to slide.
+    // Hitting them out of it has to work, without the attacker sliding on
+    // (momentum is cleared on knockdown; both guards would have to fail).
     let mut a = at(0, 200.0, 1.0);
     let mut d = at(0, 300.0, -1.0);
     a.start_attack(MoveId::FlyingKick);
@@ -2192,12 +2096,8 @@ fn a_flying_kick_can_be_met_in_the_air() {
 
 #[test]
 fn what_you_see_is_what_can_hit_you_in_the_air_too() {
-    // The grounded version of this rule has been enforced since the
-    // drawing was written; the air moves were never covered by it, so
-    // the flying kick's foot had never once been checked against the
-    // box that does its damage. Flown for real rather than posed at a
-    // guessed height, because the pose is read off vertical speed and
-    // a still frame is not the move.
+    // Air moves' feet against the boxes that do their damage, flown for real
+    // because the pose is read off vertical speed.
     let mut bad = vec![];
     for who in 0..FIGHTERS.len() {
         for mv in [MoveId::FlyingKick, MoveId::JumpKick, MoveId::JumpPunch] {
@@ -2252,11 +2152,8 @@ fn what_you_see_is_what_can_hit_you_in_the_air_too() {
 
 #[test]
 fn winning_a_round_in_mid_air_puts_you_back_on_the_floor() {
-    // The round ends by assigning Victory and Defeat outright, so a
-    // fighter who landed the killing blow mid-flight is airborne when
-    // it happens. Nothing advanced them afterwards, so they hung there
-    // for the whole two seconds — and the victory pose, which is read
-    // off the action timer, stayed frozen on its first frame.
+    // A mid-air finisher must land and play the victory pose, not hang frozen
+    // for the round-end pause.
     let mut g = Game::new();
     g.start_match(0);
     g.state = State::RoundEnd;
@@ -2277,10 +2174,7 @@ fn winning_a_round_in_mid_air_puts_you_back_on_the_floor() {
 
 #[test]
 fn a_fighter_on_the_floor_is_only_as_tall_as_they_are_drawn() {
-    // The hurtbox exists to be the box the fighter is drawn in. A
-    // downed one is flat on the boards, and was carrying a full
-    // standing box: a flying kick passing over them connected with the
-    // air above a prone body.
+    // A downed fighter's hurtbox is flat, so a flying kick passes over them.
     let mut d = at(0, 300.0, -1.0);
     d.act = Act::Knockdown;
     d.t = 0.4;
@@ -2310,10 +2204,7 @@ fn a_fighter_on_the_floor_is_only_as_tall_as_they_are_drawn() {
 
 #[test]
 fn no_guard_height_covers_any_normal() {
-    // The reason the middle kick was dropped, now extended to the
-    // punches: every normal is low or overhead, so there is nothing a
-    // player can hold a single stance against. The mid was the move
-    // that let you pick a guard and keep it.
+    // Every normal is low or overhead, so no single stance blocks them all.
     let normals = [MoveId::LowPunch, MoveId::HighPunch, MoveId::LowKick, MoveId::HighKick,
                    MoveId::Sweep, MoveId::JumpKick, MoveId::JumpPunch, MoveId::FlyingKick];
     for crouch in [false, true] {
@@ -2348,10 +2239,8 @@ fn wav_seconds(wav: &[u8]) -> f32 {
 
 #[test]
 fn a_theme_outlasts_the_round_it_plays_under() {
-    // A four-bar loop is seven seconds against a forty-five second
-    // round: you hear it round six times, and by the third you are
-    // listening to the seam instead of the fight. A theme longer than
-    // the round has no seam to hear.
+    // A stage theme longer than the round, so no loop seam is heard (a
+    // four-bar loop repeats six times in a round).
     for which in 0..2 {
         let secs = wav_seconds(&blip_assets::brawler::theme_wav(which));
         assert!(secs > ROUND_SECS,
@@ -2403,13 +2292,8 @@ fn dump_themes() {
 
 #[test]
 fn the_two_players_share_no_keys() {
-    // The whole reason the clusters were chosen: two people at one
-    // keyboard, and a key that moves both fighters makes the mode
-    // unplayable rather than merely awkward.
-    //
-    // Read off the pads themselves, not a list copied beside them — a
-    // test that restates the thing it is checking only ever checks the
-    // typing.
+    // No key moves both fighters, read off the pads themselves rather than a
+    // copied list.
     let keys = |p: &Pad| {
         let mut v: Vec<String> = Vec::new();
         for set in [p.up, p.down, p.left, p.right, p.punch_low, p.punch_high,
@@ -2542,11 +2426,9 @@ fn each_player_has_their_own_special_window() {
 }
 
 // ---- two-player play tests -----------------------------------------------
-//
-// These drive the real flow rather than a mirror of it: `update_menus`
-// is the same function main() calls, and the fight below is the same
-// `apply_input`/`advance`/`resolve_hit` the game runs. Only the
-// keyboard and the speaker are replaced.
+// The real flow: `update_menus` as main() calls it, and the game's own
+// `apply_input` / `advance` / `resolve_hit`. Only keyboard and speaker are
+// replaced.
 
 fn press(back: bool, fwd: bool, fire: bool) -> MenuIn { MenuIn { back, fwd, fire } }
 const NOTHING: MenuIn = MenuIn { back: false, fwd: false, fire: false };
@@ -2679,10 +2561,8 @@ fn playtest_1_a_whole_two_player_session() {
 
 #[test]
 fn playtest_2_player_two_is_moved_off_a_fighter_that_gets_taken() {
-    // Both cursors start on the same fighter and player one takes it.
-    // Player two was legal a moment ago and is not any more, so they
-    // are moved to a free one rather than left pressing a button that
-    // does nothing.
+    // Both cursors on one fighter, player one takes it: player two moves to a
+    // free one.
     let mut g = at_versus_select();
     g.pick = 0;
     g.pick2 = 0;
@@ -2770,10 +2650,8 @@ fn playtest_5_one_player_mode_is_untouched() {
 
 #[test]
 fn a_versus_result_reports_a_winner_not_a_score() {
-    // A versus match ends on the same state a lost solo run does, and
-    // that screen said "GAME OVER" over a score — which is true of a
-    // run against the ladder and says nothing about a match two people
-    // just played.
+    // A versus match ends with a winner, not a solo run's GAME OVER over a
+    // score.
     let mut g = Game::new();
     g.mode = Mode::Versus;
     g.pick = 0;
@@ -2929,11 +2807,9 @@ fn diag_round_5_how_fast_does_a_fighter_answer_the_stick() {
 
 #[test]
 fn a_planted_foot_stays_where_it_was_put() {
-    // The whole point of the step cycle: while a foot is on the floor
-    // it slides backwards at exactly the speed the fighter walks
-    // forwards, so in the world it does not move at all. Get the two
-    // constants out of step and the fighter moonwalks — which is what
-    // it did, to the tune of a quarter of every step.
+    // While a foot is planted it slides back at exactly the walk speed, so in
+    // the world it stays put (out of step, the fighter moonwalked a quarter
+    // of every step).
     let mut worst: f32 = 0.0;
     let mut planted = 0;
     let mut x = 0.0f32;
@@ -3036,11 +2912,9 @@ fn sweat_arrives_with_the_damage() {
 }
 
 // ---- ten rounds of looking at it ----------------------------------------
-//
-// Every one of these measures the drawing rather than the rules: what a
-// player can actually see and tell apart at sixty pixels tall. They are
-// diagnostics — run with `--ignored` — and the ones that found something
-// have a real assertion next to them further down.
+// Diagnostics of the drawing (`--ignored`): what a player can tell apart at
+// sixty pixels. The ones that found something have a real assertion further
+// down.
 
 /// Worst offenders first, with the label, so a number leads somewhere.
 fn report(title: &str, mut rows: Vec<(f32, String)>) {
@@ -3150,15 +3024,9 @@ fn dist2(a: draw::V, b: draw::V) -> f32 {
 
 #[test]
 fn no_leg_is_curled_up_behind_the_back() {
-    // A foot that is a long way behind the hip *and* a long way above
-    // the floor is a heel pulled up to the backside. One leg doing that
-    // turns the whole figure into a bundle — it was what made every air
-    // attack read as a ball rather than as a person in the air.
-    //
-    // Either on its own is fine and both are real: a trailing leg
-    // streams out behind a flying kick, and a chambered knee comes up
-    // high in front. It is the product of the two that is the fold, so
-    // that is what is bounded.
+    // A foot far behind the hip and far above the floor is a heel pulled to
+    // the backside, which balls up the figure. Each alone is real (a trailing
+    // leg, a chambered knee), so the product is bounded.
     let mut bad = Vec::new();
     for (name, f) in every_pose() {
         let k = bones_of(&f);
@@ -3207,14 +3075,8 @@ fn bin(s: &[f32], hz: f32) -> f32 {
     (re * re + im * im).sqrt() / s.len() as f32
 }
 
-/// The frequency a sound sits on, and how much it stands out from the
-/// rest of the spectrum.
-///
-/// Zero crossings were tried first and they cannot answer this: a hit
-/// here is two thirds hiss, and noise crosses zero so often that it
-/// swamps whatever the thump is doing — measured that way, three hits
-/// whose thump climbs four hundred hertz come out *falling*, because
-/// the one with the most pitch in it has the least noise.
+/// The frequency a sound sits on and how much it stands out. Not zero
+/// crossings: a hit is two thirds hiss, and noise swamps the thump's pitch.
 fn dominant(wav: &[u8], lo: f32, hi: f32) -> (f32, f32) {
     let s = wav_samples(wav);
     let n = 40;
@@ -3237,11 +3099,8 @@ fn asset(name: &str) -> Vec<u8> {
 
 #[test]
 fn a_combo_climbs_as_it_lands() {
-    // The counter in the corner was the only thing that said a chain
-    // was going anywhere; the sound stayed flat while the numbers went
-    // up. Three light hits, each brighter than the last, and the combo
-    // picks which one — so a four-hit string is audibly a four-hit
-    // string.
+    // Three light hits, each brighter, picked by the combo count, so a
+    // four-hit string sounds like one.
     let b: Vec<f32> = ["hit_light.wav", "hit_light2.wav", "hit_light3.wav"]
         .iter().map(|n| dominant(&asset(n), 150.0, 1600.0).0).collect();
     assert!(b[1] > b[0] * 1.15 && b[2] > b[1] * 1.15,
@@ -3250,8 +3109,8 @@ fn a_combo_climbs_as_it_lands() {
 
 #[test]
 fn a_body_hitting_the_floor_does_not_sound_like_a_jab() {
-    // A knockdown is the biggest thing that happens in a round and it
-    // used to share its sound with an ordinary heavy hit.
+    // A knockdown is the biggest thing in a round: its own sound, not a
+    // heavy hit's.
     let jab = asset("hit_light.wav");
     let heavy = asset("hit_heavy.wav");
     let crunch = asset("crunch.wav");

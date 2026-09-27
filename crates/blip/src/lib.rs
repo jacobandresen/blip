@@ -1,11 +1,9 @@
-//! blip — shared arcade game library, Rust port atop macroquad.
+//! blip — the shared arcade game library, on macroquad.
 //!
-//! Mirrors the C `blip.h` API where possible. Differences:
-//!   * The frame loop is owned by macroquad (`#[macroquad::main]`); games
-//!     call `blip.next_frame().await` once per tick instead of the
-//!     C-style `begin_frame` / `end_frame` pair.
-//!   * Audio is preloaded as `BlipSound` values (async) and replayed
-//!     synchronously, since macroquad's `load_sound_from_bytes` is async.
+//! macroquad owns the frame loop (`#[macroquad::main]`): games call
+//! `blip.next_frame().await` once per tick. Audio is preloaded as
+//! `BlipSound` values at startup (loading is async) and replayed
+//! synchronously in the loop.
 
 pub mod audio;
 pub mod color;

@@ -25,16 +25,11 @@ pub fn set_mode(two_player: bool) {
     set_players(i32::from(two_player));
 }
 
-/// The same channel, with the one extra state a cabinet actually has.
-///
-/// `0` is one player, `1` is two — and `2` is the attract/title screen
-/// of a machine that takes two: the second station is lit and waiting
-/// for somebody to touch it, which is neither of the other two. Without
-/// it the shell has to treat the title as a one-player game, and a
-/// one-player game is the case where the second station must be dead to
-/// the touch (in one-player mode the arrow keys are player one's own,
-/// so a live second stick is a second way to move your own fighter).
-/// Which would make "touch the second stick to join" impossible.
+/// Tell the shell how many players are in: `0` one, `1` two, `2` the title
+/// screen of a two-seat machine, with station two lit and waiting to be
+/// touched. In a one-player game station two is dead to the touch (its keys
+/// may be player one's), which would make touch-to-join impossible without
+/// the third state.
 pub fn set_players(code: i32) {
     #[cfg(target_arch = "wasm32")]
     unsafe { blip_set_mode(code); }
@@ -52,10 +47,9 @@ pub fn paddles(left: f32, right: f32) {
     let _ = (left, right);
 }
 
-/// Report the final score to the kiosk shell when a game ends, so it can
-/// post to the shared high-score board (`web/blip_scores.js`). Call once on
-/// the transition into the game-over state. A no-op on native builds and
-/// when no leaderboard backend is configured.
+/// Report the final score to the shell for the high-score board
+/// (`web/blip_scores.js`). Call once on entering game over; a no-op natively
+/// and without a backend.
 pub fn report_score(score: i32) {
     #[cfg(target_arch = "wasm32")]
     unsafe { blip_game_over(score); }

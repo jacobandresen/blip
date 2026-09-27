@@ -1,16 +1,6 @@
-//! Brawler assets — sounds only.
-//!
-//! The fighters are not sprites. They are drawn as posed figures out of
-//! rectangles by the game itself, one pose per state, because a fighting
-//! game lives or dies on whether you can read *what your opponent is
-//! doing right now* — and a pose assembled from the same parts every
-//! frame is guaranteed to agree with the hitboxes it is being judged
-//! against. A sprite sheet would have been a second source of truth for
-//! the same question, drawn by hand, for a game whose whole point is
-//! that the picture and the rules match.
-//!
-//! So what is left here is what cannot be drawn: the noises a fight
-//! makes.
+//! Brawler assets: sounds only. The fighters are drawn by the game from the
+//! same numbers as their hitboxes, so there is no sprite sheet to disagree
+//! with the rules.
 
 use crate::techno::{tame, warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, encode_pcm16_music, env, ms_to_samples,
@@ -60,15 +50,9 @@ fn whoosh(ms: f32, vol: f32, seed: u32) -> Vec<i16> {
     soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
 
-/// A crowd, all at once.
-///
-/// Thirty-odd people are already drawn watching every round and until
-/// now they made no noise whatsoever, which is a strange thing for a
-/// crowd to do at the exact moment somebody hits the floor. Built the
-/// way a cheer actually sounds: a wide band of noise that swells and
-/// falls, with a slow wobble across it so it reads as many voices
-/// rather than as one long hiss, and no pitch in it at all — a pitched
-/// cheer is a chord, and a chord is a different sound entirely.
+/// A crowd, all at once: a wide band of noise that swells and falls, with a
+/// slow wobble so it reads as many voices, and no pitch (a pitched cheer is a
+/// chord).
 fn crowd(ms: f32, vol: f32, seed: u32) -> Vec<i16> {
     let n = ms_to_samples(ms);
     let mut buf = vec![0.0f32; n];
@@ -116,31 +100,19 @@ fn land(seed: u32) -> Vec<i16> {
     soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
 
-/// Cloth snapping taut — the sound a gi makes when a leg goes out fast.
-///
-/// The `whoosh` above is air moving: low, soft-edged, and it says "an
-/// attack has started". This says something narrower and more useful —
-/// *that was quick*. A kick is the fastest thing a body does, and the
-/// only audible evidence of the speed is the fabric, which does not
-/// swish; it cracks, because the trouser leg runs out of slack all at
-/// once and stops.
-///
-/// So: noise through a band that opens upward as the leg extends, run
-/// through a one-sample difference to strip the bottom out of it, under
-/// an envelope that is almost all attack. Then a second, quieter crack
-/// a beat later — cloth snaps twice, once on the way out and once when
-/// the leg is pulled back.
+/// Cloth snapping taut, the sound of a gi when a leg goes out fast: the
+/// whoosh is air moving, this is speed. Noise through a band opening upward
+/// as the leg extends, a one-sample difference to strip the bottom, an
+/// envelope almost all attack, then a quieter second crack as the leg comes
+/// back.
 fn gi_snap(seed: u32) -> Vec<i16> {
     let ms = 150.0;
     let n = ms_to_samples(ms);
     let mut buf = vec![0.0f32; n];
     let mut rng = Rng(seed);
     let per_ms = ms_to_samples(1.0) as f32;
-    // Two cracks: the leg going out, and the smaller one as it is
-    // pulled back. Each gets its own filter, because the brightness
-    // belongs to the crack and not to the clock — sharing one sweep
-    // across both made the *second* snap the loud one, which is the
-    // opposite of what cloth does.
+    // Each crack gets its own filter sweep; sharing one made the second the
+    // louder.
     for (at_ms, gain) in [(0.0f32, 1.0f32), (62.0, 0.38)] {
         let from = ms_to_samples(at_ms);
         let (mut lp, mut prev) = (0.0f32, 0.0f32);
@@ -229,19 +201,10 @@ fn projectile() -> Vec<i16> {
     soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
 
-/// Two bars of driving loop to fight over. Deliberately plain: the
-/// sounds that matter in a fight are the ones the other player is
-/// making, and music that competes with them costs the player
-/// information.
-/// A plucked string: koto, or shamisen if you hit it harder.
-///
-/// Karplus-Strong — fill a delay line one period long with noise, then
-/// read it round and round, averaging each sample with its neighbour as
-/// it goes. The averaging is a low-pass, so the high partials die first
-/// and the note decays from a bright pluck into a pure tone, which is
-/// what a struck string actually does. Two dozen lines of arithmetic
-/// and it sounds like catgut rather than like a synthesiser, which no
-/// amount of enveloping a sine wave ever will.
+/// A plucked string: koto, or shamisen struck harder. Karplus-Strong: a
+/// period-long delay line of noise read round and round, averaging
+/// neighbours, so the highs die first and a bright pluck decays to a pure
+/// tone, like a real string.
 fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut Rng) {
     let freq = tame(freq);
     let period = (SAMPLE_RATE as f32 / freq).max(2.0) as usize;
@@ -263,11 +226,8 @@ fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut R
     }
 }
 
-/// A taiko: a big skin under tension.
-///
-/// Low body tone whose pitch falls as the head relaxes, a crack of
-/// noise for the stick, and a long enough tail to sound like a drum in
-/// a room rather than a click.
+/// A taiko: a low body tone falling in pitch as the head relaxes, a noise
+/// crack for the stick, and a room-length tail.
 fn taiko(buf: &mut [f32], off: usize, freq: f32, gain: f32, rng: &mut Rng) {
     let n = ms_to_samples(460.0).min(buf.len().saturating_sub(off));
     let mut phase = 0.0f32;
@@ -295,12 +255,9 @@ fn rim(buf: &mut [f32], off: usize, gain: f32, rng: &mut Rng) {
     }
 }
 
-/// The *hirajōshi* scale, in semitones from the root: root, minor
-/// second, fourth, fifth, minor sixth.
-///
-/// The minor second is the whole thing. It is the interval that makes a
-/// pentatonic run sound Japanese rather than merely folk — take it out
-/// and what is left could be Scottish. Everything here is built on it.
+/// The hirajoshi scale in semitones from the root: root, minor second,
+/// fourth, fifth, minor sixth. The minor second is what makes it sound
+/// Japanese.
 const HIRAJOSHI: [f32; 5] = [0.0, 1.0, 5.0, 7.0, 8.0];
 
 fn degree(root: f32, step: i32) -> f32 {
@@ -309,18 +266,9 @@ fn degree(root: f32, step: i32) -> f32 {
     root * 2.0f32.powf((d + 12.0 * oct as f32) / 12.0)
 }
 
-/// A theme, built from four-bar phrases.
-///
-/// Sequenced rather than looped. A four-bar loop is seven seconds, and
-/// a round is forty-five: you hear it round six times and by the third
-/// you are listening to the seam instead of the fight. `order` names
-/// which phrase plays in each slot, so eight slots of four bars is a
-/// theme longer than the round it plays under — which is the only
-/// arrangement you never hear repeat.
-///
-/// Phrases are scale degrees, not frequencies, so a tune cannot leave
-/// the scale by accident — which is how it stops sounding like the
-/// place it is supposed to be.
+/// A theme built from four-bar phrases, sequenced by `order` rather than
+/// looped: eight slots of four bars outlast the round, so no seam is heard.
+/// Phrases are scale degrees, so a tune cannot leave the scale.
 fn theme(bpm: f32, root: f32, phrases: &[&[i32]], bass: &[&[i32]], order: &[usize],
          drive: f32) -> Vec<i16> {
     let step = (SAMPLE_RATE as f32 * 60.0 / bpm / 4.0) as usize; // 16ths
@@ -393,14 +341,8 @@ fn theme(bpm: f32, root: f32, phrases: &[&[i32]], bass: &[&[i32]], order: &[usiz
     soft_limit_to_pcm16(&buf[..body], MIX_KNEE)
 }
 
-/// Fold what rings out past the end of the loop onto the beginning.
-///
-/// The buffer was the loop *plus* six hundred milliseconds for the
-/// tails to decay in, and the whole thing was handed to the player set
-/// to repeat — so every four seconds the music stopped dead, faded to
-/// nothing and started again. A drum that carries over a bar line has
-/// to carry over the loop point too, because for a loop they are the
-/// same line.
+/// Fold what rings out past the end of the loop onto its start, so tails
+/// carry over the loop point instead of the music stopping dead.
 fn wrap_tail(buf: &mut [f32], body: usize) {
     for i in body..buf.len() {
         buf[i - body] += buf[i];
@@ -408,24 +350,14 @@ fn wrap_tail(buf: &mut [f32], body: usize) {
 }
 
 
-/// The three themes, synthesised on demand.
-///
-/// Not baked into the binary like everything else here. A theme long
-/// enough not to repeat inside a round is a megabyte of PCM, times
-/// three, and the whole game is under two — but the *code* that makes
-/// one is a couple of hundred lines. So the game calls this at startup
-/// and builds its own music, which costs a fraction of a second on the
-/// device and nothing at all to download.
-///
-/// 0 and 1 are the two stages; 2 is the select screen.
+/// The three themes, synthesised at startup rather than baked in: a
+/// round-length theme is a megabyte of PCM, times three, while the code is a
+/// couple of hundred lines. 0 and 1 are the stages, 2 the select screen.
 pub fn theme_wav(which: usize) -> Vec<u8> {
-    // Everything sits on hirajōshi and differs in the three things that
-    // make a place sound like itself: how fast, how low, how busy. The
-    // docks take it fast and hard on the drum; the temple slower and
-    // higher up the scale with room between the notes; the select
-    // screen sits between them and stays out of the way.
-    //
-    // Four-bar phrases, sequenced. -99 is a rest.
+    // All on hirajoshi, differing in pace, register and density: the docks
+    // fast and hard on the drum, the temple slower and higher with room
+    // between notes, the select screen between them and out of the way.
+    // Four-bar phrases, sequenced; -99 is a rest.
     const R: i32 = -99;
 
     // -- the docks ------------------------------------------------------
@@ -493,13 +425,8 @@ pub fn theme_wav(which: usize) -> Vec<u8> {
     }
 }
 
-/// The crowd, built at startup rather than baked in.
-///
-/// Two and a half seconds of it is a quarter of a megabyte of PCM —
-/// more than the rest of the game's sound put together, and a third
-/// again on the wasm a player downloads — for a noise that is a few
-/// lines of filtered noise. The music already lives this way for the
-/// same reason; see the note by the other assets in the game.
+/// The crowd, built at startup: 2.5 s of PCM is a quarter of a megabyte for a
+/// few lines of filtered noise.
 pub fn crowd_wav(long: bool) -> Vec<u8> {
     let s = if long { crowd(1600.0, 1.0, 0xFEED) } else { crowd(900.0, 0.85, 0xC0DE) };
     encode_pcm16_mono(&s)
@@ -507,16 +434,10 @@ pub fn crowd_wav(long: bool) -> Vec<u8> {
 
 pub fn generate() -> Vec<Asset> {
     vec![
-        // Three light hits at rising pitch, not one played over and
-        // over. A combo is the most satisfying thing in a fighting
-        // game and the only thing that ever sold it was the counter in
-        // the corner; the sound went flat while the numbers climbed.
-        // Each hit of a chain takes the next one up, so a four-hit
-        // string *sounds* like it is going somewhere.
-        // The pitched share climbs with the pitch. Raising the
-        // frequency alone did nothing audible: a light hit is three
-        // quarters hiss, and a sine buried under that much noise can
-        // be moved four hundred hertz without anyone hearing it move.
+        // Three light hits climbing in pitch, one per combo step, so a string
+        // sounds like it is going somewhere. The pitched share climbs too: a
+        // light hit is three quarters hiss, and pitch alone moved 400 Hz
+        // unheard.
         ("sounds/hit_light.wav",  encode_pcm16_mono(&impact(110.0, 0.30, 520.0, 0.80, 0x11))),
         ("sounds/hit_light2.wav", encode_pcm16_mono(&impact(102.0, 0.46, 700.0, 0.85, 0x1b))),
         ("sounds/hit_light3.wav", encode_pcm16_mono(&impact(94.0, 0.62, 940.0, 0.90, 0x2f))),

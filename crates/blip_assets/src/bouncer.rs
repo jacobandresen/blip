@@ -369,12 +369,10 @@ const BARS: usize = 16;
 const LIFT_BAR: usize = BARS / 2;
 const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
 
-/// A bouncy tech-house banger: four-on-the-floor kick, backbeat claps,
-/// off-beat hats, a springy staccato bassline, and one catchy pluck hook
-/// repeated every bar over a simple C-F vamp — the same riff throughout is
-/// what makes it stick, not a new melody every couple of bars. The back
-/// half (~every 30s) adds an octave-up pluck harmony and an extra open hat
-/// for a small lift.
+/// A bouncy tech-house loop: four-on-the-floor kick, backbeat claps, off-beat
+/// hats, a springy staccato bass, and one pluck hook over a C-F vamp
+/// (answered on each fourth bar, phrase_note). The back half adds an
+/// octave-up harmony and an extra open hat.
 fn music() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let step_ms = 60_000.0 / BPM / 4.0;

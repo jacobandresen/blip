@@ -53,17 +53,14 @@ const MAX_ENEMY_BULLETS: usize = 260;
 const WAVE_KILL_BASE: i32 = 60;
 
 // ---- flight model ---------------------------------------------------------
-// Each enemy flight is one path through the air, flown the way an aeroplane
-// flies: it banks to turn. In a level coordinated turn the lift tilts with
-// the bank and its horizontal part pulls the plane round:
+// Each enemy flight flies one path the way an aeroplane does: it banks to
+// turn. In a level coordinated turn
 //   turn rate  w = g tan(bank) / v        radius  r = v^2 / (g tan(bank))
 //   load       n = 1 / cos(bank)
-// and the wing only holds the plane up above its stall speed, which rises
-// with the load: v_stall(n) = v_stall sqrt(n). At speed v a pilot can bank
-// at most acos((v_stall / v)^2) before the wing lets go, and the model never
-// commands more. Turning costs speed (induced drag grows with n^2 - 1); the
-// engine wins it back on the straights. Turns ease in and out at the roll
-// rate, so the path is a smooth curve, never a corner.
+// and the stall speed rises with load, v_stall(n) = v_stall sqrt(n), so at
+// speed v the bank is capped at acos((v_stall / v)^2). Turning costs speed
+// (induced drag grows with n^2 - 1) and the engine wins it back on the
+// straights; bank changes at the roll rate, so paths curve, never corner.
 const FLIGHT_G: f32 = 130.0;       // px/s^2: g at this game's scale and pace
 const FLIGHT_STALL: f32 = 55.0;    // px/s, wings level
 const FLIGHT_ROLL: f32 = 1.6;      // rad/s
@@ -107,10 +104,9 @@ const BOSS_WINGS: [(f32, f32, f32, f32); 7] = [
 const MAX_TURRETS: usize = 16;
 
 // ---- carrier launch -------------------------------------------------------
-// Every level opens on the deck of an Essex-class carrier: the engine
-// coughs into life, the launch officer winds it up, the plane rolls the
-// length of the deck and climbs away while the ship falls behind.
-// Sizes must match blip_assets' CARRIER_W / CARRIER_H.
+// Every level opens on an Essex-class deck: engine start, the launch
+// officer's signal, the deck run, and the climb away. Sizes must match
+// blip_assets' CARRIER_W / CARRIER_H.
 const CARRIER_W: i32 = 186;
 const CARRIER_H: i32 = 760;
 const CARRIER_DECK_X: f32 = 88.0;  // the deck centreline in the sprite
@@ -133,34 +129,28 @@ const POW_H: f32 = 14.0;
 const POW_SPEED: f32 = 90.0;
 
 // ---- health -----------------------------------------------------------
-// The plane now survives more than one stray shot: a 5-point health bar
-// instead of an instant "any hit is a death". A life is only lost once
-// health runs out, and a rare pickup (dropped by regular fighters, never
-// the ace — it always drops a weapon tier instead) refills some of it
-// back, falling the same way a weapon power-up does.
+// A 5-point bar per life. A rare pickup (from regular fighters; the ace drops
+// a weapon tier instead) restores some of it.
 const PLAYER_HEALTH_MAX: i32 = 5;
 const HEALTH_RESTORE: i32 = 2;
 const HEALTH_DROP_CHANCE: f32 = 0.06;
 const HEALTH_W: f32 = 14.0;
 const HEALTH_H: f32 = 14.0;
 const MAX_HEALTH_PICKUPS: usize = 1;
-// A short flinch of invulnerability after a non-lethal hit, reusing the
-// same respawn-grace timer (and its blink) that already gates hazard
-// collisions — otherwise a single burst of overlapping bullets could burn
-// through the whole health bar in one frame.
+// A flinch of invulnerability after a non-lethal hit (the respawn-grace timer
+// and its blink), so one burst cannot drain the whole bar in a frame.
 const HIT_GRACE: f32 = 1.15;
 
-// ---- background: sea, sky, boats -------------------------------------------
-// The world below the dogfight: an ocean scrolling past underneath (both the
-// wave bands and the boats sit on it, so they share one scroll speed), a
-// cloud layer floating between the sea and the planes, and enemy boats that
-// sail across it.
+// ---- background: sea, sky, boats
+// -------------------------------------------
+// The sea and its boats share one scroll speed; clouds float between the sea
+// and the planes.
 const SEA_SCROLL_SPEED: f32 = 70.0;
 
 // ---- airspeed ---------------------------------------------------------
-// 1.0 is cruise. Forward opens the throttle and back closes it; the plane
-// never flies backwards. Below cruise the scrolling world carries it down
-// the screen, and slow flight slows the scroll itself.
+// 1.0 is cruise. Forward opens the throttle, back closes it; the plane never
+// flies backwards. Below cruise the scroll carries it down the screen, and
+// slow flight slows the scroll.
 const AIRSPEED_MAX: f32 = 1.4;
 const AIRSPEED_RATE: f32 = 0.9;    // per second of throttle held
 const AIRSPEED_RELAX: f32 = 0.3;   // back toward cruise with no input
@@ -176,19 +166,15 @@ const MAX_CLOUDS: usize = 8;
 const BOAT_W: i32 = 34;
 const BOAT_H: i32 = 16;
 const MAX_BOATS: usize = 3;
-// 2 1/2 D depth cue: planes fly *above* the sea, so they drop a soft dark
-// silhouette (the same sprite, tinted and offset) onto the water beneath
-// them — the classic shmup trick for reading altitude on a flat top-down
-// scene. Offset toward lower-right, as if lit from the upper-left.
+// Altitude cue: planes drop a dark, offset copy of their sprite on the sea,
+// lit from the upper left.
 const PLANE_SHADOW_DX: f32 = 6.0;
 const PLANE_SHADOW_DY: f32 = 10.0;
 
 // ---- islands & turrets ----------------------------------------------------
-// A rare hazard: a small island drifts down with the sea current, armed with
-// a turret that tracks and fires an aimed shot at the player. Sizes/HP/score
-// scale together (small/medium/large); at most one is ever on screen, and
-// they show up only every 24-42s, so it stays a rare set-piece, not a wave
-// enemy. Sizes must match blip_assets' ISLAND_SIZES.
+// A rare set-piece: an island drifting down with the sea, its turret firing
+// aimed shots. Size, HP and score scale together; at most one on screen,
+// every 24-42s. Sizes must match blip_assets' ISLAND_SIZES.
 const ISLAND_SIZES: [(i32, i32); 3] = [(64, 44), (98, 68), (140, 96)];
 const ISLAND_HP: [i32; 3] = [26, 46, 74];
 const ISLAND_SCORE: [i32; 3] = [150, 260, 420];
@@ -239,10 +225,8 @@ const LIVES_START: i32 = 3;
 const DEAD_PAUSE: f32 = 1.6;
 const RESPAWN_GRACE: f32 = 1.5;
 const WIN_PAUSE: f32 = 2.2;
-// A hard floor on how long GAME OVER stays up before a key can dismiss it —
-// without this, a player still mashing fire from the fight that killed them
-// bounces straight back to the title screen without the score ever
-// registering.
+// How long GAME OVER stays before a key can dismiss it, so fire still mashed
+// from the fight does not skip the score.
 const OVER_MIN_WAIT: f32 = 3.0;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -257,10 +241,9 @@ impl Pooled for Bullet {
     fn is_active(&self) -> bool { self.active }
 }
 
-/// A player round: centred on x, moving at (vx, -vy) (up the screen, with
-/// the spray sideways), with its calibre r (drawn radius; the hit box is
-/// 2r + 2 wide). `bounced` once it has ricocheted: it can still hit, but
-/// not glance off again.
+/// A player round: centred on x, moving at (vx, -vy), calibre r (drawn
+/// radius; hit box 2r + 2 wide). `bounced` once it has ricocheted: it can
+/// still hit, not glance off again.
 #[derive(Copy, Clone)]
 struct Round { x: f32, y: f32, vx: f32, vy: f32, r: f32, bounced: bool, active: bool }
 impl Pooled for Round {
@@ -321,10 +304,9 @@ impl Pooled for Enemy {
 #[derive(Copy, Clone)]
 struct Explosion { x: f32, y: f32, ttl: f32, max_ttl: f32, scale: f32, color: BlipColor, active: bool }
 
-/// A shot-down plane falling to the sea: it carries on the way it was going
-/// (bent a little, never turning back), rolls, shrinks as it drops, trails
-/// fire and smoke, then splashes. `heading` is only how the sprite is
-/// turned; `course` is where it goes.
+/// A shot-down plane falling to the sea: it carries on its way (bent a
+/// little, never back), rolls, shrinks, trails fire and smoke, and splashes.
+/// `heading` turns the sprite; `course` is where it goes.
 #[derive(Copy, Clone)]
 struct Wreck {
     x: f32, y: f32, heading: f32, spin: f32, speed: f32, t: f32, kind: EnemyKind, puff_t: f32, active: bool,
@@ -363,20 +345,17 @@ impl Pooled for HealthPickup {
 #[derive(Copy, Clone)]
 struct Cloud { x: f32, y: f32, r: f32, speed: f32, variant: u8 }
 
-/// An enemy boat sailing across the sea far below the dogfight — scrolls
-/// down with the water (SEA_SCROLL_SPEED) plus its own slow lateral cruise.
-/// Shootable for a small bonus; doesn't fire back. `bob_phase` offsets each
-/// boat's rocking-with-the-swell cycle so a flotilla doesn't bob in unison.
+/// An enemy boat on the sea: scrolls with the water plus its own slow cruise;
+/// shootable for a small bonus. `bob_phase` keeps a flotilla out of step.
 #[derive(Copy, Clone)]
 struct Boat { x: f32, y: f32, active: bool, vx: f32, bob_phase: f32 }
 impl Pooled for Boat {
     fn is_active(&self) -> bool { self.active }
 }
 
-/// A rare landmass drifting down through the sea with the current, armed
-/// with a turret — shootable for a bonus like the boats, but unlike them it
-/// shoots back: the turret tracks and fires an aimed shot at the player on
-/// its own timer. `size` indexes ISLAND_SIZES/HP/SCORE (small/medium/large).
+/// An island drifting down with the current, its turret firing aimed shots on
+/// its own timer; shootable for a bonus. `size` indexes ISLAND_SIZES / HP /
+/// SCORE.
 #[derive(Copy, Clone)]
 struct Island { x: f32, y: f32, size: u8, active: bool, hp: i32, fire_timer: Timer }
 impl Pooled for Island {
@@ -548,9 +527,8 @@ fn rand01() -> f32 {
 }
 
 // ---- weapon tiers ---------------------------------------------------------
-// One place per property, all indexed by weapon_level (1..=MAX_WEAPON_LEVEL),
-// so the escalation from "single popgun" to "seven-way glowing barrage" stays
-// easy to tune as one coherent ladder.
+// Every property indexed by weapon_level (1..=MAX_WEAPON_LEVEL), so the
+// ladder from single gun to seven-way barrage tunes in one place.
 
 /// Bullet spawn offsets from the player's centreline, one shot's worth.
 /// (rounds per burst, fan width in px, calibre radius) for a tier. Rounds
@@ -872,11 +850,9 @@ fn update_barrier(g: &mut Game, dt: f32, sfx: &Sounds) {
     set_sound_volume(&sfx.barrier_hum2, ((k - 0.5) * 2.0).max(0.0).powf(1.5) * BARRIER_HUM_MAX_VOLUME);
 }
 
-/// The world under the dogfight: sea scroll, cloud drift, and boat/island
-/// spawns — shared by update_launch() and update_play() so the background
-/// keeps moving through the carrier takeoff too, not just once the fight
-/// starts. Turret *firing* is play-only (see update_islands()) — islands
-/// still drift past harmlessly during launch, same as the boats.
+/// The world under the fight: sea scroll, cloud drift, boat and island
+/// spawns, shared by the launch and play so it keeps moving on the carrier.
+/// Turrets fire only in play (update_islands()).
 fn update_background(g: &mut Game, dt: f32) {
     let sc = SEA_SCROLL_SPEED * g.scroll_k;
     g.sea_scroll += sc * dt;
@@ -1882,10 +1858,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
         if hit {
             g.health -= 1;
-            // A non-fatal clip knocks the gun down one tier — never below 2,
-            // so a good run isn't gutted by one mistake and the lost tier is
-            // easy to catch straight back. A fatal hit leaves the weapon
-            // alone (losing the life is punishment enough).
+            // A non-fatal hit drops the gun one tier, never below 2; a fatal
+            // one leaves it.
             if g.health > 0 && g.weapon_level > 2 {
                 g.weapon_level -= 1;
             }
@@ -2062,18 +2036,9 @@ fn update_over(g: &mut Game, dt: f32) {
     g.start_game();
 }
 
-/// The ocean, scrolling past underneath everything else: a base fill, a
-/// series of wavy crest-lines that scroll with `sea_scroll`, and a scatter
-/// of sunlight glints. Wobble depends on both x and y so the rows don't all
-/// read as one repeating wallpaper strip.
-/// The ocean: a vertical colour gradient (top of screen reads as farther
-/// away, so it's lighter and hazier — cheap atmospheric perspective), two
-/// octaves of wave lines (a long lazy swell plus a shorter chop riding on
-/// top of it, instead of one uniform frequency), sun-glitter concentrated in
-/// a diagonal glint band the way real light reflects off water toward a
-/// fixed sun direction rather than scattering evenly, and — the 2 1/2 D
-/// touch that ties the sky layer to the sea — each cloud casts a soft, drifting
-/// shadow onto the water below it.
+/// The ocean: a gradient lighter and hazier toward the top (distance), two
+/// octaves of wave lines (swell and chop) scrolling with `sea_scroll`, sun
+/// glitter in a diagonal band, and each cloud's shadow drifting on the water.
 fn draw_sea(blip: &Blip, g: &Game) {
     let bands = 14;
     let band_h = WIN_H as f32 / bands as f32;
@@ -2140,10 +2105,8 @@ fn draw_sea(blip: &Blip, g: &Game) {
     }
 }
 
-/// Drop the same sprite behind an entity, tinted dark and translucent and
-/// offset toward the sea — see PLANE_SHADOW_DX/DY. Draw this before the
-/// entity itself, after the sea/boats/clouds layers so it reads as resting
-/// on the water rather than floating.
+/// The sprite again, dark and translucent, offset toward the sea
+/// (PLANE_SHADOW_DX / DY). Drawn after sea and clouds, before the entity.
 fn draw_shadow(tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, rotation: f32) {
     draw_texture_ex(tex, x + PLANE_SHADOW_DX, y + PLANE_SHADOW_DY, BlipColor::new(0.0, 0.0, 0.0, 0.30), DrawTextureParams {
         dest_size: Some(vec2(w, h)),
@@ -2190,11 +2153,8 @@ fn draw_boats(blip: &Blip, g: &Game, boat_tex: &Texture2D) {
     }
 }
 
-/// The sky layer, between the sea and the planes: fluffy three-lobe cloud
-/// puffs, opaque enough to read clearly against the ocean below.
-/// The sky layer, between the sea and the planes: noise-generated cumulus
-/// puffs (see cloud_sprite() in blip_assets — fractal value noise, not flat
-/// circles) cycled across 3 baked variants for shape variety.
+/// The sky layer, between sea and planes: noise-generated cumulus
+/// (blip_assets cloud_sprite()) in 3 variants.
 fn draw_clouds(blip: &Blip, g: &Game, cloud_tex: &[Texture2D; 3]) {
     for c in g.clouds.iter() {
         let tex = &cloud_tex[c.variant as usize % cloud_tex.len()];
@@ -2206,10 +2166,8 @@ fn draw_clouds(blip: &Blip, g: &Game, cloud_tex: &[Texture2D; 3]) {
     }
 }
 
-/// True if (x, y) — an entity's centre — falls inside the visible body of
-/// any cloud currently on screen (an ellipse test against each cloud's drawn
-/// footprint, shrunk a bit so a plane has to be substantially under the
-/// cloud, not just clipping its edge, before it counts as covered).
+/// Is (x, y), an entity's centre, inside a cloud's visible body? An ellipse
+/// shrunk a little, so a plane must be well under it to count.
 fn point_in_any_cloud(g: &Game, x: f32, y: f32) -> bool {
     g.clouds.iter().any(|c| {
         let (rw, rh) = (c.r * 3.6 * 0.5 * 0.8, c.r * 1.7 * 0.5 * 0.8);
@@ -2246,10 +2204,10 @@ fn draw_slug(blip: &Blip, x: f32, y: f32, vx: f32, vy: f32, len: f32, wid: f32, 
     blip.fill_circle(x, y, wid * 0.45, BlipColor::new(1.0, 0.92, 0.7, 1.0));
 }
 
-/// An aircraft sprite, nose along `heading`, drawn narrower as it banks:
-/// seen from above, a banked wing is foreshortened.
-/// Flight moves along (sin h, cos h); rotating the nose-down sprite by r
-/// points its nose at (-sin r, cos r), hence the minus.
+/// An aircraft sprite, nose along `heading`, narrower as it banks (a banked
+/// wing is foreshortened from above). Flight moves along (sin h, cos h) and
+/// rotating the nose-down sprite by r points it at (-sin r, cos r), hence the
+/// minus.
 fn draw_plane(tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, heading: f32, bank: f32, tint: BlipColor) {
     let ww = w * (0.55 + 0.45 * bank.cos());
     draw_texture_ex(tex, x + (w - ww) / 2.0, y, tint, DrawTextureParams {
@@ -2448,10 +2406,8 @@ fn draw_play(
     }
 
     for e in pool_iter(&g.enemies) {
-        // Some planes duck out of sight under a cloud they happen to be
-        // flying through — purely a draw-order trick (nothing else about
-        // them changes: they keep flying, firing, and can still be hit) —
-        // reappearing once they've flown clear of it.
+        // Some planes vanish under a cloud they fly through: draw order only;
+        // they keep flying, firing and can be hit.
         let (ecx, ecy) = (e.x + ENEMY_W as f32 / 2.0, e.y + ENEMY_H as f32 / 2.0);
         if e.can_hide && point_in_any_cloud(g, ecx, ecy) { continue; }
         let tex = match e.kind {
@@ -2662,16 +2618,11 @@ fn draw_play(
     }
 }
 
-/// A second HUD readout, down in the corners of the playfield instead of
-/// up in the top bar with SCORE/LIVES: a mini plane icon and the lives
-/// count bottom-left, and the new per-life health meter bottom-right —
-/// close to the action, where a glance during a dogfight actually lands.
+/// The corner readouts: a mini plane and the lives bottom-left, the health
+/// bar bottom-right, where a glance mid-fight lands.
 fn draw_bottom_hud(blip: &Blip, g: &Game, player_tex: &Texture2D) {
     let y = (WIN_H - 30) as f32;
-    // The curved-glass CRT post-process (see blip::ctx's CRT_FRAGMENT)
-    // clips a wedge in each corner of the canvas — both readouts sit in
-    // a bottom corner, so they're kept this far in from the true left/
-    // right edges instead of flush against them.
+    // Kept in from the edges, clear of the curved glass's rim.
     let corner_margin = 24.0;
 
     // Lives, bottom-left.
@@ -2681,10 +2632,8 @@ fn draw_bottom_hud(blip: &Blip, g: &Game, player_tex: &Texture2D) {
     blip.draw_text("x", corner_margin + mini_w + 3.0, y + 3.0, 2.0, BLIP_WHITE);
     blip.draw_number(g.sess.lives, corner_margin + mini_w + 15.0, y + 3.0, 2.0, BLIP_WHITE);
 
-    // Health, bottom-right: a bar that empties as the plane takes hits and
-    // refills back to full on every respawn or health pickup — five hits
-    // and it's down, same as a life, but each life now soaks up more than
-    // one stray shot.
+    // Health, bottom-right: empties with hits, full again each life; pickups
+    // restore some.
     let bar_w = 64.0;
     let bar_h = 9.0;
     let bar_x = (WIN_W as f32) - bar_w - corner_margin;

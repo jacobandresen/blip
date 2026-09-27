@@ -7,18 +7,10 @@ pub fn encode_pcm16_mono(samples: &[i16]) -> Vec<u8> {
     encode_at(samples, SAMPLE_RATE)
 }
 
-/// The same, at half the rate, for music.
-///
-/// Music is the only thing here long enough for its size to matter: a
-/// sound effect is a tenth of a second and a loop is several seconds,
-/// and the two stage themes were most of the game's download. Halving
-/// the rate halves the bytes, and a taiko and a plucked string have
-/// nothing above eleven kilohertz to lose — which buys twice the loop
-/// for the same money, and a loop twice as long is the cheapest
-/// variety there is.
-///
-/// Averaging each pair before dropping one of them is the low-pass
-/// that stops whatever *is* up there folding back down as aliasing.
+/// The same at half the rate, for music: the themes are most of a download,
+/// and a taiko or plucked string has nothing above 11 kHz to lose, so the
+/// same bytes buy twice the loop. Averaging each pair before dropping one is
+/// the anti-aliasing low-pass.
 pub fn encode_pcm16_music(samples: &[i16]) -> Vec<u8> {
     let half: Vec<i16> = samples
         .chunks(2)

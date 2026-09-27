@@ -16,10 +16,10 @@ const BARS: usize = 16;
 const LIFT_BAR: usize = BARS / 2;
 const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
 
-/// A fast, driving arcade-rally banger: four-on-the-floor kick, backbeat
-/// claps, tight hats, a relentless galloping bassline, and one catchy hook
-/// riff repeated every bar over a simple Em-Am vamp. The back half
-/// (~every 30s) adds an octave-up hook harmony and an extra hat roll.
+/// A driving arcade-rally loop: four-on-the-floor kick, backbeat claps, tight
+/// hats, a galloping bass and one hook over an Em-Am vamp (answered on each
+/// fourth bar, phrase_note). The back half adds an octave-up harmony and a
+/// hat roll.
 fn music() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let step_ms = 60_000.0 / BPM / 4.0;

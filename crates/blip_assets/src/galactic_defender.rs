@@ -99,10 +99,8 @@ fn row(s: &str) -> u16 {
     v
 }
 
-/// A gnarly alien glyph — a 9x8 bitmap (finer than the old 5x5/7x7 versions,
-/// so there's room for real detail at a smaller footprint), with a second
-/// animation frame per kind (mandibles / claws / tentacles shift) for the
-/// classic two-frame march-cycle look. `frame` is 0 or 1.
+/// An alien glyph: a 9x8 bitmap with a second frame per kind (mandibles,
+/// claws, tentacles shift) for the two-frame march. `frame` is 0 or 1.
 fn alien(kind: usize, frame: usize) -> Vec<u8> {
     let w: i32 = ALIEN_W;
     let h: i32 = ALIEN_H;
@@ -165,11 +163,8 @@ fn alien(kind: usize, frame: usize) -> Vec<u8> {
             }
         }
     }
-    // Eyes on the wide head row: a bright square "sclera" ringed by a dark
-    // socket (so they read clearly against every body colour) with a dark
-    // pupil in the middle — a plain white square doesn't actually look like
-    // an eye. The pupil nudges toward the socket's own offset each frame,
-    // like the eyes are darting, for a bit of menace.
+    // Eyes on the wide head row: a bright square in a dark socket with a dark
+    // pupil, darting with the frame.
     let eye_y = oy + 3 * cell;
     let eye_dx = if frame == 1 { 1 } else { 0 };
     let eye_size = cell + 1;
@@ -194,13 +189,9 @@ fn alien(kind: usize, frame: usize) -> Vec<u8> {
     img.encode_png()
 }
 
-/// A flying-saucer UFO: a wide metallic disc, a glass dome, and a ring of
-/// rim lights. The disc and dome are always drawn upright (rotating the
-/// whole bitmap looks jagged with nearest-neighbour pixel-art filtering) —
-/// instead, `frame` (0..N_LIGHTS) advances the light ring by one position
-/// each call, so cycling through all `N_LIGHTS` frames in order gives a
-/// smooth, seamlessly-looping "spinning lights" illusion, classic UFO-toy
-/// style, while staying pixel-crisp.
+/// A flying saucer: metal disc, glass dome, a ring of rim lights. Always
+/// drawn upright (rotated pixel art looks jagged); `frame` (0..N_LIGHTS)
+/// steps the light ring, so cycling the frames spins the lights.
 const UFO_N_LIGHTS: usize = 8;
 
 fn ufo_saucer(frame: usize) -> Vec<u8> {
@@ -415,13 +406,10 @@ fn shield_block() -> Vec<u8> {
     img.encode_png()
 }
 
-/// Title/default loop — a simple, catchy trance groove at 138 BPM: one
-/// unchanging 1-bar hook riff repeated straight through over a 2-chord
-/// (Am-F) vamp, four-on-the-floor kick, and the sidechain pump. No
-/// breakdown/buildup detour — the hook is what makes it stick, and it needs
-/// to be heard right away and often. The back half (~every 30s) lifts with
-/// an octave-up harmony on the hook and a busier percussion layer, so the
-/// loop doesn't feel completely static on repeat.
+/// Title loop: a catchy 138 BPM trance groove, one hook riff over an Am-F
+/// vamp (answered on each fourth bar, phrase_note), four-on-the-floor with
+/// the sidechain pump, no breakdown so the hook is heard at once. The back
+/// half adds an octave-up harmony and busier percussion.
 fn music() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let bpm = 138.0_f32;
@@ -557,11 +545,9 @@ fn music2() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-/// Slow, dark dread loop — sparse kick, a deep sub-bass drone, and one
-/// simple two-note motif repeated every bar (the "hook", just ominous
-/// instead of uplifting) (~28.8 s @ 100 BPM, 12 bars). The back half
-/// (~every 30s) adds a wide-detune supersaw wash under the motif for extra
-/// unease.
+/// Slow, dark dread loop: sparse kick, a deep sub-bass drone and an ominous
+/// two-note motif each bar (~28.8 s at 100 BPM, 12 bars). The back half adds
+/// a wide supersaw wash.
 fn music3() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let bpm = 100.0_f32;

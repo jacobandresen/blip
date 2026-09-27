@@ -79,14 +79,12 @@ fn food() -> Vec<u8> {
     img.encode_png()
 }
 
-/// Shared step-sequenced techno renderer for Serpent's three intensity
-/// tiers. `bass_hit` marks which 16th steps in the bar trigger a bass note;
-/// `bass_roots` (2 chords) alternate every 2 bars; `hook` is a 4-note riff
-/// repeated identically every bar — the same unchanging riff throughout is
-/// what makes each tier catchy rather than a new melody every few bars.
-/// Hats/claps density scales with `energy`. The back half of the loop
-/// (~every 30s) lifts with an octave-up hook harmony and a busier hat/clap
-/// layer.
+/// Shared step-sequenced techno for Serpent's three intensity tiers.
+/// `bass_hit` marks the 16th steps with a bass note; `bass_roots` (2 chords)
+/// alternate every 2 bars; `hook` is a 4-note riff kept throughout (answered
+/// on each fourth bar, see techno::phrase_note), which is what makes it
+/// catchy. Hat and clap density scale with `energy`; the back half lifts with
+/// an octave-up harmony and busier percussion.
 fn techno_loop(
     bpm: f32,
     bars: usize,
@@ -133,14 +131,8 @@ fn techno_loop(
             bass_note(&mut buf, off, root, step_ms * 0.7, 0.58);
         }
         if pos % 4 == 0 {
-            // Call and response. The riff is the hook for three bars and
-            // then answers itself on the fourth, played backwards and a
-            // fifth up. Four bars is the phrase length a listener already
-            // feels from the chord changes, so putting the variation
-            // there lands as the phrase resolving rather than as the
-            // melody wandering — and it is the same four notes
-            // throughout, so the tune stays as recognisable as it was
-            // when every bar was identical.
+            // The riff answers itself on the fourth bar, backwards and a
+            // fifth up (phrase_note), where the phrase resolves.
             let note = phrase_note(hook, bar, pos / 4);
             supersaw(&mut buf, off, note, step_ms * 3.5, 0.18 * energy.min(1.3), 8.0, 0.008);
             if lifted {

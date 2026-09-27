@@ -47,15 +47,15 @@ impl Lcg {
     }
 }
 
-// ---------------------------------------------------------------------------- //
-// Curved-glass shader                                                           //
-// ---------------------------------------------------------------------------- //
-//
-// The flat composite (game frame + glitch + scanlines) is rendered to an
-// offscreen target, then this material blits it to the window: the image is
-// bowed into a slightly convex tube, the bright phosphor blooms into its
-// neighbours, the corners fall off into the black bezel, and a faint diagonal
-// glare sits on the "glass". GLSL ES 1.00 so it runs on WebGL 1.
+// ----------------------------------------------------------------------------
+// //
+// Curved-glass shader
+// //
+// ----------------------------------------------------------------------------
+// //
+// The flat composite (frame + glitch + scanlines) is drawn offscreen, then
+// blitted through this: bowed into a convex tube, phosphor bloom, corners
+// falling into the bezel, a faint glare. GLSL ES 1.00 for WebGL 1.
 
 const CRT_VERTEX: &str = r#"#version 100
 attribute vec3 position;
@@ -82,12 +82,9 @@ uniform sampler2D Texture;
 uniform vec4 _Time;
 uniform vec2 ScreenSize;
 
-// Bow flat 0..1 UVs outward into a convex tube. Divisors set the barrel
-// strength per axis (larger = flatter). The <1 scale then pulls the whole
-// picture back in just enough that the barrel-pushed CORNERS land inside
-// the sampling range — so the full game area, right into every corner and
-// the top HUD row, stays visible with only a hairline black rim, instead
-// of a black wedge biting out each corner.
+// Bow 0..1 UVs into a convex tube (larger divisors = flatter); the <1 scale
+// pulls the picture back so the pushed corners stay in range and the whole
+// game, corners and HUD row included, stays visible.
 vec2 curve(vec2 p) {
     p = p * 2.0 - 1.0;
     vec2 off = abs(p.yx) / vec2(12.0, 11.0);
@@ -108,10 +105,8 @@ void main() {
 
     vec2 cuv = curve(fuv);
 
-    // Soft edge where the tube meets the bezel. The fade runs from the exact
-    // 0..1 boundary OUTWARD only, so every pixel of the game — right into the
-    // corners — is drawn at full weight and only the black rim past the edge
-    // is feathered.
+    // The edge fade runs outward from the 0..1 boundary only, so every game
+    // pixel is drawn at full weight.
     vec2 lo = smoothstep(vec2(-0.006), vec2(0.0), cuv);
     vec2 hi = smoothstep(vec2(-0.006), vec2(0.0), vec2(1.0) - cuv);
     float mask = lo.x * lo.y * hi.x * hi.y;
@@ -133,9 +128,8 @@ void main() {
     col += max(b - 0.25, 0.0) * 1.4;
 
     // ---- tube vignette ----
-    // Radial, not a corner-crushing edge product: full brightness across the
-    // whole picture, only the last sliver near the glass edge eased down a
-    // little, so HUD text and action in the corners stay clearly readable.
+    // Radial, easing only the last sliver near the glass edge, so corner HUD
+    // text stays readable.
     float d = distance(cuv, vec2(0.5, 0.5));
     float vig = 1.0 - smoothstep(0.62, 1.02, d) * 0.42;
     col *= vig;
@@ -157,11 +151,9 @@ void main() {
 }
 "#;
 
-// Interlaced scanlines, folded into the main-image blit's own fragment
-// shader instead of one `draw_rectangle` per screen row (the previous
-// approach — see git history — which could mean several hundred extra
-// draw calls a frame on a tall window, by far composite()'s biggest
-// cost). Reuses CRT_VERTEX: same plain passthrough, no extra attributes.
+// Interlaced scanlines in the main blit's fragment shader, not a rectangle
+// per screen row (hundreds of draw calls on a tall window). Reuses
+// CRT_VERTEX.
 const SCANLINE_FRAGMENT: &str = r#"#version 100
 precision mediump float;
 
@@ -174,14 +166,10 @@ uniform float InterlaceField; // 0.0 or 1.0, flips every frame (Blip::interlace_
 void main() {
     vec3 col = texture2D(Texture, uv).rgb;
 
-    // Every physical row alternates between a light shadow (this frame's
-    // "active" field) and a heavy dim (the opposite field's phosphor
-    // fading) — swapping which is which each frame produces the
-    // interlaced flicker. mod(gl_FragCoord.y, 2.0) picks the row parity;
-    // comparing it against InterlaceField picks which tier applies. The
-    // caller (composite()) feeds this an already-corrected InterlaceField
-    // value — see its `offscreen_target` doc comment — so this formula
-    // itself doesn't need to know which of the two render targets is bound.
+    // Rows alternate between a light shadow (this frame's field) and a heavy
+    // dim (the other field fading); swapping each frame gives the interlace
+    // flicker. composite() passes InterlaceField already corrected for the
+    // bound target.
     float parity = mod(floor(gl_FragCoord.y), 2.0);
     float dim = (parity == InterlaceField) ? 0.25 : (1.0 - 60.0 / 255.0);
     col *= dim;
@@ -217,18 +205,16 @@ pub struct Blip {
     interlace_field: u8, // 0 or 1, flips every frame
     // ---- curved-glass shader pass ----
     crt:         Option<Material>, // None if the shader failed to compile
-    // Scanline dimming shader (see SCANLINE_FRAGMENT) — None falls back to
-    // the old per-row draw_rectangle loop, same pattern as `crt` above.
+    // Scanline dimming shader (SCANLINE_FRAGMENT); None falls back to a
+    // rectangle per row, like `crt` above.
     scanline:    Option<Material>,
     screen_rt:   Option<RenderTarget>, // offscreen composite target, window-sized
     screen_rt_w: i32,
     screen_rt_h: i32,
     // ---- adaptive render quality ----
-    // An old iPad's GPU can't sustain the full CRT pass (the curved-glass
-    // shader's bloom taps, then a rectangle per scanline in the composite).
-    // We watch the frame time and step the effects down a level at a time
-    // if it stays bad — then stay there. No device sniffing: this also
-    // catches thermal throttling and Low Power Mode.
+    // Old iPads cannot sustain the full CRT pass, so if frame time stays bad
+    // the effects step down a level and stay there (catches thermal
+    // throttling and Low Power Mode too).
     //   0 = full   1 = no curved-glass shader   2 = also no scanlines/noise
     fx_level:      u8,
     fx_settle:     u8,  // frames to ignore after startup / a level change
@@ -343,10 +329,9 @@ impl Blip {
     /// then yield to macroquad and wait for the next frame.
     /// Call this exactly once at the bottom of your game loop.
     pub async fn next_frame(&mut self, _target_fps: i32) {
-        // Switch to a screen-space camera.  set_default_camera() is deliberately
-        // NOT used here: it flushes the RT draws but leaves camera_matrix pointing
-        // at the RT projection.  Blit vertices are in screen pixels, so using the
-        // RT matrix clips everything when the window is larger than the game canvas.
+        // A screen-space camera, not set_default_camera(): that leaves
+        // camera_matrix on the RT projection, which clips blits when the
+        // window is larger than the canvas.
         {
             let cam = Camera2D::from_display_rect(
                 Rect::new(0.0, 0.0, screen_width(), screen_height()),
@@ -546,18 +531,11 @@ impl Blip {
         gl_use_default_material();
     }
 
-    /// Composite the current game frame with the glitch effects and interlaced
-    /// scanlines, drawn into whatever target/camera is currently bound. `(vx, vy)`
-    /// is the top-left corner and `(vw, vh)` the size in that target's pixels.
-    /// `offscreen_target` must be true when the currently-bound target is an
-    /// FBO (the curved-glass pass's offscreen composite) rather than the
-    /// default window framebuffer. `gl_FragCoord.y`'s row parity comes out
-    /// with the opposite sense in each case (confirmed empirically — a
-    /// pixel-level before/after screenshot diff against the original
-    /// per-row `draw_rectangle` version matched almost exactly, within a
-    /// handful of pixels of the shader's own time-based dither noise, only
-    /// once each path used the parity sense this flag selects), so the
-    /// scanline shader's dimming lands on the same physical rows either way.
+    /// Composite the frame with the glitch effects and scanlines into the
+    /// bound target at `(vx, vy)`, size `(vw, vh)`. `offscreen_target` is
+    /// true when an FBO is bound (the curved-glass pass): gl_FragCoord.y's
+    /// row parity is flipped there, so the flag keeps the scanlines on the
+    /// same physical rows.
     fn composite(&mut self, vx: f32, vy: f32, vw: f32, vh: f32, offscreen_target: bool) {
         let lw = self.width  as f32;
         let lh = self.height as f32;
@@ -581,19 +559,11 @@ impl Blip {
                 DrawTextureParams { dest_size: Some(vec2(vw, vh)), ..Default::default() });
         }
 
-        // ---- main image (with roll or tear applied), scanlines folded in ----
-        //
-        // Source-rect convention: the screen camera has y=0 at screen top,
-        // matching macroquad's game coordinate system.  Source Rect(0, a, lw, b)
-        // maps directly to game rows starting at y=a with height b.
-        //
-        // The interlaced-scanline dimming (SCANLINE_FRAGMENT) is applied as
-        // the material for whichever draw call(s) below paint the main
-        // image — one shader pass instead of a rectangle per screen row.
-        // gl_FragCoord is screen-space, so it dims correctly regardless of
-        // whether that's one draw (the plain case) or several (roll/tear's
-        // split strips): every physical pixel gets the same treatment no
-        // matter which draw call happened to touch it.
+        // ---- main image (roll or tear applied), scanlines folded in ----
+        // The screen camera has y=0 at the top, so Rect(0, a, lw, b) is game
+        // rows a..a+b. The scanline shader works in gl_FragCoord, so it dims
+        // correctly whether the image is one draw or roll/tear's several
+        // strips.
         let scanline_shader_active = self.fx_level < 2 && self.scanline.is_some();
         if scanline_shader_active {
             let scanline = self.scanline.as_ref().unwrap();
@@ -653,14 +623,10 @@ impl Blip {
         }
         if scanline_shader_active { gl_use_default_material(); }
 
-        // ---- interlaced CRT scanlines: fallback path ----
-        // Only reached if the scanline shader above failed to compile (old
-        // WebGL, driver quirk — same fallback pattern as `crt`). Active field
-        // rows get a subtle CRT shadow; inactive field rows are heavily
-        // dimmed to simulate the phosphor of the opposite field fading. The
-        // active field flips every frame, producing the interlaced flicker.
-        // This is a rectangle per screen row, so the lowest quality level
-        // drops it entirely rather than paying that cost.
+        // ---- scanlines: fallback ----
+        // Only when the scanline shader failed to compile: a rectangle per
+        // row (active field a light shadow, inactive heavily dimmed, flipping
+        // each frame). Level 2 skips it.
         if self.fx_level < 2 && self.scanline.is_none() {
             let active   = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
             let inactive = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.75 };
@@ -796,13 +762,11 @@ impl Blip {
         font::draw_centered(self.width, text, y, sz, color);
     }
 
-    /// Draw the standard three-field HUD bar across the top of the canvas:
-    /// SCORE (left), the leading high score and its holder (centre, e.g.
-    /// `HI 180940 JACOB` — the name in a fluorescent glow), and LIVES
-    /// (right). The centre field is drawn only when a high score is known
-    /// (it comes from the kiosk shell — see [`crate::web::high_score`], and
-    /// is absent on native builds) and is sized and clipped to stay in the
-    /// clear gap between the SCORE and LIVES clusters.
+    /// The three-field HUD across the top: SCORE (left), the leading score
+    /// and its holder (centre, the name glowing), LIVES (right). The centre
+    /// field needs a known high score (from the shell, see
+    /// [`crate::web::high_score`]; none natively) and is clipped to the gap
+    /// between the other two.
     pub fn draw_hud(&self, score: i32, lives: i32) {
         let hud_h = 28.0;
         // Text baseline: low enough in the bar that the curved-glass shader's
@@ -821,9 +785,8 @@ impl Blip {
         let score_right = 68.0 + score_digits * 12.0;
 
         // ---- LIVES, right ----
-        // Inset from the true right edge — the curved-glass shader keeps a
-        // hairline black rim, and a right-aligned readout should clear it on
-        // every game's canvas width, not just the common 480px one.
+        // Inset from the right edge to clear the curved glass's black rim on
+        // every canvas width.
         let edge_margin = (self.width as f32 * 0.085) as i32;
         let lives_x = self.width - edge_margin - 24; // room for up to 2 digits
         let lives_left = (lives_x - 64) as f32;

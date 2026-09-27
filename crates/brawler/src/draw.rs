@@ -1,21 +1,12 @@
-//! Drawing. The fighters are posed from the same numbers the rules use.
-//!
-//! Every limb that matters is placed from `move_data()` — the reach and
-//! height a punch is judged by are the reach and height it is *drawn*
-//! at. A fighting game where the picture and the hitbox disagree teaches
-//! the player to stop believing what they see, and there is nothing left
-//! to play after that.
+//! Drawing. Fighters are posed from the same numbers the rules use: the reach
+//! and height a punch is judged by are the reach and height it is drawn at.
 
 use super::*;
 
 fn rgb(c: (f32, f32, f32)) -> BlipColor { BlipColor { r: c.0, g: c.1, b: c.2, a: 1.0 } }
 
-/// Width of a string in pixels at size `sz`.
-///
-/// Not to be confused with blip's `text_cx()`, which returns the x that
-/// centres a string on the *whole canvas* — useful for a banner, useless
-/// for right-aligning a name over a health bar, and silently wrong if
-/// mistaken for a width. The font is a fixed 6px cell per character.
+/// Width of a string in pixels at size `sz` (a fixed 6px cell). Not blip's
+/// `text_cx()`, which returns the x that centres a string on the canvas.
 fn text_w(text: &str, sz: f32) -> f32 { text.len() as f32 * 6.0 * sz }
 fn rgba(c: (f32, f32, f32), a: f32) -> BlipColor { BlipColor { r: c.0, g: c.1, b: c.2, a } }
 
@@ -37,23 +28,10 @@ pub fn draw(blip: &Blip, g: &Game) {
 
 // ---- locations -----------------------------------------------------------
 
-/// Two places to fight, and they are only allowed to be scenery: the
-/// floor is the same flat line in both, at the same height, with the
-/// same walls. A stage that changed the fight would make the ladder's
-/// difficulty a matter of where you were standing.
-/// How far the backdrop is pushed back behind the fight.
-///
-/// Both stages were built in layers, each hazed toward its own sky by
-/// how far off it is — and then every one of those layers was drawn at
-/// full strength anyway, because "far off" was decided per layer and
-/// nothing decided how far off the *whole backdrop* was from the
-/// fighters standing in front of it. The result: cranes, warehouses,
-/// a lit skyline and thirty-odd onlookers, all at the same contrast as
-/// two men hitting each other, in the same band of the screen.
-///
-/// One scrim of its own air over the lot of it fixes that in a single
-/// pass, the way distance actually works. Nothing is removed; it is
-/// just behind something now.
+/// How far the backdrop is pushed back behind the fight: one scrim of air
+/// over every layer, so cranes, skyline and crowd stop competing with the
+/// fighters at full contrast. (Stages are scenery only: the same floor line,
+/// height and walls in both.)
 const HAZE: f32 = 0.34;
 
 fn draw_stage(blip: &Blip, g: &Game) {
@@ -72,14 +50,8 @@ fn draw_stage(blip: &Blip, g: &Game) {
     draw_floor(blip, g.stage, shake);
 }
 
-/// The ground they are standing on, seen flat-on from in front.
-///
-/// It used to be a near-black band, which was fine while the fighters
-/// had nothing to cast onto it. A shadow needs somewhere to land: a
-/// floor darker than the shadow is a floor with no shadows on it, and
-/// the fighters read as stickers on a backdrop. So the boards are lit
-/// now, and fall off toward the bottom of the screen the way a plane
-/// receding from a low sun does.
+/// The ground, seen flat-on: lit boards falling off toward the bottom of the
+/// screen, bright enough for the fighters' shadows to land on.
 fn draw_floor(blip: &Blip, stage: usize, shake: f32) {
     let near = if stage == 0 {
         BlipColor { r: 0.38, g: 0.28, b: 0.21, a: 1.0 }
@@ -117,31 +89,17 @@ fn scatter(k: usize, salt: u32) -> f32 {
     (h % 1024) as f32 / 1024.0
 }
 
-/// Distance, as a colour. Anything far off is seen through the same air
-/// the sky is, so it loses contrast toward the sky rather than simply
-/// getting darker — which is most of what separates a backdrop with
-/// depth in it from a set of cut-outs at different heights.
+/// Distance as colour: far things lose contrast toward the sky rather than
+/// just darkening.
 fn hazed(c: BlipColor, sky: BlipColor, k: f32) -> BlipColor { blend(c, sky, k) }
 
-/// A row of onlookers.
-///
-/// Silhouettes, because a crowd this size is a shape and a rhythm and
-/// not faces — and because anything detailed behind the fighters is
-/// competing with them. Small, dense and overlapping: spaced out and
-/// full height they read as a picket fence, and at the fighters' own
-/// head height they read as a third and fourth fighter.
-///
-/// They bob out of step, and a hit big enough to shake the screen puts
-/// them on their feet, which is the cheapest thing in this file that
-/// says the fight is being watched.
+/// A row of onlookers: small, dense, overlapping silhouettes below the
+/// fighters' heads, so they read as a crowd and not more fighters. They bob
+/// out of step and stand up for a big hit.
 fn draw_crowd(blip: &Blip, ground: f32, h: f32, c: BlipColor, t: f32, salt: u32, n: usize,
               hype: f32) {
-    // At this size the bodies merge into one mass and the only thing
-    // that makes it a crowd is the line along the top of it. Drawn as
-    // separate whole figures they came out as a row of chess pawns —
-    // evenly spaced, all one width, heads as wide as their shoulders.
-    // `hype` is how recently something landed: they come up off
-    // their seats for it.
+    // At this size the bodies merge and the crowd is the line along the top.
+    // `hype` is how recently something landed.
     let h = h * (1.0 + 0.30 * hype);
     let mass = ground - h * 0.42;
     blip.fill_rect(0.0, mass, WIN_W as f32, ground - mass, shade(c, 0.88));
@@ -168,17 +126,10 @@ fn draw_crowd(blip: &Blip, ground: f32, h: f32, c: BlipColor, t: f32, salt: u32,
     }
 }
 
-/// THE DOCKS — sunset over a working harbour.
-///
-/// Built in layers, far to near: sky, cloud, skyline, the far wharf and
-/// the people on it, water, then the quay the fight is on. Each layer
-/// is hazed toward the sky by how far off it is, which is what makes it
-/// a distance rather than a stack of cut-outs.
-///
-/// The band the fighters occupy is deliberately the quiet one. A
-/// backdrop competes with them at exactly the height they are, so the
-/// detail goes above their heads or below their knees and what is left
-/// behind them is flat water.
+/// THE DOCKS: sunset over a working harbour. Layers far to near (sky, cloud,
+/// skyline, far wharf and people, water, the quay), each hazed toward the sky
+/// by distance. The fighters' band is kept quiet, flat water; detail goes
+/// above their heads or below their knees.
 fn draw_dock(blip: &Blip, shake: f32, t: f32, hit: f32) {
     let hit = (hit / 0.16).clamp(0.0, 1.0);
     const HORIZON: f32 = 250.0;
@@ -318,12 +269,8 @@ fn draw_dock(blip: &Blip, shake: f32, t: f32, hit: f32) {
     }
 }
 
-/// THE TEMPLE — night, under a roof, with the mountain behind it.
-///
-/// Same build as the docks: sky, cloud, mountains, the colonnade and
-/// the people between it, then the terrace the fight is on. The light
-/// here comes from the lanterns rather than the sky, which is what
-/// gives a night stage anything to look at.
+/// THE TEMPLE: night under a roof, the mountain behind. Built like the docks;
+/// the light comes from the lanterns.
 fn draw_temple(blip: &Blip, shake: f32, t: f32, hit: f32) {
     let hit = (hit / 0.16).clamp(0.0, 1.0);
     const HORIZON: f32 = 262.0;
@@ -448,27 +395,14 @@ fn draw_temple(blip: &Blip, shake: f32, t: f32, hit: f32) {
 }
 
 // ---- anatomy -------------------------------------------------------------
-//
-// A fighter is drawn as a body, not a symbol. The difference is not
-// decoration: a player reads an attack off the *shape* of the person
-// throwing it — where the weight is, which leg is loaded, whether the
-// shoulder has turned over yet — and none of that survives being drawn
-// as a line from the hips to wherever the hitbox ends. A kick has to
-// come off a knee that chambered first, or it is not a kick, it is a
-// pointer.
-//
-// Everything below is built from three ideas:
-//
-// 1. **Pose space.** Joints are written as (forward, up) from the floor
-//    under the fighter's feet, so one pose serves both sides of the
-//    screen and every number reads as a height off the ground.
-// 2. **Two bones per limb.** Hands and feet are placed; knees and
-//    elbows are solved. A limb with a joint in it bends the way a body
-//    bends, and it is that bend — not the endpoint — that makes a kick
-//    look like a leg.
-// 3. **Tapered strokes.** Every part is a run of circles from a thick
-//    end to a thin one: hip to knee to ankle, deltoid to wrist. Uniform
-//    width is what makes a stick figure a stick figure.
+// A player reads an attack off the shape of the body throwing it (weight,
+// loaded leg, turned shoulder), so fighters are drawn as bodies:
+// 1. **Pose space.** Joints are (forward, up) from the floor under the feet,
+// so one pose serves both sides.
+// 2. **Two bones per limb.** Hands and feet are placed; knees and elbows are
+// solved.
+// 3. **Tapered strokes.** Every part runs thick to thin; uniform width is a
+// stick figure.
 
 /// A point on a fighter: `f` forward — the way they face — and `u` up
 /// from the floor under them.
@@ -499,22 +433,16 @@ pub(crate) struct Rig {
     /// Which way the face points. The same as `fwd` on a fighter who is
     /// upright, and the opposite on one who has been put on their back.
     face: f32,
-    /// How much of a joint's height survives the mapping, and which way
-    /// that height then runs on screen.
-    ///
-    /// One for the fighter: height goes *up*. Negative for their
-    /// shadow, because the floor is the plane between them and the
-    /// viewer — the light in both stages is behind the fighters, so
-    /// their shadows run toward the camera, down the screen, not up the
-    /// scenery behind them.
+    /// How much of a joint's height survives the mapping and which way it
+    /// runs on screen: one for the fighter (up), negative for the shadow,
+    /// which runs toward the camera since the light is behind the fighters.
     squash: f32,
     /// How far a joint slides sideways per unit of height — the angle
     /// of the light. Zero for the fighter.
     skew: f32,
-    /// Height of the fighter's feet above the floor, added to every
-    /// joint before projecting. Zero for the fighter, since their pose
-    /// is already measured from their own feet; for the shadow it is
-    /// what makes a jump throw its shadow further away and smaller.
+    /// Height of the feet above the floor, added before projecting: zero for
+    /// the fighter, and what makes a jump's shadow fall further off and
+    /// smaller.
     rise: f32,
 }
 
@@ -531,25 +459,19 @@ impl Rig {
     fn bone(self) -> f32 { self.squash.abs().max(0.45) }
 }
 
-/// Bone lengths, in the same pixels as everything else. The legs add up
-/// to more than the height of the hips on purpose: a fighter stands
-/// with their knees bent, and a fighter who does not is standing in a
-/// queue.
-// Checked against figure-drawing proportions rather than guessed: the
-// femur is a little longer than the tibia, not a little shorter, and
-// the two together put the hip joint at half the standing height.
+/// Bone lengths in pixels, from figure-drawing proportions: the femur a
+/// little longer than the tibia, the hip at half the standing height. The
+/// legs add up to more than the hip height, so a fighter stands with bent
+/// knees.
 const THIGH: f32 = 30.0;
 const SHIN: f32 = 29.0;
 const UARM: f32 = 24.0;
 const FARM: f32 = 21.0;
 
-/// Joint heights standing and crouching. Two each — hips and head —
-/// because the spine between them is one bone; see `neck_of`. The
-/// crouch numbers put the top of the head at `CROUCH_H`.
-/// Hips low, because a fighter waiting is sunk into their legs. At 58
-/// the hip sat exactly a leg's length from the ankles and the solver
-/// clamped both legs dead straight — see
-/// `a_waiting_fighter_has_their_knees_bent`.
+/// Joint heights standing and crouching: hips and head (the spine between is
+/// one bone, see `neck_of`); the crouch puts the head top at `CROUCH_H`. Hips
+/// low: at 58 the solver clamped both legs straight (see
+/// `a_waiting_fighter_has_their_knees_bent`).
 const HIP_U: f32 = 53.0;
 const HEAD_U: f32 = 109.0;
 const C_HIP: f32 = 31.0;
@@ -573,14 +495,9 @@ fn blend(a: BlipColor, b: BlipColor, k: f32) -> BlipColor {
 /// happen to be a similar colour.
 const INK: BlipColor = BlipColor { r: 0.07, g: 0.06, b: 0.09, a: 1.0 };
 
-/// What the lit floor looks like with a fighter standing in the way of
-/// the light. Opaque, and a little cooler than the boards it falls on —
-/// a shadow takes its colour from the sky, not from the thing casting it.
-/// Opaque, not translucent: the silhouette is drawn as a dozen
-/// overlapping strokes, and any alpha on it doubles up wherever two
-/// limbs cross, so a see-through shadow comes out blotched exactly
-/// where the body is thickest. Lightened instead — a cast shadow is a
-/// patch of floor with less light on it, not a hole in the floor.
+/// A cast shadow: opaque (overlapping strokes would double any alpha where
+/// limbs cross) and a little cooler than the boards, since a shadow takes the
+/// sky's colour.
 const SHADOW: BlipColor = BlipColor { r: 0.23, g: 0.17, b: 0.18, a: 1.0 };
 
 /// How a fighter is coloured and clothed, already shaded for the limb
@@ -604,12 +521,8 @@ struct Hide {
     /// How hard this fighter is working, 0 to 1. Sweat, and how deep
     /// the breathing under it is.
     sweat: f32,
-    /// Whether this limb is in front of the body and needs an edge
-    /// cutting round it. A white sleeve crossing a white jacket has no
-    /// silhouette of its own: the ordinary hairline outline vanishes
-    /// into the fill behind it and the arm stops existing. Near limbs
-    /// get a heavier line, which is also true of how we see — the
-    /// nearer edge is the sharper one.
+    /// Whether this limb is in front of the body and needs a heavier edge: a
+    /// white sleeve over a white jacket has no silhouette otherwise.
     front: bool,
 }
 
@@ -621,11 +534,8 @@ impl Hide {
     /// with the limb it belongs to stops separating it from the limb in
     /// front, which is the entire job of having one.
     fn ink(&self) -> BlipColor { blend(shade(INK, 0.8 + 0.2 * self.tone), BLIP_WHITE, self.flash * 0.6) }
-    /// The far side of the body. Darker, and pulled toward the colour
-    /// of the shadows rather than simply dimmed — distance takes the
-    /// warmth out of a colour as well as the light, and a far limb that
-    /// is only a darker version of the near one still reads as the same
-    /// limb drawn twice.
+    /// The far side of the body: darker and pulled toward the shadow colour,
+    /// not just dimmed, so it does not read as the near limb drawn twice.
     fn far(self) -> Hide {
         let cool = |c: BlipColor| blend(shade(c, 0.58), SHADOW, 0.22);
         Hide {
@@ -639,11 +549,8 @@ impl Hide {
     }
     fn infront(self) -> Hide { Hide { front: true, ..self } }
 
-    /// Cut this limb out of whatever is behind it.
-    ///
-    /// Each node carries its own radius, because a limb tapers: one
-    /// radius for the whole arm draws a shoulder-width line around the
-    /// wrist, and the fist comes out wearing a black mitten.
+    /// Cut this limb out of whatever is behind it; each node carries its own
+    /// radius, since a limb tapers.
     fn cut(&self, blip: &Blip, nodes: &[(V, f32)]) {
         if !self.front { return; }
         let ink = blend(INK, BLIP_WHITE, self.flash * 0.5);
@@ -661,14 +568,8 @@ impl Hide {
     }
 }
 
-/// Sweat: a wet sheen of beads, and the ones that run off.
-///
-/// A fighter who has taken half a health bar should look like they have
-/// been in a fight, and there is nothing else on a sixty-pixel figure
-/// that can say so — the face is four marks and the body is one colour.
-/// Beads catch the light, so they are drawn as highlights rather than
-/// as a colour: a pale core over a darker rim, which is what a droplet
-/// on skin is.
+/// Sweat, the only thing on a sixty-pixel figure that says it has been in a
+/// fight. Beads are highlights: a pale core over a darker rim.
 const WET: BlipColor = BlipColor { r: 0.82, g: 0.92, b: 1.0, a: 0.92 };
 
 fn bead(blip: &Blip, x: f32, y: f32, r: f32, a: f32) {
@@ -681,26 +582,18 @@ fn bead(blip: &Blip, x: f32, y: f32, r: f32, a: f32) {
     blip.fill_circle(x, y, r, BlipColor { a: a * WET.a, ..WET });
 }
 
-/// Beads standing on the skin, and the ones running off it.
-///
-/// `spots` are where they can stand, in pixels from `at` and already
-/// scaled to the part they are on — a hand-placed list rather than a
-/// scatter, because on a ten-pixel face a random cluster lands on the
-/// eye and reads as a bruise. How wet the fighter is decides how many
-/// of the spots are occupied. Nothing here is stored: a bead's whole
-/// life is a function of the clock.
+/// Beads standing on the skin and running off. `spots` are hand-placed (a
+/// random cluster on a ten-pixel face lands on the eye and reads as a
+/// bruise); wetness decides how many are used. A bead's life is a function of
+/// the clock.
 fn sweat_beads(blip: &Blip, at: V, fw: f32, spots: &[(f32, f32)], t: f32, wet: f32, salt: u32) {
     if wet < 0.12 { return; }
     let n = ((1.0 + wet * spots.len() as f32).round() as usize).min(spots.len());
     let cycle = 2.4;
     for j in 0..n {
         let k = j as u32 + salt;
-        // Beads take their turn rather than rolling dice for it. Left
-        // to a random phase each, three of them on a ten-pixel jaw come
-        // up together often enough to merge into one pale mass, which
-        // reads as a beard. Evenly spaced in time, there is almost
-        // always exactly one bead on the chin — which is what a chin
-        // dripping actually looks like.
+        // Beads take turns rather than random phases, or three on a jaw merge
+        // into a beard; evenly spaced, there is usually one on the chin.
         let u = (t / cycle + (j as f32 + scatter(5, salt)) / n as f32).fract();
         // Gather, stand, run off. It is only on the skin for half its
         // turn; the rest of the cycle that spot is dry.
@@ -746,11 +639,8 @@ fn stroke(blip: &Blip, a: V, b: V, r1: f32, r2: f32, c: BlipColor) {
 fn part(blip: &Blip, a: V, b: V, r1: f32, r2: f32, c: BlipColor, ink: BlipColor) {
     stroke(blip, a, b, r1 + 1.7, r2 + 1.7, ink);
     stroke(blip, a, b, r1, r2, c);
-    // Light along one side of the limb and shadow along the other,
-    // both *across* it rather than down its length. This is the whole
-    // difference between a cylinder and a flat sausage — and on a
-    // fighter dressed in white it is also the only thing keeping an arm
-    // from dissolving into the chest behind it.
+    // Light along one side and shadow along the other, across the limb: a
+    // cylinder, not a sausage, and what keeps a white arm off a white chest.
     let (dx, dy) = (b.0 - a.0, b.1 - a.1);
     let d = (dx * dx + dy * dy).sqrt().max(0.001);
     // Perpendicular, pointed up-screen: the light is always overhead.
@@ -778,29 +668,15 @@ fn blob(blip: &Blip, at: V, r: f32, c: BlipColor, ink: BlipColor) {
     blip.fill_circle(at.0 - r * 0.30, at.1 - r * 0.34, r * 0.46, blend(c, BLIP_WHITE, 0.30));
 }
 
-/// How far a two-bone limb can fold.
-///
-/// A knee closes to about thirty degrees between thigh and calf before
-/// the calf is against the hamstring; an elbow to about thirty-five.
-/// Past that a real limb stops, and a drawn one that does not stop puts
-/// the joint somewhere a joint cannot be.
+/// How far a two-bone limb can fold: a knee to about thirty degrees, an elbow
+/// to about thirty-five.
 const KNEE_SHUT: f32 = 0.52;  // ~30 degrees, in radians
 const ELBOW_SHUT: f32 = 0.61; // ~35 degrees
 
-/// The two-bone solve: where the joint goes, and where the end of the
-/// limb actually ends up.
-///
-/// Bones do not change length — not to reach a hitbox, not for
-/// anything. An earlier version of this stretched them to meet whatever
-/// the pose asked for, which is how the fighter ended up standing on a
-/// support leg a fifth longer than the leg it was kicking with. So the
-/// target is a *request*: it is clamped into the ring the limb can
-/// actually reach, between fully folded and fully straight, and the
-/// caller is handed back the point it settled on.
-///
-/// `toward` picks which way the joint breaks — knees forward, elbows
-/// back and down — and getting it wrong is the difference between a
-/// fighter and something with its legs on backwards.
+/// The two-bone solve: where the joint goes and where the limb's end actually
+/// lands. Bones never stretch; the target is clamped into the reachable ring
+/// and the settled point returned. `toward` picks the way the joint breaks
+/// (knees forward, elbows back).
 fn solve(root: V, want: V, l1: f32, l2: f32, shut: f32, toward: V, floor: f32) -> (V, V) {
     let (dx, dy) = (want.0 - root.0, want.1 - root.1);
     let d_raw = (dx * dx + dy * dy).sqrt();
@@ -816,38 +692,21 @@ fn solve(root: V, want: V, l1: f32, l2: f32, shut: f32, toward: V, floor: f32) -
     let off = cs.acos();
     let one = V(root.0 + l1 * (base + off).cos(), root.1 + l1 * (base + off).sin());
     let two = V(root.0 + l1 * (base - off).cos(), root.1 + l1 * (base - off).sin());
-    // There are exactly two solutions and they are mirror images about
-    // the line between the ends, so the only real decision is which way
-    // the joint breaks — and `toward` makes it, always.
-    //
-    // An earlier version overrode this to keep joints out of the
-    // floorboards, and since the two candidates are always on opposite
-    // sides of that line, "not underground" sometimes meant "knee
-    // bending backwards". A leg on backwards is worse than a knee an
-    // inch into the boards, and the real fix is not to ask for either:
-    // a pose that puts a knee underground is a pose to correct, and
-    // there is a test that says which ones do.
+    // The two solutions mirror about the line between the ends; `toward`
+    // always picks. (Keeping joints out of the floor instead sometimes bent a
+    // knee backwards; a pose that sinks a knee is fixed in the pose, and a
+    // test says which.)
     let _ = floor;
     let score = |c: V| (c.0 - root.0) * toward.0 + (c.1 - root.1) * toward.1;
     (if score(one) >= score(two) { one } else { two }, end)
 }
 
 // ---- parts ---------------------------------------------------------------
-//
-// One rule about how much of a body to draw, and it is not "as much as
-// possible".
-//
-// Each part earns its place by changing the outline. At a hundred and
-// twenty pixels a calf that swells below the knee does not; a foot that
-// sticks out behind the ankle does. This was about ninety pieces — legs
-// in three sections, feet in four, eight three-part cloth panels with
-// their own inertia — and is about sixty now.
+// Each part earns its place by changing the outline at this size: a foot
+// sticking out behind the ankle does, a swelling calf does not.
 
-/// The line a hanging piece of cloth takes.
-///
-/// Pinned at one end and swinging a little. Was a four-node chain with
-/// quadratic lag fed by posing the whole fighter a second time each
-/// frame to difference the joints; nothing at this scale could see it.
+/// The line a hanging piece of cloth takes: pinned at one end and swinging a
+/// little.
 fn hang(blip: &Blip, h: &Hide, at: V, dir: (f32, f32), len: f32, sway: f32,
         r1: f32, r2: f32, c: BlipColor) {
     let (px, py) = (-dir.1, dir.0);
@@ -870,19 +729,13 @@ fn draw_leg(blip: &Blip, h: &Hide, hip: V, knee: V, ankle: V, fwd: f32, ground: 
     h.cut(blip, &[(hip, 10.6 * b), (knee, 8.8 * b),
                   (ankle, if h.build == Build::Bare { 6.4 } else { 8.0 } * b)]);
 
-    // Two bones, two strokes. The thigh is the thickest part of a
-    // person and narrows by a third to the knee; below the knee the
-    // leg runs to an ankle barely wider than the bone in it. The calf
-    // used to get a third stroke of its own to bulge in the middle,
-    // which is true of a leg and invisible on a leg twenty-nine pixels
-    // long.
+    // Two bones, two strokes: the thigh narrowing by a third to the knee, the
+    // shin to a thin ankle.
     part(blip, hip, knee, 9.4 * b, 5.3 * b, skin, ink);
     part(blip, knee, ankle, 6.2 * b, 3.0 * b, skin, ink);
 
-    // What they are wearing over it, drawn *on the bone*: a thigh is
-    // one straight thing and a shin is one straight thing, and cloth
-    // stretched over them is straight too. Only what hangs past the
-    // ankle is free.
+    // Clothing is drawn on the bone (thigh and shin are straight, so is the
+    // cloth over them); only what hangs past the ankle is free.
     let hem = match h.build {
         Build::Gi => 0.86,
         Build::Bare => 0.30,
@@ -937,14 +790,8 @@ fn draw_leg(blip: &Blip, h: &Hide, hip: V, knee: V, ankle: V, fwd: f32, ground: 
     };
     let ank = ankle;
     let at = |along: f32, up: f32| V(ank.0 + fx * along + ux * up, ank.1 + fy * along + uy * up);
-    // A foot is about a seventh of a person long on a real person, and
-    // a fifth of one on a fighting-game sprite. The hands and the feet
-    // are drawn big here for the same reason they are drawn big there:
-    // they are what hits you. An arcade sprite puts weight into the
-    // ends of the limbs — big gloves, big boots — so that the thing
-    // the player has to read and the thing that does the damage are
-    // the largest, clearest shapes on the figure. Drawn to life scale
-    // they disappear at the end of a leg and a kick lands with a point.
+    // Feet are drawn big, a fifth of the figure as on a fighting sprite: the
+    // ends of the limbs are what hits you, so they are the clearest shapes.
     let fb = if boot { b * 0.92 } else { b };
     let ball = at(7.4 * fb, -5.4 * fb);
     part(blip, at(-5.2 * fb, -3.2 * fb), ball, 3.9 * fb, 3.1 * fb, foot_c, ink);
@@ -952,41 +799,17 @@ fn draw_leg(blip: &Blip, h: &Hide, hip: V, knee: V, ankle: V, fwd: f32, ground: 
         foot_c, ink);
 }
 
-/// A fist, and an open hand, drawn as hands.
-///
-/// They were both a ball: `blob()` at a size up for a fist, a stubby
-/// capsule for a palm. At sixty pixels tall that is the single thing
-/// the eye goes to on half the move list — a punch is a fist arriving —
-/// and a ball on the end of a stick is what makes a figure read as a
-/// doll. Three shapes are enough to fix it: a squared block for the
-/// hand itself, a row of knuckles across the face it hits with, and a
-/// thumb laid over the front. None of them is more than a few pixels;
-/// all of them are aligned to the forearm, so the knuckles always face
-/// the way the punch is going.
-/// Every piece of a hand as one silhouette: all the ink first, then all
-/// the skin over it. Drawn piece by piece with `part`, each capsule
-/// carries its own outline and cuts the ones it overlaps, so a hand
-/// made of four shapes comes out looking like four shapes.
+/// A hand as one silhouette: all the ink first, then all the skin, so a hand
+/// of four shapes does not show four outlines.
 fn lumps(blip: &Blip, pieces: &[(V, V, f32, f32)], c: BlipColor, ink: BlipColor) {
     for (a, b, r1, r2) in pieces { stroke(blip, *a, *b, r1 + 1.7, r2 + 1.7, ink); }
     for (a, b, r1, r2) in pieces { stroke(blip, *a, *b, *r1, *r2, c); }
 }
 
-/// A fist, seen from the side — which is the only way it is ever seen
-/// here, because the fighters are drawn in pure profile.
-///
-/// That is the thing the first three attempts got wrong. A fist drawn
-/// with its knuckles in a row across the front is a fist seen from the
-/// *front*, and putting one on a figure in profile gives you a pair of
-/// prongs: a claw. In profile you do not see four knuckles. You see one
-/// squared corner where the middle knuckle turns, the curled fingers
-/// stacked behind and below it, and the thumb laid across them.
-///
-/// Built the way the references build it (see the note in the commit):
-/// a mitten, with a triangular knuckle mass at the top front, a
-/// rectangular thumb jutting from the wrist at about forty-five
-/// degrees, and an upside-down Y of creases between the two for the
-/// folds of the finger digits.
+/// A fist in profile (the fighters are always seen side-on): not a row of
+/// knuckles, which in profile is a claw, but a mitten with a squared knuckle
+/// corner at the top front, a thumb at about forty-five degrees from the
+/// wrist, and a Y of creases between.
 fn draw_fist(blip: &Blip, h: &Hide, wrist: V, hand: V, b: f32) {
     let skin = h.c(h.skin);
     let ink = h.ink();
@@ -1002,10 +825,8 @@ fn draw_fist(blip: &Blip, h: &Hide, wrist: V, hand: V, b: f32) {
         // The back of the hand: a flat slab from the wrist to the
         // knuckles, and the top edge of the whole shape.
         (at(-5.0, -1.4), at(2.0, -1.9), 2.5 * b, 2.3 * b),
-        // The knuckle mass, standing across the front face rather than
-        // along the hand. That is what squares off the top front corner
-        // — the one corner the whole shape is read from, and the thing
-        // a rounded lump here cannot say.
+        // The knuckle mass across the front face: the squared top corner the
+        // fist is read from.
         (at(2.5, -1.9), at(2.5, 0.6), 2.3 * b, 2.2 * b),
         // The fingers, curled under and back toward the palm.
         (at(0.2, 2.1), at(2.2, 1.9), 2.4 * b, 2.3 * b),
@@ -1022,10 +843,9 @@ fn draw_fist(blip: &Blip, h: &Hide, wrist: V, hand: V, b: f32) {
     stroke(blip, at(-2.0, -3.0), at(2.4, -3.0), 1.1 * b, 1.3 * b,
            blend(skin, BLIP_WHITE, 0.30));
 
-    // The thumb: a bar off the wrist at about forty-five degrees, laid
-    // across the front of the fingers. Lighter than them, because it is
-    // the nearest thing on the hand — and with no ink edge of its own,
-    // since at this size an outline round a thumb is most of it.
+    // The thumb, a bar at about forty-five degrees across the fingers:
+    // lighter (nearest) and without an ink edge, which at this size would be
+    // most of it.
     stroke(blip, at(-3.2, 0.4), at(0.4, 3.0), 1.9 * b, 1.6 * b,
            blend(skin, BLIP_WHITE, 0.20));
     stroke(blip, at(-3.0, -0.9), at(0.0, 1.6), 0.55 * b, 0.55 * b, shade(skin, 0.62));
@@ -1069,12 +889,8 @@ fn draw_arm(blip: &Blip, h: &Hide, shoulder: V, elbow: V, hand: V, open: bool, t
         (hand, 6.0 * b),
     ]);
 
-    // The deltoid: a cap of muscle over the top of the joint, drawn
-    // before the arm and overlapping the torso. Without it the upper
-    // arm is a tube beginning in mid-air beside the chest, and the
-    // limb reads as stuck on rather than grown from. The shoulder is
-    // the one joint where the limb and the body are the same piece of
-    // flesh, and the drawing has to say so.
+    // The deltoid: a cap over the joint, drawn before the arm and over the
+    // torso, so the arm grows from the body.
     blob(blip, V(shoulder.0 - ax * 1.5, shoulder.1 - ay * 1.5), 7.0 * b, skin, ink);
 
     // Two bones, two strokes — as with the leg, and for the same
@@ -1109,10 +925,8 @@ fn draw_arm(blip: &Blip, h: &Hide, shoulder: V, elbow: V, hand: V, open: bool, t
         }
     }
 
-    // Wrist wrap, then the hand on the end of it. Thin, and stopped
-    // short of the hand: a thick band running right up to a fist is the
-    // cuff of a boxing glove, which is the one thing these hands must
-    // not look like.
+    // Wrist wrap, thin and short of the hand, so the fist never reads as a
+    // boxing glove.
     stroke(blip, along(elbow, hand, 0.54), along(elbow, hand, 0.74), 3.0 * b, 3.2 * b,
         h.c(h.trim));
     if open { draw_palm(blip, h, elbow, hand, b); }
@@ -1134,24 +948,10 @@ fn draw_torso(blip: &Blip, h: &Hide, hip: V, neck: V, t: f32) {
     let body = if bare { h.c(h.skin) } else { h.c(h.cloth) };
     let chest = along(hip, neck, 0.76);
 
-    // The trunk is a ribcage, not a pair of shoulders.
-    //
-    // Widening this capsule to a shoulder's width makes the whole torso
-    // that wide — a barrel from armpit to hip that swallows both arms
-    // and the neck with them. Shoulder width is ribcage *plus two
-    // deltoids*, and the deltoids are part of the arms; they are drawn
-    // there, outside this, which is where they are on a person.
-    //
-    // The taper is steeper than a real torso's. A ribcage is barely
-    // wider than a pelvis on a person; on a fighting sprite it is a
-    // good deal wider, because the wedge is doing the work of saying
-    // "this is a heavyweight" at a size where no muscle can be drawn.
-    // Breathing, where it can actually be seen. The waist barely moves
-    // and the ribcage does all of it — a chest that fills and empties,
-    // rather than a whole body scaled up and down, which is a balloon.
-    // Half a pixel at rest and closer to two when the fighter is spent,
-    // which is the difference between a figure standing there and one
-    // getting its wind back.
+    // The trunk is a ribcage, not a pair of shoulders: shoulder width is the
+    // ribcage plus the deltoids, drawn with the arms. The taper is steeper
+    // than life, the sprite wedge that says heavyweight. Breathing moves the
+    // ribcage, not the waist: half a pixel at rest, nearly two when spent.
     let swell = 1.0 + (0.055 + 0.075 * h.sweat) * h.breath;
     // And the shoulders ride up on it. Drawn, not posed: the neck is
     // where the skeleton put it, the top of the chest just reaches a
@@ -1196,12 +996,8 @@ fn draw_torso(blip: &Blip, h: &Hide, hip: V, neck: V, t: f32) {
     ], t + 0.7, h.sweat * 0.8, 27);
 }
 
-/// The gi skirt and the belt over it, drawn after the legs.
-///
-/// All three pieces stack the way they do on a person: jacket over the
-/// thighs, belt over the jacket. Drawn with the torso — before the
-/// legs — the belt went behind the near thigh and vanished, and the
-/// skirt went with it.
+/// The gi skirt and belt, drawn after the legs: jacket over thighs, belt over
+/// jacket.
 fn draw_skirt(blip: &Blip, h: &Hide, hip: V, neck: V, t: f32) {
     let b = h.bulk;
     let ink = h.ink();
@@ -1220,10 +1016,7 @@ fn draw_skirt(blip: &Blip, h: &Hide, hip: V, neck: V, t: f32) {
         stroke(blip, along(top, hem, 0.3), hem, 1.4, 1.1, shade(body, 0.66));
     }
 
-    // A band across the body, not a capsule down it. Drawn along the
-    // spine it is as tall as it is wide whatever its radius, which
-    // behind the legs looked like a belt and in front of them like a
-    // slab over both thighs.
+    // A band across the body, not a capsule along the spine.
     let (sx, sy) = unit(hip, neck);
     let (px, py) = (-sy, sx);
     let w = 8.8 * b;
@@ -1259,21 +1052,12 @@ fn draw_head(blip: &Blip, h: &Hide, rig: Rig, head: V, neck: V, t: f32) {
     part(blip, V(head.0 + fw * 0.05 * r, head.1 + 0.13 * r),
          V(head.0 + fw * 0.50 * r, head.1 + 0.61 * r), 0.66 * r, 0.43 * r, skin, ink);
 
-    // Hair: two lumps, both *behind* the band.
-    //
-    // They used to sit high and forward, and between them, the band
-    // and a brow drawn in the same colour, the top two thirds of the
-    // head was one brown mass with an eye under it. A head is worth
-    // making bigger only if the extra pixels go to the face; spent on
-    // more hair they buy a larger blob.
+    // Hair: two lumps behind the band, so the extra head size goes to the
+    // face.
     blip.fill_circle(head.0 - fw * 0.40 * r, head.1 - 0.68 * r, 0.58 * r, hair);
     blip.fill_circle(head.0 - fw * 0.82 * r, head.1 - 0.02 * r, 0.52 * r, hair);
 
-    // Headband at the hairline, and one tie trailing behind it. Thin.
-    // At a quarter of the head's radius the tie was a red wedge wider
-    // than the skull it was tied to — the single loudest shape on the
-    // fighter, attached to the one part that most needed to read
-    // clearly.
+    // Headband at the hairline and one thin tie trailing behind.
     let band_a = V(head.0 - fw * 0.86 * r, head.1 - 0.40 * r);
     stroke(blip, band_a, V(head.0 + fw * 0.70 * r, head.1 - 0.52 * r),
         0.22 * r, 0.19 * r, h.c(h.trim));
@@ -1282,11 +1066,8 @@ fn draw_head(blip: &Blip, h: &Hide, rig: Rig, head: V, neck: V, t: f32) {
         0.15 * r, 0.06 * r, h.c(h.trim));
 
 
-    // A face: brow, eye, nose, mouth. Four marks, and the head stops
-    // being a ball. The brow is the one doing the work — a fighter
-    // looks at the person they are fighting, and a heavy brow over a
-    // small eye is the whole of that at this size. The nose is on the
-    // list because it is not a feature here, it is the profile.
+    // A face: brow, eye, nose, mouth. The heavy brow over a small eye is the
+    // look at the opponent; the nose is the profile.
     stroke(blip, V(head.0 + fw * 0.24 * r, head.1 - 0.16 * r),
            V(head.0 + fw * 0.74 * r, head.1 - 0.10 * r), 0.13 * r, 0.10 * r, hair);
     blip.fill_circle(head.0 + fw * 0.56 * r, head.1 + 0.14 * r, 0.16 * r, INK);
@@ -1299,11 +1080,8 @@ fn draw_head(blip: &Blip, h: &Hide, rig: Rig, head: V, neck: V, t: f32) {
     // face. Drawn before it, the brow and the eye painted straight back
     // over every bead and the fighter stayed bone dry.
     sweat_beads(blip, head, fw, &[
-        // Low on the head, and nowhere near the brow. A bead sitting
-        // still up there reads as a stud on the headband — the face is
-        // four marks wide and anything added to it joins them. Down on
-        // the jaw a bead has somewhere to go: it gathers, runs off the
-        // chin and falls, and falling is what makes it sweat.
+        // Low on the head, away from the brow (a still bead there reads as a
+        // stud): on the jaw a bead can gather, run off the chin and fall.
         (0.44 * r, 0.62 * r),    // the point of the chin
         (0.10 * r, 0.74 * r),    // under the jaw
         (-0.36 * r, 0.52 * r),   // behind it, under the ear
@@ -1395,10 +1173,9 @@ fn crouched(breath: f32) -> Pose {
     }
 }
 
-/// Off the ground, posed from vertical speed rather than a timer:
-/// legs trailing at take-off, tucked at the apex, reaching down on the
-/// way in. Reading it off `vy` means every jump height gets the right
-/// shape without knowing how long it lasts.
+/// Off the ground, posed from vertical speed: legs trailing at take-off,
+/// tucked at the apex, reaching down on the way in, right at every jump
+/// height.
 fn airborne_pose(vy: f32) -> Pose {
     let r = (-vy / -JUMP_VY).clamp(-1.0, 1.0);
     let rise = r.max(0.0);
@@ -1648,15 +1425,9 @@ pub(crate) fn exertion(f: &Fighter) -> f32 {
     (1.0 - f.health as f32 / max).clamp(0.0, 1.0)
 }
 
-/// One breath, -1 to 1 — and then some.
-///
-/// The slow cycle is the breath itself. On top of it is a faster,
-/// shallower ripple that only exists once the fighter is hurt: the
-/// short catch in the chest of someone who has stopped getting enough
-/// air. Both run at fixed rates and grow in *amplitude* with exertion
-/// rather than in speed, because a rate that depends on health jumps
-/// the phase on the frame a blow lands, and a chest that skips is
-/// worse than one that never hurries.
+/// One breath, -1 to 1: the slow breath, plus a faster ripple once hurt.
+/// Rates are fixed and only amplitude grows with exertion, since a
+/// health-driven rate would jump the phase when a blow lands.
 pub(crate) fn breath_of(now: f32, f: &Fighter, idx: usize) -> f32 {
     let hard = exertion(f);
     let slow = (now * 2.6 + idx as f32 * 2.3).sin();
@@ -1967,54 +1738,31 @@ impl Skeleton {
     }
 }
 
-/// Solve one fighter's pose into joints.
-///
-/// `rig` decides where pose space lands on screen, so the same pose
-/// solves into a standing fighter or into the flattened silhouette of
-/// their shadow.
+/// Solve one fighter's pose into joints. `rig` maps pose space to the screen,
+/// for the fighter or their flattened shadow.
 pub(crate) fn skeleton(rig: Rig, q: &Pose) -> Skeleton {
     let hip = rig.at(q.hip);
     let neck = rig.at(neck_of(q));
     let head = rig.at(q.head);
 
-    // Sockets hang off the spine and turn with it. Fixed screen-space
-    // offsets put a shoulder in front of a fighter who is leaning back
-    // and behind one leaning in, so the arm appears to come out of the
-    // wrong side of the chest — wrong in a way that is obvious to look
-    // at and hard to name.
+    // Sockets hang off the spine and turn with it; fixed screen offsets put
+    // the arm out of the wrong side of a leaning chest.
     let (sx, sy) = unit(hip, neck);
     let (px, py) = (-sy, sx); // across the body, square to the spine
     let socket = |at: V, half: f32, up: f32| {
         (V(at.0 + px * half * rig.fwd + sx * up, at.1 + py * half * rig.fwd + sy * up),
          V(at.0 - px * half * rig.fwd + sx * up, at.1 - py * half * rig.fwd + sy * up))
     };
-    // Sockets sit well out from the spine: it is the distance between
-    // them, plus the deltoid on each, that makes a fighter's shoulders.
-    // Wide, because the top-heavy V from shoulders to waist is the
-    // second thing after the head that separates a fighting-game
-    // sprite from a figure study — those fighters are drawn as a
-    // wedge, and the wedge is what carries the silhouette.
+    // Sockets well out from the spine: that span plus the deltoids is the
+    // shoulders, the wedge a fighting sprite is drawn as.
     let (sh_lead, sh_rear) = socket(neck, 8.6, -8.5);
     let (hip_lead, hip_rear) = socket(hip, 4.5, 0.0);
 
-    // Parallax on the far side.
-    //
-    // The far arm and far leg are the width of a torso further from the
-    // camera, so they sit slightly back and slightly low of where the
-    // near ones sit — and that offset is the only reason a viewer can
-    // tell there are two of each. Without it a guard puts both fists in
-    // the same place, a stance puts both feet in the same place, and
-    // the fighter reads as a one-armed, one-legged person however well
-    // the near limb is drawn.
-    //
-    // It is small, constant, and applied to the target rather than the
-    // socket, so the far limb keeps its own bone lengths and the
-    // separation shows up at the hand and the foot where it is seen.
-    // The two go opposite ways vertically, because the camera sits at
-    // about chest height: a far *foot* is below the eye and so appears
-    // higher up the screen, toward the horizon, while a far hand is
-    // around eye level and barely moves. Shifting the foot downward
-    // instead — the obvious guess — puts it through the floorboards.
+    // Parallax on the far side: the far arm and leg sit slightly back, so a
+    // guard shows two fists and a stance two feet. Applied to the target so
+    // bone lengths stay. The camera is at chest height: a far foot appears
+    // higher (toward the horizon), a far hand barely moves; shifting the foot
+    // down puts it through the floor.
     let hand_back = |v: V| V(v.0 - rig.fwd * 3.0, v.1 + 1.0);
     let foot_back = |v: V| V(v.0 - rig.fwd * 3.5, v.1 - 1.5);
 
@@ -2022,45 +1770,20 @@ pub(crate) fn skeleton(rig: Rig, q: &Pose) -> Skeleton {
     // squashed shadow should bend. Upright, this is 1.0.
     let b = rig.bone();
     let leg_at = |root: V, want: V| {
-        // Which way a knee breaks is not a fixed direction in the
-        // world — it turns with the thigh.
-        //
-        // Standing, the knee is forward of the hip-to-ankle line. With
-        // the leg thrown out horizontally in a kick, that same
-        // anatomical "forward" has rotated with the limb and now points
-        // *up*, and a rule that says "put the knee as far forward as
-        // possible" starts choosing the backwards bend. Which is
-        // exactly what it did: on Brutus's kick and both high kicks the
-        // knee inverted for the three frames the blow was live.
-        //
-        // So the bend side is derived from the limb's own direction —
-        // the line turned a quarter turn, the way the knee faces —
-        // and it is right at every angle rather than at the one angle
-        // it was tuned for.
+        // The knee's bend side turns with the thigh: a leg thrown out
+        // horizontally has its anatomical forward pointing up, and a fixed
+        // "forward" inverted the knee on the high kicks. So it comes from the
+        // limb's own direction, a quarter turn from it.
         let (dx, dy) = unit(root, want);
         let anterior = V(dy * rig.fwd, -dx * rig.fwd);
         solve(root, want, THIGH * b, SHIN * b, KNEE_SHUT, anterior, rig.ground)
     };
     let arm_at = |root: V, want: V| {
-        // The elbow breaks to the back of the arm — and "the back of
-        // the arm" turns with the arm, exactly as the knee's forward
-        // does above.
-        //
-        // This was a fixed direction, mostly straight down, and a fixed
-        // direction is a tie waiting to happen: the two solutions are
-        // mirror images about the shoulder-to-hand line, so a bias
-        // lying near that line scores them almost equally and a pixel
-        // of movement anywhere flips the whole forearm to the other
-        // side. A rear hand tucked down across the chest — a jump
-        // kick, a sweep, a knockdown — sits right on that tie, and the
-        // elbow swapped between winging out behind the back and
-        // tucking in front for no reason the pose could name. Squaring
-        // the bias to the arm makes it maximally far from the tie at
-        // every angle instead of at most of them.
-        // The elbow trails the hand, turning with the arm: behind it
-        // hanging, below a punch, above one cocked back. One rule at
-        // every angle — any "is the arm raised" test is a cliff the
-        // forearm snaps across mid-swing. See `no_elbow_sticks_out_behind_the_back`.
+        // The elbow breaks to the back of the arm and turns with it. A fixed
+        // direction sat near the tie between the two mirrored solutions, so
+        // the forearm flipped with a pixel of movement; squared to the arm it
+        // is as far from the tie as possible. One rule at every angle (see
+        // `no_elbow_sticks_out_behind_the_back`).
         let (dx, dy) = unit(root, want);
         let posterior = V(-dy * rig.fwd, dx * rig.fwd);
         solve(root, want, UARM * b, FARM * b, ELBOW_SHUT, posterior, rig.ground)
@@ -2085,26 +1808,18 @@ fn unit(a: V, b: V) -> (f32, f32) {
 
 // ---- fighters ------------------------------------------------------------
 
-/// One fighter, posed for whatever they are doing and then built out of
-/// bones.
-///
-/// Drawing order is depth: far leg, far arm, body, head, near leg, near
-/// arm. The near limbs are the ones attacks are thrown with, so an
-/// attack always arrives in front of the body that threw it.
+/// One fighter, posed and built out of bones. Drawing order is depth: far
+/// leg, far arm, body, head, near leg, near arm, so an attack arrives in
+/// front of the body that threw it.
 fn draw_fighter(blip: &Blip, g: &Game, i: usize) {
     let shake = if g.shake > 0.0 { (g.shake * 60.0).sin() * g.shake * 30.0 } else { 0.0 };
-    // The docks put the sun low on the right, the temple puts the moon
-    // high on the left. The shadows go the other way from whichever it
-    // is: a shadow that disagrees with the only light in the picture is
-    // worse than no shadow.
+    // The docks' sun is low on the right, the temple's moon high on the left;
+    // shadows fall away from it.
     let light = if g.stage == 0 { -1.0 } else { 1.0 };
 
-    // Two players, two fighters, and in the middle of an exchange they
-    // are inside each other most of the time (measured: four frames in
-    // five). A mark on the boards under each one, in that player's own
-    // colour, is how you find yours — it is under the feet, so it is
-    // never hidden by the fighter standing on it or by the one standing
-    // on top of them.
+    // In an exchange the two fighters overlap four frames in five, so in
+    // versus a mark in each player's colour on the boards under them shows
+    // which is yours.
     if g.mode == Mode::Versus {
         let c = if i == 0 { BlipColor { r: 1.0, g: 0.35, b: 0.35, a: 0.55 } }
                 else { BlipColor { r: 0.40, g: 0.72, b: 1.0, a: 0.55 } };
@@ -2116,11 +1831,9 @@ fn draw_fighter(blip: &Blip, g: &Game, i: usize) {
     pose_and_draw_lit(blip, &g.p[i], g.now, shake, g.hitstop, i, light);
 }
 
-/// `shift` moves the whole fighter down the screen without moving the
-/// floor they are standing on: the screen shake during a hit, and the
-/// row offset the pose gallery lays its contact sheet out with. It is
-/// deliberately not part of `f.y`, because `f.y` is where the fighter
-/// *is* — the thing the rules and `airborne()` are judged on.
+/// `shift` moves the fighter down the screen without the floor: the hit
+/// shake, and the gallery's row offset. Not part of `f.y`, which is where the
+/// fighter is for the rules.
 fn pose_and_draw(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f32, i: usize) {
     pose_and_draw_lit(blip, f, now, shift, hitstop, i, 0.0);
 }
@@ -2155,12 +1868,9 @@ fn pose_and_draw_lit(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f3
     let far = hide.far();
     let near = hide.infront();
 
-    // The smear takes the colour of what is moving, washed most of the
-    // way to white. Drawn in the fighter's accent it reads as a ribbon
-    // trailing off them rather than as the limb itself, a frame ago.
-    // The flying kick is the fastest thing on the stage — a whole body
-    // crossing a hundred and fifty pixels — so it gets the whole body
-    // smeared rather than the one limb every other attack gets.
+    // The smear is the moving thing's colour washed to white, reading as a
+    // ribbon; the flying kick smears the whole body, every other attack one
+    // limb.
     if f.act == Act::Attack && f.mv == MoveId::FlyingKick {
         draw_smear(blip, &f, now, shift, i, blend(rgb(a.color), BLIP_WHITE, 0.62));
     } else {
@@ -2181,10 +1891,8 @@ fn pose_and_draw_lit(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f3
 
     let q = pose_of(now, &f, i);
 
-    // Cast shadow first, then the contact patch under the feet, then the
-    // fighter over both. The patch is what actually glues them down —
-    // the long shadow says where the light is, but a body with nothing
-    // directly beneath it floats however good its shadow.
+    // Cast shadow, then the contact patch under the feet (what glues the body
+    // down), then the fighter.
     if light != 0.0 {
         let shadow = Rig {
             cx: f.x,
@@ -2210,10 +1918,8 @@ fn pose_and_draw_lit(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f3
     draw_leg(blip, &far, k.hip_rear, k.knee_rear, k.ankle_rear, rig.fwd, rig.ground, t);
     draw_pelvis(blip, &hide, k.hip_rear, k.hip_lead);
     draw_torso(blip, &hide, k.hip, k.neck, t);
-    // The far arm goes on after the chest but *before* the head: it is
-    // in front of the ribs and behind the face. Drawn after the head it
-    // wiped the face out every time the guard came up, which at this
-    // size is most of the time.
+    // The far arm goes after the chest but before the head, or a raised guard
+    // wipes out the face.
     draw_arm(blip, &far, k.sh_rear, k.elbow_rear, k.hand_rear, q.open, t);
     draw_head(blip, &hide, rig, k.head, k.neck, t);
     draw_leg(blip, &near, k.hip_lead, k.knee_lead, k.ankle_lead, rig.fwd, rig.ground, t);
@@ -2239,10 +1945,8 @@ fn draw_fight(blip: &Blip, g: &Game) {
     for s in g.hitspark.iter() {
         if s.ttl <= 0.0 { continue; }
         let k = s.ttl * 6.0;
-        // Gold for damage, cold blue for a guard. The two outcomes have
-        // to be tellable apart at a glance, because the whole of
-        // defence is knowing whether the last exchange cost you
-        // anything.
+        // Gold for damage, cold blue for a guard: whether the last exchange
+        // cost you is the whole of defence.
         let c = if s.blocked {
             BlipColor { r: 0.55, g: 0.85, b: 1.0, a: k.min(0.9) }
         } else {
@@ -2276,12 +1980,8 @@ fn draw_fight(blip: &Blip, g: &Game) {
 
 // ---- HUD -----------------------------------------------------------------
 
-/// Health, rounds won, and the clock.
-///
-/// The bar drains toward the centre from each side, the way the cabinets
-/// did it, because the thing a player needs at a glance is not "how much
-/// have I got" but "who is ahead" — and two bars meeting in the middle
-/// answer that without being read.
+/// Health, rounds won and the clock. Bars drain toward the centre, so who is
+/// ahead reads without reading.
 fn draw_hud(blip: &Blip, g: &Game) {
     let pad = 16.0;
     let bar_w = (WIN_W as f32 - pad * 3.0 - 56.0) / 2.0;
@@ -2385,26 +2085,9 @@ fn draw_banner(blip: &Blip, g: &Game) {
 
 // ---- front of house ------------------------------------------------------
 
-/// The title screen.
-///
-/// It used to carry nine lines of rules, on the theory that a player
-/// cannot deduce a throw by pressing buttons. True — but nobody reads
-/// nine lines standing at a cabinet, and a screen nobody reads teaches
-/// nothing however correct it is. So it says the three things needed to
-/// start (what moves you, what attacks, and that the three kicks are
-/// three heights), and the rest has moved to where it is actually
-/// wanted: the two lines under the roster on the select screen, read
-/// while choosing, and the round-start reminder of the one move that is
-/// genuinely invisible.
-/// Text as a lit tube.
-///
-/// blip's own `draw_text_glow` is a one-pixel halo, which is right for
-/// a label and disappears entirely under a logo six times the size. So
-/// this blooms outward in the tube's colour over several passes, lays
-/// the glass down fattened by a fraction of a glyph pixel, and puts a
-/// near-white core inside it — which is what a fluorescent tube is:
-/// you do not see the colour, you see white gas through coloured glass
-/// with the colour thrown onto everything around it.
+/// Text as a lit tube. blip's `draw_text_glow` is a one-pixel halo, lost
+/// under a big logo: this blooms outward in colour over several passes, lays
+/// fattened glass, and puts a near-white core inside.
 fn neon(blip: &Blip, text: &str, y: f32, sz: f32, c: BlipColor, lit: f32) {
     let x = blip.text_cx(text, sz as i32) as f32;
     const RING: [(f32, f32); 8] = [(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0),
@@ -2431,6 +2114,9 @@ fn tube(t: f32, phase: f32) -> f32 {
     if stutter > 0.97 { hum * 0.42 } else { hum }
 }
 
+/// The title screen says only what is needed to start: what moves you, what
+/// attacks, and that the kicks are heights. The rest is on the select screen
+/// and the round-start reminder.
 fn draw_title(blip: &Blip, g: &Game) {
     let now = g.now;
     // A night stage behind it, the two fighters squaring off on it, and
@@ -2470,17 +2156,13 @@ fn draw_title(blip: &Blip, g: &Game) {
         }
     }
 
-    // Both players' controls, on the screen where you decide how many
-    // players there are. The two rows are padded to the same width so
-    // the columns line up without a table: at six pixels a character,
-    // aligning by eye is aligning.
+    // Both players' controls, padded to the same width so the columns line
+    // up.
     let dim = BlipColor { r: 0.74, g: 0.78, b: 0.86, a: 1.0 };
     let p1c = BlipColor { r: 1.0, g: 0.35, b: 0.35, a: 1.0 };
     let p2c = BlipColor { r: 0.40, g: 0.72, b: 1.0, a: 1.0 };
-    // Four buttons in a square on the keyboard, and the square is the
-    // legend: the top pair is high, the bottom pair is low, and in each
-    // pair the left is a punch and the right a kick. Naming all eight
-    // keys takes two lines nobody reads; naming the shape takes one.
+    // Four keys in a square, and the square is the legend: top pair high,
+    // bottom pair low, left punch, right kick.
     const ROWS: [(&str, &str, bool); 2] = [
         ("P1", "W A S D   R T HIGH   F G LOW", true),
         ("P2", "ARROWS    U I HIGH   J K LOW", false),
@@ -2503,15 +2185,8 @@ fn draw_title(blip: &Blip, g: &Game) {
         BlipColor { r: 0.95, g: 0.88, b: 0.60, a: 1.0 });
 }
 
-/// Both players' decks, along the bottom of the screen while they are
-/// fighting.
-///
-/// This is where a control panel is actually wanted. On the select
-/// screen it is read once and then the screen is gone; down here it is
-/// in the corner of the eye at the moment somebody has forgotten which
-/// button was the high kick, which is the moment they need it. Only in
-/// versus: alone there is nobody to remind.
-///
+/// The select screen: each player's cursor over the roster, the fighters
+/// standing in their boxes.
 fn draw_select(blip: &Blip, g: &Game) {
     let versus = g.mode == Mode::Versus;
     blip.draw_centered(if versus { "CHOOSE YOUR FIGHTERS" } else { "CHOOSE YOUR FIGHTER" },
@@ -2532,18 +2207,14 @@ fn draw_select(blip: &Blip, g: &Game) {
         blip.draw_rect(x, 84.0, 150.0, 190.0, box_c);
         if picked { blip.draw_rect(x - 2.0, 82.0, 154.0, 194.0, box_c); }
 
-        // The fighter, standing in their box, drawn by the same code
-        // that draws them in a match. A select screen that shows
-        // something other than what you are about to control is an
-        // advertisement, not a choice.
+        // The fighter drawn by the same code as in a match, so the select
+        // screen shows what you will control.
         let cx = x + 75.0;
         let ground = 256.0;
         let mut who = Fighter::new(i, cx, 1.0);
         who.y = FLOOR_Y;
-        // Everyone stands in their fighting stance. The winner's pose
-        // reads as a fighter with their guard down, which is the one
-        // thing a select screen must not say about the fighter you are
-        // about to pick.
+        // Everyone in their fighting stance: the winner's pose reads as a
+        // guard dropped.
         who.act = Act::Idle;
         who.facing = 1.0;
         pose_and_draw(blip, &who, g.now, ground - FLOOR_Y, 0.0, i);
@@ -2583,13 +2254,8 @@ fn draw_select(blip: &Blip, g: &Game) {
     }
 
     if versus {
-        // A deck each, either side of the split a keyboard already has,
-        // so neither player reaches across the other. Drawn rather than
-        // listed: four buttons in a square is a picture, and a picture
-        // of the deck is what a player is looking for.
-        // Just the movement here, and a reminder of the two rules a
-        // player cannot find by pressing buttons. The button panel
-        // lives at the bottom of the fight, where it is wanted.
+        // The movement keys, and a reminder of the two rules a player cannot
+        // find by pressing buttons; the button panel is on the title screen.
         blip.draw_text("P1", 40.0, 322.0, 2.0, p1c);
         blip.draw_text("W A S D", 72.0, 322.0, 2.0,
             BlipColor { r: 0.80, g: 0.74, b: 0.78, a: 1.0 });
@@ -2618,11 +2284,9 @@ fn draw_select(blip: &Blip, g: &Game) {
 }
 
 // ---- pose gallery (development only) -------------------------------------
-//
 // `cargo build -p brawler --features gallery` replaces the game with a
-// contact sheet of every pose, looping. Posing a fighter is a drawing
-// job and drawing jobs need to be *seen*; getting to a sweep by playing
-// the game takes a dozen inputs and shows it for four frames.
+// looping contact sheet of every pose, since reaching a sweep in play takes a
+// dozen inputs and shows it for four frames.
 #[cfg(feature = "gallery")]
 pub fn draw_gallery(blip: &Blip, now: f32) {
     blip.clear(BlipColor { r: 0.15, g: 0.16, b: 0.21, a: 1.0 });
@@ -2647,14 +2311,8 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
         ("DEFEAT", Act::Defeat, MoveId::LowPunch),
         ("KO", Act::Defeat, MoveId::LowPunch),
     ];
-    // One move at a time, five frames of it across the screen. A pose
-    // is only ever half the question — the other half is what it is on
-    // its way to and back from.
-    //
-    // Stepped with left/right rather than on a timer, because a contact
-    // sheet that moves on by itself cannot be looked at: every capture
-    // lands on whatever it had drifted to, and comparing a change to
-    // the frame before it becomes guesswork.
+    // One move at a time, five frames of it across the screen, stepped with
+    // left / right so a capture lands on a known frame.
     use std::sync::atomic::{AtomicUsize, Ordering};
     static AT: AtomicUsize = AtomicUsize::new(usize::MAX);
     static WHO: AtomicUsize = AtomicUsize::new(0);
@@ -2683,10 +2341,8 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
         f.act = act;
         f.mv = mv;
         f.y = FLOOR_Y;
-        // Half a health bar down the left-hand cells and nearly out on
-        // the right: the sheet is for looking at how a fighter is
-        // drawn, and sweat and the depth of their breathing are part of
-        // that. A sheet of fighters at full health never shows either.
+        // Half a health bar down on the left and nearly out on the right, so
+        // sweat and breathing show.
         f.health = (FIGHTERS[who].health as f32 * (0.62 - 0.13 * k as f32)) as i32;
         if label == "KO" { f.health = 0; }
         f.t = match act {
@@ -2697,10 +2353,8 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
                             (m.startup + m.active) * F, total * 0.8][k],
             Act::Knockdown => [0.05, 0.22, 0.6, 0.95, 1.12][k],
             Act::Hitstun => [0.02, 0.06, 0.12, 0.2, 0.3][k],
-            // Everything else gets a time sweep too. Sampling a
-            // standing pose five times at the same instant draws the
-            // same fighter five times and says nothing about whether it
-            // moves — which is exactly the question.
+            // Everything else gets a time sweep too, so the sheet shows
+            // whether a pose moves.
             Act::Victory | Act::Defeat => [0.0, 0.18, 0.45, 0.9, 1.6][k],
             _ => now + k as f32 * 0.09,
         };

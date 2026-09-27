@@ -1,11 +1,5 @@
 //! Asset generation for blip games.
 //!
-//! Each game module exposes `generate(out_dir: &Path)` which writes its
-//! PNG and WAV assets into `out_dir/{images,sounds}/`. Games drive this
-//! from their `build.rs` and consume the bytes via `include_bytes!`.
-
-//! Asset generation for blip games.
-//!
 //! Each game module exposes `generate()` returning a list of
 //! `(relative_path, bytes)`. The build.rs of each game crate writes
 //! these into `$OUT_DIR/assets/...` and the game embeds them with

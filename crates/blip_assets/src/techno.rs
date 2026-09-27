@@ -1,16 +1,9 @@
-//! Shared techno/rave sound-design toolkit.
-//!
-//! Kick, hats, claps, an acid-style bass voice, and a bright lead-stab voice —
-//! the building blocks every game's music module composes into its own
-//! step-sequenced loop (its own BPM, pattern, and scale). Keeping the voices
-//! here means every track shares one drum/bass "sound", while each game still
-//! gets its own arrangement and energy level.
-//!
-//! Voices write into a shared `&mut [f32]` accumulation buffer (via
-//! `mix_into_f32`) rather than clamping to i16 on every write — with a kick,
-//! bass, and hats all landing on the same beat, per-voice clamping would
-//! hard-clip into harsh digital distortion. Callers should render into a
-//! `Vec<f32>` and convert once at the end with `soft_limit_to_pcm16`.
+//! Shared techno toolkit: kick, hats, claps, an acid bass and a lead stab,
+//! which each game's music composes into its own step-sequenced loop (its own
+//! tempo, pattern and scale).
+//! Voices mix into a `&mut [f32]` buffer (`mix_into_f32`) instead of clamping
+//! per write, which would hard-clip where kick, bass and hats share a beat;
+//! render to `Vec<f32>` and convert once with `soft_limit_to_pcm16`.
 
 use std::f32::consts::PI;
 
@@ -32,28 +25,10 @@ impl Rng {
     }
 }
 
-/// Which note of a four-note hook to play, given the bar and the position
-/// within it — the difference between a riff and a phrase.
-///
-/// Every track here repeated its hook identically in every bar, for
-/// sixteen bars. That is what makes a loop recognisable, and also what
-/// makes it wear out: nothing ever arrives or resolves, so there is no
-/// reason to keep listening past the second pass.
-///
-/// Works for a hook of any length — these games run three, four and
-/// eight note riffs.
-///
-/// This answers the riff on the fourth bar of each four-bar phrase, in
-/// the oldest form there is: the same notes, backwards and a fifth
-/// higher. Four bars is the phrase length the chord changes already
-/// imply, so the variation lands where the ear is expecting the phrase to
-/// close rather than sounding like the melody wandered off. A perfect
-/// fifth is diatonic for every hook in these games — each is built from
-/// scale degrees whose fifths are also in the scale — so the answer stays
-/// in key without any per-track tuning.
-///
-/// The tune is still the same four notes throughout, so nothing becomes
-/// less recognisable; it just stops being flat.
+/// Which note of a hook to play at this bar and position. On the fourth bar
+/// of each four-bar phrase the riff is answered in the oldest way: backwards
+/// and a fifth higher, where the phrase is expected to close. A fifth is
+/// diatonic for every hook here, so the answer stays in key. Any hook length.
 pub fn phrase_note(hook: &[f32], bar: usize, idx: usize) -> f32 {
     debug_assert!(idx < hook.len());
     if bar % 4 == 3 {
@@ -63,10 +38,8 @@ pub fn phrase_note(hook: &[f32], bar: usize, idx: usize) -> f32 {
     }
 }
 
-/// A sixteenth-note hat roll climbing across the second half of a bar —
-/// the standard "something is about to change" cue, for the bar before a
-/// section lifts. Without it the busier half simply appears, which reads
-/// as the loop restarting rather than as the track going somewhere.
+/// A sixteenth-note hat roll across the second half of a bar, the cue that a
+/// section is about to lift.
 pub fn lift_fill(buf: &mut [f32], bar_start_off: usize, step_samples: usize, rng: &mut Rng, vol: f32) {
     for step in 8..16 {
         let off = bar_start_off + step * step_samples;
@@ -78,12 +51,9 @@ pub fn lift_fill(buf: &mut [f32], bar_start_off: usize, step_samples: usize, rng
     }
 }
 
-/// Punchy pitch-swept kick drum, with a short high-frequency click on the
-/// attack and gentle saturation — what makes a kick punch through a dense
-/// mix instead of reading as a dull sine thump.
 /// Keep a melodic voice out of the shrill register: anything above A4 drops
-/// by octaves, so a tune keeps its shape but sits where it is easy on the
-/// ears (and on a phone speaker).
+/// by octaves, keeping the tune's shape where it is easy on the ears and a
+/// phone speaker.
 pub fn tame(freq: f32) -> f32 {
     let mut f = freq;
     while f > 440.0 { f *= 0.5; }
@@ -105,6 +75,8 @@ pub fn warm(buf: &mut [f32]) {
 /// Darken a noise sample: a one-pole low-pass state, stepped per sample.
 fn dark(lp: &mut f32, x: f32, a: f32) -> f32 { *lp += a * (x - *lp); *lp }
 
+/// Punchy pitch-swept kick with a short click on the attack and gentle
+/// saturation, so it cuts through a dense mix.
 pub fn kick(buf: &mut [f32], off: usize, vol: f32) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.15) as usize;
@@ -176,14 +148,9 @@ pub fn clap(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
     }
 }
 
-/// Acid-style bass voice — a sawtooth run through a low-pass filter whose
-/// cutoff sweeps shut over the note (the classic rolling TB-303-style acid
-/// motion, not a static harmonic stack), driven into gentle saturation for
-/// grit, over a clean reinforcing sub-octave sine. The sub layer is what
-/// makes it read as a prominent, loud bassline rather than a mid-range
-/// pluck; because the caller mixes into an f32 buffer and soft-limits once
-/// at the end, this can be driven hot without hard-clipping the rest of the
-/// mix.
+/// Acid bass: a saw through a low-pass sweeping shut over the note (the
+/// TB-303 roll), gently saturated, over a clean sub-octave sine that makes it
+/// read as a bassline. Mixed in f32 and limited once, so it can run hot.
 pub fn bass_note(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
@@ -212,12 +179,9 @@ pub fn bass_note(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
     }
 }
 
-/// Sidechain "pump" — dips the buffer's level right after each kick and lets
-/// it recover, the four-on-the-floor ducking that makes house/techno feel
-/// like it's breathing in time with the kick instead of just stacking
-/// everything on top of it. Call this on the bass/pad/hat layer *before*
-/// mixing the kick hits themselves in, so the kick's own transient isn't
-/// ducked by its own hit.
+/// Sidechain pump: dip the level after each kick and let it recover, so the
+/// track breathes with the kick. Apply to the other layers before mixing the
+/// kicks in.
 pub fn sidechain_duck(buf: &mut [f32], kick_offsets: &[usize], depth: f32, release_ms: f32) {
     let sr = SAMPLE_RATE as f32;
     let rel_n = ((sr * release_ms / 1000.0) as usize).max(1);
@@ -250,11 +214,9 @@ pub fn lead_stab(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
     }
 }
 
-/// Supersaw — a stack of seven detuned sawtooth oscillators, the wide,
-/// chorus-y trance/EDM lead sound. `att_ms` controls character: short
-/// (~10ms) reads as a plucked lead/arp note, long (~200ms+) reads as a
-/// swelling breakdown pad. `detune` is the spread as a fraction of `freq`
-/// (0.006-0.01 is a classic supersaw width; wider gets dissonant/chorusy).
+/// Supersaw: seven detuned saws, the wide trance lead. Short `att_ms` (~10
+/// ms) is a plucked arp, long (200 ms+) a swelling pad; `detune` is the
+/// spread as a fraction of `freq` (0.006-0.01 classic).
 pub fn supersaw(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, att_ms: f32, detune: f32) {
     let freq = tame(freq);
     let a = 1.0 - (-2.0 * PI * (freq * 4.0).min(1800.0) / SAMPLE_RATE as f32).exp();
@@ -282,10 +244,8 @@ pub fn supersaw(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, att_m
     }
 }
 
-/// Buildup riser — filtered noise that sweeps its cutoff upward and swells
-/// in volume over `dur_ms`, the classic trance transition from breakdown
-/// into the drop. Meant to span a bar or several, ending right as the drop
-/// hits.
+/// Buildup riser: filtered noise sweeping up and swelling over `dur_ms`,
+/// ending as the drop hits.
 pub fn riser(buf: &mut [f32], off: usize, dur_ms: f32, vol: f32, rng: &mut Rng) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * dur_ms / 1000.0) as usize;

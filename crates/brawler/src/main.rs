@@ -1,27 +1,13 @@
-//! Brawler — a one-on-one fighting game, in tribute to Street Fighter II.
-//!
-//! What a fighting game actually is, under the sprites, is a
-//! rock-paper-scissors played at arm's length: every attack beats
-//! something and loses to something else, and the whole game is the
-//! argument about distance while you decide which one to throw. This
-//! build is that argument and nothing else — three fighters, two
-//! locations, one CPU opponent at a time. No sprite sheets, no
-//! super meters, no second player yet.
-//!
-//! The three things it takes seriously, because they are the game:
-//!
-//! 1. **Attack height.** Every attack is low, mid or overhead, and a
-//!    block only works at the right height. Crouch-blocking eats sweeps
-//!    and loses to jump-ins; stand-blocking is the reverse. Without this
-//!    a fighting game is two people mashing, because blocking would
-//!    have no cost.
-//! 2. **Frame data.** Every attack has startup, active and recovery
-//!    measured in frames, and is *punishable* in proportion to its reach
-//!    and damage. A whiffed sweep should hurt you; a jab should not.
-//!    This is what makes spacing a decision rather than a reflex.
-//! 3. **What you can see.** The pose is assembled from the same numbers
-//!    the hitboxes come from, so an arm that looks extended really is
-//!    the thing that will hit you.
+//! Brawler: a one-on-one fighting game in tribute to Street Fighter II. Three
+//! fighters, two stages, a CPU ladder or two players.
+//! What it takes seriously, because they are the game:
+//! 1. **Attack height.** Every attack is low, mid or overhead, and a block
+//! works only at the right height: crouch-blocking eats sweeps and loses to
+//! jump-ins, standing is the reverse.
+//! 2. **Frame data.** Startup, active and recovery in frames; punishable in
+//! proportion to reach and damage. A whiffed sweep hurts, a jab does not.
+//! 3. **What you can see.** Poses are built from the same numbers as the
+//! hitboxes, so an arm that looks extended is what hits you.
 
 mod draw;
 
@@ -48,32 +34,21 @@ const WALL_MARGIN: f32 = 46.0;
 /// One frame at 60fps. Frame data is written in frames because that is
 /// the unit fighting games are argued about in, and converted here once.
 const F: f32 = 1.0 / 60.0;
-/// Forty-five, not the arcade's sixty.
-///
-/// The clock should be a pressure, not the referee. At sixty every
-/// round against a point-blank masher ran the full count — the CPU won
-/// all of them on health, but the clock was doing the deciding, and a
-/// round decided by arithmetic is a round nobody watched. Good play
-/// finishes in twenty to thirty seconds here, so forty-five leaves room
-/// for a careful fight and none for a stalemate.
+/// Forty-five seconds, not the arcade's sixty: at sixty, rounds against a
+/// masher ran the full count and the clock decided them. Good play finishes
+/// in twenty to thirty.
 const ROUND_SECS: f32 = 45.0;
 const ROUNDS_TO_WIN: i32 = 2;
 
 // ---- bodies --------------------------------------------------------------
-/// The width of a fighter, for being hit and for being drawn.
-///
-/// These have to be the same number. It was 42 while the drawn torso was
-/// 18 across, which meant attacks landing on empty air either side of a
-/// fighter — a player judging distance by what they can see being wrong
-/// by twelve pixels on each side, with nothing on screen to explain it.
-/// The silhouette below (torso, shoulders, head) is built to fill this.
+// The width of a fighter, for being hit and for being drawn: the same number,
+// or attacks land on air beside what the player sees. The silhouette is built
+// to fill it.
 const BODY_W: f32 = 30.0;
 const STAND_H: f32 = 120.0;
 const CROUCH_H: f32 = 74.0;
-/// How tall a fighter on their back is. They are drawn flat — the
-/// highest thing on them is the knee they have pulled up — while the
-/// box stayed at full standing height, so a flying kick sailing over a
-/// prone body still connected with the air above it.
+/// Height of a fighter on their back (the raised knee is the highest point),
+/// so a flying kick sails over a prone body.
 const PRONE_H: f32 = 34.0;
 
 // ---- physics -------------------------------------------------------------
@@ -82,30 +57,17 @@ const JUMP_VY: f32 = -600.0;
 /// The flying kick's arc: lower than a jump and much faster forward.
 const FLY_VY: f32 = -372.0;
 const FLY_SPEED: f32 = 300.0;
-/// What is left of the move once the feet touch. A jump attack is
-/// cancelled by landing; this is the one that is not.
-///
-/// Two of them, because the blow connects in the air and the recovery
-/// is paid on the ground, and the flight in between is time the
-/// defender spends in hitstun and the attacker spends committed. At
-/// one flat cost the move was nineteen frames *minus on hit*: landing
-/// it handed the opponent a free turn, which is a move nobody should
-/// ever throw. Connecting buys most of the landing back; being blocked
-/// does not, and that is where the whole risk of it lives.
+/// The flying kick's landing cost, paid on the ground after the blow lands in
+/// the air. One flat cost made it 19 frames minus on hit; connecting buys
+/// most of the landing back, being blocked does not.
 const FLY_LAND_LAG: f32 = 16.0 * F;
 const FLY_HIT_LAG: f32 = 4.0 * F;
-/// How long into a jump the flying kick is still available.
-///
-/// Pressing up and kick "together" is never the same frame for a
-/// human, and up jumps on the frame it is seen — so asking for both at
-/// once asked for a one-frame window, and the move was unreachable in
-/// practice. A kick inside this window levels the jump off into the
-/// flying kick; after it, a kick is the ordinary jump kick.
+/// How long into a jump the flying kick is available: up and kick are never
+/// the same frame for a human, and up jumps on the frame it is seen. A kick
+/// inside this window levels the jump off into the flying kick.
 const FLY_WINDOW: f32 = 6.0 * F;
-/// Air control is deliberately absent: the direction held at take-off is
-/// the whole commitment. A jump you can steer mid-air turns every jump-in
-/// into a guess the defender cannot answer, which is exactly the
-/// rock-paper-scissors this game is built on.
+/// No air control: the direction held at take-off is the commitment; a
+/// steerable jump-in is a guess the defender cannot answer.
 const AIR_DRIFT: f32 = 180.0;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -115,13 +77,9 @@ enum Level { Low, Mid, Overhead }
 enum MoveId { LowPunch, HighPunch, LowKick, HighKick, Sweep, JumpPunch, JumpKick,
     FlyingKick, Special, Throw }
 
-/// One attack, in frames.
-///
-/// `startup` is how long before it can hit, `active` how long it can,
-/// `recovery` how long you are helpless afterwards. The gap between a
-/// move's reach and its recovery is its whole personality: the sweep
-/// reaches further than anything grounded and leaves you on the floor
-/// for 20 frames if it misses.
+/// One attack, in frames: `startup` before it can hit, `active` while it can,
+/// `recovery` helpless afterwards. The gap between reach and recovery is its
+/// personality.
 #[derive(Copy, Clone)]
 struct MoveData {
     startup: f32,
@@ -149,77 +107,37 @@ const fn mv(startup: f32, active: f32, recovery: f32, damage: i32, hitstun: f32,
                level, knockdown }
 }
 
-/// The move table — the closest thing this game has to a rulebook.
-///
-/// Read it as a set of trades. The jab is 4 frames of startup and 6
-/// damage: it wins scrambles and wins nothing else. The sweep is 10
-/// frames of startup, 20 of recovery, and knocks down: it beats a
-/// crouching opponent who will not block low and loses the round if you
-/// throw it at someone standing just out of range. Jump attacks are
-/// overheads with long reach, which is why the answer to them is to hit
-/// the jumper out of the air rather than to block correctly.
+/// The move table, read as trades: the jab (4f, 6 damage) wins scrambles and
+/// nothing else; the sweep (10f startup, 20 recovery, knockdown) beats a
+/// crouch that will not block low and loses to a whiff. Jump attacks are long
+/// overheads, answered by hitting the jumper out of the air.
 fn move_data(id: MoveId) -> MoveData {
     match id {
-        // Four normals, in a square: punch or kick, low or high. A
-        // punch is the fast, short one at its height and a kick is the
-        // slow, long one, so at every height there is something to open
-        // with and something to commit to — and at neither height is
-        // there anything a single guard covers.
-        //
-        // The high punch is the quickest overhead in the game and does
-        // the least for it. That is the trade: eleven frames is barely
-        // readable, so it has to be worth almost nothing when it lands,
-        // or holding down-back stops being a decision and starts being
-        // a mistake nobody can avoid making.
+        // Four normals in a square: punch or kick, low or high. At each
+        // height a fast one to open with and a slow one to commit to, and no
+        // single guard covers both heights. The high punch is the quickest
+        // overhead (11f) and does the least, or down-back stops being a
+        // choice.
         MoveId::LowPunch  => mv(5.0,  3.0,  9.0,  5,  12.0, 7.0,  48.0, 30.0, 14.0, Level::Low,      false),
         MoveId::HighPunch => mv(11.0, 3.0, 16.0,  9,  16.0, 10.0, 50.0, 92.0, 14.0, Level::Overhead, false),
-        // Two kick heights, and they are the argument: low has to be
-        // crouch-blocked, high has to be blocked standing, and there is
-        // nothing in between to cover both. A middle kick used to sit
-        // here — a plain mid the guard stopped either way — and it was
-        // the answer to every question the other two asked. Taking it
-        // out is what makes the height of a kick a decision rather than
-        // a preference.
-        //
-        // The low kick is fast and safe on block, so it is the poke you
-        // open with. The high kick is slow, is an overhead, and is
-        // punishable, so it is the one you commit to.
+        // Two kick heights and nothing between: low must be crouch-blocked,
+        // high blocked standing (a middle kick answered everything). The low
+        // kick is the safe poke, the high kick the punishable overhead you
+        // commit to.
         MoveId::LowKick   => mv(6.0,  3.0, 10.0,  7,  14.0, 9.0,  58.0, 26.0, 14.0, Level::Low,      false),
-        // No knockdown on the high kick. It was given one, and a
-        // seventeen-damage overhead that also puts you on the floor is
-        // not a mix-up, it is a win condition: a crouch-blocker went
-        // from losing the exchange to losing the round, surviving one
-        // fight in six. An overhead's job is to make holding down cost
-        // something, not to end the argument.
-        // A high kick does not reach as far *forward* as a mid one, and
-        // it should not: the leg spends its length going up. All three
-        // reference sheets show the same thing — the head-height kick
-        // lands close, the mid kick is the long poke — and the drawing
-        // cannot do otherwise without a longer leg. So the range here
-        // is what a leg that goes to head height can actually cover,
-        // and the move earns its keep by being an overhead instead.
+        // No knockdown on the high kick: a 17-damage overhead that also
+        // floors you is a win condition, not a mix-up (a crouch-blocker
+        // survived one fight in six). Its forward reach is short because the
+        // leg's length goes up.
         MoveId::HighKick  => mv(14.0, 5.0, 22.0, 17,  22.0, 13.0, 62.0, 98.0, 18.0, Level::Overhead, false),
         MoveId::Sweep     => mv(10.0, 4.0, 22.0, 13,  0.0,  12.0, 72.0, 18.0, 16.0, Level::Low,      true),
         MoveId::JumpPunch => mv(4.0,  8.0,  2.0,  9,  15.0, 9.0,  52.0, 34.0, 14.0, Level::Overhead, false),
         MoveId::JumpKick  => mv(6.0, 10.0,  2.0, 13,  17.0, 10.0, 66.0, 14.0, 16.0, Level::Overhead, false),
-        // The flying kick: the only attack that closes a screen's worth
-        // of ground on its own, and the only one whose cost is paid
-        // after it is over.
-        //
-        // Every other jump attack is cancelled by touching the floor,
-        // which is what makes a jump-in safe when it is blocked. This
-        // one is not — see the landing in `advance` — so it is thrown
-        // from outside the opponent's reach and lands inside it, and a
-        // guard it does not beat is a free heavy punish. That is the
-        // trade: the move that answers a turtle is also the move that
-        // loses the round to one who saw it coming.
-        //
-        // No knockdown, for the same reason the high kick has none: an
-        // overhead that also puts you on the floor stops being a way in
-        // and starts being a win condition.
-        // The blow lands level with the hips, not below them. At 24 the
-        // leg ran downhill out of a reclining body, which is a stomp;
-        // a flying kick is a straight line from the hip to the heel.
+        // The flying kick: the only attack that crosses a screen of ground,
+        // and the only one whose cost comes after it: it is not cancelled by
+        // landing (see `advance`), so a blocked one is a free heavy punish.
+        // No knockdown, like the high kick. The blow lands level with the
+        // hips, a straight line from hip to heel.
         MoveId::FlyingKick => mv(7.0, 16.0, 20.0, 15, 19.0, 11.0, 76.0, 42.0, 18.0,
                                  Level::Overhead, false),
         // Specials differ per fighter; this is the shape they share.
@@ -236,12 +154,8 @@ fn move_data(id: MoveId) -> MoveData {
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum Special { ChiBolt, BullRush, TalonKick }
 
-/// What a fighter is wearing and how they are put together.
-///
-/// Kept beside the numbers rather than in the drawing code, because
-/// "who is that" and "what can they do" are the same question to a
-/// player, and splitting them across two files is how a roster ends up
-/// with three fighters who move differently and look identical.
+/// What a fighter wears and how they are built, kept beside the numbers so
+/// looks and moves stay one roster.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum Build {
     /// Karate gi: jacket to the elbows, trousers to mid-shin, bare feet.
@@ -260,10 +174,9 @@ struct Archetype {
     walk: f32,
     back_walk: f32,
     jump_scale: f32,
-    /// Scales every attack's damage and its reach, so an archetype is a
-    /// real trade rather than a palette swap: Brutus hits hardest and
-    /// stands closest, Kestrel pokes from outside and takes three hits
-    /// to Brutus's two.
+    /// Scales every attack's damage and reach: Brutus hits hardest from
+    /// closest, Kestrel pokes from outside and takes three hits to Brutus's
+    /// two.
     power: f32,
     reach: f32,
     special: Special,
@@ -273,10 +186,8 @@ struct Archetype {
     skin: (f32, f32, f32),
     hair: (f32, f32, f32),
     build: Build,
-    /// How thick the limbs and torso are drawn, around 1.0. The hurtbox
-    /// is the same width for everyone — it has to be, or the fighters
-    /// would not be trading the same trades — so bulk is the one place
-    /// a heavyweight is allowed to look like one.
+    /// Limb and torso thickness, around 1.0. The hurtbox is the same width
+    /// for all; bulk is where a heavyweight looks like one.
     bulk: f32,
 }
 
@@ -339,30 +250,16 @@ struct Fighter {
     /// Hits taken without recovering in between — the combo counter,
     /// kept on the receiving end because that is what it scales.
     combo: i32,
-    /// An attack pressed while busy, and how long it stays remembered.
-    ///
-    /// Without this, a player pressing punch one frame before their
-    /// recovery ends gets nothing, and the game feels like it is
-    /// ignoring them — which, frame-accurately, it is. Every fighting
-    /// game buffers; this is the difference between "I was too early"
-    /// and "this game dropped my input".
+    /// An attack pressed while busy, remembered briefly, so a press one frame
+    /// before recovery ends still comes out.
     buffered: Option<MoveId>,
     buffer_t: f32,
 
-    // ---- what is being *drawn*, as opposed to what is being played --
-    //
-    // Every pose in this game is a pure function of (action, timer), so
-    // when the action changed the drawing changed on the same frame:
-    // a fighter went from a guard to a fully chambered kick between one
-    // picture and the next, with nothing in between. That is the single
-    // biggest reason the animation read as wrong — not any one pose,
-    // but the absence of anything joining them.
-    //
-    // So the drawing keeps its own short memory: the action it was in a
-    // few frames ago, that action's timer frozen at the handover, and
-    // how much of it is still showing. See draw::pose_of().
-    /// The action last seen, for spotting the change, and the move and
-    /// timer it was carrying when it was last seen.
+    // ---- what is being drawn, as opposed to played --
+    // Poses are a function of (action, timer), so a changed action changed
+    // the picture on the same frame. The drawing keeps a short memory
+    // instead: the previous action, its timer frozen at the handover, and how
+    // much of it still shows (see draw::pose_of()).
     shown: Act,
     shown_t: f32,
     shown_mv: MoveId,
@@ -396,10 +293,9 @@ pub(crate) const POSE_BLEND: f32 = 4.0 * F;
 /// How long the knees take to absorb a landing and push back out of it.
 pub(crate) const LAND_ABSORB: f32 = 12.0 * F;
 
-/// How long getting up off the haunches takes. Dropping into a crouch
-/// is gravity and is quick; standing up is not. Hitboxes still change
-/// on the frame the action does — this is only how long the picture
-/// takes to agree.
+/// How long standing up from a crouch takes to show (crouching down is
+/// quick). Hitboxes change on the frame the action does; this is only the
+/// picture.
 pub(crate) const RISE_BLEND: f32 = 9.0 * F;
 
 impl Fighter {
@@ -481,18 +377,13 @@ impl Fighter {
         self.hit_done = false;
         self.hit_clean = false;
         self.cancel_t = 0.0;
-        // The flying kick sets its own arc: flatter and faster than a
-        // jump, so it crosses ground rather than gaining height. Thrown
-        // a few frames into a jump it levels that jump off into the
-        // same arc, which is what the move looks like anyway.
+        // The flying kick sets its own arc, flatter and faster than a jump;
+        // thrown early in a jump it levels that jump off.
         if id == MoveId::FlyingKick {
             let launch = FLY_VY * self.arch().jump_scale;
             if self.airborne() {
-                // Thrown a few frames into a jump, it has to reach the
-                // same height it would off the floor, or the same move
-                // is a flat dart one time and a lob the next. So the
-                // rise already spent counts against the arc: whatever
-                // is left of it is all they get.
+                // Thrown mid-jump it must peak where it would off the floor,
+                // so the rise already spent counts against the arc.
                 let peak = launch * launch / (2.0 * GRAVITY);
                 let risen = (FLOOR_Y - self.y).max(0.0);
                 self.vy = -(2.0 * GRAVITY * (peak - risen).max(0.0)).sqrt();
@@ -529,12 +420,8 @@ enum State { Title, Select, RoundIntro, Fight, RoundEnd, MatchEnd, Over, Won }
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum RoundResult { P1, P2, Draw }
 
-/// One player against the ladder, or two against each other.
-///
-/// The difference runs deeper than who moves the second fighter: a
-/// solo run is a ladder with a score and a difficulty curve, and a
-/// versus match is one match that ends with a winner. They share the
-/// round, and nothing else.
+/// One player against the ladder (score, difficulty curve) or two in a single
+/// match with a winner; they share only the round.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum Mode { Solo, Versus }
 
@@ -561,13 +448,8 @@ struct Game {
     result: RoundResult,
     hitspark: [Spark; 4],
     shake: f32,
-    /// Frames where everything stops dead on contact.
-    ///
-    /// The cheapest and largest improvement available to a fighting
-    /// game: without it a punch is a number leaving one health bar, and
-    /// with it the punch has weight. It also does real work for
-    /// readability — the freeze is exactly when both players need to
-    /// see who got hit and what with.
+    /// Frames where everything stops on contact: it gives a hit weight, and
+    /// it is when both players need to see who got hit with what.
     hitstop: f32,
     /// The last combo worth shouting about, and how long to shout it —
     /// a reward the player cannot see is not a reward.
@@ -723,11 +605,9 @@ impl Game {
 
 // ---- rules ---------------------------------------------------------------
 
-/// Does a block at this stance stop an attack at this height?
-///
-/// The whole rock-paper-scissors in one function. Standing block covers
-/// overheads and mids; crouch block covers lows and mids; neither covers
-/// everything, so "block" is never simply the right answer.
+/// Does a block at this stance stop an attack at this height? Standing covers
+/// overheads and mids, crouching covers lows and mids; neither covers
+/// everything.
 fn blocks(level: Level, crouch_block: bool) -> bool {
     match level {
         Level::Mid => true,
@@ -736,13 +616,8 @@ fn blocks(level: Level, crouch_block: bool) -> bool {
     }
 }
 
-/// Throws cannot be blocked, which is the whole point of them.
-///
-/// Block beats attack, throw beats block, attack beats throw — a
-/// fighting game without the third corner has a stalemate in it, and
-/// this one had a measurable one: two players who both knew how to hold
-/// back ran the clock out, and a point-blank jab loop could not be
-/// interrupted by anything at all.
+/// Throws cannot be blocked: block beats attack, throw beats block, attack
+/// beats throw. Without it, two players holding back ran the clock out.
 fn unblockable(id: MoveId) -> bool { id == MoveId::Throw }
 
 /// How close the two have to be for a punch to become a throw.
@@ -781,12 +656,8 @@ impl Input {
     fn any_punch(self) -> bool { self.punch_low || self.punch_high }
 }
 
-/// Apply one fighter's intent. Movement, jumping, crouching, blocking and
-/// attack starts all live here so that the one rule that matters —
-/// *you cannot act while you are busy* — is stated once.
-/// Which attack these buttons are asking for, given where the fighter
-/// is standing. One place decides, so a buffered press and a live one
-/// can never disagree about what was asked for.
+/// Which attack these buttons ask for, given where the fighter is. One place
+/// decides, so a buffered press and a live one agree.
 fn pressed_move(f: &Fighter, inp: Input, close: bool) -> Option<MoveId> {
     if f.airborne() { return air_move(f, inp); }
     grounded_move(inp, close)
@@ -795,10 +666,9 @@ fn pressed_move(f: &Fighter, inp: Input, close: bool) -> Option<MoveId> {
 fn air_move(f: &Fighter, inp: Input) -> Option<MoveId> {
     {
         if inp.any_punch() { return Some(MoveId::JumpPunch); }
-        // Any kick button in the air is the jump kick. Height is a
-        // ground decision — in the air the arc already decided it.
-        // The exception is a kick still held with up, early enough in
-        // the jump to turn it into a flying kick; see FLY_WINDOW.
+        // Any kick in the air is the jump kick (the arc already decided the
+        // height), except a kick with up early enough to be the flying kick
+        // (FLY_WINDOW).
         if inp.any_kick() {
             if inp.up && f.act == Act::Air && f.t < FLY_WINDOW {
                 return Some(MoveId::FlyingKick);
@@ -811,10 +681,8 @@ fn air_move(f: &Fighter, inp: Input) -> Option<MoveId> {
 
 fn grounded_move(inp: Input, close: bool) -> Option<MoveId> {
     if inp.special { return Some(MoveId::Special); }
-    // Standing punch, right up against them, is a throw. Two buttons is
-    // all this cabinet has, so the throw cannot have its own; proximity
-    // is how the arcade originals did it too, and it makes the move
-    // discoverable by walking in and pressing what you already know.
+    // A standing punch right up against them is a throw: the throw has no
+    // button of its own, and proximity is how the originals did it.
     if inp.any_punch() && close && !inp.down { return Some(MoveId::Throw); }
     // Crouching turns a punch into the low one, the way it turns a
     // kick into the sweep: down plus a button means one thing whichever
@@ -825,10 +693,8 @@ fn grounded_move(inp: Input, close: bool) -> Option<MoveId> {
     // Crouching turns any kick into the sweep, which keeps "down plus a
     // kick" meaning one thing whichever kick button found it.
     if inp.down && inp.any_kick() { return Some(MoveId::Sweep); }
-    // Up plus a kick is the flying kick, and it is checked before the
-    // jump below so the two cannot both happen. Holding a direction is
-    // already how the sweep is aimed, so this needs no motion and no
-    // button the cabinet does not have.
+    // Up plus a kick is the flying kick, checked before the jump below so
+    // they cannot both happen.
     if inp.up && inp.any_kick() { return Some(MoveId::FlyingKick); }
     if inp.kick_low { return Some(MoveId::LowKick); }
     if inp.kick_high { return Some(MoveId::HighKick); }
@@ -844,25 +710,14 @@ const BUFFER: f32 = 10.0 * F;
 /// its second station lit and nobody at it yet. See `blip::web::set_players`.
 const TITLE_OPEN: i32 = 2;
 
-/// A blocked special still costs the blocker a sixth of its damage.
-///
-/// Normals chip for nothing; only specials do. Without it two players
-/// who both know how to block have no reason to ever stop, and the
-/// round becomes a staring contest that the clock decides — measured at
-/// seven rounds in twelve timing out. Chip is the pressure that makes
-/// holding back a cost rather than a resting state, and it is why
-/// throwing a special at a turtle is worth the recovery.
+/// A blocked special still chips a sixth of its damage (normals chip
+/// nothing). Without it two good blockers time out (seven rounds in twelve);
+/// chip makes holding back cost something.
 const CHIP_DIVISOR: i32 = 6;
 
-/// Frames to cancel a landed light attack into a heavier one.
-///
-/// This is the whole reward for precision. A jab that lands is worth six
-/// damage and nothing else; a jab that lands and is followed up is worth
-/// the jab plus most of a kick, and the difference is a player who saw
-/// the hit and reacted to it. Only light attacks that *connect* open the
-/// window — whiffing one leaves you in recovery like everything else,
-/// and a blocked one gets nothing, so pressing buttons at a guard is not
-/// a combo, it is a turn given away.
+/// Frames to cancel a landed light attack into a heavier one: the reward for
+/// seeing the hit. Only a connecting light attack opens it; whiffed or
+/// blocked, you get nothing.
 const CANCEL_WINDOW: f32 = 14.0 * F;
 
 /// What each successive hit of a combo is worth. Two hits is a reward;
@@ -881,28 +736,16 @@ fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
         if f.buffer_t <= 0.0 { f.buffered = None; }
     }
 
-    // In the air, on the way up or down, and not yet committed to
-    // anything: the jump-in is the whole reason to jump, so the attack
-    // has to come out *now*.
-    //
-    // Being airborne is not being free — you cannot walk, crouch,
-    // block or jump again — so the ordinary busy path below used to
-    // catch a jumping kick, put it in the buffer, and hand it back as a
-    // grounded kick on landing. The jump attacks were in the move table
-    // and reachable from `pressed_move()`, and there was no way to
-    // press one. Landing still ends whatever came out (see advance()),
-    // which is what keeps this to one attack per jump.
+    // In the air and not yet committed: the jump-in attack comes out now.
+    // (Airborne counts as busy, so the busy path below would buffer it into a
+    // grounded kick on landing.) Landing ends it, which keeps one attack per
+    // jump.
     if f.airborne() && f.act == Act::Air {
         if let Some(id) = air_move(f, inp) {
-            // An attack whose startup outlasts the fall never becomes
-            // live: the feet touch first and landing ends it, so the
-            // press is simply eaten. Measured at the last five frames
-            // of every jump. Hold it for the ground instead, which is
-            // what the buffer is for — and resolve it as the grounded
-            // move, because a jump kick performed standing up is not
-            // what anybody asked for.
-            // Plus a couple of frames, or it comes out on exactly the
-            // frame the feet touch and is cancelled having hit nothing.
+            // An attack whose startup outlasts the fall never goes live
+            // (landing ends it), so buffer it as the grounded move instead.
+            // Two frames of margin, or it comes out on the landing frame and
+            // is cancelled.
             if f.air_time() >= (move_data(id).startup + 2.0) * F {
                 f.start_attack(id);
             } else if let Some(g) = grounded_move(inp, close) {
@@ -997,18 +840,13 @@ fn advance(f: &mut Fighter, dt: f32) {
             f.land_force = (f.vy / -JUMP_VY).clamp(0.25, 1.0);
             f.vy = 0.0;
             f.vx = 0.0;
-            // Landing cancels an air attack: the attack was the jump's
-            // one commitment and it ends with the jump. The flying kick
-            // is the exception — its recovery plays out on the ground,
-            // which is the entire price of the distance it covered.
+            // Landing cancels an air attack, except the flying kick: its
+            // recovery plays out on the ground, the price of the distance.
             if f.act == Act::Attack && f.mv == MoveId::FlyingKick {
                 let m = f.scaled(move_data(f.mv));
                 let total = (m.startup + m.active + m.recovery) * F;
-                // A floor when it was blocked or whiffed — at least
-                // this much left to pay. A ceiling when it connected —
-                // at most this much, because otherwise the move's own
-                // recovery is the binding cost and shortening the
-                // landing changes nothing.
+                // Blocked or whiffed: at least this much left to pay.
+                // Connected: at most this much.
                 f.t = if f.hit_clean {
                     f.t.max(total - FLY_HIT_LAG)
                 } else {
@@ -1049,13 +887,10 @@ fn advance(f: &mut Fighter, dt: f32) {
     note_handover(f, dt);
 }
 
-/// Spot one action becoming another and freeze what the drawing needs
-/// to keep showing the old one.
-///
-/// Runs at the *end* of `advance`, and that is the point: a jump ends
-/// when the feet touch, an attack when recovery runs out, hitstun when
-/// the timer does — all inside `advance`. Looking at the top of the
-/// next frame drew the frame it happened on with no blend at all.
+/// Spot one action becoming another and freeze what the drawing needs to keep
+/// showing the old one. Runs at the end of `advance`, where jumps, attacks
+/// and hitstun end; at the top of the next frame the change frame had no
+/// blend.
 fn note_handover(f: &mut Fighter, dt: f32) {
     if f.act != f.shown {
         let was_low = Fighter::is_low(f.shown, f.shown_mv, f.crouch_block);
@@ -1128,14 +963,9 @@ fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: Input) -> (
     }
     defender.health = (defender.health - damage).max(0);
     attacker.hit_clean = true;
-    // A flying kick that lands in a body stops flying, which is what
-    // hitting something solid does — and it is what closes the gap
-    // between the blow landing and the attacker being able to act.
-    // Connecting early in the flight used to mean the defender's
-    // hitstun ran out while the attacker was still in the air, so the
-    // move was nineteen frames minus on hit. A *blocked* one carries
-    // on through: being shoved past a guard you failed to beat is how
-    // you end up standing in front of it to be punished.
+    // A flying kick that connects stops flying, so the attacker can act
+    // before the defender's hitstun ends. A blocked one carries on through,
+    // into punishing range.
     if attacker.mv == MoveId::FlyingKick {
         attacker.vx = 0.0;
         attacker.vy = attacker.vy.max(0.0);
@@ -1185,35 +1015,19 @@ fn separate(p: &mut [Fighter; 2]) {
 
 // ---- the CPU -------------------------------------------------------------
 
-/// What the CPU wants to do, decided on a timer rather than every frame.
-///
-/// Deciding every frame produces a player that reacts in zero time and
-/// is unbeatable for the wrong reason. Deciding on a delay that shortens
-/// with difficulty produces one that can be baited — which is the thing
-/// a fighting game CPU has to be, or the rock-paper-scissors is only
-/// being played by one side.
+/// What the CPU wants to do, decided on a delay that shortens with difficulty
+/// rather than every frame, so it reacts like a player and can be baited.
 fn cpu_think(g: &mut Game) -> CpuPlan {
     let me = g.p[1];
     let foe = g.p[0];
     let dist = (foe.x - me.x).abs();
     let roll = || (rand_int(0, 99) as f32) / 100.0;
 
-    // Ranges come from the move table, not from guesses. They were
-    // guesses — and they were shorter than the CPU's own legs, so it
-    // spent entire rounds walking toward an opponent it was already
-    // close enough to hit, taking the whole fight in the face. It threw
-    // five attacks in twenty seconds.
-    // The yardstick for "in kicking range". It was the middle kick,
-    // which reached further than either of the two that are left, so
-    // it is the high kick now and the CPU closes a little more before
-    // it commits.
+    // Ranges come from the move table. "Kicking range" is the high kick's.
     let kick_range = attack_range(&me, MoveId::HighKick);
     let jab_range = attack_range(&me, MoveId::LowPunch);
-    // The high kick is the shortest of the three, because a leg going
-    // to head height spends its length going up. Throwing it from mid
-    // kick range is throwing it at nothing, and a CPU that spends its
-    // turns on attacks that cannot connect runs the clock out while
-    // looking busy.
+    // The high kick is the shortest kick; thrown from further out it hits
+    // nothing.
     let high_range = attack_range(&me, MoveId::HighKick);
     let foe_range = attack_range(&foe, MoveId::HighKick);
 
@@ -1227,24 +1041,16 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
         };
     }
     if foe.act == Act::Attack && dist < foe_range * 1.2 {
-        // The block that stops a mash. A CPU that only reconsiders on a
-        // timer is a punching bag at close range, so being under attack
-        // is one of the things that forces a fresh decision — see
-        // update_fight().
-        //
-        // How badly it wants to block depends on what is coming. A sweep
-        // or a special is worth respecting; a jab is worth trading with,
-        // because six damage is cheaper than never taking a turn. Always
-        // blocking is how the CPU ended up in a sixty-second stalemate
-        // with someone holding down the punch button.
+        // Being attacked at close range forces a fresh decision (see
+        // update_fight()). How much it blocks depends on what is coming: a
+        // sweep or special is respected, a jab traded with; always blocking
+        // stalemated against a mashed punch.
         let scary = move_data(foe.mv).damage >= 10 || move_data(foe.mv).knockdown;
         let want = if scary { 0.55 + 0.4 * g.difficulty } else { 0.22 + 0.2 * g.difficulty };
         if roll() < want { return CpuPlan::Block; }
-        // Not blocking means taking the turn back, with the fastest
-        // thing available — or, right up close, the move their guard
-        // cannot help them with. (Retreating instead was tried and
-        // measured: it hands a rushing opponent free ground and the CPU
-        // stops winning those rounds at all.)
+        // Not blocking means taking the turn back with the fastest thing
+        // available, or a throw up close. (Retreating hands a rushing
+        // opponent free ground.)
         if dist <= THROW_RANGE { return CpuPlan::Attack(MoveId::Throw); }
         if dist < jab_range { return CpuPlan::Attack(MoveId::LowPunch); }
     }
@@ -1253,21 +1059,16 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
         return CpuPlan::Attack(MoveId::LowPunch);
     }
 
-    // Read the guard. This is the game's own rock-paper-scissors played
-    // from the other side, and without it the CPU has no answer at all
-    // to someone who simply holds back: a crouch-blocker took *zero*
-    // damage across a full sixty-second round, because crouch block
-    // covers every attack the CPU was willing to throw.
+    // Read the guard: without it a crouch-blocker took zero damage over a
+    // full round.
     if foe.act == Act::Block && dist < kick_range * 1.1 {
         let read = roll() < 0.4 + 0.5 * g.difficulty;
         if read {
             return if dist <= THROW_RANGE {
                 CpuPlan::Attack(MoveId::Throw)  // nothing guards against this
             } else if foe.crouch_block {
-                // A low guard loses to an overhead, and there are two.
-                // The high kick is the honest one — slow, telegraphed,
-                // and punishable if it is read — so the CPU prefers it
-                // and keeps the jump-in as the surprise.
+                // A low guard loses to an overhead: the high kick (slow,
+                // readable) is preferred, the jump-in kept as the surprise.
                 if dist < high_range && roll() < 0.45 { CpuPlan::Attack(MoveId::HighKick) }
                 else { CpuPlan::Jump }
             } else {
@@ -1289,33 +1090,21 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
         return CpuPlan::Approach;
     }
     if dist > kick_range * 1.25 {
-        // Jumping in is only worth it from outside their reach; jumping
-        // into a poke is a free knockdown for them, and the CPU used to
-        // spend a third of every round on the floor learning that.
+        // Jumping in is only worth it from outside their reach: into a
+        // poke it is a free knockdown for them.
         if dist > foe_range * 1.3 && roll() < 0.10 + 0.14 * g.difficulty {
-            // Two ways in, sharing one budget. The flying kick has to
-            // be in the CPU's hands or the answer to being out-ranged
-            // is a tool only the player has — but it is an overhead
-            // added to a kit that already has two, and handed out on
-            // top of the jump-in rather than instead of it, it stopped
-            // a crouch-blocker surviving a round at all.
+            // Two ways in on one budget: the flying kick and the jump-in.
+            // Both on top of each other, a crouch-blocker never survived a
+            // round.
             return if roll() < 0.35 {
                 CpuPlan::Attack(MoveId::FlyingKick)
             } else {
                 CpuPlan::Jump
             };
         }
-        // Out-ranged: standing outside your own reach and inside theirs
-        // is the worst place on the stage, and walking out of it in a
-        // straight line just means eating the poke on the way. A
-        // short-armed fighter has to *cross* that gap.
-        //
-        // Without this, Brutus against a long-limbed opponent who keeps
-        // pressing the button landed nothing at all: zero hits in a
-        // forty-five second round, walking into a jab, being knocked
-        // back out of range, and walking in again. The charge and the
-        // jump-in are the two moves that cover ground, so out here they
-        // are most of the answer rather than an occasional flourish.
+        // Out-ranged, inside their reach and outside your own, the gap must
+        // be crossed, not walked. Without this Brutus landed nothing against
+        // a long-limbed poker; the charge and the jump-in cover ground.
         if dist < foe_range * 1.15 && foe_range > kick_range * 1.1 {
             return match roll() {
                 r if r < 0.34 => CpuPlan::Attack(MoveId::Special),
@@ -1328,29 +1117,20 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
         return CpuPlan::Approach;
     }
 
-    // In range. The mix is the personality: a spread wide enough that no
-    // single answer covers it, weighted toward what this fighter is for.
-    //
-    // `r` is nudged down when the opponent is nearly out, which shifts
-    // the whole mix toward attacking: a CPU that keeps politely blocking
-    // a beaten opponent cannot close a round, and a round it cannot
-    // close is one the clock decides. Measured at 60 seconds and 102-12
-    // before this — dominant, and still unable to finish.
+    // In range, the mix is the personality: wide enough that no single answer
+    // covers it, weighted to the fighter. `r` shifts toward attacking when
+    // the opponent is nearly out, so the CPU can close a round.
     let nearly_out = (foe.health as f32) < FIGHTERS[foe.who].health as f32 * 0.35;
-    // A round that has run half its clock with both bars still full is
-    // a round the clock is about to decide, and a round decided by
-    // arithmetic is one nobody watched. Half-time with nothing on the
-    // board is itself a reason to start forcing the issue — the same
-    // nudge as smelling a finish, for the opposite reason.
+    // Half the clock gone with both bars nearly full is a round the clock
+    // will decide; force the issue, the same nudge as smelling a finish.
     let stalling = g.clock < ROUND_SECS * 0.5
         && (foe.health as f32) > FIGHTERS[foe.who].health as f32 * 0.72
         && (me.health as f32) > FIGHTERS[me.who].health as f32 * 0.72;
     let r = if nearly_out || stalling { roll() * 0.7 } else { roll() };
 
     if dist >= jab_range {
-        // At the edge of its reach: long pokes only. With the middle
-        // kick gone the sweep is the only thing that genuinely reaches
-        // out here, so it takes the share that used to be split.
+        // At the edge of its reach: long pokes only, and the sweep is the
+        // one that really reaches out here.
         return match r {
             _ if r < 0.44 => CpuPlan::Attack(MoveId::Sweep),
             _ if r < 0.58 => CpuPlan::Attack(MoveId::LowKick),
@@ -1360,26 +1140,18 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
         };
     }
 
-    // Right up close. Every fighter keeps a fast option here, including
-    // the heavy: weighting Brutus entirely toward his big swings left
-    // him with nothing that came out in time, and a fast opponent
-    // simply jabbed him for forty-five seconds while neither health bar
-    // moved. The heavy leans on the slow, heavy end of the same list
-    // rather than being handed a different list.
+    // Up close every fighter keeps a fast option, even the heavy (without one
+    // he was jabbed for a whole round); the heavy leans to the slow end of
+    // the same list.
     let heavy = me.arch().special == Special::BullRush;
     let fast_share = if heavy { 0.20 } else { 0.32 };
-    // The bands have to leave room for the last two. Adding the new
-    // kicks pushed the attacking share up to 0.96 and squeezed `Block`
-    // down to nothing — the arm was unreachable, and the CPU silently
-    // stopped guarding at close range entirely. A match arm that can
-    // never be taken is a rule that has been deleted by arithmetic.
+    // The bands must leave room for the last two arms, or `Block` becomes
+    // unreachable and the CPU stops guarding up close.
     match r {
         _ if r < fast_share * 0.6 => CpuPlan::Attack(MoveId::LowPunch),
         _ if r < fast_share => CpuPlan::Attack(MoveId::LowKick),
         _ if r < fast_share + 0.20 => CpuPlan::Attack(MoveId::Sweep),
-        // The share the middle kick held goes to the choice it used to
-        // let the CPU avoid: low or high, and the guard can only be in
-        // one place.
+        // Low or high: the guard can only be in one place.
         _ if r < fast_share + 0.34 => {
             if dist < high_range { CpuPlan::Attack(MoveId::HighKick) }
             else { CpuPlan::Attack(MoveId::LowKick) }
@@ -1436,27 +1208,13 @@ fn cpu_input(g: &Game) -> Input {
 
 // ---- update --------------------------------------------------------------
 
-/// The keys one player answers to.
-///
-/// Four attacks want a square, not a row: punches in the left column,
-/// kicks in the right, high on the top row and low on the bottom, so
-/// the buttons are laid out the way the move list is.
-///
-/// Two people at one keyboard need two such squares that never
-/// overlap, so the split is the one a keyboard already has. The left
-/// player drives with W A S D and hits with R T over F G; the right
-/// player drives with the arrows and hits with U I over J K. Each has
-/// a hand either side of the line a touch typist's hands already sit
-/// on, and neither reaches across the other.
-///
-/// Playing alone, player one also answers to everything the cabinet
-/// has — the arrows, and the two deck buttons — because a stick and
-/// two buttons is all a cabinet is, and a one-player game has nobody
-/// to take the arrows away for.
-///
-/// Stated once. The fight, the title menu and the select screen all
-/// read it, and each used to spell the alias rule out again and could
-/// get it wrong on its own.
+/// The keys one player answers to. Four attacks make a square: punches left,
+/// kicks right, high on top, low below.
+/// Two at one keyboard get squares that never overlap: the left player W A S
+/// D with R T over F G, the right player the arrows with U I over J K.
+/// Playing alone, player one also answers to the arrows and the generic fire
+/// keys.
+/// Stated once; the fight, the title menu and the select screen all read it.
 struct Pad {
     up: &'static [KeyCode],
     down: &'static [KeyCode],
@@ -1473,8 +1231,8 @@ static P1_ALONE: Pad = Pad {
     down: &[BLIP_KEY_S, BLIP_KEY_DOWN],
     left: &[BLIP_KEY_A, BLIP_KEY_LEFT],
     right: &[BLIP_KEY_D, BLIP_KEY_RIGHT],
-    // The cabinet has one punch button and one kick button, and they
-    // are the low ones, because those are the pokes you open with.
+    // The generic fire keys (Space, button 2) are the low attacks, the
+    // pokes you open with; C and X are the high ones.
     punch_low: &[BLIP_KEY_F, BLIP_KEY_SPACE],
     punch_high: &[BLIP_KEY_R, BLIP_KEY_C],
     kick_low: &[BLIP_KEY_G, BLIP_KEY_BUTTON2],
@@ -1532,10 +1290,8 @@ fn human_input(g: &mut Game, who: usize) -> Input {
     let punch = plo || phi;
     if punch { g.punch_at[who] = g.now; }
     if low || high { g.kick_at[who] = g.now; }
-    // Both buttons inside a short window is the special. Two buttons is
-    // all this cabinet has, so the special cannot be a quarter-circle;
-    // it is the one input a player can reliably hit on a stick with two
-    // buttons, and it stays out of the way of every other move.
+    // Punch and kick together inside a short window is the special: easy on a
+    // stick, and in the way of no other move.
     let (pa, ka) = (g.punch_at[who], g.kick_at[who]);
     let together = (pa - ka).abs() <= 0.08 && g.now - pa.max(ka) <= 0.08
         && pa > 0.0 && ka > 0.0;
@@ -1552,11 +1308,8 @@ fn human_input(g: &mut Game, who: usize) -> Input {
     inp
 }
 
-/// How long the world stops on contact — longer for the hits that are
-/// supposed to feel heavy.
-/// Is this attack thrown with a leg? The drawing code asks the same
-/// question to decide which limb to throw, and the sound asks it to
-/// decide whether there is a gi to crack.
+/// Is this attack thrown with a leg? The drawing asks to pick the limb, the
+/// sound to decide whether a gi cracks.
 fn is_kick(f: &Fighter) -> bool {
     matches!(f.mv, MoveId::LowKick | MoveId::HighKick | MoveId::Sweep
         | MoveId::JumpKick | MoveId::FlyingKick)
@@ -1587,10 +1340,8 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     let p_in = human_input(g, 0);
 
-    // A plan runs for its delay, *except* when the world changes under
-    // it: coming out of a hit, or being attacked at close range, is
-    // exactly when a human would think again, and a CPU that waits out
-    // its timer through a flurry of jabs is a heavy bag.
+    // A plan runs for its delay unless the world changes: coming out of a
+    // hit, or being attacked up close, forces a rethink.
     let jolted = g.p[1].act == Act::Hitstun
         || (g.p[0].act == Act::Attack && (g.p[0].x - g.p[1].x).abs() < attack_range(&g.p[0], MoveId::HighKick));
     g.cpu_delay -= dt;
@@ -1618,9 +1369,8 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
     let was_air = [g.p[0].airborne(), g.p[1].airborne()];
     advance(&mut g.p[0], dt);
     advance(&mut g.p[1], dt);
-    // Boots on boards. A jump is the one thing in the game that used to
-    // happen in silence from take-off to landing, and the touchdown is
-    // where a player finds out they are on the ground again.
+    // Boots on boards: the touchdown is how a player hears they are on
+    // the ground again.
     for i in 0..2 {
         if was_air[i] && !g.p[i].airborne() {
             play_sfx_volume(&sfx.land, 0.35 + 0.5 * g.p[i].land_force);
@@ -1632,12 +1382,8 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
     separate(&mut g.p);
 
-    // Kicks crack their gi on the frame the shin starts to unfold.
-    //
-    // Not on the first frame of the move — the knee is still coming up
-    // then and nothing is moving fast. `KICK_SNAP` is the same split
-    // the drawing uses to divide the chamber from the extension, so
-    // what you hear and what you see are the same event.
+    // Kicks crack their gi when the shin starts to unfold, at `KICK_SNAP`,
+    // the same split the drawing uses between chamber and extension.
     for i in 0..2 {
         let f = g.p[i];
         if f.act == Act::Attack && is_kick(&f) {
@@ -1716,14 +1462,9 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
                     let step = (g.p[d].combo.max(1) as usize - 1).min(2);
                     play_sfx(&sfx.hit_light[step]);
                 }
-                // A knockdown throws them clear — landing one used to
-                // leave the attacker standing over the wakeup, which is
-                // not a reward but a coin flip against invulnerability.
-                // A throw is the exception: it already ends with the
-                // thrower on top of the situation, and flinging them
-                // full distance only means walking back in, which is how
-                // a fight against someone who never moves turned into a
-                // sixty-second commute.
+                // A knockdown throws them clear, so the attacker is not
+                // standing over an invulnerable wakeup. A throw pushes
+                // little: it already leaves the thrower on top.
                 let push = match (knock, g.p[a].mv) {
                     (_, MoveId::Throw) => 18.0,
                     (true, _) => 34.0,
@@ -1814,12 +1555,9 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_round_end(g: &mut Game, dt: f32) {
-    // Keep the fighters running. The round ends by assigning Victory
-    // and Defeat outright and then only ticking a timer, so nothing
-    // moved for the whole two seconds: a fighter who landed the
-    // killing blow in mid-air hung there in the sky striking a pose,
-    // and the victory animation — which is a function of the action
-    // timer — never played at all, because the timer never advanced.
+    // Keep the fighters moving after the round ends, or a mid-air finisher
+    // hangs in the sky and the victory pose (driven by the action timer)
+    // never plays.
     for i in 0..2 {
         advance(&mut g.p[i], dt);
         g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
@@ -1839,13 +1577,9 @@ fn update_round_end(g: &mut Game, dt: f32) {
     }
 }
 
-/// One player's menu intent this frame, already debounced.
-///
-/// The menus take this rather than reading the keyboard, so the whole
-/// front of the game — mode, both cursors, the lock-in and the rule
-/// that two players cannot bring the same fighter — can be driven by a
-/// test. A flow that can only be exercised by a person with two hands
-/// on a keyboard is a flow that never gets exercised.
+/// One player's menu intent this frame, debounced. The menus take this rather
+/// than the keyboard, so the whole front of the game (mode, cursors, lock-in,
+/// no shared fighter) can be driven by a test.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 struct MenuIn { back: bool, fwd: bool, fire: bool }
 
@@ -1869,14 +1603,8 @@ fn read_menu(g: &mut Game) -> [MenuIn; 2] {
 fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
     match g.state {
         State::Title => {
-            // Player two announcing themselves IS the choice.
-            //
-            // A cabinet has never asked player one to select two-player
-            // mode on behalf of somebody standing next to them; the
-            // second player reaches for their own stick and the machine
-            // works out the rest. They cannot toggle it back off again,
-            // because the place being given up in that direction is
-            // theirs and nobody else is asking.
+            // Player two announcing themselves is the choice, like a cabinet:
+            // they reach for their own stick. It cannot be toggled back off.
             if g.menu == 0 && (m[1].back || m[1].fwd || m[1].fire) {
                 g.menu = 1;
                 web::set_mode(true);
@@ -1886,13 +1614,9 @@ fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
             // button, because that is all a cabinet has.
             if m[0].back || m[0].fwd {
                 g.menu = 1 - g.menu;
-                // The second station appears on the deck the moment the
-                // cursor lands on 2 PLAYERS, not when it is confirmed.
-                // A player choosing between one and two is asking what
-                // two looks like, and the answer is a second stick
-                // arriving in front of them — after the fact it is a
-                // surprise, and on the select screen it is too late to
-                // be an answer at all.
+                // The second station appears as the cursor lands on 2
+                // PLAYERS, not on confirm: choosing is asking what two looks
+                // like.
                 web::set_players(if g.menu == 1 { 1 } else { TITLE_OPEN });
                 return Some(Cue::Step);
             }
@@ -1934,11 +1658,8 @@ fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
                 }
                 if m[who].fire && !g.taken_by_other(who, g.picked(who)) {
                     g.locked[who] = true;
-                    // Move the other player off it if they were sitting
-                    // there. Their cursor was legal a moment ago and is
-                    // not any more, and a cursor parked on something it
-                    // can no longer confirm is a player pressing a
-                    // button that does nothing and being told nothing.
+                    // Move the other player's cursor off a fighter now taken,
+                    // so it is never parked on something it cannot confirm.
                     let other = 1 - who;
                     if versus && !g.locked[other] && g.picked(other) == g.picked(who) {
                         let mut at = g.picked(other);
@@ -2010,11 +1731,9 @@ const BLOCK_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds
 const BELL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bell.wav"));
 const KO_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ko.wav"));
 const PROJECTILE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/projectile.wav"));
-// The music is not here. Every other asset is baked into the binary,
-// but a theme long enough not to repeat inside a forty-five second
-// round is about a megabyte of PCM and there are three of them — more
-// than the whole rest of the game. The code that synthesises one is a
-// couple of hundred lines, so the game builds its own at startup.
+// The music is synthesised at startup, not baked in: three themes long enough
+// not to repeat in a round are about a megabyte of PCM, more than the rest of
+// the game.
 
 struct Sounds {
     /// Three light hits at rising pitch. A combo picks the next one up,
@@ -2022,8 +1741,8 @@ struct Sounds {
     /// hit played four times.
     hit_light: [blip::BlipSound; 3],
     hit_heavy: blip::BlipSound,
-    /// A body hitting boards. The biggest thing that happens in a
-    /// round, and it used to share a sound with an ordinary heavy.
+    /// A body hitting boards: the biggest thing in a round, with its own
+    /// sound.
     crunch: blip::BlipSound,
     land: blip::BlipSound,
     /// The crowd that has been drawn watching every round in silence.
@@ -2045,10 +1764,8 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    // Say so before anything slow happens. The three themes are
-    // synthesised below and take a second or two; told after that, the
-    // cabinet spends its whole loading screen claiming to be a
-    // one-player machine with a dead second station.
+    // Say so before the slow part (the themes take a second or two), or the
+    // loading screen shows a dead second station.
     web::set_players(TITLE_OPEN);
 
     let sfx = Sounds {
@@ -2089,10 +1806,8 @@ async fn main() {
         let dt = blip.delta_time;
         g.now += dt;
 
-        // Screenshot mode (BLIP_SCREENSHOT_OUT) drops straight into a
-        // fight: the cabinet's card should show the game being played,
-        // not its title screen. Timed so the kick below is extended on
-        // the frame that gets captured.
+        // Screenshot mode (BLIP_SCREENSHOT_OUT) drops straight into a fight,
+        // timed so the kick is extended on the captured frame.
         if blip.screenshot_mode {
             shot_frame += 1;
             if shot_frame == 1 {
@@ -2105,17 +1820,13 @@ async fn main() {
                 g.p[0].health = (FIGHTERS[g.p[0].who].health as f32 * 0.8) as i32;
                 g.clock = ROUND_SECS * 0.72;
             }
-            // Hold the opponent standing still. Left to itself the CPU
-            // ducks, and a high kick sails over a crouching fighter
-            // exactly as it should — correct, and a card with nobody
-            // hitting anybody on it. Walking it in instead put the two
-            // of them inside each other.
+            // Hold the opponent still: left alone the CPU ducks and the high
+            // kick sails over it.
             g.cpu_plan = CpuPlan::Wait;
             g.cpu_delay = 99.0;
-            // The card is taken at BLIP_SCREENSHOT_FRAME=30: by then the
-            // kick has landed, the hitstop flash has passed — it washes
-            // the fighter it is on nearly white, which is right in
-            // motion and wrong in a still — and the spark is still up.
+            // Captured at BLIP_SCREENSHOT_FRAME=30: the kick has landed, the
+            // hitstop flash (near-white in a still) has passed, and the spark
+            // is still up.
             if shot_frame == 4 { g.p[0].start_attack(MoveId::HighKick); }
         }
 
@@ -2166,12 +1877,9 @@ async fn main() {
     }
 }
 
-/// Select-screen stepping, debounced by hand: on this screen a held
-/// direction should move one step and wait, not slide through the roster.
-/// A menu step for one player, debounced by hand: on these screens a
-/// held direction must move the cursor once, not sixty times a second.
-/// `who` picks whose keys are read, so two cursors can live on one
-/// screen without either seeing the other's.
+/// A menu step for one player, debounced by hand: a held direction moves the
+/// cursor once. `who` picks whose keys are read, so two cursors share a
+/// screen.
 fn menu_step(g: &mut Game, who: usize, back: bool) -> bool {
     let k = pad(g.mode, who);
     let held = if back { any_held(k.left) || any_held(k.up) }

@@ -1,8 +1,5 @@
-//! Raider assets — a 1942-style vertical dogfighter.
-//!
-//! Sprites are small silhouettes (plane shapes read fine at arcade
-//! resolution); bullets and explosions stay plain shape draw calls in the
-//! game itself, so no sprites are needed for those here.
+//! Raider assets: a 1942-style vertical dogfighter. Planes are rendered from
+//! their real planforms; bullets and explosions are drawn by the game.
 
 use crate::image::Image;
 use std::f32::consts::PI;
@@ -98,10 +95,8 @@ fn gen_noise(dur_ms: f32, amp: f32) -> Vec<i16> {
     s
 }
 
-/// A quick run of notes played one after another (each overlapping the next
-/// slightly, since `step_ms < dur_ms`), mixed into one buffer. Used for the
-/// power-up pickup chimes — more notes and a higher register reads as a
-/// bigger pickup, which is how the four weapon-tier chimes escalate.
+/// Notes one after another, each overlapping the next (`step_ms < dur_ms`):
+/// the power-up chimes, more notes and higher for a bigger tier.
 fn ascending_run(notes: &[f32], step_ms: f32, dur_ms: f32, amp: f32) -> Vec<i16> {
     let n = ms_to_samples(step_ms * notes.len() as f32 + dur_ms);
     let mut buf = vec![0i16; n];
@@ -179,15 +174,10 @@ fn victory_sfx() -> Vec<u8> {
     encode_pcm16_mono(&buf)
 }
 
-/// The player's shot: a soft descending "pew" (sine sweeping down in pitch)
-/// rather than a flat repeated beep — this fires many times a second at
-/// full-auto, so it needs to be gentle and a little varied, not a shrill tone
-/// hit over and over.
-/// One report from a wing gun. A near-instant, overdriven crack of
-/// band-passed noise (the muzzle blast), a short saturated body, the bolt
-/// cycling twice, and two early reflections off the airframe. `pitch`
-/// and `seed` make the takes differ, so autofire is a rattle of shots
-/// rather than one sample on a loop.
+/// One report from a wing gun: an overdriven crack of band-passed noise (the
+/// muzzle blast), a short saturated body, the bolt cycling twice, and two
+/// reflections off the airframe. `pitch` and `seed` vary the takes so
+/// autofire rattles rather than loops.
 fn gun_report(seed: u32, pitch: f32) -> Vec<f32> {
     let sr = SAMPLE_RATE as f32;
     let n = ms_to_samples(120.0);
@@ -398,10 +388,9 @@ fn stage_clear_sfx() -> Vec<u8> {
 // ---------------------------------------------------------------------- //
 
 // ---- planform renderer -------------------------------------------------
-// The planes are drawn from their real planforms (three-view drawings of
-// the P-51D, A6M Zero, Ki-43 and Ki-84), rasterised 4x supersampled into a
-// small sprite: wing root and tip chords, tip rounding, cowl, tailplane,
-// canopy. Coordinates are sprite pixels, nose at y = 0, pointing up.
+// Planes drawn from their real planforms (three-views of the P-51D, A6M Zero,
+// Ki-43, Ki-84 and the bombers), rasterised 4x supersampled. Coordinates are
+// sprite pixels, nose at y = 0, pointing up.
 
 const SS: usize = 4;
 
@@ -723,11 +712,10 @@ fn player_plane() -> Vec<u8> {
     c.finish(false)
 }
 
-/// Enemy fighters, drawn nose-up and flipped to dive at the player.
-/// `kind`: 0 = grunt, an A6M Zero (IJN green, black radial cowl, wide
-/// elliptical-tipped wings); 1 = weaver, a Ki-43 Hayabusa (khaki, slim
-/// tapered wings); 2 = ace, a Ki-84 Hayate in natural metal with yellow
-/// leading-edge ID stripes (it always drops a power-up).
+/// Enemy fighters, drawn nose-up and flipped to dive at the player. `kind`: 0
+/// = grunt, an A6M Zero (IJN green, black cowl, wide rounded wings); 1 =
+/// weaver, a Ki-43 (khaki, slim tapered wings); 2 = ace, a Ki-84 in natural
+/// metal with yellow ID stripes (drops a power-up).
 fn enemy_plane(kind: usize) -> Vec<u8> {
     // designed at 26x22, rendered at 2x
     let w = 26;
@@ -777,29 +765,12 @@ fn enemy_plane(kind: usize) -> Vec<u8> {
     c.finish(true)
 }
 
-/// Body and wing colours for an enemy kind.
-///
-/// Chosen against the sky these planes are seen on, not in isolation.
-///
-/// The sea/sky gradient runs from rgb(25,61,117) at the horizon down to
-/// rgb(7,28,76) close up (see draw_sea() in the game). The drab-green
-/// grunt used to be rgb(90,130,90), which is 2.4:1 against the top of
-/// that gradient — and its wings, shaded 35 *darker*, came out at
-/// 1.45:1. The wings are the widest part of the silhouette and the first
-/// thing a player picks out of the sky; at 1.45:1 there was nothing
-/// there to pick out. Touching an enemy costs HP, so a plane you cannot
-/// see is not difficulty, it is a tax on the player.
-///
-/// Every kind now clears 3:1 against both ends of the gradient, body and
-/// wing, which is the floor the WCAG non-text contrast guidance uses for
-/// a shape whose form has to be recognised. Pinned by
-/// enemy_planes_are_visible_against_the_sky() below — which calls this,
-/// so the numbers it checks are the ones actually painted.
-///
-/// The wings are lit from above rather than shaded: they catch the sky.
-/// Darkening them was what pushed the widest surfaces below the floor,
-/// and a top surface brighter than the fuselage is what a plane seen
-/// from above actually looks like.
+/// Body and wing colours for an enemy kind, chosen against the sky they are
+/// seen on (rgb(25,61,117) at the horizon to rgb(7,28,76) near; draw_sea() in
+/// the game). Every kind clears 3:1 against both ends, body and wing, the
+/// WCAG non-text contrast floor, pinned by
+/// enemy_planes_are_visible_against_the_sky(). Wings are lit from above,
+/// brighter than the fuselage: the widest surface, the first picked out.
 fn enemy_colors(kind: usize) -> ((u8, u8, u8), (u8, u8, u8)) {
     let body: (u8, u8, u8) = match kind {
         0 => (125, 175, 115),
@@ -1020,11 +991,8 @@ fn powerup_capsule() -> Vec<u8> {
     img.encode_png()
 }
 
-/// Health pickup, dropped occasionally by regular fighters: a white
-/// roundel with a red cross — deliberately a different shape from the
-/// weapon capsule's diamond (and a fixed colour, not tinted by weapon
-/// tier), so the two are never mistaken for each other in the middle of
-/// a dogfight.
+/// Health pickup, from regular fighters: a white roundel with a red cross, a
+/// different shape and fixed colour from the weapon capsule's diamond.
 fn health_pack() -> Vec<u8> {
     let (w, h) = (HEALTH_W, HEALTH_H);
     let mut img = Image::new(w as u32, h as u32);
@@ -1050,14 +1018,12 @@ fn health_pack() -> Vec<u8> {
     img.encode_png()
 }
 
-/// The carrier the player launches from: an Essex-class fleet carrier as
-/// she looked in 1944, bow up. Straight flight deck in Deck Blue with its
-/// planking, centreline and the hull number fore and aft; two centreline
-/// elevators and the deck-edge one to port; arresting wires aft and the
-/// catapult tracks at the bow; the island to starboard with its funnel,
-/// radar and the twin 5-inch mounts fore and aft of it; 40 mm quad mounts
-/// in the sponsons; Hellcats spotted aft with their wings folded. The
-/// length is shortened to about 60% so she fits the game.
+/// The carrier: an Essex-class fleet carrier as in 1944, bow up. Deck Blue
+/// planked flight deck, centreline and hull number fore and aft; two
+/// centreline elevators and the port deck-edge one; arresting wires aft,
+/// catapults at the bow; the island to starboard with funnel, radar and twin
+/// 5-inch mounts fore and aft; 40 mm quads in the sponsons; Hellcats spotted
+/// aft, wings folded. Shortened to about 60% to fit.
 fn carrier_ship() -> Vec<u8> {
     let (w, h) = (CARRIER_W, CARRIER_H);
     let mut c = Canvas::new(w, h);
@@ -1247,19 +1213,12 @@ fn boat() -> Vec<u8> {
 }
 
 // ---------------------------------------------------------------------- //
-// Clouds — value-noise fBm, not flat circles                                //
+// Clouds: value-noise fBm, not flat circles                                //
 // ---------------------------------------------------------------------- //
-//
-// A real cumulus cloud has a flattish, harder-edged base and a much more
-// broken-up, softly-diffused, billowing top — bright where the sun catches
-// it, greyer in the "valleys" between puffs. Three flat overlapping circles
-// don't read as a cloud at all. Instead each cloud sprite is built from
-// fractional Brownian motion (a handful of octaves of value noise, each one
-// double the frequency and half the amplitude of the last — the standard
-// recipe used to fake terrain, marble, and cloud textures) masked against an
-// envelope that's flattened on the underside, with the noise's own
-// turbulence driving both the silhouette's edge and a top-lit/base-shadowed
-// tint. Baked once per variant at build time, not drawn as live shapes.
+// Cumulus: a flattish harder base and a broken, billowing top, bright where
+// lit and greyer between puffs. A few octaves of value noise (fBm) masked by
+// an envelope flattened underneath drive both the edge and the lit/shadowed
+// tint. Baked per variant at build time.
 
 const CLOUD_TEX_W: i32 = 40;
 const CLOUD_TEX_H: i32 = 26;
@@ -1345,15 +1304,11 @@ fn cloud_sprite(seed: u32) -> Vec<u8> {
 }
 
 // ---------------------------------------------------------------------- //
-// Islands — rare, turret-armed landmasses                                  //
+// Islands: rare, turret-armed landmasses                                  //
 // ---------------------------------------------------------------------- //
-//
-// Same fBm technique as the clouds above, but masked to an opaque landmass
-// instead of a soft cloud: an irregular fBm-perturbed coastline (not a
-// perfect ellipse — real islands aren't) with a band of sand right at the
-// shoreline and mottled green/rock inland, topped with a small turret
-// emplacement. Three fixed sizes are baked (small/medium/large); which one
-// appears, and where, is picked at runtime.
+// The clouds' fBm, masked to an opaque island: a noise-perturbed coastline, a
+// band of sand, mottled green and rock inland, and a turret emplacement.
+// Three sizes baked; which and where is picked at runtime.
 fn island_sprite(w: i32, h: i32, seed: u32) -> Vec<u8> {
     let mut img = Image::new(w as u32, h as u32);
     let cx = w as f32 * 0.5;
@@ -1420,23 +1375,16 @@ fn turret_fire_sfx() -> Vec<u8> {
     encode_pcm16_mono(&buf)
 }
 
-/// A low electrical drone for the laser barrier — looped and dynamically
-/// volume-ridden by the game itself as the player nears the beam, so it
-/// needs to loop with no audible seam: the 110Hz fundamental (and its
-/// harmonics, and the tremolo) all complete a whole number of cycles across
-/// the buffer.
-/// Hermite smoothstep, clamped to 0..1 — used to ramp the engine's pitch
-/// and blade-chop rate through the start-up without any corners.
+/// Hermite smoothstep, clamped to 0..1: ramps the engine's pitch and chop
+/// through the start-up.
 fn smooth01(x: f32) -> f32 {
     let x = x.clamp(0.0, 1.0);
     x * x * (3.0 - 2.0 * x)
 }
 
-/// The carrier launch, in one shot: the electric starter motor whirring
-/// up, the engine catching with a couple of uneven chugs, then the prop
-/// spinning up and settling into an idle. ~1.9s; played once as the
-/// launch sequence begins, with `propeller_sfx` looping underneath it and
-/// on through the climb.
+/// The carrier launch start-up in one shot: the starter whirring, the engine
+/// catching on a couple of uneven chugs, then the prop spinning up to idle.
+/// ~1.9s, played as the launch begins over the engine loops.
 fn engine_start_sfx() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let dur_s = 1.9_f32;
@@ -1490,11 +1438,10 @@ fn engine_start_sfx() -> Vec<u8> {
 }
 
 
-/// One engine loop at `rpm` (1.0 = cruise): the propeller's blade tone and
-/// chop, driven harder and brighter the faster it turns. One second long
-/// with whole cycles of both, so it loops without a seam. `sputter` makes
-/// it the labouring engine at the edge of a stall: it misfires, cuts out,
-/// coughs back, and the chop goes ragged.
+/// One engine loop at `rpm` (1.0 = cruise): blade tone and chop, harder and
+/// brighter faster. One second with whole cycles, so it loops seamlessly.
+/// `sputter` is the labouring engine at a stall: misfires, cut-outs, coughs,
+/// a ragged chop.
 fn engine_loop(rpm: f32, sputter: bool) -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let n = SAMPLE_RATE as usize;
@@ -1537,6 +1484,9 @@ fn engine_loop(rpm: f32, sputter: bool) -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
+/// The laser barrier's drone, looped and ridden by distance in the game:
+/// the 110 Hz fundamental, its harmonics and the tremolo all complete whole
+/// cycles in the buffer, so it loops without a seam.
 fn barrier_hum_sfx() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let dur_ms = 400.0;
@@ -1574,16 +1524,12 @@ fn barrier_hum2_sfx() -> Vec<u8> {
 }
 
 // ---------------------------------------------------------------------- //
-// Japanese boss name banners                                                //
+// Japanese boss name banners
+// //
 // ---------------------------------------------------------------------- //
-//
-// blip's shared bitmap font (crates/blip/src/font.rs) only covers A-Z/0-9,
-// so the "boss name in Japanese" banner can't go through it. Instead: the
-// katakana glyphs actually needed (one set, shared across all seven names)
-// were rasterized *once*, offline, from the real "Noto Sans CJK JP Bold"
-// font and baked in below as plain bitmap data. That keeps the game itself
-// free of any font dependency — this is the only place that font's shape
-// data is used, and only at repo-authoring time, never at build or run time.
+// blip's bitmap font covers only A-Z/0-9, so the katakana needed for the
+// seven names were rasterised once, offline, from Noto Sans CJK JP Bold and
+// baked in below; the build and the game never touch the font.
 
 /// Katakana glyphs needed for the seven boss names, 10 wide x 12 tall.
 const KATAKANA_CHARS: [char; 37] = [
@@ -1680,31 +1626,17 @@ fn boss_name_ja(tier: usize) -> Vec<u8> {
 }
 
 // ---------------------------------------------------------------------- //
-// Music — rock                                                             //
+// Music: rock                                                             //
 // ---------------------------------------------------------------------- //
-//
-// Raider's theme is a rock instrumental now, not the parade-ground march
-// it grew out of: a distorted rhythm-guitar riff, a live drum kit with a
-// cracking backbeat, a picked bass welded to the riff root, and a lead
-// guitar that steps out for a full solo in the middle. Like the march, it
-// is deliberately NOT assembled from the shared `techno.rs`
-// kick/clap/supersaw toolkit every other blip game's music is built from
-// — Raider carries its own voices (`power_chord`, `lead_guitar`, and a
-// rock kit) so it still reads as its own band on the jukebox rather than
-// "the EDM games, plus one".
-//
-// Every guitar voice runs the signal chain a real rig has: a raw
-// oscillator (detuned saws for the rhythm, a saw/square blend for the
-// lead) driven hard into a `tanh` clipper — the amp — then a one-pole
-// low-pass — the speaker cabinet — to roll the fizz off the top. Voices
-// mix into a shared f32 buffer that's soft-limited once at the end, so a
-// chord, a kick and the bass all landing on the downbeat compress
-// gracefully instead of hard-clipping.
+// Raider's theme is a rock instrumental with its own voices (`power_chord`,
+// `lead_guitar`, a rock kit), not the shared techno.rs kit, so it sounds like
+// its own band. Guitars run a rig's chain: detuned saws (rhythm) or a
+// saw/square blend (lead) driven into a tanh clipper (the amp), then a
+// one-pole low-pass (the cabinet). Voices mix into one f32 buffer
+// soft-limited once at the end.
 
-/// Rock kick — tight and dry with a hard beater click, tuned to punch
-/// through a wall of distorted guitar. Shorter and with far less "boom"
-/// than `techno::kick`; the click, not the body, is what stays audible
-/// once the amps are going.
+/// Rock kick: tight and dry with a hard beater click that cuts through
+/// distorted guitar; much less boom than `techno::kick`.
 fn rock_kick(buf: &mut [f32], off: usize, vol: f32) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.11) as usize;
@@ -2381,11 +2313,9 @@ pub fn generate() -> Vec<Asset> {
 mod tests {
     use super::*;
 
-    /// The sea/sky gradient the planes are seen against — the two ends of
-    /// it, from draw_sea() in crates/sky_raider/src/main.rs. Duplicated
-    /// rather than shared because the game does not depend on this crate
-    /// at runtime; if the gradient there changes, this test is the thing
-    /// that should start failing.
+    /// The two ends of the sea/sky gradient from draw_sea() in the game,
+    /// duplicated because the game does not depend on this crate at runtime;
+    /// if it changes there, this test should fail.
     const SKY_HORIZON: (u8, u8, u8) = (25, 61, 117);
     const SKY_NEAR: (u8, u8, u8) = (7, 28, 76);
 
@@ -2404,19 +2334,9 @@ mod tests {
         (hi + 0.05) / (lo + 0.05)
     }
 
-    /// An enemy you cannot see is not a hard enemy.
-    ///
-    /// Raider is a weaving game: the player reads a sky full of diving
-    /// planes and threads between them, and contact costs HP. That only
-    /// works if the planes are *there* to be read. The drab-green grunt —
-    /// the commonest enemy in the game — used to sit at 2.4:1 against the
-    /// horizon with wings at 1.45:1, against a player plane at 4.8:1 and
-    /// clouds at 9:1. The hardest thing on screen to see was the thing
-    /// you had to see.
-    ///
-    /// 3:1 is the floor WCAG sets for a graphical object whose shape
-    /// carries meaning. It is not a style rule — it is the line below
-    /// which the sprite stops being a shape and becomes a smudge.
+    /// An enemy you cannot see is not a hard enemy: contact costs HP, so
+    /// every kind's body and wings must clear 3:1 against the sky, the WCAG
+    /// floor for a graphical object whose shape carries meaning.
     #[test]
     fn enemy_planes_are_visible_against_the_sky() {
         for kind in 0..3 {
@@ -2435,10 +2355,7 @@ mod tests {
         }
     }
 
-    /// The wings are the widest surface and the first thing picked out of
-    /// the sky, so they must not be the dimmest part of the plane. They
-    /// were: shading them 35 darker than the fuselage is what put the
-    /// grunt's at 1.45:1.
+    /// The wings, the widest surface, are no darker than the fuselage.
     #[test]
     fn a_planes_wings_are_no_darker_than_its_fuselage() {
         for kind in 0..3 {
