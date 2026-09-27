@@ -300,84 +300,290 @@ fn stage_clear_sfx() -> Vec<u8> {
 // Sprites                                                                  //
 // ---------------------------------------------------------------------- //
 
-/// Player fighter, nose pointing up (toward the top of the screen, the
-/// direction of travel) — a radial-engine prop fighter, 1942-style: a slim
-/// tapered fuselage, a big main wing plus a small tail stabiliser (the pair
-/// that actually reads as "an airplane" from directly above), a canopy
-/// bubble, and a spinner-and-disc propeller at the nose.
-fn player_plane() -> Vec<u8> {
-    let (w, h) = (PLAYER_W, PLAYER_H);
-    let mut img = Image::new(w as u32, h as u32);
-    let cx = w / 2;
-    let prop_cy = 1;
-    let main_wing_y0 = (h as f32 * 0.46) as i32;
-    let main_wing_y1 = (h as f32 * 0.60) as i32;
-    let tail_wing_y0 = (h as f32 * 0.82) as i32;
-    let tail_wing_y1 = (h as f32 * 0.91) as i32;
-    let canopy_y0 = (h as f32 * 0.24) as i32;
-    let canopy_y1 = (h as f32 * 0.46) as i32;
-    for y in 0..h {
-        for x in 0..w {
-            let from_top = y as f32 / h as f32;
-            let body_half = (1.0 + from_top * 2.2) as i32; // slim, longer-looking taper to the nose
-            if (x - cx).abs() <= body_half && y >= 3 && y <= h - 1 {
-                img.set(x, y, 210, 214, 222);
-            }
-            // main wing, roughly amidships — a lighter leading-edge stripe
-            // and darker wingtips give it real shape instead of a flat slab.
-            if y >= main_wing_y0 && y <= main_wing_y1 {
-                let wing_half = (w as f32 * 0.48) as i32;
-                let wd = (x - cx).abs();
-                if wd <= wing_half {
-                    img.set(x, y, 50, 100, 220); // BLIP_BLUE — matches the cabinet accent
-                }
-                if y == main_wing_y0 && wd <= wing_half {
-                    img.set(x, y, 96, 150, 235); // leading-edge highlight
-                }
-                if wd > wing_half - 3 && wd <= wing_half {
-                    img.set(x, y, 30, 66, 165); // wingtip shading
-                }
-            }
-            // small tail stabiliser near the rear
-            if y >= tail_wing_y0 && y <= tail_wing_y1 {
-                let wing_half = (w as f32 * 0.26) as i32;
-                if (x - cx).abs() <= wing_half {
-                    img.set(x, y, 50, 100, 220);
-                }
-            }
-            // canopy, with a thin frame bar splitting it into two panes
-            if (x - cx).abs() <= 3 && y >= canopy_y0 && y <= canopy_y1 {
-                img.set(x, y, 40, 220, 255);
-            }
-            if (x - cx).abs() <= 3 && y == (canopy_y0 + canopy_y1) / 2 {
-                img.set(x, y, 30, 40, 48); // canopy frame
-            }
-            // a highlight down one side of the spine and a shadow down the
-            // other — a cheap "rounded fuselage" shading cue instead of a
-            // flat-looking silhouette
-            if (x - cx) == -1 && y >= 4 && y <= h - 2 {
-                img.set(x, y, 232, 236, 244);
-            }
-            if (x - cx) == 2 && y >= 4 && y <= h - 2 && body_half >= 2 {
-                img.set(x, y, 168, 174, 188);
-            }
-            // a small rudder-stripe accent right at the tail tip
-            if (x - cx).abs() <= 1 && y > tail_wing_y1 && y <= h - 1 {
-                img.set(x, y, 220, 70, 70);
-            }
-            // propeller: a blurred spinning disc plus a dark spinner hub at
-            // the very nose — drawn after the body so it sits on top of it.
-            let pdx = x - cx;
-            let pdy = y - prop_cy;
-            if pdx * pdx + pdy * pdy <= 13 {
-                img.set(x, y, 205, 205, 212);
-            }
-            if pdx.abs() <= 1 && pdy.abs() <= 1 {
-                img.set(x, y, 45, 45, 52);
+// ---- planform renderer -------------------------------------------------
+// The planes are drawn from their real planforms (three-view drawings of
+// the P-51D, A6M Zero, Ki-43 and Ki-84), rasterised 4x supersampled into a
+// small sprite: wing root and tip chords, tip rounding, cowl, tailplane,
+// canopy. Coordinates are sprite pixels, nose at y = 0, pointing up.
+
+const SS: usize = 4;
+
+struct Canvas { w: usize, h: usize, buf: Vec<[f32; 4]> }
+
+impl Canvas {
+    fn new(w: i32, h: i32) -> Self {
+        let (w, h) = (w as usize, h as usize);
+        Self { w, h, buf: vec![[0.0; 4]; w * h * SS * SS] }
+    }
+    /// Paint `col` (straight RGBA, 0..1) wherever `inside(x, y)` holds,
+    /// with `shade(x, y)` scaling its RGB.
+    fn fill(&mut self, inside: impl Fn(f32, f32) -> bool, shade: impl Fn(f32, f32) -> f32, col: [f32; 4]) {
+        let sw = self.w * SS;
+        for sy in 0..self.h * SS {
+            for sx in 0..sw {
+                let (x, y) = ((sx as f32 + 0.5) / SS as f32, (sy as f32 + 0.5) / SS as f32);
+                if !inside(x, y) { continue; }
+                let k = shade(x, y);
+                let d = &mut self.buf[sy * sw + sx];
+                let a = col[3];
+                for c in 0..3 { d[c] = d[c] * (1.0 - a) + (col[c] * k).min(1.0) * a; }
+                d[3] = d[3] + a * (1.0 - d[3]);
             }
         }
     }
-    img.encode_png()
+    fn solid(&mut self, inside: impl Fn(f32, f32) -> bool, col: [f32; 4]) {
+        self.fill(inside, |_, _| 1.0, col);
+    }
+    /// Box-filter down to the sprite, add a soft dark outline so the
+    /// silhouette holds against the sea, optionally flipped nose-down.
+    fn finish(&self, flip: bool) -> Vec<u8> {
+        let (w, h) = (self.w, self.h);
+        let sw = w * SS;
+        let mut px = vec![[0.0f32; 4]; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                let mut acc = [0.0f32; 4];
+                for j in 0..SS {
+                    for i in 0..SS {
+                        let d = self.buf[(y * SS + j) * sw + x * SS + i];
+                        for c in 0..3 { acc[c] += d[c] * d[3]; }
+                        acc[3] += d[3];
+                    }
+                }
+                let a = acc[3] / (SS * SS) as f32;
+                px[y * w + x] = if acc[3] > 0.0 {
+                    [acc[0] / acc[3], acc[1] / acc[3], acc[2] / acc[3], a]
+                } else { [0.0; 4] };
+            }
+        }
+        let mut img = Image::new(w as u32, h as u32);
+        for y in 0..h {
+            for x in 0..w {
+                let p = px[y * w + x];
+                let mut near = 0.0f32;
+                for (dx, dy) in [(-1i32, 0i32), (1, 0), (0, -1), (0, 1)] {
+                    let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+                    if nx >= 0 && ny >= 0 && (nx as usize) < w && (ny as usize) < h {
+                        near = near.max(px[ny as usize * w + nx as usize][3]);
+                    }
+                }
+                let outline = (near - p[3]).max(0.0) * 0.55;
+                let a = p[3] + outline * (1.0 - p[3]);
+                let rgb = if a > 0.0 { [p[0] * p[3] / a, p[1] * p[3] / a, p[2] * p[3] / a] } else { [0.0; 3] };
+                let oy = if flip { h - 1 - y } else { y } as i32;
+                img.set_rgba(x as i32, oy, (rgb[0] * 255.0) as u8, (rgb[1] * 255.0) as u8,
+                    (rgb[2] * 255.0) as u8, (a * 255.0).round() as u8);
+            }
+        }
+        img.encode_png()
+    }
+}
+
+fn rgb(c: (u8, u8, u8)) -> [f32; 4] { [c.0 as f32 / 255.0, c.1 as f32 / 255.0, c.2 as f32 / 255.0, 1.0] }
+fn lerp(a: f32, b: f32, t: f32) -> f32 { a + (b - a) * t }
+
+/// A lifting surface either side of the centreline `cx`: leading / trailing
+/// edge at the root and at the tip, and how much of the outer span is
+/// rounded off (0 = square tip, ~0.35 = the Japanese elliptical tips).
+#[derive(Clone, Copy)]
+struct Surface { half_span: f32, root: (f32, f32), tip: (f32, f32), round: f32 }
+
+impl Surface {
+    fn contains(&self, cx: f32, x: f32, y: f32) -> bool {
+        let t = (x - cx).abs() / self.half_span;
+        if t > 1.0 { return false; }
+        let (mut le, mut te) = (lerp(self.root.0, self.tip.0, t), lerp(self.root.1, self.tip.1, t));
+        if self.round > 0.0 && t > 1.0 - self.round {
+            let u = (t - (1.0 - self.round)) / self.round;
+            let (mid, half) = ((le + te) / 2.0, (te - le) / 2.0 * (1.0 - u * u).max(0.0).sqrt());
+            le = mid - half;
+            te = mid + half;
+        }
+        y >= le && y <= te
+    }
+    /// Lit leading edge, darker toward the trailing edge and the tip.
+    fn shade(&self, cx: f32, x: f32, y: f32) -> f32 {
+        let t = (x - cx).abs() / self.half_span;
+        let (le, te) = (lerp(self.root.0, self.tip.0, t), lerp(self.root.1, self.tip.1, t));
+        let c = ((y - le) / (te - le).max(0.1)).clamp(0.0, 1.0);
+        1.12 - 0.22 * c - 0.08 * t
+    }
+}
+
+/// One fighter seen from above, nose up.
+struct Fighter {
+    w: i32,
+    /// fuselage: half width at its widest, where that is, and the tail's
+    body_half: f32, widest: f32, tail_half: f32, tail_y: f32,
+    /// radial cowl (round, blunt) or inline nose (pointed), half width, length
+    radial: bool, nose_half: f32, nose_len: f32,
+    wing: Surface, tailplane: Surface,
+    /// canopy centre y, half length, half width
+    canopy: (f32, f32, f32),
+    body: (u8, u8, u8), wing_col: (u8, u8, u8), nose_col: (u8, u8, u8), spinner: (u8, u8, u8),
+}
+
+impl Fighter {
+    fn fuselage_half(&self, y: f32) -> f32 {
+        if y < 0.0 || y > self.tail_y { return -1.0; }
+        if y < self.widest {
+            let s = y / self.widest;
+            if self.radial {
+                // a blunt round cowl that is nearly full width at once
+                lerp(self.nose_half, self.body_half, s) * (1.0 - (1.0 - (s * 4.0).min(1.0)).powi(2) * 0.55)
+            } else {
+                lerp(0.9, self.body_half, s.sqrt())
+            }
+        } else {
+            lerp(self.body_half, self.tail_half, (y - self.widest) / (self.tail_y - self.widest))
+        }
+    }
+
+    fn paint(&self, c: &mut Canvas) {
+        let cx = self.w as f32 / 2.0;
+        // propeller disc: a faint blur ahead of the nose
+        c.solid(|x, y| ((x - cx) / (self.wing.half_span * 0.36)).powi(2) + ((y - 1.0) / 0.9).powi(2) <= 1.0,
+            [0.75, 0.75, 0.72, 0.28]);
+        let (wing, tp) = (self.wing, self.tailplane);
+        c.fill(|x, y| tp.contains(cx, x, y), |x, y| tp.shade(cx, x, y), rgb(self.wing_col));
+        c.fill(|x, y| wing.contains(cx, x, y), |x, y| wing.shade(cx, x, y), rgb(self.wing_col));
+        // control-surface hinge line along the trailing edge
+        c.solid(|x, y| {
+            let t = (x - cx).abs() / wing.half_span;
+            let te = lerp(wing.root.1, wing.tip.1, t) - (lerp(wing.root.1, wing.tip.1, t) - lerp(wing.root.0, wing.tip.0, t)) * 0.22;
+            t > 0.18 && t < 0.9 && (y - te).abs() < 0.28 && wing.contains(cx, x, y)
+        }, [0.0, 0.0, 0.0, 0.22]);
+        // fuselage, shaded as a cylinder lit from above
+        c.fill(|x, y| (x - cx).abs() <= self.fuselage_half(y), |x, y| {
+            let hw = self.fuselage_half(y).max(0.3);
+            let u = ((x - cx) / hw).clamp(-1.0, 1.0);
+            0.72 + 0.42 * (1.0 - u * u).sqrt()
+        }, rgb(self.body));
+        // nose / cowl colour over the front of the fuselage
+        c.fill(|x, y| y < self.nose_len && (x - cx).abs() <= self.fuselage_half(y), |x, y| {
+            let hw = self.fuselage_half(y).max(0.3);
+            let u = ((x - cx) / hw).clamp(-1.0, 1.0);
+            0.7 + 0.45 * (1.0 - u * u).sqrt()
+        }, rgb(self.nose_col));
+        // spinner
+        // spinner: small in the middle of a radial's cowl ring, long on an inline nose
+        let (sw, sl) = if self.radial { (0.75, 0.9) } else { (1.1, 1.5) };
+        c.solid(|x, y| ((x - cx) / sw).powi(2) + ((y - sl * 0.7) / sl).powi(2) <= 1.0, rgb(self.spinner));
+        // canopy glass with a highlight
+        let (cy, cl, cw) = self.canopy;
+        c.solid(|x, y| ((x - cx) / cw).powi(2) + ((y - cy) / cl).powi(2) <= 1.0, [0.16, 0.24, 0.32, 1.0]);
+        c.solid(|x, y| ((x - cx + cw * 0.3) / (cw * 0.35)).powi(2) + ((y - cy + cl * 0.25) / (cl * 0.45)).powi(2) <= 1.0,
+            [0.75, 0.88, 1.0, 0.85]);
+    }
+}
+
+/// A US star-and-bar on the port wing, as the P-51 carried it.
+fn us_star(c: &mut Canvas, x0: f32, y0: f32) {
+    let r = 2.1;
+    let blue = [0.10, 0.16, 0.42, 1.0];
+    c.solid(|x, y| (x - x0).abs() <= r + 1.8 && (y - y0).abs() <= 0.75, blue);
+    c.solid(|x, y| (x - x0).abs() <= r + 1.4 && (y - y0).abs() <= 0.42, [1.0, 1.0, 1.0, 1.0]);
+    c.solid(|x, y| (x - x0).powi(2) + (y - y0).powi(2) <= r * r, blue);
+    c.solid(|x, y| star(x - x0, y - y0, r * 0.95), [1.0, 1.0, 1.0, 1.0]);
+}
+
+/// Inside a five-pointed star of outer radius `r`, point up.
+fn star(x: f32, y: f32, r: f32) -> bool {
+    let pts: Vec<(f32, f32)> = (0..10).map(|i| {
+        let a = -std::f32::consts::FRAC_PI_2 + i as f32 * PI / 5.0;
+        let rr = if i % 2 == 0 { r } else { r * 0.4 };
+        (a.cos() * rr, a.sin() * rr)
+    }).collect();
+    let mut inside = false;
+    let mut j = pts.len() - 1;
+    for i in 0..pts.len() {
+        let ((xi, yi), (xj, yj)) = (pts[i], pts[j]);
+        if (yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi { inside = !inside; }
+        j = i;
+    }
+    inside
+}
+
+/// A hinomaru with a thin white surround, on each wing.
+fn hinomaru(c: &mut Canvas, cx: f32, dx: f32, y0: f32, r: f32) {
+    for x0 in [cx - dx, cx + dx] {
+        c.solid(|x, y| (x - x0).powi(2) + (y - y0).powi(2) <= (r + 0.55).powi(2), [0.97, 0.97, 0.95, 1.0]);
+        c.solid(|x, y| (x - x0).powi(2) + (y - y0).powi(2) <= r * r, [0.80, 0.08, 0.10, 1.0]);
+    }
+}
+
+/// Player: a P-51D Mustang in natural metal — straight tapered wings with
+/// squarish tips, a long inline nose with an olive anti-glare panel, a
+/// bubble canopy, red spinner and yellow nose band, star on the port wing.
+fn player_plane() -> Vec<u8> {
+    let (w, h) = (PLAYER_W, PLAYER_H);
+    let mut c = Canvas::new(w, h);
+    let cx = w as f32 / 2.0;
+    let metal = (196, 202, 212);
+    let f = Fighter {
+        w,
+        body_half: 2.5, widest: 11.0, tail_half: 0.7, tail_y: 31.5,
+        radial: false, nose_half: 1.2, nose_len: 4.2,
+        wing: Surface { half_span: 17.6, root: (10.0, 18.6), tip: (11.4, 15.0), round: 0.06 },
+        tailplane: Surface { half_span: 6.6, root: (25.6, 30.4), tip: (26.9, 29.4), round: 0.12 },
+        canopy: (13.2, 2.6, 1.45),
+        body: metal, wing_col: (206, 212, 222), nose_col: (228, 196, 40), spinner: (200, 40, 36),
+    };
+    f.paint(&mut c);
+    // olive-drab anti-glare panel from the nose band to the windscreen
+    c.solid(|x, y| y > 4.2 && y < 10.8 && (x - cx).abs() <= 0.8, [0.34, 0.36, 0.22, 1.0]);
+    us_star(&mut c, cx - 11.5, 13.6);
+    c.finish(false)
+}
+
+/// Enemy fighters, drawn nose-up and flipped to dive at the player.
+/// `kind`: 0 = grunt, an A6M Zero (IJN green, black radial cowl, wide
+/// elliptical-tipped wings); 1 = weaver, a Ki-43 Hayabusa (khaki, slim
+/// tapered wings); 2 = ace, a Ki-84 Hayate in natural metal with yellow
+/// leading-edge ID stripes (it always drops a power-up).
+fn enemy_plane(kind: usize) -> Vec<u8> {
+    let (w, h) = (ENEMY_W, ENEMY_H);
+    let mut c = Canvas::new(w, h);
+    let cx = w as f32 / 2.0;
+    let (body, wing) = enemy_colors(kind);
+    let f = match kind {
+        0 => Fighter {
+            w,
+            body_half: 1.9, widest: 4.5, tail_half: 0.5, tail_y: 20.5,
+            radial: true, nose_half: 1.8, nose_len: 3.4,
+            wing: Surface { half_span: 12.8, root: (5.6, 11.4), tip: (7.4, 10.4), round: 0.38 },
+            tailplane: Surface { half_span: 5.0, root: (16.6, 20.0), tip: (17.6, 19.4), round: 0.45 },
+            canopy: (8.6, 2.3, 1.1),
+            body, wing_col: wing, nose_col: (38, 38, 42), spinner: (150, 110, 70),
+        },
+        1 => Fighter {
+            w,
+            body_half: 1.6, widest: 4.2, tail_half: 0.45, tail_y: 19.8,
+            radial: true, nose_half: 1.5, nose_len: 2.8,
+            wing: Surface { half_span: 11.8, root: (5.4, 10.8), tip: (7.8, 9.8), round: 0.3 },
+            tailplane: Surface { half_span: 4.4, root: (16.2, 19.2), tip: (17.0, 18.8), round: 0.4 },
+            canopy: (8.4, 2.4, 0.95),
+            body, wing_col: wing, nose_col: (60, 60, 58), spinner: (150, 110, 70),
+        },
+        _ => Fighter {
+            w,
+            body_half: 2.1, widest: 5.0, tail_half: 0.55, tail_y: 21.0,
+            radial: true, nose_half: 1.6, nose_len: 3.2,
+            wing: Surface { half_span: 12.0, root: (6.0, 11.6), tip: (7.6, 10.4), round: 0.32 },
+            tailplane: Surface { half_span: 4.8, root: (16.8, 20.4), tip: (17.8, 19.8), round: 0.4 },
+            canopy: (9.0, 2.2, 1.15),
+            body, wing_col: wing, nose_col: (52, 56, 44), spinner: (160, 120, 70),
+        },
+    };
+    f.paint(&mut c);
+    // IJN/IJA yellow ID stripe on the inboard leading edges
+    let wg = f.wing;
+    c.solid(|x, y| {
+        let t = (x - cx).abs() / wg.half_span;
+        t > 0.14 && t < 0.5 && wg.contains(cx, x, y) && y < lerp(wg.root.0, wg.tip.0, t) + 0.9
+    }, [0.95, 0.72, 0.12, if kind == 2 { 1.0 } else { 0.8 }]);
+    hinomaru(&mut c, cx, wg.half_span * 0.62, lerp(wg.root.0, wg.root.1, 0.5) + 0.4, 1.7);
+    c.finish(true)
 }
 
 /// Body and wing colours for an enemy kind.
@@ -407,7 +613,7 @@ fn enemy_colors(kind: usize) -> ((u8, u8, u8), (u8, u8, u8)) {
     let body: (u8, u8, u8) = match kind {
         0 => (125, 175, 115),
         1 => (205, 158, 68),
-        _ => (245, 105, 95),
+        _ => (214, 218, 224), // natural metal: the ace's Ki-84 is left unpainted
     };
     let wing = (
         body.0.saturating_add(38),
@@ -415,63 +621,6 @@ fn enemy_colors(kind: usize) -> ((u8, u8, u8), (u8, u8, u8)) {
         body.2.saturating_add(38),
     );
     (body, wing)
-}
-
-/// Enemy fighter, nose pointing down (diving toward the player) — the same
-/// main-wing + tail-stabiliser silhouette as the player, recoloured per
-/// kind, front-to-back layout mirrored (tail near the top, nose/propeller
-/// at the bottom). `kind`: 0 = grunt (drab green), 1 = weaver (tan),
-/// 2 = ace (red, always drops a power-up).
-fn enemy_plane(kind: usize) -> Vec<u8> {
-    let (w, h) = (ENEMY_W, ENEMY_H);
-    let mut img = Image::new(w as u32, h as u32);
-    let cx = w / 2;
-    let ((r, g, b), (wr, wg, wb)) = enemy_colors(kind);
-    let prop_cy = h - 2;
-    let tail_wing_y0 = (h as f32 * 0.08) as i32;
-    let tail_wing_y1 = (h as f32 * 0.16) as i32;
-    let main_wing_y0 = (h as f32 * 0.42) as i32;
-    let main_wing_y1 = (h as f32 * 0.54) as i32;
-    let cockpit_y0 = (h as f32 * 0.62) as i32;
-    let cockpit_y1 = (h as f32 * 0.74) as i32;
-    for y in 0..h {
-        for x in 0..w {
-            let from_top = y as f32 / h as f32;
-            let body_half = (1.0 + (1.0 - from_top) * 1.9) as i32; // tapers to a nose at the bottom
-            if (x - cx).abs() <= body_half && y >= 1 && y <= h - 2 {
-                img.set(x, y, r, g, b);
-            }
-            // small tail stabiliser near the rear (top, away from the nose)
-            if y >= tail_wing_y0 && y <= tail_wing_y1 {
-                let wing_half = (w as f32 * 0.24) as i32;
-                if (x - cx).abs() <= wing_half {
-                    img.set(x, y, wr, wg, wb);
-                }
-            }
-            // main wing, roughly amidships
-            if y >= main_wing_y0 && y <= main_wing_y1 {
-                let wing_half = (w as f32 * 0.46) as i32;
-                if (x - cx).abs() <= wing_half {
-                    img.set(x, y, wr, wg, wb);
-                }
-            }
-            // cockpit, between the main wing and the nose
-            if (x - cx).abs() <= 1 && y >= cockpit_y0 && y <= cockpit_y1 {
-                img.set(x, y, 20, 20, 30);
-            }
-            // propeller disc + spinner hub at the nose (the bottom tip,
-            // since these planes dive down toward the player).
-            let pdx = x - cx;
-            let pdy = y - prop_cy;
-            if pdx * pdx + pdy * pdy <= 7 {
-                img.set(x, y, 55, 55, 62);
-            }
-            if pdx.abs() <= 1 && pdy.abs() <= 1 {
-                img.set(x, y, 15, 15, 20);
-            }
-        }
-    }
-    img.encode_png()
 }
 
 // (body, wing) colour per tier — brown-red -> orange -> purple -> deep red

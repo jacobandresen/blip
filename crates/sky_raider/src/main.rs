@@ -184,6 +184,11 @@ const BARRIER_HUM_MAX_VOLUME: f32 = 0.5;
 // ---- explosions -----------------------------------------------------------
 const MAX_EXPLOSIONS: usize = MAX_ENEMIES + 16; // + headroom for power-up bursts
 const EXPLOSION_TTL: f32 = 0.4;
+// Now and then a kill goes down in flames instead of blowing up.
+const FLAMES_CHANCE: f32 = 0.3;
+const WRECK_SECS: f32 = 1.7;
+const MAX_WRECKS: usize = 6;
+const MAX_PUFFS: usize = 120;
 const MAX_POWER_BANNER_TIME: f32 = 1.6;
 
 // ---- tuning -------------------------------------------------------------
@@ -257,6 +262,27 @@ impl Pooled for Enemy {
 
 #[derive(Copy, Clone)]
 struct Explosion { x: f32, y: f32, ttl: f32, max_ttl: f32, scale: f32, color: BlipColor, active: bool }
+
+/// A shot-down plane falling to the sea: it carries on the way it was going
+/// (bent a little, never turning back), rolls, shrinks as it drops, trails
+/// fire and smoke, then splashes. `heading` is only how the sprite is
+/// turned; `course` is where it goes.
+#[derive(Copy, Clone)]
+struct Wreck {
+    x: f32, y: f32, heading: f32, spin: f32, speed: f32, t: f32, kind: EnemyKind, puff_t: f32, active: bool,
+    /// Each fall is its own: its course, how that bends, a roll wobble, how long it takes.
+    course: f32, bend: f32, wobble: f32, dur: f32,
+}
+impl Pooled for Wreck {
+    fn is_active(&self) -> bool { self.active }
+}
+
+/// Fire (short, bright, shrinking) or smoke (dark, growing, drifting with the sea).
+#[derive(Copy, Clone)]
+struct Puff { x: f32, y: f32, r: f32, grow: f32, ttl: f32, max_ttl: f32, fire: bool, active: bool }
+impl Pooled for Puff {
+    fn is_active(&self) -> bool { self.active }
+}
 impl Pooled for Explosion {
     fn is_active(&self) -> bool { self.active }
 }
@@ -412,6 +438,8 @@ struct Game {
     enemy_bullets: [Bullet; MAX_ENEMY_BULLETS],
     enemies: [Enemy; MAX_ENEMIES],
     explosions: [Explosion; MAX_EXPLOSIONS],
+    wrecks: [Wreck; MAX_WRECKS],
+    puffs: [Puff; MAX_PUFFS],
     powerups: [Powerup; MAX_POWERUPS],
     health_pickups: [HealthPickup; MAX_HEALTH_PICKUPS],
     clouds: [Cloud; MAX_CLOUDS],
@@ -534,6 +562,9 @@ impl Game {
             enemy_bullets: [dead_bullet; MAX_ENEMY_BULLETS],
             enemies: [dead_enemy; MAX_ENEMIES],
             explosions: [dead_explosion; MAX_EXPLOSIONS],
+            wrecks: [Wreck { x: 0.0, y: 0.0, heading: 0.0, spin: 0.0, speed: 0.0, t: 0.0, kind: EnemyKind::Grunt,
+                puff_t: 0.0, active: false, course: 0.0, bend: 0.0, wobble: 0.0, dur: 1.0 }; MAX_WRECKS],
+            puffs: [Puff { x: 0.0, y: 0.0, r: 0.0, grow: 0.0, ttl: 0.0, max_ttl: 1.0, fire: false, active: false }; MAX_PUFFS],
             powerups: [dead_powerup; MAX_POWERUPS],
             health_pickups: [dead_health_pickup; MAX_HEALTH_PICKUPS],
             clouds,
@@ -613,6 +644,8 @@ impl Game {
         for p in self.powerups.iter_mut() { p.active = false; }
         for h in self.health_pickups.iter_mut() { h.active = false; }
         for e in self.explosions.iter_mut() { e.active = false; }
+        for w in self.wrecks.iter_mut() { w.active = false; }
+        for p in self.puffs.iter_mut() { p.active = false; }
         for b in self.turret_bullets.iter_mut() { b.active = false; }
         self.boss.active = false;
         self.barrier.active = false;
@@ -1294,6 +1327,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         e.ttl -= dt;
         if e.ttl <= 0.0 { e.active = false; }
     }
+    update_wrecks(g, dt, sfx);
     update_background(g, dt);
 
     update_enemies(g, dt, true);
@@ -1327,18 +1361,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             if !g.enemies[ei].active { continue; }
             let (ex, ey) = (g.enemies[ei].x, g.enemies[ei].y);
             if rects_overlap(bx, by, bw, BULLET_H, ex, ey, ENEMY_W as f32, ENEMY_H as f32) {
-                let kind = g.enemies[ei].kind;
-                g.enemies[ei].active = false;
-                g.spawn_explosion(ex + ENEMY_W as f32 / 2.0, ey + ENEMY_H as f32 / 2.0, 1.0, EXPLOSION_ORANGE);
-                let pts = match kind { EnemyKind::Grunt => 20, EnemyKind::Weaver => 30, EnemyKind::Ace => 50 };
-                g.sess.add_score(pts * g.sess.level);
-                g.wave_kills += 1;
-                play_sfx(&sfx.enemy_explode);
-                if kind == EnemyKind::Ace {
-                    pool_spawn(&mut g.powerups, Powerup { x: ex, y: ey, active: true });
-                } else if rand01() < HEALTH_DROP_CHANCE {
-                    pool_spawn(&mut g.health_pickups, HealthPickup { x: ex, y: ey, active: true });
-                }
+                shoot_down(g, ei, sfx, rand01() < FLAMES_CHANCE);
                 consumed = true;
                 break;
             }
@@ -1537,6 +1560,89 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 }
             }
         }
+    }
+}
+
+/// An enemy is down: points, the kill count, its drop, and either a fireball
+/// or (`flames`) a wreck that burns all the way to the sea.
+fn shoot_down(g: &mut Game, ei: usize, sfx: &Sounds, flames: bool) {
+    let e = g.enemies[ei];
+    g.enemies[ei].active = false;
+    let (ecx, ecy) = (e.x + ENEMY_W as f32 / 2.0, e.y + ENEMY_H as f32 / 2.0);
+    if flames && pool_iter(&g.wrecks).count() < MAX_WRECKS {
+        g.spawn_explosion(ecx, ecy, 0.45, EXPLOSION_ORANGE);
+        // A random fall along its own course: anything from a lazy burning
+        // glide to a tight spinning roll, bending up to ~25 degrees off.
+        let spin = (if rand01() < 0.5 { -1.0 } else { 1.0 }) * (0.3 + rand01() * 4.2);
+        pool_spawn(&mut g.wrecks, Wreck { x: e.x, y: e.y, heading: e.heading, spin,
+            speed: 85.0 + rand01() * 45.0, t: 0.0, kind: e.kind, puff_t: 0.0, active: true,
+            course: e.heading + (rand01() - 0.5) * 0.3, bend: (rand01() - 0.5) * 0.3,
+            wobble: rand01() * 3.0, dur: WRECK_SECS * (0.75 + rand01() * 0.55) });
+        play_sfx_volume(&sfx.enemy_explode, 0.55);
+    } else {
+        g.spawn_explosion(ecx, ecy, 1.0, EXPLOSION_ORANGE);
+        play_sfx(&sfx.enemy_explode);
+    }
+    let pts = match e.kind { EnemyKind::Grunt => 20, EnemyKind::Weaver => 30, EnemyKind::Ace => 50 };
+    g.sess.add_score(pts * g.sess.level);
+    g.wave_kills += 1;
+    if e.kind == EnemyKind::Ace {
+        pool_spawn(&mut g.powerups, Powerup { x: e.x, y: e.y, active: true });
+    } else if rand01() < HEALTH_DROP_CHANCE {
+        pool_spawn(&mut g.health_pickups, HealthPickup { x: e.x, y: e.y, active: true });
+    }
+}
+
+fn update_wrecks(g: &mut Game, dt: f32, sfx: &Sounds) {
+    for i in 0..MAX_WRECKS {
+        if !g.wrecks[i].active { continue; }
+        let w = &mut g.wrecks[i];
+        w.t += dt;
+        w.spin *= 1.0 + 0.8 * dt; // the roll tightens as it falls
+        w.heading += (w.spin + (w.t * 5.0).sin() * w.wobble) * dt;
+        w.course += w.bend * dt;
+        w.speed *= 1.0 - 0.25 * dt; // it keeps its momentum
+        w.x += w.course.sin() * w.speed * dt;
+        w.y += w.course.cos() * w.speed * dt + SEA_SCROLL_SPEED * 0.5 * dt;
+        w.puff_t -= dt;
+        let (cx, cy, k) = (w.x + ENEMY_W as f32 / 2.0, w.y + ENEMY_H as f32 / 2.0, w.t / w.dur);
+        let (emit, done) = (w.puff_t <= 0.0, w.t >= w.dur);
+        if emit { w.puff_t = 0.035; }
+        if done { w.active = false; }
+        let s = 1.0 - 0.55 * k;
+        if emit && !done {
+            let j = || (rand01() - 0.5) * 4.0;
+            pool_spawn(&mut g.puffs, Puff { x: cx + j(), y: cy + j(), r: 2.5 * s, grow: 16.0 * s,
+                ttl: 0.9, max_ttl: 0.9, fire: false, active: true });
+            pool_spawn(&mut g.puffs, Puff { x: cx + j(), y: cy + j(), r: 3.4 * s, grow: -5.0,
+                ttl: 0.22, max_ttl: 0.22, fire: true, active: true });
+        }
+        if done {
+            // the splash where it goes in
+            g.spawn_explosion(cx, cy, 0.8, BlipColor::new(0.85, 0.93, 1.0, 1.0));
+        }
+    }
+    // A burning plane still at altitude brings down any plane it crosses,
+    // and that one burns too. Low in its fall it is under them.
+    for wi in 0..MAX_WRECKS {
+        let w = g.wrecks[wi];
+        if !w.active || w.t / w.dur > 0.6 { continue; }
+        let s = 1.0 - 0.55 * w.t / w.dur;
+        let (ww, wh) = (ENEMY_W as f32 * s * 0.7, ENEMY_H as f32 * s * 0.7);
+        let (wx, wy) = (w.x + (ENEMY_W as f32 - ww) / 2.0, w.y + (ENEMY_H as f32 - wh) / 2.0);
+        for ei in 0..MAX_ENEMIES {
+            let e = g.enemies[ei];
+            if e.active && rects_overlap(wx, wy, ww, wh, e.x + 4.0, e.y + 4.0,
+                ENEMY_W as f32 - 8.0, ENEMY_H as f32 - 8.0) {
+                shoot_down(g, ei, sfx, true);
+            }
+        }
+    }
+    for p in pool_iter_mut(&mut g.puffs) {
+        p.y += SEA_SCROLL_SPEED * dt;
+        p.r = (p.r + p.grow * dt).max(0.5);
+        p.ttl -= dt;
+        if p.ttl <= 0.0 { p.active = false; }
     }
 }
 
@@ -1828,6 +1934,39 @@ fn draw_play(
     }
     if g.state == State::Play && !g.respawn_grace.active() {
         draw_shadow(player_tex, g.player_x, g.player_y, PLAYER_W as f32, PLAYER_H as f32, g.player_bank);
+    }
+
+    // Planes going down: smoke under them, the burning plane shrinking
+    // toward the sea with its shadow closing in, fire on top.
+    for p in pool_iter(&g.puffs) {
+        if p.fire { continue; }
+        let a = p.ttl / p.max_ttl;
+        blip.fill_circle(p.x, p.y, p.r, BlipColor::new(0.12, 0.11, 0.10, 0.5 * a));
+    }
+    for w in pool_iter(&g.wrecks) {
+        let k = w.t / w.dur;
+        let s = 1.0 - 0.55 * k;
+        let (ww, wh) = (ENEMY_W as f32 * s, ENEMY_H as f32 * s);
+        let (x, y) = (w.x + (ENEMY_W as f32 - ww) / 2.0, w.y + (ENEMY_H as f32 - wh) / 2.0);
+        let tex = match w.kind {
+            EnemyKind::Grunt  => &enemy_tex[0],
+            EnemyKind::Weaver => &enemy_tex[1],
+            EnemyKind::Ace    => &enemy_tex[2],
+        };
+        draw_texture_ex(tex, x + PLANE_SHADOW_DX * (1.0 - k), y + PLANE_SHADOW_DY * (1.0 - k),
+            BlipColor::new(0.0, 0.0, 0.0, 0.3), DrawTextureParams {
+                dest_size: Some(vec2(ww, wh)), rotation: w.heading, ..Default::default()
+            });
+        let burn = 1.0 - 0.6 * k;
+        draw_texture_ex(tex, x, y, BlipColor::new(burn, burn * 0.85, burn * 0.75, 1.0), DrawTextureParams {
+            dest_size: Some(vec2(ww, wh)), rotation: w.heading, ..Default::default()
+        });
+    }
+    for p in pool_iter(&g.puffs) {
+        if !p.fire { continue; }
+        let a = p.ttl / p.max_ttl;
+        blip.fill_circle(p.x, p.y, p.r, BlipColor::new(1.0, 0.45 + 0.4 * a, 0.1, 0.9 * a));
+        blip.fill_circle(p.x, p.y, p.r * 0.5, BlipColor::new(1.0, 0.95, 0.6, a));
     }
 
     for e in pool_iter(&g.enemies) {
