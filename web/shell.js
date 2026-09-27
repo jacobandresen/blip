@@ -226,10 +226,14 @@ function flashCoinBar() {
   });
 }
 
-// Called from WASM on game-over restart — spend a coin or block if empty.
+// Called from WASM on game-over restart, and again when a second player
+// joins (a two-player game takes two coins). Out of coins, the debt is
+// kept and the coins that go in next pay it before the game goes on.
+var coinsOwed = 0;
 window.blipSpendCoin = function () {
   var n = getCoins();
   if (n <= 0) {
+    coinsOwed++;
     overlay.classList.add('visible');
     return 0;
   }
@@ -308,15 +312,22 @@ window.blipSetMode = function (mode) {
   };
 }());
 
-overlay.addEventListener('click', function () {
-  var n = getCoins();
-  if (n >= MAX_COINS) return;
-  saveCoins(n + 1);
+// A coin in: it pays off anything owed first, and the wall only lifts
+// once nothing is.
+function coinIn() {
+  var n = getCoins() + 1;
+  if (coinsOwed > 0) { coinsOwed--; n--; }
+  saveCoins(n);
   updateCoinsHud();
   playCoinInsert();
   dropCoinAnimation();
   flashCoinBar();
-  overlay.classList.remove('visible');
+  if (coinsOwed <= 0) overlay.classList.remove('visible');
+}
+
+overlay.addEventListener('click', function () {
+  if (getCoins() >= MAX_COINS) return;
+  coinIn();
 });
 
 document.getElementById('insert-coin-btn').addEventListener('click', function () {
@@ -330,12 +341,7 @@ document.getElementById('insert-coin-btn').addEventListener('click', function ()
     btn.addEventListener('animationend', function () { btn.classList.remove('shake'); }, { once: true });
     return;
   }
-  saveCoins(n + 1);
-  updateCoinsHud();
-  playCoinInsert();
-  dropCoinAnimation();
-  flashCoinBar();
-  overlay.classList.remove('visible');
+  coinIn();
 });
 
 // Mirror the overlay's visibility onto <body> so CSS can key off it

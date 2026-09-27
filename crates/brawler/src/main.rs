@@ -1902,6 +1902,8 @@ fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
             if m[0].fire || (g.menu == 1 && m[1].fire) {
                 g.mode = if g.menu == 0 { Mode::Solo } else { Mode::Versus };
                 web::set_mode(g.mode == Mode::Versus);
+                // a two-player game takes two coins: this is player two's
+                if g.mode == Mode::Versus { web::spend_coin(); }
                 g.state = State::Select;
                 g.pick = 0;
                 g.pick2 = FIGHTERS.len() - 1;

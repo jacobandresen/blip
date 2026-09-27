@@ -132,6 +132,7 @@ fn update_title(g: &mut Game) {
     if key_pressed(KeyCode::Key2) || p2_dial_spun() {
         g.mode = Mode::TwoPlayer;
         web::set_mode(true);
+        web::spend_coin(); // player two's coin: two players, two coins
         g.start_game();
     } else if p1_dial_spun() {
         g.mode = Mode::OnePlayer;

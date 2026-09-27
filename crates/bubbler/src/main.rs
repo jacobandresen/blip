@@ -367,6 +367,7 @@ impl Game {
         p.place();
         self.two_up = true;
         web::set_players(1);
+        web::spend_coin(); // player two's coin: two players, two coins
     }
 
     fn platform(&self, c: i32, r: i32) -> bool {
