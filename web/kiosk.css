@@ -3171,6 +3171,46 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   }
 }
 
+/* Two players upright on a touch phone ("play upright" on the rotate hint):
+   a half-width station cannot seat a thumb-sized cross beside its caps, but
+   the picture is width-bound, so there is height to spare. Each station
+   stacks them on a diagonal, cross high and caps low, clear of each other;
+   in the middle P1's caps and P2's cross are a diagonal apart too.
+   At 375px: cross 77px, caps 42px. */
+@media (pointer: coarse) and (max-width: 520px) {
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players="2"] {
+    --cap: clamp(38px, 11.2vw, 46px);
+    --dpad: clamp(66px, 20.5vw, 84px);
+    --ctl-cx: calc(6px + var(--dpad) / 2);
+    --mid: 18px;
+  }
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players="2"] :is(#topbar, .kiosk-bar-main) {
+    height: calc(var(--dpad) + 2 * var(--cap) + 36px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] :is(#snes-pad, #snes-pad-p2) .snes-shell,
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] :is(#deck-p1, #deck-p2) {
+    display: grid;
+    grid-template: 1fr / 1fr;
+    align-items: stretch;
+    padding-top: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] .snes-shell > .snes-dpad,
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] .deck-side > .stick-base {
+    grid-area: 1 / 1;
+    justify-self: start;
+    align-self: start;
+  }
+  /* the boot where the cross is, in the top-left box */
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] .deck-side > .stick-base { height: var(--dpad); }
+  :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] .snes-shell > .snes-face,
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] .deck-side > .fire-buttons {
+    grid-area: 1 / 1;
+    justify-self: end;
+    align-self: end;
+  }
+}
+
 /* Two players sideways: a station per gutter, each as big as a thumb
    wants; the picture is fitted between them (fillCanvas). */
 :root[data-layout="landscape"][data-players="2"] .snes-pad { --sf-btn: 46px; --sf-dpad: 96px; --sf-gap: 10px; }
@@ -3180,6 +3220,26 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-layout="landscape"][data-players="2"] .stick-base { width: 80px; }
 :root[data-layout="landscape"][data-players="2"] .stick-boot { width: 48px; height: 48px; }
 :root[data-layout="landscape"][data-players="2"] .stick-ball { width: 52px; height: 52px; }
+/* One player sideways on the stick deck, laid out like the pad: stick in
+   the left gutter, the live caps stacked in the right, no dead station;
+   sizes match the pad's cross (84) and caps (52). */
+:root[data-layout="landscape"][data-controls="stick"][data-players="1"] #deck-p2 { display: none; }
+:root[data-layout="landscape"][data-controls="stick"][data-players="1"] #deck-p1 {
+  flex: 1 1 auto;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 0 max(10px, env(safe-area-inset-right, 0px)) 10px max(10px, env(safe-area-inset-left, 0px));
+}
+:root[data-layout="landscape"][data-controls="stick"][data-players="1"] #deck-p1 .fire-buttons.four {
+  grid-template-columns: 52px;
+  gap: 14px;
+}
+:root[data-layout="landscape"][data-controls="stick"][data-players="1"] #deck-p1 .arcade-btn { width: 52px; height: 52px; }
+:root[data-layout="landscape"][data-controls="stick"][data-players="1"] .stick-base { width: 84px; }
+:root[data-layout="landscape"][data-controls="stick"][data-players="1"] .stick-boot { width: 52px; height: 52px; }
+:root[data-layout="landscape"][data-controls="stick"][data-players="1"] .stick-ball { width: 56px; height: 56px; }
+
 /* Sideways every cap on show should do something: a two-button game's
    spares only look like more buttons to press. */
 :root[data-layout="landscape"] :is(.snes-btn, .arcade-btn).spare { display: none; }

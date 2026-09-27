@@ -433,7 +433,7 @@ function fillCanvas() {
   var gl = PAD, gr = PAD;
   if (landscape() && tb) {
     var mid = window.innerWidth / 2;
-    var ctl = tb.querySelectorAll('.snes-dpad, .snes-face, .stick-boot, .fire-buttons, #paddle-dial, #paddle-dial-p2');
+    var ctl = tb.querySelectorAll('.snes-dpad, .snes-face, .stick-base, .stick-ball, .fire-buttons, #paddle-dial, #paddle-dial-p2');
     for (var i = 0; i < ctl.length; i++) {
       var r = ctl[i].getBoundingClientRect();
       if (!r.width || !r.height) continue;
