@@ -212,7 +212,7 @@ enum State { Title, Launch, Play, Dead, Win, Won, Over }
 enum EnemyKind { Grunt, Weaver, Ace }
 
 #[derive(Copy, Clone)]
-struct Bullet { x: f32, y: f32, active: bool }
+struct Bullet { x: f32, y: f32, vx: f32, active: bool }
 impl Pooled for Bullet {
     fn is_active(&self) -> bool { self.active }
 }
@@ -257,7 +257,8 @@ struct Enemy {
     active: bool,
     kind: EnemyKind,
     t: f32,             // seconds alive, drives the weave phase and fire cadence
-    flight_quirk: f32,  // Grunt: its fixed target heading; Weaver: sine phase offset; Ace: unused
+    flight_quirk: f32,  // Grunt: its dive heading; Weaver: the seed of its S-turns; Ace: its break heading once it breaks off (0 = still pursuing)
+    speed: f32,         // airspeed: builds in a dive, bleeds in a hard bank
     fire_timer: Timer,
     can_hide: bool,     // this plane ducks out of sight when it flies under a cloud — see draw_play()
 }
@@ -528,10 +529,10 @@ fn weapon_tier_color(level: i32) -> BlipColor {
 
 impl Game {
     fn new() -> Self {
-        let dead_bullet = Bullet { x: 0.0, y: 0.0, active: false };
+        let dead_bullet = Bullet { x: 0.0, y: 0.0, vx: 0.0, active: false };
         let dead_enemy = Enemy {
             x: 0.0, y: 0.0, heading: 0.0, bank: 0.0, active: false, kind: EnemyKind::Grunt,
-            t: 0.0, flight_quirk: 0.0, fire_timer: Timer::default(), can_hide: false,
+            t: 0.0, flight_quirk: 0.0, speed: 0.0, fire_timer: Timer::default(), can_hide: false,
         };
         let dead_explosion = Explosion { x: 0.0, y: 0.0, ttl: 0.0, max_ttl: EXPLOSION_TTL, scale: 1.0, color: EXPLOSION_ORANGE, active: false };
         let dead_powerup = Powerup { x: 0.0, y: 0.0, active: false };
@@ -869,7 +870,7 @@ fn spawn_enemy_at(g: &mut Game, kind: EnemyKind, x: f32, y: f32, formation_angle
     let flight_quirk = match kind {
         // Grunt: target heading — up to ~±31 degrees off straight down.
         EnemyKind::Grunt  => formation_angle.unwrap_or_else(|| (rand01() - 0.5) * 1.1),
-        // Weaver: sine phase.
+        // Weaver: seeds when its S-turns reverse and how hard.
         EnemyKind::Weaver => formation_angle.unwrap_or_else(|| rand01() * std::f32::consts::TAU),
         EnemyKind::Ace    => 0.0,
     };
@@ -877,7 +878,8 @@ fn spawn_enemy_at(g: &mut Game, kind: EnemyKind, x: f32, y: f32, formation_angle
     // Weavers randomly get to duck through a cloud on the way past.
     let can_hide = kind != EnemyKind::Ace && rand01() < 0.4;
     pool_spawn(&mut g.enemies, Enemy {
-        x, y, heading: 0.0, bank: 0.0, active: true, kind, t: 0.0, flight_quirk, fire_timer, can_hide,
+        x, y, heading: 0.0, bank: 0.0, active: true, kind, t: 0.0, flight_quirk,
+        speed: base_speed(kind), fire_timer, can_hide,
     });
 }
 
@@ -933,33 +935,77 @@ fn spawn_wave_tick(g: &mut Game) {
     }
 }
 
+fn base_speed(kind: EnemyKind) -> f32 {
+    match kind {
+        EnemyKind::Grunt  => 100.0,
+        EnemyKind::Weaver => 118.0,
+        EnemyKind::Ace    => 92.0,
+    }
+}
+
+/// A repeatable 0..1 from a seed and an index: the "random" choices a
+/// formation must make together.
+fn hash01(seed: f32, n: u32) -> f32 {
+    let v = (seed * 12.9898 + n as f32 * 78.233).sin() * 43_758.547;
+    v - v.floor()
+}
+
 fn update_enemies(g: &mut Game, dt: f32, allow_fire: bool) {
     let player_x = g.player_x;
     let player_y = g.player_y;
+    let player_vx = g.player_vx;
     for i in 0..MAX_ENEMIES {
         if !g.enemies[i].active { continue; }
         g.enemies[i].t += dt;
 
-        let speed = match g.enemies[i].kind {
-            EnemyKind::Grunt  => 100.0,
-            EnemyKind::Weaver => 118.0,
-            EnemyKind::Ace    => 92.0,
-        };
+        let speed = g.enemies[i].speed;
+        let (x, y, t, seed) = (g.enemies[i].x, g.enemies[i].y, g.enemies[i].t, g.enemies[i].flight_quirk);
 
-        // The "autopilot target" — the heading this plane wants to be
-        // flying right now. It doesn't turn onto this directly; it banks
-        // toward it below, and the bank is what actually turns the plane.
-        let desired_heading = match g.enemies[i].kind {
-            EnemyKind::Grunt => g.enemies[i].flight_quirk,
-            EnemyKind::Weaver => {
-                (g.enemies[i].t * 2.6 + g.enemies[i].flight_quirk).sin() * 0.85
+        // What the pilot is doing: the heading it wants now. It banks toward
+        // it below, and the bank is what turns the plane. Choices come from
+        // hash01(seed, n), so a formation sharing a seed turns together.
+        let mut desired_heading = match g.enemies[i].kind {
+            // A diving pass, then a banked break-off turn to one side.
+            EnemyKind::Grunt => {
+                let break_at = 1.3 + hash01(seed, 1) * 1.3;
+                if t < break_at { seed } else {
+                    let side = if hash01(seed, 2) < 0.5 { -1.0 } else { 1.0 };
+                    side * (0.9 + hash01(seed, 3) * 0.4)
+                }
             }
+            // S-turns: hold an arc, roll through level into the other one.
+            EnemyKind::Weaver => {
+                let (mut k, mut end) = (0u32, 0.0f32);
+                loop {
+                    end += 1.0 + hash01(seed, 10 + k) * 0.8;
+                    if t < end || k > 40 { break; }
+                    k += 1;
+                }
+                let sign = if (k + (hash01(seed, 0) * 2.0) as u32) % 2 == 0 { 1.0 } else { -1.0 };
+                sign * (0.45 + hash01(seed, 60 + k) * 0.35)
+            }
+            // Pursuit with lead until close or tired of it, then a hard
+            // break away from the player's side, and it extends.
             EnemyKind::Ace => {
-                let dx = player_x - g.enemies[i].x;
-                let dy = (player_y - g.enemies[i].y).max(24.0);
-                dx.atan2(dy).clamp(-1.15, 1.15)
+                if seed == 0.0 && (y > player_y - 110.0 || t > 4.0) {
+                    let away = if x + ENEMY_W as f32 / 2.0 < player_x + PLAYER_W as f32 / 2.0 { -1.0 } else { 1.0 };
+                    g.enemies[i].flight_quirk = away * (1.0 + rand01() * 0.3);
+                }
+                if g.enemies[i].flight_quirk != 0.0 { g.enemies[i].flight_quirk } else {
+                    let lead = player_x + player_vx * 0.45;
+                    let dx = lead - x;
+                    let dy = (player_y - y).max(24.0);
+                    dx.atan2(dy).clamp(-1.0, 1.0)
+                }
             }
         };
+        // Turn away from the side walls in a curve rather than meet them;
+        // a plane breaking off (steep heading) may leave that way.
+        let breaking = desired_heading.abs() > 0.85;
+        if !breaking {
+            if x < 70.0 { desired_heading = desired_heading.max(0.35); }
+            if x > (WIN_W - ENEMY_W) as f32 - 70.0 { desired_heading = desired_heading.min(-0.35); }
+        }
 
         // Roll toward a bank angle proportional to the heading error (a big
         // error commands a steep bank, like correcting hard onto course;
@@ -991,21 +1037,28 @@ fn update_enemies(g: &mut Game, dt: f32, allow_fire: bool) {
         let h = g.enemies[i].heading;
         g.enemies[i].x += h.sin() * speed * dt;
         g.enemies[i].y += h.cos() * speed * dt;
-        // Keep clear of the extreme corners — nothing else bounds x once a
-        // plane is airborne, and a hard bank near the top edge can otherwise
-        // carry it right into the corner, where the CRT glass's barrel
-        // distortion curves hardest and visibly crops it.
-        g.enemies[i].x = g.enemies[i].x.clamp(ENEMY_EDGE_MARGIN, (WIN_W - ENEMY_W) as f32 - ENEMY_EDGE_MARGIN);
+        // Energy: faster in a dive, slower in a steep bank (and a slower
+        // plane turns tighter, through turn_rate above).
+        let base = base_speed(g.enemies[i].kind);
+        let b = g.enemies[i].bank / ENEMY_MAX_BANK;
+        let target = base * (0.8 + 0.3 * h.cos().max(0.0)) * (1.0 - 0.18 * b * b);
+        g.enemies[i].speed += (target - speed) * (1.5 * dt).min(1.0);
+        // The top corners are where the CRT glass crops hardest; keep out.
+        if g.enemies[i].y < 70.0 {
+            g.enemies[i].x = g.enemies[i].x.clamp(ENEMY_EDGE_MARGIN, (WIN_W - ENEMY_W) as f32 - ENEMY_EDGE_MARGIN);
+        }
 
-        if g.enemies[i].y > WIN_H as f32 {
+        if g.enemies[i].y > WIN_H as f32 || g.enemies[i].x < -(ENEMY_W as f32) - 4.0 || g.enemies[i].x > WIN_W as f32 + 4.0 {
             g.enemies[i].active = false;
             continue;
         }
-        if allow_fire && g.enemies[i].kind != EnemyKind::Weaver && g.enemies[i].fire_timer.tick(dt) {
+        // Guns fire along the nose, so only while it points down the screen.
+        if allow_fire && g.enemies[i].kind != EnemyKind::Weaver && h.abs() < 0.7 && g.enemies[i].fire_timer.tick(dt) {
             let (ex, ey, kind) = (g.enemies[i].x, g.enemies[i].y, g.enemies[i].kind);
             pool_spawn(&mut g.enemy_bullets, Bullet {
-                x: ex + ENEMY_W as f32 / 2.0 - ENEMY_BULLET_W / 2.0,
+                x: ex + ENEMY_W as f32 / 2.0 - ENEMY_BULLET_W / 2.0 + h.sin() * ENEMY_H as f32 / 2.0,
                 y: ey + ENEMY_H as f32,
+                vx: h.tan() * ENEMY_BULLET_SPEED,
                 active: true,
             });
             let (mn, mx) = if kind == EnemyKind::Ace { (0.9, 1.6) } else { (1.1, 2.0) };
@@ -1050,6 +1103,7 @@ fn fire_fan(g: &mut Game, center_x: f32, width: f32, n: i32, y: f32) {
         pool_spawn(&mut g.enemy_bullets, Bullet {
             x: center_x + dx - ENEMY_BULLET_W / 2.0,
             y,
+            vx: 0.0,
             active: true,
         });
     }
@@ -1067,7 +1121,7 @@ fn fire_curtain(g: &mut Game, gap_center: f32, n: i32, y: f32) {
         let t = if n <= 1 { 0.5 } else { i as f32 / (n - 1) as f32 };
         let x = cx - half + t * width;
         if (x - gap_center).abs() < gap_w / 2.0 { continue; }
-        pool_spawn(&mut g.enemy_bullets, Bullet { x: x - ENEMY_BULLET_W / 2.0, y, active: true });
+        pool_spawn(&mut g.enemy_bullets, Bullet { x: x - ENEMY_BULLET_W / 2.0, y, vx: 0.0, active: true });
     }
 }
 
@@ -1327,7 +1381,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
     for b in pool_iter_mut(&mut g.enemy_bullets) {
         b.y += ENEMY_BULLET_SPEED * dt;
-        if b.y > WIN_H as f32 { b.active = false; }
+        b.x += b.vx * dt;
+        if b.y > WIN_H as f32 || b.x < -10.0 || b.x > WIN_W as f32 + 10.0 { b.active = false; }
     }
     for p in pool_iter_mut(&mut g.powerups) {
         p.y += POW_SPEED * dt;
