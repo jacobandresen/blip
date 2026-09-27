@@ -975,7 +975,15 @@ fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
 fn advance(f: &mut Fighter, dt: f32) {
     if f.land > 0.0 { f.land = (f.land - dt).max(0.0); }
 
+    let from = f.t;
     f.t += dt;
+    // A long frame on a slow device can step clean over a two-frame active
+    // window; stop in it for this step so the hit is still tested.
+    if f.act == Act::Attack && !f.hit_done {
+        let m = f.scaled(move_data(f.mv));
+        let (start, end) = (m.startup * F, (m.startup + m.active) * F);
+        if from < start && f.t > end { f.t = (start + end) / 2.0; }
+    }
     if f.cancel_t > 0.0 { f.cancel_t -= dt; }
 
     if f.airborne() || f.vy < 0.0 {

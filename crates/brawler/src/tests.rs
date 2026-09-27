@@ -107,6 +107,19 @@ fn an_attack_can_only_hit_during_its_active_window() {
 }
 
 #[test]
+fn a_slow_frame_cannot_step_over_the_active_window() {
+    // One long frame (a slow phone) that starts before the active window
+    // and would end after it must still stop in it.
+    for id in [MoveId::LowPunch, MoveId::HighKick] {
+        let mut f = at(0, 200.0, 1.0);
+        let m = f.scaled(move_data(id));
+        f.start_attack(id);
+        advance(&mut f, (m.startup + m.active) * F + 0.01);
+        assert!(f.hit_box().is_some(), "{id:?}: a long frame stepped over its active window");
+    }
+}
+
+#[test]
 fn one_attack_lands_one_hit() {
     // Four active frames is four chances to overlap. Without the latch
     // a kick would do four times its listed damage.
