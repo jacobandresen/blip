@@ -12,14 +12,28 @@ use crate::wav::{encode_pcm16_mono, mix_into, mix_into_f32, ms_to_samples, soft_
 use crate::Asset;
 
 // Must match crates/sky_raider/src/main.rs's PLAYER_W / PLAYER_H.
-const PLAYER_W: i32 = 36;
-const PLAYER_H: i32 = 32;
+const PLAYER_W: i32 = 54;
+const PLAYER_H: i32 = 48;
 // Must match crates/sky_raider/src/main.rs's ENEMY_W / ENEMY_H.
-const ENEMY_W: i32 = 26;
-const ENEMY_H: i32 = 22;
+const ENEMY_W: i32 = 52;
+const ENEMY_H: i32 = 44;
 // Must match crates/sky_raider/src/main.rs's BOSS_SIZES.
+// (span, length) at the fighters' scale (a 12 m Zero is 52 px), shrunk a
+// little for the biggest so they fit the screen.
 const BOSS_SIZES: [(i32, i32); 7] = [
-    (72, 50), (84, 58), (98, 68), (114, 80), (132, 92), (152, 106), (176, 124),
+    (96, 76), (104, 84), (116, 92), (150, 106), (164, 122), (182, 134), (272, 196),
+];
+// Gun positions per boss: (x as a fraction of the half span from the
+// centreline, y as a fraction of the length from the nose). The game fires
+// from the same points (crates/sky_raider/src/main.rs BOSS_TURRETS).
+const BOSS_TURRETS: [&[(f32, f32)]; 7] = [
+    &[(0.0, 0.06), (0.0, 0.45), (0.0, 0.97)],
+    &[(0.0, 0.06), (0.0, 0.50), (0.0, 0.97)],
+    &[(0.0, 0.07), (0.0, 0.36), (-0.09, 0.62), (0.09, 0.62), (0.0, 0.98)],
+    &[(0.0, 0.06), (0.0, 0.30), (0.0, 0.60), (0.0, 0.97)],
+    &[(0.0, 0.07), (0.0, 0.36), (-0.07, 0.60), (0.07, 0.60), (0.0, 0.97)],
+    &[(0.0, 0.06), (0.0, 0.28), (0.0, 0.55), (0.0, 0.97)],
+    &[(0.0, 0.05), (0.0, 0.22), (0.0, 0.42), (0.0, 0.62), (-0.05, 0.80), (0.05, 0.80), (0.0, 0.97)],
 ];
 // Must match crates/sky_raider/src/main.rs's POW_W / POW_H.
 const POW_W: i32 = 14;
@@ -28,8 +42,8 @@ const POW_H: i32 = 14;
 const HEALTH_W: i32 = 14;
 const HEALTH_H: i32 = 14;
 // Must match crates/sky_raider/src/main.rs's CARRIER_W / CARRIER_H.
-const CARRIER_W: i32 = 108;
-const CARRIER_H: i32 = 190;
+const CARRIER_W: i32 = 186;
+const CARRIER_H: i32 = 760;
 // Must match crates/sky_raider/src/main.rs's BOAT_W / BOAT_H.
 const BOAT_W: i32 = 34;
 const BOAT_H: i32 = 16;
@@ -230,6 +244,48 @@ fn gun_burst(guns: usize, seed: u32) -> Vec<i16> {
     soft_limit_to_pcm16(&mix, MIX_KNEE)
 }
 
+/// An enemy fighter's burst, heard from a distance: three rounds from a
+/// pair of guns, lower and duller than the player's (further off, smaller
+/// calibre on most of them), with the highs rolled off by the air between.
+fn enemy_gun_sfx() -> Vec<u8> {
+    let mut rng = Rng(0xE6_6E1);
+    let n = ms_to_samples(360.0);
+    let mut mix = vec![0.0f32; n];
+    for k in 0..3 {
+        for g in 0..2 {
+            let off = ms_to_samples(k as f32 * 80.0 + g as f32 * 9.0 + rng.next_f32() * 6.0);
+            let shot = gun_report(0x1234 + (k * 2 + g) as u32 * 977, 0.78 + rng.next_f32() * 0.08);
+            for (i, v) in shot.iter().enumerate() {
+                if off + i < n { mix[off + i] += v * 12_000.0; }
+            }
+        }
+    }
+    warm(&mut mix);
+    warm(&mut mix);
+    encode_pcm16_mono(&soft_limit_to_pcm16(&mix, MIX_KNEE))
+}
+
+/// A backfire from an engine starved near a stall: a sharp pop in the
+/// exhaust, a low thump, and a crackle as it clears.
+fn backfire_sfx() -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let n = ms_to_samples(280.0);
+    let mut rng = Rng(0xBAC_F1);
+    let mut buf = vec![0.0f32; n];
+    let (mut lp, mut crack) = (0.0f32, 0.0f32);
+    for (i, out) in buf.iter_mut().enumerate() {
+        let t = i as f32 / sr;
+        let w = rng.next_f32() * 2.0 - 1.0;
+        lp += (w - lp) * 0.2;
+        let pop = lp * (-t / 0.012).exp();
+        let thump = (2.0 * PI * (70.0 + 60.0 * (-t / 0.02).exp()) * t).sin() * (-t / 0.05).exp();
+        if rng.next_f32() < 0.004 * (1.0 - t / 0.28) { crack = 1.0; }
+        crack *= 0.9;
+        *out = (pop * 1.6 + thump * 0.9 + lp * crack * 0.8) * 20_000.0;
+    }
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+}
+
 /// A ricochet: a hard metallic tick where the round strikes, then the
 /// classic "pyeww" of a spinning slug tearing away, a whistle falling from
 /// `f0` with a wavering pitch, a little air noise round it.
@@ -349,20 +405,32 @@ fn stage_clear_sfx() -> Vec<u8> {
 
 const SS: usize = 4;
 
-struct Canvas { w: usize, h: usize, buf: Vec<[f32; 4]> }
+/// `k` is design units to pixels (a design drawn at 1 can be rendered at 2
+/// for twice the size and twice the detail); `clip`, in design units, is
+/// the only area a fill scans, which keeps a big sprite quick to build.
+struct Canvas { w: usize, h: usize, k: f32, clip: (f32, f32, f32, f32), buf: Vec<[f32; 4]> }
 
 impl Canvas {
-    fn new(w: i32, h: i32) -> Self {
+    fn new(w: i32, h: i32) -> Self { Self::scaled(w, h, 1.0) }
+    fn scaled(w: i32, h: i32, k: f32) -> Self {
         let (w, h) = (w as usize, h as usize);
-        Self { w, h, buf: vec![[0.0; 4]; w * h * SS * SS] }
+        Self { w, h, k, clip: (0.0, 0.0, 1e9, 1e9), buf: vec![[0.0; 4]; w * h * SS * SS] }
     }
+    fn clip(&mut self, x0: f32, y0: f32, x1: f32, y1: f32) { self.clip = (x0, y0, x1, y1); }
+    fn unclip(&mut self) { self.clip = (0.0, 0.0, 1e9, 1e9); }
     /// Paint `col` (straight RGBA, 0..1) wherever `inside(x, y)` holds,
     /// with `shade(x, y)` scaling its RGB.
     fn fill(&mut self, inside: impl Fn(f32, f32) -> bool, shade: impl Fn(f32, f32) -> f32, col: [f32; 4]) {
         let sw = self.w * SS;
-        for sy in 0..self.h * SS {
-            for sx in 0..sw {
-                let (x, y) = ((sx as f32 + 0.5) / SS as f32, (sy as f32 + 0.5) / SS as f32);
+        let unit = self.k * SS as f32;
+        let (cx0, cy0, cx1, cy1) = self.clip;
+        let sx0 = ((cx0 * unit).floor().max(0.0) as usize).min(sw);
+        let sx1 = ((cx1 * unit).ceil().max(0.0) as usize).min(sw);
+        let sy0 = ((cy0 * unit).floor().max(0.0) as usize).min(self.h * SS);
+        let sy1 = ((cy1 * unit).ceil().max(0.0) as usize).min(self.h * SS);
+        for sy in sy0..sy1 {
+            for sx in sx0..sx1 {
+                let (x, y) = ((sx as f32 + 0.5) / unit, (sy as f32 + 0.5) / unit);
                 if !inside(x, y) { continue; }
                 let k = shade(x, y);
                 let d = &mut self.buf[sy * sw + sx];
@@ -462,6 +530,8 @@ struct Fighter {
     /// canopy centre y, half length, half width
     canopy: (f32, f32, f32),
     body: (u8, u8, u8), wing_col: (u8, u8, u8), nose_col: (u8, u8, u8), spinner: (u8, u8, u8),
+    /// gun ports along the leading edge, as fractions of the half span
+    guns: &'static [f32],
 }
 
 impl Fighter {
@@ -515,6 +585,79 @@ impl Fighter {
         c.solid(|x, y| ((x - cx) / cw).powi(2) + ((y - cy) / cl).powi(2) <= 1.0, [0.16, 0.24, 0.32, 1.0]);
         c.solid(|x, y| ((x - cx + cw * 0.3) / (cw * 0.35)).powi(2) + ((y - cy + cl * 0.25) / (cl * 0.45)).powi(2) <= 1.0,
             [0.75, 0.88, 1.0, 0.85]);
+        self.details(c);
+    }
+
+    /// The small things that make it read as a machine: panel lines,
+    /// ailerons and elevators, gun ports, exhausts and their soot, the
+    /// canopy frame, the fin seen edge-on.
+    fn details(&self, c: &mut Canvas) {
+        let cx = self.w as f32 / 2.0;
+        let (wing, tp) = (self.wing, self.tailplane);
+        let line = [0.0, 0.0, 0.0, 0.2];
+        // chordwise panel lines and the main spar
+        for t in [0.34f32, 0.62, 0.82] {
+            c.solid(|x, y| ((x - cx).abs() / wing.half_span - t).abs() * wing.half_span < 0.13
+                && wing.contains(cx, x, y), line);
+        }
+        c.solid(|x, y| {
+            let t = (x - cx).abs() / wing.half_span;
+            let (le, te) = (lerp(wing.root.0, wing.tip.0, t), lerp(wing.root.1, wing.tip.1, t));
+            (y - (le + (te - le) * 0.3)).abs() < 0.12 && t > 0.12 && wing.contains(cx, x, y)
+        }, [0.0, 0.0, 0.0, 0.12]);
+        // elevator hinge
+        c.solid(|x, y| {
+            let t = (x - cx).abs() / tp.half_span;
+            let (le, te) = (lerp(tp.root.0, tp.tip.0, t), lerp(tp.root.1, tp.tip.1, t));
+            (y - (te - (te - le) * 0.35)).abs() < 0.14 && t > 0.1 && tp.contains(cx, x, y)
+        }, [0.0, 0.0, 0.0, 0.25]);
+        // the fin, edge-on down the tail
+        let (fy0, fy1) = (tp.root.0 - 1.0, self.tail_y);
+        c.solid(|x, y| y > fy0 && y < fy1 && (x - cx).abs() < 0.35, [0.1, 0.1, 0.1, 0.45]);
+        // fuselage panel bands
+        for yb in [self.widest + 0.5, self.widest + (self.tail_y - self.widest) * 0.5] {
+            c.solid(|x, y| (y - yb).abs() < 0.12 && (x - cx).abs() <= self.fuselage_half(y), line);
+        }
+        // gun ports: dark muzzles just behind the leading edge
+        for &t in self.guns {
+            for sgn in [-1.0f32, 1.0] {
+                let gx = cx + sgn * t * wing.half_span;
+                let le = lerp(wing.root.0, wing.tip.0, t);
+                c.solid(|x, y| ((x - gx) / 0.3).powi(2) + ((y - le - 0.3) / 0.45).powi(2) <= 1.0, [0.05, 0.05, 0.05, 0.9]);
+            }
+        }
+        // exhausts: stubs down the nose of an inline, a soot streak behind a radial's cowl
+        if self.radial {
+            for sgn in [-1.0f32, 1.0] {
+                c.solid(|x, y| y > self.nose_len && y < self.nose_len + 3.5
+                    && ((x - cx) * sgn - self.fuselage_half(y) * 0.72).abs() < 0.35, [0.08, 0.07, 0.06, 0.5]);
+            }
+        } else {
+            for k in 0..4 {
+                let ey = 3.2 + k as f32 * 0.9;
+                for sgn in [-1.0f32, 1.0] {
+                    let ex = cx + sgn * (self.fuselage_half(ey) + 0.1);
+                    c.solid(|x, y| ((x - ex) / 0.35).powi(2) + ((y - ey) / 0.3).powi(2) <= 1.0, [0.12, 0.1, 0.08, 0.9]);
+                }
+            }
+            for sgn in [-1.0f32, 1.0] {
+                c.solid(|x, y| y > 6.5 && y < 10.0 && ((x - cx) * sgn - self.fuselage_half(y) * 0.85).abs() < 0.3,
+                    [0.1, 0.09, 0.08, 0.35]);
+            }
+        }
+        // canopy frame
+        let (cy, cl, cw) = self.canopy;
+        for fy in [cy - cl * 0.35, cy + cl * 0.25] {
+            c.solid(|x, y| (y - fy).abs() < 0.14 && ((x - cx) / cw).powi(2) + ((y - cy) / cl).powi(2) <= 1.0,
+                [0.1, 0.1, 0.12, 0.8]);
+        }
+        // the propeller: two faint blade arcs in the disc
+        let r = wing.half_span * 0.36;
+        c.solid(|x, y| {
+            let (dx, dy) = ((x - cx) / r, (y - 1.0) / 0.9);
+            let d = dx * dx + dy * dy;
+            d <= 1.0 && d > 0.8
+        }, [0.9, 0.9, 0.88, 0.25]);
     }
 }
 
@@ -557,8 +700,10 @@ fn hinomaru(c: &mut Canvas, cx: f32, dx: f32, y0: f32, r: f32) {
 /// squarish tips, a long inline nose with an olive anti-glare panel, a
 /// bubble canopy, red spinner and yellow nose band, star on the port wing.
 fn player_plane() -> Vec<u8> {
-    let (w, h) = (PLAYER_W, PLAYER_H);
-    let mut c = Canvas::new(w, h);
+    // designed at 36x32, rendered at 1.5x
+    let (w, h) = (36, 32);
+    let mut c = Canvas::scaled(PLAYER_W, PLAYER_H, PLAYER_W as f32 / 36.0);
+    let _ = h;
     let cx = w as f32 / 2.0;
     let metal = (196, 202, 212);
     let f = Fighter {
@@ -569,6 +714,7 @@ fn player_plane() -> Vec<u8> {
         tailplane: Surface { half_span: 6.6, root: (25.6, 30.4), tip: (26.9, 29.4), round: 0.12 },
         canopy: (13.2, 2.6, 1.45),
         body: metal, wing_col: (206, 212, 222), nose_col: (228, 196, 40), spinner: (200, 40, 36),
+        guns: &[0.38, 0.43, 0.48], // six .50s, three a side
     };
     f.paint(&mut c);
     // olive-drab anti-glare panel from the nose band to the windscreen
@@ -583,8 +729,9 @@ fn player_plane() -> Vec<u8> {
 /// tapered wings); 2 = ace, a Ki-84 Hayate in natural metal with yellow
 /// leading-edge ID stripes (it always drops a power-up).
 fn enemy_plane(kind: usize) -> Vec<u8> {
-    let (w, h) = (ENEMY_W, ENEMY_H);
-    let mut c = Canvas::new(w, h);
+    // designed at 26x22, rendered at 2x
+    let w = 26;
+    let mut c = Canvas::scaled(ENEMY_W, ENEMY_H, ENEMY_W as f32 / 26.0);
     let cx = w as f32 / 2.0;
     let (body, wing) = enemy_colors(kind);
     let f = match kind {
@@ -596,6 +743,7 @@ fn enemy_plane(kind: usize) -> Vec<u8> {
             tailplane: Surface { half_span: 5.0, root: (16.6, 20.0), tip: (17.6, 19.4), round: 0.45 },
             canopy: (8.6, 2.3, 1.1),
             body, wing_col: wing, nose_col: (38, 38, 42), spinner: (150, 110, 70),
+            guns: &[0.42], // a 20 mm cannon in each wing
         },
         1 => Fighter {
             w,
@@ -605,6 +753,7 @@ fn enemy_plane(kind: usize) -> Vec<u8> {
             tailplane: Surface { half_span: 4.4, root: (16.2, 19.2), tip: (17.0, 18.8), round: 0.4 },
             canopy: (8.4, 2.4, 0.95),
             body, wing_col: wing, nose_col: (60, 60, 58), spinner: (150, 110, 70),
+            guns: &[],
         },
         _ => Fighter {
             w,
@@ -614,6 +763,7 @@ fn enemy_plane(kind: usize) -> Vec<u8> {
             tailplane: Surface { half_span: 4.8, root: (16.8, 20.4), tip: (17.8, 19.8), round: 0.4 },
             canopy: (9.0, 2.2, 1.15),
             body, wing_col: wing, nose_col: (52, 56, 44), spinner: (160, 120, 70),
+            guns: &[0.36, 0.44],
         },
     };
     f.paint(&mut c);
@@ -664,237 +814,188 @@ fn enemy_colors(kind: usize) -> ((u8, u8, u8), (u8, u8, u8)) {
     (body, wing)
 }
 
-// (body, wing) colour per tier — brown-red -> orange -> purple -> deep red
-// -> magenta -> dark crimson -> molten orange for the finale.
-const BOSS_PALETTES: [((u8, u8, u8), (u8, u8, u8)); 7] = [
-    ((120, 60, 60),  (90, 40, 40)),
-    ((165, 75, 40),  (125, 55, 30)),
-    ((120, 55, 150), (90, 40, 115)),
-    ((160, 35, 35),  (120, 22, 22)),
-    ((185, 45, 130), (145, 28, 100)),
-    ((130, 22, 22),  (90, 12, 12)),
-    ((225, 60, 30),  (180, 35, 15)),
-];
+/// A heavy aircraft seen from above, nose up, in design px (= sprite px).
+/// Every length is laid out from real planforms of the type.
+struct Bomber {
+    w: i32,
+    fus_half: f32, fus_widest: f32, tail_y: f32,
+    nose_glaze: f32, hull: bool, floats: bool,
+    wing: Surface,
+    engines: &'static [f32], // nacelle positions, fractions of the half span
+    cowl: f32, nacelle_len: f32,
+    tailplane: Surface,
+    fins: &'static [f32],    // fin positions, fractions of the tailplane half span
+    turrets: &'static [(f32, f32)],
+}
 
-/// End-of-wave bosses, one per level 1-7 (`tier` 0..=6). Unlike the enemy
-/// planes (one shared silhouette, recoloured), each boss gets its own hull
-/// shape — they should look like different machines, not just bigger ones —
-/// while still escalating in size (BOSS_SIZES) and colour (BOSS_PALETTES).
+impl Bomber {
+    fn fuselage_half(&self, y: f32) -> f32 {
+        if y < 0.0 || y > self.tail_y { return -1.0; }
+        let hw = if self.hull { self.fus_half * 1.25 } else { self.fus_half };
+        if y < self.fus_widest {
+            let s = y / self.fus_widest;
+            hw * (1.0 - (1.0 - s).powi(2)).sqrt().max(0.25)
+        } else {
+            lerp(hw, hw * 0.3, ((y - self.fus_widest) / (self.tail_y - self.fus_widest)).powf(1.3))
+        }
+    }
+
+    fn paint(&self, c: &mut Canvas) {
+        let cx = self.w as f32 / 2.0;
+        let hs = self.wing.half_span;
+        let (wing, tp) = (self.wing, self.tailplane);
+        let green = (104, 132, 92);
+        let green_w = (116, 146, 102);
+        let le = |t: f32| lerp(wing.root.0, wing.tip.0, t);
+        let te = |t: f32| lerp(wing.root.1, wing.tip.1, t);
+        // propeller discs ahead of each engine
+        for &t in self.engines {
+            for sgn in [-1.0f32, 1.0] {
+                let (ex, ey) = (cx + sgn * t * hs, le(t) - self.cowl * 1.4);
+                let r = self.cowl * 2.3;
+                c.solid(|x, y| ((x - ex) / r).powi(2) + ((y - ey) / (r * 0.18)).powi(2) <= 1.0, [0.8, 0.8, 0.78, 0.22]);
+            }
+        }
+        // tail surfaces and fins
+        c.fill(|x, y| tp.contains(cx, x, y), |x, y| tp.shade(cx, x, y), rgb(green_w));
+        c.solid(|x, y| {
+            let t = (x - cx).abs() / tp.half_span;
+            let (l, e) = (lerp(tp.root.0, tp.tip.0, t), lerp(tp.root.1, tp.tip.1, t));
+            (y - (e - (e - l) * 0.35)).abs() < 0.4 && t > 0.1 && tp.contains(cx, x, y)
+        }, [0.0, 0.0, 0.0, 0.25]);
+        // wings, with floats under the tips of a flying boat
+        c.fill(|x, y| wing.contains(cx, x, y), |x, y| wing.shade(cx, x, y), rgb(green_w));
+        if self.floats {
+            for sgn in [-1.0f32, 1.0] {
+                let (fx, fy) = (cx + sgn * 0.84 * hs, (le(0.84) + te(0.84)) / 2.0);
+                c.solid(|x, y| ((x - fx) / (self.cowl * 0.8)).powi(2) + ((y - fy) / (self.cowl * 2.4)).powi(2) <= 1.0,
+                    [0.55, 0.6, 0.52, 1.0]);
+            }
+        }
+        // panel lines, spar, flaps and ailerons
+        let line = [0.0, 0.0, 0.0, 0.18];
+        for k in 1..8 {
+            let t = k as f32 / 8.0;
+            c.solid(|x, y| ((x - cx).abs() / hs - t).abs() * hs < 0.35 && wing.contains(cx, x, y), line);
+        }
+        c.solid(|x, y| {
+            let t = (x - cx).abs() / hs;
+            (y - (le(t) + (te(t) - le(t)) * 0.3)).abs() < 0.3 && wing.contains(cx, x, y)
+        }, [0.0, 0.0, 0.0, 0.1]);
+        c.solid(|x, y| {
+            let t = (x - cx).abs() / hs;
+            (y - (te(t) - (te(t) - le(t)) * 0.25)).abs() < 0.4 && t > 0.12 && wing.contains(cx, x, y)
+        }, [0.0, 0.0, 0.0, 0.28]);
+        // yellow ID stripe on the inboard leading edge
+        c.solid(|x, y| {
+            let t = (x - cx).abs() / hs;
+            t > 0.08 && t < 0.3 && wing.contains(cx, x, y) && y < le(t) + 1.6
+        }, [0.95, 0.72, 0.12, 0.85]);
+        // engine nacelles: cowl ring forward, nacelle over the wing, soot aft
+        for &t in self.engines {
+            for sgn in [-1.0f32, 1.0] {
+                let ex = cx + sgn * t * hs;
+                let (y0, y1) = (le(t) - self.cowl * 1.3, le(t) + self.nacelle_len);
+                c.fill(|x, y| y > y0 && y < y1 && ((x - ex).abs() / self.cowl) <= (1.0 - ((y - y0) / (y1 - y0)).powi(3) * 0.7),
+                    |x, _| 0.7 + 0.4 * (1.0 - ((x - ex) / self.cowl).powi(2)).max(0.0).sqrt(), rgb(green));
+                c.solid(|x, y| ((x - ex) / self.cowl).powi(2) + ((y - y0 - self.cowl * 0.3) / (self.cowl * 0.45)).powi(2) <= 1.0,
+                    [0.12, 0.12, 0.13, 1.0]);
+                c.solid(|x, y| ((x - ex) / (self.cowl * 0.3)).powi(2) + ((y - y0 - self.cowl * 0.1) / (self.cowl * 0.3)).powi(2) <= 1.0,
+                    [0.5, 0.45, 0.35, 1.0]);
+                c.solid(|x, y| y > y1 - 1.0 && y < y1 + self.nacelle_len * 0.18 && (x - ex).abs() < self.cowl * 0.3,
+                    [0.08, 0.07, 0.06, 0.16]);
+            }
+        }
+        // fins, edge-on
+        for &f in self.fins {
+            for sgn in [-1.0f32, 1.0] {
+                let fx = cx + sgn * f * tp.half_span;
+                if f == 0.0 && sgn > 0.0 { continue; }
+                c.solid(|x, y| y > tp.root.0 - 3.0 && y < self.tail_y + 1.0 && (x - fx).abs() < 0.8, [0.2, 0.26, 0.18, 0.95]);
+            }
+        }
+        // fuselage (a boat hull is wider, with a keel line)
+        c.fill(|x, y| (x - cx).abs() <= self.fuselage_half(y), |x, y| {
+            let hw = self.fuselage_half(y).max(0.3);
+            let u = ((x - cx) / hw).clamp(-1.0, 1.0);
+            0.7 + 0.42 * (1.0 - u * u).sqrt()
+        }, rgb(green));
+        if self.hull {
+            c.solid(|x, y| (x - cx).abs() < 0.5 && y > self.fus_widest && y < self.tail_y * 0.8, [0.0, 0.0, 0.0, 0.2]);
+        }
+        for k in 1..6 {
+            let yb = self.tail_y * k as f32 / 6.0;
+            c.solid(|x, y| (y - yb).abs() < 0.3 && (x - cx).abs() <= self.fuselage_half(y), line);
+        }
+        // glazed nose with its frames, then the cockpit
+        c.solid(|x, y| y < self.nose_glaze && (x - cx).abs() <= self.fuselage_half(y) * 0.92, [0.3, 0.42, 0.5, 1.0]);
+        for k in 1..4 {
+            let fy = self.nose_glaze * k as f32 / 4.0;
+            c.solid(|x, y| (y - fy).abs() < 0.3 && (x - cx).abs() <= self.fuselage_half(y) * 0.92, [0.15, 0.18, 0.2, 0.9]);
+        }
+        c.solid(|x, y| y < self.nose_glaze && (x - cx).abs() < 0.3, [0.15, 0.18, 0.2, 0.9]);
+        let (cy, cl) = (self.nose_glaze + self.fus_half * 1.6, self.fus_half * 1.1);
+        c.solid(|x, y| ((x - cx) / (self.fus_half * 0.55)).powi(2) + ((y - cy) / cl).powi(2) <= 1.0, [0.2, 0.28, 0.36, 1.0]);
+        c.solid(|x, y| ((x - cx + self.fus_half * 0.18) / (self.fus_half * 0.2)).powi(2) + ((y - cy + cl * 0.3) / (cl * 0.4)).powi(2) <= 1.0,
+            [0.8, 0.9, 1.0, 0.7]);
+        // gun turrets: glazed domes with twin barrels
+        let h = self.tail_y / 0.99;
+        for &(tx, ty) in self.turrets {
+            let (gx, gy) = (cx + tx * hs, ty * h);
+            let r = (self.fus_half * 0.55).max(2.2);
+            let back = ty > 0.9;
+            let dir = if back { 1.0 } else { -1.0 };
+            for off in [-0.9f32, 0.9] {
+                c.solid(|x, y| (x - gx - off).abs() < 0.45 && (y - gy) * dir > 0.0 && (y - gy).abs() < r * 2.4,
+                    [0.08, 0.08, 0.08, 1.0]);
+            }
+            c.solid(|x, y| ((x - gx) / r).powi(2) + ((y - gy) / r).powi(2) <= 1.0, [0.35, 0.48, 0.56, 1.0]);
+            c.solid(|x, y| ((x - gx + r * 0.3) / (r * 0.35)).powi(2) + ((y - gy - r * 0.3) / (r * 0.35)).powi(2) <= 1.0,
+                [0.85, 0.95, 1.0, 0.7]);
+        }
+        // hinomaru on each wing
+        let t = 0.68;
+        let chord = te(t) - le(t);
+        hinomaru(c, cx, t * hs, le(t) + chord * 0.5, chord * 0.28);
+    }
+}
+
+/// The seven bosses, smallest to largest: Ki-49 Donryu, Ki-67 Hiryu,
+/// G4M "Betty", G8N Renzan, H8K flying boat, G5N Shinzan and the six-engine
+/// Fugaku. Drawn nose-up and flipped so they fly at the player.
 fn boss_plane(tier: usize) -> Vec<u8> {
     let (w, h) = BOSS_SIZES[tier];
-    let mut img = Image::new(w as u32, h as u32);
-    let (body, wing) = BOSS_PALETTES[tier];
-    match tier {
-        0 => boss_hull_scout(&mut img, w, h, body, wing),
-        1 => boss_hull_interceptor(&mut img, w, h, body, wing),
-        2 => boss_hull_gunship(&mut img, w, h, body, wing),
-        3 => boss_hull_dreadnought(&mut img, w, h, body, wing),
-        4 => boss_hull_cruiser(&mut img, w, h, body, wing),
-        5 => boss_hull_carrier(&mut img, w, h, body, wing),
-        _ => boss_hull_apex(&mut img, w, h, body, wing),
-    }
-    img.encode_png()
-}
-
-/// Tier 1, SCOUT BOMBER: the baseline shape — tapered fuselage, one pair of
-/// swept wings, twin engine pods, single cockpit.
-fn boss_hull_scout(img: &mut Image, w: i32, h: i32, body: (u8, u8, u8), wing: (u8, u8, u8)) {
-    let cx = w / 2;
-    let wing_y0 = (h as f32 * 0.16) as i32;
-    let wing_y1 = (h as f32 * 0.36) as i32;
-    let pod_y0 = (h as f32 * 0.40) as i32;
-    let pod_y1 = (h as f32 * 0.56) as i32;
-    let cockpit_y0 = (h as f32 * 0.10) as i32;
-    let cockpit_y1 = (h as f32 * 0.20) as i32;
-    for y in 0..h {
-        let from_top = y as f32 / h as f32;
-        let body_half = (2.0 + (1.0 - from_top) * (h as f32 * 0.10)) as i32;
-        for x in 0..w {
-            let adx = (x - cx).abs();
-            if adx <= body_half && y <= h - 3 {
-                img.set(x, y, body.0, body.1, body.2);
-            }
-            if y >= wing_y0 && y <= wing_y1 {
-                let half = (w as f32 * 0.47) as i32;
-                let taper = ((y - wing_y0) as f32 / (wing_y1 - wing_y0).max(1) as f32 * half as f32) as i32;
-                if adx <= half - taper / 3 && adx >= body_half {
-                    img.set(x, y, wing.0, wing.1, wing.2);
-                }
-            }
-            if y >= pod_y0 && y <= pod_y1 {
-                for &ex in &[-w / 3, w / 3] {
-                    if (x - (cx + ex)).abs() <= 3 { img.set(x, y, 60, 60, 70); }
-                }
-            }
-            if y >= cockpit_y0 && y <= cockpit_y1 && adx <= 3 {
-                img.set(x, y, 255, 210, 60);
-            }
-        }
-    }
-}
-
-/// Tier 2, INTERCEPTOR: a sleek delta — one solid arrow-shaped wing instead
-/// of a separate fuselage, with a bright spine and twin tail-engine glow.
-fn boss_hull_interceptor(img: &mut Image, w: i32, h: i32, body: (u8, u8, u8), wing: (u8, u8, u8)) {
-    let cx = w / 2;
-    let spine_w = (w as f32 * 0.07).max(2.0);
-    for y in 0..h {
-        let ft = y as f32 / h as f32;
-        let half_w = if ft < 0.85 {
-            (ft / 0.85) * (w as f32 * 0.48)
-        } else {
-            (w as f32 * 0.48) * (1.0 - (ft - 0.85) / 0.15 * 0.7)
-        };
-        for x in 0..w {
-            let dx = (x - cx) as f32;
-            let adx = dx.abs();
-            if adx <= half_w {
-                let c = if adx <= spine_w { body } else { wing };
-                img.set(x, y, c.0, c.1, c.2);
-            }
-            if adx <= 2.0 && ft > 0.06 && ft < 0.30 {
-                img.set(x, y, 255, 220, 80);
-            }
-            if ft > 0.86 && ft < 0.96 {
-                for &ex in &[-(w / 6), w / 6] {
-                    if (x - (cx + ex)).abs() <= 3 { img.set(x, y, 255, 160, 60); }
-                }
-            }
-        }
-    }
-}
-
-/// Tier 3, GUNSHIP: a twin-boom airframe — two parallel hulls joined by a
-/// connecting wing, with a central gun pod slung underneath.
-fn boss_hull_gunship(img: &mut Image, w: i32, h: i32, body: (u8, u8, u8), wing: (u8, u8, u8)) {
-    let cx = w / 2;
-    let boom_off = w as f32 * 0.28;
-    let boom_r = (w as f32 * 0.10).max(4.0);
-    let wing_y0 = (h as f32 * 0.30) as i32;
-    let wing_y1 = (h as f32 * 0.44) as i32;
-    let gun_y0 = (h as f32 * 0.44) as i32;
-    let gun_y1 = (h as f32 * 0.64) as i32;
-    for y in 0..h {
-        let ft = y as f32 / h as f32;
-        let taper = if ft < 0.12 { (0.12 - ft) / 0.12 } else if ft > 0.88 { (ft - 0.88) / 0.12 } else { 0.0 };
-        let r = boom_r * (1.0 - taper * 0.6);
-        for x in 0..w {
-            let dx = (x - cx) as f32;
-            if (dx - boom_off).abs() <= r || (dx + boom_off).abs() <= r {
-                img.set(x, y, body.0, body.1, body.2);
-            } else if y >= wing_y0 && y <= wing_y1 && dx.abs() <= boom_off + 2.0 {
-                img.set(x, y, wing.0, wing.1, wing.2);
-            } else if y >= gun_y0 && y <= gun_y1 && dx.abs() <= w as f32 * 0.07 {
-                img.set(x, y, 50, 50, 58);
-            }
-        }
-    }
-}
-
-/// Tier 4, DREADNOUGHT: a broad manta/flying-wing — no distinct fuselage,
-/// just one wide diamond of a hull with a cockpit blister down the spine.
-fn boss_hull_dreadnought(img: &mut Image, w: i32, h: i32, body: (u8, u8, u8), wing: (u8, u8, u8)) {
-    let cx = w / 2;
-    for y in 0..h {
-        let ft = y as f32 / h as f32;
-        let half_w = if ft < 0.35 {
-            (ft / 0.35) * (w as f32 * 0.49)
-        } else {
-            (w as f32 * 0.49) * (1.0 - (ft - 0.35) / 0.65)
-        };
-        for x in 0..w {
-            let dx = (x - cx) as f32;
-            let adx = dx.abs();
-            if adx <= half_w {
-                let band = adx / half_w.max(1.0);
-                let c = if band < 0.45 { body } else { wing };
-                img.set(x, y, c.0, c.1, c.2);
-            }
-            if adx <= 1.0 && ft > 0.20 && ft < 0.36 {
-                img.set(x, y, 255, 220, 80);
-            }
-        }
-    }
-}
-
-/// Tier 5, BATTLE CRUISER: a segmented central hull flanked by two wingtip
-/// pods on thin struts — reads as a proper "ship" rather than a plane.
-fn boss_hull_cruiser(img: &mut Image, w: i32, h: i32, body: (u8, u8, u8), wing: (u8, u8, u8)) {
-    let cx = w / 2;
-    let hull_hw = w as f32 * 0.20;
-    let pod_off = w as f32 * 0.40;
-    let pod_r = w as f32 * 0.09;
-    for y in 0..h {
-        let ft = y as f32 / h as f32;
-        let taper = if ft < 0.08 { (0.08 - ft) / 0.08 } else if ft > 0.92 { (ft - 0.92) / 0.08 } else { 0.0 };
-        let hw = hull_hw * (1.0 - taper * 0.6);
-        let ridge = (y % 9) < 2;
-        let pods_here = ft > 0.30 && ft < 0.62;
-        let struts_here = ft > 0.42 && ft < 0.50;
-        for x in 0..w {
-            let dx = (x - cx) as f32;
-            let adx = dx.abs();
-            if adx <= hw {
-                let c = if ridge { wing } else { body };
-                img.set(x, y, c.0, c.1, c.2);
-            } else if pods_here && (adx - pod_off).abs() <= pod_r {
-                img.set(x, y, wing.0, wing.1, wing.2);
-            } else if struts_here && adx <= pod_off + pod_r {
-                img.set(x, y, wing.0, wing.1, wing.2);
-            }
-        }
-    }
-}
-
-/// Tier 6, DOOM CARRIER: a long boxy hull with hangar-bay pods bulging out
-/// at regular intervals — the shape itself hints at "launches fighters".
-fn boss_hull_carrier(img: &mut Image, w: i32, h: i32, body: (u8, u8, u8), wing: (u8, u8, u8)) {
-    let cx = w / 2;
-    let hull_hw = w as f32 * 0.30;
-    let bay_h = (h / 8).max(3);
-    for y in 0..h {
-        let ft = y as f32 / h as f32;
-        let taper = if ft < 0.06 { (0.06 - ft) / 0.06 } else if ft > 0.94 { (ft - 0.94) / 0.06 } else { 0.0 };
-        let hw = hull_hw * (1.0 - taper * 0.7);
-        let in_bay_band = ft > 0.14 && ft < 0.86 && (y / bay_h) % 2 == 0;
-        for x in 0..w {
-            let adx = (x - cx).abs() as f32;
-            if adx <= hw {
-                img.set(x, y, body.0, body.1, body.2);
-            } else if in_bay_band && adx <= hw + w as f32 * 0.09 {
-                img.set(x, y, wing.0, wing.1, wing.2);
-            }
-        }
-    }
-}
-
-/// Tier 7, APEX DESTROYER: a jagged five-pointed crystal with a molten core
-/// — deliberately alien next to the other six, the "totally badass" finale.
-fn boss_hull_apex(img: &mut Image, w: i32, h: i32, body: (u8, u8, u8), wing: (u8, u8, u8)) {
-    let cx = w as f32 / 2.0;
-    let cy = h as f32 / 2.0;
-    for y in 0..h {
-        for x in 0..w {
-            let ndx = (x as f32 - cx) / cx;
-            let ndy = (y as f32 - cy) / cy;
-            let spike = (ndy.atan2(ndx) * 5.0).cos().abs() * 0.30 + 0.70;
-            let ndist = (ndx * ndx + ndy * ndy).sqrt();
-            if ndist <= spike {
-                let c = if ndist < spike * 0.55 { body } else { wing };
-                img.set(x, y, c.0, c.1, c.2);
-            }
-        }
-    }
-    // Molten reactor-glow core, offset toward the "front".
-    let core_y = (h as f32 * 0.58) as i32;
-    let cxi = w / 2;
-    for y in 0..h {
-        for x in 0..w {
-            let d = (((x - cxi) * (x - cxi) + (y - core_y) * (y - core_y)) as f32).sqrt();
-            if d <= w as f32 * 0.05 { img.set(x, y, 255, 240, 180); }
-            else if d <= w as f32 * 0.09 { img.set(x, y, 255, 160, 40); }
-        }
-    }
+    let (hs, l) = (w as f32 / 2.0, h as f32);
+    let wing = |rle: f32, rte: f32, tle: f32, tte: f32, round: f32| Surface {
+        half_span: hs * 0.98, root: (l * rle, l * rte), tip: (l * tle, l * tte), round };
+    let tailp = |span: f32, y0: f32, y1: f32| Surface {
+        half_span: hs * span, root: (l * y0, l * y1), tip: (l * (y0 + 0.03), l * (y1 - 0.02)), round: 0.3 };
+    let b = match tier {
+        0 => Bomber { w, fus_half: 5.5, fus_widest: l * 0.3, tail_y: l * 0.98, nose_glaze: l * 0.1, hull: false, floats: false,
+            wing: wing(0.30, 0.52, 0.37, 0.46, 0.2), engines: &[0.3], cowl: 4.2, nacelle_len: l * 0.2,
+            tailplane: tailp(0.34, 0.84, 0.95), fins: &[0.0], turrets: BOSS_TURRETS[0] },
+        1 => Bomber { w, fus_half: 5.2, fus_widest: l * 0.3, tail_y: l * 0.98, nose_glaze: l * 0.1, hull: false, floats: false,
+            wing: wing(0.30, 0.50, 0.37, 0.45, 0.25), engines: &[0.3], cowl: 4.4, nacelle_len: l * 0.22,
+            tailplane: tailp(0.34, 0.84, 0.95), fins: &[0.0], turrets: BOSS_TURRETS[1] },
+        2 => Bomber { w, fus_half: 7.5, fus_widest: l * 0.35, tail_y: l * 0.99, nose_glaze: l * 0.12, hull: false, floats: false,
+            wing: wing(0.32, 0.54, 0.40, 0.48, 0.35), engines: &[0.28], cowl: 5.0, nacelle_len: l * 0.2,
+            tailplane: tailp(0.3, 0.84, 0.95), fins: &[0.0], turrets: BOSS_TURRETS[2] },
+        3 => Bomber { w, fus_half: 6.5, fus_widest: l * 0.3, tail_y: l * 0.98, nose_glaze: l * 0.1, hull: false, floats: false,
+            wing: wing(0.30, 0.52, 0.38, 0.46, 0.15), engines: &[0.22, 0.5], cowl: 4.8, nacelle_len: l * 0.18,
+            tailplane: tailp(0.3, 0.84, 0.95), fins: &[0.0], turrets: BOSS_TURRETS[3] },
+        4 => Bomber { w, fus_half: 7.5, fus_widest: l * 0.28, tail_y: l * 0.98, nose_glaze: l * 0.07, hull: true, floats: true,
+            wing: wing(0.30, 0.46, 0.34, 0.41, 0.2), engines: &[0.2, 0.42], cowl: 5.0, nacelle_len: l * 0.14,
+            tailplane: tailp(0.26, 0.86, 0.96), fins: &[0.0], turrets: BOSS_TURRETS[4] },
+        5 => Bomber { w, fus_half: 7.0, fus_widest: l * 0.3, tail_y: l * 0.97, nose_glaze: l * 0.09, hull: false, floats: false,
+            wing: wing(0.30, 0.48, 0.36, 0.43, 0.15), engines: &[0.2, 0.45], cowl: 5.2, nacelle_len: l * 0.16,
+            tailplane: tailp(0.3, 0.85, 0.95), fins: &[0.85], turrets: BOSS_TURRETS[5] },
+        _ => Bomber { w, fus_half: 9.0, fus_widest: l * 0.28, tail_y: l * 0.98, nose_glaze: l * 0.07, hull: false, floats: false,
+            wing: wing(0.30, 0.46, 0.36, 0.41, 0.15), engines: &[0.14, 0.3, 0.46], cowl: 5.6, nacelle_len: l * 0.14,
+            tailplane: tailp(0.24, 0.86, 0.96), fins: &[0.0], turrets: BOSS_TURRETS[6] },
+    };
+    let mut c = Canvas::new(w, h);
+    b.paint(&mut c);
+    c.finish(true)
 }
 
 /// Power-up capsule dropped by the ace: a glowing diamond with a bright core.
@@ -949,109 +1050,164 @@ fn health_pack() -> Vec<u8> {
     img.encode_png()
 }
 
-/// The carrier the player launches from at the start of each level: a
-/// top-down flight deck, tapered at bow and stern, with a dashed centre
-/// runway, arrestor cables and elevator cutouts marked into the deck, a
-/// handful of planes parked to port, and an island superstructure — mast,
-/// lit bridge windows — off to starboard. Bigger and longer than the first
-/// version, with the extra deck real estate spent on those details instead
-/// of just scaling up a plain grey rectangle.
+/// The carrier the player launches from: an Essex-class fleet carrier as
+/// she looked in 1944, bow up. Straight flight deck in Deck Blue with its
+/// planking, centreline and the hull number fore and aft; two centreline
+/// elevators and the deck-edge one to port; arresting wires aft and the
+/// catapult tracks at the bow; the island to starboard with its funnel,
+/// radar and the twin 5-inch mounts fore and aft of it; 40 mm quad mounts
+/// in the sponsons; Hellcats spotted aft with their wings folded. The
+/// length is shortened to about 60% so she fits the game.
 fn carrier_ship() -> Vec<u8> {
     let (w, h) = (CARRIER_W, CARRIER_H);
-    let mut img = Image::new(w as u32, h as u32);
-    let cx = w / 2;
-
-    // Island superstructure: offset to starboard (the right), the way a
-    // real carrier's island sits beside rather than astride the runway.
-    let ix0 = (w as f32 * 0.58) as i32;
-    let ix1 = (w as f32 * 0.82) as i32;
-    let iy0 = (h as f32 * 0.30) as i32;
-    let iy1 = (h as f32 * 0.52) as i32;
-    let mast_x = (ix0 + ix1) / 2;
-    let mast_y0 = (iy0 - (h as f32 * 0.06) as i32).max(0);
-
-    // Two elevator deck cutouts, fore and aft, on the opposite (port) side
-    // from the island — just an outline, deck-coloured inside.
-    let elev_w = (w as f32 * 0.20) as i32;
-    let elev_h = (h as f32 * 0.09) as i32;
-    let elev_x0 = (w as f32 * 0.14) as i32;
-    let elev_ys = [(h as f32 * 0.22) as i32, (h as f32 * 0.66) as i32];
-
-    for y in 0..h {
-        let from_top = y as f32 / h as f32;
-        let bow_taper = if from_top < 0.12 { (0.12 - from_top) / 0.12 } else { 0.0 };
-        let stern_taper = if from_top > 0.91 { (from_top - 0.91) / 0.09 } else { 0.0 };
-        let half_w = (w as f32 * 0.46) * (1.0 - (bow_taper + stern_taper) * 0.75);
-        let stripe = (y / 8) % 2 == 0 && from_top > 0.09 && from_top < 0.89;
-        // Arrestor wires: a few thin lines crossing the aft deck, just
-        // ahead of the stern taper — where the player's plane will catch
-        // one on landing, if Raider ever grows a carrier-landing sequence.
-        let arrestor = from_top > 0.74 && from_top < 0.88 && y % 6 == 0;
-
-        for x in 0..w {
-            let dx = (x - cx) as f32;
-            let adx = dx.abs();
-            if adx <= half_w {
-                img.set(x, y, 72, 76, 82); // deck grey
-            }
-            if adx > half_w - 2.0 && adx <= half_w {
-                img.set(x, y, 38, 40, 44); // deck edge
-            }
-            if adx <= 2.0 && stripe {
-                img.set(x, y, 224, 214, 60); // dashed runway centreline
-            }
-            if arrestor && adx <= half_w - 4.0 {
-                img.set(x, y, 30, 32, 36); // arrestor cable, crossing the centreline
-            }
-        }
-
-        // Elevator outlines, drawn per-row so they land on top of the deck
-        // fill above but under the island and parked planes below.
-        for &ey0 in &elev_ys {
-            if y >= ey0 && y < ey0 + elev_h {
-                let top_or_bottom = y == ey0 || y == ey0 + elev_h - 1;
-                for x in elev_x0..(elev_x0 + elev_w).min(w) {
-                    if top_or_bottom || x == elev_x0 || x == elev_x0 + elev_w - 1 {
-                        img.set(x, y, 46, 48, 54);
-                    }
-                }
-            }
-        }
+    let mut c = Canvas::new(w, h);
+    let (wf, hf) = (w as f32, h as f32);
+    let cx = 88.0;                  // the deck centreline (the island is to starboard)
+    let (dl, dr) = (cx - 75.0, cx + 75.0);
+    let (bow, stern) = (42.0, hf - 18.0);
+    let hull = [0.24, 0.27, 0.31, 1.0];
+    let grey = [0.46, 0.49, 0.53, 1.0];
+    let white = [0.92, 0.92, 0.88, 1.0];
+    // the hull below the deck: a sharp bow and a rounded stern
+    c.clip(0.0, 0.0, wf, 70.0);
+    c.solid(|x, y| y > 2.0 && y < 70.0 && (x - cx).abs() < (y - 2.0) * 1.3, hull);
+    c.clip(0.0, stern - 20.0, wf, hf);
+    c.solid(|x, y| y > stern - 20.0 && ((x - cx) / 72.0).powi(2) + ((y - (stern - 20.0)) / 36.0).powi(2) <= 1.0, hull);
+    // sponsons and catwalks along both sides
+    c.clip(0.0, 0.0, wf, hf);
+    c.solid(|x, y| y > bow + 30.0 && y < stern - 10.0 && ((x > dl - 9.0 && x < dl) || (x > dr && x < dr + 9.0)),
+        [0.3, 0.33, 0.37, 1.0]);
+    for k in 0..90 {
+        let y0 = bow + 34.0 + k as f32 * 7.4;
+        if y0 > stern - 14.0 { break; }
+        c.clip(0.0, y0 - 1.0, wf, y0 + 1.0);
+        c.solid(|x, y| (y - y0).abs() < 0.5 && ((x - (dl - 8.0)).abs() < 0.6 || (x - (dr + 8.0)).abs() < 0.6), [0.62, 0.64, 0.66, 1.0]);
     }
-
-    // The island block itself, a mast rising off its roof, and a strip of
-    // lit bridge windows partway down its face.
-    for y in iy0..=iy1 {
-        for x in ix0..=ix1 {
-            img.set(x, y, 42, 46, 52);
-        }
+    // the deck: squared at the ends, narrower at the bow
+    c.clip(0.0, bow - 2.0, wf, stern + 2.0);
+    let deck_half = |y: f32| if y < bow + 60.0 { lerp(52.0, 75.0, ((y - bow) / 60.0).clamp(0.0, 1.0)) } else { 75.0 };
+    let deck = |x: f32, y: f32| y > bow && y < stern && (x - cx).abs() <= deck_half(y);
+    c.fill(|x, y| deck(x, y), |x, _y| {
+        // planking: a slightly different tone every strip, seams between
+        let strip = ((x - cx + 80.0) / 2.6).floor();
+        let tone = 0.94 + 0.06 * ((strip * 12.9898).sin() * 43758.5).fract();
+        let seam = if ((x - cx + 80.0) % 2.6) < 0.35 { 0.82 } else { 1.0 };
+        tone * seam
+    }, [0.29, 0.34, 0.42, 1.0]);
+    // tie-down strips across the deck
+    for k in 0..40 {
+        let y0 = bow + 20.0 + k as f32 * 18.0;
+        if y0 > stern - 4.0 { break; }
+        c.clip(0.0, y0 - 1.0, wf, y0 + 1.0);
+        c.solid(|x, y| (y - y0).abs() < 0.35 && deck(x, y), [0.55, 0.58, 0.62, 0.28]);
     }
-    for y in mast_y0..iy0 {
-        img.set(mast_x, y, 30, 32, 36);
+    c.clip(0.0, bow - 2.0, wf, stern + 2.0);
+    // deck edge lines
+    c.solid(|x, y| deck(x, y) && (deck_half(y) - (x - cx).abs()) < 1.2, [0.8, 0.8, 0.78, 0.8]);
+    // elevators: centreline forward and aft, deck-edge to port
+    for (y0, y1) in [(bow + 110.0, bow + 158.0), (stern - 196.0, stern - 148.0)] {
+        c.clip(cx - 30.0, y0 - 2.0, cx + 30.0, y1 + 2.0);
+        c.solid(|x, y| y > y0 && y < y1 && (x - cx).abs() < 25.0 && ((y - y0).abs() < 0.8 || (y - y1).abs() < 0.8
+            || ((x - cx).abs() - 25.0).abs() < 0.8 || (x - cx).abs() > 24.2), [0.1, 0.12, 0.15, 0.9]);
+        c.solid(|x, y| y > y0 + 1.0 && y < y1 - 1.0 && (x - cx).abs() < 24.0, [0.0, 0.0, 0.0, 0.08]);
     }
-    let window_y = iy0 + (iy1 - iy0) / 3;
-    for x in (ix0 + 1)..ix1 {
-        if (x - ix0) % 2 == 1 {
-            img.set(x, window_y, 250, 220, 120);
+    let (ey0, ey1) = (bow + 250.0, bow + 292.0);
+    c.clip(0.0, ey0 - 2.0, dl + 2.0, ey1 + 2.0);
+    c.solid(|x, y| y > ey0 && y < ey1 && x > dl - 20.0 && x < dl + 1.0, [0.29, 0.34, 0.42, 1.0]);
+    c.solid(|x, y| y > ey0 && y < ey1 && x > dl - 20.0 && x < dl + 1.0
+        && ((y - ey0).abs() < 0.8 || (y - ey1).abs() < 0.8 || (x - (dl - 20.0)).abs() < 0.8), [0.1, 0.12, 0.15, 0.9]);
+    // centreline: dashed white
+    c.clip(cx - 2.0, bow, cx + 2.0, stern);
+    c.solid(|x, y| (x - cx).abs() < 0.9 && y > bow + 50.0 && y < stern - 40.0 && ((y - bow) % 22.0) < 13.0, white);
+    // catapult tracks at the bow
+    for off in [-34.0f32, 34.0] {
+        c.clip(cx + off - 2.0, bow, cx + off + 2.0, bow + 90.0);
+        c.solid(|x, y| (x - cx - off).abs() < 0.6 && y > bow + 10.0 && y < bow + 84.0, [0.08, 0.08, 0.1, 0.8]);
+    }
+    // arresting wires aft, with their sheaves at the deck edge
+    for k in 0..9 {
+        let y0 = stern - 130.0 + k as f32 * 10.0;
+        c.clip(0.0, y0 - 2.0, wf, y0 + 2.0);
+        c.solid(|x, y| (y - y0).abs() < 0.45 && deck(x, y) && (x - cx).abs() < 70.0, [0.75, 0.76, 0.74, 0.8]);
+        for sgn in [-1.0f32, 1.0] {
+            c.solid(|x, y| ((x - cx - sgn * 70.0).powi(2) + (y - y0).powi(2)) < 2.2, [0.12, 0.12, 0.12, 1.0]);
         }
     }
-
-    // A few planes parked to port — small solid silhouettes, not full
-    // sprites, just enough to read as a working flight deck rather than an
-    // empty one.
-    let plane_w = (w as f32 * 0.10) as i32;
-    let plane_h = (h as f32 * 0.045) as i32;
-    let plane_x = (w as f32 * 0.12) as i32;
-    for frac in [0.38, 0.47, 0.56] {
-        let py0 = (h as f32 * frac) as i32;
-        for y in py0..(py0 + plane_h).min(h) {
-            for x in plane_x..(plane_x + plane_w).min(w) {
-                img.set(x, y, 58, 62, 68);
-            }
+    // barriers forward of the wires
+    for y0 in [stern - 150.0, stern - 143.0] {
+        c.clip(0.0, y0 - 2.0, wf, y0 + 2.0);
+        c.solid(|x, y| (y - y0).abs() < 0.6 && deck(x, y) && (x - cx).abs() < 66.0, [0.85, 0.75, 0.2, 0.8]);
+    }
+    // the hull number, "9", fore and aft
+    let nine = |x: f32, y: f32, x0: f32, y0: f32| -> bool {
+        let (u, v) = ((x - x0) / 14.0, (y - y0) / 24.0);
+        if !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v) { return false; }
+        let bar = 0.2;
+        let top = v < bar; let mid = (v - 0.45).abs() < bar / 2.0; let bot = v > 1.0 - bar;
+        let left = u < bar * 1.4 && v < 0.5; let right = u > 1.0 - bar * 1.4;
+        top || mid || (bot && u > 0.2) || left || right
+    };
+    c.clip(cx - 10.0, bow + 20.0, cx + 10.0, bow + 50.0);
+    c.solid(|x, y| nine(x, y, cx - 7.0, bow + 22.0), white);
+    c.clip(cx - 10.0, stern - 34.0, cx + 10.0, stern - 4.0);
+    // aft, turned round to read from astern
+    c.solid(|x, y| nine(cx * 2.0 - x, (stern - 20.0) * 2.0 - y, cx - 7.0, stern - 32.0), white);
+    // the island, to starboard, its shadow on the deck
+    let (ix0, ix1, iy0, iy1) = (dr - 12.0, dr + 22.0, bow + 200.0, bow + 330.0);
+    c.clip(ix0 - 8.0, iy0 - 4.0, ix1 + 2.0, iy1 + 8.0);
+    c.solid(|x, y| x > ix0 - 6.0 && x < ix0 && y > iy0 + 6.0 && y < iy1 + 6.0, [0.0, 0.0, 0.0, 0.25]);
+    c.fill(|x, y| x > ix0 && x < ix1 && y > iy0 && y < iy1
+        && !(y < iy0 + 20.0 && x < ix0 + (iy0 + 20.0 - y) * 0.5), |x, _| 0.85 + 0.25 * ((x - ix0) / (ix1 - ix0)), grey);
+    // bridge windows, the funnel with its soot, radar and mast
+    c.solid(|x, y| y > iy0 + 22.0 && y < iy0 + 25.0 && x > ix0 + 3.0 && x < ix1 - 3.0 && ((x - ix0) % 3.5) < 2.0,
+        [0.1, 0.14, 0.2, 1.0]);
+    let (fx, fy) = ((ix0 + ix1) / 2.0 + 2.0, iy0 + 78.0);
+    c.solid(|x, y| ((x - fx) / 10.0).powi(2) + ((y - fy) / 20.0).powi(2) <= 1.0, [0.36, 0.38, 0.42, 1.0]);
+    c.solid(|x, y| ((x - fx) / 7.0).powi(2) + ((y - fy) / 16.0).powi(2) <= 1.0, [0.06, 0.06, 0.07, 1.0]);
+    let (ry, rx) = (iy0 + 44.0, (ix0 + ix1) / 2.0);
+    c.solid(|x, y| (x - rx).abs() < 9.0 && (y - ry).abs() < 3.0
+        && (((x - rx + 9.0) % 2.0) < 0.6 || (y - ry).abs() > 2.4), [0.7, 0.72, 0.75, 1.0]);
+    c.solid(|x, y| (x - rx).abs() < 0.6 && y > ry - 10.0 && y < ry + 30.0, [0.2, 0.2, 0.22, 1.0]);
+    c.solid(|x, y| (y - (ry - 8.0)).abs() < 0.5 && (x - rx).abs() < 6.0, [0.2, 0.2, 0.22, 1.0]);
+    // twin 5-inch mounts, two forward of the island, two aft
+    for (my, fwd) in [(iy0 - 36.0, true), (iy0 - 16.0, true), (iy1 + 12.0, false), (iy1 + 32.0, false)] {
+        let mx = dr + 4.0;
+        c.clip(mx - 12.0, my - 20.0, mx + 12.0, my + 20.0);
+        let dir = if fwd { -1.0 } else { 1.0 };
+        for off in [-2.2f32, 2.2] {
+            c.solid(|x, y| (x - mx - off).abs() < 0.8 && (y - my) * dir > 0.0 && (y - my).abs() < 15.0, [0.15, 0.15, 0.16, 1.0]);
+        }
+        c.fill(|x, y| ((x - mx) / 8.0).powi(2) + ((y - my) / 6.5).powi(2) <= 1.0, |_, y| 1.1 - 0.02 * (y - my), grey);
+    }
+    // 40 mm quad mounts in the sponsons and at bow and stern
+    let quads = [(dl - 5.0, bow + 90.0), (dl - 5.0, bow + 210.0), (dl - 5.0, bow + 420.0), (dl - 5.0, stern - 70.0),
+                 (dr + 5.0, bow + 140.0), (dr + 5.0, bow + 480.0), (dr + 5.0, stern - 60.0),
+                 (cx - 18.0, bow + 4.0), (cx + 18.0, bow + 4.0), (cx - 30.0, stern + 6.0), (cx + 30.0, stern + 6.0)];
+    for (qx, qy) in quads {
+        c.clip(qx - 8.0, qy - 10.0, qx + 8.0, qy + 8.0);
+        c.solid(|x, y| ((x - qx).powi(2) + (y - qy).powi(2)) < 20.0, [0.4, 0.42, 0.45, 1.0]);
+        for k in 0..4 {
+            let bx = qx - 2.4 + k as f32 * 1.6;
+            c.solid(|x, y| (x - bx).abs() < 0.35 && y < qy - 2.0 && y > qy - 8.0, [0.12, 0.12, 0.13, 1.0]);
         }
     }
-
-    img.encode_png()
+    // Hellcats spotted aft, wings folded back along their sides
+    let hellcat = |c: &mut Canvas, px: f32, py: f32| {
+        c.clip(px - 12.0, py - 16.0, px + 12.0, py + 16.0);
+        let blue = [0.18, 0.25, 0.4, 1.0];
+        c.solid(|x, y| (y - py).abs() < 13.0 && (x - px).abs() < 3.4 - ((y - py + 4.0) / 13.0).abs().powi(2) * 1.6, blue);
+        c.solid(|x, y| y > py - 7.0 && y < py + 9.0 && ((x - px).abs() - 5.5).abs() < 1.6, [0.2, 0.28, 0.44, 1.0]);
+        c.solid(|x, y| y > py + 9.0 && y < py + 12.5 && (x - px).abs() < 7.0, blue);
+        c.solid(|x, y| ((x - px) / 1.6).powi(2) + ((y - py + 3.0) / 3.0).powi(2) <= 1.0, [0.5, 0.65, 0.8, 0.9]);
+        c.solid(|x, y| ((x - px) / 3.2).powi(2) + ((y - py + 12.5) / 1.4).powi(2) <= 1.0, [0.12, 0.12, 0.12, 1.0]);
+    };
+    for (k, (dx, dy)) in [(-44.0f32, -104.0f32), (-22.0, -104.0), (0.0, -100.0), (22.0, -104.0), (44.0, -104.0),
+                          (-33.0, -74.0), (-11.0, -72.0), (11.0, -72.0), (33.0, -74.0)].iter().enumerate() {
+        let _ = k;
+        hellcat(&mut c, cx + dx, stern + dy + 30.0);
+    }
+    c.unclip();
+    c.finish(false)
 }
 
 /// An enemy boat, viewed from above: a pointed-bow hull (bow to the right;
@@ -1333,34 +1489,6 @@ fn engine_start_sfx() -> Vec<u8> {
     encode_pcm16_mono(&pcm)
 }
 
-/// The propeller drone — a short seamless loop the game plays (looped,
-/// volume-ridden) all through the carrier climb. Purely harmonic (a
-/// sawtooth-ish stack on an 78 Hz fundamental under a sharpened blade-chop
-/// tremolo), so every component completes a whole number of cycles across
-/// the 500 ms buffer and it loops with no click — no noise layer, which
-/// couldn't loop cleanly anyway; the grit comes from waveshaping instead.
-fn propeller_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let n = ms_to_samples(500.0); // 22050 samples
-    let f0 = 78.0_f32;            // 39 cycles / 500 ms
-    let chop_hz = 24.0_f32;       // 12 cycles / 500 ms
-    let mut s = Vec::with_capacity(n);
-    for i in 0..n {
-        let t = i as f32 / sr;
-        let tone = (2.0 * PI * f0 * t).sin()
-            + 0.55 * (2.0 * PI * f0 * 2.0 * t).sin()
-            + 0.30 * (2.0 * PI * f0 * 3.0 * t).sin()
-            + 0.17 * (2.0 * PI * f0 * 4.0 * t).sin()
-            + 0.08 * (2.0 * PI * f0 * 6.0 * t).sin();
-        // Blade chop: a tremolo sharpened so it "thwacks" without ever
-        // fully closing.
-        let chop_raw = (2.0 * PI * chop_hz * t).sin() * 0.5 + 0.5;
-        let chop = 0.5 + 0.5 * chop_raw.powf(1.6);
-        s.push((tone * 0.3).tanh() * chop);
-    }
-    let pcm: Vec<i16> = s.iter().map(|&v| (v * 20_000.0) as i16).collect();
-    encode_pcm16_mono(&pcm)
-}
 
 /// One engine loop at `rpm` (1.0 = cruise): the propeller's blade tone and
 /// chop, driven harder and brighter the faster it turns. One second long
@@ -1441,12 +1569,13 @@ fn barrier_hum_sfx() -> Vec<u8> {
 // data is used, and only at repo-authoring time, never at build or run time.
 
 /// Katakana glyphs needed for the seven boss names, 10 wide x 12 tall.
-const KATAKANA_CHARS: [char; 32] = [
+const KATAKANA_CHARS: [char; 37] = [
     'ス', 'カ', 'ウ', 'ト', 'ボ', 'マ', 'ー', 'イ', 'ン', 'タ', 'セ', 'プ',
     'ガ', 'シ', 'ッ', 'ド', 'レ', 'ノ', 'バ', 'ル', 'ク', 'ザ', 'ゥ', 'ム',
     'キ', 'ャ', 'リ', 'ア', 'ペ', 'デ', 'ロ', 'ヤ',
+    'ュ', 'ヒ', 'テ', 'コ', 'フ',
 ];
-const KATAKANA_GLYPHS: [[u16; 12]; 32] = [
+const KATAKANA_GLYPHS: [[u16; 12]; 37] = [
     [0x000, 0x000, 0x000, 0x0FC, 0x018, 0x008, 0x018, 0x038, 0x06C, 0x0C4, 0x080, 0x000], // ス
     [0x000, 0x000, 0x020, 0x020, 0x0FC, 0x064, 0x024, 0x064, 0x044, 0x0DC, 0x098, 0x000], // カ
     [0x000, 0x000, 0x020, 0x030, 0x0FC, 0x084, 0x084, 0x00C, 0x018, 0x030, 0x020, 0x000], // ウ
@@ -1479,19 +1608,23 @@ const KATAKANA_GLYPHS: [[u16; 12]; 32] = [
     [0x000, 0x000, 0x006, 0x0FC, 0x000, 0x0FC, 0x0FC, 0x030, 0x020, 0x060, 0x040, 0x000], // デ
     [0x000, 0x000, 0x000, 0x0FC, 0x0FC, 0x084, 0x084, 0x084, 0x084, 0x0FC, 0x084, 0x000], // ロ
     [0x000, 0x000, 0x040, 0x044, 0x07C, 0x1EC, 0x068, 0x020, 0x020, 0x030, 0x030, 0x000], // ヤ
+    [0x000, 0x000, 0x000, 0x000, 0x000, 0x0F8, 0x018, 0x018, 0x018, 0x1FC, 0x000, 0x000], // ュ
+    [0x000, 0x000, 0x080, 0x080, 0x08C, 0x0F0, 0x080, 0x080, 0x080, 0x0FE, 0x07E, 0x000], // ヒ
+    [0x000, 0x000, 0x078, 0x000, 0x1FE, 0x030, 0x030, 0x030, 0x060, 0x0C0, 0x000, 0x000], // テ
+    [0x000, 0x000, 0x000, 0x0FC, 0x00C, 0x00C, 0x00C, 0x00C, 0x0FC, 0x000, 0x000, 0x000], // コ
+    [0x000, 0x000, 0x000, 0x1FC, 0x00C, 0x00C, 0x018, 0x030, 0x060, 0x0C0, 0x000, 0x000], // フ
 ];
 
-/// The seven boss names, transliterated into katakana (they're all foreign
-/// loanwords, so katakana — not kanji — is the linguistically correct
-/// choice) in the same order as BOSS_SPECS.
+/// The seven boss aircraft's Japanese names, in katakana, in the order of
+/// BOSS_SPECS.
 const BOSS_NAMES_JA: [&[char]; 7] = [
-    &['ス', 'カ', 'ウ', 'ト', 'ボ', 'マ', 'ー'],                                    // SCOUT BOMBER
-    &['イ', 'ン', 'タ', 'ー', 'セ', 'プ', 'タ', 'ー'],                              // INTERCEPTOR
-    &['ガ', 'ン', 'シ', 'ッ', 'プ'],                                               // GUNSHIP
-    &['ド', 'レ', 'ッ', 'ド', 'ノ', 'ー', 'ト'],                                    // DREADNOUGHT
-    &['バ', 'ト', 'ル', 'ク', 'ル', 'ー', 'ザ', 'ー'],                              // BATTLE CRUISER
-    &['ド', 'ゥ', 'ー', 'ム', 'キ', 'ャ', 'リ', 'ア'],                              // DOOM CARRIER
-    &['ア', 'ペ', 'ッ', 'ク', 'ス', 'デ', 'ス', 'ト', 'ロ', 'イ', 'ヤ', 'ー'],       // APEX DESTROYER
+    &['ド', 'ン', 'リ', 'ュ', 'ウ'],          // Ki-49 Donryu
+    &['ヒ', 'リ', 'ュ', 'ウ'],                // Ki-67 Hiryu
+    &['リ', 'ッ', 'コ', 'ウ'],                // G4M, the "Rikko"
+    &['レ', 'ン', 'ザ', 'ン'],                // G8N Renzan
+    &['タ', 'イ', 'テ', 'イ'],                // H8K flying boat, "Taitei"
+    &['シ', 'ン', 'ザ', 'ン'],                // G5N Shinzan
+    &['フ', 'ガ', 'ク'],                      // Fugaku
 ];
 
 const KATAKANA_GW: u32 = 10;
@@ -2183,7 +2316,8 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/turret_fire.wav",    turret_fire_sfx()),
         ("sounds/barrier_hum.wav",    barrier_hum_sfx()),
         ("sounds/engine_start.wav",   engine_start_sfx()),
-        ("sounds/propeller.wav",      propeller_sfx()),
+        ("sounds/enemy_gun.wav",      enemy_gun_sfx()),
+        ("sounds/backfire.wav",       backfire_sfx()),
         ("sounds/engine0.wav",        engine_loop(0.4, true)),
         ("sounds/engine1.wav",        engine_loop(0.65, false)),
         ("sounds/engine2.wav",        engine_loop(1.0, false)),
