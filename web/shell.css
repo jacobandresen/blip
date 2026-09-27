@@ -705,3 +705,25 @@ canvas {
   .blip-hs-item { font-size: 8px; }
   .blip-hs-code { font-size: 12px; letter-spacing: 2px; }
 }
+
+/* ---- The cabinet under the screen ----
+   One full-width body from the bezel down, with a lit ledge where the
+   screen housing meets it. The deck's 16px side gutters used to show the
+   wall through, so the panel read as a slab floating in front of it. */
+:root[data-layout="upright"] #topbar { background: none; }
+:root[data-layout="upright"] #topbar::before {
+  content: '';
+  position: absolute;
+  left: -16px;
+  right: -16px;
+  top: -5px;
+  bottom: 0;
+  z-index: -1;
+  border-radius: 14px 14px 0 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0 1px, rgba(0, 0, 0, 0.7) 1px 3px, transparent 3px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, #19191c 0%, #0e0e10 45%, #060607 100%);
+  box-shadow: 0 -8px 16px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
