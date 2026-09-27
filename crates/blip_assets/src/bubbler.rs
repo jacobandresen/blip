@@ -115,7 +115,13 @@ const RR: i32 = -1; // rest
 /// The theme: 152 bpm, sixteen bars of eighths, C major. Bouncy bass on
 /// root-octave-fifth, a quiet chord arpeggio in sixteenths, a lead that
 /// leaps and skips — written to be hummed after one round.
-pub fn theme_wav() -> Vec<u8> {
+pub fn theme_wav() -> Vec<u8> { theme(152.0) }
+
+/// The same theme, faster: HURRY UP plays it, the way the original's
+/// music speeds up when the round has gone on too long.
+pub fn hurry_wav() -> Vec<u8> { theme(188.0) }
+
+fn theme(bpm: f32) -> Vec<u8> {
     let lead: [[i32; 8]; 16] = [
         [76, H, 79, H, 84, H, 79, 76],
         [81, H, 76, H, 72, H, 76, 81],
@@ -144,7 +150,6 @@ pub fn theme_wav() -> Vec<u8> {
         [c, c], [am, am], [f, f], [gch, gch], [c, c], [am, am], [f, gch], [c, c],
         [f, f], [gch, gch], [em, em], [am, am], [f, f], [gch, gch], [c, gch], [c, c],
     ];
-    let bpm = 152.0;
     let eighth = (60.0 / bpm / 2.0 * SR) as usize;
     let bar = eighth * 8;
     let total = bar * 16;
@@ -160,6 +165,8 @@ pub fn theme_wav() -> Vec<u8> {
                 let mut len = 1;
                 while k + len < 8 && lead[b][k + len] == H { len += 1; }
                 note(&mut buf, b0 + k * eighth, len * eighth - eighth / 6, n, 0.30, Voice::Lead);
+                // a harmony a third below in the second half, bell-soft
+                if b >= 8 { note(&mut buf, b0 + k * eighth, len * eighth, n - 4, 0.10, Voice::Bell); }
                 k += len;
             } else { k += 1; }
         }
@@ -183,8 +190,15 @@ pub fn theme_wav() -> Vec<u8> {
             hat(&mut buf, t0 + eighth, &mut rng, 0.12);
             hat(&mut buf, t0, &mut rng, 0.07);
         }
-        if b % 4 == 3 { kick(&mut buf, b0 + 7 * eighth, 0.4); }
+        if b % 4 == 3 {
+            // a snare fill into the next phrase
+            for s in 0..4 { snare(&mut buf, b0 + 6 * eighth + s * eighth / 2, &mut rng, 0.14 + 0.05 * s as f32); }
+            kick(&mut buf, b0 + 7 * eighth, 0.4);
+        }
     }
+    // A dotted-eighth echo on everything, quiet: the room the chiptune plays in.
+    let d = eighth * 3 / 2;
+    for i in (d..buf.len()).rev() { buf[i] += buf[i - d] * 0.22; }
     // Fold the tail back onto the start so the loop has no seam.
     let tail = buf.split_off(total);
     for (i, v) in tail.iter().enumerate() { buf[i] += v; }
