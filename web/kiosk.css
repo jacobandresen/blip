@@ -2026,9 +2026,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* The toggle back to the joystick goes with the deck: sideways there is
    no bar under it to sit above, so it sits in the middle of the screen's
    bottom edge, between the two gutters where nothing else is. */
-:root[data-layout="landscape"] #control-toggle {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
-}
+/* Sideways the middle of the bottom edge is the picture: no toggle there
+   (the controller is switched upright). */
+:root[data-layout="landscape"] #control-toggle { display: none; }
 
 /* Rally's spinners, sideways. The knobs are the whole controller, and
    the gutter is a good deal wider than the strip they used to share
@@ -3141,3 +3141,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 :root[data-players="2"] #snes-pad .snes-shell { --bolt-r: none; }
 :root[data-players="2"] #snes-pad-p2 .snes-shell { --bolt-l: none; }
+
+/* Upright the toggle sits on the plate, bottom centre, where neither
+   station has anything: above the bar it covered the picture. */
+:root[data-layout="upright"] #topbar ~ #control-toggle,
+:root[data-layout="upright"] #control-toggle {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 3px);
+  padding: 5px 10px;
+}

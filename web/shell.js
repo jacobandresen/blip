@@ -396,12 +396,15 @@ function deckCover(bar) {
     var r = parts[i].getBoundingClientRect();
     if (r.height > 0 && r.top < top) top = r.top;
   }
+  // Upright the whole bar is drawn: the cabinet body (#topbar::before,
+  // 5px above the bar) and the plate. None of it may lap over the picture.
+  if (!landscape() && parts.length) top = Math.min(top, bar.getBoundingClientRect().top - 5);
   // A few pixels of margin. The ball is left out on purpose: it floats
   // over the game, and the picture should not shrink to make room for it.
   // If the deck has not been built yet there is nothing to measure, so fall
   // back to the bar.
   if (top >= window.innerHeight) return Math.ceil(bar.offsetHeight);
-  return Math.ceil(window.innerHeight - top) + 10;
+  return Math.ceil(window.innerHeight - top) + 4;
 }
 
 var lastFit = '';
@@ -419,12 +422,25 @@ function fillCanvas() {
   TOPBAR_H = landscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
   var mb = document.getElementById('marquee-bar');
   MARQUEE_H = mb ? Math.max(mb.offsetHeight, 28) : 0;
-  var w = window.innerWidth  - PAD * 2;
+  // Sideways the controls stand in the two gutters; keep the picture out
+  // of them (a wide game like Brawler would otherwise run under the cross).
+  var gl = PAD, gr = PAD;
+  if (landscape() && tb) {
+    var mid = window.innerWidth / 2;
+    var ctl = tb.querySelectorAll('.snes-dpad, .snes-face, .stick-boot, .fire-buttons, #paddle-dial, #paddle-dial-p2');
+    for (var i = 0; i < ctl.length; i++) {
+      var r = ctl[i].getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      if (r.left + r.width / 2 < mid) gl = Math.max(gl, Math.ceil(r.right) + 6);
+      else gr = Math.max(gr, Math.ceil(window.innerWidth - r.left) + 6);
+    }
+  }
+  var w = window.innerWidth - gl - gr;
   var h = window.innerHeight - TOPBAR_H - MARQUEE_H - PAD * 2;
   canvas.style.setProperty('width',  w + 'px', 'important');
   canvas.style.setProperty('height', h + 'px', 'important');
   canvas.style.setProperty('top',    (MARQUEE_H + PAD) + 'px', 'important');
-  canvas.style.setProperty('left',   PAD + 'px', 'important');
+  canvas.style.setProperty('left',   gl + 'px', 'important');
   canvas.style.setProperty('transform', 'none', 'important');
   // The touch controls (dpad, fire buttons, paddle dials — all plain CSS,
   // positioned "bottom: calc(--topbar-h + ...)") key off this custom
