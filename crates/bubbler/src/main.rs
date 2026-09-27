@@ -587,6 +587,9 @@ fn pop_chain(g: &mut Game, start: usize, by: usize, sfx: &Sounds) {
         k += 1;
     }
     let mut kills = 0;
+    // One popup for the whole chain: catches sit 24px apart and a popup is
+    // wider than that, so one each piled up into an unreadable smear.
+    let (mut chain_total, mut chain_at) = (0, (0.0, 0.0));
     for &j in &chain {
         let b = g.bubbles[j];
         g.bubbles[j].active = false;
@@ -596,7 +599,8 @@ fn pop_chain(g: &mut Game, start: usize, by: usize, sfx: &Sounds) {
         if b.trapped.is_some() {
             let value = 1000 << kills.min(4);
             g.p[by].score += value;
-            g.pops.push(Popup { x: b.x, y: b.y - 6.0, t: 0.0, value, c: rgba(1.0, 0.95, 0.4, 1.0) });
+            chain_total += value;
+            if kills == 0 { chain_at = (b.x, b.y - 6.0); }
             g.burst(b.x, b.y, 10, rgba(1.0, 0.85, 0.3, 1.0), 150.0, true);
             g.fruits.push(Fruit { x: b.x - 8.0, y: b.y - 8.0, vx: rng(-110.0, 110.0), vy: -300.0,
                 kind: kills.min(3), t: 0.0, on_ground: false, active: true });
@@ -604,6 +608,9 @@ fn pop_chain(g: &mut Game, start: usize, by: usize, sfx: &Sounds) {
         } else {
             g.p[by].score += 10;
         }
+    }
+    if chain_total > 0 {
+        g.pops.push(Popup { x: chain_at.0, y: chain_at.1, t: 0.0, value: chain_total, c: rgba(1.0, 0.95, 0.4, 1.0) });
     }
     play_sfx(&sfx.pop);
     g.stats.pops += 1;
@@ -825,7 +832,7 @@ fn update_fx(g: &mut Game, dt: f32) {
         p.life -= dt;
     }
     g.parts.retain(|p| p.life > 0.0);
-    for p in g.pops.iter_mut() { p.t += dt; p.y -= 30.0 * dt; }
+    for p in g.pops.iter_mut() { p.t += dt; p.y = (p.y - 30.0 * dt).max(HUD + 6.0); }
     g.pops.retain(|p| p.t < 1.1);
     g.shake = (g.shake - dt).max(0.0);
     g.chain.1 = (g.chain.1 - dt).max(0.0);
@@ -1153,40 +1160,92 @@ fn draw_world(blip: &Blip, g: &Game) {
         let s = format!("{}", p.value);
         let sz = 1.5 * (1.0 + 0.5 * (1.0 - ease_out(p.t / 0.18)));
         let w = s.len() as f32 * 6.0 * sz;
-        blip.draw_text(&s, p.x - w / 2.0 + 1.0, p.y + 1.0, sz, rgba(0.0, 0.0, 0.0, a * 0.6));
-        blip.draw_text(&s, p.x - w / 2.0, p.y, sz, BlipColor { a, ..p.c });
+        let x = (p.x - w / 2.0).clamp(TILE + 2.0, WIN_W as f32 - TILE - 2.0 - w);
+        blip.draw_text(&s, x + 1.0, p.y + 1.0, sz, col(PLUM, a * 0.8));
+        blip.draw_text(&s, x, p.y, sz, BlipColor { a, ..p.c });
     }
 }
 
-fn draw_hud(blip: &Blip, g: &Game, hi: &web::HighScore) {
-    blip.fill_rect(0.0, 0.0, WIN_W as f32, HUD, rgba(0.0, 0.0, 0.0, 0.85));
-    blip.draw_text("1UP", 6.0, 3.0, 1.5, rgba(0.5, 1.0, 0.55, 1.0));
-    blip.draw_number(g.p[0].score, 6.0, 13.0, 1.4, rgba(1.0, 1.0, 1.0, 1.0));
-    if g.p[0].joined {
-        for k in 0..g.p[0].lives.max(0) {
-            blip::macroquad::shapes::draw_circle(40.0 + k as f32 * 9.0, 6.5, 3.2, rgba(0.35, 0.82, 0.43, 1.0));
+// ---- cosy text -------------------------------------------------------------
+// Warm pastels on soft rounded panels, a plum shadow instead of black: the
+// text sits on something, never straight over a platform or a monster.
+const CREAM: (u8, u8, u8) = (255, 244, 222);
+const PEACH: (u8, u8, u8) = (255, 196, 150);
+const PINK: (u8, u8, u8) = (255, 170, 200);
+const MINT: (u8, u8, u8) = (170, 240, 190);
+const SKY: (u8, u8, u8) = (165, 215, 255);
+const PLUM: (u8, u8, u8) = (60, 20, 70);
+
+fn text_w(text: &str, sz: f32) -> f32 { text.chars().count() as f32 * 6.0 * sz - sz }
+
+/// A rounded panel: the pill every banner sits on.
+fn pill(cx: f32, y: f32, w: f32, h: f32, edge: BlipColor, a: f32) {
+    use blip::macroquad::shapes::{draw_circle, draw_rectangle};
+    let r = (h / 2.0).min(14.0);
+    let x = cx - w / 2.0;
+    let fill = col((34, 14, 44), 0.82 * a);
+    let rim = BlipColor { a: edge.a * a * 0.9, ..edge };
+    // border: the same shape one pixel-and-a-half bigger, underneath
+    for (grow, c) in [(1.6f32, rim), (0.0, fill)] {
+        let (xx, yy, ww, hh, rr) = (x - grow, y - grow, w + grow * 2.0, h + grow * 2.0, r + grow);
+        draw_rectangle(xx + rr, yy, ww - rr * 2.0, hh, c);
+        draw_rectangle(xx, yy + rr, ww, hh - rr * 2.0, c);
+        for (px, py) in [(xx + rr, yy + rr), (xx + ww - rr, yy + rr), (xx + rr, yy + hh - rr), (xx + ww - rr, yy + hh - rr)] {
+            draw_circle(px, py, rr, c);
+        }
+    }
+    draw_rectangle(x + r, y + 2.0, w - r * 2.0, 1.5, rgba(1.0, 1.0, 1.0, 0.08 * a));
+}
+
+/// Text on its own pill, centred on the screen, popping in with `pop`.
+fn cosy(blip: &Blip, text: &str, y: f32, sz: f32, c: (u8, u8, u8), edge: (u8, u8, u8), pop: f32, a: f32) {
+    if a <= 0.01 { return; }
+    let s = sz * (0.7 + 0.3 * ease_out(pop));
+    let (w, h) = (text_w(text, s), 7.0 * s);
+    let (px, py) = (8.0 + s * 2.5, 6.0 + s * 1.5);
+    let cx = WIN_W as f32 / 2.0;
+    let top = y + (7.0 * sz - h) / 2.0;
+    pill(cx, top - py, w + px * 2.0, h + py * 2.0, col(edge, 1.0), a);
+    let x = cx - w / 2.0;
+    blip.draw_text(text, x + s * 0.5, top + s * 0.6, s, col(PLUM, 0.9 * a));
+    blip.draw_text(text, x, top, s, col(c, a));
+}
+
+/// Plain text with the soft plum shadow, left-aligned (HUD, small print).
+fn soft(blip: &Blip, text: &str, x: f32, y: f32, sz: f32, c: (u8, u8, u8), a: f32) {
+    blip.draw_text(text, x + sz * 0.5, y + sz * 0.5, sz, col(PLUM, 0.9 * a));
+    blip.draw_text(text, x, y, sz, col(c, a));
+}
+
+fn draw_hud(blip: &Blip, g: &Game, _hi: &web::HighScore) {
+    // one row: P1 on the left, the round in the middle, P2 on the right
+    blip.fill_rect(0.0, 0.0, WIN_W as f32, HUD, col((26, 10, 34), 0.92));
+    blip.fill_rect(0.0, HUD - 2.0, WIN_W as f32, 2.0, col(PINK, 0.25));
+    let sz = 1.5;
+    let y = (HUD - 7.0 * sz) / 2.0 - 1.0;
+    use blip::macroquad::shapes::draw_circle;
+    for (i, colr, life) in [(0usize, MINT, (110, 220, 130)), (1, SKY, (110, 180, 255))] {
+        let p = &g.p[i];
+        if !p.joined {
+            // player two's seat, waiting: a gentle pulse, not a blink
+            let a = 0.55 + 0.45 * (now() * 3.0).sin().abs();
+            let t = "2P JOIN";
+            soft(blip, t, WIN_W as f32 - 10.0 - text_w(t, sz), y, sz, SKY, a);
+            continue;
+        }
+        let score = format!("{}", p.score);
+        let (sw, lives) = (text_w(&score, sz), p.lives.max(0));
+        let lw = lives as f32 * 9.0;
+        let x0 = if i == 0 { 10.0 } else { WIN_W as f32 - 10.0 - sw - 8.0 - lw };
+        soft(blip, &score, x0, y, sz, colr, 1.0);
+        for k in 0..lives {
+            let (hx, hy) = (x0 + sw + 10.0 + k as f32 * 9.0, HUD / 2.0 - 1.0);
+            draw_circle(hx, hy, 3.3, col(life, 1.0));
+            draw_circle(hx - 1.0, hy - 1.0, 1.0, rgba(1.0, 1.0, 1.0, 0.7));
         }
     }
     let round = format!("ROUND {}", g.round + 1);
-    blip.draw_centered(&round, 3.0, 1.5, rgba(1.0, 0.9, 0.5, 1.0));
-    if hi.score > 0 { blip.draw_centered(&hi.label("HI"), 13.0, 1.2, rgba(0.85, 0.85, 0.95, 0.9)); }
-    let rx = WIN_W as f32 - 6.0;
-    if g.p[1].joined {
-        blip.draw_text("2UP", rx - 18.0 * 1.5, 3.0, 1.5, rgba(0.55, 0.8, 1.0, 1.0));
-        let s = format!("{}", g.p[1].score);
-        blip.draw_text(&s, rx - s.len() as f32 * 6.0 * 1.4, 13.0, 1.4, rgba(1.0, 1.0, 1.0, 1.0));
-        for k in 0..g.p[1].lives.max(0) {
-            blip::macroquad::shapes::draw_circle(rx - 36.0 - k as f32 * 9.0, 6.5, 3.2, rgba(0.35, 0.67, 1.0, 1.0));
-        }
-    } else if (now() * 2.0) as i32 % 2 == 0 {
-        blip.draw_text("2P JOIN", rx - 7.0 * 6.0 * 1.4, 7.0, 1.4, rgba(0.55, 0.8, 1.0, 1.0));
-    }
-}
-
-fn banner(blip: &Blip, text: &str, y: f32, sz: f32, c: BlipColor, pop: f32) {
-    let s = sz * (0.6 + 0.4 * ease_out(pop));
-    blip.draw_centered(text, y + 2.0, s, rgba(0.0, 0.0, 0.0, 0.6 * c.a));
-    blip.draw_centered(text, y, s, c);
+    soft(blip, &round, (WIN_W as f32 - text_w(&round, sz)) / 2.0, y, sz, PEACH, 1.0);
 }
 
 fn draw_title(blip: &Blip, g: &Game, hi: &web::HighScore) {
@@ -1227,13 +1286,19 @@ fn draw_title(blip: &Blip, g: &Game, hi: &web::HighScore) {
         draw_dragon(*x, foot, if i == 0 { 1.0 } else { -1.0 }, body, sq, t * 2.0, (t * 0.7 + i as f32) % 3.0 < 0.1,
             (t * 1.3 + i as f32 * 0.5) % 2.0 < 0.2, 1.0, 0.0, 2.4);
     }
-    if (t * 2.0) as i32 % 2 == 0 {
-        banner(blip, "P1 PRESS BUBBLE", 300.0, 2.2, rgba(0.6, 1.0, 0.65, 1.0), 1.0);
+    let glow = 0.65 + 0.35 * (t * 2.5).sin().abs();
+    cosy(blip, "P1 PRESS BUBBLE", 300.0, 2.0, MINT, MINT, 1.0, glow);
+    let two = "P2 PRESS J TO JOIN";
+    soft(blip, two, (WIN_W as f32 - text_w(two, 1.4)) / 2.0, 336.0, 1.4, SKY, 1.0);
+    // how to play, on its own panel
+    let (l1, l2) = ("MOVE A D   JUMP W   BUBBLE F", "HOLD JUMP TO RIDE BUBBLES");
+    pill(WIN_W as f32 / 2.0, 358.0, text_w(l1, 1.2) + 36.0, 46.0, col(PEACH, 0.8), 0.9);
+    soft(blip, l1, (WIN_W as f32 - text_w(l1, 1.2)) / 2.0, 369.0, 1.2, CREAM, 0.95);
+    soft(blip, l2, (WIN_W as f32 - text_w(l2, 1.2)) / 2.0, 385.0, 1.2, CREAM, 0.95);
+    if hi.score > 0 {
+        let h = hi.label("HI");
+        soft(blip, &h, (WIN_W as f32 - text_w(&h, 1.5)) / 2.0, 424.0, 1.5, PEACH, 1.0);
     }
-    blip.draw_centered("P2 PRESS J TO PLAY TOGETHER", 332.0, 1.4, rgba(0.6, 0.85, 1.0, 1.0));
-    blip.draw_centered("MOVE A D   JUMP W   BUBBLE F", 360.0, 1.2, rgba(0.85, 0.85, 0.95, 0.8));
-    blip.draw_centered("HOLD JUMP TO RIDE BUBBLES", 376.0, 1.2, rgba(0.85, 0.85, 0.95, 0.8));
-    if hi.score > 0 { blip.draw_centered(&hi.label("HI"), 410.0, 1.6, rgba(1.0, 0.9, 0.5, 1.0)); }
     let _ = g;
 }
 
@@ -1341,6 +1406,8 @@ async fn main() {
     let mut music_on = false;
     let mut shot_frame = 0u32;
     #[cfg(not(target_arch = "wasm32"))]
+    let mut scene_set = false;
+    #[cfg(not(target_arch = "wasm32"))]
     let bot: u32 = std::env::var("BUBBLER_BOT").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
     #[cfg(not(target_arch = "wasm32"))]
     let speed: u32 = std::env::var("BUBBLER_SPEED").ok().and_then(|v| v.parse().ok()).unwrap_or(1);
@@ -1375,6 +1442,31 @@ async fn main() {
             }
         }
 
+        // Native-only: BUBBLER_SCENE=intro|play|hurry|chain|clear|over|won
+        // jumps to that screen and freezes it, for checking the text.
+        #[cfg(not(target_arch = "wasm32"))]
+        let frozen = if let Ok(scene) = std::env::var("BUBBLER_SCENE") {
+            if !scene_set {
+                scene_set = true;
+                if scene != "title" { g.start(true); g.state = State::Play; }
+                for e in g.enemies.iter_mut() { e.pop_in = 1.0; }
+                for p in g.p.iter_mut() { p.safe = 0.0; p.score = 128_450; }
+                g.p[1].score = 97_320;
+                match scene.as_str() {
+                    "intro" => { g.state = State::Intro; g.state_t = 1.2; }
+                    "hurry" => { g.round_t = HURRY_AT + 0.1; g.hurry = true; }
+                    "chain" => { g.chain = (3, 1.0); }
+                    "solo" => { g.p[1].joined = false; g.two_up = false; }
+                    "clear" => { g.state = State::Clear; g.state_t = 0.8; }
+                    "over" => { g.state = State::Over; g.state_t = 3.0; }
+                    "won" => { g.state = State::Won; g.state_t = 3.0; }
+                    _ => {}
+                }
+            }
+            true
+        } else { false };
+        #[cfg(target_arch = "wasm32")]
+        let frozen = false;
         let solo = !g.two_up;
         #[allow(unused_mut)]
         let mut inp = [read(if solo { &SOLO } else { &P1_KEYS }), read(&P2_KEYS)];
@@ -1403,7 +1495,7 @@ async fn main() {
             if g.state == State::Clear && g.state_t < dt * 1.5 { bot_rounds.push(g.round_t as u32); }
         }
 
-        match g.state {
+        if !frozen { match g.state {
             State::Title => {
                 if p2_start { g.start(true); web::spend_coin(); }
                 else if inp[0].blow || inp[0].jump || key_pressed(BLIP_KEY_SPACE) { g.start(false); }
@@ -1467,7 +1559,8 @@ async fn main() {
                 }
             }
         }
-        update_fx(&mut g, dt);
+        }
+        if !frozen { update_fx(&mut g, dt); }
 
         let want_music = matches!(g.state, State::Play | State::Intro | State::Clear | State::Title);
         let want_hurry = g.state == State::Play && g.hurry;
@@ -1485,21 +1578,26 @@ async fn main() {
                 draw_world(&blip, &g);
                 draw_hud(&blip, &g, &hi);
                 let st = g.state_t;
+                // the end screens dim the world so their words sit on calm
+                if matches!(g.state, State::Over | State::Won) {
+                    blip.fill_rect(0.0, HUD, WIN_W as f32, WIN_H as f32 - HUD, col((20, 8, 28), 0.55 * (st * 2.0).min(1.0)));
+                }
                 match g.state {
                     State::Intro => {
-                        banner(&blip, &format!("ROUND {}", g.round + 1), 180.0, 4.0, rgba(1.0, 0.9, 0.5, 1.0), st * 3.0);
-                        if st > 0.7 { banner(&blip, "READY!", 225.0, 2.5, rgba(1.0, 1.0, 1.0, 1.0), (st - 0.7) * 3.0); }
+                        cosy(&blip, &format!("ROUND {}", g.round + 1), 170.0, 3.5, PEACH, PEACH, st * 3.0, (st * 4.0).min(1.0));
+                        if st > 0.7 { cosy(&blip, "READY!", 236.0, 2.2, CREAM, MINT, (st - 0.7) * 3.0, ((st - 0.7) * 4.0).min(1.0)); }
                     }
                     State::Play => {
-                        if g.hurry && g.round_t < HURRY_AT + 2.2 && (g.round_t * 6.0) as i32 % 2 == 0 {
-                            banner(&blip, "HURRY UP!", 200.0, 4.0, rgba(1.0, 0.35, 0.35, 1.0), 1.0);
+                        if g.hurry && g.round_t < HURRY_AT + 2.4 {
+                            let a = 0.6 + 0.4 * (g.round_t * 8.0).sin().abs();
+                            cosy(&blip, "HURRY UP!", 196.0, 3.2, (255, 150, 150), (255, 110, 120), 1.0, a);
                         }
                     }
                     _ => {}
                 }
                 if g.chain.1 > 0.0 {
                     let text = format!("{} CHAIN!", g.chain.0);
-                    banner(&blip, &text, 250.0, 3.2, hsv(now() * 1.5, 0.5, 1.0, g.chain.1.min(1.0)), (1.2 - g.chain.1) * 5.0);
+                    cosy(&blip, &text, 262.0, 2.6, CREAM, PINK, (1.2 - g.chain.1) * 5.0, g.chain.1.min(1.0));
                 }
                 // bubble wipe: out at the end of a round, back in at the start of the next
                 let wipe = match g.state {
@@ -1519,15 +1617,22 @@ async fn main() {
                     }
                 }
                 match g.state {
-                    State::Clear => banner(&blip, "CLEAR!", 190.0, 5.0, hsv(st * 0.5, 0.5, 1.0, 1.0), st * 3.0),
+                    State::Clear => cosy(&blip, "CLEAR!", 186.0, 4.0, CREAM, MINT, st * 3.0, (st * 4.0).min(1.0)),
                     State::Over => {
-                        banner(&blip, "GAME OVER", 170.0, 4.5, rgba(1.0, 0.4, 0.5, 1.0), st * 2.0);
-                        if st > 2.5 { blip.draw_centered("PRESS BUBBLE", 240.0, 2.0, rgba(1.0, 1.0, 1.0, 1.0)); }
+                        cosy(&blip, "GAME OVER", 160.0, 3.8, PINK, PINK, st * 2.0, (st * 3.0).min(1.0));
+                        if hi.score > 0 {
+                            cosy(&blip, &hi.label("HI"), 222.0, 1.5, PEACH, PEACH, 1.0, (st - 1.0).clamp(0.0, 1.0));
+                        }
+                        if st > 2.5 {
+                            cosy(&blip, "PRESS BUBBLE", 276.0, 2.0, CREAM, MINT, 1.0, 0.65 + 0.35 * (st * 2.5).sin().abs());
+                        }
                     }
                     State::Won => {
-                        banner(&blip, "ALL ROUNDS CLEAR!", 150.0, 3.2, hsv(st * 0.4, 0.5, 1.0, 1.0), st * 2.0);
-                        banner(&blip, "HAPPY END", 200.0, 4.0, rgba(1.0, 0.9, 0.5, 1.0), (st - 0.5) * 2.0);
-                        if st > 2.5 { blip.draw_centered("PRESS BUBBLE", 260.0, 2.0, rgba(1.0, 1.0, 1.0, 1.0)); }
+                        cosy(&blip, "ALL ROUNDS CLEAR!", 120.0, 2.6, CREAM, MINT, st * 2.0, (st * 3.0).min(1.0));
+                        cosy(&blip, "HAPPY END", 192.0, 3.8, PEACH, PINK, (st - 0.5) * 2.0, ((st - 0.5) * 3.0).clamp(0.0, 1.0));
+                        if st > 2.5 {
+                            cosy(&blip, "PRESS BUBBLE", 276.0, 2.0, CREAM, MINT, 1.0, 0.65 + 0.35 * (st * 2.5).sin().abs());
+                        }
                     }
                     _ => {}
                 }
