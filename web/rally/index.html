@@ -14,16 +14,17 @@
   <link rel="icon" type="image/svg+xml" href="../icon.svg">
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
   <script src="../howler.min.js"></script>
-  <script src="../kiosk.js?v=21"></script>
-  <link rel="stylesheet" href="../kiosk.css?v=58">
-  <link rel="stylesheet" href="../shell.css?v=50">
+  <script src="../kiosk.js?v=25"></script>
+  <link rel="stylesheet" href="../kiosk.css?v=59">
+  <link rel="stylesheet" href="../shell.css?v=51">
 </head>
 <body>
 
   <a class="blip-logo" href="../index.html">BLIP<span class="ba-rest">&nbsp;ARCADE</span></a>
 
   <!-- Coin slot: fixed in the top-right corner of the cabinet's top panel,
-       mirroring the BLIP ARCADE logo at top-left. -->
+       mirroring the BLIP ARCADE logo at top-left — the physical slot you
+       feed, up on the panel, not down on the control deck. -->
   <button id="insert-coin-btn" class="kiosk-btn"><span data-coins-hud></span></button>
 
   <div id="loader">
@@ -31,21 +32,15 @@
     <div id="bar-outer"><div id="bar-inner"></div></div>
   </div>
 
+  <!-- The fixed bar is a plain (untransformed) box; .deck-panel is the
+       3D-tilted control surface inside it. Keeping the tilt off the
+       position:fixed element is what stops iOS Safari clipping the bar's
+       lower edge / floating it off the bottom in a home-screen PWA. -->
   <div id="topbar" class="kiosk-bar">
    <div class="deck-panel">
-    <!-- Rally always hides #stick-base/#fire-buttons (it uses the paddle
-         dials below instead) — kept structurally in sync with shell.html
-         regardless. -->
-    <div id="stick-base" class="stick-base">
-      <div id="stick-boot" class="stick-boot"></div>
-      <div id="stick-handle" class="stick-handle">
-        <div id="stick-shaft" class="stick-shaft"></div>
-        <div id="stick-ball" class="stick-ball"></div>
-      </div>
-    </div>
-    <div id="fire-buttons" class="fire-buttons"></div>
-    <!-- Paddle dials: mounted in the deck like the stick — two spinner
-         knobs on the tilted panel, P1 left / P2 right. -->
+    <!-- Paddle dials: rally only. Mounted in the deck like the stick —
+         two spinner knobs on the tilted panel, P1 left / P2 right.
+         shell.js reveals them and wires the touch spin. -->
     <div id="paddle-dial">
       <div class="dial-cap"><div id="dial-hand"></div></div>
       <div id="dial-label">P1</div>
@@ -56,27 +51,10 @@
     </div>
    </div>
 
-   <!-- Rally hides this (it uses the paddle dials) — kept in sync with
-        shell.html regardless, like #stick-base / #fire-buttons. -->
-   <div id="snes-pad" class="snes-pad" aria-hidden="true">
-    <span class="snes-cord" aria-hidden="true"></span>
-    <div class="snes-shell">
-      <div class="snes-dpad">
-        <span class="snes-dp-seg dp-up"    data-blip="up"    data-blip-nopress></span>
-        <span class="snes-dp-seg dp-right" data-blip="right" data-blip-nopress></span>
-        <span class="snes-dp-seg dp-down"  data-blip="down"  data-blip-nopress></span>
-        <span class="snes-dp-seg dp-left"  data-blip="left"  data-blip-nopress></span>
-        <span class="snes-dp-hub"></span>
-      </div>
-      <div class="snes-face">
-        <button type="button" class="snes-btn snes-b" data-blip="button1" aria-label="Button B"><span></span></button>
-        <button type="button" class="snes-btn snes-a" data-blip="button1" aria-label="Button A"><span></span></button>
-      </div>
-      <span class="snes-wordmark" aria-hidden="true">BLIP</span>
-    </div>
-   </div>
   </div>
+  <script src="../deck.js?v=3"></script>
 
+  <!-- Subtle: flip the deck back to the classic arcade joystick. -->
   <button type="button" id="control-toggle" aria-label="Switch on-screen controller">&#9654;&nbsp;<span class="ct-what"></span></button>
 
   <div id="need-coin-overlay">
@@ -87,14 +65,22 @@
     </div>
   </div>
 
+  <!-- #marquee-bar (per-game backlit name sign) is injected by shell.js -->
   <div id="arcade-bezel"></div>
+  <span class="bezel-screw tl"></span>
+  <span class="bezel-screw tr"></span>
+  <span class="bezel-screw bl"></span>
+  <span class="bezel-screw br"></span>
   <canvas id="glcanvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
 
   <script src="../blip_controller.js?v=5"></script>
-  <script src="../shell.js?v=49"></script>
+  <script src="../vendor/supabase.js?v=1"></script>
+  <script src="../blip_config.js?v=1"></script>
+  <script src="../blip_scores.js?v=4"></script>
+  <script src="../shell.js?v=53"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
-  <script src="../blip_bridge.js?v=12"></script>
+  <script src="../blip_bridge.js?v=11"></script>
   <script>load("index.wasm");</script>
 
 </body>

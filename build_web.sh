@@ -42,10 +42,7 @@ for game in "${GAMES[@]}"; do
     out="web/$game"
     mkdir -p "$out"
     cp "$TARGET_DIR/$game.wasm" "$out/index.wasm"
-    # rally has a hand-maintained index.html; all other games use shell.html.
-    if [ "$game" != "rally" ]; then
-        cp "web/shell.html" "$out/index.html"
-    fi
+    cp "web/shell.html" "$out/index.html"
     bytes=$(wc -c < "$out/index.wasm")
     echo "[ok] $game -> $out/index.wasm ($bytes bytes)"
 done

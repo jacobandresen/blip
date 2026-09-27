@@ -286,6 +286,7 @@ window.blipSetMode = function (mode) {
   if (!d) return;
   var isCpu = (mode === 0);
   d.classList.toggle('cpu-mode', isCpu);
+  document.documentElement.toggleAttribute('data-cpu', isCpu);
   var label = document.getElementById('dial-label-p2');
   if (label) label.textContent = isCpu ? 'CPU' : '2P';
 };
@@ -589,17 +590,14 @@ window.addEventListener('keydown', function (e) {
 
   // ---- Rally: hide both deck controllers, run the paddle dials ----
   if (isRally) {
-    ['stick-base', 'fire-buttons', 'snes-pad'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.style.display = 'none';
-    });
+    // Same panel as every other game (data-dials swaps its controls for
+    // the dials in kiosk-sized slots; see shell.css).
+    root.setAttribute('data-dials', '');
     var ct = document.getElementById('control-toggle');
     if (ct) ct.style.display = 'none';
 
     var dialP1 = document.getElementById('paddle-dial');
     var dialP2 = document.getElementById('paddle-dial-p2');
-    if (dialP1) dialP1.style.display = 'block';
-    if (dialP2) dialP2.style.display = 'block';
 
     if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
       var rallyMode = null;               // null = title, 0 = 1P, 1 = 2P

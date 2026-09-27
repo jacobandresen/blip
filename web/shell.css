@@ -371,9 +371,10 @@ canvas {
 #paddle-dial, #paddle-dial-p2 {
   display: none;
   position: absolute;
-  bottom: 16px;
-  width: 56px;
-  height: 56px;
+  z-index: 4;
+  bottom: calc(50% - var(--dial) / 2);
+  width: var(--dial);
+  height: var(--dial);
   border-radius: 50%;
   /* the housing the knob sits in, sunk into the deck */
   background: radial-gradient(circle at 50% 40%, #313136 0%, #17171a 55%, #08080a 100%);
@@ -389,8 +390,27 @@ canvas {
   -webkit-tap-highlight-color: transparent;
   transform-style: preserve-3d;
 }
-#paddle-dial    { left: clamp(6px, 5vw, 30px); }
-#paddle-dial-p2 { right: clamp(6px, 5vw, 30px); }
+#paddle-dial    { left: calc(var(--ctl-cx) - var(--dial) / 2); }
+#paddle-dial-p2 { right: calc(var(--ctl-cx) - var(--dial) / 2); }
+
+/* Rally: the same panel as every game, the dials in the cross's slots and
+   the cross's size. Its sticks, pads and caps are hidden, not removed. */
+:root { --dial: var(--dpad, 58px); --ctl-cx: 36px; }
+:root[data-dials] #paddle-dial, :root[data-dials] #paddle-dial-p2 { display: block; }
+:root[data-dials] :is(.deck-side, .snes-dpad, .snes-face, .snes-wordmark, .snes-pad.second) { display: none !important; }
+:root[data-dials] #snes-pad { left: 0; right: 0; width: 100%; }
+:root[data-dials] #dial-label, :root[data-dials] #dial-label-p2 { display: none; }
+/* P2 lamp under the right dial, dim while the CPU has it. */
+:root[data-dials][data-layout="upright"] .kiosk-bar > .deck-panel::after {
+  display: block;
+  left: calc(100% - var(--ctl-cx));
+  --on: 1;
+}
+:root[data-dials][data-cpu] .kiosk-bar > .deck-panel::after { --on: 0.25; }
+:root[data-dials][data-layout="landscape"] { --dial: 84px; --ctl-cx: calc(max(10px, env(safe-area-inset-left, 0px)) + 42px); }
+:root[data-dials][data-layout="landscape"] :is(#paddle-dial, #paddle-dial-p2) {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+}
 
 /* soft contact shadow on the panel below the raised cap */
 #paddle-dial::before, #paddle-dial-p2::before {
@@ -398,7 +418,7 @@ canvas {
   position: absolute;
   left: 50%;
   bottom: -3px;
-  width: 52px;
+  width: 92%;
   height: 12px;
   transform: translateX(-50%);
   border-radius: 50%;
@@ -518,7 +538,6 @@ canvas {
   .fire-buttons { gap: 10px; }
   .arcade-btn { width: 46px; height: 46px; }
 
-  #paddle-dial, #paddle-dial-p2 { width: 48px; height: 48px; bottom: 8px; }
 }
 
 /* Phones — a fatter marquee strip so the BLIP logo and coin slot over its
@@ -533,27 +552,6 @@ canvas {
      into the logo. The centred game name alone reads fine. */
   #marquee-bar .marquee-bulbs { display: none; }
 
-  /* Rally dials roughly double on a phone — like the joystick ball, they
-     rise up out of the deck over the game so they can be a real thumb
-     target without needing a taller bar. */
-  #paddle-dial, #paddle-dial-p2 { width: 118px; height: 118px; bottom: 12px; }
-  #paddle-dial    { left: max(2px, env(safe-area-inset-left, 0px)); }
-  #paddle-dial-p2 { right: max(2px, env(safe-area-inset-right, 0px)); }
-  #paddle-dial::before, #paddle-dial-p2::before { width: 104px; height: 20px; bottom: -4px; }
-  .dial-cap { transform: translateZ(9px); }
-  #dial-label, #dial-label-p2 { top: -15px; font-size: 8px; letter-spacing: 2px; }
-}
-
-/* iPad / tablet — the paddle dials go up to ~2.5x, one under each thumb at
-   the screen edges (matches the bigger joystick + fire buttons the tablet
-   tier in kiosk.css gives the deck). Same gate as there. */
-@media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
-  #paddle-dial, #paddle-dial-p2 { width: 124px; height: 124px; bottom: 12px; }
-  #paddle-dial    { left: max(10px, env(safe-area-inset-left, 0px)); }
-  #paddle-dial-p2 { right: max(10px, env(safe-area-inset-right, 0px)); }
-  #paddle-dial::before, #paddle-dial-p2::before { width: 110px; height: 22px; bottom: -4px; }
-  .dial-cap { transform: translateZ(10px); }
-  #dial-label, #dial-label-p2 { top: -19px; font-size: 11px; letter-spacing: 2px; }
 }
 
 /* Narrow phones — DEFENDER at 5px letter-spacing is the widest name; give it room */
