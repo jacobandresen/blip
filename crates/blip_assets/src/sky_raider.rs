@@ -1362,6 +1362,53 @@ fn propeller_sfx() -> Vec<u8> {
     encode_pcm16_mono(&pcm)
 }
 
+/// One engine loop at `rpm` (1.0 = cruise): the propeller's blade tone and
+/// chop, driven harder and brighter the faster it turns. One second long
+/// with whole cycles of both, so it loops without a seam. `sputter` makes
+/// it the labouring engine at the edge of a stall: it misfires, cuts out,
+/// coughs back, and the chop goes ragged.
+fn engine_loop(rpm: f32, sputter: bool) -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let n = SAMPLE_RATE as usize;
+    let f0 = (78.0 * rpm).round().max(8.0);
+    let chop_hz = (24.0 * rpm).round().max(3.0);
+    let drive = 0.25 + 0.3 * rpm;
+    // (start, end) of each misfire, in seconds, away from the loop seam
+    let misfires: &[(f32, f32)] = if sputter { &[(0.16, 0.30), (0.52, 0.60), (0.78, 0.92)] } else { &[] };
+    let mut rng = Rng(0x0E61_4E55);
+    let mut lp = 0.0f32;
+    let mut buf = vec![0.0f32; n];
+    for (i, out) in buf.iter_mut().enumerate() {
+        let t = i as f32 / sr;
+        let tone = (2.0 * PI * f0 * t).sin()
+            + 0.55 * (2.0 * PI * f0 * 2.0 * t).sin()
+            + 0.30 * (2.0 * PI * f0 * 3.0 * t).sin()
+            + 0.17 * (2.0 * PI * f0 * 4.0 * t).sin()
+            + 0.08 * rpm * (2.0 * PI * f0 * 6.0 * t).sin();
+        let chop_raw = (2.0 * PI * chop_hz * t).sin() * 0.5 + 0.5;
+        let mut chop = 0.5 + 0.5 * chop_raw.powf(1.6);
+        let mut gain = 1.0f32;
+        let w = rng.next_f32() * 2.0 - 1.0;
+        lp += (w - lp) * 0.05;
+        let mut cough = 0.0;
+        if sputter {
+            chop *= 0.75 + 0.5 * (2.0 * PI * 3.0 * t).sin().abs(); // lumpy, labouring
+            for &(a, b) in misfires {
+                if t > a && t < b {
+                    gain = 0.12; // cut out
+                }
+                let ct = t - b;
+                if ct > 0.0 && ct < 0.12 {
+                    // catching again: a cough of low noise and a thump
+                    cough += lp * 6.0 * (-ct / 0.03).exp() + (2.0 * PI * 55.0 * ct).sin() * (-ct / 0.04).exp();
+                }
+            }
+        }
+        *out = (tone * drive).tanh() * chop * gain * 20_000.0 + cough * 9_000.0;
+    }
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+}
+
 fn barrier_hum_sfx() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let dur_ms = 400.0;
@@ -2132,6 +2179,11 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/barrier_hum.wav",    barrier_hum_sfx()),
         ("sounds/engine_start.wav",   engine_start_sfx()),
         ("sounds/propeller.wav",      propeller_sfx()),
+        ("sounds/engine0.wav",        engine_loop(0.4, true)),
+        ("sounds/engine1.wav",        engine_loop(0.65, false)),
+        ("sounds/engine2.wav",        engine_loop(1.0, false)),
+        ("sounds/engine3.wav",        engine_loop(1.2, false)),
+        ("sounds/engine4.wav",        engine_loop(1.42, false)),
         ("sounds/burst1_1.wav", encode_pcm16_mono(&gun_burst(2, 0x5a0f82d5))),
         ("sounds/burst1_2.wav", encode_pcm16_mono(&gun_burst(2, 0x5a0f8698))),
         ("sounds/burst2_1.wav", encode_pcm16_mono(&gun_burst(3, 0x5a0f83d6))),

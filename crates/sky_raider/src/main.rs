@@ -131,6 +131,22 @@ const HIT_GRACE: f32 = 1.15;
 // cloud layer floating between the sea and the planes, and enemy boats that
 // sail across it.
 const SEA_SCROLL_SPEED: f32 = 70.0;
+
+// ---- airspeed ---------------------------------------------------------
+// 1.0 is cruise. Forward opens the throttle and back closes it; the plane
+// never flies backwards. Below cruise the scrolling world carries it down
+// the screen, and slow flight slows the scroll itself.
+const AIRSPEED_MAX: f32 = 1.4;
+const AIRSPEED_RATE: f32 = 0.9;    // per second of throttle held
+const AIRSPEED_RELAX: f32 = 0.3;   // back toward cruise with no input
+const AIRSPEED_DRIFT: f32 = 150.0; // screen px/s per unit of airspeed off cruise
+const STALL_WARN: f32 = 0.35;      // the engine labours and STALL flashes below this
+const STALL_SPEED: f32 = 0.06;
+const STALL_HOLD: f32 = 0.5;       // seconds at stall speed before it drops
+const STALL_FALL: f32 = 1.5;       // spinning down to the sea
+// The engine loops, slowest (coughing, the stall warning) to full throttle,
+// and the airspeed each one belongs to.
+const ENGINE_AT: [f32; 5] = [0.1, 0.45, 1.0, 1.2, 1.4];
 const MAX_CLOUDS: usize = 8;
 const BOAT_W: i32 = 34;
 const BOAT_H: i32 = 16;
@@ -429,6 +445,11 @@ struct Game {
     player_vx: f32,
     player_vy: f32,
     player_bank: f32,   // cosmetic roll while strafing — eased toward a target, not instant
+    airspeed: f32,      // see AIRSPEED_*: 1.0 = cruise
+    stall_t: f32,       // seconds spent at stall speed
+    stall_fall: f32,    // > 0 while spinning down after a stall
+    stall_spin: f32,
+    scroll_k: f32,      // the world's scroll, relative to cruise
     ship_y: f32,        // carrier position during the launch sequence
     launch_timer: Timer,
     launch_climb: f32,  // 0..1 progress up the launch climb — drives the plane's grow-in scale
@@ -557,6 +578,11 @@ impl Game {
             player_vx: 0.0,
             player_vy: 0.0,
             player_bank: 0.0,
+            airspeed: 1.0,
+            stall_t: 0.0,
+            stall_fall: 0.0,
+            stall_spin: 1.0,
+            scroll_k: 1.0,
             ship_y: (WIN_H + CARRIER_H) as f32,
             launch_timer: Timer::default(),
             launch_climb: 0.0,
@@ -675,6 +701,10 @@ impl Game {
         self.player_bank = 0.0;
         self.player_vx = 0.0;
         self.player_vy = 0.0;
+        self.airspeed = 1.0;
+        self.stall_t = 0.0;
+        self.stall_fall = 0.0;
+        self.scroll_k = 1.0;
         self.ship_y = (WIN_H - CARRIER_H / 2) as f32;
         self.launch_climb = 0.0;
         self.launch_wave_up = false;
@@ -721,6 +751,8 @@ struct Sounds {
     // propeller loop update_launch() fades in and out around it.
     engine_start: blip::BlipSound,
     propeller: blip::BlipSound,
+    /// In-flight engine loops, slowest first (see ENGINE_AT, engine_mix()).
+    engine: [blip::BlipSound; 5],
 }
 
 fn spawn_boat(g: &mut Game) {
@@ -781,10 +813,11 @@ fn update_barrier(g: &mut Game, dt: f32, sfx: &Sounds) {
 /// starts. Turret *firing* is play-only (see update_islands()) — islands
 /// still drift past harmlessly during launch, same as the boats.
 fn update_background(g: &mut Game, dt: f32) {
-    g.sea_scroll += SEA_SCROLL_SPEED * dt;
+    let sc = SEA_SCROLL_SPEED * g.scroll_k;
+    g.sea_scroll += sc * dt;
 
     for c in g.clouds.iter_mut() {
-        c.y += c.speed * dt;
+        c.y += c.speed * g.scroll_k * dt;
         if c.y - c.r > WIN_H as f32 {
             c.y = -c.r;
             c.x = rand01() * WIN_W as f32;
@@ -792,7 +825,7 @@ fn update_background(g: &mut Game, dt: f32) {
     }
 
     for b in pool_iter_mut(&mut g.boats) {
-        b.y += SEA_SCROLL_SPEED * dt;
+        b.y += sc * dt;
         b.x += b.vx * dt;
         if b.y - BOAT_H as f32 > WIN_H as f32
             || b.x < -(BOAT_W as f32) - 20.0
@@ -807,7 +840,7 @@ fn update_background(g: &mut Game, dt: f32) {
     }
 
     for isl in pool_iter_mut(&mut g.islands) {
-        isl.y += SEA_SCROLL_SPEED * dt;
+        isl.y += sc * dt;
         if isl.y - ISLAND_SIZES[isl.size as usize].1 as f32 > WIN_H as f32 {
             isl.active = false;
         }
@@ -1301,37 +1334,51 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.max_power_banner.tick(dt);
 
     // ---- movement ----
-    let left  = key_active(BLIP_KEY_LEFT)  || key_active(BLIP_KEY_A);
-    let right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
-    let up    = key_active(BLIP_KEY_UP)    || key_active(BLIP_KEY_W);
-    let down  = key_active(BLIP_KEY_DOWN)  || key_active(BLIP_KEY_S);
-    // Spool up and brake over ~0.1s so the plane has weight; diagonals are
-    // normalised so they are no faster than the axes.
-    let dx = right as i32 as f32 - left as i32 as f32;
-    let dy = down as i32 as f32 - up as i32 as f32;
-    let norm = if dx != 0.0 && dy != 0.0 { std::f32::consts::FRAC_1_SQRT_2 } else { 1.0 };
-    let steer = |v: f32, dir: f32| {
-        let target = dir * norm * PLAYER_SPEED;
-        let rate = if dir == 0.0 || target * v < 0.0 { PLAYER_BRAKE } else { PLAYER_ACCEL } * dt;
-        v + clamp(target - v, -rate, rate)
-    };
-    g.player_vx = steer(g.player_vx, dx);
-    g.player_vy = steer(g.player_vy, dy);
-    g.player_x += g.player_vx * dt;
-    g.player_y += g.player_vy * dt;
-    let (max_x, max_y) = ((WIN_W - PLAYER_W) as f32, PLAYER_MAX_Y);
-    if g.player_x < 0.0 || g.player_x > max_x { g.player_vx = 0.0; }
-    if g.player_y < PLAYER_MIN_Y || g.player_y > max_y { g.player_vy = 0.0; }
-    g.player_x = clamp(g.player_x, 0.0, max_x);
-    g.player_y = clamp(g.player_y, PLAYER_MIN_Y, max_y);
+    if g.stall_fall > 0.0 {
+        update_stall(g, dt, sfx);
+    } else {
+        let left  = key_active(BLIP_KEY_LEFT)  || key_active(BLIP_KEY_A);
+        let right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
+        let up    = key_active(BLIP_KEY_UP)    || key_active(BLIP_KEY_W);
+        let down  = key_active(BLIP_KEY_DOWN)  || key_active(BLIP_KEY_S);
+        let throttle = up as i32 as f32 - down as i32 as f32;
+        if throttle != 0.0 {
+            g.airspeed += throttle * AIRSPEED_RATE * dt;
+        } else {
+            g.airspeed += (1.0 - g.airspeed).clamp(-AIRSPEED_RELAX * dt, AIRSPEED_RELAX * dt);
+        }
+        g.airspeed = g.airspeed.clamp(0.0, AIRSPEED_MAX);
+        // Sideways: spool up and brake over ~0.1s so the plane has weight.
+        let dx = right as i32 as f32 - left as i32 as f32;
+        let target = dx * PLAYER_SPEED;
+        let rate = if dx == 0.0 || target * g.player_vx < 0.0 { PLAYER_BRAKE } else { PLAYER_ACCEL } * dt;
+        g.player_vx += clamp(target - g.player_vx, -rate, rate);
+        // Up and down the screen is only gaining on or falling behind the
+        // scrolling world.
+        let vy_target = (1.0 - g.airspeed) * AIRSPEED_DRIFT;
+        g.player_vy += (vy_target - g.player_vy) * (6.0 * dt).min(1.0);
+        g.player_x += g.player_vx * dt;
+        g.player_y += g.player_vy * dt;
+        let (max_x, max_y) = ((WIN_W - PLAYER_W) as f32, PLAYER_MAX_Y);
+        if g.player_x < 0.0 || g.player_x > max_x { g.player_vx = 0.0; }
+        g.player_x = clamp(g.player_x, 0.0, max_x);
+        g.player_y = clamp(g.player_y, PLAYER_MIN_Y, max_y);
 
-    // Bank follows lateral velocity.
-    let target_bank = g.player_vx / PLAYER_SPEED * 0.30;
-    g.player_bank += (target_bank - g.player_bank) * (dt * 9.0).min(1.0);
+        // Bank follows lateral velocity.
+        let target_bank = g.player_vx / PLAYER_SPEED * 0.30;
+        g.player_bank += (target_bank - g.player_bank) * (dt * 9.0).min(1.0);
+
+        if g.airspeed <= STALL_SPEED { g.stall_t += dt; } else { g.stall_t = 0.0; }
+        if g.stall_t >= STALL_HOLD {
+            g.stall_fall = 1e-4;
+            g.stall_spin = if rand01() < 0.5 { -1.0 } else { 1.0 };
+        }
+    }
+    g.scroll_k = if g.airspeed < 1.0 { 0.25 + 0.75 * g.airspeed } else { 1.0 + 0.5 * (g.airspeed - 1.0) };
 
     // ---- firing ----
     g.fire_cd.tick(dt);
-    if key_active(BLIP_KEY_SPACE) && !g.fire_cd.active() && !g.respawn_grace.active() {
+    if g.stall_fall == 0.0 && key_active(BLIP_KEY_SPACE) && !g.fire_cd.active() && !g.respawn_grace.active() {
         g.fire_cd.start(weapon_cooldown(g.weapon_level));
         let (n, fan, r) = weapon_guns(g.weapon_level);
         let cx = g.player_x + PLAYER_W as f32 / 2.0;
@@ -1584,7 +1631,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     // ---- player vs hazards ----
-    if g.state == State::Play && !g.respawn_grace.active() {
+    if g.state == State::Play && !g.respawn_grace.active() && g.stall_fall == 0.0 {
         let (px, py) = (g.player_x, g.player_y);
         let mut hit = false;
         for i in 0..MAX_ENEMY_BULLETS {
@@ -1688,7 +1735,7 @@ fn update_wrecks(g: &mut Game, dt: f32, sfx: &Sounds) {
         w.course += w.bend * dt;
         w.speed *= 1.0 - 0.25 * dt; // it keeps its momentum
         w.x += w.course.sin() * w.speed * dt;
-        w.y += w.course.cos() * w.speed * dt + SEA_SCROLL_SPEED * 0.5 * dt;
+        w.y += w.course.cos() * w.speed * dt + SEA_SCROLL_SPEED * g.scroll_k * 0.5 * dt;
         w.puff_t -= dt;
         let (cx, cy, k) = (w.x + ENEMY_W as f32 / 2.0, w.y + ENEMY_H as f32 / 2.0, w.t / w.dur);
         let (emit, done) = (w.puff_t <= 0.0, w.t >= w.dur);
@@ -1723,12 +1770,61 @@ fn update_wrecks(g: &mut Game, dt: f32, sfx: &Sounds) {
             }
         }
     }
+    let sc = SEA_SCROLL_SPEED * g.scroll_k;
     for p in pool_iter_mut(&mut g.puffs) {
-        p.y += SEA_SCROLL_SPEED * dt;
+        p.y += sc * dt;
         p.r = (p.r + p.grow * dt).max(0.5);
         p.ttl -= dt;
         if p.ttl <= 0.0 { p.active = false; }
     }
+}
+
+/// Stalled: the plane falls off into a spin, trailing smoke, and goes into
+/// the sea. It costs a life like being shot down.
+fn update_stall(g: &mut Game, dt: f32, sfx: &Sounds) {
+    g.stall_fall += dt;
+    g.player_bank += g.stall_spin * (2.0 + g.stall_fall * 5.0) * dt;
+    g.player_y += 30.0 * dt;
+    let k = g.stall_fall / STALL_FALL;
+    let (cx, cy) = (g.player_x + PLAYER_W as f32 / 2.0, g.player_y + PLAYER_H as f32 / 2.0);
+    g.stall_t -= dt;
+    if g.stall_t <= 0.0 {
+        g.stall_t = 0.05;
+        pool_spawn(&mut g.puffs, Puff { x: cx, y: cy, r: 3.0 * (1.0 - 0.5 * k), grow: 14.0,
+            ttl: 0.9, max_ttl: 0.9, fire: false, active: true });
+    }
+    if g.stall_fall >= STALL_FALL {
+        g.stall_fall = 0.0;
+        g.spawn_explosion(cx, cy, 1.4, BlipColor::new(0.85, 0.93, 1.0, 1.0));
+        play_sfx(&sfx.player_explode);
+        g.health = 0;
+        match g.sess.lose_life() {
+            LifeResult::StillAlive => { g.dead_timer.start(DEAD_PAUSE); g.state = State::Dead; }
+            LifeResult::GameOver   => { g.over_timer.start(OVER_MIN_WAIT); g.state = State::Over; }
+        }
+    }
+}
+
+/// Engine loop volumes for the current airspeed: a crossfade between the
+/// two loops either side of it, louder the faster it turns, the coughing
+/// low loop pushed up near a stall, and the engine dying through the fall.
+fn engine_mix(g: &Game) -> [f32; 5] {
+    let a = g.airspeed.clamp(ENGINE_AT[0], AIRSPEED_MAX);
+    let mut w = [0.0f32; 5];
+    for i in 0..4 {
+        if a >= ENGINE_AT[i] && a <= ENGINE_AT[i + 1] {
+            let t = (a - ENGINE_AT[i]) / (ENGINE_AT[i + 1] - ENGINE_AT[i]);
+            w[i] = 1.0 - t;
+            w[i + 1] = t;
+        }
+    }
+    if g.airspeed < STALL_WARN {
+        let s = 1.0 - g.airspeed / STALL_WARN;
+        w[0] = w[0].max(s);
+    }
+    let loud = PROP_MAX_VOLUME * (0.55 + 0.45 * g.airspeed / AIRSPEED_MAX);
+    let dying = if g.stall_fall > 0.0 { (1.0 - g.stall_fall / STALL_FALL).max(0.0).powi(2) } else { 1.0 };
+    w.map(|v| v * loud * dying)
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
@@ -2017,7 +2113,7 @@ fn draw_play(
         let (bw, bh) = boss_size(g.boss.tier);
         draw_shadow(&boss_tex[g.boss.tier], g.boss.x, g.boss.y, bw, bh, 0.0);
     }
-    if g.state == State::Play && !g.respawn_grace.active() {
+    if g.state == State::Play && !g.respawn_grace.active() && g.stall_fall == 0.0 {
         draw_shadow(player_tex, g.player_x, g.player_y, PLAYER_W as f32, PLAYER_H as f32, g.player_bank);
     }
 
@@ -2177,9 +2273,26 @@ fn draw_play(
         }
     }
 
-    if g.state == State::Play {
+    if g.state == State::Play && g.stall_fall > 0.0 {
+        // Spinning down to the sea, its shadow closing in.
+        let k = g.stall_fall / STALL_FALL;
+        let s = 1.0 - 0.5 * k;
+        let (w, h) = (PLAYER_W as f32 * s, PLAYER_H as f32 * s);
+        let (x, y) = (g.player_x + (PLAYER_W as f32 - w) / 2.0, g.player_y + (PLAYER_H as f32 - h) / 2.0);
+        draw_texture_ex(player_tex, x + PLANE_SHADOW_DX * (1.0 - k), y + PLANE_SHADOW_DY * (1.0 - k),
+            BlipColor::new(0.0, 0.0, 0.0, 0.3), DrawTextureParams {
+                dest_size: Some(vec2(w, h)), rotation: g.player_bank, ..Default::default()
+            });
+        let d = 1.0 - 0.5 * k;
+        draw_texture_ex(player_tex, x, y, BlipColor::new(d, d, d, 1.0), DrawTextureParams {
+            dest_size: Some(vec2(w, h)), rotation: g.player_bank, ..Default::default()
+        });
+    } else if g.state == State::Play {
         // Blink the plane while the post-respawn grace period is active.
         let blink = g.respawn_grace.active() && ((g.respawn_grace.remaining() * 12.0) as i32 % 2 == 0);
+        if g.airspeed < STALL_WARN && (blip::macroquad::time::get_time() * 5.0) as i64 % 2 == 0 {
+            blip.draw_text("STALL", g.player_x + PLAYER_W as f32 / 2.0 - 15.0, g.player_y - 14.0, 2.0, BLIP_RED);
+        }
         if !blink {
             draw_texture_ex(player_tex, g.player_x, g.player_y, BLIP_WHITE, DrawTextureParams {
                 dest_size: Some(vec2(PLAYER_W as f32, PLAYER_H as f32)),
@@ -2260,6 +2373,8 @@ fn draw_title(blip: &Blip, player_tex: &Texture2D, hi: &web::HighScore) {
     let px = (WIN_W as f32 - PLAYER_W as f32 * 2.0) / 2.0;
     blip.draw_texture(player_tex, px, (WIN_H / 2 - 70) as f32, PLAYER_W as f32 * 2.0, PLAYER_H as f32 * 2.0);
     blip.draw_centered("PRESS FIRE TO START", (WIN_H * 2 / 3) as f32, 3.0, BLIP_WHITE);
+    blip.draw_centered("UP THROTTLE  DOWN SLOW", (WIN_H * 2 / 3 + 30) as f32, 2.0, BLIP_GRAY);
+    blip.draw_centered("TOO SLOW AND YOU STALL", (WIN_H * 2 / 3 + 48) as f32, 2.0, BLIP_GRAY);
 }
 
 fn draw_win(blip: &Blip, level: i32) {
@@ -2371,6 +2486,13 @@ const TURRET_FIRE_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/asse
 const BARRIER_HUM_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/barrier_hum.wav"));
 const ENGINE_START_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine_start.wav"));
 const PROPELLER_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/propeller.wav"));
+const ENGINE_WAV: [&[u8]; 5] = [
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine0.wav")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine1.wav")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine2.wav")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine3.wav")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine4.wav")),
+];
 const MUSIC_WAV:          &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
 const MUSIC2_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
 // music: 40.25s (150 BPM rock, E minor, verse/chorus/solo)  music2: 22.07s (176 BPM drop-D thrash)
@@ -2435,6 +2557,13 @@ async fn main() {
         barrier_hum:    blip::audio::load_sound(BARRIER_HUM_WAV).await,
         engine_start:   blip::audio::load_sound(ENGINE_START_WAV).await,
         propeller:      blip::audio::load_sound(PROPELLER_WAV).await,
+        engine: [
+            blip::audio::load_sound(ENGINE_WAV[0]).await,
+            blip::audio::load_sound(ENGINE_WAV[1]).await,
+            blip::audio::load_sound(ENGINE_WAV[2]).await,
+            blip::audio::load_sound(ENGINE_WAV[3]).await,
+            blip::audio::load_sound(ENGINE_WAV[4]).await,
+        ],
     };
     // Two loops in rotation instead of one, so a long level doesn't just
     // hear the same ~40s of march on repeat — see MUSIC_DURATIONS.
@@ -2482,6 +2611,17 @@ async fn main() {
             || (prev_state != State::Won && g.state == State::Won)
         {
             web::report_score(g.sess.score);
+        }
+        // In flight the engine is the crossfaded bank; it starts when play
+        // does and stops when it ends (death, stage clear, game over).
+        if prev_state != State::Play && g.state == State::Play {
+            for e in sfx.engine.iter() { play_sound(e, PlaySoundParams { looped: true, volume: 0.0 }); }
+        }
+        if prev_state == State::Play && g.state != State::Play {
+            for e in sfx.engine.iter() { stop_sound(e); }
+        }
+        if g.state == State::Play {
+            for (e, v) in sfx.engine.iter().zip(engine_mix(&g)) { set_sound_volume(e, v); }
         }
         if prev_state != State::Launch && g.state == State::Launch {
             // Kick off the carrier launch: the engine-start one-shot, and
