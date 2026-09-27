@@ -1556,6 +1556,23 @@ fn barrier_hum_sfx() -> Vec<u8> {
     encode_pcm16_mono(&s)
 }
 
+/// The barrier's close-range buzz, crossfaded in as the beam nears the
+/// player: an octave up with a fifth, and a hard 12.5 Hz throb. Every part
+/// fits whole cycles into 400 ms, so it loops without a click.
+fn barrier_hum2_sfx() -> Vec<u8> {
+    let sr = SAMPLE_RATE as f32;
+    let n = ms_to_samples(400.0);
+    let tau = 2.0 * std::f32::consts::PI;
+    let mut s = Vec::with_capacity(n);
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let tone = (tau * 220.0 * t).sin() + 0.5 * (tau * 330.0 * t).sin() + 0.25 * (tau * 110.0 * t).sin();
+        let throb = 0.55 + 0.45 * (tau * 12.5 * t).sin().max(0.0);
+        s.push(((tone * 0.6).tanh() * throb * 15_000.0) as i16);
+    }
+    encode_pcm16_mono(&s)
+}
+
 // ---------------------------------------------------------------------- //
 // Japanese boss name banners                                                //
 // ---------------------------------------------------------------------- //
@@ -2315,6 +2332,7 @@ pub fn generate() -> Vec<Asset> {
         ("images/island_large.png",  island_sprite(ISLAND_SIZES[2].0, ISLAND_SIZES[2].1, 0x9A17_3DE0)),
         ("sounds/turret_fire.wav",    turret_fire_sfx()),
         ("sounds/barrier_hum.wav",    barrier_hum_sfx()),
+        ("sounds/barrier_hum2.wav",   barrier_hum2_sfx()),
         ("sounds/engine_start.wav",   engine_start_sfx()),
         ("sounds/enemy_gun.wav",      enemy_gun_sfx()),
         ("sounds/backfire.wav",       backfire_sfx()),
