@@ -215,6 +215,32 @@ fn gun_report(seed: u32, pitch: f32) -> Vec<i16> {
     soft_limit_to_pcm16(&scaled, MIX_KNEE)
 }
 
+/// A ricochet: a hard metallic tick where the round strikes, then the
+/// classic "pyeww" of a spinning slug tearing away, a whistle falling from
+/// `f0` with a wavering pitch, a little air noise round it.
+fn ricochet_sfx(f0: f32, seed: u32) -> Vec<i16> {
+    let sr = SAMPLE_RATE as f32;
+    let n = ms_to_samples(420.0);
+    let mut rng = Rng(seed | 1);
+    let mut buf = vec![0.0f32; n];
+    let (mut phase, mut hp_prev) = (0.0f32, 0.0f32);
+    for (i, out) in buf.iter_mut().enumerate() {
+        let t = i as f32 / sr;
+        let w = rng.next_f32() * 2.0 - 1.0;
+        let hp = w - hp_prev;
+        hp_prev = w;
+        let tick = hp * (-t / 0.003).exp() + (2.0 * PI * 3100.0 * t).sin() * (-t / 0.006).exp() * 0.5;
+        // whistle: falls to ~40% of f0 and wavers as the slug tumbles
+        let f = f0 * (0.4 + 0.6 * (-t / 0.16).exp()) * (1.0 + 0.035 * (2.0 * PI * 23.0 * t).sin());
+        phase += f / sr;
+        let env = (t / 0.012).min(1.0) * (-t / 0.13).exp();
+        let whistle = (2.0 * PI * phase).sin() * env;
+        let air = w * env * 0.12;
+        *out = (tick * 0.7 + whistle * 0.55 + air) * 20_000.0;
+    }
+    soft_limit_to_pcm16(&buf, MIX_KNEE)
+}
+
 /// A round striking the fuselage: a sharp tick, a short metallic ring from
 /// two inharmonic partials, and a dull knock underneath.
 fn hit_sfx() -> Vec<i16> {
@@ -2098,6 +2124,8 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/player_explode.wav", encode_pcm16_mono(&explosion_sfx(1100.0, 1.0, 70.0, 1.6, 0x9A7E))),
         // A short, quieter crack for a non-lethal hit — reads as "took a
         // glancing blow" rather than player_explode's full "you're down".
+        ("sounds/ricochet1.wav",      encode_pcm16_mono(&ricochet_sfx(3300.0, 0x51C0_C4E7))),
+        ("sounds/ricochet2.wav",      encode_pcm16_mono(&ricochet_sfx(2700.0, 0x2B1E_77A3))),
         ("sounds/player_hit.wav",     encode_pcm16_mono(&hit_sfx())),
         ("sounds/boss_explode.wav",   encode_pcm16_mono(&explosion_sfx(1900.0, 1.0, 55.0, 2.4, 0xB055))),
         ("sounds/boss_warning.wav",   boss_warning_sfx()),

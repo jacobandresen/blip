@@ -186,6 +186,8 @@ const MAX_EXPLOSIONS: usize = MAX_ENEMIES + 16; // + headroom for power-up burst
 const EXPLOSION_TTL: f32 = 0.4;
 // Now and then a kill goes down in flames instead of blowing up.
 const FLAMES_CHANCE: f32 = 0.3;
+// Now and then a round glances off a plane instead of hitting home.
+const RICOCHET_CHANCE: f32 = 0.08;
 const WRECK_SECS: f32 = 1.7;
 const MAX_WRECKS: usize = 6;
 const MAX_PUFFS: usize = 120;
@@ -214,10 +216,12 @@ impl Pooled for Bullet {
     fn is_active(&self) -> bool { self.active }
 }
 
-/// A player round: centred on x, drifting sideways at vx (the spray), with
-/// its calibre r (drawn radius; the hit box is 2r + 2 wide).
+/// A player round: centred on x, moving at (vx, -vy) (up the screen, with
+/// the spray sideways), with its calibre r (drawn radius; the hit box is
+/// 2r + 2 wide). `bounced` once it has ricocheted: it can still hit, but
+/// not glance off again.
 #[derive(Copy, Clone)]
-struct Round { x: f32, y: f32, vx: f32, r: f32, active: bool }
+struct Round { x: f32, y: f32, vx: f32, vy: f32, r: f32, bounced: bool, active: bool }
 impl Pooled for Round {
     fn is_active(&self) -> bool { self.active }
 }
@@ -555,7 +559,7 @@ impl Game {
             launch_wave_up: false,
             weapon_level: 1,
             health: PLAYER_HEALTH_MAX,
-            bullets: [Round { x: 0.0, y: 0.0, vx: 0.0, r: 0.0, active: false }; MAX_PLAYER_BULLETS],
+            bullets: [Round { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, r: 0.0, bounced: false, active: false }; MAX_PLAYER_BULLETS],
             casings: [Casing { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, rot: 0.0, ttl: 0.0, active: false }; MAX_CASINGS],
             muzzle_t: 0.0,
             eject_left: false,
@@ -693,6 +697,7 @@ struct Sounds {
     enemy_explode: blip::BlipSound,
     player_explode: blip::BlipSound,
     player_hit: blip::BlipSound,
+    ricochet: [blip::BlipSound; 2],
     boss_explode: blip::BlipSound,
     boss_warning: blip::BlipSound,
     // Escalating weapon-tier pickup chimes: index 0 = reaching tier 2, ...,
@@ -1278,7 +1283,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 x: cx + dx + (rand01() - 0.5) * 3.0,
                 y: g.player_y + rand01() * 6.0,
                 vx: dx * 2.2 + (rand01() - 0.5) * 28.0 + g.player_vx * 0.15,
+                vy: BULLET_SPEED,
                 r,
+                bounced: false,
                 active: true,
             });
         }
@@ -1307,9 +1314,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     // ---- simple movement (no cross-entity reads) ----
     for b in pool_iter_mut(&mut g.bullets) {
-        b.y -= BULLET_SPEED * dt;
+        b.y -= b.vy * dt;
         b.x += b.vx * dt;
-        if b.y < -BULLET_H || b.x < -10.0 || b.x > WIN_W as f32 + 10.0 { b.active = false; }
+        if b.y < -BULLET_H || b.y > WIN_H as f32 || b.x < -10.0 || b.x > WIN_W as f32 + 10.0 { b.active = false; }
     }
     for b in pool_iter_mut(&mut g.enemy_bullets) {
         b.y += ENEMY_BULLET_SPEED * dt;
@@ -1361,6 +1368,22 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             if !g.enemies[ei].active { continue; }
             let (ex, ey) = (g.enemies[ei].x, g.enemies[ei].y);
             if rects_overlap(bx, by, bw, BULLET_H, ex, ey, ENEMY_W as f32, ENEMY_H as f32) {
+                if !g.bullets[bi].bounced && rand01() < RICOCHET_CHANCE {
+                    // Glances off: a spark, and away at 35-80 degrees to
+                    // one side, a little slower, the plane unharmed.
+                    let b = &mut g.bullets[bi];
+                    let side = if rand01() < 0.5 { -1.0 } else { 1.0 };
+                    let a = 0.6 + rand01() * 0.8;
+                    let v = BULLET_SPEED * 0.8;
+                    b.vx = side * v * a.sin();
+                    b.vy = v * a.cos();
+                    b.bounced = true;
+                    let (sx, sy) = (b.x, b.y);
+                    g.spawn_explosion(sx, sy, 0.18, BlipColor::new(1.0, 0.95, 0.7, 1.0));
+                    let take = &sfx.ricochet[(rand() % sfx.ricochet.len() as u32) as usize];
+                    play_sfx_volume(take, 0.7);
+                    break;
+                }
                 shoot_down(g, ei, sfx, rand01() < FLAMES_CHANCE);
                 consumed = true;
                 break;
@@ -2051,7 +2074,7 @@ fn draw_play(
     for b in pool_iter(&g.bullets) {
         let len = 10.0 + b.r * 3.0;
         let k = len / BULLET_SPEED;
-        blip.draw_line_ex(b.x - b.vx * k, b.y + len, b.x, b.y, b.r * 1.1, trail);
+        blip.draw_line_ex(b.x - b.vx * k, b.y + b.vy * k, b.x, b.y, b.r * 1.1, trail);
         blip.fill_circle(b.x, b.y, b.r, bcolor);
         blip.fill_circle(b.x, b.y - b.r * 0.3, b.r * 0.5, hot);
     }
@@ -2243,6 +2266,10 @@ const SHOOT_WAV: [&[u8]; 3] = [
 const ENEMY_EXPLODE_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/enemy_explode.wav"));
 const PLAYER_EXPLODE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/player_explode.wav"));
 const PLAYER_HIT_WAV:     &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/player_hit.wav"));
+const RICOCHET_WAV: [&[u8]; 2] = [
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ricochet1.wav")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ricochet2.wav")),
+];
 const BOSS_EXPLODE_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/boss_explode.wav"));
 const BOSS_WARNING_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/boss_warning.wav"));
 const POWERUP2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/powerup2.wav"));
@@ -2301,6 +2328,10 @@ async fn main() {
         enemy_explode:  blip::audio::load_sound(ENEMY_EXPLODE_WAV).await,
         player_explode: blip::audio::load_sound(PLAYER_EXPLODE_WAV).await,
         player_hit:     blip::audio::load_sound(PLAYER_HIT_WAV).await,
+        ricochet: [
+            blip::audio::load_sound(RICOCHET_WAV[0]).await,
+            blip::audio::load_sound(RICOCHET_WAV[1]).await,
+        ],
         boss_explode:   blip::audio::load_sound(BOSS_EXPLODE_WAV).await,
         boss_warning:   blip::audio::load_sound(BOSS_WARNING_WAV).await,
         powerup_up: [
