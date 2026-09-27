@@ -35,6 +35,11 @@ const PAD_W: i32 = 80;
 const PAD_H: i32 = 12;
 const PAD_Y: i32 = WIN_H - 48;
 const PAD_SPEED: f32 = 280.0;
+// Double-tap a direction to dash for a save: second press within the
+// window, speed x(1 + BOOST) easing back to normal over DASH_SECS.
+const DASH_WINDOW: f32 = 0.28;
+const DASH_BOOST: f32 = 0.9;
+const DASH_SECS: f32 = 0.35;
 
 const BALL_W: i32 = 18;
 const BALL_H: i32 = 18;
@@ -111,6 +116,11 @@ struct Game {
     pad_x: f32,
     pad_w: f32,
     pad_vx: f32,
+    /// Seconds since each direction was last pressed (left, right).
+    tap_age: [f32; 2],
+    /// -1 / +1 while a dash is on, and how much of it is left.
+    dash_dir: f32,
+    dash_t: f32,
     pad_effect_timer: Timer,
     slow_timer: Timer,
     ball_x: f32, ball_y: f32,
@@ -134,6 +144,9 @@ impl Game {
             pad_x: 0.0,
             pad_w: PAD_W as f32,
             pad_vx: 0.0,
+            tap_age: [f32::MAX; 2],
+            dash_dir: 0.0,
+            dash_t: 0.0,
             pad_effect_timer: Timer::default(),
             slow_timer: Timer::default(),
             ball_x: 0.0, ball_y: 0.0, ball_vx: 0.0, ball_vy: 0.0,
@@ -253,9 +266,26 @@ fn update_title(g: &mut Game) {
 
 fn paddle_input(g: &mut Game, dt: f32) {
     let prev_x = g.pad_x;
-    let ps = PAD_SPEED * dt;
-    if key_held(BLIP_KEY_LEFT)  || key_held(BLIP_KEY_A) { g.pad_x -= ps; }
-    if key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D) { g.pad_x += ps; }
+    for (i, pressed) in [
+        key_pressed(BLIP_KEY_LEFT) || key_pressed(BLIP_KEY_A),
+        key_pressed(BLIP_KEY_RIGHT) || key_pressed(BLIP_KEY_D),
+    ].into_iter().enumerate() {
+        g.tap_age[i] += dt;
+        if !pressed { continue; }
+        if g.tap_age[i] < DASH_WINDOW {
+            g.dash_dir = if i == 0 { -1.0 } else { 1.0 };
+            g.dash_t = DASH_SECS;
+            g.tap_age[i] = f32::MAX; // a third tap starts a new pair
+        } else {
+            g.tap_age[i] = 0.0;
+        }
+    }
+    g.dash_t = (g.dash_t - dt).max(0.0);
+    let dash = 1.0 + DASH_BOOST * g.dash_t / DASH_SECS;
+    let left = key_held(BLIP_KEY_LEFT) || key_held(BLIP_KEY_A);
+    let right = key_held(BLIP_KEY_RIGHT) || key_held(BLIP_KEY_D);
+    if left  { g.pad_x -= PAD_SPEED * dt * if g.dash_dir < 0.0 { dash } else { 1.0 }; }
+    if right { g.pad_x += PAD_SPEED * dt * if g.dash_dir > 0.0 { dash } else { 1.0 }; }
     g.pad_x = clamp(g.pad_x, 0.0, WIN_W as f32 - g.pad_w);
     // Actual on-screen speed this frame — reads as zero if held against a wall,
     // even with a direction key down, since the paddle isn't really moving.
@@ -632,6 +662,15 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
     let (cap, py) = (PADDLE_CAP as f32, PAD_Y as f32 + g.pad_kick);
     let (sw, cap_w) = (paddle.width(), PADDLE_CAP as f32 * 0.5);
     let ph = PAD_H as f32;
+    // Dash afterimages, trailing behind and fading with the boost.
+    if g.dash_t > 0.0 {
+        let k = g.dash_t / DASH_SECS;
+        for i in 1..=3 {
+            let x = g.pad_x - g.dash_dir * i as f32 * 9.0;
+            let c = BlipColor { r: 0.35, g: 0.75, b: 1.0, a: 0.28 * k / i as f32 };
+            blip.fill_rect(x + 2.0, py + 2.0, g.pad_w - 4.0, ph - 4.0, c);
+        }
+    }
     blip.draw_texture_region(paddle, 0.0, 0.0, cap, 24.0, g.pad_x, py, cap_w, ph);
     blip.draw_texture_region(paddle, cap, 0.0, sw - 2.0 * cap, 24.0, g.pad_x + cap_w, py, g.pad_w - 2.0 * cap_w, ph);
     blip.draw_texture_region(paddle, sw - cap, 0.0, cap, 24.0, g.pad_x + g.pad_w - cap_w, py, cap_w, ph);
@@ -664,6 +703,7 @@ fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.draw_centered("PRESS FIRE",              (WIN_H / 2) as f32,         3.0, BLIP_WHITE);
     blip.draw_centered("LEFT RIGHT ARROW OR AD",  (WIN_H * 2 / 3) as f32,     2.0, BLIP_GRAY);
     blip.draw_centered("SPACE TO LAUNCH",         (WIN_H * 2 / 3 + 20) as f32, 2.0, BLIP_GRAY);
+    blip.draw_centered("DOUBLE TAP TO DASH",      (WIN_H * 2 / 3 + 40) as f32, 2.0, BLIP_GRAY);
 }
 
 fn draw_win(blip: &Blip, level: i32) {
