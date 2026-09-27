@@ -359,6 +359,7 @@ body.need-coin #kiosk-insert-btn {
      The front page overrides this back to the near-invisible all-night
      flicker below — there it's just decor, not a control. */
   animation: blip-logo-beckon 1.9s ease-in-out infinite;
+  will-change: opacity;
   /* A true fluorescent-tube look needs a bright near-white core with the
      colour living in the glow, not the glyph itself — flat green text
      with a green shadow reads as "coloured text with a shadow", not a
@@ -400,17 +401,11 @@ body.need-coin #kiosk-insert-btn {
 body:has(.game-grid) .blip-logo {
   animation: blip-logo-flicker 6.5s ease-in-out infinite;
 }
+/* Opacity only: animating the wide text-shadow changed the logo's ink
+   overflow every frame, a layout per frame on every game page. */
 @keyframes blip-logo-beckon {
-  0%, 100% {
-    text-shadow:
-      0 0 4px #fff, 0 0 9px #32c832, 0 0 19px #32c832,
-      0 0 38px rgba(50, 200, 50, 0.75), 0 0 70px rgba(50, 200, 50, 0.4);
-  }
-  50% {
-    text-shadow:
-      0 0 6px #fff, 0 0 16px #7bffa0, 0 0 34px #32c832,
-      0 0 64px rgba(50, 200, 50, 0.95), 0 0 110px rgba(50, 200, 50, 0.6);
-  }
+  0%, 100% { opacity: 0.72; }
+  50%      { opacity: 1; }
 }
 
 /* One-shot "power-on" flourish, triggered by shell.js on game pages only

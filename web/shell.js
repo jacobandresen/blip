@@ -300,9 +300,11 @@ window.blipSetMode = function (mode) {
   var h2 = document.getElementById('dial-hand-p2');
   // Full paddle travel ≈ 1½ turns of the knob, geared like a real spinner.
   var SWEEP = 3 * Math.PI;
+  // Called every frame; only a change restyles the knob.
+  var l0 = null, r0 = null;
   window.blipPaddles = function (left, right) {
-    if (h1) h1.style.transform = 'rotate(' + ((left  - 0.5) * SWEEP) + 'rad)';
-    if (h2) h2.style.transform = 'rotate(' + ((right - 0.5) * SWEEP) + 'rad)';
+    if (h1 && left !== l0)  { l0 = left;  h1.style.transform = 'rotate(' + ((left  - 0.5) * SWEEP) + 'rad)'; }
+    if (h2 && right !== r0) { r0 = right; h2.style.transform = 'rotate(' + ((right - 0.5) * SWEEP) + 'rad)'; }
   };
 }());
 
@@ -495,6 +497,18 @@ canvas.addEventListener('webglcontextlost', function (e) {
 // library's bindDial().
 
 var isRally = window.location.pathname.indexOf('/rally/') !== -1;
+
+// While the game is being played, <html data-live> pauses the decorative
+// main-thread animations (logo glow, marquee bulbs): each one restyles and
+// repaints every frame on the thread the game and the touch deck share.
+(function () {
+  var root = document.documentElement, t = null;
+  window.addEventListener('keydown', function () {
+    if (!t) root.setAttribute('data-live', '');
+    else clearTimeout(t);
+    t = setTimeout(function () { t = null; root.removeAttribute('data-live'); }, 4000);
+  }, true);
+}());
 
 // Block the real keyboard from reaching the game while the coin wall is up.
 window.addEventListener('keydown', function (e) {

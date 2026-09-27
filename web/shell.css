@@ -144,6 +144,7 @@ body::after {
   animation: marquee-bulbs 1.6s steps(2, jump-none) infinite;
 }
 .marquee-bulbs + #marquee-name + .marquee-bulbs { animation-delay: .8s; }
+:root[data-live] :is(.blip-logo, .marquee-bulbs, #marquee-name) { animation-play-state: paused; }
 
 @keyframes marquee-bulbs {
   50% { filter: drop-shadow(0 0 1px #e6dc32); opacity: .5; }

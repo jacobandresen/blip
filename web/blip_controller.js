@@ -283,12 +283,19 @@
     var dy = Math.max(r.top - y, 0, y - r.bottom);
     return Math.sqrt(dx * dx + dy * dy);
   }
-  function _syncTouches(list) {
+  // Control rects, read on touchstart / resize only: a touchmove arrives at
+  // up to 120 Hz per finger, and reading them there forced a layout per move.
+  var _brects = null, _drects = null;
+  function _readRects() {
+    _brects = _tBtns.map(function (b) { return b.el.getBoundingClientRect(); });
+    _drects = _tDpads.map(function (p) { return p.pad.getBoundingClientRect(); });
+  }
+  window.addEventListener('resize', function () { _brects = null; });
+  function _syncTouches(list, fresh) {
     var i, j, r, x, y, d, best, bestD, bestC;
-    var brects = [], drects = [];
+    if (fresh || !_brects || _brects.length !== _tBtns.length || _drects.length !== _tDpads.length) _readRects();
+    var brects = _brects, drects = _drects;
     var bDown = [], dTouch = [];
-    for (i = 0; i < _tBtns.length; i++) brects[i] = _tBtns[i].el.getBoundingClientRect();
-    for (i = 0; i < _tDpads.length; i++) drects[i] = _tDpads[i].pad.getBoundingClientRect();
     for (j = 0; j < list.length; j++) {
       x = list[j].clientX; y = list[j].clientY;
       best = null; bestD = Infinity; bestC = Infinity;
@@ -319,12 +326,12 @@
     }
     for (i = 0; i < _tDpads.length; i++) {
       var dp = _tDpads[i];
-      if (dTouch[i]) { dp._pend = false; dp.calc(dTouch[i]); }
+      if (dTouch[i]) { dp._pend = false; dp.calc(dTouch[i], drects[i]); }
       else if (drects[i].width) _defer(dp, dp.clear);
     }
   }
   ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(function (ev) {
-    document.addEventListener(ev, function (e) { _syncTouches(e.touches); }, { passive: true });
+    document.addEventListener(ev, function (e) { _syncTouches(e.touches, ev === 'touchstart'); }, { passive: true });
   });
 
   /* ------------------------------------------------------------------ */
@@ -403,16 +410,17 @@
       set(names[n], on);
       if (segs[n]) segs[n].classList.toggle('blip-pressed', on);
     }
-    // e is a PointerEvent or a Touch — both carry clientX / clientY.
-    function calc(e) {
-      var r = pad.getBoundingClientRect();
+    // e is a PointerEvent or a Touch — both carry clientX / clientY; r is
+    // the pad's rect when the caller already has it.
+    function calc(e, r) {
+      r = r || pad.getBoundingClientRect();
       var nx = (e.clientX - (r.left + r.width  / 2)) / (r.width  / 2);
       var ny = (e.clientY - (r.top  + r.height / 2)) / (r.height / 2);
       put('left',  nx < -dead);
       put('right', nx >  dead);
       put('up',    ny < -dead);
       put('down',  ny >  dead);
-      pad.classList.add('blip-touched');
+      if (!pad.classList.contains('blip-touched')) pad.classList.add('blip-touched');
     }
     function clear() {
       ['up', 'down', 'left', 'right'].forEach(function (n) { put(n, false); });
@@ -459,8 +467,9 @@
     var last = null, pid = null, total = 0, upHeld = false, downHeld = false;
     var acc = 0, idleTimer = null;
 
+    var rect = null; // read once per grab, not per pointermove
     function angleAt(x, y) {
-      var r = dialEl.getBoundingClientRect();
+      var r = rect || dialEl.getBoundingClientRect();
       return Math.atan2(y - (r.top + r.height / 2), x - (r.left + r.width / 2));
     }
     function dir(u, d) {
@@ -468,7 +477,7 @@
       if (d !== downHeld) { downHeld = d; if (d) click('dpad'); emitKey(opts2.down, d ? 'keydown' : 'keyup'); }
     }
     function clearIdle() { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } }
-    function stop() { clearIdle(); dir(false, false); dialEl.classList.remove('active'); last = null; pid = null; acc = 0; }
+    function stop() { clearIdle(); dir(false, false); dialEl.classList.remove('active'); last = null; pid = null; acc = 0; rect = null; }
 
     dialEl.addEventListener('pointerdown', function (e) {
       e.preventDefault();
@@ -476,6 +485,7 @@
       if (opts2.onInteract) opts2.onInteract();
       pid = e.pointerId;
       try { dialEl.setPointerCapture(pid); } catch (x) {}
+      rect = dialEl.getBoundingClientRect();
       last = angleAt(e.clientX, e.clientY);
       total = 0;
       dialEl.classList.add('active');
