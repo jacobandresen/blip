@@ -261,15 +261,17 @@ impl Pooled for Casing {
     fn is_active(&self) -> bool { self.active }
 }
 
-/// One enemy aircraft. It flies a slot in its flight's formation (see
-/// Flight): the flight's path decides where the formation goes, and each
-/// plane holds `slot` — metres to the right and behind, in the leader's
-/// own frame — so a vic stays a vic through a turn.
+/// One enemy aircraft. The leader flies its flight's path (see Flight);
+/// a wingman flies itself, on the same physics, steering for its `slot`
+/// (px right and behind, in the leader's frame). It only ever moves along
+/// its nose, so in a turn it swings wide or cuts inside like a real
+/// wingman instead of sliding sideways.
 #[derive(Copy, Clone)]
 struct Enemy {
     x: f32, y: f32,
     heading: f32,
     bank: f32,
+    speed: f32,
     active: bool,
     kind: EnemyKind,
     t: f32,
@@ -295,6 +297,7 @@ struct Flight {
     active: bool,
     x: f32, y: f32,
     heading: f32, bank: f32, speed: f32, trim: f32,
+    max_bank: f32, // flat enough that the inside wingman stays above stall
     legs: [Leg; 4], n: usize, leg: usize, leg_t: f32, turned: f32,
     t: f32,
 }
@@ -563,12 +566,12 @@ impl Game {
     fn new() -> Self {
         let dead_bullet = Bullet { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, active: false };
         let dead_enemy = Enemy {
-            x: 0.0, y: 0.0, heading: 0.0, bank: 0.0, active: false, kind: EnemyKind::Grunt,
+            x: 0.0, y: 0.0, heading: 0.0, bank: 0.0, speed: 100.0, active: false, kind: EnemyKind::Grunt,
             t: 0.0, flight: 0, slot: (0.0, 0.0), fire_timer: Timer::default(), burst: 0, burst_t: 0.0,
             can_hide: false,
         };
         let dead_flight = Flight { active: false, x: 0.0, y: 0.0, heading: 0.0, bank: 0.0, speed: 100.0,
-            trim: 100.0, legs: [Leg::Straight(0.0); 4], n: 0, leg: 0, leg_t: 0.0, turned: 0.0, t: 0.0 };
+            trim: 100.0, max_bank: FLIGHT_MAX_BANK, legs: [Leg::Straight(0.0); 4], n: 0, leg: 0, leg_t: 0.0, turned: 0.0, t: 0.0 };
         let dead_explosion = Explosion { x: 0.0, y: 0.0, ttl: 0.0, max_ttl: EXPLOSION_TTL, scale: 1.0, color: EXPLOSION_ORANGE, active: false };
         let dead_powerup = Powerup { x: 0.0, y: 0.0, active: false };
         let dead_health_pickup = HealthPickup { x: 0.0, y: 0.0, active: false };
@@ -937,11 +940,19 @@ fn active_enemies(g: &Game) -> usize { pool_iter(&g.enemies).count() }
 fn spawn_flight(g: &mut Game, kind: EnemyKind, form: Formation, x: f32, y: f32, heading: f32, legs: &[Leg]) {
     let members = slots(form);
     if active_enemies(g) + members.len() > MAX_ENEMIES { return; }
-    let Some(fi) = g.flights.iter().position(|f| !f.active) else { return };
+    let Some(fi) = (0..MAX_FLIGHTS).find(|&i| !g.flights[i].active && !g.enemies.iter().any(|e| e.active && e.flight == i)) else { return };
     let mut plan = [Leg::Straight(6.0); 4];
     for (i, l) in legs.iter().take(4).enumerate() { plan[i] = *l; }
     let trim = trim_speed(kind);
-    g.flights[fi] = Flight { active: true, x, y, heading, bank: 0.0, speed: trim, trim,
+    // In a level turn the whole formation turns at one rate, so a wingman
+    // `lat` inside flies at v(1 - lat/r). Keeping that above stall needs
+    // r >= lat / (1 - v_min/v), i.e. bank <= atan(v^2 / (g r)).
+    let lat = members.iter().map(|s| s.0.abs()).fold(0.0, f32::max);
+    let max_bank = if lat == 0.0 { FLIGHT_MAX_BANK } else {
+        let r = lat / (1.0 - FLIGHT_STALL * 1.27 / trim);
+        (trim * trim / (FLIGHT_G * r)).atan().min(FLIGHT_MAX_BANK)
+    };
+    g.flights[fi] = Flight { active: true, x, y, heading, bank: 0.0, speed: trim, trim, max_bank,
         legs: plan, n: legs.len().min(4), leg: 0, leg_t: 0.0, turned: 0.0, t: 0.0 };
     let can_hide = kind != EnemyKind::Ace && rand01() < 0.4;
     for &slot in members {
@@ -949,7 +960,7 @@ fn spawn_flight(g: &mut Game, kind: EnemyKind, form: Formation, x: f32, y: f32, 
         let mut fire_timer = Timer::default();
         fire_timer.start(0.8 + rand01() * 1.4);
         pool_spawn(&mut g.enemies, Enemy {
-            x: sx - ENEMY_W as f32 / 2.0, y: sy - ENEMY_H as f32 / 2.0, heading, bank: 0.0, active: true,
+            x: sx - ENEMY_W as f32 / 2.0, y: sy - ENEMY_H as f32 / 2.0, heading, bank: 0.0, speed: trim, active: true,
             kind, t: 0.0, flight: fi, slot, fire_timer, burst: 0, burst_t: 0.0, can_hide,
         });
     }
@@ -1048,7 +1059,7 @@ fn update_flight(f: &mut Flight, dt: f32, player: (f32, f32, f32)) {
             err * 1.4 - w_now * 0.5
         }
     };
-    let lim = ((FLIGHT_STALL / f.speed).powi(2)).min(1.0).acos().min(FLIGHT_MAX_BANK);
+    let lim = ((FLIGHT_STALL / f.speed).powi(2)).min(1.0).acos().min(f.max_bank);
     cmd = cmd.clamp(-lim, lim);
     f.bank += (cmd - f.bank).clamp(-FLIGHT_ROLL * dt, FLIGHT_ROLL * dt);
     let w = FLIGHT_G * f.bank.tan() / f.speed;
@@ -1064,11 +1075,27 @@ fn update_flight(f: &mut Flight, dt: f32, player: (f32, f32, f32)) {
         Leg::Turn { by, .. } => f.turned >= by,
     };
     if done && f.leg < f.n { f.leg += 1; f.leg_t = 0.0; f.turned = 0.0; }
-    // well clear of the screen: the flight is over
-    let m = 160.0;
-    if f.t > 2.0 && (f.x < -m || f.x > WIN_W as f32 + m || f.y > WIN_H as f32 + m || f.y < -m * 1.5) {
-        f.active = false;
-    }
+}
+
+/// A wingman's step, flown as a real one would: bank to match the
+/// leader's turn rate (tan(bank) = w v / g at its own speed), correct
+/// gently toward a point well ahead of its slot, and use the throttle to
+/// hold its place along the track. Returns its new centre.
+fn fly_wing(e: &mut Enemy, f: &Flight, dt: f32) -> (f32, f32) {
+    let (cx, cy) = (e.x + ENEMY_W as f32 / 2.0, e.y + ENEMY_H as f32 / 2.0);
+    let (sx, sy) = slot_pos(f.x, f.y, f.heading, e.slot);
+    let (ax, ay) = (sx + f.heading.sin() * 110.0, sy + f.heading.cos() * 110.0);
+    let want = (ax - cx).atan2(ay - cy);
+    let err = (want - e.heading + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+    let lim = ((FLIGHT_STALL / e.speed).powi(2)).min(1.0).acos().min(FLIGHT_MAX_BANK);
+    let w_lead = FLIGHT_G * f.bank.tan() / f.speed;
+    let cmd = ((w_lead * e.speed / FLIGHT_G).atan() + err * 1.6).clamp(-lim, lim);
+    e.bank += (cmd - e.bank).clamp(-FLIGHT_ROLL * 1.3 * dt, FLIGHT_ROLL * 1.3 * dt);
+    e.heading += FLIGHT_G * e.bank.tan() / e.speed * dt;
+    let along = (sx - cx) * f.heading.sin() + (sy - cy) * f.heading.cos();
+    let target = (f.speed + along * 1.2).min(f.speed * 1.35).max(FLIGHT_STALL * 1.15);
+    e.speed += (target - e.speed) * (2.0 * dt).min(1.0);
+    (cx + e.heading.sin() * e.speed * dt, cy + e.heading.cos() * e.speed * dt)
 }
 
 fn update_enemies(g: &mut Game, dt: f32, allow_fire: bool, sfx: &Sounds) {
@@ -1082,19 +1109,24 @@ fn update_enemies(g: &mut Game, dt: f32, allow_fire: bool, sfx: &Sounds) {
         let e = &mut g.enemies[i];
         e.t += dt;
         let f = g.flights[e.flight];
-        let (cx, cy) = slot_pos(f.x, f.y, f.heading, e.slot);
+        let (cx, cy) = if e.slot == (0.0, 0.0) {
+            e.heading = f.heading;
+            e.bank = f.bank;
+            e.speed = f.speed;
+            (f.x, f.y)
+        } else {
+            fly_wing(e, &f, dt)
+        };
         e.x = cx - ENEMY_W as f32 / 2.0;
         e.y = cy - ENEMY_H as f32 / 2.0;
-        e.heading = f.heading;
-        e.bank = f.bank;
-        if !f.active || (e.t > 2.0 && (cx < -80.0 || cx > WIN_W as f32 + 80.0 || cy > WIN_H as f32 + 80.0 || cy < -140.0)) {
+        if e.t > 2.0 && (cx < -80.0 || cx > WIN_W as f32 + 80.0 || cy > WIN_H as f32 + 80.0 || cy < -140.0) {
             e.active = false;
             continue;
         }
         if !allow_fire { continue; }
         // Guns fire along the nose: only when it points down the screen
         // and the player is near the line of fire, in short bursts.
-        let (fx, fy) = (f.heading.sin(), f.heading.cos());
+        let (fx, fy) = (e.heading.sin(), e.heading.cos());
         if e.burst == 0 && e.fire_timer.tick(dt) {
             let (dx, dy) = (player.0 - cx, player.1 - cy);
             let d = dx.hypot(dy).max(1.0);
@@ -1115,7 +1147,7 @@ fn update_enemies(g: &mut Game, dt: f32, allow_fire: bool, sfx: &Sounds) {
             if e.burst_t <= 0.0 {
                 e.burst -= 1;
                 e.burst_t = 0.08;
-                let (rx, ry) = (-f.heading.cos(), f.heading.sin());
+                let (rx, ry) = (-e.heading.cos(), e.heading.sin());
                 for side in [-1.0f32, 1.0] {
                     let (gx, gy) = (cx + rx * side * 15.0 + fx * 16.0, cy + ry * side * 15.0 + fy * 16.0);
                     pool_spawn(&mut g.enemy_bullets, Bullet {
@@ -2086,11 +2118,13 @@ fn draw_slug(blip: &Blip, x: f32, y: f32, vx: f32, vy: f32, len: f32, wid: f32, 
 
 /// An aircraft sprite, nose along `heading`, drawn narrower as it banks:
 /// seen from above, a banked wing is foreshortened.
+/// Flight moves along (sin h, cos h); rotating the nose-down sprite by r
+/// points its nose at (-sin r, cos r), hence the minus.
 fn draw_plane(tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, heading: f32, bank: f32, tint: BlipColor) {
     let ww = w * (0.55 + 0.45 * bank.cos());
     draw_texture_ex(tex, x + (w - ww) / 2.0, y, tint, DrawTextureParams {
         dest_size: Some(vec2(ww, h)),
-        rotation: heading,
+        rotation: -heading,
         ..Default::default()
     });
 }
@@ -2162,7 +2196,7 @@ fn draw_launch(
         EnemyKind::Ace => &enemy_tex[2],
     };
     for e in pool_iter(&g.enemies) {
-        draw_shadow(enemy_tex_of(e), e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, e.heading);
+        draw_shadow(enemy_tex_of(e), e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, -e.heading);
     }
     for e in pool_iter(&g.enemies) {
         draw_plane(enemy_tex_of(e), e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, e.heading, e.bank, BLIP_WHITE);
@@ -2224,7 +2258,7 @@ fn draw_play(
             EnemyKind::Weaver => &enemy_tex[1],
             EnemyKind::Ace    => &enemy_tex[2],
         };
-        draw_shadow(tex, e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, e.heading);
+        draw_shadow(tex, e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, -e.heading);
     }
     if g.boss.active {
         let (bw, bh) = boss_size(g.boss.tier);
@@ -2268,11 +2302,11 @@ fn draw_play(
         };
         draw_texture_ex(tex, x + PLANE_SHADOW_DX * (1.0 - k), y + PLANE_SHADOW_DY * (1.0 - k),
             BlipColor::new(0.0, 0.0, 0.0, 0.3), DrawTextureParams {
-                dest_size: Some(vec2(ww, wh)), rotation: w.heading, ..Default::default()
+                dest_size: Some(vec2(ww, wh)), rotation: -w.heading, ..Default::default()
             });
         let burn = 1.0 - 0.6 * k;
         draw_texture_ex(tex, x, y, BlipColor::new(burn, burn * 0.85, burn * 0.75, 1.0), DrawTextureParams {
-            dest_size: Some(vec2(ww, wh)), rotation: w.heading, ..Default::default()
+            dest_size: Some(vec2(ww, wh)), rotation: -w.heading, ..Default::default()
         });
     }
     for p in pool_iter(&g.puffs) {
