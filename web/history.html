@@ -134,6 +134,8 @@
     .game-section.meteors  .game-title { color: var(--yellow);  text-shadow: 0 0 12px rgba(230,220,50,0.4); }
     .game-section.serpent  .game-title { color: var(--green);   text-shadow: 0 0 12px rgba(50,200,50,0.4); }
     .game-section.raider   .game-title { color: var(--blue);    text-shadow: 0 0 12px rgba(50,100,220,0.4); }
+    .game-section.brawler  .game-title { color: #dc3c28;        text-shadow: 0 0 12px rgba(220,60,40,0.4); }
+    .game-section.bubbler  .game-title { color: #78d2ff;        text-shadow: 0 0 12px rgba(120,210,255,0.4); }
 
     .game-section.rally    .section-body { border-left-color: rgba(220,50,50,0.3); }
     .game-section.bouncer  .section-body { border-left-color: rgba(0,200,200,0.3); }
@@ -141,6 +143,8 @@
     .game-section.meteors  .section-body { border-left-color: rgba(230,220,50,0.3); }
     .game-section.serpent  .section-body { border-left-color: rgba(50,200,50,0.3); }
     .game-section.raider   .section-body { border-left-color: rgba(50,100,220,0.3); }
+    .game-section.brawler  .section-body { border-left-color: rgba(220,60,40,0.3); }
+    .game-section.bubbler  .section-body { border-left-color: rgba(120,210,255,0.3); }
 
     .impl-label {
       font-size: 9px;
@@ -194,6 +198,10 @@
     .game-section.serpent  .inline-link:hover { color: #70e070; border-bottom-color: rgba(50,200,50,0.8); }
     .game-section.raider   .inline-link { color: var(--blue);    border-bottom-color: rgba(50,100,220,0.3); }
     .game-section.raider   .inline-link:hover { color: #7098f0; border-bottom-color: rgba(50,100,220,0.8); }
+    .game-section.brawler  .inline-link { color: #dc3c28;        border-bottom-color: rgba(220,60,40,0.3); }
+    .game-section.brawler  .inline-link:hover { color: #f07860; border-bottom-color: rgba(220,60,40,0.8); }
+    .game-section.bubbler  .inline-link { color: #78d2ff;        border-bottom-color: rgba(120,210,255,0.3); }
+    .game-section.bubbler  .inline-link:hover { color: #b0e6ff; border-bottom-color: rgba(120,210,255,0.8); }
 
     .studios { display: flex; flex-direction: column; gap: 0; }
     .studio { padding: 20px 0; border-bottom: 1px solid #111; }
@@ -308,7 +316,7 @@
         <div class="studio">
           <div class="studio-name">Taito Corporation</div>
           <div class="studio-dates" data-i18n="taitoDates">Founded 1953 &mdash; Tokyo, Japan</div>
-          <p data-i18n="taitoP">Taito began as a vending machine and jukebox importer. By the late 1970s it was one of the dominant forces in Japanese arcade gaming. Tomohiro Nishikado, a staff engineer with no formal game design training, spent nearly a year hand-designing the hardware and software for Space Invaders (1978). The game caused a national coin shortage in Japan and exported the arcade boom to the rest of the world. Galactic Defender in BLIP ARCADE is inspired by that work.</p>
+          <p data-i18n="taitoP">Taito began as a vending machine and jukebox importer. By the late 1970s it was one of the dominant forces in Japanese arcade gaming. Tomohiro Nishikado, a staff engineer with no formal game design training, spent nearly a year hand-designing the hardware and software for Space Invaders (1978). The game caused a national coin shortage in Japan and exported the arcade boom to the rest of the world. Galactic Defender in BLIP ARCADE is inspired by that work. Eight years later Taito shipped Fukio Mitsuji&#39;s Bubble Bobble (1986), the two-dragon co-op game Bubbler pays tribute to.</p>
         </div>
 
         <div class="studio">
@@ -320,7 +328,7 @@
         <div class="studio">
           <div class="studio-name">Capcom</div>
           <div class="studio-dates" data-i18n="capcomDates">Founded 1983 &mdash; Osaka, Japan</div>
-          <p data-i18n="capcomP">Capcom grew out of Kenzo Tsujimoto&#39;s 1979 electronics venture I.R.M. Corporation and was formally established in 1983 to publish arcade software. A year later, director Yoshiki Okamoto shipped 1942 (1984) &mdash; Capcom&#39;s first game built deliberately for Western arcades, casting the studio&#39;s own home air force as the enemy so American players would be shooting the other side. It set the template for the vertical-scrolling shoot-&#39;em-up: a lone fighter climbing through wave after wave of enemy planes, a barrel-roll dodge held in reserve, and formation-flying power-ups. Raider in BLIP ARCADE takes off from that runway.</p>
+          <p data-i18n="capcomP">Capcom grew out of Kenzo Tsujimoto&#39;s 1979 electronics venture I.R.M. Corporation and was formally established in 1983 to publish arcade software. A year later, director Yoshiki Okamoto shipped 1942 (1984) &mdash; Capcom&#39;s first game built deliberately for Western arcades, casting the studio&#39;s own home air force as the enemy so American players would be shooting the other side. It set the template for the vertical-scrolling shoot-&#39;em-up: a lone fighter climbing through wave after wave of enemy planes, a barrel-roll dodge held in reserve, and formation-flying power-ups. Raider in BLIP ARCADE takes off from that runway. Seven years later Street Fighter II (1991) made the one-on-one fighting game an arcade institution; Brawler is built in its honour.</p>
         </div>
 
       </div>
@@ -463,6 +471,48 @@
     </div>
   </section>
 
+  <div class="divider"></div>
+
+  <!-- ====== BRAWLER ====== -->
+  <section class="game-section brawler">
+    <div class="game-header">
+      <div class="game-title">Brawler</div>
+      <div class="game-origin" data-i18n="brawlerOrigin">Inspired by Street Fighter II &mdash; Capcom, 1991</div>
+    </div>
+    <h2 style="margin-bottom:24px;" data-i18n="brawlerSub">THE GAME THAT TURNED THE ARCADE INTO A TOURNAMENT</h2>
+    <div class="section-body">
+      <p data-i18n="brawlerP1">The first Street Fighter (1987) was a curiosity with pressure-sensitive punch pads. Its sequel, directed by Akira Nishitani with characters drawn by Akira Yasuda, gave players eight distinct fighters, each with their own reach, speed and special moves entered as joystick motions. During development the team noticed that a special move could interrupt the end of a normal attack, letting two hits land before the opponent could react. It was left in. The combo was born as a side effect, and a whole genre grew around it.</p>
+      <p data-i18n="brawlerP2">Street Fighter II turned arcades into places where strangers queued to challenge whoever was winning, a coin on the cabinet to hold their turn. Brawler keeps the part that made it last: the argument about distance. Every attack is low, mid or overhead, a block only works at the right height, and every move carries real startup, active and recovery frames, so a whiffed sweep can be punished and a jab cannot. The fighter&#39;s pose is built from the same numbers as the hitboxes, three fighters wait in two locations to a soundtrack on the hirajōshi scale, and two players can share one cabinet, sideways on a phone.</p>
+      <div class="impl-label" data-i18n="implLabel">► Other implementations online</div>
+      <ul class="impl-list">
+        <li data-i18n="brawlerImpl1"><a class="inline-link" href="https://en.wikipedia.org/wiki/Street_Fighter_II" target="_blank" rel="noopener">Wikipedia &mdash; Street Fighter II</a> — The development story, the characters and the revisions that followed.</li>
+        <li data-i18n="brawlerImpl2"><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=fighting+game" target="_blank" rel="noopener">MIT Scratch &mdash; fighting game projects</a> — Community fighters, many showing how hitboxes and frame timing work.</li>
+        <li data-i18n="brawlerImpl3"><a class="inline-link" href="https://github.com/search?q=fighting+game+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; fighting game repositories</a> — Open-source fighting games and engines, sortable by stars.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== BUBBLER ====== -->
+  <section class="game-section bubbler">
+    <div class="game-header">
+      <div class="game-title">Bubbler</div>
+      <div class="game-origin" data-i18n="bubblerOrigin">Inspired by Bubble Bobble &mdash; Taito, 1986</div>
+    </div>
+    <h2 style="margin-bottom:24px;" data-i18n="bubblerSub">TWO DRAGONS, ONE SCREEN, AND A REASON TO PLAY TOGETHER</h2>
+    <div class="section-body">
+      <p data-i18n="bubblerP1">Fukio Mitsuji designed Bubble Bobble around two little dragons, Bub and Bob, who trap monsters in bubbles and pop them to turn them into fruit. It was built for two: both players on the screen at once, working together across a hundred single-screen rounds rather than taking turns. Linger too long in a round and a HURRY UP warning sounds, the monsters turn angry, and an unkillable ghost comes looking for you. The game hid secrets everywhere, and its best ending could only be reached by two players finishing together.</p>
+      <p data-i18n="bubblerP2">Bubbler is a small love letter rather than a remake: two dragons drawn live, squashing and stretching with every jump and blinking as they go, five rounds of one-way platforms with their own colour schemes, and the original&#39;s core rules. Bubbles float to the ceiling and gather; you can ride them by holding jump; pop a whole cluster of trapped monsters at once and every catch doubles the last. Hurry up and something skull-shaped comes hunting. Player two drops in at any time, and the bouncy chiptune theme is synthesised on the device as the game loads.</p>
+      <div class="impl-label" data-i18n="implLabel">► Other implementations online</div>
+      <ul class="impl-list">
+        <li data-i18n="bubblerImpl1"><a class="inline-link" href="https://en.wikipedia.org/wiki/Bubble_Bobble" target="_blank" rel="noopener">Wikipedia &mdash; Bubble Bobble</a> — The original, its secrets, and the sequels it led to.</li>
+        <li data-i18n="bubblerImpl2"><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=bubble+bobble" target="_blank" rel="noopener">MIT Scratch &mdash; Bubble Bobble projects</a> — Community tributes, a favourite for learning platformer physics.</li>
+        <li data-i18n="bubblerImpl3"><a class="inline-link" href="https://github.com/search?q=bubble+bobble&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Bubble Bobble repositories</a> — Open-source remakes and tributes across languages, sortable by stars.</li>
+      </ul>
+    </div>
+  </section>
+
 </div>
 
   <div class="left-badges">
@@ -507,11 +557,11 @@
         atariDates:     'Founded 1972 — Sunnyvale, California',
         atariP:         'Nolan Bushnell and Ted Dabney founded Atari with $250 in capital and a single engineer, Allan Alcorn, whose training project — a table-tennis simulation — became Pong. In four years the company went from a rented cheese factory to the fastest-growing company in American history. Atari defined the arcade era and later the home console market with the Atari 2600. Three games in BLIP ARCADE trace their lineage directly to Atari: Rally (Pong, 1972), Bouncer (Breakout, 1976), and Meteors (Asteroids, 1979).',
         taitoDates:     'Founded 1953 — Tokyo, Japan',
-        taitoP:         'Taito began as a vending machine and jukebox importer. By the late 1970s it was one of the dominant forces in Japanese arcade gaming. Tomohiro Nishikado, a staff engineer with no formal game design training, spent nearly a year hand-designing the hardware and software for Space Invaders (1978). The game caused a national coin shortage in Japan and exported the arcade boom to the rest of the world. Galactic Defender in BLIP ARCADE is inspired by that work.',
+        taitoP:         'Taito began as a vending machine and jukebox importer. By the late 1970s it was one of the dominant forces in Japanese arcade gaming. Tomohiro Nishikado, a staff engineer with no formal game design training, spent nearly a year hand-designing the hardware and software for Space Invaders (1978). The game caused a national coin shortage in Japan and exported the arcade boom to the rest of the world. Galactic Defender in BLIP ARCADE is inspired by that work. Eight years later Taito shipped Fukio Mitsuji\'s Bubble Bobble (1986), the two-dragon co-op game Bubbler pays tribute to.',
         gremlinDates:   '1976 / 1997',
         gremlinP:       'The snake concept was born at Gremlin Industries as Blockade (1976), a two-player arcade game where each player\'s trail became an obstacle. The mechanic lay dormant for two decades until Nokia engineer Taneli Armanto wrote a solo version for the Nokia 6110 in 1997. Preinstalled on hundreds of millions of handsets, Snake became one of the most widely played games in history before smartphones existed. Serpent in BLIP ARCADE follows that thread.',
         capcomDates:    'Founded 1983 — Osaka, Japan',
-        capcomP:        'Capcom grew out of Kenzo Tsujimoto\'s 1979 electronics venture I.R.M. Corporation and was formally established in 1983 to publish arcade software. A year later, director Yoshiki Okamoto shipped 1942 (1984) — Capcom\'s first game built deliberately for Western arcades, casting the studio\'s own home air force as the enemy so American players would be shooting the other side. It set the template for the vertical-scrolling shoot-\'em-up: a lone fighter climbing through wave after wave of enemy planes, a barrel-roll dodge held in reserve, and formation-flying power-ups. Raider in BLIP ARCADE takes off from that runway.',
+        capcomP:        'Capcom grew out of Kenzo Tsujimoto\'s 1979 electronics venture I.R.M. Corporation and was formally established in 1983 to publish arcade software. A year later, director Yoshiki Okamoto shipped 1942 (1984) — Capcom\'s first game built deliberately for Western arcades, casting the studio\'s own home air force as the enemy so American players would be shooting the other side. It set the template for the vertical-scrolling shoot-\'em-up: a lone fighter climbing through wave after wave of enemy planes, a barrel-roll dodge held in reserve, and formation-flying power-ups. Raider in BLIP ARCADE takes off from that runway. Seven years later Street Fighter II (1991) made the one-on-one fighting game an arcade institution; Brawler is built in its honour.',
         bookLabel:      '► Learn more: Code the Classics',
         bookP1:         'If you want to understand the algorithms behind these games — the collision detection, the sprite rendering, the enemy AI — the best starting point is <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a> (Raspberry Pi Press, 2019), edited by Eben Upton and David Crookes.',
         bookP2:         'The book rebuilds games like Boing! (Pong), Cavern (Manic Miner), and Infinite Bunner (Frogger) in Python, explaining every algorithmic decision along the way. It is not a nostalgic coffee-table book — it is a working technical guide with full source code for each title. A second volume followed in 2022 and is available at <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-ii" target="_blank" rel="noopener">magazine.raspberrypi.com</a>.',
@@ -557,7 +607,21 @@
         raiderP2:       'Raider borrows 1942\'s chassis — a lone fighter climbing through wave after wave of enemy aircraft over open water — without attempting a faithful recreation of it. In its place: a coordinated-turn flight model (bank drives heading, not the other way round) instead of fixed movement paths, seven escalating bosses with bilingual name banners, a carrier launch that opens every stage, and a sea layer with drifting boats, procedurally-generated cumulus clouds, and rare turret-armed islands that shoot back.',
         raiderImpl1:    '<a class="inline-link" href="https://classicgame.online/games/1942" target="_blank" rel="noopener">classicgame.online — 1942</a> — Play the 1984 original straight in the browser, no emulator setup.',
         raiderImpl2:    '<a class="inline-link" href="https://github.com/iainbx/1942" target="_blank" rel="noopener">GitHub — iainbx/1942</a> — An HTML5/JavaScript recreation of the arcade original, fully in-browser.',
-        raiderImpl3:    '<a class="inline-link" href="https://github.com/search?q=1942+arcade+shooter&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — 1942 repositories</a> — Open-source clones and tributes across languages, sortable by stars.'
+        raiderImpl3:    '<a class="inline-link" href="https://github.com/search?q=1942+arcade+shooter&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — 1942 repositories</a> — Open-source clones and tributes across languages, sortable by stars.',
+        brawlerOrigin: 'Inspired by Street Fighter II — Capcom, 1991',
+        brawlerSub: 'THE GAME THAT TURNED THE ARCADE INTO A TOURNAMENT',
+        brawlerP1: 'The first Street Fighter (1987) was a curiosity with pressure-sensitive punch pads. Its sequel, directed by Akira Nishitani with characters drawn by Akira Yasuda, gave players eight distinct fighters, each with their own reach, speed and special moves entered as joystick motions. During development the team noticed that a special move could interrupt the end of a normal attack, letting two hits land before the opponent could react. It was left in. The combo was born as a side effect, and a whole genre grew around it.',
+        brawlerP2: 'Street Fighter II turned arcades into places where strangers queued to challenge whoever was winning, a coin on the cabinet to hold their turn. Brawler keeps the part that made it last: the argument about distance. Every attack is low, mid or overhead, a block only works at the right height, and every move carries real startup, active and recovery frames, so a whiffed sweep can be punished and a jab cannot. The fighter\'s pose is built from the same numbers as the hitboxes, three fighters wait in two locations to a soundtrack on the hirajōshi scale, and two players can share one cabinet, sideways on a phone.',
+        brawlerImpl1: '<a class="inline-link" href="https://en.wikipedia.org/wiki/Street_Fighter_II" target="_blank" rel="noopener">Wikipedia — Street Fighter II</a> — The development story, the characters and the revisions that followed.',
+        brawlerImpl2: '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=fighting+game" target="_blank" rel="noopener">MIT Scratch — fighting game projects</a> — Community fighters, many showing how hitboxes and frame timing work.',
+        brawlerImpl3: '<a class="inline-link" href="https://github.com/search?q=fighting+game+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — fighting game repositories</a> — Open-source fighting games and engines, sortable by stars.',
+        bubblerOrigin: 'Inspired by Bubble Bobble — Taito, 1986',
+        bubblerSub: 'TWO DRAGONS, ONE SCREEN, AND A REASON TO PLAY TOGETHER',
+        bubblerP1: 'Fukio Mitsuji designed Bubble Bobble around two little dragons, Bub and Bob, who trap monsters in bubbles and pop them to turn them into fruit. It was built for two: both players on the screen at once, working together across a hundred single-screen rounds rather than taking turns. Linger too long in a round and a HURRY UP warning sounds, the monsters turn angry, and an unkillable ghost comes looking for you. The game hid secrets everywhere, and its best ending could only be reached by two players finishing together.',
+        bubblerP2: 'Bubbler is a small love letter rather than a remake: two dragons drawn live, squashing and stretching with every jump and blinking as they go, five rounds of one-way platforms with their own colour schemes, and the original\'s core rules. Bubbles float to the ceiling and gather; you can ride them by holding jump; pop a whole cluster of trapped monsters at once and every catch doubles the last. Hurry up and something skull-shaped comes hunting. Player two drops in at any time, and the bouncy chiptune theme is synthesised on the device as the game loads.',
+        bubblerImpl1: '<a class="inline-link" href="https://en.wikipedia.org/wiki/Bubble_Bobble" target="_blank" rel="noopener">Wikipedia — Bubble Bobble</a> — The original, its secrets, and the sequels it led to.',
+        bubblerImpl2: '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=bubble+bobble" target="_blank" rel="noopener">MIT Scratch — Bubble Bobble projects</a> — Community tributes, a favourite for learning platformer physics.',
+        bubblerImpl3: '<a class="inline-link" href="https://github.com/search?q=bubble+bobble&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Bubble Bobble repositories</a> — Open-source remakes and tributes across languages, sortable by stars.'
       },
 
       da: {
@@ -568,11 +632,11 @@
         atariDates:     'Grundlagt 1972 — Sunnyvale, Californien',
         atariP:         'Nolan Bushnell og Ted Dabney grundlagde Atari med 250 dollars i kapital og en enkelt ingeiniør, Allan Alcorn, hvis træningsprojekt — en bordtennissimulation — blev til Pong. På fire år gik virksomheden fra et lejet ostemarked til det hurtigst voksende selskab i amerikansk historie. Atari definerede arkadeæraen og siden hjemmekonsolmarkedet med Atari 2600. Tre spil i BLIP ARCADE stammer direkte fra Atari: Rally (Pong, 1972), Bouncer (Breakout, 1976) og Meteors (Asteroids, 1979).',
         taitoDates:     'Grundlagt 1953 — Tokyo, Japan',
-        taitoP:         'Taito begyndte som importør af automater og jukebokse. I slutningen af 1970\'erne var virksomheden en af de dominerende kræfter i japansk arkadeunderholding. Tomohiro Nishikado, en stab af ingeiniører uden formel spiluddannelse, brugte næsten et år på at designe hardwaren og softwaren til Space Invaders (1978). Spillet forårsagede en national møntmangel i Japan og eksporterede arkadebølgen til resten af verden. Galactic Defender i BLIP ARCADE er inspireret af dette arbejde.',
+        taitoP:         'Taito begyndte som importør af automater og jukebokse. I slutningen af 1970\'erne var virksomheden en af de dominerende kræfter i japansk arkadeunderholding. Tomohiro Nishikado, en stab af ingeiniører uden formel spiluddannelse, brugte næsten et år på at designe hardwaren og softwaren til Space Invaders (1978). Spillet forårsagede en national møntmangel i Japan og eksporterede arkadebølgen til resten af verden. Galactic Defender i BLIP ARCADE er inspireret af dette arbejde. Otte år senere udgav Taito Fukio Mitsujis Bubble Bobble (1986), samarbejdsspillet med de to drager, som Bubbler hylder.',
         gremlinDates:   '1976 / 1997',
         gremlinP:       'Slangemekanikken opstod i spillet Blockade (1976) hos Gremlin Industries, et to-spillers arkadespil, hvor begge spilleres stier blev til forhindringer. Mekanikken lå ubrugt i to årtier, indtil Nokia-ingeiniøren Taneli Armanto i 1997 programmerede en soloversion til Nokia 6110. Forudinstalleret på hundredvis af millioner enheder blev Snake et af historiens mest udbredte spil — før smartphones eksisterede. Serpent i BLIP ARCADE følger denne tråd.',
         capcomDates:    'Grundlagt 1983 — Osaka, Japan',
-        capcomP:        'Capcom udsprang af Kenzo Tsujimotos elektronikvirksomhed I.R.M. Corporation fra 1979 og blev formelt stiftet i 1983 for at udgive arkadesoftware. Året efter udgav instruktør Yoshiki Okamoto 1942 (1984) — Capcoms første spil bevidst bygget til vestlige arkader, hvor studiets eget hjemlands luftvåben blev gjort til fjenden, så amerikanske spillere skød mod den anden side. Det satte skabelonen for det lodret-scrollende skydespil: et enkelt jagerfly, der kæmper sig gennem bølge på bølge af fjendtlige fly, en rulning i reserve som undvigemanøvre, og eskorterende power-ups i formation. Raider i BLIP ARCADE letter fra den samme landingsbane.',
+        capcomP:        'Capcom udsprang af Kenzo Tsujimotos elektronikvirksomhed I.R.M. Corporation fra 1979 og blev formelt stiftet i 1983 for at udgive arkadesoftware. Året efter udgav instruktør Yoshiki Okamoto 1942 (1984) — Capcoms første spil bevidst bygget til vestlige arkader, hvor studiets eget hjemlands luftvåben blev gjort til fjenden, så amerikanske spillere skød mod den anden side. Det satte skabelonen for det lodret-scrollende skydespil: et enkelt jagerfly, der kæmper sig gennem bølge på bølge af fjendtlige fly, en rulning i reserve som undvigemanøvre, og eskorterende power-ups i formation. Raider i BLIP ARCADE letter fra den samme landingsbane. Syv år senere gjorde Street Fighter II (1991) en mod en-kampspillet til en arkadeinstitution; Brawler er bygget til dets ære.',
         bookLabel:      '► Lær mere: Code the Classics',
         bookP1:         'Hvis du vil forstå algoritmerne bag disse spil — kollisionsdetektering, sprite-gengivelse, fjende-AI — er det bedste udgangspunkt <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a> (Raspberry Pi Press, 2019), redigeret af Eben Upton og David Crookes.',
         bookP2:         'Bogen genopbygger spil som Boing! (Pong), Cavern (Manic Miner) og Infinite Bunner (Frogger) i Python og forklarer alle algoritmiske beslutninger undervejs. Det er ikke en nostalgisk billedbog — det er en velfungerende teknisk guide med fuld kildekode til hvert spil. Et andet bind fulgte i 2022 og er tilgængeligt på <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-ii" target="_blank" rel="noopener">magazine.raspberrypi.com</a>.',
@@ -618,7 +682,21 @@
         raiderP2:       'Raider låner 1942s grundopskrift — et jagerfly, der alene klatrer gennem bølge på bølge af fjendtlige fly over åbent hav — men forsøger ikke en trofast genskabelse. I stedet: en koordineret-sving-flyvemodel (krængning styrer kurs, ikke omvendt) i stedet for faste bevægelsesmønstre, syv eskalerende bosser med tosprogede navneskilte, en hangarskibsstart der indleder hvert niveau, og et havlag med sejlende både, procedurelt genererede stakskyer og sjældne tårnbevæbnede øer, der skyder igen.',
         raiderImpl1:    '<a class="inline-link" href="https://classicgame.online/games/1942" target="_blank" rel="noopener">classicgame.online — 1942</a> — Spil originalen fra 1984 direkte i browseren, ingen emulator nødvendig.',
         raiderImpl2:    '<a class="inline-link" href="https://github.com/iainbx/1942" target="_blank" rel="noopener">GitHub — iainbx/1942</a> — En HTML5/JavaScript-genskabelse af arkadeoriginalen, kører helt i browseren.',
-        raiderImpl3:    '<a class="inline-link" href="https://github.com/search?q=1942+arcade+shooter&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — 1942-repositories</a> — Open source-kloner og hyldestprojekter på tværs af sprog, sorterbare efter stjerner.'
+        raiderImpl3:    '<a class="inline-link" href="https://github.com/search?q=1942+arcade+shooter&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — 1942-repositories</a> — Open source-kloner og hyldestprojekter på tværs af sprog, sorterbare efter stjerner.',
+        brawlerOrigin: 'Inspireret af Street Fighter II — Capcom, 1991',
+        brawlerSub: 'SPILLET DER GJORDE ARKADEN TIL EN TURNERING',
+        brawlerP1: 'Den første Street Fighter (1987) var en kuriositet med trykfølsomme slagpuder. Efterfølgeren, instrueret af Akira Nishitani med figurer tegnet af Akira Yasuda, gav spillerne otte forskellige kæmpere, hver med sin egen rækkevidde, fart og specialangreb udført som joystickbevægelser. Under udviklingen opdagede holdet, at et specialangreb kunne afbryde slutningen af et almindeligt angreb, så to slag ramte, før modstanderen nåede at reagere. Det fik lov at blive. Kombinationen opstod som en bivirkning, og en hel genre voksede op omkring den.',
+        brawlerP2: 'Street Fighter II gjorde arkaderne til steder, hvor fremmede stod i kø for at udfordre den, der vandt, med en mønt på kabinettet for at holde deres tur. Brawler beholder det, der fik det til at holde: diskussionen om afstand. Hvert angreb er lavt, midt eller over hovedet, en blokering virker kun i den rigtige højde, og hvert træk har rigtige opstarts-, aktive og genopretningsbilleder, så et forbiskud kan straffes, og et jab ikke kan. Kæmperens positur bygges af de samme tal som hitboxene, tre kæmpere venter to steder til musik på hirajōshi-skalaen, og to spillere kan dele et kabinet, på siden på en telefon.',
+        brawlerImpl1: '<a class="inline-link" href="https://en.wikipedia.org/wiki/Street_Fighter_II" target="_blank" rel="noopener">Wikipedia — Street Fighter II</a> — Udviklingshistorien, figurerne og de udgaver, der fulgte.',
+        brawlerImpl2: '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=fighting+game" target="_blank" rel="noopener">MIT Scratch — kampspilsprojekter</a> — Fællesskabets kampspil, mange af dem viser, hvordan hitboxe og timing virker.',
+        brawlerImpl3: '<a class="inline-link" href="https://github.com/search?q=fighting+game+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — kampspils-repositories</a> — Open source-kampspil og motorer, sorterbare efter stjerner.',
+        bubblerOrigin: 'Inspireret af Bubble Bobble — Taito, 1986',
+        bubblerSub: 'TO DRAGER, ÉN SKÆRM OG EN GRUND TIL AT SPILLE SAMMEN',
+        bubblerP1: 'Fukio Mitsuji byggede Bubble Bobble op om to små drager, Bub og Bob, der fanger monstre i bobler og prikker hul på dem, så de bliver til frugt. Det var lavet til to: begge spillere på skærmen på én gang, der arbejder sammen gennem hundrede baner på én skærm i stedet for at skiftes. Bliver man for længe i en bane, lyder en HURRY UP-advarsel, monstrene bliver vrede, og et udødeligt spøgelse kommer efter en. Spillet gemte hemmeligheder overalt, og den bedste slutning kunne kun nås af to spillere, der gennemførte sammen.',
+        bubblerP2: 'Bubbler er et lille kærlighedsbrev snarere end en genindspilning: to drager tegnet live, der mases sammen og strækkes ved hvert hop og blinker undervejs, fem baner med envejsplatforme i hver sit farveskema og originalens kerneregler. Boblerne svæver op til loftet og samler sig; man kan ride på dem ved at holde hop inde; prik en hel klynge fangne monstre på én gang, og hver fangst tæller dobbelt af den forrige. Nøl, og noget kranieformet kommer på jagt. Spiller to kan hoppe ind når som helst, og det hoppende chiptune-tema syntetiseres på enheden, mens spillet indlæses.',
+        bubblerImpl1: '<a class="inline-link" href="https://en.wikipedia.org/wiki/Bubble_Bobble" target="_blank" rel="noopener">Wikipedia — Bubble Bobble</a> — Originalen, dens hemmeligheder og de efterfølgere, den førte til.',
+        bubblerImpl2: '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=bubble+bobble" target="_blank" rel="noopener">MIT Scratch — Bubble Bobble-projekter</a> — Fællesskabets hyldester, en favorit til at lære platformsfysik.',
+        bubblerImpl3: '<a class="inline-link" href="https://github.com/search?q=bubble+bobble&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Bubble Bobble-repositories</a> — Open source-genindspilninger og hyldester på tværs af sprog, sorterbare efter stjerner.'
       },
 
       ja: {
@@ -629,11 +707,11 @@
         atariDates:     '1972年設立 — カリフォルニア州サニーベール',
         atariP:         'ノーラン・ブッシュネルとテッド・ダブニーは250ドルの資本とエンジニア一人、アラン・アルコーンを携えてAtariを設立しました。アルコーンの練習課題として作られた亓球シミュレーションがPongとなりました。四年間でこの会社はレンタルしたチーズ工場からアメリカ史上最も急成長した企業へと飛躍しました。Atariはアーケードゲームの時代を定義し、後にAtari 2600でホームコンソール市場も定義しました。BLIP ARCADEの3つのゲームがAtariに直接由来します：Rally（Pong、1972年）、Bouncer（Breakout、1976年）、Meteors（Asteroids、1979年）。',
         taitoDates:     '1953年設立 — 東京、日本',
-        taitoP:         'タイトーは自動販売機とジュークボックスの輸入業者として事業を始めました。1970年代後半には日本のアーケードゲーム産業の主要な勢力の一つとなっていました。正式なゲームデザインの訓練を受けていないスタッフエンジニアの西角友宮は、スペースインベーダー（1978年）のハードウェアとソフトウェアの設計に約1年を費やしました。このゲームは日本で100円硬貨の全国的な不足を引き起こし、アーケードブームを世界中へ輸出しました。BLIP ARCADEのGalactic Defenderはその作品から着想を得ています。',
+        taitoP:         'タイトーは自動販売機とジュークボックスの輸入業者として事業を始めました。1970年代後半には日本のアーケードゲーム産業の主要な勢力の一つとなっていました。正式なゲームデザインの訓練を受けていないスタッフエンジニアの西角友宮は、スペースインベーダー（1978年）のハードウェアとソフトウェアの設計に約1年を費やしました。このゲームは日本で100円硬貨の全国的な不足を引き起こし、アーケードブームを世界中へ輸出しました。BLIP ARCADEのGalactic Defenderはその作品から着想を得ています。8年後、タイトーは三辻富貴朗のバブルボブル（1986年）を発売しました——Bubblerがオマージュをささげる二匹の竜の協力プレイゲームです。',
         gremlinDates:   '1976年 / 1997年',
         gremlinP:       '蛇のコンセプトはGremlin IndustriesのBlockade（1976年）として誕生しました。プレイヤーが自分の軌跡を伸ばしながら操作する2人用アーケードゲームで、相手の軌跡に触れると負けというものでした。このメカニクは20年間眠っていましたが、1997年にNokiaのエンジニア、タネリ・アルマントがNokia 6110用にソロバージョンを制作しました。何億台ものハンドセットにプリインストールされたSnakeは、スマートフォンが存在する前から歴史上最も広くプレイされたゲームの一つになりました。BLIP ARCADEのSerpentはその系譜を受け継いでいます。',
         capcomDates:    '1983年設立 — 大阪、日本',
-        capcomP:        'Capcomは辻本憲三が1979年に設立した電子機器会社I.R.M. Corporationから生まれ、1983年にアーケードソフトウェアを発売するために正式に設立されました。翌年、ディレクターの岡本吉起は1942（1984年）を発売しました——欧米のアーケード市場を意識して作られたCapcom初のタイトルで、スタジオ自身の祖国の空軍を敵として描き、アメリカのプレイヤーが反対側を撃つようにしたのです。縦スクロールシューティングの定型を確立しました：波状に押し寄せる敵機を突破する一機の戦闘機、温存しておく宙返り回避、そして編隊を組む僚機のパワーアップ。BLIP ARCADEのRaiderはその滑走路から飛び立ちます。',
+        capcomP:        'Capcomは辻本憲三が1979年に設立した電子機器会社I.R.M. Corporationから生まれ、1983年にアーケードソフトウェアを発売するために正式に設立されました。翌年、ディレクターの岡本吉起は1942（1984年）を発売しました——欧米のアーケード市場を意識して作られたCapcom初のタイトルで、スタジオ自身の祖国の空軍を敵として描き、アメリカのプレイヤーが反対側を撃つようにしたのです。縦スクロールシューティングの定型を確立しました：波状に押し寄せる敵機を突破する一機の戦闘機、温存しておく宙返り回避、そして編隊を組む僚機のパワーアップ。BLIP ARCADEのRaiderはその滑走路から飛び立ちます。7年後、ストリートファイターII（1991年）が一対一の対戦格闘ゲームをアーケードの定番にしました。Brawlerはその栄誉をたたえて作られています。',
         bookLabel:      '► さらに学ぶ：Code the Classics',
         bookP1:         'これらのゲームの背後にあるアルゴリズム——衝突検出、スプライト描画、敵のAI——を理解したいなら、最良の出発点は<a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a>（Raspberry Pi Press、2019年）です。エベン・アプトンとデイヴィッド・クルークス編著。',
         bookP2:         'この本はBoing!（Pong）、Cavern（Manic Miner）、Infinite Bunner（Frogger）などのゲームをPythonで再構築し、すべてのアルゴリズム的決断を丁寧に解説しています。懐かしのコーヒーテーブル本ではありません——各タイトルの完全なソースコードを含む実用的な技術ガイドです。第2巻は2022年に刊行され、<a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-ii" target="_blank" rel="noopener">magazine.raspberrypi.com</a>から入手できます。',
@@ -679,7 +757,21 @@
         raiderP2:       'Raiderは1942の骨格——大海原の上空を単独で上昇し、波状の敵機を突破し続ける戦闘機——を借りていますが、忠実な再現は目指していません。固定された移動パターンの代わりに協調旋回の飛行モデル(バンク角が進路を決める、その逆ではない)、二か国語の名前バナーを持つ七体の段階的なボス、各ステージの幕開けとなる空母からの発艦、そして漂う船、手続き型生成された積雲、反撃してくる砲台付きの島が点在する稀な海面レイヤーを備えています。',
         raiderImpl1:    '<a class="inline-link" href="https://classicgame.online/games/1942" target="_blank" rel="noopener">classicgame.online — 1942</a> — エミュレータ不要、ブラウザで直接1984年のオリジナルをプレイ。',
         raiderImpl2:    '<a class="inline-link" href="https://github.com/iainbx/1942" target="_blank" rel="noopener">GitHub — iainbx/1942</a> — アーケードオリジナルのHTML5/JavaScript版、完全にブラウザ内で動作。',
-        raiderImpl3:    '<a class="inline-link" href="https://github.com/search?q=1942+arcade+shooter&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — 1942リポジトリ</a> — 複数言語によるオープンソースのクローンやオマージュ作品、スター数で並べ替え可能。'
+        raiderImpl3:    '<a class="inline-link" href="https://github.com/search?q=1942+arcade+shooter&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — 1942リポジトリ</a> — 複数言語によるオープンソースのクローンやオマージュ作品、スター数で並べ替え可能。',
+        brawlerOrigin: 'ストリートファイターII（カプコン、1991年）に着想',
+        brawlerSub: 'ゲームセンターを対戦の舞台に変えたゲーム',
+        brawlerP1: '初代ストリートファイター（1987年）は、圧力感知式のパンチパッドを備えた異色作でした。西谷亮が監督し、安田朗がキャラクターを描いた続編は、それぞれ異なるリーチと速さ、そしてレバー入力で出す必殺技を持つ8人の格闘家を用意しました。開発中、通常技の終わりを必殺技でキャンセルでき、相手が反応する前に2発が当たることにチームは気づきました。それはそのまま残されました。コンボは副産物として生まれ、ひとつのジャンルがその周りに育ったのです。',
+        brawlerP2: 'ストリートファイターIIは、見知らぬ者同士が勝っているプレイヤーに挑むため、筐体に硬貨を置いて順番待ちをする場所へとゲームセンターを変えました。Brawlerはこのゲームを長く愛されるものにした部分、つまり間合いの駆け引きを受け継いでいます。すべての攻撃は下段・中段・上段のいずれかで、ガードは正しい高さでしか効かず、すべての技に発生・持続・硬直のフレームがあるため、空振りした足払いは反撃を受け、ジャブは受けません。格闘家のポーズは当たり判定と同じ数値から組み立てられ、3人の格闘家が2つの場所で陰旋法（平調子）の音楽とともに待ち構えます。2人で1台の筐体を共有でき、スマートフォンでは横向きで遊べます。',
+        brawlerImpl1: '<a class="inline-link" href="https://en.wikipedia.org/wiki/Street_Fighter_II" target="_blank" rel="noopener">Wikipedia — Street Fighter II</a> — 開発の経緯、キャラクター、その後の改訂版。',
+        brawlerImpl2: '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=fighting+game" target="_blank" rel="noopener">MIT Scratch — 格闘ゲームのプロジェクト</a> — 当たり判定やフレームの仕組みがわかるコミュニティ作品。',
+        brawlerImpl3: '<a class="inline-link" href="https://github.com/search?q=fighting+game+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — 格闘ゲームのリポジトリ</a> — オープンソースの格闘ゲームやエンジン、スター数で並べ替え可能。',
+        bubblerOrigin: 'バブルボブル（タイトー、1986年）に着想',
+        bubblerSub: '二匹の竜と一画面、そして一緒に遊ぶ理由',
+        bubblerP1: '三辻富貴朗は、怪物を泡に閉じこめ、割ってフルーツに変える二匹の小さな竜、バブルンとボブルンを中心にバブルボブルを設計しました。二人のためのゲームでした——交代で遊ぶのではなく、二人のプレイヤーが同時に画面に立ち、100の一画面ラウンドを協力して進みます。ひとつのラウンドに長居しすぎるとHURRY UPの警告が鳴り、怪物が怒り、倒せないおばけが追いかけてきます。ゲームのいたるところに秘密が隠され、最高のエンディングには二人そろってクリアしなければたどり着けませんでした。',
+        bubblerP2: 'Bubblerはリメイクではなく、小さなラブレターです。ジャンプのたびにつぶれては伸び、まばたきしながら動く、その場で描かれる二匹の竜。それぞれの配色を持つ、一方通行の足場の5つのラウンド。そして原作の基本ルール。泡は天井へ浮かんで集まり、ジャンプを押し続ければ泡に乗れます。閉じこめた怪物の群れをまとめて割れば、ひとつごとに点数が倍になります。もたもたしていると、どくろのようなものが追いかけてきます。2Pはいつでも途中参加でき、弾むようなチップチューンのテーマはゲームの読み込み時に端末上で合成されます。',
+        bubblerImpl1: '<a class="inline-link" href="https://en.wikipedia.org/wiki/Bubble_Bobble" target="_blank" rel="noopener">Wikipedia — Bubble Bobble</a> — 原作、その秘密、そして続編へのつながり。',
+        bubblerImpl2: '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=bubble+bobble" target="_blank" rel="noopener">MIT Scratch — バブルボブルのプロジェクト</a> — アクションゲームの物理を学ぶのに人気のコミュニティ作品。',
+        bubblerImpl3: '<a class="inline-link" href="https://github.com/search?q=bubble+bobble&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — バブルボブルのリポジトリ</a> — 各言語のオープンソースのリメイクやオマージュ、スター数で並べ替え可能。'
       }
 
     };
