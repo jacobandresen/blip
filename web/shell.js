@@ -2,13 +2,10 @@
 'use strict';
 
 // ---- Zoom lock ----------------------------------------------------------
-// Every touch on a game page is game input, never a browser gesture.
-// `body { touch-action: none }` (shell.css) already kills single-finger
-// pan and double-tap zoom everywhere on the page — including a rapid mash
-// on the fire button. The one thing that leaves open is iOS Safari's
-// pinch: it ignores user-scalable=no and can start a page zoom from a
-// two-finger 'gesture' (a thumb held on fire + a thumb on the d-pad
-// drifting apart reads as one). Swallow those events outright.
+// Every touch on a game page is game input. `body { touch-action: none }`
+// (shell.css) stops pan and double-tap zoom; iOS Safari still starts a pinch
+// zoom from a two-finger gesture (a thumb on fire and one on the cross
+// drifting apart), so swallow those.
 ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) {
   document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
 });
@@ -26,9 +23,7 @@ var overlay   = document.getElementById('need-coin-overlay');
 updateCoinsHud();
 
 // ---- Per-game marquee + cabinet accent ----
-// Builds the backlit name sign in JS (rather than requiring it in every
-// game's HTML) so rally's hand-maintained page picks it up for free, same as
-// the shell-generated ones.
+// Built here rather than in each game's HTML.
 (function () {
   var game = (typeof blipGameFromPath === 'function') ? blipGameFromPath(window.location.pathname) : null;
   if (!game) return;
@@ -48,13 +43,10 @@ updateCoinsHud();
       logo.classList.remove('boot');
     }, { once: true });
 
-    // After ~12s of no input, a "> MORE GAMES" nudge fades in under the
-    // logo (.logo-hint, styled in shell.css) — the logo is the only way
-    // back to the cabinet's game grid on touch, so the reminder shouldn't
-    // be a slow one. Any input hides it and restarts the clock:
-    // pointer/touch for taps, and keydown in the capture phase so it also
-    // catches the on-screen controls and gamepad (injectKey() dispatches
-    // bubbling keydowns on the canvas).
+    // After ~12s without input a "> MORE GAMES" nudge fades in under the
+    // logo, the only way back to the game grid on touch. Any input hides it
+    // and restarts the clock (keydown in the capture phase catches the
+    // on-screen controls and gamepad too).
     var hint = document.createElement('span');
     hint.className = 'logo-hint';
     hint.setAttribute('aria-hidden', 'true');
@@ -99,12 +91,9 @@ function getUiAudio() {
 }
 
 // ---- Touch control feedback ----
-// A felt "detent" the instant a control catches, so you know it registered
-// without looking down from the game. Android gets a real Vibration-API
-// buzz. iOS Safari has no Vibration API (and never has) and no web access
-// to the Taptic Engine, so there it falls back to a ~40 ms sub-bass burst
-// through the speaker — more felt-in-the-hand than heard. Only ever fires
-// on a touch device; a no-op under a mouse or on the coin overlay.
+// A felt detent the instant a control catches: a Vibration-API buzz on
+// Android; iOS has neither that nor Taptic access, so a ~40 ms sub-bass burst
+// instead. Touch devices only, and never on the coin overlay.
 var HAS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 function feedbackTick() {
   if (!HAS_TOUCH || overlay.classList.contains('visible')) return;
@@ -126,12 +115,8 @@ function feedbackTick() {
     osc.start(t); osc.stop(t + 0.055);
   } catch (e) {}
 }
-// A real coin makes two distinct sounds in sequence: the metallic clink
-// of it dropping through the chute (bright, inharmonic, near-instant —
-// real metal doesn't ring in tidy octaves the way a synth voice does),
-// then the register's own electronic "credit accepted" chime a beat
-// later. Modelling both, rather than just the chime alone, is what reads
-// as an actual coin rather than a UI beep.
+// A coin is two sounds: the inharmonic metallic clink through the chute, then
+// the register's "credit accepted" chime a beat later.
 function playCoinInsert() {
   var ctx = getUiAudio(), t = ctx.currentTime;
 
@@ -173,10 +158,8 @@ function playCoinInsert() {
   });
 }
 
-// The coin that visually drops into #insert-coin-btn's slot on a
-// successful insert — a real element (not a pseudo-element) so a class
-// toggle can animate it on demand, injected here rather than duplicated
-// across shell.html and all six per-game index.html files.
+// The coin that drops into #insert-coin-btn's slot: a real element so a class
+// toggle can animate it, injected here for every game page.
 var coinDropAnim = null;
 (function () {
   var btn = document.getElementById('insert-coin-btn');
@@ -188,12 +171,8 @@ var coinDropAnim = null;
 }());
 function dropCoinAnimation() {
   if (!coinDropAnim) return;
-  // The slot (#insert-coin-btn::after) sits flush against the button's
-  // content-box edge, so its centre is padding-right + half its own 6px
-  // width in from the button's outer edge — read padding back from the
-  // computed style (it changes across the responsive breakpoints) rather
-  // than guessing a constant, so the coin actually lands on the slot
-  // instead of just somewhere near it.
+  // The slot sits at the button's content edge: padding-right plus half its
+  // 6px width. Padding changes across breakpoints, so read it back.
   var btn = coinDropAnim.parentElement;
   var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
   coinDropAnim.style.setProperty('--slot-x', (padRight + 3) + 'px');
@@ -253,10 +232,10 @@ window.blipGameOver = function (score) {
   window.blipScores.onGameOver(game ? game.slug : null, score);
 };
 
-// Called from WASM (title / game-over screens) to show the leading score
-// and who holds it. Prefers the leaderboard #1 that blip_scores.js caches
-// in 'blip-top-<slug>'; falls back to this browser's own best
-// ('blip-best-<slug>') tagged with the claimed handle ('blip-handle').
+// Called from WASM (title / game-over screens): the leading score and its
+// holder. Prefers the leaderboard #1 blip_scores.js caches in
+// 'blip-top-<slug>', else this browser's best ('blip-best-<slug>') with the
+// claimed handle ('blip-handle').
 function blipTopEntry() {
   var game = (typeof blipGameFromPath === 'function')
     ? blipGameFromPath(window.location.pathname) : null;
@@ -295,10 +274,8 @@ window.blipSetMode = function (mode) {
   if (label) label.textContent = isCpu ? 'CPU' : '2P';
 };
 
-// Called from WASM (rally) every frame with the two paddle positions
-// (0 = top of travel … 1 = bottom). Spins the on-screen dials to match —
-// so they turn under keyboard play on the desktop, and the P2 dial turns
-// on its own while the CPU plays it.
+// Called from WASM (rally) every frame with both paddle positions (0 top .. 1
+// bottom), so the dials turn under keyboard play and the CPU's.
 (function () {
   var h1 = document.getElementById('dial-hand');
   var h2 = document.getElementById('dial-hand-p2');
@@ -344,12 +321,9 @@ document.getElementById('insert-coin-btn').addEventListener('click', function ()
   coinIn();
 });
 
-// Mirror the overlay's visibility onto <body> so CSS can key off it
-// (body.need-coin flashes the top-right coin button, kiosk.css/shell.css)
-// without every show/hide site having to know. Also: the moment the
-// overlay closes (a coin just went in), hand keyboard focus back to the
-// game canvas so the title screen's "PRESS ANY KEY" responds to a real
-// keypress — the coin click/tap left focus on the button or the body.
+// Mirror the overlay onto <body> (body.need-coin lights the coin button).
+// When it closes, a coin just went in: give focus back to the canvas so the
+// title screen answers the keyboard.
 var overlayWasVisible = overlay.classList.contains('visible');
 new MutationObserver(function () {
   var vis = overlay.classList.contains('visible');
@@ -360,11 +334,8 @@ new MutationObserver(function () {
   overlayWasVisible = vis;
 }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
 
-// Landing on a game page with no credits — a fresh session, a shared deep
-// link — is walking up to a cold cabinet: you put a coin in before you
-// play. Same overlay the in-game "continue?" prompt uses; it blocks
-// injectKey() until a coin goes in, so the title screen can't be started
-// for free.
+// No credits on arrival (fresh session, deep link): the coin wall is up, and
+// it blocks injectKey() until a coin goes in.
 if (getCoins() <= 0) overlay.classList.add('visible');
 
 // (No ambient cabinet hum on a game page — while a game is running its
@@ -375,10 +346,8 @@ if (getCoins() <= 0) overlay.classList.add('visible');
 // The kiosk bar is position:fixed;bottom:0. We leave PAD px on each side
 // plus full clearance for the bar so it never overlaps the canvas.
 
-// Sideways the deck would take a third of the screen's height. A 5:4
-// picture in a 2:1 screen leaves a wide gutter down each side doing
-// nothing, so the deck moves into the gutters instead.
-// One layout rule for every page: kiosk.js.
+// Sideways the deck moves into the picture's side gutters (one layout rule
+// for every page, in kiosk.js).
 function landscape() { return blipLandscape(); }
 function applyLayout() { blipApplyLayout(); }
 applyLayout();
@@ -390,10 +359,8 @@ function deckCover(bar) {
   // every drawn control is INSIDE the bar, so seeding this with the bar
   // meant nothing could ever lower it and the whole bar got reserved.
   var top = window.innerHeight;
-  // The parts that are DRAWN, not the boxes holding them: the stick's
-  // base is three caps tall to give the ball room to float and only its
-  // bottom third is ever inked, so reserving the box gave the deck 46px
-  // of empty screen and the pad 78.
+  // What the deck draws, not its boxes: the stick base is three caps tall for
+  // the floating ball and only its bottom third is inked.
   var parts = document.querySelectorAll(
     '#topbar .stick-boot, #topbar .fire-buttons, ' +
     '#topbar .snes-dpad, #topbar .snes-face, ' +
@@ -405,10 +372,8 @@ function deckCover(bar) {
   // Upright the whole bar is drawn: the cabinet body (#topbar::before,
   // 5px above the bar) and the plate. None of it may lap over the picture.
   if (!landscape() && parts.length) top = Math.min(top, bar.getBoundingClientRect().top - 5);
-  // A few pixels of margin. The ball is left out on purpose: it floats
-  // over the game, and the picture should not shrink to make room for it.
-  // If the deck has not been built yet there is nothing to measure, so fall
-  // back to the bar.
+  // A few pixels of margin. The ball is left out: it floats over the game.
+  // Before the deck is built, fall back to the bar.
   if (top >= window.innerHeight) return Math.ceil(bar.offsetHeight);
   return Math.ceil(window.innerHeight - top) + 4;
 }
@@ -417,14 +382,9 @@ var lastFit = '';
 function fillCanvas() {
   applyLayout();
   var tb = document.getElementById('topbar');
-  // Sideways the deck overlays the picture's own letterbox, so it takes
-  // no height at all.
-  //
-  // Upright, reserve what the deck actually COVERS, not the height of
-  // its bar: the stick's ball floats above the bar by design and the
-  // caps sit proud of it, so a bar-height reservation let the deck lap
-  // over the bottom of the picture — far enough on a taller deck to
-  // hide Bouncer's bat.
+  // Sideways the deck sits in the letterbox and takes no height. Upright,
+  // reserve what the deck covers (caps sit proud of the bar), not the bar's
+  // height.
   TOPBAR_H = landscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
   var mb = document.getElementById('marquee-bar');
   MARQUEE_H = mb ? Math.max(mb.offsetHeight, 28) : 0;
@@ -448,11 +408,7 @@ function fillCanvas() {
   canvas.style.setProperty('top',    (MARQUEE_H + PAD) + 'px', 'important');
   canvas.style.setProperty('left',   gl + 'px', 'important');
   canvas.style.setProperty('transform', 'none', 'important');
-  // The touch controls (dpad, fire buttons, paddle dials — all plain CSS,
-  // positioned "bottom: calc(--topbar-h + ...)") key off this custom
-  // property instead of a hardcoded 56px, so they stay clear of the bar
-  // even when it renders taller than 56px (e.g. its content wrapping or
-  // growing on a narrow phone) instead of overlapping it.
+  // The controls position themselves off --topbar-h, the bar's real height.
   document.documentElement.style.setProperty('--topbar-h', TOPBAR_H + 'px');
 }
 
@@ -473,11 +429,8 @@ window.addEventListener('resize', fillCanvas);
 window.addEventListener('orientationchange', function () { setTimeout(fillCanvas, 60); });
 fillCanvas();
 
-// Re-fit whenever the deck changes shape rather than at a handful of
-// guessed moments. The bar is built in pieces — the marquee arrives
-// separately, the caps are added by the block below, a controller
-// switch changes the height — and every one of those used to need its
-// own fillCanvas() call, with a race left over wherever one was missed.
+// Re-fit whenever the deck changes shape (marquee injected, caps added,
+// controller switched) instead of at guessed moments.
 if (typeof ResizeObserver === 'function') {
   var deckWatch = new ResizeObserver(function () { refit(); });
   // The bar's own height is fixed in CSS, so watching it alone never
@@ -510,13 +463,10 @@ canvas.addEventListener('webglcontextlost', function (e) {
 }, false);
 
 // ---- On-screen controls ----
-// The deck shows one of two controllers — the Super Nintendo pad (the
-// default) or the classic arcade joystick + fire buttons — and BOTH,
-// plus a physical keyboard and a physical gamepad, funnel through
-// BlipController (blip_controller.js). It turns every logical press into
-// the same synthetic KeyboardEvent on #glcanvas the old touch code used,
-// so the WASM games are untouched. The rally paddle dials go through the
-// library's bindDial().
+// The pad (default) or the arcade stick, plus keyboard and gamepad, all go
+// through BlipController (blip_controller.js), which turns each press into a
+// synthetic KeyboardEvent on #glcanvas, so the games are untouched. Rally's
+// dials use its bindDial().
 
 var isRally = window.location.pathname.indexOf('/rally/') !== -1;
 
@@ -564,12 +514,9 @@ window.addEventListener('keydown', function (e) {
   }
   function goToKiosk() { window.location.href = '../index.html'; }
 
-  // Live input state -> the joystick ball's lean. The SNES pad lights its
-  // own buttons (inside the library); this is the stick half — the ball
-  // leans to whatever's held, whether that's the stick's own drag, the
-  // keyboard, or the gamepad.
-  // One entry per station: the stick element, the four logical names its
-  // gate drives, and what each of them is currently doing.
+  // Live input -> the stick ball's lean (the pad lights its own buttons in
+  // the library), whether from a drag, the keyboard or a gamepad. One entry
+  // per station: the stick, its four logical names, and their state.
   var stations = [
     { stick: document.getElementById('stick-base'),
       fire:  document.getElementById('fire-buttons'),
@@ -691,11 +638,9 @@ window.addEventListener('keydown', function (e) {
     if (typeof fillCanvas === 'function') fillCanvas();
   };
 
-  // Called from WASM (brawler) when the mode is chosen: 1 = two players,
-  // so the second station appears on the deck.
-  // 0 = one player, 1 = two, 2 = title screen with the second station
-  // lit and waiting. The third state is what makes "touch it to join"
-  // possible: in a one-player game it has to be dead to the touch.
+  // Called from WASM by the two-seat games: 0 = one player, 1 = two, 2 =
+  // title screen with station two lit and waiting (a one-player game keeps it
+  // dead to the touch).
   if (twoUp) window.blipSetMode = function (code) {
     open = code === 2;
     versus = code === 1;
@@ -712,11 +657,10 @@ window.addEventListener('keydown', function (e) {
     rotateHint();
   };
 
-  // Two players on a touch phone play sideways, a station per side with
-  // controls a thumb can use; upright there is room for one. The page cannot
-  // turn an iPhone, so it asks (and locks the orientation where allowed).
-  // Sideways on a touch screen a cabinet waiting for a second player lays
-  // out both stations, so there is somewhere for them to press to join.
+  // Two players on a touch phone are asked to turn sideways (orientation
+  // locked where allowed); upright still works. Sideways, a cabinet waiting
+  // for a second player lays out both stations so there is somewhere to press
+  // to join.
   var open = false;
   function applyPlayers() {
     var both = versus || (open && landscape() && matchMedia('(pointer: coarse)').matches);
@@ -753,24 +697,18 @@ window.addEventListener('keydown', function (e) {
     BlipController.registerVisual(st.fire);
   });
 
-  // The deck is built now, so the picture can be fitted to what it
-  // actually covers. fillCanvas() ran at load, before any of these caps
-  // existed, and fell back to reserving the whole bar. Once more after
-  // the frame settles, because the marquee bar is injected separately
-  // and changes the height above the picture as well.
+  // The deck is built: fit the picture to what it covers, and once more next
+  // frame for the separately injected marquee.
   if (typeof fillCanvas === 'function') {
     fillCanvas();
     requestAnimationFrame(fillCanvas);
   }
 
   // ---- The 8-way restrictor-gate joystick ----
-  // Its drag is bound to #topbar (which carries no transform), not the
-  // stick base (inside .deck-panel's 3D rotateX) — so hit-testing is the
-  // plain 2D geometry it looks like. It only turns a locked gate
-  // direction into key state via BlipController.set(); the ball's lean is
-  // reflectInput()'s job, the same path a keypress drives. One of these
-  // per station, each with its own pointer and its own lock, so two
-  // players can work their sticks at the same time.
+  // The drag is bound to #topbar (no transform), not the stick base inside
+  // the 3D-rotated .deck-panel, so hit-testing is plain 2D. It sets key state
+  // via BlipController.set(); reflectInput() draws the lean. One per station,
+  // each with its own pointer and lock.
   stations.forEach(function (st, who) {
     var base = st.stick;
     var fire = st.fire;
@@ -843,10 +781,8 @@ window.addEventListener('keydown', function (e) {
       window.removeEventListener('pointerup', onEnd, true);
       window.removeEventListener('pointercancel', onEnd, true);
     }
-    // Whose half of the deck the touch landed in, and then: is it the
-    // stick's side of that half rather than the caps'. Both stations are
-    // laid out the same way — stick left, caps right — so "left of this
-    // station's caps" is the whole test on either of them.
+    // Which station's half the touch is in, then whether it is left of that
+    // station's caps (both stations are stick left, caps right).
     function isStickTouch(e) {
       if (base.getBoundingClientRect().width === 0) return false;
       if (stations.length > 1) {

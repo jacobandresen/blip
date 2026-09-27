@@ -1,28 +1,19 @@
 #!/usr/bin/env bash
-# Build all four games for the wasm32-unknown-unknown target and lay them
-# out under web/<game>/ so they can be served by any static file host.
-#
+# Build every game for wasm32-unknown-unknown into web/<game>/, servable by
+# any static host.
 # Requires: rustup target add wasm32-unknown-unknown
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# Use rustup's cargo, not whichever one happens to be first on PATH.
-#
-# A Homebrew rust installs /opt/homebrew/bin/cargo ahead of ~/.cargo/bin,
-# and that toolchain ships only the host target. `rustup target add
-# wasm32-unknown-unknown` then reports success — it adds the target to the
-# *rustup* toolchain — while this build keeps failing with "can't find
-# crate for `core`", pointing at the one command that cannot fix it. The
-# error names the target, so the toolchain is the last thing you suspect.
+# Use rustup's cargo, not the first on PATH: Homebrew's cargo ships only the
+# host target, so `rustup target add` succeeds while the build fails with
+# "can't find crate for `core`".
 CARGO=cargo
 if command -v rustup >/dev/null 2>&1; then
     if rustup_cargo=$(rustup which cargo 2>/dev/null) && [ -x "$rustup_cargo" ]; then
         CARGO="$rustup_cargo"
-        # RUSTC too, not just cargo. Cargo resolves `rustc` from PATH unless
-        # told otherwise, so rustup's cargo will happily drive Homebrew's
-        # rustc — which has no wasm32 standard library — and the build fails
-        # exactly as if the target were missing, while `rustup target add`
-        # keeps reporting it as installed.
+        # RUSTC too: cargo takes rustc from PATH, and Homebrew's has no wasm32
+        # standard library.
         if rustup_rustc=$(rustup which rustc 2>/dev/null) && [ -x "$rustup_rustc" ]; then
             export RUSTC="$rustup_rustc"
         fi

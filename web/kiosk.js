@@ -1,11 +1,8 @@
 var MAX_COINS = 5;
 
-/* ---- On-screen controller choice ----
- * The deck shows the Super Nintendo pad by default; a subtle
- * #control-toggle flips it back to the classic arcade joystick. The
- * choice is one word in localStorage ('pad' | 'stick') and is applied as
- * <html data-controls> as early as possible so neither control flashes
- * before its CSS decides which is visible. Shared by every page's deck. */
+/* ---- Controller choice ---- The pad by default; #control-toggle switches to
+ * the stick. Stored as 'pad' | 'stick' in localStorage and applied as <html
+ * data-controls> early, so neither control flashes. */
 (function () {
   var m = 'pad';
   try { m = localStorage.getItem('blip-controls') || 'pad'; } catch (e) {}
@@ -38,22 +35,15 @@ function blipSetControls(mode) {
   }
 }
 
-/* ---- Per-game cabinet identity ----
- * Shared by the kiosk landing page (card colours) and each game's shell page
- * (marquee sign + bezel glow), so every cabinet reads as its own machine
- * instead of five copies of the same green box. `accent` is an "r, g, b"
- * triple so CSS can build both solid and translucent colours from one value.
- */
-// `buttons` lists the on-screen arcade buttons for the shell's touch/visual
-// controls, one entry per button (key/code = what injectKey()/the keyboard
-// listener match against). Omitted = a single default fire button (Space).
-//
-// `stick` overrides the touch 8-way-stick geometry for that game (shell.js
-// defaults if absent). Fields, all optional: engage/release (px from the
-// floating pivot to catch a gate detent / fall back to neutral), maxR (how
-// far the pivot is allowed to trail the thumb — smaller = a shorter unwind
-// to stop or reverse), and hyst (deg past the 22.5deg midline the thumb
-// must rotate before the lock jumps to the next detent — the notch).
+/* ---- Per-game cabinet identity ---- Card colours on the landing page,
+ * marquee and bezel glow on each game page. `accent` is an "r, g, b" triple
+ * so CSS can build solid and translucent colours. */
+// `buttons`: the deck's caps, one per button (key/code as injectKey() and the
+// keyboard listener match them); omitted = one fire button (Space).
+// `stick`: per-game stick geometry, all optional: engage / release (px from
+// the floating pivot to catch a detent / fall back to neutral), maxR (how far
+// the pivot trails the thumb), hyst (degrees past the 22.5 midline before the
+// lock jumps a detent).
 var BLIP_GAMES = {
   serpent:            { name: 'SERPENT',  accent: '50, 200, 50'   },
   bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200'   },
@@ -61,23 +51,10 @@ var BLIP_GAMES = {
   rally:              { name: 'RALLY',    accent: '220, 50, 50'   },
   meteors:            { name: 'METEORS',  accent: '180, 180, 180',
                          buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }] },
-  // Raider is a bullet-weaving shooter — fine adjustments, not broad
-  // sweeps. Smaller dead zone so a light nudge already catches a detent; a
-  // long pivot leash so the map stays put instead of creeping (re-centring
-  // then reliably neutralises); a firmer notch so a held dodge doesn't
-  // slip a detent mid-weave.
-  // A fighting game needs its attack buttons on the deck, and a stick
-  // that answers immediately: blocking is holding back, so a sloppy
-  // neutral is a dropped guard. Tight dead zone, short leash.
-  //
-  // Four caps in a square, the way a Street Fighter cabinet stacks its
-  // six: punches on the top row, kicks under them, light on the left and
-  // heavy on the right — so a cap's place on the deck IS what it throws.
-  //
-  // `keys` names the second station's stick and caps (p2…), and gives
-  // player one WASD so the arrows can be player two's alone. `players: 2`
-  // is what makes the shell build the second deck at all; the game
-  // reveals it (blip_set_mode) when a second player joins.
+  // A fighter: four caps (punches on top, kicks below, light to heavy left to
+  // right) and a stick that answers at once, since a sloppy neutral is a
+  // dropped guard. `players: 2` builds the second station, revealed by
+  // blip_set_mode; `keys` gives P1 WASD so the arrows are P2's.
   brawler:            { name: 'BRAWLER', accent: '220, 60, 40',
                          players: 2,
                          buttons: [{ key: 'f', code: 'KeyF', label: 'LP' },
@@ -114,6 +91,8 @@ var BLIP_GAMES = {
                                  p2right: { key: 'ArrowRight', code: 'ArrowRight' },
                                  p2button1: { key: 'j', code: 'KeyJ' },
                                  p2button2: { key: 'k', code: 'KeyK' } } },
+  // A bullet-weaving shooter: fine nudges. A small dead zone, a long pivot
+  // leash so re-centring neutralises, and a firm notch so a dodge holds.
   sky_raider:         { name: 'RAIDER', accent: '50, 100, 220',
                          stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } }
 };
@@ -185,13 +164,8 @@ function getKioskAudio() {
   return _kioskAudioCtx;
 }
 
-// A real coin makes two distinct sounds in sequence: the metallic clink
-// of it dropping through the chute (bright, inharmonic, near-instant —
-// real metal doesn't ring in tidy octaves the way a synth voice does),
-// then the register's own electronic "credit accepted" chime a beat
-// later. Modelling both, rather than just the chime alone, is what reads
-// as an actual coin rather than a UI beep. (Kept in sync with shell.js's
-// copy, used on the game pages.)
+// A coin is two sounds: the inharmonic clink through the chute, then the
+// register's "credit accepted" chime. Keep in sync with shell.js's copy.
 function playCoinInsert() {
   var ctx = getKioskAudio();
   var t   = ctx.currentTime;
@@ -235,11 +209,9 @@ function playCoinInsert() {
   });
 }
 
-// The coin that visually drops into the insert-coin button's slot on a
-// successful insert (see kiosk.css's #coin-drop-anim / @keyframes
-// coin-drop). A real element rather than a pseudo-element so a class
-// toggle can animate it on demand; injected here rather than duplicated
-// across index.html/history.html/about.html.
+// The coin that drops into the slot (kiosk.css #coin-drop-anim): a real
+// element so a class toggle can animate it, injected once for every non-game
+// page.
 var coinDropAnim = null;
 (function () {
   var btn = document.getElementById('kiosk-insert-btn');
@@ -251,10 +223,8 @@ var coinDropAnim = null;
 }());
 function dropCoinAnimation() {
   if (!coinDropAnim) return;
-  // See shell.js's copy of this function for why this is measured rather
-  // than a fixed guess: the slot's centre is padding-right + half its own
-  // width in from the button's edge, and that padding changes across the
-  // responsive breakpoints.
+  // Measured, like shell.js's copy: the slot's centre is padding-right plus
+  // half its width, and padding changes across breakpoints.
   var btn = coinDropAnim.parentElement;
   var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
   coinDropAnim.style.setProperty('--slot-x', (padRight + 3) + 'px');
@@ -316,10 +286,8 @@ function insertCoin() {
   }
 }
 
-// Point first-time (and broke) visitors at the coin slot: while the
-// landing page shows zero credits, the corner COINS button throbs
-// (.needs-coin, kiosk.css) from the moment the page loads until the first
-// coin goes in. Gated on .game-grid, which only exists on index.html.
+// While the landing page (.game-grid) shows zero credits, the COINS button
+// throbs (.needs-coin) until the first coin.
 function updateCoinBeckon() {
   if (!document.querySelector('.game-grid')) return;
   var btn = document.getElementById('kiosk-insert-btn');
@@ -327,14 +295,9 @@ function updateCoinBeckon() {
 }
 window.addEventListener('load', updateCoinBeckon);
 
-/* ---- BLIP logo overcharge glitch ----
- * A seldom, random electrical fault on the wordmark: one letter of "BLIP"
- * arcs like it's taken a surge, the rest of the sign flickers as if power
- * got diverted, with a matching zap/crackle on the speaker. Purely a
- * decorative flourish — every page carries the logo (kiosk.js is loaded
- * on all of them), so this one setup covers the whole site.
- * Deferred to 'load': kiosk.js sits in <head> on the game-shell pages, so
- * .blip-logo doesn't exist in the DOM yet at parse time. */
+/* ---- BLIP logo overcharge glitch ---- Now and then one letter arcs as if
+ * surged, the rest flicker, with a zap on the speaker. Every page loads
+ * kiosk.js; deferred to 'load' because game pages load it in <head>. */
 (function () {
   var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   if (reduceMotion) return; // no schedule at all — this is pure motion, nothing informational
@@ -343,10 +306,8 @@ window.addEventListener('load', updateCoinBeckon);
     var logo = document.querySelector('.blip-logo');
     if (!logo || !logo.firstChild || logo.firstChild.nodeType !== Node.TEXT_NODE) return;
 
-    // Split the "BLIP" text node (before the .ba-rest " ARCADE" span) into
-    // one span per letter, so a single one can be singled out. "BLIP" is
-    // the part of the wordmark that's always visible (ba-rest hides on
-    // phones), so that's the pool the random strike is drawn from.
+    // One span per letter of "BLIP" (the part of the wordmark always shown)
+    // so one can be struck.
     var letters = logo.firstChild.textContent.split('');
     var frag = document.createDocumentFragment();
     letters.forEach(function (ch) {
@@ -425,11 +386,9 @@ window.addEventListener('load', updateCoinBeckon);
       setTimeout(done, 900); // in case the tab was hidden mid-animation and it never fired
     }
 
-    // Seldom: the next strike lands 45s-3min out, so it reads as a rare
-    // fault rather than a tic. Re-armed after every strike (and skipped,
-    // then re-armed, while the tab is hidden) rather than on a fixed
-    // interval — running it down while backgrounded would otherwise fire
-    // a burst of overdue zaps the moment the tab regains focus.
+    // The next strike is 45s-3min out, re-armed after each one (and while
+    // hidden) rather than on an interval, so a backgrounded tab does not fire
+    // a burst of overdue zaps.
     function scheduleNext() {
       var delay = 45000 + Math.random() * 135000;
       setTimeout(function () {
@@ -446,13 +405,10 @@ window.addEventListener('load', updateCoinBeckon);
   });
 }());
 
-/* ---- Shared gamepad polling ----
- * Polls the first connected gamepad every frame and reports logical button
- * state changes ('ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' |
- * 'Space' | 'KeyZ') to onDown/onUp. Used both by game pages (shell.js, which
- * turns these into synthetic keyboard events on the game canvas) and the
- * kiosk landing page (which uses them to move the card selection).
- */
+/* ---- Shared gamepad polling ---- Reports logical button changes ('ArrowUp'
+ * | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' | 'Space' | 'KeyZ') from the
+ * first gamepad to onDown / onUp; game pages turn them into key events, the
+ * landing page moves the card selection. */
 function pollGamepad(onDown, onUp) {
   if (!navigator.getGamepads) return;
 
@@ -482,14 +438,10 @@ function pollGamepad(onDown, onUp) {
     return null;
   }
 
-  // Don't gate polling on the 'gamepadconnected' event — many browsers
-  // (notably Chrome on Linux) never fire it for generic/non-standard
-  // joysticks, even though navigator.getGamepads() reports them fine once
-  // a button has been pressed. Poll unconditionally instead; it's a cheap
-  // native call and requestAnimationFrame self-throttles to the display
-  // refresh rate, so there's no meaningful cost while nothing is connected.
-  // Station one's lamp: off with no pad, dim when one is connected but
-  // untouched for IDLE_MS, lit while it is in use.
+  // Polled unconditionally: Chrome on Linux never fires 'gamepadconnected'
+  // for many generic joysticks, and rAF polling costs nothing with none
+  // attached. Station one's lamp: off with no pad, dim when idle for IDLE_MS,
+  // lit in use.
   var IDLE_MS = 10000;
   var root = document.documentElement;
   var lastInput = -Infinity, lamp = '';

@@ -1,28 +1,9 @@
-// The BLIP logo and the COINS button must stay inside the top bar.
-//
-// They are not decoration floating near it -- they are mounted *on* the
-// marquee strip, over its two ends, and are meant to read as part of the
-// same piece of cabinet trim. That only works if they are exactly as
-// tall as the strip is.
-//
-// They had drifted apart. The strip is 28px on a desktop, 20px on a
-// short screen and 44px on a phone, while both elements took a flat
-// 52px -- so on a desktop the logo and COINS button hung 24px below the
-// lit strip, over the game, and 32px below it on a short screen. Nothing
-// caught it because the two heights were written in different files
-// (web/shell.css for the elements, the same file's breakpoints for the
-// strip) and no test had ever compared them.
-//
-// The fix is a single `--marquee-h` that all three read. This test is
-// what stops them separating again: it compares measured geometry, so it
-// fails whether someone changes the strip, the elements, or adds a
-// breakpoint that only remembers one of them.
-//
-// Animations are disabled before measuring. The logo's boot flourish and
-// the coin slot's beckon pulse both scale their element by a few percent,
-// which is real motion but not layout -- left running they add a pixel
-// or two of noise to every measurement and make the thresholds here a
-// judgement call rather than a fact.
+// The BLIP logo and the COINS button must stay inside the top bar: they are
+// mounted on the marquee strip's ends, so they must be exactly as tall as it
+// (one `--marquee-h`). This compares measured geometry, so it catches a
+// change to the strip, the elements, or a breakpoint that forgets one.
+// Animations are disabled first: the logo's boot flourish and the slot's
+// beckon scale their boxes by a few percent.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -102,10 +83,8 @@ function assertInsideBar(m, label) {
 
 }
 
-/** Page-wide horizontal overflow, reported separately from the bar.
- * A sideways-scrolling page is a real defect, but it is not this test's
- * subject and can be caused by anything on the page — see the note in
- * the suite below about controls.html. */
+/** Page-wide horizontal overflow, reported apart from the bar: a real defect,
+ * but not this test's subject. */
 function sidewaysOverflow(m) {
   return m.scrollW - m.winW;
 }
@@ -129,13 +108,8 @@ test(`the BLIP logo and COINS button stay inside the top bar (${ENGINE})`, async
         const m = await evaluate(cdp, MEASURE);
         assertInsideBar(m, `${rel} @ ${vp.width}x${vp.height}`);
 
-        // Noted, not asserted. controls.html's key-mapping table sits in
-        // a wrapper wider than a phone viewport, which makes the whole
-        // page scroll sideways. That predates this test and has nothing
-        // to do with the top bar, whose elements are measured above and
-        // are inside the bar on that page too. Surfacing it as a
-        // diagnostic keeps the finding visible without making this
-        // suite fail for an unrelated reason.
+        // Noted, not asserted: controls.html's key table is wider than a
+        // phone, so that page scrolls sideways regardless of the top bar.
         const over = sidewaysOverflow(m);
         if (over > SLACK) {
           t.diagnostic(`${rel} @ ${vp.width}x${vp.height}: page scrolls sideways by ${over}px (not a top-bar fault)`);

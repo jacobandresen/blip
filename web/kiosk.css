@@ -1,10 +1,6 @@
-/* Kill the browser's double-tap-to-zoom across every page. An iPad fires
-   it on fast repeated taps — rapid fire on the buttons, quick taps on the
-   game cards — and jumps the viewport mid-play. `manipulation` leaves
-   ordinary scrolling and pinch-to-zoom (accessibility) untouched; it only
-   drops the non-standard double-tap gesture. Set on <html> so it also
-   covers elements that don't declare their own touch-action; the deck
-   controls and canvas set the stricter `touch-action: none` themselves. */
+/* No double-tap-to-zoom: an iPad fires it on fast repeated taps and jumps the
+   viewport mid-play. Pinch-zoom still works; the deck and canvas set the
+   stricter `touch-action: none` themselves. */
 html {
   touch-action: manipulation;
 }
@@ -27,10 +23,8 @@ html {
   z-index: 200;
 }
 
-/* These labels sit on the cabinet's physical control panel, not the tube —
-   moulded/silkscreened plastic, not lit phosphor, so the legend reads as a
-   printed engraving (a soft dark impression below, a faint highlight
-   above) instead of the screen content's glow. */
+/* Panel legends are printed plastic, not lit phosphor: an engraved look (dark
+   impression below, faint highlight above). */
 .kiosk-hud {
   font-family: 'Courier New', Courier, monospace;
   font-size: 18px;
@@ -47,10 +41,8 @@ html {
   font-size: 18px;
   font-weight: 900;
   letter-spacing: 2px;
-  /* Fluorescent, not printed-plastic: a bright near-white core so the
-     colour lives in the glow (layered text-shadow), the same recipe as
-     .blip-logo, plus a matching glow on the button's own edge so it reads
-     as a lit fixture, not just glowing text sitting on a dark button. */
+  /* A lit fixture: near-white core, the colour in a layered glow (same recipe
+     as .blip-logo), and a glow on the button edge too. */
   color: #f6ffb8;
   text-shadow:
     0 0 4px #fff,
@@ -98,12 +90,9 @@ html {
   94% { opacity: 1; }
 }
 
-/* Beckon: while the landing page shows zero credits, the corner COINS
-   button lifts out of the top bar into a lit green key and throbs — from
-   page load until the first coin — so "put a coin in here" is unmissable.
-   Anchored to its top-right corner (transform-origin) so the scale never
-   pushes it off-screen. Overrides the flat idle look in #insert-coin-btn
-   below on specificity. */
+/* Beckon: at zero credits the COINS button lifts into a lit, throbbing green
+   key until the first coin. Scaled from its top-right corner so it never
+   leaves the screen. */
 #kiosk-insert-btn.needs-coin,
 #insert-coin-btn.needs-coin {
   border: 1px solid #4a9a3a;
@@ -130,11 +119,8 @@ html {
   }
 }
 
-/* Nudge: a broke player pressing a dimmed game card gets slammed toward
-   the COINS button — a hard swell + strobe + big glow flare, bigger and
-   longer than the resting beckon so the try-and-fail reads as "no, HERE".
-   !important so it wins over the always-on beckon (body.need-coin, which
-   is a more specific selector) for its duration. */
+/* Nudge: pressing a dimmed card while broke slams the COINS button (swell,
+   strobe, flare). !important to beat the always-on beckon for its duration. */
 #kiosk-insert-btn.coin-nudge,
 #insert-coin-btn.coin-nudge {
   border: 1px solid #8dff78;
@@ -195,12 +181,8 @@ html {
 }
 .coin-flash { animation: coin-flash 0.65s ease-out !important; }
 
-/* ---- INSERT COIN attract overlay ----
-   Shared: the front page shows this on startup while it's on 0 credits,
-   and the game pages use it for the in-game "continue?" prompt (shell.css
-   only tweaks its `bottom` there so the joystick stays visible over it).
-   A heavy dim with the game / menu a ghost behind it, the classic stacked
-   arcade panel in the pixel font, and a CRT flicker over the whole thing. */
+/* ---- INSERT COIN overlay ---- The landing page's zero-credit prompt and the
+   game pages' "continue?" (shell.css only moves its `bottom`). */
 @font-face {
   font-family: 'Press Start 2P';
   src: url('press-start-2p.woff2') format('woff2');
@@ -222,10 +204,8 @@ html {
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
-  /* Opacity-only flicker: a compositor-thread animation that needs no
-     repaint, so it can't tear or drop frames the way the old
-     brightness()-filter + sub-pixel translate "buzz" did on mobile GPUs.
-     will-change keeps it on its own layer for the life of the overlay. */
+  /* Opacity-only flicker: runs on the compositor, so it cannot tear on mobile
+     GPUs the way a filter animation does. */
   animation: crt-flicker 4.1s linear infinite;
   will-change: opacity;
   -webkit-backface-visibility: hidden;
@@ -281,9 +261,8 @@ html {
   text-shadow: 0 0 8px rgba(50, 200, 50, 0.5);
 }
 @keyframes blink-coin { 50% { opacity: 0; } }
-/* Irregular brightness dips only — the darkest points stand in for the old
-   brightness() surges, which cost a full-screen filter repaint per frame
-   for very little extra effect. Never drops far enough to hide the panel. */
+/* Irregular brightness dips via opacity (a filter would repaint the whole
+   screen every frame); never dark enough to hide the panel. */
 @keyframes crt-flicker {
   0%, 100% { opacity: 1; }
   4%   { opacity: 0.93; }
@@ -320,18 +299,9 @@ body.need-coin #kiosk-insert-btn {
   transform-origin: 100% 0;
 }
 
-/* ---- BLIP logo: lives in the same 28px top strip as the game shell's
-   marquee name (shell.css's #marquee-name — same font-size/weight/glow
-   recipe, just green instead of the per-game accent colour), and is the
-   click-target back to the kiosk that replaced the bottom bar's "GAMES"
-   button. height:28px (not just padding) so its own box matches the
-   marquee-bar's exactly on game pages, even though the two are separate
-   elements — shell.js generates the marquee dynamically, so reaching
-   into it from here isn't an option, but matching its box and text style
-   reads as the same bar regardless. On the non-game pages (no marquee)
-   it just sits at the very top the same way. z-index high enough to
-   clear the marquee (9), vignette/scanlines (98-100) and the bar itself
-   (200) — above all of them, on every page, without exception. */
+/* ---- BLIP logo ---- Same 28px strip, font and glow as the game shell's
+   #marquee-name (in green), and the tap back to the arcade. Above the marquee
+   (9), scanlines (98-100) and the bar (200). */
 .blip-logo {
   position: fixed;
   top: 0;
@@ -344,26 +314,19 @@ body.need-coin #kiosk-insert-btn {
   z-index: 500;
   display: inline-flex;
   align-items: center;
-  /* No visible padding beyond centring the text in the strip — but the
-     box's own width (text + this gap) still gives a reasonably wide tap
-     target despite the type not being huge, the same way the bar's own
-     kiosk-btn controls get their tap size from width, not height. The
-     top pad is the status-bar inset (0 off iPhone home-screen mode). */
+  /* Tap size comes from the width; the top pad is the status-bar inset (0
+     outside iPhone home-screen mode). */
   padding: env(safe-area-inset-top, 0px) 8px 0;
   font-family: 'Courier New', Courier, monospace;
   font-weight: 900;
   font-size: 18px;
   letter-spacing: 2px;
-  /* Everywhere except the front page, the logo is the way back to the
-     arcade, so it pulses its glow to invite the tap (blip-logo-beckon).
-     The front page overrides this back to the near-invisible all-night
-     flicker below — there it's just decor, not a control. */
+  /* Off the front page the logo is the way back, so it pulses; the front page
+     swaps in the idle flicker below. */
   animation: blip-logo-beckon 1.9s ease-in-out infinite;
   will-change: opacity;
-  /* A true fluorescent-tube look needs a bright near-white core with the
-     colour living in the glow, not the glyph itself — flat green text
-     with a green shadow reads as "coloured text with a shadow", not a
-     lit tube. */
+  /* Fluorescent tube: a near-white core with the colour in the glow; green
+     text with a green shadow reads as printed. */
   color: #eafff0;
   text-decoration: none;
   text-transform: uppercase;
@@ -408,10 +371,7 @@ body:has(.game-grid) .blip-logo {
   50%      { opacity: 1; }
 }
 
-/* One-shot "power-on" flourish, triggered by shell.js on game pages only
-   (landing/history/about never add .boot) — a gentle double-blink settling
-   down to full size, like the sign just kicked on, then it settles into
-   its normal steady flicker above. */
+/* Power-on double blink, added by shell.js on game pages only. */
 .blip-logo.boot {
   transform-origin: left center;
   animation: blip-logo-boot 1.8s ease-out;
@@ -424,14 +384,10 @@ body:has(.game-grid) .blip-logo {
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* ---- Overcharge glitch — a seldom, random electrical fault on one letter
-   of the wordmark (kiosk.js splits "BLIP" into these spans and picks one).
-   `steps()` rather than easing so it reads as electrical stutter, not a
-   smooth fade. .lg-surge (on .blip-logo itself, only while a letter is
-   struck) flashes the whole box and makes the other letters flicker too,
-   like the surge briefly stole their power. Sized to be unmissable even
-   at a glance — this only fires every couple of minutes, so it has to
-   read the instant it happens. */
+/* ---- Overcharge glitch ---- A rare electrical fault on one letter (kiosk.js
+   picks it); `steps()` for stutter, not a fade. .lg-surge flashes the whole
+   logo while it lasts. It fires every couple of minutes, so it must read at a
+   glance. */
 .blip-logo .lg-ch {
   position: relative;
   display: inline-block;
@@ -514,13 +470,10 @@ body:has(.game-grid) .blip-logo {
   .blip-logo .lg-ch.lg-zap::after { animation: none; }
 }
 
-/* ---- Top marquee strip — the lit sign box the BLIP ARCADE logo (left)
-   and the coin slot (right) sit in. Identical on the front page, about,
-   controls and history. Game pages use shell.js's #marquee-bar instead
-   (which carries the per-game name). z-index above the CRT scanline /
-   vignette overlays so the strip stays lit, not washed dark at the edge.
-   pointer-events:none — the logo and coin button are separate fixed
-   elements floating above it (z 500). */
+/* ---- Top marquee strip ---- The lit sign the logo (left) and coin slot
+   (right) sit in on the non-game pages; game pages use shell.js's
+   #marquee-bar. Above the scanline/vignette overlays; pointer-events: none,
+   the logo and coin button float above it. */
 .top-marquee-bar {
   position: fixed;
   top: 0;
@@ -542,11 +495,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   height: calc(40px + env(safe-area-inset-top, 0px));
 }
 
-/* Phones — a fat top strip so the logo and coin slot are easy thumb
-   targets, and the logo drops to just "BLIP" so it never runs into the
-   game name centred in the marquee next to it. The bigger box height is
-   also stated for the sub-pages' .top-marquee-bar (see there) so all top
-   bars stay the same size. */
+/* Phones: a fat strip so logo and coin slot are thumb targets; the logo
+   shortens to "BLIP" to clear the centred game name. .top-marquee-bar states
+   the same height. */
 @media (max-width: 480px) {
   .blip-logo .ba-rest { display: none; }
   .blip-logo {
@@ -572,25 +523,14 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .blip-logo { font-size: 20px; letter-spacing: 1.5px; }
 }
 
-/* ---- Insert-coin slot + drop animation ----
-   Shared by every page's insert-coin button — the game shell's
-   #insert-coin-btn and the kiosk landing/history/about pages'
-   #kiosk-insert-btn. Fixed in the top-right corner of the cabinet's top
-   panel, mirroring the BLIP ARCADE logo (.blip-logo) pinned top-left:
-   the physical coin slot lives up on the panel, not down on the control
-   deck with the stick and fire buttons. The slot graphic (::after) sits
-   at the button's right-hand end, like a real cabinet's slot beside its
-   label. position:fixed still establishes the containing block that
-   #coin-drop-anim (injected by shell.js/kiosk.js, the coin that animates
-   into the slot on a successful insert) anchors to. z-index matches
-   .blip-logo so it clears the marquee, scanlines/vignette and the bar. */
+/* ---- Coin slot + drop animation ---- Shared by #insert-coin-btn (games) and
+   #kiosk-insert-btn (other pages), pinned top right to mirror the logo; the
+   slot graphic (::after) is at its right end. position: fixed anchors
+   #coin-drop-anim. */
 #insert-coin-btn,
 #kiosk-insert-btn {
   position: fixed;
-  /* Mirror .blip-logo exactly: same top:0, same box height (32px + the
-     status-bar inset), same 8px gap to its edge, same top pad so the
-     label centres in the strip below the iPhone status bar / Dynamic
-     Island. The two read as one top panel, logo left / coin slot right. */
+  /* Mirror .blip-logo: top 0, same height, 8px from the edge, same top pad. */
   top: 0;
   right: calc(env(safe-area-inset-right, 0px) + 8px);
   z-index: 500;
@@ -604,10 +544,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   overflow: visible;
   font-size: 12px;
   letter-spacing: 1px;
-  /* Idle: reads as a segment of the top bar, not a raised key — the same
-     dark strip as the marquee, a hairline underline matching it, square
-     to the top edge, no lift. It only becomes a lit button on hover or
-     while beckoning (.needs-coin / .coin-nudge / .coin-flash). */
+  /* Idle it is part of the strip (hairline underline, no lift); it lights up
+     on hover or while beckoning. */
   border: 0;
   border-bottom: 1px solid rgba(230, 220, 50, 0.30);
   border-radius: 0;
@@ -644,12 +582,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   flex-shrink: 0;
 }
 
-/* The coin: hidden at rest, dropped in front of the slot above and
-   animated straight down through it on click. --slot-x is set by
-   shell.js/kiosk.js's dropCoinAnimation() at click time, measured from
-   the button's actual padding — a fixed guess would drift off the slot's
-   real position across the responsive breakpoints, which change that
-   padding (the fallback here only covers the instant before JS runs). */
+/* The coin drops through the slot on click. shell.js / kiosk.js set --slot-x
+   from the button's real padding, which changes across breakpoints; the
+   fallback covers the moment before JS runs. */
 #coin-drop-anim {
   position: absolute;
   top: 50%;
@@ -681,56 +616,30 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .kiosk-btn { font-size: 13px; letter-spacing: 0; padding: 7px 10px; }
 }
 
-/* ---- Arcade control deck: stick + fire buttons, mounted in the bar ----
-   Shared by the game shell's #topbar and the kiosk landing page's own bar
-   (.kiosk-bar-main) — NOT the plain .kiosk-bar on history/about, which
-   stays a flat nav strip. Reads as a real cabinet's control panel, tilted
-   toward the player like a horizontal surface you're standing over —
-   done entirely with shading and shadows rather than an actual CSS 3D
-   transform on the interactive elements, so hit-testing (and the drag
-   math in shell.js, which measures the ball's real on-screen position)
-   stays exactly the plain 2D geometry it looks like it is, with nothing
-   for a touch or a click to misjudge. Always shown, not just on touch
-   devices: both stick and buttons animate to reflect keyboard and gamepad
-   input too (see shell.js's reflect()), so on game pages they double as a
-   live "what's being pressed" readout for keyboard players; on the
-   landing page they're purely decorative (there's no game to drive
-   them). */
+/* ---- Control deck: stick + caps in the bar ---- The game shell's #topbar
+   and the landing page's .kiosk-bar-main (history/about keep a flat
+   .kiosk-bar). Always shown: the stick and caps also mirror keyboard and
+   gamepad input (shell.js reflect()). */
 
 #topbar,
 .kiosk-bar-main {
-  /* One angle everywhere. 56 degrees was the desk-panel look for a
-     mouse and 26 the one a finger needs, and keeping both meant the
-     deck was two different shapes depending on what you were pointing
-     with — different proportions, different heights, and a separate set
-     of overflow bugs each. 26 reads as a panel tilted toward you at
-     every size, and it is the one the stick, the caps and the shadows
-     were all drawn against. */
+  /* One tilt everywhere; the stick, caps and shadows are drawn against it. */
   --bar-tilt: 26deg;
-  /* Matches the game canvas's own left/right inset (PAD=16 in shell.js's
-     fillCanvas()) on game pages, so the deck sits exactly as wide as the
-     screen and directly under it, rather than the wider bezel-frame
-     width or a full-bleed strip. Kept the same on the kiosk/history/about
-     bars too so the bar looks identical everywhere. */
+  /* The same 16px inset as the game canvas (fillCanvas PAD), so the deck sits
+     under the screen, on every page. */
   left: 16px;
   right: 16px;
   overflow: visible;
-  /* The fixed bar itself carries NO transform — iOS Safari mis-positions
-     (and clips the lower edge of) a `position: fixed` element that also
-     has a transform / preserve-3d, especially in a home-screen PWA. The
-     3D-tilted control-deck surface is .deck-panel, an absolutely-
-     positioned child, so the tilt never touches the fixed box. */
+  /* No transform on the fixed bar: iOS Safari misplaces and clips a fixed
+     element with a transform (worst in a home-screen PWA). The tilt lives on
+     .deck-panel. */
   background: none;
   border-top: 0;
   box-shadow: none;
 }
 
-/* The visible control deck: the glossy-black moulded panel, tilted back
-   around its own front (bottom) edge so it reads as a horizontal surface
-   you're looking down onto — a genuine 3D rotate, not faked shading.
-   preserve-3d so .stick-handle can share this 3D space (partially
-   un-tilting to stand up off the panel). It fills the fixed bar exactly
-   (inset:0) but keeps the transform off the fixed ancestor. */
+/* The visible deck: glossy black, rotated back around its bottom edge.
+   preserve-3d so the stick handle can stand up out of it. */
 .kiosk-bar > .deck-panel {
   position: absolute;
   inset: 0;
@@ -746,18 +655,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   border-radius: 10px 10px 0 0;
   transform-style: preserve-3d;
   transform-origin: 50% 100%;
-  /* The lens scales with the panel.
-     A fixed 640px perspective is a portrait lens on a phone's deck and
-     a fisheye on a wall-mounted one: at 1280px wide it stretched the
-     outer stations sideways, leaned the buttons off their own axis and
-     flattened the ball-top into a disc. Tying it to the viewport keeps
-     the same mild foreshortening at every size — at phone width it
-     works out at almost exactly the 640px this was tuned to. */
+  /* Perspective scales with the viewport: a fixed 640px was a fisheye at
+     1280px wide; 180vw is about 640px on a phone. */
   transform: perspective(180vw) rotateX(var(--bar-tilt));
-  /* The panel transform is static (only the stick's children animate), so
-     a fixed compositor layer here means the tilt is rasterised once, not
-     re-composited as siblings move over it — and hidden backfaces can't
-     flash through during the stick's lean transition. */
+  /* The tilt never changes, so a fixed layer rasterises it once, and hidden
+     backfaces cannot flash during the stick's lean. */
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   background:
@@ -772,14 +674,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* ---- Stick ---- */
 
-/* The full drag hit-region: tall enough to cover the ball's floating rest
-   position above the bar, not just the boot sitting in it, so grabbing
-   the stick anywhere it's drawn works — and generously sized so it's a
-   comfortable thumb target, not a fiddly pinpoint. A real flex child of
-   the bar (not position:fixed) so it takes its place left of COINS in the
-   row; anchored to the bar's bottom edge so all of its extra height rises
-   upward, over the game, instead of being centered half above/half below
-   the bar. */
+/* The drag region covers the floating ball as well as the boot, and is
+   thumb-sized. Anchored to the bar's bottom so its extra height rises over
+   the game. */
 .stick-base {
   --dx: 0;
   --dy: 0;
@@ -797,11 +694,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* The joystick's shadow cast down onto the deck — a soft ellipse under
-   the ball that reads as "raised off the surface on a shaft". It slides
-   with the lean the way a shadow under an overhead light would, and grows
-   a touch as the stick leans further out. Flat in the deck plane, so it
-   foreshortens with the panel and stays on the surface. */
+/* The ball's shadow on the deck: slides and grows a little with the lean;
+   lies in the deck plane so it foreshortens with it. */
 .stick-base::before {
   content: '';
   position: absolute;
@@ -852,14 +746,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset 0 2px 5px rgba(0, 0, 0, 0.85);
 }
 
-/* The moving part: shaft + ball together, PIVOTING from the boot toward
-   whichever direction(s) are held via the --dx/--dy custom properties
-   (each -1, 0, or 1 — shell.js sets them, it never runs a per-frame
-   animation loop). .stick-handle is a 0×0 point sitting exactly at the
-   pivot (the boot's opening); rotating IT (rather than translating the
-   ball) swings the whole rigid shaft+ball rigidly around that fixed
-   point, like a real stick leaning in its gate — the boot never moves,
-   only the top does. */
+/* Shaft + ball pivot at the boot on --dx / --dy (each -1, 0 or 1, set by
+   shell.js). .stick-handle is a 0x0 point at the pivot; rotating it swings
+   the rigid stick while the boot stays put. */
 .stick-handle {
   /* Backward lean of the standing stick. Perspective slides anything above
      the deck plane sideways away from the panel centre, so a large lean
@@ -873,31 +762,16 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   bottom: 27px;
   width: 0;
   height: 0;
-  /* The angle, worked from the actual rotation matrix rather than
-     guessed: rotateX(θ) sends a local "straight up" vector (0,-1,0) to
-     (0, -cosθ, -sinθ). #topbar's rotateX(bar-tilt) alone (θ=44deg) gives
-     roughly (0,-0.72,-0.69) — that negative Z is "away from the viewer,
-     into the screen", which is why the stick read as pointing at the
-     game instead of up at the player. Cancelling bar-tilt entirely here
-     would leave it dead vertical (z=0); cancelling it and then leaning
-     back the *other* way by a further fixed 9deg gives a small positive
-     Z (toward the viewer) on top of the mostly-vertical rise — a stick
-     standing up with a slight, correctly-signed perspective lean, not
-     one lying back into the cabinet. rotate(dx) is the separate
-     left/right lean, on top of this frame. transform-style here (not
-     just on .stick-base) is what makes this compose correctly in true 3D
-     instead of flattening the shaft/ball into a 2D sprite first —
-     earlier, without it, a rotateX+rotate combination here sent the
-     whole stick behind the panel in some lean states. */
+  /* rotateX(-tilt - lean) stands the stick up out of the tilted deck with a
+     slight lean toward the player; rotate(dx) leans it sideways. preserve-3d
+     here keeps it true 3D; without it some leans sank the stick behind the
+     panel. */
   transform:
     rotateX(calc(var(--bar-tilt) * -1 - var(--lean) + var(--dy) * -12deg))
     rotate(calc(var(--dx) * 18deg));
   transform-style: preserve-3d;
-  /* Short enough that the lean tracks the thumb rather than trailing it —
-     the input key already fired on the frame the direction engaged, so a
-     slow visual catch-up here is what would read as lag. Still eased, not
-     instant, so a hard flick still looks like a sprung stick and not a
-     teleport. */
+  /* Short, so the lean keeps up with the thumb (the key fires on the first
+     frame); eased, so a flick still looks sprung. */
   transition: transform 55ms ease-out;
   /* This is the one element in the deck that actually animates — tell the
      compositor up front so the lean doesn't trigger a layer rebuild (and
@@ -1011,10 +885,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 .arcade-btn-cap {
   position: absolute;
-  /* Percentage, not a fixed px, so the bezel-to-cap ratio stays the same
-     now that .arcade-btn is half its old size (and across the smaller
-     breakpoints below it too), instead of a fixed inset eating an
-     ever-larger share of a shrinking button. */
+  /* A percentage, so the bezel keeps its share at every cap size. */
   inset: 12%;
   border-radius: 50%;
   /* Convex dome: a tight specular hot-spot up-left where the light hits,
@@ -1039,10 +910,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     radial-gradient(circle at 50% 44%, #fffdf6 0%, #e7ddc6 46%, #b6ab90 80%, #8b8270 100%);
 }
 
-/* Three or more caps means a fighting deck: red for the punch and a
-   blue row for the kicks, which is the colour split every Street
-   Fighter cabinet used. They darken left to right, so the row reads as
-   an order — low, mid, high — before the legends are read at all. */
+/* Three or more caps is a fighting deck: red punches, blue kicks, darkening
+   left to right (low, mid, high). */
 .arcade-btn:nth-child(n+3) ~ .arcade-btn:nth-child(2) .arcade-btn-cap,
 .arcade-btn:nth-child(2):not(:last-child) .arcade-btn-cap {
   background:
@@ -1102,34 +971,20 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 
 /* ======================================================================
-   Super Nintendo control pad — the default on-screen controller
+   The pad: the default on-screen controller
    ======================================================================
-   Swapped in for the arcade joystick + fire buttons (a subtle
-   #control-toggle flips back to the stick; the choice persists in
-   localStorage as `blip-controls`, applied as <html data-controls>).
-
-   A flat control panel that FILLS the bottom bar (#topbar / .kiosk-bar-main)
-   and never rises above it — the bar just grows tall enough to seat
-   thumb-sized buttons, and shell.js's fillCanvas() shrinks the canvas to
-   match, so the pad never overlaps the game. It's a sibling of
-   .deck-panel, not a child, so nothing is inside the 3D rotateX: the
-   d-pad drag and the button taps hit-test as plain 2D.
-
-   Not going for photoreal — clean and legible. A big d-pad on the left;
-   two round face buttons (B and A, side by side with a wide gap) on the
-   right; nothing in the middle (no SELECT / START — A / B cover the
-   title-screen "press fire", the BLIP logo is the trip back to the grid).
-   Atari palette: matte-black body, both face buttons the Atari "Fuji"
-   red, a red d-pad flash on press. */
+   #control-toggle switches to the stick; the choice is `blip-controls` in
+   localStorage, applied as <html data-controls>. The pad sits in .deck-panel
+   with the stick deck and is sized off the same --cap: a cross and four caps
+   (a game's unused caps are `spare`). Atari palette: matte black body, red
+   caps. */
 
 :root[data-controls="pad"] .stick-base,
 :root[data-controls="pad"] .fire-buttons { display: none !important; }
 :root[data-controls="stick"] .snes-pad { display: none !important; }
 
-/* In pad mode the bar seats the controller — taller than the stick's bar.
-   fillCanvas() measures #topbar and reserves it, so nothing overlaps. The
-   panel is a physical thing tilted toward the player, so it throws a soft
-   shadow UP onto the screen above it. */
+/* In pad mode the bar is taller to seat the controller; fillCanvas() reserves
+   it. The panel casts a soft shadow up onto the screen. */
 :root[data-controls="pad"] #topbar.kiosk-bar,
 :root[data-controls="pad"] .kiosk-bar-main {
   height: calc(82px + env(safe-area-inset-bottom, 0px));
@@ -1173,10 +1028,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    the mark without it crowding a button — drop it there. */
 @media (max-width: 359px) { .snes-pad .snes-wordmark { display: none; } }
 
-/* the panel face — moulded black plastic. Reads as a raised, lit surface:
-   a bright top edge catching the screen glow, a soft pool of overhead
-   light down the middle, edges + bottom falling into shadow, and a fine
-   grain so it isn't a dead flat fill. */
+/* The panel face: moulded black plastic with a lit top edge, a pool of
+   overhead light and a fine grain. */
 .snes-pad .snes-shell {
   position: absolute;
   inset: 0;
@@ -1200,10 +1053,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* lift the controls clear of both edges — on a phone / Android with no
-     home-indicator inset the d-pad would otherwise sit ~7px off the glass;
-     11px gives it real breathing room there (the inset adds ~34px on a
-     notched iPhone on top of this). */
+  /* Clear of the glass edge on phones without a home-indicator inset (the
+     inset adds ~34px on a notched iPhone). */
   padding: 7px var(--sf-edge) calc(env(safe-area-inset-bottom, 0px) + 11px);
 }
 /* a recessed "mounting plate" under the A / B buttons — a subtle darker
@@ -1348,12 +1199,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 .snes-pad .snes-mid,
 .snes-pad .snes-shoulder { display: none; }
 
-/* ---- The subtle "back to the joystick" toggle ----
-   Sits just ABOVE the control bar, horizontally centred — over the pad's
-   empty middle, so it's clear of both the d-pad (bottom-left) and the
-   A/B thumb (bottom-right) rather than sitting in the left thumb's path.
-   A tiny pixel-font tag, not a control surface. --topbar-h is the real
-   (pad-mode) bar height on a game page. */
+/* ---- Pad / stick toggle ---- A small pixel-font tag, bottom centre, clear
+   of both thumbs. --topbar-h is the real bar height on a game page. */
 #control-toggle {
   position: fixed;
   left: 50%;
@@ -1385,11 +1232,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 #control-toggle .ct-what::before { content: 'joystick'; }
 :root[data-controls="stick"] #control-toggle .ct-what::before { content: 'pad'; }
 
-/* Phones — thumb-sized controls (iPhone 8 and up). The bar grows to seat
-   them; the d-pad and the A/B pair sit hard against the two edges (the
-   middle is empty now), so a thumb never reaches across the screen. With
-   SELECT / START gone the d-pad claims that room — a big cross that's
-   easy to hit without looking. */
+/* Phones: a taller bar and a bigger cross and caps, hard against the two
+   edges. */
 @media (max-width: 560px) {
   :root[data-controls="pad"] #topbar.kiosk-bar,
   :root[data-controls="pad"] .kiosk-bar-main {
@@ -1436,20 +1280,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .snes-pad .snes-wordmark { display: none; }
 }
 
-/* The kiosk landing/history/about bar (.kiosk-bar-main) intentionally
-   shares every dimension with the game shell's #topbar below — same
-   .stick-base/boot/handle/shaft/ball sizing, same deck padding/gap — so
-   the control deck renders identically everywhere rather than a smaller
-   decorative version on non-game pages. The base .deck-panel rule above
-   holds the shared gap/padding; the tiers below only shrink them. */
+/* The landing page's .kiosk-bar-main shares every deck dimension with the
+   game shell's #topbar, so the deck looks the same everywhere; the tiers
+   below only shrink it. */
 
-/* Phones — the deck has to be actually playable by thumb here, not a
-   scaled-down diagram of one. So the bar grows tall enough to seat a
-   full-size stick and thumb-wide buttons, and the coin readout on the
-   right gives up its type size to make room rather than squeezing the
-   controls. The ball and buttons stay at (or above) Apple's ~44px touch
-   minimum at every tier; only the shaft's swing and the hit-area width
-   shrink on the way down, so the stick still clears the left edge. */
+/* Phones: the bar grows to seat a full-size stick and thumb-wide caps (44px
+   or more at every tier); only the stick's swing and hit width shrink. */
 @media (max-width: 480px) {
   #topbar.kiosk-bar, .kiosk-bar-main { height: calc(82px + env(safe-area-inset-bottom, 0px)); }
   .kiosk-bar > .deck-panel { gap: 56px; padding-left: 6px; padding-right: 6px; }
@@ -1460,8 +1296,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .stick-ball  { width: 66px; height: 66px; bottom: 37px; }
   .fire-buttons { gap: 12px; }
   .arcade-btn { width: 66px; height: 66px; }
-  /* Clear the corner badges / language flags of the now-taller bar and its
-     raised stick (index.html re-states this for its own .lang-switcher). */
+  /* Clear the corner badges and language flags of the taller bar and raised
+     stick (index.html restates this for its .lang-switcher). */
   .left-badges,
   .lang-switcher { bottom: calc(102px + env(safe-area-inset-bottom, 0px)); }
 }
@@ -1492,13 +1328,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .arcade-btn { width: 48px; height: 48px; }
 }
 
-/* iPad / tablet — the deck is a real two-handed control surface here: a
-   wide screen held by its edges, both thumbs on the panel. So the stick,
-   the fire buttons (and the rally dials, in shell.css) go to roughly twice
-   their desktop size — bigger than the phone tier — and spread apart to
-   the edges. Gated on a coarse pointer AND a tablet-sized viewport in
-   either orientation, so a desktop window this wide (mouse, fine pointer)
-   keeps the compact deck, and a phone in landscape (short) doesn't match. */
+/* Tablets (coarse pointer, tablet-sized either way round): a two-handed
+   surface, so stick and caps are about twice the desktop size and spread to
+   the edges. */
 @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
   #topbar.kiosk-bar, .kiosk-bar-main { height: calc(112px + env(safe-area-inset-bottom, 0px)); }
   .kiosk-bar > .deck-panel { gap: clamp(84px, 13vw, 210px); padding-left: 16px; padding-right: 16px; }
@@ -1517,12 +1349,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .lang-switcher { bottom: calc(138px + env(safe-area-inset-bottom, 0px)); }
 }
 
-/* ---- Left badge group — CONTROLS / ABOUT / HISTORY ----
-   One definition, shared identically by the front page and the info
-   pages so a badge doesn't shift by a pixel when you open one. Lower-left
-   corner, centred on the cabinet side rail (.cab-rail.left, 64px). Each
-   badge's box is exactly its 44px avatar (label pulled out of flow), so
-   the different label lengths never nudge the icons out of a column. */
+/* ---- Left badges: CONTROLS / ABOUT / HISTORY ---- One definition for the
+   front page and the info pages, centred on the left cabinet rail. Each box
+   is exactly its 44px avatar so labels never shift the column. */
 .left-badges {
   position: fixed;
   bottom: calc(76px + env(safe-area-inset-bottom, 0px));
@@ -1633,32 +1462,16 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 
 /* ======================================================================
-   Two-player deck — a second control station
+   Two-player deck
    ======================================================================
-   A cabinet with a 2-PLAYER badge on it has two stations on the panel,
-   so the deck builds both up front and reveals the second one when the
-   game reports a second player (blip_set_mode -> <html data-players>).
-   Both stations are the same deck: stick on the left, buttons on the
-   right, pushed as far apart as the panel allows. Mirroring the second
-   one put its buttons under the thumb the first one steers with, which
-   is two different controllers on one machine. */
-/* Anchored to the panel's front edge, like the stick was when it was a
-   direct child of it — everything tall (the stick's shaft, a square of
-   caps) then grows upward over the game instead of half of it dropping
-   off the bottom of the screen.
-   
-   A station fills its share of the panel and pushes the stick to one
-   end of it and the caps to the other, which is what the game pad does
-   (its shell has always been a space-between row) and what a cabinet
-   does. Held as a centred pair with a gap in the middle, the two were
-   under one hand and the deck read as a different controller depending
-   on which one you had chosen. */
-/* preserve-3d, or the stick inside it is flattened into a 2D sprite
-   before the panel's own tilt is applied — see the note on
-   .stick-handle, which is where that was worked out the first time.
-   The kiosk's deck has no .deck-side wrapper, so it kept composing in
-   true 3D while the game page quietly stopped: same markup, same
-   stylesheet, two different joysticks. */
+   Both stations are built up front; the second goes live when the game
+   reports a second player (blip_set_mode -> <html data-players>). Both are
+   the same: stick left, caps right. */
+/* Anchored to the panel's front edge, so tall parts (the shaft, a square of
+   caps) grow up over the game rather than off the bottom. A station fills its
+   share of the panel, stick at one end and caps at the other, like the pad. */
+/* preserve-3d, or the stick is flattened to a sprite before the panel's tilt
+   applies (see .stick-handle). */
 .deck-side {
   position: relative;
   transform-style: preserve-3d;
@@ -1688,11 +1501,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   pointer-events: none;
 }
 
-/* A cabinet with two stations has two stations in a one-player game as
-   well — that is what the empty half of an arcade panel looks like, and
-   it is how a player finds out the machine takes two before they have
-   chosen anything. `data-players` says whether the second one is in
-   play; it does not decide whether it exists. */
+/* Every two-seat cabinet shows both stations even in a one-player game;
+   `data-players` says whether the second is in play. */
 /* Gamepad lamp on station one's tag (data-pad, set by pollGamepad):
    dim when a pad is connected, lit while it is in use. */
 :root[data-pad] #deck-p1 .deck-tag::after,
@@ -1728,12 +1538,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* Two stations share the panel's width: each pad takes half of the bar,
    and the sticks pull their gaps in so both fit on a phone. */
-/* One player's stick and their caps belong together, and the other
-   player's belong somewhere else. Each station was filling half the
-   panel and pushing its own two controls to the ends of that half,
-   which put player one's caps right up against player two's stick with
-   the daylight in the wrong place — inside a station instead of
-   between them. Compact groups, hard against the two outside edges. */
+/* With two players each station is a compact group against its outside edge,
+   so the gap in the middle is between the players. */
 :root[data-players] .deck-side {
   flex: 0 0 auto;
   justify-content: flex-start;
@@ -1743,11 +1549,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-players] .snes-pad { width: 50%; --sf-edge: clamp(6px, 2.5vw, 22px); }
 :root[data-players] #snes-pad { right: 50%; }
 :root[data-players] .snes-pad.second { left: 50%; }
-/* Cross and caps together, hard against this station's outside edge,
-   so the gap in the middle of the panel is the gap between players.
-   And a size down, because a station's own controls at full size fill
-   its half of the bar exactly — leaving nothing to separate the two
-   players with, which is the whole point of grouping them. */
+/* Cross and caps together against the station's outside edge, a size down so
+   the two players have a gap between them. */
 :root[data-players] .snes-pad { --sf-btn: 36px; --sf-gap: 10px; --sf-dpad: 52px; }
 :root[data-players] .snes-pad .snes-shell {
   justify-content: flex-start;
@@ -1755,10 +1558,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 :root[data-players] .snes-pad.second .snes-shell { justify-content: flex-end; }
 
-/* ---- Four caps: the fighting deck ----
-   Punches on the top row, kicks under them; light on the left, heavy on
-   the right. The square leaves no room under the top row for a legend,
-   so the legend is printed ON the cap. */
+/* ---- Four caps: the fighting deck ---- Punches on top, kicks below, light
+   to heavy left to right; the legend is printed on the cap. */
 
 .fire-buttons.four {
   display: grid;
@@ -1840,15 +1641,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     radial-gradient(circle at 50% 62%, #1f568f 0%, #26669f 40%, #1e548a 70%, #113663 100%);
 }
 
-/* A square of caps is twice as deep as a row of them, so the joystick
-   deck grows to seat it instead of pushing the bottom row off the front
-   edge of the panel.
-
-   124, not 78. Seventy-eight was enough for the single row this deck
-   used to have; the square is twice as deep, and at 78 its top row
-   began sixteen pixels ABOVE the panel's own top edge — buttons
-   hovering over the bar with nothing behind them. Every page shows the
-   square now, so every page needs the bar for it. */
+/* A square of caps is twice as deep as a row, so the stick deck's bar grows
+   to seat it. */
 :root[data-controls="stick"][data-caps="4"] #topbar.kiosk-bar,
 :root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
   height: calc(152px + env(safe-area-inset-bottom, 0px));
@@ -1860,19 +1654,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-players] .snes-pad .snes-wordmark { display: none; }
 
 @media (max-width: 620px) {
-  /* Two stations on a phone, sized off the screen rather than off a
-     fixed number. Flattening the deck's tilt gave every control back
-     most of its height and, with it, most of its width — enough that
-     two stations at the old numbers ran off the right-hand edge at
-     375px. These scale, so they fit a 320px phone and grow to the old
-     size by the time there is room for it. */
+  /* Two stations on a phone, sized off the screen width so they fit at 320px. */
   :root[data-players] {
-    /* The caps get the width, because the stick's box is mostly air:
-       its ball floats above the panel and is allowed to overhang, and
-       the drag region is "everything left of this station's caps"
-       rather than the box itself (see isStickTouch in shell.js). So the
-       stick is sized to its boot and the rest goes to the thing you
-       actually have to hit. */
+    /* The caps get the width: the stick's drag region is everything left of
+       its caps (isStickTouch in shell.js), so its box only needs the boot. */
     --cap: clamp(36px, 10.6vw, 50px);
     --stick-w: clamp(34px, 9.4vw, 48px);
   }
@@ -1894,11 +1679,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     height: calc(var(--stick-w) * 1.08);
   }
   :root[data-players] .stick-shaft { width: 10px; }
-  /* The ball and the washer are allowed to be wider than the base they
-     stand in — the base is a drag region, not a footprint, and the
-     empty panel either side of it is exactly where a ball-top's
-     overhang goes. Held to the base's own width they came out as a
-     lollipop: a small head on a long thin stick. */
+  /* The ball and washer may be wider than the base: the base is a drag
+     region, and held to its width the stick looked like a lollipop. */
   :root[data-players] .stick-ball {
     width: calc(var(--stick-w) * 1.24);
     height: calc(var(--stick-w) * 1.24);
@@ -1909,18 +1691,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 
 /* ======================================================================
-   Landscape on a phone — the deck moves into the letterbox
+   Landscape on a phone: the deck moves into the letterbox
    ======================================================================
-   Turned sideways there is no height to spare: the control strip is a
-   third of the screen and what is left over is a slot. But the games
-   draw a 5:4 picture, and a 5:4 picture in a 2:1 screen leaves a wide
-   black gutter down each side doing nothing — which is exactly where a
-   pair of thumbs already are when a phone is held in two hands.
-
-   So sideways the bar stops being a bar. It becomes the whole screen,
-   transparent, with the stick (or the cross) down in the left gutter
-   and the buttons down in the right one. shell.js stops reserving any
-   height for it, so the picture gets the full height of the screen. */
+   A 5:4 picture on a 2:1 screen leaves a gutter down each side, where the
+   thumbs already are. Sideways the bar is the whole screen, transparent, with
+   the stick or cross in the left gutter and the caps in the right; shell.js
+   reserves no height for it. */
 
 /* [data-controls] is carried only to out-weigh the two rules above that
    set a bar height per controller — sideways there is no bar to have a
@@ -1937,10 +1713,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   pointer-events: none;   /* the controls take input; the gap does not */
 }
 
-/* No tilted panel sideways: the deck is not a surface you are looking
-   down onto any more, it is two controls sitting over the picture. The
-   3D rotate also pushed anything tall off the bottom of a short screen,
-   which is every phone in landscape. */
+/* No tilt sideways: the controls sit over the picture, and the rotate pushed
+   tall parts off a short screen. */
 :root[data-layout="landscape"] .kiosk-bar > .deck-panel {
   transform: none;
   background: none;
@@ -1976,8 +1750,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-layout="landscape"] .snes-pad .snes-wordmark,
 :root[data-layout="landscape"] .snes-pad .snes-cord { display: none; }
 
-/* Bigger, because there is room now: a gutter is a hundred-odd pixels
-   wide and a thumb is not smaller in landscape. */
+/* Bigger sideways: a gutter is about 100px wide. */
 :root[data-layout="landscape"] .snes-pad { --sf-btn: 40px; --sf-gap: 12px; --sf-dpad: 76px; }
 :root[data-layout="landscape"] .stick-base { width: 86px; height: 150px; }
 :root[data-layout="landscape"] .stick-boot { width: 46px; height: 46px; bottom: 6px; }
@@ -1985,14 +1758,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-layout="landscape"] .stick-shaft { width: 11px; height: 34px; }
 :root[data-layout="landscape"] .stick-ball { width: 52px; height: 52px; bottom: 34px; }
 
-/* Two players, sideways: a station per gutter, and the whole middle of
-   the screen is the fight. This is the one layout where two people
-   sharing one phone actually works — they are holding an end each.
-
-   Each station stays the row it is everywhere else (stick left, caps
-   right) and simply shrinks to fit a gutter, rather than stacking into
-   a column: a column climbs halfway up the screen and puts the caps
-   somewhere no thumb is. */
+/* Two players sideways: a station per gutter, the middle of the screen is the
+   fight. Up to 2:1 each station stacks its caps above its stick (see the
+   max-aspect-ratio rule). */
 :root[data-layout="landscape"][data-players] .deck-side {
   flex: 0 0 auto;
   gap: 8px;
@@ -2030,10 +1798,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    (the controller is switched upright). */
 :root[data-layout="landscape"] #control-toggle { display: none; }
 
-/* Rally's spinners, sideways. The knobs are the whole controller, and
-   the gutter is a good deal wider than the strip they used to share
-   with the coin slot — so they get the size a thumb wants, down at the
-   bottom corners where the hands already are. */
+/* Rally's spinners sideways: thumb-sized, in the bottom corners. */
 :root[data-layout="landscape"] #paddle-dial,
 :root[data-layout="landscape"] #paddle-dial-p2 {
   width: 96px;
@@ -2059,14 +1824,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   transform: translateX(-50%);
 }
 
-/* One panel, two stations — not two panels.
-   Each pad is half the bar and each was drawing its own moulded shell,
-   so the two met in the middle with a rounded corner, a lit top edge
-   and an edge shadow on each side of the join. That seam is what made
-   a perfectly good gap between the control groups read as two consoles
-   jammed together. The halves keep their outer corner and their outer
-   edge shade and lose the ones that face each other, and the deck
-   becomes one continuous surface with a player at each end of it. */
+/* One panel, two stations: each half keeps only its outer corner and edge
+   shade, so the two read as one continuous surface. */
 :root[data-players] #snes-pad .snes-shell {
   border-radius: 13px 0 0 0;
   box-shadow:
@@ -2091,10 +1850,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   #topbar, .kiosk-bar-main { --bar-tilt: 20deg; }
 }
 
-/* The joystick deck on a phone gets a taller bar to seat a taller
-   square of caps. It costs the game a little height and buys the caps
-   about a third of their size back — which on a control you are meant
-   to hit without looking is the better end of that trade. */
+/* On a phone the stick deck's bar grows for the square of caps: a little game
+   height for caps about a third bigger. */
 @media (max-width: 620px) {
   :root[data-controls="stick"][data-caps="4"] #topbar.kiosk-bar,
   :root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
@@ -2102,17 +1859,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   }
 }
 
-/* ---- The stick, as a stick ----
-   Flattening the deck made every part of it twice the size it was, and
-   at that size the shorthand showed: the dust washer was a rounded
-   black square that read as a hole in the panel, the shaft was a stub
-   mostly hidden inside it, and the ball sat down in the cup instead of
-   standing proud of it. All three are what a ball-top actually is. */
+/* ---- The stick ---- A round dust washer, a visible shaft, and a ball
+   standing proud of the cup. */
 
-/* The dust washer: a round rubber cup sunk into the panel, with a lip
-   catching the light and the shaft's hole dark inside it. It lies flat,
-   so the deck's own tilt foreshortens it into the ellipse it should be
-   without any help. */
+/* The dust washer: a round rubber cup sunk in the panel, lying flat so the
+   tilt foreshortens it. */
 .stick-boot {
   border-radius: 50%;
   /* Mostly rubber, with only the shaft's hole actually black. Taken
@@ -2172,10 +1923,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .deck-side { gap: 26px; }
   .arcade-btn { width: 64px; height: 64px; }
   .arcade-btn.lettered .arcade-btn-label { font-size: 12px; }
-  /* `:root[data-players] .snes-pad` sets these a size down so two
-     stations fit a phone, and out-specifies a bare `.snes-pad` — so
-     the big-screen sizes have to be written at the same weight or the
-     phone's numbers win on a wall panel. */
+  /* `:root[data-players] .snes-pad` out-specifies a bare `.snes-pad`, so the
+     big-screen sizes are written at the same weight. */
   .snes-pad,
   :root[data-players] .snes-pad { --sf-btn: 62px; --sf-gap: 24px; --sf-dpad: 104px; }
   .snes-pad .snes-legend { font-size: 12px; }
@@ -2189,10 +1938,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   }
 
 
-  /* The washer stays well under the ball. Scaled up with everything
-     else it became a black disc as wide as the ball-top sitting on it,
-     which reads as a hole in the panel rather than as the rubber cup
-     the shaft comes out of. */
+  /* The washer stays well under the ball; scaled up with it, it read as a
+     hole in the panel. */
   .stick-base { width: 130px; height: 250px; }
   .stick-boot { width: 76px; height: 76px; bottom: 10px; }
   .stick-handle { bottom: 48px; }
@@ -2201,14 +1948,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .stick-base::before { width: 84px; }
 }
 
-/* ---- The caps are set INTO the panel ----
-   Four lit circles on a flat surface with nothing behind them read as
-   four things resting on top of it, and the top row — flush with the
-   panel's own lip — read as floating clear of it altogether. The pad
-   has always had a recessed plate under its face buttons for exactly
-   this reason (.snes-face::before); the joystick deck never did. A
-   darker inset panel behind the square, with the bright edge along its
-   bottom lip, is what puts them in a surface instead of on one. */
+/* ---- Caps set into the panel ---- A darker inset plate behind the square,
+   lit along its bottom lip, puts the caps in the surface instead of on it
+   (the pad has .snes-face::before). */
 .fire-buttons.four { position: relative; }
 .fire-buttons.four::before {
   content: '';
@@ -2227,10 +1969,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 .arcade-btn { z-index: 1; }
 
-/* On the narrowest phone the plate is exactly as wide as the square of
-   caps and no wider. There is no spare panel for it to sit proud on
-   there — six pixels either side is the difference between a plate set
-   into the deck and one hanging off the end of it. */
+/* On the narrowest phone the plate is exactly as wide as the caps. */
 @media (max-width: 400px) {
   .fire-buttons.four::before { left: 0; right: 0; }
 }
@@ -2238,10 +1977,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* The washer: a rubber ring, lit at the rim. A filled dark disc reads
    as a hole in the panel rather than as the cup the shaft stands in. */
 .stick-boot {
-  /* The hole is the shaft's hole and nothing more. Taken any wider —
-     and 22% of the washer was already more than twice the shaft — the
-     dark core stops being a hole for the shaft and becomes a hole in
-     the panel, which is what this kept coming out as. */
+  /* The dark core is only the shaft's hole; any wider and it reads as a hole
+     in the panel. */
   background:
     radial-gradient(circle at 50% 44%,
       #000 0%, #030304 11%,
@@ -2267,13 +2004,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset 0 -6px 8px -4px rgba(0, 0, 0, 0.5);
 }
 
-/* The gate opening, not a gate plate.
-   The octagonal restrictor was drawn 5px inside the dust washer, which
-   is to say it covered all of it: a solid black octagon where the
-   rubber should be, with the washer's own shading hidden underneath.
-   On a real stick the gate is down inside the housing and what you see
-   from above is the opening the shaft swings in — a small dark recess
-   in the middle of the washer, about as wide as the throw needs. */
+/* The gate opening, not a gate plate: a small dark recess in the washer, as
+   wide as the throw. */
 .stick-boot::before {
   inset: 28%;
   background: radial-gradient(circle at 50% 40%, #0c0c0f 0%, #050506 60%, #0a0a0d 100%);
@@ -2342,10 +2074,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 .fire-buttons.four .arcade-btn:nth-child(4) { color: #2f86d8; }
 .fire-buttons .arcade-btn { color: #e5361f; }
 
-/* Every deck carries four caps per station whatever the game reads.
-   The ones it does not read are unlit blanks — same size and place,
-   which is both what a real panel looks like and how you tell at a
-   glance which are yours. */
+/* A game's unused caps are unlit blanks, same size and place. */
 .fire-buttons.four .arcade-btn.spare .arcade-btn-cap,
 .arcade-btn.spare .arcade-btn-cap {
   background:
@@ -2366,11 +2095,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     radial-gradient(circle at 50% 62%, #3d3f45 0%, #4a4c52 40%, #35373c 70%, #1e1f23 100%);
 }
 
-/* Three things make a cap hover: a long drop shadow, a reflection
-   pooled under it (which implies a floor below, so it is standing on
-   something), and a plate lighter than the panel. A recess is darker,
-   shadowed along its top edge and lit inside its bottom one. The ball
-   does stand above the panel, so it keeps its reflection. */
+/* Caps sit in recesses (darker, shadowed at the top, lit inside the bottom);
+   the ball stands above the panel, so it keeps its reflection. */
 .arcade-btn {
   box-shadow:
     0 2px 3px rgba(0, 0, 0, 0.8),
@@ -2431,17 +2157,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 
 /* ======================================================================
-   Real proportions, and Atari colours
+   Real proportions, Atari colours
    ======================================================================
-   Measured against the numbers a real panel is drilled to: 30mm buttons
-   on 36mm centres, and a 35mm ball-top. So the spacing between caps is
-   a fifth of a cap, and the ball is 1.17 caps across — not a free
-   number. Ours were 1.56 caps on a big touch screen and 0.95 on a
-   desktop, which is why the same deck read as a beach ball on one and a
-   marble on the other.
-
-   Everything below hangs off one length, --cap, so the deck keeps those
-   ratios at every size and only the scale changes. */
+   A real panel: 30mm buttons on 36mm centres and a 35mm ball-top, so cap
+   spacing is a fifth of a cap and the ball is 1.17 caps. Everything hangs off
+   --cap. */
 :root[data-caps="4"] { --cap: 46px; }
 
 :root[data-caps="4"] .arcade-btn { width: var(--cap); height: var(--cap); }
@@ -2462,10 +2182,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   height: calc(var(--cap) * 0.62);
 }
 :root[data-caps="4"] .stick-handle { bottom: calc(6px + var(--cap) * 0.56); } /* boot centre */
-/* The base is a drag region, not a footprint: the ball is allowed to
-   overhang it and the gate hit-test is "left of this station's caps",
-   not this box. Holding it to the ball's width cost the caps room they
-   could not spare with two stations on a 320px phone. */
+/* The base is a drag region, not a footprint: the ball may overhang it and
+   the hit test is "left of this station's caps". */
 :root[data-caps="4"] .stick-base {
   width: calc(var(--cap) * 1.05);
   height: calc(var(--cap) * 3.4);
@@ -2482,11 +2200,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-caps="4"] { --cap: clamp(38px, 10.6vw, 50px); }
 }
 
-/* ---- Atari caps ----
-   The Atari palette: saturated plastic on a matte black panel, in the
-   order the rainbow ran on the machines themselves. Warm across the top
-   row for the punches, cool along the bottom for the kicks, so the pair
-   a cap belongs to is still the first thing read. */
+/* ---- Atari caps ---- Per-position colours in the Atari rainbow order;
+   the red caps rule below repaints them. */
 :root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(1) .arcade-btn-cap {
   background:
     radial-gradient(circle at 33% 26%, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
@@ -2524,10 +2239,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-caps="4"] .snes-pad .snes-dpad,
 :root[data-caps="4"] .snes-pad .snes-face { margin-bottom: calc(var(--cap) * 0.22); }
 
-/* Two stations of four caps on a 320px phone is the tightest the deck
-   ever gets, and the proportions above pushed it four pixels over the
-   panel's right edge. The ratios stay; the scale comes down, which is
-   the whole reason they are ratios. */
+/* Two stations of four caps at 320px: same ratios, smaller scale. */
 @media (max-width: 620px) {
   :root[data-caps="4"] { --cap: clamp(32px, 9vw, 50px); }
   :root[data-caps="4"] .deck-side { gap: calc(var(--cap) * 0.34); }
@@ -2558,9 +2270,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset 0 -1px 0 rgba(255, 255, 255, 0.05);
 }
 
-/* Red caps. The four-colour Atari rainbow was a lot of colour for a
-   panel; the CX40's red is the Atari everybody remembers. The heavy of
-   each pair is the darker cap. */
+/* Red caps (the CX40's red), repainting the rainbow above; the heavy cap of
+   each pair is the darker one. */
 :root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(1) .arcade-btn-cap,
 :root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(3) .arcade-btn-cap {
   background:
@@ -2594,11 +2305,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   pointer-events: none;
 }
 
-/* ---- One deck, two controllers ----
-   The pad is inside .deck-panel now, so it shares the joystick deck's
-   tilt and origin. Everything below sizes it off --cap, the same length
-   the joystick deck is built from, so the cross matches the stick and
-   the caps match the caps — and a thumb does not move when you switch. */
+/* ---- One deck, two controllers ---- The pad sits in .deck-panel and is
+   sized off --cap like the stick deck, so switching moves nothing under the
+   thumbs. */
 :root[data-caps="4"] .snes-pad {
   --sf-btn: var(--cap);
   --sf-gap: calc(var(--cap) * 0.2);
@@ -2619,8 +2328,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 :root[data-caps="4"] .snes-pad .snes-dpad { margin-bottom: 26px; }
 
-/* Both controllers get the same bar. They are the same deck now, so a
-   separate pad height only made the picture jump on the way between. */
+/* Both controllers get the same bar height, so switching does not move the
+   picture. */
 :root[data-caps="4"][data-controls="pad"] #topbar.kiosk-bar,
 :root[data-caps="4"][data-controls="pad"] .kiosk-bar-main {
   height: calc(152px + env(safe-area-inset-bottom, 0px));
@@ -2630,8 +2339,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   height: calc(152px + env(safe-area-inset-bottom, 0px));
 }
 
-/* Only the controller on show names its stations. Both decks are in the
-   panel now, and the hidden one's tags were still painting. */
+/* Only the controller on show names its stations (both decks are in the
+   panel). */
 :root[data-controls="pad"] .deck-side .deck-tag { display: none; }
 :root[data-controls="stick"] .snes-pad .deck-tag { display: none; }
 
@@ -2664,10 +2373,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   left: calc(var(--cap) * 1.25);
 }
 
-/* ---- Small phones: keep the thumbs apart ----
-   Upright, station one's cross and caps were packed into one group at
-   the left edge, ~13px apart at 375px. The caps go to the station's
-   inner edge instead: cross under the left thumb, caps under the right. */
+/* Small phones, upright: cross at the station's outer edge, caps at its inner
+   edge. */
 @media (max-width: 420px) {
   :root[data-layout="upright"] .snes-pad:not(.second) .snes-shell {
     justify-content: space-between;
@@ -2709,12 +2416,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   height: calc(118px + env(safe-area-inset-bottom, 0px));
 }
 
-/* ---- Thumb-sized controls on phones (upright) ----
-   Every game seats two stations, so on a phone each got half the bar:
-   34px caps and a 52px cross, with a dead second station beside them.
-   A game that never seats two (data-seats="1") now gives station one the
-   whole bar and drops the dead station and its unused caps. Sizes are
-   visual; touches also get 12-14px of slop (blip_controller.js). */
+/* ---- Thumb-sized controls on phones (upright) ---- A one-seat game
+   (data-seats="1") gives station one the whole bar and drops the dead station
+   and unused caps. Touches get 12-14px of slop (blip_controller.js). */
 @media all {
   :root[data-layout="upright"][data-controls="pad"][data-players="1"] #topbar.kiosk-bar,
   :root[data-layout="upright"][data-controls="pad"][data-players="1"] .kiosk-bar-main {
@@ -2807,13 +2511,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   gap: 12px 0;
 }
 
-/* ---- Station lamps ----
-   A P1 and a P2 lamp on the panel's top edge, over their own station.
-   P1 is lit whenever the deck is live (out while the coin wall is up);
-   P2 is lit when a second player is in, and pulses on the title screen
-   where a second player can join. Station two is otherwise drawn like
-   station one: nothing on the deck is dimmed. The lamps replace the
-   silkscreened tags. */
+/* ---- Station lamps ---- P1 and P2 lamps on the panel's top edge replace the
+   silkscreened tags. P1 is lit while the deck is live (out behind the coin
+   wall); P2 when a second player is in, pulsing on a title screen that takes
+   one. */
 .deck-tag { display: none !important; }
 
 .kiosk-bar > .deck-panel::before,
@@ -2873,10 +2574,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* ---- Joystick base: symmetric, and centred in the bar ---- */
 
-/* The washer holds a rubber gaiter, drawn flat in the deck plane so the
-   whole ring is visible (anything of the upright boot below the pivot line
-   would be cut off by the deck itself). A short cone of the same rubber
-   rises with the shaft and leans with it. */
+/* The rubber gaiter, flat in the deck plane so the whole ring shows, with a
+   short cone that rises and leans with the shaft. */
 .stick-boot::before {
   clip-path: none;
   border-radius: 50%;
@@ -2911,12 +2610,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   height: calc(var(--boot) * 0.5);
 }
 
-/* ---- One place for the controls, whichever controller is showing ----
-   Upright phones: the joystick's base and the d-pad share a centre, and
-   the caps sit in the same spot in both, so switching moves nothing under
-   the thumbs. Everything is centred on the bar's vertical middle; --ctl-cx
-   is the cross / base centre measured from the station's left edge and
-   --ctl-pr the caps' right margin. */
+/* ---- One place for the controls ---- Upright, the stick's base and the
+   cross share a centre and the caps share a spot, centred on the bar's
+   middle. --ctl-cx: cross / base centre from the station's left edge;
+   --ctl-pr: the caps' right margin. */
 @media all {
   :root[data-layout="upright"][data-caps="4"] { --ctl-cx: 40px; --ctl-pr: 10px; }
   :root[data-layout="upright"][data-caps="4"][data-players="1"] { --ctl-cx: 64px; --ctl-pr: 22px; }
@@ -2984,13 +2681,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] :is(#topbar, #kiosk-bar) .fire-buttons.four { gap: 7px 6px; }
 }
 
-/* ---- One set of equipment, on every deck screen ----
-   The caps, cross and stick are the same size on the landing page, in a
-   one-player game and in a two-player match, so it reads as the same
-   physical panel. Two stations must fit side by side on the narrowest
-   deck, so the size is a share of what one station (half the bar) has
-   left after its margins; --cap, --dpad and the stick's boot (1.12 cap)
-   all derive from it. */
+/* ---- One set of equipment everywhere ---- Caps, cross and stick are the
+   same size on the landing page and in one- and two-player games. Sized as a
+   share of half the bar, so two stations fit the narrowest deck; --cap,
+   --dpad and the boot derive from it. */
 @media all {
   :root[data-layout="upright"][data-caps="4"][data-controls][data-players] {
     --cap: clamp(32px, calc(0.29 * (50vw - 63px)), 54px);
@@ -3024,10 +2718,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   padding-left: calc(var(--ctl-cx) - var(--dpad, var(--boot)) / 2);
 }
 
-/* Two players share one small screen: keep a clear channel between P1's caps
-   and P2's cross so neither thumb lands on the other's controls. The size
-   formula above always reserves it (so the equipment is the same size in
-   one-player mode); it is only laid out when P2 is on the deck. */
+/* Two players on one screen: a clear channel between P1's caps and P2's
+   cross. The size formula always reserves it; it is laid out only when P2 is
+   in. */
 :root[data-layout="upright"][data-caps="4"][data-players="2"] { --mid: 26px; }
 :root[data-layout="upright"][data-caps="4"][data-players="2"] #deck-p1,
 :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] #snes-pad .snes-shell {
@@ -3038,11 +2731,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   padding-left: calc(var(--ctl-cx) - var(--dpad) / 2 + var(--mid) / 2);
 }
 
-/* ---- One button, on both controllers ----
-   The joystick deck's chrome-ringed caps and the pad's matte-in-a-collar
-   buttons are now the same part: a gunmetal lip (dimmer than chrome) around
-   a dark collar, with a glossy red dome that keeps a soft highlight and a
-   matte underside. Sizes already come from the same --cap. */
+/* ---- One button, both controllers ---- The same part on stick and pad:
+   gunmetal lip, dark collar, glossy red dome. Sizes come from --cap. */
 :is(#topbar, #kiosk-bar) :is(.arcade-btn, .snes-btn) {
   border-radius: 50%;
   background:
@@ -3084,7 +2774,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.08) 16%, transparent 34%),
     radial-gradient(circle at 50% 46%, #5aa2ee 0%, #2f76d0 46%, #1a4f9e 80%, #0d2c60 100%);
 }
-/* no reflection puddle: the two controllers now share one plain part */
+/* No reflection puddle: stick and pad share one plain cap. */
 :is(#topbar, #kiosk-bar) .arcade-btn::after { display: none; }
 
 /* A slimmer plate behind the caps, so the group has air to the panel's corner
@@ -3109,10 +2799,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   left: calc(50% + var(--ctl-cx) + var(--mid) / 2);
 }
 
-/* ---- The plate is bolted to the cabinet ----
-   A dark seam round the tilted plate (it sits in a cut-out, not on top)
-   and a carriage bolt in each top corner. Two stations share one plate,
-   so each half keeps only its outer bolt. */
+/* ---- The plate is bolted to the cabinet ---- A dark seam round the plate
+   and a carriage bolt in each top corner; with two stations each half keeps
+   its outer bolt. */
 :is(#topbar, .kiosk-bar-main) {
   --bolt: #0b0b0c;
   --bolt-l: radial-gradient(circle at 12px 11px, #9a9aa0 0 0.8px, #4a4a4f 1.8px, #19191b 3.2px, rgba(0, 0, 0, 0.75) 3.9px, transparent 4.8px);
@@ -3150,11 +2839,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   padding: 5px 10px;
 }
 
-/* ---- Thumb-sized on a phone ----
-   Upright on a touch phone there is only ever one station (two players
-   play sideways, see #rotate-hint), so the equipment is sized off the whole
-   width instead of half of it: at 375px the cross was 52px and the caps
-   36px, under a thumb's reach. The bar grows to seat the bigger cross. */
+/* ---- Thumb-sized on a phone ---- One player upright on a touch phone:
+   equipment sized off the whole width, and the bar grows to seat the bigger
+   cross. */
 @media (pointer: coarse) and (max-width: 520px) {
   :root[data-layout="upright"][data-caps="4"][data-controls][data-players="1"] {
     --cap: clamp(44px, 14vw, 62px);
@@ -3171,12 +2858,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   }
 }
 
-/* Two players upright on a touch phone ("play upright" on the rotate hint):
-   a half-width station cannot seat a thumb-sized cross beside its caps, but
-   the picture is width-bound, so there is height to spare. Each station
-   stacks them on a diagonal, cross high and caps low, clear of each other;
-   in the middle P1's caps and P2's cross are a diagonal apart too.
-   At 375px: cross 77px, caps 42px. */
+/* Two players upright on a touch phone: each station stacks cross over caps
+   on a diagonal (the picture is width-bound, so there is height). At 375px:
+   cross 77px, caps 42px. */
 @media (pointer: coarse) and (max-width: 520px) {
   :root[data-layout="upright"][data-caps="4"][data-controls][data-players="2"] {
     --cap: clamp(38px, 11.2vw, 46px);

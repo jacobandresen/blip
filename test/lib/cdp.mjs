@@ -1,14 +1,7 @@
-// Minimal Chrome DevTools Protocol client over a raw WebSocket — no
-// puppeteer/playwright dependency, just Node's own `net`/`http`/`crypto`.
-// Used by the browser-driven suites to
-// drive real Chromium instances directly: navigate, run JS via
-// Runtime.evaluate, dispatch synthetic input, and get real page/console
-// errors back, all over the same protocol DevTools itself uses.
-//
-// This existed only as a series of one-off scratch scripts across
-// several playtest sessions before now; committing it is deliberate —
-// the browser suites need it to keep working as the pages evolve, not
-// just once by hand.
+// Minimal Chrome DevTools Protocol client over a raw WebSocket (Node's own
+// net / http / crypto, no puppeteer or playwright): navigate,
+// Runtime.evaluate, synthetic input, and page errors, for the browser-driven
+// suites.
 
 import http from 'node:http';
 import net from 'node:net';
@@ -32,14 +25,10 @@ function httpJSON(port, path) {
   });
 }
 
-/** Connect to a Chromium instance already listening on `--remote-debugging-port=port`
- * (retries for a few seconds — the process needs a moment to open the port).
- *
- * `matchUrl`, if given, picks the *most recently opened* page target
- * whose `url` contains that substring instead of just the first page
- * target — needed once there's more than one tab open, where older
- * matching tabs may have been backgrounded or frozen and the newest
- * match is the one actually in the foreground. */
+/** Connect to a Chromium listening on `--remote-debugging-port=port`, retrying
+ * while it opens the port. `matchUrl` picks the most recently opened page
+ * whose url contains it: with several tabs, older matches may be frozen in
+ * the background. */
 export async function connect(port, matchUrl, { commandTimeoutMs = 10000 } = {}) {
   let list;
   for (let i = 0; i < 50; i++) {
@@ -57,11 +46,9 @@ export async function connect(port, matchUrl, { commandTimeoutMs = 10000 } = {})
     ? list.filter((t) => t.type === 'page' && t.url?.includes(matchUrl) && t.webSocketDebuggerUrl)
     : list.filter((t) => t.type === 'page' && t.webSocketDebuggerUrl);
   if (!matches.length) throw new Error(`no matching page target on port ${port}`);
-  // `/json/list`'s order isn't reliably chronological, but target ids are
-  // assigned incrementally as tabs are created. Chromium uses hexadecimal-
-  // looking ids; use BigInt so long ids are compared without precision loss.
-  // If a browser uses a non-hex id, retain the endpoint's ordering rather
-  // than accidentally treating every candidate as NaN.
+  // `/json/list` is not reliably chronological, but target ids grow as tabs
+  // open. Compare hex ids as BigInt; keep the endpoint's order for a non-hex
+  // id.
   function targetRank(id) {
     const hex = String(id || '').replace(/^page_/, '').replace(/-/g, '');
     return /^[0-9a-f]+$/i.test(hex) ? BigInt(`0x${hex}`) : null;
@@ -160,13 +147,9 @@ export async function connect(port, matchUrl, { commandTimeoutMs = 10000 } = {})
   });
 }
 
-/**
- * Launch a headless Chromium listening on `port` and return `{ proc, cdp }`.
- * Flags match what this repo's own headless playtests have needed in
- * practice: sandboxing off (containers), shared-memory off (small
- * `/dev/shm`), and a capped heap so two instances at once don't starve
- * the host.
- */
+/** Launch headless Chromium on `port`, returning `{ proc, cdp }`. No sandbox
+ * (containers), no /dev/shm (small in containers), and a capped heap so two
+ * instances fit. */
 export async function launch(port, extraArgs = []) {
   const bin = chromiumBinary();
   const proc = spawn(bin, [
@@ -177,10 +160,8 @@ export async function launch(port, extraArgs = []) {
     '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
     '--no-sandbox',
     '--disable-dev-shm-usage',
-    // Chrome hides local ICE candidates behind a per-instance `.local`
-    // A headless page is never "foreground" — Chrome's background-tab
-    // throttling (meant for an unfocused real tab) can otherwise kick in
-    // almost immediately and starve a running game of frames.
+    // A headless page is never foreground, and background throttling would
+    // otherwise starve a running game of frames.
     '--disable-backgrounding-occluded-windows',
     '--disable-renderer-backgrounding',
     '--disable-background-timer-throttling',

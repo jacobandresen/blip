@@ -1,10 +1,5 @@
-// Shared plumbing for the browser-driven test suites: a static file
-// server over web/, one or more headless browsers, and a CDP-shaped
-// adapter to drive them. Every suite opens with the same few lines —
-// make a server, listen, launch, tear both down after — and written
-// once, the class of bug that used to live there (a listen() with no
-// error path, which turned a held port into a suite that produced no
-// output and never finished) has one place to live.
+// Shared plumbing for the browser-driven suites: a static server over web/,
+// headless browsers, and a CDP-shaped adapter to drive them.
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -25,15 +20,9 @@ const MIME = {
   '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
 };
 
-/** Start a server and resolve once it is actually listening.
- *
- * The obvious `new Promise((r) => server.listen(port, r))` has no error
- * path: if the port is taken, 'error' fires, the callback never runs,
- * and the promise never settles. Under `node --test` that surfaces as a
- * suite producing *no output at all* and hanging until something kills
- * it — the worst possible failure mode, and one that looks like a
- * device or network problem rather than a stray process holding a port.
- * (It was a stray process holding a port.) */
+/** Start a server and resolve once it is listening. A bare
+ * `server.listen(port, r)` never settles when the port is taken, and under
+ * `node --test` that is a suite that prints nothing and hangs. */
 export function listenOn(server, port) {
   return new Promise((resolve, reject) => {
     const onError = (err) => {

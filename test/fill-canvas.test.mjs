@@ -49,10 +49,8 @@ test('canvas stays within viewport bounds', () => {
   }
 });
 
-// Regression: if fillCanvas is computed against HTML default dimensions (300×150)
-// instead of the real game dimensions set by SDL (e.g. 480×540), the canvas
-// ends up far off-screen. The fix is to use a MutationObserver so fillCanvas
-// fires when SDL writes the real dimensions, not on the default 300×150.
+// Regression: a transform computed on the canvas's HTML default size
+// (300x150) rather than the game's real size puts the canvas far off-screen.
 test('transform computed on SDL dimensions differs from one on HTML defaults', () => {
   const vw = 375, vh = 667; // typical phone
   const htmlDefault = computeTransform(300, 150, vw, vh);  // wrong — fires before SDL

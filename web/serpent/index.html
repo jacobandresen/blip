@@ -22,9 +22,7 @@
 
   <a class="blip-logo" href="../index.html">BLIP<span class="ba-rest">&nbsp;ARCADE</span></a>
 
-  <!-- Coin slot: fixed in the top-right corner of the cabinet's top panel,
-       mirroring the BLIP ARCADE logo at top-left — the physical slot you
-       feed, up on the panel, not down on the control deck. -->
+  <!-- Coin slot, top right of the cabinet panel, mirroring the logo. -->
   <button id="insert-coin-btn" class="kiosk-btn"><span data-coins-hud></span></button>
 
   <div id="loader">
@@ -32,10 +30,8 @@
     <div id="bar-outer"><div id="bar-inner"></div></div>
   </div>
 
-  <!-- The fixed bar is a plain (untransformed) box; .deck-panel is the
-       3D-tilted control surface inside it. Keeping the tilt off the
-       position:fixed element is what stops iOS Safari clipping the bar's
-       lower edge / floating it off the bottom in a home-screen PWA. -->
+  <!-- The fixed bar has no transform (iOS Safari clips a transformed fixed
+       box); .deck-panel inside it carries the tilt. -->
   <div id="topbar" class="kiosk-bar">
    <div class="deck-panel">
     <!-- Paddle dials: rally only. Mounted in the deck like the stick —

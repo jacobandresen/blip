@@ -1,16 +1,6 @@
-// The touch controls, where precision is actually felt.
-//
-// Rally's paddle is a dial: the player rotates a knob with one finger and
-// the rotation is turned into the same key events the keyboard produces.
-// How that conversion treats a *slow* rotation decides whether careful
-// aiming is possible, and it used to make it impossible.
-//
-// The dial thresholded each individual pointermove against a dead zone.
-// Any rotation slower than one dead zone per event -- which is exactly the
-// deliberate, careful turn a player makes when lining up a shot -- was
-// discarded entirely, while a fast flick worked fine. Worse, a single
-// small delta part-way through a turn *released* the key, so even a steady
-// turn stuttered. Rotation is accumulated now.
+// Rally's dial turns finger rotation into the keyboard's key events. A slow,
+// careful turn must still move the paddle, so rotation is accumulated rather
+// than tested per pointermove against the dead band.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -65,10 +55,8 @@ test(`the paddle dial registers a slow, careful rotation (${ENGINE})`, async (t)
   await loadRally(cdp);
 
   await t.test('a rotation slower than the dead zone per event still moves the paddle', async () => {
-    // 0.006 rad per event against a 0.018 dead zone: every single event is
-    // below threshold, so the old per-event test emitted nothing at all no
-    // matter how far the finger actually travelled. Twelve of them is
-    // 0.072 rad -- four dead zones of real rotation.
+    // 0.006 rad per event against a 0.018 dead band: every event is below it,
+    // but twelve add up to four dead bands of real rotation.
     const r = await evaluate(cdp, ROTATE(0.006, 12));
     t.diagnostic(`slow rotation emitted: ${JSON.stringify(r.seen)}`);
     assert.ok(r.downs > 0,

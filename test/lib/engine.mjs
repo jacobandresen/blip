@@ -1,13 +1,6 @@
-// Launches a browser engine through Playwright and hands back a
-// CDP-shaped handle, so the helpers in test/lib/harness.mjs
-// — which reach the page only through cdp.mjs's `evaluate()`, i.e. only
-// through `cdp.send('Runtime.evaluate', { expression })` — can drive
-// WebKit and Firefox as well as Chromium, unchanged.
-//
-// Playwright's WebKit and Firefox are the same engines the phones and
-// desktops run, need none of the machine-level setup real Safari
-// automation does, and run unattended in CI — so a layout or an input
-// path can be checked on all three rather than on Chromium alone.
+// Launches a browser engine through Playwright and returns a CDP-shaped
+// handle, so harness.mjs helpers (which only call Runtime.evaluate) drive
+// WebKit and Firefox as well as Chromium, unattended.
 
 import { chromium, webkit, firefox } from 'playwright';
 

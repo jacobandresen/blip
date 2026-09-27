@@ -72,11 +72,8 @@
       width: 100%;
       max-width: 900px;
       text-align: center;
-      /* Empty now that the marquee/subtitle text is gone (moved/removed —
-         see .top-marquee-bar) — just enough padding to clear the fixed bar
-         above, not the old headroom a 3-line banner needed. Freed space
-         goes to pulling the game grid up, per an explicit request to use
-         the top of the page better. */
+      /* Just enough padding to clear the fixed top bar; the rest goes to the
+         game grid. */
       padding: calc(48px + env(safe-area-inset-top, 0px)) 0 12px;
       position: relative;
     }
@@ -147,10 +144,8 @@
       .lang-btn { width: 32px; height: 32px; font-size: 22px; }
     }
 
-    /* .top-marquee-bar, the logo/coin-slot heights, the .left-badges
-       position + the <=480px bottom-lift for the badges and flags all
-       live in kiosk.css now, shared identically with about / controls /
-       history. */
+    /* The top bar, logo and coin-slot heights and the corner badges live in
+       kiosk.css, shared with the info pages. */
 
 
     .divider {
@@ -291,10 +286,8 @@
         inset 0 0 20px color-mix(in srgb, var(--c) 4%, transparent);
     }
 
-    /* Out of credits: the card's corner brackets (its "power light") go
-       dark, and it doesn't light up or lift on hover — an unlit cabinet
-       stays unlit even under the cursor. The focused / currently-playing
-       card is exempt: it keeps its glow (see .card-focused rules below). */
+    /* Out of credits the card's corner brackets go dark and it does not light
+       on hover; the focused / playing card keeps its glow. */
     .card.no-credit:not(.card-focused):not(.card-active)::before,
     .card.no-credit:not(.card-focused):not(.card-active)::after {
       border-color: #333;
@@ -305,11 +298,8 @@
       box-shadow: none;
     }
 
-    /* Full fluorescent glow on the card you're focused on — the one the
-       arrow keys / joystick have selected (.card-focused) and the game
-       you're currently in (.card-active, last one started, JS adds it on
-       return). Its own accent colour, breathing like a lit cabinet, and
-       it stays lit even when you're out of credits. */
+    /* Full glow on the selected card (.card-focused) and the game last played
+       (.card-active), in its own accent, breathing, even with no credits. */
     .card.card-focused,
     .card.card-active {
       border-color: var(--c);
@@ -373,10 +363,8 @@
       width: 100%;
     }
 
-    /* This copy sits inside the screen bezel, describing what's on the
-       tube — the same lit-phosphor glow as the rest of the on-screen
-       text (card-title), just dimmer since it's body copy, not a
-       headline. */
+    /* Card copy sits on the tube: the same phosphor glow as the titles,
+       dimmer. */
     .card-genre, .card-desc, .card-controls {
       text-shadow: 0 0 5px currentColor;
     }
@@ -412,10 +400,8 @@
       text-align: left;
     }
 
-    /* No credits: the cards read as unlit rather than a separate "NEED
-       COIN" label — dimmed and desaturated so it's clear at a glance the
-       cabinet isn't powered up, but not so far you can't make out every
-       game. Still clickable (attemptStart() no-ops with a nudge when broke). */
+    /* No credits: cards dimmed and desaturated like an unpowered cabinet but
+       still legible; a click nudges toward the coin slot. */
     .card.no-credit {
       opacity: 0.55;
       filter: grayscale(60%) brightness(0.62);
@@ -533,15 +519,11 @@
     header, .divider, .game-grid, footer { position: relative; z-index: 1; }
 
     /* ---- left badge group ---- */
-    /* Position + badge styling all live in kiosk.css, shared byte-for-byte
-       with the about / history / controls pages so nothing shifts when you
-       open one. The one thing that's front-page-only is the attract-mode
-       hide below. */
+    /* Badge position and styling are in kiosk.css, shared with the info
+       pages; only the attract-mode hide is front-page-only. */
 
-    /* Attract-mode: the corner badges (CONTROLS / ABOUT / HISTORY) and the
-       language flags stay hidden until the front page has sat untouched
-       for 10s, then fade in — the page's own JS toggles .idle-reveal, any
-       interaction takes it away again. */
+    /* Attract mode: the corner badges and language flags fade in after 10s
+       untouched; any interaction hides them. */
     .left-badges,
     .lang-switcher {
       opacity: 0;
@@ -618,10 +600,9 @@
     }
     body.konami-shake { animation: konami-shake 0.55s ease; }
 
-    /* iPad / tablet — kiosk.css gives the deck a much taller bar and 2x
-       controls here; lift this page's own corner clusters clear of it.
-       (kiosk.css already bumps .left-badges + .lang-switcher, but this
-       page's inline .lang-switcher / .profile-badge win on specificity.) */
+    /* Tablets: kiosk.css gives the deck a taller bar, so lift this page's own
+       corner clusters (its inline .lang-switcher / .profile-badge outweigh
+       kiosk.css). */
     @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
       .lang-switcher,
       .profile-badge { bottom: calc(138px + env(safe-area-inset-bottom, 0px)); }
@@ -771,10 +752,9 @@
     <div style="margin-top:8px" data-i18n="footerCopy"></div>
   </footer>
 
-  <!-- The landing page's own arcade stick + buttons, matching the game
-       shell's bar (kiosk.css). On touch these drive the game selection:
-       push the stick to step through the cards, press fire to open the
-       lit one (wired in the card-navigation block below). -->
+  <!-- The landing page's own stick and caps, the same deck as a game's
+       (kiosk.css). They drive the card selection: the stick steps, fire opens
+       the lit card. -->
   <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
    <div class="deck-panel"></div>
   </div>
@@ -940,15 +920,11 @@
     /* ------------------------------------------------------------------ */
     /* Coin / credits                                                       */
     /* ------------------------------------------------------------------ */
-    // ---- Ambient Atari hum ----
-    // Clearly present once there's a credit in the machine — a real
-    // cabinet's transformer hum, meaning the thing is powered and waiting.
-    // Silent while broke (nothing's "on" until it's fed). Needs a user
-    // gesture to start
-    // (autoplay policy), so it arms on the first interaction but only
-    // actually starts once coins > 0; the coin-insert click itself counts,
-    // so tryStartHum() is also called directly from onCoinInserted below
-    // rather than waiting for a second, separate interaction.
+    // ---- Ambient hum ----
+    // A cabinet's transformer hum once there is a credit in the machine;
+    // silent while broke. Needs a user gesture (autoplay), so it arms on the
+    // first interaction and starts once coins > 0; the coin click itself
+    // counts (onCoinInserted calls tryStartHum).
     var tryStartHum = (function () {
       var started = false;
       function startHum() {
@@ -958,10 +934,9 @@
         });
         var ctx = getKioskAudio();
 
-        // Power-supply drone: 58 Hz sawtooth → lowpass, plus its mains-ish
-        // 120 Hz overtone — a low hum kept just at the threshold of notice,
-        // felt more than heard. Fades up over a couple of seconds like it's
-        // warming up.
+        // Power-supply drone: a 58 Hz saw through a low-pass plus a 120 Hz
+        // overtone, at the threshold of notice, fading up over a couple of
+        // seconds.
         var osc = ctx.createOscillator();
         var osc2 = ctx.createOscillator();
         var lpf = ctx.createBiquadFilter();
@@ -1026,12 +1001,9 @@
     }());
 
     // ---- Startup chime ----
-    // Plays once, the moment the machine is first fed a coin (0 → 1) — a
-    // relay thunk and a rising CRT-flyback whine settling into the ambient
-    // hum's own 58 Hz, like the cabinet is genuinely powering up. The game
-    // cards only light up once this finishes (see onCoinInserted below),
-    // not the instant the coin lands, so there's a beat of "booting up"
-    // between paying and playing rather than an instant unlock.
+    // Once, when the machine gets its first coin (0 -> 1): a relay thunk and
+    // a rising flyback whine settling on the hum's 58 Hz. The cards light
+    // when it finishes, a beat of booting between paying and playing.
     function playStartupSound(onDone) {
       var ctx = getKioskAudio();
       var t = ctx.currentTime;
@@ -1093,11 +1065,9 @@
       updateCoinLock();
     }
 
-    // No full-screen INSERT COIN attract overlay on the landing page — the
-    // game grid stays visible (dimmed) and the flashing COINS button in the
-    // corner is the "put a coin in" cue. Just mirrors the broke state onto
-    // <body> so that button knows to flash. (The per-game shell still shows
-    // the overlay when you deep-link straight to a game with no credit.)
+    // No INSERT COIN overlay here: the grid stays visible, dimmed, and the
+    // flashing COINS button is the cue (mirrored onto <body>). Game pages
+    // still show the overlay on a deep link with no credit.
     function updateCoinLock() {
       document.body.classList.toggle('need-coin', getCoins() <= 0);
     }
@@ -1110,11 +1080,9 @@
 
     updateCreditsDisplay(); // initialise dimming to match coins on page load
 
-    // Opens `card`'s game — the click handler for the whole card. Needs a
-    // credit but does NOT spend it here: the credit rides along to the
-    // game page (same sessionStorage) so it's actually there to play with,
-    // and the game itself charges it (on continue after a game over). A
-    // no-op with a nudge when broke, like pushing an unlit start button.
+    // Opens the card's game. Needs a credit but does not spend it: the credit
+    // rides along to the game page (same sessionStorage), and the game
+    // charges on the next play after game over. Broke: a nudge.
     function attemptStart(card) {
       if (getCoins() <= 0) {
         nudgeInsertCoin();
@@ -1222,11 +1190,9 @@
         function () {}
       );
 
-      // ---- The landing page's own arcade stick + buttons drive the same
-      // selection: push the stick to step through the games (with key-style
-      // auto-repeat while held), press a fire button to open the one that's
-      // lit. The stick leans via the --dx/--dy custom properties the deck
-      // CSS already reads, same as the game shell's. ----
+      // ---- The landing page's stick and caps drive the selection ---- The
+      // stick steps through the games (auto-repeating while held), fire opens
+      // the lit one; the lean uses the deck's --dx / --dy like a game page.
       (function () {
         var bar  = document.getElementById('kiosk-bar');
         var base = document.getElementById('stick-base');
@@ -1345,14 +1311,10 @@
       konamiCheck(e.key);
     });
 
-    /* Attract-mode reveal for the corner badges + language flags:
-       - hidden by default; fade in after 10s untouched, hide again on any
-         deliberate interaction.
-       - once one of them has actually been used (a badge or a flag
-         clicked), they PIN visible for 3 minutes — surviving the trip out
-         to about/history/controls and back (sessionStorage) — so you can
-         move between the info pages without the 10s wait each time.
-       - starting a game clears the pin (see attemptStart). */
+    /* Attract-mode reveal for the corner badges and flags: hidden, fading in
+       after 10s untouched and hidden again on interaction. Once a badge or
+       flag is used they stay pinned for 3 minutes across the info pages
+       (sessionStorage); starting a game clears the pin. */
     window.clearBadgePin = function () {
       try { sessionStorage.removeItem('blip-badge-pin'); } catch (e) {}
     };

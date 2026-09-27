@@ -1,15 +1,6 @@
-// Which Chromium the Chromium-based tests should launch.
-//
-// `chromium` on PATH is the right default on the Linux CI boxes this
-// suite was written for, but it is almost never on PATH on macOS, where
-// the browser is an .app bundle if it is installed at all — so the whole
-// multiplayer suite failed to start on a Mac for want of a binary.
-// Playwright is already a devDependency (it is what drives the WebKit
-// and real-iPhone tests), and it ships a pinned Chromium, so fall back
-// to that rather than making every developer install one by hand.
-//
-// Explicit $BLIP_CHROMIUM still wins, for testing against a specific
-// build.
+// Which Chromium the Chromium-based tests launch: $BLIP_CHROMIUM if set, else
+// `chromium` on PATH (Linux CI), else Playwright's pinned Chromium (macOS
+// rarely has one on PATH).
 
 import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';

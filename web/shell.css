@@ -8,15 +8,9 @@
    before that runs. */
 :root {
   --cab: 50, 200, 50;
-  /* Height of the backlit marquee strip, and therefore of the BLIP logo
-     and coin slot that sit over its two ends. One variable because the
-     three are a single piece of cabinet trim: the logo and slot are
-     mounted *on* the strip, so a strip height the elements don't share
-     leaves them hanging below it, over the game. They had drifted apart
-     at every breakpoint — the strip was 28/20/44px while both elements
-     were a flat 52px — so on a desktop the logo and COINS button hung
-     24px below the lit strip, and 32px below it on a short screen.
-     Redefined per breakpoint below; never hardcode it in two places. */
+  /* Height of the marquee strip, and so of the BLIP logo and coin slot
+     mounted on its ends; one variable so they cannot drift apart. Redefined
+     per breakpoint below. */
   --marquee-h: 28px;
 }
 
@@ -90,26 +84,19 @@ body::after {
   z-index: 99;
 }
 
-/* ---- Marquee — backlit per-game name sign, reserved above the screen ----
-   Built in shell.js (so rally's hand-maintained page gets it for free); this
-   just styles whatever it inserts. Its rendered height is what shell.js
-   reserves in fillCanvas(), so keep the 28px default here and there in sync. */
+/* ---- Marquee: the per-game name sign above the screen ---- Built in
+   shell.js; fillCanvas() reserves its rendered height. */
 #marquee-bar {
   position: fixed;
   top: 0; left: 0; right: 0;
-  /* Reserve the iPhone status bar / Dynamic Island strip when installed to
-     the home screen (standalone + viewport-fit=cover render the page full
-     bleed under it): the sign draws in the 28px below the inset, and its
-     background fills up behind the clock so it reads as one lit strip.
-     shell.js's fillCanvas() measures offsetHeight, so the canvas and bezel
-     follow this taller box automatically. */
+  /* Installed to the home screen the page runs under the status bar: the sign
+     draws in the strip below the inset and its background fills behind the
+     clock. fillCanvas() measures offsetHeight, so the canvas follows. */
   box-sizing: border-box;
   height: calc(var(--marquee-h) + env(safe-area-inset-top, 0px));
   padding-top: env(safe-area-inset-top, 0px);
-  /* Above the CRT scanline (100) and vignette (99) overlays — the backlit
-     sign is physical cabinet hardware sitting above the tube, not screen
-     content, so it stays crisp and lit rather than getting washed dark by
-     the vignette's edge falloff. Same reasoning as .blip-logo (z 500). */
+  /* Above the scanline (100) and vignette (99) overlays: cabinet hardware,
+     not screen content. */
   z-index: 201;
   display: flex;
   align-items: center;
@@ -168,11 +155,9 @@ body::after {
   pointer-events: none;
   z-index: 8;
   background: transparent;
-  /* Kept shallow: at a big radius the matching clip-path on <canvas> below
-     takes a visible rounded bite out of the top corners of the playfield
-     (Sky Raider's HUD / top-edge action sits right there). 9px here / 6px
-     on the canvas (they sit 3px apart, so the rounds stay concentric)
-     still softens the corner against the bezel without eating game pixels. */
+  /* Shallow corners: the canvas's matching clip-path would otherwise bite
+     into the playfield corners (Raider's HUD). 9px here and 6px on the
+     canvas, 3px apart, stay concentric. */
   border-radius: 9px;
   border: 1px solid rgba(var(--cab), 0.45);
   box-shadow:
@@ -266,21 +251,14 @@ canvas {
   transition: width .12s linear;
 }
 
-/* The logo and coin slot sit over the two ends of the marquee strip and
-   read as part of it, so they are exactly as tall as it is — no more.
-   They previously took a flat 52px for a fuller tap target, which was
-   taller than the strip at every breakpoint and left both of them
-   hanging below it over the game. The tap target is still a comfortable
-   one where it matters: --marquee-h is 44px on phones, which is the
-   usual 44px minimum, and a desktop pointer does not need the height.
-   Width carries the rest of the target on both (see kiosk.css). */
+/* The logo and coin slot are exactly as tall as the strip they sit on;
+   --marquee-h is 44px on phones, and width carries the rest of the tap
+   target. */
 .blip-logo,
 #insert-coin-btn { height: calc(var(--marquee-h) + env(safe-area-inset-top, 0px)); }
 
-/* A little more room than the kiosk pages use: a game page's top bar only
-   carries these two elements (no card grid competing for space), so let
-   them sit further off the screen edge and, for the coin slot's own drawn
-   border, further off their own edge too. */
+/* A game page's top bar carries only these two, so they sit further in from
+   the edges. */
 .blip-logo { left: 14px; }
 #insert-coin-btn {
   right: calc(env(safe-area-inset-right, 0px) + 14px);
@@ -289,12 +267,9 @@ canvas {
   gap: 9px;
 }
 
-/* ---- "MORE GAMES" nudge on the BLIP logo ----
-   shell.js appends .logo-hint inside .blip-logo and toggles .show-hint
-   after 30s of no input on a game page. Tucked just under the logo box
-   (top: 100% - a hair) so it never sits on top of the wordmark. Retro
-   terminal look: the games' pixel font, phosphor green, a blinking
-   caret. pointer-events:none — the whole logo <a> is already the link. */
+/* ---- "MORE GAMES" nudge ---- shell.js adds .logo-hint in .blip-logo and
+   toggles .show-hint after ~12s without input. Just under the logo; pixel
+   font, phosphor green, a blinking caret; the logo <a> is the link. */
 .blip-logo .logo-hint {
   position: absolute;
   left: 3px;
@@ -338,22 +313,15 @@ canvas {
    pages' own insert-coin button, so it lives in kiosk.css (scoped to
    "#insert-coin-btn, #kiosk-insert-btn") rather than duplicated here. */
 
-/* ---- Need-coin / INSERT COIN attract overlay ----
-   The overlay itself, its panel, the CRT flicker and the coin-button
-   flash all live in kiosk.css now (the front page uses the same attract
-   screen on startup). This is just the game-page tweak: stop the dim
-   above the deck so the joystick stays visible over it. */
+/* ---- Need-coin overlay ---- Styled in kiosk.css; on a game page it stops
+   above the deck so the controls stay visible. */
 #need-coin-overlay {
   bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px));
 }
 
-/* ---- Touch / on-screen arcade controls ----
-   The stick and fire buttons themselves (mounted in the bar, the 3D tilt,
-   the boot/shaft/ball, the buttons) are shared with the kiosk landing
-   page's bar, so they live in kiosk.css scoped to "#topbar, .kiosk-bar-main"
-   — see the "Arcade control deck" section there. This file only keeps the
-   game-page-specific short-screen resize below (the landing page has no
-   canvas to make room for, so it doesn't need it). */
+/* ---- On-screen controls ---- The deck itself is shared with the landing
+   page and lives in kiosk.css ("Control deck"); only game-page tweaks are
+   here. */
 
 #topbar {
   overflow: visible;
@@ -363,12 +331,9 @@ canvas {
 }
 #topbar .deck-panel { touch-action: none; }
 
-/* ---- Paddle dials (rally) ----
-   Mounted in the deck like the joystick: two spinner knobs lying on the
-   tilted .deck-panel (so they read as 3D — foreshortened to ellipses, a
-   chrome cap standing proud of the surface on translateZ, a contact
-   shadow on the panel). P1 left, P2 right. shell.js reveals them and
-   drives the touch spin (rotating #dial-hand). */
+/* ---- Paddle dials (Rally) ---- Two spinner knobs lying on the tilted
+   .deck-panel, chrome caps standing proud on translateZ, P1 left and P2
+   right. shell.js shows them and drives the spin. */
 #paddle-dial, #paddle-dial-p2 {
   display: none;
   position: absolute;
@@ -504,10 +469,8 @@ canvas {
   pointer-events: none;
 }
 
-/* P2 dial — CPU mode (1-player selected): you can't grab it, and the
-   chrome goes cool/desaturated, but it still turns (window.blipPaddles
-   spins it to the CPU's paddle) with a dimmer pointer so you can watch
-   the computer play it. The label reads CPU (set in shell.js). */
+/* P2 dial in one-player mode: not grabbable and cooled in colour, but it
+   turns with the CPU's paddle (window.blipPaddles). The label reads CPU. */
 #paddle-dial-p2.cpu-mode {
   pointer-events: none;
 }
@@ -561,10 +524,8 @@ canvas {
   .marquee-bulbs { max-width: 40px; }
 }
 
-/* ---- High-score board + name prompt (web/blip_scores.js) ----
-   A modal panel over the game canvas at game-over: the top-10 for this
-   cabinet, or a one-field "enter your name" the first time. Styled to sit
-   with the CRT / pixel-font look of the games themselves. */
+/* ---- High-score board + name prompt (blip_scores.js) ---- A modal at game
+   over: this cabinet's top 10, or a one-field name prompt the first time. */
 .blip-hs-modal {
   position: fixed;
   inset: 0;
@@ -600,13 +561,9 @@ canvas {
 .blip-hs-panel::-webkit-scrollbar { display: none; } /* Chrome/Safari/Edge */
 .blip-hs-panel.wide { width: min(94vw, 380px); }
 
-/* While a code is on screen it is the only thing that matters, so the
-   panel stops being a tidy 340px card and becomes as big as the screen
-   allows. A QR is scanned by another phone's camera from a hand's
-   distance: every extra pixel of code is more pixels per module for that
-   camera to resolve, which is the difference between reading it at a
-   glance and hunting for the angle that works. Square-ish, because the
-   code is square and height is what usually runs out first. */
+/* While a recovery code is shown the panel grows as big as the screen allows:
+   more pixels per QR module is what lets another phone's camera read it at a
+   glance. */
 .blip-hs-panel.showing-code {
   width: min(96vw, 96vh);
   max-width: min(96vw, 96vh);
@@ -706,10 +663,8 @@ canvas {
   .blip-hs-code { font-size: 12px; letter-spacing: 2px; }
 }
 
-/* ---- The cabinet under the screen ----
-   One full-width body from the bezel down, with a lit ledge where the
-   screen housing meets it. The deck's 16px side gutters used to show the
-   wall through, so the panel read as a slab floating in front of it. */
+/* ---- The cabinet under the screen ---- One full-width body from the bezel
+   down, with a lit ledge where the screen housing meets it. */
 :root[data-layout="upright"] #topbar { background: none; }
 :root[data-layout="upright"] #topbar::before {
   content: '';

@@ -1,33 +1,17 @@
-/* blip_controller.js — one input abstraction for the whole web shell.
- *
- * Every control surface in BLIP funnels through here: the on-screen Super
- * Nintendo pad (the default), the classic arcade joystick + fire buttons,
- * a physical keyboard, and a physical gamepad. Consumers — shell.js on a
- * game page, index.html on the kiosk — call BlipController.init() once and
- * subscribe; they never care which surface is actually driving.
- *
- * Logical inputs (the shared vocabulary):
- *
- *   up / down / left / right   directional, held
- *   button1                    primary action  (fire / launch / serve — Space)
- *   button2                    secondary       (Meteors hyperspace     — Z)
- *   start                      edge — "start the selected game"
- *   select                     edge — "go to the game kiosk"
- *
- * The Super Nintendo pad's physical buttons fold onto that vocabulary:
- *
- *   D-pad            -> up / down / left / right
- *   B, A             -> button1
- *   Y, X, L, R       -> button2
- *   START            -> start
- *   SELECT           -> select
- *
- * button1 / button2 are dispatched as synthetic KeyboardEvents on the game
- * canvas (per-game key/code from BLIP_GAMES), so the WASM games need no
- * change — it is the exact path the old touch code used. When init() gets
- * no `canvas` (the kiosk landing page) nothing is injected; the consumer
- * wires the logical events straight to its own navigation.
- */
+/* blip_controller.js: one input layer for the web shell.
+ * The on-screen pad (default) and arcade stick, the keyboard and a gamepad
+ * all funnel through here. shell.js (game pages) and index.html (the landing
+ * page) call BlipController.init() once and subscribe, whatever is driving.
+ * Logical inputs:
+ *   up / down / left / right  held
+ *   button1 .. button4        the game's caps in BLIP_GAMES order
+ *                             (button2 falls back to button1)
+ *   p2up .. p2button4         the second station
+ *   start                     edge: taps button1, or cfg.onStart
+ *   select                    edge: back to the game grid, or cfg.onSelect
+ * Presses become synthetic KeyboardEvents on the game canvas (per-game
+ * key/code), so the games need no change. With no `canvas` (the landing page)
+ * nothing is injected and the consumer wires the logical events itself. */
 (function () {
   'use strict';
 
@@ -56,7 +40,7 @@
   var roots  = [];                // containers holding [data-blip] elements, for visual reflect
 
   /* ------------------------------------------------------------------ */
-  /* Key map — arrows are fixed, the two action buttons come per-game     */
+  /* Key map — arrows are fixed, the action buttons come per game         */
   /* ------------------------------------------------------------------ */
 
   function buildKeymap(buttons, extra) {
@@ -67,14 +51,12 @@
       left:    { key: 'ArrowLeft',  code: 'ArrowLeft' },
       right:   { key: 'ArrowRight', code: 'ArrowRight' }
     };
-    // One logical name per button the game declares, however many that
-    // is. Two was enough until a fighting game wanted a kick per height;
-    // nothing below cares how long the list is.
+    // One logical name per button the game declares.
     for (var i = 0; i < list.length; i++) {
       map['button' + (i + 1)] = { key: list[i].key, code: list[i].code };
     }
-    // A one-button game still answers to button2, because the SNES pad
-    // folds Y / X / L / R onto it whatever the game asked for.
+    // A one-button game still answers to button2: deck.js gives it two
+    // live caps that both fire.
     if (!map.button2) map.button2 = map.button1;
     // Anything else the game names itself — a second player's stick and
     // buttons (p2up … p2button4), or its own keys for player one's
@@ -249,14 +231,11 @@
   /* ------------------------------------------------------------------ */
   /* Touch-list authority                                                */
   /* ------------------------------------------------------------------ */
-  // On a touch screen the browser can fire a spurious `pointercancel` on a
-  // finger that is still physically down — it happens constantly when one
-  // thumb holds fire while the other works the d-pad hard, and the old code
-  // read that cancel as "released", so continued fire kept dropping.
-  // `TouchEvent.touches` is the one list that always reflects reality, so
-  // the face buttons and the d-pad resolve their held state from it here;
-  // pointer events only drive the press *edge* (feedback + capture) and the
-  // mouse path. A `pointercancel` is now ignored outright.
+  // A touch screen fires spurious `pointercancel`s on fingers still down
+  // (constantly, with one thumb on fire and the other working the cross).
+  // `TouchEvent.touches` is always right, so held state comes from it;
+  // pointer events only drive the press edge and the mouse path, and
+  // `pointercancel` is ignored.
 
   var _tBtns = [];    // { el, on, press, release, _pend }
   var _tDpads = [];   // one { pad, calc, clear, _pend } per bound d-pad
@@ -264,19 +243,16 @@
   function _hit(r, x, y, m) {
     return x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m;
   }
-  // Releases are deferred one frame: iOS cancels every active touch when a
-  // multi-touch gesture starts moving, then re-fires touchstart for the
-  // fingers still down. Waiting a frame lets that restart land, so a
-  // still-held button never blinks off.
+  // Releases wait a frame: iOS cancels every touch when a multi-touch gesture
+  // moves, then re-fires touchstart for the fingers still down.
   function _defer(o, fn) {
     if (o._pend) return;
     o._pend = true;
     requestAnimationFrame(function () { if (o._pend) { o._pend = false; fn(); } });
   }
-  // Slop past a control's edge that still counts as touching it. A thumb
-  // is bigger than the cap it is aiming at, but each touch belongs to ONE
-  // control: the one whose edge is nearest (0 inside it), so neighbouring
-  // caps, or a cap beside a cross, never both fire.
+  // Slop past a control's edge that still counts as touching it; each touch
+  // belongs to the one control whose edge is nearest (0 inside), so
+  // neighbours never both fire.
   var BTN_SLOP = 12, DPAD_SLOP = 14;
   function _edgeDist(r, x, y) {
     var dx = Math.max(r.left - x, 0, x - r.right);
@@ -338,10 +314,9 @@
   /* Binders — connect a source surface to set()                         */
   /* ------------------------------------------------------------------ */
 
-  // Any container of elements carrying data-blip="<logical name>" (may list
-  // several, space-separated). Press / release; on a touch device the live
-  // touch list (above) is the authority, on a mouse the pointer events are.
-  // A d-pad cross is bound with bindDpad() instead.
+  // Any container of elements with data-blip="<logical name>"
+  // (space-separated for several). On touch the live touch list is the
+  // authority, on a mouse the pointer events. A cross uses bindDpad().
   function bindButtons(root) {
     if (!root) return;
     if (roots.indexOf(root) === -1) roots.push(root);
@@ -387,10 +362,9 @@
     })(els[i]);
   }
 
-  // The d-pad cross: one floating pivot at the centre of `pad`, thumb
-  // position resolved to a simple 4-way cross with a dead centre — press
-  // toward a corner and both axes engage (a real diagonal), the classic
-  // "roll" you can sweep around the rim.
+  // The cross: one pivot at the centre of `pad`, the thumb resolved to four
+  // ways with a dead centre; toward a corner both axes engage, so you can
+  // roll round the rim.
   function bindDpad(pad, o) {
     if (!pad) return;
     o = o || {};
@@ -447,16 +421,13 @@
     // pointercancel: deliberately not handled — see "Touch-list authority".
   }
 
-  // The rally rotary dial: a knob you spin with a thumb. Each frame's
-  // angular delta past a small dead band drives an up / down key (the
-  // paddle it's wired to), and a spin that barely moved is treated as a
-  // tap (mode select on the title screen). The knob's *visible* rotation
-  // is not set here — rally drives that from the game via window.blipPaddles
-  // so it tracks the real paddle, not the raw gesture.
-  //
-  //   opts.up / opts.down / opts.tap : { key, code } specs to inject
+  // Rally's spinner: each frame's angle past a small dead band drives up /
+  // down (its paddle); a spin that barely moved is a tap (mode select). The
+  // knob's drawn rotation comes from the game (window.blipPaddles), not the
+  // gesture.
+  //   opts.up / opts.down / opts.tap : { key, code } to inject
   //   opts.onTap / opts.onInteract   : callbacks (title-screen mode select)
-  //   opts.dead                      : rad/frame dead band (default 0.018)
+  //   opts.dead                      : rad dead band (default 0.018)
   function bindDial(dialEl, opts2) {
     if (!dialEl) return;
     opts2 = opts2 || {};
@@ -500,19 +471,9 @@
       last = a;
       total += Math.abs(d);
 
-      // Rotation is *accumulated* rather than thresholded per event.
-      //
-      // Testing each event's own delta against the dead zone threw away
-      // every rotation slower than one dead zone per pointermove — which
-      // is precisely the careful, deliberate turn a player makes when
-      // lining the paddle up, so fine adjustment did nothing at all while
-      // a fast flick worked. Worse, one small delta mid-turn released the
-      // key, so even a steady turn stuttered.
-      //
-      // Accumulating means a slow turn still crosses the threshold, just
-      // later; the direction is then held until the finger actually stops
-      // (IDLE_RELEASE_MS) or reverses. Fast turns are unchanged, because
-      // they cross the threshold on the first event as they always did.
+      // Rotation accumulates rather than being tested per event, so a slow,
+      // careful turn still crosses the dead band; the direction then holds
+      // until the finger stops (IDLE_RELEASE_MS) or reverses.
       acc += d;
       if (acc > dead) { acc = 0; dir(false, true); }
       else if (acc < -dead) { acc = 0; dir(true, false); }
@@ -532,10 +493,8 @@
     dialEl.addEventListener('pointercancel', end);
   }
 
-  // Physical keyboard — reflection only. The real keypress already reaches
-  // the game (macroquad reads it straight); this just leans the on-screen
-  // stick / lights the on-screen pad so the deck doubles as an input
-  // read-out for a keyboard player.
+  // Physical keyboard, reflection only: the key already reaches the game;
+  // this lights the deck to match.
   function bindKeyboard() {
     document.addEventListener('keydown', function (e) {
       var n = nameForCode(e.code); if (n) set(n, true, { silent: true });

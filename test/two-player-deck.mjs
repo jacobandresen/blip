@@ -1,18 +1,9 @@
-// The cabinet's control deck, when the cabinet seats two players.
-//
-// Brawler has a 2-PLAYER badge on it, so its deck has to have two
-// stations: two sticks and two sets of four caps, one per player, in
-// whichever controller the player picked (the arcade stick or the game
-// pad). Nothing about that is drawn by the game — it is the deck, and
-// the deck is the page.
-//
-// What can silently break here is the wiring, not the look. Every cap
-// and every stick direction funnels through one logical name in
-// BlipController, and a second player means eight more of them. Get one
-// wrong and two caps send the same key: player two punches and player
-// one's fighter throws it. These tests press each control and read back
-// the key that actually reached the canvas, which is the only thing the
-// wasm game ever sees.
+// The control deck of a two-seat cabinet: two stations (stick or pad, four
+// caps each), one per player.
+// What breaks silently is the wiring: every cap and direction maps to one
+// BlipController name, sixteen of them with two players. These tests press
+// each control and read back the key that reached the canvas, which is all
+// the wasm game sees.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -83,10 +74,8 @@ const DECK_NAMES = `(function () {
   };
 })()`;
 
-/** Whether a station is in play, as opposed to merely on the panel.
- * A two-player cabinet shows both stations in a one-player game too —
- * that is what the empty half of an arcade panel looks like — so the
- * question is never "is it there" but "is anybody at it". */
+/** Whether a station is in play, not merely on the panel: a two-seat cabinet
+ * shows both stations in a one-player game too. */
 const LIVE = (sel) => `(function () {
   var el = document.querySelector(${JSON.stringify(sel)});
   if (!el) return null;
@@ -220,10 +209,8 @@ test(`brawler's deck seats two players (${ENGINE})`, async (t) => {
     }
   });
 
-  // The deck doubles as a read-out for a keyboard player: whichever
-  // player's key is pressed, that player's stick leans. WASD is player
-  // one's and the arrows are player two's, so a deck that still reads
-  // the arrows as "up" leans the wrong stick.
+  // The deck mirrors a keyboard player: WASD leans player one's stick, the
+  // arrows player two's.
   await t.test('a keyboard player leans their own stick, not the other one', async () => {
     await loadGame(cdp, 'brawler', 'stick');
     await evaluate(cdp, 'window.blipSetMode(1)');
@@ -258,10 +245,8 @@ test(`a one-player cabinet still has one station (${ENGINE})`, async (t) => {
   const { cdp } = await openPage(t, ENGINE);
 
   await t.test('serpent gets the same panel, with the spare caps dead', async () => {
-    // The panel belongs to the machine, not to the game: serpent reads
-    // one button and still sits behind the cabinet's four, the way a
-    // JAMMA board does. What it must not do is WIRE them — a cap past
-    // what the game reads carries no logical name at all.
+    // Serpent reads one button and still shows the cabinet's four, like a
+    // JAMMA board; caps past what the game reads carry no logical name.
     await loadGame(cdp, 'serpent', 'stick');
     assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), true,
       'the cabinet lost its second station on a one-player game');
@@ -300,14 +285,9 @@ test(`a one-player cabinet still has one station (${ENGINE})`, async (t) => {
 });
 
 // ---- A phone turned on its side ----------------------------------------
-//
-// Upright the deck is a strip across the bottom and the picture sits
-// above it. Turned sideways that strip is a third of the screen's
-// height and the picture becomes a slot — while a 5:4 picture in a 2:1
-// screen leaves a wide black gutter down each side doing nothing. So
-// sideways the controls move into the gutters, and the picture gets
-// the whole height. These tests measure that it actually does, and
-// that nothing lands on top of the picture.
+// Sideways the controls move into the side gutters of the 5:4 picture and the
+// picture gets the whole height. These measure that, and that nothing lands
+// on the picture.
 
 const GEOMETRY = `(function () {
   function box(sel) {
@@ -395,14 +375,8 @@ test(`a phone on its side puts the controls beside the picture (${ENGINE})`, asy
   });
 
   await t.test("each player's controls are together, and the players are apart", async () => {
-    // Two rules, and the second is the one that keeps getting broken.
-    // Within a station the stick is on the left and the buttons on the
-    // right, whichever controller is on — the deck must not be two
-    // different controllers depending on which you picked. Between the
-    // stations there is a gap, and it has to be bigger than any gap
-    // inside one: with each station spread across its own half of the
-    // panel, player one's buttons ended up against player two's stick
-    // and the daylight was in the wrong place.
+    // Within a station: stick left, caps right, whichever controller. Between
+    // stations: a gap bigger than any inside one.
     for (const size of [PORTRAIT, LANDSCAPE]) {
       for (const [controls, steer, hit, steer2, hit2] of
            [['stick', '#stick-base', '#fire-buttons', '#stick-base-p2', '#fire-buttons-p2'],
@@ -435,12 +409,8 @@ test(`a phone on its side puts the controls beside the picture (${ENGINE})`, asy
   });
 
   await t.test('the caps sit inside the panel, not over it', async () => {
-    // The square of caps is twice as deep as the single row the deck
-    // used to carry, and the bar heights that allowed for it were
-    // written inside the phone and touch-screen media queries — so an
-    // ordinary desktop browser, which is neither, kept the bar built
-    // for one row and the top row of caps began sixteen pixels ABOVE
-    // the panel's own top edge. Buttons hovering over the bar.
+    // The square of caps needs a bar deep enough on an ordinary desktop too
+    // (neither phone nor touch), or the top row sits above the panel's edge.
     for (const [page, w, h] of [['index.html', 1280, 900],
                                 ['brawler/index.html', 1280, 900],
                                 ['brawler/index.html', 390, 844],
@@ -471,12 +441,9 @@ test(`a phone on its side puts the controls beside the picture (${ENGINE})`, asy
   });
 
   await t.test('every page carries the same deck', async () => {
-    // One cabinet, one control panel. The front page, the info pages
-    // and every game except rally show the identical deck — same bar,
-    // same stick, same two stations of four caps — and a game that
-    // reads fewer simply leaves the spares blank. It had drifted: the
-    // landing page had one station and two buttons, each game had as
-    // many caps as it declared, and nothing compared them.
+    // One cabinet, one panel: the front page, the info pages and every game
+    // but Rally show the identical deck; a game that reads fewer caps leaves
+    // the spares blank.
     const PAGES = ['index.html', 'about.html', 'serpent/index.html',
                    'meteors/index.html', 'brawler/index.html'];
     const shape = async (page) => {
@@ -555,19 +522,10 @@ test(`a phone on its side puts the controls beside the picture (${ENGINE})`, asy
   });
 });
 
-// ---- the deck answers the title screen ----------------------------------
-//
-// Choosing between one player and two is a question, and the answer a
-// player is looking for is whether a second stick appears in front of
-// them. Told only once the choice is confirmed, the deck is reporting
-// history; told on the select screen, it has answered a question
-// nobody is asking any more. So the game reports the mode as the
-// cursor lands on it.
-//
-// This drives the real wasm — a coin in the slot and a key on the
-// keyboard — because the thing being tested is whether the game calls
-// out at the right moment, and calling window.blipSetMode by hand would
-// test only that the page still listens.
+// ---- The deck answers the title screen ----------------------------------
+// The game reports the mode as the cursor lands on it, so the second station
+// appears while the player is choosing. Drives the real wasm (a coin and a
+// key) because the thing tested is when the game calls out.
 
 async function bootGame(cdp, controls) {
   await loadGame(cdp, 'brawler', controls);
@@ -596,10 +554,8 @@ test(`the deck answers the title screen straight away (${ENGINE})`, async (t) =>
   const { cdp } = await openPage(t, ENGINE);
 
   for (const controls of ['stick', 'pad']) {
-    // Which element *is* station two depends on which controller is
-    // on: the joystick deck hides its pads and the pad deck hides its
-    // sticks, so asking after the wrong one asks after something that
-    // is deliberately not there.
+    // Station two is #deck-p2 on the stick deck and #snes-pad-p2 on the pad
+    // deck; the other is hidden on purpose.
     const station2 = controls === 'stick' ? '#deck-p2' : '#snes-pad-p2';
     await t.test(`${controls}: the second station arrives with the cursor`, async () => {
       await bootGame(cdp, controls);
@@ -634,14 +590,9 @@ test(`the deck answers the title screen straight away (${ENGINE})`, async (t) =>
   }
 });
 
-// ---- what a thumb is actually offered ----------------------------------
-//
-// The deck is a panel tilted back so it reads as a surface you are
-// looking down onto, and the tilt is a projection: what the CSS calls a
-// 37px button, a thumb finds as 17px of screen. That is the number that
-// matters and it was never being measured, so it went unnoticed for as
-// long as the tilt did. These measure the rendered geometry — the same
-// rectangles the touch code hit-tests against.
+// ---- What a thumb is actually offered ----------------------------------
+// The deck is tilted, so a cap's CSS size is not its screen size. These
+// measure the rendered rectangles, the same ones the touch code hit-tests.
 
 const TARGETS = `(function () {
   function box(sel) {
@@ -690,11 +641,9 @@ test(`a thumb gets a real target on a small phone (${ENGINE})`, async (t) => {
           const what = `${phone.name} ${controls} ${players}P`;
           assert.equal(g.caps.length, 4, `${what}: found ${g.caps.length} caps, not four`);
           for (const c of g.caps) {
-            // 28px is what the projection allows on the narrowest phone
-            // with two stations on the panel. It is short of Apple's 44,
-            // and the touch code's own ±14px of slop covers the rest —
-            // but it is nearly double the 17px the tilt used to leave,
-            // and that is the regression being guarded here.
+            // 28px is what the projection allows on the narrowest phone with
+            // two stations; the touch code's ±14px slop covers the rest of
+            // Apple's 44.
             assert.ok(c.w >= 30 && c.h >= 28,
               `${what}: a cap renders ${Math.round(c.w)}x${Math.round(c.h)}`);
           }
@@ -718,10 +667,8 @@ test(`a thumb gets a real target on a small phone (${ENGINE})`, async (t) => {
             `${what}: a cap at ${Math.round(c.x)}..${Math.round(c.r)} is outside `
             + `the panel (${Math.round(g.bar.x)}..${Math.round(g.bar.r)})`);
         }
-        // The whole station, not just the caps in it. A station is
-        // wider than its controls — padding, and the recessed plate the
-        // caps are set into — and it is that margin, not the caps, that
-        // has run off the end of the panel every time this has broken.
+        // The whole station, padding and plate included, must stay on the
+        // panel.
         for (const st of g.sides) {
           assert.ok(st.x >= g.bar.x - 2 && st.r <= g.bar.r + 2,
             `${what}: a station at ${Math.round(st.x)}..${Math.round(st.r)} overflows `
@@ -732,10 +679,8 @@ test(`a thumb gets a real target on a small phone (${ENGINE})`, async (t) => {
   });
 
   await t.test('two caps never share a thumb', async () => {
-    // The touch code grants each button ±14px of slop, which is what
-    // makes a small target forgiving — and would make two of them
-    // ambiguous if they sat closer than that. The gap between adjacent
-    // caps has to be worth having.
+    // Each cap gets ±14px of slop, so adjacent caps need a real gap between
+    // them or a touch is ambiguous.
     await cdp.page.setViewportSize(PHONES[0]);
     await loadGame(cdp, 'brawler', 'stick');
     await evaluate(cdp, 'window.blipSetMode(1)');
@@ -751,12 +696,8 @@ test(`a thumb gets a real target on a small phone (${ENGINE})`, async (t) => {
 });
 
 test(`a big touch screen gets a deck sized for a finger (${ENGINE})`, async (t) => {
-  // The regression this guards against was found by playing on one.
-  // Everything that sizes the deck for a thumb was keyed on the screen
-  // being SMALL, so a wall-mounted touch panel — which is neither small
-  // nor a mouse — got the desktop deck: the full 56-degree tilt, caps
-  // meant for a pointer, and a 78px bar. What a finger was offered
-  // there was a leaning ellipse about twenty pixels tall.
+  // A large touch screen (neither small nor a mouse) must get the thumb-sized
+  // deck too.
   const { cdp } = await openPage(t, ENGINE);
   const browser = cdp.page.context().browser();
 
@@ -789,10 +730,8 @@ test(`a big touch screen gets a deck sized for a finger (${ENGINE})`, async (t) 
         // Apple's 44pt, which there is plenty of room for at this size.
         assert.ok(c.w >= 44 && c.h >= 44,
           `${where}: a cap renders ${Math.round(c.w)}x${Math.round(c.h)}`);
-        // And round, not a leaning ellipse: the panel's perspective was
-        // a fixed 640px whatever it was looking at, which on a 1248px
-        // deck is a fisheye — it stretched the outer stations sideways
-        // and tipped the buttons off their own axis.
+        // Round, not a leaning ellipse: the perspective scales with the
+        // viewport so wide decks are not fisheyed.
         assert.ok(Math.max(c.w, c.h) / Math.min(c.w, c.h) < 1.35,
           `${where}: a cap renders ${Math.round(c.w)}x${Math.round(c.h)} — `
           + 'the lens is distorting it');
@@ -803,14 +742,9 @@ test(`a big touch screen gets a deck sized for a finger (${ENGINE})`, async (t) 
 });
 
 test(`a second player joins by reaching for their own stick (${ENGINE})`, async (t) => {
-  // The whole point is that this works by TOUCH, so it is tested by
-  // touch: a real tap on the second station's own button, on a real
-  // touch context, against the real wasm. The Rust side has its own
-  // tests for the menu logic; what is checked here is the part that
-  // only exists in the page — that the second station is reachable at
-  // all while the title is up. It is dead to the touch during a
-  // one-player match, deliberately, and that very nearly made this
-  // impossible.
+  // Tested by touch: a real tap on station two's own button against the real
+  // wasm. The page's part is that station two is reachable while the title is
+  // up (it is dead during a one-player match).
   const { cdp } = await openPage(t, ENGINE);
   const browser = cdp.page.context().browser();
 
@@ -846,10 +780,7 @@ test(`a second player joins by reaching for their own stick (${ENGINE})`, async 
     const sel = controls === 'stick'
       ? '#fire-buttons-p2 .arcade-btn' : '#snes-pad-p2 .snes-btn';
     const box = await (await page.$(sel)).boundingBox();
-    // The deck reports itself as soon as the page is up, which is
-    // before the wasm has finished building its three themes and
-    // started reading input — so tap until it takes, the way a player
-    // would, rather than once at a guessed moment.
+    // The deck is up before the wasm reads input, so tap until it takes.
     const deadline = Date.now() + 15000;
     do {
       await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
@@ -865,10 +796,8 @@ test(`a second player joins by reaching for their own stick (${ENGINE})`, async 
 });
 
 test(`the deck never laps over the picture (${ENGINE})`, async (t) => {
-  // fillCanvas() reserved the height of the deck's BAR, but the stick's
-  // ball floats above that bar by design and the caps sit proud of it.
-  // On a taller deck the overhang reached far enough into the picture
-  // to hide Bouncer's bat.
+  // fillCanvas() must reserve what the deck covers (the caps sit proud of the
+  // bar), not just the bar's height.
   const { cdp } = await openPage(t, ENGINE);
   const GAMES = ['bouncer', 'serpent', 'brawler', 'meteors', 'rally', 'sky_raider'];
   const EXTENT = `(function () {
