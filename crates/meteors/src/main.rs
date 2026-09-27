@@ -187,8 +187,11 @@ impl Game {
     fn spawn_wave(&mut self) {
         for a in self.asteroids.iter_mut() { a.active = false; }
         let count = (WAVE_BASE + self.sess.level - 1).min(WAVE_MAX);
+        // Clear of the ship, wherever it is: a wave arrives mid-flight the
+        // instant the last rock dies, and the centre may be nowhere near it.
+        let (sx, sy) = if self.ship_alive { (self.ship.x, self.ship.y) } else { field_centre() };
         for _ in 0..count {
-            let (x, y) = spawn_pos_away_from_center();
+            let (x, y) = spawn_pos_away_from(sx, sy);
             spawn_asteroid(self, x, y, ASize::Large);
         }
     }
@@ -213,8 +216,8 @@ impl Game {
         self.saucer.active = false;
         let (lo, hi) = saucer_spawn_range(self.sess.level);
         self.saucer_cd = rand_range(lo, hi);
-        self.spawn_wave();
         self.respawn_ship();
+        self.spawn_wave();
         self.state = State::Play;
     }
 }
@@ -237,14 +240,18 @@ fn rand_range(lo: f32, hi: f32) -> f32 {
     gen_range(lo, hi)
 }
 
-fn spawn_pos_away_from_center() -> (f32, f32) {
-    let cx = PLAY_W as f32 / 2.0;
-    let cy = PLAY_Y0 + PLAY_H as f32 / 2.0;
+fn field_centre() -> (f32, f32) {
+    (PLAY_W as f32 / 2.0, PLAY_Y0 + PLAY_H as f32 / 2.0)
+}
+
+/// A point at least SAFE_RADIUS from (cx, cy), measured across the wrap.
+fn spawn_pos_away_from(cx: f32, cy: f32) -> (f32, f32) {
+    let (w, h) = (PLAY_W as f32, PLAY_H as f32);
     loop {
-        let x = rand_range(0.0, PLAY_W as f32);
-        let y = rand_range(PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
-        let dx = x - cx;
-        let dy = y - cy;
+        let x = rand_range(0.0, w);
+        let y = rand_range(PLAY_Y0, PLAY_Y0 + h);
+        let dx = (x - cx).abs().min(w - (x - cx).abs());
+        let dy = (y - cy).abs().min(h - (y - cy).abs());
         if dx * dx + dy * dy > SAFE_RADIUS * SAFE_RADIUS {
             return (x, y);
         }
