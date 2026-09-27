@@ -174,7 +174,7 @@ fn victory_sfx() -> Vec<u8> {
 /// cycling twice, and two early reflections off the airframe. `pitch`
 /// and `seed` make the takes differ, so autofire is a rattle of shots
 /// rather than one sample on a loop.
-fn gun_report(seed: u32, pitch: f32) -> Vec<i16> {
+fn gun_report(seed: u32, pitch: f32) -> Vec<f32> {
     let sr = SAMPLE_RATE as f32;
     let n = ms_to_samples(120.0);
     let mut rng = Rng(seed | 1);
@@ -211,8 +211,23 @@ fn gun_report(seed: u32, pitch: f32) -> Vec<i16> {
             buf[i] += lp * g;
         }
     }
-    let scaled: Vec<f32> = buf.iter().map(|v| v * 21_000.0).collect();
-    soft_limit_to_pcm16(&scaled, MIX_KNEE)
+    buf
+}
+
+/// `guns` guns firing one burst: each report a few ms off the others and a
+/// little off pitch, summed and then limited, so more guns come out denser
+/// and louder rather than the same shot turned up.
+fn gun_burst(guns: usize, seed: u32) -> Vec<i16> {
+    let mut rng = Rng(seed | 1);
+    let pad = ms_to_samples(16.0);
+    let mut mix = vec![0.0f32; ms_to_samples(120.0) + pad];
+    for g in 0..guns {
+        let delay = if g == 0 { 0 } else { (rng.next_f32() * pad as f32) as usize };
+        let pitch = 0.9 + rng.next_f32() * 0.2;
+        let shot = gun_report(seed.wrapping_add(g as u32 * 0x9E37_79B9), pitch);
+        for (i, v) in shot.iter().enumerate() { mix[delay + i] += v * 16_000.0; }
+    }
+    soft_limit_to_pcm16(&mix, MIX_KNEE)
 }
 
 /// A ricochet: a hard metallic tick where the round strikes, then the
@@ -2117,9 +2132,16 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/barrier_hum.wav",    barrier_hum_sfx()),
         ("sounds/engine_start.wav",   engine_start_sfx()),
         ("sounds/propeller.wav",      propeller_sfx()),
-        ("sounds/shoot1.wav",         encode_pcm16_mono(&gun_report(0x5A0F_7E11, 1.0))),
-        ("sounds/shoot2.wav",         encode_pcm16_mono(&gun_report(0x1D2E_3F41, 0.93))),
-        ("sounds/shoot3.wav",         encode_pcm16_mono(&gun_report(0x7C6B_5A49, 1.07))),
+        ("sounds/burst1_1.wav", encode_pcm16_mono(&gun_burst(2, 0x5a0f82d5))),
+        ("sounds/burst1_2.wav", encode_pcm16_mono(&gun_burst(2, 0x5a0f8698))),
+        ("sounds/burst2_1.wav", encode_pcm16_mono(&gun_burst(3, 0x5a0f83d6))),
+        ("sounds/burst2_2.wav", encode_pcm16_mono(&gun_burst(3, 0x5a0f8799))),
+        ("sounds/burst3_1.wav", encode_pcm16_mono(&gun_burst(5, 0x5a0f84d7))),
+        ("sounds/burst3_2.wav", encode_pcm16_mono(&gun_burst(5, 0x5a0f889a))),
+        ("sounds/burst4_1.wav", encode_pcm16_mono(&gun_burst(6, 0x5a0f85d8))),
+        ("sounds/burst4_2.wav", encode_pcm16_mono(&gun_burst(6, 0x5a0f899b))),
+        ("sounds/burst5_1.wav", encode_pcm16_mono(&gun_burst(8, 0x5a0f86d9))),
+        ("sounds/burst5_2.wav", encode_pcm16_mono(&gun_burst(8, 0x5a0f8a9c))),
         ("sounds/enemy_explode.wav",  encode_pcm16_mono(&explosion_sfx(520.0, 0.8, 95.0, 1.0, 0xE1E1))),
         ("sounds/player_explode.wav", encode_pcm16_mono(&explosion_sfx(1100.0, 1.0, 70.0, 1.6, 0x9A7E))),
         // A short, quieter crack for a non-lethal hit — reads as "took a

@@ -6,6 +6,7 @@ use blip::input::{
 };
 use blip::macroquad::audio::{play_sound, set_sound_volume, stop_sound, PlaySoundParams};
 use blip::macroquad::math::vec2;
+use blip::macroquad::shapes::draw_triangle;
 use blip::macroquad::prelude::ImageFormat;
 use blip::macroquad::rand::rand;
 use blip::macroquad::texture::{draw_texture_ex, DrawTextureParams, FilterMode, Texture2D};
@@ -221,7 +222,7 @@ impl Pooled for Bullet {
 /// 2r + 2 wide). `bounced` once it has ricocheted: it can still hit, but
 /// not glance off again.
 #[derive(Copy, Clone)]
-struct Round { x: f32, y: f32, vx: f32, vy: f32, r: f32, bounced: bool, active: bool }
+struct Round { x: f32, y: f32, vx: f32, vy: f32, r: f32, bounced: bool, tracer: bool, active: bool }
 impl Pooled for Round {
     fn is_active(&self) -> bool { self.active }
 }
@@ -439,6 +440,8 @@ struct Game {
     muzzle_t: f32,
     /// Alternates the casing ejection side, burst by burst.
     eject_left: bool,
+    /// Counts rounds so every fifth is a tracer, as the belts were loaded.
+    rounds_fired: u32,
     enemy_bullets: [Bullet; MAX_ENEMY_BULLETS],
     enemies: [Enemy; MAX_ENEMIES],
     explosions: [Explosion; MAX_EXPLOSIONS],
@@ -559,7 +562,8 @@ impl Game {
             launch_wave_up: false,
             weapon_level: 1,
             health: PLAYER_HEALTH_MAX,
-            bullets: [Round { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, r: 0.0, bounced: false, active: false }; MAX_PLAYER_BULLETS],
+            bullets: [Round { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, r: 0.0, bounced: false, tracer: false, active: false }; MAX_PLAYER_BULLETS],
+            rounds_fired: 0,
             casings: [Casing { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, rot: 0.0, ttl: 0.0, active: false }; MAX_CASINGS],
             muzzle_t: 0.0,
             eject_left: false,
@@ -693,7 +697,8 @@ impl Game {
 }
 
 struct Sounds {
-    shoot: [blip::BlipSound; 3],
+    /// Per weapon tier, two takes of that many guns firing together.
+    shoot: Vec<[blip::BlipSound; 2]>,
     enemy_explode: blip::BlipSound,
     player_explode: blip::BlipSound,
     player_hit: blip::BlipSound,
@@ -1286,8 +1291,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 vy: BULLET_SPEED,
                 r,
                 bounced: false,
+                tracer: g.rounds_fired % 5 == 0,
                 active: true,
             });
+            g.rounds_fired = g.rounds_fired.wrapping_add(1);
         }
         g.muzzle_t = 0.05;
         g.eject_left = !g.eject_left;
@@ -1298,8 +1305,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             vy: 20.0 + rand01() * 40.0,
             rot: rand01() * 3.0, ttl: 0.45, active: true,
         });
-        let take = &sfx.shoot[(rand() % sfx.shoot.len() as u32) as usize];
-        play_sfx_volume(take, 0.75 + 0.05 * g.weapon_level as f32);
+        let takes = &sfx.shoot[(g.weapon_level.clamp(1, MAX_WEAPON_LEVEL) - 1) as usize];
+        play_sfx_volume(&takes[(rand() % takes.len() as u32) as usize], 0.8 + 0.04 * g.weapon_level as f32);
     }
     g.muzzle_t = (g.muzzle_t - dt).max(0.0);
     for c in pool_iter_mut(&mut g.casings) {
@@ -2068,15 +2075,33 @@ fn draw_play(
     }
     // Rounds: a hot head with a tracer streak behind it along its path,
     // coloured and sized by the tier that fired it.
+    // Rounds: a brass slug with a pointed copper nose and a glint, laid
+    // along its flight; every fifth a burning tracer, a hot streak in the
+    // tier's colour.
     let bcolor = weapon_tier_color(g.weapon_level);
-    let trail = BlipColor::new(bcolor.r, bcolor.g * 0.8, bcolor.b * 0.5, 0.45);
-    let hot = BlipColor::new(1.0, 0.97, 0.85, 1.0);
+    let brass = BlipColor::new(0.82, 0.64, 0.28, 1.0);
+    let copper = BlipColor::new(0.72, 0.38, 0.20, 1.0);
+    let glint = BlipColor::new(1.0, 0.93, 0.72, 0.9);
     for b in pool_iter(&g.bullets) {
-        let len = 10.0 + b.r * 3.0;
-        let k = len / BULLET_SPEED;
-        blip.draw_line_ex(b.x - b.vx * k, b.y + b.vy * k, b.x, b.y, b.r * 1.1, trail);
-        blip.fill_circle(b.x, b.y, b.r, bcolor);
-        blip.fill_circle(b.x, b.y - b.r * 0.3, b.r * 0.5, hot);
+        let v = b.vx.hypot(b.vy).max(1.0);
+        let (dx, dy) = (b.vx / v, -b.vy / v); // unit, nose-ward
+        let (px, py) = (-dy, dx);
+        let (len, wid) = (b.r * 3.4, b.r * 1.15);
+        let (nx, ny) = (b.x, b.y);
+        let (tx, ty) = (nx - dx * len, ny - dy * len);
+        if b.tracer {
+            let hot = BlipColor::new((bcolor.r + 1.0) / 2.0, (bcolor.g + 1.0) / 2.0, (bcolor.b + 1.0) / 2.0, 1.0);
+            blip.draw_line_ex(tx - dx * len * 1.5, ty - dy * len * 1.5, nx, ny, wid * 0.55,
+                BlipColor::new(bcolor.r, bcolor.g, bcolor.b, 0.8));
+            blip.draw_line_ex(tx, ty, nx, ny, wid * 0.8, hot);
+            continue;
+        }
+        let (sx, sy) = (nx - dx * len * 0.35, ny - dy * len * 0.35); // where the ogive starts
+        blip.draw_line_ex(tx, ty, sx, sy, wid, brass);
+        draw_triangle(vec2(sx + px * wid / 2.0, sy + py * wid / 2.0),
+            vec2(sx - px * wid / 2.0, sy - py * wid / 2.0), vec2(nx, ny), copper);
+        blip.draw_line_ex(tx + px * wid * 0.22, ty + py * wid * 0.22,
+            sx + px * wid * 0.22, sy + py * wid * 0.22, (wid * 0.28).max(0.6), glint);
     }
     // Spent brass, tumbling off the wings.
     for c in pool_iter(&g.casings) {
@@ -2258,10 +2283,17 @@ const BOSS_NAME_JA_PNGS: [&[u8]; 7] = [
     include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_name_ja_7.png")),
 ];
 
-const SHOOT_WAV: [&[u8]; 3] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot1.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot2.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot3.wav")),
+macro_rules! burst_wav {
+    ($t:literal, $k:literal) => {
+        include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/burst", $t, "_", $k, ".wav"))
+    };
+}
+const SHOOT_WAV: [[&[u8]; 2]; 5] = [
+    [burst_wav!("1", "1"), burst_wav!("1", "2")],
+    [burst_wav!("2", "1"), burst_wav!("2", "2")],
+    [burst_wav!("3", "1"), burst_wav!("3", "2")],
+    [burst_wav!("4", "1"), burst_wav!("4", "2")],
+    [burst_wav!("5", "1"), burst_wav!("5", "2")],
 ];
 const ENEMY_EXPLODE_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/enemy_explode.wav"));
 const PLAYER_EXPLODE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/player_explode.wav"));
@@ -2319,12 +2351,12 @@ async fn main() {
     let cloud_tex = CLOUD_PNGS.map(load_png_smooth);
     let island_tex = ISLAND_PNGS.map(load_png);
 
+    let mut shoot = Vec::new();
+    for [a, b] in SHOOT_WAV {
+        shoot.push([blip::audio::load_sound(a).await, blip::audio::load_sound(b).await]);
+    }
     let sfx = Sounds {
-        shoot: [
-            blip::audio::load_sound(SHOOT_WAV[0]).await,
-            blip::audio::load_sound(SHOOT_WAV[1]).await,
-            blip::audio::load_sound(SHOOT_WAV[2]).await,
-        ],
+        shoot,
         enemy_explode:  blip::audio::load_sound(ENEMY_EXPLODE_WAV).await,
         player_explode: blip::audio::load_sound(PLAYER_EXPLODE_WAV).await,
         player_hit:     blip::audio::load_sound(PLAYER_HIT_WAV).await,
