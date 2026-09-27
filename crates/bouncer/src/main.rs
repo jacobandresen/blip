@@ -83,6 +83,16 @@ const SCREW_SPIN_DECAY: f32 = 0.9;     // spin bleeds off per second of flight
 // heading the "wrong" way.
 const SCREW_MAX_CURVE: f32 = 0.75; // radians (~43 degrees)
 
+// ---- pull ----------------------------------------------------------------
+// The ball keeps pulling the way it is heading vertically, harder the
+// flatter it flies, so a shot that would ping-pong wall to wall steepens
+// within a second instead. A screwball also gathers speed along its path
+// while it flies. The paddle and bricks set the speed back on the ramp.
+const PULL: f32 = 70.0;          // px/s^2 along vy
+const PULL_FLAT: f32 = 260.0;    // extra when |vy| is under 40% of the speed
+const SCREW_GAIN: f32 = 0.18;    // fraction of speed gained per second, spinning
+const PULL_CAP: f32 = 1.3;       // times BALL_SPEED_MAX, whatever the pull
+
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Launch, Play, Dead, Win, Over }
 
@@ -334,6 +344,22 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.ball_vx = vx * c - vy * s;
         g.ball_vy = vx * s + vy * c;
         g.ball_spin *= (1.0 - SCREW_SPIN_DECAY * dt).max(0.0);
+    }
+
+    // ---- pull: steepen and quicken the flight (see PULL) ----
+    {
+        let sp = g.ball_vx.hypot(g.ball_vy).max(1.0);
+        let flat = (1.0 - (g.ball_vy.abs() / sp) / 0.4).clamp(0.0, 1.0);
+        let dir = if g.ball_vy < 0.0 { -1.0 } else { 1.0 };
+        g.ball_vy += dir * (PULL + PULL_FLAT * flat) * dt;
+        if g.ball_spin.abs() > 0.001 || g.ball_curve_used > 0.0 {
+            let k = 1.0 + SCREW_GAIN * dt;
+            g.ball_vx *= k;
+            g.ball_vy *= k;
+        }
+        let sp = g.ball_vx.hypot(g.ball_vy);
+        let cap = BALL_SPEED_MAX * PULL_CAP;
+        if sp > cap { g.ball_vx *= cap / sp; g.ball_vy *= cap / sp; }
     }
 
     // Rolling-mark spin (visual only): angular rate = speed / radius, driven
