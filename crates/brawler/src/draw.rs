@@ -1567,6 +1567,33 @@ fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
                 load.to(up, sweep)
             };
         }
+        // The rei: heels together at attention, open hands at the thighs; a
+        // bow of about thirty degrees from the hips toward the opponent,
+        // held a beat, and up again. (The guard comes up after, in the
+        // blend into Idle.)
+        Act::Bow => {
+            let ease = |from: f32, len: f32| {
+                let k = ((f.t - from) / len).clamp(0.0, 1.0);
+                k * k * (3.0 - 2.0 * k)
+            };
+            let bow = ease(0.3, 0.42) * (1.0 - ease(1.0, 0.42));
+            // standing tall: legs all but straight, the hips going back as
+            // the torso tips forward
+            let hip = p(-6.0 * bow, HIP_U + 5.5 - 1.5 * bow);
+            let spine = HEAD_U - HIP_U + 1.0;
+            let lean = 0.62 * bow; // about 35 degrees at the bottom
+            let head = p(hip.f + spine * lean.sin() + 3.0 * bow, hip.u + spine * lean.cos() - 3.0 * bow);
+            q = Pose {
+                hip,
+                head,
+                // open hands at the sides of the thighs, sliding toward the knees
+                lead_hand: p(3.0 + 12.0 * bow, 46.0 - 12.0 * bow),
+                rear_hand: p(-3.0 + 12.0 * bow, 47.0 - 12.0 * bow),
+                lead_foot: p(6.0, 0.0),
+                rear_foot: p(-6.0, 0.0),
+                open: true,
+            };
+        }
         Act::Defeat => {
             let fall = |from: f32, len: f32| {
                 let k = ((f.t - from) / len).clamp(0.0, 1.0);
@@ -2289,7 +2316,7 @@ fn draw_select(blip: &Blip, g: &Game) {
 #[cfg(feature = "gallery")]
 pub fn draw_gallery(blip: &Blip, now: f32) {
     blip.clear(BlipColor { r: 0.15, g: 0.16, b: 0.21, a: 1.0 });
-    let acts: [(&str, Act, MoveId); 19] = [
+    let acts: [(&str, Act, MoveId); 20] = [
         ("LOW PUNCH", Act::Attack, MoveId::LowPunch),
         ("HIGH PUNCH", Act::Attack, MoveId::HighPunch),
         ("LOW KICK", Act::Attack, MoveId::LowKick),
@@ -2309,6 +2336,7 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
         ("VICTORY", Act::Victory, MoveId::LowPunch),
         ("DEFEAT", Act::Defeat, MoveId::LowPunch),
         ("KO", Act::Defeat, MoveId::LowPunch),
+        ("BOW", Act::Bow, MoveId::LowPunch),
     ];
     // One move at a time, five frames of it across the screen, stepped with
     // left / right so a capture lands on a known frame.
@@ -2355,6 +2383,7 @@ pub fn draw_gallery(blip: &Blip, now: f32) {
             // Everything else gets a time sweep too, so the sheet shows
             // whether a pose moves.
             Act::Victory | Act::Defeat => [0.0, 0.18, 0.45, 0.9, 1.6][k],
+            Act::Bow => [0.1, 0.5, 0.85, 1.2, 1.55][k],
             _ => now + k as f32 * 0.09,
         };
         if matches!(mv, MoveId::JumpKick | MoveId::JumpPunch) && act == Act::Attack {

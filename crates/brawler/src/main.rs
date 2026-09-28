@@ -212,7 +212,7 @@ const FIGHTERS: [Archetype; 3] = [
 ];
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-enum Act { Idle, Walk, Crouch, Air, Attack, Block, Hitstun, Knockdown, Victory, Defeat }
+enum Act { Idle, Walk, Crouch, Air, Attack, Block, Hitstun, Knockdown, Victory, Defeat, Bow }
 
 #[derive(Copy, Clone)]
 struct Fighter {
@@ -296,6 +296,12 @@ pub(crate) const LAND_ABSORB: f32 = 12.0 * F;
 /// quick). Hitboxes change on the frame the action does; this is only the
 /// picture.
 pub(crate) const RISE_BLEND: f32 = 9.0 * F;
+/// The opening bow (rei), seconds: attention, bow, hold, rise, attention.
+pub(crate) const BOW_TIME: f32 = 1.6;
+/// Rising out of the bow into the guard: unhurried.
+const BOW_TO_GUARD: f32 = 0.35;
+/// The round intro: the bow, then the guard coming up as FIGHT shows.
+const ROUND_INTRO: f32 = BOW_TIME + 0.7;
 
 impl Fighter {
     fn new(who: usize, x: f32, facing: f32) -> Self {
@@ -450,6 +456,8 @@ struct Game {
     /// Frames where everything stops on contact: it gives a hit weight, and
     /// it is when both players need to see who got hit with what.
     hitstop: f32,
+    /// This round's opening bow has begun.
+    bowed: bool,
     /// The last combo worth shouting about, and how long to shout it —
     /// a reward the player cannot see is not a reward.
     combo_shown: i32,
@@ -499,6 +507,7 @@ impl Game {
             hitspark: [Spark { x: 0.0, y: 0.0, ttl: 0.0, blocked: false }; 4],
             shake: 0.0,
             hitstop: 0.0,
+            bowed: false,
             combo_shown: 0,
             combo_t: 0.0,
             combo_side: 0,
@@ -572,7 +581,8 @@ impl Game {
         self.clock = ROUND_SECS;
         self.banner = "ROUND";
         self.state = State::RoundIntro;
-        self.phase.start(1.6);
+        self.phase.start(ROUND_INTRO);
+        self.bowed = false;
         self.cpu_plan = CpuPlan::Wait;
         self.cpu_delay = 0.4;
     }
@@ -819,6 +829,7 @@ fn advance(f: &mut Fighter, dt: f32) {
 
     let from = f.t;
     f.t += dt;
+    if f.act == Act::Bow && f.t >= BOW_TIME { f.act = Act::Idle; f.t = 0.0; }
     // A long frame on a slow device can step clean over a two-frame active
     // window; stop in it for this step so the hit is still tested.
     if f.act == Act::Attack && !f.hit_done {
@@ -905,7 +916,8 @@ fn note_handover(f: &mut Fighter, dt: f32) {
         // Getting up is the slow direction, and a landing is the same
         // kind of event: the feet arrive, the body takes a moment.
         let landed = f.land >= LAND_ABSORB;
-        f.blend_len = if (was_low && !f.crouching()) || landed { RISE_BLEND } else { POSE_BLEND };
+        f.blend_len = if f.prev_act == Act::Bow { BOW_TO_GUARD }
+            else if (was_low && !f.crouching()) || landed { RISE_BLEND } else { POSE_BLEND };
         f.shown = f.act;
     } else {
         // `shown_t` has to keep the *old* action's final timer until
@@ -1830,6 +1842,16 @@ async fn main() {
                 }
             }
             State::RoundIntro => {
+                // Each round opens with the fighters bowing to each other.
+                if !g.bowed {
+                    g.bowed = true;
+                    for f in g.p.iter_mut() { f.act = Act::Bow; f.shown = Act::Bow; f.t = 0.0; }
+                }
+                for f in g.p.iter_mut() {
+                    f.t += dt;
+                    if f.act == Act::Bow && f.t >= BOW_TIME { f.act = Act::Idle; f.t = 0.0; }
+                    note_handover(f, dt);
+                }
                 if g.phase.tick(dt) {
                     g.state = State::Fight;
                     play_sfx(&sfx.bell);
