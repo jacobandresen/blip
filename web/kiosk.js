@@ -79,8 +79,8 @@ function blipSetControls(mode) {
 // `touch`: the game can be played on the touch strip instead of the pad.
 // kind 'drag' puts the paddle / cannon under the finger (fire held while it
 // is down), 'swipe' steers by flicks, 'paddles' gives each player a half to
-// drag their bat up and down in, 'platform' splits the strip into RUN (slide;
-// flick up to jump) and two buttons. `hint` is printed on the strip,
+// drag their bat up and down in, 'platform' runs on a slide, fires button
+// one on a tap and button two on a swipe up. `hint` is printed on the strip,
 // `mouseHint` instead for a touchscreen laptop's mouse.
 var BLIP_GAMES = {
   serpent:            { name: 'SERPENT',  accent: '50, 200, 50',
@@ -117,8 +117,8 @@ var BLIP_GAMES = {
   // two's, who drops in with their own bubble or jump.
   bubbler:            { name: 'BUBBLER', accent: '120, 210, 255',
                          players: 2,
-                         touch: { kind: 'platform', hint: 'Slide to run &middot; flick up to jump',
-                                  mouseHint: 'Drag to run &middot; click BUBBLE or JUMP' },
+                         touch: { kind: 'platform', hint: 'Slide to run &middot; tap to bubble &middot; swipe up to jump',
+                                  mouseHint: 'Drag to run &middot; click to bubble &middot; drag up to jump' },
                          buttons: [{ key: 'f', code: 'KeyF', label: 'BUBBLE' },
                                    { key: 'g', code: 'KeyG', label: 'JUMP' }],
                          keys: { up:    { key: 'w', code: 'KeyW' },

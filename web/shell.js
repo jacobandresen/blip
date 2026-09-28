@@ -636,8 +636,7 @@ window.addEventListener('keydown', function (e) {
     var strip = document.createElement('div');
     strip.id = 'touch-strip';
     strip.setAttribute('aria-hidden', 'true');
-    var halves = kind === 'paddles' ? ['P1', '2P'] :
-                 kind === 'platform' ? ['RUN', 'BUBBLE', 'JUMP'] : [''];
+    var halves = kind === 'paddles' ? ['P1', '2P'] : [''];
     strip.innerHTML = '<div class="ts-glass">' +
       halves.map(function (h, i) {
         return '<div class="ts-half" data-slot="' + i + '">' +
@@ -761,24 +760,15 @@ window.addEventListener('keydown', function (e) {
     window.addEventListener('pointerdown', noteInput, true);
     window.addEventListener('pointermove', noteInput, true);
 
-    // ---- Platform (Bubbler): RUN on the left half of the trackpad (or the
-    // screen, sideways), BUBBLE and JUMP the quarters right of it. Presses
-    // go through BlipController, so they land on player one's own keys.
-    var RUN_PX = 14, FLICK_PX = 30, LEASH_PX = 40;
-    var plat = {};                     // pointerId -> { zone, x0, y0, dir, name }
-    function zoneOf(e) {
-      var g = glass.getBoundingClientRect();
-      var f = g.width ? (e.clientX - g.left) / g.width : e.clientX / window.innerWidth;
-      return f < 0.5 ? 0 : f < 0.75 ? 1 : 2;
-    }
+    // ---- Platform (Bubbler): one surface. Slide left / right to run (the
+    // anchor trails the thumb), tap to bubble, swipe up to jump. Presses go
+    // through BlipController, so they land on player one's own keys.
+    var RUN_PX = 14, FLICK_PX = 30, LEASH_PX = 40, TAP_PX = 12, TAP_MS = 300;
+    var plat = {};                     // pointerId -> { x0, y0, sx, sy, t, dir, moved }
     function lightZones() {
-      var lit = {};
-      for (var id in plat) lit[plat[id].zone] = true;
-      Array.prototype.forEach.call(strip.querySelectorAll('.ts-half'), function (h, i) {
-        h.classList.toggle('held', !!lit[i]);
-      });
-      strip.classList.toggle('held', Object.keys(plat).length > 0);
-      if (Object.keys(plat).length) strip.classList.add('used');
+      var any = Object.keys(plat).length > 0;
+      strip.classList.toggle('held', any);
+      if (any) strip.classList.add('used');
     }
     function runTo(p, dir) {
       if (dir === p.dir) return;
@@ -786,44 +776,41 @@ window.addEventListener('keydown', function (e) {
       if (dir) BlipController.set(dir, true, { silentClick: true });
       p.dir = dir;
     }
-    function jumpTap() {
-      BlipController.set('button2', true);
-      setTimeout(function () { BlipController.set('button2', false); }, 60);
+    function tapButton(name) {
+      BlipController.set(name, true);
+      setTimeout(function () { BlipController.set(name, false); }, 60);
     }
     function platDown(e) {
-      var zone = zoneOf(e);
-      var p = { zone: zone, x0: e.clientX, y0: e.clientY, dir: null,
-                name: zone === 1 ? 'button1' : zone === 2 ? 'button2' : null };
-      plat[e.pointerId] = p;
-      if (p.name) BlipController.set(p.name, true);
+      plat[e.pointerId] = { x0: e.clientX, y0: e.clientY, sx: e.clientX, sy: e.clientY,
+                            t: performance.now(), dir: null, moved: false };
       lightZones();
     }
     function platMove(e) {
       var p = plat[e.pointerId];
-      if (!p || p.zone !== 0) return;
+      if (!p) return;
+      if (Math.abs(e.clientX - p.sx) > TAP_PX || Math.abs(e.clientY - p.sy) > TAP_PX) p.moved = true;
       var dx = e.clientX - p.x0;
-      // The anchor trails the thumb, so turning back needs only a nudge.
       if (dx > LEASH_PX) { p.x0 = e.clientX - LEASH_PX; dx = LEASH_PX; }
       if (dx < -LEASH_PX) { p.x0 = e.clientX + LEASH_PX; dx = -LEASH_PX; }
       runTo(p, dx > RUN_PX ? 'right' : dx < -RUN_PX ? 'left' : null);
-      if (p.y0 - e.clientY > FLICK_PX) { jumpTap(); p.y0 = e.clientY; }
+      if (p.y0 - e.clientY > FLICK_PX) { tapButton('button2'); p.y0 = e.clientY; }
       else if (e.clientY > p.y0) p.y0 = e.clientY;
     }
-    function platUp(e) {
+    function platUp(e, lifted) {
       var p = plat[e.pointerId];
       if (!p) return;
       runTo(p, null);
-      if (p.name) BlipController.set(p.name, false);
+      if (lifted && !p.moved && performance.now() - p.t < TAP_MS) tapButton('button1');
       delete plat[e.pointerId];
       lightZones();
     }
     function platRelease() {
-      for (var id in plat) platUp({ pointerId: id });
+      for (var id in plat) platUp({ pointerId: id }, false);
     }
     // The game changed mode and the shell let go of every key: a thumb still
-    // on RUN picks up again on its next move; the buttons want a new press.
+    // running picks up again on its next move.
     function resync() {
-      for (var id in plat) { plat[id].dir = null; plat[id].name = null; }
+      for (var id in plat) plat[id].dir = null;
     }
 
     window.addEventListener('pointerdown', function (e) {
@@ -835,7 +822,7 @@ window.addEventListener('keydown', function (e) {
     window.addEventListener('pointermove', function (e) {
       if (kind === 'platform' && plat[e.pointerId]) { e.preventDefault(); platMove(e); }
     }, { passive: false });
-    window.addEventListener('pointerup', function (e) { if (kind === 'platform') platUp(e); });
+    window.addEventListener('pointerup', function (e) { if (kind === 'platform') platUp(e, true); });
 
     window.addEventListener('pointerdown', function (e) {
       if (kind === 'platform') return;

@@ -774,11 +774,6 @@ canvas {
     linear-gradient(180deg, #3b3c40 0%, #34353a 100%);
 }
 .ts-half { flex: 1; position: relative; transition: background .12s; }
-/* Bubbler: RUN takes half, BUBBLE and JUMP a quarter each, labels centred. */
-:root[data-touch="platform"] .ts-half:first-child { flex: 2; }
-:root[data-touch="platform"] .ts-half .ts-tag { top: 38%; left: 0; right: 0; text-align: center; }
-:root[data-touch="platform"] .ts-half.held { background: rgba(255, 255, 255, 0.07); }
-:root[data-touch="platform"] .ts-hint { right: 50%; padding: 0 8px; }
 .ts-half + .ts-half { border-left: 1px solid rgba(0, 0, 0, 0.3); box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05); }
 :root[data-touch="paddles"] .ts-half.held { background: rgba(255, 255, 255, 0.05); }
 .ts-tag, .ts-hint {
@@ -840,7 +835,7 @@ canvas {
 :root[data-touch="drag"] .ts-demo    { animation: ts-demo-drag 3.2s ease-in-out infinite; }
 :root[data-touch="swipe"] .ts-demo   { animation: ts-demo-swipe 2.4s ease-out infinite; }
 :root[data-touch="paddles"] .ts-demo { margin-left: -13px; left: 25%; animation: ts-demo-bat 2.8s ease-in-out infinite; }
-:root[data-touch="platform"] .ts-demo { left: 25%; animation: ts-demo-run 3s ease-in-out infinite; }
+:root[data-touch="platform"] .ts-demo { animation: ts-demo-run 3s ease-in-out infinite; }
 #touch-strip.used .ts-demo, #touch-strip.held .ts-demo { animation: none; opacity: 0; }
 @keyframes ts-demo-drag {
   0%   { opacity: 0; transform: translateX(-30cqw) scale(1.25); }
