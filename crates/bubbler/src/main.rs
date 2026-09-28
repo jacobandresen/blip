@@ -336,6 +336,12 @@ struct Game {
     extend: bool, // the last clear gave a life back
 }
 
+/// A one-player game's score goes to the high-score board; a game player
+/// two joined sets none.
+fn report_score(g: &Game) {
+    if !g.two_up { web::report_score(g.p[0].score); }
+}
+
 fn level_spawns(round: usize) -> ((f32, f32), (f32, f32), Vec<(Kind, f32, f32)>) {
     let mut a = (TILE + 2.0, HUD + 16.0 * TILE + TILE - P_H);
     let mut b = a;
@@ -984,7 +990,7 @@ fn update_play(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
     if !players_left(g) {
         g.state = State::Over;
         g.state_t = 0.0;
-        web::report_score(g.p[0].score.max(g.p[1].score));
+        report_score(g);
         play_sfx(&sfx.over);
         return;
     }
@@ -1688,7 +1694,7 @@ async fn main() {
                     if g.round + 1 >= ROUNDS {
                         g.state = State::Won;
                         g.state_t = 0.0;
-                        web::report_score(g.p[0].score.max(g.p[1].score));
+                        report_score(&g);
                         play_sfx(&sfx.won);
                     } else {
                         g.load_round(g.round + 1);

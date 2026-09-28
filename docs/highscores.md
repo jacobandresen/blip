@@ -9,8 +9,9 @@ and anon key are never committed to this repo.
 
 ## Goal
 
-A shared high-score table for each of the six cabinet games, shown on the
-game-over screen. A player picks a handle **once**; nobody else can post a
+A shared high-score table for each scoring cabinet game, shown on the
+game-over screen. Bubbler and Brawler post one-player games only; a
+two-player session sets no score, and Rally keeps none. A player picks a handle **once**; nobody else can post a
 score under that handle. No password, no "create an account" wall — the
 first play is friction-free.
 
@@ -75,7 +76,7 @@ players
 
 scores
   id          bigint identity PK
-  game        text  NOT NULL  CHECK (game IN ('serpent','bouncer','galactic_defender','meteors','sky_raider'))
+  game        text  NOT NULL  CHECK (game IN ('serpent','bouncer','galactic_defender','meteors','sky_raider','bubbler','brawler'))
   player_id   uuid  NOT NULL  -> players(id) ON UPDATE CASCADE ON DELETE CASCADE
   score       integer NOT NULL CHECK (score >= 0 AND score <= 10000000)
   created_at / updated_at  timestamptz default now()
