@@ -16,12 +16,14 @@ use blip::{play_music, play_sfx, play_sfx_volume, web, window_conf, Blip, BlipCo
 
 // ---- layout -----------------------------------------------------------
 const TILE: f32 = 24.0;
-const COLS: usize = 20;
-const ROWS: usize = 18;
+const COLS: usize = 26;
+const ROWS: usize = 24;
 const HUD: f32 = 24.0;
-const WIN_W: i32 = 480;
-const WIN_H: i32 = 456; // HUD + 18 rows
-const GAP: (usize, usize) = (8, 11); // the hole in the floor and ceiling you fall through
+const WIN_W: i32 = 624;
+const WIN_H: i32 = 600; // HUD + 24 rows
+/// Screen text was laid out for the 456px screen; this centres it on this one.
+const DY: f32 = (WIN_H as f32 - 456.0) / 2.0;
+const GAP: (usize, usize) = (11, 14); // the hole in the floor and ceiling you fall through
 
 // ---- feel ---------------------------------------------------------------
 const GRAV: f32 = 950.0;
@@ -43,118 +45,163 @@ const RISE: f32 = 44.0;
 const RISE_TRAPPED: f32 = 62.0; // catches reach the ceiling cluster sooner, where chains happen
 const CHAIN_REACH: f32 = 1.35;  // bubbles this many diameters apart pop together
 const FREE_LIFE: f32 = 9.0;
-const TRAP_LIFE: f32 = 7.5;  // then the monster breaks out, angry
+const TRAP_LIFE: f32 = 7.5;  // round 1; then the monster breaks out, angry
 const BLOW_CD: f32 = 0.24;
-const MAX_BUBBLES: usize = 28;
+const MAX_BUBBLES: usize = 36;
 const TOP_Y: f32 = HUD + TILE + BUB_R + 4.0;
 
 // ---- pressure -----------------------------------------------------------
-const HURRY_AT: f32 = 30.0;
-const SKULL_AT: f32 = 45.0;
+const HURRY_AT: f32 = 40.0; // round 1: bigger stages take longer to clear
+const SKULL_AT: f32 = 55.0;
+
+// Each round is harder than the last: monsters move faster, break out of
+// a bubble sooner, get angry and bring the skull earlier. From round 3
+// walkers throw rocks along their platform; from round 4 angry ghosts
+// spit sparks at you.
+fn monster_pace(round: usize) -> f32 { 1.0 + 0.07 * round as f32 }
+fn trap_life(round: usize) -> f32 { (TRAP_LIFE - 0.7 * round as f32).max(4.5) }
+fn hurry_at(round: usize) -> f32 { HURRY_AT - 2.5 * round as f32 }
+fn skull_at(round: usize) -> f32 { SKULL_AT - 3.5 * round as f32 }
+const ROCKS_FROM: usize = 2;  // round index
+const SPARKS_FROM: usize = 3;
+const ROCK_V: f32 = 170.0;
+const ROCK_WINDUP: f32 = 0.4;
+const EXTEND_MAX: i32 = 5; // lives a round clear can top a player up to
+const SPARK_V: f32 = 95.0;
 
 const ROUNDS: usize = 5;
 
 // '#' block, A / B player spawns, w walker, h hopper, g ghost.
 const LEVELS: [[&str; ROWS]; ROUNDS] = [
     [
-        "########....########",
-        "#..................#",
-        "#..................#",
-        "#..................#",
-        "#...w.........w....#",
-        "#..######..######..#",
-        "#..................#",
-        "#..................#",
-        "#.......w..w.......#",
-        "#...############...#",
-        "#..................#",
-        "#..................#",
-        "#..................#",
-        "#..######..######..#",
-        "#..................#",
-        "#..................#",
-        "#A................B#",
-        "########....########",
+        "###########....###########",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#........########........#",
+        "#........................#",
+        "#........................#",
+        "#..w..................w..#",
+        "#.#######........#######.#",
+        "#........................#",
+        "#........................#",
+        "#........w......w........#",
+        "#......############......#",
+        "#........................#",
+        "#........................#",
+        "#...w................w...#",
+        "#..#######......#######..#",
+        "#........................#",
+        "#........................#",
+        "#A......................B#",
+        "###########....###########",
     ],
     [
-        "########....########",
-        "#..................#",
-        "#..................#",
-        "#...g..........g...#",
-        "#..................#",
-        "#.....########.....#",
-        "#..................#",
-        "#..................#",
-        "#..w............w..#",
-        "#######......#######",
-        "#..................#",
-        "#..................#",
-        "#........h.........#",
-        "#.....########.....#",
-        "#..................#",
-        "#..................#",
-        "#A................B#",
-        "########....########",
+        "###########....###########",
+        "#........................#",
+        "#........................#",
+        "#.....g............g.....#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#######............#######",
+        "#........................#",
+        "#........................#",
+        "#.........w....w.........#",
+        "#......############......#",
+        "#........................#",
+        "#........................#",
+        "#..h..................h..#",
+        "#########........#########",
+        "#........................#",
+        "#........................#",
+        "#.......w........w.......#",
+        "#....################....#",
+        "#........................#",
+        "#........................#",
+        "#A......................B#",
+        "###########....###########",
     ],
     [
-        "########....########",
-        "#..................#",
-        "#..................#",
-        "#..................#",
-        "#.h..............h.#",
-        "#####..........#####",
-        "#..................#",
-        "#..................#",
-        "#.......w..w.......#",
-        "#.....########.....#",
-        "#..................#",
-        "#..................#",
-        "#.w..............w.#",
-        "#####..........#####",
-        "#..................#",
-        "#..................#",
-        "#A................B#",
-        "########....########",
+        "###########....###########",
+        "#........................#",
+        "#........................#",
+        "#...........g............#",
+        "#........................#",
+        "#........................#",
+        "#........w......w........#",
+        "#.....##############.....#",
+        "#........................#",
+        "#........................#",
+        "#..h..................h..#",
+        "##########......##########",
+        "#........................#",
+        "#........................#",
+        "#.....w............w.....#",
+        "#...##################...#",
+        "#........................#",
+        "#........................#",
+        "#.w.........h..........w.#",
+        "######...########...######",
+        "#........................#",
+        "#........................#",
+        "#A......................B#",
+        "###########....###########",
     ],
     [
-        "########....########",
-        "#..................#",
-        "#...g..........g...#",
-        "#..................#",
-        "#........w.........#",
-        "#..##############..#",
-        "#..................#",
-        "#..................#",
-        "#.h..............h.#",
-        "#####....##....#####",
-        "#..................#",
-        "#..................#",
-        "#......w....w......#",
-        "#...############...#",
-        "#..................#",
-        "#..................#",
-        "#A................B#",
-        "########....########",
+        "###########....###########",
+        "#........................#",
+        "#...........g............#",
+        "#...g................g...#",
+        "#........................#",
+        "#........................#",
+        "#..h.................h...#",
+        "#########........#########",
+        "#........................#",
+        "#........................#",
+        "#......w..........w......#",
+        "#...##################...#",
+        "#........................#",
+        "#........................#",
+        "#..w........h........w...#",
+        "#######...######...#######",
+        "#........................#",
+        "#........................#",
+        "#....w.............w.....#",
+        "#..#########..#########..#",
+        "#........................#",
+        "#........................#",
+        "#A......................B#",
+        "###########....###########",
     ],
     [
-        "########....########",
-        "#..................#",
-        "#..g.....g......g..#",
-        "#..................#",
-        "#.w..............w.#",
-        "####...######...####",
-        "#..................#",
-        "#..................#",
-        "#.....h......h.....#",
-        "#...############...#",
-        "#..................#",
-        "#..................#",
-        "#.w..............w.#",
-        "#####..######..#####",
-        "#..................#",
-        "#..................#",
-        "#A................B#",
-        "########....########",
+        "###########....###########",
+        "#........................#",
+        "#...........g............#",
+        "#...g................g...#",
+        "#........................#",
+        "#........................#",
+        "#.......w........w.......#",
+        "#....################....#",
+        "#........................#",
+        "#........................#",
+        "#..w........h.........w..#",
+        "#######...######...#######",
+        "#........................#",
+        "#........................#",
+        "#....w...h..........w....#",
+        "#...########..########...#",
+        "#........................#",
+        "#........................#",
+        "#.w.......w....w.......w.#",
+        "#####...##########...#####",
+        "#........................#",
+        "#........................#",
+        "#A......................B#",
+        "###########....###########",
     ],
 ];
 
@@ -238,7 +285,7 @@ impl Player {
 
 #[derive(Clone, Copy)]
 struct Enemy { kind: Kind, x: f32, y: f32, vx: f32, vy: f32, dir: f32, on_ground: bool, angry: bool,
-    t: f32, jump_cd: f32, edge_cd: f32, active: bool, pop_in: f32 }
+    t: f32, jump_cd: f32, edge_cd: f32, active: bool, pop_in: f32, shot_cd: f32, windup: f32 }
 
 #[derive(Clone, Copy, PartialEq)]
 enum Phase { Shoot, Float, Top }
@@ -258,6 +305,10 @@ struct Popup { x: f32, y: f32, t: f32, value: i32, c: BlipColor }
 
 struct Skull { active: bool, x: f32, y: f32, speed: f32 }
 
+/// A monster's missile: a rock rolled along a platform, or a ghost's spark.
+#[derive(Clone, Copy)]
+struct Shot { x: f32, y: f32, vx: f32, vy: f32, t: f32, spark: bool, active: bool }
+
 /// Tallies for a playtest run (printed by the native autopilot).
 #[derive(Default, Clone)]
 struct Stats { traps: u32, escapes: u32, pops: u32, kills: u32, chains: [u32; 6], fruit: u32,
@@ -276,11 +327,13 @@ struct Game {
     parts: Vec<Particle>,
     pops: Vec<Popup>,
     skull: Skull,
+    shots: Vec<Shot>,
     round_t: f32,
     state_t: f32,
     hurry: bool,
     shake: f32,
     two_up: bool, // player two is at the cabinet (joined this game)
+    extend: bool, // the last clear gave a life back
 }
 
 fn level_spawns(round: usize) -> ((f32, f32), (f32, f32), Vec<(Kind, f32, f32)>) {
@@ -312,7 +365,8 @@ impl Game {
             p: [Player::new(a, 1.0), Player::new(b, -1.0)],
             enemies: Vec::new(), bubbles: Vec::new(), fruits: Vec::new(), parts: Vec::new(), pops: Vec::new(),
             skull: Skull { active: false, x: 0.0, y: 0.0, speed: 0.0 },
-            round_t: 0.0, state_t: 0.0, hurry: false, shake: 0.0, two_up: false,
+            shots: Vec::new(),
+            round_t: 0.0, state_t: 0.0, hurry: false, shake: 0.0, two_up: false, extend: false,
         };
         g.load_round(0);
         g
@@ -329,13 +383,14 @@ impl Game {
         self.enemies = es.into_iter().map(|(kind, x, y)| Enemy {
             kind, x, y, vx: 0.0, vy: 0.0, dir: if x < WIN_W as f32 / 2.0 { 1.0 } else { -1.0 },
             on_ground: false, angry: false, t: rng(0.0, 3.0), jump_cd: rng(0.8, 2.0), edge_cd: 0.0,
-            active: true, pop_in: 0.0,
+            active: true, pop_in: 0.0, shot_cd: rng(2.5, 4.5), windup: 0.0,
         }).collect();
         for e in self.enemies.iter_mut() {
             if e.kind == Kind::Ghost { e.vx = e.dir * 62.0; e.vy = 62.0; }
         }
         self.bubbles.clear();
         self.fruits.clear();
+        self.shots.clear();
         self.skull.active = false;
         self.round_t = 0.0;
         self.hurry = false;
@@ -354,7 +409,13 @@ impl Game {
         }
         self.two_up = two;
         web::set_players(if two { 1 } else { 2 });
-        self.load_round(0);
+        // Playtest, native only: BUBBLER_ROUND=1..5 starts at that round.
+        #[cfg(not(target_arch = "wasm32"))]
+        let first = std::env::var("BUBBLER_ROUND").ok().and_then(|v| v.parse::<usize>().ok())
+            .map_or(0, |r| r.clamp(1, ROUNDS) - 1);
+        #[cfg(target_arch = "wasm32")]
+        let first = 0;
+        self.load_round(first);
         self.state = State::Intro;
         self.state_t = 0.0;
     }
@@ -513,12 +574,12 @@ fn update_enemies(g: &mut Game, dt: f32) {
         if !e.active { continue; }
         e.t += dt;
         e.pop_in = (e.pop_in + dt * 3.0).min(1.0);
-        let fast = if e.angry { 1.75 } else { 1.0 } * if g.round == 0 { 0.88 } else { 1.0 + 0.06 * g.round as f32 };
+        let fast = if e.angry { 1.75 } else { 1.0 } * monster_pace(g.round);
         let target = nearest_player(g, e.x + E_W / 2.0, e.y + E_H / 2.0);
         match e.kind {
             Kind::Walker => {
                 if e.on_ground {
-                    e.vx = e.dir * 58.0 * fast;
+                    e.vx = if e.windup > 0.0 { 0.0 } else { e.dir * 58.0 * fast };
                     e.edge_cd -= dt;
                     let ahead = if e.dir > 0.0 { e.x + E_W + 2.0 } else { e.x - 2.0 };
                     if e.edge_cd <= 0.0 && !g.floor_at(ahead, ahead + 1.0, e.y + E_H) {
@@ -569,8 +630,66 @@ fn update_enemies(g: &mut Game, dt: f32) {
                 if e.y > WIN_H as f32 - TILE - E_H { e.y = WIN_H as f32 - TILE - E_H; e.vy = -e.vy.abs(); }
             }
         }
+        // Throwing, from ROCKS_FROM / SPARKS_FROM on: a walker rolls a rock
+        // along its platform at a player level with it and in front; an
+        // angry ghost spits a slow spark straight at the nearest player.
+        // A walker stops and shakes for ROCK_WINDUP before the rock leaves,
+        // so a player can see it coming.
+        e.shot_cd -= dt;
+        if e.windup > 0.0 {
+            e.windup -= dt;
+            if e.windup <= 0.0 {
+                let (ex, ey) = (e.x + E_W / 2.0, e.y + E_H / 2.0);
+                g.shots.push(Shot { x: ex + e.dir * 12.0, y: ey + 2.0, vx: e.dir * ROCK_V, vy: 0.0,
+                    t: 0.0, spark: false, active: true });
+            }
+        } else if e.shot_cd <= 0.0 && e.pop_in >= 1.0 {
+            if let Some((px, py)) = target {
+                let (ex, ey) = (e.x + E_W / 2.0, e.y + E_H / 2.0);
+                if e.kind == Kind::Walker && g.round >= ROCKS_FROM && e.on_ground
+                    && (py - ey).abs() < 14.0 && (px - ex).abs() < 300.0 {
+                    e.dir = if px > ex { 1.0 } else { -1.0 };
+                    e.windup = ROCK_WINDUP;
+                    e.shot_cd = rng(2.2, 4.0) / fast;
+                } else if e.kind == Kind::Ghost && g.round >= SPARKS_FROM && e.angry {
+                    let (dx, dy) = (px - ex, py - ey);
+                    let d = dx.hypot(dy).max(1.0);
+                    g.shots.push(Shot { x: ex, y: ey, vx: dx / d * SPARK_V, vy: dy / d * SPARK_V,
+                        t: 0.0, spark: true, active: true });
+                    e.shot_cd = rng(3.0, 5.0) / fast;
+                } else {
+                    e.shot_cd = 0.4;
+                }
+            }
+        }
         g.enemies[i] = e;
     }
+}
+
+/// Rocks roll until they hit a block or a player's bubble; sparks drift
+/// through walls and fade after a few seconds.
+fn update_shots(g: &mut Game, dt: f32) {
+    for i in 0..g.shots.len() {
+        let mut s = g.shots[i];
+        s.t += dt;
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        if s.spark {
+            if s.t > 4.0 { s.active = false; }
+        } else {
+            let (c, r) = (((s.x + s.vx.signum() * 5.0) / TILE).floor() as i32, ((s.y - HUD) / TILE).floor() as i32);
+            if g.platform(c, r) || c <= 0 || c >= COLS as i32 - 1 { s.active = false; }
+        }
+        if s.x < -10.0 || s.x > WIN_W as f32 + 10.0 || s.y < HUD || s.y > WIN_H as f32 { s.active = false; }
+        // a bubble you blow knocks it out of the air
+        if s.active && g.bubbles.iter().any(|b| b.active && b.phase == Phase::Shoot && b.trapped.is_none()
+            && (b.x - s.x).hypot(b.y - s.y) < BUB_R + 5.0) {
+            s.active = false;
+        }
+        if !s.active { let (x, y) = (s.x, s.y); g.burst(x, y, 5, rgba(1.0, 0.85, 0.6, 0.8), 70.0, s.spark); }
+        g.shots[i] = s;
+    }
+    g.shots.retain(|s| s.active);
 }
 
 /// Pop `start` and everything touching it, and everything touching those.
@@ -670,7 +789,7 @@ fn update_bubbles(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
             }
         }
         if was_free && b.trapped.is_some() { g.stats.traps += 1; }
-        let life = if b.trapped.is_some() { TRAP_LIFE } else { FREE_LIFE };
+        let life = if b.trapped.is_some() { trap_life(g.round) } else { FREE_LIFE };
         if b.age > life && b.phase != Phase::Shoot {
             if b.trapped.is_some() { g.stats.escapes += 1; }
             b.active = false;
@@ -678,7 +797,7 @@ fn update_bubbles(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
                 // out it comes, and it is not happy about it
                 g.enemies.push(Enemy { kind, x: b.x - E_W / 2.0, y: b.y - E_H / 2.0, vx: 0.0, vy: 0.0,
                     dir: if rnd() < 0.5 { -1.0 } else { 1.0 }, on_ground: false, angry: true, t: 0.0,
-                    jump_cd: 0.5, edge_cd: 0.0, active: true, pop_in: 1.0 });
+                    jump_cd: 0.5, edge_cd: 0.0, active: true, pop_in: 1.0, shot_cd: rng(1.5, 3.0), windup: 0.0 });
                 let last = g.enemies.len() - 1;
                 if kind == Kind::Ghost { g.enemies[last].vx = 62.0; g.enemies[last].vy = 62.0; }
             }
@@ -769,13 +888,13 @@ fn update_fruit(g: &mut Game, dt: f32, sfx: &Sounds) {
 
 fn update_skull(g: &mut Game, dt: f32) {
     if !g.skull.active {
-        if g.round_t >= SKULL_AT {
+        if g.round_t >= skull_at(g.round) {
             g.skull = Skull { active: true, x: WIN_W as f32 / 2.0, y: HUD + 10.0, speed: 45.0 };
             g.stats.skulls += 1;
         }
         return;
     }
-    g.skull.speed += 4.0 * dt;
+    g.skull.speed += (4.0 + 1.5 * g.round as f32) * dt;
     if let Some((px, py)) = nearest_player(g, g.skull.x, g.skull.y) {
         let (dx, dy) = (px - g.skull.x, py - g.skull.y);
         let d = dx.hypot(dy).max(1.0);
@@ -801,6 +920,9 @@ fn hurt_players(g: &mut Game, sfx: &Sounds) {
             && (e.y + E_H / 2.0 - py).abs() < (E_H + P_H) / 2.0 - 8.0).map(|e| e.kind);
         let hit_enemy = killer.is_some();
         let hit_skull = g.skull.active && (g.skull.x - px).hypot(g.skull.y - py) < 18.0;
+        let hit_shot = g.shots.iter().any(|s| (s.x - px).abs() < P_W / 2.0 + 3.0 && (s.y - py).abs() < P_H / 2.0 + 2.0);
+        if hit_shot { g.shots.retain(|s| !((s.x - px).abs() < P_W / 2.0 + 3.0 && (s.y - py).abs() < P_H / 2.0 + 2.0)); }
+        let hit_enemy = hit_enemy || hit_shot;
         if hit_enemy || hit_skull {
             if hit_skull { g.stats.deaths_skull += 1; } else { g.stats.deaths_enemy += 1; }
             if let Some(k) = killer { g.stats.deaths_by[k as usize] += 1; }
@@ -845,7 +967,7 @@ fn players_left(g: &Game) -> bool {
 
 fn update_play(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
     g.round_t += dt;
-    if !g.hurry && g.round_t >= HURRY_AT {
+    if !g.hurry && g.round_t >= hurry_at(g.round) {
         g.hurry = true;
         g.stats.hurries += 1;
         for e in g.enemies.iter_mut() { e.angry = true; }
@@ -856,6 +978,7 @@ fn update_play(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
     update_bubbles(g, dt, inp, sfx);
     update_fruit(g, dt, sfx);
     update_skull(g, dt);
+    update_shots(g, dt);
     hurt_players(g, sfx);
     g.enemies.retain(|e| e.active);
     if !players_left(g) {
@@ -870,6 +993,12 @@ fn update_play(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
         g.state = State::Clear;
         g.state_t = 0.0;
         g.skull.active = false;
+        g.shots.clear();
+        // EXTEND: every player still in gets a life back, up to EXTEND_MAX
+        g.extend = false;
+        for p in g.p.iter_mut() {
+            if p.joined && p.lives > 0 && p.lives < EXTEND_MAX { p.lives += 1; g.extend = true; }
+        }
         play_sfx(&sfx.clear);
     }
 }
@@ -1053,9 +1182,9 @@ fn hsv(h: f32, s: f32, v: f32, a: f32) -> BlipColor {
     rgba(r + m, g + m, b + m, a)
 }
 
-fn draw_bubble(b: &Bubble, ox: f32, oy: f32, t: f32) {
+fn draw_bubble(b: &Bubble, ox: f32, oy: f32, t: f32, round: usize) {
     let (x, y) = (b.x + ox, b.y + oy);
-    let life = if b.trapped.is_some() { TRAP_LIFE } else { FREE_LIFE };
+    let life = if b.trapped.is_some() { trap_life(round) } else { FREE_LIFE };
     let escaping = b.trapped.is_some() && b.age > life - 1.6;
     let shake = if escaping { (t * 50.0).sin() * 1.5 } else { 0.0 };
     let grow = if b.phase == Phase::Shoot && b.trapped.is_none() { 0.35 + 0.65 * ease_out(b.age / 0.12) } else { 1.0 };
@@ -1130,7 +1259,8 @@ fn draw_world(blip: &Blip, g: &Game) {
     for e in &g.enemies {
         if !e.active { continue; }
         let s = ease_out(e.pop_in);
-        draw_enemy(e.kind, e.x + ox, e.y + oy, e.angry, e.t, s.max(0.05) * 1.1, s);
+        let shake = if e.windup > 0.0 { (e.t * 70.0).sin() * 1.8 } else { 0.0 };
+        draw_enemy(e.kind, e.x + ox + shake, e.y + oy, e.angry, e.t, s.max(0.05) * 1.1, s);
     }
     for (i, p) in g.p.iter().enumerate() {
         if !p.joined { continue; }
@@ -1141,8 +1271,24 @@ fn draw_world(blip: &Blip, g: &Game) {
         draw_dragon(p.cx() + ox, p.y + P_H + oy, p.face, body, p.squash, p.walk, p.blink < 0.0, p.mouth > 0.0,
             1.0, spin, 1.15);
     }
-    for b in &g.bubbles { draw_bubble(b, ox, oy, t); }
+    for b in &g.bubbles { draw_bubble(b, ox, oy, t, g.round); }
     if g.skull.active { draw_skull(&g.skull, ox, oy, t); }
+    for s in &g.shots {
+        let (x, y) = (s.x + ox, s.y + oy);
+        if s.spark {
+            let a = (4.0 - s.t).clamp(0.0, 1.0);
+            blip::macroquad::shapes::draw_circle(x, y, 7.0, rgba(1.0, 0.45, 0.8, 0.25 * a));
+            blip::macroquad::shapes::draw_poly(x, y, 4, 5.0, t * 400.0, rgba(1.0, 0.7, 0.95, a));
+            blip::macroquad::shapes::draw_circle(x, y, 2.0, rgba(1.0, 1.0, 1.0, a));
+        } else {
+            // a rolling rock: the highlight turns as it goes
+            blip::macroquad::shapes::draw_circle(x + 1.0, y + 2.0, 6.0, rgba(0.1, 0.05, 0.15, 0.4));
+            blip::macroquad::shapes::draw_circle(x, y, 6.0, col((150, 120, 110), 1.0));
+            let a = s.x / 6.0;
+            blip::macroquad::shapes::draw_circle(x + a.cos() * 2.5, y + a.sin() * 2.5, 1.6, col((110, 85, 80), 1.0));
+            blip::macroquad::shapes::draw_circle(x - 2.0, y - 2.2, 1.5, rgba(1.0, 0.95, 0.9, 0.7));
+        }
+    }
     for p in &g.parts {
         let a = (p.life / p.max).clamp(0.0, 1.0);
         let c = BlipColor { a: p.c.a * a, ..p.c };
@@ -1257,7 +1403,7 @@ fn draw_title(blip: &Blip, g: &Game, hi: &web::HighScore) {
         let s = i as f32 * 53.1;
         let b = Bubble { x: (s * 11.3) % WIN_W as f32, y: WIN_H as f32 - ((s * 9.1 + t * 30.0) % (WIN_H as f32 + 40.0)) + 20.0,
             vx: 0.0, age: 0.0, phase: Phase::Float, owner: i % 2, trapped: None, active: true, wob: t + s, squish: 0.0 };
-        draw_bubble(&b, 0.0, 0.0, t);
+        draw_bubble(&b, 0.0, 0.0, t, 0);
     }
     // the logo: each letter a bubble-lettered bob
     let word = "BUBBLER";
@@ -1268,37 +1414,37 @@ fn draw_title(blip: &Blip, g: &Game, hi: &web::HighScore) {
         let bob = (t * 3.0 + k as f32 * 0.6).sin() * 5.0;
         let x = x0 + k as f32 * 6.0 * sz;
         let s = ch.to_string();
-        let (bx, by) = (x + 2.5 * sz, 88.0 + bob + 3.5 * sz);
+        let (bx, by) = (x + 2.5 * sz, 88.0 + DY + bob + 3.5 * sz);
         let hue = hsv(0.9 + k as f32 * 0.06, 0.45, 1.0, 1.0);
         blip::macroquad::shapes::draw_circle(bx, by, 4.6 * sz, BlipColor { a: 0.16, ..hue });
         blip::macroquad::shapes::draw_circle_lines(bx, by, 4.6 * sz, 2.0, BlipColor { a: 0.7, ..hue });
         draw_ellipse(bx - 1.8 * sz, by - 2.2 * sz, 1.3 * sz, 0.7 * sz, -35.0, rgba(1.0, 1.0, 1.0, 0.7));
         for (dx, dy) in [(-2.0f32, 0.0f32), (2.0, 0.0), (0.0, -2.0), (0.0, 2.0)] {
-            blip.draw_text(&s, x + dx, 88.0 + bob + dy, sz, rgba(0.15, 0.02, 0.25, 0.9));
+            blip.draw_text(&s, x + dx, 88.0 + DY + bob + dy, sz, rgba(0.15, 0.02, 0.25, 0.9));
         }
-        blip.draw_text(&s, x, 88.0 + bob, sz, hue);
+        blip.draw_text(&s, x, 88.0 + DY + bob, sz, hue);
     }
     // the two of them, bouncing
-    for (i, x) in [170.0f32, 310.0].iter().enumerate() {
+    for (i, x) in [WIN_W as f32 / 2.0 - 70.0, WIN_W as f32 / 2.0 + 70.0].iter().enumerate() {
         let hop = ((t * 3.2 + i as f32 * 1.6).sin()).max(0.0);
-        let foot = 278.0 - hop * 34.0;
+        let foot = 278.0 + DY - hop * 34.0;
         let sq = if hop < 0.08 { 0.8 } else { 1.0 + hop * 0.12 };
         let body = if i == 0 { (90, 210, 110) } else { (90, 170, 255) };
         draw_dragon(*x, foot, if i == 0 { 1.0 } else { -1.0 }, body, sq, t * 2.0, (t * 0.7 + i as f32) % 3.0 < 0.1,
             (t * 1.3 + i as f32 * 0.5) % 2.0 < 0.2, 1.0, 0.0, 2.4);
     }
     let glow = 0.65 + 0.35 * (t * 2.5).sin().abs();
-    cosy(blip, "P1 PRESS BUBBLE", 300.0, 2.0, MINT, MINT, 1.0, glow);
+    cosy(blip, "P1 PRESS BUBBLE", 300.0 + DY, 2.0, MINT, MINT, 1.0, glow);
     let two = "P2 PRESS J TO JOIN";
-    soft(blip, two, (WIN_W as f32 - text_w(two, 1.4)) / 2.0, 336.0, 1.4, SKY, 1.0);
+    soft(blip, two, (WIN_W as f32 - text_w(two, 1.4)) / 2.0, 336.0 + DY, 1.4, SKY, 1.0);
     // how to play, on its own panel
     let (l1, l2) = ("MOVE A D   JUMP W   BUBBLE F", "HOLD JUMP TO RIDE BUBBLES");
-    pill(WIN_W as f32 / 2.0, 358.0, text_w(l1, 1.2) + 36.0, 46.0, col(PEACH, 0.8), 0.9);
-    soft(blip, l1, (WIN_W as f32 - text_w(l1, 1.2)) / 2.0, 369.0, 1.2, CREAM, 0.95);
-    soft(blip, l2, (WIN_W as f32 - text_w(l2, 1.2)) / 2.0, 385.0, 1.2, CREAM, 0.95);
+    pill(WIN_W as f32 / 2.0, 358.0 + DY, text_w(l1, 1.2) + 36.0, 46.0, col(PEACH, 0.8), 0.9);
+    soft(blip, l1, (WIN_W as f32 - text_w(l1, 1.2)) / 2.0, 369.0 + DY, 1.2, CREAM, 0.95);
+    soft(blip, l2, (WIN_W as f32 - text_w(l2, 1.2)) / 2.0, 385.0 + DY, 1.2, CREAM, 0.95);
     if hi.score > 0 {
         let h = hi.label("HI");
-        soft(blip, &h, (WIN_W as f32 - text_w(&h, 1.5)) / 2.0, 424.0, 1.5, PEACH, 1.0);
+        soft(blip, &h, (WIN_W as f32 - text_w(&h, 1.5)) / 2.0, 424.0 + DY, 1.5, PEACH, 1.0);
     }
     let _ = g;
 }
@@ -1428,18 +1574,18 @@ async fn main() {
             if shot_frame == 1 {
                 g.start(true);
                 g.state = State::Play;
-                g.p[0].x = 120.0; g.p[0].y = HUD + 13.0 * TILE - P_H; g.p[0].mouth = 10.0; g.p[0].safe = 0.0;
-                g.p[1].x = 330.0; g.p[1].y = HUD + 9.0 * TILE - P_H; g.p[1].face = -1.0; g.p[1].safe = 0.0;
+                g.p[0].x = 150.0; g.p[0].y = HUD + 19.0 * TILE - P_H; g.p[0].mouth = 10.0; g.p[0].safe = 0.0;
+                g.p[1].x = 360.0; g.p[1].y = HUD + 15.0 * TILE - P_H; g.p[1].face = -1.0; g.p[1].safe = 0.0;
                 for (k, e) in g.enemies.iter_mut().enumerate() {
                     if k < 3 { e.active = false; }
                     e.pop_in = 1.0;
                 }
-                for (k, (x, y)) in [(210.0, 70.0), (234.0, 72.0), (258.0, 70.0), (150.0, 200.0), (170.0, 300.0)].iter().enumerate() {
+                for (k, (x, y)) in [(282.0, 70.0), (306.0, 72.0), (330.0, 70.0), (200.0, 260.0), (230.0, 390.0)].iter().enumerate() {
                     g.bubbles.push(Bubble { x: *x, y: *y, vx: 0.0, age: 1.0, phase: if k < 3 { Phase::Top } else { Phase::Float },
                         owner: k % 2, trapped: if k < 3 { Some((Kind::Walker, false)) } else { None }, active: true,
                         wob: k as f32, squish: 0.0 });
                 }
-                g.fruits.push(Fruit { x: 300.0, y: HUD + 16.0 * TILE - 16.0, vx: 0.0, vy: 0.0, kind: 2, t: 1.0, on_ground: true, active: true });
+                g.fruits.push(Fruit { x: 200.0, y: HUD + 23.0 * TILE - 16.0, vx: 0.0, vy: 0.0, kind: 2, t: 1.0, on_ground: true, active: true });
             }
         }
 
@@ -1455,7 +1601,7 @@ async fn main() {
                 g.p[1].score = 97_320;
                 match scene.as_str() {
                     "intro" => { g.state = State::Intro; g.state_t = 1.2; }
-                    "hurry" => { g.round_t = HURRY_AT + 0.1; g.hurry = true; }
+                    "hurry" => { g.round_t = hurry_at(g.round) + 0.1; g.hurry = true; }
                     "chain" => { g.chain = (3, 1.0); }
                     "solo" => { g.p[1].joined = false; g.two_up = false; }
                     "clear" => { g.state = State::Clear; g.state_t = 0.8; }
@@ -1585,20 +1731,20 @@ async fn main() {
                 }
                 match g.state {
                     State::Intro => {
-                        cosy(&blip, &format!("ROUND {}", g.round + 1), 170.0, 3.5, PEACH, PEACH, st * 3.0, (st * 4.0).min(1.0));
-                        if st > 0.7 { cosy(&blip, "READY!", 236.0, 2.2, CREAM, MINT, (st - 0.7) * 3.0, ((st - 0.7) * 4.0).min(1.0)); }
+                        cosy(&blip, &format!("ROUND {}", g.round + 1), 170.0 + DY, 3.5, PEACH, PEACH, st * 3.0, (st * 4.0).min(1.0));
+                        if st > 0.7 { cosy(&blip, "READY!", 236.0 + DY, 2.2, CREAM, MINT, (st - 0.7) * 3.0, ((st - 0.7) * 4.0).min(1.0)); }
                     }
                     State::Play => {
-                        if g.hurry && g.round_t < HURRY_AT + 2.4 {
+                        if g.hurry && g.round_t < hurry_at(g.round) + 2.4 {
                             let a = 0.6 + 0.4 * (g.round_t * 8.0).sin().abs();
-                            cosy(&blip, "HURRY UP!", 196.0, 3.2, (255, 150, 150), (255, 110, 120), 1.0, a);
+                            cosy(&blip, "HURRY UP!", 196.0 + DY, 3.2, (255, 150, 150), (255, 110, 120), 1.0, a);
                         }
                     }
                     _ => {}
                 }
                 if g.chain.1 > 0.0 {
                     let text = format!("{} CHAIN!", g.chain.0);
-                    cosy(&blip, &text, 262.0, 2.6, CREAM, PINK, (1.2 - g.chain.1) * 5.0, g.chain.1.min(1.0));
+                    cosy(&blip, &text, 262.0 + DY, 2.6, CREAM, PINK, (1.2 - g.chain.1) * 5.0, g.chain.1.min(1.0));
                 }
                 // bubble wipe: out at the end of a round, back in at the start of the next
                 let wipe = match g.state {
@@ -1608,8 +1754,8 @@ async fn main() {
                 };
                 if wipe > 0.0 {
                     let pal = &PALETTES[g.round];
-                    for i in 0..9 {
-                        for j in 0..9 {
+                    for i in 0..12 {
+                        for j in 0..12 {
                             let (cx, cy) = (i as f32 * 60.0, j as f32 * 57.0);
                             let r = wipe * 46.0 * (0.8 + 0.2 * ((i * 7 + j * 3) % 5) as f32 / 4.0);
                             blip::macroquad::shapes::draw_circle(cx, cy, r, col(pal.sky0, 1.0));
@@ -1618,21 +1764,26 @@ async fn main() {
                     }
                 }
                 match g.state {
-                    State::Clear => cosy(&blip, "CLEAR!", 186.0, 4.0, CREAM, MINT, st * 3.0, (st * 4.0).min(1.0)),
+                    State::Clear => {
+                        cosy(&blip, "CLEAR!", 186.0 + DY, 4.0, CREAM, MINT, st * 3.0, (st * 4.0).min(1.0));
+                        if g.extend && st > 0.6 {
+                            cosy(&blip, "EXTEND  +1 LIFE", 246.0 + DY, 1.8, PEACH, PINK, (st - 0.6) * 3.0, ((st - 0.6) * 4.0).min(1.0));
+                        }
+                    }
                     State::Over => {
-                        cosy(&blip, "GAME OVER", 160.0, 3.8, PINK, PINK, st * 2.0, (st * 3.0).min(1.0));
+                        cosy(&blip, "GAME OVER", 160.0 + DY, 3.8, PINK, PINK, st * 2.0, (st * 3.0).min(1.0));
                         if hi.score > 0 {
-                            cosy(&blip, &hi.label("HI"), 222.0, 1.5, PEACH, PEACH, 1.0, (st - 1.0).clamp(0.0, 1.0));
+                            cosy(&blip, &hi.label("HI"), 222.0 + DY, 1.5, PEACH, PEACH, 1.0, (st - 1.0).clamp(0.0, 1.0));
                         }
                         if st > 2.5 {
-                            cosy(&blip, "PRESS BUBBLE", 276.0, 2.0, CREAM, MINT, 1.0, 0.65 + 0.35 * (st * 2.5).sin().abs());
+                            cosy(&blip, "PRESS BUBBLE", 276.0 + DY, 2.0, CREAM, MINT, 1.0, 0.65 + 0.35 * (st * 2.5).sin().abs());
                         }
                     }
                     State::Won => {
-                        cosy(&blip, "ALL ROUNDS CLEAR!", 120.0, 2.6, CREAM, MINT, st * 2.0, (st * 3.0).min(1.0));
-                        cosy(&blip, "HAPPY END", 192.0, 3.8, PEACH, PINK, (st - 0.5) * 2.0, ((st - 0.5) * 3.0).clamp(0.0, 1.0));
+                        cosy(&blip, "ALL ROUNDS CLEAR!", 120.0 + DY, 2.6, CREAM, MINT, st * 2.0, (st * 3.0).min(1.0));
+                        cosy(&blip, "HAPPY END", 192.0 + DY, 3.8, PEACH, PINK, (st - 0.5) * 2.0, ((st - 0.5) * 3.0).clamp(0.0, 1.0));
                         if st > 2.5 {
-                            cosy(&blip, "PRESS BUBBLE", 276.0, 2.0, CREAM, MINT, 1.0, 0.65 + 0.35 * (st * 2.5).sin().abs());
+                            cosy(&blip, "PRESS BUBBLE", 276.0 + DY, 2.0, CREAM, MINT, 1.0, 0.65 + 0.35 * (st * 2.5).sin().abs());
                         }
                     }
                     _ => {}
