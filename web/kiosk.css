@@ -569,46 +569,76 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   color: #fff;
   text-shadow: 0 0 6px #fff, 0 0 18px #e6dc32, 0 0 40px #e6dc32;
 }
+/* The coin mechanism, as on a real coin door: a small brushed-chrome plate
+   with a screw at each corner, a red reject button, and the coin entry, a
+   narrow recessed slot backlit orange so it can be found in a dark arcade. */
 #insert-coin-btn::after,
 #kiosk-insert-btn::after {
   content: '';
   display: inline-block;
-  width: 6px;
-  height: 16px;
-  border-radius: 3px;
-  background: #000;
-  box-shadow: inset 0 0 0 1px rgba(230, 220, 50, 0.45),
-              0 0 6px rgba(230, 220, 50, 0.3);
   flex-shrink: 0;
+  width: 18px;
+  height: 26px;
+  border-radius: 3px;
+  background:
+    /* screws */
+    radial-gradient(circle at 3px 3px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 15px 3px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 3px 23px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 15px 23px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    /* reject button: a red dome with a highlight */
+    radial-gradient(circle at 8.3px 5.3px, #ffd0c8 0 0.5px, #ff4a36 1.2px, #a3160c 2.4px, #3a0804 2.9px, transparent 3.3px),
+    /* the slot: dark inside, lit orange at its lips */
+    linear-gradient(90deg, transparent 7px, #ffb347 7px, #120600 7.8px, #000 9px, #120600 10.2px, #ffb347 11px, transparent 11px)
+      center 11px / 100% 12px no-repeat,
+    radial-gradient(ellipse 5px 9px at 9px 17px, rgba(255, 150, 40, 0.55), transparent 70%),
+    /* brushed steel */
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0 1px, rgba(0, 0, 0, 0.05) 1px 2px),
+    linear-gradient(135deg, #e3e6ea 0%, #9aa0a7 38%, #d4d8dd 55%, #7d838b 100%);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.55),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 6px rgba(255, 150, 40, 0.18);
 }
 
-/* The coin drops through the slot on click. shell.js / kiosk.js set --slot-x
-   from the button's real padding, which changes across breakpoints; the
-   fallback covers the moment before JS runs. */
+/* The coin going in. #coin-drop-anim is a window whose bottom edge is the
+   mouth of the slot (the plate is centred, its slot starts 2px above centre)
+   and which clips what passes below it; the coin is its ::before. It comes in
+   from the left, turns edge-on over the slot, and drops through the mouth,
+   vanishing into it. --slot-x (from shell.js / kiosk.js) is the slot's
+   distance from the button's right edge; the fallback covers the moment
+   before JS runs. */
 #coin-drop-anim {
   position: absolute;
-  top: 50%;
-  right: var(--slot-x, 4px);
+  right: calc(var(--slot-x, 13px) - 8px);
+  top: calc(50% - 2px - 18px);
+  width: 40px;
+  height: 18px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 5;
+}
+#coin-drop-anim::before {
+  content: '';
+  position: absolute;
+  left: calc(32px - 6.5px);   /* centred on the slot, 8px in from the right */
+  top: 2px;
   width: 13px;
   height: 13px;
   border-radius: 50%;
-  pointer-events: none;
   opacity: 0;
-  z-index: 5;
   background: radial-gradient(circle at 34% 28%, #fff6c8 0%, #e6c832 30%, #a8791a 78%, #7a5510 100%);
   box-shadow: 0 0 2px rgba(0, 0, 0, 0.5), inset 0 0 2px rgba(255, 255, 255, 0.5);
 }
-#coin-drop-anim.dropping {
-  animation: coin-drop 0.62s cubic-bezier(.55, 0, .85, .35) both;
+#coin-drop-anim.dropping::before {
+  animation: coin-drop 0.7s cubic-bezier(.45, 0, .7, .4) both;
 }
-/* Squeezes narrower as well as shorter on the way down — a coin sliding
-   into a slot only slightly wider than itself visibly pinches at the
-   edges, not just flattens top-to-bottom, right up until it's swallowed. */
 @keyframes coin-drop {
-  0%   { opacity: 1; transform: translate(50%, -26px) rotate(-25deg) scale(1, 1); }
-  50%  { opacity: 1; transform: translate(50%, -3px) rotate(150deg) scale(0.8, 0.88); }
-  75%  { opacity: 1; transform: translate(50%, 1px) rotate(230deg) scale(0.42, 0.48); }
-  100% { opacity: 0; transform: translate(50%, 3px) rotate(255deg) scale(0.12, 0.18); }
+  0%   { opacity: 1; transform: translate(-22px, 0) scale(1, 1); }
+  40%  { opacity: 1; transform: translate(0, 1px) scale(0.24, 1); }
+  55%  { opacity: 1; transform: translate(0, 2px) scale(0.2, 1); }
+  100% { opacity: 1; transform: translate(0, 20px) scale(0.2, 1); }
 }
 
 /* Narrow portrait phones (≤ 480 px) — shrink text so all three bar items fit */

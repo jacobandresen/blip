@@ -219,11 +219,12 @@ var coinDropAnim = null;
 }());
 function dropCoinAnimation() {
   if (!coinDropAnim) return;
-  // Measured, like shell.js's copy: the slot's centre is padding-right plus
-  // half its width, and padding changes across breakpoints.
+  // Measured, like shell.js's copy: the slot is the centre of the coin plate,
+  // padding-right plus half the plate, and both change across breakpoints.
   var btn = coinDropAnim.parentElement;
   var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
-  coinDropAnim.style.setProperty('--slot-x', (padRight + 3) + 'px');
+  var plateW = parseFloat(getComputedStyle(btn, '::after').width) || 18;
+  coinDropAnim.style.setProperty('--slot-x', (padRight + plateW / 2) + 'px');
   coinDropAnim.classList.remove('dropping');
   void coinDropAnim.offsetWidth;
   coinDropAnim.classList.add('dropping');
