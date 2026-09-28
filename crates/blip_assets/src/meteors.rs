@@ -313,12 +313,10 @@ fn music5() -> Vec<u8> {
 // Bubbler's warm, rounded style on Meteors' own instrument: glass, two sines
 // a hair apart ringing long, in a floating E lydian.
 
-/// The ship's shot: a small glassy ping sliding down.
+/// The ship's shot: one clean glassy "pew", a pure sine sliding down and
+/// fading to nothing (it fires fast, so it must end cleanly and quickly).
 fn fire_zap() -> Vec<u8> {
-    let ping = cosy::glide(0.09, 1800.0, 1250.0, Tone::Sine, 1.0, 0.0);
-    let mut shot = cosy::mix(ping, &cosy::run(&[88], 0.05, Voice::Glass, 0.12), 0.0, 1.0);
-    shot.truncate((0.25 * cosy::SR) as usize); // it fires fast; the ring must not pile up
-    cosy::finish_warm(shot, 14_000.0)
+    cosy::finish_warm(cosy::glide(0.09, 1400.0, 880.0, Tone::Sine, 1.6, 0.0), 13_000.0)
 }
 
 /// Thrust, retriggered while held: a soft low triangle hum.
@@ -326,12 +324,12 @@ fn thrust() -> Vec<u8> {
     cosy::finish_warm(cosy::glide(0.1, 82.0, 72.0, Tone::Tri, 0.6, 0.0), 10_000.0)
 }
 
-/// A rock breaking: a bloop tumbling down with a glass chime over it,
-/// deeper for a bigger rock (`size` 0 large .. 2 small).
+/// A rock breaking: a soft round thud falling away, deeper for a bigger
+/// rock (`size` 0 large .. 2 small), with a faint glass chime on top.
 fn bang(size: usize) -> Vec<u8> {
-    let (f0, dur, chime) = [(240.0, 0.42, 64), (340.0, 0.3, 71), (520.0, 0.2, 76)][size];
-    let fall = cosy::bloop(dur, f0, f0 * 0.28, 0xBA0 + size as u32);
-    cosy::sfx(&cosy::mix(fall, &cosy::run(&[chime], 0.05, Voice::Glass, 0.3), 0.0, 1.0))
+    let (f0, dur, chime) = [(170.0, 0.4, 64), (240.0, 0.28, 71), (360.0, 0.18, 76)][size];
+    let thud = cosy::glide(dur, f0, f0 * 0.45, Tone::Sine, 1.3, 0.0);
+    cosy::sfx(&cosy::mix(thud, &cosy::run(&[chime], 0.05, Voice::Glass, 0.18), 0.0, 1.0))
 }
 
 /// The saucers, heard in passing: a slow wobbling whistle, higher and

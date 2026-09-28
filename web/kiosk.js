@@ -51,16 +51,14 @@ var BLIP_GAMES = {
   rally:              { name: 'RALLY',    accent: '220, 50, 50'   },
   meteors:            { name: 'METEORS',  accent: '180, 180, 180',
                          buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }] },
-  // A fighter: four caps (punches on top, kicks below, light to heavy left to
-  // right) and a stick that answers at once, since a sloppy neutral is a
+  // A fighter: two caps, punch and kick (holding toward the opponent hits
+  // high), and a stick that answers at once, since a sloppy neutral is a
   // dropped guard. `players: 2` builds the second station, revealed by
   // blip_set_mode; `keys` gives P1 WASD so the arrows are P2's.
   brawler:            { name: 'BRAWLER', accent: '220, 60, 40',
                          players: 2,
-                         buttons: [{ key: 'f', code: 'KeyF', label: 'LP' },
-                                   { key: 'r', code: 'KeyR', label: 'HP' },
-                                   { key: 'g', code: 'KeyG', label: 'LK' },
-                                   { key: 't', code: 'KeyT', label: 'HK' }],
+                         buttons: [{ key: 'f', code: 'KeyF', label: 'PUNCH' },
+                                   { key: 'g', code: 'KeyG', label: 'KICK' }],
                          keys: { up:    { key: 'w', code: 'KeyW' },
                                  down:  { key: 's', code: 'KeyS' },
                                  left:  { key: 'a', code: 'KeyA' },
@@ -70,9 +68,7 @@ var BLIP_GAMES = {
                                  p2left:  { key: 'ArrowLeft',  code: 'ArrowLeft' },
                                  p2right: { key: 'ArrowRight', code: 'ArrowRight' },
                                  p2button1: { key: 'j', code: 'KeyJ' },
-                                 p2button2: { key: 'u', code: 'KeyU' },
-                                 p2button3: { key: 'k', code: 'KeyK' },
-                                 p2button4: { key: 'i', code: 'KeyI' } },
+                                 p2button2: { key: 'k', code: 'KeyK' } },
                          stick: { engage: 10, release: 6, maxR: 54, hyst: 10 } },
   // A tribute to Bubble Bobble. Two caps: bubble (fire) and jump; up
   // jumps too. Like Brawler, player one is WASD so the arrows are player

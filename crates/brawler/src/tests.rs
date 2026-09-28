@@ -2296,8 +2296,7 @@ fn the_two_players_share_no_keys() {
     // copied list.
     let keys = |p: &Pad| {
         let mut v: Vec<String> = Vec::new();
-        for set in [p.up, p.down, p.left, p.right, p.punch_low, p.punch_high,
-                    p.kick_low, p.kick_high] {
+        for set in [p.up, p.down, p.left, p.right, p.punch, p.kick] {
             v.extend(set.iter().map(|k| format!("{k:?}")));
         }
         v
@@ -2314,7 +2313,7 @@ fn the_two_players_share_no_keys() {
         let before = sorted.len();
         sorted.dedup();
         assert_eq!(sorted.len(), before, "{name} has a key bound twice");
-        assert_eq!(before, 8, "{name} should have eight controls, has {before}");
+        assert_eq!(before, 6, "{name} should have six controls, has {before}");
     }
     // Sharing takes the arrows and the deck buttons off player one;
     // alone, they get everything back.

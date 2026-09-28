@@ -4,9 +4,9 @@
  * caps, labels and player count from BLIP_GAMES, the others get the default
  * two-cap deck. Wiring (touch, keyboard, card navigation) stays with the page.
  *
- * Every deck has two stations: an arcade stick with four caps, and a pad
- * (cross + four caps). A cap the game does not use is `spare` and inert;
- * station two is inert unless the game seats two players. */
+ * Every deck has two stations, each an arcade stick or a pad (cross) with
+ * two caps: a player never gets more. A cap the game does not use is
+ * `spare`, inert and hidden; station two is inert unless the game seats two. */
 (function () {
   var panel = document.querySelector('.deck-panel');
   if (!panel || document.getElementById('deck-p1')) return;
@@ -17,7 +17,8 @@
   // A one-button game still gets two live caps: A and B both fire.
   var specs = buttons.length < 2 ? [buttons[0], buttons[0]] : buttons;
   var seatsTwo = !!(game && game.players === 2);
-  var CAPS = 4;
+  var CAPS = 4;       // the layout's name for this deck (data-caps); CSS keys off it
+  var PER_PLAYER = 2; // caps a player ever gets: no game reads more than two
 
   var root = document.documentElement;
   root.setAttribute('data-caps', String(CAPS));
@@ -85,7 +86,7 @@
     handle.appendChild(el('div', 'stick-ball'));
     base.appendChild(handle);
     var fire = el('div', 'fire-buttons four', '', { id: 'fire-buttons' + st.id });
-    for (var i = 0; i < CAPS; i++) fire.appendChild(stickCap(st, who, i));
+    for (var i = 0; i < PER_PLAYER; i++) fire.appendChild(stickCap(st, who, i));
     side.appendChild(base);
     side.appendChild(fire);
     frag.appendChild(side);
@@ -103,7 +104,7 @@
     });
     dpad.appendChild(el('span', 'snes-dp-hub'));
     var face = el('div', 'snes-face four');
-    for (var i = 0; i < CAPS; i++) face.appendChild(padCap(st, who, i));
+    for (var i = 0; i < PER_PLAYER; i++) face.appendChild(padCap(st, who, i));
     shell.appendChild(dpad);
     shell.appendChild(face);
     if (!who) shell.appendChild(el('span', 'snes-wordmark', 'BLIP', { 'aria-hidden': 'true' }));

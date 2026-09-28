@@ -133,19 +133,31 @@ pub fn jingle_with(notes: &[i32], step: f32, lead: Voice, lead_oct: i32, double:
             k += len;
         } else { k += 1; }
     }
+    buf.resize(buf.len() + (SR * 1.2) as usize, 0.0); // room for a long ring
+    let end = buf.iter().rposition(|x| x.abs() > 1e-3).map_or(1, |i| i + 1);
+    buf.truncate(end);
+    fade_out(&mut buf, 0.03);
     finish_warm(buf, 21_000.0)
 }
 
 /// Notes one after another on `v` (MIDI, `step` seconds apart), as f32.
 pub fn run(notes: &[i32], step: f32, v: Voice, vol: f32) -> Vec<f32> {
     let st = (step * SR) as usize;
-    let mut buf = vec![0.0f32; st * notes.len() + (SR * 0.9) as usize];
+    let mut buf = vec![0.0f32; st * notes.len() + (SR * 2.5) as usize];
     for (k, n) in notes.iter().enumerate() {
         if *n >= 0 { note(&mut buf, k * st, st, *n, vol, v); }
     }
-    let end = buf.iter().rposition(|x| x.abs() > 1e-4).map_or(1, |i| i + 1);
+    let end = buf.iter().rposition(|x| x.abs() > 1e-3).map_or(1, |i| i + 1);
     buf.truncate(end);
+    fade_out(&mut buf, 0.02);
     buf
+}
+
+/// Fade the last `secs` to silence, so a cut-off ring never clicks.
+pub fn fade_out(buf: &mut [f32], secs: f32) {
+    let n = ((secs * SR) as usize).min(buf.len());
+    let len = buf.len();
+    for i in 0..n { buf[len - n + i] *= 1.0 - (i + 1) as f32 / n as f32; }
 }
 
 /// The tone a sweep is drawn with.
@@ -262,9 +274,10 @@ pub fn finish(buf: &[f32], gain: f32) -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
 }
 
-/// Low-passed at 3 kHz like the music, then soft-limited and encoded.
+/// Faded out, low-passed at 3 kHz like the music, soft-limited and encoded.
 pub fn finish_warm(mut buf: Vec<f32>, gain: f32) -> Vec<u8> {
     warm(&mut buf);
+    fade_out(&mut buf, 0.008); // however an effect was cut, it ends in silence
     finish(&buf, gain)
 }
 

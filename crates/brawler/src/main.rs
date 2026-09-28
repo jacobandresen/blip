@@ -12,10 +12,9 @@
 mod draw;
 
 use blip::macroquad::input::KeyCode;
-use blip::input::{key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_C,
-    BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_I, BLIP_KEY_J, BLIP_KEY_K,
-    BLIP_KEY_LEFT, BLIP_KEY_R, BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_T,
-    BLIP_KEY_U, BLIP_KEY_UP, BLIP_KEY_W, BLIP_KEY_X};
+use blip::input::{key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
+    BLIP_KEY_DOWN, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_J, BLIP_KEY_K, BLIP_KEY_LEFT,
+    BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W};
 use blip::audio::play_sfx_volume;
 use blip::{clamp, play_music, play_sfx, rand_int, rects_overlap, web,
     window_conf, Blip,
@@ -1220,10 +1219,8 @@ struct Pad {
     down: &'static [KeyCode],
     left: &'static [KeyCode],
     right: &'static [KeyCode],
-    punch_low: &'static [KeyCode],
-    punch_high: &'static [KeyCode],
-    kick_low: &'static [KeyCode],
-    kick_high: &'static [KeyCode],
+    punch: &'static [KeyCode],
+    kick: &'static [KeyCode],
 }
 
 static P1_ALONE: Pad = Pad {
@@ -1233,10 +1230,8 @@ static P1_ALONE: Pad = Pad {
     right: &[BLIP_KEY_D, BLIP_KEY_RIGHT],
     // The generic fire keys (Space, button 2) are the low attacks, the
     // pokes you open with; C and X are the high ones.
-    punch_low: &[BLIP_KEY_F, BLIP_KEY_SPACE],
-    punch_high: &[BLIP_KEY_R, BLIP_KEY_C],
-    kick_low: &[BLIP_KEY_G, BLIP_KEY_BUTTON2],
-    kick_high: &[BLIP_KEY_T, BLIP_KEY_X],
+    punch: &[BLIP_KEY_F, BLIP_KEY_SPACE],
+    kick: &[BLIP_KEY_G, BLIP_KEY_BUTTON2],
 };
 
 static P1_SHARING: Pad = Pad {
@@ -1244,10 +1239,8 @@ static P1_SHARING: Pad = Pad {
     down: &[BLIP_KEY_S],
     left: &[BLIP_KEY_A],
     right: &[BLIP_KEY_D],
-    punch_low: &[BLIP_KEY_F],
-    punch_high: &[BLIP_KEY_R],
-    kick_low: &[BLIP_KEY_G],
-    kick_high: &[BLIP_KEY_T],
+    punch: &[BLIP_KEY_F],
+    kick: &[BLIP_KEY_G],
 };
 
 static P2: Pad = Pad {
@@ -1255,10 +1248,8 @@ static P2: Pad = Pad {
     down: &[BLIP_KEY_DOWN],
     left: &[BLIP_KEY_LEFT],
     right: &[BLIP_KEY_RIGHT],
-    punch_low: &[BLIP_KEY_J],
-    punch_high: &[BLIP_KEY_U],
-    kick_low: &[BLIP_KEY_K],
-    kick_high: &[BLIP_KEY_I],
+    punch: &[BLIP_KEY_J],
+    kick: &[BLIP_KEY_K],
 };
 
 fn pad(mode: Mode, who: usize) -> &'static Pad {
@@ -1282,14 +1273,15 @@ fn human_input(g: &mut Game, who: usize) -> Input {
     inp.right = any_held(k.right);
     inp.up = any_held(k.up);
     inp.down = any_held(k.down);
-    // Which button was pressed is the height — the whole control scheme
-    // for attack height, so a player never has to remember a motion to
-    // aim one.
-    let (plo, phi) = (any_pressed(k.punch_low), any_pressed(k.punch_high));
-    let (low, high) = (any_pressed(k.kick_low), any_pressed(k.kick_high));
-    let punch = plo || phi;
+    // Two buttons; the stick picks the height. Held toward the opponent a
+    // punch or kick is the overhead one, otherwise the low poke (down and
+    // up turn them into the sweep and the flying kick in grounded_move()).
+    let toward = if g.p[who].facing > 0.0 { inp.right } else { inp.left };
+    let (punch, kick) = (any_pressed(k.punch), any_pressed(k.kick));
+    let (plo, phi) = (punch && !toward, punch && toward);
+    let (low, high) = (kick && !toward, kick && toward);
     if punch { g.punch_at[who] = g.now; }
-    if low || high { g.kick_at[who] = g.now; }
+    if kick { g.kick_at[who] = g.now; }
     // Punch and kick together inside a short window is the special: easy on a
     // stick, and in the way of no other move.
     let (pa, ka) = (g.punch_at[who], g.kick_at[who]);
@@ -1893,8 +1885,7 @@ fn menu_step(g: &mut Game, who: usize, back: bool) -> bool {
 /// The same, for a player's confirm — any of their attack buttons.
 fn menu_fire(g: &mut Game, who: usize) -> bool {
     let k = pad(g.mode, who);
-    let held = any_held(k.punch_low) || any_held(k.punch_high)
-        || any_held(k.kick_low) || any_held(k.kick_high);
+    let held = any_held(k.punch) || any_held(k.kick);
     let slot = &mut g.sel_fire[who];
     let fired = held && !*slot;
     *slot = held;

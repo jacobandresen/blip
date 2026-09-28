@@ -2161,11 +2161,10 @@ fn draw_title(blip: &Blip, g: &Game) {
     let dim = BlipColor { r: 0.74, g: 0.78, b: 0.86, a: 1.0 };
     let p1c = BlipColor { r: 1.0, g: 0.35, b: 0.35, a: 1.0 };
     let p2c = BlipColor { r: 0.40, g: 0.72, b: 1.0, a: 1.0 };
-    // Four keys in a square, and the square is the legend: top pair high,
-    // bottom pair low, left punch, right kick.
+    // Two buttons each: punch, then kick. The stick picks the height.
     const ROWS: [(&str, &str, bool); 2] = [
-        ("P1", "W A S D   R T HIGH   F G LOW", true),
-        ("P2", "ARROWS    U I HIGH   J K LOW", false),
+        ("P1", "W A S D   F PUNCH  G KICK", true),
+        ("P2", "ARROWS    J PUNCH  K KICK", false),
     ];
     let x = (WIN_W as f32 - 32.0 * 12.0) / 2.0;
     for (i, (tag, body, one)) in ROWS.iter().enumerate() {
@@ -2180,7 +2179,7 @@ fn draw_title(blip: &Blip, g: &Game) {
         blip.draw_text(body, x + 48.0, y, 2.0, BlipColor { a: tint, ..dim });
     }
 
-    blip.draw_centered("LEFT PUNCH   RIGHT KICK   BOTH SPECIAL", 292.0, 1.0, dim);
+    blip.draw_centered("TOWARD + BUTTON HITS HIGH   BOTH TOGETHER SPECIAL", 292.0, 1.0, dim);
     blip.draw_centered("W S CHOOSE     F OR SPACE START", 314.0, 2.0,
         BlipColor { r: 0.95, g: 0.88, b: 0.60, a: 1.0 });
 }

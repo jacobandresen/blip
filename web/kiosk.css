@@ -2869,7 +2869,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     --mid: 18px;
   }
   :root[data-layout="upright"][data-caps="4"][data-controls][data-players="2"] :is(#topbar, .kiosk-bar-main) {
-    height: calc(var(--dpad) + 2 * var(--cap) + 36px + env(safe-area-inset-bottom, 0px));
+    height: calc(var(--dpad) + var(--cap) + 44px + env(safe-area-inset-bottom, 0px));
   }
   :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] :is(#snes-pad, #snes-pad-p2) .snes-shell,
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] :is(#deck-p1, #deck-p2) {
@@ -2924,6 +2924,5 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-layout="landscape"][data-controls="stick"][data-players="1"] .stick-boot { width: 52px; height: 52px; }
 :root[data-layout="landscape"][data-controls="stick"][data-players="1"] .stick-ball { width: 56px; height: 56px; }
 
-/* Sideways every cap on show should do something: a two-button game's
-   spares only look like more buttons to press. */
-:root[data-layout="landscape"] :is(.snes-btn, .arcade-btn).spare { display: none; }
+/* Every game reads at most two caps, so a station shows only its live ones. */
+:is(.snes-btn, .arcade-btn).spare { display: none; }
