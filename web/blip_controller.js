@@ -504,13 +504,15 @@
     });
   }
 
-  // Physical gamepad — kiosk.js's pollGamepad() reports logical codes
-  // (ArrowUp… / Space / KeyZ / Start / Select); fold them onto our names
-  // and drive the game for real (not silent).
-  var GP_EXTRA = { Start: 'start', Select: 'select' };
+  // Physical gamepad — kiosk.js's pollGamepad() reports codes (ArrowUp… /
+  // Space / KeyZ / Start / Select). It is player one's controller, so they
+  // become player one's names, not a key-code lookup: in Bubbler and Brawler
+  // (player one on WASD + F/G) that finds player two's arrows and no button.
+  var GP_NAME = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+                  Space: 'button1', KeyZ: 'button2', Start: 'start', Select: 'select' };
   function bindGamepad(poll) {
     if (typeof poll !== 'function') return;
-    function name(code) { return GP_EXTRA[code] || nameForCode(code); }
+    function name(code) { return GP_NAME[code] || null; }
     poll(
       function (code) { var n = name(code); if (n) set(n, true); },
       function (code) { var n = name(code); if (n) set(n, false); }

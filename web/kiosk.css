@@ -1117,50 +1117,39 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   background: radial-gradient(circle at 50% 40%, #262626, #131313 60%, #0a0a0a);
   box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.1);
 }
+.snes-pad .snes-dp-body {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.snes-pad .dp-s0 { stop-color: var(--dp-s0, #4c4c52); }
+.snes-pad .dp-s1 { stop-color: var(--dp-s1, #2d2d31); }
+.snes-pad .dp-s2 { stop-color: var(--dp-s2, #1b1b1e); }
+.snes-pad .dp-rim { fill: none; stroke: rgba(255, 255, 255, 0.13); stroke-width: 0.9; }
+.snes-pad .dp-dimple { fill: rgba(0, 0, 0, 0.32); stroke: rgba(255, 255, 255, 0.06); stroke-width: 0.8; }
+/* Arm segments: touch targets over the cross, lit only when pressed, the
+   light fading out toward the centre. */
 .snes-pad .snes-dp-seg {
   position: absolute;
-  background: linear-gradient(180deg, #45454a, #2c2c30 55%, #1c1c1f);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(0, 0, 0, 0.6);
-  transition: filter .05s, box-shadow .05s, background .05s;
+  opacity: 0;
+  background: linear-gradient(var(--fade), #f08a3a 0%, #e4342b 45%, rgba(228, 52, 43, 0) 100%);
+  transition: opacity .05s;
 }
-.snes-pad .snes-dp-seg.dp-up    { left: 32%; right: 32%; top: 2%;  bottom: 50%; border-radius: 5px 5px 0 0; }
-.snes-pad .snes-dp-seg.dp-down  { left: 32%; right: 32%; top: 50%; bottom: 2%;  border-radius: 0 0 5px 5px; }
-.snes-pad .snes-dp-seg.dp-left  { top: 32%; bottom: 32%; left: 2%;  right: 50%; border-radius: 5px 0 0 5px; }
-.snes-pad .snes-dp-seg.dp-right { top: 32%; bottom: 32%; left: 50%; right: 2%;  border-radius: 0 5px 5px 0; }
-.snes-pad .snes-dp-hub {         /* just hides the seam where the arms cross */
-  position: absolute;
-  left: 34%; right: 34%; top: 34%; bottom: 34%;
-  border-radius: 2px;
-  background: linear-gradient(180deg, #45454a, #2c2c30 55%, #1c1c1f);
-}
-.snes-pad .snes-dp-hub::after {
-  content: '';
-  position: absolute;
-  left: 50%; top: 50%;
-  width: 34%; height: 34%;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.45);
-}
-.snes-pad .snes-dp-seg.blip-pressed {
-  background: linear-gradient(180deg, #f08a3a, #e4342b 55%, #a51c14);
-  box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.45), 0 0 9px rgba(228, 52, 43, 0.75);
-}
-/* Whole cross glows while a thumb is on the d-pad (or a direction key is
-   held) — the engaged arm stays bright, but the centre + the other arms
-   pick up a dim warm cast so nothing looks like it's floating alone. */
-.snes-pad .snes-dpad.blip-touched .snes-dp-seg,
-.snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-seg {
-  background: linear-gradient(180deg, #8a5a3a, #5c3a2c 55%, #3c2620);
-}
-.snes-pad .snes-dpad.blip-touched .snes-dp-seg.blip-pressed,
-.snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-seg.blip-pressed {
-  background: linear-gradient(180deg, #f08a3a, #e4342b 55%, #a51c14);
-}
-.snes-pad .snes-dpad.blip-touched .snes-dp-hub,
-.snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) .snes-dp-hub {
-  background: linear-gradient(180deg, #c56a3a, #9c4326 55%, #7a2f1c);
-  box-shadow: inset 0 1px 1px rgba(255, 210, 180, 0.25), 0 0 7px rgba(228, 100, 43, 0.5);
+.snes-pad .snes-dp-seg.dp-up    { --fade: 180deg; left: 32%; right: 32%; top: 2%;  bottom: 50%; border-radius: 6px 6px 0 0; }
+.snes-pad .snes-dp-seg.dp-down  { --fade: 0deg;   left: 32%; right: 32%; top: 50%; bottom: 2%;  border-radius: 0 0 6px 6px; }
+.snes-pad .snes-dp-seg.dp-left  { --fade: 90deg;  top: 32%; bottom: 32%; left: 2%;  right: 50%; border-radius: 6px 0 0 6px; }
+.snes-pad .snes-dp-seg.dp-right { --fade: 270deg; top: 32%; bottom: 32%; left: 50%; right: 2%;  border-radius: 0 6px 6px 0; }
+.snes-pad .snes-dp-seg.blip-pressed { opacity: 0.95; }
+/* The whole cross picks up a warm cast while a thumb is on it (or a
+   direction key is held), so the lit arm never floats alone. */
+.snes-pad .snes-dpad.blip-touched,
+.snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) {
+  --dp-s0: #8a5a3a;
+  --dp-s1: #5c3a2c;
+  --dp-s2: #3c2620;
 }
 
 /* ---- Face buttons — just B and A, side by side with a big gap ---- */
@@ -1229,38 +1218,47 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 .snes-pad .snes-mid,
 .snes-pad .snes-shoulder { display: none; }
 
-/* ---- Pad / stick toggle ---- A small pixel-font tag, bottom centre, clear
-   of both thumbs. --topbar-h is the real bar height on a game page. */
+/* ---- Controller picker ---- PAD · STICK (· TOUCH): a small pixel-font
+   switch, bottom centre, clear of both thumbs. --topbar-h is the real bar
+   height on a game page. */
 #control-toggle {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
   bottom: calc(var(--topbar-h, 118px) + env(safe-area-inset-bottom, 0px) + 5px);
   z-index: 205;
+  display: flex;
   margin: 0;
-  padding: 8px 12px;   /* a real tap target; the type stays 6px */
+  padding: 0;
   border: 1px solid rgba(120, 130, 120, 0.3);
   border-radius: 3px;
   background: rgba(6, 8, 6, 0.72);
+  opacity: 0.8;
+  transition: opacity .2s, border-color .2s;
+}
+#control-toggle:hover { opacity: 1; border-color: rgba(50, 200, 50, 0.5); }
+#control-toggle:empty { display: none; }
+#control-toggle > button {
+  margin: 0;
+  padding: 8px 9px;    /* a real tap target; the type stays 6px */
+  border: 0;
+  background: none;
   font-family: 'Press Start 2P', 'Courier New', monospace;
   font-size: 6px;
   line-height: 1.5;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: rgba(150, 165, 150, 0.72);
+  color: rgba(150, 165, 150, 0.6);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: none;
-  opacity: 0.55;
-  transition: opacity .2s, color .2s, border-color .2s;
 }
-#control-toggle:hover {
-  opacity: 1;
+#control-toggle > button + button { border-left: 1px solid rgba(120, 130, 120, 0.25); }
+#control-toggle > button[aria-checked="true"] {
   color: #7be07b;
-  border-color: rgba(50, 200, 50, 0.5);
+  background: rgba(50, 200, 50, 0.12);
+  text-shadow: 0 0 4px rgba(80, 230, 80, 0.6);
 }
-#control-toggle .ct-what::before { content: 'joystick'; }
-:root[data-controls="stick"] #control-toggle .ct-what::before { content: 'pad'; }
 
 /* Phones: a taller bar and a bigger cross and caps, hard against the two
    edges. */
@@ -2822,7 +2820,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    cross / stick base, in the panel's lower part. */
 :root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel::before,
 :root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel::after {
-  top: calc(50% + var(--dpad) / 2 + 6px);
+  /* the cross's round well reaches 5% past it */
+  top: calc(50% + var(--dpad) * 0.55 + 4px);
 }
 :root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel::before { left: var(--ctl-cx); }
 :root[data-layout="upright"][data-caps="4"][data-players="2"] .kiosk-bar > .deck-panel::after {
@@ -2866,8 +2865,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-layout="upright"] #topbar ~ #control-toggle,
 :root[data-layout="upright"] #control-toggle {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 3px);
-  padding: 5px 10px;
 }
+:root[data-layout="upright"] #control-toggle > button { padding: 5px 6px; letter-spacing: 0.5px; }
 
 /* ---- Thumb-sized on a phone ---- One player upright on a touch phone:
    equipment sized off the whole width, and the bar grows to seat the bigger
@@ -2956,3 +2955,30 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* Every game reads at most two caps, so a station shows only its live ones. */
 :is(.snes-btn, .arcade-btn).spare { display: none; }
+
+/* ---- Breathing room (one seat) ---- The plate's sides slope with the
+   deck's tilt, so a cross or caps set nearer than ~30px to the bar's edge
+   overhang it. Sideways, controls keep 22px off the glass's edges, clear of
+   the rounded corners. */
+:root[data-layout="upright"][data-caps="4"][data-controls][data-players="1"] {
+  --ctl-cx: calc(30px + var(--dpad) / 2);
+  --ctl-pr: 30px;
+}
+@media (pointer: coarse) and (max-width: 520px) {
+  /* 27vw keeps the cross clear of the picker at the bar's bottom centre. */
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players="1"] {
+    --dpad: clamp(84px, 27vw, 112px);
+    --ctl-cx: calc(30px + var(--dpad) / 2);
+    --ctl-pr: 30px;
+  }
+}
+:root[data-layout="landscape"][data-controls="pad"][data-players="1"] #snes-pad .snes-shell {
+  padding: 0 max(22px, calc(env(safe-area-inset-right, 0px) + 10px))
+             calc(env(safe-area-inset-bottom, 0px) + 22px)
+             max(22px, calc(env(safe-area-inset-left, 0px) + 10px));
+}
+:root[data-layout="landscape"][data-controls="stick"][data-players="1"] #deck-p1 {
+  padding: 0 max(22px, calc(env(safe-area-inset-right, 0px) + 10px))
+             calc(env(safe-area-inset-bottom, 0px) + 22px)
+             max(22px, calc(env(safe-area-inset-left, 0px) + 10px));
+}

@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=65">
+  <link rel="stylesheet" href="kiosk.css?v=70">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -515,8 +515,79 @@
       0%, 100% { transform: rotate(-6deg) translateY(0); }
       50%      { transform: rotate(-4deg) translateY(-3px); }
     }
+    /* TOUCH: a quiet tablet mark in the card's lower-right corner, a
+       fingertip tapping its screen. */
+    .badge-touch {
+      position: absolute;
+      right: 12px;
+      bottom: 9px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: #6e737a;
+      pointer-events: none;
+      transition: color .2s;
+    }
+    .card:hover .badge-touch, .card-focused .badge-touch { color: #b8bec6; }
+
+    /* CONTROLLER: a real gamepad is recommended. A DualSense in the same
+       quiet corner as the TOUCH mark; its light bar comes on with the card. */
+    .badge-pad {
+      position: absolute;
+      right: 12px;
+      bottom: 8px;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      color: #6e737a;
+      pointer-events: none;
+      transition: color .2s;
+    }
+    .card:hover .badge-pad, .card-focused .badge-pad { color: #b8bec6; }
+    .bp-text {
+      display: flex;
+      flex-direction: column;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      line-height: 1.15;
+    }
+    .bp-text small { font-size: 7px; font-weight: 500; letter-spacing: 0.8px; opacity: 0.75; }
+    .bp-dualsense { width: 27px; height: 17px; overflow: visible; }
+    .bp-body { fill: currentColor; opacity: 0.55; }
+    .bp-centre { fill: #0a0a0c; stroke: currentColor; stroke-width: 0.5; }
+    .bp-light { fill: none; stroke: #4f8bff; stroke-width: 1.2; stroke-linecap: round; opacity: 0.5; transition: opacity .2s; }
+    .card:hover .bp-light, .card-focused .bp-light { opacity: 1; filter: drop-shadow(0 0 1.5px #5b8cff); }
+    .bp-stick { fill: #0a0a0c; stroke: currentColor; stroke-width: 0.6; }
+    .bp-dpad { stroke: #0a0a0c; stroke-width: 0.9; stroke-linecap: round; }
+    .bp-btn { fill: #0a0a0c; }
+    /* Only where TOUCH can be picked (kiosk.js sets data-has-touch). */
+    :root:not([data-has-touch]) .badge-touch { display: none; }
+    .bt-ipad { width: 12px; height: 15px; overflow: visible; }
+    .bt-ipad rect { fill: none; stroke: currentColor; stroke-width: 1.4; }
+    .bt-tip { fill: currentColor; }
+    .bt-ring {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1;
+      opacity: 0;
+      transform-origin: 8px 10px;
+      animation: bt-ripple 2.8s ease-out infinite;
+    }
+    @keyframes bt-ripple {
+      0%, 60% { opacity: 0; transform: scale(0.4); }
+      64%     { opacity: 0.9; transform: scale(0.5); }
+      100%    { opacity: 0; transform: scale(1.1); }
+    }
     @media (prefers-reduced-motion: reduce) {
-      .badge-action, .badge-cosy { animation: none; }
+      .badge-action, .badge-cosy, .bt-ring { animation: none; }
     }
 
     /* ---- footer ---- */
@@ -703,6 +774,7 @@
 
     <!-- RALLY -->
     <a class="card card-rally" href="rally/index.html">
+      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-badges">
         <div class="badge-2p">2<br>PLAYER</div>
       </div>
@@ -717,6 +789,7 @@
 
     <!-- BUBBLER -->
     <a class="card card-bubbler" href="bubbler/index.html">
+      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-badges">
         <div class="badge-2p">2<br>PLAYER</div>
         <div class="badge-genre badge-cosy" data-i18n="badgeCosy">COSY</div>
@@ -732,6 +805,7 @@
 
     <!-- BOUNCER -->
     <a class="card card-bouncer" href="bouncer/index.html">
+      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
         <img class="card-shot" src="bouncer/screenshot.png?v=3" alt="Bouncer gameplay">
       </div>
@@ -743,6 +817,7 @@
 
     <!-- GALACTIC DEFENDER -->
     <a class="card card-galactic" href="galactic_defender/index.html">
+      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
         <img class="card-shot" src="galactic_defender/screenshot.png?v=6" alt="Galactic Defender gameplay">
       </div>
@@ -754,6 +829,7 @@
 
     <!-- RAIDER -->
     <a class="card card-sky-raider" href="sky_raider/index.html">
+      <span class="badge-pad"><svg class="bp-dualsense" viewBox="0 0 30 19" aria-hidden="true"><path class="bp-body" d="M7 2.2C10 1.2 20 1.2 23 2.2C26.2 3.3 28.3 8.5 29 13.6C29.5 17.4 26.8 18.6 24.6 16.4L21.4 13.1C18.6 12 11.4 12 8.6 13.1L5.4 16.4C3.2 18.6.5 17.4 1 13.6C1.7 8.5 3.8 3.3 7 2.2Z"/><path class="bp-centre" d="M10.2 3.4H19.8L19 9.6C16.4 10.4 13.6 10.4 11 9.6Z"/><path class="bp-light" d="M10.8 3.9Q15 5 19.2 3.9"/><circle class="bp-stick" cx="11.2" cy="11.2" r="1.7"/><circle class="bp-stick" cx="18.8" cy="11.2" r="1.7"/><path class="bp-dpad" d="M5.4 7.6h2.6M6.7 6.3v2.6"/><circle class="bp-btn" cx="23.3" cy="6.2" r=".8"/><circle class="bp-btn" cx="23.3" cy="9" r=".8"/><circle class="bp-btn" cx="21.9" cy="7.6" r=".8"/><circle class="bp-btn" cx="24.7" cy="7.6" r=".8"/></svg><span class="bp-text" data-i18n="badgePad">CONTROLLER<small>RECOMMENDED</small></span></span>
       <div class="card-badges">
         <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
       </div>
@@ -778,6 +854,7 @@
 
     <!-- SERPENT -->
     <a class="card card-serpent" href="serpent/index.html">
+      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
         <img class="card-shot" src="serpent/screenshot.png?v=3" alt="Serpent gameplay">
       </div>
@@ -789,6 +866,7 @@
 
     <!-- BRAWLER -->
     <a class="card card-brawler" href="brawler/index.html">
+      <span class="badge-pad"><svg class="bp-dualsense" viewBox="0 0 30 19" aria-hidden="true"><path class="bp-body" d="M7 2.2C10 1.2 20 1.2 23 2.2C26.2 3.3 28.3 8.5 29 13.6C29.5 17.4 26.8 18.6 24.6 16.4L21.4 13.1C18.6 12 11.4 12 8.6 13.1L5.4 16.4C3.2 18.6.5 17.4 1 13.6C1.7 8.5 3.8 3.3 7 2.2Z"/><path class="bp-centre" d="M10.2 3.4H19.8L19 9.6C16.4 10.4 13.6 10.4 11 9.6Z"/><path class="bp-light" d="M10.8 3.9Q15 5 19.2 3.9"/><circle class="bp-stick" cx="11.2" cy="11.2" r="1.7"/><circle class="bp-stick" cx="18.8" cy="11.2" r="1.7"/><path class="bp-dpad" d="M5.4 7.6h2.6M6.7 6.3v2.6"/><circle class="bp-btn" cx="23.3" cy="6.2" r=".8"/><circle class="bp-btn" cx="23.3" cy="9" r=".8"/><circle class="bp-btn" cx="21.9" cy="7.6" r=".8"/><circle class="bp-btn" cx="24.7" cy="7.6" r=".8"/></svg><span class="bp-text" data-i18n="badgePad">CONTROLLER<small>RECOMMENDED</small></span></span>
       <div class="card-badges">
         <div class="badge-2p">2<br>PLAYER</div>
         <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
@@ -839,11 +917,11 @@
   <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
    <div class="deck-panel"></div>
   </div>
-  <script src="deck.js?v=4"></script>
+  <script src="deck.js?v=5"></script>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=26"></script>
-  <script src="blip_controller.js?v=4"></script>
+  <script src="kiosk.js?v=31"></script>
+  <script src="blip_controller.js?v=8"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Translations                                                         */
@@ -853,6 +931,8 @@
       en: {
         badgeAction:      'ACTION!',
         badgeCosy:        'COSY',
+        badgeTouch:       'TOUCH',
+        badgePad:         'CONTROLLER<small>RECOMMENDED</small>',
         serpentGenre:     'SNAKE MOVING GAME',
         serpentDesc:      'Making snake for eat thing and become large size.<br>Not to touching wall or own body is important much.<br>How much long snake you are achieve?',
         serpentControls:  'PUSH WASD / ARROW KEY FOR MOVE',
@@ -891,6 +971,8 @@
       ja: {
         badgeAction:      'アクション!',
         badgeCosy:        'ほっこり',
+        badgeTouch:       'タッチ',
+        badgePad:         'コントローラー<small>推奨</small>',
 
         serpentGenre:     'スネークゲーム',
         serpentDesc:      'ヘビを操作してエサを食べ、どんどん成長しよう。<br>壁や自分の体にぶつかってはいけない。<br>どこまで長くなれるか？',
@@ -930,6 +1012,8 @@
       da: {
         badgeAction:      'ACTION!',
         badgeCosy:        'HYGGE',
+        badgeTouch:       'TOUCH',
+        badgePad:         'CONTROLLER<small>ANBEFALES</small>',
 
         serpentGenre:     'SLANGEBANE',
         serpentDesc:      'Styr slangen til at spise og vokse.<br>Undg&aring; at ramme v&aelig;ggene eller dig selv.<br>Hvor lang kan du blive?',

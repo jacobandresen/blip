@@ -12,6 +12,10 @@ extern "C" {
     fn blip_game_over(score: i32);
     fn blip_high_score() -> i32;
     fn blip_high_name(ptr: *mut u8, cap: i32) -> i32;
+    fn blip_touch_down(slot: i32) -> i32;
+    fn blip_touch_pos(slot: i32, axis: i32) -> f32;
+    fn blip_haptic();
+    fn blip_picture(width: i32, height: i32);
 }
 
 /// Notify the kiosk shell that the player should be charged a coin.
@@ -45,6 +49,46 @@ pub fn paddles(left: f32, right: f32) {
     unsafe { blip_paddles(left, right); }
     #[cfg(not(target_arch = "wasm32"))]
     let _ = (left, right);
+}
+
+/// A finger (or a PC's pointer) on the shell's touch surface, as a fraction
+/// of the canvas (0..1 across and down; beyond when it is on the strip below
+/// the picture), and whether it is pressed: a finger always is, a mouse
+/// hovering over the trackpad is not. Slot 0 is player one, slot 1 player
+/// two. Natively slot 0 is the mouse while its left button is held.
+/// Games want [`crate::Blip::touch`], which maps this into game pixels.
+pub fn touch_fraction(slot: usize) -> Option<(f32, f32, bool)> {
+    #[cfg(target_arch = "wasm32")]
+    unsafe {
+        // 0 = nothing, 1 = hovering, 2 = pressed
+        let state = blip_touch_down(slot as i32);
+        if state == 0 { return None; }
+        Some((blip_touch_pos(slot as i32, 0), blip_touch_pos(slot as i32, 1), state == 2))
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use macroquad::input::{is_mouse_button_down, mouse_position, MouseButton};
+        use macroquad::window::{screen_height, screen_width};
+        if slot != 0 || !is_mouse_button_down(MouseButton::Left) { return None; }
+        let (x, y) = mouse_position();
+        Some((x / screen_width(), y / screen_height(), true))
+    }
+}
+
+/// A short buzz under the player's thumb (a paddle hit, a lost life). Only
+/// while the touch controls are in use, and only where the Vibration API is.
+pub fn haptic() {
+    #[cfg(target_arch = "wasm32")]
+    unsafe { blip_haptic(); }
+}
+
+/// Tell the shell the game's virtual canvas size, so it can size things to
+/// the letterboxed picture (the touch strip is never wider than it).
+pub fn picture(width: i32, height: i32) {
+    #[cfg(target_arch = "wasm32")]
+    unsafe { blip_picture(width, height); }
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = (width, height);
 }
 
 /// Report the final score to the shell for the high-score board

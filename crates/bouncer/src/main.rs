@@ -40,6 +40,9 @@ const PAD_SPEED: f32 = 280.0;
 const DASH_WINDOW: f32 = 0.28;
 const DASH_BOOST: f32 = 0.9;
 const DASH_SECS: f32 = 0.35;
+// A finger drags the paddle no faster than a full dash, so touch play gets
+// no reach the keys can't match.
+const PAD_SPEED_TOUCH: f32 = PAD_SPEED * (1.0 + DASH_BOOST);
 
 const BALL_W: i32 = 18;
 const BALL_H: i32 = 18;
@@ -128,6 +131,8 @@ struct Game {
     pad_vx: f32,
     /// Seconds since each direction was last pressed (left, right).
     tap_age: [f32; 2],
+    /// Where a finger on the touch strip wants the paddle's centre.
+    touch_x: Option<f32>,
     /// -1 / +1 while a dash is on, and how much of it is left.
     dash_dir: f32,
     dash_t: f32,
@@ -155,6 +160,7 @@ impl Game {
             pad_w: PAD_W as f32,
             pad_vx: 0.0,
             tap_age: [f32::MAX; 2],
+            touch_x: None,
             dash_dir: 0.0,
             dash_t: 0.0,
             pad_effect_timer: Timer::default(),
@@ -297,8 +303,13 @@ fn paddle_input(g: &mut Game, dt: f32) {
     let dash = 1.0 + DASH_BOOST * g.dash_t / DASH_SECS;
     let left = key_active(BLIP_KEY_LEFT) || key_active(BLIP_KEY_A);
     let right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
-    if left  { g.pad_x -= PAD_SPEED * dt * if g.dash_dir < 0.0 { dash } else { 1.0 }; }
-    if right { g.pad_x += PAD_SPEED * dt * if g.dash_dir > 0.0 { dash } else { 1.0 }; }
+    if let Some(tx) = g.touch_x {
+        let step = PAD_SPEED_TOUCH * dt;
+        g.pad_x += clamp(tx - g.pad_w / 2.0 - g.pad_x, -step, step);
+    } else {
+        if left  { g.pad_x -= PAD_SPEED * dt * if g.dash_dir < 0.0 { dash } else { 1.0 }; }
+        if right { g.pad_x += PAD_SPEED * dt * if g.dash_dir > 0.0 { dash } else { 1.0 }; }
+    }
     g.pad_x = clamp(g.pad_x, 0.0, WIN_W as f32 - g.pad_w);
     // Actual on-screen speed this frame — reads as zero if held against a wall,
     // even with a direction key down, since the paddle isn't really moving.
@@ -498,6 +509,7 @@ fn ball_paddle(g: &mut Game, speed: f32, sfx: &Sounds) {
         return;
     }
     play_variant(&sfx.paddle_hit, speed);
+    web::haptic();
     g.pad_kick_v = 40.0 + 70.0 * (speed / BALL_SPEED_MAX).min(1.0);
     let incoming_vx = g.ball_vx;
 
@@ -898,6 +910,7 @@ async fn main() {
             }
         }
 
+        g.touch_x = blip.touch(0).map(|p| p.x);
         match g.state {
             State::Title  => update_title(&mut g),
             State::Launch => update_launch(&mut g, dt),

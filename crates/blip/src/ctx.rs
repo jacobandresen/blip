@@ -57,6 +57,14 @@ impl Lcg {
 // blitted through this: bowed into a convex tube, phosphor bloom, corners
 // falling into the bezel, a faint glare. GLSL ES 1.00 for WebGL 1.
 
+/// CPU twin of the shader's `curve()`: screen UV -> the picture UV drawn there.
+fn crt_curve(p: macroquad::math::Vec2) -> macroquad::math::Vec2 {
+    let p = p * 2.0 - 1.0;
+    let off = vec2(p.y.abs() / 12.0, p.x.abs() / 11.0);
+    let p = (p + p * off * off) * 0.99;
+    p * 0.5 + 0.5
+}
+
 const CRT_VERTEX: &str = r#"#version 100
 attribute vec3 position;
 attribute vec2 texcoord;
@@ -297,6 +305,7 @@ impl Blip {
             screenshot_path,
         };
         b.apply_camera();
+        crate::web::picture(width, height);
         b
     }
 
@@ -323,6 +332,27 @@ impl Blip {
         let vx = ((sw - vw) * 0.5).round();
         let vy = ((sh - vh) * 0.5).round();
         (vx, vy, vw, vh)
+    }
+
+    /// Where the finger in touch `slot` points, in game pixels: through the
+    /// letterbox and, while the curved glass is drawn, through the same bow the
+    /// shader gives the picture, so a paddle lands under the fingertip.
+    pub fn touch(&self, slot: usize) -> Option<macroquad::math::Vec2> {
+        let (fx, fy, _) = crate::web::touch_fraction(slot)?;
+        let (vx, vy, vw, vh) = self.viewport();
+        if vw <= 0.0 || vh <= 0.0 { return None; }
+        let mut u = vec2((fx * screen_width() - vx) / vw, (fy * screen_height() - vy) / vh);
+        if self.crt.is_some() && self.fx_level == 0 && !self.screenshot_mode {
+            u = crt_curve(u);
+        }
+        Some(vec2(u.x * self.width as f32, u.y * self.height as f32))
+    }
+
+    /// Is touch `slot` pressed: a finger down, or a PC's mouse button held
+    /// over the trackpad (a pointer merely hovering there is [`Self::touch`]
+    /// without being pressed).
+    pub fn touch_pressed(&self, slot: usize) -> bool {
+        matches!(crate::web::touch_fraction(slot), Some((_, _, true)))
     }
 
     /// End the current frame: blit the virtual canvas to the screen (with CRT effects),

@@ -572,13 +572,379 @@ window.addEventListener('keydown', function (e) {
   BlipController.bindKeyboard();
   BlipController.bindGamepad(pollGamepad);
 
+  // ---- The controller selector ----
+  // Oldest to newest: JOYSTICK · PAD (· TOUCH on a game with a strip, on a
+  // touch screen); Rally has DIAL · TOUCH there and nothing to pick elsewhere.
+  var picker = document.getElementById('control-toggle');
+  var touchSpec = game && game.touch;
+  function syncPicker() {
+    if (!picker) return;
+    var now = blipControls();
+    Array.prototype.forEach.call(picker.children, function (b) {
+      var on = b.getAttribute('data-mode') === now ||
+               (b.getAttribute('data-mode') === 'dial' && now !== 'touch');
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+  if (picker) {
+    var modes = isRally ? ['dial'] : ['stick', 'pad'];
+    var LABEL = { stick: 'joystick' };
+    if (touchSpec && blipHasTouch()) modes.push('touch');
+    if (modes.length < 2) modes = [];
+    modes.forEach(function (m) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('data-mode', m);
+      b.textContent = LABEL[m] || m;
+      b.addEventListener('click', function () {
+        blipSetControls(m === 'dial' ? blipPhysicalControls() : m);
+        // Back to the game, so the keyboard and gamepad drive it at once.
+        try { canvas.focus({ preventScroll: true }); } catch (e) {}
+      });
+      picker.appendChild(b);
+    });
+    syncPicker();
+  }
+  var touchPlay = bindTouchPlay();
+  window.onBlipControlsChange = function () {
+    BlipController.releaseAll();
+    touchPlay.release();
+    stations.forEach(function (st) { st.held = {}; leanStick(st); });
+    syncPicker();
+    // The controllers are different heights, so the picture has to be
+    // re-fitted or it keeps the other one's reservation.
+    if (typeof fillCanvas === 'function') fillCanvas();
+  };
+
+  // ---- Touch play ----
+  // With TOUCH chosen, a finger anywhere but a button (the strip, the picture,
+  // the bezel) plays. 'drag' and 'paddles' hand finger positions to the game
+  // (blip_touch_* in blip_bridge.js); 'swipe' taps arrow keys. Serpent's
+  // picture takes finger swipes whatever controller is chosen. Touch screens
+  // only; a touchscreen laptop's mouse can hover-play the trackpad too.
+  function bindTouchPlay() {
+    var none = { release: function () {}, resync: function () {} };
+    if (!touchSpec || !blipHasTouch()) return none;
+    var kind = touchSpec.kind;
+    var SWIPE_PX = 22;                 // a flick this long turns the snake
+    var slots = [null, null];          // { id, x, y, pressed, mouse } in canvas fractions
+    var swipe = null;                  // { id, x, y, moved }
+    var fireHeld = false;
+    var rect = null;
+
+    var strip = document.createElement('div');
+    strip.id = 'touch-strip';
+    strip.setAttribute('aria-hidden', 'true');
+    var halves = kind === 'paddles' ? ['P1', '2P'] :
+                 kind === 'platform' ? ['RUN', 'BUBBLE', 'JUMP'] : [''];
+    strip.innerHTML = '<div class="ts-glass">' +
+      halves.map(function (h, i) {
+        return '<div class="ts-half" data-slot="' + i + '">' +
+          (h ? '<span class="ts-tag">' + h + '</span>' : '') + '</div>';
+      }).join('') +
+      '<span class="ts-demo"></span><span class="ts-thumb"></span><span class="ts-arrow"></span>' +
+      '<span class="ts-hint for-touch">' + (kind === 'drag' ? 'Drag to move &middot; ' : '') +
+      touchSpec.hint + '</span>' +
+      '<span class="ts-hint for-mouse">' + touchSpec.mouseHint + '</span></div>';
+    var bar = document.getElementById('topbar');
+    if (bar) bar.appendChild(strip);
+    var glass = strip.querySelector('.ts-glass');
+
+    // The trackpad is never wider than the game's picture: the canvas
+    // letterboxed to the size the game reported (blip_picture).
+    function fitStrip() {
+      if (!bar) return;
+      var cr = canvas.getBoundingClientRect(), br = bar.getBoundingClientRect();
+      var pic = window.blipPicture, w = cr.width;
+      if (pic && pic.w && pic.h) w = Math.min(cr.width, Math.round(cr.height * pic.w / pic.h));
+      glass.style.left = Math.round(cr.left + (cr.width - w) / 2 - br.left) + 'px';
+      glass.style.width = w + 'px';
+    }
+    window.addEventListener('blip-picture', fitStrip);
+    window.addEventListener('resize', fitStrip);
+    if (typeof ResizeObserver === 'function') new ResizeObserver(fitStrip).observe(canvas);
+    fitStrip();
+    var thumb = strip.querySelector('.ts-thumb');
+    var arrow = strip.querySelector('.ts-arrow');
+    var p2tag = strip.querySelector('.ts-half[data-slot="1"] .ts-tag');
+
+    // 0 = nothing, 1 = a PC's pointer hovering, 2 = pressed.
+    window.blipTouchDown = function (slot) {
+      var t = slots[slot];
+      return t ? (t.pressed ? 2 : 1) : 0;
+    };
+    window.blipTouchPos = function (slot, axis) {
+      var t = slots[slot];
+      return t ? (axis ? t.y : t.x) : 0;
+    };
+    window.blipHaptic = function () {
+      if (blipControls() === 'touch' && navigator.vibrate) {
+        try { navigator.vibrate(12); } catch (e) {}
+      }
+    };
+
+    function frac(e) {
+      return { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
+    }
+    // Rally: each player drags on their own half, except against the CPU,
+    // where the whole screen is player one's.
+    function slotFor(e) {
+      if (kind !== 'paddles' || root.hasAttribute('data-cpu')) return 0;
+      return e.clientX < window.innerWidth / 2 ? 0 : 1;
+    }
+    function setFire(down) {
+      if (down === fireHeld) return;
+      fireHeld = down;
+      if (!down || !coinGated()) dispatch(primary, down ? 'keydown' : 'keyup');
+    }
+    function tapKey(spec) {
+      if (coinGated()) return;
+      dispatch(spec, 'keydown');
+      dispatch(spec, 'keyup');
+    }
+    function showThumb(t) {
+      if (kind === 'drag' && t) {
+        var sr = glass.getBoundingClientRect();
+        thumb.style.transform = 'translateX(' + (rect.left + t.x * rect.width - sr.left) + 'px)';
+      }
+      var held = !!(slots[0] || slots[1] || swipe);
+      strip.classList.toggle('held', held);
+      // The demo finger has made its point once the player has touched.
+      if (held) strip.classList.add('used');
+      Array.prototype.forEach.call(strip.querySelectorAll('.ts-half'), function (h, i) {
+        h.classList.toggle('held', !!slots[i]);
+      });
+    }
+    function flashArrow(dir) {
+      arrow.setAttribute('data-dir', dir);
+      arrow.classList.remove('flash');
+      void arrow.offsetWidth;
+      arrow.classList.add('flash');
+    }
+    function ignored(e) {
+      return e.target && e.target.closest &&
+        e.target.closest('a, button, #need-coin-overlay, #rotate-hint, #control-toggle');
+    }
+
+    // A PC plays the trackpad like a laptop's: the pointer moves the paddle
+    // just by hovering over it (or the picture), a click is the tap.
+    function mouseSlot() {
+      for (var i = 0; i < slots.length; i++) if (slots[i] && slots[i].mouse) return i;
+      return -1;
+    }
+    function onSurface(e) {
+      return e.target === canvas || !!(e.target && e.target.closest && e.target.closest('.ts-glass'));
+    }
+    function placeMouse(e, pressed) {
+      var slot = slotFor(e), was = mouseSlot();
+      // Held, the click stays with the bat it started on.
+      if (was !== -1 && slots[was].pressed) slot = was;
+      else if (was !== -1 && was !== slot) slots[was] = null;
+      var f = frac(e);
+      slots[slot] = { id: e.pointerId, x: f.x, y: f.y, pressed: pressed, mouse: true };
+      return slot;
+    }
+    function dropMouse() {
+      var m = mouseSlot();
+      if (m === -1) return;
+      slots[m] = null;
+      if (kind === 'drag') setFire(false);
+      showThumb(null);
+    }
+
+    // The hint follows whatever was used last: a touchscreen laptop has both.
+    function noteInput(e) {
+      var type = e.pointerType === 'mouse' ? 'mouse' : 'touch';
+      if (strip.getAttribute('data-input') !== type) strip.setAttribute('data-input', type);
+    }
+    window.addEventListener('pointerdown', noteInput, true);
+    window.addEventListener('pointermove', noteInput, true);
+
+    // ---- Platform (Bubbler): RUN on the left half of the trackpad (or the
+    // screen, sideways), BUBBLE and JUMP the quarters right of it. Presses
+    // go through BlipController, so they land on player one's own keys.
+    var RUN_PX = 14, FLICK_PX = 30, LEASH_PX = 40;
+    var plat = {};                     // pointerId -> { zone, x0, y0, dir, name }
+    function zoneOf(e) {
+      var g = glass.getBoundingClientRect();
+      var f = g.width ? (e.clientX - g.left) / g.width : e.clientX / window.innerWidth;
+      return f < 0.5 ? 0 : f < 0.75 ? 1 : 2;
+    }
+    function lightZones() {
+      var lit = {};
+      for (var id in plat) lit[plat[id].zone] = true;
+      Array.prototype.forEach.call(strip.querySelectorAll('.ts-half'), function (h, i) {
+        h.classList.toggle('held', !!lit[i]);
+      });
+      strip.classList.toggle('held', Object.keys(plat).length > 0);
+      if (Object.keys(plat).length) strip.classList.add('used');
+    }
+    function runTo(p, dir) {
+      if (dir === p.dir) return;
+      if (p.dir) BlipController.set(p.dir, false, { silentClick: true });
+      if (dir) BlipController.set(dir, true, { silentClick: true });
+      p.dir = dir;
+    }
+    function jumpTap() {
+      BlipController.set('button2', true);
+      setTimeout(function () { BlipController.set('button2', false); }, 60);
+    }
+    function platDown(e) {
+      var zone = zoneOf(e);
+      var p = { zone: zone, x0: e.clientX, y0: e.clientY, dir: null,
+                name: zone === 1 ? 'button1' : zone === 2 ? 'button2' : null };
+      plat[e.pointerId] = p;
+      if (p.name) BlipController.set(p.name, true);
+      lightZones();
+    }
+    function platMove(e) {
+      var p = plat[e.pointerId];
+      if (!p || p.zone !== 0) return;
+      var dx = e.clientX - p.x0;
+      // The anchor trails the thumb, so turning back needs only a nudge.
+      if (dx > LEASH_PX) { p.x0 = e.clientX - LEASH_PX; dx = LEASH_PX; }
+      if (dx < -LEASH_PX) { p.x0 = e.clientX + LEASH_PX; dx = -LEASH_PX; }
+      runTo(p, dx > RUN_PX ? 'right' : dx < -RUN_PX ? 'left' : null);
+      if (p.y0 - e.clientY > FLICK_PX) { jumpTap(); p.y0 = e.clientY; }
+      else if (e.clientY > p.y0) p.y0 = e.clientY;
+    }
+    function platUp(e) {
+      var p = plat[e.pointerId];
+      if (!p) return;
+      runTo(p, null);
+      if (p.name) BlipController.set(p.name, false);
+      delete plat[e.pointerId];
+      lightZones();
+    }
+    function platRelease() {
+      for (var id in plat) platUp({ pointerId: id });
+    }
+    // The game changed mode and the shell let go of every key: a thumb still
+    // on RUN picks up again on its next move; the buttons want a new press.
+    function resync() {
+      for (var id in plat) { plat[id].dir = null; plat[id].name = null; }
+    }
+
+    window.addEventListener('pointerdown', function (e) {
+      if (kind !== 'platform') return;
+      if (blipControls() !== 'touch' || ignored(e) || coinGated()) return;
+      e.preventDefault();
+      platDown(e);
+    }, { passive: false });
+    window.addEventListener('pointermove', function (e) {
+      if (kind === 'platform' && plat[e.pointerId]) { e.preventDefault(); platMove(e); }
+    }, { passive: false });
+    window.addEventListener('pointerup', function (e) { if (kind === 'platform') platUp(e); });
+
+    window.addEventListener('pointerdown', function (e) {
+      if (kind === 'platform') return;
+      var on = blipControls() === 'touch';
+      if (!on && !(kind === 'swipe' && e.target === canvas && e.pointerType !== 'mouse')) return;
+      if (ignored(e) || coinGated()) return;
+      e.preventDefault();
+      rect = canvas.getBoundingClientRect();
+      if (kind === 'swipe') {
+        swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
+      } else if (e.pointerType === 'mouse') {
+        placeMouse(e, true);
+        if (kind === 'drag') setFire(true);
+      } else {
+        var slot = slotFor(e);
+        // A second finger on a relative bat would jump it; the first keeps it.
+        if (kind === 'paddles' && slots[slot] && !slots[slot].mouse) return;
+        var f = frac(e);
+        slots[slot] = { id: e.pointerId, x: f.x, y: f.y, pressed: true, mouse: false };
+        if (kind === 'drag') setFire(true);
+      }
+      showThumb(slots[0]);
+    }, { passive: false });
+
+    window.addEventListener('pointermove', function (e) {
+      if (swipe && e.pointerId === swipe.id) {
+        e.preventDefault();
+        var dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_PX) return;
+        var dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+        // Re-anchor, so one drag can chain turns round a corner; a straight
+        // drag turns once.
+        swipe.x = e.clientX; swipe.y = e.clientY; swipe.moved = true;
+        if (dir === swipe.dir) return;
+        swipe.dir = dir;
+        var code = 'Arrow' + dir.charAt(0).toUpperCase() + dir.slice(1);
+        tapKey({ key: code, code: code });
+        flashArrow(dir);
+        return;
+      }
+      if (e.pointerType === 'mouse' && (kind === 'drag' || kind === 'paddles')) {
+        var m = mouseSlot();
+        var held = m !== -1 && slots[m].pressed;
+        if (blipControls() !== 'touch' || coinGated() || (!held && !onSurface(e))) { dropMouse(); return; }
+        if (!held) rect = canvas.getBoundingClientRect();
+        showThumb(slots[placeMouse(e, held)]);
+        return;
+      }
+      for (var i = 0; i < slots.length; i++) {
+        var t = slots[i];
+        if (!t || t.id !== e.pointerId) continue;
+        e.preventDefault();
+        var f = frac(e);
+        t.x = f.x; t.y = f.y;
+        if (i === 0) showThumb(t);
+      }
+    }, { passive: false });
+
+    function end(e) {
+      if (swipe && e.pointerId === swipe.id) {
+        if (!swipe.moved && e.type === 'pointerup') tapKey(primary);
+        swipe = null;
+      }
+      for (var i = 0; i < slots.length; i++) {
+        var t = slots[i];
+        if (!t || t.id !== e.pointerId) continue;
+        // The mouse goes back to hovering if it is still over the trackpad.
+        if (t.mouse && e.type === 'pointerup' && onSurface(e)) t.pressed = false;
+        else slots[i] = null;
+      }
+      if (kind === 'drag' && !(slots[0] && slots[0].pressed)) setFire(false);
+      showThumb(slots[0]);
+    }
+    window.addEventListener('pointerup', end);
+    // iOS cancels fingers that are still down when a second one moves
+    // (blip_controller.js), so a finger's pointercancel is not a lift; the
+    // last finger's touchend releases everything instead.
+    window.addEventListener('pointercancel', function (e) { if (e.pointerType === 'mouse') end(e); });
+    ['touchend', 'touchcancel'].forEach(function (t) {
+      document.addEventListener(t, function (e) { if (!e.touches.length) release(); }, { passive: true });
+    });
+    document.documentElement.addEventListener('mouseleave', function () {
+      var m = mouseSlot();
+      if (m !== -1 && !slots[m].pressed) dropMouse();
+    });
+
+    function release() {
+      platRelease();
+      slots[0] = slots[1] = null;
+      swipe = null;
+      setFire(false);
+      showThumb(null);
+    }
+    window.addEventListener('blur', release);
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) release();
+    });
+    // Rally's right half is the CPU's until a second player sits down.
+    if (p2tag) new MutationObserver(function () {
+      p2tag.textContent = root.hasAttribute('data-cpu') ? 'CPU' : '2P';
+    }).observe(root, { attributes: true, attributeFilter: ['data-cpu'] });
+    return { release: release, resync: resync };
+  }
+
   // ---- Rally: hide both deck controllers, run the paddle dials ----
   if (isRally) {
     // Same panel as every other game (data-dials swaps its controls for
     // the dials in kiosk-sized slots; see shell.css).
     root.setAttribute('data-dials', '');
-    var ct = document.getElementById('control-toggle');
-    if (ct) ct.style.display = 'none';
 
     var dialP1 = document.getElementById('paddle-dial');
     var dialP2 = document.getElementById('paddle-dial-p2');
@@ -590,6 +956,7 @@ window.addEventListener('keydown', function (e) {
       // A tap on the canvas (not on a dial) = Space — start 1P / launch /
       // any-key during a rally.
       canvas.addEventListener('touchstart', function (e) {
+        if (blipControls() === 'touch') return;
         if (e.target && e.target.closest && e.target.closest('#paddle-dial, #paddle-dial-p2')) return;
         e.preventDefault();
         if (!coinGated()) { dispatch({ key: ' ', code: 'Space' }, 'keydown'); dispatch({ key: ' ', code: 'Space' }, 'keyup'); }
@@ -624,21 +991,6 @@ window.addEventListener('keydown', function (e) {
     BlipController.registerVisual(pad);
   });
 
-  // ---- The subtle toggle back to the joystick (and back again) ----
-  var toggle = document.getElementById('control-toggle');
-  if (toggle) {
-    toggle.addEventListener('click', function () {
-      blipSetControls(blipControls() === 'stick' ? 'pad' : 'stick');
-    });
-  }
-  window.onBlipControlsChange = function () {
-    BlipController.releaseAll();
-    stations.forEach(function (st) { st.held = {}; leanStick(st); });
-    // The two controllers are different heights, so the picture has to
-    // be re-fitted or it keeps the other one's reservation.
-    if (typeof fillCanvas === 'function') fillCanvas();
-  };
-
   // Called from WASM by the two-seat games: 0 = one player, 1 = two, 2 =
   // title screen with station two lit and waiting (a one-player game keeps it
   // dead to the touch).
@@ -652,8 +1004,13 @@ window.addEventListener('keydown', function (e) {
     // whether anybody is sitting at it.
     Array.prototype.forEach.call(document.querySelectorAll('.deck-tag[data-second]'),
       function (el) { el.textContent = versus ? '2P' : (open ? 'JOIN' : 'CPU'); });
-    BlipController.releaseAll();
-    stations.forEach(function (st) { st.held = {}; leanStick(st); });
+    // This runs inside the game's frame: a key-up injected now re-enters
+    // miniquad's event handler and panics, so let go once the frame returns.
+    queueMicrotask(function () {
+      BlipController.releaseAll();
+      touchPlay.resync();
+      stations.forEach(function (st) { st.held = {}; leanStick(st); });
+    });
     if (typeof fillCanvas === 'function') fillCanvas();
     rotateHint();
   };

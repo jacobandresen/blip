@@ -28,6 +28,21 @@ register_plugin = function (importObject) {
         }
         return 0;
     };
+    // Touch play (shell.js): is a finger down in this slot, and where, as a
+    // fraction of the canvas (axis 0 = x, 1 = y).
+    importObject.env.blip_touch_down = function (slot) {
+        return typeof window.blipTouchDown === 'function' ? window.blipTouchDown(slot) | 0 : 0;
+    };
+    importObject.env.blip_touch_pos = function (slot, axis) {
+        return typeof window.blipTouchPos === 'function' ? +window.blipTouchPos(slot, axis) : 0;
+    };
+    importObject.env.blip_picture = function (w, h) {
+        window.blipPicture = { w: w, h: h };
+        window.dispatchEvent(new Event('blip-picture'));
+    };
+    importObject.env.blip_haptic = function () {
+        if (typeof window.blipHaptic === 'function') window.blipHaptic();
+    };
     // Rust hands us a scratch buffer (ptr + capacity) in wasm memory; we
     // write the record holder's handle as UTF-8 and return the byte count.
     importObject.env.blip_high_name = function (ptr, cap) {

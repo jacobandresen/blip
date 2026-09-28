@@ -5,6 +5,7 @@ use blip::input::{
     any_key_pressed, key_active, key_pressed, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::input::KeyCode;
+use blip::macroquad::math::Vec2;
 use blip::macroquad::rand::rand;
 use blip::{
     play_music, play_sfx, rects_overlap, web, window_conf, Blip, BlipColor, Timer, BLIP_BLACK,
@@ -32,6 +33,9 @@ const BALL_SPD0: f32 = 275.0;
 const BALL_INC: f32 = 15.0;
 const BALL_MAX: f32 = 450.0;
 const AI_SPD: f32 = 145.0;
+// A finger drags its bat relatively, geared up so a thumb's sweep of about
+// two thirds of the picture covers the whole field.
+const TOUCH_GAIN: f32 = 1.6;
 // Keys held from the last rally must not dismiss the win/lose screen unread.
 const GAME_OVER_MIN_WAIT: f32 = 2.0;
 
@@ -60,6 +64,10 @@ struct Game {
     mode: Mode,
     ai_err: f32, // where on its face the CPU meets the ball, re-rolled each volley
     serve_dir: f32, // +1 serves to the right paddle; the loser of a point receives
+    touch: [Option<Vec2>; 2],      // each player's finger this frame (slot 1 = P2)
+    touch_prev: [Option<Vec2>; 2], // ... and last frame
+    pressed: [bool; 2],            // ... pressed (a PC's pointer can hover)
+    pressed_prev: [bool; 2],
 }
 
 impl Game {
@@ -73,6 +81,10 @@ impl Game {
             mode: Mode::OnePlayer,
             ai_err: 0.0,
             serve_dir: 1.0,
+            touch: [None; 2],
+            touch_prev: [None; 2],
+            pressed: [false; 2],
+            pressed_prev: [false; 2],
         }
     }
 
@@ -126,15 +138,41 @@ fn p2_dial_spun() -> bool {
     key_pressed(KeyCode::I) || key_pressed(KeyCode::K)
 }
 
+/// A finger came down (or the mouse was clicked) on player `slot`'s side
+/// this frame.
+fn touch_began(g: &Game, slot: usize) -> bool {
+    g.pressed[slot] && !g.pressed_prev[slot]
+}
+
+/// How far player `slot`'s finger has dragged their bat this frame.
+fn touch_drag(g: &Game, slot: usize) -> f32 {
+    match (g.touch[slot], g.touch_prev[slot]) {
+        (Some(now), Some(before)) => (now.y - before.y) * TOUCH_GAIN,
+        _ => 0.0,
+    }
+}
+
+/// Keys and fingers on the bats, for the serve and the rally.
+fn move_pads(g: &mut Game, dt: f32) {
+    if key_active(BLIP_KEY_UP)   || key_active(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
+    if key_active(BLIP_KEY_DOWN) || key_active(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
+    g.lpad_y += touch_drag(g, 0);
+    if g.mode == Mode::TwoPlayer {
+        if key_active(KeyCode::I) { g.rpad_y -= PAD_SPEED * dt; }
+        if key_active(KeyCode::K) { g.rpad_y += PAD_SPEED * dt; }
+        g.rpad_y += touch_drag(g, 1);
+    }
+}
+
 fn update_title(g: &mut Game) {
     // Spin the P2 dial (or press "2") for a two-player game; spin your own
     // dial for one player against the CPU.
-    if key_pressed(KeyCode::Key2) || p2_dial_spun() {
+    if key_pressed(KeyCode::Key2) || p2_dial_spun() || touch_began(g, 1) {
         g.mode = Mode::TwoPlayer;
         web::set_mode(true);
         web::spend_coin(); // player two's coin: two players, two coins
         g.start_game();
-    } else if p1_dial_spun() {
+    } else if p1_dial_spun() || touch_began(g, 0) {
         g.mode = Mode::OnePlayer;
         web::set_mode(false);
         g.start_game();
@@ -143,14 +181,9 @@ fn update_title(g: &mut Game) {
 
 
 fn update_serve(g: &mut Game, dt: f32) {
-    if key_active(BLIP_KEY_UP)   || key_active(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
-    if key_active(BLIP_KEY_DOWN) || key_active(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
-    if g.mode == Mode::TwoPlayer {
-        if key_active(KeyCode::I) { g.rpad_y -= PAD_SPEED * dt; }
-        if key_active(KeyCode::K) { g.rpad_y += PAD_SPEED * dt; }
-    }
+    move_pads(g, dt);
     g.clamp_pads();
-    if any_key_pressed() {
+    if any_key_pressed() || touch_began(g, 0) || touch_began(g, 1) {
         g.launch();
         g.state = State::Play;
     }
@@ -160,13 +193,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
     let dt = dt.max(1e-4);
     let (lpy0, rpy0) = (g.lpad_y, g.rpad_y);
 
-    if key_active(BLIP_KEY_UP)   || key_active(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
-    if key_active(BLIP_KEY_DOWN) || key_active(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
-
-    if g.mode == Mode::TwoPlayer {
-        if key_active(KeyCode::I) { g.rpad_y -= PAD_SPEED * dt; }
-        if key_active(KeyCode::K) { g.rpad_y += PAD_SPEED * dt; }
-    } else {
+    move_pads(g, dt);
+    if g.mode == Mode::OnePlayer {
         // Tracks the ball only while it is coming; otherwise drifts to centre.
         let target = if g.ball_vx > 0.0 {
             g.ball_y + BALL_SZ * 0.5 - PAD_H * 0.5 + g.ai_err
@@ -214,6 +242,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
             let py = g.lpad_y;
             bounce_paddle(g, py, lpad_vy, 1.0);
             play_sfx(&sfx.hit_l);
+            web::haptic();
         }
 
         if g.ball_vx > 0.0
@@ -224,6 +253,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
             let py = g.rpad_y;
             bounce_paddle(g, py, rpad_vy, -1.0);
             play_sfx(&sfx.hit_r);
+            if g.mode == Mode::TwoPlayer { web::haptic(); }
         }
 
         if g.ball_x + BALL_SZ < 0.0 {
@@ -270,7 +300,8 @@ fn update_point(g: &mut Game, dt: f32) {
 
 fn update_over(g: &mut Game, dt: f32) {
     g.point_t.tick(dt);
-    if g.point_t.active() || !(p1_dial_spun() || p2_dial_spun()) { return; }
+    let again = p1_dial_spun() || p2_dial_spun() || touch_began(g, 0) || touch_began(g, 1);
+    if g.point_t.active() || !again { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -403,6 +434,8 @@ async fn main() {
             play_music(&music[music_idx]);
         }
 
+        g.touch = [blip.touch(0), blip.touch(1)];
+        g.pressed = [blip.touch_pressed(0), blip.touch_pressed(1)];
         match g.state {
             State::Title => update_title(&mut g),
             State::Serve => update_serve(&mut g, dt),
@@ -410,6 +443,8 @@ async fn main() {
             State::Point => update_point(&mut g, dt),
             State::Over  => update_over(&mut g, dt),
         }
+        g.touch_prev = g.touch;
+        g.pressed_prev = g.pressed;
 
         // Feed the two paddle positions to the shell so it can spin the
         // on-screen dials to match — the human paddle(s) and, in 1-player

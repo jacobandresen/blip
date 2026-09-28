@@ -544,12 +544,14 @@ async fn main() {
             }
         }
 
+        let was_playing = g.state == State::Play;
         match g.state {
             State::Title => update_title(&mut g),
             State::Play  => update_play(&mut g, dt, &sfx),
             State::Dead  => update_dead(&mut g, dt),
             State::Over  => update_over(&mut g, dt),
         }
+        if was_playing && g.state != State::Play { web::haptic(); }
 
         if g.want_track != 0 && g.want_track != g.active_music {
             play_music(tracks[(g.want_track - 1) as usize]);

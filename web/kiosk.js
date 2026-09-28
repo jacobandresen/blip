@@ -1,14 +1,5 @@
 var MAX_COINS = 5;
 
-/* ---- Controller choice ---- The pad by default; #control-toggle switches to
- * the stick. Stored as 'pad' | 'stick' in localStorage and applied as <html
- * data-controls> early, so neither control flashes. */
-(function () {
-  var m = 'pad';
-  try { m = localStorage.getItem('blip-controls') || 'pad'; } catch (e) {}
-  document.documentElement.setAttribute('data-controls', m === 'stick' ? 'stick' : 'pad');
-}());
-
 /* ---- Layout: upright or landscape ----
  * One rule for every page's deck, applied as <html data-layout> and kept
  * current on resize, so the landing page and a game lay the bar out alike. */
@@ -22,16 +13,57 @@ blipApplyLayout();
 window.addEventListener('resize', blipApplyLayout);
 window.addEventListener('orientationchange', blipApplyLayout);
 
+/** The controller in use: 'pad', 'stick' or 'touch' (the strip, only on a
+ * game that has one). */
 function blipControls() {
-  return document.documentElement.getAttribute('data-controls') === 'stick' ? 'stick' : 'pad';
+  var root = document.documentElement;
+  if (root.hasAttribute('data-touch')) return 'touch';
+  return root.getAttribute('data-controls') === 'stick' ? 'stick' : 'pad';
+}
+
+/** The pad or stick chosen, which a game without a touch strip keeps using
+ * while touch is chosen. */
+function blipPhysicalControls() {
+  var m = 'pad';
+  try { m = localStorage.getItem('blip-controls') || 'pad'; } catch (e) {}
+  return m === 'stick' ? 'stick' : 'pad';
+}
+
+/** A touch screen: the only place TOUCH is offered. */
+function blipHasTouch() {
+  return ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+}
+
+/** On a touch screen: touch was chosen, or no choice has been made yet. */
+function blipTouchChosen() {
+  if (!blipHasTouch()) return false;
+  var v = null;
+  try { v = localStorage.getItem('blip-touch'); } catch (e) {}
+  return v !== '0';
+}
+
+/** Apply the stored choice as <html data-controls> (+ data-touch). Touch
+ * borrows the pad's bar so the picture is fitted the same. */
+function blipApplyControls() {
+  var root = document.documentElement;
+  var game = blipGameFromPath(window.location.pathname);
+  var touch = !!(game && game.touch) && blipTouchChosen();
+  root.setAttribute('data-controls', touch ? 'pad' : blipPhysicalControls());
+  if (touch) root.setAttribute('data-touch', game.touch.kind);
+  else root.removeAttribute('data-touch');
 }
 
 function blipSetControls(mode) {
-  mode = (mode === 'stick') ? 'stick' : 'pad';
-  try { localStorage.setItem('blip-controls', mode); } catch (e) {}
-  document.documentElement.setAttribute('data-controls', mode);
+  try {
+    if (mode === 'touch') localStorage.setItem('blip-touch', '1');
+    else {
+      localStorage.setItem('blip-touch', '0');
+      if (mode === 'pad' || mode === 'stick') localStorage.setItem('blip-controls', mode);
+    }
+  } catch (e) {}
+  blipApplyControls();
   if (typeof window.onBlipControlsChange === 'function') {
-    try { window.onBlipControlsChange(mode); } catch (e) {}
+    try { window.onBlipControlsChange(blipControls()); } catch (e) {}
   }
 }
 
@@ -44,11 +76,21 @@ function blipSetControls(mode) {
 // the floating pivot to catch a detent / fall back to neutral), maxR (how far
 // the pivot trails the thumb), hyst (degrees past the 22.5 midline before the
 // lock jumps a detent).
+// `touch`: the game can be played on the touch strip instead of the pad.
+// kind 'drag' puts the paddle / cannon under the finger (fire held while it
+// is down), 'swipe' steers by flicks, 'paddles' gives each player a half to
+// drag their bat up and down in, 'platform' splits the strip into RUN (slide;
+// flick up to jump) and two buttons. `hint` is printed on the strip,
+// `mouseHint` instead for a touchscreen laptop's mouse.
 var BLIP_GAMES = {
-  serpent:            { name: 'SERPENT',  accent: '50, 200, 50'   },
-  bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200'   },
-  galactic_defender:  { name: 'DEFENDER', accent: '200, 50, 200'  },
-  rally:              { name: 'RALLY',    accent: '220, 50, 50'   },
+  serpent:            { name: 'SERPENT',  accent: '50, 200, 50',
+                         touch: { kind: 'swipe', hint: 'Swipe to steer', mouseHint: 'Click and drag to steer' } },
+  bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200',
+                         touch: { kind: 'drag', hint: 'Tap to launch', mouseHint: 'Point to move &middot; Click to launch' } },
+  galactic_defender:  { name: 'DEFENDER', accent: '200, 50, 200',
+                         touch: { kind: 'drag', hint: 'Hold to fire', mouseHint: 'Point to move &middot; Hold the button to fire' } },
+  rally:              { name: 'RALLY',    accent: '220, 50, 50',
+                         touch: { kind: 'paddles', hint: 'Drag up or down', mouseHint: 'Point up or down &middot; Click to serve' } },
   meteors:            { name: 'METEORS',  accent: '180, 180, 180',
                          buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }] },
   // A fighter: two caps, punch and kick (holding toward the opponent hits
@@ -75,6 +117,8 @@ var BLIP_GAMES = {
   // two's, who drops in with their own bubble or jump.
   bubbler:            { name: 'BUBBLER', accent: '120, 210, 255',
                          players: 2,
+                         touch: { kind: 'platform', hint: 'Slide to run &middot; flick up to jump',
+                                  mouseHint: 'Drag to run &middot; click BUBBLE or JUMP' },
                          buttons: [{ key: 'f', code: 'KeyF', label: 'BUBBLE' },
                                    { key: 'g', code: 'KeyG', label: 'JUMP' }],
                          keys: { up:    { key: 'w', code: 'KeyW' },
@@ -99,8 +143,14 @@ function blipGameFromPath(pathname) {
   var m = /\/([a-z_]+)\/(?:index\.html)?$/i.exec(pathname || '');
   var g = m && BLIP_GAMES[m[1]];
   return g ? { slug: m[1], name: g.name, accent: g.accent, buttons: g.buttons,
-               keys: g.keys, players: g.players || 1, stick: g.stick } : null;
+               keys: g.keys, players: g.players || 1, stick: g.stick,
+               touch: g.touch || null } : null;
 }
+
+// Before first paint, so no controller flashes. data-has-touch shows the
+// TOUCH badges on the landing page.
+blipApplyControls();
+if (blipHasTouch()) document.documentElement.setAttribute('data-has-touch', '');
 
 if ('serviceWorker' in navigator) {
   var _manifest = document.querySelector('link[rel=manifest]');

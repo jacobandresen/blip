@@ -92,17 +92,31 @@
     frag.appendChild(side);
   });
 
+  // The cross, drawn as one moulded part: a rounded plus with softened inner
+  // corners, one gradient over the whole of it, a rim light and a shadow.
+  // The arm segments over it are the touch targets and light up when pressed.
+  var PLUS = 'M38 2H62Q68 2 68 8V29Q68 32 71 32H92Q98 32 98 38V62Q98 68 92 68H71Q68 68 68 71V92Q68 98 62 98H38Q32 98 32 92V71Q32 68 29 68H8Q2 68 2 62V38Q2 32 8 32H29Q32 32 32 29V8Q32 2 38 2Z';
+  function crossBody(id) {
+    return '<svg class="snes-dp-body" viewBox="0 0 100 100" aria-hidden="true">' +
+      '<defs><linearGradient id="dpg' + id + '" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0" class="dp-s0"/><stop offset=".55" class="dp-s1"/><stop offset="1" class="dp-s2"/>' +
+      '</linearGradient><filter id="dps' + id + '" x="-10%" y="-10%" width="120%" height="125%">' +
+      '<feDropShadow dx="0" dy="1.6" stdDeviation="1.4" flood-color="#000" flood-opacity=".75"/></filter></defs>' +
+      '<path d="' + PLUS + '" fill="url(#dpg' + id + ')" filter="url(#dps' + id + ')"/>' +
+      '<path class="dp-rim" d="' + PLUS + '"/>' +
+      '<circle class="dp-dimple" cx="50" cy="50" r="7"/></svg>';
+  }
+
   // ---- Pads ----
   STATIONS.forEach(function (st, who) {
     var pad = el('div', 'snes-pad' + (who ? ' second' : ''), '',
       { id: 'snes-pad' + st.id, 'aria-hidden': 'true' });
     var shell = el('div', 'snes-shell');
-    var dpad = el('div', 'snes-dpad');
+    var dpad = el('div', 'snes-dpad', crossBody(st.id || '-p1'));
     ['up', 'right', 'down', 'left'].forEach(function (d, k) {
       dpad.appendChild(el('span', 'snes-dp-seg dp-' + d, '',
         { 'data-blip': st.dirs[k], 'data-blip-nopress': '' }));
     });
-    dpad.appendChild(el('span', 'snes-dp-hub'));
     var face = el('div', 'snes-face four');
     for (var i = 0; i < PER_PLAYER; i++) face.appendChild(padCap(st, who, i));
     shell.appendChild(dpad);

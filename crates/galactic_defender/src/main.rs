@@ -35,6 +35,7 @@ const ALIEN_TOTAL: usize = (ALIEN_COLS * ALIEN_ROWS) as usize;
 const PLAYER_SPEED: f32 = 200.0;
 const PLAYER_ACCEL: f32 = 2200.0;
 const PLAYER_BRAKE: f32 = 3200.0;
+const TOUCH_CLOSE_SECS: f32 = 0.08;
 const BULLET_SPEED: f32 = 350.0;
 const MARCH_START: i32 = 520;
 const MARCH_MIN: i32 = 65;
@@ -168,6 +169,8 @@ struct Game {
     ufo_mode: UfoMode,
     laser_used_this_level: bool,
     player_still_secs: f32,
+    /// Where a finger on the touch strip wants the cannon's centre.
+    touch_x: Option<f32>,
     ufo_track_timer: Timer,
     ufo_laser_x: f32,
     ufo_charge_timer: Timer,
@@ -227,6 +230,7 @@ impl Game {
             ufo_mode: UfoMode::Flying,
             laser_used_this_level: false,
             player_still_secs: 0.0,
+            touch_x: None,
             ufo_track_timer: Timer::default(),
             ufo_laser_x: 0.0,
             ufo_charge_timer: Timer::default(),
@@ -822,12 +826,20 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             || key_active(BLIP_KEY_UP)
             || key_active(BLIP_KEY_W));
 
-    let moving_left = key_active(BLIP_KEY_LEFT) || key_active(BLIP_KEY_A);
-    let moving_right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
+    let mut moving_left = key_active(BLIP_KEY_LEFT) || key_active(BLIP_KEY_A);
+    let mut moving_right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
     // The cannon has mass: it spools up to full speed and brakes over ~0.08s.
     let dir = moving_right as i32 - moving_left as i32;
-    let target = dir as f32 * PLAYER_SPEED;
-    let rate = if dir == 0 || target * g.player_vx < 0.0 { PLAYER_BRAKE } else { PLAYER_ACCEL } * dt;
+    let mut target = dir as f32 * PLAYER_SPEED;
+    // A finger asks for the speed that closes the gap in TOUCH_CLOSE_SECS,
+    // capped at the keys' top speed, so the cannon settles under it.
+    if let Some(tx) = g.touch_x {
+        let gap = tx - ALIEN_W as f32 / 2.0 - g.player_x;
+        target = clamp(gap / TOUCH_CLOSE_SECS, -PLAYER_SPEED, PLAYER_SPEED);
+        moving_left = gap < -1.0;
+        moving_right = gap > 1.0;
+    }
+    let rate = if target == 0.0 || target * g.player_vx < 0.0 { PLAYER_BRAKE } else { PLAYER_ACCEL } * dt;
     g.player_vx += clamp(target - g.player_vx, -rate, rate);
     g.player_x += g.player_vx * dt;
     let max_x = (WIN_W - ALIEN_W) as f32;
@@ -1356,6 +1368,7 @@ async fn main() {
             music_timer = MUSIC_DURATIONS[next];
             play_music(&music[next]);
         }
+        g.touch_x = blip.touch(0).map(|p| p.x);
         let prev_state = g.state;
         match g.state {
             State::Title => update_title(&mut g),
@@ -1364,6 +1377,7 @@ async fn main() {
             State::Win   => update_win(&mut g, dt),
             State::Over  => update_over(&mut g, dt),
         }
+        if prev_state == State::Play && matches!(g.state, State::Dead | State::Over) { web::haptic(); }
         if prev_state != State::Over && g.state == State::Over {
             play_sfx(&sfx.game_over);
             web::report_score(g.sess.score);

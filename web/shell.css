@@ -728,3 +728,168 @@ canvas {
   font: 8px 'Press Start 2P', 'Courier New', monospace;
   letter-spacing: 1px;
 }
+
+/* ---- Touch strip ---- TOUCH chosen on a game that has one (<html
+   data-touch>): the pad's bar with its controls removed (blip_controller.js
+   hit-tests touches by rect, so hidden is not enough), dressed as a laptop's
+   palm rest with a glass trackpad as wide as the picture (shell.js sizes it).
+   A finger anywhere off the buttons plays. */
+#touch-strip { display: none; }
+:root[data-touch] :is(.snes-pad, .deck-side, #paddle-dial, #paddle-dial-p2) { display: none !important; }
+:root[data-touch][data-layout="upright"] #touch-strip {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  /* space-grey anodised aluminium */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0, rgba(255, 255, 255, 0) 2px),
+    linear-gradient(180deg, #4a4b4f 0%, #3d3e42 60%, #36373b 100%);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ts-glass {
+  position: absolute;
+  top: 9px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 27px);
+  display: flex;
+  overflow: hidden;
+  container-type: size;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse 90% 120% at 50% 0%, rgba(255, 255, 255, 0.07), transparent 65%),
+    linear-gradient(180deg, #37383c 0%, #313236 100%);
+  /* the diamond-cut chamfer: a bright hairline, a dark seam inside it */
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 1px 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 1px 2px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  transition: background-color .15s;
+}
+#touch-strip.held .ts-glass {
+  background:
+    radial-gradient(ellipse 90% 120% at 50% 0%, rgba(255, 255, 255, 0.1), transparent 65%),
+    linear-gradient(180deg, #3b3c40 0%, #34353a 100%);
+}
+.ts-half { flex: 1; position: relative; transition: background .12s; }
+/* Bubbler: RUN takes half, BUBBLE and JUMP a quarter each, labels centred. */
+:root[data-touch="platform"] .ts-half:first-child { flex: 2; }
+:root[data-touch="platform"] .ts-half .ts-tag { top: 38%; left: 0; right: 0; text-align: center; }
+:root[data-touch="platform"] .ts-half.held { background: rgba(255, 255, 255, 0.07); }
+:root[data-touch="platform"] .ts-hint { right: 50%; padding: 0 8px; }
+.ts-half + .ts-half { border-left: 1px solid rgba(0, 0, 0, 0.3); box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05); }
+:root[data-touch="paddles"] .ts-half.held { background: rgba(255, 255, 255, 0.05); }
+.ts-tag, .ts-hint {
+  position: absolute;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.42);
+  pointer-events: none;
+}
+.ts-tag { top: 8px; left: 11px; font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
+.ts-half + .ts-half .ts-tag { left: auto; right: 11px; }
+.ts-hint {
+  bottom: 9px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+/* A PC reads the pointer's hint, a touch screen the finger's, until one
+   is used (data-input, set by shell.js). */
+.ts-hint.for-mouse { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .ts-hint.for-touch { display: none; }
+  .ts-hint.for-mouse { display: block; }
+}
+#touch-strip[data-input="mouse"] .ts-hint.for-touch { display: none; }
+#touch-strip[data-input="mouse"] .ts-hint.for-mouse { display: block; }
+#touch-strip[data-input="touch"] .ts-hint.for-touch { display: block; }
+#touch-strip[data-input="touch"] .ts-hint.for-mouse { display: none; }
+/* the fingertip on the glass while touching (drag games) */
+.ts-thumb {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: -20px;
+  width: 40px;
+  height: 40px;
+  margin-top: -20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  pointer-events: none;
+}
+:root[data-touch="drag"] #touch-strip.held .ts-thumb { display: block; }
+/* A demo fingertip showing the gesture until the player first touches. */
+.ts-demo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -20px 0 0 -13px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28), 0 0 12px rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+  opacity: 0;
+}
+:root[data-touch="drag"] .ts-demo    { animation: ts-demo-drag 3.2s ease-in-out infinite; }
+:root[data-touch="swipe"] .ts-demo   { animation: ts-demo-swipe 2.4s ease-out infinite; }
+:root[data-touch="paddles"] .ts-demo { margin-left: -13px; left: 25%; animation: ts-demo-bat 2.8s ease-in-out infinite; }
+:root[data-touch="platform"] .ts-demo { left: 25%; animation: ts-demo-run 3s ease-in-out infinite; }
+#touch-strip.used .ts-demo, #touch-strip.held .ts-demo { animation: none; opacity: 0; }
+@keyframes ts-demo-drag {
+  0%   { opacity: 0; transform: translateX(-30cqw) scale(1.25); }
+  10%  { opacity: 1; transform: translateX(-30cqw) scale(1); }
+  45%  { transform: translateX(30cqw); }
+  80%  { opacity: 1; transform: translateX(-10cqw); }
+  90%, 100% { opacity: 0; transform: translateX(-10cqw) scale(1.25); }
+}
+@keyframes ts-demo-swipe {
+  0%   { opacity: 0; transform: translateX(-12cqw) scale(1.25); }
+  12%  { opacity: 1; transform: translateX(-12cqw) scale(1); }
+  45%  { opacity: 0; transform: translateX(14cqw); }
+  100% { opacity: 0; transform: translateX(14cqw); }
+}
+@keyframes ts-demo-run {
+  0%   { opacity: 0; transform: translateX(0) scale(1.25); }
+  10%  { opacity: 1; transform: translateX(0) scale(1); }
+  35%  { transform: translateX(12cqw); }
+  60%  { transform: translateX(-12cqw); }
+  72%  { transform: translate(-12cqw, 0); }
+  80%  { opacity: 1; transform: translate(-12cqw, -22cqh); }
+  90%, 100% { opacity: 0; transform: translate(-12cqw, -22cqh) scale(1.25); }
+}
+@keyframes ts-demo-bat {
+  0%   { opacity: 0; transform: translateY(-18cqh) scale(1.25); }
+  10%  { opacity: 1; transform: translateY(-18cqh) scale(1); }
+  50%  { transform: translateY(18cqh); }
+  85%  { opacity: 1; transform: translateY(-8cqh); }
+  95%, 100% { opacity: 0; transform: translateY(-8cqh) scale(1.25); }
+}
+/* the flick just read (swipe games) */
+.ts-arrow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  border: 12px solid transparent;
+  border-bottom: 18px solid rgba(255, 255, 255, 0.55);
+  border-top-width: 0;
+  pointer-events: none;
+  transform: translate(-50%, -70%) rotate(var(--rot, 0deg));
+}
+.ts-arrow[data-dir="right"] { --rot: 90deg; }
+.ts-arrow[data-dir="down"]  { --rot: 180deg; }
+.ts-arrow[data-dir="left"]  { --rot: 270deg; }
+.ts-arrow.flash { animation: ts-flash .35s ease-out; }
+@keyframes ts-flash { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .ts-demo { animation: none !important; }
+}
