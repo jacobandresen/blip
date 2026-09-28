@@ -269,6 +269,9 @@ window.blipSetMode = function (mode) {
   var d = document.getElementById('paddle-dial-p2');
   if (!d) return;
   var isCpu = (mode === 0);
+  // Two at the table: sideways the touch trackpad becomes one per gutter.
+  document.documentElement.toggleAttribute('data-versus', mode === 1);
+  if (typeof fillCanvas === 'function') fillCanvas();
   d.classList.toggle('cpu-mode', isCpu);
   document.documentElement.toggleAttribute('data-cpu', isCpu);
   var label = document.getElementById('dial-label-p2');
@@ -394,7 +397,7 @@ function fillCanvas() {
   var gl = PAD, gr = PAD;
   if (landscape() && tb) {
     var mid = window.innerWidth / 2;
-    var ctl = tb.querySelectorAll('.snes-dpad, .snes-face, .stick-base, .stick-ball, .fire-buttons, #paddle-dial, #paddle-dial-p2');
+    var ctl = tb.querySelectorAll('.snes-dpad, .snes-face, .stick-base, .stick-ball, .fire-buttons, #paddle-dial, #paddle-dial-p2, #touch-strip .ts-half');
     for (var i = 0; i < ctl.length; i++) {
       var r = ctl[i].getBoundingClientRect();
       if (!r.width || !r.height) continue;
