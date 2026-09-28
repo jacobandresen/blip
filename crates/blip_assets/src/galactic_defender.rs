@@ -1,14 +1,12 @@
-//! Galactic Defender assets.
-//!
-//! Direct port of `games/galactic_defender/assets/generate_assets.c`.
-
-use std::f32::consts::PI;
+//! Galactic Defender assets: pixel-art aliens and saucer, techno music, and
+//! effects on a warbling theremin (see `cosy`).
 
 use crate::image::Image;
 use crate::techno::{warm, 
     bass_note, clap, hat, kick, lead_stab, open_hat, phrase_note, sidechain_duck, supersaw, Rng, MIX_KNEE,
 };
-use crate::wav::{encode_pcm16_mono, mix_into, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::cosy::{self, Tone, Voice, H};
 use crate::Asset;
 
 // Must match crates/galactic_defender/src/main.rs's ALIEN_W / ALIEN_H.
@@ -17,50 +15,6 @@ const ALIEN_H: i32 = 28;
 // Must match crates/galactic_defender/src/main.rs's UFO_W / UFO_H.
 const UFO_W: i32 = 36;
 const UFO_H: i32 = 20;
-
-fn gen_tone(freq: f32, dur_ms: f32, amp: f32) -> Vec<i16> {
-    let sr = SAMPLE_RATE as f32;
-    let n = ms_to_samples(dur_ms);
-    let fade = SAMPLE_RATE as usize / 200;
-    let mut s = Vec::with_capacity(n);
-    for i in 0..n {
-        let t = i as f32 / sr;
-        let mut e = 1.0_f32;
-        if i < fade { e = i as f32 / fade as f32; }
-        if i + fade > n { e = (n - i) as f32 / fade as f32; }
-        let fund = (2.0 * PI * freq * t).sin();
-        let third = (2.0 * PI * freq * 3.0 * t).sin() / 3.0;
-        let shaped = (fund * 0.8 + third * 0.3).tanh();
-        s.push((e * amp * 27000.0 * shaped) as i16);
-    }
-    s
-}
-
-/// LCG for deterministic noise (matches C `rand()` behavior loosely; fine for parity).
-struct Lcg(u32);
-impl Lcg {
-    fn next(&mut self) -> u32 {
-        self.0 = self.0.wrapping_mul(1_103_515_245).wrapping_add(12345) & 0x7FFF_FFFF;
-        self.0
-    }
-}
-
-fn gen_noise(dur_ms: f32, amp: f32) -> Vec<i16> {
-    let n = ms_to_samples(dur_ms);
-    let fade = SAMPLE_RATE as usize / 200;
-    let mut rng = Lcg(1);
-    let mut s = Vec::with_capacity(n);
-    for i in 0..n {
-        let mut e = 1.0_f32;
-        if i < fade { e = i as f32 / fade as f32; }
-        if i + fade > n { e = (n - i) as f32 / fade as f32; }
-        let decay = 1.0 - i as f32 / n as f32;
-        let r = rng.next() % 65536;
-        let noise = (r as f32 - 32768.0) / 32768.0;
-        s.push((e * amp * decay * 32000.0 * noise) as i16);
-    }
-    s
-}
 
 fn player_ship() -> Vec<u8> {
     let w: i32 = 32;
@@ -247,107 +201,30 @@ fn ufo_saucer(frame: usize) -> Vec<u8> {
     img.encode_png()
 }
 
-/// A wailing two-tone siren — like a European ambulance's "hi-lo" — so the
-/// UFO boss is unmistakable by ear before it's even on screen. One glide
-/// cycle (low -> high -> low) that loops seamlessly.
+/// The saucer's call: a theremin warbling round one note, 1.2 s.
 fn ufo_siren() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let n = ms_to_samples(1200.0);
-    let mut s = Vec::with_capacity(n);
-    let f_lo = 650.0_f32;
-    let f_hi = 950.0_f32;
-    let mut phase = 0.0_f32;
-    for i in 0..n {
-        let t = i as f32 / n as f32;
-        let tri = if t < 0.5 { t * 2.0 } else { 2.0 - t * 2.0 };
-        let freq = f_lo + (f_hi - f_lo) * tri;
-        phase += freq / sr;
-        let fund = (2.0 * PI * phase).sin();
-        let third = (2.0 * PI * phase * 3.0).sin() / 4.0;
-        let shaped = (fund * 0.85 + third * 0.25).tanh();
-        s.push((shaped * 20000.0) as i16);
-    }
-    encode_pcm16_mono(&s)
+    cosy::sfx(&cosy::glide(1.2, 560.0, 560.0, Tone::Sine, 0.25, 70.0))
 }
 
-/// The UFO's death-laser "powering up" — an accelerating, ever-louder rising
-/// whine with a fast tremolo that speeds up as it approaches full charge, so
-/// the sound itself communicates urgency before the beam ever fires.
+/// The saucer charging: a theremin sliding up two octaves, trembling
+/// harder as it nears the top, 1.6 s.
 fn laser_charge_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let dur_ms = 1600.0;
-    let n = ms_to_samples(dur_ms);
-    let mut s = Vec::with_capacity(n);
-    let mut phase = 0.0_f32;
-    for i in 0..n {
-        let t = i as f32 / n as f32; // 0..1 progress through the charge
-        let t_sec = i as f32 / sr;
-        let freq = 160.0 + 1300.0 * t * t;
-        phase += freq / sr;
-        let fund = (2.0 * PI * phase).sin();
-        let third = (2.0 * PI * phase * 1.5).sin() * 0.3; // dissonant edge
-        let trem_rate = 6.0 + 22.0 * t; // tremolo accelerates as it charges
-        let trem = 0.7 + 0.3 * (2.0 * PI * trem_rate * t_sec).sin();
-        let amp = 0.2 + 0.8 * t;
-        let shaped = (fund * 0.8 + third * 0.3).tanh();
-        s.push((shaped * trem * amp * 22000.0) as i16);
-    }
-    encode_pcm16_mono(&s)
+    let rise = cosy::glide(1.6, 180.0, 720.0, Tone::Sine, 0.1, 18.0);
+    let under = cosy::glide(1.6, 90.0, 360.0, Tone::Tri, 0.1, 0.0);
+    cosy::sfx(&cosy::mix(rise, &under, 0.0, 0.4))
 }
 
-/// The laser blast itself — a bright descending zap, a heavy sub-bass thump,
-/// and a harsh noise crackle layered together for maximum "very dramatic"
-/// impact. Deliberately driven hot; a little clipping suits a superweapon.
+/// The beam: a warbling theremin falling away over a low triangle, 0.55 s.
 fn laser_blast_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let n = ms_to_samples(550.0);
-    let mut buf = vec![0i16; n];
-    let mut rng = Rng(0x1A5E_2000);
-
-    // Bright descending zap.
-    for i in 0..n {
-        let t = i as f32 / sr;
-        let e = (1.0 - i as f32 / n as f32).powf(1.2);
-        let freq = 2200.0 * (-t / 0.15).exp() + 220.0;
-        let w = (2.0 * PI * freq * t).sin();
-        mix_into(&mut buf, i, w * e * 16000.0);
-    }
-    // Sub-bass thump for weight.
-    for i in 0..n {
-        let t = i as f32 / sr;
-        let e = (1.0 - i as f32 / n as f32).powf(1.6);
-        let freq = 26.0 + 70.0 * (-t / 0.08).exp();
-        let w = (2.0 * PI * freq * t).sin();
-        mix_into(&mut buf, i, w * e * 20000.0);
-    }
-    // Harsh noise crackle up front.
-    let crackle_n = n / 2;
-    for i in 0..crackle_n {
-        let e = (1.0 - i as f32 / crackle_n as f32).powf(2.0);
-        let noise = rng.next_f32() * 2.0 - 1.0;
-        mix_into(&mut buf, i, noise * e * 9000.0);
-    }
-    encode_pcm16_mono(&buf)
+    let fall = cosy::glide(0.55, 900.0, 220.0, Tone::Sine, 1.0, 45.0);
+    let low = cosy::glide(0.55, 110.0, 80.0, Tone::Tri, 0.8, 0.0);
+    cosy::sfx(&cosy::mix(fall, &low, 0.0, 0.6))
 }
 
-/// One ominous thumping march step — a low pitch-swept thud with a driven
-/// sub-octave layer for extra weight. Four of these at descending base
-/// frequencies (classic Space Invaders "duh-duh-duh-duh") cycle as the
-/// aliens advance.
+/// One march step: a soft triangle thud falling onto `base_freq`. Four
+/// descending ones cycle as the aliens advance.
 fn march_thump(base_freq: f32) -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let n = ms_to_samples(150.0);
-    let mut s = Vec::with_capacity(n);
-    for i in 0..n {
-        let t = i as f32 / sr;
-        let e = (1.0 - i as f32 / n as f32).powf(1.5);
-        let freq = base_freq + base_freq * 2.5 * (-t / 0.05).exp();
-        let fund = (2.0 * PI * freq * t).sin();
-        let sub = (2.0 * PI * freq * 0.5 * t).sin();
-        let shaped = (fund * 0.75 + sub * 0.8).tanh();
-        s.push((e * 26000.0 * shaped) as i16);
-    }
-    encode_pcm16_mono(&s)
+    cosy::finish_warm(cosy::glide(0.16, base_freq * 1.4, base_freq, Tone::Tri, 1.4, 0.0), 24_000.0)
 }
 
 fn bullet() -> Vec<u8> {
@@ -605,45 +482,25 @@ fn music3() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
+/// Game over: the theremin walking down A minor, slowly.
 fn game_over_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let freqs = [440.0_f32, 330.0, 220.0, 110.0];
-    let total = SAMPLE_RATE as usize * 2;
-    let seg = total / 4;
-    let mut buf = vec![0i16; total];
-    let mut pos = 0;
-    for f in freqs {
-        for j in 0..seg {
-            if pos >= total { break; }
-            let t = j as f32 / sr;
-            let e = (1.0 - j as f32 / seg as f32).powf(1.3);
-            let fund = (2.0 * PI * f * t).sin();
-            let third = (2.0 * PI * f * 3.0 * t).sin() / 3.0;
-            let shaped = (fund * 0.8 + third * 0.3).tanh();
-            buf[pos] = (e * 19000.0 * shaped) as i16;
-            pos += 1;
-        }
-    }
-    encode_pcm16_mono(&buf)
+    cosy::jingle_with(&[81, H, 77, H, 76, H, 72, H, 69, H, H, H], 0.14, Voice::Theremin, -1, Some((Voice::Bell, -2)))
 }
 
+/// Wave cleared: the theremin climbing A minor to a held note.
 fn level_clear_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let freqs = [440.0_f32, 550.0, 660.0, 880.0];
-    let seg = SAMPLE_RATE as usize / 4;
-    let total = seg * 4;
-    let mut buf = vec![0i16; total];
-    for (i, f) in freqs.iter().enumerate() {
-        for j in 0..seg {
-            let t = j as f32 / sr;
-            let e = (1.0 - j as f32 / seg as f32).powf(1.3);
-            let fund = (2.0 * PI * f * t).sin();
-            let third = (2.0 * PI * f * 3.0 * t).sin() / 3.0;
-            let shaped = (fund * 0.8 + third * 0.3).tanh();
-            buf[i * seg + j] = (e * 19000.0 * shaped) as i16;
-        }
-    }
-    encode_pcm16_mono(&buf)
+    cosy::jingle_with(&[69, 72, 76, 81, H, 79, 81, H, H], 0.1, Voice::Theremin, -1, Some((Voice::Bell, -2)))
+}
+
+/// The player's shot: a quick theremin "pew" falling an octave.
+fn shoot_sfx() -> Vec<u8> {
+    cosy::finish_warm(cosy::glide(0.11, 1300.0, 620.0, Tone::Sine, 1.2, 25.0), 15_000.0)
+}
+
+/// An alien hit: a soft pop and a bloop tumbling down, no hiss.
+fn explosion_sfx() -> Vec<u8> {
+    let pop = cosy::snap(0.06, 900.0, 0xDEF1);
+    cosy::sfx(&cosy::mix(pop, &cosy::bloop(0.3, 360.0, 80.0, 0xDEF2), 0.02, 0.9))
 }
 
 pub fn generate() -> Vec<Asset> {
@@ -666,8 +523,8 @@ pub fn generate() -> Vec<Asset> {
         ("images/ufo_saucer_5.png",  ufo_saucer(5)),
         ("images/ufo_saucer_6.png",  ufo_saucer(6)),
         ("images/ufo_saucer_7.png",  ufo_saucer(7)),
-        ("sounds/shoot.wav",       encode_pcm16_mono(&gen_tone(880.0, 80.0, 0.6))),
-        ("sounds/explosion.wav",   encode_pcm16_mono(&gen_noise(300.0, 0.8))),
+        ("sounds/shoot.wav",       shoot_sfx()),
+        ("sounds/explosion.wav",   explosion_sfx()),
         ("sounds/game_over.wav",   game_over_sfx()),
         ("sounds/march1.wav",      march_thump(98.0)),
         ("sounds/march2.wav",      march_thump(87.0)),

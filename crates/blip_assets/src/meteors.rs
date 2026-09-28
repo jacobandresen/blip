@@ -1,14 +1,14 @@
 //! Meteors music — a driving four-on-the-floor techno loop.
 //! Kick + hat + a syncopated acid-style bassline + tension stabs, all synthesized.
 
-use std::f32::consts::PI;
 
 use crate::techno::{warm, 
     bass_note, clap, hat, kick, lead_stab, lift_fill, open_hat, phrase_note, riser,
     sidechain_duck, supersaw, Rng,
     MIX_KNEE,
 };
-use crate::wav::{encode_pcm16_mono, env, mix_into, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::cosy::{self, Tone, Voice, H};
 use crate::Asset;
 
 const BPM: f32 = 128.0;
@@ -309,73 +309,56 @@ fn music5() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-/// Laser-zap fire sound: a fast downward pitch sweep with a bright buzzy
-/// saw/square blend on top, plus a touch of noise sizzle for bite.
+// ---- effects: glass ------------------------------------------------------
+// Bubbler's warm, rounded style on Meteors' own instrument: glass, two sines
+// a hair apart ringing long, in a floating E lydian.
+
+/// The ship's shot: a small glassy ping sliding down.
 fn fire_zap() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let dur_ms = 110.0_f32;
-    let n = (sr * dur_ms / 1000.0) as usize;
-    let att = (sr * 0.002) as usize;
-    let rel = (n * 2 / 3).max(1);
-    let mut buf = vec![0i16; n];
-    let mut rng = Rng(0xFEED_0001);
-    let mut phase = 0.0_f32;
-    for i in 0..n {
-        let t = i as f32 / sr;
-        let f = 1900.0 * (-t / 0.045).exp() + 420.0; // sweep 2320Hz -> ~420Hz
-        phase += f / sr;
-        let ph = phase.fract();
-        // Blend a sine (body) with a saw (bite) for a brighter buzz than a pure tone.
-        let sine = (2.0 * PI * phase).sin();
-        let saw = 2.0 * ph - 1.0;
-        let sizzle = (rng.next_f32() * 2.0 - 1.0) * 0.12;
-        let e = env(i, n, att.max(1), rel);
-        let s = (sine * 0.6 + saw * 0.3 + sizzle) * e * 11000.0;
-        mix_into(&mut buf, i, s);
-    }
-    encode_pcm16_mono(&buf)
+    let ping = cosy::glide(0.09, 1800.0, 1250.0, Tone::Sine, 1.0, 0.0);
+    let mut shot = cosy::mix(ping, &cosy::run(&[88], 0.05, Voice::Glass, 0.12), 0.0, 1.0);
+    shot.truncate((0.25 * cosy::SR) as usize); // it fires fast; the ring must not pile up
+    cosy::finish_warm(shot, 14_000.0)
 }
 
-/// Ship-destruction explosion: sub-bass thump, a broadband noise blast that
-/// darkens over time (simple one-pole low-pass), and a short bright crackle on top.
+/// Thrust, retriggered while held: a soft low triangle hum.
+fn thrust() -> Vec<u8> {
+    cosy::finish_warm(cosy::glide(0.1, 82.0, 72.0, Tone::Tri, 0.6, 0.0), 10_000.0)
+}
+
+/// A rock breaking: a bloop tumbling down with a glass chime over it,
+/// deeper for a bigger rock (`size` 0 large .. 2 small).
+fn bang(size: usize) -> Vec<u8> {
+    let (f0, dur, chime) = [(240.0, 0.42, 64), (340.0, 0.3, 71), (520.0, 0.2, 76)][size];
+    let fall = cosy::bloop(dur, f0, f0 * 0.28, 0xBA0 + size as u32);
+    cosy::sfx(&cosy::mix(fall, &cosy::run(&[chime], 0.05, Voice::Glass, 0.3), 0.0, 1.0))
+}
+
+/// The saucers, heard in passing: a slow wobbling whistle, higher and
+/// faster for the small one.
+fn saucer(small: bool) -> Vec<u8> {
+    let (f, depth, dur) = if small { (760.0, 110.0, 0.22) } else { (330.0, 45.0, 0.3) };
+    cosy::finish_warm(cosy::glide(dur, f, f, Tone::Sine, 0.4, depth), 13_000.0)
+}
+
+/// The ship lost: a long glassy fall with a low chime under it.
 fn ship_explosion() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let dur_ms = 650.0_f32;
-    let n = (sr * dur_ms / 1000.0) as usize;
-    let mut buf = vec![0i16; n];
-    let mut rng = Rng(0xB00B_1E5);
-
-    // Sub-bass thump: fast downward pitch sweep, punchy attack.
-    for i in 0..n {
-        let t = i as f32 / sr;
-        let e = (1.0 - i as f32 / n as f32).powf(1.4);
-        let freq = 30.0 + 90.0 * (-t / 0.09).exp();
-        let s = (2.0 * PI * freq * t).sin();
-        mix_into(&mut buf, i, s * e * 18000.0);
-    }
-
-    // Broadband noise blast, low-passed with a decaying cutoff so it darkens
-    // from a sharp crack into a dull rumble as the explosion dies out.
-    let mut lp = 0.0_f32;
-    for i in 0..n {
-        let progress = i as f32 / n as f32;
-        let e = (1.0 - progress).powf(1.7);
-        let cutoff = 0.55 - 0.45 * progress; // one-pole coefficient, closes over time
-        let white = rng.next_f32() * 2.0 - 1.0;
-        lp += (white - lp) * cutoff;
-        mix_into(&mut buf, i, lp * e * 14000.0);
-    }
-
-    // Bright crackle on top for the first ~90ms — the initial "crack" of debris.
-    let crackle_n = (sr * 0.09) as usize;
-    for i in 0..crackle_n.min(n) {
-        let e = (1.0 - i as f32 / crackle_n as f32).powf(2.5);
-        let noise = rng.next_f32() * 2.0 - 1.0;
-        mix_into(&mut buf, i, noise * e * 9000.0);
-    }
-
-    encode_pcm16_mono(&buf)
+    let fall = cosy::glide(1.2, 820.0, 90.0, Tone::Sine, 0.9, 18.0);
+    cosy::sfx(&cosy::mix(fall, &cosy::run(&[52], 0.05, Voice::Glass, 0.5), 0.0, 1.0))
 }
+
+/// Hyperspace: a sweep up into a shower of glass.
+fn hyperspace() -> Vec<u8> {
+    let sweep = cosy::glide(0.22, 300.0, 1500.0, Tone::Sine, 0.6, 0.0);
+    cosy::sfx(&cosy::mix(sweep, &cosy::sparkle(0.3, 88, 5, 5), 0.12, 0.8))
+}
+
+/// An extra ship: a glass fanfare in E lydian.
+fn extra_life() -> Vec<u8> {
+    cosy::jingle_with(&[76, 83, 88, H, 90, 88, 95, H, H], 0.09, Voice::Glass, 0, Some((Voice::Bell, -1)))
+}
+
+
 
 pub fn generate() -> Vec<Asset> {
     vec![
@@ -385,6 +368,14 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/techno4.wav", music4()),
         ("sounds/techno5.wav", music5()),
         ("sounds/fire.wav", fire_zap()),
+        ("sounds/thrust.wav", thrust()),
+        ("sounds/bang_large.wav", bang(0)),
+        ("sounds/bang_medium.wav", bang(1)),
+        ("sounds/bang_small.wav", bang(2)),
+        ("sounds/saucer_big.wav", saucer(false)),
+        ("sounds/saucer_small.wav", saucer(true)),
+        ("sounds/hyperspace.wav", hyperspace()),
+        ("sounds/extra_life.wav", extra_life()),
         ("sounds/ship_explosion.wav", ship_explosion()),
     ]
 }

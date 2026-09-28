@@ -267,6 +267,9 @@ impl Game {
 struct Sounds {
     eat: blip::BlipSound,
     game_over: blip::BlipSound,
+    bonus: blip::BlipSound,
+    bonus_eat: blip::BlipSound,
+    level: blip::BlipSound,
 }
 
 fn update_title(g: &mut Game) {
@@ -325,7 +328,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     // Before the level check so it scores at the level it was offered on.
     if g.bonus_active() && h == g.bonus {
-        play_sfx(&sfx.eat);
+        play_sfx(&sfx.bonus_eat);
         g.sess.add_score(BONUS_VALUE * g.sess.level);
         g.bonus_ttl = 0.0;
     }
@@ -336,9 +339,13 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.sess.add_score(10 * g.sess.level);
         g.foods_eaten += 1;
         // One bonus per level, mid-level, away from the level change.
-        if g.foods_eaten % BONUS_EVERY == 0 && !g.bonus_active() { g.spawn_bonus(); }
+        if g.foods_eaten % BONUS_EVERY == 0 && !g.bonus_active() {
+            g.spawn_bonus();
+            play_sfx(&sfx.bonus);
+        }
         if g.foods_eaten >= FOODS_PER_LVL {
             g.sess.next_level();
+            play_sfx(&sfx.level);
             g.foods_eaten = 0;
             let next = rand_int(1, 3);
             g.want_track = if next == g.active_music { next % 3 + 1 } else { next };
@@ -489,6 +496,9 @@ const BODY_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/
 const FOOD_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/food.png"));
 const EAT_WAV: &[u8]  = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/eat.wav"));
 const GAME_OVER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
+const BONUS_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bonus.wav"));
+const BONUS_EAT_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bonus_eat.wav"));
+const LEVEL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/level.wav"));
 const SLITHER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/slither.wav"));
 const STALK_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/stalk.wav"));
 const FRENZY_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/frenzy.wav"));
@@ -511,6 +521,9 @@ async fn main() {
     let sfx = Sounds {
         eat:       blip::audio::load_sound(EAT_WAV).await,
         game_over: blip::audio::load_sound(GAME_OVER_WAV).await,
+        bonus:     blip::audio::load_sound(BONUS_WAV).await,
+        bonus_eat: blip::audio::load_sound(BONUS_EAT_WAV).await,
+        level:     blip::audio::load_sound(LEVEL_WAV).await,
     };
     let slither = blip::audio::load_sound(SLITHER_WAV).await;
     let stalk   = blip::audio::load_sound(STALK_WAV).await;

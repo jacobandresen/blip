@@ -262,6 +262,9 @@ struct Sounds {
     wall_hit: blip::BlipSound,
     life_lost: blip::BlipSound,
     win: blip::BlipSound,
+    pickup_good: blip::BlipSound,
+    pickup_bad: blip::BlipSound,
+    pickup_life: blip::BlipSound,
 }
 
 /// A random take of an impact sound, louder for a harder hit.
@@ -320,7 +323,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     if g.pad_effect_timer.tick(dt) { g.pad_w = PAD_W as f32; }
     g.slow_timer.tick(dt);
-    update_drops(g, dt);
+    update_drops(g, dt, sfx);
 
     let active_speed = if g.slow_timer.active() {
         g.ball_speed * BALL_SLOW_FACTOR
@@ -609,13 +612,18 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
     }
 }
 
-fn update_drops(g: &mut Game, dt: f32) {
+fn update_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
     for d in pool_iter_mut(&mut g.drops) {
         d.y += DROP_SPEED * dt;
         if d.y > WIN_H as f32 { d.active = false; continue; }
         if rects_overlap(d.x, d.y, DROP_W, DROP_H,
                          g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32) {
             d.active = false;
+            play_sfx(match d.kind {
+                DropKind::Wide | DropKind::Slow => &sfx.pickup_good,
+                DropKind::Narrow => &sfx.pickup_bad,
+                DropKind::Life => &sfx.pickup_life,
+            });
             match d.kind {
                 DropKind::Wide => {
                     g.pad_w = PAD_W_WIDE;
@@ -789,6 +797,9 @@ const BRICK_BREAK_WAV: [&[u8]; 3] = [
 const WALL_HIT_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/wall_hit.wav"));
 const LIFE_LOST_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/life_lost.wav"));
 const WIN_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/win.wav"));
+const PICKUP_GOOD_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_good.wav"));
+const PICKUP_BAD_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_bad.wav"));
+const PICKUP_LIFE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_life.wav"));
 const MUSIC_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
 const MUSIC2_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
 const MUSIC3_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
@@ -848,6 +859,9 @@ async fn main() {
         wall_hit:    blip::audio::load_sound(WALL_HIT_WAV).await,
         life_lost:   blip::audio::load_sound(LIFE_LOST_WAV).await,
         win:         blip::audio::load_sound(WIN_WAV).await,
+        pickup_good: blip::audio::load_sound(PICKUP_GOOD_WAV).await,
+        pickup_bad:  blip::audio::load_sound(PICKUP_BAD_WAV).await,
+        pickup_life: blip::audio::load_sound(PICKUP_LIFE_WAV).await,
     };
     let music = [
         blip::audio::load_sound(MUSIC_WAV).await,

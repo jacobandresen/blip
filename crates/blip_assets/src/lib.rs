@@ -9,6 +9,7 @@ use std::fs;
 use std::path::Path;
 
 pub mod image;
+pub mod cosy;
 pub mod techno;
 pub mod wav;
 

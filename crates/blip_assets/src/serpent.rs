@@ -1,8 +1,6 @@
-//! Serpent (Snake) assets.
-//!
-//! Direct port of `games/serpent/assets/generate_assets.c`.
+//! Serpent (Snake) assets: sprites, techno music, and effects on a marimba
+//! (see `cosy`).
 
-use std::f32::consts::PI;
 
 use crate::image::Image;
 use crate::techno::{warm, 
@@ -10,6 +8,7 @@ use crate::techno::{warm,
     MIX_KNEE,
 };
 use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::cosy::{self, Voice, H as HOLD};
 use crate::Asset;
 
 const W: u32 = 24;
@@ -199,55 +198,38 @@ fn frenzy() -> Vec<u8> {
     techno_loop(150.0, 18, &[110.00, 146.83, 174.61, 196.00], &HIT, &HOOK, 1.6, 0xF6E2_9000)
 }
 
+// ---- effects: a marimba --------------------------------------------------
+// Bubbler's warm, rounded style on Serpent's own instrument: wooden bars in
+// A minor pentatonic, low and earthy.
+
+/// Eating: two quick taps on the marimba, up a fourth.
 fn eat_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let n = SAMPLE_RATE as usize / 10;
-    let mut rng = Rng(0x5EA7_0001);
-    let mut s = Vec::with_capacity(n);
-    for i in 0..n {
-        let freq = 400.0 + 600.0 * i as f32 / n as f32;
-        let t = i as f32 / sr;
-        let e = (1.0 - i as f32 / n as f32).powf(1.3);
-        let fund = (2.0 * PI * freq * t).sin();
-        let third = (2.0 * PI * freq * 3.0 * t).sin() / 3.0;
-        let sparkle = if i < sr as usize / 300 { (rng.next_f32() * 2.0 - 1.0) * 0.2 } else { 0.0 };
-        let shaped = (fund * 0.8 + third * 0.3 + sparkle).tanh();
-        s.push((e * 22000.0 * shaped) as i16);
-    }
-    encode_pcm16_mono(&s)
+    cosy::sfx(&cosy::run(&[76, 81], 0.05, Voice::Marimba, 0.7))
+}
+
+/// A bonus fruit appearing: three soft taps climbing the pentatonic.
+fn bonus_sfx() -> Vec<u8> {
+    cosy::sfx(&cosy::run(&[69, 72, 76], 0.07, Voice::Marimba, 0.45))
+}
+
+/// A bonus fruit eaten: a quick run up the scale with a glassy sparkle over it.
+fn bonus_eat_sfx() -> Vec<u8> {
+    let run = cosy::run(&[69, 72, 74, 76, 79, 81, 84], 0.045, Voice::Marimba, 0.6);
+    cosy::sfx(&cosy::mix(run, &cosy::sparkle(0.3, 93, 4, 3), 0.18, 0.35))
+}
+
+/// Next level: a marimba phrase with a bell under it.
+fn level_sfx() -> Vec<u8> {
+    cosy::jingle_with(&[69, 72, 76, 81, HOLD, 76, 81, HOLD], 0.09, Voice::Marimba, 0, Some((Voice::Bell, -1)))
 }
 
 fn move_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let n = SAMPLE_RATE as usize / 40;
-    let mut s = Vec::with_capacity(n);
-    for i in 0..n {
-        let e = 1.0 - i as f32 / n as f32;
-        let t = i as f32 / sr;
-        let fund = (2.0 * PI * 200.0 * t).sin();
-        let second = (2.0 * PI * 200.0 * 2.0 * t).sin() * 0.3;
-        s.push((e * 5000.0 * (fund + second).tanh()) as i16);
-    }
-    encode_pcm16_mono(&s)
+    cosy::sfx(&cosy::run(&[57], 0.04, Voice::Marimba, 0.3))
 }
 
+/// Game over: the phrase walking back down, slowly.
 fn game_over_sfx() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let freqs = [440.0_f32, 349.0, 261.0, 196.0];
-    let seg = SAMPLE_RATE as usize / 3;
-    let total = seg * 4;
-    let mut buf = vec![0i16; total];
-    for (i, f) in freqs.iter().enumerate() {
-        for j in 0..seg {
-            let t = j as f32 / sr;
-            let e = (1.0 - j as f32 / seg as f32).powf(1.3);
-            let fund = (2.0 * PI * f * t).sin();
-            let third = (2.0 * PI * f * 3.0 * t).sin() / 3.0;
-            let shaped = (fund * 0.8 + third * 0.3).tanh();
-            buf[i * seg + j] = (e * 21000.0 * shaped) as i16;
-        }
-    }
-    encode_pcm16_mono(&buf)
+    cosy::jingle_with(&[81, HOLD, 79, HOLD, 76, HOLD, 74, HOLD, 72, HOLD, 69, HOLD, HOLD, HOLD], 0.12, Voice::Marimba, 0, Some((Voice::Bell, -1)))
 }
 
 pub fn generate() -> Vec<Asset> {
@@ -258,6 +240,9 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/eat.wav", eat_sfx()),
         ("sounds/move.wav", move_sfx()),
         ("sounds/game_over.wav", game_over_sfx()),
+        ("sounds/bonus.wav", bonus_sfx()),
+        ("sounds/bonus_eat.wav", bonus_eat_sfx()),
+        ("sounds/level.wav", level_sfx()),
         ("sounds/slither.wav", slither()),
         ("sounds/stalk.wav", stalk()),
         ("sounds/frenzy.wav", frenzy()),

@@ -1,7 +1,7 @@
 //! Meteors, a tribute to the vector-graphics rock-shooter arcade classic, on macroquad.
-//! Pure line-art rendering (no sprite assets) — true to the original's monochrome
-//! vector display. Sound effects are synthesized beeps; the background music is a
-//! procedurally generated techno loop (see `blip_assets::meteors`).
+//! Pure line-art rendering (no sprite assets), true to the original's monochrome
+//! vector display. Effects ring on glass and the music is generated techno
+//! (see `blip_assets::meteors`).
 
 use std::f32::consts::PI;
 
@@ -750,6 +750,14 @@ const TECHNO5_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/soun
 // onto the buffer. Kept in sync with meteors.rs's music()/music2..5().
 const MUSIC_DURATIONS: [f32; 5] = [30.2444, 32.2500, 26.9123, 32.0084, 35.2468];
 const FIRE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/fire.wav"));
+const THRUST_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/thrust.wav"));
+const BANG_LARGE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bang_large.wav"));
+const BANG_MEDIUM_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bang_medium.wav"));
+const BANG_SMALL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bang_small.wav"));
+const SAUCER_BIG_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/saucer_big.wav"));
+const SAUCER_SMALL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/saucer_small.wav"));
+const HYPERSPACE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hyperspace.wav"));
+const EXTRA_LIFE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/extra_life.wav"));
 const SHIP_EXPLOSION_WAV: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ship_explosion.wav"));
 
@@ -771,15 +779,15 @@ async fn main() {
 
     let mut sfx = Sounds {
         fire:         blip::audio::load_sound(FIRE_WAV).await,
-        thrust:       blip::audio::beep(90.0, 90.0).await,
-        bang_large:   blip::audio::beep(120.0, 190.0).await,
-        bang_medium:  blip::audio::beep(220.0, 150.0).await,
-        bang_small:   blip::audio::beep(380.0, 110.0).await,
-        saucer_big:   blip::audio::beep(200.0, 300.0).await,
-        saucer_small: blip::audio::beep(520.0, 220.0).await,
+        thrust:       blip::audio::load_sound(THRUST_WAV).await,
+        bang_large:   blip::audio::load_sound(BANG_LARGE_WAV).await,
+        bang_medium:  blip::audio::load_sound(BANG_MEDIUM_WAV).await,
+        bang_small:   blip::audio::load_sound(BANG_SMALL_WAV).await,
+        saucer_big:   blip::audio::load_sound(SAUCER_BIG_WAV).await,
+        saucer_small: blip::audio::load_sound(SAUCER_SMALL_WAV).await,
         ship_boom:    blip::audio::load_sound(SHIP_EXPLOSION_WAV).await,
-        hyperspace:   blip::audio::beep(1300.0, 80.0).await,
-        extra_life:   blip::audio::beep(880.0, 220.0).await,
+        hyperspace:   blip::audio::load_sound(HYPERSPACE_WAV).await,
+        extra_life:   blip::audio::load_sound(EXTRA_LIFE_WAV).await,
     };
     let mut thrust_snd_t = 0.0f32;
 

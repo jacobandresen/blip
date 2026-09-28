@@ -359,6 +359,11 @@ const MUSIC2_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sound
 const MUSIC3_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
 const MUSIC4_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music4.wav"));
 const MUSIC5_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music5.wav"));
+const WALL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/wall.wav"));
+const HIT_L_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_l.wav"));
+const HIT_R_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_r.wav"));
+const SCORE_L_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/score_l.wav"));
+const SCORE_R_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/score_r.wav"));
 // Precomputed durations (seconds) of each generated loop — TOTAL_STEPS *
 // step_ms / 1000 + the 0.25s tail every blip_assets track generator pads
 // onto the buffer. Kept in sync with rally.rs's music()/music2..5().
@@ -370,11 +375,11 @@ async fn main() {
     let mut g = Game::new();
 
     let sfx = Beeps {
-        wall:    blip::audio::beep(490.0,  22.0).await,
-        hit_l:   blip::audio::beep(240.0,  35.0).await,
-        hit_r:   blip::audio::beep(300.0,  35.0).await,
-        score_l: blip::audio::beep(660.0, 120.0).await,
-        score_r: blip::audio::beep(110.0, 200.0).await,
+        wall:    blip::audio::load_sound(WALL_WAV).await,
+        hit_l:   blip::audio::load_sound(HIT_L_WAV).await,
+        hit_r:   blip::audio::load_sound(HIT_R_WAV).await,
+        score_l: blip::audio::load_sound(SCORE_L_WAV).await,
+        score_r: blip::audio::load_sound(SCORE_R_WAV).await,
     };
     let music = [
         blip::audio::load_sound(MUSIC_WAV).await,

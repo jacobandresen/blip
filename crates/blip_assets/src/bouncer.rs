@@ -1,6 +1,5 @@
-//! Bouncer (Breakout) assets.
-//!
-//! Direct port of `games/bouncer/assets/generate_assets.c`.
+//! Bouncer (Breakout) assets: sprites, techno music, and effects from a toy
+//! box of rubber boings and glockenspiel (see `cosy`).
 
 use std::f32::consts::PI;
 
@@ -10,6 +9,7 @@ use crate::techno::{warm,
     MIX_KNEE,
 };
 use crate::wav::{encode_pcm16_mono, env, mix_into_f32, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::cosy::{self, Tone, Voice, H};
 use crate::Asset;
 
 /// Bat cap width in source pixels; the game stretches only the slice
@@ -729,153 +729,55 @@ fn music6() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-// Impact sounds are modal syntheses: a broadband contact click, then the
-// struck body ringing in a few damped partials. The ball is a hollow
-// rubber toy (a dull low "bonk" that adds to every hit); the bat is a hard
-// plastic bar, the bricks glazed ceramic, the steel bricks a metal plate.
-// Each sound comes in `IMPACT_VARIANTS` slightly detuned takes so repeated
-// hits do not machine-gun.
+// ---- effects: a toy box ----------------------------------------------------
+// Bubbler's warm, rounded style on Bouncer's own instruments: a rubber ball
+// that boings and a glockenspiel in C major. Three takes of each hit, a
+// little apart in pitch, so rapid hits do not machine-gun.
 pub const IMPACT_VARIANTS: usize = 3;
 
-/// One damped partial: frequency ratio, amplitude, decay time constant (s).
-type Mode = (f32, f32, f32);
-
-fn add_modes(buf: &mut [f32], start: usize, f0: f32, modes: &[Mode], gain: f32) {
-    let sr = SAMPLE_RATE as f32;
-    for &(ratio, amp, tau) in modes {
-        let w = 2.0 * PI * f0 * ratio / sr;
-        for (i, out) in buf.iter_mut().enumerate().skip(start) {
-            let t = (i - start) as f32 / sr;
-            if t > tau * 8.0 { break; }
-            *out += gain * amp * (-t / tau).exp() * (w * (i - start) as f32).sin();
-        }
-    }
-}
-
-/// Band-limited noise burst (one-pole high-pass then low-pass) with an
-/// exponential decay; the "tick" of two hard surfaces meeting.
-fn add_noise(buf: &mut [f32], start: usize, ms: f32, hp: f32, lp: f32, gain: f32, rng: &mut Rng) {
-    let n = crate::wav::ms_to_samples(ms);
-    let (mut lo, mut lo2) = (0.0f32, 0.0f32);
-    for i in 0..n {
-        let x = rng.next_f32() * 2.0 - 1.0;
-        lo += lp * (x - lo);       // low-pass state
-        lo2 += hp * (lo - lo2);    // slow follower; subtract for high-pass
-        let y = lo - lo2;
-        let e = (-(i as f32) / (n as f32 * 0.3)).exp();
-        if let Some(o) = buf.get_mut(start + i) { *o += gain * e * y; }
-    }
-}
-
-/// Hollow-ball thump: a sine gliding down a few percent as the shell relaxes.
-fn add_thump(buf: &mut [f32], freq: f32, tau: f32, gain: f32) {
-    let sr = SAMPLE_RATE as f32;
-    let mut phase = 0.0f32;
-    for (i, out) in buf.iter_mut().enumerate() {
-        let t = i as f32 / sr;
-        if t > tau * 8.0 { break; }
-        phase += 2.0 * PI * freq * (1.0 - 0.18 * (1.0 - (-t / 0.02).exp())) / sr;
-        *out += gain * (-t / tau).exp() * phase.sin();
-    }
-}
-
-fn finish_impact(mut buf: Vec<f32>, peak: f32) -> Vec<u8> {
-    let fade = 96.min(buf.len());
-    let len = buf.len();
-    for i in 0..fade { buf[len - 1 - i] *= i as f32 / fade as f32; }
-    let max = buf.iter().fold(1e-6f32, |m, v| m.max(v.abs()));
-    let pcm: Vec<i16> = buf.iter().map(|v| (v / max * peak * 32_000.0) as i16).collect();
-    encode_pcm16_mono(&pcm)
-}
-
-fn variant_pitch(v: usize) -> f32 { 1.0 + (v as f32 - 1.0) * 0.06 }
-
-/// Rubber ball on the hard plastic bat: clean "tock" over a soft bonk.
 fn paddle_hit(v: usize) -> Vec<u8> {
-    let mut rng = Rng(0xBA11_1000 + v as u32);
-    let mut b = vec![0.0f32; crate::wav::ms_to_samples(140.0)];
-    let k = variant_pitch(v);
-    add_noise(&mut b, 0, 3.0, 0.02, 0.6, 0.9, &mut rng);
-    add_modes(&mut b, 0, 1150.0 * k, &[(1.0, 1.0, 0.030), (2.76, 0.45, 0.018), (5.4, 0.2, 0.010)], 0.55);
-    add_thump(&mut b, 190.0 * k, 0.028, 1.0);
-    finish_impact(b, 0.62)
+    cosy::sfx(&cosy::boing(0.16, [196.0, 208.0, 220.0][v]))
 }
 
-/// Rubber ball glancing a steel brick: sharper contact, a short metal ring.
+/// A brick taking a hit without breaking: a muted glockenspiel tap.
 fn brick_hit(v: usize) -> Vec<u8> {
-    let mut rng = Rng(0xBA11_2000 + v as u32);
-    let mut b = vec![0.0f32; crate::wav::ms_to_samples(320.0)];
-    let k = variant_pitch(v);
-    add_noise(&mut b, 0, 2.0, 0.05, 0.8, 0.8, &mut rng);
-    add_modes(&mut b, 0, 1500.0 * k, &[(1.0, 1.0, 0.11), (2.32, 0.6, 0.075), (4.25, 0.4, 0.045), (6.63, 0.25, 0.025)], 0.5);
-    add_thump(&mut b, 230.0 * k, 0.015, 0.35);
-    finish_impact(b, 0.55)
+    let mut tap = cosy::run(&[79 + 2 * v as i32], 0.05, Voice::Glock, 0.45);
+    tap.truncate((0.25 * cosy::SR) as usize);
+    cosy::sfx(&tap)
 }
 
-/// A glazed brick cracking apart: hard click, ceramic ping, a scatter of
-/// fragments landing over the next ~100 ms, and a low crunch underneath.
+/// A brick breaking: a bright glockenspiel note on a soft pop.
 fn brick_break(v: usize) -> Vec<u8> {
-    let mut rng = Rng(0xBA11_3000 + v as u32 * 7919);
-    let mut b = vec![0.0f32; crate::wav::ms_to_samples(210.0)];
-    let k = variant_pitch(v);
-    add_noise(&mut b, 0, 3.0, 0.03, 0.85, 1.0, &mut rng);
-    add_modes(&mut b, 0, 2100.0 * k, &[(1.0, 1.0, 0.018), (1.58, 0.6, 0.014), (2.9, 0.35, 0.010)], 0.5);
-    add_noise(&mut b, 0, 60.0, 0.004, 0.10, 0.55, &mut rng);
-    add_thump(&mut b, 150.0 * k, 0.02, 0.5);
-    for j in 0..12 {
-        let at = crate::wav::ms_to_samples(6.0 + rng.next_f32() * 100.0);
-        let f = 2500.0 + rng.next_f32() * 3800.0;
-        let amp = 0.35 * (1.0 - j as f32 / 16.0);
-        add_modes(&mut b[at..], 0, f, &[(1.0, amp, 0.006 + rng.next_f32() * 0.008)], 1.0);
-    }
-    finish_impact(b, 0.7)
+    let pop = cosy::snap(0.08, 1400.0 + 120.0 * v as f32, 0xB0 + v as u32);
+    let bell = cosy::run(&[[84, 88, 91][v]], 0.05, Voice::Glock, 0.6);
+    cosy::sfx(&cosy::mix(pop, &bell, 0.01, 1.0))
 }
 
-/// Rubber ball off the side wall / ceiling: a dull, quiet thud.
 fn wall_hit() -> Vec<u8> {
-    let mut rng = Rng(0xBA11_4000);
-    let mut b = vec![0.0f32; crate::wav::ms_to_samples(90.0)];
-    add_noise(&mut b, 0, 4.0, 0.01, 0.15, 0.6, &mut rng);
-    add_thump(&mut b, 130.0, 0.022, 1.0);
-    add_modes(&mut b, 0, 620.0, &[(1.0, 0.25, 0.012)], 1.0);
-    finish_impact(b, 0.5)
+    cosy::finish_warm(cosy::boing(0.1, 150.0), 11_000.0)
 }
 
+/// A ball lost: a rubbery sigh falling away.
 fn life_lost() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let n = SAMPLE_RATE as usize / 2;
-    let mut s = Vec::with_capacity(n);
-    for i in 0..n {
-        let t = i as f32 / sr;
-        let freq = 440.0 * (1.0 - 0.5 * i as f32 / n as f32);
-        let e = (1.0 - i as f32 / n as f32).powf(1.2);
-        let fund = (2.0 * PI * freq * t).sin();
-        let detune = (2.0 * PI * freq * 1.008 * t).sin();
-        let shaped = (fund * 0.7 + detune * 0.5).tanh();
-        s.push((e * 18000.0 * shaped) as i16);
-    }
-    encode_pcm16_mono(&s)
+    cosy::sfx(&cosy::glide(1.0, 520.0, 170.0, Tone::Sine, 0.8, 20.0))
 }
 
 fn win() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let freqs = [440.0_f32, 494.0, 523.0, 587.0, 659.0, 698.0, 784.0, 880.0];
-    let seg = SAMPLE_RATE as usize / 6;
-    let total = seg * 8;
-    let mut buf = vec![0i16; total];
-    for (i, f) in freqs.iter().enumerate() {
-        for j in 0..seg {
-            let t = j as f32 / sr;
-            let quarter = seg / 4;
-            let e = if j < quarter {
-                j as f32 / quarter as f32
-            } else {
-                (seg - j) as f32 / seg as f32
-            };
-            buf[i * seg + j] = (e * 20000.0 * (2.0 * PI * f * t).sin()) as i16;
-        }
-    }
-    encode_pcm16_mono(&buf)
+    cosy::jingle_with(&[72, 76, 79, 84, H, 79, 84, 88, H, H], 0.09, Voice::Glock, 0, Some((Voice::Bell, -1)))
+}
+
+/// Pickups caught: a good one sparkles up the glockenspiel, the narrow bat
+/// tumbles down it, and a life is a little fanfare.
+fn pickup_good() -> Vec<u8> {
+    cosy::sfx(&cosy::run(&[84, 88, 91, 96], 0.045, Voice::Glock, 0.5))
+}
+
+fn pickup_bad() -> Vec<u8> {
+    cosy::sfx(&cosy::run(&[88, 84, 79, 72], 0.06, Voice::Glock, 0.45))
+}
+
+fn pickup_life() -> Vec<u8> {
+    cosy::jingle_with(&[79, 84, 88, 91, H, 96, H, H], 0.07, Voice::Glock, 0, Some((Voice::Bell, -1)))
 }
 
 pub fn generate() -> Vec<Asset> {
@@ -907,6 +809,9 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/wall_hit.wav", wall_hit()),
         ("sounds/life_lost.wav",  life_lost()),
         ("sounds/win.wav",        win()),
+        ("sounds/pickup_good.wav", pickup_good()),
+        ("sounds/pickup_bad.wav",  pickup_bad()),
+        ("sounds/pickup_life.wav", pickup_life()),
         ("sounds/music.wav",      music()),
         ("sounds/music2.wav",     music2()),
         ("sounds/music3.wav",     music3()),
