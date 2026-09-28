@@ -421,10 +421,26 @@
     }
 
     /* ---- 2-player seal ---- */
-    .badge-2p {
+    /* All of a card's badges, stacked down from the top-right corner: each
+       one tucks a few pixels under the one before and paints over it, so
+       however many there are, every one stays readable. */
+    .card-badges {
       position: absolute;
-      top: 14px;
-      right: 14px;
+      top: 12px;
+      right: 12px;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      pointer-events: none;
+    }
+    .card-badges > * { position: relative; flex: none; }
+    .card-badges > * + * { margin-top: -7px; }
+    .card-badges > :nth-child(2) { z-index: 2; margin-right: 4px; }
+    .card-badges > :nth-child(3) { z-index: 3; }
+    .card-badges > :nth-child(4) { z-index: 4; margin-right: 4px; }
+
+    .badge-2p {
       width: 52px;
       height: 52px;
       border: 2px solid var(--yellow);
@@ -446,18 +462,13 @@
       text-align: center;
       line-height: 1.3;
       background: rgba(0,0,0,0.85);
-      z-index: 2;
+      z-index: 1;
     }
 
-    /* Genre stickers, top left of the card, slapped on at a tilt.
+    /* Genre stickers, slapped on at a tilt.
        ACTION: a hot slanted sticker with a quick flash now and then.
        COSY: a soft pastel pill with a heart, floating gently. */
     .badge-genre {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      z-index: 3;
-      pointer-events: none;
       font-weight: 900;
       text-align: center;
       white-space: nowrap;
@@ -497,18 +508,6 @@
       margin-right: 5px;
       color: #ff6fa8;
       text-shadow: 0 0 4px rgba(255, 140, 190, 0.8);
-    }
-    /* two little bubbles drifting off the pill */
-    .badge-cosy::after {
-      content: '';
-      position: absolute;
-      right: -9px;
-      top: -7px;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      border: 1.5px solid rgba(190, 235, 255, 0.9);
-      box-shadow: 7px -6px 0 -2px rgba(190, 235, 255, 0.7);
     }
     @keyframes cosy-float {
       0%, 100% { transform: rotate(-6deg) translateY(0); }
@@ -702,7 +701,9 @@
 
     <!-- RALLY -->
     <a class="card card-rally" href="rally/index.html">
-      <div class="badge-2p">2<br>PLAYER</div>
+      <div class="card-badges">
+        <div class="badge-2p">2<br>PLAYER</div>
+      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="rally/screenshot.png" alt="Rally gameplay">
       </div>
@@ -714,8 +715,10 @@
 
     <!-- BUBBLER -->
     <a class="card card-bubbler" href="bubbler/index.html">
-      <div class="badge-2p">2<br>PLAYER</div>
-      <div class="badge-genre badge-cosy" data-i18n="badgeCosy">COSY</div>
+      <div class="card-badges">
+        <div class="badge-2p">2<br>PLAYER</div>
+        <div class="badge-genre badge-cosy" data-i18n="badgeCosy">COSY</div>
+      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="bubbler/screenshot.png?v=3" alt="Bubbler gameplay">
       </div>
@@ -771,8 +774,10 @@
 
     <!-- BRAWLER -->
     <a class="card card-brawler" href="brawler/index.html">
-      <div class="badge-2p">2<br>PLAYER</div>
-      <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
+      <div class="card-badges">
+        <div class="badge-2p">2<br>PLAYER</div>
+        <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
+      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="brawler/screenshot.png?v=7" alt="Brawler gameplay">
       </div>
@@ -784,7 +789,9 @@
 
     <!-- RAIDER -->
     <a class="card card-sky-raider" href="sky_raider/index.html">
-      <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
+      <div class="card-badges">
+        <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
+      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="sky_raider/screenshot.png?v=11" alt="Raider gameplay">
       </div>
