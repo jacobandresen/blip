@@ -14,6 +14,12 @@
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <link rel="stylesheet" href="kiosk.css?v=70">
+  <!-- Before first paint (kiosk.js loads at the end): a touch screen gets
+       no deck on this page, so it must never flash up. -->
+  <script>
+    if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
+      document.documentElement.setAttribute('data-has-touch', '');
+  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -747,6 +753,14 @@
     @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
       .lang-switcher,
       .profile-badge { bottom: calc(138px + env(safe-area-inset-bottom, 0px)); }
+    }
+
+    /* A touch screen picks a game by tapping its card: no control deck here,
+       and the corner clusters come down to the screen's edge. */
+    :root[data-has-touch] #kiosk-bar { display: none; }
+    :root[data-has-touch] body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+    :root[data-has-touch] :is(.left-badges, .lang-switcher, .profile-badge) {
+      bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     }
 
   </style>
