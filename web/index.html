@@ -449,6 +449,75 @@
       z-index: 2;
     }
 
+    /* Genre stickers, top left of the card, slapped on at a tilt.
+       ACTION: a hot slanted sticker with a quick flash now and then.
+       COSY: a soft pastel pill with a heart, floating gently. */
+    .badge-genre {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 3;
+      pointer-events: none;
+      font-weight: 900;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .badge-action {
+      padding: 7px 12px 6px 14px;
+      font-size: 11px;
+      font-style: italic;
+      letter-spacing: 1.5px;
+      color: #fff8d6;
+      background: linear-gradient(135deg, #ff3b1f 0%, #ff7a1a 55%, #ffb21a 100%);
+      clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
+      transform: rotate(-9deg) skewX(-8deg);
+      text-shadow: 1px 1px 0 #7a1200, -1px 0 0 #7a1200, 0 -1px 0 #7a1200, 0 0 6px rgba(255, 220, 120, 0.8);
+      filter: drop-shadow(0 0 0 #ffe066) drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.85))
+              drop-shadow(0 0 8px rgba(255, 110, 40, 0.55));
+      animation: action-flash 3.2s ease-in-out infinite;
+    }
+    @keyframes action-flash {
+      0%, 86%, 100% { filter: drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.85)) drop-shadow(0 0 8px rgba(255, 110, 40, 0.55)); }
+      90% { filter: drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.85)) drop-shadow(0 0 16px rgba(255, 240, 160, 1)) brightness(1.35); }
+    }
+    .badge-cosy {
+      padding: 6px 12px 6px 10px;
+      font-size: 11px;
+      letter-spacing: 1.5px;
+      color: #7a2e55;
+      background: linear-gradient(180deg, #ffe6f0 0%, #ffcfe3 100%);
+      border: 2px solid #fff4f9;
+      border-radius: 999px;
+      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.55), 0 0 12px rgba(255, 180, 215, 0.55);
+      transform: rotate(-6deg);
+      animation: cosy-float 3.6s ease-in-out infinite;
+    }
+    .badge-cosy::before {
+      content: '\2665';
+      margin-right: 5px;
+      color: #ff6fa8;
+      text-shadow: 0 0 4px rgba(255, 140, 190, 0.8);
+    }
+    /* two little bubbles drifting off the pill */
+    .badge-cosy::after {
+      content: '';
+      position: absolute;
+      right: -9px;
+      top: -7px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(190, 235, 255, 0.9);
+      box-shadow: 7px -6px 0 -2px rgba(190, 235, 255, 0.7);
+    }
+    @keyframes cosy-float {
+      0%, 100% { transform: rotate(-6deg) translateY(0); }
+      50%      { transform: rotate(-4deg) translateY(-3px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .badge-action, .badge-cosy { animation: none; }
+    }
+
     /* ---- footer ---- */
     footer {
       margin-top: 48px;
@@ -646,6 +715,7 @@
     <!-- BUBBLER -->
     <a class="card card-bubbler" href="bubbler/index.html">
       <div class="badge-2p">2<br>PLAYER</div>
+      <div class="badge-genre badge-cosy" data-i18n="badgeCosy">COSY</div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="bubbler/screenshot.png?v=3" alt="Bubbler gameplay">
       </div>
@@ -702,6 +772,7 @@
     <!-- BRAWLER -->
     <a class="card card-brawler" href="brawler/index.html">
       <div class="badge-2p">2<br>PLAYER</div>
+      <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="brawler/screenshot.png?v=7" alt="Brawler gameplay">
       </div>
@@ -713,6 +784,7 @@
 
     <!-- RAIDER -->
     <a class="card card-sky-raider" href="sky_raider/index.html">
+      <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="sky_raider/screenshot.png?v=11" alt="Raider gameplay">
       </div>
@@ -770,6 +842,8 @@
     var i18n = {
 
       en: {
+        badgeAction:      'ACTION!',
+        badgeCosy:        'COSY',
         serpentGenre:     'SNAKE MOVING GAME',
         serpentDesc:      'Making snake for eat thing and become large size.<br>Not to touching wall or own body is important much.<br>How much long snake you are achieve?',
         serpentControls:  'PUSH WASD / ARROW KEY FOR MOVE',
@@ -792,7 +866,7 @@
 
         brawlerGenre:      'ONE TO ONE FIGHT GAME',
         brawlerDesc:       'Pick a fighter; the other two are waiting, each somewhere else. Guard high or guard low &mdash; nothing covers both.<br>Here comes a new challenger.',
-        brawlerControls:   '1P WASD+RTFG &middot; 2P ARROWS+UIJK &middot; HIGH ON TOP, PUNCH ON LEFT &middot; BOTH = SPECIAL &middot; CLOSE [1] = THROW',
+        brawlerControls:   '1P WASD+F PUNCH G KICK &middot; 2P ARROWS+J/K &middot; TOWARD+BUTTON = HIGH &middot; BOTH = SPECIAL &middot; CLOSE PUNCH = THROW',
         bubblerGenre:      'TWO-DRAGON PLATFORM GAME',
         bubblerDesc:       'Blow bubbles, trap monsters, pop them for fruit. Pop a whole cluster and every catch doubles.',
         bubblerControls:   '1P WASD+F BUBBLE+G JUMP &middot; 2P ARROWS+J+K &middot; HOLD JUMP TO RIDE BUBBLES',
@@ -806,6 +880,8 @@
       },
 
       ja: {
+        badgeAction:      'アクション!',
+        badgeCosy:        'ほっこり',
 
         serpentGenre:     'スネークゲーム',
         serpentDesc:      'ヘビを操作してエサを食べ、どんどん成長しよう。<br>壁や自分の体にぶつかってはいけない。<br>どこまで長くなれるか？',
@@ -829,7 +905,7 @@
 
         brawlerGenre:      '一対一格闘ゲーム',
         brawlerDesc:       '一人を選べ。残る二人が別々の場所で待っている。上段か下段か、両方は防げない。<br>挑戦者、あらわる。',
-        brawlerControls:   '1P WASD+RTFG &middot; 2P 矢印+UIJK &middot; 上段が上、パンチが左 &middot; 同時押しで必殺技 &middot; 密着[1]で投げ',
+        brawlerControls:   '1P WASD+F パンチ G キック &middot; 2P 矢印+J/K &middot; 前+ボタンで上段 &middot; 同時押しで必殺技 &middot; 密着パンチで投げ',
         bubblerGenre:      '二匹の竜のアクションゲーム',
         bubblerDesc:       '泡を吹いて怪物を閉じこめ、割ってフルーツに。まとめて割るほど点が倍になる。',
         bubblerControls:   '1P WASD+F 泡+G ジャンプ &middot; 2P 矢印+J+K &middot; ジャンプ長押しで泡に乗る',
@@ -843,6 +919,8 @@
       },
 
       da: {
+        badgeAction:      'ACTION!',
+        badgeCosy:        'HYGGE',
 
         serpentGenre:     'SLANGEBANE',
         serpentDesc:      'Styr slangen til at spise og vokse.<br>Undg&aring; at ramme v&aelig;ggene eller dig selv.<br>Hvor lang kan du blive?',
@@ -866,7 +944,7 @@
 
         brawlerGenre:      'EN MOD EN KAMPSPIL',
         brawlerDesc:       'V&aelig;lg din k&aelig;mper; de to andre venter, hver sit sted. Hold h&oslash;jt eller lavt &mdash; ingen blokering d&aelig;kker begge.<br>Her kommer en ny udfordrer.',
-        brawlerControls:   '1P WASD+RTFG &middot; 2P PILE+UIJK &middot; H&Oslash;JT &Oslash;VERST, SLAG TIL VENSTRE &middot; BEGGE = SPECIAL &middot; T&AElig;T [1] = KAST',
+        brawlerControls:   '1P WASD+F SLAG G SPARK &middot; 2P PILE+J/K &middot; FREM+KNAP = H&Oslash;JT &middot; BEGGE = SPECIAL &middot; T&AElig;T SLAG = KAST',
         bubblerGenre:      'PLATFORMSPIL FOR TO DRAGER',
         bubblerDesc:       'Pust bobler, fang monstre, prik dem til frugt. Prik en hel klynge, og hver fangst t&aelig;ller dobbelt.',
         bubblerControls:   '1P WASD+F BOBLE+G HOP &middot; 2P PILE+J+K &middot; HOLD HOP FOR AT RIDE P&Aring; BOBLER',
