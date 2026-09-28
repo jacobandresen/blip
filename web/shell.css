@@ -836,6 +836,52 @@ canvas {
 :root[data-touch="swipe"] .ts-demo   { animation: ts-demo-swipe 2.4s ease-out infinite; }
 :root[data-touch="paddles"] .ts-demo { margin-left: -13px; left: 25%; animation: ts-demo-bat 2.8s ease-in-out infinite; }
 :root[data-touch="platform"] .ts-demo { animation: ts-demo-run 3s ease-in-out infinite; }
+/* Bubbler: one surface for one player; the P1 / 2P halves once two are in. */
+:root[data-touch="platform"]:not([data-versus]) .ts-half + .ts-half,
+:root[data-touch="platform"]:not([data-versus]) .ts-tag { display: none; }
+:root[data-touch="platform"][data-versus] .ts-half.held { background: rgba(255, 255, 255, 0.05); }
+:root[data-touch="platform"][data-versus] .ts-demo { display: none; }
+/* 2P JOIN, while a second seat is open: a Mac-style pill in the trackpad's
+   right end, or sideways in the screen's bottom-right corner. */
+.ts-join { display: none; }
+:root[data-touch="platform"][data-open] .ts-join {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 2;
+  margin: 0;
+  padding: 7px 12px 7px 9px;
+  border: 0;
+  border-radius: 999px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #fff;
+  background: linear-gradient(180deg, #4d8dff, #2f6fe8);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 2px 6px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  animation: tj-glow 2.4s ease-in-out infinite;
+}
+:root[data-touch="platform"][data-open][data-layout="landscape"] .ts-join {
+  position: fixed;
+  top: auto;
+  right: max(16px, calc(env(safe-area-inset-right, 0px) + 8px));
+  bottom: max(16px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+  z-index: 210;
+}
+.ts-join:active { transform: scale(0.96); }
+.tj-plus { font-size: 14px; line-height: 1; font-weight: 500; }
+@keyframes tj-glow {
+  0%, 100% { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 2px 6px rgba(0, 0, 0, 0.45); }
+  50%      { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 2px 6px rgba(0, 0, 0, 0.45), 0 0 12px rgba(80, 140, 255, 0.6); }
+}
+@media (prefers-reduced-motion: reduce) { .ts-join { animation: none !important; } }
 #touch-strip.used .ts-demo, #touch-strip.held .ts-demo { animation: none; opacity: 0; }
 @keyframes ts-demo-drag {
   0%   { opacity: 0; transform: translateX(-30cqw) scale(1.25); }

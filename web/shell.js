@@ -636,7 +636,7 @@ window.addEventListener('keydown', function (e) {
     var strip = document.createElement('div');
     strip.id = 'touch-strip';
     strip.setAttribute('aria-hidden', 'true');
-    var halves = kind === 'paddles' ? ['P1', '2P'] : [''];
+    var halves = kind === 'paddles' || kind === 'platform' ? ['P1', '2P'] : [''];
     strip.innerHTML = '<div class="ts-glass">' +
       halves.map(function (h, i) {
         return '<div class="ts-half" data-slot="' + i + '">' +
@@ -650,9 +650,32 @@ window.addEventListener('keydown', function (e) {
     if (bar) bar.appendChild(strip);
     var glass = strip.querySelector('.ts-glass');
 
+    // Bubbler: while a second seat is open, a button seats player two (their
+    // own bubble key). Upright it sits in the trackpad, sideways in the
+    // bottom-right corner of the screen.
+    var join = null;
+    if (kind === 'platform') {
+      join = document.createElement('button');
+      join.type = 'button';
+      join.className = 'ts-join';
+      join.innerHTML = '<span class="tj-plus">+</span>2P JOIN';
+      join.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        if (coinGated()) return;
+        BlipController.set('p2button1', true);
+        setTimeout(function () { BlipController.set('p2button1', false); }, 60);
+      });
+    }
+    function placeJoin() {
+      if (!join) return;
+      var home = blipLandscape() ? document.body : glass;
+      if (join.parentNode !== home) home.appendChild(join);
+    }
+
     // The trackpad is never wider than the game's picture: the canvas
     // letterboxed to the size the game reported (blip_picture).
     function fitStrip() {
+      placeJoin();
       if (!bar) return;
       var cr = canvas.getBoundingClientRect(), br = bar.getBoundingClientRect();
       var pic = window.blipPicture, w = cr.width;
@@ -764,16 +787,33 @@ window.addEventListener('keydown', function (e) {
     // anchor trails the thumb), tap to bubble, swipe up to jump. Presses go
     // through BlipController, so they land on player one's own keys.
     var RUN_PX = 14, FLICK_PX = 30, LEASH_PX = 40, TAP_PX = 12, TAP_MS = 300;
-    var plat = {};                     // pointerId -> { x0, y0, sx, sy, t, dir, moved }
+    var plat = {};                     // pointerId -> { who, x0, y0, sx, sy, t, dir, moved }
+    // Once player two is in, the right half (of the trackpad, or of the
+    // screen sideways) is theirs, with the same gestures on their keys.
+    var PLAT_NAMES = [
+      { left: 'left', right: 'right', bubble: 'button1', jump: 'button2' },
+      { left: 'p2left', right: 'p2right', bubble: 'p2button1', jump: 'p2button2' }];
+    function whoOf(e) {
+      if (!root.hasAttribute('data-versus')) return 0;
+      var g = glass.getBoundingClientRect();
+      var f = g.width ? (e.clientX - g.left) / g.width : e.clientX / window.innerWidth;
+      return f < 0.5 ? 0 : 1;
+    }
     function lightZones() {
+      var lit = {};
+      for (var id in plat) lit[plat[id].who] = true;
+      Array.prototype.forEach.call(strip.querySelectorAll('.ts-half'), function (h, i) {
+        h.classList.toggle('held', !!lit[i]);
+      });
       var any = Object.keys(plat).length > 0;
       strip.classList.toggle('held', any);
       if (any) strip.classList.add('used');
     }
     function runTo(p, dir) {
+      var n = PLAT_NAMES[p.who];
       if (dir === p.dir) return;
-      if (p.dir) BlipController.set(p.dir, false, { silentClick: true });
-      if (dir) BlipController.set(dir, true, { silentClick: true });
+      if (p.dir) BlipController.set(n[p.dir], false, { silentClick: true });
+      if (dir) BlipController.set(n[dir], true, { silentClick: true });
       p.dir = dir;
     }
     function tapButton(name) {
@@ -781,7 +821,7 @@ window.addEventListener('keydown', function (e) {
       setTimeout(function () { BlipController.set(name, false); }, 60);
     }
     function platDown(e) {
-      plat[e.pointerId] = { x0: e.clientX, y0: e.clientY, sx: e.clientX, sy: e.clientY,
+      plat[e.pointerId] = { who: whoOf(e), x0: e.clientX, y0: e.clientY, sx: e.clientX, sy: e.clientY,
                             t: performance.now(), dir: null, moved: false };
       lightZones();
     }
@@ -793,14 +833,14 @@ window.addEventListener('keydown', function (e) {
       if (dx > LEASH_PX) { p.x0 = e.clientX - LEASH_PX; dx = LEASH_PX; }
       if (dx < -LEASH_PX) { p.x0 = e.clientX + LEASH_PX; dx = -LEASH_PX; }
       runTo(p, dx > RUN_PX ? 'right' : dx < -RUN_PX ? 'left' : null);
-      if (p.y0 - e.clientY > FLICK_PX) { tapButton('button2'); p.y0 = e.clientY; }
+      if (p.y0 - e.clientY > FLICK_PX) { tapButton(PLAT_NAMES[p.who].jump); p.y0 = e.clientY; }
       else if (e.clientY > p.y0) p.y0 = e.clientY;
     }
     function platUp(e, lifted) {
       var p = plat[e.pointerId];
       if (!p) return;
       runTo(p, null);
-      if (lifted && !p.moved && performance.now() - p.t < TAP_MS) tapButton('button1');
+      if (lifted && !p.moved && performance.now() - p.t < TAP_MS) tapButton(PLAT_NAMES[p.who].bubble);
       delete plat[e.pointerId];
       lightZones();
     }
@@ -987,6 +1027,8 @@ window.addEventListener('keydown', function (e) {
     applyPlayers();
     if (open) root.setAttribute('data-open', '');
     else root.removeAttribute('data-open');
+    if (versus) root.setAttribute('data-versus', '');
+    else root.removeAttribute('data-versus');
     // The second station is on the panel either way; what changes is
     // whether anybody is sitting at it.
     Array.prototype.forEach.call(document.querySelectorAll('.deck-tag[data-second]'),
@@ -1015,7 +1057,9 @@ window.addEventListener('keydown', function (e) {
 
   var hint = null, hintDismissed = false;
   function rotateHint() {
-    var want = versus && !hintDismissed && !landscape() && matchMedia('(pointer: coarse)').matches;
+    // The touch trackpad splits for two upright, so it needs no turning.
+    var want = versus && !hintDismissed && !landscape() && blipControls() !== 'touch' &&
+               matchMedia('(pointer: coarse)').matches;
     if (want && !hint) {
       hint = document.createElement('div');
       hint.id = 'rotate-hint';
