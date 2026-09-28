@@ -487,6 +487,8 @@
               drop-shadow(0 0 8px rgba(255, 110, 40, 0.55));
       animation: action-flash 3.2s ease-in-out infinite;
     }
+    /* the same sticker slapped on the other way round on Raider */
+    .card-sky-raider .badge-action { transform: rotate(8deg) skewX(-8deg); }
     @keyframes action-flash {
       0%, 86%, 100% { filter: drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.85)) drop-shadow(0 0 8px rgba(255, 110, 40, 0.55)); }
       90% { filter: drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.85)) drop-shadow(0 0 16px rgba(255, 240, 160, 1)) brightness(1.35); }
