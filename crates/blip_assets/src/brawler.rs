@@ -8,42 +8,14 @@ use crate::wav::{encode_pcm16_mono, encode_pcm16_music, env, ms_to_samples,
 use crate::Asset;
 
 // ---- combat foley ---------------------------------------------------------
-// Built the way film foley builds a fight: every hit is layers of real
-// events. The skin smack (a 1-3 ms crack), the struck body ringing in a few
-// damped modes, the chest's low thump dropping in pitch, the gi's cloth, and
-// a trace of the room it happens in. Blocks, falls and footsteps are other
-// combinations of the same parts.
+// Every sound here is a person. Flesh is heavily damped, so a body being hit
+// never rings at a pitch (that is a drum): it is a short muffled thud of
+// filtered noise, a smack of skin, the gi's cloth, and the fighter's own
+// voice (a breath, a grunt, a winded groan), with a trace of the room.
 
 const SRF: f32 = SAMPLE_RATE as f32;
 
-/// Damped sine modes `(freq, amp, decay_s)` added at `at` seconds.
-fn modes(buf: &mut [f32], at: f32, ms: &[(f32, f32, f32)]) {
-    let off = (at * SRF) as usize;
-    for &(f, a, tau) in ms {
-        let n = ((tau * 7.0) * SRF) as usize;
-        for i in 0..n {
-            if off + i >= buf.len() { break; }
-            let t = i as f32 / SRF;
-            buf[off + i] += (2.0 * std::f32::consts::PI * f * t).sin() * a * (-t / tau).exp()
-                * (t / 0.0008).min(1.0);
-        }
-    }
-}
 
-/// A low thump whose pitch falls from `f0` to `f1`: a body cavity (or a
-/// floor) giving under a blow.
-fn thump(buf: &mut [f32], at: f32, f0: f32, f1: f32, amp: f32, tau: f32) {
-    let off = (at * SRF) as usize;
-    let n = ((tau * 6.0) * SRF) as usize;
-    let mut ph = 0.0f32;
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
-        let t = i as f32 / SRF;
-        let f = f1 + (f0 - f1) * (-t / 0.035).exp();
-        ph += f / SRF;
-        buf[off + i] += (2.0 * std::f32::consts::PI * ph).sin() * amp * (-t / tau).exp() * (t / 0.001).min(1.0);
-    }
-}
 
 /// Noise through a resonant band-pass (state-variable filter) at `center`
 /// Hz, rising in `attack` and dying with time constant `decay` (seconds).
@@ -99,64 +71,147 @@ fn render(mut buf: Vec<f32>, gain: f32) -> Vec<i16> {
     soft_limit_to_pcm16(&scaled, MIX_KNEE)
 }
 
-/// A blow landing. `pitch` is the struck body's main mode (the combo climbs
-/// it); `weight` 0..1 runs from a jab to a heavy kick: more chest thump,
-/// longer ring, more cloth.
-fn hit(pitch: f32, weight: f32, seed: u32) -> Vec<i16> {
+
+
+
+
+/// A very short damped sine: the pitch centre of a knock, dead in ~50 ms.
+fn knock(buf: &mut [f32], at: f32, f: f32, amp: f32, tau: f32) {
+    let off = (at * SRF) as usize;
+    let n = ((tau * 5.0) * SRF) as usize;
+    for i in 0..n {
+        if off + i >= buf.len() { break; }
+        let t = i as f32 / SRF;
+        buf[off + i] += (2.0 * std::f32::consts::PI * f * t).sin() * amp * (-t / tau).exp() * (t / 0.0008).min(1.0);
+    }
+}
+
+/// A human voice: a vocal-cord buzz (harmonics falling off like a real
+/// glottal pulse, with jitter and shimmer) plus breath, shaped by three
+/// formants into a vowel `(F1, F2, F3)`. Pitch glides `f0`..`f1`; `breath`
+/// 0..1 is how much of it is air rather than tone.
+fn voice(buf: &mut [f32], at: f32, dur: f32, f0: f32, f1: f32, vowel: (f32, f32, f32), breath: f32,
+         amp: f32, rng: &mut Rng) {
+    let off = (at * SRF) as usize;
+    let n = (dur * SRF) as usize;
+    let formants = [(vowel.0, 80.0, 1.0), (vowel.1, 110.0, 0.55), (vowel.2, 160.0, 0.3)];
+    let mut state = [(0.0f32, 0.0f32); 3];
+    let (mut ph, mut jit) = (0.0f32, 0.0f32);
+    for i in 0..n {
+        if off + i >= buf.len() { break; }
+        let k = i as f32 / n as f32;
+        jit = jit * 0.995 + (rng.next_f32() - 0.5) * 0.004;
+        let f = (f0 + (f1 - f0) * k) * (1.0 + jit);
+        ph += f / SRF;
+        let mut src = 0.0f32;
+        let harmonics = ((3800.0 / f) as usize).max(1);
+        for h in 1..=harmonics {
+            src += (2.0 * std::f32::consts::PI * ph * h as f32).sin() / (h as f32).powf(1.3);
+        }
+        let shimmer = 1.0 + (rng.next_f32() - 0.5) * 0.12;
+        let air = rng.next_f32() * 2.0 - 1.0;
+        let x = src * (1.0 - breath) * shimmer * 0.35 + air * breath * 1.6;
+        let mut y = 0.0f32;
+        for (j, &(fc, bw, g)) in formants.iter().enumerate() {
+            let fq = 2.0 * (std::f32::consts::PI * fc / SRF).sin();
+            let damp = bw / fc * 2.0;
+            let (low, bp) = &mut state[j];
+            let high = x - *low - damp * *bp;
+            *bp += fq * high;
+            *low += fq * *bp;
+            y += *bp * g;
+        }
+        let e = (k / 0.06).min(1.0) * (1.0 - k).powf(1.4);
+        buf[off + i] += y * e * amp;
+    }
+}
+
+// Vowels as formant triples.
+const UH: (f32, f32, f32) = (640.0, 1190.0, 2390.0); // "uh", the grunt of a blow
+const OO: (f32, f32, f32) = (380.0, 900.0, 2300.0);  // "oof", winded
+const AH: (f32, f32, f32) = (760.0, 1150.0, 2500.0); // "ah", the cry going down
+
+/// A blow landing on a body. `thud` is the centre of the muffled flesh thud
+/// (the combo climbs it); `weight` 0..1 runs from a jab to a heavy kick:
+/// a deeper, longer thud, more cloth, and a voiced grunt instead of a breath.
+fn hit(thud: f32, weight: f32, seed: u32) -> Vec<i16> {
     let mut rng = Rng(seed);
-    let mut buf = vec![0.0f32; (0.32 * SRF) as usize];
-    // the smack: skin on skin, a crack and a couple of crackles after it
-    band(&mut buf, 0.0, 2600.0, 1.3, 1.1, 0.0003, 0.004 + 0.003 * weight, &mut rng);
-    band(&mut buf, 0.0022, 1700.0, 1.6, 0.45, 0.0002, 0.003, &mut rng);
-    band(&mut buf, 0.0051, 3300.0, 1.6, 0.25, 0.0002, 0.002, &mut rng);
-    // the struck body
-    let ring = 0.04 + 0.04 * weight;
-    modes(&mut buf, 0.0, &[(pitch, 0.9, ring), (pitch * 1.63, 0.45, ring * 0.7), (pitch * 2.41, 0.2, ring * 0.5)]);
-    // the chest giving under it
-    // (a chest rings higher than the floor a knockdown booms on)
-    thump(&mut buf, 0.0, 150.0 + 40.0 * weight, 92.0, 0.35 + 0.55 * weight, 0.05 + 0.06 * weight);
+    let mut buf = vec![0.0f32; (0.34 * SRF) as usize];
+    // the smack: skin on skin, a crack and a crackle
+    band(&mut buf, 0.0, 2400.0, 1.2, 0.9, 0.0003, 0.003 + 0.002 * weight, &mut rng);
+    band(&mut buf, 0.0021, 1600.0, 1.5, 0.35, 0.0002, 0.0025, &mut rng);
+    // the flesh thud: a muffled knock with a pitch centre and no ring (a
+    // 12 ms core dies in about 50 ms; a drum rings for hundreds)
+    band(&mut buf, 0.0, thud, 4.0, 1.8, 0.0006, 0.016 + 0.01 * weight, &mut rng);
+    knock(&mut buf, 0.0, thud, 0.9, 0.012);
+    // the body mass behind it, deep and dead
+    band(&mut buf, 0.001, 110.0, 0.8, 0.8 + 1.4 * weight, 0.002, 0.02 + 0.025 * weight, &mut rng);
     // the gi
     band(&mut buf, 0.003, 950.0, 0.8, 0.2 + 0.25 * weight, 0.002, 0.03 + 0.02 * weight, &mut rng);
+    // the fighter taking it: a forced breath on a light hit, a grunt on a heavy one
+    if weight > 0.5 {
+        voice(&mut buf, 0.012, 0.22, 150.0, 105.0, UH, 0.35, 0.9, &mut rng);
+    } else {
+        // each gasp of a combo a little tighter than the last
+        let tight = thud / 300.0;
+        let v = (UH.0 * tight, UH.1 * tight, UH.2);
+        voice(&mut buf, 0.01, 0.09, 140.0 * tight, 120.0 * tight, v, 1.0, 0.25, &mut rng);
+    }
     render(buf, 11_000.0 + 5_000.0 * weight)
 }
 
-/// Blocked: forearm on forearm, a dry knock and the sleeves slapping. No
-/// skin smack and no chest thump, so it never sounds like a hit landing.
+/// Blocked: forearm on forearm, a dull dry knock and the sleeves slapping,
+/// and the blocker's short exhale. No skin smack, no body thud behind it,
+/// so it never sounds like a hit landing.
 fn block_sfx() -> Vec<i16> {
     let mut rng = Rng(0x51A7);
-    let mut buf = vec![0.0f32; (0.18 * SRF) as usize];
-    modes(&mut buf, 0.0, &[(540.0, 0.8, 0.018), (910.0, 0.5, 0.013), (1480.0, 0.3, 0.009)]);
-    thump(&mut buf, 0.0, 210.0, 170.0, 0.25, 0.02);
-    band(&mut buf, 0.0, 1300.0, 1.0, 0.7, 0.0005, 0.012, &mut rng);
-    band(&mut buf, 0.004, 800.0, 0.8, 0.25, 0.002, 0.02, &mut rng);
+    let mut buf = vec![0.0f32; (0.2 * SRF) as usize];
+    band(&mut buf, 0.0, 520.0, 1.6, 1.2, 0.0004, 0.008, &mut rng);
+    band(&mut buf, 0.0, 1300.0, 1.0, 0.6, 0.0005, 0.01, &mut rng);
+    band(&mut buf, 0.004, 800.0, 0.8, 0.3, 0.002, 0.02, &mut rng);
+    voice(&mut buf, 0.008, 0.07, 150.0, 140.0, UH, 0.9, 0.25, &mut rng);
     render(buf, 12_000.0)
 }
 
-/// A body going down on the boards: the floor's low planks booming, the
-/// boards rattling, the gi, a slap of hands, all slower and lower than a hit.
+/// A body going down on the boards: hips then shoulders landing as dull deep
+/// thuds, a short dead knock of the planks, the gi, and a winded "oof".
 fn crunch() -> Vec<i16> {
     let mut rng = Rng(0x5A);
     let mut buf = vec![0.0f32; (0.6 * SRF) as usize];
-    thump(&mut buf, 0.0, 110.0, 70.0, 1.0, 0.16);
-    modes(&mut buf, 0.0, &[(82.0, 0.9, 0.2), (171.0, 0.5, 0.12), (293.0, 0.25, 0.07)]);
+    band(&mut buf, 0.0, 85.0, 0.9, 3.0, 0.002, 0.05, &mut rng);
+    band(&mut buf, 0.0, 240.0, 1.2, 0.9, 0.001, 0.012, &mut rng);
     band(&mut buf, 0.0, 700.0, 1.0, 0.35, 0.001, 0.02, &mut rng);
-    // the second contact as the shoulders follow the hips down
-    thump(&mut buf, 0.09, 95.0, 62.0, 0.6, 0.12);
-    modes(&mut buf, 0.09, &[(78.0, 0.5, 0.16), (160.0, 0.25, 0.1)]);
-    // boards rattling, and the gi settling
-    band(&mut buf, 0.02, 420.0, 2.0, 0.18, 0.01, 0.08, &mut rng);
+    band(&mut buf, 0.09, 80.0, 0.9, 2.2, 0.002, 0.045, &mut rng);
+    band(&mut buf, 0.09, 220.0, 1.2, 0.6, 0.001, 0.01, &mut rng);
     band(&mut buf, 0.05, 600.0, 0.8, 0.2, 0.01, 0.07, &mut rng);
+    voice(&mut buf, 0.03, 0.34, 125.0, 88.0, OO, 0.3, 0.7, &mut rng);
+    soften(&mut buf, 1400.0); // a body is soft: the fall is all low
     render(buf, 16_000.0)
 }
 
-/// Boots on boards: a wooden knock with a heel click on top.
+/// Boots on boards: a short dead knock with a heel click.
 fn land(seed: u32) -> Vec<i16> {
     let mut rng = Rng(seed);
     let mut buf = vec![0.0f32; (0.16 * SRF) as usize];
-    modes(&mut buf, 0.0, &[(145.0, 0.9, 0.05), (312.0, 0.45, 0.03), (720.0, 0.2, 0.015)]);
-    band(&mut buf, 0.0, 3000.0, 1.5, 0.35, 0.0003, 0.002, &mut rng);
-    band(&mut buf, 0.004, 900.0, 0.9, 0.2, 0.002, 0.015, &mut rng);
+    band(&mut buf, 0.0, 150.0, 1.0, 1.4, 0.001, 0.02, &mut rng);
+    band(&mut buf, 0.0, 420.0, 1.4, 0.5, 0.0005, 0.008, &mut rng);
+    band(&mut buf, 0.0, 3000.0, 1.5, 0.3, 0.0003, 0.002, &mut rng);
     render(buf, 10_000.0)
+}
+
+/// The knockout: the finishing blow, a long cry falling away, and the body
+/// hitting the boards.
+fn ko() -> Vec<i16> {
+    let mut rng = Rng(0xF157);
+    let mut buf = vec![0.0f32; (1.1 * SRF) as usize];
+    band(&mut buf, 0.0, 2400.0, 1.2, 1.0, 0.0003, 0.005, &mut rng);
+    band(&mut buf, 0.0, 300.0, 2.0, 1.8, 0.0006, 0.03, &mut rng);
+    band(&mut buf, 0.001, 110.0, 0.8, 2.2, 0.002, 0.05, &mut rng);
+    voice(&mut buf, 0.02, 0.75, 210.0, 95.0, AH, 0.3, 1.1, &mut rng);
+    band(&mut buf, 0.72, 85.0, 0.9, 2.6, 0.002, 0.05, &mut rng);
+    band(&mut buf, 0.8, 80.0, 0.9, 1.8, 0.002, 0.045, &mut rng);
+    band(&mut buf, 0.74, 600.0, 0.8, 0.25, 0.01, 0.06, &mut rng);
+    render(buf, 14_000.0)
 }
 
 /// The swing, heard before anything connects: air through a resonant band
@@ -265,22 +320,6 @@ fn bell() -> Vec<i16> {
     soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
 
-/// Knockout: the impact, plus a long falling tone under it.
-fn ko() -> Vec<i16> {
-    let n = ms_to_samples(1100.0);
-    let mut buf = vec![0.0f32; n];
-    let mut rng = Rng(0xF157);
-    let mut phase = 0.0f32;
-    for (i, out) in buf.iter_mut().enumerate() {
-        let t = i as f32 / n as f32;
-        let e = (-2.6 * t).exp();
-        let f = 220.0 * (1.0 - 0.75 * t);
-        phase += 2.0 * std::f32::consts::PI * f / SAMPLE_RATE as f32;
-        let noise = (rng.next_f32() * 2.0 - 1.0) * (1.0 - t).max(0.0) * 0.45;
-        *out = (phase.sin() * 0.8 + noise) * e * 11000.0;
-    }
-    soft_limit_to_pcm16(&buf, MIX_KNEE)
-}
 
 /// A fireball leaving the hand: noise and a rising tone.
 fn projectile() -> Vec<i16> {
@@ -532,12 +571,12 @@ pub fn crowd_wav(long: bool) -> Vec<u8> {
 
 pub fn generate() -> Vec<Asset> {
     vec![
-        // Three light hits, the struck body's pitch climbing a combo step
-        // each, so a string sounds like it is going somewhere.
-        ("sounds/hit_light.wav",  encode_pcm16_mono(&hit(260.0, 0.15, 0x11))),
-        ("sounds/hit_light2.wav", encode_pcm16_mono(&hit(325.0, 0.2, 0x1b))),
-        ("sounds/hit_light3.wav", encode_pcm16_mono(&hit(410.0, 0.25, 0x2f))),
-        ("sounds/hit_heavy.wav",  encode_pcm16_mono(&hit(215.0, 1.0, 0x22))),
+        // Three light hits, the thud climbing a combo step each, so a string
+        // sounds like it is going somewhere.
+        ("sounds/hit_light.wav",  encode_pcm16_mono(&hit(300.0, 0.15, 0x11))),
+        ("sounds/hit_light2.wav", encode_pcm16_mono(&hit(380.0, 0.2, 0x1b))),
+        ("sounds/hit_light3.wav", encode_pcm16_mono(&hit(470.0, 0.25, 0x2f))),
+        ("sounds/hit_heavy.wav",  encode_pcm16_mono(&hit(230.0, 1.0, 0x22))),
         // A knockdown: a body on the boards, lower and longer than any hit.
         ("sounds/crunch.wav",    encode_pcm16_mono(&crunch())),
         ("sounds/land.wav",      encode_pcm16_mono(&land(0x71))),
