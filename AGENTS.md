@@ -33,6 +33,7 @@ change will be overwritten the next time the project is built.
 | Effect voices, one instrument per game | `crates/blip_assets/src/cosy.rs` |
 | Native playtest autopilot | `crates/blip/src/bot.rs`, `crates/<name>/src/bot.rs` |
 | Per-game asset build step | `crates/<name>/build.rs` |
+| Brawler's kiosk card poster and screenshot (captured from the game) | `./brawler_card.sh` |
 
 `web/shell.html` is a static template — it loads, in order, `shell.js`,
 `blip_bridge.js`, `mq_js_bundle.js`, and finally calls `load("index.wasm")` to

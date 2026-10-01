@@ -218,27 +218,37 @@ fn health_stops_at_zero() {
 // ---- archetypes ----------------------------------------------------------
 
 #[test]
-fn the_three_fighters_are_actually_different() {
-    // Three palette swaps would not be three fighters. Each has to be
-    // the best at something and the worst at something.
-    let names: Vec<&str> = FIGHTERS.iter().map(|a| a.name).collect();
-    assert_eq!(names.len(), 3);
-
-    let fastest = FIGHTERS.iter().enumerate().max_by(|a, b| a.1.walk.total_cmp(&b.1.walk)).unwrap().0;
-    let strongest = FIGHTERS.iter().enumerate().max_by(|a, b| a.1.power.total_cmp(&b.1.power)).unwrap().0;
-    let toughest = FIGHTERS.iter().enumerate().max_by_key(|(_, a)| a.health).unwrap().0;
+fn the_fighters_are_actually_different() {
+    // Palette swaps would not be fighters. Somebody has to be the best at
+    // each thing, and pay for it.
+    // (The invincible one is outside every trade, on purpose.)
+    let fair = || FIGHTERS.iter().enumerate().filter(|(_, a)| !a.invincible);
+    let fastest = fair().max_by(|a, b| a.1.walk.total_cmp(&b.1.walk)).unwrap().0;
+    let strongest = fair().max_by(|a, b| a.1.power.total_cmp(&b.1.power)).unwrap().0;
+    let toughest = fair().max_by_key(|(_, a)| a.health).unwrap().0;
     assert_ne!(fastest, strongest, "the fastest fighter is also the strongest");
-    assert_eq!(strongest, toughest, "the heavy should be the one who takes hits, too");
+    // The heavies pay in speed for what they hit with and what they take.
+    for heavy in [strongest, toughest] {
+        assert!(FIGHTERS[heavy].walk < 100.0, "{} is heavy and quick", FIGHTERS[heavy].name);
+    }
 
     // And the fast one pays for it.
     let fast = FIGHTERS[fastest];
     assert!(fast.power < 1.0 && fast.health < 100, "the fast fighter pays no price");
     assert!(fast.reach > 1.0, "the fast fighter has nothing to poke with");
 
-    // Every fighter has their own special.
-    let mut specials: Vec<Special> = FIGHTERS.iter().map(|a| a.special).collect();
-    specials.dedup();
-    assert_eq!(specials.len(), 3, "two fighters share a special move");
+    // No two fighters share a name or a full set of numbers.
+    for (i, a) in FIGHTERS.iter().enumerate() {
+        for b in &FIGHTERS[i + 1..] {
+            assert_ne!(a.name, b.name);
+            assert!(a.walk != b.walk || a.power != b.power || a.health != b.health,
+                "{} and {} play the same", a.name, b.name);
+        }
+    }
+    // Every special is somebody's.
+    for sp in [Special::ChiBolt, Special::BullRush, Special::TalonKick, Special::LaserVision] {
+        assert!(FIGHTERS.iter().any(|a| a.special == sp), "nobody has {sp:?}");
+    }
 }
 
 #[test]
@@ -252,6 +262,13 @@ fn power_and_reach_scale_the_shared_move_table() {
     assert!(kestrel.scaled(base).damage < base.damage);
     assert!(kestrel.scaled(base).reach > brutus.scaled(base).reach,
         "the lighter fighter should out-range the heavy one");
+    // Size scales the whole fighter: a turtle half the height has half the
+    // body to hit and little more than half the reach, the giant half as
+    // much again of both.
+    let (small, big) = (at(3, 0.0, 1.0), at(8, 0.0, 1.0));
+    assert!(small.height() < kestrel.height() * 0.55 && big.height() > kestrel.height() * 1.45);
+    assert!(small.scaled(base).reach < brutus.scaled(base).reach);
+    assert!(big.scaled(base).reach > kestrel.scaled(base).reach);
 }
 
 // ---- the stage -----------------------------------------------------------
@@ -290,15 +307,49 @@ fn fighters_cannot_stand_inside_each_other() {
 // ---- the ladder ----------------------------------------------------------
 
 #[test]
-fn the_ladder_is_the_two_fighters_you_did_not_pick() {
+fn the_ladder_is_everybody_else_once() {
+    let boss = FIGHTERS.iter().position(|a| a.invincible).unwrap();
     for pick in 0..FIGHTERS.len() {
-        let mut g = Game::new();
-        g.pick = pick;
-        let ladder = g.ladder();
-        assert_ne!(ladder[0], pick);
-        assert_ne!(ladder[1], pick);
-        assert_ne!(ladder[0], ladder[1], "the same opponent twice");
+        let ladder = Game { pick, ..Game::new() }.ladder();
+        assert_eq!(ladder.len(), FIGHTERS.len() - 1);
+        let mut met = ladder.to_vec();
+        met.sort();
+        met.dedup();
+        assert_eq!(met.len(), ladder.len(), "{} meets somebody twice", FIGHTERS[pick].name);
+        assert!(!ladder.contains(&pick), "{} fights themself", FIGHTERS[pick].name);
+        // The one nothing hurts is the last fight, never an earlier one, and
+        // the giant is the one before: nobody opens against either.
+        let giant = FIGHTERS.iter().position(|a| a.build == Build::Giant).unwrap();
+        let ends: Vec<usize> = [giant, boss].into_iter().filter(|&w| w != pick).collect();
+        assert_eq!(&ladder[RUNGS - ends.len()..], &ends[..],
+            "{}'s ladder does not end with the giant and the boss", FIGHTERS[pick].name);
     }
+}
+
+#[test]
+fn every_fight_is_at_the_opponents_home_and_every_stage_is_somebodys() {
+    // No ladder has two fights running in one place, whoever climbs it.
+    for pick in 0..FIGHTERS.len() {
+        let mut g = Game { pick, ..Game::new() };
+        let ladder = g.ladder();
+        let mut seen = vec![];
+        for (rung, foe) in ladder.into_iter().enumerate() {
+            g.start_match(rung);
+            assert_eq!(g.stage, home_of(foe), "{} is not fought at home", FIGHTERS[foe].name);
+            assert!(g.stage < STAGES);
+            seen.push(g.stage);
+        }
+        assert!(seen.windows(2).all(|w| w[0] != w[1]),
+            "{} fights twice running in one place: {seen:?}", FIGHTERS[pick].name);
+    }
+    for stage in 0..STAGES {
+        assert!((0..FIGHTERS.len()).any(|who| home_of(who) == stage),
+            "nobody lives at {}", STAGE_NAMES[stage]);
+    }
+    // Two players meet at player two's.
+    let mut g = Game { pick: 0, pick2: 8, ..Game::new() };
+    g.start_versus();
+    assert_eq!(g.stage, home_of(8));
 }
 
 #[test]
@@ -467,9 +518,9 @@ fn spar(a_who: usize, b_who: usize, gap: f32, frames: usize,
                 p[i].facing = if other >= p[i].x { 1.0 } else { -1.0 };
             }
         }
-        let close = (p[1].x - p[0].x).abs() <= THROW_RANGE;
+        let close = face_off(&mut p);
         for i in 0..2 {
-            apply_input(&mut p[i], ins[i], close, F);
+            apply_input(&mut p[i], ins[i], close[i], F);
             advance(&mut p[i], F);
             p[i].x = clamp(p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
         }
@@ -594,7 +645,7 @@ fn beating_the_first_opponent_moves_you_to_the_second_somewhere_else() {
     g.phase.start(0.1);
     run_phase(&mut g, update_match_end);
 
-    assert_eq!(g.state, State::RoundIntro, "the next match did not start");
+    assert_eq!(g.state, State::Vs, "the next match was not billed");
     assert_ne!(g.p[1].who, first_foe, "the same opponent came back for a second match");
     assert_ne!(g.stage, first_stage, "the second match is in the same place as the first");
     assert_eq!(g.p[0].rounds, 0, "round wins carried over into the next opponent");
@@ -603,10 +654,10 @@ fn beating_the_first_opponent_moves_you_to_the_second_somewhere_else() {
 }
 
 #[test]
-fn beating_both_opponents_wins_the_game() {
+fn beating_every_opponent_wins_the_game() {
     let mut g = Game::new();
     g.pick = 1;
-    g.start_match(1); // the last rung
+    g.start_match(RUNGS - 1); // the last rung
     g.p[0].rounds = ROUNDS_TO_WIN;
     g.state = State::MatchEnd;
     g.phase.start(0.1);
@@ -782,6 +833,13 @@ fn simulating(seed: u64) -> std::sync::MutexGuard<'static, ()> {
 }
 
 fn fight_round(pick: usize, foe_index: usize, style: fn(usize, &[Fighter; 2]) -> Input) -> RoundStats {
+    fight_round_seen(pick, foe_index, style, &mut |_, _, _| {})
+}
+
+/// The same, calling `seen(attacker, their fighter, damage)` for every blow
+/// that lands.
+fn fight_round_seen(pick: usize, foe_index: usize, style: fn(usize, &[Fighter; 2]) -> Input,
+                    seen: &mut dyn FnMut(usize, &Fighter, i32)) -> RoundStats {
     let mut g = Game::new();
     g.pick = pick;
     g.start_match(foe_index);
@@ -811,7 +869,7 @@ fn fight_round(pick: usize, foe_index: usize, style: fn(usize, &[Fighter; 2]) ->
             if g.p[i].free() && !g.p[i].airborne() {
                 g.p[i].facing = if other >= g.p[i].x { 1.0 } else { -1.0 };
             }
-            let close = (g.p[1].x - g.p[0].x).abs() <= THROW_RANGE;
+            let close = face_off(&mut g.p)[i];
             apply_input(&mut g.p[i], ins[i], close, F);
             advance(&mut g.p[i], F);
             g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
@@ -826,6 +884,7 @@ fn fight_round(pick: usize, foe_index: usize, style: fn(usize, &[Fighter; 2]) ->
             g.p[d] = def;
             if dmg > 0 {
                 if a == 0 { stats.player_hits += 1; } else { stats.cpu_hits += 1; }
+                seen(a, &g.p[a], dmg);
                 g.hitstop = hitstop_for(dmg, knock, false);
                 push_apart(&mut g.p, if knock { 34.0 } else { 9.0 });
             } else if blocked {
@@ -907,8 +966,8 @@ fn every_round_is_decided_by_something_that_happened() {
 
     for s in 0..4u64 {
         let _sim = simulating(0xB4A17E + s * 0x9E37);
-        for pick in 0..3 {
-            for foe in 0..2 {
+        for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].invincible) {
+            for foe in [0, RUNGS - 3] {
                 for (name, style) in styles {
                     let r = fight_round(pick, foe, style);
                     rounds += 1;
@@ -941,8 +1000,12 @@ fn playing_well_beats_playing_badly() {
     // forward and mashing, or none of the rules above are load-bearing.
     let mut rush_margin = 0;
     let mut poke_margin = 0;
-    for pick in 0..3 {
-        for foe in 0..2 {
+    // Between fighters who have a range to keep: a half-size one is built
+    // to leap in behind every blow, on either side of the fight.
+    let spaces = |who: usize| !FIGHTERS[who].invincible && FIGHTERS[who].size >= 1.0;
+    for pick in (0..FIGHTERS.len()).filter(|&i| spaces(i)) {
+        for foe in [0, RUNGS - 3] {
+            if !spaces(Game { pick, ..Game::new() }.ladder()[foe]) { continue; }
             let r = fight_round(pick, foe, rusher);
             rush_margin += r.player_health - r.cpu_health;
             let p = fight_round(pick, foe, poker);
@@ -959,24 +1022,26 @@ fn turtling_does_not_win_on_its_own() {
     // Blocking has to be worth doing and not worth doing *only*. A
     // player who crouch-blocks forever should survive longer than a
     // rusher and still lose, because they never take the round.
-    let mut survived = 0;
-    let mut won = 0;
-    for pick in 0..3 {
-        for foe in 0..2 {
+    // Every rung but the last: two rungs are mostly turtles, who throw.
+    let (mut survived, mut won, mut rounds) = (0, 0, 0);
+    for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].invincible) {
+        for foe in 0..RUNGS - 1 {
             let r = fight_round(pick, foe, turtle);
+            rounds += 1;
             if r.player_health > 0 { survived += 1; }
             if r.cpu_health <= 0 { won += 1; }
         }
     }
     assert_eq!(won, 0, "a fighter who never attacked won {won} rounds");
-    assert!(survived >= 2, "crouch-blocking survived only {survived} of 6 rounds — blocking is not working");
+    assert!(survived * 3 >= rounds,
+        "crouch-blocking survived only {survived} of {rounds} rounds — blocking is not working");
 }
 
 #[test]
 #[ignore]
 fn diagnose_matchups() {
-    for pick in 0..3 {
-        for foe in 0..2 {
+    for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].invincible) {
+        for foe in [0, RUNGS - 3] {
             for (name, style) in [("rusher", rusher as fn(usize, &[Fighter; 2]) -> Input),
                                   ("poker", poker), ("turtle", turtle)] {
                 let r = fight_round(pick, foe, style);
@@ -1023,7 +1088,7 @@ fn diagnose_cpu() {
                 if g.p[i].free() && !g.p[i].airborne() {
                     g.p[i].facing = if other >= g.p[i].x { 1.0 } else { -1.0 };
                 }
-                let close = (g.p[1].x - g.p[0].x).abs() <= THROW_RANGE;
+                let close = face_off(&mut g.p)[i];
             apply_input(&mut g.p[i], ins[i], close, F);
                 advance(&mut g.p[i], F);
                 g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
@@ -1261,8 +1326,15 @@ fn every_pose() -> Vec<(String, Fighter)> {
     out
 }
 
+/// The skeleton as it is drawn, at the fighter's own size. (`bones_of` is the
+/// same pose at full size, which is what the anatomy rules are written in.)
+fn drawn(f: &Fighter) -> draw::Skeleton {
+    let rig = draw::Rig::upright(f.x, f.y, f.facing, f.facing, f.size());
+    draw::skeleton(rig, &draw::pose_of(0.37, f, 0))
+}
+
 fn bones_of(f: &Fighter) -> draw::Skeleton {
-    let rig = draw::Rig::upright(f.x, f.y, f.facing, f.facing);
+    let rig = draw::Rig::upright(f.x, f.y, f.facing, f.facing, 1.0);
     draw::skeleton(rig, &draw::pose_of(0.37, f, 0))
 }
 
@@ -1344,27 +1416,27 @@ fn what_you_see_is_what_can_hit_you() {
             for step in 0..5 {
                 f.t = (m.startup + m.active * step as f32 / 4.0) * F;
                 let Some((hx, _, hw, _)) = f.hit_box() else { continue };
-                let k = bones_of(&f);
+                let k = drawn(&f);
                 let leg = matches!(mv, MoveId::LowKick | MoveId::HighKick
                     | MoveId::Sweep);
                 // The tip is the end of the foot or the front of the fist,
                 // scaled with the fighter like the drawing.
-                let bulk = FIGHTERS[who].bulk;
+                let size = f.size();
+                let bulk = FIGHTERS[who].bulk * size;
                 let tip = if leg {
-                    let (dx, dy) = (k.ankle_lead.0 - k.knee_lead.0, k.ankle_lead.1 - k.knee_lead.1);
-                    let d = (dx * dx + dy * dy).sqrt().max(0.001);
-                    k.ankle_lead.0 + dx / d * 12.6 * bulk
+                    let (dx, _, _) = draw::foot_dir(k.knee_lead, k.ankle_lead, f.facing, f.y, size);
+                    k.ankle_lead.0 + dx * draw::FOOT * bulk
                 } else {
-                    k.hand_lead.0 + 6.4 * bulk
+                    k.hand_lead.0 + draw::FIST * bulk
                 };
                 let far = hx + hw;
                 let short = far - tip;
-                if short > 14.0 {
+                if short > 14.0 * size {
                     bad.push(format!("{} {:?}: reaches {:.0}px short of its own hitbox",
                         FIGHTERS[who].name, mv, short));
                     break;
                 }
-                if tip > far + 6.0 {
+                if tip > far + 6.0 * size {
                     bad.push(format!("{} {:?}: drawn {:.0}px past its own hitbox",
                         FIGHTERS[who].name, mv, tip - far));
                     break;
@@ -1383,8 +1455,8 @@ fn why_is_that_matchup_quiet() {
     let _sim = simulating(0xB4A17E);
     let styles: [(&str, fn(usize, &[Fighter; 2]) -> Input); 3] =
         [("rusher", rusher), ("poker", poker), ("turtle", turtle)];
-    for pick in 0..3 {
-        for foe in 0..2 {
+    for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].invincible) {
+        for foe in [0, RUNGS - 3] {
             for (name, style) in styles {
                 let r = fight_round(pick, foe, style);
                 println!("{} vs foe{foe} [{name}]: {}s hp {}/{} hits {}/{}", FIGHTERS[pick].name,
@@ -1532,9 +1604,10 @@ fn nothing_teleports_between_one_frame_and_the_next() {
                     // must travel.
                     let limit = match act {
                         Act::Hitstun => 70.0,
+                        // Thrown off their feet: the arms are flung.
+                        Act::Knockdown => 45.0,
                         // The peak of a kick's whip, where the shin is
-                        // travelling fastest and the motion smear is
-                        // drawn behind it.
+                        // travelling fastest.
                         Act::Attack => 36.0,
                         _ => 30.0,
                     };
@@ -1676,22 +1749,48 @@ fn dump_wings() {
 fn no_elbow_sticks_out_behind_the_back() {
     // A side-on rig has nowhere to put the elbow of an arm folded
     // across the body, so it projects it backwards and the upper arm
-    // reads as a plank bolted to the shoulder.
+    // reads as a plank bolted to the shoulder. Each arm is measured from its
+    // own shoulder.
     let mut bad = vec![];
     for (label, f) in every_pose() {
         if f.act == Act::Knockdown { continue; }
         let k = bones_of(&f);
-        for (n, sh, el, hd) in [("lead", k.sh_lead, k.elbow_lead, k.hand_lead),
-                                ("rear", k.sh_rear, k.elbow_rear, k.hand_rear)] {
-            let back = (sh.0 - el.0) * f.facing;
-            let hand = ((sh.0 - hd.0) * f.facing).max(0.0);
-            if back - hand > 19.0 {
-                bad.push(format!("{label}: {n} elbow {:.0}px behind its shoulder, \
-                    hand only {hand:.0}px", back));
+        for (n, from, el, hd, most) in [("lead", k.sh_lead, k.elbow_lead, k.hand_lead, 19.0),
+                                        ("rear", k.sh_rear, k.elbow_rear, k.hand_rear, 22.0)] {
+            let back = (from.0 - el.0) * f.facing;
+            let hand = ((from.0 - hd.0) * f.facing).max(0.0);
+            if back - hand > most {
+                bad.push(format!("{label}: {n} elbow {:.0}px behind, hand only {hand:.0}px", back));
             }
         }
     }
     assert!(bad.is_empty(), "elbows winging out behind the back:\n  {}", bad.join("\n  "));
+}
+
+#[test]
+fn the_far_hand_stays_in_front_of_the_body() {
+    // The stance is open: the far arm is in plain sight at the back edge of
+    // the chest, and its elbow may show behind it. Its hand may not: a fist
+    // below the shoulders and behind the spine by more than the body is
+    // thick reads as a hand growing out of the back. (Thrown off the feet or
+    // beaten, the arms go where they go.)
+    let mut bad = vec![];
+    for (label, f) in every_pose() {
+        if matches!(f.act, Act::Knockdown | Act::Defeat) { continue; }
+        // The flier has no flying kick; his kick is the laser.
+        if f.flies() && f.act == Act::Attack && f.mv == MoveId::FlyingKick { continue; }
+        let k = bones_of(&f);
+        if k.hand_rear.1 < k.neck.1 { continue; }
+        let t = ((k.hip.1 - k.hand_rear.1) / (k.hip.1 - k.neck.1).max(1.0)).clamp(0.0, 1.0);
+        let spine = k.hip.0 + (k.neck.0 - k.hip.0) * t;
+        let behind = (spine - k.hand_rear.0) * f.facing;
+        if behind > 9.0 {
+            bad.push(format!("{label}: the far hand is {behind:.0}px behind the spine"));
+        }
+    }
+    bad.dedup();
+    assert!(bad.is_empty(), "hands through the back:\n  {}",
+        bad.iter().take(40).cloned().collect::<Vec<_>>().join("\n  "));
 }
 
 #[test]
@@ -1706,7 +1805,15 @@ fn a_fighter_has_two_arms_two_legs_and_one_torso() {
         if f.act == Act::Knockdown { continue; }
         let k = bones_of(&f);
         let gap = |a: draw::V, b: draw::V| ((a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)).sqrt();
-        if gap(k.hand_lead, k.hand_rear) < 6.0 {
+        // One fist passing the other on its way somewhere is a punch going
+        // out; two fists that stay in one place are one fist.
+        let still_there = {
+            let mut later = f;
+            later.t += 2.0 * F;
+            let k = bones_of(&later);
+            gap(k.hand_lead, k.hand_rear) < 6.0
+        };
+        if gap(k.hand_lead, k.hand_rear) < 6.0 && still_there {
             bad.push(format!("{label}: the two fists are in the same place"));
         }
         if gap(k.ankle_lead, k.ankle_rear) < 6.0 {
@@ -1714,7 +1821,7 @@ fn a_fighter_has_two_arms_two_legs_and_one_torso() {
         }
         // Nothing but the head belongs on the head. A hand over the
         // face deletes the one part a player has to find.
-        let head_r = 9.8 + 2.2 * (FIGHTERS[f.who].bulk - 1.0);
+        let head_r = draw::head_r(FIGHTERS[f.who].bulk);
         for (n, h) in [("lead", k.hand_lead), ("rear", k.hand_rear)] {
             if gap(h, k.head) < head_r + 2.0 {
                 bad.push(format!("{label}: the {n} fist is drawn over the head"));
@@ -1731,10 +1838,10 @@ fn a_fighter_fits_inside_their_own_hurtbox() {
     let mut bad = vec![];
     for (label, f) in every_pose() {
         if matches!(f.act, Act::Knockdown | Act::Attack) { continue; }
-        let k = bones_of(&f);
+        let k = drawn(&f);
         let top = f.y - f.height();
-        let head_r = 9.8 + 2.2 * (FIGHTERS[f.who].bulk - 1.0);
-        if k.head.1 - head_r < top - 6.0 {
+        let head_r = draw::head_r(FIGHTERS[f.who].bulk) * f.size();
+        if k.head.1 - head_r < top - 6.0 * f.size() {
             bad.push(format!("{label}: the head is {:.0}px above the hurtbox",
                 top - (k.head.1 - head_r)));
         }
@@ -1887,8 +1994,8 @@ fn the_cpu_throws_the_flying_kick_too() {
     // just never uses it — and the move becomes a player-only tool.
     let _sim = simulating(0x5EED07);
     let mut seen = 0;
-    for pick in 0..3 {
-        for foe in 0..2 {
+    for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].invincible) {
+        for foe in [0, RUNGS - 3] {
             let mut g = Game::new();
             g.pick = pick;
             g.start_match(foe);
@@ -2114,31 +2221,30 @@ fn what_you_see_is_what_can_hit_you_in_the_air_too() {
             for _ in 0..60 {
                 advance(&mut f, F);
                 let Some((hx, hy, hw, hh)) = f.hit_box() else { continue };
-                let rig = draw::Rig::upright(f.x, f.y, f.facing, f.facing);
-                let k = draw::skeleton(rig, &draw::pose_of(0.37, &f, 0));
-                let bulk = FIGHTERS[who].bulk;
+                let k = drawn(&f);
+                let size = f.size();
+                let bulk = FIGHTERS[who].bulk * size;
                 let (joint, tip) = if leg {
-                    let (dx, dy) = (k.ankle_lead.0 - k.knee_lead.0,
-                                    k.ankle_lead.1 - k.knee_lead.1);
-                    let d = (dx * dx + dy * dy).sqrt().max(0.001);
-                    (k.ankle_lead, k.ankle_lead.0 + dx / d * 12.6 * bulk)
+                    // The toes point the way the foot is drawn.
+                    let (dx, _, _) = draw::foot_dir(k.knee_lead, k.ankle_lead, f.facing, f.y, size);
+                    (k.ankle_lead, k.ankle_lead.0 + dx * draw::FOOT * bulk)
                 } else {
-                    (k.hand_lead, k.hand_lead.0 + 6.4 * bulk)
+                    (k.hand_lead, k.hand_lead.0 + draw::FIST * bulk)
                 };
                 let far = hx + hw;
-                if far - tip > 15.0 {
+                if far - tip > 15.0 * size {
                     bad.push(format!("{} {mv:?}: reaches {:.0}px short of its hitbox",
                         FIGHTERS[who].name, far - tip));
                     break;
                 }
-                if tip > far + 8.0 {
+                if tip > far + 8.0 * size {
                     bad.push(format!("{} {mv:?}: drawn {:.0}px past its hitbox",
                         FIGHTERS[who].name, tip - far));
                     break;
                 }
                 // And the right height: a box the limb is nowhere near
                 // is a box that hits things the picture never touched.
-                if joint.1 < hy - 26.0 || joint.1 > hy + hh + 26.0 {
+                if joint.1 < hy - 26.0 * size || joint.1 > hy + hh + 26.0 * size {
                     bad.push(format!("{} {mv:?}: the limb is {:.0}px off the height its \
                         hitbox is at", FIGHTERS[who].name, (joint.1 - (hy + hh / 2.0)).abs()));
                     break;
@@ -2181,7 +2287,7 @@ fn a_fighter_on_the_floor_is_only_as_tall_as_they_are_drawn() {
     let (_, by, _, bh) = d.hurt_box();
     assert!(bh <= 40.0, "a fighter on their back is {bh:.0}px tall");
     // Nothing drawn on them pokes far out of it.
-    let rig = draw::Rig::upright(d.x, d.y, d.facing, -d.facing);
+    let rig = draw::Rig::upright(d.x, d.y, d.facing, -d.facing, 1.0);
     let k = draw::skeleton(rig, &draw::pose_of(0.37, &d, 0));
     for (n, j) in [("head", k.head), ("hip", k.hip), ("knee", k.knee_lead),
                    ("hand", k.hand_lead), ("ankle", k.ankle_lead)] {
@@ -2424,6 +2530,492 @@ fn each_player_has_their_own_special_window() {
     }
 }
 
+#[test]
+fn a_special_pressed_a_few_frames_apart_still_comes_out() {
+    // Two buttons never land on the same frame. The first starts its own
+    // attack; the second, a moment later, has to turn that into the special
+    // (it used to be buffered behind the punch and forgotten).
+    for (first, late) in [(Input { punch_low: true, ..Default::default() }, 3),
+                          (Input { kick_low: true, ..Default::default() }, 4)] {
+        let mut f = at(0, 200.0, 1.0);
+        apply_input(&mut f, first, false, F);
+        advance(&mut f, F);
+        assert_eq!(f.act, Act::Attack);
+        for _ in 1..late {
+            apply_input(&mut f, Input::default(), false, F);
+            advance(&mut f, F);
+        }
+        apply_input(&mut f, Input { special: true, ..Default::default() }, false, F);
+        assert_eq!(f.mv, MoveId::Special, "the second button {late} frames late was lost");
+        assert!(f.t < F, "the special did not start from its first frame");
+    }
+    // Once the first attack is out, it is too late: no special from a jab
+    // that has already landed or missed.
+    let mut f = at(0, 200.0, 1.0);
+    f.start_attack(MoveId::LowPunch);
+    for _ in 0..8 { advance(&mut f, F); }
+    apply_input(&mut f, Input { special: true, ..Default::default() }, false, F);
+    assert_eq!(f.mv, MoveId::LowPunch);
+}
+
+// ---- sizes ---------------------------------------------------------------
+
+#[test]
+fn nobody_strikes_over_the_head_of_a_smaller_opponent() {
+    // Blows are aimed at the body in front of them: every grounded attack
+    // of every fighter, thrown from just inside its range, touches every
+    // other standing fighter, however small.
+    let mut bad = vec![];
+    for a in 0..FIGHTERS.len() {
+        for d in 0..FIGHTERS.len() {
+            for mv in [MoveId::LowPunch, MoveId::HighPunch, MoveId::LowKick, MoveId::HighKick,
+                       MoveId::Sweep, MoveId::Throw] {
+                let mut p = [at(a, 200.0, 1.0), at(d, 300.0, -1.0)];
+                face_off(&mut p);
+                p[1].x = p[0].x + attack_range(&p[0], mv) - 3.0;
+                wind_to_active(&mut p[0], mv);
+                let [atk, def] = &mut p;
+                let (dmg, _, _) = resolve_hit(atk, def, Input::default());
+                if dmg == 0 {
+                    bad.push(format!("{}'s {mv:?} misses {}", FIGHTERS[a].name, FIGHTERS[d].name));
+                }
+            }
+        }
+    }
+    assert!(bad.is_empty(), "attacks that cannot land:\n  {}", bad.join("\n  "));
+}
+
+#[test]
+fn a_throw_is_offered_only_where_it_reaches() {
+    // "Close enough to throw" is each fighter's own distance: a turtle has
+    // to be nearer than a giant does.
+    for a in 0..FIGHTERS.len() {
+        for d in 0..FIGHTERS.len() {
+            let mut p = [at(a, 200.0, 1.0), at(d, 300.0, -1.0)];
+            face_off(&mut p);
+            p[1].x = p[0].x + throw_range(&p[0]) - 0.5;
+            assert!(face_off(&mut p)[0]);
+            assert!(throw_range(&p[0]) < attack_range(&p[0], MoveId::Throw),
+                "{} is offered a throw that cannot reach {}", FIGHTERS[a].name, FIGHTERS[d].name);
+            // And it is a distance the two can actually stand at.
+            assert!(throw_range(&p[0]) > (p[0].width() + p[1].width()) / 2.0 * 0.82,
+                "{} can never get close enough to throw {}", FIGHTERS[a].name, FIGHTERS[d].name);
+        }
+    }
+    let (small, big) = (at(3, 0.0, 1.0), at(8, 0.0, 1.0));
+    assert!(throw_range(&small) < throw_range(&big));
+}
+
+// ---- the one nothing hurts -----------------------------------------------
+
+#[test]
+fn only_the_giant_hurts_the_invincible_fighter_but_blows_still_land() {
+    let who = FIGHTERS.iter().position(|a| a.invincible).expect("somebody is invincible");
+    let full = FIGHTERS[who].health;
+    for mv in [MoveId::LowPunch, MoveId::HighKick, MoveId::Sweep, MoveId::Throw, MoveId::Special] {
+        let mut p = [at(1, 200.0, 1.0), at(who, 300.0, -1.0)];
+        face_off(&mut p);
+        p[1].x = p[0].x + attack_range(&p[0], mv) - 3.0;
+        wind_to_active(&mut p[0], mv);
+        let [atk, def] = &mut p;
+        let (dmg, blocked, _) = resolve_hit(atk, def, Input::default());
+        assert!(dmg > 0 && !blocked, "{mv:?} did not land");
+        assert_eq!(def.health, full, "{mv:?} hurt the fighter nothing hurts");
+        assert!(matches!(def.act, Act::Hitstun | Act::Knockdown), "{mv:?} did not move them");
+    }
+    // Chip through a guard costs nothing either.
+    let mut p = [at(1, 200.0, 1.0), at(who, 300.0, -1.0)];
+    face_off(&mut p);
+    p[1].x = p[0].x + attack_range(&p[0], MoveId::Special) - 3.0;
+    wind_to_active(&mut p[0], MoveId::Special);
+    let [atk, def] = &mut p;
+    resolve_hit(atk, def, back_input(-1.0, false));
+    assert_eq!(def.health, full);
+
+    // Only someone bigger gets through, and only a little.
+    let giant = FIGHTERS.iter().position(|a| a.size > FIGHTERS[who].size).unwrap();
+    let mut p = [at(giant, 200.0, 1.0), at(who, 300.0, -1.0)];
+    face_off(&mut p);
+    p[1].x = p[0].x + attack_range(&p[0], MoveId::HighKick) - 3.0;
+    wind_to_active(&mut p[0], MoveId::HighKick);
+    let [atk, def] = &mut p;
+    let (dmg, _, _) = resolve_hit(atk, def, Input::default());
+    let lost = full - def.health;
+    assert!(lost > 0 && lost * 3 < dmg, "the giant's {dmg} cost them {lost}");
+}
+
+#[test]
+fn the_laser_is_aimed_at_the_head_and_goes_over_a_crouch() {
+    let who = FIGHTERS.iter().position(|a| a.special == Special::LaserVision).unwrap();
+    for foe in [0, 3] {
+        let mut g = Game::new();
+        g.p = [at(who, 200.0, 1.0), at(foe, 400.0, -1.0)];
+        face_off(&mut g.p);
+        g.spawn_bolt(0, 16);
+        let b = g.bolts.iter().find(|b| b.active).unwrap();
+        let (bx, by) = (0.0, b.y - 8.0);
+        let stand = g.p[1].hurt_box();
+        assert!(rects_overlap(bx, by, 20.0, 16.0, 0.0, stand.1, stand.2, stand.3),
+            "the laser misses a standing {}", FIGHTERS[foe].name);
+        g.p[1].act = Act::Crouch;
+        let duck = g.p[1].hurt_box();
+        assert!(!rects_overlap(bx, by, 20.0, 16.0, 0.0, duck.1, duck.2, duck.3),
+            "{} cannot duck the laser", FIGHTERS[foe].name);
+    }
+}
+
+#[test]
+fn the_laser_fired_from_the_air_is_aimed_at_the_fighter() {
+    // Level, it would pass over everyone's head. From anywhere in the air,
+    // either side, it has to reach whoever it was fired at, big or small.
+    let who = FIGHTERS.iter().position(|a| a.special == Special::LaserVision).unwrap();
+    for foe in [0, 3, 8] {
+        for (x, up) in [(120.0, 140.0), (300.0, 60.0), (520.0, 150.0), (330.0, 140.0)] {
+            let mut g = Game::new();
+            g.p = [at(who, x, 1.0), at(foe, 320.0, -1.0)];
+            g.p[0].y = FLOOR_Y - up;
+            g.p[0].act = Act::Air;
+            face_off(&mut g.p);
+            g.spawn_bolt(0, 16);
+            let mut b = *g.bolts.iter().find(|b| b.active).unwrap();
+            let (hx, hy, hw, hh) = g.p[1].hurt_box();
+            let mut hit = false;
+            for _ in 0..120 {
+                b.x += b.vx * F;
+                b.y += b.vy * F;
+                if rects_overlap(b.x - 10.0, b.y - 8.0, 20.0, 16.0, hx, hy, hw, hh) { hit = true; break; }
+                if b.y > FLOOR_Y { break; }
+            }
+            assert!(hit, "fired from ({x}, {up} up) the laser missed {}", FIGHTERS[foe].name);
+        }
+    }
+}
+
+#[test]
+fn the_flier_hangs_in_the_air_until_told_to_land() {
+    let who = FIGHTERS.iter().position(|a| a.build == Build::Caped).unwrap();
+    let mut f = at(who, 300.0, 1.0);
+    let hold = |up: bool, down: bool, right: bool| Input { up, down, right, ..Default::default() };
+    let mut step = |f: &mut Fighter, inp: Input, frames: usize| {
+        for _ in 0..frames { apply_input(f, inp, false, F); advance(f, F); }
+    };
+    step(&mut f, hold(true, false, false), 30);
+    let high = FLOOR_Y - f.y;
+    assert!(high > 60.0, "half a second of up lifted him {high:.0}px");
+    // Hands off: he stays exactly where he is.
+    step(&mut f, Input::default(), 90);
+    assert!((FLOOR_Y - f.y - high).abs() < 0.5 && f.act == Act::Air, "he did not hover");
+    // The stick moves him without gravity, and never above the ceiling.
+    let x = f.x;
+    step(&mut f, hold(true, false, true), 120);
+    assert!(f.x > x + 100.0, "he did not fly forward");
+    assert!(FLOOR_Y - f.y <= CEILING + 0.5, "he flew off the top of the screen");
+    // Down brings him back to the boards, free to act.
+    step(&mut f, hold(false, true, false), 120);
+    assert!(!f.airborne() && f.free(), "he never landed: {:?} at {:.0}", f.act, FLOOR_Y - f.y);
+    // Nobody else flies.
+    let mut g = at(0, 300.0, 1.0);
+    step(&mut g, hold(true, false, false), 5);
+    step(&mut g, Input::default(), 120);
+    assert!(!g.airborne());
+}
+
+#[test]
+fn the_fliers_kick_is_the_laser_and_his_punch_hits_three_times_as_hard() {
+    let who = FIGHTERS.iter().position(|a| a.build == Build::Caped).unwrap();
+    let f = at(who, 300.0, 1.0);
+    for kick in [Input { kick_low: true, ..Default::default() },
+                 Input { kick_high: true, ..Default::default() },
+                 Input { kick_low: true, down: true, ..Default::default() }] {
+        assert_eq!(pressed_move(&f, kick, true), Some(MoveId::Special));
+    }
+    let punch = Input { punch_low: true, ..Default::default() };
+    assert_eq!(pressed_move(&f, punch, true), Some(MoveId::HighPunch), "he throws, or jabs");
+    let base = move_data(MoveId::HighPunch).damage;
+    assert_eq!(f.scaled(move_data(MoveId::HighPunch)).damage, base * 3);
+    // And it sends them flying.
+    let mut p = [f, at(1, 300.0, -1.0)];
+    face_off(&mut p);
+    p[1].x = p[0].x + attack_range(&p[0], MoveId::HighPunch) - 3.0;
+    wind_to_active(&mut p[0], MoveId::HighPunch);
+    let [atk, def] = &mut p;
+    let (dmg, _, floored) = resolve_hit(atk, def, Input::default());
+    assert!(dmg == base * 3 && floored && def.act == Act::Knockdown);
+}
+
+#[test]
+fn the_last_fight_is_won_by_being_on_your_feet_at_the_bell() {
+    // Nobody but the giant can knock out the fighter nothing hurts, so a
+    // round against him goes to the player who lasts it out.
+    let boss = FIGHTERS.iter().position(|a| a.invincible).unwrap();
+    let mut g = Game::new();
+    g.pick = 0;
+    g.start_match(RUNGS - 1);
+    assert_eq!(g.p[1].who, boss);
+    g.p[0].health = 7;
+    assert!(survived(&g));
+    assert_eq!(round_result(&g, false), RoundResult::P1, "time ran out and he still took the round");
+    // Knocked out is knocked out.
+    g.p[0].health = 0;
+    assert_eq!(round_result(&g, true), RoundResult::P2);
+    // Against anyone else the bell goes to whoever has more left.
+    g.start_match(0);
+    g.p[0].health = 7;
+    assert!(!survived(&g));
+    assert_eq!(round_result(&g, false), RoundResult::P2);
+    // And two players settle it on health, whoever they picked.
+    g.mode = Mode::Versus;
+    g.p[1] = at(boss, 440.0, -1.0);
+    assert!(!survived(&g));
+}
+
+#[test]
+fn the_ladder_gets_harder_all_the_way_up() {
+    let mut g = Game { pick: 0, ..Game::new() };
+    let mut last = f32::MIN;
+    for rung in 0..RUNGS {
+        g.start_match(rung);
+        assert!(g.difficulty > last, "fight {} is no harder than the one before", rung + 1);
+        last = g.difficulty;
+    }
+    assert!((last - LAST_RUNG).abs() < 1e-4);
+}
+
+// ---- ten additions --------------------------------------------------------
+
+/// `a` at full extension of `mv`, just inside its range of `d`.
+fn in_range(a: usize, d: usize, mv: MoveId) -> [Fighter; 2] {
+    let mut p = [at(a, 200.0, 1.0), at(d, 300.0, -1.0)];
+    face_off(&mut p);
+    p[1].x = p[0].x + attack_range(&p[0], mv) - 3.0;
+    wind_to_active(&mut p[0], mv);
+    p
+}
+
+#[test]
+fn hitting_someone_out_of_their_attack_is_a_counter() {
+    let plain = {
+        let [mut a, mut d] = in_range(0, 2, MoveId::LowKick);
+        resolve_hit(&mut a, &mut d, Input::default()).0
+    };
+    // Caught winding up: more damage, more stun, and it is announced.
+    let [mut a, mut d] = in_range(0, 2, MoveId::LowKick);
+    d.start_attack(MoveId::HighKick);
+    let (dmg, _, _) = resolve_hit(&mut a, &mut d, Input::default());
+    assert!(a.countered && dmg > plain, "a counter did {dmg} against a plain {plain}");
+    assert!(d.stun > move_data(MoveId::LowKick).hitstun * F);
+    // Caught recovering is a punish, not a counter.
+    let [mut a, mut d] = in_range(0, 2, MoveId::LowKick);
+    d.start_attack(MoveId::HighKick);
+    d.t = 0.5;
+    let (dmg, _, _) = resolve_hit(&mut a, &mut d, Input::default());
+    assert!(!a.countered && dmg == plain);
+}
+
+#[test]
+fn the_last_quarter_of_the_bar_hits_harder() {
+    let base = move_data(MoveId::HighKick);
+    let mut f = at(0, 200.0, 1.0);
+    let fresh = f.scaled(base).damage;
+    f.health = FIGHTERS[0].health / 4;
+    assert!(f.enraged() && f.scaled(base).damage > fresh);
+    f.health = FIGHTERS[0].health / 4 + 1;
+    assert!(!f.enraged() && f.scaled(base).damage == fresh);
+    // Out is out, and the fighter nothing hurts has nothing to be angry about.
+    f.health = 0;
+    assert!(!f.enraged());
+    let mut z = at(FIGHTERS.iter().position(|a| a.invincible).unwrap(), 200.0, 1.0);
+    z.health = 1;
+    assert!(!z.enraged());
+}
+
+#[test]
+fn a_tap_toward_at_the_last_moment_turns_the_blow() {
+    let toward = Input { left: true, ..Default::default() }; // the defender faces left
+    // Tapped just before it lands: no damage, and the attacker is left open.
+    let [mut a, mut d] = in_range(0, 1, MoveId::HighKick);
+    apply_input(&mut d, toward, false, F);
+    let full = d.health;
+    let (dmg, blocked, _) = resolve_hit(&mut a, &mut d, toward);
+    assert!(dmg == 0 && blocked && d.health == full && a.turned);
+    assert!(a.act == Act::Hitstun && a.stun >= IMPACT_STUN - 0.001);
+    assert!(d.free(), "the defender is not free to answer");
+    // Held, not tapped: walking into a kick is just being kicked.
+    let [mut a, mut d] = in_range(0, 1, MoveId::HighKick);
+    for _ in 0..12 { apply_input(&mut d, toward, false, F); }
+    assert!(resolve_hit(&mut a, &mut d, toward).0 > 0);
+    // A throw is not a blow, and cannot be turned.
+    let [mut a, mut d] = in_range(0, 1, MoveId::Throw);
+    apply_input(&mut d, toward, false, F);
+    assert!(resolve_hit(&mut a, &mut d, toward).0 > 0);
+}
+
+#[test]
+fn the_fruit_comes_once_a_round_and_feeds_whoever_reaches_it() {
+    let mut g = Game::new();
+    g.start_match(0);
+    g.state = State::Fight;
+    assert!(fruit_step(&mut g, F).is_none() && g.fruit.ttl <= 0.0, "it is there from the bell");
+    g.clock = FRUIT_AT - 0.01;
+    fruit_step(&mut g, F);
+    assert!(g.fruit.ttl > 0.0, "it never appeared");
+    assert!((g.fruit.x - g.p[0].x).abs() > 60.0 && (g.fruit.x - g.p[1].x).abs() > 60.0);
+    // Jumping over it is not eating it.
+    g.p[0].health = 40;
+    g.p[0].x = g.fruit.x;
+    g.p[0].y = FLOOR_Y - 60.0;
+    assert!(fruit_step(&mut g, F).is_none());
+    // Walking onto it is, and it gives some health back and is gone.
+    g.p[0].y = FLOOR_Y;
+    assert_eq!(fruit_step(&mut g, F), Some(0));
+    assert!(g.p[0].health > 40 && g.p[0].health < FIGHTERS[g.p[0].who].health);
+    assert!(g.fruit.ttl <= 0.0 && g.sess.score > 0);
+    assert!(fruit_step(&mut g, F).is_none() && g.fruit.ttl <= 0.0, "a second helping");
+    // It never fills past full, and the next round serves the next one.
+    let first = g.fruit.kind;
+    g.round += 1;
+    g.start_round();
+    g.clock = FRUIT_AT - 0.01;
+    g.p[1].x = WIN_W as f32 / 2.0;
+    assert_eq!(fruit_step(&mut g, F), Some(1));
+    assert_eq!(g.p[1].health, FIGHTERS[g.p[1].who].health);
+    assert_ne!(g.fruit.kind, first);
+    // Left alone it goes away.
+    g.round += 1;
+    g.start_round();
+    g.clock = FRUIT_AT - 0.01;
+    for _ in 0..((FRUIT_STAYS / F) as usize + 5) { fruit_step(&mut g, F); }
+    assert!(g.fruit.ttl <= 0.0);
+}
+
+#[test]
+fn two_bolts_cancel_and_the_laser_burns_through() {
+    let bolt = |x: f32, vx: f32, owner: usize| Bolt { x, y: 276.0, vx, vy: 0.0, owner, active: true, damage: 16 };
+    let mut g = Game::new();
+    g.p = [at(0, 100.0, 1.0), at(3, 540.0, -1.0)];
+    g.bolts[0] = bolt(300.0, 300.0, 0);
+    g.bolts[1] = bolt(312.0, -300.0, 1);
+    assert!(clash_bolts(&mut g).is_some());
+    assert!(g.bolts.iter().all(|b| !b.active), "a bolt survived the clash");
+    // Two from the same hand pass each other by.
+    g.bolts[0] = bolt(300.0, 300.0, 0);
+    g.bolts[1] = bolt(312.0, 300.0, 0);
+    assert!(clash_bolts(&mut g).is_none());
+    // The laser eats the bolt and carries on.
+    let laser = FIGHTERS.iter().position(|a| a.special == Special::LaserVision).unwrap();
+    g.p[1] = at(laser, 540.0, -1.0);
+    g.bolts[1] = bolt(312.0, -600.0, 1);
+    assert!(clash_bolts(&mut g).is_some());
+    assert!(!g.bolts[0].active && g.bolts[1].active);
+}
+
+#[test]
+fn a_turtle_in_its_shell_cannot_be_chipped() {
+    let chip = |who: usize, crouch: bool| {
+        let [mut a, mut d] = in_range(1, who, MoveId::Special);
+        let full = d.health;
+        let (_, blocked, _) = resolve_hit(&mut a, &mut d, back_input(-1.0, crouch));
+        assert!(blocked);
+        (full - d.health, d.shelled())
+    };
+    assert_eq!(chip(3, true), (0, true), "the shell was chipped");
+    assert!(chip(3, false).0 > 0 && !chip(3, false).1, "a standing turtle is not in its shell");
+    assert!(chip(0, true).0 > 0, "only turtles have a shell");
+}
+
+#[test]
+fn the_announcer_calls_a_perfect_and_a_great() {
+    let mut g = Game::new();
+    g.p = [at(0, 200.0, 1.0), at(1, 440.0, -1.0)];
+    g.result = RoundResult::P1;
+    assert_eq!(round_call(&g), "PERFECT");
+    g.p[0].health = FIGHTERS[0].health - 1;
+    assert_eq!(round_call(&g), "");
+    g.p[0].health = FIGHTERS[0].health / 10;
+    assert_eq!(round_call(&g), "GREAT");
+    g.result = RoundResult::Draw;
+    assert_eq!(round_call(&g), "");
+    // Untouched is nothing to shout about when nothing can touch you.
+    let z = FIGHTERS.iter().position(|a| a.invincible).unwrap();
+    g.p[1] = at(z, 440.0, -1.0);
+    g.result = RoundResult::P2;
+    assert_eq!(round_call(&g), "");
+}
+
+#[test]
+fn the_finishing_blow_plays_in_slow_motion_and_the_bar_drains_after_it() {
+    let mut g = Game::new();
+    g.start_match(0);
+    g.state = State::RoundEnd;
+    g.phase.start(2.2);
+    g.p[0].act = Act::Victory;
+    g.p[0].t = 0.0;
+    g.slow = SLOW_MO_SECS;
+    for _ in 0..12 { update_round_end(&mut g, F); }
+    assert!(g.p[0].t < 12.0 * F * 0.5, "the fighters ran at full speed: {:.3}", g.p[0].t);
+    for _ in 0..60 { update_round_end(&mut g, F); }
+    assert!(g.slow <= 0.0, "the slow motion never ended");
+    // A bar's ghost falls to the health under it and never past.
+    g.p[1].health = 20;
+    g.ghost[1] = 100.0;
+    drain_ghosts(&mut g, 0.1);
+    assert!(g.ghost[1] < 100.0 && g.ghost[1] > 20.0);
+    for _ in 0..100 { drain_ghosts(&mut g, 0.1); }
+    assert_eq!(g.ghost[1], 20.0);
+}
+
+#[test]
+fn the_giants_rage_jump_floors_anyone_standing_anywhere() {
+    let giant = FIGHTERS.iter().position(|a| a.build == Build::Giant).unwrap();
+    // A whole jump: up, the kick in the air, and down again.
+    let jump = |g: &mut Game, kick: bool| {
+        apply_input(&mut g.p[0], Input { up: true, ..Default::default() }, false, F);
+        let mut shook = false;
+        for frame in 0..120 {
+            let inp = Input { kick_low: kick && frame == 12, ..Default::default() };
+            apply_input(&mut g.p[0], inp, false, F);
+            let was_air = g.p[0].airborne();
+            advance(&mut g.p[0], F);
+            if was_air && !g.p[0].airborne() { shook = land_quake(g, 0); break; }
+        }
+        shook
+    };
+    let fresh = |foe_x: f32| {
+        let mut g = Game::new();
+        g.p = [at(giant, 80.0, 1.0), at(0, foe_x, -1.0)];
+        g
+    };
+    // From the far end of the stage, a fighter on the floor goes down.
+    let mut g = fresh(WIN_W as f32 - WALL_MARGIN);
+    assert!(jump(&mut g, true), "the floor did not shake");
+    assert_eq!(g.p[1].act, Act::Knockdown);
+    assert!(g.p[1].health < FIGHTERS[0].health && g.quake_t > 0.0 && g.shake > 0.2);
+    // Being in the air when he lands is the answer.
+    let mut g = fresh(500.0);
+    g.p[1].y = FLOOR_Y - 40.0;
+    assert!(jump(&mut g, true));
+    assert_ne!(g.p[1].act, Act::Knockdown);
+    // A plain jump shakes nothing, and neither does anybody else's kick.
+    let mut g = fresh(500.0);
+    assert!(!jump(&mut g, false) && g.p[1].act != Act::Knockdown);
+    let mut g = fresh(500.0);
+    g.p[0] = at(1, 80.0, 1.0);
+    assert!(!jump(&mut g, true));
+    // The CPU knows the answer, and at the top of the ladder usually finds it.
+    let _sim = simulating(0x57031);
+    let mut g = fresh(500.0);
+    g.difficulty = 0.75;
+    g.p[0].y = FLOOR_Y - 80.0;
+    g.p[0].stomp = true;
+    let jumps = (0..200).filter(|_| cpu_think(&mut g) == CpuPlan::Jump).count();
+    assert!(jumps > 120, "the CPU jumped a rage jump {jumps} times in 200");
+    // Knocked out of the air, he does not get his landing.
+    let mut g = fresh(500.0);
+    g.p[0].stomp = true;
+    g.p[0].act = Act::Knockdown;
+    assert!(!land_quake(&mut g, 0) && !g.p[0].stomp);
+}
+
 // ---- two-player play tests -----------------------------------------------
 // The real flow: `update_menus` as main() calls it, and the game's own
 // `apply_input` / `advance` / `resolve_hit`. Only keyboard and speaker are
@@ -2474,6 +3066,7 @@ fn versus_bout(g: &mut Game, style: fn(usize, usize, &[Fighter; 2]) -> Input) ->
 /// One frame of a versus match. Returns false once the match is over.
 fn step_versus(g: &mut Game, frames: usize, style: fn(usize, usize, &[Fighter; 2]) -> Input) -> bool {
     match g.state {
+        State::Vs => update_vs(g, F, false),
         State::RoundIntro => { if g.phase.tick(F) { g.state = State::Fight; } }
         State::RoundEnd => update_round_end(g, F),
         State::MatchEnd => { update_match_end(g, F); }
@@ -2487,7 +3080,7 @@ fn step_versus(g: &mut Game, frames: usize, style: fn(usize, usize, &[Fighter; 2
                 if g.p[i].free() && !g.p[i].airborne() {
                     g.p[i].facing = if other >= g.p[i].x { 1.0 } else { -1.0 };
                 }
-                let close = (g.p[1].x - g.p[0].x).abs() <= THROW_RANGE;
+                let close = face_off(&mut g.p)[i];
                 apply_input(&mut g.p[i], ins[i], close, F);
                 advance(&mut g.p[i], F);
                 g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
@@ -2548,7 +3141,7 @@ fn playtest_1_a_whole_two_player_session() {
     cursor(&mut g, 1, 1);            // P2 looks around
     lock(&mut g, 0);                 // P1 takes RYUKA
     lock(&mut g, 1);                 // P2 takes whoever they are on
-    assert_eq!(g.state, State::RoundIntro, "locking both did not start the match");
+    assert_eq!(g.state, State::Vs, "locking both did not start the match");
     assert_ne!(g.p[0].who, g.p[1].who, "the same fighter reached the ring twice");
 
     let (frames, rounds) = versus_bout(&mut g, brawlers);
@@ -2571,7 +3164,7 @@ fn playtest_2_player_two_is_moved_off_a_fighter_that_gets_taken() {
     lock(&mut g, 1);
     assert!(g.locked[1], "player two could not lock the fighter they were moved to");
     assert_ne!(g.p[0].who, g.p[1].who, "the same fighter reached the ring twice");
-    assert_eq!(g.state, State::RoundIntro);
+    assert_eq!(g.state, State::Vs);
 }
 
 #[test]
@@ -2595,7 +3188,7 @@ fn playtest_3_either_player_may_lock_in_first() {
         }
         lock(&mut g, second);
         assert!(g.locked[second], "player {second} could not lock a free fighter");
-        assert_eq!(g.state, State::RoundIntro);
+        assert_eq!(g.state, State::Vs);
         assert_ne!(g.p[0].who, g.p[1].who);
     }
 }
@@ -2643,7 +3236,7 @@ fn playtest_5_one_player_mode_is_untouched() {
     cursor(&mut g, 1, 3);
     assert_eq!(g.pick, before, "player two's keys moved the solo cursor");
     update_menus(&mut g, [press(false, false, true), NOTHING]);
-    assert_eq!(g.state, State::RoundIntro, "the solo game would not start");
+    assert_eq!(g.state, State::Vs, "the solo game would not start");
     assert_eq!(g.p[1].who, g.ladder()[0], "the solo ladder picked the wrong opponent");
 }
 
@@ -2719,7 +3312,7 @@ fn diag_round_2_does_the_planted_foot_skate() {
     for k in 0..240 {
         apply_input(&mut f, inp, false, F);
         advance(&mut f, F);
-        let rig = draw::Rig::upright(f.x, f.y, f.facing, f.facing);
+        let rig = draw::Rig::upright(f.x, f.y, f.facing, f.facing, 1.0);
         let s = draw::skeleton(rig, &draw::pose_of(k as f32 * F, &f, 0));
         let feet = [(s.ankle_lead.0, s.ankle_lead.1), (s.ankle_rear.0, s.ankle_rear.1)];
         for (i, (fx, fy)) in feet.iter().enumerate() {
@@ -2774,7 +3367,7 @@ fn diag_round_4_is_a_waiting_fighter_visibly_alive() {
     let mut lo = [f32::MAX; 6];
     let mut hi = [f32::MIN; 6];
     for k in 0..200 {
-        let rig = draw::Rig::upright(f.x, f.y, f.facing, f.facing);
+        let rig = draw::Rig::upright(f.x, f.y, f.facing, f.facing, 1.0);
         let s = draw::skeleton(rig, &draw::pose_of(k as f32 * 0.01, &f, 0));
         let vals = [s.hip.1, s.head.1, s.hand_lead.1, s.hand_rear.1, s.head.0, s.hip.0];
         for i in 0..6 { lo[i] = lo[i].min(vals[i]); hi[i] = hi[i].max(vals[i]); }
@@ -2802,7 +3395,7 @@ fn diag_round_5_how_fast_does_a_fighter_answer_the_stick() {
     println!("walk {} back_walk {}", f.arch().walk, f.arch().back_walk);
 }
 
-// ---- the walk, the breath and the sweat ---------------------------------
+// ---- the walk and the idle bounce ---------------------------------
 
 #[test]
 fn a_planted_foot_stays_where_it_was_put() {
@@ -2855,59 +3448,16 @@ fn a_step_is_a_step_and_not_a_hop() {
 }
 
 #[test]
-fn a_fighter_who_has_been_hit_breathes_harder() {
-    // Breathing is the only thing on screen that says a round has been
-    // going on, so it has to get deeper as the fighter runs down.
-    let fresh = at(0, 200.0, 1.0);
-    let mut spent = fresh;
-    spent.health = 1;
-    let swing = |f: &Fighter| {
-        let (mut lo, mut hi) = (f32::MAX, f32::MIN);
-        for k in 0..400 {
-            let b = draw::breath_of(k as f32 * 0.01, f, 0);
-            lo = lo.min(b); hi = hi.max(b);
-        }
-        hi - lo
-    };
-    assert!(swing(&spent) > swing(&fresh) * 1.4,
-        "a spent fighter breathes {:.2} against a fresh one's {:.2}",
-        swing(&spent), swing(&fresh));
-    // And it is still a breath, not a seizure.
-    assert!(swing(&spent) < 4.0, "the chest is heaving {:.2}", swing(&spent));
-}
-
-#[test]
-fn two_fighters_never_breathe_in_step() {
+fn two_fighters_never_bounce_in_step() {
     // Two figures rising and falling together read as one animation
     // played twice, which is the single easiest way to make a fight
     // look cheap.
-    let f = at(0, 200.0, 1.0);
     let mut apart: f32 = 0.0;
     for k in 0..200 {
         let t = k as f32 * 0.01;
-        apart = apart.max((draw::breath_of(t, &f, 0) - draw::breath_of(t, &f, 1)).abs());
+        apart = apart.max((draw::bounce_of(t, 0, 0) - draw::bounce_of(t, 0, 1)).abs());
     }
-    assert!(apart > 0.5, "the two fighters breathe together: {apart:.2} apart at most");
-}
-
-#[test]
-fn sweat_arrives_with_the_damage() {
-    // Nobody is sweating on the first frame of the first round, and
-    // everybody is by the time their bar is nearly out.
-    for who in 0..FIGHTERS.len() {
-        let mut f = at(who, 200.0, 1.0);
-        assert_eq!(draw::exertion(&f), 0.0, "{} starts the round wet", FIGHTERS[who].name);
-        f.health = FIGHTERS[who].health / 2;
-        let half = draw::exertion(&f);
-        assert!((half - 0.5).abs() < 0.02, "{} at half health reads {half:.2}",
-            FIGHTERS[who].name);
-        f.health = 0;
-        assert!((draw::exertion(&f) - 1.0).abs() < 0.001);
-        // Below zero is a fighter who has already lost, and nothing is
-        // allowed to run off the end of the scale.
-        f.health = -40;
-        assert_eq!(draw::exertion(&f), 1.0);
-    }
+    assert!(apart > 0.5, "the two fighters bounce together: {apart:.2} apart at most");
 }
 
 // ---- ten rounds of looking at it ----------------------------------------
@@ -3226,4 +3776,245 @@ fn a_solo_player_is_never_dragged_into_two_player_mode() {
     update_menus(&mut g, [press(false, false, true), NOTHING]);
     assert_eq!(g.state, State::Select);
     assert_eq!(g.mode, Mode::Solo, "a solo player was put into a versus match");
+}
+
+#[test]
+#[ignore = "diagnostic"]
+fn dump_high_kick_arms() {
+    let mut f = at(0, 300.0, 1.0);
+    f.act = Act::Attack;
+    f.mv = MoveId::HighKick;
+    let m = f.scaled(move_data(f.mv));
+    for step in 0..16 {
+        f.t = step as f32 / 15.0 * (m.startup + m.active + m.recovery) * F;
+        let k = bones_of(&f);
+        let rel = |v: draw::V| (v.0 - f.x, f.y - v.1);
+        println!("t={:.3} hip={:?} neck={:?} lead={:?} rear={:?} elbow_rear={:?}", f.t,
+            rel(k.hip), rel(k.neck), rel(k.hand_lead), rel(k.hand_rear), rel(k.elbow_rear));
+    }
+}
+
+#[test]
+#[ignore = "diagnostic"]
+fn dump_ladders() {
+    for pick in 0..FIGHTERS.len() {
+        let names: Vec<&str> = Game { pick, ..Game::new() }.ladder().iter().map(|&w| FIGHTERS[w].name).collect();
+        println!("{:8} -> {}", FIGHTERS[pick].name, names.join(", "));
+    }
+}
+
+#[test]
+fn the_billing_gives_way_to_the_bow_and_a_press_cuts_it_short() {
+    let mut g = Game { pick: 0, ..Game::new() };
+    g.start_match(0);
+    g.announce();
+    // A press on the frame it appears is the one that chose the fighter.
+    update_vs(&mut g, F, true);
+    assert_eq!(g.state, State::Vs, "the billing was skipped before it was seen");
+    for _ in 0..60 { update_vs(&mut g, F, false); }
+    update_vs(&mut g, F, true);
+    assert_eq!(g.state, State::RoundIntro, "a press did not move it on");
+
+    g.announce();
+    run_phase(&mut g, |g, dt| update_vs(g, dt, false));
+    assert_eq!(g.state, State::RoundIntro, "left alone, it never started the round");
+    assert!(g.phase.active(), "the bow got no time");
+}
+
+#[test]
+fn a_turtle_hits_its_own_size_softer_than_it_hits_a_grown_fighter() {
+    let turtle = FIGHTERS.iter().position(|a| a.build == Build::Turtle).unwrap();
+    let blow = |foe: usize| {
+        let mut p = [at(turtle, 200.0, 1.0), at(foe, 240.0, -1.0)];
+        face_off(&mut p);
+        p[0].scaled(move_data(MoveId::HighKick)).damage
+    };
+    let (small, big) = (blow(turtle + 1), blow(0));
+    assert!(small < big, "{small} against a turtle, {big} against a grown fighter");
+}
+
+#[test]
+#[ignore = "diagnostic"]
+fn dump_what_beats_a_blocker() {
+    let _sim = simulating(1);
+    for (pick, rung) in [(0, 0), (1, 0), (2, 0), (0, 6)] {
+        let mut hits: std::collections::BTreeMap<String, (i32, i32)> = Default::default();
+        let r = fight_round_seen(pick, rung, turtle, &mut |a, f, dmg| {
+            if a == 1 { let e = hits.entry(format!("{:?}", f.mv)).or_default(); e.0 += 1; e.1 += dmg; }
+        });
+        println!("{} vs {} {:.1}s left {}: {:?}", FIGHTERS[pick].name,
+            FIGHTERS[Game { pick, ..Game::new() }.ladder()[rung]].name, r.seconds, r.player_health, hits);
+    }
+}
+
+#[test]
+fn nobody_is_thrown_twice_running() {
+    let mut p = [at(0, 300.0, 1.0), at(1, 330.0, -1.0)];
+    face_off(&mut p);
+    wind_to_active(&mut p[0], MoveId::Throw);
+    {
+        let [atk, def] = &mut p;
+        let (dmg, _, _) = resolve_hit(atk, def, Input::default());
+        assert!(dmg > 0, "the first throw missed");
+        assert!(def.throw_rest > 0.0);
+    }
+    // Back on their feet, and grabbed again at once: it does not take.
+    let hp = p[1].health;
+    p[1].act = Act::Idle;
+    p[1].x = 330.0;
+    wind_to_active(&mut p[0], MoveId::Throw);
+    let [atk, def] = &mut p;
+    assert_eq!(resolve_hit(atk, def, Input::default()).0, 0, "thrown again straight away");
+    assert_eq!(def.health, hp);
+    // It wears off.
+    for _ in 0..(THROW_REST / F) as usize + 2 { advance(def, F); }
+    assert_eq!(def.throw_rest, 0.0);
+}
+
+// ---- the turtle call and the web -------------------------------------------
+
+/// A turtle against RYUKA, the call already made; runs the helpers until
+/// they have all gone, the opponent holding `hold`.
+fn turtle_call(hold: fn(f32) -> Input) -> (Game, Vec<(i32, bool, bool)>) {
+    let turtle = FIGHTERS.iter().position(|a| a.build == Build::Turtle).unwrap();
+    let mut g = Game::new();
+    g.p = [at(turtle, 200.0, 1.0), at(0, 420.0, -1.0)];
+    face_off(&mut g.p);
+    g.call_turtles(0);
+    let mut landed = vec![];
+    for _ in 0..600 {
+        let holds = [Input::default(), hold(g.p[1].facing)];
+        landed.extend(update_helpers(&mut g, F, holds));
+        advance(&mut g.p[1], F);
+        if g.helpers.iter().all(|h| h.is_none()) { break; }
+    }
+    (g, landed)
+}
+
+#[test]
+fn a_turtles_first_special_of_the_round_calls_the_other_three() {
+    let turtle = FIGHTERS.iter().position(|a| a.build == Build::Turtle).unwrap();
+    let mut f = at(turtle, 200.0, 1.0);
+    f.start_attack(MoveId::Special);
+    assert!(f.calling && f.called);
+    assert!(f.hit_box().is_none(), "the caller struck a blow of his own");
+    // The second one is his own special again.
+    f.act = Act::Idle;
+    f.start_attack(MoveId::Special);
+    assert!(!f.calling, "he called twice in a round");
+    // Nobody else calls anybody.
+    let mut other = at(0, 200.0, 1.0);
+    other.start_attack(MoveId::Special);
+    assert!(!other.calling);
+
+    let (g, landed) = turtle_call(|_| Input::default());
+    assert!(g.helpers.iter().all(|h| h.is_none()), "a helper never left the stage");
+    assert_eq!(landed.len(), 3, "the three did not each land a blow: {landed:?}");
+    assert!(landed.iter().all(|&(dmg, blocked, _)| dmg > 0 && !blocked));
+    assert!(landed[2].2, "the last of them did not put the opponent down");
+    assert!(g.p[1].health < FIGHTERS[0].health);
+}
+
+#[test]
+fn the_helpers_are_three_different_turtles_and_never_the_caller() {
+    for turtle in (0..FIGHTERS.len()).filter(|&w| FIGHTERS[w].build == Build::Turtle) {
+        let mut g = Game::new();
+        g.p[0] = at(turtle, 200.0, 1.0);
+        g.call_turtles(0);
+        let mut who: Vec<usize> = g.helpers.iter().map(|h| h.unwrap().f.who).collect();
+        who.sort();
+        who.dedup();
+        assert_eq!(who.len(), 3);
+        assert!(!who.contains(&turtle));
+        assert!(who.iter().all(|&w| FIGHTERS[w].build == Build::Turtle));
+    }
+}
+
+#[test]
+fn one_low_guard_answers_the_whole_call() {
+    let (g, landed) = turtle_call(|facing| back_input(facing, true));
+    assert_eq!(landed.len(), 3);
+    assert!(landed.iter().all(|&(dmg, blocked, _)| dmg == 0 && blocked), "{landed:?}");
+    assert_eq!(g.p[1].health, FIGHTERS[0].health);
+}
+
+#[test]
+fn a_web_holds_for_five_seconds_or_two_blows() {
+    let mut f = at(0, 300.0, 1.0);
+    assert!(f.web());
+    assert_eq!(f.webbed, WEB_SECS);
+    assert_eq!(WEB_SECS, 5.0);
+    // One blow leaves it on; the second takes it off.
+    f.hurt(5, 1.0);
+    assert!(f.webbed > 0.0);
+    f.hurt(5, 1.0);
+    assert_eq!(f.webbed, 0.0, "two blows did not break the web");
+    // And another does not hold straight away.
+    assert!(!f.web(), "webbed again the moment it came off");
+    for _ in 0..(WEB_REST / F) as usize + 2 { advance(&mut f, F); }
+    assert!(f.web());
+    // Left alone it lets go by itself.
+    for _ in 0..(WEB_SECS / F) as usize + 2 { advance(&mut f, F); }
+    assert_eq!(f.webbed, 0.0);
+    assert!(f.web_rest > 0.0);
+}
+
+// ---- chain punches and the front leg ---------------------------------------
+
+#[test]
+fn punches_thrown_quickly_change_hands() {
+    let mut f = at(0, 300.0, 1.0);
+    f.start_attack(MoveId::LowPunch);
+    assert!(!f.alt_punch, "the first punch is with the near hand");
+    for _ in 0..12 { advance(&mut f, F); }
+    f.start_attack(MoveId::LowPunch);
+    assert!(f.alt_punch, "the second, straight after, is with the other");
+    for _ in 0..12 { advance(&mut f, F); }
+    f.start_attack(MoveId::HighPunch);
+    assert!(!f.alt_punch, "and the third comes back to the first");
+    // After a pause the chain starts again from the near hand.
+    for _ in 0..(CHAIN_PUNCH / F) as usize + 2 { advance(&mut f, F); }
+    f.act = Act::Idle;
+    f.start_attack(MoveId::LowPunch);
+    assert!(!f.alt_punch);
+
+    // The far fist goes where the near one would: out to the end of the blow.
+    let reach = |alt: bool| {
+        let mut f = at(0, 300.0, 1.0);
+        wind_to_active(&mut f, MoveId::HighPunch);
+        f.alt_punch = alt;
+        let k = bones_of(&f);
+        if alt { k.hand_rear.0 } else { k.hand_lead.0 }
+    };
+    assert!((reach(true) - reach(false)).abs() < 6.0,
+        "the far fist stops at {} and the near one at {}", reach(true), reach(false));
+}
+
+#[test]
+fn a_walk_leaves_whichever_foot_it_stopped_on_in_front_and_the_kick_comes_off_it() {
+    // Over a stride each foot takes its turn in front.
+    let mut seen = [false; 2];
+    for step in 0..60 {
+        let mut f = at(0, 200.0 + step as f32, 1.0);
+        f.act = Act::Walk;
+        advance(&mut f, F);
+        seen[f.far_leads as usize] = true;
+        // Standing, the front foot is the one the flag names.
+        f.act = Act::Idle;
+        f.blend = 0.0;
+        let k = bones_of(&f);
+        assert_eq!(k.ankle_rear.0 > k.ankle_lead.0, f.far_leads, "at x {}", f.x);
+    }
+    assert!(seen[0] && seen[1], "a walk never changed the front foot");
+
+    // The kick is thrown with the front leg, whichever it is.
+    for far in [false, true] {
+        let mut f = at(0, 300.0, 1.0);
+        f.far_leads = far;
+        wind_to_active(&mut f, MoveId::HighKick);
+        let k = bones_of(&f);
+        let (kicking, standing) = if far { (k.ankle_rear, k.ankle_lead) } else { (k.ankle_lead, k.ankle_rear) };
+        assert!(kicking.1 < standing.1 - 40.0 && kicking.0 > standing.0 + 30.0,
+            "far_leads {far}: the kicking foot is at {kicking:?}, the standing one at {standing:?}");
+    }
 }

@@ -309,32 +309,222 @@ fn bell() -> Vec<i16> {
     let n = ms_to_samples(900.0);
     let mut buf = vec![0.0f32; n];
     // Three inharmonic partials: a struck bell, not a note.
-    for (freq, amp) in [(880.0f32, 1.0f32), (1320.0, 0.55), (2093.0, 0.3)] {
+    for (freq, amp) in [(880.0f32, 1.0f32), (886.0, 0.45), (1320.0, 0.55), (2093.0, 0.3), (440.0, 0.35)] {
         for (i, out) in buf.iter_mut().enumerate() {
             let t = i as f32 / SAMPLE_RATE as f32;
             let decay = (-3.2 * t).exp();
             let phase = 2.0 * std::f32::consts::PI * freq * t;
-            *out += phase.sin() * decay * amp * 5000.0;
+            *out += phase.sin() * decay * amp * 3800.0;
         }
     }
     soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
 
 
-/// A fireball leaving the hand: noise and a rising tone.
+/// A fireball leaving the hands: the shout that throws it, the air catching
+/// light in a band that sweeps up, and a low body under both.
 fn projectile() -> Vec<i16> {
-    let n = ms_to_samples(420.0);
-    let mut buf = vec![0.0f32; n];
     let mut rng = Rng(0x2B01);
-    let mut phase = 0.0f32;
+    let mut buf = vec![0.0f32; (0.5 * SRF) as usize];
+    voice(&mut buf, 0.0, 0.3, 190.0, 240.0, AH, 0.25, 0.8, &mut rng);
+    for k in 0..10 {
+        let t = k as f32 / 10.0;
+        band(&mut buf, 0.03 * k as f32, 420.0 + 1500.0 * t, 2.2, 0.5 * (1.0 - 0.5 * t), 0.01, 0.03, &mut rng);
+    }
+    band(&mut buf, 0.0, 130.0, 1.0, 1.2, 0.004, 0.08, &mut rng);
+    render(buf, 11_000.0)
+}
+
+/// Eye beams: two tones a hair apart falling fast, so they beat, over a hiss
+/// of scorched air.
+fn laser() -> Vec<i16> {
+    let n = ms_to_samples(380.0);
+    let mut buf = vec![0.0f32; n];
+    let mut rng = Rng(0x1A5E);
+    let (mut a, mut b) = (0.0f32, 0.0f32);
     for (i, out) in buf.iter_mut().enumerate() {
         let t = i as f32 / n as f32;
-        let e = env(i, n, ms_to_samples(6.0), ms_to_samples(300.0));
-        let f = 180.0 + 520.0 * t;
-        phase += 2.0 * std::f32::consts::PI * f / SAMPLE_RATE as f32;
-        let noise = (rng.next_f32() * 2.0 - 1.0) * 0.5;
-        *out = (phase.sin() * 0.7 + noise) * e * 8000.0;
+        let e = env(i, n, ms_to_samples(3.0), ms_to_samples(240.0));
+        let f = 1500.0 * (1.0 - t).powf(1.6) + 260.0;
+        a += 2.0 * std::f32::consts::PI * f / SRF;
+        b += 2.0 * std::f32::consts::PI * f * 1.035 / SRF;
+        let hiss = (rng.next_f32() * 2.0 - 1.0) * 0.18 * (1.0 - t);
+        *out = (a.sin() * 0.5 + b.sin() * 0.4 + hiss) * e * 7000.0;
     }
+    soften(&mut buf, 4200.0);
+    soft_limit_to_pcm16(&buf, MIX_KNEE)
+}
+
+/// The ground giving under a giant: a long low rumble, the boards jumping
+/// twice, and grit coming down after.
+fn quake() -> Vec<i16> {
+    let mut rng = Rng(0x9A4E);
+    let mut buf = vec![0.0f32; (1.0 * SRF) as usize];
+    band(&mut buf, 0.0, 62.0, 1.4, 4.0, 0.004, 0.16, &mut rng);
+    band(&mut buf, 0.0, 120.0, 1.0, 2.2, 0.002, 0.07, &mut rng);
+    knock(&mut buf, 0.0, 70.0, 1.6, 0.06);
+    band(&mut buf, 0.14, 90.0, 1.2, 1.8, 0.004, 0.1, &mut rng);
+    band(&mut buf, 0.0, 420.0, 0.9, 0.5, 0.001, 0.03, &mut rng);
+    band(&mut buf, 0.2, 1500.0, 0.7, 0.12, 0.08, 0.12, &mut rng);
+    soften(&mut buf, 1800.0);
+    render(buf, 9_000.0)
+}
+
+/// A blow turned aside: steel on steel, bright and gone, over the knock of
+/// the forearms. Nothing like a hit, nothing like a block.
+fn parry() -> Vec<i16> {
+    let mut rng = Rng(0x7E4C);
+    let mut buf = vec![0.0f32; (0.5 * SRF) as usize];
+    for (f, amp, tau) in [(1568.0f32, 0.8f32, 0.09f32), (2637.0, 0.55, 0.06), (3951.0, 0.3, 0.035)] {
+        knock(&mut buf, 0.0, f, amp, tau);
+    }
+    band(&mut buf, 0.0, 3200.0, 2.0, 0.5, 0.0002, 0.004, &mut rng);
+    band(&mut buf, 0.0, 520.0, 1.6, 0.7, 0.0004, 0.008, &mut rng);
+    render(buf, 9_000.0)
+}
+
+/// Caught swinging: a dry crack laid over the hit, sharper than any of them.
+fn counter() -> Vec<i16> {
+    let mut rng = Rng(0xC0A7);
+    let mut buf = vec![0.0f32; (0.22 * SRF) as usize];
+    band(&mut buf, 0.0, 3400.0, 1.4, 1.3, 0.0002, 0.004, &mut rng);
+    band(&mut buf, 0.0015, 1900.0, 1.6, 0.8, 0.0002, 0.006, &mut rng);
+    knock(&mut buf, 0.0, 190.0, 1.2, 0.02);
+    band(&mut buf, 0.0, 95.0, 0.8, 1.6, 0.002, 0.04, &mut rng);
+    render(buf, 7_500.0)
+}
+
+/// Notes of the koto one after another, rising: the bonus taken.
+fn run_up(steps: &[i32], root: f32, gap_ms: f32, ring_ms: f32, seed: u32) -> Vec<i16> {
+    let gap = ms_to_samples(gap_ms);
+    let mut buf = vec![0.0f32; gap * steps.len() + ms_to_samples(ring_ms)];
+    let mut rng = Rng(seed);
+    for (i, &d) in steps.iter().enumerate() {
+        pluck(&mut buf, i * gap, degree(&HIRAJOSHI, root, d), ring_ms, 0.9, &mut rng);
+    }
+    render(buf, 1.0)
+}
+
+/// Fingers in the mouth: two notes, the second higher and held, with the
+/// breath that makes them.
+fn whistle() -> Vec<i16> {
+    let n = ms_to_samples(520.0);
+    let mut buf = vec![0.0f32; n];
+    let mut rng = Rng(0x3157);
+    let (mut ph, mut air) = (0.0f32, 0.0f32);
+    for (i, out) in buf.iter_mut().enumerate() {
+        let t = i as f32 / SRF;
+        // 0.16 s on the low note, a quick slide, the rest on the high one.
+        let k = ((t - 0.16) / 0.05).clamp(0.0, 1.0);
+        let f = 1250.0 + 650.0 * k * k * (3.0 - 2.0 * k);
+        ph += 2.0 * std::f32::consts::PI * f / SRF;
+        air += ((rng.next_f32() * 2.0 - 1.0) - air) * 0.5;
+        let gap = if (0.13..0.16).contains(&t) { 0.25 } else { 1.0 };
+        let e = (t / 0.015).min(1.0) * ((0.52 - t) / 0.12).clamp(0.0, 1.0) * gap;
+        *out = (ph.sin() + air * 0.35) * e * 3000.0;
+    }
+    soft_limit_to_pcm16(&buf, MIX_KNEE)
+}
+
+/// A web leaving the wrist and landing: a spit of air that rises, then the
+/// wet slap of it sticking.
+fn thwip() -> Vec<i16> {
+    let mut rng = Rng(0x7419);
+    let mut buf = vec![0.0f32; (0.36 * SRF) as usize];
+    for k in 0..8 {
+        let t = k as f32 / 8.0;
+        band(&mut buf, 0.012 * k as f32, 900.0 + 3200.0 * t, 3.0, 0.7 * (1.0 - 0.4 * t), 0.004, 0.012, &mut rng);
+    }
+    band(&mut buf, 0.13, 700.0, 1.2, 0.9, 0.001, 0.02, &mut rng);
+    band(&mut buf, 0.13, 2200.0, 1.5, 0.5, 0.0005, 0.006, &mut rng);
+    render(buf, 10_000.0)
+}
+
+/// The match decided, on the koto and the flute: a run up to a held chord
+/// for the winner, three notes falling onto the drum for the loser.
+fn verdict(won: bool) -> Vec<i16> {
+    let mut rng = Rng(if won { 0x0BA1 } else { 0x10B5 });
+    let mut buf = vec![0.0f32; ms_to_samples(if won { 2300.0 } else { 2100.0 })];
+    let root = 220.0;
+    let at = |ms: f32| ms_to_samples(ms);
+    if won {
+        for (i, d) in [0, 2, 3, 4].into_iter().enumerate() {
+            pluck(&mut buf, at(95.0 * i as f32), degree(&YO, root, d), 500.0, 0.8, &mut rng);
+        }
+        for (d, g) in [(0, 0.8f32), (2, 0.7), (3, 0.7), (5, 0.9)] {
+            pluck(&mut buf, at(420.0), degree(&YO, root, d), 1700.0, g, &mut rng);
+        }
+        taiko(&mut buf, at(420.0), 96.0, 1.0, &mut rng);
+        flute(&mut buf, at(520.0), degree(&YO, root, 5) * 2.0, 1500.0, 0.9, &mut rng);
+    } else {
+        for (i, d) in [4, 3, 1].into_iter().enumerate() {
+            pluck(&mut buf, at(330.0 * i as f32), degree(&HIRAJOSHI, root, d), 900.0, 0.8, &mut rng);
+        }
+        pluck(&mut buf, at(990.0), degree(&HIRAJOSHI, root, 0) * 0.5, 1000.0, 0.9, &mut rng);
+        taiko(&mut buf, at(990.0), 80.0, 0.9, &mut rng);
+        flute(&mut buf, at(990.0), degree(&HIRAJOSHI, root, 0), 1000.0, 0.6, &mut rng);
+    }
+    let n = buf.len();
+    let fade = ms_to_samples(120.0);
+    for i in 0..fade { buf[n - fade + i] *= 1.0 - (i + 1) as f32 / fade as f32; }
+    warm(&mut buf);
+    soft_limit_to_pcm16(&buf, MIX_KNEE)
+}
+
+/// The giant coming down: a roar from the chest, low and long, with the
+/// breath of it.
+fn bellow() -> Vec<i16> {
+    let mut rng = Rng(0x6A44);
+    let mut buf = vec![0.0f32; (0.8 * SRF) as usize];
+    voice(&mut buf, 0.0, 0.7, 96.0, 70.0, AH, 0.25, 1.3, &mut rng);
+    voice(&mut buf, 0.01, 0.66, 49.0, 36.0, OO, 0.15, 0.9, &mut rng);
+    band(&mut buf, 0.0, 300.0, 0.8, 0.25, 0.05, 0.12, &mut rng);
+    soften(&mut buf, 2200.0);
+    render(buf, 13_000.0)
+}
+
+/// A swing with a body's whole weight behind it: lower and longer than the
+/// ordinary one, and it ends in a clap of air.
+fn heavy_swing() -> Vec<i16> {
+    let mut rng = Rng(0x5E11);
+    let mut buf = vec![0.0f32; (0.42 * SRF) as usize];
+    for k in 0..10 {
+        let t = k as f32 / 10.0;
+        let up = 1.0 - (2.0 * t - 1.0).abs();
+        band(&mut buf, 0.022 * k as f32, 260.0 + 900.0 * up, 1.6, 0.6 + 0.6 * up, 0.012, 0.03, &mut rng);
+    }
+    band(&mut buf, 0.2, 110.0, 1.0, 1.4, 0.003, 0.05, &mut rng);
+    render(buf, 11_000.0)
+}
+
+/// A wood block: the menu moving a step.
+fn tick() -> Vec<i16> {
+    let mut rng = Rng(0x71C4);
+    let mut buf = vec![0.0f32; (0.09 * SRF) as usize];
+    knock(&mut buf, 0.0, 940.0, 1.0, 0.007);
+    knock(&mut buf, 0.0, 1430.0, 0.4, 0.004);
+    band(&mut buf, 0.0, 2600.0, 1.5, 0.3, 0.0002, 0.002, &mut rng);
+    render(buf, 9_000.0)
+}
+
+/// A gong: the mallet's thump, then partials that do not line up swelling
+/// out of it and beating against each other as they die.
+fn gong() -> Vec<i16> {
+    let n = ms_to_samples(1500.0);
+    let mut buf = vec![0.0f32; n];
+    let mut rng = Rng(0x6046);
+    for (freq, amp, tau) in [(110.0f32, 1.0f32, 0.55f32), (164.0, 0.7, 0.5), (233.0, 0.55, 0.42),
+                             (331.0, 0.4, 0.34), (447.0, 0.25, 0.26), (452.0, 0.2, 0.26)] {
+        for (i, out) in buf.iter_mut().enumerate() {
+            let t = i as f32 / SRF;
+            // The shimmer blooms a moment after the stroke.
+            let swell = (t / (0.02 + 60.0 / freq / 100.0)).min(1.0);
+            *out += (2.0 * std::f32::consts::PI * freq * t).sin() * (-t / tau).exp() * swell * amp * 3200.0;
+        }
+    }
+    let mut thump = vec![0.0f32; n];
+    band(&mut thump, 0.0, 140.0, 1.0, 1.0, 0.001, 0.02, &mut rng);
+    for (out, x) in buf.iter_mut().zip(&thump) { *out += x * 5000.0; }
     soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
 
@@ -392,29 +582,67 @@ fn rim(buf: &mut [f32], off: usize, gain: f32, rng: &mut Rng) {
     }
 }
 
-/// The hirajoshi scale in semitones from the root: root, minor second,
-/// fourth, fifth, minor sixth. The minor second is what makes it sound
-/// Japanese.
+/// Five-note scales in semitones from the root. Hirajoshi's minor second is
+/// what makes it sound Japanese; yo is the bright folk scale without one;
+/// in is the dark one; the minor pentatonic is the one a rock band plays.
 const HIRAJOSHI: [f32; 5] = [0.0, 1.0, 5.0, 7.0, 8.0];
+const YO: [f32; 5] = [0.0, 2.0, 5.0, 7.0, 9.0];
+const IN: [f32; 5] = [0.0, 1.0, 5.0, 7.0, 10.0];
+const MINOR: [f32; 5] = [0.0, 3.0, 5.0, 7.0, 10.0];
 
-fn degree(root: f32, step: i32) -> f32 {
+fn degree(scale: &[f32; 5], root: f32, step: i32) -> f32 {
     let oct = step.div_euclid(5);
-    let d = HIRAJOSHI[step.rem_euclid(5) as usize];
+    let d = scale[step.rem_euclid(5) as usize];
     root * 2.0f32.powf((d + 12.0 * oct as f32) / 12.0)
 }
 
-/// A theme built from four-bar phrases, sequenced by `order` rather than
-/// looped: eight slots of four bars outlast the round, so no seam is heard.
-/// Phrases are scale degrees, so a tune cannot leave the scale.
-fn theme(bpm: f32, root: f32, phrases: &[&[i32]], bass: &[&[i32]], order: &[usize],
-         drive: f32) -> Vec<i16> {
+/// A shakuhachi: a breathy tone that swells in, wavers once it is held and
+/// dies away, with the air of the player's breath round it.
+fn flute(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut Rng) {
+    let n = ms_to_samples(ms).min(buf.len().saturating_sub(off));
+    let (mut ph, mut air) = (0.0f32, 0.0f32);
+    for i in 0..n {
+        let t = i as f32 / SRF;
+        let k = i as f32 / n as f32;
+        // Blown from just under the note, as the player's lip finds it.
+        let scoop = 1.0 - 0.03 * (-t / 0.05).exp();
+        let vib = 1.0 + 0.007 * (t / 0.35).min(1.0) * (2.0 * std::f32::consts::PI * 5.2 * t).sin();
+        ph += 2.0 * std::f32::consts::PI * freq * scoop * vib / SRF;
+        air += ((rng.next_f32() * 2.0 - 1.0) - air) * 0.25;
+        let e = (t / 0.09).min(1.0) * (1.0 - k).powf(0.7);
+        let tone = ph.sin() + 0.28 * (2.0 * ph).sin() + 0.10 * (3.0 * ph).sin();
+        buf[off + i] += (tone + air * 0.5) * e * gain * 2600.0;
+    }
+}
+
+/// What a theme is made of. Phrases are four bars of sixteenths in scale
+/// degrees, so a tune cannot leave the scale; `bass` is a degree a bar.
+struct Theme<'a> {
+    bpm: f32,
+    /// The lowest note of the tune. Degrees 0..=5 must stay under A4, where
+    /// `tame` starts folding notes down an octave and bends the melody.
+    root: f32,
+    scale: &'a [f32; 5],
+    phrases: &'a [&'a [i32]],
+    bass: &'a [&'a [i32]],
+    /// Which phrase each four-bar slot plays; phrase 3 is the hushed one.
+    order: &'a [usize],
+    /// 0..1: how hard the drums push.
+    drive: f32,
+}
+
+/// A theme sequenced by `order` rather than looped: eight slots of four bars
+/// outlast the round, so no seam is heard.
+impl Theme<'_> {
+fn pcm(&self) -> Vec<i16> {
+    let Theme { bpm, root, scale, phrases, bass, order, drive } = *self;
     let step = (SAMPLE_RATE as f32 * 60.0 / bpm / 4.0) as usize; // 16ths
     let bars = 4 * order.len();
     let steps = bars * 16;
     // Room past the end for the last notes to ring out in, which is
     // then folded back onto the top — see `wrap_tail`.
     let body = step * steps;
-    let n = body + ms_to_samples(900.0);
+    let n = body + ms_to_samples(1400.0);
     let mut buf = vec![0.0f32; n];
     let mut rng = Rng(0x9E3B);
     let beat_ms = 60.0 * 1000.0 / bpm;
@@ -455,27 +683,50 @@ fn theme(bpm: f32, root: f32, phrases: &[&[i32]], bass: &[&[i32]], order: &[usiz
         let note = melody[within % melody.len()];
         if note > -90 {
             let gain = if lull { 0.62 } else { 0.85 };
-            pluck(&mut buf, off, degree(root, note), beat_ms * 1.6, gain, &mut rng);
+            pluck(&mut buf, off, degree(scale, root, note), beat_ms * 1.6, gain, &mut rng);
             // Doubled an octave up on the last bar of a phrase, so the
             // tune has a top to it once every four bars.
             if last_bar && b == 0 {
-                pluck(&mut buf, off, degree(root, note + 5), beat_ms * 1.2, 0.4, &mut rng);
+                pluck(&mut buf, off, degree(scale, root, note + 5), beat_ms * 1.2, 0.4, &mut rng);
             }
+            // A second koto answers the tune three steps behind it, on the
+            // phrases after the first: the tune comes back with company.
+            if order[slot] != 0 && !lull && s + 3 < steps {
+                pluck(&mut buf, off + 3 * step, degree(scale, root, note), beat_ms * 0.9, 0.22, &mut rng);
+            }
+        }
+
+        // Each phrase opens on a strummed chord: three strings a moment apart.
+        if within == 0 && !hush {
+            let d = line[0];
+            for (j, up) in [0, 2, 4].into_iter().enumerate() {
+                pluck(&mut buf, off + j * ms_to_samples(14.0), degree(scale, root, d + up),
+                    beat_ms * 2.4, 0.3, &mut rng);
+            }
+        }
+
+        // The flute answers where the koto leaves room: over the quiet bar
+        // and the cadence, and all through a hushed phrase. It holds a note
+        // of the bar's chord an octave above the tune.
+        let d = line[bar % line.len()];
+        if b == 0 && (lull || last_bar) {
+            let up = if last_bar { 0 } else { 2 };
+            flute(&mut buf, off, degree(scale, root, d + up) * 2.0, beat_ms * 3.4,
+                if hush { 0.8 } else { 0.6 }, &mut rng);
         }
 
         // The bass walks a note a bar.
         if b == 0 {
-            let d = line[bar % line.len()];
-            pluck(&mut buf, off, degree(root, d) * 0.5, beat_ms * 3.6, 0.55, &mut rng);
+            pluck(&mut buf, off, degree(scale, root, d) * 0.5, beat_ms * 3.6, 0.55, &mut rng);
         }
         if b == 10 && !lull {
-            let d = line[bar % line.len()];
-            pluck(&mut buf, off, degree(root, d + 2) * 0.5, beat_ms * 1.2, 0.3, &mut rng);
+            pluck(&mut buf, off, degree(scale, root, d + 2) * 0.5, beat_ms * 1.2, 0.3, &mut rng);
         }
     }
     wrap_tail(&mut buf, body);
     warm(&mut buf[..body]);
     soft_limit_to_pcm16(&buf[..body], MIX_KNEE)
+}
 }
 
 /// Fold what rings out past the end of the loop onto its start, so tails
@@ -487,13 +738,13 @@ fn wrap_tail(buf: &mut [f32], body: usize) {
 }
 
 
-/// The three themes, synthesised at startup rather than baked in: a
-/// round-length theme is a megabyte of PCM, times three, while the code is a
-/// couple of hundred lines. 0 and 1 are the stages, 2 the select screen.
+/// The themes, synthesised on the device rather than baked in: a
+/// round-length theme is megabytes of PCM, the code a couple of hundred
+/// lines. 0 docks, 1 temple, 2 the select screen, 3 air base, 4 bath house,
+/// 5 river village.
 pub fn theme_wav(which: usize) -> Vec<u8> {
-    // All on hirajoshi, differing in pace, register and density: the docks
-    // fast and hard on the drum, the temple slower and higher with room
-    // between notes, the select screen between them and out of the way.
+    // The docks, the temple and the select screen are on hirajoshi and differ
+    // in pace and density; each later stage has a scale of its own.
     // Four-bar phrases, sequenced; -99 is a rest.
     const R: i32 = -99;
 
@@ -543,6 +794,60 @@ pub fn theme_wav(which: usize) -> Vec<u8> {
                1, R, R, R, 2, R, R, 1, 0, R, R, R, R, R, 2, R,
                1, R, R, R, R, R, 0, R, R, R, R, R, R, R, R, R];
 
+    // -- the air base: a march on the minor pentatonic -------------------
+    let a_a = [0, R, 0, R, 2, R, 3, R, 4, R, R, 3, R, R, 2, R,
+               0, R, 0, R, 2, R, 3, R, 5, R, R, 4, R, R, 3, R,
+               4, R, 4, R, 5, R, 6, R, 5, R, R, 4, R, R, 3, R,
+               2, R, 3, R, 4, R, R, 2, 0, R, R, R, R, R, R, R];
+    let a_b = [5, R, R, R, 4, R, 5, R, 6, R, R, R, 5, R, 4, R,
+               3, R, R, R, 2, R, 3, R, 4, R, R, R, R, R, 2, R,
+               5, R, R, R, 4, R, 5, R, 6, R, R, 5, R, R, 4, R,
+               3, R, 2, R, 3, R, 4, R, 5, R, R, R, R, R, R, R];
+    let a_c = [0, R, R, 2, R, R, 3, R, 4, R, R, R, 3, R, 2, R,
+               0, R, R, 2, R, R, 3, R, 2, R, R, R, R, R, R, R,
+               3, R, R, 4, R, R, 5, R, 6, R, R, R, 5, R, 4, R,
+               3, R, R, 2, R, R, 0, R, 0, R, R, R, R, R, R, R];
+    let a_d = [0, R, R, R, R, R, R, R, 3, R, R, R, R, R, R, R,
+               2, R, R, R, R, R, R, R, 0, R, R, R, R, R, R, R,
+               4, R, R, R, R, R, R, R, 3, R, R, R, R, R, R, R,
+               2, R, R, R, R, R, 3, R, 0, R, R, R, R, R, R, R];
+
+    // -- the bath house: bright and easy, on yo --------------------------
+    let h_a = [2, R, R, 3, 4, R, R, R, 3, R, 2, R, 0, R, R, R,
+               2, R, R, 3, 4, R, 5, R, 4, R, R, R, R, R, 3, R,
+               2, R, R, 3, 4, R, R, R, 5, R, 4, R, 3, R, R, 2,
+               3, R, 2, R, 1, R, R, 2, 0, R, R, R, R, R, R, R];
+    let h_b = [5, R, R, R, 4, R, 3, R, 4, R, R, R, 2, R, R, R,
+               3, R, R, R, 2, R, 1, R, 2, R, R, R, R, R, R, R,
+               5, R, R, R, 4, R, 3, R, 4, R, R, 5, 6, R, R, R,
+               5, R, 4, R, 3, R, 2, R, 0, R, R, R, R, R, R, R];
+    let h_c = [0, R, 2, R, 3, R, 2, R, 0, R, R, R, R, R, 1, R,
+               0, R, 2, R, 3, R, 4, R, 3, R, R, R, R, R, R, R,
+               4, R, 3, R, 2, R, 3, R, 4, R, R, R, 5, R, R, R,
+               4, R, R, 3, R, R, 2, R, 0, R, R, R, R, R, R, R];
+    let h_d = [2, R, R, R, R, R, R, R, 3, R, R, R, R, R, R, R,
+               4, R, R, R, R, R, R, R, 2, R, R, R, R, R, R, R,
+               3, R, R, R, R, R, R, R, 1, R, R, R, R, R, R, R,
+               0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R];
+
+    // -- the river village: slow and heavy, on in ------------------------
+    let v_a = [0, R, R, R, 0, R, 1, R, 2, R, R, R, R, R, R, R,
+               3, R, R, R, 2, R, 1, R, 0, R, R, R, R, R, R, R,
+               0, R, R, R, 0, R, 1, R, 2, R, R, R, 3, R, R, R,
+               4, R, R, 3, R, R, 2, R, 0, R, R, R, R, R, R, R];
+    let v_b = [4, R, R, R, 3, R, R, R, 4, R, R, R, 5, R, R, R,
+               4, R, R, 3, R, R, 2, R, 3, R, R, R, R, R, R, R,
+               2, R, R, R, 3, R, R, R, 4, R, R, R, 6, R, R, R,
+               5, R, R, 4, R, R, 3, R, 2, R, R, R, R, R, R, R];
+    let v_c = [0, R, 2, R, R, R, 3, R, R, R, 2, R, 0, R, R, R,
+               0, R, 2, R, R, R, 3, R, R, R, 4, R, 3, R, R, R,
+               5, R, R, R, 4, R, R, R, 3, R, R, R, 2, R, R, R,
+               1, R, R, R, 0, R, R, R, 0, R, R, R, R, R, R, R];
+    let v_d = [0, R, R, R, R, R, R, R, R, R, R, R, 1, R, R, R,
+               2, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R,
+               3, R, R, R, R, R, R, R, 2, R, R, R, 1, R, R, R,
+               0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R];
+
     // A note a bar under each, so the ground moves.
     let b0 = [0, 0, 3, 2];
     let b1 = [2, 3, 4, 2];
@@ -552,14 +857,19 @@ pub fn theme_wav(which: usize) -> Vec<u8> {
     // Eight slots of four bars: a rondo, so the tune keeps coming back
     // without the piece repeating. Slot 3 is the hushed one.
     let order = [0usize, 1, 0, 3, 2, 1, 0, 1];
-    match which {
-        0 => encode_pcm16_music(&theme(132.0, 293.66,
-            &[&d_a, &d_b, &d_c, &d_d], &[&b0, &b1, &b2, &b3], &order, 1.0)),
-        1 => encode_pcm16_music(&theme(108.0, 220.0,
-            &[&t_a, &t_b, &t_c, &t_d], &[&b0, &b1, &b2, &b3], &order, 0.2)),
-        _ => encode_pcm16_music(&theme(118.0, 246.94,
-            &[&s_a, &s_b], &[&b2, &b0], &[0, 1, 0, 1], 0.0)),
-    }
+    let bass: [&[i32]; 4] = [&b0, &b1, &b2, &b3];
+    let stage = |bpm, root, scale, phrases: [&[i32]; 4], drive| Theme {
+        bpm, root, scale, phrases: &phrases, bass: &bass, order: &order, drive,
+    }.pcm();
+    encode_pcm16_music(&match which {
+        0 => stage(132.0, 196.00, &HIRAJOSHI, [&d_a, &d_b, &d_c, &d_d], 1.0),
+        1 => stage(108.0, 220.00, &HIRAJOSHI, [&t_a, &t_b, &t_c, &t_d], 0.2),
+        3 => stage(144.0, 174.61, &MINOR, [&a_a, &a_b, &a_c, &a_d], 1.0),
+        4 => stage(120.0, 196.00, &YO, [&h_a, &h_b, &h_c, &h_d], 0.4),
+        5 => stage(100.0, 164.81, &IN, [&v_a, &v_b, &v_c, &v_d], 0.7),
+        _ => Theme { bpm: 118.0, root: 207.65, scale: &HIRAJOSHI, phrases: &[&s_a, &s_b],
+                     bass: &[&b2, &b0], order: &[0, 1, 0, 1], drive: 0.0 }.pcm(),
+    })
 }
 
 /// The crowd, built at startup: 2.5 s of PCM is a quarter of a megabyte for a
@@ -586,5 +896,20 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/bell.wav",      encode_pcm16_mono(&bell())),
         ("sounds/ko.wav",        encode_pcm16_mono(&ko())),
         ("sounds/projectile.wav", encode_pcm16_mono(&projectile())),
+        // The long low ones are stored at half the rate: nothing in them is
+        // above 5 kHz, and at full rate they were a third of the download.
+        ("sounds/laser.wav",     encode_pcm16_mono(&laser())),
+        ("sounds/quake.wav",     encode_pcm16_music(&quake())),
+        ("sounds/parry.wav",     encode_pcm16_mono(&parry())),
+        ("sounds/counter.wav",   encode_pcm16_mono(&counter())),
+        ("sounds/fruit.wav",     encode_pcm16_mono(&run_up(&[0, 2, 3, 5], 220.0, 55.0, 420.0, 0xF2))),
+        ("sounds/tick.wav",      encode_pcm16_mono(&tick())),
+        ("sounds/gong.wav",      encode_pcm16_music(&gong())),
+        ("sounds/bellow.wav",    encode_pcm16_music(&bellow())),
+        ("sounds/swing.wav",     encode_pcm16_mono(&heavy_swing())),
+        ("sounds/whistle.wav",   encode_pcm16_mono(&whistle())),
+        ("sounds/thwip.wav",     encode_pcm16_mono(&thwip())),
+        ("sounds/win.wav",       encode_pcm16_music(&verdict(true))),
+        ("sounds/lose.wav",      encode_pcm16_music(&verdict(false))),
     ]
 }

@@ -1,5 +1,5 @@
-//! Brawler: a one-on-one fighting game in tribute to Street Fighter II. Three
-//! fighters, two stages, a CPU ladder or two players.
+//! Brawler: a one-on-one fighting game in tribute to Street Fighter II. Ten
+//! fighters, five stages, a CPU ladder or two players.
 //! What it takes seriously, because they are the game:
 //! 1. **Attack height.** Every attack is low, mid or overhead, and a block
 //! works only at the right height: crouch-blocking eats sweeps and loses to
@@ -44,7 +44,7 @@ const ROUNDS_TO_WIN: i32 = 2;
 // ---- bodies --------------------------------------------------------------
 // The width of a fighter, for being hit and for being drawn: the same number,
 // or attacks land on air beside what the player sees. The silhouette is built
-// to fill it.
+// to fill it. These are a full-size fighter's; `Archetype::size` scales them.
 const BODY_W: f32 = 30.0;
 const STAND_H: f32 = 120.0;
 const CROUCH_H: f32 = 74.0;
@@ -67,6 +67,34 @@ const FLY_HIT_LAG: f32 = 4.0 * F;
 /// the same frame for a human, and up jumps on the frame it is seen. A kick
 /// inside this window levels the jump off into the flying kick.
 const FLY_WINDOW: f32 = 6.0 * F;
+/// A half-size fighter's lunge, in pixels a second at the first frame: about
+/// 30px of ground by the time a kick lands, the reach the size took away.
+const LUNGE: f32 = 520.0;
+/// A punch within this long of the last one is thrown with the other hand.
+const CHAIN_PUNCH: f32 = 0.5;
+/// What a guarded laser still costs.
+const LASER_CHIP: i32 = 9;
+/// A web holds for this long, or until this many blows have landed on it;
+/// then no web holds for a while.
+const WEB_SECS: f32 = 5.0;
+const WEB_HITS: u8 = 2;
+const WEB_REST: f32 = 3.0;
+/// The turtles called in: how fast they run, how far apart they arrive, and
+/// what each does when he gets there. All low, so one guard answers the lot.
+const HELPER_RUN: f32 = 340.0;
+const HELPER_GAP: f32 = 0.38;
+const HELPER_MOVES: [MoveId; 3] = [MoveId::LowKick, MoveId::LowPunch, MoveId::Sweep];
+/// How long after a throw the one thrown cannot be thrown again: the time on
+/// the floor and a second on their feet.
+const THROW_REST: f32 = 2.6;
+/// What a small fighter's blows are worth against another as small. At 1.0
+/// two turtles settle a round in five to fifteen seconds.
+const SMALL_ON_SMALL: f32 = 0.7;
+const LASER_SPEED: f32 = 600.0;
+/// How fast a flier moves through the air, and how high the feet may go: the
+/// head stays under the health bars.
+const SOAR: f32 = 170.0;
+const CEILING: f32 = 150.0;
 /// No air control: the direction held at take-off is the commitment; a
 /// steerable jump-in is a guess the defender cannot answer.
 const AIR_DRIFT: f32 = 180.0;
@@ -153,7 +181,7 @@ fn move_data(id: MoveId) -> MoveData {
 // ---- fighters ------------------------------------------------------------
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-enum Special { ChiBolt, BullRush, TalonKick }
+enum Special { ChiBolt, BullRush, TalonKick, LaserVision }
 
 /// What a fighter wears and how they are built, kept beside the numbers so
 /// looks and moves stay one roster.
@@ -165,6 +193,14 @@ enum Build {
     Bare,
     /// A one-piece flight suit, wrapped forearms and shins.
     Suit,
+    /// Shell on the back, plastron in front, a mask and pads in `trim`.
+    Turtle,
+    /// Masked head to toe: `cloth` limbs, `trim` body, head, gloves and boots.
+    Spider,
+    /// Stripped to the waist and barefoot, trousers torn off at the knee.
+    Giant,
+    /// A `cloth` suit with a cape and boots in `trim`.
+    Caped,
 }
 
 /// A fighter's identity, in the only terms that change how they play.
@@ -175,9 +211,8 @@ struct Archetype {
     walk: f32,
     back_walk: f32,
     jump_scale: f32,
-    /// Scales every attack's damage and reach: Brutus hits hardest from
-    /// closest, Kestrel pokes from outside and takes three hits to Brutus's
-    /// two.
+    /// Scales every attack's damage and reach: the heavies hit hardest from
+    /// closest, the light fighters poke from outside.
     power: f32,
     reach: f32,
     special: Special,
@@ -187,31 +222,108 @@ struct Archetype {
     skin: (f32, f32, f32),
     hair: (f32, f32, f32),
     build: Build,
-    /// Limb and torso thickness, around 1.0. The hurtbox is the same width
-    /// for all; bulk is where a heavyweight looks like one.
+    /// Limb and torso thickness, around 1.0: where a heavyweight looks like
+    /// one without being any bigger.
     bulk: f32,
+    /// The whole fighter's scale: body, hurtbox and reach together, so a
+    /// small fighter is hard to hit and has to get close.
+    size: f32,
+    /// Blows land on them and move them, and cost them nothing, unless
+    /// thrown by someone bigger (see `Fighter::hurt`).
+    invincible: bool,
 }
 
-const FIGHTERS: [Archetype; 3] = [
+const FIGHTERS: [Archetype; 10] = [
     Archetype {
         name: "RYUKA", health: 100, walk: 132.0, back_walk: 108.0, jump_scale: 1.0,
         power: 1.0, reach: 1.0, special: Special::ChiBolt, special_name: "CHI BOLT",
         color: (0.92, 0.92, 0.96), trim: (0.85, 0.25, 0.25),
-        skin: (0.85, 0.68, 0.52), hair: (0.24, 0.16, 0.12), build: Build::Gi, bulk: 1.0,
+        skin: (0.85, 0.68, 0.52), hair: (0.24, 0.16, 0.12), build: Build::Gi, bulk: 1.0, size: 1.0, invincible: false,
     },
     Archetype {
         name: "BRUTUS", health: 120, walk: 96.0, back_walk: 78.0, jump_scale: 0.88,
         power: 1.35, reach: 0.88, special: Special::BullRush, special_name: "BULL RUSH",
         color: (0.30, 0.20, 0.26), trim: (0.95, 0.75, 0.2),
-        skin: (0.74, 0.50, 0.34), hair: (0.20, 0.14, 0.12), build: Build::Bare, bulk: 1.28,
+        skin: (0.74, 0.50, 0.34), hair: (0.20, 0.14, 0.12), build: Build::Bare, bulk: 1.28, size: 1.0, invincible: false,
     },
     Archetype {
         name: "KESTREL", health: 88, walk: 164.0, back_walk: 140.0, jump_scale: 1.12,
         power: 0.82, reach: 1.12, special: Special::TalonKick, special_name: "TALON KICK",
         color: (0.25, 0.65, 0.85), trim: (0.95, 0.95, 0.35),
-        skin: (0.90, 0.74, 0.60), hair: (0.55, 0.42, 0.18), build: Build::Suit, bulk: 0.86,
+        skin: (0.90, 0.74, 0.60), hair: (0.55, 0.42, 0.18), build: Build::Suit, bulk: 0.86, size: 1.0, invincible: false,
+    },
+    // Four turtles, told apart by the mask: `color` is the shell.
+    Archetype {
+        name: "GIOTTO", health: 88, walk: 220.0, back_walk: 180.0, jump_scale: 1.30,
+        power: 1.00, reach: 1.12, special: Special::ChiBolt, special_name: "SHURIKEN",
+        color: TURTLE_SHELL, trim: (0.25, 0.50, 0.95),
+        skin: TURTLE_SKIN, hair: TURTLE_SHELL, build: Build::Turtle, bulk: 1.14, size: 0.5, invincible: false,
+    },
+    Archetype {
+        name: "TITIAN", health: 96, walk: 200.0, back_walk: 164.0, jump_scale: 1.25,
+        power: 1.10, reach: 1.06, special: Special::BullRush, special_name: "SHELL RAM",
+        color: TURTLE_SHELL, trim: (0.90, 0.22, 0.20),
+        skin: TURTLE_SKIN, hair: TURTLE_SHELL, build: Build::Turtle, bulk: 1.22, size: 0.5, invincible: false,
+    },
+    Archetype {
+        name: "VERMEER", health: 82, walk: 235.0, back_walk: 192.0, jump_scale: 1.32,
+        power: 0.92, reach: 1.15, special: Special::TalonKick, special_name: "RISING KICK",
+        color: TURTLE_SHELL, trim: (0.62, 0.36, 0.85),
+        skin: TURTLE_SKIN, hair: TURTLE_SHELL, build: Build::Turtle, bulk: 1.08, size: 0.5, invincible: false,
+    },
+    Archetype {
+        name: "BOSCH", health: 78, walk: 250.0, back_walk: 205.0, jump_scale: 1.38,
+        power: 0.85, reach: 1.12, special: Special::ChiBolt, special_name: "PIZZA TOSS",
+        color: TURTLE_SHELL, trim: (0.98, 0.58, 0.14),
+        skin: TURTLE_SKIN, hair: TURTLE_SHELL, build: Build::Turtle, bulk: 1.12, size: 0.5, invincible: false,
+    },
+    Archetype {
+        name: "WEBBER", health: 90, walk: 300.0, back_walk: 250.0, jump_scale: 1.20,
+        power: 0.85, reach: 1.08, special: Special::ChiBolt, special_name: "WEB SHOT",
+        color: (0.20, 0.32, 0.78), trim: (0.86, 0.14, 0.16),
+        skin: (0.86, 0.14, 0.16), hair: (0.10, 0.10, 0.12), build: Build::Spider, bulk: 0.88, size: 1.0, invincible: false,
+    },
+    Archetype {
+        name: "GAMMA", health: 126, walk: 84.0, back_walk: 70.0, jump_scale: 0.90,
+        power: 1.80, reach: 0.82, special: Special::BullRush, special_name: "RAMPAGE",
+        color: (0.46, 0.28, 0.62), trim: (0.72, 0.52, 0.92),
+        skin: (0.38, 0.64, 0.26), hair: (0.10, 0.10, 0.12), build: Build::Giant, bulk: 1.15, size: 1.5, invincible: false,
+    },
+    // The man of steel: only the giant can hurt him, he flies instead of
+    // jumping, his punch hits three times as hard and his kick is the laser,
+    // which kills. He is the last fight of every ladder (see `round_result`).
+    Archetype {
+        name: "ZENITH", health: 200, walk: 330.0, back_walk: 275.0, jump_scale: 1.0,
+        power: 3.0, reach: 1.0, special: Special::LaserVision, special_name: "LASER VISION",
+        color: (0.16, 0.36, 0.84), trim: (0.86, 0.14, 0.16),
+        skin: (0.90, 0.72, 0.58), hair: (0.08, 0.08, 0.10), build: Build::Caped, bulk: 1.12,
+        size: 1.0, invincible: true,
     },
 ];
+
+/// The stages. Scenery only: the same floor line, height and walls in all.
+const STAGES: usize = 7;
+const STAGE_NAMES: [&str; STAGES] =
+    ["THE DOCKS", "MOONLIT TEMPLE", "THE AIR BASE", "THE BATH HOUSE", "RIVER VILLAGE",
+     "CRYSTAL FORTRESS", "QUEENS ROOFTOP"];
+
+/// Where a fighter is at home. As in Street Fighter II, a fight is held at
+/// the opponent's; a ladder never meets two of a kind in a row, so it never
+/// visits one stage twice.
+fn home_of(who: usize) -> usize {
+    match FIGHTERS[who].build {
+        Build::Bare => 0,
+        Build::Gi => 1,
+        Build::Suit => 2,
+        Build::Turtle => 3,
+        Build::Giant => 4,
+        Build::Caped => 5,
+        Build::Spider => 6,
+    }
+}
+
+const TURTLE_SKIN: (f32, f32, f32) = (0.44, 0.68, 0.30);
+const TURTLE_SHELL: (f32, f32, f32) = (0.44, 0.31, 0.17);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum Act { Idle, Walk, Crouch, Air, Attack, Block, Hitstun, Knockdown, Victory, Defeat, Bow }
@@ -284,6 +396,40 @@ struct Fighter {
     /// sees it, so a landing is still actionable on the touchdown frame.
     land: f32,
     land_force: f32,
+    /// How far a flier has tipped over into level flight, 0 to 1, eased so
+    /// the picture does not snap with the stick. Drawing state only.
+    soar: f32,
+    /// Seconds left of the guard impact window, and whether toward was held
+    /// last frame (the window opens on the press, not the hold).
+    parry_t: f32,
+    /// Seconds for which this fighter cannot be thrown: no throw loops.
+    throw_rest: f32,
+    /// Seconds left wrapped in a web, the blows taken in it, and the time
+    /// after it during which another web will not hold.
+    webbed: f32,
+    web_hits: u8,
+    web_rest: f32,
+    /// Punches thrown in quick succession change hands: this one is with the
+    /// far hand. `since_punch` is the time since the last one started.
+    alt_punch: bool,
+    since_punch: f32,
+    /// The far leg is the one in front: whichever foot a walk stopped on.
+    /// Kicks come off the front leg.
+    far_leads: bool,
+    /// This round's call for the other turtles has been made; and whether
+    /// the special now under way is that call.
+    called: bool,
+    calling: bool,
+    was_toward: bool,
+    /// A rage jump is on its way down: the landing shakes the floor.
+    stomp: bool,
+    /// What just happened to this fighter's blow, for `update_fight` to
+    /// announce: it landed as a counter, or it was turned by a guard impact.
+    countered: bool,
+    turned: bool,
+    /// The opponent's size, kept up to date by `face_off`: blows are aimed
+    /// at the body in front of them.
+    foe_size: f32,
 }
 
 /// How long a pose takes to hand over to the next one. Four frames:
@@ -304,6 +450,8 @@ pub(crate) const BOW_TIME: f32 = 1.6;
 const BOW_TO_GUARD: f32 = 0.35;
 /// The round intro: the bow, then the guard coming up as FIGHT shows.
 const ROUND_INTRO: f32 = BOW_TIME + 0.7;
+/// How long the two fighters are shown off before a match.
+const VS_SECS: f32 = 2.6;
 
 impl Fighter {
     fn new(who: usize, x: f32, facing: f32) -> Self {
@@ -318,6 +466,10 @@ impl Fighter {
             shown_air: false, shown_vy: 0.0, prev_air: false, prev_vy: 0.0,
             prev_act: Act::Idle, prev_mv: MoveId::LowPunch, prev_t: 0.0, blend: 0.0,
             blend_len: POSE_BLEND, land: 0.0, land_force: 0.0,
+            soar: 0.0, stomp: false, parry_t: 0.0, throw_rest: 0.0,
+            webbed: 0.0, web_hits: 0, web_rest: 0.0, called: false, calling: false,
+            alt_punch: false, since_punch: 9.0, far_leads: false, was_toward: false, countered: false, turned: false,
+            foe_size: FIGHTERS[who].size,
         }
     }
 
@@ -336,10 +488,60 @@ impl Fighter {
         act == Act::Crouch || (act == Act::Block && crouch_block)
             || (act == Act::Attack && matches!(mv, MoveId::Sweep))
     }
+    fn size(&self) -> f32 { self.arch().size }
+    /// How fast a ground attack throws the body forward. Nothing for a
+    /// full-size fighter; a small one has half the reach and has to leap in
+    /// behind every blow, which leaves them in the other's face if it misses.
+    fn lunge(&self) -> f32 { (1.0 - self.size()).max(0.0) * LUNGE }
+    /// Down to the last quarter of the bar (see `RAGE`).
+    fn enraged(&self) -> bool {
+        let a = self.arch();
+        !a.invincible && self.health > 0 && self.health * 4 <= a.health
+    }
+    /// A turtle guarding low is inside its shell, where nothing chips it.
+    fn shelled(&self) -> bool {
+        self.arch().build == Build::Turtle && self.act == Act::Block && self.crouch_block
+    }
+    /// Flies instead of jumping: up rises, down lands, no gravity between.
+    fn flies(&self) -> bool { self.arch().build == Build::Caped }
+    /// In the air under their own power, as opposed to falling.
+    fn soaring(&self) -> bool {
+        self.flies() && self.airborne() && matches!(self.act, Act::Air | Act::Attack)
+    }
+    /// The punch that sends them flying, whatever it hits.
+    fn epic_punch(&self) -> bool {
+        self.flies() && matches!(self.mv, MoveId::HighPunch | MoveId::LowPunch | MoveId::JumpPunch)
+    }
+    /// Lose health to a blow from a fighter of size `from`. The invincible
+    /// feel only someone bigger than themselves, and then a quarter of it.
+    fn hurt(&mut self, damage: i32, from: f32) {
+        // A web takes two blows and no more, whatever they cost.
+        if self.webbed > 0.0 && damage > 0 {
+            self.web_hits += 1;
+            if self.web_hits >= WEB_HITS { self.unweb(); }
+        }
+        let damage = if !self.arch().invincible { damage }
+            else if from > self.size() { (damage / 4).max(1) }
+            else { 0 };
+        self.health = (self.health - damage).max(0);
+    }
+    /// Wrap this fighter up, unless a web has only just come off.
+    fn web(&mut self) -> bool {
+        if self.webbed > 0.0 || self.web_rest > 0.0 { return false; }
+        self.webbed = WEB_SECS;
+        self.web_hits = 0;
+        self.vx = 0.0;
+        true
+    }
+    fn unweb(&mut self) {
+        self.webbed = 0.0;
+        self.web_rest = WEB_REST;
+    }
+    fn width(&self) -> f32 { BODY_W * self.size() }
     fn height(&self) -> f32 {
-        if self.act == Act::Knockdown { PRONE_H }
-        else if self.crouching() { CROUCH_H }
-        else { STAND_H }
+        self.size() * if self.act == Act::Knockdown { PRONE_H }
+            else if self.crouching() { CROUCH_H }
+            else { STAND_H }
     }
 
     /// The box that can be hit. Deliberately the same box the fighter is
@@ -347,7 +549,8 @@ impl Fighter {
     /// player learns to stop trusting their eyes.
     fn hurt_box(&self) -> (f32, f32, f32, f32) {
         let h = self.height();
-        (self.x - BODY_W / 2.0, self.y - h, BODY_W, h)
+        let w = self.width();
+        (self.x - w / 2.0, self.y - h, w, h)
     }
 
     /// Can this fighter act at all right now?
@@ -357,33 +560,56 @@ impl Fighter {
 
     fn scaled(&self, m: MoveData) -> MoveData {
         let a = self.arch();
+        // Reach is the fighter's own; height is where the blow is aimed, and
+        // nobody strikes over the head of a smaller opponent.
+        let aim = a.size.min(self.foe_size);
+        let rage = if self.enraged() { RAGE } else { 1.0 };
+        // A small fighter hits above its weight to make up for its reach.
+        // Against its own size there is nothing to make up.
+        let even = if a.size < 1.0 && self.foe_size <= a.size { SMALL_ON_SMALL } else { 1.0 };
         MoveData {
-            damage: ((m.damage as f32) * a.power).round() as i32,
-            reach: m.reach * a.reach,
+            damage: ((m.damage as f32) * a.power * rage * even).round() as i32,
+            reach: m.reach * a.reach * a.size,
+            height: m.height * aim,
+            thickness: m.thickness * aim,
             ..m
         }
     }
 
     /// Where the current attack can hit, during its active window only.
     fn hit_box(&self) -> Option<(f32, f32, f32, f32)> {
-        if self.act != Act::Attack || self.hit_done { return None; }
+        if self.act != Act::Attack || self.hit_done || self.calling { return None; }
         let m = self.scaled(move_data(self.mv));
         let start = m.startup * F;
         let end = start + m.active * F;
         if self.t < start || self.t > end { return None; }
         let len = m.reach;
-        let x = if self.facing > 0.0 { self.x + BODY_W / 2.0 } else { self.x - BODY_W / 2.0 - len };
+        let half = self.width() / 2.0;
+        let x = if self.facing > 0.0 { self.x + half } else { self.x - half - len };
         Some((x, self.y - m.height - m.thickness / 2.0, len, m.thickness))
     }
 
     fn start_attack(&mut self, id: MoveId) {
+        // A turtle's first special of the round calls the others in.
+        self.calling = id == MoveId::Special && self.arch().build == Build::Turtle && !self.called;
+        if self.calling { self.called = true; }
         self.chained = self.cancel_t > 0.0 && self.act == Act::Attack;
+        if matches!(id, MoveId::LowPunch | MoveId::HighPunch) {
+            self.alt_punch = self.since_punch < CHAIN_PUNCH && !self.alt_punch;
+            self.since_punch = 0.0;
+        }
         self.act = Act::Attack;
         self.mv = id;
         self.t = 0.0;
         self.hit_done = false;
         self.hit_clean = false;
+        self.countered = false;
+        self.stomp = id == MoveId::JumpKick && self.arch().build == Build::Giant;
         self.cancel_t = 0.0;
+        if !self.airborne() && matches!(id, MoveId::LowPunch | MoveId::HighPunch
+            | MoveId::LowKick | MoveId::HighKick | MoveId::Sweep) {
+            self.vx = self.facing * self.lunge();
+        }
         // The flying kick sets its own arc, flatter and faster than a jump;
         // thrown early in a jump it levels that jump off.
         if id == MoveId::FlyingKick {
@@ -414,15 +640,30 @@ impl Fighter {
 /// A flash where something connected. `blocked` picks the colour, which
 /// is how a player tells "that cost me nothing" from "that cost me".
 #[derive(Copy, Clone)]
-struct Spark { x: f32, y: f32, ttl: f32, blocked: bool }
+struct Spark { x: f32, y: f32, ttl: f32, life: f32, blocked: bool }
+
+/// One of the other turtles, called in: a fighter run by a script instead of
+/// a stick. He waits his turn, runs in, strikes once and runs off the far side.
+#[derive(Copy, Clone)]
+struct Helper { f: Fighter, side: usize, wait: f32, mv: MoveId, struck: bool }
+
+/// A word that pops up where something happened: COUNTER!, a fruit's points.
+#[derive(Copy, Clone)]
+struct Pop { text: &'static str, x: f32, y: f32, ttl: f32 }
+const POP_SECS: f32 = 0.9;
+
+/// The bonus fruit on the boards: where, how long it has left, and which of
+/// the eight it is.
+#[derive(Copy, Clone)]
+struct Fruit { x: f32, ttl: f32, kind: usize }
 
 #[derive(Copy, Clone)]
-struct Bolt { x: f32, y: f32, vx: f32, owner: usize, active: bool, damage: i32 }
+struct Bolt { x: f32, y: f32, vx: f32, vy: f32, owner: usize, active: bool, damage: i32 }
 
 // ---- the match -----------------------------------------------------------
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-enum State { Title, Select, RoundIntro, Fight, RoundEnd, MatchEnd, Over, Won }
+enum State { Title, Select, Vs, RoundIntro, Fight, RoundEnd, MatchEnd, Over, Won }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum RoundResult { P1, P2, Draw }
@@ -437,6 +678,9 @@ struct Game {
     sess: Session,
     p: [Fighter; 2],
     bolts: [Bolt; 4],
+    helpers: [Option<Helper>; 3],
+    /// Screenshot scene 15: draw the kiosk card's poster instead of the game.
+    poster: bool,
     mode: Mode,
     pick: usize,
     /// Player two's fighter, and whether each player has committed to
@@ -482,7 +726,28 @@ struct Game {
     /// each one eat the other's.
     sel_held: [[bool; 2]; 2],
     sel_fire: [bool; 2],
+    pops: [Pop; 4],
+    fruit: Fruit,
+    /// This round's fruit has not appeared yet.
+    fruit_due: bool,
+    /// Each health bar as it was a moment ago: the bar drains to the new
+    /// value, so a player sees what a blow cost.
+    ghost: [f32; 2],
+    /// Where the floor was last shaken by a rage jump, and for how much longer
+    /// the dust of it hangs.
+    quake_x: f32,
+    quake_t: f32,
+    /// Real seconds of slow motion left on the finishing blow.
+    slow: f32,
+    /// The announcer's verdict on how the round was won: PERFECT, GREAT.
+    call: &'static str,
 }
+
+/// How many fights a solo run is: everybody else, once.
+const RUNGS: usize = FIGHTERS.len() - 1;
+/// The difficulty dial for the first and the last opponent on the ladder.
+const FIRST_RUNG: f32 = -0.45;
+const LAST_RUNG: f32 = 0.8;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum CpuPlan { Wait, Approach, Retreat, Attack(MoveId), Jump, Block }
@@ -493,7 +758,9 @@ impl Game {
             state: State::Title,
             sess: Session::new(1),
             p: [Fighter::new(0, 200.0, 1.0), Fighter::new(1, 440.0, -1.0)],
-            bolts: [Bolt { x: 0.0, y: 0.0, vx: 0.0, owner: 0, active: false, damage: 0 }; 4],
+            bolts: [Bolt { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, owner: 0, active: false, damage: 0 }; 4],
+            helpers: [None; 3],
+            poster: false,
             mode: Mode::Solo,
             pick: 0,
             pick2: 1,
@@ -506,7 +773,7 @@ impl Game {
             phase: Timer::default(),
             banner: "",
             result: RoundResult::Draw,
-            hitspark: [Spark { x: 0.0, y: 0.0, ttl: 0.0, blocked: false }; 4],
+            hitspark: [Spark { x: 0.0, y: 0.0, ttl: 0.0, life: 1.0, blocked: false }; 4],
             shake: 0.0,
             hitstop: 0.0,
             bowed: false,
@@ -521,6 +788,14 @@ impl Game {
             now: 0.0,
             sel_held: [[false; 2]; 2],
             sel_fire: [false; 2],
+            pops: [Pop { text: "", x: 0.0, y: 0.0, ttl: 0.0 }; 4],
+            fruit: Fruit { x: 0.0, ttl: 0.0, kind: 0 },
+            fruit_due: false,
+            ghost: [0.0; 2],
+            quake_x: 0.0,
+            quake_t: 0.0,
+            slow: 0.0,
+            call: "",
         }
     }
 
@@ -536,24 +811,40 @@ impl Game {
         self.mode == Mode::Versus && self.locked[1 - who] && self.picked(1 - who) == at
     }
 
-    /// The two fighters the player did not pick, in order — the ladder.
-    fn ladder(&self) -> [usize; 2] {
-        let mut out = [0usize; 2];
-        let mut n = 0;
-        for i in 0..FIGHTERS.len() {
-            if i != self.pick { out[n] = i; n += 1; }
+    /// The ladder: every other fighter, once. Round the roster from the pick,
+    /// reordered so no two fights running are at the same home stage, with
+    /// the giant and then the fighter nothing hurts kept for the end.
+    fn ladder(&self) -> [usize; RUNGS] {
+        // The fights that close the ladder, in order, and everyone before.
+        fn place(ring: &[usize], ends: &[usize], out: &mut Vec<usize>) -> bool {
+            if out.len() == ring.len() { return true; }
+            let early = ring.len() - ends.len();
+            for &who in ring {
+                let fits = if out.len() < early { !ends.contains(&who) } else { ends[out.len() - early] == who };
+                if !fits || out.contains(&who) { continue; }
+                if out.last().is_some_and(|&prev| home_of(prev) == home_of(who)) { continue; }
+                out.push(who);
+                if place(ring, ends, out) { return true; }
+                out.pop();
+            }
+            false
         }
-        out
+        let n = FIGHTERS.len();
+        let ring: Vec<usize> = (1..n).map(|k| (self.pick + k) % n).collect();
+        let mut ends: Vec<usize> = ring.iter().copied()
+            .filter(|&w| FIGHTERS[w].invincible || FIGHTERS[w].build == Build::Giant).collect();
+        ends.sort_by_key(|&w| FIGHTERS[w].invincible);
+        let mut out = Vec::with_capacity(RUNGS);
+        if !place(&ring, &ends, &mut out) { out = ring; }
+        std::array::from_fn(|i| out[i])
     }
 
     /// Two players, one match, no ladder and no difficulty dial.
     fn start_versus(&mut self) {
         self.mode = Mode::Versus;
         self.opponent_index = 0;
-        // Each fighter's own stage would be arbitrary with nobody
-        // climbing anything, so the pick decides it: choose the same
-        // fighter twice in a row and you get the same fight twice.
-        self.stage = (self.pick + self.pick2) % 2;
+        // Player two is the challenger here, so the fight is at their home.
+        self.stage = home_of(self.pick2);
         self.difficulty = 0.0;
         self.p[0] = Fighter::new(self.pick, 200.0, 1.0);
         self.p[1] = Fighter::new(self.pick2, 440.0, -1.0);
@@ -561,13 +852,23 @@ impl Game {
         self.start_round();
     }
 
+    /// Put the match just set up behind its billing: who, where, and how
+    /// far up the ladder.
+    fn announce(&mut self) {
+        self.state = State::Vs;
+        self.phase.start(VS_SECS);
+    }
+
     fn start_match(&mut self, opponent_index: usize) {
         self.opponent_index = opponent_index;
         let foe = self.ladder()[opponent_index];
-        self.stage = opponent_index % 2;
-        // The first opponent is a warm-up a newcomer can beat; the dial
-        // then climbs steeply (a playtest bot lost 0-2 at 0.35).
-        self.difficulty = if opponent_index == 0 { 0.15 } else { 0.35 + 0.4 * opponent_index as f32 };
+        self.stage = home_of(foe);
+        // The first opponent is a warm-up a newcomer can beat: below zero the
+        // CPU also hesitates (see cpu_think). At 0.15 a playtest bot lost the
+        // first match with six fighters in nine. The dial then climbs evenly
+        // to the last.
+        self.difficulty = FIRST_RUNG
+            + (LAST_RUNG - FIRST_RUNG) * opponent_index as f32 / (RUNGS - 1) as f32;
         self.p[0] = Fighter::new(self.pick, 200.0, 1.0);
         self.p[1] = Fighter::new(foe, 440.0, -1.0);
         self.round = 1;
@@ -582,6 +883,16 @@ impl Game {
         self.p[0].rounds = r0;
         self.p[1].rounds = r1;
         for b in self.bolts.iter_mut() { b.active = false; }
+        self.helpers = [None; 3];
+        for s in self.hitspark.iter_mut() { s.ttl = 0.0; }
+        for w in self.pops.iter_mut() { w.ttl = 0.0; }
+        self.fruit.ttl = 0.0;
+        self.fruit_due = true;
+        self.ghost = [self.p[0].health as f32, self.p[1].health as f32];
+        self.slow = 0.0;
+        self.quake_t = 0.0;
+        self.call = "";
+        self.hitstop = 0.0;
         self.clock = ROUND_SECS;
         self.banner = "ROUND";
         self.state = State::RoundIntro;
@@ -591,24 +902,57 @@ impl Game {
         self.cpu_delay = 0.4;
     }
 
-    fn spawn_bolt(&mut self, owner: usize, damage: i32) {
-        let f = self.p[owner];
-        for b in self.bolts.iter_mut() {
-            if b.active { continue; }
-            *b = Bolt {
-                x: f.x + f.facing * (BODY_W / 2.0 + 10.0),
-                y: f.y - 54.0,
-                vx: f.facing * 300.0,
-                owner,
-                active: true,
-                damage,
-            };
-            return;
+    /// The other three turtles come in from behind whoever called, one after
+    /// another.
+    fn call_turtles(&mut self, side: usize) {
+        let caller = self.p[side];
+        let from = if caller.facing > 0.0 { -30.0 } else { WIN_W as f32 + 30.0 };
+        let others = (0..FIGHTERS.len())
+            .filter(|&w| FIGHTERS[w].build == Build::Turtle && w != caller.who);
+        for (k, who) in others.take(3).enumerate() {
+            self.helpers[k] = Some(Helper {
+                f: Fighter::new(who, from, caller.facing),
+                side, wait: k as f32 * HELPER_GAP, mv: HELPER_MOVES[k], struck: false,
+            });
         }
     }
 
+    fn spawn_bolt(&mut self, owner: usize, damage: i32) {
+        let foe = self.p[1 - owner];
+        let laser = self.p[owner].arch().special == Special::LaserVision;
+        // From the air the laser is aimed, so he turns to look first.
+        if laser && self.p[owner].airborne() {
+            self.p[owner].facing = if foe.x >= self.p[owner].x { 1.0 } else { -1.0 };
+        }
+        let f = self.p[owner];
+        let x = f.x + f.facing * (f.width() / 2.0 + 10.0);
+        // A bolt leaves the hands at chest height. The laser leaves the eyes,
+        // twice as fast: level at the head in front of it from the ground (a
+        // crouch goes under either), straight at the body from the air.
+        let (y, vx, vy) = if !laser {
+            (f.y - 54.0 * f.size(), f.facing * 300.0, 0.0)
+        } else if !f.airborne() {
+            (f.y - 98.0 * f.size().min(f.foe_size), f.facing * LASER_SPEED, 0.0)
+        } else {
+            let y = f.y - 100.0 * f.size();
+            let (dx, dy) = (foe.x - x, foe.y - foe.height() * 0.5 - y);
+            let d = dx.hypot(dy).max(1.0);
+            (y, dx / d * LASER_SPEED, dy / d * LASER_SPEED)
+        };
+        if let Some(b) = self.bolts.iter_mut().find(|b| !b.active) {
+            *b = Bolt { x, y, vx, vy, owner, active: true, damage };
+        }
+    }
+
+    fn pop(&mut self, text: &'static str, x: f32, y: f32) {
+        let fresh = Pop { text, x, y, ttl: POP_SECS };
+        let slot = self.pops.iter().position(|w| w.ttl <= 0.0).unwrap_or(0);
+        self.pops[slot] = fresh;
+    }
+
     fn spark(&mut self, x: f32, y: f32, big: bool, blocked: bool) {
-        let fresh = Spark { x, y, ttl: if big { 0.22 } else { 0.14 }, blocked };
+        let life = if big { 0.26 } else { 0.17 };
+        let fresh = Spark { x, y, ttl: life, life, blocked };
         for s in self.hitspark.iter_mut() {
             if s.ttl <= 0.0 { *s = fresh; return; }
         }
@@ -633,14 +977,26 @@ fn blocks(level: Level, crouch_block: bool) -> bool {
 /// beats throw. Without it, two players holding back ran the clock out.
 fn unblockable(id: MoveId) -> bool { id == MoveId::Throw }
 
-/// How close the two have to be for a punch to become a throw.
-const THROW_RANGE: f32 = 52.0;
+/// How close the two have to be for a punch to become a throw, as a share of
+/// the throw's own range: well inside it, so a throw that starts connects.
+const THROW_CLOSE: f32 = 0.74;
+
+/// Tell each fighter how big the other is, and whether they are close enough
+/// to throw. Called before input, every frame.
+fn face_off(p: &mut [Fighter; 2]) -> [bool; 2] {
+    let dist = (p[1].x - p[0].x).abs();
+    p[0].foe_size = p[1].size();
+    p[1].foe_size = p[0].size();
+    [0, 1].map(|i| dist <= throw_range(&p[i]))
+}
+
+fn throw_range(f: &Fighter) -> f32 { attack_range(f, MoveId::Throw) * THROW_CLOSE }
 
 /// The distance between centres at which `id` would just touch the
 /// other fighter. Reach plus both half-widths — the number a player is
 /// judging by eye every time they decide whether to step in.
 fn attack_range(f: &Fighter, id: MoveId) -> f32 {
-    f.scaled(move_data(id)).reach + BODY_W
+    f.scaled(move_data(id)).reach + (f.width() + BODY_W * f.foe_size) / 2.0
 }
 
 /// Is this fighter holding away from the other one?
@@ -672,6 +1028,14 @@ impl Input {
 /// Which attack these buttons ask for, given where the fighter is. One place
 /// decides, so a buffered press and a live one agree.
 fn pressed_move(f: &Fighter, inp: Input, close: bool) -> Option<MoveId> {
+    // The flier has two moves wherever he is: any kick is the laser, any
+    // punch the one big punch. No throw; he does not need one.
+    if f.flies() {
+        return if inp.special || inp.any_kick() { Some(MoveId::Special) }
+            else if !inp.any_punch() { None }
+            else if f.airborne() { Some(MoveId::JumpPunch) }
+            else { Some(MoveId::HighPunch) };
+    }
     if f.airborne() { return air_move(f, inp); }
     grounded_move(inp, close)
 }
@@ -733,6 +1097,46 @@ const CHIP_DIVISOR: i32 = 6;
 /// blocked, you get nothing.
 const CANCEL_WINDOW: f32 = 14.0 * F;
 
+/// How long after a punch or kick starts the other button still turns it into
+/// the special: nobody presses two buttons on the same frame, least of all on
+/// a touch screen.
+const SPECIAL_WINDOW: f32 = 5.0 * F;
+
+/// Hitting someone out of their own attack is a counter, as in Tekken: a
+/// quarter more damage and six frames more stun.
+const COUNTER: f32 = 1.25;
+const COUNTER_STUN: f32 = 6.0 * F;
+
+/// Rage, as in Tekken: with a quarter of the bar left a fighter hits a fifth
+/// harder, so a round is not over until it is over.
+const RAGE: f32 = 1.2;
+
+/// The guard impact, Soulcalibur's: tap toward the opponent inside this
+/// window before a blow lands and it is knocked aside, leaving the attacker
+/// open for `IMPACT_STUN`. Throws and projectiles cannot be turned.
+const IMPACT_WINDOW: f32 = 6.0 * F;
+const IMPACT_STUN: f32 = 24.0 * F;
+
+/// The bonus fruit, Pac-Man's: once a round it appears mid-stage when the
+/// clock reaches `FRUIT_AT`, waits `FRUIT_STAYS` seconds, and gives whoever
+/// walks over it a share of their health back. The eight follow Pac-Man's
+/// order and are worth Pac-Man's points.
+const FRUIT_AT: f32 = ROUND_SECS - 12.0;
+const FRUIT_STAYS: f32 = 9.0;
+const FRUIT_HEAL: f32 = 0.12;
+const FRUIT_POINTS: [(i32, &str); 8] = [(100, "100"), (300, "300"), (500, "500"), (700, "700"),
+    (1000, "1000"), (2000, "2000"), (3000, "3000"), (5000, "5000")];
+
+/// The giant's jump kick is a rage jump: when he comes down the whole floor
+/// jumps, and a fighter standing on it anywhere is thrown off their feet for
+/// this much. Being in the air when he lands is the only answer.
+const QUAKE_DAMAGE: i32 = 6;
+const QUAKE_SECS: f32 = 0.5;
+
+/// The finishing blow plays at this speed for this long, as Tekken's does.
+const SLOW_MO: f32 = 0.3;
+const SLOW_MO_SECS: f32 = 0.6;
+
 /// What each successive hit of a combo is worth. Two hits is a reward;
 /// eight would be a cutscene.
 fn combo_scale(hits: i32) -> f32 {
@@ -744,9 +1148,28 @@ fn combo_scale(hits: i32) -> f32 {
 }
 
 fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
+    let toward = if f.facing > 0.0 { inp.right } else { inp.left };
+    if toward && !f.was_toward { f.parry_t = IMPACT_WINDOW; }
+    else if f.parry_t > 0.0 { f.parry_t -= dt; }
+    f.was_toward = toward;
+
     if f.buffer_t > 0.0 {
         f.buffer_t -= dt;
         if f.buffer_t <= 0.0 { f.buffered = None; }
+    }
+
+    // Flying: the stick steers, a button attacks from where he hangs.
+    if f.soaring() {
+        if f.act == Act::Attack { return; }
+        if let Some(id) = pressed_move(f, inp, close) {
+            f.vx = 0.0;
+            f.vy = 0.0;
+            f.start_attack(id);
+            return;
+        }
+        f.vx = if inp.left { -SOAR } else if inp.right { SOAR } else { 0.0 };
+        f.vy = if inp.up { -SOAR } else if inp.down { SOAR * 1.4 } else { 0.0 };
+        return;
     }
 
     // In the air and not yet committed: the jump-in attack comes out now.
@@ -766,6 +1189,14 @@ fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
                 f.buffer_t = BUFFER;
             }
         }
+        return;
+    }
+
+    // The second button of a special, a moment late: the attack the first
+    // button began becomes the special, as long as it has not come out yet.
+    if inp.special && f.act == Act::Attack && f.mv != MoveId::Special && !f.airborne()
+        && f.t < SPECIAL_WINDOW.min(move_data(f.mv).startup * F) {
+        f.start_attack(MoveId::Special);
         return;
     }
 
@@ -793,6 +1224,14 @@ fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
     // decision and only an attack is left.
     if f.airborne() { return; }
 
+    if inp.up && f.flies() {
+        f.vy = -SOAR;
+        f.vx = 0.0;
+        f.y -= 0.5;
+        f.act = Act::Air;
+        f.t = 0.0;
+        return;
+    }
     if inp.up {
         f.vy = JUMP_VY * f.arch().jump_scale;
         f.vx = if inp.left { -AIR_DRIFT } else if inp.right { AIR_DRIFT } else { 0.0 };
@@ -830,6 +1269,16 @@ fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
 /// Advance one fighter's physics and action timer.
 fn advance(f: &mut Fighter, dt: f32) {
     if f.land > 0.0 { f.land = (f.land - dt).max(0.0); }
+    if f.throw_rest > 0.0 { f.throw_rest = (f.throw_rest - dt).max(0.0); }
+    f.since_punch += dt;
+    if f.act == Act::Walk && !f.airborne() { f.far_leads = draw::far_foot_leads(f); }
+    if f.web_rest > 0.0 { f.web_rest = (f.web_rest - dt).max(0.0); }
+    if f.webbed > 0.0 {
+        f.webbed -= dt;
+        if f.webbed <= 0.0 { f.unweb(); }
+    }
+    let level = if f.soaring() && f.act == Act::Air { (f.vx * f.facing / SOAR).clamp(0.0, 1.0) } else { 0.0 };
+    f.soar += (level - f.soar) * (10.0 * dt).min(1.0);
 
     let from = f.t;
     f.t += dt;
@@ -844,8 +1293,10 @@ fn advance(f: &mut Fighter, dt: f32) {
     if f.cancel_t > 0.0 { f.cancel_t -= dt; }
 
     if f.airborne() || f.vy < 0.0 {
-        f.vy += GRAVITY * dt;
+        // A flier hangs where the stick left him; everyone else falls.
+        if f.soaring() { f.vy = f.vy.max(-SOAR); } else { f.vy += GRAVITY * dt; }
         f.y += f.vy * dt;
+        if f.soaring() && f.y < FLOOR_Y - CEILING { f.y = FLOOR_Y - CEILING; f.vy = 0.0; }
         f.x += f.vx * dt;
         if f.y >= FLOOR_Y {
             f.y = FLOOR_Y;
@@ -874,11 +1325,20 @@ fn advance(f: &mut Fighter, dt: f32) {
         }
     }
 
+    // An attack that carries the body along the floor (the rush, a small
+    // fighter's lunge) slides, and the slide bleeds off so it ends.
+    if !f.airborne() && f.act == Act::Attack {
+        f.x += f.vx * dt;
+        f.vx *= 1.0 - (6.0 * dt).min(1.0);
+    }
+
     match f.act {
         Act::Attack => {
             let m = f.scaled(move_data(f.mv));
             let total = (m.startup + m.active + m.recovery) * F;
-            if !f.airborne() && f.t >= total { f.act = Act::Idle; f.t = 0.0; }
+            if !f.airborne() && f.t >= total { f.act = Act::Idle; f.t = 0.0; f.vx = 0.0; }
+            // In the air a flier's attack ends on its own clock, not on landing.
+            else if f.soaring() && f.t >= total { f.act = Act::Air; f.t = 0.0; }
         }
         Act::Hitstun | Act::Block => {
             f.stun -= dt;
@@ -953,8 +1413,23 @@ fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: Input) -> (
     // A throw cannot catch someone off the ground — jumping is the
     // answer to a throw, as attacking is, which keeps the triangle from
     // collapsing into "walk in and throw".
-    if attacker.mv == MoveId::Throw && defender.airborne() { return (0, false, false); }
+    if attacker.mv == MoveId::Throw && (defender.airborne() || defender.throw_rest > 0.0) {
+        return (0, false, false);
+    }
     attacker.hit_done = true;
+    if attacker.mv == MoveId::Throw { defender.throw_rest = THROW_REST; }
+
+    // The guard impact: the blow is turned and the attacker left open.
+    if defender.parry_t > 0.0 && !defender.airborne() && defender.free()
+        && !unblockable(attacker.mv) {
+        defender.parry_t = 0.0;
+        attacker.turned = true;
+        attacker.act = Act::Hitstun;
+        attacker.stun = IMPACT_STUN;
+        attacker.t = 0.0;
+        attacker.vx = 0.0;
+        return (0, true, false);
+    }
 
     // A defender can only block on the ground, holding away, and not
     // while already committed to something of their own.
@@ -966,17 +1441,22 @@ fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: Input) -> (
         defender.crouch_block = hold.down;
         defender.stun = m.blockstun * F;
         let chip = if attacker.mv == MoveId::Special { (m.damage / CHIP_DIVISOR).max(1) } else { 0 };
-        defender.health = (defender.health - chip).max(0);
+        if chip > 0 && !defender.shelled() { defender.hurt(chip, attacker.size()); }
         return (0, true, false);
     }
 
-    let damage = ((m.damage as f32) * combo_scale(defender.combo)).round().max(1.0) as i32;
+    // Caught in the middle of their own attack, before its recovery.
+    let theirs = move_data(defender.mv);
+    let counter = defender.act == Act::Attack && defender.t <= (theirs.startup + theirs.active) * F;
+    attacker.countered = counter;
+    let bonus = if counter { COUNTER } else { 1.0 };
+    let damage = ((m.damage as f32) * combo_scale(defender.combo) * bonus).round().max(1.0) as i32;
     defender.combo += 1;
     // A light attack that lands buys the right to follow it up.
     if matches!(attacker.mv, MoveId::LowPunch) && !attacker.chained {
         attacker.cancel_t = CANCEL_WINDOW;
     }
-    defender.health = (defender.health - damage).max(0);
+    defender.hurt(damage, attacker.size());
     attacker.hit_clean = true;
     // A flying kick that connects stops flying, so the attacker can act
     // before the defender's hitstun ends. A blocked one carries on through,
@@ -985,7 +1465,8 @@ fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: Input) -> (
         attacker.vx = 0.0;
         attacker.vy = attacker.vy.max(0.0);
     }
-    if m.knockdown || defender.airborne() {
+    let floored = m.knockdown || attacker.epic_punch();
+    if floored || defender.airborne() {
         defender.act = Act::Knockdown;
         defender.t = 0.0;
         defender.vy = 0.0;
@@ -993,10 +1474,10 @@ fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: Input) -> (
         defender.y = FLOOR_Y;
     } else {
         defender.act = Act::Hitstun;
-        defender.stun = m.hitstun * F;
+        defender.stun = m.hitstun * F + if counter { COUNTER_STUN } else { 0.0 };
         defender.t = 0.0;
     }
-    (damage, false, m.knockdown)
+    (damage, false, floored)
 }
 
 /// Push the two apart after a hit, and if one of them is against a wall,
@@ -1019,7 +1500,7 @@ fn push_apart(p: &mut [Fighter; 2], amount: f32) {
 
 /// Fighters may not walk through each other.
 fn separate(p: &mut [Fighter; 2]) {
-    let min = BODY_W * 0.82;
+    let min = (p[0].width() + p[1].width()) / 2.0 * 0.82;
     let d = p[1].x - p[0].x;
     if d.abs() >= min { return; }
     let fix = (min - d.abs()) / 2.0 * if d >= 0.0 { 1.0 } else { -1.0 };
@@ -1038,6 +1519,9 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
     let dist = (foe.x - me.x).abs();
     let roll = || (rand_int(0, 99) as f32) / 100.0;
 
+    // Below zero on the dial it stands and thinks for some of its turns.
+    if roll() < -g.difficulty { return CpuPlan::Wait; }
+
     // Ranges come from the move table. "Kicking range" is the high kick's.
     let kick_range = attack_range(&me, MoveId::HighKick);
     let jab_range = attack_range(&me, MoveId::LowPunch);
@@ -1046,6 +1530,19 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
     let high_range = attack_range(&me, MoveId::HighKick);
     let foe_range = attack_range(&foe, MoveId::HighKick);
 
+
+    // A rage jump is coming down: be off the floor when it lands. The better
+    // the opponent, the more often it sees it.
+    if foe.stomp && foe.airborne() && !me.airborne() {
+        return if roll() < 0.35 + 0.5 * g.difficulty { CpuPlan::Jump } else { CpuPlan::Wait };
+    }
+
+    // The one with the laser uses it from range: level from the ground, which
+    // a crouch goes under, and from the air at whoever is sitting under it.
+    if me.arch().special == Special::LaserVision && !me.airborne() && me.free()
+        && dist > kick_range * 1.4 && roll() < 0.30 + 0.35 * g.difficulty {
+        return if foe.crouching() { CpuPlan::Jump } else { CpuPlan::Attack(MoveId::Special) };
+    }
 
     // React to what they are doing, before deciding what to do.
     if foe.airborne() && dist < kick_range * 1.4 {
@@ -1066,7 +1563,7 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
         // Not blocking means taking the turn back with the fastest thing
         // available, or a throw up close. (Retreating hands a rushing
         // opponent free ground.)
-        if dist <= THROW_RANGE { return CpuPlan::Attack(MoveId::Throw); }
+        if dist <= throw_range(&me) && foe.throw_rest <= 0.0 { return CpuPlan::Attack(MoveId::Throw); }
         if dist < jab_range { return CpuPlan::Attack(MoveId::LowPunch); }
     }
     // They committed to something slow and it missed: take the turn.
@@ -1079,7 +1576,7 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
     if foe.act == Act::Block && dist < kick_range * 1.1 {
         let read = roll() < 0.4 + 0.5 * g.difficulty;
         if read {
-            return if dist <= THROW_RANGE {
+            return if dist <= throw_range(&me) && foe.throw_rest <= 0.0 {
                 CpuPlan::Attack(MoveId::Throw)  // nothing guards against this
             } else if foe.crouch_block {
                 // A low guard loses to an overhead: the high kick (slow,
@@ -1099,7 +1596,7 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
     if dist > 230.0 {
         // Too far to do anything but close the gap — or throw something
         // that crosses it.
-        if me.arch().special == Special::ChiBolt && roll() < 0.2 + 0.4 * g.difficulty {
+        if matches!(me.arch().special, Special::ChiBolt | Special::LaserVision) && roll() < 0.2 + 0.4 * g.difficulty {
             return CpuPlan::Attack(MoveId::Special);
         }
         return CpuPlan::Approach;
@@ -1172,7 +1669,7 @@ fn cpu_think(g: &mut Game) -> CpuPlan {
             else { CpuPlan::Attack(MoveId::LowKick) }
         }
         _ if r < fast_share + 0.44 => CpuPlan::Attack(MoveId::Special),
-        _ if r < fast_share + 0.53 => CpuPlan::Attack(MoveId::Throw),
+        _ if r < fast_share + 0.53 && foe.throw_rest <= 0.0 => CpuPlan::Attack(MoveId::Throw),
         _ if r < 0.94 => CpuPlan::Block,
         _ => CpuPlan::Retreat,
     }
@@ -1185,6 +1682,8 @@ fn cpu_input(g: &Game) -> Input {
     let me = g.p[1];
     let foe = g.p[0];
     let mut inp = Input::default();
+    // A flier comes back down unless the plan is to be up there.
+    if me.soaring() && g.cpu_plan != CpuPlan::Jump { inp.down = true; }
     let back = if me.facing > 0.0 { &mut inp.left } else { &mut inp.right };
     match g.cpu_plan {
         CpuPlan::Wait => {}
@@ -1198,11 +1697,21 @@ fn cpu_input(g: &Game) -> Input {
                 // Already committed — throw the overhead. A jump-in that
                 // never attacks is just a fighter volunteering to be hit
                 // out of the air.
-                inp.kick_high = true;
+                // A flier out of arm's reach looks down and fires instead.
+                let far = (foe.x - me.x).abs() > attack_range(&me, MoveId::LowPunch) * 1.5;
+                if !me.flies() { inp.kick_high = true; }
+                else if far { inp.kick_low = true; }
+                else { inp.punch_low = true; }
             } else {
                 inp.up = true;
                 if me.facing > 0.0 { inp.right = true; } else { inp.left = true; }
             }
+        }
+        // A flier's kick is the laser, which ends the round: the CPU keeps it
+        // for when it plans a special, and punches otherwise.
+        CpuPlan::Attack(id) if me.flies() && id != MoveId::Special => {
+            let _ = id;
+            inp.punch_low = true;
         }
         CpuPlan::Attack(id) => match id {
             MoveId::LowPunch => inp.punch_low = true,
@@ -1335,6 +1844,80 @@ fn hitstop_for(damage: i32, knockdown: bool, blocked: bool) -> f32 {
     else { 5.0 * F }
 }
 
+/// Serve this round's fruit when its time comes, and feed it to whoever
+/// walks over it. Returns who ate.
+fn fruit_step(g: &mut Game, dt: f32) -> Option<usize> {
+    if g.fruit_due && g.clock <= FRUIT_AT {
+        g.fruit_due = false;
+        let kind = (g.opponent_index as i32 * 3 + g.round - 1).rem_euclid(FRUIT_POINTS.len() as i32);
+        g.fruit = Fruit { x: WIN_W as f32 / 2.0, ttl: FRUIT_STAYS, kind: kind as usize };
+    }
+    if g.fruit.ttl <= 0.0 { return None; }
+    g.fruit.ttl -= dt;
+    let who = (0..2).find(|&i| {
+        let f = &g.p[i];
+        !f.airborne() && f.act != Act::Knockdown && (f.x - g.fruit.x).abs() < f.width() / 2.0 + 10.0
+    })?;
+    g.fruit.ttl = 0.0;
+    let max = g.p[who].arch().health;
+    g.p[who].health = (g.p[who].health + (max as f32 * FRUIT_HEAL).round() as i32).min(max);
+    let (points, label) = FRUIT_POINTS[g.fruit.kind];
+    g.pop(label, g.fruit.x, FLOOR_Y - 46.0);
+    if who == 0 && g.mode == Mode::Solo { g.sess.add_score(points); }
+    Some(who)
+}
+
+/// Two bolts thrown at each other meet and cancel. A laser is not a thing
+/// that can be knocked out of the air: it burns through and carries on.
+fn clash_bolts(g: &mut Game) -> Option<(f32, f32)> {
+    for i in 0..g.bolts.len() {
+        for j in i + 1..g.bolts.len() {
+            let (a, b) = (g.bolts[i], g.bolts[j]);
+            if !a.active || !b.active || a.owner == b.owner { continue; }
+            if !rects_overlap(a.x - 10.0, a.y - 8.0, 20.0, 16.0, b.x - 10.0, b.y - 8.0, 20.0, 16.0) {
+                continue;
+            }
+            for k in [i, j] {
+                if g.p[g.bolts[k].owner].arch().special != Special::LaserVision {
+                    g.bolts[k].active = false;
+                }
+            }
+            return Some(((a.x + b.x) / 2.0, (a.y + b.y) / 2.0));
+        }
+    }
+    None
+}
+
+/// Fighter `i` has just touched down. If that was a rage jump the floor
+/// shakes, and the other fighter, if standing on it, goes down wherever they
+/// are. Returns whether the floor shook. A jump ended by being hit is not a
+/// landing.
+fn land_quake(g: &mut Game, i: usize) -> bool {
+    let stomp = std::mem::take(&mut g.p[i].stomp);
+    if !stomp || !matches!(g.p[i].act, Act::Idle | Act::Attack) { return false; }
+    g.quake_x = g.p[i].x;
+    g.quake_t = QUAKE_SECS;
+    g.shake = 0.3;
+    let from = g.p[i].size();
+    let d = &mut g.p[1 - i];
+    if !d.airborne() && d.act != Act::Knockdown && !invulnerable(d) {
+        d.hurt(QUAKE_DAMAGE, from);
+        d.act = Act::Knockdown;
+        d.t = 0.0;
+        d.vx = 0.0;
+        if i == 0 && g.mode == Mode::Solo { g.sess.add_score(QUAKE_DAMAGE * 10); }
+    }
+    true
+}
+
+/// Let each bar's ghost drain down to the health it stands for.
+fn drain_ghosts(g: &mut Game, dt: f32) {
+    for i in 0..2 {
+        let (now, max) = (g.p[i].health as f32, g.p[i].arch().health as f32);
+        g.ghost[i] = if g.ghost[i] <= now { now } else { (g.ghost[i] - max * 0.5 * dt).max(now) };
+    }
+}
+
 fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
     // The freeze holds the fighters and the clock: a round should not
     // lose time to the impacts that make it worth watching.
@@ -1344,7 +1927,11 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
         return;
     }
 
+    // The last ten seconds are counted out loud.
+    let before = g.clock.ceil();
     g.clock -= dt;
+    if g.clock < 10.0 && g.clock > 0.0 && g.clock.ceil() < before { play_sfx(&sfx.tick); }
+    if fruit_step(g, dt).is_some() { play_sfx(&sfx.fruit); }
 
     #[cfg(not(target_arch = "wasm32"))]
     let p_in = if blip::bot::active() { bot::fight(g, dt) } else { human_input(g, 0) };
@@ -1353,11 +1940,17 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     // A plan runs for its delay unless the world changes: coming out of a
     // hit, or being attacked up close, forces a rethink.
-    let jolted = g.p[1].act == Act::Hitstun
+    let jolted = g.p[1].act == Act::Hitstun || g.p[0].stomp
         || (g.p[0].act == Act::Attack && (g.p[0].x - g.p[1].x).abs() < attack_range(&g.p[0], MoveId::HighKick));
     g.cpu_delay -= dt;
     if g.cpu_delay <= 0.0 || (jolted && g.cpu_delay < 0.12) {
         g.cpu_plan = cpu_think(g);
+        // The early turtles fight alone: the call is kept for opponents who
+        // have had three fights to learn to guard low.
+        if g.cpu_plan == CpuPlan::Attack(MoveId::Special) && g.difficulty < 0.0
+            && g.p[1].arch().build == Build::Turtle && !g.p[1].called {
+            g.cpu_plan = CpuPlan::Attack(MoveId::LowKick);
+        }
         // Faster decisions as the ladder climbs — this is the difficulty
         // dial that actually matters, far more than damage numbers.
         g.cpu_delay = 0.38 - 0.18 * g.difficulty + (rand_int(0, 12) as f32) * 0.01;
@@ -1369,14 +1962,19 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
     // Face each other whenever both are free to turn.
     for i in 0..2 {
         let other = g.p[1 - i].x;
-        if g.p[i].free() && !g.p[i].airborne() {
+        let hovering = g.p[i].soaring() && g.p[i].act == Act::Air;
+        if (g.p[i].free() && !g.p[i].airborne()) || hovering {
             g.p[i].facing = if other >= g.p[i].x { 1.0 } else { -1.0 };
         }
     }
 
-    let close = (g.p[1].x - g.p[0].x).abs() <= THROW_RANGE;
-    apply_input(&mut g.p[0], p_in, close, dt);
-    apply_input(&mut g.p[1], c_in, close, dt);
+    // Wrapped in a web there is no stick: no step, no guard, no blow.
+    let p_in = if g.p[0].webbed > 0.0 { Input::default() } else { p_in };
+    let c_in = if g.p[1].webbed > 0.0 { Input::default() } else { c_in };
+
+    let close = face_off(&mut g.p);
+    apply_input(&mut g.p[0], p_in, close[0], dt);
+    apply_input(&mut g.p[1], c_in, close[1], dt);
     let was_air = [g.p[0].airborne(), g.p[1].airborne()];
     advance(&mut g.p[0], dt);
     advance(&mut g.p[1], dt);
@@ -1385,6 +1983,7 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
     for i in 0..2 {
         if was_air[i] && !g.p[i].airborne() {
             play_sfx_volume(&sfx.land, 0.35 + 0.5 * g.p[i].land_force);
+            if land_quake(g, i) { play_sfx(&sfx.quake); play_sfx(&sfx.crunch); }
         }
     }
 
@@ -1406,6 +2005,14 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
         if f.act == Act::Attack && f.mv == MoveId::FlyingKick && f.t <= dt {
             play_sfx(&sfx.whoosh);
         }
+        // The big ones are heard coming: the rage jump, the epic punch, the
+        // sweep and the high kick.
+        if f.act == Act::Attack && f.t <= dt {
+            if f.stomp { play_sfx(&sfx.bellow); }
+            else if f.epic_punch() || matches!(f.mv, MoveId::Sweep | MoveId::HighKick) {
+                play_sfx_volume(&sfx.swing, 0.7);
+            }
+        }
     }
 
     // Specials fire their effect at the end of startup.
@@ -1414,12 +2021,23 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
         if f.act == Act::Attack && f.mv == MoveId::Special && !f.hit_done {
             let m = f.scaled(move_data(MoveId::Special));
             let at = m.startup * F;
-            if f.t >= at && f.t - dt < at {
+            if f.calling {
+                if f.t >= at && f.t - dt < at {
+                    g.p[i].hit_done = true;
+                    g.call_turtles(i);
+                    g.pop("TURTLES!", f.x, f.y - f.height() - 18.0);
+                    play_sfx(&sfx.whistle);
+                }
+            } else if f.t >= at && f.t - dt < at {
                 match f.arch().special {
-                    Special::ChiBolt => {
+                    Special::ChiBolt | Special::LaserVision => {
                         g.p[i].hit_done = true; // the bolt carries the hit, not the hand
                         g.spawn_bolt(i, m.damage);
-                        play_sfx(&sfx.projectile);
+                        play_sfx(match f.arch().build {
+                            Build::Caped => &sfx.laser,
+                            Build::Spider => &sfx.thwip,
+                            _ => &sfx.projectile,
+                        });
                     }
                     Special::BullRush => {
                         g.p[i].vx = f.facing * 430.0;
@@ -1435,29 +2053,32 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
             }
         }
     }
-    // Bull Rush slides along the floor; bleed it off so it ends.
-    for i in 0..2 {
-        if !g.p[i].airborne() && g.p[i].act == Act::Attack && g.p[i].mv == MoveId::Special {
-            let slide = g.p[i].vx * dt;
-            g.p[i].x = clamp(g.p[i].x + slide, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
-            g.p[i].vx *= 1.0 - (6.0 * dt).min(1.0);
-        }
-    }
-
     // Attacks, both ways, in the same frame — trades are part of the game.
     let holds = [p_in, c_in];
     for a in 0..2 {
         let d = 1 - a;
         let (mut atk, mut def) = (g.p[a], g.p[d]);
+        let reach = atk.hit_box();
         let (dmg, blocked, knock) = resolve_hit(&mut atk, &mut def, holds[d]);
         g.p[a] = atk;
         g.p[d] = def;
         if dmg > 0 || blocked {
             let x = (g.p[a].x + g.p[d].x) / 2.0;
-            let y = g.p[d].y - g.p[d].height() * 0.55;
-            g.spark(x, y, knock, blocked);
+            let (sx, sy) = contact(reach, &g.p[a], &g.p[d]);
+            g.spark(sx, sy, knock, blocked);
             g.hitstop = g.hitstop.max(hitstop_for(dmg, knock, blocked));
-            if blocked {
+            let over = g.p[d].y - g.p[d].height() - 18.0;
+            if dmg > 0 && g.p[a].countered {
+                g.pop("COUNTER!", x, over);
+                play_sfx(&sfx.counter);
+            }
+            if g.p[a].turned {
+                g.p[a].turned = false;
+                g.pop("GUARD IMPACT!", x, over);
+                g.hitstop = g.hitstop.max(8.0 * F);
+                play_sfx(&sfx.parry);
+                push_apart(&mut g.p, 10.0);
+            } else if blocked {
                 play_sfx(&sfx.block);
                 push_apart(&mut g.p, 6.0);
             } else {
@@ -1497,11 +2118,27 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
+    // The turtles who were called in.
+    for (dmg, blocked, knock) in update_helpers(g, dt, holds) {
+        if blocked { play_sfx(&sfx.block); }
+        else if knock { play_sfx(&sfx.crunch); play_sfx_volume(&sfx.cheer, 0.5); }
+        else if dmg > 0 { play_sfx(&sfx.hit_light[1]); }
+    }
+
     // Projectiles.
+    if let Some((x, y)) = clash_bolts(g) {
+        g.spark(x, y, false, true);
+        play_sfx(&sfx.parry);
+    }
     for i in 0..g.bolts.len() {
         if !g.bolts[i].active { continue; }
         g.bolts[i].x += g.bolts[i].vx * dt;
-        if g.bolts[i].x < -20.0 || g.bolts[i].x > WIN_W as f32 + 20.0 { g.bolts[i].active = false; continue; }
+        g.bolts[i].y += g.bolts[i].vy * dt;
+        // Off the side of the stage, or into the boards.
+        if g.bolts[i].x < -20.0 || g.bolts[i].x > WIN_W as f32 + 20.0 || g.bolts[i].y > FLOOR_Y {
+            g.bolts[i].active = false;
+            continue;
+        }
         let d = 1 - g.bolts[i].owner;
         let (dx, dy, dw, dh) = g.p[d].hurt_box();
         let (bx, by) = (g.bolts[i].x - 10.0, g.bolts[i].y - 8.0);
@@ -1513,16 +2150,32 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
             && matches!(g.p[d].act, Act::Idle | Act::Walk | Act::Crouch | Act::Block);
         if guarding {
             g.p[d].act = Act::Block;
+            g.p[d].crouch_block = holds[d].down;
             g.p[d].stun = 12.0 * F;
-            let chip = (g.bolts[i].damage / CHIP_DIVISOR).max(1);
-            g.p[d].health = (g.p[d].health - chip).max(0);
+            // A guard stops the laser killing, not hurting: it is ducked or
+            // dodged, or it is paid for.
+            let laser = g.p[1 - d].arch().special == Special::LaserVision;
+            let chip = if laser { LASER_CHIP } else { (g.bolts[i].damage / CHIP_DIVISOR).max(1) };
+            if laser || !g.p[d].shelled() { g.p[d].hurt(chip, g.p[1 - d].size()); }
             play_sfx(&sfx.block);
         } else {
-            let dmg = g.bolts[i].damage;
-            g.p[d].health = (g.p[d].health - dmg).max(0);
+            // The laser is the end of the round for whoever it touches.
+            let laser = g.p[1 - d].arch().special == Special::LaserVision;
+            // A web costs little in itself: what it costs is the next five
+            // seconds.
+            let web = g.p[1 - d].arch().build == Build::Spider;
+            let dmg = if laser { g.p[d].health.max(1) }
+                else if web { (g.bolts[i].damage / 3).max(1) }
+                else { g.bolts[i].damage };
+            g.p[d].hurt(dmg, g.p[1 - d].size());
             g.p[d].act = Act::Hitstun;
             g.p[d].stun = 18.0 * F;
             g.p[d].t = 0.0;
+            if web && g.p[d].web() {
+                let over = g.p[d].y - g.p[d].height() - 18.0;
+                g.pop("WEBBED!", g.p[d].x, over);
+                play_sfx(&sfx.thwip);
+            }
             play_sfx(&sfx.hit_light[0]);
             g.shake = 0.08;
             if d == 1 { g.sess.add_score(dmg * 10); }
@@ -1531,16 +2184,17 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     for s in g.hitspark.iter_mut() { if s.ttl > 0.0 { s.ttl -= dt; } }
+    for w in g.pops.iter_mut() { if w.ttl > 0.0 { w.ttl -= dt; } }
+    drain_ghosts(g, dt);
     if g.shake > 0.0 { g.shake -= dt; }
+    if g.quake_t > 0.0 { g.quake_t -= dt; }
     if g.combo_t > 0.0 { g.combo_t -= dt; }
 
     // Round over?
     let ko = g.p[0].health <= 0 || g.p[1].health <= 0;
     let time = g.clock <= 0.0;
     if ko || time {
-        g.result = if g.p[0].health == g.p[1].health { RoundResult::Draw }
-            else if g.p[0].health > g.p[1].health { RoundResult::P1 }
-            else { RoundResult::P2 };
+        g.result = round_result(g, ko);
         match g.result {
             RoundResult::P1 => { g.p[0].rounds += 1; g.p[1].act = Act::Defeat; g.p[0].act = Act::Victory;
                 g.p[0].t = 0.0; g.p[1].t = 0.0; }
@@ -1554,8 +2208,14 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
         if ko {
             play_sfx(&sfx.ko);
             play_sfx_volume(&sfx.roar, 0.75);
+            g.slow = SLOW_MO_SECS;
         }
-        g.banner = if ko { "K.O." } else { "TIME UP" };
+        g.fruit.ttl = 0.0;
+        g.call = round_call(g);
+        if g.result == RoundResult::P1 && g.mode == Mode::Solo {
+            g.sess.add_score(match g.call { "PERFECT" => 3000, "GREAT" => 1000, _ => 0 });
+        }
+        g.banner = if ko { "K.O." } else if survived(g) { "SURVIVED" } else { "TIME UP" };
         g.state = State::RoundEnd;
         g.phase.start(2.2);
         // Surviving a round is worth something, and so is surviving it
@@ -1567,7 +2227,94 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 }
 
+/// Where a blow met the body: on the near face of the defender, at the
+/// height the fist or foot came in.
+fn contact(reach: Option<(f32, f32, f32, f32)>, atk: &Fighter, def: &Fighter) -> (f32, f32) {
+    let (dx, dy, dw, dh) = def.hurt_box();
+    let face = if atk.x < def.x { dx } else { dx + dw };
+    let Some((hx, hy, hw, hh)) = reach else { return (face, dy + dh * 0.45) };
+    (face.clamp(hx, hx + hw), (hy + hh / 2.0).clamp(dy + 6.0, dy + dh - 6.0))
+}
+
+/// Run the turtles who were called in: each waits his turn, runs at the
+/// opponent, strikes once under the same rules as anyone, and runs on off
+/// the far side. Returns what each blow did: (damage, blocked, knockdown).
+fn update_helpers(g: &mut Game, dt: f32, holds: [Input; 2]) -> Vec<(i32, bool, bool)> {
+    let mut landed = vec![];
+    for k in 0..g.helpers.len() {
+        let Some(mut h) = g.helpers[k] else { continue };
+        let d = 1 - h.side;
+        h.f.foe_size = g.p[d].size();
+        if h.wait > 0.0 {
+            h.wait -= dt;
+        } else if h.f.act == Act::Attack {
+            advance(&mut h.f, dt);
+            let reach = h.f.hit_box();
+            let mut def = g.p[d];
+            let (dmg, blocked, knock) = resolve_hit(&mut h.f, &mut def, holds[d]);
+            g.p[d] = def;
+            if dmg > 0 || blocked {
+                let (x, y) = contact(reach, &h.f, &g.p[d]);
+                g.spark(x, y, knock, blocked);
+                g.hitstop = g.hitstop.max(hitstop_for(dmg, knock, blocked));
+                if d == 1 { g.sess.add_score(dmg * 10); }
+                landed.push((dmg, blocked, knock));
+            }
+        } else {
+            h.f.act = Act::Walk;
+            h.f.t += dt;
+            h.f.x += h.f.facing * HELPER_RUN * dt;
+            let ahead = (g.p[d].x - h.f.x) * h.f.facing;
+            if !h.struck && ahead <= attack_range(&h.f, h.mv) * 0.9 {
+                h.struck = true;
+                h.f.start_attack(h.mv);
+            }
+            if h.f.x < -40.0 || h.f.x > WIN_W as f32 + 40.0 {
+                g.helpers[k] = None;
+                continue;
+            }
+        }
+        note_handover(&mut h.f, dt);
+        g.helpers[k] = Some(h);
+    }
+    landed
+}
+
+/// Against the CPU fighter nothing can hurt, the player has only to be
+/// standing at the bell.
+fn survived(g: &Game) -> bool {
+    g.mode == Mode::Solo && g.p[1].arch().invincible && !g.p[0].arch().invincible
+        && g.p[0].health > 0 && g.p[1].health > 0
+}
+
+/// Who took the round: whoever has more health left, by knockout or at the
+/// bell. The one exception is `survived`: a round nobody could have won on
+/// health goes to the player for lasting it out.
+fn round_result(g: &Game, ko: bool) -> RoundResult {
+    if !ko && survived(g) { return RoundResult::P1; }
+    if g.p[0].health == g.p[1].health { RoundResult::Draw }
+    else if g.p[0].health > g.p[1].health { RoundResult::P1 }
+    else { RoundResult::P2 }
+}
+
+/// The announcer's verdict, Tekken's: PERFECT for a round won untouched,
+/// GREAT for one won on the last sliver of the bar. Nothing for the fighter
+/// who cannot be hurt; it is no achievement of his.
+fn round_call(g: &Game) -> &'static str {
+    let winner = match g.result {
+        RoundResult::P1 => g.p[0],
+        RoundResult::P2 => g.p[1],
+        RoundResult::Draw => return "",
+    };
+    let max = winner.arch().health;
+    if winner.arch().invincible { "" }
+    else if winner.health >= max { "PERFECT" }
+    else if winner.health * 10 <= max { "GREAT" }
+    else { "" }
+}
+
 fn update_round_end(g: &mut Game, dt: f32) {
+    let dt = if g.slow > 0.0 { g.slow -= dt; dt * SLOW_MO } else { dt };
     // Keep the fighters moving after the round ends, or a mid-air finisher
     // hangs in the sky and the victory pose (driven by the action timer)
     // never plays.
@@ -1578,9 +2325,15 @@ fn update_round_end(g: &mut Game, dt: f32) {
     // A bolt in flight at the bell sails on off screen, harmless, rather than hang there.
     for b in g.bolts.iter_mut().filter(|b| b.active) {
         b.x += b.vx * dt;
-        if b.x < -20.0 || b.x > WIN_W as f32 + 20.0 { b.active = false; }
+        b.y += b.vy * dt;
+        if b.x < -20.0 || b.x > WIN_W as f32 + 20.0 || b.y > FLOOR_Y { b.active = false; }
     }
+    // The finishing blow's spark fades through the round end too.
+    for s in g.hitspark.iter_mut() { if s.ttl > 0.0 { s.ttl -= dt; } }
+    for w in g.pops.iter_mut() { if w.ttl > 0.0 { w.ttl -= dt; } }
+    drain_ghosts(g, dt);
     if g.shake > 0.0 { g.shake -= dt; }
+    if g.quake_t > 0.0 { g.quake_t -= dt; }
     if !g.phase.tick(dt) { return; }
     let (a, b) = (g.p[0].rounds, g.p[1].rounds);
     if a >= ROUNDS_TO_WIN || b >= ROUNDS_TO_WIN {
@@ -1696,11 +2449,21 @@ fn update_menus(g: &mut Game, m: [MenuIn; 2]) -> Option<Cue> {
                 g.p[0].rounds = 0;
                 g.p[1].rounds = 0;
                 if versus { g.start_versus(); } else { g.start_match(0); }
+                g.announce();
                 cue = Some(Cue::Confirm);
             }
             cue
         }
         _ => None,
+    }
+}
+
+/// The billing runs its time, or a press cuts it short once it has been seen.
+fn update_vs(g: &mut Game, dt: f32, fire: bool) {
+    let skip = fire && g.phase.remaining() < VS_SECS - 0.8;
+    if g.phase.tick(dt) || skip {
+        g.state = State::RoundIntro;
+        g.phase.start(ROUND_INTRO);
     }
 }
 
@@ -1721,10 +2484,11 @@ fn update_match_end(g: &mut Game, dt: f32) {
         g.phase.start(1.2);
         return;
     }
-    if g.opponent_index + 1 < 2 {
+    if g.opponent_index + 1 < RUNGS {
         g.p[0].rounds = 0;
         g.p[1].rounds = 0;
         g.start_match(g.opponent_index + 1);
+        g.announce();
     } else {
         g.sess.add_score(5000);
         web::report_score(g.sess.score);
@@ -1749,9 +2513,22 @@ const BLOCK_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds
 const BELL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bell.wav"));
 const KO_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ko.wav"));
 const PROJECTILE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/projectile.wav"));
-// The music is synthesised at startup, not baked in: three themes long enough
-// not to repeat in a round are about a megabyte of PCM, more than the rest of
-// the game.
+const LASER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/laser.wav"));
+const QUAKE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/quake.wav"));
+const PARRY_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/parry.wav"));
+const COUNTER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/counter.wav"));
+const FRUIT_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/fruit.wav"));
+const TICK_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/tick.wav"));
+const GONG_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/gong.wav"));
+const BELLOW_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bellow.wav"));
+const SWING_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/swing.wav"));
+const WHISTLE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/whistle.wav"));
+const THWIP_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/thwip.wav"));
+const WIN_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/win.wav"));
+const LOSE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/lose.wav"));
+// The music is synthesised on the device, not baked in: a theme long enough
+// not to repeat in a round is megabytes of PCM, more than the rest of the
+// game.
 
 struct Sounds {
     /// Three light hits at rising pitch. A combo picks the next one up,
@@ -1773,6 +2550,24 @@ struct Sounds {
     bell: blip::BlipSound,
     ko: blip::BlipSound,
     projectile: blip::BlipSound,
+    laser: blip::BlipSound,
+    /// The giant coming down.
+    quake: blip::BlipSound,
+    /// A guard impact: nothing else in the fight rings.
+    parry: blip::BlipSound,
+    counter: blip::BlipSound,
+    fruit: blip::BlipSound,
+    /// The menus: a wood block for a step, a gong for a choice.
+    tick: blip::BlipSound,
+    gong: blip::BlipSound,
+    whistle: blip::BlipSound,
+    thwip: blip::BlipSound,
+    /// The giant's rage jump, and any blow with a whole body behind it.
+    bellow: blip::BlipSound,
+    swing: blip::BlipSound,
+    /// The match decided: played alone, the stage music stopped under it.
+    win: blip::BlipSound,
+    lose: blip::BlipSound,
 }
 
 fn main_conf() -> blip::macroquad::window::Conf { window_conf("BRAWLER", WIN_W, WIN_H) }
@@ -1780,6 +2575,9 @@ fn main_conf() -> blip::macroquad::window::Conf { window_conf("BRAWLER", WIN_W, 
 #[blip::macroquad::main(main_conf)]
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
+    // Whole lit scenes, not lines on black: at full bloom every fighter
+    // wears a halo and the names smear.
+    blip.set_bloom(0.15);
     let mut g = Game::new();
 
     // Say so before the slow part (the themes take a second or two), or the
@@ -1805,11 +2603,28 @@ async fn main() {
         bell: blip::audio::load_sound(BELL_WAV).await,
         ko: blip::audio::load_sound(KO_WAV).await,
         projectile: blip::audio::load_sound(PROJECTILE_WAV).await,
+        laser: blip::audio::load_sound(LASER_WAV).await,
+        quake: blip::audio::load_sound(QUAKE_WAV).await,
+        parry: blip::audio::load_sound(PARRY_WAV).await,
+        counter: blip::audio::load_sound(COUNTER_WAV).await,
+        fruit: blip::audio::load_sound(FRUIT_WAV).await,
+        tick: blip::audio::load_sound(TICK_WAV).await,
+        gong: blip::audio::load_sound(GONG_WAV).await,
+        whistle: blip::audio::load_sound(WHISTLE_WAV).await,
+        bellow: blip::audio::load_sound(BELLOW_WAV).await,
+        swing: blip::audio::load_sound(SWING_WAV).await,
+        thwip: blip::audio::load_sound(THWIP_WAV).await,
+        win: blip::audio::load_sound(WIN_WAV).await,
+        lose: blip::audio::load_sound(LOSE_WAV).await,
     };
     // Built here rather than shipped: see the note where the other
     // assets are declared.
     use blip_assets::brawler::theme_wav;
-    let mut music = Jukebox::new(&[|| theme_wav(0), || theme_wav(1), || theme_wav(2)]);
+    let mut music = Jukebox::new(&[|| theme_wav(0), || theme_wav(1), || theme_wav(2),
+        || theme_wav(3), || theme_wav(4), || theme_wav(5)]);
+    /// The theme of each stage, in stage order.
+    // The fortress borrows the temple's theme and the rooftop the air base's.
+    const STAGE_TRACK: [usize; STAGES] = [0, 1, 3, 4, 5, 1, 3];
     /// The title and select screens have a loop of their own — they were
     /// silent, and silence in front of a noisy game reads as not loaded.
     const SELECT_TRACK: usize = 2;
@@ -1822,17 +2637,74 @@ async fn main() {
 
         // Screenshot mode (BLIP_SCREENSHOT_OUT) drops straight into a fight,
         // timed so the kick is extended on the captured frame.
-        if blip.screenshot_mode {
+        // BLIP_SHOT_SCENE picks another picture (see brawler_card.sh): 1 the
+        // laser from the air, 2 a rage jump landing, 3 the title screen, 4 to
+        // 6 the air base, the bath house and the river village, 7 the billing
+        // before the fourth fight, 8 a knockout, 9 a turtle calling the others,
+        // 10 a fighter in a web, 11 the fortress, 12 the rooftop, 13 a kick off
+        // the far leg, 14 a chain punch, 15 the card's poster.
+        let scene = std::env::var("BLIP_SHOT_SCENE").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+        if blip.screenshot_mode && scene == 3 {
+            // The title is where the game already is.
+        } else if blip.screenshot_mode && scene == 15 {
+            g.poster = true;
+        } else if blip.screenshot_mode && scene == 7 {
+            if g.state != State::Vs {
+                g.pick = 0;
+                g.start_match(3);
+                g.announce();
+            }
+        } else if blip.screenshot_mode && scene > 0 && !matches!(scene, 8 | 13 | 14) {
+            shot_frame += 1;
+            let (a, b, stage) = match scene {
+                1 => (9, 8, 1),
+                2 => (8, 4, 0),
+                4 => (0, 2, 2),
+                5 => (1, 3, 3),
+                9 => (3, 0, 3),
+                11 => (0, 9, 5),
+                12 => (0, 7, 6),
+                10 => (7, 0, 2),
+                _ => (0, 8, 4),
+            };
+            if shot_frame == 1 {
+                g.pick = a;
+                g.start_match(0);
+                g.stage = stage;
+                g.state = State::Fight;
+                g.p = [Fighter::new(a, 210.0, 1.0), Fighter::new(b, 440.0, -1.0)];
+                g.ghost = [g.p[0].health as f32, g.p[1].health as f32];
+                g.clock = ROUND_SECS * 0.6;
+                g.fruit_due = false;
+                if scene == 1 {
+                    g.p[0].y = FLOOR_Y - 70.0;
+                    g.p[0].act = Act::Air;
+                }
+            }
+            g.cpu_plan = CpuPlan::Wait;
+            g.cpu_delay = 99.0;
+            if shot_frame == 4 && matches!(scene, 1 | 9 | 10) { g.p[0].start_attack(MoveId::Special); }
+            if shot_frame == 4 && scene == 2 {
+                g.p[0].y = FLOOR_Y - 130.0;
+                g.p[0].act = Act::Air;
+                g.p[0].start_attack(MoveId::JumpKick);
+            }
+        } else if blip.screenshot_mode {
             shot_frame += 1;
             if shot_frame == 1 {
                 g.pick = 0;
                 g.start_match(0);
                 g.state = State::Fight;
+                // The two the game began with, on the docks.
+                g.p[1] = Fighter::new(1, 370.0, -1.0);
+                g.stage = home_of(1);
                 g.p[0].x = 286.0;
-                g.p[1].x = 370.0;
                 g.p[1].health = (FIGHTERS[g.p[1].who].health as f32 * 0.55) as i32;
+                // Scene 8: the same kick is the last of the round.
+                if scene == 8 { g.p[1].health = 1; }
                 g.p[0].health = (FIGHTERS[g.p[0].who].health as f32 * 0.8) as i32;
                 g.clock = ROUND_SECS * 0.72;
+                g.fruit_due = false;
             }
             // Hold the opponent still: left alone the CPU ducks and the high
             // kick sails over it.
@@ -1841,7 +2713,27 @@ async fn main() {
             // Captured at BLIP_SCREENSHOT_FRAME=30: the kick has landed, the
             // hitstop flash (near-white in a still) has passed, and the spark
             // is still up.
-            if shot_frame == 4 { g.p[0].start_attack(MoveId::HighKick); }
+            if shot_frame == 4 {
+                // Scene 13 kicks off the far leg; 14 is the second punch of a chain.
+                g.p[0].far_leads = scene == 13;
+                g.p[0].since_punch = 0.1;
+                g.p[0].start_attack(if scene == 14 { MoveId::HighPunch } else { MoveId::HighKick });
+            }
+            if scene == 14 && shot_frame > 14 {
+                let m = move_data(MoveId::HighPunch);
+                g.p[0].act = Act::Attack;
+                g.p[0].t = (m.startup + m.active * 0.5) * F;
+            }
+            // Frames run on the wall clock: hold the splash open so the still
+            // has it whichever frame it lands on.
+            for s in g.hitspark.iter_mut().filter(|s| s.ttl > 0.0) { s.ttl = s.ttl.max(s.life * 0.55); }
+            // And, short of a knockout, the kick at full stretch.
+            if matches!(scene, 0 | 13) && g.p[0].hit_done && g.p[0].mv == MoveId::HighKick {
+                let m = move_data(MoveId::HighKick);
+                g.p[0].act = Act::Attack;
+                g.p[0].t = (m.startup + m.active * 0.5) * F;
+                g.hitstop = 0.0;
+            }
         }
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -1850,8 +2742,12 @@ async fn main() {
             State::Title | State::Select => {
                 let m = read_menu(&mut g);
                 if let Some(cue) = update_menus(&mut g, m) {
-                    play_sfx(if cue == Cue::Step { &sfx.block } else { &sfx.bell });
+                    play_sfx(if cue == Cue::Step { &sfx.tick } else { &sfx.gong });
                 }
+            }
+            State::Vs => {
+                let m = read_menu(&mut g);
+                update_vs(&mut g, dt, m[0].fire || m[1].fire);
             }
             State::RoundIntro => {
                 // Each round opens with the fighters bowing to each other.
@@ -1870,8 +2766,22 @@ async fn main() {
                 }
             }
             State::Fight => update_fight(&mut g, dt, &sfx),
-            State::RoundEnd => update_round_end(&mut g, dt),
-            State::MatchEnd => update_match_end(&mut g, dt),
+            State::RoundEnd => {
+                update_round_end(&mut g, dt);
+                if g.state == State::MatchEnd {
+                    music.stop();
+                    let lost = g.mode == Mode::Solo && g.p[0].rounds < g.p[1].rounds;
+                    play_sfx(if lost { &sfx.lose } else { &sfx.win });
+                }
+            }
+            State::MatchEnd => {
+                update_match_end(&mut g, dt);
+                match g.state {
+                    State::Vs => play_sfx(&sfx.gong),
+                    State::Won => { play_sfx(&sfx.gong); play_sfx(&sfx.roar); }
+                    _ => {}
+                }
+            }
             State::Over | State::Won => {
                 g.phase.tick(dt);
                 // Either player can take it back to the title.
@@ -1885,8 +2795,8 @@ async fn main() {
 
         let want = match g.state {
             State::Title | State::Select => Some(SELECT_TRACK),
-            State::RoundIntro | State::Fight | State::RoundEnd | State::MatchEnd => {
-                Some(g.stage)
+            State::Vs | State::RoundIntro | State::Fight | State::RoundEnd => {
+                Some(STAGE_TRACK[g.stage % STAGES])
             }
             _ => None,
         };

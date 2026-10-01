@@ -89,6 +89,7 @@ varying lowp vec4 color;
 uniform sampler2D Texture;
 uniform vec4 _Time;
 uniform vec2 ScreenSize;
+uniform float Bloom;
 
 // Bow 0..1 UVs into a convex tube (larger divisors = flatter); the <1 scale
 // pulls the picture back so the pushed corners stay in range and the whole
@@ -133,7 +134,7 @@ void main() {
     b += texture2D(Texture, cuv + vec2( 1.5, -2.5) * px * 4.0).rgb;
     b += texture2D(Texture, cuv + vec2(-1.5,  2.5) * px * 4.0).rgb;
     b *= 0.125;
-    col += max(b - 0.25, 0.0) * 1.4;
+    col += max(b - 0.25, 0.0) * 1.4 * Bloom;
 
     // ---- tube vignette ----
     // Radial, easing only the last sliver near the glass edge, so corner HUD
@@ -213,6 +214,9 @@ pub struct Blip {
     interlace_field: u8, // 0 or 1, flips every frame
     // ---- curved-glass shader pass ----
     crt:         Option<Material>, // None if the shader failed to compile
+    // How much of the phosphor bloom is added back: 1.0 suits lit lines on
+    // black; a game with bright filled scenes turns it down or it smears.
+    bloom:       f32,
     // Scanline dimming shader (SCANLINE_FRAGMENT); None falls back to a
     // rectangle per row, like `crt` above.
     scanline:    Option<Material>,
@@ -256,7 +260,8 @@ impl Blip {
         let crt = load_material(
             ShaderSource::Glsl { vertex: CRT_VERTEX, fragment: CRT_FRAGMENT },
             MaterialParams {
-                uniforms: vec![UniformDesc::new("ScreenSize", UniformType::Float2)],
+                uniforms: vec![UniformDesc::new("ScreenSize", UniformType::Float2),
+                               UniformDesc::new("Bloom", UniformType::Float1)],
                 ..Default::default()
             },
         )
@@ -299,6 +304,7 @@ impl Blip {
             chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
             interlace_field: 0,
             crt,
+            bloom: 1.0,
             scanline,
             screen_rt: None,
             screen_rt_w: 0,
@@ -565,6 +571,7 @@ impl Blip {
         }
         clear_background(macroquad::color::BLACK);
         crt.set_uniform("ScreenSize", vec2(vw, vh));
+        crt.set_uniform("Bloom", self.bloom);
         gl_use_material(&crt);
         // The composite was drawn under a render-target camera whose vertical
         // axis is inverted vs. the screen; the shader flips it back (`fuv`).
@@ -706,6 +713,10 @@ impl Blip {
     }
 
     // ----- drawing helpers — see blip::draw and blip::font for full docs -----
+
+    /// Set the strength of the screen's phosphor bloom, 0.0 (none) to 1.0
+    /// (the default, tuned for bright lines on a black field).
+    pub fn set_bloom(&mut self, k: f32) { self.bloom = k.clamp(0.0, 1.0); }
 
     /// Fill the canvas with a solid colour. Call this at the start of your draw pass.
     #[inline]

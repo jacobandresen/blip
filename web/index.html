@@ -317,6 +317,39 @@
       image-rendering: auto;
     }
 
+    /* Brawler's card is a fight poster (brawler_card.sh), not one frame: it
+       fills the frame, leans its title like a marquee, and a light sweeps
+       across it while the card is lit. */
+    .card-brawler .card-shot-wrap { overflow: hidden; }
+    .card-brawler .card-shot { object-fit: cover; transition: transform .4s ease-out; }
+    .card-brawler:hover .card-shot,
+    .card-brawler.card-focused .card-shot { transform: scale(1.05); }
+    .card-brawler .card-shot-wrap::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,.22) 50%, transparent 58%);
+      transform: translateX(-120%);
+      pointer-events: none;
+    }
+    .card-brawler:hover .card-shot-wrap::after,
+    .card-brawler.card-focused .card-shot-wrap::after,
+    .card-brawler.card-active .card-shot-wrap::after { animation: brawler-shine 3.2s ease-in-out infinite; }
+    @keyframes brawler-shine {
+      0%, 55% { transform: translateX(-120%); }
+      100%    { transform: translateX(120%); }
+    }
+    .card-brawler .card-title {
+      font-style: italic;
+      letter-spacing: .26em;
+      background: linear-gradient(180deg, #ffe45c 20%, #ff7a2a 55%, #dc3c28 90%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow: none;
+      filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c) 70%, transparent));
+    }
+
     .card-title {
       font-size: clamp(1rem, 3vw, 1.4rem);
       letter-spacing: .2em;
@@ -589,6 +622,8 @@
     }
     @media (prefers-reduced-motion: reduce) {
       .badge-action, .badge-cosy, .badge-trippy, .badge-trippy::before, .bt-ring { animation: none; }
+      .card-brawler .card-shot-wrap::after { animation: none !important; }
+      .card-brawler .card-shot { transition: none; transform: none !important; }
     }
 
     /* ---- footer ---- */
@@ -809,7 +844,7 @@
         <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
       </div>
       <div class="card-shot-wrap">
-        <img class="card-shot" src="brawler/screenshot.png?v=7" alt="Brawler gameplay">
+        <img class="card-shot" src="brawler/card.png?v=11" alt="Brawler: a high kick, over the sign">
       </div>
       <div class="card-title">BRAWLER</div>
       <div class="card-genre"  data-i18n="brawlerGenre"></div>
@@ -892,8 +927,8 @@
         meteorsControls:   'A/D ROTATE &middot; W THRUST &middot; [1] FIRE &middot; [2] HYPERSPACE',
 
         brawlerGenre:      'ONE TO ONE FIGHT GAME',
-        brawlerDesc:       'Pick a fighter; the other two are waiting, each somewhere else. Guard high or guard low &mdash; nothing covers both.<br>Here comes a new challenger.',
-        brawlerControls:   '1P WASD+F PUNCH G KICK &middot; 2P ARROWS+J/K &middot; TOWARD+BUTTON = HIGH &middot; BOTH = SPECIAL &middot; CLOSE PUNCH = THROW',
+        brawlerDesc:       'Pick one of ten fighters and fight the other nine, each on home ground. Guard high or guard low &mdash; nothing covers both.<br>Here comes a new challenger.',
+        brawlerControls:   '1P WASD + F/G &middot; 2P ARROWS + J/K &middot; BOTH = SPECIAL',
         bubblerGenre:      'TWO-DRAGON PLATFORM GAME',
         bubblerDesc:       'Two cuddly dragons blow bubbles, catch the toy monsters and pop them into candy. Pop a whole cluster and every catch doubles.',
         bubblerControls:   '1P WASD+F BUBBLE+G JUMP &middot; 2P ARROWS+J+K &middot; HOLD JUMP TO RIDE BUBBLES',
@@ -943,8 +978,8 @@
         meteorsControls:   'A/D 回転 &middot; W 推進 &middot; [1] 発射 &middot; [2] ワープ',
 
         brawlerGenre:      '一対一格闘ゲーム',
-        brawlerDesc:       '一人を選べ。残る二人が別々の場所で待っている。上段か下段か、両方は防げない。<br>挑戦者、あらわる。',
-        brawlerControls:   '1P WASD+F パンチ G キック &middot; 2P 矢印+J/K &middot; 前+ボタンで上段 &middot; 同時押しで必殺技 &middot; 密着パンチで投げ',
+        brawlerDesc:       '十人から一人を選び、残る九人とそれぞれの本拠地で戦え。上段か下段か、両方は防げない。<br>挑戦者、あらわる。',
+        brawlerControls:   '1P WASD + F/G &middot; 2P 矢印 + J/K &middot; 同時押しで必殺技',
         bubblerGenre:      '二匹の竜のアクションゲーム',
         bubblerDesc:       'ふわふわの竜が泡を吹いて、おもちゃのモンスターをつかまえ、割ってキャンディーに。まとめて割るほど点が倍になる。',
         bubblerControls:   '1P WASD+F 泡+G ジャンプ &middot; 2P 矢印+J+K &middot; ジャンプ長押しで泡に乗る',
@@ -994,8 +1029,8 @@
         meteorsControls:   'A/D DREJ &middot; W FREMDRIFT &middot; [1] SKYD &middot; [2] HYPERSPACE',
 
         brawlerGenre:      'EN MOD EN KAMPSPIL',
-        brawlerDesc:       'V&aelig;lg din k&aelig;mper; de to andre venter, hver sit sted. Hold h&oslash;jt eller lavt &mdash; ingen blokering d&aelig;kker begge.<br>Her kommer en ny udfordrer.',
-        brawlerControls:   '1P WASD+F SLAG G SPARK &middot; 2P PILE+J/K &middot; FREM+KNAP = H&Oslash;JT &middot; BEGGE = SPECIAL &middot; T&AElig;T SLAG = KAST',
+        brawlerDesc:       'V&aelig;lg en af ti k&aelig;mpere og m&oslash;d de ni andre, hver p&aring; hjemmebane. Hold h&oslash;jt eller lavt &mdash; ingen blokering d&aelig;kker begge.<br>Her kommer en ny udfordrer.',
+        brawlerControls:   '1P WASD + F/G &middot; 2P PILE + J/K &middot; BEGGE = SPECIAL',
         bubblerGenre:      'PLATFORMSPIL FOR TO DRAGER',
         bubblerDesc:       'To bl&oslash;de drager puster bobler, fanger legetøjsmonstrene og prikker dem til slik. Prik en hel klynge, og hver fangst t&aelig;ller dobbelt.',
         bubblerControls:   '1P WASD+F BOBLE+G HOP &middot; 2P PILE+J+K &middot; HOLD HOP FOR AT RIDE P&Aring; BOBLER',
