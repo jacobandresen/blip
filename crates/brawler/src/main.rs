@@ -10,13 +10,15 @@
 //! hitboxes, so an arm that looks extended is what hits you.
 
 mod draw;
+#[cfg(not(target_arch = "wasm32"))]
+mod bot;
 
 use blip::macroquad::input::KeyCode;
 use blip::input::{key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
     BLIP_KEY_DOWN, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_J, BLIP_KEY_K, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W};
 use blip::audio::play_sfx_volume;
-use blip::{clamp, play_music, play_sfx, rand_int, rects_overlap, web,
+use blip::{clamp, play_sfx, Jukebox, rand_int, rects_overlap, web,
     window_conf, Blip,
     BlipColor, Session, Timer, BLIP_BLACK, BLIP_WHITE, BLIP_YELLOW};
 
@@ -563,7 +565,9 @@ impl Game {
         self.opponent_index = opponent_index;
         let foe = self.ladder()[opponent_index];
         self.stage = opponent_index % 2;
-        self.difficulty = 0.35 + 0.4 * opponent_index as f32;
+        // The first opponent is a warm-up a newcomer can beat; the dial
+        // then climbs steeply (a playtest bot lost 0-2 at 0.35).
+        self.difficulty = if opponent_index == 0 { 0.15 } else { 0.35 + 0.4 * opponent_index as f32 };
         self.p[0] = Fighter::new(self.pick, 200.0, 1.0);
         self.p[1] = Fighter::new(foe, 440.0, -1.0);
         self.round = 1;
@@ -1342,6 +1346,9 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     g.clock -= dt;
 
+    #[cfg(not(target_arch = "wasm32"))]
+    let p_in = if blip::bot::active() { bot::fight(g, dt) } else { human_input(g, 0) };
+    #[cfg(target_arch = "wasm32")]
     let p_in = human_input(g, 0);
 
     // A plan runs for its delay unless the world changes: coming out of a
@@ -1555,6 +1562,8 @@ fn update_fight(g: &mut Game, dt: f32, sfx: &Sounds) {
         // untouched — a player who wins 100-0 has done more than one who
         // wins 100-99.
         if g.result == RoundResult::P1 { g.sess.add_score(1000 + g.p[0].health * 20); }
+        let side = match g.result { RoundResult::P1 => "won", RoundResult::P2 => "lost", RoundResult::Draw => "drew" };
+        blip::bot::add(&format!("round_{side}_vs{}_{}", g.opponent_index, if ko { "ko" } else { "time" }), 1.0);
     }
 }
 
@@ -1565,6 +1574,11 @@ fn update_round_end(g: &mut Game, dt: f32) {
     for i in 0..2 {
         advance(&mut g.p[i], dt);
         g.p[i].x = clamp(g.p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
+    }
+    // A bolt in flight at the bell sails on off screen, harmless, rather than hang there.
+    for b in g.bolts.iter_mut().filter(|b| b.active) {
+        b.x += b.vx * dt;
+        if b.x < -20.0 || b.x > WIN_W as f32 + 20.0 { b.active = false; }
     }
     if g.shake > 0.0 { g.shake -= dt; }
     if !g.phase.tick(dt) { return; }
@@ -1794,16 +1808,12 @@ async fn main() {
     };
     // Built here rather than shipped: see the note where the other
     // assets are declared.
-    let mut music = Vec::with_capacity(3);
-    for i in 0..3 {
-        let wav = blip_assets::brawler::theme_wav(i);
-        music.push(blip::audio::load_sound(&wav).await);
-    }
-    /// Which loop is playing. The title and select screens have one of
-    /// their own — they were silent, and silence in front of a noisy
-    /// game reads as something not having loaded.
+    use blip_assets::brawler::theme_wav;
+    let mut music = Jukebox::new(&[|| theme_wav(0), || theme_wav(1), || theme_wav(2)]);
+    /// The title and select screens have a loop of their own — they were
+    /// silent, and silence in front of a noisy game reads as not loaded.
     const SELECT_TRACK: usize = 2;
-    let mut playing_track = usize::MAX;
+    music.start(SELECT_TRACK).await;
     let mut shot_frame: u32 = 0;
 
     loop {
@@ -1834,6 +1844,8 @@ async fn main() {
             if shot_frame == 4 { g.p[0].start_attack(MoveId::HighKick); }
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
+        if blip::bot::active() { bot::menus(&mut g, blip::bot::clock()); }
         match g.state {
             State::Title | State::Select => {
                 let m = read_menu(&mut g);
@@ -1878,12 +1890,8 @@ async fn main() {
             }
             _ => None,
         };
-        if let Some(track) = want {
-            if playing_track != track {
-                play_music(&music[track]);
-                playing_track = track;
-            }
-        }
+        if let Some(track) = want { music.play(track); }
+        if matches!(g.state, State::Title | State::Select) { music.warm_up().await; }
 
         blip.clear(BLIP_BLACK);
         draw::draw(&blip, &g);

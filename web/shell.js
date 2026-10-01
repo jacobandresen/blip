@@ -206,8 +206,8 @@ function flashCoinBar() {
   });
 }
 
-// Called from WASM on game-over restart, and again when a second player
-// joins (a two-player game takes two coins). Out of coins, the debt is
+// Called from WASM when play starts (from the title or a game-over
+// restart), once more per second player. Out of coins, the debt is
 // kept and the coins that go in next pay it before the game goes on.
 var coinsOwed = 0;
 window.blipSpendCoin = function () {
@@ -786,11 +786,12 @@ window.addEventListener('keydown', function (e) {
     window.addEventListener('pointerdown', noteInput, true);
     window.addEventListener('pointermove', noteInput, true);
 
-    // ---- Platform (Bubbler): one surface. Slide left / right to run (the
-    // anchor trails the thumb), tap to bubble, swipe up to jump. Presses go
-    // through BlipController, so they land on player one's own keys.
-    var RUN_PX = 14, FLICK_PX = 30, LEASH_PX = 40, TAP_PX = 12, TAP_MS = 300;
-    var plat = {};                     // pointerId -> { who, x0, y0, sx, sy, t, dir, moved }
+    // ---- Platform (Bubbler): one surface. Every touch blows a bubble the
+    // moment it lands (a tap judged on release missed whenever the thumb
+    // slid or lingered), a slide runs (the anchor trails the thumb), a swipe
+    // up jumps. Presses go through BlipController, onto the player's keys.
+    var RUN_PX = 10, FLICK_PX = 20, LEASH_PX = 28;
+    var plat = {};                     // pointerId -> { who, x0, y0, dir }
     // Once player two is in, the right half (of the trackpad, or of the
     // screen sideways) is theirs, with the same gestures on their keys.
     var PLAT_NAMES = [
@@ -822,16 +823,16 @@ window.addEventListener('keydown', function (e) {
     function tapButton(name) {
       BlipController.set(name, true);
       setTimeout(function () { BlipController.set(name, false); }, 60);
+      if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) {} }
     }
     function platDown(e) {
-      plat[e.pointerId] = { who: whoOf(e), x0: e.clientX, y0: e.clientY, sx: e.clientX, sy: e.clientY,
-                            t: performance.now(), dir: null, moved: false };
+      var p = plat[e.pointerId] = { who: whoOf(e), x0: e.clientX, y0: e.clientY, dir: null };
+      tapButton(PLAT_NAMES[p.who].bubble);
       lightZones();
     }
     function platMove(e) {
       var p = plat[e.pointerId];
       if (!p) return;
-      if (Math.abs(e.clientX - p.sx) > TAP_PX || Math.abs(e.clientY - p.sy) > TAP_PX) p.moved = true;
       var dx = e.clientX - p.x0;
       if (dx > LEASH_PX) { p.x0 = e.clientX - LEASH_PX; dx = LEASH_PX; }
       if (dx < -LEASH_PX) { p.x0 = e.clientX + LEASH_PX; dx = -LEASH_PX; }
@@ -839,16 +840,15 @@ window.addEventListener('keydown', function (e) {
       if (p.y0 - e.clientY > FLICK_PX) { tapButton(PLAT_NAMES[p.who].jump); p.y0 = e.clientY; }
       else if (e.clientY > p.y0) p.y0 = e.clientY;
     }
-    function platUp(e, lifted) {
+    function platUp(e) {
       var p = plat[e.pointerId];
       if (!p) return;
       runTo(p, null);
-      if (lifted && !p.moved && performance.now() - p.t < TAP_MS) tapButton(PLAT_NAMES[p.who].bubble);
       delete plat[e.pointerId];
       lightZones();
     }
     function platRelease() {
-      for (var id in plat) platUp({ pointerId: id }, false);
+      for (var id in plat) platUp({ pointerId: id });
     }
     // The game changed mode and the shell let go of every key: a thumb still
     // running picks up again on its next move.
@@ -865,7 +865,7 @@ window.addEventListener('keydown', function (e) {
     window.addEventListener('pointermove', function (e) {
       if (kind === 'platform' && plat[e.pointerId]) { e.preventDefault(); platMove(e); }
     }, { passive: false });
-    window.addEventListener('pointerup', function (e) { if (kind === 'platform') platUp(e, true); });
+    window.addEventListener('pointerup', function (e) { if (kind === 'platform') platUp(e); });
 
     window.addEventListener('pointerdown', function (e) {
       if (kind === 'platform') return;

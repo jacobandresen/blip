@@ -148,3 +148,87 @@ fn encode_wav(sample_rate: u32, samples: &[i16]) -> Vec<u8> {
     }
     out
 }
+
+/// A game's music: tracks synthesised on the device from `fn() -> Vec<u8>`
+/// WAV makers. `start` renders the first one wanted; the rest wait until
+/// `warm_up` is called on a screen where a short stall is harmless (a title
+/// or a pause), so loading never renders every track up front.
+pub struct Jukebox {
+    makers: Vec<fn() -> Vec<u8>>,
+    tracks: Vec<Option<(BlipSound, f32)>>,
+    playing: Option<usize>,
+    /// Seconds left in the current loop, for `rotate`.
+    left: f32,
+}
+
+impl Jukebox {
+    pub fn new(makers: &[fn() -> Vec<u8>]) -> Self {
+        Self { makers: makers.to_vec(), tracks: vec![None; makers.len()], playing: None, left: 0.0 }
+    }
+
+    /// Render track `first` and play it.
+    pub async fn start(&mut self, first: usize) {
+        self.render(first).await;
+        self.switch(first);
+    }
+
+    /// Render the next track still missing, if any. Returns true while more remain.
+    pub async fn warm_up(&mut self) -> bool {
+        if let Some(i) = self.tracks.iter().position(|t| t.is_none()) {
+            self.render(i).await;
+        }
+        self.tracks.iter().any(|t| t.is_none())
+    }
+
+    /// Play track `i` unless it is already playing or not rendered yet.
+    pub fn play(&mut self, i: usize) {
+        if self.playing != Some(i) && self.tracks.get(i).is_some_and(|t| t.is_some()) { self.switch(i); }
+    }
+
+    /// Silence; the next `play` starts again.
+    pub fn stop(&mut self) {
+        stop_music();
+        self.playing = None;
+    }
+
+    /// Move on to the next ready track each time the current loop ends.
+    pub fn rotate(&mut self, dt: f32) {
+        let Some(cur) = self.playing else { return };
+        self.left -= dt;
+        if self.left > 0.0 { return; }
+        let n = self.tracks.len();
+        let next = (1..=n).map(|k| (cur + k) % n).find(|&i| self.tracks[i].is_some()).unwrap_or(cur);
+        self.switch(next);
+    }
+
+    async fn render(&mut self, i: usize) {
+        let wav = (self.makers[i])();
+        let secs = wav_seconds(&wav);
+        self.tracks[i] = Some((load_sound(&wav).await, secs));
+    }
+
+    fn switch(&mut self, i: usize) {
+        if let Some((s, secs)) = &self.tracks[i] {
+            play_music(s);
+            self.playing = Some(i);
+            self.left = *secs;
+        }
+    }
+}
+
+/// The length of a 16-bit mono PCM WAV, from its header.
+fn wav_seconds(wav: &[u8]) -> f32 {
+    if wav.len() < 44 { return 0.0; }
+    let rate = u32::from_le_bytes([wav[24], wav[25], wav[26], wav[27]]) as f32;
+    let data = u32::from_le_bytes([wav[40], wav[41], wav[42], wav[43]]) as f32;
+    data / 2.0 / rate.max(1.0)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_wav_header_gives_its_length() {
+        let wav = super::encode_wav(22_050, &vec![0i16; 22_050 * 3]);
+        assert!((super::wav_seconds(&wav) - 3.0).abs() < 1e-4);
+    }
+}

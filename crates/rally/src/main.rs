@@ -8,9 +8,13 @@ use blip::macroquad::input::KeyCode;
 use blip::macroquad::math::Vec2;
 use blip::macroquad::rand::rand;
 use blip::{
-    play_music, play_sfx, rects_overlap, web, window_conf, Blip, BlipColor, Timer, BLIP_BLACK,
+    GAME_OVER_MIN_WAIT,
+    play_sfx, Jukebox, rects_overlap, web, window_conf, Blip, BlipColor, Timer, BLIP_BLACK,
     BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
+
+#[cfg(not(target_arch = "wasm32"))]
+mod bot;
 
 // ---- layout -----------------------------------------------------------
 const WIN_W: i32 = 480;
@@ -36,8 +40,6 @@ const AI_SPD: f32 = 145.0;
 // A finger drags its bat relatively, geared up so a thumb's sweep of about
 // two thirds of the picture covers the whole field.
 const TOUCH_GAIN: f32 = 1.6;
-// Keys held from the last rally must not dismiss the win/lose screen unread.
-const GAME_OVER_MIN_WAIT: f32 = 2.0;
 
 // ---- derived ----------------------------------------------------------
 const LPAD_X: f32 = PAD_OFF;
@@ -170,11 +172,14 @@ fn update_title(g: &mut Game) {
     if key_pressed(KeyCode::Key2) || p2_dial_spun() || touch_began(g, 1) {
         g.mode = Mode::TwoPlayer;
         web::set_mode(true);
-        web::spend_coin(); // player two's coin: two players, two coins
+        // Two players, two coins.
+        web::spend_coin();
+        web::spend_coin();
         g.start_game();
     } else if p1_dial_spun() || touch_began(g, 0) {
         g.mode = Mode::OnePlayer;
         web::set_mode(false);
+        web::spend_coin();
         g.start_game();
     }
 }
@@ -385,20 +390,11 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("RALLY", WIN_W, WIN_H)
 }
 
-const MUSIC_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
-const MUSIC2_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
-const MUSIC3_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
-const MUSIC4_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music4.wav"));
-const MUSIC5_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music5.wav"));
 const WALL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/wall.wav"));
 const HIT_L_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_l.wav"));
 const HIT_R_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_r.wav"));
 const SCORE_L_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/score_l.wav"));
 const SCORE_R_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/score_r.wav"));
-// Precomputed durations (seconds) of each generated loop — TOTAL_STEPS *
-// step_ms / 1000 + the 0.25s tail every blip_assets track generator pads
-// onto the buffer. Kept in sync with rally.rs's music()/music2..5().
-const MUSIC_DURATIONS: [f32; 5] = [29.3388, 26.5466, 26.9167, 31.1071, 31.7246];
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -412,30 +408,23 @@ async fn main() {
         score_l: blip::audio::load_sound(SCORE_L_WAV).await,
         score_r: blip::audio::load_sound(SCORE_R_WAV).await,
     };
-    let music = [
-        blip::audio::load_sound(MUSIC_WAV).await,
-        blip::audio::load_sound(MUSIC2_WAV).await,
-        blip::audio::load_sound(MUSIC3_WAV).await,
-        blip::audio::load_sound(MUSIC4_WAV).await,
-        blip::audio::load_sound(MUSIC5_WAV).await,
-    ];
-    let mut music_idx: usize = 0;
-    let mut music_timer: f32 = MUSIC_DURATIONS[0];
-    play_music(&music[0]);
+    // Five loops in rotation, synthesised here (see blip_assets::rally).
+    use blip_assets::rally::{music, music2, music3, music4, music5};
+    let mut jukebox = Jukebox::new(&[music, music2, music3, music4, music5]);
+    jukebox.start(0).await;
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut autopilot = bot::Bot { err: 0.0, last_vx: 0.0, hits: 0 };
 
     loop {
         let dt = blip.delta_time;
 
-        // Advance to the next loop in rotation at each track's boundary.
-        music_timer -= dt;
-        if music_timer <= 0.0 {
-            music_idx = (music_idx + 1) % music.len();
-            music_timer = MUSIC_DURATIONS[music_idx];
-            play_music(&music[music_idx]);
-        }
+        jukebox.rotate(dt);
+        if g.state != State::Play { jukebox.warm_up().await; }
 
         g.touch = [blip.touch(0), blip.touch(1)];
         g.pressed = [blip.touch_pressed(0), blip.touch_pressed(1)];
+        #[cfg(not(target_arch = "wasm32"))]
+        if blip::bot::active() { bot::drive(&g, &mut autopilot, blip::bot::clock()); }
         match g.state {
             State::Title => update_title(&mut g),
             State::Serve => update_serve(&mut g, dt),

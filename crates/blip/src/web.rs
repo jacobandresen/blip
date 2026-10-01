@@ -98,7 +98,10 @@ pub fn report_score(score: i32) {
     #[cfg(target_arch = "wasm32")]
     unsafe { blip_game_over(score); }
     #[cfg(not(target_arch = "wasm32"))]
-    let _ = score;
+    {
+        crate::bot::set("score", score as f64);
+        crate::bot::finish("over");
+    }
 }
 
 /// The leading score for the current game and who holds it, as tracked by

@@ -12,7 +12,7 @@ use blip::input::{key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_
 use blip::macroquad::input::KeyCode;
 use blip::macroquad::math::vec2;
 use blip::macroquad::shapes::{draw_ellipse, draw_triangle};
-use blip::{play_music, play_sfx, play_sfx_volume, web, window_conf, Blip, BlipColor};
+use blip::{play_sfx, Jukebox, play_sfx_volume, web, window_conf, Blip, BlipColor};
 
 // ---- layout -----------------------------------------------------------
 const TILE: f32 = 24.0;
@@ -1542,7 +1542,6 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
     web::set_players(2);
-    blip::macroquad::rand::srand((now() * 1000.0) as u64);
 
     use blip_assets::bubbler::{jingle_wav, sfx_wav, theme_wav};
     let load = |b: Vec<u8>| async move { blip::audio::load_sound(&b).await };
@@ -1553,10 +1552,9 @@ async fn main() {
         round: load(jingle_wav(0)).await, clear: load(jingle_wav(1)).await, hurry: load(jingle_wav(2)).await,
         over: load(jingle_wav(3)).await, won: load(jingle_wav(4)).await,
     };
-    let theme = load(theme_wav()).await;
-    let theme_hurry = load(blip_assets::bubbler::hurry_wav()).await;
-    let mut hurry_music = false;
-    let mut music_on = false;
+    // The theme, and the same tune faster for HURRY UP.
+    let mut music = Jukebox::new(&[theme_wav, blip_assets::bubbler::hurry_wav]);
+    music.start(0).await;
     let mut shot_frame = 0u32;
     #[cfg(not(target_arch = "wasm32"))]
     let mut scene_set = false;
@@ -1650,8 +1648,9 @@ async fn main() {
 
         if !frozen { match g.state {
             State::Title => {
-                if p2_start { g.start(true); web::spend_coin(); }
-                else if inp[0].blow || inp[0].jump || key_pressed(BLIP_KEY_SPACE) { g.start(false); }
+                // A game is paid for as it starts: one coin, two for two players.
+                if p2_start { g.start(true); web::spend_coin(); web::spend_coin(); }
+                else if inp[0].blow || inp[0].jump || key_pressed(BLIP_KEY_SPACE) { g.start(false); web::spend_coin(); }
             }
             State::Intro => {
                 if g.state_t < dt * 1.5 { play_sfx(&sfx.round); }
@@ -1705,7 +1704,6 @@ async fn main() {
             }
             State::Over | State::Won => {
                 if g.state_t > 2.5 && (inp[0].blow || inp[0].jump || key_pressed(BLIP_KEY_SPACE) || p2_start) {
-                    web::spend_coin();
                     g.state = State::Title;
                     g.two_up = false;
                     web::set_players(2);
@@ -1716,13 +1714,12 @@ async fn main() {
         if !frozen { update_fx(&mut g, dt); }
 
         let want_music = matches!(g.state, State::Play | State::Intro | State::Clear | State::Title);
-        let want_hurry = g.state == State::Play && g.hurry;
-        if want_music && (!music_on || want_hurry != hurry_music) {
-            play_music(if want_hurry { &theme_hurry } else { &theme });
-            music_on = true;
-            hurry_music = want_hurry;
+        if want_music {
+            music.play(if g.state == State::Play && g.hurry { 1 } else { 0 });
+        } else {
+            music.stop();
         }
-        if !want_music && music_on { blip::stop_music(); music_on = false; }
+        if g.state == State::Title { music.warm_up().await; }
 
         blip.clear(BlipColor::new(0.0, 0.0, 0.0, 1.0));
         match g.state {

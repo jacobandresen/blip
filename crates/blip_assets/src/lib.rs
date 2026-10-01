@@ -10,6 +10,7 @@ use std::path::Path;
 
 pub mod image;
 pub mod cosy;
+pub mod song;
 pub mod techno;
 pub mod wav;
 

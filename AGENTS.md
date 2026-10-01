@@ -26,7 +26,12 @@ change will be overwritten the next time the project is built.
 | macroquad JS runtime (vendored, do not edit) | `web/mq_js_bundle.js` |
 | Game logic, rendering, audio (Rust side) | `crates/<name>/src/main.rs` |
 | Shared engine library (blip API) | `crates/blip/src/*.rs` |
+| Score popups, bursts, rings (`blip::Fx`) | `crates/blip/src/fx.rs` |
+| Music playback (`blip::Jukebox`) | `crates/blip/src/audio.rs` |
 | Asset generators (sprites + WAV) | `crates/blip_assets/src/<game>.rs` |
+| Songs written as note data (`Song`) | `crates/blip_assets/src/song.rs` |
+| Effect voices, one instrument per game | `crates/blip_assets/src/cosy.rs` |
+| Native playtest autopilot | `crates/blip/src/bot.rs`, `crates/<name>/src/bot.rs` |
 | Per-game asset build step | `crates/<name>/build.rs` |
 
 `web/shell.html` is a static template — it loads, in order, `shell.js`,
@@ -50,6 +55,7 @@ Run the test suite locally before pushing:
 
 ```
 node --test test/fill-canvas.test.mjs   # unit tests (canvas geometry)
+cargo test --release                    # game rules (Brawler's balance, Serpent's turns, ...)
 ```
 
 For native development:
@@ -68,6 +74,29 @@ returned PNG / WAV bytes into `$OUT_DIR/assets/{images,sounds}/`. The game's
 `main.rs` embeds those bytes via `include_bytes!(concat!(env!("OUT_DIR"), ...))`,
 so wasm builds carry every asset inside the single `index.wasm` and need no
 separate preload step.
+
+Music is the exception: a WAV loop is megabytes, so games depend on
+`blip_assets` at runtime too and synthesise their tunes on the device through
+a `blip::Jukebox` (first track at load, the rest on the title screen). Most
+tunes are `song::Song` values — a melody of MIDI notes over chords, played on
+the game's own instrument. To hear them all without a game:
+
+```
+cargo run --release -p blip_assets --example render_music -- /tmp/music
+```
+
+### Playtesting with the autopilot
+
+Native builds carry a bot per game (`crates/<name>/src/bot.rs`; Bubbler has
+its own, `BUBBLER_BOT=1`). It plays through the normal input path and prints
+one `RESULT` line of stats at game over:
+
+```
+BLIP_BOT=1 BLIP_BOT_MAXT=300 xvfb-run -a -s "-screen 0 720x810x24" target/release/serpent
+```
+
+`BLIP_BOT_SHOTS=dir` saves a frame every `BLIP_BOT_SHOT_EVERY` seconds. Run
+one game at a time.
 
 ## Comments
 

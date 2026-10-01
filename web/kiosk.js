@@ -79,8 +79,8 @@ function blipSetControls(mode) {
 // `touch`: the game can be played on the touch strip instead of the pad.
 // kind 'drag' puts the paddle / cannon under the finger (fire held while it
 // is down), 'swipe' steers by flicks, 'paddles' gives each player a half to
-// drag their bat up and down in, 'platform' runs on a slide, fires button
-// one on a tap and button two on a swipe up. `hint` is printed on the strip,
+// drag their bat up and down in, 'platform' fires button one on every
+// touch, runs on a slide and presses button two on a swipe up. `hint` is printed on the strip,
 // `mouseHint` instead for a touchscreen laptop's mouse.
 var BLIP_GAMES = {
   serpent:            { name: 'SERPENT',  accent: '50, 200, 50',
@@ -117,7 +117,7 @@ var BLIP_GAMES = {
   // two's, who drops in with their own bubble or jump.
   bubbler:            { name: 'BUBBLER', accent: '120, 210, 255',
                          players: 2,
-                         touch: { kind: 'platform', hint: 'Slide to run &middot; tap to bubble &middot; swipe up to jump',
+                         touch: { kind: 'platform', hint: 'Touch to bubble &middot; slide to run &middot; swipe up to jump',
                                   mouseHint: 'Drag to run &middot; click to bubble &middot; drag up to jump' },
                          buttons: [{ key: 'f', code: 'KeyF', label: 'BUBBLE' },
                                    { key: 'g', code: 'KeyG', label: 'JUMP' }],
@@ -160,22 +160,6 @@ if ('serviceWorker' in navigator) {
   }
 }
 
-(function () {
-  // The about / history / controls pages (they carry a .page wrapper) keep
-  // the corner badges + flags visible the whole time — don't fade them
-  // near the bottom there. This only trims them on the landing page.
-  if (document.querySelector('.page')) return;
-  function updateFixedOverlayVisibility() {
-    var atBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 60;
-    var badges = document.querySelector('.left-badges');
-    if (badges) badges.classList.toggle('near-bottom', atBottom);
-    var lang = document.querySelector('.lang-switcher');
-    if (lang) lang.classList.toggle('near-bottom', atBottom);
-  }
-  window.addEventListener('scroll',  updateFixedOverlayVisibility, { passive: true });
-  window.addEventListener('resize',  updateFixedOverlayVisibility, { passive: true });
-  document.addEventListener('DOMContentLoaded', updateFixedOverlayVisibility);
-}());
 
 function getCoins() {
   try {
@@ -556,3 +540,28 @@ function pollGamepad(onDown, onUp) {
 }());
 
 /* The deck itself is built by deck.js, the same on every page. */
+
+/* The side badges and flags sit 16px above the page's deck, whose height
+   changes with the controller, layout and player count, or 16px off the
+   screen's edge when there is none (a touch screen's front page). */
+(function () {
+  var GAP = 16;
+  function place() {
+    var top = Infinity;
+    document.querySelectorAll('.kiosk-bar').forEach(function (bar) {
+      var r = bar.getBoundingClientRect();
+      if (r.height > 0 && r.top < top) top = r.top;
+    });
+    var v = top === Infinity
+      ? 'calc(' + GAP + 'px + env(safe-area-inset-bottom, 0px))'
+      : Math.round(window.innerHeight - top + GAP) + 'px';
+    document.documentElement.style.setProperty('--side-badges-bottom', v);
+  }
+  window.addEventListener('resize', place);
+  document.addEventListener('DOMContentLoaded', function () {
+    place();
+    if (typeof ResizeObserver === 'function') {
+      document.querySelectorAll('.kiosk-bar').forEach(function (bar) { new ResizeObserver(place).observe(bar); });
+    }
+  });
+}());

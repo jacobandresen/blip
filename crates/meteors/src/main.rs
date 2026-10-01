@@ -1,7 +1,6 @@
 //! Meteors, a tribute to the vector-graphics rock-shooter arcade classic, on macroquad.
 //! Pure line-art rendering (no sprite assets), true to the original's monochrome
-//! vector display. Effects ring on glass and the music is generated techno
-//! (see `blip_assets::meteors`).
+//! vector display. Music and effects ring on glass (see `blip_assets::meteors`).
 
 use std::f32::consts::PI;
 
@@ -11,10 +10,14 @@ use blip::input::{
 };
 use blip::macroquad::rand::gen_range;
 use blip::{
-    play_music, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, web, window_conf, Blip,
+    GAME_OVER_MIN_WAIT,
+    Jukebox, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, web, window_conf, Blip, Fx,
     BlipColor, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
     NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
 };
+
+#[cfg(not(target_arch = "wasm32"))]
+mod bot;
 
 // ---- layout -------------------------------------------------------------
 const HUD_H:   i32 = 28;
@@ -34,10 +37,6 @@ const RESPAWN_DELAY:    f32 = 1.6;
 const SAFE_RADIUS:      f32 = 110.0;
 const LIVES_START:      i32 = 3;
 const EXTRA_LIFE_SCORE: i32 = 10_000;
-// A hard floor on how long GAME OVER stays up before a key can dismiss it —
-// without this, fire/thrust still held from the fight that killed you
-// bounces straight back to the title screen unread.
-const GAME_OVER_MIN_WAIT: f32 = 2.0;
 
 // ---- weapons --------------------------------------------------------
 const MAX_BULLETS:   usize = 10;
@@ -57,6 +56,10 @@ const SAUCER_SPEED:    f32 = 90.0;
 const SAUCER_FIRE_CD:  f32 = 1.4;
 const SAUCER_SPAWN_MIN: f32 = 9.0;
 const SAUCER_SPAWN_MAX: f32 = 18.0;
+/// How long before each shot the saucer's core lights up as a warning.
+const SAUCER_TELL: f32 = 0.4;
+const WAVE_BANNER_SECS: f32 = 1.6;
+const STORM_WAVE: i32 = 5;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Play, Dead, Over }
@@ -163,6 +166,9 @@ struct Game {
     saucer_cd: f32,
     sess: Session,
     next_life_score: i32,
+    /// Seconds since the current wave arrived, for its banner.
+    wave_t: f32,
+    fx: Fx,
 }
 
 impl Game {
@@ -181,11 +187,14 @@ impl Game {
             saucer_cd: 12.0,
             sess: Session::new(LIVES_START),
             next_life_score: EXTRA_LIFE_SCORE,
+            wave_t: 0.0,
+            fx: Fx::new(),
         }
     }
 
     fn spawn_wave(&mut self) {
         for a in self.asteroids.iter_mut() { a.active = false; }
+        self.wave_t = 0.0;
         let count = (WAVE_BASE + self.sess.level - 1).min(WAVE_MAX);
         // Clear of the ship, wherever it is: a wave arrives mid-flight the
         // instant the last rock dies, and the centre may be nowhere near it.
@@ -213,6 +222,7 @@ impl Game {
         self.next_life_score = EXTRA_LIFE_SCORE;
         self.bullets = [BULLET_OFF; MAX_BULLETS];
         self.debris = [DEBRIS_OFF; MAX_DEBRIS];
+        self.fx.clear();
         self.saucer.active = false;
         let (lo, hi) = saucer_spawn_range(self.sess.level);
         self.saucer_cd = rand_range(lo, hi);
@@ -387,11 +397,17 @@ fn award(g: &mut Game, sfx: &Sounds, pts: i32) {
         g.sess.lives += 1;
         g.next_life_score += EXTRA_LIFE_SCORE;
         play_sfx(&sfx.extra_life);
+        let (x, y) = if g.ship_alive { (g.ship.x, g.ship.y - 24.0) } else { field_centre() };
+        g.fx.popup(x, y, "EXTRA LIFE", NEON_CYAN);
+        g.fx.ring(x, y + 24.0, 60.0, 0.6, NEON_CYAN);
     }
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() { g.start_game(); }
+    if btn1_pressed() {
+        web::spend_coin();
+        g.start_game();
+    }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) {
@@ -446,6 +462,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
             let (px, py) = (bx - g.bullets[bi].vx * dt, by - g.bullets[bi].vy * dt);
             if seg_hits_circle(px, py, bx, by, g.ship.x, g.ship.y, SHIP_RADIUS) {
                 g.bullets[bi].active = false;
+                blip::bot::add("death_saucer_shot", 1.0);
                 kill_ship(g, sfx);
                 break;
             }
@@ -462,6 +479,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
                 g.asteroids[ai].active = false;
                 burst(g, a.x, a.y, a.vx, a.vy, 6, a.size.radius() * 0.5, 70.0, NEON_PURPLE);
                 split_asteroid(g, a.x, a.y, a.size, a.vx, a.vy);
+                blip::bot::add("death_rock", 1.0);
                 kill_ship(g, sfx);
                 break;
             }
@@ -475,12 +493,15 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
             g.saucer.active = false;
             let (sx, sy) = (g.saucer.x, g.saucer.y);
             burst(g, sx, sy, g.saucer.vx, 0.0, 6, r, 90.0, NEON_PINK);
+            blip::bot::add("death_saucer_ram", 1.0);
             kill_ship(g, sfx);
         }
     }
 }
 
 fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
+    g.fx.update(dt);
+    g.wave_t += dt;
     for b in pool_iter_mut(&mut g.bullets) {
         b.x += b.vx * dt;
         b.y += b.vy * dt;
@@ -571,7 +592,9 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.saucer.active = false;
                 let (sx, sy, svx) = (g.saucer.x, g.saucer.y, g.saucer.vx);
                 burst(g, sx, sy, svx, 0.0, 6, r, 90.0, NEON_PINK);
-                award(g, sfx, if g.saucer.big { 200 } else { 1000 });
+                let pts = if g.saucer.big { 200 } else { 1000 };
+                g.fx.popup(sx, sy - 14.0, &format!("{pts}"), NEON_YELLOW);
+                award(g, sfx, pts);
                 if g.saucer.big { play_sfx(&sfx.saucer_big); } else { play_sfx(&sfx.saucer_small); }
                 break;
             }
@@ -579,7 +602,9 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     if pool_iter(&g.asteroids).count() == 0 {
+        blip::bot::set(&format!("t_wave{}", g.sess.level), blip::bot::clock() as f64);
         g.sess.next_level();
+        blip::bot::set("level", g.sess.level as f64);
         g.spawn_wave();
     }
 }
@@ -650,6 +675,11 @@ fn draw_asteroid(blip: &Blip, a: &Asteroid) {
 
 fn draw_saucer(blip: &Blip, s: &Saucer) {
     let r = if s.big { 16.0 } else { 9.0 };
+    // A shot is coming: the core lights up and swells just before it fires.
+    if s.fire_t < SAUCER_TELL {
+        let k = 1.0 - s.fire_t / SAUCER_TELL;
+        blip.fill_glow_circle(s.x, s.y, 2.0 + 4.0 * k, NEON_PINK);
+    }
     let w = r * 2.6;
     let dw = r * 1.1;
     let h = r * 0.5;
@@ -700,6 +730,11 @@ fn draw_play(blip: &Blip, g: &Game) {
         blip.draw_line(d.x - c * h, d.y - s * h, d.x + c * h, d.y + s * h, col);
     }
     if g.saucer.active { draw_saucer(blip, &g.saucer); }
+    g.fx.draw(blip);
+    if g.wave_t < WAVE_BANNER_SECS && g.state == State::Play {
+        let a = (1.0 - g.wave_t / WAVE_BANNER_SECS).min(0.5) * 2.0;
+        blip.draw_centered(&format!("WAVE {}", g.sess.level), PLAY_Y0 + 120.0, 4.0, BlipColor { a, ..NEON_CYAN });
+    }
     for b in pool_iter(&g.bullets) {
         let c = if b.from_player { NEON_YELLOW } else { NEON_PINK };
         blip.fill_glow_circle(b.x, b.y, 2.0, c);
@@ -725,30 +760,16 @@ fn draw_title(blip: &Blip, hi: &web::HighScore) {
 }
 
 fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
-    let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
     draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
-    blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, NEON_PINK);
-    blip.draw_centered(&buf, (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
-    blip.draw_best(score, hi, (WIN_H / 2) as f32 + 28.0, NEON_CYAN);
-    if !waiting {
-        blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, NEON_YELLOW);
-    }
+    blip.draw_game_over(score, hi, NEON_PINK, NEON_CYAN, NEON_YELLOW, !waiting);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
     window_conf("METEORS", WIN_W, WIN_H)
 }
 
-const TECHNO_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno.wav"));
-const TECHNO2_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno2.wav"));
-const TECHNO3_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno3.wav"));
-const TECHNO4_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno4.wav"));
-const TECHNO5_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/techno5.wav"));
-// Precomputed durations (seconds) of each generated loop — TOTAL_STEPS *
-// step_ms / 1000 + the 0.25s tail every blip_assets track generator pads
-// onto the buffer. Kept in sync with meteors.rs's music()/music2..5().
-const MUSIC_DURATIONS: [f32; 5] = [30.2444, 32.2500, 26.9123, 32.0084, 35.2468];
+
 const FIRE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/fire.wav"));
 const THRUST_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/thrust.wav"));
 const BANG_LARGE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bang_large.wav"));
@@ -766,16 +787,9 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let music = [
-        blip::audio::load_sound(TECHNO_WAV).await,
-        blip::audio::load_sound(TECHNO2_WAV).await,
-        blip::audio::load_sound(TECHNO3_WAV).await,
-        blip::audio::load_sound(TECHNO4_WAV).await,
-        blip::audio::load_sound(TECHNO5_WAV).await,
-    ];
-    let mut music_idx: usize = 0;
-    let mut music_timer: f32 = MUSIC_DURATIONS[0];
-    play_music(&music[0]);
+    // DRIFT, then STORM from wave STORM_WAVE (synthesised here, see blip_assets::meteors).
+    let mut music = Jukebox::new(&[blip_assets::meteors::drift_wav, blip_assets::meteors::storm_wav]);
+    music.start(0).await;
 
     let mut sfx = Sounds {
         fire:         blip::audio::load_sound(FIRE_WAV).await,
@@ -796,13 +810,8 @@ async fn main() {
     loop {
         let dt = blip.delta_time;
 
-        // Advance to the next loop in rotation at each track's boundary.
-        music_timer -= dt;
-        if music_timer <= 0.0 {
-            music_idx = (music_idx + 1) % music.len();
-            music_timer = MUSIC_DURATIONS[music_idx];
-            play_music(&music[music_idx]);
-        }
+        music.play(if g.state != State::Title && g.sess.level >= STORM_WAVE { 1 } else { 0 });
+        if g.state != State::Play { music.warm_up().await; }
 
         if blip.screenshot_mode {
             shot_frame += 1;
@@ -815,6 +824,8 @@ async fn main() {
             }
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
+        if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }
         match g.state {
             State::Title => update_title(&mut g),
             State::Play  => update_play(&mut g, dt, &mut sfx, &mut thrust_snd_t),

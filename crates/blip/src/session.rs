@@ -49,3 +49,7 @@ impl Session {
         self.lives = lives;
     }
 }
+
+/// How long GAME OVER stays up before a key can dismiss it: the fire button
+/// still held from the play that ended would otherwise skip it unread.
+pub const GAME_OVER_MIN_WAIT: f32 = 2.0;

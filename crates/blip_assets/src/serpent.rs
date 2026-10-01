@@ -1,62 +1,17 @@
-//! Serpent (Snake) assets: sprites, techno music, and effects on a marimba
-//! (see `cosy`).
+//! Serpent (Snake) assets: the food sprite, and music and effects on a
+//! marimba (see `cosy` and `song`).
 
 
 use crate::image::Image;
-use crate::techno::{warm, 
-    bass_note, clap, hat, kick, lift_fill, open_hat, phrase_note, sidechain_duck, supersaw, Rng,
-    MIX_KNEE,
-};
-use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::cosy::{self, Voice, H as HOLD};
+use crate::song::{major, minor, Chord, Groove, Song, H, R};
 use crate::Asset;
 
-const W: u32 = 24;
-const H: u32 = 24;
-
-fn head() -> Vec<u8> {
-    let mut img = Image::new(W, H);
-    let (w, h) = (W as i32, H as i32);
-    for y in 1..h - 1 {
-        for x in 1..w - 1 {
-            img.set(x, y, 80, 220, 80);
-        }
-    }
-    for x in 1..w - 1 {
-        img.set(x, 1, 150, 255, 150);
-        img.set(x, h - 2, 40, 120, 40);
-    }
-    img.set(w / 2 - 3, h / 2 - 2, 10, 10, 10);
-    img.set(w / 2 + 3, h / 2 - 2, 10, 10, 10);
-    img.set(w / 2 - 3, h / 2 - 1, 10, 10, 10);
-    img.set(w / 2 + 3, h / 2 - 1, 10, 10, 10);
-    img.set(w / 2, h - 3, 230, 40, 40);
-    img.set(w / 2 - 1, h - 2, 230, 40, 40);
-    img.set(w / 2 + 1, h - 2, 230, 40, 40);
-    img.encode_png()
-}
-
-fn body() -> Vec<u8> {
-    let mut img = Image::new(W, H);
-    let (w, h) = (W as i32, H as i32);
-    for y in 2..h - 2 {
-        for x in 2..w - 2 {
-            img.set(x, y, 50, 170, 50);
-        }
-    }
-    for x in 4..w - 4 {
-        img.set(x, h / 2, 30, 120, 30);
-    }
-    for x in 2..w - 2 {
-        img.set(x, 2, 80, 200, 80);
-        img.set(x, h - 3, 30, 110, 30);
-    }
-    img.encode_png()
-}
+const SPRITE: u32 = 24;
 
 fn food() -> Vec<u8> {
-    let mut img = Image::new(W, H);
-    let (w, h) = (W as i32, H as i32);
+    let mut img = Image::new(SPRITE, SPRITE);
+    let (w, h) = (SPRITE as i32, SPRITE as i32);
     let cx = w / 2;
     let cy = h / 2;
     let r = w / 2 - 3;
@@ -78,124 +33,73 @@ fn food() -> Vec<u8> {
     img.encode_png()
 }
 
-/// Shared step-sequenced techno for Serpent's three intensity tiers.
-/// `bass_hit` marks the 16th steps with a bass note; `bass_roots` (2 chords)
-/// alternate every 2 bars; `hook` is a 4-note riff kept throughout (answered
-/// on each fourth bar, see techno::phrase_note), which is what makes it
-/// catchy. Hat and clap density scale with `energy`; the back half lifts with
-/// an octave-up harmony and busier percussion.
-fn techno_loop(
-    bpm: f32,
-    bars: usize,
-    bass_roots: &[f32],
-    bass_hit: &[bool; 16],
-    hook: &[f32; 4],
-    energy: f32,
-    seed: u32,
-) -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let steps_per_bar = 16;
-    let lift_bar = bars / 2;
-    let total_steps = bars * steps_per_bar;
-    let step_ms = 60_000.0 / bpm / 4.0;
-    let step_samples = (sr * step_ms / 1000.0) as usize;
-    let total = step_samples * total_steps + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0f32; total];
-    let mut rng = Rng(seed);
-    let mut kick_offsets = Vec::with_capacity(total_steps / 4);
+// ---- music: two tunes on the marimba -------------------------------------
+// Synthesised on the device (see `song`): A minor pentatonic, the notes a
+// snake winds through. SLITHER plays the early levels, FRENZY from level 5.
 
-    for step in 0..total_steps {
-        let bar = step / steps_per_bar;
-        let pos = step % steps_per_bar;
-        let off = step * step_samples;
-        let lifted = bar >= lift_bar;
+const AM: Chord = minor(45);
+const C: Chord = major(48);
+const DM: Chord = minor(50);
+const EM: Chord = minor(40);
+const F: Chord = major(41);
+const G: Chord = major(43);
 
-        if pos % 4 == 0 {
-            kick_offsets.push(off);
-        }
-        if pos == 4 || pos == 12 {
-            clap(&mut buf, off, &mut rng, 0.4 * energy);
-        }
-        if lifted && pos == 8 {
-            clap(&mut buf, off, &mut rng, 0.3 * energy);
-        }
-        if pos % 2 == 1 {
-            hat(&mut buf, off, &mut rng, 0.20 * energy);
-        }
-        if (energy > 1.1 && (pos == 6 || pos == 14)) || (lifted && pos == 6) {
-            open_hat(&mut buf, off, &mut rng, 0.16);
-        }
-        if bass_hit[pos] {
-            let root = bass_roots[(bar / 2) % bass_roots.len()];
-            bass_note(&mut buf, off, root, step_ms * 0.7, 0.58);
-        }
-        if pos % 4 == 0 {
-            // The riff answers itself on the fourth bar, backwards and a
-            // fifth up (phrase_note), where the phrase resolves.
-            let note = phrase_note(hook, bar, pos / 4);
-            supersaw(&mut buf, off, note, step_ms * 3.5, 0.18 * energy.min(1.3), 8.0, 0.008);
-            if lifted {
-                supersaw(
-                    &mut buf,
-                    off,
-                    note * 2.0,
-                    step_ms * 3.5,
-                    0.09 * energy.min(1.3),
-                    8.0,
-                    0.008,
-                );
-            }
-        }
-
+/// The calm tune: stepwise, winding, a little sly.
+pub fn slither_wav() -> Vec<u8> {
+    Song {
+        bpm: 108.0,
+        melody: &[
+            [69, H, 72, 74, 76, H, 74, 72], [69, H, H, 67, 69, H, R, R],
+            [72, H, 74, 76, 79, H, 76, 74], [76, H, H, H, R, R, 74, 72],
+            [69, H, 72, 74, 76, H, 79, 81], [79, H, 76, H, 74, H, 72, H],
+            [74, 76, 74, 72, 69, H, 67, H], [69, H, H, H, R, R, R, R],
+            [81, H, 79, 76, 79, H, 76, 74], [76, H, 74, 72, 74, H, R, R],
+            [72, H, 74, 76, 74, 72, 69, H], [67, H, 69, H, 72, H, R, R],
+            [81, H, 79, H, 76, H, 79, 81], [84, H, 81, H, 79, H, 76, H],
+            [74, 76, 79, 76, 74, 72, 67, H], [69, H, H, H, R, R, R, R],
+        ],
+        chords: &[
+            [AM, AM], [AM, G], [C, C], [G, G], [AM, AM], [C, G], [DM, EM], [AM, AM],
+            [F, F], [C, C], [AM, AM], [G, G], [F, F], [G, G], [DM, EM], [AM, AM],
+        ],
+        lead: Voice::Marimba,
+        lead_vol: 0.6,
+        harmony: Some((Voice::Marimba, -12)),
+        bass: [0, R, 7, R],
+        groove: Groove::Brush,
+        seed: 0x5111_7000,
+        ..Song::DEFAULT
     }
-
-    if lift_bar > 0 {
-        lift_fill(&mut buf, (lift_bar - 1) * steps_per_bar * step_samples, step_samples, &mut rng, 0.26);
-    }
-
-    sidechain_duck(&mut buf, &kick_offsets, 0.55, step_ms * 0.85);
-    for &off in &kick_offsets {
-        kick(&mut buf, off, 0.9);
-    }
-
-    warm(&mut buf);
-    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+    .render()
 }
 
-/// Base groove — a relaxed mid-tempo techno loop for the early game.
-fn slither() -> Vec<u8> {
-    const HIT: [bool; 16] = [
-        true, false, true, false, false, true, false, true,
-        true, false, false, true, false, true, false, false,
-    ];
-    // C - F vamp; hook: C5 E5 G5 E5.
-    const HOOK: [f32; 4] = [523.25, 659.25, 783.99, 659.25];
-    // C - F - Am - G
-    techno_loop(120.0, 16, &[130.81, 174.61, 220.00, 196.00], &HIT, &HOOK, 1.0, 0x5111_7000)
-}
-
-/// Faster, darker minor-key loop — kicks in as the snake grows.
-fn stalk() -> Vec<u8> {
-    const HIT: [bool; 16] = [
-        true, false, true, true, false, true, false, true,
-        true, false, true, false, true, true, false, true,
-    ];
-    // Fm - Bbm vamp; hook: F4 Ab4 C5 Ab4.
-    const HOOK: [f32; 4] = [349.23, 415.30, 523.25, 415.30];
-    // Fm - Bbm - Db - Eb
-    techno_loop(132.0, 16, &[174.61, 233.08, 138.59, 155.56], &HIT, &HOOK, 1.25, 0x57A1_4000)
-}
-
-/// Hard, fast rave loop for high-level frenzy — dense hats, driving acid bass.
-fn frenzy() -> Vec<u8> {
-    const HIT: [bool; 16] = [
-        true, true, false, true, true, false, true, true,
-        false, true, true, false, true, true, false, true,
-    ];
-    // Am - Dm vamp; hook: A4 C5 E5 C5.
-    const HOOK: [f32; 4] = [440.00, 523.25, 659.25, 523.25];
-    // Am - Dm - F - G
-    techno_loop(150.0, 18, &[110.00, 146.83, 174.61, 196.00], &HIT, &HOOK, 1.6, 0xF6E2_9000)
+/// The fast tune: the same scale, running and leaping.
+pub fn frenzy_wav() -> Vec<u8> {
+    Song {
+        bpm: 136.0,
+        melody: &[
+            [81, 79, 76, H, 74, 76, 79, H], [81, H, 84, H, 81, 79, 76, H],
+            [74, 72, 69, H, 72, 74, 76, H], [74, H, 72, H, 69, H, R, R],
+            [81, 79, 76, H, 74, 76, 79, H], [84, H, 86, H, 84, 81, 79, H],
+            [76, 79, 81, 79, 76, 74, 72, 74], [69, H, H, H, R, 76, 79, 81],
+            [84, H, 81, H, 79, H, 81, H], [76, H, 79, H, 74, H, R, R],
+            [72, 74, 76, 79, 81, H, 79, 76], [79, H, H, H, R, R, R, R],
+            [84, H, 81, H, 79, H, 81, 84], [86, H, 84, H, 81, H, 79, H],
+            [76, 79, 81, 79, 76, 74, 72, 74], [69, H, H, H, R, R, R, R],
+        ],
+        chords: &[
+            [AM, AM], [F, G], [DM, DM], [EM, AM], [AM, AM], [F, G], [C, G], [AM, AM],
+            [F, F], [C, C], [AM, AM], [G, G], [F, F], [G, G], [C, EM], [AM, AM],
+        ],
+        lead: Voice::Marimba,
+        lead_vol: 0.42,
+        harmony: Some((Voice::Bell, -12)),
+        bass: [0, 12, 0, 12],
+        groove: Groove::FourFloor,
+        seed: 0xF6E2_9000,
+        ..Song::DEFAULT
+    }
+    .render()
 }
 
 // ---- effects: a marimba --------------------------------------------------
@@ -223,10 +127,6 @@ fn level_sfx() -> Vec<u8> {
     cosy::jingle_with(&[69, 72, 76, 81, HOLD, 76, 81, HOLD], 0.09, Voice::Marimba, 0, Some((Voice::Bell, -1)))
 }
 
-fn move_sfx() -> Vec<u8> {
-    cosy::sfx(&cosy::run(&[57], 0.04, Voice::Marimba, 0.3))
-}
-
 /// Game over: the phrase walking back down, slowly.
 fn game_over_sfx() -> Vec<u8> {
     cosy::jingle_with(&[81, HOLD, 79, HOLD, 76, HOLD, 74, HOLD, 72, HOLD, 69, HOLD, HOLD, HOLD], 0.12, Voice::Marimba, 0, Some((Voice::Bell, -1)))
@@ -234,17 +134,11 @@ fn game_over_sfx() -> Vec<u8> {
 
 pub fn generate() -> Vec<Asset> {
     vec![
-        ("images/head.png", head()),
-        ("images/body.png", body()),
         ("images/food.png", food()),
         ("sounds/eat.wav", eat_sfx()),
-        ("sounds/move.wav", move_sfx()),
         ("sounds/game_over.wav", game_over_sfx()),
         ("sounds/bonus.wav", bonus_sfx()),
         ("sounds/bonus_eat.wav", bonus_eat_sfx()),
         ("sounds/level.wav", level_sfx()),
-        ("sounds/slither.wav", slither()),
-        ("sounds/stalk.wav", stalk()),
-        ("sounds/frenzy.wav", frenzy()),
     ]
 }

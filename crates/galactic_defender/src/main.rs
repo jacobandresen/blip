@@ -5,15 +5,19 @@ use blip::input::{
     btn1_pressed, key_active, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
-use blip::macroquad::prelude::ImageFormat;
 use blip::macroquad::rand::rand;
-use blip::macroquad::texture::{FilterMode, Texture2D};
+use blip::macroquad::texture::Texture2D;
 use blip::{
-    clamp, lerp, play_music, play_sfx, rand_int, rects_overlap, web, window_conf, Blip,
+    GAME_OVER_MIN_WAIT,
+    load_png,
+    clamp, lerp, play_sfx, Jukebox, rand_int, rects_overlap, web, window_conf, Blip, Fx,
     BlipColor, LifeResult, Session, Timer,
     BLIP_BLACK, BLIP_CYAN, BLIP_GREEN, BLIP_MAGENTA, BLIP_ORANGE, BLIP_RED,
     BLIP_WHITE, BLIP_YELLOW,
 };
+
+#[cfg(not(target_arch = "wasm32"))]
+mod bot;
 
 // ---- layout -----------------------------------------------------------
 const WIN_W: i32 = 480;
@@ -36,9 +40,12 @@ const PLAYER_SPEED: f32 = 200.0;
 const PLAYER_ACCEL: f32 = 2200.0;
 const PLAYER_BRAKE: f32 = 3200.0;
 const TOUCH_CLOSE_SECS: f32 = 0.08;
-const BULLET_SPEED: f32 = 350.0;
+const BULLET_SPEED: f32 = 420.0;
 const MARCH_START: i32 = 520;
 const MARCH_MIN: i32 = 65;
+// The formation's step down at each edge: gentle on level 1 (a steady
+// playtest bot was landed on at 16 px), full height from level 4.
+const MARCH_DROP_FIRST: f32 = 10.0;
 const MARCH_DROP: f32 = 16.0;
 const MAX_BOMBS: usize = 4;
 const MAX_PLAYER_BULLETS: usize = 1;
@@ -102,11 +109,8 @@ const DEATH_EXPLOSION_PHASE: f32 = 0.7; // seconds of that pause spent on the gi
                                          // before the ship starts fading back in — the
                                          // remainder (DEAD_PAUSE - this) is the mist fade-in
 const RESPAWN_GRACE_SECS: f32 = 1.2; // once play resumes, firing stays locked out this long
-                                      // How long GAME OVER stays before a key
-                                      // can dismiss it, so the fire button
-                                      // still held from the fight does not
-                                      // skip it.
-const GAME_OVER_MIN_WAIT: f32 = 2.0;
+/// Invaders this close above the ground line turn it into a warning.
+const LANDING_WARN: i32 = 110;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Play, Dead, Win, Over }
@@ -188,6 +192,7 @@ struct Game {
     boss_phase: f32,
     boss_fire: Timer,
     boss_flash: f32,
+    fx: Fx,
 }
 
 impl Game {
@@ -246,6 +251,7 @@ impl Game {
             boss_phase: 0.0,
             boss_fire: Timer::default(),
             boss_flash: 0.0,
+            fx: Fx::new(),
         }
     }
 
@@ -325,7 +331,7 @@ impl Game {
         // so a first-time player isn't faced with a full 5x11 wall immediately.
         let (rows, cols) = match theme {
             0 => (if self.sess.level == 1 { 4 } else { 5 }, 10_i32),
-            1 => (6,     10),
+            1 => (if self.sess.level == 2 { 5 } else { 6 }, 10),
             2 => (3,     11),
             3 => (4,     10),
             _ => (6,     8),
@@ -377,6 +383,7 @@ impl Game {
         self.player_vx = 0.0;
         self.bullets.iter_mut().for_each(|b| b.active = false);
         self.explosions.iter_mut().for_each(|e| e.active = false);
+        self.fx.clear();
         self.init_aliens();
         let theme = (self.sess.level - 1).rem_euclid(5);
         if theme != 2 && theme != 4 {
@@ -494,6 +501,7 @@ fn fire_laser(g: &mut Game) -> bool {
 
     let player_hit = g.player_x < bx1 && g.player_x + ALIEN_W as f32 > bx0;
     if player_hit {
+        blip::bot::add("death_laser", 1.0);
         let px = g.player_x;
         g.spawn_player_death(px, (GROUND_Y - 28) as f32);
         match g.sess.lose_life() {
@@ -718,7 +726,10 @@ fn draw_ufo(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() { g.start_game(); }
+    if btn1_pressed() {
+        web::spend_coin();
+        g.start_game();
+    }
 }
 
 /// An alien kind's colour, and so its score: magenta 30, cyan 20, green 10,
@@ -866,8 +877,14 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     for b in g.bullets.iter_mut() {
         if !b.active { continue; }
         b.y += if b.player { -BULLET_SPEED } else { g.bomb_speed } * dt;
-        if b.y < PLAY_Y as f32 || b.y > WIN_H as f32 { b.active = false; }
+        if b.y < PLAY_Y as f32 { b.active = false; }
+        // A bomb that misses bursts on the ground line.
+        if !b.player && b.y + 12.0 > GROUND_Y as f32 {
+            b.active = false;
+            g.fx.burst(b.x + 2.0, GROUND_Y as f32 - 2.0, 6, 60.0, BLIP_ORANGE);
+        }
     }
+    g.fx.update(dt);
 
     g.march_timer += dt * 1000.0;
     if g.march_timer >= g.march_interval() {
@@ -877,8 +894,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.march_step = (g.march_step + 1) % 4;
         }
         if g.march_drop_next {
+            let drop = lerp(MARCH_DROP_FIRST, MARCH_DROP, ((g.sess.level - 1) as f32 / 3.0).min(1.0));
             for a in g.aliens.iter_mut() {
-                if a.alive { a.y += MARCH_DROP; }
+                if a.alive { a.y += drop; }
             }
             g.march_dir = -g.march_dir;
             g.march_drop_next = false;
@@ -943,6 +961,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.bullets[bi].active = false;
                 let pts = match kind { 0 => 30, 1 => 20, _ => 10 };
                 g.sess.add_score(pts * g.sess.level);
+                let (cx, cy) = (ax + ALIEN_W as f32 / 2.0, ay + ALIEN_H as f32 / 2.0);
+                g.fx.burst(cx, cy, 10, 110.0, alien_color(kind));
+                g.fx.popup(cx, cy - 6.0, &format!("{}", pts * g.sess.level), alien_color(kind));
                 break;
             }
         }
@@ -963,6 +984,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                     ) {
                         g.shields[s].alive[r][c] = false;
                         g.bullets[bi].active = false;
+                        g.fx.burst(bx + SHIELD_BLOCK as f32 / 2.0, by + SHIELD_BLOCK as f32 / 2.0, 5, 50.0, BLIP_GREEN);
                         break 'outer;
                     }
                 }
@@ -999,6 +1021,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             let px = g.player_x;
             g.spawn_player_death(px, (GROUND_Y - 28) as f32);
             play_sfx(&sfx.explosion);
+            blip::bot::add(if bi == UFO_BOMB_IDX { "death_ufo_bomb" } else { "death_bomb" }, 1.0);
             match g.sess.lose_life() {
                 LifeResult::StillAlive => {
                     for k in MAX_PLAYER_BULLETS..N_BULLETS {
@@ -1024,6 +1047,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if a.alive && a.y + ALIEN_H as f32 >= GROUND_Y as f32 {
             // The invasion landing ends the game outright, but as a real
             // death explosion, and skips the respawn.
+            blip::bot::add("death_landing", 1.0);
             let px = g.player_x;
             g.spawn_player_death(px, (GROUND_Y - 28) as f32);
             play_sfx(&sfx.explosion);
@@ -1057,7 +1081,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             blip::play_alert(&sfx.ufo_siren);
         } else {
             play_sfx(&sfx.level_clear);
+            blip::bot::set(&format!("t_clear{}", g.sess.level), blip::bot::clock() as f64);
             g.sess.next_level();
+            blip::bot::set("level", g.sess.level as f64);
             g.dead_timer.start(1.5);
             g.state = State::Win;
         }
@@ -1072,6 +1098,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
+    g.fx.update(dt);
     // Keep the death explosion's burst of fireballs animating through the
     // pause instead of freezing at full brightness until play resumes.
     for e in g.explosions.iter_mut() {
@@ -1138,7 +1165,11 @@ fn draw_boss(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
 fn draw_play(blip: &Blip, g: &Game,
              player: &Texture2D, alien: &[[Texture2D; 2]; 3],
              explosion: &Texture2D, shield: &Texture2D, saucer: &[Texture2D; UFO_N_LIGHTS]) {
-    blip.draw_line(0.0, GROUND_Y as f32, WIN_W as f32, GROUND_Y as f32, BLIP_GREEN);
+    // The ground line pulses red while the invaders are close to landing.
+    let lowest = g.aliens.iter().filter(|a| a.alive).map(|a| a.y + ALIEN_H as f32).fold(0.0, f32::max);
+    let ground = if g.state == State::Play && lowest > (GROUND_Y - LANDING_WARN) as f32
+        && (blip::macroquad::time::get_time() * 4.0) as i64 % 2 == 0 { BLIP_RED } else { BLIP_GREEN };
+    blip.fill_rect(0.0, GROUND_Y as f32 - 1.0, WIN_W as f32, 2.0, ground);
 
     for s in 0..SHIELDS {
         for r in 0..SHIELD_ROWS {
@@ -1207,6 +1238,7 @@ fn draw_play(blip: &Blip, g: &Game,
     }
 
     draw_ufo(blip, g, saucer);
+    g.fx.draw(blip);
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
@@ -1245,14 +1277,8 @@ fn draw_win(blip: &Blip, level: i32) {
 }
 
 fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
-    let buf = format!("SCORE {}", score);
     blip.clear(BLIP_BLACK);
-    blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
-    blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
-    blip.draw_best(score, hi, (WIN_H / 2 + 28) as f32, BLIP_GREEN);
-    if !waiting {
-        blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
-    }
+    blip.draw_game_over(score, hi, BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !waiting);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -1287,19 +1313,8 @@ const MARCH2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets
 const MARCH3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march3.wav"));
 const MARCH4_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march4.wav"));
 const GAME_OVER_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
-const MUSIC_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
-const MUSIC2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
-const MUSIC3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
 
-// Loop durations in seconds — used to switch tracks at loop boundaries.
-// music: 28.07s (138 BPM trance)  music2: 31.11s (140 BPM trance)  music3: 29.05s (100 BPM dread)
-const MUSIC_DURATIONS: [f32; 3] = [28.07, 31.11, 29.05];
 
-fn load_png(bytes: &'static [u8]) -> Texture2D {
-    let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));
-    tex.set_filter(FilterMode::Nearest);
-    tex
-}
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -1336,14 +1351,13 @@ async fn main() {
         laser_blast:  blip::audio::load_sound(LASER_BLAST_WAV).await,
         game_over:    blip::audio::load_sound(GAME_OVER_WAV).await,
     };
-    let music = [
-        blip::audio::load_sound(MUSIC_WAV).await,
-        blip::audio::load_sound(MUSIC2_WAV).await,
-        blip::audio::load_sound(MUSIC3_WAV).await,
-    ];
-    let mut music_idx: usize = 0;
-    let mut music_timer: f32 = MUSIC_DURATIONS[0];
-    play_music(&music[0]);
+    // The invasion tune, and the mothership's on boss levels (synthesised
+    // here, see blip_assets::galactic_defender).
+    let mut music = Jukebox::new(&[
+        blip_assets::galactic_defender::invasion_wav,
+        blip_assets::galactic_defender::mothership_wav,
+    ]);
+    music.start(0).await;
 
     let mut shot_frame: u32 = 0;
 
@@ -1357,18 +1371,11 @@ async fn main() {
             }
         }
 
-        // Switch to a random different loop at each loop boundary.
-        music_timer -= dt;
-        if music_timer <= 0.0 {
-            let next = {
-                let candidate = rand_int(0, 1) as usize; // 0 or 1
-                if candidate < music_idx { candidate } else { candidate + 1 } // skip current
-            };
-            music_idx = next;
-            music_timer = MUSIC_DURATIONS[next];
-            play_music(&music[next]);
-        }
+        music.play(if g.state != State::Title && g.is_boss_level() { 1 } else { 0 });
+        if g.state != State::Play { music.warm_up().await; }
         g.touch_x = blip.touch(0).map(|p| p.x);
+        #[cfg(not(target_arch = "wasm32"))]
+        if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }
         let prev_state = g.state;
         match g.state {
             State::Title => update_title(&mut g),

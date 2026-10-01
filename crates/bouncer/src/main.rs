@@ -6,14 +6,18 @@ use blip::input::{
     btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
-use blip::macroquad::prelude::ImageFormat;
 use blip::macroquad::rand::rand;
-use blip::macroquad::texture::{FilterMode, Texture2D};
+use blip::macroquad::texture::Texture2D;
 use blip::{
-    clamp, play_music, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
+    GAME_OVER_MIN_WAIT,
+    load_png, load_png_smooth,
+    clamp, Fx, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
     window_conf, Blip, BlipColor, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_CYAN,
     BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
+
+#[cfg(not(target_arch = "wasm32"))]
+mod bot;
 
 // ---- layout -----------------------------------------------------------
 const WIN_W: i32 = 480;
@@ -69,10 +73,6 @@ const LIVES_START: i32 = 3;
 const SPEED_INC: f32 = 7.0;
 // Taken off the ramp when a life is lost, so the new ball is catchable.
 const SPEED_LIFE_RELIEF: f32 = 60.0;
-// A hard floor on how long GAME OVER stays up before a key can dismiss it —
-// without this, a direction/launch key still held from the rally that
-// killed you bounces straight back to the title screen unread.
-const GAME_OVER_MIN_WAIT: f32 = 2.0;
 
 // ---- screwball spin -----------------------------------------------------
 // Hitting the ball while the paddle is moving fast puts a spin on it — the
@@ -95,6 +95,24 @@ const PULL: f32 = 70.0;          // px/s^2 along vy
 const PULL_FLAT: f32 = 260.0;    // extra when |vy| is under 40% of the speed
 const SCREW_GAIN: f32 = 0.18;    // fraction of speed gained per second, spinning
 const PULL_CAP: f32 = 1.3;       // times BALL_SPEED_MAX, whatever the pull
+
+// ---- seeking ---------------------------------------------------------------
+// The last few bricks of a level could take minutes to hit (a playtest bot
+// spent 190 s on the final three). After this long without breaking one, a
+// rising ball glows and bends gently toward the nearest brick.
+const SEEK_AFTER: f32 = 5.0;
+const SEEK_RATE: f32 = 1.5; // radians/sec of bend at most
+
+const BRICK_COLORS: [BlipColor; 8] = [
+    BlipColor { r: 0.90, g: 0.25, b: 0.25, a: 1.0 },
+    BlipColor { r: 0.95, g: 0.55, b: 0.20, a: 1.0 },
+    BlipColor { r: 0.95, g: 0.85, b: 0.30, a: 1.0 },
+    BlipColor { r: 0.35, g: 0.80, b: 0.35, a: 1.0 },
+    BlipColor { r: 0.30, g: 0.50, b: 0.95, a: 1.0 },
+    BlipColor { r: 0.65, g: 0.35, b: 0.90, a: 1.0 },
+    BlipColor { r: 0.70, g: 0.72, b: 0.78, a: 1.0 },
+    BlipColor { r: 0.70, g: 0.72, b: 0.78, a: 1.0 },
+];
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Launch, Play, Dead, Win, Over }
@@ -149,6 +167,9 @@ struct Game {
     sess: Session,
     dead_timer: Timer,
     state: State,
+    /// Seconds since a brick last broke (see SEEK_AFTER).
+    since_break: f32,
+    fx: Fx,
 }
 
 impl Game {
@@ -175,6 +196,8 @@ impl Game {
             sess: Session::new(LIVES_START),
             dead_timer: Timer::default(),
             state: State::Title,
+            since_break: 0.0,
+            fx: Fx::new(),
         }
     }
 
@@ -225,7 +248,18 @@ impl Game {
         }
     }
 
+    fn seeking(&self) -> bool { self.state == State::Play && self.since_break > SEEK_AFTER }
+
+    /// Centre of the live brick nearest the ball.
+    fn nearest_brick(&self) -> Option<(f32, f32)> {
+        let (cx, cy, _) = ball_circle(self);
+        (0..BRICK_TOTAL).filter(|&i| self.bricks[i].alive).map(brick_rect)
+            .map(|(x, y)| (x + BRICK_W as f32 / 2.0, y + BRICK_H as f32 / 2.0))
+            .min_by(|a, b| (a.0 - cx).hypot(a.1 - cy).total_cmp(&(b.0 - cx).hypot(b.1 - cy)))
+    }
+
     fn launch_ball(&mut self) {
+        self.since_break = 0.0;
         self.ball_x = self.pad_x + (self.pad_w / 2.0 - BALL_W as f32 / 2.0);
         self.ball_y = (PAD_Y - BALL_H - 2) as f32;
         let r01 = (rand() as f32) / (u32::MAX as f32);
@@ -252,6 +286,7 @@ impl Game {
 
     fn next_level(&mut self) {
         self.sess.next_level();
+        self.fx.clear();
         self.ball_speed = BALL_SPEED_0;
         self.reset_drops();
         self.build_bricks();
@@ -280,7 +315,10 @@ fn play_variant(takes: &[blip::BlipSound; 3], speed: f32) {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() { g.start_game(); }
+    if btn1_pressed() {
+        web::spend_coin();
+        g.start_game();
+    }
 }
 
 fn paddle_input(g: &mut Game, dt: f32) {
@@ -318,6 +356,7 @@ fn paddle_input(g: &mut Game, dt: f32) {
 
 fn update_launch(g: &mut Game, dt: f32) {
     paddle_input(g, dt);
+    g.fx.update(dt);
     g.ball_x = g.pad_x + (g.pad_w / 2.0 - BALL_W as f32 / 2.0);
     g.ball_y = (PAD_Y - BALL_H - 2) as f32;
     if key_pressed(BLIP_KEY_SPACE) || key_pressed(BLIP_KEY_UP) || key_pressed(BLIP_KEY_W) {
@@ -335,6 +374,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.pad_effect_timer.tick(dt) { g.pad_w = PAD_W as f32; }
     g.slow_timer.tick(dt);
     update_drops(g, dt, sfx);
+    g.fx.update(dt);
+    g.since_break += dt;
+    seek(g, dt);
 
     let active_speed = if g.slow_timer.active() {
         g.ball_speed * BALL_SLOW_FACTOR
@@ -395,6 +437,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         ball_bricks(g, active_speed, sfx);
 
         if g.ball_y > WIN_H as f32 {
+            g.fx.burst(g.ball_x + BALL_W as f32 / 2.0, WIN_H as f32 - 4.0, 14, 160.0, BLIP_RED);
+            blip::bot::add("lives_lost", 1.0);
+            blip::bot::add(&format!("lost_at_speed{}", (g.ball_vx.hypot(g.ball_vy) / 50.0) as i32 * 50), 1.0);
             play_sfx(&sfx.life_lost);
             g.reset_drops();
             match g.sess.lose_life() {
@@ -410,10 +455,33 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     if g.bricks_alive() == 0 {
+        blip::bot::set("cleared", g.sess.level as f64);
+        blip::bot::set(&format!("t_clear{}", g.sess.level), blip::bot::clock() as f64);
         play_sfx(&sfx.win);
         g.dead_timer.start(1.5);
         g.state = State::Win;
     }
+}
+
+/// The top-left corner of brick `i`.
+fn brick_rect(i: usize) -> (f32, f32) {
+    let (row, col) = (i as i32 / BRICK_COLS, i as i32 % BRICK_COLS);
+    ((BRICK_OX + col * (BRICK_W + BRICK_GAP)) as f32, (BRICK_OY + row * (BRICK_H + BRICK_GAP)) as f32)
+}
+
+/// While seeking, bend a rising ball toward the nearest brick.
+fn seek(g: &mut Game, dt: f32) {
+    if !g.seeking() || g.ball_vy >= 0.0 { return; }
+    let Some((tx, ty)) = g.nearest_brick() else { return };
+    let (cx, cy, _) = ball_circle(g);
+    let want = (ty - cy).atan2(tx - cx);
+    let have = g.ball_vy.atan2(g.ball_vx);
+    let diff = (want - have + PI).rem_euclid(2.0 * PI) - PI;
+    let turn = diff.clamp(-SEEK_RATE * dt, SEEK_RATE * dt);
+    let (s, c) = turn.sin_cos();
+    let (vx, vy) = (g.ball_vx, g.ball_vy);
+    g.ball_vx = vx * c - vy * s;
+    g.ball_vy = vx * s + vy * c;
 }
 
 type Mat3 = [[f32; 3]; 3];
@@ -510,6 +578,7 @@ fn ball_paddle(g: &mut Game, speed: f32, sfx: &Sounds) {
     }
     play_variant(&sfx.paddle_hit, speed);
     web::haptic();
+    g.fx.ring(g.ball_x + BALL_W as f32 / 2.0, PAD_Y as f32, 22.0, 0.25, BlipColor { r: 0.6, g: 0.85, b: 1.0, a: 0.8 });
     g.pad_kick_v = 40.0 + 70.0 * (speed / BALL_SPEED_MAX).min(1.0);
     let incoming_vx = g.ball_vx;
 
@@ -595,20 +664,26 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
         g.ball_vy = g.ball_vy / m * speed;
 
         g.bricks[i].hp -= 1;
+        let (mx, my) = (bx + BRICK_W as f32 / 2.0, by + BRICK_H as f32 / 2.0);
         if g.bricks[i].hp == 0 {
             g.bricks[i].alive = false;
-            g.sess.add_score((BRICK_ROWS - row) * 10 * g.sess.level);
+            g.since_break = 0.0;
+            let points = (BRICK_ROWS - row) * 10 * g.sess.level;
+            g.sess.add_score(points);
+            g.fx.burst(mx, my, 10, 120.0, BRICK_COLORS[g.bricks[i].kind]);
+            g.fx.popup(mx, my, &format!("{points}"), BLIP_WHITE);
             // Same ramp on every level, so the ball plays identically no
             // matter how far the player has gotten.
             g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
 
-            // 30% chance to spawn a loot drop
+            // 30% chance to spawn a loot drop; one in ten of those a life
+            // (at one in five a steady player ended level 1 with six).
             if rand() % 10 < 3 {
                 let drop_x = bx + BRICK_W as f32 / 2.0 - DROP_W / 2.0;
                 let drop_kind = match rand() % 10 {
                     0..=2 => DropKind::Wide,
                     3..=5 => DropKind::Slow,
-                    6..=7 => DropKind::Narrow,
+                    6..=8 => DropKind::Narrow,
                     _ => DropKind::Life,
                 };
                 pool_spawn(&mut g.drops, Drop { x: drop_x, y: by, active: true, kind: drop_kind });
@@ -618,6 +693,7 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
             // Steel brick survived — the cracked texture warns the next hit
             // finishes it.
             g.bricks[i].kind = BRICK_STEEL_CRACKED;
+            g.fx.burst(mx, my, 5, 70.0, BRICK_COLORS[BRICK_STEEL]);
             play_variant(&sfx.brick_hit, speed);
         }
         return;
@@ -631,6 +707,14 @@ fn update_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
         if rects_overlap(d.x, d.y, DROP_W, DROP_H,
                          g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32) {
             d.active = false;
+            blip::bot::add(["got_wide", "got_narrow", "got_slow", "got_life"][d.kind as usize], 1.0);
+            let (label, c) = match d.kind {
+                DropKind::Wide => ("WIDE", BLIP_GREEN),
+                DropKind::Narrow => ("NARROW", BLIP_RED),
+                DropKind::Slow => ("SLOW", BLIP_CYAN),
+                DropKind::Life => ("+1 LIFE", BLIP_YELLOW),
+            };
+            g.fx.popup(d.x + DROP_W / 2.0, PAD_Y as f32 - 14.0, label, c);
             play_sfx(match d.kind {
                 DropKind::Wide | DropKind::Slow => &sfx.pickup_good,
                 DropKind::Narrow => &sfx.pickup_bad,
@@ -657,6 +741,7 @@ fn update_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
+    g.fx.update(dt);
     if g.dead_timer.tick(dt) {
         g.ball_speed = (g.ball_speed - SPEED_LIFE_RELIEF).max(BALL_SPEED_0);
         g.pad_x = ((WIN_W - PAD_W) / 2) as f32;
@@ -733,11 +818,22 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
         BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.35 },
     );
 
+    // Seeking: the ball glows and the brick it is bending toward pulses.
+    if g.seeking() {
+        let pulse = 0.5 + 0.5 * (blip::macroquad::time::get_time() as f32 * 8.0).sin();
+        blip.fill_glow_circle(ball_cx, ball_cy, BALL_W as f32 * 0.55, BlipColor { r: 1.0, g: 0.9, b: 0.5, a: 0.35 });
+        if let Some((tx, ty)) = g.nearest_brick() {
+            let (x, y) = (tx - BRICK_W as f32 / 2.0 - 2.0, ty - BRICK_H as f32 / 2.0 - 2.0);
+            blip.draw_rect(x, y, BRICK_W as f32 + 4.0, BRICK_H as f32 + 4.0, BlipColor { r: 1.0, g: 0.95, b: 0.6, a: pulse });
+        }
+    }
+
     let (col, row, roll) = ball_pose(&g.ball_rot);
     let (bx, by, bs) = (g.ball_x - 1.0, g.ball_y - 1.0, BALL_W as f32 + 2.0);
     blip.draw_texture_cell(ball, col, BALL_YAW_N, row, BALL_PITCH_N, bx, by, bs, bs, roll);
     blip.draw_texture(shade, bx, by, bs, bs);
 
+    g.fx.draw(blip);
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
@@ -760,14 +856,8 @@ fn draw_win(blip: &Blip, level: i32) {
 }
 
 fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
-    let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
-    blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
-    blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
-    blip.draw_best(score, hi, (WIN_H / 2 + 28) as f32, BLIP_GREEN);
-    if !waiting {
-        blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
-    }
+    blip.draw_game_over(score, hi, BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !waiting);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -812,16 +902,7 @@ const WIN_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/
 const PICKUP_GOOD_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_good.wav"));
 const PICKUP_BAD_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_bad.wav"));
 const PICKUP_LIFE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_life.wav"));
-const MUSIC_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music.wav"));
-const MUSIC2_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music2.wav"));
-const MUSIC3_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music3.wav"));
-const MUSIC4_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music4.wav"));
-const MUSIC5_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music5.wav"));
-const MUSIC6_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/music6.wav"));
-// Six loops in rotation instead of one, so a long session doesn't just hear
-// the same ~30s on repeat — see blip_assets::bouncer's music()..music6() for
-// what each one is (tech-house, acid, downtempo, trance, funky, dark).
-const MUSIC_DURATIONS: [f32; 6] = [30.7262, 29.3388, 29.0500, 31.5512, 32.2471, 30.7922];
+
 
 async fn load_takes(wavs: &[&'static [u8]; 3]) -> [blip::BlipSound; 3] {
     [
@@ -831,28 +912,16 @@ async fn load_takes(wavs: &[&'static [u8]; 3]) -> [blip::BlipSound; 3] {
     ]
 }
 
-fn load_png(bytes: &'static [u8]) -> Texture2D {
-    let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));
-    tex.set_filter(FilterMode::Nearest);
-    tex
-}
 
 #[blip::macroquad::main(conf)]
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let paddle = load_png(PADDLE_PNG);
-    paddle.set_filter(FilterMode::Linear);
-    let ball = load_png(BALL_PNG);
-    ball.set_filter(FilterMode::Linear);
-    let drops = DROP_PNGS.map(|b| {
-        let t = load_png(b);
-        t.set_filter(FilterMode::Linear);
-        t
-    });
-    let ball_shade = load_png(BALL_SHADE_PNG);
-    ball_shade.set_filter(FilterMode::Linear);
+    let paddle = load_png_smooth(PADDLE_PNG);
+    let ball = load_png_smooth(BALL_PNG);
+    let drops = DROP_PNGS.map(load_png_smooth);
+    let ball_shade = load_png_smooth(BALL_SHADE_PNG);
     let brick = [
         load_png(BRICK_RED_PNG),
         load_png(BRICK_ORANGE_PNG),
@@ -875,30 +944,17 @@ async fn main() {
         pickup_bad:  blip::audio::load_sound(PICKUP_BAD_WAV).await,
         pickup_life: blip::audio::load_sound(PICKUP_LIFE_WAV).await,
     };
-    let music = [
-        blip::audio::load_sound(MUSIC_WAV).await,
-        blip::audio::load_sound(MUSIC2_WAV).await,
-        blip::audio::load_sound(MUSIC3_WAV).await,
-        blip::audio::load_sound(MUSIC4_WAV).await,
-        blip::audio::load_sound(MUSIC5_WAV).await,
-        blip::audio::load_sound(MUSIC6_WAV).await,
-    ];
-    let mut music_idx: usize = 0;
-    let mut music_timer: f32 = MUSIC_DURATIONS[0];
-    play_music(&music[0]);
+    // Two tunes, alternating by level (synthesised here, see blip_assets::bouncer).
+    let mut music = Jukebox::new(&[blip_assets::bouncer::bounce_wav, blip_assets::bouncer::rebound_wav]);
+    music.start(0).await;
 
     let mut shot_frame: u32 = 0;
 
     loop {
         let dt = blip.delta_time;
 
-        // Advance to the next loop in rotation at each track's boundary.
-        music_timer -= dt;
-        if music_timer <= 0.0 {
-            music_idx = (music_idx + 1) % music.len();
-            music_timer = MUSIC_DURATIONS[music_idx];
-            play_music(&music[music_idx]);
-        }
+        music.play(if g.state == State::Title { 0 } else { (g.sess.level as usize + 1) % 2 });
+        if g.state != State::Play { music.warm_up().await; }
 
         if blip.screenshot_mode {
             shot_frame += 1;
@@ -911,6 +967,8 @@ async fn main() {
         }
 
         g.touch_x = blip.touch(0).map(|p| p.x);
+        #[cfg(not(target_arch = "wasm32"))]
+        if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }
         match g.state {
             State::Title  => update_title(&mut g),
             State::Launch => update_launch(&mut g, dt),

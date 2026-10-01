@@ -5,50 +5,11 @@
 
 use std::f32::consts::PI;
 
-use crate::techno::{warm, Rng, MIX_KNEE};
+use crate::wav::{warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, encode_pcm16_music, soft_limit_to_pcm16};
 
 use crate::cosy::{midi_hz, note, pulse, Voice, SR};
-
-fn kick(buf: &mut [f32], start: usize, vol: f32) {
-    let n = (0.16 * SR) as usize;
-    let mut ph = 0.0f32;
-    for i in 0..n {
-        let j = start + i;
-        if j >= buf.len() { break; }
-        let t = i as f32 / SR;
-        ph += (48.0 + 110.0 * (-t / 0.03).exp()) / SR;
-        buf[j] += ((2.0 * PI * ph).sin() * 2.0).tanh() * (-t / 0.07).exp() * vol;
-    }
-}
-
-fn snare(buf: &mut [f32], start: usize, rng: &mut Rng, vol: f32) {
-    let n = (0.14 * SR) as usize;
-    let mut lp = 0.0f32;
-    for i in 0..n {
-        let j = start + i;
-        if j >= buf.len() { break; }
-        let t = i as f32 / SR;
-        let w = rng.next_f32() * 2.0 - 1.0;
-        lp += (w - lp) * 0.5;
-        let body = (2.0 * PI * 190.0 * t).sin() * (-t / 0.03).exp();
-        buf[j] += (lp * (-t / 0.05).exp() * 0.9 + body * 0.5) * vol;
-    }
-}
-
-fn hat(buf: &mut [f32], start: usize, rng: &mut Rng, vol: f32) {
-    let n = (0.035 * SR) as usize;
-    let mut prev = 0.0f32;
-    for i in 0..n {
-        let j = start + i;
-        if j >= buf.len() { break; }
-        let t = i as f32 / SR;
-        let w = rng.next_f32() * 2.0 - 1.0;
-        let hp = w - prev;
-        prev = w;
-        buf[j] += hp * (-t / 0.012).exp() * vol;
-    }
-}
+use crate::song::{hat, kick, snare};
 
 const H: i32 = -2; // hold the previous note
 const RR: i32 = -1; // rest

@@ -4,7 +4,7 @@
 
 use std::f32::consts::PI;
 
-use crate::techno::{warm, Rng, MIX_KNEE};
+use crate::wav::{warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, SAMPLE_RATE};
 
 pub const SR: f32 = SAMPLE_RATE as f32;

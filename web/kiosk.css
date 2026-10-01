@@ -1324,10 +1324,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .stick-ball  { width: 66px; height: 66px; bottom: 37px; }
   .fire-buttons { gap: 12px; }
   .arcade-btn { width: 66px; height: 66px; }
-  /* Clear the corner badges and language flags of the taller bar and raised
-     stick (index.html restates this for its .lang-switcher). */
-  .left-badges,
-  .lang-switcher { bottom: calc(102px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* Smallest phones (iPhone SE/mini class) — a 2-button game plus the coin
@@ -1371,36 +1367,52 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .stick-ball  { width: 90px; height: 90px; bottom: 58px; }
   .fire-buttons { gap: 24px; }
   .arcade-btn { width: 92px; height: 92px; }
-  /* Clear the corner badges / flags of the taller deck (index.html
-     re-states .lang-switcher for itself). */
-  .left-badges,
-  .lang-switcher { bottom: calc(138px + env(safe-area-inset-bottom, 0px)); }
 }
 
-/* ---- Left badges: CONTROLS / ABOUT / HISTORY ---- One definition for the
-   front page and the info pages, centred on the left cabinet rail. Each box
-   is exactly its 44px avatar so labels never shift the column. */
-.left-badges {
+/* ---- Side badges: CONTROLS / ABOUT / HISTORY on the left, the language
+   flags mirroring them on the right ---- One definition for the front page
+   and the info pages. Each column is centred on its 64px cabinet rail
+   (10px either side of a 44px badge), and the two share a baseline, 16px
+   above the deck (kiosk.js measures it into --side-badges-bottom). */
+.left-badges,
+.lang-switcher {
   position: fixed;
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-  left: 10px;
+  bottom: var(--side-badges-bottom, calc(92px + env(safe-area-inset-bottom, 0px)));
   z-index: 10000;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  transition: opacity .3s;
 }
-.lang-switcher { transition: opacity .3s; }
+.left-badges   { left: 10px; }
+.lang-switcher { right: 10px; }
 
-@media (max-width: 600px) {
-  /* badges + flags hide when scrolled to the bottom of the landing page
-     (kiosk.js only arms this there) to avoid crowding the kiosk bar */
-  .left-badges.near-bottom,
-  .lang-switcher.near-bottom {
-    opacity: 0;
-    pointer-events: none;
-  }
+/* A flag is a round badge like the avatars: dimmed until it is the page's
+   language, which gets the green ring. */
+.lang-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #222;
+  background: radial-gradient(circle at 50% 30%, #1d1d23, #09090c 72%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  filter: grayscale(55%) brightness(0.7);
+  transition: border-color .2s, box-shadow .2s, filter .2s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.lang-btn:hover { filter: none; border-color: #4a4a52; }
+.lang-btn.active {
+  filter: none;
+  border-color: #32c832;
+  box-shadow: 0 0 12px rgba(50,200,50,0.45);
+  cursor: default;
 }
 
 .controls-badge,
@@ -1435,7 +1447,9 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 @media (max-width: 600px) {
   .controls-avatar,
   .about-avatar,
-  .history-avatar { width: 32px; height: 32px; }
+  .history-avatar,
+  .lang-btn { width: 32px; height: 32px; }
+  .lang-btn { font-size: 18px; }
   .controls-label,
   .about-label,
   .history-label { left: 42px; }

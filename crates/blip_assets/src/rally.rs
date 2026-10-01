@@ -1,12 +1,11 @@
-//! Rally assets: techno music and plucky effects (see `cosy`); the sprites
-//! are drawn at runtime.
+//! Rally assets: techno music (see `techno`) and plucky effects (see `cosy`);
+//! the sprites are drawn at runtime. The music is synthesised on the device.
 
-use crate::techno::{warm, 
+use crate::techno::{
     bass_note, clap, hat, kick, lead_stab, lift_fill, open_hat, phrase_note, riser,
-    sidechain_duck, supersaw, Rng,
-    MIX_KNEE,
+    sidechain_duck, supersaw,
 };
-use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, warm, Rng, MIX_KNEE, SAMPLE_RATE};
 use crate::cosy::{self, Voice, H};
 use crate::Asset;
 
@@ -20,7 +19,7 @@ const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
 /// hats, a galloping bass and one hook over an Em-Am vamp (answered on each
 /// fourth bar, phrase_note). The back half adds an octave-up harmony and a
 /// hat roll.
-fn music() -> Vec<u8> {
+pub fn music() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let step_ms = 60_000.0 / BPM / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
@@ -86,7 +85,7 @@ fn music() -> Vec<u8> {
 /// hit pattern (landing off the beat in places, not the steady gallop) and
 /// a bright `lead_stab` hook instead of `supersaw`, in a different key so
 /// it doesn't just read as the title loop sped up.
-fn music2() -> Vec<u8> {
+pub fn music2() -> Vec<u8> {
     const BPM: f32 = 146.0;
     const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 16;
@@ -143,7 +142,7 @@ fn music2() -> Vec<u8> {
 /// notes instead of a moving line, and a slow, spaced-out `lead_stab`
 /// motif — the breather in Rally's rotation, deliberately roomier than the
 /// other four rather than another up-tempo racer.
-fn music3() -> Vec<u8> {
+pub fn music3() -> Vec<u8> {
     const BPM: f32 = 108.0;
     const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 12;
@@ -195,7 +194,7 @@ fn music3() -> Vec<u8> {
 /// last two bars into a hard cut back to the top, the closest thing Rally's
 /// rotation has to an obvious "drop" moment, for the lap where the race is
 /// close.
-fn music4() -> Vec<u8> {
+pub fn music4() -> Vec<u8> {
     const BPM: f32 = 140.0;
     const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 18;
@@ -254,7 +253,7 @@ fn music4() -> Vec<u8> {
 /// the beat instead of four-on-the-floor-locked, and a call-and-response
 /// `lead_stab` hook (one phrase answered by a second) instead of one riff
 /// repeated verbatim.
-fn music5() -> Vec<u8> {
+pub fn music5() -> Vec<u8> {
     const BPM: f32 = 122.0;
     const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 16;
@@ -339,15 +338,10 @@ fn point_lost() -> Vec<u8> {
 
 pub fn generate() -> Vec<Asset> {
     vec![
-        ("sounds/music.wav",  music()),
         ("sounds/wall.wav",   wall()),
         ("sounds/hit_l.wav",  hit(false)),
         ("sounds/hit_r.wav",  hit(true)),
         ("sounds/score_l.wav", point_won()),
         ("sounds/score_r.wav", point_lost()),
-        ("sounds/music2.wav", music2()),
-        ("sounds/music3.wav", music3()),
-        ("sounds/music4.wav", music4()),
-        ("sounds/music5.wav", music5()),
     ]
 }

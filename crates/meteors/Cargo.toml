@@ -8,6 +8,8 @@ publish.workspace = true
 [dependencies]
 macroquad = { workspace = true }
 blip = { workspace = true }
+# The music is synthesised on the device (blip_assets::meteors).
+blip_assets = { workspace = true }
 
 [build-dependencies]
 blip_assets = { workspace = true }

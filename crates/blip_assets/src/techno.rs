@@ -1,29 +1,13 @@
-//! Shared techno toolkit: kick, hats, claps, an acid bass and a lead stab,
-//! which each game's music composes into its own step-sequenced loop (its own
-//! tempo, pattern and scale).
+//! Rally's drum machine: kick, hats, claps, an acid bass, a lead stab and a
+//! supersaw, which its music composes into step-sequenced techno loops. The
+//! other games write their music as songs instead (see `song`).
 //! Voices mix into a `&mut [f32]` buffer (`mix_into_f32`) instead of clamping
 //! per write, which would hard-clip where kick, bass and hats share a beat;
 //! render to `Vec<f32>` and convert once with `soft_limit_to_pcm16`.
 
 use std::f32::consts::PI;
 
-use crate::wav::{env, mix_into_f32, SAMPLE_RATE};
-
-/// Default knee for `wav::soft_limit_to_pcm16` when rendering a full track
-/// built from these voices — tuned so a kick + bass + hats all landing on
-/// the same beat compress gracefully instead of clipping.
-pub const MIX_KNEE: f32 = 24_000.0;
-
-/// Small deterministic PRNG — no external dependency, reproducible builds.
-pub struct Rng(pub u32);
-impl Rng {
-    pub fn next_f32(&mut self) -> f32 {
-        self.0 ^= self.0 << 13;
-        self.0 ^= self.0 >> 17;
-        self.0 ^= self.0 << 5;
-        (self.0 >> 8) as f32 / 16_777_216.0 // 0..1
-    }
-}
+use crate::wav::{env, mix_into_f32, tame, Rng, SAMPLE_RATE};
 
 /// Which note of a hook to play at this bar and position. On the fourth bar
 /// of each four-bar phrase the riff is answered in the oldest way: backwards
@@ -48,27 +32,6 @@ pub fn lift_fill(buf: &mut [f32], bar_start_off: usize, step_samples: usize, rng
         }
         let ramp = (step - 8) as f32 / 8.0;
         hat(buf, off, rng, vol * (0.45 + 0.55 * ramp));
-    }
-}
-
-/// Keep a melodic voice out of the shrill register: anything above A4 drops
-/// by octaves, keeping the tune's shape where it is easy on the ears and a
-/// phone speaker.
-pub fn tame(freq: f32) -> f32 {
-    let mut f = freq;
-    while f > 440.0 { f *= 0.5; }
-    f
-}
-
-/// The master warmth for a music track: two gentle low-pass poles round
-/// 3 kHz take the fizz off hats, saws and noise without dulling the tune.
-pub fn warm(buf: &mut [f32]) {
-    let a = 1.0 - (-2.0 * PI * 3000.0 / SAMPLE_RATE as f32).exp();
-    let (mut l1, mut l2) = (0.0f32, 0.0f32);
-    for v in buf.iter_mut() {
-        l1 += a * (*v - l1);
-        l2 += a * (l1 - l2);
-        *v = l2;
     }
 }
 

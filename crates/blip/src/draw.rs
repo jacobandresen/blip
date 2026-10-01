@@ -128,3 +128,18 @@ pub fn draw_texture_region(
         },
     );
 }
+
+/// Decode a PNG (usually `include_bytes!`) into a texture that keeps crisp
+/// pixels when scaled: for pixel art.
+pub fn load_png(bytes: &[u8]) -> Texture2D {
+    let tex = Texture2D::from_file_with_format(bytes, Some(macroquad::prelude::ImageFormat::Png));
+    tex.set_filter(macroquad::texture::FilterMode::Nearest);
+    tex
+}
+
+/// The same, smoothed when scaled: for shaded sprites and soft edges.
+pub fn load_png_smooth(bytes: &[u8]) -> Texture2D {
+    let tex = load_png(bytes);
+    tex.set_filter(macroquad::texture::FilterMode::Linear);
+    tex
+}

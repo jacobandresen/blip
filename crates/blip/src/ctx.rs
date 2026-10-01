@@ -14,7 +14,7 @@ use macroquad::math::{vec2, Rect};
 use macroquad::miniquad::{ShaderSource, UniformDesc, UniformType};
 use macroquad::shapes::draw_rectangle;
 use macroquad::texture::{
-    draw_texture_ex, get_screen_data, render_target_ex, DrawTextureParams, FilterMode,
+    draw_texture_ex, render_target_ex, DrawTextureParams, FilterMode,
     RenderTarget, RenderTargetParams,
 };
 use macroquad::time::get_frame_time;
@@ -228,10 +228,13 @@ pub struct Blip {
     fx_settle:     u8,  // frames to ignore after startup / a level change
     fx_slow_accum: f32, // seconds run slow at the current level
     fx_frame_ema:  f32, // smoothed frame time, seconds
-    // ---- screenshot capture ----
+    // ---- screenshot capture (native only) ----
     pub screenshot_mode:   bool,
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     screenshot_frame:      u32,
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     screenshot_frame_target: u32,
+    #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     screenshot_path:       Option<String>,
 }
 
@@ -265,6 +268,8 @@ impl Blip {
         )
         .ok();
 
+        // Unseeded, every game deals the same food, rocks and drops each time.
+        macroquad::rand::srand((macroquad::miniquad::date::now() * 1000.0) as u64);
         let mut rng = Lcg(0xdead_beef);
         // Stagger initial cooldowns so effects don't all fire at once.
         let tear_cd   =  5.0 + rng.next() * 10.0;
@@ -377,12 +382,15 @@ impl Blip {
             self.screenshot_frame += 1;
             if self.screenshot_frame >= self.screenshot_frame_target {
                 if let Some(ref path) = self.screenshot_path {
-                    let img = get_screen_data();
+                    let img = macroquad::texture::get_screen_data();
                     img.export_png(path);
                 }
                 std::process::exit(0);
             }
         }
+
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::bot::before_present();
 
         next_frame().await;
 
@@ -392,6 +400,8 @@ impl Blip {
 
         let raw = get_frame_time();
         self.delta_time = if raw > 0.1 { 0.1 } else { raw };
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(fixed) = crate::bot::after_present() { self.delta_time = fixed; }
         self.update_fx_level(raw);
         self.update_glitch(self.delta_time);
         self.interlace_field ^= 1;
@@ -875,6 +885,20 @@ impl Blip {
     pub fn draw_hi(&self, hi: &crate::web::HighScore, y: f32, color: Color) {
         if hi.score > 0 {
             self.draw_centered(&hi.label("HI"), y, 2.0, color);
+        }
+    }
+
+    /// The game-over screen every game shares: GAME OVER in `headline`, the
+    /// score, the best-score line (NEW BEST! in `best`), and PRESS FIRE in
+    /// `prompt` once `ready` (see [`crate::GAME_OVER_MIN_WAIT`]). Draws over
+    /// what is there, so a game can paint its own backdrop first.
+    pub fn draw_game_over(&self, score: i32, hi: &crate::web::HighScore, headline: Color, best: Color, prompt: Color, ready: bool) {
+        let h = self.height as f32;
+        self.draw_centered("GAME OVER", h / 4.0, 5.0, headline);
+        self.draw_centered(&format!("SCORE {score}"), h / 2.0, 3.0, BLIP_WHITE);
+        self.draw_best(score, hi, h / 2.0 + 28.0, best);
+        if ready {
+            self.draw_centered("PRESS FIRE", h * 2.0 / 3.0, 3.0, prompt);
         }
     }
 

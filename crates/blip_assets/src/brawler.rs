@@ -2,7 +2,7 @@
 //! same numbers as their hitboxes, so there is no sprite sheet to disagree
 //! with the rules.
 
-use crate::techno::{tame, warm, Rng, MIX_KNEE};
+use crate::wav::{tame, warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, encode_pcm16_music, env, ms_to_samples,
     soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;

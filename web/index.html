@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=70">
+  <link rel="stylesheet" href="kiosk.css?v=71">
   <!-- Before first paint (kiosk.js loads at the end): a touch screen gets
        no deck on this page, so it must never flash up. -->
   <script>
@@ -104,50 +104,6 @@
     }
     @media (max-width: 520px) {
       header::before { left: 4%; right: 4%; }
-    }
-
-    /* ---- language switcher ---- */
-    .lang-switcher {
-      position: fixed;
-      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-      right: 20px;
-      z-index: 10000;
-      display: flex;
-      flex-direction: column-reverse;
-      gap: 8px;
-      align-items: flex-end;
-    }
-
-    .lang-btn {
-      background: none;
-      border: none;
-      width: 44px;
-      height: 44px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 30px;
-      line-height: 1;
-      padding: 0;
-      cursor: pointer;
-      opacity: 0.35;
-      transition: opacity .15s, filter .15s;
-      -webkit-tap-highlight-color: transparent;
-      user-select: none;
-    }
-
-    .lang-btn:hover:not(.active) { opacity: 0.65; }
-
-    .lang-btn.active {
-      opacity: 1;
-      filter: drop-shadow(0 0 5px var(--green));
-    }
-
-    /* Keep the flags and the corner badges the same size here as on the
-       about / history / controls pages (kiosk.css shrinks them at this
-       width). */
-    @media (max-width: 600px) {
-      .lang-btn { width: 32px; height: 32px; font-size: 22px; }
     }
 
     /* The top bar, logo and coin-slot heights and the corner badges live in
@@ -665,74 +621,6 @@
 
     header, .divider, .game-grid, footer { position: relative; z-index: 1; }
 
-    /* ---- left badge group ---- */
-    /* Badge position and styling are in kiosk.css, shared with the info
-       pages; only the attract-mode hide is front-page-only. */
-
-    /* Attract mode: the corner badges and language flags fade in after 10s
-       untouched; any interaction hides them. */
-    .left-badges,
-    .lang-switcher {
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity .7s ease;
-    }
-    .left-badges.idle-reveal,
-    .lang-switcher.idle-reveal {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    /* about / history / controls badge styling: all in kiosk.css now,
-       shared identically with those pages. */
-
-    /* ---- mastodon badge ---- */
-    .profile-badge {
-      position: fixed;
-      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-      left: 20px;
-      z-index: 10000;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-      color: #444;
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      transition: color .2s;
-    }
-
-    .profile-badge:hover { color: var(--green); }
-
-    .profile-badge:hover .profile-handle { opacity: 1; transform: translateX(0); }
-
-    .profile-handle {
-      opacity: 0;
-      transform: translateX(-6px);
-      transition: opacity .2s, transform .2s;
-      white-space: nowrap;
-      text-shadow: 0 0 8px var(--green);
-      color: var(--green);
-    }
-
-    .avatar {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      border: 1px solid #222;
-      display: block;
-      transition: border-color .2s, box-shadow .2s;
-      image-rendering: auto;
-      filter: grayscale(40%) brightness(0.8);
-    }
-
-    .profile-badge:hover .avatar {
-      border-color: var(--green);
-      box-shadow: 0 0 12px color-mix(in srgb, var(--green) 50%, transparent);
-      filter: none;
-    }
-
     @keyframes konami-shake {
       0%,100% { transform: translate(0,0); }
       10%     { transform: translate(-10px,-6px); }
@@ -747,21 +635,11 @@
     }
     body.konami-shake { animation: konami-shake 0.55s ease; }
 
-    /* Tablets: kiosk.css gives the deck a taller bar, so lift this page's own
-       corner clusters (its inline .lang-switcher / .profile-badge outweigh
-       kiosk.css). */
-    @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
-      .lang-switcher,
-      .profile-badge { bottom: calc(138px + env(safe-area-inset-bottom, 0px)); }
-    }
-
     /* A touch screen picks a game by tapping its card: no control deck here,
        and the corner clusters come down to the screen's edge. */
     :root[data-has-touch] #kiosk-bar { display: none; }
     :root[data-has-touch] body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
-    :root[data-has-touch] :is(.left-badges, .lang-switcher, .profile-badge) {
-      bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-    }
+
 
   </style>
 </head>
@@ -848,7 +726,7 @@
         <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
       </div>
       <div class="card-shot-wrap">
-        <img class="card-shot" src="sky_raider/screenshot.png?v=11" alt="Raider gameplay">
+        <img class="card-shot" src="sky_raider/screenshot.png?v=12" alt="Raider gameplay">
       </div>
       <div class="card-title">RAIDER</div>
       <div class="card-genre"  data-i18n="skyRaiderGenre"></div>
@@ -900,8 +778,8 @@
 
   <div class="lang-switcher">
     <button class="lang-btn" data-lang="en">🇬🇧</button>
-    <button class="lang-btn" data-lang="ja">🇯🇵</button>
     <button class="lang-btn" data-lang="da">🇩🇰</button>
+    <button class="lang-btn" data-lang="ja">🇯🇵</button>
   </div>
 
   <div class="left-badges">
@@ -934,7 +812,7 @@
   <script src="deck.js?v=5"></script>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=32"></script>
+  <script src="kiosk.js?v=34"></script>
   <script src="blip_controller.js?v=8"></script>
   <script>
     /* ------------------------------------------------------------------ */
@@ -1267,7 +1145,7 @@
 
     // Opens the card's game. Needs a credit but does not spend it: the credit
     // rides along to the game page (same sessionStorage), and the game
-    // charges on the next play after game over. Broke: a nudge.
+    // charges it when play starts. Broke: a nudge.
     function attemptStart(card) {
       if (getCoins() <= 0) {
         nudgeInsertCoin();
@@ -1279,7 +1157,6 @@
         }, { once: true });
         return;
       }
-      if (window.clearBadgePin) window.clearBadgePin();
       try { sessionStorage.setItem('blip-last-game', (card.getAttribute('href') || '').split('/')[0]); } catch (e) {}
       window.location.href = card.href;
     }
@@ -1495,68 +1372,6 @@
       if (e.key === '5' || e.key === 'c' || e.key === 'C') insertCoin();
       konamiCheck(e.key);
     });
-
-    /* Attract-mode reveal for the corner badges and flags: hidden, fading in
-       after 10s untouched and hidden again on interaction. Once a badge or
-       flag is used they stay pinned for 3 minutes across the info pages
-       (sessionStorage); starting a game clears the pin. */
-    window.clearBadgePin = function () {
-      try { sessionStorage.removeItem('blip-badge-pin'); } catch (e) {}
-    };
-    (function () {
-      var badges = document.querySelector('.left-badges');
-      var flags  = document.querySelector('.lang-switcher');
-      if (!badges && !flags) return;
-      var IDLE_MS = 10000, PIN_MS = 180000, KEY = 'blip-badge-pin';
-      var idleTimer = null, pinTimer = null;
-
-      function pinnedUntil() {
-        try { return +sessionStorage.getItem(KEY) || 0; } catch (e) { return 0; }
-      }
-      function isPinned() { return Date.now() < pinnedUntil(); }
-      function toggle(on) {
-        if (badges) badges.classList.toggle('idle-reveal', on);
-        if (flags)  flags.classList.toggle('idle-reveal', on);
-      }
-      function armIdle() {
-        clearTimeout(idleTimer);
-        idleTimer = setTimeout(function () { toggle(true); }, IDLE_MS);
-      }
-      function armPinRevert() {
-        clearTimeout(pinTimer);
-        var ms = pinnedUntil() - Date.now();
-        if (ms > 0) pinTimer = setTimeout(function () { toggle(false); armIdle(); }, ms);
-      }
-      function pin() {
-        try { sessionStorage.setItem(KEY, Date.now() + PIN_MS); } catch (e) {}
-        clearTimeout(idleTimer);
-        toggle(true);
-        armPinRevert();
-      }
-      function poke(e) {
-        // A press ON a badge or flag must never hide them — otherwise the
-        // pointerdown pulls pointer-events:none out from under the click
-        // and the navigation is lost.
-        if (e && e.target && e.target.closest &&
-            e.target.closest('.left-badges, .lang-switcher')) return;
-        if (isPinned()) return;   // pinned — interaction doesn't dismiss
-        toggle(false);
-        armIdle();
-      }
-
-      // Deliberate actions only — a mouse moving toward a revealed badge
-      // to click it must not make it vanish first.
-      ['pointerdown', 'keydown', 'wheel', 'touchstart', 'touchmove', 'scroll']
-        .forEach(function (ev) { window.addEventListener(ev, poke, { passive: true }); });
-
-      // Using a badge or a flag pins the set.
-      document.querySelectorAll('.left-badges a, .lang-btn')
-        .forEach(function (el) { el.addEventListener('click', pin); });
-
-      if (isPinned()) { toggle(true); armPinRevert(); }
-      else { toggle(false); armIdle(); }
-    }());
-
 
     var KONAMI = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
     var konamiIdx = 0;

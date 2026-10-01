@@ -6,10 +6,12 @@
 //! synchronously in the loop.
 
 pub mod audio;
+pub mod bot;
 pub mod color;
 pub mod ctx;
 pub mod draw;
 pub mod font;
+pub mod fx;
 pub mod input;
 pub mod math;
 pub mod pool;
@@ -19,7 +21,7 @@ pub mod web;
 
 pub use audio::{
     play_alert, play_ambient, play_music, play_sfx, play_sfx_volume, stop_alert, stop_ambient, stop_music,
-    BlipSound,
+    BlipSound, Jukebox,
 };
 pub use color::{
     BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_DARKGRAY, BLIP_GRAY, BLIP_GREEN, BLIP_MAGENTA,
@@ -27,9 +29,11 @@ pub use color::{
     NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
 };
 pub use ctx::{window_conf, Blip};
+pub use draw::{load_png, load_png_smooth};
+pub use fx::Fx;
 pub use math::{clamp, lerp, rand_int, rects_overlap, rand_seed};
 pub use pool::{pool_iter, pool_iter_mut, pool_spawn, Pooled};
-pub use session::{LifeResult, Session};
+pub use session::{LifeResult, Session, GAME_OVER_MIN_WAIT};
 pub use timer::Timer;
 
 // Re-export macroquad's color::Color as BlipColor for game code.

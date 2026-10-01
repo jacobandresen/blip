@@ -4,12 +4,16 @@ use blip::input::{
     btn1_pressed, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
 };
-use blip::macroquad::texture::{FilterMode, Texture2D};
-use blip::macroquad::prelude::ImageFormat;
+use blip::macroquad::texture::Texture2D;
 use blip::{
-    lerp, play_music, play_sfx, rand_int, web, window_conf, Blip, BlipColor, LifeResult, Session,
+    GAME_OVER_MIN_WAIT,
+    load_png,
+    lerp, play_sfx, Jukebox, rand_int, web, window_conf, Blip, BlipColor, Fx, LifeResult, Session,
     Timer, BLIP_BLACK, BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
+
+#[cfg(not(target_arch = "wasm32"))]
+mod bot;
 
 // ---- layout -----------------------------------------------------------
 const COLS: i32 = 20;
@@ -26,6 +30,7 @@ const SPEED_START: f32 = 180.0;
 const SPEED_MIN: f32 = 70.0;
 const SPEED_STEP: f32 = 10.0;
 const FOODS_PER_LVL: i32 = 5;
+const FRENZY_LEVEL: i32 = 5;     // the fast tune from here on
 
 // ---- bonus fruit --------------------------------------------------------
 // Worth five foods, somewhere else, and leaving: whether to go for it is the
@@ -34,10 +39,16 @@ const BONUS_EVERY: i32 = 3;      // which food of the level brings one out
 const BONUS_TTL: f32 = 6.0;      // seconds on the board
 const BONUS_WARN: f32 = 2.0;     // when it starts flashing out
 const BONUS_VALUE: i32 = 50;     // x level, against ordinary food's 10
-// A hard floor on how long GAME OVER stays up before a key can dismiss it —
-// a reflexive direction-key press right after dying would otherwise bounce
-// straight back to the title screen before the score is even readable.
-const GAME_OVER_MIN_WAIT: f32 = 2.0;
+// A new level's obstacles arrive mid-run; this long to see them before they are solid.
+const OBS_FADE_SECS: f32 = 1.2;
+const BANNER_SECS: f32 = 1.4;
+
+const GOLD: BlipColor = BlipColor { r: 1.0, g: 0.84, b: 0.20, a: 1.0 };
+
+/// The pixel centre of a board cell.
+fn cell_centre(c: Cell) -> (f32, f32) {
+    ((c.c * CELL + CELL / 2) as f32, (HUD_H + c.r * CELL + CELL / 2) as f32)
+}
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum Dir { Up, Right, Down, Left }
@@ -86,8 +97,13 @@ struct Game {
     state: State,
     obstacles: [Cell; 16],
     obstacle_count: usize,
-    active_music: i32,
-    want_track: i32,
+    /// 0..1 as a new layout fades in; obstacles are solid only at 1.
+    obs_fade: f32,
+    /// Swallowed food, as a segment index travelling down the body.
+    gulps: Vec<f32>,
+    /// Score popups, the ring where food was eaten, the burst on a crash.
+    fx: Fx,
+    banner_t: f32,
 }
 
 impl Game {
@@ -109,9 +125,16 @@ impl Game {
             state: State::Title,
             obstacles: [Cell { c: 0, r: 0 }; 16],
             obstacle_count: 0,
-            active_music: 0,
-            want_track: 0,
+            obs_fade: 1.0,
+            gulps: Vec::new(),
+            fx: Fx::new(),
+            banner_t: 9.0,
         }
+    }
+
+    /// The music for where the game is: the calm tune, then the fast one.
+    fn track(&self) -> usize {
+        if self.state != State::Title && self.sess.level >= FRENZY_LEVEL { 1 } else { 0 }
     }
 
     #[inline]
@@ -211,6 +234,27 @@ impl Game {
         }
     }
 
+    /// The next level's layout, arriving under a moving snake: cells on the
+    /// snake, the food, the bonus or the head's next three steps are left
+    /// out, and the rest fade in harmless (see OBS_FADE_SECS).
+    fn raise_obstacles(&mut self) {
+        self.build_obstacles();
+        let head = self.snake_at(0);
+        let (dc, dr) = match self.cur_dir { Dir::Up => (0, -1), Dir::Down => (0, 1), Dir::Left => (-1, 0), Dir::Right => (1, 0) };
+        let ahead: Vec<Cell> = (1..=3).map(|k| Cell { c: head.c + dc * k, r: head.r + dr * k }).collect();
+        let mut kept = 0;
+        for i in 0..self.obstacle_count {
+            let o = self.obstacles[i];
+            let on_snake = (0..self.snake_len).any(|j| self.snake_at(j) == o);
+            let on_item = o == self.food || (self.bonus_active() && o == self.bonus);
+            if on_snake || on_item || ahead.contains(&o) { continue; }
+            self.obstacles[kept] = o;
+            kept += 1;
+        }
+        self.obstacle_count = kept;
+        self.obs_fade = 0.0;
+    }
+
     /// Queue a turn if the snake can take it, checked against the last
     /// direction queued, not the current one: otherwise up then left from
     /// travelling right is a U-turn into its own neck.
@@ -241,6 +285,8 @@ impl Game {
         // A bonus left over from the life just lost would be counting down
         // against a snake that was not on the board when it appeared.
         self.bonus_ttl = 0.0;
+        self.obs_fade = 1.0;
+        self.gulps.clear();
         // The middle row runs through the plus and the ring, and the ring
         // closes round the head: pick the nearest row with the snake and
         // its first six steps clear of obstacles.
@@ -259,7 +305,6 @@ impl Game {
         self.sess.reset(LIVES_START);
         self.foods_eaten = 0;
         self.reset_snake();
-        self.want_track = rand_int(1, 3);
         self.state = State::Play;
     }
 }
@@ -273,7 +318,10 @@ struct Sounds {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() { g.start_game(); }
+    if btn1_pressed() {
+        web::spend_coin();
+        g.start_game();
+    }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
@@ -287,6 +335,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.bonus_ttl -= dt;
         if g.bonus_ttl < 0.0 { g.bonus_ttl = 0.0; }
     }
+
+    g.obs_fade = (g.obs_fade + dt / OBS_FADE_SECS).min(1.0);
+    g.fx.update(dt);
+    g.banner_t += dt;
 
     g.move_timer += dt * 1000.0;
     if g.move_timer < g.move_interval() { return; }
@@ -310,10 +362,17 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
     if !dead {
         for i in 0..g.obstacle_count {
+            if g.obs_fade < 1.0 { break; }
             if g.obstacles[i].c == h.c && g.obstacles[i].r == h.r { dead = true; break; }
         }
     }
     if dead {
+        let why = if h.c < 0 || h.c >= COLS || h.r < 0 || h.r >= ROWS { "wall" }
+            else if g.obs_fade >= 1.0 && g.obstacles[..g.obstacle_count].contains(&h) { "obstacle" } else { "self" };
+        blip::bot::add(&format!("death_{why}"), 1.0);
+        blip::bot::add(&format!("death_len{}", g.snake_len / 10 * 10), 1.0);
+        let (x, y) = cell_centre(g.snake_at(0));
+        g.fx.burst(x, y, 16, 140.0, BLIP_RED);
         play_sfx(&sfx.game_over);
         match g.sess.lose_life() {
             LifeResult::StillAlive => { g.dead_timer.start(1.5); g.state = State::Dead; }
@@ -329,29 +388,43 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     // Before the level check so it scores at the level it was offered on.
     if g.bonus_active() && h == g.bonus {
         play_sfx(&sfx.bonus_eat);
+        blip::bot::add("bonus_eaten", 1.0);
         g.sess.add_score(BONUS_VALUE * g.sess.level);
+        let (x, y) = cell_centre(h);
+        g.fx.burst(x, y, 12, 110.0, GOLD);
+        g.fx.popup(x, y - 10.0, &format!("+{}", BONUS_VALUE * g.sess.level), GOLD);
         g.bonus_ttl = 0.0;
     }
 
     let ate = h.c == g.food.c && h.r == g.food.r;
     if ate {
         play_sfx(&sfx.eat);
+        g.gulps.push(0.0);
         g.sess.add_score(10 * g.sess.level);
+        let (x, y) = cell_centre(h);
+        g.fx.ring(x, y, CELL as f32 * 1.3, 0.3, BlipColor { r: 1.0, g: 0.85, b: 0.4, a: 1.0 });
+        g.fx.popup(x, y - 10.0, &format!("+{}", 10 * g.sess.level), BLIP_WHITE);
         g.foods_eaten += 1;
         // One bonus per level, mid-level, away from the level change.
         if g.foods_eaten % BONUS_EVERY == 0 && !g.bonus_active() {
             g.spawn_bonus();
+            blip::bot::add("bonus_offered", 1.0);
             play_sfx(&sfx.bonus);
         }
         if g.foods_eaten >= FOODS_PER_LVL {
             g.sess.next_level();
+            g.raise_obstacles();
+            g.banner_t = 0.0;
+            blip::bot::set("level", g.sess.level as f64);
+            blip::bot::set(&format!("t_level{}", g.sess.level), blip::bot::clock() as f64);
             play_sfx(&sfx.level);
             g.foods_eaten = 0;
-            let next = rand_int(1, 3);
-            g.want_track = if next == g.active_music { next % 3 + 1 } else { next };
         }
         g.spawn_food();
     }
+    for k in g.gulps.iter_mut() { *k += 1.0; }
+    let len = g.snake_len as f32;
+    g.gulps.retain(|&k| k < len);
 
     g.snake_head = (g.snake_head + MAX_LEN - 1) % MAX_LEN;
     g.snake[g.snake_head] = h;
@@ -359,6 +432,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
+    g.fx.update(dt);
     if g.dead_timer.tick(dt) {
         g.reset_snake();
         g.state = State::Play;
@@ -394,7 +468,9 @@ fn draw_board(blip: &Blip) {
     blip.fill_rect(x0 + w - 2.0, y0,         2.0, h,   wall); // right
 }
 
-fn draw_snake(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D) {
+/// The snake drawn as one body: thick strokes between segment centres,
+/// brighter toward the head, eyes on the side it is heading.
+fn draw_snake(blip: &Blip, g: &Game) {
     // Glide between cells by step progress; frozen fully arrived once dead
     // (move_timer stalls mid-step on the fatal tick).
     let f = if g.state == State::Play {
@@ -402,12 +478,8 @@ fn draw_snake(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D) {
     } else {
         1.0
     };
-    // Death flash.
-    let tint = if g.state == State::Dead && (g.dead_timer.remaining() / 0.12) as i32 % 2 == 0 {
-        BLIP_RED
-    } else {
-        BLIP_WHITE
-    };
+    let flash = g.state == State::Dead && (g.dead_timer.remaining() / 0.12) as i32 % 2 == 0;
+    let half = CELL as f32 / 2.0;
     let seg_px = |i: usize| -> (f32, f32) {
         let cur = g.snake_at(i);
         let prev = if i + 1 < g.snake_len {
@@ -417,35 +489,73 @@ fn draw_snake(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D) {
             let ahead = g.snake_at(i - 1);
             Cell { c: 2 * cur.c - ahead.c, r: 2 * cur.r - ahead.r }
         };
-        let x = lerp(prev.c as f32, cur.c as f32, f) * CELL as f32;
-        let y = HUD_H as f32 + lerp(prev.r as f32, cur.r as f32, f) * CELL as f32;
+        let x = lerp(prev.c as f32, cur.c as f32, f) * CELL as f32 + half;
+        let y = HUD_H as f32 + lerp(prev.r as f32, cur.r as f32, f) * CELL as f32 + half;
         (x, y)
     };
-    for i in (1..g.snake_len).rev() {
-        let (x, y) = seg_px(i);
-        blip.draw_texture_tinted(body, x, y, CELL as f32, CELL as f32, tint);
+    let n = g.snake_len;
+    let shade = |i: usize| -> BlipColor {
+        if flash { return BLIP_RED; }
+        let k = i as f32 / n.max(2) as f32;
+        BlipColor { r: lerp(0.36, 0.16, k), g: lerp(0.86, 0.50, k), b: lerp(0.36, 0.20, k), a: 1.0 }
+    };
+    let thick = CELL as f32 - 6.0;
+    for i in (1..n).rev() {
+        let (x0, y0) = seg_px(i);
+        let (x1, y1) = seg_px(i - 1);
+        let c = shade(i);
+        blip.draw_line_ex(x0, y0, x1, y1, thick, c);
+        blip.fill_rect(x0 - thick / 2.0, y0 - thick / 2.0, thick, thick, c);
     }
-    let (x, y) = seg_px(0);
-    blip.draw_texture_tinted(head, x, y, CELL as f32, CELL as f32, tint);
+    // A swallowed food, travelling down toward the tail.
+    for &k in &g.gulps {
+        let i = (k as usize).min(n - 1);
+        let (x, y) = seg_px(i);
+        let r = thick / 2.0 + 3.0;
+        blip.fill_rect(x - r, y - r, r * 2.0, r * 2.0, shade(i));
+    }
+    let (hx, hy) = seg_px(0);
+    let hs = CELL as f32 - 4.0;
+    let head = if flash { BLIP_RED } else { BlipColor { r: 0.45, g: 0.95, b: 0.45, a: 1.0 } };
+    blip.fill_rect(hx - hs / 2.0, hy - hs / 2.0, hs, hs, head);
+    let (fx, fy) = match g.cur_dir { Dir::Up => (0.0, -1.0), Dir::Down => (0.0, 1.0), Dir::Left => (-1.0, 0.0), Dir::Right => (1.0, 0.0) };
+    // A tongue flicks out now and then, in the direction of travel.
+    if g.state == State::Play && blip::macroquad::time::get_time().rem_euclid(1.6) < 0.18 {
+        let tip = hs / 2.0 + 6.0;
+        blip.draw_line_ex(hx + fx * hs / 2.0, hy + fy * hs / 2.0, hx + fx * tip, hy + fy * tip, 2.0, BLIP_RED);
+    }
+    for side in [-1.0f32, 1.0] {
+        let (ex, ey) = (hx + fx * 4.0 - fy * side * 5.0, hy + fy * 4.0 + fx * side * 5.0);
+        blip.fill_circle(ex, ey, 3.2, BLIP_WHITE);
+        blip.fill_circle(ex + fx * 1.2, ey + fy * 1.2, 1.6, BLIP_BLACK);
+    }
 }
 
-fn draw_play(blip: &Blip, g: &Game, head: &Texture2D, body: &Texture2D, food: &Texture2D) {
+fn draw_play(blip: &Blip, g: &Game, food: &Texture2D) {
     draw_board(blip);
+    // A new layout blinks in, see-through, until it is solid.
+    let solid = g.obs_fade >= 1.0;
+    let a = if solid { 1.0 } else if (g.obs_fade * 8.0) as i32 % 2 == 0 { 0.55 } else { 0.25 };
     for i in 0..g.obstacle_count {
         let obs = g.obstacles[i];
-        blip.fill_rect(
-            (obs.c * CELL) as f32,
-            (HUD_H + obs.r * CELL) as f32,
-            CELL as f32, CELL as f32,
-            BLIP_GRAY,
-        );
+        let (x, y) = ((obs.c * CELL) as f32, (HUD_H + obs.r * CELL) as f32);
+        blip.fill_rect(x + 1.0, y + 1.0, CELL as f32 - 2.0, CELL as f32 - 2.0, BlipColor { a, ..BLIP_GRAY });
+        blip.fill_rect(x + 1.0, y + 1.0, CELL as f32 - 2.0, 3.0, BlipColor { r: 0.75, g: 0.75, b: 0.75, a });
     }
-    blip.draw_texture(food,
-        (g.food.c * CELL) as f32,
-        (HUD_H + g.food.r * CELL) as f32,
-        CELL as f32, CELL as f32);
+    // Food breathes a little so the eye finds it.
+    let breathe = 1.0 + 0.08 * (blip::macroquad::time::get_time() as f32 * 5.0).sin();
+    let fs = CELL as f32 * breathe;
+    let (fcx, fcy) = ((g.food.c * CELL) as f32 + CELL as f32 / 2.0, (HUD_H + g.food.r * CELL) as f32 + CELL as f32 / 2.0);
+    blip.draw_texture(food, fcx - fs / 2.0, fcy - fs / 2.0, fs, fs);
     draw_bonus(blip, g);
-    draw_snake(blip, g, head, body);
+    draw_snake(blip, g);
+    g.fx.draw(blip);
+    if g.banner_t < BANNER_SECS && g.state == State::Play {
+        let a = (1.0 - g.banner_t / BANNER_SECS).min(1.0) * 1.5;
+        // Row 5 is clear in every obstacle layout.
+        blip.draw_centered(&format!("LEVEL {}", g.sess.level), (HUD_H + 5 * CELL + 2) as f32, 4.0,
+            BlipColor { a: a.min(1.0), ..BLIP_YELLOW });
+    }
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
@@ -461,7 +571,7 @@ fn draw_bonus(blip: &Blip, g: &Game) {
     let cy = (HUD_H + g.bonus.r * CELL) as f32 + CELL as f32 / 2.0;
     let life = g.bonus_ttl / BONUS_TTL;
     let r = CELL as f32 * (0.26 + 0.20 * life);
-    let gold = BlipColor { r: 1.0, g: 0.84, b: 0.20, a: 1.0 };
+    let gold = GOLD;
     let hot = BlipColor { r: 1.0, g: 0.98, b: 0.72, a: 1.0 };
     blip.fill_circle(cx, cy, r, gold);
     blip.fill_circle(cx, cy, r * 0.45, hot);
@@ -474,48 +584,52 @@ fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
     blip.draw_centered("PRESS FIRE",         (WIN_H / 2) as f32,       3.0, BLIP_WHITE);
     blip.draw_centered("ARROW KEYS OR WASD", (WIN_H * 2 / 3) as f32,   2.0, BLIP_GRAY);
+    draw_title_snake(blip, blip::macroquad::time::get_time() as f32);
 }
 
-fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
-    let buf = format!("SCORE {score}");
-    blip.clear(BLIP_BLACK);
-    blip.draw_centered("GAME OVER", (WIN_H / 4) as f32, 5.0, BLIP_RED);
-    blip.draw_centered(&buf,        (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
-    blip.draw_best(score, hi, (WIN_H / 2 + 28) as f32, BLIP_GREEN);
-    if !waiting {
-        blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_YELLOW);
+/// A snake winding across the title screen, head first, wrapping round.
+fn draw_title_snake(blip: &Blip, t: f32) {
+    const SEGS: usize = 16;
+    let span = WIN_W as f32 + 160.0;
+    let at = |d: f32| {
+        let x = (t * 90.0 - d).rem_euclid(span) - 80.0;
+        (x, WIN_H as f32 * 0.83 + (x * 0.035).sin() * 18.0)
+    };
+    for i in (0..SEGS).rev() {
+        let (x, y) = at(i as f32 * 11.0);
+        let k = i as f32 / SEGS as f32;
+        let c = BlipColor { r: lerp(0.36, 0.16, k), g: lerp(0.86, 0.50, k), b: lerp(0.36, 0.20, k), a: 1.0 };
+        blip.fill_circle(x, y, 9.0 - k * 3.0, c);
     }
+    let (hx, hy) = at(0.0);
+    blip.fill_circle(hx + 3.0, hy - 4.0, 2.6, BLIP_WHITE);
+    blip.fill_circle(hx + 4.0, hy - 4.0, 1.3, BLIP_BLACK);
+}
+
+fn draw_over(blip: &Blip, g: &Game, hi: &web::HighScore) {
+    blip.clear(BLIP_BLACK);
+    blip.draw_game_over(g.sess.score, hi, BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active());
+    blip.draw_centered(&format!("LEVEL {}   LENGTH {}", g.sess.level, g.snake_len),
+        (WIN_H / 2 + 54) as f32, 2.0, BLIP_GRAY);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
     window_conf("SERPENT", WIN_W, WIN_H)
 }
 
-const HEAD_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/head.png"));
-const BODY_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/body.png"));
 const FOOD_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/food.png"));
 const EAT_WAV: &[u8]  = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/eat.wav"));
 const GAME_OVER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
 const BONUS_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bonus.wav"));
 const BONUS_EAT_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bonus_eat.wav"));
 const LEVEL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/level.wav"));
-const SLITHER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/slither.wav"));
-const STALK_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/stalk.wav"));
-const FRENZY_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/frenzy.wav"));
 
-fn load_png(bytes: &'static [u8]) -> Texture2D {
-    let tex = Texture2D::from_file_with_format(bytes, Some(ImageFormat::Png));
-    tex.set_filter(FilterMode::Nearest);
-    tex
-}
 
 #[blip::macroquad::main(conf)]
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let head = load_png(HEAD_PNG);
-    let body = load_png(BODY_PNG);
     let food = load_png(FOOD_PNG);
 
     let sfx = Sounds {
@@ -525,12 +639,8 @@ async fn main() {
         bonus_eat: blip::audio::load_sound(BONUS_EAT_WAV).await,
         level:     blip::audio::load_sound(LEVEL_WAV).await,
     };
-    let slither = blip::audio::load_sound(SLITHER_WAV).await;
-    let stalk   = blip::audio::load_sound(STALK_WAV).await;
-    let frenzy  = blip::audio::load_sound(FRENZY_WAV).await;
-    let tracks = [&slither, &stalk, &frenzy];
-    play_music(&slither);
-    g.active_music = 1;
+    let mut music = Jukebox::new(&[blip_assets::serpent::slither_wav, blip_assets::serpent::frenzy_wav]);
+    music.start(0).await;
 
     let mut shot_frame: u32 = 0;
 
@@ -544,6 +654,8 @@ async fn main() {
             }
         }
 
+        #[cfg(not(target_arch = "wasm32"))]
+        if blip::bot::active() { bot::drive(&g); }
         let was_playing = g.state == State::Play;
         match g.state {
             State::Title => update_title(&mut g),
@@ -553,17 +665,14 @@ async fn main() {
         }
         if was_playing && g.state != State::Play { web::haptic(); }
 
-        if g.want_track != 0 && g.want_track != g.active_music {
-            play_music(tracks[(g.want_track - 1) as usize]);
-            g.active_music = g.want_track;
-            g.want_track = 0;
-        }
+        music.play(g.track());
+        if g.state != State::Play { music.warm_up().await; }
 
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip, &web::high_score()),
-            State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
-            State::Play | State::Dead => draw_play(&blip, &g, &head, &body, &food),
+            State::Over  => draw_over(&blip, &g, &web::high_score()),
+            State::Play | State::Dead => draw_play(&blip, &g, &food),
         }
 
         blip.next_frame(60).await;
@@ -699,6 +808,23 @@ mod tests {
         assert!(g.bonus_active());
         g.reset_snake();
         assert!(!g.bonus_active(), "the bonus carried over into the next life");
+    }
+
+    #[test]
+    fn a_new_levels_obstacles_never_land_on_the_snake_or_just_ahead_of_it() {
+        // They arrive under a moving snake; one on its body or in its next
+        // steps is a death the player never had a chance to see coming.
+        for level in 2..=6 {
+            let mut g = running();
+            g.sess.level = level;
+            g.raise_obstacles();
+            let head = g.snake_at(0);
+            for o in &g.obstacles[..g.obstacle_count] {
+                assert!((0..g.snake_len).all(|i| g.snake_at(i) != *o), "level {level}: an obstacle on the snake");
+                assert!(!(o.r == head.r && o.c > head.c && o.c <= head.c + 3), "level {level}: an obstacle just ahead");
+            }
+            assert!(g.obs_fade < 1.0, "the new layout is solid at once");
+        }
     }
 
     #[test]

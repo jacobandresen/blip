@@ -1,16 +1,54 @@
-//! WAV (16-bit signed PCM, mono, 44.1 kHz) helpers and tone synthesis.
+//! WAV encoding (16-bit PCM, mono) and the basics every sound shares: a
+//! seeded random source, the master low-pass and the soft limiter.
+
+use std::f32::consts::PI;
 
 pub const SAMPLE_RATE: u32 = 44_100;
+
+/// Default knee for `soft_limit_to_pcm16` on a full track: a kick, bass and
+/// hats landing on one beat compress gracefully instead of clipping.
+pub const MIX_KNEE: f32 = 24_000.0;
+
+/// Small deterministic PRNG — no external dependency, reproducible builds.
+pub struct Rng(pub u32);
+impl Rng {
+    pub fn next_f32(&mut self) -> f32 {
+        self.0 ^= self.0 << 13;
+        self.0 ^= self.0 >> 17;
+        self.0 ^= self.0 << 5;
+        (self.0 >> 8) as f32 / 16_777_216.0 // 0..1
+    }
+}
+
+/// The master warmth for a music track: two gentle low-pass poles round
+/// 3 kHz take the fizz off hats, saws and noise without dulling the tune.
+pub fn warm(buf: &mut [f32]) {
+    let a = 1.0 - (-2.0 * PI * 3000.0 / SAMPLE_RATE as f32).exp();
+    let (mut l1, mut l2) = (0.0f32, 0.0f32);
+    for v in buf.iter_mut() {
+        l1 += a * (*v - l1);
+        l2 += a * (l1 - l2);
+        *v = l2;
+    }
+}
+
+/// Keep a melodic voice out of the shrill register: anything above A4 drops
+/// by octaves, keeping the tune's shape where it is easy on the ears and a
+/// phone speaker.
+pub fn tame(freq: f32) -> f32 {
+    let mut f = freq;
+    while f > 440.0 { f *= 0.5; }
+    f
+}
 
 /// Encode a buffer of i16 mono samples at `SAMPLE_RATE` as a WAV file.
 pub fn encode_pcm16_mono(samples: &[i16]) -> Vec<u8> {
     encode_at(samples, SAMPLE_RATE)
 }
 
-/// The same at half the rate, for music: the themes are most of a download,
-/// and a taiko or plucked string has nothing above 11 kHz to lose, so the
-/// same bytes buy twice the loop. Averaging each pair before dropping one is
-/// the anti-aliasing low-pass.
+/// The same at half the rate, for music: after the 3 kHz `warm` pass there
+/// is nothing above 11 kHz to lose, and it halves the memory a loop takes.
+/// Averaging each pair before dropping one is the anti-aliasing low-pass.
 pub fn encode_pcm16_music(samples: &[i16]) -> Vec<u8> {
     let half: Vec<i16> = samples
         .chunks(2)
