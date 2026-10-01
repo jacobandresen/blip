@@ -30,3 +30,14 @@ pub const NEON_PURPLE:  Color = rgb(170,  60, 255); // horizon grids, background
 pub const NEON_GREEN:   Color = rgb(140, 255,  60); // pickups, go signals
 pub const NEON_ORANGE:  Color = rgb(255, 120,   0); // thrust, fire, explosions
 pub const NEON_YELLOW:  Color = rgb(255, 230,   0); // score pops, bullets
+
+/// A colour from hue (0..1, wrapping round the rainbow), saturation and
+/// value (0..1), and alpha.
+pub fn hsv(h: f32, s: f32, v: f32, a: f32) -> Color {
+    let h = h.rem_euclid(1.0) * 6.0;
+    let c = v * s;
+    let x = c * (1.0 - ((h % 2.0) - 1.0).abs());
+    let (r, g, b) = match h as i32 { 0 => (c, x, 0.0), 1 => (x, c, 0.0), 2 => (0.0, c, x), 3 => (0.0, x, c), 4 => (x, 0.0, c), _ => (c, 0.0, x) };
+    let m = v - c;
+    Color { r: r + m, g: g + m, b: b + m, a }
+}

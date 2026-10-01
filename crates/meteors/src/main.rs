@@ -10,7 +10,7 @@ use blip::input::{
 };
 use blip::macroquad::rand::gen_range;
 use blip::{
-    GAME_OVER_MIN_WAIT,
+    GAME_OVER_MIN_WAIT, hsv,
     Jukebox, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, web, window_conf, Blip, Fx,
     BlipColor, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
     NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
@@ -477,7 +477,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
             if dx * dx + dy * dy <= (r + SHIP_RADIUS) * (r + SHIP_RADIUS) {
                 let a = g.asteroids[ai];
                 g.asteroids[ai].active = false;
-                burst(g, a.x, a.y, a.vx, a.vy, 6, a.size.radius() * 0.5, 70.0, NEON_PURPLE);
+                let c = rock_color(&a, g.sess.level, blip::macroquad::time::get_time() as f32);
+                burst(g, a.x, a.y, a.vx, a.vy, 6, a.size.radius() * 0.5, 70.0, c);
                 split_asteroid(g, a.x, a.y, a.size, a.vx, a.vy);
                 blip::bot::add("death_rock", 1.0);
                 kill_ship(g, sfx);
@@ -567,7 +568,8 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
                 // A share of the bullet's momentum goes into the fragments.
                 let (pvx, pvy) = (a.vx + g.bullets[bi].vx * 0.04, a.vy + g.bullets[bi].vy * 0.04);
                 g.asteroids[ai].active = false;
-                burst(g, a.x, a.y, a.vx, a.vy, 5, size.radius() * 0.5, 60.0, NEON_PURPLE);
+                let c = rock_color(&a, g.sess.level, blip::macroquad::time::get_time() as f32);
+                burst(g, a.x, a.y, a.vx, a.vy, 5, size.radius() * 0.5, 60.0, c);
                 award(g, sfx, size.points());
                 match size {
                     ASize::Large  => play_sfx(&sfx.bang_large),
@@ -657,7 +659,59 @@ fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, color: BlipColor) {
     }
 }
 
-fn draw_asteroid(blip: &Blip, a: &Asteroid) {
+// ---- the trip -------------------------------------------------------------
+// Each wave past the first gets a little more psychedelic: the picture
+// smears (the last frame fades instead of clearing), the rocks take on more
+// colours, and from wave 3 more and more of them are flowers.
+
+/// How much of the last frame is wiped each frame: 1 is a clean slate.
+fn smear_wipe(level: i32) -> f32 {
+    if level <= 1 { 1.0 } else { (0.72 - 0.12 * (level - 1) as f32).max(0.2) }
+}
+
+/// A rock's own fixed random number, 0..1, from its shape.
+fn rock_seed(a: &Asteroid, k: usize) -> f32 { (a.jag[k] * 7.13).fract() }
+
+/// A rock's colour: wave 1's purple, fanning out round the rainbow wave by
+/// wave, and drifting from wave 4.
+fn rock_color(a: &Asteroid, level: i32, t: f32) -> BlipColor {
+    if level <= 1 { return NEON_PURPLE; }
+    let spread = (0.18 * (level - 1) as f32).min(1.0);
+    let drift = if level >= 4 { t * 0.04 * (level - 3) as f32 } else { 0.0 };
+    hsv(0.76 + (rock_seed(a, 3) - 0.5) * spread + drift, 0.75, 1.0, 1.0)
+}
+
+/// From wave 3 a growing share of the rocks are flowers: a quarter, half,
+/// three quarters, then all of them.
+fn is_flower(a: &Asteroid, level: i32) -> bool {
+    rock_seed(a, 5) < ((level - 2) as f32 * 0.25).clamp(0.0, 1.0)
+}
+
+/// A flower in glowing lines: petals round a bright heart, turning slowly,
+/// the same size as the rock it stands for.
+fn draw_flower(blip: &Blip, a: &Asteroid, c: BlipColor) {
+    let r = a.size.radius();
+    let petals = 5 + (rock_seed(a, 1) * 3.0) as i32;
+    for p in 0..petals {
+        let ang = a.rot + p as f32 / petals as f32 * PI * 2.0;
+        let (pcx, pcy) = (a.x + ang.cos() * r * 0.55, a.y + ang.sin() * r * 0.55);
+        let (ux, uy, vx, vy) = (ang.cos(), ang.sin(), -ang.sin(), ang.cos());
+        let mut prev: Option<(f32, f32)> = None;
+        for k in 0..=10 {
+            let t = k as f32 / 10.0 * PI * 2.0;
+            let (ex, ey) = (t.cos() * r * 0.45, t.sin() * r * 0.22);
+            let pt = (pcx + ux * ex + vx * ey, pcy + uy * ex + vy * ey);
+            if let Some(q) = prev { blip.draw_glow_line(q.0, q.1, pt.0, pt.1, c); }
+            prev = Some(pt);
+        }
+    }
+    let heart = hsv(0.14 + rock_seed(a, 2) * 0.1, 0.8, 1.0, 1.0);
+    blip.fill_glow_circle(a.x, a.y, r * 0.2, heart);
+}
+
+fn draw_asteroid(blip: &Blip, a: &Asteroid, level: i32, t: f32) {
+    let c = rock_color(a, level, t);
+    if is_flower(a, level) { draw_flower(blip, a, c); return; }
     let n = a.jag.len();
     let r = a.size.radius();
     let mut prev: Option<(f32, f32)> = None;
@@ -667,7 +721,7 @@ fn draw_asteroid(blip: &Blip, a: &Asteroid) {
         let rr = r * a.jag[idx];
         let pt = (a.x + ang.cos() * rr, a.y + ang.sin() * rr);
         if let Some(p) = prev {
-            blip.draw_glow_line(p.0, p.1, pt.0, pt.1, NEON_PURPLE);
+            blip.draw_glow_line(p.0, p.1, pt.0, pt.1, c);
         }
         prev = Some(pt);
     }
@@ -721,8 +775,13 @@ fn draw_horizon_grid(blip: &Blip, y0: f32, y1: f32) {
 }
 
 fn draw_play(blip: &Blip, g: &Game) {
-    blip.clear(BLIP_BLACK);
-    for a in pool_iter(&g.asteroids) { draw_asteroid(blip, a); }
+    let t = blip::macroquad::time::get_time() as f32;
+    if blip.keep_frame {
+        blip.fill_rect(0.0, 0.0, WIN_W as f32, WIN_H as f32, BlipColor { a: smear_wipe(g.sess.level), ..BLIP_BLACK });
+    } else {
+        blip.clear(BLIP_BLACK);
+    }
+    for a in pool_iter(&g.asteroids) { draw_asteroid(blip, a, g.sess.level, t); }
     for d in pool_iter(&g.debris) {
         let (s, c) = d.rot.sin_cos();
         let h = d.len * 0.5;
@@ -736,7 +795,9 @@ fn draw_play(blip: &Blip, g: &Game) {
         blip.draw_centered(&format!("WAVE {}", g.sess.level), PLAY_Y0 + 120.0, 4.0, BlipColor { a, ..NEON_CYAN });
     }
     for b in pool_iter(&g.bullets) {
-        let c = if b.from_player { NEON_YELLOW } else { NEON_PINK };
+        // from wave 3 the ship's shots run through the rainbow
+        let c = if !b.from_player { NEON_PINK }
+            else if g.sess.level >= 3 { hsv(t * 0.8 + b.x * 0.004, 0.6, 1.0, 1.0) } else { NEON_YELLOW };
         blip.fill_glow_circle(b.x, b.y, 2.0, c);
     }
     if g.ship_alive {
@@ -833,6 +894,8 @@ async fn main() {
             State::Over  => update_over(&mut g, dt),
         }
 
+        // the smear (see smear_wipe) is for play, from wave 2
+        blip.keep_frame = matches!(g.state, State::Play | State::Dead) && g.sess.level >= 2;
         match g.state {
             State::Title => draw_title(&blip, &web::high_score()),
             State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.respawn_t.active()),

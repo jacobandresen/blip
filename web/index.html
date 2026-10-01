@@ -481,6 +481,41 @@
       0%, 100% { transform: rotate(-6deg) translateY(0); }
       50%      { transform: rotate(-4deg) translateY(-3px); }
     }
+    /* TRIPPY: a melting blob of swirling rainbow, its colours cycling, the
+       letters printed slightly out of register. */
+    .badge-trippy {
+      padding: 6px 13px 6px 11px;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: #fff;
+      background: conic-gradient(from 30deg, #ff3cac, #ffd23f, #3cff9e, #2bd2ff, #a64bff, #ff3cac);
+      border: 2px solid #fff6fd;
+      border-radius: 42% 58% 55% 45% / 55% 45% 58% 42%;
+      text-shadow: -1.5px 0 #ff00c8, 1.5px 0 #00e5ff, 0 0 6px rgba(255, 255, 255, 0.9);
+      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.55), 0 0 14px rgba(190, 80, 255, 0.65);
+      transform: rotate(7deg);
+      animation: trippy-hue 4s linear infinite, trippy-melt 3s ease-in-out infinite;
+    }
+    /* a hypnotic pinwheel, spinning */
+    .badge-trippy::before {
+      content: '';
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 6px;
+      vertical-align: -1px;
+      border-radius: 50%;
+      background: repeating-conic-gradient(#1a0030 0 22.5deg, #fff 22.5deg 45deg);
+      box-shadow: 0 0 0 1px #fff;
+      animation: trippy-spin 1.6s linear infinite;
+    }
+    @keyframes trippy-hue { to { filter: hue-rotate(360deg); } }
+    @keyframes trippy-spin { to { transform: rotate(360deg); } }
+    @keyframes trippy-melt {
+      0%, 100% { border-radius: 42% 58% 55% 45% / 55% 45% 58% 42%; transform: rotate(7deg) scale(1, 1); }
+      33%      { border-radius: 58% 42% 40% 60% / 45% 60% 40% 55%; transform: rotate(4deg) scale(1.05, 0.96); }
+      66%      { border-radius: 50% 50% 62% 38% / 60% 40% 55% 45%; transform: rotate(10deg) scale(0.97, 1.04); }
+    }
     /* TOUCH: a quiet tablet mark in the card's lower-right corner, a
        fingertip tapping its screen. */
     .badge-touch {
@@ -553,7 +588,7 @@
       100%    { opacity: 0; transform: scale(1.1); }
     }
     @media (prefers-reduced-motion: reduce) {
-      .badge-action, .badge-cosy, .bt-ring { animation: none; }
+      .badge-action, .badge-cosy, .badge-trippy, .badge-trippy::before, .bt-ring { animation: none; }
     }
 
     /* ---- footer ---- */
@@ -686,6 +721,9 @@
     <!-- BUBBLER -->
     <a class="card card-bouncer" href="bouncer/index.html">
       <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
+      <div class="card-badges">
+        <div class="badge-genre badge-cosy" data-i18n="badgeCosy">COSY</div>
+      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="bouncer/screenshot.png?v=4" alt="Bouncer gameplay">
       </div>
@@ -739,6 +777,9 @@
     </a>
     <!-- METEORS -->
     <a class="card card-meteors" href="meteors/index.html">
+      <div class="card-badges">
+        <div class="badge-genre badge-trippy" data-i18n="badgeTrippy">TRIPPY</div>
+      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="meteors/screenshot.png?v=4" alt="Meteors gameplay">
       </div>
@@ -827,6 +868,7 @@
       en: {
         badgeAction:      'ACTION!',
         badgeCosy:        'COSY',
+        badgeTrippy:      'TRIPPY',
         badgeTouch:       'TOUCH',
         badgePad:         'CONTROLLER<small>RECOMMENDED</small>',
         serpentGenre:     'SNAKE MOVING GAME',
@@ -876,6 +918,7 @@
       ja: {
         badgeAction:      'アクション!',
         badgeCosy:        'ほっこり',
+        badgeTrippy:      'サイケ',
         badgeTouch:       'タッチ',
         badgePad:         'コントローラー<small>推奨</small>',
 
@@ -926,6 +969,7 @@
       da: {
         badgeAction:      'ACTION!',
         badgeCosy:        'HYGGE',
+        badgeTrippy:      'SYRET',
         badgeTouch:       'TOUCH',
         badgePad:         'CONTROLLER<small>ANBEFALES</small>',
 

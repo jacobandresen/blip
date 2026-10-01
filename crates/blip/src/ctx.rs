@@ -230,6 +230,9 @@ pub struct Blip {
     fx_frame_ema:  f32, // smoothed frame time, seconds
     // ---- screenshot capture (native only) ----
     pub screenshot_mode:   bool,
+    /// Keep the last frame instead of clearing it, so a game can fade it
+    /// (a translucent fill) and leave trails behind whatever moves.
+    pub keep_frame:        bool,
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     screenshot_frame:      u32,
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
@@ -305,6 +308,7 @@ impl Blip {
             fx_slow_accum: 0.0,
             fx_frame_ema: 1.0 / 60.0,
             screenshot_mode,
+            keep_frame: false,
             screenshot_frame: 0,
             screenshot_frame_target,
             screenshot_path,
@@ -396,7 +400,7 @@ impl Blip {
 
         // Prepare render target for the next game frame.
         self.apply_camera();
-        clear_background(macroquad::color::BLACK);
+        if !self.keep_frame { clear_background(macroquad::color::BLACK); }
 
         let raw = get_frame_time();
         self.delta_time = if raw > 0.1 { 0.1 } else { raw };
