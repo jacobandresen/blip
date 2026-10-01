@@ -186,6 +186,10 @@
       max-width: 900px;
       position: relative;
     }
+    /* Wide screens: four across, so the eight games fill two rows. */
+    @media (min-width: 1300px) {
+      .game-grid { grid-template-columns: repeat(4, 1fr); max-width: 1200px; }
+    }
 
     /* ---- card ---- */
     .card {
@@ -683,7 +687,7 @@
     <a class="card card-bouncer" href="bouncer/index.html">
       <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
-        <img class="card-shot" src="bouncer/screenshot.png?v=3" alt="Bouncer gameplay">
+        <img class="card-shot" src="bouncer/screenshot.png?v=4" alt="Bouncer gameplay">
       </div>
       <div class="card-title">BOUNCER</div>
       <div class="card-genre"  data-i18n="bouncerGenre"></div>
@@ -695,7 +699,7 @@
     <a class="card card-galactic" href="galactic_defender/index.html">
       <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
-        <img class="card-shot" src="galactic_defender/screenshot.png?v=6" alt="Galactic Defender gameplay">
+        <img class="card-shot" src="galactic_defender/screenshot.png?v=7" alt="Galactic Defender gameplay">
       </div>
       <div class="card-title">DEFENDER</div>
       <div class="card-genre"  data-i18n="galacticGenre"></div>
@@ -711,7 +715,7 @@
         <div class="badge-genre badge-cosy" data-i18n="badgeCosy">COSY</div>
       </div>
       <div class="card-shot-wrap">
-        <img class="card-shot" src="bubbler/screenshot.png?v=3" alt="Bubbler gameplay">
+        <img class="card-shot" src="bubbler/screenshot.png?v=4" alt="Bubbler gameplay">
       </div>
       <div class="card-title">BUBBLER</div>
       <div class="card-genre"  data-i18n="bubblerGenre"></div>
@@ -736,7 +740,7 @@
     <!-- METEORS -->
     <a class="card card-meteors" href="meteors/index.html">
       <div class="card-shot-wrap">
-        <img class="card-shot" src="meteors/screenshot.png?v=3" alt="Meteors gameplay">
+        <img class="card-shot" src="meteors/screenshot.png?v=4" alt="Meteors gameplay">
       </div>
       <div class="card-title">METEORS</div>
       <div class="card-genre"  data-i18n="meteorsGenre"></div>
@@ -748,7 +752,7 @@
     <a class="card card-serpent" href="serpent/index.html">
       <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
-        <img class="card-shot" src="serpent/screenshot.png?v=3" alt="Serpent gameplay">
+        <img class="card-shot" src="serpent/screenshot.png?v=4" alt="Serpent gameplay">
       </div>
       <div class="card-title">SERPENT</div>
       <div class="card-genre"  data-i18n="serpentGenre"></div>
@@ -849,14 +853,23 @@
         brawlerDesc:       'Pick a fighter; the other two are waiting, each somewhere else. Guard high or guard low &mdash; nothing covers both.<br>Here comes a new challenger.',
         brawlerControls:   '1P WASD+F PUNCH G KICK &middot; 2P ARROWS+J/K &middot; TOWARD+BUTTON = HIGH &middot; BOTH = SPECIAL &middot; CLOSE PUNCH = THROW',
         bubblerGenre:      'TWO-DRAGON PLATFORM GAME',
-        bubblerDesc:       'Blow bubbles, trap monsters, pop them for fruit. Pop a whole cluster and every catch doubles.',
+        bubblerDesc:       'Two cuddly dragons blow bubbles, catch the toy monsters and pop them into candy. Pop a whole cluster and every catch doubles.',
         bubblerControls:   '1P WASD+F BUBBLE+G JUMP &middot; 2P ARROWS+J+K &middot; HOLD JUMP TO RIDE BUBBLES',
 
         skyRaiderGenre:    'VERTICAL SKY BATTLE GAME',
-        skyRaiderDesc:     'Fighter plane is flying up sky for shooting many enemy craft.<br>Catch power capsule for become more strong gun.<br>Big boss plane is arrive after enough enemy destroy.',
+        skyRaiderDesc:     'Fighter plane is flying up sky for shooting many enemy craft.<br>Watch for flak from island and coast, and boss gun turret.<br>Last mission is fly over land to big city.',
         skyRaiderControls: 'ARROW OR WASD MOVE &middot; [1] FIRE',
 
         footerControls:   'WASD / ARROW &nbsp;&mdash;&nbsp; [1] SHOOT OR LAUNCH',
+        serpentControlsTouch: 'SWIPE FOR TURN SNAKE &middot; TAP FOR START',
+        bouncerControlsTouch: 'DRAG FOR MOVE PADDLE &middot; TAP FOR LAUNCH',
+        galacticControlsTouch: 'DRAG FOR MOVE CANNON &middot; HOLD FINGER FOR SHOOT',
+        rallyControlsTouch: 'DRAG UP OR DOWN &middot; 2 PLAYER = HALF SCREEN EACH',
+        meteorsControlsTouch: 'D-PAD ROTATE+THRUST &middot; RED FIRE &middot; BLUE HYPERSPACE',
+        brawlerControlsTouch: 'D-PAD MOVE &middot; LEFT BUTTON PUNCH &middot; RIGHT BUTTON KICK &middot; TOWARD+BUTTON = HIGH',
+        bubblerControlsTouch: 'TOUCH = BUBBLE &middot; SLIDE = RUN &middot; SWIPE UP = JUMP &middot; 2P JOIN FOR FRIEND',
+        skyRaiderControlsTouch: 'D-PAD FLY &middot; BUTTON FIRE',
+        footerControlsTouch: 'TAP GAME FOR PLAY &nbsp;&mdash;&nbsp; TAP COINS FOR CREDIT',
         footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALL RIGHT IS RESERVE'
       },
 
@@ -890,14 +903,23 @@
         brawlerDesc:       '一人を選べ。残る二人が別々の場所で待っている。上段か下段か、両方は防げない。<br>挑戦者、あらわる。',
         brawlerControls:   '1P WASD+F パンチ G キック &middot; 2P 矢印+J/K &middot; 前+ボタンで上段 &middot; 同時押しで必殺技 &middot; 密着パンチで投げ',
         bubblerGenre:      '二匹の竜のアクションゲーム',
-        bubblerDesc:       '泡を吹いて怪物を閉じこめ、割ってフルーツに。まとめて割るほど点が倍になる。',
+        bubblerDesc:       'ふわふわの竜が泡を吹いて、おもちゃのモンスターをつかまえ、割ってキャンディーに。まとめて割るほど点が倍になる。',
         bubblerControls:   '1P WASD+F 泡+G ジャンプ &middot; 2P 矢印+J+K &middot; ジャンプ長押しで泡に乗る',
 
         skyRaiderGenre:    '空中戦闘ゲーム',
-        skyRaiderDesc:     '戦闘機で空を飛び、敵機を撃墜せよ。<br>パワーカプセルを取って武器を強化。<br>多くの敵を倒すと巨大なボス機が現れる。',
+        skyRaiderDesc:     '戦闘機で空を飛び、敵機を撃墜せよ。<br>島や海岸の対空砲火、ボスの銃塔に注意。<br>最後の任務は陸地を越えて大都市へ。',
         skyRaiderControls: '矢印またはWASD移動 &middot; [1] 発射',
 
         footerControls:   'WASD / 矢印キー &nbsp;―&nbsp; [1] 射撃・発射',
+        serpentControlsTouch: 'スワイプで曲がる &middot; タップでスタート',
+        bouncerControlsTouch: 'ドラッグでパドル移動 &middot; タップで発射',
+        galacticControlsTouch: 'ドラッグで砲台移動 &middot; 指を置くと射撃',
+        rallyControlsTouch: '上下にドラッグ &middot; 2人なら画面を半分ずつ',
+        meteorsControlsTouch: '方向キーで回転・推進 &middot; 赤で発射 &middot; 青でワープ',
+        brawlerControlsTouch: '方向キーで移動 &middot; 左ボタンでパンチ &middot; 右ボタンでキック &middot; 前+ボタンで上段',
+        bubblerControlsTouch: 'タッチで泡 &middot; スライドで走る &middot; 上スワイプでジャンプ &middot; 2P JOINで友だち参加',
+        skyRaiderControlsTouch: '方向キーで飛行 &middot; ボタンで発射',
+        footerControlsTouch: 'ゲームをタップして遊ぶ &nbsp;―&nbsp; COINSをタップしてクレジット',
         footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; 全権利保留'
       },
 
@@ -931,14 +953,23 @@
         brawlerDesc:       'V&aelig;lg din k&aelig;mper; de to andre venter, hver sit sted. Hold h&oslash;jt eller lavt &mdash; ingen blokering d&aelig;kker begge.<br>Her kommer en ny udfordrer.',
         brawlerControls:   '1P WASD+F SLAG G SPARK &middot; 2P PILE+J/K &middot; FREM+KNAP = H&Oslash;JT &middot; BEGGE = SPECIAL &middot; T&AElig;T SLAG = KAST',
         bubblerGenre:      'PLATFORMSPIL FOR TO DRAGER',
-        bubblerDesc:       'Pust bobler, fang monstre, prik dem til frugt. Prik en hel klynge, og hver fangst t&aelig;ller dobbelt.',
+        bubblerDesc:       'To bl&oslash;de drager puster bobler, fanger legetøjsmonstrene og prikker dem til slik. Prik en hel klynge, og hver fangst t&aelig;ller dobbelt.',
         bubblerControls:   '1P WASD+F BOBLE+G HOP &middot; 2P PILE+J+K &middot; HOLD HOP FOR AT RIDE P&Aring; BOBLER',
 
         skyRaiderGenre:    'LUFTKAMPSPIL',
-        skyRaiderDesc:     'Styr jagerflyet op gennem himlen og skyd fjendens fly.<br>Opsaml kapsler for at styrke dit v&aring;ben.<br>En k&aelig;mpe bossflyver dukker op, n&aring;r mange fjender er besejret.',
+        skyRaiderDesc:     'Styr jagerflyet op gennem himlen og skyd fjendens fly.<br>Pas p&aring; antiluftskyts fra &oslash;er og kyst og bossernes kanont&aring;rne.<br>Sidste mission g&aring;r ind over land til den store by.',
         skyRaiderControls: 'PILE ELLER WASD &middot; [1] SKYD',
 
         footerControls:   'WASD / PILETASTER &nbsp;&mdash;&nbsp; [1] SKYD ELLER AFFYR',
+        serpentControlsTouch: 'SWIPE FOR AT DREJE &middot; TRYK FOR AT STARTE',
+        bouncerControlsTouch: 'TR&AElig;K FOR AT FLYTTE BAT &middot; TRYK FOR AT STARTE',
+        galacticControlsTouch: 'TR&AElig;K FOR AT FLYTTE KANONEN &middot; HOLD FINGEREN FOR AT SKYDE',
+        rallyControlsTouch: 'TR&AElig;K OP ELLER NED &middot; 2 SPILLERE = HALV SK&AElig;RM HVER',
+        meteorsControlsTouch: 'RETNINGSKORS DREJ+FREMDRIFT &middot; R&Oslash;D SKYD &middot; BL&Aring; HYPERSPACE',
+        brawlerControlsTouch: 'RETNINGSKORS BEV&AElig;G &middot; VENSTRE KNAP SLAG &middot; H&Oslash;JRE KNAP SPARK &middot; FREM+KNAP = H&Oslash;JT',
+        bubblerControlsTouch: 'BER&Oslash;RING = BOBLE &middot; GLID = L&Oslash;B &middot; SWIPE OP = HOP &middot; 2P JOIN FOR EN VEN',
+        skyRaiderControlsTouch: 'RETNINGSKORS FLYV &middot; KNAP SKYD',
+        footerControlsTouch: 'TRYK P&Aring; ET SPIL FOR AT SPILLE &nbsp;&mdash;&nbsp; TRYK P&Aring; COINS FOR KREDIT',
         footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALLE RETTIGHEDER FORBEHOLDES'
       }
     };
@@ -950,9 +981,12 @@
       var t = i18n[lang];
       if (!t) return;
 
+      // A touch screen gets the touch version of a hint where there is one.
+      var touch = document.documentElement.hasAttribute('data-has-touch');
       document.querySelectorAll('[data-i18n]').forEach(function(el) {
         var key = el.getAttribute('data-i18n');
-        if (t[key] !== undefined) el.innerHTML = t[key];
+        var text = touch && t[key + 'Touch'] !== undefined ? t[key + 'Touch'] : t[key];
+        if (text !== undefined) el.innerHTML = text;
       });
 
       document.querySelectorAll('.lang-btn').forEach(function(btn) {

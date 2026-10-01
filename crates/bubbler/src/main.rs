@@ -34,39 +34,44 @@ const P_W: f32 = 20.0;
 const P_H: f32 = 22.0;
 const E_W: f32 = 20.0;
 const E_H: f32 = 20.0;
-const LIVES: i32 = 3;
-const RESPAWN_SAFE: f32 = 2.5;
+const LIVES: i32 = 5;
+/// Everyone is drawn this much bigger than their hit box: soft toys, easy
+/// to see; the box stays small, so a near miss is a miss.
+const TOY_SCALE: f32 = 1.4;
+const RESPAWN_SAFE: f32 = 3.5;
 
 // ---- bubbles --------------------------------------------------------------
 const BUB_R: f32 = 12.0;
 const SHOOT_V: f32 = 340.0;
-const SHOOT_T: f32 = 0.32;   // the blown bubble traps only while it is still flying
+const SHOOT_T: f32 = 0.4;    // the blown bubble traps only while it is still flying
 const RISE: f32 = 44.0;
 const RISE_TRAPPED: f32 = 62.0; // catches reach the ceiling cluster sooner, where chains happen
 const CHAIN_REACH: f32 = 1.35;  // bubbles this many diameters apart pop together
 const FREE_LIFE: f32 = 9.0;
-const TRAP_LIFE: f32 = 7.5;  // round 1; then the monster breaks out, angry
+const TRAP_LIFE: f32 = 10.0; // round 1; then the monster breaks out, angry
 const BLOW_CD: f32 = 0.24;
 const MAX_BUBBLES: usize = 36;
 const TOP_Y: f32 = HUD + TILE + BUB_R + 4.0;
 
 // ---- pressure -----------------------------------------------------------
-const HURRY_AT: f32 = 40.0; // round 1: bigger stages take longer to clear
-const SKULL_AT: f32 = 55.0;
+const HURRY_AT: f32 = 70.0; // round 1: little players take their time
+const SKULL_AT: f32 = 95.0;
 
 // Each round is harder than the last: monsters move faster, break out of
 // a bubble sooner, get angry and bring the skull earlier. From round 3
 // walkers throw rocks along their platform; from round 4 angry ghosts
 // spit sparks at you.
-fn monster_pace(round: usize) -> f32 { 1.0 + 0.07 * round as f32 }
-fn trap_life(round: usize) -> f32 { (TRAP_LIFE - 0.7 * round as f32).max(4.5) }
+fn monster_pace(round: usize) -> f32 { 0.8 + 0.04 * round as f32 }
+fn trap_life(round: usize) -> f32 { (TRAP_LIFE - 0.5 * round as f32).max(7.0) }
 fn hurry_at(round: usize) -> f32 { HURRY_AT - 2.5 * round as f32 }
 fn skull_at(round: usize) -> f32 { SKULL_AT - 3.5 * round as f32 }
-const ROCKS_FROM: usize = 2;  // round index
-const SPARKS_FROM: usize = 3;
+const ROCKS_FROM: usize = 3;  // round index
+const SPARKS_FROM: usize = 4;
 const ROCK_V: f32 = 170.0;
-const ROCK_WINDUP: f32 = 0.4;
-const EXTEND_MAX: i32 = 5; // lives a round clear can top a player up to
+const ROCK_WINDUP: f32 = 0.6;
+/// How long a monster crouches before it jumps: long enough to see.
+const JUMP_TELL: f32 = 0.22;
+const EXTEND_MAX: i32 = 7; // lives a round clear can top a player up to
 const SPARK_V: f32 = 95.0;
 
 const ROUNDS: usize = 5;
@@ -260,6 +265,10 @@ struct Player {
     score: i32,
     blow_cd: f32,
     mouth: f32,     // > 0 while the cheeks puff out a bubble
+    /// Eating a candy: seconds since it was picked up (negative when not),
+    /// and the candy itself, flying in from where it lay.
+    eat: f32,
+    eaten: Fruit,
     safe: f32,      // respawn protection
     dead_t: f32,    // > 0 while the losing-a-life animation plays
     squash: f32,    // landing squash / jump stretch, eased back to 1
@@ -272,6 +281,7 @@ impl Player {
     fn new(spawn: (f32, f32), face: f32) -> Self {
         Self { joined: false, alive: false, x: spawn.0, y: spawn.1, vx: 0.0, vy: 0.0, face, on_ground: false,
             lives: LIVES, score: 0, blow_cd: 0.0, mouth: 0.0, safe: 0.0, dead_t: 0.0, squash: 1.0, walk: 0.0,
+            eat: -1.0, eaten: Fruit { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, kind: 0, t: 0.0, on_ground: true, active: false },
             blink: rng(1.0, 4.0), spawn }
     }
     fn place(&mut self) {
@@ -285,7 +295,9 @@ impl Player {
 
 #[derive(Clone, Copy)]
 struct Enemy { kind: Kind, x: f32, y: f32, vx: f32, vy: f32, dir: f32, on_ground: bool, angry: bool,
-    t: f32, jump_cd: f32, edge_cd: f32, active: bool, pop_in: f32, shot_cd: f32, windup: f32 }
+    t: f32, jump_cd: f32, edge_cd: f32, active: bool, pop_in: f32, shot_cd: f32, windup: f32,
+    /// Crouching before a jump (seconds left), and the leap (vx, vy) it springs into.
+    crouch: f32, leap: (f32, f32) }
 
 #[derive(Clone, Copy, PartialEq)]
 enum Phase { Shoot, Float, Top }
@@ -389,7 +401,7 @@ impl Game {
         self.enemies = es.into_iter().map(|(kind, x, y)| Enemy {
             kind, x, y, vx: 0.0, vy: 0.0, dir: if x < WIN_W as f32 / 2.0 { 1.0 } else { -1.0 },
             on_ground: false, angry: false, t: rng(0.0, 3.0), jump_cd: rng(0.8, 2.0), edge_cd: 0.0,
-            active: true, pop_in: 0.0, shot_cd: rng(2.5, 4.5), windup: 0.0,
+            active: true, pop_in: 0.0, shot_cd: rng(2.5, 4.5), windup: 0.0, crouch: 0.0, leap: (0.0, 0.0),
         }).collect();
         for e in self.enemies.iter_mut() {
             if e.kind == Kind::Ghost { e.vx = e.dir * 62.0; e.vy = 62.0; }
@@ -554,6 +566,10 @@ fn update_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
         p.walk += vx.abs() * dt * 0.09;
         p.blow_cd -= dt;
         p.mouth = (p.mouth - dt).max(0.0);
+        if p.eat >= 0.0 {
+            p.eat += dt;
+            if p.eat > EAT_SECS { p.eat = -1.0; }
+        }
         p.safe = (p.safe - dt).max(0.0);
         p.blink -= dt;
         if p.blink < -0.12 { p.blink = rng(2.0, 4.5); }
@@ -580,11 +596,18 @@ fn update_enemies(g: &mut Game, dt: f32) {
         if !e.active { continue; }
         e.t += dt;
         e.pop_in = (e.pop_in + dt * 3.0).min(1.0);
-        let fast = if e.angry { 1.75 } else { 1.0 } * monster_pace(g.round);
+        let fast = if e.angry { 1.35 } else { 1.0 } * monster_pace(g.round);
         let target = nearest_player(g, e.x + E_W / 2.0, e.y + E_H / 2.0);
+        // A jump is told before it happens: the monster crouches, still,
+        // for JUMP_TELL, then springs.
+        if e.crouch > 0.0 {
+            e.crouch -= dt;
+            e.vx = 0.0;
+            if e.crouch <= 0.0 { (e.vx, e.vy) = e.leap; e.on_ground = false; }
+        }
         match e.kind {
             Kind::Walker => {
-                if e.on_ground {
+                if e.on_ground && e.crouch <= 0.0 {
                     e.vx = if e.windup > 0.0 { 0.0 } else { e.dir * 58.0 * fast };
                     e.edge_cd -= dt;
                     let ahead = if e.dir > 0.0 { e.x + E_W + 2.0 } else { e.x - 2.0 };
@@ -596,7 +619,10 @@ fn update_enemies(g: &mut Game, dt: f32) {
                     if e.jump_cd <= 0.0 {
                         e.jump_cd = rng(1.0, 2.4) / fast;
                         if let Some((px, py)) = target {
-                            if py < e.y - 30.0 && (px - e.x).abs() < 150.0 && rnd() < 0.7 { e.vy = -JUMP_V; }
+                            if py < e.y - 30.0 && (px - e.x).abs() < 150.0 && rnd() < 0.7 {
+                                e.crouch = JUMP_TELL;
+                                e.leap = (e.dir * 58.0 * fast, -JUMP_V);
+                            }
                             else if rnd() < 0.15 { e.dir = if px > e.x { 1.0 } else { -1.0 }; }
                         }
                     }
@@ -607,7 +633,7 @@ fn update_enemies(g: &mut Game, dt: f32) {
                 e.x = x; e.y = y; e.vx = vx; e.vy = vy; e.on_ground = ground;
             }
             Kind::Hopper => {
-                if e.on_ground {
+                if e.on_ground && e.crouch <= 0.0 {
                     e.vx *= 0.8;
                     e.jump_cd -= dt;
                     if e.jump_cd <= 0.0 {
@@ -615,8 +641,8 @@ fn update_enemies(g: &mut Game, dt: f32) {
                         let toward = target.map(|(px, _)| if px > e.x { 1.0 } else { -1.0 }).unwrap_or(e.dir);
                         e.dir = if rnd() < 0.75 { toward } else { -toward };
                         let high = target.map(|(_, py)| py < e.y - 20.0).unwrap_or(false) || rnd() < 0.3;
-                        e.vy = if high { -JUMP_V * 0.98 } else { -300.0 };
-                        e.vx = e.dir * 85.0 * fast;
+                        e.crouch = JUMP_TELL;
+                        e.leap = (e.dir * 85.0 * fast, if high { -JUMP_V * 0.98 } else { -300.0 });
                     }
                 }
                 let (mut x, mut y, mut vx, mut vy) = (e.x, e.y, e.vx, e.vy);
@@ -803,7 +829,8 @@ fn update_bubbles(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
                 // out it comes, and it is not happy about it
                 g.enemies.push(Enemy { kind, x: b.x - E_W / 2.0, y: b.y - E_H / 2.0, vx: 0.0, vy: 0.0,
                     dir: if rnd() < 0.5 { -1.0 } else { 1.0 }, on_ground: false, angry: true, t: 0.0,
-                    jump_cd: 0.5, edge_cd: 0.0, active: true, pop_in: 1.0, shot_cd: rng(1.5, 3.0), windup: 0.0 });
+                    jump_cd: 0.5, edge_cd: 0.0, active: true, pop_in: 1.0, shot_cd: rng(1.5, 3.0), windup: 0.0,
+                        crouch: 0.0, leap: (0.0, 0.0) });
                 let last = g.enemies.len() - 1;
                 if kind == Kind::Ghost { g.enemies[last].vx = 62.0; g.enemies[last].vy = 62.0; }
             }
@@ -880,9 +907,11 @@ fn update_fruit(g: &mut Game, dt: f32, sfx: &Sounds) {
                 f.active = false;
                 let v = VALUE[f.kind];
                 g.p[pi].score += v;
+                g.p[pi].eat = 0.0;
+                g.p[pi].eaten = f;
                 g.stats.fruit += 1;
                 g.pops.push(Popup { x: f.x + 8.0, y: f.y, t: 0.0, value: v, c: rgba(1.0, 1.0, 1.0, 1.0) });
-                g.burst(f.x + 8.0, f.y + 8.0, 8, rgba(1.0, 1.0, 0.6, 1.0), 80.0, true);
+                g.burst(f.x + 8.0, f.y + 8.0, 5, rgba(1.0, 1.0, 0.6, 1.0), 60.0, true);
                 play_sfx(&sfx.fruit);
                 break;
             }
@@ -890,6 +919,18 @@ fn update_fruit(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.fruits[i] = f;
     }
     g.fruits.retain(|f| f.active);
+}
+
+/// Crumbs fly from a chewing dragon's mouth on each chomp.
+fn update_chewing(g: &mut Game, dt: f32) {
+    for pi in 0..2 {
+        let p = &g.p[pi];
+        if p.eat < 0.0 { continue; }
+        if !CHOMPS.iter().any(|&c| p.eat - dt < c && p.eat >= c) { continue; }
+        let (mx, my) = mouth_pos(p);
+        let c = col(CANDY[candy_pick(&p.eaten)], 1.0);
+        g.burst(mx, my, 4, c, 45.0, false);
+    }
 }
 
 fn update_skull(g: &mut Game, dt: f32) {
@@ -922,8 +963,8 @@ fn hurt_players(g: &mut Game, sfx: &Sounds) {
         if !p.joined || !p.alive || p.dead_t > 0.0 || p.safe > 0.0 { continue; }
         let (px, py) = (p.cx(), p.cy());
         let killer = g.enemies.iter().find(|e| e.active && e.pop_in >= 1.0
-            && (e.x + E_W / 2.0 - px).abs() < (E_W + P_W) / 2.0 - 5.0
-            && (e.y + E_H / 2.0 - py).abs() < (E_H + P_H) / 2.0 - 8.0).map(|e| e.kind);
+            && (e.x + E_W / 2.0 - px).abs() < (E_W + P_W) / 2.0 - 7.0
+            && (e.y + E_H / 2.0 - py).abs() < (E_H + P_H) / 2.0 - 10.0).map(|e| e.kind);
         let hit_enemy = killer.is_some();
         let hit_skull = g.skull.active && (g.skull.x - px).hypot(g.skull.y - py) < 18.0;
         let hit_shot = g.shots.iter().any(|s| (s.x - px).abs() < P_W / 2.0 + 3.0 && (s.y - py).abs() < P_H / 2.0 + 2.0);
@@ -962,7 +1003,7 @@ fn update_fx(g: &mut Game, dt: f32) {
     }
     g.parts.retain(|p| p.life > 0.0);
     for p in g.pops.iter_mut() { p.t += dt; p.y = (p.y - 30.0 * dt).max(HUD + 6.0); }
-    g.pops.retain(|p| p.t < 1.1);
+    g.pops.retain(|p| p.t < 1.4);
     g.shake = (g.shake - dt).max(0.0);
     g.chain.1 = (g.chain.1 - dt).max(0.0);
 }
@@ -984,6 +1025,7 @@ fn update_play(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
     update_bubbles(g, dt, inp, sfx);
     update_fruit(g, dt, sfx);
     update_skull(g, dt);
+    update_chewing(g, dt);
     update_shots(g, dt);
     hurt_players(g, sfx);
     g.enemies.retain(|e| e.active);
@@ -1072,109 +1114,214 @@ fn draw_tiles(blip: &Blip, g: &Game, ox: f32, oy: f32) {
 /// A cute little dragon: round body, cream belly, big shiny eyes, rosy
 /// cheek, spikes down its back, stubby feet; squash and stretch with
 /// every jump and landing, blinking, cheeks puffing to blow.
-fn draw_dragon(x: f32, foot: f32, face: f32, body: (u8, u8, u8), squash: f32, walk: f32, blink: bool,
-               mouth: bool, alpha: f32, spin: f32, k: f32) {
-    let breathe = 1.0 + (now() * 3.0 + x * 0.05).sin() * 0.03;
-    let squash = squash * breathe;
-    let sy = squash * k;
-    let sx = k / squash.sqrt();
-    let cy = foot - 11.0 * sy;
-    let dark = tint(body, 0.55);
-    let belly = (255, 244, 210);
-    let rot = spin.to_degrees();
-    // feet
-    let step = (walk * std::f32::consts::TAU).sin() * 1.8;
-    for (i, s) in [-1.0f32, 1.0].iter().enumerate() {
-        let lift = if i == 0 { step.max(0.0) } else { (-step).max(0.0) };
-        draw_ellipse(x + s * 5.5 * sx, foot - (2.0 + lift) * k, 4.2 * k, 2.6 * k, 0.0, col(dark, alpha));
+// ---- plush toys ------------------------------------------------------------
+// Everyone in Bubbler is a soft toy: a felt body with a fuzzy edge and a
+// stitched seam, shiny button eyes, rosy cheeks and a stitched smile. Angry
+// monsters only blush redder and frown; nobody looks scary.
+
+/// A felt body: a soft shadow, a fuzzy rim of tufts, the fabric, a soft
+/// highlight up and to the left.
+fn plush_body(cx: f32, cy: f32, rx: f32, ry: f32, c: (u8, u8, u8), alpha: f32) {
+    use blip::macroquad::shapes::draw_circle;
+    draw_ellipse(cx + 1.5, cy + 2.0, rx, ry, 0.0, rgba(0.1, 0.0, 0.15, 0.25 * alpha));
+    let fuzz = col(tint(c, 0.82), alpha);
+    let n = 18;
+    for k in 0..n {
+        let a = k as f32 / n as f32 * std::f32::consts::TAU;
+        draw_circle(cx + a.cos() * rx * 0.94, cy + a.sin() * ry * 0.94, rx.min(ry) * 0.2, fuzz);
     }
-    // spikes down the back
-    for sp in 0..3 {
-        let a = std::f32::consts::PI * (0.55 + 0.17 * sp as f32);
-        let (bx, by) = (x - face * a.sin() * 10.5 * sx, cy - a.cos() * 9.5 * sy);
-        let (nx, ny) = (-face * a.sin(), -a.cos());
-        draw_triangle(vec2(bx + ny * 3.0 * k * face, by - nx * 3.0 * k * face), vec2(bx - ny * 3.0 * k * face, by + nx * 3.0 * k * face),
-            vec2(bx + nx * 5.0 * k, by + ny * 5.0 * k), col((255, 255, 255), alpha));
-    }
-    // outline, body, belly
-    draw_ellipse(x, cy, 12.4 * sx, 11.4 * sy, rot, col(dark, alpha));
-    draw_ellipse(x, cy, 11.0 * sx, 10.0 * sy, rot, col(body, alpha));
-    draw_ellipse(x - face * 2.0, cy - 4.0 * sy, 6.0 * sx, 3.0 * sy, rot, col(tint(body, 1.25), alpha * 0.6));
-    draw_ellipse(x + face * 2.5, cy + 3.5 * sy, 6.5 * sx, 5.5 * sy, rot, col(belly, alpha));
-    // head tuft
-    draw_ellipse(x - face * 1.0 * k, cy - 10.0 * sy, 3.0 * k, 2.5 * k, 0.0, col(tint(body, 1.1), alpha));
-    // eyes: two big ones on the front of the face
-    let kk = k;
-    for (k, off) in [2.0f32, 7.5].iter().enumerate() {
-        let (ex, ey) = (x + face * off * sx, cy - 3.5 * sy);
-        let r = if k == 0 { 3.3 * kk } else { 3.0 * kk };
-        let h = if blink { 0.5 * kk } else { r * 1.18 };
-        draw_ellipse(ex, ey, r, h, 0.0, col((255, 255, 255), alpha));
-        if !blink {
-            blip::macroquad::shapes::draw_circle(ex + face * 0.9 * kk, ey + 0.4 * kk, r * 0.62, col((20, 20, 40), alpha));
-            blip::macroquad::shapes::draw_circle(ex + face * 0.3 * kk, ey - 0.9 * kk, r * 0.25, col((255, 255, 255), alpha));
-        }
-    }
-    // rosy cheek
-    blip::macroquad::shapes::draw_circle(x + face * 7.5 * sx, cy + 2.5 * sy, 2.0 * k, rgba(1.0, 0.45, 0.55, 0.55 * alpha));
-    if mouth {
-        // puffed cheeks and an "o"
-        draw_ellipse(x + face * 10.5 * sx, cy + 2.0 * sy, 2.6 * k, 2.2 * k, 0.0, col((90, 20, 30), alpha));
+    draw_ellipse(cx, cy, rx, ry, 0.0, col(c, alpha));
+    draw_ellipse(cx - rx * 0.28, cy - ry * 0.32, rx * 0.5, ry * 0.36, -20.0, col(tint(c, 1.18), alpha * 0.55));
+}
+
+/// A stitched seam: short dashes along an arc of the ellipse (`a0`..`a1`, radians).
+fn stitches(cx: f32, cy: f32, rx: f32, ry: f32, a0: f32, a1: f32, n: usize, c: BlipColor) {
+    for k in 0..n {
+        let t0 = a0 + (a1 - a0) * (k as f32 + 0.15) / n as f32;
+        let t1 = a0 + (a1 - a0) * (k as f32 + 0.6) / n as f32;
+        blip::macroquad::shapes::draw_line(cx + t0.cos() * rx, cy + t0.sin() * ry, cx + t1.cos() * rx, cy + t1.sin() * ry, 1.0, c);
     }
 }
 
+/// A shiny button eye; `blink` closes it to a stitched line.
+fn button_eye(x: f32, y: f32, r: f32, blink: bool, alpha: f32) {
+    use blip::macroquad::shapes::{draw_circle, draw_line};
+    if blink {
+        draw_line(x - r, y, x + r, y, 1.4, col((40, 25, 45), alpha));
+        return;
+    }
+    draw_circle(x, y, r, col((35, 22, 40), alpha));
+    draw_circle(x, y, r * 0.72, col((60, 40, 70), alpha));
+    draw_circle(x - r * 0.35, y - r * 0.38, r * 0.32, col((255, 255, 255), alpha));
+}
+
+/// A little stitched smile (or, `frown`, a worried wiggle) centred on (`x`, `y`).
+fn stitched_mouth(x: f32, y: f32, w: f32, frown: bool, alpha: f32) {
+    let c = col((90, 40, 60), alpha);
+    let dir = if frown { -1.0 } else { 1.0 };
+    let pts: Vec<(f32, f32)> = (0..=4).map(|k| {
+        let u = k as f32 / 4.0 * 2.0 - 1.0;
+        (x + u * w, y + dir * (1.0 - u * u) * w * 0.55)
+    }).collect();
+    for p in pts.windows(2) {
+        blip::macroquad::shapes::draw_line(p[0].0, p[0].1, p[1].0, p[1].1, 1.3, c);
+    }
+}
+
+fn cheeks(x: f32, y: f32, apart: f32, r: f32, angry: bool, alpha: f32) {
+    let c = if angry { rgba(1.0, 0.25, 0.3, 0.7 * alpha) } else { rgba(1.0, 0.5, 0.6, 0.55 * alpha) };
+    for s in [-1.0f32, 1.0] { blip::macroquad::shapes::draw_circle(x + s * apart, y, r, c); }
+}
+
+/// Eating a candy: it flies into the mouth for EAT_FLY, then two chomps.
+const EAT_SECS: f32 = 0.6;
+const EAT_FLY: f32 = 0.15;
+const CHOMPS: [f32; 2] = [0.28, 0.45];
+
+/// Where a player's mouth is on screen (see draw_dragon).
+fn mouth_pos(p: &Player) -> (f32, f32) {
+    (p.cx() + p.face * 10.5 * TOY_SCALE, p.y + P_H - 9.0 * TOY_SCALE)
+}
+
+/// The player: a plush dragon standing on `foot`, facing `face`, drawn `k`
+/// times life size. `eat` is seconds into eating a candy, negative if not.
+fn draw_dragon(x: f32, foot: f32, face: f32, body: (u8, u8, u8), squash: f32, walk: f32, blink: bool,
+               mouth: bool, alpha: f32, spin: f32, k: f32, eat: f32) {
+    use blip::macroquad::shapes::draw_circle;
+    let breathe = 1.0 + (now() * 3.0 + x * 0.05).sin() * 0.03;
+    let squash = squash * breathe;
+    let (sy, sx) = (squash * k, k / squash.sqrt());
+    let cy = foot - 11.0 * sy;
+    let dark = tint(body, 0.7);
+    let belly = (255, 240, 205);
+    // stubby felt feet, stepping
+    let step = (walk * std::f32::consts::TAU).sin() * 1.8;
+    for (i, s) in [-1.0f32, 1.0].iter().enumerate() {
+        let lift = if i == 0 { step.max(0.0) } else { (-step).max(0.0) };
+        draw_ellipse(x + s * 5.5 * sx, foot - (2.2 + lift) * k, 4.6 * k, 3.0 * k, 0.0, col(dark, alpha));
+    }
+    // soft rounded spikes down the back, in the belly's cream
+    for sp in 0..3 {
+        let a = std::f32::consts::PI * (0.55 + 0.17 * sp as f32) + spin;
+        let (bx, by) = (x - face * a.sin() * 11.0 * sx, cy - a.cos() * 10.0 * sy);
+        draw_circle(bx, by, 3.0 * k, col(tint(belly, 0.9), alpha));
+        draw_circle(bx, by, 2.2 * k, col(belly, alpha));
+    }
+    plush_body(x, cy, 11.5 * sx, 10.5 * sy, body, alpha);
+    // the round cream belly, with its seam
+    draw_ellipse(x + face * 2.5 * sx, cy + 3.5 * sy, 6.8 * sx, 5.8 * sy, 0.0, col(belly, alpha));
+    stitches(x + face * 2.5 * sx, cy + 3.5 * sy, 6.8 * sx, 5.8 * sy, 0.0, std::f32::consts::TAU, 12, col(tint(belly, 0.7), alpha));
+    // a little felt tuft on top
+    draw_circle(x - face * 1.0 * k, cy - 10.5 * sy, 2.8 * k, col(tint(body, 1.1), alpha));
+    let chewing = eat >= EAT_FLY;
+    // eyes: buttons, or squeezed shut in two happy arcs while it chews
+    for (i, off) in [2.0f32, 7.5].iter().enumerate() {
+        let (ex, ey) = (x + face * off * sx, cy - 3.8 * sy);
+        if chewing {
+            let (c, r) = (col((40, 25, 45), alpha), 2.4 * k);
+            blip::macroquad::shapes::draw_line(ex - r, ey + r * 0.4, ex, ey - r * 0.5, 1.5, c);
+            blip::macroquad::shapes::draw_line(ex, ey - r * 0.5, ex + r, ey + r * 0.4, 1.5, c);
+        } else {
+            let r = if i == 0 { 2.7 } else { 2.5 } * k;
+            button_eye(ex, ey, r, blink, alpha);
+        }
+    }
+    cheeks(x + face * 4.8 * sx, cy + 1.2 * sy, 4.2 * sx, 1.8 * k, false, alpha);
+    if eat >= 0.0 && !chewing {
+        // wide open for the candy coming in
+        draw_ellipse(x + face * 10.5 * sx, cy + 2.0 * sy, 3.6 * k, 3.4 * k, 0.0, col((120, 40, 60), alpha));
+        draw_ellipse(x + face * 10.5 * sx, cy + 3.0 * sy, 2.2 * k, 1.4 * k, 0.0, col((240, 120, 140), alpha));
+    } else if chewing {
+        // a full cheek bulging, the mouth working open and shut
+        let chew = ((eat - EAT_FLY) * 22.0).sin();
+        draw_circle(x + face * 9.0 * sx, cy + 2.2 * sy, 3.6 * k * (1.0 + 0.12 * chew.abs()), col(body, alpha));
+        draw_circle(x + face * 9.0 * sx, cy + 2.6 * sy, 1.9 * k, rgba(1.0, 0.5, 0.6, 0.55 * alpha));
+        if chew > 0.0 {
+            draw_ellipse(x + face * 11.0 * sx, cy + 3.4 * sy, 1.8 * k, 1.2 * k, 0.0, col((120, 40, 60), alpha));
+        } else {
+            stitched_mouth(x + face * 10.5 * sx, cy + 3.2 * sy, 1.6 * k, false, alpha);
+        }
+    } else if mouth {
+        // blowing: a round "o"
+        draw_ellipse(x + face * 10.5 * sx, cy + 2.0 * sy, 2.4 * k, 2.2 * k, 0.0, col((120, 40, 60), alpha));
+    } else {
+        stitched_mouth(x + face * 5.2 * sx, cy + 1.6 * sy, 2.0 * k, false, alpha);
+    }
+}
+
+/// A monster as a plush toy, its feet on `y + E_H`, drawn `scale` times life size.
 fn draw_enemy(kind: Kind, x: f32, y: f32, angry: bool, t: f32, scale: f32, alpha: f32) {
-    let cx = x + E_W / 2.0;
-    let cy = y + E_H / 2.0;
+    use blip::macroquad::shapes::{draw_circle, draw_line};
     let s = scale;
+    let cx = x + E_W / 2.0;
+    // grow upward from the feet, so a bigger toy still stands on its platform
+    let cy = y + E_H - E_H / 2.0 * s;
     match kind {
         Kind::Walker => {
-            // a wind-up robot, key turning on its back
-            let body = if angry { (255, 110, 110) } else { (215, 200, 255) };
-            let bob = (t * 10.0).sin().abs() * 1.5 * s;
-            let key_rot = (t * 360.0 * 1.5) % 360.0;
-            draw_ellipse(cx, cy - 11.0 * s, 1.5 * s, 4.0 * s, key_rot, col((255, 210, 80), alpha));
-            draw_ellipse(cx, cy - bob, 11.0 * s, 10.0 * s, 0.0, col(tint(body, 0.6), alpha));
-            draw_ellipse(cx, cy - bob, 9.8 * s, 8.8 * s, 0.0, col(body, alpha));
-            blip::macroquad::shapes::draw_rectangle(cx - 7.0 * s, cy - 4.0 * s - bob, 14.0 * s, 6.0 * s, col((30, 30, 60), alpha));
-            let glow = if angry { (255, 240, 120) } else { (120, 255, 220) };
-            blip::macroquad::shapes::draw_circle(cx - 3.2 * s, cy - 1.0 * s - bob, 1.6 * s, col(glow, alpha));
-            blip::macroquad::shapes::draw_circle(cx + 3.2 * s, cy - 1.0 * s - bob, 1.6 * s, col(glow, alpha));
+            // a plush wind-up robot, its felt key turning
+            let body = if angry { (255, 150, 140) } else { (200, 190, 245) };
+            let bob = (t * 10.0).sin().abs() * 1.2 * s;
+            let cy = cy - bob;
+            let key = (t * 6.0).sin();
+            draw_line(cx, cy - 9.0 * s, cx, cy - 12.5 * s, 2.0 * s, col((230, 180, 70), alpha));
+            draw_ellipse(cx - 2.6 * s * key.abs().max(0.3), cy - 13.0 * s, 2.6 * s * key.abs().max(0.3), 1.8 * s, 0.0, col((255, 205, 90), alpha));
+            draw_ellipse(cx + 2.6 * s * key.abs().max(0.3), cy - 13.0 * s, 2.6 * s * key.abs().max(0.3), 1.8 * s, 0.0, col((255, 205, 90), alpha));
             for sgn in [-1.0f32, 1.0] {
-                draw_ellipse(cx + sgn * 5.0 * s, cy + 9.0 * s, 3.2 * s, 2.0 * s, 0.0, col(tint(body, 0.5), alpha));
+                draw_ellipse(cx + sgn * 5.0 * s, cy + 9.0 * s + bob, 3.4 * s, 2.2 * s, 0.0, col(tint(body, 0.7), alpha));
             }
+            plush_body(cx, cy, 10.5 * s, 9.5 * s, body, alpha);
+            // a felt face panel with its seam
+            draw_ellipse(cx, cy + 0.5 * s, 7.2 * s, 5.0 * s, 0.0, col((250, 245, 255), alpha));
+            stitches(cx, cy + 0.5 * s, 7.2 * s, 5.0 * s, 0.0, std::f32::consts::TAU, 12, col((150, 140, 190), alpha));
+            for sgn in [-1.0f32, 1.0] { button_eye(cx + sgn * 3.0 * s, cy - 0.5 * s, 1.8 * s, false, alpha); }
+            if angry {
+                for sgn in [-1.0f32, 1.0] {
+                    draw_line(cx + sgn * 5.0 * s, cy - 4.2 * s, cx + sgn * 1.4 * s, cy - 3.0 * s, 1.2, col((90, 40, 60), alpha));
+                }
+            }
+            stitched_mouth(cx, cy + 3.0 * s, 1.8 * s, angry, alpha);
+            cheeks(cx, cy + 2.4 * s, 5.4 * s, 1.4 * s, angry, alpha);
         }
         Kind::Hopper => {
-            // a springy pink jelly that squashes into every hop
-            let body = if angry { (255, 80, 110) } else { (255, 150, 200) };
-            let sq = 1.0 + (t * 8.0).sin() * 0.12;
-            draw_ellipse(cx, cy + 2.0, 10.5 * s / sq, 9.0 * s * sq, 0.0, col(tint(body, 0.6), alpha));
-            draw_ellipse(cx, cy + 2.0, 9.5 * s / sq, 8.0 * s * sq, 0.0, col(body, alpha));
-            draw_ellipse(cx - 3.0 * s, cy - 2.0 * s, 3.5 * s, 2.0 * s, -20.0, rgba(1.0, 1.0, 1.0, 0.45 * alpha));
+            // a plush bunny that hops, ears flopping with each bounce
+            let body = if angry { (255, 140, 160) } else { (255, 195, 220) };
+            let sq = 1.0 + (t * 8.0).sin() * 0.08;
+            let flop = (t * 8.0).sin() * 0.25;
             for sgn in [-1.0f32, 1.0] {
-                draw_ellipse(cx + sgn * 3.6 * s, cy + 1.0 * s, 2.4 * s, 3.0 * s, 0.0, col((255, 255, 255), alpha));
-                blip::macroquad::shapes::draw_circle(cx + sgn * 3.6 * s, cy + 1.8 * s, 1.4 * s, col((40, 10, 30), alpha));
+                let (ex, ey) = (cx + sgn * 4.0 * s, cy - 11.0 * s);
+                draw_ellipse(ex + sgn * flop * 4.0 * s, ey, 2.8 * s, 6.5 * s, sgn * (12.0 + flop * 40.0), col(tint(body, 0.85), alpha));
+                draw_ellipse(ex + sgn * flop * 4.0 * s, ey + 0.5 * s, 1.4 * s, 4.5 * s, sgn * (12.0 + flop * 40.0), col((255, 160, 190), alpha));
             }
+            plush_body(cx, cy + 1.0 * s, 10.0 * s / sq, 9.0 * s * sq, body, alpha);
+            draw_circle(cx + 9.0 * s, cy + 5.0 * s, 2.6 * s, col((255, 250, 250), alpha)); // a cotton tail
+            for sgn in [-1.0f32, 1.0] { button_eye(cx + sgn * 3.6 * s, cy - 0.5 * s, 1.9 * s, false, alpha); }
+            draw_circle(cx, cy + 2.2 * s, 1.1 * s, col((230, 90, 130), alpha)); // a little nose
             if angry {
-                blip::macroquad::shapes::draw_line(cx - 6.0 * s, cy - 3.0 * s, cx - 1.5 * s, cy - 1.5 * s, 1.5, col((60, 0, 0), alpha));
-                blip::macroquad::shapes::draw_line(cx + 6.0 * s, cy - 3.0 * s, cx + 1.5 * s, cy - 1.5 * s, 1.5, col((60, 0, 0), alpha));
+                for sgn in [-1.0f32, 1.0] {
+                    draw_line(cx + sgn * 5.8 * s, cy - 4.0 * s, cx + sgn * 1.8 * s, cy - 2.8 * s, 1.2, col((90, 40, 60), alpha));
+                }
             }
+            stitched_mouth(cx, cy + 4.0 * s, 1.6 * s, angry, alpha);
+            cheeks(cx, cy + 2.6 * s, 6.0 * s, 1.5 * s, angry, alpha);
         }
         Kind::Ghost => {
-            // a round little ghost with a wavy hem
-            let body = if angry { (255, 120, 230) } else { (140, 240, 255) };
-            let a = alpha * 0.9;
-            draw_ellipse(cx, cy - 1.0 * s, 10.0 * s, 9.5 * s, 0.0, col(body, a));
+            // a pillow ghost, its soft hem waving
+            let body = if angry { (255, 190, 235) } else { (215, 245, 255) };
+            let a = alpha * 0.95;
             for k in 0..4 {
                 let wx = cx - 7.5 * s + k as f32 * 5.0 * s;
-                let wy = cy + 7.0 * s + (t * 8.0 + k as f32).sin() * 1.2;
-                blip::macroquad::shapes::draw_circle(wx, wy, 2.8 * s, col(body, a));
+                let wy = cy + 7.5 * s + (t * 6.0 + k as f32).sin() * 1.2;
+                draw_circle(wx, wy, 3.0 * s, col(tint(body, 0.85), a));
             }
-            for sgn in [-1.0f32, 1.0] {
-                draw_ellipse(cx + sgn * 3.5 * s, cy - 2.0 * s, 2.6 * s, 3.4 * s, 0.0, col((20, 20, 50), alpha));
-                blip::macroquad::shapes::draw_circle(cx + sgn * 3.0 * s, cy - 3.2 * s, 0.9 * s, col((255, 255, 255), alpha));
+            plush_body(cx, cy - 1.0 * s, 10.0 * s, 9.5 * s, body, a);
+            for sgn in [-1.0f32, 1.0] { button_eye(cx + sgn * 3.5 * s, cy - 2.0 * s, 2.0 * s, false, alpha); }
+            if angry {
+                for sgn in [-1.0f32, 1.0] {
+                    draw_line(cx + sgn * 5.6 * s, cy - 5.6 * s, cx + sgn * 1.8 * s, cy - 4.4 * s, 1.2, col((90, 40, 60), alpha));
+                }
             }
-            draw_ellipse(cx, cy + 3.0 * s, 2.0 * s, 1.2 * s, 0.0, col((20, 20, 50), alpha));
+            stitched_mouth(cx, cy + 2.2 * s, 1.8 * s, angry, alpha);
+            cheeks(cx, cy + 1.0 * s, 6.0 * s, 1.5 * s, angry, alpha);
         }
     }
 }
@@ -1197,7 +1344,8 @@ fn draw_bubble(b: &Bubble, ox: f32, oy: f32, t: f32, round: usize) {
     let r = (BUB_R + (b.wob * 3.0).sin() * 0.6) * grow;
     let (rx, ry) = (r * (1.0 + b.squish * 0.25), r * (1.0 - b.squish * 0.25));
     if let Some((kind, angry)) = b.trapped {
-        draw_enemy(kind, x - E_W / 2.0 + shake, y - E_H / 2.0 + (b.wob * 5.0).sin(), angry, b.wob, 0.78, 1.0);
+        // centred in its bubble (draw_enemy stands a toy on its feet)
+        draw_enemy(kind, x - E_W / 2.0 + shake, y - E_H + E_H / 2.0 * 0.78 + (b.wob * 5.0).sin(), angry, b.wob, 0.78, 1.0);
     }
     let tint_c = if b.owner == 0 { (120, 255, 140) } else { (120, 200, 255) };
     draw_ellipse(x + shake, y, rx, ry, 0.0, col(tint_c, if b.trapped.is_some() { 0.16 } else { 0.22 }));
@@ -1208,38 +1356,102 @@ fn draw_bubble(b: &Bubble, ox: f32, oy: f32, t: f32, round: usize) {
     blip::macroquad::shapes::draw_circle(x + r * 0.45 + shake, y + r * 0.35, 1.2, rgba(1.0, 1.0, 1.0, 0.6));
 }
 
+/// Candy colours, picked per drop so a shower of them is a pick-and-mix.
+const CANDY: [(u8, u8, u8); 6] = [
+    (255, 120, 160), (120, 200, 255), (255, 200, 80), (150, 230, 140), (200, 150, 255), (255, 150, 90),
+];
+
+/// A dropped treat, sweeter the bigger the chain that made it (see VALUE):
+/// a wrapped bonbon, a swirled lollipop, a sprinkled donut, a cupcake with
+/// a cherry on top. Each shines, and twinkles now and then.
 fn draw_fruit(f: &Fruit, ox: f32, oy: f32) {
     if f.t > 7.0 && (f.t * 10.0) as i32 % 2 == 0 { return; }
-    let (x, y) = (f.x + 8.0 + ox, f.y + 8.0 + oy);
     let bob = if f.on_ground { (f.t * 4.0).sin() * 1.0 } else { 0.0 };
-    let y = y + bob;
+    draw_candy(f.kind, candy_pick(f), f.t, f.x + 8.0 + ox, f.y + 8.0 + oy + bob, true);
+}
+
+/// Which colour a candy is: fixed by where it dropped.
+fn candy_pick(f: &Fruit) -> usize {
+    ((f.x * 7.0 + f.kind as f32 * 13.0) as i32).rem_euclid(CANDY.len() as i32) as usize
+}
+
+/// A candy of `kind` in colour `pick`, centred on (`x`, `y`); `t` drives
+/// its shine, `halo` the glow it has lying on the floor.
+fn draw_candy(kind: usize, pick: usize, t: f32, x: f32, y: f32, halo: bool) {
     use blip::macroquad::shapes::{draw_circle, draw_line};
-    match f.kind {
-        0 => { // cherries
-            draw_line(x - 3.0, y + 1.0, x + 2.0, y - 7.0, 1.5, rgba(0.3, 0.7, 0.2, 1.0));
-            draw_line(x + 4.0, y + 2.0, x + 2.0, y - 7.0, 1.5, rgba(0.3, 0.7, 0.2, 1.0));
-            draw_circle(x - 3.5, y + 3.0, 4.2, rgba(0.9, 0.1, 0.2, 1.0));
-            draw_circle(x + 4.0, y + 4.0, 4.2, rgba(0.85, 0.08, 0.18, 1.0));
-            draw_circle(x - 4.5, y + 1.8, 1.2, rgba(1.0, 1.0, 1.0, 0.8));
-        }
-        1 => { // banana
-            for k in 0..7 {
-                let a = -0.9 + k as f32 * 0.3;
-                draw_circle(x + a.sin() * 6.0, y + a.cos() * -4.0 + 2.0, 2.8, rgba(1.0, 0.88, 0.2, 1.0));
+    let c = CANDY[pick];
+    let c2 = CANDY[(pick + 2) % CANDY.len()];
+    if halo {
+        // a warm halo behind, so a treat is found at a glance
+        let glow = 0.07 + 0.03 * (t * 5.0).sin();
+        draw_circle(x, y + 1.0, 13.0, rgba(1.0, 0.8, 0.6, glow));
+        draw_circle(x, y + 1.0, 10.0, rgba(1.0, 0.85, 0.65, glow));
+    }
+    let shine = rgba(1.0, 1.0, 1.0, 0.85);
+    match kind {
+        0 => { // a wrapped bonbon: a round sweet, twisted cellophane ends
+            for s in [-1.0f32, 1.0] {
+                draw_triangle(vec2(x + s * 6.0, y), vec2(x + s * 12.0, y - 5.0), vec2(x + s * 12.0, y + 5.0), col(tint(c, 1.15), 1.0));
+                draw_line(x + s * 9.0, y - 3.0, x + s * 9.0, y + 3.0, 1.0, col(tint(c, 0.75), 1.0));
             }
-            draw_circle(x - 5.0, y - 1.0, 1.4, rgba(0.4, 0.3, 0.1, 1.0));
+            draw_circle(x, y, 7.5, col(tint(c, 0.8), 1.0));
+            draw_circle(x, y, 6.6, col(c, 1.0));
+            for k in 0..3 { // candy stripes
+                let dx = -4.0 + k as f32 * 4.0;
+                draw_line(x + dx - 1.5, y - 5.0, x + dx + 1.5, y + 5.0, 1.6, col((255, 255, 255), 0.55));
+            }
+            draw_ellipse(x - 2.6, y - 3.0, 2.4, 1.4, -30.0, shine);
         }
-        2 => { // melon slice
-            draw_ellipse(x, y + 2.0, 8.0, 6.0, 0.0, rgba(0.2, 0.7, 0.25, 1.0));
-            draw_ellipse(x, y + 1.0, 6.6, 4.6, 0.0, rgba(1.0, 0.35, 0.4, 1.0));
-            for k in -1..=1 { draw_circle(x + k as f32 * 3.0, y + 1.0, 0.9, rgba(0.1, 0.1, 0.1, 1.0)); }
+        1 => { // a lollipop: a spiral of two colours on a stick
+            draw_line(x, y + 4.0, x + 1.0, y + 14.0, 2.2, col((250, 245, 235), 1.0));
+            draw_circle(x, y - 1.0, 8.0, col(tint(c, 0.8), 1.0));
+            draw_circle(x, y - 1.0, 7.2, col(c, 1.0));
+            let turn = t * 1.5;
+            for k in 0..28 {
+                let u = k as f32 / 28.0;
+                let a = u * 12.0 + turn;
+                let r = 1.0 + u * 5.6;
+                draw_circle(x + a.cos() * r, y - 1.0 + a.sin() * r, 1.2, col(c2, 1.0));
+            }
+            draw_ellipse(x - 3.0, y - 4.4, 2.2, 1.3, -30.0, shine);
         }
-        _ => { // a gem
-            let c = hsv(f.t * 0.3, 0.6, 1.0, 1.0);
-            draw_triangle(vec2(x - 7.0, y - 2.0), vec2(x + 7.0, y - 2.0), vec2(x, y + 8.0), c);
-            draw_triangle(vec2(x - 7.0, y - 2.0), vec2(x + 7.0, y - 2.0), vec2(x, y - 7.0), rgba(1.0, 1.0, 1.0, 0.9));
-            draw_triangle(vec2(x - 7.0, y - 2.0), vec2(x - 3.0, y - 2.0), vec2(x, y + 8.0), rgba(1.0, 1.0, 1.0, 0.35));
+        2 => { // a donut: soft dough, glossy icing, sprinkles
+            draw_ellipse(x, y + 1.0, 10.0, 7.5, 0.0, col((215, 155, 95), 1.0));
+            draw_ellipse(x, y, 9.0, 6.4, 0.0, col(c, 1.0));
+            draw_ellipse(x, y + 0.4, 3.2, 2.2, 0.0, col((90, 50, 40), 1.0));
+            for k in 0..9 {
+                let a = k as f32 * 0.7 + 0.3;
+                let r = 5.4 + (k % 2) as f32 * 1.4;
+                let (sx, sy) = (x + a.cos() * r, y + a.sin() * r * 0.7);
+                let sc = CANDY[(pick + 1 + k) % CANDY.len()];
+                draw_line(sx - 1.0, sy - 0.6, sx + 1.0, sy + 0.6, 1.4, col(sc, 1.0));
+            }
+            draw_ellipse(x - 4.0, y - 3.0, 2.6, 1.2, -15.0, shine);
         }
+        _ => { // a cupcake: a pleated case, swirled frosting, a cherry
+            draw_triangle(vec2(x - 8.0, y + 1.0), vec2(x + 8.0, y + 1.0), vec2(x + 6.0, y + 10.0), col(c2, 1.0));
+            draw_triangle(vec2(x - 8.0, y + 1.0), vec2(x - 6.0, y + 10.0), vec2(x + 6.0, y + 10.0), col(c2, 1.0));
+            for k in 0..5 {
+                let px = x - 6.0 + k as f32 * 3.0;
+                draw_line(px, y + 2.0, px + (k as f32 - 2.0) * 0.4, y + 9.5, 1.0, col(tint(c2, 0.75), 1.0));
+            }
+            for (dy, r) in [(-1.0f32, 8.0f32), (-4.5, 6.0), (-7.5, 3.8)] {
+                draw_ellipse(x, y + dy, r, r * 0.6, 0.0, col(tint(c, 0.9), 1.0));
+                draw_ellipse(x, y + dy - 0.6, r * 0.9, r * 0.5, 0.0, col(c, 1.0));
+            }
+            draw_circle(x + 0.5, y - 11.0, 2.8, col((220, 30, 60), 1.0));
+            draw_line(x + 0.5, y - 13.5, x + 2.5, y - 16.0, 1.0, col((80, 140, 50), 1.0));
+            draw_circle(x - 0.4, y - 11.8, 0.8, shine);
+            draw_ellipse(x - 3.0, y - 4.5, 2.0, 1.0, -15.0, shine);
+        }
+    }
+    // a sugar twinkle now and then
+    let tw = (t * 2.0 + pick as f32).fract();
+    if tw < 0.12 {
+        let a = 1.0 - tw / 0.12;
+        let (sx, sy) = (x + 6.0, y - 7.0);
+        draw_line(sx - 3.0, sy, sx + 3.0, sy, 1.0, rgba(1.0, 1.0, 1.0, a));
+        draw_line(sx, sy - 3.0, sx, sy + 3.0, 1.0, rgba(1.0, 1.0, 1.0, a));
     }
 }
 
@@ -1265,8 +1477,10 @@ fn draw_world(blip: &Blip, g: &Game) {
     for e in &g.enemies {
         if !e.active { continue; }
         let s = ease_out(e.pop_in);
-        let shake = if e.windup > 0.0 { (e.t * 70.0).sin() * 1.8 } else { 0.0 };
-        draw_enemy(e.kind, e.x + ox + shake, e.y + oy, e.angry, e.t, s.max(0.05) * 1.1, s);
+        let shake = if e.windup > 0.0 || e.crouch > 0.0 { (e.t * 70.0).sin() * 1.4 } else { 0.0 };
+        // crouching to jump: drawn smaller, feet still on the platform
+        let k = if e.crouch > 0.0 { 0.82 } else { 1.0 };
+        draw_enemy(e.kind, e.x + ox + shake, e.y + oy, e.angry, e.t, s.max(0.05) * TOY_SCALE * k, s);
     }
     for (i, p) in g.p.iter().enumerate() {
         if !p.joined { continue; }
@@ -1275,7 +1489,14 @@ fn draw_world(blip: &Blip, g: &Game) {
         let body = if i == 0 { (90, 210, 110) } else { (90, 170, 255) };
         let spin = if p.dead_t > 0.0 { (1.4 - p.dead_t) * 9.0 } else { 0.0 };
         draw_dragon(p.cx() + ox, p.y + P_H + oy, p.face, body, p.squash, p.walk, p.blink < 0.0, p.mouth > 0.0,
-            1.0, spin, 1.15);
+            1.0, spin, TOY_SCALE, p.eat);
+        // the candy flying into the open mouth
+        if p.eat >= 0.0 && p.eat < EAT_FLY {
+            let (mx, my) = mouth_pos(p);
+            let k = ease_out(p.eat / EAT_FLY);
+            let (fx, fy) = (p.eaten.x + 8.0, p.eaten.y + 8.0);
+            draw_candy(p.eaten.kind, candy_pick(&p.eaten), 1.0, fx + (mx - fx) * k + ox, fy + (my - fy) * k + oy, false);
+        }
     }
     for b in &g.bubbles { draw_bubble(b, ox, oy, t, g.round); }
     if g.skull.active { draw_skull(&g.skull, ox, oy, t); }
@@ -1309,9 +1530,9 @@ fn draw_world(blip: &Blip, g: &Game) {
         }
     }
     for p in &g.pops {
-        let a = (1.1 - p.t).clamp(0.0, 1.0);
+        let a = (1.4 - p.t).clamp(0.0, 1.0);
         let s = format!("{}", p.value);
-        let sz = 1.5 * (1.0 + 0.5 * (1.0 - ease_out(p.t / 0.18)));
+        let sz = 2.0 * (1.0 + 0.5 * (1.0 - ease_out(p.t / 0.18)));
         let w = s.len() as f32 * 6.0 * sz;
         let x = (p.x - w / 2.0).clamp(TILE + 2.0, WIN_W as f32 - TILE - 2.0 - w);
         blip.draw_text(&s, x + 1.0, p.y + 1.0, sz, col(PLUM, a * 0.8));
@@ -1388,13 +1609,17 @@ fn draw_hud(blip: &Blip, g: &Game, _hi: &web::HighScore) {
         }
         let score = format!("{}", p.score);
         let (sw, lives) = (text_w(&score, sz), p.lives.max(0));
-        let lw = lives as f32 * 9.0;
+        let lw = lives as f32 * 11.0;
         let x0 = if i == 0 { 10.0 } else { WIN_W as f32 - 10.0 - sw - 8.0 - lw };
         soft(blip, &score, x0, y, sz, colr, 1.0);
         for k in 0..lives {
-            let (hx, hy) = (x0 + sw + 10.0 + k as f32 * 9.0, HUD / 2.0 - 1.0);
-            draw_circle(hx, hy, 3.3, col(life, 1.0));
-            draw_circle(hx - 1.0, hy - 1.0, 1.0, rgba(1.0, 1.0, 1.0, 0.7));
+            // a little heart per life, in the player's colour
+            let (hx, hy) = (x0 + sw + 11.0 + k as f32 * 11.0, HUD / 2.0 - 2.0);
+            let c = col(life, 1.0);
+            draw_circle(hx - 2.0, hy, 2.6, c);
+            draw_circle(hx + 2.0, hy, 2.6, c);
+            draw_triangle(vec2(hx - 4.5, hy + 0.8), vec2(hx + 4.5, hy + 0.8), vec2(hx, hy + 5.5), c);
+            draw_circle(hx - 2.6, hy - 0.8, 0.9, rgba(1.0, 1.0, 1.0, 0.7));
         }
     }
     let round = format!("ROUND {}", g.round + 1);
@@ -1437,7 +1662,7 @@ fn draw_title(blip: &Blip, g: &Game, hi: &web::HighScore) {
         let sq = if hop < 0.08 { 0.8 } else { 1.0 + hop * 0.12 };
         let body = if i == 0 { (90, 210, 110) } else { (90, 170, 255) };
         draw_dragon(*x, foot, if i == 0 { 1.0 } else { -1.0 }, body, sq, t * 2.0, (t * 0.7 + i as f32) % 3.0 < 0.1,
-            (t * 1.3 + i as f32 * 0.5) % 2.0 < 0.2, 1.0, 0.0, 2.4);
+            (t * 1.3 + i as f32 * 0.5) % 2.0 < 0.2, 1.0, 0.0, 2.4, -1.0);
     }
     let glow = 0.65 + 0.35 * (t * 2.5).sin().abs();
     cosy(blip, "P1 PRESS BUBBLE", 300.0 + DY, 2.0, MINT, MINT, 1.0, glow);
@@ -1589,7 +1814,10 @@ async fn main() {
                         owner: k % 2, trapped: if k < 3 { Some((Kind::Walker, false)) } else { None }, active: true,
                         wob: k as f32, squish: 0.0 });
                 }
-                g.fruits.push(Fruit { x: 200.0, y: HUD + 23.0 * TILE - 16.0, vx: 0.0, vy: 0.0, kind: 2, t: 1.0, on_ground: true, active: true });
+                // one of each treat on the floor
+                for (kind, x) in [(0usize, 150.0f32), (1, 196.0), (2, 410.0), (3, 456.0)] {
+                    g.fruits.push(Fruit { x, y: HUD + 23.0 * TILE - 16.0, vx: 0.0, vy: 0.0, kind, t: 1.0, on_ground: true, active: true });
+                }
             }
         }
 
