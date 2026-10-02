@@ -1753,15 +1753,16 @@ fn draw_title(blip: &Blip, g: &Game, hi: &web::HighScore) {
     let glow = 0.65 + 0.35 * (t * 2.5).sin().abs();
     cosy(blip, "P1 PRESS BUBBLE", 300.0 + DY, 2.0, MINT, MINT, 1.0, glow);
     let two = "P2 PRESS J TO JOIN";
-    soft(blip, two, (WIN_W as f32 - text_w(two, 1.4)) / 2.0, 336.0 + DY, 1.4, SKY, 1.0);
+    // Whole-pixel sizes from here down: at 1.2 to 1.5 the font's rows are uneven.
+    soft(blip, two, (WIN_W as f32 - text_w(two, 2.0)) / 2.0, 334.0 + DY, 2.0, SKY, 1.0);
     // how to play, on its own panel
     let (l1, l2) = ("MOVE A D   JUMP W   BUBBLE F", "HOLD JUMP TO RIDE BUBBLES");
-    pill(WIN_W as f32 / 2.0, 358.0 + DY, text_w(l1, 1.2) + 36.0, 46.0, col(PEACH, 0.8), 0.9);
-    soft(blip, l1, (WIN_W as f32 - text_w(l1, 1.2)) / 2.0, 369.0 + DY, 1.2, CREAM, 0.95);
-    soft(blip, l2, (WIN_W as f32 - text_w(l2, 1.2)) / 2.0, 385.0 + DY, 1.2, CREAM, 0.95);
+    pill(WIN_W as f32 / 2.0, 358.0 + DY, text_w(l1, 2.0) + 36.0, 54.0, col(PEACH, 0.8), 0.9);
+    soft(blip, l1, (WIN_W as f32 - text_w(l1, 2.0)) / 2.0, 368.0 + DY, 2.0, CREAM, 0.95);
+    soft(blip, l2, (WIN_W as f32 - text_w(l2, 2.0)) / 2.0, 388.0 + DY, 2.0, CREAM, 0.95);
     if hi.score > 0 {
         let h = hi.label("HI");
-        soft(blip, &h, (WIN_W as f32 - text_w(&h, 1.5)) / 2.0, 424.0 + DY, 1.5, PEACH, 1.0);
+        soft(blip, &h, (WIN_W as f32 - text_w(&h, 2.0)) / 2.0, 428.0 + DY, 2.0, PEACH, 1.0);
     }
     let _ = g;
 }

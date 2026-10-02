@@ -3005,7 +3005,7 @@ fn draw_play(
             blip.fill_rect(0.0, by - 1.5, WIN_W as f32, 3.0, BLIP_WHITE);
         } else {
             let color = if flicker { BLIP_RED } else { BLIP_WHITE };
-            blip.draw_centered("LASER BARRIER", by + 22.0, 2.4, color);
+            blip.draw_centered("LASER BARRIER", by + 22.0, 2.0, color);
         }
 
         // The motor: a dark housing with a glowing core and its own health
@@ -3138,7 +3138,7 @@ fn draw_play(
     if g.max_power_banner.active() {
         let flash = ((g.max_power_banner.remaining() * 14.0) as i32 % 2) == 0;
         let color = if flash { weapon_tier_color(MAX_WEAPON_LEVEL) } else { BLIP_WHITE };
-        blip.draw_centered("MAXIMUM POWER", (WIN_H / 2 - 10) as f32, 3.5, color);
+        blip.draw_centered("MAXIMUM POWER", (WIN_H / 2 - 12) as f32, 4.0, color);
     }
 
     if g.boss_intro.active() {
@@ -3341,7 +3341,7 @@ fn draw_won(blip: &Blip, score: i32, hi: &web::HighScore) {
     let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
     blip.draw_centered("YOU WON!!",           (WIN_H / 4) as f32,      6.0, BLIP_YELLOW);
-    blip.draw_centered("ALL 7 WAVES CLEARED", (WIN_H / 2 - 20) as f32, 2.5, BLIP_GREEN);
+    blip.draw_centered("ALL 7 WAVES CLEARED", (WIN_H / 2 - 20) as f32, 3.0, BLIP_GREEN);
     blip.draw_centered(&buf,                  (WIN_H / 2 + 14) as f32, 3.0, BLIP_WHITE);
     blip.draw_best(score, hi, (WIN_H / 2 + 40) as f32, BLIP_GREEN);
     blip.draw_centered("PRESS FIRE",          (WIN_H * 2 / 3) as f32,  3.0, BLIP_CYAN);

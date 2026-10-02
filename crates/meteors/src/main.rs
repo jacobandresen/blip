@@ -1017,7 +1017,7 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
     blip.draw_hud(g.sess.score, g.sess.lives);
     // x=12 clears the shell's 3px canvas clip, which eats more of this wider canvas's units.
     let lvl = format!("LEVEL {}", g.sess.level);
-    blip.draw_text(&lvl, 12.0, WIN_H as f32 - 18.0, 1.5, BLIP_GRAY);
+    blip.draw_text(&lvl, 12.0, WIN_H as f32 - 22.0, 2.0, BLIP_GRAY);
 }
 
 fn draw_title(blip: &Blip, hi: &web::HighScore) {
