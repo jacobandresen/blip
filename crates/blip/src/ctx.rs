@@ -183,6 +183,7 @@ varying lowp vec4 color;
 
 uniform sampler2D Texture;
 uniform float InterlaceField; // 0.0 or 1.0, flips every frame (Blip::interlace_field)
+uniform float FieldDim;       // brightness of the fading field's rows (Blip::set_interlace)
 
 void main() {
     vec3 col = texture2D(Texture, uv).rgb;
@@ -192,7 +193,7 @@ void main() {
     // flicker. composite() passes InterlaceField already corrected for the
     // bound target.
     float parity = mod(floor(gl_FragCoord.y), 2.0);
-    float dim = (parity == InterlaceField) ? 0.25 : (1.0 - 60.0 / 255.0);
+    float dim = (parity == InterlaceField) ? FieldDim : (1.0 - 60.0 / 255.0);
     col *= dim;
 
     gl_FragColor = vec4(col * color.rgb, 1.0);
@@ -224,6 +225,8 @@ pub struct Blip {
     chroma_dx: f32, // horizontal shift in virtual pixels
     // ---- interlaced field ----
     interlace_field: u8, // 0 or 1, flips every frame
+    // How bright the fading field's rows stay (the other field's are 0.76).
+    field_dim: f32,
     // ---- curved-glass shader pass ----
     crt:         Option<Material>, // None if the shader failed to compile
     // How much of the phosphor bloom is added back: 1.0 suits lit lines on
@@ -279,7 +282,10 @@ impl Blip {
         let scanline = load_material(
             ShaderSource::Glsl { vertex: CRT_VERTEX, fragment: SCANLINE_FRAGMENT },
             MaterialParams {
-                uniforms: vec![UniformDesc::new("InterlaceField", UniformType::Float1)],
+                uniforms: vec![
+                    UniformDesc::new("InterlaceField", UniformType::Float1),
+                    UniformDesc::new("FieldDim", UniformType::Float1),
+                ],
                 ..Default::default()
             },
         )
@@ -312,6 +318,7 @@ impl Blip {
             roll_cd,  roll_t: 0.0, roll_dy: 0.0, roll_spd: 0.0,
             chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
             interlace_field: 0,
+            field_dim: 0.25,
             crt,
             bloom: 1.0,
             scanline,
@@ -628,6 +635,7 @@ impl Blip {
             let scanline = self.scanline.as_ref().unwrap();
             let field = if offscreen_target { self.interlace_field } else { 1 - self.interlace_field };
             scanline.set_uniform("InterlaceField", field as f32);
+            scanline.set_uniform("FieldDim", self.field_dim);
             gl_use_material(scanline);
         }
         if roll_on {
@@ -688,7 +696,7 @@ impl Blip {
         // each frame). Level 2 skips it.
         if self.fx_level < 2 && self.scanline.is_none() {
             let active   = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
-            let inactive = Color { r: 0.0, g: 0.0, b: 0.0, a: 0.75 };
+            let inactive = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 - self.field_dim };
             let bottom   = vy + vh;
             let f0 = self.interlace_field as f32;
             let f1 = 1.0 - f0;
@@ -721,6 +729,11 @@ impl Blip {
     }
 
     // ----- drawing helpers — see blip::draw and blip::font for full docs -----
+
+    /// How bright the interlace's fading rows stay, 0.25 (the default: lines
+    /// on black) to 0.76 (no interlace). Rows swap between this and 0.76
+    /// every frame, which twitters on a game of bright filled scenes.
+    pub fn set_interlace(&mut self, dim: f32) { self.field_dim = dim.clamp(0.25, 0.76); }
 
     /// The device could not hold the frame rate and the post-process has
     /// stepped down: a game can spend less on its own effects too.

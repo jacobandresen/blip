@@ -105,6 +105,8 @@ async fn main() {
     // Whole lit scenes, not lines on black: at full bloom every fighter
     // wears a halo and the names smear.
     blip.set_bloom(0.15);
+    // And the interlace's rows swap half as far, or the lit scenes twitter.
+    blip.set_interlace(0.5);
     let mut g = Game::new();
 
     // Say so before the slow part (the themes take a second or two), or the
