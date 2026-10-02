@@ -565,3 +565,112 @@ function pollGamepad(onDown, onUp) {
     }
   });
 }());
+
+/* ---- Fullscreen ---- One button, on every page with a coin slot. It sets
+ * <html data-fullscreen> (each page's CSS decides what that hides) and asks
+ * the browser for real fullscreen. The choice is stored, so a kiosk stays
+ * fullscreen from the cabinet into a game and back; the browser drops real
+ * fullscreen on every page load and only gives it back on a key or a click,
+ * so the first one on each page asks again. The button or Esc turns it off. */
+(function () {
+  var root = document.documentElement;
+  var KEY = 'blip-fullscreen';
+  var enter = root.requestFullscreen || root.webkitRequestFullscreen;
+  var leave = document.exitFullscreen || document.webkitExitFullscreen;
+  function wanted() { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } }
+  function inBrowserFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function request() {
+    if (!enter || inBrowserFullscreen()) return;
+    try {
+      var p = enter.call(root);
+      // Refused (an embedded page, no gesture yet): the layout still holds.
+      if (p && p.catch) p.catch(function () {});
+    } catch (e) {}
+  }
+  var btn = null;
+  function apply(on) {
+    root.toggleAttribute('data-fullscreen', on);
+    if (btn) {
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.title = on ? 'Exit fullscreen' : 'Fullscreen';
+      btn.setAttribute('aria-label', btn.title);
+    }
+    if (typeof window.onBlipFullscreenChange === 'function') {
+      try { window.onBlipFullscreenChange(on); } catch (e) {}
+    }
+  }
+  function set(on) {
+    try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {}
+    apply(on);
+  }
+  // Before first paint where this script is in <head>.
+  if (wanted()) root.setAttribute('data-fullscreen', '');
+
+  // Left of the coin slot; on a phone a game's name reaches that far, so
+  // it goes right of the logo instead.
+  function place() {
+    var coin = document.getElementById('insert-coin-btn') || document.getElementById('kiosk-insert-btn');
+    var name = document.getElementById('marquee-name');
+    var logo = document.querySelector('.blip-logo');
+    if (!btn || !coin) return;
+    var w = btn.offsetWidth || 34;
+    var left = coin.getBoundingClientRect().left - w - 2;
+    if (name && logo && name.getBoundingClientRect().right > left) left = logo.getBoundingClientRect().right + 2;
+    btn.style.left = Math.round(left) + 'px';
+  }
+
+  function build() {
+    var coin = document.getElementById('insert-coin-btn') || document.getElementById('kiosk-insert-btn');
+    // A touch screen keeps its whole layout, so without real fullscreen
+    // (iPhone) the button would do nothing.
+    if (!coin || (blipHasTouch() && !enter)) return;
+    btn = document.createElement('button');
+    btn.id = 'fullscreen-btn';
+    btn.type = 'button';
+    btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true">' +
+      '<path class="fs-enter" d="M1.5 6V1.5H6M10 1.5h4.5V6M14.5 10v4.5H10M6 14.5H1.5V10"/>' +
+      '<path class="fs-exit" d="M1.5 6H6V1.5M10 1.5V6h4.5M14.5 10H10v4.5M6 14.5V10H1.5"/></svg>';
+    document.body.appendChild(btn);
+    btn.addEventListener('click', function () {
+      var on = !root.hasAttribute('data-fullscreen');
+      set(on);
+      if (on) request();
+      else if (inBrowserFullscreen() && leave) { try { leave.call(document); } catch (e) {} }
+    });
+    window.addEventListener('resize', place);
+    // The logo and the slot settle after their fonts and boot animation.
+    if (typeof ResizeObserver === 'function') {
+      var settle = new ResizeObserver(place);
+      ['.blip-logo', '#insert-coin-btn', '#kiosk-insert-btn', '#marquee-name'].forEach(function (sel) {
+        var el = document.querySelector(sel);
+        if (el) settle.observe(el);
+      });
+    }
+    var logo = document.querySelector('.blip-logo');
+    if (logo) logo.addEventListener('animationend', place);
+    apply(wanted());
+    place();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);
+  else build();
+
+  // Esc, or the browser's own way out, turns the mode off. A page load also
+  // drops real fullscreen, but fires nothing, so the choice survives it.
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) {
+    document.addEventListener(ev, function () {
+      if (!inBrowserFullscreen() && root.hasAttribute('data-fullscreen')) set(false);
+      place();
+    });
+  });
+  // Back in real fullscreen on the first key or click of a page.
+  ['keydown', 'mousedown', 'pointerup', 'touchend'].forEach(function (ev) {
+    window.addEventListener(ev, function (e) {
+      if (!wanted() || inBrowserFullscreen()) return;
+      if (e.target && e.target.closest && e.target.closest('#fullscreen-btn')) return;
+      if (e.key === 'Escape') return;
+      request();
+    }, true);
+  });
+}());

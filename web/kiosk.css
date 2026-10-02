@@ -2996,3 +2996,43 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
              calc(env(safe-area-inset-bottom, 0px) + 22px)
              max(22px, calc(env(safe-area-inset-left, 0px) + 10px));
 }
+
+/* ---- Fullscreen ---- The button sits left of the coin slot, or right of
+   the logo where a game's name leaves no room (kiosk.js sets `left`). */
+#fullscreen-btn {
+  position: fixed;
+  top: 0;
+  z-index: 500;
+  box-sizing: border-box;
+  height: calc(var(--marquee-h, 32px) + env(safe-area-inset-top, 0px));
+  width: 34px;
+  margin: 0;
+  padding: env(safe-area-inset-top, 0px) 0 0;
+  border: 0;
+  background: none;
+  color: #cfc94a;
+  opacity: 0.7;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+#fullscreen-btn[hidden] { display: none; }
+#fullscreen-btn:hover, #fullscreen-btn:focus-visible { opacity: 1; }
+#fullscreen-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  filter: drop-shadow(0 0 3px rgba(230, 220, 50, 0.7));
+}
+#fullscreen-btn .fs-exit,
+:root[data-fullscreen] #fullscreen-btn .fs-enter { display: none; }
+:root[data-fullscreen] #fullscreen-btn .fs-exit { display: inline; }
+:root[data-fullscreen] #fullscreen-btn { color: #7be07b; opacity: 1; }
+@media (max-width: 480px) {
+  #fullscreen-btn { width: 26px; }
+}

@@ -72,6 +72,23 @@ updateCoinsHud();
   }
 }());
 
+// A kiosk nobody is playing goes back to the cabinet: in fullscreen, two
+// minutes without a key, a touch or a pad press (the deck and a gamepad both
+// arrive as key events on the canvas).
+(function () {
+  var IDLE_MS = 120000, last = Date.now();
+  function poke() { last = Date.now(); }
+  ['keydown', 'pointerdown', 'pointermove', 'touchstart'].forEach(function (ev) {
+    window.addEventListener(ev, poke, { capture: true, passive: true });
+  });
+  setInterval(function () {
+    if (!document.documentElement.hasAttribute('data-fullscreen') || document.hidden) return;
+    // Somebody typing their name is not idle.
+    if (document.querySelector('.blip-hs-modal')) { poke(); return; }
+    if (Date.now() - last >= IDLE_MS) window.location.href = '../index.html';
+  }, 5000);
+}());
+
 // Stop all audio when navigating away (pagehide is reliable on iOS Safari / PWA)
 window.addEventListener('pagehide', function () {
   if (typeof Howler !== 'undefined') Howler.stop();
@@ -467,71 +484,12 @@ if (typeof ResizeObserver === 'function') {
   });
 }
 
-// ---- Fullscreen ----
-// The button toggles <html data-fullscreen> and, where the browser can, real
-// fullscreen with it. Esc (or the browser's own way out) turns both off.
-(function () {
-  var btn = document.getElementById('fullscreen-btn');
-  if (!btn) return;
-  var root = document.documentElement;
-  var enter = root.requestFullscreen || root.webkitRequestFullscreen;
-  var leave = document.exitFullscreen || document.webkitExitFullscreen;
-  function inBrowserFullscreen() {
-    return !!(document.fullscreenElement || document.webkitFullscreenElement);
-  }
-  // A touch screen keeps its whole layout, so without real fullscreen
-  // (iPhone) the button would do nothing.
-  if (blipHasTouch() && !enter) { btn.hidden = true; return; }
-
-  // Left of the coin slot; on a phone the game's name reaches that far, so
-  // it goes right of the logo instead.
-  function place() {
-    var coin = document.getElementById('insert-coin-btn');
-    var name = document.getElementById('marquee-name');
-    var logo = document.querySelector('.blip-logo');
-    if (!coin) return;
-    var w = btn.offsetWidth || 34;
-    var left = coin.getBoundingClientRect().left - w - 2;
-    if (name && logo && name.getBoundingClientRect().right > left) left = logo.getBoundingClientRect().right + 2;
-    btn.style.left = Math.round(left) + 'px';
-  }
-  function set(on) {
-    root.toggleAttribute('data-fullscreen', on);
-    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    btn.title = on ? 'Exit fullscreen' : 'Fullscreen';
-    btn.setAttribute('aria-label', btn.title);
-    fillCanvas();
-  }
-  btn.addEventListener('click', function () {
-    var on = !root.hasAttribute('data-fullscreen');
-    set(on);
-    try {
-      var p = on ? (enter && enter.call(root))
-                 : (inBrowserFullscreen() && leave && leave.call(document));
-      // Refused (an embedded page, say): the layout still changes.
-      if (p && p.catch) p.catch(function () {});
-    } catch (e) {}
-    try { canvas.focus({ preventScroll: true }); } catch (e) {}
-  });
-  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) {
-    document.addEventListener(ev, function () {
-      if (!inBrowserFullscreen() && root.hasAttribute('data-fullscreen')) set(false);
-      place();
-    });
-  });
-  window.addEventListener('resize', place);
-  // The logo and the slot settle after their fonts and boot animation.
-  if (typeof ResizeObserver === 'function') {
-    var settle = new ResizeObserver(place);
-    ['.blip-logo', '#insert-coin-btn', '#marquee-name'].forEach(function (sel) {
-      var el = document.querySelector(sel);
-      if (el) settle.observe(el);
-    });
-  }
-  var bootLogo = document.querySelector('.blip-logo');
-  if (bootLogo) bootLogo.addEventListener('animationend', place);
-  place();
-}());
+// Fullscreen went on or off (kiosk.js owns the button): the deck comes or
+// goes, so the picture is fitted again.
+window.onBlipFullscreenChange = function () {
+  fillCanvas();
+  try { canvas.focus({ preventScroll: true }); } catch (e) {}
+};
 
 function hideLoader() {
   if (loader && loader.style.display !== 'none') {

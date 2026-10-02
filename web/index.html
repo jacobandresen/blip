@@ -13,12 +13,17 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=71">
+  <link rel="stylesheet" href="kiosk.css?v=72">
   <!-- Before first paint (kiosk.js loads at the end): a touch screen gets
        no deck on this page, so it must never flash up. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
       document.documentElement.setAttribute('data-has-touch', '');
+    // Likewise a kiosk in fullscreen (kiosk.js) has no deck.
+    try {
+      if (localStorage.getItem('blip-fullscreen') === '1')
+        document.documentElement.setAttribute('data-fullscreen', '');
+    } catch (e) {}
   </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -713,6 +718,9 @@
        and the corner clusters come down to the screen's edge. */
     :root[data-has-touch] #kiosk-bar { display: none; }
     :root[data-has-touch] body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+    /* Fullscreen on a PC: the keyboard picks the game, so the deck goes too. */
+    :root[data-fullscreen] #kiosk-bar { display: none; }
+    :root[data-fullscreen] body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
 
 
   </style>
@@ -892,7 +900,7 @@
   <script src="deck.js?v=5"></script>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=34"></script>
+  <script src="kiosk.js?v=35"></script>
   <script src="blip_controller.js?v=8"></script>
   <script>
     /* ------------------------------------------------------------------ */
@@ -1339,6 +1347,19 @@
         cards[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       }
 
+      // A kiosk left alone (fullscreen, 20 s without input) walks the
+      // selection through the games, so the whole catalogue passes the
+      // screen. Any input stops it.
+      var lastInput = Date.now();
+      function poke() { lastInput = Date.now(); }
+      ['keydown', 'pointerdown', 'pointermove', 'wheel', 'touchstart'].forEach(function (ev) {
+        window.addEventListener(ev, poke, { capture: true, passive: true });
+      });
+      setInterval(function () {
+        if (!document.documentElement.hasAttribute('data-fullscreen') || document.hidden) return;
+        if (Date.now() - lastInput >= 20000) move(1);
+      }, 5000);
+
       function activate() {
         // Fire always starts the selected game — default to the first card
         // if the player hasn't moved the selection yet, and auto-insert a
@@ -1358,6 +1379,7 @@
 
       pollGamepad(
         function (code) {
+          poke();
           if (code === 'ArrowRight' || code === 'ArrowDown') move(1);
           else if (code === 'ArrowLeft' || code === 'ArrowUp') move(-1);
           else if (code === 'Space') activate();
