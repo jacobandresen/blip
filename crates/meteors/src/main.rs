@@ -1002,7 +1002,14 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
             } else { (ex, ey) };
             blip.fill_circle(ex, ey, 1.0, BlipColor { a: SMEAR_ALPHA * age, ..c });
         }
-        blip.fill_glow_circle(b.x, b.y, 2.0, c);
+        if b.from_player {
+            blip.fill_glow_circle(b.x, b.y, 2.0, c);
+        } else {
+            // The saucer's shot is the one thing here that kills from afar:
+            // bigger, with a white heart, so it reads over the purple haze.
+            blip.fill_glow_circle(b.x, b.y, 3.0, c);
+            blip.fill_circle(b.x, b.y, 1.5, BLIP_WHITE);
+        }
     }
     if g.ship_alive {
         draw_ship(blip, &g.ship, g.invuln_t, g.sess.level, NEON_CYAN);

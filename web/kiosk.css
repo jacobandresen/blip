@@ -254,6 +254,8 @@ html {
   color: rgba(230, 220, 50, 0.8);
   text-shadow: 0 0 8px rgba(230, 220, 50, 0.35);
 }
+/* How to pay, for a cabinet with no mouse. */
+#need-coin-overlay .nco-how { color: rgba(207, 230, 239, 0.75); text-shadow: none; }
 #need-coin-overlay .nco-credit {
   font-size: clamp(7px, 2.1vw, 11px);
   line-height: 1.6;
