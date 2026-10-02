@@ -116,6 +116,13 @@
       white-space: nowrap;
     }
     .keytable td:last-child { color: #bbb; font-size: 12px; letter-spacing: .5px; }
+    /* A phone has no room for two columns: the unwrapped labels pushed the
+       page 60px wider than a 360px screen. The keys go under their label. */
+    @media (max-width: 560px) {
+      .keytable, .keytable tbody, .keytable tr, .keytable td { display: block; }
+      .keytable td:first-child { width: auto; white-space: normal; padding: 8px 0 0; border-bottom: 0; }
+      .keytable td:last-child { padding-top: 2px; }
+    }
 
     kbd {
       display: inline-block;

@@ -194,6 +194,16 @@ test('the game shell', async (t) => {
     assert.ok(name2[0] >= mute[1] && name2[1] <= slot[0], `name ${name2} between button ${mute} and slot ${slot}`);
   });
 
+  await t.test('no page is wider than a 360px phone', async (t) => {
+    const cdp = await browser(t, 9409, { touch: true, width: 360, height: 760 });
+    for (const page of ['index.html', 'controls.html', 'about.html', 'history.html']) {
+      await open(cdp, page, 2500);
+      // A page that overflows makes a phone lay it out wider and zoom out.
+      assert.deepEqual(JSON.parse(await evaluate(cdp, 'JSON.stringify([innerWidth, document.documentElement.scrollWidth])')),
+        [360, 360], page);
+    }
+  });
+
   await t.test('sound goes off and on from the button or M, and stays off across pages', async (t) => {
     const cdp = await browser(t, 9405);
     await open(cdp, 'meteors/index.html', 6000);
