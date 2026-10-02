@@ -5,7 +5,7 @@ use crate::image::Image;
 use std::f32::consts::PI;
 
 use crate::wav::{low_pass, tame, warm, Rng, MIX_KNEE};
-use crate::wav::{encode_pcm16_mono, mix_into, mix_into_f32, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::wav::{encode_pcm16_mono, encode_pcm16_music, mix_into, mix_into_f32, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 // Must match crates/sky_raider/src/main.rs's PLAYER_W / PLAYER_H.
@@ -1510,7 +1510,7 @@ fn engine_start_sfx() -> Vec<u8> {
         s[n - 1 - i] *= g;
     }
     let pcm: Vec<i16> = s.iter().map(|&v| (v.tanh() * 24_000.0) as i16).collect();
-    encode_pcm16_mono(&pcm)
+    half_rate(&pcm)
 }
 
 
@@ -1592,7 +1592,7 @@ fn engine_loop(rpm: f32, sputter: bool) -> Vec<u8> {
     let tail = buf.split_off(n);
     for (i, v) in tail.iter().enumerate() { buf[i] += v; }
     let scaled: Vec<f32> = buf.iter().map(|v| v * 11_000.0).collect();
-    encode_pcm16_mono(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
+    half_rate(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
 }
 
 /// Seconds into `engine_splutter_sfx` the engine dies, and catches again.
@@ -1640,7 +1640,7 @@ fn engine_splutter_sfx() -> Vec<u8> {
         *v *= 1.0 - (i - f0) as f32 / (n - f0) as f32;
     }
     let scaled: Vec<f32> = buf.iter().map(|v| v * 11_000.0).collect();
-    encode_pcm16_mono(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
+    half_rate(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
 }
 
 /// A flak shell bursting at altitude: the hard crack of the charge, a dull
@@ -1648,7 +1648,7 @@ fn engine_splutter_sfx() -> Vec<u8> {
 /// explosion_sfx, heard from a little way off.
 fn flak_burst_sfx() -> Vec<u8> {
     let b = Blast { secs: 0.45, boom_hz: 140.0, secondaries: 0, debris: 3, amp: 0.7, seed: 0xF1A4 };
-    encode_pcm16_mono(&explosion_sfx(b))
+    half_rate(&explosion_sfx(b))
 }
 
 /// A laser turret charging, 1.3 s: a whine climbing two octaves, its
@@ -2432,6 +2432,15 @@ pub fn music2() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
+/// A rumble (an explosion, an engine) encoded at half rate: little of it
+/// lives above 8 kHz, and these are most of the game's download.
+fn half_rate(pcm: &[i16]) -> Vec<u8> {
+    let mut f: Vec<f32> = pcm.iter().map(|&v| v as f32).collect();
+    low_pass(&mut f, 8000.0);
+    let s: Vec<i16> = f.iter().map(|&v| v.clamp(-32767.0, 32767.0) as i16).collect();
+    encode_pcm16_music(&s)
+}
+
 pub fn generate() -> Vec<Asset> {
     vec![
         ("images/player_plane.png",   player_plane()),
@@ -2493,19 +2502,19 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/burst4_2.wav", encode_pcm16_mono(&gun_burst(6, 0x5a0f899b))),
         ("sounds/burst5_1.wav", encode_pcm16_mono(&gun_burst(8, 0x5a0f86d9))),
         ("sounds/burst5_2.wav", encode_pcm16_mono(&gun_burst(8, 0x5a0f8a9c))),
-        ("sounds/enemy_explode0.wav", encode_pcm16_mono(&explosion_sfx(ENEMY_BLASTS[0]))),
-        ("sounds/enemy_explode1.wav", encode_pcm16_mono(&explosion_sfx(ENEMY_BLASTS[1]))),
-        ("sounds/enemy_explode2.wav", encode_pcm16_mono(&explosion_sfx(ENEMY_BLASTS[2]))),
-        ("sounds/enemy_explode3.wav", encode_pcm16_mono(&explosion_sfx(ENEMY_BLASTS[3]))),
-        ("sounds/player_explode0.wav", encode_pcm16_mono(&explosion_sfx(PLAYER_BLASTS[0]))),
-        ("sounds/player_explode1.wav", encode_pcm16_mono(&explosion_sfx(PLAYER_BLASTS[1]))),
+        ("sounds/enemy_explode0.wav", half_rate(&explosion_sfx(ENEMY_BLASTS[0]))),
+        ("sounds/enemy_explode1.wav", half_rate(&explosion_sfx(ENEMY_BLASTS[1]))),
+        ("sounds/enemy_explode2.wav", half_rate(&explosion_sfx(ENEMY_BLASTS[2]))),
+        ("sounds/enemy_explode3.wav", half_rate(&explosion_sfx(ENEMY_BLASTS[3]))),
+        ("sounds/player_explode0.wav", half_rate(&explosion_sfx(PLAYER_BLASTS[0]))),
+        ("sounds/player_explode1.wav", half_rate(&explosion_sfx(PLAYER_BLASTS[1]))),
         // A short, quieter crack for a non-lethal hit — reads as "took a
         // glancing blow" rather than player_explode's full "you're down".
         ("sounds/ricochet1.wav",      encode_pcm16_mono(&ricochet_sfx(3300.0, 0x51C0_C4E7))),
         ("sounds/ricochet2.wav",      encode_pcm16_mono(&ricochet_sfx(2700.0, 0x2B1E_77A3))),
         ("sounds/player_hit.wav",     encode_pcm16_mono(&hit_sfx())),
-        ("sounds/boss_explode0.wav",  encode_pcm16_mono(&explosion_sfx(BOSS_BLASTS[0]))),
-        ("sounds/boss_explode1.wav",  encode_pcm16_mono(&explosion_sfx(BOSS_BLASTS[1]))),
+        ("sounds/boss_explode0.wav",  half_rate(&explosion_sfx(BOSS_BLASTS[0]))),
+        ("sounds/boss_explode1.wav",  half_rate(&explosion_sfx(BOSS_BLASTS[1]))),
         ("sounds/boss_warning.wav",   boss_warning_sfx()),
         // Weapon-tier pickup chimes, escalating: more notes, higher register,
         // and a proper fanfare (with a harmony note) for the last one.

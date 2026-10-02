@@ -5,7 +5,7 @@
 use std::f32::consts::PI;
 
 use crate::wav::{warm, Rng, MIX_KNEE};
-use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::wav::{encode_pcm16_mono, encode_pcm16_music, soft_limit_to_pcm16, SAMPLE_RATE};
 
 pub const SR: f32 = SAMPLE_RATE as f32;
 /// Hold the previous note, in a jingle.
@@ -291,11 +291,14 @@ pub fn finish(buf: &[f32], gain: f32) -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
 }
 
-/// Faded out, low-passed at 3 kHz like the music, soft-limited and encoded.
+/// Faded out, low-passed at 3 kHz like the music, soft-limited and encoded
+/// at half rate, as the music is: after the low-pass there is nothing up
+/// there to lose, and an effect is half the bytes to download.
 pub fn finish_warm(mut buf: Vec<f32>, gain: f32) -> Vec<u8> {
     warm(&mut buf);
     fade_out(&mut buf, 0.008); // however an effect was cut, it ends in silence
-    finish(&buf, gain)
+    let scaled: Vec<f32> = buf.iter().map(|v| v * gain).collect();
+    encode_pcm16_music(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
 }
 
 /// The usual level for a finished effect, warmed.
