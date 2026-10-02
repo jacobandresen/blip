@@ -183,6 +183,14 @@ test('the game shell', async (t) => {
     assert.ok(name[0] >= fs[1] && name[1] <= slot[0], `name ${name} between button ${fs} and slot ${slot}`);
     assert.equal(await evaluate(cdp, "getComputedStyle(document.getElementById('marquee-name')).visibility"), 'visible');
 
+    // At 320px the slot drops its word to leave the name room.
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 700, deviceScaleFactor: 1, mobile: true });
+    await open(cdp, 'galactic_defender/index.html', 5000);
+    const [narrow, slot320] = [await at('#marquee-name'), await at('#insert-coin-btn')];
+    assert.equal(await evaluate(cdp, "getComputedStyle(document.getElementById('marquee-name')).visibility"), 'visible');
+    assert.ok(narrow[1] <= slot320[0] && slot320[1] <= 320, `name ${narrow}, slot ${slot320}`);
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+
     // An iPhone has no fullscreen to offer: the sound button stands alone.
     await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
       source: 'delete Element.prototype.requestFullscreen; delete Element.prototype.webkitRequestFullscreen;',
@@ -192,6 +200,25 @@ test('the game shell', async (t) => {
     const [name2, mute] = [await at('#marquee-name'), await at('#mute-btn')];
     assert.ok(mute[1] > mute[0], 'no sound button');
     assert.ok(name2[0] >= mute[1] && name2[1] <= slot[0], `name ${name2} between button ${mute} and slot ${slot}`);
+  });
+
+  await t.test('a game that traps says so and goes back to the cabinet', async (t) => {
+    const cdp = await browser(t, 9410);
+    await open(cdp, 'serpent/index.html', 5000);
+    await evaluate(cdp, "window.dispatchEvent(new ErrorEvent('error', { error: new WebAssembly.RuntimeError('unreachable') })); true");
+    assert.equal(await evaluate(cdp, "document.getElementById('status').textContent"), 'GAME STOPPED');
+    assert.notEqual(await evaluate(cdp, "getComputedStyle(document.getElementById('loader')).display"), 'none');
+    await sleep(3500);
+    assert.equal(await evaluate(cdp, 'location.pathname'), '/index.html');
+
+    // A lost GL context loads the game again, with no dialog to hang on;
+    // nor do the runtime's own alerts raise one.
+    await open(cdp, 'serpent/index.html', 5000);
+    assert.equal(await evaluate(cdp, "alert('x'); 'no dialog'"), 'no dialog');
+    await evaluate(cdp, "window.__mark = 1; document.getElementById('glcanvas').dispatchEvent(new Event('webglcontextlost', { cancelable: true })); true");
+    assert.equal(await evaluate(cdp, "document.getElementById('status').textContent"), 'ONE MOMENT');
+    await sleep(4000);
+    assert.deepEqual([await evaluate(cdp, 'location.pathname'), await evaluate(cdp, 'window.__mark || 0')], ['/serpent/index.html', 0]);
   });
 
   await t.test('no page is wider than a 360px phone', async (t) => {

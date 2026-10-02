@@ -10,6 +10,10 @@
   document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
 });
 
+// The vendored runtime reports its failures with alert(), a dialog nobody
+// at a kiosk can dismiss. They go to the console instead.
+window.alert = function (msg) { try { console.error('[blip] ' + msg); } catch (e) {} };
+
 var TOPBAR_H   = 56;
 var MARQUEE_H  = 28; // reserved header height once #marquee-bar exists
 var FRAME_PAD  = 16; // padding around the canvas on all sides (= bezel width)
@@ -501,7 +505,22 @@ window.onBlipFullscreenChange = function () {
   try { canvas.focus({ preventScroll: true }); } catch (e) {}
 };
 
+// A game that traps (a Rust panic aborts) leaves a frozen picture, and a
+// kiosk has nobody to reload it: say so, then go back to the cabinet.
+var gameStopped = false;
+function onGameStopped(err) {
+  if (gameStopped || typeof WebAssembly === 'undefined' || !(err instanceof WebAssembly.RuntimeError)) return;
+  gameStopped = true;
+  if (loader) loader.style.display = 'flex';
+  if (statusEl) statusEl.textContent = 'GAME STOPPED';
+  if (barInner && barInner.parentNode) barInner.parentNode.style.display = 'none';
+  setTimeout(function () { window.location.href = '../index.html'; }, 2500);
+}
+window.addEventListener('error', function (e) { onGameStopped(e.error); });
+window.addEventListener('unhandledrejection', function (e) { onGameStopped(e.reason); });
+
 function hideLoader() {
+  if (gameStopped) return;
   if (loader && loader.style.display !== 'none') {
     loader.style.display = 'none';
     fillCanvas();
@@ -515,9 +534,22 @@ function hideLoader() {
 })();
 setTimeout(hideLoader, 3000);
 
+// The GPU dropped the picture. An alert would hang a kiosk for good: load
+// the page again, or the cabinet if that was tried in the last half minute.
 canvas.addEventListener('webglcontextlost', function (e) {
   e.preventDefault();
-  alert('WebGL context lost. Please reload the page.');
+  if (gameStopped) return;
+  gameStopped = true;
+  var again = true;
+  try {
+    again = Date.now() - (+sessionStorage.getItem('blip-gl-lost') || 0) > 30000;
+    sessionStorage.setItem('blip-gl-lost', String(Date.now()));
+  } catch (err) {}
+  if (loader) loader.style.display = 'flex';
+  if (statusEl) statusEl.textContent = 'ONE MOMENT';
+  setTimeout(function () {
+    if (again) window.location.reload(); else window.location.href = '../index.html';
+  }, 1200);
 }, false);
 
 // ---- On-screen controls ----

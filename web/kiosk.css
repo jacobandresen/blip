@@ -2999,6 +2999,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
              max(22px, calc(env(safe-area-inset-left, 0px) + 10px));
 }
 
+/* At 320px the slot with its word left 39px for a game's name. */
+@media (max-width: 350px) {
+  .coins-word { display: none; }
+}
+
 /* ---- Fullscreen ---- The button sits left of the coin slot, or right of
    the logo where a game's name leaves no room (kiosk.js sets `left`). */
 #fullscreen-btn, #mute-btn {

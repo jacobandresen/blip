@@ -175,9 +175,10 @@ function saveCoins(n) {
 function updateCoinsHud() {
   var n = getCoins(), icons = '';
   for (var i = 0; i < MAX_COINS; i++) icons += i < n ? '●' : '○';
-  var text = 'COINS ' + icons;
+  // The word is its own span: the narrowest phones drop it (kiosk.css).
+  var html = '<span class="coins-word">COINS </span>' + icons;
   document.querySelectorAll('[data-coins-hud]').forEach(function (el) {
-    el.textContent = text;
+    el.innerHTML = html;
   });
 }
 
