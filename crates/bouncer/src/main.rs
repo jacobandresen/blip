@@ -365,6 +365,7 @@ struct Sounds {
     brick_hit: [blip::BlipSound; 3],
     brick_break: [blip::BlipSound; 3],
     wall_hit: blip::BlipSound,
+    bomb: blip::BlipSound,
     life_lost: blip::BlipSound,
     win: blip::BlipSound,
     pickup_good: blip::BlipSound,
@@ -702,8 +703,9 @@ fn ball_paddle(g: &mut Game, speed: f32, sfx: &Sounds) {
 }
 
 /// Brick `i` breaks: the points (see CHAIN_MAX), the sparks, the ball a
-/// little faster, perhaps a drop. A bomb takes its eight neighbours with it.
-fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds) {
+/// little faster, perhaps a drop. A bomb takes its eight neighbours with it
+/// (`blasted`: this one went that way).
+fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds, blasted: bool) {
     let (row, col) = (i as i32 / BRICK_COLS, i as i32 % BRICK_COLS);
     let (bx, by) = brick_rect(i);
     let (mx, my) = (bx + BRICK_W as f32 / 2.0, by + BRICK_H as f32 / 2.0);
@@ -736,7 +738,9 @@ fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds) {
         };
         pool_spawn(&mut g.drops, Drop { x: drop_x, y: by, active: true, kind: drop_kind });
     }
-    play_variant(&sfx.brick_break, speed);
+    // The blast has one sound of its own: nine bricks at once would clip.
+    if g.bricks[i].kind == BRICK_BOMB { play_sfx(&sfx.bomb); }
+    else if !blasted { play_variant(&sfx.brick_break, speed); }
     if g.bricks[i].kind == BRICK_BOMB {
         g.fx.ring(mx, my, BRICK_W as f32 * 1.4, 0.35, BRICK_COLORS[BRICK_BOMB]);
         g.fx.burst(mx, my, 18, 200.0, BRICK_COLORS[BRICK_BOMB]);
@@ -744,7 +748,7 @@ fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds) {
             let (r, c) = (row + dr, col + dc);
             if r < 0 || r >= BRICK_ROWS || c < 0 || c >= BRICK_COLS { continue; }
             let j = (r * BRICK_COLS + c) as usize;
-            if g.bricks[j].alive { break_brick(g, j, speed, sfx); }
+            if g.bricks[j].alive { break_brick(g, j, speed, sfx, true); }
         }
     }
 }
@@ -804,7 +808,7 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
         g.bricks[i].hp -= 1;
         let (mx, my) = (bx + BRICK_W as f32 / 2.0, by + BRICK_H as f32 / 2.0);
         if g.bricks[i].hp == 0 {
-            break_brick(g, i, speed, sfx);
+            break_brick(g, i, speed, sfx, false);
         } else {
             // Steel brick survived — the cracked texture warns the next hit
             // finishes it.
@@ -1020,6 +1024,7 @@ const BRICK_BREAK_WAV: [&[u8]; 3] = [
     include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_break_2.wav")),
 ];
 const WALL_HIT_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/wall_hit.wav"));
+const BOMB_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bomb.wav"));
 const LIFE_LOST_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/life_lost.wav"));
 const WIN_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/win.wav"));
 const PICKUP_GOOD_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_good.wav"));
@@ -1062,6 +1067,7 @@ async fn main() {
         brick_hit:   load_takes(&BRICK_HIT_WAV).await,
         brick_break: load_takes(&BRICK_BREAK_WAV).await,
         wall_hit:    blip::audio::load_sound(WALL_HIT_WAV).await,
+        bomb:        blip::audio::load_sound(BOMB_WAV).await,
         life_lost:   blip::audio::load_sound(LIFE_LOST_WAV).await,
         win:         blip::audio::load_sound(WIN_WAV).await,
         pickup_good: blip::audio::load_sound(PICKUP_GOOD_WAV).await,

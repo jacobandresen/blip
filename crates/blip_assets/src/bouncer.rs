@@ -494,6 +494,13 @@ fn pickup_life() -> Vec<u8> {
     cosy::jingle_with(&[79, 84, 88, 91, H, 96, H, H], 0.07, Voice::Glock, 0, Some((Voice::Bell, -1)))
 }
 
+/// A bomb brick going off: a soft pop over a low boom tumbling down. One
+/// sound for the whole blast, not nine bricks at once.
+fn bomb_sfx() -> Vec<u8> {
+    let pop = cosy::snap(0.07, 700.0, 0xB0B1);
+    cosy::sfx(&cosy::mix(pop, &cosy::bloop(0.42, 220.0, 55.0, 0xB0B2), 0.01, 1.0))
+}
+
 pub fn generate() -> Vec<Asset> {
     vec![
         ("images/paddle.png", paddle()),
@@ -523,6 +530,7 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/brick_break_1.wav", brick_break(1)),
         ("sounds/brick_break_2.wav", brick_break(2)),
         ("sounds/wall_hit.wav", wall_hit()),
+        ("sounds/bomb.wav", bomb_sfx()),
         ("sounds/life_lost.wav",  life_lost()),
         ("sounds/win.wav",        win()),
         ("sounds/pickup_good.wav", pickup_good()),
