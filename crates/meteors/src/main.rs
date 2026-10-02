@@ -9,11 +9,12 @@ use blip::input::{
     BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::rand::gen_range;
+use blip::macroquad::texture::{FilterMode, Texture2D};
 use blip::{
     GAME_OVER_MIN_WAIT, hsv,
     Jukebox, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, web, window_conf, Blip, Fx,
     BlipColor, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
-    NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
+    NEON_GREEN, NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -60,6 +61,36 @@ const SAUCER_SPAWN_MAX: f32 = 18.0;
 const SAUCER_TELL: f32 = 0.4;
 const WAVE_BANNER_SECS: f32 = 1.6;
 const STORM_WAVE: i32 = 5;
+
+// ---- smear --------------------------------------------------------------
+/// Seconds the smear looks back at wave 0, per wave after, and at most.
+const SMEAR_REACH:     f32 = 0.06;
+const SMEAR_REACH_MAX: f32 = 0.84;
+const SMEAR_ECHOES:    i32 = 10;
+/// Pixels a line must have moved to leave an echo, and to leave a full one.
+const SMEAR_STILL: f32 = 1.0;
+const SMEAR_FULL:  f32 = 6.0;
+const SMEAR_ALPHA: f32 = 0.6;
+
+// ---- haze ---------------------------------------------------------------
+const HAZES: usize = 8;
+/// The wave by which the haze is at its fullest, the black nearly gone.
+const HAZE_FULL_WAVE: i32 = 12;
+/// A patch's alpha at its fullest, on wave 1 and on the full wave.
+const HAZE_ALPHA:     f32 = 0.05;
+const HAZE_ALPHA_MAX: f32 = 0.42;
+/// The same for the mushroom at its centre.
+const SHROOM_ALPHA:     f32 = 0.04;
+const SHROOM_ALPHA_MAX: f32 = 0.50;
+/// Threads join the mushrooms from this wave, and reach for the rocks from
+/// the second; their alpha at first and `THREAD_WAVES` waves on.
+const THREAD_WAVE:      i32 = 3;
+const THREAD_ROCK_WAVE: i32 = 6;
+const THREAD_WAVES:     i32 = 8;
+const THREAD_ALPHA:     f32 = 0.10;
+const THREAD_ALPHA_MAX: f32 = 0.25;
+/// How far a mushroom reaches for a rock.
+const THREAD_REACH: f32 = 240.0;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Play, Dead, Over }
@@ -637,7 +668,7 @@ fn update_over(g: &mut Game, dt: f32) {
     g.start_game();
 }
 
-fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, color: BlipColor) {
+fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, level: i32, color: BlipColor) {
     if invuln_t > 0.0 && (invuln_t * 10.0) as i32 % 2 == 0 { return; }
     let a = ship.angle;
     let fwd = (a.sin(), -a.cos());
@@ -646,10 +677,14 @@ fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, color: BlipColor) {
     let left = (ship.x - fwd.0 * 10.0 - side.0 * 9.0, ship.y - fwd.1 * 10.0 - side.1 * 9.0);
     let right = (ship.x - fwd.0 * 10.0 + side.0 * 9.0, ship.y - fwd.1 * 10.0 + side.1 * 9.0);
     let tail = (ship.x - fwd.0 * 4.0, ship.y - fwd.1 * 4.0);
-    blip.draw_glow_line(nose.0, nose.1, left.0, left.1, color);
-    blip.draw_glow_line(left.0, left.1, tail.0, tail.1, color);
-    blip.draw_glow_line(tail.0, tail.1, right.0, right.1, color);
-    blip.draw_glow_line(right.0, right.1, nose.0, nose.1, color);
+    let hull = [(nose, left), (left, tail), (tail, right), (right, nose)];
+    for (back, age) in smear_echoes(level) {
+        let (dx, dy) = (ship.vx * back, ship.vy * back);
+        for (p, q) in hull {
+            smear_line(blip, (p, q), ((p.0 - dx, p.1 - dy), (q.0 - dx, q.1 - dy)), age, color);
+        }
+    }
+    for (p, q) in hull { blip.draw_glow_line(p.0, p.1, q.0, q.1, color); }
 
     if ship.thrusting {
         let flick = rand_range(0.5, 1.0);
@@ -660,13 +695,28 @@ fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, color: BlipColor) {
 }
 
 // ---- the trip -------------------------------------------------------------
-// Each wave past the first gets a little more psychedelic: the picture
-// smears (the last frame fades instead of clearing), the rocks take on more
-// colours, and from wave 3 more and more of them are flowers.
+// Each wave gets a little more psychedelic: moving lines smear further, the
+// rocks take on more colours, and from wave 3 more and more of them are
+// flowers.
 
-/// How much of the last frame is wiped each frame: 1 is a clean slate.
-fn smear_wipe(level: i32) -> f32 {
-    if level <= 1 { 1.0 } else { (0.72 - 0.12 * (level - 1) as f32).max(0.2) }
+type Seg = ((f32, f32), (f32, f32));
+
+/// The echoes a moving line leaves, oldest first: how many seconds back each
+/// one stands, and how bright it is for its age. Both grow with the wave.
+fn smear_echoes(level: i32) -> impl Iterator<Item = (f32, f32)> {
+    let n = (1 + level).min(SMEAR_ECHOES);
+    let reach = (SMEAR_REACH * (1 + level) as f32).min(SMEAR_REACH_MAX);
+    (1..=n).rev().map(move |e| (reach * e as f32 / n as f32, 1.0 - (e - 1) as f32 / n as f32))
+}
+
+/// One echo of a line: where it was `then`, lit only by how far it has come
+/// since. What moves fast streaks; what stands still stays a sharp line.
+fn smear_line(blip: &Blip, now: Seg, then: Seg, age: f32, c: BlipColor) {
+    let dist = |a: (f32, f32), b: (f32, f32)| ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt();
+    let moved = (dist(now.0, then.0) + dist(now.1, then.1)) * 0.5;
+    if moved < SMEAR_STILL { return; }
+    let lit = ((moved - SMEAR_STILL) / SMEAR_FULL).min(1.0) * age;
+    blip.draw_line_ex(then.0.0, then.0.1, then.1.0, then.1.1, 1.0, BlipColor { a: SMEAR_ALPHA * lit, ..c });
 }
 
 /// A rock's own fixed random number, 0..1, from its shape.
@@ -682,52 +732,172 @@ fn rock_color(a: &Asteroid, level: i32, t: f32) -> BlipColor {
 }
 
 /// From wave 3 a growing share of the rocks are flowers: a quarter, half,
-/// three quarters, then all of them.
+/// three quarters, then nine in ten.
 fn is_flower(a: &Asteroid, level: i32) -> bool {
-    rock_seed(a, 5) < ((level - 2) as f32 * 0.25).clamp(0.0, 1.0)
+    rock_seed(a, 5) < ((level - 2) as f32 * 0.25).clamp(0.0, 0.9)
 }
 
-/// A flower in glowing lines: petals round a bright heart, turning slowly,
-/// the same size as the rock it stands for.
-fn draw_flower(blip: &Blip, a: &Asteroid, c: BlipColor) {
+/// A rock's outline round its own centre, as it is turned now: a flower's
+/// petals (the same size as the rock it stands for) or the jagged ring.
+fn outline(a: &Asteroid, flower: bool) -> Vec<Seg> {
     let r = a.size.radius();
-    let petals = 5 + (rock_seed(a, 1) * 3.0) as i32;
-    for p in 0..petals {
-        let ang = a.rot + p as f32 / petals as f32 * PI * 2.0;
-        let (pcx, pcy) = (a.x + ang.cos() * r * 0.55, a.y + ang.sin() * r * 0.55);
-        let (ux, uy, vx, vy) = (ang.cos(), ang.sin(), -ang.sin(), ang.cos());
-        let mut prev: Option<(f32, f32)> = None;
-        for k in 0..=10 {
-            let t = k as f32 / 10.0 * PI * 2.0;
-            let (ex, ey) = (t.cos() * r * 0.45, t.sin() * r * 0.22);
-            let pt = (pcx + ux * ex + vx * ey, pcy + uy * ex + vy * ey);
-            if let Some(q) = prev { blip.draw_glow_line(q.0, q.1, pt.0, pt.1, c); }
-            prev = Some(pt);
+    if flower {
+        let petals = 5 + (rock_seed(a, 1) * 3.0) as usize;
+        (0..petals * 10).map(|i| {
+            let (uy, ux) = (a.rot + (i / 10) as f32 / petals as f32 * PI * 2.0).sin_cos();
+            let pt = |k: usize| {
+                let (ty, tx) = (k as f32 / 10.0 * PI * 2.0).sin_cos();
+                let (ex, ey) = (r * (0.55 + 0.45 * tx), r * 0.22 * ty);
+                (ux * ex - uy * ey, uy * ex + ux * ey)
+            };
+            (pt(i % 10), pt(i % 10 + 1))
+        }).collect()
+    } else {
+        let n = a.jag.len();
+        let pt = |k: usize| {
+            let (s, c) = (a.rot + (k % n) as f32 / n as f32 * PI * 2.0).sin_cos();
+            (c * r * a.jag[k % n], s * r * a.jag[k % n])
+        };
+        (0..n).map(|i| (pt(i), pt(i + 1))).collect()
+    }
+}
+
+/// A round white blot thinning to nothing at the rim, with no edge to see.
+fn haze_texture() -> Texture2D {
+    const N: usize = 64;
+    let mut px = Vec::with_capacity(N * N * 4);
+    for i in 0..N * N {
+        let (x, y) = ((i % N) as f32 + 0.5, (i / N) as f32 + 0.5);
+        let d2 = (x / N as f32 * 2.0 - 1.0).powi(2) + (y / N as f32 * 2.0 - 1.0).powi(2);
+        px.extend([255, 255, 255, ((1.0 - d2.min(1.0)).powi(2) * 255.0) as u8]);
+    }
+    let tex = Texture2D::from_rgba8(N as u16, N as u16, &px);
+    tex.set_filter(FilterMode::Linear);
+    tex
+}
+
+/// A mushroom in thin lines, its cap `w` to each side, leaning by `lean`.
+fn draw_mushroom(blip: &Blip, x: f32, y: f32, w: f32, lean: f32, c: BlipColor) {
+    let (s, k) = lean.sin_cos();
+    let at = |px: f32, py: f32| (x + (px * k - py * s) * w, y + (px * s + py * k) * w);
+    let line = |p: (f32, f32), q: (f32, f32)| blip.draw_line_ex(p.0, p.1, q.0, q.1, 1.5, c);
+    // part of an ellipse, from angle `a0` to `a1`, in `n` lines
+    let arc = |cx: f32, cy: f32, rx: f32, ry: f32, a0: f32, a1: f32, n: usize| {
+        let pt = |j: usize| {
+            let (sn, cs) = (a0 + (a1 - a0) * j as f32 / n as f32).sin_cos();
+            at(cx + cs * rx, cy + sn * ry)
+        };
+        for j in 0..n { line(pt(j), pt(j + 1)); }
+    };
+    arc(0.0, -0.2, 1.0, 0.85, PI, PI * 2.0, 12); // the cap
+    arc(0.0, -0.2, 1.0, 0.18, 0.0, PI, 8);       // its underside
+    line(at(-0.26, -0.03), at(-0.36, 0.9));      // the stalk
+    line(at(0.26, -0.03), at(0.36, 0.9));
+    arc(0.0, 0.9, 0.36, 0.1, 0.0, PI, 5);
+    for (sx, sy, sr) in [(-0.45, -0.58, 0.16), (0.1, -0.75, 0.2), (0.55, -0.45, 0.12)] {
+        arc(sx, sy, sr, sr * 0.8, 0.0, PI * 2.0, 8);
+    }
+}
+
+/// A thread from `p` to `q`, shading from `c0` to `c1`: a faint bowed line
+/// with a brighter pulse `pulse` of the way along it.
+fn draw_thread(blip: &Blip, p: (f32, f32), q: (f32, f32), bow: f32, pulse: f32, c0: BlipColor, c1: BlipColor, a: f32) {
+    const N: usize = 14;
+    let (dx, dy) = (q.0 - p.0, q.1 - p.1);
+    let at = |u: f32| {
+        let b = 4.0 * u * (1.0 - u) * bow;
+        (p.0 + dx * u - dy * b, p.1 + dy * u + dx * b)
+    };
+    for j in 0..N {
+        let u = j as f32 / N as f32;
+        let (m, n) = (at(u), at(u + 1.0 / N as f32));
+        let lit = 1.0 + 2.0 * (1.0 - ((u - pulse).abs() * 6.0).min(1.0));
+        let mix = |x: f32, y: f32| x + (y - x) * u;
+        blip.draw_line(m.0, m.1, n.0, n.1,
+            BlipColor { r: mix(c0.r, c1.r), g: mix(c0.g, c1.g), b: mix(c0.b, c1.b), a: a * lit });
+    }
+}
+
+/// Green and purple patches behind the field, a mushroom at the heart of
+/// each, wandering and coming and going on clocks of their own. Wave by wave
+/// they fill out, swell and stay, until little of the black is left. From
+/// wave 3 threads run between the mushrooms, and later out to the rocks.
+fn draw_haze(blip: &Blip, blot: &Texture2D, rocks: &[Asteroid], level: i32, t: f32) {
+    let full = ((level - 1) as f32 / (HAZE_FULL_WAVE - 1) as f32).clamp(0.0, 1.0);
+    let patch = |i: usize| {
+        let k = i as f32;
+        let x = PLAY_W as f32 * (0.5 + 0.45 * (t * (0.05 + 0.011 * k) + k * 2.4).sin());
+        let y = PLAY_Y0 + PLAY_H as f32 * (0.5 + 0.45 * (t * (0.04 + 0.013 * k) + k * 1.7).cos());
+        let r = 200.0 + 70.0 * (k * 1.3).sin();
+        // squared, so on the early waves each is gone a while between showings
+        let fade = (0.5 + 0.5 * (t * (0.21 + 0.03 * k) + k * 1.9).sin()).powi(2);
+        (x, y, r, 0.7 * full + (1.0 - 0.7 * full) * fade, if i % 2 == 0 { NEON_GREEN } else { NEON_PURPLE })
+    };
+    for i in 0..HAZES {
+        let (x, y, r, fade, c) = patch(i);
+        let r = r * (1.0 + 0.6 * full);
+        // purple is the darker of the two to the eye, so it is laid on thicker
+        let a = (HAZE_ALPHA + (HAZE_ALPHA_MAX - HAZE_ALPHA) * full) * if i % 2 == 0 { 1.0 } else { 1.5 };
+        blip.draw_texture_tinted(blot, x - r, y - r, r * 2.0, r * 2.0, BlipColor { a: a * fade, ..c });
+    }
+    if level >= THREAD_WAVE {
+        let grown = ((level - THREAD_WAVE) as f32 / THREAD_WAVES as f32).min(1.0);
+        let a = THREAD_ALPHA + (THREAD_ALPHA_MAX - THREAD_ALPHA) * grown;
+        // from the foot of the stalk
+        let foot = |i: usize| { let (x, y, r, fade, c) = patch(i); ((x, y + r * 0.13), fade, c) };
+        for i in 0..HAZES {
+            let k = i as f32;
+            let (p, fade, c) = foot(i);
+            // each to the next, and two waves on to one across the ring as well
+            for (n, step) in [1, 3].into_iter().enumerate().take(if level >= THREAD_WAVE + 2 { 2 } else { 1 }) {
+                let (q, fade2, c2) = foot((i + step) % HAZES);
+                let bow = 0.12 * (t * 0.3 + k + n as f32 * 2.0).sin();
+                draw_thread(blip, p, q, bow, (t * 0.15 + k * 0.37 + n as f32 * 0.5).fract(), c, c2, a * fade.min(fade2));
+            }
+            if level < THREAD_ROCK_WAVE { continue; }
+            let near = pool_iter(rocks)
+                .map(|rock| (rock, (rock.x - p.0).hypot(rock.y - p.1)))
+                .filter(|&(_, d)| d < THREAD_REACH)
+                .min_by(|m, n| m.1.total_cmp(&n.1));
+            if let Some((rock, d)) = near {
+                // thinning out as the rock gets away
+                let hold = (1.0 - d / THREAD_REACH) * 0.6;
+                draw_thread(blip, p, (rock.x, rock.y), 0.1 * (t * 0.4 + k).sin(), (t * 0.3 + k * 0.61).fract(),
+                    c, rock_color(rock, level, t), a * fade * hold);
+            }
         }
     }
-    let heart = hsv(0.14 + rock_seed(a, 2) * 0.1, 0.8, 1.0, 1.0);
-    blip.fill_glow_circle(a.x, a.y, r * 0.2, heart);
+    for i in 0..HAZES {
+        let (x, y, r, fade, c) = patch(i);
+        let a = SHROOM_ALPHA + (SHROOM_ALPHA_MAX - SHROOM_ALPHA) * full;
+        let lean = 0.12 * (t * 0.5 + i as f32).sin();
+        draw_mushroom(blip, x, y, r * 0.14, lean, BlipColor { a: a * fade, ..c });
+    }
 }
 
 fn draw_asteroid(blip: &Blip, a: &Asteroid, level: i32, t: f32) {
     let c = rock_color(a, level, t);
-    if is_flower(a, level) { draw_flower(blip, a, c); return; }
-    let n = a.jag.len();
-    let r = a.size.radius();
-    let mut prev: Option<(f32, f32)> = None;
-    for i in 0..=n {
-        let idx = i % n;
-        let ang = a.rot + (idx as f32 / n as f32) * PI * 2.0;
-        let rr = r * a.jag[idx];
-        let pt = (a.x + ang.cos() * rr, a.y + ang.sin() * rr);
-        if let Some(p) = prev {
-            blip.draw_glow_line(p.0, p.1, pt.0, pt.1, c);
-        }
-        prev = Some(pt);
+    let flower = is_flower(a, level);
+    let lines = outline(a, flower);
+    let at = |p: (f32, f32)| (a.x + p.0, a.y + p.1);
+    for (back, age) in smear_echoes(level) {
+        // Where the rock was: drifted back, and turned back about its centre.
+        let (ox, oy) = (a.x - a.vx * back, a.y - a.vy * back);
+        let (s, k) = (-a.spin * back).sin_cos();
+        let was = |p: (f32, f32)| (ox + p.0 * k - p.1 * s, oy + p.0 * s + p.1 * k);
+        for &(p, q) in &lines { smear_line(blip, (at(p), at(q)), (was(p), was(q)), age, c); }
+    }
+    for &(p, q) in &lines {
+        let (p, q) = (at(p), at(q));
+        blip.draw_glow_line(p.0, p.1, q.0, q.1, c);
+    }
+    if flower {
+        let heart = hsv(0.14 + rock_seed(a, 2) * 0.1, 0.8, 1.0, 1.0);
+        blip.fill_glow_circle(a.x, a.y, a.size.radius() * 0.2, heart);
     }
 }
 
-fn draw_saucer(blip: &Blip, s: &Saucer) {
+fn draw_saucer(blip: &Blip, s: &Saucer, level: i32) {
     let r = if s.big { 16.0 } else { 9.0 };
     // A shot is coming: the core lights up and swells just before it fires.
     if s.fire_t < SAUCER_TELL {
@@ -737,8 +907,7 @@ fn draw_saucer(blip: &Blip, s: &Saucer) {
     let w = r * 2.6;
     let dw = r * 1.1;
     let h = r * 0.5;
-    let (x, y) = (s.x, s.y);
-    let pts = [
+    let hull = |x: f32, y: f32| [
         (x - w / 2.0, y),
         (x - dw / 2.0, y - h),
         (x + dw / 2.0, y - h),
@@ -746,6 +915,14 @@ fn draw_saucer(blip: &Blip, s: &Saucer) {
         (x + dw / 2.0, y + h),
         (x - dw / 2.0, y + h),
     ];
+    let pts = hull(s.x, s.y);
+    for (back, age) in smear_echoes(level) {
+        let was = hull(s.x - s.vx * back, s.y - (s.wave_t * 2.0).sin() * 24.0 * back);
+        for i in 0..pts.len() {
+            let j = (i + 1) % pts.len();
+            smear_line(blip, (pts[i], pts[j]), (was[i], was[j]), age, NEON_PINK);
+        }
+    }
     for i in 0..pts.len() {
         let p0 = pts[i];
         let p1 = pts[(i + 1) % pts.len()];
@@ -774,21 +951,27 @@ fn draw_horizon_grid(blip: &Blip, y0: f32, y1: f32) {
     }
 }
 
-fn draw_play(blip: &Blip, g: &Game) {
+fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
     let t = blip::macroquad::time::get_time() as f32;
-    if blip.keep_frame {
-        blip.fill_rect(0.0, 0.0, WIN_W as f32, WIN_H as f32, BlipColor { a: smear_wipe(g.sess.level), ..BLIP_BLACK });
-    } else {
-        blip.clear(BLIP_BLACK);
-    }
+    blip.clear(BLIP_BLACK);
+    draw_haze(blip, blot, &g.asteroids, g.sess.level, t);
     for a in pool_iter(&g.asteroids) { draw_asteroid(blip, a, g.sess.level, t); }
     for d in pool_iter(&g.debris) {
-        let (s, c) = d.rot.sin_cos();
         let h = d.len * 0.5;
         let col = BlipColor { a: d.ttl / d.ttl0, ..d.color };
-        blip.draw_line(d.x - c * h, d.y - s * h, d.x + c * h, d.y + s * h, col);
+        let shard = |back: f32| {
+            let (x, y) = (d.x - d.vx * back, d.y - d.vy * back);
+            let (s, c) = (d.rot - d.spin * back).sin_cos();
+            ((x - c * h, y - s * h), (x + c * h, y + s * h))
+        };
+        let (p, q) = shard(0.0);
+        // no echo from before the burst
+        for (back, age) in smear_echoes(g.sess.level).filter(|e| e.0 < d.ttl0 - d.ttl) {
+            smear_line(blip, (p, q), shard(back), age, col);
+        }
+        blip.draw_line(p.0, p.1, q.0, q.1, col);
     }
-    if g.saucer.active { draw_saucer(blip, &g.saucer); }
+    if g.saucer.active { draw_saucer(blip, &g.saucer, g.sess.level); }
     g.fx.draw(blip);
     if g.wave_t < WAVE_BANNER_SECS && g.state == State::Play {
         let a = (1.0 - g.wave_t / WAVE_BANNER_SECS).min(0.5) * 2.0;
@@ -798,10 +981,14 @@ fn draw_play(blip: &Blip, g: &Game) {
         // from wave 3 the ship's shots run through the rainbow
         let c = if !b.from_player { NEON_PINK }
             else if g.sess.level >= 3 { hsv(t * 0.8 + b.x * 0.004, 0.6, 1.0, 1.0) } else { NEON_YELLOW };
+        // a shot's echoes are dots, back to the muzzle and no further
+        for (back, age) in smear_echoes(g.sess.level).filter(|e| e.0 < BULLET_TTL - b.ttl) {
+            blip.fill_circle(b.x - b.vx * back, b.y - b.vy * back, 1.0, BlipColor { a: SMEAR_ALPHA * age, ..c });
+        }
         blip.fill_glow_circle(b.x, b.y, 2.0, c);
     }
     if g.ship_alive {
-        draw_ship(blip, &g.ship, g.invuln_t, NEON_CYAN);
+        draw_ship(blip, &g.ship, g.invuln_t, g.sess.level, NEON_CYAN);
     }
     blip.draw_hud(g.sess.score, g.sess.lives);
     // x=12 clears the shell's 3px canvas clip, which eats more of this wider canvas's units.
@@ -847,6 +1034,7 @@ const SHIP_EXPLOSION_WAV: &[u8] =
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
+    let blot = haze_texture();
 
     // DRIFT, then STORM from wave STORM_WAVE (synthesised here, see blip_assets::meteors).
     let mut music = Jukebox::new(&[blip_assets::meteors::drift_wav, blip_assets::meteors::storm_wav]);
@@ -894,12 +1082,10 @@ async fn main() {
             State::Over  => update_over(&mut g, dt),
         }
 
-        // the smear (see smear_wipe) is for play, from wave 2
-        blip.keep_frame = matches!(g.state, State::Play | State::Dead) && g.sess.level >= 2;
         match g.state {
             State::Title => draw_title(&blip, &web::high_score()),
             State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.respawn_t.active()),
-            State::Play | State::Dead => draw_play(&blip, &g),
+            State::Play | State::Dead => draw_play(&blip, &g, &blot),
         }
 
         blip.next_frame(60).await;
