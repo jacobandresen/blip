@@ -538,6 +538,13 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
         b.x += b.vx * dt;
         b.y += b.vy * dt;
         b.ttl -= dt;
+        // The ship's shots wrap like everything else in the field, so a rock
+        // across the edge can be hit; the saucer's leave, or they would come
+        // back from behind with no warning.
+        if b.from_player {
+            b.x = wrap(b.x, 0.0, PLAY_W as f32);
+            b.y = wrap(b.y, PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
+        }
         if b.ttl <= 0.0 || b.x < 0.0 || b.x > PLAY_W as f32 || b.y < PLAY_Y0 || b.y > PLAY_Y0 + PLAY_H as f32 {
             b.active = false;
         }
@@ -983,7 +990,12 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
             else if g.sess.level >= 3 { hsv(t * 0.8 + b.x * 0.004, 0.6, 1.0, 1.0) } else { NEON_YELLOW };
         // a shot's echoes are dots, back to the muzzle and no further
         for (back, age) in smear_echoes(g.sess.level).filter(|e| e.0 < BULLET_TTL - b.ttl) {
-            blip.fill_circle(b.x - b.vx * back, b.y - b.vy * back, 1.0, BlipColor { a: SMEAR_ALPHA * age, ..c });
+            let (ex, ey) = (b.x - b.vx * back, b.y - b.vy * back);
+            // a shot's own echoes follow it round the wrap
+            let (ex, ey) = if b.from_player {
+                (wrap(ex, 0.0, PLAY_W as f32), wrap(ey, PLAY_Y0, PLAY_Y0 + PLAY_H as f32))
+            } else { (ex, ey) };
+            blip.fill_circle(ex, ey, 1.0, BlipColor { a: SMEAR_ALPHA * age, ..c });
         }
         blip.fill_glow_circle(b.x, b.y, 2.0, c);
     }

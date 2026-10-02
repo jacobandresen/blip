@@ -1111,4 +1111,35 @@ mod tests {
         // The view-facing point (0,0,1) should move toward +x.
         assert!(g.ball_rot[0][2] > 0.0 && g.ball_rot[1][2].abs() < 1e-4);
     }
+
+    #[test]
+    fn a_multi_makes_three_balls_at_the_same_speed_none_of_them_flat() {
+        let mut g = Game::new();
+        (g.ball_x, g.ball_y, g.ball_vx, g.ball_vy) = (200.0, 300.0, 240.0, -20.0);
+        g.split_ball();
+        assert_eq!(1 + g.extra.len(), MULTI_BALLS);
+        let speed = g.ball_vx.hypot(g.ball_vy);
+        for b in &g.extra {
+            assert!((b.x, b.y) == (200.0, 300.0), "a copy started somewhere else");
+            assert!(b.vy.abs() >= speed * 0.3 - 0.01, "a copy left along the paddle line: vy {}", b.vy);
+            assert!(b.vx.hypot(b.vy) < speed * 1.2, "a copy left faster than the ball: {}", b.vx.hypot(b.vy));
+        }
+        // A second pickup with three in play adds none.
+        g.split_ball();
+        assert_eq!(1 + g.extra.len(), MULTI_BALLS);
+        // A new ball starts alone.
+        g.launch_ball();
+        assert!(g.extra.is_empty());
+    }
+
+    #[test]
+    fn swapping_a_ball_in_and_out_leaves_both_as_they_were() {
+        let mut g = Game::new();
+        (g.ball_x, g.ball_vx) = (10.0, 1.0);
+        g.extra.push(Ball { x: 99.0, vx: -7.0, ..g.ball() });
+        g.swap_ball(0);
+        assert_eq!((g.ball_x, g.ball_vx, g.extra[0].x, g.extra[0].vx), (99.0, -7.0, 10.0, 1.0));
+        g.swap_ball(0);
+        assert_eq!((g.ball_x, g.ball_vx, g.extra[0].x, g.extra[0].vx), (10.0, 1.0, 99.0, -7.0));
+    }
 }

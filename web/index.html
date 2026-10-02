@@ -721,6 +721,11 @@
     /* Fullscreen on a PC: the keyboard picks the game, so the deck goes too. */
     :root[data-fullscreen] #kiosk-bar { display: none; }
     :root[data-fullscreen] body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+    /* A kiosk's wide screen shows the whole catalogue at once: eight across. */
+    @media (min-width: 1700px) {
+      :root[data-fullscreen] .screen-bezel { max-width: calc(100vw - 170px); }
+      :root[data-fullscreen] .game-grid { grid-template-columns: repeat(8, 1fr); max-width: none; gap: 16px; }
+    }
 
 
   </style>

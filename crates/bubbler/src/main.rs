@@ -74,7 +74,7 @@ const JUMP_TELL: f32 = 0.22;
 const EXTEND_MAX: i32 = 7; // lives a round clear can top a player up to
 const SPARK_V: f32 = 95.0;
 
-const ROUNDS: usize = 5;
+const ROUNDS: usize = 6;
 
 // '#' block, A / B player spawns, w walker, h hopper, g ghost.
 const LEVELS: [[&str; ROWS]; ROUNDS] = [
@@ -208,6 +208,32 @@ const LEVELS: [[&str; ROWS]; ROUNDS] = [
         "#A......................B#",
         "###########....###########",
     ],
+    [
+        "###########....###########",
+        "#........................#",
+        "#...........g............#",
+        "#...g................g...#",
+        "#........................#",
+        "#........................#",
+        "#....h......w.......h....#",
+        "#..######.######.######..#",
+        "#........................#",
+        "#........................#",
+        "#...w................w...#",
+        "##########......##########",
+        "#........................#",
+        "#........................#",
+        "#.......w........h.......#",
+        "#....#######..#######....#",
+        "#........................#",
+        "#........................#",
+        "#..w........w.........w..#",
+        "#######...######...#######",
+        "#........................#",
+        "#........................#",
+        "#A......................B#",
+        "###########....###########",
+    ],
 ];
 
 /// Per round: sky top, sky bottom, block, block light, block dark, bokeh.
@@ -218,6 +244,7 @@ const PALETTES: [Palette; ROUNDS] = [
     Palette { sky0: (30, 16, 8), sky1: (70, 36, 16), block: (250, 180, 60), light: (255, 230, 150), dark: (170, 100, 20), glow: (255, 200, 90) },
     Palette { sky0: (8, 30, 18), sky1: (16, 70, 40), block: (110, 220, 110), light: (190, 255, 180), dark: (40, 130, 60), glow: (150, 255, 150) },
     Palette { sky0: (26, 6, 30), sky1: (60, 10, 50), block: (190, 110, 250), light: (230, 190, 255), dark: (110, 50, 170), glow: (220, 150, 255) },
+    Palette { sky0: (36, 10, 18), sky1: (84, 26, 40), block: (255, 120, 120), light: (255, 196, 186), dark: (170, 56, 70), glow: (255, 150, 140) },
 ];
 
 fn col(c: (u8, u8, u8), a: f32) -> BlipColor { BlipColor::new(c.0 as f32 / 255.0, c.1 as f32 / 255.0, c.2 as f32 / 255.0, a) }
@@ -324,7 +351,7 @@ struct Shot { x: f32, y: f32, vx: f32, vy: f32, t: f32, spark: bool, active: boo
 /// Tallies for a playtest run (printed by the native autopilot).
 #[derive(Default, Clone)]
 struct Stats { traps: u32, escapes: u32, pops: u32, kills: u32, chains: [u32; 6], fruit: u32,
-    deaths_enemy: u32, deaths_skull: u32, deaths_by: [u32; 3], deaths_round: [u32; 5], hurries: u32, skulls: u32, bounces: u32 }
+    deaths_enemy: u32, deaths_skull: u32, deaths_by: [u32; 3], deaths_round: [u32; ROUNDS], hurries: u32, skulls: u32, bounces: u32 }
 
 struct Game {
     stats: Stats,

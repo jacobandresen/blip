@@ -279,4 +279,25 @@ mod tests {
         let secs = samples as f32 / (crate::wav::SAMPLE_RATE / 2) as f32;
         assert!((secs - song.duration()).abs() < 0.01, "{secs} s rendered for a {} s song", song.duration());
     }
+
+    fn pcm(wav: &[u8]) -> Vec<i16> {
+        wav[44..].chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]])).collect()
+    }
+
+    #[test]
+    fn an_action_song_is_brighter_than_a_cosy_one_and_does_not_clip() {
+        let tune = |action| Song {
+            bpm: 140.0, melody: &[[72, H, 76, H, 79, H, 76, H]; 4], chords: &[[minor(45); 2]; 4],
+            lead: Voice::Saw, bass_voice: Voice::Growl, groove: Groove::Drive, action, ..Song::DEFAULT
+        }.render();
+        // Sample-to-sample movement is a cheap measure of what is left above 3 kHz.
+        let edge = |wav: &[u8]| {
+            let s = pcm(wav);
+            s.windows(2).map(|w| (w[1] as f64 - w[0] as f64).abs()).sum::<f64>() / s.len() as f64
+        };
+        let (cosy, action) = (tune(false), tune(true));
+        assert!(edge(&action) > edge(&cosy) * 1.25, "the action mix kept no more edge: {} against {}", edge(&action), edge(&cosy));
+        let peak = pcm(&action).iter().map(|v| v.unsigned_abs()).max().unwrap();
+        assert!(peak < 31_500, "the action mix clips at {peak}");
+    }
 }

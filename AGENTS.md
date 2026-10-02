@@ -22,6 +22,8 @@ change will be overwritten the next time the project is built.
 | Shared coin state (`getCoins`, `saveCoins`, `updateCoinsHud`), layout rule | `web/kiosk.js` |
 | Bottom control deck markup (stations, stick, pad, caps) — one builder for every page | `web/deck.js` |
 | Kiosk / landing page | `web/index.html` |
+| Fullscreen button and the stored choice (`blip-fullscreen`), on every page | `web/kiosk.js` |
+| What fullscreen hides on a game page; the idle return to the cabinet | `web/shell.css`, `web/shell.js` |
 | Wasm <-> JS bridge (`blip_spend_coin`) | `web/blip_bridge.js` |
 | macroquad JS runtime (vendored, do not edit) | `web/mq_js_bundle.js` |
 | Game logic, rendering, audio (Rust side) | `crates/<name>/src/main.rs` |
@@ -34,7 +36,7 @@ change will be overwritten the next time the project is built.
 | Score popups, bursts, rings (`blip::Fx`) | `crates/blip/src/fx.rs` |
 | Music playback (`blip::Jukebox`) | `crates/blip/src/audio.rs` |
 | Asset generators (sprites + WAV) | `crates/blip_assets/src/<game>.rs` |
-| Songs written as note data (`Song`) | `crates/blip_assets/src/song.rs` |
+| Songs written as note data (`Song`); `action: true` for the action games' mix | `crates/blip_assets/src/song.rs` |
 | Effect voices, one instrument per game | `crates/blip_assets/src/cosy.rs` |
 | Native playtest autopilot | `crates/blip/src/bot.rs`, `crates/<name>/src/bot.rs` |
 | Per-game asset build step | `crates/<name>/build.rs` |
