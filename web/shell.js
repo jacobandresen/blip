@@ -12,7 +12,7 @@
 
 var TOPBAR_H   = 56;
 var MARQUEE_H  = 28; // reserved header height once #marquee-bar exists
-var PAD        = 16; // padding around the canvas on all sides (= bezel width)
+var FRAME_PAD  = 16; // padding around the canvas on all sides (= bezel width)
 
 var loader    = document.getElementById('loader');
 var barInner  = document.getElementById('bar-inner');
@@ -382,14 +382,23 @@ function deckCover(bar) {
   return Math.ceil(window.innerHeight - top) + 4;
 }
 
+/** Fullscreen on a PC: no deck and no cabinet frame, so the picture runs to
+ * the edges under the top bar (see #fullscreen-btn in shell.css). */
+function bareScreen() {
+  return document.documentElement.hasAttribute('data-fullscreen') && !blipHasTouch();
+}
+
 var lastFit = '';
 function fillCanvas() {
   applyLayout();
   var tb = document.getElementById('topbar');
+  var bare = bareScreen();
+  // The frame is FRAME_PAD wide; without it the picture needs no margin.
+  var PAD = bare ? 0 : FRAME_PAD;
   // Sideways the deck sits in the letterbox and takes no height. Upright,
   // reserve what the deck covers (caps sit proud of the bar), not the bar's
   // height.
-  TOPBAR_H = landscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
+  TOPBAR_H = bare || landscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
   var mb = document.getElementById('marquee-bar');
   MARQUEE_H = mb ? Math.max(mb.offsetHeight, 28) : 0;
   // Sideways the controls stand in the two gutters; keep the picture out
@@ -414,6 +423,17 @@ function fillCanvas() {
   canvas.style.setProperty('transform', 'none', 'important');
   // The controls position themselves off --topbar-h, the bar's real height.
   document.documentElement.style.setProperty('--topbar-h', TOPBAR_H + 'px');
+  syncBuffer();
+}
+
+/** The macroquad runtime sizes the canvas's drawing buffer on a window
+ * resize only (its window.onresize). A layout change that moves the canvas
+ * without one (fullscreen on or off, another controller) would leave the
+ * game drawing for the old size, stretched into the new box. */
+function syncBuffer() {
+  if (canvas.width === canvas.clientWidth && canvas.height === canvas.clientHeight) return;
+  if (typeof window.onresize !== 'function') return;
+  try { window.onresize(); } catch (e) { /* the game has not loaded yet */ }
 }
 
 /** Re-fit only when something actually changed. The deck is watched by
@@ -446,6 +466,72 @@ if (typeof ResizeObserver === 'function') {
     if (el) deckWatch.observe(el);
   });
 }
+
+// ---- Fullscreen ----
+// The button toggles <html data-fullscreen> and, where the browser can, real
+// fullscreen with it. Esc (or the browser's own way out) turns both off.
+(function () {
+  var btn = document.getElementById('fullscreen-btn');
+  if (!btn) return;
+  var root = document.documentElement;
+  var enter = root.requestFullscreen || root.webkitRequestFullscreen;
+  var leave = document.exitFullscreen || document.webkitExitFullscreen;
+  function inBrowserFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  // A touch screen keeps its whole layout, so without real fullscreen
+  // (iPhone) the button would do nothing.
+  if (blipHasTouch() && !enter) { btn.hidden = true; return; }
+
+  // Left of the coin slot; on a phone the game's name reaches that far, so
+  // it goes right of the logo instead.
+  function place() {
+    var coin = document.getElementById('insert-coin-btn');
+    var name = document.getElementById('marquee-name');
+    var logo = document.querySelector('.blip-logo');
+    if (!coin) return;
+    var w = btn.offsetWidth || 34;
+    var left = coin.getBoundingClientRect().left - w - 2;
+    if (name && logo && name.getBoundingClientRect().right > left) left = logo.getBoundingClientRect().right + 2;
+    btn.style.left = Math.round(left) + 'px';
+  }
+  function set(on) {
+    root.toggleAttribute('data-fullscreen', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.title = on ? 'Exit fullscreen' : 'Fullscreen';
+    btn.setAttribute('aria-label', btn.title);
+    fillCanvas();
+  }
+  btn.addEventListener('click', function () {
+    var on = !root.hasAttribute('data-fullscreen');
+    set(on);
+    try {
+      var p = on ? (enter && enter.call(root))
+                 : (inBrowserFullscreen() && leave && leave.call(document));
+      // Refused (an embedded page, say): the layout still changes.
+      if (p && p.catch) p.catch(function () {});
+    } catch (e) {}
+    try { canvas.focus({ preventScroll: true }); } catch (e) {}
+  });
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) {
+    document.addEventListener(ev, function () {
+      if (!inBrowserFullscreen() && root.hasAttribute('data-fullscreen')) set(false);
+      place();
+    });
+  });
+  window.addEventListener('resize', place);
+  // The logo and the slot settle after their fonts and boot animation.
+  if (typeof ResizeObserver === 'function') {
+    var settle = new ResizeObserver(place);
+    ['.blip-logo', '#insert-coin-btn', '#marquee-name'].forEach(function (sel) {
+      var el = document.querySelector(sel);
+      if (el) settle.observe(el);
+    });
+  }
+  var bootLogo = document.querySelector('.blip-logo');
+  if (bootLogo) bootLogo.addEventListener('animationend', place);
+  place();
+}());
 
 function hideLoader() {
   if (loader && loader.style.display !== 'none') {
@@ -487,7 +573,9 @@ var isRally = window.location.pathname.indexOf('/rally/') !== -1;
 }());
 
 // Block the real keyboard from reaching the game while the coin wall is up.
+// Not the high-score prompt's: its Enter and Escape are for the name field.
 window.addEventListener('keydown', function (e) {
+  if (e.target && e.target.closest && e.target.closest('.blip-hs-modal')) return;
   if (overlay.classList.contains('visible')) e.stopImmediatePropagation();
 }, true);
 
@@ -749,7 +837,7 @@ window.addEventListener('keydown', function (e) {
     }
     function ignored(e) {
       return e.target && e.target.closest &&
-        e.target.closest('a, button, #need-coin-overlay, #rotate-hint, #control-toggle');
+        e.target.closest('a, button, #need-coin-overlay, #rotate-hint, #control-toggle, .blip-hs-modal');
     }
 
     // A PC plays the trackpad like a laptop's: the pointer moves the paddle

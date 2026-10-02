@@ -267,6 +267,66 @@ canvas {
   gap: 9px;
 }
 
+/* ---- Fullscreen ---- The button sits left of the coin slot, or right of
+   the logo where the game's name leaves no room (shell.js sets `left`). */
+#fullscreen-btn {
+  position: fixed;
+  top: 0;
+  z-index: 500;
+  box-sizing: border-box;
+  height: calc(var(--marquee-h) + env(safe-area-inset-top, 0px));
+  width: 34px;
+  margin: 0;
+  padding: env(safe-area-inset-top, 0px) 0 0;
+  border: 0;
+  background: none;
+  color: #cfc94a;
+  opacity: 0.7;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+#fullscreen-btn[hidden] { display: none; }
+#fullscreen-btn:hover, #fullscreen-btn:focus-visible { opacity: 1; }
+#fullscreen-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  filter: drop-shadow(0 0 3px rgba(230, 220, 50, 0.7));
+}
+#fullscreen-btn .fs-exit,
+:root[data-fullscreen] #fullscreen-btn .fs-enter { display: none; }
+:root[data-fullscreen] #fullscreen-btn .fs-exit { display: inline; }
+:root[data-fullscreen] #fullscreen-btn { color: #7be07b; opacity: 1; }
+
+/* Fullscreen on a PC is the top bar and the picture: the keyboard plays, so
+   the deck, its picker and the cabinet frame go. A touch screen keeps them
+   (data-has-touch), since the deck is what it plays on. */
+:root[data-fullscreen]:not([data-has-touch]) :is(#topbar, #control-toggle, #arcade-bezel, .bezel-screw) {
+  display: none;
+}
+/* No cabinet behind the picture either. */
+:root[data-fullscreen]:not([data-has-touch]) body { background: #000; }
+/* The picture starts right under the bar and runs to every edge, so nothing
+   may lap over it: no vignette, no edge trim, and the bar's glows, the coin
+   slot's swell and the logo's hint are cut off at the bar's own bottom. */
+:root[data-fullscreen]:not([data-has-touch]) body::after { display: none; }
+:root[data-fullscreen]:not([data-has-touch]) canvas { clip-path: none; }
+:root[data-fullscreen]:not([data-has-touch]) #marquee-bar { box-shadow: none; }
+:root[data-fullscreen]:not([data-has-touch]) :is(.blip-logo, #insert-coin-btn, #fullscreen-btn) {
+  clip-path: inset(0 -80px);
+  transform: none !important;   /* beats the beckon's scale */
+}
+:root[data-fullscreen]:not([data-has-touch]) .blip-logo .logo-hint { display: none; }
+@media (max-width: 480px) {
+  #fullscreen-btn { width: 26px; }
+}
+
 /* ---- "MORE GAMES" nudge ---- shell.js adds .logo-hint in .blip-logo and
    toggles .show-hint after ~12s without input. Just under the logo; pixel
    font, phosphor green, a blinking caret; the logo <a> is the link. */
@@ -604,6 +664,10 @@ canvas {
   letter-spacing: 3px;
   text-align: center;
   text-transform: uppercase;
+  /* <html> turns selection off for the whole page; iOS will not type into a
+     field that inherits it. */
+  -webkit-user-select: text;
+  user-select: text;
 }.blip-hs-input:focus { outline: none; border-color: #ffd94a; }.blip-hs-code {
   margin: 10px 0 2px;
   padding: 12px 8px;
@@ -617,6 +681,8 @@ canvas {
   text-align: center;
   word-break: break-all;
   text-shadow: 0 0 8px rgba(120, 220, 255, 0.55);
+  -webkit-user-select: text;   /* the code is there to be copied */
+  user-select: text;
 }.blip-hs-list {
   list-style: none;
   margin: 8px 0 4px;
