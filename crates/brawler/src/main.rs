@@ -273,11 +273,12 @@ async fn main() {
             }
             _ => None,
         };
-        // A stage's theme is rendered when its billing first comes up: the
-        // half second it takes hides behind a still picture. Warming all
-        // seven up on the title froze it seven times in its first seconds.
+        // A stage's theme is rendered when it is first wanted, which is at a
+        // billing, a round's intro or the start of a bonus round: the half
+        // second it takes hides behind a still picture, never inside a fight.
+        // Warming all seven up on the title froze it seven times.
         match want {
-            Some(track) if g.state == State::Vs && !music.ready(track) => music.start(track).await,
+            Some(track) if g.state != State::Fight && !music.ready(track) => music.start(track).await,
             Some(track) => music.play(track),
             None => {}
         }
