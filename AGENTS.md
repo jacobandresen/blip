@@ -24,6 +24,7 @@ change will be overwritten the next time the project is built.
 | Bottom control deck markup (stations, stick, pad, caps) — one builder for every page | `web/deck.js` |
 | Kiosk / landing page | `web/index.html` |
 | Fullscreen button and the stored choice (`blip-fullscreen`), on every page | `web/kiosk.js` |
+| Sound on / off (`blip-mute`); `blipOut(ctx)`, where the cabinet's own sounds must connect | `web/kiosk.js` |
 | What fullscreen hides on a game page; the idle return to the cabinet | `web/shell.css`, `web/shell.js` |
 | Wasm <-> JS bridge (`blip_spend_coin`) | `web/blip_bridge.js` |
 | macroquad JS runtime (vendored, do not edit) | `web/mq_js_bundle.js` |

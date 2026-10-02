@@ -281,7 +281,7 @@ canvas {
 :root[data-fullscreen]:not([data-has-touch]) body::after { display: none; }
 :root[data-fullscreen]:not([data-has-touch]) canvas { clip-path: none; }
 :root[data-fullscreen]:not([data-has-touch]) #marquee-bar { box-shadow: none; }
-:root[data-fullscreen]:not([data-has-touch]) :is(.blip-logo, #insert-coin-btn, #fullscreen-btn) {
+:root[data-fullscreen]:not([data-has-touch]) :is(.blip-logo, #insert-coin-btn, #fullscreen-btn, #mute-btn) {
   clip-path: inset(0 -80px);
   transform: none !important;   /* beats the beckon's scale */
 }

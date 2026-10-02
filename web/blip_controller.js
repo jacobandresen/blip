@@ -143,7 +143,7 @@
     var ng = ctx.createGain();
     ng.gain.setValueAtTime(spec.ng, t);
     ng.gain.exponentialRampToValueAtTime(0.0006, t + spec.nd);
-    src.connect(hp); hp.connect(ng); ng.connect(ctx.destination);
+    src.connect(hp); hp.connect(ng); ng.connect(blipOut(ctx));
     src.start(t); src.stop(t + spec.nd + 0.01);
 
     // The muted thock of the cap bottoming out.
@@ -152,7 +152,7 @@
     osc.frequency.exponentialRampToValueAtTime(spec.thk * 0.6, t + spec.td);
     og.gain.setValueAtTime(spec.tg, t);
     og.gain.exponentialRampToValueAtTime(0.0006, t + spec.td);
-    osc.connect(og); og.connect(ctx.destination);
+    osc.connect(og); og.connect(blipOut(ctx));
     osc.start(t); osc.stop(t + spec.td + 0.02);
   }
 

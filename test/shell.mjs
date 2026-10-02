@@ -133,6 +133,27 @@ test('the game shell', async (t) => {
     assert.equal(await evaluate(cdp, "document.documentElement.hasAttribute('data-cursor-idle')"), true);
   });
 
+  await t.test('sound goes off and on from the button or M, and stays off across pages', async (t) => {
+    const cdp = await browser(t, 9405);
+    await open(cdp, 'meteors/index.html', 6000);
+    const muted = "JSON.stringify([Howler._muted, document.documentElement.hasAttribute('data-muted'), localStorage.getItem('blip-mute')])";
+    assert.equal(await evaluate(cdp, muted), '[false,false,null]');
+    await evaluate(cdp, "document.getElementById('mute-btn').click(); true");
+    assert.equal(await evaluate(cdp, muted), '[true,true,"1"]');
+    // The cabinet's own sounds leave through one gain, shut with it.
+    assert.equal(await evaluate(cdp, 'blipOut(getKioskAudio()).gain.value'), 0);
+
+    await open(cdp, 'index.html');
+    assert.equal(await evaluate(cdp, muted), '[true,true,"1"]', 'the next page forgot it');
+    await key(cdp, 'm', 'KeyM', 77);
+    assert.equal(await evaluate(cdp, muted), '[false,false,"0"]', 'M did not turn the sound back on');
+
+    // Both buttons sit on the bar's middle line, the sound one left of the other.
+    const x = (sel) => `document.querySelector('${sel}').getBoundingClientRect().left`;
+    assert.equal(await evaluate(cdp, centre('#mute-btn svg')), await evaluate(cdp, centre('.top-marquee-bar')));
+    assert.ok(await evaluate(cdp, `${x('#mute-btn')} < ${x('#fullscreen-btn')} && ${x('#fullscreen-btn')} < ${x('#kiosk-insert-btn')}`));
+  });
+
   await t.test('coins need no mouse: fire at the wall, 5 at any time', async (t) => {
     const cdp = await browser(t, 9404);
     await open(cdp, 'meteors/index.html', 6000);

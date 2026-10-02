@@ -13,7 +13,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/svg+xml" href="icon.svg">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=74">
+  <link rel="stylesheet" href="kiosk.css?v=75">
   <!-- Before first paint (kiosk.js loads at the end): a touch screen gets
        no deck on this page, so it must never flash up. -->
   <script>
@@ -920,8 +920,8 @@
   <script src="deck.js?v=5"></script>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=38"></script>
-  <script src="blip_controller.js?v=8"></script>
+  <script src="kiosk.js?v=39"></script>
+  <script src="blip_controller.js?v=9"></script>
   <!-- Git-ignored, written at deploy: absent means no leaderboard. -->
   <script src="blip_config.js?v=1"></script>
   <script>
@@ -1159,7 +1159,7 @@
         g2.gain.value = 0.32;
         osc.connect(lpf);
         osc2.connect(g2); g2.connect(lpf);
-        lpf.connect(gMaster); gMaster.connect(ctx.destination);
+        lpf.connect(gMaster); gMaster.connect(blipOut(ctx));
         osc.start();
         osc2.start();
         gMaster.gain.linearRampToValueAtTime(0.055, ctx.currentTime + 2);
@@ -1188,7 +1188,7 @@
         bpf.type = 'bandpass';
         bpf.frequency.value = 150 + Math.random() * 500;
         bpf.Q.value = 1;
-        src.connect(bpf); bpf.connect(g); g.connect(ctx.destination);
+        src.connect(bpf); bpf.connect(g); g.connect(blipOut(ctx));
         g.gain.setValueAtTime(0.014 + Math.random() * 0.012, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + dur);
         src.start(t); src.stop(t + dur + 0.01);
@@ -1226,7 +1226,7 @@
       var noiseGain = ctx.createGain();
       noiseGain.gain.setValueAtTime(0.5, t);
       noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-      noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(ctx.destination);
+      noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(blipOut(ctx));
       noise.start(t); noise.stop(t + 0.16);
 
       var osc  = ctx.createOscillator();
@@ -1238,7 +1238,7 @@
       gain.gain.setValueAtTime(0.0001, t + 0.06);
       gain.gain.exponentialRampToValueAtTime(0.2, t + 0.32);
       gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
-      osc.connect(gain); gain.connect(ctx.destination);
+      osc.connect(gain); gain.connect(blipOut(ctx));
       osc.start(t + 0.06); osc.stop(t + 0.96);
 
       if (typeof onDone === 'function') setTimeout(onDone, 900);

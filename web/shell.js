@@ -139,7 +139,7 @@ function feedbackTick() {
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.exponentialRampToValueAtTime(0.2, t + 0.004);
     gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-    osc.connect(gain); gain.connect(ctx.destination);
+    osc.connect(gain); gain.connect(blipOut(ctx));
     osc.start(t); osc.stop(t + 0.055);
   } catch (e) {}
 }
@@ -162,13 +162,13 @@ function playCoinInsert() {
   var noiseGain = ctx.createGain();
   noiseGain.gain.setValueAtTime(0.4, t);
   noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
-  noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(ctx.destination);
+  noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(blipOut(ctx));
   noise.start(t); noise.stop(t + 0.045);
 
   [3000, 4550, 6100].forEach(function (freq, i) {
     var osc = ctx.createOscillator(), gain = ctx.createGain();
     osc.type = 'triangle'; osc.frequency.value = freq;
-    osc.connect(gain); gain.connect(ctx.destination);
+    osc.connect(gain); gain.connect(blipOut(ctx));
     var start = t + i * 0.006;
     gain.gain.setValueAtTime(0.16 / (i + 1), start);
     gain.gain.exponentialRampToValueAtTime(0.0008, start + 0.1);
@@ -178,7 +178,7 @@ function playCoinInsert() {
   // The credit chime, arriving just after the coin lands.
   [{ freq: 1047, start: 0.1 }, { freq: 1319, start: 0.155 }].forEach(function (note) {
     var osc = ctx.createOscillator(), gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
+    osc.connect(gain); gain.connect(blipOut(ctx));
     osc.type = 'square'; osc.frequency.value = note.freq;
     gain.gain.setValueAtTime(0.22, t + note.start);
     gain.gain.exponentialRampToValueAtTime(0.001, t + note.start + 0.11);
@@ -215,7 +215,7 @@ function dropCoinAnimation() {
 function playNoRoom() {
   var ctx = getUiAudio(), t = ctx.currentTime;
   var osc = ctx.createOscillator(), gain = ctx.createGain();
-  osc.connect(gain); gain.connect(ctx.destination);
+  osc.connect(gain); gain.connect(blipOut(ctx));
   osc.type = 'sawtooth';
   osc.frequency.setValueAtTime(200, t);
   osc.frequency.exponentialRampToValueAtTime(65, t + 0.38);

@@ -71,7 +71,8 @@ the top bar and the picture only; the choice is remembered, so the cabinet and
 the games stay fullscreen from page to page. Left alone, the cabinet walks
 through its games and shows their title screens, and an unattended game
 returns to the cabinet. No mouse is needed: the stick or arrows pick a game,
-fire starts it, and fire, Enter or `5` drops a coin.
+fire starts it, fire, Enter or `5` drops a coin, and `M` turns the sound off
+and on.
 
 ---
 

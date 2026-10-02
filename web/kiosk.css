@@ -3001,7 +3001,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* ---- Fullscreen ---- The button sits left of the coin slot, or right of
    the logo where a game's name leaves no room (kiosk.js sets `left`). */
-#fullscreen-btn {
+#fullscreen-btn, #mute-btn {
   position: fixed;
   top: 0;
   z-index: 500;
@@ -3021,9 +3021,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
-#fullscreen-btn[hidden] { display: none; }
-#fullscreen-btn:hover, #fullscreen-btn:focus-visible { opacity: 1; }
-#fullscreen-btn svg {
+#fullscreen-btn[hidden], #mute-btn[hidden] { display: none; }
+#fullscreen-btn:hover, #fullscreen-btn:focus-visible,
+#mute-btn:hover, #mute-btn:focus-visible { opacity: 1; }
+#fullscreen-btn svg, #mute-btn svg {
   width: 14px;
   height: 14px;
   fill: none;
@@ -3036,9 +3037,14 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-fullscreen] #fullscreen-btn .fs-exit { display: inline; }
 :root[data-fullscreen] #fullscreen-btn { color: #7be07b; opacity: 1; }
 @media (max-width: 480px) {
-  #fullscreen-btn { width: 26px; }
+  #fullscreen-btn, #mute-btn { width: 26px; }
 }
 
 /* In fullscreen an idle mouse pointer is hidden (kiosk.js sets the attribute). */
 :root[data-fullscreen][data-cursor-idle],
 :root[data-fullscreen][data-cursor-idle] * { cursor: none !important; }
+
+/* Sound off: the waves give way to a cross, and the button dims to red. */
+#mute-btn .snd-off, :root[data-muted] #mute-btn .snd-on { display: none; }
+:root[data-muted] #mute-btn .snd-off { display: inline; }
+:root[data-muted] #mute-btn { color: #e0705a; opacity: 1; }

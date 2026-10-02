@@ -181,6 +181,30 @@ function updateCoinsHud() {
   });
 }
 
+/* ---- Sound on / off ---- The choice is stored ('blip-mute'). The games'
+ * sounds are Howler's, muted there; the cabinet's own (coins, clicks) all
+ * leave through blipOut(), one gain that is shut while muted. */
+var _blipOut = null;
+function blipMuted() { try { return localStorage.getItem('blip-mute') === '1'; } catch (e) { return false; } }
+function blipOut(ctx) {
+  if (!_blipOut || _blipOut.context !== ctx) {
+    _blipOut = ctx.createGain();
+    _blipOut.connect(ctx.destination);
+  }
+  _blipOut.gain.value = blipMuted() ? 0 : 1;
+  return _blipOut;
+}
+function blipSetMuted(on) {
+  try { localStorage.setItem('blip-mute', on ? '1' : '0'); } catch (e) {}
+  if (typeof Howler !== 'undefined') Howler.mute(on);
+  if (_blipOut) _blipOut.gain.value = on ? 0 : 1;
+  document.documentElement.toggleAttribute('data-muted', on);
+}
+if (blipMuted()) {
+  document.documentElement.setAttribute('data-muted', '');
+  if (typeof Howler !== 'undefined') Howler.mute(true);
+}
+
 /* ---- Audio ---- */
 var _kioskAudioCtx = null;
 
@@ -212,13 +236,13 @@ function playCoinInsert() {
   var noiseGain = ctx.createGain();
   noiseGain.gain.setValueAtTime(0.4, t);
   noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
-  noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(ctx.destination);
+  noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(blipOut(ctx));
   noise.start(t); noise.stop(t + 0.045);
 
   [3000, 4550, 6100].forEach(function (freq, i) {
     var osc = ctx.createOscillator(), gain = ctx.createGain();
     osc.type = 'triangle'; osc.frequency.value = freq;
-    osc.connect(gain); gain.connect(ctx.destination);
+    osc.connect(gain); gain.connect(blipOut(ctx));
     var start = t + i * 0.006;
     gain.gain.setValueAtTime(0.16 / (i + 1), start);
     gain.gain.exponentialRampToValueAtTime(0.0008, start + 0.1);
@@ -229,7 +253,7 @@ function playCoinInsert() {
     var osc  = ctx.createOscillator();
     var gain = ctx.createGain();
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(blipOut(ctx));
     osc.type = 'square';
     osc.frequency.value = note.freq;
     gain.gain.setValueAtTime(0.22, t + note.start);
@@ -273,7 +297,7 @@ function playNoRoom() {
   var osc  = ctx.createOscillator();
   var gain = ctx.createGain();
   osc.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(blipOut(ctx));
   osc.type = 'sawtooth';
   osc.frequency.setValueAtTime(200, t);
   osc.frequency.exponentialRampToValueAtTime(65, t + 0.38);
@@ -373,7 +397,7 @@ window.addEventListener('load', updateCoinBeckon);
         var ng = ctx.createGain();
         ng.gain.setValueAtTime(gain, start);
         ng.gain.exponentialRampToValueAtTime(0.001, start + dur);
-        noise.connect(filt); filt.connect(ng); ng.connect(ctx.destination);
+        noise.connect(filt); filt.connect(ng); ng.connect(blipOut(ctx));
         noise.start(start); noise.stop(start + dur);
       }
       crackle(t, 0.16, 0.65);
@@ -388,7 +412,7 @@ window.addEventListener('load', updateCoinBeckon);
       osc.frequency.exponentialRampToValueAtTime(70, t + 0.2);
       og.gain.setValueAtTime(0.3, t);
       og.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
-      osc.connect(og); og.connect(ctx.destination);
+      osc.connect(og); og.connect(blipOut(ctx));
       osc.start(t); osc.stop(t + 0.23);
 
       // A low undertone thump, like the sign's transformer took the hit.
@@ -399,7 +423,7 @@ window.addEventListener('load', updateCoinBeckon);
       thump.frequency.exponentialRampToValueAtTime(45, t + 0.3);
       tg.gain.setValueAtTime(0.28, t + 0.02);
       tg.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
-      thump.connect(tg); tg.connect(ctx.destination);
+      thump.connect(tg); tg.connect(blipOut(ctx));
       thump.start(t + 0.02); thump.stop(t + 0.33);
     }
 
@@ -630,8 +654,15 @@ function pollGamepad(onDown, onUp) {
     btn.style.height = coin.offsetHeight + 'px';
     var w = btn.offsetWidth || 34;
     var left = coin.getBoundingClientRect().left - w - 2;
-    if (name && logo && name.getBoundingClientRect().right > left) left = logo.getBoundingClientRect().right + 2;
+    var cramped = !!(name && logo && name.getBoundingClientRect().right > left);
+    if (cramped) left = logo.getBoundingClientRect().right + 2;
     btn.style.left = Math.round(left) + 'px';
+    // The sound button stands left of it, where there is room for two.
+    var mute = document.getElementById('mute-btn');
+    if (!mute) return;
+    mute.hidden = cramped;
+    mute.style.height = coin.offsetHeight + 'px';
+    mute.style.left = Math.round(left - (mute.offsetWidth || 34)) + 'px';
   }
 
   function build() {
@@ -646,6 +677,28 @@ function pollGamepad(onDown, onUp) {
       '<path class="fs-enter" d="M1.5 6V1.5H6M10 1.5h4.5V6M14.5 10v4.5H10M6 14.5H1.5V10"/>' +
       '<path class="fs-exit" d="M1.5 6H6V1.5M10 1.5V6h4.5M14.5 10H10v4.5M6 14.5V10H1.5"/></svg>';
     document.body.appendChild(btn);
+    var mute = document.createElement('button');
+    mute.id = 'mute-btn';
+    mute.type = 'button';
+    mute.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true">' +
+      '<path d="M1.5 6h2.7L8 3v10L4.2 10H1.5z"/>' +
+      '<path class="snd-on" d="M10.4 5.6c1.1 1.2 1.1 3.6 0 4.8M12.4 3.8c2.1 2.2 2.1 6.2 0 8.4"/>' +
+      '<path class="snd-off" d="M10.6 6l4 4M14.6 6l-4 4"/></svg>';
+    function label() {
+      mute.title = blipMuted() ? 'Sound on' : 'Sound off';
+      mute.setAttribute('aria-label', mute.title);
+      mute.setAttribute('aria-pressed', blipMuted() ? 'true' : 'false');
+    }
+    document.body.appendChild(mute);
+    label();
+    mute.addEventListener('click', function () { blipSetMuted(!blipMuted()); label(); });
+    // M does the same, for a cabinet with no mouse (no game uses the key).
+    window.addEventListener('keydown', function (e) {
+      if ((e.key !== 'm' && e.key !== 'M') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
+      blipSetMuted(!blipMuted());
+      label();
+    }, true);
     btn.addEventListener('click', function () {
       var on = !root.hasAttribute('data-fullscreen');
       set(on);
