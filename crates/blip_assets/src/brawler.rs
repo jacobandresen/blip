@@ -585,6 +585,13 @@ fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut R
     for i in 1..period {
         line[i] = line[i] * 0.6 + line[i - 1] * 0.4;
     }
+    // A long (low) string has few trips round the line to lose its hiss in,
+    // so it starts rounder: a bass note should be a note, not a thwack.
+    for _ in 0..period / 150 {
+        let first = line[0];
+        for i in 0..period - 1 { line[i] = (line[i] + line[i + 1]) * 0.5; }
+        line[period - 1] = (line[period - 1] + first) * 0.5;
+    }
     for i in 0..n {
         let idx = i % period;
         let nxt = (i + 1) % period;
