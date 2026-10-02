@@ -69,7 +69,7 @@ const CRT_VERTEX: &str = r#"#version 100
 attribute vec3 position;
 attribute vec2 texcoord;
 attribute vec4 color0;
-varying lowp vec2 uv;
+varying highp vec2 uv;
 varying lowp vec4 color;
 uniform mat4 Model;
 uniform mat4 Projection;
@@ -80,10 +80,16 @@ void main() {
 }
 "#;
 
+// Fragment floats are highp where the device has it: mediump can be 16 bits
+// (NVIDIA's GLES is), too coarse for screen coordinates on a big canvas.
 const CRT_FRAGMENT: &str = r#"#version 100
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 
-varying lowp vec2 uv;
+varying vec2 uv;
 varying lowp vec4 color;
 
 uniform sampler2D Texture;
@@ -102,9 +108,12 @@ vec2 curve(vec2 p) {
     return p * 0.5 + 0.5;
 }
 
-// Cheap ordered dither — breaks up 8-bit banding in the dark gradients.
+// Cheap ordered dither — breaks up 8-bit banding in the dark gradients. The
+// pixel is wrapped to a 64px cell: unwrapped, the dot product passes 65504
+// (the 16-bit float limit) toward the top right of a 1080p canvas, and the
+// NaN that follows blacks the picture out there.
 float dither(vec2 p) {
-    return fract(sin(dot(floor(p), vec2(12.9898, 78.233))) * 43758.5453);
+    return fract(sin(dot(mod(floor(p), 64.0), vec2(12.9898, 78.233))) * 43758.5453);
 }
 
 void main() {
@@ -164,9 +173,13 @@ void main() {
 // per screen row (hundreds of draw calls on a tall window). Reuses
 // CRT_VERTEX.
 const SCANLINE_FRAGMENT: &str = r#"#version 100
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 
-varying lowp vec2 uv;
+varying vec2 uv;
 varying lowp vec4 color;
 
 uniform sampler2D Texture;
@@ -234,9 +247,6 @@ pub struct Blip {
     fx_frame_ema:  f32, // smoothed frame time, seconds
     // ---- screenshot capture (native only) ----
     pub screenshot_mode:   bool,
-    /// Keep the last frame instead of clearing it, so a game can fade it
-    /// (a translucent fill) and leave trails behind whatever moves.
-    pub keep_frame:        bool,
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
     screenshot_frame:      u32,
     #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
@@ -314,7 +324,6 @@ impl Blip {
             fx_slow_accum: 0.0,
             fx_frame_ema: 1.0 / 60.0,
             screenshot_mode,
-            keep_frame: false,
             screenshot_frame: 0,
             screenshot_frame_target,
             screenshot_path,
@@ -406,7 +415,7 @@ impl Blip {
 
         // Prepare render target for the next game frame.
         self.apply_camera();
-        if !self.keep_frame { clear_background(macroquad::color::BLACK); }
+        clear_background(macroquad::color::BLACK);
 
         let raw = get_frame_time();
         self.delta_time = if raw > 0.1 { 0.1 } else { raw };
