@@ -51,3 +51,28 @@ impl Image {
         out
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_png_is_compressed_and_decodes_to_the_same_pixels() {
+        // A gradient with a sprite's flat areas: 64 KB raw.
+        let mut img = Image::new(128, 128);
+        for y in 0..128i32 {
+            for x in 0..128i32 {
+                let v = if (x / 16 + y / 16) % 2 == 0 { 200 } else { (x + y) as u8 };
+                img.set(x, y, v, 255 - v, 40);
+            }
+        }
+        let png = img.encode_png();
+        assert!(png.len() < img.px.len() / 8, "{} bytes for {} of pixels", png.len(), img.px.len());
+
+        let mut reader = png::Decoder::new(&png[..]).read_info().expect("header");
+        let mut out = vec![0u8; reader.output_buffer_size()];
+        let info = reader.next_frame(&mut out).expect("frame");
+        assert_eq!((info.width, info.height), (128, 128));
+        assert_eq!(&out[..info.buffer_size()], &img.px[..]);
+    }
+}
