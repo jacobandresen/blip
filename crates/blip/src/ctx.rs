@@ -224,6 +224,7 @@ pub struct Blip {
     chroma_t:  f32,
     chroma_dx: f32, // horizontal shift in virtual pixels
     // ---- interlaced field ----
+    rt_blended: bool, // the frame is being shown shrunk, so sampled linear
     interlace_field: u8, // 0 or 1, flips every frame
     // How bright the fading field's rows stay (the other field's are 0.76).
     field_dim: f32,
@@ -317,6 +318,7 @@ impl Blip {
             tear_cd,  tear_t: 0.0, tear_y: 0.5, tear_dx: 0.0,
             roll_cd,  roll_t: 0.0, roll_dy: 0.0, roll_spd: 0.0,
             chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
+            rt_blended: false,
             interlace_field: 0,
             field_dim: 0.25,
             crt,
@@ -609,7 +611,10 @@ impl Blip {
         // Shrunk (a phone shows Meteors at half size), nearest sampling
         // drops every other pixel and one-pixel lines break up: blend then.
         // Enlarged, pixels stay crisp.
-        self.rt.texture.set_filter(if scale < 1.0 { FilterMode::Linear } else { FilterMode::Nearest });
+        if (scale < 1.0) != self.rt_blended {
+            self.rt_blended = scale < 1.0;
+            self.rt.texture.set_filter(if self.rt_blended { FilterMode::Linear } else { FilterMode::Nearest });
+        }
 
         let roll_on   = self.roll_t  > 0.0;
         let tear_on   = self.tear_t  > 0.0 && !roll_on; // don't combine tear + roll
