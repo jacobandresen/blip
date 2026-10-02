@@ -174,6 +174,26 @@ test('the game shell', async (t) => {
     assert.ok(to % cols === 1 && to + cols >= n, `went to card ${to}`);
   });
 
+  await t.test("on a phone the game's name fits between the buttons and the coin slot", async (t) => {
+    const cdp = await browser(t, 9408, { touch: true, width: 390, height: 844 });
+    await open(cdp, 'galactic_defender/index.html', 5000);   // the longest name
+    const edges = (sel) => `(function(){var r=document.querySelector('${sel}').getBoundingClientRect();return JSON.stringify([r.left,r.right]);})()`;
+    const at = async (sel) => JSON.parse(await evaluate(cdp, edges(sel)));
+    const [name, slot, fs] = [await at('#marquee-name'), await at('#insert-coin-btn'), await at('#fullscreen-btn')];
+    assert.ok(name[0] >= fs[1] && name[1] <= slot[0], `name ${name} between button ${fs} and slot ${slot}`);
+    assert.equal(await evaluate(cdp, "getComputedStyle(document.getElementById('marquee-name')).visibility"), 'visible');
+
+    // An iPhone has no fullscreen to offer: the sound button stands alone.
+    await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+      source: 'delete Element.prototype.requestFullscreen; delete Element.prototype.webkitRequestFullscreen;',
+    });
+    await open(cdp, 'galactic_defender/index.html', 5000);
+    assert.equal(await evaluate(cdp, "!!document.getElementById('fullscreen-btn')"), false);
+    const [name2, mute] = [await at('#marquee-name'), await at('#mute-btn')];
+    assert.ok(mute[1] > mute[0], 'no sound button');
+    assert.ok(name2[0] >= mute[1] && name2[1] <= slot[0], `name ${name2} between button ${mute} and slot ${slot}`);
+  });
+
   await t.test('sound goes off and on from the button or M, and stays off across pages', async (t) => {
     const cdp = await browser(t, 9405);
     await open(cdp, 'meteors/index.html', 6000);

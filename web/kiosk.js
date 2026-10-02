@@ -642,42 +642,65 @@ function pollGamepad(onDown, onUp) {
   // Before first paint where this script is in <head>.
   if (wanted()) root.setAttribute('data-fullscreen', '');
 
-  // Left of the coin slot; on a phone a game's name reaches that far, so
-  // it goes right of the logo instead.
+  // Left of the coin slot. On a phone a game's name reaches that far: one
+  // button then goes right of the logo, and the name is centred in what is
+  // left between it and the slot, its letters closed up until it fits.
+  var mute = null;
   function place() {
     var coin = document.getElementById('insert-coin-btn') || document.getElementById('kiosk-insert-btn');
     var name = document.getElementById('marquee-name');
     var logo = document.querySelector('.blip-logo');
-    if (!btn || !coin) return;
+    if (!mute || !coin) return;
+    var bar = name && name.parentNode;
+    if (bar) {
+      bar.style.paddingLeft = bar.style.paddingRight = '';
+      name.style.letterSpacing = name.style.visibility = '';
+    }
+    mute.hidden = false;
+    var first = btn || mute;   // the one that stays where there is room for one
+    var slot = coin.getBoundingClientRect();
     // As tall as the coin slot, which is as tall as the page's top bar (28,
     // 40 or 46px), so the icon sits on the bar's middle line.
-    btn.style.height = coin.offsetHeight + 'px';
-    var w = btn.offsetWidth || 34;
-    var left = coin.getBoundingClientRect().left - w - 2;
-    var cramped = !!(name && logo && name.getBoundingClientRect().right > left);
+    var h = coin.offsetHeight + 'px';
+    var w = first.offsetWidth || 34;
+    var left = slot.left - w - 2;
+    var cramped = !!(name && logo && slot.width > 0 &&
+      name.getBoundingClientRect().right > left - (btn ? w : 0));
     if (cramped) left = logo.getBoundingClientRect().right + 2;
-    btn.style.left = Math.round(left) + 'px';
-    // The sound button stands left of it, where there is room for two.
-    var mute = document.getElementById('mute-btn');
-    if (!mute) return;
-    mute.hidden = cramped;
-    mute.style.height = coin.offsetHeight + 'px';
-    mute.style.left = Math.round(left - (mute.offsetWidth || 34)) + 'px';
+    first.style.height = h;
+    first.style.left = Math.round(left) + 'px';
+    if (btn) {
+      mute.hidden = cramped;
+      mute.style.height = h;
+      mute.style.left = Math.round(left - w) + 'px';
+    }
+    if (!cramped) return;
+    var from = left + w, room = slot.left - 4 - from;
+    bar.style.paddingLeft = Math.round(from) + 'px';
+    bar.style.paddingRight = Math.round(window.innerWidth - slot.left + 4) + 'px';
+    var gap = parseFloat(getComputedStyle(name).letterSpacing) || 0;
+    while (gap > 1 && name.getBoundingClientRect().width > room) {
+      gap -= 1;
+      name.style.letterSpacing = gap + 'px';
+    }
+    if (name.getBoundingClientRect().width > room) name.style.visibility = 'hidden';
   }
 
   function build() {
     var coin = document.getElementById('insert-coin-btn') || document.getElementById('kiosk-insert-btn');
+    if (!coin) return;
     // A touch screen keeps its whole layout, so without real fullscreen
-    // (iPhone) the button would do nothing.
-    if (!coin || (blipHasTouch() && !enter)) return;
-    btn = document.createElement('button');
-    btn.id = 'fullscreen-btn';
-    btn.type = 'button';
-    btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true">' +
-      '<path class="fs-enter" d="M1.5 6V1.5H6M10 1.5h4.5V6M14.5 10v4.5H10M6 14.5H1.5V10"/>' +
-      '<path class="fs-exit" d="M1.5 6H6V1.5M10 1.5V6h4.5M14.5 10H10v4.5M6 14.5V10H1.5"/></svg>';
-    document.body.appendChild(btn);
-    var mute = document.createElement('button');
+    // (iPhone) the button would do nothing: the sound button stands alone.
+    if (!blipHasTouch() || enter) {
+      btn = document.createElement('button');
+      btn.id = 'fullscreen-btn';
+      btn.type = 'button';
+      btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true">' +
+        '<path class="fs-enter" d="M1.5 6V1.5H6M10 1.5h4.5V6M14.5 10v4.5H10M6 14.5H1.5V10"/>' +
+        '<path class="fs-exit" d="M1.5 6H6V1.5M10 1.5V6h4.5M14.5 10H10v4.5M6 14.5V10H1.5"/></svg>';
+      document.body.appendChild(btn);
+    }
+    mute = document.createElement('button');
     mute.id = 'mute-btn';
     mute.type = 'button';
     mute.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true">' +
@@ -699,7 +722,7 @@ function pollGamepad(onDown, onUp) {
       blipSetMuted(!blipMuted());
       label();
     }, true);
-    btn.addEventListener('click', function () {
+    if (btn) btn.addEventListener('click', function () {
       var on = !root.hasAttribute('data-fullscreen');
       set(on);
       if (on) request();
