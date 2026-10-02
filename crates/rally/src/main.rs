@@ -352,7 +352,8 @@ fn draw_serve(blip: &Blip, g: &Game) {
     blip.clear(BLIP_BLACK);
     draw_field(blip, g);
     blip.fill_rect(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ, BLIP_WHITE);
-    blip.draw_centered("PRESS FIRE", PLAY_T + PLAY_H * 0.5 + 54.0, 2.0, BLIP_GRAY);
+    let prompt = web::controls().pick("PRESS FIRE", "PRESS FIRE", "TAP TO SERVE");
+    blip.draw_centered(prompt, PLAY_T + PLAY_H * 0.5 + 54.0, 2.0, BLIP_GRAY);
 }
 
 fn draw_play(blip: &Blip, g: &Game) {

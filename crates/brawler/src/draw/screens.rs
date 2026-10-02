@@ -121,12 +121,17 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
     let p1c = BlipColor { r: 1.0, g: 0.35, b: 0.35, a: 1.0 };
     let p2c = BlipColor { r: 0.40, g: 0.72, b: 1.0, a: 1.0 };
     // Two buttons each: punch, then kick. The stick picks the height.
-    const ROWS: [(&str, &str, bool); 2] = [
+    // A phone has the deck's pads, red cap and blue, and no keys to name.
+    let keys = web::controls() == web::Controls::Keys;
+    let rows: [(&str, &str, bool); 2] = if keys {[
         ("P1", "W A S D   F PUNCH  G KICK", true),
         ("P2", "ARROWS    J PUNCH  K KICK", false),
-    ];
+    ]} else {[
+        ("P1", "STICK   RED PUNCH  BLUE KICK", true),
+        ("P2", "THE SAME ON THE SECOND PAD", false),
+    ]};
     let x = (WIN_W as f32 - 32.0 * 12.0) / 2.0;
-    for (i, (tag, body, one)) in ROWS.iter().enumerate() {
+    for (i, (tag, body, one)) in rows.iter().enumerate() {
         let y = 250.0 + i as f32 * 22.0;
         // Player two greys out on the one-player line: the row is still
         // there to say the mode exists, without claiming those keys do
@@ -137,17 +142,19 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
         blip.draw_text(tag, x, y, 2.0, BlipColor { a: tint, ..col });
         blip.draw_text(body, x + 48.0, y, 2.0, BlipColor { a: tint, ..dim });
     }
-    blip.draw_centered("TOWARD AND BUTTON HITS HIGH   BOTH TOGETHER SPECIAL", 300.0, 1.0, dim);
+    // Size 2 for the rules and the keys (at 1 a phone shows them 4px tall),
+    // so the rule is cut to what fits between the two fighters.
+    blip.draw_centered("TOWARD HITS HIGH   BOTH IS SPECIAL", 298.0, 2.0, dim);
 
     // The prompt, on the boards: the one line that has to be found. It
     // breathes with the menu line; a sign this size blinking is a strobe.
     neon(blip, "PRESS PUNCH TO START", 348.0, 3.0,
         BlipColor { r: 1.0, g: 0.85, b: 0.25, a: 1.0 }, 0.9 + 0.1 * (now * 2.0).sin());
-    blip.draw_centered("W S CHOOSE     F OR SPACE START", 382.0, 1.0, dim);
+    blip.draw_centered(if keys { "W S CHOOSE     F OR SPACE START" } else { "UP DOWN CHOOSE     PUNCH START" }, 376.0, 2.0, dim);
     // The record to beat, when the kiosk knows of one.
     let hi = web::high_score();
     if hi.score > 0 {
-        blip.draw_centered(&hi.label("HI"), 322.0, 1.0, BlipColor { r: 0.98, g: 0.90, b: 0.40, a: 1.0 });
+        blip.draw_centered(&hi.label("HI"), 320.0, 2.0, BlipColor { r: 0.98, g: 0.90, b: 0.40, a: 1.0 });
     }
 }
 
