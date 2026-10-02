@@ -674,7 +674,15 @@ function pollGamepad(onDown, onUp) {
       mute.style.height = h;
       mute.style.left = Math.round(left - w) + 'px';
     }
-    if (!cramped) return;
+    if (!cramped) {
+      // The bulb strips beside the name stop short of the buttons; the same
+      // on both sides, so the name stays in the middle.
+      if (bar && logo) {
+        var edge = Math.max(logo.getBoundingClientRect().right, window.innerWidth - (left - (btn ? w : 0)));
+        bar.style.paddingLeft = bar.style.paddingRight = Math.round(edge + 4) + 'px';
+      }
+      return;
+    }
     var from = left + w, room = slot.left - 4 - from;
     bar.style.paddingLeft = Math.round(from) + 'px';
     bar.style.paddingRight = Math.round(window.innerWidth - slot.left + 4) + 'px';
