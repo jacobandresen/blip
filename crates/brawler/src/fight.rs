@@ -365,8 +365,10 @@ fn fly_bolts(g: &mut Game, dt: f32, holds: [Input; 2]) {
         }
         let d = 1 - g.bolts[i].owner;
         let (dx, dy, dw, dh) = g.p[d].hurt_box();
-        let (bx, by) = (g.bolts[i].x - 10.0, g.bolts[i].y - 8.0);
-        if !rects_overlap(bx, by, 20.0, 16.0, dx, dy, dw, dh) { continue; }
+        // A beam is thinner than a ball of chi.
+        let tall = if g.p[1 - d].arch().special == Special::LaserVision { LASER_THICK } else { 16.0 };
+        let (bx, by) = (g.bolts[i].x - 10.0, g.bolts[i].y - tall / 2.0);
+        if !rects_overlap(bx, by, 20.0, tall, dx, dy, dw, dh) { continue; }
         g.bolts[i].active = false;
         if invulnerable(&g.p[d]) { continue; }
         let guarding = !g.p[d].airborne()

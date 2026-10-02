@@ -383,6 +383,20 @@
       text-align: left;
     }
 
+    /* The record to beat, when one is known (set by the script below). */
+    .card-hi {
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      color: var(--yellow);
+      text-shadow: 0 0 6px color-mix(in srgb, var(--yellow) 60%, transparent);
+      margin: -8px 0 14px;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .card-desc {
       font-size: 11px;
       font-weight: 700;
@@ -907,6 +921,8 @@
   <script src="howler.min.js"></script>
   <script src="kiosk.js?v=35"></script>
   <script src="blip_controller.js?v=8"></script>
+  <!-- Git-ignored, written at deploy: absent means no leaderboard. -->
+  <script src="blip_config.js?v=1"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Translations                                                         */
@@ -1321,6 +1337,46 @@
     });
 
     document.getElementById('kiosk-insert-btn').addEventListener('click', insertCoin);
+
+    // ---- The record on each card ---- "HI 12,340 NAME": the leaderboard's
+    // top as a game page last cached it (or this browser's own best), then
+    // every game's current top in one request where the backend is set up.
+    (function () {
+      function show(slug, top) {
+        var card = document.querySelector('.card[href^="' + slug + '/"]');
+        if (!card || !top || !(top.score > 0)) return;
+        var el = card.querySelector('.card-hi');
+        if (!el) {
+          el = document.createElement('div');
+          el.className = 'card-hi';
+          card.insertBefore(el, card.querySelector('.card-desc'));
+        }
+        el.textContent = 'HI ' + Number(top.score).toLocaleString('en-US') +
+          (top.handle ? ' ' + String(top.handle).toUpperCase() : '');
+      }
+      function cached(slug) {
+        try {
+          var t = JSON.parse(localStorage.getItem('blip-top-' + slug) || 'null');
+          if (t && t.score > 0) return t;
+          var best = parseInt(localStorage.getItem('blip-best-' + slug) || '0', 10);
+          return best > 0 ? { score: best, handle: localStorage.getItem('blip-handle') || '' } : null;
+        } catch (e) { return null; }
+      }
+      Object.keys(BLIP_GAMES).forEach(function (slug) { show(slug, cached(slug)); });
+      var cfg = window.BLIP_SUPABASE;
+      if (!cfg || !cfg.url || !cfg.anonKey || !window.fetch) return;
+      fetch(cfg.url + '/rest/v1/leaderboard_top?select=game,handle,score&rank=eq.1',
+            { headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + cfg.anonKey } })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (rows) {
+          rows.forEach(function (row) {
+            var top = { handle: row.handle || '', score: row.score | 0 };
+            try { localStorage.setItem('blip-top-' + row.game, JSON.stringify(top)); } catch (e) {}
+            show(row.game, top);
+          });
+        })
+        .catch(function () {});
+    }());
 
     // ---- Card navigation: keyboard arrows + joystick/gamepad ----
     (function () {

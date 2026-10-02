@@ -437,12 +437,12 @@ impl Game {
         let f = self.p[owner];
         let x = f.x + f.facing * (f.width() / 2.0 + 10.0);
         // A bolt leaves the hands at chest height. The laser leaves the eyes,
-        // twice as fast: level at the head in front of it from the ground (a
-        // crouch goes under either), straight at its aim from the air.
+        // twice as fast: level at LASER_HEIGHT from the ground (a crouch goes
+        // under either, a jump over it), straight at its aim from the air.
         let (y, vx, vy) = if !laser {
             (f.y - 54.0 * f.size(), f.facing * 300.0, 0.0)
         } else if !f.airborne() {
-            (f.y - 98.0 * f.size().min(f.foe_size), f.facing * LASER_SPEED, 0.0)
+            (f.y - LASER_HEIGHT * f.size().min(f.foe_size), f.facing * LASER_SPEED, 0.0)
         } else {
             let y = f.y - 100.0 * f.size();
             let (dx, dy) = (ax - x, ay - y);

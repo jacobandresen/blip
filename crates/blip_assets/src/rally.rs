@@ -5,7 +5,7 @@ use crate::techno::{
     bass_note, clap, hat, kick, lead_stab, lift_fill, open_hat, phrase_note, riser,
     sidechain_duck, supersaw,
 };
-use crate::wav::{encode_pcm16_mono, soft_limit_to_pcm16, warm, Rng, MIX_KNEE, SAMPLE_RATE};
+use crate::wav::{encode_pcm16_mono, low_pass, soft_limit_to_pcm16, Rng, MIX_KNEE, SAMPLE_RATE};
 use crate::cosy::{self, Voice, H};
 use crate::Asset;
 
@@ -77,7 +77,7 @@ pub fn music() -> Vec<u8> {
         kick(&mut buf, off, 0.95);
     }
 
-    warm(&mut buf);
+    low_pass(&mut buf, 6500.0); // techno: the hats and the lead keep their edge
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -134,7 +134,7 @@ pub fn music2() -> Vec<u8> {
         kick(&mut buf, off, 0.95);
     }
 
-    warm(&mut buf);
+    low_pass(&mut buf, 6500.0); // techno: the hats and the lead keep their edge
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -186,7 +186,7 @@ pub fn music3() -> Vec<u8> {
         kick(&mut buf, off, 0.75);
     }
 
-    warm(&mut buf);
+    low_pass(&mut buf, 6500.0); // techno: the hats and the lead keep their edge
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -245,7 +245,7 @@ pub fn music4() -> Vec<u8> {
         kick(&mut buf, off, 0.95);
     }
 
-    warm(&mut buf);
+    low_pass(&mut buf, 6500.0); // techno: the hats and the lead keep their edge
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -306,7 +306,7 @@ pub fn music5() -> Vec<u8> {
         kick(&mut buf, off, 0.9);
     }
 
-    warm(&mut buf);
+    low_pass(&mut buf, 6500.0); // techno: the hats and the lead keep their edge
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 

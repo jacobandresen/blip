@@ -138,7 +138,7 @@ pub fn bass_note(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
         let driven = (lp * 1.6).tanh();
 
         let sub = (2.0 * PI * freq * 0.5 * t).sin();
-        mix_into_f32(buf, off + i, (driven * 0.85 + sub * 0.9) * e * vol * 20000.0);
+        mix_into_f32(buf, off + i, (driven * 0.85 + sub * 0.9) * e * vol * 16500.0);
     }
 }
 
@@ -173,7 +173,7 @@ pub fn lead_stab(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
         let w = (2.0 * PI * freq * t).sin()
             + 0.3 * (2.0 * PI * freq * 2.0 * t).sin()
             + 0.08 * (2.0 * PI * freq * 3.0 * t).sin();
-        mix_into_f32(buf, off + i, w * e * vol * 9000.0);
+        mix_into_f32(buf, off + i, w * e * vol * 16000.0);
     }
 }
 
@@ -203,7 +203,7 @@ pub fn supersaw(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, att_m
         s /= SPREAD.len() as f32;
         l1 += a * (s - l1);
         l2 += a * (l1 - l2);
-        mix_into_f32(buf, off + i, l2 * e * vol * 17000.0);
+        mix_into_f32(buf, off + i, l2 * e * vol * 28000.0);
     }
 }
 

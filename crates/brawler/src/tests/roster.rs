@@ -145,7 +145,7 @@ pub(crate) fn only_the_giant_hurts_the_invincible_fighter_but_blows_still_land()
 }
 
 #[test]
-pub(crate) fn the_laser_is_aimed_at_the_head_and_goes_over_a_crouch() {
+pub(crate) fn the_level_laser_hits_whoever_stands_and_goes_over_a_crouch() {
     let who = FIGHTERS.iter().position(|a| a.special == Special::LaserVision).unwrap();
     for foe in [0, 3] {
         let mut g = Game::new();
@@ -153,13 +153,13 @@ pub(crate) fn the_laser_is_aimed_at_the_head_and_goes_over_a_crouch() {
         face_off(&mut g.p);
         g.spawn_bolt(0, 16);
         let b = g.bolts.iter().find(|b| b.active).unwrap();
-        let (bx, by) = (0.0, b.y - 8.0);
+        let (bx, by) = (0.0, b.y - LASER_THICK / 2.0);
         let stand = g.p[1].hurt_box();
-        assert!(rects_overlap(bx, by, 20.0, 16.0, 0.0, stand.1, stand.2, stand.3),
+        assert!(rects_overlap(bx, by, 20.0, LASER_THICK, 0.0, stand.1, stand.2, stand.3),
             "the laser misses a standing {}", FIGHTERS[foe].name);
         g.p[1].act = Act::Crouch;
         let duck = g.p[1].hurt_box();
-        assert!(!rects_overlap(bx, by, 20.0, 16.0, 0.0, duck.1, duck.2, duck.3),
+        assert!(!rects_overlap(bx, by, 20.0, LASER_THICK, 0.0, duck.1, duck.2, duck.3),
             "{} cannot duck the laser", FIGHTERS[foe].name);
     }
 }

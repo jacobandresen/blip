@@ -168,6 +168,11 @@ pub(crate) fn the_laser_from_the_air_burns_where_he_looked_and_a_jump_gets_clear
     for delay in [0, 6, 12] {
         assert_eq!(under_the_stare(200.0, 140.0, delay, up), full, "a jump {delay} frames in was followed");
     }
+    // The level laser, from 180px: a jump within ten frames of the eyes
+    // lighting goes over it (ducking is tested with the laser itself).
+    for delay in [0, 5, 10] {
+        assert_eq!(under_the_stare(200.0, 0.0, delay, up), full, "a jump {delay} frames in did not clear the level laser");
+    }
     // Jumping away works later still, and with him low and 80px off, where
     // the beam lands on frame 17.
     for (x, h, latest) in [(200.0, 140.0, 18), (300.0, 60.0, 12)] {

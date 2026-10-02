@@ -57,6 +57,11 @@ pub(crate) const THROW_REST: f32 = 2.6;
 /// two turtles settle a round in five to fifteen seconds.
 pub(crate) const SMALL_ON_SMALL: f32 = 0.7;
 pub(crate) const LASER_SPEED: f32 = 600.0;
+/// How high the level laser flies, per unit of size, and how tall its beam
+/// is: over a crouch (74), and low and thin enough to jump (a jump peaks at
+/// 120, and clears 91 a fifth of a second after leaving the ground).
+pub(crate) const LASER_HEIGHT: f32 = 88.0;
+pub(crate) const LASER_THICK: f32 = 6.0;
 /// How fast a flier moves through the air, and how high the feet may go: the
 /// head stays under the health bars.
 pub(crate) const SOAR: f32 = 170.0;
