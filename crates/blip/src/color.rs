@@ -41,3 +41,37 @@ pub fn hsv(h: f32, s: f32, v: f32, a: f32) -> Color {
     let m = v - c;
     Color { r: r + m, g: g + m, b: b + m, a }
 }
+
+/// `c` darkened (`k` < 1) or brightened (`k` > 1), alpha untouched: the shadow
+/// side of a flat-coloured shape.
+pub fn shade(c: Color, k: f32) -> Color {
+    Color { r: c.r * k, g: c.g * k, b: c.b * k, a: c.a }
+}
+
+/// A colour `k` of the way from `a` to `b`, alpha included.
+pub fn blend(a: Color, b: Color, k: f32) -> Color {
+    Color {
+        r: a.r + (b.r - a.r) * k,
+        g: a.g + (b.g - a.g) * k,
+        b: a.b + (b.b - a.b) * k,
+        a: a.a + (b.a - a.a) * k,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn blend_runs_from_one_colour_to_the_other_and_shade_keeps_alpha() {
+        let (a, b) = (BLIP_RED, Color { a: 0.5, ..BLIP_BLUE });
+        let near = |x: Color, y: Color| [x.r - y.r, x.g - y.g, x.b - y.b, x.a - y.a].iter().all(|d| d.abs() < 1e-6);
+        assert!(near(blend(a, b, 0.0), a));
+        assert!(near(blend(a, b, 1.0), b));
+        let mid = blend(a, b, 0.5);
+        assert!((mid.a - 0.75).abs() < 1e-6 && (mid.r - (a.r + b.r) / 2.0).abs() < 1e-6);
+        let dark = shade(b, 0.5);
+        assert_eq!(dark.a, b.a);
+        assert!((dark.b - b.b * 0.5).abs() < 1e-6);
+    }
+}

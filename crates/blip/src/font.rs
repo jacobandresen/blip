@@ -94,6 +94,24 @@ pub fn draw_text(text: &str, x: f32, y: f32, sz: f32, color: Color) {
     }
 }
 
+/// Draw a string with an outline of `ink` all round it, one font pixel thick
+/// at small sizes: lettering that has to be read over a picture.
+pub fn draw_text_outlined(text: &str, x: f32, y: f32, sz: f32, color: Color, ink: Color) {
+    let d = (sz * 0.5).max(1.0);
+    for (dx, dy) in [
+        (-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0),
+        (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0),
+    ] {
+        draw_text(text, x + dx * d, y + dy * d, sz, ink);
+    }
+    draw_text(text, x, y, sz, color);
+}
+
+/// Width of a string in pixels at size `sz` (a fixed 6-pixel cell).
+pub fn text_width(text: &str, sz: f32) -> f32 {
+    text.chars().count() as f32 * 6.0 * sz
+}
+
 /// Draw a string as a lit neon tube: a tight one-pixel halo in `c` around a
 /// crisp near-white core, so it reads as "glowing" without smearing at
 /// small sizes (the CRT post-process widens the bloom). Costs ~10× a plain
@@ -124,4 +142,16 @@ pub fn text_cx(width: i32, text: &str, sz: i32) -> i32 {
 /// Draw a horizontally centred string within a canvas of `width` pixels.
 pub fn draw_centered(width: i32, text: &str, y: f32, sz: f32, color: Color) {
     draw_text(text, text_cx(width, text, sz as i32) as f32, y, sz, color);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::text_width;
+
+    #[test]
+    fn a_character_is_six_pixels_wide_at_size_one() {
+        assert_eq!(text_width("", 2.0), 0.0);
+        assert_eq!(text_width("FIGHT", 1.0), 30.0);
+        assert_eq!(text_width("K.O.", 5.0), 120.0);
+    }
 }

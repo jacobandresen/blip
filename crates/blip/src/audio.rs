@@ -180,6 +180,11 @@ impl Jukebox {
         self.tracks.iter().any(|t| t.is_none())
     }
 
+    /// Has track `i` been rendered?
+    pub fn ready(&self, i: usize) -> bool {
+        self.tracks.get(i).is_some_and(|t| t.is_some())
+    }
+
     /// Play track `i` unless it is already playing or not rendered yet.
     pub fn play(&mut self, i: usize) {
         if self.playing != Some(i) && self.tracks.get(i).is_some_and(|t| t.is_some()) { self.switch(i); }

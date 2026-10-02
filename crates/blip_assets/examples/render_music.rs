@@ -35,6 +35,12 @@ fn main() {
         ("brawler_airbase", || brawler::theme_wav(3)),
         ("brawler_bathhouse", || brawler::theme_wav(4)),
         ("brawler_village", || brawler::theme_wav(5)),
+        ("brawler_fortress", || brawler::theme_wav(6)),
+        ("brawler_rooftop", || brawler::theme_wav(7)),
+        ("brawler_crowd", || brawler::ambience_wav(0)),
+        ("brawler_wind", || brawler::ambience_wav(1)),
+        ("brawler_crickets", || brawler::ambience_wav(2)),
+        ("brawler_city", || brawler::ambience_wav(3)),
         ("bubbler_theme", bubbler::theme_wav),
         ("bubbler_hurry", bubbler::hurry_wav),
     ];

@@ -56,6 +56,44 @@ pub fn fill_circle(cx: f32, cy: f32, r: f32, c: Color) {
     draw_circle(cx, cy, r, c);
 }
 
+/// Draw a capsule from (`x1`, `y1`) to (`x2`, `y2`), `r1` thick at the first
+/// end and `r2` at the second: a limb, a beam, a spike. Built from circles a
+/// pixel or two apart, so keep the colour opaque (overlapping alpha shows
+/// as beads).
+pub fn fill_capsule(x1: f32, y1: f32, x2: f32, y2: f32, r1: f32, r2: f32, c: Color) {
+    let len = ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt();
+    // Circles a third of a radius apart leave an edge smooth to a hundredth
+    // of the radius; a thin line still needs one every pixel or two.
+    let mut d = 0.0;
+    loop {
+        let t = if len > 0.0 { (d / len).min(1.0) } else { 1.0 };
+        let r = r1 + (r2 - r1) * t;
+        draw_circle(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, r, c);
+        if t >= 1.0 { break; }
+        d += (r * 0.3).max(1.7);
+    }
+}
+
+/// Draw a sunburst: `rays` wedges fanning out from (`cx`, `cy`) to `reach`,
+/// in the two `colors` turn about, the first ray at angle `turn`. The wedges
+/// meet, so with an even count the burst covers everything inside `reach`.
+/// A backdrop for a title or a finishing blow.
+pub fn fill_sunburst(cx: f32, cy: f32, rays: usize, turn: f32, reach: f32, colors: [Color; 2]) {
+    // Half the angle a ray is given, as the slope its edge leaves the axis at.
+    let spread = (std::f32::consts::PI / rays as f32).tan();
+    for j in 0..rays {
+        let ang = turn + j as f32 * std::f32::consts::TAU / rays as f32;
+        let (dx, dy) = (ang.cos(), ang.sin());
+        // Circles spaced by their own size: a wedge in forty, not four hundred.
+        let mut d = 16.0;
+        while d < reach {
+            let r = d * spread;
+            draw_circle(cx + dx * d, cy + dy * d, r, colors[j % 2]);
+            d += r * 0.7;
+        }
+    }
+}
+
 /// Draw a soft glowing circle: a faint wide halo under a bright core. Good for thruster
 /// flames, muzzle flashes, and other small neon-lit particles.
 pub fn fill_glow_circle(cx: f32, cy: f32, r: f32, c: Color) {

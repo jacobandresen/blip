@@ -38,3 +38,33 @@ pub fn rects_overlap(
 ) -> bool {
     x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2
 }
+
+/// Deterministic scatter in `[0, 1)`: the same value for the same `k` and
+/// `salt` on every frame, so scenery (a crowd, stars, windows) can be placed
+/// without storing it. `k` indexes the thing, `salt` separates two uses.
+pub fn scatter(k: usize, salt: u32) -> f32 {
+    let mut h = (k as u32).wrapping_mul(2654435761).wrapping_add(salt);
+    h ^= h >> 15;
+    h = h.wrapping_mul(2246822519);
+    h ^= h >> 13;
+    (h % 1024) as f32 / 1024.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::scatter;
+
+    #[test]
+    fn scatter_is_the_same_every_time_and_stays_in_range() {
+        for k in 0..500 {
+            let v = scatter(k, 0x51);
+            assert!((0.0..1.0).contains(&v));
+            assert_eq!(v, scatter(k, 0x51));
+        }
+        // A different salt is a different scatter, and it does spread.
+        let differs = (0..100).filter(|&k| scatter(k, 1) != scatter(k, 2)).count();
+        assert!(differs > 90);
+        let mean = (0..1000).map(|k| scatter(k, 7)).sum::<f32>() / 1000.0;
+        assert!((0.4..0.6).contains(&mean), "mean {mean}");
+    }
+}

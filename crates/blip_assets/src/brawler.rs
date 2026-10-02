@@ -170,7 +170,7 @@ fn block_sfx() -> Vec<i16> {
     band(&mut buf, 0.0, 1300.0, 1.0, 0.6, 0.0005, 0.01, &mut rng);
     band(&mut buf, 0.004, 800.0, 0.8, 0.3, 0.002, 0.02, &mut rng);
     voice(&mut buf, 0.008, 0.07, 150.0, 140.0, UH, 0.9, 0.25, &mut rng);
-    render(buf, 12_000.0)
+    render(buf, 20_000.0)
 }
 
 /// A body going down on the boards: hips then shoulders landing as dull deep
@@ -196,7 +196,7 @@ fn land(seed: u32) -> Vec<i16> {
     band(&mut buf, 0.0, 150.0, 1.0, 1.4, 0.001, 0.02, &mut rng);
     band(&mut buf, 0.0, 420.0, 1.4, 0.5, 0.0005, 0.008, &mut rng);
     band(&mut buf, 0.0, 3000.0, 1.5, 0.3, 0.0003, 0.002, &mut rng);
-    render(buf, 10_000.0)
+    render(buf, 24_000.0)
 }
 
 /// The knockout: the finishing blow, a long cry falling away, and the body
@@ -367,7 +367,7 @@ fn quake() -> Vec<i16> {
     band(&mut buf, 0.0, 420.0, 0.9, 0.5, 0.001, 0.03, &mut rng);
     band(&mut buf, 0.2, 1500.0, 0.7, 0.12, 0.08, 0.12, &mut rng);
     soften(&mut buf, 1800.0);
-    render(buf, 9_000.0)
+    render(buf, 6_200.0)
 }
 
 /// A blow turned aside: steel on steel, bright and gone, over the knock of
@@ -497,6 +497,49 @@ fn heavy_swing() -> Vec<i16> {
     render(buf, 11_000.0)
 }
 
+/// The round called: three strokes on the big drum, closing up, and a rim
+/// shot to finish.
+fn drum_call() -> Vec<i16> {
+    let mut rng = Rng(0xD0D0);
+    let mut buf = vec![0.0f32; ms_to_samples(1100.0)];
+    for (ms, f, g) in [(0.0f32, 92.0f32, 0.9f32), (300.0, 98.0, 0.95), (520.0, 104.0, 1.0)] {
+        taiko(&mut buf, ms_to_samples(ms), f, g, &mut rng);
+    }
+    rim(&mut buf, ms_to_samples(680.0), 0.9, &mut rng);
+    soft_limit_to_pcm16(&buf, MIX_KNEE)
+}
+
+/// A barrel going: staves cracking one after another over the knock of the
+/// blow, and the hoops ringing on the boards.
+fn smash() -> Vec<i16> {
+    let mut rng = Rng(0x5A4A);
+    let mut buf = vec![0.0f32; (0.5 * SRF) as usize];
+    knock(&mut buf, 0.0, 170.0, 1.4, 0.02);
+    band(&mut buf, 0.0, 420.0, 1.0, 1.6, 0.001, 0.03, &mut rng);
+    for k in 0..6 {
+        let at = 0.012 + 0.022 * k as f32;
+        band(&mut buf, at, 1100.0 + 380.0 * ((k * 5) % 4) as f32, 2.2, 0.9 - 0.1 * k as f32, 0.0004, 0.006, &mut rng);
+    }
+    for (at, f) in [(0.16f32, 1900.0f32), (0.24, 2300.0)] { knock(&mut buf, at, f, 0.25, 0.03); }
+    render(buf, 8_000.0)
+}
+
+/// Birds round the head: four chirps, each a quick slide up.
+fn tweet() -> Vec<i16> {
+    let n = ms_to_samples(520.0);
+    let mut buf = vec![0.0f32; n];
+    let mut ph = 0.0f32;
+    for (i, out) in buf.iter_mut().enumerate() {
+        let t = i as f32 / SRF;
+        let k = (t / 0.13).fract();
+        let f = 1500.0 + 700.0 * k + 120.0 * ((t / 0.13).floor() % 2.0);
+        ph += 2.0 * std::f32::consts::PI * f / SRF;
+        let e = (k / 0.1).min(1.0) * (1.0 - k).powf(1.5) * (1.0 - t / 0.52);
+        *out = ph.sin() * e * 3900.0;
+    }
+    soft_limit_to_pcm16(&buf, MIX_KNEE)
+}
+
 /// A wood block: the menu moving a step.
 fn tick() -> Vec<i16> {
     let mut rng = Rng(0x71C4);
@@ -589,6 +632,10 @@ const HIRAJOSHI: [f32; 5] = [0.0, 1.0, 5.0, 7.0, 8.0];
 const YO: [f32; 5] = [0.0, 2.0, 5.0, 7.0, 9.0];
 const IN: [f32; 5] = [0.0, 1.0, 5.0, 7.0, 10.0];
 const MINOR: [f32; 5] = [0.0, 3.0, 5.0, 7.0, 10.0];
+/// The major pentatonic, open and heroic; and the minor with its fifth
+/// flattened, which is the blues.
+const MAJOR: [f32; 5] = [0.0, 2.0, 4.0, 7.0, 9.0];
+const BLUES: [f32; 5] = [0.0, 3.0, 5.0, 6.0, 10.0];
 
 fn degree(scale: &[f32; 5], root: f32, step: i32) -> f32 {
     let oct = step.div_euclid(5);
@@ -615,6 +662,17 @@ fn flute(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut R
     }
 }
 
+/// A struck glass: one clear partial and its octave, gone in half a second.
+/// Not tamed like the koto, so it can sit above the tune.
+fn chime(buf: &mut [f32], off: usize, freq: f32, gain: f32) {
+    let n = ms_to_samples(520.0).min(buf.len().saturating_sub(off));
+    for i in 0..n {
+        let t = i as f32 / SRF;
+        let ph = 2.0 * std::f32::consts::PI * freq * t;
+        buf[off + i] += (ph.sin() + 0.3 * (2.0 * ph).sin()) * (-t * 7.0).exp() * gain * 2400.0;
+    }
+}
+
 /// What a theme is made of. Phrases are four bars of sixteenths in scale
 /// degrees, so a tune cannot leave the scale; `bass` is a degree a bar.
 struct Theme<'a> {
@@ -629,13 +687,19 @@ struct Theme<'a> {
     order: &'a [usize],
     /// 0..1: how hard the drums push.
     drive: f32,
+    /// What the sticks do between the drum beats.
+    feel: Feel,
 }
+
+/// A theme's percussion besides the big drum.
+#[derive(Copy, Clone)]
+enum Feel { Rim, March, Push, Chime }
 
 /// A theme sequenced by `order` rather than looped: eight slots of four bars
 /// outlast the round, so no seam is heard.
 impl Theme<'_> {
 fn pcm(&self) -> Vec<i16> {
-    let Theme { bpm, root, scale, phrases, bass, order, drive } = *self;
+    let Theme { bpm, root, scale, phrases, bass, order, drive, feel } = *self;
     let step = (SAMPLE_RATE as f32 * 60.0 / bpm / 4.0) as usize; // 16ths
     let bars = 4 * order.len();
     let steps = bars * 16;
@@ -674,10 +738,35 @@ fn pcm(&self) -> Vec<i16> {
             let g = if last_slot { 0.7 } else { 0.5 } + 0.15 * drive;
             taiko(&mut buf, off, 92.0 + (b as f32 - 10.0) * 14.0, g, &mut rng);
         }
-        // Rim on the off-beats, denser on a driving stage.
-        if b % 4 == 2 && !(lull && b == 10) { rim(&mut buf, off, 0.5, &mut rng); }
-        if b % 8 == 7 && !hush { rim(&mut buf, off, 0.32, &mut rng); }
-        if drive > 0.5 && b % 4 == 3 && !lull { rim(&mut buf, off, 0.18, &mut rng); }
+        match feel {
+            // A parade ground: the rim on every beat, and a roll into each
+            // new phrase.
+            Feel::March => {
+                if b % 4 == 0 && !hush { rim(&mut buf, off, 0.36, &mut rng); }
+                if b % 4 == 2 { rim(&mut buf, off, 0.5, &mut rng); }
+                if last_bar && b >= 12 { rim(&mut buf, off, 0.22 + 0.06 * (b - 12) as f32, &mut rng); }
+            }
+            // The city: every rim pushed a sixteenth ahead of where it is
+            // expected, and a soft drum in the gap.
+            Feel::Push => {
+                if b % 4 == 3 && !(lull && b == 11) { rim(&mut buf, off, 0.46, &mut rng); }
+                if b == 6 && !lull { taiko(&mut buf, off, 132.0, 0.4, &mut rng); }
+            }
+            // Ice: no sticks at all, and a chime answering the drum from
+            // high above the tune.
+            Feel::Chime => {
+                if b % 8 == 4 {
+                    let d = line[bar % line.len()];
+                    chime(&mut buf, off, degree(scale, root, d + 4) * 2.0, if lull { 0.35 } else { 0.5 });
+                }
+            }
+            // Rim on the off-beats, denser on a driving stage.
+            Feel::Rim => {
+                if b % 4 == 2 && !(lull && b == 10) { rim(&mut buf, off, 0.5, &mut rng); }
+                if b % 8 == 7 && !hush { rim(&mut buf, off, 0.32, &mut rng); }
+                if drive > 0.5 && b % 4 == 3 && !lull { rim(&mut buf, off, 0.18, &mut rng); }
+            }
+        }
 
         // The koto line.
         let note = melody[within % melody.len()];
@@ -741,7 +830,7 @@ fn wrap_tail(buf: &mut [f32], body: usize) {
 /// The themes, synthesised on the device rather than baked in: a
 /// round-length theme is megabytes of PCM, the code a couple of hundred
 /// lines. 0 docks, 1 temple, 2 the select screen, 3 air base, 4 bath house,
-/// 5 river village.
+/// 5 river village, 6 crystal fortress, 7 rooftop.
 pub fn theme_wav(which: usize) -> Vec<u8> {
     // The docks, the temple and the select screen are on hirajoshi and differ
     // in pace and density; each later stage has a scale of its own.
@@ -848,6 +937,42 @@ pub fn theme_wav(which: usize) -> Vec<u8> {
                3, R, R, R, R, R, R, R, 2, R, R, R, 1, R, R, R,
                0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R];
 
+    // -- the crystal fortress: slow and open, on the major pentatonic ------
+    let f_a = [0, R, R, R, 3, R, R, R, R, R, R, R, 4, R, 3, R,
+               5, R, R, R, R, R, R, R, 4, R, R, R, 3, R, R, R,
+               0, R, R, R, 3, R, R, R, R, R, R, R, 4, R, 5, R,
+               6, R, R, R, R, R, 5, R, 5, R, R, R, R, R, R, R];
+    let f_b = [5, R, R, R, 4, R, R, R, 3, R, R, R, R, R, 2, R,
+               3, R, R, R, R, R, R, R, 2, R, R, R, 0, R, R, R,
+               5, R, R, R, 4, R, R, R, 3, R, R, R, 4, R, 5, R,
+               6, R, R, R, R, R, R, R, 5, R, R, R, R, R, R, R];
+    let f_c = [2, R, R, R, 3, R, R, R, 4, R, R, R, R, R, R, R,
+               3, R, R, R, 4, R, R, R, 5, R, R, R, R, R, R, R,
+               4, R, R, R, 5, R, R, R, 6, R, R, R, R, R, 5, R,
+               4, R, R, R, 3, R, R, R, 0, R, R, R, R, R, R, R];
+    let f_d = [0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R,
+               3, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R,
+               2, R, R, R, R, R, R, R, 4, R, R, R, R, R, R, R,
+               0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R];
+
+    // -- the rooftop: pushed off the beat, on the blues -------------------
+    let q_a = [0, R, R, 0, R, R, 1, R, 2, R, 3, R, 2, R, 1, R,
+               0, R, R, R, R, R, 4, R, R, R, 3, R, 2, R, R, R,
+               0, R, R, 0, R, R, 1, R, 2, R, 3, R, 4, R, 5, R,
+               4, R, R, 3, R, R, 2, R, 0, R, R, R, R, R, R, R];
+    let q_b = [5, R, R, R, 4, R, R, 5, R, R, 4, R, 3, R, 2, R,
+               4, R, R, R, 3, R, R, 4, R, R, 3, R, 2, R, 1, R,
+               5, R, R, R, 4, R, R, 5, R, R, 6, R, 5, R, 4, R,
+               3, R, 2, R, 1, R, 2, R, 0, R, R, R, R, R, R, R];
+    let q_c = [2, R, 2, R, R, R, 3, R, 2, R, R, R, 1, R, 0, R,
+               2, R, 2, R, R, R, 3, R, 4, R, R, R, R, R, R, R,
+               5, R, 5, R, R, R, 4, R, 3, R, R, R, 2, R, 1, R,
+               0, R, R, 1, R, R, 2, R, 0, R, R, R, R, R, R, R];
+    let q_d = [0, R, R, R, R, R, R, R, 2, R, R, R, R, R, 1, R,
+               0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R,
+               3, R, R, R, R, R, R, R, 2, R, R, R, R, R, 1, R,
+               0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R];
+
     // A note a bar under each, so the ground moves.
     let b0 = [0, 0, 3, 2];
     let b1 = [2, 3, 4, 2];
@@ -858,18 +983,85 @@ pub fn theme_wav(which: usize) -> Vec<u8> {
     // without the piece repeating. Slot 3 is the hushed one.
     let order = [0usize, 1, 0, 3, 2, 1, 0, 1];
     let bass: [&[i32]; 4] = [&b0, &b1, &b2, &b3];
-    let stage = |bpm, root, scale, phrases: [&[i32]; 4], drive| Theme {
-        bpm, root, scale, phrases: &phrases, bass: &bass, order: &order, drive,
+    let stage = |bpm, root, scale, phrases: [&[i32]; 4], drive, feel| Theme {
+        bpm, root, scale, phrases: &phrases, bass: &bass, order: &order, drive, feel,
     }.pcm();
     encode_pcm16_music(&match which {
-        0 => stage(132.0, 196.00, &HIRAJOSHI, [&d_a, &d_b, &d_c, &d_d], 1.0),
-        1 => stage(108.0, 220.00, &HIRAJOSHI, [&t_a, &t_b, &t_c, &t_d], 0.2),
-        3 => stage(144.0, 174.61, &MINOR, [&a_a, &a_b, &a_c, &a_d], 1.0),
-        4 => stage(120.0, 196.00, &YO, [&h_a, &h_b, &h_c, &h_d], 0.4),
-        5 => stage(100.0, 164.81, &IN, [&v_a, &v_b, &v_c, &v_d], 0.7),
+        0 => stage(132.0, 196.00, &HIRAJOSHI, [&d_a, &d_b, &d_c, &d_d], 1.0, Feel::Rim),
+        1 => stage(108.0, 220.00, &HIRAJOSHI, [&t_a, &t_b, &t_c, &t_d], 0.2, Feel::Rim),
+        3 => stage(144.0, 174.61, &MINOR, [&a_a, &a_b, &a_c, &a_d], 1.0, Feel::March),
+        4 => stage(120.0, 196.00, &YO, [&h_a, &h_b, &h_c, &h_d], 0.4, Feel::Rim),
+        5 => stage(100.0, 164.81, &IN, [&v_a, &v_b, &v_c, &v_d], 0.7, Feel::Rim),
+        6 => stage(104.0, 196.00, &MAJOR, [&f_a, &f_b, &f_c, &f_d], 0.1, Feel::Chime),
+        7 => stage(126.0, 185.00, &BLUES, [&q_a, &q_b, &q_c, &q_d], 0.9, Feel::Push),
         _ => Theme { bpm: 118.0, root: 207.65, scale: &HIRAJOSHI, phrases: &[&s_a, &s_b],
-                     bass: &[&b2, &b0], order: &[0, 1, 0, 1], drive: 0.0 }.pcm(),
+                     bass: &[&b2, &b0], order: &[0, 1, 0, 1], drive: 0.0, feel: Feel::Rim }.pcm(),
     })
+}
+
+/// What a stage sounds like under the fight, as a loop: 0 a crowd murmuring,
+/// 1 wind over ice with nobody there, 2 the crowd with crickets in the trees
+/// behind it, 3 the crowd over the hum of a city. Built at startup like the
+/// crowd.
+pub fn ambience_wav(kind: usize) -> Vec<u8> {
+    let body = ms_to_samples(4000.0);
+    let fade = ms_to_samples(400.0);
+    let mut buf = vec![0.0f32; body + fade];
+    let mut rng = Rng(0xA3B1 + kind as u32);
+    let (mut lp, mut hp, mut bp, mut low) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+    for (i, out) in buf.iter_mut().enumerate() {
+        let t = i as f32 / body as f32;
+        let turn = |cycles: f32, at: f32| (std::f32::consts::TAU * (cycles * t + at)).sin();
+        let noise = rng.next_f32() * 2.0 - 1.0;
+        *out = if kind != 1 {
+            // Voices: the middle of the band, swelling here and there.
+            lp += (noise - lp) * 0.30;
+            hp += (lp - hp) * 0.030;
+            let crowd = (lp - hp) * (1.0 + 0.25 * turn(3.0, 0.0) + 0.18 * turn(7.0, 0.3) + 0.12 * turn(11.0, 0.7)) * 5200.0;
+            let secs = t * 4.0;
+            crowd + match kind {
+                // Crickets: a high note chopped into chirps, three to a burst.
+                2 => {
+                    let burst = (secs * 2.5).fract() < 0.45;
+                    let chop = (secs * 31.0).fract() < 0.5;
+                    if burst && chop { (std::f32::consts::TAU * 3900.0 * secs).sin() * 420.0 } else { 0.0 }
+                }
+                // The city: a low drone that beats slowly against itself.
+                3 => ((std::f32::consts::TAU * 58.0 * secs).sin() + (std::f32::consts::TAU * 61.25 * secs).sin()) * 800.0,
+                _ => 0.0,
+            }
+        } else {
+            // Wind: a narrow band whose pitch rises and falls with the gusts.
+            let gust = 0.5 + 0.5 * turn(1.0, 0.0) * turn(3.0, 0.2);
+            let f = 2.0 * (std::f32::consts::PI * (260.0 + 420.0 * gust) / SRF).sin();
+            let high = noise - low - 0.35 * bp;
+            bp += f * high;
+            low += f * bp;
+            bp * (0.35 + 0.65 * gust) * 9000.0
+        };
+    }
+    // The tail is laid over the head, each fading as the other comes in, so
+    // the loop has no seam.
+    for i in 0..fade {
+        let k = i as f32 / fade as f32;
+        buf[i] = buf[i] * k + buf[body + i] * (1.0 - k);
+    }
+    buf.truncate(body);
+    encode_pcm16_music(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+}
+
+/// A heart going hard: two low thuds and a rest, to loop while a fighter is
+/// nearly out.
+fn heartbeat() -> Vec<i16> {
+    let mut rng = Rng(0x4EA7);
+    let mut buf = vec![0.0f32; (0.86 * SRF) as usize];
+    for (at, amp) in [(0.0f32, 1.0f32), (0.21, 0.7)] {
+        knock(&mut buf, at, 58.0, amp * 1.6, 0.05);
+        band(&mut buf, at, 90.0, 1.2, amp * 1.2, 0.004, 0.03, &mut rng);
+    }
+    soften(&mut buf, 900.0);
+    let scaled: Vec<f32> = buf.iter().map(|v| v * 3300.0).collect();
+    soft_limit_to_pcm16(&scaled, MIX_KNEE)
 }
 
 /// The crowd, built at startup: 2.5 s of PCM is a quarter of a megabyte for a
@@ -886,6 +1078,12 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/hit_light.wav",  encode_pcm16_mono(&hit(300.0, 0.15, 0x11))),
         ("sounds/hit_light2.wav", encode_pcm16_mono(&hit(380.0, 0.2, 0x1b))),
         ("sounds/hit_light3.wav", encode_pcm16_mono(&hit(470.0, 0.25, 0x2f))),
+        // A second take of each, a shade lower and from another seed: the
+        // same blow twice running should not be the same recording twice.
+        ("sounds/hit_light_b.wav",  encode_pcm16_mono(&hit(284.0, 0.18, 0x51))),
+        ("sounds/hit_light2_b.wav", encode_pcm16_mono(&hit(360.0, 0.23, 0x5b))),
+        ("sounds/hit_light3_b.wav", encode_pcm16_mono(&hit(446.0, 0.28, 0x6f))),
+        ("sounds/hit_heavy_b.wav",  encode_pcm16_mono(&hit(216.0, 1.0, 0x62))),
         ("sounds/hit_heavy.wav",  encode_pcm16_mono(&hit(230.0, 1.0, 0x22))),
         // A knockdown: a body on the boards, lower and longer than any hit.
         ("sounds/crunch.wav",    encode_pcm16_mono(&crunch())),
@@ -907,6 +1105,10 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/gong.wav",      encode_pcm16_music(&gong())),
         ("sounds/bellow.wav",    encode_pcm16_music(&bellow())),
         ("sounds/swing.wav",     encode_pcm16_mono(&heavy_swing())),
+        ("sounds/drums.wav",     encode_pcm16_music(&drum_call())),
+        ("sounds/smash.wav",     encode_pcm16_mono(&smash())),
+        ("sounds/tweet.wav",     encode_pcm16_mono(&tweet())),
+        ("sounds/heart.wav",     encode_pcm16_music(&heartbeat())),
         ("sounds/whistle.wav",   encode_pcm16_mono(&whistle())),
         ("sounds/thwip.wav",     encode_pcm16_mono(&thwip())),
         ("sounds/win.wav",       encode_pcm16_music(&verdict(true))),

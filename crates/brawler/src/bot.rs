@@ -31,7 +31,18 @@ pub fn menus(g: &mut Game, t: f32) {
             g.p[1] = Fighter { rounds: g.p[1].rounds, ..Fighter::new(foe, 440.0, -1.0) };
         }
     }
-    let fire = matches!(g.state, State::Title | State::Select | State::Over | State::Won);
+    // BLIP_BOT_CONTINUES=n takes a lost fight again, up to n times.
+    static USED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    static LAST: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    let allowed = std::env::var("BLIP_BOT_CONTINUES").ok().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+    let at_continue = g.state == State::Continue;
+    if at_continue && !LAST.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        USED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+    if !at_continue { LAST.store(false, std::sync::atomic::Ordering::Relaxed); }
+    let again = at_continue && USED.load(std::sync::atomic::Ordering::Relaxed) <= allowed;
+    // (It taps through the result screen too, as a player does.)
+    let fire = again || matches!(g.state, State::Title | State::Select | State::MatchEnd | State::Over | State::Won);
     blip::bot::hold(if fire && tap { &[BLIP_KEY_SPACE] } else { &[] });
 }
 
@@ -85,6 +96,15 @@ pub fn fight(g: &Game, dt: f32) -> Input {
         if me.airborne() { inp.kick_low = me.act == Act::Air && me.vy > 0.0; }
         else if b.next_attack <= 0.0 && me.free() { inp.up = true; b.next_attack = 2.0; }
         return inp;
+    }
+    // Somebody coming down on top of it: the uppercut, most of the time.
+    if foe.airborne() && dist < attack_range(&me, MoveId::Uppercut) && me.free() && b.next_attack <= 0.0 {
+        b.next_attack = 0.5;
+        if gen_range(0.0, 1.0) < 0.7 {
+            inp.down = true;
+            inp.punch_low = true;
+            return inp;
+        }
     }
     let reach = attack_range(&me, MoveId::HighKick);
     if dist > reach + 10.0 {

@@ -26,6 +26,11 @@ change will be overwritten the next time the project is built.
 | macroquad JS runtime (vendored, do not edit) | `web/mq_js_bundle.js` |
 | Game logic, rendering, audio (Rust side) | `crates/<name>/src/main.rs` |
 | Shared engine library (blip API) | `crates/blip/src/*.rs` |
+| Colour maths, deterministic scatter, capsules, outlined text | `crates/blip/src/{color,math,draw,font}.rs` |
+| Brawler: the roster, the move table, the rules, the CPU | `crates/brawler/src/{roster,moves,rules,cpu}.rs` |
+| Brawler: stages, fighter parts, poses, screens | `crates/brawler/src/draw/{stage,parts,pose,screens}.rs` |
+| Brawler: screenshot scenes (`BLIP_SHOT_SCENE`) | `crates/brawler/src/shots.rs` |
+| Brawler: tests, by theme (rules, anatomy, ladder, balance, ...) | `crates/brawler/src/tests/*.rs` |
 | Score popups, bursts, rings (`blip::Fx`) | `crates/blip/src/fx.rs` |
 | Music playback (`blip::Jukebox`) | `crates/blip/src/audio.rs` |
 | Asset generators (sprites + WAV) | `crates/blip_assets/src/<game>.rs` |

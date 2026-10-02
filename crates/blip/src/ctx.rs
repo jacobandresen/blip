@@ -752,6 +752,16 @@ impl Blip {
     pub fn fill_circle(&self, cx: f32, cy: f32, r: f32, c: Color) {
         draw::fill_circle(cx, cy, r, c);
     }
+    /// Draw a tapered capsule between two points; see [`draw::fill_capsule`].
+    #[inline]
+    pub fn fill_capsule(&self, x1: f32, y1: f32, x2: f32, y2: f32, r1: f32, r2: f32, c: Color) {
+        draw::fill_capsule(x1, y1, x2, y2, r1, r2, c);
+    }
+    /// Draw a two-colour sunburst; see [`draw::fill_sunburst`].
+    #[inline]
+    pub fn fill_sunburst(&self, cx: f32, cy: f32, rays: usize, turn: f32, reach: f32, colors: [Color; 2]) {
+        draw::fill_sunburst(cx, cy, rays, turn, reach, colors);
+    }
     /// Draw a soft glowing circle — halo under a bright core. Good for thruster flames,
     /// muzzle flashes, and explosion particles.
     #[inline]
@@ -800,6 +810,16 @@ impl Blip {
     #[inline]
     pub fn draw_text(&self, text: &str, x: f32, y: f32, sz: f32, color: Color) {
         font::draw_text(text, x, y, sz, color);
+    }
+    /// Draw a left-aligned string outlined in `ink`, to be read over a picture.
+    #[inline]
+    pub fn draw_text_outlined(&self, text: &str, x: f32, y: f32, sz: f32, color: Color, ink: Color) {
+        font::draw_text_outlined(text, x, y, sz, color, ink);
+    }
+    /// Draw an outlined string centred on `cx`.
+    #[inline]
+    pub fn draw_centered_outlined(&self, text: &str, cx: f32, y: f32, sz: f32, color: Color, ink: Color) {
+        font::draw_text_outlined(text, cx - font::text_width(text, sz) / 2.0, y, sz, color, ink);
     }
     /// Draw an integer as text — avoids a `format!` call.
     #[inline]
