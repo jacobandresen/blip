@@ -653,10 +653,16 @@ function pollGamepad(onDown, onUp) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);
   else build();
 
-  // Esc, or the browser's own way out, turns the mode off. A page load also
-  // drops real fullscreen, but fires nothing, so the choice survives it.
+  // Esc, or the browser's own way out, turns the mode off. Leaving the page
+  // drops real fullscreen too, and that must not count: the choice has to
+  // survive into the next page.
+  var leaving = false;
+  ['beforeunload', 'pagehide'].forEach(function (ev) {
+    window.addEventListener(ev, function () { leaving = true; });
+  });
   ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) {
     document.addEventListener(ev, function () {
+      if (leaving) return;
       if (!inBrowserFullscreen() && root.hasAttribute('data-fullscreen')) set(false);
       place();
     });
