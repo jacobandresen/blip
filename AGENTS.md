@@ -116,6 +116,12 @@ BLIP_BOT=1 BLIP_BOT_MAXT=300 xvfb-run -a -s "-screen 0 720x810x24" target/releas
 `BLIP_BOT_SHOTS=dir` saves a frame every `BLIP_BOT_SHOT_EVERY` seconds. Run
 one game at a time.
 
+## Pixel text
+
+Draw text at whole-number sizes (`draw_text(.., 2.0, ..)`). The font is a
+pixel grid: at 1.5 or 2.5 its rows come out uneven, and a phone shows a
+680px game at half size, where anything under 2 cannot be read.
+
 ## Comments
 
 Keep them short. A comment earns its place by saying something the code
