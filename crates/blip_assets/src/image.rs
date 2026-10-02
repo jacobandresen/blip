@@ -41,6 +41,10 @@ impl Image {
             let mut enc = Encoder::new(&mut out, self.w, self.h);
             enc.set_color(ColorType::Rgba);
             enc.set_depth(BitDepth::Eight);
+            // The crate's default is its fastest deflate, which left the
+            // carrier at 254 KB; this is 12 times smaller, at build time only.
+            enc.set_compression(png::Compression::Best);
+            enc.set_adaptive_filter(png::AdaptiveFilterType::Adaptive);
             let mut writer = enc.write_header().expect("png header");
             writer.write_image_data(&self.px).expect("png data");
         }
