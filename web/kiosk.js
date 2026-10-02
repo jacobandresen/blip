@@ -566,12 +566,9 @@ function pollGamepad(onDown, onUp) {
   });
 }());
 
-/* ---- Fullscreen ---- One button, on every page with a coin slot. It sets
- * <html data-fullscreen> (each page's CSS decides what that hides) and asks
- * the browser for real fullscreen. The choice is stored, so a kiosk stays
- * fullscreen from the cabinet into a game and back; the browser drops real
- * fullscreen on every page load and only gives it back on a key or a click,
- * so the first one on each page asks again. The button or Esc turns it off. */
+/* ---- Fullscreen ---- One button beside every coin slot sets <html
+ * data-fullscreen> (each page's CSS decides what that hides) and stores it.
+ * A page load drops real fullscreen; the first key or click asks again. */
 (function () {
   var root = document.documentElement;
   var KEY = 'blip-fullscreen';

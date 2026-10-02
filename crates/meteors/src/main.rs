@@ -685,7 +685,7 @@ fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, level: i32, color: BlipCol
     let right = (ship.x - fwd.0 * 10.0 + side.0 * 9.0, ship.y - fwd.1 * 10.0 + side.1 * 9.0);
     let tail = (ship.x - fwd.0 * 4.0, ship.y - fwd.1 * 4.0);
     let hull = [(nose, left), (left, tail), (tail, right), (right, nose)];
-    for (back, age) in smear_echoes(level) {
+    for (back, age) in smear_echoes(blip, level) {
         let (dx, dy) = (ship.vx * back, ship.vy * back);
         for (p, q) in hull {
             smear_line(blip, (p, q), ((p.0 - dx, p.1 - dy), (q.0 - dx, q.1 - dy)), age, color);
@@ -710,8 +710,9 @@ type Seg = ((f32, f32), (f32, f32));
 
 /// The echoes a moving line leaves, oldest first: how many seconds back each
 /// one stands, and how bright it is for its age. Both grow with the wave.
-fn smear_echoes(level: i32) -> impl Iterator<Item = (f32, f32)> {
-    let n = (1 + level).min(SMEAR_ECHOES);
+fn smear_echoes(blip: &Blip, level: i32) -> impl Iterator<Item = (f32, f32)> {
+    // A device already short of frame time gets four at most.
+    let n = (1 + level).min(if blip.low_power() { 4 } else { SMEAR_ECHOES });
     let reach = (SMEAR_REACH * (1 + level) as f32).min(SMEAR_REACH_MAX);
     (1..=n).rev().map(move |e| (reach * e as f32 / n as f32, 1.0 - (e - 1) as f32 / n as f32))
 }
@@ -826,9 +827,8 @@ fn draw_thread(blip: &Blip, p: (f32, f32), q: (f32, f32), bow: f32, pulse: f32, 
 }
 
 /// Green and purple patches behind the field, a mushroom at the heart of
-/// each, wandering and coming and going on clocks of their own. Wave by wave
-/// they fill out, swell and stay, until little of the black is left. From
-/// wave 3 threads run between the mushrooms, and later out to the rocks.
+/// each, coming and going on clocks of their own; by HAZE_FULL_WAVE little
+/// black is left. From wave 3 threads join the mushrooms, later the rocks.
 fn draw_haze(blip: &Blip, blot: &Texture2D, rocks: &[Asteroid], level: i32, t: f32) {
     let full = ((level - 1) as f32 / (HAZE_FULL_WAVE - 1) as f32).clamp(0.0, 1.0);
     let patch = |i: usize| {
@@ -887,12 +887,17 @@ fn draw_asteroid(blip: &Blip, a: &Asteroid, level: i32, t: f32) {
     let flower = is_flower(a, level);
     let lines = outline(a, flower);
     let at = |p: (f32, f32)| (a.x + p.0, a.y + p.1);
-    for (back, age) in smear_echoes(level) {
+    for (back, age) in smear_echoes(blip, level) {
         // Where the rock was: drifted back, and turned back about its centre.
         let (ox, oy) = (a.x - a.vx * back, a.y - a.vy * back);
         let (s, k) = (-a.spin * back).sin_cos();
         let was = |p: (f32, f32)| (ox + p.0 * k - p.1 * s, oy + p.0 * s + p.1 * k);
-        for &(p, q) in &lines { smear_line(blip, (at(p), at(q)), (was(p), was(q)), age, c); }
+        // A flower's echoes are drawn at half the outline's detail: two
+        // lines as one, which halves the busiest thing on a late wave.
+        for pair in lines.chunks(if flower { 2 } else { 1 }) {
+            let (p, q) = (pair[0].0, pair[pair.len() - 1].1);
+            smear_line(blip, (at(p), at(q)), (was(p), was(q)), age, c);
+        }
     }
     for &(p, q) in &lines {
         let (p, q) = (at(p), at(q));
@@ -923,7 +928,7 @@ fn draw_saucer(blip: &Blip, s: &Saucer, level: i32) {
         (x - dw / 2.0, y + h),
     ];
     let pts = hull(s.x, s.y);
-    for (back, age) in smear_echoes(level) {
+    for (back, age) in smear_echoes(blip, level) {
         let was = hull(s.x - s.vx * back, s.y - (s.wave_t * 2.0).sin() * 24.0 * back);
         for i in 0..pts.len() {
             let j = (i + 1) % pts.len();
@@ -973,7 +978,7 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
         };
         let (p, q) = shard(0.0);
         // no echo from before the burst
-        for (back, age) in smear_echoes(g.sess.level).filter(|e| e.0 < d.ttl0 - d.ttl) {
+        for (back, age) in smear_echoes(blip, g.sess.level).filter(|e| e.0 < d.ttl0 - d.ttl) {
             smear_line(blip, (p, q), shard(back), age, col);
         }
         blip.draw_line(p.0, p.1, q.0, q.1, col);
@@ -989,7 +994,7 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
         let c = if !b.from_player { NEON_PINK }
             else if g.sess.level >= 3 { hsv(t * 0.8 + b.x * 0.004, 0.6, 1.0, 1.0) } else { NEON_YELLOW };
         // a shot's echoes are dots, back to the muzzle and no further
-        for (back, age) in smear_echoes(g.sess.level).filter(|e| e.0 < BULLET_TTL - b.ttl) {
+        for (back, age) in smear_echoes(blip, g.sess.level).filter(|e| e.0 < BULLET_TTL - b.ttl) {
             let (ex, ey) = (b.x - b.vx * back, b.y - b.vy * back);
             // a shot's own echoes follow it round the wrap
             let (ex, ey) = if b.from_player {

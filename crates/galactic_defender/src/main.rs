@@ -110,10 +110,9 @@ const DEATH_EXPLOSION_PHASE: f32 = 0.7; // seconds of that pause spent on the gi
                                          // remainder (DEAD_PAUSE - this) is the mist fade-in
 const RESPAWN_GRACE_SECS: f32 = 1.2; // once play resumes, firing stays locked out this long
 // ---- divers ----------------------------------------------------------------
-// From DIVE_LEVEL one alien at a time leaves the bottom of the formation and
-// swoops at the ship. It shakes for DIVE_TELL first, steers slower than the
-// ship moves (200 px/s), breaks any shield block it crosses, and is worth
-// double shot on the way down.
+// From DIVE_LEVEL one alien at a time shakes for DIVE_TELL, then swoops at
+// the ship: steering slower than the ship's 200 px/s, through any shield
+// block in its way, and worth double shot on the way down.
 const DIVE_LEVEL: i32 = 3;
 const DIVE_EVERY: (i32, i32) = (7, 12); // seconds between dives
 const DIVE_TELL: f32 = 0.8;
@@ -490,6 +489,7 @@ impl Game {
 struct Sounds {
     shoot: blip::BlipSound,
     explosion: blip::BlipSound,
+    dive: blip::BlipSound,
     level_clear: blip::BlipSound,
     ufo_siren: blip::BlipSound,
     march: [blip::BlipSound; 4],
@@ -935,7 +935,7 @@ fn update_diver(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
             g.aliens[idx].alive = false;
             g.dive_pick = None;
             g.diver = Some(Diver { x: a.x, y: a.y, kind: a.kind, t: 0.0 });
-            play_sfx(&sfx.shoot);
+            play_sfx(&sfx.dive);
         } else {
             g.dive_pick = Some((idx, left - dt));
         }
@@ -1455,6 +1455,7 @@ const UFO_SAUCER_6_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets
 const UFO_SAUCER_7_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_7.png"));
 const SHOOT_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot.wav"));
 const EXPLOSION_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/explosion.wav"));
+const DIVE_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/dive.wav"));
 const LEVEL_CLEAR_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/level_clear.wav"));
 const UFO_SIREN_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ufo_siren.wav"));
 const LASER_CHARGE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/laser_charge.wav"));
@@ -1490,6 +1491,7 @@ async fn main() {
     let sfx = Sounds {
         shoot:       blip::audio::load_sound(SHOOT_WAV).await,
         explosion:   blip::audio::load_sound(EXPLOSION_WAV).await,
+        dive:        blip::audio::load_sound(DIVE_WAV).await,
         level_clear: blip::audio::load_sound(LEVEL_CLEAR_WAV).await,
         ufo_siren:   blip::audio::load_sound(UFO_SIREN_WAV).await,
         march: [

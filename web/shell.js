@@ -73,11 +73,13 @@ updateCoinsHud();
 }());
 
 // A kiosk nobody is playing goes back to the cabinet: in fullscreen, two
-// minutes without a key, a touch or a pad press (the deck and a gamepad both
-// arrive as key events on the canvas).
+// minutes without a key, a touch or a pad press (deck and gamepad arrive as
+// key events on the canvas); 40 s when the cabinet's attract loop opened it.
 (function () {
-  var IDLE_MS = 120000, last = Date.now();
-  function poke() { last = Date.now(); }
+  var attract = false;
+  try { attract = sessionStorage.getItem('blip-attract') === '1'; sessionStorage.removeItem('blip-attract'); } catch (e) {}
+  var IDLE_MS = attract ? 40000 : 120000, last = Date.now();
+  function poke() { last = Date.now(); IDLE_MS = 120000; }
   ['keydown', 'pointerdown', 'pointermove', 'touchstart'].forEach(function (ev) {
     window.addEventListener(ev, poke, { capture: true, passive: true });
   });
@@ -443,10 +445,9 @@ function fillCanvas() {
   syncBuffer();
 }
 
-/** The macroquad runtime sizes the canvas's drawing buffer on a window
- * resize only (its window.onresize). A layout change that moves the canvas
- * without one (fullscreen on or off, another controller) would leave the
- * game drawing for the old size, stretched into the new box. */
+/** The macroquad runtime sizes the drawing buffer on window resize only
+ * (its window.onresize); a layout change without one (fullscreen, another
+ * controller) would leave the game drawn for the old size, stretched. */
 function syncBuffer() {
   if (canvas.width === canvas.clientWidth && canvas.height === canvas.clientHeight) return;
   if (typeof window.onresize !== 'function') return;

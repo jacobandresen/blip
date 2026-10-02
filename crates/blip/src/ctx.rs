@@ -108,10 +108,9 @@ vec2 curve(vec2 p) {
     return p * 0.5 + 0.5;
 }
 
-// Cheap ordered dither — breaks up 8-bit banding in the dark gradients. The
-// pixel is wrapped to a 64px cell: unwrapped, the dot product passes 65504
-// (the 16-bit float limit) toward the top right of a 1080p canvas, and the
-// NaN that follows blacks the picture out there.
+// Cheap ordered dither against 8-bit banding in the dark gradients. The pixel
+// is wrapped to a 64px cell: unwrapped, the dot product passes the 16-bit
+// float limit toward the top right of a 1080p canvas and the result is NaN.
 float dither(vec2 p) {
     return fract(sin(dot(mod(floor(p), 64.0), vec2(12.9898, 78.233))) * 43758.5453);
 }
@@ -722,6 +721,10 @@ impl Blip {
     }
 
     // ----- drawing helpers — see blip::draw and blip::font for full docs -----
+
+    /// The device could not hold the frame rate and the post-process has
+    /// stepped down: a game can spend less on its own effects too.
+    pub fn low_power(&self) -> bool { self.fx_level > 0 }
 
     /// Set the strength of the screen's phosphor bloom, 0.0 (none) to 1.0
     /// (the default, tuned for bright lines on a black field).

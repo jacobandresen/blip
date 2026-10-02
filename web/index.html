@@ -1353,8 +1353,8 @@
       }
 
       // A kiosk left alone (fullscreen, 20 s without input) walks the
-      // selection through the games, so the whole catalogue passes the
-      // screen. Any input stops it.
+      // selection through the games; after 90 s it opens the lit one to show
+      // its title screen (shell.js brings it back). Any input stops it.
       var lastInput = Date.now();
       function poke() { lastInput = Date.now(); }
       ['keydown', 'pointerdown', 'pointermove', 'wheel', 'touchstart'].forEach(function (ev) {
@@ -1362,7 +1362,18 @@
       });
       setInterval(function () {
         if (!document.documentElement.hasAttribute('data-fullscreen') || document.hidden) return;
-        if (Date.now() - lastInput >= 20000) move(1);
+        var idle = Date.now() - lastInput;
+        if (idle >= 90000) {
+          var href = cards[idx].getAttribute('href') || '';
+          try {
+            sessionStorage.setItem('blip-attract', '1');
+            // so the walk carries on from here when it comes back
+            sessionStorage.setItem('blip-last-game', href.split('/')[0]);
+          } catch (e) {}
+          window.location.href = href;
+        } else if (idle >= 20000) {
+          move(1);
+        }
       }, 5000);
 
       function activate() {

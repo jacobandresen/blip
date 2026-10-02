@@ -367,6 +367,12 @@ fn shoot_sfx() -> Vec<u8> {
     cosy::finish_warm(cosy::glide(0.11, 1300.0, 620.0, Tone::Sine, 1.2, 25.0), 15_000.0)
 }
 
+/// A diver leaving the formation: the theremin swooping down a ninth, with
+/// a wobble, so the dive is heard as well as seen.
+fn dive_sfx() -> Vec<u8> {
+    cosy::sfx(&cosy::glide(0.55, 1100.0, 480.0, Tone::Sine, 0.9, 30.0))
+}
+
 /// An alien hit: a soft pop and a bloop tumbling down, no hiss.
 fn explosion_sfx() -> Vec<u8> {
     let pop = cosy::snap(0.06, 900.0, 0xDEF1);
@@ -395,6 +401,7 @@ pub fn generate() -> Vec<Asset> {
         ("images/ufo_saucer_7.png",  ufo_saucer(7)),
         ("sounds/shoot.wav",       shoot_sfx()),
         ("sounds/explosion.wav",   explosion_sfx()),
+        ("sounds/dive.wav",        dive_sfx()),
         ("sounds/game_over.wav",   game_over_sfx()),
         ("sounds/march1.wav",      march_thump(98.0)),
         ("sounds/march2.wav",      march_thump(87.0)),
