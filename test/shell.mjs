@@ -154,6 +154,26 @@ test('the game shell', async (t) => {
     assert.equal(await evaluate(cdp, "document.documentElement.hasAttribute('data-cursor-idle')"), true);
   });
 
+  await t.test('on the cabinet, up and down move the selection a row', async (t) => {
+    const cdp = await browser(t, 9407);
+    await open(cdp, 'index.html');
+    const lit = "Array.prototype.findIndex.call(document.querySelectorAll('.card'), function (c) { return c.classList.contains('card-focused'); })";
+    const cols = await evaluate(cdp, `(function(){var c=document.querySelectorAll('.card'),t=c[0].getBoundingClientRect().top,n=0;
+      while(n<c.length&&Math.abs(c[n].getBoundingClientRect().top-t)<2)n++;return n;})()`);
+    const n = await evaluate(cdp, "document.querySelectorAll('.card').length");
+    assert.ok(cols > 1 && cols < n, `expected several rows of several cards, got ${cols} across of ${n}`);
+    await key(cdp, 'ArrowRight', 'ArrowRight', 39);
+    assert.equal(await evaluate(cdp, lit), 1);
+    await key(cdp, 'ArrowDown', 'ArrowDown', 40);
+    assert.equal(await evaluate(cdp, lit), 1 + cols);
+    await key(cdp, 'ArrowUp', 'ArrowUp', 38);
+    assert.equal(await evaluate(cdp, lit), 1);
+    // Up from the top row goes round to the bottom of the same column.
+    await key(cdp, 'ArrowUp', 'ArrowUp', 38);
+    const to = await evaluate(cdp, lit);
+    assert.ok(to % cols === 1 && to + cols >= n, `went to card ${to}`);
+  });
+
   await t.test('sound goes off and on from the button or M, and stays off across pages', async (t) => {
     const cdp = await browser(t, 9405);
     await open(cdp, 'meteors/index.html', 6000);
