@@ -511,7 +511,7 @@ impl Game {
         }
         self.two_up = two;
         web::set_players(if two { 1 } else { 2 });
-        // Playtest, native only: BUBBLER_ROUND=1..5 starts at that round.
+        // Playtest, native only: BUBBLER_ROUND=1..8 starts at that round.
         #[cfg(not(target_arch = "wasm32"))]
         let first = std::env::var("BUBBLER_ROUND").ok().and_then(|v| v.parse::<usize>().ok())
             .map_or(0, |r| r.clamp(1, ROUNDS) - 1);
@@ -1679,7 +1679,9 @@ fn draw_hud(blip: &Blip, g: &Game, _hi: &web::HighScore) {
     // one row: P1 on the left, the round in the middle, P2 on the right
     blip.fill_rect(0.0, 0.0, WIN_W as f32, HUD, col((26, 10, 34), 0.92));
     blip.fill_rect(0.0, HUD - 2.0, WIN_W as f32, 2.0, col(PINK, 0.25));
-    let sz = 1.5;
+    // A whole-pixel size: at 1.5 the font's rows were uneven, and a phone
+    // (the picture at 0.57) showed 6px text that could not be read.
+    let sz = 2.0;
     let y = (HUD - 7.0 * sz) / 2.0 - 1.0;
     use blip::macroquad::shapes::draw_circle;
     for (i, colr, life) in [(0usize, MINT, (110, 220, 130)), (1, SKY, (110, 180, 255))] {
