@@ -133,6 +133,7 @@ async function nextPlayer(cdp, score) {
   })()`);
   await waitFor(cdp, has(PROMPT), 8000);
   await waitFor(cdp, `document.activeElement === document.querySelector('${PROMPT}')`, 3000);
+  await sleep(600);     // the prompt takes no keys in its first half second
 }
 
 test('high-score entry in every game', async (t) => {
@@ -173,7 +174,7 @@ test('high-score entry in every game', async (t) => {
       if (over === 0) {
         await waitFor(cdp, has('.blip-hs-list'), 8000);
         assert.equal(await evaluate(cdp, has(PROMPT)), false, 'a name was asked for a score of 0');
-        await sleep(600);
+        await sleep(1300);
         await key(cdp, fire);
         first = 7;
         await nextPlayer(cdp, first);
@@ -184,6 +185,12 @@ test('high-score entry in every game', async (t) => {
       await waitFor(cdp, has(PROMPT), 8000);
       assert.equal(await evaluate(cdp, "document.querySelector('.blip-hs-title').textContent"), 'ENTER YOUR NAME');
       await waitFor(cdp, `document.activeElement === document.querySelector('${PROMPT}')`, 3000);
+      // Fire hammered as the prompt comes up does nothing, and no name
+      // starts with a space.
+      await key(cdp, fire);
+      await sleep(600);
+      await key(cdp, SPACE);
+      assert.equal(await evaluate(cdp, `document.querySelector('${PROMPT}').value`), '');
       const before = await evaluate(cdp, 'JSON.stringify([getCoins(), blipMuted(), location.pathname])');
       for (const c of 'am 5f') await key(cdp, charKey(c), { text: c });
       assert.equal(await evaluate(cdp, `document.querySelector('${PROMPT}').value`), 'am 5f');
@@ -202,11 +209,17 @@ test('high-score entry in every game', async (t) => {
       ]);
       assert.equal(await evaluate(cdp, "localStorage.getItem('blip-handle')"), 'am 5f');
       assert.equal(await evaluate(cdp, `localStorage.getItem('blip-best-${slug}')`), String(first));
-      await sleep(600);
+      await sleep(1300);
       await key(cdp, fire);                      // any key puts the board away
       assert.equal(await evaluate(cdp, has('.blip-hs-modal')), false, 'the board stayed up');
 
-      // 2. From the stick, by the next player: B, then BA, then BB; fire accepts.
+      // 2. From the stick, by the next player. Left on an empty name skips,
+      //    and nothing is claimed.
+      await nextPlayer(cdp, first + 5);
+      await key(cdp, arrow('Left'));
+      assert.equal(await evaluate(cdp, has('.blip-hs-modal')), false, 'left did not skip the prompt');
+      assert.deepEqual((await db(cdp)).calls.map((c) => c.name), ['submit_score']);
+      //    B, then BA, then BB; fire accepts.
       await nextPlayer(cdp, first + 10);
       for (const d of ['Up', 'Up', 'Right', 'Up']) await key(cdp, arrow(d));
       assert.equal(await evaluate(cdp, `document.querySelector('${PROMPT}').value`), 'BB');
@@ -217,7 +230,7 @@ test('high-score entry in every game', async (t) => {
       await waitFor(cdp, has('.blip-hs-list'), 8000);
       assert.equal(await evaluate(cdp, MY_ROW), JSON.stringify(['BB', await shown(cdp, first + 10)]));
       assert.equal((await db(cdp)).scores[slug].u1, first + 10);
-      await sleep(600);
+      await sleep(1300);
       await key(cdp, fire);
       assert.equal(await evaluate(cdp, has('.blip-hs-modal')), false, 'the board stayed up');
 
@@ -226,7 +239,7 @@ test('high-score entry in every game', async (t) => {
       await waitFor(cdp, has('.blip-hs-list'), 8000);
       assert.equal(await evaluate(cdp, has(PROMPT)), false);
       assert.equal(await evaluate(cdp, MY_ROW), JSON.stringify(['BB', await shown(cdp, first + 20)]));
-      await sleep(600);
+      await sleep(1300);
       await key(cdp, fire);
 
       // And the game still answers the keyboard, with nobody clicking the
@@ -258,7 +271,7 @@ test('high-score entry in every game', async (t) => {
       await tap(cdp, '.blip-hs-panel .blip-hs-btn.ghost');            // I SAVED IT
       await waitFor(cdp, has('.blip-hs-list'), 8000);
       assert.equal(await evaluate(cdp, MY_ROW), JSON.stringify(['TAP', await shown(cdp, 4321)]));
-      await sleep(600);
+      await sleep(1300);
       await tap(cdp, '.blip-hs-panel .blip-hs-btn:not(.ghost)');      // CONTINUE
       assert.equal(await evaluate(cdp, has('.blip-hs-modal')), false, 'the board stayed up');
     });

@@ -195,7 +195,7 @@
       input.value = (lsGet(LS_HANDLE) || '').toUpperCase();
       m.panel.appendChild(input);
       el('div', 'blip-hs-sub blip-hs-stick', m.panel).textContent =
-        'stick: up/down letter \u00b7 right next \u00b7 fire ok';
+        'stick: up/down letter \u00b7 right next \u00b7 fire ok \u00b7 left skips';
       var err = el('div', 'blip-hs-err', m.panel);
       var row = el('div', 'blip-hs-row', m.panel);
       var ok = el('button', 'blip-hs-btn', row); ok.type = 'button'; ok.textContent = 'OK';
@@ -241,8 +241,14 @@
       mineBtn.addEventListener('click', function () {
         promptRestore(input.value.trim()).then(function (h) { if (h) close(h); });
       });
+      var opened = Date.now();
       input.addEventListener('keydown', function (e) {
         e.stopPropagation();
+        // The prompt comes up under a player still hammering fire: nothing
+        // counts for half a second, and a name never starts with a space.
+        if (Date.now() - opened < 500 || (e.key === ' ' && !input.value)) { e.preventDefault(); return; }
+        // Left on an empty name is the way out for a stick with no Escape.
+        if (e.key === 'ArrowLeft' && !input.value) { e.preventDefault(); close(null); return; }
         if (stickEntry(input, e, entry, submit)) return;
         if (e.key === 'Enter') submit();
         if (e.key === 'Escape') close(null);
@@ -377,8 +383,9 @@
       });
     }
 
-    // first tap / key anywhere dismisses the board (and is swallowed, so
-    // it doesn't also poke the WASM game-over screen behind it)
+    // A tap or key anywhere dismisses the board (and is swallowed, so it
+    // doesn't also poke the WASM game-over screen behind it), once it has
+    // been up a second: a player hammering fire should still get to see it.
     boardKeys = function (e) {
       if (boardEl && boardEl.contains(e.target)) return;
       e.preventDefault(); e.stopPropagation();
@@ -388,7 +395,7 @@
       if (!boardEl) return;
       window.addEventListener('keydown', boardKeys, true);
       window.addEventListener('pointerdown', boardKeys, true);
-    }, 400);
+    }, 1000);
   }
 
   // ---- entry point from shell.js ------------------------------------

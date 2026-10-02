@@ -92,7 +92,7 @@ test('the game shell', async (t) => {
     const cdp = await browser(t, 9406);
     await open(cdp, 'meteors/index.html', 6000);
     await evaluate(cdp, "localStorage.removeItem('blip-handle'); window.blipScores.promptHandle('test'); true");
-    await sleep(300);
+    await sleep(800);     // the prompt takes no keys in its first half second
     const name = "document.querySelector('.blip-hs-input').value";
     const press = async (...keys) => {
       for (const k of keys) await key(cdp, k, k, { ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39 }[k]);
