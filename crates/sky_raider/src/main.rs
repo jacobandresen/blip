@@ -3300,8 +3300,9 @@ fn draw_bottom_hud(blip: &Blip, g: &Game, player_tex: &Texture2D) {
     let mini_w = PLAYER_W as f32 * 0.6;
     let mini_h = PLAYER_H as f32 * 0.6;
     blip.draw_texture(player_tex, corner_margin, y, mini_w, mini_h);
-    blip.draw_text("x", corner_margin + mini_w + 3.0, y + 3.0, 2.0, BLIP_WHITE);
-    blip.draw_number(g.sess.lives, corner_margin + mini_w + 15.0, y + 3.0, 2.0, BLIP_WHITE);
+    // Outlined, and the bar backed: white on a passing cloud was unreadable.
+    let ink = BlipColor::new(0.0, 0.05, 0.15, 0.8);
+    blip.draw_text_outlined(&format!("x{}", g.sess.lives.max(0)), corner_margin + mini_w + 3.0, y + 3.0, 2.0, BLIP_WHITE, ink);
 
     // Health, bottom-right: empties with hits, full again each life; pickups
     // restore some.
@@ -3311,7 +3312,8 @@ fn draw_bottom_hud(blip: &Blip, g: &Game, player_tex: &Texture2D) {
     let bar_y = y + (mini_h - bar_h) / 2.0;
     let hp_frac = (g.health as f32 / PLAYER_HEALTH_MAX as f32).clamp(0.0, 1.0);
     let hp_color = if hp_frac > 0.6 { BLIP_GREEN } else if hp_frac > 0.3 { BLIP_YELLOW } else { BLIP_RED };
-    blip.draw_text("HP", bar_x - 26.0, y + 3.0, 2.0, BLIP_WHITE);
+    blip.draw_text_outlined("HP", bar_x - 26.0, y + 3.0, 2.0, BLIP_WHITE, ink);
+    blip.fill_rect(bar_x - 1.0, bar_y - 1.0, bar_w + 2.0, bar_h + 2.0, ink);
     blip.draw_rect(bar_x, bar_y, bar_w, bar_h, BLIP_GRAY);
     blip.fill_rect(bar_x, bar_y, bar_w * hp_frac, bar_h, hp_color);
 }
