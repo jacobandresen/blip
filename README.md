@@ -17,11 +17,14 @@ The Blip Engine is an open-source framework designed to provide a standardized, 
 
 This collection features several classic titles, all running within the unified Blip Engine:
 
-*   **Rally**: Keep the ball in play and keep your score high.
+*   **Rally**: Table tennis for one or two. First to seven.
 *   **Serpent**: Guide the snake through the maze, eat the pellet, and avoid self-collision.
-*   **Bouncer**: The ultimate brick-breaking challenge.
-*   **Galactic Defender**: Shoot down the endless swarm of invading aliens.
-*   **Meteors**: A tribute to the golden-age vector rock-shooter. Rotate, thrust, and blast a field of drifting boulders before they blast you.
+*   **Bouncer**: The ultimate brick-breaking challenge, with pickups, a multi-ball and bomb bricks.
+*   **Galactic Defender**: Shoot down the swarm of invading aliens; some dive, and every fifth level ends with a mothership.
+*   **Meteors**: A tribute to the golden-age vector rock-shooter. Rotate, thrust, and blast a field of drifting boulders, which get stranger by the wave.
+*   **Raider**: A 1942-style vertical dogfighter: formations, flak, bosses and weapon tiers.
+*   **Brawler**: A one-on-one fighter for one or two players: ten fighters, a nine-fight ladder, seven stages.
+*   **Bubbler**: A gentle bubble-blowing platformer for young players, alone or in pairs.
 
 ---
 
@@ -61,6 +64,14 @@ rustup target add wasm32-unknown-unknown
 # Step 3: Run a simple local server to view the compiled application
 python3 -m http.server -d web 8080
 ```
+
+### Running as a kiosk
+The fullscreen button beside the coin slot (on every page) leaves a PC with
+the top bar and the picture only; the choice is remembered, so the cabinet and
+the games stay fullscreen from page to page. Left alone, the cabinet walks
+through its games and shows their title screens, and an unattended game
+returns to the cabinet. No mouse is needed: the stick or arrows pick a game,
+fire starts it, and fire, Enter or `5` drops a coin.
 
 ---
 

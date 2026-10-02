@@ -2,8 +2,9 @@
 
 ## Web `.wasm` output is compiled — do not edit it directly
 
-The `index.wasm` and `index.html` files under `web/serpent/`, `web/bouncer/`,
-`web/galactic_defender/`, and `web/rally/` are **build outputs**. They are
+The `index.wasm` and `index.html` files under each game's directory in `web/`
+(`serpent`, `bouncer`, `galactic_defender`, `rally`, `meteors`, `sky_raider`,
+`brawler`, `bubbler`) are **build outputs**. They are
 produced by compiling Rust source with `cargo build --release --target
 wasm32-unknown-unknown` and copying `target/wasm32-unknown-unknown/release/<game>.wasm`
 into the game's web directory; `index.html` is a copy of `web/shell.html`.
@@ -42,10 +43,10 @@ change will be overwritten the next time the project is built.
 | Per-game asset build step | `crates/<name>/build.rs` |
 | Brawler's kiosk card poster and screenshot (captured from the game) | `./brawler_card.sh` |
 
-`web/shell.html` is a static template — it loads, in order, `shell.js`,
-`blip_bridge.js`, `mq_js_bundle.js`, and finally calls `load("index.wasm")` to
-boot the macroquad runtime. `kiosk.css`, `kiosk.js`, `shell.css`, `shell.js`,
-, `blip_bridge.js`, and `mq_js_bundle.js` are referenced with
+`web/shell.html` is a static template — it loads `kiosk.js` in the head,
+then `deck.js`, `blip_controller.js`, the high-score scripts, `shell.js`,
+`mq_js_bundle.js` and `blip_bridge.js`, and finally calls `load("index.wasm")`
+to boot the macroquad runtime. All of them are referenced with
 `../` paths so they resolve from inside each game's subdirectory. `kiosk.js`
 and `kiosk.css` are also loaded by `web/index.html` (without the `../` prefix)
 to share the nav bar between the landing page and game pages.
@@ -54,7 +55,7 @@ to share the nav bar between the landing page and game pages.
 
 ```
 rustup target add wasm32-unknown-unknown   # one-time
-./build_web.sh                              # recompile all four games
+./build_web.sh                              # recompile all eight games
 ```
 
 ### Tests
@@ -69,10 +70,8 @@ cargo test --release                    # game rules (Brawler's balance, Serpent
 For native development:
 
 ```
-cargo run -p serpent
-cargo run -p bouncer
-cargo run -p rally
-cargo run -p galactic_defender
+cargo run -p serpent            # or bouncer, rally, galactic_defender,
+                                # meteors, sky_raider, brawler, bubbler
 ```
 
 ### Asset pipeline
