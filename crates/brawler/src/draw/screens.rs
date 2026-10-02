@@ -72,8 +72,7 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
         }
     }
 
-    // A new pair every few seconds, so the title shows the whole roster. They
-    // arrive in a soft bloom of white.
+    // A new pair every few seconds, so the title shows the whole roster.
     let n = FIGHTERS.len();
     let turn = (now / TITLE_TURN) as usize;
     let u = now % TITLE_TURN;
@@ -81,10 +80,6 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
     for (i, (x, face)) in [(66.0f32, 1.0f32), (574.0, -1.0)].into_iter().enumerate() {
         let f = title_fighter(pair[i], x, face, u, i == 0);
         draw_body(blip, &f, now, 0.0, 0.0, i, true);
-        if u < 0.3 {
-            blip.fill_glow_circle(x, FLOOR_Y - f.height() * 0.5, f.height() * 0.7,
-                BlipColor { a: 0.25 * (1.0 - u / 0.3), ..BLIP_WHITE });
-        }
     }
 
     let glow = tube(now, 0.0);
@@ -114,7 +109,7 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
         let y = 176.0 + i as f32 * 32.0;
         if g.menu == i {
             neon(blip, label, y, 3.0, BlipColor { r: 1.0, g: 0.85, b: 0.25, a: 1.0 },
-                0.62 + 0.38 * (now * 3.4).sin().max(0.0));
+                0.9 + 0.1 * (now * 2.0).sin());
         } else {
             blip.draw_centered(label, y, 3.0, dark);
         }
@@ -144,12 +139,10 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
     }
     blip.draw_centered("TOWARD AND BUTTON HITS HIGH   BOTH TOGETHER SPECIAL", 300.0, 1.0, dim);
 
-    // The prompt, on the boards and blinking: the one line that has to be
-    // found.
-    if (now * 2.2).fract() < 0.7 {
-        neon(blip, "PRESS PUNCH TO START", 348.0, 3.0,
-            BlipColor { r: 1.0, g: 0.85, b: 0.25, a: 1.0 }, 1.0);
-    }
+    // The prompt, on the boards: the one line that has to be found. It
+    // breathes with the menu line; a sign this size blinking is a strobe.
+    neon(blip, "PRESS PUNCH TO START", 348.0, 3.0,
+        BlipColor { r: 1.0, g: 0.85, b: 0.25, a: 1.0 }, 0.9 + 0.1 * (now * 2.0).sin());
     blip.draw_centered("W S CHOOSE     F OR SPACE START", 382.0, 1.0, dim);
     // The record to beat, when the kiosk knows of one.
     let hi = web::high_score();

@@ -271,14 +271,14 @@ async fn main() {
             }
             _ => None,
         };
-        // A player who went straight through the menus is ahead of the
-        // warm-up: the billing waits the half second their stage's theme takes.
+        // A stage's theme is rendered when its billing first comes up: the
+        // half second it takes hides behind a still picture. Warming all
+        // seven up on the title froze it seven times in its first seconds.
         match want {
             Some(track) if g.state == State::Vs && !music.ready(track) => music.start(track).await,
             Some(track) => music.play(track),
             None => {}
         }
-        if matches!(g.state, State::Title | State::Select) { music.warm_up().await; }
 
         if g.fade > 0.0 { g.fade -= dt; }
         blip.clear(BLIP_BLACK);
