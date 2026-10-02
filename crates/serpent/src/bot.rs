@@ -88,6 +88,12 @@ pub fn drive(g: &Game) {
             if n as f32 * secs_per_step < g.bonus_ttl { want = Some(d); }
         }
     }
+    // The shears, when they can be reached in time.
+    if want.is_none() && g.shears_active() {
+        if let Some((d, n)) = bfs(&b, head, g.shears, |d| d != back && roomy(d)) {
+            if n as f32 * secs_per_step < g.shears_ttl { want = Some(d); }
+        }
+    }
     if want.is_none() {
         want = bfs(&b, head, g.food, |d| d != back && roomy(d)).map(|x| x.0);
     }

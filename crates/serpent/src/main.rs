@@ -43,6 +43,15 @@ const BONUS_VALUE: i32 = 50;     // x level, against ordinary food's 10
 const OBS_FADE_SECS: f32 = 1.2;
 const BANNER_SECS: f32 = 1.4;
 
+// ---- shears ----------------------------------------------------------------
+// Once the snake is SHEARS_FROM long, the first food of every second level
+// brings out shears for a few seconds: reaching them cuts SHEARS_CUT off the
+// tail (ten foods grow it by ten, so it still grows, at 60% of the pace).
+const SHEARS_FROM: usize = 25;
+const SHEARS_CUT: usize = 4;
+const SHEARS_TTL: f32 = 7.0;
+const SHEARS_BLUE: BlipColor = BlipColor { r: 0.45, g: 0.85, b: 1.0, a: 1.0 };
+
 // ---- streaks ---------------------------------------------------------------
 // Food reached within this many steps of the last is worth one multiple
 // more, up to STREAK_MAX: going straight for it pays, dawdling resets it.
@@ -97,6 +106,9 @@ struct Game {
     /// in seconds and is what makes it a decision rather than a pickup.
     bonus: Cell,
     bonus_ttl: f32,
+    /// The tail-cutting pickup (see SHEARS_FROM), timed like the bonus.
+    shears: Cell,
+    shears_ttl: f32,
     sess: Session,
     foods_eaten: i32,
     /// See STREAK_STEPS.
@@ -129,6 +141,8 @@ impl Game {
             sess: Session::new(LIVES_START),
             bonus: Cell { c: 0, r: 0 },
             bonus_ttl: 0.0,
+            shears: Cell { c: 0, r: 0 },
+            shears_ttl: 0.0,
             foods_eaten: 0,
             streak: 0,
             steps_since_food: 0,
@@ -183,6 +197,17 @@ impl Game {
     }
 
     fn bonus_active(&self) -> bool { self.bonus_ttl > 0.0 }
+    fn shears_active(&self) -> bool { self.shears_ttl > 0.0 }
+
+    fn spawn_shears(&mut self) {
+        for _ in 0..64 {
+            let c = Cell { c: rand_int(0, COLS - 1), r: rand_int(0, ROWS - 1) };
+            if !self.cell_is_free(c) || c == self.food || (self.bonus_active() && c == self.bonus) { continue; }
+            self.shears = c;
+            self.shears_ttl = SHEARS_TTL;
+            return;
+        }
+    }
 
     /// Put a bonus somewhere the snake must travel to: aim for a third of the
     /// board away, and settle for any free cell only if the board is nearly
@@ -297,6 +322,7 @@ impl Game {
         // A bonus left over from the life just lost would be counting down
         // against a snake that was not on the board when it appeared.
         self.bonus_ttl = 0.0;
+        self.shears_ttl = 0.0;
         self.obs_fade = 1.0;
         self.gulps.clear();
         // The middle row runs through the plus and the ring, and the ring
@@ -349,6 +375,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.bonus_ttl -= dt;
         if g.bonus_ttl < 0.0 { g.bonus_ttl = 0.0; }
     }
+    g.shears_ttl = (g.shears_ttl - dt).max(0.0);
 
     g.obs_fade = (g.obs_fade + dt / OBS_FADE_SECS).min(1.0);
     g.fx.update(dt);
@@ -410,6 +437,21 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.bonus_ttl = 0.0;
     }
 
+    if g.shears_active() && h == g.shears {
+        play_sfx(&sfx.bonus_eat);
+        blip::bot::add("shears", 1.0);
+        g.shears_ttl = 0.0;
+        // The tail end goes, in a puff per segment.
+        let cut = SHEARS_CUT.min(g.snake_len.saturating_sub(3));
+        for k in 0..cut {
+            let (x, y) = cell_centre(g.snake_at(g.snake_len - 1 - k));
+            g.fx.burst(x, y, 4, 70.0, SHEARS_BLUE);
+        }
+        g.snake_len -= cut;
+        let (x, y) = cell_centre(h);
+        g.fx.popup(x, y - 10.0, "SNIP", SHEARS_BLUE);
+    }
+
     let ate = h.c == g.food.c && h.r == g.food.r;
     if ate {
         play_sfx(&sfx.eat);
@@ -427,6 +469,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
         g.foods_eaten += 1;
         // One bonus per level, mid-level, away from the level change.
+        if g.foods_eaten == 1 && g.sess.level % 2 == 0 && g.snake_len >= SHEARS_FROM && !g.shears_active() {
+            g.spawn_shears();
+        }
         if g.foods_eaten % BONUS_EVERY == 0 && !g.bonus_active() {
             g.spawn_bonus();
             blip::bot::add("bonus_offered", 1.0);
@@ -570,6 +615,7 @@ fn draw_play(blip: &Blip, g: &Game, food: &Texture2D) {
     let (fcx, fcy) = ((g.food.c * CELL) as f32 + CELL as f32 / 2.0, (HUD_H + g.food.r * CELL) as f32 + CELL as f32 / 2.0);
     blip.draw_texture(food, fcx - fs / 2.0, fcy - fs / 2.0, fs, fs);
     draw_bonus(blip, g);
+    draw_shears(blip, g);
     draw_snake(blip, g);
     g.fx.draw(blip);
     if g.banner_t < BANNER_SECS && g.state == State::Play {
@@ -597,6 +643,20 @@ fn draw_bonus(blip: &Blip, g: &Game) {
     let hot = BlipColor { r: 1.0, g: 0.98, b: 0.72, a: 1.0 };
     blip.fill_circle(cx, cy, r, gold);
     blip.fill_circle(cx, cy, r * 0.45, hot);
+}
+
+/// The shears: a pale blue X of two blades, flashing as they run out.
+fn draw_shears(blip: &Blip, g: &Game) {
+    if !g.shears_active() { return; }
+    if g.shears_ttl <= BONUS_WARN && (g.shears_ttl * 6.0) as i32 % 3 == 0 { return; }
+    let (cx, cy) = cell_centre(g.shears);
+    let r = CELL as f32 * 0.34;
+    blip.draw_line_ex(cx - r, cy - r, cx + r, cy + r, 3.0, SHEARS_BLUE);
+    blip.draw_line_ex(cx - r, cy + r, cx + r, cy - r, 3.0, SHEARS_BLUE);
+    // the two finger rings
+    blip.fill_circle(cx - r, cy + r, 3.0, SHEARS_BLUE);
+    blip.fill_circle(cx + r, cy + r, 3.0, SHEARS_BLUE);
+    blip.fill_circle(cx, cy, 2.0, BLIP_WHITE);
 }
 
 fn draw_title(blip: &Blip, hi: &web::HighScore) {
