@@ -1849,6 +1849,8 @@ fn conf() -> blip::macroquad::window::Conf { window_conf("BUBBLER", WIN_W, WIN_H
 #[blip::macroquad::main(conf)]
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
+    // Bright filled blocks twitter under the full interlace (see Brawler).
+    blip.set_interlace(0.5);
     let mut g = Game::new();
     web::set_players(2);
 

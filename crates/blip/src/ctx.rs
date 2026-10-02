@@ -606,6 +606,10 @@ impl Blip {
         let lw = self.width  as f32;
         let lh = self.height as f32;
         let scale = vw / lw;
+        // Shrunk (a phone shows Meteors at half size), nearest sampling
+        // drops every other pixel and one-pixel lines break up: blend then.
+        // Enlarged, pixels stay crisp.
+        self.rt.texture.set_filter(if scale < 1.0 { FilterMode::Linear } else { FilterMode::Nearest });
 
         let roll_on   = self.roll_t  > 0.0;
         let tear_on   = self.tear_t  > 0.0 && !roll_on; // don't combine tear + roll
@@ -878,11 +882,15 @@ impl Blip {
         );
 
         // ---- SCORE, left ----
-        self.draw_text("SCORE", 4.0, ty, 2.0, BLIP_YELLOW);
-        self.draw_number(score, 68.0, ty, 2.0, BLIP_WHITE);
+        // In from the edge by 1.2% of the width: the shell clips 3 screen px
+        // off the canvas, which on a phone showing a 680px game at half size
+        // is 6px of the picture, and took half the S.
+        let x0 = (self.width as f32 * 0.012).max(4.0).round();
+        self.draw_text("SCORE", x0, ty, 2.0, BLIP_YELLOW);
+        self.draw_number(score, x0 + 64.0, ty, 2.0, BLIP_WHITE);
         // right edge of the SCORE cluster: label + one digit-cell per digit
         let score_digits = score.max(0).to_string().len().max(1) as f32;
-        let score_right = 68.0 + score_digits * 12.0;
+        let score_right = x0 + 64.0 + score_digits * 12.0;
 
         // ---- LIVES, right ----
         // Inset from the right edge to clear the curved glass's black rim on
