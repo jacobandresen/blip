@@ -2,7 +2,7 @@
 //! same numbers as their hitboxes, so there is no sprite sheet to disagree
 //! with the rules.
 
-use crate::wav::{tame, warm, Rng, MIX_KNEE};
+use crate::wav::{low_pass, tame, warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, encode_pcm16_music, env, ms_to_samples,
     soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
@@ -726,6 +726,19 @@ fn pcm(&self) -> Vec<i16> {
         let last_bar = bar == 3;
         let last_slot = slot + 1 == order.len();
 
+        // The fight under the tune, as hard as the stage drives: a low drum
+        // on every beat, a bass string plucked on every eighth (the octave
+        // on the off-beats), and sticks on the sixteenths at full drive.
+        let ground = line[bar % line.len()];
+        if drive >= 0.4 && !hush {
+            if b % 4 == 0 && b != 0 { taiko(&mut buf, off, 84.0, 0.42 * drive, &mut rng); }
+            if b % 2 == 0 && !(lull && b >= 8) {
+                let f = degree(scale, root, ground) * if b % 4 == 2 { 0.5 } else { 0.25 };
+                pluck(&mut buf, off, f, beat_ms * 0.45, 0.5 * drive, &mut rng);
+            }
+            if drive > 0.8 && b % 2 == 1 && !lull { rim(&mut buf, off, 0.14, &mut rng); }
+        }
+
         // The pulse: a heavy taiko on one, an answer past the middle.
         if b == 0 {
             taiko(&mut buf, off, 96.0, if bar == 0 && !hush { 1.0 } else { 0.8 }, &mut rng);
@@ -813,7 +826,10 @@ fn pcm(&self) -> Vec<i16> {
         }
     }
     wrap_tail(&mut buf, body);
-    warm(&mut buf[..body]);
+    // Fight music: brighter than the house warmth, and as loud as the other
+    // games' (the koto alone sat 12 dB under them).
+    low_pass(&mut buf[..body], 6500.0);
+    for v in buf[..body].iter_mut() { *v *= 2.6; }
     soft_limit_to_pcm16(&buf[..body], MIX_KNEE)
 }
 }
@@ -987,13 +1003,13 @@ pub fn theme_wav(which: usize) -> Vec<u8> {
         bpm, root, scale, phrases: &phrases, bass: &bass, order: &order, drive, feel,
     }.pcm();
     encode_pcm16_music(&match which {
-        0 => stage(132.0, 196.00, &HIRAJOSHI, [&d_a, &d_b, &d_c, &d_d], 1.0, Feel::Rim),
-        1 => stage(108.0, 220.00, &HIRAJOSHI, [&t_a, &t_b, &t_c, &t_d], 0.2, Feel::Rim),
-        3 => stage(144.0, 174.61, &MINOR, [&a_a, &a_b, &a_c, &a_d], 1.0, Feel::March),
-        4 => stage(120.0, 196.00, &YO, [&h_a, &h_b, &h_c, &h_d], 0.4, Feel::Rim),
-        5 => stage(100.0, 164.81, &IN, [&v_a, &v_b, &v_c, &v_d], 0.7, Feel::Rim),
-        6 => stage(104.0, 196.00, &MAJOR, [&f_a, &f_b, &f_c, &f_d], 0.1, Feel::Chime),
-        7 => stage(126.0, 185.00, &BLUES, [&q_a, &q_b, &q_c, &q_d], 0.9, Feel::Push),
+        0 => stage(148.0, 196.00, &HIRAJOSHI, [&d_a, &d_b, &d_c, &d_d], 1.0, Feel::Rim),
+        1 => stage(128.0, 220.00, &HIRAJOSHI, [&t_a, &t_b, &t_c, &t_d], 0.6, Feel::Rim),
+        3 => stage(156.0, 174.61, &MINOR, [&a_a, &a_b, &a_c, &a_d], 1.0, Feel::March),
+        4 => stage(136.0, 196.00, &YO, [&h_a, &h_b, &h_c, &h_d], 0.7, Feel::Rim),
+        5 => stage(124.0, 164.81, &IN, [&v_a, &v_b, &v_c, &v_d], 0.8, Feel::Rim),
+        6 => stage(120.0, 196.00, &MAJOR, [&f_a, &f_b, &f_c, &f_d], 0.5, Feel::Chime),
+        7 => stage(142.0, 185.00, &BLUES, [&q_a, &q_b, &q_c, &q_d], 0.9, Feel::Push),
         _ => Theme { bpm: 118.0, root: 207.65, scale: &HIRAJOSHI, phrases: &[&s_a, &s_b],
                      bass: &[&b2, &b0], order: &[0, 1, 0, 1], drive: 0.0, feel: Feel::Rim }.pcm(),
     })

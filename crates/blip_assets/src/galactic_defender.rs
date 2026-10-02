@@ -281,8 +281,9 @@ fn shield_block() -> Vec<u8> {
 }
 
 // ---- music: two tunes on the theremin ----------------------------------
-// Synthesised on the device (see `song`). Long gliding notes over a slow
-// bass; the mothership levels get a faster, tenser tune.
+// Synthesised on the device (see `song`). Action songs: a saw lead with
+// the theremin under it over a galloping bass; the mothership levels get
+// the faster, harder one.
 
 const EM: Chord = minor(40);
 const AM: Chord = minor(45);
@@ -294,10 +295,10 @@ const D: Chord = major(50);
 const F: Chord = major(41);
 const G: Chord = major(43);
 
-/// The invasion: E minor, eerie, the flat sixth (F) for the alien touch.
+/// The invasion: E minor, a march, the flat sixth (F) for the alien touch.
 pub fn invasion_wav() -> Vec<u8> {
     Song {
-        bpm: 112.0,
+        bpm: 126.0,
         melody: &[
             [76, H, H, 79, 78, H, 76, H], [71, H, H, H, R, R, 74, 76],
             [77, H, H, 76, 74, H, 72, H], [71, H, H, H, R, R, R, R],
@@ -312,21 +313,23 @@ pub fn invasion_wav() -> Vec<u8> {
             [EM, EM], [B, B], [F, F], [B, B], [EM, EM], [B, B], [AM, B], [EM, EM],
             [G, D], [EM, EM], [F, F], [G, G], [EM, EM], [B, B], [C, B], [EM, EM],
         ],
-        lead: Voice::Theremin,
+        lead: Voice::Saw,
         lead_vol: 0.30,
-        harmony: Some((Voice::Bell, -12)),
-        bass: [0, R, 7, R],
-        groove: Groove::Brush,
+        harmony: Some((Voice::Theremin, -12)),
+        bass: [0, 0, 7, 0],
+        bass_voice: Voice::Growl,
+        groove: Groove::FourFloor,
+        action: true,
         seed: 0xDEF0_1001,
         ..Song::DEFAULT
     }
     .render()
 }
 
-/// The mothership: A minor, quick, circling the leading note.
+/// The mothership: A minor, flat out, circling the leading note.
 pub fn mothership_wav() -> Vec<u8> {
     Song {
-        bpm: 144.0,
+        bpm: 158.0,
         melody: &[
             [69, H, 72, 69, 76, H, 75, 76], [77, H, 76, 74, 72, H, 71, H],
             [69, H, 72, 69, 76, H, 79, H], [77, H, 76, H, 75, H, R, R],
@@ -336,11 +339,13 @@ pub fn mothership_wav() -> Vec<u8> {
         chords: &[
             [AM, AM], [F, E], [AM, AM], [F, E], [AM, AM], [DM, E], [F, E], [AM, AM],
         ],
-        lead: Voice::Theremin,
+        lead: Voice::Saw,
         lead_vol: 0.30,
-        harmony: Some((Voice::Theremin, -12)),
+        harmony: Some((Voice::Saw, -12)),
         bass: [0, 0, 12, 0],
-        groove: Groove::FourFloor,
+        bass_voice: Voice::Growl,
+        groove: Groove::Drive,
+        action: true,
         seed: 0xDEF0_2002,
         ..Song::DEFAULT
     }

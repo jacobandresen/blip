@@ -11,7 +11,7 @@
 use std::f32::consts::PI;
 
 use crate::cosy::{note, Voice, SR};
-use crate::wav::{warm, Rng, MIX_KNEE};
+use crate::wav::{bright, warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_music, soft_limit_to_pcm16};
 
 /// Hold the previous note for another eighth.
@@ -36,6 +36,9 @@ pub enum Groove {
     FourFloor,
     /// Only a soft kick on one and a rim on three: for calm songs.
     Brush,
+    /// A hard kick on every beat, a cracking snare on two and four and
+    /// sixteenth hats: for the action songs.
+    Drive,
 }
 
 pub struct Song<'a> {
@@ -63,6 +66,9 @@ pub struct Song<'a> {
     pub fills: bool,
     /// Dotted-eighth echo level, 0 for none.
     pub echo: f32,
+    /// An action song: the bass is struck on every sixteenth and the mix
+    /// keeps its edge instead of being warmed.
+    pub action: bool,
     pub seed: u32,
 }
 
@@ -82,6 +88,7 @@ impl Song<'_> {
         groove: Groove::Backbeat,
         fills: true,
         echo: 0.2,
+        action: false,
         seed: 0x5eed,
     };
 
@@ -105,7 +112,13 @@ impl Song<'_> {
                 let h0 = b0 + half * 4 * eighth;
                 for (s, &off) in self.bass.iter().enumerate() {
                     if off == R { continue; }
-                    note(&mut buf, h0 + s * eighth, eighth - eighth / 4, root + off, 0.34, self.bass_voice);
+                    if self.action {
+                        // struck twice, the second softer: a gallop
+                        note(&mut buf, h0 + s * eighth, eighth * 2 / 5, root + off, 0.24, self.bass_voice);
+                        note(&mut buf, h0 + s * eighth + eighth / 2, eighth * 2 / 5, root + off, 0.17, self.bass_voice);
+                    } else {
+                        note(&mut buf, h0 + s * eighth, eighth - eighth / 4, root + off, 0.34, self.bass_voice);
+                    }
                 }
                 if self.arp {
                     for s in 0..8 {
@@ -123,7 +136,7 @@ impl Song<'_> {
         // Fold the tail back onto the start so the loop has no seam.
         let tail = buf.split_off(total);
         for (i, v) in tail.iter().enumerate() { buf[i % total] += v; }
-        warm(&mut buf);
+        if self.action { bright(&mut buf); } else { warm(&mut buf); }
         let scaled: Vec<f32> = buf.iter().map(|v| v * 21_000.0).collect();
         encode_pcm16_music(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
     }
@@ -163,6 +176,15 @@ impl Song<'_> {
                     if beat == 2 { snare(buf, t0, rng, 0.12); }
                     hat(buf, t0 + eighth, rng, 0.04);
                 }
+                Groove::Drive => {
+                    punch(buf, t0, 0.62);
+                    if beat % 2 == 1 { crack(buf, t0, rng, 0.44); }
+                    // a pickup kick into three
+                    if beat == 1 { punch(buf, t0 + eighth + eighth / 2, 0.4); }
+                    for s in 0..4 {
+                        hat(buf, t0 + s * eighth / 2, rng, if s == 2 { 0.24 } else { 0.12 });
+                    }
+                }
             }
         }
         if self.fills && self.groove != Groove::None && b % 4 == 3 {
@@ -181,6 +203,36 @@ pub fn kick(buf: &mut [f32], start: usize, vol: f32) {
         let t = i as f32 / SR;
         ph += (48.0 + 110.0 * (-t / 0.03).exp()) / SR;
         buf[j] += ((2.0 * PI * ph).sin() * 2.0).tanh() * (-t / 0.07).exp() * vol;
+    }
+}
+
+/// The action kick: a faster, deeper sweep with a click on the front.
+pub fn punch(buf: &mut [f32], start: usize, vol: f32) {
+    let n = (0.14 * SR) as usize;
+    let mut ph = 0.0f32;
+    for i in 0..n {
+        let j = start + i;
+        if j >= buf.len() { break; }
+        let t = i as f32 / SR;
+        ph += (46.0 + 190.0 * (-t / 0.018).exp()) / SR;
+        let click = (2.0 * PI * 1800.0 * t).sin() * (-t / 0.002).exp() * 0.35;
+        buf[j] += (((2.0 * PI * ph).sin() * 2.6).tanh() * (-t / 0.055).exp() + click) * vol;
+    }
+}
+
+/// The action snare: bright noise that cracks, over a 220 Hz body.
+pub fn crack(buf: &mut [f32], start: usize, rng: &mut Rng, vol: f32) {
+    let n = (0.16 * SR) as usize;
+    let mut prev = 0.0f32;
+    for i in 0..n {
+        let j = start + i;
+        if j >= buf.len() { break; }
+        let t = i as f32 / SR;
+        let w = rng.next_f32() * 2.0 - 1.0;
+        let hp = w - 0.6 * prev;
+        prev = w;
+        let body = (2.0 * PI * 220.0 * t).sin() * (-t / 0.025).exp();
+        buf[j] += (hp * 0.7 * (-t / 0.045).exp() + body * 0.6) * vol;
     }
 }
 

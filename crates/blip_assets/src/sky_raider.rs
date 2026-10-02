@@ -4,7 +4,7 @@
 use crate::image::Image;
 use std::f32::consts::PI;
 
-use crate::wav::{tame, warm, Rng, MIX_KNEE};
+use crate::wav::{low_pass, tame, warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, mix_into, mix_into_f32, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
@@ -2287,7 +2287,8 @@ pub fn music() -> Vec<u8> {
         power_chord(&mut buf, bar_off, E2, step_ms * steps_per_bar as f32 * 1.02, 0.06, false);
     }
 
-    warm(&mut buf);
+    // a rock band, not a lullaby: the guitars keep their bite
+    low_pass(&mut buf, 6500.0);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
@@ -2426,7 +2427,8 @@ pub fn music2() -> Vec<u8> {
         power_chord(&mut buf, bar_off, D2, step_ms * steps_per_bar as f32 * 1.02, 0.06, false);
     }
 
-    warm(&mut buf);
+    // a rock band, not a lullaby: the guitars keep their bite
+    low_pass(&mut buf, 6500.0);
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 

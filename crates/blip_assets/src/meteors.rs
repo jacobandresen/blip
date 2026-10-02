@@ -48,7 +48,7 @@ pub fn drift_wav() -> Vec<u8> {
 /// Driving: the same scale in a rolling figure over a steady kick.
 pub fn storm_wav() -> Vec<u8> {
     Song {
-        bpm: 132.0,
+        bpm: 140.0,
         melody: &[
             [76, 83, 80, 83, 76, 83, 82, 83], [78, 85, 82, 85, 78, 85, 83, 85],
             [80, 87, 83, 87, 80, 87, 85, 87], [88, H, 87, H, 85, H, 83, H],
@@ -60,10 +60,12 @@ pub fn storm_wav() -> Vec<u8> {
         ],
         lead: Voice::Glass,
         lead_vol: 0.30,
-        harmony: Some((Voice::Bell, -12)),
+        harmony: Some((Voice::Saw, -12)),
         arp: false,
         bass: [0, 12, 0, 12],
-        groove: Groove::FourFloor,
+        bass_voice: Voice::Growl,
+        groove: Groove::Drive,
+        action: true,
         seed: 0x3E7E_0002,
         ..Song::DEFAULT
     }

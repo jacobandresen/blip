@@ -21,6 +21,8 @@ pub fn pulse(phase: f32, d: f32) -> f32 {
     sq * 0.8 + (2.0 * PI * p).sin() * 0.2
 }
 
+pub fn saw(phase: f32) -> f32 { 2.0 * phase.fract() - 1.0 }
+
 pub fn tri(phase: f32) -> f32 {
     let p = phase.fract();
     4.0 * (p - 0.5).abs() - 1.0
@@ -30,9 +32,10 @@ pub fn tri(phase: f32) -> f32 {
 /// (triangle with a pulse edge), arpeggio blip, or bell: Bubbler's band.
 /// The rest give each game its own instrument in the same warm family:
 /// marimba (Serpent), glockenspiel (Bouncer), theremin (Defender), glass
-/// (Meteors) and pluck (Rally).
+/// (Meteors) and pluck (Rally). Saw and growl are the action songs' lead and
+/// bass: detuned sawtooths with their edge left on.
 #[derive(Clone, Copy)]
-pub enum Voice { Lead, Bass, Arp, Bell, Marimba, Glock, Theremin, Glass, Pluck }
+pub enum Voice { Lead, Bass, Arp, Bell, Marimba, Glock, Theremin, Glass, Pluck, Saw, Growl }
 
 /// A note into `buf` at `start`, held `len` samples.
 pub fn note(buf: &mut [f32], start: usize, len: usize, midi: i32, vol: f32, v: Voice) {
@@ -41,6 +44,7 @@ pub fn note(buf: &mut [f32], start: usize, len: usize, midi: i32, vol: f32, v: V
     let tail = match v {
         Voice::Lead => 0.06, Voice::Bass => 0.03, Voice::Arp => 0.01, Voice::Bell => 0.4,
         Voice::Marimba => 0.25, Voice::Glock => 0.6, Voice::Theremin => 0.12, Voice::Glass => 0.9, Voice::Pluck => 0.02,
+        Voice::Saw => 0.05, Voice::Growl => 0.02,
     };
     let n = len + (tail * SR) as usize;
     for i in 0..n {
@@ -71,10 +75,19 @@ pub fn note(buf: &mut [f32], start: usize, len: usize, midi: i32, vol: f32, v: V
             }
             Voice::Glass => (t / 0.004).min(1.0) * (-t / 0.55).exp(),
             Voice::Pluck => (t / 0.001).min(1.0) * (-t / 0.09).exp(),
+            Voice::Saw => {
+                let a = (t / 0.004).min(1.0) * (0.7 + 0.3 * (-t / 0.12).exp());
+                if held { a } else { a * (1.0 - (i - len) as f32 / (tail * SR)) }
+            }
+            Voice::Growl => {
+                let a = (t / 0.002).min(1.0) * (0.45 + 0.55 * (-t / 0.06).exp());
+                if held { a } else { a * (1.0 - (i - len) as f32 / (tail * SR)) }
+            }
         };
         let vib = match v {
             Voice::Lead => 1.0 + 0.004 * (2.0 * PI * 5.5 * t).sin() * (t / 0.15).min(1.0),
             Voice::Theremin => 1.0 + 0.012 * (2.0 * PI * 6.0 * t).sin() * ((t - 0.06) / 0.12).clamp(0.0, 1.0),
+            Voice::Saw => 1.0 + 0.006 * (2.0 * PI * 6.0 * t).sin() * ((t - 0.12) / 0.1).clamp(0.0, 1.0),
             _ => 1.0,
         };
         ph += f * vib / SR;
@@ -92,6 +105,10 @@ pub fn note(buf: &mut [f32], start: usize, len: usize, midi: i32, vol: f32, v: V
             Voice::Glass => (2.0 * PI * ph * 0.996).sin() * 0.5 + (2.0 * PI * ph * 1.004).sin() * 0.5
                 + 0.2 * (2.0 * PI * ph * 3.0).sin() * (-t / 0.2).exp(),
             Voice::Pluck => pulse(ph, 0.25) * 0.35 + (2.0 * PI * ph).sin() * 0.65,
+            // two sawtooths a few cents apart over a square an octave down
+            Voice::Saw => saw(ph * 0.997) * 0.4 + saw(ph * 1.003) * 0.4 + pulse(ph * 0.5, 0.5) * 0.2,
+            // a sawtooth with a sine under it for weight
+            Voice::Growl => saw(ph) * 0.55 + (2.0 * PI * ph).sin() * 0.6,
         };
         buf[j] += s * env * vol;
     }

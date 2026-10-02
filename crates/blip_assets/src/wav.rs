@@ -22,8 +22,11 @@ impl Rng {
 
 /// The master warmth for a music track: two gentle low-pass poles round
 /// 3 kHz take the fizz off hats, saws and noise without dulling the tune.
-pub fn warm(buf: &mut [f32]) {
-    let a = 1.0 - (-2.0 * PI * 3000.0 / SAMPLE_RATE as f32).exp();
+pub fn warm(buf: &mut [f32]) { low_pass(buf, 3000.0); }
+
+/// Two gentle low-pass poles at `hz`.
+pub fn low_pass(buf: &mut [f32], hz: f32) {
+    let a = 1.0 - (-2.0 * PI * hz / SAMPLE_RATE as f32).exp();
     let (mut l1, mut l2) = (0.0f32, 0.0f32);
     for v in buf.iter_mut() {
         l1 += a * (*v - l1);
@@ -31,6 +34,10 @@ pub fn warm(buf: &mut [f32]) {
         *v = l2;
     }
 }
+
+/// The action games' master: music is stored at half rate, so this only
+/// keeps what would alias out of it. The edge of a saw or a snare stays.
+pub fn bright(buf: &mut [f32]) { low_pass(buf, 7500.0); }
 
 /// Keep a melodic voice out of the shrill register: anything above A4 drops
 /// by octaves, keeping the tune's shape where it is easy on the ears and a
