@@ -243,11 +243,8 @@ fn explosion() -> Vec<u8> {
     let mut img = Image::new(w as u32, h as u32);
     let cx = w / 2;
     let cy = h / 2;
-    let angles = [
-        0.0_f32, 0.523, 1.047, 1.571, 2.094, 2.618,
-        3.142, 3.665, 4.189, 4.712, 5.236, 5.760,
-    ];
-    for angle in angles {
+    // Twelve rays, one every 30 degrees.
+    for angle in (0..12).map(|k| k as f32 * std::f32::consts::PI / 6.0) {
         for r in 0..(w / 2 - 1) {
             let x = cx + (r as f32 * angle.cos()) as i32;
             let y = cy + (r as f32 * angle.sin()) as i32;

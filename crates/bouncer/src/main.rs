@@ -334,7 +334,7 @@ impl Game {
         self.ball_vx = side * self.ball_speed * s;
         self.ball_vy = -self.ball_speed * c;
         self.ball_spin = 0.0;
-        self.ball_rot = mat_mul(&rot_x(0.5), &rot_y(rand_f() * 6.28));
+        self.ball_rot = mat_mul(&rot_x(0.5), &rot_y(rand_f() * std::f32::consts::TAU));
         self.ball_curve_used = 0.0;
     }
 
