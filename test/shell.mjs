@@ -164,5 +164,10 @@ test('the game shell', async (t) => {
     assert.deepEqual([await evaluate(cdp, WALL), await evaluate(cdp, 'getCoins()')], [false, 1], 'fire at the wall did not pay it');
     await key(cdp, '5', 'Digit5', 53);
     assert.equal(await evaluate(cdp, 'getCoins()'), 2);
+
+    // And Backspace is the way back to the cabinet.
+    await key(cdp, 'Backspace', 'Backspace', 8);
+    await sleep(1500);
+    assert.equal(await evaluate(cdp, 'location.pathname'), '/index.html');
   });
 });

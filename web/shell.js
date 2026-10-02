@@ -580,6 +580,13 @@ window.addEventListener('keydown', function (e) {
     dispatch(primary, 'keyup');
   }
   function goToKiosk() { window.location.href = '../index.html'; }
+  // Backspace does it from the keyboard: a kiosk has no mouse for the logo.
+  window.addEventListener('keydown', function (e) {
+    if (e.key !== 'Backspace' || e.repeat) return;
+    if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
+    e.preventDefault();
+    goToKiosk();
+  }, true);
 
   // Live input -> the stick ball's lean (the pad lights its own buttons in
   // the library), whether from a drag, the keyboard or a gamepad. One entry
