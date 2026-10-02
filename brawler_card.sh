@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Regenerate Brawler's kiosk pictures from the game itself:
 #   web/brawler/screenshot.png  one plain frame of a fight
-#   web/brawler/card.png        the card poster: a flying kick over the sign
+#   web/brawler/card.png        the card: RYUKA against BRUTUS over the sign
 # Requires: a native release build, xvfb-run, ImageMagick (magick).
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -23,10 +23,14 @@ shot 15 10 poster
 
 cp "$tmp/kick.png" web/brawler/screenshot.png
 
-# 640x720, the card frame's shape (480:540): the poster at three times its
-# size, and the sign along the bottom, clear of the badges in the card's top
-# corner.
-magick "$tmp/poster.png" -crop 213x200+232+78 +repage -filter point -resize 640x600! "$tmp/hero.png"
+# 640x720, the card frame's shape (480:540): the fight at twice its size,
+# and the sign along the bottom, clear of the badges in the card's top
+# corner. CARD=poster uses the flying-kick poster (scene 15) instead.
+if [ "${CARD:-fight}" = poster ]; then
+    magick "$tmp/poster.png" -crop 213x200+232+78 +repage -filter point -resize 640x600! "$tmp/hero.png"
+else
+    magick "$tmp/kick.png" -crop 320x300+168+62 +repage -filter point -resize 200% "$tmp/hero.png"
+fi
 magick "$tmp/title.png" -crop 640x114+0+8 +repage "$tmp/sign.png"
 magick -size 640x720 xc:black \
     "$tmp/hero.png" -geometry +0+0 -composite \
