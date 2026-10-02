@@ -1052,8 +1052,8 @@ async fn main() {
             shot_frame += 1;
             if shot_frame == 1 {
                 g.start_game();
-                for (i, kind) in [DropKind::Wide, DropKind::Narrow, DropKind::Slow, DropKind::Life].into_iter().enumerate() {
-                    pool_spawn(&mut g.drops, Drop { x: 90.0 + i as f32 * 90.0, y: 250.0 + i as f32 * 25.0, active: true, kind });
+                for (i, kind) in [DropKind::Wide, DropKind::Narrow, DropKind::Slow, DropKind::Life, DropKind::Multi].into_iter().enumerate() {
+                    pool_spawn(&mut g.drops, Drop { x: 70.0 + i as f32 * 75.0, y: 250.0 + i as f32 * 22.0, active: true, kind });
                 }
             }
         }

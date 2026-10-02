@@ -1083,6 +1083,10 @@ async fn main() {
             shot_frame += 1;
             if shot_frame == 1 {
                 g.start_game();
+                // The card's picture: a late wave, flowers and haze and all.
+                g.sess.level = 8;
+                g.spawn_wave();
+                g.wave_t = WAVE_BANNER_SECS;
                 g.ship.angle = -0.4;
                 g.ship.thrusting = true;
                 g.invuln_t = 0.0;
