@@ -19,6 +19,12 @@ pub fn drive(g: &Game, t: f32) {
                         && b.x + 4.0 > x0 && b.x - 4.0 < x1
                 }) || (matches!(g.ufo_mode, UfoMode::Charging | UfoMode::Firing) && g.ufo_active
                     && (g.ufo_laser_x - (x0 + x1) / 2.0).abs() < LASER_HIT_W)
+                // A diver, with the room it can still steer across.
+                || g.diver.is_some_and(|d| {
+                    let secs = ((ship_y - d.y) / DIVE_SPEED).max(0.0);
+                    let reach = 8.0 + secs.min(1.0) * DIVE_STEER;
+                    d.x + w + reach > x0 && d.x - reach < x1
+                })
             };
             let span = |c: f32| (c - w / 2.0 - 6.0, c + w / 2.0 + 6.0);
             let (a, b) = span(me);

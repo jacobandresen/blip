@@ -43,6 +43,13 @@ const BONUS_VALUE: i32 = 50;     // x level, against ordinary food's 10
 const OBS_FADE_SECS: f32 = 1.2;
 const BANNER_SECS: f32 = 1.4;
 
+// ---- streaks ---------------------------------------------------------------
+// Food reached within this many steps of the last is worth one multiple
+// more, up to STREAK_MAX: going straight for it pays, dawdling resets it.
+// 22 steps is the board's width and a turn.
+const STREAK_STEPS: i32 = 22;
+const STREAK_MAX: i32 = 5;
+
 const GOLD: BlipColor = BlipColor { r: 1.0, g: 0.84, b: 0.20, a: 1.0 };
 
 /// The pixel centre of a board cell.
@@ -92,6 +99,9 @@ struct Game {
     bonus_ttl: f32,
     sess: Session,
     foods_eaten: i32,
+    /// See STREAK_STEPS.
+    streak: i32,
+    steps_since_food: i32,
     move_timer: f32,
     dead_timer: Timer,
     state: State,
@@ -120,6 +130,8 @@ impl Game {
             bonus: Cell { c: 0, r: 0 },
             bonus_ttl: 0.0,
             foods_eaten: 0,
+            streak: 0,
+            steps_since_food: 0,
             move_timer: 0.0,
             dead_timer: Timer::default(),
             state: State::Title,
@@ -299,6 +311,8 @@ impl Game {
         }
         self.spawn_food();
         self.move_timer = 0.0;
+        self.streak = 0;
+        self.steps_since_food = 0;
     }
 
     fn start_game(&mut self) {
@@ -400,10 +414,17 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     if ate {
         play_sfx(&sfx.eat);
         g.gulps.push(0.0);
-        g.sess.add_score(10 * g.sess.level);
+        g.streak = if g.steps_since_food <= STREAK_STEPS { (g.streak + 1).min(STREAK_MAX) } else { 1 };
+        g.steps_since_food = 0;
+        let points = 10 * g.sess.level * g.streak;
+        g.sess.add_score(points);
         let (x, y) = cell_centre(h);
         g.fx.ring(x, y, CELL as f32 * 1.3, 0.3, BlipColor { r: 1.0, g: 0.85, b: 0.4, a: 1.0 });
-        g.fx.popup(x, y - 10.0, &format!("+{}", 10 * g.sess.level), BLIP_WHITE);
+        if g.streak > 1 {
+            g.fx.popup(x, y - 10.0, &format!("+{points} X{}", g.streak), GOLD);
+        } else {
+            g.fx.popup(x, y - 10.0, &format!("+{points}"), BLIP_WHITE);
+        }
         g.foods_eaten += 1;
         // One bonus per level, mid-level, away from the level change.
         if g.foods_eaten % BONUS_EVERY == 0 && !g.bonus_active() {
@@ -422,6 +443,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
         g.spawn_food();
     }
+    g.steps_since_food += 1;
     for k in g.gulps.iter_mut() { *k += 1.0; }
     let len = g.snake_len as f32;
     g.gulps.retain(|&k| k < len);

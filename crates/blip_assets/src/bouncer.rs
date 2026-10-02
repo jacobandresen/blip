@@ -197,7 +197,7 @@ fn brick(color: (u8, u8, u8)) -> Vec<u8> {
 /// Good ones are smooth and cool/bright with a plain icon; the bad one is
 /// red with hazard stripes, so it reads by pattern as well as by colour.
 #[derive(Copy, Clone, PartialEq)]
-enum Pickup { Wide, Narrow, Slow, Life }
+enum Pickup { Wide, Narrow, Slow, Life, Multi }
 
 fn in_tri(p: (f32, f32), a: (f32, f32), b: (f32, f32), c: (f32, f32)) -> bool {
     let s = |p: (f32, f32), q: (f32, f32), r: (f32, f32)| (p.0 - r.0) * (q.1 - r.1) - (q.0 - r.0) * (p.1 - r.1);
@@ -231,6 +231,8 @@ fn pickup_icon(kind: Pickup, p: (f32, f32)) -> bool {
             let q = x * x + y * y - 1.0;
             q * q * q - x * x * y * y * y <= 0.0
         }
+        // three balls in a row
+        Pickup::Multi => [-12.0f32, 0.0, 12.0].iter().any(|&cx| (p.0 - cx).hypot(p.1) <= 4.6),
     }
 }
 
@@ -244,6 +246,7 @@ fn pickup(kind: Pickup) -> Vec<u8> {
         Pickup::Slow => ((0.5, 0.78, 1.0), (0.05, 0.28, 0.75)),
         Pickup::Life => ((1.0, 0.9, 0.4), (0.85, 0.5, 0.0)),
         Pickup::Narrow => ((1.0, 0.4, 0.35), (0.6, 0.03, 0.05)),
+        Pickup::Multi => ((0.85, 0.6, 1.0), (0.42, 0.12, 0.72)),
     };
     const N: i32 = 3;
     for py in 0..h {
@@ -466,6 +469,7 @@ pub fn generate() -> Vec<Asset> {
         ("images/drop_narrow.png", pickup(Pickup::Narrow)),
         ("images/drop_slow.png", pickup(Pickup::Slow)),
         ("images/drop_life.png", pickup(Pickup::Life)),
+        ("images/drop_multi.png", pickup(Pickup::Multi)),
         ("images/ball_shade.png", ball_shade()),
         ("images/brick_red.png",    brick((220, 60, 60))),
         ("images/brick_orange.png", brick((220, 140, 40))),

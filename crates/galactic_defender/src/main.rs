@@ -109,6 +109,23 @@ const DEATH_EXPLOSION_PHASE: f32 = 0.7; // seconds of that pause spent on the gi
                                          // before the ship starts fading back in — the
                                          // remainder (DEAD_PAUSE - this) is the mist fade-in
 const RESPAWN_GRACE_SECS: f32 = 1.2; // once play resumes, firing stays locked out this long
+// ---- divers ----------------------------------------------------------------
+// From DIVE_LEVEL one alien at a time leaves the bottom of the formation and
+// swoops at the ship. It shakes for DIVE_TELL first, steers slower than the
+// ship moves (200 px/s), breaks any shield block it crosses, and is worth
+// double shot on the way down.
+const DIVE_LEVEL: i32 = 3;
+const DIVE_EVERY: (i32, i32) = (7, 12); // seconds between dives
+const DIVE_TELL: f32 = 0.8;
+const DIVE_SPEED: f32 = 150.0;
+const DIVE_STEER: f32 = 60.0;
+const DIVE_MIN_ALIENS: i32 = 6;         // the last few stay in formation
+
+// ---- sharpshooting ---------------------------------------------------------
+// Every third alien hit in a row without a shot going over the top is worth
+// one multiple more, up to this. A miss starts the count again.
+const STREAK_PER: i32 = 3;
+const STREAK_MAX: i32 = 5;
 /// Invaders this close above the ground line turn it into a warning.
 const LANDING_WARN: i32 = 110;
 
@@ -125,6 +142,10 @@ struct Alien {
     kind: usize, // 0=squid 1=crab 2=octopus
     anim: u8,    // 0/1
 }
+
+/// An alien on its way down at the ship (see DIVE_LEVEL).
+#[derive(Copy, Clone)]
+struct Diver { x: f32, y: f32, kind: usize, t: f32 }
 
 #[derive(Copy, Clone)]
 struct Bullet {
@@ -193,6 +214,13 @@ struct Game {
     boss_fire: Timer,
     boss_flash: f32,
     fx: Fx,
+    /// Alien hits in a row without a miss (see STREAK_PER).
+    streak: i32,
+    /// Seconds to the next dive; the alien shaking before it goes and how
+    /// long it has; the one in the air.
+    dive_cd: f32,
+    dive_pick: Option<(usize, f32)>,
+    diver: Option<Diver>,
 }
 
 impl Game {
@@ -252,6 +280,10 @@ impl Game {
             boss_fire: Timer::default(),
             boss_flash: 0.0,
             fx: Fx::new(),
+            streak: 0,
+            dive_cd: 0.0,
+            dive_pick: None,
+            diver: None,
         }
     }
 
@@ -384,6 +416,10 @@ impl Game {
         self.bullets.iter_mut().for_each(|b| b.active = false);
         self.explosions.iter_mut().for_each(|e| e.active = false);
         self.fx.clear();
+        self.streak = 0;
+        self.dive_cd = rand_int(DIVE_EVERY.0, DIVE_EVERY.1) as f32;
+        self.dive_pick = None;
+        self.diver = None;
         self.init_aliens();
         let theme = (self.sess.level - 1).rem_euclid(5);
         if theme != 2 && theme != 4 {
@@ -828,6 +864,96 @@ fn bomb_hits_ship(bx: f32, by: f32, px: f32) -> bool {
     dx <= half.max(3.0) + 2.0
 }
 
+/// The ship is hit: the explosion, a life gone, and the pause or the end.
+fn lose_ship(g: &mut Game, sfx: &Sounds, why: &str) {
+    let px = g.player_x;
+    g.spawn_player_death(px, (GROUND_Y - 28) as f32);
+    play_sfx(&sfx.explosion);
+    blip::bot::add(why, 1.0);
+    g.dive_pick = None;
+    g.diver = None;
+    match g.sess.lose_life() {
+        LifeResult::StillAlive => {
+            for k in MAX_PLAYER_BULLETS..N_BULLETS {
+                g.bullets[k].active = false;
+            }
+            g.dead_timer.start(DEAD_PAUSE);
+            g.dead_pause_total = DEAD_PAUSE;
+            g.state = State::Dead;
+        }
+        LifeResult::GameOver => {
+            g.dead_timer.start(GAME_OVER_MIN_WAIT);
+            g.state = State::Over;
+        }
+    }
+    // The UFO stops updating once we leave State::Play, so its siren
+    // loop would otherwise keep wailing through the Dead/Over screen.
+    if g.ufo_active { g.ufo_active = false; blip::stop_alert(); }
+}
+
+/// Pick, shake and fly the diver. Returns true when it has hit the ship.
+fn update_diver(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
+    if let Some(mut d) = g.diver {
+        d.t += dt;
+        d.y += DIVE_SPEED * dt;
+        let aim = g.player_x - d.x;
+        d.x += aim.clamp(-DIVE_STEER * dt, DIVE_STEER * dt);
+        // Through a shield, not round it.
+        for sh in g.shields.iter_mut() {
+            for r in 0..SHIELD_ROWS {
+                for c in 0..SHIELD_COLS {
+                    let (bx, by) = (sh.x + (c as i32 * SHIELD_BLOCK) as f32, sh.y + (r as i32 * SHIELD_BLOCK) as f32);
+                    if sh.alive[r][c] && rects_overlap(d.x + 6.0, d.y + 6.0, ALIEN_W as f32 - 12.0, ALIEN_H as f32 - 12.0,
+                        bx, by, SHIELD_BLOCK as f32, SHIELD_BLOCK as f32) {
+                        sh.alive[r][c] = false;
+                        g.fx.burst(bx + 6.0, by + 6.0, 4, 60.0, BLIP_GREEN);
+                    }
+                }
+            }
+        }
+        let ship_top = (GROUND_Y - 24) as f32;
+        if rects_overlap(d.x + 6.0, d.y + 6.0, ALIEN_W as f32 - 12.0, ALIEN_H as f32 - 12.0,
+            g.player_x + 5.0, ship_top, ALIEN_W as f32 - 10.0, 24.0) {
+            g.diver = None;
+            return true;
+        }
+        if d.y + ALIEN_H as f32 >= GROUND_Y as f32 {
+            // Missed: it ploughs into the ground and is gone.
+            g.fx.burst(d.x + ALIEN_W as f32 / 2.0, GROUND_Y as f32 - 4.0, 12, 110.0, alien_color(d.kind));
+            play_sfx(&sfx.explosion);
+            g.diver = None;
+        } else {
+            g.diver = Some(d);
+        }
+        return false;
+    }
+    if let Some((idx, left)) = g.dive_pick {
+        if !g.aliens[idx].alive {
+            g.dive_pick = None;
+        } else if left <= dt {
+            let a = g.aliens[idx];
+            g.aliens[idx].alive = false;
+            g.dive_pick = None;
+            g.diver = Some(Diver { x: a.x, y: a.y, kind: a.kind, t: 0.0 });
+            play_sfx(&sfx.shoot);
+        } else {
+            g.dive_pick = Some((idx, left - dt));
+        }
+        return false;
+    }
+    if g.sess.level < DIVE_LEVEL || g.boss_active { return false; }
+    g.dive_cd -= dt;
+    if g.dive_cd > 0.0 || g.aliens_alive() < DIVE_MIN_ALIENS { return false; }
+    g.dive_cd = rand_int(DIVE_EVERY.0, DIVE_EVERY.1) as f32;
+    // The lowest alien of a random column.
+    let col = rand_int(0, g.active_cols - 1);
+    let pick = (0..g.active_rows).rev()
+        .map(|r| (r * g.active_cols + col) as usize)
+        .find(|&i| g.aliens[i].alive);
+    if let Some(idx) = pick { g.dive_pick = Some((idx, DIVE_TELL)); }
+    false
+}
+
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.respawn_grace.tick(dt);
     // Hold to fire, like the cabinet: a new shot goes as soon as the last
@@ -877,7 +1003,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     for b in g.bullets.iter_mut() {
         if !b.active { continue; }
         b.y += if b.player { -BULLET_SPEED } else { g.bomb_speed } * dt;
-        if b.y < PLAY_Y as f32 { b.active = false; }
+        if b.y < PLAY_Y as f32 {
+            b.active = false;
+            if b.player { g.streak = 0; }
+        }
         // A bomb that misses bursts on the ground line.
         if !b.player && b.y + 12.0 > GROUND_Y as f32 {
             b.active = false;
@@ -959,11 +1088,37 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.spawn_explosion(ax, ay);
                 g.aliens[ai].alive = false;
                 g.bullets[bi].active = false;
-                let pts = match kind { 0 => 30, 1 => 20, _ => 10 };
-                g.sess.add_score(pts * g.sess.level);
+                g.streak += 1;
+                let times = (1 + (g.streak - 1) / STREAK_PER).min(STREAK_MAX);
+                let pts = match kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * times;
+                g.sess.add_score(pts);
                 let (cx, cy) = (ax + ALIEN_W as f32 / 2.0, ay + ALIEN_H as f32 / 2.0);
                 g.fx.burst(cx, cy, 10, 110.0, alien_color(kind));
-                g.fx.popup(cx, cy - 6.0, &format!("{}", pts * g.sess.level), alien_color(kind));
+                if times > 1 {
+                    g.fx.popup(cx, cy - 6.0, &format!("{pts} X{times}"), BLIP_YELLOW);
+                } else {
+                    g.fx.popup(cx, cy - 6.0, &format!("{pts}"), alien_color(kind));
+                }
+                break;
+            }
+        }
+    }
+
+    // Player bullet vs the diver: double.
+    if let Some(d) = g.diver {
+        for bi in 0..MAX_PLAYER_BULLETS {
+            if !g.bullets[bi].active { continue; }
+            if rects_overlap(g.bullets[bi].x, g.bullets[bi].y, 8.0, 16.0, d.x, d.y, ALIEN_W as f32, ALIEN_H as f32) {
+                g.bullets[bi].active = false;
+                g.diver = None;
+                play_sfx(&sfx.explosion);
+                g.spawn_explosion(d.x, d.y);
+                g.streak += 1;
+                let pts = match d.kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * 2;
+                g.sess.add_score(pts);
+                let (cx, cy) = (d.x + ALIEN_W as f32 / 2.0, d.y + ALIEN_H as f32 / 2.0);
+                g.fx.burst(cx, cy, 14, 130.0, alien_color(d.kind));
+                g.fx.popup(cx, cy - 6.0, &format!("DIVER {pts}"), BLIP_YELLOW);
                 break;
             }
         }
@@ -1018,29 +1173,14 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if !g.bullets[bi].active { continue; }
         if bomb_hits_ship(g.bullets[bi].x, g.bullets[bi].y, g.player_x) {
             g.bullets[bi].active = false;
-            let px = g.player_x;
-            g.spawn_player_death(px, (GROUND_Y - 28) as f32);
-            play_sfx(&sfx.explosion);
-            blip::bot::add(if bi == UFO_BOMB_IDX { "death_ufo_bomb" } else { "death_bomb" }, 1.0);
-            match g.sess.lose_life() {
-                LifeResult::StillAlive => {
-                    for k in MAX_PLAYER_BULLETS..N_BULLETS {
-                        g.bullets[k].active = false;
-                    }
-                    g.dead_timer.start(DEAD_PAUSE);
-                    g.dead_pause_total = DEAD_PAUSE;
-                    g.state = State::Dead;
-                }
-                LifeResult::GameOver => {
-                    g.dead_timer.start(GAME_OVER_MIN_WAIT);
-                    g.state = State::Over;
-                }
-            }
-            // The UFO stops updating once we leave State::Play, so its siren
-            // loop would otherwise keep wailing through the Dead/Over screen.
-            if g.ufo_active { g.ufo_active = false; blip::stop_alert(); }
+            lose_ship(g, sfx, if bi == UFO_BOMB_IDX { "death_ufo_bomb" } else { "death_bomb" });
             return;
         }
+    }
+
+    if update_diver(g, dt, sfx) {
+        lose_ship(g, sfx, "death_diver");
+        return;
     }
 
     for a in g.aliens.iter() {
@@ -1068,7 +1208,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     update_boss(g, dt, sfx);
     boss_take_hits(g, sfx);
 
-    if g.aliens_alive() == 0 && !g.boss_active {
+    if g.aliens_alive() == 0 && !g.boss_active && g.diver.is_none() {
         // Whichever way this goes the ordinary UFO's pass is over: the
         // level has ended, or a mothership is taking the sky and two
         // sirens and two saucers at once is a fight nobody can read.
@@ -1185,12 +1325,23 @@ fn draw_play(blip: &Blip, g: &Game,
         }
     }
 
-    for a in g.aliens.iter() {
+    let now = blip::macroquad::time::get_time() as f32;
+    for (i, a) in g.aliens.iter().enumerate() {
         if !a.alive { continue; }
+        // The one about to dive shakes and flashes white: the tell.
+        let (shake, tint) = match g.dive_pick {
+            Some((idx, _)) if idx == i => ((now * 60.0).sin() * 3.0,
+                if (now * 14.0) as i32 % 2 == 0 { BLIP_WHITE } else { alien_color(a.kind) }),
+            _ => (0.0, alien_color(a.kind)),
+        };
         blip.draw_texture_tinted(
             &alien[a.kind][a.anim as usize],
-            a.x, a.y, ALIEN_W as f32, ALIEN_H as f32, alien_color(a.kind),
+            a.x + shake, a.y, ALIEN_W as f32, ALIEN_H as f32, tint,
         );
+    }
+    if let Some(d) = g.diver {
+        let frame = (d.t * 12.0) as usize % 2;
+        blip.draw_texture_tinted(&alien[d.kind][frame], d.x, d.y, ALIEN_W as f32, ALIEN_H as f32, BLIP_WHITE);
     }
 
     draw_boss(blip, g, saucer);

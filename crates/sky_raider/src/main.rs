@@ -58,6 +58,8 @@ const MAX_ENEMIES: usize = 30;
 const ENEMY_BULLET_SPEED: f32 = 205.0;
 const MAX_ENEMY_BULLETS: usize = 260;
 const WAVE_KILL_BASE: i32 = 60;
+/// Per plane, times the level, for shooting down every plane of a flight.
+const FLIGHT_BONUS: i32 = 50;
 
 // ---- flight model ---------------------------------------------------------
 // Each enemy flight flies one path the way an aeroplane does: it banks to
@@ -326,6 +328,9 @@ struct Flight {
     max_bank: f32, // flat enough that the inside wingman stays above stall
     legs: [Leg; 4], n: usize, leg: usize, leg_t: f32, turned: f32,
     t: f32,
+    /// How many planes it launched with and how many were shot down: all of
+    /// them is a formation bonus (see FLIGHT_BONUS).
+    members: u8, downed: u8,
 }
 impl Pooled for Enemy {
     fn is_active(&self) -> bool { self.active }
@@ -699,7 +704,7 @@ impl Game {
             can_hide: false,
         };
         let dead_flight = Flight { active: false, x: 0.0, y: 0.0, heading: 0.0, bank: 0.0, speed: 100.0,
-            trim: 100.0, max_bank: FLIGHT_MAX_BANK, legs: [Leg::Straight(0.0); 4], n: 0, leg: 0, leg_t: 0.0, turned: 0.0, t: 0.0 };
+            trim: 100.0, max_bank: FLIGHT_MAX_BANK, legs: [Leg::Straight(0.0); 4], n: 0, leg: 0, leg_t: 0.0, turned: 0.0, t: 0.0, members: 0, downed: 0 };
         let dead_explosion = Explosion { x: 0.0, y: 0.0, ttl: 0.0, max_ttl: EXPLOSION_TTL, scale: 1.0, color: EXPLOSION_ORANGE, active: false };
         let dead_powerup = Powerup { x: 0.0, y: 0.0, active: false };
         let dead_health_pickup = HealthPickup { x: 0.0, y: 0.0, active: false };
@@ -1177,7 +1182,8 @@ fn spawn_flight(g: &mut Game, kind: EnemyKind, form: Formation, x: f32, y: f32, 
         (trim * trim / (FLIGHT_G * r)).atan().min(FLIGHT_MAX_BANK)
     };
     g.flights[fi] = Flight { active: true, x, y, heading, bank: 0.0, speed: trim, trim, max_bank,
-        legs: plan, n: legs.len().min(4), leg: 0, leg_t: 0.0, turned: 0.0, t: 0.0 };
+        legs: plan, n: legs.len().min(4), leg: 0, leg_t: 0.0, turned: 0.0, t: 0.0,
+        members: members.len() as u8, downed: 0 };
     let can_hide = kind != EnemyKind::Ace && rand01() < 0.4;
     for &slot in members {
         let (sx, sy) = slot_pos(x, y, heading, slot);
@@ -2254,6 +2260,15 @@ fn shoot_down(g: &mut Game, ei: usize, sfx: &Sounds, flames: bool) {
     let pts = match e.kind { EnemyKind::Grunt => 20, EnemyKind::Weaver => 30, EnemyKind::Ace => 50 };
     g.score_at(ecx, ecy, pts * g.sess.level);
     g.wave_kills += 1;
+    // The whole flight shot down, none got away.
+    let f = &mut g.flights[e.flight];
+    f.downed += 1;
+    if f.members >= 2 && f.downed == f.members {
+        let bonus = FLIGHT_BONUS * f.members as i32 * g.sess.level;
+        g.sess.add_score(bonus);
+        g.fx.popup(ecx, ecy - 30.0, &format!("FLIGHT +{bonus}"), BLIP_YELLOW);
+        blip::bot::add("flights_down", 1.0);
+    }
     if e.kind == EnemyKind::Ace {
         pool_spawn(&mut g.powerups, Powerup { x: e.x, y: e.y, active: true });
     } else if rand01() < HEALTH_DROP_CHANCE {

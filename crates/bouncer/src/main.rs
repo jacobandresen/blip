@@ -65,6 +65,10 @@ const EFFECT_DURATION: f32 = 8.0;
 const PAD_W_WIDE: f32 = 130.0;
 const PAD_W_NARROW: f32 = 46.0;
 const BALL_SLOW_FACTOR: f32 = 0.6;
+// MULTI splits the ball into this many, fanned this far apart (radians).
+// A ball lost while another is in play costs nothing; the last one a life.
+const MULTI_BALLS: usize = 3;
+const MULTI_FAN: f32 = 0.45;
 
 // ---- tuning -----------------------------------------------------------
 const LIVES_START: i32 = 3;
@@ -103,6 +107,11 @@ const PULL_CAP: f32 = 1.3;       // times BALL_SPEED_MAX, whatever the pull
 const SEEK_AFTER: f32 = 5.0;
 const SEEK_RATE: f32 = 1.5; // radians/sec of bend at most
 
+// ---- chains -----------------------------------------------------------------
+// Each brick the ball breaks before it comes back to the paddle is worth one
+// multiple more, up to this: a shot that gets in behind the wall pays.
+const CHAIN_MAX: i32 = 5;
+
 const BRICK_COLORS: [BlipColor; 8] = [
     BlipColor { r: 0.90, g: 0.25, b: 0.25, a: 1.0 },
     BlipColor { r: 0.95, g: 0.55, b: 0.20, a: 1.0 },
@@ -118,7 +127,7 @@ const BRICK_COLORS: [BlipColor; 8] = [
 enum State { Title, Launch, Play, Dead, Win, Over }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-enum DropKind { Wide, Narrow, Slow, Life }
+enum DropKind { Wide, Narrow, Slow, Life, Multi }
 
 #[derive(Copy, Clone)]
 struct Drop { x: f32, y: f32, active: bool, kind: DropKind }
@@ -140,6 +149,11 @@ const STEEL_MIN_LEVEL: i32 = 4;
 
 #[derive(Copy, Clone)]
 struct Brick { kind: usize, hp: u8, alive: bool }
+
+/// One ball's own state. The game's `ball_*` fields are the ball in hand;
+/// the others wait in `extra` and are swapped in for their turn.
+#[derive(Copy, Clone)]
+struct Ball { x: f32, y: f32, vx: f32, vy: f32, spin: f32, curve_used: f32, rot: Mat3 }
 
 struct Game {
     bricks: [Brick; BRICK_TOTAL],
@@ -163,12 +177,16 @@ struct Game {
     pad_kick: f32,   // recoil depth (px) from the last ball strike, on a damped spring
     pad_kick_v: f32,
     ball_rot: Mat3, // orientation of the ball's surface pattern in view space
+    /// The other balls in play after a MULTI.
+    extra: Vec<Ball>,
     ball_speed: f32,
     sess: Session,
     dead_timer: Timer,
     state: State,
     /// Seconds since a brick last broke (see SEEK_AFTER).
     since_break: f32,
+    /// Bricks broken since the ball last left the paddle (see CHAIN_MAX).
+    chain: i32,
     fx: Fx,
 }
 
@@ -192,11 +210,13 @@ impl Game {
             pad_kick: 0.0,
             pad_kick_v: 0.0,
             ball_rot: MAT3_ID,
+            extra: Vec::new(),
             ball_speed: BALL_SPEED_0,
             sess: Session::new(LIVES_START),
             dead_timer: Timer::default(),
             state: State::Title,
             since_break: 0.0,
+            chain: 0,
             fx: Fx::new(),
         }
     }
@@ -258,7 +278,40 @@ impl Game {
             .min_by(|a, b| (a.0 - cx).hypot(a.1 - cy).total_cmp(&(b.0 - cx).hypot(b.1 - cy)))
     }
 
+    fn ball(&self) -> Ball {
+        Ball { x: self.ball_x, y: self.ball_y, vx: self.ball_vx, vy: self.ball_vy,
+               spin: self.ball_spin, curve_used: self.ball_curve_used, rot: self.ball_rot }
+    }
+
+    fn set_ball(&mut self, b: Ball) {
+        (self.ball_x, self.ball_y, self.ball_vx, self.ball_vy) = (b.x, b.y, b.vx, b.vy);
+        (self.ball_spin, self.ball_curve_used, self.ball_rot) = (b.spin, b.curve_used, b.rot);
+    }
+
+    /// Put extra ball `k` in hand and the one in hand in its place.
+    fn swap_ball(&mut self, k: usize) {
+        let mine = self.ball();
+        let theirs = std::mem::replace(&mut self.extra[k], mine);
+        self.set_ball(theirs);
+    }
+
+    /// Split the ball in hand until MULTI_BALLS are in play, each copy
+    /// turned a fan's width from it.
+    fn split_ball(&mut self) {
+        let b = self.ball();
+        let mut side = 1.0;
+        while 1 + self.extra.len() < MULTI_BALLS {
+            let (s, c) = (MULTI_FAN * side).sin_cos();
+            let (vx, mut vy) = (b.vx * c - b.vy * s, b.vx * s + b.vy * c);
+            // Never straight along the paddle line.
+            if vy.abs() < b.vx.hypot(b.vy) * 0.3 { vy = -b.vx.hypot(b.vy) * 0.3; }
+            self.extra.push(Ball { vx, vy, spin: 0.0, curve_used: 0.0, ..b });
+            side = -side;
+        }
+    }
+
     fn launch_ball(&mut self) {
+        self.extra.clear();
         self.since_break = 0.0;
         self.ball_x = self.pad_x + (self.pad_w / 2.0 - BALL_W as f32 / 2.0);
         self.ball_y = (PAD_Y - BALL_H - 2) as f32;
@@ -355,6 +408,7 @@ fn paddle_input(g: &mut Game, dt: f32) {
 }
 
 fn update_launch(g: &mut Game, dt: f32) {
+    g.chain = 0;
     paddle_input(g, dt);
     g.fx.update(dt);
     g.ball_x = g.pad_x + (g.pad_w / 2.0 - BALL_W as f32 / 2.0);
@@ -376,13 +430,56 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     update_drops(g, dt, sfx);
     g.fx.update(dt);
     g.since_break += dt;
-    seek(g, dt);
 
     let active_speed = if g.slow_timer.active() {
         g.ball_speed * BALL_SLOW_FACTOR
     } else {
         g.ball_speed
     };
+
+    // Every ball flies by the same code: each extra is swapped into the ball
+    // fields for its turn.
+    let lost = fly_ball(g, dt, active_speed, sfx);
+    let mut k = 0;
+    while k < g.extra.len() {
+        g.swap_ball(k);
+        let gone = fly_ball(g, dt, active_speed, sfx);
+        g.swap_ball(k);
+        if gone { g.extra.remove(k); } else { k += 1; }
+    }
+    if lost {
+        if let Some(b) = g.extra.pop() {
+            g.set_ball(b);
+        } else {
+            blip::bot::add("lives_lost", 1.0);
+            blip::bot::add(&format!("lost_at_speed{}", (g.ball_vx.hypot(g.ball_vy) / 50.0) as i32 * 50), 1.0);
+            play_sfx(&sfx.life_lost);
+            g.reset_drops();
+            match g.sess.lose_life() {
+                LifeResult::StillAlive => { g.dead_timer.start(1.2); g.state = State::Dead; }
+                LifeResult::GameOver => {
+                    g.dead_timer.start(GAME_OVER_MIN_WAIT);
+                    g.state = State::Over;
+                    web::report_score(g.sess.score);
+                }
+            }
+            return;
+        }
+    }
+
+    if g.bricks_alive() == 0 {
+        blip::bot::set("cleared", g.sess.level as f64);
+        blip::bot::set(&format!("t_clear{}", g.sess.level), blip::bot::clock() as f64);
+        play_sfx(&sfx.win);
+        g.dead_timer.start(1.5);
+        g.state = State::Win;
+    }
+}
+
+/// One frame of the ball in hand: seeking, spin, pull, and the move itself
+/// against walls, paddle and bricks. Returns true if it fell out the bottom.
+fn fly_ball(g: &mut Game, dt: f32, active_speed: f32, sfx: &Sounds) -> bool {
+    seek(g, dt);
 
     // ---- screwball curve: rotate the velocity vector (speed preserved) by
     //      the current spin rate, capped at SCREW_MAX_CURVE, spin bleeding
@@ -438,29 +535,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
         if g.ball_y > WIN_H as f32 {
             g.fx.burst(g.ball_x + BALL_W as f32 / 2.0, WIN_H as f32 - 4.0, 14, 160.0, BLIP_RED);
-            blip::bot::add("lives_lost", 1.0);
-            blip::bot::add(&format!("lost_at_speed{}", (g.ball_vx.hypot(g.ball_vy) / 50.0) as i32 * 50), 1.0);
-            play_sfx(&sfx.life_lost);
-            g.reset_drops();
-            match g.sess.lose_life() {
-                LifeResult::StillAlive => { g.dead_timer.start(1.2); g.state = State::Dead; }
-                LifeResult::GameOver => {
-                    g.dead_timer.start(GAME_OVER_MIN_WAIT);
-                    g.state = State::Over;
-                    web::report_score(g.sess.score);
-                }
-            }
-            return;
+            return true;
         }
     }
-
-    if g.bricks_alive() == 0 {
-        blip::bot::set("cleared", g.sess.level as f64);
-        blip::bot::set(&format!("t_clear{}", g.sess.level), blip::bot::clock() as f64);
-        play_sfx(&sfx.win);
-        g.dead_timer.start(1.5);
-        g.state = State::Win;
-    }
+    false
 }
 
 /// The top-left corner of brick `i`.
@@ -578,6 +656,7 @@ fn ball_paddle(g: &mut Game, speed: f32, sfx: &Sounds) {
     }
     play_variant(&sfx.paddle_hit, speed);
     web::haptic();
+    g.chain = 0;
     g.fx.ring(g.ball_x + BALL_W as f32 / 2.0, PAD_Y as f32, 22.0, 0.25, BlipColor { r: 0.6, g: 0.85, b: 1.0, a: 0.8 });
     g.pad_kick_v = 40.0 + 70.0 * (speed / BALL_SPEED_MAX).min(1.0);
     let incoming_vx = g.ball_vx;
@@ -668,10 +747,16 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
         if g.bricks[i].hp == 0 {
             g.bricks[i].alive = false;
             g.since_break = 0.0;
-            let points = (BRICK_ROWS - row) * 10 * g.sess.level;
+            g.chain += 1;
+            let times = g.chain.min(CHAIN_MAX);
+            let points = (BRICK_ROWS - row) * 10 * g.sess.level * times;
             g.sess.add_score(points);
             g.fx.burst(mx, my, 10, 120.0, BRICK_COLORS[g.bricks[i].kind]);
-            g.fx.popup(mx, my, &format!("{points}"), BLIP_WHITE);
+            if times > 1 {
+                g.fx.popup(mx, my, &format!("{points} X{times}"), BLIP_YELLOW);
+            } else {
+                g.fx.popup(mx, my, &format!("{points}"), BLIP_WHITE);
+            }
             // Same ramp on every level, so the ball plays identically no
             // matter how far the player has gotten.
             g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
@@ -681,8 +766,9 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
             if rand() % 10 < 3 {
                 let drop_x = bx + BRICK_W as f32 / 2.0 - DROP_W / 2.0;
                 let drop_kind = match rand() % 10 {
-                    0..=2 => DropKind::Wide,
-                    3..=5 => DropKind::Slow,
+                    0..=1 => DropKind::Wide,
+                    2..=3 => DropKind::Slow,
+                    4..=5 => DropKind::Multi,
                     6..=8 => DropKind::Narrow,
                     _ => DropKind::Life,
                 };
@@ -701,22 +787,24 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
 }
 
 fn update_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
+    let mut split = false;
     for d in pool_iter_mut(&mut g.drops) {
         d.y += DROP_SPEED * dt;
         if d.y > WIN_H as f32 { d.active = false; continue; }
         if rects_overlap(d.x, d.y, DROP_W, DROP_H,
                          g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32) {
             d.active = false;
-            blip::bot::add(["got_wide", "got_narrow", "got_slow", "got_life"][d.kind as usize], 1.0);
+            blip::bot::add(["got_wide", "got_narrow", "got_slow", "got_life", "got_multi"][d.kind as usize], 1.0);
             let (label, c) = match d.kind {
                 DropKind::Wide => ("WIDE", BLIP_GREEN),
                 DropKind::Narrow => ("NARROW", BLIP_RED),
                 DropKind::Slow => ("SLOW", BLIP_CYAN),
                 DropKind::Life => ("+1 LIFE", BLIP_YELLOW),
+                DropKind::Multi => ("MULTI", BlipColor { r: 0.8, g: 0.55, b: 1.0, a: 1.0 }),
             };
             g.fx.popup(d.x + DROP_W / 2.0, PAD_Y as f32 - 14.0, label, c);
             play_sfx(match d.kind {
-                DropKind::Wide | DropKind::Slow => &sfx.pickup_good,
+                DropKind::Wide | DropKind::Slow | DropKind::Multi => &sfx.pickup_good,
                 DropKind::Narrow => &sfx.pickup_bad,
                 DropKind::Life => &sfx.pickup_life,
             });
@@ -735,9 +823,11 @@ fn update_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
                 DropKind::Life => {
                     g.sess.lives += 1;
                 }
+                DropKind::Multi => split = true,
             }
         }
     }
+    if split { g.split_ball(); }
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
@@ -761,7 +851,7 @@ fn update_over(g: &mut Game, dt: f32) {
     g.start_game();
 }
 
-fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 8], drops: &[Texture2D; 4]) {
+fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 8], drops: &[Texture2D; 5]) {
     for i in 0..BRICK_TOTAL {
         if !g.bricks[i].alive { continue; }
         let r = i as i32 / BRICK_COLS;
@@ -806,32 +896,33 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
     blip.draw_texture_region(paddle, cap, 0.0, sw - 2.0 * cap, 24.0, g.pad_x + cap_w, py, g.pad_w - 2.0 * cap_w, ph);
     blip.draw_texture_region(paddle, sw - cap, 0.0, cap, 24.0, g.pad_x + g.pad_w - cap_w, py, cap_w, ph);
 
-    // Soft drop shadow, offset toward the direction of travel, so the ball
-    // reads as rolling across the play field rather than floating over it.
-    let ball_cx = g.ball_x + BALL_W as f32 / 2.0;
-    let ball_cy = g.ball_y + BALL_H as f32 / 2.0;
-    let speed = (g.ball_vx * g.ball_vx + g.ball_vy * g.ball_vy).sqrt().max(1.0);
-    let shadow_ox = (g.ball_vx / speed) * 4.0;
-    let shadow_oy = (g.ball_vy / speed) * 4.0 + 3.0;
-    blip.fill_circle(
-        ball_cx + shadow_ox, ball_cy + shadow_oy, BALL_W as f32 * 0.42,
-        BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.35 },
-    );
-
-    // Seeking: the ball glows and the brick it is bending toward pulses.
+    // Seeking: the brick the ball is bending toward pulses.
     if g.seeking() {
         let pulse = 0.5 + 0.5 * (blip::macroquad::time::get_time() as f32 * 8.0).sin();
-        blip.fill_glow_circle(ball_cx, ball_cy, BALL_W as f32 * 0.55, BlipColor { r: 1.0, g: 0.9, b: 0.5, a: 0.35 });
         if let Some((tx, ty)) = g.nearest_brick() {
             let (x, y) = (tx - BRICK_W as f32 / 2.0 - 2.0, ty - BRICK_H as f32 / 2.0 - 2.0);
             blip.draw_rect(x, y, BRICK_W as f32 + 4.0, BRICK_H as f32 + 4.0, BlipColor { r: 1.0, g: 0.95, b: 0.6, a: pulse });
         }
     }
 
-    let (col, row, roll) = ball_pose(&g.ball_rot);
-    let (bx, by, bs) = (g.ball_x - 1.0, g.ball_y - 1.0, BALL_W as f32 + 2.0);
-    blip.draw_texture_cell(ball, col, BALL_YAW_N, row, BALL_PITCH_N, bx, by, bs, bs, roll);
-    blip.draw_texture(shade, bx, by, bs, bs);
+    for b in g.extra.iter().copied().chain([g.ball()]) {
+        // Soft drop shadow, offset toward the direction of travel, so the ball
+        // reads as rolling across the play field rather than floating over it.
+        let ball_cx = b.x + BALL_W as f32 / 2.0;
+        let ball_cy = b.y + BALL_H as f32 / 2.0;
+        let speed = b.vx.hypot(b.vy).max(1.0);
+        blip.fill_circle(
+            ball_cx + (b.vx / speed) * 4.0, ball_cy + (b.vy / speed) * 4.0 + 3.0, BALL_W as f32 * 0.42,
+            BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.35 },
+        );
+        if g.seeking() {
+            blip.fill_glow_circle(ball_cx, ball_cy, BALL_W as f32 * 0.55, BlipColor { r: 1.0, g: 0.9, b: 0.5, a: 0.35 });
+        }
+        let (col, row, roll) = ball_pose(&b.rot);
+        let (bx, by, bs) = (b.x - 1.0, b.y - 1.0, BALL_W as f32 + 2.0);
+        blip.draw_texture_cell(ball, col, BALL_YAW_N, row, BALL_PITCH_N, bx, by, bs, bs, roll);
+        blip.draw_texture(shade, bx, by, bs, bs);
+    }
 
     g.fx.draw(blip);
     blip.draw_hud(g.sess.score, g.sess.lives);
@@ -865,11 +956,12 @@ fn conf() -> blip::macroquad::window::Conf {
 }
 
 const PADDLE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/paddle.png"));
-const DROP_PNGS: [&[u8]; 4] = [
+const DROP_PNGS: [&[u8]; 5] = [
     include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_wide.png")),
     include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_narrow.png")),
     include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_slow.png")),
     include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_life.png")),
+    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_multi.png")),
 ];
 const BALL_SHADE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ball_shade.png"));
 const BALL_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ball.png"));
