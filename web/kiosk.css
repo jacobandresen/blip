@@ -3038,3 +3038,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 @media (max-width: 480px) {
   #fullscreen-btn { width: 26px; }
 }
+
+/* In fullscreen an idle mouse pointer is hidden (kiosk.js sets the attribute). */
+:root[data-fullscreen][data-cursor-idle],
+:root[data-fullscreen][data-cursor-idle] * { cursor: none !important; }

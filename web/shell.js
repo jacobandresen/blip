@@ -85,8 +85,17 @@ updateCoinsHud();
   });
   setInterval(function () {
     if (!document.documentElement.hasAttribute('data-fullscreen') || document.hidden) return;
-    // Somebody typing their name is not idle.
-    if (document.querySelector('.blip-hs-modal')) { poke(); return; }
+    // A name prompt or score board nobody has touched for a minute is put
+    // away (typing counts as touching), or it would hold the kiosk here.
+    var modal = document.querySelector('.blip-hs-modal');
+    if (modal) {
+      if (Date.now() - last < 60000) return;
+      var out = Array.prototype.filter.call(modal.querySelectorAll('button'), function (b) {
+        return /^(SKIP|CANCEL|CONTINUE|I SAVED IT)$/.test(b.textContent);
+      })[0];
+      if (out) out.click(); else modal.remove();
+      return;
+    }
     if (Date.now() - last >= IDLE_MS) window.location.href = '../index.html';
   }, 5000);
 }());

@@ -65,7 +65,11 @@ Run the test suite locally before pushing:
 ```
 node --test test/fill-canvas.test.mjs   # unit tests (canvas geometry)
 cargo test --release                    # game rules (Brawler's balance, Serpent's turns, ...)
+npm run test:shell                      # the web shell in headless Chromium (after ./build_web.sh)
 ```
+
+`test/shell.mjs` needs only a Chromium binary; the other browser suites
+(`test:controls`, `test:deck`, `test:topbar`) need Playwright installed.
 
 For native development:
 

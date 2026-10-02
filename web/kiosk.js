@@ -586,9 +586,22 @@ function pollGamepad(onDown, onUp) {
       if (p && p.catch) p.catch(function () {});
     } catch (e) {}
   }
+  // In fullscreen a mouse left lying loses its pointer after three seconds.
+  var cursorT = null;
+  function wakeCursor() {
+    root.removeAttribute('data-cursor-idle');
+    clearTimeout(cursorT);
+    if (!root.hasAttribute('data-fullscreen')) return;
+    cursorT = setTimeout(function () { root.setAttribute('data-cursor-idle', ''); }, 3000);
+  }
+  ['mousemove', 'mousedown'].forEach(function (ev) {
+    window.addEventListener(ev, wakeCursor, { passive: true });
+  });
+
   var btn = null;
   function apply(on) {
     root.toggleAttribute('data-fullscreen', on);
+    wakeCursor();
     if (btn) {
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
       btn.title = on ? 'Exit fullscreen' : 'Fullscreen';
