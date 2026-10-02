@@ -1751,12 +1751,14 @@ fn draw_title(blip: &Blip, g: &Game, hi: &web::HighScore) {
             (t * 1.3 + i as f32 * 0.5) % 2.0 < 0.2, 1.0, 0.0, 2.4, -1.0);
     }
     let glow = 0.65 + 0.35 * (t * 2.5).sin().abs();
-    cosy(blip, "P1 PRESS BUBBLE", 300.0 + DY, 2.0, MINT, MINT, 1.0, glow);
-    let two = "P2 PRESS J TO JOIN";
+    let by = web::controls();
+    cosy(blip, by.pick("P1 PRESS BUBBLE", "P1 PRESS BUBBLE", "P1 TOUCH TO START"), 300.0 + DY, 2.0, MINT, MINT, 1.0, glow);
+    let two = by.pick("P2 PRESS J TO JOIN", "P2 TOUCH TO JOIN", "P2 TOUCH TO JOIN");
     // Whole-pixel sizes from here down: at 1.2 to 1.5 the font's rows are uneven.
     soft(blip, two, (WIN_W as f32 - text_w(two, 2.0)) / 2.0, 334.0 + DY, 2.0, SKY, 1.0);
     // how to play, on its own panel
-    let (l1, l2) = ("MOVE A D   JUMP W   BUBBLE F", "HOLD JUMP TO RIDE BUBBLES");
+    let l1 = by.pick("MOVE A D   JUMP W   BUBBLE F", "PAD MOVES   BUTTONS BUBBLE AND JUMP", "TOUCH TO BUBBLE   SLIDE TO RUN");
+    let l2 = by.pick("HOLD JUMP TO RIDE BUBBLES", "HOLD JUMP TO RIDE BUBBLES", "SWIPE UP TO JUMP");
     pill(WIN_W as f32 / 2.0, 358.0 + DY, text_w(l1, 2.0) + 36.0, 54.0, col(PEACH, 0.8), 0.9);
     soft(blip, l1, (WIN_W as f32 - text_w(l1, 2.0)) / 2.0, 368.0 + DY, 2.0, CREAM, 0.95);
     soft(blip, l2, (WIN_W as f32 - text_w(l2, 2.0)) / 2.0, 388.0 + DY, 2.0, CREAM, 0.95);

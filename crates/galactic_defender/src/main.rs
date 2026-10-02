@@ -1417,7 +1417,8 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
     blip.draw_centered("30 PTS",        row0,                 2.0, BLIP_MAGENTA);
     blip.draw_centered("20 PTS",        row1,                 2.0, BLIP_CYAN);
     blip.draw_centered("10 PTS",        row2,                 2.0, BLIP_GREEN);
-    blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_WHITE);
+    let prompt = web::controls().pick("PRESS FIRE", "PRESS FIRE", "TAP TO START");
+    blip.draw_centered(prompt, (WIN_H * 2 / 3) as f32, 3.0, BLIP_WHITE);
 }
 
 fn draw_win(blip: &Blip, level: i32) {

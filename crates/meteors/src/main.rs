@@ -1027,8 +1027,12 @@ fn draw_title(blip: &Blip, hi: &web::HighScore) {
     // METEORS is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4) as f32 + 50.0, NEON_YELLOW);
     blip.draw_centered("PRESS FIRE", (WIN_H / 2) as f32, 3.0, NEON_YELLOW);
-    blip.draw_centered("ARROWS/WASD ROTATE+THRUST", (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
-    blip.draw_centered("SPACE FIRE  ·  Z HYPERSPACE", (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);
+    // No touch surface here: a phone plays on the pad.
+    let keys = web::controls() == web::Controls::Keys;
+    let (l1, l2) = if keys { ("ARROWS/WASD ROTATE+THRUST", "SPACE FIRE  ·  Z HYPERSPACE") }
+        else { ("PAD TURNS   UP THRUSTS", "BUTTONS FIRE AND HYPERSPACE") };
+    blip.draw_centered(l1, (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
+    blip.draw_centered(l2, (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);
 }
 
 fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {

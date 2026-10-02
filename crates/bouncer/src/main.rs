@@ -967,10 +967,16 @@ fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.draw_centered("BOUNCER",                 (WIN_H / 4) as f32,         6.0, BLIP_CYAN);
     // BOUNCER is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
-    blip.draw_centered("PRESS FIRE",              (WIN_H / 2) as f32,         3.0, BLIP_WHITE);
-    blip.draw_centered("LEFT RIGHT ARROW OR AD",  (WIN_H * 2 / 3) as f32,     2.0, BLIP_GRAY);
-    blip.draw_centered("SPACE TO LAUNCH",         (WIN_H * 2 / 3 + 20) as f32, 2.0, BLIP_GRAY);
-    blip.draw_centered("DOUBLE TAP TO DASH",      (WIN_H * 2 / 3 + 40) as f32, 2.0, BLIP_GRAY);
+    let by = web::controls();
+    blip.draw_centered(by.pick("PRESS FIRE", "PRESS FIRE", "TAP TO START"), (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
+    let lines = [
+        by.pick("LEFT RIGHT ARROW OR AD", "PAD LEFT AND RIGHT", "DRAG TO MOVE"),
+        by.pick("SPACE TO LAUNCH", "FIRE TO LAUNCH", "TAP TO LAUNCH"),
+        by.pick("DOUBLE TAP TO DASH", "DOUBLE TAP TO DASH", ""),
+    ];
+    for (i, line) in lines.iter().enumerate() {
+        blip.draw_centered(line, (WIN_H * 2 / 3 + 20 * i as i32) as f32, 2.0, BLIP_GRAY);
+    }
 }
 
 fn draw_win(blip: &Blip, level: i32) {
@@ -1117,7 +1123,8 @@ async fn main() {
                 draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick, &drops);
                 // The ball waits on the paddle after every lost life; say so.
                 if g.state == State::Launch && (blip::macroquad::time::get_time() * 2.0) as i64 % 2 == 0 {
-                    blip.draw_centered("PRESS FIRE", (PAD_Y - 90) as f32, 3.0, BLIP_WHITE);
+                    let prompt = web::controls().pick("PRESS FIRE", "PRESS FIRE", "TAP TO LAUNCH");
+                    blip.draw_centered(prompt, (PAD_Y - 90) as f32, 3.0, BLIP_WHITE);
                 }
             }
         }

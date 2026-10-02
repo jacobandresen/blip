@@ -15,6 +15,7 @@ extern "C" {
     fn blip_touch_down(slot: i32) -> i32;
     fn blip_touch_pos(slot: i32, axis: i32) -> f32;
     fn blip_haptic();
+    fn blip_controls() -> i32;
     fn blip_picture(width: i32, height: i32);
 }
 
@@ -80,6 +81,32 @@ pub fn touch_fraction(slot: usize) -> Option<(f32, f32, bool)> {
 pub fn haptic() {
     #[cfg(target_arch = "wasm32")]
     unsafe { blip_haptic(); }
+}
+
+/// What the player is holding, so a title can name the right thing.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Controls {
+    /// A keyboard (always, natively; `BLIP_CONTROLS=pad|touch` overrides).
+    Keys,
+    /// The deck's pad or stick on a touch screen.
+    Pad,
+    /// The touch surface: swipes, drags and taps on the picture.
+    Touch,
+}
+
+impl Controls {
+    /// The wording for whichever it is.
+    pub fn pick<'a>(self, keys: &'a str, pad: &'a str, touch: &'a str) -> &'a str {
+        match self { Controls::Keys => keys, Controls::Pad => pad, Controls::Touch => touch }
+    }
+}
+
+pub fn controls() -> Controls {
+    #[cfg(target_arch = "wasm32")]
+    let code = unsafe { blip_controls() };
+    #[cfg(not(target_arch = "wasm32"))]
+    let code = match std::env::var("BLIP_CONTROLS").as_deref() { Ok("pad") => 1, Ok("touch") => 2, _ => 0 };
+    match code { 1 => Controls::Pad, 2 => Controls::Touch, _ => Controls::Keys }
 }
 
 /// Tell the shell the game's virtual canvas size, so it can size things to

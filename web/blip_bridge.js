@@ -40,6 +40,13 @@ register_plugin = function (importObject) {
         window.blipPicture = { w: w, h: h };
         window.dispatchEvent(new Event('blip-picture'));
     };
+    // What the player holds: 0 a keyboard, 1 the deck's pad or stick, 2 the
+    // touch surface. A title screen words its prompts by it.
+    importObject.env.blip_controls = function () {
+        var root = document.documentElement;
+        if (root.hasAttribute('data-touch')) return 2;
+        return root.hasAttribute('data-has-touch') ? 1 : 0;
+    };
     importObject.env.blip_haptic = function () {
         if (typeof window.blipHaptic === 'function') window.blipHaptic();
     };

@@ -664,8 +664,10 @@ fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.draw_centered("SERPENT",            (WIN_H / 4) as f32,       6.0, BLIP_GREEN);
     // SERPENT is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
-    blip.draw_centered("PRESS FIRE",         (WIN_H / 2) as f32,       3.0, BLIP_WHITE);
-    blip.draw_centered("ARROW KEYS OR WASD", (WIN_H * 2 / 3) as f32,   2.0, BLIP_GRAY);
+    let by = web::controls();
+    blip.draw_centered(by.pick("PRESS FIRE", "PRESS FIRE", "TAP TO START"), (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
+    blip.draw_centered(by.pick("ARROW KEYS OR WASD", "STEER WITH THE PAD", "SWIPE TO STEER"),
+        (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
     draw_title_snake(blip, blip::macroquad::time::get_time() as f32);
 }
 
