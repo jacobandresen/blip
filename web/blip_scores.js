@@ -82,6 +82,47 @@
   function restoreHandle(code) { return rpc('restore_handle', { p_code: code }); }
   function rotateCode() { return rpc('new_recovery_code', {}); }
 
+  // The page's fire key: Space, or the game's first button (F in Brawler).
+  function isFire(e) {
+    if (e.key === ' ') return true;
+    var g = window.blipGameFromPath && blipGameFromPath(location.pathname);
+    var b = g && g.buttons && g.buttons[0];
+    return !!b && String(e.key).toLowerCase() === String(b.key).toLowerCase();
+  }
+
+  // A name from a stick and one button, as on a cabinet: up and down turn
+  // the last letter, and from then on right adds one, left takes it back and
+  // fire accepts. Typing a letter goes back to plain typing. Returns true if
+  // it took the key.
+  var STICK_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -_';
+  function stickEntry(input, e, state, submit) {
+    var v = input.value.toUpperCase();
+    var turn = e.key === 'ArrowUp' ? 1 : e.key === 'ArrowDown' ? -1 : 0;
+    if (turn) {
+      if (!v) v = 'A';
+      else {
+        var at = STICK_CHARS.indexOf(v.charAt(v.length - 1));
+        var n = STICK_CHARS.length;
+        v = v.slice(0, -1) + STICK_CHARS.charAt(((at < 0 ? 0 : at + turn) + n) % n);
+      }
+    } else if (state.stick && e.key === 'ArrowRight') {
+      if (v.length < input.maxLength) v += 'A';
+    } else if (state.stick && e.key === 'ArrowLeft') {
+      v = v.slice(0, -1);
+    } else if (state.stick && isFire(e)) {
+      e.preventDefault();
+      if (!e.repeat) submit();
+      return true;
+    } else {
+      if (e.key.length === 1) state.stick = false;
+      return false;
+    }
+    e.preventDefault();
+    state.stick = true;
+    input.value = v;
+    return true;
+  }
+
   function el(tag, cls, parent) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -121,10 +162,21 @@
 
     var done = el('button', 'blip-hs-btn ghost', row);
     done.type = 'button'; done.textContent = 'I SAVED IT';
-    done.addEventListener('click', function () {
+    function saved() {
+      window.removeEventListener('keydown', onKey, true);
       m.wrap.remove();
       if (opts.onClose) opts.onClose();
-    });
+    }
+    // Fire or Enter does it too, for a cabinet with no mouse; and the key
+    // must not reach the game behind.
+    function onKey(e) {
+      e.stopPropagation();
+      if (e.repeat || !(e.key === 'Enter' || isFire(e))) return;
+      e.preventDefault();
+      saved();
+    }
+    window.addEventListener('keydown', onKey, true);
+    done.addEventListener('click', saved);
   }
 
   // ---- UI: handle prompt --------------------------------------------
@@ -142,10 +194,13 @@
       input.setAttribute('aria-label', 'Your leaderboard name');
       input.value = (lsGet(LS_HANDLE) || '').toUpperCase();
       m.panel.appendChild(input);
+      el('div', 'blip-hs-sub blip-hs-stick', m.panel).textContent =
+        'stick: up/down letter \u00b7 right next \u00b7 fire ok';
       var err = el('div', 'blip-hs-err', m.panel);
       var row = el('div', 'blip-hs-row', m.panel);
       var ok = el('button', 'blip-hs-btn', row); ok.type = 'button'; ok.textContent = 'OK';
       var skip = el('button', 'blip-hs-btn ghost', row); skip.type = 'button'; skip.textContent = 'SKIP';
+      var entry = { stick: false };
 
       // Shown only after a name comes back TAKEN — the taker might be you,
       // on a new device or a cleared browser. Enter the recovery code to
@@ -188,6 +243,7 @@
       });
       input.addEventListener('keydown', function (e) {
         e.stopPropagation();
+        if (stickEntry(input, e, entry, submit)) return;
         if (e.key === 'Enter') submit();
         if (e.key === 'Escape') close(null);
       });

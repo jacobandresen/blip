@@ -88,6 +88,27 @@ test('the game shell', async (t) => {
     assert.ok(await evaluate(cdp, "!document.querySelector('.blip-hs-modal')"), 'Escape did not close the prompt');
   });
 
+  await t.test('a name can be entered with a stick and the fire button', async (t) => {
+    const cdp = await browser(t, 9406);
+    await open(cdp, 'meteors/index.html', 6000);
+    await evaluate(cdp, "localStorage.removeItem('blip-handle'); window.blipScores.promptHandle('test'); true");
+    await sleep(300);
+    const name = "document.querySelector('.blip-hs-input').value";
+    const press = async (...keys) => {
+      for (const k of keys) await key(cdp, k, k, { ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39 }[k]);
+    };
+    await press('ArrowUp', 'ArrowUp', 'ArrowUp');           // A, B, C
+    assert.equal(await evaluate(cdp, name), 'C');
+    await press('ArrowRight', 'ArrowDown');                  // CA, then back round to C_
+    assert.equal(await evaluate(cdp, name), 'C_');
+    await press('ArrowLeft');
+    assert.equal(await evaluate(cdp, name), 'C');
+    // Fire accepts: one letter is too short, and the prompt says so.
+    await key(cdp, ' ', 'Space', 32);
+    assert.equal(await evaluate(cdp, name), 'C', 'fire typed a space instead of accepting');
+    assert.match(await evaluate(cdp, "document.querySelector('.blip-hs-err').textContent"), /2-14/);
+  });
+
   await t.test('fullscreen on a PC is the top bar and the picture, and comes off again', async (t) => {
     const cdp = await browser(t, 9402);
     await open(cdp, 'meteors/index.html', 6000);

@@ -603,6 +603,8 @@ canvas {
   color: #7fa6b5;
   margin: 8px 0;
 }
+/* How to enter a name without a keyboard: quieter than the line above. */
+.blip-hs-stick { margin-top: 8px; opacity: 0.6; }
 .blip-hs-err {
   min-height: 12px;
   margin: 6px 0 2px;
