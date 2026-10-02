@@ -3,7 +3,7 @@
 //! with the rules.
 
 use crate::wav::{low_pass, tame, warm, Rng, MIX_KNEE};
-use crate::wav::{encode_pcm16_mono, encode_pcm16_music, env, ms_to_samples,
+use crate::wav::{encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, env, ms_to_samples,
     soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
@@ -1098,39 +1098,40 @@ pub fn generate() -> Vec<Asset> {
     vec![
         // Three light hits, the thud climbing a combo step each, so a string
         // sounds like it is going somewhere.
-        ("sounds/hit_light.wav",  encode_pcm16_mono(&hit(300.0, 0.15, 0x11))),
-        ("sounds/hit_light2.wav", encode_pcm16_mono(&hit(380.0, 0.2, 0x1b))),
-        ("sounds/hit_light3.wav", encode_pcm16_mono(&hit(470.0, 0.25, 0x2f))),
+        ("sounds/hit_light.wav",  encode_pcm16_half(&hit(300.0, 0.15, 0x11))),
+        ("sounds/hit_light2.wav", encode_pcm16_half(&hit(380.0, 0.2, 0x1b))),
+        ("sounds/hit_light3.wav", encode_pcm16_half(&hit(470.0, 0.25, 0x2f))),
         // A second take of each, a shade lower and from another seed: the
         // same blow twice running should not be the same recording twice.
-        ("sounds/hit_light_b.wav",  encode_pcm16_mono(&hit(284.0, 0.18, 0x51))),
-        ("sounds/hit_light2_b.wav", encode_pcm16_mono(&hit(360.0, 0.23, 0x5b))),
-        ("sounds/hit_light3_b.wav", encode_pcm16_mono(&hit(446.0, 0.28, 0x6f))),
-        ("sounds/hit_heavy_b.wav",  encode_pcm16_mono(&hit(216.0, 1.0, 0x62))),
-        ("sounds/hit_heavy.wav",  encode_pcm16_mono(&hit(230.0, 1.0, 0x22))),
+        ("sounds/hit_light_b.wav",  encode_pcm16_half(&hit(284.0, 0.18, 0x51))),
+        ("sounds/hit_light2_b.wav", encode_pcm16_half(&hit(360.0, 0.23, 0x5b))),
+        ("sounds/hit_light3_b.wav", encode_pcm16_half(&hit(446.0, 0.28, 0x6f))),
+        ("sounds/hit_heavy_b.wav",  encode_pcm16_half(&hit(216.0, 1.0, 0x62))),
+        ("sounds/hit_heavy.wav",  encode_pcm16_half(&hit(230.0, 1.0, 0x22))),
         // A knockdown: a body on the boards, lower and longer than any hit.
-        ("sounds/crunch.wav",    encode_pcm16_mono(&crunch())),
+        ("sounds/crunch.wav",    encode_pcm16_half(&crunch())),
         ("sounds/land.wav",      encode_pcm16_mono(&land(0x71))),
-        ("sounds/whoosh.wav",    encode_pcm16_mono(&whoosh(150.0, 0.7, 0x33))),
+        ("sounds/whoosh.wav",    encode_pcm16_half(&whoosh(150.0, 0.7, 0x33))),
         ("sounds/gi.wav",        encode_pcm16_mono(&gi_snap(0x6C1D))),
         ("sounds/block.wav",     encode_pcm16_mono(&block_sfx())),
-        ("sounds/bell.wav",      encode_pcm16_mono(&bell())),
-        ("sounds/ko.wav",        encode_pcm16_mono(&ko())),
-        ("sounds/projectile.wav", encode_pcm16_mono(&projectile())),
-        // The long low ones are stored at half the rate: nothing in them is
-        // above 5 kHz, and at full rate they were a third of the download.
-        ("sounds/laser.wav",     encode_pcm16_mono(&laser())),
+        ("sounds/bell.wav",      encode_pcm16_half(&bell())),
+        ("sounds/ko.wav",        encode_pcm16_half(&ko())),
+        ("sounds/projectile.wav", encode_pcm16_half(&projectile())),
+        // Stored at half the rate: everything whose energy above 10 kHz is
+        // 33 dB or more under the rest (render() rolls off from 5 kHz). The
+        // snaps, whistles and swishes keep the full rate.
+        ("sounds/laser.wav",     encode_pcm16_half(&laser())),
         ("sounds/quake.wav",     encode_pcm16_music(&quake())),
-        ("sounds/parry.wav",     encode_pcm16_mono(&parry())),
-        ("sounds/counter.wav",   encode_pcm16_mono(&counter())),
+        ("sounds/parry.wav",     encode_pcm16_half(&parry())),
+        ("sounds/counter.wav",   encode_pcm16_half(&counter())),
         ("sounds/fruit.wav",     encode_pcm16_mono(&run_up(&[0, 2, 3, 5], 220.0, 55.0, 420.0, 0xF2))),
-        ("sounds/tick.wav",      encode_pcm16_mono(&tick())),
+        ("sounds/tick.wav",      encode_pcm16_half(&tick())),
         ("sounds/gong.wav",      encode_pcm16_music(&gong())),
         ("sounds/bellow.wav",    encode_pcm16_music(&bellow())),
         ("sounds/swing.wav",     encode_pcm16_mono(&heavy_swing())),
         ("sounds/drums.wav",     encode_pcm16_music(&drum_call())),
-        ("sounds/smash.wav",     encode_pcm16_mono(&smash())),
-        ("sounds/tweet.wav",     encode_pcm16_mono(&tweet())),
+        ("sounds/smash.wav",     encode_pcm16_half(&smash())),
+        ("sounds/tweet.wav",     encode_pcm16_half(&tweet())),
         ("sounds/heart.wav",     encode_pcm16_music(&heartbeat())),
         ("sounds/whistle.wav",   encode_pcm16_mono(&whistle())),
         ("sounds/thwip.wav",     encode_pcm16_mono(&thwip())),

@@ -89,7 +89,9 @@ separate preload step.
 
 Effects are most of a game's download, so the warm ones
 (`cosy::finish_warm`, low-passed at 3 kHz) are encoded at 22 kHz, and so are
-Raider's explosions and engines.
+Raider's and Brawler's low effects (`wav::encode_pcm16_half`, flat to 8 kHz).
+A new effect goes at half rate if its energy above 10 kHz is 33 dB or more
+under the rest; snaps, whistles and gunfire keep the full rate.
 
 Music is the exception: a WAV loop is megabytes, so games depend on
 `blip_assets` at runtime too and synthesise their tunes on the device through

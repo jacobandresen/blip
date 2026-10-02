@@ -5,7 +5,7 @@ use crate::image::Image;
 use std::f32::consts::PI;
 
 use crate::wav::{low_pass, tame, warm, Rng, MIX_KNEE};
-use crate::wav::{encode_pcm16_mono, encode_pcm16_music, mix_into, mix_into_f32, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
+use crate::wav::{encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, halved, mix_into, mix_into_f32, ms_to_samples, soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 // Must match crates/sky_raider/src/main.rs's PLAYER_W / PLAYER_H.
@@ -2481,11 +2481,11 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/barrier_hum.wav",    barrier_hum_sfx()),
         ("sounds/barrier_hum2.wav",   barrier_hum2_sfx()),
         ("sounds/engine_start.wav",   engine_start_sfx()),
-        ("sounds/enemy_gun.wav",      enemy_gun_sfx()),
+        ("sounds/enemy_gun.wav",      halved(&enemy_gun_sfx())),
         ("sounds/backfire.wav",       backfire_sfx()),
         ("sounds/engine_splutter.wav", engine_splutter_sfx()),
         ("sounds/flak_burst.wav",     flak_burst_sfx()),
-        ("sounds/laser_charge.wav",   laser_charge_sfx()),
+        ("sounds/laser_charge.wav",   halved(&laser_charge_sfx())),
         ("sounds/laser_fire.wav",     laser_fire_sfx()),
         ("sounds/engine0.wav",        engine_loop(0.4, true)),
         ("sounds/engine1.wav",        engine_loop(0.65, false)),
@@ -2502,6 +2502,8 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/burst4_2.wav", encode_pcm16_mono(&gun_burst(6, 0x5a0f899b))),
         ("sounds/burst5_1.wav", encode_pcm16_mono(&gun_burst(8, 0x5a0f86d9))),
         ("sounds/burst5_2.wav", encode_pcm16_mono(&gun_burst(8, 0x5a0f8a9c))),
+        // Half rate too, through the sharper filter, are the tunes, the
+        // pickups and the low guns: under -50 dB above 10 kHz, all of them.
         ("sounds/enemy_explode0.wav", half_rate(&explosion_sfx(ENEMY_BLASTS[0]))),
         ("sounds/enemy_explode1.wav", half_rate(&explosion_sfx(ENEMY_BLASTS[1]))),
         ("sounds/enemy_explode2.wav", half_rate(&explosion_sfx(ENEMY_BLASTS[2]))),
@@ -2515,19 +2517,19 @@ pub fn generate() -> Vec<Asset> {
         ("sounds/player_hit.wav",     encode_pcm16_mono(&hit_sfx())),
         ("sounds/boss_explode0.wav",  half_rate(&explosion_sfx(BOSS_BLASTS[0]))),
         ("sounds/boss_explode1.wav",  half_rate(&explosion_sfx(BOSS_BLASTS[1]))),
-        ("sounds/boss_warning.wav",   boss_warning_sfx()),
+        ("sounds/boss_warning.wav",   halved(&boss_warning_sfx())),
         // Weapon-tier pickup chimes, escalating: more notes, higher register,
         // and a proper fanfare (with a harmony note) for the last one.
-        ("sounds/powerup2.wav",       encode_pcm16_mono(&ascending_run(&[880.00, 1318.51], 55.0, 85.0, 0.5))),
-        ("sounds/powerup3.wav",       encode_pcm16_mono(&ascending_run(&[987.77, 1479.98], 50.0, 90.0, 0.5))),
-        ("sounds/powerup4.wav",       encode_pcm16_mono(&ascending_run(&[740.00, 987.77, 1318.51], 55.0, 95.0, 0.5))),
-        ("sounds/max_power.wav",      max_power_sfx()),
+        ("sounds/powerup2.wav",       encode_pcm16_half(&ascending_run(&[880.00, 1318.51], 55.0, 85.0, 0.5))),
+        ("sounds/powerup3.wav",       encode_pcm16_half(&ascending_run(&[987.77, 1479.98], 50.0, 90.0, 0.5))),
+        ("sounds/powerup4.wav",       encode_pcm16_half(&ascending_run(&[740.00, 987.77, 1318.51], 55.0, 95.0, 0.5))),
+        ("sounds/max_power.wav",      halved(&max_power_sfx())),
         // A gentle rising chime, lower and warmer than the weapon-tier
         // chimes, for catching a health pickup.
-        ("sounds/health_pickup.wav",  encode_pcm16_mono(&ascending_run(&[392.00, 523.25, 659.25], 55.0, 90.0, 0.42))),
-        ("sounds/stage_clear.wav",    stage_clear_sfx()),
-        ("sounds/victory.wav",        victory_sfx()),
-        ("sounds/game_over.wav",      game_over_sfx()),
+        ("sounds/health_pickup.wav",  encode_pcm16_half(&ascending_run(&[392.00, 523.25, 659.25], 55.0, 90.0, 0.42))),
+        ("sounds/stage_clear.wav",    halved(&stage_clear_sfx())),
+        ("sounds/victory.wav",        halved(&victory_sfx())),
+        ("sounds/game_over.wav",      halved(&game_over_sfx())),
     ]
 }
 

@@ -64,6 +64,41 @@ pub fn encode_pcm16_music(samples: &[i16]) -> Vec<u8> {
     encode_at(&half, SAMPLE_RATE / 2)
 }
 
+/// Half the rate through a proper low-pass, flat to 8 kHz and gone by 12:
+/// for effects whose top octave is already 30 dB down. The pair averaging
+/// above would take another 2 dB off what they have at 10 kHz.
+pub fn encode_pcm16_half(samples: &[i16]) -> Vec<u8> {
+    const TAPS: usize = 63;
+    let fc = 10_000.0 / SAMPLE_RATE as f32;
+    let mid = (TAPS / 2) as isize;
+    // A Blackman-windowed sinc.
+    let mut kernel = [0.0f32; TAPS];
+    for (i, k) in kernel.iter_mut().enumerate() {
+        let n = (i as isize - mid) as f32;
+        let sinc = if n == 0.0 { 2.0 * fc } else { (2.0 * PI * fc * n).sin() / (PI * n) };
+        let x = i as f32 / (TAPS - 1) as f32;
+        *k = sinc * (0.42 - 0.5 * (2.0 * PI * x).cos() + 0.08 * (4.0 * PI * x).cos());
+    }
+    let sum: f32 = kernel.iter().sum();
+    let half: Vec<i16> = (0..samples.len().div_ceil(2))
+        .map(|j| {
+            let mut acc = 0.0f32;
+            for (i, k) in kernel.iter().enumerate() {
+                let at = 2 * j as isize + i as isize - mid;
+                if at >= 0 && (at as usize) < samples.len() { acc += k * samples[at as usize] as f32; }
+            }
+            (acc / sum).round().clamp(-32767.0, 32767.0) as i16
+        })
+        .collect();
+    encode_at(&half, SAMPLE_RATE / 2)
+}
+
+/// `encode_pcm16_half` for a sound that is already a full-rate WAV.
+pub fn halved(wav: &[u8]) -> Vec<u8> {
+    let pcm: Vec<i16> = wav[44..].chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]])).collect();
+    encode_pcm16_half(&pcm)
+}
+
 fn encode_at(samples: &[i16], rate: u32) -> Vec<u8> {
     let n = samples.len();
     let data_bytes = (n * 2) as u32;
@@ -131,5 +166,32 @@ pub fn env(i: usize, n: usize, attack: usize, release: usize) -> f32 {
         (n - i) as f32 / release as f32
     } else {
         1.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// RMS of a full-scale sine at `hz` after `encode_pcm16_half`, against the sine's own.
+    fn through_half(hz: f32) -> f32 {
+        let tone: Vec<i16> = (0..SAMPLE_RATE as usize / 2)
+            .map(|i| ((2.0 * PI * hz * i as f32 / SAMPLE_RATE as f32).sin() * 20_000.0) as i16)
+            .collect();
+        let wav = encode_pcm16_half(&tone);
+        let out: Vec<f32> = wav[44..].chunks(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32).collect();
+        let rms = |v: &[f32]| (v.iter().map(|x| x * x).sum::<f32>() / v.len() as f32).sqrt();
+        rms(&out[100..out.len() - 100]) / (20_000.0 / 2.0f32.sqrt())
+    }
+
+    #[test]
+    fn half_rate_keeps_what_is_under_8_khz_and_drops_what_would_alias() {
+        for hz in [200.0, 3000.0, 6000.0, 8000.0] {
+            let db = 20.0 * through_half(hz).log10();
+            assert!(db.abs() < 0.5, "{hz} Hz came through at {db:.2} dB");
+        }
+        // 15 kHz would fold down to 7 kHz.
+        let db = 20.0 * through_half(15_000.0).log10();
+        assert!(db < -50.0, "15 kHz came through at {db:.1} dB");
     }
 }
