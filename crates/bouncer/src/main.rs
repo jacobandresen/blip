@@ -112,7 +112,7 @@ const SEEK_RATE: f32 = 1.5; // radians/sec of bend at most
 // multiple more, up to this: a shot that gets in behind the wall pays.
 const CHAIN_MAX: i32 = 5;
 
-const BRICK_COLORS: [BlipColor; 8] = [
+const BRICK_COLORS: [BlipColor; 9] = [
     BlipColor { r: 0.90, g: 0.25, b: 0.25, a: 1.0 },
     BlipColor { r: 0.95, g: 0.55, b: 0.20, a: 1.0 },
     BlipColor { r: 0.95, g: 0.85, b: 0.30, a: 1.0 },
@@ -121,6 +121,7 @@ const BRICK_COLORS: [BlipColor; 8] = [
     BlipColor { r: 0.65, g: 0.35, b: 0.90, a: 1.0 },
     BlipColor { r: 0.70, g: 0.72, b: 0.78, a: 1.0 },
     BlipColor { r: 0.70, g: 0.72, b: 0.78, a: 1.0 },
+    BlipColor { r: 1.00, g: 0.60, b: 0.15, a: 1.0 },
 ];
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -146,6 +147,12 @@ const BRICK_STEEL_CRACKED: usize = 7;
 // Steel bricks only start showing up from this level on, so new players
 // meet the plain single-hit grid first.
 const STEEL_MIN_LEVEL: i32 = 4;
+// A bomb brick takes the eight round it with it when it breaks (and sets off
+// any bomb among them). From level 2, a few to a level.
+const BRICK_BOMB: usize = 8;
+const BOMB_MIN_LEVEL: i32 = 2;
+const BOMB_CHANCE: u32 = 5; // percent of plain bricks
+const BOMB_MAX: usize = 4;
 
 #[derive(Copy, Clone)]
 struct Brick { kind: usize, hp: u8, alive: bool }
@@ -235,6 +242,7 @@ impl Game {
     /// Eight distinct brick layouts, cycling forever as `level` climbs so the
     /// game doesn't settle into repeating the same pattern from level 3 on.
     fn build_bricks(&mut self) {
+        let mut bombs = 0;
         let pattern = (self.sess.level - 1).rem_euclid(8);
         let center_col = (BRICK_COLS - 1) as f32 / 2.0;
         for r in 0..BRICK_ROWS {
@@ -262,7 +270,10 @@ impl Game {
                 let is_steel = alive
                     && self.sess.level >= STEEL_MIN_LEVEL
                     && (rand() % 1000) < (steel_chance * 1000.0) as u32;
-                let (kind, hp) = if is_steel { (BRICK_STEEL, 2) } else { (r as usize, 1) };
+                let is_bomb = alive && !is_steel && self.sess.level >= BOMB_MIN_LEVEL
+                    && bombs < BOMB_MAX && rand() % 100 < BOMB_CHANCE;
+                if is_bomb { bombs += 1; }
+                let (kind, hp) = if is_steel { (BRICK_STEEL, 2) } else if is_bomb { (BRICK_BOMB, 1) } else { (r as usize, 1) };
                 self.bricks[i] = Brick { kind, hp, alive };
             }
         }
@@ -690,6 +701,54 @@ fn ball_paddle(g: &mut Game, speed: f32, sfx: &Sounds) {
     g.ball_curve_used = 0.0;
 }
 
+/// Brick `i` breaks: the points (see CHAIN_MAX), the sparks, the ball a
+/// little faster, perhaps a drop. A bomb takes its eight neighbours with it.
+fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds) {
+    let (row, col) = (i as i32 / BRICK_COLS, i as i32 % BRICK_COLS);
+    let (bx, by) = brick_rect(i);
+    let (mx, my) = (bx + BRICK_W as f32 / 2.0, by + BRICK_H as f32 / 2.0);
+    g.bricks[i].alive = false;
+    g.since_break = 0.0;
+    g.chain += 1;
+    let times = g.chain.min(CHAIN_MAX);
+    let points = (BRICK_ROWS - row) * 10 * g.sess.level * times;
+    g.sess.add_score(points);
+    g.fx.burst(mx, my, 10, 120.0, BRICK_COLORS[g.bricks[i].kind]);
+    if times > 1 {
+        g.fx.popup(mx, my, &format!("{points} X{times}"), BLIP_YELLOW);
+    } else {
+        g.fx.popup(mx, my, &format!("{points}"), BLIP_WHITE);
+    }
+    // Same ramp on every level, so the ball plays identically no
+    // matter how far the player has gotten.
+    g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
+
+    // 30% chance to spawn a loot drop; one in ten of those a life
+    // (at one in five a steady player ended level 1 with six).
+    if rand() % 10 < 3 {
+        let drop_x = bx + BRICK_W as f32 / 2.0 - DROP_W / 2.0;
+        let drop_kind = match rand() % 10 {
+            0..=1 => DropKind::Wide,
+            2..=3 => DropKind::Slow,
+            4..=5 => DropKind::Multi,
+            6..=8 => DropKind::Narrow,
+            _ => DropKind::Life,
+        };
+        pool_spawn(&mut g.drops, Drop { x: drop_x, y: by, active: true, kind: drop_kind });
+    }
+    play_variant(&sfx.brick_break, speed);
+    if g.bricks[i].kind == BRICK_BOMB {
+        g.fx.ring(mx, my, BRICK_W as f32 * 1.4, 0.35, BRICK_COLORS[BRICK_BOMB]);
+        g.fx.burst(mx, my, 18, 200.0, BRICK_COLORS[BRICK_BOMB]);
+        for (dr, dc) in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)] {
+            let (r, c) = (row + dr, col + dc);
+            if r < 0 || r >= BRICK_ROWS || c < 0 || c >= BRICK_COLS { continue; }
+            let j = (r * BRICK_COLS + c) as usize;
+            if g.bricks[j].alive { break_brick(g, j, speed, sfx); }
+        }
+    }
+}
+
 /// Circle-vs-rectangle against the brick grid — one contact per call. The
 /// bounce normal is the direction from the closest point on the brick to the
 /// ball's centre, so a glancing hit on a brick's corner deflects along the
@@ -745,36 +804,7 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
         g.bricks[i].hp -= 1;
         let (mx, my) = (bx + BRICK_W as f32 / 2.0, by + BRICK_H as f32 / 2.0);
         if g.bricks[i].hp == 0 {
-            g.bricks[i].alive = false;
-            g.since_break = 0.0;
-            g.chain += 1;
-            let times = g.chain.min(CHAIN_MAX);
-            let points = (BRICK_ROWS - row) * 10 * g.sess.level * times;
-            g.sess.add_score(points);
-            g.fx.burst(mx, my, 10, 120.0, BRICK_COLORS[g.bricks[i].kind]);
-            if times > 1 {
-                g.fx.popup(mx, my, &format!("{points} X{times}"), BLIP_YELLOW);
-            } else {
-                g.fx.popup(mx, my, &format!("{points}"), BLIP_WHITE);
-            }
-            // Same ramp on every level, so the ball plays identically no
-            // matter how far the player has gotten.
-            g.ball_speed = clamp(g.ball_speed + SPEED_INC, 0.0, BALL_SPEED_MAX);
-
-            // 30% chance to spawn a loot drop; one in ten of those a life
-            // (at one in five a steady player ended level 1 with six).
-            if rand() % 10 < 3 {
-                let drop_x = bx + BRICK_W as f32 / 2.0 - DROP_W / 2.0;
-                let drop_kind = match rand() % 10 {
-                    0..=1 => DropKind::Wide,
-                    2..=3 => DropKind::Slow,
-                    4..=5 => DropKind::Multi,
-                    6..=8 => DropKind::Narrow,
-                    _ => DropKind::Life,
-                };
-                pool_spawn(&mut g.drops, Drop { x: drop_x, y: by, active: true, kind: drop_kind });
-            }
-            play_variant(&sfx.brick_break, speed);
+            break_brick(g, i, speed, sfx);
         } else {
             // Steel brick survived — the cracked texture warns the next hit
             // finishes it.
@@ -851,7 +881,7 @@ fn update_over(g: &mut Game, dt: f32) {
     g.start_game();
 }
 
-fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 8], drops: &[Texture2D; 5]) {
+fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9], drops: &[Texture2D; 5]) {
     for i in 0..BRICK_TOTAL {
         if !g.bricks[i].alive { continue; }
         let r = i as i32 / BRICK_COLS;
@@ -973,6 +1003,7 @@ const BRICK_BLUE_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets
 const BRICK_PURPLE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_purple.png"));
 const BRICK_STEEL_PNG:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_steel.png"));
 const BRICK_STEEL_CRACKED_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_steel_cracked.png"));
+const BRICK_BOMB_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_bomb.png"));
 const PADDLE_HIT_WAV: [&[u8]; 3] = [
     include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/paddle_hit_0.wav")),
     include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/paddle_hit_1.wav")),
@@ -1023,6 +1054,7 @@ async fn main() {
         load_png(BRICK_PURPLE_PNG),
         load_png(BRICK_STEEL_PNG),
         load_png(BRICK_STEEL_CRACKED_PNG),
+        load_png(BRICK_BOMB_PNG),
     ];
 
     let sfx = Sounds {

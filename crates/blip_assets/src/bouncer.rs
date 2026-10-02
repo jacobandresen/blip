@@ -294,6 +294,39 @@ fn pickup(kind: Pickup) -> Vec<u8> {
     img.encode_png()
 }
 
+/// The bomb brick: a dark casing with a lit fuse-coloured burst on it, so
+/// it reads as "this one goes off" among the plain colours.
+fn brick_bomb() -> Vec<u8> {
+    let (w, h): (i32, i32) = (72, 22);
+    let mut img = Image::new(w as u32, h as u32);
+    let (cx, cy) = (w as f32 / 2.0, h as f32 / 2.0);
+    for y in 1..h - 1 {
+        for x in 1..w - 1 {
+            let mut shade = 1.0_f32;
+            if y < 3 { shade = 1.4; }
+            if y > h - 4 { shade = 0.6; }
+            let (mut r, mut g, mut b) = (46.0 * shade, 42.0 * shade, 52.0 * shade);
+            // an eight-pointed burst: orange, with a yellow heart
+            let (dx, dy) = ((x as f32 + 0.5 - cx) / 1.5, y as f32 + 0.5 - cy);
+            let d = dx.hypot(dy);
+            let ang = dy.atan2(dx);
+            let reach = 6.5 + 2.5 * (ang * 8.0).cos();
+            if d < reach { (r, g, b) = (255.0, 140.0, 30.0); }
+            if d < 3.4 { (r, g, b) = (255.0, 235.0, 120.0); }
+            img.set(x, y, r.min(255.0) as u8, g.min(255.0) as u8, b.min(255.0) as u8);
+        }
+    }
+    for x in 0..w {
+        img.set(x, 0, 15, 15, 18);
+        img.set(x, h - 1, 15, 15, 18);
+    }
+    for y in 0..h {
+        img.set(0, y, 15, 15, 18);
+        img.set(w - 1, y, 15, 15, 18);
+    }
+    img.encode_png()
+}
+
 /// Steel-plated brick: takes two hits to break. A cool, riveted metal tone
 /// keeps it visually distinct from the six single-hit color rows, and the
 /// `cracked` variant (shown after the first hit) darkens it and adds a
@@ -479,6 +512,7 @@ pub fn generate() -> Vec<Asset> {
         ("images/brick_purple.png", brick((160, 50,  220))),
         ("images/brick_steel.png",         brick_steel(false)),
         ("images/brick_steel_cracked.png", brick_steel(true)),
+        ("images/brick_bomb.png", brick_bomb()),
         ("sounds/paddle_hit_0.wav", paddle_hit(0)),
         ("sounds/paddle_hit_1.wav", paddle_hit(1)),
         ("sounds/paddle_hit_2.wav", paddle_hit(2)),
