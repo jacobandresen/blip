@@ -737,7 +737,8 @@
     :root[data-fullscreen] body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     /* A kiosk's wide screen shows the whole catalogue at once: eight across. */
     @media (min-width: 1700px) {
-      :root[data-fullscreen] .screen-bezel { max-width: calc(100vw - 170px); }
+      /* 800px is about the row's height: this sits it mid-screen. */
+      :root[data-fullscreen] .screen-bezel { max-width: calc(100vw - 170px); margin-top: max(0px, calc((100vh - 800px) / 2 - 40px)); }
       :root[data-fullscreen] .game-grid { grid-template-columns: repeat(8, 1fr); max-width: none; gap: 16px; }
     }
 
