@@ -16,7 +16,7 @@
   <script src="../howler.min.js"></script>
   <script src="../kiosk.js?v=34"></script>
   <link rel="stylesheet" href="../kiosk.css?v=71">
-  <link rel="stylesheet" href="../shell.css?v=62">
+  <link rel="stylesheet" href="../shell.css?v=65">
 </head>
 <body>
 
@@ -24,6 +24,15 @@
 
   <!-- Coin slot, top right of the cabinet panel, mirroring the logo. -->
   <button id="insert-coin-btn" class="kiosk-btn"><span data-coins-hud></span></button>
+
+  <!-- Fullscreen on and off: beside the coin slot, in the bar that stays.
+       shell.js wires it. -->
+  <button id="fullscreen-btn" type="button" aria-pressed="false" aria-label="Fullscreen" title="Fullscreen">
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path class="fs-enter" d="M1.5 6V1.5H6M10 1.5h4.5V6M14.5 10v4.5H10M6 14.5H1.5V10"/>
+      <path class="fs-exit" d="M1.5 6H6V1.5M10 1.5V6h4.5M14.5 10H10v4.5M6 14.5V10H1.5"/>
+    </svg>
+  </button>
 
   <div id="loader">
     <div id="status">LOADING</div>
@@ -73,7 +82,7 @@
   <script src="../vendor/supabase.js?v=1"></script>
   <script src="../blip_config.js?v=1"></script>
   <script src="../blip_scores.js?v=4"></script>
-  <script src="../shell.js?v=71"></script>
+  <script src="../shell.js?v=74"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
   <script src="../blip_bridge.js?v=13"></script>
