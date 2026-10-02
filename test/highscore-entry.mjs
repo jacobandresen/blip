@@ -12,7 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,10 +64,16 @@ function serve() {
 }
 
 async function browser(t, port, { touch = false, width = 1280, height = 800 } = {}) {
-  const args = [`--window-size=${width},${height}`, `--user-data-dir=${mkdtempSync(path.join(tmpdir(), 'blip-hs-'))}`];
+  const profile = mkdtempSync(path.join(tmpdir(), 'blip-hs-'));
+  const args = [`--window-size=${width},${height}`, `--user-data-dir=${profile}`];
   if (touch) args.push('--touch-events=enabled');
   const { proc, cdp } = await launch(port, args);
-  t.after(() => killAll([proc]));
+  // A profile is tens of megabytes, and /tmp is often memory: take it away.
+  t.after(async () => {
+    killAll([proc]);
+    await sleep(300);
+    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  });
   await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch });
   if (touch) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
   return cdp;
