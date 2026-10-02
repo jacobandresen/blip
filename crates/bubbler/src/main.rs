@@ -61,10 +61,13 @@ const SKULL_AT: f32 = 95.0;
 // a bubble sooner, get angry and bring the skull earlier. From round 3
 // walkers throw rocks along their platform; from round 4 angry ghosts
 // spit sparks at you.
-fn monster_pace(round: usize) -> f32 { 0.8 + 0.04 * round as f32 }
-fn trap_life(round: usize) -> f32 { (TRAP_LIFE - 0.5 * round as f32).max(7.0) }
-fn hurry_at(round: usize) -> f32 { HURRY_AT - 2.5 * round as f32 }
-fn skull_at(round: usize) -> f32 { SKULL_AT - 3.5 * round as f32 }
+/// The ramp stops at round 5: the rounds after it are new places, not harder
+/// ones (the autopilot lost all five lives on rounds 7 and 8 when it ran on).
+const RAMP_TOP: usize = 4;
+fn monster_pace(round: usize) -> f32 { 0.8 + 0.04 * round.min(RAMP_TOP) as f32 }
+fn trap_life(round: usize) -> f32 { (TRAP_LIFE - 0.5 * round.min(RAMP_TOP) as f32).max(7.0) }
+fn hurry_at(round: usize) -> f32 { HURRY_AT - 2.5 * round.min(RAMP_TOP) as f32 }
+fn skull_at(round: usize) -> f32 { SKULL_AT - 3.5 * round.min(RAMP_TOP) as f32 }
 const ROCKS_FROM: usize = 3;  // round index
 const SPARKS_FROM: usize = 4;
 const ROCK_V: f32 = 170.0;
@@ -74,7 +77,7 @@ const JUMP_TELL: f32 = 0.22;
 const EXTEND_MAX: i32 = 7; // lives a round clear can top a player up to
 const SPARK_V: f32 = 95.0;
 
-const ROUNDS: usize = 6;
+const ROUNDS: usize = 8;
 
 // '#' block, A / B player spawns, w walker, h hopper, g ghost.
 const LEVELS: [[&str; ROWS]; ROUNDS] = [
@@ -234,6 +237,58 @@ const LEVELS: [[&str; ROWS]; ROUNDS] = [
         "#A......................B#",
         "###########....###########",
     ],
+    [
+        "###########....###########",
+        "#........................#",
+        "#.....g............g.....#",
+        "#........................#",
+        "#........................#",
+        "#........................#",
+        "#...w.......h........w...#",
+        "########..######..########",
+        "#........................#",
+        "#........................#",
+        "#.......h........w.......#",
+        "#....#######..#######....#",
+        "#........................#",
+        "#........................#",
+        "#..w........w.........h..#",
+        "######...########...######",
+        "#........................#",
+        "#........................#",
+        "#.....w...........w......#",
+        "#..########....########..#",
+        "#........................#",
+        "#........................#",
+        "#A......................B#",
+        "###########....###########",
+    ],
+    [
+        "###########....###########",
+        "#........................#",
+        "#...........g............#",
+        "#....g..............g....#",
+        "#........................#",
+        "#........................#",
+        "#.........w....w.........#",
+        "#.......##########.......#",
+        "#........................#",
+        "#........................#",
+        "#...w................h...#",
+        "#.#######........#######.#",
+        "#........................#",
+        "#........................#",
+        "#........w......h........#",
+        "#.....##############.....#",
+        "#........................#",
+        "#........................#",
+        "#....w..............w....#",
+        "#..#######......#######..#",
+        "#........................#",
+        "#........................#",
+        "#A......................B#",
+        "###########....###########",
+    ],
 ];
 
 /// Per round: sky top, sky bottom, block, block light, block dark, bokeh.
@@ -245,6 +300,8 @@ const PALETTES: [Palette; ROUNDS] = [
     Palette { sky0: (8, 30, 18), sky1: (16, 70, 40), block: (110, 220, 110), light: (190, 255, 180), dark: (40, 130, 60), glow: (150, 255, 150) },
     Palette { sky0: (26, 6, 30), sky1: (60, 10, 50), block: (190, 110, 250), light: (230, 190, 255), dark: (110, 50, 170), glow: (220, 150, 255) },
     Palette { sky0: (36, 10, 18), sky1: (84, 26, 40), block: (255, 120, 120), light: (255, 196, 186), dark: (170, 56, 70), glow: (255, 150, 140) },
+    Palette { sky0: (24, 22, 6), sky1: (60, 56, 16), block: (226, 222, 84), light: (252, 250, 176), dark: (136, 130, 34), glow: (244, 240, 124) },
+    Palette { sky0: (6, 22, 26), sky1: (16, 54, 60), block: (150, 240, 210), light: (222, 255, 240), dark: (60, 150, 130), glow: (170, 255, 230) },
 ];
 
 fn col(c: (u8, u8, u8), a: f32) -> BlipColor { BlipColor::new(c.0 as f32 / 255.0, c.1 as f32 / 255.0, c.2 as f32 / 255.0, a) }
