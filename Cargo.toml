@@ -31,3 +31,8 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+# The synthesis crate renders music on the device at load: speed matters more
+# there than the few kilobytes "z" saves.
+[profile.release.package.blip_assets]
+opt-level = 3
