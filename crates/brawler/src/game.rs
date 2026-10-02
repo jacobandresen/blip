@@ -90,7 +90,7 @@ pub(crate) struct Game {
     pub(crate) demo_cpu: (CpuPlan, f32),
     /// Sounds asked for this frame, for the main loop to play.
     pub(crate) sounds: Vec<(Sfx, f32)>,
-    pub(crate) helpers: [Option<Helper>; 3],
+    pub(crate) helpers: [Option<Helper>; 6],
     pub(crate) barrels: [Barrel; BARRELS],
     /// How many barrels this bonus round has.
     pub(crate) bonus_total: usize,
@@ -193,7 +193,7 @@ impl Game {
             idle: 0.0,
             demo_cpu: (CpuPlan::Wait, 0.0),
             sounds: Vec::new(),
-            helpers: [None; 3],
+            helpers: [None; 6],
             barrels: [Barrel { x: 0.0, y: FLOOR_Y, vx: 0.0, vy: 0.0, wait: 0.0, hp: 0, rolls: false,
                 hit_t: 9.0, broke_t: -1.0 }; BARRELS],
             bonus_total: 0,
@@ -321,7 +321,7 @@ impl Game {
         }
         for b in self.bolts.iter_mut() { b.active = false; }
         for s in self.hitspark.iter_mut() { s.ttl = 0.0; }
-        self.helpers = [None; 3];
+        self.helpers = [None; 6];
         self.fruit.ttl = 0.0;
         self.hitstop = 0.0;
         self.slow = 0.0;
@@ -386,7 +386,7 @@ impl Game {
         self.p[0].rounds = r0;
         self.p[1].rounds = r1;
         for b in self.bolts.iter_mut() { b.active = false; }
-        self.helpers = [None; 3];
+        self.helpers = [None; 6];
         for s in self.hitspark.iter_mut() { s.ttl = 0.0; }
         for w in self.pops.iter_mut() { w.ttl = 0.0; }
         self.fruit.ttl = 0.0;
@@ -406,17 +406,20 @@ impl Game {
         self.cpu_delay = 0.4;
     }
 
-    /// The other three turtles come in from behind whoever called, one after
-    /// another.
+    /// The other turtles come in from behind whoever called, one after
+    /// another: three of them, or two when the fourth is the opponent. Each
+    /// side has three slots of its own, and the sweep always comes last.
     pub(crate) fn call_turtles(&mut self, side: usize) {
-        let caller = self.p[side];
+        let (caller, foe) = (self.p[side], self.p[1 - side].who);
         let from = if caller.facing > 0.0 { -30.0 } else { WIN_W as f32 + 30.0 };
-        let others = (0..FIGHTERS.len())
-            .filter(|&w| FIGHTERS[w].build == Build::Turtle && w != caller.who);
-        for (k, who) in others.take(3).enumerate() {
-            self.helpers[k] = Some(Helper {
+        let others: Vec<usize> = (0..FIGHTERS.len())
+            .filter(|&w| FIGHTERS[w].build == Build::Turtle && w != caller.who && w != foe)
+            .take(3).collect();
+        let first = HELPER_MOVES.len() - others.len();
+        for (k, &who) in others.iter().enumerate() {
+            self.helpers[side * 3 + k] = Some(Helper {
                 f: Fighter::new(who, from, caller.facing),
-                side, wait: k as f32 * HELPER_GAP, mv: HELPER_MOVES[k], struck: false,
+                side, wait: k as f32 * HELPER_GAP, mv: HELPER_MOVES[first + k], struck: false,
             });
         }
     }
@@ -425,22 +428,24 @@ impl Game {
     pub(crate) fn spawn_bolt(&mut self, owner: usize, damage: i32) {
         let foe = self.p[1 - owner];
         let laser = self.p[owner].arch().special == Special::LaserVision;
-        // From the air the laser is aimed, so he turns to look first.
+        // From the air the laser is aimed, so he turns to look first: at the
+        // spot the stare fixed on, or failing that at the opponent.
+        let (ax, ay) = self.p[owner].aim.unwrap_or((foe.x, foe.y - foe.height() * 0.5));
         if laser && self.p[owner].airborne() {
-            self.p[owner].facing = if foe.x >= self.p[owner].x { 1.0 } else { -1.0 };
+            self.p[owner].facing = if ax >= self.p[owner].x { 1.0 } else { -1.0 };
         }
         let f = self.p[owner];
         let x = f.x + f.facing * (f.width() / 2.0 + 10.0);
         // A bolt leaves the hands at chest height. The laser leaves the eyes,
         // twice as fast: level at the head in front of it from the ground (a
-        // crouch goes under either), straight at the body from the air.
+        // crouch goes under either), straight at its aim from the air.
         let (y, vx, vy) = if !laser {
             (f.y - 54.0 * f.size(), f.facing * 300.0, 0.0)
         } else if !f.airborne() {
             (f.y - 98.0 * f.size().min(f.foe_size), f.facing * LASER_SPEED, 0.0)
         } else {
             let y = f.y - 100.0 * f.size();
-            let (dx, dy) = (foe.x - x, foe.y - foe.height() * 0.5 - y);
+            let (dx, dy) = (ax - x, ay - y);
             let d = dx.hypot(dy).max(1.0);
             (y, dx / d * LASER_SPEED, dy / d * LASER_SPEED)
         };

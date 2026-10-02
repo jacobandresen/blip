@@ -110,12 +110,28 @@ pub(crate) fn the_helpers_are_three_different_turtles_and_never_the_caller() {
         let mut g = Game::new();
         g.p[0] = at(turtle, 200.0, 1.0);
         g.call_turtles(0);
-        let mut who: Vec<usize> = g.helpers.iter().map(|h| h.unwrap().f.who).collect();
+        let mut who: Vec<usize> = g.helpers.iter().flatten().map(|h| h.f.who).collect();
         who.sort();
         who.dedup();
         assert_eq!(who.len(), 3);
         assert!(!who.contains(&turtle));
         assert!(who.iter().all(|&w| FIGHTERS[w].build == Build::Turtle));
+    }
+}
+
+#[test]
+pub(crate) fn against_a_turtle_only_the_two_not_fighting_answer_the_call() {
+    let turtles: Vec<usize> = (0..FIGHTERS.len()).filter(|&w| FIGHTERS[w].build == Build::Turtle).collect();
+    let mut g = Game::new();
+    g.p = [at(turtles[0], 200.0, 1.0), at(turtles[1], 420.0, -1.0)];
+    // Both call: neither set of helpers takes the other's place.
+    g.call_turtles(0);
+    g.call_turtles(1);
+    for side in 0..2 {
+        let mine: Vec<Helper> = g.helpers.iter().flatten().filter(|h| h.side == side).copied().collect();
+        let who: Vec<usize> = mine.iter().map(|h| h.f.who).collect();
+        assert_eq!(who, [turtles[2], turtles[3]], "side {side} called the wrong turtles");
+        assert!(mine.last().unwrap().mv == MoveId::Sweep, "the last one in does not sweep");
     }
 }
 

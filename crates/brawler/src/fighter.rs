@@ -107,6 +107,8 @@ pub(crate) struct Fighter {
     /// the special now under way is that call.
     pub(crate) called: bool,
     pub(crate) calling: bool,
+    /// Where the laser will go: where the opponent stood when the stare began.
+    pub(crate) aim: Option<(f32, f32)>,
     pub(crate) was_toward: bool,
     /// A rage jump is on its way down: the landing shakes the floor.
     pub(crate) stomp: bool,
@@ -161,7 +163,7 @@ impl Fighter {
             prev_act: Act::Idle, prev_mv: MoveId::LowPunch, prev_t: 0.0, blend: 0.0,
             blend_len: POSE_BLEND, land: 0.0, land_force: 0.0,
             soar: 0.0, stomp: false, parry_t: 0.0, throw_rest: 0.0,
-            webbed: 0.0, web_hits: 0, web_rest: 0.0, called: false, calling: false,
+            webbed: 0.0, web_hits: 0, web_rest: 0.0, called: false, calling: false, aim: None,
             alt_punch: false, since_punch: 9.0, far_leads: false,
             daze: 0.0, dizzy: 0.0, dazed: false, was_toward: false, countered: false, turned: false,
             foe_size: FIGHTERS[who].size,
@@ -305,6 +307,7 @@ impl Fighter {
             self.alt_punch = self.since_punch < CHAIN_PUNCH && !self.alt_punch;
             self.since_punch = 0.0;
         }
+        self.aim = None;
         self.act = Act::Attack;
         self.mv = id;
         self.t = 0.0;

@@ -227,6 +227,12 @@ fn fire_specials(g: &mut Game, dt: f32) {
         if f.act == Act::Attack && f.mv == MoveId::Special && !f.hit_done {
             let m = f.scaled(move_data(MoveId::Special));
             let at = m.startup * F;
+            // The laser goes where he looked as the eyes lit, not where the
+            // opponent has got to since: moving off the spot is the way out.
+            if f.arch().special == Special::LaserVision && f.aim.is_none() {
+                let foe = g.p[1 - i];
+                g.p[i].aim = Some((foe.x, foe.y - foe.height() * 0.5));
+            }
             if f.calling {
                 if f.t >= at && f.t - dt < at {
                     g.p[i].hit_done = true;

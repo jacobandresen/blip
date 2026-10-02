@@ -143,6 +143,41 @@ pub(crate) fn play(g: &mut Game, frames: usize, mut keys: impl FnMut(usize, &Gam
 
 pub(crate) fn special() -> Input { Input { special: true, ..Input::default() } }
 
+/// A round with ZENITH hovering `up` over `x`, staring from the first frame;
+/// RYUKA presses `keys` for three frames from frame `delay`. Returns what
+/// health that left.
+pub(crate) fn under_the_stare(x: f32, up: f32, delay: usize, keys: Input) -> i32 {
+    let zenith = FIGHTERS.iter().position(|a| a.invincible).unwrap();
+    let mut g = round(zenith, 0);
+    g.p[0].x = x;
+    g.p[0].y = FLOOR_Y - up;
+    g.p[0].act = Act::Air;
+    play(&mut g, 150, |f, _| [if f == 0 { special() } else { Input::default() },
+        if (delay..delay + 3).contains(&f) { keys } else { Input::default() }]);
+    g.p[1].health
+}
+
+#[test]
+pub(crate) fn the_laser_from_the_air_burns_where_he_looked_and_a_jump_gets_clear() {
+    let full = FIGHTERS[0].health;
+    let up = Input { up: true, ..Input::default() };
+    // RYUKA faces left, so away is right.
+    let back = Input { up: true, right: true, ..Input::default() };
+    assert_eq!(under_the_stare(200.0, 140.0, 0, Input::default()), 0, "standing in it did not end the round");
+    // Jumping as the eyes light, or a moment after: it does not follow.
+    for delay in [0, 6, 12] {
+        assert_eq!(under_the_stare(200.0, 140.0, delay, up), full, "a jump {delay} frames in was followed");
+    }
+    // Jumping away works later still, and with him low and 80px off, where
+    // the beam lands on frame 17.
+    for (x, h, latest) in [(200.0, 140.0, 18), (300.0, 60.0, 12)] {
+        for delay in (0..=latest).step_by(6) {
+            assert_eq!(under_the_stare(x, h, delay, back), full,
+                "a jump back {delay} frames in, from under ({x}, {h} up), was caught");
+        }
+    }
+}
+
 #[test]
 pub(crate) fn the_web_shot_wraps_whoever_it_reaches_and_two_blows_cut_them_out() {
     let webber = FIGHTERS.iter().position(|a| a.build == Build::Spider).unwrap();

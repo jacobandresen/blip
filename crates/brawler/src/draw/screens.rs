@@ -23,13 +23,10 @@ pub(crate) fn neon(blip: &Blip, text: &str, y: f32, sz: f32, c: BlipColor, lit: 
     blip.draw_text(text, x, y, sz, BlipColor { a: lit, ..blend(c, BLIP_WHITE, 0.78) });
 }
 
-/// A tube's flicker: mains hum, and the odd dropout of one that is on
-/// its way out. Both are what makes a sign read as lit rather than as
-/// coloured text.
+/// A tube's glow: a slow swell of a few percent, so a sign reads as lit
+/// rather than as coloured text. No dropouts: on a sign this size they strobe.
 pub(crate) fn tube(t: f32, phase: f32) -> f32 {
-    let hum = 0.93 + 0.07 * ((t * 9.3 + phase).sin() * 0.6 + (t * 23.0).sin() * 0.4);
-    let stutter = ((t * 0.83 + phase).sin() * (t * 7.7).sin()).abs();
-    if stutter > 0.97 { hum * 0.42 } else { hum }
+    0.96 + 0.04 * (t * 1.7 + phase).sin()
 }
 
 /// How long each pair of fighters holds the title screen.
@@ -76,7 +73,7 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
     }
 
     // A new pair every few seconds, so the title shows the whole roster. They
-    // arrive in a flash of white.
+    // arrive in a soft bloom of white.
     let n = FIGHTERS.len();
     let turn = (now / TITLE_TURN) as usize;
     let u = now % TITLE_TURN;
@@ -84,9 +81,9 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
     for (i, (x, face)) in [(66.0f32, 1.0f32), (574.0, -1.0)].into_iter().enumerate() {
         let f = title_fighter(pair[i], x, face, u, i == 0);
         draw_body(blip, &f, now, 0.0, 0.0, i, true);
-        if u < 0.12 {
+        if u < 0.3 {
             blip.fill_glow_circle(x, FLOOR_Y - f.height() * 0.5, f.height() * 0.7,
-                BlipColor { a: 0.5 * (1.0 - u / 0.12), ..BLIP_WHITE });
+                BlipColor { a: 0.25 * (1.0 - u / 0.3), ..BLIP_WHITE });
         }
     }
 
