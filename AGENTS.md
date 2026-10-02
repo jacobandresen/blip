@@ -87,6 +87,10 @@ returned PNG / WAV bytes into `$OUT_DIR/assets/{images,sounds}/`. The game's
 so wasm builds carry every asset inside the single `index.wasm` and need no
 separate preload step.
 
+Effects are most of a game's download, so the warm ones
+(`cosy::finish_warm`, low-passed at 3 kHz) are encoded at 22 kHz, and so are
+Raider's explosions and engines.
+
 Music is the exception: a WAV loop is megabytes, so games depend on
 `blip_assets` at runtime too and synthesise their tunes on the device through
 a `blip::Jukebox` (first track at load, the rest on the title screen). Most

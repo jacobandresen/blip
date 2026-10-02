@@ -303,3 +303,17 @@ pub fn finish_warm(mut buf: Vec<f32>, gain: f32) -> Vec<u8> {
 
 /// The usual level for a finished effect, warmed.
 pub fn sfx(buf: &[f32]) -> Vec<u8> { finish_warm(buf.to_vec(), 20_000.0) }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_warm_effect_is_half_rate_and_as_long_as_it_was() {
+        let wav = sfx(&glide(0.5, 880.0, 440.0, Tone::Sine, 1.0, 0.0));
+        let rate = u32::from_le_bytes([wav[24], wav[25], wav[26], wav[27]]);
+        let samples = (wav.len() - 44) / 2;
+        assert_eq!(rate, SAMPLE_RATE / 2);
+        assert!((samples as f32 / rate as f32 - 0.5).abs() < 0.01, "{samples} samples at {rate} Hz");
+    }
+}
