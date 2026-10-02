@@ -612,6 +612,9 @@ function pollGamepad(onDown, onUp) {
     var name = document.getElementById('marquee-name');
     var logo = document.querySelector('.blip-logo');
     if (!btn || !coin) return;
+    // As tall as the coin slot, which is as tall as the page's top bar (28,
+    // 40 or 46px), so the icon sits on the bar's middle line.
+    btn.style.height = coin.offsetHeight + 'px';
     var w = btn.offsetWidth || 34;
     var left = coin.getBoundingClientRect().left - w - 2;
     if (name && logo && name.getBoundingClientRect().right > left) left = logo.getBoundingClientRect().right + 2;
