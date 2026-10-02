@@ -533,9 +533,15 @@ var isRally = window.location.pathname.indexOf('/rally/') !== -1;
 
 // Block the real keyboard from reaching the game while the coin wall is up.
 // Not the high-score prompt's: its Enter and Escape are for the name field.
+// A kiosk has no mouse, so keys drop coins too: 5 at any time (as on the
+// cabinet page), and fire, Enter or C while the wall is up.
 window.addEventListener('keydown', function (e) {
   if (e.target && e.target.closest && e.target.closest('.blip-hs-modal')) return;
-  if (overlay.classList.contains('visible')) e.stopImmediatePropagation();
+  var wall = overlay.classList.contains('visible');
+  var coinKey = e.key === '5' || (wall && (e.key === ' ' || e.key === 'Enter' || e.key === 'c' || e.key === 'C'));
+  // isTrusted: the deck and a gamepad send synthetic keys, gated elsewhere.
+  if (coinKey && !e.repeat && e.isTrusted && getCoins() < MAX_COINS) coinIn();
+  if (wall) e.stopImmediatePropagation();
 }, true);
 
 (function () {
@@ -559,7 +565,8 @@ window.addEventListener('keydown', function (e) {
   // serve, the launch. SELECT leaves for the arcade's game grid (the trip
   // the BLIP logo makes) and is allowed even off the coin wall.
   function tapPrimary() {
-    if (coinGated()) return;
+    // START at the coin wall drops a coin: a gamepad has no other way.
+    if (coinGated()) { if (getCoins() < MAX_COINS) coinIn(); return; }
     dispatch(primary, 'keydown');
     dispatch(primary, 'keyup');
   }
