@@ -67,7 +67,14 @@ Run the test suite locally before pushing:
 node --test test/fill-canvas.test.mjs   # unit tests (canvas geometry)
 cargo test --release                    # game rules (Brawler's balance, Serpent's turns, ...)
 npm run test:shell                      # the web shell in headless Chromium (after ./build_web.sh)
+npm run test:scores                     # high-score entry in all seven scoring games (ten minutes)
 ```
+
+`test:scores` plays each built game until it ends and enters a name typed,
+from the stick and by touch, against `test/lib/fake-supabase.js`. Run it
+after touching `blip_scores.js`, the shell's key handling, or a game's
+game-over path. A game hears keys only while the canvas has focus: anything
+that takes focus (a prompt, a button) must leave it back there.
 
 `test/shell.mjs` needs only a Chromium binary; the other browser suites
 (`test:controls`, `test:deck`, `test:topbar`) need Playwright installed.

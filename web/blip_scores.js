@@ -392,14 +392,17 @@
   }
 
   // ---- entry point from shell.js ------------------------------------
-  var lastGame = null, lastScore = -1;
+  var lastGame = null, lastScore = -1, lastAt = 0;
   function onGameOver(game, score) {
     score = Math.max(0, Math.floor(Number(score) || 0));
     setLocalBest(game, score);
     if (!ENABLED || !game) return Promise.resolve();
-    // de-dupe: WASM may re-enter Over on a redraw
-    if (game === lastGame && score === lastScore) return Promise.resolve();
-    lastGame = game; lastScore = score;
+    // De-dupe a report repeated at once, but not the next game ending on
+    // the same score (two games of nothing in a row is common): that one
+    // has to get its board too.
+    var now = Date.now();
+    if (game === lastGame && score === lastScore && now - lastAt < 3000) return Promise.resolve();
+    lastGame = game; lastScore = score; lastAt = now;
 
     return ensureSession()
       .then(function () { return submitScore(game, score); })
@@ -410,7 +413,8 @@
           showBoard(game, res);
           return;
         }
-        if (res && res.reason === 'needs_handle') {
+        // Nothing scored is nothing to sign: the board alone.
+        if (res && res.reason === 'needs_handle' && score > 0) {
           return promptHandle('new high score — pick a name for the board')
             .then(function (h) {
               if (!h) return;                       // skipped

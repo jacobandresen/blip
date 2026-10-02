@@ -528,6 +528,23 @@ function hideLoader() {
   }
 }
 
+// The game hears keys only while the canvas has focus. A name prompt that
+// closes leaves it on <body>, a click on a bar button on the button, and the
+// keyboard is dead: on a kiosk with no mouse, for good. Hand it back.
+function refocusGame() {
+  if (document.querySelector('.blip-hs-modal')) return;
+  var a = document.activeElement;
+  if (a === canvas || (a && a.closest && a.closest('input, textarea'))) return;
+  try { canvas.focus({ preventScroll: true }); } catch (e) {}
+}
+new MutationObserver(refocusGame).observe(document.body, { childList: true });
+document.addEventListener('click', function (e) {
+  if (e.detail > 0) setTimeout(refocusGame, 0);   // a pointer's click, not Enter on a button
+}, true);
+window.addEventListener('keydown', function () {
+  if (document.activeElement === document.body) refocusGame();
+}, true);
+
 (function waitForCanvas() {
   if (canvas.width > 0 && canvas.height > 0) { hideLoader(); return; }
   setTimeout(waitForCanvas, 50);
@@ -608,8 +625,10 @@ window.addEventListener('keydown', function (e) {
   function tapPrimary() {
     // START at the coin wall drops a coin: a gamepad has no other way.
     if (coinGated()) { if (getCoins() < MAX_COINS) coinIn(); return; }
+    // Held for a few frames: Brawler samples the key, and a press that is
+    // down and up inside one frame never happened.
     dispatch(primary, 'keydown');
-    dispatch(primary, 'keyup');
+    setTimeout(function () { dispatch(primary, 'keyup'); }, 60);
   }
   function goToKiosk() { window.location.href = '../index.html'; }
   // Backspace does it from the keyboard: a kiosk has no mouse for the logo.
