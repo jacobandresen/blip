@@ -32,7 +32,10 @@ pub use color::{
 pub use ctx::{window_conf, Blip};
 pub use draw::{load_png, load_png_smooth};
 pub use fx::Fx;
-pub use math::{clamp, lerp, rand_int, rects_overlap, rand_seed, scatter};
+pub use fx::{EffectParticle, EffectParticles};
+pub use math::{angle_diff, clamp, ease_out_cubic, lerp, rand_int, rand_range_f32,
+    rects_overlap, rand_seed, scatter, segment_circle_overlap, segment_rect_overlap,
+    smoothstep01, wrap};
 pub use pool::{pool_iter, pool_iter_mut, pool_spawn, Pooled};
 pub use session::{LifeResult, Session, GAME_OVER_MIN_WAIT};
 pub use timer::Timer;

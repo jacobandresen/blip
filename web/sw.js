@@ -1,9 +1,10 @@
-var CACHE = "blip-v311";
+var CACHE = "blip-v312";
 
 var ASSETS = [
   "/blip/",
   "/blip/index.html",
   "/blip/about.html",
+  "/blip/api.html",
   "/blip/history.html",
   "/blip/controls.html",
   "/blip/manifest.json",

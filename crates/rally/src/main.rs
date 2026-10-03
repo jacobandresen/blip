@@ -8,8 +8,8 @@ use blip::macroquad::input::KeyCode;
 use blip::macroquad::math::Vec2;
 use blip::macroquad::rand::rand;
 use blip::{
-    GAME_OVER_MIN_WAIT,
-    play_sfx, Jukebox, rects_overlap, web, window_conf, Blip, BlipColor, Timer, BLIP_BLACK,
+    GAME_OVER_MIN_WAIT, segment_rect_overlap,
+    play_sfx, Jukebox, web, window_conf, Blip, BlipColor, Timer, BLIP_BLACK,
     BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
 
@@ -224,8 +224,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
     let sdt = dt / substeps as f32;
 
     for _ in 0..substeps {
+        let (prev_x, prev_y) = (g.ball_x + BALL_SZ * 0.5, g.ball_y + BALL_SZ * 0.5);
         g.ball_x += g.ball_vx * sdt;
         g.ball_y += g.ball_vy * sdt;
+        let (next_x, next_y) = (g.ball_x + BALL_SZ * 0.5, g.ball_y + BALL_SZ * 0.5);
 
         // Reflect the overshoot rather than clamp, so no speed is shaved off.
         if g.ball_y < PLAY_T {
@@ -240,8 +242,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
         }
 
         if g.ball_vx < 0.0
-            && rects_overlap(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ,
-                             LPAD_X, g.lpad_y, PAD_W, PAD_H)
+            && segment_rect_overlap(prev_x, prev_y, next_x, next_y,
+                LPAD_X - BALL_SZ * 0.5, g.lpad_y - BALL_SZ * 0.5,
+                PAD_W + BALL_SZ, PAD_H + BALL_SZ)
         {
             g.ball_x = LPAD_X + PAD_W;
             let py = g.lpad_y;
@@ -251,8 +254,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
         }
 
         if g.ball_vx > 0.0
-            && rects_overlap(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ,
-                             RPAD_X, g.rpad_y, PAD_W, PAD_H)
+            && segment_rect_overlap(prev_x, prev_y, next_x, next_y,
+                RPAD_X - BALL_SZ * 0.5, g.rpad_y - BALL_SZ * 0.5,
+                PAD_W + BALL_SZ, PAD_H + BALL_SZ)
         {
             g.ball_x = RPAD_X - BALL_SZ;
             let py = g.rpad_y;

@@ -12,7 +12,7 @@ use blip::{
     GAME_OVER_MIN_WAIT,
     load_png, load_png_smooth,
     clamp, Fx, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
-    window_conf, Blip, BlipColor, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_CYAN,
+    window_conf, Blip, BlipColor, LifeResult, Pooled, Session, Timer, rand_range_f32, BLIP_BLACK, BLIP_CYAN,
     BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
@@ -326,7 +326,7 @@ impl Game {
         self.since_break = 0.0;
         self.ball_x = self.pad_x + (self.pad_w / 2.0 - BALL_W as f32 / 2.0);
         self.ball_y = (PAD_Y - BALL_H - 2) as f32;
-        let r01 = (rand() as f32) / (u32::MAX as f32);
+        let r01 = rand_range_f32(0.0, 1.0);
         // 36-43 degrees off vertical, either side, at exactly the ramp's
         // speed (the old (sin, 1) vector served a third too fast).
         let side = if rand() % 2 == 0 { 1.0 } else { -1.0 };
@@ -334,7 +334,7 @@ impl Game {
         self.ball_vx = side * self.ball_speed * s;
         self.ball_vy = -self.ball_speed * c;
         self.ball_spin = 0.0;
-        self.ball_rot = mat_mul(&rot_x(0.5), &rot_y(rand_f() * std::f32::consts::TAU));
+        self.ball_rot = mat_mul(&rot_x(0.5), &rot_y(rand_range_f32(0.0, std::f32::consts::TAU)));
         self.ball_curve_used = 0.0;
     }
 
@@ -566,7 +566,7 @@ fn seek(g: &mut Game, dt: f32) {
     let (cx, cy, _) = ball_circle(g);
     let want = (ty - cy).atan2(tx - cx);
     let have = g.ball_vy.atan2(g.ball_vx);
-    let diff = (want - have + PI).rem_euclid(2.0 * PI) - PI;
+    let diff = blip::angle_diff(have, want);
     let turn = diff.clamp(-SEEK_RATE * dt, SEEK_RATE * dt);
     let (s, c) = turn.sin_cos();
     let (vx, vy) = (g.ball_vx, g.ball_vy);
@@ -584,8 +584,6 @@ fn mat_mul(a: &Mat3, b: &Mat3) -> Mat3 {
 }
 fn rot_x(t: f32) -> Mat3 { let (s, c) = t.sin_cos(); [[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]] }
 fn rot_y(t: f32) -> Mat3 { let (s, c) = t.sin_cos(); [[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]] }
-fn rand_f() -> f32 { (rand() % 10_000) as f32 / 10_000.0 }
-
 /// Rolls the ball without slipping: its surface drifts along the velocity
 /// (axis = view-normal x v), plus the screwball spin about the view axis.
 fn roll_ball(g: &mut Game, dt: f32) {

@@ -11,6 +11,8 @@ The Blip Engine is an open-source framework designed to provide a standardized, 
 
 **[Play in the browser →](https://jacobandresen.github.io/blip/)**
 
+**[Explore the Blip API →](https://jacobandresen.github.io/blip/api.html)** — see how the games use the engine, then try making one with Rust or an AI coding agent such as Claude Code or Codex.
+
 ---
 
 ## 🕹️ Game Modules
@@ -49,7 +51,7 @@ To explore development or contribute:
     cargo build --release
     ```
     *This compiles the core engine and individual game modules.*
-3.  **Library guide:** See [docs/blip.md](docs/blip.md) for a walkthrough of the blip API — what each module does, the game loop pattern, and how to get started writing a new game.
+3.  **Library guide:** Start with the [Blip API page](https://jacobandresen.github.io/blip/api.html) for illustrated examples and links into the games. For the longer source guide, see [docs/blip.md](docs/blip.md).
 
 ### Web Distribution (Production)
 To compile all games for the web:
@@ -80,4 +82,3 @@ the cabinet, and `M` turns the sound off and on.
 
 ### Contributing
 The engine is open-source! We welcome contributions from the community. Please check the `CONTRIBUTING.md` file for detailed guidelines.
-

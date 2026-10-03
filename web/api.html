@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050508">
+  <title>BLIP API — BLIP ARCADE</title>
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="stylesheet" href="kiosk.css?v=76">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root { color-scheme: dark; --green:#32c832; --cyan:#00d8e8; --yellow:#e6dc32; --pink:#ef50c8; --ink:#08090d; }
+    html { min-height:100%; background:#050508; scroll-behavior:smooth; }
+    body { margin:0; min-height:100vh; background:#050508; color:#ddd; font-family:'Courier New',monospace; }
+    body::before { content:""; position:fixed; inset:0; z-index:10; pointer-events:none; opacity:.27;
+      background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.42) 3px 4px); }
+    a { color:var(--cyan); text-decoration:none; }
+    a:hover { color:#fff; text-shadow:0 0 12px currentColor; }
+    .page { width:min(1080px,100%); margin:auto; padding:86px 28px 100px; }
+    .eyebrow { color:var(--pink); font-size:11px; letter-spacing:.3em; text-transform:uppercase; }
+    h1 { margin:14px 0 12px; color:var(--green); font-size:clamp(38px,8vw,76px); line-height:.95; letter-spacing:.08em;
+      text-shadow:0 0 16px rgba(50,200,50,.55),0 0 48px rgba(50,200,50,.2); }
+    .lede { max-width:680px; margin:20px 0 26px; color:#b7b7c1; font-size:16px; line-height:1.7; }
+    .hero-actions { display:flex; flex-wrap:wrap; gap:12px; }
+    .button { display:inline-flex; align-items:center; min-height:42px; padding:10px 15px; border:1px solid #276b37;
+      background:linear-gradient(180deg,#102015,#080e0b); color:#9cff9c; font-weight:bold; letter-spacing:.08em; }
+    .button.secondary { border-color:#3a3a54; color:#d3d3e5; background:#101018; }
+    .marquee { height:8px; margin:40px 0 30px; background:radial-gradient(circle,#e6dc32 0 2px,transparent 2.7px) left center/26px 8px repeat-x;
+      filter:drop-shadow(0 0 5px rgba(230,220,50,.55)); }
+    .intro-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:38px; }
+    .intro-strip div { padding:14px; border:1px solid #20202a; background:#0a0a10; color:#8e8e9a; font-size:12px; line-height:1.55; }
+    .intro-strip b { display:block; margin-bottom:5px; color:var(--yellow); letter-spacing:.1em; }
+    h2 { margin:0 0 17px; color:var(--yellow); font-size:20px; letter-spacing:.11em; text-transform:uppercase; }
+    h3 { margin:0 0 9px; color:#fff; font-size:16px; letter-spacing:.04em; }
+    p { color:#a7a7b2; font-size:13px; line-height:1.7; }
+    .section { margin:30px 0; padding:24px; border:1px solid #252530; background:linear-gradient(135deg,rgba(16,16,25,.96),rgba(7,7,12,.96));
+      box-shadow:0 12px 38px rgba(0,0,0,.28),inset 0 1px rgba(255,255,255,.025); }
+    .section-head { display:flex; align-items:baseline; gap:12px; margin-bottom:17px; }
+    .num { color:var(--pink); font-size:12px; letter-spacing:.15em; }
+    .feature { display:grid; grid-template-columns:minmax(0,1fr) minmax(220px,.72fr); gap:24px; align-items:center; }
+    .feature.reverse { grid-template-columns:minmax(220px,.72fr) minmax(0,1fr); }
+    pre { overflow:auto; margin:16px 0 0; padding:15px 16px; border-left:2px solid var(--green); background:#030407; color:#b8f6c0;
+      font:12px/1.65 'Courier New',monospace; tab-size:4; }
+    code { color:#b8f6c0; }
+    figure { margin:0; padding:7px; border:1px solid #30303b; background:#030305; box-shadow:0 0 26px rgba(0,216,232,.08); }
+    figure img { display:block; width:100%; height:auto; image-rendering:pixelated; }
+    figcaption { padding:9px 4px 3px; color:#737381; font-size:10px; line-height:1.5; }
+    .links { display:flex; gap:15px; flex-wrap:wrap; margin-top:13px; font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+    .api-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .effect-example { display:grid; grid-template-columns:minmax(190px,.55fr) minmax(0,1fr); gap:18px; align-items:center; margin-top:18px; }
+    .api-card { min-width:0; padding:18px; border:1px solid #252530; background:#0a0a10; }
+    .api-card p { margin:6px 0 0; }
+    .api-card pre { font-size:11px; }
+    .pill { display:inline-block; margin:5px 4px 0 0; padding:4px 7px; border:1px solid #252530; color:#8f8f9d; font-size:10px; }
+    .cta { margin:36px 0 0; padding:25px; border:1px solid #276b37; background:radial-gradient(ellipse at 15% 0%,rgba(50,200,50,.13),transparent 60%),#090d0b; }
+    .cta h2 { color:#87f487; }
+    .cta p { max-width:740px; }
+    .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:18px 0; counter-reset:step; }
+    .step { padding:13px; border:1px solid #242b27; background:rgba(0,0,0,.28); color:#a8b6aa; font-size:12px; line-height:1.6; }
+    .step b { display:block; color:#8ff28f; font-size:11px; letter-spacing:.12em; }
+    .bot-loop { display:grid; grid-template-columns:minmax(0,1fr) minmax(250px,.8fr); gap:20px; align-items:start; }
+    .bot-loop ol { margin:12px 0 0; padding-left:22px; color:#a7a7b2; font-size:13px; line-height:1.8; }
+    .bot-loop li { padding-left:4px; margin:4px 0; }
+    .bot-prompt { margin-top:18px; }
+    .cta pre { border-left-color:var(--cyan); color:#c8f8ff; }
+    .foot { margin-top:35px; padding-top:16px; border-top:1px solid #20202a; color:#666; font-size:11px; line-height:1.7; }
+    @media(max-width:700px) {
+      .page { padding:78px 16px 90px; }
+      .intro-strip { grid-template-columns:1fr; }
+      .feature,.feature.reverse { grid-template-columns:1fr; }
+      .feature figure { max-width:440px; }
+      .section { padding:18px; }
+      .api-grid { grid-template-columns:1fr; }
+      .effect-example { grid-template-columns:1fr; }
+      .steps { grid-template-columns:1fr; }
+      .bot-loop { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+  <a class="blip-logo" href="index.html">BLIP<span class="ba-rest">&nbsp;ARCADE</span></a>
+  <button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
+  <div class="top-marquee-bar"></div>
+
+  <main class="page">
+    <div class="eyebrow">The cabinet under the cabinet</div>
+    <h1>THE BLIP API</h1>
+    <p class="lede">A small Rust kit for games with big arcade energy. Blip gives you the canvas, frame loop, bitmap lettering, sound, and cabinet bridge; your game keeps the rules and the personality.</p>
+    <div class="hero-actions">
+      <a class="button" href="index.html">▶ PLAY THE ARCADE</a>
+      <a class="button secondary" href="https://github.com/jacobandresen/blip/blob/main/docs/blip.md">READ THE FULL GUIDE ↗</a>
+    </div>
+
+    <div class="marquee"></div>
+    <div class="intro-strip">
+      <div><b>01 / WRITE</b>Rust + Macroquad, with a fixed virtual canvas.</div>
+      <div><b>02 / RUN</b>Native during development; WebAssembly in the cabinet.</div>
+      <div><b>03 / PLAY</b>Keyboard, cabinet controls, and touch feed the same game.</div>
+    </div>
+
+    <section class="section">
+      <div class="section-head"><span class="num">01</span><h2>One loop, one canvas</h2></div>
+      <div class="feature">
+        <div>
+          <p>Create a <code>Blip</code> canvas, update your state with elapsed seconds, draw a frame, and hand control back to Macroquad. Blip keeps the virtual resolution steady while the browser or desktop window scales it.</p>
+          <pre><code>use blip::{window_conf, Blip, BLIP_BLACK};
+
+fn conf() -&gt; blip::macroquad::window::Conf {
+    window_conf("MY GAME", 480, 540)
+}
+
+#[blip::macroquad::main(conf)]
+async fn main() {
+    let mut blip = Blip::new(480, 540);
+    let mut game = Game::new();
+    loop {
+        let dt = blip.delta_time;
+        game.update(dt);
+        blip.clear(BLIP_BLACK);
+        game.draw(&blip);
+        blip.next_frame(60).await;
+    }
+}</code></pre>
+          <div class="links"><a href="serpent/index.html">Play Serpent ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/serpent/src/main.rs">See its loop in Rust ↗</a></div>
+        </div>
+        <figure><a href="serpent/index.html"><img src="serpent/screenshot.png" alt="Serpent running on Blip's virtual canvas"></a><figcaption>Serpent draws a crisp 480-pixel board through the same canvas on desktop and phone.</figcaption></figure>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="num">02</span><h2>Input that meets players where they are</h2></div>
+      <div class="feature reverse">
+        <figure><a href="bouncer/index.html"><img src="bouncer/screenshot.png" alt="Bouncer with paddle, ball, bricks, and score HUD"></a><figcaption>Bouncer reads the same movement from keys, a stick, or a finger dragging the paddle.</figcaption></figure>
+        <div>
+          <p>Pressed-this-frame input is handy for actions; held input is for movement. The browser cabinet maps its controls into the same key events, so your game logic stays portable.</p>
+          <pre><code>use blip::input::{key_active, key_pressed,
+    BLIP_KEY_LEFT, BLIP_KEY_SPACE};
+
+if key_active(BLIP_KEY_LEFT) {
+    player.x -= SPEED * dt;
+}
+if key_pressed(BLIP_KEY_SPACE) {
+    player.fire();
+}</code></pre>
+          <div class="links"><a href="bouncer/index.html">Play Bouncer ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/bouncer/src/main.rs">See input in Rust ↗</a><a href="controls.html">See all controls ↗</a></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="num">03</span><h2>Pixels, shapes, and arcade text</h2></div>
+      <p>Draw in virtual-canvas pixels with the built-in shapes, textures, palette, and legible bitmap font. Blip applies its CRT glass and scanline finish around the scene.</p>
+      <div class="api-grid" style="margin-top:16px">
+        <div class="api-card"><h3>Shape + sprite</h3><pre><code>blip.fill_rect(x, y, w, h, BLIP_RED);
+blip.draw_line(x1, y1, x2, y2, BLIP_WHITE);
+blip.fill_circle(cx, cy, r, BLIP_YELLOW);
+blip.draw_texture(&amp;ship, x, y, w, h);</code></pre></div>
+        <div class="api-card"><h3>5×7 bitmap font</h3><pre><code>blip.draw_text("READY!", 12.0, 32.0,
+               2.0, BLIP_CYAN);
+blip.draw_centered("PRESS FIRE", 280.0,
+                   3.0, BLIP_WHITE);</code></pre></div>
+      </div>
+      <div class="links"><a href="meteors/index.html">Play Meteors ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/meteors/src/main.rs">See vector drawing in Rust ↗</a></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="num">04</span><h2>Game-ready building blocks</h2></div>
+      <div class="api-grid">
+        <div class="api-card"><h3>Math + collision</h3><p>Inclusive random integers, float ranges, wraparound, angle steering, easing, and common overlap tests.</p><pre><code>if rects_overlap(ball.x, ball.y, 12.0, 12.0,
+                 brick.x, brick.y, 44.0, 18.0) {
+    brick.hit();
+}</code></pre><span class="pill">blip::math</span></div>
+        <div class="api-card"><h3>Session + timer</h3><p>Keep score, lives, and level together. Countdowns return a one-frame signal when they expire.</p><pre><code>let mut session = Session::new(3);
+session.add_score(100);
+if timer.tick(dt) { respawn(); }</code></pre><span class="pill">Session</span><span class="pill">Timer</span></div>
+        <div class="api-card"><h3>Effects + entity pools</h3><p>Score popups, rings, screen shake, bursts, and fixed-capacity entity arrays help a hit feel like a hit.</p><pre><code>fx.popup(x, y, "+100", BLIP_YELLOW);
+fx.burst(x, y, 10, 90.0, BLIP_CYAN);
+fx.update(dt);
+fx.draw(&amp;blip);</code></pre><span class="pill">Fx</span><span class="pill">Pooled</span></div>
+        <div class="api-card"><h3>Cabinet bridge</h3><p>Coins, player count, high scores, controls, touch, and haptics. On native builds, browser-only calls safely do nothing.</p><pre><code>web::spend_coin();
+web::set_players(1);
+web::report_score(session.score);</code></pre><span class="pill">blip::web</span></div>
+      </div>
+      <div class="effect-example">
+        <figure><a href="bubbler/index.html"><img src="bubbler/screenshot.png" alt="Bubbler's colorful platforms, bubbles, and pop effects"></a><figcaption>Bubbler keeps its own soft, colorful look while using shared particle motion and lifetime updates.</figcaption></figure>
+        <p>The effect layer handles common motion and timing; a game can keep its own drawing style. This is useful when a stock burst is close, but your particles need custom colors, shapes, or animation. <a href="bubbler/index.html">See it in Bubbler ↗</a></p>
+      </div>
+      <div class="links"><a href="bubbler/index.html">Play Bubbler ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/bubbler/src/main.rs">See shared effects in use ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/blip/src/lib.rs">Browse the crate exports ↗</a></div>
+    </section>
+
+    <section class="section">
+      <div class="section-head"><span class="num">05</span><h2>Tune mechanics with bot playthroughs</h2></div>
+      <div class="bot-loop">
+        <div>
+          <p>A bot gives a coding agent a repeatable way to probe game feel. Ask it to measure a specific goal, make one tuning change at a time, and run several trials with the same setup. Blip prints a <code>RESULT</code> line at game over or when the time limit is reached; compare those stats before deciding whether a change helped.</p>
+          <ol>
+            <li>Build the game in release mode and capture a baseline from several runs.</li>
+            <li>Change one mechanic or tuning value, then repeat the same runs.</li>
+            <li>Compare outcomes and relevant counters; keep the change only if the evidence supports it.</li>
+          </ol>
+          <p>Bouncer records lost lives, the speed at each loss, and level clear times. Add <code>BLIP_BOT_SHOTS</code> to save frames for visual review too. The bot runs only in native builds.</p>
+          <div class="links"><a href="bouncer/index.html">Play Bouncer ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/bouncer/src/bot.rs">Read its bot ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/blip/src/bot.rs">Read bot playtesting API ↗</a></div>
+        </div>
+        <pre><code>cargo build --release -p bouncer
+BLIP_BOT=1 BLIP_BOT_MAXT=300 \
+  xvfb-run -a -s "-screen 0 720x810x24" \
+  target/release/bouncer
+
+# Optional screenshots every 5 game seconds
+BLIP_BOT=1 BLIP_BOT_SHOTS=/tmp/bouncer-shots \
+  BLIP_BOT_SHOT_EVERY=5 target/release/bouncer</code></pre>
+      </div>
+      <div class="bot-prompt">
+        <p>Give your coding agent a focused experiment. For example:</p>
+        <pre><code>Read AGENTS.md, crates/bouncer/src/bot.rs, and the Bouncer
+RESULT stats. Run five baseline bot playthroughs and summarize
+lives_lost, lost_at_speed*, and t_clear*.
+
+Tune only the ball's top speed to make late rallies tense but
+recoverable. After each change, rebuild and run the same five
+trials. Show baseline and new results, explain the tradeoff, and
+keep the change only if the stats support the goal.</code></pre>
+      </div>
+    </section>
+
+    <section class="cta">
+      <div class="section-head"><span class="num">06</span><h2>Build your first Blip game with an agent.</h2></div>
+      <p>Claude Code and Codex can read this repo, follow its Rust patterns, and help build a playable game. Treat the agent like a teammate: give it a specific brief, point it at a working example, and ask it to build and run the result in small steps.</p>
+      <div class="steps">
+        <div class="step"><b>1 / GET THE CABINET</b>Clone the repo and open it in Claude Code, Codex, or another coding agent.</div>
+        <div class="step"><b>2 / PICK A REFERENCE</b>Ask the agent to read <code>AGENTS.md</code>, <code>docs/blip.md</code>, and a nearby game such as <code>crates/meteors</code>.</div>
+        <div class="step"><b>3 / MAKE A SMALL PLAYABLE</b>Start with one screen, one input, one win or lose condition. Build natively, playtest, then tune.</div>
+      </div>
+      <p>Try this as your first prompt:</p>
+      <pre><code>Read AGENTS.md, docs/blip.md, and crates/serpent/src/main.rs.
+Create a new Rust arcade game crate named orbit_dash using the blip API.
+It should have a title screen, keyboard and cabinet input, score/lives,
+and a short replayable round. Keep the first version small and playable.
+Build it, run any relevant checks, and tell me how to launch it natively.
+Do not edit generated files under web/.</code></pre>
+      <p>Then iterate: ask for a game-feel adjustment, an enemy pattern, a sound, or a touch-control pass. The API is small on purpose; the game’s character should come from your idea.</p>
+      <div class="hero-actions"><a class="button" href="https://github.com/jacobandresen/blip">GET THE SOURCE ↗</a><a class="button secondary" href="https://github.com/jacobandresen/blip/blob/main/docs/blip.md">OPEN THE FULL GUIDE ↗</a><a class="button secondary" href="index.html">TRY THE GAMES</a></div>
+    </section>
+    <p class="foot">Blip is built on <a href="https://macroquad.rs/">Macroquad</a>. Games run natively during development and can be compiled to WebAssembly for this arcade.</p>
+  </main>
+
+  <div class="left-badges">
+    <a class="controls-badge" href="controls.html"><img class="controls-avatar" src="controls-icon.svg" alt="Controls"><span class="controls-label">CONTROLS</span></a>
+    <a class="about-badge" href="about.html"><img class="about-avatar" src="claude-avatar.svg" alt="About"><span class="about-label">ABOUT</span></a>
+    <a class="history-badge" href="history.html"><img class="history-avatar" src="history-icon.svg" alt="Game history"><span class="history-label">HISTORY</span></a>
+  </div>
+  <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main"><div class="deck-panel"></div></div>
+  <script src="deck.js?v=5"></script>
+  <script src="kiosk.js?v=42"></script>
+</body>
+</html>

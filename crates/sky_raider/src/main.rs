@@ -11,7 +11,7 @@ use blip::macroquad::rand::rand;
 use blip::macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use blip::{
     load_png, load_png_smooth,
-    clamp, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
+    clamp, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rand_range_f32, rects_overlap, web,
     window_conf, Blip, BlipColor, Fx, LifeResult, Pooled, Session, Timer,
     BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_GRAY, BLIP_GREEN, BLIP_ORANGE, BLIP_RED, BLIP_WHITE,
     BLIP_YELLOW,
@@ -652,10 +652,6 @@ fn spawn_interval_range(level: i32) -> (f32, f32) {
     (1.5 - l * 0.08, 2.6 - l * 0.14)
 }
 
-fn rand01() -> f32 {
-    (rand() as f32) / (u32::MAX as f32)
-}
-
 // ---- weapon tiers ---------------------------------------------------------
 // Every property indexed by weapon_level (1..=MAX_WEAPON_LEVEL), so the
 // ladder from single gun to seven-way barrage tunes in one place.
@@ -951,9 +947,9 @@ struct Sounds {
 }
 
 fn spawn_boat(g: &mut Game) {
-    let x = 20.0 + rand01() * (WIN_W as f32 - BOAT_W as f32 - 40.0);
-    let vx = (rand01() - 0.5) * 30.0; // slow lateral cruise, +/- 15 px/s
-    let bob_phase = rand01() * std::f32::consts::TAU;
+    let x = 20.0 + rand_range_f32(0.0, 1.0) * (WIN_W as f32 - BOAT_W as f32 - 40.0);
+    let vx = (rand_range_f32(0.0, 1.0) - 0.5) * 30.0; // slow lateral cruise, +/- 15 px/s
+    let bob_phase = rand_range_f32(0.0, 1.0) * std::f32::consts::TAU;
     pool_spawn(&mut g.boats, Boat { x, y: -(BOAT_H as f32), active: true, vx, bob_phase });
 }
 
@@ -963,9 +959,9 @@ fn spawn_island(g: &mut Game) {
 
 fn spawn_island_sized(g: &mut Game, size: u8) {
     let (w, h) = ISLAND_SIZES[size as usize];
-    let x = 10.0 + rand01() * (WIN_W as f32 - w as f32 - 20.0);
+    let x = 10.0 + rand_range_f32(0.0, 1.0) * (WIN_W as f32 - w as f32 - 20.0);
     // a moment to scroll fully into view before they open up, guns staggered
-    let guns = [0, 1, 2].map(|k| FlakGun { angle: 0.0, reload: 1.6 + k as f32 * 0.7 + rand01() * 0.5, flash: 0.0 });
+    let guns = [0, 1, 2].map(|k| FlakGun { angle: 0.0, reload: 1.6 + k as f32 * 0.7 + rand_range_f32(0.0, 1.0) * 0.5, flash: 0.0 });
     pool_spawn(&mut g.islands, Island { x, y: -(h as f32), size, active: true, hp: ISLAND_HP[size as usize], guns });
 }
 
@@ -973,13 +969,13 @@ fn spawn_island_sized(g: &mut Game, size: u8) {
 /// then re-arm `barrier_timer` for the next (seldom) one.
 fn spawn_barrier(g: &mut Game, sfx: &Sounds) {
     let span = (BARRIER_HP_MAX - BARRIER_HP_MIN + 1) as f32;
-    let hp = (BARRIER_HP_MIN as f32 + rand01() * span) as i32;
+    let hp = (BARRIER_HP_MIN as f32 + rand_range_f32(0.0, 1.0) * span) as i32;
     let hp = hp.clamp(BARRIER_HP_MIN, BARRIER_HP_MAX);
-    let motor_x = MOTOR_W / 2.0 + 20.0 + rand01() * (WIN_W as f32 - MOTOR_W - 40.0);
+    let motor_x = MOTOR_W / 2.0 + 20.0 + rand_range_f32(0.0, 1.0) * (WIN_W as f32 - MOTOR_W - 40.0);
     let mut warmup = Timer::default();
     warmup.start(BARRIER_WARMUP);
     g.barrier = Barrier { active: true, motor_x, hp, max_hp: hp, warmup, t: 0.0, y: BARRIER_START_Y };
-    g.barrier_timer.start(BARRIER_MIN_INTERVAL + rand01() * (BARRIER_MAX_INTERVAL - BARRIER_MIN_INTERVAL));
+    g.barrier_timer.start(BARRIER_MIN_INTERVAL + rand_range_f32(0.0, 1.0) * (BARRIER_MAX_INTERVAL - BARRIER_MIN_INTERVAL));
     // Silent to start; update_barrier() rides both loops by distance.
     play_sound(&sfx.barrier_hum, PlaySoundParams { looped: true, volume: 0.0 });
     play_sound(&sfx.barrier_hum2, PlaySoundParams { looped: true, volume: 0.0 });
@@ -1029,7 +1025,7 @@ fn update_background(g: &mut Game, dt: f32) {
         c.y += c.speed * g.scroll_k * dt;
         if c.y - c.r > WIN_H as f32 {
             c.y = -c.r;
-            c.x = rand01() * WIN_W as f32;
+            c.x = rand_range_f32(0.0, 1.0) * WIN_W as f32;
         }
     }
 
@@ -1047,7 +1043,7 @@ fn update_background(g: &mut Game, dt: f32) {
     let at_sea = land::coast_y(g).is_none_or(|cy| cy < -200.0);
     if g.boat_timer.tick(dt) && at_sea {
         spawn_boat(g);
-        g.boat_timer.start(4.0 + rand01() * 4.0);
+        g.boat_timer.start(4.0 + rand_range_f32(0.0, 1.0) * 4.0);
     }
 
     for isl in pool_iter_mut(&mut g.islands) {
@@ -1058,7 +1054,7 @@ fn update_background(g: &mut Game, dt: f32) {
     }
     if g.island_timer.tick(dt) && at_sea {
         spawn_island(g);
-        g.island_timer.start(ISLAND_MIN_INTERVAL + rand01() * (ISLAND_MAX_INTERVAL - ISLAND_MIN_INTERVAL));
+        g.island_timer.start(ISLAND_MIN_INTERVAL + rand_range_f32(0.0, 1.0) * (ISLAND_MAX_INTERVAL - ISLAND_MIN_INTERVAL));
     }
 }
 
@@ -1102,7 +1098,7 @@ fn aim_flak_gun(gun: &mut FlakGun, x: f32, y: f32, px: f32, py: f32, dt: f32, re
     gun.flash = (gun.flash - dt).max(0.0);
     gun.reload -= dt;
     if gun.reload > 0.0 { return false; }
-    gun.reload = reload.0 + rand01() * (reload.1 - reload.0);
+    gun.reload = reload.0 + rand_range_f32(0.0, 1.0) * (reload.1 - reload.0);
     gun.flash = 0.08;
     true
 }
@@ -1184,11 +1180,11 @@ fn spawn_flight(g: &mut Game, kind: EnemyKind, form: Formation, x: f32, y: f32, 
     g.flights[fi] = Flight { active: true, x, y, heading, bank: 0.0, speed: trim, trim, max_bank,
         legs: plan, n: legs.len().min(4), leg: 0, leg_t: 0.0, turned: 0.0, t: 0.0,
         members: members.len() as u8, downed: 0 };
-    let can_hide = kind != EnemyKind::Ace && rand01() < 0.4;
+    let can_hide = kind != EnemyKind::Ace && rand_range_f32(0.0, 1.0) < 0.4;
     for &slot in members {
         let (sx, sy) = slot_pos(x, y, heading, slot);
         let mut fire_timer = Timer::default();
-        fire_timer.start(0.8 + rand01() * 1.4);
+        fire_timer.start(0.8 + rand_range_f32(0.0, 1.0) * 1.4);
         pool_spawn(&mut g.enemies, Enemy {
             x: sx - ENEMY_W as f32 / 2.0, y: sy - ENEMY_H as f32 / 2.0, heading, bank: 0.0, speed: trim, active: true,
             kind, t: 0.0, flight: fi, slot, fire_timer, burst: 0, burst_t: 0.0, can_hide,
@@ -1199,13 +1195,13 @@ fn spawn_flight(g: &mut Game, kind: EnemyKind, form: Formation, x: f32, y: f32, 
 /// A diving pass: in from the top toward where the player is, then a hard
 /// banked break-away to one side and out.
 fn spawn_dive_pass(g: &mut Game, kind: EnemyKind, form: Formation) {
-    let x = 90.0 + rand01() * (WIN_W as f32 - 180.0);
+    let x = 90.0 + rand_range_f32(0.0, 1.0) * (WIN_W as f32 - 180.0);
     let px = g.player_x + PLAYER_W as f32 / 2.0;
     let heading = (px - x).atan2(420.0).clamp(-0.35, 0.35);
     let side = if x < WIN_W as f32 / 2.0 { 1.0 } else { -1.0 };
     spawn_flight(g, kind, form, x, -70.0, heading, &[
-        Leg::Straight(1.4 + rand01() * 0.6),
-        Leg::Turn { bank: side * 0.95, by: 1.8 + rand01() * 0.6 },
+        Leg::Straight(1.4 + rand_range_f32(0.0, 1.0) * 0.6),
+        Leg::Turn { bank: side * 0.95, by: 1.8 + rand_range_f32(0.0, 1.0) * 0.6 },
         Leg::Straight(6.0),
     ]);
 }
@@ -1214,16 +1210,16 @@ fn spawn_dive_pass(g: &mut Game, kind: EnemyKind, form: Formation) {
 /// gentle turn downward and out the bottom (`high`: straight across the
 /// top of the screen instead).
 fn spawn_crossing(g: &mut Game, kind: EnemyKind, form: Formation, high: bool) {
-    let from_left = rand01() < 0.5;
+    let from_left = rand_range_f32(0.0, 1.0) < 0.5;
     let s = if from_left { 1.0 } else { -1.0 };
     let x = if from_left { -70.0 } else { WIN_W as f32 + 70.0 };
-    let y = 40.0 + rand01() * 110.0;
+    let y = 40.0 + rand_range_f32(0.0, 1.0) * 110.0;
     if high {
         spawn_flight(g, kind, form, x, y, s * 1.35, &[Leg::Straight(9.0)]);
         return;
     }
-    spawn_flight(g, kind, form, x, y, s * (0.95 + rand01() * 0.25), &[
-        Leg::Straight(1.8 + rand01() * 0.6),
+    spawn_flight(g, kind, form, x, y, s * (0.95 + rand_range_f32(0.0, 1.0) * 0.25), &[
+        Leg::Straight(1.8 + rand_range_f32(0.0, 1.0) * 0.6),
         Leg::Turn { bank: -s * 0.5, by: 0.7 },
         Leg::Straight(6.0),
     ]);
@@ -1231,10 +1227,10 @@ fn spawn_crossing(g: &mut Game, kind: EnemyKind, form: Formation, high: bool) {
 
 /// Down into the fight, a 180-degree turn, and away up the screen.
 fn spawn_turn_back(g: &mut Game, kind: EnemyKind, form: Formation) {
-    let x = 110.0 + rand01() * (WIN_W as f32 - 220.0);
+    let x = 110.0 + rand_range_f32(0.0, 1.0) * (WIN_W as f32 - 220.0);
     let side = if x < WIN_W as f32 / 2.0 { 1.0 } else { -1.0 };
     spawn_flight(g, kind, form, x, -70.0, 0.0, &[
-        Leg::Straight(1.2 + rand01() * 0.5),
+        Leg::Straight(1.2 + rand_range_f32(0.0, 1.0) * 0.5),
         Leg::Turn { bank: side * 1.0, by: std::f32::consts::PI },
         Leg::Straight(6.0),
     ]);
@@ -1242,7 +1238,7 @@ fn spawn_turn_back(g: &mut Game, kind: EnemyKind, form: Formation) {
 
 /// A lone ace: chases the player's lead point, then breaks away.
 fn spawn_ace(g: &mut Game) {
-    let x = 80.0 + rand01() * (WIN_W as f32 - 160.0);
+    let x = 80.0 + rand_range_f32(0.0, 1.0) * (WIN_W as f32 - 160.0);
     let side = if x < WIN_W as f32 / 2.0 { 1.0 } else { -1.0 };
     spawn_flight(g, EnemyKind::Ace, Formation::Solo, x, -70.0, 0.0, &[
         Leg::Pursue(3.4),
@@ -1263,11 +1259,11 @@ fn spawn_opening_wave(g: &mut Game) {
 /// lone Ki-84; from level 2 more and more often a second flight with it.
 fn spawn_wave_tick(g: &mut Game) {
     let level = g.sess.level;
-    let flights = if rand01() < (0.15 * (level - 1) as f32).min(0.6) { 2 } else { 1 };
+    let flights = if rand_range_f32(0.0, 1.0) < (0.15 * (level - 1) as f32).min(0.6) { 2 } else { 1 };
     for _ in 0..flights {
-        let r = rand01();
+        let r = rand_range_f32(0.0, 1.0);
         if r < 0.32 {
-            let form = if level >= 2 && rand01() < 0.5 { Formation::FingerFour } else { Formation::Vic };
+            let form = if level >= 2 && rand_range_f32(0.0, 1.0) < 0.5 { Formation::FingerFour } else { Formation::Vic };
             spawn_dive_pass(g, EnemyKind::Grunt, form);
         }
         else if r < 0.52 { spawn_dive_pass(g, EnemyKind::Grunt, Formation::Pair); }
@@ -1294,7 +1290,7 @@ fn update_flight(f: &mut Flight, dt: f32, player: (f32, f32, f32)) {
             let (lx, ly) = (px + pvx * 0.5, py);
             let want = (lx - f.x).atan2((ly - f.y).max(40.0));
             let mut err = want - f.heading;
-            err = (err + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+            err = blip::angle_diff(0.0, err);
             err * 1.4 - w_now * 0.5
         }
     };
@@ -1325,7 +1321,7 @@ fn fly_wing(e: &mut Enemy, f: &Flight, dt: f32) -> (f32, f32) {
     let (sx, sy) = slot_pos(f.x, f.y, f.heading, e.slot);
     let (ax, ay) = (sx + f.heading.sin() * 110.0, sy + f.heading.cos() * 110.0);
     let want = (ax - cx).atan2(ay - cy);
-    let err = (want - e.heading + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+    let err = blip::angle_diff(e.heading, want);
     let lim = ((FLIGHT_STALL / e.speed).powi(2)).min(1.0).acos().min(FLIGHT_MAX_BANK);
     let w_lead = FLIGHT_G * f.bank.tan() / f.speed;
     let cmd = ((w_lead * e.speed / FLIGHT_G).atan() + err * 1.6).clamp(-lim, lim);
@@ -1380,7 +1376,7 @@ fn update_enemies(g: &mut Game, dt: f32, allow_fire: bool, sfx: &Sounds) {
                 }
             }
             let (mn, mx) = if e.kind == EnemyKind::Ace { (0.8, 1.5) } else { (1.2, 2.4) };
-            e.fire_timer.start((mn + rand01() * (mx - mn)) / (1.0 + 0.12 * lvl));
+            e.fire_timer.start((mn + rand_range_f32(0.0, 1.0) * (mx - mn)) / (1.0 + 0.12 * lvl));
         }
         if e.burst > 0 {
             e.burst_t -= dt;
@@ -1483,7 +1479,7 @@ fn update_lasers(g: &mut Game, dt: f32, sfx: &Sounds) {
         match l.phase {
             LaserPhase::Cooling => {
                 let want = (px - x).atan2(py - y);
-                let err = (want - l.angle + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+                let err = blip::angle_diff(l.angle, want);
                 l.angle += err.clamp(-LASER_TURN * dt, LASER_TURN * dt);
                 if l.t <= 0.0 {
                     l.phase = LaserPhase::Charging;
@@ -1591,7 +1587,7 @@ fn update_turrets(g: &mut Game, dt: f32) {
                 want = (edge - x).atan2((py - y).max(1.0));
             }
         }
-        let err = (want - t.angle + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI;
+        let err = blip::angle_diff(t.angle, want);
         t.angle += err.clamp(-1.75 * dt, 1.75 * dt);
         t.flash = (t.flash - dt).max(0.0);
         if t.reload_t > 0.0 {
@@ -1654,7 +1650,7 @@ fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
     update_lasers(g, dt, sfx);
     if spec.escorts && g.boss.escort_timer.tick(dt) {
         spawn_dive_pass(g, EnemyKind::Grunt, Formation::Pair);
-        g.boss.escort_timer.start(5.0 + rand01() * 2.5);
+        g.boss.escort_timer.start(5.0 + rand_range_f32(0.0, 1.0) * 2.5);
     }
 }
 
@@ -1689,7 +1685,7 @@ fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
     } else {
         // with height the sea below appears to slide by more slowly
         let u = t - LAUNCH_ROLL_END;
-        let c = smoothstep01(u / (LAUNCH_TIME - LAUNCH_ROLL_END));
+        let c = blip::smoothstep01(u / (LAUNCH_TIME - LAUNCH_ROLL_END));
         (-(lift_v * u * (1.0 - 0.45 * c)) / CARRIER_DECK_LEN, c)
     };
     g.launch_climb = climb;
@@ -1780,12 +1776,6 @@ fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 }
 
-/// Hermite smoothstep clamped to 0..1.
-fn smoothstep01(x: f32) -> f32 {
-    let x = x.clamp(0.0, 1.0);
-    x * x * (3.0 - 2.0 * x)
-}
-
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.fx.update(dt);
     g.respawn_grace.tick(dt);
@@ -1835,7 +1825,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if g.airspeed <= STALL_SPEED { g.stall_t += dt; } else { g.stall_t = 0.0; }
         if g.stall_t >= STALL_HOLD {
             g.stall_fall = 1e-4;
-            g.stall_spin = if rand01() < 0.5 { -1.0 } else { 1.0 };
+            g.stall_spin = if rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
         }
     }
     g.scroll_k = if g.airspeed < 1.0 { 0.25 + 0.75 * g.airspeed } else { 1.0 + 0.5 * (g.airspeed - 1.0) };
@@ -1851,9 +1841,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             let dx = if n > 1 { (i as f32 / (n - 1) as f32 - 0.5) * fan } else { 0.0 };
             // Guns are not lasers: each round leaves a little off true.
             pool_spawn(&mut g.bullets, Round {
-                x: cx + dx + (rand01() - 0.5) * 3.0,
-                y: g.player_y + rand01() * 6.0,
-                vx: dx * 2.2 + (rand01() - 0.5) * 28.0 + g.player_vx * 0.15,
+                x: cx + dx + (rand_range_f32(0.0, 1.0) - 0.5) * 3.0,
+                y: g.player_y + rand_range_f32(0.0, 1.0) * 6.0,
+                vx: dx * 2.2 + (rand_range_f32(0.0, 1.0) - 0.5) * 28.0 + g.player_vx * 0.15,
                 vy: BULLET_SPEED,
                 r,
                 bounced: false,
@@ -1865,9 +1855,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         let side = if g.eject_left { -1.0 } else { 1.0 };
         pool_spawn(&mut g.casings, Casing {
             x: cx + side * 6.0, y: g.player_y + PLAYER_H as f32 * 0.45,
-            vx: side * (70.0 + rand01() * 50.0) + g.player_vx * 0.5,
-            vy: 20.0 + rand01() * 40.0,
-            rot: rand01() * 3.0, ttl: 0.45, active: true,
+            vx: side * (70.0 + rand_range_f32(0.0, 1.0) * 50.0) + g.player_vx * 0.5,
+            vy: 20.0 + rand_range_f32(0.0, 1.0) * 40.0,
+            rot: rand_range_f32(0.0, 1.0) * 3.0, ttl: 0.45, active: true,
         });
         let takes = &sfx.shoot[(g.weapon_level.clamp(1, MAX_WEAPON_LEVEL) - 1) as usize];
         play_sfx_volume(&takes[(rand() % takes.len() as u32) as usize], 0.8 + 0.04 * g.weapon_level as f32);
@@ -1902,15 +1892,15 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if g.smoke_t <= 0.0 {
             let hurt = (PLAYER_HEALTH_MAX - g.health) as f32; // 2..4
             g.smoke_t = 0.13 - 0.025 * hurt;
-            let (cx, ny) = (g.player_x + PLAYER_W as f32 / 2.0 + (rand01() - 0.5) * 6.0, g.player_y + PLAYER_H as f32 * 0.3);
+            let (cx, ny) = (g.player_x + PLAYER_W as f32 / 2.0 + (rand_range_f32(0.0, 1.0) - 0.5) * 6.0, g.player_y + PLAYER_H as f32 * 0.3);
             let dark = if g.health <= 2 { 1.0 } else { 0.6 };
             pool_spawn(&mut g.puffs, Puff { x: cx, y: ny, r: 2.5 * dark + 1.0, grow: 12.0 + 8.0 * dark,
                 ttl: 0.9, max_ttl: 0.9, fire: false, top: true, active: true });
             if g.health <= 2 {
                 // flames licking back from both sides of the cowling
                 for side in [-1.0f32, 1.0] {
-                    let fx = g.player_x + PLAYER_W as f32 / 2.0 + side * (3.0 + rand01() * 3.0);
-                    pool_spawn(&mut g.puffs, Puff { x: fx, y: g.player_y + PLAYER_H as f32 * 0.2, r: 2.5 + hurt * 0.9 + rand01() * 2.0,
+                    let fx = g.player_x + PLAYER_W as f32 / 2.0 + side * (3.0 + rand_range_f32(0.0, 1.0) * 3.0);
+                    pool_spawn(&mut g.puffs, Puff { x: fx, y: g.player_y + PLAYER_H as f32 * 0.2, r: 2.5 + hurt * 0.9 + rand_range_f32(0.0, 1.0) * 2.0,
                         grow: -9.0, ttl: 0.28, max_ttl: 0.28, fire: true, top: true, active: true });
                 }
             }
@@ -1920,7 +1910,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.airspeed < STALL_WARN && g.stall_fall == 0.0 {
         g.backfire_t -= dt;
         if g.backfire_t <= 0.0 {
-            g.backfire_t = 0.18 + rand01() * 0.35;
+            g.backfire_t = 0.18 + rand_range_f32(0.0, 1.0) * 0.35;
             play_sfx_volume(&sfx.backfire, 0.75);
             let (cx, ny) = (g.player_x + PLAYER_W as f32 / 2.0, g.player_y + PLAYER_H as f32 * 0.2);
             pool_spawn(&mut g.puffs, Puff { x: cx, y: ny, r: 3.0, grow: -8.0, ttl: 0.12, max_ttl: 0.12, fire: true, top: true, active: true });
@@ -1953,7 +1943,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if g.spawn_timer.tick(dt) {
             spawn_wave_tick(g);
             let (mn, mx) = spawn_interval_range(g.sess.level);
-            g.spawn_timer.start(mn + rand01() * (mx - mn));
+            g.spawn_timer.start(mn + rand_range_f32(0.0, 1.0) * (mx - mn));
         }
         if g.wave_kills >= g.wave_target {
             spawn_boss(g, sfx);
@@ -1975,12 +1965,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             if !g.enemies[ei].active { continue; }
             let (ex, ey) = (g.enemies[ei].x, g.enemies[ei].y);
             if rects_overlap(bx, by, bw, BULLET_H, ex, ey, ENEMY_W as f32, ENEMY_H as f32) {
-                if !g.bullets[bi].bounced && rand01() < RICOCHET_CHANCE {
+                if !g.bullets[bi].bounced && rand_range_f32(0.0, 1.0) < RICOCHET_CHANCE {
                     // Glances off: a spark, and away at 35-80 degrees to
                     // one side, a little slower, the plane unharmed.
                     let b = &mut g.bullets[bi];
-                    let side = if rand01() < 0.5 { -1.0 } else { 1.0 };
-                    let a = 0.6 + rand01() * 0.8;
+                    let side = if rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
+                    let a = 0.6 + rand_range_f32(0.0, 1.0) * 0.8;
                     let v = BULLET_SPEED * 0.8;
                     b.vx = side * v * a.sin();
                     b.vy = v * a.cos();
@@ -1991,7 +1981,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                     play_sfx_volume(take, 0.7);
                     break;
                 }
-                shoot_down(g, ei, sfx, rand01() < FLAMES_CHANCE);
+                shoot_down(g, ei, sfx, rand_range_f32(0.0, 1.0) < FLAMES_CHANCE);
                 consumed = true;
                 break;
             }
@@ -2271,7 +2261,7 @@ fn shoot_down(g: &mut Game, ei: usize, sfx: &Sounds, flames: bool) {
     }
     if e.kind == EnemyKind::Ace {
         pool_spawn(&mut g.powerups, Powerup { x: e.x, y: e.y, active: true });
-    } else if rand01() < HEALTH_DROP_CHANCE {
+    } else if rand_range_f32(0.0, 1.0) < HEALTH_DROP_CHANCE {
         pool_spawn(&mut g.health_pickups, HealthPickup { x: e.x, y: e.y, active: true });
     }
 }
@@ -2281,8 +2271,8 @@ fn shoot_down(g: &mut Game, ei: usize, sfx: &Sounds, flames: bool) {
 /// way the plane was, and only drag and the turn it falls into change that.
 fn new_wreck(e: &Enemy) -> Wreck {
     // A banked plane falls into a turn that way; a level one either way.
-    let side = if e.bank.abs() > 0.05 { e.bank.signum() } else if rand01() < 0.5 { -1.0 } else { 1.0 };
-    let fall = match rand01() {
+    let side = if e.bank.abs() > 0.05 { e.bank.signum() } else if rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
+    let fall = match rand_range_f32(0.0, 1.0) {
         r if r < 0.30 => Fall::Roll,
         r if r < 0.55 => Fall::Spiral,
         r if r < 0.70 => Fall::FlatSpin,
@@ -2291,15 +2281,15 @@ fn new_wreck(e: &Enemy) -> Wreck {
     };
     let mut w = Wreck { x: e.x, y: e.y, heading: e.heading, kind: e.kind, active: true,
         course: e.heading, speed: e.speed, fall,
-        spin: side * (1.0 + rand01() * 3.0), bend: side * rand01() * 0.25,
-        wobble: rand01() * 2.0, dur: WRECK_SECS * (0.75 + rand01() * 0.55), ..DEAD_WRECK };
+        spin: side * (1.0 + rand_range_f32(0.0, 1.0) * 3.0), bend: side * rand_range_f32(0.0, 1.0) * 0.25,
+        wobble: rand_range_f32(0.0, 1.0) * 2.0, dur: WRECK_SECS * (0.75 + rand_range_f32(0.0, 1.0) * 0.55), ..DEAD_WRECK };
     match fall {
         Fall::Roll => {}
         // a descending turn: `spin` is the turn rate, tightening as it falls
-        Fall::Spiral => { w.spin = side * (1.4 + rand01() * 0.8); w.dur *= 1.15; }
-        Fall::FlatSpin => { w.spin = side * (7.0 + rand01() * 4.0); w.dur *= 0.8; }
-        Fall::Dive => { w.spin = 0.0; w.bend = 0.0; w.wobble = 0.4 + rand01() * 0.5; }
-        Fall::Tumble => { w.spin = side * (3.0 + rand01() * 3.0); w.flip_t = 0.2 + rand01() * 0.3; }
+        Fall::Spiral => { w.spin = side * (1.4 + rand_range_f32(0.0, 1.0) * 0.8); w.dur *= 1.15; }
+        Fall::FlatSpin => { w.spin = side * (7.0 + rand_range_f32(0.0, 1.0) * 4.0); w.dur *= 0.8; }
+        Fall::Dive => { w.spin = 0.0; w.bend = 0.0; w.wobble = 0.4 + rand_range_f32(0.0, 1.0) * 0.5; }
+        Fall::Tumble => { w.spin = side * (3.0 + rand_range_f32(0.0, 1.0) * 3.0); w.flip_t = 0.2 + rand_range_f32(0.0, 1.0) * 0.3; }
     }
     w
 }
@@ -2330,8 +2320,8 @@ fn fly_wreck(w: &mut Wreck, scroll: f32, dt: f32) {
         Fall::Tumble => {
             w.flip_t -= dt;
             if w.flip_t <= 0.0 {
-                w.spin = -w.spin * (0.7 + rand01() * 0.6);
-                w.flip_t = 0.15 + rand01() * 0.35;
+                w.spin = -w.spin * (0.7 + rand_range_f32(0.0, 1.0) * 0.6);
+                w.flip_t = 0.15 + rand_range_f32(0.0, 1.0) * 0.35;
             }
             w.heading += w.spin * dt;
             w.course += w.bend * dt;
@@ -2363,7 +2353,7 @@ fn update_wrecks(g: &mut Game, dt: f32, sfx: &Sounds) {
         if done { w.active = false; }
         let s = 1.0 - 0.55 * k;
         if emit && !done {
-            let j = || (rand01() - 0.5) * 4.0;
+            let j = || (rand_range_f32(0.0, 1.0) - 0.5) * 4.0;
             pool_spawn(&mut g.puffs, Puff { x: cx + j(), y: cy + j(), r: 2.5 * s, grow: 16.0 * s,
                 ttl: 0.9, max_ttl: 0.9, fire: false, top: false, active: true });
             pool_spawn(&mut g.puffs, Puff { x: cx + j(), y: cy + j(), r: 3.4 * s, grow: -5.0,
@@ -2440,7 +2430,7 @@ fn update_splutter(g: &mut Game, dt: f32, sfx: &Sounds) {
         // Not near a stall or in a boss's entrance, where it would be unfair.
         if g.splutter_next <= 0.0 && g.airspeed > 0.7 && !g.boss_intro.active() {
             g.splutter_t = 0.0;
-            g.splutter_next = SPLUTTER_EVERY.0 + rand01() * (SPLUTTER_EVERY.1 - SPLUTTER_EVERY.0);
+            g.splutter_next = SPLUTTER_EVERY.0 + rand_range_f32(0.0, 1.0) * (SPLUTTER_EVERY.1 - SPLUTTER_EVERY.0);
             play_sfx_volume(&sfx.engine_splutter, PROP_MAX_VOLUME * 1.1);
             blip::bot::add("splutters", 1.0);
         }
@@ -2475,8 +2465,8 @@ fn splutter_duck(g: &Game) -> f32 {
 /// One of several takes of a sound, at a slightly varied volume, so a run
 /// of the same event never repeats exactly.
 fn play_take(takes: &[blip::BlipSound], vol: f32) {
-    let i = ((rand01() * takes.len() as f32) as usize).min(takes.len() - 1);
-    play_sfx_volume(&takes[i], vol * (0.85 + 0.15 * rand01()));
+    let i = ((rand_range_f32(0.0, 1.0) * takes.len() as f32) as usize).min(takes.len() - 1);
+    play_sfx_volume(&takes[i], vol * (0.85 + 0.15 * rand_range_f32(0.0, 1.0)));
 }
 
 async fn load_takes(wavs: &[&[u8]]) -> Vec<blip::BlipSound> {

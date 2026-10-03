@@ -6,8 +6,6 @@ use super::*;
 /// Shortest offset across the wrap.
 fn wd(d: f32, span: f32) -> f32 { let d = d.rem_euclid(span); if d > span / 2.0 { d - span } else { d } }
 
-fn angle_diff(a: f32, b: f32) -> f32 { (a - b + PI).rem_euclid(2.0 * PI) - PI }
-
 pub fn drive(g: &Game, t: f32) {
     let tap = (t * 10.0) as i32 % 2 == 0;
     let keys: Vec<_> = match g.state {
@@ -33,14 +31,14 @@ pub fn drive(g: &Game, t: f32) {
             if g.saucer.active { consider(g.saucer.x, g.saucer.y, g.saucer.vx, 0.0, 16.0); }
             let mut k = vec![];
             if let Some((_, aim, dist)) = best {
-                let d = angle_diff(aim, s.angle);
+                let d = blip::angle_diff(s.angle, aim);
                 if d > 0.06 { k.push(BLIP_KEY_RIGHT); } else if d < -0.06 { k.push(BLIP_KEY_LEFT); }
                 if d.abs() < 0.12 && dist < BULLET_SPEED * BULLET_TTL + 30.0 { k.push(BLIP_KEY_SPACE); }
             }
             if let Some((dx, dy)) = danger {
                 // Thrust when the nose points away from the threat.
                 let away = (-dx).atan2(dy);
-                if angle_diff(away, s.angle).abs() < 1.2 { k.push(BLIP_KEY_UP); }
+                if blip::angle_diff(s.angle, away).abs() < 1.2 { k.push(BLIP_KEY_UP); }
             }
             k
         }

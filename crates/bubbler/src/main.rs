@@ -306,10 +306,7 @@ const PALETTES: [Palette; ROUNDS] = [
 
 fn col(c: (u8, u8, u8), a: f32) -> BlipColor { BlipColor::new(c.0 as f32 / 255.0, c.1 as f32 / 255.0, c.2 as f32 / 255.0, a) }
 fn rgba(r: f32, g: f32, b: f32, a: f32) -> BlipColor { BlipColor::new(r, g, b, a) }
-fn rnd() -> f32 { blip::macroquad::rand::gen_range(0.0, 1.0) }
-fn rng(a: f32, b: f32) -> f32 { a + (b - a) * rnd() }
 fn now() -> f32 { blip::macroquad::time::get_time() as f32 }
-fn ease_out(t: f32) -> f32 { 1.0 - (1.0 - t.clamp(0.0, 1.0)).powi(3) }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State { Title, Intro, Play, Clear, Over, Won }
@@ -366,7 +363,7 @@ impl Player {
         Self { joined: false, alive: false, x: spawn.0, y: spawn.1, vx: 0.0, vy: 0.0, face, on_ground: false,
             lives: LIVES, score: 0, blow_cd: 0.0, mouth: 0.0, safe: 0.0, dead_t: 0.0, squash: 1.0, walk: 0.0,
             eat: -1.0, eaten: Fruit { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, kind: 0, t: 0.0, on_ground: true, active: false },
-            blink: rng(1.0, 4.0), spawn }
+            blink: blip::rand_range_f32(1.0, 4.0), spawn }
     }
     fn place(&mut self) {
         self.x = self.spawn.0; self.y = self.spawn.1;
@@ -394,7 +391,7 @@ struct Bubble { x: f32, y: f32, vx: f32, age: f32, phase: Phase, owner: usize,
 struct Fruit { x: f32, y: f32, vx: f32, vy: f32, kind: usize, t: f32, on_ground: bool, active: bool }
 
 #[derive(Clone, Copy)]
-struct Particle { x: f32, y: f32, vx: f32, vy: f32, life: f32, max: f32, c: BlipColor, size: f32, star: bool, ring: bool }
+struct ParticleStyle { c: BlipColor, size: f32, star: bool, ring: bool }
 
 #[derive(Clone, Copy)]
 struct Popup { x: f32, y: f32, t: f32, value: i32, c: BlipColor }
@@ -420,7 +417,7 @@ struct Game {
     enemies: Vec<Enemy>,
     bubbles: Vec<Bubble>,
     fruits: Vec<Fruit>,
-    parts: Vec<Particle>,
+    parts: blip::EffectParticles<ParticleStyle>,
     pops: Vec<Popup>,
     skull: Skull,
     shots: Vec<Shot>,
@@ -465,7 +462,7 @@ impl Game {
         let mut g = Self {
             stats: Stats::default(), chain: (0, 0.0), state: State::Title, round: 0, tiles: [[false; COLS]; ROWS],
             p: [Player::new(a, 1.0), Player::new(b, -1.0)],
-            enemies: Vec::new(), bubbles: Vec::new(), fruits: Vec::new(), parts: Vec::new(), pops: Vec::new(),
+            enemies: Vec::new(), bubbles: Vec::new(), fruits: Vec::new(), parts: blip::EffectParticles::new(60.0, 2.0), pops: Vec::new(),
             skull: Skull { active: false, x: 0.0, y: 0.0, speed: 0.0 },
             shots: Vec::new(),
             round_t: 0.0, state_t: 0.0, hurry: false, shake: 0.0, two_up: false, extend: false,
@@ -484,8 +481,8 @@ impl Game {
         self.p[1].spawn = b;
         self.enemies = es.into_iter().map(|(kind, x, y)| Enemy {
             kind, x, y, vx: 0.0, vy: 0.0, dir: if x < WIN_W as f32 / 2.0 { 1.0 } else { -1.0 },
-            on_ground: false, angry: false, t: rng(0.0, 3.0), jump_cd: rng(0.8, 2.0), edge_cd: 0.0,
-            active: true, pop_in: 0.0, shot_cd: rng(2.5, 4.5), windup: 0.0, crouch: 0.0, leap: (0.0, 0.0),
+            on_ground: false, angry: false, t: blip::rand_range_f32(0.0, 3.0), jump_cd: blip::rand_range_f32(0.8, 2.0), edge_cd: 0.0,
+            active: true, pop_in: 0.0, shot_cd: blip::rand_range_f32(2.5, 4.5), windup: 0.0, crouch: 0.0, leap: (0.0, 0.0),
         }).collect();
         for e in self.enemies.iter_mut() {
             if e.kind == Kind::Ghost { e.vx = e.dir * 62.0; e.vy = 62.0; }
@@ -583,16 +580,19 @@ impl Game {
 
     /// An expanding shockwave ring.
     fn ring(&mut self, x: f32, y: f32, c: BlipColor, size: f32) {
-        self.parts.push(Particle { x, y, vx: 0.0, vy: 0.0, life: 0.35, max: 0.35, c, size, star: false, ring: true });
+        self.parts.push(blip::EffectParticle { x, y, vx: 0.0, vy: 0.0, life: 0.35, max_life: 0.35,
+            data: ParticleStyle { c, size, star: false, ring: true } });
     }
 
     fn burst(&mut self, x: f32, y: f32, n: usize, c: BlipColor, speed: f32, star: bool) {
         for i in 0..n {
-            let a = i as f32 / n as f32 * std::f32::consts::TAU + rng(-0.3, 0.3);
-            let s = speed * rng(0.5, 1.0);
-            let life = rng(0.35, 0.7);
-            self.parts.push(Particle { x, y, vx: a.cos() * s, vy: a.sin() * s, life, max: life, c,
-                size: if star { rng(2.5, 4.0) } else { rng(1.2, 2.6) }, star, ring: false });
+            let a = i as f32 / n as f32 * std::f32::consts::TAU + blip::rand_range_f32(-0.3, 0.3);
+            let s = speed * blip::rand_range_f32(0.5, 1.0);
+            let life = blip::rand_range_f32(0.35, 0.7);
+            self.parts.push(blip::EffectParticle { x, y, vx: a.cos() * s, vy: a.sin() * s, life, max_life: life,
+                data: ParticleStyle { c,
+                    size: if star { blip::rand_range_f32(2.5, 4.0) } else { blip::rand_range_f32(1.2, 2.6) },
+                    star, ring: false } });
         }
     }
 }
@@ -629,8 +629,8 @@ fn update_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
             g.p[i].squash = 1.35;
             let (fx, fy) = (x + P_W / 2.0, y + P_H);
             for s in [-1.0, 1.0] {
-                g.parts.push(Particle { x: fx, y: fy, vx: s * rng(40.0, 70.0), vy: -rng(5.0, 20.0),
-                    life: 0.25, max: 0.25, c: rgba(1.0, 1.0, 1.0, 0.45), size: 1.8, star: false, ring: false });
+                g.parts.push(blip::EffectParticle { x: fx, y: fy, vx: s * blip::rand_range_f32(40.0, 70.0), vy: -blip::rand_range_f32(5.0, 20.0),
+                    life: 0.25, max_life: 0.25, data: ParticleStyle { c: rgba(1.0, 1.0, 1.0, 0.45), size: 1.8, star: false, ring: false } });
             }
             play_sfx_volume(&sfx.jump, 0.5);
         }
@@ -640,8 +640,8 @@ fn update_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
         if ground && was_air && fall_speed > 150.0 {
             g.p[i].squash = 0.7;
             for s in [-1.0, 1.0] {
-                g.parts.push(Particle { x: x + P_W / 2.0, y: y + P_H, vx: s * rng(30.0, 60.0), vy: -rng(10.0, 30.0),
-                    life: 0.3, max: 0.3, c: rgba(1.0, 1.0, 1.0, 0.5), size: 2.0, star: false, ring: false });
+                g.parts.push(blip::EffectParticle { x: x + P_W / 2.0, y: y + P_H, vx: s * blip::rand_range_f32(30.0, 60.0), vy: -blip::rand_range_f32(10.0, 30.0),
+                    life: 0.3, max_life: 0.3, data: ParticleStyle { c: rgba(1.0, 1.0, 1.0, 0.5), size: 2.0, star: false, ring: false } });
             }
         }
         let p = &mut g.p[i];
@@ -656,13 +656,13 @@ fn update_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
         }
         p.safe = (p.safe - dt).max(0.0);
         p.blink -= dt;
-        if p.blink < -0.12 { p.blink = rng(2.0, 4.5); }
+        if p.blink < -0.12 { p.blink = blip::rand_range_f32(2.0, 4.5); }
         if k.blow && p.blow_cd <= 0.0 && g.bubbles.len() < MAX_BUBBLES {
             p.blow_cd = BLOW_CD;
             p.mouth = 0.18;
             let (bx, by, f) = (p.cx() + p.face * 14.0, p.cy() - 1.0, p.face);
             g.bubbles.push(Bubble { x: bx, y: by, vx: f * SHOOT_V, age: 0.0, phase: Phase::Shoot, owner: i,
-                trapped: None, active: true, wob: rng(0.0, 6.0), squish: 0.0 });
+                trapped: None, active: true, wob: blip::rand_range_f32(0.0, 6.0), squish: 0.0 });
             play_sfx_volume(&sfx.blow, 0.6);
         }
     }
@@ -697,17 +697,17 @@ fn update_enemies(g: &mut Game, dt: f32) {
                     let ahead = if e.dir > 0.0 { e.x + E_W + 2.0 } else { e.x - 2.0 };
                     if e.edge_cd <= 0.0 && !g.floor_at(ahead, ahead + 1.0, e.y + E_H) {
                         e.edge_cd = 0.6;
-                        if rnd() < 0.55 { e.dir = -e.dir; e.vx = -e.vx; }
+                        if blip::rand_range_f32(0.0, 1.0) < 0.55 { e.dir = -e.dir; e.vx = -e.vx; }
                     }
                     e.jump_cd -= dt;
                     if e.jump_cd <= 0.0 {
-                        e.jump_cd = rng(1.0, 2.4) / fast;
+                        e.jump_cd = blip::rand_range_f32(1.0, 2.4) / fast;
                         if let Some((px, py)) = target {
-                            if py < e.y - 30.0 && (px - e.x).abs() < 150.0 && rnd() < 0.7 {
+                            if py < e.y - 30.0 && (px - e.x).abs() < 150.0 && blip::rand_range_f32(0.0, 1.0) < 0.7 {
                                 e.crouch = JUMP_TELL;
                                 e.leap = (e.dir * 58.0 * fast, -JUMP_V);
                             }
-                            else if rnd() < 0.15 { e.dir = if px > e.x { 1.0 } else { -1.0 }; }
+                            else if blip::rand_range_f32(0.0, 1.0) < 0.15 { e.dir = if px > e.x { 1.0 } else { -1.0 }; }
                         }
                     }
                 }
@@ -721,10 +721,10 @@ fn update_enemies(g: &mut Game, dt: f32) {
                     e.vx *= 0.8;
                     e.jump_cd -= dt;
                     if e.jump_cd <= 0.0 {
-                        e.jump_cd = rng(0.6, 1.3) / fast;
+                        e.jump_cd = blip::rand_range_f32(0.6, 1.3) / fast;
                         let toward = target.map(|(px, _)| if px > e.x { 1.0 } else { -1.0 }).unwrap_or(e.dir);
-                        e.dir = if rnd() < 0.75 { toward } else { -toward };
-                        let high = target.map(|(_, py)| py < e.y - 20.0).unwrap_or(false) || rnd() < 0.3;
+                        e.dir = if blip::rand_range_f32(0.0, 1.0) < 0.75 { toward } else { -toward };
+                        let high = target.map(|(_, py)| py < e.y - 20.0).unwrap_or(false) || blip::rand_range_f32(0.0, 1.0) < 0.3;
                         e.crouch = JUMP_TELL;
                         e.leap = (e.dir * 85.0 * fast, if high { -JUMP_V * 0.98 } else { -300.0 });
                     }
@@ -766,13 +766,13 @@ fn update_enemies(g: &mut Game, dt: f32) {
                     && (py - ey).abs() < 14.0 && (px - ex).abs() < 300.0 {
                     e.dir = if px > ex { 1.0 } else { -1.0 };
                     e.windup = ROCK_WINDUP;
-                    e.shot_cd = rng(2.2, 4.0) / fast;
+                    e.shot_cd = blip::rand_range_f32(2.2, 4.0) / fast;
                 } else if e.kind == Kind::Ghost && g.round >= SPARKS_FROM && e.angry {
                     let (dx, dy) = (px - ex, py - ey);
                     let d = dx.hypot(dy).max(1.0);
                     g.shots.push(Shot { x: ex, y: ey, vx: dx / d * SPARK_V, vy: dy / d * SPARK_V,
                         t: 0.0, spark: true, active: true });
-                    e.shot_cd = rng(3.0, 5.0) / fast;
+                    e.shot_cd = blip::rand_range_f32(3.0, 5.0) / fast;
                 } else {
                     e.shot_cd = 0.4;
                 }
@@ -838,7 +838,7 @@ fn pop_chain(g: &mut Game, start: usize, by: usize, sfx: &Sounds) {
             chain_total += value;
             if kills == 0 { chain_at = (b.x, b.y - 6.0); }
             g.burst(b.x, b.y, 10, rgba(1.0, 0.85, 0.3, 1.0), 150.0, true);
-            g.fruits.push(Fruit { x: b.x - 8.0, y: b.y - 8.0, vx: rng(-110.0, 110.0), vy: -300.0,
+            g.fruits.push(Fruit { x: b.x - 8.0, y: b.y - 8.0, vx: blip::rand_range_f32(-110.0, 110.0), vy: -300.0,
                 kind: kills.min(3), t: 0.0, on_ground: false, active: true });
             kills += 1;
         } else {
@@ -912,8 +912,8 @@ fn update_bubbles(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
             if let Some((kind, _)) = b.trapped {
                 // out it comes, and it is not happy about it
                 g.enemies.push(Enemy { kind, x: b.x - E_W / 2.0, y: b.y - E_H / 2.0, vx: 0.0, vy: 0.0,
-                    dir: if rnd() < 0.5 { -1.0 } else { 1.0 }, on_ground: false, angry: true, t: 0.0,
-                    jump_cd: 0.5, edge_cd: 0.0, active: true, pop_in: 1.0, shot_cd: rng(1.5, 3.0), windup: 0.0,
+                    dir: if blip::rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 }, on_ground: false, angry: true, t: 0.0,
+                    jump_cd: 0.5, edge_cd: 0.0, active: true, pop_in: 1.0, shot_cd: blip::rand_range_f32(1.5, 3.0), windup: 0.0,
                         crouch: 0.0, leap: (0.0, 0.0) });
                 let last = g.enemies.len() - 1;
                 if kind == Kind::Ghost { g.enemies[last].vx = 62.0; g.enemies[last].vy = 62.0; }
@@ -1078,14 +1078,7 @@ fn hurt_players(g: &mut Game, sfx: &Sounds) {
 }
 
 fn update_fx(g: &mut Game, dt: f32) {
-    for p in g.parts.iter_mut() {
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.vx *= 1.0 - 2.0 * dt;
-        p.vy = p.vy * (1.0 - 2.0 * dt) + 60.0 * dt;
-        p.life -= dt;
-    }
-    g.parts.retain(|p| p.life > 0.0);
+    g.parts.update(dt);
     for p in g.pops.iter_mut() { p.t += dt; p.y = (p.y - 30.0 * dt).max(HUD + 6.0); }
     g.pops.retain(|p| p.t < 1.4);
     g.shake = (g.shake - dt).max(0.0);
@@ -1424,7 +1417,7 @@ fn draw_bubble(b: &Bubble, ox: f32, oy: f32, t: f32, round: usize) {
     let life = if b.trapped.is_some() { trap_life(round) } else { FREE_LIFE };
     let escaping = b.trapped.is_some() && b.age > life - 1.6;
     let shake = if escaping { (t * 50.0).sin() * 1.5 } else { 0.0 };
-    let grow = if b.phase == Phase::Shoot && b.trapped.is_none() { 0.35 + 0.65 * ease_out(b.age / 0.12) } else { 1.0 };
+    let grow = if b.phase == Phase::Shoot && b.trapped.is_none() { 0.35 + 0.65 * blip::ease_out_cubic(b.age / 0.12) } else { 1.0 };
     let r = (BUB_R + (b.wob * 3.0).sin() * 0.6) * grow;
     let (rx, ry) = (r * (1.0 + b.squish * 0.25), r * (1.0 - b.squish * 0.25));
     if let Some((kind, angry)) = b.trapped {
@@ -1560,7 +1553,7 @@ fn draw_world(blip: &Blip, g: &Game) {
     for f in &g.fruits { draw_fruit(f, ox, oy); }
     for e in &g.enemies {
         if !e.active { continue; }
-        let s = ease_out(e.pop_in);
+        let s = blip::ease_out_cubic(e.pop_in);
         let shake = if e.windup > 0.0 || e.crouch > 0.0 { (e.t * 70.0).sin() * 1.4 } else { 0.0 };
         // crouching to jump: drawn smaller, feet still on the platform
         let k = if e.crouch > 0.0 { 0.82 } else { 1.0 };
@@ -1577,7 +1570,7 @@ fn draw_world(blip: &Blip, g: &Game) {
         // the candy flying into the open mouth
         if p.eat >= 0.0 && p.eat < EAT_FLY {
             let (mx, my) = mouth_pos(p);
-            let k = ease_out(p.eat / EAT_FLY);
+            let k = blip::ease_out_cubic(p.eat / EAT_FLY);
             let (fx, fy) = (p.eaten.x + 8.0, p.eaten.y + 8.0);
             draw_candy(p.eaten.kind, candy_pick(&p.eaten), 1.0, fx + (mx - fx) * k + ox, fy + (my - fy) * k + oy, false);
         }
@@ -1600,23 +1593,23 @@ fn draw_world(blip: &Blip, g: &Game) {
             blip::macroquad::shapes::draw_circle(x - 2.0, y - 2.2, 1.5, rgba(1.0, 0.95, 0.9, 0.7));
         }
     }
-    for p in &g.parts {
-        let a = (p.life / p.max).clamp(0.0, 1.0);
-        let c = BlipColor { a: p.c.a * a, ..p.c };
-        if p.ring {
-            let r = p.size + (1.0 - a) * 16.0;
+    for p in g.parts.iter() {
+        let a = (p.life / p.max_life).clamp(0.0, 1.0);
+        let c = BlipColor { a: p.data.c.a * a, ..p.data.c };
+        if p.data.ring {
+            let r = p.data.size + (1.0 - a) * 16.0;
             blip::macroquad::shapes::draw_circle_lines(p.x + ox, p.y + oy, r, 2.0 * a + 0.5, c);
-        } else if p.star {
-            let r = p.size * (0.6 + 0.4 * a);
+        } else if p.data.star {
+            let r = p.data.size * (0.6 + 0.4 * a);
             blip::macroquad::shapes::draw_poly(p.x + ox, p.y + oy, 4, r, t * 200.0, c);
         } else {
-            blip::macroquad::shapes::draw_circle(p.x + ox, p.y + oy, p.size, c);
+            blip::macroquad::shapes::draw_circle(p.x + ox, p.y + oy, p.data.size, c);
         }
     }
     for p in &g.pops {
         let a = (1.4 - p.t).clamp(0.0, 1.0);
         let s = format!("{}", p.value);
-        let sz = 2.0 * (1.0 + 0.5 * (1.0 - ease_out(p.t / 0.18)));
+        let sz = 2.0 * (1.0 + 0.5 * (1.0 - blip::ease_out_cubic(p.t / 0.18)));
         let w = s.len() as f32 * 6.0 * sz;
         let x = (p.x - w / 2.0).clamp(TILE + 2.0, WIN_W as f32 - TILE - 2.0 - w);
         blip.draw_text(&s, x + 1.0, p.y + 1.0, sz, col(PLUM, a * 0.8));
@@ -1658,7 +1651,7 @@ fn pill(cx: f32, y: f32, w: f32, h: f32, edge: BlipColor, a: f32) {
 /// Text on its own pill, centred on the screen, popping in with `pop`.
 fn cosy(blip: &Blip, text: &str, y: f32, sz: f32, c: (u8, u8, u8), edge: (u8, u8, u8), pop: f32, a: f32) {
     if a <= 0.01 { return; }
-    let s = sz * (0.7 + 0.3 * ease_out(pop));
+    let s = sz * (0.7 + 0.3 * blip::ease_out_cubic(pop));
     let (w, h) = (text_w(text, s), 7.0 * s);
     let (px, py) = (8.0 + s * 2.5, 6.0 + s * 1.5);
     let cx = WIN_W as f32 / 2.0;
@@ -1808,7 +1801,7 @@ fn bot_input(g: &Game, pi: usize, mem: &mut [f32; 4]) -> Input {
     if let Some((dx, _)) = danger {
         // hop away / over
         k.left = dx > 0.0; k.right = dx < 0.0;
-        if p.on_ground && rnd() < 0.25 { k.jump = true; }
+        if p.on_ground && blip::rand_range_f32(0.0, 1.0) < 0.25 { k.jump = true; }
         // and bubble it if we face it
         if (dx > 0.0) == (p.face > 0.0) && !passive { k.blow = true; }
         k.jump_held = true;
@@ -1826,7 +1819,7 @@ fn bot_input(g: &Game, pi: usize, mem: &mut [f32; 4]) -> Input {
             if level && dx.abs() < 150.0 {
                 // face it and blow
                 if (dx > 0.0) != (p.face > 0.0) { k.left = dx < 0.0; k.right = dx > 0.0; }
-                else if rnd() < 0.5 && !passive { k.blow = true; }
+                else if blip::rand_range_f32(0.0, 1.0) < 0.5 && !passive { k.blow = true; }
                 if dx.abs() > 70.0 { k.left = dx < 0.0; k.right = dx > 0.0; }
             } else {
                 if dx.abs() > 30.0 || dy > 0.0 {
@@ -1835,14 +1828,14 @@ fn bot_input(g: &Game, pi: usize, mem: &mut [f32; 4]) -> Input {
                     let dir = if wander != 0.0 { wander } else { dx.signum() };
                     k.left = dir < 0.0; k.right = dir > 0.0;
                 }
-                if dy < -30.0 && p.on_ground && mem[0] <= 0.0 && rnd() < 0.12 { k.jump = true; mem[0] = 0.4; }
+                if dy < -30.0 && p.on_ground && mem[0] <= 0.0 && blip::rand_range_f32(0.0, 1.0) < 0.12 { k.jump = true; mem[0] = 0.4; }
             }
         }
         // stuck against a wall or under a ledge: wander a bit
         mem[1] -= 1.0 / 60.0;
         if (p.vx.abs() < 5.0 && (k.left || k.right)) && mem[1] <= 0.0 {
             mem[1] = 0.8;
-            mem[2] = if rnd() < 0.5 { -1.0 } else { 1.0 };
+            mem[2] = if blip::rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
         }
     }
     k.jump_held = k.jump_held || k.jump;

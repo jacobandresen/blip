@@ -8,12 +8,11 @@ use blip::input::{
     btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
     BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
-use blip::macroquad::rand::gen_range;
 use blip::macroquad::texture::{FilterMode, Texture2D};
 use blip::{
     GAME_OVER_MIN_WAIT, hsv,
-    Jukebox, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, web, window_conf, Blip, Fx,
-    BlipColor, LifeResult, Pooled, Session, Timer, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
+    Jukebox, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, rand_range_f32, web, window_conf, Blip, Fx,
+    BlipColor, LifeResult, Pooled, Session, Timer, segment_circle_overlap, wrap, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
     NEON_GREEN, NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
 };
 
@@ -256,7 +255,7 @@ impl Game {
         self.fx.clear();
         self.saucer.active = false;
         let (lo, hi) = saucer_spawn_range(self.sess.level);
-        self.saucer_cd = rand_range(lo, hi);
+        self.saucer_cd = rand_range_f32(lo, hi);
         self.respawn_ship();
         self.spawn_wave();
         self.state = State::Play;
@@ -276,11 +275,6 @@ struct Sounds {
     extra_life:  blip::BlipSound,
 }
 
-fn rand_range(lo: f32, hi: f32) -> f32 {
-    if hi <= lo { return lo; }
-    gen_range(lo, hi)
-}
-
 fn field_centre() -> (f32, f32) {
     (PLAY_W as f32 / 2.0, PLAY_Y0 + PLAY_H as f32 / 2.0)
 }
@@ -289,8 +283,8 @@ fn field_centre() -> (f32, f32) {
 fn spawn_pos_away_from(cx: f32, cy: f32) -> (f32, f32) {
     let (w, h) = (PLAY_W as f32, PLAY_H as f32);
     loop {
-        let x = rand_range(0.0, w);
-        let y = rand_range(PLAY_Y0, PLAY_Y0 + h);
+    let x = rand_range_f32(0.0, w);
+    let y = rand_range_f32(PLAY_Y0, PLAY_Y0 + h);
         let dx = (x - cx).abs().min(w - (x - cx).abs());
         let dy = (y - cy).abs().min(h - (y - cy).abs());
         if dx * dx + dy * dy > SAFE_RADIUS * SAFE_RADIUS {
@@ -301,19 +295,19 @@ fn spawn_pos_away_from(cx: f32, cy: f32) -> (f32, f32) {
 
 fn spawn_asteroid(g: &mut Game, x: f32, y: f32, size: ASize) {
     let (smin, smax) = size.speed_range();
-    let speed = rand_range(smin, smax);
-    let dir = rand_range(0.0, PI * 2.0);
+    let speed = rand_range_f32(smin, smax);
+    let dir = rand_range_f32(0.0, PI * 2.0);
     spawn_asteroid_v(g, x, y, size, dir.cos() * speed, dir.sin() * speed);
 }
 
 fn spawn_asteroid_v(g: &mut Game, x: f32, y: f32, size: ASize, vx: f32, vy: f32) {
     let mut jag = [1.0f32; 10];
-    for j in jag.iter_mut() { *j = rand_range(0.75, 1.25); }
+    for j in jag.iter_mut() { *j = rand_range_f32(0.75, 1.25); }
     pool_spawn(&mut g.asteroids, Asteroid {
         active: true, x, y,
         vx, vy,
-        size, rot: rand_range(0.0, PI * 2.0),
-        spin: rand_range(-1.5, 1.5),
+        size, rot: rand_range_f32(0.0, PI * 2.0),
+        spin: rand_range_f32(-1.5, 1.5),
         jag,
     });
 }
@@ -322,11 +316,11 @@ fn spawn_asteroid_v(g: &mut Game, x: f32, y: f32, size: ASize, vx: f32, vy: f32)
 /// parent's velocity (plus a share of the impactor's), so momentum carries through.
 fn split_asteroid(g: &mut Game, x: f32, y: f32, size: ASize, pvx: f32, pvy: f32) {
     let Some(child) = size.child() else { return };
-    let axis = rand_range(0.0, PI * 2.0);
+    let axis = rand_range_f32(0.0, PI * 2.0);
     let (ax, ay) = (axis.cos(), axis.sin());
     let (smin, smax) = child.speed_range();
     for sign in [1.0_f32, -1.0] {
-        let kick = rand_range(smin, smax) * 0.6;
+        let kick = rand_range_f32(smin, smax) * 0.6;
         spawn_asteroid_v(g, x + ax * sign * 6.0, y + ay * sign * 6.0, child,
             pvx + ax * sign * kick, pvy + ay * sign * kick);
     }
@@ -334,39 +328,22 @@ fn split_asteroid(g: &mut Game, x: f32, y: f32, size: ASize, pvx: f32, pvy: f32)
 
 fn burst(g: &mut Game, x: f32, y: f32, vx: f32, vy: f32, n: usize, len: f32, speed: f32, color: BlipColor) {
     for _ in 0..n {
-        let dir = rand_range(0.0, PI * 2.0);
-        let sp = rand_range(0.25, 1.0) * speed;
-        let ttl = rand_range(0.5, 1.1);
+        let dir = rand_range_f32(0.0, PI * 2.0);
+        let sp = rand_range_f32(0.25, 1.0) * speed;
+        let ttl = rand_range_f32(0.5, 1.1);
         pool_spawn(&mut g.debris, Debris {
             active: true, x, y,
             vx: vx * 0.5 + dir.cos() * sp, vy: vy * 0.5 + dir.sin() * sp,
-            rot: rand_range(0.0, PI * 2.0), spin: rand_range(-6.0, 6.0),
-            len: len * rand_range(0.5, 1.0), ttl, ttl0: ttl, color,
+            rot: rand_range_f32(0.0, PI * 2.0), spin: rand_range_f32(-6.0, 6.0),
+            len: len * rand_range_f32(0.5, 1.0), ttl, ttl0: ttl, color,
         });
     }
-}
-
-fn wrap(v: f32, lo: f32, hi: f32) -> f32 {
-    let span = hi - lo;
-    if v < lo { v + span } else if v >= hi { v - span } else { v }
 }
 
 /// Did the segment `p0 -> p1` pass within `r` of `(cx, cy)` at any point? Used
 /// for bullet hits: a fast bullet covers several of its own widths per frame,
 /// so a point test at the frame's end lets it punch straight through a small
 /// rock. Testing the whole swept path closes that gap.
-fn seg_hits_circle(x0: f32, y0: f32, x1: f32, y1: f32, cx: f32, cy: f32, r: f32) -> bool {
-    let (dx, dy) = (x1 - x0, y1 - y0);
-    let len2 = dx * dx + dy * dy;
-    let t = if len2 > 1e-6 {
-        (((cx - x0) * dx + (cy - y0) * dy) / len2).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
-    let (ex, ey) = (cx - (x0 + t * dx), cy - (y0 + t * dy));
-    ex * ex + ey * ey <= r * r
-}
-
 fn spawn_bullet(bullets: &mut [Bullet; MAX_BULLETS], x: f32, y: f32, vx: f32, vy: f32, from_player: bool) {
     pool_spawn(bullets, Bullet { active: true, x, y, vx, vy, ttl: BULLET_TTL, from_player });
 }
@@ -386,10 +363,10 @@ fn saucer_fire_cooldown(level: i32) -> f32 {
 
 fn spawn_saucer(g: &mut Game) {
     let small_prob = (0.33 + (g.sess.level - 1) as f32 * 0.05).min(0.75);
-    let big = g.sess.score < 5000 || rand_range(0.0, 1.0) > small_prob;
+    let big = g.sess.score < 5000 || rand_range_f32(0.0, 1.0) > small_prob;
     let from_left = rand_int(0, 1) == 0;
     let x = if from_left { -20.0 } else { PLAY_W as f32 + 20.0 };
-    let y = rand_range(PLAY_Y0 + 40.0, PLAY_Y0 + PLAY_H as f32 - 40.0);
+    let y = rand_range_f32(PLAY_Y0 + 40.0, PLAY_Y0 + PLAY_H as f32 - 40.0);
     let vx = if from_left { SAUCER_SPEED } else { -SAUCER_SPEED };
     let fire_cd = saucer_fire_cooldown(g.sess.level);
     g.saucer = Saucer { active: true, x, y, vx, wave_t: 0.0, fire_t: fire_cd * 0.5, big };
@@ -397,8 +374,8 @@ fn spawn_saucer(g: &mut Game) {
 
 fn hyperspace(g: &mut Game, sfx: &Sounds) {
     play_sfx(&sfx.hyperspace);
-    g.ship.x = rand_range(0.0, PLAY_W as f32);
-    g.ship.y = rand_range(PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
+    g.ship.x = rand_range_f32(0.0, PLAY_W as f32);
+    g.ship.y = rand_range_f32(PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
     g.ship.vx = 0.0;
     g.ship.vy = 0.0;
     if rand_int(1, HYPERSPACE_RISK) == 1 {
@@ -491,7 +468,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
             if !g.bullets[bi].active || g.bullets[bi].from_player { continue; }
             let (bx, by) = (g.bullets[bi].x, g.bullets[bi].y);
             let (px, py) = (bx - g.bullets[bi].vx * dt, by - g.bullets[bi].vy * dt);
-            if seg_hits_circle(px, py, bx, by, g.ship.x, g.ship.y, SHIP_RADIUS) {
+            if segment_circle_overlap(px, py, bx, by, g.ship.x, g.ship.y, SHIP_RADIUS) {
                 g.bullets[bi].active = false;
                 blip::bot::add("death_saucer_shot", 1.0);
                 kill_ship(g, sfx);
@@ -573,7 +550,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
             let dx = g.ship.x - g.saucer.x;
             let dy = g.ship.y - g.saucer.y;
             let spread = if g.saucer.big { 0.35 } else { 0.04 };
-            let jitter = rand_range(-spread, spread);
+            let jitter = rand_range_f32(-spread, spread);
             let base = dy.atan2(dx) + jitter;
             let speed = 260.0;
             spawn_bullet(&mut g.bullets, g.saucer.x, g.saucer.y, base.cos() * speed, base.sin() * speed, false);
@@ -587,7 +564,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
         if g.saucer_cd <= 0.0 {
             spawn_saucer(g);
             let (lo, hi) = saucer_spawn_range(g.sess.level);
-            g.saucer_cd = rand_range(lo, hi);
+            g.saucer_cd = rand_range_f32(lo, hi);
         }
     }
 
@@ -599,7 +576,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
         for ai in 0..MAX_ASTEROIDS {
             if !g.asteroids[ai].active { continue; }
             let r = g.asteroids[ai].size.radius();
-            if seg_hits_circle(px, py, bx, by, g.asteroids[ai].x, g.asteroids[ai].y, r) {
+            if segment_circle_overlap(px, py, bx, by, g.asteroids[ai].x, g.asteroids[ai].y, r) {
                 g.bullets[bi].active = false;
                 let a = g.asteroids[ai];
                 let size = a.size;
@@ -627,7 +604,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
             let (bx, by) = (g.bullets[bi].x, g.bullets[bi].y);
             let (px, py) = (bx - g.bullets[bi].vx * dt, by - g.bullets[bi].vy * dt);
             let r = if g.saucer.big { 16.0 } else { 9.0 };
-            if seg_hits_circle(px, py, bx, by, g.saucer.x, g.saucer.y, r) {
+            if segment_circle_overlap(px, py, bx, by, g.saucer.x, g.saucer.y, r) {
                 g.bullets[bi].active = false;
                 g.saucer.active = false;
                 let (sx, sy, svx) = (g.saucer.x, g.saucer.y, g.saucer.vx);
@@ -694,7 +671,7 @@ fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, level: i32, color: BlipCol
     for (p, q) in hull { blip.draw_glow_line(p.0, p.1, q.0, q.1, color); }
 
     if ship.thrusting {
-        let flick = rand_range(0.5, 1.0);
+        let flick = rand_range_f32(0.5, 1.0);
         let flame = (ship.x - fwd.0 * (10.0 + 10.0 * flick), ship.y - fwd.1 * (10.0 + 10.0 * flick));
         blip.draw_glow_line(left.0, left.1, flame.0, flame.1, NEON_ORANGE);
         blip.draw_glow_line(right.0, right.1, flame.0, flame.1, NEON_ORANGE);

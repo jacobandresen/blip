@@ -17,6 +17,67 @@ use macroquad::color::Color;
 use crate::ctx::Blip;
 use crate::font;
 
+/// A moving, expiring effect with game-specific rendering data.
+pub struct EffectParticle<T> {
+    pub x: f32,
+    pub y: f32,
+    pub vx: f32,
+    pub vy: f32,
+    pub life: f32,
+    pub max_life: f32,
+    pub data: T,
+}
+
+/// Shared motion and lifetime handling for effects rendered by a game.
+pub struct EffectParticles<T> {
+    items: Vec<EffectParticle<T>>,
+    pub gravity: f32,
+    pub drag: f32,
+}
+
+impl<T> EffectParticles<T> {
+    pub fn new(gravity: f32, drag: f32) -> Self {
+        Self { items: Vec::new(), gravity, drag }
+    }
+
+    pub fn push(&mut self, particle: EffectParticle<T>) { self.items.push(particle); }
+
+    pub fn iter(&self) -> impl Iterator<Item = &EffectParticle<T>> { self.items.iter() }
+
+    pub fn update(&mut self, dt: f32) {
+        for p in &mut self.items {
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 1.0 - self.drag * dt;
+            p.vy = p.vy * (1.0 - self.drag * dt) + self.gravity * dt;
+            p.life -= dt;
+        }
+        self.items.retain(|p| p.life > 0.0);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{EffectParticle, EffectParticles};
+
+    #[test]
+    fn effect_particles_share_motion_and_lifetime_updates() {
+        let mut particles = EffectParticles::new(10.0, 1.0);
+        particles.push(EffectParticle {
+            x: 1.0, y: 2.0, vx: 4.0, vy: 0.0, life: 0.5, max_life: 0.5, data: (),
+        });
+        particles.update(0.25);
+        let p = particles.iter().next().unwrap();
+        assert!((p.x - 2.0).abs() < 1e-6);
+        assert!((p.y - 2.0).abs() < 1e-6);
+        assert!((p.vx - 3.0).abs() < 1e-6);
+        assert!((p.vy - 2.5).abs() < 1e-6);
+        assert!((p.life - 0.25).abs() < 1e-6);
+        particles.update(0.25);
+        assert_eq!(particles.iter().count(), 0);
+    }
+}
+
 /// How long a popup stays up, and how far it rises (px).
 const POPUP_SECS: f32 = 0.8;
 const POPUP_RISE: f32 = 28.0;

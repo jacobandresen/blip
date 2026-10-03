@@ -51,14 +51,14 @@ pub fn lay_batteries() -> Vec<Battery> {
     let gun = |k: usize| FlakGun { angle: 0.0, reload: 1.0 + (k % 5) as f32 * 0.6, flash: 0.0 };
     let mut v = Vec::new();
     for k in 0..BELT_GUNS {
-        let d = BELT.0 + (BELT.1 - BELT.0) * (k as f32 + rand01() * 0.6) / BELT_GUNS as f32;
-        v.push(Battery { x: 24.0 + rand01() * (WIN_W as f32 - 48.0), d, gun: gun(k), hp: BATTERY_HP });
+        let d = BELT.0 + (BELT.1 - BELT.0) * (k as f32 + blip::rand_range_f32(0.0, 1.0) * 0.6) / BELT_GUNS as f32;
+        v.push(Battery { x: blip::rand_range_f32(24.0, WIN_W as f32 - 24.0), d, gun: gun(k), hp: BATTERY_HP });
     }
     let mut d = BELT.1 + INLAND_GAP;
     let mut k = BELT_GUNS;
     while d < INLAND_END {
-        v.push(Battery { x: 24.0 + rand01() * (WIN_W as f32 - 48.0), d, gun: gun(k), hp: BATTERY_HP });
-        d += INLAND_GAP * (0.7 + rand01() * 0.6);
+        v.push(Battery { x: blip::rand_range_f32(24.0, WIN_W as f32 - 24.0), d, gun: gun(k), hp: BATTERY_HP });
+        d += blip::rand_range_f32(0.7, 1.3) * INLAND_GAP;
         k += 1;
     }
     v
