@@ -459,7 +459,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 .kiosk-bar-main {
   /* One tilt everywhere; the stick, caps and shadows are drawn against it. */
   --bar-tilt: 26deg;
-  /* The same 16px inset as the game canvas (fillCanvas PAD), so the deck sits
+  /* The same 14px inset as the game canvas, so the deck sits
      under the screen, on every page. */
   left: 16px;
   right: 16px;
@@ -2367,22 +2367,38 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   position: absolute;
   top: 5px;
   z-index: 6;
-  height: 10px;
-  padding-left: 15px;
-  font: 7px/10px 'Press Start 2P', 'Courier New', monospace;
-  letter-spacing: 1px;
+  height: 18px;
+  padding: 0 7px 0 23px;
+  border: 1px solid #8e9291;
+  border-radius: 10px;
+  box-sizing: border-box;
+  font: 700 8px/16px 'Courier New', monospace;
+  letter-spacing: 1.2px;
   pointer-events: none;
-  color: rgba(226, 232, 240, calc(0.3 + 0.5 * var(--on)));
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
-  /* the lamp: a dark lens that fills with light when on */
+  color: rgba(226, 232, 240, calc(0.28 + 0.55 * var(--on)));
+  text-shadow: 0 1px 1px #000;
+  /* A raised steel bezel and a glass lens seated against the panel. */
   background:
+    radial-gradient(ellipse at 32% 25%, rgba(255,255,255,.9), transparent 24%),
     radial-gradient(circle at 50% 50%,
-      rgba(var(--lamp), var(--on)) 0 2.2px,
-      rgba(var(--lamp), calc(var(--on) * 0.35)) 3px,
-      rgba(0, 0, 0, 0.55) 3.6px 4.6px,
-      transparent 5px)
-    no-repeat 0 50% / 10px 10px;
-  filter: drop-shadow(0 0 calc(var(--on) * 3px) rgba(var(--lamp), 0.9));
+      rgba(var(--lamp), var(--on)) 0 3px,
+      rgba(var(--lamp), calc(var(--on) * .45)) 4px,
+      #101413 5px 6px,
+      transparent 6.5px)
+      no-repeat 3px 50% / 14px 14px,
+    linear-gradient(180deg, #d2d5d2 0%, #777e7d 24%, #343a39 54%, #a5aaa7 78%, #4a504e 100%);
+  background-clip: border-box;
+  box-shadow:
+    0 2px 2px #000b,
+    0 1px 0 #111,
+    inset 0 1px 1px #f4f5f2aa,
+    inset 0 -2px 2px #101312;
+}
+.kiosk-bar > .deck-panel::before,
+.kiosk-bar > .deck-panel::after { text-indent: 0; }
+.kiosk-bar > .deck-panel::before,
+.kiosk-bar > .deck-panel::after {
+  background-color: #555b59;
 }
 .kiosk-bar > .deck-panel::before { content: 'P1'; left: 25%; transform: translateX(-50%); }
 .kiosk-bar > .deck-panel::after {
@@ -2411,8 +2427,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 
 /* Sideways the panel is the whole screen: lamps go over the two gutters. */
-:root[data-layout="landscape"] .kiosk-bar > .deck-panel::before { left: max(14px, env(safe-area-inset-left, 0px)); top: 56px; transform: none; }
-:root[data-layout="landscape"] .kiosk-bar > .deck-panel::after { left: auto; right: max(14px, env(safe-area-inset-right, 0px)); top: 56px; transform: none; }
+:root[data-layout="landscape"] .kiosk-bar > .deck-panel::before { left: 25%; top: 56px; transform: translateX(-50%); }
+:root[data-layout="landscape"] .kiosk-bar > .deck-panel::after { left: 75%; right: auto; top: 56px; transform: translateX(-50%); }
 :root[data-layout="landscape"][data-players="1"] .kiosk-bar > .deck-panel::after { display: none; }
 
 /* ---- Joystick base: symmetric, and centred in the bar ---- */
@@ -2638,8 +2654,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   /* the cross's round well reaches 5% past it */
   top: calc(50% + var(--dpad) * 0.55 + 4px);
 }
-:root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel::before { left: var(--ctl-cx); }
-:root[data-layout="upright"][data-caps="4"][data-players="2"] .kiosk-bar > .deck-panel::after {
+:root[data-layout="upright"] .kiosk-bar > .deck-panel::before { left: var(--ctl-cx); }
+:root[data-layout="upright"][data-players="2"] .kiosk-bar > .deck-panel::after {
   left: calc(50% + var(--ctl-cx) + var(--mid) / 2);
 }
 

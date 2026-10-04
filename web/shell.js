@@ -18,7 +18,7 @@ var TOPBAR_H   = 56;
 var MARQUEE_H  = 94; // marquee and the card receiver beneath it
 var CABINET_SCREEN = new URLSearchParams(location.search).get('cabinet') === '1';
 if (CABINET_SCREEN) document.documentElement.setAttribute('data-cabinet-screen','');
-var FRAME_PAD  = 16; // padding around the canvas on all sides (= bezel width)
+var FRAME_PAD  = 14; // matches the cabinet screen's inset below the Rolodex
 
 var loader    = document.getElementById('loader');
 var barInner  = document.getElementById('bar-inner');
@@ -343,30 +343,9 @@ function landscape() { return blipLandscape(); }
 function applyLayout() { blipApplyLayout(); }
 applyLayout();
 
-/** How much of the screen's bottom the deck covers: its bar, plus
- * anything drawn outside it. */
+/** Reserve the whole fixed bottom panel so the screen always ends at its edge. */
 function deckCover(bar) {
-  // Start from the bottom of the screen, not from the bar's own top:
-  // every drawn control is INSIDE the bar, so seeding this with the bar
-  // meant nothing could ever lower it and the whole bar got reserved.
-  var top = window.innerHeight;
-  // What the deck draws, not its boxes: the stick base is three caps tall for
-  // the floating ball and only its bottom third is inked.
-  var parts = document.querySelectorAll(
-    '#topbar .stick-boot, #topbar .fire-buttons, ' +
-    '#topbar .snes-dpad, #topbar .snes-face, ' +
-    '#topbar #paddle-dial, #topbar #paddle-dial-p2');
-  for (var i = 0; i < parts.length; i++) {
-    var r = parts[i].getBoundingClientRect();
-    if (r.height > 0 && r.top < top) top = r.top;
-  }
-  // Upright the whole bar is drawn: the cabinet body (#topbar::before,
-  // 5px above the bar) and the plate. None of it may lap over the picture.
-  if (!landscape() && parts.length) top = Math.min(top, bar.getBoundingClientRect().top - 5);
-  // A few pixels of margin. The ball is left out: it floats over the game.
-  // Before the deck is built, fall back to the bar.
-  if (top >= window.innerHeight) return Math.ceil(bar.offsetHeight);
-  return Math.ceil(window.innerHeight - top) + 4;
+  return Math.ceil(window.innerHeight - bar.getBoundingClientRect().top);
 }
 
 /** Fullscreen on a PC: no deck and no cabinet frame, so the picture runs to
@@ -388,11 +367,10 @@ function fillCanvas() {
   var bare = bareScreen();
   // The frame is FRAME_PAD wide; without it the picture needs no margin.
   var PAD = bare ? 0 : FRAME_PAD;
-  var GAP = bare ? 0 : (parseFloat(getComputedStyle(document.documentElement)
-    .getPropertyValue('--marquee-gap')) || 0);
-  // Sideways the deck sits in the letterbox and takes no height. Upright,
-  // reserve what the deck covers (caps sit proud of the bar), not the bar's
-  // height.
+  // The picture starts at the cabinet fascia and uses the same 14px inset as
+  // the display below the Rolodex on the landing page.
+  var GAP = 0;
+  // Sideways the deck sits in the gutters. Upright, reserve its full panel.
   TOPBAR_H = bare || landscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
   var mb = document.getElementById('marquee-bar');
   if (mb) {

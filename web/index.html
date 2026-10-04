@@ -95,14 +95,18 @@
     /* ---- screen bezel — frames the game grid like a monitor set into the
        cabinet, complete with corner screws and a glass glare ---- */
     .screen-bezel {
-      position: relative;
+      position: fixed;
+      top: calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+      bottom: var(--cabinet-panel-depth,56px);
+      left: 50%;
+      transform: translateX(-50%);
       flex-shrink:0;
       perspective: 1500px;
       transform-style:preserve-3d;
       overflow:hidden;
-      width: 100%;
+      width: min(calc(100% - 32px), var(--cabinet-width));
       max-width: var(--cabinet-width);
-      margin: 0 auto 40px;
+      margin: 0;
       padding: 27px 22px 54px;
       border: 1px solid rgba(224,183,121,.72);
       border-radius: 22px;
@@ -163,7 +167,7 @@
       position:relative;padding-top:25px;perspective:1000px;isolation:isolate;
     }
     .jukebox-front {
-      position:relative;z-index:2;transform-origin:top center;transform-style:preserve-3d;
+      position:absolute;inset:90px 14px 14px;z-index:2;min-height:0;transform-origin:top center;transform-style:preserve-3d;
       transition:transform 4s cubic-bezier(.45,.02,.25,1),visibility 0s linear 4s;
       backface-visibility:hidden;
     }
@@ -172,11 +176,11 @@
     :root[data-fullscreen] :is(header,.divider,footer) { display:none; }
     :root[data-fullscreen] .screen-bezel {
       position:fixed;inset:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px)) 0 calc(var(--cabinet-bottom-bar-height) + env(safe-area-inset-bottom,0px));
-      z-index:1;width:auto;max-width:none;margin:0;padding:0;border-radius:0;
+      z-index:1;left:0;transform:none;width:auto;max-width:none;margin:0;padding:0;border-radius:0;
     }
-    :root[data-fullscreen] .jukebox-front {position:absolute;inset:0;width:auto;height:auto;}
+    :root[data-fullscreen] .jukebox-front {position:absolute;inset:90px 14px 14px;width:auto;height:auto;}
     :root[data-fullscreen] #game-grid {height:100%;min-height:0;}
-    :root[data-fullscreen] #game-grid .card {height:calc(100% - 50px);}
+    :root[data-fullscreen] #game-grid .card {height:min(500px,calc(100% - 50px));}
     @media(max-width:480px) { :root { --cabinet-bottom-bar-height:82px; } }
     @media(min-width:768px) and (min-height:700px) and (pointer:coarse) { :root { --cabinet-bottom-bar-height:112px; } }
     .jukebox-storage {
@@ -771,14 +775,14 @@
     body.konami-shake { animation: konami-shake 0.55s ease; }
 
     /* The cards carry game descriptions; full instructions live in the manual. */
-    #game-grid {position:relative;display:block;flex:none;width:100%;height:560px;min-height:560px;overflow:visible;padding:0;perspective:1100px;transform-style:preserve-3d;}
+    #game-grid {position:relative;display:block;flex:none;width:100%;height:100%;min-height:0;overflow:visible;padding:0;perspective:1100px;transform-style:preserve-3d;}
     #game-grid::-webkit-scrollbar {display:none}
     #game-grid .card {pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent}
     #game-grid .card * {pointer-events:none!important;cursor:default}
     #game-grid {user-select:none;touch-action:pan-y}
     #game-grid::before {content:'';position:absolute;left:50%;top:40px;width:min(410px,calc(100% - 24px));height:9px;transform:translateX(-50%);z-index:12;border:1px solid #9b7d53;border-radius:7px;
       background:linear-gradient(180deg,#f5e4c0,#9a7e55 32%,#36291f 67%,#d2b47b);box-shadow:0 4px 7px #080606,inset 0 1px #fff4d8;pointer-events:none;}
-    #game-grid .card {position:absolute;left:50%;top:35px;flex:none;width:min(330px,calc(100% - 44px));height:500px;margin:0;padding:35px 17px 16px!important;
+    #game-grid .card {position:absolute;left:50%;top:35px;flex:none;width:min(330px,calc(100% - 44px));height:min(500px,calc(100% - 50px));margin:0;padding:35px 17px 16px!important;
       border:2px solid color-mix(in srgb,var(--c) 38%,#bca17a);border-radius:7px;scroll-snap-align:center;transform-origin:50% 12px;
       background-color:#241d19;background-image:linear-gradient(118deg,rgba(255,245,220,.14),transparent 22% 72%,rgba(255,245,220,.035)),linear-gradient(155deg,#403128,#241d1a 55%,#30251f);
       box-shadow:0 12px 18px #000a,0 2px 0 #846b4b,inset 0 1px #fff4dc66,inset 0 -3px #0b0909;transition:transform .52s cubic-bezier(.18,.72,.2,1) var(--arc-delay,0ms),box-shadow .3s,border-color .3s;}
@@ -802,8 +806,8 @@
       background:radial-gradient(circle at 35% 30%,#e8d6ae 0 1px,#171313 2px 3px,#b49565 3.5px 4px,transparent 4.5px);}
     .card-punch::before {left:3px}.card-punch::after {right:3px}
     @media (max-width:620px) {
-      #game-grid {height:600px;min-height:600px;}
-      #game-grid .card {width:min(300px,calc(100% - 20px));height:540px;padding:35px 16px 16px!important;}
+      #game-grid .card {width:min(300px,calc(100% - 20px));height:min(540px,calc(100% - 50px));padding:35px 16px 16px!important;}
+      :root[data-fullscreen] #game-grid .card {height:min(540px,calc(100% - 50px));}
       #game-grid .card-shot-wrap {height:124px}
       #game-grid .card-genre {font-size:11px;}
       #game-grid .card-desc {font-size:14px;line-height:1.48}
@@ -1640,7 +1644,7 @@
           },
           onSeat: function () {
             bezel.classList.add('jukebox-open');
-            var screen=document.querySelector('.jukebox-game-screen');screen.classList.remove('game-ready');screen.style.backgroundImage='url("'+art.src+'")';
+            var screen=document.querySelector('.jukebox-game-screen');screen.classList.remove('game-ready');screen.style.backgroundImage='none';
             document.getElementById('cabinet-game-screen').src=gameCardUrl(card)+'?cabinet=1';
             blipSetMarquee(title.textContent.trim(),true);
             try {
@@ -1716,6 +1720,8 @@
     var railLeft=0,railRight=0,railY=28;
     function fitSelectorRails(){
       var bezel=document.getElementById('screen-bezel');
+      var panel=document.getElementById('kiosk-bar');
+      if(panel)bezel.style.setProperty('--cabinet-panel-depth',Math.max(0,innerHeight-panel.getBoundingClientRect().top)+'px');
       var guides=document.querySelector('.rolodex-guides');
       var bezelBox=bezel.getBoundingClientRect(),guideBox=guides.getBoundingClientRect();
       bezel.style.setProperty('--rolodex-travel',(Math.max(selectorPlane.offsetHeight,guideBox.bottom-bezelBox.top)+30)+'px');
@@ -1757,6 +1763,9 @@
       setStay('left',railLeft);setStay('right',railRight);
     }
     new ResizeObserver(fitSelectorRails).observe(selectorPlane);
+    var cabinetPanel=document.getElementById('kiosk-bar');
+    if(cabinetPanel)new ResizeObserver(fitSelectorRails).observe(cabinetPanel);
+    window.addEventListener('resize',fitSelectorRails);
     fitSelectorRails();
     var supportFrame=0,railMotion=0;
     document.getElementById('game-grid').addEventListener('scroll',function(){if(supportFrame)return;supportFrame=requestAnimationFrame(function(){supportFrame=0;updateRailSupports();});},{passive:true});
@@ -1862,7 +1871,9 @@
       function clearTapArm() { armedCard=null;window.clearTimeout(armTimer);armTimer=0; }
       function highlight(force) {
         if (cardInFlight&&!force) return;
+        var cardHadFocus=cards.indexOf(document.activeElement)>=0;
         cards.forEach(function (c, i) {
+          c.tabIndex = i === idx ? 0 : -1;
           c.classList.toggle('card-focused', navActive && i === idx);
           // Once you're navigating, the focus glow is the only glow —
           // hand it over from the "last played" card.
@@ -1881,6 +1892,7 @@
           c.style.setProperty('--arc-scale','1');
           c.style.zIndex=String(30-Math.min(distance,25));
         });
+        if(cardHadFocus)cards[idx].focus({preventScroll:true});
         fitSelectorRails();
         if(railMotion)cancelAnimationFrame(railMotion);
         var railStart=performance.now();
@@ -1889,6 +1901,7 @@
       }
       focusRolodexCard=function(card){var selected=cards.indexOf(card);if(selected<0)return;idx=selected;navActive=true;highlight(true);};
       highlight();
+      cards[idx].focus({preventScroll:true});
 
       function move(delta) {
         if (getCoins()<=0||cardInFlight||!manualOverlay.hidden) return;
