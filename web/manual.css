@@ -69,7 +69,7 @@ body.info-page .manual-leaf .inline-link {color:#85512e;border-bottom-color:#ad8
 }
 
 /* The shelf manual opens as a book above the cabinet. */
-.manual-overlay {position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:clamp(8px,3vw,34px);background:radial-gradient(ellipse at 50% 42%,#291e1bdc,#080809f5 75%);backdrop-filter:blur(5px);perspective:1800px;}
+.manual-overlay {position:fixed;inset:0;z-index:20000;display:grid;place-items:center;padding:clamp(8px,3vw,34px);background:radial-gradient(ellipse at 50% 42%,#291e1bdc,#080809f5 75%);backdrop-filter:blur(5px);perspective:1800px;}
 .manual-overlay[hidden] {display:none}
 .manual-open-book {position:absolute;left:50%;top:50%;translate:-50% -50%;display:grid;grid-template-columns:minmax(0,1fr) 17px minmax(0,1fr);width:min(1320px,96vw);height:min(850px,88vh);min-height:min(520px,90vh);padding:13px;border:1px solid #c09b63;border-radius:9px;background:linear-gradient(90deg,#38271f,#765537 2%,#2d201b 3%,#261b18 50%,#765537 50.5%,#34231d 51%,#785538 98%,#261b19);box-shadow:0 30px 90px #000e,0 0 0 5px #100d0c,0 0 0 7px #735436,inset 0 2px #f6d9a166,inset 0 -8px #120d0d;transform-origin:50% 100%;animation:manual-lift-open .85s cubic-bezier(.18,.76,.22,1) both;}
 @keyframes manual-lift-open {from{opacity:0;translate:-50% calc(-50% + 100px);scale:.78;rotate:x 10deg}to{opacity:1;translate:-50% -50%;scale:1;rotate:x 0deg}}

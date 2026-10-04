@@ -86,7 +86,7 @@ html {
   color:#fff0d2;
   text-shadow:0 1px 0 rgba(0,0,0,.72);
   animation:none!important;
-  transform:none!important;
+  transform:rotateX(var(--bar-tilt,26deg))!important;
 }
 @media (prefers-reduced-motion: reduce) {
   #need-coin-overlay,
@@ -99,7 +99,7 @@ body.need-coin #kiosk-insert-btn {
   color:#fff0d2;
   text-shadow:0 1px 0 rgba(0,0,0,.72);
   animation:none!important;
-  transform:none!important;
+  transform:rotateX(var(--bar-tilt,26deg))!important;
 }
 
 /* ---- BLIP logo ---- Same 28px strip, font and glow as the game shell's
@@ -367,7 +367,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 }
 #insert-coin-btn:active,
 #kiosk-insert-btn:active {
-  transform: none;
+  transform: perspective(180vw) rotateX(var(--bar-tilt,26deg));
   box-shadow: none;
   color: #fff;
   text-shadow: 0 0 6px #fff, 0 0 18px #e6dc32, 0 0 40px #e6dc32;
@@ -380,21 +380,21 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   content: '';
   display: inline-block;
   flex-shrink: 0;
-  width: 18px;
-  height: 26px;
+  width: 26px;
+  height: 18px;
   border-radius: 3px;
   background:
     /* screws */
     radial-gradient(circle at 3px 3px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
-    radial-gradient(circle at 15px 3px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
-    radial-gradient(circle at 3px 23px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
-    radial-gradient(circle at 15px 23px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 23px 3px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 3px 15px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 23px 15px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
     /* reject button: a red dome with a highlight */
-    radial-gradient(circle at 8.3px 5.3px, #ffd0c8 0 0.5px, #ff4a36 1.2px, #a3160c 2.4px, #3a0804 2.9px, transparent 3.3px),
+    radial-gradient(circle at 5px 9px, #ffd0c8 0 0.5px, #ff4a36 1.2px, #a3160c 2.4px, #3a0804 2.9px, transparent 3.3px),
     /* the slot: dark inside, lit orange at its lips */
-    linear-gradient(90deg, transparent 7px, #ffb347 7px, #120600 7.8px, #000 9px, #120600 10.2px, #ffb347 11px, transparent 11px)
-      center 11px / 100% 12px no-repeat,
-    radial-gradient(ellipse 5px 9px at 9px 17px, rgba(255, 150, 40, 0.55), transparent 70%),
+    linear-gradient(180deg, transparent 5px, #ffb347 6px, #120600 7px, #000 9px, #120600 11px, #ffb347 12px, transparent 13px)
+      center / 100% 100% no-repeat,
+    radial-gradient(ellipse 12px 4px at 14px 9px, rgba(255, 150, 40, 0.55), transparent 70%),
     /* brushed steel */
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0 1px, rgba(0, 0, 0, 0.05) 1px 2px),
     linear-gradient(135deg, #e3e6ea 0%, #9aa0a7 38%, #d4d8dd 55%, #7d838b 100%);
@@ -405,43 +405,44 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     0 0 6px rgba(255, 150, 40, 0.18);
 }
 
-/* The coin going in. #coin-drop-anim is a window whose bottom edge is the
-   mouth of the slot (the plate is centred, its slot starts 2px above centre)
-   and which clips what passes below it; the coin is its ::before. It comes in
-   from the left, turns edge-on over the slot, and drops through the mouth,
-   vanishing into it. --slot-x (from shell.js / kiosk.js) is the slot's
-   distance from the button's right edge; the fallback covers the moment
-   before JS runs. */
+/* The coin slides across the face, turns edge-on, and recedes into the slit. */
 #coin-drop-anim {
+  --coin-size: clamp(34px,var(--cap,44px),48px);
   position: absolute;
-  right: calc(var(--slot-x, 13px) - 8px);
-  top: calc(50% - 2px - 18px);
-  width: 40px;
-  height: 18px;
+  right: calc(var(--slot-x, 13px) - 40px);
+  top: 50%;
+  width: 80px;
+  height: 56px;
   overflow: hidden;
+  perspective: 120px;
+  transform:translateY(-50%);
   pointer-events: none;
   z-index: 5;
 }
 #coin-drop-anim::before {
   content: '';
   position: absolute;
-  left: calc(32px - 6.5px);   /* centred on the slot, 8px in from the right */
-  top: 2px;
-  width: 13px;
-  height: 13px;
+  left: calc((80px - var(--coin-size))/2);
+  top: calc((56px - var(--coin-size))/2);
+  width: var(--coin-size);
+  height: var(--coin-size);
   border-radius: 50%;
+  transform-origin: 50% 50%;
   opacity: 0;
-  background: radial-gradient(circle at 34% 28%, #fff6c8 0%, #e6c832 30%, #a8791a 78%, #7a5510 100%);
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.5), inset 0 0 2px rgba(255, 255, 255, 0.5);
+  background:url("quarter-1964.svg") center/contain no-repeat;
+  box-shadow:0 0 2px #000a,inset 0 0 0 1px #f4f3e9;
+  filter:drop-shadow(0 1px 1px #000);
 }
 #coin-drop-anim.dropping::before {
-  animation: coin-drop 0.7s cubic-bezier(.45, 0, .7, .4) both;
+  animation: coin-drop .82s cubic-bezier(.3,.55,.4,1) both;
 }
 @keyframes coin-drop {
-  0%   { opacity: 1; transform: translate(-22px, 0) scale(1, 1); }
-  40%  { opacity: 1; transform: translate(0, 1px) scale(0.24, 1); }
-  55%  { opacity: 1; transform: translate(0, 2px) scale(0.2, 1); }
-  100% { opacity: 1; transform: translate(0, 20px) scale(0.2, 1); }
+  0%   { opacity:1; transform:translate3d(-14px,0,0) rotateX(0deg) scale(1); }
+  34%  { opacity:1; transform:translate3d(-5px,0,0) rotateX(0deg) scale(1); }
+  50%  { opacity:1; transform:translate3d(0,0,0) rotateX(78deg) scale(.96); }
+  68%  { opacity:1; transform:translate3d(0,0,-3px) rotateX(82deg) scale(.92); }
+  78%  { opacity:.9; transform:translate3d(0,0,-7px) rotateX(82deg) scale(.9); }
+  100% { opacity:0; transform:translate3d(0,0,-30px) rotateX(84deg) scale(.75); }
 }
 
 /* Narrow portrait phones (≤ 480 px) — shrink text so all three bar items fit */
@@ -1021,14 +1022,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 .snes-pad .snes-mid,
 .snes-pad .snes-shoulder { display: none; }
 
-/* ---- Controller picker ---- PAD · STICK (· TOUCH): a small pixel-font
-   switch, bottom centre, clear of both thumbs. --topbar-h is the real bar
-   height on a game page. */
+/* Keep the controller picker at the lower-right edge, above the deck. */
 #control-toggle {
   position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(var(--topbar-h, 118px) + env(safe-area-inset-bottom, 0px) + 5px);
+  right: max(10px, calc(env(safe-area-inset-right, 0px) + 10px));
+  bottom: calc(var(--topbar-h, var(--cabinet-bottom-bar-height, 56px)) + env(safe-area-inset-bottom, 0px) + 5px);
   z-index: 205;
   display: flex;
   margin: 0;
@@ -2677,12 +2675,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-players="2"] #snes-pad .snes-shell { --bolt-r: none; }
 :root[data-players="2"] #snes-pad-p2 .snes-shell { --bolt-l: none; }
 
-/* Upright the toggle sits on the plate, bottom centre, where neither
-   station has anything: above the bar it covered the picture. */
-:root[data-layout="upright"] #topbar ~ #control-toggle,
-:root[data-layout="upright"] #control-toggle {
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 3px);
-}
 :root[data-layout="upright"] #control-toggle > button { padding: 5px 6px; letter-spacing: 0.5px; }
 
 /* ---- Thumb-sized on a phone ---- One player upright on a touch phone:
@@ -2805,55 +2797,26 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .coins-word { display: none; }
 }
 
-/* ---- Fullscreen ---- The button sits left of the coin slot, or right of
-   the logo where a game's name leaves no room (kiosk.js sets `left`). */
-#fullscreen-btn, #mute-btn {
-  position: fixed;
-  top: 0;
-  z-index: 500;
-  box-sizing: border-box;
-  height: calc(var(--marquee-h, 32px) + env(safe-area-inset-top, 0px));
-  width: 34px;
-  margin: 0;
-  padding: env(safe-area-inset-top, 0px) 0 0;
-  border: 0;
-  background: none;
-  color: #cfc94a;
-  opacity: 0.7;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
+.blip-power-indicator {
+  position:fixed;top:calc(env(safe-area-inset-top,0px) + 3px);z-index:700;
+  display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #524435;border-radius:12px;
+  background:linear-gradient(#181512ee,#090a09ee);box-shadow:0 2px 7px #000b,inset 0 1px #ffffff12;
+  color:#776b58;font:700 9px/1 system-ui,sans-serif;letter-spacing:.11em;pointer-events:none;
 }
-#fullscreen-btn[hidden], #mute-btn[hidden] { display: none; }
-#fullscreen-btn:hover, #fullscreen-btn:focus-visible,
-#mute-btn:hover, #mute-btn:focus-visible { opacity: 1; }
-#fullscreen-btn svg, #mute-btn svg {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  filter: drop-shadow(0 0 3px rgba(230, 220, 50, 0.7));
-}
-#fullscreen-btn .fs-exit,
-:root[data-fullscreen] #fullscreen-btn .fs-enter { display: none; }
-:root[data-fullscreen] #fullscreen-btn .fs-exit { display: inline; }
-:root[data-fullscreen] #fullscreen-btn { color: #7be07b; opacity: 1; }
-@media (max-width: 480px) {
-  #fullscreen-btn, #mute-btn { width: 26px; }
+.power-bulb {width:12px;height:12px;border-radius:50%;border:1px solid #553329;background:radial-gradient(circle at 35% 30%,#57372e,#241612 62%,#100d0b);box-shadow:inset 0 1px 2px #000b}
+.power-state {color:#95604d}
+:root[data-credit] .blip-power-indicator {border-color:#866c43;color:#c3b08d;box-shadow:0 2px 9px #000b,inset 0 1px #fff2d42b}
+:root[data-credit] .power-bulb {border-color:#edcd83;background:radial-gradient(circle at 34% 28%,#fff8d7 0 18%,#ffd879 42%,#bb672d 75%);box-shadow:0 0 5px 2px #ffc857aa,0 0 15px #ffb43b88,inset 0 0 2px #fff}
+:root[data-credit] .power-state {color:#ffe09b;text-shadow:0 0 6px #ffc45d99}
+@media(max-width:480px) {
+  .blip-power-indicator {gap:0;padding:2px;border:0;background:none;box-shadow:none}
+  .power-label,.power-state {display:none}
+  .power-bulb {width:16px;height:16px}
 }
 
 /* In fullscreen an idle mouse pointer is hidden (kiosk.js sets the attribute). */
 :root[data-fullscreen][data-cursor-idle],
 :root[data-fullscreen][data-cursor-idle] * { cursor: none !important; }
-
-/* Sound off: the waves give way to a cross, and the button dims to red. */
-#mute-btn .snd-off, :root[data-muted] #mute-btn .snd-on { display: none; }
-:root[data-muted] #mute-btn .snd-off { display: inline; }
-:root[data-muted] #mute-btn { color: #e0705a; opacity: 1; }
 
 /* Warm bakelite, woodgrain trim and amber lamps carry the Atari cabinet feel
    through the shared controls without changing their input or geometry. */
@@ -2969,23 +2932,6 @@ body:has(.game-grid) .blip-logo { animation:blip-logo-beckon 3.2s ease-in-out in
     linear-gradient(135deg,#efd4ad 0%,#a88159 38%,#e2c49c 55%,#75573b 100%);
 }
 .coins-word { color:#f7cb80; text-shadow:none; font-weight:900; }
-#fullscreen-btn,
-#mute-btn {
-  color:#f0c27c;
-  opacity:.84;
-  border-radius:0 0 8px 8px;
-  background:linear-gradient(180deg,rgba(78,45,35,.88),rgba(35,24,25,.84));
-  box-shadow:inset 0 -1px rgba(255,226,176,.12);
-}
-#fullscreen-btn:hover,
-#fullscreen-btn:focus-visible,
-#mute-btn:hover,
-#mute-btn:focus-visible {
-  color:#fff2d6;
-  background:linear-gradient(180deg,rgba(112,66,41,.98),rgba(48,30,27,.96));
-  filter:drop-shadow(0 0 7px rgba(255,184,91,.65));
-}
-:root[data-fullscreen] #fullscreen-btn { color:#ffd27d; }
 
 /* The three info pages use the same padded, softly lit cabinet panels. */
 body.info-page {
@@ -3079,16 +3025,6 @@ body.need-coin #kiosk-insert-btn,
     repeating-linear-gradient(174deg,rgba(255,213,160,.055) 0 1px,transparent 1px 8px),
     linear-gradient(180deg,rgba(47,22,14,.42),rgba(80,40,22,.24)),
     linear-gradient(180deg,#684430,#392721);
-}
-#fullscreen-btn,
-#mute-btn {
-  border:1px solid rgba(25,13,11,.72);
-  border-bottom-color:rgba(255,207,143,.28);
-  background:
-    repeating-linear-gradient(174deg,rgba(255,213,160,.05) 0 1px,transparent 1px 8px),
-    linear-gradient(180deg,rgba(24,12,12,.58),rgba(51,28,24,.3)),
-    linear-gradient(180deg,#684430,#392721);
-  box-shadow:inset 0 3px 6px rgba(12,6,7,.52),inset 0 1px rgba(9,5,5,.68);
 }
 
 /* More tangible deck hardware: machined joystick fittings and moulded
@@ -3433,7 +3369,6 @@ body.need-coin #kiosk-insert-btn,
   .jukebox-transfer-arm > .jukebox-flight-card img,.jukebox-insert-arm > .jukebox-insert-card img {height:112px}
 }
 .jukebox-receiver.loaded {box-shadow:0 3px 0 #100b0a,0 5px 8px rgba(0,0,0,.72),inset 0 1px rgba(255,244,218,.3),inset 0 0 9px rgba(231,183,112,.14)}
-@media (max-width:520px) {#fullscreen-btn,#mute-btn {left:calc(50vw - 95px)!important}}
 @media (max-width:520px) {
   .top-marquee-bar #marquee-name,#marquee-bar.jukebox-marquee #marquee-name {padding:5px 0 6px}
   .top-marquee-bar #marquee-name,#marquee-bar.jukebox-marquee #marquee-name {left:calc(50% - 11px)}
@@ -3759,51 +3694,75 @@ body :is(.about-label,.controls-label) {
 
 @media (max-width:620px), (pointer:coarse) and (max-width:950px) and (max-height:520px) {
   #marquee-name {visibility:hidden!important;pointer-events:none}
-  #fullscreen-btn {display:none!important}
-  #mute-btn {left:var(--mobile-mute-left)!important}
 }
 
 /* The coin mechanism occupies its own bay beside every control deck. */
-.kiosk-bar:has(.deck-coin-slot) {--coin-bay:54px}
-.kiosk-bar:has(.deck-coin-slot) > .deck-panel {right:var(--coin-bay)!important}
+.kiosk-bar:has(.deck-coin-slot) {
+  --coin-width:clamp(80px,22vw,88px);
+  --coin-bay:calc(var(--coin-width) + 4px);
+  perspective:180vw;
+  perspective-origin:50% 100%;
+}
+#topbar.kiosk-bar:has(.deck-coin-slot) {--coin-bay:calc(var(--coin-width) + 10px)}
+.kiosk-bar:has(.deck-coin-slot) > .deck-panel {
+  right:var(--coin-bay)!important;
+  transform:rotateX(var(--bar-tilt,26deg));
+}
 .kiosk-bar:has(.deck-coin-slot) > .deck-panel::before {content:none}
 .kiosk-bar #insert-coin-btn.deck-coin-slot,
 .kiosk-bar #kiosk-insert-btn.deck-coin-slot {
-  position:absolute;top:auto;right:4px;bottom:calc(max(6px,(100% - 64px)/2) + env(safe-area-inset-bottom,0px));
-  width:40px;height:64px;margin:0;padding:3px;display:block;z-index:520;
+  --coin-size:clamp(34px,var(--cap,44px),48px);
+  position:absolute;top:4px;right:4px;bottom:0;box-sizing:border-box;
+  width:var(--coin-width);height:auto!important;margin:0;padding:3px;display:block;z-index:520;
+  pointer-events:auto;
   border:1px solid #30281d;border-radius:5px;cursor:pointer;overflow:visible;
   background:linear-gradient(110deg,#665d4b,#2d271e 45%,#91816a 92%,#332b21);
   box-shadow:0 3px 0 #211a12,0 5px 8px #000c,inset 0 1px #cbbb9c;
-  color:inherit;text-shadow:none;animation:none;transition:none;transform:none;
+  color:inherit;text-shadow:none;animation:none;transition:none;
+  transform:rotateX(var(--bar-tilt,26deg));transform-origin:50% 100%;
   -webkit-tap-highlight-color:transparent;touch-action:manipulation;
 }
 .kiosk-bar .deck-coin-slot::after {content:none!important}
 .kiosk-bar .deck-coin-slot::before {content:'';position:absolute;inset:-3px;pointer-events:auto}
 .kiosk-bar .deck-coin-slot:focus-visible {outline:2px solid #e5cf9e;outline-offset:3px}
 .coin-plate {
-  position:absolute;inset:3px;border:1px solid #827d70;border-radius:3px;
-  background:repeating-linear-gradient(0deg,#ffffff0a 0 1px,#00000006 1px 2px),linear-gradient(110deg,#c4c1b6,#827e70 24%,#d7d2c5 42%,#9a9485 70%,#777061);
-  box-shadow:inset 1px 1px #f0ead7,inset -1px -2px #51483a,0 1px 2px #0009;
+  position:absolute;inset:2px;border:1px solid #a59b82;border-radius:3px;
+  background:repeating-linear-gradient(0deg,#ffffff12 0 1px,#00000008 1px 2px),linear-gradient(110deg,#e0ded3,#8c897e 24%,#f0eee4 42%,#aaa697 70%,#777061);
+  box-shadow:inset 1px 1px #fff8e7,inset -1px -2px #51483a,0 1px 2px #0009;
   pointer-events:none;
 }
+.coin-plate::before {
+  content:'▼';position:absolute;left:0;right:0;top:calc(50% - 12px);text-align:center;
+  color:#4b4539;font:900 8px/8px Arial,sans-serif;text-shadow:0 1px #fff4d7;
+}
 .coin-mouth {
-  position:absolute;left:50%;top:12px;width:5px;height:25px;transform:translateX(-50%);
-  border:1px solid #5d5748;border-radius:2px;background:#080806;
-  box-shadow:inset 1px 0 2px #000,-1px 0 #e5dfcc,1px 1px #4a4234;
+  position:absolute;left:50%;top:calc(50% - 4px);width:min(calc(100% - 12px),calc(var(--coin-size) + 8px));height:8px;transform:translateX(-50%);
+  border:1px solid #fff0c4;border-radius:2px;
+  background:linear-gradient(180deg,#020202 0 25%,#1b160d 47%,#030302 75%);
+  box-shadow:0 0 0 1px #49463e,0 0 5px #ffbd5c99,inset 0 1px 2px #000,0 1px 0 #fff9e8;
 }
 .coin-mouth::before {
-  content:'';position:absolute;inset:-3px -4px;border:1px solid #716955;border-radius:3px;
-  box-shadow:inset 1px 0 #e8dec4,inset -1px 0 #575041;
+  content:'';position:absolute;inset:-2px -4px;border:1px solid #f0ecdc;border-radius:3px;
+  box-shadow:0 0 0 1px #555247,0 1px 3px #0009,inset 0 1px #fff,inset 0 -1px #6b6658;
+}
+.coin-instruction {
+  position:absolute;left:1px;right:1px;top:calc(50% - 22px);display:block;
+  color:#24221d;font:900 clamp(10px,2.8vw,11px)/11px 'Arial Narrow',Arial,sans-serif;letter-spacing:.15px;
+  text-align:center;text-shadow:0 1px #fff8e7,0 -1px #797365;white-space:nowrap;overflow:hidden;
+}
+.coin-return::after {
+  content:'RETURN';position:absolute;left:0;right:0;top:-7px;
+  color:#4c4336;font:900 4.5px/6px Arial,sans-serif;letter-spacing:.5px;text-align:center;
 }
 .coin-return {
-  position:absolute;left:10px;bottom:5px;width:10px;height:8px;border:1px solid #4d3022;border-radius:2px;
+  position:absolute;left:50%;bottom:4px;width:22px;height:5px;transform:translateX(-50%);border:1px solid #4d3022;border-radius:2px;
   background:linear-gradient(#ae6750,#713d2e 50%,#4c251d);
   box-shadow:0 1px 0 #342016,inset 0 1px #d99479,inset -1px -1px #4c251d;
 }
 .coin-fastener {position:absolute;width:5px;height:5px;border:1px solid #5b5548;border-radius:50%;background:linear-gradient(120deg,#cec5af 38%,#504737 43% 56%,#b3a88f 61%);box-shadow:inset 0 1px #ebe3ce}
 .coin-fastener.upper {left:3px;top:3px}
 .coin-fastener.lower {right:3px;bottom:3px}
-.deck-coin-slot #coin-drop-anim {left:calc(50% - 32px);right:auto;top:12px}
+.deck-coin-slot #coin-drop-anim {left:calc(50% - 40px);right:auto;top:50%}
 .deck-credit-lamp {
   position:absolute;right:auto;bottom:calc(4px + env(safe-area-inset-bottom,0px));z-index:521;
   box-sizing:border-box;width:60px;height:20px;padding:2px 4px 2px 25px;transform:none;
@@ -3821,7 +3780,10 @@ body :is(.about-label,.controls-label) {
   box-shadow:0 0 7px #8dd76cbb,inset 0 1px #f7ffd3,0 1px 2px #000;
 }
 .kiosk-bar:has(.deck-coin-slot) :is(.deck-side,.snes-shell) {padding-bottom:24px!important}
-:root[data-layout="landscape"] .kiosk-bar .deck-coin-slot {bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+:root[data-layout="landscape"] .kiosk-bar #insert-coin-btn.deck-coin-slot,
+:root[data-layout="landscape"] .kiosk-bar #kiosk-insert-btn.deck-coin-slot {
+  top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px));height:62px!important;transform:none!important;
+}
 @media(max-width:600px) {
   :root[data-layout="upright"][data-players="2"] :is(.snes-face.four,.fire-buttons.four) {grid-template-columns:var(--cap)!important}
   :root[data-layout="upright"][data-players="2"] {--mid:8px;--ctl-pr:8px}
@@ -3830,6 +3792,10 @@ body :is(.about-label,.controls-label) {
   display:block!important;height:0!important;background:none!important;border:0;
 }
 :root[data-fullscreen]:not([data-has-touch]) .kiosk-bar:has(.deck-coin-slot) > .deck-panel {display:none!important}
+:root[data-fullscreen]:not([data-has-touch]) .kiosk-bar #insert-coin-btn.deck-coin-slot,
+:root[data-fullscreen]:not([data-has-touch]) .kiosk-bar #kiosk-insert-btn.deck-coin-slot {
+  top:auto;bottom:0;height:56px!important;
+}
 
 body .blip-logo.led-logo {
   top:calc(6px + env(safe-area-inset-top,0px));left:10px;width:116px;height:40px!important;

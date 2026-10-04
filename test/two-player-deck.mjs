@@ -17,13 +17,11 @@ async function loadGame(cdp, slug, controls) {
   await waitFor(cdp, "document.readyState === 'complete'", 15000);
   await evaluate(cdp, `blipSetControls(${JSON.stringify(controls)})`);
   await waitFor(cdp, "typeof window.BlipController === 'object'", 15000);
-  // The coin wall swallows every input while it is up; insert a coin the
-  // way a player would, or nothing below reaches the canvas.
-  await evaluate(cdp, `(function () {
-    var o = document.getElementById('need-coin-overlay');
-    if (o && o.classList.contains('visible')) o.click();
-    return true;
-  })()`);
+  // Controls stay gated until a credit enters through the coin button.
+  if (await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.contains('visible')")) {
+    await cdp.page.locator('#insert-coin-btn').click();
+    await waitFor(cdp, "!document.getElementById('need-coin-overlay').classList.contains('visible')");
+  }
   await sleep(150);
 }
 
@@ -530,13 +528,6 @@ test(`a phone on its side puts the controls beside the picture (${ENGINE})`, asy
 async function bootGame(cdp, controls) {
   await loadGame(cdp, 'brawler', controls);
   await waitFor(cdp, "document.getElementById('loader').style.display === 'none'", 20000);
-  // The coin wall goes up on a cold cabinet; the title screen does not
-  // read a key until it comes down.
-  await evaluate(cdp, `(function () {
-    var o = document.getElementById('need-coin-overlay');
-    if (o && o.classList.contains('visible')) o.click();
-    return true;
-  })()`);
   await sleep(800);
 }
 
@@ -757,10 +748,7 @@ test(`a second player joins by reaching for their own stick (${ENGINE})`, async 
     await page.goto(`http://127.0.0.1:${HTTP_PORT}/brawler/index.html`);
     await page.waitForFunction(() => document.getElementById('loader').style.display === 'none',
       null, { timeout: 20000 });
-    await page.evaluate(() => {
-      const o = document.getElementById('need-coin-overlay');
-      if (o && o.classList.contains('visible')) o.click();
-    });
+    if (await page.locator('#need-coin-overlay.visible').count()) await page.locator('#insert-coin-btn').click();
     // The cabinet reports itself as soon as it is up; wait for that
     // rather than for a guessed number of milliseconds.
     await page.waitForFunction(

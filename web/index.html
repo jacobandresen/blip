@@ -35,6 +35,7 @@
       --red:     #ed684d;
       --blue:    #6d91e8;
       --yellow:  #ffd16a;
+      --cabinet-bottom-bar-height:56px;
     }
 
     html { height: 100%; }
@@ -167,6 +168,17 @@
       backface-visibility:hidden;
     }
     .screen-bezel.jukebox-open .jukebox-front { transform:translateY(calc(-1 * var(--rolodex-travel, 500px)));opacity:1;pointer-events:none;visibility:hidden; }
+    :root[data-fullscreen] body { height:100vh;min-height:100vh;padding:0; }
+    :root[data-fullscreen] :is(header,.divider,footer) { display:none; }
+    :root[data-fullscreen] .screen-bezel {
+      position:fixed;inset:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px)) 0 calc(var(--cabinet-bottom-bar-height) + env(safe-area-inset-bottom,0px));
+      z-index:1;width:auto;max-width:none;margin:0;padding:0;border-radius:0;
+    }
+    :root[data-fullscreen] .jukebox-front {position:absolute;inset:0;width:auto;height:auto;}
+    :root[data-fullscreen] #game-grid {height:100%;min-height:0;}
+    :root[data-fullscreen] #game-grid .card {height:calc(100% - 50px);}
+    @media(max-width:480px) { :root { --cabinet-bottom-bar-height:82px; } }
+    @media(min-width:768px) and (min-height:700px) and (pointer:coarse) { :root { --cabinet-bottom-bar-height:112px; } }
     .jukebox-storage {
       position:absolute;inset:14px;z-index:1;display:flex;flex-direction:column;align-items:stretch;gap:10px;padding:14px 12px;
       border:1px solid rgba(228,192,133,.48);border-radius:10px;opacity:0;transform:translateZ(-3px);
@@ -761,14 +773,15 @@
     /* The cards carry game descriptions; full instructions live in the manual. */
     #game-grid {position:relative;display:block;flex:none;width:100%;height:560px;min-height:560px;overflow:visible;padding:0;perspective:1100px;transform-style:preserve-3d;}
     #game-grid::-webkit-scrollbar {display:none}
-    #game-grid .card,#game-grid .card * {pointer-events:none!important;cursor:default}
+    #game-grid .card {pointer-events:auto;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    #game-grid .card * {pointer-events:none!important;cursor:default}
     #game-grid {user-select:none;touch-action:pan-y}
     #game-grid::before {content:'';position:absolute;left:50%;top:40px;width:min(410px,calc(100% - 24px));height:9px;transform:translateX(-50%);z-index:12;border:1px solid #9b7d53;border-radius:7px;
       background:linear-gradient(180deg,#f5e4c0,#9a7e55 32%,#36291f 67%,#d2b47b);box-shadow:0 4px 7px #080606,inset 0 1px #fff4d8;pointer-events:none;}
     #game-grid .card {position:absolute;left:50%;top:35px;flex:none;width:min(330px,calc(100% - 44px));height:500px;margin:0;padding:35px 17px 16px!important;
       border:2px solid color-mix(in srgb,var(--c) 38%,#bca17a);border-radius:7px;scroll-snap-align:center;transform-origin:50% 12px;
       background-color:#241d19;background-image:linear-gradient(118deg,rgba(255,245,220,.14),transparent 22% 72%,rgba(255,245,220,.035)),linear-gradient(155deg,#403128,#241d1a 55%,#30251f);
-      box-shadow:0 12px 18px #000a,0 2px 0 #846b4b,inset 0 1px #fff4dc66,inset 0 -3px #0b0909;transition:transform .8s cubic-bezier(.2,.72,.25,1),box-shadow .3s,border-color .3s;}
+      box-shadow:0 12px 18px #000a,0 2px 0 #846b4b,inset 0 1px #fff4dc66,inset 0 -3px #0b0909;transition:transform .52s cubic-bezier(.18,.72,.2,1) var(--arc-delay,0ms),box-shadow .3s,border-color .3s;}
     #game-grid .card:hover,#game-grid .card.card-focused,#game-grid .card.card-active {animation:none;border-color:#d0b27f;box-shadow:0 18px 24px #000c,0 3px 0 #8f754e,inset 0 1px #fff4dc77,inset 0 -3px #0b0909;}
     #game-grid .card:first-child {margin-left:0}
     #game-grid .card {transform:translateX(calc(-50% + var(--arc-x,0px))) translateY(var(--arc-y,0px)) translateZ(var(--arc-z,0px)) rotateZ(var(--arc-tilt,0deg)) rotateY(var(--arc-turn,0deg)) rotateX(var(--arc-pitch,0deg)) scale(var(--arc-scale,1));}
@@ -858,6 +871,11 @@
       border:2px solid #bda780;border-radius:5px;background:linear-gradient(90deg,#483c2d,#ebdabc 38%,#806c4f 68%,#30271e);
       box-shadow:1px 2px 2px #0008,inset 0 1px #fff4dd}
     .rolodex-pin::after {content:'';position:absolute;left:1px;top:2px;width:3px;height:5px;border-radius:2px;background:#211b17;box-shadow:inset 1px 1px #000}
+    .rolodex-lights {position:absolute;top:10px;right:15px;z-index:8;display:flex;gap:4px;pointer-events:none}
+    .rolodex-lights i {width:3px;height:3px;border-radius:50%;background:#181a16;box-shadow:inset 0 0 1px #000;transition:background .3s,box-shadow .3s}
+    :root[data-credit] .rolodex-lights i {background:#e7bd75;box-shadow:0 0 4px #e7bd7566}
+    :root[data-credit] .rolodex-lights i:nth-child(2) {background:#a5c18b;box-shadow:0 0 4px #a5c18b66}
+    :root[data-credit] .rolodex-lights i:nth-child(3) {background:#e7bd75;box-shadow:0 0 4px #e7bd7566}
     .rolodex-spindle .hanger-shadow {fill:none;stroke:#201812;stroke-width:5;stroke-linecap:round}
     .rolodex-spindle .hanger-metal {fill:none;stroke:#ac9672;stroke-width:2;stroke-linecap:round}
     .rolodex-bearing {position:absolute;top:17px;width:22px;height:24px;border:1px solid #ae9267;border-radius:4px;
@@ -876,7 +894,8 @@
     #game-grid .card-desc {background:linear-gradient(105deg,#e9ddc1,#f2e7cf 46%,#dfd0af);border-color:#bcaa88;box-shadow:inset 0 0 0 2px #fff6e344,0 1px 2px #0005}
     #game-grid .card .card-shot {transform:none!important;transition:none;filter:none}
     #game-grid .card-shot-wrap::after {content:none;animation:none!important}
-    #game-grid .card.no-credit {filter:none}
+    #game-grid .card.no-credit {filter:grayscale(.72) brightness(.52)}
+    #game-grid .card.no-credit:is(.card-focused,.card-active) {border-color:#625943;box-shadow:0 12px 20px #000b,0 2px 0 #766c56,0 4px 0 #484335,0 5px 0 #151511,inset 0 0 0 2px #a1997944,inset 0 -2px #141411}
     #game-grid .card-title {text-shadow:none}
     #game-grid .card-shot-wrap {width:142px;max-width:100%;align-self:center;background:linear-gradient(90deg,#29241d,#0d0d0c 12% 88%,#29241d);box-shadow:inset 0 4px 8px #000,inset 0 0 0 3px #100e0c,0 1px #e6d3ae55}
     #game-grid .card-shot-wrap::before {inset:auto auto 11px 50%;width:56px;height:6px;transform:translateX(-50%);z-index:0;background:repeating-linear-gradient(90deg,#9b7942 0 3px,#e4c78b 3px 5px,#171410 5px 8px);box-shadow:0 -1px #423725}
@@ -1047,11 +1066,6 @@
     </div>
   </div>
 
-  <footer>
-    <div data-i18n="footerControls"></div>
-    <div style="margin-top:8px" data-i18n="footerCopy"></div>
-  </footer>
-
   <!-- The landing page's own stick and caps, the same deck as a game's
        (kiosk.css). They drive the card selection: the stick steps, fire opens
        the lit card. -->
@@ -1163,7 +1177,6 @@
         skyRaiderDesc:     'Climb into the cockpit and send enemy planes packing! Watch for island and coastal flak—and the boss’s gun turret. Your final run takes you over the mainland to the big city!',
         skyRaiderControls: 'ARROW OR WASD MOVE &middot; [1] FIRE',
 
-        footerControls:   'WASD / ARROW &nbsp;&mdash;&nbsp; [1] SHOOT OR LAUNCH',
         serpentControlsTouch: 'SWIPE FOR TURN SNAKE &middot; TAP FOR START',
         bouncerControlsTouch: 'DRAG FOR MOVE PADDLE &middot; TAP FOR LAUNCH',
         galacticControlsTouch: 'DRAG FOR MOVE CANNON &middot; HOLD FINGER FOR SHOOT',
@@ -1172,8 +1185,6 @@
         brawlerControlsTouch: 'D-PAD MOVE &middot; LEFT BUTTON PUNCH &middot; RIGHT BUTTON KICK &middot; TOWARD+BUTTON = HIGH',
         bubblerControlsTouch: 'TOUCH = BUBBLE &middot; SLIDE = RUN &middot; SWIPE UP = JUMP &middot; 2P JOIN FOR FRIEND',
         skyRaiderControlsTouch: 'D-PAD FLY &middot; BUTTON FIRE',
-        footerControlsTouch: 'TAP GAME FOR PLAY &nbsp;&mdash;&nbsp; TAP COINS FOR CREDIT',
-        footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALL RIGHT IS RESERVE'
       },
 
       ja: {
@@ -1214,7 +1225,6 @@
         skyRaiderDesc:     '戦闘機で空を飛び、敵機を撃墜せよ。<br>島や海岸の対空砲火、ボスの銃塔に注意。<br>最後の任務は陸地を越えて大都市へ。',
         skyRaiderControls: '矢印またはWASD移動 &middot; [1] 発射',
 
-        footerControls:   'WASD / 矢印キー &nbsp;―&nbsp; [1] 射撃・発射',
         serpentControlsTouch: 'スワイプで曲がる &middot; タップでスタート',
         bouncerControlsTouch: 'ドラッグでパドル移動 &middot; タップで発射',
         galacticControlsTouch: 'ドラッグで砲台移動 &middot; 指を置くと射撃',
@@ -1223,8 +1233,6 @@
         brawlerControlsTouch: '方向キーで移動 &middot; 左ボタンでパンチ &middot; 右ボタンでキック &middot; 前+ボタンで上段',
         bubblerControlsTouch: 'タッチで泡 &middot; スライドで走る &middot; 上スワイプでジャンプ &middot; 2P JOINで友だち参加',
         skyRaiderControlsTouch: '方向キーで飛行 &middot; ボタンで発射',
-        footerControlsTouch: 'ゲームをタップして遊ぶ &nbsp;―&nbsp; COINSをタップしてクレジット',
-        footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; 全権利保留'
       },
 
       da: {
@@ -1265,7 +1273,6 @@
         skyRaiderDesc:     'Styr jagerflyet op gennem himlen og skyd fjendens fly.<br>Pas p&aring; antiluftskyts fra &oslash;er og kyst og bossernes kanont&aring;rne.<br>Sidste mission g&aring;r ind over land til den store by.',
         skyRaiderControls: 'PILE ELLER WASD &middot; [1] SKYD',
 
-        footerControls:   'WASD / PILETASTER &nbsp;&mdash;&nbsp; [1] SKYD ELLER AFFYR',
         serpentControlsTouch: 'SWIPE FOR AT DREJE &middot; TRYK FOR AT STARTE',
         bouncerControlsTouch: 'TR&AElig;K FOR AT FLYTTE BAT &middot; TRYK FOR AT STARTE',
         galacticControlsTouch: 'TR&AElig;K FOR AT FLYTTE KANONEN &middot; HOLD FINGEREN FOR AT SKYDE',
@@ -1274,8 +1281,6 @@
         brawlerControlsTouch: 'RETNINGSKORS BEV&AElig;G &middot; VENSTRE KNAP SLAG &middot; H&Oslash;JRE KNAP SPARK &middot; FREM+KNAP = H&Oslash;JT',
         bubblerControlsTouch: 'BER&Oslash;RING = BOBLE &middot; GLID = L&Oslash;B &middot; SWIPE OP = HOP &middot; 2P JOIN FOR EN VEN',
         skyRaiderControlsTouch: 'RETNINGSKORS FLYV &middot; KNAP SKYD',
-        footerControlsTouch: 'TRYK P&Aring; ET SPIL FOR AT SPILLE &nbsp;&mdash;&nbsp; TRYK P&Aring; COINS FOR KREDIT',
-        footerCopy:       'BLIP ARCADE &nbsp;&#x25A0;&nbsp; ALLE RETTIGHEDER FORBEHOLDES'
       }
     };
 
@@ -1702,6 +1707,7 @@
     var bearings=['left','right'].map(function(side){var bearing=document.createElement('i');bearing.className='rolodex-bearing '+side;spindle.appendChild(bearing);return bearing;});
     document.getElementById('game-grid').appendChild(spindle);
     var bindings=Array.from(document.querySelectorAll('#game-grid .card')).map(function(card){
+      var lights=document.createElement('span');lights.className='rolodex-lights';lights.setAttribute('aria-hidden','true');lights.innerHTML='<i></i><i></i><i></i>';card.appendChild(lights);
       return {card:card,pins:[-13,13].map(function(offset){
         var pin=document.createElement('i');pin.className='rolodex-pin';pin.setAttribute('aria-hidden','true');
         pin.style.left='calc(50% + '+(offset-4.5)+'px)';card.appendChild(pin);return pin;
@@ -1709,7 +1715,10 @@
     });
     var railLeft=0,railRight=0,railY=28;
     function fitSelectorRails(){
-      document.getElementById('screen-bezel').style.setProperty('--rolodex-travel',(Math.max(selectorPlane.offsetHeight,document.querySelector('.rolodex-guides').offsetHeight)+30)+'px');
+      var bezel=document.getElementById('screen-bezel');
+      var guides=document.querySelector('.rolodex-guides');
+      var bezelBox=bezel.getBoundingClientRect(),guideBox=guides.getBoundingClientRect();
+      bezel.style.setProperty('--rolodex-travel',(Math.max(selectorPlane.offsetHeight,guideBox.bottom-bezelBox.top)+30)+'px');
       var track=document.getElementById('game-grid');
       var width=track.clientWidth;
       spindle.style.width=width+'px';rodSvg.setAttribute('viewBox','0 0 '+width+' '+track.clientHeight);
@@ -1848,6 +1857,9 @@
       }) : -1;
       var idx = activeIdx >= 0 ? activeIdx : 0;
       var navActive = true;
+      var armedCard = null, armTimer = 0;
+      var shuffleQueue=[],shuffling=false;
+      function clearTapArm() { armedCard=null;window.clearTimeout(armTimer);armTimer=0; }
       function highlight(force) {
         if (cardInFlight&&!force) return;
         cards.forEach(function (c, i) {
@@ -1857,13 +1869,14 @@
           if (navActive) c.classList.remove('card-active');
           if(!c.classList.contains('card'))return;
           var delta=i-idx, distance=Math.abs(delta), maxShift=Math.max(0,(document.getElementById('game-grid').clientWidth-c.offsetWidth)/2-6);
-          var arcX=distance===0?0:Math.sign(delta)*Math.min(maxShift,distance*3);
+          var arcX=distance===0?0:Math.sign(delta)*Math.min(maxShift,distance*15);
           var arcY=distance===0?-24:-35-distance*1.3;
+          c.style.setProperty('--arc-delay',Math.min(distance,4)*12+'ms');
           c.style.setProperty('--arc-x',arcX+'px');
           c.style.setProperty('--arc-y',arcY+'px');
-          c.style.setProperty('--arc-z',distance===0?'26px':(-distance*4)+'px');
-          c.style.setProperty('--arc-turn','0deg');
-          c.style.setProperty('--arc-tilt','0deg');
+          c.style.setProperty('--arc-z',distance===0?'38px':(-distance*3)+'px');
+          c.style.setProperty('--arc-turn',distance===0?'0deg':(-Math.sign(delta)*Math.min(18,distance*2.5))+'deg');
+          c.style.setProperty('--arc-tilt',distance===0?'0deg':(Math.sign(delta)*Math.min(5,distance*.7))+'deg');
           c.style.setProperty('--arc-pitch',distance===0?'0deg':(-Math.min(54,12+distance*6))+'deg');
           c.style.setProperty('--arc-scale','1');
           c.style.zIndex=String(30-Math.min(distance,25));
@@ -1878,15 +1891,28 @@
       highlight();
 
       function move(delta) {
-        if (cardInFlight||!manualOverlay.hidden) return;
+        if (getCoins()<=0||cardInFlight||!manualOverlay.hidden) return;
+        if(shuffleQueue.length<6)shuffleQueue.push(delta<0?-1:1);
+        if(!shuffling)shuffleNext();
+      }
+      function shuffleNext() {
+        if(getCoins()<=0||cardInFlight||!manualOverlay.hidden) {
+          shuffleQueue.length=0;shuffling=false;return;
+        }
+        if(!shuffleQueue.length){shuffling=false;return;}
+        shuffling=true;
+        var delta=shuffleQueue.shift();
+        clearTapArm();
         navActive = true;
         var previous=idx;
         idx = (idx + delta + cards.length) % cards.length;
-        if(idx===previous) return;
-        highlight();
-        if(typeof playRolodexMove==='function') playRolodexMove(delta);
-        var track = document.getElementById('game-grid');
-        if(cards[idx].classList.contains('card'))track.scrollTo({ left: cards[idx].offsetLeft + cards[idx].offsetWidth / 2 - track.clientWidth / 2, behavior: 'smooth' });
+        if(idx!==previous) {
+          highlight();
+          if(typeof playRolodexMove==='function') playRolodexMove(delta);
+          var track = document.getElementById('game-grid');
+          if(cards[idx].classList.contains('card'))track.scrollTo({ left: cards[idx].offsetLeft + cards[idx].offsetWidth / 2 - track.clientWidth / 2, behavior: 'smooth' });
+        }
+        window.setTimeout(shuffleNext,360);
       }
 
       // The Rolodex is a single horizontal row; every direction steps to its neighbor.
@@ -1896,9 +1922,59 @@
 
       function activate() {
         if(cardInFlight||!manualOverlay.hidden)return;
+        clearTapArm();
         if (!navActive) { navActive = true; highlight(); }
         attemptStart(cards[idx]);
       }
+
+      // The cards overlap like a physical Rolodex, so a horizontal drag steps
+      // through them while a tap selects the exposed card. A second tap opens it.
+      var track = document.getElementById('game-grid');
+      var touchStart = null, suppressClick = false, suppressClickTimer = 0;
+      function selectByTouch(card) {
+        if(getCoins()<=0||!card || cardInFlight || !manualOverlay.hidden)return;
+        var selected=cards.indexOf(card);
+        if(selected<0)return;
+        if(selected!==idx || armedCard!==card) {
+          idx=selected;navActive=true;highlight();
+          track.scrollTo({left:card.offsetLeft+card.offsetWidth/2-track.clientWidth/2,behavior:'smooth'});
+          armedCard=card;window.clearTimeout(armTimer);
+          armTimer=window.setTimeout(clearTapArm,2200);
+        } else activate();
+      }
+      function suppressPointerClick() {
+        suppressClick=true;window.clearTimeout(suppressClickTimer);
+        suppressClickTimer=window.setTimeout(function(){suppressClick=false;},0);
+      }
+      track.addEventListener('pointerdown', function (e) {
+        if (e.button !== undefined && e.button !== 0) return;
+        touchStart = {id:e.pointerId, x:e.clientX, y:e.clientY, card:e.target.closest && e.target.closest('.card')};
+        if(e.pointerType==='touch' && track.setPointerCapture)track.setPointerCapture(e.pointerId);
+      });
+      track.addEventListener('pointerup', function (e) {
+        var start=touchStart;
+        touchStart=null;
+        if(!start || start.id!==e.pointerId || cardInFlight || !manualOverlay.hidden)return;
+        var dx=e.clientX-start.x,dy=e.clientY-start.y;
+        if(Math.abs(dx)>Math.max(38,track.clientWidth*.09) && Math.abs(dx)>Math.abs(dy)*1.2) {
+          var steps=Math.max(1,Math.round(Math.abs(dx)/(track.clientWidth*.34)));
+          for(var n=0;n<steps;n++)move(dx<0?1:-1);
+          e.preventDefault();
+          suppressPointerClick();
+          return;
+        }
+        if(Math.hypot(dx,dy)>12)return;
+        if(e.pointerType!=='touch')return;
+        selectByTouch(start.card);
+        e.preventDefault();
+        suppressPointerClick();
+      });
+      track.addEventListener('pointercancel', function(){touchStart=null;});
+      track.addEventListener('click',function(e){
+        if(suppressClick){suppressClick=false;window.clearTimeout(suppressClickTimer);return;}
+        var card=e.target.closest&&e.target.closest('.card');
+        if(card)attemptStart(card);
+      });
 
       document.addEventListener('keydown', function (e) {
         if(e.target.closest&&e.target.closest('input,textarea,select,[contenteditable]'))return;

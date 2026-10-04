@@ -1,30 +1,12 @@
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { launch, evaluate, killAll, sleep } from './lib/cdp.mjs';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { evaluate, sleep } from './lib/playwright-utils.mjs';
+import { startPage } from './lib/harness.mjs';
 
-const WEB = path.resolve('web');
-let PORT;
 const shots = process.env.BLIP_JUKEBOX_SHOTS || '/tmp/blip-jukebox-rounds';
-const mime = { '.html':'text/html', '.js':'application/javascript', '.css':'text/css', '.wasm':'application/wasm', '.png':'image/png', '.json':'application/json', '.svg':'image/svg+xml', '.woff2':'font/woff2' };
-const server = createServer(async (req, res) => {
-  try {
-    const file = path.join(WEB, decodeURIComponent(req.url.split('?')[0]));
-    const body = await readFile(file);
-    res.writeHead(200, { 'content-type': mime[path.extname(file)] || 'application/octet-stream' });
-    res.end(body);
-  } catch { res.writeHead(404); res.end(); }
-});
-await new Promise((resolve) => server.listen(0, resolve));
-
-PORT=server.address().port;
-const profile = mkdtempSync(path.join(tmpdir(), 'blip-jukebox-rounds-'));
-const { proc, cdp } = await launch(10000 + Math.floor(Math.random()*20000), ['--window-size=1280,800', `--user-data-dir=${profile}`]);
+const { browser, cdp, origin, close } = await startPage('chromium', { viewport:{width:1280,height:800} });
 await cdp.send('Emulation.setDeviceMetricsOverride', { width:1280, height:800, deviceScaleFactor:1, mobile:false });
-const open = async (url, wait=3800) => { await cdp.send('Page.navigate', { url:`http://127.0.0.1:${PORT}/${url}` }); await sleep(wait); };
+const open = async (url, wait=3800) => { await cdp.send('Page.navigate', { url:`${origin}/${url}` }); await sleep(wait); };
 const key = async (keyName, code, vk) => {
   for (const type of ['keyDown','keyUp']) { await cdp.send('Input.dispatchKeyEvent', { type, key:keyName, code, windowsVirtualKeyCode:vk }); await sleep(80); }
 };
@@ -161,7 +143,5 @@ try {
     process.stdout.write(`${page}: rear Rolodex card opened without a credit\n`);
   }
 } finally {
-    await cdp.send('Browser.close').catch(() => {});
-    cdp.close(); killAll([proc]); server.close();
-    rmSync(profile, { recursive:true, force:true, maxRetries:5, retryDelay:200 });
+    await close();
 }

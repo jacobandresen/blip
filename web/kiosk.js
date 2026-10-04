@@ -180,6 +180,39 @@ function saveCoins(n) {
   if((navigation&&navigation.type==='reload')||(!internal&&(!navigation||navigation.type!=='back_forward')))saveCoins(0);
 }());
 document.documentElement.toggleAttribute('data-credit',getCoins()>0);
+function buildPowerIndicators() {
+  if (!document.body || document.querySelector('.blip-power-indicator')) return;
+  var lamp=document.createElement('div');
+  lamp.className='blip-power-indicator';
+  lamp.setAttribute('role','status');
+  lamp.setAttribute('aria-live','polite');
+  lamp.innerHTML='<span class="power-label">AC/DC</span><i class="power-bulb" aria-hidden="true"><svg viewBox="0 0 10 16"><path d="M6.2 0 1 9h3.3L3.8 16 9 6.7H5.7z"/></svg></i>';
+  document.body.appendChild(lamp);
+  function place() {
+    var topBar=document.querySelector('.top-marquee-bar, #marquee-bar')||document.querySelector('.blip-logo');
+    if(!topBar)return;
+    var barBox=topBar.getBoundingClientRect();
+    lamp.style.left='';
+    lamp.style.right=Math.max(8,innerWidth-barBox.right+8)+'px';
+    lamp.style.top=barBox.top+(barBox.height-lamp.offsetHeight)/2+'px';
+  }
+  function sync() {
+    var on=document.documentElement.hasAttribute('data-credit');
+    lamp.setAttribute('aria-label','AC/DC voltage '+(on?'on':'off'));
+    lamp.title='AC/DC '+(on?'on':'off');
+    place();
+  }
+  sync();
+  window.addEventListener('resize',place);
+  if(typeof ResizeObserver==='function'){
+    var resizeObserver=new ResizeObserver(place);
+    var bar=document.querySelector('.top-marquee-bar, #marquee-bar')||document.querySelector('.blip-logo');
+    if(bar)resizeObserver.observe(bar);
+  }
+  new MutationObserver(sync).observe(document.documentElement,{attributes:true,attributeFilter:['data-credit']});
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',buildPowerIndicators,{once:true});
+else buildPowerIndicators();
 var cabinetPowerTimer=null;
 function updateCoinsHud() {
   var root=document.documentElement,powered=getCoins()>0,wasPowered=root.hasAttribute('data-credit');
@@ -278,8 +311,7 @@ window.addEventListener('pagehide',function(){
   cabinetHum.nodes.forEach(function(node){node.disconnect();});cabinetHum=null;
 });
 
-// A coin is two sounds: the inharmonic clink through the chute, then the
-// register's "credit accepted" chime. Keep in sync with shell.js's copy.
+// Chute clink, collection-box rattle, then the credit chime.
 function playCoinInsert() {
   var ctx = getKioskAudio();
   var t   = ctx.currentTime;
@@ -309,7 +341,23 @@ function playCoinInsert() {
     osc.start(start); osc.stop(start + 0.11);
   });
 
-  [{ freq: 1047, start: 0.1 }, { freq: 1319, start: 0.155 }].forEach(function(note) {
+  function boxHit(at, strength) {
+    var size=Math.ceil(ctx.sampleRate*.035),buffer=ctx.createBuffer(1,size,ctx.sampleRate),data=buffer.getChannelData(0);
+    for(var i=0;i<size;i++)data[i]=(Math.random()*2-1)*(1-i/size);
+    var noise=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+    noise.buffer=buffer;filter.type='bandpass';filter.frequency.value=2600;filter.Q.value=1.4;
+    gain.gain.setValueAtTime(strength,at);gain.gain.exponentialRampToValueAtTime(.001,at+.035);
+    noise.connect(filter);filter.connect(gain);gain.connect(blipOut(ctx));noise.start(at);noise.stop(at+.036);
+    [[920,.12,.19],[1470,.075,.15],[2240,.045,.105]].forEach(function(partial){
+      var osc=ctx.createOscillator(),ring=ctx.createGain();osc.type='triangle';osc.frequency.value=partial[0];
+      ring.gain.setValueAtTime(partial[1]*strength,at);ring.gain.exponentialRampToValueAtTime(.0005,at+partial[2]);
+      osc.connect(ring);ring.connect(blipOut(ctx));osc.start(at);osc.stop(at+partial[2]);
+    });
+  }
+  boxHit(t+.66,.9);
+  boxHit(t+.73,.42);
+
+  [{ freq: 1047, start: 0.86 }, { freq: 1319, start: 0.915 }].forEach(function(note) {
     var osc  = ctx.createOscillator();
     var gain = ctx.createGain();
     osc.connect(gain);
@@ -381,10 +429,13 @@ var coinDropAnim = null;
 (function () {
   var btn = document.getElementById('kiosk-insert-btn');
   if (!btn) return;
-  coinDropAnim = document.createElement('span');
-  coinDropAnim.id = 'coin-drop-anim';
-  coinDropAnim.setAttribute('aria-hidden', 'true');
-  btn.appendChild(coinDropAnim);
+  coinDropAnim = btn.querySelector('#coin-drop-anim');
+  if(!coinDropAnim) {
+    coinDropAnim = document.createElement('span');
+    coinDropAnim.id = 'coin-drop-anim';
+    coinDropAnim.setAttribute('aria-hidden', 'true');
+    btn.appendChild(coinDropAnim);
+  }
 }());
 function dropCoinAnimation() {
   if (!coinDropAnim) return;
@@ -756,6 +807,7 @@ function pollGamepad(onDown, onUp) {
     try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {}
     apply(on);
   }
+  window.blipSetFullscreen = set;
   // Before first paint where this script is in <head>.
   if (wanted()) root.setAttribute('data-fullscreen', '');
 

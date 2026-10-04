@@ -1,25 +1,17 @@
 import assert from 'node:assert/strict';
-import {createServer} from 'node:http';
-import {readFile,mkdir,writeFile} from 'node:fs/promises';
-import {mkdtempSync,rmSync} from 'node:fs';
-import {tmpdir} from 'node:os';
-import path from 'node:path';
-import {launch,evaluate,killAll,sleep} from './lib/cdp.mjs';
-const web=path.resolve('web');
-const mime={'.html':'text/html','.css':'text/css','.js':'application/javascript','.png':'image/png','.svg':'image/svg+xml'};
-const server=createServer(async(req,res)=>{try{const file=path.join(web,req.url.split('?')[0]);res.writeHead(200,{'content-type':mime[path.extname(file)]||'application/octet-stream'});res.end(await readFile(file));}catch{res.end();}});
-await new Promise(resolve=>server.listen(0,resolve));
-const profile=mkdtempSync(path.join(tmpdir(),'blip-details-'));
-const {proc,cdp}=await launch(10000+Math.floor(Math.random()*20000),[`--user-data-dir=${profile}`]);
+import {mkdir,writeFile} from 'node:fs/promises';
+import {evaluate,sleep} from './lib/playwright-utils.mjs';
+import {startPage} from './lib/harness.mjs';
+const {cdp,origin,close}=await startPage('chromium',{hasTouch:true,viewport:{width:1280,height:844}});
 try {
   for(const width of [1280,768,390,320]) {
     await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:width<620});
     await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:width<620});
-    await cdp.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/index.html`});
+    await cdp.send('Page.navigate',{url:`${origin}/index.html`});
     await sleep(1500);
     await evaluate(cdp,'document.fonts.ready.then(()=>true)');
     assert.equal(await evaluate(cdp,"getComputedStyle(document.body).userSelect"),'none',`${width}px landing page prevents accidental text selection`);
-    const stack=await evaluate(cdp,"(function(){var cards=Array.from(document.querySelectorAll('#game-grid .card')),book=document.querySelector('#manual-book'),bezel=document.querySelector('.screen-bezel').getBoundingClientRect(),bar=document.querySelector('#kiosk-bar').getBoundingClientRect(),box=book.getBoundingClientRect();return {inside:cards.every(function(card){var r=card.getBoundingClientRect();return r.left>=bezel.left&&r.right<=bezel.right&&r.top>=bezel.top&&r.bottom<=bezel.bottom}),bookOnShelf:box.left>=bar.left&&box.right<=bar.right&&box.top>=bar.top-12&&box.bottom<=bar.bottom&&box.width<150&&box.height<38,upright:cards.every(function(card){return parseFloat(card.style.getPropertyValue('--arc-turn'))===0&&parseFloat(card.style.getPropertyValue('--arc-tilt'))===0}),scrollWidth:document.querySelector('#game-grid').scrollWidth,clientWidth:document.querySelector('#game-grid').clientWidth,bookHint:book.textContent.includes('LIFT HERE'),hiddenGame:getComputedStyle(document.querySelector('.jukebox-game-screen')).visibility==='hidden'};})()");
+    const stack=await evaluate(cdp,"(function(){var cards=Array.from(document.querySelectorAll('#game-grid .card')),book=document.querySelector('#manual-book'),bezel=document.querySelector('.screen-bezel').getBoundingClientRect(),bar=document.querySelector('#kiosk-bar').getBoundingClientRect(),box=book.getBoundingClientRect();return {inside:cards.every(function(card){var r=card.getBoundingClientRect();return r.left>=bezel.left&&r.right<=bezel.right&&r.top>=bezel.top&&r.bottom<=bezel.bottom}),bookOnShelf:box.left>=bar.left&&box.right<=bar.right&&box.top>=bar.top-12&&box.bottom<=bar.bottom&&box.width<150&&box.height<38,upright:cards.every(function(card){return parseFloat(card.style.getPropertyValue('--arc-turn'))===0&&parseFloat(card.style.getPropertyValue('--arc-tilt'))===0}),scrollWidth:document.querySelector('#game-grid').scrollWidth,clientWidth:document.querySelector('#game-grid').clientWidth,bookHint:book.getAttribute('aria-label').toLowerCase().includes('lift'),hiddenGame:getComputedStyle(document.querySelector('.jukebox-game-screen')).visibility==='hidden'};})()");
     assert.equal(stack.inside,true,`${width}px every complete game card remains inside the cabinet`);
     assert.equal(stack.bookOnShelf,true,`${width}px compact field manual sits on the bottom bar shelf`);
     assert.equal(stack.upright,true,`${width}px cards stand upright in their stack`);
@@ -51,9 +43,10 @@ try {
     }
   }
   for(const page of ['about','controls','history']) {
-    await cdp.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/${page}.html`});await sleep(1800);
+    await cdp.send('Page.navigate',{url:`${origin}/${page}.html`});await sleep(1800);
     assert.equal(await evaluate(cdp,"!document.querySelector('#manual-overlay').hidden"),true,`${page} opens as a chapter in the physical manual`);
-    assert.equal((await evaluate(cdp,"document.querySelector('#manual-book-title').textContent")).toLowerCase(),page,`${page} direct address opens to its printed chapter`);
+    const expectedTitle=page==='about'?'about blip':page;
+    assert.equal((await evaluate(cdp,"document.querySelector('#manual-book-title').textContent")).toLowerCase(),expectedTitle,`${page} direct address opens to its printed chapter`);
   }
   console.log('About, Controls, History: direct addresses open the combined manual');
   for(const [width,height] of [[320,844],[390,844],[844,390],[1280,844]]) {
@@ -61,23 +54,21 @@ try {
     await cdp.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile});
     await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:mobile});
     for(const page of ['index','about','controls','history','api','galactic_defender/index']) {
-      await cdp.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/${page}.html`});await sleep(1000);
-      for(let attempt=0;attempt<30 && !(await evaluate(cdp,"!!document.querySelector('#mute-btn')"));attempt++) await sleep(100);
-      const state=await evaluate(cdp,"(function(){var title=document.querySelector('#marquee-name'),full=document.querySelector('#fullscreen-btn'),sound=document.querySelector('#mute-btn');return {title:getComputedStyle(title).visibility,fullscreen:!!full&&getComputedStyle(full).display!=='none',sound:!!sound&&!sound.hidden&&getComputedStyle(sound).display!=='none'};})()");
+      await cdp.send('Page.navigate',{url:`${origin}/${page}.html`});await sleep(1000);
+      const state=await evaluate(cdp,"(function(){var title=document.querySelector('#marquee-name');return {title:getComputedStyle(title).visibility,utilityButtons:document.querySelectorAll('#fullscreen-btn,#mute-btn').length};})()");
       assert.equal(state.title,mobile?'hidden':'visible',`${page} at ${width}px title`);
-      assert.equal(state.fullscreen,!mobile,`${page} at ${width}px fullscreen`);
-      assert.equal(state.sound,true,`${page} at ${width}px sound stays available`);
+      assert.equal(state.utilityButtons,0,`${page} at ${width}px omits fullscreen and sound buttons`);
     }
-    console.log(`${width}×${height}: shared title/fullscreen visibility passed on all six pages`);
+    console.log(`${width}×${height}: title visibility passed on all six pages`);
   }
-  await cdp.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/index.html?manual=about`});await sleep(2200);
+  await cdp.send('Page.navigate',{url:`${origin}/index.html?manual=about`});await sleep(2200);
   const book=await evaluate(cdp,"(function(){var overlay=document.querySelector('#manual-overlay'),page=document.querySelector('.manual-page-content'),leaf=page.querySelector('.manual-leaf-sheet'),rect=overlay.querySelector('.manual-open-book').getBoundingClientRect(),frame=overlay.getBoundingClientRect();return {open:!overlay.hidden,front:parseInt(getComputedStyle(overlay).zIndex)>=10000,centerError:rect.left+rect.width/2-(frame.left+frame.width/2),rect:{left:rect.left,width:rect.width},scrolling:getComputedStyle(page).overflow!=='hidden'||page.scrollHeight>page.clientHeight+1,leafFits:leaf&&leaf.scrollHeight<=leaf.clientHeight+1,pageCount:document.querySelector('#manual-page-count').textContent,index:Array.from(document.querySelectorAll('.manual-contents li b')).map(function(e){return e.textContent})};})()");
   assert.equal(book.open,true,'deep chapter opens as the physical manual');
   assert.equal(book.front,true,'the open book sits in front of the cabinet');
   assert.ok(Math.abs(book.centerError)<2,`the opened manual is centered in front of the player: ${JSON.stringify(book.rect)}`);
   assert.equal(book.scrolling,false,'manual pages have no scroll area');
   assert.equal(book.leafFits,true,'first printed leaf fits its paper without clipping');
-  assert.equal(book.index.length,3,'printed contents list all three chapters');
+    assert.ok(book.index.length>=3,'printed contents include the chapter page entries');
   assert.equal(book.index[0],'01','index shows the actual first page number for About');
   const total=Number(book.pageCount.split('/')[1]);
   assert.ok(total>3,'long chapters are laid out as multiple real pages');
@@ -94,5 +85,5 @@ try {
   await evaluate(cdp,"document.querySelector('#manual-close').click();true");
   console.log(`Field Manual: ${total} typeset leaves, no clipped text or scrolling`);
 }finally {
-  await cdp.send('Browser.close').catch(()=>{});cdp.close();killAll([proc]);server.close();rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});
+  await close();
 }

@@ -164,59 +164,19 @@ function feedbackTick() {
     osc.start(t); osc.stop(t + 0.055);
   } catch (e) {}
 }
-// A coin is two sounds: the inharmonic metallic clink through the chute, then
-// the register's "credit accepted" chime a beat later.
-function playCoinInsert() {
-  var ctx = getUiAudio(), t = ctx.currentTime;
-
-  // The clink: filtered noise for the transient "tik" of metal on metal,
-  // plus a few short inharmonic tones for the coin's own brief ring.
-  var noiseBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.045), ctx.sampleRate);
-  var noiseData = noiseBuf.getChannelData(0);
-  for (var i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
-  var noise = ctx.createBufferSource();
-  noise.buffer = noiseBuf;
-  var noiseFilter = ctx.createBiquadFilter();
-  noiseFilter.type = 'bandpass';
-  noiseFilter.frequency.value = 4200;
-  noiseFilter.Q.value = 1.1;
-  var noiseGain = ctx.createGain();
-  noiseGain.gain.setValueAtTime(0.4, t);
-  noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
-  noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(blipOut(ctx));
-  noise.start(t); noise.stop(t + 0.045);
-
-  [3000, 4550, 6100].forEach(function (freq, i) {
-    var osc = ctx.createOscillator(), gain = ctx.createGain();
-    osc.type = 'triangle'; osc.frequency.value = freq;
-    osc.connect(gain); gain.connect(blipOut(ctx));
-    var start = t + i * 0.006;
-    gain.gain.setValueAtTime(0.16 / (i + 1), start);
-    gain.gain.exponentialRampToValueAtTime(0.0008, start + 0.1);
-    osc.start(start); osc.stop(start + 0.11);
-  });
-
-  // The credit chime, arriving just after the coin lands.
-  [{ freq: 1047, start: 0.1 }, { freq: 1319, start: 0.155 }].forEach(function (note) {
-    var osc = ctx.createOscillator(), gain = ctx.createGain();
-    osc.connect(gain); gain.connect(blipOut(ctx));
-    osc.type = 'square'; osc.frequency.value = note.freq;
-    gain.gain.setValueAtTime(0.22, t + note.start);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + note.start + 0.11);
-    osc.start(t + note.start); osc.stop(t + note.start + 0.12);
-  });
-}
-
 // The coin that drops into #insert-coin-btn's slot: a real element so a class
 // toggle can animate it, injected here for every game page.
 var coinDropAnim = null;
 (function () {
   var btn = document.getElementById('insert-coin-btn');
   if (!btn) return;
-  coinDropAnim = document.createElement('span');
-  coinDropAnim.id = 'coin-drop-anim';
-  coinDropAnim.setAttribute('aria-hidden', 'true');
-  btn.appendChild(coinDropAnim);
+  coinDropAnim = btn.querySelector('#coin-drop-anim');
+  if(!coinDropAnim) {
+    coinDropAnim = document.createElement('span');
+    coinDropAnim.id = 'coin-drop-anim';
+    coinDropAnim.setAttribute('aria-hidden', 'true');
+    btn.appendChild(coinDropAnim);
+  }
 }());
 function dropCoinAnimation() {
   if (!coinDropAnim) return;
@@ -264,6 +224,7 @@ window.blipSpendCoin = function () {
 // final score to the shared high-score board; a no-op beyond updating the
 // local best if no backend is configured (web/blip_config.js).
 window.blipGameOver = function (score) {
+  if (getCoins() <= 0) overlay.classList.add('visible');
   if (!window.blipScores) return;
   var game = (typeof blipGameFromPath === 'function')
     ? blipGameFromPath(window.location.pathname) : null;
@@ -358,6 +319,10 @@ var overlayWasVisible = overlay.classList.contains('visible');
 new MutationObserver(function () {
   var vis = overlay.classList.contains('visible');
   document.body.classList.toggle('need-coin', vis);
+  if (vis) {
+    if (window.BlipController) window.BlipController.releaseAll();
+    if (window.blipReleaseTouch) window.blipReleaseTouch();
+  }
   if (overlayWasVisible && !vis && canvas) {
     try { canvas.focus(); } catch (e) {}
   }
@@ -738,6 +703,7 @@ window.addEventListener('keydown', function (e) {
     syncPicker();
   }
   var touchPlay = bindTouchPlay();
+  window.blipReleaseTouch = touchPlay.release;
   window.onBlipControlsChange = function () {
     BlipController.releaseAll();
     touchPlay.release();
@@ -824,10 +790,12 @@ window.addEventListener('keydown', function (e) {
 
     // 0 = nothing, 1 = a PC's pointer hovering, 2 = pressed.
     window.blipTouchDown = function (slot) {
+      if (coinGated()) return 0;
       var t = slots[slot];
       return t ? (t.pressed ? 2 : 1) : 0;
     };
     window.blipTouchPos = function (slot, axis) {
+      if (coinGated()) return 0;
       var t = slots[slot];
       return t ? (axis ? t.y : t.x) : 0;
     };

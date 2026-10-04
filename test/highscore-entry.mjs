@@ -12,11 +12,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { launch, evaluate, killAll, sleep, waitFor } from './lib/cdp.mjs';
+import { evaluate, sleep, waitFor } from './lib/playwright-utils.mjs';
+import { launchEngine } from './lib/engine.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB = path.join(HERE, '..', 'web');
@@ -64,19 +63,9 @@ function serve() {
 }
 
 async function browser(t, port, { touch = false, width = 1280, height = 800 } = {}) {
-  const profile = mkdtempSync(path.join(tmpdir(), 'blip-hs-'));
-  const args = [`--window-size=${width},${height}`, `--user-data-dir=${profile}`];
-  if (touch) args.push('--touch-events=enabled');
-  const { proc, cdp } = await launch(port, args);
-  // A profile is tens of megabytes, and /tmp is often memory: take it away.
-  t.after(async () => {
-    killAll([proc]);
-    await sleep(300);
-    rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-  });
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: touch });
-  if (touch) await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
-  return cdp;
+  const handle = await launchEngine('chromium', { hasTouch: touch, viewport: { width, height } });
+  t.after(() => handle.browser.close().catch(() => {}));
+  return handle.cdp;
 }
 
 /** Load a game with five coins in, and note the score it reports. */

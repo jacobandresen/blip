@@ -1,16 +1,13 @@
 import assert from 'node:assert/strict';
-import {createServer} from 'node:http';
-import {readFile,writeFile} from 'node:fs/promises';
-import {mkdtempSync,rmSync} from 'node:fs';
-import {launch,evaluate,killAll,sleep} from './lib/cdp.mjs';
-const server=createServer(async(req,res)=>{try{const file='web'+req.url.split('?')[0],bytes=await readFile(file);res.setHeader('Content-Type',file.endsWith('.html')?'text/html':file.endsWith('.css')?'text/css':file.endsWith('.js')?'text/javascript':file.endsWith('.svg')?'image/svg+xml':'image/png');res.end(bytes);}catch{res.statusCode=404;res.end();}});
-await new Promise(resolve=>server.listen(0,resolve));
-const profile=mkdtempSync('/tmp/blip-rom-physics-'),{proc,cdp}=await launch(18000+Math.floor(Math.random()*10000),[`--user-data-dir=${profile}`]);
+import {writeFile} from 'node:fs/promises';
+import {evaluate,sleep} from './lib/playwright-utils.mjs';
+import {startPage} from './lib/harness.mjs';
+const {cdp,origin,close}=await startPage('chromium',{hasTouch:true,viewport:{width:1280,height:844}});
 try {
  for(const width of [1280,390,320]) {
   await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:844,deviceScaleFactor:1,mobile:width<700});
   await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:width<700});
-  await cdp.send('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/index.html`});await sleep(1400);
+  await cdp.send('Page.navigate',{url:`${origin}/index.html`});await sleep(1400);
   for(const returning of [false,true]) {
    await evaluate(cdp,`(()=>{const rom=document.querySelector('.card-focused .game-rom'),r=rom.getBoundingClientRect(),receiver=document.querySelector('.jukebox-receiver');receiver.style.transform='translate(-50%,0px)';receiver.style.clipPath='';receiver.classList.remove('stowed');const slot=receiver.querySelector('.jukebox-receiver-lip').getBoundingClientRect();window.physicsOptions={returning:${returning},original:rom,width:rom.offsetWidth,height:rom.offsetHeight,scale:r.height/rom.offsetHeight,source:{x:r.left+r.width/2,y:r.top+r.height/2},pivot:blipCardArmPivot(receiver),slot:{x:slot.left+slot.width/2,y:slot.top+slot.height/2},receiver,onPickup:()=>rom.closest('.card').classList.add('card-loaded'),onReturned:()=>rom.closest('.card').classList.remove('card-loaded')};window.physicsStage=blipTransferCard(physicsOptions);physicsStage.blipSeek(0);return true;})()`);
    const result=await evaluate(cdp,`(()=>{
@@ -51,4 +48,4 @@ try {
   }
   console.log(`${width}px: insertion and return sampled every 50 ms; ROM above linkage, all joints visible, no collisions or detached joints`);
  }
-}finally{await cdp.send('Browser.close').catch(()=>{});cdp.close();killAll([proc]);server.close();rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});}
+}finally{await close();}

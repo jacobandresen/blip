@@ -1,7 +1,5 @@
-// The BLIP logo and the COINS button must stay inside the top bar: they are
-// mounted on the marquee strip's ends, so they must be exactly as tall as it
-// (one `--marquee-h`). This compares measured geometry, so it catches a
-// change to the strip, the elements, or a breakpoint that forgets one.
+// The logo belongs on the marquee; the coinbox belongs on the shared control
+// deck. Check both physical placements across every page and viewport.
 // Animations are disabled first: the logo's boot flourish and the slot's
 // beckon scale their boxes by a few percent.
 
@@ -37,8 +35,7 @@ const FREEZE_ANIMATIONS = `(function () {
   return true;
 })()`;
 
-/** Geometry of the strip and the two elements mounted on it, for
- * whichever of the two top-bar flavours the page uses. */
+/** Geometry of the marquee and the shared bottom deck. */
 const MEASURE = `(function () {
   function box(el) {
     if (!el) return null;
@@ -50,6 +47,9 @@ const MEASURE = `(function () {
   var coin = document.querySelector('#insert-coin-btn') || document.querySelector('#kiosk-insert-btn');
   return {
     bar: box(bar), logo: box(logo), coin: box(coin),
+    coinBar: box(coin && coin.closest('.kiosk-bar')),
+    coinPlane: coin && getComputedStyle(coin).transform,
+    deckPlane: coin && getComputedStyle(coin.closest('.kiosk-bar').querySelector('.deck-panel')).transform,
     winW: window.innerWidth,
     scrollW: document.documentElement.scrollWidth,
   };
@@ -64,7 +64,7 @@ function assertInsideBar(m, label) {
   assert.ok(m.logo, `${label}: no BLIP logo found`);
   assert.ok(m.coin, `${label}: no COINS button found`);
 
-  for (const [name, el] of [['BLIP logo', m.logo], ['COINS button', m.coin]]) {
+  for (const [name, el] of [['BLIP logo', m.logo]]) {
     assert.ok(el.bottom <= m.bar.bottom + SLACK,
       `${label}: the ${name} hangs ${(el.bottom - m.bar.bottom).toFixed(1)}px below the bar ` +
       `(bar ${m.bar.h.toFixed(0)}px tall, ${name} ${el.h.toFixed(0)}px)`);
@@ -78,8 +78,11 @@ function assertInsideBar(m, label) {
       `${label}: the ${name} runs ${(el.right - m.winW).toFixed(1)}px past the right edge`);
   }
 
-  assert.ok(m.logo.right <= m.coin.left + SLACK,
-    `${label}: the BLIP logo and COINS button overlap by ${(m.logo.right - m.coin.left).toFixed(1)}px`);
+  assert.ok(m.coinBar, `${label}: the coinbox is not on the shared deck`);
+  assert.ok(m.coin.left >= -SLACK && m.coin.right <= m.winW + SLACK,
+    `${label}: the coinbox runs outside the viewport`);
+  assert.equal(m.coinPlane, m.deckPlane,
+    `${label}: the coinbox and control deck do not share a tabletop plane`);
 
 }
 
@@ -89,7 +92,7 @@ function sidewaysOverflow(m) {
   return m.scrollW - m.winW;
 }
 
-test(`the BLIP logo and COINS button stay inside the top bar (${ENGINE})`, async (t) => {
+test(`the BLIP logo stays on the marquee and coinbox aligns with the deck (${ENGINE})`, async (t) => {
   const { browser, page, cdp } = await openPage(t, ENGINE);
 
   assert.ok(GAME_PAGES.length > 0, 'found no built game pages to check');
@@ -103,6 +106,7 @@ test(`the BLIP logo and COINS button stay inside the top bar (${ENGINE})`, async
         await evaluate(cdp, FREEZE_ANIMATIONS);
         // The game pages build their marquee from shell.js after load.
         await waitFor(cdp, `!!(document.querySelector('#marquee-bar') || document.querySelector('.top-marquee-bar'))`, 15000);
+        await waitFor(cdp, `!!document.querySelector('.deck-coin-slot .coin-plate')`, 15000);
         await sleep(120); // let the strip's own layout settle before measuring
 
         const m = await evaluate(cdp, MEASURE);

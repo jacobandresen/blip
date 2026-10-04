@@ -5,14 +5,14 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { evaluate, waitFor, sleep, killAll } from './cdp.mjs';
+import { evaluate, waitFor, sleep } from './playwright-utils.mjs';
 import { launchEngine } from './engine.mjs';
 
-export { evaluate, waitFor, sleep, killAll };
+export { evaluate, waitFor, sleep };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const WEB_DIR = path.join(__dirname, '..', '..', 'web');
-export const HTTP_PORT = 8098; // distinct from the 8080 devs run by hand
+export let HTTP_PORT = 8098; // Updated to the isolated port for each browser suite.
 
 const MIME = {
   '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
@@ -67,22 +67,35 @@ export async function loadRallyAt(cdp, origin) {
   await cdp.send('Page.navigate', { url: `${origin}/rally/index.html` });
   await waitFor(cdp, "document.readyState === 'complete'", 15000);
   await waitFor(cdp, "typeof window.BlipController === 'object'", 15000);
-  // The coin wall: shell.js swallows every keydown while it's up — dismiss
-  // it the same way a real player would, a click/tap inserting a coin.
+  // Game controls stay gated until a real credit is inserted.
   if (await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.contains('visible')")) {
-    await evaluate(cdp, "document.getElementById('need-coin-overlay').click()");
+    await cdp.page.locator('#insert-coin-btn').click();
+    await waitFor(cdp, "!document.getElementById('need-coin-overlay').classList.contains('visible')");
   }
 }
 
 export async function openPage(t, engine = 'chromium', opts = {}) {
-  const server = createFileServer();
-  await listenOn(server, HTTP_PORT);
-  const handle = await launchEngine(engine, opts);
+  const handle = await startPage(engine, opts);
   t.after(async () => {
-    await handle.browser.close().catch(() => {});
-    await new Promise((r) => server.close(r));
+    await handle.close();
   });
-  return { ...handle, server };
+  return handle;
+}
+
+export async function startPage(engine = 'chromium', opts = {}) {
+  const server = createFileServer();
+  await listenOn(server, 0);
+  HTTP_PORT = server.address().port;
+  let handle;
+  try { handle = await launchEngine(engine, opts); }
+  catch (error) { await new Promise((r) => server.close(r)); throw error; }
+  return {
+    ...handle, server, origin: `http://127.0.0.1:${HTTP_PORT}`,
+    async close() {
+      await handle.browser.close().catch(() => {});
+      await new Promise((r) => server.close(r));
+    },
+  };
 }
 
 /** Two browsers with Rally already loaded on both — the shape almost

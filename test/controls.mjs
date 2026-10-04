@@ -87,4 +87,5 @@ test(`the paddle dial registers a slow, careful rotation (${ENGINE})`, async (t)
     const ups = r.seen.map((s, i) => (s.startsWith('up:') ? i : -1)).filter((i) => i > lastDown);
     assert.ok(ups.length > 0, `no key release after the rotation stopped: ${JSON.stringify(r.seen)}`);
   });
+
 });

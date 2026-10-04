@@ -300,7 +300,7 @@ canvas {
 :root[data-fullscreen]:not([data-has-touch]) body::after { display: none; }
 :root[data-fullscreen]:not([data-has-touch]) canvas { clip-path: none; }
 :root[data-fullscreen]:not([data-has-touch]) #marquee-bar { box-shadow: none; }
-:root[data-fullscreen]:not([data-has-touch]) :is(.blip-logo, #insert-coin-btn, #fullscreen-btn, #mute-btn) {
+:root[data-fullscreen]:not([data-has-touch]) :is(.blip-logo, #insert-coin-btn) {
   clip-path: inset(0 -80px);
   transform: none !important;   /* beats the beckon's scale */
 }
@@ -316,10 +316,20 @@ canvas {
    pages' own insert-coin button, so it lives in kiosk.css (scoped to
    "#insert-coin-btn, #kiosk-insert-btn") rather than duplicated here. */
 
-/* ---- Need-coin overlay ---- Styled in kiosk.css; on a game page it stops
-   above the deck so the controls stay visible. */
+/* Lock the playfield while preserving the coin slot and physical controls. */
 #need-coin-overlay {
+  position:fixed;left:0;right:0;top:calc(var(--marquee-h) + env(safe-area-inset-top,0px));
   bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px));
+  z-index:150;display:none;place-items:center;padding:24px;
+  color:#c6b89d;background:#000;pointer-events:auto;touch-action:none;
+}
+#need-coin-overlay.visible {display:grid}
+.nco-panel {text-align:center;font-family:'Courier New',monospace;text-transform:uppercase;letter-spacing:.14em}
+.nco-msg {color:#7d3025;font-size:clamp(18px,4vw,30px);font-weight:900;letter-spacing:.2em}
+.nco-sub {margin-top:13px;font-size:11px;font-weight:700}
+.nco-how {color:#777064;font-size:9px;letter-spacing:.08em}
+:root[data-fullscreen]:not([data-has-touch]) #need-coin-overlay {
+  bottom:0;
 }
 
 /* ---- On-screen controls ---- The deck itself is shared with the landing
@@ -981,7 +991,7 @@ canvas {
 :root[data-card-loading] canvas {visibility:hidden}
 
 /* The cabinet's screen stays fixed behind the selector. */
-:root[data-cabinet-screen] :is(.blip-logo,#insert-coin-btn,#topbar,#marquee-bar,#arcade-bezel,.bezel-screw,#fullscreen-btn,#mute-btn,#need-coin-overlay,#loader) {display:none!important}
+:root[data-cabinet-screen] :is(.blip-logo,#insert-coin-btn,#topbar,#marquee-bar,#arcade-bezel,.bezel-screw,#need-coin-overlay,#loader) {display:none!important}
 :root[data-cabinet-screen] canvas {clip-path:none}
 #game-startup-poster {position:fixed;z-index:2;pointer-events:none;object-fit:contain;background:#080808;image-rendering:pixelated;clip-path:inset(3px round 6px)}
 :root[data-game-ready] #game-startup-poster {display:none}

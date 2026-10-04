@@ -4,18 +4,20 @@
 
 import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 
 function onPath(name) {
-  try {
-    execFileSync('command', ['-v', name], { stdio: 'ignore', shell: '/bin/sh' });
-    return true;
-  } catch { return false; }
+  for (const dir of (process.env.PATH || '').split(path.delimiter)) {
+    const candidate = path.join(dir, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 export function chromiumBinary() {
   if (process.env.BLIP_CHROMIUM) return process.env.BLIP_CHROMIUM;
-  if (onPath('chromium')) return 'chromium';
+  const system = onPath('chromium');
+  if (system) return system;
   try {
     const require = createRequire(import.meta.url);
     const p = require('playwright').chromium.executablePath();

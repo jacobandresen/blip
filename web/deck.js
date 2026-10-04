@@ -139,10 +139,12 @@
   var coin=document.getElementById('insert-coin-btn')||document.getElementById('kiosk-insert-btn');
   if(coin) {
     try {root.toggleAttribute('data-credit',Number(sessionStorage.getItem('blip-coins'))>0);}catch(e){}
+    var coinAnim=coin.querySelector('#coin-drop-anim');
     coin.replaceChildren();
     coin.classList.add('deck-coin-slot');
     coin.setAttribute('aria-label','Insert coin');coin.title='Insert coin';
-    coin.innerHTML='<span class="coin-plate" aria-hidden="true"><i class="coin-mouth"></i><i class="coin-return"></i><i class="coin-fastener upper"></i><i class="coin-fastener lower"></i></span>';
+    coin.innerHTML='<span class="coin-plate" aria-hidden="true"><span class="coin-instruction">INSERT COIN</span><i class="coin-mouth"></i><i class="coin-return"></i><i class="coin-fastener upper"></i><i class="coin-fastener lower"></i></span>';
+    if(coinAnim)coin.appendChild(coinAnim);
     panel.parentElement.appendChild(coin);
     var lamp=el('span','deck-credit-lamp','P1',{'aria-label':'Player one credit'});
     var bar=panel.parentElement;bar.appendChild(lamp);

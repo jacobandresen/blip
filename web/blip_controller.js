@@ -96,7 +96,7 @@
      rally dial and by the default start action, both of which drive
      explicit key specs rather than a logical name. */
   function emitKey(spec, type) {
-    if (cfg.gate && cfg.gate()) return;
+    if (type === 'keydown' && cfg.gate && cfg.gate()) return;
     injectKey(spec, type);
   }
 
@@ -234,6 +234,7 @@
   function releaseAll() {
     _tBtns.forEach(function (g) { g._pend = false; g.release(); });
     _tDpads.forEach(function (d) { d._pend = false; d.clear(); });
+    _tDials.forEach(function (release) { release(); });
     Object.keys(held).forEach(function (n) { if (held[n]) set(n, false); });
   }
 
@@ -248,6 +249,7 @@
 
   var _tBtns = [];    // { el, on, press, release, _pend }
   var _tDpads = [];   // one { pad, calc, clear, _pend } per bound d-pad
+  var _tDials = [];
 
   function _hit(r, x, y, m) {
     return x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m;
@@ -458,6 +460,7 @@
     }
     function clearIdle() { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } }
     function stop() { clearIdle(); dir(false, false); dialEl.classList.remove('active'); last = null; pid = null; acc = 0; rect = null; }
+    _tDials.push(stop);
 
     dialEl.addEventListener('pointerdown', function (e) {
       e.preventDefault();

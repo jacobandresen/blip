@@ -7,11 +7,13 @@
     "test:highscores": "node test/highscores.mjs",
     "test:topbar": "node --test test/topbar-layout.mjs",
     "test:controls": "node --test test/controls.mjs",
+    "test:touch": "node --test --test-concurrency=1 test/touch-start.mjs",
+    "test:coin": "node --test --test-concurrency=1 test/coin-slot.mjs",
     "test:deck": "node --test test/two-player-deck.mjs",
     "test:shell": "node --test --test-concurrency=1 test/shell.mjs",
     "test:scores": "node --test --test-concurrency=1 test/highscore-entry.mjs",
     "supabase": "supabase",
-    "test:web": "node --test --test-concurrency=1 test/fill-canvas.test.mjs test/topbar-layout.mjs test/controls.mjs test/two-player-deck.mjs"
+    "test:web": "node --test --test-concurrency=1 test/fill-canvas.test.mjs test/topbar-layout.mjs test/controls.mjs test/two-player-deck.mjs test/touch-start.mjs test/coin-slot.mjs"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.116.0",
