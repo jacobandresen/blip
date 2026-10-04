@@ -9,17 +9,17 @@
   <meta name="apple-mobile-web-app-title" content="BLIP">
   <title>BLIP ARCADE</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
-  <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=76">
-  <!-- Before first paint (kiosk.js loads at the end): a touch screen gets
-       no deck on this page, so it must never flash up. -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico?v=2">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
+  <link rel="stylesheet" href="kiosk.css?v=124">
+  <link rel="stylesheet" href="manual.css?v=7">
+  <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
       document.documentElement.setAttribute('data-has-touch', '');
-    // Likewise a kiosk in fullscreen (kiosk.js) has no deck.
+
     try {
       if (localStorage.getItem('blip-fullscreen') === '1')
         document.documentElement.setAttribute('data-fullscreen', '');
@@ -29,23 +29,27 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --green:   #32c832;
-      --cyan:    #00c8c8;
-      --magenta: #c832c8;
-      --red:     #dc3232;
-      --blue:    #3264dc;
-      --yellow:  #e6dc32;
+      --green:   #65c879;
+      --cyan:    #48c4c8;
+      --magenta: #e77bb7;
+      --red:     #ed684d;
+      --blue:    #6d91e8;
+      --yellow:  #ffd16a;
     }
 
-    html, body { height: 100%; }
+    html { height: 100%; }
+    body { height:auto; }
     /* Kill rubber-band overscroll so the fixed bottom bar can't appear to
        peel off the bottom edge during a bounce on iOS. */
     html { overflow-x: hidden; overscroll-behavior: none; }
 
     body {
-      background: #050508;
-      color: #ccc;
+      background: radial-gradient(ellipse at 50% 8%, rgba(164,78,37,.19), transparent 43%),
+                  radial-gradient(ellipse at 50% 72%, rgba(74,38,80,.18), transparent 60%), #100c12;
+      color: #f0dfcc;
       font-family: 'Courier New', Courier, monospace, sans-serif;
+      -webkit-user-select:none;
+      user-select:none;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -54,26 +58,11 @@
       overscroll-behavior: none;
     }
 
-    /* CRT overlay */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent 0px, transparent 3px,
-        rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px
-      );
-      pointer-events: none;
-      z-index: 99;
-    }
-
-    /* vignette */
     body::after {
       content: '';
       position: fixed;
       inset: 0;
-      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.75) 100%);
+      background: radial-gradient(ellipse at center, transparent 43%, rgba(12,5,11,.58) 100%);
       pointer-events: none;
       z-index: 98;
     }
@@ -85,30 +74,8 @@
       text-align: center;
       /* Just enough padding to clear the fixed top bar; the rest goes to the
          game grid. */
-      padding: calc(48px + env(safe-area-inset-top, 0px)) 0 12px;
+      padding: calc(var(--cabinet-fascia-height) + 8px + env(safe-area-inset-top, 0px)) 0 12px;
       position: relative;
-    }
-
-    /* marquee bulb strip — the illuminated sign at the top of a real cabinet */
-    header::before {
-      content: '';
-      position: absolute;
-      top: 22px;
-      left: 10%;
-      right: 10%;
-      height: 6px;
-      background-image: radial-gradient(circle, var(--yellow) 0 2.2px, transparent 2.6px);
-      background-size: 26px 6px;
-      background-repeat: repeat-x;
-      background-position: center;
-      filter: drop-shadow(0 0 5px var(--yellow));
-      animation: marquee-bulbs 1.6s steps(2, jump-none) infinite;
-    }
-    @keyframes marquee-bulbs {
-      50% { filter: drop-shadow(0 0 2px var(--yellow)); opacity: .5; }
-    }
-    @media (max-width: 520px) {
-      header::before { left: 4%; right: 4%; }
     }
 
     /* The top bar, logo and coin-slot heights and the corner badges live in
@@ -119,31 +86,38 @@
       width: 100%;
       max-width: 900px;
       height: 1px;
-      background: linear-gradient(to right, transparent, #222, transparent);
-      margin: 0 auto 24px;
+      background: linear-gradient(to right, transparent, rgba(255,193,107,.4), transparent);
+      margin: 0 auto 20px;
+      box-shadow: 0 0 14px rgba(227,127,64,.18);
     }
 
     /* ---- screen bezel — frames the game grid like a monitor set into the
        cabinet, complete with corner screws and a glass glare ---- */
     .screen-bezel {
       position: relative;
+      flex-shrink:0;
+      perspective: 1500px;
+      transform-style:preserve-3d;
+      overflow:hidden;
       width: 100%;
-      max-width: 948px;
+      max-width: var(--cabinet-width);
       margin: 0 auto 40px;
-      padding: 26px 22px 30px;
-      border-radius: 18px;
-      background: linear-gradient(155deg, #29292d 0%, #17171a 40%, #0b0b0d 100%);
+      padding: 27px 22px 54px;
+      border: 1px solid rgba(224,183,121,.72);
+      border-radius: 22px;
+      background: repeating-linear-gradient(174deg, transparent 0 13px, rgba(246,205,148,.045) 14px, transparent 16px 28px),
+                  linear-gradient(155deg, #69452f 0%, #422b24 18%, #261a1c 62%, #110d11 100%);
       box-shadow:
-        0 18px 40px rgba(0,0,0,0.6),
-        0 0 0 6px #050506,
-        0 0 0 7px rgba(255,255,255,0.03);
+        0 20px 52px rgba(0,0,0,.72), 0 0 0 5px #0c090e,
+        0 0 0 7px rgba(224,183,121,.34), 0 0 46px rgba(202,99,50,.14),
+        inset 0 2px rgba(255,239,208,.2), inset 0 -9px 18px rgba(0,0,0,.58);
     }
     .screen-bezel::before {
       content: '';
       position: absolute;
       inset: 12px;
       border-radius: 10px;
-      box-shadow: inset 0 0 26px rgba(0,0,0,0.85), inset 0 2px 0 rgba(255,255,255,0.04);
+        box-shadow: inset 0 0 26px rgba(0,0,0,.84), inset 0 2px 0 rgba(255,239,208,.2), inset 0 0 0 1px rgba(224,183,121,.18);
       pointer-events: none;
     }
     .screen-bezel::after {
@@ -151,9 +125,9 @@
       position: absolute;
       inset: 12px;
       border-radius: 10px;
-      background: linear-gradient(115deg,
-        rgba(255,255,255,0.05) 0%, transparent 16%,
-        transparent 82%, rgba(255,255,255,0.03) 100%);
+        background: linear-gradient(115deg,
+        rgba(255,239,208,.11) 0%, transparent 16%,
+        transparent 82%, rgba(255,196,132,.05) 100%);
       pointer-events: none;
     }
     .screen-bezel .screw {
@@ -161,8 +135,8 @@
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #6c6c70, #101012 72%);
-      box-shadow: 0 1px 1px rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.8);
+      background: radial-gradient(circle at 35% 35%, #f0d7a8, #92734d 34%, #281816 72%);
+      box-shadow: 0 1px 1px rgba(255,239,208,.62), 0 1px 3px rgba(0,0,0,.88), inset 0 0 0 1px rgba(255,222,167,.25);
     }
     .screen-bezel .screw::after {
       content: '';
@@ -179,23 +153,62 @@
     .screen-bezel .screw.bl { bottom: 9px; left: 9px; }
     .screen-bezel .screw.br { bottom: 9px; right: 9px; }
     @media (max-width: 520px) {
-      .screen-bezel { padding: 20px 14px 24px; border-radius: 14px; }
+      .screen-bezel { padding: 20px 14px 48px; border-radius: 14px; }
     }
 
     /* ---- game grid ---- */
     .game-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 24px;
-      width: 100%;
-      max-width: 900px;
-      position: relative;
+      display:flex;flex-wrap:nowrap;align-items:stretch;justify-content:flex-start;gap:0;width:100%;max-width:none;min-height:300px;
+      position:relative;padding-top:25px;perspective:1000px;isolation:isolate;
     }
-    /* Wide screens: four across, so the eight games fill two rows. */
-    @media (min-width: 1300px) {
-      .game-grid { grid-template-columns: repeat(4, 1fr); max-width: 1200px; }
+    .jukebox-front {
+      position:relative;z-index:2;transform-origin:top center;transform-style:preserve-3d;
+      transition:transform 4s cubic-bezier(.45,.02,.25,1),visibility 0s linear 4s;
+      backface-visibility:hidden;
     }
-
+    .screen-bezel.jukebox-open .jukebox-front { transform:translateY(calc(-1 * var(--rolodex-travel, 500px)));opacity:1;pointer-events:none;visibility:hidden; }
+    .jukebox-storage {
+      position:absolute;inset:14px;z-index:1;display:flex;flex-direction:column;align-items:stretch;gap:10px;padding:14px 12px;
+      border:1px solid rgba(228,192,133,.48);border-radius:10px;opacity:0;transform:translateZ(-3px);
+      background:radial-gradient(ellipse at 50% 0,rgba(193,147,88,.19),transparent 58%),linear-gradient(180deg,#151317,#09090b 58%,#1d1715);
+      box-shadow:inset 0 0 0 5px rgba(4,4,6,.8),inset 0 12px 24px rgba(0,0,0,.8);
+      transition:opacity .24s .22s ease,transform .55s ease;
+    }
+    .screen-bezel.jukebox-open .jukebox-storage {opacity:1;transform:translateZ(0);}
+    .jukebox-rack {position:relative;flex:1;min-height:0;width:100%;display:flex;justify-content:flex-start;align-items:stretch;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;scroll-snap-type:x proximity;perspective:1000px;isolation:isolate;}
+    .jukebox-rack::-webkit-scrollbar {display:none}
+    .jukebox-rack::before {content:'';position:absolute;left:5%;right:5%;top:8%;height:9px;z-index:9;border:1px solid #94764d;border-radius:7px;
+      background:linear-gradient(180deg,#f4dfb3,#89704c 35%,#3d3027 65%,#d6b67c);box-shadow:0 4px 7px #050405,inset 0 1px #fff0c8;}
+    .jukebox-rack::after {content:'';position:absolute;left:4%;right:4%;top:10%;height:4px;z-index:10;pointer-events:none;
+      background:repeating-linear-gradient(90deg,transparent 0 32px,rgba(20,15,13,.8) 33px 36px);}
+    .jukebox-bay {position:relative;display:flex;align-items:flex-start;justify-content:center;min-width:0;flex:0 0 clamp(112px,10.5vw,134px);height:100%;padding-top:7%;margin-left:-2px;scroll-snap-align:center;
+      background:none;transform:rotateY(var(--fan-y,0deg)) rotateZ(var(--fan-z,0deg));transform-origin:50% 8%;}
+    .jukebox-bay:first-child {margin-left:0}
+    .jukebox-bay:nth-child(1) {--fan-y:-24deg;--fan-z:-6deg;z-index:1}
+    .jukebox-bay:nth-child(2) {--fan-y:-18deg;--fan-z:-4.5deg;z-index:2}
+    .jukebox-bay:nth-child(3) {--fan-y:-12deg;--fan-z:-3deg;z-index:3}
+    .jukebox-bay:nth-child(4) {--fan-y:-6deg;--fan-z:-1.5deg;z-index:4}
+    .jukebox-bay:nth-child(5) {--fan-y:6deg;--fan-z:1.5deg;z-index:5}
+    .jukebox-bay:nth-child(6) {--fan-y:12deg;--fan-z:3deg;z-index:4}
+    .jukebox-bay:nth-child(7) {--fan-y:18deg;--fan-z:4.5deg;z-index:3}
+    .jukebox-bay:nth-child(8) {--fan-y:24deg;--fan-z:6deg;z-index:2}
+    .jukebox-bay:nth-child(9) {--fan-y:30deg;--fan-z:9deg;z-index:1}
+    .jukebox-bay:nth-child(10) {--fan-y:36deg;--fan-z:11deg;z-index:1}
+    .jukebox-bay:nth-child(11) {--fan-y:42deg;--fan-z:13deg;z-index:1}
+    .jukebox-module {position:relative;display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+      width:calc(100% - 2px);height:258px;flex:none;box-sizing:border-box;padding:29px 9px 11px;border:1px solid rgba(224,183,121,.58);border-radius:7px;
+      background:linear-gradient(118deg,rgba(255,255,255,.085),transparent 24% 70%,rgba(255,255,255,.035)),linear-gradient(155deg,#30251f,#171419 74%);
+      box-shadow:0 7px 12px rgba(0,0,0,.38),inset 0 1px rgba(255,239,208,.3),inset 0 -2px rgba(0,0,0,.65);
+      transition:transform .35s,filter .35s,box-shadow .35s;}
+    .jukebox-module::before {content:'';position:absolute;left:50%;top:4px;width:36px;height:9px;transform:translateX(-50%);
+      background:radial-gradient(circle at 5px 4px,#080707 0 2px,#d7bc8b 2.5px 3.5px,transparent 4px),radial-gradient(circle at 30px 4px,#080707 0 2px,#d7bc8b 2.5px 3.5px,transparent 4px);}
+    .jukebox-module img {width:100%;height:120px;flex:none;object-fit:cover;border:1px solid rgba(255,231,188,.42);box-shadow:0 2px 5px #080708;}
+    .jukebox-module strong {max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f2dfbd;font:900 12px/1.25 'Courier New',monospace;letter-spacing:.11em;text-shadow:0 1px #090708;}
+    .jukebox-module small {color:#d8b778;font:700 8px/1 'Courier New',monospace;letter-spacing:.12em;}
+    .jukebox-module.selected {transform:translateY(-7px) rotateY(0) rotateZ(0) scale(1.045);filter:brightness(1.2);z-index:20;
+      box-shadow:0 0 0 2px rgba(241,202,135,.64),0 10px 20px rgba(0,0,0,.9),0 0 22px rgba(232,184,106,.42);}
+    .jukebox-module.picked {opacity:0;transform:translateY(-24px) scale(.94);filter:brightness(.5)}
+    .jukebox-module.selected::after {content:'';position:absolute;inset:-5px;border:1px solid rgba(248,218,166,.62);border-radius:6px;box-shadow:0 0 13px rgba(244,192,106,.42);}
     /* ---- card ---- */
     .card {
       display: flex;
@@ -203,16 +216,22 @@
       align-items: stretch;
       text-decoration: none;
       color: inherit;
-      border: 1px solid #1e1e1e;
-      padding: 28px 24px 24px;
-      background: #0a0a0c;
+      border: 1px solid rgba(224,183,121,.58);
+      border-radius: 13px;
+      padding: 22px 18px 20px;
+      background:
+        linear-gradient(118deg,rgba(255,255,255,.085),transparent 24% 70%,rgba(255,255,255,.035)),
+        linear-gradient(155deg,#30251f,#171419 74%);
       position: relative;
       overflow: hidden;
-      transition: transform .15s, box-shadow .2s, border-color .2s, opacity .3s, filter .3s;
+      transform-style:preserve-3d;
+      transition: transform .3s cubic-bezier(.2,.75,.2,1), box-shadow .3s, border-color .3s, opacity .35s, filter .35s;
       cursor: pointer;
+      box-shadow:0 7px 12px rgba(0,0,0,.38),inset 0 1px rgba(255,239,208,.3),inset 0 -2px rgba(0,0,0,.65);
     }
 
-    .card:hover, .card-focused { transform: translateY(-3px); }
+    .card:hover, .card.card-focused { transform:translateY(-4px) rotateX(1deg); }
+    .card-picked { opacity:0!important; transform:translateY(-34px) rotateY(12deg) scale(.96)!important; }
 
     .card::before, .card::after {
       content: '';
@@ -299,12 +318,18 @@
     .card-shot-wrap {
       position: relative;
       width: 100%;
-      aspect-ratio: 480 / 540;
-      margin-bottom: 16px;
-      padding: 6px;
-      border: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
-      box-shadow: 0 0 12px color-mix(in srgb, var(--c) 15%, transparent);
-      background: #000;
+      aspect-ratio: 16 / 10;
+      margin-bottom: 12px;
+      padding: 7px;
+      border: 1px solid rgba(235,199,139,.57);
+      border-radius:5px;
+      box-shadow:0 2px 5px rgba(0,0,0,.7),inset 0 1px rgba(255,241,211,.22),0 0 0 3px rgba(9,7,8,.8);
+      background:linear-gradient(145deg,#6c5238,#211a18 38%,#0b0a0a 72%,#87633b);
+    }
+    .card-shot-wrap::before {
+      content:'';position:absolute;inset:7px;z-index:2;pointer-events:none;
+      background:linear-gradient(118deg,rgba(255,255,255,.18),transparent 18% 72%,rgba(255,255,255,.04));
+      box-shadow:inset 0 0 0 1px rgba(255,242,215,.13);
     }
 
     .card-shot {
@@ -359,17 +384,35 @@
       font-size: clamp(1rem, 3vw, 1.4rem);
       letter-spacing: .2em;
       font-weight: 900;
-      color: var(--c);
-      text-shadow: 0 0 12px color-mix(in srgb, var(--c) 60%, transparent);
+      color: color-mix(in srgb,var(--c) 52%,#fff0cc);
+      text-shadow:0 1px 0 #100b09,0 0 8px color-mix(in srgb,var(--c) 34%,transparent);
       text-transform: uppercase;
       margin-bottom: 6px;
       text-align: left;
       width: 100%;
     }
 
+    .card-selector {
+      position:absolute;top:9px;right:11px;width:28px;height:28px;z-index:5;
+      display:grid;place-items:center;border-radius:50%;opacity:0;transform:scale(.75);
+      border:1px solid rgba(243,208,151,.58);
+      background:radial-gradient(circle at 35% 25%,#6e5b40,#211a18 65%,#100d0d);
+      box-shadow:inset 0 1px rgba(255,242,213,.3),0 2px 5px #090707;
+      transition:opacity .18s,transform .22s cubic-bezier(.2,1.6,.4,1);
+    }
+    .card-selector::before { content:'';width:5px;height:15px;border-radius:4px;
+      background:linear-gradient(90deg,#726d63,#f3e7cf 46%,#786d5e);
+      box-shadow:0 1px 2px #000;transform:rotate(-34deg);transform-origin:50% 90%;transition:transform .28s; }
+    .card:is(:hover,.card-focused,.card-active) .card-selector { opacity:1;transform:scale(1); }
+    .card-picked .card-selector::before { transform:rotate(48deg); }
+    .card-code {position:absolute;top:14px;right:48px;z-index:5;padding:3px 5px;border:1px solid rgba(220,185,129,.64);border-radius:2px;
+      color:#f0d6a4;background:linear-gradient(180deg,rgba(17,13,12,.94),rgba(48,35,27,.9));font:700 9px/1 'Courier New',monospace;
+      letter-spacing:.1em;text-shadow:0 1px #090708;box-shadow:inset 0 1px rgba(255,242,211,.25),0 1px 3px #090707;}
+    .card { padding-bottom:20px; }
+
     /* Card copy sits on the tube: the same phosphor glow as the titles,
        dimmer. */
-    .card-genre, .card-desc, .card-controls {
+    .card-genre, .card-desc {
       text-shadow: 0 0 5px currentColor;
     }
 
@@ -377,7 +420,7 @@
       font-size: 12px;
       font-weight: 700;
       letter-spacing: 3px;
-      color: #6e8c30;
+      color: #e6b76e;
       text-transform: uppercase;
       margin-bottom: 16px;
       text-align: left;
@@ -401,37 +444,24 @@
       font-size: 11px;
       font-weight: 700;
       line-height: 1.75;
-      color: #6e8c30;
+      color: #d5b9a2;
       text-align: left;
       letter-spacing: .04em;
       margin-bottom: 24px;
       flex: 1;
     }
 
-    .card-controls {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      color: #6e8c30;
-      text-transform: uppercase;
-      margin-bottom: 20px;
-      text-align: left;
-    }
-
     /* No credits: cards dimmed and desaturated like an unpowered cabinet but
        still legible; a click nudges toward the coin slot. */
-    .card.no-credit {
-      opacity: 0.55;
-      filter: grayscale(60%) brightness(0.62);
-    }
+    .card.no-credit { filter: grayscale(60%) brightness(0.72); }
     /* Pressing a dark card while broke: it drops almost out entirely for a
        beat — a dead, unlit "nothing happens here, put a coin in" thunk —
        then eases back to its resting dim. */
     .card.rejected { animation: card-reject 0.55s ease-out; }
     @keyframes card-reject {
-      0%   { opacity: 0.55; filter: grayscale(60%) brightness(0.62); }
-      22%  { opacity: 0.05; filter: grayscale(90%) brightness(0.28); transform: scale(0.97); }
-      100% { opacity: 0.55; filter: grayscale(60%) brightness(0.62); }
+      0%   { filter: grayscale(60%) brightness(0.72); }
+      22%  { filter: grayscale(90%) brightness(0.4); transform: scale(0.97); }
+      100% { filter: grayscale(60%) brightness(0.72); }
     }
 
     @media (max-width: 520px) {
@@ -651,7 +681,7 @@
       text-align: center;
       font-size: 10px;
       letter-spacing: 2px;
-      color: #2a2a2a;
+      color: #705548;
       text-transform: uppercase;
       line-height: 2;
     }
@@ -667,10 +697,10 @@
       pointer-events: none;
       z-index: 4;
       background:
-        radial-gradient(circle at 50% 0, #c8c8ce 0 2.4px, rgba(200,200,206,0.15) 3px, transparent 4px)
-          0 44px / 100% 150px repeat-y,
-        repeating-linear-gradient(180deg, rgba(255,255,255,0.05) 0 2px, transparent 2px 5px),
-        linear-gradient(90deg, #3c3c42, #232326 55%, #131315);
+        linear-gradient(90deg, transparent 0 10%, rgba(255,201,117,.22) 10.5%, transparent 11.5% 89%, rgba(255,201,117,.18) 90%, transparent 91%),
+        repeating-linear-gradient(173deg, transparent 0 8px, rgba(236,164,102,.075) 9px, transparent 11px 18px),
+        radial-gradient(circle at 50% 0, #ffca73 0 2.4px, rgba(255,202,116,.18) 3px, transparent 4px) 0 44px / 100% 150px repeat-y,
+        linear-gradient(90deg, #8a5937, #4b2d29 52%, #1c1417);
     }
     /* bright seam where the rail meets the screen — sells it as a distinct panel */
     .cab-rail::after {
@@ -679,11 +709,11 @@
       top: 0;
       bottom: 0;
       width: 2px;
-      background: linear-gradient(180deg, transparent, rgba(255,255,255,0.18) 15%, rgba(255,255,255,0.18) 85%, transparent);
+      background: linear-gradient(180deg, transparent, rgba(255,218,160,.42) 15%, rgba(255,218,160,.42) 85%, transparent);
     }
-    .cab-rail.left  { left: 0; box-shadow: inset -14px 0 28px rgba(0,0,0,0.75); }
+    .cab-rail.left  { left: 0; box-shadow: inset -14px 0 28px rgba(0,0,0,.75), inset 9px 0 18px rgba(255,174,97,.11); }
     .cab-rail.left::after  { right: 0; }
-    .cab-rail.right { right: 0; box-shadow: inset 14px 0 28px rgba(0,0,0,0.75); transform: scaleX(-1); }
+    .cab-rail.right { right: 0; box-shadow: inset 14px 0 28px rgba(0,0,0,.75), inset 9px 0 18px rgba(255,174,97,.11); transform: scaleX(-1); }
     .cab-rail.right::after { right: 0; }
     @media (min-width: 1180px) {
       .cab-rail { display: block; }
@@ -702,7 +732,7 @@
       position: absolute;
       width: 1px;
       height: 1px;
-      background: #fff;
+      background: #ffe1a5;
       border-radius: 50%;
       animation: twinkle var(--d) var(--delay) ease-in-out infinite alternate;
     }
@@ -728,30 +758,165 @@
     }
     body.konami-shake { animation: konami-shake 0.55s ease; }
 
-    /* A touch screen picks a game by tapping its card: no control deck here,
-       and the corner clusters come down to the screen's edge. */
-    :root[data-has-touch] #kiosk-bar { display: none; }
-    :root[data-has-touch] body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
-    /* Fullscreen on a PC: the keyboard picks the game, so the deck goes too. */
-    :root[data-fullscreen] #kiosk-bar { display: none; }
-    :root[data-fullscreen] body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
-    /* A kiosk's wide screen shows the whole catalogue at once: eight across. */
-    @media (min-width: 1700px) {
-      /* 800px is about the row's height: this sits it mid-screen. */
-      :root[data-fullscreen] .screen-bezel { max-width: calc(100vw - 170px); margin-top: max(0px, calc((100vh - 800px) / 2 - 40px)); }
-      :root[data-fullscreen] .game-grid { grid-template-columns: repeat(8, 1fr); max-width: none; gap: 16px; }
+    /* The cards carry game descriptions; full instructions live in the manual. */
+    #game-grid {position:relative;display:block;flex:none;width:100%;height:560px;min-height:560px;overflow:visible;padding:0;perspective:1100px;transform-style:preserve-3d;}
+    #game-grid::-webkit-scrollbar {display:none}
+    #game-grid .card,#game-grid .card * {pointer-events:none!important;cursor:default}
+    #game-grid {user-select:none;touch-action:pan-y}
+    #game-grid::before {content:'';position:absolute;left:50%;top:40px;width:min(410px,calc(100% - 24px));height:9px;transform:translateX(-50%);z-index:12;border:1px solid #9b7d53;border-radius:7px;
+      background:linear-gradient(180deg,#f5e4c0,#9a7e55 32%,#36291f 67%,#d2b47b);box-shadow:0 4px 7px #080606,inset 0 1px #fff4d8;pointer-events:none;}
+    #game-grid .card {position:absolute;left:50%;top:35px;flex:none;width:min(330px,calc(100% - 44px));height:500px;margin:0;padding:35px 17px 16px!important;
+      border:2px solid color-mix(in srgb,var(--c) 38%,#bca17a);border-radius:7px;scroll-snap-align:center;transform-origin:50% 12px;
+      background-color:#241d19;background-image:linear-gradient(118deg,rgba(255,245,220,.14),transparent 22% 72%,rgba(255,245,220,.035)),linear-gradient(155deg,#403128,#241d1a 55%,#30251f);
+      box-shadow:0 12px 18px #000a,0 2px 0 #846b4b,inset 0 1px #fff4dc66,inset 0 -3px #0b0909;transition:transform .8s cubic-bezier(.2,.72,.25,1),box-shadow .3s,border-color .3s;}
+    #game-grid .card:hover,#game-grid .card.card-focused,#game-grid .card.card-active {animation:none;border-color:#d0b27f;box-shadow:0 18px 24px #000c,0 3px 0 #8f754e,inset 0 1px #fff4dc77,inset 0 -3px #0b0909;}
+    #game-grid .card:first-child {margin-left:0}
+    #game-grid .card {transform:translateX(calc(-50% + var(--arc-x,0px))) translateY(var(--arc-y,0px)) translateZ(var(--arc-z,0px)) rotateZ(var(--arc-tilt,0deg)) rotateY(var(--arc-turn,0deg)) rotateX(var(--arc-pitch,0deg)) scale(var(--arc-scale,1));}
+    #game-grid .card.card-focused {z-index:20}
+    #game-grid .card-active:not(:hover):not(.card-focused) {z-index:19}
+    #game-grid .card-shot-wrap {flex:none;width:100%;height:132px;aspect-ratio:auto;margin:0 0 10px;padding:5px;border-radius:3px;}
+    #game-grid .card-title {font-size:16px;letter-spacing:.12em;line-height:1.25;margin:2px 0 6px;min-height:0;text-align:left;color:color-mix(in srgb,var(--c) 48%,#fff0d3);background:none!important;-webkit-background-clip:border-box!important;background-clip:border-box!important;-webkit-text-fill-color:currentColor!important;font-style:normal;filter:none;text-shadow:0 1px #100b09,0 2px 1px #0009;}
+    #game-grid .rolodex-page-card {border-color:#a9936d;background-color:#30271f;background-image:linear-gradient(118deg,rgba(255,245,220,.14),transparent 22% 72%,rgba(255,245,220,.035)),linear-gradient(155deg,#403128,#241d1a 55%,#30251f)}
+    #game-grid .rolodex-page-card .card-title {color:#e5d4b5;text-shadow:0 1px #080708,0 2px 1px #0009}
+    #game-grid .rolodex-page-card .card-shot-wrap img {filter:sepia(.25) saturate(.7)}
+    #game-grid .card-genre,#game-grid .card-desc {display:block!important;min-width:0;overflow-wrap:anywhere;white-space:normal;text-shadow:none;}
+    #game-grid .card-genre {flex:none;margin:0 0 9px;color:#765733;font:700 12px/1.35 'Courier New',monospace;letter-spacing:.075em;text-shadow:none;}
+    #game-grid .card-desc {flex:1;margin:0 0 11px;padding:11px 12px;border:1px solid #a88b61;border-radius:3px;color:#30251d;font:14px/1.48 'Courier New',monospace;letter-spacing:0;text-shadow:none;background:linear-gradient(135deg,#f1e6ce,#d9c7a5);box-shadow:inset 0 1px #fff8e8,0 2px 4px #120d0b99;}
+    #game-grid .card-hi {flex:none;margin:0 0 8px;font-size:10px;}
+    #game-grid .card-badges,#game-grid .badge-touch,#game-grid .badge-pad {display:none!important}
+    .card-punch {position:absolute;top:7px;left:50%;width:40px;height:10px;z-index:6;transform:translateX(-50%);pointer-events:none;}
+    .card-punch::before,.card-punch::after {content:'';position:absolute;top:1px;width:8px;height:8px;border-radius:50%;
+      background:radial-gradient(circle at 35% 30%,#e8d6ae 0 1px,#171313 2px 3px,#b49565 3.5px 4px,transparent 4.5px);}
+    .card-punch::before {left:3px}.card-punch::after {right:3px}
+    @media (max-width:620px) {
+      #game-grid {height:600px;min-height:600px;}
+      #game-grid .card {width:min(300px,calc(100% - 20px));height:540px;padding:35px 16px 16px!important;}
+      #game-grid .card-shot-wrap {height:124px}
+      #game-grid .card-genre {font-size:11px;}
+      #game-grid .card-desc {font-size:14px;line-height:1.48}
+    }
+    @media (max-width:520px) {
+      .top-marquee-bar #marquee-name,#marquee-bar.jukebox-marquee #marquee-name {left:calc(50% - 2px);padding-left:2px;padding-right:2px}
     }
 
+    .screen-bezel.jukebox-open .jukebox-rack {visibility:hidden}
+    .cabinet-return .jukebox-front {animation:rolodex-return 4s cubic-bezier(.45,.02,.25,1) both}
+    @keyframes rolodex-return {
+      from {transform:translateY(calc(-1 * var(--rolodex-travel, 500px)));opacity:1}
+      to {transform:translateY(0);opacity:1}
+    }
+    @media(prefers-reduced-motion:reduce) {
+      .jukebox-front,.rolodex-guides {transition-duration:.01ms!important}
+      .cabinet-return .jukebox-front,.cabinet-return .rolodex-guides {animation-duration:.01ms!important}
+    }
+    .rolodex-empty-bay {position:absolute;z-index:18;border:1px solid #b2956244;border-radius:7px;pointer-events:none;
+      transform-origin:50% 8%;background:linear-gradient(90deg,#1c181a55,transparent 15% 85%,#1c181a55)}
+    .rolodex-empty-bay::before,.rolodex-empty-bay::after {content:'';position:absolute;top:4px;width:9px;height:15px;
+      border:1px solid #bda171;border-radius:3px;background:linear-gradient(90deg,#58442c,#e0c393,#58442c)}
+    .rolodex-empty-bay::before {left:calc(50% - 18px)}.rolodex-empty-bay::after {right:calc(50% - 18px)}
+    #game-grid .card.card-loaded .game-rom {visibility:hidden}
+    .jukebox-game-screen {position:absolute;inset:14px;z-index:1;overflow:hidden;border-radius:10px;background:#09090b;visibility:hidden;
+      box-shadow:inset 0 0 25px #000,inset 0 0 0 2px #261d18}
+    .screen-bezel.jukebox-open .jukebox-game-screen {visibility:visible}
+    .jukebox-game-screen {background-position:center;background-size:contain;background-repeat:no-repeat}
+    .jukebox-game-screen iframe {display:block;width:100%;height:100%;border:0;pointer-events:none;opacity:0}
+    .jukebox-game-screen.game-ready iframe {opacity:1}
+    .screen-bezel.jukebox-open .jukebox-storage {opacity:0;visibility:hidden}
+    .jukebox-front::before {content:'';position:absolute;inset:-10px -7px;z-index:-1;border:1px solid #b39461;border-radius:8px;
+      background:linear-gradient(135deg,#332922,#141216 65%);box-shadow:0 8px 18px #000b,inset 0 1px #f0d9ad55}
+    .rolodex-guides {position:absolute;inset:0 auto 0 50%;width:min(410px,calc(100% - 24px));transform:translateX(-50%);z-index:3;pointer-events:none;transition:transform 4s cubic-bezier(.45,.02,.25,1)}
+    .screen-bezel.jukebox-open .rolodex-guides {transform:translateX(-50%) translateY(calc(-1 * var(--rolodex-travel, 500px)))}
+    .cabinet-return .rolodex-guides {animation:rolodex-guides-return 4s cubic-bezier(.45,.02,.25,1) both}
+    @keyframes rolodex-guides-return {from{transform:translateX(-50%) translateY(calc(-1 * var(--rolodex-travel, 500px)))}to{transform:translateX(-50%) translateY(0)}}
+    .rolodex-guide {position:absolute;top:0;bottom:0;width:10px;border:1px solid #806647;border-radius:4px;
+      background:linear-gradient(90deg,#281e18,#c4aa7f 22%,#756049 40%,#302820 64%,#d9bf92 84%,#32231b);
+      box-shadow:2px 0 4px #000b,inset 1px 0 #eddbb7}
+    .rolodex-guide.left {left:0}.rolodex-guide.right {right:0}
+    .rolodex-guide::before,.rolodex-guide::after {content:'';position:absolute;left:-2px;width:12px;height:13px;border:1px solid #c0a06e;border-radius:3px;
+      background:radial-gradient(circle,#35271b 0 2px,#e2c591 2.5px 3.5px,#6a4d30 4px)}
+    .rolodex-guide::before {top:0}.rolodex-guide::after {bottom:4px}
+    .rolodex-stay {position:absolute;z-index:2;width:0;height:8px;border:1px solid #b99966;border-radius:6px;transform-origin:0 50%;
+      background:linear-gradient(180deg,#f3dfb7 0%,#9b7950 27%,#3c2d22 56%,#d0ad75 82%,#59422c 100%);
+      box-shadow:0 4px 7px #000d,inset 0 1px #fff0ce,inset 0 -2px #291e17;}
+    .rolodex-stay::before,.rolodex-stay::after {content:'';position:absolute;top:50%;width:13px;height:13px;transform:translateY(-50%);border:2px solid #c4a570;border-radius:50%;
+      background:radial-gradient(circle at 32% 27%,#f7e7c5,#80623e 45%,#211814 72%);box-shadow:0 3px 5px #000d,inset 0 1px #fff0ca;}
+    .rolodex-stay::before {left:-5px}.rolodex-stay::after {right:-5px}
+    .rolodex-carriage {position:absolute;top:27px;width:17px;height:40px;border:1px solid #d4b585;border-radius:4px;
+      background:linear-gradient(90deg,#57412d,#ddc399 34%,#6c5337 60%,#2d231b);box-shadow:0 5px 6px #000c,inset 0 1px #fff0ce;
+      transition:transform 4s cubic-bezier(.45,.02,.25,1)}
+    .rolodex-carriage.left {left:0}.rolodex-carriage.right {right:0}
+    .rolodex-carriage::after {content:'';position:absolute;top:10px;width:15px;height:19px;border:1px solid #b69361;
+      background:linear-gradient(#d5b78a,#51402c);box-shadow:0 4px 5px #000b}
+    .rolodex-carriage.left::after {left:12px}.rolodex-carriage.right::after {right:12px}
+    #game-grid::before {content:none}
+    .rolodex-spindle {position:absolute;left:0;top:0;height:100%;z-index:0;overflow:visible;pointer-events:none;filter:drop-shadow(0 4px 3px #080606)}
+    .rolodex-spindle .rail-shadow {fill:none;stroke:#30241b;stroke-width:15;stroke-linecap:round;stroke-linejoin:round}
+    .rolodex-spindle .rail-metal {fill:none;stroke:url(#rolodex-metal);stroke-width:9;stroke-linecap:round;stroke-linejoin:round}
+    .rolodex-spindle .stay-shadow {fill:none;stroke:#201812;stroke-width:10;stroke-linecap:round;stroke-linejoin:round}
+    .rolodex-spindle .stay-metal {fill:none;stroke:url(#rolodex-metal);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+    .rolodex-pin {position:absolute;top:5px;width:9px;height:12px;z-index:7;pointer-events:none;
+      border:2px solid #bda780;border-radius:5px;background:linear-gradient(90deg,#483c2d,#ebdabc 38%,#806c4f 68%,#30271e);
+      box-shadow:1px 2px 2px #0008,inset 0 1px #fff4dd}
+    .rolodex-pin::after {content:'';position:absolute;left:1px;top:2px;width:3px;height:5px;border-radius:2px;background:#211b17;box-shadow:inset 1px 1px #000}
+    .rolodex-spindle .hanger-shadow {fill:none;stroke:#201812;stroke-width:5;stroke-linecap:round}
+    .rolodex-spindle .hanger-metal {fill:none;stroke:#ac9672;stroke-width:2;stroke-linecap:round}
+    .rolodex-bearing {position:absolute;top:17px;width:22px;height:24px;border:1px solid #ae9267;border-radius:4px;
+      background:linear-gradient(90deg,#3d3227,#b9a282 36%,#62503d 70%,#32291f);box-shadow:0 5px 5px #000b,inset 0 1px #f3e1bf}
+    .rolodex-bearing::before {content:'';position:absolute;inset:5px;border:2px solid #c4af8a;border-radius:50%;background:radial-gradient(circle,#30271e 0 2px,#928063 3px,#47392a 5px);box-shadow:inset 0 1px 2px #000}
+    .rolodex-bearing::after {content:'';position:absolute;top:1px;left:3px;width:3px;height:3px;border-radius:50%;background:#342c23;box-shadow:12px 17px #342c23}
+    #game-grid .card {--index-stock:#55716a;overflow:visible;border:2px solid #b5aa8d;border-radius:11px;background:#243e3c;
+      box-shadow:0 12px 20px #000b,0 2px 0 #d8d3b9,0 4px 0 #738980,0 5px 0 #172d2b,inset 0 0 0 2px #f9edcf44,inset 0 -2px #142826;transition:transform .95s cubic-bezier(.25,.65,.25,1),box-shadow .35s,border-color .35s}
+    #game-grid .card::before {inset:3px;width:auto;height:auto;border:1px solid #f5edda55;border-radius:7px;
+      background:linear-gradient(112deg,#fff8e924,transparent 19% 67%,#fff8e91b 69%,#fff8e92b 72%,transparent 76%),linear-gradient(178deg,#fff9ec1a,transparent 18% 91%,#fff9ec14);pointer-events:none;z-index:4;
+      box-shadow:inset 1px 1px 1px #fff4df55,inset -1px -1px 2px #16110b66;transition:background-position .95s cubic-bezier(.25,.65,.25,1);background-size:130% 100%,100% 100%;background-position:100% 0,0 0}
+    #game-grid .card::after {left:9px;right:9px;top:auto;bottom:2px;width:auto;height:2px;border:0;border-radius:50%;background:linear-gradient(90deg,transparent,#fff6d9aa 20% 75%,transparent);pointer-events:none}
+    #game-grid .card:is(.card-focused,.card-active) {border-color:#e1d8b8;box-shadow:0 18px 24px #000c,0 2px 0 #eee8d0,0 4px 0 #8da69a,0 5px 0 #172d2b,inset 0 0 0 2px #fff4dc55,inset 0 -2px #211a14}
+    #game-grid .card.card-focused::before {background-position:0 0,0 0}
+    #game-grid .card-genre {color:#c9b391}
+    #game-grid .card-desc {background:linear-gradient(105deg,#e9ddc1,#f2e7cf 46%,#dfd0af);border-color:#bcaa88;box-shadow:inset 0 0 0 2px #fff6e344,0 1px 2px #0005}
+    #game-grid .card .card-shot {transform:none!important;transition:none;filter:none}
+    #game-grid .card-shot-wrap::after {content:none;animation:none!important}
+    #game-grid .card.no-credit {filter:none}
+    #game-grid .card-title {text-shadow:none}
+    #game-grid .card-shot-wrap {width:142px;max-width:100%;align-self:center;background:linear-gradient(90deg,#29241d,#0d0d0c 12% 88%,#29241d);box-shadow:inset 0 4px 8px #000,inset 0 0 0 3px #100e0c,0 1px #e6d3ae55}
+    #game-grid .card-shot-wrap::before {inset:auto auto 11px 50%;width:56px;height:6px;transform:translateX(-50%);z-index:0;background:repeating-linear-gradient(90deg,#9b7942 0 3px,#e4c78b 3px 5px,#171410 5px 8px);box-shadow:0 -1px #423725}
+    .game-rom {position:absolute;inset:5px;display:flex;flex-direction:column;gap:2px;padding:3px;border:1px solid #aa9270;border-radius:3px;background:#25231e;box-shadow:0 2px 4px #000c,inset 0 1px #ecdbb580;overflow:hidden}
+    #game-grid .game-rom .card-shot {flex:1;min-height:0;width:100%;height:calc(100% - 13px);object-fit:contain}
+    .rom-label {flex:none;height:11px;color:#d5c5a4;font:700 7px/11px 'Courier New',monospace;letter-spacing:.12em;text-align:center;background:linear-gradient(#403a2e,#29251e)}
+    @media(max-width:620px) {#game-grid .card-shot-wrap {width:128px}}
+    #game-grid .card-copy {position:relative;flex:1;min-height:0;padding:14px 14px 18px;border:1px solid #b9a888;border-radius:3px;
+      background:
+        radial-gradient(ellipse at 2% 94%,#88602a26,transparent 29%),
+        radial-gradient(ellipse at 98% 6%,#91632624,transparent 24%),
+        radial-gradient(circle at 11% 81%,#8c642c2b 0 .7px,transparent 1.3px),
+        radial-gradient(circle at 92% 19%,#8c642c22 0 1px,transparent 1.7px),
+        radial-gradient(circle at 84% 91%,#8c642c26 0 .8px,transparent 1.5px),
+        repeating-linear-gradient(83deg,#6f542908 0 1px,transparent 1px 5px),
+        linear-gradient(100deg,#cdb77e,#e9d8a7 8%,#ecdeb7 48%,#e6d4a3 91%,#cdb87f);
+      box-shadow:inset 0 0 0 2px #f5e8c544,inset 0 0 13px #87612522,0 1px 1px #fff0cf66;}
+    #game-grid .card-copy::before {content:'';position:absolute;inset:2px;border-radius:2px;border:1px solid #fff9e833;background:linear-gradient(112deg,#fffdf00e,transparent 40% 78%,#fffdf012 81% 83%,transparent 87%);pointer-events:none}
+    #game-grid .card-copy::after {content:'';position:absolute;left:14px;right:14px;bottom:8px;height:1px;background:#99836666;pointer-events:none}
+    #game-grid .card-copy .card-title {margin:0 0 5px;color:#742e36;font:900 18px/1.2 'Courier New',monospace;letter-spacing:.075em;}
+    #game-grid .card-copy .card-genre {margin:0 0 12px;padding-bottom:9px;border-bottom:1px solid #65807777;color:#3e5f59;font:700 10px/1.4 'Courier New',monospace;letter-spacing:.08em;}
+    #game-grid .card-copy .card-desc {margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;color:#302f29;font:16px/1.5 Georgia,'Times New Roman',serif;overflow-wrap:normal;}
+    #game-grid .card-copy .card-hi {color:#3e5f59;font:700 9px/1.4 'Courier New',monospace;letter-spacing:.025em;text-shadow:none;}
+    #game-grid .game-rom {background:linear-gradient(125deg,#393329,#24221d 40%,#171613);border-color:#a18c6b;box-shadow:0 3px 5px #000b,inset 0 1px #efdfbe99,inset 0 -2px #0b0b09;}
+    #game-grid .game-rom::after {content:'';position:absolute;inset:3px;border-radius:1px;background:linear-gradient(115deg,#fff2cf0c,transparent 35% 76%,#fff2cf06);pointer-events:none}
+    #game-grid .card-code {left:13px;right:auto;top:10px;color:#742e36;background:#e0cd9d;border-color:#aa9466;box-shadow:inset 0 1px #fff2d2,0 1px 2px #0005;text-shadow:none}
+
+    #game-grid :is(.card-rally,.card-brawler,.card-galactic,.card-meteors) {--index-stock:#854851}
+    .card-index-tab {position:absolute;top:-10px;left:calc(1% + var(--tab-lane)*24%);width:23%;height:15px;padding:0 3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;border:1px solid #c8b78f;border-bottom:0;border-radius:4px 4px 0 0;
+      background:linear-gradient(#ffffff20,transparent 48%,#00000014),var(--index-stock);color:#fff3d9;font:700 8px/14px 'Courier New',monospace;letter-spacing:.02em;box-shadow:0 -1px 0 #fff2d355,inset 0 1px #fff6df55,2px -2px 3px #0007;pointer-events:auto}
 
   </style>
 </head>
 <body>
 
-  <a class="blip-logo" href="index.html">BLIP<span class="ba-rest">&nbsp;ARCADE</span></a>
-  <div class="top-marquee-bar"></div>
+  <a class="blip-logo led-logo" href="index.html" aria-label="BLIP — cabinet"><svg class="blip-led-display" viewBox="0 0 100 32" aria-hidden="true"><circle class="led-on" cx="4" cy="4" r="1.35"/><circle class="led-on" cx="8" cy="4" r="1.35"/><circle class="led-on" cx="12" cy="4" r="1.35"/><circle class="led-on" cx="16" cy="4" r="1.35"/><circle class="led-off" cx="20" cy="4" r="1.35"/><circle class="led-on" cx="4" cy="8" r="1.35"/><circle class="led-off" cx="8" cy="8" r="1.35"/><circle class="led-off" cx="12" cy="8" r="1.35"/><circle class="led-off" cx="16" cy="8" r="1.35"/><circle class="led-on" cx="20" cy="8" r="1.35"/><circle class="led-on" cx="4" cy="12" r="1.35"/><circle class="led-off" cx="8" cy="12" r="1.35"/><circle class="led-off" cx="12" cy="12" r="1.35"/><circle class="led-off" cx="16" cy="12" r="1.35"/><circle class="led-on" cx="20" cy="12" r="1.35"/><circle class="led-on" cx="4" cy="16" r="1.35"/><circle class="led-on" cx="8" cy="16" r="1.35"/><circle class="led-on" cx="12" cy="16" r="1.35"/><circle class="led-on" cx="16" cy="16" r="1.35"/><circle class="led-off" cx="20" cy="16" r="1.35"/><circle class="led-on" cx="4" cy="20" r="1.35"/><circle class="led-off" cx="8" cy="20" r="1.35"/><circle class="led-off" cx="12" cy="20" r="1.35"/><circle class="led-off" cx="16" cy="20" r="1.35"/><circle class="led-on" cx="20" cy="20" r="1.35"/><circle class="led-on" cx="4" cy="24" r="1.35"/><circle class="led-off" cx="8" cy="24" r="1.35"/><circle class="led-off" cx="12" cy="24" r="1.35"/><circle class="led-off" cx="16" cy="24" r="1.35"/><circle class="led-on" cx="20" cy="24" r="1.35"/><circle class="led-on" cx="4" cy="28" r="1.35"/><circle class="led-on" cx="8" cy="28" r="1.35"/><circle class="led-on" cx="12" cy="28" r="1.35"/><circle class="led-on" cx="16" cy="28" r="1.35"/><circle class="led-off" cx="20" cy="28" r="1.35"/><circle class="led-on" cx="28" cy="4" r="1.35"/><circle class="led-off" cx="32" cy="4" r="1.35"/><circle class="led-off" cx="36" cy="4" r="1.35"/><circle class="led-off" cx="40" cy="4" r="1.35"/><circle class="led-off" cx="44" cy="4" r="1.35"/><circle class="led-on" cx="28" cy="8" r="1.35"/><circle class="led-off" cx="32" cy="8" r="1.35"/><circle class="led-off" cx="36" cy="8" r="1.35"/><circle class="led-off" cx="40" cy="8" r="1.35"/><circle class="led-off" cx="44" cy="8" r="1.35"/><circle class="led-on" cx="28" cy="12" r="1.35"/><circle class="led-off" cx="32" cy="12" r="1.35"/><circle class="led-off" cx="36" cy="12" r="1.35"/><circle class="led-off" cx="40" cy="12" r="1.35"/><circle class="led-off" cx="44" cy="12" r="1.35"/><circle class="led-on" cx="28" cy="16" r="1.35"/><circle class="led-off" cx="32" cy="16" r="1.35"/><circle class="led-off" cx="36" cy="16" r="1.35"/><circle class="led-off" cx="40" cy="16" r="1.35"/><circle class="led-off" cx="44" cy="16" r="1.35"/><circle class="led-on" cx="28" cy="20" r="1.35"/><circle class="led-off" cx="32" cy="20" r="1.35"/><circle class="led-off" cx="36" cy="20" r="1.35"/><circle class="led-off" cx="40" cy="20" r="1.35"/><circle class="led-off" cx="44" cy="20" r="1.35"/><circle class="led-on" cx="28" cy="24" r="1.35"/><circle class="led-off" cx="32" cy="24" r="1.35"/><circle class="led-off" cx="36" cy="24" r="1.35"/><circle class="led-off" cx="40" cy="24" r="1.35"/><circle class="led-off" cx="44" cy="24" r="1.35"/><circle class="led-on" cx="28" cy="28" r="1.35"/><circle class="led-on" cx="32" cy="28" r="1.35"/><circle class="led-on" cx="36" cy="28" r="1.35"/><circle class="led-on" cx="40" cy="28" r="1.35"/><circle class="led-on" cx="44" cy="28" r="1.35"/><circle class="led-on" cx="52" cy="4" r="1.35"/><circle class="led-on" cx="56" cy="4" r="1.35"/><circle class="led-on" cx="60" cy="4" r="1.35"/><circle class="led-on" cx="64" cy="4" r="1.35"/><circle class="led-on" cx="68" cy="4" r="1.35"/><circle class="led-off" cx="52" cy="8" r="1.35"/><circle class="led-off" cx="56" cy="8" r="1.35"/><circle class="led-on" cx="60" cy="8" r="1.35"/><circle class="led-off" cx="64" cy="8" r="1.35"/><circle class="led-off" cx="68" cy="8" r="1.35"/><circle class="led-off" cx="52" cy="12" r="1.35"/><circle class="led-off" cx="56" cy="12" r="1.35"/><circle class="led-on" cx="60" cy="12" r="1.35"/><circle class="led-off" cx="64" cy="12" r="1.35"/><circle class="led-off" cx="68" cy="12" r="1.35"/><circle class="led-off" cx="52" cy="16" r="1.35"/><circle class="led-off" cx="56" cy="16" r="1.35"/><circle class="led-on" cx="60" cy="16" r="1.35"/><circle class="led-off" cx="64" cy="16" r="1.35"/><circle class="led-off" cx="68" cy="16" r="1.35"/><circle class="led-off" cx="52" cy="20" r="1.35"/><circle class="led-off" cx="56" cy="20" r="1.35"/><circle class="led-on" cx="60" cy="20" r="1.35"/><circle class="led-off" cx="64" cy="20" r="1.35"/><circle class="led-off" cx="68" cy="20" r="1.35"/><circle class="led-off" cx="52" cy="24" r="1.35"/><circle class="led-off" cx="56" cy="24" r="1.35"/><circle class="led-on" cx="60" cy="24" r="1.35"/><circle class="led-off" cx="64" cy="24" r="1.35"/><circle class="led-off" cx="68" cy="24" r="1.35"/><circle class="led-on" cx="52" cy="28" r="1.35"/><circle class="led-on" cx="56" cy="28" r="1.35"/><circle class="led-on" cx="60" cy="28" r="1.35"/><circle class="led-on" cx="64" cy="28" r="1.35"/><circle class="led-on" cx="68" cy="28" r="1.35"/><circle class="led-on" cx="76" cy="4" r="1.35"/><circle class="led-on" cx="80" cy="4" r="1.35"/><circle class="led-on" cx="84" cy="4" r="1.35"/><circle class="led-on" cx="88" cy="4" r="1.35"/><circle class="led-off" cx="92" cy="4" r="1.35"/><circle class="led-on" cx="76" cy="8" r="1.35"/><circle class="led-off" cx="80" cy="8" r="1.35"/><circle class="led-off" cx="84" cy="8" r="1.35"/><circle class="led-off" cx="88" cy="8" r="1.35"/><circle class="led-on" cx="92" cy="8" r="1.35"/><circle class="led-on" cx="76" cy="12" r="1.35"/><circle class="led-off" cx="80" cy="12" r="1.35"/><circle class="led-off" cx="84" cy="12" r="1.35"/><circle class="led-off" cx="88" cy="12" r="1.35"/><circle class="led-on" cx="92" cy="12" r="1.35"/><circle class="led-on" cx="76" cy="16" r="1.35"/><circle class="led-on" cx="80" cy="16" r="1.35"/><circle class="led-on" cx="84" cy="16" r="1.35"/><circle class="led-on" cx="88" cy="16" r="1.35"/><circle class="led-off" cx="92" cy="16" r="1.35"/><circle class="led-on" cx="76" cy="20" r="1.35"/><circle class="led-off" cx="80" cy="20" r="1.35"/><circle class="led-off" cx="84" cy="20" r="1.35"/><circle class="led-off" cx="88" cy="20" r="1.35"/><circle class="led-off" cx="92" cy="20" r="1.35"/><circle class="led-on" cx="76" cy="24" r="1.35"/><circle class="led-off" cx="80" cy="24" r="1.35"/><circle class="led-off" cx="84" cy="24" r="1.35"/><circle class="led-off" cx="88" cy="24" r="1.35"/><circle class="led-off" cx="92" cy="24" r="1.35"/><circle class="led-on" cx="76" cy="28" r="1.35"/><circle class="led-off" cx="80" cy="28" r="1.35"/><circle class="led-off" cx="84" cy="28" r="1.35"/><circle class="led-off" cx="88" cy="28" r="1.35"/><circle class="led-off" cx="92" cy="28" r="1.35"/></svg></a>
+  <div class="top-marquee-bar"><span id="marquee-name" class="marquee-empty" aria-label="No game selected"><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span></span></div>
   <!-- Coin slot: top-right corner of the cabinet panel, mirroring the
        BLIP ARCADE logo at top-left. -->
-  <button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
+  <button class="kiosk-btn" id="kiosk-insert-btn"></button>
 
   <div class="stars" id="stars"></div>
   <div class="cab-rail left"></div>
@@ -761,13 +926,19 @@
 
   <div class="divider"></div>
 
-  <div class="screen-bezel">
+  <div class="screen-bezel" id="screen-bezel">
     <span class="screw tl"></span><span class="screw tr"></span>
     <span class="screw bl"></span><span class="screw br"></span>
-  <div class="game-grid">
+    <div class="jukebox-game-screen"><iframe id="cabinet-game-screen" title="Game screen" tabindex="-1"></iframe></div>
+    <div class="jukebox-storage" id="jukebox-storage" aria-hidden="true">
+      <div class="jukebox-rack"></div>
+    </div>
+    <div class="rolodex-guides" aria-hidden="true"><i class="rolodex-guide left"></i><i class="rolodex-guide right"></i><i class="rolodex-carriage left"></i><i class="rolodex-carriage right"></i><i class="rolodex-stay left"></i><i class="rolodex-stay right"></i></div>
+    <div class="jukebox-front" id="jukebox-front">
+  <div class="game-grid" id="game-grid" aria-label="Choose a game from the Rolodex">
 
     <!-- RALLY -->
-    <a class="card card-rally" href="rally/index.html">
+    <article class="card card-rally" data-game-url="rally/index.html">
       <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-badges">
         <div class="badge-2p">2<br>PLAYER</div>
@@ -778,11 +949,10 @@
       <div class="card-title">RALLY</div>
       <div class="card-genre"  data-i18n="rallyGenre"></div>
       <div class="card-desc"   data-i18n="rallyDesc"></div>
-      <div class="card-controls" data-i18n="rallyControls"></div>
-    </a>
+    </article>
 
     <!-- BUBBLER -->
-    <a class="card card-bouncer" href="bouncer/index.html">
+    <article class="card card-bouncer" data-game-url="bouncer/index.html">
       <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-badges">
         <div class="badge-genre badge-cosy" data-i18n="badgeCosy">COSY</div>
@@ -793,11 +963,10 @@
       <div class="card-title">BOUNCER</div>
       <div class="card-genre"  data-i18n="bouncerGenre"></div>
       <div class="card-desc"   data-i18n="bouncerDesc"></div>
-      <div class="card-controls" data-i18n="bouncerControls"></div>
-    </a>
+    </article>
 
     <!-- GALACTIC DEFENDER -->
-    <a class="card card-galactic" href="galactic_defender/index.html">
+    <article class="card card-galactic" data-game-url="galactic_defender/index.html">
       <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
         <img class="card-shot" src="galactic_defender/screenshot.png?v=7" alt="Galactic Defender gameplay">
@@ -805,11 +974,10 @@
       <div class="card-title">DEFENDER</div>
       <div class="card-genre"  data-i18n="galacticGenre"></div>
       <div class="card-desc"   data-i18n="galacticDesc"></div>
-      <div class="card-controls" data-i18n="galacticControls"></div>
-    </a>
+    </article>
 
     <!-- RAIDER -->
-    <a class="card card-bubbler" href="bubbler/index.html">
+    <article class="card card-bubbler" data-game-url="bubbler/index.html">
       <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-badges">
         <div class="badge-2p">2<br>PLAYER</div>
@@ -821,11 +989,10 @@
       <div class="card-title">BUBBLER</div>
       <div class="card-genre"  data-i18n="bubblerGenre"></div>
       <div class="card-desc"   data-i18n="bubblerDesc"></div>
-      <div class="card-controls" data-i18n="bubblerControls"></div>
-    </a>
+    </article>
 
     <!-- BOUNCER -->
-    <a class="card card-sky-raider" href="sky_raider/index.html">
+    <article class="card card-sky-raider" data-game-url="sky_raider/index.html">
       <span class="badge-pad"><svg class="bp-dualsense" viewBox="0 0 30 19" aria-hidden="true"><path class="bp-body" d="M7 2.2C10 1.2 20 1.2 23 2.2C26.2 3.3 28.3 8.5 29 13.6C29.5 17.4 26.8 18.6 24.6 16.4L21.4 13.1C18.6 12 11.4 12 8.6 13.1L5.4 16.4C3.2 18.6.5 17.4 1 13.6C1.7 8.5 3.8 3.3 7 2.2Z"/><path class="bp-centre" d="M10.2 3.4H19.8L19 9.6C16.4 10.4 13.6 10.4 11 9.6Z"/><path class="bp-light" d="M10.8 3.9Q15 5 19.2 3.9"/><circle class="bp-stick" cx="11.2" cy="11.2" r="1.7"/><circle class="bp-stick" cx="18.8" cy="11.2" r="1.7"/><path class="bp-dpad" d="M5.4 7.6h2.6M6.7 6.3v2.6"/><circle class="bp-btn" cx="23.3" cy="6.2" r=".8"/><circle class="bp-btn" cx="23.3" cy="9" r=".8"/><circle class="bp-btn" cx="21.9" cy="7.6" r=".8"/><circle class="bp-btn" cx="24.7" cy="7.6" r=".8"/></svg><span class="bp-text" data-i18n="badgePad">CONTROLLER<small>RECOMMENDED</small></span></span>
       <div class="card-badges">
         <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
@@ -836,10 +1003,9 @@
       <div class="card-title">RAIDER</div>
       <div class="card-genre"  data-i18n="skyRaiderGenre"></div>
       <div class="card-desc"   data-i18n="skyRaiderDesc"></div>
-      <div class="card-controls" data-i18n="skyRaiderControls"></div>
-    </a>
+    </article>
     <!-- METEORS -->
-    <a class="card card-meteors" href="meteors/index.html">
+    <article class="card card-meteors" data-game-url="meteors/index.html">
       <div class="card-badges">
         <div class="badge-genre badge-trippy" data-i18n="badgeTrippy">TRIPPY</div>
       </div>
@@ -849,11 +1015,10 @@
       <div class="card-title">METEORS</div>
       <div class="card-genre"  data-i18n="meteorsGenre"></div>
       <div class="card-desc"   data-i18n="meteorsDesc"></div>
-      <div class="card-controls" data-i18n="meteorsControls"></div>
-    </a>
+    </article>
 
     <!-- SERPENT -->
-    <a class="card card-serpent" href="serpent/index.html">
+    <article class="card card-serpent" data-game-url="serpent/index.html">
       <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
         <img class="card-shot" src="serpent/screenshot.png?v=4" alt="Serpent gameplay">
@@ -861,11 +1026,10 @@
       <div class="card-title">SERPENT</div>
       <div class="card-genre"  data-i18n="serpentGenre"></div>
       <div class="card-desc"   data-i18n="serpentDesc"></div>
-      <div class="card-controls" data-i18n="serpentControls"></div>
-    </a>
+    </article>
 
     <!-- BRAWLER -->
-    <a class="card card-brawler" href="brawler/index.html">
+    <article class="card card-brawler" data-game-url="brawler/index.html">
       <span class="badge-pad"><svg class="bp-dualsense" viewBox="0 0 30 19" aria-hidden="true"><path class="bp-body" d="M7 2.2C10 1.2 20 1.2 23 2.2C26.2 3.3 28.3 8.5 29 13.6C29.5 17.4 26.8 18.6 24.6 16.4L21.4 13.1C18.6 12 11.4 12 8.6 13.1L5.4 16.4C3.2 18.6.5 17.4 1 13.6C1.7 8.5 3.8 3.3 7 2.2Z"/><path class="bp-centre" d="M10.2 3.4H19.8L19 9.6C16.4 10.4 13.6 10.4 11 9.6Z"/><path class="bp-light" d="M10.8 3.9Q15 5 19.2 3.9"/><circle class="bp-stick" cx="11.2" cy="11.2" r="1.7"/><circle class="bp-stick" cx="18.8" cy="11.2" r="1.7"/><path class="bp-dpad" d="M5.4 7.6h2.6M6.7 6.3v2.6"/><circle class="bp-btn" cx="23.3" cy="6.2" r=".8"/><circle class="bp-btn" cx="23.3" cy="9" r=".8"/><circle class="bp-btn" cx="21.9" cy="7.6" r=".8"/><circle class="bp-btn" cx="24.7" cy="7.6" r=".8"/></svg><span class="bp-text" data-i18n="badgePad">CONTROLLER<small>RECOMMENDED</small></span></span>
       <div class="card-badges">
         <div class="badge-2p">2<br>PLAYER</div>
@@ -877,34 +1041,11 @@
       <div class="card-title">BRAWLER</div>
       <div class="card-genre"  data-i18n="brawlerGenre"></div>
       <div class="card-desc"   data-i18n="brawlerDesc"></div>
-      <div class="card-controls" data-i18n="brawlerControls"></div>
-    </a>
-
+    </article>
 
   </div>
+    </div>
   </div>
-
-  <div class="lang-switcher">
-    <button class="lang-btn" data-lang="en">🇬🇧</button>
-    <button class="lang-btn" data-lang="da">🇩🇰</button>
-    <button class="lang-btn" data-lang="ja">🇯🇵</button>
-  </div>
-
-  <div class="left-badges">
-    <a class="controls-badge" href="controls.html">
-      <img class="controls-avatar" src="controls-icon.svg" alt="Controls">
-      <span class="controls-label">CONTROLS</span>
-    </a>
-    <a class="about-badge" href="about.html">
-      <img class="about-avatar" src="claude-avatar.svg" alt="About this experiment">
-      <span class="about-label">ABOUT</span>
-    </a>
-    <a class="history-badge" href="history.html">
-      <img class="history-avatar" src="history-icon.svg" alt="Game history">
-      <span class="history-label">HISTORY</span>
-    </a>
-  </div>
-
 
   <footer>
     <div data-i18n="footerControls"></div>
@@ -916,12 +1057,67 @@
        the lit card. -->
   <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
    <div class="deck-panel"></div>
+
   </div>
-  <script src="deck.js?v=5"></script>
+  <div class="manual-overlay" id="manual-overlay" hidden role="dialog" aria-modal="true" aria-label="BLIP Arcade Field Manual">
+    <div class="manual-open-book" role="document">
+      <section class="manual-open-page manual-open-left" id="manual-contents-page" aria-label="Manual contents">
+        <div class="manual-paper-mark">BLIP ARCADE &nbsp; · &nbsp; OPERATOR'S COPY</div>
+        <h2>CONTENTS</h2>
+        <ol class="manual-contents manual-chapter-contents">
+          <li><button type="button" data-chapter="first-use" disabled><span>First time use<i></i></span><b>—</b></button></li>
+          <li><button type="button" data-chapter="controls" disabled><span>1 &nbsp; Playing the games<i></i></span><b>—</b></button></li>
+        </ol>
+        <h3 class="manual-game-index-title">Game index</h3>
+        <ol class="manual-contents manual-game-contents" id="manual-game-contents"></ol>
+        <ol class="manual-contents manual-back-contents">
+          <li><button type="button" data-chapter="history" disabled><span>2 &nbsp; The old machines<i></i></span><b>—</b></button></li>
+          <li><button type="button" data-chapter="about" disabled><span>3 &nbsp; About Blip<i></i></span><b>—</b></button></li>
+        </ol>
+        <div class="manual-stamp">BLIP<br><small>EST. 1981*</small></div>
+        <small class="manual-footnote">* A new cabinet with an old soul.</small>
+      </section>
+      <div class="manual-open-spine" aria-hidden="true"></div>
+      <section class="manual-open-page manual-open-right" aria-label="Manual page">
+        <div class="manual-page-number"><span id="manual-book-title">FIELD MANUAL</span><b id="manual-page-count">01 / 01</b></div>
+        <article class="manual-page-content" id="manual-page-content" tabindex="-1" aria-live="polite"></article>
+        <div class="manual-page-corner" aria-hidden="true"></div>
+      </section>
+      <button class="manual-contents-tab" id="manual-contents-tab" type="button" aria-controls="manual-contents-page" aria-expanded="false">Contents</button>
+      <button class="manual-close" id="manual-close" type="button" aria-label="Close the manual"><span>Close book</span></button>
+      <button class="manual-turn manual-turn-prev" id="manual-prev" type="button" disabled aria-label="Turn to the previous page">‹ <small>PREV</small></button>
+      <button class="manual-turn manual-turn-next" id="manual-next" type="button" disabled aria-label="Turn to the next page"><small>TURN PAGE</small> ›</button>
+    </div>
+  </div>
+  <template id="manual-first-use">
+    <div class="manual-leaf">
+    <div class="page">
+    <p class="manual-first-edition">BLIP ARCADE &nbsp; · &nbsp; FIELD MANUAL</p>
+    <h2>First time use</h2>
+    <p class="manual-first-intro">A few coins. A steady hand. You are ready to play.</p>
+    <div class="manual-first-steps">
+    <section class="manual-first-step">
+    <h3>1. Insert a coin</h3>
+    <p>Press the metal coin slot at the right of the lower control deck, or press <kbd>5</kbd> on the keyboard. The BLIP sign and P1 lamp light when credit is available.</p>
+    </section>
+    <section class="manual-first-step">
+    <h3>2. Choose your game</h3>
+    <p>Move the cabinet joystick or pad to bring a card to the front. The arrow keys or W A S D work too. Read the description on the selected card.</p>
+    </section>
+    <section class="manual-first-step">
+    <h3>3. Load and play</h3>
+    <p>Press a red button, Space or Enter. The arm carries the ROM to its dock; wait for the loading whirr, then press fire on the game’s title screen.</p>
+    </section>
+    </div>
+    <p>For the particular keys and playing notes, turn to your game in the contents. To choose another game, press the BLIP logo, game title or docked ROM.</p>
+    </div>
+    </div>
+  </template>
+  <script src="deck.js?v=10"></script>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=42"></script>
-  <script src="blip_controller.js?v=9"></script>
+  <script src="kiosk.js?v=75"></script>
+  <script src="blip_controller.js?v=10"></script>
   <!-- Git-ignored, written at deploy: absent means no leaderboard. -->
   <script src="blip_config.js?v=1"></script>
   <script>
@@ -936,35 +1132,35 @@
         badgeTrippy:      'TRIPPY',
         badgeTouch:       'TOUCH',
         badgePad:         'CONTROLLER<small>RECOMMENDED</small>',
-        serpentGenre:     'SNAKE MOVING GAME',
-        serpentDesc:      'Making snake for eat thing and become large size.<br>Not to touching wall or own body is important much.<br>How much long snake you are achieve?',
+        serpentGenre:     'SNAKE CHASE',
+        serpentDesc:      'Feed your snake and watch it grow! Keep clear of the walls and your own tail. How long can you keep this slippery customer on the move?',
         serpentControls:  'PUSH WASD / ARROW KEY FOR MOVE',
 
-        bouncerGenre:     'BRICK BREAK GAME',
-        bouncerDesc:      'Ball is must break all brick for become empty board.<br>Paddle must not allow ball escape to fall below.<br>Clear stage happen, next stage will arrive.',
+        bouncerGenre:     'BRICK-BREAKING ACTION',
+        bouncerDesc:      'Smash every brick and clear the board! Keep that ball in play—let it slip past your paddle and you’re out. Clear one rack and the next is waiting!',
         bouncerControls:  'A/D OR ARROW &middot; [1] LAUNCH',
 
-        galacticGenre:    'ALIEN ATTACK GAME',
-        galacticDesc:     'Many alien spaceship is coming very close near now.<br>Please for shoot all before they arrive on ground.<br>Must defend Earth happening at every cost situation.',
+        galacticGenre:    'SPACE INVADERS',
+        galacticDesc:     'Alert! The alien fleet is closing in on Earth. Blast every saucer before it lands. Our planet is counting on you, space cadet!',
         galacticControls: 'A/D OR ARROW &middot; [1] SHOOT',
 
-        rallyGenre:        'PADDLE BATTLE GAME',
-        rallyDesc:         'First player to reach seven point is win.<br>Ball getting more fast with every hit.',
+        rallyGenre:        'PADDLE DUEL',
+        rallyDesc:         'Serve it up! First player to seven takes the match. Every volley sends that ball screaming faster!',
         rallyControls:     'P1 W/S OR ARROW &middot; P2 I/K &middot; [1] SERVE',
 
-        meteorsGenre:      'ROCK SHOOTING GAME',
-        meteorsDesc:       'Spaceship is drift in field of many rock.<br>Shoot rock for break into more small piece.<br>Do not to crashing, is very dangerous choice.',
+        meteorsGenre:      'ASTEROID BLAST',
+        meteorsDesc:       'Take the controls, pilot! Blast the rock field and watch each asteroid split into smaller chunks. Keep clear—or it’s a one-way trip!',
         meteorsControls:   'A/D ROTATE &middot; W THRUST &middot; [1] FIRE &middot; [2] HYPERSPACE',
 
-        brawlerGenre:      'ONE TO ONE FIGHT GAME',
-        brawlerDesc:       'Pick one of ten fighters and fight the other nine, each on home ground, with barrels to smash along the way. Guard high or guard low &mdash; nothing covers both.<br>Here comes a new challenger.',
+        brawlerGenre:      'CHAMPIONSHIP FIGHTING',
+        brawlerDesc:       'Choose your champ, then take on nine challengers on their own turf. Smash barrels for bonus points, and guard high or low—there’s no blocking both. A new challenger is stepping up!',
         brawlerControls:   '1P WASD + F/G &middot; 2P ARROWS + J/K &middot; BOTH = SPECIAL',
-        bubblerGenre:      'TWO-DRAGON PLATFORM GAME',
-        bubblerDesc:       'Two cuddly dragons blow bubbles, catch the toy monsters and pop them into candy. Pop a whole cluster and every catch doubles.',
+        bubblerGenre:      'BUBBLE-BLASTING ADVENTURE',
+        bubblerDesc:       'Two bubble-blowing dragons take on a gang of toy monsters. Trap ’em, pop ’em, and turn the whole bunch into candy. Pop a cluster and double your haul!',
         bubblerControls:   '1P WASD+F BUBBLE+G JUMP &middot; 2P ARROWS+J+K &middot; HOLD JUMP TO RIDE BUBBLES',
 
-        skyRaiderGenre:    'VERTICAL SKY BATTLE GAME',
-        skyRaiderDesc:     'Fighter plane is flying up sky for shooting many enemy craft.<br>Watch for flak from island and coast, and boss gun turret.<br>Last mission is fly over land to big city.',
+        skyRaiderGenre:    'HIGH-FLYING AIR COMBAT',
+        skyRaiderDesc:     'Climb into the cockpit and send enemy planes packing! Watch for island and coastal flak—and the boss’s gun turret. Your final run takes you over the mainland to the big city!',
         skyRaiderControls: 'ARROW OR WASD MOVE &middot; [1] FIRE',
 
         footerControls:   'WASD / ARROW &nbsp;&mdash;&nbsp; [1] SHOOT OR LAUNCH',
@@ -1086,9 +1282,9 @@
     /* ------------------------------------------------------------------ */
     /* Language application                                                 */
     /* ------------------------------------------------------------------ */
-    function applyLang(lang) {
-      var t = i18n[lang];
-      if (!t) return;
+    function applyLang() {
+      var lang = 'en';
+      var t = i18n.en;
 
       // A touch screen gets the touch version of a hint where there is one.
       var touch = document.documentElement.hasAttribute('data-has-touch');
@@ -1098,114 +1294,13 @@
         if (text !== undefined) el.innerHTML = text;
       });
 
-      document.querySelectorAll('.lang-btn').forEach(function(btn) {
-        btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
-      });
-
       document.documentElement.lang = lang;
-      try { localStorage.setItem('blip-lang', lang); } catch(e) {}
     }
-
-    document.querySelectorAll('.lang-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        currentLang = this.getAttribute('data-lang');
-        applyLang(currentLang);
-      });
-    });
-
-    /* load saved language, fall back to browser preference, then English */
-    var currentLang = 'en';
-    (function() {
-      var saved = null;
-      try { saved = localStorage.getItem('blip-lang'); } catch(e) {}
-      var browserLang = (navigator.language || '').slice(0, 2).toLowerCase();
-      currentLang = saved || (i18n[browserLang] ? browserLang : 'en');
-      applyLang(currentLang);
-    })();
+    applyLang();
 
     /* ------------------------------------------------------------------ */
     /* Coin / credits                                                       */
     /* ------------------------------------------------------------------ */
-    // ---- Ambient hum ----
-    // A cabinet's transformer hum once there is a credit in the machine;
-    // silent while broke. Needs a user gesture (autoplay), so it arms on the
-    // first interaction and starts once coins > 0; the coin click itself
-    // counts (onCoinInserted calls tryStartHum).
-    var tryStartHum = (function () {
-      var started = false;
-      function startHum() {
-        started = true;
-        ['click', 'touchstart', 'keydown'].forEach(function (ev) {
-          document.removeEventListener(ev, tryStartHumImpl);
-        });
-        var ctx = getKioskAudio();
-
-        // Power-supply drone: a 58 Hz saw through a low-pass plus a 120 Hz
-        // overtone, at the threshold of notice, fading up over a couple of
-        // seconds.
-        var osc = ctx.createOscillator();
-        var osc2 = ctx.createOscillator();
-        var lpf = ctx.createBiquadFilter();
-        var gMaster = ctx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.value = 58;
-        osc2.type = 'sine';
-        osc2.frequency.value = 120;
-        lpf.type = 'lowpass';
-        lpf.frequency.value = 520;
-        lpf.Q.value = 1.4;
-        gMaster.gain.value = 0;
-        var g2 = ctx.createGain();
-        g2.gain.value = 0.32;
-        osc.connect(lpf);
-        osc2.connect(g2); g2.connect(lpf);
-        lpf.connect(gMaster); gMaster.connect(blipOut(ctx));
-        osc.start();
-        osc2.start();
-        gMaster.gain.linearRampToValueAtTime(0.055, ctx.currentTime + 2);
-
-        scheduleGlitch(ctx);
-      }
-
-      function scheduleGlitch(ctx) {
-        setTimeout(function () {
-          playAtariGlitch(ctx);
-          scheduleGlitch(ctx);
-        }, 12000 + Math.random() * 22000);
-      }
-
-      function playAtariGlitch(ctx) {
-        var t   = ctx.currentTime;
-        var dur = 0.03 + Math.random() * 0.09;
-        var len = Math.ceil(ctx.sampleRate * dur);
-        var buf = ctx.createBuffer(1, len, ctx.sampleRate);
-        var d   = buf.getChannelData(0);
-        for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-        var src = ctx.createBufferSource();
-        var bpf = ctx.createBiquadFilter();
-        var g   = ctx.createGain();
-        src.buffer = buf;
-        bpf.type = 'bandpass';
-        bpf.frequency.value = 150 + Math.random() * 500;
-        bpf.Q.value = 1;
-        src.connect(bpf); bpf.connect(g); g.connect(blipOut(ctx));
-        g.gain.setValueAtTime(0.014 + Math.random() * 0.012, t);
-        g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-        src.start(t); src.stop(t + dur + 0.01);
-      }
-
-      function tryStartHumImpl() {
-        if (started || getCoins() <= 0) return;
-        startHum();
-      }
-
-      ['click', 'touchstart', 'keydown'].forEach(function (ev) {
-        document.addEventListener(ev, tryStartHumImpl, { passive: true });
-      });
-
-      return tryStartHumImpl;
-    }());
-
     // ---- Startup chime ----
     // Once, when the machine gets its first coin (0 -> 1): a relay thunk and
     // a rising flyback whine settling on the hum's 58 Hz. The cards light
@@ -1254,7 +1349,6 @@
         playStartupSound(function () {
           updateCardDimming();
         });
-        tryStartHum();
       } else {
         updateCardDimming();
       }
@@ -1265,15 +1359,12 @@
     // same gate as the card click itself, shown on the cards directly.
     function updateCardDimming() {
       var enabled = getCoins() > 0;
-      document.querySelectorAll('.card').forEach(function(card) {
+      document.querySelectorAll('.card:not([data-page-card])').forEach(function(card) {
         card.classList.toggle('no-credit', !enabled);
       });
       updateCoinLock();
     }
 
-    // No INSERT COIN overlay here: the grid stays visible, dimmed, and the
-    // flashing COINS button is the cue (mirrored onto <body>). Game pages
-    // still show the overlay on a deep link with no credit.
     function updateCoinLock() {
       document.body.classList.toggle('need-coin', getCoins() <= 0);
     }
@@ -1281,17 +1372,213 @@
     function updateCreditsDisplay() {
       updateCoinsHud();
       updateCardDimming();
-      if (typeof updateCoinBeckon === 'function') updateCoinBeckon();
+      if (typeof updateCoinPrompt === 'function') updateCoinPrompt();
     }
 
     updateCreditsDisplay(); // initialise dimming to match coins on page load
 
     // Opens the card's game. Needs a credit but does not spend it: the credit
     // rides along to the game page (same sessionStorage), and the game
-    // charges it when play starts. Broke: a nudge.
+    // charges it when play starts.
+    var cardInFlight = false, pendingCard = null, loadedCard = null, focusRolodexCard = null;
+    document.querySelectorAll('#game-grid .card').forEach(function(card){var tray=card.querySelector('.card-shot-wrap'),image=tray.querySelector('.card-shot'),rom=document.createElement('div'),label=document.createElement('span');rom.className='game-rom';label.className='rom-label';label.textContent=card.querySelector('.card-title').textContent.trim();rom.append(image,label);tray.appendChild(rom);});
+    document.querySelectorAll('#game-grid .card').forEach(function(card){
+      var copy=document.createElement('div');copy.className='card-copy';
+      Array.from(card.querySelectorAll('.card-title,.card-genre,.card-hi,.card-desc')).forEach(function(part){copy.appendChild(part);});
+      card.appendChild(copy);
+    });
+    try {loadedCard=JSON.parse(sessionStorage.getItem('blip-loaded-card') || 'null');} catch(e) {}
+    if(loadedCard) {
+      var loadedLeaf=document.querySelector('.card[data-game-url="'+loadedCard.slug+'/index.html"]');
+      if(loadedLeaf) loadedLeaf.classList.add('card-loaded');
+      document.getElementById('cabinet-game-screen').src=loadedCard.slug+'/index.html?cabinet=1';
+      blipSetMarquee(loadedCard.name,false);
+    }
+    var returningToCabinet = !!document.referrer && new URL(document.referrer).origin === location.origin && new URL(document.referrer).pathname !== location.pathname;
+    if (returningToCabinet) {
+      document.body.classList.add('cabinet-return');
+      var selector=document.getElementById('jukebox-front');
+      selector.addEventListener('animationend',function returned(event){
+        if(event.target!==selector || event.animationName!=='rolodex-return') return;
+        selector.removeEventListener('animationend',returned);
+        document.body.classList.remove('cabinet-return');
+        playRolodexDock();
+        if(pendingCard){var card=pendingCard;pendingCard=null;attemptStart(card);}
+      });
+    }
+    var manualChapters=['controls.html','history.html','about.html'], manualPages=[], manualPageIndex=0, manualLoadPromise=null, manualChapterStarts=[],manualGameStarts={},manualGameNames={},manualGameNumbers={},manualMeasureSize='';
+    var manualOverlay=document.getElementById('manual-overlay');
+    function manualAtoms(node,parents,out) {
+      if(node.nodeType!==1||node.classList.contains('divider'))return;
+      if(node.tagName==='TABLE') {
+        Array.from(node.rows).forEach(function(row){var table=node.cloneNode(false);table.appendChild(row.cloneNode(true));out.push({parents:parents,leaf:table});});return;
+      }
+      if(/^(H1|H2|H3|P|IMG|UL|OL)$/.test(node.tagName)||node.matches('.studio,.profile,.game-section,.game-header,.game-title,.game-origin,.manual-first-step,[data-manual-game]')) {out.push({parents:parents,leaf:node.cloneNode(true)});return;}
+      if(!node.children.length) {if(node.textContent.trim())out.push({parents:parents,leaf:node.cloneNode(true)});return;}
+      var next=parents.concat(node.cloneNode(false));
+      Array.from(node.children).forEach(function(child){manualAtoms(child,next,out);});
+    }
+    function prepareManualPages() {
+      var viewport=document.getElementById('manual-page-content'), width=viewport.clientWidth,height=viewport.clientHeight;
+      if(!width||!height)return Promise.resolve([]);
+      var size=width+'x'+height;if(size===manualMeasureSize&&manualLoadPromise)return manualLoadPromise;
+      manualMeasureSize=size;
+      var measure=document.createElement('article');measure.className='manual-page-content manual-measure';measure.style.width=width+'px';measure.style.height=height+'px';document.body.appendChild(measure);
+      manualLoadPromise=Promise.all(manualChapters.map(function(url){return fetch(url).then(function(response){if(!response.ok)throw new Error('Manual page unavailable');return response.text();});})).then(function(markups){
+        var result=[];
+        markups.unshift(document.getElementById('manual-first-use').innerHTML);
+        markups.forEach(function(markup,chapterIndex){
+          chapterIndex--;
+          var doc=new DOMParser().parseFromString(markup,'text/html'),source=doc.querySelector('.manual-leaf .page');
+          if(!source)return;
+          source.querySelectorAll('[data-i18n]').forEach(function(el){var key=el.getAttribute('data-i18n'),text=i18n.en[key];if(document.documentElement.hasAttribute('data-has-touch')&&i18n.en[key+'Touch']!==undefined)text=i18n.en[key+'Touch'];if(text!==undefined)el.innerHTML=text;});
+          source.querySelectorAll('[data-manual-game]').forEach(function(game){var heading=game.querySelector('h3').textContent,number=heading.match(/^\s*(\d+\.\d+)/);manualGameNumbers[game.dataset.manualGame]=number?number[1]:'';manualGameNames[game.dataset.manualGame]=heading.replace(/^\s*\d+\.\d+\s*/, '').trim();});
+          source.querySelectorAll('a').forEach(function(link){var print=document.createElement('span');print.className=link.className;print.innerHTML=link.innerHTML;link.replaceWith(print);});
+          var titles=['PLAYING THE GAMES','THE OLD MACHINES','ABOUT BLIP'];
+          var title=chapterIndex<0?'FIRST TIME USE':['CONTROLS','HISTORY','ABOUT BLIP'][chapterIndex], atoms=[];
+          var sourceHead=source.querySelector('h1');
+          if(sourceHead)sourceHead.remove();
+          var sourceSubhead=source.querySelector('h2');
+          if(sourceSubhead&&chapterIndex>=0){var deck=document.createElement('p');deck.className='manual-chapter-deck';deck.innerHTML=sourceSubhead.innerHTML;sourceSubhead.replaceWith(deck);}
+          var chapter=document.createElement('h1');
+          chapter.className='manual-chapter-number';chapter.textContent='CHAPTER '+(chapterIndex+1);
+          var subchapter=document.createElement('h2');
+          subchapter.className='manual-subchapter-title';subchapter.textContent=titles[chapterIndex];
+          if(chapterIndex>=0){source.insertBefore(subchapter,source.firstChild);source.insertBefore(chapter,subchapter);}
+          source.querySelectorAll('.section-label,.thoughts-label').forEach(function(label){label.textContent=label.textContent.replace(/^[\s►▸→]+/,'').trim();});
+          source.querySelectorAll('h2').forEach(function(heading){if(chapterIndex<0||heading.classList.contains('manual-subchapter-title'))return;var sectionHeading=document.createElement('h3');sectionHeading.className=heading.className;sectionHeading.innerHTML=heading.innerHTML;heading.replaceWith(sectionHeading);});
+          Array.from(source.children).forEach(function(node){manualAtoms(node,[],atoms);});
+          var sheet=document.createElement('div');sheet.className='page manual-leaf-sheet';measure.appendChild(sheet);var count=0;
+          function appendAtom(atom){var wrapper=sheet;atom.parents.forEach(function(parent){var copy=parent.cloneNode(false);wrapper.appendChild(copy);wrapper=copy;});wrapper.appendChild(atom.leaf);}
+          function saveSheet(){if(sheet.childElementCount){var game=sheet.querySelector('[data-manual-game]'),slug=game?game.dataset.manualGame:null;result.push({chapter:chapterIndex,game:slug,title:slug?manualGameNames[slug]:title,html:sheet.innerHTML});}sheet.remove();}
+          function newSheet(){sheet=document.createElement('div');sheet.className='page manual-leaf-sheet';measure.appendChild(sheet);count=0;}
+          function placeAtom(atom){
+            if(count&&atom.leaf.matches('[data-manual-game]')){saveSheet();newSheet();}
+            appendAtom(atom);var wrapper=sheet.lastElementChild;
+            if(sheet.scrollHeight>height+1){
+              wrapper.remove();
+              if(count){saveSheet();newSheet();}
+              appendAtom(atom);wrapper=sheet.lastElementChild;
+              if(sheet.scrollHeight>height+1&&atom.leaf.children.length){
+                wrapper.remove();var parts=[],parents=atom.parents.concat(atom.leaf.cloneNode(false));
+                Array.from(atom.leaf.children).forEach(function(child){manualAtoms(child,parents,parts);});
+                if(parts.length>1){parts.forEach(placeAtom);return;}
+                appendAtom(atom);
+              }
+              if(sheet.scrollHeight>height+1&&atom.leaf.tagName==='P'){
+                sheet.lastElementChild.remove();
+                var words=atom.leaf.textContent.trim().split(/\s+/),chunks=[],chunk='';
+                words.forEach(function(word){
+                  var candidate=chunk?chunk+' '+word:word,probe=atom.leaf.cloneNode(false);probe.textContent=candidate;sheet.appendChild(probe);
+                  if(sheet.scrollHeight>height+1&&chunk){probe.remove();chunks.push(chunk);chunk=word;}
+                  else {chunk=candidate;probe.remove();}
+                });
+                if(chunk)chunks.push(chunk);
+                chunks.forEach(function(text){var paragraph=atom.leaf.cloneNode(false);paragraph.textContent=text;placeAtom({parents:atom.parents,leaf:paragraph});});
+                return;
+              }
+            }
+            count++;
+          }
+          atoms.forEach(placeAtom);
+          saveSheet();
+        });
+        var firstUse=document.querySelector('[data-chapter="first-use"]');firstUse.disabled=false;firstUse.dataset.page=0;firstUse.querySelector('b').textContent='01';
+        var starts={};result.forEach(function(page,index){if(starts[page.chapter]===undefined)starts[page.chapter]=index;});
+        manualChapterStarts=[0,1,2].map(function(index){return starts[index]===undefined?0:starts[index];});
+        ['controls','history','about'].forEach(function(key,index){
+          var entry=document.querySelector('.manual-contents [data-chapter="'+key+'"]');entry.disabled=false;entry.dataset.page=manualChapterStarts[index];
+          entry.querySelector('b').textContent=String(manualChapterStarts[index]+1).padStart(2,'0');
+        });
+        manualGameStarts={};result.forEach(function(page,index){if(page.game&&manualGameStarts[page.game]===undefined)manualGameStarts[page.game]=index;});
+        var contents=document.getElementById('manual-game-contents');contents.replaceChildren();
+        Object.keys(manualGameStarts).sort(function(a,b){return manualGameNames[a].localeCompare(manualGameNames[b]);}).forEach(function(slug){
+          var row=document.createElement('li'),button=document.createElement('button'),name=document.createElement('span'),leader=document.createElement('i'),number=document.createElement('b');
+          button.type='button';button.dataset.game=slug;button.dataset.page=manualGameStarts[slug];
+          name.textContent=manualGameNumbers[slug]+'  '+manualGameNames[slug];name.appendChild(leader);number.textContent=String(manualGameStarts[slug]+1).padStart(2,'0');
+          button.append(name,number);row.appendChild(button);contents.appendChild(row);
+        });
+        return result;
+      }).catch(function(error){manualMeasureSize='';manualLoadPromise=null;throw error;}).finally(function(){measure.remove();});
+      return manualLoadPromise;
+    }
+    function showManualPage(index,direction) {
+      prepareManualPages().then(function(pages){
+        if(!pages.length)return;
+        manualPages=pages;manualPageIndex=Math.max(0,Math.min(pages.length-1,index));
+        var content=document.getElementById('manual-page-content'), page=pages[manualPageIndex];
+        document.getElementById('manual-prev').disabled=manualPageIndex===0;
+        document.getElementById('manual-next').disabled=manualPageIndex===pages.length-1;
+        document.getElementById('manual-page-count').textContent=String(manualPageIndex+1).padStart(2,'0')+' / '+String(pages.length).padStart(2,'0');
+        document.getElementById('manual-book-title').textContent=page.title.toUpperCase();
+        manualOverlay.classList.add('manual-page-turning');content.innerHTML='<div class="page manual-leaf-sheet">'+page.html+'</div>';
+        window.setTimeout(function(){manualOverlay.classList.remove('manual-page-turning');},600);
+        manualOverlay.querySelectorAll('.manual-contents button').forEach(function(entry){var current=entry.dataset.game?entry.dataset.game===page.game:Number(entry.dataset.page)===manualPageIndex;entry.toggleAttribute('aria-current',current);if(current)entry.setAttribute('aria-current','page');});
+        if(direction&&typeof playManualPaper==='function')playManualPaper(false);
+      }).catch(function(){document.getElementById('manual-page-content').innerHTML='<div class="page manual-leaf-sheet"><h1>PAGE MISSING</h1><p>This leaf could not be read. Please turn back and try again.</p></div>';});
+    }
+    function openFieldManual(chapterIndex,gameSlug) {
+      manualPageIndex=0;
+      manualOverlay.hidden=false;
+      document.body.classList.add('manual-open');
+      document.documentElement.style.overflow='hidden';
+      document.getElementById('manual-book').classList.add('manual-picked');
+      if(typeof playManualPaper==='function')playManualPaper(true);
+      window.setTimeout(function(){document.getElementById('manual-book').classList.remove('manual-picked');},600);
+      setManualContents(false);
+      prepareManualPages().then(function(){showManualPage(manualGameStarts[gameSlug]===undefined?(chapterIndex===undefined?0:manualChapterStarts[chapterIndex]||0):manualGameStarts[gameSlug],false);});
+      document.getElementById('manual-close').focus();
+    }
+    function closeFieldManual() {
+      if(typeof playManualPaper==='function')playManualPaper(true);
+      manualOverlay.hidden=true;
+      manualOverlay.classList.remove('manual-page-turning');
+      document.body.classList.remove('manual-open');
+      document.documentElement.style.overflow='';
+      cardInFlight=false;
+      if(new URLSearchParams(location.search).has('manual'))history.replaceState(null,'',location.pathname);
+      document.getElementById('manual-book').focus();
+    }
+    function setManualContents(show) {
+      manualOverlay.querySelector('.manual-open-book').toggleAttribute('data-show-contents',show);
+      var tab=document.getElementById('manual-contents-tab');tab.setAttribute('aria-expanded',String(show));tab.textContent=show?'Read page':'Contents';
+    }
+    document.getElementById('manual-contents-tab').addEventListener('click',function(){setManualContents(!manualOverlay.querySelector('.manual-open-book').hasAttribute('data-show-contents'));});
+    manualOverlay.querySelector('.manual-open-left').addEventListener('click',function(event){
+      var entry=event.target.closest('button[data-page]');if(!entry)return;
+      setManualContents(false);showManualPage(Number(entry.dataset.page),1);document.getElementById('manual-page-content').focus({preventScroll:true});
+    });
+    new ResizeObserver(function(){
+      if(manualOverlay.hidden)return;
+      var viewport=document.getElementById('manual-page-content'),size=viewport.clientWidth+'x'+viewport.clientHeight;
+      if(viewport.clientWidth&&size!==manualMeasureSize){var current=manualPages[manualPageIndex];prepareManualPages().then(function(){showManualPage(current&&current.game?manualGameStarts[current.game]||0:manualChapterStarts[current?current.chapter:0]||0,false);});}
+    }).observe(document.getElementById('manual-page-content'));
+    document.getElementById('manual-prev').addEventListener('click',function(){showManualPage(manualPageIndex-1,-1);});
+    document.getElementById('manual-next').addEventListener('click',function(){showManualPage(manualPageIndex+1,1);});
+    document.getElementById('manual-close').addEventListener('click',closeFieldManual);
+    document.addEventListener('keydown',function(event){
+      if(manualOverlay.hidden)return;
+      if(event.key==='Tab') {
+        var stops=Array.from(manualOverlay.querySelectorAll('button:not(:disabled),[tabindex="0"]')).filter(function(node){return node.offsetWidth&&node.offsetHeight&&getComputedStyle(node).visibility!=='hidden';});
+        var index=stops.indexOf(document.activeElement),next=(index+(event.shiftKey?-1:1)+stops.length)%stops.length;
+        event.preventDefault();event.stopImmediatePropagation();if(stops[next])stops[next].focus();return;
+      }
+      if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closeFieldManual();return;}
+      if(event.key==='ArrowRight'||event.key==='PageDown'){event.preventDefault();event.stopImmediatePropagation();var contents=manualOverlay.querySelector('.manual-open-book').hasAttribute('data-show-contents')&&matchMedia('(max-width:700px)').matches;setManualContents(false);showManualPage(manualPageIndex+(contents?0:1),1);}
+      else if(event.key==='ArrowLeft'||event.key==='PageUp'){event.preventDefault();event.stopImmediatePropagation();setManualContents(false);showManualPage(manualPageIndex-1,-1);}
+      else event.stopImmediatePropagation();
+    },true);
+    function gameCardUrl(card) {return card.getAttribute('data-game-url')||'';}
+    window.addEventListener('message',function(event){
+      var frame=document.getElementById('cabinet-game-screen');
+      if(event.origin===location.origin&&event.source===frame.contentWindow&&event.data&&event.data.type==='blip-game-ready')frame.parentElement.classList.add('game-ready');
+    });
     function attemptStart(card) {
+      if (cardInFlight) return;
+      var parked = document.querySelector('.jukebox-transfer.idle');
+      if ((parked && parked.dataset.deploying) || document.body.classList.contains('cabinet-return')) { pendingCard=card; return; }
+      if(card.id==='manual-book') {cardInFlight=true;openFieldManual();return;}
       if (getCoins() <= 0) {
-        nudgeInsertCoin();
         card.classList.remove('rejected');
         void card.offsetWidth;
         card.classList.add('rejected');
@@ -1300,57 +1587,226 @@
         }, { once: true });
         return;
       }
-      try { sessionStorage.setItem('blip-last-game', (card.getAttribute('href') || '').split('/')[0]); } catch (e) {}
-      window.location.href = card.href;
+      if (card.classList.contains('card-loaded')) {
+        cardInFlight = true;
+        var seatedSlug = (gameCardUrl(card) || '').split('/')[0];
+        try {
+          sessionStorage.removeItem('blip-card-insert');
+          sessionStorage.setItem('blip-card-seated', seatedSlug);
+          sessionStorage.setItem('blip-title-seated', seatedSlug);
+        } catch (e) {}
+        document.getElementById('screen-bezel').classList.add('jukebox-open');
+        window.setTimeout(function () { window.location.href = gameCardUrl(card); }, 4200);
+        return;
+      }
+      var slug = (gameCardUrl(card) || '').split('/')[0];
+      var art = card.querySelector('.card-shot');
+      var title = card.querySelector('.card-title');
+      var module = document.querySelector('.jukebox-module[data-slug="' + slug + '"]');
+      var code = card.getAttribute('data-card-code') || 'A1';
+      cardInFlight = true;
+      try {
+        sessionStorage.setItem('blip-last-game', slug);
+        sessionStorage.setItem('blip-card-insert', JSON.stringify({
+          name: title ? title.textContent.trim() : slug.toUpperCase(), code: code,
+          art: art ? art.src : '', accent: getComputedStyle(card).getPropertyValue('--c').trim()
+        }));
+      } catch (e) {}
+      var bezel = document.getElementById('screen-bezel');
+      if (typeof playCardMechanism === 'function') playCardMechanism();
+      function pickSelectedCard() {
+        var rom=card.querySelector('.game-rom'),source = rom.getBoundingClientRect();
+        var receiver = document.querySelector('.top-marquee-bar .jukebox-receiver');
+        var slot = receiver.querySelector('.jukebox-receiver-lip').getBoundingClientRect();
+        blipTransferCard({
+          name: title ? title.textContent.trim() : slug.toUpperCase(),
+          code: code, art: art ? art.src : '', original: rom,
+          width: rom.offsetWidth, height: rom.offsetHeight,
+          scale: source.height / rom.offsetHeight,
+          angle: 0,
+          source: {x:source.left + source.width/2, y:source.top + source.height/2},
+          pivot: blipCardArmPivot(receiver),
+          slot: {x:slot.left + slot.width/2, y:slot.top + slot.height/2},
+          receiver: receiver,
+          onDone: function () { window.location.href = gameCardUrl(card); },
+          onPickup: function () {
+            card.classList.add('card-loaded');
+            if (module) module.classList.add('picked');
+          },
+          onSeat: function () {
+            bezel.classList.add('jukebox-open');
+            var screen=document.querySelector('.jukebox-game-screen');screen.classList.remove('game-ready');screen.style.backgroundImage='url("'+art.src+'")';
+            document.getElementById('cabinet-game-screen').src=gameCardUrl(card)+'?cabinet=1';
+            blipSetMarquee(title.textContent.trim(),true);
+            try {
+              sessionStorage.setItem('blip-title-seated',slug);
+              sessionStorage.setItem('blip-card-seated', slug);
+              loadedCard={slug:slug,name:title.textContent.trim(),code:code,art:art.src};
+              sessionStorage.setItem('blip-loaded-card',JSON.stringify(loadedCard));
+            } catch (e) {}
+          }
+        });
+      }
+      function startCardCycle() {
+        var oldLeaf=loadedCard && document.querySelector('.card[data-game-url="'+loadedCard.slug+'/index.html"]');
+        if(!oldLeaf) {centerLeaf(card);window.setTimeout(pickSelectedCard,1100);return;}
+        function returnOldCard() {
+        var old=loadedCard,oldRom=oldLeaf.querySelector('.game-rom'),box=oldRom.getBoundingClientRect();
+        var receiver=document.querySelector('.jukebox-receiver');
+        var slot=receiver.querySelector('.jukebox-receiver-lip').getBoundingClientRect();
+        blipTransferCard({
+          returning:true,original:oldRom,name:old.name,code:old.code,art:old.art,
+          width:oldRom.offsetWidth,height:oldRom.offsetHeight,scale:box.height/oldRom.offsetHeight,angle:0,
+          source:{x:box.left+box.width/2,y:box.top+box.height/2},
+          pivot:blipCardArmPivot(receiver),
+          slot:{x:slot.left+slot.width/2,y:slot.top+slot.height/2},receiver:receiver,
+          onExtract:function(){
+            blipSetMarquee('',false);
+            document.getElementById('cabinet-game-screen').src='about:blank';
+          },
+          onReturned:function(){
+            oldLeaf.classList.remove('card-loaded');loadedCard=null;
+            try {sessionStorage.removeItem('blip-loaded-card');}catch(e){}
+          },onDone:function(){
+            blipParkMechanism(document.getElementById('game-grid'),false);
+            centerLeaf(card);
+            window.setTimeout(pickSelectedCard,1100);
+          }
+        });
+        }
+        centerLeaf(oldLeaf);
+        window.setTimeout(returnOldCard,1100);
+      }
+      function centerLeaf(leaf) {
+        if(focusRolodexCard)focusRolodexCard(leaf);
+        var track=document.getElementById('game-grid');
+        track.scrollTo({left:leaf.offsetLeft+leaf.offsetWidth/2-track.clientWidth/2,behavior:'smooth'});
+      }
+      window.setTimeout(startCardCycle,900);
     }
+
+    function parkSelectionArm() {
+      if (cardInFlight || document.querySelector('.jukebox-transfer[data-deploying]')) return;
+      var parked = blipParkMechanism(document.getElementById('game-grid'), returningToCabinet);
+      returningToCabinet=false;
+      parked.addEventListener('blip-deployed', function () {
+        if(document.body.classList.contains('cabinet-return')) return;
+        if(pendingCard) { var card=pendingCard; pendingCard=null; attemptStart(card); }
+      }, {once:true});
+    }
+    var selectorPlane=document.getElementById('jukebox-front');
+    var spindle=document.createElement('div');spindle.className='rolodex-spindle';spindle.setAttribute('aria-hidden','true');
+    var rodSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');rodSvg.setAttribute('aria-hidden','true');
+    rodSvg.innerHTML='<defs><linearGradient id="rolodex-metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f7e4bd"/><stop offset=".34" stop-color="#a8895d"/><stop offset=".66" stop-color="#33271e"/><stop offset="1" stop-color="#ddbd83"/></linearGradient></defs><path class="rail-shadow"></path><path class="rail-metal"></path><path class="stay-shadow"></path><path class="stay-metal"></path><path class="hanger-shadow"></path><path class="hanger-metal"></path>';
+    rodSvg.style.cssText='display:block;width:100%;height:100%;overflow:visible';spindle.appendChild(rodSvg);
+    var bearings=['left','right'].map(function(side){var bearing=document.createElement('i');bearing.className='rolodex-bearing '+side;spindle.appendChild(bearing);return bearing;});
+    document.getElementById('game-grid').appendChild(spindle);
+    var bindings=Array.from(document.querySelectorAll('#game-grid .card')).map(function(card){
+      return {card:card,pins:[-13,13].map(function(offset){
+        var pin=document.createElement('i');pin.className='rolodex-pin';pin.setAttribute('aria-hidden','true');
+        pin.style.left='calc(50% + '+(offset-4.5)+'px)';card.appendChild(pin);return pin;
+      })};
+    });
+    var railLeft=0,railRight=0,railY=28;
+    function fitSelectorRails(){
+      document.getElementById('screen-bezel').style.setProperty('--rolodex-travel',(Math.max(selectorPlane.offsetHeight,document.querySelector('.rolodex-guides').offsetHeight)+30)+'px');
+      var track=document.getElementById('game-grid');
+      var width=track.clientWidth;
+      spindle.style.width=width+'px';rodSvg.setAttribute('viewBox','0 0 '+width+' '+track.clientHeight);
+      var frame=track.getBoundingClientRect();
+      var hangers=[];
+      bindings.forEach(function(binding){
+        binding.pins.forEach(function(pin){
+          var box=pin.getBoundingClientRect(),x=(box.left+box.right)/2-frame.left,y=box.top+box.height/2-frame.top;
+          var halfSpan=Math.min(width/2-12,190),t=Math.max(0,Math.min(1,(x-width/2+halfSpan)/(halfSpan*2)));
+          var railTop=28-64*t*(1-t);
+          hangers.push('M '+x+' '+railTop+' L '+x+' '+y);
+        });
+      });
+      rodSvg.querySelector('.hanger-shadow').setAttribute('d',hangers.join(' '));
+      rodSvg.querySelector('.hanger-metal').setAttribute('d',hangers.join(' '));
+      var halfSpan=Math.min(width/2-12,190);railLeft=width/2-halfSpan;railRight=width/2+halfSpan;
+      bearings[0].style.left=(railLeft-11)+'px';bearings[1].style.left=(railRight-11)+'px';
+      var d='M '+railLeft+' '+railY+' Q '+width/2+' -4 '+railRight+' '+railY;
+      rodSvg.querySelector('.rail-shadow').setAttribute('d',d);rodSvg.querySelector('.rail-metal').setAttribute('d',d);
+      updateRailSupports();
+    }
+    function updateRailSupports(){
+      var track=document.getElementById('game-grid'),frame=track.getBoundingClientRect(),guides=document.querySelector('.rolodex-guides').getBoundingClientRect();
+      var leftX=guides.left+8-frame.left,rightX=guides.right-8-frame.left;
+      var jointY=guides.top+47-frame.top;
+      var stays='M '+leftX+' '+jointY+' L '+railLeft+' '+railY+' M '+rightX+' '+jointY+' L '+railRight+' '+railY;
+      rodSvg.querySelector('.stay-shadow').setAttribute('d',stays);rodSvg.querySelector('.stay-metal').setAttribute('d',stays);
+      var guideBox=document.querySelector('.rolodex-guides').getBoundingClientRect();
+      function setStay(side,end){
+        var element=document.querySelector('.rolodex-stay.'+side),startX=side==='left'?guideBox.left+16:guideBox.right-16,startY=guideBox.top+47;
+        var endX=frame.left+end;
+        var endY=frame.top+railY;
+        var dx=endX-startX,dy=endY-startY;element.style.left=(startX-guideBox.left)+'px';element.style.top=(startY-guideBox.top)+'px';
+        element.style.width=Math.hypot(dx,dy)+'px';element.style.transform='rotate('+Math.atan2(dy,dx)+'rad)';
+      }
+      setStay('left',railLeft);setStay('right',railRight);
+    }
+    new ResizeObserver(fitSelectorRails).observe(selectorPlane);
+    fitSelectorRails();
+    var supportFrame=0,railMotion=0;
+    document.getElementById('game-grid').addEventListener('scroll',function(){if(supportFrame)return;supportFrame=requestAnimationFrame(function(){supportFrame=0;updateRailSupports();});},{passive:true});
+    requestAnimationFrame(parkSelectionArm);
+    window.addEventListener('resize', parkSelectionArm);
 
     /* Light up the card of the game you're currently in (last started). */
     (function () {
       try {
         var last = sessionStorage.getItem('blip-last-game');
         if (!last) return;
-        var el = document.querySelector('.card[href^="' + last + '/"]');
+        var el = document.querySelector('.card[data-game-url^="' + last + '/"]');
         if (el) el.classList.add('card-active');
       } catch (e) {}
     }());
 
-    // Points a broke player at the COINS button in the top-right corner
-    // instead of leaving the dimmed-card press feeling dead: a quick swell
-    // + flicker on the button (see .coin-nudge).
-    function nudgeInsertCoin() {
-      ['kiosk-insert-btn'].forEach(function (id) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        el.classList.remove('coin-nudge');
-        void el.offsetWidth;
-        el.classList.add('coin-nudge');
-        el.addEventListener('animationend', function () {
-          el.classList.remove('coin-nudge');
-        }, { once: true });
-      });
-    }
-
     document.querySelectorAll('.card').forEach(function(card) {
-      card.addEventListener('click', function(e) {
-        e.preventDefault();
-        attemptStart(card);
-      });
-    });
+      var index = Array.prototype.indexOf.call(document.querySelectorAll('.card'), card);
+      var code = card.hasAttribute('data-page-card') ? 'B' + (index - 7) : 'A' + (index + 1);
+      var slug = (gameCardUrl(card) || '').split('/')[0];
+      card.setAttribute('data-card-code', code);
+      var punch = document.createElement('span');
+      punch.className = 'card-punch'; punch.setAttribute('aria-hidden', 'true');
+      card.appendChild(punch);
+      var codeBadge = document.createElement('span');
+      codeBadge.className = 'card-code'; codeBadge.textContent = code;
+      codeBadge.setAttribute('aria-label', 'Selection ' + code);
+      card.appendChild(codeBadge);
+      var tab=document.createElement('span');tab.className='card-index-tab';tab.style.setProperty('--tab-lane',index%4);tab.textContent=card.querySelector('.card-title').textContent.trim();card.appendChild(tab);
+      var selector = document.createElement('span');
+      selector.className = 'card-selector'; selector.setAttribute('aria-hidden', 'true');
+      card.appendChild(selector);
+      var bay = document.createElement('div');
+      bay.className = 'jukebox-bay';
+      bay.setAttribute('aria-hidden', 'true');
+      var module = document.createElement('div'); module.className = 'jukebox-module';
+      module.setAttribute('data-slug', slug);
+      var moduleArt = document.createElement('img'); moduleArt.alt = ''; moduleArt.src = (card.querySelector('.card-shot') || {}).src || '';
+      var moduleName = document.createElement('strong'); moduleName.textContent = (card.querySelector('.card-title') || {}).textContent.trim();
+      var moduleCode = document.createElement('small'); moduleCode.textContent = code;
+      module.append(moduleArt, moduleName, moduleCode); bay.appendChild(module);
+      document.querySelector('.jukebox-rack').appendChild(bay);
 
-    document.getElementById('kiosk-insert-btn').addEventListener('click', insertCoin);
+    });
+    document.getElementById('manual-book').addEventListener('click',function(event){event.preventDefault();attemptStart(this);});
+
 
     // ---- The record on each card ---- "HI 12,340 NAME": the leaderboard's
     // top as a game page last cached it (or this browser's own best), then
     // every game's current top in one request where the backend is set up.
     (function () {
       function show(slug, top) {
-        var card = document.querySelector('.card[href^="' + slug + '/"]');
+        var card = document.querySelector('.card[data-game-url^="' + slug + '/"]');
         if (!card || !top || !(top.score > 0)) return;
         var el = card.querySelector('.card-hi');
         if (!el) {
           el = document.createElement('div');
           el.className = 'card-hi';
-          card.insertBefore(el, card.querySelector('.card-desc'));
+          var description=card.querySelector('.card-desc');description.parentElement.insertBefore(el,description);
         }
         el.textContent = 'HI ' + Number(top.score).toLocaleString('en-US') +
           (top.handle ? ' ' + String(top.handle).toUpperCase() : '');
@@ -1381,103 +1837,90 @@
 
     // ---- Card navigation: keyboard arrows + joystick/gamepad ----
     (function () {
-      var cards = Array.prototype.slice.call(document.querySelectorAll('.card'));
+      var cards = Array.prototype.slice.call(document.querySelectorAll('.card, #manual-book'));
       if (!cards.length) return;
       // Start the selection on the game you're currently in (last started),
       // so the first arrow press steps away from there.
       var lastGame = null;
       try { lastGame = sessionStorage.getItem('blip-last-game'); } catch (e) {}
       var activeIdx = lastGame ? cards.findIndex(function (c) {
-        return (c.getAttribute('href') || '').indexOf(lastGame + '/') === 0;
+        return (gameCardUrl(c) || '').indexOf(lastGame + '/') === 0;
       }) : -1;
       var idx = activeIdx >= 0 ? activeIdx : 0;
-      var navActive = false;
-
-      function highlight() {
+      var navActive = true;
+      function highlight(force) {
+        if (cardInFlight&&!force) return;
         cards.forEach(function (c, i) {
           c.classList.toggle('card-focused', navActive && i === idx);
           // Once you're navigating, the focus glow is the only glow —
           // hand it over from the "last played" card.
           if (navActive) c.classList.remove('card-active');
+          if(!c.classList.contains('card'))return;
+          var delta=i-idx, distance=Math.abs(delta), maxShift=Math.max(0,(document.getElementById('game-grid').clientWidth-c.offsetWidth)/2-6);
+          var arcX=distance===0?0:Math.sign(delta)*Math.min(maxShift,distance*3);
+          var arcY=distance===0?-24:-35-distance*1.3;
+          c.style.setProperty('--arc-x',arcX+'px');
+          c.style.setProperty('--arc-y',arcY+'px');
+          c.style.setProperty('--arc-z',distance===0?'26px':(-distance*4)+'px');
+          c.style.setProperty('--arc-turn','0deg');
+          c.style.setProperty('--arc-tilt','0deg');
+          c.style.setProperty('--arc-pitch',distance===0?'0deg':(-Math.min(54,12+distance*6))+'deg');
+          c.style.setProperty('--arc-scale','1');
+          c.style.zIndex=String(30-Math.min(distance,25));
         });
+        fitSelectorRails();
+        if(railMotion)cancelAnimationFrame(railMotion);
+        var railStart=performance.now();
+        function followCards(){fitSelectorRails();if(performance.now()-railStart<1050)railMotion=requestAnimationFrame(followCards);else railMotion=0;}
+        railMotion=requestAnimationFrame(followCards);
       }
+      focusRolodexCard=function(card){var selected=cards.indexOf(card);if(selected<0)return;idx=selected;navActive=true;highlight(true);};
+      highlight();
 
       function move(delta) {
+        if (cardInFlight||!manualOverlay.hidden) return;
         navActive = true;
+        var previous=idx;
         idx = (idx + delta + cards.length) % cards.length;
+        if(idx===previous) return;
         highlight();
-        cards[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+        if(typeof playRolodexMove==='function') playRolodexMove(delta);
+        var track = document.getElementById('game-grid');
+        if(cards[idx].classList.contains('card'))track.scrollTo({ left: cards[idx].offsetLeft + cards[idx].offsetWidth / 2 - track.clientWidth / 2, behavior: 'smooth' });
       }
 
-      // Up and down go to the card above or below. In a single row or a
-      // single column they are next and previous, like left and right.
-      function columns() {
-        var top = cards[0].getBoundingClientRect().top, n = 0;
-        while (n < cards.length && Math.abs(cards[n].getBoundingClientRect().top - top) < 2) n++;
-        return n;
-      }
+      // The Rolodex is a single horizontal row; every direction steps to its neighbor.
       function moveRow(dir) {
-        var cols = columns(), n = cards.length;
-        if (cols <= 1 || cols >= n) { move(dir); return; }
-        var col = idx % cols, last = Math.floor((n - 1) / cols) * cols;
-        var to = idx + dir * cols;
-        // Off the bottom: the short last row's end first, then round to the top.
-        if (to >= n) to = idx < last ? n - 1 : col;
-        if (to < 0) to = last + col < n ? last + col : last + col - cols;
-        move(to - idx);
+        move(dir);
       }
-
-      // A kiosk left alone (fullscreen, 20 s without input) walks the
-      // selection through the games; after 90 s it opens the lit one to show
-      // its title screen (shell.js brings it back). Any input stops it.
-      var lastInput = Date.now();
-      function poke() { lastInput = Date.now(); }
-      ['keydown', 'pointerdown', 'pointermove', 'wheel', 'touchstart'].forEach(function (ev) {
-        window.addEventListener(ev, poke, { capture: true, passive: true });
-      });
-      setInterval(function () {
-        if (!document.documentElement.hasAttribute('data-fullscreen') || document.hidden) return;
-        var idle = Date.now() - lastInput;
-        if (idle >= 90000) {
-          var href = cards[idx].getAttribute('href') || '';
-          try {
-            sessionStorage.setItem('blip-attract', '1');
-            // so the walk carries on from here when it comes back
-            sessionStorage.setItem('blip-last-game', href.split('/')[0]);
-          } catch (e) {}
-          window.location.href = href;
-        } else if (idle >= 20000) {
-          move(1);
-        }
-      }, 5000);
 
       function activate() {
-        // Fire always starts the selected game — default to the first card
-        // if the player hasn't moved the selection yet, and auto-insert a
-        // coin if needed rather than silently doing nothing.
+        if(cardInFlight||!manualOverlay.hidden)return;
         if (!navActive) { navActive = true; highlight(); }
-        if (getCoins() <= 0) insertCoin();
-        cards[idx].click();
+        attemptStart(cards[idx]);
       }
 
       document.addEventListener('keydown', function (e) {
+        if(e.target.closest&&e.target.closest('input,textarea,select,[contenteditable]'))return;
+        var control=e.target.closest&&e.target.closest('button,a');
+        if(control&&(e.code==='Space'||e.code==='Enter'))return;
+        if(control&&/^(Arrow|Key[WASD])/.test(e.code))control.blur();
         switch (e.code) {
-          case 'ArrowRight': move(1);     e.preventDefault(); break;
-          case 'ArrowLeft':  move(-1);    e.preventDefault(); break;
-          case 'ArrowDown':  moveRow(1);  e.preventDefault(); break;
-          case 'ArrowUp':    moveRow(-1); e.preventDefault(); break;
-          case 'Space': case 'Enter': activate(); e.preventDefault(); break;
+          case 'KeyD': case 'ArrowRight': move(1);     e.preventDefault(); break;
+          case 'KeyA': case 'ArrowLeft':  move(-1);    e.preventDefault(); break;
+          case 'KeyS': case 'ArrowDown':  moveRow(1);  e.preventDefault(); break;
+          case 'KeyW': case 'ArrowUp':    moveRow(-1); e.preventDefault(); break;
+          case 'KeyF': case 'KeyG': case 'Space': case 'Enter': activate(); e.preventDefault(); break;
         }
       });
 
       pollGamepad(
         function (code) {
-          poke();
           if (code === 'ArrowRight') move(1);
           else if (code === 'ArrowLeft') move(-1);
           else if (code === 'ArrowDown') moveRow(1);
           else if (code === 'ArrowUp') moveRow(-1);
-          else if (code === 'Space') activate();
+          else if (code === 'Space'||code === 'KeyZ'||code === 'Start') activate();
         },
         function () {}
       );
@@ -1527,7 +1970,7 @@
           function onMove(e) {
             if (e.pointerId === activeId && pivot) { e.preventDefault(); apply(e); }
           }
-          bar.addEventListener('pointerdown', function (e) {
+          base.addEventListener('pointerdown', function (e) {
             if (blipControls() !== 'stick') return;   // pad mode — deck shows the SNES pad
             // Stick half only — the right half is the fire buttons.
             if (fire && e.target.closest && e.target.closest('#fire-buttons')) return;
@@ -1645,6 +2088,8 @@
       ].join(';');
       stars.appendChild(s);
     }
+    var directManualChapter=new URLSearchParams(location.search).get('manual');
+    if(directManualChapter){var directIndex=manualChapters.indexOf(directManualChapter+'.html');if(directIndex>=0)requestAnimationFrame(function(){openFieldManual(directIndex,new URLSearchParams(location.search).get('game'));});}
   </script>
 </body>
 </html>

@@ -177,6 +177,7 @@
     }
     window.addEventListener('keydown', onKey, true);
     done.addEventListener('click', saved);
+    done.focus({preventScroll:true});
   }
 
   // ---- UI: handle prompt --------------------------------------------
@@ -212,6 +213,7 @@
 
       function close(val) { m.wrap.remove(); resolve(val); }
       function submit() {
+        if(ok.disabled)return;
         var v = input.value.trim();
         if (!HANDLE_RE.test(v)) { err.textContent = '2-14 letters, digits, space, - or _'; return; }
         ok.disabled = true; err.textContent = '';
@@ -285,6 +287,7 @@
 
       function close(v) { m.wrap.remove(); resolve(v); }
       function submit() {
+        if(ok.disabled)return;
         var v = input.value.trim();
         if (v.replace(/[^0-9a-z]/gi, '').length < 8) { err.textContent = 'check the code'; return; }
         ok.disabled = true; err.textContent = '';
@@ -442,8 +445,24 @@
       });
   }
 
+  function handleControl(name,down) {
+    var modals=document.querySelectorAll('.blip-hs-modal'),wrap=modals[modals.length-1];
+    if(!wrap)return false;
+    var logical=name.replace(/^p2/,''),key;
+    if(/^(up|down|left|right)$/.test(logical))key='Arrow'+logical[0].toUpperCase()+logical.slice(1);
+    else if(logical==='start'||/^button\d+$/.test(logical))key='Enter';
+    else if(logical==='select')key='Escape';
+    if(key){
+      var input=wrap.querySelector('.blip-hs-input'),target=input||wrap;
+      if(input)input.focus({preventScroll:true});
+      target.dispatchEvent(new KeyboardEvent(down?'keydown':'keyup',{key:key,code:key,bubbles:true,cancelable:true}));
+    }
+    return true;
+  }
+
   window.blipScores = {
     enabled: ENABLED,
+    handleControl: handleControl,
     onGameOver: onGameOver,
     promptHandle: promptHandle,
     promptRestore: promptRestore,

@@ -11,7 +11,8 @@
   /* Height of the marquee strip, and so of the BLIP logo and coin slot
      mounted on its ends; one variable so they cannot drift apart. Redefined
      per breakpoint below. */
-  --marquee-h: 28px;
+  --marquee-h: var(--cabinet-fascia-height);
+  --marquee-gap: 8px;
 }
 
 html {
@@ -103,38 +104,53 @@ body::after {
   justify-content: center;
   gap: 12px;
   pointer-events: none;
-  background: linear-gradient(180deg, #101010, #000 92%);
-  border-bottom: 1px solid rgba(var(--cab), 0.35);
-  box-shadow: 0 0 16px rgba(var(--cab), 0.25), 0 2px 10px rgba(0, 0, 0, 0.6);
+  background:
+    repeating-linear-gradient(174deg, transparent 0 7px, rgba(255,210,154,.045) 8px, transparent 10px 15px),
+    linear-gradient(180deg,#684430 0%,#392721 48%,#1a1519 100%);
+  border-bottom: 1px solid rgba(var(--cab), 0.48);
+  box-shadow: 0 0 20px rgba(var(--cab), 0.22), 0 2px 10px rgba(0,0,0,.72), inset 0 1px rgba(255,231,188,.2);
 }
 
 #marquee-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  perspective: 280px;
   font-family: 'Courier New', Courier, monospace;
   font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 5px;
-  color: rgb(var(--cab));
-  text-shadow: 0 0 6px rgba(var(--cab), 0.9), 0 0 20px rgba(var(--cab), 0.5);
-  animation: marquee-flicker 5s ease-in-out infinite;
+  line-height: 1;
+}
+.marquee-letter {
+  -webkit-text-stroke:.25px rgba(81,245,255,.6);
+  text-shadow:-1px 0 rgba(255,49,198,.7),1px 0 rgba(37,225,255,.78),0 0 3px #fff,0 0 9px rgba(67,235,255,.9),0 0 20px rgba(var(--cab),.78),0 0 30px rgba(214,52,255,.42);
+  transform-origin:50% 50%;
+  backface-visibility:hidden;
+}
+.marquee-letter::after {
+  content:'';
+  position:absolute;
+  left:0;right:0;top:50%;height:1px;
+  background:linear-gradient(90deg,rgba(2,7,10,.95),rgba(196,247,245,.56),rgba(2,7,10,.95));
+  box-shadow:0 1px 2px rgba(0,0,0,.8);
 }
 
-/* bulb strips flanking the name, same warm bulbs as the kiosk landing page */
+/* Neon pinstripes flank the mechanical title cells. */
 .marquee-bulbs {
   flex: 1 1 auto;
   max-width: 110px;
   height: 4px;
-  background-image: radial-gradient(circle, #e6dc32 0 1.6px, transparent 2px);
+  background-image: radial-gradient(circle, #8dfaff 0 1.6px, transparent 2px);
   background-size: 18px 4px;
   background-repeat: repeat-x;
   background-position: center;
-  filter: drop-shadow(0 0 4px #e6dc32);
-  animation: marquee-bulbs 1.6s steps(2, jump-none) infinite;
+  filter: drop-shadow(0 0 4px #28dff5) drop-shadow(0 0 8px rgba(220,61,255,.42));
+  animation: none;
 }
-.marquee-bulbs + #marquee-name + .marquee-bulbs { animation-delay: .8s; }
-:root[data-live] :is(.blip-logo, .marquee-bulbs, #marquee-name) { animation-play-state: paused; }
+:root[data-live] :is(.blip-logo, .marquee-bulbs) { animation-play-state: paused; }
 
 @keyframes marquee-bulbs {
-  50% { filter: drop-shadow(0 0 1px #e6dc32); opacity: .5; }
+  50% { filter: drop-shadow(0 0 1px #ffd16a); opacity: .5; }
 }
 /* rare, brief flicker — a sign that's been running all night, not a strobe */
 @keyframes marquee-flicker {
@@ -142,12 +158,15 @@ body::after {
   96% { opacity: 0.35; }
   97% { opacity: 0.9; }
 }
+@media (prefers-reduced-motion: reduce) {
+  #marquee-name.marquee-engage .marquee-letter { animation:none; }
+}
 
 /* ---- Arcade cabinet bezel ---- */
 
 #arcade-bezel {
   position: fixed;
-  top: calc(31px + env(safe-area-inset-top, 0px)); /* marquee (28px) + 3px, below the status-bar inset */
+  top: calc(var(--marquee-h) + var(--marquee-gap) + 3px + env(safe-area-inset-top, 0px));
   left: 3px;
   right: 3px;
   bottom: calc(var(--topbar-h, 56px) + 3px + env(safe-area-inset-bottom, 0px));
@@ -188,8 +207,8 @@ body::after {
   background: #000;
   transform: translate(-50%, -50%) rotate(35deg);
 }
-.bezel-screw.tl { top: calc(41px + env(safe-area-inset-top, 0px)); left: 13px; } /* marquee (28px) + 13px */
-.bezel-screw.tr { top: calc(41px + env(safe-area-inset-top, 0px)); right: 13px; }
+.bezel-screw.tl { top: calc(var(--marquee-h) + var(--marquee-gap) + 13px + env(safe-area-inset-top, 0px)); left: 13px; }
+.bezel-screw.tr { top: calc(var(--marquee-h) + var(--marquee-gap) + 13px + env(safe-area-inset-top, 0px)); right: 13px; }
 .bezel-screw.bl { bottom: calc(var(--topbar-h, 56px) + 13px + env(safe-area-inset-bottom, 0px)); left: 13px; }
 .bezel-screw.br { bottom: calc(var(--topbar-h, 56px) + 13px + env(safe-area-inset-bottom, 0px)); right: 13px; }
 
@@ -214,7 +233,7 @@ canvas {
 #loader {
   position: fixed;
   inset: 0;
-  background: #000;
+  background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -285,42 +304,6 @@ canvas {
   clip-path: inset(0 -80px);
   transform: none !important;   /* beats the beckon's scale */
 }
-:root[data-fullscreen]:not([data-has-touch]) .blip-logo .logo-hint { display: none; }
-
-/* ---- "MORE GAMES" nudge ---- shell.js adds .logo-hint in .blip-logo and
-   toggles .show-hint after ~12s without input. Just under the logo; pixel
-   font, phosphor green, a blinking caret; the logo <a> is the link. */
-.blip-logo .logo-hint {
-  position: absolute;
-  left: 3px;
-  top: calc(100% - 6px);
-  font-family: 'Press Start 2P', 'Courier New', monospace;
-  font-size: 7px;
-  line-height: 1;
-  letter-spacing: 1px;
-  white-space: nowrap;
-  text-transform: none;
-  color: #5cf05c;
-  text-shadow: 0 0 5px #32c832, 0 0 12px rgba(50, 200, 50, 0.55);
-  -webkit-font-smoothing: none;
-  pointer-events: none;
-  opacity: 0;
-  transform: translateY(-3px);
-  transition: opacity .45s ease, transform .45s ease;
-}
-.blip-logo .logo-hint::after {
-  content: '_';
-  margin-left: 2px;
-  animation: blink-coin 0.9s step-end infinite;
-}
-.blip-logo.show-hint .logo-hint {
-  opacity: 1;
-  transform: translateY(0);
-}
-@media (max-width: 480px) {
-  .blip-logo .logo-hint { font-size: 6px; top: calc(100% - 9px); }
-}
-
 /* ---- Bottom bar — game-page overrides ---- */
 
 #topbar {
@@ -504,12 +487,9 @@ canvas {
 
 /* Shrink controls in landscape / short screens */
 @media (max-height: 450px) {
-  :root { --marquee-h: 20px; }
+  :root { --marquee-gap: 6px; }
   #marquee-bar { gap: 8px; }
-  #marquee-name { font-size: 10px; letter-spacing: 3px; }
   .marquee-bulbs { max-width: 60px; }
-  #arcade-bezel { top: calc(23px + env(safe-area-inset-top, 0px)); } /* marquee (20px) + 3px */
-  .bezel-screw.tl, .bezel-screw.tr { top: calc(31px + env(safe-area-inset-top, 0px)); } /* marquee (20px) + 11px */
   /* Landscape still gets a real thumb target — the ball floats above the
      bar over the game, so it can stay large even though vertical room is
      tight; only the shaft's swing shrinks. */
@@ -528,19 +508,11 @@ canvas {
    ends are easy thumb targets (kiosk.css bumps those to a 46px box). The
    bezel and top screws follow it down. */
 @media (max-width: 480px) {
-  :root { --marquee-h: 44px; }
-  #arcade-bezel { top: calc(47px + env(safe-area-inset-top, 0px)); } /* marquee 44 + 3 */
-  .bezel-screw.tl, .bezel-screw.tr { top: calc(56px + env(safe-area-inset-top, 0px)); }
-  /* Drop the flanking bulb dots — the BLIP logo and coin slot over the
-     strip's ends leave no room for them, and the left strip was running
-     into the logo. The centred game name alone reads fine. */
-  #marquee-bar .marquee-bulbs { display: none; }
-
+  :root { --marquee-h: var(--cabinet-fascia-height); }
 }
 
 /* Narrow phones — DEFENDER at 5px letter-spacing is the widest name; give it room */
 @media (max-width: 380px) {
-  #marquee-name { font-size: 11px; letter-spacing: 3px; }
   .marquee-bulbs { max-width: 40px; }
 }
 
@@ -716,7 +688,7 @@ canvas {
   position: fixed;
   left: 16px;
   right: 16px;
-  top: calc(var(--marquee-h, 28px) + 20px + env(safe-area-inset-top, 0px));
+  top: calc(var(--marquee-h, 28px) + var(--marquee-gap, 8px) + 20px + env(safe-area-inset-top, 0px));
   bottom: calc(var(--topbar-h, 56px) + 12px + env(safe-area-inset-bottom, 0px));
   z-index: 140;
   display: none;
@@ -1005,3 +977,12 @@ canvas {
 @media (prefers-reduced-motion: reduce) {
   .ts-demo { animation: none !important; }
 }
+
+:root[data-card-loading] canvas {visibility:hidden}
+
+/* The cabinet's screen stays fixed behind the selector. */
+:root[data-cabinet-screen] :is(.blip-logo,#insert-coin-btn,#topbar,#marquee-bar,#arcade-bezel,.bezel-screw,#fullscreen-btn,#mute-btn,#need-coin-overlay,#loader) {display:none!important}
+:root[data-cabinet-screen] canvas {clip-path:none}
+#game-startup-poster {position:fixed;z-index:2;pointer-events:none;object-fit:contain;background:#080808;image-rendering:pixelated;clip-path:inset(3px round 6px)}
+:root[data-game-ready] #game-startup-poster {display:none}
+:root[data-cabinet-screen] #game-startup-poster {clip-path:none}

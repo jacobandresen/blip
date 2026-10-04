@@ -172,21 +172,30 @@ function saveCoins(n) {
   try { sessionStorage.setItem('blip-coins', n); } catch (e) {}
 }
 
+// A fresh cabinet visit powers down; travelling between its pages keeps credit.
+(function(){
+  if(!document.getElementById('game-grid')||new URLSearchParams(location.search).has('manual'))return;
+  var navigation=performance.getEntriesByType('navigation')[0],internal=false;
+  try{var previous=new URL(document.referrer),scope=new URL('.',location.href);internal=previous.origin===scope.origin&&previous.pathname.startsWith(scope.pathname);}catch(e){}
+  if((navigation&&navigation.type==='reload')||(!internal&&(!navigation||navigation.type!=='back_forward')))saveCoins(0);
+}());
+document.documentElement.toggleAttribute('data-credit',getCoins()>0);
+var cabinetPowerTimer=null;
 function updateCoinsHud() {
-  var n = getCoins(), icons = '';
-  for (var i = 0; i < MAX_COINS; i++) icons += i < n ? '●' : '○';
-  // The word is its own span: the narrowest phones drop it (kiosk.css).
-  var html = '<span class="coins-word">COINS </span>' + icons;
-  document.querySelectorAll('[data-coins-hud]').forEach(function (el) {
-    el.innerHTML = html;
-  });
+  var root=document.documentElement,powered=getCoins()>0,wasPowered=root.hasAttribute('data-credit');
+  root.toggleAttribute('data-credit',powered);
+  if(powered&&!wasPowered){
+    clearTimeout(cabinetPowerTimer);root.setAttribute('data-power-up','');
+    cabinetPowerTimer=setTimeout(function(){root.removeAttribute('data-power-up');},1200);
+  }else if(!powered){clearTimeout(cabinetPowerTimer);root.removeAttribute('data-power-up');}
+  blipUpdateCabinetHum();
 }
 
 /* ---- Sound on / off ---- The choice is stored ('blip-mute'). The games'
  * sounds are Howler's, muted there; the cabinet's own (coins, clicks) all
  * leave through blipOut(), one gain that is shut while muted. */
 var _blipOut = null;
-function blipMuted() { try { return localStorage.getItem('blip-mute') === '1'; } catch (e) { return false; } }
+function blipMuted() { if(document.documentElement.hasAttribute('data-cabinet-screen')) return true; try { return localStorage.getItem('blip-mute') === '1'; } catch (e) { return false; } }
 function blipOut(ctx) {
   if (!_blipOut || _blipOut.context !== ctx) {
     _blipOut = ctx.createGain();
@@ -218,6 +227,56 @@ function getKioskAudio() {
   if (_kioskAudioCtx.state === 'suspended') _kioskAudioCtx.resume();
   return _kioskAudioCtx;
 }
+
+var cabinetHum=null;
+function blipUpdateCabinetHum(unlock) {
+  var powered=getCoins()>0&&!document.hidden&&!document.documentElement.hasAttribute('data-cabinet-screen');
+  if(!powered) {
+    if(cabinetHum&&!cabinetHum.offTimer) {
+      var fading=cabinetHum;
+      fading.output.gain.setTargetAtTime(0,fading.ctx.currentTime,.22);
+      fading.offTimer=setTimeout(function(){
+        fading.sources.forEach(function(source){source.stop();source.disconnect();});
+        fading.nodes.forEach(function(node){node.disconnect();});
+        if(cabinetHum===fading)cabinetHum=null;
+      },1400);
+    }
+    return;
+  }
+  try {
+    var existing=_kioskAudioCtx||(typeof Howler!=='undefined'&&Howler.ctx);
+    if(!existing&&!unlock)return;
+    var ctx=getKioskAudio();
+    if(ctx.state!=='running') {ctx.resume().then(function(){blipUpdateCabinetHum();}).catch(function(){});return;}
+    if(!cabinetHum) {
+      var output=ctx.createGain(),filter=ctx.createBiquadFilter(),sources=[],nodes=[output,filter];
+      filter.type='lowpass';filter.frequency.value=430;filter.Q.value=.65;
+      output.gain.value=0;filter.connect(output);output.connect(blipOut(ctx));
+      [[60,'sawtooth',.6],[120,'sine',.28],[93,'triangle',.12]].forEach(function(voice){
+        var oscillator=ctx.createOscillator(),level=ctx.createGain();
+        oscillator.type=voice[1];oscillator.frequency.value=voice[0];level.gain.value=voice[2];
+        oscillator.connect(level);level.connect(filter);oscillator.start();sources.push(oscillator);nodes.push(level);
+      });
+      var buffer=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate),data=buffer.getChannelData(0),smoothed=0;
+      for(var i=0;i<data.length;i++){smoothed=.97*smoothed+.03*(Math.random()*2-1);data[i]=smoothed;}
+      var fan=ctx.createBufferSource(),air=ctx.createGain();fan.buffer=buffer;fan.loop=true;air.gain.value=.55;
+      fan.connect(air);air.connect(filter);fan.start();sources.push(fan);nodes.push(air);
+      cabinetHum={ctx:ctx,output:output,sources:sources,nodes:nodes,offTimer:null};
+    }
+    clearTimeout(cabinetHum.offTimer);cabinetHum.offTimer=null;
+    cabinetHum.output.gain.setTargetAtTime(.09,cabinetHum.ctx.currentTime,.35);
+  }catch(e){}
+}
+['pointerdown','keydown','touchstart'].forEach(function(event){
+  document.addEventListener(event,function(){blipUpdateCabinetHum(true);},{capture:true,passive:true});
+});
+document.addEventListener('visibilitychange',function(){blipUpdateCabinetHum();});
+window.addEventListener('pagehide',function(){
+  if(!cabinetHum)return;
+  clearTimeout(cabinetHum.offTimer);
+  cabinetHum.sources.forEach(function(source){source.stop();source.disconnect();});
+  cabinetHum.nodes.forEach(function(node){node.disconnect();});cabinetHum=null;
+});
 
 // A coin is two sounds: the inharmonic clink through the chute, then the
 // register's "credit accepted" chime. Keep in sync with shell.js's copy.
@@ -264,6 +323,57 @@ function playCoinInsert() {
   });
 }
 
+// A switch latch and the muted clack of a card seating in its guide.
+function playCardMechanism() {
+  try {
+    var ctx = getKioskAudio(), t = ctx.currentTime;
+    var size = Math.ceil(ctx.sampleRate * 0.026), buffer = ctx.createBuffer(1, size, ctx.sampleRate);
+    var data = buffer.getChannelData(0);
+    for (var i = 0; i < size; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / size);
+    var noise = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), snap = ctx.createGain();
+    noise.buffer = buffer; filter.type = 'bandpass'; filter.frequency.value = 1750; filter.Q.value = 1.3;
+    snap.gain.setValueAtTime(0.12, t); snap.gain.exponentialRampToValueAtTime(0.0001, t + 0.027);
+    noise.connect(filter); filter.connect(snap); snap.connect(blipOut(ctx));
+    noise.start(t); noise.stop(t + 0.028);
+    var osc = ctx.createOscillator(), body = ctx.createGain();
+    osc.type = 'triangle'; osc.frequency.setValueAtTime(230, t + 0.004);
+    osc.frequency.exponentialRampToValueAtTime(105, t + 0.065);
+    body.gain.setValueAtTime(0.0001, t); body.gain.exponentialRampToValueAtTime(0.12, t + 0.006);
+    body.gain.exponentialRampToValueAtTime(0.0001, t + 0.085);
+    osc.connect(body); body.connect(blipOut(ctx)); osc.start(t); osc.stop(t + 0.09);
+  } catch (e) {}
+}
+
+function playRolodexMove(direction) {
+  try {
+    var ctx=getKioskAudio(), start=ctx.currentTime, sign=direction<0?-1:1;
+    var count=3, buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.19),ctx.sampleRate), data=buffer.getChannelData(0);
+    for(var i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.055));
+    var noise=ctx.createBufferSource(), filter=ctx.createBiquadFilter(), scrape=ctx.createGain();
+    noise.buffer=buffer;filter.type='bandpass';filter.frequency.value=780;filter.Q.value=.65;
+    scrape.gain.setValueAtTime(.0001,start);scrape.gain.exponentialRampToValueAtTime(.035,start+.025);scrape.gain.exponentialRampToValueAtTime(.0001,start+.2);
+    noise.connect(filter);filter.connect(scrape);scrape.connect(blipOut(ctx));noise.start(start);noise.stop(start+.2);
+    for(var tick=0;tick<count;tick++) {
+      var at=start+.018+tick*.052, osc=ctx.createOscillator(), gain=ctx.createGain();
+      osc.type='triangle';osc.frequency.setValueAtTime(155+tick*13,at);osc.frequency.exponentialRampToValueAtTime(82+tick*8,at+.035);
+      gain.gain.setValueAtTime(.0001,at);gain.gain.exponentialRampToValueAtTime(.075,at+.004);gain.gain.exponentialRampToValueAtTime(.0001,at+.045);
+      osc.connect(gain);gain.connect(blipOut(ctx));osc.start(at);osc.stop(at+.05);
+    }
+  } catch(e) {}
+}
+
+function playManualPaper(lift) {
+  try {
+    var ctx=getKioskAudio(),duration=lift?.38:.25,size=Math.ceil(ctx.sampleRate*duration);
+    var buffer=ctx.createBuffer(1,size,ctx.sampleRate),data=buffer.getChannelData(0);
+    for(var i=0;i<size;i++){var p=i/size;data[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*p),1.3)*(.65+.35*Math.sin(p*31));}
+    var paper=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+    paper.buffer=buffer;filter.type='bandpass';filter.frequency.value=lift?1150:1800;filter.Q.value=.45;gain.gain.value=.14;
+    paper.connect(filter);filter.connect(gain);gain.connect(blipOut(ctx));paper.start();
+    paper.onended=function(){paper.disconnect();filter.disconnect();gain.disconnect();};
+  }catch(e){}
+}
+
 // The coin that drops into the slot (kiosk.css #coin-drop-anim): a real
 // element so a class toggle can animate it, injected once for every non-game
 // page.
@@ -283,7 +393,7 @@ function dropCoinAnimation() {
   var btn = coinDropAnim.parentElement;
   var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
   var plateW = parseFloat(getComputedStyle(btn, '::after').width) || 18;
-  coinDropAnim.style.setProperty('--slot-x', (padRight + plateW / 2) + 'px');
+  coinDropAnim.style.setProperty('--slot-x', (btn.classList.contains('deck-coin-slot')?btn.offsetWidth/2:padRight+plateW/2)+'px');
   coinDropAnim.classList.remove('dropping');
   void coinDropAnim.offsetWidth;
   coinDropAnim.classList.add('dropping');
@@ -308,17 +418,6 @@ function playNoRoom() {
   osc.stop(t + 0.39);
 }
 
-function flashCoins() {
-  ['insert-coin', 'kiosk-insert-btn'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.classList.remove('coin-flash');
-    void el.offsetWidth;
-    el.classList.add('coin-flash');
-    el.addEventListener('animationend', function() { el.classList.remove('coin-flash'); }, { once: true });
-  });
-}
-
 function insertCoin() {
   var n = getCoins();
   if (n < MAX_COINS) {
@@ -326,30 +425,56 @@ function insertCoin() {
     playCoinInsert();
     dropCoinAnimation();
     updateCoinsHud();
-    updateCoinBeckon();
-    flashCoins();
+    updateCoinPrompt();
     if (typeof window.onCoinInserted === 'function') window.onCoinInserted();
   } else {
     playNoRoom();
-    ['insert-coin', 'kiosk-insert-btn'].forEach(function(id) {
-      var el = document.getElementById(id);
-      if (!el) return;
-      el.classList.remove('shake');
-      void el.offsetWidth;
-      el.classList.add('shake');
-      el.addEventListener('animationend', function() { el.classList.remove('shake'); }, { once: true });
-    });
   }
 }
 
-// While the landing page (.game-grid) shows zero credits, the COINS button
-// throbs (.needs-coin) until the first coin.
-function updateCoinBeckon() {
+function wireCabinetLogo() {
+  document.querySelectorAll('.led-logo').forEach(function(logo){
+    if(logo.querySelector('.logo-power-wire'))return;
+    var wire=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    wire.setAttribute('class','logo-power-wire');wire.setAttribute('viewBox','0 0 32 40');wire.setAttribute('aria-hidden','true');
+    wire.innerHTML='<circle cx="27" cy="11" r="4.5" fill="#211c16" stroke="#9e8764" stroke-width="1.5"/>'+
+      '<path class="wire-shadow" d="M0 22 H7 C14 22 10 34 20 34 C30 34 27 23 27 11"/>'+
+      '<path class="wire-jacket" d="M0 20 H7 C14 20 10 32 20 32 C30 32 27 21 27 11"/>'+
+      '<path class="wire-highlight" d="M0 19 H7 C14 19 10 31 20 31 C30 31 27 20 27 11"/>'+
+      '<path class="wire-current" d="M0 19 H7 C14 19 10 31 20 31 C30 31 27 20 27 11"/>'+
+      '<rect x="-2" y="16" width="7" height="8" rx="1.5" fill="#40372b" stroke="#aa9270" stroke-width=".8"/>';
+    logo.appendChild(wire);
+    logo.querySelectorAll('.led-on').forEach(function(lamp){lamp.style.setProperty('--led-bank',3-Math.floor(Number(lamp.getAttribute('cx'))/24));});
+    var display=logo.querySelector('.blip-led-display'),brand=document.createElementNS('http://www.w3.org/2000/svg','g');
+    brand.setAttribute('class','led-blip');
+    while(display.firstChild)brand.appendChild(display.firstChild);display.appendChild(brand);
+    var prompt=document.createElementNS('http://www.w3.org/2000/svg','g');prompt.setAttribute('class','led-coin-prompt');
+    var glyphs={I:['11111','00100','00100','00100','00100','00100','11111'],N:['10001','11001','11001','10101','10011','10011','10001'],S:['01111','10000','10000','01110','00001','00001','11110'],E:['11111','10000','10000','11110','10000','10000','11111'],R:['11110','10001','10001','11110','10100','10010','10001'],T:['11111','00100','00100','00100','00100','00100','00100'],C:['01111','10000','10000','10000','10000','10000','01111'],O:['01110','10001','10001','10001','10001','10001','01110']};
+    ['INSERT','COIN'].forEach(function(word,line){
+      var left=(100-(word.length*6-2)*2.5)/2;
+      Array.from(word).forEach(function(letter,index){glyphs[letter].forEach(function(row,y){Array.from(row).forEach(function(dot,x){
+        if(dot==='0')return;var lamp=document.createElementNS('http://www.w3.org/2000/svg','circle');
+        lamp.setAttribute('cx',left+(index*6+x)*2.5);lamp.setAttribute('cy',3+line*16+y*1.7);lamp.setAttribute('r','.66');prompt.appendChild(lamp);
+      });});});
+    });display.appendChild(prompt);
+  });
+}
+function wireCoinSlot() {
+  wireCabinetLogo();
+  var slot=document.getElementById('kiosk-insert-btn');
+  if(slot)slot.addEventListener('click',insertCoin);
+  updateCoinsHud();
+}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',wireCoinSlot);
+else wireCoinSlot();
+
+// Mark the coin control while the landing page has no credits.
+function updateCoinPrompt() {
   if (!document.querySelector('.game-grid')) return;
   var btn = document.getElementById('kiosk-insert-btn');
   if (btn) btn.classList.toggle('needs-coin', getCoins() <= 0);
 }
-window.addEventListener('load', updateCoinBeckon);
+window.addEventListener('load', updateCoinPrompt);
 
 /* ---- BLIP logo overcharge glitch ---- Now and then one letter arcs as if
  * surged, the rest flicker, with a zap on the speaker. Every page loads
@@ -591,14 +716,11 @@ function pollGamepad(onDown, onUp) {
   });
 }());
 
-/* ---- Fullscreen ---- One button beside every coin slot sets <html
- * data-fullscreen> (each page's CSS decides what that hides) and stores it.
- * A page load drops real fullscreen; the first key or click asks again. */
+/* Restore the saved fullscreen layout after navigation. */
 (function () {
   var root = document.documentElement;
   var KEY = 'blip-fullscreen';
   var enter = root.requestFullscreen || root.webkitRequestFullscreen;
-  var leave = document.exitFullscreen || document.webkitExitFullscreen;
   function wanted() { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } }
   function inBrowserFullscreen() {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
@@ -623,15 +745,9 @@ function pollGamepad(onDown, onUp) {
     window.addEventListener(ev, wakeCursor, { passive: true });
   });
 
-  var btn = null;
   function apply(on) {
     root.toggleAttribute('data-fullscreen', on);
     wakeCursor();
-    if (btn) {
-      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-      btn.title = on ? 'Exit fullscreen' : 'Fullscreen';
-      btn.setAttribute('aria-label', btn.title);
-    }
     if (typeof window.onBlipFullscreenChange === 'function') {
       try { window.onBlipFullscreenChange(on); } catch (e) {}
     }
@@ -643,113 +759,13 @@ function pollGamepad(onDown, onUp) {
   // Before first paint where this script is in <head>.
   if (wanted()) root.setAttribute('data-fullscreen', '');
 
-  // Left of the coin slot. On a phone a game's name reaches that far: one
-  // button then goes right of the logo, and the name is centred in what is
-  // left between it and the slot, its letters closed up until it fits.
-  var mute = null;
-  function place() {
-    var coin = document.getElementById('insert-coin-btn') || document.getElementById('kiosk-insert-btn');
-    var name = document.getElementById('marquee-name');
-    var logo = document.querySelector('.blip-logo');
-    if (!mute || !coin) return;
-    var bar = name && name.parentNode;
-    if (bar) {
-      bar.style.paddingLeft = bar.style.paddingRight = '';
-      name.style.letterSpacing = name.style.visibility = '';
-    }
-    mute.hidden = false;
-    var first = btn || mute;   // the one that stays where there is room for one
-    var slot = coin.getBoundingClientRect();
-    // As tall as the coin slot, which is as tall as the page's top bar (28,
-    // 40 or 46px), so the icon sits on the bar's middle line.
-    var h = coin.offsetHeight + 'px';
-    var w = first.offsetWidth || 34;
-    var left = slot.left - w - 2;
-    var cramped = !!(name && logo && slot.width > 0 &&
-      name.getBoundingClientRect().right > left - (btn ? w : 0));
-    if (cramped) left = logo.getBoundingClientRect().right + 2;
-    first.style.height = h;
-    first.style.left = Math.round(left) + 'px';
-    if (btn) {
-      mute.hidden = cramped;
-      mute.style.height = h;
-      mute.style.left = Math.round(left - w) + 'px';
-    }
-    if (!cramped) {
-      // The bulb strips beside the name stop short of the buttons; the same
-      // on both sides, so the name stays in the middle.
-      if (bar && logo) {
-        var edge = Math.max(logo.getBoundingClientRect().right, window.innerWidth - (left - (btn ? w : 0)));
-        bar.style.paddingLeft = bar.style.paddingRight = Math.round(edge + 4) + 'px';
-      }
-      return;
-    }
-    var from = left + w, room = slot.left - 4 - from;
-    bar.style.paddingLeft = Math.round(from) + 'px';
-    bar.style.paddingRight = Math.round(window.innerWidth - slot.left + 4) + 'px';
-    var gap = parseFloat(getComputedStyle(name).letterSpacing) || 0;
-    while (gap > 1 && name.getBoundingClientRect().width > room) {
-      gap -= 1;
-      name.style.letterSpacing = gap + 'px';
-    }
-    if (name.getBoundingClientRect().width > room) name.style.visibility = 'hidden';
-  }
-
   function build() {
-    var coin = document.getElementById('insert-coin-btn') || document.getElementById('kiosk-insert-btn');
-    if (!coin) return;
-    // A touch screen keeps its whole layout, so without real fullscreen
-    // (iPhone) the button would do nothing: the sound button stands alone.
-    if (!blipHasTouch() || enter) {
-      btn = document.createElement('button');
-      btn.id = 'fullscreen-btn';
-      btn.type = 'button';
-      btn.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true">' +
-        '<path class="fs-enter" d="M1.5 6V1.5H6M10 1.5h4.5V6M14.5 10v4.5H10M6 14.5H1.5V10"/>' +
-        '<path class="fs-exit" d="M1.5 6H6V1.5M10 1.5V6h4.5M14.5 10H10v4.5M6 14.5V10H1.5"/></svg>';
-      document.body.appendChild(btn);
-    }
-    mute = document.createElement('button');
-    mute.id = 'mute-btn';
-    mute.type = 'button';
-    mute.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true">' +
-      '<path d="M1.5 6h2.7L8 3v10L4.2 10H1.5z"/>' +
-      '<path class="snd-on" d="M10.4 5.6c1.1 1.2 1.1 3.6 0 4.8M12.4 3.8c2.1 2.2 2.1 6.2 0 8.4"/>' +
-      '<path class="snd-off" d="M10.6 6l4 4M14.6 6l-4 4"/></svg>';
-    function label() {
-      mute.title = blipMuted() ? 'Sound on' : 'Sound off';
-      mute.setAttribute('aria-label', mute.title);
-      mute.setAttribute('aria-pressed', blipMuted() ? 'true' : 'false');
-    }
-    document.body.appendChild(mute);
-    label();
-    mute.addEventListener('click', function () { blipSetMuted(!blipMuted()); label(); });
-    // M does the same, for a cabinet with no mouse (no game uses the key).
     window.addEventListener('keydown', function (e) {
       if ((e.key !== 'm' && e.key !== 'M') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
       blipSetMuted(!blipMuted());
-      label();
     }, true);
-    if (btn) btn.addEventListener('click', function () {
-      var on = !root.hasAttribute('data-fullscreen');
-      set(on);
-      if (on) request();
-      else if (inBrowserFullscreen() && leave) { try { leave.call(document); } catch (e) {} }
-    });
-    window.addEventListener('resize', place);
-    // The logo and the slot settle after their fonts and boot animation.
-    if (typeof ResizeObserver === 'function') {
-      var settle = new ResizeObserver(place);
-      ['.blip-logo', '#insert-coin-btn', '#kiosk-insert-btn', '#marquee-name'].forEach(function (sel) {
-        var el = document.querySelector(sel);
-        if (el) settle.observe(el);
-      });
-    }
-    var logo = document.querySelector('.blip-logo');
-    if (logo) logo.addEventListener('animationend', place);
     apply(wanted());
-    place();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build);
   else build();
@@ -765,16 +781,537 @@ function pollGamepad(onDown, onUp) {
     document.addEventListener(ev, function () {
       if (leaving) return;
       if (!inBrowserFullscreen() && root.hasAttribute('data-fullscreen')) set(false);
-      place();
     });
   });
   // Back in real fullscreen on the first key or click of a page.
   ['keydown', 'mousedown', 'pointerup', 'touchend'].forEach(function (ev) {
     window.addEventListener(ev, function (e) {
       if (!wanted() || inBrowserFullscreen()) return;
-      if (e.target && e.target.closest && e.target.closest('#fullscreen-btn')) return;
       if (e.key === 'Escape') return;
       request();
     }, true);
   });
 }());
+
+// The telescoping boom keeps its level clamp clear of the receiver.
+window.blipTransferCard = function (options) {
+  var stage = document.querySelector('.jukebox-transfer.idle') || document.createElement('div');
+  stage.className = 'jukebox-transfer active' + (options.idle ? ' idle' : '');
+  stage.setAttribute('aria-hidden', 'true');
+  var cabinet=document.querySelector('.screen-bezel');
+  var cabinetBox=cabinet&&cabinet.getBoundingClientRect();
+  if(cabinetBox) {
+    var fascia=document.querySelector('.top-marquee-bar, #marquee-bar'),fasciaBottom=fascia?fascia.getBoundingClientRect().bottom:40;
+    stage.style.clipPath='inset('+Math.max(0,fasciaBottom)+'px '+Math.max(0,innerWidth-cabinetBox.right)+'px '+
+      Math.max(0,innerHeight-cabinetBox.bottom)+'px '+Math.max(0,cabinetBox.left)+'px)';
+  }
+  stage.innerHTML = '<div class="jukebox-mechanics-bar"></div><div class="jukebox-transfer-arm articulated"><i class="jukebox-arm-anchor"></i><i class="jukebox-arm-mount"></i><i class="jukebox-arm-shaft"></i><i class="jukebox-arm-forearm"></i><i class="jukebox-arm-pivot"></i><div class="jukebox-arm-wrist"><div class="jukebox-flight-card"><img alt=""><strong></strong><small></small></div><i class="jukebox-arm-grip"></i></div></div>';
+  var returning=!!options.returning;
+  stage.dataset.cycle=returning?'return':'insert';
+  var totalTime=returning?12300:14700;
+  var arm = stage.querySelector('.jukebox-transfer-arm'), card = arm.querySelector('.jukebox-flight-card');
+  card.querySelector('img').src = options.art;
+  card.querySelector('strong').textContent = options.name;
+  card.querySelector('small').textContent = options.code;
+  var width = options.width, height = options.height, scale = options.scale || 1;
+  if (options.original) {
+    var copy = options.original.cloneNode(true);
+    var originals = [options.original].concat(Array.from(options.original.querySelectorAll('*')));
+    var copies = [copy].concat(Array.from(copy.querySelectorAll('*')));
+    originals.forEach(function (original,index) {
+      var styles=getComputedStyle(original);
+      Array.from(styles).forEach(function (key) { copies[index].style.setProperty(key,styles.getPropertyValue(key)); });
+    });
+    copies.slice(1).forEach(function(part){part.style.visibility='visible';});
+    copy.className='jukebox-flight-card'; copy.removeAttribute('href');
+    copy.style.minWidth='0'; copy.style.minHeight='0'; copy.style.maxWidth='none'; copy.style.maxHeight='none';
+    copy.style.position='absolute'; copy.style.margin='0'; copy.style.transition='none';
+    copy.style.left='0'; copy.style.top='0'; copy.style.zIndex='5';
+    copy.style.transformOrigin='50% 100%';
+    copy.style.transform='translate(-50%,-100%) scale('+scale+')';
+    card.replaceWith(copy); card=copy;
+  }
+  var cardOpacity=parseFloat(card.style.opacity || '1');
+  var physicalHeight=height*scale,physicalWidth=width*scale;
+  var exposedEdge=Math.min(18,physicalHeight*.2),feedTravel=physicalHeight-exposedEdge;
+  card.style.visibility='hidden';
+  card.style.width = width + 'px'; card.style.height = height + 'px';
+  var pivot = options.pivot, source = options.source, slot = options.slot;
+  var initialAngle=options.angle || 0, radians=initialAngle*Math.PI/180;
+  var start = options.idle ? {x:pivot.x-58,y:pivot.y} :
+    {x:source.x-Math.sin(radians)*physicalHeight/2, y:source.y+Math.cos(radians)*physicalHeight/2};
+  var approach = {x:slot.x, y:slot.y + physicalHeight};
+  var park = {x:pivot.x-58,y:pivot.y};
+  var restingRom=null;
+  if(options.original&&!options.idle) {
+    restingRom=card.cloneNode(true);restingRom.className='jukebox-resting-rom';
+    restingRom.style.position='fixed';restingRom.style.zIndex='21';
+    restingRom.style.left=start.x+'px';restingRom.style.top=start.y+'px';
+    restingRom.style.transform='translate(-50%,-100%) rotate('+initialAngle+'deg) scale('+scale+')';
+    restingRom.style.visibility='visible';restingRom.style.pointerEvents='none';
+    arm.appendChild(restingRom);
+  }
+  var shaft = arm.querySelector('.jukebox-arm-shaft'), forearm = arm.querySelector('.jukebox-arm-forearm');
+  var wrist = arm.querySelector('.jukebox-arm-wrist');
+  var grip=arm.querySelector('.jukebox-arm-grip');arm.appendChild(grip);
+  grip.innerHTML='<i class="jukebox-claw-rail"></i><i class="jukebox-claw-jaw left"><b></b></i><i class="jukebox-claw-jaw right"><b></b></i><i class="jukebox-claw-lock"></i>';
+  grip.style.setProperty('--rom-half',(physicalWidth/2)+'px');
+  if(returning)grip.classList.add('edge-grip');
+  var tool=document.createElement('i');tool.className='jukebox-arm-tool';arm.appendChild(tool);
+  var bearing=document.createElement('i');bearing.className='jukebox-arm-bearing';arm.appendChild(bearing);
+  var shoulderLift=document.createElement('i');shoulderLift.className='jukebox-joint-lift shoulder';arm.appendChild(shoulderLift);
+  var rotaryPivot=arm.querySelector('.jukebox-arm-pivot'),rotor={x:pivot.x,y:pivot.y};
+  rotaryPivot.dataset.joint='shoulder';arm.dataset.drive='telescopic';
+  wrist.dataset.layer='rom';
+  arm.querySelector('.jukebox-arm-mount').dataset.layer='chassis';
+  tool.dataset.layer='gripper';
+  [arm.querySelector('.jukebox-arm-mount'), arm.querySelector('.jukebox-arm-pivot')].forEach(function (part) {
+    part.style.left = pivot.x + 'px'; part.style.top = pivot.y + 'px';
+  });
+  var anchor=arm.querySelector('.jukebox-arm-anchor'),guide=document.querySelector('.rolodex-guide.right');
+  anchor.style.left=pivot.x+'px';anchor.style.top=pivot.y+'px';
+  anchor.style.width=(guide?Math.max(30,guide.getBoundingClientRect().left+5-pivot.x):40)+'px';
+  function ease(t) { return t*t*t*(10+t*(-15+6*t)); }
+  function mix(a,b,t) { return a+(b-a)*t; }
+  function link(el,a,b,length) {
+    el.style.left = a.x + 'px'; el.style.top = a.y + 'px';
+    el.style.width = length + 'px';
+    el.style.transform = 'rotate(' + Math.atan2(b.y-a.y,b.x-a.x) + 'rad)';
+  }
+  var picked = false, seated = false, lifted = false, extracted = false, drive = null, guideClicks = 0;
+  var jointSound=null,loadSound=null,lastPose=null,soundEvents={};
+  function stopSound() {
+    if(jointSound){jointSound.stop();jointSound=null;}
+    if(loadSound){loadSound.stop();loadSound=null;}
+    if(drive){drive.stop();drive=null;}
+  }
+  function drawer(stow) {
+    arm.style.transform='translateY('+(-60*stow)+'px)';
+    stage.querySelector('.jukebox-mechanics-bar').style.transform='translateY('+(-60*stow)+'px)';
+  }
+  function render(ms) {
+    var x=start.x, y=start.y, roll=options.idle?0:initialAngle, feed=0;
+    if (ms < 1500) {
+      if(ms<900) {
+        var descend=ease(ms/900);
+        x=mix(park.x,start.x,descend);
+        y=mix(park.y,start.y-physicalHeight-22,descend)+(physicalHeight-14)*descend;
+      } else {
+        x=start.x;y=mix(start.y-36,start.y,ease((ms-900)/600));
+      }
+    } else if (ms>=2100 && ms<3100) {
+      y=start.y-12*ease((ms-2100)/1000);
+    } else if (ms >= 3100 && ms < 7100) {
+      var t = ease((ms-3100)/4000);
+      x=mix(start.x,approach.x,t); y=mix(start.y-12,approach.y,t)-Math.sin(t*Math.PI)*8;
+      roll=mix(initialAngle,0,t)+Math.sin(t*Math.PI)*-8;
+    } else if (ms >= 7100) {
+      feed=ease(Math.min(1,(ms-7100)/2500));
+      x=slot.x; y=approach.y-feedTravel*feed; roll=0;
+    }
+    if (ms >= 10200) {
+      var back=ease(Math.min(1,(ms-10200)/2500));
+      x=mix(slot.x,park.x,back); y=mix(slot.y+exposedEdge,park.y,back)+Math.sin(back*Math.PI)*35;
+    }
+    if(!paused && !options.idle) {
+      if(ms>=(returning?2100:7100) && ms<(returning?4600:9600)) {
+        if(!drive) drive=blipCardDrive();
+        if(drive) drive.update((ms-(returning?2100:7100))/2500);
+        var clicks=Math.floor((ms-(returning?2100:7100))/700);
+        if(clicks>guideClicks) {guideClicks=clicks;playCardLatch(true);}
+      } else if(drive) {drive.stop();drive=null;}
+    }
+    if(returning) {
+      roll=0; feed=1;
+      if(ms<1500) {
+        var out=ease(ms/1500);x=mix(park.x,slot.x,out);y=mix(park.y,slot.y+exposedEdge,out);
+      } else if(ms<2100) {x=slot.x;y=slot.y+exposedEdge;}
+      else if(ms<4600) {
+        feed=1-ease((ms-2100)/2500);x=slot.x;y=slot.y+exposedEdge+feedTravel*(1-feed);
+      } else if(ms<8600) {
+        var home=ease((ms-4600)/4000); feed=0;
+        x=mix(approach.x,start.x,home);y=mix(approach.y,start.y-12,home)-Math.sin(home*Math.PI)*8;
+        roll=mix(0,initialAngle,home)+Math.sin(home*Math.PI)*-8;
+      } else if(ms<9800) {
+        feed=0;x=start.x;y=start.y-12*(1-ease(Math.min(1,(ms-8600)/1000)));roll=initialAngle;
+      } else {
+        feed=0;roll=0;
+        if(ms<10700) {
+          x=start.x;y=mix(start.y,start.y-36,ease((ms-9800)/900));
+        } else {
+          var rest=ease(Math.min(1,(ms-10700)/1600));
+          x=mix(start.x,park.x,rest);
+          y=mix(start.y-physicalHeight-22,park.y,rest)+(physicalHeight-14)*(1-rest);
+        }
+      }
+    }
+    var extension=ms<900?ease(ms/900):ms<10200?1:1-ease(Math.min(1,(ms-10200)/2500));
+    if(returning) extension=ms<1500?ease(ms/1500):ms<10700?1:1-ease(Math.min(1,(ms-10700)/1600));
+    var toolAngle=roll*Math.PI/180,toolSide=(physicalWidth/2+38)*extension,toolDrop=(returning?-10:14-physicalHeight)*extension;
+    var carrierY=y+(returning?0:feedTravel*feed*extension);
+    var withdraw=returning?0:ease(Math.max(0,Math.min(1,(ms-7400)/800)))*
+      (1-ease(Math.max(0,Math.min(1,(ms-10200)/2500))));
+    var carrierX=x+12*withdraw;carrierY+=32*withdraw;
+    var toolPoint={x:carrierX+Math.cos(toolAngle)*toolSide-Math.sin(toolAngle)*toolDrop,y:carrierY+Math.sin(toolAngle)*toolSide+Math.cos(toolAngle)*toolDrop};
+    var gripDrop=(returning?-10:14-physicalHeight)*extension;
+    var gripPoint={x:carrierX-Math.sin(toolAngle)*gripDrop,y:carrierY+Math.cos(toolAngle)*gripDrop};
+    var bridge=(physicalWidth/2+18)*extension;
+    var toolStart={x:gripPoint.x+Math.cos(toolAngle)*bridge,y:gripPoint.y+Math.sin(toolAngle)*bridge};
+    var elevation=ms<1500?0:ms<2100?ease((ms-1500)/600):
+      1-ease(Math.max(0,Math.min(1,(ms-(returning?9800:10200))/2500)));
+    if(options.idle)elevation=0;
+    // Elevation changes depth; the shoulder stays centred in its chassis bay.
+    arm.dataset.elevation=elevation.toFixed(3);
+    arm.dataset.depth=(16+12*elevation).toFixed(2);
+    wrist.dataset.depth='12';
+    var distance=Math.hypot(toolPoint.x-rotor.x,toolPoint.y-rotor.y),shoulderAngle=Math.atan2(toolPoint.y-rotor.y,toolPoint.x-rotor.x);
+    var housing=Math.min(52,distance),overlap=Math.min(14,housing),slide=Math.max(0,housing-overlap);
+    var carriage={x:rotor.x+Math.cos(shoulderAngle)*slide,y:rotor.y+Math.sin(shoulderAngle)*slide};
+    link(shaft,rotor,toolPoint,housing);link(forearm,carriage,toolPoint,distance-slide);
+    shoulderLift.style.left=rotor.x+'px';shoulderLift.style.top=rotor.y+'px';
+    shoulderLift.style.setProperty('--joint-rise',(12*elevation)+'px');
+    // A 20px standoff keeps the wrist outside the open jaw's sweep.
+    link(tool,toolStart,toolPoint,Math.hypot(toolPoint.x-toolStart.x,toolPoint.y-toolStart.y));tool.style.opacity=extension;
+    bearing.style.left=toolPoint.x+'px';bearing.style.top=toolPoint.y+'px';
+    bearing.style.opacity=extension;
+    bearing.style.setProperty('--bearing-angle',roll+'deg');
+    rotaryPivot.style.setProperty('--bearing-angle',shoulderAngle+'rad');
+    var jawClose=ease(Math.max(0,Math.min(1,(ms-1500)/600)))*
+      (1-ease(Math.max(0,Math.min(1,(ms-(returning?9300:7100))/300))));
+    grip.style.setProperty('--jaw-travel',(12*jawClose)+'px');
+    grip.style.setProperty('--rom-half',(physicalWidth/2*extension)+'px');
+    grip.style.setProperty('--jaw-close',jawClose);
+    grip.dataset.holding=String(jawClose>.999&&(returning?ms>=2100&&ms<9300:ms>=2100&&ms<=7100));
+    var gripDepth=16+12*elevation-16*jawClose;
+    grip.dataset.depth=gripDepth.toFixed(2);
+    grip.style.filter='drop-shadow(0 '+Math.max(0,(gripDepth-12)*.4)+'px 2px #000a)';
+    if(!paused&&!options.idle) {
+      if(!jointSound)jointSound=blipArmJointSound();
+      if(lastPose&&ms>lastPose.ms&&jointSound) {
+        var dt=(ms-lastPose.ms)/1000;
+        function angularSpeed(a,b){return Math.abs(Math.atan2(Math.sin(a-b),Math.cos(a-b)))/dt;}
+        jointSound.update(angularSpeed(shoulderAngle,lastPose.shoulder),Math.abs(distance-lastPose.reach)/(70*dt),Math.abs(elevation-lastPose.elevation)/dt);
+      }
+      lastPose={ms:ms,shoulder:shoulderAngle,reach:distance,elevation:elevation};
+      [[1500,'valve'],[2100,'attach'],[returning?4600:9600,returning?'unseat':'seat'],[returning?9600:7400,'release'],[returning?12300:12700,'vent']].forEach(function(event){
+        if(ms>=event[0]&&!soundEvents[event[1]]){soundEvents[event[1]]=true;playRomCoupling(event[1]);}
+      });
+    }
+    wrist.style.left=x+'px'; wrist.style.top=y+'px'; wrist.style.transform='rotate('+roll+'deg)';
+    var clearance=returning?1-ease(Math.max(0,Math.min(1,(ms-8600)/1000))):ease(Math.max(0,Math.min(1,(ms-2100)/1000)));
+    wrist.style.filter='drop-shadow(0 '+(9*clearance)+'px '+(4*clearance)+'px #000b)';
+    grip.style.left=(gripPoint.x-16)+'px';grip.style.top=(gripPoint.y-11)+'px';grip.style.transform='rotate('+roll+'deg)';
+    card.style.clipPath='inset('+(feed*feedTravel/physicalHeight*100)+'% 0 0 0)';
+    if(returning&&ms>=2100)options.receiver.classList.remove('loaded');
+    card.style.visibility=ms>=2100 && ms<9600?'visible':'hidden';
+    card.style.opacity=ms>=2100 && ms<9600?cardOpacity:0;
+    card.classList.toggle('seated',ms>=9600);
+    if(restingRom)restingRom.style.display=(returning?ms>=9600:ms<2100)?'flex':'none';
+    arm.classList.toggle('clamped',ms>=1500 && ms<(returning?9600:9800));
+    if(ms>=2100 && !picked) {
+      picked=true; card.style.visibility='visible';
+      if(!returning && options.onPickup) options.onPickup();
+    }
+    var stow=returning?0:ease(Math.max(0,Math.min(1,(ms-12700)/2000)));
+    drawer(stow);
+    if(ms>=14700) options.receiver.classList.add('stowed');
+    if(returning && ms>=4600 && !extracted) {extracted=true;options.receiver.classList.remove('loaded');if(options.onExtract) options.onExtract();}
+    if(!returning && ms>=3100 && !lifted) {lifted=true;if(options.onLift) options.onLift();}
+    stage.dataset.phase = ms<2100?'grip':ms<3100?'lift':ms<7100?'swing':ms<9600?'feed':ms<10200?'release':ms<12700?'return':'stow';
+    if (ms >= 9600 && !seated) {
+      seated=true; card.classList.add('seated');
+      if(returning)options.receiver.classList.remove('loaded');
+      else {
+        blipSeatRom(options.receiver,options);
+        if(!paused&&!options.idle)loadSound=playRomLoading(Math.min(4.8,(totalTime-ms)/1000-.1));
+      }
+      if(returning && options.onReturned) options.onReturned();
+      else if (options.onSeat) options.onSeat();
+    }
+  }
+  document.body.appendChild(stage);
+  var paused=false;
+  render(0);
+  var began=performance.now();
+  // A deterministic pose is useful when inspecting the joints in screenshots.
+  stage.blipSeek=function(ms) { paused=true; stopSound(); render(ms); };
+  function frame(now) {
+    if (paused) return;
+    var ms=now-began; render(ms);
+    if(ms<totalTime) requestAnimationFrame(frame);
+    else { stopSound();stage.remove(); if(options.onDone) options.onDone(); }
+  }
+  if (!options.idle && typeof playCardMechanism==='function') playCardMechanism();
+  if(options.idle) {
+    paused=true; options.receiver.classList.remove('stowed');
+    if(options.deploy) {
+      stage.dataset.deploying='true'; drawer(1);
+      var deployStart=performance.now();
+      function deploy(now) {
+        var t=Math.min(1,(now-deployStart)/2000); drawer(1-ease(t));
+        if(t<1) requestAnimationFrame(deploy);
+        else { delete stage.dataset.deploying; stage.dispatchEvent(new Event('blip-deployed')); }
+      }
+      requestAnimationFrame(deploy);
+    }
+  } else requestAnimationFrame(frame);
+  return stage;
+};
+
+function blipCardReceiver(bar) {
+  var receiver=bar.querySelector('.jukebox-receiver');
+  if (!receiver) {
+    var game=blipGameFromPath(location.pathname),interactive=game&&!document.documentElement.hasAttribute('data-cabinet-screen');
+    receiver=document.createElement(interactive?'a':'div'); receiver.className='jukebox-receiver';
+    if(interactive){receiver.href='../index.html';receiver.setAttribute('aria-label','Return to the cabinet');receiver.title='Return to the cabinet';}
+    else receiver.setAttribute('aria-hidden','true');
+    receiver.innerHTML='<div class="jukebox-receiver-lip"><i></i><i></i></div><div class="jukebox-seated-card"><i></i><i></i></div>';
+    bar.appendChild(receiver);
+    try {
+      var loaded=JSON.parse(sessionStorage.getItem('blip-loaded-card')||'null');
+      if(loaded)blipSeatRom(receiver,loaded);
+    }catch(e){}
+  }
+  return receiver;
+}
+
+function blipSeatRom(receiver,rom) {
+  receiver.dataset.rom=rom.slug||rom.name||'';
+  receiver.classList.add('loaded');
+}
+
+function blipCardArmPivot(receiver) {
+  var box=receiver.getBoundingClientRect(),bar=receiver.closest('.top-marquee-bar, #marquee-bar');
+  var top=bar?bar.getBoundingClientRect().bottom:box.top;
+  var guide=document.querySelector('.rolodex-guide.right'),center=box.left+box.width/2;
+  var cabinetWidth=Math.min(960,document.documentElement.clientWidth-32);
+  var x=guide?guide.getBoundingClientRect().left-30:center+Math.min(205,(cabinetWidth-26)/2)-40;
+  var layerHeight=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mechanics-layer-height'))||54;
+  return {x:x,y:top+layerHeight/2};
+}
+
+function blipParkMechanism(track, deploy) {
+  var bar=document.querySelector('.top-marquee-bar');
+  if (!bar) return null;
+  var receiver=blipCardReceiver(bar), housing=receiver.getBoundingClientRect(), barBox=bar.getBoundingClientRect();
+  var slot=receiver.querySelector('.jukebox-receiver-lip').getBoundingClientRect();
+  var area=track ? track.getBoundingClientRect() : {left:0,width:innerWidth,top:110,bottom:440};
+  return blipTransferCard({
+    idle:true,deploy:!!deploy,name:'',code:'',art:'',width:134,height:258,
+    reach:Math.hypot(housing.right+34-(area.left+area.width/2),area.bottom-housing.top)+60,
+    source:{x:area.left+area.width/2,y:area.top+150},
+    pivot:blipCardArmPivot(receiver),
+    slot:{x:slot.left+slot.width/2,y:slot.top+slot.height/2},receiver:receiver
+  });
+}
+
+function blipBuildGuideMechanism() {
+  if (!/\/(about|controls|history|api)\.html$/.test(location.pathname)) return;
+  document.documentElement.setAttribute('data-cabinet-mechanism','');
+  var deploy=!!document.referrer && new URL(document.referrer).origin===location.origin;
+  function park() {
+    if(document.querySelector('.jukebox-transfer[data-deploying]')) return;
+    blipParkMechanism(null,deploy); deploy=false;
+  }
+  requestAnimationFrame(park); window.addEventListener('resize',park);
+}
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',blipBuildGuideMechanism);
+else blipBuildGuideMechanism();
+
+function blipArmJointSound() {
+  try {
+    var ctx=getKioskAudio(),output=ctx.createGain(),nodes=[],sources=[],motors=[];
+    output.gain.value=1.5;output.connect(blipOut(ctx));nodes.push(output);
+    [79,113].forEach(function(base){
+      var motor=ctx.createOscillator(),tone=ctx.createBiquadFilter(),volume=ctx.createGain();
+      motor.type='sawtooth';motor.frequency.value=base;
+      tone.type='lowpass';tone.frequency.value=640;tone.Q.value=1.2;
+      volume.gain.value=0;motor.connect(tone);tone.connect(volume);volume.connect(output);
+      var cog=ctx.createOscillator(),teeth=ctx.createGain();
+      cog.type='triangle';cog.frequency.value=19;teeth.gain.value=0;
+      cog.connect(teeth);teeth.connect(volume.gain);
+      motor.start();cog.start();sources.push(motor,cog);nodes.push(tone,volume,teeth);
+      motors.push({motor: motor,tone:tone,volume:volume,cog:cog,teeth:teeth,base:base});
+    });
+    var buffer=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate),data=buffer.getChannelData(0);
+    for(var i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+    var air=ctx.createBufferSource(),valve=ctx.createBiquadFilter(),pressure=ctx.createGain();
+    air.buffer=buffer;air.loop=true;valve.type='bandpass';valve.frequency.value=2400;valve.Q.value=.65;
+    pressure.gain.value=0;air.connect(valve);valve.connect(pressure);pressure.connect(output);
+    air.start();sources.push(air);nodes.push(valve,pressure);
+    var stopped=false,timer=setTimeout(stop,18000);
+    function stop(){
+      if(stopped)return;stopped=true;clearTimeout(timer);window.removeEventListener('pagehide',stop);
+      output.gain.setTargetAtTime(0,ctx.currentTime,.015);
+      sources.forEach(function(source){source.stop(ctx.currentTime+.1);});
+      setTimeout(function(){sources.concat(nodes).forEach(function(node){node.disconnect();});},150);
+    }
+    window.addEventListener('pagehide',stop,{once:true});
+    return {stop:stop,update:function(shoulder,elbow,lift){
+      if(stopped)return;
+      var t=ctx.currentTime;
+      [shoulder,elbow].forEach(function(speed,index){
+        var voice=motors[index],motion=Math.min(1,speed/.9);
+        voice.motor.frequency.setTargetAtTime(voice.base+motion*125,t,.04);
+        voice.tone.frequency.setTargetAtTime(400+motion*1100,t,.04);
+        voice.volume.gain.setTargetAtTime(motion*.036,t,.025);
+        voice.teeth.gain.setTargetAtTime(motion*.012,t,.025);
+        voice.cog.frequency.setTargetAtTime(16+motion*67,t,.04);
+      });
+      var flow=Math.min(1,lift/2.2);
+      pressure.gain.setTargetAtTime(flow*.11,t,.025);
+      valve.frequency.setTargetAtTime(1600+flow*2100,t,.04);
+    }};
+  }catch(e){return null;}
+}
+
+function playRomLoading(duration) {
+  if(duration<=1.2)return null;
+  try {
+    var ctx=getKioskAudio(),start=ctx.currentTime+.1,end=start+duration,nodes=[],sources=[];
+    var output=ctx.createGain(),tone=ctx.createBiquadFilter();
+    output.gain.setValueAtTime(.0001,start);output.gain.exponentialRampToValueAtTime(.19,start+.18);
+    output.gain.setValueAtTime(.19,end-.95);output.gain.exponentialRampToValueAtTime(.0001,end);
+    tone.type='lowpass';tone.frequency.value=1900;tone.Q.value=.55;
+    tone.connect(output);output.connect(blipOut(ctx));nodes.push(tone,output);
+    var wave=ctx.createPeriodicWave(new Float32Array(6),new Float32Array([0,1,.36,.2,.12,.07]));
+    var motor=ctx.createOscillator();motor.setPeriodicWave(wave);
+    motor.frequency.setValueAtTime(90,start);motor.frequency.exponentialRampToValueAtTime(260,start+.7);
+    motor.frequency.linearRampToValueAtTime(235,end-.95);motor.frequency.exponentialRampToValueAtTime(65,end);
+    motor.connect(tone);sources.push(motor);
+    var rotor=ctx.createOscillator(),ripple=ctx.createGain();rotor.type='sine';
+    rotor.frequency.setValueAtTime(12,start);rotor.frequency.linearRampToValueAtTime(34,start+.7);
+    rotor.frequency.linearRampToValueAtTime(9,end);ripple.gain.value=7;
+    rotor.connect(ripple);ripple.connect(motor.frequency);sources.push(rotor);nodes.push(ripple);
+    var buffer=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate),data=buffer.getChannelData(0);
+    for(var i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+    var air=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),breath=ctx.createGain();
+    air.buffer=buffer;air.loop=true;filter.type='bandpass';filter.frequency.value=2100;filter.Q.value=.6;breath.gain.value=.18;
+    air.connect(filter);filter.connect(breath);breath.connect(output);sources.push(air);nodes.push(filter,breath);
+    sources.forEach(function(source){source.start(start);source.stop(end+.02);});
+    var stopped=false,timer=setTimeout(stop,(duration+.2)*1000);
+    function stop(){
+      if(stopped)return;stopped=true;clearTimeout(timer);window.removeEventListener('pagehide',stop);
+      output.gain.cancelScheduledValues(ctx.currentTime);output.gain.setTargetAtTime(.0001,ctx.currentTime,.025);
+      sources.forEach(function(source){try{source.stop(ctx.currentTime+.1);}catch(e){}});
+      setTimeout(function(){sources.concat(nodes).forEach(function(node){node.disconnect();});},150);
+    }
+    window.addEventListener('pagehide',stop,{once:true});return {stop:stop};
+  }catch(e){return null;}
+}
+
+function playRomCoupling(kind) {
+  try {
+    var ctx=getKioskAudio(),now=ctx.currentTime,isValve=kind==='valve'||kind==='vent';
+    var offsets=isValve?[0]:kind==='attach'?[0,.045,.095]:kind==='release'?[0,.055]:[0,.025,.08];
+    offsets.forEach(function(offset,index){
+      var t=now+offset,duration=isValve?.22:.12;
+      var buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*duration),ctx.sampleRate),data=buffer.getChannelData(0);
+      for(var i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*(isValve?.05:.008)));
+      var noise=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),snap=ctx.createGain();
+      noise.buffer=buffer;filter.type='bandpass';filter.frequency.value=isValve?3300:kind==='release'?2100:1250+index*480;filter.Q.value=.8;
+      snap.gain.value=isValve?.22:(kind==='attach'?.42:.23)/(1+index*.3);
+      noise.connect(filter);filter.connect(snap);snap.connect(blipOut(ctx));noise.start(t);
+      noise.onended=function(){noise.disconnect();filter.disconnect();snap.disconnect();};
+      if(isValve)return;
+      [kind==='attach'?96:kind==='seat'?94:146,327+index*91,713].forEach(function(frequency,partial){
+        var metal=ctx.createOscillator(),ring=ctx.createGain();metal.type='sine';
+        metal.frequency.setValueAtTime(frequency,t);metal.frequency.exponentialRampToValueAtTime(frequency*.82,t+.09);
+        ring.gain.setValueAtTime((kind==='attach'?.28:.16)/(1+partial+index),t);ring.gain.exponentialRampToValueAtTime(.0001,t+.14);
+        metal.connect(ring);ring.connect(blipOut(ctx));metal.start(t);metal.stop(t+.15);
+        metal.onended=function(){metal.disconnect();ring.disconnect();};
+      });
+    });
+  }catch(e){}
+}
+
+function blipCardDrive() {
+  try {
+    var ctx=getKioskAudio(), out=ctx.createGain(), filter=ctx.createBiquadFilter();
+    filter.type='lowpass'; filter.frequency.value=850;
+    filter.connect(out); out.connect(blipOut(ctx)); out.gain.value=0;
+    var motor=ctx.createOscillator(), harmonic=ctx.createOscillator();
+    motor.type='sine'; harmonic.type='triangle';
+    var overtone=ctx.createGain(); overtone.gain.value=.22;
+    motor.connect(filter); harmonic.connect(overtone); overtone.connect(filter);
+    var buffer=ctx.createBuffer(1,ctx.sampleRate*.4,ctx.sampleRate), data=buffer.getChannelData(0);
+    for(var i=0;i<data.length;i++) data[i]=Math.random()*2-1;
+    var friction=ctx.createBufferSource(), rub=ctx.createGain();
+    friction.buffer=buffer; friction.loop=true; rub.gain.value=.12;
+    friction.connect(rub); rub.connect(filter);
+    motor.start(); harmonic.start(); friction.start();
+    var stopped=false;
+    function stop() {
+      if(stopped) return; stopped=true;
+      out.gain.setTargetAtTime(0,ctx.currentTime,.015);
+      [motor,harmonic,friction].forEach(function(node){node.stop(ctx.currentTime+.08);});
+      setTimeout(function(){out.disconnect();filter.disconnect();},150);
+    }
+    window.addEventListener('pagehide',stop,{once:true});
+    setTimeout(stop,3500);
+    return {update:function(progress){
+      var speed=Math.sin(progress*Math.PI), now=ctx.currentTime;
+      motor.frequency.setTargetAtTime(62+speed*74,now,.025);
+      harmonic.frequency.setTargetAtTime(124+speed*148,now,.025);
+      out.gain.setTargetAtTime(.04+.105*speed,now,.025);
+    },stop:stop};
+  } catch(e) {return null;}
+}
+
+function playRolodexDock() {
+  try {
+    var ctx=getKioskAudio(),start=ctx.currentTime,output=ctx.createGain(),nodes=[output];
+    output.gain.value=.85;output.connect(blipOut(ctx));
+    // Both catches engage together; a short second strike is the latch's rebound.
+    [0,.032].forEach(function(offset,index){
+      var at=start+offset,buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.09),ctx.sampleRate),data=buffer.getChannelData(0);
+      for(var i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.009));
+      var snap=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+      snap.buffer=buffer;filter.type='highpass';filter.frequency.value=950;gain.gain.value=index?.28:.9;
+      snap.connect(filter);filter.connect(gain);gain.connect(output);snap.start(at);nodes.push(snap,filter,gain);
+      [163,431,1187].forEach(function(frequency,partial){
+        var tone=ctx.createOscillator(),body=ctx.createGain();tone.type='triangle';tone.frequency.value=frequency;
+        body.gain.setValueAtTime((index?.07:.18)/(partial+1),at);body.gain.exponentialRampToValueAtTime(.0001,at+.12);
+        tone.connect(body);body.connect(output);tone.start(at);tone.stop(at+.14);nodes.push(tone,body);
+      });
+    });
+    setTimeout(function(){nodes.forEach(function(node){node.disconnect();});},300);
+  } catch(e) {}
+}
+
+function playCardLatch(guide) {
+  try {
+    var ctx=getKioskAudio(), t=ctx.currentTime;
+    var buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.06),ctx.sampleRate), data=buffer.getChannelData(0);
+    for(var i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.012));
+    var noise=ctx.createBufferSource(), filter=ctx.createBiquadFilter(), gain=ctx.createGain();
+    noise.buffer=buffer; filter.type='bandpass'; filter.frequency.value=guide?1500:950; filter.Q.value=.7;
+    gain.gain.value=guide ? .045 : .16;
+    noise.connect(filter); filter.connect(gain); gain.connect(blipOut(ctx)); noise.start(t);
+    (guide?[270]:[118,283,517]).forEach(function(frequency,index){
+      var osc=ctx.createOscillator(), body=ctx.createGain(); osc.type='sine'; osc.frequency.value=frequency;
+      var at=t+(index===0?0:.014);
+      body.gain.setValueAtTime(guide ? .025 : .1/(index+1),at);
+      body.gain.exponentialRampToValueAtTime(.0001,at+(guide ? .04 : .16));
+      osc.connect(body);body.connect(blipOut(ctx));osc.start(at);osc.stop(at+.18);
+    });
+  } catch(e) {}
+}
+
+function blipSetMarquee(name, animate) {
+  var sign=document.getElementById('marquee-name');
+  if(!sign) return;
+  var tiles=sign.querySelectorAll('.marquee-letter');
+  sign.setAttribute('aria-label',name || 'No game selected');
+  sign.classList.remove('marquee-engage');
+  tiles.forEach(function(tile,index){
+    tile.textContent=animate?'\u00a0':name[index] || '\u00a0';
+    tile.style.setProperty('--flap-index',index);
+  });
+  if(animate) {
+    void sign.offsetWidth; sign.classList.add('marquee-engage');
+    Array.from(name).forEach(function(char,index){
+      setTimeout(function(){tiles[index].textContent=char;playCardLatch(true);},index*190);
+    });
+  }
+}

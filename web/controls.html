@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="google" content="notranslate">
   <title>CONTROLS — BLIP ARCADE</title>
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-  <link rel="icon" type="image/svg+xml" href="icon.svg">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <link rel="stylesheet" href="kiosk.css?v=76">
+  <link rel="icon" type="image/x-icon" href="favicon.ico?v=2">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
+  <link rel="stylesheet" href="kiosk.css?v=124">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -153,44 +153,58 @@
     /* ---- language switcher ---- */
 
   </style>
+  <link rel="stylesheet" href="manual.css?v=7">
+  <script>location.replace('index.html?manual=controls')</script>
 </head>
-<body>
+<body class="info-page manual-chapter-controls">
 
-<a class="blip-logo" href="index.html">BLIP<span class="ba-rest">&nbsp;ARCADE</span></a>
+<a class="blip-logo led-logo" href="index.html" aria-label="BLIP — cabinet"><svg class="blip-led-display" viewBox="0 0 100 32" aria-hidden="true"><circle class="led-on" cx="4" cy="4" r="1.35"/><circle class="led-on" cx="8" cy="4" r="1.35"/><circle class="led-on" cx="12" cy="4" r="1.35"/><circle class="led-on" cx="16" cy="4" r="1.35"/><circle class="led-off" cx="20" cy="4" r="1.35"/><circle class="led-on" cx="4" cy="8" r="1.35"/><circle class="led-off" cx="8" cy="8" r="1.35"/><circle class="led-off" cx="12" cy="8" r="1.35"/><circle class="led-off" cx="16" cy="8" r="1.35"/><circle class="led-on" cx="20" cy="8" r="1.35"/><circle class="led-on" cx="4" cy="12" r="1.35"/><circle class="led-off" cx="8" cy="12" r="1.35"/><circle class="led-off" cx="12" cy="12" r="1.35"/><circle class="led-off" cx="16" cy="12" r="1.35"/><circle class="led-on" cx="20" cy="12" r="1.35"/><circle class="led-on" cx="4" cy="16" r="1.35"/><circle class="led-on" cx="8" cy="16" r="1.35"/><circle class="led-on" cx="12" cy="16" r="1.35"/><circle class="led-on" cx="16" cy="16" r="1.35"/><circle class="led-off" cx="20" cy="16" r="1.35"/><circle class="led-on" cx="4" cy="20" r="1.35"/><circle class="led-off" cx="8" cy="20" r="1.35"/><circle class="led-off" cx="12" cy="20" r="1.35"/><circle class="led-off" cx="16" cy="20" r="1.35"/><circle class="led-on" cx="20" cy="20" r="1.35"/><circle class="led-on" cx="4" cy="24" r="1.35"/><circle class="led-off" cx="8" cy="24" r="1.35"/><circle class="led-off" cx="12" cy="24" r="1.35"/><circle class="led-off" cx="16" cy="24" r="1.35"/><circle class="led-on" cx="20" cy="24" r="1.35"/><circle class="led-on" cx="4" cy="28" r="1.35"/><circle class="led-on" cx="8" cy="28" r="1.35"/><circle class="led-on" cx="12" cy="28" r="1.35"/><circle class="led-on" cx="16" cy="28" r="1.35"/><circle class="led-off" cx="20" cy="28" r="1.35"/><circle class="led-on" cx="28" cy="4" r="1.35"/><circle class="led-off" cx="32" cy="4" r="1.35"/><circle class="led-off" cx="36" cy="4" r="1.35"/><circle class="led-off" cx="40" cy="4" r="1.35"/><circle class="led-off" cx="44" cy="4" r="1.35"/><circle class="led-on" cx="28" cy="8" r="1.35"/><circle class="led-off" cx="32" cy="8" r="1.35"/><circle class="led-off" cx="36" cy="8" r="1.35"/><circle class="led-off" cx="40" cy="8" r="1.35"/><circle class="led-off" cx="44" cy="8" r="1.35"/><circle class="led-on" cx="28" cy="12" r="1.35"/><circle class="led-off" cx="32" cy="12" r="1.35"/><circle class="led-off" cx="36" cy="12" r="1.35"/><circle class="led-off" cx="40" cy="12" r="1.35"/><circle class="led-off" cx="44" cy="12" r="1.35"/><circle class="led-on" cx="28" cy="16" r="1.35"/><circle class="led-off" cx="32" cy="16" r="1.35"/><circle class="led-off" cx="36" cy="16" r="1.35"/><circle class="led-off" cx="40" cy="16" r="1.35"/><circle class="led-off" cx="44" cy="16" r="1.35"/><circle class="led-on" cx="28" cy="20" r="1.35"/><circle class="led-off" cx="32" cy="20" r="1.35"/><circle class="led-off" cx="36" cy="20" r="1.35"/><circle class="led-off" cx="40" cy="20" r="1.35"/><circle class="led-off" cx="44" cy="20" r="1.35"/><circle class="led-on" cx="28" cy="24" r="1.35"/><circle class="led-off" cx="32" cy="24" r="1.35"/><circle class="led-off" cx="36" cy="24" r="1.35"/><circle class="led-off" cx="40" cy="24" r="1.35"/><circle class="led-off" cx="44" cy="24" r="1.35"/><circle class="led-on" cx="28" cy="28" r="1.35"/><circle class="led-on" cx="32" cy="28" r="1.35"/><circle class="led-on" cx="36" cy="28" r="1.35"/><circle class="led-on" cx="40" cy="28" r="1.35"/><circle class="led-on" cx="44" cy="28" r="1.35"/><circle class="led-on" cx="52" cy="4" r="1.35"/><circle class="led-on" cx="56" cy="4" r="1.35"/><circle class="led-on" cx="60" cy="4" r="1.35"/><circle class="led-on" cx="64" cy="4" r="1.35"/><circle class="led-on" cx="68" cy="4" r="1.35"/><circle class="led-off" cx="52" cy="8" r="1.35"/><circle class="led-off" cx="56" cy="8" r="1.35"/><circle class="led-on" cx="60" cy="8" r="1.35"/><circle class="led-off" cx="64" cy="8" r="1.35"/><circle class="led-off" cx="68" cy="8" r="1.35"/><circle class="led-off" cx="52" cy="12" r="1.35"/><circle class="led-off" cx="56" cy="12" r="1.35"/><circle class="led-on" cx="60" cy="12" r="1.35"/><circle class="led-off" cx="64" cy="12" r="1.35"/><circle class="led-off" cx="68" cy="12" r="1.35"/><circle class="led-off" cx="52" cy="16" r="1.35"/><circle class="led-off" cx="56" cy="16" r="1.35"/><circle class="led-on" cx="60" cy="16" r="1.35"/><circle class="led-off" cx="64" cy="16" r="1.35"/><circle class="led-off" cx="68" cy="16" r="1.35"/><circle class="led-off" cx="52" cy="20" r="1.35"/><circle class="led-off" cx="56" cy="20" r="1.35"/><circle class="led-on" cx="60" cy="20" r="1.35"/><circle class="led-off" cx="64" cy="20" r="1.35"/><circle class="led-off" cx="68" cy="20" r="1.35"/><circle class="led-off" cx="52" cy="24" r="1.35"/><circle class="led-off" cx="56" cy="24" r="1.35"/><circle class="led-on" cx="60" cy="24" r="1.35"/><circle class="led-off" cx="64" cy="24" r="1.35"/><circle class="led-off" cx="68" cy="24" r="1.35"/><circle class="led-on" cx="52" cy="28" r="1.35"/><circle class="led-on" cx="56" cy="28" r="1.35"/><circle class="led-on" cx="60" cy="28" r="1.35"/><circle class="led-on" cx="64" cy="28" r="1.35"/><circle class="led-on" cx="68" cy="28" r="1.35"/><circle class="led-on" cx="76" cy="4" r="1.35"/><circle class="led-on" cx="80" cy="4" r="1.35"/><circle class="led-on" cx="84" cy="4" r="1.35"/><circle class="led-on" cx="88" cy="4" r="1.35"/><circle class="led-off" cx="92" cy="4" r="1.35"/><circle class="led-on" cx="76" cy="8" r="1.35"/><circle class="led-off" cx="80" cy="8" r="1.35"/><circle class="led-off" cx="84" cy="8" r="1.35"/><circle class="led-off" cx="88" cy="8" r="1.35"/><circle class="led-on" cx="92" cy="8" r="1.35"/><circle class="led-on" cx="76" cy="12" r="1.35"/><circle class="led-off" cx="80" cy="12" r="1.35"/><circle class="led-off" cx="84" cy="12" r="1.35"/><circle class="led-off" cx="88" cy="12" r="1.35"/><circle class="led-on" cx="92" cy="12" r="1.35"/><circle class="led-on" cx="76" cy="16" r="1.35"/><circle class="led-on" cx="80" cy="16" r="1.35"/><circle class="led-on" cx="84" cy="16" r="1.35"/><circle class="led-on" cx="88" cy="16" r="1.35"/><circle class="led-off" cx="92" cy="16" r="1.35"/><circle class="led-on" cx="76" cy="20" r="1.35"/><circle class="led-off" cx="80" cy="20" r="1.35"/><circle class="led-off" cx="84" cy="20" r="1.35"/><circle class="led-off" cx="88" cy="20" r="1.35"/><circle class="led-off" cx="92" cy="20" r="1.35"/><circle class="led-on" cx="76" cy="24" r="1.35"/><circle class="led-off" cx="80" cy="24" r="1.35"/><circle class="led-off" cx="84" cy="24" r="1.35"/><circle class="led-off" cx="88" cy="24" r="1.35"/><circle class="led-off" cx="92" cy="24" r="1.35"/><circle class="led-on" cx="76" cy="28" r="1.35"/><circle class="led-off" cx="80" cy="28" r="1.35"/><circle class="led-off" cx="84" cy="28" r="1.35"/><circle class="led-off" cx="88" cy="28" r="1.35"/><circle class="led-off" cx="92" cy="28" r="1.35"/></svg></a>
 <!-- Coin slot: top-right corner, mirroring the BLIP ARCADE logo. -->
-<button class="kiosk-btn" id="kiosk-insert-btn"><span data-coins-hud></span></button>
-<div class="top-marquee-bar"></div>
+<button class="kiosk-btn" id="kiosk-insert-btn"></button>
+<div class="top-marquee-bar"><span class="marquee-bulbs" aria-hidden="true"></span><span id="marquee-name" class="marquee-empty" aria-label="No game selected"><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span></span><span class="marquee-bulbs" aria-hidden="true"></span></div>
 
+<div class="manual-book">
+  <aside class="manual-index">
+    <div class="manual-brand">BLIP ARCADE</div>
+    <div class="manual-index-title">FIELD<br>MANUAL</div>
+    <div class="manual-printed-contents" aria-label="Contents"><b>CONTENTS</b><span>01 &nbsp; ABOUT</span><span>02 &nbsp; CONTROLS</span><span>03 &nbsp; HISTORY</span></div>
+    <small class="manual-edition">OPERATOR'S COPY<br>EDITION 01</small>
+  </aside>
+  <div class="manual-leaf">
 <div class="page">
 
   <h1 data-i18n="pageTitle">CONTROLS</h1>
   <h2 data-i18n="pageSubtitle">HOW TO PLAY ON PC AND MOBILE</h2>
 
   <section>
+    <h3>Choosing a game</h3>
+    <p>Move the joystick or pad to bring a card to the front. On a keyboard,
+      use the arrow keys or W A S D. Press either red button, Space or Enter
+      to load the game. The cards themselves are display pieces.</p>
+    <p>Lift the field manual from the lower deck whenever you need a hand.
+      Its contents lead straight to each game’s instructions. Turn a page
+      with the folded corners or the left and right arrow keys; press Escape
+      to put the book down.</p>
+  </section>
+
+  <section>
     <div class="section-label" data-i18n="kbLabel">&#x25BA; Keyboard</div>
     <div class="section-body">
       <p data-i18n="kbIntro">
-        Every game runs on the keyboard. Each one also prints its own key
-        hints on its card here and on its title screen, but the layout is
-        the same across the arcade:
+        Every game runs on the keyboard. Each one has its own playing notes
+        in the game index and key hints on its title screen. These are
+        the common cabinet keys:
       </p>
       <table class="keytable">
         <tr><td data-i18n="kbMoveLabel">Move / aim</td><td data-i18n="kbMoveKeys"><kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></td></tr>
         <tr><td data-i18n="kbFire1Label">Button 1 — fire / launch / serve</td><td data-i18n="kbFire1Keys"><kbd>Space</kbd></td></tr>
         <tr><td data-i18n="kbFire2Label">Button 2 — second action</td><td data-i18n="kbFire2Keys"><kbd>Z</kbd> <span style="color:#666">(Meteors hyperspace only)</span></td></tr>
-        <tr><td data-i18n="kbCoinLabel">Insert coin</td><td data-i18n="kbCoinKeys"><kbd>5</kbd> <span style="color:#666">(or fire at the INSERT COIN wall)</span></td></tr>
+        <tr><td data-i18n="kbCoinLabel">Insert coin</td><td data-i18n="kbCoinKeys"><kbd>5</kbd></td></tr>
         <tr><td data-i18n="kbBackLabel">Back to the arcade</td><td data-i18n="kbBackKeys"><kbd>Backspace</kbd> <span style="color:#666">(or the BLIP logo)</span></td></tr>
-        <tr><td data-i18n="kbMuteLabel">Sound on / off</td><td data-i18n="kbMuteKeys"><kbd>M</kbd> <span style="color:#666">(or the speaker button)</span></td></tr>
-        <tr><td data-i18n="kbFullLabel">Fullscreen</td><td data-i18n="kbFullKeys">the corner-brackets button beside the coin slot &mdash; <kbd>Esc</kbd> leaves</td></tr>
+        <tr><td data-i18n="kbMuteLabel">Sound on / off</td><td data-i18n="kbMuteKeys"><kbd>M</kbd></td></tr>
+        <tr><td data-i18n="kbFullLabel">Fullscreen</td><td data-i18n="kbFullKeys">Use the browser’s fullscreen command; <kbd>Esc</kbd> leaves</td></tr>
       </table>
-      <p data-i18n="kbPerGame">
-        Per game: <b>Serpent</b> steers with WASD / arrows. <b>Bouncer</b>,
-        <b>Defender</b> and <b>Raider</b> move with A/D or the arrows and
-        fire with Space. In <b>Bouncer</b>, double-tap a direction to dash for a save. In <b>Raider</b>, up opens the throttle and down slows the plane; fly too slow and it stalls. <b>Meteors</b> rotates with A/D, thrusts with W,
-        fires with Space and jumps to hyperspace with Z. <b>Rally</b> is
-        two-player on one keyboard: player&nbsp;1 uses W/S or &uarr;/&darr;,
-        player&nbsp;2 uses I/K, and Space serves.
-      </p>
+      <p>Turn to the game index for each game’s controls and playing notes.</p>
     </div>
   </section>
 
@@ -217,12 +231,12 @@
       <p data-i18n="touchIntro">
         On a touch screen the cabinet's control deck is a pad — a big
         d-pad and two red buttons — mounted along the bottom of every
-        game. Every button gives a soft click as you press it:
+        game and the catalogue. Every button gives a soft click as you press it:
       </p>
       <table class="keytable">
         <tr><td data-i18n="touchDpadLabel">D-pad (left)</td><td data-i18n="touchDpadBody">Press or roll your thumb across it to move or aim in any of 8 directions. Let go to stop.</td></tr>
-        <tr><td data-i18n="touchABLabel">The two red buttons</td><td data-i18n="touchABBody">Fire / launch / serve — and press on the title screen to start. Both do the same thing, so either thumb works. (In Meteors the right one is hyperspace instead.)</td></tr>
-        <tr><td data-i18n="touchCoinLabel">Coin slot</td><td data-i18n="touchCoinBody">The <b>COINS</b> panel in the top-right corner. Tap it to drop a credit — up to 5 held at once.</td></tr>
+        <tr><td data-i18n="touchABLabel">The two red buttons</td><td data-i18n="touchABBody">Press to start, fire, launch or serve. In Meteors, Brawler and Bubbler the two buttons have different jobs; consult the game’s playing notes.</td></tr>
+        <tr><td data-i18n="touchCoinLabel">Coin slot</td><td data-i18n="touchCoinBody">The metal coin slot at the right of the lower control deck. Press it to add a credit; the P1 lamp lights when credit is available.</td></tr>
       </table>
       <p data-i18n="touchNote">
         The pad lights up under keyboard and gamepad input too, so on a
@@ -244,17 +258,17 @@
   <section>
     <div class="section-label" data-i18n="thumbsLabel">&#x25BA; Made for thumbs</div>
     <div class="section-body">
-      <p data-i18n="thumbsIntro"></p>
-      <p data-i18n="thumbsCards"></p>
+      <p data-i18n="thumbsIntro">A whole generation learned to play on a phone: a fingertip on glass instead of a joystick, a swipe instead of a button. These games come from the arcades of the 1970s and 80s, and here they meet you on the screen in your pocket. No controller or download is required: choose a game with the cabinet controls, then play.</p>
+      <p data-i18n="thumbsCards">Use the cabinet’s pad or joystick to choose a card, then press a red button. The coin slot is at the right of the lower deck. Inside a game, choose <b>TOUCH</b> for direct control on the glass:</p>
       <table class="keytable">
-        <tr><td data-i18n="thSerpentLabel"></td><td data-i18n="thSerpentBody"></td></tr>
-        <tr><td data-i18n="thBouncerLabel"></td><td data-i18n="thBouncerBody"></td></tr>
-        <tr><td data-i18n="thDefenderLabel"></td><td data-i18n="thDefenderBody"></td></tr>
-        <tr><td data-i18n="thRallyLabel"></td><td data-i18n="thRallyBody"></td></tr>
-        <tr><td data-i18n="thBubblerLabel"></td><td data-i18n="thBubblerBody"></td></tr>
-        <tr><td data-i18n="thPadLabel"></td><td data-i18n="thPadBody"></td></tr>
+        <tr><td data-i18n="thSerpentLabel">Serpent</td><td data-i18n="thSerpentBody">Swipe the way you want the snake to turn. Tap to start.</td></tr>
+        <tr><td data-i18n="thBouncerLabel">Bouncer</td><td data-i18n="thBouncerBody">Drag along the strip and the paddle follows your finger. Tap to launch the ball.</td></tr>
+        <tr><td data-i18n="thDefenderLabel">Defender</td><td data-i18n="thDefenderBody">Drag to move the cannon; it keeps firing while your finger is down.</td></tr>
+        <tr><td data-i18n="thRallyLabel">Rally</td><td data-i18n="thRallyBody">Drag up or down to move your bat. Against the computer the whole screen is yours; with two players each has a half.</td></tr>
+        <tr><td data-i18n="thBubblerLabel">Bubbler</td><td data-i18n="thBubblerBody">Every touch blows a bubble the moment it lands. Slide to run, swipe up to jump.</td></tr>
+        <tr><td data-i18n="thPadLabel">Meteors, Raider, Brawler</td><td data-i18n="thPadBody">Played on the on-screen pad: the d-pad under your left thumb, the two buttons under your right.</td></tr>
       </table>
-      <p data-i18n="thumbsNote"></p>
+      <p data-i18n="thumbsNote">Turn your phone sideways for a bigger picture and room for both thumbs. On phones that support it, a light buzz answers hits and taps.</p>
     </div>
   </section>
 
@@ -263,13 +277,13 @@
   <section>
     <div class="section-label" data-i18n="twoLabel">&#x25BA; Two players</div>
     <div class="section-body">
-      <p data-i18n="twoIntro"></p>
+      <p data-i18n="twoIntro">Three games are made for two people at one screen: <b>Rally</b>, <b>Brawler</b> and <b>Bubbler</b>. A two-player game takes two coins, one each, just like the cabinets did.</p>
       <table class="keytable">
-        <tr><td data-i18n="twoRallyLabel"></td><td data-i18n="twoRallyBody"></td></tr>
-        <tr><td data-i18n="twoBrawlerLabel"></td><td data-i18n="twoBrawlerBody"></td></tr>
-        <tr><td data-i18n="twoBubblerLabel"></td><td data-i18n="twoBubblerBody"></td></tr>
+        <tr><td data-i18n="twoRallyLabel">Rally</td><td data-i18n="twoRallyBody">Press <kbd>2</kbd> on the title screen (or turn the right-hand dial) for two players. Player&nbsp;1: <kbd>W</kbd>/<kbd>S</kbd> or <kbd>&uarr;</kbd>/<kbd>&darr;</kbd>. Player&nbsp;2: <kbd>I</kbd>/<kbd>K</kbd>. On touch, each player drags on their own half of the screen.</td></tr>
+        <tr><td data-i18n="twoBrawlerLabel">Brawler</td><td data-i18n="twoBrawlerBody">Choose <b>2 PLAYERS</b> on the title screen. Player&nbsp;1: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, <kbd>F</kbd> punch, <kbd>G</kbd> kick. Player&nbsp;2: the arrow keys, <kbd>J</kbd> punch, <kbd>K</kbd> kick. Hold toward your opponent as you press for a high attack.</td></tr>
+        <tr><td data-i18n="twoBubblerLabel">Bubbler</td><td data-i18n="twoBubblerBody">A friend can join at any time: player&nbsp;2 presses <kbd>J</kbd> or <kbd>K</kbd>, or taps <b>2P JOIN</b> on a touch screen. Player&nbsp;1: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, <kbd>F</kbd> bubble, <kbd>G</kbd> jump. Player&nbsp;2: the arrow keys, <kbd>J</kbd> bubble, <kbd>K</kbd> jump. On touch, player&nbsp;2 plays on the right half.</td></tr>
       </table>
-      <p data-i18n="twoDeck"></p>
+      <p data-i18n="twoDeck">When a second player comes in, the panel grows a second station: player&nbsp;1 on the left, player&nbsp;2 on the right, each with their own stick and buttons. Hold a phone or tablet sideways and each of you gets a side of the screen.</p>
     </div>
   </section>
 
@@ -300,38 +314,109 @@
     </div>
   </section>
 
+  <section class="manual-game-notes" data-manual-game="bouncer">
+    <h3>1.1 &nbsp; Bouncer</h3>
+    <p>Keep the ball in play and clear every brick. One missed return costs a life.</p>
+    <table class="keytable">
+      <tr><td>Move</td><td>A / D or Left / Right</td></tr>
+      <tr><td>Launch</td><td>Space</td></tr>
+      <tr><td>Dash</td><td>Double-tap a direction</td></tr>
+    </table>
+    <p>On the touch surface, drag to position the paddle and tap to launch. Save your dash for a ball that is getting away.</p>
+  </section>
+
+  <section class="manual-game-notes" data-manual-game="brawler">
+    <h3>1.2 &nbsp; Brawler</h3>
+    <p>Choose a fighter and work your way through nine challengers. Watch the opponent’s stance before committing to a blow.</p>
+    <table class="keytable">
+      <tr><td>Player 1: move</td><td>W A S D</td></tr>
+      <tr><td>Punch / kick</td><td>F / G</td></tr>
+      <tr><td>Player 2: move</td><td>Arrow keys</td></tr>
+      <tr><td>Punch / kick</td><td>J / K</td></tr>
+      <tr><td>Special move</td><td>Both attack buttons together</td></tr>
+    </table>
+    <p>Hold toward the opponent while attacking for a high blow. Guard high or low; one guard cannot cover both. Break the barrels for bonus points.</p>
+  </section>
+
+  <section class="manual-game-notes" data-manual-game="bubbler">
+    <h3>1.3 &nbsp; Bubbler</h3>
+    <p>Trap a monster inside a bubble, then pop it to collect the reward. Clear the gang to move to the next room.</p>
+    <table class="keytable">
+      <tr><td>Player 1: move</td><td>W A S D</td></tr>
+      <tr><td>Bubble / jump</td><td>F / G</td></tr>
+      <tr><td>Player 2: move</td><td>Arrow keys</td></tr>
+      <tr><td>Bubble / jump</td><td>J / K</td></tr>
+    </table>
+    <p>Pop several bubbles together for a bigger haul. Hold jump to ride a bubble. On the touch surface, slide to run and swipe upward to jump; touching the surface blows bubbles.</p>
+  </section>
+
+  <section class="manual-game-notes" data-manual-game="galactic_defender">
+    <h3>1.4 &nbsp; Defender</h3>
+    <p>Keep the alien fleet away from Earth. Move beneath the invaders and shoot before they reach the ground.</p>
+    <table class="keytable">
+      <tr><td>Move</td><td>A / D or Left / Right</td></tr>
+      <tr><td>Fire</td><td>Space</td></tr>
+    </table>
+    <p>On the touch surface, slide to position the cannon and hold to fire. Clear a lane before the fleet gets too close.</p>
+  </section>
+
+  <section class="manual-game-notes" data-manual-game="meteors">
+    <h3>1.5 &nbsp; Meteors</h3>
+    <p>Pilot through the asteroid field. Large rocks split into smaller pieces, so keep an escape route clear.</p>
+    <table class="keytable">
+      <tr><td>Rotate</td><td>A / D or Left / Right</td></tr>
+      <tr><td>Thrust</td><td>W or Up</td></tr>
+      <tr><td>Fire</td><td>Space</td></tr>
+      <tr><td>Hyperspace</td><td>Z</td></tr>
+    </table>
+    <p>Use short bursts of thrust to keep the ship under control. The second red button is hyperspace; the first fires.</p>
+  </section>
+
+  <section class="manual-game-notes" data-manual-game="sky_raider">
+    <h3>1.6 &nbsp; Raider</h3>
+    <p>Fly through the islands and coastline to the mainland. Bring down enemy aircraft and keep clear of the ground batteries.</p>
+    <table class="keytable">
+      <tr><td>Steer</td><td>A / D or Left / Right</td></tr>
+      <tr><td>Throttle up / down</td><td>W / S or Up / Down</td></tr>
+      <tr><td>Fire</td><td>Space</td></tr>
+    </table>
+    <p>Use the throttle to choose your pace. Fly too slowly and the plane stalls. Watch for flak as well as the aircraft ahead.</p>
+  </section>
+
+  <section class="manual-game-notes" data-manual-game="rally">
+    <h3>1.7 &nbsp; Rally</h3>
+    <p>Keep the ball past the other paddle. The first player to seven points takes the match.</p>
+    <table class="keytable">
+      <tr><td>Player 1: move</td><td>W / S or Up / Down</td></tr>
+      <tr><td>Player 2: move</td><td>I / K</td></tr>
+      <tr><td>Serve</td><td>Space</td></tr>
+    </table>
+    <p>On the touch surface, each player drags in their own half. The rally speeds up with each return. Two-player play uses one credit for each player.</p>
+  </section>
+
+  <section class="manual-game-notes" data-manual-game="serpent">
+    <h3>1.8 &nbsp; Serpent</h3>
+    <p>Steer the serpent toward food and leave room for its growing tail. A collision ends the run.</p>
+    <table class="keytable">
+      <tr><td>Steer</td><td>W A S D or Arrow keys</td></tr>
+    </table>
+    <p>Choose the next turn before reaching the corner. On the touch surface, swipe in the direction you want to travel.</p>
+  </section>
+
 </div>
-
-  <div class="left-badges">
-    <div class="controls-badge active">
-      <img class="controls-avatar" src="controls-icon.svg" alt="Controls">
-      <span class="controls-label">CONTROLS</span>
-    </div>
-    <a class="about-badge" href="about.html">
-      <img class="about-avatar" src="claude-avatar.svg" alt="About this experiment">
-      <span class="about-label">ABOUT</span>
-    </a>
-    <a class="history-badge" href="history.html">
-      <img class="history-avatar" src="history-icon.svg" alt="Game history">
-      <span class="history-label">HISTORY</span>
-    </a>
   </div>
-
-  <div class="lang-switcher">
-    <button class="lang-btn" data-lang="en">&#127468;&#127463;</button>
-    <button class="lang-btn" data-lang="da">&#127465;&#127472;</button>
-    <button class="lang-btn" data-lang="ja">&#127471;&#127477;</button>
-  </div>
+  <button class="manual-return" type="button" onclick="location.href='index.html'"><span>↩&nbsp; CLOSE BOOK · RETURN TO ARCADE</span></button>
+</div>
 
   <!-- Decorative arcade stick + buttons, matching the game shell's bar
        (kiosk.css) — static here, just cabinet flavor. -->
   <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
    <div class="deck-panel"></div>
   </div>
-  <script src="deck.js?v=5"></script>
+  <script src="deck.js?v=10"></script>
 
-  <script src="kiosk.js?v=42"></script>
-  <script src="blip_controller.js?v=9"></script>
+  <script src="kiosk.js?v=75"></script>
+  <script src="blip_controller.js?v=10"></script>
   <script>
     var i18n = {
       en: {
@@ -339,7 +424,7 @@
         pageSubtitle:    'HOW TO PLAY ON PC AND MOBILE',
 
         kbLabel:         '&#x25BA; Keyboard',
-        kbIntro:         'Every game runs on the keyboard. Each one also prints its own key hints on its card here and on its title screen, but the layout is the same across the arcade:',
+        kbIntro:         'Every game runs on the keyboard. Each one has its own playing notes in this manual and key hints on its title screen, These are the common cabinet keys:',
         kbMoveLabel:     'Move / aim',
         kbMoveKeys:      '<kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>',
         kbFire1Label:    'Button 1 — fire / launch / serve',
@@ -347,31 +432,31 @@
         kbFire2Label:    'Button 2 — second action',
         kbFire2Keys:     '<kbd>Z</kbd> <span style="color:#666">(Meteors hyperspace only)</span>',
         kbCoinLabel:     'Insert coin',
-        kbCoinKeys:      '<kbd>5</kbd> <span style="color:#666">(or fire at the INSERT COIN wall)</span>',
+        kbCoinKeys:      '<kbd>5</kbd>',
         kbBackLabel:     'Back to the arcade',
         kbBackKeys:      '<kbd>Backspace</kbd> <span style="color:#666">(or the BLIP logo)</span>',
         kbMuteLabel:     'Sound on / off',
-        kbMuteKeys:      '<kbd>M</kbd> <span style="color:#666">(or the speaker button)</span>',
+        kbMuteKeys:      '<kbd>M</kbd>',
         kbFullLabel:     'Fullscreen',
-        kbFullKeys:      'the corner-brackets button beside the coin slot &mdash; <kbd>Esc</kbd> leaves',
+        kbFullKeys:      'Use the browser’s fullscreen command; <kbd>Esc</kbd> leaves',
         kbPerGame:       'Per game: <b>Serpent</b> steers with WASD / arrows. <b>Bouncer</b>, <b>Defender</b> and <b>Raider</b> move with A/D or the arrows and fire with Space. In <b>Bouncer</b>, double-tap a direction to dash for a save. In <b>Raider</b>, up opens the throttle and down slows the plane; fly too slow and it stalls. <b>Meteors</b> rotates with A/D, thrusts with W, fires with Space and jumps to hyperspace with Z. <b>Rally</b> is two-player on one keyboard: player&nbsp;1 uses W/S or &uarr;/&darr;, player&nbsp;2 uses I/K, and Space serves. <b>Brawler</b> and <b>Bubbler</b> give player&nbsp;1 W A S D with F and G (punch and kick; bubble and jump) and player&nbsp;2 the arrows with J and K. In <b>Brawler</b>, holding toward the opponent makes a blow high, and both buttons together is the special.',
 
         padLabel:        '&#x25BA; Gamepad',
         padBody:         'A connected controller is picked up automatically. The left stick or D-pad moves, the bottom face button (A / &times;) is Button&nbsp;1, the right face button (B / &#9711;) is Button&nbsp;2, Start starts the game and Back / Select returns to the arcade\'s game grid. The on-screen pad lights up to mirror whatever the controller is doing.',
 
         touchLabel:      '&#x25BA; Touch — the control pad',
-        touchIntro:      'On a touch screen the cabinet\'s control deck is a pad — a big d-pad and two red buttons — mounted along the bottom of every game. Every button gives a soft click as you press it:',
+        touchIntro:      'On a touch screen the cabinet\'s control deck is a pad — a big d-pad and two red buttons — mounted along the bottom of every game and the catalogue. Every button gives a soft click as you press it:',
         touchDpadLabel:  'D-pad (left)',
         touchDpadBody:   'Press or roll your thumb across it to move or aim in any of 8 directions. Let go to stop.',
         touchABLabel:    'The two red buttons',
-        touchABBody:     'Fire / launch / serve — and press on the title screen to start. Both do the same thing, so either thumb works. (In Meteors the right one is hyperspace instead.)',
+        touchABBody:     'Press to start, fire, launch or serve. In Meteors, Brawler and Bubbler the two buttons have different jobs; consult the game’s playing notes.',
         touchCoinLabel:  'Coin slot',
-        touchCoinBody:   'The <b>COINS</b> panel in the top-right corner. Tap it to drop a credit — up to 5 held at once.',
+        touchCoinBody:   'The metal coin slot at the right of the lower control deck. Press it to add a credit; the P1 lamp lights when credit is available.',
         touchNote:       'The pad lights up under keyboard and gamepad input too, so on a laptop it doubles as a live read-out of what is being pressed.',
         touchToggle:     'Pick your controller with the small <b>JOYSTICK &middot; PAD &middot; TOUCH</b> switch on the panel. <b>JOYSTICK</b> swaps the pad for an 8-way restrictor-gate joystick and two fire buttons; <b>TOUCH</b> is the thumb-on-glass way to play, below. Your choice is remembered across every game.',
         thumbsLabel:     '&#x25BA; Made for thumbs',
-        thumbsIntro:     'A whole generation learned to play on a phone: a fingertip on glass instead of a joystick, a swipe instead of a button. These games come from the arcades of the 1970s and 80s, and here they meet you on the screen in your pocket. No controller, no download: touch a game and you are playing.',
-        thumbsCards:     'On a touch screen the arcade\'s front page has no control deck. Tap a game\'s card to play it, and tap the <b>COINS</b> panel to drop in a credit. Inside the game, the games below take your finger directly (choose <b>TOUCH</b> on the switch; on a touch screen they start in it):',
+        thumbsIntro:     'A whole generation learned to play on a phone: a fingertip on glass instead of a joystick, a swipe instead of a button. These games come from the arcades of the 1970s and 80s, and here they meet you on the screen in your pocket. No controller or download is required: choose a game with the cabinet controls, then play.',
+        thumbsCards:     'Use the cabinet’s pad or joystick to choose a card, then press a red button. The coin slot is at the right of the lower deck. Inside a game, choose <b>TOUCH</b> for direct control on the glass:',
         thSerpentLabel:  'Serpent',
         thSerpentBody:   'Swipe the way you want the snake to turn. Tap to start.',
         thBouncerLabel:  'Bouncer',
@@ -547,21 +632,9 @@
       try { localStorage.setItem('blip-lang', lang); } catch(e) {}
     }
 
-    document.querySelectorAll('.lang-btn').forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        applyLang(this.getAttribute('data-lang'));
-      });
-    });
-
-    (function() {
-      var saved = null;
-      try { saved = localStorage.getItem('blip-lang'); } catch(e) {}
-      var browserLang = (navigator.language || '').slice(0, 2).toLowerCase();
-      applyLang(saved || (i18n[browserLang] ? browserLang : 'en'));
-    })();
+    applyLang('en');
 
     updateCoinsHud();
-    document.getElementById('kiosk-insert-btn').addEventListener('click', insertCoin);
     document.addEventListener('keydown', function(e) {
       if (e.key === '5' || e.key === 'c' || e.key === 'C') insertCoin();
     });

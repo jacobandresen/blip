@@ -196,6 +196,15 @@
     down = !!down;
     if (!keymap) return;
 
+    // Name entry must receive deck input even after the last credit is spent.
+    if(!opts.silent&&down!==!!held[name]&&window.blipScores&&
+       window.blipScores.handleControl&&window.blipScores.handleControl(name,down)) {
+      held[name]=down;reflect(name,down);
+      if(cfg.onInput)cfg.onInput(name,down);
+      if(down){click(DIR[name]?'dpad':'face');tick();}
+      return;
+    }
+
     if (name === 'start' || name === 'select') {
       if (down === !!held[name]) return;
       held[name] = down;

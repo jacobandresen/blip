@@ -127,4 +127,43 @@
   });
 
   panel.insertBefore(frag, panel.firstChild);
+  var book=el(document.getElementById('manual-overlay')?'button':'a','cabinet-manual',
+    '<span class="manual-book-spine" aria-hidden="true"></span><span class="manual-book-copy"><strong>FIELD MANUAL</strong><small>BLIP · OPERATOR’S COPY</small></span><span class="manual-page-edges" aria-hidden="true"></span>',
+    {id:'manual-book','data-page-card':'true','aria-label':'Lift the BLIP Arcade Field Manual'});
+  if(book.tagName==='BUTTON')book.type='button';
+  else {
+    book.href=(game?'../':'')+'index.html?manual=controls'+(game?'&game='+game.slug:'');
+    if(game){book.target='_blank';book.rel='noopener';book.title='Field manual (opens in a new tab)';book.setAttribute('aria-label','Open field manual in a new tab');}
+  }
+  var shelf=el('div','manual-shelf','');shelf.appendChild(book);panel.parentElement.appendChild(shelf);
+  var coin=document.getElementById('insert-coin-btn')||document.getElementById('kiosk-insert-btn');
+  if(coin) {
+    try {root.toggleAttribute('data-credit',Number(sessionStorage.getItem('blip-coins'))>0);}catch(e){}
+    coin.replaceChildren();
+    coin.classList.add('deck-coin-slot');
+    coin.setAttribute('aria-label','Insert coin');coin.title='Insert coin';
+    coin.innerHTML='<span class="coin-plate" aria-hidden="true"><i class="coin-mouth"></i><i class="coin-return"></i><i class="coin-fastener upper"></i><i class="coin-fastener lower"></i></span>';
+    panel.parentElement.appendChild(coin);
+    var lamp=el('span','deck-credit-lamp','P1',{'aria-label':'Player one credit'});
+    var bar=panel.parentElement;bar.appendChild(lamp);
+    var placementFrame=0;
+    function placeLamp() {
+      placementFrame=0;
+      var bounds=bar.getBoundingClientRect();
+      var parts=Array.from(bar.querySelectorAll('#stick-base .stick-boot,#snes-pad .snes-dpad,#paddle-dial,#touch-strip .ts-half[data-slot="0"]'))
+        .map(function(part){return part.getBoundingClientRect();}).filter(function(rect){return rect.width>0&&rect.height>0;});
+      var center=parts.length?(parts[0].left+parts[0].right)/2:
+        bounds.left+(bounds.width-54)/4;
+      // The lens centre is 14px from the plaque's left edge.
+      lamp.style.left=Math.max(0,Math.min(bounds.width-114,center-bounds.left-14))+'px';
+    }
+    function scheduleLamp(){if(!placementFrame)placementFrame=requestAnimationFrame(placeLamp);}
+    window.addEventListener('resize',scheduleLamp);
+    new MutationObserver(scheduleLamp).observe(root,{attributes:true,attributeFilter:['data-controls','data-players','data-layout','data-dials','data-touch','data-fullscreen','data-has-touch']});
+    new MutationObserver(scheduleLamp).observe(bar,{childList:true,subtree:true});
+    if(typeof ResizeObserver==='function')new ResizeObserver(scheduleLamp).observe(panel);
+    scheduleLamp();
+    coin.addEventListener('pointerdown',function(event){event.preventDefault();event.stopPropagation();});
+    coin.addEventListener('click',function(){var canvas=document.getElementById('glcanvas');if(canvas)canvas.focus();});
+  }
 }());

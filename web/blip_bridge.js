@@ -2,6 +2,18 @@
 // Loaded BEFORE mq_js_bundle.js so `miniquad_add_plugin` is available.
 
 register_plugin = function (importObject) {
+    var drawNames=['glDrawElements','glDrawArrays','glDrawElementsInstanced','glDrawArraysInstanced'],draws={},ready=false;
+    drawNames.forEach(function(name){
+        var original=importObject.env[name];if(typeof original!=='function')return;draws[name]=original;
+        importObject.env[name]=function(){
+            var result=original.apply(this,arguments),count=arguments[name.indexOf('Arrays')>=0?2:1];
+            if(!ready&&count>0&&gl.getParameter(gl.FRAMEBUFFER_BINDING)===null){
+                ready=true;Object.keys(draws).forEach(function(key){importObject.env[key]=draws[key];});
+                requestAnimationFrame(function(){if(typeof window.blipCanvasReady==='function')window.blipCanvasReady();});
+            }
+            return result;
+        };
+    });
     importObject.env.blip_spend_coin = function () {
         if (typeof window.blipSpendCoin === 'function') {
             window.blipSpendCoin();

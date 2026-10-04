@@ -15,13 +15,16 @@
 window.alert = function (msg) { try { console.error('[blip] ' + msg); } catch (e) {} };
 
 var TOPBAR_H   = 56;
-var MARQUEE_H  = 28; // reserved header height once #marquee-bar exists
+var MARQUEE_H  = 94; // marquee and the card receiver beneath it
+var CABINET_SCREEN = new URLSearchParams(location.search).get('cabinet') === '1';
+if (CABINET_SCREEN) document.documentElement.setAttribute('data-cabinet-screen','');
 var FRAME_PAD  = 16; // padding around the canvas on all sides (= bezel width)
 
 var loader    = document.getElementById('loader');
 var barInner  = document.getElementById('bar-inner');
 var statusEl  = document.getElementById('status');
 var canvas    = document.getElementById('glcanvas');
+var startupPoster = document.getElementById('game-startup-poster');
 var overlay   = document.getElementById('need-coin-overlay');
 
 updateCoinsHud();
@@ -29,16 +32,34 @@ updateCoinsHud();
 // ---- Per-game marquee + cabinet accent ----
 // Built here rather than in each game's HTML.
 (function () {
+  if(CABINET_SCREEN) return;
   var game = (typeof blipGameFromPath === 'function') ? blipGameFromPath(window.location.pathname) : null;
   if (!game) return;
   document.documentElement.style.setProperty('--cab', game.accent);
   var bar = document.createElement('div');
   bar.id = 'marquee-bar';
-  bar.innerHTML =
-    '<span class="marquee-bulbs"></span>' +
-    '<span id="marquee-name">' + game.name + '</span>' +
-    '<span class="marquee-bulbs"></span>';
+  bar.className = 'jukebox-marquee';
+  var sign = document.createElement('a');
+  sign.href='../index.html';sign.title='Return to the cabinet';
+  sign.id = 'marquee-name';
+  sign.setAttribute('aria-label', game.name);
+  for (var i = 0; i < 8; i++) {
+    var char = '\u00a0';
+    var tile = document.createElement('span');
+    tile.className = 'marquee-letter';
+    tile.style.setProperty('--flap-index', i);
+    tile.textContent = char;
+    sign.appendChild(tile);
+
+  }
+  bar.append(
+    Object.assign(document.createElement('span'), { className: 'marquee-bulbs' }),
+    sign,
+    Object.assign(document.createElement('span'), { className: 'marquee-bulbs' })
+  );
+  blipCardReceiver(bar);
   document.body.insertBefore(bar, document.body.firstChild);
+  markGameLoaded(game, bar);
 
   var logo = document.querySelector('.blip-logo');
   if (logo) {
@@ -46,33 +67,6 @@ updateCoinsHud();
     logo.addEventListener('animationend', function () {
       logo.classList.remove('boot');
     }, { once: true });
-
-    // After ~12s without input a "> MORE GAMES" nudge fades in under the
-    // logo, the only way back to the game grid on touch. Any input hides it
-    // and restarts the clock (keydown in the capture phase catches the
-    // on-screen controls and gamepad too).
-    var hint = document.createElement('span');
-    hint.className = 'logo-hint';
-    hint.setAttribute('aria-hidden', 'true');
-    hint.textContent = '> MORE GAMES';
-    logo.appendChild(hint);
-    var hintTimer = null;
-    function hintIdle() {
-      logo.classList.remove('show-hint');
-      clearTimeout(hintTimer);
-      hintTimer = setTimeout(function () { logo.classList.add('show-hint'); }, 12000);
-    }
-    ['pointerdown', 'touchstart'].forEach(function (ev) {
-      window.addEventListener(ev, hintIdle, { passive: true });
-    });
-    document.addEventListener('keydown', hintIdle, true);
-    hintIdle();
-    // a finished game is the moment you're most likely to want out — surface
-    // the way back right away instead of waiting the idle-out.
-    window.addEventListener('blip-game-over', function () {
-      clearTimeout(hintTimer);
-      hintTimer = setTimeout(function () { logo.classList.add('show-hint'); }, 2500);
-    });
   }
 }());
 
@@ -120,6 +114,29 @@ function getUiAudio() {
   if (!uiAudio) uiAudio = new (window.AudioContext || window.webkitAudioContext)();
   if (uiAudio.state === 'suspended') uiAudio.resume();
   return uiAudio;
+}
+
+function markGameLoaded(game, bar) {
+  var receiver=bar.querySelector('.jukebox-receiver');
+  receiver.classList.add('stowed');
+  blipSetMarquee(game.name, false);
+  document.documentElement.removeAttribute('data-card-loading');
+  try {
+    var loaded = JSON.parse(sessionStorage.getItem('blip-loaded-card') || 'null');
+    var selectionOrder = ['rally', 'bouncer', 'galactic_defender', 'bubbler', 'sky_raider', 'meteors', 'serpent', 'brawler'];
+    var code = loaded && loaded.slug === game.slug ? loaded.code : 'A' + (selectionOrder.indexOf(game.slug) + 1);
+    var rom={
+      slug: game.slug, name: game.name, code: code,
+      art: new URL('screenshot.png', location.href).href
+    };
+    blipSeatRom(receiver,rom);
+    sessionStorage.setItem('blip-loaded-card', JSON.stringify(rom));
+    sessionStorage.setItem('blip-last-game', game.slug);
+    ['blip-card-insert', 'blip-card-seated', 'blip-title-seated'].forEach(function (key) {
+      sessionStorage.removeItem(key);
+    });
+  } catch (e) {}
+  if(!receiver.classList.contains('loaded'))blipSeatRom(receiver,{name:game.name,art:'screenshot.png'});
 }
 
 // ---- Touch control feedback ----
@@ -208,7 +225,7 @@ function dropCoinAnimation() {
   var btn = coinDropAnim.parentElement;
   var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
   var plateW = parseFloat(getComputedStyle(btn, '::after').width) || 18;
-  coinDropAnim.style.setProperty('--slot-x', (padRight + plateW / 2) + 'px');
+  coinDropAnim.style.setProperty('--slot-x', (btn.classList.contains('deck-coin-slot')?btn.offsetWidth/2:padRight+plateW/2)+'px');
   coinDropAnim.classList.remove('dropping');
   void coinDropAnim.offsetWidth;
   coinDropAnim.classList.add('dropping');
@@ -227,17 +244,6 @@ function playNoRoom() {
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
   osc.start(t); osc.stop(t + 0.39);
 }
-function flashCoinBar() {
-  ['insert-coin-btn'].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.classList.remove('coin-flash');
-    void el.offsetWidth;
-    el.classList.add('coin-flash');
-    el.addEventListener('animationend', function () { el.classList.remove('coin-flash'); }, { once: true });
-  });
-}
-
 // Called from WASM when play starts (from the title or a game-over
 // restart), once more per second player. Out of coins, the debt is
 // kept and the coins that go in next pay it before the game goes on.
@@ -258,7 +264,6 @@ window.blipSpendCoin = function () {
 // final score to the shared high-score board; a no-op beyond updating the
 // local best if no backend is configured (web/blip_config.js).
 window.blipGameOver = function (score) {
-  window.dispatchEvent(new Event('blip-game-over'));   // nudges the "MORE GAMES" hint
   if (!window.blipScores) return;
   var game = (typeof blipGameFromPath === 'function')
     ? blipGameFromPath(window.location.pathname) : null;
@@ -334,24 +339,13 @@ function coinIn() {
   updateCoinsHud();
   playCoinInsert();
   dropCoinAnimation();
-  flashCoinBar();
   if (coinsOwed <= 0) overlay.classList.remove('visible');
 }
-
-overlay.addEventListener('click', function () {
-  if (getCoins() >= MAX_COINS) return;
-  coinIn();
-});
 
 document.getElementById('insert-coin-btn').addEventListener('click', function () {
   var n = getCoins();
   if (n >= MAX_COINS) {
     playNoRoom();
-    var btn = this;
-    btn.classList.remove('shake');
-    void btn.offsetWidth;
-    btn.classList.add('shake');
-    btn.addEventListener('animationend', function () { btn.classList.remove('shake'); }, { once: true });
     return;
   }
   coinIn();
@@ -373,10 +367,6 @@ new MutationObserver(function () {
 // No credits on arrival (fresh session, deep link): the coin wall is up, and
 // it blocks injectKey() until a coin goes in.
 if (getCoins() <= 0) overlay.classList.add('visible');
-
-// (No ambient cabinet hum on a game page — while a game is running its
-// own audio is the whole soundscape. The transformer drone lives only on
-// the landing page, index.html, where the machine is idling in attract.)
 
 // ---- Canvas sizing ----
 // The kiosk bar is position:fixed;bottom:0. We leave PAD px on each side
@@ -422,17 +412,31 @@ function bareScreen() {
 
 var lastFit = '';
 function fillCanvas() {
+  if(CABINET_SCREEN) {
+    canvas.style.setProperty('width',innerWidth+'px','important');
+    canvas.style.setProperty('height',innerHeight+'px','important');
+    canvas.style.setProperty('top','0','important');canvas.style.setProperty('left','0','important');
+    canvas.style.setProperty('transform','none','important');syncBuffer();if(startupPoster)startupPoster.style.cssText=canvas.style.cssText;return;
+  }
   applyLayout();
   var tb = document.getElementById('topbar');
   var bare = bareScreen();
   // The frame is FRAME_PAD wide; without it the picture needs no margin.
   var PAD = bare ? 0 : FRAME_PAD;
+  var GAP = bare ? 0 : (parseFloat(getComputedStyle(document.documentElement)
+    .getPropertyValue('--marquee-gap')) || 0);
   // Sideways the deck sits in the letterbox and takes no height. Upright,
   // reserve what the deck covers (caps sit proud of the bar), not the bar's
   // height.
   TOPBAR_H = bare || landscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
   var mb = document.getElementById('marquee-bar');
-  MARQUEE_H = mb ? Math.max(mb.offsetHeight, 28) : 0;
+  if (mb) {
+    var receiver = bare ? null : mb.querySelector('.jukebox-receiver');
+    var receiverBottom = receiver
+      ? Math.ceil(parseFloat(getComputedStyle(receiver).top) + receiver.offsetHeight)
+      : 0;
+    MARQUEE_H = Math.max(mb.offsetHeight, receiverBottom, 28);
+  } else MARQUEE_H = 0;
   // Sideways the controls stand in the two gutters; keep the picture out
   // of them (a wide game like Brawler would otherwise run under the cross).
   var gl = PAD, gr = PAD;
@@ -447,15 +451,16 @@ function fillCanvas() {
     }
   }
   var w = window.innerWidth - gl - gr;
-  var h = window.innerHeight - TOPBAR_H - MARQUEE_H - PAD * 2;
+  var h = window.innerHeight - TOPBAR_H - MARQUEE_H - GAP - PAD * 2;
   canvas.style.setProperty('width',  w + 'px', 'important');
   canvas.style.setProperty('height', h + 'px', 'important');
-  canvas.style.setProperty('top',    (MARQUEE_H + PAD) + 'px', 'important');
+  canvas.style.setProperty('top',    (MARQUEE_H + GAP + PAD) + 'px', 'important');
   canvas.style.setProperty('left',   gl + 'px', 'important');
   canvas.style.setProperty('transform', 'none', 'important');
   // The controls position themselves off --topbar-h, the bar's real height.
   document.documentElement.style.setProperty('--topbar-h', TOPBAR_H + 'px');
   syncBuffer();
+  if(startupPoster)startupPoster.style.cssText=canvas.style.cssText;
 }
 
 /** The macroquad runtime sizes the drawing buffer on window resize only
@@ -524,7 +529,7 @@ function hideLoader() {
   if (loader && loader.style.display !== 'none') {
     loader.style.display = 'none';
     fillCanvas();
-    canvas.focus();
+    if(!CABINET_SCREEN&&!document.querySelector('.blip-hs-modal'))canvas.focus();
   }
 }
 
@@ -545,11 +550,14 @@ window.addEventListener('keydown', function () {
   if (document.activeElement === document.body) refocusGame();
 }, true);
 
-(function waitForCanvas() {
-  if (canvas.width > 0 && canvas.height > 0) { hideLoader(); return; }
-  setTimeout(waitForCanvas, 50);
-})();
-setTimeout(hideLoader, 3000);
+// Canvas dimensions exist before WASM starts; only a real draw proves readiness.
+window.blipCanvasReady=function(){
+  fillCanvas();
+  requestAnimationFrame(function(){requestAnimationFrame(function(){
+    document.documentElement.setAttribute('data-game-ready','');hideLoader();
+    if(CABINET_SCREEN)parent.postMessage({type:'blip-game-ready'},location.origin);
+  });});
+};
 
 // The GPU dropped the picture. An alert would hang a kiosk for good: load
 // the page again, or the cabinet if that was tried in the last half minute.
@@ -591,18 +599,18 @@ var isRally = window.location.pathname.indexOf('/rally/') !== -1;
 
 // Block the real keyboard from reaching the game while the coin wall is up.
 // Not the high-score prompt's: its Enter and Escape are for the name field.
-// A kiosk has no mouse, so keys drop coins too: 5 at any time (as on the
-// cabinet page), and fire, Enter or C while the wall is up.
+// Pressing 5 explicitly inserts a coin; game controls never add credits.
 window.addEventListener('keydown', function (e) {
-  if (e.target && e.target.closest && e.target.closest('.blip-hs-modal')) return;
+  if(document.querySelector('.blip-hs-modal'))return;
   var wall = overlay.classList.contains('visible');
-  var coinKey = e.key === '5' || (wall && (e.key === ' ' || e.key === 'Enter' || e.key === 'c' || e.key === 'C'));
+  var coinKey=e.key==='5';
   // isTrusted: the deck and a gamepad send synthetic keys, gated elsewhere.
   if (coinKey && !e.repeat && e.isTrusted && getCoins() < MAX_COINS) coinIn();
   if (wall) e.stopImmediatePropagation();
 }, true);
 
 (function () {
+  if(CABINET_SCREEN) return;
   var game = (typeof blipGameFromPath === 'function')
     ? blipGameFromPath(window.location.pathname) : null;
   var buttonSpecs = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
@@ -623,8 +631,7 @@ window.addEventListener('keydown', function (e) {
   // serve, the launch. SELECT leaves for the arcade's game grid (the trip
   // the BLIP logo makes) and is allowed even off the coin wall.
   function tapPrimary() {
-    // START at the coin wall drops a coin: a gamepad has no other way.
-    if (coinGated()) { if (getCoins() < MAX_COINS) coinIn(); return; }
+    if(coinGated())return;
     // Held for a few frames: Brawler samples the key, and a press that is
     // down and up inside one frame never happened.
     dispatch(primary, 'keydown');
