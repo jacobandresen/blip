@@ -28,6 +28,19 @@ var overlay   = document.getElementById('need-coin-overlay');
 
 updateCoinsHud();
 
+var returningToCabinet = false;
+function returnToCabinet(event) {
+  if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
+  if (event) event.preventDefault();
+  if (CABINET_SCREEN || returningToCabinet) return;
+  returningToCabinet = true;
+  var game = blipGameFromPath(location.pathname);
+  var departure = { slug:game && game.slug, at:Date.now() };
+  try { departure.frame = canvas.toDataURL('image/png'); } catch (e) {}
+  try { sessionStorage.setItem('blip-cabinet-return', JSON.stringify(departure)); } catch (e) {}
+  location.href = '../index.html';
+}
+
 // ---- Per-game marquee + cabinet accent ----
 // Built here rather than in each game's HTML.
 (function () {
@@ -59,6 +72,8 @@ updateCoinsHud();
   blipCardReceiver(bar);
   document.body.insertBefore(bar, document.body.firstChild);
   markGameLoaded(game, bar);
+  sign.addEventListener('click', returnToCabinet);
+  document.querySelector('.blip-logo').addEventListener('click', returnToCabinet);
 
   var logo = document.querySelector('.blip-logo');
   if (logo) {
@@ -303,12 +318,10 @@ function coinIn() {
 }
 
 document.getElementById('insert-coin-btn').addEventListener('click', function () {
-  var n = getCoins();
-  if (n >= MAX_COINS) {
-    playNoRoom();
-    return;
-  }
-  coinIn();
+  if (returningToCabinet) return;
+  if (getCoins() >= MAX_COINS) playNoRoom();
+  else coinIn();
+  returnToCabinet();
 });
 
 // Mirror the overlay onto <body> (body.need-coin lights the coin button).
@@ -375,6 +388,7 @@ function fillCanvas() {
   var bare = bareScreen();
   // The frame is FRAME_PAD wide; without it the picture needs no margin.
   var PAD = bare ? 0 : FRAME_PAD;
+  var screenInset = bare ? 0 : FRAME_PAD + 1;
   // The picture starts at the cabinet fascia and uses the same 14px inset as
   // the display below the Rolodex on the landing page.
   var GAP = 0;
@@ -402,10 +416,33 @@ function fillCanvas() {
     }
   }
   var w = window.innerWidth - gl - gr;
-  var h = window.innerHeight - TOPBAR_H - MARQUEE_H - GAP - PAD * 2;
+  if (!bare && !landscape()) {
+    var cabinetWidth = parseFloat(getComputedStyle(document.documentElement)
+      .getPropertyValue('--cabinet-width')) || innerWidth - 32;
+    var screenWidth = Math.min(innerWidth - 32, cabinetWidth) - screenInset * 2;
+    w = Math.max(0, Math.min(w, screenWidth));
+    gl = gr = (innerWidth - w) / 2;
+  }
+  var h = window.innerHeight - TOPBAR_H - MARQUEE_H - GAP - screenInset * 2;
+  var screenTop = MARQUEE_H + GAP + screenInset;
+  var bezel = document.getElementById('arcade-bezel');
+  if (!bare && !landscape() && bezel) {
+    // Match the landing page's panel boundary, including the 1px bezel border.
+    bezel.style.setProperty('--cabinet-panel-depth',
+      Math.max(0, innerHeight - tb.getBoundingClientRect().top) + 'px');
+    var frame = bezel.getBoundingClientRect();
+    gl = frame.left + screenInset;
+    screenTop = frame.top + screenInset;
+    w = frame.width - screenInset * 2;
+    h = frame.height - screenInset * 2;
+  }
+  document.querySelectorAll('.cabinet-glass, #need-coin-overlay').forEach(function(surface) {
+    surface.style.left = gl + 'px'; surface.style.top = screenTop + 'px';
+    surface.style.width = w + 'px'; surface.style.height = h + 'px';
+  });
   canvas.style.setProperty('width',  w + 'px', 'important');
   canvas.style.setProperty('height', h + 'px', 'important');
-  canvas.style.setProperty('top',    (MARQUEE_H + GAP + PAD) + 'px', 'important');
+  canvas.style.setProperty('top',    screenTop + 'px', 'important');
   canvas.style.setProperty('left',   gl + 'px', 'important');
   canvas.style.setProperty('transform', 'none', 'important');
   // The controls position themselves off --topbar-h, the bar's real height.
@@ -669,7 +706,7 @@ window.addEventListener('keydown', function (e) {
   }
   if (picker) {
     var modes = isRally ? ['dial'] : ['stick', 'pad'];
-    var LABEL = { stick: 'joystick' };
+    var LABEL = { stick: 'joystick', pad: 'd-pad' };
     if (touchSpec && blipHasTouch()) modes.push('touch');
     if (modes.length < 2) modes = [];
     modes.forEach(function (m) {
@@ -677,6 +714,7 @@ window.addEventListener('keydown', function (e) {
       b.type = 'button';
       b.setAttribute('role', 'radio');
       b.setAttribute('data-mode', m);
+      b.title = { stick:'Use the joystick', pad:'Use the directional pad', touch:'Use touch gestures', dial:'Use the paddle dial' }[m];
       b.textContent = LABEL[m] || m;
       b.addEventListener('click', function () {
         blipSetControls(m === 'dial' ? blipPhysicalControls() : m);
@@ -763,14 +801,12 @@ window.addEventListener('keydown', function (e) {
       var pic = window.blipPicture, w = cr.width;
       if (pic && pic.w && pic.h) w = Math.min(cr.width, Math.round(cr.height * pic.w / pic.h));
       var left = cr.left + (cr.width - w) / 2;
-      var split = kind === 'paddles' || (kind === 'platform' &&
-        (root.hasAttribute('data-open') || root.hasAttribute('data-versus')));
-      if (split && !blipLandscape()) {
+      if (!blipLandscape()) {
         var coin = bar.querySelector('.deck-coin-slot');
-        if (coin) {
-          w = Math.min(w, Math.max(0, coin.getBoundingClientRect().left - cr.left - 8));
-          left = cr.left;
-        }
+        var innerLeft = Math.max(cr.left, br.left + 12);
+        var innerRight = coin ? coin.getBoundingClientRect().left - 10 : br.right - 12;
+        w = Math.min(w, Math.max(0, innerRight - innerLeft));
+        left = Math.max(innerLeft, Math.min(left, innerRight - w));
       }
       glass.style.left = Math.round(left - br.left) + 'px';
       glass.style.width = w + 'px';
@@ -1189,10 +1225,8 @@ window.addEventListener('keydown', function (e) {
   }
 
   // ---- The 8-way restrictor-gate joystick ----
-  // The drag is bound to #topbar (no transform), not the stick base inside
-  // the 3D-rotated .deck-panel, so hit-testing is plain 2D. It sets key state
-  // via BlipController.set(); reflectInput() draws the lean. One per station,
-  // each with its own pointer and lock.
+  // Capture starts anywhere on the screen: the ball can project over the
+  // game canvas even though its untransformed base stays in the deck.
   stations.forEach(function (st, who) {
     var base = st.stick;
     var fire = st.fire;
@@ -1265,10 +1299,16 @@ window.addEventListener('keydown', function (e) {
       window.removeEventListener('pointerup', onEnd, true);
       window.removeEventListener('pointercancel', onEnd, true);
     }
-    // Which station's half the touch is in, then whether it is left of that
-    // station's caps (both stations are stick left, caps right).
+    // Pick the stick the pointer actually landed on, including its raised
+    // ball. Otherwise use the station half, excluding its action caps.
     function isStickTouch(e) {
       if (base.getBoundingClientRect().width === 0) return false;
+      var ball = base.querySelector('.stick-ball');
+      var ballRect = ball && ball.getBoundingClientRect();
+      var onStick = e.target === base || (e.target.closest && e.target.closest('.stick-base') === base) ||
+        (ballRect && e.clientX >= ballRect.left && e.clientX <= ballRect.right &&
+          e.clientY >= ballRect.top && e.clientY <= ballRect.bottom);
+      if (onStick) return true;
       if (stations.length > 1) {
         var br = bar.getBoundingClientRect();
         if ((e.clientX < br.left + br.width / 2) !== (who === 0)) return false;
@@ -1295,7 +1335,7 @@ window.addEventListener('keydown', function (e) {
     function onEnd(e) {
       if (e.type === 'pointercancel' || e.pointerId === activeId) release();
     }
-    bar.addEventListener('pointerdown', function (e) {
+    window.addEventListener('pointerdown', function (e) {
       if (blipControls() !== 'stick') return;   // pad mode — deck is the SNES pad
       if (activeId !== null) release();
       if (!isStickTouch(e)) return;
@@ -1305,7 +1345,7 @@ window.addEventListener('keydown', function (e) {
       window.addEventListener('pointermove', onMove, true);
       window.addEventListener('pointerup', onEnd, true);
       window.addEventListener('pointercancel', onEnd, true);
-    });
+    }, true);
     window.addEventListener('blur', release);
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) release();

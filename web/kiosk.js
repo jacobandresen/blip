@@ -186,7 +186,7 @@ function buildPowerIndicators() {
   lamp.className='blip-power-indicator';
   lamp.setAttribute('role','status');
   lamp.setAttribute('aria-live','polite');
-  lamp.innerHTML='<span class="power-label">AC/DC</span><i class="power-bulb" aria-hidden="true"><svg viewBox="0 0 10 16"><path d="M6.2 0 1 9h3.3L3.8 16 9 6.7H5.7z"/></svg></i>';
+  lamp.innerHTML='<span class="power-label">POWER</span><i class="power-bulb" aria-hidden="true"><svg viewBox="0 0 10 16"><path d="M6.2 0 1 9h3.3L3.8 16 9 6.7H5.7z"/></svg></i>';
   document.body.appendChild(lamp);
   function place() {
     var topBar=document.querySelector('.top-marquee-bar, #marquee-bar')||document.querySelector('.blip-logo');
@@ -198,8 +198,8 @@ function buildPowerIndicators() {
   }
   function sync() {
     var on=document.documentElement.hasAttribute('data-credit');
-    lamp.setAttribute('aria-label','AC/DC voltage '+(on?'on':'off'));
-    lamp.title='AC/DC '+(on?'on':'off');
+    lamp.setAttribute('aria-label','Power '+(on?'on':'off'));
+    lamp.title='Power '+(on?'on':'off');
     place();
   }
   sync();
@@ -894,6 +894,11 @@ window.blipTransferCard = function (options) {
     {x:source.x-Math.sin(radians)*physicalHeight/2, y:source.y+Math.cos(radians)*physicalHeight/2};
   var approach = {x:slot.x, y:slot.y + physicalHeight};
   var park = {x:pivot.x-58,y:pivot.y};
+  var feedStart=returning?2100:7100;
+  var gripDrop=returning?-exposedEdge-6:14-physicalHeight;
+  var sourceGrip={x:start.x-Math.sin(radians)*gripDrop,y:start.y+Math.cos(radians)*gripDrop};
+  var pickupGrip=returning?{x:slot.x,y:slot.y+exposedEdge+gripDrop}:sourceGrip;
+  var toolSide=physicalWidth/2+38,bridge=toolSide-20;
   var restingRom=null;
   if(options.original&&!options.idle) {
     restingRom=card.cloneNode(true);restingRom.className='jukebox-resting-rom';
@@ -905,13 +910,15 @@ window.blipTransferCard = function (options) {
   }
   var shaft = arm.querySelector('.jukebox-arm-shaft'), forearm = arm.querySelector('.jukebox-arm-forearm');
   var wrist = arm.querySelector('.jukebox-arm-wrist');
+  wrist.dataset.depth='12';
   var grip=arm.querySelector('.jukebox-arm-grip');arm.appendChild(grip);
   grip.innerHTML='<i class="jukebox-claw-rail"></i><i class="jukebox-claw-jaw left"><b></b></i><i class="jukebox-claw-jaw right"><b></b></i><i class="jukebox-claw-lock"></i>';
   grip.style.setProperty('--rom-half',(physicalWidth/2)+'px');
-  if(returning)grip.classList.add('edge-grip');
   var tool=document.createElement('i');tool.className='jukebox-arm-tool';arm.appendChild(tool);
   var bearing=document.createElement('i');bearing.className='jukebox-arm-bearing';arm.appendChild(bearing);
   var shoulderLift=document.createElement('i');shoulderLift.className='jukebox-joint-lift shoulder';arm.appendChild(shoulderLift);
+  shoulderLift.style.left=pivot.x+'px';shoulderLift.style.top=pivot.y+'px';
+  var mechanicsBar=stage.querySelector('.jukebox-mechanics-bar');
   var rotaryPivot=arm.querySelector('.jukebox-arm-pivot'),rotor={x:pivot.x,y:pivot.y};
   rotaryPivot.dataset.joint='shoulder';arm.dataset.drive='telescopic';
   wrist.dataset.layer='rom';
@@ -939,19 +946,11 @@ window.blipTransferCard = function (options) {
   }
   function drawer(stow) {
     arm.style.transform='translateY('+(-60*stow)+'px)';
-    stage.querySelector('.jukebox-mechanics-bar').style.transform='translateY('+(-60*stow)+'px)';
+    mechanicsBar.style.transform='translateY('+(-60*stow)+'px)';
   }
   function render(ms) {
     var x=start.x, y=start.y, roll=options.idle?0:initialAngle, feed=0;
-    if (ms < 1500) {
-      if(ms<900) {
-        var descend=ease(ms/900);
-        x=mix(park.x,start.x,descend);
-        y=mix(park.y,start.y-physicalHeight-22,descend)+(physicalHeight-14)*descend;
-      } else {
-        x=start.x;y=mix(start.y-36,start.y,ease((ms-900)/600));
-      }
-    } else if (ms>=2100 && ms<3100) {
+    if (ms>=2100 && ms<3100) {
       y=start.y-12*ease((ms-2100)/1000);
     } else if (ms >= 3100 && ms < 7100) {
       var t = ease((ms-3100)/4000);
@@ -961,23 +960,17 @@ window.blipTransferCard = function (options) {
       feed=ease(Math.min(1,(ms-7100)/2500));
       x=slot.x; y=approach.y-feedTravel*feed; roll=0;
     }
-    if (ms >= 10200) {
-      var back=ease(Math.min(1,(ms-10200)/2500));
-      x=mix(slot.x,park.x,back); y=mix(slot.y+exposedEdge,park.y,back)+Math.sin(back*Math.PI)*35;
-    }
     if(!paused && !options.idle) {
-      if(ms>=(returning?2100:7100) && ms<(returning?4600:9600)) {
+      if(ms>=feedStart && ms<feedStart+2500) {
         if(!drive) drive=blipCardDrive();
-        if(drive) drive.update((ms-(returning?2100:7100))/2500);
-        var clicks=Math.floor((ms-(returning?2100:7100))/700);
+        if(drive) drive.update((ms-feedStart)/2500);
+        var clicks=Math.floor((ms-feedStart)/700);
         if(clicks>guideClicks) {guideClicks=clicks;playCardLatch(true);}
       } else if(drive) {drive.stop();drive=null;}
     }
     if(returning) {
       roll=0; feed=1;
-      if(ms<1500) {
-        var out=ease(ms/1500);x=mix(park.x,slot.x,out);y=mix(park.y,slot.y+exposedEdge,out);
-      } else if(ms<2100) {x=slot.x;y=slot.y+exposedEdge;}
+      if(ms<2100) {x=slot.x;y=slot.y+exposedEdge;}
       else if(ms<4600) {
         feed=1-ease((ms-2100)/2500);x=slot.x;y=slot.y+exposedEdge+feedTravel*(1-feed);
       } else if(ms<8600) {
@@ -988,26 +981,35 @@ window.blipTransferCard = function (options) {
         feed=0;x=start.x;y=start.y-12*(1-ease(Math.min(1,(ms-8600)/1000)));roll=initialAngle;
       } else {
         feed=0;roll=0;
-        if(ms<10700) {
-          x=start.x;y=mix(start.y,start.y-36,ease((ms-9800)/900));
-        } else {
-          var rest=ease(Math.min(1,(ms-10700)/1600));
-          x=mix(start.x,park.x,rest);
-          y=mix(start.y-physicalHeight-22,park.y,rest)+(physicalHeight-14)*(1-rest);
-        }
       }
     }
-    var extension=ms<900?ease(ms/900):ms<10200?1:1-ease(Math.min(1,(ms-10200)/2500));
-    if(returning) extension=ms<1500?ease(ms/1500):ms<10700?1:1-ease(Math.min(1,(ms-10700)/1600));
-    var toolAngle=roll*Math.PI/180,toolSide=(physicalWidth/2+38)*extension,toolDrop=(returning?-10:14-physicalHeight)*extension;
-    var carrierY=y+(returning?0:feedTravel*feed*extension);
+    var toolAngle=roll*Math.PI/180;
+    var carrierY=y+(returning?0:feedTravel*feed);
     var withdraw=returning?0:ease(Math.max(0,Math.min(1,(ms-7400)/800)))*
       (1-ease(Math.max(0,Math.min(1,(ms-10200)/2500))));
     var carrierX=x+12*withdraw;carrierY+=32*withdraw;
-    var toolPoint={x:carrierX+Math.cos(toolAngle)*toolSide-Math.sin(toolAngle)*toolDrop,y:carrierY+Math.sin(toolAngle)*toolSide+Math.cos(toolAngle)*toolDrop};
-    var gripDrop=(returning?-10:14-physicalHeight)*extension;
     var gripPoint={x:carrierX-Math.sin(toolAngle)*gripDrop,y:carrierY+Math.cos(toolAngle)*gripDrop};
-    var bridge=(physicalWidth/2+18)*extension;
+    if(ms<1500) {
+      if(ms<900) {
+        var reach=ease(ms/900);
+        gripPoint={x:mix(park.x,pickupGrip.x,reach),y:mix(park.y,pickupGrip.y-36,reach)};
+      } else gripPoint={x:pickupGrip.x,y:mix(pickupGrip.y-36,pickupGrip.y,ease((ms-900)/600))};
+    }
+    if(returning&&ms>=9800) {
+      if(ms<10700) {
+        var rise=ease((ms-9800)/900);
+        gripPoint={x:sourceGrip.x,y:sourceGrip.y-36*rise};
+        roll=mix(initialAngle,0,rise);toolAngle=roll*Math.PI/180;
+      } else {
+        var retreat=ease(Math.min(1,(ms-10700)/1600));
+        gripPoint={x:mix(sourceGrip.x,park.x,retreat),y:mix(sourceGrip.y-36,park.y,retreat)};
+      }
+    } else if(!returning&&ms>=10200) {
+      var retreat=ease(Math.min(1,(ms-10200)/2500));
+      gripPoint={x:mix(slot.x+12,park.x,retreat),y:mix(slot.y+46,park.y,retreat)};
+    }
+    if(options.idle) gripPoint={x:park.x,y:park.y};
+    var toolPoint={x:gripPoint.x+Math.cos(toolAngle)*toolSide,y:gripPoint.y+Math.sin(toolAngle)*toolSide};
     var toolStart={x:gripPoint.x+Math.cos(toolAngle)*bridge,y:gripPoint.y+Math.sin(toolAngle)*bridge};
     var elevation=ms<1500?0:ms<2100?ease((ms-1500)/600):
       1-ease(Math.max(0,Math.min(1,(ms-(returning?9800:10200))/2500)));
@@ -1015,23 +1017,19 @@ window.blipTransferCard = function (options) {
     // Elevation changes depth; the shoulder stays centred in its chassis bay.
     arm.dataset.elevation=elevation.toFixed(3);
     arm.dataset.depth=(16+12*elevation).toFixed(2);
-    wrist.dataset.depth='12';
     var distance=Math.hypot(toolPoint.x-rotor.x,toolPoint.y-rotor.y),shoulderAngle=Math.atan2(toolPoint.y-rotor.y,toolPoint.x-rotor.x);
     var housing=Math.min(52,distance),overlap=Math.min(14,housing),slide=Math.max(0,housing-overlap);
     var carriage={x:rotor.x+Math.cos(shoulderAngle)*slide,y:rotor.y+Math.sin(shoulderAngle)*slide};
     link(shaft,rotor,toolPoint,housing);link(forearm,carriage,toolPoint,distance-slide);
-    shoulderLift.style.left=rotor.x+'px';shoulderLift.style.top=rotor.y+'px';
     shoulderLift.style.setProperty('--joint-rise',(12*elevation)+'px');
     // A 20px standoff keeps the wrist outside the open jaw's sweep.
-    link(tool,toolStart,toolPoint,Math.hypot(toolPoint.x-toolStart.x,toolPoint.y-toolStart.y));tool.style.opacity=extension;
+    link(tool,toolStart,toolPoint,20);
     bearing.style.left=toolPoint.x+'px';bearing.style.top=toolPoint.y+'px';
-    bearing.style.opacity=extension;
     bearing.style.setProperty('--bearing-angle',roll+'deg');
     rotaryPivot.style.setProperty('--bearing-angle',shoulderAngle+'rad');
     var jawClose=ease(Math.max(0,Math.min(1,(ms-1500)/600)))*
       (1-ease(Math.max(0,Math.min(1,(ms-(returning?9300:7100))/300))));
     grip.style.setProperty('--jaw-travel',(12*jawClose)+'px');
-    grip.style.setProperty('--rom-half',(physicalWidth/2*extension)+'px');
     grip.style.setProperty('--jaw-close',jawClose);
     grip.dataset.holding=String(jawClose>.999&&(returning?ms>=2100&&ms<9300:ms>=2100&&ms<=7100));
     var gripDepth=16+12*elevation-16*jawClose;
@@ -1277,7 +1275,7 @@ function playRomCoupling(kind) {
   }catch(e){}
 }
 
-function blipCardDrive() {
+function blipCardDrive(duration) {
   try {
     var ctx=getKioskAudio(), out=ctx.createGain(), filter=ctx.createBiquadFilter();
     filter.type='lowpass'; filter.frequency.value=850;
@@ -1300,7 +1298,7 @@ function blipCardDrive() {
       setTimeout(function(){out.disconnect();filter.disconnect();},150);
     }
     window.addEventListener('pagehide',stop,{once:true});
-    setTimeout(stop,3500);
+    setTimeout(stop,duration || 3500);
     return {update:function(progress){
       var speed=Math.sin(progress*Math.PI), now=ctx.currentTime;
       motor.frequency.setTargetAtTime(62+speed*74,now,.025);
@@ -1310,18 +1308,18 @@ function blipCardDrive() {
   } catch(e) {return null;}
 }
 
-function playRolodexDock() {
+function playRolodexDock(attached) {
   try {
     var ctx=getKioskAudio(),start=ctx.currentTime,output=ctx.createGain(),nodes=[output];
     output.gain.value=.85;output.connect(blipOut(ctx));
     // Both catches engage together; a short second strike is the latch's rebound.
-    [0,.032].forEach(function(offset,index){
+    [0,attached ? .065 : .032].forEach(function(offset,index){
       var at=start+offset,buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.09),ctx.sampleRate),data=buffer.getChannelData(0);
       for(var i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.009));
       var snap=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
       snap.buffer=buffer;filter.type='highpass';filter.frequency.value=950;gain.gain.value=index?.28:.9;
       snap.connect(filter);filter.connect(gain);gain.connect(output);snap.start(at);nodes.push(snap,filter,gain);
-      [163,431,1187].forEach(function(frequency,partial){
+      (attached ? [92,287,741] : [163,431,1187]).forEach(function(frequency,partial){
         var tone=ctx.createOscillator(),body=ctx.createGain();tone.type='triangle';tone.frequency.value=frequency;
         body.gain.setValueAtTime((index?.07:.18)/(partial+1),at);body.gain.exponentialRampToValueAtTime(.0001,at+.12);
         tone.connect(body);body.connect(output);tone.start(at);tone.stop(at+.14);nodes.push(tone,body);
@@ -1367,3 +1365,28 @@ function blipSetMarquee(name, animate) {
     });
   }
 }
+
+function blipBuildCabinetStars() {
+  if (!document.body.classList.contains('cabinet-page') ||
+      document.documentElement.hasAttribute('data-cabinet-screen')) return;
+  var stars = document.createElement('div');
+  stars.className = 'cabinet-stars';
+  stars.setAttribute('aria-hidden', 'true');
+  // Fixed seed keeps the cabinet's speckles in place across page navigation.
+  var seed = 1977;
+  function random() {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  }
+  for (var i = 0; i < 120; i++) {
+    var star = document.createElement('i');
+    star.style.left = random() * 100 + '%';
+    star.style.top = random() * 100 + '%';
+    star.style.opacity = (0.12 + random() * 0.23).toFixed(2);
+    stars.appendChild(star);
+  }
+  document.body.prepend(stars);
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', blipBuildCabinetStars, { once:true });
+} else blipBuildCabinetStars();

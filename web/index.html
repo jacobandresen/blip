@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-cabinet-arranging>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -13,12 +13,21 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
-  <link rel="stylesheet" href="kiosk.css?v=124">
-  <link rel="stylesheet" href="manual.css?v=7">
+  <link rel="stylesheet" href="kiosk.css?v=135">
+  <link rel="stylesheet" href="manual.css?v=8">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
       document.documentElement.setAttribute('data-has-touch', '');
+
+    try {
+      var departure = JSON.parse(sessionStorage.getItem('blip-cabinet-return') || 'null');
+      sessionStorage.removeItem('blip-cabinet-return');
+      if (departure && Date.now() - departure.at < 15000 && /^[a-z_]+$/.test(departure.slug)) {
+        window.blipCabinetReturn = departure;
+        document.documentElement.setAttribute('data-cabinet-return', '');
+      }
+    } catch (e) {}
 
     try {
       if (localStorage.getItem('blip-fullscreen') === '1')
@@ -45,8 +54,6 @@
     html { overflow-x: hidden; overscroll-behavior: none; }
 
     body {
-      background: radial-gradient(ellipse at 50% 8%, rgba(164,78,37,.19), transparent 43%),
-                  radial-gradient(ellipse at 50% 72%, rgba(74,38,80,.18), transparent 60%), #100c12;
       color: #f0dfcc;
       font-family: 'Courier New', Courier, monospace, sans-serif;
       -webkit-user-select:none;
@@ -57,15 +64,6 @@
       min-height: 100vh;
       padding: 0 16px calc(96px + env(safe-area-inset-bottom, 0px));
       overscroll-behavior: none;
-    }
-
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: radial-gradient(ellipse at center, transparent 43%, rgba(12,5,11,.58) 100%);
-      pointer-events: none;
-      z-index: 98;
     }
 
     /* ---- header ---- */
@@ -92,75 +90,6 @@
       box-shadow: 0 0 14px rgba(227,127,64,.18);
     }
 
-    /* ---- screen bezel — frames the game grid like a monitor set into the
-       cabinet, complete with corner screws and a glass glare ---- */
-    .screen-bezel {
-      position: fixed;
-      top: calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
-      bottom: var(--cabinet-panel-depth,56px);
-      left: 50%;
-      transform: translateX(-50%);
-      flex-shrink:0;
-      perspective: 1500px;
-      transform-style:preserve-3d;
-      overflow:hidden;
-      width: min(calc(100% - 32px), var(--cabinet-width));
-      max-width: var(--cabinet-width);
-      margin: 0;
-      padding: 27px 22px 54px;
-      border: 1px solid rgba(224,183,121,.72);
-      border-radius: 22px;
-      background: repeating-linear-gradient(174deg, transparent 0 13px, rgba(246,205,148,.045) 14px, transparent 16px 28px),
-                  linear-gradient(155deg, #69452f 0%, #422b24 18%, #261a1c 62%, #110d11 100%);
-      box-shadow:
-        0 20px 52px rgba(0,0,0,.72), 0 0 0 5px #0c090e,
-        0 0 0 7px rgba(224,183,121,.34), 0 0 46px rgba(202,99,50,.14),
-        inset 0 2px rgba(255,239,208,.2), inset 0 -9px 18px rgba(0,0,0,.58);
-    }
-    .screen-bezel::before {
-      content: '';
-      position: absolute;
-      inset: 12px;
-      border-radius: 10px;
-        box-shadow: inset 0 0 26px rgba(0,0,0,.84), inset 0 2px 0 rgba(255,239,208,.2), inset 0 0 0 1px rgba(224,183,121,.18);
-      pointer-events: none;
-    }
-    .screen-bezel::after {
-      content: '';
-      position: absolute;
-      inset: 12px;
-      border-radius: 10px;
-        background: linear-gradient(115deg,
-        rgba(255,239,208,.11) 0%, transparent 16%,
-        transparent 82%, rgba(255,196,132,.05) 100%);
-      pointer-events: none;
-    }
-    .screen-bezel .screw {
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #f0d7a8, #92734d 34%, #281816 72%);
-      box-shadow: 0 1px 1px rgba(255,239,208,.62), 0 1px 3px rgba(0,0,0,.88), inset 0 0 0 1px rgba(255,222,167,.25);
-    }
-    .screen-bezel .screw::after {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 6px;
-      height: 1px;
-      background: #000;
-      transform: translate(-50%, -50%) rotate(35deg);
-    }
-    .screen-bezel .screw.tl { top: 9px; left: 9px; }
-    .screen-bezel .screw.tr { top: 9px; right: 9px; }
-    .screen-bezel .screw.bl { bottom: 9px; left: 9px; }
-    .screen-bezel .screw.br { bottom: 9px; right: 9px; }
-    @media (max-width: 520px) {
-      .screen-bezel { padding: 20px 14px 48px; border-radius: 14px; }
-    }
-
     /* ---- game grid ---- */
     .game-grid {
       display:flex;flex-wrap:nowrap;align-items:stretch;justify-content:flex-start;gap:0;width:100%;max-width:none;min-height:300px;
@@ -168,10 +97,10 @@
     }
     .jukebox-front {
       position:absolute;inset:90px 14px 14px;z-index:2;min-height:0;transform-origin:top center;transform-style:preserve-3d;
-      transition:transform 4s cubic-bezier(.45,.02,.25,1),visibility 0s linear 4s;
+      transition:none;
       backface-visibility:hidden;
     }
-    .screen-bezel.jukebox-open .jukebox-front { transform:translateY(calc(-1 * var(--rolodex-travel, 500px)));opacity:1;pointer-events:none;visibility:hidden; }
+    .screen-bezel.jukebox-open .jukebox-front { animation:rolodex-stow 4.8s linear both;transform:translateY(calc(-1 * var(--rolodex-travel, 500px)));opacity:1;pointer-events:none;visibility:hidden; }
     :root[data-fullscreen] body { height:100vh;min-height:100vh;padding:0; }
     :root[data-fullscreen] :is(header,.divider,footer) { display:none; }
     :root[data-fullscreen] .screen-bezel {
@@ -702,62 +631,6 @@
       line-height: 2;
     }
 
-    /* ---- cabinet side rails — the cabinet's side art, only shown once the
-       viewport is wide enough that they won't crowd the actual content ---- */
-    .cab-rail {
-      position: fixed;
-      top: 0;
-      bottom: 0;
-      width: 64px;
-      display: none;
-      pointer-events: none;
-      z-index: 4;
-      background:
-        linear-gradient(90deg, transparent 0 10%, rgba(255,201,117,.22) 10.5%, transparent 11.5% 89%, rgba(255,201,117,.18) 90%, transparent 91%),
-        repeating-linear-gradient(173deg, transparent 0 8px, rgba(236,164,102,.075) 9px, transparent 11px 18px),
-        radial-gradient(circle at 50% 0, #ffca73 0 2.4px, rgba(255,202,116,.18) 3px, transparent 4px) 0 44px / 100% 150px repeat-y,
-        linear-gradient(90deg, #8a5937, #4b2d29 52%, #1c1417);
-    }
-    /* bright seam where the rail meets the screen — sells it as a distinct panel */
-    .cab-rail::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: linear-gradient(180deg, transparent, rgba(255,218,160,.42) 15%, rgba(255,218,160,.42) 85%, transparent);
-    }
-    .cab-rail.left  { left: 0; box-shadow: inset -14px 0 28px rgba(0,0,0,.75), inset 9px 0 18px rgba(255,174,97,.11); }
-    .cab-rail.left::after  { right: 0; }
-    .cab-rail.right { right: 0; box-shadow: inset 14px 0 28px rgba(0,0,0,.75), inset 9px 0 18px rgba(255,174,97,.11); transform: scaleX(-1); }
-    .cab-rail.right::after { right: 0; }
-    @media (min-width: 1180px) {
-      .cab-rail { display: block; }
-    }
-
-    /* ---- stars ---- */
-    .stars {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      overflow: hidden;
-      z-index: 0;
-    }
-
-    .star {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      background: #ffe1a5;
-      border-radius: 50%;
-      animation: twinkle var(--d) var(--delay) ease-in-out infinite alternate;
-    }
-
-    @keyframes twinkle {
-      from { opacity: var(--lo); }
-      to   { opacity: var(--hi); }
-    }
-
     header, .divider, .game-grid, footer { position: relative; z-index: 1; }
 
     @keyframes konami-shake {
@@ -774,6 +647,7 @@
     }
     body.konami-shake { animation: konami-shake 0.55s ease; }
 
+    :root[data-cabinet-arranging] :is(.card,.jukebox-front,.rolodex-guides) {transition:none!important;animation:none!important}
     /* The cards carry game descriptions; full instructions live in the manual. */
     #game-grid {position:relative;display:block;flex:none;width:100%;height:100%;min-height:0;overflow:visible;padding:0;perspective:1100px;transform-style:preserve-3d;}
     #game-grid::-webkit-scrollbar {display:none}
@@ -817,14 +691,36 @@
     }
 
     .screen-bezel.jukebox-open .jukebox-rack {visibility:hidden}
-    .cabinet-return .jukebox-front {animation:rolodex-return 4s cubic-bezier(.45,.02,.25,1) both}
+    :root[data-cabinet-return] :is(.jukebox-front,.rolodex-guides) {visibility:hidden}
+    :root[data-cabinet-return] .jukebox-game-screen,.cabinet-return .jukebox-game-screen {visibility:visible}
+    :root[data-cabinet-return] .jukebox-game-screen iframe,.cabinet-return .jukebox-game-screen iframe {opacity:0!important}
+    .cabinet-return .jukebox-front {visibility:visible;transition:none;animation:rolodex-return 4s cubic-bezier(.45,.02,.25,1) both}
+    @keyframes rolodex-stow {
+      0% {visibility:visible;transform:translateY(0);animation-timing-function:cubic-bezier(.4,0,.4,1);}
+      65% {transform:translateY(calc(-0.84 * var(--rolodex-travel,500px)));animation-timing-function:cubic-bezier(.3,0,.35,1);}
+      88% {transform:translateY(calc(-0.966 * var(--rolodex-travel,500px)));animation-timing-function:ease-out;}
+      96% {transform:translateY(calc(-0.994 * var(--rolodex-travel,500px)));animation-timing-function:ease-in-out;}
+      100% {visibility:visible;transform:translateY(calc(-1 * var(--rolodex-travel,500px)));}
+    }
+    @keyframes rolodex-guides-stow {
+      0% {transform:translateX(-50%) translateY(0);animation-timing-function:cubic-bezier(.4,0,.4,1);}
+      65% {transform:translateX(-50%) translateY(calc(-0.84 * var(--rolodex-travel,500px)));animation-timing-function:cubic-bezier(.3,0,.35,1);}
+      88% {transform:translateX(-50%) translateY(calc(-0.966 * var(--rolodex-travel,500px)));animation-timing-function:ease-out;}
+      96% {transform:translateX(-50%) translateY(calc(-0.994 * var(--rolodex-travel,500px)));animation-timing-function:ease-in-out;}
+      100% {transform:translateX(-50%) translateY(calc(-1 * var(--rolodex-travel,500px)));}
+    }
+    .screen-bezel.rolodex-stowing::after {
+      inset:0 0 auto;height:24px;border-radius:0;z-index:4;
+      background:linear-gradient(#080607e6,#08060777 35%,transparent);
+      box-shadow:inset 0 2px #000;
+    }
     @keyframes rolodex-return {
       from {transform:translateY(calc(-1 * var(--rolodex-travel, 500px)));opacity:1}
       to {transform:translateY(0);opacity:1}
     }
     @media(prefers-reduced-motion:reduce) {
       .jukebox-front,.rolodex-guides {transition-duration:.01ms!important}
-      .cabinet-return .jukebox-front,.cabinet-return .rolodex-guides {animation-duration:.01ms!important}
+      .cabinet-return .jukebox-front,.cabinet-return .rolodex-guides,.screen-bezel.jukebox-open .jukebox-front,.screen-bezel.jukebox-open .rolodex-guides {animation-duration:.01ms!important}
     }
     .rolodex-empty-bay {position:absolute;z-index:18;border:1px solid #b2956244;border-radius:7px;pointer-events:none;
       transform-origin:50% 8%;background:linear-gradient(90deg,#1c181a55,transparent 15% 85%,#1c181a55)}
@@ -842,7 +738,7 @@
     .jukebox-front::before {content:'';position:absolute;inset:-10px -7px;z-index:-1;border:1px solid #b39461;border-radius:8px;
       background:linear-gradient(135deg,#332922,#141216 65%);box-shadow:0 8px 18px #000b,inset 0 1px #f0d9ad55}
     .rolodex-guides {position:absolute;inset:0 auto 0 50%;width:min(410px,calc(100% - 24px));transform:translateX(-50%);z-index:3;pointer-events:none;transition:transform 4s cubic-bezier(.45,.02,.25,1)}
-    .screen-bezel.jukebox-open .rolodex-guides {transform:translateX(-50%) translateY(calc(-1 * var(--rolodex-travel, 500px)))}
+    .screen-bezel.jukebox-open .rolodex-guides {animation:rolodex-guides-stow 4.8s linear both;transform:translateX(-50%) translateY(calc(-1 * var(--rolodex-travel, 500px)))}
     .cabinet-return .rolodex-guides {animation:rolodex-guides-return 4s cubic-bezier(.45,.02,.25,1) both}
     @keyframes rolodex-guides-return {from{transform:translateX(-50%) translateY(calc(-1 * var(--rolodex-travel, 500px)))}to{transform:translateX(-50%) translateY(0)}}
     .rolodex-guide {position:absolute;top:0;bottom:0;width:10px;border:1px solid #806647;border-radius:4px;
@@ -933,7 +829,7 @@
 
   </style>
 </head>
-<body>
+<body class="cabinet-page">
 
   <a class="blip-logo led-logo" href="index.html" aria-label="BLIP — cabinet"><svg class="blip-led-display" viewBox="0 0 100 32" aria-hidden="true"><circle class="led-on" cx="4" cy="4" r="1.35"/><circle class="led-on" cx="8" cy="4" r="1.35"/><circle class="led-on" cx="12" cy="4" r="1.35"/><circle class="led-on" cx="16" cy="4" r="1.35"/><circle class="led-off" cx="20" cy="4" r="1.35"/><circle class="led-on" cx="4" cy="8" r="1.35"/><circle class="led-off" cx="8" cy="8" r="1.35"/><circle class="led-off" cx="12" cy="8" r="1.35"/><circle class="led-off" cx="16" cy="8" r="1.35"/><circle class="led-on" cx="20" cy="8" r="1.35"/><circle class="led-on" cx="4" cy="12" r="1.35"/><circle class="led-off" cx="8" cy="12" r="1.35"/><circle class="led-off" cx="12" cy="12" r="1.35"/><circle class="led-off" cx="16" cy="12" r="1.35"/><circle class="led-on" cx="20" cy="12" r="1.35"/><circle class="led-on" cx="4" cy="16" r="1.35"/><circle class="led-on" cx="8" cy="16" r="1.35"/><circle class="led-on" cx="12" cy="16" r="1.35"/><circle class="led-on" cx="16" cy="16" r="1.35"/><circle class="led-off" cx="20" cy="16" r="1.35"/><circle class="led-on" cx="4" cy="20" r="1.35"/><circle class="led-off" cx="8" cy="20" r="1.35"/><circle class="led-off" cx="12" cy="20" r="1.35"/><circle class="led-off" cx="16" cy="20" r="1.35"/><circle class="led-on" cx="20" cy="20" r="1.35"/><circle class="led-on" cx="4" cy="24" r="1.35"/><circle class="led-off" cx="8" cy="24" r="1.35"/><circle class="led-off" cx="12" cy="24" r="1.35"/><circle class="led-off" cx="16" cy="24" r="1.35"/><circle class="led-on" cx="20" cy="24" r="1.35"/><circle class="led-on" cx="4" cy="28" r="1.35"/><circle class="led-on" cx="8" cy="28" r="1.35"/><circle class="led-on" cx="12" cy="28" r="1.35"/><circle class="led-on" cx="16" cy="28" r="1.35"/><circle class="led-off" cx="20" cy="28" r="1.35"/><circle class="led-on" cx="28" cy="4" r="1.35"/><circle class="led-off" cx="32" cy="4" r="1.35"/><circle class="led-off" cx="36" cy="4" r="1.35"/><circle class="led-off" cx="40" cy="4" r="1.35"/><circle class="led-off" cx="44" cy="4" r="1.35"/><circle class="led-on" cx="28" cy="8" r="1.35"/><circle class="led-off" cx="32" cy="8" r="1.35"/><circle class="led-off" cx="36" cy="8" r="1.35"/><circle class="led-off" cx="40" cy="8" r="1.35"/><circle class="led-off" cx="44" cy="8" r="1.35"/><circle class="led-on" cx="28" cy="12" r="1.35"/><circle class="led-off" cx="32" cy="12" r="1.35"/><circle class="led-off" cx="36" cy="12" r="1.35"/><circle class="led-off" cx="40" cy="12" r="1.35"/><circle class="led-off" cx="44" cy="12" r="1.35"/><circle class="led-on" cx="28" cy="16" r="1.35"/><circle class="led-off" cx="32" cy="16" r="1.35"/><circle class="led-off" cx="36" cy="16" r="1.35"/><circle class="led-off" cx="40" cy="16" r="1.35"/><circle class="led-off" cx="44" cy="16" r="1.35"/><circle class="led-on" cx="28" cy="20" r="1.35"/><circle class="led-off" cx="32" cy="20" r="1.35"/><circle class="led-off" cx="36" cy="20" r="1.35"/><circle class="led-off" cx="40" cy="20" r="1.35"/><circle class="led-off" cx="44" cy="20" r="1.35"/><circle class="led-on" cx="28" cy="24" r="1.35"/><circle class="led-off" cx="32" cy="24" r="1.35"/><circle class="led-off" cx="36" cy="24" r="1.35"/><circle class="led-off" cx="40" cy="24" r="1.35"/><circle class="led-off" cx="44" cy="24" r="1.35"/><circle class="led-on" cx="28" cy="28" r="1.35"/><circle class="led-on" cx="32" cy="28" r="1.35"/><circle class="led-on" cx="36" cy="28" r="1.35"/><circle class="led-on" cx="40" cy="28" r="1.35"/><circle class="led-on" cx="44" cy="28" r="1.35"/><circle class="led-on" cx="52" cy="4" r="1.35"/><circle class="led-on" cx="56" cy="4" r="1.35"/><circle class="led-on" cx="60" cy="4" r="1.35"/><circle class="led-on" cx="64" cy="4" r="1.35"/><circle class="led-on" cx="68" cy="4" r="1.35"/><circle class="led-off" cx="52" cy="8" r="1.35"/><circle class="led-off" cx="56" cy="8" r="1.35"/><circle class="led-on" cx="60" cy="8" r="1.35"/><circle class="led-off" cx="64" cy="8" r="1.35"/><circle class="led-off" cx="68" cy="8" r="1.35"/><circle class="led-off" cx="52" cy="12" r="1.35"/><circle class="led-off" cx="56" cy="12" r="1.35"/><circle class="led-on" cx="60" cy="12" r="1.35"/><circle class="led-off" cx="64" cy="12" r="1.35"/><circle class="led-off" cx="68" cy="12" r="1.35"/><circle class="led-off" cx="52" cy="16" r="1.35"/><circle class="led-off" cx="56" cy="16" r="1.35"/><circle class="led-on" cx="60" cy="16" r="1.35"/><circle class="led-off" cx="64" cy="16" r="1.35"/><circle class="led-off" cx="68" cy="16" r="1.35"/><circle class="led-off" cx="52" cy="20" r="1.35"/><circle class="led-off" cx="56" cy="20" r="1.35"/><circle class="led-on" cx="60" cy="20" r="1.35"/><circle class="led-off" cx="64" cy="20" r="1.35"/><circle class="led-off" cx="68" cy="20" r="1.35"/><circle class="led-off" cx="52" cy="24" r="1.35"/><circle class="led-off" cx="56" cy="24" r="1.35"/><circle class="led-on" cx="60" cy="24" r="1.35"/><circle class="led-off" cx="64" cy="24" r="1.35"/><circle class="led-off" cx="68" cy="24" r="1.35"/><circle class="led-on" cx="52" cy="28" r="1.35"/><circle class="led-on" cx="56" cy="28" r="1.35"/><circle class="led-on" cx="60" cy="28" r="1.35"/><circle class="led-on" cx="64" cy="28" r="1.35"/><circle class="led-on" cx="68" cy="28" r="1.35"/><circle class="led-on" cx="76" cy="4" r="1.35"/><circle class="led-on" cx="80" cy="4" r="1.35"/><circle class="led-on" cx="84" cy="4" r="1.35"/><circle class="led-on" cx="88" cy="4" r="1.35"/><circle class="led-off" cx="92" cy="4" r="1.35"/><circle class="led-on" cx="76" cy="8" r="1.35"/><circle class="led-off" cx="80" cy="8" r="1.35"/><circle class="led-off" cx="84" cy="8" r="1.35"/><circle class="led-off" cx="88" cy="8" r="1.35"/><circle class="led-on" cx="92" cy="8" r="1.35"/><circle class="led-on" cx="76" cy="12" r="1.35"/><circle class="led-off" cx="80" cy="12" r="1.35"/><circle class="led-off" cx="84" cy="12" r="1.35"/><circle class="led-off" cx="88" cy="12" r="1.35"/><circle class="led-on" cx="92" cy="12" r="1.35"/><circle class="led-on" cx="76" cy="16" r="1.35"/><circle class="led-on" cx="80" cy="16" r="1.35"/><circle class="led-on" cx="84" cy="16" r="1.35"/><circle class="led-on" cx="88" cy="16" r="1.35"/><circle class="led-off" cx="92" cy="16" r="1.35"/><circle class="led-on" cx="76" cy="20" r="1.35"/><circle class="led-off" cx="80" cy="20" r="1.35"/><circle class="led-off" cx="84" cy="20" r="1.35"/><circle class="led-off" cx="88" cy="20" r="1.35"/><circle class="led-off" cx="92" cy="20" r="1.35"/><circle class="led-on" cx="76" cy="24" r="1.35"/><circle class="led-off" cx="80" cy="24" r="1.35"/><circle class="led-off" cx="84" cy="24" r="1.35"/><circle class="led-off" cx="88" cy="24" r="1.35"/><circle class="led-off" cx="92" cy="24" r="1.35"/><circle class="led-on" cx="76" cy="28" r="1.35"/><circle class="led-off" cx="80" cy="28" r="1.35"/><circle class="led-off" cx="84" cy="28" r="1.35"/><circle class="led-off" cx="88" cy="28" r="1.35"/><circle class="led-off" cx="92" cy="28" r="1.35"/></svg></a>
   <div class="top-marquee-bar"><span id="marquee-name" class="marquee-empty" aria-label="No game selected"><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span></span></div>
@@ -941,7 +837,6 @@
        BLIP ARCADE logo at top-left. -->
   <button class="kiosk-btn" id="kiosk-insert-btn"></button>
 
-  <div class="stars" id="stars"></div>
   <div class="cab-rail left"></div>
   <div class="cab-rail right"></div>
 
@@ -952,7 +847,7 @@
   <div class="screen-bezel" id="screen-bezel">
     <span class="screw tl"></span><span class="screw tr"></span>
     <span class="screw bl"></span><span class="screw br"></span>
-    <div class="jukebox-game-screen"><iframe id="cabinet-game-screen" title="Game screen" tabindex="-1"></iframe></div>
+    <div class="jukebox-game-screen"><iframe id="cabinet-game-screen" title="Game screen" tabindex="-1"></iframe><div class="cabinet-glass" aria-hidden="true"></div></div>
     <div class="jukebox-storage" id="jukebox-storage" aria-hidden="true">
       <div class="jukebox-rack"></div>
     </div>
@@ -1102,7 +997,7 @@
         <div class="manual-page-corner" aria-hidden="true"></div>
       </section>
       <button class="manual-contents-tab" id="manual-contents-tab" type="button" aria-controls="manual-contents-page" aria-expanded="false">Contents</button>
-      <button class="manual-close" id="manual-close" type="button" aria-label="Close the manual"><span>Close book</span></button>
+      <button class="manual-close" id="manual-close" type="button" aria-label="Close field manual"><span>Close field manual</span></button>
       <button class="manual-turn manual-turn-prev" id="manual-prev" type="button" disabled aria-label="Turn to the previous page">‹ <small>PREV</small></button>
       <button class="manual-turn manual-turn-next" id="manual-next" type="button" disabled aria-label="Turn to the next page"><small>TURN PAGE</small> ›</button>
     </div>
@@ -1131,10 +1026,11 @@
     </div>
     </div>
   </template>
-  <script src="deck.js?v=10"></script>
+  <script src="deck.js?v=12"></script>
+  <script src="manual-motion.js?v=2"></script>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=75"></script>
+  <script src="kiosk.js?v=81"></script>
   <script src="blip_controller.js?v=10"></script>
   <!-- Git-ignored, written at deploy: absent means no leaderboard. -->
   <script src="blip_config.js?v=1"></script>
@@ -1403,17 +1299,45 @@
       document.getElementById('cabinet-game-screen').src=loadedCard.slug+'/index.html?cabinet=1';
       blipSetMarquee(loadedCard.name,false);
     }
-    var returningToCabinet = !!document.referrer && new URL(document.referrer).origin === location.origin && new URL(document.referrer).pathname !== location.pathname;
-    if (returningToCabinet) {
+    var cabinetDeparture = window.blipCabinetReturn;
+    if (cabinetDeparture && /^data:image\/png;base64,/.test(cabinetDeparture.frame || '')) {
+      document.querySelector('.jukebox-game-screen').style.backgroundImage = 'url(' + JSON.stringify(cabinetDeparture.frame) + ')';
+    }
+    function rollOutRolodex() {
+      document.documentElement.removeAttribute('data-cabinet-arranging');
+      if (!cabinetDeparture) return;
+      var selector = document.getElementById('jukebox-front');
+      selector.inert = true;
       document.body.classList.add('cabinet-return');
-      var selector=document.getElementById('jukebox-front');
-      selector.addEventListener('animationend',function returned(event){
-        if(event.target!==selector || event.animationName!=='rolodex-return') return;
-        selector.removeEventListener('animationend',returned);
+      document.documentElement.removeAttribute('data-cabinet-return');
+      var reduced = matchMedia('(prefers-reduced-motion:reduce)').matches;
+      var drive = reduced ? null : blipCardDrive(4500);
+      var began = performance.now(), motionFrame, finished = false, fallback;
+      function move(now) {
+        if (drive) drive.update(Math.min(1, (now - began) / 4000));
+        if (!finished) motionFrame = requestAnimationFrame(move);
+      }
+      function finish(event) {
+        if (event && (event.target !== selector || event.animationName !== 'rolodex-return')) return;
+        if (finished) return;
+        finished = true;
+        clearTimeout(fallback);
+        cancelAnimationFrame(motionFrame);
+        if (drive) drive.stop();
+        selector.removeEventListener('animationend', finish);
         document.body.classList.remove('cabinet-return');
+        document.querySelector('.jukebox-game-screen').style.backgroundImage = 'none';
+        selector.inert = false;
+        cabinetDeparture = null;
+        delete window.blipCabinetReturn;
         playRolodexDock();
-        if(pendingCard){var card=pendingCard;pendingCard=null;attemptStart(card);}
-      });
+        var selected = document.querySelector('.card-focused');
+        if (selected) selected.focus({preventScroll:true});
+        if (pendingCard) { var card = pendingCard; pendingCard = null; attemptStart(card); }
+      }
+      selector.addEventListener('animationend', finish);
+      motionFrame = requestAnimationFrame(move);
+      fallback = setTimeout(function () { finish(); }, reduced ? 50 : 4500);
     }
     var manualChapters=['controls.html','history.html','about.html'], manualPages=[], manualPageIndex=0, manualLoadPromise=null, manualChapterStarts=[],manualGameStarts={},manualGameNames={},manualGameNumbers={},manualMeasureSize='';
     var manualOverlay=document.getElementById('manual-overlay');
@@ -1526,27 +1450,37 @@
         if(direction&&typeof playManualPaper==='function')playManualPaper(false);
       }).catch(function(){document.getElementById('manual-page-content').innerHTML='<div class="page manual-leaf-sheet"><h1>PAGE MISSING</h1><p>This leaf could not be read. Please turn back and try again.</p></div>';});
     }
-    function openFieldManual(chapterIndex,gameSlug) {
+    var manualMoving=false, manualCloseRequested=false, manualPreviousOverflow='';
+    async function openFieldManual(chapterIndex,gameSlug) {
+      if(manualMoving||!manualOverlay.hidden)return;
+      manualMoving=true;manualCloseRequested=false;
+      manualPreviousOverflow=document.documentElement.style.overflow;
       manualPageIndex=0;
       manualOverlay.hidden=false;
       document.body.classList.add('manual-open');
       document.documentElement.style.overflow='hidden';
-      document.getElementById('manual-book').classList.add('manual-picked');
       if(typeof playManualPaper==='function')playManualPaper(true);
-      window.setTimeout(function(){document.getElementById('manual-book').classList.remove('manual-picked');},600);
       setManualContents(false);
       prepareManualPages().then(function(){showManualPage(manualGameStarts[gameSlug]===undefined?(chapterIndex===undefined?0:manualChapterStarts[chapterIndex]||0):manualGameStarts[gameSlug],false);});
-      document.getElementById('manual-close').focus();
+      await window.blipMoveManual(manualOverlay,false);
+      manualMoving=false;
+      if(manualCloseRequested){closeFieldManual();return;}
+      document.getElementById('manual-close').focus({preventScroll:true});
     }
-    function closeFieldManual() {
+    async function closeFieldManual() {
+      if(manualOverlay.hidden)return;
+      if(manualMoving){manualCloseRequested=true;return;}
+      manualMoving=true;manualCloseRequested=false;
       if(typeof playManualPaper==='function')playManualPaper(true);
+      await window.blipMoveManual(manualOverlay,true);
       manualOverlay.hidden=true;
       manualOverlay.classList.remove('manual-page-turning');
       document.body.classList.remove('manual-open');
-      document.documentElement.style.overflow='';
+      document.documentElement.style.overflow=manualPreviousOverflow;
+      manualMoving=false;
       cardInFlight=false;
       if(new URLSearchParams(location.search).has('manual'))history.replaceState(null,'',location.pathname);
-      document.getElementById('manual-book').focus();
+      document.getElementById('manual-book').focus({preventScroll:true});
     }
     function setManualContents(show) {
       manualOverlay.querySelector('.manual-open-book').toggleAttribute('data-show-contents',show);
@@ -1582,6 +1516,36 @@
       var frame=document.getElementById('cabinet-game-screen');
       if(event.origin===location.origin&&event.source===frame.contentWindow&&event.data&&event.data.type==='blip-game-ready')frame.parentElement.classList.add('game-ready');
     });
+    var rolodexStowPromise = Promise.resolve();
+    function stowRolodex() {
+      var bezel = document.getElementById('screen-bezel');
+      if (bezel.classList.contains('jukebox-open')) return rolodexStowPromise;
+      bezel.classList.add('rolodex-stowing', 'jukebox-open');
+      rolodexStowPromise = new Promise(function (resolve) {
+        var reduced = matchMedia('(prefers-reduced-motion:reduce)').matches;
+        var drive = reduced ? null : blipCardDrive(5200);
+        var began = performance.now(), motionFrame, fallback, finished = false;
+        function move(now) {
+          if (drive) drive.update(Math.min(1, (now - began) / 4800));
+          if (!finished) motionFrame = requestAnimationFrame(move);
+        }
+        function finish(event) {
+          if (event && event.animationName !== 'rolodex-guides-stow') return;
+          if (finished) return;
+          finished = true;
+          clearTimeout(fallback);cancelAnimationFrame(motionFrame);
+          bezel.removeEventListener('animationend', finish);
+          bezel.classList.remove('rolodex-stowing');
+          if (drive) drive.stop();
+          playRolodexDock(true);
+          resolve();
+        }
+        bezel.addEventListener('animationend', finish);
+        motionFrame = requestAnimationFrame(move);
+        fallback = setTimeout(function () { finish(); }, reduced ? 50 : 5000);
+      });
+      return rolodexStowPromise;
+    }
     function attemptStart(card) {
       if (cardInFlight) return;
       var parked = document.querySelector('.jukebox-transfer.idle');
@@ -1604,8 +1568,9 @@
           sessionStorage.setItem('blip-card-seated', seatedSlug);
           sessionStorage.setItem('blip-title-seated', seatedSlug);
         } catch (e) {}
-        document.getElementById('screen-bezel').classList.add('jukebox-open');
-        window.setTimeout(function () { window.location.href = gameCardUrl(card); }, 4200);
+        stowRolodex().then(function () {
+          window.setTimeout(function () { window.location.href = gameCardUrl(card); }, 300);
+        });
         return;
       }
       var slug = (gameCardUrl(card) || '').split('/')[0];
@@ -1637,13 +1602,13 @@
           pivot: blipCardArmPivot(receiver),
           slot: {x:slot.left + slot.width/2, y:slot.top + slot.height/2},
           receiver: receiver,
-          onDone: function () { window.location.href = gameCardUrl(card); },
+          onDone: function () { rolodexStowPromise.then(function () { window.location.href = gameCardUrl(card); }); },
           onPickup: function () {
             card.classList.add('card-loaded');
             if (module) module.classList.add('picked');
           },
           onSeat: function () {
-            bezel.classList.add('jukebox-open');
+            stowRolodex();
             var screen=document.querySelector('.jukebox-game-screen');screen.classList.remove('game-ready');screen.style.backgroundImage='none';
             document.getElementById('cabinet-game-screen').src=gameCardUrl(card)+'?cabinet=1';
             blipSetMarquee(title.textContent.trim(),true);
@@ -1696,8 +1661,7 @@
 
     function parkSelectionArm() {
       if (cardInFlight || document.querySelector('.jukebox-transfer[data-deploying]')) return;
-      var parked = blipParkMechanism(document.getElementById('game-grid'), returningToCabinet);
-      returningToCabinet=false;
+      var parked = blipParkMechanism(document.getElementById('game-grid'), false);
       parked.addEventListener('blip-deployed', function () {
         if(document.body.classList.contains('cabinet-return')) return;
         if(pendingCard) { var card=pendingCard; pendingCard=null; attemptStart(card); }
@@ -1901,10 +1865,13 @@
       }
       focusRolodexCard=function(card){var selected=cards.indexOf(card);if(selected<0)return;idx=selected;navActive=true;highlight(true);};
       highlight();
+      requestAnimationFrame(function () {
+        requestAnimationFrame(rollOutRolodex);
+      });
       cards[idx].focus({preventScroll:true});
 
       function move(delta) {
-        if (getCoins()<=0||cardInFlight||!manualOverlay.hidden) return;
+        if (getCoins()<=0||cardInFlight||!manualOverlay.hidden||document.body.classList.contains('cabinet-return')) return;
         if(shuffleQueue.length<6)shuffleQueue.push(delta<0?-1:1);
         if(!shuffling)shuffleNext();
       }
@@ -2170,23 +2137,6 @@
       }, { once: true });
     }
 
-    /* ------------------------------------------------------------------ */
-    /* Starfield                                                            */
-    /* ------------------------------------------------------------------ */
-    var stars = document.getElementById('stars');
-    for (var i = 0; i < 120; i++) {
-      var s = document.createElement('div');
-      s.className = 'star';
-      s.style.cssText = [
-        'left:'    + (Math.random() * 100) + '%',
-        'top:'     + (Math.random() * 100) + '%',
-        '--d:'     + (2 + Math.random() * 4).toFixed(1) + 's',
-        '--delay:' + (Math.random() * 4).toFixed(1) + 's',
-        '--lo:'    + (0.05 + Math.random() * 0.1).toFixed(2),
-        '--hi:'    + (0.3  + Math.random() * 0.5).toFixed(2),
-      ].join(';');
-      stars.appendChild(s);
-    }
     var directManualChapter=new URLSearchParams(location.search).get('manual');
     if(directManualChapter){var directIndex=manualChapters.indexOf(directManualChapter+'.html');if(directIndex>=0)requestAnimationFrame(function(){openFieldManual(directIndex,new URLSearchParams(location.search).get('game'));});}
   </script>

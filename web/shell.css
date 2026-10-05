@@ -43,46 +43,7 @@ html {
 body {
   width: 100%; height: 100%;
   overscroll-behavior: none;
-  background:
-    repeating-linear-gradient(
-      -45deg,
-      transparent 0px, transparent 4px,
-      rgba(255,255,255,0.03) 4px, rgba(255,255,255,0.03) 5px
-    ),
-    repeating-linear-gradient(
-      45deg,
-      transparent 0px, transparent 4px,
-      rgba(255,255,255,0.03) 4px, rgba(255,255,255,0.03) 5px
-    ),
-    /* per-game wash — a hint of cabinet accent bleeding down from the marquee,
-       so each game's chassis reads as its own machine, not five green boxes */
-    radial-gradient(ellipse 70% 40% at 50% 0%, rgba(var(--cab), 0.18) 0%, transparent 70%),
-    linear-gradient(155deg, #505050 0%, #3a3a3a 55%, #484848 100%);
   touch-action: none;
-}
-
-/* CRT scanlines */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent 0px, transparent 3px,
-    rgba(0,0,0,0.16) 3px, rgba(0,0,0,0.16) 4px
-  );
-  pointer-events: none;
-  z-index: 100;
-}
-
-/* vignette — darkens the cabinet chassis toward the edges, same as the kiosk page */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%);
-  pointer-events: none;
-  z-index: 99;
 }
 
 /* ---- Marquee: the per-game name sign above the screen ---- Built in
@@ -162,57 +123,12 @@ body::after {
   #marquee-name.marquee-engage .marquee-letter { animation:none; }
 }
 
-/* ---- Arcade cabinet bezel ---- */
+/* The shared bezel stays behind the separately positioned game canvas. */
+#arcade-bezel { z-index: 0; pointer-events: none; }
 
-#arcade-bezel {
-  position: fixed;
-  top: calc(var(--marquee-h) + var(--marquee-gap) + 3px + env(safe-area-inset-top, 0px));
-  left: 3px;
-  right: 3px;
-  bottom: calc(var(--topbar-h, 56px) + 3px + env(safe-area-inset-bottom, 0px));
-  box-sizing: border-box;
-  pointer-events: none;
-  z-index: 8;
-  background: transparent;
-  /* Shallow corners: the canvas's matching clip-path would otherwise bite
-     into the playfield corners (Raider's HUD). 9px here and 6px on the
-     canvas, 3px apart, stay concentric. */
-  border-radius: 9px;
-  border: 1px solid rgba(var(--cab), 0.45);
-  box-shadow:
-    0 0 28px rgba(var(--cab), 0.15),
-    inset 0 0 18px rgba(0, 0, 0, 0.35),
-    0 0 0 12px rgba(10, 10, 11, 0.9),
-    0 0 0 13px rgba(255, 255, 255, 0.05);
-}
-
-/* corner screws on the outer metal frame — same detail as the kiosk screen-bezel */
-.bezel-screw {
-  position: fixed;
-  z-index: 9;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #6c6c70, #101012 72%);
-  box-shadow: 0 1px 1px rgba(255,255,255,0.15), 0 1px 2px rgba(0,0,0,0.8);
-  pointer-events: none;
-}
-.bezel-screw::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 5px;
-  height: 1px;
-  background: #000;
-  transform: translate(-50%, -50%) rotate(35deg);
-}
-.bezel-screw.tl { top: calc(var(--marquee-h) + var(--marquee-gap) + 13px + env(safe-area-inset-top, 0px)); left: 13px; }
-.bezel-screw.tr { top: calc(var(--marquee-h) + var(--marquee-gap) + 13px + env(safe-area-inset-top, 0px)); right: 13px; }
-.bezel-screw.bl { bottom: calc(var(--topbar-h, 56px) + 13px + env(safe-area-inset-bottom, 0px)); left: 13px; }
-.bezel-screw.br { bottom: calc(var(--topbar-h, 56px) + 13px + env(safe-area-inset-bottom, 0px)); right: 13px; }
 
 canvas {
+  background:#09090b;
   display: block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
@@ -222,10 +138,9 @@ canvas {
   left: 50%;
   transform-origin: 0 0;
   touch-action: none;
-  /* 3px trims edge overscan; the round is deliberately small so it doesn't
-     clip a visible wedge out of the top corners of the game (see the
-     matching note on #arcade-bezel's radius above). */
-  clip-path: inset(3px round 6px);
+  /* Match the glass opening on the selector page. */
+  clip-path: inset(0 round 10px);
+  z-index: 1;
 }
 
 /* ---- Loading screen ---- */
@@ -276,20 +191,10 @@ canvas {
 .blip-logo,
 #insert-coin-btn { height: calc(var(--marquee-h) + env(safe-area-inset-top, 0px)); }
 
-/* A game page's top bar carries only these two, so they sit further in from
-   the edges. */
-.blip-logo { left: 14px; }
-#insert-coin-btn {
-  right: calc(env(safe-area-inset-right, 0px) + 14px);
-  padding-left: 12px;
-  padding-right: 12px;
-  gap: 9px;
-}
-
 /* Fullscreen on a PC is the top bar and the picture: the keyboard plays, so
    the deck, its picker and the cabinet frame go. A touch screen keeps them
    (data-has-touch), since the deck is what it plays on. */
-:root[data-fullscreen]:not([data-has-touch]) :is(#topbar, #control-toggle, #arcade-bezel, .bezel-screw) {
+:root[data-fullscreen]:not([data-has-touch]) :is(#topbar, #control-toggle, #arcade-bezel, .bezel-screw, .cabinet-glass, .cab-rail) {
   display: none;
 }
 /* No cabinet behind the picture either. */
@@ -305,12 +210,6 @@ canvas {
   transform: none !important;   /* beats the beckon's scale */
 }
 /* ---- Bottom bar — game-page overrides ---- */
-
-#topbar {
-  background:
-    repeating-linear-gradient(180deg, rgba(255,255,255,0.03) 0 1px, transparent 1px 3px),
-    linear-gradient(180deg, #0c0c0c, #000);
-}
 
 /* Coin slot + drop animation: shared with the kiosk landing/history/about
    pages' own insert-coin button, so it lives in kiosk.css (scoped to
@@ -673,26 +572,6 @@ canvas {
   .blip-hs-code { font-size: 12px; letter-spacing: 2px; }
 }
 
-/* ---- The cabinet under the screen ---- One full-width body from the bezel
-   down, with a lit ledge where the screen housing meets it. */
-:root[data-layout="upright"] #topbar { background: none; }
-:root[data-layout="upright"] #topbar::before {
-  content: '';
-  position: absolute;
-  left: -16px;
-  right: -16px;
-  top: -5px;
-  bottom: 0;
-  z-index: -1;
-  border-radius: 14px 14px 0 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0 1px, rgba(0, 0, 0, 0.7) 1px 3px, transparent 3px),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 4px),
-    linear-gradient(180deg, #19191c 0%, #0e0e10 45%, #060607 100%);
-  box-shadow: 0 -8px 16px rgba(0, 0, 0, 0.6);
-  pointer-events: none;
-}
-
 /* ---- Two players on a phone: turn it sideways (shell.js rotateHint) ---- */
 #rotate-hint {
   position: fixed;
@@ -1003,7 +882,7 @@ canvas {
 :root[data-card-loading] canvas {visibility:hidden}
 
 /* The cabinet's screen stays fixed behind the selector. */
-:root[data-cabinet-screen] :is(.blip-logo,#insert-coin-btn,#topbar,#marquee-bar,#arcade-bezel,.bezel-screw,#need-coin-overlay,#loader) {display:none!important}
+:root[data-cabinet-screen] :is(.blip-logo,#insert-coin-btn,#topbar,#marquee-bar,#arcade-bezel,.bezel-screw,.cabinet-glass,.cab-rail,#need-coin-overlay,#loader) {display:none!important}
 :root[data-cabinet-screen] canvas {clip-path:none}
 
 /* The shared cabinet skin gives the deck a body background after its
@@ -1013,3 +892,19 @@ canvas {
   border: 0;
   box-shadow: none;
 }
+
+:root[data-cabinet-screen] body::after { display:none; }
+
+:root[data-touch][data-layout="upright"] #touch-strip {
+  background:none;
+  transform:rotateX(var(--bar-tilt,26deg));transform-origin:50% 100%;
+}
+body.cabinet-page .ts-glass {
+  background:radial-gradient(ellipse at 30% 0,#e7d3a30c,transparent 70%),linear-gradient(#24201e,#151315);
+  box-shadow:0 0 0 1px #ab8f6159,0 1px #e5c79d1f,inset 0 2px 5px #000b,inset 0 0 0 1px #0008;
+}
+body.cabinet-page #touch-strip.held .ts-glass {
+  background:radial-gradient(ellipse at 30% 0,#e7d3a314,transparent 70%),linear-gradient(#29241f,#191619);
+}
+body.cabinet-page :is(.ts-tag,.ts-hint) {color:#c2b49c;font-family:'Courier New',monospace;}
+body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,0 0 12px #e8cea41a;}
