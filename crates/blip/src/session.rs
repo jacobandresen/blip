@@ -28,7 +28,7 @@ impl Session {
 
     /// Add `pts` to the score.
     pub fn add_score(&mut self, pts: i32) {
-        self.score += pts;
+        self.score = self.score.saturating_add(pts);
     }
 
     /// Decrement lives by one and report whether the game should end.

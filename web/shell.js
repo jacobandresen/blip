@@ -24,7 +24,6 @@ var loader    = document.getElementById('loader');
 var barInner  = document.getElementById('bar-inner');
 var statusEl  = document.getElementById('status');
 var canvas    = document.getElementById('glcanvas');
-var startupPoster = document.getElementById('game-startup-poster');
 var overlay   = document.getElementById('need-coin-overlay');
 
 updateCoinsHud();
@@ -369,7 +368,7 @@ function fillCanvas() {
     canvas.style.setProperty('width',innerWidth+'px','important');
     canvas.style.setProperty('height',innerHeight+'px','important');
     canvas.style.setProperty('top','0','important');canvas.style.setProperty('left','0','important');
-    canvas.style.setProperty('transform','none','important');syncBuffer();if(startupPoster)startupPoster.style.cssText=canvas.style.cssText;return;
+    canvas.style.setProperty('transform','none','important');syncBuffer();return;
   }
   applyLayout();
   var tb = document.getElementById('topbar');
@@ -412,7 +411,6 @@ function fillCanvas() {
   // The controls position themselves off --topbar-h, the bar's real height.
   document.documentElement.style.setProperty('--topbar-h', TOPBAR_H + 'px');
   syncBuffer();
-  if(startupPoster)startupPoster.style.cssText=canvas.style.cssText;
 }
 
 /** The macroquad runtime sizes the drawing buffer on window resize only

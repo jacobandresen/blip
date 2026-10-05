@@ -136,7 +136,7 @@ pub fn draw_number(n: i32, x: f32, y: f32, sz: f32, color: Color) {
 
 /// Return the x coordinate that would centre `text` within a canvas of `width` pixels.
 pub fn text_cx(width: i32, text: &str, sz: i32) -> i32 {
-    (width - text.len() as i32 * 6 * sz) / 2
+    (width - text.chars().count() as i32 * 6 * sz) / 2
 }
 
 /// Draw a horizontally centred string within a canvas of `width` pixels.

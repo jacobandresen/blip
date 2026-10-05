@@ -66,7 +66,7 @@ pub fn rand_int(lo: i32, hi: i32) -> i32 {
     if hi <= lo {
         return lo;
     }
-    rand::gen_range(lo, hi + 1)
+    rand::gen_range(lo as i64, hi as i64 + 1) as i32
 }
 
 /// Axis-aligned bounding-box (AABB) overlap test.

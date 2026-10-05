@@ -147,17 +147,20 @@
     if(coinAnim)coin.appendChild(coinAnim);
     panel.parentElement.appendChild(coin);
     var lamp=el('span','deck-credit-lamp','P1',{'aria-label':'Player one credit'});
-    var bar=panel.parentElement;bar.appendChild(lamp);
+    var lamp2=el('span','deck-second-lamp','P2',{'aria-label':'Player two station'});
+    var bar=panel.parentElement;panel.append(lamp,lamp2);
     var placementFrame=0;
     function placeLamp() {
       placementFrame=0;
-      var bounds=bar.getBoundingClientRect();
-      var parts=Array.from(bar.querySelectorAll('#stick-base .stick-boot,#snes-pad .snes-dpad,#paddle-dial,#touch-strip .ts-half[data-slot="0"]'))
-        .map(function(part){return part.getBoundingClientRect();}).filter(function(rect){return rect.width>0&&rect.height>0;});
-      var center=parts.length?(parts[0].left+parts[0].right)/2:
-        bounds.left+(bounds.width-54)/4;
-      // The lens centre is 14px from the plaque's left edge.
-      lamp.style.left=Math.max(0,Math.min(bounds.width-114,center-bounds.left-14))+'px';
+      if(root.getAttribute('data-layout')!=='landscape') {lamp.style.left='';lamp2.style.left='';return;}
+      var bounds=panel.getBoundingClientRect();
+      function center(selector,fallback) {
+        var part=bar.querySelector(selector),rect=part&&part.getBoundingClientRect();
+        var x=rect&&rect.width>0?(rect.left+rect.right)/2:bounds.left+bounds.width*fallback;
+        return Math.max(22,Math.min(bounds.width-22,x-bounds.left));
+      }
+      lamp.style.left=center('#stick-base .stick-boot,#snes-pad .snes-dpad,#paddle-dial,#touch-strip .ts-half[data-slot="0"]',.25)+'px';
+      lamp2.style.left=center('#stick-base-p2 .stick-boot,#snes-pad-p2 .snes-dpad,#paddle-dial-p2,#touch-strip .ts-half[data-slot="1"]',.75)+'px';
     }
     function scheduleLamp(){if(!placementFrame)placementFrame=requestAnimationFrame(placeLamp);}
     window.addEventListener('resize',scheduleLamp);

@@ -2360,76 +2360,70 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    one. */
 .deck-tag { display: none !important; }
 
-.kiosk-bar > .deck-panel::before,
-.kiosk-bar > .deck-panel::after {
-  --lamp: 74, 222, 128;
-  --on: 1;
+.deck-credit-lamp,
+.deck-second-lamp {
+  --lamp:74,222,128;
+  --on:0;
   position: absolute;
   top: 5px;
   z-index: 6;
-  height: 18px;
-  padding: 0 7px 0 23px;
+  width:42px;
+  height:14px;
+  padding:0 4px 0 16px;
   border: 1px solid #8e9291;
-  border-radius: 10px;
+  border-radius:9px;
   box-sizing: border-box;
-  font: 700 8px/16px 'Courier New', monospace;
-  letter-spacing: 1.2px;
+  font:700 6px/12px 'Courier New',monospace;
+  letter-spacing:.7px;
   pointer-events: none;
   color: rgba(226, 232, 240, calc(0.28 + 0.55 * var(--on)));
   text-shadow: 0 1px 1px #000;
   /* A raised steel bezel and a glass lens seated against the panel. */
   background:
-    radial-gradient(ellipse at 32% 25%, rgba(255,255,255,.9), transparent 24%),
-    radial-gradient(circle at 50% 50%,
-      rgba(var(--lamp), var(--on)) 0 3px,
-      rgba(var(--lamp), calc(var(--on) * .45)) 4px,
-      #101413 5px 6px,
-      transparent 6.5px)
-      no-repeat 3px 50% / 14px 14px,
+    radial-gradient(ellipse at 32% 25%,rgba(255,255,255,.9),transparent 24%),
+    radial-gradient(circle at 34% 28%,rgba(255,255,225,var(--on)) 0 18%,rgba(var(--lamp),var(--on)) 42%,rgba(var(--lamp),calc(var(--on) * .65)) 70%,#211c16 100%)
+    no-repeat 2px 50% / 10px 10px,
+    radial-gradient(circle,rgba(var(--lamp),calc(var(--on) * .42)),transparent 72%)
+      no-repeat 0 50% / 14px 14px,
     linear-gradient(180deg, #d2d5d2 0%, #777e7d 24%, #343a39 54%, #a5aaa7 78%, #4a504e 100%);
   background-clip: border-box;
   box-shadow:
-    0 2px 2px #000b,
-    0 1px 0 #111,
+    0 2px 0 #2a2d2b,
+    0 5px 6px #000c,
     inset 0 1px 1px #f4f5f2aa,
     inset 0 -2px 2px #101312;
 }
-.kiosk-bar > .deck-panel::before,
-.kiosk-bar > .deck-panel::after { text-indent: 0; }
-.kiosk-bar > .deck-panel::before,
-.kiosk-bar > .deck-panel::after {
-  background-color: #555b59;
+:root[data-credit] .deck-credit-lamp,
+:root[data-pad="active"] .deck-credit-lamp {--on:1;border-color:#a7b7a2;color:#f1f5df}
+.deck-credit-lamp::before,
+.deck-second-lamp::before {
+  content:'';position:absolute;box-sizing:border-box;left:2px;top:1px;width:10px;height:10px;
+  border:1px solid #553329;border-radius:50%;
+  background:radial-gradient(circle at 34% 28%,#57372e,#241612 62%,#100d0b);
+  box-shadow:inset 0 1px 2px #000b,0 1px 1px #000;
 }
-.kiosk-bar > .deck-panel::before { content: 'P1'; left: 25%; transform: translateX(-50%); }
-.kiosk-bar > .deck-panel::after {
-  content: 'P2';
-  left: 75%;
-  transform: translateX(-50%);
-  --lamp: 56, 189, 248;
-  --on: 0;
+:root[data-credit] .deck-credit-lamp::before,
+:root[data-pad="active"] .deck-credit-lamp::before {
+  background:radial-gradient(circle at 34% 28%,#f3ffe0 0 18%,#b6f285 42%,#55a84d 75%);
+  box-shadow:0 0 5px 2px #8dd76c99,0 0 13px #8dd76c66,inset 0 0 2px #fff;
 }
-
-:root:has(#need-coin-overlay.visible) .kiosk-bar > .deck-panel::before { --on: 0; }
-:root[data-pad="active"] .kiosk-bar > .deck-panel::before { color: #86efac; }
-:root[data-players="2"] .kiosk-bar > .deck-panel::after { --on: 1; }
-:root[data-players="1"][data-open] .kiosk-bar > .deck-panel::after {
+.deck-second-lamp {--lamp:56,189,248}
+:root[data-players="2"] .deck-second-lamp {--on:1;border-color:#a7b7a2;color:#f1f5df}
+:root[data-players="2"] .deck-second-lamp::before {
+  background:radial-gradient(circle at 34% 28%,#e4f8ff 0 18%,#79cefa 42%,#347fae 75%);
+  box-shadow:0 0 5px 2px #56bdf899,0 0 13px #56bdf866,inset 0 0 2px #fff;
+}
+:root[data-players="1"][data-open] .deck-second-lamp {
   animation: lamp-join 1.2s ease-in-out infinite;
 }
 @property --on { syntax: '<number>'; inherits: true; initial-value: 1; }
 @keyframes lamp-join { 0%, 100% { --on: 0.15; } 50% { --on: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  :root[data-players="1"][data-open] .kiosk-bar > .deck-panel::after { animation: none; --on: 1; }
+  :root[data-players="1"][data-open] .deck-second-lamp { animation:none;--on:1 }
 }
-
-/* One player: station two, and its lamp, are gone. */
-@media all {
-  :root[data-layout="upright"][data-players="1"] .kiosk-bar > .deck-panel::after { display: none; }
-}
-
-/* Sideways the panel is the whole screen: lamps go over the two gutters. */
-:root[data-layout="landscape"] .kiosk-bar > .deck-panel::before { left: 25%; top: 56px; transform: translateX(-50%); }
-:root[data-layout="landscape"] .kiosk-bar > .deck-panel::after { left: 75%; right: auto; top: 56px; transform: translateX(-50%); }
-:root[data-layout="landscape"][data-players="1"] .kiosk-bar > .deck-panel::after { display: none; }
+:root[data-players="1"]:not([data-open]) .deck-second-lamp {display:none}
+:root[data-layout="landscape"] .deck-credit-lamp,
+:root[data-layout="landscape"] .deck-second-lamp {top:56px;transform:translateX(-50%)}
 
 /* ---- Joystick base: symmetric, and centred in the bar ---- */
 
@@ -2649,14 +2643,17 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* Lamps go under their controller: level with each other, centred on the
    cross / stick base, in the panel's lower part. */
-:root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel::before,
-:root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel::after {
-  /* the cross's round well reaches 5% past it */
-  top: calc(50% + var(--dpad) * 0.55 + 4px);
+:root[data-layout="upright"][data-caps="4"] .deck-credit-lamp,
+:root[data-layout="upright"][data-caps="4"] .deck-second-lamp {
+  top:calc(50% + var(--dpad) * 0.55 - 12px);
 }
-:root[data-layout="upright"] .kiosk-bar > .deck-panel::before { left: var(--ctl-cx); }
-:root[data-layout="upright"][data-players="2"] .kiosk-bar > .deck-panel::after {
+:root[data-layout="upright"][data-caps="4"] .deck-credit-lamp {
+  left: var(--ctl-cx);
+  transform: translateX(-50%);
+}
+:root[data-layout="upright"][data-players="2"] .deck-second-lamp {
   left: calc(50% + var(--ctl-cx) + var(--mid) / 2);
+  transform:translateX(-50%);
 }
 
 /* ---- The plate is bolted to the cabinet ---- A dark seam round the plate
@@ -3779,22 +3776,6 @@ body :is(.about-label,.controls-label) {
 .coin-fastener.upper {left:3px;top:3px}
 .coin-fastener.lower {right:3px;bottom:3px}
 .deck-coin-slot #coin-drop-anim {left:calc(50% - 40px);right:auto;top:50%}
-.deck-credit-lamp {
-  position:absolute;right:auto;bottom:calc(4px + env(safe-area-inset-bottom,0px));z-index:521;
-  box-sizing:border-box;width:60px;height:20px;padding:2px 4px 2px 25px;transform:none;
-  border:1px solid #75654b;border-radius:4px;background:linear-gradient(#463b2b,#241d16);
-  box-shadow:0 2px 3px #0009,inset 0 1px #c2ad8155;
-  color:#e3d6b9;font:900 12px/14px 'Courier New',monospace;letter-spacing:1px;pointer-events:none;
-}
-.deck-credit-lamp::before {
-  content:'';position:absolute;box-sizing:content-box;left:4px;top:0;width:14px;height:14px;border:2px solid #a18e68;border-radius:50%;
-  background:radial-gradient(circle at 32% 25%,#70755a,#1e281b 55%,#11140e);
-  box-shadow:inset 0 1px 1px #e7dbb044,0 1px 1px #000;
-}
-:root[data-credit] .deck-credit-lamp::before {
-  background:radial-gradient(circle at 32% 25%,#f0ffd0,#95e774 40%,#398c3a 78%);
-  box-shadow:0 0 7px #8dd76cbb,inset 0 1px #f7ffd3,0 1px 2px #000;
-}
 .kiosk-bar:has(.deck-coin-slot) :is(.deck-side,.snes-shell) {padding-bottom:24px!important}
 :root[data-layout="landscape"] .kiosk-bar #insert-coin-btn.deck-coin-slot,
 :root[data-layout="landscape"] .kiosk-bar #kiosk-insert-btn.deck-coin-slot {

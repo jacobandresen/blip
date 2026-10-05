@@ -168,6 +168,7 @@ impl Jukebox {
 
     /// Render track `first` and play it.
     pub async fn start(&mut self, first: usize) {
+        if first >= self.tracks.len() { return; }
         self.render(first).await;
         self.switch(first);
     }

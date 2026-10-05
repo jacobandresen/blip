@@ -1005,9 +1005,6 @@ canvas {
 /* The cabinet's screen stays fixed behind the selector. */
 :root[data-cabinet-screen] :is(.blip-logo,#insert-coin-btn,#topbar,#marquee-bar,#arcade-bezel,.bezel-screw,#need-coin-overlay,#loader) {display:none!important}
 :root[data-cabinet-screen] canvas {clip-path:none}
-#game-startup-poster {position:fixed;z-index:2;pointer-events:none;object-fit:contain;background:#080808;image-rendering:pixelated;clip-path:inset(3px round 6px)}
-:root[data-game-ready] #game-startup-poster {display:none}
-:root[data-cabinet-screen] #game-startup-poster {clip-path:none}
 
 /* The shared cabinet skin gives the deck a body background after its
    landscape rule; in landscape the deck covers the viewport above the game. */

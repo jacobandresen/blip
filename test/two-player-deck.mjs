@@ -93,6 +93,31 @@ const VISIBLE = (sel) => `(function () {
   return r.width > 0 && r.height > 0;
 })()`;
 
+const LAMPS_VISIBLE = `(function () {
+  var panel = document.querySelector('#topbar > .deck-panel');
+  var lamps = ['.deck-credit-lamp', '.deck-second-lamp'];
+  if (!panel) return { error: 'no deck panel' };
+  var p = panel.getBoundingClientRect();
+  return lamps.map(function (selector) {
+    var el = panel.querySelector(selector);
+    if (!el) return { selector: selector, error: 'missing lamp' };
+    var r = el.getBoundingClientRect();
+    var style = getComputedStyle(el);
+    return {
+      selector: selector,
+      display: style.display,
+      width: r.width,
+      height: r.height,
+      left: r.left,
+      right: r.right,
+      top: r.top,
+      bottom: r.bottom,
+      panel: { left: p.left, right: p.right, top: p.top, bottom: p.bottom },
+      viewport: { width: innerWidth, height: innerHeight }
+    };
+  });
+})()`;
+
 test(`brawler's deck seats two players (${ENGINE})`, async (t) => {
   const { cdp } = await openPage(t, ENGINE);
 
@@ -122,6 +147,26 @@ test(`brawler's deck seats two players (${ENGINE})`, async (t) => {
     assert.equal(await evaluate(cdp,
       "document.documentElement.hasAttribute('data-open')"), false,
       'the title screen still advertises an open station');
+  });
+
+  await t.test('both player lamps stay visible on the deck', async () => {
+    await loadGame(cdp, 'brawler', 'stick');
+    await waitFor(cdp, "document.documentElement.hasAttribute('data-open')", 10000);
+    await evaluate(cdp, 'window.blipSetMode(1)');
+    await sleep(120);
+    const lamps = await evaluate(cdp, LAMPS_VISIBLE);
+    assert.ok(Array.isArray(lamps), JSON.stringify(lamps));
+    for (const lamp of lamps) {
+      assert.equal(lamp.display, 'block', `${lamp.selector} is hidden`);
+      assert.ok(lamp.width > 0 && lamp.height > 0, `${lamp.selector} has no visible size`);
+      assert.ok(lamp.left >= lamp.panel.left && lamp.right <= lamp.panel.right,
+        `${lamp.selector} extends beyond the deck: ${JSON.stringify(lamp)}`);
+      assert.ok(lamp.top >= lamp.panel.top && lamp.bottom <= lamp.panel.bottom,
+        `${lamp.selector} extends beyond the deck: ${JSON.stringify(lamp)}`);
+      assert.ok(lamp.left >= 0 && lamp.right <= lamp.viewport.width &&
+        lamp.top >= 0 && lamp.bottom <= lamp.viewport.height,
+      `${lamp.selector} is clipped by the viewport: ${JSON.stringify(lamp)}`);
+    }
   });
 
   await t.test('each station has two action caps, and the names stay separate', async () => {
