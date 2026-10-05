@@ -1982,7 +1982,17 @@
         e.preventDefault();
         suppressPointerClick();
       });
-      track.addEventListener('pointercancel', function(){touchStart=null;});
+      track.addEventListener('pointercancel', function(e){
+        var start=touchStart;
+        touchStart=null;
+        if(!start || start.id!==e.pointerId || e.pointerType!=='touch' || cardInFlight || !manualOverlay.hidden)return;
+        var dx=e.clientX-start.x,dy=e.clientY-start.y;
+        if(Math.abs(dx)>Math.max(38,track.clientWidth*.09) && Math.abs(dx)>Math.abs(dy)*1.2) {
+          var steps=Math.max(1,Math.round(Math.abs(dx)/(track.clientWidth*.34)));
+          for(var n=0;n<steps;n++)move(dx<0?1:-1);
+          suppressPointerClick();
+        }
+      });
       track.addEventListener('click',function(e){
         if(suppressClick){suppressClick=false;window.clearTimeout(suppressClickTimer);return;}
         var card=e.target.closest&&e.target.closest('.card');

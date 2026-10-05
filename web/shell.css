@@ -806,6 +806,7 @@ canvas {
 /* Two players sideways: a trackpad in each gutter, P1 left and P2 right,
    the picture fitted between them (fillCanvas measures .ts-half). Below the
    station lamps. */
+:root[data-touch="paddles"][data-layout="landscape"] #touch-strip,
 :root[data-touch][data-layout="landscape"][data-versus] #touch-strip {
   display: block;
   position: fixed;
@@ -814,7 +815,9 @@ canvas {
   background: none;
   pointer-events: none;
 }
+:root[data-touch="paddles"][data-layout="landscape"] .ts-glass,
 :root[data-touch][data-layout="landscape"][data-versus] .ts-glass { display: contents; }
+:root[data-touch="paddles"][data-layout="landscape"] .ts-half,
 :root[data-touch][data-layout="landscape"][data-versus] .ts-half {
   display: block;
   position: fixed;
@@ -830,10 +833,14 @@ canvas {
     0 0 0 1px rgba(255, 255, 255, 0.16),
     inset 0 1px 2px rgba(0, 0, 0, 0.45),
     0 4px 14px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  touch-action: none;
 }
+:root[data-touch="paddles"][data-layout="landscape"] .ts-half:first-child,
 :root[data-touch][data-layout="landscape"][data-versus] .ts-half:first-child {
   left: max(12px, calc(env(safe-area-inset-left, 0px) + 6px));
 }
+:root[data-touch="paddles"][data-layout="landscape"] .ts-half + .ts-half,
 :root[data-touch][data-layout="landscape"][data-versus] .ts-half + .ts-half {
   right: max(12px, calc(env(safe-area-inset-right, 0px) + 6px));
 }
@@ -842,6 +849,7 @@ canvas {
     radial-gradient(ellipse 120% 70% at 50% 0%, rgba(255, 255, 255, 0.1), transparent 65%),
     linear-gradient(180deg, #3d3e43 0%, #36373b 100%);
 }
+:root[data-touch="paddles"][data-layout="landscape"] :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow),
 :root[data-touch][data-layout="landscape"][data-versus] :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow) { display: none; }
 /* Rally has no P2 lamp in that corner: the trackpad says whose it is. */
 :root[data-touch="paddles"][data-layout="landscape"][data-versus] .ts-half + .ts-half .ts-tag { display: block; }
@@ -902,10 +910,13 @@ canvas {
   align-items: center;
   gap: 6px;
   position: absolute;
-  right: 10px;
+  left: 10px;
+  right: auto;
   top: 10px;
   z-index: 2;
   margin: 0;
+  min-width: 88px;
+  min-height: 44px;
   padding: 7px 12px 7px 9px;
   border: 0;
   border-radius: 999px;
@@ -923,9 +934,10 @@ canvas {
 }
 :root[data-touch="platform"][data-open][data-layout="landscape"] .ts-join {
   position: fixed;
-  top: auto;
-  right: max(16px, calc(env(safe-area-inset-right, 0px) + 8px));
-  bottom: max(16px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+  top: max(100px, calc(env(safe-area-inset-top, 0px) + 12px));
+  left: max(16px, calc(env(safe-area-inset-left, 0px) + 8px));
+  right: auto;
+  bottom: auto;
   z-index: 210;
 }
 .ts-join:active { transform: scale(0.96); }
@@ -996,3 +1008,11 @@ canvas {
 #game-startup-poster {position:fixed;z-index:2;pointer-events:none;object-fit:contain;background:#080808;image-rendering:pixelated;clip-path:inset(3px round 6px)}
 :root[data-game-ready] #game-startup-poster {display:none}
 :root[data-cabinet-screen] #game-startup-poster {clip-path:none}
+
+/* The shared cabinet skin gives the deck a body background after its
+   landscape rule; in landscape the deck covers the viewport above the game. */
+:root[data-layout="landscape"][data-caps][data-controls] .kiosk-bar > .deck-panel {
+  background: none;
+  border: 0;
+  box-shadow: none;
+}

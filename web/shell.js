@@ -343,9 +343,18 @@ function landscape() { return blipLandscape(); }
 function applyLayout() { blipApplyLayout(); }
 applyLayout();
 
-/** Reserve the whole fixed bottom panel so the screen always ends at its edge. */
+/** Reserve the panel through the highest visible control, including any part
+ * that rises above its fixed box. */
 function deckCover(bar) {
-  return Math.ceil(window.innerHeight - bar.getBoundingClientRect().top);
+  var top = bar.getBoundingClientRect().top;
+  var parts = bar.querySelectorAll(
+    '.stick-ball, .stick-boot, .fire-buttons, .snes-dpad, .snes-face, ' +
+    '#paddle-dial, #paddle-dial-p2, #touch-strip .ts-half');
+  for (var i = 0; i < parts.length; i++) {
+    var r = parts[i].getBoundingClientRect();
+    if (r.width > 0 && r.height > 0 && r.top < top) top = r.top;
+  }
+  return Math.ceil(window.innerHeight - top);
 }
 
 /** Fullscreen on a PC: no deck and no cabinet frame, so the picture runs to
@@ -755,11 +764,24 @@ window.addEventListener('keydown', function (e) {
       var cr = canvas.getBoundingClientRect(), br = bar.getBoundingClientRect();
       var pic = window.blipPicture, w = cr.width;
       if (pic && pic.w && pic.h) w = Math.min(cr.width, Math.round(cr.height * pic.w / pic.h));
-      glass.style.left = Math.round(cr.left + (cr.width - w) / 2 - br.left) + 'px';
+      var left = cr.left + (cr.width - w) / 2;
+      var split = kind === 'paddles' || (kind === 'platform' &&
+        (root.hasAttribute('data-open') || root.hasAttribute('data-versus')));
+      if (split && !blipLandscape()) {
+        var coin = bar.querySelector('.deck-coin-slot');
+        if (coin) {
+          w = Math.min(w, Math.max(0, coin.getBoundingClientRect().left - cr.left - 8));
+          left = cr.left;
+        }
+      }
+      glass.style.left = Math.round(left - br.left) + 'px';
       glass.style.width = w + 'px';
     }
     window.addEventListener('blip-picture', fitStrip);
     window.addEventListener('resize', fitStrip);
+    new MutationObserver(fitStrip).observe(root, {
+      attributes: true, attributeFilter: ['data-open', 'data-versus', 'data-layout']
+    });
     if (typeof ResizeObserver === 'function') new ResizeObserver(fitStrip).observe(canvas);
     fitStrip();
     var thumb = strip.querySelector('.ts-thumb');
@@ -872,7 +894,7 @@ window.addEventListener('keydown', function (e) {
       { left: 'left', right: 'right', bubble: 'button1', jump: 'button2' },
       { left: 'p2left', right: 'p2right', bubble: 'p2button1', jump: 'p2button2' }];
     function whoOf(e) {
-      if (!root.hasAttribute('data-versus')) return 0;
+      if (!root.hasAttribute('data-versus') && !root.hasAttribute('data-open')) return 0;
       var g = glass.getBoundingClientRect();
       var f = g.width ? (e.clientX - g.left) / g.width : e.clientX / window.innerWidth;
       return f < 0.5 ? 0 : 1;
@@ -1121,13 +1143,11 @@ window.addEventListener('keydown', function (e) {
     rotateHint();
   };
 
-  // Two players on a touch phone are asked to turn sideways (orientation
-  // locked where allowed); upright still works. Sideways, a cabinet waiting
-  // for a second player lays out both stations so there is somewhere to press
-  // to join.
+  // The open title screen shows both stations so player two can join in either
+  // orientation; one-player matches hide the second station.
   var open = false;
   function applyPlayers() {
-    var both = versus || (open && landscape() && matchMedia('(pointer: coarse)').matches);
+    var both = versus || open;
     root.setAttribute('data-players', both ? '2' : '1');
   }
   window.addEventListener('resize', applyPlayers);

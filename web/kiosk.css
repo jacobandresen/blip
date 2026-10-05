@@ -2267,7 +2267,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-layout="upright"][data-controls="pad"][data-players="1"] .kiosk-bar-main {
     height: calc(128px + env(safe-area-inset-bottom, 0px));
   }
-  :root[data-layout="upright"][data-controls="pad"][data-players="1"] #snes-pad-p2 { display: none; }
+  :root[data-layout="upright"][data-controls="pad"][data-players="1"]:not([data-open]) #snes-pad-p2 { display: none; }
   :root[data-layout="upright"][data-controls="pad"][data-players="1"] #snes-pad {
     left: 0;
     right: 0;
@@ -2316,7 +2316,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-layout="upright"][data-controls="stick"][data-players="1"] .kiosk-bar-main {
     height: calc(128px + env(safe-area-inset-bottom, 0px));
   }
-  :root[data-layout="upright"][data-controls="stick"][data-players="1"] #deck-p2,
+  :root[data-layout="upright"][data-controls="stick"][data-players="1"]:not([data-open]) #deck-p2,
   :root[data-layout="upright"][data-controls="stick"][data-players="1"] #deck-p1 .arcade-btn.spare,
   :root[data-layout="upright"][data-controls="stick"][data-players="1"] #deck-p1 .deck-tag { display: none; }
   :root[data-layout="upright"][data-controls="stick"][data-players="1"] #deck-p1 .fire-buttons.four {
