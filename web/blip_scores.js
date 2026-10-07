@@ -1,15 +1,6 @@
-/* BLIP high-score leaderboard client — talks to Supabase (see
- * docs/highscores.md). Loaded on every game page after vendor/supabase.js
- * and blip_config.js.
- *
- * Identity is a Supabase ANONYMOUS user: no login, no password. The player
- * picks a handle once (stored server-side, UNIQUE) and a JWT in
- * localStorage is what proves it's them. On first claim they get a one-time
- * RECOVERY CODE — the only way to move the handle to another device or
- * recover it after clearing the browser. Everything degrades to a
- * local-only best if the backend is absent or unreachable — the games
- * never block on the network.
- */
+/* Supabase high-score client (see docs/highscores.md).
+ * Anonymous users claim unique handles; a recovery code transfers them between devices.
+ * If the backend is unavailable, scores stay local and gameplay never waits on the network. */
 (function () {
   'use strict';
 
@@ -90,10 +81,7 @@
     return !!b && String(e.key).toLowerCase() === String(b.key).toLowerCase();
   }
 
-  // A name from a stick and one button, as on a cabinet: up and down turn
-  // the last letter, and from then on right adds one, left takes it back and
-  // fire accepts. Typing a letter goes back to plain typing. Returns true if
-  // it took the key.
+  // Stick naming: up/down change letters, left/right move, fire accepts; typing resumes. Returns true when consumed.
   var STICK_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 -_';
   function stickEntry(input, e, state, submit) {
     var v = input.value.toUpperCase();
@@ -111,7 +99,7 @@
       v = v.slice(0, -1);
     } else if (state.stick && isFire(e)) {
       e.preventDefault();
-      if (!e.repeat) submit();
+      if (!e.repeat) submit(e);
       return true;
     } else {
       if (e.key.length === 1) state.stick = false;
@@ -134,6 +122,10 @@
     var panel = el('div', 'blip-hs-panel', wrap);
     return { wrap: wrap, panel: panel };
   }
+
+  var keysDown = Object.create(null);
+  window.addEventListener('keydown', function (e) { keysDown[e.key] = true; }, true);
+  window.addEventListener('keyup', function (e) { keysDown[e.key] = false; }, true);
 
   // ---- UI: recovery code ---------------------------------------------
   function showRecoveryCode(handle, code, opts) {
@@ -177,7 +169,16 @@
     }
     window.addEventListener('keydown', onKey, true);
     done.addEventListener('click', saved);
-    done.focus({preventScroll:true});
+    if (opts.afterKeyUp && keysDown[opts.afterKeyUp]) {
+      var release = function (e) {
+        if (e.key !== opts.afterKeyUp) return;
+        window.removeEventListener('keyup', release, true);
+        done.focus({preventScroll:true});
+      };
+      window.addEventListener('keyup', release, true);
+    } else {
+      done.focus({preventScroll:true});
+    }
   }
 
   // ---- UI: handle prompt --------------------------------------------
@@ -212,7 +213,7 @@
       mineBtn.type = 'button'; mineBtn.textContent = 'THAT NAME IS MINE';
 
       function close(val) { m.wrap.remove(); resolve(val); }
-      function submit() {
+      function submit(e) {
         if(ok.disabled)return;
         var v = input.value.trim();
         if (!HANDLE_RE.test(v)) { err.textContent = '2-14 letters, digits, space, - or _'; return; }
@@ -223,7 +224,10 @@
             if (res.recovery_code) {
               m.wrap.remove();
               showRecoveryCode(res.handle, res.recovery_code,
-                { onClose: function () { resolve(res.handle); } });
+                {
+                  onClose: function () { resolve(res.handle); },
+                  afterKeyUp: e && e.type === 'keydown' ? e.key : null,
+                });
               return;
             }
             close(res.handle);
@@ -252,7 +256,7 @@
         // Left on an empty name is the way out for a stick with no Escape.
         if (e.key === 'ArrowLeft' && !input.value) { e.preventDefault(); close(null); return; }
         if (stickEntry(input, e, entry, submit)) return;
-        if (e.key === 'Enter') submit();
+        if (e.key === 'Enter') submit(e);
         if (e.key === 'Escape') close(null);
       });
       setTimeout(function () { try { input.focus(); } catch (e) {} }, 30);

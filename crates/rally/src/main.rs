@@ -1,4 +1,4 @@
-//! Rally (Pong vs CPU), Rust port of `games/rally/main.c` on macroquad.
+//! Pong against the CPU.
 
 
 use blip::input::{
@@ -32,6 +32,7 @@ const PAD_OFF: f32 = 28.0;
 
 // ---- tuning -----------------------------------------------------------
 const SCORE_WIN: i32 = 7;
+const POINT_PAUSE: f32 = 1.2;
 const PAD_SPEED: f32 = 300.0;
 const BALL_SPD0: f32 = 275.0;
 const BALL_INC: f32 = 15.0;
@@ -266,28 +267,39 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
         }
 
         if g.ball_x + BALL_SZ < 0.0 {
-            g.score_r += 1;
-            g.serve_dir = -1.0;
-            play_sfx(&sfx.score_r);
-            if g.score_r >= SCORE_WIN { g.point_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
-            else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
+            award_point(g, false, &sfx.score_r);
             return;
         }
         if g.ball_x > WIN_W as f32 {
-            g.score_l += 1;
-            g.serve_dir = 1.0;
-            play_sfx(&sfx.score_l);
-            if g.score_l >= SCORE_WIN { g.point_t.start(GAME_OVER_MIN_WAIT); g.state = State::Over; }
-            else { g.reset_for_serve(); g.point_t.start(1.2); g.state = State::Point; }
+            award_point(g, true, &sfx.score_l);
             return;
         }
     }
 }
 
-/// Reflect the ball off a paddle: aim by where it struck the face, step the
-/// speed up a notch, then fold in a quarter of the paddle's own vertical
-/// speed so a moving paddle curls the return. `dir` is +1 when the ball
-/// should leave to the right (left paddle), -1 for the right paddle.
+fn award_point(g: &mut Game, left_scored: bool, sound: &blip::BlipSound) {
+    if left_scored {
+        g.score_l += 1;
+        g.serve_dir = 1.0;
+    } else {
+        g.score_r += 1;
+        g.serve_dir = -1.0;
+    }
+    play_sfx(sound);
+
+    let score = if left_scored { g.score_l } else { g.score_r };
+    if score >= SCORE_WIN {
+        g.point_t.start(GAME_OVER_MIN_WAIT);
+        g.state = State::Over;
+    } else {
+        g.reset_for_serve();
+        g.point_t.start(POINT_PAUSE);
+        g.state = State::Point;
+    }
+}
+
+/// Aim by impact position, increase speed, and add a quarter of paddle velocity.
+/// `dir` is +1 for the left paddle and -1 for the right.
 fn bounce_paddle(g: &mut Game, pad_y: f32, pad_vy: f32, dir: f32) {
     let rel = ((g.ball_y + BALL_SZ * 0.5 - pad_y) / PAD_H - 0.5).clamp(-0.5, 0.5);
     g.ball_spd = (g.ball_spd + BALL_INC).min(BALL_MAX);

@@ -1,10 +1,4 @@
-//! Bubbler — a tribute to Taito's Bubble Bobble (1986).
-//!
-//! One screen, two little dragons, a sky full of monsters. Blow a bubble
-//! into a monster to trap it, then pop the bubble to finish it off; pop a
-//! cluster at once and the points double down the chain. Hold jump to ride
-//! bubbles like stepping stones. Take too long and the monsters get angry,
-//! and then something worse comes looking for you.
+//! Bubble Bobble-inspired platform game with one- or two-player co-op.
 
 use blip::input::{key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D, BLIP_KEY_F,
     BLIP_KEY_G, BLIP_KEY_J, BLIP_KEY_K, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP,
@@ -57,12 +51,7 @@ const TOP_Y: f32 = HUD + TILE + BUB_R + 4.0;
 const HURRY_AT: f32 = 70.0; // round 1: little players take their time
 const SKULL_AT: f32 = 95.0;
 
-// Each round is harder than the last: monsters move faster, break out of
-// a bubble sooner, get angry and bring the skull earlier. From round 3
-// walkers throw rocks along their platform; from round 4 angry ghosts
-// spit sparks at you.
-/// The ramp stops at round 5: the rounds after it are new places, not harder
-/// ones (the autopilot lost all five lives on rounds 7 and 8 when it ran on).
+// Rounds cap at 5: the autopilot lost all lives on rounds 7 and 8 at higher difficulty.
 const RAMP_TOP: usize = 4;
 fn monster_pace(round: usize) -> f32 { 0.8 + 0.04 * round.min(RAMP_TOP) as f32 }
 fn trap_life(round: usize) -> f32 { (TRAP_LIFE - 0.5 * round.min(RAMP_TOP) as f32).max(7.0) }
@@ -604,6 +593,19 @@ struct Sounds { blow: blip::BlipSound, pop: blip::BlipSound, trap: blip::BlipSou
 
 // ---- update ------------------------------------------------------------
 
+fn player_dust(g: &mut Game, x: f32, y: f32, speed: (f32, f32), lift: (f32, f32), life: f32, alpha: f32, size: f32) {
+    for side in [-1.0, 1.0] {
+        g.parts.push(blip::EffectParticle {
+            x, y,
+            vx: side * blip::rand_range_f32(speed.0, speed.1),
+            vy: -blip::rand_range_f32(lift.0, lift.1),
+            life,
+            max_life: life,
+            data: ParticleStyle { c: rgba(1.0, 1.0, 1.0, alpha), size, star: false, ring: false },
+        });
+    }
+}
+
 fn update_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
     for i in 0..2 {
         if !g.p[i].joined { continue; }
@@ -628,10 +630,7 @@ fn update_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
             vy = -JUMP_V;
             g.p[i].squash = 1.35;
             let (fx, fy) = (x + P_W / 2.0, y + P_H);
-            for s in [-1.0, 1.0] {
-                g.parts.push(blip::EffectParticle { x: fx, y: fy, vx: s * blip::rand_range_f32(40.0, 70.0), vy: -blip::rand_range_f32(5.0, 20.0),
-                    life: 0.25, max_life: 0.25, data: ParticleStyle { c: rgba(1.0, 1.0, 1.0, 0.45), size: 1.8, star: false, ring: false } });
-            }
+            player_dust(g, fx, fy, (40.0, 70.0), (5.0, 20.0), 0.25, 0.45, 1.8);
             play_sfx_volume(&sfx.jump, 0.5);
         }
         let was_air = !g.p[i].on_ground;
@@ -639,10 +638,7 @@ fn update_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
         let (ground, _) = g.step_body(&mut x, &mut y, &mut vx, &mut vy, P_W, P_H, dt);
         if ground && was_air && fall_speed > 150.0 {
             g.p[i].squash = 0.7;
-            for s in [-1.0, 1.0] {
-                g.parts.push(blip::EffectParticle { x: x + P_W / 2.0, y: y + P_H, vx: s * blip::rand_range_f32(30.0, 60.0), vy: -blip::rand_range_f32(10.0, 30.0),
-                    life: 0.3, max_life: 0.3, data: ParticleStyle { c: rgba(1.0, 1.0, 1.0, 0.5), size: 2.0, star: false, ring: false } });
-            }
+            player_dust(g, x + P_W / 2.0, y + P_H, (30.0, 60.0), (10.0, 30.0), 0.3, 0.5, 2.0);
         }
         let p = &mut g.p[i];
         p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.on_ground = ground;
@@ -746,11 +742,7 @@ fn update_enemies(g: &mut Game, dt: f32) {
                 if e.y > WIN_H as f32 - TILE - E_H { e.y = WIN_H as f32 - TILE - E_H; e.vy = -e.vy.abs(); }
             }
         }
-        // Throwing, from ROCKS_FROM / SPARKS_FROM on: a walker rolls a rock
-        // along its platform at a player level with it and in front; an
-        // angry ghost spits a slow spark straight at the nearest player.
-        // A walker stops and shakes for ROCK_WINDUP before the rock leaves,
-        // so a player can see it coming.
+        // Walkers wind up before rolling rocks at aligned players; angry ghosts aim slow sparks at the nearest player.
         e.shot_cd -= dt;
         if e.windup > 0.0 {
             e.windup -= dt;
@@ -934,9 +926,7 @@ fn update_bubbles(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
                 let push = (min - d) * 0.5;
                 g.bubbles[i].x -= dx / d * push;
                 g.bubbles[j].x += dx / d * push;
-                if a.phase == Phase::Top && b.phase == Phase::Top {
-                    g.bubbles[j].y += 0.0;
-                } else {
+                if a.phase != Phase::Top || b.phase != Phase::Top {
                     g.bubbles[i].y -= dy / d * push * 0.5;
                     g.bubbles[j].y += dy / d * push * 0.5;
                 }
@@ -1034,6 +1024,10 @@ fn update_skull(g: &mut Game, dt: f32) {
     }
 }
 
+fn shot_hits_player(s: &Shot, x: f32, y: f32) -> bool {
+    (s.x - x).abs() < P_W / 2.0 + 3.0 && (s.y - y).abs() < P_H / 2.0 + 2.0
+}
+
 fn hurt_players(g: &mut Game, sfx: &Sounds) {
     #[cfg(not(target_arch = "wasm32"))]
     if std::env::var_os("BUBBLER_GOD").is_some() {
@@ -1049,11 +1043,10 @@ fn hurt_players(g: &mut Game, sfx: &Sounds) {
         let killer = g.enemies.iter().find(|e| e.active && e.pop_in >= 1.0
             && (e.x + E_W / 2.0 - px).abs() < (E_W + P_W) / 2.0 - 7.0
             && (e.y + E_H / 2.0 - py).abs() < (E_H + P_H) / 2.0 - 10.0).map(|e| e.kind);
-        let hit_enemy = killer.is_some();
         let hit_skull = g.skull.active && (g.skull.x - px).hypot(g.skull.y - py) < 18.0;
-        let hit_shot = g.shots.iter().any(|s| (s.x - px).abs() < P_W / 2.0 + 3.0 && (s.y - py).abs() < P_H / 2.0 + 2.0);
-        if hit_shot { g.shots.retain(|s| !((s.x - px).abs() < P_W / 2.0 + 3.0 && (s.y - py).abs() < P_H / 2.0 + 2.0)); }
-        let hit_enemy = hit_enemy || hit_shot;
+        let hit_shot = g.shots.iter().any(|s| shot_hits_player(s, px, py));
+        if hit_shot { g.shots.retain(|s| !shot_hits_player(s, px, py)); }
+        let hit_enemy = killer.is_some() || hit_shot;
         if hit_enemy || hit_skull {
             if hit_skull { g.stats.deaths_skull += 1; } else { g.stats.deaths_enemy += 1; }
             if let Some(k) = killer { g.stats.deaths_by[k as usize] += 1; }
@@ -1188,16 +1181,8 @@ fn draw_tiles(blip: &Blip, g: &Game, ox: f32, oy: f32) {
     }
 }
 
-/// A cute little dragon: round body, cream belly, big shiny eyes, rosy
-/// cheek, spikes down its back, stubby feet; squash and stretch with
-/// every jump and landing, blinking, cheeks puffing to blow.
 // ---- plush toys ------------------------------------------------------------
-// Everyone in Bubbler is a soft toy: a felt body with a fuzzy edge and a
-// stitched seam, shiny button eyes, rosy cheeks and a stitched smile. Angry
-// monsters only blush redder and frown; nobody looks scary.
-
-/// A felt body: a soft shadow, a fuzzy rim of tufts, the fabric, a soft
-/// highlight up and to the left.
+// Felt-toy drawing helpers shared by players and monsters.
 fn plush_body(cx: f32, cy: f32, rx: f32, ry: f32, c: (u8, u8, u8), alpha: f32) {
     use blip::macroquad::shapes::draw_circle;
     draw_ellipse(cx + 1.5, cy + 2.0, rx, ry, 0.0, rgba(0.1, 0.0, 0.15, 0.25 * alpha));
@@ -1762,10 +1747,7 @@ fn draw_title(blip: &Blip, g: &Game, hi: &web::HighScore) {
     let _ = g;
 }
 
-/// Playtest autopilot, native only (BUBBLER_BOT=1 or 2 players). Hunts the
-/// nearest monster, blows when it is level and in range, goes up to pop
-/// trapped bubbles, hops over trouble. Deliberately no better than a
-/// decent player: it reacts late and misjudges now and then.
+/// Native playtest bot (`BUBBLER_BOT=1` or `2`); targets nearby enemies and avoids hazards.
 #[cfg(not(target_arch = "wasm32"))]
 fn bot_input(g: &Game, pi: usize, mem: &mut [f32; 4]) -> Input {
     let mut k = Input::default();

@@ -163,10 +163,7 @@ pub(crate) const RAGE: f32 = 1.2;
 pub(crate) const IMPACT_WINDOW: f32 = 6.0 * F;
 pub(crate) const IMPACT_STUN: f32 = 24.0 * F;
 
-/// The bonus fruit, Pac-Man's: once a round it appears mid-stage when the
-/// clock reaches `FRUIT_AT`, waits `FRUIT_STAYS` seconds, and gives whoever
-/// walks over it a share of their health back. The eight follow Pac-Man's
-/// order and are worth Pac-Man's points.
+/// Once per round, fruit appears at `FRUIT_AT`, heals 12%, and awards its listed points.
 pub(crate) const FRUIT_AT: f32 = ROUND_SECS - 12.0;
 pub(crate) const FRUIT_STAYS: f32 = 9.0;
 pub(crate) const FRUIT_HEAL: f32 = 0.12;
@@ -220,16 +217,10 @@ pub(crate) fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
         return;
     }
 
-    // In the air and not yet committed: the jump-in attack comes out now.
-    // (Airborne counts as busy, so the busy path below would buffer it into a
-    // grounded kick on landing.) Landing ends it, which keeps one attack per
-    // jump.
+    // Start jump-in attacks here; the busy path below buffers grounded moves.
     if f.airborne() && f.act == Act::Air {
         if let Some(id) = air_move(f, inp) {
-            // An attack whose startup outlasts the fall never goes live
-            // (landing ends it), so buffer it as the grounded move instead.
-            // Two frames of margin, or it comes out on the landing frame and
-            // is cancelled.
+            // Landing cancels unfinished attacks, so buffer moves that cannot start two frames early.
             if f.air_time() >= (move_data(id).startup + 2.0) * F {
                 f.start_attack(id);
             } else if let Some(g) = grounded_move(inp, close) {
@@ -412,10 +403,7 @@ pub(crate) fn advance(f: &mut Fighter, dt: f32) {
     note_handover(f, dt);
 }
 
-/// Spot one action becoming another and freeze what the drawing needs to keep
-/// showing the old one. Runs at the end of `advance`, where jumps, attacks
-/// and hitstun end; at the top of the next frame the change frame had no
-/// blend.
+/// Capture the previous pose when an action changes, so drawing can blend across the handover.
 pub(crate) fn note_handover(f: &mut Fighter, dt: f32) {
     if f.act != f.shown {
         let was_low = Fighter::is_low(f.shown, f.shown_mv, f.crouch_block);

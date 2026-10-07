@@ -62,14 +62,8 @@ const WAVE_KILL_BASE: i32 = 60;
 const FLIGHT_BONUS: i32 = 50;
 
 // ---- flight model ---------------------------------------------------------
-// Each enemy flight flies one path the way an aeroplane does: it banks to
-// turn. In a level coordinated turn
-//   turn rate  w = g tan(bank) / v        radius  r = v^2 / (g tan(bank))
-//   load       n = 1 / cos(bank)
-// and the stall speed rises with load, v_stall(n) = v_stall sqrt(n), so at
-// speed v the bank is capped at acos((v_stall / v)^2). Turning costs speed
-// (induced drag grows with n^2 - 1) and the engine wins it back on the
-// straights; bank changes at the roll rate, so paths curve, never corner.
+// Coordinated turn: rate = g tan(bank)/v; load = 1/cos(bank).
+// Stall limits bank to acos((v_stall/v)^2); drag costs speed, and roll rate limits bank changes.
 const FLIGHT_G: f32 = 130.0;       // px/s^2: g at this game's scale and pace
 const FLIGHT_STALL: f32 = 55.0;    // px/s, wings level
 const FLIGHT_ROLL: f32 = 1.6;      // rad/s
@@ -98,10 +92,7 @@ const BOSS_TURRETS: [&[(f32, f32)]; 7] = [
 ];
 const BOSS_INTRO_TIME: f32 = 1.3;
 
-// Wing gun positions per boss, as fractions of the half span (both sides),
-// on the wing's centre chord; the fuselage guns are BOSS_TURRETS. More
-// turrets each level, 3, 5, 7, 8, 9, 12, until the last: only 4 guns, but
-// two laser turrets (BOSS_LASERS).
+// Wing gun positions are fractions of half-span; fuselage guns use `BOSS_TURRETS`.
 const BOSS_WING_GUNS: [&[f32]; 7] = [
     &[], &[0.62], &[0.62], &[0.36, 0.72], &[0.31, 0.62], &[0.32, 0.6, 0.8], &[0.62],
 ];
@@ -119,10 +110,7 @@ const BOSS_WINGS: [(f32, f32, f32, f32); 7] = [
 ];
 const MAX_TURRETS: usize = 16;
 
-// ---- carrier launch -------------------------------------------------------
-// Every level opens on an Essex-class deck: engine start, the launch
-// officer's signal, the deck run, and the climb away. Sizes must match
-// blip_assets' CARRIER_W / CARRIER_H.
+// Each level opens with an Essex-class carrier launch. Sizes match `blip_assets`.
 const CARRIER_W: i32 = 186;
 const CARRIER_H: i32 = 760;
 const CARRIER_DECK_X: f32 = 88.0;  // the deck centreline in the sprite
@@ -157,16 +145,12 @@ const MAX_HEALTH_PICKUPS: usize = 1;
 // and its blink), so one burst cannot drain the whole bar in a frame.
 const HIT_GRACE: f32 = 1.15;
 
-// ---- background: sea, sky, boats
-// -------------------------------------------
-// The sea and its boats share one scroll speed; clouds float between the sea
-// and the planes.
+// ---- background: sea, sky and boats --------------------------------------
+// Sea and boats share a scroll speed; clouds move between the sea and planes.
 const SEA_SCROLL_SPEED: f32 = 70.0;
 
 // ---- airspeed ---------------------------------------------------------
-// 1.0 is cruise. Forward opens the throttle, back closes it; the plane never
-// flies backwards. Below cruise the scroll carries it down the screen, and
-// slow flight slows the scroll.
+// 1.0 is cruise; throttle adjusts airspeed, and below cruise the plane drifts down-screen.
 const AIRSPEED_MAX: f32 = 1.4;
 const AIRSPEED_RATE: f32 = 0.9;    // per second of throttle held
 const AIRSPEED_RELAX: f32 = 0.3;   // back toward cruise with no input
@@ -195,11 +179,8 @@ const MAX_BOATS: usize = 3;
 const PLANE_SHADOW_DX: f32 = 6.0;
 const PLANE_SHADOW_DY: f32 = 10.0;
 
-// ---- islands & their flak ---------------------------------------------------
-// A rare set-piece: an island drifting down with the sea, its flak cannons
-// firing shells that burst where the player was when they fired. Size, HP,
-// score and guns scale together; at most one on screen, every 24-42s.
-// Sizes must match blip_assets' ISLAND_SIZES.
+// At most one island appears every 24–42 seconds; size, health, score and guns scale together.
+// Sizes match `blip_assets::ISLAND_SIZES`; flak targets the player's position when fired.
 const ISLAND_SIZES: [(i32, i32); 3] = [(64, 44), (98, 68), (140, 96)];
 const ISLAND_HP: [i32; 3] = [26, 46, 74];
 const ISLAND_SCORE: [i32; 3] = [150, 260, 420];
@@ -220,11 +201,8 @@ const FLAK_LETHAL: f32 = 0.25;     // seconds a burst can hurt; then it is smoke
 const FLAK_SMOKE: f32 = 1.4;
 const MAX_FLAK: usize = 12;
 
-// ---- laser barrier ----------------------------------------------------
-// From level BARRIER_MIN_LEVEL: a full-width laser beam that creeps down
-// the screen toward the player. There is no way round it and the plane
-// cannot back away, so the motor (3-10 hits) must come down before it
-// arrives. Rare, and never while a boss is up.
+// From level 3, a full-width barrier approaches; destroy its 3–10 HP motor before it reaches you.
+// Barriers never overlap a boss fight.
 const BARRIER_MIN_LEVEL: i32 = 3;
 const BARRIER_MIN_INTERVAL: f32 = 75.0;
 const BARRIER_MAX_INTERVAL: f32 = 140.0;
@@ -289,11 +267,8 @@ impl Pooled for Casing {
     fn is_active(&self) -> bool { self.active }
 }
 
-/// One enemy aircraft. The leader flies its flight's path (see Flight);
-/// a wingman flies itself, on the same physics, steering for its `slot`
-/// (px right and behind, in the leader's frame). It only ever moves along
-/// its nose, so in a turn it swings wide or cuts inside like a real
-/// wingman instead of sliding sideways.
+/// A leader follows its flight path; wingmen steer toward their leader-relative `slot`.
+/// Both use the same flight physics and move along their nose direction.
 #[derive(Copy, Clone)]
 struct Enemy {
     x: f32, y: f32,
@@ -454,11 +429,7 @@ struct Barrier {
     y: f32,
 }
 
-/// A gun turret on a boss: it traverses toward its target at a real
-/// turret's slew rate and fires along its barrels only once they are on
-/// it, in bursts at a steady rhythm, from a drum that runs dry and is
-/// changed by hand (the drum-fed Type 92 and Type 99 guns of these
-/// bombers), so where and when it fires can be read off the turret.
+/// A boss turret tracks at a limited slew rate and fires aimed bursts from a finite drum.
 #[derive(Copy, Clone)]
 struct Turret {
     fx: f32, fy: f32, // x: fraction of the half span, y: fraction of the length from the nose
@@ -981,10 +952,7 @@ fn spawn_barrier(g: &mut Game, sfx: &Sounds) {
     play_sound(&sfx.barrier_hum2, PlaySoundParams { looped: true, volume: 0.0 });
 }
 
-/// Laser barrier upkeep: after its warm-up the beam creeps down the screen;
-/// the hum builds as it closes on the player (a low drone from the start,
-/// a harsher buzz crossfading in over the second half) and fades once it
-/// has gone past.
+/// Move the warmed-up barrier and crossfade its warning hum as it approaches and passes.
 fn update_barrier(g: &mut Game, dt: f32, sfx: &Sounds) {
     if !g.barrier.active {
         stop_sound(&sfx.barrier_hum);
@@ -1312,10 +1280,7 @@ fn update_flight(f: &mut Flight, dt: f32, player: (f32, f32, f32)) {
     if done && f.leg < f.n { f.leg += 1; f.leg_t = 0.0; f.turned = 0.0; }
 }
 
-/// A wingman's step, flown as a real one would: bank to match the
-/// leader's turn rate (tan(bank) = w v / g at its own speed), correct
-/// gently toward a point well ahead of its slot, and use the throttle to
-/// hold its place along the track. Returns its new centre.
+/// Match the leader's turn rate, steer toward a point ahead of the slot, and hold position with throttle.
 fn fly_wing(e: &mut Enemy, f: &Flight, dt: f32) -> (f32, f32) {
     let (cx, cy) = (e.x + ENEMY_W as f32 / 2.0, e.y + ENEMY_H as f32 / 2.0);
     let (sx, sy) = slot_pos(f.x, f.y, f.heading, e.slot);
@@ -1661,16 +1626,7 @@ fn update_title(g: &mut Game) {
     }
 }
 
-/// Carrier launch. The camera rides with the plane, so the carrier moves:
-///  - engine start: the plane sits spotted aft; the engine coughs and
-///    catches (the engine bank runs from the sputter loop up), smoke from
-///    the exhausts;
-///  - the launch officer winds it up to full throttle;
-///  - the deck run: the deck slides back under the plane, accelerating,
-///    until it runs off the bow;
-///  - the climb: the carrier falls away below and shrinks with height, the
-///    plane's shadow falls behind it, and the player takes the stick.
-/// The opening wave arrives during the climb, holding its fire.
+/// Animate engine start, signal, deck run and climb; the opening wave holds fire until the launch ends.
 fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.launch_t += dt;
     let t = g.launch_t;
@@ -1745,10 +1701,7 @@ fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.respawn_grace.start(0.4);
         g.spawn_timer.start(1.5);
         g.state = State::Play;
-        // Playtest, native only: RAIDER_BOSS=1..7 goes straight to that boss,
-        // RAIDER_HP=1..5 starts damaged, RAIDER_BARRIER=1 brings a barrier in,
-        // RAIDER_ISLAND=0..2 an island of that size, RAIDER_LEVEL=1..7 starts
-        // that level's waves.
+        // Native playtest controls: `RAIDER_BOSS`, `RAIDER_HP`, `RAIDER_BARRIER`, `RAIDER_ISLAND` and `RAIDER_LEVEL`.
         #[cfg(not(target_arch = "wasm32"))]
         {
             let env = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<i32>().ok());
@@ -2294,10 +2247,7 @@ fn new_wreck(e: &Enemy) -> Wreck {
     w
 }
 
-/// One step of a wreck's fall. The velocity (`course`, `speed`) carries on
-/// from the plane; drag takes speed off, the turn bends the course, and the
-/// airframe rotates on its own. As it loses height it falls behind with the
-/// ground scrolling under the fight.
+/// Advance a wreck's inherited course and speed; drag, turning and rotation continue as it falls behind the scrolling ground.
 fn fly_wreck(w: &mut Wreck, scroll: f32, dt: f32) {
     let drag = match w.fall {
         Fall::Dive => -0.15,     // nose down, gravity outruns drag
@@ -2418,12 +2368,8 @@ fn update_stall(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 }
 
-/// Engine loop volumes for the current airspeed: a crossfade between the
-/// two loops either side of it, louder the faster it turns, the coughing
-/// low loop pushed up near a stall, and the engine dying through the fall.
-/// Now and then low-grade fuel starves the engine: it misses, cuts out for
-/// a second with a cough or two, and catches (blip_assets::sky_raider's
-/// engine_splutter_sfx carries the sound; the loops are ducked meanwhile).
+/// Crossfade engine loops by airspeed, raise the cough near stall, and fade the engine during a fall.
+/// Fuel starvation can briefly cut the engine; the loops duck under the splutter sound.
 fn update_splutter(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.splutter_t < 0.0 {
         g.splutter_next -= dt;
@@ -2737,10 +2683,7 @@ fn draw_slug(blip: &Blip, x: f32, y: f32, vx: f32, vy: f32, len: f32, wid: f32, 
     blip.fill_circle(x, y, wid * 0.45, BlipColor::new(1.0, 0.92, 0.7, 1.0));
 }
 
-/// An aircraft sprite, nose along `heading`, narrower as it banks (a banked
-/// wing is foreshortened from above). Flight moves along (sin h, cos h) and
-/// rotating the nose-down sprite by r points it at (-sin r, cos r), hence the
-/// minus.
+/// Draw a bank-foreshortened aircraft; nose-down sprites rotate by `-heading`.
 fn draw_plane(tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, heading: f32, bank: f32, tint: BlipColor) {
     let ww = w * (0.55 + 0.45 * bank.cos());
     draw_texture_ex(tex, x + (w - ww) / 2.0, y, tint, DrawTextureParams {
@@ -3186,10 +3129,7 @@ fn draw_idle_prop(blip: &Blip, g: &Game, x: f32, y: f32, rot: f32, gl: f32) {
     blip.draw_line_ex(hx - dx, hy - dy, hx + dx, hy + dy, 2.6, c);
 }
 
-/// A boss turret, readable at a glance: a steel ring and glazed dome, twin
-/// barrels on the aim, a faint line of fire ahead of a loaded gun that
-/// brightens as its next burst comes due, the muzzle flash, and an amber
-/// ring filling while the gunner changes the drum.
+/// Draw turret health, aimed barrels, a loaded-gun cue, muzzle flash and reload progress.
 fn draw_turret(blip: &Blip, g: &Game, k: usize) {
     let t = &g.boss.turrets[k];
     let r = turret_radius(g.boss.tier);

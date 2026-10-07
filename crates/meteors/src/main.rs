@@ -1,6 +1,4 @@
-//! Meteors, a tribute to the vector-graphics rock-shooter arcade classic, on macroquad.
-//! Pure line-art rendering (no sprite assets), true to the original's monochrome
-//! vector display. Music and effects ring on glass (see `blip_assets::meteors`).
+//! Vector-graphics asteroid shooter with monochrome line art.
 
 use std::f32::consts::PI;
 
@@ -340,10 +338,7 @@ fn burst(g: &mut Game, x: f32, y: f32, vx: f32, vy: f32, n: usize, len: f32, spe
     }
 }
 
-/// Did the segment `p0 -> p1` pass within `r` of `(cx, cy)` at any point? Used
-/// for bullet hits: a fast bullet covers several of its own widths per frame,
-/// so a point test at the frame's end lets it punch straight through a small
-/// rock. Testing the whole swept path closes that gap.
+/// Whether segment `p0 -> p1` passes within `r` of `(cx, cy)`; this prevents fast bullets tunnelling through rocks.
 fn spawn_bullet(bullets: &mut [Bullet; MAX_BULLETS], x: f32, y: f32, vx: f32, vy: f32, from_player: bool) {
     pool_spawn(bullets, Bullet { active: true, x, y, vx, vy, ttl: BULLET_TTL, from_player });
 }
@@ -678,10 +673,7 @@ fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, level: i32, color: BlipCol
     }
 }
 
-// ---- the trip -------------------------------------------------------------
-// Each wave gets a little more psychedelic: moving lines smear further, the
-// rocks take on more colours, and from wave 3 more and more of them are
-// flowers.
+// Line smearing and rock colours increase by wave; flowers appear from wave 3.
 
 type Seg = ((f32, f32), (f32, f32));
 

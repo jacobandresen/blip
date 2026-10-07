@@ -57,10 +57,7 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
         };
     }
     if foe.act == Act::Attack && dist < foe_range * 1.2 {
-        // Being attacked at close range forces a fresh decision (see
-        // update_fight()). How much it blocks depends on what is coming: a
-        // sweep or special is respected, a jab traded with; always blocking
-        // stalemated against a mashed punch.
+        // Block 55–95% against heavy or knockdown moves, 22–42% against jabs.
         let scary = move_data(foe.mv).damage >= 10 || move_data(foe.mv).knockdown;
         let want = if scary { 0.55 + 0.4 * g.difficulty } else { 0.22 + 0.2 * g.difficulty };
         if roll() < want { return CpuPlan::Block; }
@@ -161,10 +158,7 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
     // the same list.
     let heavy = me.arch().special == Special::BullRush;
     let fast_share = if heavy { 0.20 } else { 0.32 };
-    // What each kind of fighter likes: those with something to throw throw
-    // it, the heavy ones would rather take hold, the kickers keep their feet.
-    // (How much of the roll goes to the special and to the throw; with the
-    // rest of the bands it must stay under 0.94.)
+    // Special and throw shares vary by archetype; all bands stay below 0.94.
     let (special, throw) = match me.arch().special {
         Special::ChiBolt => (0.16, 0.05),
         Special::BullRush => (0.08, 0.11),
@@ -189,10 +183,7 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
     }
 }
 
-/// The CPU's turn for the fighter on `side`: think again if the plan has run
-/// out, and press what the plan says. It is written for the second fighter;
-/// for the first (the attract mode's) the two are changed over for the
-/// length of the call.
+/// Run the CPU turn for `side`, swapping fighters around it for attract mode's player one.
 pub(crate) fn cpu_turn(g: &mut Game, side: usize, dt: f32) -> Input {
     if side == 0 {
         g.p.swap(0, 1);
@@ -242,10 +233,7 @@ pub(crate) fn cpu_input(g: &Game) -> Input {
         }
         CpuPlan::Jump => {
             if me.airborne() {
-                // Already committed — throw the overhead. A jump-in that
-                // never attacks is just a fighter volunteering to be hit
-                // out of the air.
-                // A flier out of arm's reach looks down and fires instead.
+                // Commit to an overhead; a flier beyond arm's reach fires downward.
                 let far = (foe.x - me.x).abs() > attack_range(&me, MoveId::LowPunch) * 1.5;
                 if !me.flies() { inp.kick_high = true; }
                 else if far { inp.kick_low = true; }

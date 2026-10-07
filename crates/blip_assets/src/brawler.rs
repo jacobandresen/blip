@@ -2,16 +2,12 @@
 //! same numbers as their hitboxes, so there is no sprite sheet to disagree
 //! with the rules.
 
-use crate::wav::{low_pass, tame, warm, Rng, MIX_KNEE};
+use crate::wav::{fade_out, low_pass, tame, warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, env, ms_to_samples,
     soft_limit_to_pcm16, SAMPLE_RATE};
 use crate::Asset;
 
 // ---- combat foley ---------------------------------------------------------
-// Every sound here is a person. Flesh is heavily damped, so a body being hit
-// never rings at a pitch (that is a drum): it is a short muffled thud of
-// filtered noise, a smack of skin, the gi's cloth, and the fighter's own
-// voice (a breath, a grunt, a winded groan), with a trace of the room.
 
 const SRF: f32 = SAMPLE_RATE as f32;
 
@@ -64,9 +60,7 @@ fn soften(buf: &mut [f32], hz: f32) {
 fn render(mut buf: Vec<f32>, gain: f32) -> Vec<i16> {
     soften(&mut buf, 5000.0);
     room(&mut buf, 1.0);
-    let n = buf.len();
-    let fade = ((0.01 * SRF) as usize).min(n);
-    for i in 0..fade { buf[n - fade + i] *= 1.0 - (i + 1) as f32 / fade as f32; }
+    fade_out(&mut buf, ms_to_samples(10.0));
     let scaled: Vec<f32> = buf.iter().map(|v| v * gain).collect();
     soft_limit_to_pcm16(&scaled, MIX_KNEE)
 }
@@ -86,10 +80,7 @@ fn knock(buf: &mut [f32], at: f32, f: f32, amp: f32, tau: f32) {
     }
 }
 
-/// A human voice: a vocal-cord buzz (harmonics falling off like a real
-/// glottal pulse, with jitter and shimmer) plus breath, shaped by three
-/// formants into a vowel `(F1, F2, F3)`. Pitch glides `f0`..`f1`; `breath`
-/// 0..1 is how much of it is air rather than tone.
+/// Synthesize a formant-shaped voice from `f0` to `f1`; `breath` controls the noise mix.
 fn voice(buf: &mut [f32], at: f32, dur: f32, f0: f32, f1: f32, vowel: (f32, f32, f32), breath: f32,
          amp: f32, rng: &mut Rng) {
     let off = (at * SRF) as usize;
@@ -271,11 +262,7 @@ fn crowd(ms: f32, vol: f32, seed: u32) -> Vec<i16> {
 }
 
 
-/// Cloth snapping taut, the sound of a gi when a leg goes out fast: the
-/// whoosh is air moving, this is speed. Noise through a band opening upward
-/// as the leg extends, a one-sample difference to strip the bottom, an
-/// envelope almost all attack, then a quieter second crack as the leg comes
-/// back.
+/// Fast cloth snap from an upward-opening noise band and quieter return crack.
 fn gi_snap(seed: u32) -> Vec<i16> {
     let ms = 150.0;
     let n = ms_to_samples(ms);
@@ -464,9 +451,7 @@ fn verdict(won: bool) -> Vec<i16> {
         taiko(&mut buf, at(990.0), 80.0, 0.9, &mut rng);
         flute(&mut buf, at(990.0), degree(&HIRAJOSHI, root, 0), 1000.0, 0.6, &mut rng);
     }
-    let n = buf.len();
-    let fade = ms_to_samples(120.0);
-    for i in 0..fade { buf[n - fade + i] *= 1.0 - (i + 1) as f32 / fade as f32; }
+    fade_out(&mut buf, ms_to_samples(120.0));
     warm(&mut buf);
     soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
@@ -571,10 +556,7 @@ fn gong() -> Vec<i16> {
     soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
 
-/// A plucked string: koto, or shamisen struck harder. Karplus-Strong: a
-/// period-long delay line of noise read round and round, averaging
-/// neighbours, so the highs die first and a bright pluck decays to a pure
-/// tone, like a real string.
+/// Plucked string using Karplus–Strong averaging; upper harmonics decay first.
 fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut Rng) {
     let freq = tame(freq);
     let period = (SAMPLE_RATE as f32 / freq).max(2.0) as usize;
@@ -850,10 +832,7 @@ fn wrap_tail(buf: &mut [f32], body: usize) {
 }
 
 
-/// The themes, synthesised on the device rather than baked in: a
-/// round-length theme is megabytes of PCM, the code a couple of hundred
-/// lines. 0 docks, 1 temple, 2 the select screen, 3 air base, 4 bath house,
-/// 5 river village, 6 crystal fortress, 7 rooftop.
+/// Device-synthesized themes by stage: docks, temple, select, air base, bath house, river, fortress, rooftop.
 pub fn theme_wav(which: usize) -> Vec<u8> {
     // The docks, the temple and the select screen are on hirajoshi and differ
     // in pace and density; each later stage has a scale of its own.
@@ -1022,10 +1001,7 @@ pub fn theme_wav(which: usize) -> Vec<u8> {
     })
 }
 
-/// What a stage sounds like under the fight, as a loop: 0 a crowd murmuring,
-/// 1 wind over ice with nobody there, 2 the crowd with crickets in the trees
-/// behind it, 3 the crowd over the hum of a city. Built at startup like the
-/// crowd.
+/// Stage ambience loops: 0 crowd, 1 wind, 2 crowd and crickets, 3 crowd and city hum.
 pub fn ambience_wav(kind: usize) -> Vec<u8> {
     let body = ms_to_samples(4000.0);
     let fade = ms_to_samples(400.0);

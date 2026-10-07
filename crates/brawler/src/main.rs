@@ -1,37 +1,5 @@
-//! Brawler: a one-on-one fighting game in tribute to Street Fighter II. Ten
-//! fighters, seven stages, a nine-fight ladder against the CPU or one match
-//! between two players.
-//!
-//! What it takes seriously, because they are the game:
-//!
-//! 1. **Attack height.** Every attack is low, mid or overhead, and a block
-//!    works only at the right height: crouch-blocking eats sweeps and loses
-//!    to jump-ins, standing is the reverse.
-//! 2. **Frame data.** Startup, active and recovery in frames; punishable in
-//!    proportion to reach and damage. A whiffed sweep hurts, a jab does not.
-//! 3. **What you can see.** Poses are built from the same numbers as the
-//!    hitboxes, so an arm that looks extended is what hits you.
-//!
-//! Where things are:
-//!
-//! | module | what is in it |
-//! |---|---|
-//! | [`moves`] | physics constants and the move table |
-//! | [`roster`] | the ten fighters and the seven stages |
-//! | [`fighter`] | one fighter's state in a round |
-//! | [`game`] | the session: ladder, round, everything on the stage |
-//! | [`rules`] | input to action, movement, and what a blow does |
-//! | [`cpu`] | the CPU opponent |
-//! | [`keys`] | each player's keys, read as an `Input` |
-//! | [`fight`] | one frame of a round |
-//! | [`flow`] | menus, billing, bonus round, results, continue |
-//! | [`draw`] | all drawing: stages, fighter parts, poses, HUD, screens |
-//! | [`sound`] | the effects, and the `Sfx` the rules ask for by name |
-//! | [`shots`] | screenshot scenes for the card and for checking drawings |
-//! | `bot` | the native playtest autopilot (`BLIP_BOT=1`) |
-//!
-//! This file is the frame loop: load, read the state, update it, play the
-//! sounds it asked for, keep the music and ambience in step, draw.
+//! One-on-one fighter with ten characters and CPU or local two-player modes.
+//! Attack heights, frame data and poses share the same move definitions.
 
 mod moves;
 mod roster;
@@ -77,19 +45,14 @@ const FLOOR_Y: f32 = 330.0;
 const WALL_MARGIN: f32 = 46.0;
 
 // ---- timing --------------------------------------------------------------
-/// One frame at 60fps. Frame data is written in frames because that is
-/// the unit fighting games are argued about in, and converted here once.
+/// One frame at 60 Hz; move timings use frames.
 const F: f32 = 1.0 / 60.0;
-/// Forty-five seconds, not the arcade's sixty: at sixty, rounds against a
-/// masher ran the full count and the clock decided them. Good play finishes
-/// in twenty to thirty.
+/// 45 seconds; at 60 seconds, rounds too often timed out against mashers.
 const ROUND_SECS: f32 = 45.0;
 const ROUNDS_TO_WIN: i32 = 2;
 
 // ---- bodies --------------------------------------------------------------
-// The width of a fighter, for being hit and for being drawn: the same number,
-// or attacks land on air beside what the player sees. The silhouette is built
-// to fill it. These are a full-size fighter's; `Archetype::size` scales them.
+// The drawn silhouette fills this hit width; `Archetype::size` scales it.
 const BODY_W: f32 = 30.0;
 const STAND_H: f32 = 120.0;
 const CROUCH_H: f32 = 74.0;
@@ -247,7 +210,7 @@ async fn main() {
         // The room under the fight: a crowd, with crickets behind it by the
         // river and the city under it on the roof; in the fortress only wind.
         let room = (!g.demo && matches!(g.state, State::Vs | State::RoundIntro | State::Fight | State::RoundEnd | State::Bonus))
-            .then(|| match g.stage { 5 => 1, 4 => 2, 6 => 3, _ => 0 });
+            .then_some(match g.stage { 5 => 1, 4 => 2, 6 => 3, _ => 0 });
         if room != ambient {
             match room {
                 Some(k) => blip::audio::play_ambient(&sfx.ambience[k]),
@@ -265,18 +228,14 @@ async fn main() {
             alarmed = danger;
         }
 
-        let want = match g.state {
-            _ if g.demo => Some(SELECT_TRACK),
-            State::Title | State::Select => Some(SELECT_TRACK),
-            State::Vs | State::RoundIntro | State::Fight | State::RoundEnd | State::Bonus => {
-                Some(STAGE_TRACK[g.stage % STAGES])
-            }
-            _ => None,
+        let want = if g.demo || matches!(g.state, State::Title | State::Select) {
+            Some(SELECT_TRACK)
+        } else if matches!(g.state, State::Vs | State::RoundIntro | State::Fight | State::RoundEnd | State::Bonus) {
+            Some(STAGE_TRACK[g.stage % STAGES])
+        } else {
+            None
         };
-        // A stage's theme is rendered when it is first wanted, which is at a
-        // billing, a round's intro or the start of a bonus round: the half
-        // second it takes hides behind a still picture, never inside a fight.
-        // Warming all seven up on the title froze it seven times.
+        // Render each stage theme at billing or intro; warming all seven on the title froze it repeatedly.
         match want {
             Some(track) if g.state != State::Fight && !music.ready(track) => music.start(track).await,
             Some(track) => music.play(track),

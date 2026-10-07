@@ -1871,12 +1871,12 @@
       cards[idx].focus({preventScroll:true});
 
       function move(delta) {
-        if (getCoins()<=0||cardInFlight||!manualOverlay.hidden||document.body.classList.contains('cabinet-return')) return;
+        if (cardInFlight||!manualOverlay.hidden||document.body.classList.contains('cabinet-return')) return;
         if(shuffleQueue.length<6)shuffleQueue.push(delta<0?-1:1);
         if(!shuffling)shuffleNext();
       }
       function shuffleNext() {
-        if(getCoins()<=0||cardInFlight||!manualOverlay.hidden) {
+        if(cardInFlight||!manualOverlay.hidden) {
           shuffleQueue.length=0;shuffling=false;return;
         }
         if(!shuffleQueue.length){shuffling=false;return;}
@@ -1912,7 +1912,7 @@
       var track = document.getElementById('game-grid');
       var touchStart = null, suppressClick = false, suppressClickTimer = 0;
       function selectByTouch(card) {
-        if(getCoins()<=0||!card || cardInFlight || !manualOverlay.hidden)return;
+        if(!card || cardInFlight || !manualOverlay.hidden)return;
         var selected=cards.indexOf(card);
         if(selected<0)return;
         if(selected!==idx || armedCard!==card) {

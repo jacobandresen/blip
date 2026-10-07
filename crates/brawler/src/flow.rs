@@ -123,7 +123,7 @@ pub(crate) fn update_bonus(g: &mut Game, dt: f32, inp: Input) -> Option<bool> {
         b.hit_t += dt;
         if b.broke_t >= 0.0 { b.broke_t += dt; }
     }
-    for s in g.hitspark.iter_mut() { if s.ttl > 0.0 { s.ttl -= dt; } }
+    super::fight::tick_sparks(g, dt);
     if g.shake > 0.0 { g.shake -= dt; }
     // Decided: the tally shows, then the ladder goes on.
     if g.bonus_done > 0.0 {

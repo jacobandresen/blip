@@ -1,16 +1,5 @@
-//! Small feedback effects every game can use to show what just happened:
-//! a score popup that rises and fades, a burst of sparks, a ring that
-//! widens from a point, and a screen shake.
-//!
-//! Each is a plain struct kept in the game's state. Call `update(dt)` once a
-//! frame and `draw(&blip)` after the playfield:
-//!
-//! ```ignore
-//! g.fx.popup(x, y, "+50", BLIP_YELLOW);
-//! g.fx.burst(x, y, 12, 90.0, BLIP_RED);
-//! g.fx.update(dt);
-//! g.fx.draw(&blip);
-//! ```
+//! Shared score popups, sparks, rings and screen shake.
+//! Call `update(dt)` each frame and `draw(&blip)` after the playfield.
 
 use macroquad::color::Color;
 

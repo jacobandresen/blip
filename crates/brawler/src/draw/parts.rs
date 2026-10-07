@@ -4,14 +4,8 @@
 
 use super::*;
 
-// Fighters are drawn like the HD redraws of Street Fighter II: a bold line
-// round each shape, flat colour inside, one darker tone for the far limbs.
-// 1. **Pose space.** Joints are (forward, up) from the floor under the feet,
-// so one pose serves both sides.
-// 2. **Two bones per limb.** Hands and feet are placed; knees and elbows are
-// solved.
-// 3. **One outline per shape.** A limb is inked whole and then filled, so a
-// knee is a bend in a leg and not a hinge between two parts.
+// Poses use forward/up coordinates; hands and feet are placed, joints solved.
+// Each limb is outlined and filled as one shape.
 
 /// A point on a fighter: `f` forward — the way they face — and `u` up
 /// from the floor under them.
@@ -152,10 +146,7 @@ pub(crate) const ELBOW_SHUT: f32 = 0.61;
 /// The nearest a hand is drawn to its own shoulder.
 pub(crate) const ARM_MIN: f32 = 18.0;
 
-/// The two-bone solve: where the joint goes and where the limb's end actually
-/// lands. Bones never stretch; the target is clamped into the reachable ring
-/// and the settled point returned. `toward` picks the way the joint breaks
-/// (knees forward, elbows back).
+/// Solve a two-bone limb without stretching; clamp unreachable targets and choose the bend with `toward`.
 pub(crate) fn solve(root: V, want: V, l1: f32, l2: f32, shut: f32, toward: V) -> (V, V) {
     let (dx, dy) = (want.0 - root.0, want.1 - root.1);
     let d_raw = (dx * dx + dy * dy).sqrt();

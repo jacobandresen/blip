@@ -150,7 +150,7 @@ blip.draw_hud(g.score, g.lives);
 
 ### `blip::color` — the palette
 
-Ten named colours, matching the original C API:
+Named colours:
 
 | Constant | Appearance |
 |----------|-----------|
@@ -216,4 +216,4 @@ rustup target add wasm32-unknown-unknown   # one-time setup
 python3 -m http.server -d web 8080         # serve locally
 ```
 
-Each game is compiled to its own `.wasm` + `.js` pair under `web/<gamename>/`.
+Each game is compiled to `web/<gamename>/index.wasm`; the shared shell and macroquad runtime are served from `web/`.

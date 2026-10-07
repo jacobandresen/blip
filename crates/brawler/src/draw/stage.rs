@@ -3,10 +3,7 @@
 
 use super::*;
 
-/// How far the backdrop is pushed back behind the fight: one scrim of air
-/// over every layer, so cranes, skyline and crowd stop competing with the
-/// fighters at full contrast. (Stages are scenery only: the same floor line,
-/// height and walls in both.)
+/// Backdrop contrast reduction keeps fighters prominent; all stages share floor, height and walls.
 pub(crate) const HAZE: f32 = 0.34;
 
 /// The current stage: its backdrop, the knockout burst if there is one, and
@@ -204,10 +201,7 @@ pub(crate) fn draw_flyby(blip: &Blip, y: f32, t: f32) {
     blip.fill_rect(bx - 2.0, by - 4.0, 4.0, 1.5, red);
 }
 
-/// THE DOCKS: sunset over a working harbour. Layers far to near (sky, cloud,
-/// skyline, far wharf and people, water, the quay), each hazed toward the sky
-/// by distance. The fighters' band is kept quiet, flat water; detail goes
-/// above their heads or below their knees.
+/// Docks layers run from sky to quay with distance haze; keep the fighter band low-detail.
 pub(crate) fn draw_dock(blip: &Blip, shake: f32, t: f32, hit: f32) {
     let hit = (hit / 0.16).clamp(0.0, 1.0);
     const HORIZON: f32 = 250.0;

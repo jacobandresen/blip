@@ -1,7 +1,4 @@
-//! A song written as data: a melody of eighth notes over two chords a bar,
-//! played by a game's own instrument (see `cosy::Voice`) over a bass line,
-//! a quiet arpeggio and soft drums. Games synthesise their songs on the
-//! device at load, so music adds code, not megabytes, to the download.
+//! Note-data songs rendered on-device with a game's instrument, bass and drums.
 //!
 //! ```ignore
 //! let tune = Song { bpm: 120.0, melody: &[[72, H, 76, H, 79, H, R, R]], chords: &[[C, G]], ..Song::DEFAULT };

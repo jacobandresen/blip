@@ -1,12 +1,8 @@
-//! Input — wraps macroquad's keyboard state with named BLIP_KEY_* constants.
-//! Games should use these constants rather than raw `KeyCode` values so the
-//! same bindings work whether the player uses arrow keys or WASD.
-//! Touch input from the web shell is translated into these same key events by shell.js,
-//! so you get mobile support for free.
+//! Shared keyboard input helpers for game code.
+//! Web touch controls feed these same key states through `shell.js`.
 
 use macroquad::input::{is_key_down, is_key_pressed, KeyCode};
 
-// Direction keys — available as both arrow keys and WASD.
 pub const BLIP_KEY_UP:      KeyCode = KeyCode::Up;
 pub const BLIP_KEY_DOWN:    KeyCode = KeyCode::Down;
 pub const BLIP_KEY_LEFT:    KeyCode = KeyCode::Left;
@@ -15,26 +11,16 @@ pub const BLIP_KEY_W:       KeyCode = KeyCode::W;
 pub const BLIP_KEY_A:       KeyCode = KeyCode::A;
 pub const BLIP_KEY_S:       KeyCode = KeyCode::S;
 pub const BLIP_KEY_D:       KeyCode = KeyCode::D;
-// Action buttons
 pub const BLIP_KEY_SPACE:   KeyCode = KeyCode::Space;  // primary fire / jump / confirm
 pub const BLIP_KEY_BUTTON2: KeyCode = KeyCode::Z;       // secondary action
-// Two more action keys, for the rare game that needs a row of them —
-// brawler puts a kick height on each. Z, X, C sit in a row on the
-// keyboard the way a cabinet's kick buttons sit in a row on the deck.
 pub const BLIP_KEY_X:       KeyCode = KeyCode::X;
 pub const BLIP_KEY_C:       KeyCode = KeyCode::C;
-// Two home-row clusters, for a game two people play at one keyboard.
-// F-G-H and J-K-L sit either side of the split a touch typist's hands
-// already make, so the player on the left and the player on the right
-// each get three buttons without reaching across each other.
 pub const BLIP_KEY_F:       KeyCode = KeyCode::F;
 pub const BLIP_KEY_G:       KeyCode = KeyCode::G;
 pub const BLIP_KEY_H:       KeyCode = KeyCode::H;
 pub const BLIP_KEY_J:       KeyCode = KeyCode::J;
 pub const BLIP_KEY_K:       KeyCode = KeyCode::K;
 pub const BLIP_KEY_L:       KeyCode = KeyCode::L;
-// The row above each of those, for a game wanting a two-by-two block
-// of buttons per player rather than a row of three.
 pub const BLIP_KEY_R:       KeyCode = KeyCode::R;
 pub const BLIP_KEY_T:       KeyCode = KeyCode::T;
 pub const BLIP_KEY_U:       KeyCode = KeyCode::U;
@@ -58,7 +44,7 @@ pub fn key_held(key: KeyCode) -> bool {
 /// up between two frames) is never "held", and would otherwise be lost.
 #[inline]
 pub fn key_active(key: KeyCode) -> bool {
-    is_key_down(key) || is_key_pressed(key) || crate::bot::held(key)
+    key_held(key) || is_key_pressed(key)
 }
 
 /// True only on the single frame the key first goes down — good for jumping or firing.

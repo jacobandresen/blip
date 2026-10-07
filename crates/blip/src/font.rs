@@ -1,7 +1,5 @@
-//! 5×7 bitmap font — each glyph is stored as seven rows of five bits.
-//! Supported characters: digits 0-9, letters A-Z (case-insensitive), and ! : - . ( ) space.
-//! The `sz` parameter in every draw function is a pixel scale multiplier:
-//! `sz=1.0` renders at 5×7 pixels, `sz=2.0` at 10×14, `sz=3.0` at 15×21, and so on.
+//! 5×7 bitmap font for digits, case-insensitive A–Z, and `! : - . ( )`.
+//! `sz` scales each pixel; at 2.0 each glyph is 10×14.
 
 use macroquad::color::Color;
 
@@ -56,6 +54,11 @@ pub const FONT: [[u8; 7]; 43] = [
     /* ) */ [0x08, 0x04, 0x02, 0x02, 0x02, 0x04, 0x08],
 ];
 
+const OUTLINE_OFFSETS: [(f32, f32); 8] = [
+    (-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0),
+    (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0),
+];
+
 fn char_to_glyph(c: char) -> Option<usize> {
     match c {
         '0'..='9' => Some((c as u8 - b'0') as usize),
@@ -75,8 +78,7 @@ fn char_to_glyph(c: char) -> Option<usize> {
 /// Draw a single character at pixel position (`x`, `y`). Unknown characters are silently skipped.
 pub fn draw_char(c: char, x: f32, y: f32, sz: f32, color: Color) {
     let Some(idx) = char_to_glyph(c) else { return };
-    for row in 0..7 {
-        let bits = FONT[idx][row];
+    for (row, bits) in FONT[idx].iter().enumerate() {
         for col in 0..5 {
             if bits & (1 << (4 - col)) != 0 {
                 fill_rect(x + col as f32 * sz, y + row as f32 * sz, sz, sz, color);
@@ -98,10 +100,7 @@ pub fn draw_text(text: &str, x: f32, y: f32, sz: f32, color: Color) {
 /// at small sizes: lettering that has to be read over a picture.
 pub fn draw_text_outlined(text: &str, x: f32, y: f32, sz: f32, color: Color, ink: Color) {
     let d = (sz * 0.5).max(1.0);
-    for (dx, dy) in [
-        (-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0),
-        (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0),
-    ] {
+    for (dx, dy) in OUTLINE_OFFSETS {
         draw_text(text, x + dx * d, y + dy * d, sz, ink);
     }
     draw_text(text, x, y, sz, color);
@@ -112,16 +111,11 @@ pub fn text_width(text: &str, sz: f32) -> f32 {
     text.chars().count() as f32 * 6.0 * sz
 }
 
-/// Draw a string as a lit neon tube: a tight one-pixel halo in `c` around a
-/// crisp near-white core, so it reads as "glowing" without smearing at
-/// small sizes (the CRT post-process widens the bloom). Costs ~10× a plain
-/// [`draw_text`] — keep it for short accent strings (a name, a label).
+/// Draw a glowing string with a one-pixel halo and near-white core.
+/// About 10× the cost of [`draw_text`]; use for short labels.
 pub fn draw_text_glow(text: &str, x: f32, y: f32, sz: f32, c: Color) {
     let halo = Color { a: c.a * 0.5, ..c };
-    for (dx, dy) in [
-        (-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0),
-        (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0), (1.0, 1.0),
-    ] {
+    for (dx, dy) in OUTLINE_OFFSETS {
         draw_text(text, x + dx, y + dy, sz, halo);
     }
     // core: mostly white with a wash of the neon colour so the tint reads

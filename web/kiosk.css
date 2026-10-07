@@ -1086,7 +1086,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 @media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
   :root[data-controls="pad"] #topbar.kiosk-bar,
   :root[data-controls="pad"] .kiosk-bar-main {
-    height: calc(134px + env(safe-area-inset-bottom, 0px));
+    height: calc(128px + env(safe-area-inset-bottom, 0px));
   }
   .snes-pad {
     --sf-btn: 64px;
@@ -2314,7 +2314,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-layout="upright"][data-controls="stick"][data-players="1"][data-caps="4"] { --cap: 54px; }
   :root[data-layout="upright"][data-controls="stick"][data-players="1"] #topbar.kiosk-bar,
   :root[data-layout="upright"][data-controls="stick"][data-players="1"] .kiosk-bar-main {
-    height: calc(128px + env(safe-area-inset-bottom, 0px));
+    height: calc(134px + env(safe-area-inset-bottom, 0px));
   }
   :root[data-layout="upright"][data-controls="stick"][data-players="1"]:not([data-open]) #deck-p2,
   :root[data-layout="upright"][data-controls="stick"][data-players="1"] #deck-p1 .arcade-btn.spare,
@@ -3337,7 +3337,6 @@ body.need-coin #kiosk-insert-btn,
   box-shadow:inset 0 1px rgba(255,255,255,.35),0 1px 3px #050404;
   transition:opacity .2s,transform .32s cubic-bezier(.2,.9,.25,1.25);
 }
-.jukebox-receiver.loaded .jukebox-seated-card {opacity:0;transform:translateY(-9px)}
 .jukebox-receiver.loaded .jukebox-receiver-lip {height:7px;box-shadow:inset 0 2px 3px #000,0 0 5px rgba(244,208,143,.35)}
 .jukebox-seated-card img {width:32px;height:24px;object-fit:cover;border:1px solid rgba(255,235,194,.62);box-shadow:0 1px 3px #080707}
 .jukebox-seated-card strong {overflow:hidden;color:#fff0d2;text-overflow:ellipsis;white-space:nowrap;font:900 9px/1 'Courier New',monospace;letter-spacing:.08em;text-shadow:0 1px #080707}

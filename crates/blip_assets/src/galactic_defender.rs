@@ -277,10 +277,7 @@ fn shield_block() -> Vec<u8> {
     img.encode_png()
 }
 
-// ---- music: two tunes on the theremin ----------------------------------
-// Synthesised on the device (see `song`). Action songs: a saw lead with
-// the theremin under it over a galloping bass; the mothership levels get
-// the faster, harder one.
+// Device-synthesized action tracks use saw lead, theremin and galloping bass; boss levels use the faster theme.
 
 const EM: Chord = minor(40);
 const AM: Chord = minor(45);

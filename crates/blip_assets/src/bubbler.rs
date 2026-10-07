@@ -1,7 +1,4 @@
-//! Bubbler — a tribute to Bubble Bobble. All of its sound is synthesised
-//! on the device at load (like Brawler's), so the game ships as code:
-//! an original bouncy chiptune theme, the round / clear / hurry / game-over
-//! jingles, and the effects.
+//! Bubbler's synthesized music and sound effects.
 
 use std::f32::consts::PI;
 

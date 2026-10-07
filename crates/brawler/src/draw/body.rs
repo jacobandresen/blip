@@ -32,12 +32,8 @@ pub(crate) fn mood_of(f: &Fighter) -> Mood {
     }
 }
 
-/// One fighter, posed and drawn. Drawing order is depth: far leg, far arm,
-/// body, head, near leg, near arm, so an attack arrives in front of the body
-/// that threw it.
-/// `shift` moves the fighter down the screen without the floor: the hit
-/// shake, and the select screen's row. Not part of `f.y`, which is where the
-/// fighter is for the rules. `shadow` is off where there is no floor.
+/// Draw one fighter in depth order: far limbs, body and head, then near limbs.
+/// `shift` affects drawing only; `shadow` disables the floor shadow.
 pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f32, i: usize, shadow: bool) {
     let a = f.arch();
     let prone = down_time(f).is_some_and(|t| t < 0.9);

@@ -1,11 +1,6 @@
-//! Native-only playtest autopilot plumbing. A game's bot calls `hold()` with
-//! the keys it wants down; the input wrappers see them as real keys.
-//!
-//! `BLIP_BOT=1` turns it on: the clock runs a fixed 1/60 s a frame (as fast
-//! as the machine renders), the run ends at the first `web::report_score`
-//! or after `BLIP_BOT_MAXT` seconds (default 600), printing one `RESULT`
-//! line with every `add`/`set` stat. `BLIP_BOT_SHOTS=dir` saves a PNG every
-//! `BLIP_BOT_SHOT_EVERY` game seconds (default 4). On wasm all of it is off.
+//! Native playtest autopilot. `BLIP_BOT=1` enables fixed 60 Hz input;
+//! `BLIP_BOT_MAXT` sets the time limit and `BLIP_BOT_SHOTS` enables screenshots.
+//! Disabled on wasm.
 
 use macroquad::input::KeyCode;
 

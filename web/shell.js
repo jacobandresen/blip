@@ -1,11 +1,7 @@
 (function () {
 'use strict';
 
-// ---- Zoom lock ----------------------------------------------------------
-// Every touch on a game page is game input. `body { touch-action: none }`
-// (shell.css) stops pan and double-tap zoom; iOS Safari still starts a pinch
-// zoom from a two-finger gesture (a thumb on fire and one on the cross
-// drifting apart), so swallow those.
+// Game-page touches are input; iOS still pinches to zoom despite `touch-action: none`.
 ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) {
   document.addEventListener(t, function (e) { e.preventDefault(); }, { passive: false });
 });
@@ -17,6 +13,8 @@ window.alert = function (msg) { try { console.error('[blip] ' + msg); } catch (e
 var TOPBAR_H   = 56;
 var MARQUEE_H  = 94; // marquee and the card receiver beneath it
 var CABINET_SCREEN = new URLSearchParams(location.search).get('cabinet') === '1';
+var GAME = (typeof blipGameFromPath === 'function')
+  ? blipGameFromPath(location.pathname) : null;
 if (CABINET_SCREEN) document.documentElement.setAttribute('data-cabinet-screen','');
 var FRAME_PAD  = 14; // matches the cabinet screen's inset below the Rolodex
 
@@ -34,8 +32,7 @@ function returnToCabinet(event) {
   if (event) event.preventDefault();
   if (CABINET_SCREEN || returningToCabinet) return;
   returningToCabinet = true;
-  var game = blipGameFromPath(location.pathname);
-  var departure = { slug:game && game.slug, at:Date.now() };
+  var departure = { slug:GAME && GAME.slug, at:Date.now() };
   try { departure.frame = canvas.toDataURL('image/png'); } catch (e) {}
   try { sessionStorage.setItem('blip-cabinet-return', JSON.stringify(departure)); } catch (e) {}
   location.href = '../index.html';
@@ -45,7 +42,7 @@ function returnToCabinet(event) {
 // Built here rather than in each game's HTML.
 (function () {
   if(CABINET_SCREEN) return;
-  var game = (typeof blipGameFromPath === 'function') ? blipGameFromPath(window.location.pathname) : null;
+  var game = GAME;
   if (!game) return;
   document.documentElement.style.setProperty('--cab', game.accent);
   var bar = document.createElement('div');
@@ -153,11 +150,8 @@ function markGameLoaded(game, bar) {
   if(!receiver.classList.contains('loaded'))blipSeatRom(receiver,{name:game.name,art:'screenshot.png'});
 }
 
-// ---- Touch control feedback ----
-// A felt detent the instant a control catches: a Vibration-API buzz on
-// Android; iOS has neither that nor Taptic access, so a ~40 ms sub-bass burst
-// instead. Touch devices only, and never on the coin overlay.
-var HAS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+// Control detents use vibration where supported, otherwise a 40 ms sub-bass pulse.
+var HAS_TOUCH = blipHasTouch();
 function feedbackTick() {
   if (!HAS_TOUCH || overlay.classList.contains('visible')) return;
   if (navigator.vibrate) {
@@ -240,18 +234,12 @@ window.blipSpendCoin = function () {
 window.blipGameOver = function (score) {
   if (getCoins() <= 0) overlay.classList.add('visible');
   if (!window.blipScores) return;
-  var game = (typeof blipGameFromPath === 'function')
-    ? blipGameFromPath(window.location.pathname) : null;
-  window.blipScores.onGameOver(game ? game.slug : null, score);
+  window.blipScores.onGameOver(GAME ? GAME.slug : null, score);
 };
 
-// Called from WASM (title / game-over screens): the leading score and its
-// holder. Prefers the leaderboard #1 blip_scores.js caches in
-// 'blip-top-<slug>', else this browser's best ('blip-best-<slug>') with the
-// claimed handle ('blip-handle').
+// Return the leaderboard entry, or this browser's best and claimed handle.
 function blipTopEntry() {
-  var game = (typeof blipGameFromPath === 'function')
-    ? blipGameFromPath(window.location.pathname) : null;
+  var game = GAME;
   if (!game) return null;
   try {
     var raw = localStorage.getItem('blip-top-' + game.slug);
@@ -321,7 +309,6 @@ document.getElementById('insert-coin-btn').addEventListener('click', function ()
   if (returningToCabinet) return;
   if (getCoins() >= MAX_COINS) playNoRoom();
   else coinIn();
-  returnToCabinet();
 });
 
 // Mirror the overlay onto <body> (body.need-coin lights the coin button).
@@ -429,7 +416,7 @@ function fillCanvas() {
   if (!bare && !landscape() && bezel) {
     // Match the landing page's panel boundary, including the 1px bezel border.
     bezel.style.setProperty('--cabinet-panel-depth',
-      Math.max(0, innerHeight - tb.getBoundingClientRect().top) + 'px');
+      TOPBAR_H + 'px');
     var frame = bezel.getBoundingClientRect();
     gl = frame.left + screenInset;
     screenTop = frame.top + screenInset;
@@ -459,10 +446,7 @@ function syncBuffer() {
   try { window.onresize(); } catch (e) { /* the game has not loaded yet */ }
 }
 
-/** Re-fit only when something actually changed. The deck is watched by
- * a ResizeObserver and fillCanvas writes --topbar-h, which the deck's
- * own children read — so an unguarded re-fit can feed itself and the
- * picture flickers between two sizes. */
+/** Re-fit only when inputs change; deck observation and `--topbar-h` writes otherwise form a resize loop. */
 function refit() {
   var key = [window.innerWidth, window.innerHeight, TOPBAR_H, MARQUEE_H,
              canvas.style.width, canvas.style.height].join('|');
@@ -564,11 +548,7 @@ canvas.addEventListener('webglcontextlost', function (e) {
   }, 1200);
 }, false);
 
-// ---- On-screen controls ----
-// The pad (default) or the arcade stick, plus keyboard and gamepad, all go
-// through BlipController (blip_controller.js), which turns each press into a
-// synthetic KeyboardEvent on #glcanvas, so the games are untouched. Rally's
-// dials use its bindDial().
+// Pad, stick, keyboard and gamepad presses become canvas key events via BlipController; Rally uses bindDial().
 
 var isRally = window.location.pathname.indexOf('/rally/') !== -1;
 
@@ -586,20 +566,20 @@ var isRally = window.location.pathname.indexOf('/rally/') !== -1;
 
 // Block the real keyboard from reaching the game while the coin wall is up.
 // Not the high-score prompt's: its Enter and Escape are for the name field.
-// Pressing 5 explicitly inserts a coin; game controls never add credits.
+// Fire, Enter and 5 insert a coin at the wall; controls never add credit during play.
 window.addEventListener('keydown', function (e) {
   if(document.querySelector('.blip-hs-modal'))return;
   var wall = overlay.classList.contains('visible');
-  var coinKey=e.key==='5';
+  var coinKey = e.key === '5' || (wall && (e.key === ' ' || e.key === 'Enter'));
+  var muteKey = e.key === 'm' || e.key === 'M';
   // isTrusted: the deck and a gamepad send synthetic keys, gated elsewhere.
   if (coinKey && !e.repeat && e.isTrusted && getCoins() < MAX_COINS) coinIn();
-  if (wall) e.stopImmediatePropagation();
+  if (wall && !coinKey && !muteKey) e.stopImmediatePropagation();
 }, true);
 
 (function () {
   if(CABINET_SCREEN) return;
-  var game = (typeof blipGameFromPath === 'function')
-    ? blipGameFromPath(window.location.pathname) : null;
+  var game = GAME;
   var buttonSpecs = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
   var primary = buttonSpecs[0] || { key: ' ', code: 'Space' };
   // deck.js has built the deck (two stations, stick and pad each, caps from
@@ -737,12 +717,8 @@ window.addEventListener('keydown', function (e) {
     if (typeof fillCanvas === 'function') fillCanvas();
   };
 
-  // ---- Touch play ----
-  // With TOUCH chosen, a finger anywhere but a button (the strip, the picture,
-  // the bezel) plays. 'drag' and 'paddles' hand finger positions to the game
-  // (blip_touch_* in blip_bridge.js); 'swipe' taps arrow keys. Serpent's
-  // picture takes finger swipes whatever controller is chosen. Touch screens
-  // only; a touchscreen laptop's mouse can hover-play the trackpad too.
+  // Touch drag/paddles send positions; swipe sends keys. Serpent accepts picture swipes in every mode.
+  // Touch screens only; a touchscreen laptop's mouse may hover-play the trackpad.
   function bindTouchPlay() {
     var none = { release: function () {}, resync: function () {} };
     if (!touchSpec || !blipHasTouch()) return none;
@@ -916,10 +892,8 @@ window.addEventListener('keydown', function (e) {
     window.addEventListener('pointerdown', noteInput, true);
     window.addEventListener('pointermove', noteInput, true);
 
-    // ---- Platform (Bubbler): one surface. Every touch blows a bubble the
-    // moment it lands (a tap judged on release missed whenever the thumb
-    // slid or lingered), a slide runs (the anchor trails the thumb), a swipe
-    // up jumps. Presses go through BlipController, onto the player's keys.
+    // Touch-down blows a bubble (release missed drags); slides run and upward flicks jump.
+    // Player-two gestures use the right half; BlipController injects the keys.
     var RUN_PX = 10, FLICK_PX = 20, LEASH_PX = 28;
     var plat = {};                     // pointerId -> { who, x0, y0, dir }
     // Once player two is in, the right half (of the trackpad, or of the
@@ -1109,7 +1083,7 @@ window.addEventListener('keydown', function (e) {
     var dialP1 = document.getElementById('paddle-dial');
     var dialP2 = document.getElementById('paddle-dial-p2');
 
-    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+    if (blipHasTouch()) {
       var rallyMode = null;               // null = title, 0 = 1P, 1 = 2P
       var applyMode = function (m) { rallyMode = m; window.blipSetMode(m); };
 

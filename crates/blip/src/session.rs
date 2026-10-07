@@ -1,7 +1,5 @@
-//! Session — tracks score, lives, and level for a single play session.
-//!
-//! Create one in `Game::new()` via [`Session::new`], and call [`Session::reset`]
-//! at the start of each game to zero the score.
+//! Score, lives and level state for one play session.
+//! Call `reset` to start a new game.
 
 /// Returned by [`Session::lose_life`] so callers can branch cleanly without
 /// inspecting the lives count themselves.

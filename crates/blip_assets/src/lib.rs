@@ -1,9 +1,5 @@
-//! Asset generation for blip games.
-//!
-//! Each game module exposes `generate()` returning a list of
-//! `(relative_path, bytes)`. The build.rs of each game crate writes
-//! these into `$OUT_DIR/assets/...` and the game embeds them with
-//! `include_bytes!`.
+//! Build-time asset generators for the BLIP games.
+//! Each `generate()` returns `(relative_path, bytes)` pairs for the crate's `build.rs`.
 
 use std::fs;
 use std::path::Path;

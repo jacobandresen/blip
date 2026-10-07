@@ -14,10 +14,8 @@ pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
 }
 
-/// Wrap `v` into the half-open interval `[lo, hi)`.
-///
-/// Values may be more than one span outside the interval. If `hi <= lo`,
-/// returns `lo` because the interval has no positive span.
+/// Wrap `v` into `[lo, hi)`, including values multiple spans away.
+/// Returns `lo` when `hi <= lo`.
 #[inline]
 pub fn wrap(v: f32, lo: f32, hi: f32) -> f32 {
     let span = hi - lo;

@@ -1,4 +1,4 @@
-//! Bouncer (Breakout), Rust port of `games/bouncer/main.c` on macroquad.
+//! Breakout-inspired brick breaker.
 
 use std::f32::consts::PI;
 
@@ -78,10 +78,7 @@ const SPEED_INC: f32 = 7.0;
 // Taken off the ramp when a life is lost, so the new ball is catchable.
 const SPEED_LIFE_RELIEF: f32 = 60.0;
 
-// ---- screwball spin -----------------------------------------------------
-// Hitting the ball while the paddle is moving fast puts a spin on it — the
-// faster the paddle, the sharper the curve. A stationary or slow-moving
-// paddle produces a plain straight shot.
+// Paddle velocity adds spin; faster movement creates a sharper curve.
 const SCREW_MIN_PAD_SPEED: f32 = 30.0; // below this, no spin at all
 const SCREW_MAX_SPIN_RATE: f32 = 1.3;  // radians/sec of curve at full paddle speed
 const SCREW_SPIN_DECAY: f32 = 0.9;     // spin bleeds off per second of flight
@@ -90,20 +87,13 @@ const SCREW_SPIN_DECAY: f32 = 0.9;     // spin bleeds off per second of flight
 // heading the "wrong" way.
 const SCREW_MAX_CURVE: f32 = 0.75; // radians (~43 degrees)
 
-// ---- pull ----------------------------------------------------------------
-// The ball keeps pulling the way it is heading vertically, harder the
-// flatter it flies, so a shot that would ping-pong wall to wall steepens
-// within a second instead. A screwball also gathers speed along its path
-// while it flies. The paddle and bricks set the speed back on the ramp.
+// Vertical pull steepens flat shots; screwballs gain speed until a paddle or brick resets it.
 const PULL: f32 = 70.0;          // px/s^2 along vy
 const PULL_FLAT: f32 = 260.0;    // extra when |vy| is under 40% of the speed
 const SCREW_GAIN: f32 = 0.18;    // fraction of speed gained per second, spinning
 const PULL_CAP: f32 = 1.3;       // times BALL_SPEED_MAX, whatever the pull
 
-// ---- seeking ---------------------------------------------------------------
-// The last few bricks of a level could take minutes to hit (a playtest bot
-// spent 190 s on the final three). After this long without breaking one, a
-// rising ball glows and bends gently toward the nearest brick.
+// A playtest took 190s to hit the last three bricks; after a delay, rising balls seek the nearest brick.
 const SEEK_AFTER: f32 = 5.0;
 const SEEK_RATE: f32 = 1.5; // radians/sec of bend at most
 
@@ -254,7 +244,7 @@ impl Game {
                     1 => (r + c) % 2 == 0,                                 // checkerboard
                     2 => dist <= 3.0,                                      // diamond
                     3 => dist <= (r + 1) as f32,                           // pyramid, narrow at top
-                    4 => c < 2 || c >= BRICK_COLS - 2,                     // two side pillars
+                    4 => !(2..BRICK_COLS - 2).contains(&c),                // two side pillars
                     5 => r % 2 == 0,                                       // horizontal stripes
                     6 => r == 0 || r == BRICK_ROWS - 1 || c == 0 || c == BRICK_COLS - 1, // hollow border
                     _ => {                                                 // X shape
@@ -744,17 +734,14 @@ fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds, blasted: bool) 
         g.fx.burst(mx, my, 18, 200.0, BRICK_COLORS[BRICK_BOMB]);
         for (dr, dc) in [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)] {
             let (r, c) = (row + dr, col + dc);
-            if r < 0 || r >= BRICK_ROWS || c < 0 || c >= BRICK_COLS { continue; }
+            if !(0..BRICK_ROWS).contains(&r) || !(0..BRICK_COLS).contains(&c) { continue; }
             let j = (r * BRICK_COLS + c) as usize;
             if g.bricks[j].alive { break_brick(g, j, speed, sfx, true); }
         }
     }
 }
 
-/// Circle-vs-rectangle against the brick grid — one contact per call. The
-/// bounce normal is the direction from the closest point on the brick to the
-/// ball's centre, so a glancing hit on a brick's corner deflects along the
-/// real diagonal instead of snapping to a pure horizontal / vertical bounce.
+/// Resolve one ball/brick contact using the closest-point normal for corner hits.
 fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
     let (cx, cy, rad) = ball_circle(g);
 

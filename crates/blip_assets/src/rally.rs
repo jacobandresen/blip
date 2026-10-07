@@ -15,10 +15,7 @@ const BARS: usize = 16;
 const LIFT_BAR: usize = BARS / 2;
 const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
 
-/// A driving arcade-rally loop: four-on-the-floor kick, backbeat claps, tight
-/// hats, a galloping bass and one hook over an Em-Am vamp (answered on each
-/// fourth bar, phrase_note). The back half adds an octave-up harmony and a
-/// hat roll.
+/// Four-on-the-floor rally loop with Em–Am hook, octave harmony and a final hat roll.
 pub fn music() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let step_ms = 60_000.0 / BPM / 4.0;
@@ -81,10 +78,7 @@ pub fn music() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-/// Turbo Boost: faster and punchier than the title loop — a syncopated bass
-/// hit pattern (landing off the beat in places, not the steady gallop) and
-/// a bright `lead_stab` hook instead of `supersaw`, in a different key so
-/// it doesn't just read as the title loop sped up.
+/// Turbo Boost: syncopated bass and bright `lead_stab` hook in a new key.
 pub fn music2() -> Vec<u8> {
     const BPM: f32 = 146.0;
     const STEPS_PER_BAR: usize = 16;
@@ -138,10 +132,7 @@ pub fn music2() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-/// Night Circuit: a laid-back cruising cut — half-time kick, long held bass
-/// notes instead of a moving line, and a slow, spaced-out `lead_stab`
-/// motif — the breather in Rally's rotation, deliberately roomier than the
-/// other four rather than another up-tempo racer.
+/// Night Circuit: half-time kick, held bass notes and a spaced `lead_stab` motif.
 pub fn music3() -> Vec<u8> {
     const BPM: f32 = 108.0;
     const STEPS_PER_BAR: usize = 16;
@@ -190,10 +181,7 @@ pub fn music3() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-/// Photo Finish: built around one big finish — a `riser` sweeps through the
-/// last two bars into a hard cut back to the top, the closest thing Rally's
-/// rotation has to an obvious "drop" moment, for the lap where the race is
-/// close.
+/// Photo Finish: a `riser` builds through the last two bars before a hard cut to the top.
 pub fn music4() -> Vec<u8> {
     const BPM: f32 = 140.0;
     const STEPS_PER_BAR: usize = 16;
@@ -249,10 +237,7 @@ pub fn music4() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-/// Pit Stop Groove: a funkier cut than the others — the bassline lands off
-/// the beat instead of four-on-the-floor-locked, and a call-and-response
-/// `lead_stab` hook (one phrase answered by a second) instead of one riff
-/// repeated verbatim.
+/// Pit Stop Groove: syncopated bass and a call-and-response `lead_stab` hook.
 pub fn music5() -> Vec<u8> {
     const BPM: f32 = 122.0;
     const STEPS_PER_BAR: usize = 16;

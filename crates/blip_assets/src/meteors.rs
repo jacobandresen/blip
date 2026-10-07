@@ -5,10 +5,7 @@ use crate::cosy::{self, Tone, Voice, H};
 use crate::song::{major, minor, Chord, Groove, Song, R};
 use crate::Asset;
 
-// ---- music: two tunes on glass --------------------------------------------
-// Synthesised on the device (see `song`). E lydian, whose raised fourth
-// (A sharp) sounds like floating; DRIFT plays the first waves, STORM from
-// wave 5.
+// Two device-synthesized E Lydian tracks: DRIFT for early waves, STORM from wave 5.
 
 const E: Chord = major(40);
 const FS: Chord = major(42);

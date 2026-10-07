@@ -60,6 +60,7 @@ export function wrapPage(page, engineName = 'unknown') {
         return { data: (await page.screenshot(options)).toString('base64') };
       }
       if (method === 'Input.dispatchKeyEvent') return params.type === 'keyDown' ? page.keyboard.down(params.key) : page.keyboard.up(params.key);
+      if (method === 'Input.insertText') return page.keyboard.insertText(params.text);
       if (method === 'Input.dispatchMouseEvent') return page.mouse.move(params.x, params.y);
       if (method === 'Input.dispatchTouchEvent') {
         if (params.type === 'touchStart' && params.touchPoints?.[0]) return page.touchscreen.tap(params.touchPoints[0].x, params.touchPoints[0].y);

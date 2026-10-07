@@ -1,10 +1,4 @@
-//! Audio — load sounds at startup, play them synchronously during the game loop.
-//!
-//! The basic pattern for every game:
-//! 1. At startup (inside `async fn main`), load each sound with `load_sound()` or `beep()`.
-//! 2. Store the returned `BlipSound` handles somewhere (usually a `Sounds` struct).
-//! 3. Call `play_sfx()`, `play_music()`, or `play_ambient()` whenever you need them — these
-//!    are synchronous and can be called freely inside the game loop.
+//! Load sounds at startup and play them synchronously during the game loop.
 
 use std::f32::consts::PI;
 use std::sync::Mutex;
@@ -36,68 +30,47 @@ pub fn play_sfx_volume(s: &BlipSound, volume: f32) {
 }
 
 static CURRENT_MUSIC: Mutex<Option<Sound>> = Mutex::new(None);
-
-/// Start looping background music. Replaces any currently playing music.
-/// Volume is set to 0.7 — up front in the mix, not background wallpaper.
-pub fn play_music(s: &BlipSound) {
-    stop_music();
-    play_sound(s, PlaySoundParams { looped: true, volume: 0.7 });
-    if let Ok(mut guard) = CURRENT_MUSIC.lock() {
-        *guard = Some(s.clone());
-    }
-}
-
-pub fn stop_music() {
-    if let Ok(mut guard) = CURRENT_MUSIC.lock() {
-        if let Some(s) = guard.take() {
-            stop_sound(&s);
-        }
-    }
-}
-
 static CURRENT_AMBIENT: Mutex<Option<Sound>> = Mutex::new(None);
-
-/// Start looping ambient sound (e.g. wind, ocean). Quieter than music at volume 0.18.
-pub fn play_ambient(s: &BlipSound) {
-    stop_ambient();
-    play_sound(s, PlaySoundParams { looped: true, volume: 0.18 });
-    if let Ok(mut guard) = CURRENT_AMBIENT.lock() {
-        *guard = Some(s.clone());
-    }
-}
-
-pub fn stop_ambient() {
-    if let Ok(mut guard) = CURRENT_AMBIENT.lock() {
-        if let Some(s) = guard.take() {
-            stop_sound(&s);
-        }
-    }
-}
-
 static CURRENT_ALERT: Mutex<Option<Sound>> = Mutex::new(None);
 
-/// Start looping an attention-grabbing alert sound (e.g. a boss/UFO siren)
-/// layered over the music and ambient channels — loud enough to stand out.
-pub fn play_alert(s: &BlipSound) {
-    stop_alert();
-    play_sound(s, PlaySoundParams { looped: true, volume: 0.55 });
-    if let Ok(mut guard) = CURRENT_ALERT.lock() {
-        *guard = Some(s.clone());
+fn play_loop(current: &Mutex<Option<Sound>>, sound: &BlipSound, volume: f32) {
+    stop_loop(current);
+    play_sound(sound, PlaySoundParams { looped: true, volume });
+    if let Ok(mut guard) = current.lock() {
+        *guard = Some(sound.clone());
     }
 }
 
-pub fn stop_alert() {
-    if let Ok(mut guard) = CURRENT_ALERT.lock() {
-        if let Some(s) = guard.take() {
-            stop_sound(&s);
+fn stop_loop(current: &Mutex<Option<Sound>>) {
+    if let Ok(mut guard) = current.lock() {
+        if let Some(sound) = guard.take() {
+            stop_sound(&sound);
         }
     }
 }
 
-/// Synthesize a short beep as a `BlipSound` (no WAV file): `freq` in Hz,
-/// `duration_ms` long. Await at startup; replay freely with `play_sfx`.
-/// A fundamental with a soft third harmonic and a touch of tanh saturation, a
-/// fast attack and a slight downward drift.
+/// Start looping music at volume 0.7, replacing the current track.
+pub fn play_music(s: &BlipSound) {
+    play_loop(&CURRENT_MUSIC, s, 0.7);
+}
+
+pub fn stop_music() { stop_loop(&CURRENT_MUSIC); }
+
+/// Start looping ambient sound at volume 0.18.
+pub fn play_ambient(s: &BlipSound) {
+    play_loop(&CURRENT_AMBIENT, s, 0.18);
+}
+
+pub fn stop_ambient() { stop_loop(&CURRENT_AMBIENT); }
+
+/// Start a looping alert at volume 0.55, layered over music and ambient sound.
+pub fn play_alert(s: &BlipSound) {
+    play_loop(&CURRENT_ALERT, s, 0.55);
+}
+
+pub fn stop_alert() { stop_loop(&CURRENT_ALERT); }
+
+/// Synthesize a beep at `freq` Hz for `duration_ms`; load it at startup.
 pub async fn beep(freq: f32, duration_ms: f32) -> BlipSound {
     load_sound(&synth_beep_wav(freq, duration_ms)).await
 }
@@ -149,10 +122,7 @@ fn encode_wav(sample_rate: u32, samples: &[i16]) -> Vec<u8> {
     out
 }
 
-/// A game's music: tracks synthesised on the device from `fn() -> Vec<u8>`
-/// WAV makers. `start` renders the first one wanted; the rest wait until
-/// `warm_up` is called on a screen where a short stall is harmless (a title
-/// or a pause), so loading never renders every track up front.
+/// Synthesizes tracks from WAV makers on demand; call `warm_up` on a screen where a short stall is harmless.
 pub struct Jukebox {
     makers: Vec<fn() -> Vec<u8>>,
     tracks: Vec<Option<(BlipSound, f32)>>,

@@ -1,10 +1,5 @@
-//! Renders every game's music to WAV files, to listen to a change without
-//! starting the game, and prints how long each takes to synthesise (the
-//! games do this on the device, so it is load time):
-//!
-//! ```text
-//! cargo run --release -p blip_assets --example render_music -- /tmp/music
-//! ```
+//! Render every game's music to WAV and report synthesis time.
+//! Run with `cargo run --release -p blip_assets --example render_music -- /tmp/music`.
 
 use std::time::Instant;
 

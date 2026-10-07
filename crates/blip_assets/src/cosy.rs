@@ -4,7 +4,7 @@
 
 use std::f32::consts::PI;
 
-use crate::wav::{warm, Rng, MIX_KNEE};
+use crate::wav::{fade_out as fade_out_samples, warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, encode_pcm16_music, soft_limit_to_pcm16, SAMPLE_RATE};
 
 pub const SR: f32 = SAMPLE_RATE as f32;
@@ -28,12 +28,7 @@ pub fn tri(phase: f32) -> f32 {
     4.0 * (p - 0.5).abs() - 1.0
 }
 
-/// Lead (pulse and sine, vibrato, quick attack, gentle decay), bass
-/// (triangle with a pulse edge), arpeggio blip, or bell: Bubbler's band.
-/// The rest give each game its own instrument in the same warm family:
-/// marimba (Serpent), glockenspiel (Bouncer), theremin (Defender), glass
-/// (Meteors) and pluck (Rally). Saw and growl are the action songs' lead and
-/// bass: detuned sawtooths with their edge left on.
+/// Instruments for each game's warm synthesized music; Saw and Growl are the action-game leads.
 #[derive(Clone, Copy)]
 pub enum Voice { Lead, Bass, Arp, Bell, Marimba, Glock, Theremin, Glass, Pluck, Saw, Growl }
 
@@ -172,9 +167,7 @@ pub fn run(notes: &[i32], step: f32, v: Voice, vol: f32) -> Vec<f32> {
 
 /// Fade the last `secs` to silence, so a cut-off ring never clicks.
 pub fn fade_out(buf: &mut [f32], secs: f32) {
-    let n = ((secs * SR) as usize).min(buf.len());
-    let len = buf.len();
-    for i in 0..n { buf[len - n + i] *= 1.0 - (i + 1) as f32 / n as f32; }
+    fade_out_samples(buf, (secs * SR) as usize);
 }
 
 /// The tone a sweep is drawn with.

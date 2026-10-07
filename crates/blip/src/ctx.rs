@@ -1,9 +1,5 @@
-//! The `Blip` context — the central object every game creates once and holds for its lifetime.
-//!
-//! `Blip` owns the virtual canvas (a fixed-size render target), drives the frame loop,
-//! and applies the CRT post-process effect (scanlines, glitch tears, chromatic aberration,
-//! and a curved-glass shader pass) when blitting to the real window. Games interact with it
-//! through its drawing methods and `blip.delta_time`.
+//! Central game context: fixed-size canvas, frame loop and CRT post-processing.
+//! Games draw through `Blip` and read `delta_time` each frame.
 
 use macroquad::camera::{set_camera, Camera2D};
 use macroquad::color::{Color, WHITE};
@@ -47,15 +43,8 @@ impl Lcg {
     }
 }
 
-// ----------------------------------------------------------------------------
-// //
-// Curved-glass shader
-// //
-// ----------------------------------------------------------------------------
-// //
-// The flat composite (frame + glitch + scanlines) is drawn offscreen, then
-// blitted through this: bowed into a convex tube, phosphor bloom, corners
-// falling into the bezel, a faint glare. GLSL ES 1.00 for WebGL 1.
+// Curved-glass shader, GLSL ES 1.00 for WebGL 1.
+// Applied to the flat composite for curvature, bloom, vignette and glare.
 
 /// CPU twin of the shader's `curve()`: screen UV -> the picture UV drawn there.
 fn crt_curve(p: macroquad::math::Vec2) -> macroquad::math::Vec2 {
@@ -188,10 +177,7 @@ uniform float FieldDim;       // brightness of the fading field's rows (Blip::se
 void main() {
     vec3 col = texture2D(Texture, uv).rgb;
 
-    // Rows alternate between a light shadow (this frame's field) and a heavy
-    // dim (the other field fading); swapping each frame gives the interlace
-    // flicker. composite() passes InterlaceField already corrected for the
-    // bound target.
+    // Alternate light and dark fields each frame; `composite` corrects parity for the target.
     float parity = mod(floor(gl_FragCoord.y), 2.0);
     float dim = (parity == InterlaceField) ? FieldDim : (1.0 - 60.0 / 255.0);
     col *= dim;
@@ -240,10 +226,7 @@ pub struct Blip {
     screen_rt_w: i32,
     screen_rt_h: i32,
     // ---- adaptive render quality ----
-    // Old iPads cannot sustain the full CRT pass, so if frame time stays bad
-    // the effects step down a level and stay there (catches thermal
-    // throttling and Low Power Mode too).
-    //   0 = full   1 = no curved-glass shader   2 = also no scanlines/noise
+    // Sustained slow frames step quality down: 0 full, 1 no CRT curve, 2 no scanlines or noise.
     fx_level:      u8,
     fx_settle:     u8,  // frames to ignore after startup / a level change
     fx_slow_accum: f32, // seconds run slow at the current level
@@ -599,11 +582,8 @@ impl Blip {
         gl_use_default_material();
     }
 
-    /// Composite the frame with the glitch effects and scanlines into the
-    /// bound target at `(vx, vy)`, size `(vw, vh)`. `offscreen_target` is
-    /// true when an FBO is bound (the curved-glass pass): gl_FragCoord.y's
-    /// row parity is flipped there, so the flag keeps the scanlines on the
-    /// same physical rows.
+    /// Composite glitch effects and scanlines into `(vx, vy, vw, vh)`.
+    /// `offscreen_target` corrects scanline parity, which flips for FBOs.
     fn composite(&mut self, vx: f32, vy: f32, vw: f32, vh: f32, offscreen_target: bool) {
         let lw = self.width  as f32;
         let lh = self.height as f32;
@@ -634,11 +614,7 @@ impl Blip {
                 DrawTextureParams { dest_size: Some(vec2(vw, vh)), ..Default::default() });
         }
 
-        // ---- main image (roll or tear applied), scanlines folded in ----
-        // The screen camera has y=0 at the top, so Rect(0, a, lw, b) is game
-        // rows a..a+b. The scanline shader works in gl_FragCoord, so it dims
-        // correctly whether the image is one draw or roll/tear's several
-        // strips.
+        // The top-origin screen camera and `gl_FragCoord` keep scanlines aligned across roll/tear strips.
         let scanline_shader_active = self.fx_level < 2 && self.scanline.is_some();
         if scanline_shader_active {
             let scanline = self.scanline.as_ref().unwrap();
@@ -699,10 +675,7 @@ impl Blip {
         }
         if scanline_shader_active { gl_use_default_material(); }
 
-        // ---- scanlines: fallback ----
-        // Only when the scanline shader failed to compile: a rectangle per
-        // row (active field a light shadow, inactive heavily dimmed, flipping
-        // each frame). Level 2 skips it.
+        // If shader compilation failed, draw scanlines as row rectangles. Quality level 2 skips them.
         if self.fx_level < 2 && self.scanline.is_none() {
             let active   = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
             let inactive = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 - self.field_dim };
@@ -871,11 +844,8 @@ impl Blip {
         font::draw_centered(self.width, text, y, sz, color);
     }
 
-    /// The three-field HUD across the top: SCORE (left), the leading score
-    /// and its holder (centre, the name glowing), LIVES (right). The centre
-    /// field needs a known high score (from the shell, see
-    /// [`crate::web::high_score`]; none natively) and is clipped to the gap
-    /// between the other two.
+    /// Draw SCORE, the leading score and holder, and LIVES across the top.
+    /// The high-score field is clipped between the left and right fields.
     pub fn draw_hud(&self, score: i32, lives: i32) {
         let hud_h = 28.0;
         // Text baseline: low enough in the bar that the curved-glass shader's
@@ -887,9 +857,7 @@ impl Blip {
         );
 
         // ---- SCORE, left ----
-        // In from the edge by 1.2% of the width: the shell clips 3 screen px
-        // off the canvas, which on a phone showing a 680px game at half size
-        // is 6px of the picture, and took half the S.
+        // The shell clips 3 screen pixels; at half scale that removes 6 game pixels.
         let x0 = (self.width as f32 * 0.012).max(4.0).round();
         self.draw_text("SCORE", x0, ty, 2.0, BLIP_YELLOW);
         self.draw_number(score, x0 + 64.0, ty, 2.0, BLIP_WHITE);
@@ -961,10 +929,8 @@ impl Blip {
         }
     }
 
-    /// The game-over screen every game shares: GAME OVER in `headline`, the
-    /// score, the best-score line (NEW BEST! in `best`), and PRESS FIRE in
-    /// `prompt` once `ready` (see [`crate::GAME_OVER_MIN_WAIT`]). Draws over
-    /// what is there, so a game can paint its own backdrop first.
+    /// Draw the shared game-over screen over the game's chosen backdrop.
+    /// `ready` controls PRESS FIRE after [`crate::GAME_OVER_MIN_WAIT`].
     pub fn draw_game_over(&self, score: i32, hi: &crate::web::HighScore, headline: Color, best: Color, prompt: Color, ready: bool) {
         let h = self.height as f32;
         self.draw_centered("GAME OVER", h / 4.0, 5.0, headline);

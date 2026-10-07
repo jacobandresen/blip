@@ -1,12 +1,6 @@
-/* The control deck: one builder for every page (landing, info pages and
- * games), so the bar is the same equipment everywhere. Pages carry an empty
- * <div class="deck-panel"> and load this after the bar; a game page gets its
- * caps, labels and player count from BLIP_GAMES, the others get the default
- * two-cap deck. Wiring (touch, keyboard, card navigation) stays with the page.
- *
- * Every deck has two stations, each an arcade stick or a pad (cross) with
- * two caps: a player never gets more. A cap the game does not use is
- * `spare`, inert and hidden; station two is inert unless the game seats two. */
+/* Shared control-deck builder; game pages configure it through BLIP_GAMES.
+ * Each station has a stick or pad and at most two caps; unused caps are hidden.
+ * Station two is inert unless the game supports two players. */
 (function () {
   var panel = document.querySelector('.deck-panel');
   if (!panel || document.getElementById('deck-p1')) return;

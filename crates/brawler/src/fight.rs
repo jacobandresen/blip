@@ -1,7 +1,4 @@
-//! One frame of a round. `step_fight` is the whole of it, given what each
-//! side is pressing: movement, specials, blows both ways, the called
-//! turtles, projectiles and the bell. `update_fight` reads the keys (or asks
-//! the bot and the CPU) and calls it.
+//! Round simulation: `update_fight` reads inputs; `step_fight` advances one frame.
 
 use super::*;
 
@@ -69,10 +66,7 @@ pub(crate) fn clash_bolts(g: &mut Game) -> Option<(f32, f32)> {
     None
 }
 
-/// Fighter `i` has just touched down. If that was a rage jump the floor
-/// shakes, and the other fighter, if standing on it, goes down wherever they
-/// are. Returns whether the floor shook. A jump ended by being hit is not a
-/// landing.
+/// Resolve a rage-jump landing; a jump ended by a hit does not trigger the quake.
 pub(crate) fn land_quake(g: &mut Game, i: usize) -> bool {
     let stomp = std::mem::take(&mut g.p[i].stomp);
     if !stomp || !matches!(g.p[i].act, Act::Idle | Act::Attack) { return false; }
@@ -99,6 +93,23 @@ pub(crate) fn drain_ghosts(g: &mut Game, dt: f32) {
     }
 }
 
+pub(crate) fn tick_sparks(g: &mut Game, dt: f32) {
+    for s in &mut g.hitspark {
+        if s.ttl > 0.0 { s.ttl -= dt; }
+    }
+}
+
+fn tick_pops(g: &mut Game, dt: f32) {
+    for p in &mut g.pops {
+        if p.ttl > 0.0 { p.ttl -= dt; }
+    }
+}
+
+fn tick_hit_effects(g: &mut Game, dt: f32) {
+    tick_sparks(g, dt);
+    tick_pops(g, dt);
+}
+
 /// One frame of a round for the keys (or the bot) against the CPU or a
 /// second player.
 pub(crate) fn update_fight(g: &mut Game, dt: f32) {
@@ -121,7 +132,7 @@ pub(crate) fn update_fight(g: &mut Game, dt: f32) {
 /// round does not lose time to the impacts that make it worth watching.
 fn hold_frame(g: &mut Game, dt: f32) {
     g.hitstop -= dt;
-    for s in g.hitspark.iter_mut() { if s.ttl > 0.0 { s.ttl -= dt; } }
+    tick_sparks(g, dt);
 }
 
 /// One frame of a round, given what each side is pressing. Everything a
@@ -181,8 +192,7 @@ pub(crate) fn step_fight(g: &mut Game, dt: f32, p_in: Input, c_in: Input) {
     }
 
     fly_bolts(g, dt, holds);
-    for s in g.hitspark.iter_mut() { if s.ttl > 0.0 { s.ttl -= dt; } }
-    for w in g.pops.iter_mut() { if w.ttl > 0.0 { w.ttl -= dt; } }
+    tick_hit_effects(g, dt);
     drain_ghosts(g, dt);
     if g.shake > 0.0 { g.shake -= dt; }
     if g.quake_t > 0.0 { g.quake_t -= dt; }
@@ -562,8 +572,7 @@ pub(crate) fn update_round_end(g: &mut Game, dt: f32) {
         if b.x < -20.0 || b.x > WIN_W as f32 + 20.0 || b.y > FLOOR_Y { b.active = false; }
     }
     // The finishing blow's spark fades through the round end too.
-    for s in g.hitspark.iter_mut() { if s.ttl > 0.0 { s.ttl -= dt; } }
-    for w in g.pops.iter_mut() { if w.ttl > 0.0 { w.ttl -= dt; } }
+    tick_hit_effects(g, dt);
     drain_ghosts(g, dt);
     if g.shake > 0.0 { g.shake -= dt; }
     if g.quake_t > 0.0 { g.quake_t -= dt; }

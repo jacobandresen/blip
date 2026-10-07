@@ -175,10 +175,7 @@ fn victory_sfx() -> Vec<u8> {
     encode_pcm16_mono(&buf)
 }
 
-/// One report from a wing gun: an overdriven crack of band-passed noise (the
-/// muzzle blast), a short saturated body, the bolt cycling twice, and two
-/// reflections off the airframe. `pitch` and `seed` vary the takes so
-/// autofire rattles rather than loops.
+/// Generate a wing-gun report; `pitch` and `seed` vary the takes for autofire.
 fn gun_report(seed: u32, pitch: f32) -> Vec<f32> {
     let sr = SAMPLE_RATE as f32;
     let n = ms_to_samples(120.0);
@@ -335,10 +332,7 @@ struct Blast {
     seed: u32,
 }
 
-/// An explosion, built the way a real one sounds: a sharp blast front, a
-/// boom falling in pitch, a fireball roar that swells and gutters rather
-/// than fading smoothly, secondary pops, metal debris, and a faint echo
-/// off the sea. Each seed is a different take of the same size.
+/// Generate a seeded explosion from blast, roar, secondary, debris and echo layers.
 fn explosion_sfx(b: Blast) -> Vec<i16> {
     let sr = SAMPLE_RATE as f32;
     let n = (b.secs * sr) as usize;
@@ -463,10 +457,7 @@ fn stage_clear_sfx() -> Vec<u8> {
 // Sprites                                                                  //
 // ---------------------------------------------------------------------- //
 
-// ---- planform renderer -------------------------------------------------
-// Planes drawn from their real planforms (three-views of the P-51D, A6M Zero,
-// Ki-43, Ki-84 and the bombers), rasterised 4x supersampled. Coordinates are
-// sprite pixels, nose at y = 0, pointing up.
+// Four-times supersampled aircraft planforms; sprite origin is the nose, pointing up.
 
 const SS: usize = 4;
 
@@ -788,10 +779,7 @@ fn player_plane() -> Vec<u8> {
     c.finish(false)
 }
 
-/// Enemy fighters, drawn nose-up and flipped to dive at the player. `kind`: 0
-/// = grunt, an A6M Zero (IJN green, black cowl, wide rounded wings); 1 =
-/// weaver, a Ki-43 (khaki, slim tapered wings); 2 = ace, a Ki-84 in natural
-/// metal with yellow ID stripes (drops a power-up).
+/// Draw an enemy fighter: kind 0 Zero, 1 Ki-43, 2 Ki-84 ace (drops a power-up).
 fn enemy_plane(kind: usize) -> Vec<u8> {
     // designed at 26x22, rendered at 2x
     let w = 26;
@@ -841,12 +829,8 @@ fn enemy_plane(kind: usize) -> Vec<u8> {
     c.finish(true)
 }
 
-/// Body and wing colours for an enemy kind, chosen against the sky they are
-/// seen on (rgb(25,61,117) at the horizon to rgb(7,28,76) near; draw_sea() in
-/// the game). Every kind clears 3:1 against both ends, body and wing, the
-/// WCAG non-text contrast floor, pinned by
-/// enemy_planes_are_visible_against_the_sky(). Wings are lit from above,
-/// brighter than the fuselage: the widest surface, the first picked out.
+/// Enemy body and wing colours maintain at least 3:1 contrast against both sky colours.
+/// `enemy_planes_are_visible_against_the_sky` checks the contrast floor.
 fn enemy_colors(kind: usize) -> ((u8, u8, u8), (u8, u8, u8)) {
     let body: (u8, u8, u8) = match kind {
         0 => (125, 175, 115),
@@ -1094,12 +1078,7 @@ fn health_pack() -> Vec<u8> {
     img.encode_png()
 }
 
-/// The carrier: an Essex-class fleet carrier as in 1944, bow up. Deck Blue
-/// planked flight deck, centreline and hull number fore and aft; two
-/// centreline elevators and the port deck-edge one; arresting wires aft,
-/// catapults at the bow; the island to starboard with funnel, radar and twin
-/// 5-inch mounts fore and aft; 40 mm quads in the sponsons; Hellcats spotted
-/// aft, wings folded. Shortened to about 60% to fit.
+/// Draw a 1944 Essex-class carrier, scaled to fit the game canvas.
 fn carrier_ship() -> Vec<u8> {
     let (w, h) = (CARRIER_W, CARRIER_H);
     let mut c = Canvas::new(w, h);
@@ -1129,7 +1108,7 @@ fn carrier_ship() -> Vec<u8> {
     c.clip(0.0, bow - 2.0, wf, stern + 2.0);
     let deck_half = |y: f32| if y < bow + 60.0 { lerp(52.0, 75.0, ((y - bow) / 60.0).clamp(0.0, 1.0)) } else { 75.0 };
     let deck = |x: f32, y: f32| y > bow && y < stern && (x - cx).abs() <= deck_half(y);
-    c.fill(|x, y| deck(x, y), |x, _y| {
+    c.fill(&deck, |x, _y| {
         // planking: a slightly different tone every strip, seams between
         let strip = ((x - cx + 80.0) / 2.6).floor();
         let tone = 0.94 + 0.06 * ((strip * 12.9898).sin() * 43758.5).fract();
@@ -1288,13 +1267,7 @@ fn boat() -> Vec<u8> {
     img.encode_png()
 }
 
-// ---------------------------------------------------------------------- //
-// Clouds: value-noise fBm, not flat circles                                //
-// ---------------------------------------------------------------------- //
-// Cumulus: a flattish harder base and a broken, billowing top, bright where
-// lit and greyer between puffs. A few octaves of value noise (fBm) masked by
-// an envelope flattened underneath drive both the edge and the lit/shadowed
-// tint. Baked per variant at build time.
+// Clouds use masked value-noise fBm for billowing edges and lighting; variants are baked at build time.
 
 const CLOUD_TEX_W: i32 = 40;
 const CLOUD_TEX_H: i32 = 26;
@@ -1379,12 +1352,7 @@ fn cloud_sprite(seed: u32) -> Vec<u8> {
     img.encode_png()
 }
 
-// ---------------------------------------------------------------------- //
-// Islands: rare, turret-armed landmasses                                  //
-// ---------------------------------------------------------------------- //
-// The clouds' fBm, masked to an opaque island: a noise-perturbed coastline, a
-// band of sand, mottled green and rock inland, and a turret emplacement.
-// Three sizes baked; which and where is picked at runtime.
+// Islands reuse cloud fBm for coast, sand and inland texture; three sizes are baked.
 fn island_sprite(w: i32, h: i32, seed: u32) -> Vec<u8> {
     let mut img = Image::new(w as u32, h as u32);
     let cx = w as f32 * 0.5;
@@ -1514,14 +1482,8 @@ fn engine_start_sfx() -> Vec<u8> {
 }
 
 
-// ---- the engine: a V12, cylinder by cylinder ------------------------------
-// Measured from Spitfire recordings (Wikimedia Commons, Duxford ground run
-// and a Biggin Hill landing): a comb of harmonics spaced at the crankshaft
-// rate (~26 Hz at a steady run, ~16 Hz throttled back), loudest at the
-// firing rate (6 x crank for a V12), the loudness pulsing at the crank rate
-// because no two cylinders are quite alike, all over a broad exhaust rasp.
-// A few sines (the old engine) read as a generator; a train of exhaust pops
-// reads as a piston engine.
+// Spitfire recordings set the 26 Hz cruise / 16 Hz idle crank rates and six firings per crank turn.
+// Vary cylinder levels and add exhaust rasp; sine-only tones sounded like a generator.
 
 /// Crankshaft turns per second at cruise.
 const CRANK_HZ: f32 = 26.0;
@@ -1568,10 +1530,8 @@ fn prop_roar(buf: &mut [f32], blade_hz: f32, level: f32, rng: &mut Rng) {
     }
 }
 
-/// One engine loop at `rpm` (1.0 = cruise), one second long. The crank rate
-/// is rounded to an even number so the twelve-cylinder cycle (two turns) and
-/// the blade pass fit the second whole, and the loop has no seam.
-/// `sputter` is the labouring engine at a stall: lumpy, missing firings.
+/// One-second engine loop at `rpm` (1.0 = cruise); even crank rates keep the 12-cylinder loop seamless.
+/// `sputter` omits firings to model a labouring engine.
 fn engine_loop(rpm: f32, sputter: bool) -> Vec<u8> {
     let n = SAMPLE_RATE as usize;
     let crank = ((CRANK_HZ * rpm / 2.0).round() * 2.0).max(4.0);
@@ -1727,13 +1687,7 @@ fn barrier_hum2_sfx() -> Vec<u8> {
     encode_pcm16_mono(&s)
 }
 
-// ---------------------------------------------------------------------- //
-// Japanese boss name banners
-// //
-// ---------------------------------------------------------------------- //
-// blip's bitmap font covers only A-Z/0-9, so the katakana needed for the
-// seven names were rasterised once, offline, from Noto Sans CJK JP Bold and
-// baked in below; the build and the game never touch the font.
+// Offline-rasterized katakana glyphs; the runtime font supports only A–Z and digits.
 
 /// Katakana glyphs needed for the seven boss names, 10 wide x 12 tall.
 const KATAKANA_CHARS: [char; 37] = [
@@ -1829,15 +1783,8 @@ fn boss_name_ja(tier: usize) -> Vec<u8> {
     katakana_image(BOSS_NAMES_JA[tier], 2).encode_png()
 }
 
-// ---------------------------------------------------------------------- //
-// Music: rock                                                             //
-// ---------------------------------------------------------------------- //
-// Raider's theme is a rock instrumental with its own voices (`power_chord`,
-// `lead_guitar`, a rock kit), not the shared techno.rs kit, so it sounds like
-// its own band. Guitars run a rig's chain: detuned saws (rhythm) or a
-// saw/square blend (lead) driven into a tanh clipper (the amp), then a
-// one-pole low-pass (the cabinet). Voices mix into one f32 buffer
-// soft-limited once at the end.
+// Rock music uses detuned saws or saw/square guitars, tanh drive and a low-pass cabinet filter.
+// Voices mix in f32 and are limited once at the end.
 
 /// Rock kick: tight and dry with a hard beater click that cuts through
 /// distorted guitar; much less boom than `techno::kick`.
@@ -1914,11 +1861,7 @@ fn crash(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
     }
 }
 
-/// Distorted rhythm-guitar power chord: root + fifth + octave, each a pair
-/// of very slightly detuned saws, summed and driven through the
-/// amp/cabinet chain. `palm` picks the articulation — `true` chokes it
-/// into a short, dark palm-muted chug; `false` lets it ring open and
-/// bright.
+/// Distorted root/fifth/octave power chord; `palm` selects muted or open articulation.
 fn power_chord(buf: &mut [f32], off: usize, root: f32, ms: f32, vol: f32, palm: bool) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
@@ -1958,11 +1901,7 @@ fn power_chord(buf: &mut [f32], off: usize, root: f32, ms: f32, vol: f32, palm: 
     }
 }
 
-/// Lead guitar for the solo — a driven saw/square blend with a delayed
-/// finger vibrato, an optional pick-attack bend up into the target pitch,
-/// and a slight volume swell toward the tail that stands in for a held
-/// note blooming into amp feedback. `bend` is how many semitones the note
-/// slides up from on the attack (0.0 = struck clean).
+/// Driven saw/square solo with delayed vibrato and optional attack bend in semitones.
 fn lead_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, bend: f32) {
     let mut freq = freq;
     while freq > 660.0 { freq *= 0.5; } // an octave down until it sings, not screams
@@ -2059,10 +1998,7 @@ fn dive_bomb(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
     }
 }
 
-/// One in-bar step of the core rock beat: kick on 1, the "and" of 2, 3 and
-/// the "and" of 4; snare backbeat on 2 and 4; straight 8th-note hats, with
-/// an open hat lifting the last off-beat. `busy` doubles the hats to 16ths
-/// for the higher-energy solo section.
+/// Core rock beat step; `busy` doubles eighth-note hats to sixteenths for the solo.
 fn rock_beat_step(buf: &mut [f32], off: usize, pos: usize, rng: &mut Rng, busy: bool) {
     const KICK: [bool; 16] = [
         true, false, false, false, false, false, true, false,
@@ -2092,17 +2028,8 @@ fn drum_fill(buf: &mut [f32], bar_off: usize, step_samples: usize, rng: &mut Rng
     }
 }
 
-/// The main Raider theme: a driving rock instrumental in E minor.
-///
-/// Form is intro / verse / chorus / guitar solo / chorus, looped. The
-/// verse is a palm-muted gallop riff on the open low E with a short
-/// minor-triad answer at the top of every second bar — the hook, and it
-/// never changes, because changing the hook is how you lose it. The
-/// chorus opens up: rung-out power chords walking Em–C–G–D under a
-/// held, singing lead line. The solo takes eight bars over the gallop
-/// (the last four moving through the chorus changes for somewhere to go),
-/// climbs a pentatonic run to a bent-and-held high note, and drops off a
-/// dive bomb straight back into the last chorus. An original composition.
+/// Main Raider theme in E minor: intro, verse, chorus, solo, chorus.
+/// The fixed gallop hook anchors the verse; the chorus moves Em–C–G–D.
 pub fn music() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let bpm = 150.0_f32;
@@ -2292,13 +2219,7 @@ pub fn music() -> Vec<u8> {
     encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
 }
 
-/// The second loop in Raider's rotation — same band, harder and faster: a
-/// drop-D thrash riff in D minor at 176 BPM, tremolo-picked chugs with a
-/// chromatic breakdown accent, straight 8th-note kicks underneath, and a
-/// shred solo that ends on a screaming pinch harmonic and a dive bomb.
-/// No chorus, no let-up: one relentless riff either side of the solo, so
-/// over a long level it answers the main theme's developed form with a
-/// pure adrenaline hit.
+/// Second Raider loop: 176 BPM drop-D thrash in D minor, with a chromatic break and solo.
 pub fn music2() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let bpm = 176.0_f32;

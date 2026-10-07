@@ -110,41 +110,23 @@ pub(crate) const fn mv(startup: f32, active: f32, recovery: f32, damage: i32, hi
                level, knockdown }
 }
 
-/// The move table, read as trades: the jab (4f, 6 damage) wins scrambles and
-/// nothing else; the sweep (10f startup, 20 recovery, knockdown) beats a
-/// crouch that will not block low and loses to a whiff. Jump attacks are long
-/// overheads, answered by hitting the jumper out of the air.
+/// Shared timings, hitboxes and block levels for each move.
 pub(crate) fn move_data(id: MoveId) -> MoveData {
     match id {
-        // Four normals in a square: punch or kick, low or high. At each
-        // height a fast one to open with and a slow one to commit to, and no
-        // single guard covers both heights. The high punch is the quickest
-        // overhead (11f) and does the least, or down-back stops being a
-        // choice.
+        // High punch is the quickest overhead (11f) and deals the least damage.
         MoveId::LowPunch  => mv(5.0,  3.0,  9.0,  5,  12.0, 7.0,  48.0, 30.0, 14.0, Level::Low,      false),
         MoveId::HighPunch => mv(11.0, 3.0, 16.0,  9,  16.0, 10.0, 50.0, 92.0, 14.0, Level::Overhead, false),
-        // Two kick heights and nothing between: low must be crouch-blocked,
-        // high blocked standing (a middle kick answered everything). The low
-        // kick is the safe poke, the high kick the punishable overhead you
-        // commit to.
+        // Low kick is a safe poke; high kick is a punishable overhead.
         MoveId::LowKick   => mv(6.0,  3.0, 10.0,  7,  14.0, 9.0,  58.0, 26.0, 14.0, Level::Low,      false),
-        // No knockdown on the high kick: a 17-damage overhead that also
-        // floors you is a win condition, not a mix-up (a crouch-blocker
-        // survived one fight in six). Its forward reach is short because the
-        // leg's length goes up.
+        // Crouch-blockers survived this 17-damage overhead in one fight out of six; it causes no knockdown.
         MoveId::HighKick  => mv(14.0, 5.0, 22.0, 17,  22.0, 13.0, 62.0, 98.0, 18.0, Level::Overhead, false),
         MoveId::Sweep     => mv(10.0, 4.0, 22.0, 13,  0.0,  12.0, 72.0, 18.0, 16.0, Level::Low,      true),
-        // The uppercut: down and punch. It reaches up where a jump comes
-        // in and puts whoever it meets on the floor; it misses a croucher
-        // altogether, and 24 frames of recovery is the price of guessing.
+        // The uppercut hits jump-ins, misses crouchers, and has 24 frames of recovery.
         MoveId::Uppercut  => mv(6.0,  6.0, 24.0, 15,  0.0,  12.0, 30.0, 110.0, 40.0, Level::Mid,     true),
         MoveId::JumpPunch => mv(4.0,  8.0,  2.0,  9,  15.0, 9.0,  52.0, 34.0, 14.0, Level::Overhead, false),
         MoveId::JumpKick  => mv(6.0, 10.0,  2.0, 13,  17.0, 10.0, 66.0, 14.0, 16.0, Level::Overhead, false),
-        // The flying kick: the only attack that crosses a screen of ground,
-        // and the only one whose cost comes after it: it is not cancelled by
-        // landing (see `advance`), so a blocked one is a free heavy punish.
-        // No knockdown, like the high kick. The blow lands level with the
-        // hips, a straight line from hip to heel.
+        // The only move crossing full ground is uncancelled on landing; a block earns a heavy punish.
+        // It causes no knockdown and hits at hip height.
         MoveId::FlyingKick => mv(7.0, 16.0, 20.0, 15, 19.0, 11.0, 76.0, 42.0, 18.0,
                                  Level::Overhead, false),
         // Specials differ per fighter; this is the shape they share.

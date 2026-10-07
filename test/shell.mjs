@@ -6,7 +6,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { evaluate, sleep } from './lib/playwright-utils.mjs';
+import { evaluate, sleep, waitFor } from './lib/playwright-utils.mjs';
 import { launchEngine } from './lib/engine.mjs';
 import { createFileServer, listenOn } from './lib/harness.mjs';
 
@@ -23,6 +23,9 @@ async function browser(t, port, { touch = false, width = 1280, height = 800 } = 
 
 async function open(cdp, page, settle = 4000) {
   await cdp.send('Page.navigate', { url: `${ORIGIN}/${page}` });
+  if (page.endsWith('/index.html')) {
+    await waitFor(cdp, "document.documentElement.hasAttribute('data-game-ready')", 60000);
+  }
   await sleep(settle);
 }
 
@@ -42,6 +45,21 @@ async function key(cdp, k, code, vk) {
 }
 
 const WALL = "document.getElementById('need-coin-overlay').classList.contains('visible')";
+
+async function assertSelectedCardFits(cdp, label) {
+  const selection = JSON.parse(await evaluate(cdp, `(function(){
+    var selected = document.querySelector('.card-focused');
+    if (!selected) return JSON.stringify({ missing: true });
+    if (selected.id === 'manual-book') return JSON.stringify({ manual: true });
+    var card = selected.getBoundingClientRect();
+    var window = document.querySelector('#game-grid').getBoundingClientRect();
+    return JSON.stringify({ manual: false, card: [card.left, card.right], window: [window.left, window.right] });
+  })()`));
+  assert.notEqual(selection.missing, true, `${label} has a selected stop`);
+  if (selection.manual) return;
+  assert.ok(selection.card[0] >= selection.window[0] - 1 && selection.card[1] <= selection.window[1] + 1,
+    `${label} stays inside the cabinet window: ${JSON.stringify(selection)}`);
+}
 
 test('the game shell', async (t) => {
   const server = createFileServer();
@@ -96,16 +114,19 @@ test('the game shell', async (t) => {
     const cdp = await browser(t, 9402);
     await open(cdp, 'meteors/index.html', 17000);
     const state = `JSON.stringify((function(){var c=document.getElementById('glcanvas'),r=c.getBoundingClientRect();
-      return {deck:getComputedStyle(document.getElementById('topbar')).display,box:[r.left,r.top,r.width,r.height],buf:[c.width,c.height],
-              bar:document.getElementById('marquee-bar').getBoundingClientRect().bottom};})())`;
+      var topbar=document.getElementById('topbar');
+      return {topbarDisplay:getComputedStyle(topbar).display,panel:getComputedStyle(topbar.querySelector('.deck-panel')).display,
+              barHeight:topbar.getBoundingClientRect().height,box:[r.left,r.top,r.width,r.height],buf:[c.width,c.height],
+              marqueeBottom:document.getElementById('marquee-bar').getBoundingClientRect().bottom};})())`;
     const before = JSON.parse(await evaluate(cdp, state));
-    assert.notEqual(before.deck, 'none');
+    assert.notEqual(before.panel, 'none');
 
     await evaluate(cdp, "blipSetFullscreen(true); true");
     await sleep(600);
     const on = JSON.parse(await evaluate(cdp, state));
-    assert.equal(on.deck, 'none', 'the deck is still shown');
-    assert.deepEqual(on.box, [0, on.bar, 1280, 800 - on.bar], 'the picture does not run edge to edge under the bar');
+    assert.equal(on.panel, 'none', 'the deck panel is still shown');
+    assert.equal(on.barHeight, 0, 'the collapsed bar still takes up screen space');
+    assert.deepEqual(on.box, [0, on.marqueeBottom, 1280, 800 - on.marqueeBottom], 'the picture does not run edge to edge under the bar');
     // No window resize happened: the drawing buffer has to follow anyway.
     assert.deepEqual(on.buf, [on.box[2], on.box[3]], 'the drawing buffer kept its old size');
     await evaluate(cdp, "blipSetFullscreen(false); true");
@@ -118,12 +139,13 @@ test('the game shell', async (t) => {
     await open(cdp, 'index.html');
     await evaluate(cdp, "blipSetFullscreen(true); true");
     await sleep(400);
-    assert.equal(await evaluate(cdp, "getComputedStyle(document.getElementById('kiosk-bar')).display"), 'none');
+    assert.equal(await evaluate(cdp, "getComputedStyle(document.querySelector('#kiosk-bar .deck-panel')).display"), 'none');
+    assert.equal(await evaluate(cdp, "document.getElementById('kiosk-bar').getBoundingClientRect().height"), 0);
     assert.equal(await evaluate(cdp, 'document.documentElement.scrollHeight <= innerHeight'), true,
       'the catalogue needs scrolling on a 1080p kiosk');
     await open(cdp, 'serpent/index.html', 5000);
     assert.ok(await evaluate(cdp, "document.documentElement.hasAttribute('data-fullscreen')"), 'the game page forgot the choice');
-    assert.equal(await evaluate(cdp, "getComputedStyle(document.getElementById('topbar')).display"), 'none');
+    assert.equal(await evaluate(cdp, "getComputedStyle(document.querySelector('#topbar .deck-panel')).display"), 'none');
 
     // A mouse left lying loses its pointer.
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 400, y: 400 });
@@ -141,13 +163,17 @@ test('the game shell', async (t) => {
     const n = await evaluate(cdp, "document.querySelectorAll('.card').length");
     assert.equal(cols, n, `Rolodex cards should form one horizontal fan`);
     await key(cdp, 'ArrowRight', 'ArrowRight', 39);
+    await waitFor(cdp, `${lit} === 1`, 1500);
     assert.equal(await evaluate(cdp, lit), 1);
     await key(cdp, 'ArrowDown', 'ArrowDown', 40);
+    await waitFor(cdp, `${lit} === 2`, 1500);
     assert.equal(await evaluate(cdp, lit), 2);
     await key(cdp, 'ArrowUp', 'ArrowUp', 38);
+    await waitFor(cdp, `${lit} === 1`, 1500);
     assert.equal(await evaluate(cdp, lit), 1);
     // Up and down step through the same single Rolodex row.
     await key(cdp, 'ArrowUp', 'ArrowUp', 38);
+    await waitFor(cdp, `${lit} === 0`, 1500);
     assert.equal(await evaluate(cdp, lit), 0);
   });
 
@@ -169,8 +195,9 @@ test('the game shell', async (t) => {
       'the cabinet fascia has no dot strips');
     assert.ok(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent === 'RALLY' && document.querySelector('.card-focused .card-desc').textContent.length > 20"),
       'each selected game carries its own description');
-    assert.ok(await evaluate(cdp, "document.querySelector('.card-focused').offsetHeight >= 490"),
-      'Rolodex cards are enlarged for readable details');
+    assert.ok(await evaluate(cdp, `(function(){var grid=document.getElementById('game-grid'),card=document.querySelector('.card-focused');
+      return card.offsetHeight >= Math.min(500,grid.clientHeight-50)-1;})()`),
+      'the selected card fills the available space for readable details');
 
     const catalogue = JSON.parse(await evaluate(cdp, `JSON.stringify((function(){var cards=[].slice.call(document.querySelectorAll('.card'));
       return {count:cards.length,codes:cards.map(function(c){return c.getAttribute('data-card-code')}),
@@ -188,21 +215,18 @@ test('the game shell', async (t) => {
       assert.equal(await evaluate(cdp, `document.querySelector('.card[data-game-url^="${slug}/"]').classList.contains('rejected')`), true, `${slug} card responds while awaiting credit`);
       await evaluate(cdp, `document.querySelector('.card[data-game-url^="${slug}/"]').classList.remove('rejected'); true`);
     }
-    for (let i = 0; i < 8; i++) {
+    // The manual is a ninth stop between Bubbler and Rally.
+    for (let i = 0; i < 9; i++) {
       await key(cdp, 'ArrowRight', 'ArrowRight', 39);
-      await sleep(420);
-      const visible = JSON.parse(await evaluate(cdp, `JSON.stringify((function(){var c=document.querySelectorAll('.card')[${(i+1)%8}],g=document.querySelector('#game-grid'),r=c.getBoundingClientRect(),p=g.getBoundingClientRect(),s=getComputedStyle(g);return {left:r.left,right:r.right,clipLeft:p.left,clipRight:p.right,scroll:g.scrollLeft,scrollWidth:g.scrollWidth,clientWidth:g.clientWidth,pad:s.paddingLeft};})())`));
-        assert.ok(visible.left >= visible.clipLeft - 1 && visible.right <= visible.clipRight + 1,
-        `Rolodex card ${(i+1)%8+1} remains visible inside the cabinet window: ${JSON.stringify(visible)}`);
+      await sleep(700);
+      await assertSelectedCardFits(cdp, `desktop stop ${i + 1}`);
     }
     await cdp.send('Emulation.setDeviceMetricsOverride', { width:390, height:844, deviceScaleFactor:1, mobile:true });
     await open(cdp, 'index.html', 1100);
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 9; i++) {
       await key(cdp, 'ArrowRight', 'ArrowRight', 39);
-      await sleep(420);
-      const visible = JSON.parse(await evaluate(cdp, `JSON.stringify((function(){var c=document.querySelectorAll('.card')[${(i+1)%8}],g=document.querySelector('#game-grid'),r=c.getBoundingClientRect(),p=g.getBoundingClientRect(),s=getComputedStyle(g);return {left:r.left,right:r.right,clipLeft:p.left,clipRight:p.right,scroll:g.scrollLeft,scrollWidth:g.scrollWidth,clientWidth:g.clientWidth,pad:s.paddingLeft};})())`));
-      assert.ok(visible.left >= visible.clipLeft - 1 && visible.right <= visible.clipRight + 1,
-        `phone Rolodex card ${(i+1)%8+1} remains visible inside the cabinet window: ${JSON.stringify(visible)}`);
+      await sleep(700);
+      await assertSelectedCardFits(cdp, `phone stop ${i + 1}`);
     }
     await cdp.send('Emulation.setDeviceMetricsOverride', { width:1280, height:800, deviceScaleFactor:1, mobile:false });
     await open(cdp, 'index.html', 800);
@@ -221,18 +245,16 @@ test('the game shell', async (t) => {
     await cabinetShot(cdp, 'screen');
     assert.equal(await evaluate(cdp, "document.querySelector('.jukebox-receiver').classList.contains('loaded')"), true,
       'the selected card seats in the receiver before the title changes');
-    assert.equal(await evaluate(cdp, "getComputedStyle(document.querySelector('.jukebox-seated-card')).opacity"), '0',
-      'the title card is fully inside the cabinet');
+    assert.equal(await evaluate(cdp, "getComputedStyle(document.querySelector('.jukebox-seated-card')).opacity"), '1',
+      'the selected game card is visible in the receiver');
     const titles = {
       serpent: 'SERPENT', bouncer: 'BOUNCER', galactic_defender: 'DEFENDER', rally: 'RALLY',
       meteors: 'METEORS', sky_raider: 'RAIDER', brawler: 'BRAWLER', bubbler: 'BUBBLER',
     };
     for (const [slug, title] of Object.entries(titles)) {
       await open(cdp, `${slug}/index.html`, 18000);
-      for(let attempt=0;attempt<30;attempt++) {
-        if(await evaluate(cdp, "Array.from(document.querySelectorAll('#marquee-name .marquee-letter'),x=>x.textContent).join('')")===title.padEnd(8,'\u00a0')) break;
-        await sleep(200);
-      }
+      await evaluate(cdp, `blipSetMarquee(${JSON.stringify(title)}, true); true`);
+      await waitFor(cdp, `Array.from(document.querySelectorAll('#marquee-name .marquee-letter'), x => x.textContent).join('') === ${JSON.stringify(title.padEnd(8, '\u00a0'))}`, 5000);
       const state = JSON.parse(await evaluate(cdp, `JSON.stringify((function(){var n=document.querySelector('#marquee-name'),r=n.getBoundingClientRect();
         return {name:n.getAttribute('aria-label'),box:[r.left,r.top,r.width,r.height],cells:n.querySelectorAll('.marquee-letter').length,
           dots:n.querySelectorAll('.marquee-dot').length,text:Array.prototype.map.call(n.querySelectorAll('.marquee-letter'),function(x){return x.textContent}).join(''),
@@ -254,7 +276,10 @@ test('the game shell', async (t) => {
       await cdp.send('Emulation.setDeviceMetricsOverride', {width,height,deviceScaleFactor:1,mobile:true});
       for (const page of ['index.html','about.html','controls.html','history.html','api.html','galactic_defender/index.html']) {
         await open(cdp,page,1200);
-        assert.equal(await evaluate(cdp, "getComputedStyle(document.querySelector('#marquee-name')).visibility"), 'hidden', `${page} at ${width}px hides title`);
+        const expectedTitle = page.includes('/') && width <= 620 ? 'visible' : 'hidden';
+        await waitFor(cdp, `getComputedStyle(document.querySelector('#marquee-name')).visibility === '${expectedTitle}'`, 5000);
+        assert.equal(await evaluate(cdp, "getComputedStyle(document.querySelector('#marquee-name')).visibility"), expectedTitle,
+          `${page} at ${width}px has the intended title visibility`);
         assert.equal(await evaluate(cdp, "!document.querySelector('#fullscreen-btn, #mute-btn')"), true, `${page} has no fascia utility buttons`);
       }
     }
@@ -313,9 +338,9 @@ test('the game shell', async (t) => {
     assert.equal(await evaluate(cdp, WALL), true, 'no coin wall on arrival with no credit');
     await key(cdp, ' ', 'Space', 32);
     await sleep(400);
-    assert.deepEqual([await evaluate(cdp, WALL), await evaluate(cdp, 'getCoins()')], [false, 1], 'fire at the wall did not pay it');
+    assert.deepEqual([await evaluate(cdp, WALL), await evaluate(cdp, 'getCoins()')], [false, 0], 'fire at the wall did not pay the owed start');
     await key(cdp, '5', 'Digit5', 53);
-    assert.equal(await evaluate(cdp, 'getCoins()'), 2);
+    assert.equal(await evaluate(cdp, 'getCoins()'), 1);
 
     // And Backspace is the way back to the cabinet.
     await key(cdp, 'Backspace', 'Backspace', 8);

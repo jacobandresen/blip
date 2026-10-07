@@ -39,6 +39,15 @@ pub fn low_pass(buf: &mut [f32], hz: f32) {
 /// keeps what would alias out of it. The edge of a saw or a snare stays.
 pub fn bright(buf: &mut [f32]) { low_pass(buf, 7500.0); }
 
+/// Fade the last `samples` to silence.
+pub fn fade_out(buf: &mut [f32], samples: usize) {
+    let n = samples.min(buf.len());
+    let start = buf.len() - n;
+    for (i, sample) in buf[start..].iter_mut().enumerate() {
+        *sample *= 1.0 - (i + 1) as f32 / n as f32;
+    }
+}
+
 /// Keep a melodic voice out of the shrill register: anything above A4 drops
 /// by octaves, keeping the tune's shape where it is easy on the ears and a
 /// phone speaker.
@@ -136,10 +145,7 @@ pub fn mix_into(buf: &mut [i16], off: usize, sample: f32) {
     buf[off] = v.clamp(-32_767, 32_767) as i16;
 }
 
-/// Plain (non-clamping) add into an f32 accumulation buffer. Use this for
-/// multi-voice mixes (drums + bass + leads all landing on the same beat)
-/// where clamping per-voice, per-sample would hard-clip into harsh digital
-/// distortion; clamp once at the end instead, with `soft_limit_to_pcm16`.
+/// Add to an f32 mix buffer without clipping; limit once with `soft_limit_to_pcm16`.
 pub fn mix_into_f32(buf: &mut [f32], off: usize, sample: f32) {
     if off >= buf.len() {
         return;
@@ -147,10 +153,8 @@ pub fn mix_into_f32(buf: &mut [f32], off: usize, sample: f32) {
     buf[off] += sample;
 }
 
-/// Convert an f32 accumulation buffer to 16-bit PCM through a soft (tanh)
-/// limiter, so loud collisions between voices compress gracefully instead of
-/// flat-topping. `knee` is roughly "the level at which compression starts to
-/// bite" — signals well under it pass through close to linear.
+/// Convert an f32 mix to 16-bit PCM through a tanh limiter.
+/// `knee` sets the level where compression becomes noticeable.
 pub fn soft_limit_to_pcm16(buf: &[f32], knee: f32) -> Vec<i16> {
     buf.iter()
         .map(|&s| ((s / knee).tanh() * 31_000.0) as i16)
@@ -193,5 +197,19 @@ mod tests {
         // 15 kHz would fold down to 7 kHz.
         let db = 20.0 * through_half(15_000.0).log10();
         assert!(db < -50.0, "15 kHz came through at {db:.1} dB");
+    }
+
+    #[test]
+    fn fade_out_is_linear_and_clamps_to_the_buffer() {
+        let mut samples = [1.0; 4];
+        fade_out(&mut samples, 2);
+        assert_eq!(samples, [1.0, 1.0, 0.5, 0.0]);
+
+        fade_out(&mut samples, usize::MAX);
+        assert_eq!(samples[3], 0.0);
+
+        let mut unchanged = [0.25; 2];
+        fade_out(&mut unchanged, 0);
+        assert_eq!(unchanged, [0.25; 2]);
     }
 }

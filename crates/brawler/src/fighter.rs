@@ -50,11 +50,7 @@ pub(crate) struct Fighter {
     pub(crate) buffered: Option<MoveId>,
     pub(crate) buffer_t: f32,
 
-    // ---- what is being drawn, as opposed to played --
-    // Poses are a function of (action, timer), so a changed action changed
-    // the picture on the same frame. The drawing keeps a short memory
-    // instead: the previous action, its timer frozen at the handover, and how
-    // much of it still shows (see draw::pose_of()).
+    // Drawing blends from the previous action and timer at each handover.
     pub(crate) shown: Act,
     pub(crate) shown_t: f32,
     pub(crate) shown_mv: MoveId,

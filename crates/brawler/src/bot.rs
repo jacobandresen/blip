@@ -1,7 +1,4 @@
-//! Native-only autopilot (BLIP_BOT=1) for player one: walk in, mix the
-//! moves, block what it sees coming at a human reaction time.
-//! BLIP_BOT_PICK=0..9 chooses the fighter, BLIP_BOT_FOE=0..9 every opponent,
-//! BLIP_BOT_RUNG=0..8 the fight to start at.
+//! Native player-one autopilot. `BLIP_BOT_PICK`, `BLIP_BOT_FOE` and `BLIP_BOT_RUNG` select the matchup.
 
 use super::*;
 use blip::macroquad::rand::gen_range;

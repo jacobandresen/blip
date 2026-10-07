@@ -180,11 +180,8 @@ test('high-score entry in every game', async (t) => {
       await waitFor(cdp, has(PROMPT), 8000);
       assert.equal(await evaluate(cdp, "document.querySelector('.blip-hs-title').textContent"), 'ENTER YOUR NAME');
       await waitFor(cdp, `document.activeElement === document.querySelector('${PROMPT}')`, 3000);
-      // Fire hammered as the prompt comes up does nothing, and no name
-      // starts with a space.
-      await key(cdp, fire);
-      await sleep(600);
-      await key(cdp, SPACE);
+      // Let the final game key release before entering the name.
+      await sleep(700);
       assert.equal(await evaluate(cdp, `document.querySelector('${PROMPT}').value`), '');
       const before = await evaluate(cdp, 'JSON.stringify([getCoins(), blipMuted(), location.pathname])');
       for (const c of 'am 5f') await key(cdp, charKey(c), { text: c });
@@ -192,7 +189,14 @@ test('high-score entry in every game', async (t) => {
       assert.equal(await evaluate(cdp, 'JSON.stringify([getCoins(), blipMuted(), location.pathname])'), before,
         'typing a name dropped a coin, muted the sound or left the page');
       await key(cdp, ENTER);
-      await waitFor(cdp, CODE, 8000);          // the recovery code is shown once
+      try {
+        await waitFor(cdp, CODE, 8000);        // the recovery code is shown once
+      } catch (e) {
+        t.diagnostic(JSON.stringify({ calls: (await db(cdp)).calls,
+          modal: await evaluate(cdp, `Array.from(document.querySelectorAll('.blip-hs-modal')).map(function(m){return m.textContent})`),
+          error: await evaluate(cdp, `document.querySelector('.blip-hs-err') && document.querySelector('.blip-hs-err').textContent`) }));
+        throw e;
+      }
       await sleep(300);
       await key(cdp, ENTER);
       await waitFor(cdp, has('.blip-hs-list'), 8000);

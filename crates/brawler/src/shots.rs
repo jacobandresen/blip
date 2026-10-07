@@ -1,7 +1,4 @@
-//! Screenshot scenes. With `BLIP_SCREENSHOT_OUT` set the game captures one
-//! frame (`BLIP_SCREENSHOT_FRAME`) and exits; `BLIP_SHOT_SCENE=n` chooses
-//! what is on it, so the card (see brawler_card.sh) and any check of a
-//! drawing change can be made without playing to the moment.
+//! `BLIP_SHOT_SCENE=n` selects a screenshot scene; `BLIP_SCREENSHOT_OUT` captures it and exits.
 //!
 //! | n | scene |
 //! |---|---|

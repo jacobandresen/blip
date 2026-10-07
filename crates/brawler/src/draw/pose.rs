@@ -762,10 +762,7 @@ pub(crate) fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
                 q.twist = lift;
             }
         }
-        // The rei: heels together at attention, open hands at the thighs; a
-        // bow of about thirty degrees from the hips toward the opponent,
-        // held a beat, and up again. (The guard comes up after, in the
-        // blend into Idle.)
+        // Rei: heels together, open hands at thighs, bow about 30°, then blend back to Idle.
         Act::Bow => {
             let ease = |from: f32, len: f32| {
                 let k = ((f.t - from) / len).clamp(0.0, 1.0);
@@ -919,32 +916,19 @@ pub(crate) fn skeleton(rig: Rig, q: &Pose) -> Skeleton {
     let (hip_lead, _) = socket(hip, 4.5 * z, 0.0);
     let (_, hip_rear) = socket(hip, 1.5 * z, 0.0);
 
-    // Parallax on the far side: the far arm and leg sit slightly back, so a
-    // guard shows two fists and a stance two feet. Applied to the target so
-    // bone lengths stay. The camera is at chest height: a far foot appears
-    // higher (toward the horizon), a far hand barely moves; shifting the foot
-    // down puts it through the floor.
+    // Apply parallax to far-limb targets to preserve bone lengths; far feet rise toward the horizon.
     let hand_back = |v: V| V(v.0 - rig.fwd * 3.0 * z, v.1 + z);
     let foot_back = |v: V| V(v.0 - rig.fwd * 3.5 * z, v.1 - 1.5 * z);
 
     let leg_at = |root: V, want: V| {
-        // The knee's bend side turns with the thigh: a leg thrown out
-        // horizontally has its anatomical forward pointing up, and a fixed
-        // "forward" inverted the knee on the high kicks. So it comes from the
-        // limb's own direction, a quarter turn from it.
+        // Derive the knee bend side from the thigh direction; a fixed forward vector inverted high kicks.
         let (dx, dy) = unit(root, want);
         let anterior = V(dy * rig.fwd, -dx * rig.fwd);
         solve(root, want, THIGH * z, SHIN * z, KNEE_SHUT, anterior)
     };
     let arm_at = |root: V, want: V| {
-        // The elbow breaks to the back of the arm and turns with it. A fixed
-        // direction sat near the tie between the two mirrored solutions, so
-        // the forearm flipped with a pixel of movement; squared to the arm it
-        // is as far from the tie as possible. One rule at every angle (see
-        // `no_elbow_sticks_out_behind_the_back`).
-        // A hand posed too near its own shoulder is pushed out: folded
-        // almost shut, the elbow's place is guesswork (see
-        // `no_limb_is_folded_up_to_nothing`).
+        // Bend elbows behind the arm; a fixed direction caused mirrored-solution flips.
+        // Push hands away from shoulders when a near-closed elbow has no stable solution.
         let (dx, dy) = unit(root, want);
         let reach = dist(root, want).max(ARM_MIN * z);
         let want = V(root.0 + dx * reach, root.1 + dy * reach);

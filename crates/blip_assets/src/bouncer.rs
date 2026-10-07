@@ -327,11 +327,7 @@ fn brick_bomb() -> Vec<u8> {
     img.encode_png()
 }
 
-/// Steel-plated brick: takes two hits to break. A cool, riveted metal tone
-/// keeps it visually distinct from the six single-hit color rows, and the
-/// `cracked` variant (shown after the first hit) darkens it and adds a
-/// jagged fracture so the damage — and the fact one more hit will do it — is
-/// obvious at a glance.
+/// Two-hit brick; the cracked variant shows its remaining hit with a darker, fractured surface.
 fn brick_steel(cracked: bool) -> Vec<u8> {
     let w: i32 = 72;
     let h: i32 = 22;
@@ -443,10 +439,8 @@ pub fn rebound_wav() -> Vec<u8> {
     .render()
 }
 
-// ---- effects: a toy box ----------------------------------------------------
-// Bubbler's warm, rounded style on Bouncer's own instruments: a rubber ball
-// that boings and a glockenspiel in C major. Three takes of each hit, a
-// little apart in pitch, so rapid hits do not machine-gun.
+// ---- effects --------------------------------------------------------------
+// Three pitch variants keep repeated hits from sounding identical.
 pub const IMPACT_VARIANTS: usize = 3;
 
 fn paddle_hit(v: usize) -> Vec<u8> {

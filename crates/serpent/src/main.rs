@@ -44,18 +44,14 @@ const OBS_FADE_SECS: f32 = 1.2;
 const BANNER_SECS: f32 = 1.4;
 
 // ---- shears ----------------------------------------------------------------
-// Once the snake is SHEARS_FROM long, the first food of every second level
-// brings out shears for a few seconds: reaching them cuts SHEARS_CUT off the
-// tail (ten foods grow it by ten, so it still grows, at 60% of the pace).
+// After `SHEARS_FROM`, every second level's first food spawns shears; collecting them cuts `SHEARS_CUT` from the tail.
 const SHEARS_FROM: usize = 25;
 const SHEARS_CUT: usize = 4;
 const SHEARS_TTL: f32 = 7.0;
 const SHEARS_BLUE: BlipColor = BlipColor { r: 0.45, g: 0.85, b: 1.0, a: 1.0 };
 
 // ---- streaks ---------------------------------------------------------------
-// Food reached within this many steps of the last is worth one multiple
-// more, up to STREAK_MAX: going straight for it pays, dawdling resets it.
-// 22 steps is the board's width and a turn.
+// Food within 22 steps adds a multiplier up to `STREAK_MAX`; 22 is one board width and a turn.
 const STREAK_STEPS: i32 = 22;
 const STREAK_MAX: i32 = 5;
 
@@ -80,10 +76,7 @@ impl Dir {
     }
 }
 
-/// How many turns may be held ahead of the snake. Rounding a corner is two
-/// presses in one gesture (right, then down), faster than a 180ms step; with
-/// one slot the second overwrote the first. Three would let a player queue a
-/// path the snake has not visibly committed to.
+/// Two turns fit a corner gesture; more would queue movement the snake has not visibly committed to.
 const TURN_QUEUE: usize = 2;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]

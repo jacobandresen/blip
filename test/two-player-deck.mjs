@@ -888,9 +888,10 @@ test(`a gamepad lights station one's lamp (${ENGINE})`, async (t) => {
     return true;
   })()`;
   const STATE = `document.documentElement.getAttribute('data-pad')`;
-  const LAMP = `getComputedStyle(document.querySelector('.kiosk-bar > .deck-panel'), '::before').color`;
+  const LAMP = `getComputedStyle(document.querySelector('.deck-credit-lamp')).getPropertyValue('--on').trim()`;
 
   assert.equal(await evaluate(cdp, STATE), null, 'a lamp is on with no pad connected');
+  await evaluate(cdp, `document.documentElement.removeAttribute('data-credit')`);
 
   await evaluate(cdp, PAD(false));
   await waitFor(cdp, `${STATE} === 'idle'`, 2000);

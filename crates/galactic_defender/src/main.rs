@@ -1,5 +1,4 @@
-//! Galactic Defender (Space Invaders), Rust port of
-//! `games/galactic_defender/main.c` on macroquad.
+//! Space Invaders-inspired shooter.
 
 use blip::input::{
     btn1_pressed, key_active, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
@@ -75,12 +74,7 @@ const UFO_CHARGE_SECS: f32 = 1.9;    // "gnarly" charge-up before it fires
 const UFO_FIRE_SECS: f32 = 0.4;      // how long the beam itself is on screen
 const LASER_HIT_W: f32 = UFO_W;      // width of the beam's kill zone
 
-// ---- the mothership -----------------------------------------------------
-// Every fifth level ends with one: the themes cycle, so without it the game
-// only gets faster, never different. It arrives when the last alien of a boss
-// level dies, takes real damage, and fires volleys. Built from existing
-// parts: the saucer art drawn large, the (by then empty) alien bomb pool with
-// its collisions, and the explosion pool.
+// Every fifth level ends with a mothership built from the saucer, bomb and explosion systems.
 const BOSS_EVERY: i32 = 5;            // every fifth level ends with one
 const BOSS_SCALE: f32 = 2.6;          // times the ordinary saucer
 const BOSS_W: f32 = UFO_W * BOSS_SCALE;
@@ -109,10 +103,7 @@ const DEATH_EXPLOSION_PHASE: f32 = 0.7; // seconds of that pause spent on the gi
                                          // before the ship starts fading back in — the
                                          // remainder (DEAD_PAUSE - this) is the mist fade-in
 const RESPAWN_GRACE_SECS: f32 = 1.2; // once play resumes, firing stays locked out this long
-// ---- divers ----------------------------------------------------------------
-// From DIVE_LEVEL one alien at a time shakes for DIVE_TELL, then swoops at
-// the ship: steering slower than the ship's 200 px/s, through any shield
-// block in its way, and worth double shot on the way down.
+// From `DIVE_LEVEL`, one alien telegraphs then dives through shields toward the ship; shoot it for double points.
 const DIVE_LEVEL: i32 = 3;
 const DIVE_EVERY: (i32, i32) = (7, 12); // seconds between dives
 const DIVE_TELL: f32 = 0.8;
@@ -888,7 +879,14 @@ fn lose_ship(g: &mut Game, sfx: &Sounds, why: &str) {
     }
     // The UFO stops updating once we leave State::Play, so its siren
     // loop would otherwise keep wailing through the Dead/Over screen.
-    if g.ufo_active { g.ufo_active = false; blip::stop_alert(); }
+    stop_ufo(g);
+}
+
+fn stop_ufo(g: &mut Game) {
+    if g.ufo_active {
+        g.ufo_active = false;
+        blip::stop_alert();
+    }
 }
 
 /// Pick, shake and fly the diver. Returns true when it has hit the ship.
@@ -952,6 +950,15 @@ fn update_diver(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
         .find(|&i| g.aliens[i].alive);
     if let Some(idx) = pick { g.dive_pick = Some((idx, DIVE_TELL)); }
     false
+}
+
+fn update_explosions(g: &mut Game, dt: f32) {
+    for e in &mut g.explosions {
+        if e.active {
+            e.ttl -= dt;
+            if e.ttl <= 0.0 { e.active = false; }
+        }
+    }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
@@ -1196,7 +1203,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.dead_timer.start(DEATH_EXPLOSION_PHASE);
             g.dead_pause_total = DEATH_EXPLOSION_PHASE;
             g.state = State::Dead;
-            if g.ufo_active { g.ufo_active = false; blip::stop_alert(); }
+            stop_ufo(g);
             return;
         }
     }
@@ -1212,7 +1219,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         // Whichever way this goes the ordinary UFO's pass is over: the
         // level has ended, or a mothership is taking the sky and two
         // sirens and two saucers at once is a fight nobody can read.
-        if g.ufo_active { g.ufo_active = false; blip::stop_alert(); }
+        stop_ufo(g);
 
         // On a boss level the formation is the doorway, not the level.
         if g.is_boss_level() && !g.boss_done {
@@ -1229,24 +1236,14 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
-    for e in g.explosions.iter_mut() {
-        if e.active {
-            e.ttl -= dt;
-            if e.ttl <= 0.0 { e.active = false; }
-        }
-    }
+    update_explosions(g, dt);
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
     g.fx.update(dt);
     // Keep the death explosion's burst of fireballs animating through the
     // pause instead of freezing at full brightness until play resumes.
-    for e in g.explosions.iter_mut() {
-        if e.active {
-            e.ttl -= dt;
-            if e.ttl <= 0.0 { e.active = false; }
-        }
-    }
+    update_explosions(g, dt);
     if g.dead_timer.tick(dt) {
         g.bullets.iter_mut().for_each(|b| b.active = false);
         if g.sess.lives <= 0 {

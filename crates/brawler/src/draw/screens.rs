@@ -205,10 +205,7 @@ pub(crate) fn draw_select(blip: &Blip, g: &Game) {
                       else { a.special_name.to_string() };
         blip.draw_text(&special, tx, 164.0, 1.0, grey);
         blip.draw_text(STAGE_NAMES[home_of(who)], tx, 174.0, 1.0, BlipColor { r: 0.55, g: 0.58, b: 0.66, a: 1.0 });
-        // The three numbers that actually differ, as bars: a player choosing
-        // between fighters needs the trade, not a biography. Full is the best
-        // of the fair fighters; the invincible one runs off the end of all
-        // three.
+        // Show move speed, reach and damage; Full leads the fair fighters, while the invincible fighter exceeds all three.
         let stats = [("PWR", a.power / 1.45), ("SPD", a.walk / 250.0),
                      ("HP ", if a.invincible { 2.0 } else { a.health as f32 / 130.0 })];
         for (r, (label, v)) in stats.iter().enumerate() {

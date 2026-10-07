@@ -1,11 +1,5 @@
-//! The last level flies in over land. It starts at sea off the carrier like
-//! every level; after COAST_DIST of sea the coast comes up, its first stretch
-//! inland thick with flak batteries, then farmland, and from where the last
-//! boss appears, a city.
-//!
-//! Distances here are "inland": pixels from the coastline, growing as the
-//! world scrolls down the screen. A point `d` inland is drawn at
-//! `coast_y - d`.
+//! Final level terrain after the carrier crossing: coast, flak, farmland and city.
+//! Inland distances are pixels from the coastline, drawn at `coast_y - d`.
 
 use super::*;
 
@@ -35,7 +29,7 @@ pub fn is_land_level(g: &Game) -> bool { g.sess.level == MAX_LEVEL }
 
 /// Screen y of the coastline (land above it), when the coast is in this level.
 pub fn coast_y(g: &Game) -> Option<f32> {
-    is_land_level(g).then(|| g.land_dist - COAST_DIST)
+    is_land_level(g).then_some(g.land_dist - COAST_DIST)
 }
 
 /// The shoreline is not ruled straight: a gentle wiggle across the screen.

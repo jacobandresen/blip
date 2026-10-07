@@ -1,9 +1,5 @@
-//! blip — the shared arcade game library, on macroquad.
-//!
-//! macroquad owns the frame loop (`#[macroquad::main]`): games call
-//! `blip.next_frame().await` once per tick. Audio is preloaded as
-//! `BlipSound` values at startup (loading is async) and replayed
-//! synchronously in the loop.
+//! Shared game context, rendering, input, effects and audio for the BLIP games.
+//! Macroquad drives the frame loop; sounds load asynchronously and play synchronously.
 
 pub mod audio;
 pub mod bot;

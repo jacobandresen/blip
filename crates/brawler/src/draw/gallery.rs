@@ -3,9 +3,7 @@
 
 use super::*;
 
-// `cargo build -p brawler --features gallery` replaces the game with a
-// looping contact sheet of every pose, since reaching a sweep in play takes a
-// dozen inputs and shows it for four frames.
+// `cargo build -p brawler --features gallery` replaces the game with a looping contact sheet of every pose.
 /// The sheet: one pose, five moments of it across the screen.
 #[cfg(feature = "gallery")]
 pub(crate) fn draw_gallery(blip: &Blip, now: f32) {

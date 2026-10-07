@@ -1,4 +1,11 @@
 var MAX_COINS = 5;
+var TWO_PLAYER_KEYS = {
+  up: { key: 'w', code: 'KeyW' }, down: { key: 's', code: 'KeyS' },
+  left: { key: 'a', code: 'KeyA' }, right: { key: 'd', code: 'KeyD' },
+  p2up: { key: 'ArrowUp', code: 'ArrowUp' }, p2down: { key: 'ArrowDown', code: 'ArrowDown' },
+  p2left: { key: 'ArrowLeft', code: 'ArrowLeft' }, p2right: { key: 'ArrowRight', code: 'ArrowRight' },
+  p2button1: { key: 'j', code: 'KeyJ' }, p2button2: { key: 'k', code: 'KeyK' }
+};
 
 /* ---- Layout: upright or landscape ----
  * One rule for every page's deck, applied as <html data-layout> and kept
@@ -70,18 +77,9 @@ function blipSetControls(mode) {
 /* ---- Per-game cabinet identity ---- Card colours on the landing page,
  * marquee and bezel glow on each game page. `accent` is an "r, g, b" triple
  * so CSS can build solid and translucent colours. */
-// `buttons`: the deck's caps, one per button (key/code as injectKey() and the
-// keyboard listener match them); omitted = one fire button (Space).
-// `stick`: per-game stick geometry, all optional: engage / release (px from
-// the floating pivot to catch a detent / fall back to neutral), maxR (how far
-// the pivot trails the thumb), hyst (degrees past the 22.5 midline before the
-// lock jumps a detent).
-// `touch`: the game can be played on the touch strip instead of the pad.
-// kind 'drag' puts the paddle / cannon under the finger (fire held while it
-// is down), 'swipe' steers by flicks, 'paddles' gives each player a half to
-// drag their bat up and down in, 'platform' fires button one on every
-// touch, runs on a slide and presses button two on a swipe up. `hint` is printed on the strip,
-// `mouseHint` instead for a touchscreen laptop's mouse.
+// `buttons` map deck caps; `stick` accepts engage/release and maxR pixels plus hysteresis degrees.
+// `touch.kind`: drag follows a finger, swipe steers by flick, paddles split bats, platform runs/blows/jumps.
+// `hint` labels the touch strip; `mouseHint` labels a touchscreen laptop's mouse controls.
 var BLIP_GAMES = {
   serpent:            { name: 'SERPENT',  accent: '50, 200, 50',
                          touch: { kind: 'swipe', hint: 'Swipe to steer', mouseHint: 'Click and drag to steer' } },
@@ -93,24 +91,12 @@ var BLIP_GAMES = {
                          touch: { kind: 'paddles', hint: 'Drag up or down', mouseHint: 'Point up or down &middot; Click to serve' } },
   meteors:            { name: 'METEORS',  accent: '180, 180, 180',
                          buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }] },
-  // A fighter: two caps, punch and kick (holding toward the opponent hits
-  // high), and a stick that answers at once, since a sloppy neutral is a
-  // dropped guard. `players: 2` builds the second station, revealed by
-  // blip_set_mode; `keys` gives P1 WASD so the arrows are P2's.
+  // Two caps; holding toward hits high. `players: 2` enables the second station; `keys` maps P1 to WASD.
   brawler:            { name: 'BRAWLER', accent: '220, 60, 40',
                          players: 2,
                          buttons: [{ key: 'f', code: 'KeyF', label: 'PUNCH' },
                                    { key: 'g', code: 'KeyG', label: 'KICK' }],
-                         keys: { up:    { key: 'w', code: 'KeyW' },
-                                 down:  { key: 's', code: 'KeyS' },
-                                 left:  { key: 'a', code: 'KeyA' },
-                                 right: { key: 'd', code: 'KeyD' },
-                                 p2up:    { key: 'ArrowUp',    code: 'ArrowUp' },
-                                 p2down:  { key: 'ArrowDown',  code: 'ArrowDown' },
-                                 p2left:  { key: 'ArrowLeft',  code: 'ArrowLeft' },
-                                 p2right: { key: 'ArrowRight', code: 'ArrowRight' },
-                                 p2button1: { key: 'j', code: 'KeyJ' },
-                                 p2button2: { key: 'k', code: 'KeyK' } },
+                         keys: TWO_PLAYER_KEYS,
                          stick: { engage: 10, release: 6, maxR: 54, hyst: 10 } },
   // A tribute to Bubble Bobble. Two caps: bubble (fire) and jump; up
   // jumps too. Like Brawler, player one is WASD so the arrows are player
@@ -121,16 +107,7 @@ var BLIP_GAMES = {
                                   mouseHint: 'Drag to run &middot; click to bubble &middot; drag up to jump' },
                          buttons: [{ key: 'f', code: 'KeyF', label: 'BUBBLE' },
                                    { key: 'g', code: 'KeyG', label: 'JUMP' }],
-                         keys: { up:    { key: 'w', code: 'KeyW' },
-                                 down:  { key: 's', code: 'KeyS' },
-                                 left:  { key: 'a', code: 'KeyA' },
-                                 right: { key: 'd', code: 'KeyD' },
-                                 p2up:    { key: 'ArrowUp',    code: 'ArrowUp' },
-                                 p2down:  { key: 'ArrowDown',  code: 'ArrowDown' },
-                                 p2left:  { key: 'ArrowLeft',  code: 'ArrowLeft' },
-                                 p2right: { key: 'ArrowRight', code: 'ArrowRight' },
-                                 p2button1: { key: 'j', code: 'KeyJ' },
-                                 p2button2: { key: 'k', code: 'KeyK' } } },
+                         keys: TWO_PLAYER_KEYS },
   // A bullet-weaving shooter: fine nudges. A small dead zone, a long pivot
   // leash so re-centring neutralises, and a firm notch so a dodge holds.
   sky_raider:         { name: 'RAIDER', accent: '50, 100, 220',
@@ -637,10 +614,7 @@ window.addEventListener('load', updateCoinPrompt);
   });
 }());
 
-/* ---- Shared gamepad polling ---- Reports logical button changes ('ArrowUp'
- * | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' | 'Space' | 'KeyZ') from the
- * first gamepad to onDown / onUp; game pages turn them into key events, the
- * landing page moves the card selection. */
+/* Poll the first gamepad and report logical button edges to games or the cabinet picker. */
 function pollGamepad(onDown, onUp) {
   if (!navigator.getGamepads) return;
 
@@ -670,10 +644,7 @@ function pollGamepad(onDown, onUp) {
     return null;
   }
 
-  // Polled unconditionally: Chrome on Linux never fires 'gamepadconnected'
-  // for many generic joysticks, and rAF polling costs nothing with none
-  // attached. Station one's lamp: off with no pad, dim when idle for IDLE_MS,
-  // lit in use.
+  // Poll continuously because some Linux gamepads omit `gamepadconnected`; lamp dims after `IDLE_MS`.
   var IDLE_MS = 10000;
   var root = document.documentElement;
   var lastInput = -Infinity, lamp = '';
@@ -815,6 +786,12 @@ function pollGamepad(onDown, onUp) {
     window.addEventListener('keydown', function (e) {
       if ((e.key !== 'm' && e.key !== 'M') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
+      if (root.hasAttribute('data-cabinet-screen') && window.parent !== window) {
+        try {
+          window.parent.blipSetMuted(!window.parent.blipMuted());
+          return;
+        } catch (e) {}
+      }
       blipSetMuted(!blipMuted());
     }, true);
     apply(wanted());

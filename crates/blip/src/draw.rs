@@ -40,12 +40,18 @@ pub fn draw_line_ex(x1: f32, y1: f32, x2: f32, y2: f32, thickness: f32, c: Color
     mq_draw_line(x1, y1, x2, y2, thickness, c);
 }
 
+fn glow_colors(c: Color, halo_alpha: f32) -> (Color, Color) {
+    (
+        Color { a: c.a * halo_alpha, ..c },
+        Color { a: c.a * 0.35, ..c },
+    )
+}
+
 /// Draw a neon-style glowing line: a soft wide halo under a bright hairline core.
 /// Use for vector silhouettes that should read as "lit up" against a black background.
 pub fn draw_glow_line(x1: f32, y1: f32, x2: f32, y2: f32, c: Color) {
-    let halo = Color { a: c.a * 0.16, ..c };
+    let (halo, mid) = glow_colors(c, 0.16);
     mq_draw_line(x1, y1, x2, y2, 6.0, halo);
-    let mid = Color { a: c.a * 0.35, ..c };
     mq_draw_line(x1, y1, x2, y2, 2.5, mid);
     mq_draw_line(x1, y1, x2, y2, 1.0, c);
 }
@@ -56,10 +62,8 @@ pub fn fill_circle(cx: f32, cy: f32, r: f32, c: Color) {
     draw_circle(cx, cy, r, c);
 }
 
-/// Draw a capsule from (`x1`, `y1`) to (`x2`, `y2`), `r1` thick at the first
-/// end and `r2` at the second: a limb, a beam, a spike. Built from circles a
-/// pixel or two apart, so keep the colour opaque (overlapping alpha shows
-/// as beads).
+/// Draw a capsule from (`x1`, `y1`) to (`x2`, `y2`), tapering from `r1` to `r2`.
+/// Use opaque colours; overlapping circles show through as beads.
 pub fn fill_capsule(x1: f32, y1: f32, x2: f32, y2: f32, r1: f32, r2: f32, c: Color) {
     let len = ((x2 - x1).powi(2) + (y2 - y1).powi(2)).sqrt();
     // Circles a third of a radius apart leave an edge smooth to a hundredth
@@ -74,10 +78,8 @@ pub fn fill_capsule(x1: f32, y1: f32, x2: f32, y2: f32, r1: f32, r2: f32, c: Col
     }
 }
 
-/// Draw a sunburst: `rays` wedges fanning out from (`cx`, `cy`) to `reach`,
-/// in the two `colors` turn about, the first ray at angle `turn`. The wedges
-/// meet, so with an even count the burst covers everything inside `reach`.
-/// A backdrop for a title or a finishing blow.
+/// Draw `rays` alternating wedges from (`cx`, `cy`) to `reach`, starting at `turn`.
+/// Even ray counts cover the full circle.
 pub fn fill_sunburst(cx: f32, cy: f32, rays: usize, turn: f32, reach: f32, colors: [Color; 2]) {
     // Half the angle a ray is given, as the slope its edge leaves the axis at.
     let spread = (std::f32::consts::PI / rays as f32).tan();
@@ -97,9 +99,8 @@ pub fn fill_sunburst(cx: f32, cy: f32, rays: usize, turn: f32, reach: f32, color
 /// Draw a soft glowing circle: a faint wide halo under a bright core. Good for thruster
 /// flames, muzzle flashes, and other small neon-lit particles.
 pub fn fill_glow_circle(cx: f32, cy: f32, r: f32, c: Color) {
-    let halo = Color { a: c.a * 0.15, ..c };
+    let (halo, mid) = glow_colors(c, 0.15);
     draw_circle(cx, cy, r * 2.6, halo);
-    let mid = Color { a: c.a * 0.35, ..c };
     draw_circle(cx, cy, r * 1.5, mid);
     draw_circle(cx, cy, r, c);
 }

@@ -1,7 +1,4 @@
-//! Sound effects. The short ones are generated at build time (see
-//! build.rs) and carried inside the binary; the crowd and the ambience are
-//! synthesised here at startup, like the music, because as PCM they would be
-//! most of the download.
+//! Effects are generated at build time; crowd and ambience are synthesized at startup.
 
 use blip::audio::load_sound as load;
 

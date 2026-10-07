@@ -1,18 +1,11 @@
-//! Rally's drum machine: kick, hats, claps, an acid bass, a lead stab and a
-//! supersaw, which its music composes into step-sequenced techno loops. The
-//! other games write their music as songs instead (see `song`).
-//! Voices mix into a `&mut [f32]` buffer (`mix_into_f32`) instead of clamping
-//! per write, which would hard-clip where kick, bass and hats share a beat;
-//! render to `Vec<f32>` and convert once with `soft_limit_to_pcm16`.
+//! Step-sequenced techno instruments for Rally.
+//! Mix voices into `f32` buffers and limit once with `soft_limit_to_pcm16`.
 
 use std::f32::consts::PI;
 
 use crate::wav::{env, mix_into_f32, tame, Rng, SAMPLE_RATE};
 
-/// Which note of a hook to play at this bar and position. On the fourth bar
-/// of each four-bar phrase the riff is answered in the oldest way: backwards
-/// and a fifth higher, where the phrase is expected to close. A fifth is
-/// diatonic for every hook here, so the answer stays in key. Any hook length.
+/// Select a hook note; every fourth bar answers the phrase backwards, a diatonic fifth higher.
 pub fn phrase_note(hook: &[f32], bar: usize, idx: usize) -> f32 {
     debug_assert!(idx < hook.len());
     if bar % 4 == 3 {

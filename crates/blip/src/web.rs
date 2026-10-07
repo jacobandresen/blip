@@ -1,8 +1,5 @@
-//! Web integration — thin wrappers around JavaScript calls made via `web/blip_bridge.js`.
-//!
-//! When compiled for `wasm32`, these functions call into the browser's JS environment
-//! to communicate with the kiosk shell.
-//! On native builds they all do nothing, so your game logic works identically on the desktop.
+//! Wrappers for the browser bridge in `web/blip_bridge.js`.
+//! They call JavaScript on wasm and do nothing in native builds.
 
 #[cfg(target_arch = "wasm32")]
 extern "C" {
@@ -30,11 +27,7 @@ pub fn set_mode(two_player: bool) {
     set_players(i32::from(two_player));
 }
 
-/// Tell the shell how many players are in: `0` one, `1` two, `2` the title
-/// screen of a two-seat machine, with station two lit and waiting to be
-/// touched. In a one-player game station two is dead to the touch (its keys
-/// may be player one's), which would make touch-to-join impossible without
-/// the third state.
+/// Set players: `0` one, `1` two, `2` title screen with the second station waiting to join.
 pub fn set_players(code: i32) {
     #[cfg(target_arch = "wasm32")]
     unsafe { blip_set_mode(code); }
@@ -52,12 +45,8 @@ pub fn paddles(left: f32, right: f32) {
     let _ = (left, right);
 }
 
-/// A finger (or a PC's pointer) on the shell's touch surface, as a fraction
-/// of the canvas (0..1 across and down; beyond when it is on the strip below
-/// the picture), and whether it is pressed: a finger always is, a mouse
-/// hovering over the trackpad is not. Slot 0 is player one, slot 1 player
-/// two. Natively slot 0 is the mouse while its left button is held.
-/// Games want [`crate::Blip::touch`], which maps this into game pixels.
+/// Pointer position normalized to the canvas, pressed state and player slot (0 or 1).
+/// Native slot 0 reports the mouse; use [`crate::Blip::touch`] for game pixels.
 pub fn touch_fraction(slot: usize) -> Option<(f32, f32, bool)> {
     #[cfg(target_arch = "wasm32")]
     unsafe {
@@ -189,4 +178,3 @@ pub fn high_score() -> HighScore {
         }
     }
 }
-

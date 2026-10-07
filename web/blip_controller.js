@@ -1,17 +1,6 @@
-/* blip_controller.js: one input layer for the web shell.
- * The on-screen pad (default) and arcade stick, the keyboard and a gamepad
- * all funnel through here. shell.js (game pages) and index.html (the landing
- * page) call BlipController.init() once and subscribe, whatever is driving.
- * Logical inputs:
- *   up / down / left / right  held
- *   button1 .. button4        the game's caps in BLIP_GAMES order
- *                             (button2 falls back to button1)
- *   p2up .. p2button4         the second station
- *   start                     edge: taps button1, or cfg.onStart
- *   select                    edge: back to the game grid, or cfg.onSelect
- * Presses become synthetic KeyboardEvents on the game canvas (per-game
- * key/code), so the games need no change. With no `canvas` (the landing page)
- * nothing is injected and the consumer wires the logical events itself. */
+/* Shared input layer for pad, stick, keyboard and gamepad.
+ * Inputs: directions, button1–4 (button2 falls back), p2up–p2button4, start/select edges.
+ * `init` injects per-game key events; start/select can call callbacks. Without a canvas, callers handle logical events. */
 (function () {
   'use strict';
 
@@ -241,11 +230,7 @@
   /* ------------------------------------------------------------------ */
   /* Touch-list authority                                                */
   /* ------------------------------------------------------------------ */
-  // A touch screen fires spurious `pointercancel`s on fingers still down
-  // (constantly, with one thumb on fire and the other working the cross).
-  // `TouchEvent.touches` is always right, so held state comes from it;
-  // pointer events only drive the press edge and the mouse path, and
-  // `pointercancel` is ignored.
+  // iOS cancels pointers during multi-touch; derive held state from `TouchEvent.touches` and ignore `pointercancel`.
 
   var _tBtns = [];    // { el, on, press, release, _pend }
   var _tDpads = [];   // one { pad, calc, clear, _pend } per bound d-pad
@@ -432,13 +417,8 @@
     // pointercancel: deliberately not handled — see "Touch-list authority".
   }
 
-  // Rally's spinner: each frame's angle past a small dead band drives up /
-  // down (its paddle); a spin that barely moved is a tap (mode select). The
-  // knob's drawn rotation comes from the game (window.blipPaddles), not the
-  // gesture.
-  //   opts.up / opts.down / opts.tap : { key, code } to inject
-  //   opts.onTap / opts.onInteract   : callbacks (title-screen mode select)
-  //   opts.dead                      : rad dead band (default 0.018)
+  // Rally dial: angle past `dead` injects up/down; small movement calls `onTap`.
+  // Options: injected `up`/`down` keys, `onTap`/`onInteract` callbacks, `dead` radians (default 0.018).
   function bindDial(dialEl, opts2) {
     if (!dialEl) return;
     opts2 = opts2 || {};
@@ -516,10 +496,7 @@
     });
   }
 
-  // Physical gamepad — kiosk.js's pollGamepad() reports codes (ArrowUp… /
-  // Space / KeyZ / Start / Select). It is player one's controller, so they
-  // become player one's names, not a key-code lookup: in Bubbler and Brawler
-  // (player one on WASD + F/G) that finds player two's arrows and no button.
+  // Map gamepad codes to player one directly; Bubbler and Brawler bind arrows to player two.
   var GP_NAME = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
                   Space: 'button1', KeyZ: 'button2', Start: 'start', Select: 'select' };
   function bindGamepad(poll) {

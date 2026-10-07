@@ -1,7 +1,4 @@
-//! PNG image helpers.
-//!
-//! Sprites are authored as RGBA buffers (background = transparent black).
-//! macroquad loads them via `Texture2D::from_file_with_format`.
+//! PNG helpers for RGBA sprites with transparent backgrounds.
 
 use png::{BitDepth, ColorType, Encoder};
 
