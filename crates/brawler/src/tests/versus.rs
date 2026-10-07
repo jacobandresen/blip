@@ -140,9 +140,6 @@ pub(crate) fn each_player_has_their_own_special_window() {
 
 #[test]
 pub(crate) fn a_special_pressed_a_few_frames_apart_still_comes_out() {
-    // Two buttons never land on the same frame. The first starts its own
-    // attack; the second, a moment later, has to turn that into the special
-    // (it used to be buffered behind the punch and forgotten).
     for (first, late) in [(Input { punch_low: true, ..Default::default() }, 3),
                           (Input { kick_low: true, ..Default::default() }, 4)] {
         let mut f = at(0, 200.0, 1.0);

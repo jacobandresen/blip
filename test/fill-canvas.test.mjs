@@ -17,6 +17,11 @@ function canvasRect(canvasW, canvasH, viewportW, viewportH, tx, ty, scale) {
   return { left, top, right: left + canvasW * scale, bottom: top + canvasH * scale };
 }
 
+function assertCentered(rect, width, height) {
+  assert.ok(Math.abs((rect.left + rect.right) / 2 - width / 2) < 0.001);
+  assert.ok(Math.abs((rect.top + rect.bottom) / 2 - height / 2) < 0.001);
+}
+
 const CASES = [
   { cw: 640, ch: 480, vw: 1280, vh: 960  },  // 2× upscale
   { cw: 640, ch: 480, vw:  800, vh: 600  },  // slight scale > 1
@@ -29,12 +34,7 @@ test('canvas center equals viewport center', () => {
   for (const { cw, ch, vw, vh } of CASES) {
     const { scale, tx, ty } = computeTransform(cw, ch, vw, vh);
     const r = canvasRect(cw, ch, vw, vh, tx, ty, scale);
-    const cx = (r.left + r.right)  / 2;
-    const cy = (r.top  + r.bottom) / 2;
-    assert.ok(Math.abs(cx - vw / 2) < 0.001,
-      `x center wrong for ${cw}×${ch} in ${vw}×${vh}: ${cx} ≠ ${vw/2}`);
-    assert.ok(Math.abs(cy - vh / 2) < 0.001,
-      `y center wrong for ${cw}×${ch} in ${vw}×${vh}: ${cy} ≠ ${vh/2}`);
+    assertCentered(r, vw, vh);
   }
 });
 
@@ -49,37 +49,16 @@ test('canvas stays within viewport bounds', () => {
   }
 });
 
-// Regression: a transform computed on the canvas's HTML default size
-// (300x150) rather than the game's real size puts the canvas far off-screen.
-test('transform computed on SDL dimensions differs from one on HTML defaults', () => {
-  const vw = 375, vh = 667; // typical phone
-  const htmlDefault = computeTransform(300, 150, vw, vh);  // wrong — fires before SDL
-  const gameReal    = computeTransform(480, 540, vw, vh);  // correct — after SDL sets
-
-  // The wrong transform (calibrated for 300×150) positions a 480×540 canvas badly
-  const wrongRect = canvasRect(480, 540, vw, vh, htmlDefault.tx, htmlDefault.ty, htmlDefault.scale);
+test('canvas dimensions must be known before computing its transform', () => {
+  const vw = 375, vh = 667;
+  const defaultSize = computeTransform(300, 150, vw, vh);
+  const gameSize = computeTransform(480, 540, vw, vh);
+  const wrongRect = canvasRect(480, 540, vw, vh,
+    defaultSize.tx, defaultSize.ty, defaultSize.scale);
   assert.ok(
     wrongRect.right > vw || wrongRect.bottom > vh,
-    'canvas calibrated for HTML defaults should overflow the viewport when real dims are used'
+    'a transform computed for different canvas dimensions should overflow'
   );
-
-  // The correct transform centers the real canvas
-  const goodRect = canvasRect(480, 540, vw, vh, gameReal.tx, gameReal.ty, gameReal.scale);
-  const cx = (goodRect.left + goodRect.right) / 2;
-  const cy = (goodRect.top + goodRect.bottom) / 2;
-  assert.ok(Math.abs(cx - vw / 2) < 0.001, `x off-center: ${cx}`);
-  assert.ok(Math.abs(cy - vh / 2) < 0.001, `y off-center: ${cy}`);
-});
-
-// Regression: the reverted commit used -(w/2) instead of -(w*scale/2).
-// When scale ≠ 1 this shifts the canvas off-center and partially off-screen.
-test('buggy -(w/2) formula fails when scale != 1', () => {
-  const { cw, ch, vw, vh } = { cw: 640, ch: 480, vw: 1280, vh: 960 };
-  const scale   = Math.min(vw / cw, vh / ch); // 2.0
-  const buggyTx = -(cw / 2);
-  const buggyTy = -(ch / 2);
-  const r = canvasRect(cw, ch, vw, vh, buggyTx, buggyTy, scale);
-  const cx = (r.left + r.right) / 2;
-  assert.notEqual(Math.round(cx), vw / 2,
-    'buggy formula should NOT center the canvas');
+  assertCentered(canvasRect(480, 540, vw, vh,
+    gameSize.tx, gameSize.ty, gameSize.scale), vw, vh);
 });
