@@ -7,8 +7,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openPage, HTTP_PORT, evaluate, waitFor, sleep } from './lib/harness.mjs';
 
-const ENGINE = process.env.BLIP_DECK_ENGINE || 'chromium';
-
 async function loadGame(cdp, slug, controls) {
   await evaluate(cdp, 'true');
   await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/${slug}/index.html` });
@@ -118,8 +116,8 @@ const LAMPS_VISIBLE = `(function () {
   });
 })()`;
 
-test(`brawler's deck seats two players (${ENGINE})`, async (t) => {
-  const { cdp } = await openPage(t, ENGINE);
+test(`brawler's deck seats two players`, async (t) => {
+  const { cdp } = await openPage(t);
 
   await t.test('station two is always on the panel, and comes alive with a player', async () => {
     await loadGame(cdp, 'brawler', 'stick');
@@ -277,8 +275,8 @@ test(`brawler's deck seats two players (${ENGINE})`, async (t) => {
   });
 });
 
-test(`a one-player cabinet still has one station (${ENGINE})`, async (t) => {
-  const { cdp } = await openPage(t, ENGINE);
+test(`a one-player cabinet still has one station`, async (t) => {
+  const { cdp } = await openPage(t);
 
   await t.test('serpent hides the unused second station', async () => {
     // Serpent reads one button; both cabinet action caps map to fire.
@@ -362,8 +360,8 @@ async function geometry(cdp, slug, controls, size, players) {
   return evaluate(cdp, GEOMETRY);
 }
 
-test(`a phone on its side puts the controls beside the picture (${ENGINE})`, async (t) => {
-  const { cdp } = await openPage(t, ENGINE);
+test(`a phone on its side puts the controls beside the picture`, async (t) => {
+  const { cdp } = await openPage(t);
 
   await t.test('sideways, the picture gets the whole height of the screen', async () => {
     for (const [slug, controls, players] of
@@ -577,8 +575,8 @@ async function tap(cdp, key) {
 
 const PLAYERS = "document.documentElement.getAttribute('data-players')";
 
-test(`the deck answers the title screen straight away (${ENGINE})`, async (t) => {
-  const { cdp } = await openPage(t, ENGINE);
+test(`the deck answers the title screen straight away`, async (t) => {
+  const { cdp } = await openPage(t);
 
   for (const controls of ['stick', 'pad']) {
     // Station two is #deck-p2 on the stick deck and #snes-pad-p2 on the pad
@@ -655,8 +653,8 @@ const PHONES = [
   { name: 'iPhone 13', width: 390, height: 844 },
 ];
 
-test(`a thumb gets a real target on a small phone (${ENGINE})`, async (t) => {
-  const { cdp } = await openPage(t, ENGINE);
+test(`a thumb gets a real target on a small phone`, async (t) => {
+  const { cdp } = await openPage(t);
 
   await t.test('every cap is big enough to hit without looking', async () => {
     for (const phone of PHONES) {
@@ -723,10 +721,10 @@ test(`a thumb gets a real target on a small phone (${ENGINE})`, async (t) => {
   });
 });
 
-test(`a big touch screen gets a deck sized for a finger (${ENGINE})`, async (t) => {
+test(`a big touch screen gets a deck sized for a finger`, async (t) => {
   // A large touch screen (neither small nor a mouse) must get the thumb-sized
   // deck too.
-  const { cdp } = await openPage(t, ENGINE);
+  const { cdp } = await openPage(t);
   const browser = cdp.page.context().browser();
 
   for (const [w, h, what] of [[1024, 768, 'tablet'], [1280, 800, 'touch monitor'],
@@ -769,11 +767,11 @@ test(`a big touch screen gets a deck sized for a finger (${ENGINE})`, async (t) 
   }
 });
 
-test(`a second player joins by reaching for their own stick (${ENGINE})`, async (t) => {
+test(`a second player joins by reaching for their own stick`, async (t) => {
   // Tested by touch: a real tap on station two's own button against the real
   // wasm. The page's part is that station two is reachable while the title is
   // up (it is dead during a one-player match).
-  const { cdp } = await openPage(t, ENGINE);
+  const { cdp } = await openPage(t);
   const browser = cdp.page.context().browser();
 
   for (const controls of ['stick', 'pad']) {
@@ -830,10 +828,10 @@ test(`a second player joins by reaching for their own stick (${ENGINE})`, async 
   }
 });
 
-test(`the deck never laps over the picture (${ENGINE})`, async (t) => {
+test(`the deck never laps over the picture`, async (t) => {
   // fillCanvas() must reserve what the deck covers (the caps sit proud of the
   // bar), not just the bar's height.
-  const { cdp } = await openPage(t, ENGINE);
+  const { cdp } = await openPage(t);
   const GAMES = ['bouncer', 'serpent', 'brawler', 'meteors', 'rally', 'sky_raider'];
   const EXTENT = `(function () {
     var c = document.getElementById('glcanvas').getBoundingClientRect();
@@ -875,8 +873,8 @@ test(`the deck never laps over the picture (${ENGINE})`, async (t) => {
 
 // A physical pad has nothing on screen of its own, so station one's tag
 // carries a lamp: dim when a pad is connected, lit once it is used.
-test(`a gamepad lights station one's lamp (${ENGINE})`, async (t) => {
-  const { cdp } = await openPage(t, ENGINE);
+test(`a gamepad lights station one's lamp`, async (t) => {
+  const { cdp } = await openPage(t);
   await loadGame(cdp, 'serpent', 'stick');
 
   const PAD = (pressed) => `(function () {

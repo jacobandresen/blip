@@ -21,7 +21,7 @@ fn blocked(g: &Game) -> Vec<bool> {
     b
 }
 
-fn inside(c: i32, r: i32) -> bool { c >= 0 && c < COLS && r >= 0 && r < ROWS }
+fn inside(c: i32, r: i32) -> bool { (0..COLS).contains(&c) && (0..ROWS).contains(&r) }
 
 /// First step and distance of the shortest path from `from` to `to`.
 fn bfs(b: &[bool], from: Cell, to: Cell, first_ok: impl Fn(Dir) -> bool) -> Option<(Dir, i32)> {

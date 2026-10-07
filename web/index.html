@@ -656,7 +656,7 @@
     #game-grid {user-select:none;touch-action:pan-y}
     #game-grid::before {content:'';position:absolute;left:50%;top:40px;width:min(410px,calc(100% - 24px));height:9px;transform:translateX(-50%);z-index:12;border:1px solid #9b7d53;border-radius:7px;
       background:linear-gradient(180deg,#f5e4c0,#9a7e55 32%,#36291f 67%,#d2b47b);box-shadow:0 4px 7px #080606,inset 0 1px #fff4d8;pointer-events:none;}
-    #game-grid .card {position:absolute;left:50%;top:35px;flex:none;width:min(330px,calc(100% - 44px));height:min(500px,calc(100% - 50px));margin:0;padding:35px 17px 16px!important;
+    #game-grid .card {position:absolute;left:50%;top:35px;flex:none;width:min(380px,calc(100% - 44px));height:min(620px,calc(100% - 50px));margin:0;padding:35px 17px 16px!important;
       border:2px solid color-mix(in srgb,var(--c) 38%,#bca17a);border-radius:7px;scroll-snap-align:center;transform-origin:50% 12px;
       background-color:#241d19;background-image:linear-gradient(118deg,rgba(255,245,220,.14),transparent 22% 72%,rgba(255,245,220,.035)),linear-gradient(155deg,#403128,#241d1a 55%,#30251f);
       box-shadow:0 12px 18px #000a,0 2px 0 #846b4b,inset 0 1px #fff4dc66,inset 0 -3px #0b0909;transition:transform .52s cubic-bezier(.18,.72,.2,1) var(--arc-delay,0ms),box-shadow .3s,border-color .3s;}
@@ -665,7 +665,7 @@
     #game-grid .card {transform:translateX(calc(-50% + var(--arc-x,0px))) translateY(var(--arc-y,0px)) translateZ(var(--arc-z,0px)) rotateZ(var(--arc-tilt,0deg)) rotateY(var(--arc-turn,0deg)) rotateX(var(--arc-pitch,0deg)) scale(var(--arc-scale,1));}
     #game-grid .card.card-focused {z-index:20}
     #game-grid .card-active:not(:hover):not(.card-focused) {z-index:19}
-    #game-grid .card-shot-wrap {flex:none;width:100%;height:132px;aspect-ratio:auto;margin:0 0 10px;padding:5px;border-radius:3px;}
+    #game-grid .card-shot-wrap {flex:none;width:100%;height:164px;aspect-ratio:auto;margin:0 0 10px;padding:5px;border-radius:3px;}
     #game-grid .card-title {font-size:16px;letter-spacing:.12em;line-height:1.25;margin:2px 0 6px;min-height:0;text-align:left;color:color-mix(in srgb,var(--c) 48%,#fff0d3);background:none!important;-webkit-background-clip:border-box!important;background-clip:border-box!important;-webkit-text-fill-color:currentColor!important;font-style:normal;filter:none;text-shadow:0 1px #100b09,0 2px 1px #0009;}
     #game-grid .rolodex-page-card {border-color:#a9936d;background-color:#30271f;background-image:linear-gradient(118deg,rgba(255,245,220,.14),transparent 22% 72%,rgba(255,245,220,.035)),linear-gradient(155deg,#403128,#241d1a 55%,#30251f)}
     #game-grid .rolodex-page-card .card-title {color:#e5d4b5;text-shadow:0 1px #080708,0 2px 1px #0009}
@@ -794,8 +794,8 @@
     #game-grid .card-desc {background:linear-gradient(105deg,#e9ddc1,#f2e7cf 46%,#dfd0af);border-color:#bcaa88;box-shadow:inset 0 0 0 2px #fff6e344,0 1px 2px #0005}
     #game-grid .card .card-shot {transform:none!important;transition:none;filter:none}
     #game-grid .card-shot-wrap::after {content:none;animation:none!important}
-    #game-grid .card.no-credit {filter:grayscale(.72) brightness(.52)}
-    #game-grid .card.no-credit:is(.card-focused,.card-active) {border-color:#625943;box-shadow:0 12px 20px #000b,0 2px 0 #766c56,0 4px 0 #484335,0 5px 0 #151511,inset 0 0 0 2px #a1997944,inset 0 -2px #141411}
+    #game-grid .card.no-credit {filter:grayscale(.62) brightness(.68)}
+    #game-grid .card.no-credit:is(.card-focused,.card-active) {filter:grayscale(.28) brightness(.84);border-color:#8e805f;box-shadow:0 12px 20px #000b,0 2px 0 #8b8069,0 4px 0 #514b3d,0 5px 0 #151511,inset 0 0 0 2px #c0b18b55,inset 0 -2px #141411}
     #game-grid .card-title {text-shadow:none}
     #game-grid .card-shot-wrap {width:142px;max-width:100%;align-self:center;background:linear-gradient(90deg,#29241d,#0d0d0c 12% 88%,#29241d);box-shadow:inset 0 4px 8px #000,inset 0 0 0 3px #100e0c,0 1px #e6d3ae55}
     #game-grid .card-shot-wrap::before {inset:auto auto 11px 50%;width:56px;height:6px;transform:translateX(-50%);z-index:0;background:repeating-linear-gradient(90deg,#9b7942 0 3px,#e4c78b 3px 5px,#171410 5px 8px);box-shadow:0 -1px #423725}
@@ -1685,7 +1685,7 @@
     function fitSelectorRails(){
       var bezel=document.getElementById('screen-bezel');
       var panel=document.getElementById('kiosk-bar');
-      if(panel)bezel.style.setProperty('--cabinet-panel-depth',Math.max(0,innerHeight-panel.getBoundingClientRect().top)+'px');
+      if(panel)bezel.style.setProperty('--cabinet-panel-depth',document.documentElement.getAttribute('data-layout')==='landscape'?'0px':Math.max(0,innerHeight-panel.getBoundingClientRect().top)+'px');
       var guides=document.querySelector('.rolodex-guides');
       var bezelBox=bezel.getBoundingClientRect(),guideBox=guides.getBoundingClientRect();
       bezel.style.setProperty('--rolodex-travel',(Math.max(selectorPlane.offsetHeight,guideBox.bottom-bezelBox.top)+30)+'px');
@@ -1832,6 +1832,39 @@
       var navActive = true;
       var armedCard = null, armTimer = 0;
       var shuffleQueue=[],shuffling=false;
+      // Where a card rests, `delta` places from the front of the rack.
+      function cardPose(c,delta) {
+        var distance=Math.abs(delta), maxShift=Math.max(0,(document.getElementById('game-grid').clientWidth-c.offsetWidth)/2-34);
+        return {
+          x:distance===0?0:Math.sign(delta)*Math.min(maxShift,distance*15),
+          y:distance===0?-24:-35-distance*1.3,
+          z:distance===0?38:-distance*3,
+          turn:distance===0?0:-Math.sign(delta)*Math.min(18,distance*2.5)*Math.min(1,maxShift/20),
+          tilt:distance===0?0:Math.sign(delta)*Math.min(5,distance*.7),
+          pitch:distance===0?0:-Math.min(54,12+distance*6)
+        };
+      }
+      function poseTransform(p) {
+        return 'translateX(calc(-50% + '+p.x+'px)) translateY('+p.y+'px) translateZ('+p.z+'px) rotateZ('+p.tilt+'deg) rotateY('+p.turn+'deg) rotateX('+p.pitch+'deg) scale(1)';
+      }
+      // The card that leaves the front slides out toward its pile, tipping
+      // back, and tucks in behind the card coming forward.
+      function flipToBack(c,from,to) {
+        if(!c.animate||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+        var a=cardPose(c,from), b=cardPose(c,to), dir=to<from?-1:1;
+        var out={x:a.x+dir*86,y:a.y-26,z:a.z+30,turn:dir*-6,tilt:dir*3,pitch:-12};
+        var back={x:b.x+dir*14,y:b.y-6,z:b.z,turn:b.turn,tilt:b.tilt,pitch:b.pitch-4};
+        var rest=Number(c.style.zIndex)||1, top=60;
+        var anim=c.animate([
+          {transform:poseTransform(a),zIndex:top,offset:0,easing:'cubic-bezier(.2,.7,.3,1)'},
+          {transform:poseTransform(out),zIndex:top,offset:.34},
+          {transform:poseTransform(out),zIndex:rest,offset:.35,easing:'cubic-bezier(.4,0,.2,1)'},
+          {transform:poseTransform(back),zIndex:rest,offset:.82,easing:'ease-out'},
+          {transform:poseTransform(b),zIndex:rest,offset:1}
+        ],{duration:560});
+        c.classList.add('card-shuffling');
+        anim.onfinish=anim.oncancel=function(){c.classList.remove('card-shuffling');};
+      }
       function clearTapArm() { armedCard=null;window.clearTimeout(armTimer);armTimer=0; }
       function highlight(force) {
         if (cardInFlight&&!force) return;
@@ -1843,17 +1876,16 @@
           // hand it over from the "last played" card.
           if (navActive) c.classList.remove('card-active');
           if(!c.classList.contains('card'))return;
-          var delta=i-idx, distance=Math.abs(delta), maxShift=Math.max(0,(document.getElementById('game-grid').clientWidth-c.offsetWidth)/2-6);
-          var arcX=distance===0?0:Math.sign(delta)*Math.min(maxShift,distance*15);
-          var arcY=distance===0?-24:-35-distance*1.3;
-          c.style.setProperty('--arc-delay',Math.min(distance,4)*12+'ms');
-          c.style.setProperty('--arc-x',arcX+'px');
-          c.style.setProperty('--arc-y',arcY+'px');
-          c.style.setProperty('--arc-z',distance===0?'38px':(-distance*3)+'px');
-          c.style.setProperty('--arc-turn',distance===0?'0deg':(-Math.sign(delta)*Math.min(18,distance*2.5))+'deg');
-          c.style.setProperty('--arc-tilt',distance===0?'0deg':(Math.sign(delta)*Math.min(5,distance*.7))+'deg');
-          c.style.setProperty('--arc-pitch',distance===0?'0deg':(-Math.min(54,12+distance*6))+'deg');
+          var pose=cardPose(c,i-idx);
+          c.style.setProperty('--arc-delay',Math.min(Math.abs(i-idx),4)*12+'ms');
+          c.style.setProperty('--arc-x',pose.x+'px');
+          c.style.setProperty('--arc-y',pose.y+'px');
+          c.style.setProperty('--arc-z',pose.z+'px');
+          c.style.setProperty('--arc-turn',pose.turn+'deg');
+          c.style.setProperty('--arc-tilt',pose.tilt+'deg');
+          c.style.setProperty('--arc-pitch',pose.pitch+'deg');
           c.style.setProperty('--arc-scale','1');
+          var distance=Math.abs(i-idx);
           c.style.zIndex=String(30-Math.min(distance,25));
         });
         if(cardHadFocus)cards[idx].focus({preventScroll:true});
@@ -1888,11 +1920,12 @@
         idx = (idx + delta + cards.length) % cards.length;
         if(idx!==previous) {
           highlight();
+          if(cards[previous].classList.contains('card'))flipToBack(cards[previous],0,previous-idx);
           if(typeof playRolodexMove==='function') playRolodexMove(delta);
           var track = document.getElementById('game-grid');
           if(cards[idx].classList.contains('card'))track.scrollTo({ left: cards[idx].offsetLeft + cards[idx].offsetWidth / 2 - track.clientWidth / 2, behavior: 'smooth' });
         }
-        window.setTimeout(shuffleNext,360);
+        window.setTimeout(shuffleNext,440);
       }
 
       // The Rolodex is a single horizontal row; every direction steps to its neighbor.

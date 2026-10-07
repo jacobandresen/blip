@@ -1,4 +1,4 @@
-//! Shared score popups, sparks, rings and screen shake.
+//! Shared score popups, sparks and rings.
 //! Call `update(dt)` each frame and `draw(&blip)` after the playfield.
 
 use macroquad::color::Color;
@@ -75,7 +75,7 @@ struct Popup { x: f32, y: f32, t: f32, text: String, c: Color }
 struct Spark { x: f32, y: f32, vx: f32, vy: f32, t: f32, life: f32, c: Color, size: f32 }
 struct Ring { x: f32, y: f32, t: f32, life: f32, r: f32, c: Color }
 
-/// The effects layer: popups, sparks, rings and shake together.
+/// The effects layer: popups, sparks and rings together.
 #[derive(Default)]
 pub struct Fx {
     popups: Vec<Popup>,
@@ -83,7 +83,6 @@ pub struct Fx {
     rings: Vec<Ring>,
     /// Pulls sparks down, px/s². 0 lets them drift (space, a top-down board).
     pub gravity: f32,
-    shake: f32,
 }
 
 impl Fx {
@@ -111,21 +110,10 @@ impl Fx {
         self.rings.push(Ring { x, y, t: 0.0, life, r: radius, c });
     }
 
-    /// Shake the screen; strength is in pixels and decays over about a third of a second.
-    pub fn shake(&mut self, px: f32) { self.shake = self.shake.max(px); }
-
-    /// The current shake offset to add to the playfield's drawing.
-    pub fn shake_offset(&self) -> (f32, f32) {
-        if self.shake <= 0.0 { return (0.0, 0.0); }
-        use macroquad::rand::gen_range;
-        (gen_range(-self.shake, self.shake), gen_range(-self.shake, self.shake))
-    }
-
     pub fn clear(&mut self) {
         self.popups.clear();
         self.sparks.clear();
         self.rings.clear();
-        self.shake = 0.0;
     }
 
     pub fn update(&mut self, dt: f32) {
@@ -142,7 +130,6 @@ impl Fx {
         self.sparks.retain(|s| s.t < s.life);
         for r in &mut self.rings { r.t += dt; }
         self.rings.retain(|r| r.t < r.life);
-        self.shake = (self.shake - dt * self.shake.max(3.0) * 3.0).max(0.0);
     }
 
     pub fn draw(&self, blip: &Blip) {

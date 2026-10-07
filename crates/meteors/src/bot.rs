@@ -24,7 +24,7 @@ pub fn drive(g: &Game, t: f32) {
                 let aim = lx.atan2(-ly);
                 let closing = -(dx * (vx - s.vx) + dy * (vy - s.vy)) / dist.max(1.0);
                 let urgency = dist - r - closing * 1.5;
-                if best.map_or(true, |b| urgency < b.0) { best = Some((urgency, aim, dist)); }
+                if best.is_none_or(|b| urgency < b.0) { best = Some((urgency, aim, dist)); }
                 if dist - r < 70.0 && closing > 20.0 { danger = Some((dx, dy)); }
             };
             for a in pool_iter(&g.asteroids) { consider(a.x, a.y, a.vx, a.vy, a.size.radius()); }

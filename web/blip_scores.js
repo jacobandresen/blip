@@ -482,7 +482,11 @@
     if (!g) return;
     sb.from('leaderboard_top').select('handle,score')
       .eq('game', g.slug).order('rank').limit(1)
-      .then(function (r) { if (r.data && r.data[0]) cacheTop(g.slug, r.data[0]); })
+      .then(function (r) {
+        if (!r.data) return;
+        if (r.data[0]) cacheTop(g.slug, r.data[0]);
+        else lsSet('blip-top-' + g.slug, '');     // an emptied board drops its old record
+      })
       .catch(function () {});
   }());
 }());

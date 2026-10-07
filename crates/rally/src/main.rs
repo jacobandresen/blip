@@ -116,14 +116,14 @@ impl Game {
     fn start_game(&mut self) {
         self.score_l = 0;
         self.score_r = 0;
-        self.serve_dir = if rand() % 2 == 0 { 1.0 } else { -1.0 };
+        self.serve_dir = if rand().is_multiple_of(2) { 1.0 } else { -1.0 };
         self.reset_for_serve();
         self.state = State::Serve;
     }
 }
 
 struct Beeps {
-    wall: blip::BlipSound,    // 490 Hz / 22 ms
+    wall: blip::BlipSound,    // 587 Hz / 35 ms
     hit_l: blip::BlipSound,   // 240 Hz / 35 ms
     hit_r: blip::BlipSound,   // 300 Hz / 35 ms
     score_l: blip::BlipSound, // 660 Hz / 120 ms (player scored)
@@ -358,6 +358,17 @@ fn draw_title(blip: &Blip) {
     blip.fill_rect(LPAD_X, py, PAD_W, PAD_H, C_PAD);
     blip.fill_rect(RPAD_X, py, PAD_W, PAD_H, C_PAD);
     let cy = PLAY_T + PLAY_H * 0.5;
+    let t = blip::macroquad::time::get_time() as f32;
+    let travel = (t * 150.0).rem_euclid(WIN_W as f32 * 2.0);
+    let ball_x = if travel <= WIN_W as f32 { travel } else { WIN_W as f32 * 2.0 - travel };
+    let ball_y = cy + 126.0 + (t * 2.1).sin() * 10.0;
+    let trail_dir = if travel < WIN_W as f32 { -1.0 } else { 1.0 };
+    for (i, alpha) in [0.12, 0.24, 0.42].into_iter().enumerate() {
+        let offset = (i as f32 + 1.0) * 9.0 * trail_dir;
+        blip.fill_rect(ball_x + offset, ball_y, BALL_SZ, BALL_SZ,
+            BlipColor { r: 0.72, g: 0.92, b: 1.0, a: alpha });
+    }
+    blip.fill_rect(ball_x, ball_y, BALL_SZ, BALL_SZ, BLIP_WHITE);
     blip.draw_centered("RALLY", cy - 34.0, 5.0, BLIP_YELLOW);
     // Moving a paddle (dial or keys) picks the mode; there is no menu.
     blip.draw_centered("MOVE LEFT PADDLE: 1 PLAYER",   cy + 14.0, 2.0, BLIP_WHITE);

@@ -29,14 +29,6 @@ async function open(cdp, page, settle = 4000) {
   await sleep(settle);
 }
 
-async function cabinetShot(cdp, name) {
-  if (!process.env.BLIP_JUKEBOX_SHOTS) return;
-  const dir = process.env.BLIP_JUKEBOX_SHOTS;
-  await mkdir(dir, { recursive: true });
-  const shot = await cdp.send('Page.captureScreenshot', { format: 'png' });
-  await writeFile(path.join(dir, `${name}.png`), Buffer.from(shot.data, 'base64'));
-}
-
 async function key(cdp, k, code, vk) {
   for (const type of ['keyDown', 'keyUp']) {
     await cdp.send('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk });
@@ -87,27 +79,6 @@ test('the game shell', async (t) => {
     await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.add('visible'); true");
     await key(cdp, 'Escape', 'Escape', 27);
     assert.ok(await evaluate(cdp, "!document.querySelector('.blip-hs-modal')"), 'Escape did not close the prompt');
-  });
-
-  await t.test('a name can be entered with a stick and the fire button', async (t) => {
-    const cdp = await browser(t, 9406);
-    await open(cdp, 'meteors/index.html', 6000);
-    await evaluate(cdp, "localStorage.removeItem('blip-handle'); window.blipScores.promptHandle('test'); true");
-    await sleep(800);     // the prompt takes no keys in its first half second
-    const name = "document.querySelector('.blip-hs-input').value";
-    const press = async (...keys) => {
-      for (const k of keys) await key(cdp, k, k, { ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39 }[k]);
-    };
-    await press('ArrowUp', 'ArrowUp', 'ArrowUp');           // A, B, C
-    assert.equal(await evaluate(cdp, name), 'C');
-    await press('ArrowRight', 'ArrowDown');                  // CA, then back round to C_
-    assert.equal(await evaluate(cdp, name), 'C_');
-    await press('ArrowLeft');
-    assert.equal(await evaluate(cdp, name), 'C');
-    // Fire accepts: one letter is too short, and the prompt says so.
-    await key(cdp, ' ', 'Space', 32);
-    assert.equal(await evaluate(cdp, name), 'C', 'fire typed a space instead of accepting');
-    assert.match(await evaluate(cdp, "document.querySelector('.blip-hs-err').textContent"), /2-14/);
   });
 
   await t.test('fullscreen on a PC is the top bar and the picture, and comes off again', async (t) => {
@@ -180,7 +151,6 @@ test('the game shell', async (t) => {
   await t.test('the mechanical title stays in place and flips through every game', async (t) => {
     const cdp = await browser(t, 9410, { width: 1280, height: 800 });
     await open(cdp, 'index.html');
-    await cabinetShot(cdp, 'rack');
     const layout = `JSON.stringify((function(){var n=document.querySelector('#marquee-name'),r=n.getBoundingClientRect();
       return {box:[r.left,r.top,r.width,r.height],cells:n.querySelectorAll('.marquee-letter').length,
         dots:n.querySelectorAll('.marquee-dot').length,text:Array.prototype.map.call(n.querySelectorAll('.marquee-letter'),function(x){return x.textContent}).join(''),
@@ -189,8 +159,8 @@ test('the game shell', async (t) => {
     assert.equal(empty.cells, 8);
     assert.equal(empty.dots, 0);
     assert.equal(empty.text, '\u00a0'.repeat(8));
-    assert.equal(await evaluate(cdp, "document.querySelector('.top-marquee-bar').getBoundingClientRect().height"), 52,
-      'the raised marquee keeps the original fascia height');
+    assert.equal(await evaluate(cdp, "document.querySelector('.top-marquee-bar').getBoundingClientRect().height"), 60,
+      'the fascia is tall enough for the large title flipper');
     assert.equal(await evaluate(cdp, "document.querySelectorAll('.top-marquee-bar .marquee-bulbs').length"), 0,
       'the cabinet fascia has no dot strips');
     assert.ok(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent === 'RALLY' && document.querySelector('.card-focused .card-desc').textContent.length > 20"),
@@ -239,10 +209,8 @@ test('the game shell', async (t) => {
     assert.equal(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent"), 'BOUNCER');
     await key(cdp, ' ', 'Space', 32);
     await sleep(1450);
-    await cabinetShot(cdp, 'pickup');
     await sleep(18000);
     assert.equal(await evaluate(cdp, 'location.pathname'), '/bouncer/index.html');
-    await cabinetShot(cdp, 'screen');
     assert.equal(await evaluate(cdp, "document.querySelector('.jukebox-receiver').classList.contains('loaded')"), true,
       'the selected card seats in the receiver before the title changes');
     assert.equal(await evaluate(cdp, "getComputedStyle(document.querySelector('.jukebox-seated-card')).opacity"), '1',

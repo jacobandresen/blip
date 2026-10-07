@@ -64,10 +64,12 @@ rustup target add wasm32-unknown-unknown   # one-time
 Run the test suite locally before pushing:
 
 ```
-node --test test/fill-canvas.test.mjs   # unit tests (canvas geometry)
-cargo test --release                    # game rules (Brawler's balance, Serpent's turns, ...)
-npm run test:shell                      # the web shell in headless Chromium (after ./build_web.sh)
-npm run test:scores                     # high-score entry in all seven scoring games (ten minutes)
+npm test                # canvas geometry (unit)
+cargo test --release    # game rules (Brawler's balance, Serpent's turns, ...)
+npm run test:web        # cabinet, manual, top bar, controls, decks (after ./build_web.sh)
+npm run test:shell      # the game shell in headless Chromium (six minutes)
+npm run test:scores     # high-score entry in all seven scoring games (ten minutes)
+npm run test:scores-db  # the score backend, against `npx supabase start` (skipped without it)
 ```
 
 `test:scores` plays each built game until it ends and enters a name typed,
@@ -76,8 +78,10 @@ after touching `blip_scores.js`, the shell's key handling, or a game's
 game-over path. A game hears keys only while the canvas has focus: anything
 that takes focus (a prompt, a button) must leave it back there.
 
-`test/shell.mjs` needs only a Chromium binary; the other browser suites
-(`test:controls`, `test:deck`, `test:topbar`) need Playwright installed.
+The browser suites need Playwright and a Chromium binary (`BLIP_CHROMIUM`
+names one outside `PATH`). Test files are `node:test` suites, one theme
+each: `cabinet.mjs` (the card rack), `manual.mjs`, `topbar-layout.mjs`,
+`controls.mjs`, `two-player-*.mjs` (decks and phones).
 
 For native development:
 
@@ -122,6 +126,10 @@ BLIP_BOT=1 BLIP_BOT_MAXT=300 xvfb-run -a -s "-screen 0 720x810x24" target/releas
 
 `BLIP_BOT_SHOTS=dir` saves a frame every `BLIP_BOT_SHOT_EVERY` seconds. Run
 one game at a time.
+
+`BLIP_BOT_FUZZ=<seed>` swaps the autopilot for random key mashing, which finds
+panics and stuck screens the bot's good play never reaches. Bubbler's own bot
+has no fuzz mode.
 
 ## Pixel text
 

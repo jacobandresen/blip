@@ -807,7 +807,7 @@ fn draw_haze(blip: &Blip, blot: &Texture2D, rocks: &[Asteroid], level: i32, t: f
         let r = 200.0 + 70.0 * (k * 1.3).sin();
         // squared, so on the early waves each is gone a while between showings
         let fade = (0.5 + 0.5 * (t * (0.21 + 0.03 * k) + k * 1.9).sin()).powi(2);
-        (x, y, r, 0.7 * full + (1.0 - 0.7 * full) * fade, if i % 2 == 0 { NEON_GREEN } else { NEON_PURPLE })
+        (x, y, r, 0.7 * full + (1.0 - 0.7 * full) * fade, if i.is_multiple_of(2) { NEON_GREEN } else { NEON_PURPLE })
     };
     for i in 0..HAZES {
         let (x, y, r, fade, c) = patch(i);
@@ -1002,6 +1002,17 @@ fn draw_title(blip: &Blip, hi: &web::HighScore) {
         else { ("PAD TURNS   UP THRUSTS", "BUTTONS FIRE AND HYPERSPACE") };
     blip.draw_centered(l1, (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
     blip.draw_centered(l2, (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);
+    let t = blip::macroquad::time::get_time() as f32;
+    let rocks = [
+        Asteroid { active: true, x: 120.0, y: 606.0, vx: 0.0, vy: 0.0, size: ASize::Large,
+            rot: t * 0.16, spin: 0.16, jag: [0.78, 1.0, 0.88, 1.08, 0.75, 0.96, 1.12, 0.84, 1.0, 0.9] },
+        Asteroid { active: true, x: 560.0, y: 604.0, vx: 0.0, vy: 0.0, size: ASize::Medium,
+            rot: -t * 0.22, spin: -0.22, jag: [0.86, 1.12, 0.78, 0.96, 1.08, 0.82, 1.04, 0.9, 1.14, 0.8] },
+    ];
+    for rock in &rocks { draw_asteroid(blip, rock, 1, t); }
+    let ship = Ship { x: 340.0 + (t * 0.5).sin() * 12.0, y: 608.0,
+        vx: (t * 0.5).cos() * 6.0, vy: 0.0, angle: (t * 0.35).sin() * 0.12, thrusting: false };
+    draw_ship(blip, &ship, 0.0, 1, NEON_CYAN);
 }
 
 fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {

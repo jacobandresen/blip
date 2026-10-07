@@ -1,12 +1,14 @@
-/* End-to-end check of the high-score backend against a local
- * `supabase start` stack. Not part of `npm test` (needs Docker + the
- * stack running). Run:
- *
- *   npx supabase start
- *   node test/highscores.mjs        # reads the URL + anon key from `supabase status`
- *
- * Or point it elsewhere with SUPABASE_URL / SUPABASE_ANON_KEY.
- */
+// The high-score backend, end to end against a local `supabase start` stack
+// (Docker). Skipped when no stack answers. The steps share state and run in
+// order.
+//
+//   npx supabase start
+//   node --test test/highscores.mjs
+//
+// The URL and anon key come from `supabase status`, or SUPABASE_URL and
+// SUPABASE_ANON_KEY.
+
+import test from 'node:test';
 import { createClient } from '@supabase/supabase-js';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
@@ -27,19 +29,10 @@ const local = fromSupabaseStatus();
 const URL = process.env.SUPABASE_URL || local.url || 'http://127.0.0.1:54321';
 const ANON = process.env.SUPABASE_ANON_KEY || local.anon;
 
-if (!ANON) {
-  console.error('No anon key — run `npx supabase start` first, or set SUPABASE_ANON_KEY.');
-  process.exit(2);
-}
-
 const rnd = () => 'T' + Math.random().toString(36).slice(2, 8).toUpperCase();
-const fresh = () => createClient(URL, ANON, { auth: { persistSession: false } });
+const fresh = () => createClient(URL, ANON || 'no-stack', { auth: { persistSession: false } });
 
-let failed = 0;
-async function step(name, fn) {
-  try { await fn(); console.log('  ok  ', name); }
-  catch (e) { failed++; console.error('  FAIL', name, '\n       ', e.message); }
-}
+const step = (name, fn) => test(name, { skip: !ANON && 'no local supabase stack' }, fn);
 
 // -- player A: anonymous sign-in, claim a handle, submit a score ----------
 const a = fresh();
@@ -180,6 +173,3 @@ await step('new_recovery_code rotates and invalidates the old one', async () => 
   const { data: old } = await c.rpc('restore_handle', { p_code: codeA });
   assert.equal(old.reason, 'bad_code');
 });
-
-console.log(failed ? `\n${failed} check(s) failed` : '\nall checks passed');
-process.exit(failed ? 1 : 0);

@@ -9,7 +9,6 @@ import { readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { openPage, HTTP_PORT, WEB_DIR, evaluate, waitFor, sleep } from './lib/harness.mjs';
 
-const ENGINE = process.env.BLIP_TOPBAR_ENGINE || 'chromium';
 
 /** Every built game page, discovered rather than listed, so a new game
  * is covered the day it is added instead of the day someone remembers. */
@@ -88,12 +87,8 @@ function assertInsideBar(m, label) {
 
 /** Page-wide horizontal overflow, reported apart from the bar: a real defect,
  * but not this test's subject. */
-function sidewaysOverflow(m) {
-  return m.scrollW - m.winW;
-}
-
-test(`the BLIP logo stays on the marquee and coinbox aligns with the deck (${ENGINE})`, async (t) => {
-  const { browser, page, cdp } = await openPage(t, ENGINE);
+test(`the BLIP logo stays on the marquee and coinbox aligns with the deck`, async (t) => {
+  const { browser, page, cdp } = await openPage(t);
 
   assert.ok(GAME_PAGES.length > 0, 'found no built game pages to check');
 
@@ -111,13 +106,6 @@ test(`the BLIP logo stays on the marquee and coinbox aligns with the deck (${ENG
 
         const m = await evaluate(cdp, MEASURE);
         assertInsideBar(m, `${rel} @ ${vp.width}x${vp.height}`);
-
-        // Noted, not asserted: controls.html's key table is wider than a
-        // phone, so that page scrolls sideways regardless of the top bar.
-        const over = sidewaysOverflow(m);
-        if (over > SLACK) {
-          t.diagnostic(`${rel} @ ${vp.width}x${vp.height}: page scrolls sideways by ${over}px (not a top-bar fault)`);
-        }
       });
     }
   }

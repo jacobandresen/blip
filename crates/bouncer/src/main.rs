@@ -62,6 +62,7 @@ const DROP_W: f32 = 32.0;
 const DROP_H: f32 = 18.0;
 const DROP_SPEED: f32 = 120.0;
 const EFFECT_DURATION: f32 = 8.0;
+const EFFECT_WARN: f32 = 2.0;   // the indicator blinks for this long before an effect ends
 const PAD_W_WIDE: f32 = 130.0;
 const PAD_W_NARROW: f32 = 46.0;
 const BALL_SLOW_FACTOR: f32 = 0.6;
@@ -319,7 +320,7 @@ impl Game {
         let r01 = rand_range_f32(0.0, 1.0);
         // 36-43 degrees off vertical, either side, at exactly the ramp's
         // speed (the old (sin, 1) vector served a third too fast).
-        let side = if rand() % 2 == 0 { 1.0 } else { -1.0 };
+        let side = if rand().is_multiple_of(2) { 1.0 } else { -1.0 };
         let (s, c) = (0.62 + r01 * 0.12).sin_cos();
         self.ball_vx = side * self.ball_speed * s;
         self.ball_vy = -self.ball_speed * c;
@@ -886,16 +887,19 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
         blip.draw_texture_cell(&drops[d.kind as usize], 0, 1, 0, 1, d.x, d.y, DROP_W, DROP_H, phase.sin() * 0.16);
     }
 
-    // Draw active effect indicators
-    let indicator_y = (PAD_Y - 20) as f32;
-    if g.slow_timer.active() {
-        blip.draw_centered("SLOW", indicator_y, 2.0, BLIP_CYAN);
-    } else if g.pad_effect_timer.active() {
-        if g.pad_w > PAD_W as f32 {
-            blip.draw_centered("WIDE",   indicator_y, 2.0, BLIP_GREEN);
-        } else {
-            blip.draw_centered("NARROW", indicator_y, 2.0, BLIP_RED);
+    // Each active effect on its own line with its seconds left; it blinks for the last two.
+    let widened = g.pad_w > PAD_W as f32;
+    let effects = [
+        (g.slow_timer.active(), "SLOW", BLIP_CYAN, g.slow_timer.remaining()),
+        (g.pad_effect_timer.active(), if widened { "WIDE" } else { "NARROW" },
+            if widened { BLIP_GREEN } else { BLIP_RED }, g.pad_effect_timer.remaining()),
+    ];
+    let mut line_y = (PAD_Y - 20) as f32;
+    for (_, label, color, left) in effects.iter().filter(|e| e.0) {
+        if *left > EFFECT_WARN || (left * 6.0) as i32 % 2 == 0 {
+            blip.draw_centered(&format!("{label} {}", left.ceil() as i32), line_y, 2.0, *color);
         }
+        line_y -= 18.0;
     }
 
     // Left cap, stretched middle, right cap: the ends keep their shape at any width.
@@ -947,8 +951,17 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
     blip.draw_hud(g.sess.score, g.sess.lives);
 }
 
-fn draw_title(blip: &Blip, hi: &web::HighScore) {
+fn draw_title(blip: &Blip, hi: &web::HighScore, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9]) {
     blip.clear(BLIP_BLACK);
+    for (row, (start, count)) in [(1, 8), (2, 6)].into_iter().enumerate() {
+        let x0 = (WIN_W - count * (BRICK_W + BRICK_GAP) + BRICK_GAP) / 2;
+        for col in 0..count {
+            let kind = ((start + col) % 6) as usize;
+            let x = (x0 + col * (BRICK_W + BRICK_GAP)) as f32;
+            let y = (HUD_H + 36 + row as i32 * (BRICK_H + BRICK_GAP)) as f32;
+            blip.draw_texture(&brick[kind], x, y, BRICK_W as f32, BRICK_H as f32);
+        }
+    }
     blip.draw_centered("BOUNCER",                 (WIN_H / 4) as f32,         6.0, BLIP_CYAN);
     // BOUNCER is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
@@ -962,6 +975,22 @@ fn draw_title(blip: &Blip, hi: &web::HighScore) {
     for (i, line) in lines.iter().enumerate() {
         blip.draw_centered(line, (WIN_H * 2 / 3 + 20 * i as i32) as f32, 2.0, BLIP_GRAY);
     }
+    let t = blip::macroquad::time::get_time() as f32;
+    let cx = WIN_W as f32 * 0.5 + (t * 1.2).sin() * 132.0;
+    let bx = cx - BALL_W as f32 * 0.5;
+    let by = PAD_Y as f32 - 48.0 + (t * 2.0).sin() * 7.0;
+    for i in (1..=3).rev() {
+        blip.fill_rect(bx - i as f32 * 8.0, by + 3.0, BALL_W as f32, BALL_H as f32,
+            BlipColor { r: 0.25, g: 0.55, b: 1.0, a: 0.11 / i as f32 });
+    }
+    blip.draw_texture_cell(ball, 0, BALL_YAW_N, 0, BALL_PITCH_N, bx, by, BALL_W as f32, BALL_H as f32, t * 0.7);
+    blip.draw_texture(shade, bx, by, BALL_W as f32, BALL_H as f32);
+    let pad_x = (cx - PAD_W as f32 * 0.5).clamp(0.0, WIN_W as f32 - PAD_W as f32);
+    let cap = PADDLE_CAP as f32;
+    let sw = paddle.width();
+    blip.draw_texture_region(paddle, 0.0, 0.0, cap, 24.0, pad_x, PAD_Y as f32, cap * 0.5, PAD_H as f32);
+    blip.draw_texture_region(paddle, cap, 0.0, sw - 2.0 * cap, 24.0, pad_x + cap * 0.5, PAD_Y as f32, PAD_W as f32 - cap, PAD_H as f32);
+    blip.draw_texture_region(paddle, sw - cap, 0.0, cap, 24.0, pad_x + PAD_W as f32 - cap * 0.5, PAD_Y as f32, cap * 0.5, PAD_H as f32);
 }
 
 fn draw_win(blip: &Blip, level: i32) {
@@ -1101,7 +1130,7 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, &web::high_score()),
+            State::Title => draw_title(&blip, &web::high_score(), &paddle, &ball, &ball_shade, &brick),
             State::Win   => draw_win(&blip, g.sess.level),
             State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
             State::Launch | State::Play | State::Dead => {

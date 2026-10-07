@@ -1,6 +1,7 @@
 //! Native playtest autopilot. `BLIP_BOT=1` enables fixed 60 Hz input;
 //! `BLIP_BOT_MAXT` sets the time limit and `BLIP_BOT_SHOTS` enables screenshots.
-//! Disabled on wasm.
+//! `BLIP_BOT_FUZZ=<seed>` replaces the game's autopilot with random key mashing,
+//! to look for panics and stuck screens. Disabled on wasm.
 
 use macroquad::input::KeyCode;
 
@@ -21,6 +22,10 @@ mod imp {
         pub next_shot: f32,
         pub shot_n: u32,
         pub stats: BTreeMap<String, f64>,
+        /// Random key mashing instead of the autopilot: the generator state, or 0 when off.
+        pub fuzz: u64,
+        pub fuzz_left: u32,
+        pub fuzz_keys: Vec<KeyCode>,
     }
 
     pub static ST: Mutex<Option<St>> = Mutex::new(None);
@@ -40,6 +45,10 @@ mod imp {
                 next_shot: 1.0,
                 shot_n: 0,
                 stats: BTreeMap::new(),
+                fuzz: std::env::var("BLIP_BOT_FUZZ").ok()
+                    .map_or(0, |v| v.parse::<u64>().unwrap_or(1).wrapping_mul(2654435761).max(1)),
+                fuzz_left: 0,
+                fuzz_keys: Vec::new(),
             }
         });
         f(st)
@@ -55,10 +64,30 @@ pub fn active() -> bool {
     { false }
 }
 
+/// Keys a fuzzing run presses, each held for a few frames at random.
+#[cfg(not(target_arch = "wasm32"))]
+const FUZZ_KEYS: [KeyCode; 11] = [
+    KeyCode::Up, KeyCode::Down, KeyCode::Left, KeyCode::Right, KeyCode::W, KeyCode::A,
+    KeyCode::S, KeyCode::D, KeyCode::Space, KeyCode::Z, KeyCode::F,
+];
+
 /// The keys the bot holds from now until the next call.
 pub fn hold(keys: &[KeyCode]) {
     #[cfg(not(target_arch = "wasm32"))]
-    imp::with(|s| { s.held.clear(); s.held.extend_from_slice(keys); });
+    imp::with(|s| {
+        s.held.clear();
+        if s.fuzz == 0 { s.held.extend_from_slice(keys); return; }
+        if s.fuzz_left == 0 {
+            s.fuzz_left = 4;
+            s.fuzz = s.fuzz.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let bits = s.fuzz >> 20;
+            s.fuzz_keys = FUZZ_KEYS.iter().enumerate()
+                .filter(|(i, _)| (bits >> (i * 3)) & 3 == 0).map(|(_, k)| *k).collect();
+        }
+        s.fuzz_left -= 1;
+        let keys = s.fuzz_keys.clone();
+        s.held.extend(keys);
+    });
     #[cfg(target_arch = "wasm32")]
     let _ = keys;
 }

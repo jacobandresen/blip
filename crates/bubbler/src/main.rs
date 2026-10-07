@@ -843,7 +843,7 @@ fn pop_chain(g: &mut Game, start: usize, by: usize, sfx: &Sounds) {
     play_sfx(&sfx.pop);
     g.stats.pops += 1;
     g.stats.kills += kills as u32;
-    if kills > 0 { g.stats.chains[(kills as usize).min(5)] += 1; }
+    if kills > 0 { g.stats.chains[kills.min(5)] += 1; }
     if kills > 0 { play_sfx(&sfx.kill); }
     if kills >= 2 {
         g.chain = (kills as i32, 1.2);
@@ -1918,7 +1918,7 @@ async fn main() {
         #[allow(unused_mut)]
         let mut p2_start = key_pressed(BLIP_KEY_J) || key_pressed(BLIP_KEY_K);
         #[cfg(not(target_arch = "wasm32"))]
-        if bot > 0 && std::env::var("BUBBLER_MAXT").ok().and_then(|v| v.parse::<f32>().ok()).map_or(false, |m| bot_clock > m) {
+        if bot > 0 && std::env::var("BUBBLER_MAXT").ok().and_then(|v| v.parse::<f32>().ok()).is_some_and(|m| bot_clock > m) {
             g.state = State::Over;
         }
         #[cfg(not(target_arch = "wasm32"))]
@@ -2031,12 +2031,11 @@ async fn main() {
                         cosy(&blip, &format!("ROUND {}", g.round + 1), 170.0 + DY, 3.5, PEACH, PEACH, st * 3.0, (st * 4.0).min(1.0));
                         if st > 0.7 { cosy(&blip, "READY!", 236.0 + DY, 2.2, CREAM, MINT, (st - 0.7) * 3.0, ((st - 0.7) * 4.0).min(1.0)); }
                     }
-                    State::Play => {
-                        if g.hurry && g.round_t < hurry_at(g.round) + 2.4 {
+                    State::Play
+                        if g.hurry && g.round_t < hurry_at(g.round) + 2.4 => {
                             let a = 0.6 + 0.4 * (g.round_t * 8.0).sin().abs();
                             cosy(&blip, "HURRY UP!", 196.0 + DY, 3.2, (255, 150, 150), (255, 110, 120), 1.0, a);
                         }
-                    }
                     _ => {}
                 }
                 if g.chain.1 > 0.0 {

@@ -1096,7 +1096,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.aliens[ai].alive = false;
                 g.bullets[bi].active = false;
                 g.streak += 1;
-                let times = (1 + (g.streak - 1) / STREAK_PER).min(STREAK_MAX);
+                let times = streak_multiple(g.streak);
                 let pts = match kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * times;
                 g.sess.add_score(pts);
                 let (cx, cy) = (ax + ALIEN_W as f32 / 2.0, ay + ALIEN_H as f32 / 2.0);
@@ -1388,6 +1388,23 @@ fn draw_play(blip: &Blip, g: &Game,
     draw_ufo(blip, g, saucer);
     g.fx.draw(blip);
     blip.draw_hud(g.sess.score, g.sess.lives);
+    if g.streak > 0 {
+        let x = blip.text_cx(&streak_label(g.streak), 2) as f32;
+        blip.draw_text(&streak_label(g.streak), x, (GROUND_Y + 10) as f32, 2.0, BLIP_YELLOW);
+    }
+}
+
+/// Score multiple for `streak` hits in a row: one more every `STREAK_PER` hits.
+fn streak_multiple(streak: i32) -> i32 {
+    (1 + (streak - 1) / STREAK_PER).max(1).min(STREAK_MAX)
+}
+
+/// The strip under the ground line: the run of hits, the multiple it earns, and how many more raise it.
+fn streak_label(streak: i32) -> String {
+    let times = streak_multiple(streak);
+    if times == STREAK_MAX { return format!("{streak} IN A ROW  X{times}"); }
+    let to_next = times * STREAK_PER + 1 - streak;
+    format!("{streak} IN A ROW  X{times}  {to_next} FOR X{}", times + 1)
 }
 
 fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
@@ -1407,15 +1424,27 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
     let row1 = (WIN_H / 2 - 20) as f32;
     let row2 = (WIN_H / 2) as f32;
 
-    blip.draw_texture_tinted(&alien[0][0], ax, row0 + voff, dw, dh, alien_color(0));
-    blip.draw_texture_tinted(&alien[1][0], ax, row1 + voff, dw, dh, alien_color(1));
-    blip.draw_texture_tinted(&alien[2][0], ax, row2 + voff, dw, dh, alien_color(2));
+    // The invaders' two-frame shuffle, one beat every half second.
+    let beat = (blip::macroquad::time::get_time() * 2.0) as i64;
+    let frame = (beat % 2) as usize;
+    blip.draw_texture_tinted(&alien[0][frame], ax, row0 + voff, dw, dh, alien_color(0));
+    blip.draw_texture_tinted(&alien[1][frame], ax, row1 + voff, dw, dh, alien_color(1));
+    blip.draw_texture_tinted(&alien[2][frame], ax, row2 + voff, dw, dh, alien_color(2));
 
     blip.draw_centered("30 PTS",        row0,                 2.0, BLIP_MAGENTA);
     blip.draw_centered("20 PTS",        row1,                 2.0, BLIP_CYAN);
     blip.draw_centered("10 PTS",        row2,                 2.0, BLIP_GREEN);
     let prompt = web::controls().pick("PRESS FIRE", "PRESS FIRE", "TAP TO START");
     blip.draw_centered(prompt, (WIN_H * 2 / 3) as f32, 3.0, BLIP_WHITE);
+    // A patrol steps across the foot of the screen, a stride per beat.
+    let sweep = 5i64;
+    let pos = beat.rem_euclid(sweep * 2);
+    let step = if pos < sweep { pos } else { sweep * 2 - pos - 1 };
+    for i in 0..6i64 {
+        let kind = (i % 3) as usize;
+        let x = 90.0 + (i * 52) as f32 + step as f32 * 12.0;
+        blip.draw_texture_tinted(&alien[kind][frame], x, (WIN_H * 5 / 6) as f32, dw, dh, alien_color(kind));
+    }
 }
 
 fn draw_win(blip: &Blip, level: i32) {
@@ -1575,6 +1604,23 @@ mod tests {
                 "level {level} disagrees about whether it ends with a mothership"
             );
         }
+    }
+
+    #[test]
+    fn the_strip_counts_down_to_the_next_multiple() {
+        let shown: Vec<(i32, i32, String)> = [1, 3, 4, 6, 7]
+            .into_iter().map(|n| (n, streak_multiple(n), streak_label(n))).collect();
+        assert_eq!(shown[0], (1, 1, "1 IN A ROW  X1  3 FOR X2".to_string()));
+        assert_eq!(shown[1], (3, 1, "3 IN A ROW  X1  1 FOR X2".to_string()));
+        assert_eq!(shown[2], (4, 2, "4 IN A ROW  X2  3 FOR X3".to_string()));
+        assert_eq!(shown[3], (6, 2, "6 IN A ROW  X2  1 FOR X3".to_string()));
+        assert_eq!(shown[4], (7, 3, "7 IN A ROW  X3  3 FOR X4".to_string()));
+    }
+
+    #[test]
+    fn the_multiple_stops_at_its_cap() {
+        assert_eq!(streak_multiple(STREAK_PER * STREAK_MAX * 3), STREAK_MAX);
+        assert_eq!(streak_label(100), format!("100 IN A ROW  X{STREAK_MAX}"));
     }
 
     #[test]

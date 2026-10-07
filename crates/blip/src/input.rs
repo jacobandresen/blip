@@ -13,26 +13,14 @@ pub const BLIP_KEY_S:       KeyCode = KeyCode::S;
 pub const BLIP_KEY_D:       KeyCode = KeyCode::D;
 pub const BLIP_KEY_SPACE:   KeyCode = KeyCode::Space;  // primary fire / jump / confirm
 pub const BLIP_KEY_BUTTON2: KeyCode = KeyCode::Z;       // secondary action
-pub const BLIP_KEY_X:       KeyCode = KeyCode::X;
-pub const BLIP_KEY_C:       KeyCode = KeyCode::C;
 pub const BLIP_KEY_F:       KeyCode = KeyCode::F;
 pub const BLIP_KEY_G:       KeyCode = KeyCode::G;
-pub const BLIP_KEY_H:       KeyCode = KeyCode::H;
 pub const BLIP_KEY_J:       KeyCode = KeyCode::J;
 pub const BLIP_KEY_K:       KeyCode = KeyCode::K;
-pub const BLIP_KEY_L:       KeyCode = KeyCode::L;
-pub const BLIP_KEY_R:       KeyCode = KeyCode::R;
-pub const BLIP_KEY_T:       KeyCode = KeyCode::T;
-pub const BLIP_KEY_U:       KeyCode = KeyCode::U;
-pub const BLIP_KEY_I:       KeyCode = KeyCode::I;
 
 /// Primary fire / jump / confirm — true only on the frame the key goes down.
 #[inline]
 pub fn btn1_pressed() -> bool { key_pressed(BLIP_KEY_SPACE) }
-
-/// Secondary action button — true only on the frame the key goes down.
-#[inline]
-pub fn btn2_pressed() -> bool { key_pressed(BLIP_KEY_BUTTON2) }
 
 /// True every frame the key is held down — good for movement.
 #[inline]

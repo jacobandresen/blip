@@ -191,7 +191,7 @@ fn ufo_saucer(frame: usize) -> Vec<u8> {
         let a = (idx as f32 / UFO_N_LIGHTS as f32) * std::f32::consts::PI * 2.0;
         let lx = (cx + a.cos() * disc_rx * 0.88).round() as i32;
         let ly = (cy + a.sin() * disc_ry * 0.88).round() as i32;
-        let (r, g, b) = if idx % 2 == 0 { (255u8, 230, 60) } else { (255, 255, 255) };
+        let (r, g, b) = if idx.is_multiple_of(2) { (255u8, 230, 60) } else { (255, 255, 255) };
         img.set(lx, ly, r, g, b);
         img.set(lx, ly - 1, r, g, b);
     }

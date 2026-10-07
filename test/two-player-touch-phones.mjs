@@ -66,7 +66,6 @@ for (const phone of PHONES) {
       const canvas = await page.locator('#glcanvas').boundingBox();
       assert.ok(canvas && canvas.width > 100 && canvas.height > 100,
         `Rally playfield disappeared after entering 2P: ${JSON.stringify(canvas)}`);
-      console.log(`${phone.name} ${orientation}: canvas ${Math.round(canvas.width)}×${Math.round(canvas.height)}`);
     });
 
     test(`Brawler 2P touch visibility on ${phone.name} ${orientation}`, async (t) => {
@@ -122,7 +121,6 @@ for (const phone of PHONES) {
         assert.equal(geometry.deckBackground, 'none', 'cabinet deck obscures the landscape game');
         assert.equal(geometry.deckBorder, '0px', 'cabinet deck border obscures the landscape game');
       }
-      console.log(`${phone.name} ${orientation}: canvas ${Math.round(geometry.canvas.width)}×${Math.round(geometry.canvas.height)}, two touch zones visible`);
     });
   }
 }

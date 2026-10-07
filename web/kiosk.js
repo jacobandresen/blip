@@ -308,14 +308,14 @@ function playCoinInsert() {
   noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(blipOut(ctx));
   noise.start(t); noise.stop(t + 0.045);
 
-  [3000, 4550, 6100].forEach(function (freq, i) {
+  [2400, 3550, 4900].forEach(function (freq, i) {
     var osc = ctx.createOscillator(), gain = ctx.createGain();
     osc.type = 'triangle'; osc.frequency.value = freq;
     osc.connect(gain); gain.connect(blipOut(ctx));
     var start = t + i * 0.006;
-    gain.gain.setValueAtTime(0.16 / (i + 1), start);
-    gain.gain.exponentialRampToValueAtTime(0.0008, start + 0.1);
-    osc.start(start); osc.stop(start + 0.11);
+    gain.gain.setValueAtTime(0.11 / (i + 1), start);
+    gain.gain.exponentialRampToValueAtTime(0.0008, start + 0.085);
+    osc.start(start); osc.stop(start + 0.09);
   });
 
   function boxHit(at, strength) {
@@ -335,16 +335,18 @@ function playCoinInsert() {
   boxHit(t+.73,.42);
 
   [{ freq: 1047, start: 0.86 }, { freq: 1319, start: 0.915 }].forEach(function(note) {
-    var osc  = ctx.createOscillator();
-    var gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(blipOut(ctx));
-    osc.type = 'square';
-    osc.frequency.value = note.freq;
-    gain.gain.setValueAtTime(0.22, t + note.start);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + note.start + 0.11);
-    osc.start(t + note.start);
-    osc.stop(t + note.start + 0.12);
+    [[1, 0.13, 0.17], [2.73, 0.028, 0.11]].forEach(function(partial) {
+      var osc = ctx.createOscillator(), gain = ctx.createGain();
+      var start = t + note.start, end = start + partial[2];
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(note.freq * partial[0], start);
+      osc.frequency.exponentialRampToValueAtTime(note.freq * partial[0] * 0.985, end);
+      gain.gain.setValueAtTime(partial[1], start);
+      gain.gain.exponentialRampToValueAtTime(0.0008, end);
+      osc.connect(gain); gain.connect(blipOut(ctx));
+      osc.start(start); osc.stop(end + 0.005);
+      osc.onended = function() { osc.disconnect(); gain.disconnect(); };
+    });
   });
 }
 
@@ -384,6 +386,12 @@ function playRolodexMove(direction) {
       gain.gain.setValueAtTime(.0001,at);gain.gain.exponentialRampToValueAtTime(.075,at+.004);gain.gain.exponentialRampToValueAtTime(.0001,at+.045);
       osc.connect(gain);gain.connect(blipOut(ctx));osc.start(at);osc.stop(at+.05);
     }
+    // The card settling on the stack, as the shuffle drops it behind.
+    var land=start+.42, thud=ctx.createOscillator(), thudGain=ctx.createGain();
+    thud.type='sine';thud.frequency.setValueAtTime(128,land);thud.frequency.exponentialRampToValueAtTime(62,land+.07);
+    thudGain.gain.setValueAtTime(.0001,land);thudGain.gain.exponentialRampToValueAtTime(.09,land+.006);thudGain.gain.exponentialRampToValueAtTime(.0001,land+.09);
+    thud.connect(thudGain);thudGain.connect(blipOut(ctx));thud.start(land);thud.stop(land+.1);
+    thud.onended=function(){thud.disconnect();thudGain.disconnect();};
   } catch(e) {}
 }
 

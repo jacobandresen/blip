@@ -13,7 +13,7 @@ use blip::{
     load_png, load_png_smooth,
     clamp, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rand_range_f32, rects_overlap, web,
     window_conf, Blip, BlipColor, Fx, LifeResult, Pooled, Session, Timer,
-    BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_GRAY, BLIP_GREEN, BLIP_ORANGE, BLIP_RED, BLIP_WHITE,
+    BLIP_BLACK, BLIP_CYAN, BLIP_GRAY, BLIP_GREEN, BLIP_ORANGE, BLIP_RED, BLIP_WHITE,
     BLIP_YELLOW,
 };
 
@@ -1576,7 +1576,7 @@ fn update_turrets(g: &mut Game, dt: f32) {
                 t.flash = 0.05;
                 let (s, c) = t.angle.sin_cos();
                 // twin barrels, firing alternately, straight along them
-                let side = if t.burst % 2 == 0 { 1.0 } else { -1.0 };
+                let side = if t.burst.is_multiple_of(2) { 1.0 } else { -1.0 };
                 let (ox, oy) = (c * 1.8 * side, -s * 1.8 * side);
                 let a = t.angle;
                 if t.ammo == 0 { t.reload_t = RELOAD_SECS; t.burst = 0; }
@@ -1993,6 +1993,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                     blip::bot::set("score", g.sess.score as f64);
                     blip::bot::finish("won");
                     play_sfx(&sfx.victory);
+                    g.over_timer.start(OVER_MIN_WAIT);
                     g.state = State::Won;
                 } else {
                     blip::bot::set(&format!("t_boss{}", g.sess.level), blip::bot::clock() as f64);
@@ -2451,8 +2452,9 @@ fn update_win(g: &mut Game, dt: f32) {
     if g.win_timer.tick(dt) { g.start_round(); }
 }
 
-fn update_won(g: &mut Game) {
-    if !btn1_pressed() { return; }
+fn update_won(g: &mut Game, dt: f32) {
+    g.over_timer.tick(dt);
+    if g.over_timer.active() || !btn1_pressed() { return; }
     web::spend_coin();
     g.start_game();
 }
@@ -3248,16 +3250,24 @@ fn draw_bottom_hud(blip: &Blip, g: &Game, player_tex: &Texture2D) {
     blip.fill_rect(bar_x, bar_y, bar_w * hp_frac, bar_h, hp_color);
 }
 
-fn draw_title(blip: &Blip, player_tex: &Texture2D, hi: &web::HighScore) {
-    blip.clear(BLIP_BLACK);
-    blip.draw_centered("RAIDER", (WIN_H / 4) as f32, 5.0, BLIP_BLUE);
+fn draw_title(
+    blip: &Blip, g: &Game, player_tex: &Texture2D, cloud_tex: &[Texture2D; 3], hi: &web::HighScore,
+) {
+    draw_sea(blip, g);
+    draw_clouds(blip, g, cloud_tex);
+    blip.fill_rect(0.0, 0.0, WIN_W as f32, WIN_H as f32, BlipColor::new(0.01, 0.025, 0.08, 0.38));
+    blip.draw_centered_outlined(
+        "RAIDER", (WIN_W / 2) as f32, (WIN_H / 4) as f32, 5.0, BlipColor::new(0.38, 0.72, 1.0, 1.0),
+        BlipColor::new(0.015, 0.045, 0.12, 1.0),
+    );
     // RAIDER is sz=5 (35px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4 + 43) as f32, BLIP_YELLOW);
     let px = (WIN_W as f32 - PLAYER_W as f32 * 2.0) / 2.0;
     blip.draw_texture(player_tex, px, (WIN_H / 2 - 70) as f32, PLAYER_W as f32 * 2.0, PLAYER_H as f32 * 2.0);
     blip.draw_centered("PRESS FIRE TO START", (WIN_H * 2 / 3) as f32, 3.0, BLIP_WHITE);
-    blip.draw_centered("UP THROTTLE  DOWN SLOW", (WIN_H * 2 / 3 + 30) as f32, 2.0, BLIP_GRAY);
-    blip.draw_centered("TOO SLOW AND YOU STALL", (WIN_H * 2 / 3 + 48) as f32, 2.0, BLIP_GRAY);
+    let hint = BlipColor::new(0.68, 0.76, 0.9, 1.0);
+    blip.draw_centered("UP THROTTLE  DOWN SLOW", (WIN_H * 2 / 3 + 30) as f32, 2.0, hint);
+    blip.draw_centered("TOO SLOW AND YOU STALL", (WIN_H * 2 / 3 + 48) as f32, 2.0, hint);
 }
 
 fn draw_win(blip: &Blip, level: i32) {
@@ -3267,14 +3277,14 @@ fn draw_win(blip: &Blip, level: i32) {
     blip.draw_centered(&buf,          (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
 }
 
-fn draw_won(blip: &Blip, score: i32, hi: &web::HighScore) {
+fn draw_won(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
     let buf = format!("SCORE {score}");
     blip.clear(BLIP_BLACK);
     blip.draw_centered("YOU WON!!",           (WIN_H / 4) as f32,      6.0, BLIP_YELLOW);
     blip.draw_centered("ALL 7 WAVES CLEARED", (WIN_H / 2 - 20) as f32, 3.0, BLIP_GREEN);
     blip.draw_centered(&buf,                  (WIN_H / 2 + 14) as f32, 3.0, BLIP_WHITE);
     blip.draw_best(score, hi, (WIN_H / 2 + 40) as f32, BLIP_GREEN);
-    blip.draw_centered("PRESS FIRE",          (WIN_H * 2 / 3) as f32,  3.0, BLIP_CYAN);
+    if !waiting { blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_CYAN); }
 }
 
 fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
@@ -3477,7 +3487,7 @@ async fn main() {
             State::Play   => update_play(&mut g, dt, &sfx),
             State::Dead   => update_dead(&mut g, dt),
             State::Win    => update_win(&mut g, dt),
-            State::Won    => update_won(&mut g),
+            State::Won    => update_won(&mut g, dt),
             State::Over   => update_over(&mut g, dt),
         }
         if prev_state != State::Win  && g.state == State::Win  { play_sfx(&sfx.stage_clear); }
@@ -3505,10 +3515,10 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title  => draw_title(&blip, &player_tex, &web::high_score()),
+            State::Title  => draw_title(&blip, &g, &player_tex, &cloud_tex, &web::high_score()),
             State::Launch => draw_launch(&blip, &g, &player_tex, &enemy_tex, &carrier_tex, &boat_tex, &cloud_tex, &island_tex),
             State::Win    => draw_win(&blip, g.sess.level),
-            State::Won    => draw_won(&blip, g.sess.score, &web::high_score()),
+            State::Won    => draw_won(&blip, g.sess.score, &web::high_score(), g.over_timer.active()),
             State::Over   => draw_over(&blip, g.sess.score, &web::high_score(), g.over_timer.active()),
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player_tex, &enemy_tex, &boss_tex, &powerup_tex, &health_tex, &boss_name_ja_tex, &boat_tex, &cloud_tex, &island_tex);

@@ -41,7 +41,7 @@ pub fn music() -> Vec<u8> {
         let off = step * step_samples;
         let lifted = bar >= LIFT_BAR;
 
-        if pos % 4 == 0 {
+        if pos.is_multiple_of(4) {
             kick_offsets.push(off);
         }
         if pos == 4 || pos == 12 {
@@ -57,7 +57,7 @@ pub fn music() -> Vec<u8> {
             let root = bass_roots[(bar / 2) % bass_roots.len()];
             bass_note(&mut buf, off, root, step_ms * 0.6, 0.60);
         }
-        if pos % 4 == 0 {
+        if pos.is_multiple_of(4) {
             supersaw(&mut buf, off, phrase_note(&HOOK, bar, pos / 4), step_ms * 3.0, 0.18, 6.0, 0.008);
             if lifted {
                 supersaw(&mut buf, off, phrase_note(&HOOK, bar, pos / 4) * 2.0, step_ms * 3.0, 0.09, 6.0, 0.008);
@@ -105,7 +105,7 @@ pub fn music2() -> Vec<u8> {
         let pos = step % STEPS_PER_BAR;
         let off = step * step_samples;
 
-        if pos % 4 == 0 {
+        if pos.is_multiple_of(4) {
             kick_offsets.push(off);
         }
         if pos == 4 || pos == 12 {
@@ -119,7 +119,7 @@ pub fn music2() -> Vec<u8> {
             bass_note(&mut buf, off, root, step_ms * 0.55, 0.58);
         }
         if pos == 6 || pos == 7 || pos == 8 {
-            lead_stab(&mut buf, off, HOOK[(pos - 6) as usize], step_ms * 1.6, 0.20);
+            lead_stab(&mut buf, off, HOOK[pos - 6], step_ms * 1.6, 0.20);
         }
     }
 
@@ -205,7 +205,7 @@ pub fn music4() -> Vec<u8> {
         let off = step * step_samples;
         let in_lift = bar >= BARS - 2;
 
-        if pos % 4 == 0 {
+        if pos.is_multiple_of(4) {
             kick_offsets.push(off);
         }
         if pos == 4 || pos == 12 {
@@ -214,15 +214,14 @@ pub fn music4() -> Vec<u8> {
         if pos % 2 == 1 {
             open_hat(&mut buf, off, &mut rng, if in_lift { 0.26 } else { 0.17 });
         }
-        if pos % 4 == 0 {
+        if pos.is_multiple_of(4) {
             bass_note(&mut buf, off, bass_roots[(bar / 2) % 2], step_ms * 3.5, 0.55);
         }
-        if bar % 2 == 0 || in_lift {
-            if pos == 8 || pos == 9 || pos == 10 || pos == 11 {
-                let note = HOOK[(pos - 8) as usize];
+        if (bar.is_multiple_of(2) || in_lift)
+            && (pos == 8 || pos == 9 || pos == 10 || pos == 11) {
+                let note = HOOK[pos - 8];
                 supersaw(&mut buf, off, note, step_ms * 1.4, 0.15, 7.0, 0.009);
             }
-        }
         if bar == BARS - 2 && pos == 0 {
             riser(&mut buf, off, step_ms * (STEPS_PER_BAR * 2) as f32, 0.3, &mut rng);
         }
@@ -265,7 +264,7 @@ pub fn music5() -> Vec<u8> {
         let pos = step % STEPS_PER_BAR;
         let off = step * step_samples;
 
-        if pos % 4 == 0 {
+        if pos.is_multiple_of(4) {
             kick_offsets.push(off);
         }
         if pos == 4 || pos == 12 {
@@ -280,9 +279,9 @@ pub fn music5() -> Vec<u8> {
         if BASS_HIT[pos] {
             bass_note(&mut buf, off, root * if pos == 7 || pos == 13 { 1.5 } else { 1.0 }, step_ms * 0.6, 0.55);
         }
-        let phrase = if bar % 2 == 0 { &CALL } else { &RESPONSE };
+        let phrase = if bar.is_multiple_of(2) { &CALL } else { &RESPONSE };
         if pos == 9 || pos == 10 || pos == 11 {
-            lead_stab(&mut buf, off, phrase[(pos - 9) as usize], step_ms * 1.3, 0.19);
+            lead_stab(&mut buf, off, phrase[pos - 9], step_ms * 1.3, 0.19);
         }
     }
 
@@ -301,7 +300,7 @@ pub fn music5() -> Vec<u8> {
 
 /// Ball off the side rail: a tiny pluck.
 fn wall() -> Vec<u8> {
-    cosy::finish_warm(cosy::run(&[86], 0.03, Voice::Pluck, 0.5), 12_000.0)
+    cosy::finish_warm(cosy::run(&[74], 0.035, Voice::Marimba, 0.28), 9_000.0)
 }
 
 /// Ball off a paddle: a short boing with a pluck on top, a step higher for

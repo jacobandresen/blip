@@ -475,15 +475,6 @@ pub(crate) fn a_solo_player_is_never_dragged_into_two_player_mode() {
 }
 
 #[test]
-#[ignore = "diagnostic"]
-pub(crate) fn dump_ladders() {
-    for pick in 0..FIGHTERS.len() {
-        let names: Vec<&str> = Game { pick, ..Game::new() }.ladder().iter().map(|&w| FIGHTERS[w].name).collect();
-        println!("{:8} -> {}", FIGHTERS[pick].name, names.join(", "));
-    }
-}
-
-#[test]
 pub(crate) fn the_billing_gives_way_to_the_bow_and_a_press_cuts_it_short() {
     let mut g = Game { pick: 0, ..Game::new() };
     g.start_match(0);

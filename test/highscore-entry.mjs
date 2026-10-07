@@ -43,7 +43,7 @@ const ALL = {
   bouncer:           { fire: SPACE, presses: Infinity },
   galactic_defender: { fire: SPACE, presses: 1 },
   meteors:           { fire: SPACE, presses: 1 },
-  sky_raider:        { fire: SPACE, presses: 2 },
+  sky_raider:        { fire: SPACE, presses: Infinity },
   brawler:           { fire: F, presses: 7 },
   bubbler:           { fire: F, presses: 2 },
 };

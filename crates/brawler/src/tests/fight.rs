@@ -306,32 +306,6 @@ pub(crate) fn cpu_round(a: usize, b: usize, difficulty: f32) -> ([f32; 2], f32) 
 }
 
 #[test]
-#[ignore = "diagnostic"]
-pub(crate) fn diagnose_cpu_against_cpu() {
-    let _sim = simulating(0xBA1A);
-    let fair: Vec<usize> = (0..FIGHTERS.len()).filter(|&w| !FIGHTERS[w].invincible).collect();
-    const N: usize = 30;
-    println!("{:8}  {}  | won   secs", "", fair.iter().map(|&w| format!("{:>4.4}", FIGHTERS[w].name)).collect::<Vec<_>>().join(" "));
-    for &a in &fair {
-        let (mut row, mut total, mut time) = (vec![], 0.0, 0.0);
-        for &b in &fair {
-            if a == b { row.push("   -".to_string()); continue; }
-            let mut won = 0.0;
-            for k in 0..N {
-                // Each side of the stage in turn.
-                let (h, secs) = if k % 2 == 0 { cpu_round(a, b, 0.4) } else { let (h, s) = cpu_round(b, a, 0.4); ([h[1], h[0]], s) };
-                won += if h[0] > h[1] { 1.0 } else if h[0] == h[1] { 0.5 } else { 0.0 };
-                time += secs;
-            }
-            total += won;
-            row.push(format!("{:>4.0}", won / N as f32 * 100.0));
-        }
-        println!("{:8}  {}  | {:>3.0}%  {:>4.1}", FIGHTERS[a].name, row.join(" "),
-            total / (N * (fair.len() - 1)) as f32 * 100.0, time / (N * (fair.len() - 1)) as f32);
-    }
-}
-
-#[test]
 pub(crate) fn nobody_on_the_roster_is_hopeless_or_unbeatable() {
     // CPU against CPU on the real loop, everyone against everyone. The giant
     // is the ladder's second-to-last fight and is meant to be the strongest;
@@ -392,4 +366,83 @@ pub(crate) fn a_challenger_stops_the_solo_fight_and_takes_both_to_the_select_scr
     assert_ne!(g.pick2, g.pick);
     assert_eq!(g.locked, [false; 2]);
     assert_eq!((g.opponent_index, g.sess.score), (0, 0), "the solo run came along");
+}
+
+#[test]
+pub(crate) fn the_fruit_comes_once_a_round_and_feeds_whoever_reaches_it() {
+    let mut g = Game::new();
+    g.start_match(0);
+    g.state = State::Fight;
+    assert!(fruit_step(&mut g, F).is_none() && g.fruit.ttl <= 0.0, "it is there from the bell");
+    g.clock = FRUIT_AT - 0.01;
+    fruit_step(&mut g, F);
+    assert!(g.fruit.ttl > 0.0, "it never appeared");
+    assert!((g.fruit.x - g.p[0].x).abs() > 60.0 && (g.fruit.x - g.p[1].x).abs() > 60.0);
+    // Jumping over it is not eating it.
+    g.p[0].health = 40;
+    g.p[0].x = g.fruit.x;
+    g.p[0].y = FLOOR_Y - 60.0;
+    assert!(fruit_step(&mut g, F).is_none());
+    // Walking onto it is, and it gives some health back and is gone.
+    g.p[0].y = FLOOR_Y;
+    assert_eq!(fruit_step(&mut g, F), Some(0));
+    assert!(g.p[0].health > 40 && g.p[0].health < FIGHTERS[g.p[0].who].health);
+    assert!(g.fruit.ttl <= 0.0 && g.sess.score > 0);
+    assert!(fruit_step(&mut g, F).is_none() && g.fruit.ttl <= 0.0, "a second helping");
+    // It never fills past full, and the next round serves the next one.
+    let first = g.fruit.kind;
+    g.round += 1;
+    g.start_round();
+    g.clock = FRUIT_AT - 0.01;
+    g.p[1].x = WIN_W as f32 / 2.0;
+    assert_eq!(fruit_step(&mut g, F), Some(1));
+    assert_eq!(g.p[1].health, FIGHTERS[g.p[1].who].health);
+    assert_ne!(g.fruit.kind, first);
+    // Left alone it goes away.
+    g.round += 1;
+    g.start_round();
+    g.clock = FRUIT_AT - 0.01;
+    for _ in 0..((FRUIT_STAYS / F) as usize + 5) { fruit_step(&mut g, F); }
+    assert!(g.fruit.ttl <= 0.0);
+}
+
+#[test]
+pub(crate) fn the_announcer_calls_a_perfect_and_a_great() {
+    let mut g = Game::new();
+    g.p = [at(0, 200.0, 1.0), at(1, 440.0, -1.0)];
+    g.result = RoundResult::P1;
+    assert_eq!(round_call(&g), "PERFECT");
+    g.p[0].health = FIGHTERS[0].health - 1;
+    assert_eq!(round_call(&g), "");
+    g.p[0].health = FIGHTERS[0].health / 10;
+    assert_eq!(round_call(&g), "GREAT");
+    g.result = RoundResult::Draw;
+    assert_eq!(round_call(&g), "");
+    // Untouched is nothing to shout about when nothing can touch you.
+    let z = FIGHTERS.iter().position(|a| a.invincible).unwrap();
+    g.p[1] = at(z, 440.0, -1.0);
+    g.result = RoundResult::P2;
+    assert_eq!(round_call(&g), "");
+}
+
+#[test]
+pub(crate) fn the_finishing_blow_plays_in_slow_motion_and_the_bar_drains_after_it() {
+    let mut g = Game::new();
+    g.start_match(0);
+    g.state = State::RoundEnd;
+    g.phase.start(2.2);
+    g.p[0].act = Act::Victory;
+    g.p[0].t = 0.0;
+    g.slow = SLOW_MO_SECS;
+    for _ in 0..12 { update_round_end(&mut g, F); }
+    assert!(g.p[0].t < 12.0 * F * 0.5, "the fighters ran at full speed: {:.3}", g.p[0].t);
+    for _ in 0..60 { update_round_end(&mut g, F); }
+    assert!(g.slow <= 0.0, "the slow motion never ended");
+    // A bar's ghost falls to the health under it and never past.
+    g.p[1].health = 20;
+    g.ghost[1] = 100.0;
+    drain_ghosts(&mut g, 0.1);
+    assert!(g.ghost[1] < 100.0 && g.ghost[1] > 20.0);
+    for _ in 0..100 { drain_ghosts(&mut g, 0.1); }
+    assert_eq!(g.ghost[1], 20.0);
 }

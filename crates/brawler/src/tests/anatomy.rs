@@ -195,25 +195,6 @@ pub(crate) fn what_you_see_is_what_can_hit_you() {
 }
 
 #[test]
-#[ignore = "diagnostic, not an assertion"]
-pub(crate) fn why_is_that_matchup_quiet() {
-    // Same order and the same seed as the balance test, so the rounds
-    // land on the same randomness and the quiet one can be looked at.
-    let _sim = simulating(0xB4A17E);
-    let styles: [(&str, fn(usize, &[Fighter; 2]) -> Input); 3] =
-        [("rusher", rusher), ("poker", poker), ("turtle", turtle)];
-    for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].invincible) {
-        for foe in [0, RUNGS - 3] {
-            for (name, style) in styles {
-                let r = fight_round(pick, foe, style);
-                println!("{} vs foe{foe} [{name}]: {}s hp {}/{} hits {}/{}", FIGHTERS[pick].name,
-                    r.seconds as i32, r.player_health, r.cpu_health, r.player_hits, r.cpu_hits);
-            }
-        }
-    }
-}
-
-#[test]
 pub(crate) fn a_standing_fighter_is_standing_on_something() {
     // Weight over the feet, or the pose reads as falling. Attacks get a wider
     // allowance (a punch is falling forward); standing, walking and guarding
@@ -445,54 +426,6 @@ pub(crate) fn no_limb_is_folded_up_to_nothing() {
 }
 
 #[test]
-#[ignore = "diagnostic"]
-pub(crate) fn dump_folds() {
-    let shut = |l1: f32, l2: f32, c: f32| (l1 * l1 + l2 * l2 - 2.0 * l1 * l2 * c.cos()).sqrt();
-    let amin = shut(24.0, 21.0, 0.61);
-    let mut worst: std::collections::BTreeMap<String, (f32, String)> = Default::default();
-    for (label, f) in every_pose() {
-        let k = bones_of(&f);
-        let g = f.y;
-        let pose = |v: draw::V| (v.0 - f.x, g - v.1);
-        for (name, root, end) in [("arm-lead", k.sh_lead, k.hand_lead),
-                                  ("arm-rear", k.sh_rear, k.hand_rear),
-                                  ("leg-lead", k.hip_lead, k.ankle_lead),
-                                  ("leg-rear", k.hip_rear, k.ankle_rear)] {
-            let d = ((end.0 - root.0).powi(2) + (end.1 - root.1).powi(2)).sqrt();
-            let fam = if label.contains("Knockdown") { label.split_whitespace().skip(1).collect::<Vec<_>>().join(" ") } else { label.split_whitespace().nth(1).unwrap_or("?").to_string() };
-            let key = format!("{fam} {name}");
-            let e = worst.entry(key).or_insert((99.0, String::new()));
-            if d / amin < e.0 {
-                let (sf, su) = pose(root);
-                let (hf, hu) = pose(end);
-                *e = (d / amin, format!("shoulder=({sf:5.1},{su:5.1}) hand=({hf:5.1},{hu:5.1}) \
-                    d={d:4.1} [{label}]"));
-            }
-        }
-    }
-    for (k, (r, s)) in worst {
-        if r < 1.30 { println!("{r:.2}x {k:16} {s}"); }
-    }
-}
-
-#[test]
-#[ignore = "diagnostic"]
-pub(crate) fn dump_wings() {
-    let mut rows: Vec<(f32, String)> = vec![];
-    for (label, f) in every_pose() {
-        let k = bones_of(&f);
-        for (n, sh, el, hd) in [("lead", k.sh_lead, k.elbow_lead, k.hand_lead),
-                                ("rear", k.sh_rear, k.elbow_rear, k.hand_rear)] {
-            let back = (sh.0 - el.0) * f.facing;
-            let hand_back = (sh.0 - hd.0) * f.facing;
-            rows.push((back - hand_back.max(0.0), format!("back={back:5.1} hand={hand_back:5.1}  {n} {label}")));
-        }
-    }
-    rows.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-    for (d, s) in rows.iter().take(18) { println!("{d:5.1}  {s}"); }
-}
-
-#[test]
 pub(crate) fn no_elbow_sticks_out_behind_the_back() {
     // A side-on rig has nowhere to put the elbow of an arm folded
     // across the body, so it projects it backwards and the upper arm
@@ -709,29 +642,6 @@ pub(crate) fn a_blocked_flying_kick_is_a_free_punish() {
     assert!(lag >= 10, "only {lag} frames of landing lag — that is not a punish");
     assert!(d.free() || d.act == Act::Block,
         "the defender should be out of blockstun before the attacker recovers");
-}
-
-#[test]
-#[ignore = "diagnostic"]
-pub(crate) fn dump_flying_kick() {
-    let mut f = at(0, 200.0, 1.0);
-    f.start_attack(MoveId::FlyingKick);
-    let (start, mut peak, mut frames) = (f.x, 0.0f32, 0);
-    while f.airborne() && frames < 120 {
-        advance(&mut f, F);
-        peak = peak.max(FLOOR_Y - f.y);
-        frames += 1;
-    }
-    println!("travel {:.0}px  airtime {frames}f  peak {peak:.0}px", f.x - start);
-    let mut lag = 0;
-    while !f.free() && lag < 90 { advance(&mut f, F); lag += 1; }
-    println!("landing lag {lag}f");
-    for mv in [MoveId::LowPunch, MoveId::LowKick, MoveId::HighKick, MoveId::Sweep, MoveId::JumpKick,
-               MoveId::FlyingKick] {
-        let m = move_data(mv);
-        println!("{mv:?}: startup {} active {} recovery {} dmg {} reach {} level {:?}",
-            m.startup, m.active, m.recovery, m.damage, m.reach, m.level);
-    }
 }
 
 #[test]
@@ -1131,16 +1041,6 @@ pub(crate) fn building_the_themes_is_quick_enough_to_do_at_startup() {
     println!("three themes in {ms}ms");
 }
 
-#[test]
-#[ignore = "diagnostic"]
-pub(crate) fn dump_themes() {
-    for which in 0..3 {
-        let wav = blip_assets::brawler::theme_wav(which);
-        std::fs::write(format!("/tmp/theme{which}.wav"), &wav).unwrap();
-        println!("wrote /tmp/theme{which}.wav ({:.1}s)", wav_seconds(&wav));
-    }
-}
-
 // ---- the walk and the idle bounce ---------------------------------
 
 #[test]
@@ -1273,4 +1173,26 @@ pub(crate) fn a_round_won_quickly_and_unhurt_is_worth_the_most() {
     assert_eq!(round_bonus(12.0, 50, 100), [1200, 1500]);
     // A bigger fighter is not paid more for the same share of health.
     assert_eq!(round_bonus(0.0, 65, 130)[1], round_bonus(0.0, 50, 100)[1]);
+}
+
+#[test]
+pub(crate) fn no_leg_is_curled_up_behind_the_back() {
+    // A foot far behind the hip and far above the floor is a heel pulled to
+    // the backside, which balls up the figure. Each alone is real (a trailing
+    // leg, a chambered knee), so the product is bounded.
+    let mut bad = Vec::new();
+    for (name, f) in every_pose() {
+        let k = bones_of(&f);
+        for (side, ankle) in [("lead", k.ankle_lead), ("rear", k.ankle_rear)] {
+            let behind = (k.hip.0 - ankle.0) * f.facing;
+            let up = f.y - ankle.1;
+            if behind.min(up) > 24.0 {
+                bad.push(format!("{name}: {side} foot is {behind:.0}px behind the hip \
+                    and {up:.0}px off the floor"));
+            }
+        }
+    }
+    bad.dedup();
+    assert!(bad.is_empty(), "legs folded up behind the back:\n  {}",
+        bad.iter().take(6).cloned().collect::<Vec<_>>().join("\n  "));
 }

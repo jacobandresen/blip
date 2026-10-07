@@ -2,22 +2,12 @@
   "name": "blip",
   "private": true,
   "scripts": {
-    "test:unit": "node --test test/fill-canvas.test.mjs",
     "test": "node --test test/fill-canvas.test.mjs",
-    "test:highscores": "node test/highscores.mjs",
-    "test:topbar": "node --test test/topbar-layout.mjs",
-    "test:controls": "node --test test/controls.mjs",
-    "test:touch": "node --test --test-concurrency=1 test/touch-start.mjs",
-    "test:card-touch": "node --test --test-concurrency=1 test/card-touch-selection.mjs",
-    "test:bubbler-iphone": "node --test --test-concurrency=1 test/bubbler-two-player-iphone.mjs",
-    "test:2p-touch-phones": "node --test --test-concurrency=1 test/two-player-touch-phones.mjs",
-    "test:coin": "node --test --test-concurrency=1 test/coin-slot.mjs",
-    "test:deck": "node --test test/two-player-deck.mjs",
-    "test:manual": "node --test test/manual-motion.mjs",
+    "test:web": "node --test --test-concurrency=1 test/cabinet.mjs test/manual.mjs test/topbar-layout.mjs test/controls.mjs test/two-player-deck.mjs test/two-player-touch-phones.mjs test/bubbler-two-player-iphone.mjs",
     "test:shell": "node --test --test-concurrency=1 test/shell.mjs",
     "test:scores": "node --test --test-concurrency=1 test/highscore-entry.mjs",
-    "supabase": "supabase",
-    "test:web": "node --test --test-concurrency=1 test/fill-canvas.test.mjs test/topbar-layout.mjs test/controls.mjs test/two-player-deck.mjs test/touch-start.mjs test/card-touch-selection.mjs test/bubbler-two-player-iphone.mjs test/two-player-touch-phones.mjs test/coin-slot.mjs"
+    "test:scores-db": "node --test test/highscores.mjs",
+    "supabase": "supabase"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.116.0",

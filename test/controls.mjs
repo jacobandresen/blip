@@ -6,8 +6,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openPage, loadRally, evaluate } from './lib/harness.mjs';
 
-const ENGINE = process.env.BLIP_CONTROLS_ENGINE || 'chromium';
-
 /** Rotate a bound dial by `steps` increments of `perStep` radians, and
  * report which keys the controller emitted onto the game canvas. */
 const ROTATE = (perStep, steps) => `
@@ -50,15 +48,14 @@ const ROTATE = (perStep, steps) => `
     }, 200);
   })`;
 
-test(`the paddle dial registers a slow, careful rotation (${ENGINE})`, async (t) => {
-  const { cdp } = await openPage(t, ENGINE);
+test(`the paddle dial registers a slow, careful rotation`, async (t) => {
+  const { cdp } = await openPage(t);
   await loadRally(cdp);
 
   await t.test('a rotation slower than the dead zone per event still moves the paddle', async () => {
     // 0.006 rad per event against a 0.018 dead band: every event is below it,
     // but twelve add up to four dead bands of real rotation.
     const r = await evaluate(cdp, ROTATE(0.006, 12));
-    t.diagnostic(`slow rotation emitted: ${JSON.stringify(r.seen)}`);
     assert.ok(r.downs > 0,
       'a slow rotation emitted no key at all — fine adjustment is impossible');
   });
@@ -67,7 +64,6 @@ test(`the paddle dial registers a slow, careful rotation (${ENGINE})`, async (t)
     const forward = await evaluate(cdp, ROTATE(0.006, 12));
     const backward = await evaluate(cdp, ROTATE(-0.006, 12));
     const dirOf = (r) => (r.seen.find((s) => s.indexOf('down:') === 0) || '').replace('down:', '');
-    t.diagnostic(`forward -> ${dirOf(forward)}, backward -> ${dirOf(backward)}`);
     assert.ok(dirOf(forward) && dirOf(backward), 'one of the directions emitted nothing');
     assert.notEqual(dirOf(forward), dirOf(backward),
       'turning the dial both ways produced the same key');

@@ -1108,7 +1108,7 @@ fn carrier_ship() -> Vec<u8> {
     c.clip(0.0, bow - 2.0, wf, stern + 2.0);
     let deck_half = |y: f32| if y < bow + 60.0 { lerp(52.0, 75.0, ((y - bow) / 60.0).clamp(0.0, 1.0)) } else { 75.0 };
     let deck = |x: f32, y: f32| y > bow && y < stern && (x - cx).abs() <= deck_half(y);
-    c.fill(&deck, |x, _y| {
+    c.fill(deck, |x, _y| {
         // planking: a slightly different tone every strip, seams between
         let strip = ((x - cx + 80.0) / 2.6).floor();
         let tone = 0.94 + 0.06 * ((strip * 12.9898).sin() * 43758.5).fract();
@@ -2010,8 +2010,8 @@ fn rock_beat_step(buf: &mut [f32], off: usize, pos: usize, rng: &mut Rng, busy: 
     if pos == 4 || pos == 12 {
         rock_snare(buf, off, rng, 0.6);
     }
-    if busy || pos % 2 == 0 {
-        rock_hat(buf, off, rng, if pos % 4 == 0 { 0.22 } else { 0.16 }, false);
+    if busy || pos.is_multiple_of(2) {
+        rock_hat(buf, off, rng, if pos.is_multiple_of(4) { 0.22 } else { 0.16 }, false);
     }
     if pos == 14 {
         rock_hat(buf, off, rng, 0.16, true);
@@ -2174,7 +2174,7 @@ pub fn music() -> Vec<u8> {
             if pos == 8 {
                 power_chord(&mut buf, off, root, step_ms * 7.5, 0.42, false);
             }
-            if pos % 2 == 0 {
+            if pos.is_multiple_of(2) {
                 bass_guitar(&mut buf, off, root, step_ms * 1.7, 0.5);
             }
             if pos == 0 {
@@ -2294,17 +2294,17 @@ pub fn music2() -> Vec<u8> {
             if pos == 0 {
                 drum_fill(&mut buf, bar_off, step_samples, &mut rng);
             }
-            if pos % 4 == 0 {
+            if pos.is_multiple_of(4) {
                 rock_kick(&mut buf, off, 0.85);
             }
         } else {
-            if pos % 2 == 0 {
+            if pos.is_multiple_of(2) {
                 rock_kick(&mut buf, off, 0.88);
             }
             if pos == 4 || pos == 12 {
                 rock_snare(&mut buf, off, &mut rng, 0.6);
             }
-            rock_hat(&mut buf, off, &mut rng, if pos % 4 == 0 { 0.2 } else { 0.14 }, false);
+            rock_hat(&mut buf, off, &mut rng, if pos.is_multiple_of(4) { 0.2 } else { 0.14 }, false);
         }
 
         // ---- Rhythm guitar + bass ----
@@ -2319,7 +2319,7 @@ pub fn music2() -> Vec<u8> {
                     power_chord(&mut buf, off, root, step_ms * dur, if palm { 0.5 } else { 0.44 }, palm);
                 }
             }
-            if pos % 2 == 0 {
+            if pos.is_multiple_of(2) {
                 bass_guitar(&mut buf, off, D2, step_ms * 1.4, 0.5);
             }
         } else {

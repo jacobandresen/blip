@@ -113,7 +113,7 @@ fn ball() -> Vec<u8> {
                             } else {
                                 (0.9, 0.17, 0.13)
                             };
-                            if !cap && (seam < 0.025 || seam > 0.975) {
+                            if !cap && !(0.025..=0.975).contains(&seam) {
                                 cr *= 0.7; cg *= 0.7; cb_ *= 0.7;
                             }
                             r += cr; g += cg; b += cb_; cov += 1.0;
@@ -355,7 +355,7 @@ fn brick_steel(cracked: bool) -> Vec<u8> {
         let mut x = 5;
         let mut toggle = 0i32;
         while x < w - 5 {
-            let y = (h / 2 + toggle) as i32;
+            let y = h / 2 + toggle;
             img.set(x, y, 18, 18, 22);
             img.set(x, (y + 1).min(h - 2), 18, 18, 22);
             toggle = if toggle <= 0 { 3 } else { -3 };
@@ -440,9 +440,7 @@ pub fn rebound_wav() -> Vec<u8> {
 }
 
 // ---- effects --------------------------------------------------------------
-// Three pitch variants keep repeated hits from sounding identical.
-pub const IMPACT_VARIANTS: usize = 3;
-
+// Pitch variants (`v`) keep repeated hits from sounding identical.
 fn paddle_hit(v: usize) -> Vec<u8> {
     cosy::sfx(&cosy::boing(0.16, [196.0, 208.0, 220.0][v]))
 }

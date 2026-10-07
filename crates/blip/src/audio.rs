@@ -33,6 +33,11 @@ static CURRENT_MUSIC: Mutex<Option<Sound>> = Mutex::new(None);
 static CURRENT_AMBIENT: Mutex<Option<Sound>> = Mutex::new(None);
 static CURRENT_ALERT: Mutex<Option<Sound>> = Mutex::new(None);
 
+// The rendered loops span 8 dB RMS; bound matching so sparse intros stay restrained.
+const MUSIC_RMS_TARGET_DB: f64 = -17.5;
+const MUSIC_GAIN_MIN: f32 = 0.5;
+const MUSIC_GAIN_MAX: f32 = 1.3;
+
 fn play_loop(current: &Mutex<Option<Sound>>, sound: &BlipSound, volume: f32) {
     stop_loop(current);
     play_sound(sound, PlaySoundParams { looped: true, volume });
@@ -51,7 +56,12 @@ fn stop_loop(current: &Mutex<Option<Sound>>) {
 
 /// Start looping music at volume 0.7, replacing the current track.
 pub fn play_music(s: &BlipSound) {
-    play_loop(&CURRENT_MUSIC, s, 0.7);
+    play_music_volume(s, 0.7);
+}
+
+/// Start looping music at a specific volume, replacing the current track.
+pub fn play_music_volume(s: &BlipSound, volume: f32) {
+    play_loop(&CURRENT_MUSIC, s, volume.clamp(0.0, 1.0));
 }
 
 pub fn stop_music() { stop_loop(&CURRENT_MUSIC); }
@@ -125,7 +135,7 @@ fn encode_wav(sample_rate: u32, samples: &[i16]) -> Vec<u8> {
 /// Synthesizes tracks from WAV makers on demand; call `warm_up` on a screen where a short stall is harmless.
 pub struct Jukebox {
     makers: Vec<fn() -> Vec<u8>>,
-    tracks: Vec<Option<(BlipSound, f32)>>,
+    tracks: Vec<Option<(BlipSound, f32, f32)>>,
     playing: Option<usize>,
     /// Seconds left in the current loop, for `rotate`.
     left: f32,
@@ -180,12 +190,13 @@ impl Jukebox {
     async fn render(&mut self, i: usize) {
         let wav = (self.makers[i])();
         let secs = wav_seconds(&wav);
-        self.tracks[i] = Some((load_sound(&wav).await, secs));
+        let gain = music_gain(&wav);
+        self.tracks[i] = Some((load_sound(&wav).await, secs, gain));
     }
 
     fn switch(&mut self, i: usize) {
-        if let Some((s, secs)) = &self.tracks[i] {
-            play_music(s);
+        if let Some((s, secs, gain)) = &self.tracks[i] {
+            play_music_volume(s, 0.7 * gain);
             self.playing = Some(i);
             self.left = *secs;
         }
@@ -200,11 +211,38 @@ fn wav_seconds(wav: &[u8]) -> f32 {
     data / 2.0 / rate.max(1.0)
 }
 
+fn music_gain(wav: &[u8]) -> f32 {
+    if wav.len() < 46 || &wav[0..4] != b"RIFF" || &wav[8..12] != b"WAVE" || &wav[36..40] != b"data" {
+        return 1.0;
+    }
+    let bytes = u32::from_le_bytes([wav[40], wav[41], wav[42], wav[43]]) as usize;
+    let end = wav.len().min(44 + bytes) & !1;
+    let samples = wav[44..end].chunks_exact(2).map(|s| i16::from_le_bytes([s[0], s[1]]) as f64);
+    let (sum, count) = samples.fold((0.0, 0usize), |(sum, count), s| (sum + s * s, count + 1));
+    if count == 0 { return 1.0; }
+    let rms = (sum / count as f64).sqrt() / i16::MAX as f64;
+    if rms < 1e-5 { return 1.0; }
+    let db = 20.0 * rms.log10();
+    (10.0f64.powf((MUSIC_RMS_TARGET_DB - db) / 20.0) as f32)
+        .clamp(MUSIC_GAIN_MIN, MUSIC_GAIN_MAX)
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn a_wav_header_gives_its_length() {
         let wav = super::encode_wav(22_050, &vec![0i16; 22_050 * 3]);
         assert!((super::wav_seconds(&wav) - 3.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn jukebox_gain_balances_track_loudness_without_large_boosts() {
+        let quiet = super::encode_wav(22_050, &vec![4_000i16; 100]);
+        let loud = super::encode_wav(22_050, &vec![8_000i16; 100]);
+        let q = super::music_gain(&quiet);
+        let l = super::music_gain(&loud);
+        assert!((q / l - 2.0).abs() < 0.02, "the louder track should receive half the gain: {q} vs {l}");
+        assert!((0.5..=1.3).contains(&q) && (0.5..=1.3).contains(&l));
+        assert_eq!(super::music_gain(b"not a wav"), 1.0);
     }
 }
