@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <link rel="stylesheet" href="kiosk.css?v=148">
   <link rel="stylesheet" href="wear.css?v=12">
-  <link rel="stylesheet" href="manual.css?v=33">
+  <link rel="stylesheet" href="manual.css?v=34">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
@@ -1051,18 +1051,18 @@
     <div class="manual-first-steps">
     <section class="manual-first-step">
     <h3>1. Insert a coin</h3>
-    <p>Press the metal coin slot at the right of the lower control deck, or press <kbd>5</kbd> on the keyboard. The BLIP sign and P1 lamp light when credit is available.</p>
+    <p>Press the metal coin slot at the right of the lower deck, or press <kbd>5</kbd> on the keyboard. The BLIP sign and the P1 lamp light up when a credit is waiting.</p>
     </section>
     <section class="manual-first-step">
     <h3>2. Choose your game</h3>
-    <p>Move the cabinet joystick or pad to bring a card to the front. The arrow keys or W A S D work too. Read the description on the selected card.</p>
+    <p>Move the joystick or pad to bring a card to the front. The arrow keys or W A S D work too. The card in front describes its game.</p>
     </section>
     <section class="manual-first-step">
     <h3>3. Load and play</h3>
-    <p>Press a red button, Space or Enter. The arm carries the ROM to its dock; wait for the loading whirr, then press fire on the game’s title screen.</p>
+    <p>Press a red button, Space or Enter. The arm carries the ROM to its dock. When the whirring stops, press fire on the game’s title screen.</p>
     </section>
     </div>
-    <p>For the particular keys and playing notes, turn to your game in the contents. To choose another game, press the BLIP logo, game title or docked ROM.</p>
+    <p>For a game’s own keys and playing notes, find it in the contents. To choose another game, press the BLIP logo, the game’s title or the docked ROM.</p>
     </div>
     </div>
   </template>
@@ -1459,7 +1459,7 @@
           var subchapter=document.createElement('h2');
           subchapter.className='manual-subchapter-title';subchapter.textContent=titles[chapterIndex];
           if(chapterIndex>=0){source.insertBefore(subchapter,source.firstChild);source.insertBefore(chapter,subchapter);}
-          source.querySelectorAll('.section-label,.thoughts-label').forEach(function(label){label.textContent=label.textContent.replace(/^[\s►▸→]+/,'').trim();});
+          source.querySelectorAll('.section-label,.thoughts-label,.impl-label').forEach(function(label){label.textContent=label.textContent.replace(/^[\s►▸→]+/,'').trim();});
           source.querySelectorAll('h2').forEach(function(heading){if(chapterIndex<0||heading.classList.contains('manual-subchapter-title'))return;var sectionHeading=document.createElement('h3');sectionHeading.className=heading.className;sectionHeading.innerHTML=heading.innerHTML;heading.replaceWith(sectionHeading);});
           Array.from(source.children).forEach(function(node){manualAtoms(node,[],atoms);});
           var sheet=document.createElement('div');sheet.className='page manual-leaf-sheet';measure.appendChild(sheet);var count=0;
@@ -1499,7 +1499,17 @@
             }
             count++;
           }
-          atoms.forEach(placeAtom);
+          // A heading never ends a page alone: it moves with what follows unless a few lines of that fit.
+          atoms.forEach(function(atom,i){
+            var after=atoms[i+1];
+            if(count&&after&&atom.leaf.matches('h1,h2,h3,.section-label,.thoughts-label,.impl-label')&&!after.leaf.matches('[data-manual-game],[data-manual-sheet]')) {
+              appendAtom(atom);var headed=sheet.scrollHeight;appendAtom(after);
+              var fits=sheet.scrollHeight<=height+1||height-headed>=72;
+              sheet.lastElementChild.remove();sheet.lastElementChild.remove();
+              if(!fits){saveSheet();newSheet();}
+            }
+            placeAtom(atom);
+          });
           saveSheet();
         });
         // Chapters open on a right-hand page and each game's left page lands on a left-hand one,
