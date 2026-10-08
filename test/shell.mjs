@@ -172,9 +172,9 @@ test('the game shell', async (t) => {
     const catalogue = JSON.parse(await evaluate(cdp, `JSON.stringify((function(){var cards=[].slice.call(document.querySelectorAll('.card'));
       return {count:cards.length,codes:cards.map(function(c){return c.getAttribute('data-card-code')}),
         rack:document.querySelectorAll('.jukebox-module').length,slugs:cards.map(function(c){return c.getAttribute('data-game-url').split('/')[0]})};})())`));
-    assert.equal(catalogue.count, 8);
-    assert.equal(catalogue.rack, 8);
-    assert.equal(new Set(catalogue.codes).size, 8, 'every laminated selector card has a unique code');
+    assert.equal(catalogue.count, 9);
+    assert.equal(catalogue.rack, 9);
+    assert.equal(new Set(catalogue.codes).size, 9, 'every laminated selector card has a unique code');
     assert.equal(await evaluate(cdp, "document.querySelectorAll('.lang-switcher,.left-badges').length"), 0,
       'the cabinet has no language or page badges');
     assert.equal(await evaluate(cdp, "document.querySelectorAll('.rolodex-page-card').length"), 0,
@@ -185,15 +185,15 @@ test('the game shell', async (t) => {
       assert.equal(await evaluate(cdp, `document.querySelector('.card[data-game-url^="${slug}/"]').classList.contains('rejected')`), true, `${slug} card responds while awaiting credit`);
       await evaluate(cdp, `document.querySelector('.card[data-game-url^="${slug}/"]').classList.remove('rejected'); true`);
     }
-    // The manual is a ninth stop between Bubbler and Rally.
-    for (let i = 0; i < 9; i++) {
+    // The manual is a tenth stop after Adder.
+    for (let i = 0; i < 10; i++) {
       await key(cdp, 'ArrowRight', 'ArrowRight', 39);
       await sleep(700);
       await assertSelectedCardFits(cdp, `desktop stop ${i + 1}`);
     }
     await cdp.send('Emulation.setDeviceMetricsOverride', { width:390, height:844, deviceScaleFactor:1, mobile:true });
     await open(cdp, 'index.html', 1100);
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 10; i++) {
       await key(cdp, 'ArrowRight', 'ArrowRight', 39);
       await sleep(700);
       await assertSelectedCardFits(cdp, `phone stop ${i + 1}`);
@@ -218,6 +218,7 @@ test('the game shell', async (t) => {
     const titles = {
       serpent: 'SERPENT', bouncer: 'BOUNCER', galactic_defender: 'DEFENDER', rally: 'RALLY',
       meteors: 'METEORS', sky_raider: 'RAIDER', brawler: 'BRAWLER', bubbler: 'BUBBLER',
+      adder: 'ADDER',
     };
     for (const [slug, title] of Object.entries(titles)) {
       await open(cdp, `${slug}/index.html`, 18000);

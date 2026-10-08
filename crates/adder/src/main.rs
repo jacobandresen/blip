@@ -36,7 +36,7 @@ const STEP_MS_START: f32 = 200.0; // a glide step in pit 1
 const STEP_MS_PIT: f32 = 12.0;    // every pit is this much quicker
 const STEP_MS_MIN: f32 = 110.0;
 const STRIKE_RATE: f32 = 0.55;    // a strike step, as a slice of the glide step
-const EGGS_PER_PIT: i32 = 8;
+const EGGS_PER_PIT: i32 = 6;
 const SHED_EVERY: i32 = 4;        // eggs between sheds
 const SHED_SEGS: usize = 3;
 /// A shed may not leave the adder less than this much of the pit to move in.

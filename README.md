@@ -1,5 +1,5 @@
 # Blip Engine Arcade
-Eight arcade games built with the Rust `blip` engine and compiled to WebAssembly.
+Nine arcade games built with the Rust `blip` engine and compiled to WebAssembly.
 
 **[Play in the browser →](https://jacobandresen.github.io/blip/)**
 
@@ -9,6 +9,7 @@ Eight arcade games built with the Rust `blip` engine and compiled to WebAssembly
 
 - **Rally** — table tennis for one or two players.
 - **Serpent** — guide a snake through a maze.
+- **Adder** — pit snake with a strike button and a shedding tail.
 - **Bouncer** — brick breaker with pickups and multi-ball.
 - **Galactic Defender** — shoot the alien formation and its motherships.
 - **Meteors** — steer and fire through drifting asteroids.

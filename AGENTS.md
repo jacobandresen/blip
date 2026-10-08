@@ -4,7 +4,7 @@
 
 The `index.wasm` and `index.html` files under each game's directory in `web/`
 (`serpent`, `bouncer`, `galactic_defender`, `rally`, `meteors`, `sky_raider`,
-`brawler`, `bubbler`) are **build outputs**. They are
+`brawler`, `bubbler`, `adder`) are **build outputs**. They are
 produced by compiling Rust source with `cargo build --release --target
 wasm32-unknown-unknown` and copying `target/wasm32-unknown-unknown/release/<game>.wasm`
 into the game's web directory; `index.html` is a copy of `web/shell.html`.
@@ -60,7 +60,7 @@ to share the nav bar between the landing page and game pages.
 
 ```
 rustup target add wasm32-unknown-unknown   # one-time
-./build_web.sh                              # recompile all eight games
+./build_web.sh                              # recompile all nine games
 ```
 
 ### Tests
@@ -73,7 +73,7 @@ cargo test --release    # game rules (Brawler's balance, Serpent's turns, ...)
 npm run test:web        # cabinet, manual, top bar, controls, decks (after ./build_web.sh)
 npm run test:layout     # nothing overlaps or leaves the screen: 21 devices, notches, every page and controller (forty minutes)
 npm run test:shell      # the game shell in headless Chromium (six minutes)
-npm run test:scores     # high-score entry in all seven scoring games (ten minutes)
+npm run test:scores     # high-score entry in all eight scoring games (ten minutes)
 npm run test:scores-db  # the score backend, against `npx supabase start` (skipped without it)
 ```
 
@@ -92,7 +92,7 @@ For native development:
 
 ```
 cargo run -p serpent            # or bouncer, rally, galactic_defender,
-                                # meteors, sky_raider, brawler, bubbler
+                                # meteors, sky_raider, brawler, bubbler, adder
 ```
 
 ### Asset pipeline

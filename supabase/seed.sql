@@ -10,7 +10,7 @@ declare
     gen_random_uuid(), gen_random_uuid(), gen_random_uuid()
   ];
   handles text[] := array['RETROJACK','PIXELPETE','QBERT','NOVA','ZAP','ADA'];
-  games   text[] := array['serpent','bouncer','galactic_defender','meteors','sky_raider','bubbler','brawler'];
+  games   text[] := array['serpent','bouncer','galactic_defender','meteors','sky_raider','bubbler','brawler','adder'];
   i int; g text;
 begin
   for i in 1 .. array_length(ids, 1) loop

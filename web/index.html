@@ -196,6 +196,7 @@
     .card-sky-raider { --c: var(--blue);    }
     .card-brawler    { --c: #dc3c28;        }
     .card-bubbler    { --c: #78d2ff;        }
+    .card-adder      { --c: #e0a034;        }
 
     /* ---- keyboard-recommended chip ---- */
     .badge-kb {
@@ -982,6 +983,17 @@
       <div class="card-desc"   data-i18n="brawlerDesc"></div>
     </article>
 
+    <!-- ADDER -->
+    <article class="card card-adder" data-game-url="adder/index.html">
+      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="adder/screenshot.png" alt="Adder gameplay">
+      </div>
+      <div class="card-title">ADDER</div>
+      <div class="card-genre"  data-i18n="adderGenre"></div>
+      <div class="card-desc"   data-i18n="adderDesc"></div>
+    </article>
+
   </div>
     </div>
   </div>
@@ -1105,6 +1117,10 @@
         skyRaiderDesc:     'Climb into the cockpit and send enemy planes packing! Watch for island and coastal flak—and the boss’s gun turret. Your final run takes you over the mainland to the big city!',
         skyRaiderControls: 'ARROW OR WASD MOVE &middot; [1] FIRE',
 
+        adderGenre:        'PIT SNAKE',
+        adderDesc:         'Eat eggs and the adder grows. Turn into a wall or your own tail and the run ends. Hold the strike for double points per egg—and every fourth egg it sheds, leaving its cast-off tail behind as wall. Six eggs clears the pit.',
+        adderControls:     'WASD / ARROW KEY TO STEER &middot; [1] HOLD TO STRIKE',
+
         serpentControlsTouch: 'SWIPE FOR TURN SNAKE &middot; TAP FOR START',
         bouncerControlsTouch: 'DRAG FOR MOVE PADDLE &middot; TAP FOR LAUNCH',
         galacticControlsTouch: 'DRAG FOR MOVE CANNON &middot; HOLD FINGER FOR SHOOT',
@@ -1113,6 +1129,7 @@
         brawlerControlsTouch: 'D-PAD MOVE &middot; LEFT BUTTON PUNCH &middot; RIGHT BUTTON KICK &middot; TOWARD+BUTTON = HIGH',
         bubblerControlsTouch: 'TOUCH = BUBBLE &middot; SLIDE = RUN &middot; SWIPE UP = JUMP &middot; 2P JOIN FOR FRIEND',
         skyRaiderControlsTouch: 'D-PAD FLY &middot; BUTTON FIRE',
+        adderControlsTouch: 'SWIPE TO STEER &middot; TAP TO STRIKE',
       },
 
       ja: {
@@ -1153,6 +1170,10 @@
         skyRaiderDesc:     '戦闘機で空を飛び、敵機を撃墜せよ。<br>島や海岸の対空砲火、ボスの銃塔に注意。<br>最後の任務は陸地を越えて大都市へ。',
         skyRaiderControls: '矢印またはWASD移動 &middot; [1] 発射',
 
+        adderGenre:        'ピットスネーク',
+        adderDesc:         '卵を食べるほど蛇は伸びる。壁や自分の尾にぶつかれば終わり。<br>ボタンを押している間は速くなり、卵の点は倍。<br>四つ食べるごとに皮を脱ぎ、抜け殻が壁となって残る。六つでピットをクリア。',
+        adderControls:     'WASD / 矢印キー &middot; [1] 長押しでストライク',
+
         serpentControlsTouch: 'スワイプで曲がる &middot; タップでスタート',
         bouncerControlsTouch: 'ドラッグでパドル移動 &middot; タップで発射',
         galacticControlsTouch: 'ドラッグで砲台移動 &middot; 指を置くと射撃',
@@ -1161,6 +1182,7 @@
         brawlerControlsTouch: '方向キーで移動 &middot; 左ボタンでパンチ &middot; 右ボタンでキック &middot; 前+ボタンで上段',
         bubblerControlsTouch: 'タッチで泡 &middot; スライドで走る &middot; 上スワイプでジャンプ &middot; 2P JOINで友だち参加',
         skyRaiderControlsTouch: '方向キーで飛行 &middot; ボタンで発射',
+        adderControlsTouch: 'スワイプで移動 &middot; タップでストライク',
       },
 
       da: {
@@ -1201,6 +1223,10 @@
         skyRaiderDesc:     'Styr jagerflyet op gennem himlen og skyd fjendens fly.<br>Pas p&aring; antiluftskyts fra &oslash;er og kyst og bossernes kanont&aring;rne.<br>Sidste mission g&aring;r ind over land til den store by.',
         skyRaiderControls: 'PILE ELLER WASD &middot; [1] SKYD',
 
+        adderGenre:        'SLANGE I GRUBEN',
+        adderDesc:         'Spis &aelig;g, og slangen vokser. Rammer du en v&aelig;g eller din egen hale, er spillet slut.<br>Hold knappen inde, og den bliver hurtigere &mdash; hvert &aelig;g t&aelig;ller dobbelt &mdash; og for hvert fjerde &aelig;g skifter den ham og efterlader den gamle hale som mur.<br>Seks &aelig;g rydder gruben.',
+        adderControls:     'WASD / PILETASTER &middot; [1] HOLD FOR AT SL&Aring;',
+
         serpentControlsTouch: 'SWIPE FOR AT DREJE &middot; TRYK FOR AT STARTE',
         bouncerControlsTouch: 'TR&AElig;K FOR AT FLYTTE BAT &middot; TRYK FOR AT STARTE',
         galacticControlsTouch: 'TR&AElig;K FOR AT FLYTTE KANONEN &middot; HOLD FINGEREN FOR AT SKYDE',
@@ -1209,6 +1235,7 @@
         brawlerControlsTouch: 'RETNINGSKORS BEV&AElig;G &middot; VENSTRE KNAP SLAG &middot; H&Oslash;JRE KNAP SPARK &middot; FREM+KNAP = H&Oslash;JT',
         bubblerControlsTouch: 'BER&Oslash;RING = BOBLE &middot; GLID = L&Oslash;B &middot; SWIPE OP = HOP &middot; 2P JOIN FOR EN VEN',
         skyRaiderControlsTouch: 'RETNINGSKORS FLYV &middot; KNAP SKYD',
+        adderControlsTouch: 'SWIPE FOR AT STYRE &middot; TRYK FOR AT SL&Aring;',
       }
     };
 

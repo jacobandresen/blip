@@ -116,7 +116,13 @@ var BLIP_GAMES = {
   // A bullet-weaving shooter: fine nudges. A small dead zone, a long pivot
   // leash so re-centring neutralises, and a firm notch so a dodge holds.
   sky_raider:         { name: 'RAIDER', accent: '50, 100, 220',
-                         stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } }
+                         stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } },
+  // A tribute to Viper (shareware, 1994). Four-way and one cap, held: the
+  // swipe strip Serpent uses, whose tap is that cap.
+  adder:              { name: 'ADDER', accent: '224, 160, 52',
+                         buttons: [{ key: ' ', code: 'Space' }],
+                         touch: { kind: 'swipe', hint: 'Swipe to steer &middot; tap to strike',
+                                  mouseHint: 'Click and drag to steer &middot; click to strike' } }
 };
 
 // Pick out the game slug from a shell-page URL, e.g. "/blip/serpent/index.html"

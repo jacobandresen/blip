@@ -201,7 +201,7 @@ for (const held of [true, false]) {
   });
 }
 
-for (const slug of ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler']) {
+for (const slug of ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler', 'adder']) {
   test(`${slug} keeps running when the clock jumps back and then a long way forward`, async (t) => {
     const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 390, height: 844 } });
     await page.goto(`${origin}/${slug}/index.html`);

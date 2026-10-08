@@ -136,6 +136,7 @@
     .game-section.raider   .game-title { color: var(--blue);    text-shadow: 0 0 12px rgba(50,100,220,0.4); }
     .game-section.brawler  .game-title { color: #dc3c28;        text-shadow: 0 0 12px rgba(220,60,40,0.4); }
     .game-section.bubbler  .game-title { color: #78d2ff;        text-shadow: 0 0 12px rgba(120,210,255,0.4); }
+    .game-section.adder    .game-title { color: #e0a034;        text-shadow: 0 0 12px rgba(224,160,52,0.4); }
 
     .game-section.rally    .section-body { border-left-color: rgba(220,50,50,0.3); }
     .game-section.bouncer  .section-body { border-left-color: rgba(0,200,200,0.3); }
@@ -145,6 +146,7 @@
     .game-section.raider   .section-body { border-left-color: rgba(50,100,220,0.3); }
     .game-section.brawler  .section-body { border-left-color: rgba(220,60,40,0.3); }
     .game-section.bubbler  .section-body { border-left-color: rgba(120,210,255,0.3); }
+    .game-section.adder    .section-body { border-left-color: rgba(224,160,52,0.3); }
 
     .impl-label {
       font-size: 9px;
@@ -202,6 +204,8 @@
     .game-section.brawler  .inline-link:hover { color: #f07860; border-bottom-color: rgba(220,60,40,0.8); }
     .game-section.bubbler  .inline-link { color: #78d2ff;        border-bottom-color: rgba(120,210,255,0.3); }
     .game-section.bubbler  .inline-link:hover { color: #b0e6ff; border-bottom-color: rgba(120,210,255,0.8); }
+    .game-section.adder    .inline-link { color: #e0a034;        border-bottom-color: rgba(224,160,52,0.3); }
+    .game-section.adder    .inline-link:hover { color: #f6c874; border-bottom-color: rgba(224,160,52,0.8); }
 
     .studios { display: flex; flex-direction: column; gap: 0; }
     .studio { padding: 20px 0; border-bottom: 1px solid #111; }
@@ -480,6 +484,26 @@
     </div>
   </section>
 
+  <div class="divider"></div>
+
+  <!-- ====== ADDER ====== -->
+  <section class="game-section adder">
+    <div class="game-header">
+      <div class="game-title">Adder</div>
+      <div class="game-origin" data-i18n="adderOrigin">Inspired by Viper &mdash; 1994</div>
+    </div>
+    <h2 style="margin-bottom:24px;" data-i18n="adderSub">A SHAREWARE SNAKE ALMOST NOBODY PLAYED</h2>
+    <div class="section-body">
+      <p data-i18n="adderP1">Viper is a single-player shareware snake variant for the Amiga and DOS, published in 1994 and remembered by very few. It is described as a snake whose tail grows as it feeds, with the one rule that matters — do not turn back on yourself or hit the walls — and a speed of play the player could set. That is all the original is said to be, and this page will not invent more of it.</p>
+      <p data-i18n="adderP2">Adder keeps those rules and adds two of its own. Hold the fire button and the adder strikes: it runs faster, and every egg it takes is worth double. Every fourth egg it sheds, and the cast-off tail stays in the pit as solid wall for the rest of the round. Six eggs clears a pit, which is swept while the adder starts faster. One player, the stick or the arrow keys, one button.</p>
+      <div class="impl-label" data-i18n="implLabel">► Other implementations online</div>
+      <ul class="impl-list">
+        <li data-i18n="adderImpl1"><a class="inline-link" href="https://www.mobygames.com/game/72914/viper/" target="_blank" rel="noopener">MobyGames &mdash; Viper</a> — The original: a single-player shareware snake variant whose tail grows as it feeds.</li>
+        <li data-i18n="adderImpl2"><a class="inline-link" href="https://www.myabandonware.com/game/viper-7ge" target="_blank" rel="noopener">My Abandonware &mdash; Viper</a> — The 1994 shareware download, for an Amiga or DOS emulator.</li>
+      </ul>
+    </div>
+  </section>
+
 </div>
   </div>
   <button class="manual-return" type="button" onclick="location.href='index.html'"><span>↩&nbsp; CLOSE BOOK · RETURN TO ARCADE</span></button>
@@ -570,7 +594,13 @@
         bubblerP2: 'Bubbler is a small love letter rather than a remake: two dragons drawn live, squashing and stretching with every jump and blinking as they go, five rounds of one-way platforms with their own colour schemes, and the original\'s core rules. Bubbles float to the ceiling and gather; you can ride them by holding jump; pop a whole cluster of trapped monsters at once and every catch doubles the last. Hurry up and something skull-shaped comes hunting. Player two drops in at any time, and the bouncy chiptune theme is synthesised on the device as the game loads.',
         bubblerImpl1: '<a class="inline-link" href="https://en.wikipedia.org/wiki/Bubble_Bobble" target="_blank" rel="noopener">Wikipedia — Bubble Bobble</a> — The original, its secrets, and the sequels it led to.',
         bubblerImpl2: '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=bubble+bobble" target="_blank" rel="noopener">MIT Scratch — Bubble Bobble projects</a> — Community tributes, a favourite for learning platformer physics.',
-        bubblerImpl3: '<a class="inline-link" href="https://github.com/search?q=bubble+bobble&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Bubble Bobble repositories</a> — Open-source remakes and tributes across languages, sortable by stars.'
+        bubblerImpl3: '<a class="inline-link" href="https://github.com/search?q=bubble+bobble&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Bubble Bobble repositories</a> — Open-source remakes and tributes across languages, sortable by stars.',
+        adderOrigin:  'Inspired by Viper — 1994',
+        adderSub:     'A SHAREWARE SNAKE ALMOST NOBODY PLAYED',
+        adderP1:      'Viper is a single-player shareware snake variant for the Amiga and DOS, published in 1994 and remembered by very few. It is described as a snake whose tail grows as it feeds, with the one rule that matters — do not turn back on yourself or hit the walls — and a speed of play the player could set. That is all the original is said to be, and this page will not invent more of it.',
+        adderP2:      'Adder keeps those rules and adds two of its own. Hold the fire button and the adder strikes: it runs faster, and every egg it takes is worth double. Every fourth egg it sheds, and the cast-off tail stays in the pit as solid wall for the rest of the round. Six eggs clears a pit, which is swept while the adder starts faster. One player, the stick or the arrow keys, one button.',
+        adderImpl1:   '<a class="inline-link" href="https://www.mobygames.com/game/72914/viper/" target="_blank" rel="noopener">MobyGames — Viper</a> — The original: a single-player shareware snake variant whose tail grows as it feeds.',
+        adderImpl2:   '<a class="inline-link" href="https://www.myabandonware.com/game/viper-7ge" target="_blank" rel="noopener">My Abandonware — Viper</a> — The 1994 shareware download, for an Amiga or DOS emulator.'
       },
 
       da: {
@@ -645,7 +675,13 @@
         bubblerP2: 'Bubbler er et lille kærlighedsbrev snarere end en genindspilning: to drager tegnet live, der mases sammen og strækkes ved hvert hop og blinker undervejs, fem baner med envejsplatforme i hver sit farveskema og originalens kerneregler. Boblerne svæver op til loftet og samler sig; man kan ride på dem ved at holde hop inde; prik en hel klynge fangne monstre på én gang, og hver fangst tæller dobbelt af den forrige. Nøl, og noget kranieformet kommer på jagt. Spiller to kan hoppe ind når som helst, og det hoppende chiptune-tema syntetiseres på enheden, mens spillet indlæses.',
         bubblerImpl1: '<a class="inline-link" href="https://en.wikipedia.org/wiki/Bubble_Bobble" target="_blank" rel="noopener">Wikipedia — Bubble Bobble</a> — Originalen, dens hemmeligheder og de efterfølgere, den førte til.',
         bubblerImpl2: '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=bubble+bobble" target="_blank" rel="noopener">MIT Scratch — Bubble Bobble-projekter</a> — Fællesskabets hyldester, en favorit til at lære platformsfysik.',
-        bubblerImpl3: '<a class="inline-link" href="https://github.com/search?q=bubble+bobble&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Bubble Bobble-repositories</a> — Open source-genindspilninger og hyldester på tværs af sprog, sorterbare efter stjerner.'
+        bubblerImpl3: '<a class="inline-link" href="https://github.com/search?q=bubble+bobble&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — Bubble Bobble-repositories</a> — Open source-genindspilninger og hyldester på tværs af sprog, sorterbare efter stjerner.',
+        adderOrigin:  'Inspireret af Viper — 1994',
+        adderSub:     'EN SHAREWARE-SLANGE, NÆSTEN INGEN HAR SPILLET',
+        adderP1:      'Viper er en enkeltspliller-shareware-slange til Amiga og DOS, udgivet i 1994 og husket af meget få. Den beskrives som en slange, hvis hale vokser, mens den spiser, med den ene regel, der betyder noget — drej ikke tilbage på dig selv, og ram ikke væggene — og en hastighed, spilleren selv kunne sætte. Det er alt, hvad originalen siges at være, og denne side digter ikke mere på den.',
+        adderP2:      'Adder beholder de regler og lægger to af sine egne til. Hold skydeknappen inde, og slangen hugger: den løber hurtigere, og hvert æg, den tager, tæller dobbelt. For hvert fjerde æg skifter den ham, og det afkastede halestykke bliver liggende i gruben som fast mur resten af banen. Seks æg rydder gruben, der fejes, mens slangen starter hurtigere. Én spiller, joysticket eller piletasterne, én knap.',
+        adderImpl1:   '<a class="inline-link" href="https://www.mobygames.com/game/72914/viper/" target="_blank" rel="noopener">MobyGames — Viper</a> — Originalen: en enkeltspliller-shareware-slange, hvis hale vokser, mens den spiser.',
+        adderImpl2:   '<a class="inline-link" href="https://www.myabandonware.com/game/viper-7ge" target="_blank" rel="noopener">My Abandonware — Viper</a> — Shareware-downloadet fra 1994, til en Amiga- eller DOS-emulator.'
       },
 
       ja: {
@@ -720,7 +756,13 @@
         bubblerP2: 'Bubblerはリメイクではなく、小さなラブレターです。ジャンプのたびにつぶれては伸び、まばたきしながら動く、その場で描かれる二匹の竜。それぞれの配色を持つ、一方通行の足場の5つのラウンド。そして原作の基本ルール。泡は天井へ浮かんで集まり、ジャンプを押し続ければ泡に乗れます。閉じこめた怪物の群れをまとめて割れば、ひとつごとに点数が倍になります。もたもたしていると、どくろのようなものが追いかけてきます。2Pはいつでも途中参加でき、弾むようなチップチューンのテーマはゲームの読み込み時に端末上で合成されます。',
         bubblerImpl1: '<a class="inline-link" href="https://en.wikipedia.org/wiki/Bubble_Bobble" target="_blank" rel="noopener">Wikipedia — Bubble Bobble</a> — 原作、その秘密、そして続編へのつながり。',
         bubblerImpl2: '<a class="inline-link" href="https://scratch.mit.edu/search/projects?q=bubble+bobble" target="_blank" rel="noopener">MIT Scratch — バブルボブルのプロジェクト</a> — アクションゲームの物理を学ぶのに人気のコミュニティ作品。',
-        bubblerImpl3: '<a class="inline-link" href="https://github.com/search?q=bubble+bobble&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — バブルボブルのリポジトリ</a> — 各言語のオープンソースのリメイクやオマージュ、スター数で並べ替え可能。'
+        bubblerImpl3: '<a class="inline-link" href="https://github.com/search?q=bubble+bobble&type=repositories&s=stars" target="_blank" rel="noopener">GitHub — バブルボブルのリポジトリ</a> — 各言語のオープンソースのリメイクやオマージュ、スター数で並べ替え可能。',
+        adderOrigin:  'Viper（1994年）に着想',
+        adderSub:     'ほとんど知られていないシェアウェアの蛇',
+        adderP1:      'Viperは1994年に公開された、AmigaとDOS向けの一人用シェアウェアのスネーク変種で、覚えている人はほとんどいません。餌を食べるほど尾が伸びる蛇で、大事なルールはひとつ——自分自身に折り返したり、壁に当たったりしないこと。ゲームの速度はプレイヤーが設定できました。原作について言えるのはそれだけで、このページはそれ以上を作り話にはしません。',
+        adderP2:      'Adderはそのルールをそのままに、ふたつを独自に足しました。発射ボタンを押している間は「ストライク」で速くなり、取った卵はどれも倍の点。四つ食べるごとに皮を脱ぎ、抜け殻になった尾はそのバッドの残りを壁としてふさぎます。卵を六つ食べればピットをクリア、床は掃かれ、蛇は前より速く動き出します。一人用、スティックか矢印キー、ボタンはひとつ。',
+        adderImpl1:   '<a class="inline-link" href="https://www.mobygames.com/game/72914/viper/" target="_blank" rel="noopener">MobyGames — Viper</a> — 原作の項目：食べるほど尾が伸びる、一人用シェアウェアのスネーク変種。',
+        adderImpl2:   '<a class="inline-link" href="https://www.myabandonware.com/game/viper-7ge" target="_blank" rel="noopener">My Abandonware — Viper</a> — 1994年のシェアウェア版。AmigaかDOSのエミュレータで遊べます。'
       }
 
     };

@@ -76,7 +76,7 @@ players
 
 scores
   id          bigint identity PK
-  game        text  NOT NULL  CHECK (game IN ('serpent','bouncer','galactic_defender','meteors','sky_raider','bubbler','brawler'))
+  game        text  NOT NULL  CHECK (game IN ('serpent','bouncer','galactic_defender','meteors','sky_raider','bubbler','brawler','adder'))
   player_id   uuid  NOT NULL  -> players(id) ON UPDATE CASCADE ON DELETE CASCADE
   score       integer NOT NULL CHECK (score >= 0 AND score <= 10000000)
   created_at / updated_at  timestamptz default now()

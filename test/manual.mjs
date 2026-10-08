@@ -58,7 +58,7 @@ for (const [slug, title] of [['about', 'about blip'], ['controls', 'controls'], 
   });
 }
 
-const SLUGS = ['bouncer', 'brawler', 'bubbler', 'galactic_defender', 'meteors', 'sky_raider', 'rally', 'serpent'];
+const SLUGS = ['adder', 'bouncer', 'brawler', 'bubbler', 'galactic_defender', 'meteors', 'sky_raider', 'rally', 'serpent'];
 
 async function openManual(t, query, { width = 1280, height = 844 } = {}) {
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: width < 700, viewport: { width, height } });
