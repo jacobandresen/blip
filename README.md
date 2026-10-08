@@ -9,7 +9,7 @@ Nine arcade games built with the Rust `blip` engine and compiled to WebAssembly.
 
 - **Rally** — table tennis for one or two players.
 - **Serpent** — guide a snake through a maze.
-- **Adder** — pit snake with a strike button and a shedding tail.
+- **Adder** — two vipers, and CPU ones to fill the pit: free movement, holes in the bodies to pass through.
 - **Bouncer** — brick breaker with pickups and multi-ball.
 - **Galactic Defender** — shoot the alien formation and its motherships.
 - **Meteors** — steer and fire through drifting asteroids.

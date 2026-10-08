@@ -117,12 +117,16 @@ var BLIP_GAMES = {
   // leash so re-centring neutralises, and a firm notch so a dodge holds.
   sky_raider:         { name: 'RAIDER', accent: '50, 100, 220',
                          stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } },
-  // A tribute to Viper (shareware, 1994). Four-way and one cap, held: the
-  // swipe strip Serpent uses, whose tap is that cap.
+  // A tribute to Viper (shareware, 1994). A nose you steer rather than a grid
+  // you step, holes in the bodies to pass through, and CPU vipers filling the
+  // pit: two seats, so player two drops in with the arrows and their own cap.
+  // The strip is a drag, because a heading is held rather than tapped.
   adder:              { name: 'ADDER', accent: '224, 160, 52',
+                         players: 2,
                          buttons: [{ key: ' ', code: 'Space' }],
-                         touch: { kind: 'swipe', hint: 'Swipe to steer &middot; tap to strike',
-                                  mouseHint: 'Click and drag to steer &middot; click to strike' } }
+                         keys: TWO_PLAYER_KEYS,
+                         touch: { kind: 'drag', hint: 'Drag to steer &middot; tap to strike',
+                                  mouseHint: 'Point to steer &middot; click to strike' } }
 };
 
 // Pick out the game slug from a shell-page URL, e.g. "/blip/serpent/index.html"
