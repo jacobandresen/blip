@@ -3,7 +3,7 @@
 
 use std::time::Instant;
 
-use blip_assets::{bouncer, brawler, bubbler, galactic_defender, meteors, rally, serpent, sky_raider};
+use blip_assets::{adder, bouncer, brawler, bubbler, galactic_defender, meteors, rally, serpent, sky_raider};
 
 fn main() {
     let dir = std::env::args().nth(1).unwrap_or_else(|| "music".to_string());
@@ -38,6 +38,8 @@ fn main() {
         ("brawler_city", || brawler::ambience_wav(3)),
         ("bubbler_theme", bubbler::theme_wav),
         ("bubbler_hurry", bubbler::hurry_wav),
+        ("adder_coil", adder::coil_wav),
+        ("adder_hunt", adder::hunt_wav),
     ];
     for (name, make) in tunes {
         let t = Instant::now();
