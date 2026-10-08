@@ -6,14 +6,12 @@ mod arena;
 mod cpu;
 
 use blip::input::{
-    btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
-    BLIP_KEY_DOWN, BLIP_KEY_J, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE,
-    BLIP_KEY_UP, BLIP_KEY_W,
+    btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D,
+    BLIP_KEY_J, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE,
 };
 use blip::macroquad::input::KeyCode;
-use blip::macroquad::texture::Texture2D;
 use blip::{
-    angle_diff, load_png, play_sfx, web, window_conf, Blip, BlipColor, Jukebox, Timer,
+    play_sfx, web, window_conf, Blip, BlipColor, Jukebox, Timer,
     GAME_OVER_MIN_WAIT, BLIP_BLACK, BLIP_RED, BLIP_WHITE,
 };
 
@@ -28,10 +26,8 @@ const DEMO_SNAKES: usize = 3;
 enum State { Title, Play, Over }
 
 struct Sounds {
-    eat: blip::BlipSound,
     through: blip::BlipSound,
-    shed: blip::BlipSound,
-    strike: blip::BlipSound,
+    kill: blip::BlipSound,
     round: blip::BlipSound,
     game_over: blip::BlipSound,
 }
@@ -68,33 +64,29 @@ impl Game {
 }
 
 // ---- input ---------------------------------------------------------------
-/// The keys a seat holds: up, down, left, right, and the fire cap, which is the
-/// throttle. Seat one is WASD so the arrows belong to player two, whose cap is
-/// the deck's second one.
-fn seat_keys(seat: usize) -> [KeyCode; 5] {
+/// Player one uses A/D and Space to start; player two uses arrows and J to join.
+fn seat_keys(seat: usize) -> [KeyCode; 3] {
     if seat == 0 {
-        [BLIP_KEY_W, BLIP_KEY_S, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_SPACE]
+        [BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_SPACE]
     } else {
-        [BLIP_KEY_UP, BLIP_KEY_DOWN, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_J]
+        [BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_J]
     }
 }
 
-/// What a person is asking of a snake: the held directions become a heading and
-/// the cap is the throttle. A heading is a vector, so two keys held together are
-/// a diagonal — which is why this is a direction to point the head at rather
-/// than a left and a right.
-fn human_steer(w: &World, seat: usize) -> Steer {
-    let [up, down, left, right, fire] = seat_keys(seat);
-    let (mut vx, mut vy) = (0.0f32, 0.0f32);
-    if key_active(left) { vx -= 1.0; }
-    if key_active(right) { vx += 1.0; }
-    if key_active(up) { vy -= 1.0; }
-    if key_active(down) { vy += 1.0; }
-    let boost = key_active(fire) || (seat == 0 && key_active(BLIP_KEY_BUTTON2));
-    if vx == 0.0 && vy == 0.0 { return Steer { turn: 0.0, boost }; }
-    let want = vy.atan2(vx);
-    let heading = w.snakes.iter().find(|s| s.seat == seat).map_or(0.0, |s| s.heading);
-    Steer { turn: (angle_diff(heading, want) / 0.25).clamp(-1.0, 1.0), boost }
+/// Left and right curve the viper; it keeps its heading when neither is held.
+fn human_steer(seat: usize) -> Steer {
+    let [left, right, _] = seat_keys(seat);
+    let mut turn = match (key_active(left), key_active(right)) {
+        (true, false) => -1.0,
+        (false, true) => 1.0,
+        _ => 0.0,
+    };
+    if seat == 0 && web::controls() == web::Controls::Touch {
+        if let Some((x, _, _)) = web::touch_fraction(0) {
+            turn = if x < 0.45 { -1.0 } else if x > 0.55 { 1.0 } else { 0.0 };
+        }
+    }
+    Steer { turn }
 }
 
 /// Intent for every seat this frame: the human seats answer to their keys and
@@ -103,8 +95,9 @@ fn gather(g: &Game) -> [Steer; SEATS] {
     autopilot(&g.world);
     let mut steers = [Steer::default(); SEATS];
     for (i, s) in g.world.snakes.iter().enumerate() {
+        if !s.alive { continue; }
         let seat = s.seat.min(SEATS - 1);
-        steers[seat] = if s.human { human_steer(&g.world, s.seat) } else { cpu::steer(&g.world, i) };
+        steers[seat] = if s.human { human_steer(s.seat) } else { cpu::steer(&g.world, i) };
     }
     steers
 }
@@ -112,38 +105,25 @@ fn gather(g: &Game) -> [Steer; SEATS] {
 /// Intent for a pit nobody is holding: every snake answers to its brain.
 fn cpu_steers(w: &World) -> [Steer; SEATS] {
     let mut steers = [Steer::default(); SEATS];
-    for (i, s) in w.snakes.iter().enumerate() { steers[s.seat.min(SEATS - 1)] = cpu::steer(w, i); }
+    for (i, s) in w.snakes.iter().enumerate() {
+        if s.alive { steers[s.seat.min(SEATS - 1)] = cpu::steer(w, i); }
+    }
     steers
 }
 
-/// Hold the keys pointing nearest to `dir`. This is how a pad turns a
-/// continuous heading: hold the cardinal a quarter turn off and let it go when
-/// the nose arrives, because holding the cardinal you are already on asks for no
-/// turn at all.
-fn hold_toward(dir: f32, keys: [KeyCode; 5], held: &mut Vec<KeyCode>) {
-    if dir.cos() > 0.5 { held.push(keys[3]); } else if dir.cos() < -0.5 { held.push(keys[2]); }
-    if dir.sin() > 0.5 { held.push(keys[1]); } else if dir.sin() < -0.5 { held.push(keys[0]); }
-}
-
-/// The native autopilot (BLIP_BOT=1) drives the human seats the way a person
-/// does: it holds the keys a thumb would, and the cap when it wants the
-/// throttle. BLIP_BOT_FUZZ replaces the lot.
+/// The native autopilot holds only turn keys, through the normal input path.
 #[cfg(not(target_arch = "wasm32"))]
 fn autopilot(w: &World) {
     if !blip::bot::active() { return; }
+    let mut held = Vec::new();
     for (i, s) in w.snakes.iter().enumerate() {
         if !s.human || !s.alive { continue; }
         let st = cpu::steer(w, i);
-        let keys = seat_keys(s.seat);
-        let mut held = Vec::new();
-        if st.turn < -0.15 {
-            hold_toward(s.heading - std::f32::consts::FRAC_PI_2, keys, &mut held);
-        } else if st.turn > 0.15 {
-            hold_toward(s.heading + std::f32::consts::FRAC_PI_2, keys, &mut held);
-        }
-        if st.boost { held.push(keys[4]); }
-        blip::bot::hold(&held);
+        let [left, right, _] = seat_keys(s.seat);
+        if st.turn < -0.15 { held.push(left); }
+        if st.turn > 0.15 { held.push(right); }
     }
+    blip::bot::hold(&held);
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -162,10 +142,8 @@ fn update_title(g: &mut Game, dt: f32) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    // Player two drops in on their own keys; the kiosk is told, so its deck can
-    // light the second station.
-    let p2 = seat_keys(1);
-    if p2.iter().any(|k| key_pressed(*k)) && g.world.join_human(1) {
+    // J joins player two and lights the kiosk's second station.
+    if key_pressed(seat_keys(1)[2]) && g.world.join_human(1) {
         g.humans = 2;
         web::set_mode(true);
     }
@@ -175,10 +153,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     for e in g.world.events.drain(..) {
         match e {
-            Event::Eat => play_sfx(&sfx.eat),
             Event::Through => play_sfx(&sfx.through),
-            Event::Shed => play_sfx(&sfx.shed),
-            Event::Kill => play_sfx(&sfx.strike),
+            Event::Kill => play_sfx(&sfx.kill),
             Event::RoundWin => play_sfx(&sfx.round),
             Event::Die => {
                 play_sfx(&sfx.game_over);
@@ -205,10 +181,7 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("ADDER", WIN_W, WIN_H)
 }
 
-const EGG_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/egg.png"));
-const EAT_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/eat.wav"));
 const THROUGH_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/through.wav"));
-const SHED_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shed.wav"));
 const STRIKE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/strike.wav"));
 const ROUND_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pit.wav"));
 const GAME_OVER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
@@ -218,13 +191,9 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let egg = load_png(EGG_PNG);
-
     let sfx = Sounds {
-        eat: blip::audio::load_sound(EAT_WAV).await,
         through: blip::audio::load_sound(THROUGH_WAV).await,
-        shed: blip::audio::load_sound(SHED_WAV).await,
-        strike: blip::audio::load_sound(STRIKE_WAV).await,
+        kill: blip::audio::load_sound(STRIKE_WAV).await,
         round: blip::audio::load_sound(ROUND_WAV).await,
         game_over: blip::audio::load_sound(GAME_OVER_WAV).await,
     };
@@ -252,8 +221,8 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, &g, &egg),
-            State::Play => draw_play(&blip, &g, &egg),
+            State::Title => draw_title(&blip, &g),
+            State::Play => draw_play(&blip, &g),
             State::Over => draw_over(&blip, &g),
         }
 
@@ -267,7 +236,6 @@ const BANNER: f32 = 1.6; // a round's name stays up this long
 const EARTH: BlipColor = BlipColor { r: 0.085, g: 0.07, b: 0.05, a: 1.0 };
 const DUST: BlipColor = BlipColor { r: 0.145, g: 0.12, b: 0.085, a: 1.0 };
 const TOPSOIL: BlipColor = BlipColor { r: 0.40, g: 0.29, b: 0.15, a: 1.0 };
-const SKIN: BlipColor = BlipColor { r: 0.86, g: 0.81, b: 0.65, a: 1.0 };
 const HOLE: BlipColor = BlipColor { r: 1.0, g: 0.86, b: 0.34, a: 1.0 };
 const SAND: BlipColor = BlipColor { r: 0.60, g: 0.52, b: 0.36, a: 1.0 };
 
@@ -287,58 +255,29 @@ fn draw_pit(blip: &Blip) {
     blip.fill_rect(arena::PIT_X + arena::PIT_W, 28.0, arena::PIT_X, WIN_H as f32 - 28.0, TOPSOIL);
 }
 
-fn band_of(c: BlipColor) -> BlipColor {
-    BlipColor { r: (c.r * 0.62).min(1.0), g: (c.g * 0.62).min(1.0), b: (c.b * 0.62).min(1.0), a: 1.0 }
-}
-
-/// One snake: a tube along the path its head has taken, banded so two vipers in
-/// the same quarter of the pit stay tellable apart, its hole drawn as a lit gap
-/// with a ring on it — a hole you cannot see is a hole you cannot aim at.
+/// Dead trails stay solid; passable gaps keep the seat's colour at 23% brightness.
 fn draw_snake(blip: &Blip, s: &arena::Snake) {
-    if !s.alive { return; }
-    let (c, band) = (s.colour(), band_of(s.colour()));
+    let c = s.colour();
+    let gap = BlipColor { r: c.r * 0.23, g: c.g * 0.23, b: c.b * 0.23, ..c };
     let thick = arena::BODY_R * 2.0;
-    let pts: Vec<arena::Pt> = s.path.iter().copied().collect();
-    for i in (1..pts.len()).rev() {
-        if s.in_hole(i) || s.in_hole(i - 1) { continue; }
-        let col = if (i / 3) % 2 == 0 { c } else { band };
-        blip.draw_line_ex(pts[i].x, pts[i].y, pts[i - 1].x, pts[i - 1].y, thick, col);
+    for i in (1..s.path.len()).rev() {
+        let (a, b) = (s.path[i], s.path[i - 1]);
+        let col = if s.in_hole(i) || s.in_hole(i - 1) { gap } else { c };
+        blip.draw_line_ex(a.x, a.y, b.x, b.y, thick, col);
     }
-    if let Some(p) = pts.first() {
+    if !s.alive { return; }
+    if let Some(p) = s.path.front() {
         blip.draw_line_ex(s.head.x, s.head.y, p.x, p.y, thick, c);
     }
-    if let Some(h) = s.hole {
-        let mid = s.hole_centre();
-        if !h.spent {
-            if let Some(m) = mid {
-                let r = arena::BODY_R * 1.1 + (blip::macroquad::time::get_time() as f32 * 6.0).sin().abs() * 2.0;
-                blip.fill_circle(m.x, m.y, r, BlipColor { a: 0.35, ..HOLE });
-            }
-        }
-        for k in [h.at, h.at + h.len] {
-            if let Some(p) = s.path.get(k) {
-                blip.fill_circle(p.x, p.y, arena::BODY_R * 0.8, if h.spent { band } else { HOLE });
-            }
-        }
+    let head_len = arena::BODY_R * 3.0;
+    blip.draw_line_ex(s.head.x - s.heading.cos() * head_len,
+        s.head.y - s.heading.sin() * head_len, s.head.x, s.head.y, thick + 1.0, c);
+    if s.human {
+        let label = if s.seat == 0 { "YOU" } else { "P2" };
+        let x = (s.head.x - 10.0).clamp(arena::PIT_X + 2.0, arena::PIT_X + arena::PIT_W - 24.0);
+        let y = (s.head.y - 16.0).clamp(arena::PIT_Y + 2.0, arena::PIT_Y + arena::PIT_H - 4.0);
+        blip.draw_text_outlined(label, x, y, 2.0, BLIP_WHITE, BLIP_BLACK);
     }
-    // The head, with eyes either side of the way it is going.
-    let head = BlipColor { r: (c.r + 0.2).min(1.0), g: (c.g + 0.2).min(1.0), b: (c.b + 0.2).min(1.0), a: 1.0 };
-    blip.fill_circle(s.head.x, s.head.y, arena::BODY_R + 1.0, if s.boost { HOLE } else { head });
-    let (fx, fy) = (s.heading.cos(), s.heading.sin());
-    for side in [-1.0f32, 1.0] {
-        let (ex, ey) = (s.head.x + fx * 3.0 - fy * side * 3.6, s.head.y + fy * 3.0 + fx * side * 3.6);
-        blip.fill_circle(ex, ey, 1.9, BLIP_BLACK);
-    }
-}
-
-/// Skin: what a snake left behind, pale enough never to be mistaken for a body.
-fn draw_skin(blip: &Blip, w: &World) {
-    for q in &w.skin { blip.fill_rect(q.x - 4.0, q.y - 4.0, 8.0, 8.0, SKIN); }
-}
-
-fn draw_eggs(blip: &Blip, w: &World, egg: &Texture2D) {
-    let s = arena::EGG_R * 2.4;
-    for e in &w.eggs { blip.draw_texture(egg, e.x - s / 2.0, e.y - s / 2.0, s, s); }
 }
 
 /// Who else is in the pit: a chip in each snake's colour and its score down the
@@ -355,18 +294,20 @@ fn draw_standings(blip: &Blip, w: &World) {
     }
 }
 
-fn draw_world(blip: &Blip, w: &World, egg: &Texture2D) {
+fn draw_world(blip: &Blip, w: &World) {
     draw_pit(blip);
-    draw_skin(blip, w);
-    draw_eggs(blip, w, egg);
     for s in &w.snakes { draw_snake(blip, s); }
     w.fx.draw(blip);
 }
 
-fn draw_play(blip: &Blip, g: &Game, egg: &Texture2D) {
-    draw_world(blip, &g.world, egg);
+fn draw_play(blip: &Blip, g: &Game) {
+    draw_world(blip, &g.world);
     draw_standings(blip, &g.world);
-    if g.world.banner_t < BANNER {
+    if g.world.round_wait > 0.0 {
+        let won = g.world.snakes.iter().any(|s| s.alive && s.human);
+        blip.draw_centered(if won { "YOU WIN" } else { "ROUND LOST" },
+            arena::PIT_Y + arena::PIT_H / 2.0, 4.0, if won { HOLE } else { BLIP_RED });
+    } else if g.world.banner_t < BANNER {
         let a = (1.0 - g.world.banner_t / BANNER).min(1.0);
         blip.draw_centered(&format!("ROUND {}", g.world.round), (arena::PIT_Y + arena::PIT_H / 2.0) as f32, 4.0,
             BlipColor { a, ..HOLE });
@@ -376,20 +317,22 @@ fn draw_play(blip: &Blip, g: &Game, egg: &Texture2D) {
 
 /// The title screen is an attract mode: a real pit, three CPUs, and the game
 /// showing its own movement and its own holes while it waits for a coin.
-fn draw_title(blip: &Blip, g: &Game, egg: &Texture2D) {
-    draw_world(blip, &g.demo, egg);
+fn draw_title(blip: &Blip, g: &Game) {
+    draw_world(blip, &g.demo);
     draw_standings(blip, &g.demo);
     let veil = BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.55 };
     blip.fill_rect(0.0, 46.0, WIN_W as f32, 92.0, veil);
-    blip.fill_rect(0.0, 402.0, WIN_W as f32, 116.0, veil);
+    blip.fill_rect(0.0, 384.0, WIN_W as f32, 136.0, veil);
     blip.draw_text_outlined("ADDER", 96.0, 62.0, 6.0, arena::seat_colour(0), BLIP_BLACK);
     blip.draw_hi(&web::high_score(), 116.0, HOLE);
     let by = web::controls();
-    blip.draw_centered(by.pick("PRESS FIRE", "PRESS FIRE", "TAP TO START"), 424.0, 3.0, BLIP_WHITE);
-    blip.draw_centered(by.pick("WASD STEER   HOLD FIRE TO STRIKE", "STICK STEER   HOLD TO STRIKE", "DRAG STEER   TAP TO STRIKE"),
-        454.0, 2.0, SAND);
-    blip.draw_centered("PASS THROUGH THE HOLES", 474.0, 2.0, HOLE);
-    blip.draw_centered("PLAYER 2 PRESSES ANY KEY", 494.0, 2.0, arena::seat_colour(1));
+    blip.draw_centered(by.pick("SPACE TO START", "PRESS FIRE TO START", "TAP TO START"), 404.0, 3.0, BLIP_WHITE);
+    blip.draw_centered(by.pick("GREEN VIPER: A/D TURN", "GREEN VIPER: STICK LEFT/RIGHT", "GREEN VIPER: DRAG LEFT/RIGHT"),
+        430.0, 2.0, SAND);
+    blip.draw_centered("CONSTANT MOVEMENT", 450.0, 2.0, SAND);
+    blip.draw_centered("GROWING TRAILS STAY ALL ROUND", 468.0, 2.0, SAND);
+    blip.draw_centered("DIM GAPS ARE PASSABLE", 486.0, 2.0, HOLE);
+    blip.draw_centered("P2: LEFT/RIGHT TURN, J TO JOIN", 504.0, 2.0, arena::seat_colour(1));
 }
 
 fn draw_over(blip: &Blip, g: &Game) {
