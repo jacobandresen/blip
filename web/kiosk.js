@@ -84,20 +84,20 @@ function blipSetControls(mode) {
  * so CSS can build solid and translucent colours. */
 // `buttons` map deck caps; `stick` accepts engage/release and maxR pixels plus hysteresis degrees.
 // `touch.kind`: drag follows a finger, swipe steers by flick, paddles split bats, platform runs/blows/jumps.
-// `hint` labels the touch strip; `mouseHint` labels a touchscreen laptop's mouse controls.
+// `controls` is the key legend a PC sees after the first coin: [label, keys, alternative keys]; `hint` labels the touch strip; `mouseHint` labels a touchscreen laptop's mouse controls.
 var BLIP_GAMES = {
-  serpent:            { name: 'SERPENT',  accent: '50, 200, 50',
+  serpent:            { name: 'SERPENT',  accent: '50, 200, 50', touchControls: [['STEER',['SWIPE']],['START',['TAP']]], controls: [['STEER',['↑','←','↓','→'],['W','A','S','D']],['START',['SPACE']]],
                          touch: { kind: 'swipe', hint: 'Swipe to steer', mouseHint: 'Click and drag to steer' } },
-  bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200',
+  bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200', touchControls: [['MOVE',['DRAG']],['LAUNCH',['TAP']]], controls: [['MOVE',['←','→'],['A','D']],['LAUNCH',['SPACE']]],
                          touch: { kind: 'drag', hint: 'Tap to launch', mouseHint: 'Point to move &middot; Click to launch' } },
-  galactic_defender:  { name: 'DEFENDER', accent: '200, 50, 200',
+  galactic_defender:  { name: 'DEFENDER', accent: '200, 50, 200', touchControls: [['MOVE',['DRAG']],['FIRE',['HOLD']]], controls: [['MOVE',['←','→'],['A','D']],['FIRE',['SPACE']]],
                          touch: { kind: 'drag', hint: 'Hold to fire', mouseHint: 'Point to move &middot; Hold the button to fire' } },
-  rally:              { name: 'RALLY',    accent: '220, 50, 50',
+  rally:              { name: 'RALLY',    accent: '220, 50, 50', touchControls: [['1 PLAYER',['TAP LEFT']],['2 PLAYERS',['TAP RIGHT']],['MOVE BAT',['DRAG']]], controls: [['1 PLAYER',['W','S'],['↑','↓']],['2 PLAYERS',['I','K']],['SERVE',['SPACE']]],
                          touch: { kind: 'paddles', hint: 'Drag up or down', mouseHint: 'Point up or down &middot; Click to serve' } },
-  meteors:            { name: 'METEORS',  accent: '180, 180, 180',
+  meteors:            { name: 'METEORS',  accent: '180, 180, 180', touchControls: [['TURN AND THRUST',['D-PAD']],['FIRE',['RED BUTTON']],['HYPERSPACE',['BLUE BUTTON']]], controls: [['TURN',['←','→'],['A','D']],['THRUST',['↑'],['W']],['FIRE',['SPACE']],['HYPERSPACE',['Z']]],
                          buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }] },
   // Two caps; holding toward hits high. `players: 2` enables the second station; `keys` maps P1 to WASD.
-  brawler:            { name: 'BRAWLER', accent: '220, 60, 40',
+  brawler:            { name: 'BRAWLER', accent: '220, 60, 40', touchControls: [['MOVE',['D-PAD']],['PUNCH',['RED BUTTON']],['KICK',['BLUE BUTTON']]], ownLegend: true, controls: [['MOVE',['←','→'],['A','D']],['PUNCH',['SPACE'],['F']],['KICK',['Z'],['G']]],
                          players: 2,
                          buttons: [{ key: 'f', code: 'KeyF', label: 'PUNCH' },
                                    { key: 'g', code: 'KeyG', label: 'KICK' }],
@@ -106,7 +106,7 @@ var BLIP_GAMES = {
   // A tribute to Bubble Bobble. Two caps: bubble (fire) and jump; up
   // jumps too. Like Brawler, player one is WASD so the arrows are player
   // two's, who drops in with their own bubble or jump.
-  bubbler:            { name: 'BUBBLER', accent: '120, 210, 255',
+  bubbler:            { name: 'BUBBLER', accent: '120, 210, 255', touchControls: [['RUN',['SLIDE']],['BUBBLE',['TAP']],['JUMP',['FLICK UP']]], controls: [['RUN',['←','→'],['A','D']],['BUBBLE',['SPACE'],['F']],['JUMP',['↑'],['W']],['2ND PLAYER',['J','K']]],
                          players: 2,
                          touch: { kind: 'platform', hint: 'Touch to bubble &middot; slide to run &middot; swipe up to jump',
                                   mouseHint: 'Drag to run &middot; click to bubble &middot; drag up to jump' },
@@ -115,11 +115,11 @@ var BLIP_GAMES = {
                          keys: TWO_PLAYER_KEYS },
   // A bullet-weaving shooter: fine nudges. A small dead zone, a long pivot
   // leash so re-centring neutralises, and a firm notch so a dodge holds.
-  sky_raider:         { name: 'RAIDER', accent: '50, 100, 220',
+  sky_raider:         { name: 'RAIDER', accent: '50, 100, 220', touchControls: [['STEER AND THROTTLE',['D-PAD']],['FIRE',['RED BUTTON']]], controls: [['STEER',['←','→'],['A','D']],['THROTTLE',['↑','↓'],['W','S']],['FIRE',['SPACE']]],
                          stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } },
   // Viper-inspired trail arena: relative left/right turns, passable dim gaps.
   // Space only starts/restarts; J joins player two. Drag steers by horizontal position.
-  adder:              { name: 'ADDER', accent: '224, 160, 52',
+  adder:              { name: 'ADDER', accent: '224, 160, 52', touchControls: [['STEER',['DRAG']],['START',['TAP']]], controls: [['TURN',['A','D']],['2ND PLAYER TURNS',['←','→']],['START',['SPACE']],['2ND PLAYER JOINS',['J']]],
                          players: 2,
                          buttons: [{ key: ' ', code: 'Space', label: 'START' }],
                          keys: TWO_PLAYER_KEYS,
@@ -132,7 +132,7 @@ var BLIP_GAMES = {
 function blipGameFromPath(pathname) {
   var m = /\/([a-z_]+)\/(?:index\.html)?$/i.exec(pathname || '');
   var g = m && BLIP_GAMES[m[1]];
-  return g ? { slug: m[1], name: g.name, accent: g.accent, buttons: g.buttons,
+  return g ? { slug: m[1], name: g.name, accent: g.accent, controls: g.controls, touchControls: g.touchControls, ownLegend: !!g.ownLegend, buttons: g.buttons,
                keys: g.keys, players: g.players || 1, stick: g.stick,
                touch: g.touch || null } : null;
 }

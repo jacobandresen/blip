@@ -227,6 +227,13 @@ canvas {
 .nco-msg {color:#7d3025;font-size:clamp(18px,4vw,30px);font-weight:900;letter-spacing:.2em}
 .nco-sub {margin-top:13px;font-size:11px;font-weight:700}
 .nco-how {color:#777064;font-size:9px;letter-spacing:.08em}
+.nco-go {margin-top:22px;color:#f1e3c0;font-size:clamp(13px,2.2vw,18px);animation:nco-blink 1.2s steps(2,jump-none) infinite}
+.nco-go kbd {padding:2px 8px;border:1px solid #c6b89d;border-radius:4px;background:#2a2218;font:inherit}
+.nco-how {font-size:11px}
+:root[data-has-touch] .nco-pc, :root:not([data-has-touch]) .nco-touch {display:none}
+#need-coin-overlay.visible {cursor:pointer}
+@keyframes nco-blink {50% {opacity:.35}}
+@media (prefers-reduced-motion:reduce) {.nco-go {animation:none}}
 :root[data-fullscreen]:not([data-has-touch]) #need-coin-overlay {
   bottom:0;
 }
@@ -908,3 +915,38 @@ body.cabinet-page #touch-strip.held .ts-glass {
 }
 body.cabinet-page :is(.ts-tag,.ts-hint) {color:#c2b49c;font-family:'Courier New',monospace;}
 body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,0 0 12px #e8cea41a;}
+
+/* The key legend: keycaps over a verb, the same card on every game. */
+.pc-legend {display:flex;gap:10px 24px;flex-wrap:wrap;justify-content:center;font-family:'Courier New',monospace}
+#pc-hint {
+  position:fixed;left:50%;transform:translateX(-50%);z-index:140;pointer-events:none;
+  bottom:calc(var(--topbar-h,56px) + env(safe-area-inset-bottom,0px) + 14px);
+  max-width:calc(100vw - 32px);padding:10px 20px 9px;border:1px solid #c6b89d66;border-radius:8px;
+  background:#000000cc;opacity:0;transition:opacity .4s;
+}
+#pc-hint.visible {opacity:1}
+:root[data-fullscreen] #pc-hint {bottom:14px}
+#need-coin-overlay .pc-legend {margin-top:34px;padding-top:22px;border-top:1px solid #c6b89d33}
+.pc-group {display:flex;flex-direction:column;align-items:center;gap:7px}
+.pc-keys {display:flex;align-items:center;gap:4px}
+.pc-keys i {margin:0 4px;color:#8c8270;font:700 10px/1 'Courier New',monospace;font-style:normal;letter-spacing:.1em;text-transform:uppercase}
+.pc-legend kbd {
+  position:relative;min-width:30px;height:30px;padding:0 7px;display:inline-grid;place-items:center;
+  border:1px solid #d9cba8;border-bottom-width:3px;border-radius:5px;background:#2a2218;color:#f1e3c0;
+  font:700 15px/1 'Courier New',monospace;
+}
+.pc-legend kbd.wide {padding:0 12px;letter-spacing:.12em;font-size:12px;white-space:nowrap}
+.pc-legend kbd.space {min-width:84px}
+.pc-legend kbd.arrow::before {
+  content:'';width:0;height:0;border:6px solid transparent;
+}
+.pc-legend kbd.left::before {border-right:9px solid #f1e3c0;border-left:0}
+.pc-legend kbd.right::before {border-left:9px solid #f1e3c0;border-right:0}
+.pc-legend kbd.up::before {border-bottom:9px solid #f1e3c0;border-top:0}
+.pc-legend kbd.down::before {border-top:9px solid #f1e3c0;border-bottom:0}
+.pc-label {color:#f1e3c0;font-size:11px;font-weight:700;letter-spacing:.2em}
+
+.pc-legend kbd.red {border-color:#e8705f}
+.pc-legend kbd.blue {border-color:#6fa0ff}
+.pc-legend kbd.red::before, .pc-legend kbd.blue::before {content:'';width:9px;height:9px;margin-right:7px;border-radius:50%;background:#e03a2f}
+.pc-legend kbd.blue::before {background:#3f78e6}

@@ -241,3 +241,44 @@ test('the end of a touch wakes a sleeping audio context, as iOS requires', async
   await p.page.evaluate(() => document.dispatchEvent(new Event('touchend', { bubbles: true })));
   assert.equal(await p.page.evaluate(() => window.__resumes), 1);
 });
+
+test('on a PC a click on the coin wall inserts a coin and leaves the game focused', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  await page.goto(`${origin}/meteors/index.html`);
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout: 60000 });
+  await page.waitForTimeout(1500);
+  assert.equal(await page.evaluate(() => document.getElementById('need-coin-overlay').classList.contains('visible')), true);
+  await page.mouse.click(640, 300);
+  await page.waitForFunction(() => !document.getElementById('need-coin-overlay').classList.contains('visible'));
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'glcanvas');
+});
+
+const SLUGS = ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler'];
+for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
+  test(`on ${label} every game's coin wall lists its controls inside the screen`, async (t) => {
+    const size = phoneish ? { width: 390, height: 844 } : { width: 1280, height: 800 };
+    const { page, origin } = await openPage(t, 'chromium', { hasTouch: phoneish, viewport: size });
+    if (phoneish) {
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setDeviceMetricsOverride', { ...size, deviceScaleFactor: 2, mobile: true });
+      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+    }
+    const failures = [];
+    for (const slug of SLUGS) {
+      await page.goto(`${origin}/${slug}/index.html`);
+      await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout: 60000 });
+      await page.waitForTimeout(600);
+      const wall = await page.evaluate(() => {
+        const box = document.getElementById('need-coin-overlay').getBoundingClientRect();
+        const groups = [...document.querySelectorAll('#need-coin-overlay .pc-group')];
+        return {
+          labels: groups.map((g) => g.querySelector('.pc-label').textContent),
+          inside: groups.every((g) => { const r = g.getBoundingClientRect(); return r.left >= box.left && r.right <= box.right && r.bottom <= box.bottom; }),
+        };
+      });
+      if (!wall.labels.length) failures.push(`${slug}: no controls listed`);
+      else if (!wall.inside) failures.push(`${slug}: the controls leave the screen`);
+    }
+    assert.deepEqual(failures, []);
+  });
+}
