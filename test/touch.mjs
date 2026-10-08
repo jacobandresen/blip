@@ -253,7 +253,7 @@ test('on a PC a click on the coin wall inserts a coin and leaves the game focuse
   assert.equal(await page.evaluate(() => document.activeElement.id), 'glcanvas');
 });
 
-const SLUGS = ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler'];
+const SLUGS = ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler', 'adder'];
 for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
   test(`on ${label} every game's coin wall lists its controls inside the screen`, async (t) => {
     const size = phoneish ? { width: 390, height: 844 } : { width: 1280, height: 800 };

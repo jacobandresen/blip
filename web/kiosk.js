@@ -92,7 +92,7 @@ var BLIP_GAMES = {
                          touch: { kind: 'drag', hint: 'Tap to launch', mouseHint: 'Point to move &middot; Click to launch' } },
   galactic_defender:  { name: 'DEFENDER', accent: '200, 50, 200', touchControls: [['MOVE',['DRAG']],['FIRE',['HOLD']]], controls: [['MOVE',['←','→'],['A','D']],['FIRE',['SPACE']]],
                          touch: { kind: 'drag', hint: 'Hold to fire', mouseHint: 'Point to move &middot; Hold the button to fire' } },
-  rally:              { name: 'RALLY',    accent: '220, 50, 50', touchControls: [['1 PLAYER',['TAP LEFT']],['2 PLAYERS',['TAP RIGHT']],['MOVE BAT',['DRAG']]], controls: [['1 PLAYER',['W','S'],['↑','↓']],['2 PLAYERS',['I','K']],['SERVE',['SPACE']]],
+  rally:              { name: 'RALLY',    accent: '220, 50, 50', touchControls: [['1 PLAYER',['TAP LEFT']],['2 PLAYERS',['TAP RIGHT']],['MOVE BAT',['DRAG']]], controls: [['1 PLAYER',['W','S'],['↑','↓']],['2 PLAYERS',['I','K']],['START AND SERVE',['SPACE']]],
                          touch: { kind: 'paddles', hint: 'Drag up or down', mouseHint: 'Point up or down &middot; Click to serve' } },
   meteors:            { name: 'METEORS',  accent: '180, 180, 180', touchControls: [['TURN AND THRUST',['D-PAD']],['FIRE',['RED BUTTON']],['HYPERSPACE',['BLUE BUTTON']]], controls: [['TURN',['←','→'],['A','D']],['THRUST',['↑'],['W']],['FIRE',['SPACE']],['HYPERSPACE',['Z']]],
                          buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }] },
@@ -119,7 +119,7 @@ var BLIP_GAMES = {
                          stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } },
   // Viper-inspired trail arena: relative left/right turns, passable dim gaps.
   // Space only starts/restarts; J joins player two. Drag steers by horizontal position.
-  adder:              { name: 'ADDER', accent: '224, 160, 52', touchControls: [['STEER',['DRAG']],['START',['TAP']]], controls: [['TURN',['A','D']],['2ND PLAYER TURNS',['←','→']],['START',['SPACE']],['2ND PLAYER JOINS',['J']]],
+  adder:              { name: 'ADDER', accent: '224, 160, 52', touchControls: [['STEER',['DRAG']],['START',['TAP']]], controls: [['TURN',['A','D'],['←','→']],['START',['SPACE']],['2ND PLAYER JOINS',['J']]],
                          players: 2,
                          buttons: [{ key: ' ', code: 'Space', label: 'START' }],
                          keys: TWO_PLAYER_KEYS,

@@ -64,7 +64,7 @@ impl Game {
 }
 
 // ---- input ---------------------------------------------------------------
-/// Player one uses A/D and Space to start; player two uses arrows and J to join.
+/// Player one uses A/D (or the arrows, alone) and Space to start; player two uses arrows and J to join.
 fn seat_keys(seat: usize) -> [KeyCode; 3] {
     if seat == 0 {
         [BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_SPACE]
@@ -74,9 +74,12 @@ fn seat_keys(seat: usize) -> [KeyCode; 3] {
 }
 
 /// Left and right curve the viper; it keeps its heading when neither is held.
-fn human_steer(seat: usize) -> Steer {
+fn human_steer(seat: usize, solo: bool) -> Steer {
     let [left, right, _] = seat_keys(seat);
-    let mut turn = match (key_active(left), key_active(right)) {
+    // Alone, the arrows turn too; once player two joins they are theirs.
+    let arrows = solo && seat == 0;
+    let mut turn = match (key_active(left) || (arrows && key_active(BLIP_KEY_LEFT)),
+                          key_active(right) || (arrows && key_active(BLIP_KEY_RIGHT))) {
         (true, false) => -1.0,
         (false, true) => 1.0,
         _ => 0.0,
@@ -97,7 +100,7 @@ fn gather(g: &Game) -> [Steer; SEATS] {
     for (i, s) in g.world.snakes.iter().enumerate() {
         if !s.alive { continue; }
         let seat = s.seat.min(SEATS - 1);
-        steers[seat] = if s.human { human_steer(s.seat) } else { cpu::steer(&g.world, i) };
+        steers[seat] = if s.human { human_steer(s.seat, g.humans < 2) } else { cpu::steer(&g.world, i) };
     }
     steers
 }

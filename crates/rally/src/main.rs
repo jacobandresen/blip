@@ -2,7 +2,7 @@
 
 
 use blip::input::{
-    any_key_pressed, key_active, key_pressed, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
+    any_key_pressed, btn1_pressed, key_active, key_pressed, BLIP_KEY_DOWN, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::input::KeyCode;
 use blip::macroquad::math::Vec2;
@@ -169,7 +169,7 @@ fn move_pads(g: &mut Game, dt: f32) {
 
 fn update_title(g: &mut Game) {
     // Spin the P2 dial (or press "2") for a two-player game; spin your own
-    // dial for one player against the CPU.
+    // dial (or press Space) for one player against the CPU.
     if key_pressed(KeyCode::Key2) || p2_dial_spun() || touch_began(g, 1) {
         g.mode = Mode::TwoPlayer;
         web::set_mode(true);
@@ -177,7 +177,7 @@ fn update_title(g: &mut Game) {
         web::spend_coin();
         web::spend_coin();
         g.start_game();
-    } else if p1_dial_spun() || touch_began(g, 0) {
+    } else if p1_dial_spun() || touch_began(g, 0) || btn1_pressed() {
         g.mode = Mode::OnePlayer;
         web::set_mode(false);
         web::spend_coin();
