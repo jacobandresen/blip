@@ -129,6 +129,14 @@ fn strike_sfx() -> Vec<u8> {
     cosy::sfx(&cosy::mix(whip, &cosy::run(&[72], 0.05, Voice::Pluck, 0.35), 0.0, 1.0))
 }
 
+/// Through a hole: a rising slip, which is what getting away with it sounds
+/// like.
+fn through_sfx() -> Vec<u8> {
+    let slip: Vec<f32> = cosy::glide(0.22, 320.0, 1500.0, Tone::Tri, 1.4, 30.0)
+        .iter().map(|v| v * 0.4).collect();
+    cosy::sfx(&cosy::mix(slip, &cosy::run(&[81, 88], 0.05, Voice::Pluck, 0.45), 0.02, 1.0))
+}
+
 /// A new pit: four plucked notes climbing, a bell under them.
 fn pit_sfx() -> Vec<u8> {
     cosy::jingle_with(&[62, 66, 69, 74, HOLD, HOLD], 0.07, Voice::Pluck, 0, Some((Voice::Bell, -1)))
@@ -143,6 +151,7 @@ pub fn generate() -> Vec<Asset> {
     vec![
         ("images/egg.png", egg()),
         ("sounds/eat.wav", eat_sfx()),
+        ("sounds/through.wav", through_sfx()),
         ("sounds/shed.wav", shed_sfx()),
         ("sounds/strike.wav", strike_sfx()),
         ("sounds/pit.wav", pit_sfx()),
