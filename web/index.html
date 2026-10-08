@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <link rel="stylesheet" href="kiosk.css?v=148">
   <link rel="stylesheet" href="wear.css?v=12">
-  <link rel="stylesheet" href="manual.css?v=34">
+  <link rel="stylesheet" href="manual.css?v=35">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
@@ -1523,7 +1523,7 @@
           if(gap) {
             var jotting=['','coin box emptied Friday','left stool still wobbles','','player 2 button sticks - oiled','','free game if you beat MAX','','cleaned the glass, 3rd time this month',''][aligned.length%10];
             var letter=aligned.filter(function(page){return page.filler;}).length===1;
-            aligned.push({chapter:-9,game:null,side:'',filler:true,title:'',html:letter?
+            aligned.push({chapter:-9,game:null,side:'',filler:true,note:letter,title:'',html:letter?
               '<div class="manual-notes"><p>NOTES</p><figure class="manual-note-card"><i class="manual-doodle" aria-hidden="true"></i>'+
               '<div class="manual-note-body">'+manualHand('Blip Arcade is a tribute to the golden age of arcade games. I hope you enjoy this as much as I enjoyed playing the old games.')+'</div>'+
               '<div class="manual-note-regards">'+manualHand('Kind regards,')+'</div>'+
@@ -1624,10 +1624,10 @@
         var wide=manualWide(),last=pages.length-1,limit=wide&&last%2?last+1:last;
         var right=Math.max(0,Math.min(index,limit));
         if(wide&&right%2)right=Math.min(right+1,limit);
-        if(!wide&&pages[right]&&pages[right].filler) {
+        if(!wide&&pages[right]&&pages[right].filler&&!pages[right].note) {
           var step=direction<0?-1:1,probe=right;
-          while(pages[probe]&&pages[probe].filler)probe+=step;
-          if(!pages[probe]){probe=right;while(pages[probe]&&pages[probe].filler)probe-=step;}
+          while(pages[probe]&&pages[probe].filler&&!pages[probe].note)probe+=step;
+          if(!pages[probe]){probe=right;while(pages[probe]&&pages[probe].filler&&!pages[probe].note)probe-=step;}
           right=Math.max(0,probe);
         }
         var turning=direction&&manualShown&&wide&&right!==manualPageIndex&&Math.abs(right-manualPageIndex)===2&&!matchMedia('(prefers-reduced-motion: reduce)').matches;

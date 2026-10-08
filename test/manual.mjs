@@ -112,7 +112,7 @@ for (const [width, height] of [[1280, 844], [390, 844], [320, 720]]) {
       if (!(await page.locator('#manual-next').isEnabled())) break;
       await page.locator('#manual-next').click();
     }
-    const expected = wide ? book.leaves - 1 : await page.evaluate(() => manualPages.filter((leaf) => !leaf.filler).length);
+    const expected = wide ? book.leaves - 1 : await page.evaluate(() => manualPages.filter((leaf) => !leaf.filler || leaf.note).length);
     assert.ok(shown >= expected, `every leaf was seen: ${shown} of ${expected}`);
     assert.ok(portraits > 0, 'the operators appear in the manual');
   });
@@ -194,6 +194,15 @@ test('a swipe across the open book turns its pages, left for next and right for 
   assert.equal(await leaf(), first + 1, 'a left swipe turns to the next page');
   await swipe(0.2, 0.8);
   assert.equal(await leaf(), first, 'a right swipe turns back');
+});
+
+test('on a phone the handwritten note is still a page of the book', async (t) => {
+  const page = await openManual(t, 'controls', { width: 390, height: 844 });
+  for (let turns = 0; turns < 60 && !(await page.locator('.manual-open-page .manual-note-card').count()); turns++) {
+    await page.locator('#manual-next').click();
+    await page.waitForTimeout(60);
+  }
+  assert.equal(await page.locator('.manual-open-page .manual-note-card').count(), 1, 'turning pages reaches the note');
 });
 
 test('the second notes page carries a handwritten note, taped near the foot and signed Jacob Andresen', async (t) => {
