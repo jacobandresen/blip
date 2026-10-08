@@ -10,6 +10,7 @@ pub mod song;
 pub mod techno;
 pub mod wav;
 
+pub mod adder;
 pub mod bouncer;
 pub mod brawler;
 pub mod bubbler;
