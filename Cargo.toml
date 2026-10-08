@@ -11,6 +11,7 @@ members = [
     "crates/rally",
     "crates/meteors",
     "crates/sky_raider",
+    "crates/adder",
 ]
 
 [workspace.package]
