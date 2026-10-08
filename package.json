@@ -4,6 +4,7 @@
   "scripts": {
     "test": "node --test test/fill-canvas.test.mjs",
     "test:web": "node --test --test-concurrency=1 test/cabinet.mjs test/manual.mjs test/touch.mjs test/topbar-layout.mjs test/controls.mjs test/two-player-deck.mjs test/two-player-touch-phones.mjs test/bubbler-two-player-iphone.mjs",
+    "test:layout": "node --test --test-concurrency=1 test/layout.mjs",
     "test:shell": "node --test --test-concurrency=1 test/shell.mjs",
     "test:scores": "node --test --test-concurrency=1 test/highscore-entry.mjs",
     "test:scores-db": "node --test test/highscores.mjs",

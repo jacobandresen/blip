@@ -1567,7 +1567,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   align-items: flex-end;
   padding: 0 0 env(safe-area-inset-bottom, 0px);
 }
-:root[data-layout="landscape"] .deck-side,
 :root[data-layout="landscape"] .stick-base,
 :root[data-layout="landscape"] .fire-buttons,
 :root[data-layout="landscape"] .snes-btn,
@@ -2697,7 +2696,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    cross. */
 @media (pointer: coarse) and (max-width: 520px) {
   :root[data-layout="upright"][data-caps="4"][data-controls][data-players="1"] {
-    --cap: clamp(44px, 14vw, 62px);
+    --cap: clamp(44px, 15.4vw, 66px);
     --dpad: clamp(84px, 30vw, 124px);
     --ctl-cx: calc(10px + var(--dpad) / 2);
     --ctl-pr: 16px;
@@ -2722,7 +2721,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     --mid: 18px;
   }
   :root[data-layout="upright"][data-caps="4"][data-controls][data-players="2"] :is(#topbar, .kiosk-bar-main) {
-    height: calc(var(--dpad) + var(--cap) + 44px + env(safe-area-inset-bottom, 0px));
+    height: calc(var(--dpad) + var(--cap) + 56px + env(safe-area-inset-bottom, 0px));
   }
   :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] :is(#snes-pad, #snes-pad-p2) .snes-shell,
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] :is(#deck-p1, #deck-p2) {
@@ -4148,28 +4147,21 @@ body.cabinet-page #control-toggle > button {
   background:linear-gradient(180deg,#34292a 0 47%,#e0b97a 48% 52%,#1d1514 53% 100%);
   text-shadow:0 0 6px rgba(255,201,110,.7),0 1px #090707;
 }
+/* Phones: the title takes the gap between the logo and the manual book, and its letters size to it. */
 @media (max-width:520px) {
   .top-marquee-bar #marquee-name,
-  #marquee-bar.jukebox-marquee #marquee-name {width:140px;height:38px;min-height:38px;gap:1px;padding:4px 5px;font-size:15px}
-  #marquee-name .marquee-letter {font-size:15px}
+  #marquee-bar.jukebox-marquee #marquee-name {
+    --flip:clamp(11px,calc((100vw - 262px) / 6.4),19px);
+    left:calc(50% - 21px);top:calc(env(safe-area-inset-top,0px) + 25px - var(--flip) * .56);
+    width:auto;height:auto;min-height:0;gap:1px;padding:4px 6px;font-size:var(--flip);
+  }
+  #marquee-name .marquee-letter {font-size:var(--flip)}
 }
-
-/* Sideways, the cabinet's deck is controls over the picture, not a panel. */
-:root[data-layout="landscape"] body.cabinet-page .kiosk-bar > .deck-panel {
-  background: none;
-  box-shadow: none;
-  border: 0;
-}
-:root[data-layout="landscape"] body.cabinet-page .snes-pad .snes-shell {
-  background: none;
-  box-shadow: none;
-  border: 0;
-}
-@media (max-width:360px) {
+/* Under 340px there is no room for the manual book beside the title on a game page: the title is centred, the book waits on the cabinet. */
+@media (max-width:340px) {
   body:has(#glcanvas) .manual-pocket {display:none}
   .top-marquee-bar #marquee-name,
-  #marquee-bar.jukebox-marquee #marquee-name {width:100px;height:32px;min-height:32px;padding:3px;font-size:11px}
-  #marquee-name .marquee-letter {font-size:11px}
+  #marquee-bar.jukebox-marquee #marquee-name {left:50%}
 }
 
 /* The mode switch looks small but takes a 44px-tall touch, through padding that draws nothing. */
@@ -4179,3 +4171,44 @@ body.cabinet-page #control-toggle > button {
 }
 
 .manual-open-book { touch-action: pan-y; }
+
+/* ---- Phones: room for a big thumb ---- */
+/* The coin bay is narrower on a phone, and the width goes to the controls. */
+.kiosk-bar:has(.deck-coin-slot) {--coin-width:clamp(62px,17vw,88px)}
+.coin-instruction {font-size:clamp(7px,calc(var(--coin-width,88px) * .122),11px)}
+/* Two players on a phone: bigger caps and cross. */
+@media (pointer: coarse) and (max-width: 520px) {
+  :root {--coin-width: clamp(62px, 17vw, 88px)}
+  /* A station is half of what the coin bay leaves; the cross and one cap share it. */
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players="2"] {
+    --room: calc((100vw - 36px - var(--coin-width)) / 2 - 10px);
+    --dpad: clamp(50px, calc(var(--room) * .52), 88px);
+    --cap: clamp(40px, calc(var(--room) * .38), 52px);
+  }
+}
+/* Controls stand above the home bar. */
+.kiosk-bar:has(.deck-coin-slot) :is(.deck-side,.snes-shell) {padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))!important}
+/* The credit lamps sit under the touch strip's glass, where nobody sees them. */
+:root[data-touch] :is(.deck-credit-lamp,.deck-second-lamp) {display:none}
+/* A landscape notch or island: the logo, the power lamp and the coin box stay clear of it. */
+body .blip-logo.led-logo,
+body:has(#marquee-bar,.top-marquee-bar) .blip-logo.led-logo {left:max(8px,calc(env(safe-area-inset-left,0px) + 6px))}
+.kiosk-bar .deck-coin-slot,
+body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin-btn,#kiosk-insert-btn).deck-coin-slot {right:max(4px,env(safe-area-inset-right,0px))}
+@media (max-width: 340px) {
+  .deck-credit-lamp, .deck-second-lamp {width:36px;padding-left:14px}
+  :root[data-layout="upright"][data-caps="4"] .deck-credit-lamp {left:calc(var(--ctl-cx) - 8px)}
+  :root[data-layout="upright"][data-players="2"] .deck-second-lamp {left:calc(50% + var(--ctl-cx) + var(--mid) / 2 - 8px)}
+}
+/* A small phone on its side with two players: the lamps go under the caps, not behind them. */
+@media (max-width: 700px) {
+  :root[data-layout="landscape"][data-players="2"] :is(.deck-credit-lamp, .deck-second-lamp) {top: 104px}
+}
+
+/* Sideways, the cabinet's deck is controls over the picture, not a panel. */
+:root[data-layout="landscape"] body.cabinet-page .kiosk-bar > .deck-panel,
+:root[data-layout="landscape"] body.cabinet-page .snes-pad .snes-shell {
+  background: none;
+  box-shadow: none;
+  border: 0;
+}

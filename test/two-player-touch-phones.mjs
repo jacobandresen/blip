@@ -130,7 +130,7 @@ for (const viewport of [
   { name: 'iPhone 8', width: 375, height: 667 },
   { name: 'iPhone 14', width: 390, height: 844 },
 ]) {
-  test(`Brawler controller selector stays clear of Field Manual on ${viewport.name}`, async (t) => {
+  test(`Brawler controller selector stays clear of Manual on ${viewport.name}`, async (t) => {
     const { browser, origin } = await openPage(t, 'chromium');
     const context = await browser.newContext({ viewport, hasTouch: true });
     const page = await context.newPage();
@@ -151,7 +151,7 @@ for (const viewport of [
         intersects: a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top };
     });
     assert.equal(overlap.intersects, false,
-      `${viewport.name}: controller selector overlaps Field Manual: ${JSON.stringify(overlap)}`);
+      `${viewport.name}: controller selector overlaps Manual: ${JSON.stringify(overlap)}`);
     for (const mode of ['stick', 'pad']) {
       const button = page.locator(`#control-toggle [data-mode="${mode}"]`);
       assert.equal(await button.count(), 1, `${mode} selector missing`);

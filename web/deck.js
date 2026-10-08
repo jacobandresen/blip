@@ -123,12 +123,12 @@
   panel.insertBefore(frag, panel.firstChild);
   panel.parentElement.prepend(el('div', 'deck-housing', '', { 'aria-hidden':'true' }));
   var book=el(document.getElementById('manual-overlay')?'button':'a','cabinet-manual',
-    '<span class="manual-book-spine" aria-hidden="true"></span><span class="manual-book-copy"><strong>FIELD MANUAL</strong><small>BLIP · OPERATOR’S COPY</small></span><span class="manual-page-edges" aria-hidden="true"></span>',
-    {id:'manual-book','data-page-card':'true','aria-label':'Lift the BLIP Arcade Field Manual'});
+    '<span class="manual-book-spine" aria-hidden="true"></span><span class="manual-book-copy"><strong>MANUAL</strong><small>BLIP · OPERATOR’S COPY</small></span><span class="manual-page-edges" aria-hidden="true"></span>',
+    {id:'manual-book','data-page-card':'true','aria-label':'Lift the BLIP Arcade Manual'});
   if(book.tagName==='BUTTON')book.type='button';
   else {
     book.href=(game?'../':'')+'index.html?manual=controls'+(game?'&game='+game.slug:'');
-    if(game){book.target='_blank';book.rel='noopener';book.title='Field manual (opens in a new tab)';book.setAttribute('aria-label','Open field manual in a new tab');}
+    if(game){book.target='_blank';book.rel='noopener';book.title='Manual (opens in a new tab)';book.setAttribute('aria-label','Open manual in a new tab');}
   }
   var bookPocket=el('div','manual-pocket','');bookPocket.appendChild(book);document.body.appendChild(bookPocket);
   var coin=document.getElementById('insert-coin-btn')||document.getElementById('kiosk-insert-btn');

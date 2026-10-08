@@ -1,4 +1,4 @@
-var CACHE = "blip-v396";
+var CACHE = "blip-v409";
 
 var ASSETS = [
   "/blip/",
@@ -9,10 +9,13 @@ var ASSETS = [
   "/blip/controls.html",
   "/blip/manifest.json",
   "/blip/kiosk.css",
+  "/blip/wear.css",
   "/blip/manual.css",
   "/blip/kiosk.js",
   "/blip/deck.js",
   "/blip/press-start-2p.woff2",
+  "/blip/caveat.woff2",
+  "/blip/mrs-saint-delafield.woff2",
   "/blip/shell.css",
   "/blip/shell.html",
   "/blip/shell.js",
@@ -31,6 +34,8 @@ var ASSETS = [
   "/blip/icon-192.png",
   "/blip/icon-512.png",
   "/blip/apple-touch-icon.png",
+  "/blip/operator-jacob.jpg",
+  "/blip/operator-bjorn.jpg",
   "/blip/claude-avatar.svg",
   "/blip/codex-avatar.svg",
   "/blip/copilot-avatar.svg",

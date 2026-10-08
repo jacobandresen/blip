@@ -26,6 +26,10 @@ change will be overwritten the next time the project is built.
 | Fullscreen button and the stored choice (`blip-fullscreen`), on every page | `web/kiosk.js` |
 | Sound on / off (`blip-mute`); `blipOut(ctx)`, where the cabinet's own sounds must connect | `web/kiosk.js` |
 | What fullscreen hides on a game page; the idle return to the cabinet | `web/shell.css`, `web/shell.js` |
+| Cabinet wear: scratches, burns, rings, scuffs, thumbed cards and manual | `tools/make_wear.py`, which writes `web/wear.css` (generated, not edited by hand) |
+| Field manual: spreads, page flip, contents, notes pages | `web/index.html` (the manual script), `web/manual.css` |
+| The manual's last page, the operators (a `data-manual-sheet`: never split, its type shrinks to fit) | `web/about.html` |
+| A game's manual pages: screenshot, blurb, controls, tip | `web/controls.html`: a `data-side="left"` and a `data-side="right"` section per game |
 | Wasm <-> JS bridge (`blip_spend_coin`) | `web/blip_bridge.js` |
 | macroquad JS runtime (vendored, do not edit) | `web/mq_js_bundle.js` |
 | Game logic, rendering, audio (Rust side) | `crates/<name>/src/main.rs` |
@@ -67,6 +71,7 @@ Run the test suite locally before pushing:
 npm test                # canvas geometry (unit)
 cargo test --release    # game rules (Brawler's balance, Serpent's turns, ...)
 npm run test:web        # cabinet, manual, top bar, controls, decks (after ./build_web.sh)
+npm run test:layout     # nothing overlaps or leaves the screen: 21 devices, notches, every page and controller (forty minutes)
 npm run test:shell      # the game shell in headless Chromium (six minutes)
 npm run test:scores     # high-score entry in all seven scoring games (ten minutes)
 npm run test:scores-db  # the score backend, against `npx supabase start` (skipped without it)
@@ -80,7 +85,7 @@ that takes focus (a prompt, a button) must leave it back there.
 
 The browser suites need Playwright and a Chromium binary (`BLIP_CHROMIUM`
 names one outside `PATH`). Test files are `node:test` suites, one theme
-each: `cabinet.mjs` (the card rack), `manual.mjs`, `touch.mjs` (fingers on the strip and deck), `topbar-layout.mjs`,
+each: `cabinet.mjs` (the card rack), `manual.mjs`, `touch.mjs` (fingers on the strip and deck), `layout.mjs` (every page on every device: overlaps, thumbs, safe areas), `topbar-layout.mjs`,
 `controls.mjs`, `two-player-*.mjs` (decks and phones).
 
 For native development:

@@ -88,7 +88,7 @@ test('the arrow keys step through the rack, and the card that leaves tucks in be
   await page.keyboard.press('ArrowLeft');
   await settled(page);
   assert.equal(await page.evaluate(() => document.getElementById('manual-book').classList.contains('card-focused')),
-    true, 'the rack wraps round to the field manual, the last item');
+    true, 'the rack wraps round to the manual, the last item');
 });
 
 test('a swipe steps the rack either way, and a long one steps across several cards', async (t) => {

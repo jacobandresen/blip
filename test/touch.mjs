@@ -95,10 +95,12 @@ test('Rally: a finger on the strip drags the bat by distance, at the picture\'s 
   const p = await phone(t, 'rally');
   const { x, y, w, h } = await p.strip();
   const canvasHeight = await p.page.evaluate(() => document.getElementById('glcanvas').getBoundingClientRect().height);
-  await p.down(1, x + w / 2, y + 10);
-  const before = await p.page.evaluate(() => blipTouchPos(0, 1));
-  await p.move(1, x + w / 2, y + 10 + 50);
-  const after = await p.page.evaluate(() => blipTouchPos(0, 1));
+  const read = async () => { await p.page.waitForTimeout(150); return p.page.evaluate(() => blipTouchPos(0, 1)); };
+  const left = x + w * 0.25;                     // player one's half; the middle is the line between the players
+  await p.down(1, left, y + 10);
+  const before = await read();
+  await p.move(1, left, y + 10 + 50);
+  const after = await read();
   assert.ok(Math.abs((after - before) * canvasHeight - 50) < 1, 'fifty pixels of finger are fifty pixels of picture');
 });
 

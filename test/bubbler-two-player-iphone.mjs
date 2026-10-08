@@ -76,7 +76,5 @@ for (const layout of layouts) {
     }
     assert.ok(joinBox.width >= 88 && joinBox.height >= 44,
       `the 2P join button is a usable touch target: ${JSON.stringify(joinBox)}`);
-    process.stdout.write(`${layout.device} ${layout.orientation}: game ${Math.round(geometry.game.w)}×${Math.round(geometry.game.h)} CSS px; ` +
-      `touch zones ${geometry.halves.map((half) => `${Math.round(half.w)}×${Math.round(half.h)}`).join(' and ')} px\n`);
   });
 }

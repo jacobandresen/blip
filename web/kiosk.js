@@ -175,7 +175,7 @@ function buildPowerIndicators() {
     if(!topBar)return;
     var barBox=topBar.getBoundingClientRect();
     lamp.style.left='';
-    lamp.style.right=Math.max(8,innerWidth-barBox.right+8)+'px';
+    lamp.style.right='max('+Math.max(8,innerWidth-barBox.right+8)+'px,calc(env(safe-area-inset-right,0px) + 8px))';
     lamp.style.top=barBox.top+(barBox.height-lamp.offsetHeight)/2+'px';
   }
   function sync() {

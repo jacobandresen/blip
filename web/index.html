@@ -13,8 +13,9 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
-  <link rel="stylesheet" href="kiosk.css?v=135">
-  <link rel="stylesheet" href="manual.css?v=8">
+  <link rel="stylesheet" href="kiosk.css?v=148">
+  <link rel="stylesheet" href="wear.css?v=12">
+  <link rel="stylesheet" href="manual.css?v=33">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
@@ -827,6 +828,26 @@
     .card-index-tab {position:absolute;top:-10px;left:calc(1% + var(--tab-lane)*24%);width:23%;height:15px;padding:0 3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;border:1px solid #c8b78f;border-bottom:0;border-radius:4px 4px 0 0;
       background:linear-gradient(#ffffff20,transparent 48%,#00000014),var(--index-stock);color:#fff3d9;font:700 8px/14px 'Courier New',monospace;letter-spacing:.02em;box-shadow:0 -1px 0 #fff2d355,inset 0 1px #fff6df55,2px -2px 3px #0007;pointer-events:auto}
 
+    /* A phone on its side: the card lies down, screen on the left and words on the right, so the description fits the short window. */
+    :root[data-layout="landscape"] #game-grid .card {width:clamp(340px,calc(100% - 300px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)),620px);flex-direction:row;align-items:stretch;gap:14px;padding:32px 16px 14px!important}
+    :root[data-layout="landscape"] #game-grid .card-shot-wrap {flex:none;align-self:center;width:auto;height:min(100%,170px);aspect-ratio:142/164;margin:0}
+    :root[data-layout="landscape"] #game-grid .card-copy {padding:8px 12px 10px;overflow:hidden}
+    :root[data-layout="landscape"] #game-grid .card-copy .card-title {margin:0 0 3px;font-size:15px}
+    :root[data-layout="landscape"] #game-grid .card-copy .card-genre {margin:0 0 5px;padding-bottom:4px}
+    :root[data-layout="landscape"] #game-grid .card-desc {margin:0;padding:6px 8px;font-size:12px;line-height:1.35}
+    @media (max-width:700px) {
+      :root[data-layout="landscape"] #game-grid .card-shot-wrap {height:min(100%,128px)}
+      :root[data-layout="landscape"] #game-grid .card {gap:10px;padding:30px 12px 12px!important}
+      :root[data-layout="landscape"] #game-grid .card-desc {padding:4px 6px;font-size:11px;line-height:1.3}
+      :root[data-layout="landscape"] #game-grid .card-copy .card-title {font-size:13px}
+    }
+    @media (max-width:700px) and (max-height:380px) {
+      :root[data-layout="landscape"] #game-grid .card-copy .card-genre {display:none!important}
+    }
+    /* A short window: the card's screen gives up height to the words. */
+    #game-grid .card.card-compact .card-shot-wrap {height:84px;width:auto;aspect-ratio:142/164;margin-bottom:6px}
+    #game-grid .card.card-tight .card-shot-wrap {display:none}
+    #game-grid .card.card-tight .card-copy .card-genre {display:none!important}
   </style>
 </head>
 <body class="cabinet-page">
@@ -972,32 +993,39 @@
    <div class="deck-panel"></div>
 
   </div>
-  <div class="manual-overlay" id="manual-overlay" hidden role="dialog" aria-modal="true" aria-label="BLIP Arcade Field Manual">
+  <div class="manual-overlay" id="manual-overlay" hidden role="dialog" aria-modal="true" aria-label="BLIP Arcade Manual">
     <div class="manual-open-book" role="document">
-      <section class="manual-open-page manual-open-left" id="manual-contents-page" aria-label="Manual contents">
-        <div class="manual-paper-mark">BLIP ARCADE &nbsp; · &nbsp; OPERATOR'S COPY</div>
-        <h2>CONTENTS</h2>
-        <ol class="manual-contents manual-chapter-contents">
-          <li><button type="button" data-chapter="first-use" disabled><span>First time use<i></i></span><b>—</b></button></li>
-          <li><button type="button" data-chapter="controls" disabled><span>1 &nbsp; Playing the games<i></i></span><b>—</b></button></li>
-        </ol>
-        <h3 class="manual-game-index-title">Game index</h3>
-        <ol class="manual-contents manual-game-contents" id="manual-game-contents"></ol>
-        <ol class="manual-contents manual-back-contents">
-          <li><button type="button" data-chapter="history" disabled><span>2 &nbsp; The old machines<i></i></span><b>—</b></button></li>
-          <li><button type="button" data-chapter="about" disabled><span>3 &nbsp; About Blip<i></i></span><b>—</b></button></li>
-        </ol>
-        <div class="manual-stamp">BLIP<br><small>EST. 1981*</small></div>
-        <small class="manual-footnote">* A new cabinet with an old soul.</small>
+      <section class="manual-open-page manual-open-left" id="manual-contents-page" aria-label="Manual left page">
+        <div class="manual-left-contents">
+          <div class="manual-paper-mark">BLIP ARCADE &nbsp; · &nbsp; OPERATOR'S COPY</div>
+          <h2>CONTENTS</h2>
+          <ol class="manual-contents manual-chapter-contents">
+            <li><button type="button" data-chapter="first-use" disabled><span>First time use<i></i></span><b>—</b></button></li>
+            <li><button type="button" data-chapter="controls" disabled><span>1 &nbsp; Playing the games<i></i></span><b>—</b></button></li>
+          </ol>
+          <h3 class="manual-game-index-title">Game index</h3>
+          <ol class="manual-contents manual-game-contents" id="manual-game-contents"></ol>
+          <ol class="manual-contents manual-back-contents">
+            <li><button type="button" data-chapter="history" disabled><span>2 &nbsp; The golden age of arcade games<i></i></span><b>—</b></button></li>
+            <li><button type="button" data-chapter="about" disabled><span>3 &nbsp; About Blip<i></i></span><b>—</b></button></li>
+            <li><button type="button" data-chapter="operators" disabled><span>&emsp;The operators<i></i></span><b>—</b></button></li>
+          </ol>
+          <div class="manual-stamp">BLIP<br><small>EST. 1981*</small></div>
+          <small class="manual-footnote">* A new cabinet with an old soul.</small>
+        </div>
+        <div class="manual-page-number manual-left-head"><span id="manual-left-title"></span></div>
+        <article class="manual-page-content manual-left-content" id="manual-left-content" aria-hidden="true"></article>
+        <span class="manual-folio" id="manual-left-folio"></span>
       </section>
       <div class="manual-open-spine" aria-hidden="true"></div>
       <section class="manual-open-page manual-open-right" aria-label="Manual page">
-        <div class="manual-page-number"><span id="manual-book-title">FIELD MANUAL</span><b id="manual-page-count">01 / 01</b></div>
+        <div class="manual-page-number"><span id="manual-book-title">MANUAL</span><b id="manual-page-count">01 / 01</b></div>
         <article class="manual-page-content" id="manual-page-content" tabindex="-1" aria-live="polite"></article>
+        <span class="manual-folio" id="manual-right-folio"></span>
         <div class="manual-page-corner" aria-hidden="true"></div>
       </section>
       <button class="manual-contents-tab" id="manual-contents-tab" type="button" aria-controls="manual-contents-page" aria-expanded="false">Contents</button>
-      <button class="manual-close" id="manual-close" type="button" aria-label="Close field manual"><span>Close field manual</span></button>
+      <button class="manual-close" id="manual-close" type="button" aria-label="Close manual"><span>Close manual</span></button>
       <button class="manual-turn manual-turn-prev" id="manual-prev" type="button" disabled aria-label="Turn to the previous page">‹ <small>PREV</small></button>
       <button class="manual-turn manual-turn-next" id="manual-next" type="button" disabled aria-label="Turn to the next page"><small>TURN PAGE</small> ›</button>
     </div>
@@ -1005,7 +1033,7 @@
   <template id="manual-first-use">
     <div class="manual-leaf">
     <div class="page">
-    <p class="manual-first-edition">BLIP ARCADE &nbsp; · &nbsp; FIELD MANUAL</p>
+    <p class="manual-first-edition">BLIP ARCADE &nbsp; · &nbsp; MANUAL</p>
     <h2>First time use</h2>
     <p class="manual-first-intro">A few coins. A steady hand. You are ready to play.</p>
     <div class="manual-first-steps">
@@ -1026,11 +1054,11 @@
     </div>
     </div>
   </template>
-  <script src="deck.js?v=12"></script>
+  <script src="deck.js?v=13"></script>
   <script src="manual-motion.js?v=2"></script>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=81"></script>
+  <script src="kiosk.js?v=82"></script>
   <script src="blip_controller.js?v=10"></script>
   <!-- Git-ignored, written at deploy: absent means no leaderboard. -->
   <script src="blip_config.js?v=1"></script>
@@ -1341,12 +1369,38 @@
     }
     var manualChapters=['controls.html','history.html','about.html'], manualPages=[], manualPageIndex=0, manualLoadPromise=null, manualChapterStarts=[],manualGameStarts={},manualGameNames={},manualGameNumbers={},manualMeasureSize='';
     var manualOverlay=document.getElementById('manual-overlay');
+    // Handwriting is never quite level or quite even: each word sits a hair off the line, with its own tilt and pressure.
+    function manualHand(text) {
+      var seed=11;
+      function next(){seed=(seed*1103515245+12345)&0x7fffffff;return seed/0x7fffffff;}
+      return text.split(' ').map(function(word){
+        return '<span style="--dy:'+((next()-.5)*3.6).toFixed(1)+'px;--r:'+((next()-.5)*3).toFixed(1)+'deg;--o:'+(.84+next()*.15).toFixed(2)+'">'+word+'</span>';
+      }).join(' ');
+    }
+    // Sizes a page that must stay whole until it fits: its type, and so its photos and cards, shrink half a pixel at a
+    // time; on a very short screen the intro and the role lines go too.
+    function manualFitWhole(section,sheet,room) {
+      section.style.fontSize='';section.removeAttribute('data-compact');
+      for(var size=16;size>=7&&sheet.scrollHeight>room()+1;size-=.5) {
+        section.style.fontSize=size+'px';
+        if(size<11)section.dataset.compact='';
+      }
+    }
+    // The measured size can differ from the shown one (a font arriving late), so the shown page is fitted again.
+    function manualFitShown() {
+      manualOverlay.querySelectorAll('.manual-operators').forEach(function(section){
+        if(section.closest('.manual-flip,.manual-flip-cover'))return;
+        var sheet=section.closest('.manual-leaf-sheet');
+        if(sheet&&sheet.clientHeight>0)manualFitWhole(section,sheet,function(){return sheet.clientHeight;});
+      });
+    }
+    if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){if(!manualOverlay.hidden)manualFitShown();});
     function manualAtoms(node,parents,out) {
       if(node.nodeType!==1||node.classList.contains('divider'))return;
       if(node.tagName==='TABLE') {
         Array.from(node.rows).forEach(function(row){var table=node.cloneNode(false);table.appendChild(row.cloneNode(true));out.push({parents:parents,leaf:table});});return;
       }
-      if(/^(H1|H2|H3|P|IMG|UL|OL)$/.test(node.tagName)||node.matches('.studio,.profile,.game-section,.game-header,.game-title,.game-origin,.manual-first-step,[data-manual-game]')) {out.push({parents:parents,leaf:node.cloneNode(true)});return;}
+      if(/^(H1|H2|H3|P|IMG|UL|OL)$/.test(node.tagName)||node.matches('.studio,.profile,.game-section,.game-header,.game-title,.game-origin,.manual-first-step,[data-manual-game],[data-manual-sheet]')) {out.push({parents:parents,leaf:node.cloneNode(true)});return;}
       if(!node.children.length) {if(node.textContent.trim())out.push({parents:parents,leaf:node.cloneNode(true)});return;}
       var next=parents.concat(node.cloneNode(false));
       Array.from(node.children).forEach(function(child){manualAtoms(child,next,out);});
@@ -1365,9 +1419,9 @@
           var doc=new DOMParser().parseFromString(markup,'text/html'),source=doc.querySelector('.manual-leaf .page');
           if(!source)return;
           source.querySelectorAll('[data-i18n]').forEach(function(el){var key=el.getAttribute('data-i18n'),text=i18n.en[key];if(document.documentElement.hasAttribute('data-has-touch')&&i18n.en[key+'Touch']!==undefined)text=i18n.en[key+'Touch'];if(text!==undefined)el.innerHTML=text;});
-          source.querySelectorAll('[data-manual-game]').forEach(function(game){var heading=game.querySelector('h3').textContent,number=heading.match(/^\s*(\d+\.\d+)/);manualGameNumbers[game.dataset.manualGame]=number?number[1]:'';manualGameNames[game.dataset.manualGame]=heading.replace(/^\s*\d+\.\d+\s*/, '').trim();});
+          source.querySelectorAll('[data-manual-game]').forEach(function(game){var h3=game.querySelector('h3');if(!h3)return;var heading=h3.textContent,number=heading.match(/^\s*(\d+\.\d+)/);manualGameNumbers[game.dataset.manualGame]=number?number[1]:'';manualGameNames[game.dataset.manualGame]=heading.replace(/^\s*\d+\.\d+\s*/, '').trim();});
           source.querySelectorAll('a').forEach(function(link){var print=document.createElement('span');print.className=link.className;print.innerHTML=link.innerHTML;link.replaceWith(print);});
-          var titles=['PLAYING THE GAMES','THE OLD MACHINES','ABOUT BLIP'];
+          var titles=['PLAYING THE GAMES','THE GOLDEN AGE OF ARCADE GAMES','ABOUT BLIP'];
           var title=chapterIndex<0?'FIRST TIME USE':['CONTROLS','HISTORY','ABOUT BLIP'][chapterIndex], atoms=[];
           var sourceHead=source.querySelector('h1');
           if(sourceHead)sourceHead.remove();
@@ -1383,11 +1437,16 @@
           Array.from(source.children).forEach(function(node){manualAtoms(node,[],atoms);});
           var sheet=document.createElement('div');sheet.className='page manual-leaf-sheet';measure.appendChild(sheet);var count=0;
           function appendAtom(atom){var wrapper=sheet;atom.parents.forEach(function(parent){var copy=parent.cloneNode(false);wrapper.appendChild(copy);wrapper=copy;});wrapper.appendChild(atom.leaf);}
-          function saveSheet(){if(sheet.childElementCount){var game=sheet.querySelector('[data-manual-game]'),slug=game?game.dataset.manualGame:null;result.push({chapter:chapterIndex,game:slug,title:slug?manualGameNames[slug]:title,html:sheet.innerHTML});}sheet.remove();}
+          function saveSheet(){if(sheet.childElementCount){var game=sheet.querySelector('[data-manual-game]'),slug=game?game.dataset.manualGame:null,sided=sheet.querySelector('[data-side]');result.push({chapter:chapterIndex,game:slug,side:sided?sided.dataset.side||'':'',operators:!!sheet.querySelector('.manual-operators'),title:slug?manualGameNames[slug]:title,html:sheet.innerHTML});}sheet.remove();}
           function newSheet(){sheet=document.createElement('div');sheet.className='page manual-leaf-sheet';measure.appendChild(sheet);count=0;}
           function placeAtom(atom){
-            if(count&&atom.leaf.matches('[data-manual-game]')){saveSheet();newSheet();}
+            if(count&&atom.leaf.matches('[data-manual-game],[data-manual-sheet]')){saveSheet();newSheet();}
             appendAtom(atom);var wrapper=sheet.lastElementChild;
+            // A page made to stay whole (the operators) is never split: it is sized to fit.
+            if(atom.leaf.matches('[data-manual-sheet]')) {
+              manualFitWhole(wrapper,sheet,function(){return height;});
+              count++;return;
+            }
             if(sheet.scrollHeight>height+1){
               wrapper.remove();
               if(count){saveSheet();newSheet();}
@@ -1416,6 +1475,29 @@
           atoms.forEach(placeAtom);
           saveSheet();
         });
+        // Chapters open on a right-hand page and each game's left page lands on a left-hand one,
+        // with a ruled notes page wherever that leaves a gap, as a printed book does.
+        var aligned=[];
+        result.forEach(function(leaf,i){
+          var before=result[i-1],opens=!before||before.chapter!==leaf.chapter;
+          var sideStarts=leaf.side&&(!before||before.game!==leaf.game||before.side!==leaf.side);
+          var odd=aligned.length%2===1;
+          var gap=leaf.side==='left'?sideStarts&&!odd:leaf.side==='right'?sideStarts&&odd:opens&&odd;
+          if(gap) {
+            var jotting=['','coin box emptied Friday','left stool still wobbles','','player 2 button sticks - oiled','','free game if you beat MAX','','cleaned the glass, 3rd time this month',''][aligned.length%10];
+            var letter=aligned.filter(function(page){return page.filler;}).length===1;
+            aligned.push({chapter:-9,game:null,side:'',filler:true,title:'',html:letter?
+              '<div class="manual-notes"><p>NOTES</p><figure class="manual-note-card"><i class="manual-doodle" aria-hidden="true"></i>'+
+              '<div class="manual-note-body">'+manualHand('Blip Arcade is a tribute to the golden age of arcade games. I hope you enjoy this as much as I enjoyed playing the old games.')+'</div>'+
+              '<div class="manual-note-regards">'+manualHand('Kind regards,')+'</div>'+
+              '<span class="manual-signature">Jacob Andresen</span><i class="manual-heart" aria-hidden="true"></i></figure></div>':
+              '<div class="manual-notes" aria-hidden="true"><p>NOTES</p>'+(jotting?'<q>'+jotting+'</q>':'')+'</div>'});
+          }
+          aligned.push(leaf);
+        });
+        result=aligned;
+        var operatorsAt=result.findIndex(function(page){return page.operators;}),operatorsEntry=document.querySelector('[data-chapter="operators"]');
+        if(operatorsAt>=0){operatorsEntry.disabled=false;operatorsEntry.dataset.page=operatorsAt;operatorsEntry.querySelector('b').textContent=String(operatorsAt+1).padStart(2,'0');}
         var firstUse=document.querySelector('[data-chapter="first-use"]');firstUse.disabled=false;firstUse.dataset.page=0;firstUse.querySelector('b').textContent='01';
         var starts={};result.forEach(function(page,index){if(starts[page.chapter]===undefined)starts[page.chapter]=index;});
         manualChapterStarts=[0,1,2].map(function(index){return starts[index]===undefined?0:starts[index];});
@@ -1435,27 +1517,97 @@
       }).catch(function(error){manualMeasureSize='';manualLoadPromise=null;throw error;}).finally(function(){measure.remove();});
       return manualLoadPromise;
     }
+    function manualWide() {return matchMedia('(min-width:701px)').matches;}
+    function manualSheet(leaf) {return '<div class="page manual-leaf-sheet'+(leaf?'':' manual-endpaper')+'">'+(leaf?leaf.html:'')+'</div>';}
+    // Which pages the book shows for a spread whose right-hand leaf is `right`; the first spread has the contents on its left.
+    function manualFill(pages,right) {
+      var wide=manualWide(),left=wide&&right>0?pages[right-1]:null,leaf=pages[right]||null;
+      var leftPage=manualOverlay.querySelector('.manual-open-left');
+      leftPage.dataset.face=left?'leaf':'contents';
+      document.getElementById('manual-left-content').innerHTML=left?manualSheet(left):'';
+      document.getElementById('manual-left-title').textContent=left&&!left.filler?left.title.toUpperCase():'';
+      document.getElementById('manual-left-folio').textContent=left?String(right):'';
+      document.getElementById('manual-page-content').innerHTML=manualSheet(leaf);
+      document.getElementById('manual-book-title').textContent=leaf&&!leaf.filler?leaf.title.toUpperCase():'';
+      document.getElementById('manual-right-folio').textContent=leaf?String(right+1):'';
+      document.getElementById('manual-page-count').textContent=String(right+1).padStart(2,'0')+' / '+String(pages.length).padStart(2,'0');
+      var last=pages.length-1;
+      document.getElementById('manual-prev').disabled=right===0;
+      document.getElementById('manual-next').disabled=right>=(wide&&last%2?last+1:last);
+      manualOverlay.querySelector('.manual-open-book').style.setProperty('--read',String(last?right/last:0));
+      manualOverlay.querySelector('.manual-open-book').dataset.smudge=String((wide?right/2:right)%4);
+      manualFitShown();
+      manualOverlay.querySelectorAll('.manual-contents button').forEach(function(entry){
+        var shown=[leaf,left].filter(Boolean),current=shown.some(function(page){return entry.dataset.game?entry.dataset.game===page.game:Number(entry.dataset.page)===pages.indexOf(page);});
+        entry.toggleAttribute('aria-current',current);if(current)entry.setAttribute('aria-current','page');
+      });
+    }
+    // The lifted page turns about the spine: its front is the page it was, its back the page it becomes.
+    var manualFlipping=null;
+    function manualFlip(pages,right,direction) {
+      if(manualFlipping)manualFlipping.finish();
+      var book=manualOverlay.querySelector('.manual-open-book'),leftPage=book.querySelector('.manual-open-left'),rightPage=book.querySelector('.manual-open-right');
+      var forward=direction>0,lifted=forward?rightPage:leftPage,landing=forward?leftPage:rightPage;
+      var frame=book.getBoundingClientRect();
+      function bare(page) {
+        var copy=page.cloneNode(true);copy.removeAttribute('id');
+        copy.querySelectorAll('[id]').forEach(function(node){node.removeAttribute('id');});
+        copy.style.cssText='position:absolute;inset:0;margin:0;grid-area:auto;';
+        return copy;
+      }
+      function place(node,box) {
+        node.style.cssText='position:absolute;margin:0;left:'+(box.left-frame.left)+'px;top:'+(box.top-frame.top)+'px;width:'+box.width+'px;height:'+box.height+'px;';
+      }
+      var liftedBox=lifted.getBoundingClientRect(),landingBox=landing.getBoundingClientRect();
+      var front=bare(lifted),covered=bare(landing);
+      var cover=document.createElement('div');cover.className='manual-flip-cover';place(cover,landingBox);cover.appendChild(covered);
+      manualFill(pages,right);
+      var back=bare(landing);
+      var leaf=document.createElement('div');leaf.className='manual-flip';place(leaf,liftedBox);
+      leaf.style.transformOrigin=forward?'-8px 50%':'calc(100% + 8px) 50%';
+      var frontFace=document.createElement('div'),backFace=document.createElement('div');
+      frontFace.className='manual-flip-face manual-flip-front';backFace.className='manual-flip-face manual-flip-back';
+      frontFace.appendChild(front);backFace.appendChild(back);
+      var frontShade=document.createElement('i'),backShade=document.createElement('i');
+      frontShade.className=backShade.className='manual-flip-shade';
+      frontFace.appendChild(frontShade);backFace.appendChild(backShade);
+      leaf.append(frontFace,backFace);
+      book.append(cover,leaf);
+      var sign=forward?-1:1;
+      manualFlipping=leaf.animate([{transform:'rotateY(0deg)'},{transform:'rotateY('+sign*180+'deg)'}],{duration:720,easing:'cubic-bezier(.45,.05,.25,1)',fill:'forwards'});
+      frontShade.animate([{opacity:0},{opacity:.45}],{duration:720,easing:'ease-in',fill:'forwards'});
+      backShade.animate([{opacity:.45},{opacity:0}],{duration:720,easing:'ease-out',fill:'forwards'});
+      var finish=function(){leaf.remove();cover.remove();manualFlipping=null;};
+      manualFlipping.onfinish=finish;manualFlipping.oncancel=finish;
+    }
+    var manualShown=false;
     function showManualPage(index,direction) {
       prepareManualPages().then(function(pages){
         if(!pages.length)return;
-        manualPages=pages;manualPageIndex=Math.max(0,Math.min(pages.length-1,index));
-        var content=document.getElementById('manual-page-content'), page=pages[manualPageIndex];
-        document.getElementById('manual-prev').disabled=manualPageIndex===0;
-        document.getElementById('manual-next').disabled=manualPageIndex===pages.length-1;
-        document.getElementById('manual-page-count').textContent=String(manualPageIndex+1).padStart(2,'0')+' / '+String(pages.length).padStart(2,'0');
-        document.getElementById('manual-book-title').textContent=page.title.toUpperCase();
-        manualOverlay.classList.add('manual-page-turning');content.innerHTML='<div class="page manual-leaf-sheet">'+page.html+'</div>';
-        window.setTimeout(function(){manualOverlay.classList.remove('manual-page-turning');},600);
-        manualOverlay.querySelectorAll('.manual-contents button').forEach(function(entry){var current=entry.dataset.game?entry.dataset.game===page.game:Number(entry.dataset.page)===manualPageIndex;entry.toggleAttribute('aria-current',current);if(current)entry.setAttribute('aria-current','page');});
+        var wide=manualWide(),last=pages.length-1,limit=wide&&last%2?last+1:last;
+        var right=Math.max(0,Math.min(index,limit));
+        if(wide&&right%2)right=Math.min(right+1,limit);
+        if(!wide&&pages[right]&&pages[right].filler) {
+          var step=direction<0?-1:1,probe=right;
+          while(pages[probe]&&pages[probe].filler)probe+=step;
+          if(!pages[probe]){probe=right;while(pages[probe]&&pages[probe].filler)probe-=step;}
+          right=Math.max(0,probe);
+        }
+        var turning=direction&&manualShown&&wide&&right!==manualPageIndex&&Math.abs(right-manualPageIndex)===2&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
+        manualPages=pages;
+        if(turning){manualPageIndex=right;manualFlip(pages,right,direction);}
+        else {manualPageIndex=right;if(manualFlipping)manualFlipping.finish();manualFill(pages,right);}
+        manualShown=true;
         if(direction&&typeof playManualPaper==='function')playManualPaper(false);
       }).catch(function(){document.getElementById('manual-page-content').innerHTML='<div class="page manual-leaf-sheet"><h1>PAGE MISSING</h1><p>This leaf could not be read. Please turn back and try again.</p></div>';});
     }
+    function turnManualPage(direction) {showManualPage(manualPageIndex+direction*(manualWide()?2:1),direction);}
     var manualMoving=false, manualCloseRequested=false, manualPreviousOverflow='';
     async function openFieldManual(chapterIndex,gameSlug) {
       if(manualMoving||!manualOverlay.hidden)return;
       manualMoving=true;manualCloseRequested=false;
       manualPreviousOverflow=document.documentElement.style.overflow;
-      manualPageIndex=0;
+      manualPageIndex=0;manualShown=false;
       manualOverlay.hidden=false;
       document.body.classList.add('manual-open');
       document.documentElement.style.overflow='hidden';
@@ -1486,18 +1638,21 @@
       manualOverlay.querySelector('.manual-open-book').toggleAttribute('data-show-contents',show);
       var tab=document.getElementById('manual-contents-tab');tab.setAttribute('aria-expanded',String(show));tab.textContent=show?'Read page':'Contents';
     }
-    document.getElementById('manual-contents-tab').addEventListener('click',function(){setManualContents(!manualOverlay.querySelector('.manual-open-book').hasAttribute('data-show-contents'));});
+    document.getElementById('manual-contents-tab').addEventListener('click',function(){
+      if(manualWide()){showManualPage(0,-1);return;}
+      setManualContents(!manualOverlay.querySelector('.manual-open-book').hasAttribute('data-show-contents'));
+    });
     manualOverlay.querySelector('.manual-open-left').addEventListener('click',function(event){
       var entry=event.target.closest('button[data-page]');if(!entry)return;
-      setManualContents(false);showManualPage(Number(entry.dataset.page),1);document.getElementById('manual-page-content').focus({preventScroll:true});
+      setManualContents(false);showManualPage(Number(entry.dataset.page),Number(entry.dataset.page)>=manualPageIndex?1:-1);document.getElementById('manual-page-content').focus({preventScroll:true});
     });
     new ResizeObserver(function(){
       if(manualOverlay.hidden)return;
       var viewport=document.getElementById('manual-page-content'),size=viewport.clientWidth+'x'+viewport.clientHeight;
-      if(viewport.clientWidth&&size!==manualMeasureSize){var current=manualPages[manualPageIndex];prepareManualPages().then(function(){showManualPage(current&&current.game?manualGameStarts[current.game]||0:manualChapterStarts[current?current.chapter:0]||0,false);});}
+      if(viewport.clientWidth&&size!==manualMeasureSize){var current=manualPages[manualPageIndex];if(current&&current.filler)current=manualPages[manualPageIndex+1]||manualPages[manualPageIndex-1];prepareManualPages().then(function(){showManualPage(current&&current.game?manualGameStarts[current.game]||0:manualChapterStarts[current&&current.chapter>=-1?current.chapter:0]||0,false);});}
     }).observe(document.getElementById('manual-page-content'));
-    document.getElementById('manual-prev').addEventListener('click',function(){showManualPage(manualPageIndex-1,-1);});
-    document.getElementById('manual-next').addEventListener('click',function(){showManualPage(manualPageIndex+1,1);});
+    document.getElementById('manual-prev').addEventListener('click',function(){turnManualPage(-1);});
+    document.getElementById('manual-next').addEventListener('click',function(){turnManualPage(1);});
     document.getElementById('manual-close').addEventListener('click',closeFieldManual);
     document.addEventListener('keydown',function(event){
       if(manualOverlay.hidden)return;
@@ -1507,8 +1662,8 @@
         event.preventDefault();event.stopImmediatePropagation();if(stops[next])stops[next].focus();return;
       }
       if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();closeFieldManual();return;}
-      if(event.key==='ArrowRight'||event.key==='PageDown'){event.preventDefault();event.stopImmediatePropagation();var contents=manualOverlay.querySelector('.manual-open-book').hasAttribute('data-show-contents')&&matchMedia('(max-width:700px)').matches;setManualContents(false);showManualPage(manualPageIndex+(contents?0:1),1);}
-      else if(event.key==='ArrowLeft'||event.key==='PageUp'){event.preventDefault();event.stopImmediatePropagation();setManualContents(false);showManualPage(manualPageIndex-1,-1);}
+      if(event.key==='ArrowRight'||event.key==='PageDown'){event.preventDefault();event.stopImmediatePropagation();var contents=manualOverlay.querySelector('.manual-open-book').hasAttribute('data-show-contents')&&matchMedia('(max-width:700px)').matches;setManualContents(false);if(manualWide())turnManualPage(1);else showManualPage(manualPageIndex+(contents?0:1),1);}
+      else if(event.key==='ArrowLeft'||event.key==='PageUp'){event.preventDefault();event.stopImmediatePropagation();setManualContents(false);turnManualPage(-1);}
       else event.stopImmediatePropagation();
     },true);
     // A swipe across the open book turns the page, as the arrow keys do.
@@ -1695,7 +1850,34 @@
       })};
     });
     var railLeft=0,railRight=0,railY=28;
+
+    // Each card's words are sized to its own card: the type shrinks, then the screen, until the description fits.
+    var cardFitKey='';
+    function fitCardText() {
+      var cards=document.querySelectorAll('#game-grid .card');
+      if(!cards.length||!cards[0].offsetHeight)return;
+      var key=cards[0].offsetWidth+'x'+cards[0].offsetHeight+document.documentElement.getAttribute('data-layout');
+      if(key===cardFitKey)return;
+      cardFitKey=key;
+      cards.forEach(function(card){
+        var desc=card.querySelector('.card-desc');
+        function over() {
+          var y=0,el=desc;
+          while(el&&el!==card){y+=el.offsetTop;el=el.offsetParent;}
+          return y+Math.max(desc.offsetHeight,desc.scrollHeight)-(card.clientHeight-22);
+        }
+        card.classList.remove('card-compact','card-tight');desc.style.fontSize='';
+        var base=parseFloat(getComputedStyle(desc).fontSize);
+        for(var pass=0;pass<2&&over()>0;pass++) {
+          for(var size=pass?14:base;size>=11&&over()>0;size-=.5)desc.style.fontSize=size+'px';
+          if(over()>0&&!pass)card.classList.add('card-compact');
+          if(over()>0&&pass)card.classList.add('card-tight');
+        }
+      });
+    }
+    if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){cardFitKey='';fitCardText();});
     function fitSelectorRails(){
+      fitCardText();
       var bezel=document.getElementById('screen-bezel');
       var panel=document.getElementById('kiosk-bar');
       if(panel)bezel.style.setProperty('--cabinet-panel-depth',document.documentElement.getAttribute('data-layout')==='landscape'?'0px':Math.max(0,innerHeight-panel.getBoundingClientRect().top)+'px');

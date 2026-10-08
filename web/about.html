@@ -107,79 +107,6 @@
     }
     .thoughts-body p:last-child { margin-bottom: 0; }
 
-    /* ---- profiles ---- */
-    .profiles {
-      display: flex;
-      gap: 40px;
-      flex-wrap: wrap;
-    }
-
-    .profile {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 12px;
-      flex: 1;
-      min-width: 200px;
-    }
-
-    .profile-avatar {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      border: 1px solid #222;
-      display: block;
-      filter: grayscale(20%) brightness(0.85);
-      transition: filter .2s, border-color .2s, box-shadow .2s;
-    }
-    .profile:hover .profile-avatar {
-      filter: none;
-      border-color: var(--green);
-      box-shadow: 0 0 16px rgba(50,200,50,0.3);
-    }
-    .profile.claude-profile:hover .profile-avatar {
-      border-color: var(--orange);
-      box-shadow: 0 0 16px rgba(217,119,87,0.35);
-    }
-    .profile.copilot-profile:hover .profile-avatar {
-      border-color: var(--copilot);
-      box-shadow: 0 0 16px rgba(110,64,201,0.4);
-    }
-
-    .profile-name {
-      font-size: 15px;
-      font-weight: 900;
-      letter-spacing: 4px;
-      color: #ddd;
-      text-transform: uppercase;
-    }
-
-    .profile-role {
-      font-size: 9px;
-      letter-spacing: 4px;
-      color: #444;
-      text-transform: uppercase;
-    }
-
-    .profile-desc {
-      font-size: 11px;
-      line-height: 1.8;
-      letter-spacing: .5px;
-      color: #666;
-      max-width: 280px;
-    }
-
-    .profile-link {
-      font-size: 10px;
-      letter-spacing: 2px;
-      color: #333;
-      text-decoration: none;
-      text-transform: uppercase;
-      transition: color .2s;
-    }
-    .profile-link:hover { color: var(--green); }
-    .claude-profile .profile-link:hover { color: var(--orange); }
-    .copilot-profile .profile-link:hover { color: var(--copilot); }
 
     .inline-link {
       color: var(--orange);
@@ -294,83 +221,58 @@
 
   <div class="divider"></div>
 
-  <h2 data-i18n="operatorsHeading">THE OPERATORS</h2>
-  <div class="profiles">
-
-    <div class="profile">
-      <a href="https://bsky.app/profile/jacobandresen.bsky.social" target="_blank" rel="noopener">
-        <img class="profile-avatar"
-             src="https://cdn.bsky.app/img/avatar/plain/did:plc:rejv5j5e5cyh3sbsaq3ycg4f/bafkreiajhk6hb5meowsvcdypgwlcfoedthgzzuypffboomgq3c7mphjq5e"
-             alt="Jacob Andresen">
-      </a>
-      <div class="profile-name">Jacob Andresen</div>
-      <div class="profile-role" data-i18n="jacobRole">Human Operator</div>
-      <p class="profile-desc" data-i18n="jacobDesc">
-        The person with the ideas, the taste, and the finger on the coin slot.
-        Jacob directs the experiment, plays the games and performs random hacks on the project.
-      </p>
-      <a class="profile-link" href="https://bsky.app/profile/jacobandresen.bsky.social" target="_blank" rel="noopener">
-        @jacobandresen.bsky.social
-      </a>
-    </div>
-
-    <div class="profile">
-      <a href="https://github.com/bjornharrtell" target="_blank" rel="noopener">
-        <img class="profile-avatar"
-             src="https://avatars.githubusercontent.com/u/141030?v=4"
-             alt="Björn Harrtell">
-      </a>
-      <div class="profile-name">Björn Harrtell</div>
-      <div class="profile-role" data-i18n="bjornRole">Human Operator</div>
-      <p class="profile-desc" data-i18n="bjornDesc">
-        Rust enthusiast and internationally known GIS expert. Author of JSTS
-        and the driving force behind the Rust port of Blip.
-      </p>
-      <a class="profile-link" href="https://github.com/bjornharrtell" target="_blank" rel="noopener">
-        github.com/bjornharrtell
-      </a>
-    </div>
-
-    <div class="profile claude-profile">
-      <a href="https://claude.ai" target="_blank" rel="noopener">
-        <img class="profile-avatar" src="claude-avatar.svg" alt="Claude">
-      </a>
-      <div class="profile-name">Claude</div>
-      <div class="profile-role" data-i18n="claudeRole">AI Collaborator</div>
-      <p class="profile-desc" data-i18n="claudeDesc">
-        An AI assistant made by Anthropic. Writes Rust, JavaScript, HTML and CSS
-        on request. Has opinions about game feel, pixel spacing, and naming things.
-        Cannot insert coins.
-      </p>
-      <a class="profile-link" href="https://claude.ai" target="_blank" rel="noopener">
-        claude.ai
-      </a>
-    </div>
-
-    <div class="profile copilot-profile">
-      <a href="https://github.com/features/copilot" target="_blank" rel="noopener">
-        <img class="profile-avatar" src="copilot-avatar.svg" alt="GitHub Copilot">
-      </a>
-      <div class="profile-name">Copilot</div>
-      <div class="profile-role" data-i18n="copilotRole">AI Collaborator</div>
-      <p class="profile-desc" data-i18n="copilotDesc">
-        An AI coding assistant made by GitHub. Writes Rust, JavaScript, HTML and CSS
-        on request. Expert at completions, refactoring, and turning vague
-        prompts into working code. Cannot insert coins.
-      </p>
-      <a class="profile-link" href="https://github.com/features/copilot" target="_blank" rel="noopener">
-        github.com/features/copilot
-      </a>
-    </div>
-
-    <div class="profile codex-profile">
-      <img class="profile-avatar" src="codex-avatar.svg" alt="Codex">
-      <div class="profile-name">Codex</div>
-      <div class="profile-role">AI Coding Operator</div>
-      <p class="profile-desc">An OpenAI coding agent that works in the project itself: reading its instructions, shaping a game, and checking the result. The human operator sets the direction and keeps the final say. Cannot insert coins.</p>
-    </div>
-
-  </div>
+  <section class="manual-operators" data-manual-sheet data-side="right">
+    <h3 class="manual-operators-title">The operators</h3>
+    <p class="manual-operators-intro">Every game in this cabinet was made at one table, by people and machines taking turns. This is the crew on the night shift.</p>
+    <table class="operators">
+      <tr>
+        <td class="operator">
+          <img class="operator-photo" src="operator-jacob.jpg" alt="Jacob Andresen" width="120" height="120">
+          <b class="operator-name">Jacob Andresen</b>
+          <span class="operator-role">Human operator</span>
+          <span class="operator-job">Ideas, taste, and the finger on the coin slot.</span>
+        </td>
+        <td class="operator">
+          <img class="operator-photo" src="operator-bjorn.jpg" alt="Bj&ouml;rn Harrtell" width="120" height="120">
+          <b class="operator-name">Bj&ouml;rn Harrtell</b>
+          <span class="operator-role">Human operator</span>
+          <span class="operator-job">Rust enthusiast and GIS expert. Driving force behind the Rust port.</span>
+        </td>
+      </tr>
+      <tr>
+        <td class="operator">
+          <img class="operator-photo" src="claude-avatar.svg" alt="Claude" width="120" height="120">
+          <b class="operator-name">Claude</b>
+          <span class="operator-role">AI collaborator</span>
+          <span class="operator-job">Writes the code, has opinions about game feel. Cannot insert coins.</span>
+        </td>
+        <td class="operator">
+          <img class="operator-photo" src="copilot-avatar.svg" alt="GitHub Copilot" width="120" height="120">
+          <b class="operator-name">Copilot</b>
+          <span class="operator-role">AI collaborator</span>
+          <span class="operator-job">Completions, refactoring, and vague prompts turned into code.</span>
+        </td>
+      </tr>
+      <tr>
+        <td class="operator">
+          <img class="operator-photo" src="codex-avatar.svg" alt="Codex" width="120" height="120">
+          <b class="operator-name">Codex</b>
+          <span class="operator-role">AI coding operator</span>
+          <span class="operator-job">Works inside the project: reads, shapes a game, checks the result.</span>
+        </td>
+        <td class="operator operator-you">
+          <span class="operator-photo operator-photo-you" aria-hidden="true"></span>
+          <b class="operator-name">You?</b>
+          <span class="operator-role">Operator wanted</span>
+          <span class="operator-job">Your name goes here.</span>
+        </td>
+      </tr>
+    </table>
+    <aside class="operators-pitch">
+      <p class="operators-pitch-title">HELP WANTED</p>
+      <p>One more operator, please. There is always room for one more card in the rack, and the next game could be yours. Pick the arcade game you loved best when you were twelve, tell an AI agent what made it fun, and watch it turn into pixels, sound and a high score table. Blip does the plumbing, so all you bring is the idea. Fork <b>github.com/jacobandresen/blip</b>, read the Blip API, and send your game in. We still cannot insert coins for you.</p>
+    </aside>
+  </section>
 
 </div>
   </div>
@@ -385,7 +287,7 @@
   </div>
   <script src="deck.js?v=10"></script>
 
-  <script src="kiosk.js?v=75"></script>
+  <script src="kiosk.js?v=76"></script>
   <script src="blip_controller.js?v=10"></script>
   <script>
     var i18n = {
@@ -401,15 +303,6 @@
         contribP1:       'Want to add a game? Pull requests are welcome at <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. The blip library handles the <a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a> and Rust plumbing so you can focus on game logic.',
         contribP2:       'For inspiration, the <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Golden Age of Arcade Video Games</a> (roughly 1978–1986) produced hundreds of titles worth revisiting — Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest, and many more. That era is a deep well.',
         contribP3:       'Please honour copyrights when contributing. Reimplement mechanics and aesthetics from scratch — do not copy proprietary code, graphics, or audio. Original names are trademarked; use alternative titles as this project does (Rally instead of Pong, Serpent instead of Snake, Raider instead of 1942, and so on). When in doubt, treat your implementation as a tribute, not a reproduction.',
-        operatorsHeading:'THE OPERATORS',
-        jacobRole:       'Human Operator',
-        jacobDesc:       'The person with the ideas, the taste, and the finger on the coin slot. Jacob directs the experiment, plays the games and performs random hacks on the project.',
-        bjornRole:       'Human Operator',
-        bjornDesc:       'Rust enthusiast and internationally known GIS expert. Author of JSTS and the driving force behind the Rust port of Blip.',
-        claudeRole:      'AI Collaborator',
-        claudeDesc:      'An AI assistant made by Anthropic. Writes Rust, JavaScript, HTML and CSS on request. Has opinions about game feel, pixel spacing, and naming things. Cannot insert coins.',
-        copilotRole:     'AI Collaborator',
-        copilotDesc:     'An AI coding assistant made by GitHub. Writes Rust, JavaScript, HTML and CSS on request. Expert at completions, refactoring, and turning vague prompts into working code. Cannot insert coins.'
       },
 
       da: {
@@ -424,15 +317,6 @@
         contribP1:       'Vil du tilføje et spil? Pull requests er velkomne på <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. blip-biblioteket håndterer <a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a> og Rust, så du kan fokusere på spillogikken.',
         contribP2:       'Til inspiration producerede <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Arkadespillenes Guldalder</a> (ca. 1978–1986) hundredvis af titler, der er værd at genbesøge — Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest og mange flere. Den æra er et dybt brønd.',
         contribP3:       'Respektér venligst ophavsretten, når du bidrager. Genimplementer mekanikker og æstetik fra bunden — kopier ikke proprietær kode, grafik eller lyd. Originale navne er varemærker; brug alternative titler, som dette projekt gør (Rally i stedet for Pong, Serpent i stedet for Snake, Raider i stedet for 1942 osv.). Tvivler du, så behandl din implementering som en hyldest, ikke en reproduktion.',
-        operatorsHeading:'OPERATØRERNE',
-        jacobRole:       'Menneskelig operatør',
-        jacobDesc:       'Personen med ideerne, smagen og fingeren på møntspalten. Jacob styrer eksperimentet, spiller spillene og laver tilfældige hacks på projektet.',
-        bjornRole:       'Menneskelig operatør',
-        bjornDesc:       'Rust-entusiast og internationalt anerkendt GIS-ekspert. Forfatter til JSTS og den drivende kraft bag Rust-porten af Blip.',
-        claudeRole:      'AI-samarbejdspartner',
-        claudeDesc:      'En AI-assistent lavet af Anthropic. Skriver Rust, JavaScript, HTML og CSS på anmodning. Har meninger om spilsfølelse, pixelafstand og navngivning. Kan ikke indsætte mønter.',
-        copilotRole:     'AI-samarbejdspartner',
-        copilotDesc:     'Et AI-kodningsassistentprogram lavet af GitHub. Skriver Rust, JavaScript, HTML og CSS på anmodning. Ekspert i kodefuldførelse, refaktorering og at omsætte vage idéer til fungerende kode. Kan ikke indsætte mønter.'
       },
 
       ja: {
@@ -447,15 +331,6 @@
         contribP1:       'ゲームを追加したいですか？プルリクエストは <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a> で歓迎します。blipライブラリが<a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a>とRustの基盤を担当するので、ゲームロジックに集中できます。',
         contribP2:       'インスピレーションとして、<a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">アーケードビデオゲームの黄金時代</a>（おおよそ1978–1986年）には再訪する価値のある作品が何百もあります——Asteroids、Centipede、Frogger、Pac-Man、Donkey Kong、Tempestなど。あの時代は深い井戸です。',
         contribP3:       'コントリビュートの際は著作権を尊重してください。メカニクスと美学をゼロから再実装し——独自コード、グラフィックス、オーディオはコピーしないでください。オリジナルの名前は商標登録されています。このプロジェクトのように代替タイトルを使用してください（PongのかわりにRally、SnakeのかわりにSerpent、1942のかわりにRaiderなど）。迷ったときは、実装を複製ではなくトリビュートとして扱ってください。',
-        operatorsHeading:'オペレーター',
-        jacobRole:       '人間オペレーター',
-        jacobDesc:       'アイデア、センス、そしてコインスロットに指を置く人物。Jacobは実験を指揮し、ゲームをプレイし、プロジェクトにランダムなハックを施します。',
-        bjornRole:       '人間オペレーター',
-        bjornDesc:       'Rustの愛好家で、国際的に知られたGISの専門家。JSTSの作者であり、BlipのRustポートの推進力。',
-        claudeRole:      'AIコラボレーター',
-        claudeDesc:      'Anthropicが作ったAIアシスタント。リクエストに応じてRust、JavaScript、HTML、CSSを書きます。ゲームの手触り、ピクセル間隔、命名において意見を持っています。コインを投入することはできません。',
-        copilotRole:     'AIコラボレーター',
-        copilotDesc:     'GitHubが作ったAIコーディングアシスタント。リクエストに応じてRust、JavaScript、HTML、CSSを書きます。コード補完、リファクタリング、曖昧なプロンプトを動くコードに変換することが得意です。コインを投入することはできません。'
       }
     };
 
