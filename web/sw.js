@@ -1,4 +1,4 @@
-var CACHE = "blip-v409";
+var CACHE = "blip-v410";
 
 var ASSETS = [
   "/blip/",
@@ -66,6 +66,9 @@ var ASSETS = [
   "/blip/sky_raider/index.html",
   "/blip/sky_raider/index.wasm",
   "/blip/sky_raider/screenshot.png",
+  "/blip/adder/index.html",
+  "/blip/adder/index.wasm",
+  "/blip/adder/screenshot.png",
 ];
 
 self.addEventListener("install", function (e) {

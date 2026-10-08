@@ -146,7 +146,7 @@ function markGameLoaded(game, bar) {
   document.documentElement.removeAttribute('data-card-loading');
   try {
     var loaded = JSON.parse(sessionStorage.getItem('blip-loaded-card') || 'null');
-    var selectionOrder = ['rally', 'bouncer', 'galactic_defender', 'bubbler', 'sky_raider', 'meteors', 'serpent', 'brawler'];
+    var selectionOrder = ['rally', 'bouncer', 'galactic_defender', 'bubbler', 'sky_raider', 'meteors', 'serpent', 'brawler', 'adder'];
     var code = loaded && loaded.slug === game.slug ? loaded.code : 'A' + (selectionOrder.indexOf(game.slug) + 1);
     var rom={
       slug: game.slug, name: game.name, code: code,

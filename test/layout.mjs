@@ -34,7 +34,7 @@ const DEVICES = [
 ];
 
 const TWO_SEATS = ['rally', 'brawler', 'bubbler'];
-const GAMES = ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler'];
+const GAMES = ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler', 'adder'];
 
 // The pieces of interface that must each have their own space.
 const PIECES = {
@@ -252,7 +252,7 @@ for (const device of DEVICES.filter((d) => !only || d.name.includes(only))) {
     await page.goto(`${origin}/index.html`);
     await page.waitForFunction(() => document.querySelector('.card-focused')?.offsetWidth > 0);
     await page.waitForTimeout(1200);
-    for (let step = 0; step < 8; step++) {
+    for (let step = 0; step < 9; step++) {
       await page.waitForFunction(() => [...document.querySelectorAll('.card')].every((card) => card.getAnimations().length === 0));
       const card = await page.evaluate(() => {
         const el = document.querySelector('.card-focused');

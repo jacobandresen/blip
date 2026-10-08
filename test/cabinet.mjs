@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openPage } from './lib/harness.mjs';
 
-const GAMES = ['RALLY', 'BOUNCER', 'DEFENDER', 'BUBBLER', 'RAIDER', 'METEORS', 'SERPENT', 'BRAWLER'];
+const GAMES = ['RALLY', 'BOUNCER', 'DEFENDER', 'BUBBLER', 'RAIDER', 'METEORS', 'SERPENT', 'BRAWLER', 'ADDER'];
 
 async function openCabinet(t, { width = 1280, height = 844, touch = false } = {}) {
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: touch, viewport: { width, height } });
