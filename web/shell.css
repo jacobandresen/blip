@@ -781,16 +781,16 @@ canvas {
 :root[data-touch="platform"]:not([data-versus]) .ts-tag { display: none; }
 :root[data-touch="platform"][data-versus] .ts-half.held { background: rgba(255, 255, 255, 0.05); }
 :root[data-touch="platform"][data-versus] .ts-demo { display: none; }
-/* 2P JOIN, while a second seat is open: a Mac-style pill in the trackpad's
-   right end, or sideways in the screen's bottom-right corner. */
+/* 2P JOIN, while a second seat is open: a Mac-style pill in the right half,
+   which is player two's, so player one's touches never land on it. */
 .ts-join { display: none; }
 :root[data-touch="platform"][data-open] .ts-join {
   display: flex;
   align-items: center;
   gap: 6px;
   position: absolute;
-  left: 10px;
-  right: auto;
+  left: auto;
+  right: 10px;
   top: 10px;
   z-index: 2;
   margin: 0;
@@ -814,8 +814,8 @@ canvas {
 :root[data-touch="platform"][data-open][data-layout="landscape"] .ts-join {
   position: fixed;
   top: max(100px, calc(env(safe-area-inset-top, 0px) + 12px));
-  left: max(16px, calc(env(safe-area-inset-left, 0px) + 8px));
-  right: auto;
+  left: auto;
+  right: max(16px, calc(env(safe-area-inset-right, 0px) + 8px));
   bottom: auto;
   z-index: 210;
 }

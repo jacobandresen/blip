@@ -1511,6 +1511,19 @@
       else if(event.key==='ArrowLeft'||event.key==='PageUp'){event.preventDefault();event.stopImmediatePropagation();setManualContents(false);showManualPage(manualPageIndex-1,-1);}
       else event.stopImmediatePropagation();
     },true);
+    // A swipe across the open book turns the page, as the arrow keys do.
+    (function(){
+      var book=manualOverlay.querySelector('.manual-open-book'),start=null;
+      book.addEventListener('pointerdown',function(e){start=e.pointerType==='mouse'?null:{id:e.pointerId,x:e.clientX,y:e.clientY};});
+      book.addEventListener('pointercancel',function(){start=null;});
+      book.addEventListener('pointerup',function(e){
+        var s=start;start=null;
+        if(!s||s.id!==e.pointerId)return;
+        var dx=e.clientX-s.x,dy=e.clientY-s.y;
+        if(Math.abs(dx)<48||Math.abs(dx)<Math.abs(dy)*1.5)return;
+        document.dispatchEvent(new KeyboardEvent('keydown',{key:dx<0?'ArrowRight':'ArrowLeft',bubbles:true,cancelable:true}));
+      });
+    }());
     function gameCardUrl(card) {return card.getAttribute('data-game-url')||'';}
     window.addEventListener('message',function(event){
       var frame=document.getElementById('cabinet-game-screen');

@@ -107,3 +107,28 @@ for (const [width, height] of [[1280, 844], [390, 844], [320, 720]]) {
     assert.ok(portraits > 0, 'the operators appear in the manual');
   });
 }
+
+test('a swipe across the open book turns its pages, left for next and right for previous', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 390, height: 844 } });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  await page.goto(`${origin}/index.html?manual=about`);
+  await page.waitForFunction(() => document.querySelector('.manual-page-content .manual-leaf-sheet')
+    && document.getElementById('manual-page-count').textContent.split('/')[1].trim() !== '01'
+    && !document.getElementById('manual-overlay').inert);
+  const leaf = async () => Number((await page.locator('#manual-page-count').textContent()).split('/')[0]);
+  const box = await page.locator('.manual-open-book').boundingBox();
+  const y = box.y + box.height / 2;
+  const swipe = async (from, to) => {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, x: box.x + box.width * from, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 1, x: box.x + box.width * to, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ id: 1, x: box.x + box.width * to, y }] });
+    await page.waitForTimeout(400);
+  };
+  const first = await leaf();
+  await swipe(0.8, 0.2);
+  assert.equal(await leaf(), first + 1, 'a left swipe turns to the next page');
+  await swipe(0.2, 0.8);
+  assert.equal(await leaf(), first, 'a right swipe turns back');
+});

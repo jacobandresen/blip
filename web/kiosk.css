@@ -4150,8 +4150,8 @@ body.cabinet-page #control-toggle > button {
 }
 @media (max-width:520px) {
   .top-marquee-bar #marquee-name,
-  #marquee-bar.jukebox-marquee #marquee-name {width:176px;height:44px;min-height:44px;gap:2px;padding:5px 6px;font-size:20px}
-  #marquee-name .marquee-letter {font-size:20px}
+  #marquee-bar.jukebox-marquee #marquee-name {width:140px;height:38px;min-height:38px;gap:1px;padding:4px 5px;font-size:15px}
+  #marquee-name .marquee-letter {font-size:15px}
 }
 
 /* Sideways, the cabinet's deck is controls over the picture, not a panel. */
@@ -4165,3 +4165,17 @@ body.cabinet-page #control-toggle > button {
   box-shadow: none;
   border: 0;
 }
+@media (max-width:360px) {
+  body:has(#glcanvas) .manual-pocket {display:none}
+  .top-marquee-bar #marquee-name,
+  #marquee-bar.jukebox-marquee #marquee-name {width:100px;height:32px;min-height:32px;padding:3px;font-size:11px}
+  #marquee-name .marquee-letter {font-size:11px}
+}
+
+/* The mode switch looks small but takes a 44px-tall touch, through padding that draws nothing. */
+@media (pointer: coarse) {
+  #control-toggle > button { position: relative; }
+  #control-toggle > button::after { content: ''; position: absolute; inset: -4px -1px; }
+}
+
+.manual-open-book { touch-action: pan-y; }

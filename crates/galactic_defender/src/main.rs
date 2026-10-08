@@ -1426,7 +1426,7 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
 
     // The invaders' two-frame shuffle, one beat every half second.
     let beat = (blip::macroquad::time::get_time() * 2.0) as i64;
-    let frame = (beat % 2) as usize;
+    let frame = beat.rem_euclid(2) as usize;
     blip.draw_texture_tinted(&alien[0][frame], ax, row0 + voff, dw, dh, alien_color(0));
     blip.draw_texture_tinted(&alien[1][frame], ax, row1 + voff, dw, dh, alien_color(1));
     blip.draw_texture_tinted(&alien[2][frame], ax, row2 + voff, dw, dh, alien_color(2));

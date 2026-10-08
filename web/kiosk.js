@@ -1,4 +1,9 @@
 var MAX_COINS = 5;
+
+// A held finger must never raise a context menu (Android does, and it cancels the touch).
+document.addEventListener('contextmenu', function (e) {
+  if (!(e.target.closest && e.target.closest('input, textarea, [contenteditable]'))) e.preventDefault();
+});
 var TWO_PLAYER_KEYS = {
   up: { key: 'w', code: 'KeyW' }, down: { key: 's', code: 'KeyS' },
   left: { key: 'a', code: 'KeyA' }, right: { key: 'd', code: 'KeyD' },
@@ -712,7 +717,11 @@ function pollGamepad(onDown, onUp) {
       Howler.ctx.resume();
     }
   }
-  document.addEventListener('touchstart', unlockAudio, { passive: true, capture: true });
+  // iOS counts a touch's end, not its start, as the gesture that may start sound,
+  // and the touch strip suppresses the click that would follow.
+  ['touchstart', 'touchend', 'pointerup'].forEach(function (type) {
+    document.addEventListener(type, unlockAudio, { passive: true, capture: true });
+  });
   document.addEventListener('click',      unlockAudio, { capture: true });
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) unlockAudio();

@@ -80,7 +80,7 @@ that takes focus (a prompt, a button) must leave it back there.
 
 The browser suites need Playwright and a Chromium binary (`BLIP_CHROMIUM`
 names one outside `PATH`). Test files are `node:test` suites, one theme
-each: `cabinet.mjs` (the card rack), `manual.mjs`, `topbar-layout.mjs`,
+each: `cabinet.mjs` (the card rack), `manual.mjs`, `touch.mjs` (fingers on the strip and deck), `topbar-layout.mjs`,
 `controls.mjs`, `two-player-*.mjs` (decks and phones).
 
 For native development:

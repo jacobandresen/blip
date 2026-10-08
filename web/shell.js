@@ -92,7 +92,19 @@ function returnToCabinet(event) {
   ['keydown', 'pointerdown', 'pointermove', 'touchstart'].forEach(function (ev) {
     window.addEventListener(ev, poke, { capture: true, passive: true });
   });
+  // A finger held still sends nothing more, but it is still playing.
+  var down = 0;
+  window.addEventListener('pointerdown', function () { down++; }, { capture: true, passive: true });
+  ['pointerup', 'pointercancel'].forEach(function (ev) {
+    window.addEventListener(ev, function () { down = Math.max(0, down - 1); }, { capture: true, passive: true });
+  });
+  // However it got there, a miscount must not hold the kiosk awake: no touches left means none down.
+  ['touchend', 'touchcancel'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) { if (!e.touches.length) down = 0; }, { capture: true, passive: true });
+  });
+  window.addEventListener('blur', function () { down = 0; });
   setInterval(function () {
+    if (down > 0) poke();
     if (!document.documentElement.hasAttribute('data-fullscreen') || document.hidden) return;
     // A name prompt or score board nobody has touched for a minute is put
     // away (typing counts as touching), or it would hold the kiosk here.
@@ -815,6 +827,13 @@ window.addEventListener('keydown', function (e) {
       }
     };
 
+    // Where a finger lands is the whole picture: across the strip's width if it
+    // is on the strip, one to one on the picture. Rally's bats move by how far
+    // a finger drags, so they keep the picture's scale.
+    function surfaceRect(e) {
+      var onStrip = e.target && e.target.closest && e.target.closest('.ts-glass');
+      return (kind === 'drag' && onStrip ? glass : canvas).getBoundingClientRect();
+    }
     function frac(e) {
       return { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
     }
@@ -822,7 +841,10 @@ window.addEventListener('keydown', function (e) {
     // where the whole screen is player one's.
     function slotFor(e) {
       if (kind !== 'paddles' || root.hasAttribute('data-cpu')) return 0;
-      return e.clientX < window.innerWidth / 2 ? 0 : 1;
+      var onStrip = e.target && e.target.closest && e.target.closest('.ts-glass');
+      var g = glass.getBoundingClientRect();
+      var middle = onStrip ? g.left + g.width / 2 : window.innerWidth / 2;
+      return e.clientX < middle ? 0 : 1;
     }
     function setFire(down) {
       if (down === fireHeld) return;
@@ -977,16 +999,17 @@ window.addEventListener('keydown', function (e) {
       if (!on && !(kind === 'swipe' && e.target === canvas && e.pointerType !== 'mouse')) return;
       if (ignored(e) || coinGated()) return;
       e.preventDefault();
-      rect = canvas.getBoundingClientRect();
+      rect = surfaceRect(e);
       if (kind === 'swipe') {
+        if (swipe) return;               // the first finger keeps the swipe
         swipe = { id: e.pointerId, x: e.clientX, y: e.clientY, moved: false };
       } else if (e.pointerType === 'mouse') {
         placeMouse(e, true);
         if (kind === 'drag') setFire(true);
       } else {
         var slot = slotFor(e);
-        // A second finger on a relative bat would jump it; the first keeps it.
-        if (kind === 'paddles' && slots[slot] && !slots[slot].mouse) return;
+        // A second finger would take the control from the first, and lifting it would drop both.
+        if (slots[slot] && !slots[slot].mouse) return;
         var f = frac(e);
         slots[slot] = { id: e.pointerId, x: f.x, y: f.y, pressed: true, mouse: false };
         if (kind === 'drag') setFire(true);
@@ -1014,7 +1037,7 @@ window.addEventListener('keydown', function (e) {
         var m = mouseSlot();
         var held = m !== -1 && slots[m].pressed;
         if (blipControls() !== 'touch' || coinGated() || (!held && !onSurface(e))) { dropMouse(); return; }
-        if (!held) rect = canvas.getBoundingClientRect();
+        if (!held) rect = surfaceRect(e);
         showThumb(slots[placeMouse(e, held)]);
         return;
       }
