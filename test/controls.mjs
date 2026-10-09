@@ -4,7 +4,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, loadRally, evaluate } from './lib/harness.mjs';
+import { openPage, loadRally, evaluate, sleep } from './lib/harness.mjs';
 
 /** Rotate a bound dial by `steps` increments of `perStep` radians, and
  * report which keys the controller emitted onto the game canvas. */
@@ -51,18 +51,26 @@ const ROTATE = (perStep, steps) => `
 test(`the paddle dial registers a slow, careful rotation`, async (t) => {
   const { cdp } = await openPage(t);
   await loadRally(cdp);
+  // The dial lets go of its key a little after the finger stops: each turn waits for the last one's release, however busy the machine.
+  // Turning the dial on the title starts a game and spends coins; with none left the wall holds the keys back, so each turn is paid for.
+  const turn = async (perStep, steps) => {
+    await evaluate(cdp, "(function () { for (var i = 0; i < 5; i++) document.getElementById('insert-coin-btn').click(); return true; })()");
+    const result = await evaluate(cdp, ROTATE(perStep, steps));
+    await sleep(500);
+    return result;
+  };
 
   await t.test('a rotation slower than the dead zone per event still moves the paddle', async () => {
     // 0.006 rad per event against a 0.018 dead band: every event is below it,
     // but twelve add up to four dead bands of real rotation.
-    const r = await evaluate(cdp, ROTATE(0.006, 12));
+    const r = await turn(0.006, 12);
     assert.ok(r.downs > 0,
       'a slow rotation emitted no key at all — fine adjustment is impossible');
   });
 
   await t.test('it moves in the direction the finger actually turned', async () => {
-    const forward = await evaluate(cdp, ROTATE(0.006, 12));
-    const backward = await evaluate(cdp, ROTATE(-0.006, 12));
+    const forward = await turn(0.006, 12);
+    const backward = await turn(-0.006, 12);
     const dirOf = (r) => (r.seen.find((s) => s.indexOf('down:') === 0) || '').replace('down:', '');
     assert.ok(dirOf(forward) && dirOf(backward), 'one of the directions emitted nothing');
     assert.notEqual(dirOf(forward), dirOf(backward),
@@ -71,14 +79,14 @@ test(`the paddle dial registers a slow, careful rotation`, async (t) => {
 
   await t.test('a fast rotation still works, unchanged', async () => {
     // The case that always worked: one event well past the dead zone.
-    const r = await evaluate(cdp, ROTATE(0.05, 6));
+    const r = await turn(0.05, 6);
     assert.ok(r.downs > 0, 'a fast rotation stopped working');
   });
 
   await t.test('the key is released once the finger stops', async () => {
     // Holding a direction forever after the finger stopped would be worse
     // than the bug being fixed: the paddle would run off on its own.
-    const r = await evaluate(cdp, ROTATE(0.006, 12));
+    const r = await turn(0.006, 12);
     const lastDown = r.seen.lastIndexOf(r.seen.filter((s) => s.startsWith('down:')).pop());
     const ups = r.seen.map((s, i) => (s.startsWith('up:') ? i : -1)).filter((i) => i > lastDown);
     assert.ok(ups.length > 0, `no key release after the rotation stopped: ${JSON.stringify(r.seen)}`);

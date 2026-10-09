@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <link rel="stylesheet" href="kiosk.css?v=151">
   <link rel="stylesheet" href="wear.css?v=12">
-  <link rel="stylesheet" href="manual.css?v=42">
+  <link rel="stylesheet" href="manual.css?v=45">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
@@ -836,6 +836,13 @@
     :root[data-layout="landscape"] #game-grid .card-copy .card-title {margin:0 0 3px;font-size:15px}
     :root[data-layout="landscape"] #game-grid .card-copy .card-genre {margin:0 0 5px;padding-bottom:4px}
     :root[data-layout="landscape"] #game-grid .card-desc {margin:0;padding:6px 8px;font-size:12px;line-height:1.35}
+    /* The guide rods stand either side of the card, whatever width the card takes. */
+    :root[data-layout="landscape"] .rolodex-guides {width:calc(clamp(340px,calc(100% - 330px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)),620px) + 30px)}
+    /* The card's own small print: who can play. */
+    .card-meta {display:block;margin-top:12px;padding-top:7px;border-top:1px dotted #a88b6199;color:#765733;font:700 10px/1.3 'Courier New',monospace;letter-spacing:.12em;text-transform:uppercase}
+    :root[data-layout="landscape"] .card-meta {margin-top:5px;padding-top:3px;font-size:9px}
+    #game-grid .card.card-tight .card-meta {display:none}
+    @media (max-width:340px) {.card-meta {display:none}}
     @media (max-width:700px) {
       :root[data-layout="landscape"] #game-grid .card-shot-wrap {height:min(100%,128px)}
       :root[data-layout="landscape"] #game-grid .card {gap:10px;padding:30px 12px 12px!important}
@@ -2250,6 +2257,15 @@
           bar.querySelector(entry[0]).addEventListener('click',function(){move(entry[1]);this.blur();});
         });
       }());
+
+      // Each card's small print: who can play.
+      cards.forEach(function (card) {
+        var desc=card.querySelector&&card.querySelector('.card-desc'),url=card.getAttribute('data-game-url');
+        if(!desc||!url)return;
+        var meta=document.createElement('span');meta.className='card-meta';
+        meta.textContent=['rally','brawler','bubbler','adder'].indexOf(url.split('/')[0])>=0?'1\u20132 PLAYERS':'1 PLAYER';
+        desc.appendChild(meta);
+      });
 
       // The cards overlap like a physical Rolodex, so a horizontal drag steps
       // through them while a tap selects the exposed card. A second tap opens it.
