@@ -273,3 +273,24 @@ test('the front page has the "?" at all times, and its card welcomes the player'
   await page.waitForTimeout(300);
   assert.equal((await card()).out, false, 'a click outside puts the card away');
 });
+
+for (const [width, touch] of [[1280, false], [390, true], [320, true]]) {
+  test(`a plaque says how to choose a game, and its arrows do it, at ${width}px`, async (t) => {
+    const { page } = await openCabinet(t, { width, touch });
+    const plaque = await page.evaluate(() => {
+      const box = document.getElementById('card-pick').getBoundingClientRect(), bezel = document.getElementById('screen-bezel').getBoundingClientRect();
+      return { text: document.getElementById('card-pick').innerText.replace(/\s+/g, ' '), inside: box.left >= bezel.left && box.right <= bezel.right && box.bottom <= bezel.bottom };
+    });
+    assert.match(plaque.text, /CHOOSE/);
+    assert.match(plaque.text, /PLAY/);
+    assert.equal(plaque.inside, true, 'the plaque sits inside the glass');
+    const first = await focusedTitle(page);
+    await page.click('.pick-next');
+    await settled(page);
+    const second = await focusedTitle(page);
+    assert.notEqual(second, first, 'the right arrow brings the next card');
+    await page.click('.pick-prev');
+    await settled(page);
+    assert.equal(await focusedTitle(page), first, 'the left arrow brings it back');
+  });
+}

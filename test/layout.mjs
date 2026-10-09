@@ -3,6 +3,7 @@
 //
 //   node --test --test-concurrency=1 test/layout.mjs        (after ./build_web.sh)
 //   LAYOUT=iPad node --test test/layout.mjs                  (only the devices whose name has "iPad")
+//   node test/shard.mjs 2 test/layout.mjs                    (the devices shared between two processes)
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,6 +43,7 @@ const PIECES = {
   title: '#marquee-name',
   manual: '.manual-pocket',
   cardButton: '#card-button',
+  pick: '.card-pick',
   lamp: '.blip-power-indicator',
   receiver: '.jukebox-receiver',
   coin: '.deck-coin-slot',
@@ -118,6 +120,18 @@ function collect(core) {
   };
 }
 
+/** Resolves once the pieces have stopped moving (two equal readings 150ms apart), at most 3s. */
+async function settled(page) {
+  let last = '';
+  for (let waited = 0; waited < 3000; waited += 150) {
+    await page.waitForTimeout(150);
+    const now = await page.evaluate(() => JSON.stringify(Object.values(window.__pieces || {}).map((selector) =>
+      [...document.querySelectorAll(selector)].map((el) => { const r = el.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round); }))));
+    if (now === last) return;
+    last = now;
+  }
+}
+
 async function open(t, device) {
   const touch = !device.desktop;
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: touch, viewport: { width: device.w, height: device.h } });
@@ -127,6 +141,8 @@ async function open(t, device) {
   const insets = { top: device.top || 0, bottom: device.bottom || 0, left: device.left || 0, right: device.right || 0 };
   await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets });
   await page.addInitScript((pieces) => { window.__pieces = pieces; }, PIECES);
+  // The layout belongs to the shell, not to the game: a wasm that never arrives keeps the page quiet and the CPU free.
+  await page.route('**/*.wasm', () => {});
   return { page, origin, insets };
 }
 
@@ -169,11 +185,14 @@ async function check(page, device, insets, label, failures) {
 }
 
 const only = process.env.LAYOUT;
-for (const device of DEVICES.filter((d) => !only || d.name.includes(only))) {
+// LAYOUT_SHARD=1/2 runs every second device, for test/shard.mjs.
+const [shard, shards] = (process.env.LAYOUT_SHARD || '0/1').split('/').map(Number);
+const mine = DEVICES.filter((d, i) => i % shards === shard && (!only || d.name.includes(only)));
+for (const device of mine) {
   test(`nothing overlaps or leaves the screen on ${device.name} (${device.w}x${device.h})`, async (t) => {
     const { page, origin, insets } = await open(t, device);
     const failures = [];
-    const settle = () => page.waitForTimeout(1800);
+    const settle = () => settled(page);
 
     await page.goto(`${origin}/index.html`);
     await settle();
@@ -205,7 +224,7 @@ for (const device of DEVICES.filter((d) => !only || d.name.includes(only))) {
   });
 }
 
-for (const device of DEVICES.filter((d) => !only || d.name.includes(only))) {
+for (const device of mine) {
   test(`the manual sits inside the screen and its buttons are clear on ${device.name} (${device.w}x${device.h})`, async (t) => {
     const { page, origin, insets } = await open(t, device);
     const failures = [];
@@ -246,13 +265,13 @@ for (const device of DEVICES.filter((d) => !only || d.name.includes(only))) {
   });
 }
 
-for (const device of DEVICES.filter((d) => !only || d.name.includes(only))) {
+for (const device of mine) {
   test(`every card fits the cabinet window with its text on ${device.name} (${device.w}x${device.h})`, async (t) => {
     const { page, origin } = await open(t, device);
     const failures = [];
     await page.goto(`${origin}/index.html`);
     await page.waitForFunction(() => document.querySelector('.card-focused')?.offsetWidth > 0);
-    await page.waitForTimeout(1200);
+    await settled(page);
     for (let step = 0; step < 9; step++) {
       await page.waitForFunction(() => [...document.querySelectorAll('.card')].every((card) => card.getAnimations().length === 0));
       const card = await page.evaluate(() => {
@@ -287,17 +306,17 @@ for (const device of DEVICES.filter((d) => !only || d.name.includes(only))) {
   });
 }
 
-for (const device of DEVICES.filter((d) => !only || d.name.includes(only))) {
+for (const device of mine) {
   test(`the controls card opens inside the screen and clear of the bar on ${device.name} (${device.w}x${device.h})`, async (t) => {
     const { page, origin } = await open(t, device);
     const failures = [];
     for (const slug of ['cabinet', ...GAMES]) {
       await page.goto(`${origin}/${slug === 'cabinet' ? '' : `${slug}/`}index.html`);
-      if (slug === 'cabinet') await page.waitForSelector('#card-button');
-      else await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout: 60000 });
-      await page.waitForTimeout(400);
+      await page.waitForSelector('#card-button');
+      await settled(page);
       await page.evaluate(() => document.getElementById('card-button')?.click());
-      await page.waitForTimeout(900);
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      await page.waitForFunction(() => document.getElementById('controls-card').getAnimations().length === 0);
       const card = await page.evaluate(() => {
         const box = document.getElementById('controls-card').getBoundingClientRect();
         const bar = document.getElementById('marquee-bar')?.getBoundingClientRect();

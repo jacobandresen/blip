@@ -89,6 +89,7 @@ function assertInsideBar(m, label) {
  * but not this test's subject. */
 test(`the BLIP logo stays on the marquee and coinbox aligns with the deck`, async (t) => {
   const { browser, page, cdp } = await openPage(t);
+  await page.route('**/*.wasm', () => {});   // the bar belongs to the shell; no game needs to run
 
   assert.ok(GAME_PAGES.length > 0, 'found no built game pages to check');
 
