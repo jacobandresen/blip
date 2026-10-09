@@ -97,7 +97,7 @@ var BLIP_GAMES = {
   meteors:            { name: 'METEORS',  accent: '180, 180, 180', touchControls: [['TURN AND THRUST',['D-PAD']],['FIRE',['RED BUTTON']],['HYPERSPACE',['BLUE BUTTON']]], controls: [['TURN',['←','→'],['A','D']],['THRUST',['↑'],['W']],['FIRE',['SPACE']],['HYPERSPACE',['Z']]],
                          buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }] },
   // Two caps; holding toward hits high. `players: 2` enables the second station; `keys` maps P1 to WASD.
-  brawler:            { name: 'BRAWLER', accent: '220, 60, 40', touchControls: [['MOVE',['D-PAD']],['PUNCH',['RED BUTTON']],['KICK',['BLUE BUTTON']]], ownLegend: true, controls: [['MOVE',['←','→'],['A','D']],['PUNCH',['SPACE'],['F']],['KICK',['Z'],['G']]],
+  brawler:            { name: 'BRAWLER', accent: '220, 60, 40', touchControls: [['MOVE',['D-PAD']],['PUNCH',['RED BUTTON']],['KICK',['BLUE BUTTON']]], controls: [['MOVE',['←','→'],['A','D']],['PUNCH',['SPACE'],['F']],['KICK',['Z'],['G']]],
                          players: 2,
                          buttons: [{ key: 'f', code: 'KeyF', label: 'PUNCH' },
                                    { key: 'g', code: 'KeyG', label: 'KICK' }],
@@ -132,7 +132,7 @@ var BLIP_GAMES = {
 function blipGameFromPath(pathname) {
   var m = /\/([a-z_]+)\/(?:index\.html)?$/i.exec(pathname || '');
   var g = m && BLIP_GAMES[m[1]];
-  return g ? { slug: m[1], name: g.name, accent: g.accent, controls: g.controls, touchControls: g.touchControls, ownLegend: !!g.ownLegend, buttons: g.buttons,
+  return g ? { slug: m[1], name: g.name, accent: g.accent, controls: g.controls, touchControls: g.touchControls, buttons: g.buttons,
                keys: g.keys, players: g.players || 1, stick: g.stick,
                touch: g.touch || null } : null;
 }
@@ -408,15 +408,122 @@ function playRolodexMove(direction) {
   } catch(e) {}
 }
 
-function playManualPaper(lift) {
+/* ---- The controls card ---- Printed card on a little arm: the "?" under the top bar brings it down.
+ * A game page lists its keys; the cabinet welcomes the player. */
+var BLIP_ARROWS = { '←': 'left', '→': 'right', '↑': 'up', '↓': 'down' };
+function legendHtml(controls) {
+  function caps(list) {
+    return list.map(function (k) {
+      return BLIP_ARROWS[k] ? '<kbd class="arrow ' + BLIP_ARROWS[k] + '" aria-label="' + BLIP_ARROWS[k] + ' arrow"></kbd>'
+        : '<kbd' + (k.length > 1 ? ' class="wide' + (k === 'SPACE' ? ' space' : '') + (/^(RED|BLUE) /.test(k) ? ' ' + k.split(' ')[0].toLowerCase() : '') + '"' : '') + '>' + k + '</kbd>';
+    }).join('');
+  }
+  return controls.map(function (c) {
+    return '<span class="pc-group"><span class="pc-keys">' + caps(c[1]) +
+      (c[2] ? '<i>or</i>' + caps(c[2]) : '') + '</span><span class="pc-label">' + c[0] + '</span></span>';
+  }).join('');
+}
+function blipControlsCard(opts) {
+  var card = document.createElement('div');
+  card.id = 'controls-card';
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-label', opts.label + ' ' + opts.name);
+  card.innerHTML = '<span class="cc-rod" aria-hidden="true"></span><span class="cc-clamp" aria-hidden="true"></span><span class="cc-punch" aria-hidden="true"></span>' +
+    '<div class="cc-paper"><p class="cc-title">' + opts.label + '</p><p class="cc-game">' + opts.name + '</p>' + opts.html +
+    '<p class="cc-foot">BLIP ARCADE &middot; OPERATOR&rsquo;S CARD</p></div>';
+  var sleeve = document.createElement('span');
+  sleeve.id = 'card-sleeve';
+  sleeve.setAttribute('aria-hidden', 'true');
+  var button = document.createElement('button');
+  button.id = 'card-button';
+  button.type = 'button';
+  button.setAttribute('aria-controls', 'controls-card');
+  button.setAttribute('aria-expanded', 'false');
+  button.setAttribute('aria-label', 'Controls card');
+  button.title = 'Controls card';
+  button.innerHTML = '<span aria-hidden="true">?</span>';
+  document.body.appendChild(card);
+  document.body.appendChild(sleeve);
+  document.body.appendChild(button);
+  var root = document.documentElement;
+  function isOpen() { return root.hasAttribute('data-card'); }
+  function set(open) {
+    root.toggleAttribute('data-card', open);
+    button.setAttribute('aria-expanded', open ? 'true' : 'false');
+    playControlsCard(open);
+    button.blur();
+    if (opts.after) opts.after(open);
+  }
+  button.addEventListener('click', function () { set(!isOpen()); });
+  card.addEventListener('click', function () { set(false); });
+  // A press anywhere else puts the card away and still reaches what was pressed.
+  document.addEventListener('pointerdown', function (e) {
+    if (isOpen() && !card.contains(e.target) && !button.contains(e.target)) set(false);
+  }, true);
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && isOpen()) { set(false); e.stopImmediatePropagation(); e.preventDefault(); }
+  }, true);
+  return { set: set, isOpen: isOpen };
+}
+
+// The front page: a welcome, in three lines.
+(function () {
+  function welcome() {
+    if (!document.getElementById('game-grid') || new URLSearchParams(location.search).has('manual')) return;
+    var touch = document.documentElement.hasAttribute('data-has-touch');
+    blipControlsCard({
+      label: 'WELCOME TO', name: 'BLIP ARCADE',
+      html: '<ul class="cc-lines"><li><b>Insert a coin to play.</b> ' + (touch ? 'Tap the coin slot, bottom right.' : 'Click the coin slot, or press&nbsp;5.') + '</li>' +
+        '<li>' + (touch ? 'Pick a game with the d-pad, bottom left, then tap a red button.' : 'Pick a game with the arrow keys, then press a red button or Space.') + '</li>' +
+        '<li>Need a hand? ' + (touch ? 'Tap MANUAL at the top.' : 'Click MANUAL at the top.') + '</li></ul>'
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', welcome, { once: true });
+  else welcome();
+}());
+
+// The controls card's little arm: a servo whirr that climbs as the card swings out and falls as it
+// is put away, a breath of air, and a soft latch at the end.
+function playControlsCard(out) {
   try {
-    var ctx=getKioskAudio(),duration=lift?.38:.25,size=Math.ceil(ctx.sampleRate*duration);
+    var ctx=getKioskAudio(),t=ctx.currentTime,dur=out?.6:.42,level=out?1:.7,sink=blipOut(ctx);
+    var motor=ctx.createOscillator(),tone=ctx.createBiquadFilter(),volume=ctx.createGain();
+    motor.type='sawtooth';motor.frequency.setValueAtTime(out?120:300,t);motor.frequency.linearRampToValueAtTime(out?310:140,t+dur);
+    tone.type='lowpass';tone.frequency.setValueAtTime(out?500:1100,t);tone.frequency.linearRampToValueAtTime(out?1200:450,t+dur);tone.Q.value=1.1;
+    volume.gain.setValueAtTime(0,t);volume.gain.linearRampToValueAtTime(.05*level,t+.06);
+    volume.gain.setValueAtTime(.05*level,t+dur-.07);volume.gain.linearRampToValueAtTime(0,t+dur);
+    var cog=ctx.createOscillator(),teeth=ctx.createGain();
+    cog.type='triangle';cog.frequency.setValueAtTime(out?20:46,t);cog.frequency.linearRampToValueAtTime(out?48:20,t+dur);teeth.gain.value=.016*level;
+    cog.connect(teeth);teeth.connect(volume.gain);
+    motor.connect(tone);tone.connect(volume);volume.connect(sink);
+    motor.start(t);cog.start(t);motor.stop(t+dur+.05);cog.stop(t+dur+.05);
+    motor.onended=function(){motor.disconnect();tone.disconnect();volume.disconnect();cog.disconnect();teeth.disconnect();};
+    // The latch: a short tick and a low knock as the card seats.
+    var size=Math.ceil(ctx.sampleRate*.05),buffer=ctx.createBuffer(1,size,ctx.sampleRate),data=buffer.getChannelData(0);
+    for(var i=0;i<size;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/size,3);
+    var tick=ctx.createBufferSource(),hp=ctx.createBiquadFilter(),tickGain=ctx.createGain();
+    tick.buffer=buffer;hp.type='highpass';hp.frequency.value=1500;tickGain.gain.value=.18*level;
+    tick.connect(hp);hp.connect(tickGain);tickGain.connect(sink);tick.start(t+dur);
+    tick.onended=function(){tick.disconnect();hp.disconnect();tickGain.disconnect();};
+    var knock=ctx.createOscillator(),knockGain=ctx.createGain();
+    knock.type='sine';knock.frequency.setValueAtTime(150,t+dur);knock.frequency.exponentialRampToValueAtTime(70,t+dur+.08);
+    knockGain.gain.setValueAtTime(.16*level,t+dur);knockGain.gain.exponentialRampToValueAtTime(.001,t+dur+.1);
+    knock.connect(knockGain);knockGain.connect(sink);knock.start(t+dur);knock.stop(t+dur+.12);
+    knock.onended=function(){knock.disconnect();knockGain.disconnect();};
+  }catch(e){}
+}
+
+function playManualPaper(lift) {
+  // Page turns are a whisper: soft air through paper, quieter and rounder than the lift of the whole book.
+  try {
+    var ctx=getKioskAudio(),duration=lift?.4:.34,size=Math.ceil(ctx.sampleRate*duration);
     var buffer=ctx.createBuffer(1,size,ctx.sampleRate),data=buffer.getChannelData(0);
-    for(var i=0;i<size;i++){var p=i/size;data[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*p),1.3)*(.65+.35*Math.sin(p*31));}
-    var paper=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
-    paper.buffer=buffer;filter.type='bandpass';filter.frequency.value=lift?1150:1800;filter.Q.value=.45;gain.gain.value=.14;
-    paper.connect(filter);filter.connect(gain);gain.connect(blipOut(ctx));paper.start();
-    paper.onended=function(){paper.disconnect();filter.disconnect();gain.disconnect();};
+    for(var i=0;i<size;i++){var p=i/size;data[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*Math.pow(p,lift?1:.8)),1.8)*(.7+.3*Math.sin(p*(lift?31:22)));}
+    var paper=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),soften=ctx.createBiquadFilter(),gain=ctx.createGain();
+    paper.buffer=buffer;filter.type='bandpass';filter.frequency.value=lift?1000:1250;filter.Q.value=.4;
+    soften.type='lowpass';soften.frequency.value=lift?3200:2300;gain.gain.value=lift?.085:.04;
+    paper.connect(filter);filter.connect(soften);soften.connect(gain);gain.connect(blipOut(ctx));paper.start();
+    paper.onended=function(){paper.disconnect();filter.disconnect();soften.disconnect();gain.disconnect();};
   }catch(e){}
 }
 

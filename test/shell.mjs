@@ -306,13 +306,6 @@ test('the game shell', async (t) => {
     assert.equal(await evaluate(cdp, "document.activeElement.id"), 'glcanvas', 'the game does not have focus');
     const shown = await evaluate(cdp, "[...document.querySelectorAll('#need-coin-overlay .nco-go span')].find((s) => s.offsetParent)?.textContent");
     assert.equal(shown, 'PRESS SPACE TO INSERT A COIN');
-    await key(cdp, ' ', 'Space', 32);
-    await sleep(600);
-    const legend = "document.getElementById('pc-hint').classList.contains('visible')";
-    assert.equal(await evaluate(cdp, legend), true, 'a coin in, the keys are not listed');
-    await key(cdp, 'ArrowLeft', 'ArrowLeft', 37);
-    await sleep(600);
-    assert.equal(await evaluate(cdp, legend), false, 'the legend stays after a key is pressed');
   });
 
   await t.test('coins need no mouse: fire at the wall, 5 at any time', async (t) => {

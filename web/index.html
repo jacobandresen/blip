@@ -13,9 +13,9 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
-  <link rel="stylesheet" href="kiosk.css?v=148">
+  <link rel="stylesheet" href="kiosk.css?v=151">
   <link rel="stylesheet" href="wear.css?v=12">
-  <link rel="stylesheet" href="manual.css?v=35">
+  <link rel="stylesheet" href="manual.css?v=36">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
@@ -1008,6 +1008,7 @@
   <div class="manual-overlay" id="manual-overlay" hidden role="dialog" aria-modal="true" aria-label="BLIP Arcade Manual">
     <div class="manual-open-book" role="document">
       <section class="manual-open-page manual-open-left" id="manual-contents-page" aria-label="Manual left page">
+        <i class="manual-tear" aria-hidden="true"></i>
         <div class="manual-left-contents">
           <div class="manual-paper-mark">BLIP ARCADE &nbsp; · &nbsp; OPERATOR'S COPY</div>
           <h2>CONTENTS</h2>
@@ -1031,6 +1032,7 @@
       </section>
       <div class="manual-open-spine" aria-hidden="true"></div>
       <section class="manual-open-page manual-open-right" aria-label="Manual page">
+        <i class="manual-tear" aria-hidden="true"></i>
         <div class="manual-page-number"><span id="manual-book-title">MANUAL</span><b id="manual-page-count">01 / 01</b></div>
         <article class="manual-page-content" id="manual-page-content" tabindex="-1" aria-live="polite"></article>
         <span class="manual-folio" id="manual-right-folio"></span>
@@ -1067,10 +1069,10 @@
     </div>
   </template>
   <script src="deck.js?v=13"></script>
-  <script src="manual-motion.js?v=2"></script>
+  <script src="manual-motion.js?v=3"></script>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=88"></script>
+  <script src="kiosk.js?v=95"></script>
   <script src="blip_controller.js?v=10"></script>
   <!-- Git-ignored, written at deploy: absent means no leaderboard. -->
   <script src="blip_config.js?v=1"></script>
@@ -1532,6 +1534,9 @@
           }
           aligned.push(leaf);
         });
+        // One leaf has lost its outer corner at the foot, as a well-read leaf will.
+        var torn=aligned.filter(function(leaf){return leaf.game==='meteors'&&leaf.side==='right';})[0];
+        if(torn)torn.torn=true;
         result=aligned;
         var operatorsAt=result.findIndex(function(page){return page.operators;}),operatorsEntry=document.querySelector('[data-chapter="operators"]');
         if(operatorsAt>=0){operatorsEntry.disabled=false;operatorsEntry.dataset.page=operatorsAt;operatorsEntry.querySelector('b').textContent=String(operatorsAt+1).padStart(2,'0');}
@@ -1561,6 +1566,8 @@
       var wide=manualWide(),left=wide&&right>0?pages[right-1]:null,leaf=pages[right]||null;
       var leftPage=manualOverlay.querySelector('.manual-open-left');
       leftPage.dataset.face=left?'leaf':'contents';
+      leftPage.toggleAttribute('data-torn',!!(left&&left.torn));
+      manualOverlay.querySelector('.manual-open-right').toggleAttribute('data-torn',!!(leaf&&leaf.torn));
       document.getElementById('manual-left-content').innerHTML=left?manualSheet(left):'';
       document.getElementById('manual-left-title').textContent=left&&!left.filler?left.title.toUpperCase():'';
       document.getElementById('manual-left-folio').textContent=left?String(right):'';
@@ -1581,6 +1588,28 @@
     }
     // The lifted page turns about the spine: its front is the page it was, its back the page it becomes.
     var manualFlipping=null;
+    // Three ways a page is turned, never the same twice running: a plain sweep, a lazy curl that lifts off the page, a quick flick that overshoots and settles.
+    var manualFlipLast=-1,manualFlipUsed=[],manualFlipTurns=0;
+    var MANUAL_FLIPS=[
+      {ms:720,shade:.45,cast:.3,frames:function(s){return [{transform:'rotateY(0deg)',easing:'cubic-bezier(.45,.05,.25,1)'},{transform:'rotateY('+s*180+'deg)'}];}},
+      {ms:920,shade:.55,cast:.38,frames:function(s){return [
+        {transform:'translateZ(0) rotateX(0deg) rotateY(0deg) skewY(0deg)',offset:0,easing:'cubic-bezier(.3,0,.55,1)'},
+        {transform:'translateZ(12px) rotateX(-1.5deg) rotateY('+s*62+'deg) skewY('+s*-2+'deg)',offset:.36,easing:'linear'},
+        {transform:'translateZ(16px) rotateX(-1deg) rotateY('+s*128+'deg) skewY('+s*1.5+'deg)',offset:.7,easing:'cubic-bezier(.2,.6,.3,1)'},
+        {transform:'translateZ(0) rotateX(0deg) rotateY('+s*180+'deg) skewY(0deg)',offset:1}];}},
+      {ms:540,shade:.35,cast:.22,frames:function(s){return [
+        {transform:'rotateY(0deg) rotateX(0deg)',offset:0,easing:'cubic-bezier(.25,.7,.3,1)'},
+        {transform:'rotateY('+s*187+'deg) rotateX(1.6deg)',offset:.78,easing:'ease-in-out'},
+        {transform:'rotateY('+s*180+'deg) rotateX(0deg)',offset:1}];}}
+    ];
+    function manualFlipStyle() {
+      // The style used longest ago, with ties settled at random: every style comes round before any repeats.
+      manualFlipUsed.length||MANUAL_FLIPS.forEach(function(){manualFlipUsed.push(-1);});
+      var oldest=Math.min.apply(null,manualFlipUsed.filter(function(_,i){return i!==manualFlipLast;}));
+      var choices=MANUAL_FLIPS.map(function(_,i){return i;}).filter(function(i){return i!==manualFlipLast&&manualFlipUsed[i]===oldest;});
+      var pick=manualFlipLast<0?0:choices[Math.floor(Math.random()*choices.length)];
+      manualFlipUsed[pick]=++manualFlipTurns;manualFlipLast=pick;return MANUAL_FLIPS[pick];
+    }
     function manualFlip(pages,right,direction) {
       if(manualFlipping)manualFlipping.finish();
       var book=manualOverlay.querySelector('.manual-open-book'),leftPage=book.querySelector('.manual-open-left'),rightPage=book.querySelector('.manual-open-right');
@@ -1610,10 +1639,12 @@
       frontFace.appendChild(frontShade);backFace.appendChild(backShade);
       leaf.append(frontFace,backFace);
       book.append(cover,leaf);
-      var sign=forward?-1:1;
-      manualFlipping=leaf.animate([{transform:'rotateY(0deg)'},{transform:'rotateY('+sign*180+'deg)'}],{duration:720,easing:'cubic-bezier(.45,.05,.25,1)',fill:'forwards'});
-      frontShade.animate([{opacity:0},{opacity:.45}],{duration:720,easing:'ease-in',fill:'forwards'});
-      backShade.animate([{opacity:.45},{opacity:0}],{duration:720,easing:'ease-out',fill:'forwards'});
+      var sign=forward?-1:1,style=manualFlipStyle(),ms=style.ms;
+      var cast=document.createElement('i');cast.className='manual-flip-cast '+(forward?'manual-flip-cast-left':'manual-flip-cast-right');cover.appendChild(cast);
+      manualFlipping=leaf.animate(style.frames(sign),{duration:ms,fill:'forwards'});
+      frontShade.animate([{opacity:0},{opacity:style.shade}],{duration:ms,easing:'ease-in',fill:'forwards'});
+      backShade.animate([{opacity:style.shade},{opacity:0}],{duration:ms,easing:'ease-out',fill:'forwards'});
+      cast.animate([{opacity:0},{opacity:style.cast,offset:.55},{opacity:0}],{duration:ms,easing:'ease-in-out',fill:'forwards'});
       var finish=function(){leaf.remove();cover.remove();manualFlipping=null;};
       manualFlipping.onfinish=finish;manualFlipping.oncancel=finish;
     }
@@ -1644,7 +1675,7 @@
       if(manualMoving||!manualOverlay.hidden)return;
       manualMoving=true;manualCloseRequested=false;
       manualPreviousOverflow=document.documentElement.style.overflow;
-      manualPageIndex=0;manualShown=false;
+      manualPageIndex=0;manualShown=false;manualFlipLast=-1;manualFlipUsed=[];manualFlipTurns=0;
       manualOverlay.hidden=false;
       document.body.classList.add('manual-open');
       document.documentElement.style.overflow='hidden';

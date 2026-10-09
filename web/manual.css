@@ -436,3 +436,21 @@ body.info-page .manual-return {position:fixed;z-index:5100;left:50%;bottom:calc(
 @media (max-width:700px) {
   .manual-signature {margin-left:2%;font-size:44px;line-height:40px}
 }
+
+/* The landing page darkens a little under the turning leaf. */
+.manual-flip-cast {position:absolute;inset:0;z-index:8;opacity:0;pointer-events:none}
+.manual-flip-cast-left {background:linear-gradient(270deg,#000b,#0003 45%,#0000)}
+.manual-flip-cast-right {background:linear-gradient(90deg,#000b,#0003 45%,#0000)}
+
+/* A leaf with its outer corner torn away at the foot: the leaf beneath shows, darker, past a ragged edge. Only the margin is lost. */
+.manual-tear {display:none;position:absolute;bottom:0;z-index:4;width:clamp(56px,17%,118px);height:clamp(64px,12%,104px);pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23a9a79c'/%3E%3Cstop offset='.5' stop-color='%23c9c7bb'/%3E%3Cstop offset='1' stop-color='%23d8d6ca'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M100 0 92 9 88 14 80 16 74 27 69 30 61 38 55 37 47 50 40 57 33 56 24 69 17 73 10 86 4 88 0 100H100Z' fill='url(%23g)'/%3E%3Cpath d='M100 0 92 9 88 14 80 16 74 27 69 30 61 38 55 37 47 50 40 57 33 56 24 69 17 73 10 86 4 88 0 100' fill='none' stroke='%23000' stroke-opacity='.28' stroke-width='3.5' vector-effect='non-scaling-stroke' transform='translate(1.5 1.5)'/%3E%3Cpath d='M100 0 92 9 88 14 80 16 74 27 69 30 61 38 55 37 47 50 40 57 33 56 24 69 17 73 10 86 4 88 0 100' fill='none' stroke='%23fbfaf3' stroke-width='1.6' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat}
+.manual-open-right[data-torn] .manual-tear {display:block;right:0}
+.manual-open-left[data-torn] .manual-tear {display:block;left:0;transform:scaleX(-1)}
+
+/* The cover of the opening book: the closed book in front, the left-hand page inside. */
+.manual-cover-face {position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 0 22px #0007}
+.manual-cover-back {transform:rotateY(180deg)}
+
+.manual-cover-book {position:absolute!important;inset:0;width:100%!important;height:100%!important;margin:0!important;transform:none!important;font-size:30px!important;box-shadow:none!important}
+.manual-cover-book .manual-book-copy strong {font-size:inherit}

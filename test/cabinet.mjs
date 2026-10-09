@@ -248,3 +248,28 @@ test('a game whose card is already seated opens at once, with the arm still', as
     'no arm cycle runs on the game page');
   assert.equal(await title(page), 'BOUNCER');
 });
+
+test('the front page has the "?" at all times, and its card welcomes the player', async (t) => {
+  const { page } = await openCabinet(t);
+  const card = () => page.evaluate(() => ({
+    out: document.documentElement.hasAttribute('data-card'),
+    button: document.getElementById('card-button')?.getBoundingClientRect().width > 0,
+    text: document.getElementById('controls-card')?.innerText.replace(/\s+/g, ' ') || '',
+  }));
+  assert.deepEqual([(await card()).button, (await card()).out], [true, false], 'the "?" is there, the card is not');
+  await page.click('#card-button');
+  await page.waitForTimeout(900);
+  const open = await card();
+  assert.equal(open.out, true);
+  assert.match(open.text, /WELCOME TO BLIP ARCADE/);
+  assert.match(open.text, /Insert a coin to play/);
+  assert.match(open.text, /manual/i);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  assert.equal((await card()).out, false, 'Escape puts the card away');
+  await page.click('#card-button');
+  await page.waitForTimeout(700);
+  await page.mouse.click(60, 400);
+  await page.waitForTimeout(300);
+  assert.equal((await card()).out, false, 'a click outside puts the card away');
+});

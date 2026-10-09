@@ -295,3 +295,67 @@ test('the contents list The operators at its page', async (t) => {
   });
   assert.deepEqual(entry, { enabled: true, page: entry.last, last: entry.last });
 });
+
+test('page turns vary and never repeat the style just used', async (t) => {
+  const page = await openManual(t, 'controls');
+  await page.evaluate(() => {
+    window.__flips = [];
+    const animate = HTMLElement.prototype.animate;
+    HTMLElement.prototype.animate = function (...args) {
+      if (this.classList.contains('manual-flip')) window.__flips.push(args[1].duration);
+      return animate.apply(this, args);
+    };
+  });
+  for (let turn = 0; turn < 7; turn++) {
+    await page.locator('#manual-next').click();
+    await page.waitForTimeout(1100);
+  }
+  const durations = await page.evaluate(() => window.__flips);
+  assert.equal(durations.length, 7);
+  assert.ok(new Set(durations).size >= 3, `three kinds of turn were used: ${durations}`);
+  durations.slice(1).forEach((ms, i) => assert.notEqual(ms, durations[i], `turn ${i + 2} repeated the style of turn ${i + 1}`));
+});
+
+for (const [width, height] of [[1280, 800], [800, 600], [390, 844]]) {
+  test(`a torn corner keeps every word readable at ${width}px`, async (t) => {
+    const page = await openManual(t, 'controls', { width, height });
+    const torn = await page.evaluate(() => manualPages.findIndex((leaf) => leaf.torn));
+    assert.ok(torn >= 0, 'one leaf is torn');
+    await page.evaluate((index) => showManualPage(index, 0), torn);
+    await page.waitForFunction(() => document.querySelector('.manual-open-right[data-torn]'));
+    await page.waitForTimeout(500);
+    const result = await page.evaluate(() => {
+      const tear = document.querySelector('.manual-open-right .manual-tear').getBoundingClientRect();
+      const hits = [];
+      const walker = document.createTreeWalker(document.getElementById('manual-page-content'), NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent.trim()) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const r of range.getClientRects()) {
+          if (r.width && r.height && r.right > tear.left && r.left < tear.right && r.bottom > tear.top && r.top < tear.bottom) hits.push(node.textContent.trim().slice(0, 30));
+        }
+      }
+      return { visible: tear.width > 20 && tear.height > 20, hits };
+    });
+    assert.equal(result.visible, true, 'the missing corner shows');
+    assert.deepEqual(result.hits, [], 'text runs into the missing corner');
+  });
+}
+
+test('on a wide screen the cover swings open about the spine, and the book is whole again at the end', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  await page.goto(`${origin}/index.html`);
+  await page.waitForSelector('.card-focused');
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => {
+    window.__covers = 0;
+    new MutationObserver(() => { if (document.querySelector('.manual-cover')) window.__covers++; })
+      .observe(document.querySelector('.manual-open-book'), { childList: true });
+  });
+  await page.evaluate(() => document.getElementById('manual-book').click());
+  await page.waitForFunction(() => !document.getElementById('manual-overlay').inert && !document.getElementById('manual-overlay').hidden, null, { timeout: 8000 });
+  assert.ok(await page.evaluate(() => window.__covers) >= 1, 'a cover swung open');
+  assert.equal(await page.locator('.manual-cover').count(), 0, 'the cover is gone once it lies open');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.manual-open-left')).visibility), 'visible', 'the left page is back');
+});

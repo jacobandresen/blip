@@ -27,9 +27,11 @@ change will be overwritten the next time the project is built.
 | Sound on / off (`blip-mute`); `blipOut(ctx)`, where the cabinet's own sounds must connect | `web/kiosk.js` |
 | What fullscreen hides on a game page; the idle return to the cabinet | `web/shell.css`, `web/shell.js` |
 | Cabinet wear: scratches, burns, rings, scuffs, thumbed cards and manual | `tools/make_wear.py`, which writes `web/wear.css` (generated, not edited by hand) |
-| Field manual: spreads, page flip, contents, notes pages | `web/index.html` (the manual script), `web/manual.css` |
+| Field manual: spreads, the three page-turn styles, the torn leaf, contents, notes pages | `web/index.html` (the manual script), `web/manual.css` |
+| The book leaving its pocket, its cover swinging open and shut | `web/manual-motion.js` |
 | The manual's last page, the operators (a `data-manual-sheet`: never split, its type shrinks to fit) | `web/about.html` |
 | A game's manual pages: screenshot, blurb, controls, tip | `web/controls.html`: a `data-side="left"` and a `data-side="right"` section per game |
+| The controls card (the "?" under the top bar, its arm and whirr): the cabinet's welcome and each game's keys (`controls`, `touchControls` in `BLIP_GAMES`) | `web/kiosk.js`, `web/kiosk.css` |
 | Wasm <-> JS bridge (`blip_spend_coin`) | `web/blip_bridge.js` |
 | macroquad JS runtime (vendored, do not edit) | `web/mq_js_bundle.js` |
 | Game logic, rendering, audio (Rust side) | `crates/<name>/src/main.rs` |

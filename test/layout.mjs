@@ -41,6 +41,7 @@ const PIECES = {
   logo: '.blip-logo',
   title: '#marquee-name',
   manual: '.manual-pocket',
+  cardButton: '#card-button',
   lamp: '.blip-power-indicator',
   receiver: '.jukebox-receiver',
   coin: '.deck-coin-slot',
@@ -281,6 +282,35 @@ for (const device of DEVICES.filter((d) => !only || d.name.includes(only))) {
       if (!card.textOnCard) failures.push(`${card.title}: its text runs off the card`);
       if (card.fontPx < 11) failures.push(`${card.title}: its text is only ${card.fontPx}px`);
       await page.keyboard.press('ArrowRight');
+    }
+    assert.deepEqual(failures, []);
+  });
+}
+
+for (const device of DEVICES.filter((d) => !only || d.name.includes(only))) {
+  test(`the controls card opens inside the screen and clear of the bar on ${device.name} (${device.w}x${device.h})`, async (t) => {
+    const { page, origin } = await open(t, device);
+    const failures = [];
+    for (const slug of ['cabinet', ...GAMES]) {
+      await page.goto(`${origin}/${slug === 'cabinet' ? '' : `${slug}/`}index.html`);
+      if (slug === 'cabinet') await page.waitForSelector('#card-button');
+      else await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout: 60000 });
+      await page.waitForTimeout(400);
+      await page.evaluate(() => document.getElementById('card-button')?.click());
+      await page.waitForTimeout(900);
+      const card = await page.evaluate(() => {
+        const box = document.getElementById('controls-card').getBoundingClientRect();
+        const bar = document.getElementById('marquee-bar')?.getBoundingClientRect();
+        const groups = [...document.querySelectorAll('#controls-card .pc-group, #controls-card .cc-lines li')].map((g) => g.getBoundingClientRect());
+        return {
+          box: [box.left, box.top, box.right, box.bottom], bar: bar ? bar.bottom : 0,
+          groupsInside: groups.length > 0 && groups.every((g) => g.left >= box.left && g.right <= box.right && g.bottom <= box.bottom),
+        };
+      });
+      const [left, top, right, bottom] = card.box;
+      if (left < (device.left || 0) || right > device.w - (device.right || 0) || bottom > device.h) failures.push(`${slug}: the card leaves the screen`);
+      if (top < card.bar - 1) failures.push(`${slug}: the card sits under the top bar`);
+      if (!card.groupsInside) failures.push(`${slug}: the controls run off the card`);
     }
     assert.deepEqual(failures, []);
   });

@@ -255,7 +255,7 @@ test('on a PC a click on the coin wall inserts a coin and leaves the game focuse
 
 const SLUGS = ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler', 'adder'];
 for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
-  test(`on ${label} every game's coin wall lists its controls inside the screen`, async (t) => {
+  test(`on ${label} the controls card stays away until its button is pressed, then shows every control`, async (t) => {
     const size = phoneish ? { width: 390, height: 844 } : { width: 1280, height: 800 };
     const { page, origin } = await openPage(t, 'chromium', { hasTouch: phoneish, viewport: size });
     if (phoneish) {
@@ -268,16 +268,36 @@ for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
       await page.goto(`${origin}/${slug}/index.html`);
       await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout: 60000 });
       await page.waitForTimeout(600);
-      const wall = await page.evaluate(() => {
-        const box = document.getElementById('need-coin-overlay').getBoundingClientRect();
-        const groups = [...document.querySelectorAll('#need-coin-overlay .pc-group')];
-        return {
-          labels: groups.map((g) => g.querySelector('.pc-label').textContent),
-          inside: groups.every((g) => { const r = g.getBoundingClientRect(); return r.left >= box.left && r.right <= box.right && r.bottom <= box.bottom; }),
-        };
+      if (await page.evaluate(() => document.documentElement.hasAttribute('data-card') || getComputedStyle(document.getElementById('controls-card')).visibility !== 'hidden')) {
+        failures.push(`${slug}: the card is out before it is asked for`);
+      }
+      await page.evaluate(() => {
+        window.__whirrs = [];
+        const original = window.playControlsCard;
+        window.playControlsCard = (out) => { window.__whirrs.push(out); original(out); };
       });
-      if (!wall.labels.length) failures.push(`${slug}: no controls listed`);
-      else if (!wall.inside) failures.push(`${slug}: the controls leave the screen`);
+      await page.click('#card-button');
+      await page.waitForTimeout(900);
+      const card = await page.evaluate((viewport) => {
+        const box = document.getElementById('controls-card').getBoundingClientRect();
+        return {
+          labels: [...document.querySelectorAll('#controls-card .pc-label')].map((l) => l.textContent),
+          inside: box.left >= 0 && box.right <= viewport.width && box.top >= 0 && box.bottom <= viewport.height,
+          focus: document.activeElement.id,
+        };
+      }, size);
+      if (!card.labels.length) failures.push(`${slug}: no controls on the card`);
+      if (!card.inside) failures.push(`${slug}: the card leaves the screen`);
+      if (card.focus !== 'glcanvas') failures.push(`${slug}: the game lost the keyboard`);
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      if ((await page.evaluate(() => window.__whirrs.join())) !== 'true,false') failures.push(`${slug}: the arm whirs once out and once back`);
+      if (await page.evaluate(() => document.documentElement.hasAttribute('data-card'))) failures.push(`${slug}: Escape did not put the card away`);
+      await page.click('#card-button');
+      await page.waitForTimeout(700);
+      await page.mouse.click(size.width / 2, size.height / 2);
+      await page.waitForTimeout(300);
+      if (await page.evaluate(() => document.documentElement.hasAttribute('data-card'))) failures.push(`${slug}: a click outside did not put the card away`);
     }
     assert.deepEqual(failures, []);
   });

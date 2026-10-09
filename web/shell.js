@@ -329,46 +329,16 @@ overlay.addEventListener('click', function (e) {
   try { canvas.focus(); } catch (err) {}
 });
 
-// The key legend: keycaps over a verb, the same card on every game. A PC reads it on the coin wall
-// and again, until a key is pressed, once the coin is in.
-var ARROWS = { '←': 'left', '→': 'right', '↑': 'up', '↓': 'down' };
-function legendHtml(controls) {
-  function caps(list) {
-    return list.map(function (k) {
-      return ARROWS[k] ? '<kbd class="arrow ' + ARROWS[k] + '" aria-label="' + ARROWS[k] + ' arrow"></kbd>'
-        : '<kbd' + (k.length > 1 ? ' class="wide' + (k === 'SPACE' ? ' space' : '') + (/^(RED|BLUE) /.test(k) ? ' ' + k.split(' ')[0].toLowerCase() : '') + '"' : '') + '>' + k + '</kbd>';
-    }).join('');
-  }
-  return controls.map(function (c) {
-    return '<span class="pc-group"><span class="pc-keys">' + caps(c[1]) +
-      (c[2] ? '<i>or</i>' + caps(c[2]) : '') + '</span><span class="pc-label">' + c[0] + '</span></span>';
-  }).join('');
-}
-var noTouch = !document.documentElement.hasAttribute('data-has-touch');
-if (GAME && GAME.controls) {
-  var wallCard = document.createElement('div');
-  wallCard.className = 'pc-legend';
-  wallCard.innerHTML = legendHtml(noTouch ? GAME.controls : GAME.touchControls);
-  overlay.querySelector('.nco-panel').appendChild(wallCard);
-}
-var pcHint = (function () {
-  if (!GAME || !GAME.controls || GAME.ownLegend || !noTouch) return null;
-  var el = document.createElement('div');
-  el.id = 'pc-hint';
-  el.className = 'pc-legend';
-  el.innerHTML = legendHtml(GAME.controls);
-  document.body.appendChild(el);
-  var timer = 0;
-  function hide() { clearTimeout(timer); el.classList.remove('visible'); }
-  window.addEventListener('keydown', function (e) {
-    if (e.isTrusted && e.key !== '5' && e.key.toLowerCase() !== 'm' && !overlay.classList.contains('visible')) hide();
-  }, true);
-  return {
-    show: function () { el.classList.add('visible'); clearTimeout(timer); timer = setTimeout(hide, 20000); },
-    hide: hide
-  };
+// The controls card (kiosk.js builds it): this game's keys, or its touch gestures on a phone.
+var cardApi = (function () {
+  var noTouch = !document.documentElement.hasAttribute('data-has-touch');
+  var list = GAME && (noTouch ? GAME.controls : GAME.touchControls);
+  if (!list) return null;
+  return blipControlsCard({
+    label: 'HOW TO PLAY', name: GAME.name, html: '<div class="pc-legend">' + legendHtml(list) + '</div>',
+    after: function () { try { canvas.focus({ preventScroll: true }); } catch (e) {} }
+  });
 }());
-if (pcHint && !overlay.classList.contains('visible')) pcHint.show();
 
 // Mirror the overlay onto <body> (body.need-coin lights the coin button).
 // When it closes, a coin just went in: give focus back to the canvas so the
@@ -384,7 +354,6 @@ new MutationObserver(function () {
   if (overlayWasVisible && !vis && canvas) {
     try { canvas.focus(); } catch (e) {}
   }
-  if (pcHint) { if (vis) pcHint.hide(); else pcHint.show(); }
   overlayWasVisible = vis;
 }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
 
