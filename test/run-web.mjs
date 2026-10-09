@@ -15,7 +15,9 @@ const codes = await Promise.all(LANES.map((lane) => new Promise((done) => {
   let out = '';
   child.stdout.on('data', (chunk) => { out += chunk; });
   child.on('close', (code) => {
-    process.stdout.write(`\n== ${lane.name} lane\n` + out.split('\n').filter((l) => /^(✖|ℹ (tests|pass|fail))|^\s+✖/.test(l)).join('\n') + '\n');
+    const lines = out.split('\n'), failing = lines.findIndex((l) => l.startsWith('✖ failing tests:'));
+    process.stdout.write(`\n== ${lane.name} lane\n` + lines.filter((l) => /^(✖|ℹ (tests|pass|fail))|^\s+✖/.test(l)).join('\n') + '\n' +
+      (failing >= 0 ? lines.slice(failing, failing + 40).join('\n') + '\n' : ''));
     done(code);
   });
 })));

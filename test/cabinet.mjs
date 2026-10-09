@@ -282,7 +282,7 @@ for (const [width, touch] of [[1280, false], [390, true], [320, true]]) {
       return { text: document.getElementById('card-pick').innerText.replace(/\s+/g, ' '), inside: box.left >= bezel.left && box.right <= bezel.right && box.bottom <= bezel.bottom };
     });
     assert.match(plaque.text, /CHOOSE/);
-    assert.match(plaque.text, /PLAY/);
+    assert.match(plaque.text, /START/);
     assert.equal(plaque.inside, true, 'the plaque sits inside the glass');
     const first = await focusedTitle(page);
     await page.click('.pick-next');
@@ -292,5 +292,37 @@ for (const [width, touch] of [[1280, false], [390, true], [320, true]]) {
     await page.click('.pick-prev');
     await settled(page);
     assert.equal(await focusedTitle(page), first, 'the left arrow brings it back');
+    await page.click('.pick-start');
+    assert.equal(await page.evaluate(() => document.querySelector('.card-focused').classList.contains('rejected')), true, 'START without a coin is turned away like the card itself');
   });
 }
+
+test('the joystick steps the rack from any part of its ball, the top that stands over the frame too', async (t) => {
+  const { page } = await openCabinet(t);
+  await page.evaluate(() => localStorage.setItem('blip-controls', 'stick'));
+  await page.reload();
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.offsetWidth > 0);
+  for (const fraction of [0.1, 0.3, 0.5, 0.8]) {
+    await page.waitForSelector('.card-focused .card-title', { timeout: 20000 });   // a held stick steps on until it is let go and the rack has caught up
+    await settled(page);
+    const ball = await page.evaluate(() => { const r = document.querySelector('.stick-ball').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
+    const [x, y] = [ball[0] + ball[2] / 2, ball[1] + ball[3] * fraction];
+    const before = await focusedTitle(page);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 45, y, { steps: 5 });
+    await page.waitForTimeout(250);
+    await page.mouse.up();
+    await page.waitForSelector('.card-focused .card-title', { timeout: 20000 });
+    await settled(page);
+    assert.notEqual(await focusedTitle(page), before, `a press ${Math.round(fraction * 100)}% down the ball did nothing`);
+  }
+});
+
+test('the pick panel sits dark until a credit powers the cabinet', async (t) => {
+  const { page } = await openCabinet(t);
+  const filter = () => page.evaluate(() => getComputedStyle(document.getElementById('card-pick')).filter);
+  assert.match(await filter(), /brightness/, 'the panel is lit with no credit');
+  await page.evaluate(() => { document.getElementById('kiosk-insert-btn').click(); });
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('card-pick')).filter === 'none', null, { timeout: 5000 });
+});

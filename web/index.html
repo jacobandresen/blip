@@ -15,7 +15,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <link rel="stylesheet" href="kiosk.css?v=151">
   <link rel="stylesheet" href="wear.css?v=12">
-  <link rel="stylesheet" href="manual.css?v=45">
+  <link rel="stylesheet" href="manual.css?v=49">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
@@ -826,8 +826,8 @@
     #game-grid .card-code {left:13px;right:auto;top:10px;color:#742e36;background:#e0cd9d;border-color:#aa9466;box-shadow:inset 0 1px #fff2d2,0 1px 2px #0005;text-shadow:none}
 
     #game-grid :is(.card-rally,.card-brawler,.card-galactic,.card-meteors) {--index-stock:#854851}
-    .card-index-tab {position:absolute;top:-10px;left:calc(1% + var(--tab-lane)*24%);width:23%;height:15px;padding:0 3px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;border:1px solid #c8b78f;border-bottom:0;border-radius:4px 4px 0 0;
-      background:linear-gradient(#ffffff20,transparent 48%,#00000014),var(--index-stock);color:#fff3d9;font:700 8px/14px 'Courier New',monospace;letter-spacing:.02em;box-shadow:0 -1px 0 #fff2d355,inset 0 1px #fff6df55,2px -2px 3px #0007;pointer-events:auto}
+    .card-index-tab {position:absolute;top:-16px;left:calc(1% + var(--tab-lane)*24%);width:23%;height:21px;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;border:1px solid #c8b78f;border-bottom:0;border-radius:4px 4px 0 0;
+      background:linear-gradient(#ffffff20,transparent 48%,#00000014),var(--index-stock);color:#fff3d9;font:700 11px/20px 'Courier New',monospace;letter-spacing:.03em;text-shadow:0 1px 0 #0006;box-shadow:0 -1px 0 #fff2d355,inset 0 1px #fff6df55,2px -2px 3px #0007;pointer-events:auto}
 
     /* A phone on its side: the card lies down, screen on the left and words on the right, so the description fits the short window. */
     :root[data-layout="landscape"] #game-grid .card {width:clamp(340px,calc(100% - 300px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px)),620px);flex-direction:row;align-items:stretch;gap:14px;padding:32px 16px 14px!important}
@@ -856,29 +856,41 @@
     #game-grid .card.card-compact .card-shot-wrap {height:84px;width:auto;aspect-ratio:142/164;margin-bottom:6px}
     #game-grid .card.card-tight .card-shot-wrap {display:none}
     #game-grid .card.card-tight .card-copy .card-genre {display:none!important}
-    /* The pick plate: brushed brass screwed to the bezel, two steel pushbuttons and a red jewel, lettering engraved. */
-    .card-pick {position:absolute;left:50%;bottom:7px;z-index:60;display:flex;align-items:center;gap:8px;transform:translateX(-50%);max-width:calc(100% - 26px);
-      padding:6px 22px;border:1px solid #4d3b17;border-radius:4px;white-space:nowrap;color:#33250d;
-      background:repeating-linear-gradient(90deg,#ffffff10 0 1px,transparent 1px 3px),linear-gradient(180deg,#e0cb92,#b3955a 50%,#85703b);
-      box-shadow:0 3px 5px #000c,0 0 0 1px #0006,inset 0 1px #fff4c8cc,inset 0 -2px #5a4620;
-      font:900 11px/1 'Courier New',monospace;letter-spacing:.16em;text-shadow:0 1px 0 #f3e2aeaa}
-    .card-pick::before,.card-pick::after {content:'';position:absolute;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;
-      background:radial-gradient(circle at 35% 30%,#f3e6bd 0 1px,#8d7a4e 2px,#4f4122 4px);box-shadow:0 1px 1px #0008,inset 0 0 0 1px #3a2c1055}
-    .card-pick::before {left:7px}
-    .card-pick::after {right:7px}
-    .pick-arrow {position:relative;width:26px;height:26px;padding:0;border:1px solid #14120f;border-radius:4px;cursor:pointer;
-      background:linear-gradient(#78756e,#33312d 55%,#242220);box-shadow:0 3px 0 #0b0a08,0 4px 3px #0008,inset 0 1px #ffffff55;transition:transform .06s,box-shadow .06s}
-    .pick-arrow:active {transform:translateY(2px);box-shadow:0 1px 0 #0b0a08,inset 0 1px #ffffff33}
+    /* The pick panel: a carriage of the rolodex, umber with brass rods above and below, two brass pegs to step through the cards and a START key. */
+    .card-pick {position:absolute;left:50%;bottom:7px;z-index:60;display:flex;align-items:center;gap:9px;transform:translateX(-50%);max-width:calc(100% - 26px);
+      padding:9px 20px 9px 22px;border:1px solid #806647;border-radius:5px;white-space:nowrap;color:#f0d6a4;
+      background:
+        linear-gradient(180deg,#e9d3a4,#8f7248 30%,#3b2d20 55%,#cbab78 80%,#4f3b27) top/100% 4px no-repeat,
+        linear-gradient(0deg,#e9d3a4,#8f7248 30%,#3b2d20 55%,#cbab78 80%,#4f3b27) bottom/100% 4px no-repeat,
+        linear-gradient(180deg,#352a20,#1c1511 60%,#120d0b);
+      box-shadow:0 5px 8px #000d,0 0 0 1px #0008,inset 0 1px #fff0ce55,inset 0 -2px #0009;
+      font:700 11px/1 'Courier New',monospace;letter-spacing:.16em;text-shadow:0 1px #090708}
+    .card-pick::before,.card-pick::after {content:'';position:absolute;top:50%;width:13px;height:13px;margin-top:-6.5px;border:2px solid #c4a570;border-radius:50%;
+      background:radial-gradient(circle at 32% 27%,#f7e7c5,#80623e 45%,#211814 72%);box-shadow:0 3px 5px #000d,inset 0 1px #fff0ca}
+    .card-pick::before {left:-7px}
+    .card-pick::after {right:-7px}
+    .pick-arrow {position:relative;width:26px;height:26px;padding:0;border:2px solid #c4a570;border-radius:50%;cursor:pointer;
+      background:radial-gradient(circle at 35% 28%,#8d7452,#2d231b 62%,#130e0b);box-shadow:0 3px 4px #000c,inset 0 1px #fff0ce77;transition:transform .06s,box-shadow .06s}
+    .pick-arrow:active {transform:translateY(2px);box-shadow:0 1px 1px #000c,inset 0 1px #fff0ce44}
     .pick-arrow i {position:absolute;left:50%;top:50%;width:0;height:0;border:6px solid transparent;transform:translate(-50%,-50%)}
-    .pick-prev i {border-right:9px solid #f4e9c6;border-left:0;margin-left:-1px}
-    .pick-next i {border-left:9px solid #f4e9c6;border-right:0;margin-left:1px}
-    .pick-arrow:hover,.pick-arrow:focus-visible {border-color:#f4e9c6;outline:0}
-    .pick-text {margin:0 6px 0 4px}
-    .pick-play .pick-long {margin-left:.5em}
-    .pick-play {display:flex;align-items:center;padding-left:12px;border-left:1px solid #5a462066;box-shadow:-1px 0 0 #f1dfa688}
-    .pick-dot {width:12px;height:12px;margin-right:7px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffb4a6,#d9301f 55%,#7a150d);
-      box-shadow:0 0 0 2px #5a4620,0 0 0 3px #f1dfa655,0 0 7px #ff553f99}
-    @media (max-width:520px) {.pick-long {display:none}.card-pick {font-size:10px;padding:6px 20px}.pick-arrow {width:30px;height:30px}}
+    .pick-prev i {border-right:9px solid #f0d6a4;border-left:0;margin-left:-1px}
+    .pick-next i {border-left:9px solid #f0d6a4;border-right:0;margin-left:1px}
+    .pick-arrow:hover,.pick-arrow:focus-visible {border-color:#f7e7c5;outline:0}
+    .pick-text {margin:0 8px 0 3px}
+    /* START: a plunger key in the carriage, its lamp lit while a credit is waiting, like the rolodex's own lights. */
+    .pick-start {position:relative;display:flex;align-items:center;gap:8px;height:28px;padding:0 14px 0 11px;border:2px solid #c4a570;border-radius:6px;cursor:pointer;
+      color:#f0d6a4;font:700 11px/1 'Courier New',monospace;letter-spacing:.2em;text-shadow:0 1px #090708;
+      background:linear-gradient(180deg,#6b5238,#2a2018 55%,#150f0c);box-shadow:0 4px 0 #0b0806,0 6px 6px #000c,inset 0 1px #fff0ce66,inset 0 -2px #0007;
+      transition:transform .06s,box-shadow .06s}
+    .pick-start:active {transform:translateY(3px);box-shadow:0 1px 0 #0b0806,0 2px 3px #000c,inset 0 1px #fff0ce44,inset 0 -2px #0007}
+    .pick-start:hover,.pick-start:focus-visible {border-color:#f7e7c5;outline:0}
+    .pick-lamp {width:7px;height:7px;border-radius:50%;background:#18110d;box-shadow:inset 0 1px #000,0 0 0 1px #5a422b}
+    :root[data-credit] .pick-lamp {background:#e7bd75;box-shadow:0 0 7px #e7bd75cc,0 0 0 1px #8a6a3c}
+    /* Unpowered, the panel sits dark; a credit brings it up, as the rest of the cabinet comes up. */
+    .card-pick {transition:filter .7s ease-out,opacity .7s ease-out}
+    :root:not([data-credit]) .card-pick {filter:brightness(.5) saturate(.6)}
+    :root:not([data-credit]) .pick-start {filter:brightness(.75)}
+    @media (max-width:520px) {.pick-long {display:none}.card-pick {font-size:10px;padding:8px 18px 8px 20px;gap:7px}.pick-arrow {width:30px;height:30px}.pick-start {height:30px;padding:0 11px 0 9px;letter-spacing:.14em}}
     @media (prefers-reduced-motion:no-preference) {
       .pick-arrow {animation:pick-nudge 1.8s ease-in-out 5}
       .pick-next {animation-name:pick-nudge-r}
@@ -2251,11 +2263,12 @@
         bar.innerHTML='<button type="button" class="pick-arrow pick-prev" aria-label="Previous game"><i></i></button>'+
           '<button type="button" class="pick-arrow pick-next" aria-label="Next game"><i></i></button>'+
           '<span class="pick-text">CHOOSE<span class="pick-long"> A GAME</span></span>'+
-          '<span class="pick-play"><i class="pick-dot"></i>PLAY<span class="pick-long">WITH A RED BUTTON</span></span>';
+          '<button type="button" class="pick-start" aria-label="Start the chosen game"><i class="pick-lamp"></i>START</button>';
         bezel.appendChild(bar);
         [['.pick-prev',-1],['.pick-next',1]].forEach(function(entry){
           bar.querySelector(entry[0]).addEventListener('click',function(){move(entry[1]);this.blur();});
         });
+        bar.querySelector('.pick-start').addEventListener('click',function(){activate();this.blur();});
       }());
 
       // Each card's small print: who can play.
@@ -2396,7 +2409,14 @@
           function onMove(e) {
             if (e.pointerId === activeId && pivot) { e.preventDefault(); apply(e); }
           }
-          base.addEventListener('pointerdown', function (e) {
+          // The ball stands above the base's own box, over the cabinet's frame: a press on any part of it is the stick's.
+          function onStick(e) {
+            if (e.target.closest && e.target.closest('.stick-base') === base) return true;
+            var ball = base.querySelector('.stick-ball'), rect = ball && ball.getBoundingClientRect();
+            return !!rect && rect.width > 0 && e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
+          }
+          window.addEventListener('pointerdown', function (e) {
+            if (!manualOverlay.hidden || !onStick(e)) return;
             if (blipControls() !== 'stick') return;   // pad mode — deck shows the SNES pad
             // Stick half only — the right half is the fire buttons.
             if (fire && e.target.closest && e.target.closest('#fire-buttons')) return;
