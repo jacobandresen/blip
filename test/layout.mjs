@@ -185,8 +185,8 @@ async function check(page, device, insets, label, failures) {
 }
 
 const only = process.env.LAYOUT;
-// LAYOUT_SHARD=1/2 runs every second device, for test/shard.mjs.
-const [shard, shards] = (process.env.LAYOUT_SHARD || '0/1').split('/').map(Number);
+// TEST_SHARD=1/2 runs every second device, for test/shard.mjs.
+const [shard, shards] = (process.env.TEST_SHARD || '0/1').split('/').map(Number);
 const mine = DEVICES.filter((d, i) => i % shards === shard && (!only || d.name.includes(only)));
 for (const device of mine) {
   test(`nothing overlaps or leaves the screen on ${device.name} (${device.w}x${device.h})`, async (t) => {
@@ -309,6 +309,7 @@ for (const device of mine) {
 for (const device of mine) {
   test(`the controls card opens inside the screen and clear of the bar on ${device.name} (${device.w}x${device.h})`, async (t) => {
     const { page, origin } = await open(t, device);
+    await page.emulateMedia({ reducedMotion: 'reduce' });   // the card lands where it will rest, without the slide
     const failures = [];
     for (const slug of ['cabinet', ...GAMES]) {
       await page.goto(`${origin}/${slug === 'cabinet' ? '' : `${slug}/`}index.html`);

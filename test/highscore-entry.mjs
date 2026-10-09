@@ -19,7 +19,9 @@ import { launchEngine } from './lib/engine.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB = path.join(HERE, '..', 'web');
-const PORT = 8098;
+// TEST_SHARD=1/3 plays every third game, on a port of its own, for test/shard.mjs.
+const [shard, shards] = (process.env.TEST_SHARD || '0/1').split('/').map(Number);
+const PORT = 8098 + shard;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const MIME = {
   '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
@@ -137,6 +139,7 @@ test('high-score entry in every game', async (t) => {
   t.after(() => new Promise((ok) => server.close(ok)));
 
   for (const [i, [slug, { fire, presses }]] of GAMES.entries()) {
+    if (i % shards !== shard) continue;
     await t.test(`${slug}: played to the end, a name typed and one from the stick`, async (t) => {
       const cdp = await browser(t, 9420 + i);
       await openGame(cdp, slug);

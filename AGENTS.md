@@ -72,10 +72,10 @@ Run the test suite locally before pushing:
 ```
 npm test                # canvas geometry (unit)
 cargo test --release    # game rules (Brawler's balance, Serpent's turns, ...)
-npm run test:web        # cabinet, manual, top bar, controls, decks (after ./build_web.sh; seven minutes, two files at a time)
-npm run test:layout     # nothing overlaps or leaves the screen: 21 devices, notches, every page and controller (ten minutes, two processes)
+npm run test:web        # cabinet, manual, top bar, controls, decks (after ./build_web.sh; six minutes, in two lanes: one for the tests that run a game, one for the rest)
+npm run test:layout     # nothing overlaps or leaves the screen: 21 devices, notches, every page and controller (seven minutes, four processes)
 npm run test:shell      # the game shell in headless Chromium (four minutes)
-npm run test:scores     # high-score entry in all eight scoring games (ten minutes)
+npm run test:scores     # high-score entry in all eight scoring games (three minutes, three processes)
 npm run test:scores-db  # the score backend, against `npx supabase start` (skipped without it)
 ```
 
