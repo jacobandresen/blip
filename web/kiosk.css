@@ -4218,10 +4218,19 @@ body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin
   position:fixed;z-index:521;width:22px;height:22px;padding:0;display:grid;place-items:center;
   right:calc(env(safe-area-inset-right,0px) + 246px);
   top:calc((var(--cabinet-fascia-height) - 22px) / 2 + env(safe-area-inset-top,0px));
-  border:1px solid #80684955;border-radius:50%;background:#150e0a99;color:#a88f66;
-  font:700 12px/1 Georgia,serif;opacity:.5;cursor:pointer;transition:opacity .2s,border-color .2s;
+  border:1px solid #b79865;border-radius:50%;background:radial-gradient(circle at 35% 28%,#57432a,#24180e 75%);color:#eed4a3;
+  box-shadow:0 1px 3px #000b,inset 0 1px #fff3;
+  font:700 14px/1 Georgia,serif;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s,border-color .2s;
 }
-#card-button:hover, #card-button:focus-visible, :root[data-card] #card-button {opacity:1;border-color:#c8a871}
+#card-button:hover, #card-button:focus-visible, :root[data-card] #card-button,
+body:has(#glcanvas) #card-button,
+body:has(.card-loaded):has(.jukebox-game-screen.game-ready) #card-button {
+  border-color:#ffe2a0;color:#fff9df;
+  background:radial-gradient(circle at 35% 28%,#ffe8af,#bc752a 65%,#724015);
+  box-shadow:0 0 5px 2px #ffc85799,0 0 13px #ffb43b77,inset 0 1px 3px #fff6;
+  text-shadow:0 0 4px #fff1b8;
+}
+#card-button:focus-visible {outline:2px solid #fff3ca;outline-offset:3px}
 :root[data-cabinet-screen] #card-button {display:none}
 /* Wide: beside the title window, away from the manual. Phones: between the title and the manual book. */
 @media (min-width:521px) {#card-button {right:auto;left:calc(50% - 168px)}}

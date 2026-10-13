@@ -24,6 +24,9 @@ var statusEl  = document.getElementById('status');
 var canvas    = document.getElementById('glcanvas');
 var overlay   = document.getElementById('need-coin-overlay');
 
+// The runtime focuses its canvas at boot; a cabinet preview must leave keys with the Rolodex.
+if (CABINET_SCREEN) canvas.inert = true;
+
 updateCoinsHud();
 
 var returningToCabinet = false;

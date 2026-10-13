@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-cabinet-arranging>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -8,6 +8,11 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="BLIP">
   <title>BLIP ARCADE</title>
+  <style>
+    html { background:#100d0b; }
+    :root[data-cabinet-arranging] body { opacity:0; pointer-events:none; }
+  </style>
+  <script>document.documentElement.setAttribute('data-cabinet-arranging', '');</script>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/x-icon" href="favicon.ico?v=2">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
@@ -2211,9 +2216,6 @@
       }
       focusRolodexCard=function(card){var selected=cards.indexOf(card);if(selected<0)return;idx=selected;navActive=true;highlight(true);};
       highlight();
-      requestAnimationFrame(function () {
-        requestAnimationFrame(rollOutRolodex);
-      });
       cards[idx].focus({preventScroll:true});
 
       function move(delta) {
@@ -2519,6 +2521,20 @@
 
     var directManualChapter=new URLSearchParams(location.search).get('manual');
     if(directManualChapter){var directIndex=manualChapters.indexOf(directManualChapter+'.html');if(directIndex>=0)requestAnimationFrame(function(){openFieldManual(directIndex,new URLSearchParams(location.search).get('game'));});}
+
+    // Reveal the assembled rack after its artwork and shared controls are ready.
+    document.addEventListener('DOMContentLoaded', function () {
+      Promise.all(Array.from(document.querySelectorAll('#game-grid .card-shot'), function (image) {
+        return image.decode().catch(function () {});
+      })).then(function () {
+        requestAnimationFrame(function () {
+          cardFitKey='';
+          fitSelectorRails();
+          parkSelectionArm();
+          requestAnimationFrame(rollOutRolodex);
+        });
+      });
+    }, {once:true});
   </script>
 </body>
 </html>
