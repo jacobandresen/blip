@@ -11,7 +11,8 @@ const GAMES = ['RALLY', 'BOUNCER', 'DEFENDER', 'BUBBLER', 'RAIDER', 'METEORS', '
 async function openCabinet(t, { width = 1280, height = 844, touch = false } = {}) {
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: touch, viewport: { width, height } });
   await page.goto(`${origin}/index.html`);
-  await page.waitForFunction(() => document.querySelector('.card-focused')?.offsetWidth > 0);
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.offsetWidth > 0 &&
+    !document.documentElement.hasAttribute('data-cabinet-arranging'));
   return { page, origin };
 }
 
@@ -20,6 +21,57 @@ const settled = (page) => page.waitForFunction(() =>
   [...document.querySelectorAll('.card')].every((card) => card.getAnimations().length === 0));
 
 const focusedTitle = (page) => page.locator('.card-focused .card-title').textContent();
+
+for (const width of [1280, 390]) {
+  test(`startup reveals the assembled Rolodex even when scripts and artwork arrive late at ${width}px`, async (t) => {
+    const { page, origin } = await openPage(t, 'chromium', { viewport: { width, height: 844 } });
+    let releaseScript, releaseArt;
+    const scriptGate = new Promise((resolve) => { releaseScript = resolve; });
+    const artGate = new Promise((resolve) => { releaseArt = resolve; });
+    let scriptRequested;
+    const requested = new Promise((resolve) => { scriptRequested = resolve; });
+    await page.route('**/kiosk.js?*', async (route) => {
+      scriptRequested();
+      await scriptGate;
+      await route.continue();
+    });
+    await page.route('**/rally/screenshot.png', async (route) => {
+      await artGate;
+      await route.continue();
+    });
+    const navigation = page.goto(`${origin}/index.html`, { waitUntil: 'domcontentloaded' });
+    await requested;
+    assert.equal(await page.locator('body').evaluate((body) => getComputedStyle(body).opacity), '0',
+      'the unfinished cards stay out of view while the shared script loads');
+    releaseScript();
+    await navigation;
+    assert.equal(await page.locator('body').evaluate((body) => getComputedStyle(body).opacity), '0',
+      'the rack waits for its artwork');
+    releaseArt();
+    await page.waitForFunction(() => getComputedStyle(document.body).opacity === '1');
+    const first = await page.evaluate(() => {
+      const card = document.querySelector('.card-focused');
+      const box = card.getBoundingClientRect();
+      return {
+        title: card.querySelector('.card-title').textContent,
+        art: card.querySelector('.card-shot').naturalWidth > 0,
+        controls: !!document.getElementById('kiosk-bar') && !!document.getElementById('card-pick'),
+        rail: !!document.querySelector('.rail-metal').getAttribute('d'),
+        animating: card.getAnimations().length,
+        box: [box.x, box.y, box.width, box.height],
+      };
+    });
+    assert.deepEqual({ ...first, box: undefined },
+      { title: 'RALLY', art: true, controls: true, rail: true, animating: 0, box: undefined });
+    await page.waitForTimeout(250);
+    const later = await page.locator('.card-focused').boundingBox();
+    assert.ok([later.x, later.y, later.width, later.height].every((value, i) => Math.abs(value - first.box[i]) < 0.1),
+      'the first visible card already rests in its final position');
+    await page.keyboard.press('ArrowRight');
+    await settled(page);
+    assert.equal(await focusedTitle(page), 'BOUNCER');
+  });
+}
 
 for (const width of [1280, 768, 390, 320]) {
   test(`every card stays inside the cabinet with readable text at ${width}px`, async (t) => {
@@ -89,6 +141,34 @@ test('the arrow keys step through the rack, and the card that leaves tucks in be
   await settled(page);
   assert.equal(await page.evaluate(() => document.getElementById('manual-book').classList.contains('card-focused')),
     true, 'the rack wraps round to the manual, the last item');
+});
+
+test('arrow keys and P1 controls keep selecting games with a loaded cabinet screen', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  await page.addInitScript(() => {
+    sessionStorage.setItem('blip-loaded-card', JSON.stringify({ slug: 'rally', name: 'RALLY' }));
+  });
+  await page.goto(`${origin}/index.html`);
+  await page.waitForFunction(() => document.querySelector('.jukebox-game-screen.game-ready') &&
+    !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  await page.keyboard.press('ArrowRight');
+  await settled(page);
+  assert.equal(await focusedTitle(page), 'BOUNCER');
+  await page.keyboard.press('ArrowDown');
+  await settled(page);
+  assert.equal(await focusedTitle(page), 'DEFENDER');
+  await page.keyboard.press('ArrowUp');
+  await settled(page);
+  assert.equal(await focusedTitle(page), 'BOUNCER');
+  await page.keyboard.press('ArrowLeft');
+  await settled(page);
+  assert.equal(await focusedTitle(page), 'RALLY');
+  await page.locator('#snes-pad .dp-right').click();
+  await settled(page);
+  assert.equal(await focusedTitle(page), 'BOUNCER');
+  await page.keyboard.press('a');
+  await settled(page);
+  assert.equal(await focusedTitle(page), 'RALLY');
 });
 
 test('a swipe steps the rack either way, and a long one steps across several cards', async (t) => {
@@ -272,4 +352,57 @@ test('the front page has the "?" at all times, and its card welcomes the player'
   await page.mouse.click(60, 400);
   await page.waitForTimeout(300);
   assert.equal((await card()).out, false, 'a click outside puts the card away');
+});
+
+for (const [width, touch] of [[1280, false], [390, true], [320, true]]) {
+  test(`a plaque says how to choose a game, and its arrows do it, at ${width}px`, async (t) => {
+    const { page } = await openCabinet(t, { width, touch });
+    const plaque = await page.evaluate(() => {
+      const box = document.getElementById('card-pick').getBoundingClientRect(), bezel = document.getElementById('screen-bezel').getBoundingClientRect();
+      return { text: document.getElementById('card-pick').innerText.replace(/\s+/g, ' '), inside: box.left >= bezel.left && box.right <= bezel.right && box.bottom <= bezel.bottom };
+    });
+    assert.match(plaque.text, /CHOOSE/);
+    assert.match(plaque.text, /START/);
+    assert.equal(plaque.inside, true, 'the plaque sits inside the glass');
+    const first = await focusedTitle(page);
+    await page.click('.pick-next');
+    await settled(page);
+    const second = await focusedTitle(page);
+    assert.notEqual(second, first, 'the right arrow brings the next card');
+    await page.click('.pick-prev');
+    await settled(page);
+    assert.equal(await focusedTitle(page), first, 'the left arrow brings it back');
+    await page.click('.pick-start');
+    assert.equal(await page.evaluate(() => document.querySelector('.card-focused').classList.contains('rejected')), true, 'START without a coin is turned away like the card itself');
+  });
+}
+
+test('the joystick steps the rack from any part of its ball, the top that stands over the frame too', async (t) => {
+  const { page } = await openCabinet(t);
+  const selection = () => page.locator('.card-focused').evaluate((card) => card.dataset.gameUrl || card.id);
+  await page.evaluate(() => localStorage.setItem('blip-controls', 'stick'));
+  await page.reload();
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.offsetWidth > 0 &&
+    !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  for (const fraction of [0.1, 0.3, 0.5, 0.8]) {
+    await settled(page);
+    const ball = await page.evaluate(() => { const r = document.querySelector('.stick-ball').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
+    const [x, y] = [ball[0] + ball[2] / 2, ball[1] + ball[3] * fraction];
+    const before = await selection();
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 45, y, { steps: 5 });
+    await page.waitForTimeout(250);
+    await page.mouse.up();
+    await settled(page);
+    assert.notEqual(await selection(), before, `a press ${Math.round(fraction * 100)}% down the ball did nothing`);
+  }
+});
+
+test('the pick panel sits dark until a credit powers the cabinet', async (t) => {
+  const { page } = await openCabinet(t);
+  const filter = () => page.evaluate(() => getComputedStyle(document.getElementById('card-pick')).filter);
+  assert.match(await filter(), /brightness/, 'the panel is lit with no credit');
+  await page.evaluate(() => { document.getElementById('kiosk-insert-btn').click(); });
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('card-pick')).filter === 'none', null, { timeout: 5000 });
 });

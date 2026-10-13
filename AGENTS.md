@@ -72,10 +72,10 @@ Run the test suite locally before pushing:
 ```
 npm test                # canvas geometry (unit)
 cargo test --release    # game rules (Brawler's balance, Serpent's turns, ...)
-npm run test:web        # cabinet, manual, top bar, controls, decks (after ./build_web.sh)
-npm run test:layout     # nothing overlaps or leaves the screen: 21 devices, notches, every page and controller (forty minutes)
-npm run test:shell      # the game shell in headless Chromium (six minutes)
-npm run test:scores     # high-score entry in all eight scoring games (ten minutes)
+npm run test:web        # cabinet, manual, top bar, controls, decks (after ./build_web.sh; six minutes, in two lanes: one for the tests that run a game, one for the rest)
+npm run test:layout     # nothing overlaps or leaves the screen: 21 devices, notches, every page and controller (seven minutes, four processes)
+npm run test:shell      # the game shell in headless Chromium (four minutes)
+npm run test:scores     # high-score entry in all eight scoring games (three minutes, three processes)
 npm run test:scores-db  # the score backend, against `npx supabase start` (skipped without it)
 ```
 
@@ -84,6 +84,8 @@ from the stick and by touch, against `test/lib/fake-supabase.js`. Run it
 after touching `blip_scores.js`, the shell's key handling, or a game's
 game-over path. A game hears keys only while the canvas has focus: anything
 that takes focus (a prompt, a button) must leave it back there.
+
+Tests that read the shell's layout hold the game's wasm back (`page.route('**/*.wasm', () => {})`) and wait for the page to go still instead of for a clock; only tests that need a running game load it.
 
 The browser suites need Playwright and a Chromium binary (`BLIP_CHROMIUM`
 names one outside `PATH`). Test files are `node:test` suites, one theme

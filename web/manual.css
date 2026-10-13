@@ -134,8 +134,8 @@ body.info-page .manual-leaf .inline-link {color:#85512e;border-bottom-color:#ad8
 
 /* A printed field book uses paper, cloth and ink rather than cabinet lights. */
 .manual-overlay {background:rgba(12,12,10,.99);backdrop-filter:none}
-.manual-open-book {border-color:#45443d;border-radius:6px;background:repeating-linear-gradient(0deg,#ffffff06 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,#00000015 0 1px,transparent 1px 3px),#383831;box-shadow:0 30px 70px #000d,0 0 0 3px #25251f,inset 0 1px #8b897c,inset 0 -5px #20201b}
-.manual-open-book::before {content:"";position:absolute;inset:6px 9px;border:1px solid #bbb8ac;border-radius:3px;background:repeating-linear-gradient(0deg,#c7c5ba 0 1px,#e5e2d7 1px 3px);box-shadow:0 3px 3px #0008;pointer-events:none}
+.manual-open-book {border-color:#444;border-radius:6px;background:repeating-linear-gradient(0deg,#ffffff06 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,#00000015 0 1px,transparent 1px 3px),#383838;box-shadow:0 30px 70px #000d,0 0 0 3px #252525,inset 0 1px #898989,inset 0 -5px #202020}
+.manual-open-book::before {content:"";position:absolute;inset:6px 9px;border:1px solid #b8b8b8;border-radius:3px;background:repeating-linear-gradient(0deg,#c5c5c5 0 1px,#e2e2e2 1px 3px);box-shadow:0 3px 3px #0008;pointer-events:none}
 .manual-open-page {color:#292a26;background:repeating-linear-gradient(112deg,#00000003 0 1px,transparent 1px 4px),radial-gradient(ellipse at 75% 15%,#f3f0e6,transparent 80%),linear-gradient(100deg,#c6c4b8,#e7e4d9 7%,#ebe8df 88%,#d6d3c7);box-shadow:inset 0 1px #fff,inset 0 -2px #aaa593,0 4px 9px #09090799}
 .manual-open-page::after {content:'';position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.72;background:radial-gradient(ellipse 43px 34px at 86% 16%,transparent 55%,#786c4b18 58% 62%,transparent 66%),radial-gradient(ellipse 31px 25px at 12% 83%,transparent 54%,#786c4b10 57% 61%,transparent 65%)}
 .manual-open-left {background:repeating-linear-gradient(72deg,#00000003 0 1px,transparent 1px 4px),radial-gradient(ellipse at 25% 15%,#f1eee4,transparent 80%),linear-gradient(90deg,#d4d1c5,#e9e6dc 8%,#e1ded2);box-shadow:inset 0 1px #fff,inset -18px 0 24px #45423816,0 4px 9px #09090799}
@@ -148,7 +148,9 @@ body.info-page .manual-leaf .inline-link {color:#85512e;border-bottom-color:#ad8
 .manual-contents li > span i {flex:1;border-bottom:1px dotted #747267}
 .manual-contents li > b {font:700 10px/1 'Courier New',monospace;color:#464740}
 .manual-contents li > span i {display:block;min-width:18px}
-.manual-open-book {filter:grayscale(1)}
+/* The print is black and white but the cover is not: the grey is put on the pages, not the whole book. The turning leaf and the cover
+   keep their 3D, so their faces carry it. */
+.manual-open-book > :not(.manual-flip):not(.manual-cover), .manual-flip-face, .manual-cover-back {filter:grayscale(1)}
 .manual-page-content {overflow:hidden;filter:grayscale(1)}
 .manual-page-content .manual-leaf-sheet {margin:0}
 .manual-page-content .manual-leaf-sheet h1 {margin:0 0 12px}
@@ -373,7 +375,7 @@ body.info-page .manual-return {position:fixed;z-index:5100;left:50%;bottom:calc(
   background:
     radial-gradient(ellipse 34px 46px at 3% 95%,#3c3c3624,#3c3c3600),
     radial-gradient(ellipse 30px 40px at 97% 94%,#3c3c3620,#3c3c3600),
-    linear-gradient(90deg,#3c382c29,#3c382c00 5%,#3c382c00 95%,#3c382c29),
+    linear-gradient(90deg,#3a3a3a29,#3a3a3a00 5%,#3a3a3a00 95%,#3a3a3a29),
     var(--smudges,linear-gradient(#0000,#0000))}
 .manual-open-book[data-smudge="0"] {--smudges:radial-gradient(ellipse 30px 17px at 18% 38%,#37372f20,#37372f00),radial-gradient(ellipse 20px 12px at 21% 40%,#37372f18,#37372f00),radial-gradient(ellipse 22px 13px at 72% 64%,#37372f1c,#37372f00),radial-gradient(ellipse 16px 24px at 91% 30%,#37372f18,#37372f00)}
 .manual-open-book[data-smudge="1"] {--smudges:radial-gradient(ellipse 26px 15px at 38% 72%,#37372f20,#37372f00),radial-gradient(ellipse 36px 12px at 66% 22%,#37372f1a,#37372f00),radial-gradient(ellipse 14px 20px at 8% 52%,#37372f1c,#37372f00)}
@@ -445,8 +447,8 @@ body.info-page .manual-return {position:fixed;z-index:5100;left:50%;bottom:calc(
 /* A leaf with its outer corner torn away at the foot: the leaf beneath shows, darker, past a ragged edge. Only the margin is lost. */
 .manual-tear {display:none;position:absolute;bottom:0;z-index:4;width:clamp(56px,17%,118px);height:clamp(64px,12%,104px);pointer-events:none;
   background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23a9a79c'/%3E%3Cstop offset='.5' stop-color='%23c9c7bb'/%3E%3Cstop offset='1' stop-color='%23d8d6ca'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M100 0 92 9 88 14 80 16 74 27 69 30 61 38 55 37 47 50 40 57 33 56 24 69 17 73 10 86 4 88 0 100H100Z' fill='url(%23g)'/%3E%3Cpath d='M100 0 92 9 88 14 80 16 74 27 69 30 61 38 55 37 47 50 40 57 33 56 24 69 17 73 10 86 4 88 0 100' fill='none' stroke='%23000' stroke-opacity='.28' stroke-width='3.5' vector-effect='non-scaling-stroke' transform='translate(1.5 1.5)'/%3E%3Cpath d='M100 0 92 9 88 14 80 16 74 27 69 30 61 38 55 37 47 50 40 57 33 56 24 69 17 73 10 86 4 88 0 100' fill='none' stroke='%23fbfaf3' stroke-width='1.6' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat}
-.manual-open-right[data-torn] .manual-tear {display:block;right:0}
-.manual-open-left[data-torn] .manual-tear {display:block;left:0;transform:scaleX(-1)}
+[data-torn="br"] > .manual-tear {display:block;right:0}
+[data-torn="bl"] > .manual-tear {display:block;left:0;transform:scaleX(-1)}
 
 /* The cover of the opening book: the closed book in front, the left-hand page inside. */
 .manual-cover-face {position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 0 22px #0007}
@@ -454,3 +456,9 @@ body.info-page .manual-return {position:fixed;z-index:5100;left:50%;bottom:calc(
 
 .manual-cover-book {position:absolute!important;inset:0;width:100%!important;height:100%!important;margin:0!important;transform:none!important;font-size:30px!important;box-shadow:none!important}
 .manual-cover-book .manual-book-copy strong {font-size:inherit}
+
+/* No icons in the lower corners: the leaves turn by the arrow keys, a swipe, the contents, or a press on the corner itself. */
+.manual-turn::before {display:none}
+.manual-turn {cursor:pointer}
+.manual-turn:disabled {cursor:default}
+.manual-turn:focus-visible {outline:1px dotted #77766b;outline-offset:-6px}

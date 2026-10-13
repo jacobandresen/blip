@@ -7,7 +7,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openPage, HTTP_PORT, evaluate, waitFor, sleep } from './lib/harness.mjs';
 
-async function loadGame(cdp, slug, controls) {
+// Most of these tests read the shell's own layout and key plumbing, which do not need the wasm: unless
+// `real`, it is held back so the page loads at once and the CPU stays free.
+const held = new WeakSet();
+async function loadGame(cdp, slug, controls, { real = false } = {}) {
+  if (!real && !held.has(cdp.page)) { await cdp.page.route('**/*.wasm', () => {}); held.add(cdp.page); }
+  if (real && held.has(cdp.page)) { await cdp.page.unroute('**/*.wasm'); held.delete(cdp.page); }
   await evaluate(cdp, 'true');
   await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/${slug}/index.html` });
   await waitFor(cdp, "document.readyState === 'complete'", 15000);
@@ -18,8 +23,8 @@ async function loadGame(cdp, slug, controls) {
     await cdp.page.locator('#insert-coin-btn').click();
     await waitFor(cdp, "!document.getElementById('need-coin-overlay').classList.contains('visible')");
   }
-  await waitFor(cdp, "document.getElementById('loader').style.display === 'none'", 20000);
-  await sleep(150);
+  if (real) await waitFor(cdp, "document.getElementById('loader').style.display === 'none'", 20000);
+  await sleep(real ? 150 : 40);
 }
 
 /** Press a control and report the key codes the canvas received. `sel`
@@ -120,7 +125,7 @@ test(`brawler's deck seats two players`, async (t) => {
   const { cdp } = await openPage(t);
 
   await t.test('station two is always on the panel, and comes alive with a player', async () => {
-    await loadGame(cdp, 'brawler', 'stick');
+    await loadGame(cdp, 'brawler', 'stick', { real: true });
     await waitFor(cdp, "document.documentElement.hasAttribute('data-open')", 10000);
     // There from the start: the machine takes two, and a player should
     // be able to see that before choosing anything.
@@ -148,7 +153,7 @@ test(`brawler's deck seats two players`, async (t) => {
   });
 
   await t.test('both player lamps stay visible on the deck', async () => {
-    await loadGame(cdp, 'brawler', 'stick');
+    await loadGame(cdp, 'brawler', 'stick', { real: true });
     await waitFor(cdp, "document.documentElement.hasAttribute('data-open')", 10000);
     await evaluate(cdp, 'window.blipSetMode(1)');
     await sleep(120);
@@ -560,7 +565,7 @@ test(`a phone on its side puts the controls beside the picture`, async (t) => {
 // active while the player is choosing. Drive the real wasm with a coin and key.
 
 async function bootGame(cdp, controls) {
-  await loadGame(cdp, 'brawler', controls);
+  await loadGame(cdp, 'brawler', controls, { real: true });
   await waitFor(cdp, "document.getElementById('loader').style.display === 'none'", 20000);
   await sleep(800);
 }

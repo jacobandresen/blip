@@ -253,6 +253,12 @@ test('on a PC a click on the coin wall inserts a coin and leaves the game focuse
   assert.equal(await page.evaluate(() => document.activeElement.id), 'glcanvas');
 });
 
+/** Resolves once the controls card has stopped sliding. */
+async function cardSettled(page) {
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await page.waitForFunction(() => document.getElementById('controls-card').getAnimations().length === 0);
+}
+
 const SLUGS = ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler', 'adder'];
 for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
   test(`on ${label} the controls card stays away until its button is pressed, then shows every control`, async (t) => {
@@ -264,10 +270,11 @@ for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
       await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
     }
     const failures = [];
+    await page.route('**/*.wasm', () => {});          // the card belongs to the shell; no game needs to run
     for (const slug of SLUGS) {
       await page.goto(`${origin}/${slug}/index.html`);
-      await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout: 60000 });
-      await page.waitForTimeout(600);
+      await page.waitForSelector('#card-button');
+      await page.waitForTimeout(150);
       if (await page.evaluate(() => document.documentElement.hasAttribute('data-card') || getComputedStyle(document.getElementById('controls-card')).visibility !== 'hidden')) {
         failures.push(`${slug}: the card is out before it is asked for`);
       }
@@ -277,7 +284,7 @@ for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
         window.playControlsCard = (out) => { window.__whirrs.push(out); original(out); };
       });
       await page.click('#card-button');
-      await page.waitForTimeout(900);
+      await cardSettled(page);
       const card = await page.evaluate((viewport) => {
         const box = document.getElementById('controls-card').getBoundingClientRect();
         return {
@@ -294,7 +301,7 @@ for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
       if ((await page.evaluate(() => window.__whirrs.join())) !== 'true,false') failures.push(`${slug}: the arm whirs once out and once back`);
       if (await page.evaluate(() => document.documentElement.hasAttribute('data-card'))) failures.push(`${slug}: Escape did not put the card away`);
       await page.click('#card-button');
-      await page.waitForTimeout(700);
+      await cardSettled(page);
       await page.mouse.click(size.width / 2, size.height / 2);
       await page.waitForTimeout(300);
       if (await page.evaluate(() => document.documentElement.hasAttribute('data-card'))) failures.push(`${slug}: a click outside did not put the card away`);

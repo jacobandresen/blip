@@ -24,6 +24,9 @@ var statusEl  = document.getElementById('status');
 var canvas    = document.getElementById('glcanvas');
 var overlay   = document.getElementById('need-coin-overlay');
 
+// The runtime focuses its canvas at boot; a cabinet preview must leave keys with the Rolodex.
+if (CABINET_SCREEN) canvas.inert = true;
+
 updateCoinsHud();
 
 var returningToCabinet = false;
@@ -334,6 +337,7 @@ var cardApi = (function () {
   var noTouch = !document.documentElement.hasAttribute('data-has-touch');
   var list = GAME && (noTouch ? GAME.controls : GAME.touchControls);
   if (!list) return null;
+  list = list.concat([['ANOTHER GAME', noTouch ? ['BACKSPACE'] : ['TAP BLIP LOGO']]]);
   return blipControlsCard({
     label: 'HOW TO PLAY', name: GAME.name, html: '<div class="pc-legend">' + legendHtml(list) + '</div>',
     after: function () { try { canvas.focus({ preventScroll: true }); } catch (e) {} }

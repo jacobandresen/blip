@@ -359,3 +359,32 @@ test('on a wide screen the cover swings open about the spine, and the book is wh
   assert.equal(await page.locator('.manual-cover').count(), 0, 'the cover is gone once it lies open');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.manual-open-left')).visibility), 'visible', 'the left page is back');
 });
+
+for (const [width, height] of [[1280, 800], [390, 844]]) {
+  test(`the torn leaf is torn on its back too, at the other foot, at ${width}px`, async (t) => {
+    const page = await openManual(t, 'controls', { width, height });
+    const wide = width > 700;
+    const torn = await page.evaluate(() => manualPages.findIndex((leaf) => leaf.torn === 'br'));
+    assert.ok(torn >= 0 && await page.evaluate((i) => manualPages[i + 1].torn, torn) === 'bl', 'the next page is the leaf\'s back');
+    await page.evaluate(([index, step]) => showManualPage(index + step, 0), [torn, wide ? 2 : 1]);
+    await page.waitForFunction(() => document.querySelector('.manual-open-page[data-torn="bl"]'));
+    await page.waitForTimeout(500);
+    const result = await page.evaluate(() => {
+      const holder = document.querySelector('.manual-open-page[data-torn="bl"]');
+      const tear = holder.querySelector('.manual-tear').getBoundingClientRect(), sheet = holder.getBoundingClientRect();
+      const hits = [];
+      const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent.trim() || node.parentElement.closest('.manual-folio, .manual-turn, button')) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const r of range.getClientRects()) {
+          if (r.width && r.height && r.right > tear.left && r.left < tear.right && r.bottom > tear.top && r.top < tear.bottom) hits.push(node.textContent.trim().slice(0, 30));
+        }
+      }
+      return { atLeftFoot: Math.abs(tear.left - sheet.left) < 2 && Math.abs(tear.bottom - sheet.bottom) < 2, visible: tear.width > 20, hits };
+    });
+    assert.deepEqual([result.atLeftFoot, result.visible], [true, true]);
+    assert.deepEqual(result.hits, [], 'text runs into the missing corner');
+  });
+}

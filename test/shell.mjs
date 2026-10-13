@@ -29,6 +29,15 @@ async function open(cdp, page, settle = 4000) {
   await sleep(settle);
 }
 
+/** Waits through a navigation (the page under the question is replaced while it is asked). */
+async function arrivedAt(cdp, pathname, timeout = 30000) {
+  for (let waited = 0; waited < timeout; waited += 200) {
+    await sleep(200);
+    try { if (await evaluate(cdp, `location.pathname === ${JSON.stringify(pathname)} && document.readyState === 'complete'`)) return; } catch { /* mid-navigation */ }
+  }
+  assert.fail(`never reached ${pathname}`);
+}
+
 async function key(cdp, k, code, vk) {
   for (const type of ['keyDown', 'keyUp']) {
     await cdp.send('Input.dispatchKeyEvent', { type, key: k, code, windowsVirtualKeyCode: vk });
@@ -36,6 +45,8 @@ async function key(cdp, k, code, vk) {
   }
 }
 
+/** No card is mid-move (the rack waits a frame before it starts one, so look twice). */
+const STILL_CARDS = "[...document.querySelectorAll('.card')].every((c) => c.getAnimations().length === 0) && !document.querySelector('.card-flying')";
 const WALL = "document.getElementById('need-coin-overlay').classList.contains('visible')";
 
 async function assertSelectedCardFits(cdp, label) {
@@ -188,14 +199,16 @@ test('the game shell', async (t) => {
     // The manual is a tenth stop after Adder.
     for (let i = 0; i < 10; i++) {
       await key(cdp, 'ArrowRight', 'ArrowRight', 39);
-      await sleep(700);
+      await sleep(150);
+      await waitFor(cdp, STILL_CARDS, 5000);
       await assertSelectedCardFits(cdp, `desktop stop ${i + 1}`);
     }
     await cdp.send('Emulation.setDeviceMetricsOverride', { width:390, height:844, deviceScaleFactor:1, mobile:true });
     await open(cdp, 'index.html', 1100);
     for (let i = 0; i < 10; i++) {
       await key(cdp, 'ArrowRight', 'ArrowRight', 39);
-      await sleep(700);
+      await sleep(150);
+      await waitFor(cdp, STILL_CARDS, 5000);
       await assertSelectedCardFits(cdp, `phone stop ${i + 1}`);
     }
     await cdp.send('Emulation.setDeviceMetricsOverride', { width:1280, height:800, deviceScaleFactor:1, mobile:false });
@@ -208,8 +221,7 @@ test('the game shell', async (t) => {
     await key(cdp, 'ArrowRight', 'ArrowRight', 39);
     assert.equal(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent"), 'BOUNCER');
     await key(cdp, ' ', 'Space', 32);
-    await sleep(1450);
-    await sleep(18000);
+    await arrivedAt(cdp, '/bouncer/index.html');
     assert.equal(await evaluate(cdp, 'location.pathname'), '/bouncer/index.html');
     assert.equal(await evaluate(cdp, "document.querySelector('.jukebox-receiver').classList.contains('loaded')"), true,
       'the selected card seats in the receiver before the title changes');
@@ -221,7 +233,7 @@ test('the game shell', async (t) => {
       adder: 'ADDER',
     };
     for (const [slug, title] of Object.entries(titles)) {
-      await open(cdp, `${slug}/index.html`, 18000);
+      await open(cdp, `${slug}/index.html`, 300);
       await evaluate(cdp, `blipSetMarquee(${JSON.stringify(title)}, true); true`);
       await waitFor(cdp, `Array.from(document.querySelectorAll('#marquee-name .marquee-letter'), x => x.textContent).join('') === ${JSON.stringify(title.padEnd(8, '\u00a0'))}`, 5000);
       const state = JSON.parse(await evaluate(cdp, `JSON.stringify((function(){var n=document.querySelector('#marquee-name'),r=n.getBoundingClientRect();
