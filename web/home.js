@@ -110,9 +110,23 @@ function scoresWidget() {
 }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
 
+/* The order the icons were arranged in (edit mode), with any game added
+ * since at the end. */
+var ORDER_KEY = 'blip-home-order';
+function savedOrder() {
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem(ORDER_KEY) || '[]') || []; } catch (e) {}
+  list = Array.isArray(list) ? list.filter(function (s, i) { return BLIP_GAMES[s] && list.indexOf(s) === i; }) : [];
+  return list.concat(Object.keys(BLIP_GAMES).filter(function (s) { return list.indexOf(s) < 0; }));
+}
+function saveOrder() {
+  var list = Array.prototype.map.call(grid.querySelectorAll('.app-button[data-slug]'), function (b) { return b.dataset.slug; });
+  try { localStorage.setItem(ORDER_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
 function build() {
   grid.appendChild(scoresWidget());
-  Object.keys(BLIP_GAMES).forEach(function (slug) { grid.appendChild(gameApp(slug, false)); });
+  savedOrder().forEach(function (slug) { grid.appendChild(gameApp(slug, false)); });
   dockRow.appendChild(systemApp('arcade', 'Arcade', ARCADE_SVG, toCabinet));
   recent().slice(0, DOCK_GAMES).forEach(function (slug) { dockRow.appendChild(gameApp(slug, true)); });
   dockRow.appendChild(systemApp('settings', 'Settings', GEAR_SVG, openSettings));
@@ -127,7 +141,7 @@ function wirePress(button, onTap, onHold) {
     if (e.button !== 0) return;
     held = false; start = { x: e.clientX, y: e.clientY };
     button.classList.add('pressed');
-    if (onHold) timer = setTimeout(function () { held = true; cancel(); onHold(); }, 500);
+    if (onHold && !editing) timer = setTimeout(function () { held = true; cancel(); onHold(); }, 500);
   });
   button.addEventListener('pointermove', function (e) {
     if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) cancel();
@@ -135,10 +149,105 @@ function wirePress(button, onTap, onHold) {
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (type) { button.addEventListener(type, cancel); });
   button.addEventListener('click', function (e) {
     if (held) { held = false; e.preventDefault(); return; }
+    if (editing) return;
     onTap();
   });
-  if (onHold) button.addEventListener('contextmenu', function (e) { e.preventDefault(); cancel(); held = false; onHold(); });
+  if (onHold) button.addEventListener('contextmenu', function (e) { e.preventDefault(); cancel(); held = false; if (!editing) onHold(); });
 }
+
+/* ---- Edit mode ---- The icons jiggle and can be dragged into a new
+ * order; Done, Escape or a tap on the wallpaper ends it. */
+var editing = false;
+var doneButton = document.getElementById('edit-done');
+function setEditing(on) {
+  editing = on;
+  root.toggleAttribute('data-editing', on);
+  doneButton.hidden = !on;
+  if (on) {
+    Array.prototype.forEach.call(document.querySelectorAll('.app, .widget'), function (el, i) {
+      el.style.setProperty('--jiggle-delay', (-(i * 137) % 260) + 'ms');
+    });
+    doneButton.focus({ preventScroll: true });
+  } else saveOrder();
+}
+doneButton.addEventListener('click', function () { setEditing(false); });
+
+// A long press on the wallpaper starts it, as on iOS.
+(function () {
+  var timer = null, start = null;
+  document.querySelector('.springboard').addEventListener('pointerdown', function (e) {
+    if (editing || e.target.closest('.app, .widget, button')) return;
+    start = { x: e.clientX, y: e.clientY };
+    timer = setTimeout(function () { setEditing(true); }, 600);
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (timer && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) { clearTimeout(timer); timer = null; }
+  });
+  ['pointerup', 'pointercancel'].forEach(function (t) { document.addEventListener(t, function () { clearTimeout(timer); timer = null; }); });
+  document.querySelector('.springboard').addEventListener('click', function (e) {
+    if (editing && !e.target.closest('.app, .widget')) setEditing(false);
+  });
+}());
+
+/** Move one icon to before `ref` (or the end), the others sliding along. */
+function placeApp(app, ref) {
+  var apps = Array.prototype.slice.call(grid.querySelectorAll('.app'));
+  var before = apps.map(function (a) { return a.getBoundingClientRect(); });
+  grid.insertBefore(app, ref);
+  apps.forEach(function (a, i) {
+    if (a === app || REDUCED) return;
+    var now = a.getBoundingClientRect(), dx = before[i].left - now.left, dy = before[i].top - now.top;
+    if (dx || dy) a.animate([{ translate: dx + 'px ' + dy + 'px' }, { translate: '0 0' }], { duration: 260, easing: 'cubic-bezier(.32,.72,0,1)' });
+  });
+}
+
+// Dragging an icon: it follows the finger, and the others make room.
+grid.addEventListener('pointerdown', function (e) {
+  var button = e.target.closest('.app-button');
+  if (!editing || !button || e.button !== 0) return;
+  e.preventDefault();
+  var app = button.parentElement, r = app.getBoundingClientRect();
+  var grab = { x: e.clientX - r.left, y: e.clientY - r.top }, dx = 0, dy = 0, moved = false;
+  try { button.setPointerCapture(e.pointerId); } catch (err) {}
+  // Where the grid has the icon, its drag offset taken off.
+  function slot() { var b = app.getBoundingClientRect(); return { left: b.left - dx, top: b.top - dy }; }
+  function follow(x, y) {
+    var at = slot();
+    dx = x - grab.x - at.left; dy = y - grab.y - at.top;
+    app.style.translate = dx + 'px ' + dy + 'px';
+  }
+  function move(ev) {
+    if (!moved && Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 6) return;
+    if (!moved) { moved = true; app.classList.add('dragging'); }
+    // The icon under the finger gives up its place; one still sliding away
+    // is not where it will be, so it is no target yet.
+    var target = null;
+    Array.prototype.forEach.call(grid.querySelectorAll('.app:not(.dragging)'), function (other) {
+      if (other.getAnimations().some(function (a) { return a.playState === 'running' && !(a instanceof CSSAnimation); })) return;
+      var b = other.querySelector('.app-icon').getBoundingClientRect();
+      if (ev.clientX > b.left && ev.clientX < b.right && ev.clientY > b.top && ev.clientY < b.bottom) target = other;
+    });
+    if (target) {
+      var later = Array.prototype.indexOf.call(grid.children, target) > Array.prototype.indexOf.call(grid.children, app);
+      placeApp(app, later ? target.nextSibling : target);
+    }
+    follow(ev.clientX, ev.clientY);
+  }
+  function up() {
+    button.removeEventListener('pointermove', move);
+    button.removeEventListener('pointerup', up);
+    button.removeEventListener('pointercancel', up);
+    if (!moved) return;
+    var from = dx + 'px ' + dy + 'px';
+    app.style.translate = '';
+    app.classList.remove('dragging');
+    if (!REDUCED) app.animate([{ translate: from }, { translate: '0 0' }], { duration: 220, easing: 'cubic-bezier(.32,.72,0,1)' });
+    saveOrder();
+  }
+  button.addEventListener('pointermove', move);
+  button.addEventListener('pointerup', up);
+  button.addEventListener('pointercancel', up);
+});
 
 /* ---- Sound ---- One soft tick when a game opens, through blipOut so the
  * stored mute holds. */
@@ -274,6 +383,7 @@ actionSheet.addEventListener('click', function (e) {
   // The game's page is what a browser saves, so it shows how from there.
   if (action === 'play') launch(slug, from);
   else if (action === 'install') launch(slug, from, slug + '/?install');
+  else if (action === 'edit') setEditing(true);
 });
 
 var setSound = document.getElementById('set-sound');
@@ -296,6 +406,11 @@ setFullscreen.addEventListener('change', function () {
 });
 setCabinet.addEventListener('change', function () { if (setCabinet.checked) toCabinet(); });
 document.getElementById('settings-done').addEventListener('click', closeSheet);
+document.getElementById('set-reset').addEventListener('click', function () {
+  try { localStorage.removeItem(ORDER_KEY); } catch (e) {}
+  Object.keys(BLIP_GAMES).forEach(function (slug) { grid.appendChild(grid.querySelector('.app-button[data-slug="' + slug + '"]').parentElement); });
+  closeSheet();
+});
 
 /* ---- Keys and pads ---- Arrows move to the nearest icon that way (the
  * widget breaks the grid's rows), Enter or the pad's first button opens it,
@@ -329,6 +444,17 @@ function move(dir) {
 }
 var ARROWS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
 document.addEventListener('keydown', function (e) {
+  if (editing && e.key === 'Escape') { e.preventDefault(); setEditing(false); return; }
+  if (editing && e.shiftKey && ARROWS[e.key] && document.activeElement.closest('#app-grid .app')) {
+    // Shift and an arrow carries the focused icon along the row.
+    e.preventDefault();
+    var app = document.activeElement.closest('.app'), apps = Array.prototype.slice.call(grid.querySelectorAll('.app')), i = apps.indexOf(app);
+    var j = ARROWS[e.key] === 'left' || ARROWS[e.key] === 'up' ? i - 1 : i + 1;
+    if (j >= 0 && j < apps.length) placeApp(app, j > i ? apps[j].nextSibling : apps[j]);
+    document.activeElement.focus();
+    saveOrder();
+    return;
+  }
   if (ARROWS[e.key]) { e.preventDefault(); move(ARROWS[e.key]); }
   else if (e.key === 'Escape' && openSheet) { e.preventDefault(); closeSheet(); }
   else if ((e.key === 'Enter' || e.key === ' ') && !document.activeElement.matches('button, input')) {

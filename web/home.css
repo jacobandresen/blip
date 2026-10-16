@@ -202,6 +202,24 @@ body {
 @keyframes sheet-up { from { transform: translate(-50%, 40px); opacity: 0; } }
 [hidden] { display: none !important; }
 
+/* ---- Edit mode ---- */
+.edit-done {
+  position: fixed; z-index: 15; right: calc(env(safe-area-inset-right, 0px) + 14px); top: calc(env(safe-area-inset-top, 0px) + 6px);
+  padding: 7px 14px; border: 0; border-radius: 16px; background: rgba(255, 255, 255, .26);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  color: #fff; font: 600 15px/1 var(--font); cursor: pointer;
+}
+.edit-done:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+:root[data-editing] .status-right { visibility: hidden; }
+:root[data-editing] .app, :root[data-editing] .widget { animation: jiggle .26s ease-in-out infinite alternate; animation-delay: var(--jiggle-delay, 0ms); }
+:root[data-editing] .app:nth-child(odd) { animation-direction: alternate-reverse; }
+@keyframes jiggle { from { rotate: -1.6deg; } to { rotate: 1.6deg; } }
+:root[data-editing] .app-badge { display: none; }
+:root[data-editing] .app-button { cursor: grab; touch-action: none; }
+.app.dragging { z-index: 5; animation: none !important; }
+.app.dragging .app-icon { transform: scale(1.12); box-shadow: 0 14px 30px rgba(0, 0, 0, .45); filter: none; }
+.app.dragging .app-label { opacity: 0; }
+
 /* ---- Context menu ---- */
 .context-lift {
   position: fixed; z-index: 22; left: 0; top: 0; pointer-events: none;
@@ -253,6 +271,9 @@ input[role="switch"]::after {
 input[role="switch"]:checked { background: #34c759; }
 input[role="switch"]:checked::after { transform: translateX(20px); }
 input[role="switch"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.settings-actions { margin-top: 12px; }
+.settings-actions button { width: 100%; min-height: 48px; border: 0; background: none; color: var(--accent); font: 400 16px/1 var(--font); text-align: left; cursor: pointer; }
+.settings-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
 .settings-done {
   display: block; width: 100%; min-height: 48px; margin-top: 12px; border: 0; border-radius: 10px;
   background: var(--accent); color: #fff; font: 600 17px/1 var(--font); cursor: pointer;
@@ -287,5 +308,6 @@ input[role="switch"]:focus-visible { outline: 2px solid var(--accent); outline-o
 
 @media (prefers-reduced-motion: reduce) {
   .context-menu, .context-lift, .settings-sheet, .search-sheet { animation: none; }
+  :root[data-editing] .app, :root[data-editing] .widget { animation: none; outline: 1px dashed rgba(255, 255, 255, .35); outline-offset: 4px; border-radius: 12px; }
   .app-icon { transition: none; }
 }

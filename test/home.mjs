@@ -52,6 +52,62 @@ test('the home screen shows every game as an app with its own icon, and nothing 
   assert.equal(sideways, 0);
 });
 
+test('Search finds a game by name, and Enter opens it', async (t) => {
+  const { page, origin } = await phone(t);
+  await page.goto(`${origin}/home.html`);
+  await page.locator('#search-pill').click();
+  await page.locator('#search-input').fill('bub');
+  assert.deepEqual(await page.locator('#search-results button').evaluateAll((bs) => bs.map((b) => b.dataset.slug)), ['bubbler']);
+  await page.locator('#search-input').fill('zzz');
+  assert.match(await page.locator('#search-results').textContent(), /No games match/);
+  await page.locator('#search-cancel').click();
+  assert.ok(await page.locator('#search-sheet').isHidden());
+  await page.keyboard.press('r');   // typing on the home screen searches
+  await page.locator('#search-sheet').waitFor();
+  assert.equal(await page.locator('#search-input').inputValue(), 'r');
+  await page.locator('#search-input').fill('raid');
+  await page.locator('#search-input').press('Enter');
+  await page.waitForURL(`${origin}/sky_raider/`);
+});
+
+test('the context menu sits beside its icon and inside the screen', async (t) => {
+  const { page, origin } = await phone(t);
+  await page.goto(`${origin}/home.html`);
+  for (const slug of ['serpent', 'rally', 'adder']) {
+    await page.locator(`#app-grid [data-slug="${slug}"]`).dispatchEvent('contextmenu');
+    await page.locator('#action-sheet').waitFor();
+    const [menu, icon] = await Promise.all([page.locator('#action-sheet').boundingBox(), page.locator(`#app-grid [data-slug="${slug}"] .app-icon`).boundingBox()]);
+    assert.ok(menu.x >= 0 && menu.x + menu.width <= 390 && menu.y >= 0 && menu.y + menu.height <= 844, `${slug}: the menu is on screen`);
+    assert.ok(menu.y >= icon.y + icon.height || menu.y + menu.height <= icon.y, `${slug}: the menu leaves the icon in view`);
+    await page.keyboard.press('Escape');
+    assert.ok(await page.locator('#action-sheet').isHidden());
+  }
+});
+
+test('in edit mode an icon is dragged to a new place, which is kept', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 390, height: 844 } });
+  await page.goto(`${origin}/home.html`);
+  await page.locator('#app-grid [data-slug="adder"]').dispatchEvent('contextmenu');
+  await page.locator('[data-action="edit"]').click();
+  assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-editing')), true);
+  const box = (slug) => page.locator(`#app-grid [data-slug="${slug}"] .app-icon`).boundingBox();
+  const from = await box('adder'), to = await box('serpent');
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) await page.mouse.move(from.x + from.width / 2 + (to.x - from.x) * i / 12, from.y + from.height / 2 + (to.y - from.y) * i / 12, { steps: 2 });
+  await page.mouse.up();
+  await page.locator('#edit-done').click();
+  assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-editing')), false);
+  await page.reload();
+  const order = await page.locator('#app-grid .app-button').evaluateAll((bs) => bs.map((b) => b.dataset.slug));
+  assert.deepEqual(order.slice(0, 2), ['adder', 'serpent']);
+  // A tap while editing does not open a game.
+  await page.locator('#app-grid [data-slug="rally"]').dispatchEvent('contextmenu');
+  await page.locator('[data-action="edit"]').click();
+  await page.locator('#app-grid [data-slug="rally"]').click({ force: true });   // it jiggles, so it is never "stable"
+  assert.equal(new URL(page.url()).pathname, '/home.html');
+});
+
 test('a tap on an icon starts the game on free play, and the logo brings it back home', async (t) => {
   const { page, origin } = await phone(t);
   await page.goto(`${origin}/home.html`);
