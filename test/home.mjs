@@ -213,6 +213,33 @@ test('opened from its own icon, a game plays free and stays itself', async (t) =
   assert.equal(await coinWall(page), true);
 });
 
+test('a game opened as an app draws a clean, sharp picture: no CRT, full pixel density', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 390, height: 844 } });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 3, mobile: false });
+  // Record what the game is told when it asks, through the bridge's own import.
+  await page.addInitScript(() => {
+    let plugin;
+    Object.defineProperty(window, 'register_plugin', {
+      configurable: true,
+      get: () => plugin,
+      set: (fn) => { plugin = (imports) => { fn(imports); const ask = imports.env.blip_crt; imports.env.blip_crt = () => (window.__crt = ask()); }; },
+    });
+  });
+  await page.goto(`${origin}/serpent/index.html`);
+  await page.waitForFunction(() => window.__crt !== undefined, null, { timeout: 30000 });
+  assert.equal(await page.evaluate(() => window.__crt), 1, 'the cabinet keeps its CRT');
+  await page.waitForFunction(() => document.getElementById('glcanvas').width > 0);
+  assert.equal(await page.evaluate(() => document.getElementById('glcanvas').width === document.getElementById('glcanvas').clientWidth), true, 'the cabinet draws at CSS pixels');
+
+  await page.goto(`${origin}/home.html`);
+  await page.locator('[data-slug="serpent"]').first().click();
+  await page.waitForURL(`${origin}/serpent/`);
+  await page.waitForFunction(() => window.__crt !== undefined, null, { timeout: 30000 });
+  assert.equal(await page.evaluate(() => window.__crt), 0);
+  await page.waitForFunction(() => { const c = document.getElementById('glcanvas'); return c.width === Math.floor(c.clientWidth * 3); }, null, { timeout: 10000 });
+});
+
 test('each game page names itself and links its own manifest and icon', async (t) => {
   const { page, origin } = await phone(t);
   const seen = new Set();

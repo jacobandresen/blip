@@ -555,7 +555,8 @@ function fillCanvas() {
  * (its window.onresize); a layout change without one (fullscreen, another
  * controller) would leave the game drawn for the old size, stretched. */
 function syncBuffer() {
-  if (canvas.width === canvas.clientWidth && canvas.height === canvas.clientHeight) return;
+  var dpr = window.high_dpi ? window.devicePixelRatio || 1 : 1;   // the runtime's high-DPI buffer (app style)
+  if (canvas.width === Math.floor(canvas.clientWidth * dpr) && canvas.height === Math.floor(canvas.clientHeight * dpr)) return;
   if (typeof window.onresize !== 'function') return;
   try { window.onresize(); } catch (e) { /* the game has not loaded yet */ }
 }

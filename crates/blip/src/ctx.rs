@@ -195,6 +195,7 @@ pub struct Blip {
     pub delta_time: f32,
     rt:             RenderTarget,
     rng:            Lcg,
+    crt_look:       bool, // a CRT's picture, or a clean one (crate::web::crt)
     // ---- glitch: horizontal tear ----
     tear_cd:  f32, // cooldown to next tear event (seconds)
     tear_t:   f32, // remaining duration of active tear (0 = inactive)
@@ -297,7 +298,7 @@ impl Blip {
 
         let b = Self {
             width, height, delta_time: 1.0 / 60.0,
-            rt, rng,
+            rt, rng, crt_look: crate::web::crt(),
             tear_cd,  tear_t: 0.0, tear_y: 0.5, tear_dx: 0.0,
             roll_cd,  roll_t: 0.0, roll_dy: 0.0, roll_spd: 0.0,
             chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
@@ -357,7 +358,7 @@ impl Blip {
         let (vx, vy, vw, vh) = self.viewport();
         if vw <= 0.0 || vh <= 0.0 { return None; }
         let mut u = vec2((fx * screen_width() - vx) / vw, (fy * screen_height() - vy) / vh);
-        if self.crt.is_some() && self.fx_level == 0 && !self.screenshot_mode {
+        if self.crt.is_some() && self.fx() == 0 && !self.screenshot_mode {
             u = crt_curve(u);
         }
         Some(vec2(u.x * self.width as f32, u.y * self.height as f32))
@@ -467,6 +468,7 @@ impl Blip {
     // ------------------------------------------------------------------ //
 
     fn update_glitch(&mut self, dt: f32) {
+        if !self.crt_look { return; }
         let lh = self.height as f32;
 
         // Tear
@@ -533,7 +535,7 @@ impl Blip {
         // No curved-glass material (old WebGL / driver quirk), or the
         // adaptive quality has switched it off on a slow device: composite
         // straight to the screen.
-        let Some(crt) = self.crt.clone().filter(|_| self.fx_level == 0) else {
+        let Some(crt) = self.crt.clone().filter(|_| self.fx() == 0) else {
             self.composite(vx, vy, vw, vh, false);
             return;
         };
@@ -615,7 +617,7 @@ impl Blip {
         }
 
         // The top-origin screen camera and `gl_FragCoord` keep scanlines aligned across roll/tear strips.
-        let scanline_shader_active = self.fx_level < 2 && self.scanline.is_some();
+        let scanline_shader_active = self.fx() < 2 && self.scanline.is_some();
         if scanline_shader_active {
             let scanline = self.scanline.as_ref().unwrap();
             let field = if offscreen_target { self.interlace_field } else { 1 - self.interlace_field };
@@ -676,7 +678,7 @@ impl Blip {
         if scanline_shader_active { gl_use_default_material(); }
 
         // If shader compilation failed, draw scanlines as row rectangles. Quality level 2 skips them.
-        if self.fx_level < 2 && self.scanline.is_none() {
+        if self.fx() < 2 && self.scanline.is_none() {
             let active   = Color { r: 0.0, g: 0.0, b: 0.0, a: 60.0 / 255.0 };
             let inactive = Color { r: 0.0, g: 0.0, b: 0.0, a: 1.0 - self.field_dim };
             let bottom   = vy + vh;
@@ -689,7 +691,7 @@ impl Blip {
         }
 
         // ---- background noise ----
-        if self.fx_level < 2 {
+        if self.fx() < 2 {
             let pixel = scale.max(1.0);
             for _ in 0..48 {
                 let nx = vx + self.rng.next() * vw;
@@ -716,6 +718,10 @@ impl Blip {
     /// on black) to 0.76 (no interlace). Rows swap between this and 0.76
     /// every frame, which twitters on a game of bright filled scenes.
     pub fn set_interlace(&mut self, dim: f32) { self.field_dim = dim.clamp(0.25, 0.76); }
+
+    /// The post-process level drawn: the adaptive one, or 2 (none of the
+    /// CRT) for a clean picture.
+    fn fx(&self) -> u8 { if self.crt_look { self.fx_level } else { 2 } }
 
     /// The device could not hold the frame rate and the post-process has
     /// stepped down: a game can spend less on its own effects too.

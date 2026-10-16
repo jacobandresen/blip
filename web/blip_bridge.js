@@ -48,6 +48,15 @@ register_plugin = function (importObject) {
     importObject.env.blip_touch_pos = function (slot, axis) {
         return typeof window.blipTouchPos === 'function' ? +window.blipTouchPos(slot, axis) : 0;
     };
+    // A game opened as an app (home screen, its own icon) draws a clean,
+    // modern picture: no CRT, and at the screen's full pixel density, so
+    // the pixels are scaled up sharp rather than shrunk and blurred.
+    var clean = document.documentElement.hasAttribute('data-appstyle');
+    importObject.env.blip_crt = function () { return clean ? 0 : 1; };
+    var setupCanvas = importObject.env.setup_canvas_size;
+    if (clean && typeof setupCanvas === 'function') {
+        importObject.env.setup_canvas_size = function () { return setupCanvas.call(this, true); };
+    }
     importObject.env.blip_picture = function (w, h) {
         window.blipPicture = { w: w, h: h };
         window.dispatchEvent(new Event('blip-picture'));

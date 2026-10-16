@@ -97,37 +97,6 @@ body {
   pointer-events: none;
 }
 
-/* ---- The High Scores widget: four icons wide, two tall ---- */
-.widget {
-  grid-column: span 4; grid-row: span 2;
-  height: calc(2 * var(--icon) + var(--gap-y) + 20px);
-  border-radius: calc(var(--icon-radius) * 1.15 + 6px);
-  padding: 12px 14px;
-  background: rgba(30, 28, 44, .52);
-  border: .5px solid rgba(255, 255, 255, .16);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6); backdrop-filter: blur(28px) saturate(1.6);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
-  display: flex; flex-direction: column; overflow: hidden;
-}
-.app-grid { grid-auto-flow: row dense; }
-/* Two icons square: only where the grid has six columns or more. */
-.widget-small { display: none; grid-column: span 2; grid-row: span 2; }
-.widget-calendar { justify-content: flex-start; }
-.cal-day { font: 600 13px/1.2 var(--font); color: #ff453a; text-transform: uppercase; letter-spacing: .02em; }
-.cal-date { font: 300 calc(var(--icon) * .9)/1 var(--font); letter-spacing: -.03em; margin-top: 4px; }
-.cal-note { margin-top: auto; font: 500 13px/1.2 var(--font); color: var(--ink-dim); }
-.widget-head { display: flex; align-items: center; gap: 6px; font: 600 13px/1 var(--font); color: #ffd60a; }
-.widget-head svg { width: 14px; height: 14px; fill: currentColor; }
-.widget-list { list-style: none; flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; margin-top: 6px; }
-.widget-list li { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.widget-list img { width: 26px; height: 26px; border-radius: 6px; flex: none; }
-.widget-game { flex: 1; min-width: 0; font: 600 14px/1.15 var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.widget-game small { display: block; font-weight: 400; font-size: 11px; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; }
-.widget-score { font: 700 17px/1 var(--font); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-.widget-empty { flex: 1; display: grid; place-items: center; text-align: center; font: 500 14px/1.35 var(--font); color: var(--ink-dim); padding: 0 8px; }
-/* A short screen keeps the icons in view: one row less of widget. */
-@media (max-height: 600px) { .widget { grid-row: span 1; height: calc(var(--icon) + 18px); } .widget-list li:nth-child(n+2) { display: none; } }
-
 /* ---- Search: the pill above the dock, and its sheet ---- */
 .search-pill {
   display: flex; align-items: center; gap: 5px; margin: 0 auto 12px;
@@ -220,7 +189,7 @@ body {
 }
 .edit-done:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 :root[data-editing] .status-right { visibility: hidden; }
-:root[data-editing] .app, :root[data-editing] .widget { animation: jiggle .26s ease-in-out infinite alternate; animation-delay: var(--jiggle-delay, 0ms); }
+:root[data-editing] .app { animation: jiggle .26s ease-in-out infinite alternate; animation-delay: var(--jiggle-delay, 0ms); }
 :root[data-editing] .app:nth-child(odd) { animation-direction: alternate-reverse; }
 @keyframes jiggle { from { rotate: -1.6deg; } to { rotate: 1.6deg; } }
 :root[data-editing] .app-badge { display: none; }
@@ -304,9 +273,6 @@ input[role="switch"]:focus-visible { outline: 2px solid var(--accent); outline-o
   .app-label { font-size: 13px; }
   .dock { padding: 14px 22px; }
 }
-@media (min-width: 700px) and (min-height: 600px) {
-  .widget-small { display: flex; }
-}
 /* An iPad on its side, or a desktop: eight columns. */
 @media (min-width: 1000px) {
   :root { --cols: 8; --gap-x: max(28px, min(64px, calc((var(--safe-w) - 120px - 8 * var(--icon)) / 7))); }
@@ -324,6 +290,13 @@ input[role="switch"]:focus-visible { outline: 2px solid var(--accent); outline-o
 
 @media (prefers-reduced-motion: reduce) {
   .context-menu, .context-lift, .settings-sheet, .search-sheet { animation: none; }
-  :root[data-editing] .app, :root[data-editing] .widget { animation: none; outline: 1px dashed rgba(255, 255, 255, .35); outline-offset: 4px; border-radius: 12px; }
+  :root[data-editing] .app { animation: none; outline: 1px dashed rgba(255, 255, 255, .35); outline-offset: 4px; border-radius: 12px; }
   .app-icon { transition: none; }
 }
+
+/* A phone or tablet draws its own status bar: ours would be a second
+   clock under it. Only a desktop, which has none, shows ours. */
+:root[data-has-touch] .status-bar { height: 10px; }
+:root[data-has-touch] .status-bar > * { display: none; }
+:root[data-has-touch][data-editing] .springboard { padding-top: 54px; }
+:root[data-has-touch][data-layout="landscape"][data-editing] .springboard { padding-top: 44px; }

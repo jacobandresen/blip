@@ -77,37 +77,6 @@ function systemApp(kind, label, svg, act) {
   return li;
 }
 
-/* ---- The High Scores widget ---- The board's best (cached from the
- * leaderboard) or this device's own, for the games played last. */
-var TROPHY_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1h8v1.5h2.5V5a3 3 0 0 1-3 3h-.2A4 4 0 0 1 9 10.3V12h2v2H5v-2h2v-1.7A4 4 0 0 1 4.7 8h-.2a3 3 0 0 1-3-3V2.5H4zm0 3H3v1a1.5 1.5 0 0 0 1 1.4zm8 0v2.4A1.5 1.5 0 0 0 13 5V4z"/></svg>';
-function bestOf(slug) {
-  try {
-    var top = JSON.parse(localStorage.getItem('blip-top-' + slug) || 'null');
-    if (top && (top.score | 0) > 0) return { score: top.score | 0, who: top.handle || '' };
-  } catch (e) {}
-  var mine = 0;
-  try { mine = parseInt(localStorage.getItem('blip-best-' + slug) || '0', 10) || 0; } catch (e) {}
-  return mine > 0 ? { score: mine, who: 'You' } : null;
-}
-function scoresWidget() {
-  var li = document.createElement('li');
-  li.className = 'widget';
-  li.setAttribute('aria-label', 'High scores');
-  var order = recent().concat(Object.keys(BLIP_GAMES));
-  var rows = order.filter(function (slug, i) { return order.indexOf(slug) === i && bestOf(slug); }).slice(0, 3);
-  var html = '<p class="widget-head">' + TROPHY_SVG + 'High Scores</p>';
-  if (!rows.length) {
-    html += '<p class="widget-empty">Play a game to put a score up here.</p>';
-  } else {
-    html += '<ul class="widget-list">' + rows.map(function (slug) {
-      var best = bestOf(slug);
-      return '<li><img src="' + slug + '/icon-192.png?v=2" alt=""><span class="widget-game">' + titleCase(BLIP_GAMES[slug].name) +
-        '<small>' + (best.who ? escapeHtml(best.who) : '&nbsp;') + '</small></span><span class="widget-score">' + best.score.toLocaleString() + '</span></li>';
-    }).join('') + '</ul>';
-  }
-  li.innerHTML = html;
-  return li;
-}
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
 
 /* The order the icons were arranged in (edit mode), with any game added
@@ -122,21 +91,6 @@ function savedOrder() {
 function saveOrder() {
   var list = Array.prototype.map.call(grid.querySelectorAll('.app-button[data-slug]'), function (b) { return b.dataset.slug; });
   try { localStorage.setItem(ORDER_KEY, JSON.stringify(list)); } catch (e) {}
-}
-
-/* A tablet's small Calendar widget: the day and the date, as on iPad. */
-function calendarWidget() {
-  var li = document.createElement('li');
-  li.className = 'widget widget-small widget-calendar';
-  li.setAttribute('aria-hidden', 'true');
-  li.innerHTML = '<p class="cal-day"></p><p class="cal-date"></p><p class="cal-note">Free play all day</p>';
-  return li;
-}
-function tickCalendar() {
-  var d = new Date(), cal = grid.querySelector('.widget-calendar');
-  if (!cal) return;
-  cal.querySelector('.cal-day').textContent = d.toLocaleDateString(undefined, { weekday: 'long' });
-  cal.querySelector('.cal-date').textContent = d.getDate();
 }
 
 // A tablet or wider: a phone on its side is wide but has no height for more.
@@ -167,9 +121,6 @@ function buildDock() {
 }
 
 function build() {
-  grid.appendChild(scoresWidget());
-  grid.appendChild(calendarWidget());
-  tickCalendar();
   savedOrder().forEach(function (slug) { grid.appendChild(gameApp(slug, false)); });
   buildDock();
   matchMedia(WIDE).addEventListener('change', buildDock);
@@ -207,7 +158,7 @@ function setEditing(on) {
   root.toggleAttribute('data-editing', on);
   doneButton.hidden = !on;
   if (on) {
-    Array.prototype.forEach.call(document.querySelectorAll('.app, .widget'), function (el, i) {
+    Array.prototype.forEach.call(document.querySelectorAll('.app'), function (el, i) {
       el.style.setProperty('--jiggle-delay', (-(i * 137) % 260) + 'ms');
     });
     doneButton.focus({ preventScroll: true });
@@ -219,7 +170,7 @@ doneButton.addEventListener('click', function () { setEditing(false); });
 (function () {
   var timer = null, start = null;
   document.querySelector('.springboard').addEventListener('pointerdown', function (e) {
-    if (editing || e.target.closest('.app, .widget, button')) return;
+    if (editing || e.target.closest('.app, button')) return;
     start = { x: e.clientX, y: e.clientY };
     timer = setTimeout(function () { setEditing(true); }, 600);
   });
@@ -228,7 +179,7 @@ doneButton.addEventListener('click', function () { setEditing(false); });
   });
   ['pointerup', 'pointercancel'].forEach(function (t) { document.addEventListener(t, function () { clearTimeout(timer); timer = null; }); });
   document.querySelector('.springboard').addEventListener('click', function (e) {
-    if (editing && !e.target.closest('.app, .widget')) setEditing(false);
+    if (editing && !e.target.closest('.app')) setEditing(false);
   });
 }());
 
@@ -456,7 +407,7 @@ document.getElementById('set-reset').addEventListener('click', function () {
 });
 
 /* ---- Keys and pads ---- Arrows move to the nearest icon that way (the
- * widget breaks the grid's rows), Enter or the pad's first button opens it,
+ * dock is not in the grid's columns), Enter or the pad's first button opens it,
  * Escape (or the second) closes a sheet. */
 function focusables() {
   var scope = openSheet || document;
@@ -594,7 +545,7 @@ function tickClock() {
   clock.dateTime = d.toISOString();
 }
 tickClock();
-setInterval(function () { tickClock(); tickCalendar(); }, 15000);
+setInterval(tickClock, 15000);
 
 build();
 arrive();
