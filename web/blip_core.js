@@ -314,7 +314,8 @@ function blipFrontendUrl() {
 (function () {
   var root = document.documentElement;
   if (blipGameFromPath(location.pathname)) {
-    if (blipFreePlay()) root.setAttribute('data-freeplay', '');
+    // Opened as an app (home screen, or its own icon): an app's look, not the cabinet's.
+    if (blipFreePlay()) { root.setAttribute('data-freeplay', ''); root.setAttribute('data-appstyle', ''); }
     if (blipAppMode()) root.setAttribute('data-app', '');
   } else {
     try { sessionStorage.setItem('blip-frontend-visit', '1'); } catch (e) {}

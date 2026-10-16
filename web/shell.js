@@ -63,6 +63,9 @@ function returnToCabinet(event) {
   sign.href=blipFrontendUrl();sign.title=blipAppMode()?'Back to the title':'Return to the '+(blipFrontend()==='home'?'home screen':'cabinet');
   sign.id = 'marquee-name';
   sign.setAttribute('aria-label', game.name);
+  sign.dataset.title = game.name.charAt(0) + game.name.slice(1).toLowerCase();
+  // An app's launch screen shows its icon while the game loads.
+  document.documentElement.style.setProperty('--app-icon', 'url("' + new URL('icon-512.png?v=1', location.href).href + '")');
   for (var i = 0; i < 8; i++) {
     var char = '\u00a0';
     var tile = document.createElement('span');
@@ -82,6 +85,15 @@ function returnToCabinet(event) {
   markGameLoaded(game, bar);
   sign.addEventListener('click', returnToCabinet);
   document.querySelector('.blip-logo').addEventListener('click', returnToCabinet);
+  // An app's way back: "< Home" where the logo stands. A game in its own app has nowhere to go back to.
+  if (document.documentElement.hasAttribute('data-appstyle') && !blipAppMode()) {
+    var back = document.createElement('a');
+    back.className = 'app-back';
+    back.href = blipFrontendUrl();
+    back.innerHTML = '<svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Home';
+    back.addEventListener('click', returnToCabinet);
+    document.body.appendChild(back);
+  }
 
   var logo = document.querySelector('.blip-logo');
   if (logo) {

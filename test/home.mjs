@@ -63,7 +63,10 @@ test('a tap on an icon starts the game on free play, and the logo brings it back
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.deck-coin-slot')).visibility), 'hidden', 'no coin slot');
   assert.equal(await page.evaluate(() => blipSpendCoin()), 1, 'a start costs nothing');
   assert.equal(await coinWall(page), false);
-  await page.locator('.blip-logo').click();
+  assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-appstyle')), true, 'an app\'s look, not the cabinet\'s');
+  assert.equal(await page.locator('.blip-logo').isVisible(), false);
+  assert.equal(await page.locator('#marquee-name').evaluate((el) => getComputedStyle(el, '::after').content), '"Serpent"');
+  await page.locator('.app-back').click();
   await page.waitForURL(`${origin}/home.html`);
   assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-return')), null, 'no handoff to the cabinet');
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('blip-recent'))[0]), 'serpent');
@@ -137,8 +140,12 @@ test('opened from its own icon, a game plays free and stays itself', async (t) =
   assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-app')), true);
   assert.equal(await coinWall(page), false);
   assert.equal(await page.evaluate(() => blipFrontendUrl()), './?app');
-  await page.locator('.blip-logo').click();
-  await page.waitForURL(`${origin}/meteors/?app`);
+  assert.equal(await page.locator('.app-back').count(), 0, 'its own app has no Home to go back to');
+  await page.locator('#glcanvas').focus();
+  // Back to its own title: the page loads again, at the same address.
+  await Promise.all([page.waitForEvent('load'), page.keyboard.press('Backspace')]);
+  assert.equal(page.url(), `${origin}/meteors/?app`);
+  await page.waitForFunction(() => typeof BlipController === 'object');
   assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-return')), null);
   assert.equal(await page.locator('#cc-install').count(), 0, 'an installed game does not offer to install itself');
 

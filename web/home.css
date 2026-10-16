@@ -13,7 +13,7 @@
   /* The width left between the notch and the screen's edge. */
   --safe-w: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
   --icon: min(64px, calc((var(--safe-w) - 48px - 3 * 20px) / 4));
-  --icon-radius: calc(var(--icon) * .225);
+  --icon-radius: calc(var(--icon) * .2237);
   --cols: 4;
   --gap-x: max(16px, calc((var(--safe-w) - 48px - 4 * var(--icon)) / 3));
   --gap-y: 26px;
@@ -47,14 +47,14 @@ body {
   height: 44px; padding: 0 26px;
   font: 600 15px/1 var(--font); letter-spacing: .01em;
 }
-.status-right { display: flex; align-items: center; gap: 8px; }
-.status-pill {
-  font-size: 10px; font-weight: 700; letter-spacing: .08em;
-  padding: 3px 7px; border-radius: 9px; background: rgba(255, 255, 255, .16);
-}
-.status-battery { width: 26px; height: 12px; fill: none; stroke: rgba(255, 255, 255, .55); }
-.status-battery .charge { fill: #fff; stroke: none; }
-.status-battery rect:last-child { fill: rgba(255, 255, 255, .55); stroke: none; }
+.status-time { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 16px; padding-left: 6px; }
+.status-right { display: flex; align-items: center; gap: 6px; }
+.status-right svg { display: block; fill: #fff; }
+.status-signal { width: 17px; height: 11px; }
+.status-wifi { width: 16px; height: 12px; }
+.status-battery { width: 26px; height: 12.5px; }
+.status-battery .shell { fill: none; stroke: rgba(255, 255, 255, .4); }
+.status-battery .nub { fill: rgba(255, 255, 255, .4); }
 
 /* ---- The grid ---- */
 .springboard { flex: 1; padding: 18px 24px 24px; }
@@ -96,6 +96,72 @@ body {
   box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
   pointer-events: none;
 }
+
+/* ---- The High Scores widget: four icons wide, two tall ---- */
+.widget {
+  grid-column: span 4; grid-row: span 2;
+  height: calc(2 * var(--icon) + var(--gap-y) + 20px);
+  border-radius: calc(var(--icon-radius) * 1.15 + 6px);
+  padding: 12px 14px;
+  background: rgba(30, 28, 44, .52);
+  border: .5px solid rgba(255, 255, 255, .16);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6); backdrop-filter: blur(28px) saturate(1.6);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.app-grid { grid-auto-flow: row dense; }
+.widget-head { display: flex; align-items: center; gap: 6px; font: 600 13px/1 var(--font); color: #ffd60a; }
+.widget-head svg { width: 14px; height: 14px; fill: currentColor; }
+.widget-list { list-style: none; flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; margin-top: 6px; }
+.widget-list li { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.widget-list img { width: 26px; height: 26px; border-radius: 6px; flex: none; }
+.widget-game { flex: 1; min-width: 0; font: 600 14px/1.15 var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.widget-game small { display: block; font-weight: 400; font-size: 11px; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; }
+.widget-score { font: 700 17px/1 var(--font); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.widget-empty { flex: 1; display: grid; place-items: center; text-align: center; font: 500 14px/1.35 var(--font); color: var(--ink-dim); padding: 0 8px; }
+/* A short screen keeps the icons in view: one row less of widget. */
+@media (max-height: 600px) { .widget { grid-row: span 1; height: calc(var(--icon) + 18px); } .widget-list li:nth-child(n+2) { display: none; } }
+
+/* ---- Search: the pill above the dock, and its sheet ---- */
+.search-pill {
+  display: flex; align-items: center; gap: 5px; margin: 0 auto 12px;
+  padding: 6px 12px; border: 0; border-radius: 16px;
+  background: rgba(255, 255, 255, .2);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  color: #fff; font: 600 13px/1 var(--font); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.search-pill svg { width: 12px; height: 12px; }
+.search-pill:active { background: rgba(255, 255, 255, .3); }
+.search-pill:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.search-sheet {
+  position: fixed; inset: 0; z-index: 25;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) calc(env(safe-area-inset-right, 0px) + 16px) 16px calc(env(safe-area-inset-left, 0px) + 16px);
+  background: rgba(14, 12, 28, .55);
+  -webkit-backdrop-filter: blur(40px) saturate(1.4); backdrop-filter: blur(40px) saturate(1.4);
+  animation: search-in .22s ease-out;
+}
+@keyframes search-in { from { opacity: 0; } }
+.search-field { display: flex; align-items: center; gap: 10px; max-width: 640px; margin: 0 auto; }
+.search-field > svg { position: absolute; width: 15px; height: 15px; margin-left: 10px; color: rgba(235, 235, 245, .6); pointer-events: none; }
+.search-field input {
+  flex: 1; min-width: 0; height: 38px; padding: 0 10px 0 33px; border: 0; border-radius: 11px;
+  background: rgba(118, 118, 128, .32); color: #fff; font: 400 17px/1 var(--font); outline: none;
+  -webkit-appearance: none; appearance: none;
+}
+.search-field input::placeholder { color: rgba(235, 235, 245, .6); }
+.search-cancel { border: 0; background: none; color: #fff; font: 400 17px/1 var(--font); cursor: pointer; padding: 8px 2px; }
+.search-heading { max-width: 640px; margin: 22px auto 8px; font: 700 20px/1 var(--font); }
+.search-results { list-style: none; max-width: 640px; margin: 0 auto; border-radius: 14px; overflow: hidden; background: rgba(255, 255, 255, .08); }
+.search-results li + li { border-top: .5px solid var(--sheet-line); }
+.search-results button {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 8px 14px;
+  border: 0; background: none; color: #fff; font: 500 16px/1.2 var(--font); text-align: left; cursor: pointer;
+}
+.search-results button:focus-visible, .search-results button.first { background: rgba(255, 255, 255, .1); outline: none; }
+.search-results img { width: 40px; height: 40px; border-radius: 9px; }
+.search-results small { display: block; font-size: 12px; font-weight: 400; color: var(--ink-dim); }
+.search-none { padding: 18px 14px; color: var(--ink-dim); }
 
 /* ---- Dock ---- */
 .dock {
@@ -180,10 +246,12 @@ input[role="switch"]:focus-visible { outline: 2px solid var(--accent); outline-o
 
 /* ---- Opening and closing a game ---- */
 .launch-zoom {
-  position: fixed; z-index: 30; left: 0; top: 0;
-  background: center / cover no-repeat;
-  pointer-events: none;
+  position: fixed; z-index: 30; left: 0; top: 0; overflow: hidden;
+  background: #000; pointer-events: none;
 }
+/* The icon rides the zoom to the middle of the screen, where the game's
+   launch screen shows it while the game loads. */
+.launch-zoom img { position: absolute; left: 0; top: 0; width: 108px; height: 108px; border-radius: 24px; }
 
 /* ---- Tablets: more columns, bigger icons ---- */
 @media (min-width: 700px) {

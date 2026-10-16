@@ -72,7 +72,41 @@ function systemApp(kind, label, svg, act) {
   return li;
 }
 
+/* ---- The High Scores widget ---- The board's best (cached from the
+ * leaderboard) or this device's own, for the games played last. */
+var TROPHY_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 1h8v1.5h2.5V5a3 3 0 0 1-3 3h-.2A4 4 0 0 1 9 10.3V12h2v2H5v-2h2v-1.7A4 4 0 0 1 4.7 8h-.2a3 3 0 0 1-3-3V2.5H4zm0 3H3v1a1.5 1.5 0 0 0 1 1.4zm8 0v2.4A1.5 1.5 0 0 0 13 5V4z"/></svg>';
+function bestOf(slug) {
+  try {
+    var top = JSON.parse(localStorage.getItem('blip-top-' + slug) || 'null');
+    if (top && (top.score | 0) > 0) return { score: top.score | 0, who: top.handle || '' };
+  } catch (e) {}
+  var mine = 0;
+  try { mine = parseInt(localStorage.getItem('blip-best-' + slug) || '0', 10) || 0; } catch (e) {}
+  return mine > 0 ? { score: mine, who: 'You' } : null;
+}
+function scoresWidget() {
+  var li = document.createElement('li');
+  li.className = 'widget';
+  li.setAttribute('aria-label', 'High scores');
+  var order = recent().concat(Object.keys(BLIP_GAMES));
+  var rows = order.filter(function (slug, i) { return order.indexOf(slug) === i && bestOf(slug); }).slice(0, 3);
+  var html = '<p class="widget-head">' + TROPHY_SVG + 'High Scores</p>';
+  if (!rows.length) {
+    html += '<p class="widget-empty">Play a game to put a score up here.</p>';
+  } else {
+    html += '<ul class="widget-list">' + rows.map(function (slug) {
+      var best = bestOf(slug);
+      return '<li><img src="' + slug + '/icon-192.png?v=1" alt=""><span class="widget-game">' + titleCase(BLIP_GAMES[slug].name) +
+        '<small>' + (best.who ? escapeHtml(best.who) : '&nbsp;') + '</small></span><span class="widget-score">' + best.score.toLocaleString() + '</span></li>';
+    }).join('') + '</ul>';
+  }
+  li.innerHTML = html;
+  return li;
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+
 function build() {
+  grid.appendChild(scoresWidget());
   Object.keys(BLIP_GAMES).forEach(function (slug) { grid.appendChild(gameApp(slug, false)); });
   dockRow.appendChild(systemApp('arcade', 'Arcade', ARCADE_SVG, toCabinet));
   recent().slice(0, DOCK_GAMES).forEach(function (slug) { dockRow.appendChild(gameApp(slug, true)); });
@@ -119,8 +153,28 @@ function tick() {
   } catch (e) {}
 }
 
-/* ---- Opening a game ---- The icon grows to fill the screen, the way an
- * app opens, then the game's page loads under it. */
+/* ---- Opening a game ---- The icon opens into a black window, and rides
+ * to the middle of it: where the game's launch screen shows it while the
+ * game loads, so the handover is seamless. */
+var ICON_ON_LAUNCH = 108;
+function launchFrames(slug, button) {
+  var icon = button.querySelector('.app-icon').getBoundingClientRect();
+  var r = icon.width * 0.2237, W = innerWidth, H = innerHeight;
+  var clipIcon = 'inset(' + icon.top + 'px ' + (W - icon.right) + 'px ' + (H - icon.bottom) + 'px ' + icon.left + 'px round ' + r + 'px)';
+  var clipFull = 'inset(0px 0px 0px 0px round 0px)';
+  // The launch screen's icon sits 16px above the middle: half its gap and bar.
+  var cx = W / 2 - ICON_ON_LAUNCH / 2, cy = H / 2 - 16 - ICON_ON_LAUNCH / 2;
+  var s = icon.width / ICON_ON_LAUNCH;
+  var atIcon = 'translate(' + icon.left + 'px,' + icon.top + 'px) scale(' + s + ')';
+  var atMiddle = 'translate(' + cx + 'px,' + cy + 'px) scale(1)';
+  var img = zoom.querySelector('img');
+  img.src = slug + '/icon-512.png?v=1';
+  img.style.transformOrigin = '0 0';
+  zoom.style.width = W + 'px';
+  zoom.style.height = H + 'px';
+  zoom.hidden = false;
+  return { img: img, clipIcon: clipIcon, clipFull: clipFull, atIcon: atIcon, atMiddle: atMiddle, radius: (24 * s) + 'px' };
+}
 var leaving = false;
 function launch(slug, from, url) {
   if (leaving) return;
@@ -130,48 +184,36 @@ function launch(slug, from, url) {
   var target = url || (slug + '/');
   tick();
   if (REDUCED || !from || !zoom.animate) { location.href = target; return; }
-  var icon = from.querySelector('.app-icon').getBoundingClientRect();
-  zoom.hidden = false;
-  zoom.style.backgroundColor = accentOf(slug);
-  zoom.style.backgroundImage = 'url(' + slug + '/icon-512.png?v=1)';
-  zoom.style.width = innerWidth + 'px';
-  zoom.style.height = innerHeight + 'px';
-  var sx = icon.width / innerWidth, sy = icon.height / innerHeight;
-  var anim = zoom.animate([
-    { transform: 'translate(' + icon.left + 'px,' + icon.top + 'px) scale(' + sx + ',' + sy + ')', borderRadius: (icon.width * 0.225 / sx) + 'px / ' + (icon.height * 0.225 / sy) + 'px' },
-    { transform: 'translate(0,0) scale(1,1)', borderRadius: '0px' }
-  ], { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
-  anim.onfinish = function () { zoom.style.backgroundImage = 'none'; location.href = target; };
+  var f = launchFrames(slug, from);
+  var timing = { duration: 380, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'forwards' };
+  zoom.animate([{ clipPath: f.clipIcon }, { clipPath: f.clipFull }], timing);
+  f.img.animate([{ transform: f.atIcon }, { transform: f.atMiddle }], timing)
+    .onfinish = function () { location.href = target; };
 }
 
-/* Back from a game: the screen shrinks into its icon. */
+/* Back from a game: the window closes back into its icon. */
 function arrive() {
   var back = null;
   try {
     back = JSON.parse(sessionStorage.getItem('blip-home-return') || 'null');
     sessionStorage.removeItem('blip-home-return');
   } catch (e) {}
-  if (!back || !BLIP_GAMES[back.slug] || Date.now() - back.at > 15000 || REDUCED || !zoom.animate) return;
+  if (!back || !BLIP_GAMES[back.slug] || Date.now() - back.at > 15000) return;
   var button = grid.querySelector('[data-slug="' + back.slug + '"]');
   if (!button) return;
-  var icon = button.querySelector('.app-icon').getBoundingClientRect();
-  var sx = icon.width / innerWidth, sy = icon.height / innerHeight;
-  zoom.hidden = false;
-  zoom.style.backgroundColor = accentOf(back.slug);
-  zoom.style.backgroundImage = 'url(' + back.slug + '/icon-512.png?v=1)';
-  zoom.style.width = innerWidth + 'px';
-  zoom.style.height = innerHeight + 'px';
-  var anim = zoom.animate([
-    { transform: 'translate(0,0) scale(1,1)', borderRadius: '0px', opacity: 1 },
-    { transform: 'translate(' + icon.left + 'px,' + icon.top + 'px) scale(' + sx + ',' + sy + ')', borderRadius: (icon.width * 0.225 / sx) + 'px / ' + (icon.height * 0.225 / sy) + 'px', opacity: 0.6 }
-  ], { duration: 300, easing: 'cubic-bezier(.3,.7,.2,1)' });
-  anim.onfinish = function () { zoom.hidden = true; button.focus({ preventScroll: true }); };
+  button.focus({ preventScroll: true });
+  if (REDUCED || !zoom.animate) return;
+  var f = launchFrames(back.slug, button);
+  var timing = { duration: 340, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'forwards' };
+  zoom.animate([{ clipPath: f.clipFull }, { clipPath: f.clipIcon }], timing);
+  f.img.animate([{ transform: f.atMiddle }, { transform: f.atIcon }], timing)
+    .onfinish = function () { zoom.hidden = true; zoom.getAnimations({ subtree: true }).forEach(function (a) { a.cancel(); }); };
 }
 
 // Back from the game by the browser's own back button: the page comes out
 // of the cache with the zoom still covering it.
 window.addEventListener('pageshow', function (e) {
-  if (e.persisted) { leaving = false; zoom.hidden = true; zoom.getAnimations().forEach(function (a) { a.cancel(); }); }
+  if (e.persisted) { leaving = false; zoom.hidden = true; zoom.getAnimations({ subtree: true }).forEach(function (a) { a.cancel(); }); }
 });
 
 function toCabinet() {
@@ -192,6 +234,7 @@ function showSheet(sheet, from) {
 function closeSheet() {
   if (!openSheet) return;
   openSheet.hidden = true; backdrop.hidden = true; openSheet = null;
+  searchSheet.hidden = true;
   if (returnFocus && returnFocus.focus) returnFocus.focus({ preventScroll: true });
 }
 backdrop.addEventListener('click', closeSheet);
@@ -234,43 +277,35 @@ setFullscreen.addEventListener('change', function () {
 setCabinet.addEventListener('change', function () { if (setCabinet.checked) toCabinet(); });
 document.getElementById('settings-done').addEventListener('click', closeSheet);
 
-/* ---- Keys and pads ---- Arrows move between icons, Enter or the pad's
- * first button opens one, Escape (or the second) closes a sheet. */
+/* ---- Keys and pads ---- Arrows move to the nearest icon that way (the
+ * widget breaks the grid's rows), Enter or the pad's first button opens it,
+ * Escape (or the second) closes a sheet. */
 function focusables() {
   var scope = openSheet || document;
-  return Array.prototype.slice.call(scope.querySelectorAll(openSheet ? 'button, input' : '.app-button'));
-}
-function columns() {
-  return getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+  return Array.prototype.slice.call(scope.querySelectorAll(openSheet ? 'button:not([hidden]), input' : '.app-button'));
 }
 function move(dir) {
   var items = focusables();
   if (!items.length) return;
-  var i = items.indexOf(document.activeElement);
+  var here = document.activeElement, i = items.indexOf(here);
   if (i < 0) { items[0].focus(); return; }
   if (openSheet) {
     var step = dir === 'up' || dir === 'left' ? -1 : 1;
     items[(i + step + items.length) % items.length].focus();
     return;
   }
-  var gridItems = Array.prototype.slice.call(grid.querySelectorAll('.app-button'));
-  var dockItems = Array.prototype.slice.call(dockRow.querySelectorAll('.app-button'));
-  var gi = gridItems.indexOf(document.activeElement), di = dockItems.indexOf(document.activeElement), cols = columns();
-  var next = null;
-  if (gi >= 0) {
-    if (dir === 'left') next = gridItems[gi - 1];
-    else if (dir === 'right') next = gridItems[gi + 1];
-    else if (dir === 'up') next = gridItems[gi - cols];
-    else next = gridItems[gi + cols] || (Math.floor(gi / cols) === Math.floor((gridItems.length - 1) / cols) ? dockItems[Math.min(gi % cols, dockItems.length - 1)] : gridItems[gridItems.length - 1]);
-  } else if (di >= 0) {
-    if (dir === 'left') next = dockItems[di - 1];
-    else if (dir === 'right') next = dockItems[di + 1];
-    else if (dir === 'up') {
-      var lastRow = Math.floor((gridItems.length - 1) / cols) * cols;
-      next = gridItems[Math.min(lastRow + di, gridItems.length - 1)];
-    }
-  }
-  if (next) next.focus();
+  var a = here.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+  var best = null, bestCost = Infinity;
+  items.forEach(function (el) {
+    if (el === here) return;
+    var b = el.getBoundingClientRect(), dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
+    var along = dir === 'left' ? -dx : dir === 'right' ? dx : dir === 'up' ? -dy : dy;
+    var across = dir === 'left' || dir === 'right' ? Math.abs(dy) : Math.abs(dx);
+    if (along < 4) return;
+    var cost = along + across * 2;
+    if (cost < bestCost) { bestCost = cost; best = el; }
+  });
+  if (best) best.focus();
 }
 var ARROWS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
 document.addEventListener('keydown', function (e) {
@@ -304,6 +339,48 @@ document.addEventListener('keydown', function (e) {
     requestAnimationFrame(poll);
   });
 }());
+
+/* ---- Search ---- The pill, or a letter typed on the home screen. */
+var searchSheet = document.getElementById('search-sheet');
+var searchInput = document.getElementById('search-input');
+var searchResults = document.getElementById('search-results');
+function genreOf(slug) { return BLIP_GAMES[slug].players === 2 ? '1 or 2 players' : '1 player'; }
+function renderSearch() {
+  var q = searchInput.value.trim().toLowerCase();
+  var hits = Object.keys(BLIP_GAMES).filter(function (slug) {
+    return !q || BLIP_GAMES[slug].name.toLowerCase().indexOf(q) >= 0 || slug.replace('_', ' ').indexOf(q) >= 0;
+  });
+  searchResults.innerHTML = hits.length ? hits.map(function (slug, i) {
+    return '<li><button type="button" data-slug="' + slug + '"' + (i === 0 && q ? ' class="first"' : '') + '><img src="' + slug + '/icon-192.png?v=1" alt=""><span>' +
+      titleCase(BLIP_GAMES[slug].name) + '<small>' + genreOf(slug) + '</small></span></button></li>';
+  }).join('') : '<li class="search-none">No games match “' + escapeHtml(searchInput.value.trim()) + '”.</li>';
+}
+function openSearch(first) {
+  searchInput.value = first || '';
+  renderSearch();
+  openSheet = searchSheet; returnFocus = document.activeElement;
+  searchSheet.hidden = false;
+  searchInput.focus({ preventScroll: true });
+}
+document.getElementById('search-pill').addEventListener('click', function () { openSearch(''); });
+document.getElementById('search-cancel').addEventListener('click', function () { searchSheet.hidden = true; openSheet = null; if (returnFocus && returnFocus.focus) returnFocus.focus(); });
+searchInput.addEventListener('input', renderSearch);
+searchInput.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { var first = searchResults.querySelector('button'); if (first) { e.preventDefault(); first.click(); } }
+  if (e.key === 'ArrowDown') { var b = searchResults.querySelector('button'); if (b) { e.preventDefault(); e.stopPropagation(); b.focus(); } }
+});
+searchResults.addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-slug]');
+  if (!b) return;
+  var slug = b.dataset.slug, icon = grid.querySelector('.app-button[data-slug="' + slug + '"]');
+  searchSheet.hidden = true; openSheet = null;
+  launch(slug, icon);
+});
+document.addEventListener('keydown', function (e) {
+  if (openSheet || e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1 || !/[a-z]/i.test(e.key)) return;
+  e.preventDefault();
+  openSearch(e.key);
+});
 
 /* ---- Clock ---- */
 var clock = document.getElementById('home-clock');
