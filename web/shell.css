@@ -1105,3 +1105,27 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 /* The cabinet hides its title tiles where the bar is crowded; an app's
    title bar has room for its name. */
 :root[data-appstyle] #marquee-name { visibility: visible !important; }
+
+/* The Guide over a game: a sheet that rises from the bottom, its top edge
+   showing the game still underneath. */
+#guide-sheet {
+  position: fixed; inset: 0; z-index: 950; display: flex; align-items: flex-end;
+  background: rgba(0, 0, 0, .4);
+  animation: guide-dim .3s ease-out;
+}
+#guide-sheet iframe {
+  display: block; width: 100%; height: calc(100% - env(safe-area-inset-top, 0px) - 12px);
+  border: 0; border-radius: 12px 12px 0 0; background: #000;
+  animation: guide-up .42s cubic-bezier(.32, .72, 0, 1);
+}
+#guide-sheet.closing { animation: guide-dim .26s ease-in reverse forwards; }
+#guide-sheet.closing iframe { animation: guide-up .26s ease-in reverse forwards; }
+@keyframes guide-dim { from { background: transparent; } }
+@keyframes guide-up { from { transform: translateY(100%); } }
+@media (min-width: 768px) and (min-height: 700px) {
+  #guide-sheet { align-items: center; justify-content: center; }
+  #guide-sheet iframe { width: min(720px, 92vw); height: min(860px, 88vh); border-radius: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { #guide-sheet, #guide-sheet iframe { animation: none !important; } }
+:root[data-appstyle]:not([data-layout="landscape"]) .cc-install { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+:root[data-appstyle] #cc-guide { background: rgba(118, 118, 128, .3); }

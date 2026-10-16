@@ -240,6 +240,55 @@ test('a game opened as an app draws a clean, sharp picture: no CRT, full pixel d
   await page.waitForFunction(() => { const c = document.getElementById('glcanvas'); return c.width === Math.floor(c.clientWidth * 3); }, null, { timeout: 10000 });
 });
 
+test('the Guide sets the manual\'s own chapters as an iOS guide, without the cabinet\'s parts', async (t) => {
+  const { page, origin } = await phone(t);
+  await page.goto(`${origin}/guide.html`);
+  await page.locator('#guide[data-ready]').waitFor();
+  const groups = await page.locator('#toc .group-title').allTextContents();
+  assert.deepEqual(groups, ['Getting started', 'Games', 'History', 'About']);
+  assert.equal(await page.locator('#toc a[href^="#/t/game-"]').count(), 9);
+  const titles = await page.locator('#toc .row').allTextContents();
+  assert.ok(titles.some((x) => /Play on iPhone and iPad/.test(x)), 'the app\'s own section');
+  assert.ok(!titles.some((x) => /Choosing a game/.test(x)), 'the cabinet\'s card rack is left out');
+  await page.locator('#toc a[href="#/t/keyboard"]').click();
+  assert.ok(!/Insert coin/.test(await page.locator('#article').textContent()), 'no coins in the app');
+  await page.locator('#pane-detail .nav-back').click();
+  await page.locator('#toc a[href="#/t/game-rally"]').click();
+  const article = page.locator('#article');
+  assert.match(await article.locator('.hero-meta b').textContent(), /Pong/, 'History\'s origin line');
+  assert.ok(await article.locator('.prose .group .info').count() >= 2, 'controls as info rows');
+  assert.equal(await article.locator('.tip').count(), 1, 'the operator\'s tip as a Tips card');
+  await page.locator('#pane-detail .nav-back').click();
+  await page.locator('#guide-search').fill('hyperspace');
+  const hits = await page.locator('#toc .row').evaluateAll((rows) => rows.map((r) => r.dataset.topic));
+  assert.ok(hits.includes('game-meteors'));
+});
+
+test('the cabinet\'s manual leaves out what was written for the Guide', async (t) => {
+  const { page, origin } = await phone(t);
+  await page.goto(`${origin}/index.html?manual=controls`);
+  await page.waitForFunction(() => document.querySelector('.manual-page-content .manual-leaf-sheet'), null, { timeout: 30000 });
+  const book = await page.evaluate(() => manualPages.map((p) => p.html).join(' '));
+  assert.ok(!/Play on iPhone and iPad/.test(book));
+  assert.ok(/Choosing a game/.test(book));
+});
+
+test('over a game, Guide opens a sheet at that game, and Done puts it away', async (t) => {
+  const { page, origin } = await phone(t, { reducedMotion: 'reduce' });
+  await page.goto(`${origin}/home.html`);
+  await page.locator('[data-slug="bouncer"]').first().tap();
+  await page.waitForURL(`${origin}/bouncer/`);
+  await page.evaluate(() => document.getElementById('card-button').click());
+  await page.locator('#cc-guide').click();
+  const frame = page.frameLocator('#guide-sheet iframe');
+  await frame.locator('#guide[data-ready]').waitFor();
+  assert.equal(await frame.locator('#article .large-title').textContent(), 'Bouncer');
+  assert.equal(await frame.locator('.play').count(), 0, 'no Play inside a game');
+  await frame.locator('#pane-detail .nav-done').click();
+  await page.locator('#guide-sheet').waitFor({ state: 'detached' });
+  assert.equal(new URL(page.url()).pathname, '/bouncer/', 'the game stayed where it was');
+});
+
 test('each game page names itself and links its own manifest and icon', async (t) => {
   const { page, origin } = await phone(t);
   const seen = new Set();

@@ -12,7 +12,7 @@ var actionSheet = document.getElementById('action-sheet');
 var settingsSheet = document.getElementById('settings-sheet');
 var REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 var RECENT_KEY = 'blip-recent';
-var DOCK_GAMES = 2;   // beside the arcade and Settings: four in a phone's dock
+var DOCK_GAMES = 1;   // beside the arcade, the Guide and Settings: four in a phone's dock
 
 // Being here is the choice: a game played from here comes back here.
 blipSetFrontend('home');
@@ -61,6 +61,7 @@ function gameApp(slug, inDock) {
 }
 
 var ARCADE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#e8c47e" d="M6 2h12l1 4v16H5V6z"/><path fill="#1b130c" d="M7 7h10v7H7z"/><path fill="#7fe08e" d="M8 8h8v5H8z" opacity=".75"/><path fill="#2a1a10" d="M6 16h12v2H6z"/><circle cx="9" cy="17" r="1" fill="#ed684d"/><circle cx="14" cy="17" r="1" fill="#ffd16a"/><circle cx="16.5" cy="17" r="1" fill="#ffd16a"/><path fill="#c79a52" d="M6.5 3h11l.5 2H6z"/></svg>';
+var GUIDE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M12 6.2C10.2 4.8 7.6 4.3 4.5 4.6c-.6 0-1 .5-1 1.1v11.8c0 .6.6 1.1 1.2 1 2.8-.3 5.2.2 6.8 1.5.3.2.7.2 1 0 1.6-1.3 4-1.8 6.8-1.5.6.1 1.2-.4 1.2-1V5.7c0-.6-.4-1.1-1-1.1-3.1-.3-5.7.2-7.5 1.6zm-.8 1.6v10c-1.7-.9-3.8-1.3-6.2-1.2V6.2c2.6-.1 4.7.4 6.2 1.6zm1.6 0c1.5-1.2 3.6-1.7 6.2-1.6v10.4c-2.4-.1-4.5.3-6.2 1.2z"/></svg>';
 var GEAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#f2f2f7" d="M13.6 2l.5 2.4c.6.2 1.2.5 1.7.9l2.3-.8 1.6 2.8-1.8 1.6c.1.6.1 1.3 0 1.9l1.8 1.6-1.6 2.8-2.3-.8c-.5.4-1.1.7-1.7.9l-.5 2.4h-3.2l-.5-2.4c-.6-.2-1.2-.5-1.7-.9l-2.3.8-1.6-2.8 1.8-1.6a6 6 0 010-1.9L3.3 7.3l1.6-2.8 2.3.8c.5-.4 1.1-.7 1.7-.9L9.4 2zM12 8.2a3.3 3.3 0 100 6.6 3.3 3.3 0 000-6.6z" transform="translate(0 1)"/></svg>';
 
 function systemApp(kind, label, svg, act) {
@@ -103,6 +104,7 @@ function buildDock() {
   dockRow.textContent = '';
   var wide = matchMedia(WIDE).matches;
   dockRow.appendChild(systemApp('arcade', 'Arcade', ARCADE_SVG, toCabinet));
+  dockRow.appendChild(systemApp('guide', 'Guide', GUIDE_SVG, toGuide));
   if (wide) {
     savedOrder().slice(0, 3).forEach(function (slug) { dockRow.appendChild(gameApp(slug, true)); });
     dockRow.appendChild(systemApp('settings', 'Settings', GEAR_SVG, openSettings));
@@ -323,6 +325,12 @@ function arrive() {
 window.addEventListener('pageshow', function (e) {
   if (e.persisted) { leaving = false; zoom.hidden = true; zoom.getAnimations({ subtree: true }).forEach(function (a) { a.cancel(); }); }
 });
+
+function toGuide() {
+  if (leaving) return;
+  leaving = true;
+  location.href = 'guide.html';
+}
 
 function toCabinet() {
   if (leaving) return;

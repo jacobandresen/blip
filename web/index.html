@@ -1489,7 +1489,8 @@
     }
     if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){if(!manualOverlay.hidden)manualFitShown();});
     function manualAtoms(node,parents,out) {
-      if(node.nodeType!==1||node.classList.contains('divider'))return;
+      // Written for the app's Guide (guide.js), not this book.
+      if(node.nodeType!==1||node.classList.contains('divider')||node.matches('[data-guide="app"]'))return;
       if(node.tagName==='TABLE') {
         Array.from(node.rows).forEach(function(row){var table=node.cloneNode(false);table.appendChild(row.cloneNode(true));out.push({parents:parents,leaf:table});});return;
       }

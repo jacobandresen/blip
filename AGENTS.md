@@ -29,6 +29,7 @@ change will be overwritten the next time the project is built.
 | Each game as its own home-screen app: icons (a small game card) and `manifest.json` | `tools/make_game_icons.mjs`, which writes `web/<game>/icon-*.png` and `manifest.json` (generated, not edited by hand) |
 | The "Add to Home Screen" sheet, free play and app mode on a game page | `web/shell.js`, `web/shell.css` |
 | App style's clean picture: no CRT (`blip_crt`), drawn at the screen's pixel density | `web/blip_bridge.js`, `crates/blip/src/ctx.rs` (`crt_look`); natively `BLIP_CRT=0` |
+| The app's Guide: the manual's chapters set as an iOS guide (also a sheet over an app-style game) | `web/guide.html`, `web/guide.css`, `web/guide.js`; its words stay in `controls.html`, `history.html`, `about.html` |
 
 The home screen's zoom into a game ends with the icon where the game's
 launch screen (`#loader` in app style) shows it: 108px, 16px above the
@@ -71,6 +72,18 @@ to boot the macroquad runtime. All of them are referenced with
 saved to a home screen is its own app. `kiosk.js`
 and `kiosk.css` are also loaded by `web/index.html` (without the `../` prefix)
 to share the nav bar between the landing page and game pages.
+
+### One manual, two bindings
+
+The cabinet's book (`index.html`) and the app's Guide (`guide.js`) both read
+`controls.html`, `history.html` and `about.html`. Write the words there once.
+Mark what belongs to one binding only: `data-guide="cabinet"` (coins, the card
+rack, the BLIP logo) is left out of the Guide, `data-guide="app"` (the Home
+Screen, Add to Home Screen) out of the book. The Guide follows Apple's
+[Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines)
+(typography, lists and tables, navigation bars, sidebars, dark mode); text
+written for it follows the [Apple Style Guide](https://support.apple.com/guide/applestyleguide/welcome/web):
+sentence-case headings, "tap" and "touch and hold", "Home Screen".
 
 ### Rebuilding
 

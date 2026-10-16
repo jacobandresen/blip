@@ -362,8 +362,11 @@ var cardApi = (function () {
   var exitLabel = blipAppMode() ? 'BACK TO THE TITLE' : appStyle ? 'HOME' : 'ANOTHER GAME';
   // A game in its own app has no Home to tap, only Backspace back to its title.
   if (noTouch || !blipAppMode()) list = list.concat([[exitLabel, noTouch ? ['BACKSPACE'] : [appStyle ? 'TAP ‹ HOME' : 'TAP BLIP LOGO']]]);
-  var install = blipStandalone() ? '' : '<p class="cc-install"><button type="button" id="cc-install">' +
-    (appStyle ? 'Add to Home Screen' : 'ADD ' + GAME.name + ' TO HOME SCREEN') + '</button></p>';
+  var install = blipStandalone() ? '' : '<button type="button" id="cc-install">' +
+    (appStyle ? 'Add to Home Screen' : 'ADD ' + GAME.name + ' TO HOME SCREEN') + '</button>';
+  // The app's Guide, open at this game's page (the cabinet has its book).
+  var guide = appStyle ? '<button type="button" id="cc-guide">Guide</button>' : '';
+  install = install || guide ? '<p class="cc-install">' + guide + install + '</p>' : '';
   return blipControlsCard({
     label: 'HOW TO PLAY', name: GAME.name, html: '<div class="pc-legend">' + legendHtml(list) + '</div>' + install,
     after: function () { try { canvas.focus({ preventScroll: true }); } catch (e) {} }
@@ -422,6 +425,32 @@ function showInstallSheet() {
 window.blipShowInstallSheet = showInstallSheet;
 document.addEventListener('click', function (e) {
   if (e.target.closest && e.target.closest('#cc-install')) showInstallSheet();
+  if (e.target.closest && e.target.closest('#cc-guide')) showGuide();
+});
+
+// ---- The Guide, as a sheet over the game ---- The game keeps its place
+// underneath; Done (a message from the guide) puts the sheet away.
+function showGuide() {
+  if (!GAME || document.getElementById('guide-sheet')) return;
+  var sheet = document.createElement('div');
+  sheet.id = 'guide-sheet';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-label', 'Guide');
+  var frame = document.createElement('iframe');
+  frame.title = 'Guide';
+  frame.src = '../guide.html?embed#/t/game-' + GAME.slug;
+  sheet.appendChild(frame);
+  document.body.appendChild(sheet);
+  if (window.BlipController) window.BlipController.releaseAll();
+  frame.addEventListener('load', function () { try { frame.contentWindow.focus(); } catch (e) {} });
+}
+window.addEventListener('message', function (e) {
+  if (e.origin !== location.origin || !e.data || e.data.type !== 'blip-guide-close') return;
+  var sheet = document.getElementById('guide-sheet');
+  if (!sheet) return;
+  sheet.classList.add('closing');
+  setTimeout(function () { sheet.remove(); try { canvas.focus({ preventScroll: true }); } catch (err) {} }, 260);
 });
 if (new URLSearchParams(location.search).has('install')) showInstallSheet();
 
