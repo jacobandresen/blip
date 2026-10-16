@@ -44,7 +44,7 @@ test('the home screen shows every game as an app with its own icon, and nothing 
   })));
   assert.deepEqual(apps.map((a) => a.slug).sort(), [...GAMES].sort());
   for (const a of apps) assert.match(a.src, new RegExp(`^${a.slug}/icon-192\\.png`));
-  assert.deepEqual(apps.filter((a) => a.badge).map((a) => a.slug).sort(), ['adder', 'brawler', 'bubbler']);
+  assert.deepEqual(apps.filter((a) => a.badge).map((a) => a.slug).sort(), ['adder', 'brawler', 'bubbler', 'rally']);
   assert.ok(await page.locator('#dock-arcade').isVisible(), 'the dock has the way back to the cabinet');
   const cabinet = requested.filter((p) => /kiosk\.(js|css)|wear\.css|deck\.js|manual|howler|blip_controller/.test(p));
   assert.deepEqual(cabinet, [], 'the home screen loads none of the cabinet');
@@ -99,7 +99,7 @@ test('a long press offers Add to Home Screen, which shows how on the game page',
   await page.goto(`${origin}/home.html`);
   await page.locator('[data-slug="brawler"]').first().dispatchEvent('contextmenu');
   await page.locator('#action-sheet').waitFor();
-  assert.equal(await page.locator('#action-title').textContent(), 'Brawler');
+  assert.match(await page.locator('#action-title').textContent(), /^Brawler · 1 or 2 players$/);
   await page.locator('#action-sheet [data-action="install"]').click();
   await page.waitForURL(/\/brawler\/\?app$/);
   await page.locator('#install-sheet').waitFor();

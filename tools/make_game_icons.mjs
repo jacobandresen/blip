@@ -28,24 +28,28 @@ const CROPS = {
   adder:             { art: 'screenshot.png', cx: 0.50, cy: 0.40, w: 0.86 },
 };
 
+// Full bleed, as a modern home screen expects: the game's picture to the
+// edges, and the card's name band along the bottom in the game's colour.
 const ICON_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face { font-family: 'Press Start 2P'; src: url(/press-start-2p.woff2) format('woff2'); }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { width: 512px; height: 512px; overflow: hidden; background: #171419; }
-/* The card fills the square; a maskable icon keeps it inside the middle 80%. */
-.icon { position: absolute; inset: 0; display: grid; place-items: center;
-  background: radial-gradient(circle at 50% 38%, rgba(var(--accent), .30), transparent 62%), linear-gradient(155deg, #30251f, #171419 74%); }
-.card { position: relative; width: 512px; height: 512px; }
-.maskable .card { transform: scale(.8); }
-.frame { position: absolute; inset: 26px; border: 5px solid rgba(224, 183, 121, .7); border-radius: 44px;
-  box-shadow: inset 0 2px rgba(255, 239, 208, .35), 0 0 0 2px rgba(0, 0, 0, .35); }
-.window { position: absolute; left: 62px; right: 62px; top: 62px; height: 290px; overflow: hidden;
-  border-radius: 18px; background: #000; box-shadow: 0 0 0 6px #0b0a0c, 0 0 0 9px rgba(var(--accent), .8), 0 0 26px 6px rgba(var(--accent), .45); }
+html, body { width: 512px; height: 512px; overflow: hidden; background: #000; }
+.icon { position: absolute; inset: 0; background: #000; }
+/* A maskable icon keeps everything that matters inside the middle 80%. */
+.card { position: absolute; inset: 0; }
+.maskable .window { inset: 0 0 128px 0; }
+.maskable .band { height: 128px; padding-bottom: 36px; }
+.window { position: absolute; inset: 0 0 116px 0; overflow: hidden; background: #000; }
 .window img { position: absolute; }
-.title { position: absolute; left: 40px; right: 40px; top: 386px; text-align: center; white-space: nowrap;
-  font: 48px/1 'Press Start 2P', monospace; color: rgb(var(--accent)); text-shadow: 0 0 10px rgba(var(--accent), .8), 0 4px 0 #000; }
-</style></head><body><div class="icon"><div class="card"><div class="frame"></div>
-<div class="window"><img alt=""></div><div class="title"></div></div></div></body></html>`;
+/* A soft fall into the band, so the picture does not end on a hard line. */
+.window::after { content: ''; position: absolute; inset: auto 0 0 0; height: 70px; background: linear-gradient(transparent, rgba(0,0,0,.55)); }
+.band { position: absolute; left: 0; right: 0; bottom: 0; height: 116px; display: grid; place-items: center;
+  background: linear-gradient(180deg, rgba(var(--accent), .30), rgba(var(--accent), .12) 40%, #0b0a0e), #0b0a0e;
+  border-top: 5px solid rgb(var(--accent)); box-shadow: 0 -6px 22px rgba(var(--accent), .45); }
+.title { max-width: 440px; text-align: center; white-space: nowrap;
+  font: 52px/1 'Press Start 2P', monospace; color: #fff; text-shadow: 0 0 14px rgba(var(--accent), .95), 0 4px 0 rgba(0,0,0,.6); }
+</style></head><body><div class="icon"><div class="card">
+<div class="window"><img alt=""></div><div class="band"><div class="title"></div></div></div></div></body></html>`;
 
 /** Title case for the label under the icon: SKY RAIDER -> Sky Raider. */
 const titleCase = (s) => s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
@@ -71,10 +75,10 @@ try {
       const title = document.querySelector('.title');
       title.textContent = game.name;
       title.style.fontSize = '';
-      await document.fonts.load("48px 'Press Start 2P'");
+      await document.fonts.load("52px 'Press Start 2P'");
       // Long names shrink to fit; whole pixels keep the pixel font even.
-      const room = title.clientWidth;
-      if (title.scrollWidth > room) title.style.fontSize = Math.floor(48 * room / title.scrollWidth) + 'px';
+      const room = 440, wide = title.scrollWidth;
+      if (wide > room) title.style.fontSize = Math.floor(52 * room / wide) + 'px';
       const img = document.querySelector('.window img'), win = document.querySelector('.window');
       img.src = `/${slug}/${crop.art}`;
       await img.decode();

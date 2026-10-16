@@ -19,6 +19,11 @@ blipSetFrontend('home');
 
 function titleCase(s) { return s.toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }
 function accentOf(slug) { return 'rgb(' + BLIP_GAMES[slug].accent + ')'; }
+// Two can play: a second station, or a key for the second player (Rally's dials share one).
+function twoPlayer(slug) {
+  var g = BLIP_GAMES[slug];
+  return g.players === 2 || /2(ND)? PLAYER/.test(JSON.stringify(g.controls || []));
+}
 
 function recent() {
   try {
@@ -40,10 +45,10 @@ function gameApp(slug, inDock) {
   button.type = 'button';
   button.className = 'app-button';
   button.dataset.slug = slug;
-  button.setAttribute('aria-label', name + (game.players === 2 ? ', 1 or 2 players' : ''));
-  button.innerHTML = '<span class="app-icon"><img src="' + slug + '/icon-192.png?v=1" alt="" draggable="false"></span>' +
+  button.setAttribute('aria-label', name + (twoPlayer(slug) ? ', 1 or 2 players' : ''));
+  button.innerHTML = '<span class="app-icon"><img src="' + slug + '/icon-192.png?v=2" alt="" draggable="false"></span>' +
     '<span class="app-label">' + name + '</span>';
-  if (game.players === 2 && !inDock) {
+  if (twoPlayer(slug) && !inDock) {
     var badge = document.createElement('span');
     badge.className = 'app-badge';
     badge.textContent = '2P';
@@ -96,7 +101,7 @@ function scoresWidget() {
   } else {
     html += '<ul class="widget-list">' + rows.map(function (slug) {
       var best = bestOf(slug);
-      return '<li><img src="' + slug + '/icon-192.png?v=1" alt=""><span class="widget-game">' + titleCase(BLIP_GAMES[slug].name) +
+      return '<li><img src="' + slug + '/icon-192.png?v=2" alt=""><span class="widget-game">' + titleCase(BLIP_GAMES[slug].name) +
         '<small>' + (best.who ? escapeHtml(best.who) : '&nbsp;') + '</small></span><span class="widget-score">' + best.score.toLocaleString() + '</span></li>';
     }).join('') + '</ul>';
   }
@@ -168,7 +173,7 @@ function launchFrames(slug, button) {
   var atIcon = 'translate(' + icon.left + 'px,' + icon.top + 'px) scale(' + s + ')';
   var atMiddle = 'translate(' + cx + 'px,' + cy + 'px) scale(1)';
   var img = zoom.querySelector('img');
-  img.src = slug + '/icon-512.png?v=1';
+  img.src = slug + '/icon-512.png?v=2';
   img.style.transformOrigin = '0 0';
   zoom.style.width = W + 'px';
   zoom.style.height = H + 'px';
@@ -234,17 +239,32 @@ function showSheet(sheet, from) {
 function closeSheet() {
   if (!openSheet) return;
   openSheet.hidden = true; backdrop.hidden = true; openSheet = null;
-  searchSheet.hidden = true;
+  searchSheet.hidden = true; lift.hidden = true;
   if (returnFocus && returnFocus.focus) returnFocus.focus({ preventScroll: true });
 }
 backdrop.addEventListener('click', closeSheet);
 
 var actionSlug = null, actionFrom = null;
+var lift = document.getElementById('context-lift');
 function openActions(slug, from) {
   actionSlug = slug; actionFrom = from;
-  document.getElementById('action-title').textContent = titleCase(BLIP_GAMES[slug].name);
-  document.getElementById('action-icon').src = slug + '/icon-192.png?v=1';
+  if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {}
+  var game = BLIP_GAMES[slug];
+  document.getElementById('action-title').textContent = titleCase(game.name) + ' \u00b7 ' + (twoPlayer(slug) ? '1 or 2 players' : '1 player');
+  var icon = from.querySelector('.app-icon').getBoundingClientRect();
+  lift.querySelector('img').src = slug + '/icon-192.png?v=2';
+  Object.assign(lift.style, { left: icon.left + 'px', top: icon.top + 'px', width: icon.width + 'px', height: icon.height + 'px' });
+  lift.hidden = false;
   showSheet(actionSheet, from);
+  // Below the icon, or above where the screen runs out; never off its sides.
+  var w = actionSheet.offsetWidth, h = actionSheet.offsetHeight, pad = 12, gap = icon.height * 0.12 + 10;
+  var fromRight = icon.left + icon.width / 2 > innerWidth / 2;
+  var left = Math.max(pad, Math.min(fromRight ? icon.right - w : icon.left, innerWidth - w - pad));
+  var below = icon.bottom + gap + h < innerHeight - pad;
+  var top = below ? icon.bottom + gap : Math.max(pad, icon.top - gap - h);
+  actionSheet.style.left = left + 'px';
+  actionSheet.style.top = top + 'px';
+  actionSheet.style.setProperty('--from', (icon.left + icon.width / 2 - left) + 'px ' + (below ? '0' : h + 'px'));
 }
 actionSheet.addEventListener('click', function (e) {
   var b = e.target.closest('button[data-action]');
@@ -344,14 +364,14 @@ document.addEventListener('keydown', function (e) {
 var searchSheet = document.getElementById('search-sheet');
 var searchInput = document.getElementById('search-input');
 var searchResults = document.getElementById('search-results');
-function genreOf(slug) { return BLIP_GAMES[slug].players === 2 ? '1 or 2 players' : '1 player'; }
+function genreOf(slug) { return twoPlayer(slug) ? '1 or 2 players' : '1 player'; }
 function renderSearch() {
   var q = searchInput.value.trim().toLowerCase();
   var hits = Object.keys(BLIP_GAMES).filter(function (slug) {
     return !q || BLIP_GAMES[slug].name.toLowerCase().indexOf(q) >= 0 || slug.replace('_', ' ').indexOf(q) >= 0;
   });
   searchResults.innerHTML = hits.length ? hits.map(function (slug, i) {
-    return '<li><button type="button" data-slug="' + slug + '"' + (i === 0 && q ? ' class="first"' : '') + '><img src="' + slug + '/icon-192.png?v=1" alt=""><span>' +
+    return '<li><button type="button" data-slug="' + slug + '"' + (i === 0 && q ? ' class="first"' : '') + '><img src="' + slug + '/icon-192.png?v=2" alt=""><span>' +
       titleCase(BLIP_GAMES[slug].name) + '<small>' + genreOf(slug) + '</small></span></button></li>';
   }).join('') : '<li class="search-none">No games match “' + escapeHtml(searchInput.value.trim()) + '”.</li>';
 }
@@ -381,6 +401,21 @@ document.addEventListener('keydown', function (e) {
   e.preventDefault();
   openSearch(e.key);
 });
+
+// A finger drawn down the home screen opens Search, as on iOS. Touch events,
+// not pointer events: a pan cancels the pointer before it has gone far.
+(function () {
+  var start = null;
+  document.querySelector('.springboard').addEventListener('touchstart', function (e) {
+    start = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (!start || openSheet || leaving) return;
+    var dx = e.touches[0].clientX - start.x, dy = e.touches[0].clientY - start.y;
+    if (dy > 56 && Math.abs(dx) < dy / 2) { start = null; openSearch(''); }
+  }, { passive: true });
+  document.addEventListener('touchend', function () { start = null; }, { passive: true });
+}());
 
 /* ---- Clock ---- */
 var clock = document.getElementById('home-clock');

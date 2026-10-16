@@ -65,7 +65,7 @@ function returnToCabinet(event) {
   sign.setAttribute('aria-label', game.name);
   sign.dataset.title = game.name.charAt(0) + game.name.slice(1).toLowerCase();
   // An app's launch screen shows its icon while the game loads.
-  document.documentElement.style.setProperty('--app-icon', 'url("' + new URL('icon-512.png?v=1', location.href).href + '")');
+  document.documentElement.style.setProperty('--app-icon', 'url("' + new URL('icon-512.png?v=2', location.href).href + '")');
   for (var i = 0; i < 8; i++) {
     var char = '\u00a0';
     var tile = document.createElement('span');
@@ -358,8 +358,12 @@ var cardApi = (function () {
   var noTouch = !document.documentElement.hasAttribute('data-has-touch');
   var list = GAME && (noTouch ? GAME.controls : GAME.touchControls);
   if (!list) return null;
-  list = list.concat([[blipAppMode() ? 'BACK TO THE TITLE' : 'ANOTHER GAME', noTouch ? ['BACKSPACE'] : ['TAP BLIP LOGO']]]);
-  var install = blipStandalone() ? '' : '<p class="cc-install"><button type="button" id="cc-install">ADD ' + GAME.name + ' TO HOME SCREEN</button></p>';
+  var appStyle = document.documentElement.hasAttribute('data-appstyle');
+  var exitLabel = blipAppMode() ? 'BACK TO THE TITLE' : appStyle ? 'HOME' : 'ANOTHER GAME';
+  // A game in its own app has no Home to tap, only Backspace back to its title.
+  if (noTouch || !blipAppMode()) list = list.concat([[exitLabel, noTouch ? ['BACKSPACE'] : [appStyle ? 'TAP ‹ HOME' : 'TAP BLIP LOGO']]]);
+  var install = blipStandalone() ? '' : '<p class="cc-install"><button type="button" id="cc-install">' +
+    (appStyle ? 'Add to Home Screen' : 'ADD ' + GAME.name + ' TO HOME SCREEN') + '</button></p>';
   return blipControlsCard({
     label: 'HOW TO PLAY', name: GAME.name, html: '<div class="pc-legend">' + legendHtml(list) + '</div>' + install,
     after: function () { try { canvas.focus({ preventScroll: true }); } catch (e) {} }
@@ -385,7 +389,7 @@ function showInstallSheet() {
   var body = iosSafari()
     ? '<ol class="install-steps"><li>Tap ' + share + ' <b>Share</b> in Safari\'s toolbar.</li><li>Choose <b>Add to Home Screen</b>.</li></ol>'
     : '<p class="install-wait">Use your browser\'s menu: <b>Install app</b> or <b>Add to Home screen</b>.</p>';
-  sheet.innerHTML = '<div class="install-card"><img class="install-icon" src="icon-180.png?v=1" alt="">' +
+  sheet.innerHTML = '<div class="install-card"><img class="install-icon" src="icon-180.png?v=2" alt="">' +
     '<h2 id="install-title">Add ' + name + ' to your Home Screen</h2>' +
     '<p class="install-lede">Its icon opens ' + name + ' straight away, full screen, free to play.</p>' + body +
     '<div class="install-actions"><button type="button" class="install-go" hidden>INSTALL</button><button type="button" class="install-close">NOT NOW</button></div></div>';
