@@ -124,12 +124,55 @@ function saveOrder() {
   try { localStorage.setItem(ORDER_KEY, JSON.stringify(list)); } catch (e) {}
 }
 
+/* A tablet's small Calendar widget: the day and the date, as on iPad. */
+function calendarWidget() {
+  var li = document.createElement('li');
+  li.className = 'widget widget-small widget-calendar';
+  li.setAttribute('aria-hidden', 'true');
+  li.innerHTML = '<p class="cal-day"></p><p class="cal-date"></p><p class="cal-note">Free play all day</p>';
+  return li;
+}
+function tickCalendar() {
+  var d = new Date(), cal = grid.querySelector('.widget-calendar');
+  if (!cal) return;
+  cal.querySelector('.cal-day').textContent = d.toLocaleDateString(undefined, { weekday: 'long' });
+  cal.querySelector('.cal-date').textContent = d.getDate();
+}
+
+// A tablet or wider: a phone on its side is wide but has no height for more.
+var WIDE = '(min-width: 700px) and (min-height: 600px)';
+
+/* The dock. A phone's holds four: the arcade, the two games played last,
+ * Settings. A tablet's adds the first games of the grid, then a divider
+ * and three recent ones, as iPad does. */
+function buildDock() {
+  dockRow.textContent = '';
+  var wide = matchMedia(WIDE).matches;
+  dockRow.appendChild(systemApp('arcade', 'Arcade', ARCADE_SVG, toCabinet));
+  if (wide) {
+    savedOrder().slice(0, 3).forEach(function (slug) { dockRow.appendChild(gameApp(slug, true)); });
+    dockRow.appendChild(systemApp('settings', 'Settings', GEAR_SVG, openSettings));
+    var recents = recent().slice(0, 3);
+    if (recents.length) {
+      var divider = document.createElement('li');
+      divider.className = 'dock-divider';
+      divider.setAttribute('aria-hidden', 'true');
+      dockRow.appendChild(divider);
+      recents.forEach(function (slug) { dockRow.appendChild(gameApp(slug, true)); });
+    }
+  } else {
+    recent().slice(0, DOCK_GAMES).forEach(function (slug) { dockRow.appendChild(gameApp(slug, true)); });
+    dockRow.appendChild(systemApp('settings', 'Settings', GEAR_SVG, openSettings));
+  }
+}
+
 function build() {
   grid.appendChild(scoresWidget());
+  grid.appendChild(calendarWidget());
+  tickCalendar();
   savedOrder().forEach(function (slug) { grid.appendChild(gameApp(slug, false)); });
-  dockRow.appendChild(systemApp('arcade', 'Arcade', ARCADE_SVG, toCabinet));
-  recent().slice(0, DOCK_GAMES).forEach(function (slug) { dockRow.appendChild(gameApp(slug, true)); });
-  dockRow.appendChild(systemApp('settings', 'Settings', GEAR_SVG, openSettings));
+  buildDock();
+  matchMedia(WIDE).addEventListener('change', buildDock);
 }
 
 /* ---- Press, long press ---- A tap opens; a finger held half a second, or
@@ -551,7 +594,7 @@ function tickClock() {
   clock.dateTime = d.toISOString();
 }
 tickClock();
-setInterval(tickClock, 15000);
+setInterval(function () { tickClock(); tickCalendar(); }, 15000);
 
 build();
 arrive();

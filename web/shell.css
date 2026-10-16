@@ -1025,7 +1025,7 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
   background: #1c1c1e; box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .14); border-radius: 18px;
 }
 :root[data-appstyle] #touch-strip.held .ts-glass { background: #242426; }
-:root[data-appstyle] .kiosk-bar > .deck-panel {
+:root[data-appstyle][data-layout="upright"] .kiosk-bar > .deck-panel {
   background: linear-gradient(180deg, #1c1c1e, #0e0e10) !important;
   box-shadow: inset 0 .5px rgba(255, 255, 255, .16) !important;
   border: 0 !important;
@@ -1059,7 +1059,7 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 :root[data-appstyle] #status { display: none; }
 :root[data-appstyle] #bar-outer { width: 120px; height: 4px; border: 0; border-radius: 2px; background: rgba(255, 255, 255, .16); overflow: hidden; }
 :root[data-appstyle] #bar-inner { background: #fff; box-shadow: none; border-radius: 2px; }
-:root[data-appstyle] .snes-pad .snes-shell {
+:root[data-appstyle][data-layout="upright"] .snes-pad .snes-shell {
   background: linear-gradient(180deg, #242426, #121214) !important;
   border: .5px solid rgba(255, 255, 255, .12) !important;
   box-shadow: inset 0 .5px rgba(255, 255, 255, .14) !important;
@@ -1102,3 +1102,6 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
   border: 0; border-radius: 10px; padding: 9px 14px; background: var(--app-tint); color: #fff;
   font: 600 13px/1 var(--app-font); letter-spacing: 0;
 }
+/* The cabinet hides its title tiles where the bar is crowded; an app's
+   title bar has room for its name. */
+:root[data-appstyle] #marquee-name { visibility: visible !important; }

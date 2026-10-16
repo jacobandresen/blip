@@ -110,6 +110,12 @@ body {
   display: flex; flex-direction: column; overflow: hidden;
 }
 .app-grid { grid-auto-flow: row dense; }
+/* Two icons square: only where the grid has six columns or more. */
+.widget-small { display: none; grid-column: span 2; grid-row: span 2; }
+.widget-calendar { justify-content: flex-start; }
+.cal-day { font: 600 13px/1.2 var(--font); color: #ff453a; text-transform: uppercase; letter-spacing: .02em; }
+.cal-date { font: 300 calc(var(--icon) * .9)/1 var(--font); letter-spacing: -.03em; margin-top: 4px; }
+.cal-note { margin-top: auto; font: 500 13px/1.2 var(--font); color: var(--ink-dim); }
 .widget-head { display: flex; align-items: center; gap: 6px; font: 600 13px/1 var(--font); color: #ffd60a; }
 .widget-head svg { width: 14px; height: 14px; fill: currentColor; }
 .widget-list { list-style: none; flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; margin-top: 6px; }
@@ -175,6 +181,9 @@ body {
 }
 .dock-row { list-style: none; display: flex; justify-content: center; gap: max(18px, min(var(--gap-x), 32px)); }
 .dock .app-label { display: none; }
+.dock .app-icon { width: var(--dock-icon, var(--icon)); height: var(--dock-icon, var(--icon)); border-radius: calc(var(--dock-icon, var(--icon)) * .2237); }
+@media (min-width: 700px) and (min-height: 600px) { .dock { --dock-icon: 62px; } .dock-row { gap: 16px; } }
+.dock-divider { align-self: stretch; width: .5px; margin: 6px 2px; background: rgba(255, 255, 255, .3); }
 
 /* The cabinet: a small arcade in wood and brass, the way back to the rolodex. */
 .app-icon.icon-arcade {
@@ -295,8 +304,15 @@ input[role="switch"]:focus-visible { outline: 2px solid var(--accent); outline-o
   .app-label { font-size: 13px; }
   .dock { padding: 14px 22px; }
 }
+@media (min-width: 700px) and (min-height: 600px) {
+  .widget-small { display: flex; }
+}
+/* An iPad on its side, or a desktop: eight columns. */
+@media (min-width: 1000px) {
+  :root { --cols: 8; --gap-x: max(28px, min(64px, calc((var(--safe-w) - 120px - 8 * var(--icon)) / 7))); }
+}
 @media (min-width: 1100px) {
-  :root { --icon: 84px; --gap-x: 56px; --gap-y: 40px; }
+  :root { --icon: 84px; --gap-y: 40px; }
 }
 /* A phone on its side: one wide row and a slim dock. */
 :root[data-layout="landscape"] {
