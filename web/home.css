@@ -1,0 +1,209 @@
+/* The home screen: BLIP's games as apps on a phone or tablet springboard.
+   Its own page and look; nothing here comes from the cabinet. */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink: #fff;
+  --ink-dim: rgba(255, 255, 255, .72);
+  --glass: rgba(255, 255, 255, .18);
+  --glass-edge: rgba(255, 255, 255, .22);
+  --sheet: rgba(36, 34, 48, .86);
+  --sheet-line: rgba(255, 255, 255, .12);
+  --accent: #0a84ff;
+  /* The width left between the notch and the screen's edge. */
+  --safe-w: calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  --icon: min(64px, calc((var(--safe-w) - 48px - 3 * 20px) / 4));
+  --icon-radius: calc(var(--icon) * .225);
+  --cols: 4;
+  --gap-x: max(16px, calc((var(--safe-w) - 48px - 4 * var(--icon)) / 3));
+  --gap-y: 26px;
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  color-scheme: dark;
+}
+
+html { height: 100%; background: #120f24; overscroll-behavior: none; }
+body {
+  min-height: 100%;
+  color: var(--ink);
+  font: 400 15px/1.3 var(--font);
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+  display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  /* The wallpaper: soft colour fields under a dark sky. */
+  background:
+    radial-gradient(60vmax 50vmax at 12% 18%, rgba(116, 72, 255, .55), transparent 70%),
+    radial-gradient(55vmax 45vmax at 92% 30%, rgba(255, 92, 140, .40), transparent 70%),
+    radial-gradient(70vmax 50vmax at 40% 100%, rgba(40, 190, 220, .38), transparent 70%),
+    linear-gradient(170deg, #1d1840, #0d0b1c 70%);
+  background-attachment: fixed;
+}
+
+/* ---- Status bar ---- */
+.status-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  height: 44px; padding: 0 26px;
+  font: 600 15px/1 var(--font); letter-spacing: .01em;
+}
+.status-right { display: flex; align-items: center; gap: 8px; }
+.status-pill {
+  font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  padding: 3px 7px; border-radius: 9px; background: rgba(255, 255, 255, .16);
+}
+.status-battery { width: 26px; height: 12px; fill: none; stroke: rgba(255, 255, 255, .55); }
+.status-battery .charge { fill: #fff; stroke: none; }
+.status-battery rect:last-child { fill: rgba(255, 255, 255, .55); stroke: none; }
+
+/* ---- The grid ---- */
+.springboard { flex: 1; padding: 18px 24px 24px; }
+.app-grid {
+  list-style: none;
+  display: grid; justify-content: center;
+  grid-template-columns: repeat(var(--cols), var(--icon));
+  column-gap: var(--gap-x); row-gap: var(--gap-y);
+}
+.app { position: relative; }
+.app-button {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 100%; border: 0; background: none; color: inherit; font: inherit;
+  cursor: pointer; touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.app-button:focus { outline: none; }
+.app-icon {
+  position: relative; display: block;
+  width: var(--icon); height: var(--icon); border-radius: var(--icon-radius);
+  overflow: hidden; background: #222;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+  transition: transform .18s ease, filter .18s ease;
+}
+.app-icon img { display: block; width: 100%; height: 100%; }
+.app-button:active .app-icon, .app-button.pressed .app-icon { transform: scale(.9); filter: brightness(.82); }
+.app-button:focus-visible .app-icon { box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--accent); }
+.app-label {
+  display: block; max-width: calc(var(--icon) + var(--gap-x) - 4px);
+  font: 500 12px/1.2 var(--font); text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .55);
+}
+/* Two can play: a badge in the corner, like a notification count. */
+.app-badge {
+  position: absolute; top: -6px; right: -7px; z-index: 1;
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px;
+  background: #ff3b30; color: #fff; font: 700 11px/22px var(--font); text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+  pointer-events: none;
+}
+
+/* ---- Dock ---- */
+.dock {
+  margin: 0 auto calc(10px + max(0px, 8px - env(safe-area-inset-bottom, 0px)));
+  padding: 12px 16px;
+  border-radius: 30px;
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6);
+  width: fit-content; min-width: min(calc(100% - 20px), 340px); max-width: calc(100% - 20px);
+}
+.dock-row { list-style: none; display: flex; justify-content: center; gap: max(18px, min(var(--gap-x), 32px)); }
+.dock .app-label { display: none; }
+
+/* The cabinet: a small arcade in wood and brass, the way back to the rolodex. */
+.app-icon.icon-arcade {
+  background: linear-gradient(160deg, #5a3a22, #2a1a10 75%);
+}
+.app-icon.icon-settings {
+  background: linear-gradient(160deg, #8e8e93, #48484c);
+}
+.app-icon svg { position: absolute; inset: 14%; width: 72%; height: 72%; }
+
+/* ---- Sheets ---- */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 20;
+  background: rgba(0, 0, 0, .38);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.action-sheet, .settings-sheet {
+  position: fixed; z-index: 21; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  width: min(420px, calc(100% - 20px)); transform: translateX(-50%);
+  animation: sheet-up .24s cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes sheet-up { from { transform: translate(-50%, 40px); opacity: 0; } }
+[hidden] { display: none !important; }
+.action-group, .action-cancel, .settings-sheet {
+  border-radius: 14px; background: var(--sheet);
+  -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px);
+}
+.action-group { overflow: hidden; }
+.action-head {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  font: 600 15px/1.2 var(--font); border-bottom: 1px solid var(--sheet-line);
+}
+.action-head img { width: 44px; height: 44px; border-radius: 10px; }
+.action-sheet button {
+  display: block; width: 100%; min-height: 54px; padding: 0 16px;
+  border: 0; background: none; color: var(--accent);
+  font: 400 19px/1 var(--font); cursor: pointer;
+}
+.action-group button + button { border-top: 1px solid var(--sheet-line); }
+.action-sheet button:focus-visible { outline: none; background: rgba(255, 255, 255, .1); }
+.action-cancel { margin-top: 8px; font-weight: 600 !important; }
+
+.settings-sheet { padding: 18px 16px 12px; }
+.settings-sheet h2 { font: 700 20px/1.2 var(--font); margin: 0 4px 12px; }
+.settings-list { list-style: none; border-radius: 10px; background: rgba(255, 255, 255, .06); }
+.settings-list li {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 48px; padding: 0 14px;
+}
+.settings-list li + li { border-top: 1px solid var(--sheet-line); }
+.settings-list label { flex: 1; font-size: 16px; cursor: pointer; }
+/* A switch, drawn on the checkbox itself. */
+input[role="switch"] {
+  -webkit-appearance: none; appearance: none; position: relative; flex: none;
+  width: 51px; height: 31px; border-radius: 16px;
+  background: rgba(120, 120, 128, .4); cursor: pointer; transition: background .2s;
+}
+input[role="switch"]::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, .3); transition: transform .2s;
+}
+input[role="switch"]:checked { background: #34c759; }
+input[role="switch"]:checked::after { transform: translateX(20px); }
+input[role="switch"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.settings-done {
+  display: block; width: 100%; min-height: 48px; margin-top: 12px; border: 0; border-radius: 10px;
+  background: var(--accent); color: #fff; font: 600 17px/1 var(--font); cursor: pointer;
+}
+
+/* ---- Opening and closing a game ---- */
+.launch-zoom {
+  position: fixed; z-index: 30; left: 0; top: 0;
+  background: center / cover no-repeat;
+  pointer-events: none;
+}
+
+/* ---- Tablets: more columns, bigger icons ---- */
+@media (min-width: 700px) {
+  :root { --icon: 76px; --cols: 6; --gap-x: max(28px, calc((var(--safe-w) - 120px - 6 * 76px) / 5)); --gap-y: 34px; }
+  .springboard { padding: 32px 60px; }
+  .app-label { font-size: 13px; }
+  .dock { padding: 14px 22px; }
+}
+@media (min-width: 1100px) {
+  :root { --icon: 84px; --gap-x: 56px; --gap-y: 40px; }
+}
+/* A phone on its side: one wide row and a slim dock. */
+:root[data-layout="landscape"] {
+  --icon: 52px; --cols: 7; --gap-x: max(18px, calc((var(--safe-w) - 96px - 7 * 52px) / 6)); --gap-y: 16px;
+}
+:root[data-layout="landscape"] .status-bar { height: 30px; }
+:root[data-layout="landscape"] .springboard { padding: 8px 48px; }
+:root[data-layout="landscape"] .dock { padding: 8px 14px; border-radius: 22px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .action-sheet, .settings-sheet { animation: none; }
+  .app-icon { transition: none; }
+}

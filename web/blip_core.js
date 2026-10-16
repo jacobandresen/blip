@@ -321,6 +321,13 @@ function blipFrontendUrl() {
   }
 }());
 
+// Chrome's install prompt, kept for the game page's own Install button.
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault();
+  window.blipInstallPrompt = e;
+  document.dispatchEvent(new Event('blip-install-ready'));
+});
+
 // The worker lives beside this script, whichever page (or game app) loads it.
 if ('serviceWorker' in navigator && document.querySelector('link[rel=manifest]')) {
   navigator.serviceWorker.register(new URL('sw.js', BLIP_CORE_SRC).href);

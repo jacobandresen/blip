@@ -5,7 +5,9 @@
   try{var previous=new URL(document.referrer),scope=new URL('.',location.href);internal=previous.origin===scope.origin&&previous.pathname.startsWith(scope.pathname);}catch(e){}
   if((navigation&&navigation.type==='reload')||(!internal&&(!navigation||navigation.type!=='back_forward')))saveCoins(0);
 }());
-document.documentElement.toggleAttribute('data-credit',getCoins()>0);
+// Free play keeps the cabinet lit with no coin in it.
+function blipPowered() { return getCoins()>0||document.documentElement.hasAttribute('data-freeplay'); }
+document.documentElement.toggleAttribute('data-credit',blipPowered());
 function buildPowerIndicators() {
   if (!document.body || document.querySelector('.blip-power-indicator')) return;
   var lamp=document.createElement('div');
@@ -41,7 +43,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 else buildPowerIndicators();
 var cabinetPowerTimer=null;
 function updateCoinsHud() {
-  var root=document.documentElement,powered=getCoins()>0,wasPowered=root.hasAttribute('data-credit');
+  var root=document.documentElement,powered=blipPowered(),wasPowered=root.hasAttribute('data-credit');
   root.toggleAttribute('data-credit',powered);
   if(powered&&!wasPowered){
     clearTimeout(cabinetPowerTimer);root.setAttribute('data-power-up','');
@@ -65,7 +67,7 @@ function getKioskAudio() {
 
 var cabinetHum=null;
 function blipUpdateCabinetHum(unlock) {
-  var powered=getCoins()>0&&!document.hidden&&!document.documentElement.hasAttribute('data-cabinet-screen');
+  var powered=blipPowered()&&!document.hidden&&!document.documentElement.hasAttribute('data-cabinet-screen');
   if(!powered) {
     if(cabinetHum&&!cabinetHum.offTimer) {
       var fading=cabinetHum;

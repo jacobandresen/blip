@@ -20,11 +20,17 @@ change will be overwritten the next time the project is built.
 | Styles (layout, touch controls, topbar, loading screen) | `web/shell.css` |
 | JavaScript (canvas scaling, touch controls, coin handling) | `web/shell.js` |
 | Shared nav bar styles (`.kiosk-bar`, `.kiosk-btn`, `.kiosk-hud`) | `web/kiosk.css` |
-| Shared coin state (`getCoins`, `saveCoins`, `updateCoinsHud`), layout rule | `web/kiosk.js` |
+| The game list (`BLIP_GAMES`), coins (`getCoins`, `saveCoins`), layout rule, mute, fullscreen | `web/blip_core.js` (every page; the home screen loads only this) |
+| Which front end a game returns to (`blip-frontend`, `blipFrontendUrl`), free play, a game's own app mode (`blipAppMode`) | `web/blip_core.js` |
+| Cabinet parts: power lamp, coin HUD (`updateCoinsHud`), card arm, hum | `web/kiosk.js` |
+| The home screen: icons, dock, long-press sheet, Settings | `web/home.html`, `web/home.css`, `web/home.js` (nothing from the cabinet) |
+| The cabinet's switch to the home screen (`#home-switch-btn`) | `web/index.html`, `web/kiosk.css` |
+| Each game as its own home-screen app: icons (a small game card) and `manifest.json` | `tools/make_game_icons.mjs`, which writes `web/<game>/icon-*.png` and `manifest.json` (generated, not edited by hand) |
+| The "Add to Home Screen" sheet, free play and app mode on a game page | `web/shell.js`, `web/shell.css` |
 | Bottom control deck markup (stations, stick, pad, caps) — one builder for every page | `web/deck.js` |
 | Kiosk / landing page | `web/index.html` |
-| Fullscreen button and the stored choice (`blip-fullscreen`), on every page | `web/kiosk.js` |
-| Sound on / off (`blip-mute`); `blipOut(ctx)`, where the cabinet's own sounds must connect | `web/kiosk.js` |
+| Fullscreen button and the stored choice (`blip-fullscreen`), on every page | `web/blip_core.js` |
+| Sound on / off (`blip-mute`); `blipOut(ctx)`, where the cabinet's own sounds must connect | `web/blip_core.js` |
 | What fullscreen hides on a game page; the idle return to the cabinet | `web/shell.css`, `web/shell.js` |
 | Cabinet wear: scratches, burns, rings, scuffs, thumbed cards and manual | `tools/make_wear.py`, which writes `web/wear.css` (generated, not edited by hand) |
 | Field manual: spreads, the three page-turn styles, the torn leaf, contents, notes pages | `web/index.html` (the manual script), `web/manual.css` |
@@ -50,11 +56,13 @@ change will be overwritten the next time the project is built.
 | Per-game asset build step | `crates/<name>/build.rs` |
 | Brawler's kiosk card poster and screenshot (captured from the game) | `./brawler_card.sh` |
 
-`web/shell.html` is a static template — it loads `kiosk.js` in the head,
+`web/shell.html` is a static template — it loads `blip_core.js` and `kiosk.js` in the head,
 then `deck.js`, `blip_controller.js`, the high-score scripts, `shell.js`,
 `mq_js_bundle.js` and `blip_bridge.js`, and finally calls `load("index.wasm")`
 to boot the macroquad runtime. All of them are referenced with
-`../` paths so they resolve from inside each game's subdirectory. `kiosk.js`
+`../` paths so they resolve from inside each game's subdirectory; only
+`manifest.json` and `icon-180.png` are the game directory's own, so a game
+saved to a home screen is its own app. `kiosk.js`
 and `kiosk.css` are also loaded by `web/index.html` (without the `../` prefix)
 to share the nav bar between the landing page and game pages.
 
@@ -72,7 +80,7 @@ Run the test suite locally before pushing:
 ```
 npm test                # canvas geometry (unit)
 cargo test --release    # game rules (Brawler's balance, Serpent's turns, ...)
-npm run test:web        # cabinet, manual, top bar, controls, decks (after ./build_web.sh; six minutes, in two lanes: one for the tests that run a game, one for the rest)
+npm run test:web        # cabinet, home screen, manual, top bar, controls, decks (after ./build_web.sh; six minutes, in two lanes: one for the tests that run a game, one for the rest)
 npm run test:layout     # nothing overlaps or leaves the screen: 21 devices, notches, every page and controller (seven minutes, four processes)
 npm run test:shell      # the game shell in headless Chromium (four minutes)
 npm run test:scores     # high-score entry in all eight scoring games (three minutes, three processes)
@@ -90,13 +98,24 @@ Tests that read the shell's layout hold the game's wasm back (`page.route('**/*.
 The browser suites need Playwright and a Chromium binary (`BLIP_CHROMIUM`
 names one outside `PATH`). Test files are `node:test` suites, one theme
 each: `cabinet.mjs` (the card rack), `manual.mjs`, `touch.mjs` (fingers on the strip and deck), `layout.mjs` (every page on every device: overlaps, thumbs, safe areas), `topbar-layout.mjs`,
-`controls.mjs`, `two-player-*.mjs` (decks and phones).
+`controls.mjs`, `two-player-*.mjs` (decks and phones), `home.mjs` (the home screen,
+free play, each game as an installable app).
 
 For native development:
 
 ```
 cargo run -p serpent            # or bouncer, rally, galactic_defender,
                                 # meteors, sky_raider, brawler, bubbler, adder
+```
+
+### Home-screen icons
+
+Each game's icon is a small version of its cabinet card, drawn from its
+screenshot (Brawler's from `card.png`). After a screenshot changes, or a game
+is added (give it a crop in `CROPS`):
+
+```
+node tools/make_game_icons.mjs
 ```
 
 ### Asset pipeline

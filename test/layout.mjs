@@ -54,6 +54,16 @@ const PIECES = {
   join: '.ts-join',
   toggle: '#control-toggle',
   creditLamp: '.deck-credit-lamp, .deck-second-lamp',
+  homeSwitch: '#home-switch-btn',
+};
+
+// The home screen's own pieces: nothing of the cabinet is on it.
+const HOME_PIECES = {
+  status: '.status-time, .status-right',
+  icon: '#app-grid .app-icon',
+  label: '#app-grid .app-label',
+  badge: '.app-badge',
+  dock: '.dock',
 };
 
 // The visible part of a piece: round buttons, the cross and the stick's boot do not fill their boxes.
@@ -220,6 +230,28 @@ for (const device of mine) {
         }
       }
     }
+    assert.deepEqual(failures, []);
+  });
+}
+
+for (const device of mine) {
+  test(`the home screen fits, every icon and label clear, on ${device.name} (${device.w}x${device.h})`, async (t) => {
+    const { page, origin, insets } = await open(t, device);
+    await page.goto(`${origin}/home.html`);
+    await page.evaluate((pieces) => { window.__pieces = pieces; }, HOME_PIECES);
+    await settled(page);
+    const result = await page.evaluate(collect, {});
+    const failures = [...result.overlaps.filter((line) => !/^(badge\S* (overlaps|lies wholly over) icon|icon\S* (overlaps|lies wholly over) badge)/.test(line))];
+    if (result.sideways > 0) failures.push(`the page is ${result.sideways}px wider than the screen`);
+    for (const box of result.boxes) {
+      const w = box.whole;
+      if (w.left < insets.left - 1 || w.right > device.w - insets.right + 1 || w.top < -1 || w.bottom > device.h - insets.bottom + 1) {
+        failures.push(`${box.name} leaves the screen or sits under the notch or home bar (${Math.round(w.left)},${Math.round(w.top)} to ${Math.round(w.right)},${Math.round(w.bottom)})`);
+      }
+    }
+    const icons = result.boxes.filter((b) => b.key === 'icon');
+    if (icons.length !== 9) failures.push(`${icons.length} icons show, not 9`);
+    if (!device.desktop) for (const i of icons) if (i.right - i.left < 44) failures.push(`${i.name} is ${Math.round(i.right - i.left)}px, too small for a thumb`);
     assert.deepEqual(failures, []);
   });
 }

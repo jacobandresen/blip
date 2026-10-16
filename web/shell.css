@@ -915,3 +915,39 @@ body.cabinet-page #touch-strip.held .ts-glass {
 }
 body.cabinet-page :is(.ts-tag,.ts-hint) {color:#c2b49c;font-family:'Courier New',monospace;}
 body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,0 0 12px #e8cea41a;}
+
+/* Free play (home screen, a game's own icon): no coin to put in. Hidden,
+   not removed, so the deck keeps the layout the layout tests measure. */
+:root[data-freeplay] .deck-coin-slot,
+:root[data-freeplay] .blip-power-indicator { visibility: hidden; }
+
+/* "Add to Home Screen": the game's icon and how to save it. */
+#install-sheet {
+  position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; padding: 16px;
+  background: rgba(0, 0, 0, .62);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+.install-card {
+  width: min(360px, 100%); padding: 22px 20px 16px; border-radius: 18px; text-align: center;
+  background: #1f1d26; color: #f2f2f7; box-shadow: 0 12px 40px rgba(0, 0, 0, .6);
+}
+.install-icon { width: 76px; height: 76px; border-radius: 17px; box-shadow: 0 4px 12px rgba(0, 0, 0, .5); }
+.install-card h2 { margin: 12px 0 6px; font-size: 19px; line-height: 1.25; }
+.install-lede, .install-wait { margin: 0 0 12px; font-size: 14px; line-height: 1.4; color: #c7c7cc; }
+.install-steps { margin: 0 0 14px; padding: 0 0 0 22px; text-align: left; font-size: 15px; line-height: 1.6; }
+.install-share { width: 14px; height: 18px; vertical-align: -3px; color: #0a84ff; }
+.install-actions { display: flex; flex-direction: column; gap: 8px; }
+.install-actions button {
+  min-height: 46px; border: 0; border-radius: 12px; font: 600 16px/1 inherit; cursor: pointer;
+  font-family: inherit;
+}
+.install-go { background: #0a84ff; color: #fff; }
+.install-close { background: rgba(255, 255, 255, .1); color: #f2f2f7; }
+.install-actions button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.cc-install { margin: 10px 0 0; text-align: center; }
+.cc-install button {
+  padding: 6px 10px; border: 1px solid currentColor; border-radius: 6px; background: none;
+  color: inherit; font: inherit; font-size: 11px; letter-spacing: .06em; cursor: pointer;
+}
+/* A phone on its side has no height to spare on the card. */
+:root[data-layout="landscape"] .cc-install { display: none; }
