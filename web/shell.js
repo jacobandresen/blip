@@ -508,6 +508,36 @@ window.addEventListener('message', function (e) {
 });
 if (new URLSearchParams(location.search).has('install')) showInstallSheet();
 
+// ---- App mode: the first time, how to play ---- The game's first frame
+// comes up under its controls card, paused; any key, tap or Escape starts
+// play. Once per game (blip-seen-<slug>).
+function introduceControls() {
+  var root = document.documentElement;
+  if (!cardApi || !GAME || !root.hasAttribute('data-appstyle') || CABINET_SCREEN) return;
+  var key = 'blip-seen-' + GAME.slug;
+  try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) { return; }
+  root.setAttribute('data-intro', '');
+  new MutationObserver(function (list, obs) {
+    if (!root.hasAttribute('data-card')) { root.removeAttribute('data-intro'); obs.disconnect(); }
+  }).observe(root, { attributes: true, attributeFilter: ['data-card'] });
+  cardApi.set(true);
+  function onKey(e) {
+    window.removeEventListener('keydown', onKey, true);
+    if (!root.hasAttribute('data-card')) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    cardApi.set(false);
+  }
+  window.addEventListener('keydown', onKey, true);
+}
+
+// A hidden app is a paused one: no music from a tab in the background.
+document.addEventListener('visibilitychange', function () {
+  var root = document.documentElement;
+  if (!root.hasAttribute('data-appstyle')) return;
+  if (document.hidden) window.blipPause(true);
+  else if (!root.hasAttribute('data-card') && !document.getElementById('guide-sheet')) window.blipPause(false);
+});
+
 // Mirror the overlay onto <body> (body.need-coin lights the coin button).
 // When it closes, a coin just went in: give focus back to the canvas so the
 // title screen answers the keyboard.
@@ -725,6 +755,7 @@ function hideLoader() {
     }
     loader.style.display = 'none';
     fillCanvas();
+    introduceControls();
     if(!CABINET_SCREEN&&!document.querySelector('.blip-hs-modal'))canvas.focus();
   }
 }

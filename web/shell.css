@@ -1202,3 +1202,9 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
   font: 600 15px/1 var(--app-font); letter-spacing: 0; text-transform: lowercase;
 }
 :root[data-appstyle] #rotate-hint .rh-stay::first-letter { text-transform: uppercase; }
+/* The first time: the card says how to begin. */
+:root[data-appstyle][data-intro] .cc-paper::after {
+  content: 'Press any key to play'; display: block; margin-top: 12px;
+  font: 400 13px/1.3 var(--app-font); color: rgba(235, 235, 245, .6);
+}
+:root[data-appstyle][data-intro][data-has-touch] .cc-paper::after { content: 'Tap to play'; }

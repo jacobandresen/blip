@@ -386,6 +386,7 @@ actionSheet.addEventListener('click', function (e) {
   if (action === 'play') launch(slug, from);
   else if (action === 'install') launch(slug, from, slug + '/?install');
   else if (action === 'edit') setEditing(true);
+  else if (action === 'guide') { leaving = true; location.href = 'guide.html#/t/game-' + slug; }
 });
 
 var setSound = document.getElementById('set-sound');
