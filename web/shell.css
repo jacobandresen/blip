@@ -193,19 +193,20 @@ canvas {
 
 /* Fullscreen on a PC is the top bar and the picture: the keyboard plays, so
    the deck, its picker and the cabinet frame go. A touch screen keeps them
-   (data-has-touch), since the deck is what it plays on. */
-:root[data-fullscreen]:not([data-has-touch]) :is(#topbar, #control-toggle, #arcade-bezel, .bezel-screw, .cabinet-glass, .cab-rail) {
+   (data-has-touch), since the deck is what it plays on. App mode does the
+   same on a PC, or on a tablet with a gamepad in hand (data-bare). */
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) :is(#topbar, #control-toggle, #arcade-bezel, .bezel-screw, .cabinet-glass, .cab-rail) {
   display: none;
 }
 /* No cabinet behind the picture either. */
-:root[data-fullscreen]:not([data-has-touch]) body { background: #000; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) body { background: #000; }
 /* The picture starts right under the bar and runs to every edge, so nothing
    may lap over it: no vignette, no edge trim, and the bar's glows, the coin
    slot's swell and the logo's hint are cut off at the bar's own bottom. */
-:root[data-fullscreen]:not([data-has-touch]) body::after { display: none; }
-:root[data-fullscreen]:not([data-has-touch]) canvas { clip-path: none; }
-:root[data-fullscreen]:not([data-has-touch]) #marquee-bar { box-shadow: none; }
-:root[data-fullscreen]:not([data-has-touch]) :is(.blip-logo, #insert-coin-btn) {
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) body::after { display: none; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) canvas { clip-path: none; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) #marquee-bar { box-shadow: none; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) :is(.blip-logo, #insert-coin-btn) {
   clip-path: inset(0 -80px);
   transform: none !important;   /* beats the beckon's scale */
 }
@@ -234,7 +235,7 @@ canvas {
 #need-coin-overlay.visible {cursor:pointer}
 @keyframes nco-blink {50% {opacity:.35}}
 @media (prefers-reduced-motion:reduce) {.nco-go {animation:none}}
-:root[data-fullscreen]:not([data-has-touch]) #need-coin-overlay {
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) #need-coin-overlay {
   bottom:0;
 }
 
@@ -1129,3 +1130,75 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 @media (prefers-reduced-motion: reduce) { #guide-sheet, #guide-sheet iframe { animation: none !important; } }
 :root[data-appstyle]:not([data-layout="landscape"]) .cc-install { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 :root[data-appstyle] #cc-guide { background: rgba(118, 118, 128, .3); }
+/* The "?" is the bar's trailing button, as in an iOS navigation bar. */
+:root[data-appstyle] #card-button { left: auto !important; right: calc(env(safe-area-inset-right, 0px) + 16px) !important; width: 26px; height: 26px; top: calc((var(--cabinet-fascia-height) - 26px) / 2 + env(safe-area-inset-top, 0px)); }
+
+/* The launch screen's copy, fading into the game's first frame. */
+.launch-fade {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+  background: #000; pointer-events: none; animation: launch-fade .35s ease-out .05s forwards;
+}
+.launch-fade::before { content: ''; width: 108px; height: 108px; border-radius: 24px; background: var(--app-icon) center / cover no-repeat; }
+.launch-fade > * { visibility: hidden; }
+@keyframes launch-fade { to { opacity: 0; } }
+
+/* The score to beat, under the title, as a navigation bar's subtitle. */
+:root[data-appstyle] #marquee-bar.jukebox-marquee #marquee-name {
+  flex-direction: column; gap: 3px; width: min(230px, calc(100vw - 210px)); padding: 0;
+  /* The same 44px line as the back button beside it. */
+  top: calc(env(safe-area-inset-top, 0px) + (var(--cabinet-fascia-height, 52px) - 44px) / 2) !important;
+  height: 44px !important; min-height: 44px !important;
+}
+:root[data-appstyle] #marquee-name::after { order: 1; }
+:root[data-appstyle] #marquee-name[data-best]::before {
+  display: block !important; order: 2; content: attr(data-best); max-width: 100%;
+  font: 400 12px/1 var(--app-font); color: rgba(235, 235, 245, .6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---- Score prompts as iOS alerts (app style) ---- */
+:root[data-appstyle] .blip-hs-modal { background: rgba(0, 0, 0, .45); -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root[data-appstyle] .blip-hs-panel:not(.showing-code) {
+  width: min(300px, 92vw); padding: 20px 16px 0; border: 0; border-radius: 14px;
+  background: rgba(37, 37, 41, .86); -webkit-backdrop-filter: blur(40px) saturate(1.8); backdrop-filter: blur(40px) saturate(1.8);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .4); color: #fff; font-family: var(--app-font);
+}
+:root[data-appstyle] .blip-hs-panel.showing-code { border: 0; border-radius: 14px; background: #1c1c1e; font-family: var(--app-font); }
+:root[data-appstyle] .blip-hs-title { font: 600 17px/1.3 var(--app-font); letter-spacing: 0; color: #fff; text-shadow: none; text-transform: lowercase; margin-bottom: 4px; }
+:root[data-appstyle] .blip-hs-sub { font: 400 13px/1.35 var(--app-font); letter-spacing: 0; color: rgba(235, 235, 245, .6); text-transform: lowercase; margin: 2px 0 10px; }
+:root[data-appstyle] .blip-hs-title::first-letter, :root[data-appstyle] .blip-hs-sub::first-letter { text-transform: uppercase; }
+:root[data-appstyle] .blip-hs-err { font: 400 13px/1.3 var(--app-font); color: #ff453a; }
+:root[data-appstyle] .blip-hs-input {
+  font: 400 17px/1 var(--app-font); letter-spacing: .04em; height: 36px; border: .5px solid rgba(255, 255, 255, .2);
+  border-radius: 8px; background: rgba(0, 0, 0, .35); color: #fff; text-shadow: none; box-shadow: none;
+}
+:root[data-appstyle] .blip-hs-input:focus { border-color: #0a84ff; }
+:root[data-appstyle] .blip-hs-row { margin: 14px -16px 0; gap: 0; border-top: .5px solid rgba(84, 84, 88, .65); flex-direction: row-reverse; }   /* the action on the right */
+:root[data-appstyle] .blip-hs-row + .blip-hs-row { margin-top: 0; }
+:root[data-appstyle] .blip-hs-btn {
+  flex: 1; min-height: 44px; margin: 0; padding: 0 8px; border: 0; border-radius: 0; background: none; box-shadow: none;
+  color: #0a84ff; font-size: 0; letter-spacing: 0; text-shadow: none;
+}
+:root[data-appstyle] .blip-hs-btn::after { content: attr(data-ios); font: 600 17px/1 var(--app-font); }
+:root[data-appstyle] .blip-hs-btn.ghost::after { font-weight: 400; }
+:root[data-appstyle] .blip-hs-btn + .blip-hs-btn { border-right: .5px solid rgba(84, 84, 88, .65); }
+:root[data-appstyle] .blip-hs-btn:focus-visible, :root[data-appstyle] .blip-hs-btn:active { background: rgba(255, 255, 255, .1); outline: none; }
+:root[data-appstyle] .blip-hs-btn:disabled { color: rgba(235, 235, 245, .3); }
+:root[data-appstyle] .blip-hs-list { font-family: var(--app-font); }
+:root[data-appstyle] .blip-hs-item { font: 400 15px/1.3 var(--app-font); color: #fff; letter-spacing: 0; }
+:root[data-appstyle] .blip-hs-item .hs-score { color: rgba(235, 235, 245, .6); }
+:root[data-appstyle] .blip-hs-item.me, :root[data-appstyle] .blip-hs-item.me .hs-rank, :root[data-appstyle] .blip-hs-item.me .hs-score { color: #30d158; }
+:root[data-appstyle] .blip-hs-stick { display: none; }
+
+/* "Turn sideways" in app style: a frosted card in system type. */
+:root[data-appstyle] #rotate-hint {
+  background: rgba(30, 30, 32, .82); -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px);
+  border-radius: 20px; font-family: var(--app-font); color: #fff;
+}
+:root[data-appstyle] #rotate-hint .rh-text { font: 600 17px/1.35 var(--app-font); letter-spacing: 0; text-shadow: none; text-transform: lowercase; }
+:root[data-appstyle] #rotate-hint .rh-text::first-letter { text-transform: uppercase; }
+:root[data-appstyle] #rotate-hint .rh-phone { border-color: #fff; box-shadow: inset 0 -6px 0 -3px #fff; border-radius: 9px; }
+:root[data-appstyle] #rotate-hint .rh-stay {
+  border: 0; border-radius: 12px; padding: 11px 18px; background: rgba(118, 118, 128, .3); color: #fff;
+  font: 600 15px/1 var(--app-font); letter-spacing: 0; text-transform: lowercase;
+}
+:root[data-appstyle] #rotate-hint .rh-stay::first-letter { text-transform: uppercase; }

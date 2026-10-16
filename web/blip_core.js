@@ -324,6 +324,13 @@ function blipFrontendUrl() {
   if (blipGameFromPath(location.pathname)) {
     // Opened as an app (home screen, or its own icon): an app's look, not the cabinet's.
     if (blipFreePlay()) { root.setAttribute('data-freeplay', ''); root.setAttribute('data-appstyle', ''); }
+    // An app on a PC plays from the keyboard or a gamepad: no deck on screen.
+    if (blipFreePlay() && !blipHasTouch()) root.setAttribute('data-bare', '');
+    // The system bar (Android, a desktop app window) takes the title bar's colour.
+    if (blipFreePlay()) {
+      var tint = document.querySelector('meta[name=theme-color]') || document.head.appendChild(document.createElement('meta'));
+      tint.name = 'theme-color'; tint.content = '#161618';
+    }
     if (blipAppMode()) root.setAttribute('data-app', '');
   } else {
     try { sessionStorage.setItem('blip-frontend-visit', '1'); } catch (e) {}

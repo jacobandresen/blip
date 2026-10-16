@@ -10,6 +10,30 @@
 // at a kiosk can dismiss. They go to the console instead.
 window.alert = function (msg) { try { console.error('[blip] ' + msg); } catch (e) {} };
 
+// ---- Pause ---- The games have no pause of their own. In app mode the
+// controls card and the Guide stop the game as an app's menus do: the
+// runtime's frame callback (named `animation`) is held back and the sound
+// suspended. The engine caps a frame at 0.1s, so play resumes without a jump.
+(function () {
+  var paused = false, held = [];
+  var raf = window.requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = function (cb) {
+    if (paused && cb && cb.name === 'animation') { held.push(cb); return -1; }
+    return raf(cb);
+  };
+  window.blipPause = function (on) {
+    on = !!on;
+    if (on === paused) return;
+    paused = on;
+    document.documentElement.toggleAttribute('data-paused', on);
+    try {
+      if (typeof Howler !== 'undefined' && Howler.ctx) { if (on) Howler.ctx.suspend(); else Howler.ctx.resume(); }
+    } catch (e) {}
+    if (window.BlipController && on) window.BlipController.releaseAll();
+    if (!on) { var q = held; held = []; q.forEach(function (cb) { raf(cb); }); }
+  };
+}());
+
 var TOPBAR_H   = 56;
 var MARQUEE_H  = 94; // marquee and the card receiver beneath it
 var CABINET_SCREEN = new URLSearchParams(location.search).get('cabinet') === '1';
@@ -64,6 +88,7 @@ function returnToCabinet(event) {
   sign.id = 'marquee-name';
   sign.setAttribute('aria-label', game.name);
   sign.dataset.title = game.name.charAt(0) + game.name.slice(1).toLowerCase();
+  showBest(sign);
   // An app's launch screen shows its icon while the game loads.
   document.documentElement.style.setProperty('--app-icon', 'url("' + new URL('icon-512.png?v=2', location.href).href + '")');
   for (var i = 0; i < 8; i++) {
@@ -269,9 +294,19 @@ window.blipSpendCoin = function () {
 // local best if no backend is configured (web/blip_config.js).
 window.blipGameOver = function (score) {
   if (!FREE_PLAY && getCoins() <= 0) overlay.classList.add('visible');
+  setTimeout(showBest, 1500);
   if (!window.blipScores) return;
   window.blipScores.onGameOver(GAME ? GAME.slug : null, score);
 };
+
+// The title bar's subtitle in app mode: the score to beat.
+function showBest(sign) {
+  sign = sign || document.getElementById('marquee-name');
+  if (!sign) return;
+  var t = blipTopEntry();
+  if (t) sign.dataset.best = 'Best ' + t.score.toLocaleString() + (t.name ? ' \u00b7 ' + t.name : '');
+  else delete sign.dataset.best;
+}
 
 // Return the leaderboard entry, or this browser's best and claimed handle.
 function blipTopEntry() {
@@ -369,9 +404,24 @@ var cardApi = (function () {
   install = install || guide ? '<p class="cc-install">' + guide + install + '</p>' : '';
   return blipControlsCard({
     label: 'HOW TO PLAY', name: GAME.name, html: '<div class="pc-legend">' + legendHtml(list) + '</div>' + install,
-    after: function () { try { canvas.focus({ preventScroll: true }); } catch (e) {} }
+    after: function (open) {
+      if (document.documentElement.hasAttribute('data-appstyle')) window.blipPause(open);
+      try { canvas.focus({ preventScroll: true }); } catch (e) {}
+    }
   });
 }());
+
+// ---- The score prompts as iOS alerts (app style) ---- Their labels stay
+// as written (code and tests match them); data-ios carries the title-case
+// label an alert shows.
+if (document.documentElement.hasAttribute('data-appstyle')) {
+  new MutationObserver(function () {
+    Array.prototype.forEach.call(document.querySelectorAll('.blip-hs-btn:not([data-ios])'), function (b) {
+      var t = b.textContent.trim();
+      b.dataset.ios = t === 'OK' ? t : t.toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
+    });
+  }).observe(document.body, { childList: true, subtree: true });
+}
 
 // ---- Saving this game to a home screen ---- Chrome and Android install it
 // from their own prompt; iOS can only be told where Share is. Either way the
@@ -442,7 +492,7 @@ function showGuide() {
   frame.src = '../guide.html?embed#/t/game-' + GAME.slug;
   sheet.appendChild(frame);
   document.body.appendChild(sheet);
-  if (window.BlipController) window.BlipController.releaseAll();
+  window.blipPause(true);
   frame.addEventListener('load', function () { try { frame.contentWindow.focus(); } catch (e) {} });
 }
 window.addEventListener('message', function (e) {
@@ -450,7 +500,11 @@ window.addEventListener('message', function (e) {
   var sheet = document.getElementById('guide-sheet');
   if (!sheet) return;
   sheet.classList.add('closing');
-  setTimeout(function () { sheet.remove(); try { canvas.focus({ preventScroll: true }); } catch (err) {} }, 260);
+  setTimeout(function () {
+    sheet.remove();
+    if (!document.documentElement.hasAttribute('data-card')) window.blipPause(false);
+    try { canvas.focus({ preventScroll: true }); } catch (err) {}
+  }, 260);
 });
 if (new URLSearchParams(location.search).has('install')) showInstallSheet();
 
@@ -502,8 +556,27 @@ function deckCover(bar) {
 /** Fullscreen on a PC: no deck and no cabinet frame, so the picture runs to
  * the edges under the top bar (see #fullscreen-btn in shell.css). */
 function bareScreen() {
-  return document.documentElement.hasAttribute('data-fullscreen') && !blipHasTouch();
+  var root = document.documentElement;
+  return root.hasAttribute('data-bare') || (root.hasAttribute('data-fullscreen') && !blipHasTouch());
 }
+
+// App mode needs no deck where nothing plays on it: a PC (keys or a pad),
+// or a tablet with a gamepad connected (kiosk.js sets data-pad), until a
+// finger touches the screen again.
+(function () {
+  var root = document.documentElement;
+  if (!root.hasAttribute('data-appstyle')) return;
+  var touched = false;
+  function update() {
+    var bare = !blipHasTouch() || (root.hasAttribute('data-pad') && !touched);
+    if (bare === root.hasAttribute('data-bare')) return;
+    root.toggleAttribute('data-bare', bare);
+    if (typeof fillCanvas === 'function') fillCanvas();
+  }
+  new MutationObserver(function () { if (!root.hasAttribute('data-pad')) touched = false; update(); })
+    .observe(root, { attributes: true, attributeFilter: ['data-pad'] });
+  document.addEventListener('touchstart', function () { if (!touched && root.hasAttribute('data-bare')) { touched = true; update(); } }, { passive: true, capture: true });
+}());
 
 var lastFit = '';
 function fillCanvas() {
@@ -642,6 +715,14 @@ window.addEventListener('unhandledrejection', function (e) { onGameStopped(e.rea
 function hideLoader() {
   if (gameStopped) return;
   if (loader && loader.style.display !== 'none') {
+    // An app's launch screen fades into the first frame.
+    if (document.documentElement.hasAttribute('data-appstyle') && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      var fading = loader.cloneNode(true);
+      fading.removeAttribute('id');
+      fading.className = 'launch-fade';
+      document.body.appendChild(fading);
+      fading.addEventListener('animationend', function () { fading.remove(); });
+    }
     loader.style.display = 'none';
     fillCanvas();
     if(!CABINET_SCREEN&&!document.querySelector('.blip-hs-modal'))canvas.focus();
