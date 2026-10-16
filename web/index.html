@@ -12,13 +12,21 @@
     html { background:#100d0b; }
     :root[data-cabinet-arranging] body { opacity:0; pointer-events:none; }
   </style>
-  <script>document.documentElement.setAttribute('data-cabinet-arranging', '');</script>
+  <script>
+    // The home screen was chosen: go there before the rack starts to build.
+    try {
+      var q = new URLSearchParams(location.search);
+      if (localStorage.getItem('blip-frontend') === 'home' && !q.has('cabinet') && !q.has('manual')) location.replace('home.html');
+    } catch (e) {}
+    try { sessionStorage.setItem('blip-freeplay', '0'); } catch (e) {}   // this session plays the cabinet's way
+    document.documentElement.setAttribute('data-cabinet-arranging', '');
+  </script>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/x-icon" href="favicon.ico?v=2">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
-  <link rel="stylesheet" href="kiosk.css?v=151">
+  <link rel="stylesheet" href="kiosk.css?v=152">
   <link rel="stylesheet" href="wear.css?v=12">
   <link rel="stylesheet" href="manual.css?v=49">
   <!-- Match the shared cabinet controls before first paint. -->
@@ -908,6 +916,7 @@
 <body class="cabinet-page">
 
   <a class="blip-logo led-logo" href="index.html" aria-label="BLIP — cabinet"><svg class="blip-led-display" viewBox="0 0 100 32" aria-hidden="true"><circle class="led-on" cx="4" cy="4" r="1.35"/><circle class="led-on" cx="8" cy="4" r="1.35"/><circle class="led-on" cx="12" cy="4" r="1.35"/><circle class="led-on" cx="16" cy="4" r="1.35"/><circle class="led-off" cx="20" cy="4" r="1.35"/><circle class="led-on" cx="4" cy="8" r="1.35"/><circle class="led-off" cx="8" cy="8" r="1.35"/><circle class="led-off" cx="12" cy="8" r="1.35"/><circle class="led-off" cx="16" cy="8" r="1.35"/><circle class="led-on" cx="20" cy="8" r="1.35"/><circle class="led-on" cx="4" cy="12" r="1.35"/><circle class="led-off" cx="8" cy="12" r="1.35"/><circle class="led-off" cx="12" cy="12" r="1.35"/><circle class="led-off" cx="16" cy="12" r="1.35"/><circle class="led-on" cx="20" cy="12" r="1.35"/><circle class="led-on" cx="4" cy="16" r="1.35"/><circle class="led-on" cx="8" cy="16" r="1.35"/><circle class="led-on" cx="12" cy="16" r="1.35"/><circle class="led-on" cx="16" cy="16" r="1.35"/><circle class="led-off" cx="20" cy="16" r="1.35"/><circle class="led-on" cx="4" cy="20" r="1.35"/><circle class="led-off" cx="8" cy="20" r="1.35"/><circle class="led-off" cx="12" cy="20" r="1.35"/><circle class="led-off" cx="16" cy="20" r="1.35"/><circle class="led-on" cx="20" cy="20" r="1.35"/><circle class="led-on" cx="4" cy="24" r="1.35"/><circle class="led-off" cx="8" cy="24" r="1.35"/><circle class="led-off" cx="12" cy="24" r="1.35"/><circle class="led-off" cx="16" cy="24" r="1.35"/><circle class="led-on" cx="20" cy="24" r="1.35"/><circle class="led-on" cx="4" cy="28" r="1.35"/><circle class="led-on" cx="8" cy="28" r="1.35"/><circle class="led-on" cx="12" cy="28" r="1.35"/><circle class="led-on" cx="16" cy="28" r="1.35"/><circle class="led-off" cx="20" cy="28" r="1.35"/><circle class="led-on" cx="28" cy="4" r="1.35"/><circle class="led-off" cx="32" cy="4" r="1.35"/><circle class="led-off" cx="36" cy="4" r="1.35"/><circle class="led-off" cx="40" cy="4" r="1.35"/><circle class="led-off" cx="44" cy="4" r="1.35"/><circle class="led-on" cx="28" cy="8" r="1.35"/><circle class="led-off" cx="32" cy="8" r="1.35"/><circle class="led-off" cx="36" cy="8" r="1.35"/><circle class="led-off" cx="40" cy="8" r="1.35"/><circle class="led-off" cx="44" cy="8" r="1.35"/><circle class="led-on" cx="28" cy="12" r="1.35"/><circle class="led-off" cx="32" cy="12" r="1.35"/><circle class="led-off" cx="36" cy="12" r="1.35"/><circle class="led-off" cx="40" cy="12" r="1.35"/><circle class="led-off" cx="44" cy="12" r="1.35"/><circle class="led-on" cx="28" cy="16" r="1.35"/><circle class="led-off" cx="32" cy="16" r="1.35"/><circle class="led-off" cx="36" cy="16" r="1.35"/><circle class="led-off" cx="40" cy="16" r="1.35"/><circle class="led-off" cx="44" cy="16" r="1.35"/><circle class="led-on" cx="28" cy="20" r="1.35"/><circle class="led-off" cx="32" cy="20" r="1.35"/><circle class="led-off" cx="36" cy="20" r="1.35"/><circle class="led-off" cx="40" cy="20" r="1.35"/><circle class="led-off" cx="44" cy="20" r="1.35"/><circle class="led-on" cx="28" cy="24" r="1.35"/><circle class="led-off" cx="32" cy="24" r="1.35"/><circle class="led-off" cx="36" cy="24" r="1.35"/><circle class="led-off" cx="40" cy="24" r="1.35"/><circle class="led-off" cx="44" cy="24" r="1.35"/><circle class="led-on" cx="28" cy="28" r="1.35"/><circle class="led-on" cx="32" cy="28" r="1.35"/><circle class="led-on" cx="36" cy="28" r="1.35"/><circle class="led-on" cx="40" cy="28" r="1.35"/><circle class="led-on" cx="44" cy="28" r="1.35"/><circle class="led-on" cx="52" cy="4" r="1.35"/><circle class="led-on" cx="56" cy="4" r="1.35"/><circle class="led-on" cx="60" cy="4" r="1.35"/><circle class="led-on" cx="64" cy="4" r="1.35"/><circle class="led-on" cx="68" cy="4" r="1.35"/><circle class="led-off" cx="52" cy="8" r="1.35"/><circle class="led-off" cx="56" cy="8" r="1.35"/><circle class="led-on" cx="60" cy="8" r="1.35"/><circle class="led-off" cx="64" cy="8" r="1.35"/><circle class="led-off" cx="68" cy="8" r="1.35"/><circle class="led-off" cx="52" cy="12" r="1.35"/><circle class="led-off" cx="56" cy="12" r="1.35"/><circle class="led-on" cx="60" cy="12" r="1.35"/><circle class="led-off" cx="64" cy="12" r="1.35"/><circle class="led-off" cx="68" cy="12" r="1.35"/><circle class="led-off" cx="52" cy="16" r="1.35"/><circle class="led-off" cx="56" cy="16" r="1.35"/><circle class="led-on" cx="60" cy="16" r="1.35"/><circle class="led-off" cx="64" cy="16" r="1.35"/><circle class="led-off" cx="68" cy="16" r="1.35"/><circle class="led-off" cx="52" cy="20" r="1.35"/><circle class="led-off" cx="56" cy="20" r="1.35"/><circle class="led-on" cx="60" cy="20" r="1.35"/><circle class="led-off" cx="64" cy="20" r="1.35"/><circle class="led-off" cx="68" cy="20" r="1.35"/><circle class="led-off" cx="52" cy="24" r="1.35"/><circle class="led-off" cx="56" cy="24" r="1.35"/><circle class="led-on" cx="60" cy="24" r="1.35"/><circle class="led-off" cx="64" cy="24" r="1.35"/><circle class="led-off" cx="68" cy="24" r="1.35"/><circle class="led-on" cx="52" cy="28" r="1.35"/><circle class="led-on" cx="56" cy="28" r="1.35"/><circle class="led-on" cx="60" cy="28" r="1.35"/><circle class="led-on" cx="64" cy="28" r="1.35"/><circle class="led-on" cx="68" cy="28" r="1.35"/><circle class="led-on" cx="76" cy="4" r="1.35"/><circle class="led-on" cx="80" cy="4" r="1.35"/><circle class="led-on" cx="84" cy="4" r="1.35"/><circle class="led-on" cx="88" cy="4" r="1.35"/><circle class="led-off" cx="92" cy="4" r="1.35"/><circle class="led-on" cx="76" cy="8" r="1.35"/><circle class="led-off" cx="80" cy="8" r="1.35"/><circle class="led-off" cx="84" cy="8" r="1.35"/><circle class="led-off" cx="88" cy="8" r="1.35"/><circle class="led-on" cx="92" cy="8" r="1.35"/><circle class="led-on" cx="76" cy="12" r="1.35"/><circle class="led-off" cx="80" cy="12" r="1.35"/><circle class="led-off" cx="84" cy="12" r="1.35"/><circle class="led-off" cx="88" cy="12" r="1.35"/><circle class="led-on" cx="92" cy="12" r="1.35"/><circle class="led-on" cx="76" cy="16" r="1.35"/><circle class="led-on" cx="80" cy="16" r="1.35"/><circle class="led-on" cx="84" cy="16" r="1.35"/><circle class="led-on" cx="88" cy="16" r="1.35"/><circle class="led-off" cx="92" cy="16" r="1.35"/><circle class="led-on" cx="76" cy="20" r="1.35"/><circle class="led-off" cx="80" cy="20" r="1.35"/><circle class="led-off" cx="84" cy="20" r="1.35"/><circle class="led-off" cx="88" cy="20" r="1.35"/><circle class="led-off" cx="92" cy="20" r="1.35"/><circle class="led-on" cx="76" cy="24" r="1.35"/><circle class="led-off" cx="80" cy="24" r="1.35"/><circle class="led-off" cx="84" cy="24" r="1.35"/><circle class="led-off" cx="88" cy="24" r="1.35"/><circle class="led-off" cx="92" cy="24" r="1.35"/><circle class="led-on" cx="76" cy="28" r="1.35"/><circle class="led-off" cx="80" cy="28" r="1.35"/><circle class="led-off" cx="84" cy="28" r="1.35"/><circle class="led-off" cx="88" cy="28" r="1.35"/><circle class="led-off" cx="92" cy="28" r="1.35"/></svg></a>
+  <button type="button" class="home-switch" id="home-switch-btn" aria-label="Switch to the home screen" title="Home screen"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="4" height="4" rx="1.2"/><rect x="7" y="1" width="4" height="4" rx="1.2"/><rect x="1" y="7" width="4" height="4" rx="1.2"/><rect x="7" y="7" width="4" height="4" rx="1.2"/></svg></button>
   <div class="top-marquee-bar"><span id="marquee-name" class="marquee-empty" aria-label="No game selected"><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span></span></div>
   <!-- Coin slot: top-right corner of the cabinet panel, mirroring the
        BLIP ARCADE logo at top-left. -->
@@ -1126,7 +1135,8 @@
   <script src="manual-motion.js?v=3"></script>
 
   <script src="howler.min.js"></script>
-  <script src="kiosk.js?v=95"></script>
+  <script src="blip_core.js?v=4"></script>
+  <script src="kiosk.js?v=96"></script>
   <script src="blip_controller.js?v=10"></script>
   <!-- Git-ignored, written at deploy: absent means no leaderboard. -->
   <script src="blip_config.js?v=1"></script>
@@ -1479,7 +1489,8 @@
     }
     if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){if(!manualOverlay.hidden)manualFitShown();});
     function manualAtoms(node,parents,out) {
-      if(node.nodeType!==1||node.classList.contains('divider'))return;
+      // Written for the app's Guide (guide.js), not this book.
+      if(node.nodeType!==1||node.classList.contains('divider')||node.matches('[data-guide="app"]'))return;
       if(node.tagName==='TABLE') {
         Array.from(node.rows).forEach(function(row){var table=node.cloneNode(false);table.appendChild(row.cloneNode(true));out.push({parents:parents,leaf:table});});return;
       }
@@ -2535,6 +2546,40 @@
         });
       });
     }, {once:true});
+  </script>
+  <script>
+    /* The switch to the home screen sits just right of the logo, else just
+       left of the manual; where the top bar has no room, on the rack below. */
+    (function () {
+      var button = document.getElementById('home-switch-btn');
+      button.addEventListener('click', function () {
+        blipSetFrontend('home');
+        location.replace('home.html');
+      });
+      function shown(el) {
+        if (!el) return null;
+        var style = getComputedStyle(el), r = el.getBoundingClientRect();
+        return r.width > 0 && style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) > 0.05 ? r : null;
+      }
+      function place() {
+        var logo = document.querySelector('.blip-logo').getBoundingClientRect();
+        var bar = document.querySelector('.top-marquee-bar').getBoundingClientRect();
+        var manual = shown(document.querySelector('.manual-pocket'));
+        var blockers = ['#card-button', '.manual-pocket', '#marquee-name', '.blip-power-indicator']
+          .map(function (q) { return shown(document.querySelector(q)); }).filter(Boolean);
+        var size = button.offsetWidth;
+        var free = function (x) { return x > logo.right + 4 && x + size < innerWidth - 8 && !blockers.some(function (b) { return x < b.right + 8 && x + size > b.left - 8; }); };
+        var left = [logo.right + 10, manual ? manual.left - 10 - size : -1].filter(free)[0];
+        var top = '';
+        if (left === undefined) { left = logo.left + 52; top = Math.round(bar.bottom + 12) + 'px'; }
+        button.style.left = Math.round(left) + 'px';
+        button.style.top = top;
+      }
+      place();
+      window.addEventListener('resize', place);
+      window.addEventListener('load', place);
+      if (typeof ResizeObserver === 'function') new ResizeObserver(place).observe(document.querySelector('.blip-logo'));
+    }());
   </script>
 </body>
 </html>

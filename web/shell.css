@@ -193,19 +193,20 @@ canvas {
 
 /* Fullscreen on a PC is the top bar and the picture: the keyboard plays, so
    the deck, its picker and the cabinet frame go. A touch screen keeps them
-   (data-has-touch), since the deck is what it plays on. */
-:root[data-fullscreen]:not([data-has-touch]) :is(#topbar, #control-toggle, #arcade-bezel, .bezel-screw, .cabinet-glass, .cab-rail) {
+   (data-has-touch), since the deck is what it plays on. App mode does the
+   same on a PC, or on a tablet with a gamepad in hand (data-bare). */
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) :is(#topbar, #control-toggle, #arcade-bezel, .bezel-screw, .cabinet-glass, .cab-rail) {
   display: none;
 }
 /* No cabinet behind the picture either. */
-:root[data-fullscreen]:not([data-has-touch]) body { background: #000; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) body { background: #000; }
 /* The picture starts right under the bar and runs to every edge, so nothing
    may lap over it: no vignette, no edge trim, and the bar's glows, the coin
    slot's swell and the logo's hint are cut off at the bar's own bottom. */
-:root[data-fullscreen]:not([data-has-touch]) body::after { display: none; }
-:root[data-fullscreen]:not([data-has-touch]) canvas { clip-path: none; }
-:root[data-fullscreen]:not([data-has-touch]) #marquee-bar { box-shadow: none; }
-:root[data-fullscreen]:not([data-has-touch]) :is(.blip-logo, #insert-coin-btn) {
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) body::after { display: none; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) canvas { clip-path: none; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) #marquee-bar { box-shadow: none; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) :is(.blip-logo, #insert-coin-btn) {
   clip-path: inset(0 -80px);
   transform: none !important;   /* beats the beckon's scale */
 }
@@ -234,7 +235,7 @@ canvas {
 #need-coin-overlay.visible {cursor:pointer}
 @keyframes nco-blink {50% {opacity:.35}}
 @media (prefers-reduced-motion:reduce) {.nco-go {animation:none}}
-:root[data-fullscreen]:not([data-has-touch]) #need-coin-overlay {
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) #need-coin-overlay {
   bottom:0;
 }
 
@@ -915,3 +916,295 @@ body.cabinet-page #touch-strip.held .ts-glass {
 }
 body.cabinet-page :is(.ts-tag,.ts-hint) {color:#c2b49c;font-family:'Courier New',monospace;}
 body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,0 0 12px #e8cea41a;}
+
+/* Free play (home screen, a game's own icon): no coin to put in. Hidden,
+   not removed, so the deck keeps the layout the layout tests measure. */
+:root[data-freeplay] .deck-coin-slot,
+:root[data-freeplay] .blip-power-indicator { visibility: hidden; }
+
+/* "Add to Home Screen": the game's icon and how to save it. */
+#install-sheet {
+  position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; padding: 16px;
+  background: rgba(0, 0, 0, .62);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+.install-card {
+  width: min(360px, 100%); padding: 22px 20px 16px; border-radius: 18px; text-align: center;
+  background: #1f1d26; color: #f2f2f7; box-shadow: 0 12px 40px rgba(0, 0, 0, .6);
+}
+.install-icon { width: 76px; height: 76px; border-radius: 17px; box-shadow: 0 4px 12px rgba(0, 0, 0, .5); }
+.install-card h2 { margin: 12px 0 6px; font-size: 19px; line-height: 1.25; }
+.install-lede, .install-wait { margin: 0 0 12px; font-size: 14px; line-height: 1.4; color: #c7c7cc; }
+.install-steps { margin: 0 0 14px; padding: 0 0 0 22px; text-align: left; font-size: 15px; line-height: 1.6; }
+.install-share { width: 14px; height: 18px; vertical-align: -3px; color: #0a84ff; }
+.install-actions { display: flex; flex-direction: column; gap: 8px; }
+.install-actions button {
+  min-height: 46px; border: 0; border-radius: 12px; font: 600 16px/1 inherit; cursor: pointer;
+  font-family: inherit;
+}
+.install-go { background: #0a84ff; color: #fff; }
+.install-close { background: rgba(255, 255, 255, .1); color: #f2f2f7; }
+.install-actions button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.cc-install { margin: 10px 0 0; text-align: center; }
+.cc-install button {
+  padding: 6px 10px; border: 1px solid currentColor; border-radius: 6px; background: none;
+  color: inherit; font: inherit; font-size: 11px; letter-spacing: .06em; cursor: pointer;
+}
+/* A phone on its side has no height to spare on the card. */
+:root[data-layout="landscape"] .cc-install { display: none; }
+
+/* ---- App style ---- A game opened from the home screen or its own icon
+   wears an app's look: a frosted title bar with a way Home, the game on
+   black, a plain deck. Sizes stay the cabinet's, so the picture is fitted
+   the same. */
+:root[data-appstyle] {
+  --app-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --app-tint: #0a84ff;
+  background: #000;
+}
+:root[data-appstyle] body { background: #000; }
+:root[data-appstyle] .cabinet-stars,
+:root[data-appstyle] .cab-rail,
+:root[data-appstyle] .screen-bezel .screw,
+:root[data-appstyle] .cabinet-glass,
+:root[data-appstyle] .manual-pocket,
+:root[data-appstyle] .marquee-bulbs,
+:root[data-appstyle] .jukebox-receiver,
+:root[data-appstyle] #card-sleeve,
+:root[data-appstyle] .logo-power-wire,
+:root[data-appstyle] .blip-led-display { display: none !important; }
+:root[data-appstyle] #arcade-bezel { background: #000; border: 0; box-shadow: none; border-radius: 0; }
+:root[data-appstyle] #arcade-bezel::before, :root[data-appstyle] #arcade-bezel::after { display: none; }
+
+:root[data-appstyle] #marquee-bar {
+  background: rgba(22, 22, 24, .78);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8);
+  border: 0; border-bottom: .5px solid rgba(255, 255, 255, .14); box-shadow: none;
+}
+:root[data-appstyle] #marquee-bar::before, :root[data-appstyle] #marquee-bar::after { display: none; }
+:root[data-appstyle] #marquee-bar.jukebox-marquee #marquee-name {
+  background: none; border: 0; box-shadow: none; pointer-events: none;
+}
+:root[data-appstyle] #marquee-name::before { display: none; }
+:root[data-appstyle] #marquee-name .marquee-letter { display: none; }
+:root[data-appstyle] #marquee-name::after {
+  content: attr(data-title);
+  font: 600 17px/1 var(--app-font); color: #fff; letter-spacing: -.01em;
+}
+/* Home: an app's back button, where the logo stands. */
+:root[data-appstyle] .blip-logo { display: none !important; }
+.app-back { display: none; }
+:root[data-appstyle] .app-back {
+  position: fixed; z-index: 520; display: flex; align-items: center; gap: 5px;
+  left: calc(env(safe-area-inset-left, 0px) + 8px);
+  top: calc(env(safe-area-inset-top, 0px) + (var(--cabinet-fascia-height, 52px) - 44px) / 2);
+  height: 44px; padding: 0 8px;
+  color: var(--app-tint); font: 400 17px/1 var(--app-font); text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+:root[data-appstyle] .app-back svg { width: 11px; height: 19px; }
+:root[data-appstyle] .app-back:active { opacity: .45; }
+:root[data-appstyle] .app-back:focus-visible { outline: 2px solid var(--app-tint); outline-offset: 2px; border-radius: 8px; }
+/* The controls card's "?" as an app's info button. */
+:root[data-appstyle] #card-button {
+  border: 1.5px solid var(--app-tint); background: none; box-shadow: none; color: var(--app-tint);
+  font: 600 13px/1 var(--app-font); text-shadow: none;
+}
+:root[data-appstyle] #card-button:hover, :root[data-appstyle][data-card] #card-button,
+:root[data-appstyle] body:has(#glcanvas) #card-button {
+  border-color: var(--app-tint); background: none; color: var(--app-tint); box-shadow: none; text-shadow: none;
+}
+:root[data-appstyle][data-card] #card-button { background: var(--app-tint); color: #fff; }
+
+/* The deck: matte black glass, no wood, no wear. */
+:root[data-appstyle] body.cabinet-page .deck-housing { background: #000 !important; box-shadow: none !important; border: 0 !important; }
+:root[data-appstyle] body.cabinet-page .deck-housing::before,
+:root[data-appstyle] body.cabinet-page .deck-housing::after { display: none !important; }
+/* The touch strip: a black trackpad. */
+:root[data-appstyle][data-touch] #touch-strip { background: #0e0e10; }
+:root[data-appstyle] .ts-glass {
+  background: #1c1c1e; box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .14); border-radius: 18px;
+}
+:root[data-appstyle] #touch-strip.held .ts-glass { background: #242426; }
+:root[data-appstyle][data-layout="upright"] .kiosk-bar > .deck-panel {
+  background: linear-gradient(180deg, #1c1c1e, #0e0e10) !important;
+  box-shadow: inset 0 .5px rgba(255, 255, 255, .16) !important;
+  border: 0 !important;
+  border-radius: 22px 22px 0 0;
+}
+:root[data-appstyle] .ts-hint, :root[data-appstyle] .ts-tag { font-family: var(--app-font) !important; }
+:root[data-appstyle] .kiosk-bar > .deck-panel::before,
+:root[data-appstyle] .kiosk-bar > .deck-panel::after { display: none; }
+
+/* The controller picker as a segmented control. */
+:root[data-appstyle] #control-toggle {
+  padding: 2px; border: 0; border-radius: 9px; background: rgba(118, 118, 128, .24); opacity: 1;
+}
+:root[data-appstyle] #control-toggle > button {
+  padding: 6px 10px; border: 0; border-radius: 7px;
+  font: 600 11px/1.2 var(--app-font); letter-spacing: 0; text-transform: none; color: #fff;
+  -webkit-font-smoothing: auto;
+}
+:root[data-appstyle] #control-toggle > button + button { border-left: 0; }
+:root[data-appstyle] #control-toggle > button[aria-checked="true"] {
+  background: #636366; color: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 3px 1px rgba(0, 0, 0, .04);
+}
+
+/* The launch screen: the icon on black while the game loads. */
+:root[data-appstyle] #loader { background: #000; gap: 28px; }
+:root[data-appstyle] #loader::before {
+  content: ''; width: 108px; height: 108px; border-radius: 24px;
+  background: var(--app-icon) center / cover no-repeat;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .6);
+}
+:root[data-appstyle] #status { display: none; }
+:root[data-appstyle] #bar-outer { width: 120px; height: 4px; border: 0; border-radius: 2px; background: rgba(255, 255, 255, .16); overflow: hidden; }
+:root[data-appstyle] #bar-inner { background: #fff; box-shadow: none; border-radius: 2px; }
+:root[data-appstyle][data-layout="upright"] .snes-pad .snes-shell {
+  background: linear-gradient(180deg, #242426, #121214) !important;
+  border: .5px solid rgba(255, 255, 255, .12) !important;
+  box-shadow: inset 0 .5px rgba(255, 255, 255, .14) !important;
+}
+:root[data-appstyle] .kiosk-bar { background: #000; border-top: 0; box-shadow: none; }
+
+/* The controls card as an app's panel: frosted, system type, plain keys. */
+:root[data-appstyle] #controls-card {
+  border: .5px solid rgba(255, 255, 255, .16); border-radius: 20px; padding: 16px 14px 14px;
+  background: rgba(30, 30, 32, .82);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55); font-family: var(--app-font);
+  transform: translate(-50%, -24px) scale(.96);
+  transition: transform .32s cubic-bezier(.32, .72, 0, 1), opacity .2s, visibility 0s .32s;
+}
+:root[data-appstyle][data-card] #controls-card {
+  transform: translate(-50%, 0); transition: transform .32s cubic-bezier(.32, .72, 0, 1), opacity .2s, visibility 0s;
+}
+:root[data-appstyle] #controls-card::before,
+:root[data-appstyle] #controls-card .cc-rod,
+:root[data-appstyle] #controls-card .cc-clamp,
+:root[data-appstyle] #controls-card .cc-punch,
+:root[data-appstyle] #controls-card .cc-foot { display: none; }
+:root[data-appstyle] .cc-paper { padding: 0; border: 0; background: none; box-shadow: none; color: #fff; }
+:root[data-appstyle] .cc-title { color: rgba(235, 235, 245, .6); font: 600 12px/1 var(--app-font); letter-spacing: .02em; text-transform: uppercase; }
+:root[data-appstyle] .cc-game { margin: 6px 0 14px; color: #fff; font: 700 24px/1.1 var(--app-font); letter-spacing: -.01em; text-transform: capitalize; }
+:root[data-appstyle] #controls-card .pc-legend { border-top: .5px solid rgba(255, 255, 255, .14); }
+:root[data-appstyle] .pc-label { color: rgba(235, 235, 245, .6); font: 500 12px/1 var(--app-font); letter-spacing: 0; text-transform: capitalize; }
+:root[data-appstyle] .pc-keys i { color: rgba(235, 235, 245, .45); font: 400 12px/1 var(--app-font); text-transform: none; }
+:root[data-appstyle] .pc-legend kbd {
+  border: 0; border-radius: 8px; background: rgba(118, 118, 128, .3); color: #fff;
+  font: 600 14px/1 var(--app-font); box-shadow: inset 0 -1px rgba(0, 0, 0, .3);
+}
+:root[data-appstyle] .pc-legend kbd.wide { font-size: 12px; letter-spacing: .02em; }
+:root[data-appstyle] .pc-legend kbd.left::before { border-right-color: #fff; }
+:root[data-appstyle] .pc-legend kbd.right::before { border-left-color: #fff; }
+:root[data-appstyle] .pc-legend kbd.up::before { border-bottom-color: #fff; }
+:root[data-appstyle] .pc-legend kbd.down::before { border-top-color: #fff; }
+:root[data-appstyle] .cc-install button {
+  border: 0; border-radius: 10px; padding: 9px 14px; background: var(--app-tint); color: #fff;
+  font: 600 13px/1 var(--app-font); letter-spacing: 0;
+}
+/* The cabinet hides its title tiles where the bar is crowded; an app's
+   title bar has room for its name. */
+:root[data-appstyle] #marquee-name { visibility: visible !important; }
+
+/* The Guide over a game: a sheet that rises from the bottom, its top edge
+   showing the game still underneath. */
+#guide-sheet {
+  position: fixed; inset: 0; z-index: 950; display: flex; align-items: flex-end;
+  background: rgba(0, 0, 0, .4);
+  animation: guide-dim .3s ease-out;
+}
+#guide-sheet iframe {
+  display: block; width: 100%; height: calc(100% - env(safe-area-inset-top, 0px) - 12px);
+  border: 0; border-radius: 12px 12px 0 0; background: #000;
+  animation: guide-up .42s cubic-bezier(.32, .72, 0, 1);
+}
+#guide-sheet.closing { animation: guide-dim .26s ease-in reverse forwards; }
+#guide-sheet.closing iframe { animation: guide-up .26s ease-in reverse forwards; }
+@keyframes guide-dim { from { background: transparent; } }
+@keyframes guide-up { from { transform: translateY(100%); } }
+@media (min-width: 768px) and (min-height: 700px) {
+  #guide-sheet { align-items: center; justify-content: center; }
+  #guide-sheet iframe { width: min(720px, 92vw); height: min(860px, 88vh); border-radius: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { #guide-sheet, #guide-sheet iframe { animation: none !important; } }
+:root[data-appstyle]:not([data-layout="landscape"]) .cc-install { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+:root[data-appstyle] #cc-guide { background: rgba(118, 118, 128, .3); }
+/* The "?" is the bar's trailing button, as in an iOS navigation bar. */
+:root[data-appstyle] #card-button { left: auto !important; right: calc(env(safe-area-inset-right, 0px) + 16px) !important; width: 26px; height: 26px; top: calc((var(--cabinet-fascia-height) - 26px) / 2 + env(safe-area-inset-top, 0px)); }
+
+/* The launch screen's copy, fading into the game's first frame. */
+.launch-fade {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+  background: #000; pointer-events: none; animation: launch-fade .35s ease-out .05s forwards;
+}
+.launch-fade::before { content: ''; width: 108px; height: 108px; border-radius: 24px; background: var(--app-icon) center / cover no-repeat; }
+.launch-fade > * { visibility: hidden; }
+@keyframes launch-fade { to { opacity: 0; } }
+
+/* The score to beat, under the title, as a navigation bar's subtitle. */
+:root[data-appstyle] #marquee-bar.jukebox-marquee #marquee-name {
+  flex-direction: column; gap: 3px; width: min(230px, calc(100vw - 210px)); padding: 0;
+  /* The same 44px line as the back button beside it. */
+  top: calc(env(safe-area-inset-top, 0px) + (var(--cabinet-fascia-height, 52px) - 44px) / 2) !important;
+  height: 44px !important; min-height: 44px !important;
+}
+:root[data-appstyle] #marquee-name::after { order: 1; }
+:root[data-appstyle] #marquee-name[data-best]::before {
+  display: block !important; order: 2; content: attr(data-best); max-width: 100%;
+  font: 400 12px/1 var(--app-font); color: rgba(235, 235, 245, .6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---- Score prompts as iOS alerts (app style) ---- */
+:root[data-appstyle] .blip-hs-modal { background: rgba(0, 0, 0, .45); -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root[data-appstyle] .blip-hs-panel:not(.showing-code) {
+  width: min(300px, 92vw); padding: 20px 16px 0; border: 0; border-radius: 14px;
+  background: rgba(37, 37, 41, .86); -webkit-backdrop-filter: blur(40px) saturate(1.8); backdrop-filter: blur(40px) saturate(1.8);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .4); color: #fff; font-family: var(--app-font);
+}
+:root[data-appstyle] .blip-hs-panel.showing-code { border: 0; border-radius: 14px; background: #1c1c1e; font-family: var(--app-font); }
+:root[data-appstyle] .blip-hs-title { font: 600 17px/1.3 var(--app-font); letter-spacing: 0; color: #fff; text-shadow: none; text-transform: lowercase; margin-bottom: 4px; }
+:root[data-appstyle] .blip-hs-sub { font: 400 13px/1.35 var(--app-font); letter-spacing: 0; color: rgba(235, 235, 245, .6); text-transform: lowercase; margin: 2px 0 10px; }
+:root[data-appstyle] .blip-hs-title::first-letter, :root[data-appstyle] .blip-hs-sub::first-letter { text-transform: uppercase; }
+:root[data-appstyle] .blip-hs-err { font: 400 13px/1.3 var(--app-font); color: #ff453a; }
+:root[data-appstyle] .blip-hs-input {
+  font: 400 17px/1 var(--app-font); letter-spacing: .04em; height: 36px; border: .5px solid rgba(255, 255, 255, .2);
+  border-radius: 8px; background: rgba(0, 0, 0, .35); color: #fff; text-shadow: none; box-shadow: none;
+}
+:root[data-appstyle] .blip-hs-input:focus { border-color: #0a84ff; }
+:root[data-appstyle] .blip-hs-row { margin: 14px -16px 0; gap: 0; border-top: .5px solid rgba(84, 84, 88, .65); flex-direction: row-reverse; }   /* the action on the right */
+:root[data-appstyle] .blip-hs-row + .blip-hs-row { margin-top: 0; }
+:root[data-appstyle] .blip-hs-btn {
+  flex: 1; min-height: 44px; margin: 0; padding: 0 8px; border: 0; border-radius: 0; background: none; box-shadow: none;
+  color: #0a84ff; font-size: 0; letter-spacing: 0; text-shadow: none;
+}
+:root[data-appstyle] .blip-hs-btn::after { content: attr(data-ios); font: 600 17px/1 var(--app-font); }
+:root[data-appstyle] .blip-hs-btn.ghost::after { font-weight: 400; }
+:root[data-appstyle] .blip-hs-btn + .blip-hs-btn { border-right: .5px solid rgba(84, 84, 88, .65); }
+:root[data-appstyle] .blip-hs-btn:focus-visible, :root[data-appstyle] .blip-hs-btn:active { background: rgba(255, 255, 255, .1); outline: none; }
+:root[data-appstyle] .blip-hs-btn:disabled { color: rgba(235, 235, 245, .3); }
+:root[data-appstyle] .blip-hs-list { font-family: var(--app-font); }
+:root[data-appstyle] .blip-hs-item { font: 400 15px/1.3 var(--app-font); color: #fff; letter-spacing: 0; }
+:root[data-appstyle] .blip-hs-item .hs-score { color: rgba(235, 235, 245, .6); }
+:root[data-appstyle] .blip-hs-item.me, :root[data-appstyle] .blip-hs-item.me .hs-rank, :root[data-appstyle] .blip-hs-item.me .hs-score { color: #30d158; }
+:root[data-appstyle] .blip-hs-stick { display: none; }
+
+/* "Turn sideways" in app style: a frosted card in system type. */
+:root[data-appstyle] #rotate-hint {
+  background: rgba(30, 30, 32, .82); -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px);
+  border-radius: 20px; font-family: var(--app-font); color: #fff;
+}
+:root[data-appstyle] #rotate-hint .rh-text { font: 600 17px/1.35 var(--app-font); letter-spacing: 0; text-shadow: none; text-transform: lowercase; }
+:root[data-appstyle] #rotate-hint .rh-text::first-letter { text-transform: uppercase; }
+:root[data-appstyle] #rotate-hint .rh-phone { border-color: #fff; box-shadow: inset 0 -6px 0 -3px #fff; border-radius: 9px; }
+:root[data-appstyle] #rotate-hint .rh-stay {
+  border: 0; border-radius: 12px; padding: 11px 18px; background: rgba(118, 118, 128, .3); color: #fff;
+  font: 600 15px/1 var(--app-font); letter-spacing: 0; text-transform: lowercase;
+}
+:root[data-appstyle] #rotate-hint .rh-stay::first-letter { text-transform: uppercase; }
+/* The first time: the card says how to begin. */
+:root[data-appstyle][data-intro] .cc-paper::after {
+  content: 'Press any key to play'; display: block; margin-top: 12px;
+  font: 400 13px/1.3 var(--app-font); color: rgba(235, 235, 245, .6);
+}
+:root[data-appstyle][data-intro][data-has-touch] .cc-paper::after { content: 'Tap to play'; }

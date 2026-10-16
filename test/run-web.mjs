@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 
 const LANES = [
   { name: 'game', concurrency: 1, files: ['touch', 'controls', 'two-player-touch-phones', 'bubbler-two-player-iphone'] },
-  { name: 'layout', concurrency: 2, files: ['manual', 'cabinet', 'two-player-deck', 'topbar-layout'] },
+  { name: 'layout', concurrency: 2, files: ['manual', 'cabinet', 'two-player-deck', 'topbar-layout', 'home'] },
 ];
 
 const codes = await Promise.all(LANES.map((lane) => new Promise((done) => {

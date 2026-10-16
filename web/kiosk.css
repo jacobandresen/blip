@@ -3767,12 +3767,12 @@ body :is(.about-label,.controls-label) {
   :root[data-layout="upright"][data-players="2"] :is(.snes-face.four,.fire-buttons.four) {grid-template-columns:var(--cap)!important}
   :root[data-layout="upright"][data-players="2"] {--mid:8px;--ctl-pr:8px}
 }
-:root[data-fullscreen]:not([data-has-touch]) .kiosk-bar:has(.deck-coin-slot) {
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .kiosk-bar:has(.deck-coin-slot) {
   display:block!important;height:0!important;background:none!important;border:0;
 }
-:root[data-fullscreen]:not([data-has-touch]) .kiosk-bar:has(.deck-coin-slot) > .deck-panel {display:none!important}
-:root[data-fullscreen]:not([data-has-touch]) .kiosk-bar #insert-coin-btn.deck-coin-slot,
-:root[data-fullscreen]:not([data-has-touch]) .kiosk-bar #kiosk-insert-btn.deck-coin-slot {
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .kiosk-bar:has(.deck-coin-slot) > .deck-panel {display:none!important}
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .kiosk-bar #insert-coin-btn.deck-coin-slot,
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .kiosk-bar #kiosk-insert-btn.deck-coin-slot {
   top:auto;bottom:0;height:56px!important;
 }
 
@@ -3878,7 +3878,7 @@ body .blip-logo.led-logo {
 .cabinet-manual.manual-away {visibility:hidden;pointer-events:none}
 .manual-transit {position:fixed;left:0;top:0;right:auto;margin:0;z-index:20001;pointer-events:none;transition:none;transform-origin:50% 75%}
 .manual-transit .manual-book-copy strong {font-size:inherit}
-:root[data-cabinet-screen] .manual-pocket,:root[data-fullscreen]:not([data-has-touch]) .manual-pocket {display:none}
+:root[data-cabinet-screen] .manual-pocket,:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .manual-pocket {display:none}
 @media(max-width:480px) {
   .manual-pocket {right:calc(env(safe-area-inset-right,0px) + 42px);top:calc((var(--cabinet-fascia-height) - 27px) / 2 + env(safe-area-inset-top,0px));width:94px;height:27px;padding:4px 4px 5px}
   .cabinet-manual {width:82px;height:19px;padding:0 4px 0 10px;font-size:7px}
@@ -4090,7 +4090,7 @@ body.cabinet-page #control-toggle > button:focus-visible {outline:1px solid #e1c
 }
 
 :root[data-layout="landscape"] .deck-housing,
-:root[data-fullscreen]:not([data-has-touch]) .deck-housing {display:none;}
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .deck-housing {display:none;}
 
 @media(max-width:520px) {
   :root[data-layout="upright"][data-caps="4"][data-controls][data-players="1"] {
@@ -4302,3 +4302,20 @@ body:has(.card-loaded):has(.jukebox-game-screen.game-ready) #card-button {
 .cc-lines {margin:0;padding:12px 4px 0;border-top:1px solid #65807777;list-style:none;text-align:left}
 .cc-lines li {margin:0 0 9px;font:13px/1.45 'Courier New',monospace;color:#30251d}
 .cc-lines b {color:#742e36}
+
+/* The cabinet's switch to the home screen: a brass button like the "?",
+   placed beside the logo by index.html. */
+.home-switch {
+  position:fixed;z-index:521;width:22px;height:22px;padding:0;display:grid;place-items:center;left:110px;
+  top:calc((var(--cabinet-fascia-height) - 22px) / 2 + env(safe-area-inset-top,0px));
+  border:1px solid #b79865;border-radius:50%;background:radial-gradient(circle at 35% 28%,#57432a,#24180e 75%);color:#eed4a3;
+  box-shadow:0 1px 3px #000b,inset 0 1px #fff3;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s,border-color .2s;
+}
+.home-switch svg {width:12px;height:12px;fill:currentColor}
+.home-switch:hover, .home-switch:focus-visible {
+  border-color:#ffe2a0;color:#fff9df;background:radial-gradient(circle at 35% 28%,#ffe8af,#bc752a 65%,#724015);
+  box-shadow:0 0 5px 2px #ffc85799,0 0 13px #ffb43b77,inset 0 1px 3px #fff6;
+}
+.home-switch:focus-visible {outline:2px solid #fff3ca;outline-offset:3px}
+/* A thumb needs more than the 22px disc. */
+.home-switch::after {content:'';position:absolute;inset:-10px}

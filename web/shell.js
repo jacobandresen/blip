@@ -10,6 +10,30 @@
 // at a kiosk can dismiss. They go to the console instead.
 window.alert = function (msg) { try { console.error('[blip] ' + msg); } catch (e) {} };
 
+// ---- Pause ---- The games have no pause of their own. In app mode the
+// controls card and the Guide stop the game as an app's menus do: the
+// runtime's frame callback (named `animation`) is held back and the sound
+// suspended. The engine caps a frame at 0.1s, so play resumes without a jump.
+(function () {
+  var paused = false, held = [];
+  var raf = window.requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = function (cb) {
+    if (paused && cb && cb.name === 'animation') { held.push(cb); return -1; }
+    return raf(cb);
+  };
+  window.blipPause = function (on) {
+    on = !!on;
+    if (on === paused) return;
+    paused = on;
+    document.documentElement.toggleAttribute('data-paused', on);
+    try {
+      if (typeof Howler !== 'undefined' && Howler.ctx) { if (on) Howler.ctx.suspend(); else Howler.ctx.resume(); }
+    } catch (e) {}
+    if (window.BlipController && on) window.BlipController.releaseAll();
+    if (!on) { var q = held; held = []; q.forEach(function (cb) { raf(cb); }); }
+  };
+}());
+
 var TOPBAR_H   = 56;
 var MARQUEE_H  = 94; // marquee and the card receiver beneath it
 var CABINET_SCREEN = new URLSearchParams(location.search).get('cabinet') === '1';
@@ -23,6 +47,8 @@ var barInner  = document.getElementById('bar-inner');
 var statusEl  = document.getElementById('status');
 var canvas    = document.getElementById('glcanvas');
 var overlay   = document.getElementById('need-coin-overlay');
+// Launched from the home screen or the game's own icon: no coins at all.
+var FREE_PLAY = blipFreePlay();
 
 // The runtime focuses its canvas at boot; a cabinet preview must leave keys with the Rolodex.
 if (CABINET_SCREEN) canvas.inert = true;
@@ -36,9 +62,15 @@ function returnToCabinet(event) {
   if (CABINET_SCREEN || returningToCabinet) return;
   returningToCabinet = true;
   var departure = { slug:GAME && GAME.slug, at:Date.now() };
-  try { departure.frame = canvas.toDataURL('image/png'); } catch (e) {}
-  try { sessionStorage.setItem('blip-cabinet-return', JSON.stringify(departure)); } catch (e) {}
-  location.href = '../index.html';
+  if (blipAppMode()) {
+    // The game's own app has nowhere else to go: back to its title.
+  } else if (document.documentElement.hasAttribute('data-appstyle')) {
+    try { sessionStorage.setItem('blip-home-return', JSON.stringify(departure)); } catch (e) {}
+  } else {
+    try { departure.frame = canvas.toDataURL('image/png'); } catch (e) {}
+    try { sessionStorage.setItem('blip-cabinet-return', JSON.stringify(departure)); } catch (e) {}
+  }
+  location.href = blipFrontendUrl();
 }
 
 // ---- Per-game marquee + cabinet accent ----
@@ -52,9 +84,13 @@ function returnToCabinet(event) {
   bar.id = 'marquee-bar';
   bar.className = 'jukebox-marquee';
   var sign = document.createElement('a');
-  sign.href='../index.html';sign.title='Return to the cabinet';
+  sign.href=blipFrontendUrl();sign.title=blipAppMode()?'Back to the title':'Return to the '+(blipFrontend()==='home'?'home screen':'cabinet');
   sign.id = 'marquee-name';
   sign.setAttribute('aria-label', game.name);
+  sign.dataset.title = game.name.charAt(0) + game.name.slice(1).toLowerCase();
+  showBest(sign);
+  // An app's launch screen shows its icon while the game loads.
+  document.documentElement.style.setProperty('--app-icon', 'url("' + new URL('icon-512.png?v=2', location.href).href + '")');
   for (var i = 0; i < 8; i++) {
     var char = '\u00a0';
     var tile = document.createElement('span');
@@ -74,6 +110,15 @@ function returnToCabinet(event) {
   markGameLoaded(game, bar);
   sign.addEventListener('click', returnToCabinet);
   document.querySelector('.blip-logo').addEventListener('click', returnToCabinet);
+  // An app's way back: "< Home" where the logo stands. A game in its own app has nowhere to go back to.
+  if (document.documentElement.hasAttribute('data-appstyle') && !blipAppMode()) {
+    var back = document.createElement('a');
+    back.className = 'app-back';
+    back.href = blipFrontendUrl();
+    back.innerHTML = '<svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Home';
+    back.addEventListener('click', returnToCabinet);
+    document.body.appendChild(back);
+  }
 
   var logo = document.querySelector('.blip-logo');
   if (logo) {
@@ -120,7 +165,7 @@ function returnToCabinet(event) {
       if (out) out.click(); else modal.remove();
       return;
     }
-    if (Date.now() - last >= IDLE_MS) window.location.href = '../index.html';
+    if (Date.now() - last >= IDLE_MS) window.location.href = blipFrontendUrl();
   }, 5000);
 }());
 
@@ -232,6 +277,7 @@ function playNoRoom() {
 // kept and the coins that go in next pay it before the game goes on.
 var coinsOwed = 0;
 window.blipSpendCoin = function () {
+  if (FREE_PLAY) return 1;
   var n = getCoins();
   if (n <= 0) {
     coinsOwed++;
@@ -247,10 +293,20 @@ window.blipSpendCoin = function () {
 // final score to the shared high-score board; a no-op beyond updating the
 // local best if no backend is configured (web/blip_config.js).
 window.blipGameOver = function (score) {
-  if (getCoins() <= 0) overlay.classList.add('visible');
+  if (!FREE_PLAY && getCoins() <= 0) overlay.classList.add('visible');
+  setTimeout(showBest, 1500);
   if (!window.blipScores) return;
   window.blipScores.onGameOver(GAME ? GAME.slug : null, score);
 };
+
+// The title bar's subtitle in app mode: the score to beat.
+function showBest(sign) {
+  sign = sign || document.getElementById('marquee-name');
+  if (!sign) return;
+  var t = blipTopEntry();
+  if (t) sign.dataset.best = 'Best ' + t.score.toLocaleString() + (t.name ? ' \u00b7 ' + t.name : '');
+  else delete sign.dataset.best;
+}
 
 // Return the leaderboard entry, or this browser's best and claimed handle.
 function blipTopEntry() {
@@ -337,12 +393,150 @@ var cardApi = (function () {
   var noTouch = !document.documentElement.hasAttribute('data-has-touch');
   var list = GAME && (noTouch ? GAME.controls : GAME.touchControls);
   if (!list) return null;
-  list = list.concat([['ANOTHER GAME', noTouch ? ['BACKSPACE'] : ['TAP BLIP LOGO']]]);
+  var appStyle = document.documentElement.hasAttribute('data-appstyle');
+  var exitLabel = blipAppMode() ? 'BACK TO THE TITLE' : appStyle ? 'HOME' : 'ANOTHER GAME';
+  // A game in its own app has no Home to tap, only Backspace back to its title.
+  if (noTouch || !blipAppMode()) list = list.concat([[exitLabel, noTouch ? ['BACKSPACE'] : [appStyle ? 'TAP ‹ HOME' : 'TAP BLIP LOGO']]]);
+  var install = blipStandalone() ? '' : '<button type="button" id="cc-install">' +
+    (appStyle ? 'Add to Home Screen' : 'ADD ' + GAME.name + ' TO HOME SCREEN') + '</button>';
+  // The app's Guide, open at this game's page (the cabinet has its book).
+  var guide = appStyle ? '<button type="button" id="cc-guide">Guide</button>' : '';
+  install = install || guide ? '<p class="cc-install">' + guide + install + '</p>' : '';
   return blipControlsCard({
-    label: 'HOW TO PLAY', name: GAME.name, html: '<div class="pc-legend">' + legendHtml(list) + '</div>',
-    after: function () { try { canvas.focus({ preventScroll: true }); } catch (e) {} }
+    label: 'HOW TO PLAY', name: GAME.name, html: '<div class="pc-legend">' + legendHtml(list) + '</div>' + install,
+    after: function (open) {
+      if (document.documentElement.hasAttribute('data-appstyle')) window.blipPause(open);
+      try { canvas.focus({ preventScroll: true }); } catch (e) {}
+    }
   });
 }());
+
+// ---- The score prompts as iOS alerts (app style) ---- Their labels stay
+// as written (code and tests match them); data-ios carries the title-case
+// label an alert shows.
+if (document.documentElement.hasAttribute('data-appstyle')) {
+  new MutationObserver(function () {
+    Array.prototype.forEach.call(document.querySelectorAll('.blip-hs-btn:not([data-ios])'), function (b) {
+      var t = b.textContent.trim();
+      b.dataset.ios = t === 'OK' ? t : t.toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
+    });
+  }).observe(document.body, { childList: true, subtree: true });
+}
+
+// ---- Saving this game to a home screen ---- Chrome and Android install it
+// from their own prompt; iOS can only be told where Share is. Either way the
+// saved page is ./?app, so the icon opens the game in its own app mode.
+function iosSafari() {
+  return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+function showInstallSheet() {
+  if (CABINET_SCREEN || blipStandalone() || !GAME || document.getElementById('install-sheet')) return;
+  try { history.replaceState(null, '', './?app'); } catch (e) {}
+  var name = GAME.name.charAt(0) + GAME.name.slice(1).toLowerCase();
+  var sheet = document.createElement('div');
+  sheet.id = 'install-sheet';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-labelledby', 'install-title');
+  var share = '<svg class="install-share" viewBox="0 0 16 20" aria-label="Share"><path d="M8 1v11M4.5 4.5 8 1l3.5 3.5M5 8H2v11h12V8h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var body = iosSafari()
+    ? '<ol class="install-steps"><li>Tap ' + share + ' <b>Share</b> in Safari\'s toolbar.</li><li>Choose <b>Add to Home Screen</b>.</li></ol>'
+    : '<p class="install-wait">Use your browser\'s menu: <b>Install app</b> or <b>Add to Home screen</b>.</p>';
+  sheet.innerHTML = '<div class="install-card"><img class="install-icon" src="icon-180.png?v=2" alt="">' +
+    '<h2 id="install-title">Add ' + name + ' to your Home Screen</h2>' +
+    '<p class="install-lede">Its icon opens ' + name + ' straight away, full screen, free to play.</p>' + body +
+    '<div class="install-actions"><button type="button" class="install-go" hidden>INSTALL</button><button type="button" class="install-close">NOT NOW</button></div></div>';
+  document.body.appendChild(sheet);
+  var go = sheet.querySelector('.install-go'), close = sheet.querySelector('.install-close');
+  function offer() {
+    if (!window.blipInstallPrompt) return;
+    go.hidden = false;
+    var wait = sheet.querySelector('.install-wait');
+    if (wait) wait.hidden = true;
+    go.focus();
+  }
+  function dismiss() {
+    sheet.remove();
+    try { canvas.focus({ preventScroll: true }); } catch (e) {}
+  }
+  go.addEventListener('click', function () {
+    var prompt = window.blipInstallPrompt;
+    window.blipInstallPrompt = null;
+    if (!prompt) return dismiss();
+    prompt.prompt();
+    (prompt.userChoice || Promise.resolve()).then(dismiss, dismiss);
+  });
+  close.addEventListener('click', dismiss);
+  sheet.addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.stopPropagation(); dismiss(); } });
+  document.addEventListener('blip-install-ready', offer);
+  offer();
+  if (go.hidden) close.focus();
+}
+window.blipShowInstallSheet = showInstallSheet;
+document.addEventListener('click', function (e) {
+  if (e.target.closest && e.target.closest('#cc-install')) showInstallSheet();
+  if (e.target.closest && e.target.closest('#cc-guide')) showGuide();
+});
+
+// ---- The Guide, as a sheet over the game ---- The game keeps its place
+// underneath; Done (a message from the guide) puts the sheet away.
+function showGuide() {
+  if (!GAME || document.getElementById('guide-sheet')) return;
+  var sheet = document.createElement('div');
+  sheet.id = 'guide-sheet';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-label', 'Guide');
+  var frame = document.createElement('iframe');
+  frame.title = 'Guide';
+  frame.src = '../guide.html?embed#/t/game-' + GAME.slug;
+  sheet.appendChild(frame);
+  document.body.appendChild(sheet);
+  window.blipPause(true);
+  frame.addEventListener('load', function () { try { frame.contentWindow.focus(); } catch (e) {} });
+}
+window.addEventListener('message', function (e) {
+  if (e.origin !== location.origin || !e.data || e.data.type !== 'blip-guide-close') return;
+  var sheet = document.getElementById('guide-sheet');
+  if (!sheet) return;
+  sheet.classList.add('closing');
+  setTimeout(function () {
+    sheet.remove();
+    if (!document.documentElement.hasAttribute('data-card')) window.blipPause(false);
+    try { canvas.focus({ preventScroll: true }); } catch (err) {}
+  }, 260);
+});
+if (new URLSearchParams(location.search).has('install')) showInstallSheet();
+
+// ---- App mode: the first time, how to play ---- The game's first frame
+// comes up under its controls card, paused; any key, tap or Escape starts
+// play. Once per game (blip-seen-<slug>).
+function introduceControls() {
+  var root = document.documentElement;
+  if (!cardApi || !GAME || !root.hasAttribute('data-appstyle') || CABINET_SCREEN) return;
+  var key = 'blip-seen-' + GAME.slug;
+  try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) { return; }
+  root.setAttribute('data-intro', '');
+  new MutationObserver(function (list, obs) {
+    if (!root.hasAttribute('data-card')) { root.removeAttribute('data-intro'); obs.disconnect(); }
+  }).observe(root, { attributes: true, attributeFilter: ['data-card'] });
+  cardApi.set(true);
+  function onKey(e) {
+    window.removeEventListener('keydown', onKey, true);
+    if (!root.hasAttribute('data-card')) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    cardApi.set(false);
+  }
+  window.addEventListener('keydown', onKey, true);
+}
+
+// A hidden app is a paused one: no music from a tab in the background.
+document.addEventListener('visibilitychange', function () {
+  var root = document.documentElement;
+  if (!root.hasAttribute('data-appstyle')) return;
+  if (document.hidden) window.blipPause(true);
+  else if (!root.hasAttribute('data-card') && !document.getElementById('guide-sheet')) window.blipPause(false);
+});
 
 // Mirror the overlay onto <body> (body.need-coin lights the coin button).
 // When it closes, a coin just went in: give focus back to the canvas so the
@@ -363,7 +557,7 @@ new MutationObserver(function () {
 
 // No credits on arrival (fresh session, deep link): the coin wall is up, and
 // it blocks injectKey() until a coin goes in.
-if (getCoins() <= 0) overlay.classList.add('visible');
+if (!FREE_PLAY && getCoins() <= 0) overlay.classList.add('visible');
 
 // ---- Canvas sizing ----
 // The kiosk bar is position:fixed;bottom:0. We leave PAD px on each side
@@ -392,8 +586,27 @@ function deckCover(bar) {
 /** Fullscreen on a PC: no deck and no cabinet frame, so the picture runs to
  * the edges under the top bar (see #fullscreen-btn in shell.css). */
 function bareScreen() {
-  return document.documentElement.hasAttribute('data-fullscreen') && !blipHasTouch();
+  var root = document.documentElement;
+  return root.hasAttribute('data-bare') || (root.hasAttribute('data-fullscreen') && !blipHasTouch());
 }
+
+// App mode needs no deck where nothing plays on it: a PC (keys or a pad),
+// or a tablet with a gamepad connected (kiosk.js sets data-pad), until a
+// finger touches the screen again.
+(function () {
+  var root = document.documentElement;
+  if (!root.hasAttribute('data-appstyle')) return;
+  var touched = false;
+  function update() {
+    var bare = !blipHasTouch() || (root.hasAttribute('data-pad') && !touched);
+    if (bare === root.hasAttribute('data-bare')) return;
+    root.toggleAttribute('data-bare', bare);
+    if (typeof fillCanvas === 'function') fillCanvas();
+  }
+  new MutationObserver(function () { if (!root.hasAttribute('data-pad')) touched = false; update(); })
+    .observe(root, { attributes: true, attributeFilter: ['data-pad'] });
+  document.addEventListener('touchstart', function () { if (!touched && root.hasAttribute('data-bare')) { touched = true; update(); } }, { passive: true, capture: true });
+}());
 
 var lastFit = '';
 function fillCanvas() {
@@ -474,7 +687,8 @@ function fillCanvas() {
  * (its window.onresize); a layout change without one (fullscreen, another
  * controller) would leave the game drawn for the old size, stretched. */
 function syncBuffer() {
-  if (canvas.width === canvas.clientWidth && canvas.height === canvas.clientHeight) return;
+  var dpr = window.high_dpi ? window.devicePixelRatio || 1 : 1;   // the runtime's high-DPI buffer (app style)
+  if (canvas.width === Math.floor(canvas.clientWidth * dpr) && canvas.height === Math.floor(canvas.clientHeight * dpr)) return;
   if (typeof window.onresize !== 'function') return;
   try { window.onresize(); } catch (e) { /* the game has not loaded yet */ }
 }
@@ -523,7 +737,7 @@ function onGameStopped(err) {
   if (loader) loader.style.display = 'flex';
   if (statusEl) statusEl.textContent = 'GAME STOPPED';
   if (barInner && barInner.parentNode) barInner.parentNode.style.display = 'none';
-  setTimeout(function () { window.location.href = '../index.html'; }, 2500);
+  setTimeout(function () { window.location.href = blipFrontendUrl(); }, 2500);
 }
 window.addEventListener('error', function (e) { onGameStopped(e.error); });
 window.addEventListener('unhandledrejection', function (e) { onGameStopped(e.reason); });
@@ -531,8 +745,17 @@ window.addEventListener('unhandledrejection', function (e) { onGameStopped(e.rea
 function hideLoader() {
   if (gameStopped) return;
   if (loader && loader.style.display !== 'none') {
+    // An app's launch screen fades into the first frame.
+    if (document.documentElement.hasAttribute('data-appstyle') && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      var fading = loader.cloneNode(true);
+      fading.removeAttribute('id');
+      fading.className = 'launch-fade';
+      document.body.appendChild(fading);
+      fading.addEventListener('animationend', function () { fading.remove(); });
+    }
     loader.style.display = 'none';
     fillCanvas();
+    introduceControls();
     if(!CABINET_SCREEN&&!document.querySelector('.blip-hs-modal'))canvas.focus();
   }
 }
@@ -577,7 +800,7 @@ canvas.addEventListener('webglcontextlost', function (e) {
   if (loader) loader.style.display = 'flex';
   if (statusEl) statusEl.textContent = 'ONE MOMENT';
   setTimeout(function () {
-    if (again) window.location.reload(); else window.location.href = '../index.html';
+    if (again) window.location.reload(); else window.location.href = blipFrontendUrl();
   }, 1200);
 }, false);
 
@@ -637,7 +860,7 @@ window.addEventListener('keydown', function (e) {
     dispatch(primary, 'keydown');
     setTimeout(function () { dispatch(primary, 'keyup'); }, 60);
   }
-  function goToKiosk() { window.location.href = '../index.html'; }
+  function goToKiosk() { window.location.href = blipFrontendUrl(); }
   // Backspace does it from the keyboard: a kiosk has no mouse for the logo.
   window.addEventListener('keydown', function (e) {
     if (e.key !== 'Backspace' || e.repeat) return;
