@@ -174,3 +174,26 @@ article { max-width: 680px; margin: 0 auto; }
 @media (prefers-reduced-motion: reduce) {
   .detail, .sidebar { transition: none; }
 }
+
+/* ---- Add Guide to Home Screen ---- A card that rises over the page. */
+.install-row::after { content: none; }
+.install-row .row-text { color: var(--tint); }
+.install-sheet {
+  position: fixed; z-index: 10; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); transform: translateX(-50%);
+  width: min(380px, calc(100% - 24px)); padding: 22px 20px 14px; border-radius: 18px; text-align: center;
+  background: var(--cell); box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .4), 0 12px 40px rgba(0, 0, 0, .35);
+  animation: install-up .32s cubic-bezier(.32, .72, 0, 1);
+}
+@keyframes install-up { from { transform: translate(-50%, 40px); opacity: 0; } }
+.install-sheet img { width: 72px; height: 72px; border-radius: 16px; }
+.install-sheet h2 { margin: 10px 0 4px; font: 600 1.0625rem/1.3 var(--font); }
+.install-sheet p { margin-bottom: 12px; font: 400 .9375rem/1.333 var(--font); color: var(--label-2); }
+.install-steps { margin: 0 0 14px 1.4em; text-align: left; line-height: 1.7; }
+.install-steps svg { width: 14px; height: 18px; vertical-align: -3px; fill: none; stroke: var(--tint); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.install-sheet button {
+  display: block; width: 100%; min-height: 46px; margin-top: 8px; border: 0; border-radius: 12px;
+  font: 600 1.0625rem/1 var(--font); cursor: pointer;
+}
+.install-go { background: var(--tint); color: #fff; }
+.install-close { background: var(--fill); color: var(--label); }
+@media (prefers-reduced-motion: reduce) { .install-sheet { animation: none; } }

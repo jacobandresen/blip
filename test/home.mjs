@@ -267,7 +267,7 @@ test('the Guide sets the manual\'s own chapters as an iOS guide, without the cab
   await page.goto(`${origin}/guide.html`);
   await page.locator('#guide[data-ready]').waitFor();
   const groups = await page.locator('#toc .group-title').allTextContents();
-  assert.deepEqual(groups, ['Getting started', 'Games', 'History', 'About']);
+  assert.deepEqual(groups, ['Getting started', 'Games', 'History', 'About', 'This guide']);
   assert.equal(await page.locator('#toc a[href^="#/t/game-"]').count(), 9);
   const titles = await page.locator('#toc .row').allTextContents();
   assert.ok(titles.some((x) => /Play on iPhone and iPad/.test(x)), 'the app\'s own section');
@@ -284,6 +284,29 @@ test('the Guide sets the manual\'s own chapters as an iOS guide, without the cab
   await page.locator('#guide-search').fill('hyperspace');
   const hits = await page.locator('#toc .row').evaluateAll((rows) => rows.map((r) => r.dataset.topic));
   assert.ok(hits.includes('game-meteors'));
+});
+
+test('the drawn status bar is for a PC: a phone or tablet has its own', async (t) => {
+  const { page, origin } = await phone(t);
+  await page.goto(`${origin}/home.html`);
+  assert.equal(await page.locator('.status-time').isVisible(), false);
+  const pc = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  await pc.page.goto(`${pc.origin}/home.html`);
+  assert.equal(await pc.page.locator('.status-time').isVisible(), true);
+  assert.equal(await pc.page.locator('.status-battery').isVisible(), true);
+});
+
+test('the Guide offers itself to the home screen with its own icon', async (t) => {
+  const { page, origin } = await phone(t);
+  await page.goto(`${origin}/home.html`);
+  assert.match(await page.locator('#dock-guide img').getAttribute('src'), /^guide-icon-192\.png/);
+  await page.goto(`${origin}/guide.html`);
+  await page.locator('#guide[data-ready]').waitFor();
+  assert.match(await page.locator('link[rel=apple-touch-icon]').getAttribute('href'), /^guide-icon-180\.png/);
+  await page.locator('.install-row').click();
+  await page.locator('#install-sheet').waitFor();
+  await page.locator('#install-close').click();
+  assert.ok(await page.locator('#install-sheet').isHidden());
 });
 
 test('the cabinet\'s manual leaves out what was written for the Guide', async (t) => {
@@ -309,6 +332,74 @@ test('over a game, Guide opens a sheet at that game, and Done puts it away', asy
   await frame.locator('#pane-detail .nav-done').click();
   await page.locator('#guide-sheet').waitFor({ state: 'detached' });
   assert.equal(new URL(page.url()).pathname, '/bouncer/', 'the game stayed where it was');
+});
+
+test('app mode on a PC needs no deck; a tablet drops it for a gamepad until touched', async (t) => {
+  const pc = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  await pc.page.route('**/*.wasm', () => {});
+  await pc.page.goto(`${pc.origin}/serpent/?app`);
+  await pc.page.waitForFunction(() => typeof BlipController === 'object');
+  const deck = (page) => page.evaluate(() => ({
+    bare: document.documentElement.hasAttribute('data-bare'),
+    deck: (() => { const t = document.getElementById('topbar'); return getComputedStyle(t).display !== 'none' && t.getBoundingClientRect().height > 2 && [...t.querySelectorAll('.snes-dpad, .stick-base, .ts-glass')].some((c) => c.getBoundingClientRect().height > 2); })(),
+    bottom: Math.round(document.getElementById('glcanvas').getBoundingClientRect().bottom),
+  }));
+  const shown = await deck(pc.page);
+  assert.equal(shown.bare, true);
+  assert.equal(shown.deck, false, 'no deck on a PC');
+  assert.ok(shown.bottom >= 790, `the picture runs to the bottom (${shown.bottom})`);
+  await pc.page.goto(`${pc.origin}/serpent/`);   // the cabinet's way keeps its deck
+  assert.equal((await deck(pc.page)).deck, true);
+
+  const { page, origin } = await phone(t);
+  await page.goto(`${origin}/serpent/?app`);
+  await page.waitForFunction(() => typeof BlipController === 'object');
+  assert.equal((await deck(page)).deck, true, 'a phone plays on its deck');
+  await page.evaluate(() => document.documentElement.setAttribute('data-pad', 'active'));   // as kiosk.js marks a pad
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-bare'));
+  assert.equal((await deck(page)).deck, false, 'a gamepad in hand needs no deck');
+  await page.touchscreen.tap(195, 300);
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-bare'));
+});
+
+test('in app mode the controls card and the Guide pause the game', async (t) => {
+  const { page, origin } = await phone(t, { reducedMotion: 'reduce' });
+  await page.goto(`${origin}/rally/?app`);
+  await page.waitForFunction(() => typeof BlipController === 'object');
+  const paused = () => page.evaluate(() => document.documentElement.hasAttribute('data-paused'));
+  await page.evaluate(() => document.getElementById('card-button').click());
+  assert.equal(await paused(), true, 'the card pauses');
+  await page.locator('#cc-guide').click();
+  const frame = page.frameLocator('#guide-sheet iframe');
+  await frame.locator('#guide[data-ready]').waitFor();
+  assert.equal(await paused(), true, 'the Guide keeps it paused');
+  await frame.locator('#pane-detail .nav-done').click();
+  await page.locator('#guide-sheet').waitFor({ state: 'detached' });
+  if (await page.evaluate(() => document.documentElement.hasAttribute('data-card'))) await page.evaluate(() => document.getElementById('card-button').click());
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-paused'));
+});
+
+test('the first time a game opens in app mode it shows its controls, paused, until a key', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  await page.goto(`${origin}/bouncer/?app`);   // the game itself runs here
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-card'), null, { timeout: 30000 });
+  assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-paused')), true);
+  assert.match(await page.locator('.cc-paper').evaluate((el) => getComputedStyle(el, '::after').content), /Press any key to play/);
+  await page.keyboard.press('Space');
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-card') && !document.documentElement.hasAttribute('data-paused'));
+  await page.reload();
+  await page.waitForFunction(() => document.getElementById('loader').style.display === 'none', null, { timeout: 30000 });
+  assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-card')), false, 'only the first time');
+});
+
+test('an icon\'s menu opens the game\'s page in the Guide', async (t) => {
+  const { page, origin } = await phone(t);
+  await page.goto(`${origin}/home.html`);
+  await page.locator('#app-grid [data-slug="adder"]').dispatchEvent('contextmenu');
+  await page.locator('[data-action="guide"]').click();
+  await page.waitForURL(`${origin}/guide.html#/t/game-adder`);
+  await page.locator('#guide[data-ready]').waitFor();
+  assert.equal(await page.locator('#article .large-title').textContent(), 'Adder');
 });
 
 test('each game page names itself and links its own manifest and icon', async (t) => {
@@ -377,6 +468,12 @@ test('Chrome finds each game installable as its own app', async (t) => {
     const { appId } = await cdp.send('Page.getAppId');
     assert.equal(new URL(appId).pathname, `/blip-${slug}`, 'each game is a separate app');
   }
+  // The Guide is an app of its own as well.
+  await page.goto(`${origin}/blip/guide.html`);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  assert.equal(new URL((await cdp.send('Page.getAppManifest')).url).pathname, '/blip/guide-manifest.json');
+  assert.deepEqual((await cdp.send('Page.getInstallabilityErrors')).installabilityErrors.map((e) => e.errorId), [], 'the Guide installs');
+  assert.equal(new URL((await cdp.send('Page.getAppId')).appId).pathname, '/blip-guide');
 });
 
 /** Width and height from a PNG's header. */

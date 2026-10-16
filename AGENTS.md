@@ -26,10 +26,11 @@ change will be overwritten the next time the project is built.
 | The home screen: icons, dock, Search, the long-press menu, edit mode (`blip-home-order`), Settings | `web/home.html`, `web/home.css`, `web/home.js` (nothing from the cabinet) |
 | App style: a game opened from the home screen or its own icon (`data-appstyle`), with `‹ Home`, a frosted title bar and a launch screen | `web/shell.css` (the `App style` section), `web/shell.js` |
 | The cabinet's switch to the home screen (`#home-switch-btn`) | `web/index.html`, `web/kiosk.css` |
-| Each game as its own home-screen app: icons (a small game card) and `manifest.json` | `tools/make_game_icons.mjs`, which writes `web/<game>/icon-*.png` and `manifest.json` (generated, not edited by hand) |
+| Each game as its own home-screen app: icons (a small game card) and `manifest.json` | `tools/make_game_icons.mjs`, which writes `web/<game>/icon-*.png` and `manifest.json`, and the Guide's (generated, not edited by hand) |
 | The "Add to Home Screen" sheet, free play and app mode on a game page | `web/shell.js`, `web/shell.css` |
 | App style's clean picture: no CRT (`blip_crt`), drawn at the screen's pixel density | `web/blip_bridge.js`, `crates/blip/src/ctx.rs` (`crt_look`); natively `BLIP_CRT=0` |
-| The app's Guide: the manual's chapters set as an iOS guide (also a sheet over an app-style game) | `web/guide.html`, `web/guide.css`, `web/guide.js`; its words stay in `controls.html`, `history.html`, `about.html` |
+| The app's Guide: the manual's chapters set as an iOS guide (also a sheet over an app-style game), an app of its own (`guide-manifest.json`, `guide-icon-*.png` from `tools/make_game_icons.mjs`) | `web/guide.html`, `web/guide.css`, `web/guide.js`; its words stay in `controls.html`, `history.html`, `about.html` |
+| App mode's game page: no deck on a PC or with a gamepad (`data-bare`), the pause (`blipPause`, for the controls card, the Guide and a hidden page), the controls card on first open (`blip-seen-<slug>`), the score to beat under the title | `web/shell.js`, `web/shell.css` |
 
 The home screen's zoom into a game ends with the icon where the game's
 launch screen (`#loader` in app style) shows it: 108px, 16px above the

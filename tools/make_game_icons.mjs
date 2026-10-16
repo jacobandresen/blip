@@ -4,7 +4,9 @@
 //   node tools/make_game_icons.mjs            (after a screenshot changes)
 //
 // Writes, per game in web/<slug>/: icon-180.png (apple-touch-icon),
-// icon-192.png, icon-512.png, icon-maskable-512.png and manifest.json.
+// icon-192.png, icon-512.png, icon-maskable-512.png and manifest.json; and
+// the Guide's own (web/guide-icon-*.png, web/guide-manifest.json), so the
+// manual can be saved to a home screen as an app of its own.
 // Generated: edit this file, not its output.
 
 import { writeFile } from 'node:fs/promises';
@@ -109,6 +111,36 @@ try {
     await writeFile(path.join(WEB_DIR, slug, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
     console.log(`[ok] ${slug}`);
   }
+
+  // The Guide: an open book on orange, as in the home screen's dock.
+  const GUIDE_HTML = `<!doctype html><html><head><style>
+* { margin: 0; } html, body { width: 512px; height: 512px; overflow: hidden; }
+.icon { position: absolute; inset: 0; display: grid; place-items: center; background: linear-gradient(160deg, #ffa53a, #ff7a00); }
+.maskable svg { width: 260px; }
+svg { width: 320px; filter: drop-shadow(0 6px 10px rgba(120, 50, 0, .35)); }
+</style></head><body><div class="icon"><svg viewBox="0 0 24 24"><path fill="#fff" d="M12 6.2C10.2 4.8 7.6 4.3 4.5 4.6c-.6 0-1 .5-1 1.1v11.8c0 .6.6 1.1 1.2 1 2.8-.3 5.2.2 6.8 1.5.3.2.7.2 1 0 1.6-1.3 4-1.8 6.8-1.5.6.1 1.2-.4 1.2-1V5.7c0-.6-.4-1.1-1-1.1-3.1-.3-5.7.2-7.5 1.6zm-.8 1.6v10c-1.7-.9-3.8-1.3-6.2-1.2V6.2c2.6-.1 4.7.4 6.2 1.6zm1.6 0c1.5-1.2 3.6-1.7 6.2-1.6v10.4c-2.4-.1-4.5.3-6.2 1.2z"/></svg></div></body></html>`;
+  await page.route(`${origin}/__guide.html`, (route) => route.fulfill({ contentType: 'text/html', body: GUIDE_HTML }));
+  await page.goto(`${origin}/__guide.html`);
+  for (const [file, size, maskable] of [['guide-icon-180.png', 180, false], ['guide-icon-192.png', 192, false], ['guide-icon-512.png', 512, false], ['guide-icon-maskable-512.png', 512, true]]) {
+    await page.evaluate((m) => document.querySelector('.icon').classList.toggle('maskable', m), maskable);
+    const html = await page.content();
+    const shot = await context.browser().newPage({ viewport: { width: 512, height: 512 }, deviceScaleFactor: size / 512 });
+    await shot.route(`${origin}/__guide.html`, (route) => route.fulfill({ contentType: 'text/html', body: html }));
+    await shot.goto(`${origin}/__guide.html`);
+    await writeFile(path.join(WEB_DIR, file), await shot.screenshot());
+    await shot.close();
+  }
+  await writeFile(path.join(WEB_DIR, 'guide-manifest.json'), JSON.stringify({
+    id: 'blip-guide', name: 'BLIP Guide', short_name: 'Guide',
+    start_url: 'guide.html', scope: 'guide.html', display: 'standalone',
+    background_color: '#000000', theme_color: '#000000',
+    icons: [
+      { src: 'guide-icon-192.png', sizes: '192x192', type: 'image/png' },
+      { src: 'guide-icon-512.png', sizes: '512x512', type: 'image/png' },
+      { src: 'guide-icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
+  }, null, 2) + '\n');
+  console.log('[ok] guide');
 } finally {
   await browser.close();
   await new Promise((r) => server.close(r));

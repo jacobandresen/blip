@@ -13,6 +13,8 @@ var rootPane = document.getElementById('pane-root');
 var detailPane = document.getElementById('pane-detail');
 var inlineTitle = document.getElementById('detail-inline-title');
 var EMBED = new URLSearchParams(location.search).has('embed');
+// Opened from its own home-screen icon: an app of its own, with nowhere to go back to.
+var OWN_APP = !EMBED && blipStandalone() && !document.referrer;
 var SOURCES = ['controls.html', 'history.html', 'about.html'];
 var GROUPS = ['Getting started', 'Games', 'History', 'About'];
 var topics = [], byId = {};
@@ -140,7 +142,7 @@ function readGames(controls, history) {
           var box = document.createDocumentFragment();
           var meta = el('div', 'hero-meta', '<img src="' + g.slug + '/icon-192.png?v=2" alt=""><span><b>' + (past ? text(past, '.game-origin') : g.name) + '</b><span class="row-sub">' +
             (BLIP_GAMES[g.slug].players === 2 || /2(ND)? PLAYER/.test(JSON.stringify(BLIP_GAMES[g.slug].controls || [])) ? '1 or 2 players' : '1 player') + '</span></span>');
-          if (!EMBED) {
+          if (!EMBED && !OWN_APP) {
             var play = meta.appendChild(el('a', 'play', 'Play'));
             play.href = g.slug + '/';
             // From the guide, as from the home screen: free play, back to the home screen.
@@ -275,6 +277,7 @@ document.addEventListener('keydown', function (e) {
 });
 
 // Opened over a game (its controls card): Done closes the sheet.
+if (OWN_APP) document.getElementById('nav-home').hidden = true;
 if (EMBED) {
   document.getElementById('nav-home').hidden = true;
   Array.prototype.forEach.call(document.querySelectorAll('.nav-done'), function (done) {
@@ -283,6 +286,41 @@ if (EMBED) {
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !current()) parent.postMessage({ type: 'blip-guide-close' }, location.origin); });
 }
+
+/* ---- The Guide on a home screen of its own ---- A row at the end of the
+ * contents, unless it is there already or open over a game. */
+var installSheet = document.getElementById('install-sheet');
+function iosSafari() { return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function offerInstall() {
+  if (EMBED || blipStandalone() || search.value) return;
+  toc.appendChild(el('h2', 'group-title', 'This guide'));
+  var ul = el('ul', 'group');
+  var li = el('li', 'with-icon');
+  var b = el('button', 'row install-row', '<img src="guide-icon-192.png?v=1" alt=""><span class="row-text">Add Guide to Home Screen</span>');
+  b.type = 'button';
+  b.addEventListener('click', openInstall);
+  li.appendChild(b); ul.appendChild(li); toc.appendChild(ul);
+}
+function openInstall() {
+  var go = document.getElementById('install-go');
+  var ios = iosSafari();
+  document.getElementById('install-steps').hidden = !ios;
+  document.getElementById('install-other').hidden = ios || !!window.blipInstallPrompt;
+  go.hidden = !window.blipInstallPrompt;
+  installSheet.hidden = false;
+  (go.hidden ? document.getElementById('install-close') : go).focus();
+}
+function closeInstall() { installSheet.hidden = true; }
+document.getElementById('install-close').addEventListener('click', closeInstall);
+document.getElementById('install-go').addEventListener('click', function () {
+  var prompt = window.blipInstallPrompt;
+  window.blipInstallPrompt = null;
+  closeInstall();
+  if (prompt) prompt.prompt();
+});
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !installSheet.hidden) closeInstall(); });
+var _renderToc = renderToc;
+renderToc = function (q) { _renderToc(q); if (!q && topics.length) offerInstall(); };
 
 /* ---- Load ---- */
 Promise.all(SOURCES.map(function (url) {
