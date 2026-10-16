@@ -188,6 +188,28 @@ test('Safari is shown the Share steps; Chrome gets its own Install button', asyn
   await page.waitForFunction(() => window.__prompted === 1 && !document.getElementById('install-sheet'));
 });
 
+test('any game can start in app mode: from a link with ?app, or once the home screen is chosen', async (t) => {
+  const { page, origin } = await phone(t);
+  const appStyle = () => page.evaluate(() => document.documentElement.hasAttribute('data-appstyle'));
+  for (const slug of ['rally', 'brawler']) {
+    await page.goto(`${origin}/${slug}/?app`);   // a fresh browser, no front end chosen
+    await page.waitForFunction(() => typeof BlipController === 'object');
+    assert.equal(await appStyle(), true, `${slug}: app style`);
+    assert.equal(await coinWall(page), false, `${slug}: free to play`);
+  }
+  await page.locator('.app-back').click();
+  await page.waitForURL(`${origin}/home.html`);
+
+  // A new session, straight to a game: the home screen is the choice, so app mode.
+  await page.evaluate(() => sessionStorage.clear());
+  await page.goto(`${origin}/meteors/`);
+  await page.waitForFunction(() => typeof BlipController === 'object');
+  assert.equal(await appStyle(), true);
+  // The cabinet's preview of a game is the cabinet's, whatever the choice.
+  await page.goto(`${origin}/meteors/?cabinet=1`);
+  assert.equal(await appStyle(), false);
+});
+
 test('opened from its own icon, a game plays free and stays itself', async (t) => {
   const { page, origin } = await phone(t);
   await page.addInitScript(STANDALONE);

@@ -18,7 +18,7 @@
       var q = new URLSearchParams(location.search);
       if (localStorage.getItem('blip-frontend') === 'home' && !q.has('cabinet') && !q.has('manual')) location.replace('home.html');
     } catch (e) {}
-    try { sessionStorage.removeItem('blip-freeplay'); } catch (e) {}
+    try { sessionStorage.setItem('blip-freeplay', '0'); } catch (e) {}   // this session plays the cabinet's way
     document.documentElement.setAttribute('data-cabinet-arranging', '');
   </script>
   <link rel="manifest" href="manifest.json">
@@ -1135,7 +1135,7 @@
   <script src="manual-motion.js?v=3"></script>
 
   <script src="howler.min.js"></script>
-  <script src="blip_core.js?v=2"></script>
+  <script src="blip_core.js?v=3"></script>
   <script src="kiosk.js?v=96"></script>
   <script src="blip_controller.js?v=10"></script>
   <!-- Git-ignored, written at deploy: absent means no leaderboard. -->

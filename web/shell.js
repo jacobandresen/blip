@@ -40,7 +40,7 @@ function returnToCabinet(event) {
   var departure = { slug:GAME && GAME.slug, at:Date.now() };
   if (blipAppMode()) {
     // The game's own app has nowhere else to go: back to its title.
-  } else if (blipFrontend() === 'home') {
+  } else if (document.documentElement.hasAttribute('data-appstyle')) {
     try { sessionStorage.setItem('blip-home-return', JSON.stringify(departure)); } catch (e) {}
   } else {
     try { departure.frame = canvas.toDataURL('image/png'); } catch (e) {}

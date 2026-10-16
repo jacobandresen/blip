@@ -276,8 +276,7 @@ function blipFrontend() {
 function blipSetFrontend(which) {
   try { localStorage.setItem('blip-frontend', which === 'home' ? 'home' : 'cabinet'); } catch (e) {}
   try {
-    if (which === 'home') sessionStorage.setItem('blip-freeplay', '1');
-    else sessionStorage.removeItem('blip-freeplay');
+    sessionStorage.setItem('blip-freeplay', which === 'home' ? '1' : '0');
   } catch (e) {}
 }
 
@@ -299,16 +298,25 @@ function blipAppMode() {
   return !document.referrer && !visited;
 }
 
-/** No coins: a game launched from the home screen or its own icon. */
+/** App mode, free to play: any game can start this way. Its own icon,
+ * a link with ?app, a launch from the home screen, or any visit while the
+ * home screen is the front end chosen. A session that has the cabinet open
+ * ('blip-freeplay' 0) keeps coins, and the cabinet's preview always does. */
 function blipFreePlay() {
   if (blipAppMode()) return true;
-  try { return sessionStorage.getItem('blip-freeplay') === '1'; } catch (e) { return false; }
+  var q = new URLSearchParams(location.search);
+  if (q.get('cabinet') === '1') return false;
+  if (q.has('app')) return true;
+  var session = null;
+  try { session = sessionStorage.getItem('blip-freeplay'); } catch (e) {}
+  if (session !== null) return session === '1';
+  return blipFrontend() === 'home';
 }
 
 /** Where a game page goes back to, relative to the game's directory. */
 function blipFrontendUrl() {
   if (blipAppMode()) return './?app';
-  return blipFrontend() === 'home' ? '../home.html' : '../index.html';
+  return blipFreePlay() || blipFrontend() === 'home' ? '../home.html' : '../index.html';
 }
 
 (function () {
