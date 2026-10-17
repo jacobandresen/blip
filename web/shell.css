@@ -903,6 +903,13 @@ canvas {
 
 :root[data-cabinet-screen] body::after { display:none; }
 
+/* Amstrad mode is a game inside the CPC monitor; the host keeps the case. */
+:root[data-amstrad] body::after,
+:root[data-amstrad] :is(.blip-logo,#insert-coin-btn,#topbar,#control-toggle,#controls-card,#marquee-bar,#arcade-bezel,.bezel-screw,.cabinet-glass,.cab-rail,#need-coin-overlay) { display:none!important; }
+:root[data-amstrad] body { background:#000; }
+:root[data-amstrad] canvas { clip-path:none; }
+:root[data-amstrad] .app-back { display:none!important; }
+
 :root[data-touch][data-layout="upright"] #touch-strip {
   background:none;
   transform:rotateX(var(--bar-tilt,26deg));transform-origin:50% 100%;

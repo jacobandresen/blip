@@ -1,4 +1,4 @@
-/* What every BLIP page shares, cabinet or home screen: the games, coins,
+/* What every BLIP page shares: the games, coins,
  * the layout rule, sound on/off, fullscreen and the front-end choice. Load
  * it before kiosk.js; the home screen loads it alone. */
 var BLIP_CORE_SRC = document.currentScript ? document.currentScript.src : location.href;
@@ -267,16 +267,18 @@ if (blipMuted()) {
 }());
 
 
-/* ---- Front ends ---- The rolodex cabinet (index.html) or the home screen
- * (home.html), stored as 'blip-frontend'. A game page leaves for the one
- * chosen; a game saved as its own app (blipAppMode) never leaves itself. */
+/* ---- Front ends ---- The cabinet, home screen or BASIC computer. */
 function blipFrontend() {
-  try { return localStorage.getItem('blip-frontend') === 'home' ? 'home' : 'cabinet'; } catch (e) { return 'cabinet'; }
+  try {
+    var which = localStorage.getItem('blip-frontend');
+    return which === 'home' || which === 'basic' ? which : 'cabinet';
+  } catch (e) { return 'cabinet'; }
 }
 function blipSetFrontend(which) {
-  try { localStorage.setItem('blip-frontend', which === 'home' ? 'home' : 'cabinet'); } catch (e) {}
+  which = which === 'home' || which === 'basic' ? which : 'cabinet';
+  try { localStorage.setItem('blip-frontend', which); } catch (e) {}
   try {
-    sessionStorage.setItem('blip-freeplay', which === 'home' ? '1' : '0');
+    sessionStorage.setItem('blip-freeplay', which === 'cabinet' ? '0' : '1');
   } catch (e) {}
 }
 
@@ -298,11 +300,17 @@ function blipAppMode() {
   return !document.referrer && !visited;
 }
 
+/** A game running inside the Amstrad front end's monitor. */
+function blipAmstradMode() {
+  return new URLSearchParams(location.search).has('amstrad') && !!blipGameFromPath(location.pathname);
+}
+
 /** App mode, free to play: any game can start this way. Its own icon,
  * a link with ?app, a launch from the home screen, or any visit while the
- * home screen is the front end chosen. A session that has the cabinet open
+ * home screen or BASIC is the front end chosen. A session that has the cabinet open
  * ('blip-freeplay' 0) keeps coins, and the cabinet's preview always does. */
 function blipFreePlay() {
+  if (blipAmstradMode()) return true;
   if (blipAppMode()) return true;
   var q = new URLSearchParams(location.search);
   if (q.get('cabinet') === '1') return false;
@@ -310,18 +318,20 @@ function blipFreePlay() {
   var session = null;
   try { session = sessionStorage.getItem('blip-freeplay'); } catch (e) {}
   if (session !== null) return session === '1';
-  return blipFrontend() === 'home';
+  return blipFrontend() !== 'cabinet';
 }
 
 /** Where a game page goes back to, relative to the game's directory. */
 function blipFrontendUrl() {
   if (blipAppMode()) return './?app';
-  return blipFreePlay() || blipFrontend() === 'home' ? '../home.html' : '../index.html';
+  if (!blipFreePlay()) return '../index.html';
+  return blipFrontend() === 'basic' ? '../basic.html' : '../home.html';
 }
 
 (function () {
   var root = document.documentElement;
   if (blipGameFromPath(location.pathname)) {
+    if (blipAmstradMode()) root.setAttribute('data-amstrad', '');
     // Opened as an app (home screen, or its own icon): an app's look, not the cabinet's.
     if (blipFreePlay()) { root.setAttribute('data-freeplay', ''); root.setAttribute('data-appstyle', ''); }
     // An app on a PC plays from the keyboard or a gamepad: no deck on screen.

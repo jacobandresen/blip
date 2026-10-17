@@ -399,6 +399,18 @@ test('the joystick steps the rack from any part of its ball, the top that stands
   }
 });
 
+test('the home and BLIP switches stay separate on a narrow phone', async (t) => {
+  const { page } = await openCabinet(t, { width: 320, height: 568 });
+  const boxes = await page.evaluate(() => ['home-switch-btn', 'basic-switch-btn'].map((id) => {
+    const r = document.getElementById(id).getBoundingClientRect();
+    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+  }));
+  assert.ok(boxes[0].right <= boxes[1].left || boxes[1].right <= boxes[0].left ||
+    boxes[0].bottom <= boxes[1].top || boxes[1].bottom <= boxes[0].top,
+  'the two front-end switches do not overlap');
+  assert.ok(boxes[1].right <= 320, 'the BLIP switch stays on screen');
+});
+
 test('the pick panel sits dark until a credit powers the cabinet', async (t) => {
   const { page } = await openCabinet(t);
   const filter = () => page.evaluate(() => getComputedStyle(document.getElementById('card-pick')).filter);

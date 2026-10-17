@@ -114,6 +114,11 @@ body {
 .search-pill svg { width: 12px; height: 12px; }
 .search-pill:active { background: rgba(255, 255, 255, .3); }
 .search-pill:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.home-actions { display:flex; justify-content:center; align-items:center; gap:8px; margin:0 auto 12px; }
+.home-actions .search-pill { margin:0; }
+.basic-pill { display:flex; align-items:center; justify-content:center; min-width:64px; padding:8px 12px; border-radius:16px; background:rgba(255,255,255,.2); color:#fff; text-decoration:none; font:600 13px/1 var(--font); -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px); }
+.basic-pill img { width:42px; height:auto; filter:invert(1); }
+.basic-pill:hover,.basic-pill:focus-visible { background:rgba(255,255,255,.3); outline:2px solid #fff; outline-offset:2px; }
 .search-sheet {
   position: fixed; inset: 0; z-index: 25;
   padding: calc(env(safe-area-inset-top, 0px) + 14px) calc(env(safe-area-inset-right, 0px) + 16px) 16px calc(env(safe-area-inset-left, 0px) + 16px);
@@ -163,10 +168,17 @@ body {
 .app-icon.icon-arcade {
   background: linear-gradient(160deg, #5a3a22, #2a1a10 75%);
 }
+.app-icon.icon-amstrad {
+  background:linear-gradient(145deg,#d4d1c6,#777a80 72%,#45464a);
+}
 .app-icon.icon-settings {
   background: linear-gradient(160deg, #8e8e93, #48484c);
 }
 .app-icon svg { position: absolute; inset: 14%; width: 72%; height: 72%; }
+@media (max-width: 699px) {
+  .dock-row { gap:10px; }
+  .dock .app-icon { --dock-icon:clamp(40px,calc((100vw - 90px - 40px) / 5),50px); }
+}
 
 /* ---- Sheets ---- */
 .sheet-backdrop {

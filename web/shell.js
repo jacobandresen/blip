@@ -59,12 +59,13 @@ var returningToCabinet = false;
 function returnToCabinet(event) {
   if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
   if (event) event.preventDefault();
+  if (blipAmstradMode()) { parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin); return; }
   if (CABINET_SCREEN || returningToCabinet) return;
   returningToCabinet = true;
   var departure = { slug:GAME && GAME.slug, at:Date.now() };
   if (blipAppMode()) {
     // The game's own app has nowhere else to go: back to its title.
-  } else if (document.documentElement.hasAttribute('data-appstyle')) {
+  } else if (blipFrontend() === 'home' && document.documentElement.hasAttribute('data-appstyle')) {
     try { sessionStorage.setItem('blip-home-return', JSON.stringify(departure)); } catch (e) {}
   } else {
     try { departure.frame = canvas.toDataURL('image/png'); } catch (e) {}
@@ -84,7 +85,7 @@ function returnToCabinet(event) {
   bar.id = 'marquee-bar';
   bar.className = 'jukebox-marquee';
   var sign = document.createElement('a');
-  sign.href=blipFrontendUrl();sign.title=blipAppMode()?'Back to the title':'Return to the '+(blipFrontend()==='home'?'home screen':'cabinet');
+  sign.href=blipFrontendUrl();sign.title=blipAppMode()?'Back to the title':'Return to the '+({home:'home screen',basic:'Amstrad',cabinet:'cabinet'}[blipFrontend()]);
   sign.id = 'marquee-name';
   sign.setAttribute('aria-label', game.name);
   sign.dataset.title = game.name.charAt(0) + game.name.slice(1).toLowerCase();
@@ -115,7 +116,7 @@ function returnToCabinet(event) {
     var back = document.createElement('a');
     back.className = 'app-back';
     back.href = blipFrontendUrl();
-    back.innerHTML = '<svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Home';
+    back.innerHTML = '<svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' + (blipFrontend() === 'basic' ? 'Amstrad' : 'Home');
     back.addEventListener('click', returnToCabinet);
     document.body.appendChild(back);
   }
@@ -165,7 +166,10 @@ function returnToCabinet(event) {
       if (out) out.click(); else modal.remove();
       return;
     }
-    if (Date.now() - last >= IDLE_MS) window.location.href = blipFrontendUrl();
+    if (Date.now() - last >= IDLE_MS) {
+      if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
+      else window.location.href = blipFrontendUrl();
+    }
   }, 5000);
 }());
 
@@ -618,7 +622,8 @@ function fillCanvas() {
   }
   applyLayout();
   var tb = document.getElementById('topbar');
-  var bare = bareScreen();
+  var amstrad = blipAmstradMode();
+  var bare = bareScreen() || amstrad;
   // The frame is FRAME_PAD wide; without it the picture needs no margin.
   var PAD = bare ? 0 : FRAME_PAD;
   var screenInset = bare ? 0 : FRAME_PAD + 1;
@@ -628,7 +633,7 @@ function fillCanvas() {
   // Sideways the deck sits in the gutters. Upright, reserve its full panel.
   TOPBAR_H = bare || landscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
   var mb = document.getElementById('marquee-bar');
-  if (mb) {
+  if (mb && !amstrad) {
     var receiver = bare ? null : mb.querySelector('.jukebox-receiver');
     var receiverBottom = receiver
       ? Math.ceil(parseFloat(getComputedStyle(receiver).top) + receiver.offsetHeight)
@@ -737,7 +742,10 @@ function onGameStopped(err) {
   if (loader) loader.style.display = 'flex';
   if (statusEl) statusEl.textContent = 'GAME STOPPED';
   if (barInner && barInner.parentNode) barInner.parentNode.style.display = 'none';
-  setTimeout(function () { window.location.href = blipFrontendUrl(); }, 2500);
+  setTimeout(function () {
+    if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
+    else window.location.href = blipFrontendUrl();
+  }, 2500);
 }
 window.addEventListener('error', function (e) { onGameStopped(e.error); });
 window.addEventListener('unhandledrejection', function (e) { onGameStopped(e.reason); });
@@ -800,7 +808,9 @@ canvas.addEventListener('webglcontextlost', function (e) {
   if (loader) loader.style.display = 'flex';
   if (statusEl) statusEl.textContent = 'ONE MOMENT';
   setTimeout(function () {
-    if (again) window.location.reload(); else window.location.href = blipFrontendUrl();
+    if (again) window.location.reload();
+    else if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
+    else window.location.href = blipFrontendUrl();
   }, 1200);
 }, false);
 
@@ -860,9 +870,15 @@ window.addEventListener('keydown', function (e) {
     dispatch(primary, 'keydown');
     setTimeout(function () { dispatch(primary, 'keyup'); }, 60);
   }
-  function goToKiosk() { window.location.href = blipFrontendUrl(); }
+  function goToKiosk() {
+    if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
+    else window.location.href = blipFrontendUrl();
+  }
   // Backspace does it from the keyboard: a kiosk has no mouse for the logo.
   window.addEventListener('keydown', function (e) {
+    if (blipAmstradMode() && e.key === 'Escape') {
+      e.preventDefault(); e.stopImmediatePropagation(); goToKiosk(); return;
+    }
     if (e.key !== 'Backspace' || e.repeat) return;
     if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
     e.preventDefault();

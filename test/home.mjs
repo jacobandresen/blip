@@ -45,11 +45,26 @@ test('the home screen shows every game as an app with its own icon, and nothing 
   assert.deepEqual(apps.map((a) => a.slug).sort(), [...GAMES].sort());
   for (const a of apps) assert.match(a.src, new RegExp(`^${a.slug}/icon-192\\.png`));
   assert.deepEqual(apps.filter((a) => a.badge).map((a) => a.slug).sort(), ['adder', 'brawler', 'bubbler', 'rally']);
-  assert.ok(await page.locator('#dock-arcade').isVisible(), 'the dock has the way back to the cabinet');
+  assert.ok(await page.locator('#dock-arcade').isVisible(), 'the dock has the way back to BLIP Home');
+  assert.equal(await page.locator('#dock-arcade').getAttribute('aria-label'), 'BLIP Home');
+  assert.match(await page.locator('#dock-arcade img').getAttribute('src'), /^icon\.svg/);
+  assert.equal(await page.locator('#dock-amstrad').getAttribute('aria-label'), 'Amstrad');
+  assert.match(await page.locator('#dock-amstrad img').getAttribute('src'), /^amstrad-icon\.svg/);
+  await page.waitForFunction(() => document.querySelector('#dock-amstrad img').complete && document.querySelector('#dock-amstrad img').naturalWidth > 0);
   const cabinet = requested.filter((p) => /kiosk\.(js|css)|wear\.css|deck\.js|manual|howler|blip_controller/.test(p));
   assert.deepEqual(cabinet, [], 'the home screen loads none of the cabinet');
   const sideways = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   assert.equal(sideways, 0);
+  await page.setViewportSize({ width: 320, height: 568 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, 'the five dock icons fit a small phone');
+  const dockBounds = await page.locator('#dock-row .app-icon').evaluateAll(icons => icons.map(icon => {
+    const r = icon.getBoundingClientRect(); return [r.left, r.right];
+  }));
+  assert.ok(dockBounds.every(([left, right]) => left >= 0 && right <= 320), 'every dock icon stays on screen');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#dock-amstrad').click();
+  await page.waitForURL(`${origin}/basic.html`);
+  assert.equal(await page.evaluate(() => blipFrontend()), 'basic');
 });
 
 test('Search finds a game by name, and Enter opens it', async (t) => {
@@ -129,7 +144,7 @@ test('a tap on an icon starts the game on free play, and the logo brings it back
   assert.equal(await page.locator('#dock-row [data-slug="serpent"]').count(), 1, 'the game just played is in the dock');
 });
 
-test('the cabinet switches to the home screen, which then opens first, and the Arcade icon switches back', async (t) => {
+test('the cabinet switches to the home screen, which then opens first, and the BLIP Home icon switches back', async (t) => {
   const { page, origin } = await phone(t);
   await page.goto(`${origin}/index.html`);
   await page.locator('#home-switch-btn').click();

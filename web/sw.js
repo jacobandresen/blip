@@ -1,4 +1,4 @@
-var CACHE = "blip-v460";
+var CACHE = "blip-v507";
 
 var ASSETS = [
   "/blip/",
@@ -6,6 +6,13 @@ var ASSETS = [
   "/blip/home.html",
   "/blip/home.css",
   "/blip/home.js",
+  "/blip/amstrad-icon.svg",
+  "/blip/basic.html",
+  "/blip/basic.css",
+  "/blip/basic.js",
+  "/blip/amstrad-tape-load.mp3",
+  "/blip/amstrad-wordmark.svg",
+  "/blip/blip-wordmark.svg",
   "/blip/guide.html",
   "/blip/guide.css",
   "/blip/guide.js",

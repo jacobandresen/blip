@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+<title id="title">BLIP Amstrad home computer</title>
+<defs>
+  <linearGradient id="case" x2=".15" y2="1"><stop stop-color="#f0eee4"/><stop offset=".52" stop-color="#c8c6bc"/><stop offset="1" stop-color="#8e9091"/></linearGradient>
+  <linearGradient id="screen" x2="0" y2="1"><stop stop-color="#1839ce"/><stop offset="1" stop-color="#071583"/></linearGradient>
+  <linearGradient id="deck" x2="0" y2="1"><stop stop-color="#55585b"/><stop offset="1" stop-color="#202226"/></linearGradient>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#000" flood-opacity=".45"/></filter>
+</defs>
+<rect width="512" height="512" rx="112" fill="#292a34"/>
+<circle cx="256" cy="245" r="207" fill="#55466f" opacity=".46"/>
+<g filter="url(#shadow)">
+  <path d="M68 272q0-17 18-17h340q18 0 18 17v112q0 22-22 22H90q-22 0-22-22z" fill="url(#case)" stroke="#f4f1e8" stroke-opacity=".65" stroke-width="3"/>
+  <path d="M109 88q0-23 24-23h246q24 0 24 23v187H109z" fill="url(#case)" stroke="#f4f1e8" stroke-opacity=".8" stroke-width="4"/>
+  <path d="M127 92q0-18 18-18h222q18 0 18 18v149H127z" fill="#30343a" stroke="#74777a" stroke-width="4"/>
+  <path d="M142 102q0-14 15-14h198q15 0 15 14v126H142z" fill="url(#screen)"/>
+  <path d="M155 113h182v104H155z" fill="none" stroke="#708bff" stroke-opacity=".2" stroke-width="3"/>
+  <g fill="#fff49a" font-family="monospace" font-weight="700">
+    <text x="159" y="140" font-size="14">BLIP 64K</text>
+    <text x="159" y="164" font-size="13">BASIC 1.0</text>
+    <text x="159" y="192" font-size="13">READY</text>
+    <path d="M207 198h9v3h-9z"/>
+  </g>
+  <path d="M90 286h218v78H90z" fill="#a6a49d" stroke="#777973" stroke-width="3"/>
+  <path d="M101 294h196v61H101z" fill="#25272c"/>
+  <g fill="#d7d4c9" stroke="#101114" stroke-width="2">
+    <path d="M110 302h19v12h-19zM134 302h19v12h-19zM158 302h19v12h-19zM182 302h19v12h-19zM206 302h19v12h-19zM230 302h19v12h-19zM254 302h19v12h-19zM278 302h12v12h-12z"/>
+    <path d="M110 320h19v12h-19zM134 320h19v12h-19zM158 320h19v12h-19zM182 320h19v12h-19zM206 320h19v12h-19zM230 320h19v12h-19zM254 320h19v12h-19zM278 320h12v12h-12z"/>
+    <path d="M110 338h27v12h-27zM142 338h105v12H142zM252 338h38v12h-38z"/>
+  </g>
+  <path d="M319 286h123v78H319z" fill="url(#deck)" stroke="#777973" stroke-width="3"/>
+  <path d="M330 295h101v53H330z" fill="#15171a" stroke="#979993" stroke-width="2"/>
+  <circle cx="354" cy="321" r="12" fill="#26292c" stroke="#a5a69f" stroke-width="3"/>
+  <circle cx="405" cy="321" r="12" fill="#26292c" stroke="#a5a69f" stroke-width="3"/>
+  <circle cx="354" cy="321" r="4" fill="#777a7b"/><circle cx="405" cy="321" r="4" fill="#777a7b"/>
+  <path d="M339 354h84" stroke="#101114" stroke-width="4"/>
+  <path d="M106 374h92" stroke="#25272c" stroke-width="4"/>
+  <circle cx="418" cy="374" r="5" fill="#ef4938"/>
+</g>
+</svg>

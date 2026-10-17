@@ -12,7 +12,7 @@ var actionSheet = document.getElementById('action-sheet');
 var settingsSheet = document.getElementById('settings-sheet');
 var REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 var RECENT_KEY = 'blip-recent';
-var DOCK_GAMES = 1;   // beside the arcade, the Guide and Settings: four in a phone's dock
+var DOCK_GAMES = 1;   // one recent game fits beside the four fixed apps on a phone
 
 // Being here is the choice: a game played from here comes back here.
 blipSetFrontend('home');
@@ -60,7 +60,6 @@ function gameApp(slug, inDock) {
   return li;
 }
 
-var ARCADE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#e8c47e" d="M6 2h12l1 4v16H5V6z"/><path fill="#1b130c" d="M7 7h10v7H7z"/><path fill="#7fe08e" d="M8 8h8v5H8z" opacity=".75"/><path fill="#2a1a10" d="M6 16h12v2H6z"/><circle cx="9" cy="17" r="1" fill="#ed684d"/><circle cx="14" cy="17" r="1" fill="#ffd16a"/><circle cx="16.5" cy="17" r="1" fill="#ffd16a"/><path fill="#c79a52" d="M6.5 3h11l.5 2H6z"/></svg>';
 var GEAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#f2f2f7" d="M13.6 2l.5 2.4c.6.2 1.2.5 1.7.9l2.3-.8 1.6 2.8-1.8 1.6c.1.6.1 1.3 0 1.9l1.8 1.6-1.6 2.8-2.3-.8c-.5.4-1.1.7-1.7.9l-.5 2.4h-3.2l-.5-2.4c-.6-.2-1.2-.5-1.7-.9l-2.3.8-1.6-2.8 1.8-1.6a6 6 0 010-1.9L3.3 7.3l1.6-2.8 2.3.8c.5-.4 1.1-.7 1.7-.9L9.4 2zM12 8.2a3.3 3.3 0 100 6.6 3.3 3.3 0 000-6.6z" transform="translate(0 1)"/></svg>';
 
 function systemApp(kind, label, svg, act) {
@@ -102,7 +101,8 @@ var WIDE = '(min-width: 700px) and (min-height: 600px)';
 function buildDock() {
   dockRow.textContent = '';
   var wide = matchMedia(WIDE).matches;
-  dockRow.appendChild(systemApp('arcade', 'Arcade', ARCADE_SVG, toCabinet));
+  dockRow.appendChild(systemApp('arcade', 'BLIP Home', '<img src="icon.svg?v=1" alt="">', toCabinet));
+  dockRow.appendChild(systemApp('amstrad', 'Amstrad', '<img src="amstrad-icon.svg?v=1" alt="">', toAmstrad));
   // The Guide's icon is the one it has as an app of its own.
   dockRow.appendChild(systemApp('guide', 'Guide', '<img src="guide-icon-192.png?v=1" alt="">', toGuide));
   if (wide) {
@@ -338,6 +338,13 @@ function toCabinet() {
   blipSetFrontend('cabinet');
   location.href = 'index.html?cabinet';
 }
+function toAmstrad() {
+  if (leaving) return;
+  leaving = true;
+  blipSetFrontend('basic');
+  location.href = 'basic.html';
+}
+document.getElementById('basic-switch').addEventListener('click', function () { blipSetFrontend('basic'); });
 
 /* ---- Sheets ---- */
 var openSheet = null, returnFocus = null;
