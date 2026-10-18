@@ -46,9 +46,7 @@ const MEASURE = `(function () {
   var coin = document.querySelector('#insert-coin-btn') || document.querySelector('#kiosk-insert-btn');
   return {
     bar: box(bar), logo: box(logo), coin: box(coin),
-    coinBar: box(coin && coin.closest('.kiosk-bar')),
-    coinPlane: coin && getComputedStyle(coin).transform,
-    deckPlane: coin && getComputedStyle(coin.closest('.kiosk-bar').querySelector('.deck-panel')).transform,
+    coinShown: !!coin && coin.getClientRects().length > 0,
     winW: window.innerWidth,
     scrollW: document.documentElement.scrollWidth,
   };
@@ -61,7 +59,6 @@ const SLACK = 1.5;
 function assertInsideBar(m, label) {
   assert.ok(m.bar, `${label}: no top bar found`);
   assert.ok(m.logo, `${label}: no BLIP logo found`);
-  assert.ok(m.coin, `${label}: no COINS button found`);
 
   for (const [name, el] of [['BLIP logo', m.logo]]) {
     assert.ok(el.bottom <= m.bar.bottom + SLACK,
@@ -77,17 +74,14 @@ function assertInsideBar(m, label) {
       `${label}: the ${name} runs ${(el.right - m.winW).toFixed(1)}px past the right edge`);
   }
 
-  assert.ok(m.coinBar, `${label}: the coinbox is not on the shared deck`);
-  assert.ok(m.coin.left >= -SLACK && m.coin.right <= m.winW + SLACK,
-    `${label}: the coinbox runs outside the viewport`);
-  assert.equal(m.coinPlane, m.deckPlane,
-    `${label}: the coinbox and control deck do not share a tabletop plane`);
+  // The deck is the machine's control panel; coins go in at the cabinet's door, never on the deck.
+  assert.equal(m.coinShown, false, `${label}: a coin box shows on the control deck`);
 
 }
 
 /** Page-wide horizontal overflow, reported apart from the bar: a real defect,
  * but not this test's subject. */
-test(`the BLIP logo stays on the marquee and coinbox aligns with the deck`, async (t) => {
+test(`the BLIP logo stays on the marquee and the deck carries no coin box`, async (t) => {
   const { browser, page, cdp } = await openPage(t);
   await page.route('**/*.wasm', () => {});   // the bar belongs to the shell; no game needs to run
 
@@ -102,7 +96,7 @@ test(`the BLIP logo stays on the marquee and coinbox aligns with the deck`, asyn
         await evaluate(cdp, FREEZE_ANIMATIONS);
         // The game pages build their marquee from shell.js after load.
         await waitFor(cdp, `!!(document.querySelector('#marquee-bar') || document.querySelector('.top-marquee-bar'))`, 15000);
-        await waitFor(cdp, `!!document.querySelector('.deck-coin-slot .coin-plate')`, 15000);
+        await waitFor(cdp, `!!document.querySelector('.deck-housing')`, 15000);
         await sleep(120); // let the strip's own layout settle before measuring
 
         const m = await evaluate(cdp, MEASURE);

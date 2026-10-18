@@ -1,420 +1,283 @@
-// The cabinet's front page: the card rack, its shuffle, touch, and the coin.
-//
-//   node --test test/cabinet.mjs        (after ./build_web.sh)
+// The arcade aisle: approach a machine, insert a coin, start its game, and use its controls.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openPage } from './lib/harness.mjs';
 
-const GAMES = ['RALLY', 'BOUNCER', 'DEFENDER', 'BUBBLER', 'RAIDER', 'METEORS', 'SERPENT', 'BRAWLER', 'ADDER'];
+const GAMES = [
+  ['rally', 'RALLY', 2],
+  ['bouncer', 'BOUNCER', 1],
+  ['galactic_defender', 'DEFENDER', 1],
+  ['bubbler', 'BUBBLER', 2],
+  ['sky_raider', 'RAIDER', 1],
+  ['meteors', 'METEORS', 1],
+  ['serpent', 'SERPENT', 1],
+  ['brawler', 'BRAWLER', 2],
+  ['adder', 'ADDER', 2],
+];
 
-async function openCabinet(t, { width = 1280, height = 844, touch = false } = {}) {
-  const { page, origin } = await openPage(t, 'chromium', { hasTouch: touch, viewport: { width, height } });
+async function openArcade(t, width = 390, height = 844) {
+  const { page, origin } = await openPage(t, 'chromium', {
+    hasTouch: width < 700, viewport: { width, height },
+  });
   await page.goto(`${origin}/index.html`);
-  await page.waitForFunction(() => document.querySelector('.card-focused')?.offsetWidth > 0 &&
+  await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') &&
     !document.documentElement.hasAttribute('data-cabinet-arranging'));
   return { page, origin };
 }
 
-/** Resolves once no card is mid-move, whether by transition or animation. */
-const settled = (page) => page.waitForFunction(() =>
-  [...document.querySelectorAll('.card')].every((card) => card.getAnimations().length === 0));
+const selectedSlug = (page) => page.locator('.card-focused').getAttribute('data-game-url');
 
-const focusedTitle = (page) => page.locator('.card-focused .card-title').textContent();
+test('the aisle shows one complete, selectable cabinet for every game', async (t) => {
+  const { page } = await openArcade(t, 1280);
+  const cabinets = await page.locator('#game-grid .card').evaluateAll((cards) => cards.map((card) => ({
+    slug: card.dataset.gameUrl.split('/')[0],
+    title: card.querySelector('.card-title')?.textContent.trim(),
+    stations: card.querySelectorAll('.machine-station').length,
+    hasScreen: card.querySelector('.card-shot')?.complete && card.querySelector('.card-shot')?.naturalWidth > 0,
+    hasCoinDoor: !!card.querySelector('.machine-coinbox .machine-coin-slot'),
+    hasStart: !!card.querySelector('.machine-start'),
+    deck: card.querySelector('.machine-controls iframe')?.getAttribute('src'),
+  })));
+  assert.deepEqual(cabinets, GAMES.map(([slug, title, stations]) => ({
+    slug, title, stations, hasScreen: true, hasCoinDoor: true, hasStart: true, deck: `machine-deck.html?game=${slug}`,
+  })));
+  const marqueeArt = await page.locator('#game-grid .card').evaluateAll((cards) =>
+    cards.map((card) => getComputedStyle(card).getPropertyValue('--marquee-art').trim()));
+  assert.equal(new Set(marqueeArt).size, GAMES.length, 'each machine has its own printed marquee motif');
+  assert.ok(marqueeArt.every((art) => art.includes('gradient')));
+  assert.equal(await page.locator('#kiosk-bar').isVisible(), false, 'the controls belong to the machines');
+  assert.equal(await page.locator('#kiosk-insert-btn').isVisible(), false, 'the coin doors belong to the machines');
+  assert.equal(await page.locator('#card-button,#controls-card').count(), 0, 'no "?" and no operator’s card on the arcade');
+  assert.equal(await page.locator('.jukebox-storage,.jukebox-module').count(), 0,
+    'the old selector rack is gone');
+  const aisle = await page.evaluate(() => ['adder', 'rally', 'bouncer'].map((slug) => {
+    const r = document.querySelector(`.card-${slug}`).getBoundingClientRect();
+    return r.left + r.width / 2;
+  }));
+  assert.ok(aisle[0] < aisle[1] && aisle[1] < aisle[2],
+    'the first machine has a neighbor on each side of the loop');
+});
 
-for (const width of [1280, 390]) {
-  test(`startup reveals the assembled Rolodex even when scripts and artwork arrive late at ${width}px`, async (t) => {
-    const { page, origin } = await openPage(t, 'chromium', { viewport: { width, height: 844 } });
-    let releaseScript, releaseArt;
-    const scriptGate = new Promise((resolve) => { releaseScript = resolve; });
-    const artGate = new Promise((resolve) => { releaseArt = resolve; });
-    let scriptRequested;
-    const requested = new Promise((resolve) => { scriptRequested = resolve; });
-    await page.route('**/kiosk.js?*', async (route) => {
-      scriptRequested();
-      await scriptGate;
-      await route.continue();
-    });
-    await page.route('**/rally/screenshot.png', async (route) => {
-      await artGate;
-      await route.continue();
-    });
-    const navigation = page.goto(`${origin}/index.html`, { waitUntil: 'domcontentloaded' });
-    await requested;
-    assert.equal(await page.locator('body').evaluate((body) => getComputedStyle(body).opacity), '0',
-      'the unfinished cards stay out of view while the shared script loads');
-    releaseScript();
-    await navigation;
-    assert.equal(await page.locator('body').evaluate((body) => getComputedStyle(body).opacity), '0',
-      'the rack waits for its artwork');
-    releaseArt();
-    await page.waitForFunction(() => getComputedStyle(document.body).opacity === '1');
-    const first = await page.evaluate(() => {
+for (const [width, height] of [[1280, 844], [390, 844], [320, 568]]) {
+  test(`the selected machine and its controls fit the arcade at ${width}×${height}`, async (t) => {
+    const { page } = await openArcade(t, width, height);
+    const fit = await page.evaluate(() => {
+      const frame = document.querySelector('.screen-bezel').getBoundingClientRect();
       const card = document.querySelector('.card-focused');
-      const box = card.getBoundingClientRect();
+      const controls = card.querySelector('.machine-controls').getBoundingClientRect();
+      const coin = card.querySelector('.machine-coinbox').getBoundingClientRect();
+      const start = card.querySelector('.machine-start').getBoundingClientRect();
       return {
-        title: card.querySelector('.card-title').textContent,
-        art: card.querySelector('.card-shot').naturalWidth > 0,
-        controls: !!document.getElementById('kiosk-bar') && !!document.getElementById('card-pick'),
-        rail: !!document.querySelector('.rail-metal').getAttribute('d'),
-        animating: card.getAnimations().length,
-        box: [box.x, box.y, box.width, box.height],
+        frameHeight: frame.height,
+        startHeight: start.height,
+        controlsInside: controls.left >= frame.left && controls.right <= frame.right && controls.bottom <= frame.bottom,
+        coinInside: coin.left >= frame.left && coin.right <= frame.right && coin.bottom <= frame.bottom,
+        startBelowDeck: start.top >= controls.bottom - 1 && start.bottom <= coin.top + 1 && start.bottom <= frame.bottom,
+        overflow: document.documentElement.scrollWidth - innerWidth,
       };
     });
-    assert.deepEqual({ ...first, box: undefined },
-      { title: 'RALLY', art: true, controls: true, rail: true, animating: 0, box: undefined });
-    await page.waitForTimeout(250);
-    const later = await page.locator('.card-focused').boundingBox();
-    assert.ok([later.x, later.y, later.width, later.height].every((value, i) => Math.abs(value - first.box[i]) < 0.1),
-      'the first visible card already rests in its final position');
-    await page.keyboard.press('ArrowRight');
-    await settled(page);
-    assert.equal(await focusedTitle(page), 'BOUNCER');
+    assert.ok(fit.frameHeight > height * .6, 'the old shared deck has not collapsed the arcade frame');
+    if(width < 700)assert.ok(fit.startHeight >= 30, 'the Start button has a usable touch target');
+    assert.deepEqual({ ...fit, frameHeight: undefined, startHeight: undefined }, {
+      frameHeight: undefined, startHeight: undefined, controlsInside: true, coinInside: true, startBelowDeck: true, overflow: 0,
+    });
   });
 }
 
-for (const width of [1280, 768, 390, 320]) {
-  test(`every card stays inside the cabinet with readable text at ${width}px`, async (t) => {
-    const { page } = await openCabinet(t, { width });
-    for (const title of GAMES) {
-      await settled(page);
-      assert.equal(await focusedTitle(page), title);
-      const fit = await page.evaluate(() => {
-        const card = document.querySelector('.card-focused');
-        const box = card.getBoundingClientRect();
-        const bezel = document.querySelector('.screen-bezel').getBoundingClientRect();
-        const text = ['.card-title', '.card-genre', '.card-desc'].flatMap((selector) => {
-          const range = document.createRange();
-          range.selectNodeContents(card.querySelector(selector));
-          return [...range.getClientRects()].filter((rect) => rect.width > 0);
-        });
-        return {
-          inBezel: box.left >= bezel.left && box.right <= bezel.right && box.bottom <= bezel.bottom,
-          textOnCard: text.every((r) => r.left >= box.left && r.right <= box.right && r.bottom <= box.bottom),
-          fontPx: parseFloat(getComputedStyle(card.querySelector('.card-desc')).fontSize),
-          pageOverflow: document.documentElement.scrollWidth - innerWidth,
-        };
-      });
-      assert.deepEqual({ ...fit, fontPx: fit.fontPx >= 14 },
-        { inBezel: true, textOnCard: true, fontPx: true, pageOverflow: 0 }, `${title}`);
+test('arrows and a tap walk between machines; tapping the cabinet body does not launch it', async (t) => {
+  const { page, origin } = await openArcade(t, 390);
+  assert.equal(await selectedSlug(page), 'rally/index.html');
+  await page.locator('.pick-next').tap();
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
+  assert.equal(await page.locator('#game-grid').evaluate((grid) => grid.style.getPropertyValue('--aisle-floor-x')), '-42px');
+  assert.equal(await page.locator('.card-shuffling').count(), 0, 'machines slide past instead of shuffling');
+  await page.locator('.pick-prev').tap();
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'rally/index.html');
+  assert.equal(await page.locator('#game-grid').evaluate((grid) => grid.style.getPropertyValue('--aisle-floor-x')), '0px');
+  await page.locator('.card-rally').tap();
+  assert.equal(new URL(page.url()).pathname, '/index.html');
+  assert.equal(await selectedSlug(page), 'rally/index.html');
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
+  assert.equal(page.url(), `${origin}/index.html`);
+});
+
+test('returning from a game restores its machine without loading a hidden second game', async (t) => {
+  const { page, origin } = await openArcade(t);
+  await page.locator('.card-focused .machine-coinbox').tap();
+  await page.locator('.card-focused .machine-start').tap();
+  await page.waitForURL(`${origin}/rally/index.html`);
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await page.locator('.blip-logo').click();
+  await page.waitForURL(`${origin}/index.html`);
+  await page.waitForFunction(() => !window.blipCabinetReturn &&
+    !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  assert.equal(await selectedSlug(page), 'rally/index.html');
+  assert.equal(await page.locator('#cabinet-game-screen').count(), 0);
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-loaded-card')), null);
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
+});
+
+test('a tap on the chosen machine’s screen starts it, paying its own coin', async (t) => {
+  const { page, origin } = await openArcade(t, 390);
+  assert.equal(await page.locator('.card-focused .machine-attract b').textContent(), 'PRESS START');
+  await page.locator('.card-focused .card-shot-wrap').tap({ force: true });
+  await page.waitForURL(`${origin}/rally/index.html`);
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await page.waitForFunction(() => getCoins() === 0);
+});
+
+test('desktop keyboard walking and physical Start begin play at the chosen machine', async (t) => {
+  const { page, origin } = await openArcade(t, 1280);
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
+  await page.locator('.card-focused .machine-coinbox').click();
+  await page.locator('.card-focused .machine-start').click();
+  await page.waitForURL(`${origin}/bouncer/index.html`);
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await page.waitForFunction(() => getCoins() === 0);
+  assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'CANVAS');
+  await page.evaluate(() => {
+    window.__cabinetKeys = [];
+    document.querySelector('canvas').addEventListener('keydown', (event) => window.__cabinetKeys.push(event.code));
+  });
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Space');
+  assert.deepEqual(await page.evaluate(() => window.__cabinetKeys.slice(-2)), ['ArrowLeft', 'Space']);
+});
+
+test('keyboard coin input updates the selected door and its Start lamp', async (t) => {
+  const { page } = await openArcade(t, 1280);
+  const readout = page.locator('.card-focused .machine-credit');
+  assert.equal(await readout.textContent(), 'CREDIT 0');
+  await page.keyboard.press('5');
+  assert.equal(await page.evaluate(() => getCoins()), 1);
+  assert.equal(await readout.textContent(), 'CREDIT 1');
+  assert.equal(await page.locator('.card-focused').evaluate((card) => card.classList.contains('card-ready')), true);
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
+  assert.equal(await page.locator('.card-focused .machine-credit').textContent(), 'CREDIT 1');
+});
+
+test('a full credit bank refuses another coin without showing a coin drop', async (t) => {
+  const { page } = await openArcade(t, 1280);
+  for (let coin = 0; coin < 5; coin++) await page.keyboard.press('5');
+  assert.equal(await page.evaluate(() => getCoins()), 5);
+  const door = page.locator('.card-focused .machine-coinbox');
+  await door.click();
+  assert.equal(await page.evaluate(() => getCoins()), 5);
+  assert.equal(await page.locator('.card-focused .machine-credit').textContent(), 'CREDIT 5');
+  assert.equal(await door.evaluate((el) => el.classList.contains('coin-inserting')), false);
+});
+
+test('gamepad Select inserts a coin at the machine, then Start launches it', async (t) => {
+  const { page, origin } = await openArcade(t, 1280);
+  await page.evaluate(() => {
+    const buttons = Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
+    window.__cabinetPadButtons = buttons;
+    navigator.getGamepads = () => [{ connected: true, buttons, axes: [0, 0] }];
+  });
+  await page.evaluate(() => { window.__cabinetPadButtons[8].pressed = true; });
+  await page.waitForFunction(() => getCoins() === 1);
+  assert.equal(await page.locator('.card-focused .machine-credit').textContent(), 'CREDIT 1');
+  await page.evaluate(() => { window.__cabinetPadButtons[8].pressed = false; });
+  await page.evaluate(() => { window.__cabinetPadButtons[9].pressed = true; });
+  await page.waitForURL(`${origin}/rally/index.html`);
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await page.waitForFunction(() => getCoins() === 0);
+});
+
+for (const width of [1280, 390, 320]) {
+  test(`walking the entire aisle keeps each cabinet in view at ${width}px`, async (t) => {
+    const { page } = await openArcade(t, width, width === 320 ? 568 : 844);
+    for (let stop = 1; stop <= GAMES.length; stop++) {
       await page.keyboard.press('ArrowRight');
+      const next = GAMES[stop % GAMES.length][0];
+      await page.waitForFunction((slug) => {
+        const chosen = document.querySelector('.card-focused');
+        return chosen?.dataset.gameUrl === `${slug}/index.html`;
+      }, next);
+      await page.waitForFunction(() => {
+        const frame = document.querySelector('.screen-bezel').getBoundingClientRect();
+        const cabinet = document.querySelector('.card-focused').getBoundingClientRect();
+        return cabinet.left >= frame.left - 1 && cabinet.right <= frame.right + 1 && cabinet.bottom <= frame.bottom + 1;
+      });
+      assert.equal(await selectedSlug(page), `${next}/index.html`);
     }
   });
 }
 
-test('the card fanned out in the rack never leaves the cabinet on a phone', async (t) => {
-  const { page } = await openCabinet(t, { width: 320 });
-  const outside = await page.evaluate(() => {
-    const bezel = document.querySelector('.screen-bezel').getBoundingClientRect();
-    return [...document.querySelectorAll('.card')].filter((card) => {
-      const box = card.getBoundingClientRect();
-      return box.left < bezel.left || box.right > bezel.right;
-    }).length;
-  });
-  assert.equal(outside, 0);
-});
+for (const [index, [slug, title, players]] of GAMES.entries()) {
+  test(`${title}: press its Start and reach playable controls`, async (t) => {
+    const { page, origin } = await openArcade(t);
+    for (let step = 0; step < index; step++) await page.keyboard.press('ArrowRight');
+    await page.waitForFunction((game) => document.querySelector('.card-focused')?.dataset.gameUrl === `${game}/index.html`, slug);
+    const machine = page.locator('.card-focused');
+    assert.equal(await machine.locator('.machine-station').count(), players);
+    assert.equal(await page.evaluate(() => getCoins()), 0);
 
-test('the arrow keys step through the rack, and the card that leaves tucks in behind the new front', async (t) => {
-  const { page } = await openCabinet(t);
-  assert.equal(await focusedTitle(page), 'RALLY');
-  await page.keyboard.press('ArrowRight');
-  await page.waitForTimeout(100);
-  const leaving = await page.evaluate(() => {
-    const card = document.querySelector('.card-rally');
-    return { animated: card.getAnimations().length > 0, shuffling: card.classList.contains('card-shuffling') };
-  });
-  assert.deepEqual(leaving, { animated: true, shuffling: true }, 'RALLY is lifted out while BOUNCER comes forward');
-  await settled(page);
-  const stack = await page.evaluate(() => ({
-    rally: Number(document.querySelector('.card-rally').style.zIndex),
-    bouncer: Number(document.querySelector('.card-bouncer').style.zIndex),
-    shuffling: document.querySelector('.card-shuffling') !== null,
-  }));
-  assert.equal(await focusedTitle(page), 'BOUNCER');
-  assert.ok(stack.rally < stack.bouncer, 'RALLY rests behind BOUNCER');
-  assert.equal(stack.shuffling, false);
-
-  await page.keyboard.press('ArrowLeft');
-  await settled(page);
-  assert.equal(await focusedTitle(page), 'RALLY');
-  await page.keyboard.press('ArrowLeft');
-  await settled(page);
-  assert.equal(await page.evaluate(() => document.getElementById('manual-book').classList.contains('card-focused')),
-    true, 'the rack wraps round to the manual, the last item');
-});
-
-test('arrow keys and P1 controls keep selecting games with a loaded cabinet screen', async (t) => {
-  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
-  await page.addInitScript(() => {
-    sessionStorage.setItem('blip-loaded-card', JSON.stringify({ slug: 'rally', name: 'RALLY' }));
-  });
-  await page.goto(`${origin}/index.html`);
-  await page.waitForFunction(() => document.querySelector('.jukebox-game-screen.game-ready') &&
-    !document.documentElement.hasAttribute('data-cabinet-arranging'));
-  await page.keyboard.press('ArrowRight');
-  await settled(page);
-  assert.equal(await focusedTitle(page), 'BOUNCER');
-  await page.keyboard.press('ArrowDown');
-  await settled(page);
-  assert.equal(await focusedTitle(page), 'DEFENDER');
-  await page.keyboard.press('ArrowUp');
-  await settled(page);
-  assert.equal(await focusedTitle(page), 'BOUNCER');
-  await page.keyboard.press('ArrowLeft');
-  await settled(page);
-  assert.equal(await focusedTitle(page), 'RALLY');
-  await page.locator('#snes-pad .dp-right').click();
-  await settled(page);
-  assert.equal(await focusedTitle(page), 'BOUNCER');
-  await page.keyboard.press('a');
-  await settled(page);
-  assert.equal(await focusedTitle(page), 'RALLY');
-});
-
-test('a swipe steps the rack either way, and a long one steps across several cards', async (t) => {
-  const { page } = await openCabinet(t, { width: 390, touch: true });
-  const box = await page.locator('#game-grid').boundingBox();
-  const y = box.y + box.height / 2;
-  const touch = await page.context().newCDPSession(page);
-  const swipe = async (from, to) => {
-    const at = (fraction) => box.x + box.width * fraction;
-    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, x: at(from), y }] });
-    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 1, x: at(to), y }] });
-    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    await page.waitForTimeout(1200);
-  };
-  const first = await focusedTitle(page);
-  await swipe(0.78, 0.22);
-  const next = await focusedTitle(page);
-  assert.notEqual(next, first, 'a left swipe moves on');
-  await swipe(0.22, 0.78);
-  assert.equal(await focusedTitle(page), first, 'a right swipe comes back');
-  await swipe(0.84, 0.16);
-  await page.waitForTimeout(1500);
-  assert.ok(GAMES.indexOf(await focusedTitle(page)) >= 2, 'a long swipe steps across more than one card');
-});
-
-test('a coin lights the cards; a first tap arms a card and a second opens the game with its credit', async (t) => {
-  const { page } = await openCabinet(t, { width: 390, touch: true });
-  const lit = () => page.evaluate(() => !document.querySelector('.card-bouncer').classList.contains('no-credit'));
-  assert.equal(await page.evaluate(() => getCoins()), 0);
-  assert.equal(await lit(), false, 'the cards are dark with no credit');
-
-  await page.locator('#kiosk-insert-btn').tap();
-  assert.equal(await page.evaluate(() => getCoins()), 1);
-  await page.waitForFunction(() => !document.querySelector('.card-bouncer').classList.contains('no-credit'));
-
-  const box = await page.locator('#game-grid').boundingBox();
-  const y = box.y + box.height / 2;
-  const touch = await page.context().newCDPSession(page);
-  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, x: box.x + box.width - 24, y }] });
-  await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 1, x: box.x + box.width - 150, y }] });
-  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await page.waitForFunction(() => document.querySelector('.card-bouncer').classList.contains('card-focused'));
-
-  await page.locator('.card-bouncer').tap();
-  assert.equal(await page.evaluate(() => location.pathname), '/index.html', 'the first tap only arms the card');
-  await page.locator('.card-bouncer').tap();
-  await page.waitForURL(/\/bouncer\/index\.html/, { timeout: 25000 });
-  assert.equal(await page.evaluate(() => getCoins()), 1, 'the credit reaches the game');
-});
-
-test('the coin slot takes a touch in every layout, and its box sits flush against the deck', async (t) => {
-  const { page, origin } = await openCabinet(t, { width: 390, touch: true });
-  const flush = () => page.evaluate(() => {
-    const slot = document.querySelector('.deck-coin-slot');
-    const deck = slot.closest('.kiosk-bar').querySelector('.deck-panel');
-    const label = slot.querySelector('.coin-instruction');
-    const mouth = slot.querySelector('.coin-mouth').getBoundingClientRect();
-    return {
-      gap: Math.abs(deck.offsetLeft + deck.offsetWidth - slot.offsetLeft),
-      labelFits: label.scrollWidth <= label.clientWidth,
-      slotWide: mouth.width > mouth.height * 4,
-    };
-  });
-  const insert = async (expected) => {
-    await page.locator('.deck-coin-slot').tap();
-    assert.equal(await page.evaluate(() => getCoins()), expected);
-  };
-  const expectFlush = async (where) => {
-    const state = await flush();
-    assert.ok(state.gap <= 1 && state.labelFits && state.slotWide, `${where}: ${JSON.stringify(state)}`);
-  };
-
-  await expectFlush('upright');
-  await insert(1);
-
-  await page.setViewportSize({ width: 844, height: 390 });
-  await page.waitForFunction(() => document.documentElement.dataset.layout === 'landscape');
-  await expectFlush('sideways');
-  await insert(2);
-
-  await page.setViewportSize({ width: 320, height: 568 });
-  await page.waitForFunction(() => document.documentElement.dataset.layout === 'upright');
-  await expectFlush('narrow');
-  await insert(3);
-
-  await page.goto(`${origin}/bouncer/index.html`, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('.deck-coin-slot');
-  await expectFlush('game page');
-  await insert(4);
-});
-
-/** Pauses each arm cycle at time zero so a test can step it to any millisecond. */
-const stepTransfers = (page) => page.evaluate(() => {
-  const real = blipTransferCard;
-  window.__cycles = [];
-  window.blipTransferCard = (options) => {
-    if (!options.returning) options.onDone = () => {};
-    const stage = real(options);
-    if (!options.idle) { stage.blipSeek(0); window.__cycles.push({ stage, options }); }
-    return stage;
-  };
-});
-const seek = (page, cycle, ms) => page.evaluate(([c, t]) => window.__cycles[c].stage.blipSeek(t), [cycle, ms]);
-const title = (page) => page.locator('#marquee-name').getAttribute('aria-label');
-
-test('choosing a game sends the loaded card back, then seats the new one before its game starts', async (t) => {
-  const { page } = await openCabinet(t);
-  await page.evaluate(() => {
-    saveCoins(3);
-    loadedCard = { slug: 'bouncer', name: 'BOUNCER', code: 'A2', art: 'bouncer/screenshot.png' };
-    document.querySelector('.card-bouncer').classList.add('card-loaded');
-    blipSetMarquee('BOUNCER', false);
-  });
-  await stepTransfers(page);
-  await page.evaluate(() => document.querySelector('.card-galactic').click());
-  await page.waitForFunction(() => window.__cycles.length === 1);
-
-  assert.equal(await page.evaluate(() => window.__cycles[0].options.returning), true, 'the loaded card goes back first');
-  await seek(page, 0, 3000);
-  assert.equal(await title(page), 'BOUNCER', 'the old title stays until its card is released');
-  await seek(page, 0, 4600);
-  assert.equal(await title(page), 'No game selected');
-  assert.equal(await page.locator('#cabinet-game-screen').getAttribute('src'), 'about:blank');
-  await seek(page, 0, 9600);
-  assert.equal(await page.locator('.card-bouncer .game-rom').evaluate((el) => getComputedStyle(el).visibility), 'visible',
-    'the old cartridge is back on its card');
-  await page.evaluate(() => { window.__cycles[0].stage.remove(); window.__cycles[0].options.onDone(); });
-
-  await page.waitForFunction(() => window.__cycles.length === 2);
-  assert.equal(await page.evaluate(() => !!window.__cycles[1].options.returning), false, 'then the new card goes in');
-  const fascia = () => page.evaluate(() => document.querySelector('.top-marquee-bar').getBoundingClientRect().bottom);
-  await seek(page, 1, 2100);
-  for (let ms = 5200; ms <= 9400; ms += 200) {
-    await seek(page, 1, ms);
-    const pivot = await page.evaluate(() => parseFloat(window.__cycles[1].stage.querySelector('.jukebox-arm-pivot').style.top));
-    assert.ok(pivot >= await fascia(), `the arm's pivot stays below the fascia at ${ms}ms`);
-  }
-  await seek(page, 1, 9590);
-  assert.equal(await page.locator('#cabinet-game-screen').getAttribute('src'), 'about:blank', 'the game waits for the card to seat');
-  await seek(page, 1, 9600);
-  await page.waitForFunction(() => document.getElementById('cabinet-game-screen').src.endsWith('/galactic_defender/index.html?cabinet=1'));
-  assert.equal(await title(page), 'DEFENDER');
-});
-
-test('a game whose card is already seated opens at once, with the arm still', async (t) => {
-  const { page, origin } = await openCabinet(t);
-  await page.evaluate(() => sessionStorage.setItem('blip-loaded-card',
-    JSON.stringify({ slug: 'bouncer', name: 'BOUNCER', code: 'A2', art: 'bouncer/screenshot.png' })));
-  await page.goto(`${origin}/index.html`);
-  await page.waitForFunction(() => document.querySelector('.card-bouncer')?.classList.contains('card-loaded'));
-  await page.evaluate(() => {
-    saveCoins(3);
-    document.querySelector('.card-bouncer').click();
-  });
-  await page.waitForURL(/\/bouncer\/index\.html/, { timeout: 20000 });
-  assert.equal(await page.evaluate(() => document.querySelectorAll('.jukebox-transfer:not(.idle)').length), 0,
-    'no arm cycle runs on the game page');
-  assert.equal(await title(page), 'BOUNCER');
-});
-
-test('the front page has the "?" at all times, and its card welcomes the player', async (t) => {
-  const { page } = await openCabinet(t);
-  const card = () => page.evaluate(() => ({
-    out: document.documentElement.hasAttribute('data-card'),
-    button: document.getElementById('card-button')?.getBoundingClientRect().width > 0,
-    text: document.getElementById('controls-card')?.innerText.replace(/\s+/g, ' ') || '',
-  }));
-  assert.deepEqual([(await card()).button, (await card()).out], [true, false], 'the "?" is there, the card is not');
-  await page.click('#card-button');
-  await page.waitForTimeout(900);
-  const open = await card();
-  assert.equal(open.out, true);
-  assert.match(open.text, /WELCOME TO BLIP ARCADE/);
-  assert.match(open.text, /Insert a coin to play/);
-  assert.match(open.text, /manual/i);
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
-  assert.equal((await card()).out, false, 'Escape puts the card away');
-  await page.click('#card-button');
-  await page.waitForTimeout(700);
-  await page.mouse.click(60, 400);
-  await page.waitForTimeout(300);
-  assert.equal((await card()).out, false, 'a click outside puts the card away');
-});
-
-for (const [width, touch] of [[1280, false], [390, true], [320, true]]) {
-  test(`a plaque says how to choose a game, and its arrows do it, at ${width}px`, async (t) => {
-    const { page } = await openCabinet(t, { width, touch });
-    const plaque = await page.evaluate(() => {
-      const box = document.getElementById('card-pick').getBoundingClientRect(), bezel = document.getElementById('screen-bezel').getBoundingClientRect();
-      return { text: document.getElementById('card-pick').innerText.replace(/\s+/g, ' '), inside: box.left >= bezel.left && box.right <= bezel.right && box.bottom <= bezel.bottom };
+    if (index % 2) {
+      await machine.locator('.machine-coinbox').tap();
+      assert.equal(await page.evaluate(() => getCoins()), 1, 'the machine coin door adds one credit');
+      assert.equal(await selectedSlug(page), `${slug}/index.html`, 'inserting a coin keeps the player at this machine');
+      assert.equal(await machine.evaluate((card) => card.classList.contains('card-ready')), true);
+    }
+    // Without a credit, Start drops the coin itself.
+    await machine.locator('.machine-start').tap();
+    await page.waitForURL(`${origin}/${slug}/index.html`, { timeout: 30000 });
+    await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout: 30000 });
+    const game = await page.evaluate(() => {
+      const visible = (selector) => [...document.querySelectorAll(selector)].some((el) => {
+        const r = el.getBoundingClientRect(), style = getComputedStyle(el);
+        return r.width >= 10 && r.height >= 10 && style.display !== 'none' && style.visibility !== 'hidden';
+      });
+      return {
+        slug: blipGameFromPath(location.pathname)?.slug,
+        credit: getCoins(),
+        returnTo: blipFrontendUrl(),
+        controls: BLIP_GAMES[blipGameFromPath(location.pathname)?.slug]?.touchControls?.length || 0,
+        screen: visible('canvas'),
+        deck: visible('#topbar .deck-panel'),
+        move: visible('#stick-base,#snes-pad .snes-dpad,#paddle-dial,#touch-strip'),
+        action: visible('#fire-buttons .arcade-btn,#snes-pad .snes-face,#paddle-dial-p2,#touch-strip'),
+      };
     });
-    assert.match(plaque.text, /CHOOSE/);
-    assert.match(plaque.text, /START/);
-    assert.equal(plaque.inside, true, 'the plaque sits inside the glass');
-    const first = await focusedTitle(page);
-    await page.click('.pick-next');
-    await settled(page);
-    const second = await focusedTitle(page);
-    assert.notEqual(second, first, 'the right arrow brings the next card');
-    await page.click('.pick-prev');
-    await settled(page);
-    assert.equal(await focusedTitle(page), first, 'the left arrow brings it back');
-    await page.click('.pick-start');
-    assert.equal(await page.evaluate(() => document.querySelector('.card-focused').classList.contains('rejected')), true, 'START without a coin is turned away like the card itself');
+    assert.equal(game.slug, slug);
+    assert.ok(game.credit === 0 || game.credit === 1, `${title} kept or spent the inserted credit`);
+    assert.equal(game.returnTo, '../index.html', `${title} returns to the arcade`);
+    assert.ok(game.controls > 0, `${title} has a touch control guide`);
+    assert.deepEqual([game.screen, game.deck, game.move, game.action], [true, true, true, true],
+      `${title} started with a screen and usable controls: ${JSON.stringify(game)}`);
+    await page.waitForFunction(() => getCoins() === 0, null, { timeout: 5000 });
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-start')), null,
+      `${title} consumed the cabinet Start action`);
+    if (slug === 'rally') {
+      const touchState = await page.locator('#touch-strip .ts-glass').evaluate((surface) => {
+        const box = surface.getBoundingClientRect();
+        const details = { bubbles: true, pointerId: 71, pointerType: 'touch',
+          clientX: box.left + box.width / 4, clientY: box.top + box.height / 2 };
+        surface.dispatchEvent(new PointerEvent('pointerdown', details));
+        const held = window.blipTouchDown(0);
+        surface.dispatchEvent(new PointerEvent('pointerup', details));
+        return held;
+      });
+      assert.equal(touchState, 2, 'Rally’s paddle strip reaches the game as a pressed touch');
+    } else {
+      await page.evaluate(() => {
+        window.__cabinetActionKeys = [];
+        document.querySelector('canvas').addEventListener('keydown', (event) => window.__cabinetActionKeys.push(event.code));
+      });
+      const actionTarget = ['serpent', 'bouncer', 'galactic_defender', 'bubbler', 'adder'].includes(slug) ?
+        '#touch-strip .ts-glass' : '#snes-pad .snes-btn[data-blip="button1"]';
+      const action = page.locator(actionTarget);
+      if (slug === 'bubbler') {
+        const box = await action.boundingBox();
+        await action.tap({ timeout: 3000, position: { x: box.width * .9, y: box.height * .8 } });
+      } else await action.tap({ timeout: 3000 });
+      const expected = await page.evaluate(() => BLIP_GAMES[blipGameFromPath(location.pathname).slug]?.buttons?.[0]?.code || 'Space');
+      await page.waitForFunction((code) => window.__cabinetActionKeys?.includes(code), expected, { timeout: 2000 });
+    }
   });
 }
-
-test('the joystick steps the rack from any part of its ball, the top that stands over the frame too', async (t) => {
-  const { page } = await openCabinet(t);
-  const selection = () => page.locator('.card-focused').evaluate((card) => card.dataset.gameUrl || card.id);
-  await page.evaluate(() => localStorage.setItem('blip-controls', 'stick'));
-  await page.reload();
-  await page.waitForFunction(() => document.querySelector('.card-focused')?.offsetWidth > 0 &&
-    !document.documentElement.hasAttribute('data-cabinet-arranging'));
-  for (const fraction of [0.1, 0.3, 0.5, 0.8]) {
-    await settled(page);
-    const ball = await page.evaluate(() => { const r = document.querySelector('.stick-ball').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; });
-    const [x, y] = [ball[0] + ball[2] / 2, ball[1] + ball[3] * fraction];
-    const before = await selection();
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x + 45, y, { steps: 5 });
-    await page.waitForTimeout(250);
-    await page.mouse.up();
-    await settled(page);
-    assert.notEqual(await selection(), before, `a press ${Math.round(fraction * 100)}% down the ball did nothing`);
-  }
-});
-
-test('the home and BLIP switches stay separate on a narrow phone', async (t) => {
-  const { page } = await openCabinet(t, { width: 320, height: 568 });
-  const boxes = await page.evaluate(() => ['home-switch-btn', 'basic-switch-btn'].map((id) => {
-    const r = document.getElementById(id).getBoundingClientRect();
-    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
-  }));
-  assert.ok(boxes[0].right <= boxes[1].left || boxes[1].right <= boxes[0].left ||
-    boxes[0].bottom <= boxes[1].top || boxes[1].bottom <= boxes[0].top,
-  'the two front-end switches do not overlap');
-  assert.ok(boxes[1].right <= 320, 'the BLIP switch stays on screen');
-});
-
-test('the pick panel sits dark until a credit powers the cabinet', async (t) => {
-  const { page } = await openCabinet(t);
-  const filter = () => page.evaluate(() => getComputedStyle(document.getElementById('card-pick')).filter);
-  assert.match(await filter(), /brightness/, 'the panel is lit with no credit');
-  await page.evaluate(() => { document.getElementById('kiosk-insert-btn').click(); });
-  await page.waitForFunction(() => getComputedStyle(document.getElementById('card-pick')).filter === 'none', null, { timeout: 5000 });
-});

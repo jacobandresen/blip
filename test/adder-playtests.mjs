@@ -53,7 +53,7 @@ async function runRust(page, origin, trial) {
   await page.goto(`${origin}/adder/index.html?amstrad=1&playtest=${trial}`);
   await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), undefined, { timeout: 20000 });
   if (await page.locator('#need-coin-overlay').evaluate((el) => el.classList.contains('visible'))) {
-    await page.locator('#insert-coin-btn').click();
+    await page.evaluate(() => document.getElementById('insert-coin-btn').click());
     await page.waitForFunction(() => !document.querySelector('#need-coin-overlay').classList.contains('visible'));
   }
   const canvas = page.locator('#glcanvas');

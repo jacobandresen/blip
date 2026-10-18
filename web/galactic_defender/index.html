@@ -24,9 +24,10 @@
     document.title = name + ' \u00b7 BLIP';
     document.querySelector('meta[name=apple-mobile-web-app-title]').content = name;
   }());</script>
-  <script src="../kiosk.js?v=96"></script>
-  <link rel="stylesheet" href="../kiosk.css?v=152">
-  <link rel="stylesheet" href="../shell.css?v=105">
+  <script src="../kiosk.js?v=97"></script>
+  <link rel="stylesheet" href="../marquee.css?v=1">
+  <link rel="stylesheet" href="../kiosk.css?v=153">
+  <link rel="stylesheet" href="../shell.css?v=106">
   <link rel="stylesheet" href="../wear.css?v=12">
   <script>if (document.documentElement.hasAttribute('data-appstyle')) document.querySelector('link[href*="wear.css"]').disabled = true;</script>
 </head>
@@ -62,7 +63,7 @@
    </div>
 
   </div>
-  <script src="../deck.js?v=13"></script>
+  <script src="../deck.js?v=14"></script>
 
   <!-- Subtle: pick the controller (pad, stick, touch strip). shell.js fills it. -->
   <div id="control-toggle" role="radiogroup" aria-label="On-screen controller"></div>
@@ -70,7 +71,7 @@
   <div id="need-coin-overlay">
     <div class="nco-panel">
       <div class="nco-msg">POWER OFF</div>
-      <div class="nco-sub nco-go"><span class="nco-pc">PRESS <kbd>SPACE</kbd> TO INSERT A COIN</span><span class="nco-touch">TAP THE COIN SLOT TO START</span></div>
+      <div class="nco-sub nco-go"><span class="nco-pc">PRESS <kbd>SPACE</kbd> TO INSERT A COIN</span><span class="nco-touch">TAP HERE TO INSERT A COIN</span></div>
       <div class="nco-sub nco-how"><span class="nco-pc">Or click here, or press 5</span><span class="nco-touch">Controls resume when credit is added</span></div>
     </div>
   </div>

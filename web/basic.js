@@ -250,7 +250,7 @@ function renderTapePile(){
   });
   updateTapeStackGeometry();
 }
-window.addEventListener('resize',renderTapePile);
+window.addEventListener('resize',function(){renderTapePile();seatBox(document.querySelector('.deck-bay'));});
 function reducedTapeMotion(){return window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;}
 function waitForMotion(ms){return new Promise(function(resolve){setTimeout(resolve,reducedTapeMotion()?0:ms);});}
 function openDeck(){pressDeckKey('eject');document.body.setAttribute('data-deck-open','');return waitForMotion(380);}
@@ -261,9 +261,13 @@ function leavePile(tape,node){
   tapePlaceholder=document.createElement('div');tapePlaceholder.className='game-tape tape-placeholder';tapePlaceholder.dataset.tape=tape.command;tapePlaceholder.setAttribute('aria-hidden','true');tapePlaceholder.style.cssText=node.style.cssText;pile.insertBefore(tapePlaceholder,next||null);
 }
 // Unrotated box of a tape: its centre on screen, its layout size and its tilt in the pile.
-function tapeBox(node){var rect=node.getBoundingClientRect();return {x:rect.left+rect.width/2,y:rect.top+rect.height/2,w:node.offsetWidth,h:node.offsetHeight,angle:parseFloat(node.style.getPropertyValue('--tape-angle'))||0};}
-// Where a seated tape sits: .deck-inserted-tape is 67% of the bay high, 17% down, centred.
-function seatBox(bay){var rect=bay.getBoundingClientRect(),h=rect.height*.67,w=h*1.58;return {x:rect.left+rect.width/2,y:rect.top+rect.height*.17+h/2,w:w,h:h,angle:0};}
+function tapeBox(node){var rect=node.getBoundingClientRect(),matrix=new DOMMatrixReadOnly(getComputedStyle(node).transform);return {x:rect.left+rect.width/2,y:rect.top+rect.height/2,w:node.offsetWidth,h:node.offsetHeight,angle:Math.atan2(matrix.b,matrix.a)*180/Math.PI};}
+// Measure the seat inside the tilted computer, so the flying tape meets the actual bay.
+function seatBox(bay){
+  bay.style.setProperty('--tape-seat-width',Math.min(bay.clientWidth*.84,bay.clientHeight*.67*1.58)+'px');
+  var rect=bay.querySelector('.deck-seat').getBoundingClientRect();
+  return {x:rect.left+rect.width/2,y:rect.top+rect.height/2,w:rect.width,h:rect.height,angle:0};
+}
 function setFlightBox(node,box){
   node.classList.add('game-tape-flight');node.style.left=(box.x-box.w/2)+'px';node.style.top=(box.y-box.h/2)+'px';node.style.width=box.w+'px';node.style.height=box.h+'px';document.body.append(node);
 }
@@ -281,7 +285,7 @@ async function returnTapeToPile(keepOpen){
   var tape=insertedTape,node=insertedTapeNode;
   document.body.setAttribute('data-tape-rewinding','');delete node.dataset.wound;await waitForMotion(1800);document.body.removeAttribute('data-tape-rewinding');
   var from=seatBox(node.parentElement);
-  openDeck();await waitForMotion(110);
+  await openDeck();
   if(!tapePlaceholder||tapePlaceholder.dataset.tape!==tape.command)leavePile(tape,node);
   var to=tapeBox(tapePlaceholder),s0=from.w/to.w,dx=from.x-to.x,dy=from.y-to.y;
   insertedTape=null;insertedTapeNode=null;
@@ -290,7 +294,7 @@ async function returnTapeToPile(keepOpen){
   var done=await flyTape(node,[
     {at:0,x:dx,y:dy,s:s0,r:0,tilt:0,lift:0,ease:'cubic-bezier(.2,1.6,.4,1)'},
     {at:.1,x:dx,y:dy-from.h*.05,s:s0*1.02,r:0,tilt:-14,lift:.15},
-    {at:.26,x:dx,y:dy-from.h*.42,s:s0*1.12,r:0,tilt:-32,lift:.6},
+    {at:.26,x:dx,y:dy+from.h*.6,s:s0*1.08,r:0,tilt:-20,lift:.6},
     {at:.62,x:dx*.45+6,y:dy*.45-Math.max(40,to.h*.5),s:(s0+1)*.56,r:4,tilt:-10,lift:1},
     {at:.88,x:0,y:-12,s:1.06,r:to.angle,tilt:-3,lift:.55,ease:'cubic-bezier(.4,0,.6,1.4)'},
     {at:1,x:0,y:0,s:1,r:to.angle,tilt:0,lift:0}
@@ -303,21 +307,27 @@ async function returnTapeToPile(keepOpen){
 }
 async function insertTapeFromPile(tape){
   var node=tapeNodes[tape.command],bay=document.querySelector('.deck-bay');if(!node||!bay)return;
-  if(!document.body.hasAttribute('data-deck-open'))openDeck();
-  var from=tapeBox(node),to=seatBox(bay),s0=from.w/to.w,dx=from.x-to.x,dy=from.y-to.y;
-  leavePile(tape,node);setFlightBox(node,to);node.classList.add('tape-bay-size');
-  // Picked up, carried over the deck, the head edge slid in first and the top pressed down.
+  var lidReady=document.body.hasAttribute('data-deck-open')?Promise.resolve():openDeck();
+  var from=tapeBox(node),to=seatBox(bay),scale=to.w/from.w,dx=to.x-from.x,dy=to.y-from.y;
+  var approachX=from.y<to.y?dx+(from.x>=to.x?1:-1)*to.w*1.25:dx*.7;
+  leavePile(tape,node);setFlightBox(node,from);
+  // Keep the original cassette size through pickup; approach below the top hinge.
   var done=await flyTape(node,[
-    {at:0,x:dx,y:dy,s:s0,r:from.angle,tilt:0,lift:0,ease:'cubic-bezier(.2,.8,.3,1)'},
-    {at:.14,x:dx-8,y:dy-24,s:s0*1.07,r:from.angle*.4,tilt:-6,lift:.8},
-    {at:.52,x:dx*.4-6,y:dy*.4-Math.max(40,to.h*.8),s:(s0+1)*.58,r:-4,tilt:-16,lift:1},
-    {at:.72,x:0,y:-to.h*.4,s:1.1,r:0,tilt:-36,lift:.8,ease:'cubic-bezier(.4,0,.7,1)'},
-    {at:.85,x:0,y:-to.h*.1,s:1.035,r:0,tilt:-24,lift:.4,ease:'cubic-bezier(.5,0,.8,.6)'},
-    {at:.94,x:0,y:1,s:.995,r:0,tilt:1,lift:.02},
-    {at:1,x:0,y:0,s:1,r:0,tilt:0,lift:0}
-  ],1550);
-  clearFlightBox(node);node.classList.remove('tape-bay-size');node.classList.add('game-tape-inserting');bay.append(node);
+    {at:0,x:0,y:0,s:1,r:from.angle,tilt:4,lift:0,ease:'cubic-bezier(.25,.1,.35,1)'},
+    {at:.22,x:-12,y:-30,s:1.04,r:from.angle*.5,tilt:-8,lift:.8},
+    {at:.6,x:approachX,y:dy+to.h*.7,s:scale*1.05,r:-3,tilt:-12,lift:1},
+    {at:.84,x:dx,y:dy+to.h*.7,s:scale,r:0,tilt:-6,lift:.5},
+    {at:1,x:dx,y:dy+to.h*.42,s:scale,r:0,tilt:0,lift:.3}
+  ],1900);
+  await lidReady;
+  clearFlightBox(node);node.classList.add('game-tape-inserting');bay.append(node);
+  var settle=reducedTapeMotion()?null:node.animate([
+    {transform:'translate(-50%,-8%)'},
+    {transform:'translate(-50%,-50%)'}
+  ],{duration:650,easing:'cubic-bezier(.3,.1,.35,1)',fill:'forwards'});
   if(done)done.forEach(function(animation){animation.cancel();});
+  if(settle){await settle.finished;settle.cancel();}
+  await waitForMotion(240);
   node.tabIndex=-1;node.setAttribute('role','img');node.setAttribute('aria-label',tape.title+' game tape loaded');
   insertedTape=tape;insertedTapeNode=node;document.body.setAttribute('data-deck-tape','');await closeDeck();
 }

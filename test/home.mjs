@@ -131,7 +131,7 @@ test('a tap on an icon starts the game on free play, and the logo brings it back
   await page.waitForFunction(() => typeof BlipController === 'object');
   assert.equal(await coinWall(page), false, 'no coin wall');
   assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-freeplay')), true);
-  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.deck-coin-slot')).visibility), 'hidden', 'no coin slot');
+  assert.equal(await page.evaluate(() => !!document.querySelector('.deck-coin-slot')), false, 'no coin slot');
   assert.equal(await page.evaluate(() => blipSpendCoin()), 1, 'a start costs nothing');
   assert.equal(await coinWall(page), false);
   assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-appstyle')), true, 'an app\'s look, not the cabinet\'s');

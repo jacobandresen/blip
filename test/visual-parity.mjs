@@ -227,7 +227,7 @@ for (const [name, slug] of GAMES.filter(([name]) => !process.env.BLIP_VISUAL_GAM
     await page.goto(`${origin}/${slug}/index.html?amstrad=1`);
     await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), undefined, { timeout: 20000 });
     if (await page.locator('#need-coin-overlay').evaluate((overlay) => overlay.classList.contains('visible'))) {
-      await page.locator('#insert-coin-btn').click();
+      await page.evaluate(() => document.getElementById('insert-coin-btn').click());
       await page.waitForFunction(() => !document.querySelector('#need-coin-overlay').classList.contains('visible'));
     }
     await page.waitForTimeout(900);

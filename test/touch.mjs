@@ -127,6 +127,20 @@ test('Bubbler: touch blows a bubble, a slide runs, a flick up jumps, a lift stop
   assert.equal(stop, '-KeyD', 'lifting the finger stops the run');
 });
 
+test('Bubbler: the whole strip stays with player one until player two joins', async (t) => {
+  const p = await phone(t, 'bubbler');
+  const { x, y, w, h } = await p.strip();
+  const right = x + w * .85, lower = y + h * .8;
+  await p.page.evaluate(() => document.documentElement.setAttribute('data-open', ''));
+  await p.down(1, right, lower);
+  await p.up(1);
+  assert.equal(await p.keys(), '+KeyF -KeyF', 'the right side still blows a player-one bubble');
+  await p.page.evaluate(() => document.documentElement.setAttribute('data-versus', ''));
+  await p.down(1, right, lower);
+  await p.up(1);
+  assert.equal(await p.keys(), '+KeyJ -KeyJ', 'the right side belongs to player two after joining');
+});
+
 test('Meteors: one finger holds the d-pad while another taps the buttons', async (t) => {
   const p = await phone(t, 'meteors');
   const pad = await p.page.evaluate(() => {

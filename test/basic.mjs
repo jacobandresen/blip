@@ -1580,6 +1580,36 @@ test('BUBBLER trapped enemies are defeated when a player pops their bubble', asy
   await page.locator('#exit-game').click();
 });
 
+test('BUBBLER physical controls trap a monster, pop it, and collect its candy', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(`${origin}/basic.html`);
+  await page.evaluate(() => {
+    BlipBasic.submit('CD /TAPE');
+    BlipBasic.submit('LOAD BUBBLER');
+  });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
+  await page.evaluate(() => {
+    BlipBasic.lines.set(870, 'FOR E=1 TO ENEMY_COUNT:MONSTER(E)=0:ETRAPPED(E)=0:NEXT E:EX(1)=32:EY(1)=176:ETYPE(1)=1:MONSTER(1)=1:ETRAPPED(1)=0:EGROUND(1)=1:EDIR(1)=0:EMIN(1)=13:EMAX(1)=292:MSPEED=0');
+    BlipBasic.lines.set(10, 'GOTO 800');
+    BlipBasic.lines.set(817, 'STOP_MUSIC');
+    BlipBasic.lines.set(2042, 'FRUIT(FRUIT_SLOT)=1:FX(FRUIT_SLOT)=QX(C)-8:FY(FRUIT_SLOT)=QY(C)-8:FRUIT_HOME(FRUIT_SLOT)=FY(FRUIT_SLOT):FVX(FRUIT_SLOT)=0:FVY(FRUIT_SLOT)=0-1.7:FRUIT_KIND(FRUIT_SLOT)=CHAIN_KILLS-1');
+    BlipBasic.submit('RUN');
+  });
+  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
+  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'Bubbler should launch without a BASIC error');
+  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  await canvas.focus();
+  await page.waitForTimeout(200);
+  const initialSounds = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
+  await page.keyboard.press('f');
+  await page.waitForTimeout(700);
+  const finalSounds = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
+  assert.ok(finalSounds >= initialSounds + 4, `F should blow, trap, pop and pick up candy (sound events ${initialSounds} → ${finalSounds}; error ${await page.locator('body').getAttribute('data-wasm-error')})`);
+  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'trapping, popping and picking up candy should run without a BASIC error');
+  await page.locator('#exit-game').click();
+});
+
 test('BUBBLER trapped enemies escape and return to play when their bubbles expire', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -2791,8 +2821,10 @@ test('the BASIC home has no game toolbar and uses the BLIP 64 page title', async
   const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1000, height: 900 } });
   await page.goto(`${origin}/basic.html`);
   assert.equal(await page.title(), 'BLIP 64');
-  assert.equal(await page.locator('#basic-to-cabinet').textContent(), 'Arcade');
-  assert.equal(await page.locator('#basic-to-home').textContent(), 'Tablet');
+  // The arcade's own top bar: the BLIP badge and Home Screen.
+  assert.equal(await page.locator('#basic-to-cabinet.blip-logo.led-logo .blip-led-display').count(), 1);
+  assert.equal(await page.locator('#basic-to-home.home-switch').getAttribute('aria-label'), 'Switch to the home screen');
+  assert.equal(await page.locator('.top-marquee-bar').isVisible(), true, 'the arcade’s top bar');
   assert.equal(await page.locator('.quick-bar, #maximize-screen, [data-command="GAMES"]').count(), 0);
   assert.equal(await page.locator('#exit-game').isVisible(), false);
 });

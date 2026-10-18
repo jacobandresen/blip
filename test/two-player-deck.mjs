@@ -20,7 +20,7 @@ async function loadGame(cdp, slug, controls, { real = false } = {}) {
   await waitFor(cdp, "typeof window.BlipController === 'object'", 15000);
   // Controls stay gated until a credit enters through the coin button.
   if (await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.contains('visible')")) {
-    await cdp.page.locator('#insert-coin-btn').click();
+    await cdp.page.evaluate(() => document.getElementById('insert-coin-btn').click());
     await waitFor(cdp, "!document.getElementById('need-coin-overlay').classList.contains('visible')");
   }
   if (real) await waitFor(cdp, "document.getElementById('loader').style.display === 'none'", 20000);
@@ -788,7 +788,7 @@ test(`a second player joins by reaching for their own stick`, async (t) => {
     await page.goto(`http://127.0.0.1:${HTTP_PORT}/brawler/index.html`);
     await page.waitForFunction(() => document.getElementById('loader').style.display === 'none',
       null, { timeout: 20000 });
-    if (await page.locator('#need-coin-overlay.visible').count()) await page.locator('#insert-coin-btn').click();
+    if (await page.locator('#need-coin-overlay.visible').count()) await page.evaluate(() => document.getElementById('insert-coin-btn').click());
     // The cabinet reports itself as soon as it is up; wait for that
     // rather than for a guessed number of milliseconds.
     await page.waitForFunction(

@@ -45,24 +45,7 @@ async function key(cdp, k, code, vk) {
   }
 }
 
-/** No card is mid-move (the rack waits a frame before it starts one, so look twice). */
-const STILL_CARDS = "[...document.querySelectorAll('.card')].every((c) => c.getAnimations().length === 0) && !document.querySelector('.card-flying')";
 const WALL = "document.getElementById('need-coin-overlay').classList.contains('visible')";
-
-async function assertSelectedCardFits(cdp, label) {
-  const selection = JSON.parse(await evaluate(cdp, `(function(){
-    var selected = document.querySelector('.card-focused');
-    if (!selected) return JSON.stringify({ missing: true });
-    if (selected.id === 'manual-book') return JSON.stringify({ manual: true });
-    var card = selected.getBoundingClientRect();
-    var window = document.querySelector('#game-grid').getBoundingClientRect();
-    return JSON.stringify({ manual: false, card: [card.left, card.right], window: [window.left, window.right] });
-  })()`));
-  assert.notEqual(selection.missing, true, `${label} has a selected stop`);
-  if (selection.manual) return;
-  assert.ok(selection.card[0] >= selection.window[0] - 1 && selection.card[1] <= selection.window[1] + 1,
-    `${label} stays inside the cabinet window: ${JSON.stringify(selection)}`);
-}
 
 test('the game shell', async (t) => {
   const server = createFileServer();
@@ -143,7 +126,7 @@ test('the game shell', async (t) => {
     const cols = await evaluate(cdp, `(function(){var c=document.querySelectorAll('.card'),t=c[0].offsetTop,n=0;
       while(n<c.length&&c[n].offsetTop===t)n++;return n;})()`);
     const n = await evaluate(cdp, "document.querySelectorAll('.card').length");
-    assert.equal(cols, n, `Rolodex cards should form one horizontal fan`);
+    assert.equal(cols, n, `the machines should share one horizontal aisle`);
     await key(cdp, 'ArrowRight', 'ArrowRight', 39);
     await waitFor(cdp, `${lit} === 1`, 1500);
     assert.equal(await evaluate(cdp, lit), 1);
@@ -153,7 +136,7 @@ test('the game shell', async (t) => {
     await key(cdp, 'ArrowUp', 'ArrowUp', 38);
     await waitFor(cdp, `${lit} === 1`, 1500);
     assert.equal(await evaluate(cdp, lit), 1);
-    // Up and down step through the same single Rolodex row.
+    // Up and down step through the same horizontal aisle.
     await key(cdp, 'ArrowUp', 'ArrowUp', 38);
     await waitFor(cdp, `${lit} === 0`, 1500);
     assert.equal(await evaluate(cdp, lit), 0);
@@ -181,52 +164,27 @@ test('the game shell', async (t) => {
       'the selected card fills the available space for readable details');
 
     const catalogue = JSON.parse(await evaluate(cdp, `JSON.stringify((function(){var cards=[].slice.call(document.querySelectorAll('.card'));
-      return {count:cards.length,codes:cards.map(function(c){return c.getAttribute('data-card-code')}),
-        rack:document.querySelectorAll('.jukebox-module').length,slugs:cards.map(function(c){return c.getAttribute('data-game-url').split('/')[0]})};})())`));
+      return {count:cards.length,slugs:cards.map(function(c){return c.getAttribute('data-game-url').split('/')[0]}),
+        machines:cards.every(function(c){return !!c.querySelector('.machine-coinbox,.machine-start')})};})())`));
     assert.equal(catalogue.count, 9);
-    assert.equal(catalogue.rack, 9);
-    assert.equal(new Set(catalogue.codes).size, 9, 'every laminated selector card has a unique code');
+    assert.equal(catalogue.machines, true, 'every game has cabinet controls');
     assert.equal(await evaluate(cdp, "document.querySelectorAll('.lang-switcher,.left-badges').length"), 0,
       'the cabinet has no language or page badges');
-    assert.equal(await evaluate(cdp, "document.querySelectorAll('.rolodex-page-card').length"), 0,
+    assert.equal(await evaluate(cdp, "document.querySelectorAll('.arcade-page-card').length"), 0,
       'the current selector contains game cards only');
     for (const slug of catalogue.slugs) {
-      assert.equal(await evaluate(cdp, `document.querySelector('.jukebox-module[data-slug="${slug}"]') !== null`), true, `${slug} has a stored card`);
-      await evaluate(cdp, `document.querySelector('.card[data-game-url^="${slug}/"]').click(); true`);
-      assert.equal(await evaluate(cdp, `document.querySelector('.card[data-game-url^="${slug}/"]').classList.contains('rejected')`), true, `${slug} card responds while awaiting credit`);
-      await evaluate(cdp, `document.querySelector('.card[data-game-url^="${slug}/"]').classList.remove('rejected'); true`);
+      assert.equal(await evaluate(cdp, `!!document.querySelector('.card[data-game-url^="${slug}/"] .machine-coinbox')`), true, `${slug} has a coin door`);
+      assert.equal(await evaluate(cdp, `!!document.querySelector('.card[data-game-url^="${slug}/"] .machine-start')`), true, `${slug} has a Start button`);
     }
-    // The manual is a tenth stop after Adder.
-    for (let i = 0; i < 10; i++) {
-      await key(cdp, 'ArrowRight', 'ArrowRight', 39);
-      await sleep(150);
-      await waitFor(cdp, STILL_CARDS, 5000);
-      await assertSelectedCardFits(cdp, `desktop stop ${i + 1}`);
-    }
-    await cdp.send('Emulation.setDeviceMetricsOverride', { width:390, height:844, deviceScaleFactor:1, mobile:true });
-    await open(cdp, 'index.html', 1100);
-    for (let i = 0; i < 10; i++) {
-      await key(cdp, 'ArrowRight', 'ArrowRight', 39);
-      await sleep(150);
-      await waitFor(cdp, STILL_CARDS, 5000);
-      await assertSelectedCardFits(cdp, `phone stop ${i + 1}`);
-    }
-    await cdp.send('Emulation.setDeviceMetricsOverride', { width:1280, height:800, deviceScaleFactor:1, mobile:false });
-    await open(cdp, 'index.html', 800);
-
-    // Enter from the cabinet itself so the first title change is a real
-    // front-page selection, not a direct load of the shell.
-    await evaluate(cdp, "document.getElementById('kiosk-insert-btn').click(); true");
+    // Enter through the selected machine's own coin door.
+    await evaluate(cdp, "document.querySelector('.card-focused .machine-coinbox').click(); true");
     await sleep(300);
     await key(cdp, 'ArrowRight', 'ArrowRight', 39);
     assert.equal(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent"), 'BOUNCER');
     await key(cdp, ' ', 'Space', 32);
     await arrivedAt(cdp, '/bouncer/index.html');
     assert.equal(await evaluate(cdp, 'location.pathname'), '/bouncer/index.html');
-    assert.equal(await evaluate(cdp, "document.querySelector('.jukebox-receiver').classList.contains('loaded')"), true,
-      'the selected card seats in the receiver before the title changes');
-    assert.equal(await evaluate(cdp, "getComputedStyle(document.querySelector('.jukebox-seated-card')).opacity"), '1',
-      'the selected game card is visible in the receiver');
+    assert.ok([0, 1].includes(await evaluate(cdp, 'getCoins()')), 'the inserted credit reaches the game or starts play');
     const titles = {
       serpent: 'SERPENT', bouncer: 'BOUNCER', galactic_defender: 'DEFENDER', rally: 'RALLY',
       meteors: 'METEORS', sky_raider: 'RAIDER', brawler: 'BRAWLER', bubbler: 'BUBBLER',

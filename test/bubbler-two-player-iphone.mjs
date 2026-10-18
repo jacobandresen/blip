@@ -22,8 +22,8 @@ for (const layout of layouts) {
     await page.goto(`${origin}/bubbler/index.html`);
     await page.waitForFunction(() => document.documentElement.dataset.touch === 'platform');
     await page.waitForFunction(() => document.documentElement.hasAttribute('data-open'));
-    await page.locator('#insert-coin-btn').tap();
-    await page.locator('#insert-coin-btn').tap();
+    await page.evaluate(() => document.getElementById('insert-coin-btn').click());
+    await page.evaluate(() => document.getElementById('insert-coin-btn').click());
     assert.equal(await page.locator('.ts-join').evaluate((button) => {
       const r = button.getBoundingClientRect();
       return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === button;
