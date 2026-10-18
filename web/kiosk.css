@@ -2739,6 +2739,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   }
   /* the boot where the cross is, in the top-left box */
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] .deck-side > .stick-base { height: var(--dpad); }
+  /* A station keeps its stick by its caps; the deck's spare width (it has no coin box) goes between the players. */
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] :is(#deck-p1, #deck-p2) {
+    flex: 0 1 calc(var(--dpad) + var(--cap) + 20px);
+  }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] #deck-p2 { margin-left: auto; }
   :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] .snes-shell > .snes-face,
   :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] .deck-side > .fire-buttons {
     grid-area: 1 / 1;
