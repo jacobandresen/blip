@@ -401,8 +401,8 @@ body[data-loading-tape] .tape-buttons [data-key=play],body[data-tape-rewinding] 
 #monitor-fullscreen:focus-visible { outline:2px solid #fff4a2; outline-offset:2px; }
 body[data-wasm-playing] #monitor-fullscreen,body[data-playing] #monitor-fullscreen { right:106px; }
 body[data-monitor-expanded] { --monitor-bottom:0px; overflow:hidden; }
-body[data-monitor-expanded][data-wasm-playing],body[data-monitor-expanded][data-playing] { --monitor-bottom:var(--amstrad-control-clearance,56px); }
-body[data-monitor-expanded] .front-nav,body[data-monitor-expanded] .computer,body[data-monitor-expanded] .tape-rack,body[data-monitor-expanded] #basic-book-peek { display:none; }
+/* Maximized, the monitor is all there is: no top bar and no control deck; keys and a gamepad still play. */
+body[data-monitor-expanded] .front-nav,body[data-monitor-expanded] .top-marquee-bar,body[data-monitor-expanded] #kiosk-bar.amstrad-controls,body[data-monitor-expanded] .amstrad-rally-dial,body[data-monitor-expanded] .computer,body[data-monitor-expanded] .tape-rack,body[data-monitor-expanded] #basic-book-peek { display:none; }
 body[data-monitor-expanded] .setup,body[data-monitor-expanded][data-wasm-playing] .setup,body[data-monitor-expanded][data-playing] .setup { position:fixed; inset:0 0 var(--monitor-bottom); z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; max-width:none; min-height:0; padding:0; }
 body[data-monitor-expanded] .monitor,body[data-monitor-expanded][data-wasm-playing] .monitor,body[data-monitor-expanded][data-playing] .monitor { width:min(100vw,calc((100dvh - var(--monitor-bottom) - 65px) * 1.3333)); max-width:none; transform:none; }
 @media(max-width:650px) { #monitor-fullscreen { top:1px; right:10px; width:26px; height:24px; font-size:21px; } body[data-wasm-playing] #monitor-fullscreen,body[data-playing] #monitor-fullscreen { right:105px; } }

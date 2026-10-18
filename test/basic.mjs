@@ -52,10 +52,12 @@ test('the monitor fullscreen button expands and restores the monitor', async (t)
   await page.waitForFunction((width) => document.querySelector('.monitor').getBoundingClientRect().width > width * 1.35, normal.width);
   const expanded = await page.locator('.monitor').boundingBox();
   assert.equal(await page.locator('#monitor-fullscreen').getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.locator('.top-marquee-bar').isVisible(), false, 'the maximized monitor has no top bar over it');
   assert.ok(expanded.x >= -1 && expanded.y >= -1 && expanded.x + expanded.width <= 1001 && expanded.y + expanded.height <= 901);
   await page.locator('#monitor-fullscreen').click();
   await page.waitForFunction((width) => document.querySelector('.monitor').getBoundingClientRect().width < width * 1.1, normal.width);
   assert.equal(await page.locator('#monitor-fullscreen').getAttribute('aria-pressed'), 'false');
+  assert.equal(await page.locator('.top-marquee-bar').isVisible(), true, 'restored, the top bar is back');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#monitor-fullscreen').click();
   const mobile = await page.locator('.monitor').boundingBox();
@@ -63,7 +65,7 @@ test('the monitor fullscreen button expands and restores the monitor', async (t)
   await page.locator('#monitor-fullscreen').click();
 });
 
-test('the expanded monitor leaves room for controls during a BASIC game', async (t) => {
+test('the expanded monitor fills the screen during a BASIC game, without the control deck', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1000, height: 900 } });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
@@ -74,13 +76,15 @@ test('the expanded monitor leaves room for controls during a BASIC game', async 
   await page.locator('#monitor-fullscreen').click();
   const layout = await page.evaluate(() => ({
     monitor: document.querySelector('.monitor').getBoundingClientRect().bottom,
-    controls: document.querySelector('.amstrad-controls').getBoundingClientRect().top,
+    deck: getComputedStyle(document.querySelector('.amstrad-controls')).display,
     canvasFocused: document.querySelector('#basic-wasm-frame').contentDocument.activeElement?.id === 'glcanvas',
   }));
-  assert.ok(layout.monitor <= layout.controls + 2, `monitor should leave room for controls: ${JSON.stringify(layout)}`);
+  assert.equal(layout.deck, 'none', 'the control deck goes away');
+  assert.ok(layout.monitor > 850, `the monitor takes the room the deck had: ${JSON.stringify(layout)}`);
   assert.equal(layout.canvasFocused, true, 'the game keeps physical keyboard focus');
   await page.locator('#monitor-fullscreen').click();
   assert.equal(await page.locator('#monitor-fullscreen').getAttribute('aria-pressed'), 'false');
+  assert.equal(await page.locator('.amstrad-controls').isVisible(), true, 'restored, the deck is back');
 });
 
 test('BASIC stores and runs a numbered program, then launches a BLIP BASIC game with LOAD and RUN', async (t) => {
