@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 140" role="img" aria-labelledby="title">
+  <title id="title">BLIP BASIC programming book cover</title>
+  <defs>
+    <linearGradient id="cloth" x2=".2" y2="1"><stop stop-color="#ecd9a6"/><stop offset=".55" stop-color="#dcc38a"/><stop offset="1" stop-color="#c2a66b"/></linearGradient>
+    <linearGradient id="band" x2="1"><stop stop-color="#6e2620"/><stop offset=".5" stop-color="#94382c"/><stop offset="1" stop-color="#7c2c23"/></linearGradient>
+    <linearGradient id="plate" x2="0" y2="1"><stop stop-color="#26324a"/><stop offset="1" stop-color="#18202f"/></linearGradient>
+    <linearGradient id="screen" x2="0" y2="1"><stop stop-color="#1d3384"/><stop offset="1" stop-color="#0b1850"/></linearGradient>
+    <linearGradient id="case" x2="0" y2="1"><stop stop-color="#5a5446"/><stop offset="1" stop-color="#37332b"/></linearGradient>
+  </defs>
+  <rect width="96" height="140" fill="url(#cloth)"/>
+  <rect width="13" height="140" fill="url(#band)"/>
+  <path d="M13.4 0v140" stroke="#f3dfae" stroke-opacity=".55" stroke-width=".5"/>
+  <path d="M15 0v140" stroke="#5d4826" stroke-opacity=".25" stroke-width=".6"/>
+  <rect x="20" y="8" width="68" height="124" fill="none" stroke="#6a5532" stroke-width=".7"/>
+  <rect x="21.6" y="9.6" width="64.8" height="120.8" fill="none" stroke="#fff4d4" stroke-opacity=".5" stroke-width=".4"/>
+  <!-- The name plate: the computer's own wordmark and stripes, big enough to read from the corner of the desk. -->
+  <rect x="20" y="8" width="68" height="19" fill="url(#plate)"/>
+  <text x="23.6" y="22" fill="#f6ecd2" font-family="Arial Black,Arial,sans-serif" font-size="10.5" font-weight="900" letter-spacing="-.8">BLIP</text>
+  <path d="M55 12.2h33" stroke="#d2493d" stroke-width="1.7"/>
+  <path d="M55 14.5h33" stroke="#e48d3a" stroke-width="1.7"/>
+  <path d="M55 16.8h33" stroke="#ecc54c" stroke-width="1.7"/>
+  <path d="M55 19.1h33" stroke="#4f86b4" stroke-width="1.7"/>
+  <text x="55.2" y="24.4" fill="#cdbf9c" font-family="Arial,sans-serif" font-size="1.9" font-weight="700" textLength="29.5" lengthAdjust="spacingAndGlyphs">COMPUTER SYSTEMS</text>
+  <text x="24.6" y="41" fill="#24364a" font-family="Arial Black,Arial,sans-serif" font-size="11" font-weight="900" letter-spacing="-.1">BASIC</text>
+  <text x="25" y="46.6" fill="#8a3a2d" font-family="Arial,sans-serif" font-size="2.7" font-weight="700" letter-spacing=".45">PROGRAMMING BOOK</text>
+  <text x="83" y="52.6" fill="#5f5139" fill-opacity=".7" font-family="Snell Roundhand,Apple Chancery,Segoe Script,Z003,URW Chancery L,Brush Script MT,cursive" font-size="3.6" font-style="italic" text-anchor="end">Jacob Andresen</text>
+  <path d="M25 56h58" stroke="#8b7650" stroke-width=".4"/>
+  <g transform="translate(0 -5)">
+    <rect x="28" y="69" width="52" height="34" rx="2.2" fill="url(#case)"/>
+    <rect x="28" y="69" width="52" height="34" rx="2.2" fill="none" stroke="#1f1c17" stroke-width=".6"/>
+    <rect x="31" y="72" width="46" height="26" rx="1.4" fill="url(#screen)"/>
+    <path d="M33.5 76.5h13m-13 4h24" stroke="#c9d4ff" stroke-width=".9" opacity=".75"/>
+    <text x="33.5" y="89.5" fill="#f2e6b0" font-family="Courier New,monospace" font-size="3.5" font-weight="700">10 PRINT "HI"</text>
+    <text x="33.5" y="94.5" fill="#f2e6b0" font-family="Courier New,monospace" font-size="3.5" font-weight="700">RUN</text>
+    <rect x="41.6" y="92" width="2.2" height="3.2" fill="#f2e6b0"/>
+    <path d="M48 103h12l2.6 4.6H45.4z" fill="#4a4538"/>
+    <rect x="40" y="107.4" width="28" height="1.6" rx=".6" fill="#3a362d"/>
+  </g>
+  <path d="M20 114h68" stroke="#b5443a" stroke-width="2.2"/>
+  <path d="M20 116.6h68" stroke="#d98a3a" stroke-width="2.2"/>
+  <path d="M20 119.2h68" stroke="#e3bd4a" stroke-width="2.2"/>
+  <path d="M20 121.8h68" stroke="#3f6c8f" stroke-width="2.2"/>
+  <text x="25" y="127.8" fill="#5d4d30" font-family="Arial,sans-serif" font-size="2.6" font-weight="700" letter-spacing=".35">A PRACTICAL COURSE</text>
+  <text x="83" y="127.8" fill="#5d4d30" font-family="Georgia,serif" font-size="2.8" font-style="italic" text-anchor="end">2026</text>
+</svg>

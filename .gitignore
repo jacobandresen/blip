@@ -40,6 +40,7 @@ web/blip_config.js
 # Playwright output
 test-results/
 playwright-report/
+test/artifacts/
 
 # Editor / OS
 .DS_Store

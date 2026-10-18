@@ -85,7 +85,7 @@ function returnToCabinet(event) {
   bar.id = 'marquee-bar';
   bar.className = 'jukebox-marquee';
   var sign = document.createElement('a');
-  sign.href=blipFrontendUrl();sign.title=blipAppMode()?'Back to the title':'Return to the '+({home:'home screen',basic:'Amstrad',cabinet:'cabinet'}[blipFrontend()]);
+  sign.href=blipFrontendUrl();sign.title=blipAppMode()?'Back to the title':'Return to the '+({home:'home screen',basic:'BLIP',cabinet:'cabinet'}[blipFrontend()]);
   sign.id = 'marquee-name';
   sign.setAttribute('aria-label', game.name);
   sign.dataset.title = game.name.charAt(0) + game.name.slice(1).toLowerCase();
@@ -116,7 +116,7 @@ function returnToCabinet(event) {
     var back = document.createElement('a');
     back.className = 'app-back';
     back.href = blipFrontendUrl();
-    back.innerHTML = '<svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' + (blipFrontend() === 'basic' ? 'Amstrad' : 'Home');
+    back.innerHTML = '<svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' + (blipFrontend() === 'basic' ? 'BLIP' : 'Home');
     back.addEventListener('click', returnToCabinet);
     document.body.appendChild(back);
   }
@@ -941,6 +941,14 @@ window.addEventListener('keydown', function (e) {
   });
   BlipController.bindKeyboard();
   BlipController.bindGamepad(pollGamepad);
+
+  window.addEventListener('message', function (event) {
+    if (event.origin !== location.origin || event.source !== parent || !blipAmstradMode() || !event.data || event.data.type !== 'blip-amstrad-key') return;
+    var type = event.data.down ? 'keydown' : 'keyup';
+    canvas.dispatchEvent(new KeyboardEvent(type, {
+      bubbles: true, cancelable: true, key: event.data.key, code: event.data.code
+    }));
+  });
 
   // ---- The controller selector ----
   // Oldest to newest: JOYSTICK · PAD (· TOUCH on a game with a strip, on a

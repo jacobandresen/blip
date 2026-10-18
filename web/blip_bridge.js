@@ -51,8 +51,10 @@ register_plugin = function (importObject) {
     // A game opened as an app (home screen, its own icon) draws a clean,
     // modern picture: no CRT, and at the screen's full pixel density, so
     // the pixels are scaled up sharp rather than shrunk and blurred.
-    var clean = document.documentElement.hasAttribute('data-appstyle');
+    var amstrad = document.documentElement.hasAttribute('data-amstrad');
+    var clean = document.documentElement.hasAttribute('data-appstyle') && !amstrad;
     importObject.env.blip_crt = function () { return clean ? 0 : 1; };
+    importObject.env.blip_glitch = function () { return !clean && !amstrad ? 1 : 0; };
     var setupCanvas = importObject.env.setup_canvas_size;
     if (clean && typeof setupCanvas === 'function') {
         importObject.env.setup_canvas_size = function () { return setupCanvas.call(this, true); };

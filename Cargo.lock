@@ -68,6 +68,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "blip_basic"
+version = "0.1.0"
+dependencies = [
+ "blip",
+ "blip_assets",
+ "macroquad",
+]
+
+[[package]]
 name = "bouncer"
 version = "0.1.0"
 dependencies = [

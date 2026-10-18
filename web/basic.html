@@ -4,18 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#232431">
-  <title>BLIP 64K · Amstrad</title>
+  <title>BLIP 64</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <script src="blip_core.js?v=5"></script>
   <link rel="stylesheet" href="kiosk.css?v=493">
-  <link rel="stylesheet" href="basic.css?v=29">
+  <link rel="stylesheet" href="basic.css?v=48">
 </head>
 <body>
   <nav class="front-nav" aria-label="BLIP front ends">
-    <a href="index.html?cabinet" id="basic-to-cabinet">Arcade cabinet</a>
-    <a href="home.html" id="basic-to-home">Home Screen</a>
-    <span aria-current="page">BLIP</span>
+    <a href="index.html?cabinet" id="basic-to-cabinet">Arcade</a>
+    <a href="home.html" id="basic-to-home">Tablet</a>
   </nav>
   <main class="setup" aria-label="BLIP BASIC computer">
     <section class="monitor" aria-label="Colour monitor">
@@ -24,6 +23,7 @@
         <div class="screen-bezel">
           <div class="screen" id="basic-screen">
             <canvas id="basic-graphics" width="320" height="200" aria-hidden="true"></canvas>
+            <iframe id="basic-wasm-frame" title="BLIP BASIC WebAssembly display" hidden allow="autoplay"></iframe>
             <div class="screen-glass" aria-hidden="true"></div>
             <div class="screen-content">
               <pre id="basic-output" aria-live="polite" aria-label="BASIC output"></pre>
@@ -31,11 +31,12 @@
                 <label for="basic-input" class="visually-hidden">BASIC command or program line</label>
                 <span class="cursor-mark" aria-hidden="true">▌</span><input id="basic-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="enter">
               </form>
+              <section id="basic-editor" hidden aria-label="BLIP BASIC source editor">
+                <header class="editor-heading"><strong id="editor-file"></strong><span>BLIP BASIC EDITOR</span></header>
+                <div id="editor-code" role="textbox" aria-label="Program source" aria-multiline="true"></div>
+                <footer class="editor-status"><span id="editor-mode">AUTO-SAVE</span><span id="editor-message"></span><span class="editor-keys">↑ ↓ ← → MOVE · ESC CLOSE · TAB COMPLETE</span></footer>
+              </section>
             </div>
-          <iframe id="amstrad-game-frame" title="BLIP game running on the Amstrad" hidden allow="autoplay; fullscreen"></iframe>
-          <div id="tape-loader" hidden aria-live="polite"><pre>BLIP BASIC 1.0
-<span id="tape-loader-message">LOADING</span>
-<span id="tape-loader-name"></span></pre></div>
           </div>
         </div>
         <div class="monitor-chin"><img class="monitor-brand" src="blip-wordmark.svg" alt="BLIP"><span class="monitor-model">CTM 640 COLOUR MONITOR</span><span class="power-led" aria-label="Power on"></span></div>
@@ -43,14 +44,13 @@
       <div class="monitor-foot"></div>
     </section>
 
-    <section class="computer" aria-label="1984 style keyboard and cassette deck">
-      <div class="computer-top"><img class="computer-brand" src="blip-wordmark.svg" alt="BLIP"><span class="computer-title">64K COLOUR PERSONAL COMPUTER <strong>1984</strong></span></div>
+    <section class="computer" aria-label="BLIP 64 keyboard and cassette deck">
+      <div class="computer-top"><img class="computer-brand" src="blip-wordmark.svg" alt="BLIP"><span class="computer-title">64K COLOUR PERSONAL COMPUTER <strong>2026.1</strong></span></div>
       <div class="computer-body">
         <div class="keyboard" id="basic-keyboard" role="group" aria-label="Touch keyboard"></div>
         <div class="cassette" id="cassette-deck">
           <div class="deck-bay">
             <div class="deck-cavity"><span></span><span></span><small>DATACORDER</small></div>
-            <div class="deck-tape" id="loading-tape" aria-hidden="true"><span class="tape-label" id="loading-tape-label"><i></i>BLIP</span><span class="tape-reel reel-left"></span><span class="tape-reel reel-right"></span><span class="tape-window"></span></div>
             <div class="deck-hinge" aria-hidden="true"><i></i><i></i></div>
             <div class="deck-lid" id="cassette-lid" aria-hidden="true"><span>BLIP DATACORDER</span></div>
           </div>
@@ -59,17 +59,12 @@
       </div>
       <div class="computer-edge"></div>
     </section>
+    <aside class="tape-rack" aria-label="BLIP game cassette collection">
+      <div id="tape-pile" class="tape-pile" aria-label="Choose a game cassette"></div>
+    </aside>
   </main>
-  <aside class="quick-bar" aria-label="BASIC shortcuts">
-    <span class="command-buttons"><button type="button" data-command="GAMES">GAMES</button>
-      <button type="button" data-command="HELP">HELP</button></span>
-    <button type="button" id="maximize-screen" aria-label="Maximize Amstrad screen" aria-pressed="false" title="Maximize screen">⛶</button>
-    <button type="button" id="exit-game" hidden>EXIT GAME</button>
-  </aside>
-  <section class="catalog" id="basic-catalog" hidden aria-label="BLIP game cassettes">
-    <h2>BLIP game cassettes</h2>
-    <div id="basic-game-list"></div>
-  </section>
+  <a href="basic-book.html" id="basic-book-peek" aria-label="Open the BLIP BASIC programming book"><img src="blip-basic-cover.svg" alt="BLIP BASIC programming book"></a>
+  <button type="button" id="exit-game" class="game-exit">EXIT GAME</button>
   <div id="kiosk-bar" class="kiosk-bar amstrad-controls" aria-label="BLIP game controls">
     <div class="deck-panel">
       <div id="amstrad-rally-dial-p1" class="amstrad-rally-dial" aria-label="Player 1 paddle dial">
@@ -82,6 +77,6 @@
   </div>
   <script>document.documentElement.setAttribute('data-controls', 'stick');</script>
   <script src="deck.js?v=13"></script>
-  <script src="basic.js?v=22"></script>
+  <script src="basic.js?v=69"></script>
 </body>
 </html>

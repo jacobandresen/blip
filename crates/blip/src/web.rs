@@ -15,16 +15,25 @@ extern "C" {
     fn blip_controls() -> i32;
     fn blip_picture(width: i32, height: i32);
     fn blip_crt() -> i32;
+    fn blip_glitch() -> i32;
 }
 
-/// Whether the picture is a CRT's: curved glass, bloom, scanlines, noise,
-/// tears and rolls. A game opened as an app (the home screen, its own icon)
+/// Whether the picture gets the CRT treatment: curved glass, bloom, scanlines
+/// and noise. A game opened as an app (the home screen, its own icon)
 /// asks for a clean, modern picture instead; natively `BLIP_CRT=0` does.
 pub fn crt() -> bool {
     #[cfg(target_arch = "wasm32")]
     unsafe { blip_crt() != 0 }
     #[cfg(not(target_arch = "wasm32"))]
     { std::env::var_os("BLIP_CRT").map_or(true, |v| v != "0") }
+}
+
+/// Whether occasional picture faults should interrupt the CRT image.
+pub fn glitches() -> bool {
+    #[cfg(target_arch = "wasm32")]
+    unsafe { blip_glitch() != 0 }
+    #[cfg(not(target_arch = "wasm32"))]
+    { std::env::var_os("BLIP_GLITCH").map_or(true, |v| v != "0") }
 }
 
 /// Notify the kiosk shell that the player should be charged a coin.

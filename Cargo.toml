@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/blip",
     "crates/blip_assets",
+    "crates/blip_basic",
     "crates/serpent",
     "crates/bouncer",
     "crates/brawler",

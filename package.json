@@ -4,6 +4,7 @@
   "scripts": {
     "test": "node --test test/fill-canvas.test.mjs",
     "test:web": "node test/run-web.mjs",
+    "test:visual": "node test/run-visual.mjs",
     "test:layout": "node test/shard.mjs 4 test/layout.mjs",
     "test:shell": "node --test --test-concurrency=1 test/shell.mjs",
     "test:scores": "node test/shard.mjs 3 test/highscore-entry.mjs",
