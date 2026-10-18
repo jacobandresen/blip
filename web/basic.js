@@ -48,6 +48,18 @@ if (blipHasTouch()) input.readOnly = true;
 var canvas = document.getElementById('basic-graphics');
 var wasmFrame=document.getElementById('basic-wasm-frame'),basicWasmPlaying=false,basicWasmReady=false,basicWasmSource='',basicWasmRunId=0;
 var exitGameButton = document.getElementById('exit-game');
+var monitorFullscreenButton = document.getElementById('monitor-fullscreen');
+monitorFullscreenButton.addEventListener('click',function(){
+  var expanded=document.body.toggleAttribute('data-monitor-expanded');
+  monitorFullscreenButton.setAttribute('aria-pressed',String(expanded));
+  monitorFullscreenButton.setAttribute('aria-label',expanded?'Restore monitor':'Maximize monitor');
+  monitorFullscreenButton.title=expanded?'Restore monitor':'Maximize monitor';
+  monitorFullscreenButton.textContent=expanded?'⤡':'⤢';
+  if(basicWasmPlaying){
+    var gameCanvas=wasmFrame.contentDocument&&wasmFrame.contentDocument.querySelector('#glcanvas');
+    if(gameCanvas)gameCanvas.focus({preventScroll:true});
+  }else if(!blipHasTouch())input.focus({preventScroll:true});
+});
 var soundContext=null,soundCursor=0;
 var tapeLoadingAudio=new Audio('blip-tape-load.mp3');
 tapeLoadingAudio.preload='auto';

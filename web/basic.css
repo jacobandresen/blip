@@ -352,3 +352,14 @@ body[data-wasm-playing][data-rally] .deck-side { display:none!important; }
 .amstrad-controls .arcade-btn-cap { background:radial-gradient(circle at 34% 25%,#ffad9a 0 8%,transparent 31%),radial-gradient(circle at 50% 45%,#eb4935 0,#c92318 52%,#80140d 100%); }
 #manual-book,.manual-pocket { display:none!important; }
 body[data-playing] #basic-book-peek,body[data-wasm-playing] #basic-book-peek { display:none; }
+
+#monitor-fullscreen { position:absolute; z-index:5; top:3px; right:18px; width:30px; height:28px; padding:0; display:grid; place-items:center; border:1px solid #7d8189; border-radius:4px; background:linear-gradient(#535862,#292c34); box-shadow:inset 0 1px #ffffff45,0 2px 4px #000a; color:#f5f5ed; font:700 24px/1 Arial,sans-serif; cursor:pointer; touch-action:manipulation; }
+#monitor-fullscreen:hover { filter:brightness(1.2); }
+#monitor-fullscreen:focus-visible { outline:2px solid #fff4a2; outline-offset:2px; }
+body[data-wasm-playing] #monitor-fullscreen,body[data-playing] #monitor-fullscreen { right:106px; }
+body[data-monitor-expanded] { --monitor-bottom:0px; overflow:hidden; }
+body[data-monitor-expanded][data-wasm-playing],body[data-monitor-expanded][data-playing] { --monitor-bottom:var(--amstrad-control-clearance,56px); }
+body[data-monitor-expanded] .front-nav,body[data-monitor-expanded] .computer,body[data-monitor-expanded] .tape-rack,body[data-monitor-expanded] #basic-book-peek { display:none; }
+body[data-monitor-expanded] .setup,body[data-monitor-expanded][data-wasm-playing] .setup,body[data-monitor-expanded][data-playing] .setup { position:fixed; inset:0 0 var(--monitor-bottom); z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; max-width:none; min-height:0; padding:0; }
+body[data-monitor-expanded] .monitor,body[data-monitor-expanded][data-wasm-playing] .monitor,body[data-monitor-expanded][data-playing] .monitor { width:min(100vw,calc((100dvh - var(--monitor-bottom) - 65px) * 1.3333)); max-width:none; transform:none; }
+@media(max-width:650px) { #monitor-fullscreen { top:1px; right:10px; width:26px; height:24px; font-size:21px; } body[data-wasm-playing] #monitor-fullscreen,body[data-playing] #monitor-fullscreen { right:105px; } }

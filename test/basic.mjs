@@ -43,6 +43,46 @@ test('BASIC uses uppercase text and hides the monitor scrollbar without disablin
   })), { transform: 'uppercase', scrollbar: 'none', overflowY: 'auto' });
 });
 
+test('the monitor fullscreen button expands and restores the monitor', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1000, height: 900 } });
+  await page.route('**/*.wasm', () => {});
+  await page.goto(`${origin}/basic.html`);
+  const normal = await page.locator('.monitor').boundingBox();
+  await page.locator('#monitor-fullscreen').click();
+  await page.waitForFunction((width) => document.querySelector('.monitor').getBoundingClientRect().width > width * 1.35, normal.width);
+  const expanded = await page.locator('.monitor').boundingBox();
+  assert.equal(await page.locator('#monitor-fullscreen').getAttribute('aria-pressed'), 'true');
+  assert.ok(expanded.x >= -1 && expanded.y >= -1 && expanded.x + expanded.width <= 1001 && expanded.y + expanded.height <= 901);
+  await page.locator('#monitor-fullscreen').click();
+  await page.waitForFunction((width) => document.querySelector('.monitor').getBoundingClientRect().width < width * 1.1, normal.width);
+  assert.equal(await page.locator('#monitor-fullscreen').getAttribute('aria-pressed'), 'false');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('#monitor-fullscreen').click();
+  const mobile = await page.locator('.monitor').boundingBox();
+  assert.ok(mobile.x >= -1 && mobile.y >= -1 && mobile.x + mobile.width <= 391 && mobile.y + mobile.height <= 845);
+  await page.locator('#monitor-fullscreen').click();
+});
+
+test('the expanded monitor leaves room for controls during a BASIC game', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1000, height: 900 } });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(`${origin}/basic.html`);
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BOUNCER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
+  await page.evaluate(() => BlipBasic.submit('RUN'));
+  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
+  await page.locator('#monitor-fullscreen').click();
+  const layout = await page.evaluate(() => ({
+    monitor: document.querySelector('.monitor').getBoundingClientRect().bottom,
+    controls: document.querySelector('.amstrad-controls').getBoundingClientRect().top,
+    canvasFocused: document.querySelector('#basic-wasm-frame').contentDocument.activeElement?.id === 'glcanvas',
+  }));
+  assert.ok(layout.monitor <= layout.controls + 2, `monitor should leave room for controls: ${JSON.stringify(layout)}`);
+  assert.equal(layout.canvasFocused, true, 'the game keeps physical keyboard focus');
+  await page.locator('#monitor-fullscreen').click();
+  assert.equal(await page.locator('#monitor-fullscreen').getAttribute('aria-pressed'), 'false');
+});
+
 test('BASIC stores and runs a numbered program, then launches a BLIP BASIC game with LOAD and RUN', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1000, height: 900 } });
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -1971,6 +2011,54 @@ test('BOUNCER win and game-over screens keep rendering while they wait', async (
     }
     assert.ok(colored > 100, `${screen}: expected visible colored title text, found ${colored} pixels`);
   }
+});
+
+test('BOUNCER clears its last brick and advances to the next level automatically', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(`${origin}/basic.html`);
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BOUNCER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
+  await page.evaluate(() => {
+    BlipBasic.lines.set(90, 'GOSUB 1000:FOR R=0 TO 5:FOR C=0 TO 9:B(C,R)=0:NEXT C:NEXT R:B(5,0)=1:LEFT=1');
+    BlipBasic.lines.set(160, BlipBasic.lines.get(160)
+      .replace('BX=160:BY=169:VX=1.6:VY=-2.7', 'BX=171:BY=49:VX=0:VY=-3')
+      .replace('SERVE=1', 'SERVE=0'));
+    BlipBasic.submit('RUN');
+  });
+  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
+  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  await canvas.press('Space');
+  await page.waitForTimeout(600);
+  const win = await canvas.screenshot();
+  await page.waitForTimeout(1300);
+  async function colors(base64) {
+    return page.evaluate(async (encoded) => {
+      const image = new Image(); image.src = `data:image/png;base64,${encoded}`; await image.decode();
+      const sample = document.createElement('canvas'); sample.width = image.width; sample.height = image.height;
+      const ctx = sample.getContext('2d'); ctx.drawImage(image, 0, 0);
+      const pixels = ctx.getImageData(0, 0, image.width, image.height).data;
+      let green = 0, bricks = 0;
+      for (let y = Math.floor(image.height * .15); y < Math.floor(image.height * .55); y += 2) {
+        for (let x = Math.floor(image.width * .03); x < Math.floor(image.width * .97); x += 2) {
+          const i = (y * image.width + x) * 4, r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+          if (g > 80 && g > r * 1.4 && g > b * 1.1) green++;
+          if (r + g + b > 210) bricks++;
+        }
+      }
+      return { green, bricks };
+    }, base64);
+  }
+  const colorCounts = { win: await colors(win.toString('base64')), next: null };
+  for (let attempt = 0; attempt < 20; attempt++) {
+    colorCounts.next = await colors((await canvas.screenshot()).toString('base64'));
+    if (colorCounts.next.bricks > colorCounts.win.bricks * 3) break;
+    await page.waitForTimeout(100);
+  }
+  const runtime = await page.evaluate(() => ({ running: document.body.hasAttribute('data-wasm-running'), playing: document.body.hasAttribute('data-wasm-playing'), output: document.querySelector('#basic-output').textContent }));
+  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `BOUNCER should keep running: ${JSON.stringify({ colorCounts, runtime })}`);
+  assert.ok(colorCounts.win.green > 100, `cleared screen should be visible: ${JSON.stringify(colorCounts)}`);
+  assert.ok(colorCounts.next.bricks > colorCounts.win.bricks * 3, `level two should rebuild its brick wall: ${JSON.stringify({ colorCounts, runtime })}`);
 });
 
 test('DEFENDER.BLIP runs a keyboard-controlled game through Rust Blip primitives', async (t) => {
