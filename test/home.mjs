@@ -48,8 +48,8 @@ test('the home screen shows every game as an app with its own icon, and nothing 
   assert.ok(await page.locator('#dock-arcade').isVisible(), 'the dock has the way back to BLIP Home');
   assert.equal(await page.locator('#dock-arcade').getAttribute('aria-label'), 'BLIP Home');
   assert.match(await page.locator('#dock-arcade img').getAttribute('src'), /^icon\.svg/);
-  assert.equal(await page.locator('#dock-amstrad').getAttribute('aria-label'), 'Amstrad');
-  assert.match(await page.locator('#dock-amstrad img').getAttribute('src'), /^amstrad-icon\.svg/);
+  assert.equal(await page.locator('#dock-amstrad').getAttribute('aria-label'), 'BLIP');
+  assert.match(await page.locator('#dock-amstrad img').getAttribute('src'), /^blip-computer-icon\.svg/);
   await page.waitForFunction(() => document.querySelector('#dock-amstrad img').complete && document.querySelector('#dock-amstrad img').naturalWidth > 0);
   const cabinet = requested.filter((p) => /kiosk\.(js|css)|wear\.css|deck\.js|manual|howler|blip_controller/.test(p));
   assert.deepEqual(cabinet, [], 'the home screen loads none of the cabinet');
@@ -131,7 +131,7 @@ test('a tap on an icon starts the game on free play, and the logo brings it back
   await page.waitForFunction(() => typeof BlipController === 'object');
   assert.equal(await coinWall(page), false, 'no coin wall');
   assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-freeplay')), true);
-  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.deck-coin-slot')).visibility), 'hidden', 'no coin slot');
+  assert.equal(await page.evaluate(() => !!document.querySelector('.deck-coin-slot')), false, 'no coin slot');
   assert.equal(await page.evaluate(() => blipSpendCoin()), 1, 'a start costs nothing');
   assert.equal(await coinWall(page), false);
   assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-appstyle')), true, 'an app\'s look, not the cabinet\'s');

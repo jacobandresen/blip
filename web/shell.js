@@ -40,7 +40,7 @@ var CABINET_SCREEN = new URLSearchParams(location.search).get('cabinet') === '1'
 var GAME = (typeof blipGameFromPath === 'function')
   ? blipGameFromPath(location.pathname) : null;
 if (CABINET_SCREEN) document.documentElement.setAttribute('data-cabinet-screen','');
-var FRAME_PAD  = 14; // matches the cabinet screen's inset below the Rolodex
+var FRAME_PAD  = 14; // matches the cabinet screen's inset below the arcade
 
 var loader    = document.getElementById('loader');
 var barInner  = document.getElementById('bar-inner');
@@ -50,7 +50,7 @@ var overlay   = document.getElementById('need-coin-overlay');
 // Launched from the home screen or the game's own icon: no coins at all.
 var FREE_PLAY = blipFreePlay();
 
-// The runtime focuses its canvas at boot; a cabinet preview must leave keys with the Rolodex.
+// The runtime focuses its canvas at boot; a cabinet preview must leave keys with the arcade.
 if (CABINET_SCREEN) canvas.inert = true;
 
 updateCoinsHud();
@@ -84,8 +84,9 @@ function returnToCabinet(event) {
   var bar = document.createElement('div');
   bar.id = 'marquee-bar';
   bar.className = 'jukebox-marquee';
+  bar.dataset.machine = game.slug;
   var sign = document.createElement('a');
-  sign.href=blipFrontendUrl();sign.title=blipAppMode()?'Back to the title':'Return to the '+({home:'home screen',basic:'Amstrad',cabinet:'cabinet'}[blipFrontend()]);
+  sign.href=blipFrontendUrl();sign.title=blipAppMode()?'Back to the title':'Return to the '+({home:'home screen',basic:'BLIP',cabinet:'cabinet'}[blipFrontend()]);
   sign.id = 'marquee-name';
   sign.setAttribute('aria-label', game.name);
   sign.dataset.title = game.name.charAt(0) + game.name.slice(1).toLowerCase();
@@ -101,6 +102,9 @@ function returnToCabinet(event) {
     sign.appendChild(tile);
 
   }
+  // The cabinet's own marquee (marquee.css), as it stands in the arcade: the same machine.
+  sign.classList.add('machine-marquee');
+  sign.appendChild(Object.assign(document.createElement('b'), { className: 'machine-marquee-name', textContent: game.name }));
   bar.append(
     Object.assign(document.createElement('span'), { className: 'marquee-bulbs' }),
     sign,
@@ -116,7 +120,7 @@ function returnToCabinet(event) {
     var back = document.createElement('a');
     back.className = 'app-back';
     back.href = blipFrontendUrl();
-    back.innerHTML = '<svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' + (blipFrontend() === 'basic' ? 'Amstrad' : 'Home');
+    back.innerHTML = '<svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' + (blipFrontend() === 'basic' ? 'BLIP' : 'Home');
     back.addEventListener('click', returnToCabinet);
     document.body.appendChild(back);
   }
@@ -197,15 +201,13 @@ function markGameLoaded(game, bar) {
   blipSetMarquee(game.name, false);
   document.documentElement.removeAttribute('data-card-loading');
   try {
-    var loaded = JSON.parse(sessionStorage.getItem('blip-loaded-card') || 'null');
     var selectionOrder = ['rally', 'bouncer', 'galactic_defender', 'bubbler', 'sky_raider', 'meteors', 'serpent', 'brawler', 'adder'];
-    var code = loaded && loaded.slug === game.slug ? loaded.code : 'A' + (selectionOrder.indexOf(game.slug) + 1);
+    var code = 'A' + (selectionOrder.indexOf(game.slug) + 1);
     var rom={
       slug: game.slug, name: game.name, code: code,
       art: new URL('screenshot.png', location.href).href
     };
     blipSeatRom(receiver,rom);
-    sessionStorage.setItem('blip-loaded-card', JSON.stringify(rom));
     sessionStorage.setItem('blip-last-game', game.slug);
     ['blip-card-insert', 'blip-card-seated', 'blip-title-seated'].forEach(function (key) {
       sessionStorage.removeItem(key);
@@ -628,7 +630,7 @@ function fillCanvas() {
   var PAD = bare ? 0 : FRAME_PAD;
   var screenInset = bare ? 0 : FRAME_PAD + 1;
   // The picture starts at the cabinet fascia and uses the same 14px inset as
-  // the display below the Rolodex on the landing page.
+  // the display below the arcade on the landing page.
   var GAP = 0;
   // Sideways the deck sits in the gutters. Upright, reserve its full panel.
   TOPBAR_H = bare || landscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
@@ -791,6 +793,31 @@ window.blipCanvasReady=function(){
   requestAnimationFrame(function(){requestAnimationFrame(function(){
     document.documentElement.setAttribute('data-game-ready','');hideLoader();
     if(CABINET_SCREEN)parent.postMessage({type:'blip-game-ready'},location.origin);
+    if(!CABINET_SCREEN && !blipAppMode()) {
+      var slug=blipGameFromPath(location.pathname)?.slug;
+      var cabinetStart=false;
+      try {
+        cabinetStart=sessionStorage.getItem('blip-cabinet-start')===slug;
+        sessionStorage.removeItem('blip-cabinet-start');
+      } catch(e) {}
+      if(cabinetStart && getCoins()>0) {
+        function pressStart() {
+          canvas.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:' ',code:'Space'}));
+          setTimeout(function(){canvas.dispatchEvent(new KeyboardEvent('keyup',{bubbles:true,cancelable:true,key:' ',code:'Space'}));},80);
+        }
+        function beginCabinetPlay() {
+          if(document.hidden) {
+            document.addEventListener('visibilitychange',beginCabinetPlay,{once:true});
+            return;
+          }
+          if(getCoins()<=0 || document.querySelector('.blip-hs-modal'))return;
+          canvas.focus({preventScroll:true});
+          pressStart();
+          if(slug==='brawler')setTimeout(pressStart,320);
+        }
+        setTimeout(beginCabinetPlay,180);
+      }
+    }
   });});
 };
 
@@ -941,6 +968,14 @@ window.addEventListener('keydown', function (e) {
   });
   BlipController.bindKeyboard();
   BlipController.bindGamepad(pollGamepad);
+
+  window.addEventListener('message', function (event) {
+    if (event.origin !== location.origin || event.source !== parent || !blipAmstradMode() || !event.data || event.data.type !== 'blip-amstrad-key') return;
+    var type = event.data.down ? 'keydown' : 'keyup';
+    canvas.dispatchEvent(new KeyboardEvent(type, {
+      bubbles: true, cancelable: true, key: event.data.key, code: event.data.code
+    }));
+  });
 
   // ---- The controller selector ----
   // Oldest to newest: JOYSTICK · PAD (· TOUCH on a game with a strip, on a
@@ -1184,7 +1219,7 @@ window.addEventListener('keydown', function (e) {
       { left: 'left', right: 'right', bubble: 'button1', jump: 'button2' },
       { left: 'p2left', right: 'p2right', bubble: 'p2button1', jump: 'p2button2' }];
     function whoOf(e) {
-      if (!root.hasAttribute('data-versus') && !root.hasAttribute('data-open')) return 0;
+      if (!root.hasAttribute('data-versus')) return 0;
       var g = glass.getBoundingClientRect();
       var f = g.width ? (e.clientX - g.left) / g.width : e.clientX / window.innerWidth;
       return f < 0.5 ? 0 : 1;

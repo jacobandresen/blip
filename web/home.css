@@ -164,7 +164,7 @@ body {
 @media (min-width: 700px) and (min-height: 600px) { .dock { --dock-icon: 62px; } .dock-row { gap: 16px; } }
 .dock-divider { align-self: stretch; width: .5px; margin: 6px 2px; background: rgba(255, 255, 255, .3); }
 
-/* The cabinet: a small arcade in wood and brass, the way back to the rolodex. */
+/* The cabinet shortcut in the dock. */
 .app-icon.icon-arcade {
   background: linear-gradient(160deg, #5a3a22, #2a1a10 75%);
 }

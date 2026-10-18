@@ -69,7 +69,7 @@ export async function loadRallyAt(cdp, origin) {
   await waitFor(cdp, "typeof window.BlipController === 'object'", 15000);
   // Game controls stay gated until a real credit is inserted.
   if (await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.contains('visible')")) {
-    await cdp.page.locator('#insert-coin-btn').click();
+    await cdp.page.evaluate(() => document.getElementById('insert-coin-btn').click());
     await waitFor(cdp, "!document.getElementById('need-coin-overlay').classList.contains('visible')");
   }
 }

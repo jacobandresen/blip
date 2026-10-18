@@ -198,32 +198,31 @@ function playCardMechanism() {
   } catch (e) {}
 }
 
-function playRolodexMove(direction) {
+function playMachineStep(direction) {
   try {
-    var ctx=getKioskAudio(), start=ctx.currentTime, sign=direction<0?-1:1;
-    var count=3, buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.19),ctx.sampleRate), data=buffer.getChannelData(0);
-    for(var i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.055));
-    var noise=ctx.createBufferSource(), filter=ctx.createBiquadFilter(), scrape=ctx.createGain();
-    noise.buffer=buffer;filter.type='bandpass';filter.frequency.value=780;filter.Q.value=.65;
-    scrape.gain.setValueAtTime(.0001,start);scrape.gain.exponentialRampToValueAtTime(.035,start+.025);scrape.gain.exponentialRampToValueAtTime(.0001,start+.2);
-    noise.connect(filter);filter.connect(scrape);scrape.connect(blipOut(ctx));noise.start(start);noise.stop(start+.2);
-    for(var tick=0;tick<count;tick++) {
-      var at=start+.018+tick*.052, osc=ctx.createOscillator(), gain=ctx.createGain();
-      osc.type='triangle';osc.frequency.setValueAtTime(155+tick*13,at);osc.frequency.exponentialRampToValueAtTime(82+tick*8,at+.035);
-      gain.gain.setValueAtTime(.0001,at);gain.gain.exponentialRampToValueAtTime(.075,at+.004);gain.gain.exponentialRampToValueAtTime(.0001,at+.045);
-      osc.connect(gain);gain.connect(blipOut(ctx));osc.start(at);osc.stop(at+.05);
+    var ctx=getKioskAudio(), start=ctx.currentTime, output=blipOut(ctx);
+    var buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.095),ctx.sampleRate), data=buffer.getChannelData(0);
+    for(var i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.022));
+    for(var step=0;step<2;step++) {
+      let at=start+step*.19, foot=ctx.createOscillator(), body=ctx.createGain();
+      let grit=ctx.createBufferSource(), low=ctx.createBiquadFilter(), gritGain=ctx.createGain();
+      let pan=ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      if(pan){pan.pan.value=(direction<0?-1:1)*(step?-.16:.16);pan.connect(output);}
+      var destination=pan||output;
+      foot.type='sine';foot.frequency.setValueAtTime(106-step*7,at);foot.frequency.exponentialRampToValueAtTime(54,at+.1);
+      body.gain.setValueAtTime(.0001,at);body.gain.exponentialRampToValueAtTime(.055,at+.012);body.gain.exponentialRampToValueAtTime(.0001,at+.13);
+      foot.connect(body);body.connect(destination);foot.start(at);foot.stop(at+.14);
+      grit.buffer=buffer;low.type='lowpass';low.frequency.value=460;
+      gritGain.gain.setValueAtTime(.0001,at);gritGain.gain.exponentialRampToValueAtTime(.012,at+.009);gritGain.gain.exponentialRampToValueAtTime(.0001,at+.085);
+      grit.connect(low);low.connect(gritGain);gritGain.connect(destination);grit.start(at);grit.stop(at+.095);
+      grit.onended=function(){grit.disconnect();low.disconnect();gritGain.disconnect();};
+      foot.onended=function(){foot.disconnect();body.disconnect();if(pan)pan.disconnect();};
     }
-    // The card settling on the stack, as the shuffle drops it behind.
-    var land=start+.42, thud=ctx.createOscillator(), thudGain=ctx.createGain();
-    thud.type='sine';thud.frequency.setValueAtTime(128,land);thud.frequency.exponentialRampToValueAtTime(62,land+.07);
-    thudGain.gain.setValueAtTime(.0001,land);thudGain.gain.exponentialRampToValueAtTime(.09,land+.006);thudGain.gain.exponentialRampToValueAtTime(.0001,land+.09);
-    thud.connect(thudGain);thudGain.connect(blipOut(ctx));thud.start(land);thud.stop(land+.1);
-    thud.onended=function(){thud.disconnect();thudGain.disconnect();};
   } catch(e) {}
 }
 
 /* ---- The controls card ---- Printed card on a little arm: the "?" under the top bar brings it down.
- * A game page lists its keys; the cabinet welcomes the player. */
+ * A game page lists its keys. */
 var BLIP_ARROWS = { '←': 'left', '→': 'right', '↑': 'up', '↓': 'down' };
 function legendHtml(controls) {
   function caps(list) {
@@ -279,22 +278,6 @@ function blipControlsCard(opts) {
   }, true);
   return { set: set, isOpen: isOpen };
 }
-
-// The front page: a welcome, in three lines.
-(function () {
-  function welcome() {
-    if (!document.getElementById('game-grid') || new URLSearchParams(location.search).has('manual')) return;
-    var touch = document.documentElement.hasAttribute('data-has-touch');
-    blipControlsCard({
-      label: 'WELCOME TO', name: 'BLIP ARCADE',
-      html: '<ul class="cc-lines"><li><b>Insert a coin to play.</b> ' + (touch ? 'Tap the coin slot, bottom right.' : 'Click the coin slot, or press&nbsp;5.') + '</li>' +
-        '<li>' + (touch ? 'Pick a game with the d-pad, bottom left, then tap a red button.' : 'Pick a game with the arrow keys, then press a red button or Space.') + '</li>' +
-        '<li>Need a hand? ' + (touch ? 'Tap MANUAL at the top.' : 'Click MANUAL at the top.') + '</li></ul>'
-    });
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', welcome, { once: true });
-  else welcome();
-}());
 
 // The controls card's little arm: a servo whirr that climbs as the card swings out and falls as it
 // is put away, a breath of air, and a soft latch at the end.
@@ -418,15 +401,6 @@ function wireCabinetLogo() {
     var display=logo.querySelector('.blip-led-display'),brand=document.createElementNS('http://www.w3.org/2000/svg','g');
     brand.setAttribute('class','led-blip');
     while(display.firstChild)brand.appendChild(display.firstChild);display.appendChild(brand);
-    var prompt=document.createElementNS('http://www.w3.org/2000/svg','g');prompt.setAttribute('class','led-coin-prompt');
-    var glyphs={I:['11111','00100','00100','00100','00100','00100','11111'],N:['10001','11001','11001','10101','10011','10011','10001'],S:['01111','10000','10000','01110','00001','00001','11110'],E:['11111','10000','10000','11110','10000','10000','11111'],R:['11110','10001','10001','11110','10100','10010','10001'],T:['11111','00100','00100','00100','00100','00100','00100'],C:['01111','10000','10000','10000','10000','10000','01111'],O:['01110','10001','10001','10001','10001','10001','01110']};
-    ['INSERT','COIN'].forEach(function(word,line){
-      var left=(100-(word.length*6-2)*2.5)/2;
-      Array.from(word).forEach(function(letter,index){glyphs[letter].forEach(function(row,y){Array.from(row).forEach(function(dot,x){
-        if(dot==='0')return;var lamp=document.createElementNS('http://www.w3.org/2000/svg','circle');
-        lamp.setAttribute('cx',left+(index*6+x)*2.5);lamp.setAttribute('cy',3+line*16+y*1.7);lamp.setAttribute('r','.66');prompt.appendChild(lamp);
-      });});});
-    });display.appendChild(prompt);
   });
 }
 function wireCoinSlot() {
@@ -766,7 +740,7 @@ window.blipTransferCard = function (options) {
   [arm.querySelector('.jukebox-arm-mount'), arm.querySelector('.jukebox-arm-pivot')].forEach(function (part) {
     part.style.left = pivot.x + 'px'; part.style.top = pivot.y + 'px';
   });
-  var anchor=arm.querySelector('.jukebox-arm-anchor'),guide=document.querySelector('.rolodex-guide.right');
+  var anchor=arm.querySelector('.jukebox-arm-anchor'),guide=document.querySelector('.arcade-guide.right');
   anchor.style.left=pivot.x+'px';anchor.style.top=pivot.y+'px';
   anchor.style.width=(guide?Math.max(30,guide.getBoundingClientRect().left+5-pivot.x):40)+'px';
   function ease(t) { return t*t*t*(10+t*(-15+6*t)); }
@@ -972,7 +946,7 @@ function blipSeatRom(receiver,rom) {
 function blipCardArmPivot(receiver) {
   var box=receiver.getBoundingClientRect(),bar=receiver.closest('.top-marquee-bar, #marquee-bar');
   var top=bar?bar.getBoundingClientRect().bottom:box.top;
-  var guide=document.querySelector('.rolodex-guide.right'),center=box.left+box.width/2;
+  var guide=document.querySelector('.arcade-guide.right'),center=box.left+box.width/2;
   var cabinetWidth=Math.min(960,document.documentElement.clientWidth-32);
   var x=guide?guide.getBoundingClientRect().left-30:center+Math.min(205,(cabinetWidth-26)/2)-40;
   var layerHeight=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--mechanics-layer-height'))||54;
@@ -1147,7 +1121,7 @@ function blipCardDrive(duration) {
   } catch(e) {return null;}
 }
 
-function playRolodexDock(attached) {
+function playArcadeDock(attached) {
   try {
     var ctx=getKioskAudio(),start=ctx.currentTime,output=ctx.createGain(),nodes=[output];
     output.gain.value=.85;output.connect(blipOut(ctx));
@@ -1229,3 +1203,74 @@ function blipBuildCabinetStars() {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', blipBuildCabinetStars, { once:true });
 } else blipBuildCabinetStars();
+
+/* ---- The front-end switches ---- Home Screen and BLIP, on the top bar of the cabinet and of every game page:
+ * beside the logo, else just left of the manual; where the bar has no room for the pair, stacked after the logo's
+ * wire, with the game's name made small enough to fit what is left of its sign. */
+(function () {
+  function build() {
+    var root = document.documentElement;
+    if (!document.body.classList.contains('cabinet-page') || !document.querySelector('.blip-logo') ||
+        root.hasAttribute('data-appstyle') || root.hasAttribute('data-cabinet-screen') || root.hasAttribute('data-amstrad')) return;
+    var up = blipGameFromPath(location.pathname) ? '../' : '';
+    function switchButton(id, cls, label, title, html) {
+      var b = document.getElementById(id);
+      if (b) return b;
+      b = document.createElement('button');
+      b.type = 'button'; b.id = id; b.className = cls; b.title = title; b.innerHTML = html;
+      b.setAttribute('aria-label', label);
+      document.body.appendChild(b);
+      return b;
+    }
+    var button = switchButton('home-switch-btn', 'home-switch', 'Switch to the home screen', 'Home screen',
+      '<svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="4" height="4" rx="1.2"/><rect x="7" y="1" width="4" height="4" rx="1.2"/><rect x="1" y="7" width="4" height="4" rx="1.2"/><rect x="7" y="7" width="4" height="4" rx="1.2"/></svg>');
+    var basic = switchButton('basic-switch-btn', 'home-switch basic-switch', 'Switch to BLIP', 'BLIP', 'B');
+    button.addEventListener('click', function () { blipSetFrontend('home'); location.replace(up + 'home.html'); });
+    basic.addEventListener('click', function () { blipSetFrontend('basic'); location.replace(up + 'basic.html'); });
+    function shown(el) {
+      if (!el) return null;
+      var style = getComputedStyle(el), r = el.getBoundingClientRect();
+      return r.width > 0 && style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) > 0.05 ? r : null;
+    }
+    // Stacked, the pair takes the sign's left end: the sign runs from the pair to the next part on the bar.
+    function fitName(from) {
+      var sign = document.querySelector('#marquee-name.machine-marquee'), name = sign && sign.querySelector('.machine-marquee-name');
+      if (!name) return;
+      ['left', 'width', 'transform', 'paddingLeft'].forEach(function (k) { sign.style[k] = ''; });
+      name.style.fontSize = '';
+      if (from) {
+        var next = ['#card-button', '.manual-pocket', '.blip-power-indicator'].map(function (q) { return shown(document.querySelector(q)); })
+          .filter(function (r) { return r && r.left > from; }).map(function (r) { return r.left; });
+        var to = Math.min.apply(null, next.concat(innerWidth - 8)) - 6;
+        sign.style.left = from + 'px'; sign.style.width = Math.max(40, to - from) + 'px';
+        sign.style.transform = 'none'; sign.style.paddingLeft = '4px';
+      }
+      // Whole pixels only: the pixel font blurs between.
+      for (var size = parseFloat(getComputedStyle(name).fontSize); size > 7 && name.scrollWidth > sign.clientWidth - 8; size--)
+        name.style.fontSize = (size - 1) + 'px';
+    }
+    function place() {
+      var logo = document.querySelector('.blip-logo').getBoundingClientRect();
+      var manual = shown(document.querySelector('.manual-pocket'));
+      var blockers = ['#card-button', '.manual-pocket', '#marquee-name', '.blip-power-indicator']
+        .map(function (q) { return shown(document.querySelector(q)); }).filter(Boolean);
+      var size = button.offsetWidth, pair = size + 9 + basic.offsetWidth;
+      var free = function (x) { return x > logo.right + 4 && x + pair < innerWidth - 8 && !blockers.some(function (b) { return x < b.right + 8 && x + pair > b.left - 8; }); };
+      var left = [logo.right + 10, manual ? manual.left - 10 - pair : -1].filter(free)[0];
+      var stacked = left === undefined, middle = (logo.top + logo.bottom) / 2;
+      if (stacked) left = logo.right + 30;   // clear of the logo's power wire
+      button.style.left = Math.round(left) + 'px';
+      basic.style.left = Math.round(stacked ? left : left + size + 9) + 'px';
+      button.style.top = stacked ? Math.round(middle - size - 3) + 'px' : '';
+      basic.style.top = stacked ? Math.round(middle + 3) + 'px' : '';
+      fitName(stacked ? Math.round(left + size + 6) : 0);
+    }
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('load', place);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
+    if (typeof ResizeObserver === 'function') new ResizeObserver(place).observe(document.querySelector('.blip-logo'));
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build, { once: true });
+  else build();
+}());

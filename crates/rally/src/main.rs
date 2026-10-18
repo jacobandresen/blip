@@ -447,8 +447,6 @@ async fn main() {
         let dt = blip.delta_time;
 
         jukebox.rotate(dt);
-        if g.state != State::Play { jukebox.warm_up().await; }
-
         g.touch = [blip.touch(0), blip.touch(1)];
         g.pressed = [blip.touch_pressed(0), blip.touch_pressed(1)];
         #[cfg(not(target_arch = "wasm32"))]
@@ -480,5 +478,7 @@ async fn main() {
             State::Over  => draw_over(&blip, &g),
         }
         blip.next_frame(60).await;
+        #[cfg(not(target_arch = "wasm32"))]
+        if g.state != State::Play { jukebox.warm_up().await; }
     }
 }

@@ -343,8 +343,8 @@ for (const device of mine) {
     const { page, origin } = await open(t, device);
     await page.emulateMedia({ reducedMotion: 'reduce' });   // the card lands where it will rest, without the slide
     const failures = [];
-    for (const slug of ['cabinet', ...GAMES]) {
-      await page.goto(`${origin}/${slug === 'cabinet' ? '' : `${slug}/`}index.html`);
+    for (const slug of GAMES) {
+      await page.goto(`${origin}/${slug}/index.html`);
       await page.waitForSelector('#card-button');
       await settled(page);
       await page.evaluate(() => document.getElementById('card-button')?.click());

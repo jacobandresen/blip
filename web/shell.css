@@ -789,8 +789,7 @@ canvas {
 :root[data-touch="platform"]:not([data-versus]) .ts-tag { display: none; }
 :root[data-touch="platform"][data-versus] .ts-half.held { background: rgba(255, 255, 255, 0.05); }
 :root[data-touch="platform"][data-versus] .ts-demo { display: none; }
-/* 2P JOIN, while a second seat is open: a Mac-style pill in the right half,
-   which is player two's, so player one's touches never land on it. */
+/* 2P JOIN has its own target; the rest of the strip stays with P1 until P2 joins. */
 .ts-join { display: none; }
 :root[data-touch="platform"][data-open] .ts-join {
   display: flex;
@@ -1215,3 +1214,31 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
   font: 400 13px/1.3 var(--app-font); color: rgba(235, 235, 245, .6);
 }
 :root[data-appstyle][data-intro][data-has-touch] .cc-paper::after { content: 'Tap to play'; }
+
+/* The top bar is the machine's marquee (marquee.css), the sign it wears in the arcade, lit across the whole bar
+   with the game's name; the flip tiles and the ROM slot are gone. App style keeps its own title bar. */
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee :is(.marquee-bulbs,.jukebox-receiver),
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee::before,
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee::after,
+:root:not([data-appstyle]) #marquee-name.machine-marquee::before,
+:root:not([data-appstyle]) #marquee-name.machine-marquee::after,
+:root:not([data-appstyle]) #marquee-name.machine-marquee .marquee-letter {display:none!important}
+:root[data-appstyle] .machine-marquee-name {display:none}
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee {
+  --trim:var(--machine-trim,#9a9aa6);
+  background:radial-gradient(ellipse 38% 95% at 50% 50%,#ffffff40,transparent 72%),var(--marquee-art,linear-gradient(transparent,transparent)),
+    linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff),var(--trim) 40%,color-mix(in srgb,var(--trim) 45%,#000))!important;
+  border:0!important;border-bottom:3px solid #09080c!important;
+  box-shadow:inset 0 0 0 1px #ffffff40,inset 0 -5px 9px #0006,0 0 30px color-mix(in srgb,var(--trim) 45%,transparent)!important;
+}
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {
+  gap:0;padding:0 14px;background:none!important;border:0!important;box-shadow:none!important;
+}
+:root:not([data-appstyle]) .machine-marquee-name {
+  font:400 20px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.02em;color:var(--marquee-ink,#fff7d6);-webkit-text-fill-color:currentColor;
+  text-shadow:-2px -2px #120c18,2px -2px #120c18,-2px 2px #120c18,2px 2px #120c18,3px 4px 0 color-mix(in srgb,var(--trim) 70%,#000),0 0 18px color-mix(in srgb,var(--trim) 80%,#fff);
+}
+@media (max-width:520px) {
+  :root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {padding:0 4px 0 14px}
+  :root:not([data-appstyle]) .machine-marquee-name {font-size:12px;text-shadow:-1px -1px #120c18,1px -1px #120c18,-1px 1px #120c18,1px 1px #120c18,2px 2px 0 color-mix(in srgb,var(--trim) 70%,#000)}
+}

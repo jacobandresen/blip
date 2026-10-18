@@ -5,8 +5,9 @@
   var panel = document.querySelector('.deck-panel');
   if (!panel || document.getElementById('deck-p1')) return;
 
+  // A cabinet in the arcade's aisle shows its game's deck (machine-deck.html?game=<slug>).
   var game = (typeof blipGameFromPath === 'function')
-    ? blipGameFromPath(window.location.pathname) : null;
+    ? blipGameFromPath(window.BLIP_DECK_GAME ? '/' + window.BLIP_DECK_GAME + '/' : window.location.pathname) : null;
   var buttons = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
   // A one-button game still gets two live caps: A and B both fire.
   var specs = buttons.length < 2 ? [buttons[0], buttons[0]] : buttons;
@@ -134,13 +135,8 @@
   var coin=document.getElementById('insert-coin-btn')||document.getElementById('kiosk-insert-btn');
   if(coin) {
     try {root.toggleAttribute('data-credit',Number(sessionStorage.getItem('blip-coins'))>0);}catch(e){}
-    var coinAnim=coin.querySelector('#coin-drop-anim');
-    coin.replaceChildren();
-    coin.classList.add('deck-coin-slot');
-    coin.setAttribute('aria-label','Insert coin');coin.title='Insert coin';
-    coin.innerHTML='<span class="coin-plate" aria-hidden="true"><span class="coin-instruction">INSERT COIN</span><i class="coin-mouth"></i><i class="coin-return"></i><i class="coin-fastener upper"></i><i class="coin-fastener lower"></i></span>';
-    if(coinAnim)coin.appendChild(coinAnim);
-    panel.parentElement.appendChild(coin);
+    // The deck carries no coin mechanism: the cabinet's coin door, the coin wall over a game and the keys drop credits through this hidden button.
+    coin.style.display='none';
     var lamp=el('span','deck-credit-lamp','P1',{'aria-label':'Player one credit'});
     var lamp2=el('span','deck-second-lamp','P2',{'aria-label':'Player two station'});
     var bar=panel.parentElement;panel.append(lamp,lamp2);

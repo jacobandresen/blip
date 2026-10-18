@@ -25,7 +25,10 @@ change will be overwritten the next time the project is built.
 | Cabinet parts: power lamp, coin HUD (`updateCoinsHud`), card arm, hum | `web/kiosk.js` |
 | The home screen: icons, dock, Search, the long-press menu, edit mode (`blip-home-order`), Settings | `web/home.html`, `web/home.css`, `web/home.js` (nothing from the cabinet) |
 | App style: a game opened from the home screen or its own icon (`data-appstyle`), with `‹ Home`, a frosted title bar and a launch screen | `web/shell.css` (the `App style` section), `web/shell.js` |
-| The cabinet's switch to the home screen (`#home-switch-btn`) | `web/index.html`, `web/kiosk.css` |
+| The Home Screen and BLIP switches on the top bar (`#home-switch-btn`, `#basic-switch-btn`), arcade and game pages | `web/kiosk.js`, `web/kiosk.css` |
+| The arcade's aisle of cabinets: marquee, screen, deck, Start, coin door, side art | `web/index.html` |
+| A machine's marquee, the same sign on its cabinet and as its game page's top bar; each game's colours (`data-machine`) | `web/marquee.css` |
+| The deck on each cabinet: the game page's own, rendered per game | `web/machine-deck.html` (builds it with `web/deck.js`) |
 | Each game as its own home-screen app: icons (a small game card) and `manifest.json` | `tools/make_game_icons.mjs`, which writes `web/<game>/icon-*.png` and `manifest.json`, and the Guide's (generated, not edited by hand) |
 | The "Add to Home Screen" sheet, free play and app mode on a game page | `web/shell.js`, `web/shell.css` |
 | App style's clean picture: no CRT (`blip_crt`), drawn at the screen's pixel density | `web/blip_bridge.js`, `crates/blip/src/ctx.rs` (`crt_look`); natively `BLIP_CRT=0` |

@@ -27,6 +27,7 @@ TARGET_DIR="target/wasm32-unknown-unknown/release"
 echo "[build] cargo build --release --target wasm32-unknown-unknown"
 PKG_ARGS=()
 for g in "${GAMES[@]}"; do PKG_ARGS+=(-p "$g"); done
+PKG_ARGS+=(-p blip_basic)
 "$CARGO" build --release --target wasm32-unknown-unknown "${PKG_ARGS[@]}"
 
 for game in "${GAMES[@]}"; do
@@ -37,6 +38,9 @@ for game in "${GAMES[@]}"; do
     bytes=$(wc -c < "$out/index.wasm")
     echo "[ok] $game -> $out/index.wasm ($bytes bytes)"
 done
+
+cp "$TARGET_DIR/blip_basic.wasm" web/basic-runtime.wasm
+echo "[ok] blip_basic -> web/basic-runtime.wasm"
 
 echo
 echo "Done. Serve with: python3 -m http.server -d web 8080"

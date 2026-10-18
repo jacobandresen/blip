@@ -1,0 +1,28 @@
+/* A machine's marquee: the backlit sign over its screen, the game's name printed bold over its own motif.
+   The arcade's cabinets and the game page's top bar show the same sign; it is the same machine. */
+@font-face {font-family:'Press Start 2P';src:url(press-start-2p.woff2) format('woff2');font-display:swap}
+
+[data-machine="rally"] {--machine-trim:#e2513a;--marquee-art:repeating-linear-gradient(90deg,transparent 0 46%,#fff4 46% 47%,transparent 47%)}
+[data-machine="serpent"] {--machine-trim:#3ec44f;--marquee-ink:#f3ffdc;--marquee-art:repeating-linear-gradient(90deg,#0002 0 12px,transparent 12px 24px)}
+[data-machine="bouncer"] {--machine-trim:#1fb7c4;--marquee-ink:#efffff;--marquee-art:linear-gradient(90deg,#ff5a5a55 0 20%,#ffd25a55 20% 40%,#5aff8a55 40% 60%,#5ab4ff55 60% 80%,#c45aff55 80%) 0 0/100% 22% no-repeat}
+[data-machine="galactic_defender"] {--machine-trim:#b046d6;--marquee-ink:#fbeaff;--marquee-art:radial-gradient(circle at 12% 30%,#fff 0 1px,transparent 2px),radial-gradient(circle at 86% 65%,#fff 0 1px,transparent 2px),radial-gradient(circle at 70% 20%,#fff9 0 1px,transparent 2px)}
+[data-machine="meteors"] {--machine-trim:#8e98b3;--marquee-ink:#fff;--marquee-art:radial-gradient(circle at 20% 60%,transparent 0 7px,#fff8 8px 9px,transparent 10px),radial-gradient(circle at 82% 35%,transparent 0 5px,#fff8 6px 7px,transparent 8px)}
+[data-machine="sky_raider"] {--machine-trim:#3a6fe0;--marquee-ink:#eef4ff;--marquee-art:repeating-linear-gradient(0deg,transparent 0 6px,#fff2 6px 7px)}
+[data-machine="brawler"] {--machine-trim:#e0362a;--marquee-ink:#fff3c4;--marquee-art:repeating-conic-gradient(from 0deg at 50% 120%,#fff1 0 6deg,transparent 6deg 12deg)}
+[data-machine="bubbler"] {--machine-trim:#45b6f0;--marquee-ink:#ffffff;--marquee-art:radial-gradient(circle at 12% 40%,transparent 0 7px,#fff9 8px 9px,transparent 10px),radial-gradient(circle at 90% 62%,transparent 0 5px,#fff9 6px 7px,transparent 8px)}
+[data-machine="adder"] {--machine-trim:#e09a2a;--marquee-ink:#fff5d8;--marquee-art:repeating-linear-gradient(45deg,transparent 0 14px,#fff2 14px 16px)}
+
+.machine-marquee,#game-grid .card-title.machine-marquee {
+  /* !important where the arcade's older card rules force a plain title. */
+  --trim:var(--machine-trim,#9a9aa6);
+  display:flex;align-items:center;justify-content:center;box-sizing:border-box;
+  font:400 20px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.02em;font-style:normal;text-align:center;text-decoration:none;white-space:nowrap;
+  color:var(--marquee-ink,#fff7d6)!important;-webkit-text-fill-color:currentColor;
+  text-shadow:-2px -2px #120c18,2px -2px #120c18,-2px 2px #120c18,2px 2px #120c18,3px 4px 0 color-mix(in srgb,var(--trim) 70%,#000),0 0 18px color-mix(in srgb,var(--trim) 80%,#fff);
+  background:
+    radial-gradient(ellipse 62% 85% at 50% 50%,#ffffff40,transparent 72%),
+    var(--marquee-art,linear-gradient(transparent,transparent)),
+    linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff),var(--trim) 40%,color-mix(in srgb,var(--trim) 45%,#000))!important;
+  border:3px solid #09080c;border-radius:4px 4px 2px 2px;
+  box-shadow:inset 0 0 0 1px #ffffff55,inset 0 -5px 9px #0006,0 0 30px color-mix(in srgb,var(--trim) 55%,transparent),0 5px 0 #050407;
+}

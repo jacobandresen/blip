@@ -194,6 +194,7 @@ pub struct Blip {
     pub height:     i32,
     pub delta_time: f32,
     rt:             RenderTarget,
+    retain_frame:   bool,
     rng:            Lcg,
     crt_look:       bool, // a CRT's picture, or a clean one (crate::web::crt)
     // ---- glitch: horizontal tear ----
@@ -298,7 +299,7 @@ impl Blip {
 
         let b = Self {
             width, height, delta_time: 1.0 / 60.0,
-            rt, rng, crt_look: crate::web::crt(),
+            rt, retain_frame: false, rng, crt_look: crate::web::crt(),
             tear_cd,  tear_t: 0.0, tear_y: 0.5, tear_dx: 0.0,
             roll_cd,  roll_t: 0.0, roll_dy: 0.0, roll_spd: 0.0,
             chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
@@ -407,7 +408,7 @@ impl Blip {
 
         // Prepare render target for the next game frame.
         self.apply_camera();
-        clear_background(macroquad::color::BLACK);
+        if !self.retain_frame { clear_background(macroquad::color::BLACK); }
 
         let raw = get_frame_time();
         self.delta_time = if raw > 0.1 { 0.1 } else { raw };
@@ -468,7 +469,7 @@ impl Blip {
     // ------------------------------------------------------------------ //
 
     fn update_glitch(&mut self, dt: f32) {
-        if !self.crt_look { return; }
+        if !self.crt_look || !crate::web::glitches() { return; }
         let lh = self.height as f32;
 
         // Tear
@@ -730,6 +731,9 @@ impl Blip {
     /// Set the strength of the screen's phosphor bloom, 0.0 (none) to 1.0
     /// (the default, tuned for bright lines on a black field).
     pub fn set_bloom(&mut self, k: f32) { self.bloom = k.clamp(0.0, 1.0); }
+
+    /// Keep the last picture visible while an interpreter waits to redraw it.
+    pub fn set_frame_retention(&mut self, retain: bool) { self.retain_frame = retain; }
 
     /// Fill the canvas with a solid colour. Call this at the start of your draw pass.
     #[inline]

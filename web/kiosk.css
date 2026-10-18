@@ -3784,13 +3784,9 @@ body .blip-logo.led-logo {
   text-shadow:none;animation:none!important;overflow:visible;
 }
 .blip-led-display {width:100%;height:100%;display:block;background:#100d0a;border-radius:2px}
-.blip-led-display .led-on {fill:#38291c;filter:none;transition:fill .12s}
-:root[data-credit] .blip-led-display .led-on {fill:#ffc17a;filter:drop-shadow(0 0 1px #ff8a30)}
+/* The badge always reads BLIP, lit; credits show on the machines, not here. */
+.blip-led-display .led-on {fill:#ffc17a;filter:drop-shadow(0 0 1px #ff8a30);transition:fill .12s}
 .blip-led-display .led-off {fill:#302017}
-.blip-led-display .led-blip {display:none}
-.blip-led-display .led-coin-prompt {fill:#b58a54;filter:none}
-:root[data-credit] .blip-led-display .led-blip {display:inline}
-:root[data-credit] .blip-led-display .led-coin-prompt {display:none}
 .led-logo .logo-power-wire {position:absolute;left:calc(100% - 1px);top:0;width:32px;height:100%;overflow:visible;pointer-events:none}
 .logo-power-wire path {fill:none;stroke-linecap:round}
 .logo-power-wire .wire-shadow {stroke:#0009;stroke-width:6}

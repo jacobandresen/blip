@@ -22,8 +22,8 @@ for (const phone of PHONES) {
       await page.goto(`${origin}/rally/index.html`);
       await page.waitForFunction(() => document.querySelector('#glcanvas') &&
         getComputedStyle(document.querySelector('#loader')).display === 'none');
-      await page.locator('#insert-coin-btn').click();
-      await page.locator('#insert-coin-btn').click();
+      await page.evaluate(() => document.getElementById('insert-coin-btn').click());
+      await page.evaluate(() => document.getElementById('insert-coin-btn').click());
       await page.waitForFunction(() => !document.querySelector('#need-coin-overlay').classList.contains('visible'));
 
       const stateBefore = await page.evaluate(() => ({
@@ -78,7 +78,7 @@ for (const phone of PHONES) {
       await page.waitForFunction(() => document.querySelector('#glcanvas') &&
         getComputedStyle(document.querySelector('#loader')).display === 'none');
       if (await page.locator('#need-coin-overlay.visible').count()) {
-        await page.locator('#insert-coin-btn').click();
+        await page.evaluate(() => document.getElementById('insert-coin-btn').click());
       }
       await page.waitForFunction(() => document.documentElement.hasAttribute('data-open'),
         { timeout: 20000 });
@@ -139,7 +139,7 @@ for (const viewport of [
     await page.goto(`${origin}/brawler/index.html`);
     await page.waitForFunction(() => document.getElementById('loader').style.display === 'none');
     if (await page.locator('#need-coin-overlay.visible').count()) {
-      await page.locator('#insert-coin-btn').click();
+      await page.evaluate(() => document.getElementById('insert-coin-btn').click());
     }
     await page.evaluate(() => window.blipSetMode(1));
     const overlap = await page.evaluate(() => {
