@@ -10,6 +10,8 @@
   <script src="blip_core.js?v=5"></script>
   <link rel="stylesheet" href="kiosk.css?v=493">
   <link rel="stylesheet" href="basic.css?v=49">
+  <link rel="stylesheet" href="paint.css?v=4">
+  <link rel="stylesheet" href="tune.css?v=1">
 </head>
 <body>
   <nav class="front-nav" aria-label="BLIP front ends">
@@ -38,6 +40,25 @@
                 <footer class="editor-status"><span id="editor-mode">AUTO-SAVE</span><span id="editor-message"></span><span class="editor-keys">↑ ↓ ← → MOVE · ESC CLOSE · TAB COMPLETE</span></footer>
               </section>
             </div>
+            <section id="paint" class="paint" hidden aria-label="BLIP PAINT pixel editor">
+              <header class="paint-head"><strong>BLIP PAINT</strong><label>FILE <input id="paint-name" autocomplete="off" spellcheck="false" aria-label="PNG filename"></label><button id="paint-save" type="button">SAVE</button><button id="paint-close" type="button" aria-label="Close PAINT">DONE</button></header>
+              <div class="paint-workspace">
+                <nav class="paint-tools" aria-label="Paint tools"><button type="button" data-paint-tool="pencil" class="selected">PEN</button><button type="button" data-paint-tool="eraser">ERASE</button><button type="button" data-paint-tool="fill">FILL</button><button type="button" data-paint-tool="eyedropper">PICK</button><button id="paint-undo" type="button">UNDO</button><button id="paint-clear" type="button">CLEAR</button></nav>
+                <div class="paint-stage"><div class="paint-sheet"><canvas id="paint-canvas" width="320" height="200" aria-label="320 by 200 pixel canvas" tabindex="0"></canvas></div></div>
+                <aside class="paint-side"><label>SIZE <select id="paint-size" aria-label="Graphic size"><option value="16x16">16 × 16</option><option value="32x32">32 × 32</option><option value="64x64">64 × 64</option><option value="128x128">128 × 128</option><option value="320x200" selected>320 × 200</option></select></label><div id="paint-palette" aria-label="Color palette"></div><small>PNG · transparent</small><small>Use DRAW_TEXTURE in BASIC.</small></aside>
+              </div>
+              <footer id="paint-status">NEW · 320 × 200 · /USER/GFX</footer>
+              <p class="paint-hint">FILENAME · /USER ONLY · /TAPE READ ONLY</p>
+              <section id="paint-confirm" class="paint-confirm" role="alertdialog" aria-modal="true" aria-labelledby="paint-confirm-title" hidden><div class="paint-confirm-box"><strong id="paint-confirm-title">UNSAVED DRAWING</strong><p>DISCARD CHANGES?</p><div><button id="paint-confirm-cancel" type="button">CANCEL</button><button id="paint-confirm-discard" type="button">DISCARD</button></div></div></section>
+            </section>
+              <section id="tune" class="tune" hidden aria-label="BLIP TUNE music editor">
+                <header class="tune-head"><strong>BLIP TUNE</strong><label>FILE <input id="tune-name" autocomplete="off" spellcheck="false" aria-label="Tune filename"></label><button id="tune-import" type="button">IMPORT XM</button><input id="tune-file" type="file" accept=".xm,application/octet-stream" hidden><button id="tune-save" type="button">SAVE</button><button id="tune-close" type="button">DONE</button></header>
+                <div class="tune-controls"><button id="tune-prev" type="button">◀</button><label>PAT <select id="tune-pattern" aria-label="Pattern"></select></label><button id="tune-next" type="button">▶</button><label>BPM <input id="tune-bpm" type="number" min="50" max="240" value="120"></label><label>NOTE <select id="tune-note" aria-label="Selected note"></select></label><button id="tune-play" type="button">PLAY</button><button id="tune-stop" type="button">STOP</button></div>
+                <div id="tune-grid" class="tune-grid" aria-label="Four channel, sixteen step tracker"></div>
+                <footer id="tune-status">NEW · /USER/MUSIC</footer>
+                <p class="tune-hint">SELECT A NOTE · CLICK A CELL TO ADD OR CLEAR · 4 CHIP VOICES</p>
+                <section id="tune-confirm" class="tune-confirm" role="alertdialog" aria-modal="true" aria-labelledby="tune-confirm-title" hidden><div><strong id="tune-confirm-title">UNSAVED TUNE</strong><p>DISCARD CHANGES?</p><button id="tune-cancel" type="button">CANCEL</button><button id="tune-discard" type="button">DISCARD</button></div></section>
+              </section>
           </div>
         </div>
         <div class="monitor-chin"><img class="monitor-brand" src="blip-wordmark.svg" alt="BLIP"><span class="monitor-model">CTM 640 COLOUR MONITOR</span><span class="power-led" aria-label="Power on"></span></div>
@@ -55,7 +76,7 @@
             <div class="deck-hinge" aria-hidden="true"><i></i><i></i></div>
             <div class="deck-lid" id="cassette-lid" aria-hidden="true"><span>BLIP DATACORDER</span></div>
           </div>
-          <div class="tape-buttons"><span>REC</span><span>PLAY</span><span>REW</span><span>F.FWD</span><span>STOP/EJECT</span></div>
+          <div class="tape-buttons"><span>REC</span><span data-key="play">PLAY</span><span data-key="rew">REW</span><span>F.FWD</span><span data-key="eject">STOP/EJECT</span></div>
         </div>
       </div>
       <div class="computer-edge"></div>
@@ -78,6 +99,8 @@
   </div>
   <script>document.documentElement.setAttribute('data-controls', 'stick');</script>
   <script src="deck.js?v=13"></script>
-  <script src="basic.js?v=69"></script>
+  <script src="basic.js?v=83"></script>
+  <script src="paint.js?v=3"></script>
+  <script src="tune.js?v=6"></script>
 </body>
 </html>

@@ -7,6 +7,8 @@
     "test:visual": "node test/run-visual.mjs",
     "test:layout": "node test/shard.mjs 4 test/layout.mjs",
     "test:shell": "node --test --test-concurrency=1 test/shell.mjs",
+    "test:paint": "node --test test/paint.mjs",
+    "test:tune": "node --test test/tune.mjs",
     "test:scores": "node test/shard.mjs 3 test/highscore-entry.mjs",
     "test:scores-db": "node --test test/highscores.mjs",
     "supabase": "supabase"

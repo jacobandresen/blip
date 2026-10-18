@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use blip::{Blip, BlipSound, BlipTex, Jukebox, BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_DARKGRAY, BLIP_GRAY, BLIP_GREEN, BLIP_MAGENTA, BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW, NEON_CYAN};
-use macroquad::{audio::load_sound_from_bytes, color::Color, texture::Texture2D};
+use macroquad::{audio::{load_sound_from_bytes, play_sound, stop_sound, PlaySoundParams, Sound}, color::Color, texture::Texture2D};
 
 #[cfg(target_arch = "wasm32")]
 extern "C" {
@@ -13,6 +13,20 @@ extern "C" {
     fn blip_basic_runtime_error(ptr: *const u8, len: i32);
     fn blip_basic_sound(frequency: f32, seconds: f32, volume: f32);
     fn blip_basic_audio_event();
+    fn blip_basic_texture_count() -> i32;
+    fn blip_basic_texture_name_len(index: i32) -> i32;
+    fn blip_basic_texture_name_copy(index: i32, ptr: *mut u8, capacity: i32) -> i32;
+    fn blip_basic_texture_png_len(index: i32) -> i32;
+    fn blip_basic_texture_png_copy(index: i32, ptr: *mut u8, capacity: i32) -> i32;
+    fn blip_basic_export_requested() -> i32;
+    fn blip_basic_export_game() -> i32;
+    fn blip_basic_export_rom_asset(path_ptr: *const u8, path_len: i32, png_ptr: *const u8, png_len: i32);
+    fn blip_basic_export_done();
+    fn blip_basic_music_count() -> i32;
+    fn blip_basic_music_name_len(index: i32) -> i32;
+    fn blip_basic_music_name_copy(index: i32, ptr: *mut u8, capacity: i32) -> i32;
+    fn blip_basic_music_wav_len(index: i32) -> i32;
+    fn blip_basic_music_wav_copy(index: i32, ptr: *mut u8, capacity: i32) -> i32;
 }
 
 const WIDTH: i32 = 320;
@@ -89,12 +103,12 @@ impl MusicRequest {
 }
 
 struct Program {
-    lines: Vec<(u16, String)>, statements: Vec<Vec<Arc<str>>>, expressions: HashMap<String, Arc<[Token]>>, pc: usize, statement: usize, vars: HashMap<String, Value>, arrays: HashMap<String, Value>, loops: Vec<ForLoop>, calls: Vec<(usize, usize)>, output: Vec<String>, wait_until: f64, yielded: bool, active: bool, error: Option<String>, rng: u64, pen: i32, paper: i32, music_request: Option<MusicRequest>, sound_request: Option<(f32, f32, f32)>,
+    lines: Vec<(u16, String)>, statements: Vec<Vec<Arc<str>>>, expressions: HashMap<String, Arc<[Token]>>, pc: usize, statement: usize, vars: HashMap<String, Value>, arrays: HashMap<String, Value>, loops: Vec<ForLoop>, calls: Vec<(usize, usize)>, output: Vec<String>, wait_until: f64, yielded: bool, uninterrupted: u32, active: bool, error: Option<String>, rng: u64, pen: i32, paper: i32, music_request: Option<MusicRequest>, music_file_request: Option<String>, sound_request: Option<(f32, f32, f32)>,
 }
 impl Program {
-    fn new() -> Self { Self { lines: vec![], statements: vec![], expressions: HashMap::new(), pc: 0, statement: 0, vars: HashMap::new(), arrays: HashMap::new(), loops: vec![], calls: vec![], output: vec![], wait_until: 0.0, yielded: false, active: false, error: None, rng: 0x5eed, pen:1, paper:0, music_request: None, sound_request: None } }
+    fn new() -> Self { Self { lines: vec![], statements: vec![], expressions: HashMap::new(), pc: 0, statement: 0, vars: HashMap::new(), arrays: HashMap::new(), loops: vec![], calls: vec![], output: vec![], wait_until: 0.0, yielded: false, uninterrupted: 0, active: false, error: None, rng: 0x5eed, pen:1, paper:0, music_request: None, music_file_request:None, sound_request: None } }
     fn load(&mut self, source: &str) {
-        self.lines.clear(); self.statements.clear(); self.expressions.clear(); self.vars.clear(); self.arrays.clear(); self.loops.clear(); self.calls.clear(); self.output.clear(); self.error = None; self.active = true; self.pc = 0; self.statement = 0; self.wait_until = 0.0; self.yielded = false; self.paper=0; self.pen=1; self.music_request=None; self.sound_request=None;
+        self.lines.clear(); self.statements.clear(); self.expressions.clear(); self.vars.clear(); self.arrays.clear(); self.loops.clear(); self.calls.clear(); self.output.clear(); self.error = None; self.active = true; self.pc = 0; self.statement = 0; self.wait_until = 0.0; self.yielded = false; self.uninterrupted=0; self.paper=0; self.pen=1; self.music_request=None; self.music_file_request=None; self.sound_request=None;
         for line in source.lines() { let line=line.trim(); if line.is_empty() { continue; } if let Some((number, body))=line.split_once(char::is_whitespace) { if let Ok(n)=number.parse::<u16>() { self.lines.push((n,body.trim().to_string())); } } }
         self.lines.sort_by_key(|line| line.0);
         self.statements=self.lines.iter().map(|(_,source)|split_statements(source).into_iter().map(Arc::<str>::from).collect()).collect();
@@ -117,14 +131,15 @@ impl Program {
             let current=self.statement; self.statement+=1;
             let pc=self.pc;let statement=self.statement;
             let source=Arc::clone(&self.statements[pc][current]);
+            self.uninterrupted+=1;
+            if self.uninterrupted>100_000 { self.error=Some(format!("? Program took too long between WAIT commands at line {line}")); self.active=false; return; }
             if let Err(error)=self.execute(&source, blip, textures, sounds) { self.error=Some(format!("? {error} at line {line}")); self.active=false; return; }
             if self.yielded { return; }
             if macroquad::time::get_time()*1000.0 < self.wait_until { return; }
             if self.pc!=pc||self.statement!=statement { continue; }
         }
-        let line=self.lines.get(self.pc).map(|entry|entry.0).unwrap_or_default();
-        let loop_state=self.loops.last().map(|frame|format!("{}={}",frame.name,self.vars.get(&frame.name).map(Value::string).unwrap_or_default())).unwrap_or_default();
-        self.error=Some(format!("? Program took too long between WAIT commands at line {line} ({} GOSUB, {} FOR, {loop_state})",self.calls.len(),self.loops.len())); self.active=false;
+        // Long but finite loops resume on the next frame; the cumulative guard
+        // above still catches programs that never reach WAIT.
     }
     fn execute(&mut self, source: &str, blip: &Blip, textures: &HashMap<String, BlipTex>, sounds: &HashMap<String, BlipSound>) -> Result<(), String> {
         let mut command=source.trim().to_string(); let upper=command.to_ascii_uppercase(); if command.is_empty() || upper=="REM" || upper.starts_with("REM ") || command.starts_with('\'') { return Ok(()); }
@@ -154,13 +169,13 @@ impl Program {
         if upper=="CLS" { self.output.clear(); blip.clear(paper_color(self.paper)); return Ok(()); }
         if upper.starts_with("PAPER ") { self.paper=self.eval(command[6..].trim(),blip)?.number() as i32;blip.clear(paper_color(self.paper));return Ok(()); }
         if upper.starts_with("PEN ")||upper.starts_with("INK ") { self.pen=self.eval(command[4..].trim(),blip)?.number() as i32;return Ok(()); }
-        if let Some(rest)=command.strip_prefix("WAIT ").or_else(||command.strip_prefix("wait ")) { self.wait_until=macroquad::time::get_time()*1000.0+self.eval(rest,blip)?.number().clamp(0.0,10000.0); self.yielded=true; return Ok(()); }
+        if let Some(rest)=command.strip_prefix("WAIT ").or_else(||command.strip_prefix("wait ")) { self.wait_until=macroquad::time::get_time()*1000.0+self.eval(rest,blip)?.number().clamp(0.0,10000.0); self.uninterrupted=0; self.yielded=true; return Ok(()); }
         if upper.starts_with("SOUND ") { let args=split_args(command[6..].trim());if args.len()<2||args.len()>3{return Err("SOUND needs frequency,duration[,volume]".into())}let frequency=self.eval(&args[0],blip)?.number();let seconds=self.eval(&args[1],blip)?.number();let volume=args.get(2).map(|value|self.eval(value,blip).map(|v|v.number())).transpose()?.unwrap_or(0.35);if !(0.0..=12000.0).contains(&frequency)||!(0.0..=10.0).contains(&seconds)||!(0.0..=1.0).contains(&volume){return Err("SOUND values are out of range".into())}self.sound_request=Some((frequency as f32,seconds as f32,volume as f32));return Ok(()); }
-        if upper.starts_with("REST ") { let seconds=self.eval(command[5..].trim(),blip)?.number();if !(0.0..=10.0).contains(&seconds){return Err("REST duration must be 0–10 seconds".into())}self.wait_until=macroquad::time::get_time()*1000.0+seconds*1000.0;self.yielded=true;return Ok(()); }
+        if upper.starts_with("REST ") { let seconds=self.eval(command[5..].trim(),blip)?.number();if !(0.0..=10.0).contains(&seconds){return Err("REST duration must be 0–10 seconds".into())}self.wait_until=macroquad::time::get_time()*1000.0+seconds*1000.0;self.uninterrupted=0;self.yielded=true;return Ok(()); }
         if upper.starts_with("PRINT") { let text=command.get(5..).unwrap_or("").trim(); let value=if text.is_empty(){String::new()}else{split_args(text).iter().map(|p|self.eval(p,blip).map(|v|v.string())).collect::<Result<Vec<_>,_>>()?.join(" ")}; self.output.push(value); if self.output.len()>10 { self.output.remove(0); } return Ok(()); }
         if upper.starts_with("PLAY_SFX ") { let args=split_args(command[8..].trim()); if args.is_empty()||args.len()>2{return Err("PLAY_SFX needs name[,volume]".into())} let name=self.eval(&args[0],blip)?.string().to_ascii_lowercase(); let volume=args.get(1).map(|value|self.eval(value,blip).map(|v|v.number() as f32)).transpose()?.unwrap_or(1.0).clamp(0.0,1.0); let sound=sounds.get(&name).ok_or_else(||format!("Unknown sound {name}"))?;blip::play_sfx_volume(sound,volume);#[cfg(target_arch="wasm32")]unsafe{blip_basic_audio_event();}return Ok(()); }
-        if upper.starts_with("PLAY_MUSIC ") { let name=self.eval(command[11..].trim(),blip)?.string().to_ascii_uppercase(); let level=self.vars.get("LV").or_else(||self.vars.get("ROUND")).map(Value::number).unwrap_or(1.0) as i32; self.music_request=Some(match name.as_str(){"BOUNCER_TITLE"=>MusicRequest::Bouncer(0),"BOUNCER_GAME"=>MusicRequest::Bouncer((level+1).rem_euclid(2) as usize),"BOUNCER_ALT"=>MusicRequest::Bouncer(1),"DEFENDER_MAIN"=>MusicRequest::Defender(0),"DEFENDER_BOSS"=>MusicRequest::Defender(1),"ADDER_COIL"=>MusicRequest::Adder(0),"ADDER_HUNT"=>MusicRequest::Adder(1),"SERPENT_MAIN"=>MusicRequest::Serpent(0),"SERPENT_FRENZY"=>MusicRequest::Serpent(1),"RALLY_MAIN"=>MusicRequest::Rally(0),"RALLY_ALT"=>MusicRequest::Rally(1),"METEORS_DRIFT"=>MusicRequest::Meteors(0),"METEORS_STORM"=>MusicRequest::Meteors(1),"SKY_RAIDER_MAIN"=>MusicRequest::SkyRaider(0),"SKY_RAIDER_ALT"=>MusicRequest::SkyRaider(1),"BRAWLER_ARENA"=>MusicRequest::Brawler(0),"BUBBLER_MAIN"=>MusicRequest::Bubbler(0),"BUBBLER_HURRY"=>MusicRequest::Bubbler(1),_=>return Err(format!("Unknown music track {name}"))}); return Ok(()); }
-        if upper=="STOP_MUSIC" { self.music_request=Some(MusicRequest::Stop); return Ok(()); }
+        if upper.starts_with("PLAY_MUSIC ") { let name=self.eval(command[11..].trim(),blip)?.string();let builtin=name.to_ascii_uppercase();let level=self.vars.get("LV").or_else(||self.vars.get("ROUND")).map(Value::number).unwrap_or(1.0) as i32;self.music_file_request=None;self.music_request=Some(match builtin.as_str(){"BOUNCER_TITLE"=>MusicRequest::Bouncer(0),"BOUNCER_GAME"=>MusicRequest::Bouncer((level+1).rem_euclid(2) as usize),"BOUNCER_ALT"=>MusicRequest::Bouncer(1),"DEFENDER_MAIN"=>MusicRequest::Defender(0),"DEFENDER_BOSS"=>MusicRequest::Defender(1),"ADDER_COIL"=>MusicRequest::Adder(0),"ADDER_HUNT"=>MusicRequest::Adder(1),"SERPENT_MAIN"=>MusicRequest::Serpent(0),"SERPENT_FRENZY"=>MusicRequest::Serpent(1),"RALLY_MAIN"=>MusicRequest::Rally(0),"RALLY_ALT"=>MusicRequest::Rally(1),"METEORS_DRIFT"=>MusicRequest::Meteors(0),"METEORS_STORM"=>MusicRequest::Meteors(1),"SKY_RAIDER_MAIN"=>MusicRequest::SkyRaider(0),"SKY_RAIDER_ALT"=>MusicRequest::SkyRaider(1),"BRAWLER_ARENA"=>MusicRequest::Brawler(0),"BUBBLER_MAIN"=>MusicRequest::Bubbler(0),"BUBBLER_HURRY"=>MusicRequest::Bubbler(1),_=>{let mut path=builtin;if !path.starts_with("/USER/"){return Err(format!("Unknown music track {name}"))}if path.ends_with(".TUNE"){path.truncate(path.len()-5);path.push_str(".WAV");}else if !path.ends_with(".WAV"){path.push_str(".WAV");}self.music_request=None;self.music_file_request=Some(path);return Ok(())}});return Ok(()); }
+        if upper=="STOP_MUSIC" { self.music_file_request=None;self.music_request=Some(MusicRequest::Stop); return Ok(()); }
         if let Some(eq)=assignment_eq(&command) {
             let lhs=command[..eq].trim().strip_prefix("LET ").or_else(||command[..eq].trim().strip_prefix("let ")).unwrap_or(command[..eq].trim()).trim(); let value=self.eval(command[eq+1..].trim(),blip)?;
             if let Some(open)=lhs.find('(') { let name=lhs[..open].trim().to_ascii_uppercase(); let inds=lhs[open+1..].trim_end_matches(')').trim(); let key=split_args(inds).iter().map(|s|self.eval(s,blip).map(|v|v.string())).collect::<Result<Vec<_>,_>>()?.join(","); self.arrays.insert(format!("{name}({key})"),value); } else { self.vars.insert(lhs.to_ascii_uppercase(),value); } return Ok(());
@@ -274,6 +289,44 @@ fn host_source()->Option<String>{
     #[cfg(not(target_arch="wasm32"))] { Some(include_str!("../../../web/TAPE/BOUNCER.BLIP").to_string()) }
 }
 
+#[cfg(target_arch="wasm32")]
+fn host_user_textures()->Vec<(String,Vec<u8>)>{
+    unsafe {
+        let count=blip_basic_texture_count().clamp(0,512);
+        (0..count).filter_map(|index|{
+            let name_len=blip_basic_texture_name_len(index).clamp(0,4096) as usize;
+            let png_len=blip_basic_texture_png_len(index).clamp(0,8*1024*1024) as usize;
+            if name_len==0||png_len==0{return None;}
+            let mut name=vec![0;name_len];let mut png=vec![0;png_len];
+            let name_copied=blip_basic_texture_name_copy(index,name.as_mut_ptr(),name_len as i32).max(0) as usize;
+            let png_copied=blip_basic_texture_png_copy(index,png.as_mut_ptr(),png_len as i32).max(0) as usize;
+            name.truncate(name_copied);png.truncate(png_copied);
+            Some((String::from_utf8(name).ok()?.to_ascii_uppercase(),png))
+        }).collect()
+    }
+}
+#[cfg(not(target_arch="wasm32"))]
+fn host_user_textures()->Vec<(String,Vec<u8>)>{Vec::new()}
+
+#[cfg(target_arch="wasm32")]
+fn host_user_music()->Vec<(String,Vec<u8>)>{
+    unsafe {
+        let count=blip_basic_music_count().clamp(0,64);
+        (0..count).filter_map(|index|{
+            let name_len=blip_basic_music_name_len(index).clamp(0,4096) as usize;
+            let wav_len=blip_basic_music_wav_len(index).clamp(0,8*1024*1024) as usize;
+            if name_len==0||wav_len<44{return None;}
+            let mut name=vec![0;name_len];let mut wav=vec![0;wav_len];
+            let name_copied=blip_basic_music_name_copy(index,name.as_mut_ptr(),name_len as i32).max(0) as usize;
+            let wav_copied=blip_basic_music_wav_copy(index,wav.as_mut_ptr(),wav_len as i32).max(0) as usize;
+            name.truncate(name_copied);wav.truncate(wav_copied);
+            Some((String::from_utf8(name).ok()?.to_ascii_uppercase(),wav))
+        }).collect()
+    }
+}
+#[cfg(not(target_arch="wasm32"))]
+fn host_user_music()->Vec<(String,Vec<u8>)>{Vec::new()}
+
 fn brawler_theme_0()->Vec<u8>{blip_assets::brawler::theme_wav(0)}
 fn brawler_theme_1()->Vec<u8>{blip_assets::brawler::theme_wav(1)}
 fn brawler_theme_2()->Vec<u8>{blip_assets::brawler::theme_wav(2)}
@@ -314,16 +367,36 @@ async fn main(){
     let mut brawler_music=Jukebox::new(&[brawler_theme_0,brawler_theme_1,brawler_theme_2,brawler_theme_3,brawler_theme_4,brawler_theme_5,brawler_theme_6,brawler_theme_7]);
     let mut bubbler_music=Jukebox::new(&[blip_assets::bubbler::theme_wav,blip_assets::bubbler::hurry_wav]);
     let mut active_music:Option<MusicRequest>=None;
+    let mut user_music:HashMap<String,Sound>=HashMap::new();
+    let mut active_user_music:Option<String>=None;
     let mut program=Program::new();let mut old_source=String::new();let mut reported_error=String::new();
     loop {
-        if let Some(source)=host_source(){if source!=old_source{old_source=source.clone();bouncer_music.stop();defender_music.stop();adder_music.stop();serpent_music.stop();rally_music.stop();meteors_music.stop();sky_raider_music.stop();brawler_music.stop();bubbler_music.stop();active_music=None;program.load(&source);reported_error.clear();#[cfg(target_arch="wasm32")]unsafe{blip_basic_program_loaded();}}}
-        else if !old_source.is_empty(){old_source.clear();bouncer_music.stop();defender_music.stop();adder_music.stop();serpent_music.stop();rally_music.stop();meteors_music.stop();sky_raider_music.stop();brawler_music.stop();bubbler_music.stop();active_music=None;program=Program::new();reported_error.clear();}
+        if let Some(source)=host_source(){if source!=old_source{old_source=source.clone();bouncer_music.stop();defender_music.stop();adder_music.stop();serpent_music.stop();rally_music.stop();meteors_music.stop();sky_raider_music.stop();brawler_music.stop();bubbler_music.stop();for sound in user_music.values(){stop_sound(sound);}user_music.clear();active_user_music=None;active_music=None;program.load(&source);for (path,bytes) in host_user_textures(){let tex=Texture2D::from_file_with_format(&bytes,Some(macroquad::prelude::ImageFormat::Png));tex.set_filter(macroquad::texture::FilterMode::Nearest);textures.insert(path.clone(),tex.clone());let alias=path.rsplit('/').next().unwrap_or(&path).trim_end_matches(".PNG").to_ascii_lowercase();textures.entry(alias).or_insert(tex);}for (path,bytes) in host_user_music(){if let Ok(sound)=load_sound_from_bytes(&bytes).await{user_music.insert(path,sound);}}reported_error.clear();#[cfg(target_arch="wasm32")]unsafe{blip_basic_program_loaded();}}}
+        else if !old_source.is_empty(){old_source.clear();bouncer_music.stop();defender_music.stop();adder_music.stop();serpent_music.stop();rally_music.stop();meteors_music.stop();sky_raider_music.stop();brawler_music.stop();bubbler_music.stop();for sound in user_music.values(){stop_sound(sound);}active_user_music=None;active_music=None;program=Program::new();reported_error.clear();}
+        #[cfg(target_arch="wasm32")]
+        unsafe {
+            if blip_basic_export_requested() != 0 {
+                let game = match blip_basic_export_game() { 1 => "ADDER", 2 => "BOUNCER", 3 => "BRAWLER", 4 => "BUBBLER", 5 => "GALACTIC_DEFENDER", 6 => "METEORS", 7 => "RALLY", 8 => "SERPENT", 9 => "SKY_RAIDER", _ => "" };
+                for (path, bytes) in TAPE_GFX {
+                    if !game.is_empty() && path.starts_with(&format!("/TAPE/GFX/{game}/")) {
+                        blip_basic_export_rom_asset(path.as_ptr(), path.len() as i32, bytes.as_ptr(), bytes.len() as i32);
+                    }
+                }
+                blip_basic_export_done();
+            }
+        }
         program.tick(&blip,&textures,&sounds);
         #[cfg(target_arch="wasm32")]
         if let Some((frequency,seconds,volume))=program.sound_request.take(){unsafe{blip_basic_sound(frequency,seconds,volume);}}
+        if let Some(path)=program.music_file_request.take(){
+            bouncer_music.stop();defender_music.stop();adder_music.stop();serpent_music.stop();rally_music.stop();meteors_music.stop();sky_raider_music.stop();brawler_music.stop();bubbler_music.stop();active_music=None;for sound in user_music.values(){stop_sound(sound);}active_user_music=None;
+            if let Some(sound)=user_music.get(&path){play_sound(sound,PlaySoundParams{looped:true,volume:0.7});active_user_music=Some(path);#[cfg(target_arch="wasm32")]unsafe{blip_basic_audio_event();}}
+            else{program.error=Some(format!("? MUSIC FILE NOT FOUND: {path}"));}
+        }
         if let Some(request)=program.music_request.take(){
-            if request==MusicRequest::Stop { bouncer_music.stop();defender_music.stop();adder_music.stop();serpent_music.stop();rally_music.stop();meteors_music.stop();sky_raider_music.stop();brawler_music.stop();bubbler_music.stop();active_music=None; }
+            if request==MusicRequest::Stop { bouncer_music.stop();defender_music.stop();adder_music.stop();serpent_music.stop();rally_music.stop();meteors_music.stop();sky_raider_music.stop();brawler_music.stop();bubbler_music.stop();for sound in user_music.values(){stop_sound(sound);}active_user_music=None;active_music=None; }
             else {
+                if active_user_music.take().is_some(){for sound in user_music.values(){stop_sound(sound);}}
                 if active_music!=Some(request) { #[cfg(target_arch="wasm32")]unsafe{blip_basic_audio_event();} }
                 if active_music.map(MusicRequest::group)!=Some(request.group()){bouncer_music.stop();defender_music.stop();adder_music.stop();serpent_music.stop();rally_music.stop();meteors_music.stop();sky_raider_music.stop();brawler_music.stop();bubbler_music.stop();}
                 match request {
@@ -357,7 +430,7 @@ mod tests {
     #[test] fn defender_source_loads_as_numbered_program(){let mut p=Program::new();p.load(include_str!("../../../web/TAPE/DEFENDER.BLIP"));assert!(p.lines.len()>80);assert_eq!(p.lines[0].0,10);assert_eq!(p.lines.last().unwrap().0,1660);}
     #[test] fn serpent_source_loads_as_numbered_program(){let mut p=Program::new();p.load(include_str!("../../../web/TAPE/SERPENT.BLIP"));assert!(p.lines.len()>60);assert_eq!(p.lines[0].0,10);assert_eq!(p.lines.last().unwrap().0,1070);assert!(p.lines.windows(2).all(|pair|pair[0].0<pair[1].0));let source=p.lines.iter().map(|(_,line)|line.as_str()).collect::<Vec<_>>().join(" ");assert!(source.contains("NX>20")&&source.contains("NY>20")&&source.contains("GX=0 TO 160 STEP 8")&&source.contains("HEAD_X=10:HEAD_Y=10"));assert!(source.contains("FILL_CIRCLE(SX,SY")&&source.contains("LIVES=LIVES-1")&&source.contains("LEVEL=LEVEL+1"));assert!(source.contains("SCORE=SCORE+10*LEVEL*STREAK")&&source.contains("BONUS_TIME=6")&&source.contains("SERPENT/BONUS_EAT")&&source.contains("EVENLEVEL=INT(LEVEL/2)*2")&&source.contains("SHEARS_TIME=7")&&source.contains("BODY_LENGTH=BODY_LENGTH-4"));}
     #[test] fn rally_source_loads_as_numbered_program(){let mut p=Program::new();p.load(include_str!("../../../web/TAPE/RALLY.BLIP"));assert!(p.lines.len()>35);assert_eq!(p.lines[0].0,10);assert_eq!(p.lines.last().unwrap().0,820);assert!(p.lines.windows(2).all(|pair|pair[0].0<pair[1].0));let source=p.lines.iter().map(|(_,line)|line.as_str()).collect::<Vec<_>>().join(" ");assert!(source.contains("BALL_Y=139+SIN")&&source.contains("MODE=2 AND KEY_HELD(\"I\")")&&source.contains("MODE=2 AND KEY_HELD(\"K\")")&&source.contains("FILL_RECT(85,PY,4,24")&&source.contains("HITDIR=1")&&source.contains("BALL_SPEED=BALL_SPEED+0.0833")&&source.contains("REL*1.1")&&source.contains("WAIT 1200:GOTO 600"));}
-    #[test] fn adder_source_loads_as_numbered_program(){let mut p=Program::new();p.load(include_str!("../../../web/TAPE/ADDER.BLIP"));assert!(p.lines.len()>50);assert_eq!(p.lines[0].0,10);assert_eq!(p.lines.last().unwrap().0,999);assert!(p.lines.windows(2).all(|pair|pair[0].0<pair[1].0));assert!(p.lines.iter().any(|(_,source)|source.contains("FILL_CIRCLE(SX,SY")));let source=p.lines.iter().map(|(_,line)|line.as_str()).collect::<Vec<_>>().join(" ");assert!(source.contains("LENGTH=LENGTH+1")&&source.contains("HOLE_LEFT=2")&&source.contains("H1_SPENT(SEGMENT)=H1_SPENT(SEGMENT-1)")&&source.contains("CANDIDATE=EDIR+CHOICE")&&source.contains("CLEARANCE=LOOK-1")&&source.contains("SCORE=SCORE+50*ROUND")&&source.contains("SCORE=SCORE+100")&&source.contains("WAIT 2000")&&source.contains("IF ROUND=4 THEN PLAY_MUSIC \"ADDER_HUNT\""));}
+    #[test] fn adder_source_loads_as_numbered_program(){let mut p=Program::new();p.load(include_str!("../../../web/TAPE/ADDER.BLIP"));assert!(p.lines.len()>50);assert_eq!(p.lines[0].0,10);assert_eq!(p.lines.last().unwrap().0,999);assert!(p.lines.windows(2).all(|pair|pair[0].0<pair[1].0));assert!(p.lines.iter().any(|(_,source)|source.contains("FILL_CIRCLE(SX,SY")));let source=p.lines.iter().map(|(_,line)|line.as_str()).collect::<Vec<_>>().join(" ");assert!(source.contains("LENGTH=LENGTH+1")&&source.contains("HOLE_LEFT=2")&&source.contains("H1_SPENT(SEGMENT)=H1_SPENT(SEGMENT-1)")&&source.contains("CANDIDATE=EDIR+CHOICE")&&source.contains("CLEARANCE=FORWARD-1")&&source.contains("SCORE=SCORE+50*ROUND")&&source.contains("SCORE=SCORE+100")&&source.contains("WAIT 2000")&&source.contains("IF ROUND=4 THEN PLAY_MUSIC \"ADDER_HUNT\""));}
     #[test] fn meteors_source_loads_as_numbered_program(){let mut p=Program::new();p.load(include_str!("../../../web/TAPE/METEORS.BLIP"));assert!(p.lines.len()>80);assert_eq!(p.lines[0].0,10);assert_eq!(p.lines.last().unwrap().0,1980);assert!(p.lines.windows(2).all(|pair|pair[0].0<pair[1].0));let source=p.lines.iter().map(|(_,line)|line.as_str()).collect::<Vec<_>>().join(" ");assert!(source.contains("FOR I=1 TO 48")&&source.contains("DRAW_LINE(FX,FY")&&source.contains("SPLIT_R*0.62"));assert!(source.contains("FOR VERT=1 TO 9")&&source.contains("JAG(I,VERT)=0.75+RND(0.5)")&&source.contains("ROT+VERT*0.628319"));assert!(source.contains("SCORE=SCORE+20")&&source.contains("SCORE=SCORE+100"));assert!(source.contains("METEORS/THRUST")&&source.contains("METEORS/HYPERSPACE")&&source.contains("METEORS/SAUCER_BIG"));}
     #[test] fn sky_raider_source_loads_as_numbered_program(){
         let mut p=Program::new();

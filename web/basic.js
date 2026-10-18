@@ -159,6 +159,8 @@ var tapePrograms=[
 ];
 var tapeReady=fetch('TAPE/manifest.json').then(function(response){if(!response.ok)throw Error('TAPE DIRECTORY UNAVAILABLE');return response.json();}).then(function(names){if(!Array.isArray(names))throw Error('BAD TAPE MANIFEST');tapeNames=names.filter(function(name){return tapePrograms.some(function(tape){return tape.file===name;});});}).catch(function(error){tapeLoadError=error.message;});
 var gfxReady=fetch('TAPE/GFX/manifest.json').then(function(response){if(!response.ok)throw Error('GFX directory unavailable');return response.json();}).then(function(games){if(games&&typeof games==='object')gfxNames=games;}).catch(function(){});
+var romTunes=[];
+var romTunesReady=fetch('ROM/TUNES/manifest.json').then(function(response){if(!response.ok)throw Error('ROM TUNES unavailable');return response.json();}).then(function(files){if(Array.isArray(files))romTunes=files.filter(function(name){return typeof name==='string'&&/\.xm$/i.test(name);});}).catch(function(){});
 var currentDir = '/USER';
 var currentFile = null;
 var editor=null;
@@ -168,7 +170,7 @@ function readFilesystem(){
     var saved=JSON.parse(localStorage.getItem(FS_STORE)||'null');
     if(saved&&Array.isArray(saved.dirs)&&saved.files&&typeof saved.files==='object'){
       state.dirs=state.dirs.concat(saved.dirs.filter(function(path){return typeof path==='string'&&path.indexOf('/USER/')===0;}).map(function(path){return path.toUpperCase();}));
-      Object.keys(saved.files).forEach(function(path){if(path.toUpperCase().indexOf('/USER/')===0&&typeof saved.files[path]==='string')state.files[path.toUpperCase()]=saved.files[path].toUpperCase();});
+      Object.keys(saved.files).forEach(function(path){if(path.toUpperCase().indexOf('/USER/')===0&&typeof saved.files[path]==='string'){var value=saved.files[path];state.files[path.toUpperCase()]=value.indexOf('data:image/png;')===0?value:value.toUpperCase();}});
     }
     var legacy=JSON.parse(localStorage.getItem(LEGACY_STORE)||'{}');
     Object.keys(legacy).forEach(function(name){
@@ -200,7 +202,7 @@ function resolvePath(path,base){
 }
 function canonicalDirectory(path){
   var target=canonicalRoot(path).toLowerCase();
-  var roots=['/','/TAPE','/TAPE/GFX','/USER'].concat(Object.keys(BLIP_GAMES).map(function(slug){return '/TAPE/GFX/'+slug.toUpperCase();}),filesystem.dirs);
+  var roots=['/','/TAPE','/TAPE/GFX','/ROM','/ROM/TUNES','/USER'].concat(Object.keys(BLIP_GAMES).map(function(slug){return '/TAPE/GFX/'+slug.toUpperCase();}),filesystem.dirs);
   return roots.find(function(dir){return dir.toLowerCase()===target;})||path;
 }
 function programPath(name){
@@ -218,10 +220,10 @@ function tapeForPath(path){return tapePrograms.find(function(tape){return ('/TAP
 var tapeOrder=tapePrograms.slice();
 var tapeNodes=Object.create(null),insertedTape=null,insertedTapeNode=null,tapePlaceholder=null;
 function makeTapeNode(tape,index){
-  var game=BLIP_GAMES[tape.slug],item=document.createElement('div'),caseEl=document.createElement('span'),art=document.createElement('img'),label=document.createElement('span'),title=document.createElement('strong'),reels=document.createElement('span');
+  var game=BLIP_GAMES[tape.slug],item=document.createElement('div'),caseEl=document.createElement('span'),art=document.createElement('img'),label=document.createElement('span'),title=document.createElement('strong'),reels=document.createElement('span'),film=document.createElement('i');
   item.className='game-tape';item.dataset.tape=tape.command;item.tabIndex=0;item.setAttribute('role','button');item.setAttribute('aria-label','Load '+tape.title+' game tape');item.style.setProperty('--tape-accent','rgb('+game.accent+')');item.style.setProperty('--tape-index',String(index));
-  caseEl.className='game-tape-case';art.className='game-tape-art';art.src=tape.slug+'/screenshot.png';art.alt='';label.className='game-tape-label';title.textContent=tape.title;reels.className='game-tape-reels';
-  label.append(title);caseEl.append(art,label,reels);item.append(caseEl);item.addEventListener('click',function(){if(!tapeDragged)startTape(tape,item);});item.addEventListener('keydown',function(event){if(event.key==='Enter'||event.key===' '){event.preventDefault();startTape(tape,item);}});return item;
+  caseEl.className='game-tape-case';art.className='game-tape-art';art.src=tape.slug+'/screenshot.png';art.alt='';label.className='game-tape-label';title.textContent=tape.title;reels.className='game-tape-reels';reels.innerHTML='<i class="tape-spool supply"></i><i class="tape-spool takeup"></i>';film.className='game-tape-film';
+  label.append(title);caseEl.append(art,label,reels,film);item.append(caseEl);item.addEventListener('click',function(){if(!tapeDragged)startTape(tape,item);});item.addEventListener('keydown',function(event){if(event.key==='Enter'||event.key===' '){event.preventDefault();startTape(tape,item);}});return item;
 }
 function tapeAngle(index){return Math.sin((index+1)*1.618)*2.2+Math.sin(index*.73)*.65;}
 function updateTapeStackGeometry(){
@@ -251,56 +253,72 @@ function renderTapePile(){
 window.addEventListener('resize',renderTapePile);
 function reducedTapeMotion(){return window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;}
 function waitForMotion(ms){return new Promise(function(resolve){setTimeout(resolve,reducedTapeMotion()?0:ms);});}
-function openDeck(){document.body.setAttribute('data-deck-open','');return waitForMotion(430);}
-function closeDeck(){document.body.removeAttribute('data-deck-open');return waitForMotion(430);}
+function openDeck(){pressDeckKey('eject');document.body.setAttribute('data-deck-open','');return waitForMotion(380);}
+function closeDeck(){document.body.removeAttribute('data-deck-open');return waitForMotion(300);}
+function pressDeckKey(key){document.body.setAttribute('data-deck-key',key);setTimeout(function(){if(document.body.getAttribute('data-deck-key')===key)document.body.removeAttribute('data-deck-key');},180);}
 function leavePile(tape,node){
   var pile=document.getElementById('tape-pile'),index=tapeOrder.indexOf(tape),next=tapeOrder.slice(index+1).map(function(nextTape){return tapeNodes[nextTape.command];}).find(function(nextNode){return nextNode&&nextNode.parentElement===pile;});
   tapePlaceholder=document.createElement('div');tapePlaceholder.className='game-tape tape-placeholder';tapePlaceholder.dataset.tape=tape.command;tapePlaceholder.setAttribute('aria-hidden','true');tapePlaceholder.style.cssText=node.style.cssText;pile.insertBefore(tapePlaceholder,next||null);
-  var rect=node.getBoundingClientRect();node.classList.add('game-tape-flight');node.style.left=rect.left+'px';node.style.top=rect.top+'px';node.style.width=rect.width+'px';node.style.height=rect.height+'px';document.body.append(node);
 }
-async function liftTape(tape,node){
-  leavePile(tape,node);
-  if(reducedTapeMotion())return;
-  if(!node.animate){await waitForMotion(260);return;}
-  var lift=node.animate([{transform:'translateY(0) scale(1)',filter:'brightness(1)'},{transform:'translateY(-34px) scale(1.08)',filter:'brightness(1.16)'}],{duration:300,easing:'cubic-bezier(.2,.8,.2,1)',fill:'forwards'});
-  await lift.finished.catch(function(){});lift.cancel();
+// Unrotated box of a tape: its centre on screen, its layout size and its tilt in the pile.
+function tapeBox(node){var rect=node.getBoundingClientRect();return {x:rect.left+rect.width/2,y:rect.top+rect.height/2,w:node.offsetWidth,h:node.offsetHeight,angle:parseFloat(node.style.getPropertyValue('--tape-angle'))||0};}
+// Where a seated tape sits: .deck-inserted-tape is 67% of the bay high, 17% down, centred.
+function seatBox(bay){var rect=bay.getBoundingClientRect(),h=rect.height*.67,w=h*1.58;return {x:rect.left+rect.width/2,y:rect.top+rect.height*.17+h/2,w:w,h:h,angle:0};}
+function setFlightBox(node,box){
+  node.classList.add('game-tape-flight');node.style.left=(box.x-box.w/2)+'px';node.style.top=(box.y-box.h/2)+'px';node.style.width=box.w+'px';node.style.height=box.h+'px';document.body.append(node);
 }
-function insertTapeIntoBay(tape,node,bay){
-  var from=node.getBoundingClientRect(),bayRect=bay.getBoundingClientRect(),height=bayRect.height*.67,width=Math.min(bayRect.width*.76,height*1.58),left=(bayRect.width-width)/2,top=bayRect.height-height;
-  top=bayRect.height*.17+height;
-  node.classList.remove('game-tape-flight');node.classList.add('game-tape-inserting');node.style.left=(from.left-bayRect.left)+'px';node.style.top=(from.top-bayRect.top)+'px';node.style.width=from.width+'px';node.style.height=from.height+'px';bay.append(node);
-  var duration=reducedTapeMotion()?0:1450,flight;
-  if(duration&&node.animate)flight=node.animate([{left:(from.left-bayRect.left)+'px',top:(from.top-bayRect.top)+'px',width:from.width+'px',height:from.height+'px',transform:'rotate(-3deg)'},{left:left+'px',top:top+'px',width:width+'px',height:height+'px',transform:'rotate(0deg)'}],{duration:duration,easing:'cubic-bezier(.2,.7,.2,1)',fill:'forwards'});
-  return (flight?flight.finished.catch(function(){}):Promise.resolve()).then(function(){if(flight)flight.cancel();node.classList.remove('game-tape-inserting');node.classList.add('deck-inserted-tape');node.tabIndex=-1;node.setAttribute('role','img');node.setAttribute('aria-label',tape.title+' game tape loaded');node.removeAttribute('style');node.style.setProperty('--tape-accent','rgb('+BLIP_GAMES[tape.slug].accent+')');});
+function clearFlightBox(node){node.classList.remove('game-tape-flight');['left','top','width','height'].forEach(function(prop){node.style.removeProperty(prop);});}
+// Each pose: offset from the flight box, scale, turn, tilt of the top edge towards the viewer, height above the desk (0-1).
+function flyTape(node,poses,duration){
+  if(reducedTapeMotion()||!node.animate)return waitForMotion(0);
+  var caseEl=node.querySelector('.game-tape-case');
+  var body=node.animate(poses.map(function(p){return {offset:p.at,easing:p.ease||'ease-in-out',transform:'translate('+p.x.toFixed(1)+'px,'+p.y.toFixed(1)+'px) rotate('+p.r.toFixed(2)+'deg) scale('+p.s.toFixed(4)+')'};}),{duration:duration,fill:'forwards'});
+  var tilt=caseEl.animate(poses.map(function(p){var l=p.lift;return {offset:p.at,easing:p.ease||'ease-in-out',transform:'perspective(520px) rotateX('+p.tilt.toFixed(1)+'deg)',boxShadow:'inset 0 1px 2px #ffffff9c,inset 0 -4px 7px #000b,'+(l*7).toFixed(1)+'px '+(2+l*20).toFixed(1)+'px '+(3+l*22).toFixed(1)+'px rgba(0,0,0,'+(.75-l*.3).toFixed(2)+')'};}),{duration:duration,fill:'forwards'});
+  return Promise.all([body.finished,tilt.finished]).catch(function(){}).then(function(){return [body,tilt];});
 }
-function floatTapeTo(tape,node,rect,returning){
-  var from=node.getBoundingClientRect(),cx=from.left+from.width/2,cy=from.top+from.height/2,tx=rect.left+rect.width/2,ty=rect.top+rect.height/2;
-  node.classList.add('game-tape-flight');node.style.left=from.left+'px';node.style.top=from.top+'px';node.style.width=from.width+'px';node.style.height=from.height+'px';document.body.append(node);
-  var frames=[{transform:'translate(0,0) scale(1) rotate(0deg)',offset:0},{transform:'translate(-12px,-34px) scale(1.08) rotate(-5deg)',offset:.22},{transform:'translate('+(tx-cx-8)+'px,'+(ty-cy-38)+'px) scale('+Math.min(rect.width/from.width,rect.height/from.height)*1.04+') rotate(3deg)',offset:.76},{transform:'translate('+(tx-cx)+'px,'+(ty-cy)+'px) scale('+Math.min(rect.width/from.width,rect.height/from.height)+') rotate(0deg)',offset:1}];
-  if(reducedTapeMotion())return Promise.resolve();
-  if(!node.animate)return waitForMotion(850);
-  return node.animate(frames,{duration:returning?1050:1450,easing:'cubic-bezier(.2,.7,.2,1)',fill:'forwards'}).finished.catch(function(){});
-}
-async function returnTapeToPile(){
+async function returnTapeToPile(keepOpen){
   if(!insertedTapeNode||!insertedTape)return;
-  var tape=insertedTape,node=insertedTapeNode,pile=document.getElementById('tape-pile');
-  document.body.setAttribute('data-tape-rewinding','');await waitForMotion(1800);document.body.removeAttribute('data-tape-rewinding');
-  await openDeck();
-  if(!tapePlaceholder||tapePlaceholder.dataset.tape!==tape.command){leavePile(tape,node);}
-  var targetRect=tapePlaceholder.getBoundingClientRect();insertedTape=null;insertedTapeNode=null;
-  node.classList.remove('deck-inserted-tape');
-  node.classList.add('deck-ejecting-tape');
-  if(!reducedTapeMotion()&&node.animate){var lower=node.animate([{transform:'translateX(-50%) translateY(0) rotateX(0)'},{transform:'translateX(-50%) translateY(100%) rotateX(10deg) scale(.92)'}],{duration:620,easing:'cubic-bezier(.2,.72,.2,1)'});await lower.finished.catch(function(){});lower.cancel();}
-  node.classList.remove('deck-ejecting-tape');
-  await floatTapeTo(tape,node,targetRect,true);
-  node.classList.remove('game-tape-flight','deck-inserted-tape');node.removeAttribute('style');node.tabIndex=0;node.setAttribute('role','button');node.setAttribute('aria-label','Load '+tape.title+' game tape');tapePlaceholder.replaceWith(node);tapePlaceholder=null;renderTapePile();
-  document.body.removeAttribute('data-deck-tape');await closeDeck();
+  var tape=insertedTape,node=insertedTapeNode;
+  document.body.setAttribute('data-tape-rewinding','');delete node.dataset.wound;await waitForMotion(1800);document.body.removeAttribute('data-tape-rewinding');
+  var from=seatBox(node.parentElement);
+  openDeck();await waitForMotion(110);
+  if(!tapePlaceholder||tapePlaceholder.dataset.tape!==tape.command)leavePile(tape,node);
+  var to=tapeBox(tapePlaceholder),s0=from.w/to.w,dx=from.x-to.x,dy=from.y-to.y;
+  insertedTape=null;insertedTapeNode=null;
+  node.classList.remove('deck-inserted-tape');setFlightBox(node,to);
+  // The eject spring pops the top edge up, a hand tips the tape out by it and carries it back to its slot.
+  var done=await flyTape(node,[
+    {at:0,x:dx,y:dy,s:s0,r:0,tilt:0,lift:0,ease:'cubic-bezier(.2,1.6,.4,1)'},
+    {at:.1,x:dx,y:dy-from.h*.05,s:s0*1.02,r:0,tilt:-14,lift:.15},
+    {at:.26,x:dx,y:dy-from.h*.42,s:s0*1.12,r:0,tilt:-32,lift:.6},
+    {at:.62,x:dx*.45+6,y:dy*.45-Math.max(40,to.h*.5),s:(s0+1)*.56,r:4,tilt:-10,lift:1},
+    {at:.88,x:0,y:-12,s:1.06,r:to.angle,tilt:-3,lift:.55,ease:'cubic-bezier(.4,0,.6,1.4)'},
+    {at:1,x:0,y:0,s:1,r:to.angle,tilt:0,lift:0}
+  ],1350);
+  node.style.transition='none';clearFlightBox(node);tapePlaceholder.replaceWith(node);tapePlaceholder=null;
+  if(done)done.forEach(function(animation){animation.cancel();});
+  node.tabIndex=0;node.setAttribute('role','button');node.setAttribute('aria-label','Load '+tape.title+' game tape');renderTapePile();void node.offsetWidth;node.style.removeProperty('transition');
+  document.body.removeAttribute('data-deck-tape');
+  if(!keepOpen)await closeDeck();
 }
 async function insertTapeFromPile(tape){
   var node=tapeNodes[tape.command],bay=document.querySelector('.deck-bay');if(!node||!bay)return;
-  await liftTape(tape,node);await openDeck();
-  await insertTapeIntoBay(tape,node,bay);
-  if(!reducedTapeMotion()&&node.animate){var settle=node.animate([{transform:'translateX(-50%) translateY(100%) rotateX(10deg) scale(.92)'},{transform:'translateX(-50%) translateY(-5%) rotateX(-2deg) scale(1.015)',offset:.82},{transform:'translateX(-50%) translateY(0) rotateX(0) scale(1)'}],{duration:620,easing:'cubic-bezier(.2,.72,.2,1)'});await settle.finished.catch(function(){});settle.cancel();}
+  if(!document.body.hasAttribute('data-deck-open'))openDeck();
+  var from=tapeBox(node),to=seatBox(bay),s0=from.w/to.w,dx=from.x-to.x,dy=from.y-to.y;
+  leavePile(tape,node);setFlightBox(node,to);node.classList.add('tape-bay-size');
+  // Picked up, carried over the deck, the head edge slid in first and the top pressed down.
+  var done=await flyTape(node,[
+    {at:0,x:dx,y:dy,s:s0,r:from.angle,tilt:0,lift:0,ease:'cubic-bezier(.2,.8,.3,1)'},
+    {at:.14,x:dx-8,y:dy-24,s:s0*1.07,r:from.angle*.4,tilt:-6,lift:.8},
+    {at:.52,x:dx*.4-6,y:dy*.4-Math.max(40,to.h*.8),s:(s0+1)*.58,r:-4,tilt:-16,lift:1},
+    {at:.72,x:0,y:-to.h*.4,s:1.1,r:0,tilt:-36,lift:.8,ease:'cubic-bezier(.4,0,.7,1)'},
+    {at:.85,x:0,y:-to.h*.1,s:1.035,r:0,tilt:-24,lift:.4,ease:'cubic-bezier(.5,0,.8,.6)'},
+    {at:.94,x:0,y:1,s:.995,r:0,tilt:1,lift:.02},
+    {at:1,x:0,y:0,s:1,r:0,tilt:0,lift:0}
+  ],1550);
+  clearFlightBox(node);node.classList.remove('tape-bay-size');node.classList.add('game-tape-inserting');bay.append(node);
+  if(done)done.forEach(function(animation){animation.cancel();});
+  node.tabIndex=-1;node.setAttribute('role','img');node.setAttribute('aria-label',tape.title+' game tape loaded');
   insertedTape=tape;insertedTapeNode=node;document.body.setAttribute('data-deck-tape','');await closeDeck();
 }
 var tapeDrag=null,tapeDragged=false;
@@ -332,6 +350,7 @@ async function startTape(tape,item){
   tapeBusy=true;document.body.setAttribute('data-tape-selecting','');
   document.querySelectorAll('.game-tape').forEach(function(control){control.setAttribute('aria-disabled','true');});
   try{
+    if(editor)closeEditor();
     if(basicWasmPlaying||run)exitActiveProgram();
     submit('CD /TAPE');
     await new Promise(function(resolve){setTimeout(resolve,220);});
@@ -372,13 +391,34 @@ function saveProgram(name){
   currentFile=path;
   print('Saved '+path);
 }
-function deleteProgram(name){
-  var path=programPath(name);
+function moveUserFile(from,to){
+  if(!from||!to)throw Error('MOVE needs a source and destination');
+  var source=canonicalRoot(resolvePath(from));
+  if(source.indexOf('/USER/')!==0)throw Error('Only /USER files can be moved');
+  if(!Object.prototype.hasOwnProperty.call(filesystem.files,source))throw Error('File not found: '+source);
+  var destination=canonicalRoot(resolvePath(to));
+  if(isDirectory(destination))destination+='/'+source.slice(source.lastIndexOf('/')+1);
+  if(destination.indexOf('/USER/')!==0)throw Error('Only /USER files can be moved');
+  var parent=destination.slice(0,destination.lastIndexOf('/'))||'/';
+  if(!isDirectory(parent))throw Error('Directory not found: '+parent);
+  if(source===destination)throw Error('Source and destination are the same');
+  if(Object.prototype.hasOwnProperty.call(filesystem.files,destination)||isDirectory(destination))throw Error('Already exists: '+destination);
+  filesystem.files[destination]=filesystem.files[source];
+  delete filesystem.files[source];
+  writeFilesystem();
+  if(currentFile===source){currentFile=destination;storeDraft();}
+  print('Moved '+source+' to '+destination);
+}
+function deleteUserFile(name){
+  if(!name)throw Error('DEL needs a file');
+  var path=canonicalRoot(resolvePath(name));
+  if(!/\.[^/]+$/.test(path))path+='.BLIP';
+  path=findFile(path);
   if(path.indexOf('/USER/')!==0)throw Error('Only /USER files can be deleted');
-  if(!Object.prototype.hasOwnProperty.call(filesystem.files,path))throw Error('Program not found: '+path);
+  if(!Object.prototype.hasOwnProperty.call(filesystem.files,path))throw Error('File not found: '+path);
   delete filesystem.files[path];
   writeFilesystem();
-  if(currentFile===path){currentFile=null;storeDraft();}
+  if(currentFile&&currentFile.toUpperCase()===path.toUpperCase()){currentFile=null;storeDraft();}
   print('Deleted '+path);
 }
 async function readProgramSource(path){
@@ -426,11 +466,11 @@ function beginTapeLoad(tape){
   document.body.removeAttribute('data-tape-loaded');
   if(!blipMuted()){try{basicAudio();}catch(e){}}
   var needsInsertion=insertedTape!==tape;
-  var choreography=(needsInsertion?returnTapeToPile().then(function(){return insertTapeFromPile(tape);}):Promise.resolve());
+  var choreography=(needsInsertion?returnTapeToPile(true).then(function(){return insertTapeFromPile(tape);}):Promise.resolve());
   return choreography.then(function(){
     if(needsInsertion){document.body.setAttribute('data-tape-seated','');playTapeSeatClick();}
     return waitForMotion(needsInsertion?220:0).then(function(){
-      document.body.removeAttribute('data-tape-seated');document.body.setAttribute('data-loading-tape','');document.body.setAttribute('data-tape-name',tape.command);
+      document.body.removeAttribute('data-tape-seated');if(insertedTapeNode){insertedTapeNode.classList.remove('game-tape-inserting');insertedTapeNode.classList.add('deck-inserted-tape');insertedTapeNode.dataset.wound='';}document.body.setAttribute('data-loading-tape','');document.body.setAttribute('data-tape-name',tape.command);
       if(!blipMuted()){try{tapeLoadingAudio.volume=.9;tapeLoadingAudio.currentTime=0;var playback=tapeLoadingAudio.play();if(playback)playback.catch(function(){});}catch(e){}}
       return new Promise(function(resolve){setTimeout(function(){document.body.removeAttribute('data-loading-tape');document.body.setAttribute('data-tape-loaded','');resolve();},reducedTapeMotion()?0:7300);});
     });
@@ -450,13 +490,13 @@ async function showSource(name){
   source.split(/\r?\n/).forEach(print);
 }
 function editorEscapeHtml(value){return String(value).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});}
-var editorKeywords=new Set(('PRINT INPUT LET IF THEN ELSE FOR TO STEP NEXT GOTO GOSUB RETURN END STOP REM DATA READ RESTORE DIM AND OR NOT MOD ABS INT RND SQR SIN COS TAN ATN LOG EXP LEN STR$ VAL CHR$ ASC LEFT$ RIGHT$ MID$ CLEAR COLOR FILL_RECT DRAW_RECT DRAW_LINE DRAW_LINE_EX DRAW_GLOW_LINE CIRCLE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_CAPSULE FILL_SUNBURST DRAW_TEXT DRAW_CHAR DRAW_NUMBER DRAW_HUD DRAW_TEXTURE TEXT_CX KEY_ACTIVE KEY_HELD KEY_PRESSED LOAD SAVE DIR CD MKDIR DEL').split(' '));
+var editorKeywords=new Set(('PRINT INPUT LET IF THEN ELSE FOR TO STEP NEXT GOTO GOSUB RETURN END STOP REM DATA READ RESTORE DIM AND OR NOT MOD ABS INT RND SQR SIN COS TAN ATN LOG EXP LEN STR$ VAL CHR$ ASC LEFT$ RIGHT$ MID$ CLEAR COLOR FILL_RECT DRAW_RECT DRAW_LINE DRAW_LINE_EX DRAW_GLOW_LINE CIRCLE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_CAPSULE FILL_SUNBURST DRAW_TEXT DRAW_CHAR DRAW_NUMBER DRAW_HUD DRAW_TEXTURE TEXT_CX KEY_ACTIVE KEY_HELD KEY_PRESSED LOAD SAVE DIR CD MKDIR DEL MOVE TUNE').split(' '));
 function highlightEditorText(value){
   var pattern=/"[^\"]*"|\bREM\b.*$|\b[A-Z_][A-Z0-9_$]*\b|\b\d+(?:\.\d+)?\b/gi,out='',last=0,match;
   while((match=pattern.exec(value))){out+=editorEscapeHtml(value.slice(last,match.index));var token=match[0],upper=token.toUpperCase(),kind=token[0]==='"'?'editor-string':/^REM\b/i.test(token)?'editor-comment':/^\d/.test(token)?'editor-number':/^\b(?:BLIP_|NEON_)/i.test(token)?'editor-constant':editorKeywords.has(upper)?'editor-keyword':'';out+=kind?'<span class="'+kind+'">'+editorEscapeHtml(token)+'</span>':editorEscapeHtml(token);last=pattern.lastIndex;if(/^REM\b/i.test(token))break;}
   return out+editorEscapeHtml(value.slice(last));
 }
-var editorCompletions=('ABS AND CIRCLE CD CLEAR COLOR COS DATA DEL DIR DRAW_CHAR DRAW_GLOW_LINE DRAW_HUD DRAW_LINE DRAW_LINE_EX DRAW_NUMBER DRAW_RECT DRAW_SUNBURST DRAW_TEXT DRAW_TEXTURE END EXP FILL_CAPSULE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_RECT FILL_SUNBURST FOR GOSUB GOTO IF INPUT INT KEY_ACTIVE KEY_HELD KEY_PRESSED LEFT$ LEN LET LOAD LOG MID$ MKDIR MOD NEXT NOT OR PRINT READ RETURN RIGHT$ RND SAVE SIN SQR STEP STR$ TAN TEXT_CX THEN TO VAL').split(' ');
+var editorCompletions=('ABS AND CIRCLE CD CLEAR COLOR COS DATA DEL DIR DRAW_CHAR DRAW_GLOW_LINE DRAW_HUD DRAW_LINE DRAW_LINE_EX DRAW_NUMBER DRAW_RECT DRAW_SUNBURST DRAW_TEXT DRAW_TEXTURE END EXP FILL_CAPSULE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_RECT FILL_SUNBURST FOR GOSUB GOTO IF INPUT INT KEY_ACTIVE KEY_HELD KEY_PRESSED LEFT$ LEN LET LOAD LOG MID$ MKDIR MOD MOVE NEXT NOT OR PRINT READ RETURN RIGHT$ RND SAVE SIN SQR STEP STR$ TAN TEXT_CX THEN TO TUNE VAL').split(' ');
 function editorCompletion(){
   var before=(editor.rows[editor.row]||'').slice(0,editor.column);
   if((before.match(/"/g)||[]).length%2)return null;
@@ -555,7 +595,9 @@ function sound(frequency,duration,volume){
 function rest(duration){sound(0,duration,0);}
 function directoryEntries(path){
   var dirs=[],files=[];
-  if(path==='/')dirs=['/TAPE/','/USER/'];
+  if(path==='/')dirs=['/ROM/','/TAPE/','/USER/'];
+  if(path==='/ROM')dirs.push('TUNES/');
+  if(path==='/ROM/TUNES')files=files.concat(romTunes);
   if(path==='/TAPE'){dirs.push('GFX/');files=files.concat(tapeNames);}
   if(path==='/TAPE/GFX')dirs=dirs.concat(Object.keys(BLIP_GAMES).map(function(slug){return slug.toUpperCase()+'/';}));
   var gfxGame=path.match(/^\/TAPE\/GFX\/([A-Z0-9_]+)$/);
@@ -574,6 +616,7 @@ function directoryEntries(path){
 async function showDirectory(path){
   await tapeReady;
   if(path.toUpperCase().indexOf('/TAPE/GFX')===0)await gfxReady;
+  if(path.toUpperCase().indexOf('/ROM/TUNES')===0)await romTunesReady;
   if(tapeLoadError)throw Error(tapeLoadError);
   path=canonicalDirectory(path||currentDir);
   if(!isDirectory(path))throw Error('Directory not found: '+path);
@@ -583,7 +626,7 @@ async function showDirectory(path){
   else entries.forEach(print);
 }
 function isDirectory(path){
-  return ['/','/TAPE','/TAPE/GFX','/USER'].concat(Object.keys(BLIP_GAMES).map(function(slug){return '/TAPE/GFX/'+slug.toUpperCase();}),filesystem.dirs).some(function(dir){return dir.toLowerCase()===path.toLowerCase();});
+  return ['/','/ROM','/ROM/TUNES','/TAPE','/TAPE/GFX','/USER'].concat(Object.keys(BLIP_GAMES).map(function(slug){return '/TAPE/GFX/'+slug.toUpperCase();}),filesystem.dirs).some(function(dir){return dir.toLowerCase()===path.toLowerCase();});
 }
 function makeDirectory(name){
   var path=canonicalRoot(resolvePath(name));
@@ -720,14 +763,52 @@ function jump(number) {
   var i=run.numbers.indexOf(Number(number)); if(i<0)throw Error('Line '+number+' not found');
   run.index=i;run.statement=0;
 }
+var pendingGameCopy=null;
+function ensureUserDirectory(path){
+  var parts=path.split('/').filter(Boolean),current='';
+  parts.forEach(function(part){current+='/'+part;if(current!=='/USER'&&!filesystem.dirs.some(function(dir){return dir.toUpperCase()===current;}))filesystem.dirs.push(current);});
+}
+function pngDataUrl(buffer){
+  var bytes=new Uint8Array(buffer),binary='';
+  for(var start=0;start<bytes.length;start+=0x8000)binary+=String.fromCharCode.apply(null,bytes.subarray(start,Math.min(start+0x8000,bytes.length)));
+  return 'data:image/png;base64,'+btoa(binary);
+}
+function finishGameCopy(){
+  var pending=pendingGameCopy;if(!pending)return;
+  try{
+    Object.keys(pending.assets).forEach(function(path){var name=path.slice(path.lastIndexOf('/')+1),alias=name.replace(/\.PNG$/,'');pending.source=pending.source.replaceAll('"'+alias+'"','"'+path+'"');});
+    Object.keys(pending.assets).forEach(function(path){filesystem.files[path]=pending.assets[path];});
+    filesystem.files[pending.destination]=pending.source;
+    writeFilesystem();currentFile=pending.destination;storeDraft();
+    pendingGameCopy=null;stopBouncerWasm();openEditor(currentFile);
+  }catch(error){pendingGameCopy=null;stopBouncerWasm();print('? GAME COPY FAILED: '+error.message);}
+}
+function escapeFromBasicGame(){
+  if(!basicWasmPlaying||pendingGameCopy)return;
+  var tape=tapeForPath(currentFile),destination=currentFile;
+  if(tape){destination='/USER/'+tape.command+'/'+tape.file;ensureUserDirectory('/USER/'+tape.command+'/GFX');}
+  if(!destination||destination.indexOf('/USER/')!==0){stopBouncerWasm();return;}
+  var source=filesystem.files[destination];
+  if(source===undefined){
+    source=programSource();
+    if(tape)source=source.replaceAll('/TAPE/GFX/'+tape.slug.toUpperCase()+'/',destination.slice(0,destination.lastIndexOf('/'))+'/GFX/');
+  }
+  pendingGameCopy={destination:destination,source:source,assets:{}};
+  if(tape&&filesystem.files[destination]===undefined&&basicWasmReady){
+    var gameId={adder:1,bouncer:2,brawler:3,bubbler:4,galactic_defender:5,meteors:6,rally:7,serpent:8,sky_raider:9}[tape.slug]||0;
+    wasmFrame.contentWindow.postMessage({type:'blip-basic-export-rom-assets',game:gameId},location.origin);
+    return;
+  }
+  finishGameCopy();
+}
 function exitActiveProgram(){if(basicWasmPlaying)stopBouncerWasm();else if(run)stopProgram();}
-function postBasicWasmSource(){if(basicWasmReady&&wasmFrame.contentWindow)wasmFrame.contentWindow.postMessage({type:'blip-basic-source',source:basicWasmSource},location.origin);}
+function postBasicWasmSource(){if(basicWasmReady&&wasmFrame.contentWindow)wasmFrame.contentWindow.postMessage({type:'blip-basic-source',source:basicWasmSource,textures:typeof paintTexturePayload==='function'?paintTexturePayload():[],music:typeof blipBasicMusicPayload==='function'?blipBasicMusicPayload():[]},location.origin);}
 function focusBasicWasmCanvas(){try{wasmFrame.contentWindow.focus();wasmFrame.contentDocument.getElementById('glcanvas').focus();}catch(e){}}
 function runBlipInWasm(){
   basicWasmRunId++;
   basicWasmSource=Array.from(lines.keys()).sort(function(a,b){return a-b;}).map(function(n){return n+' '+lines.get(n);}).join('\n')+'\nREM RUN '+basicWasmRunId;
   basicWasmPlaying=true;document.body.setAttribute('data-wasm-playing','');if(/\/RALLY\.BLIP$/i.test(currentFile||''))document.body.setAttribute('data-rally','');else document.body.removeAttribute('data-rally');updatePlayClearance();document.body.removeAttribute('data-wasm-error');document.body.removeAttribute('data-wasm-running');output.textContent='';clear();wasmFrame.hidden=false;
-  if(!wasmFrame.hasAttribute('src')){wasmFrame.addEventListener('load',function loaded(){wasmFrame.removeEventListener('load',loaded);basicWasmReady=true;postBasicWasmSource();focusBasicWasmCanvas();},{once:true});wasmFrame.src='basic-runtime.html?v=9';}
+  if(!wasmFrame.hasAttribute('src')){wasmFrame.addEventListener('load',function loaded(){wasmFrame.removeEventListener('load',loaded);basicWasmReady=true;postBasicWasmSource();focusBasicWasmCanvas();},{once:true});wasmFrame.src='basic-runtime.html?v=13';}
   else {postBasicWasmSource();focusBasicWasmCanvas();}
 }
 var blipPrimitiveNames='clear fill_rect draw_rect draw_line draw_line_ex draw_glow_line fill_circle fill_capsule fill_sunburst fill_glow_circle draw_texture draw_texture_region draw_texture_cell draw_texture_tinted draw_char draw_text draw_text_outlined draw_centered_outlined draw_number draw_centered draw_hud'.split(' ');
@@ -742,6 +823,9 @@ window.addEventListener('message', function (event) {
   if(event.data.type==='blip-basic-wasm-ready'){basicWasmReady=true;postBasicWasmSource();focusBasicWasmCanvas();}
   if(event.data.type==='blip-basic-program-loaded'){document.body.setAttribute('data-wasm-running','');focusBasicWasmCanvas();}
   if(event.data.type==='blip-basic-runtime-error')document.body.setAttribute('data-wasm-error',event.data.message||'error');
+  if(event.data.type==='blip-basic-rom-asset'&&pendingGameCopy){var sourcePath=String(event.data.path||'').toUpperCase(),game=tapeForPath(currentFile),destinationPath=game?sourcePath.replace(/^\/TAPE\/GFX\/[^/]+\//,'/USER/'+game.command+'/GFX/'):'';if(destinationPath.indexOf('/USER/')===0)pendingGameCopy.assets[destinationPath]=pngDataUrl(event.data.bytes);}
+  if(event.data.type==='blip-basic-rom-assets-done')finishGameCopy();
+  if(event.data.type==='blip-basic-escape')escapeFromBasicGame();
   if(event.data.type==='blip-basic-stop')stopBouncerWasm();
 });
 exitGameButton.addEventListener('click', exitActiveProgram);
@@ -856,6 +940,8 @@ function submit(raw) {
   if(numbered){var number=Number(numbered[1]);if(numbered[2])lines.set(number,numbered[2]);else lines.delete(number);storeDraft();return;}
   try {
     var m;
+    if((m=/^PAINT(?:\s+(.+))?$/i.exec(s))){if(typeof startPaint!=='function')throw Error('PAINT is unavailable');if(run||basicWasmPlaying)exitActiveProgram();startPaint(m[1]?pathArgument(m[1]):null);return;}
+    if((m=/^TUNE(?:\s+(.+))?$/i.exec(s))){if(m[1])throw Error('TUNE TAKES NO FILE; USE IMPORT XM');if(typeof startTune!=='function')throw Error('TUNE is unavailable');if(run||basicWasmPlaying)exitActiveProgram();startTune();return;}
     if(s.toUpperCase()==='RUN'){
       if(!lines.size)throw Error('No program');
       if(programUsesBlipPrimitives()){runBlipInWasm();return;}
@@ -866,60 +952,24 @@ function submit(raw) {
     if((m=/^EDIT\s+(.+)$/i.exec(s))){openEditor(pathArgument(m[1]));return;}
     if(s.toUpperCase()==='NEW'){run=null;document.body.removeAttribute('data-basic-running');lines.clear();vars=Object.create(null);arrays=Object.create(null);currentFile=null;storeDraft();clear();ready();return;}
     if(s.toUpperCase()==='HELP'){
+      clear();
       print('BLIP BASIC · HELP');
-      print('');
       print('FILESYSTEM');
-      print('LOAD FILE     LOAD A .BLIP PROGRAM FROM /TAPE OR /USER');
+      print('LOAD FILE     LOAD A .BLIP PROGRAM FROM /ROM, /TAPE OR /USER');
       print('SAVE [NAME]   SAVE THE PROGRAM IN /USER');
       print('DIR [PATH]    LIST FILES');
-      print('CD [PATH]     CHANGE FOLDER: /TAPE OR /USER');
-      print('MKDIR NAME    CREATE A FOLDER');
+      print('CD [PATH]     CHANGE FOLDER');
+      print('MKDIR NAME    CREATE A FOLDER IN /USER');
       print('DEL FILE      DELETE A FILE IN /USER');
+      print('MOVE FROM TO  MOVE A FILE IN /USER');
       print('EDIT FILE     EDIT A /USER FILE; CHANGES AUTO-SAVE; ESC CLOSES');
-      print('');
+      print('PAINT [FILE]  OPEN THE PIXEL ART EDITOR');
+      print('TUNE          OPEN THE MUSIC EDITOR');
+      print('TAB           ACCEPT THE DIMMED EDITOR SUGGESTION');
       print('NAMES ARE UPPERCASE');
+      print('/ROM IS READ-ONLY SYSTEM EXAMPLES');
       print('/TAPE IS READ-ONLY');
       print('/USER PERSISTS IN THIS BROWSER');
-      print('');
-      print('BLIP PRIMITIVES');
-      print('COLOURS');
-      print('BLIP_BLACK/WHITE/RED/GREEN/BLUE/CYAN');
-      print('BLIP_MAGENTA/YELLOW/ORANGE/GRAY/DARKGRAY');
-      print('NEON_CYAN/MAGENTA/PINK/PURPLE/GREEN/ORANGE/YELLOW');
-      print('COLOR(R,G,B[,A])  MAKE A COLOUR');
-      print('HEX COLOURS: #RRGGBB OR #RRGGBBAA');
-      print('');
-      print('SHAPES');
-      print('CLEAR(C)  CLEAR THE SCREEN');
-      print('FILL_RECT(X,Y,W,H,C)  FILLED BOX');
-      print('DRAW_RECT(X,Y,W,H,C)  BOX OUTLINE');
-      print('DRAW_LINE(X1,Y1,X2,Y2,C)  LINE');
-      print('DRAW_LINE_EX(X1,Y1,X2,Y2,WIDTH,C)  THICK LINE');
-      print('DRAW_GLOW_LINE(X1,Y1,X2,Y2,C)  GLOWING LINE');
-      print('CIRCLE(X,Y,R)  CIRCLE OUTLINE');
-      print('FILL_CIRCLE(X,Y,R,C)  FILLED CIRCLE');
-      print('FILL_GLOW_CIRCLE(X,Y,R,C)  GLOWING CIRCLE');
-      print('FILL_CAPSULE(X1,Y1,X2,Y2,R1,R2,C)');
-      print('FILL_SUNBURST(X,Y,RAYS,TURN,REACH,C1,C2)');
-      print('SUNBURST TURN IS IN RADIANS');
-      print('');
-      print('TEXT');
-      print('DRAW_TEXT(TEXT,X,Y,SIZE,C[,ALIGN[,OUTLINE]])');
-      print('ALIGN IS LEFT OR CENTER; OUTLINE IS OPTIONAL');
-      print('DRAW_CHAR(TEXT,X,Y,SIZE,C)  DRAW ONE CHARACTER');
-      print('DRAW_NUMBER(N,X,Y,SIZE,C)  DRAW AN INTEGER');
-      print('DRAW_HUD(SCORE,LIVES)  DRAW SCORE AND LIVES');
-      print('TEXT_CX(TEXT,SIZE)  MEASURE CENTRED TEXT');
-      print('');
-      print('TEXTURES');
-      print('DRAW_TEXTURE(FILE,X,Y,W,H[,TINT])');
-      print('DRAW_TEXTURE(FILE,X,Y,W,H,SX,SY,SW,SH)  CROP');
-      print('DRAW_TEXTURE(FILE,X,Y,W,H,COL,COLS,ROW,ROWS,ANGLE)');
-      print('LAST FORM DRAWS A ROTATED SPRITE-SHEET CELL');
-      print('');
-      print('INPUT');
-      print('KEY_ACTIVE(KEY), KEY_HELD(KEY), KEY_PRESSED(KEY)');
-      print('KEYS: ARROWS, SPACE, A/D/W/S, F/G/I/J/K, BUTTON2');
       ready();return;
     }
     if(s.toUpperCase()==='STOP'){run=null;pendingInput=null;document.body.removeAttribute('data-basic-running');ready();return;}
@@ -927,7 +977,8 @@ function submit(raw) {
     if((m=/^CD(?:\s+(.+))?$/i.exec(s))){var dest=canonicalDirectory(m[1]?resolvePath(pathArgument(m[1])):'/USER');if(!isDirectory(dest))throw Error('Directory not found: '+dest);currentDir=dest;print(currentDir);ready();return;}
     if((m=/^MKDIR\s+(.+)$/i.exec(s))){makeDirectory(pathArgument(m[1]));ready();return;}
     if((m=/^SAVE(?:\s+(.+))?$/i.exec(s))){saveProgram(m[1]?pathArgument(m[1]):null);ready();return;}
-    if((m=/^DEL\s+(.+)$/i.exec(s))){deleteProgram(pathArgument(m[1]));ready();return;}
+    if((m=/^DEL(?:\s+(.+))?$/i.exec(s))){deleteUserFile(m[1]?pathArgument(m[1]):null);ready();return;}
+    if((m=/^MOVE\s+("(?:[^"]|"")*"|\S+)\s+("(?:[^"]|"")*"|\S+)$/i.exec(s))){moveUserFile(pathArgument(m[1]),pathArgument(m[2]));ready();return;}
     if((m=/^LOAD\s+(.+)$/i.exec(s))){return loadProgram(pathArgument(m[1])).then(function(){ready();return true;}).catch(function(error){fail(error.message);return false;});}
     splitStatements(s).forEach(statement);ready();
   }catch(e){fail(e.message);}
@@ -983,7 +1034,7 @@ function virtualKey(label){
   }
   if(label==='ALT'){insertAtCaret('@');return;}
   if(basicWasmPlaying){
-    if(label==='ESC'){exitActiveProgram();return;}
+    if(label==='ESC'){escapeFromBasicGame();return;}
     var wasmKeys={'SPACE':[' ','Space'],'←':['ArrowLeft','ArrowLeft'],'→':['ArrowRight','ArrowRight'],'↑':['ArrowUp','ArrowUp'],'↓':['ArrowDown','ArrowDown']};
     if(wasmKeys[label]){sendBasicWasmKey(wasmKeys[label][0],wasmKeys[label][1],true);setTimeout(function(){sendBasicWasmKey(wasmKeys[label][0],wasmKeys[label][1],false);},35);return;}
   }
@@ -1040,7 +1091,7 @@ keyboard.addEventListener('click',function(event){
   if(key)virtualKey(key.dataset.keyLabel);
 });
 keyboard.addEventListener('pointerdown',function(event){if(event.target.closest('[data-key-label]'))event.preventDefault();});
-window.addEventListener('keydown',function(e){if(basicWasmPlaying){if(e.key==='Escape'){e.preventDefault();exitActiveProgram();return;}sendBasicWasmKey(e.key,e.code,true);e.preventDefault();return;}if(e.target===input){if(run&&e.key==='Escape'){e.preventDefault();stopProgram();}return;}heldKeys[e.key]=true;if(!e.repeat)pressedKeys[e.key]=true;lastKey=e.key.length===1?e.key.toUpperCase():e.key==='ArrowLeft'?'A':e.key==='ArrowRight'?'D':e.key==='ArrowUp'?'W':e.key==='ArrowDown'?'S':'';if(run&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();if(run&&e.key==='Escape'){e.preventDefault();stopProgram();}},true);
+window.addEventListener('keydown',function(e){if(basicWasmPlaying){if(e.key==='Escape'){e.preventDefault();escapeFromBasicGame();return;}sendBasicWasmKey(e.key,e.code,true);e.preventDefault();return;}if(e.target===input){if(run&&e.key==='Escape'){e.preventDefault();stopProgram();}return;}heldKeys[e.key]=true;if(!e.repeat)pressedKeys[e.key]=true;lastKey=e.key.length===1?e.key.toUpperCase():e.key==='ArrowLeft'?'A':e.key==='ArrowRight'?'D':e.key==='ArrowUp'?'W':e.key==='ArrowDown'?'S':'';if(run&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();if(run&&e.key==='Escape'){e.preventDefault();stopProgram();}},true);
 window.addEventListener('keyup',function(e){if(basicWasmPlaying){sendBasicWasmKey(e.key,e.code,false);return;}delete heldKeys[e.key];},true);
 window.addEventListener('blur',function(){heldKeys=Object.create(null);pressedKeys=Object.create(null);});
 document.querySelectorAll('[data-command]').forEach(function(button){button.addEventListener('click',function(){submit(button.dataset.command);if(button.dataset.command!=='RUN')input.focus();});});
@@ -1048,7 +1099,7 @@ document.getElementById('basic-screen').addEventListener('click',function(){inpu
 restoreDraft();clear();print('BLIP 64K COLOUR PERSONAL COMPUTER');print('BLIP BASIC 1.0');print('');if(lines.size)print(lines.size+' program lines recovered.');ready();
 if(!blipHasTouch())input.focus();
 requestAnimationFrame(tick);
-window.BlipBasic={submit:submit,lines:lines,output:output};
+window.BlipBasic={submit:submit,lines:lines,output:output,filesystem:filesystem,resolvePath:resolvePath,isDirectory:isDirectory,writeFilesystem:writeFilesystem,refreshTextures:postBasicWasmSource};
 }());
 
 // The book in the corner is picked up: it straightens and comes to where basic-book.html lays it, closed.

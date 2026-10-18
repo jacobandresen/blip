@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-basic-runtime>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -8,15 +8,35 @@
 <body>
   <canvas id="glcanvas" tabindex="0"></canvas>
   <script src="mq_js_bundle.js?v=2"></script>
-  <script src="blip_bridge.js?v=18"></script>
+  <script src="blip_bridge.js?v=19"></script>
   <script>
     'use strict';
     window.blipBasicSource = '';
+    window.blipBasicTextures = [];
+    window.blipBasicMusic = [];
     window.blipBasicSoundEvents = 0;
     window.blipBasicSoundTimes = [];
+    window.blipBasicExportRequested = false;
+    window.blipBasicExportGame = 0;
     var encoder = new TextEncoder();
     var decoder = new TextDecoder();
     var audioContext;
+    function textureEntry(index) { return window.blipBasicTextures[index] || {}; }
+    function textureBytes(index) {
+      var item=textureEntry(index);
+      if(item.bytes)return item.bytes;
+      var encoded=String(item.data||'').split(',')[1]||'',binary=atob(encoded),bytes=new Uint8Array(binary.length);
+      for(var i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+      item.bytes=bytes;return bytes;
+    }
+    function musicEntry(index) { return window.blipBasicMusic[index] || {}; }
+    function musicBytes(index) {
+      var item=musicEntry(index);
+      if(item.bytes)return item.bytes;
+      var encoded=String(item.data||'').split(',')[1]||'',binary=atob(encoded),bytes=new Uint8Array(binary.length);
+      for(var i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+      item.bytes=bytes;return bytes;
+    }
     function playBasicTone(frequency, seconds, volume) {
       window.blipBasicSoundEvents++;
       window.blipBasicSoundTimes.push(performance.now());
@@ -42,16 +62,31 @@
       imports.env.blip_basic_runtime_error=function(ptr,len){var message=decoder.decode(new Uint8Array(window.wasm_memory.buffer,ptr,len));window.parent.postMessage({type:'blip-basic-runtime-error',message:message},location.origin);};
       imports.env.blip_basic_sound=playBasicTone;
       imports.env.blip_basic_audio_event=function(){window.blipBasicSoundEvents++;};
+      imports.env.blip_basic_texture_count=function(){return window.blipBasicTextures.length;};
+      imports.env.blip_basic_texture_name_len=function(index){return encoder.encode(String(textureEntry(index).path||'')).length;};
+      imports.env.blip_basic_texture_name_copy=function(index,ptr,capacity){var bytes=encoder.encode(String(textureEntry(index).path||'')),size=Math.min(bytes.length,capacity),memory=window.wasm_memory;if(!memory)return 0;new Uint8Array(memory.buffer,ptr,size).set(bytes.subarray(0,size));return size;};
+      imports.env.blip_basic_texture_png_len=function(index){return textureBytes(index).length;};
+      imports.env.blip_basic_texture_png_copy=function(index,ptr,capacity){var bytes=textureBytes(index),size=Math.min(bytes.length,capacity),memory=window.wasm_memory;if(!memory)return 0;new Uint8Array(memory.buffer,ptr,size).set(bytes.subarray(0,size));return size;};
+      imports.env.blip_basic_export_requested=function(){var requested=window.blipBasicExportRequested;window.blipBasicExportRequested=false;return requested?1:0;};
+      imports.env.blip_basic_export_game=function(){return window.blipBasicExportGame;};
+      imports.env.blip_basic_export_rom_asset=function(pathPtr,pathLen,pngPtr,pngLen){var memory=window.wasm_memory;if(!memory)return;var path=decoder.decode(new Uint8Array(memory.buffer,pathPtr,pathLen)),bytes=new Uint8Array(memory.buffer,pngPtr,pngLen).slice();window.parent.postMessage({type:'blip-basic-rom-asset',path:path,bytes:bytes.buffer},location.origin,[bytes.buffer]);};
+      imports.env.blip_basic_export_done=function(){window.parent.postMessage({type:'blip-basic-rom-assets-done'},location.origin);};
+      imports.env.blip_basic_music_count=function(){return window.blipBasicMusic.length;};
+      imports.env.blip_basic_music_name_len=function(index){return encoder.encode(String(musicEntry(index).path||'')).length;};
+      imports.env.blip_basic_music_name_copy=function(index,ptr,capacity){var bytes=encoder.encode(String(musicEntry(index).path||'')),size=Math.min(bytes.length,capacity),memory=window.wasm_memory;if(!memory)return 0;new Uint8Array(memory.buffer,ptr,size).set(bytes.subarray(0,size));return size;};
+      imports.env.blip_basic_music_wav_len=function(index){return musicBytes(index).length;};
+      imports.env.blip_basic_music_wav_copy=function(index,ptr,capacity){var bytes=musicBytes(index),size=Math.min(bytes.length,capacity),memory=window.wasm_memory;if(!memory)return 0;new Uint8Array(memory.buffer,ptr,size).set(bytes.subarray(0,size));return size;};
     }});
     window.addEventListener('message',function(event){
       if(event.origin!==location.origin||!event.data)return;
-      if(event.data.type==='blip-basic-source')window.blipBasicSource=String(event.data.source||'');
+      if(event.data.type==='blip-basic-source'){window.blipBasicSource=String(event.data.source||'');window.blipBasicTextures=Array.isArray(event.data.textures)?event.data.textures:[];window.blipBasicMusic=Array.isArray(event.data.music)?event.data.music:[];}
+      if(event.data.type==='blip-basic-export-rom-assets'){window.blipBasicExportGame=Number(event.data.game)||0;window.blipBasicExportRequested=true;}
       if(event.data.type==='blip-basic-key'){
         var canvas=document.getElementById('glcanvas'),type=event.data.down?'keydown':'keyup';
         canvas.dispatchEvent(new KeyboardEvent(type,{key:event.data.key,code:event.data.code,bubbles:true,cancelable:true}));
       }
     });
-    window.addEventListener('keydown',function(event){if(event.key==='Escape'){event.preventDefault();window.parent.postMessage({type:'blip-basic-stop'},location.origin);}});
+    window.addEventListener('keydown',function(event){if(event.key==='Escape'){event.preventDefault();window.parent.postMessage({type:'blip-basic-escape'},location.origin);}});
     load('basic-runtime.wasm');
   </script>
 </body>

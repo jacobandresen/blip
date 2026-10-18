@@ -1,4 +1,4 @@
-var CACHE = "blip-v631";
+var CACHE = "blip-v653";
 
 var ASSETS = [
   "/blip/",
@@ -17,7 +17,14 @@ var ASSETS = [
   "/blip/basic-runtime.html",
   "/blip/basic-runtime.wasm",
   "/blip/basic.css",
+  "/blip/paint.css",
+  "/blip/tune.css",
   "/blip/basic.js",
+  "/blip/paint.js",
+  "/blip/tune.js",
+  "/blip/ROM/TUNES/manifest.json",
+  "/blip/ROM/TUNES/BLUE_INTERMISSION.XM",
+  "/blip/ROM/TUNES/ATTRIBUTION.txt",
   "/blip/TAPE/BOUNCER.BLIP",
   "/blip/TAPE/BRAWLER.BLIP",
   "/blip/TAPE/BUBBLER.BLIP",
