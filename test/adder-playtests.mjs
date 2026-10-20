@@ -89,9 +89,9 @@ test('Adder BASIC yields across long trail frames instead of stopping at the fra
   const source = await page.evaluate(async () => {
     const response = await fetch('/TAPE/ADDER.BLIP');
     const original = await response.text();
-    return original.replace('GAME_STATE=1:SCORE=0:LIVES=3:ROUND=1:LENGTH=4:', 'GAME_STATE=1:SCORE=0:LIVES=3:ROUND=1:LENGTH=320:');
+    return original.replace('FOR INITIAL=1 TO 17', 'FOR INITIAL=1 TO 320');
   });
-  assert.ok(source.includes('GAME_STATE=1:SCORE=0:LIVES=3:ROUND=1:LENGTH=320:'), 'the stress fixture starts with a long trail');
+  assert.ok(source.includes('FOR INITIAL=1 TO 320'), 'the stress fixture starts with a long trail');
   await page.evaluate((text) => {
     BlipBasic.filesystem.files['/USER/ADDER.BLIP'] = text.toUpperCase();
     BlipBasic.writeFilesystem();

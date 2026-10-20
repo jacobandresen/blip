@@ -150,6 +150,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     // J joins player two and lights the kiosk's second station.
     if key_pressed(seat_keys(1)[2]) && g.world.join_human(1) {
         g.humans = 2;
+        web::spend_coin();
         web::set_mode(true);
     }
 
@@ -195,6 +196,8 @@ const GAME_OVER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/so
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
+    // Leave station two available for a mid-game join from the title screen.
+    web::set_players(2);
     let pit = blip::load_png(include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/pit.png")));
 
     let sfx = Sounds {
@@ -233,6 +236,17 @@ async fn main() {
         }
 
         blip.next_frame(60).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_seat_has_distinct_join_and_turn_keys() {
+        assert_eq!(seat_keys(0), [BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_SPACE]);
+        assert_eq!(seat_keys(1), [BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_J]);
     }
 }
 

@@ -335,6 +335,25 @@ fn spawn_bullet(bullets: &mut [Bullet; MAX_BULLETS], x: f32, y: f32, vx: f32, vy
     pool_spawn(bullets, Bullet { active: true, x, y, vx, vy, ttl: BULLET_TTL, from_player });
 }
 
+fn wrapped_segment_circle_overlap(
+    from: (f32, f32),
+    to: (f32, f32),
+    centre: (f32, f32),
+    radius: f32,
+) -> bool {
+    for dx in [-PLAY_W as f32, 0.0, PLAY_W as f32] {
+        for dy in [-PLAY_H as f32, 0.0, PLAY_H as f32] {
+            if segment_circle_overlap(
+                from.0, from.1, to.0, to.1,
+                centre.0 + dx, centre.1 + dy, radius,
+            ) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// Saucers spawn more often, shoot more often, and skew toward the harder
 /// "small" variant as the level climbs, so late levels keep escalating even
 /// after the asteroid count itself caps out.
@@ -498,6 +517,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
 fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.fx.update(dt);
     g.wave_t += dt;
+    let bullet_starts: [(f32, f32); MAX_BULLETS] = std::array::from_fn(|i| {
+        (g.bullets[i].x, g.bullets[i].y)
+    });
     for b in pool_iter_mut(&mut g.bullets) {
         b.x += b.vx * dt;
         b.y += b.vy * dt;
@@ -558,12 +580,12 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     // ---- collisions: player bullets vs asteroids ----
     for bi in 0..MAX_BULLETS {
         if !g.bullets[bi].active || !g.bullets[bi].from_player { continue; }
-        let (bx, by) = (g.bullets[bi].x, g.bullets[bi].y);
-        let (px, py) = (bx - g.bullets[bi].vx * dt, by - g.bullets[bi].vy * dt);
+        let from = bullet_starts[bi];
+        let to = (from.0 + g.bullets[bi].vx * dt, from.1 + g.bullets[bi].vy * dt);
         for ai in 0..MAX_ASTEROIDS {
             if !g.asteroids[ai].active { continue; }
             let r = g.asteroids[ai].size.radius();
-            if segment_circle_overlap(px, py, bx, by, g.asteroids[ai].x, g.asteroids[ai].y, r) {
+            if wrapped_segment_circle_overlap(from, to, (g.asteroids[ai].x, g.asteroids[ai].y), r) {
                 g.bullets[bi].active = false;
                 let a = g.asteroids[ai];
                 let size = a.size;
@@ -588,10 +610,10 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.saucer.active {
         for bi in 0..MAX_BULLETS {
             if !g.bullets[bi].active || !g.bullets[bi].from_player { continue; }
-            let (bx, by) = (g.bullets[bi].x, g.bullets[bi].y);
-            let (px, py) = (bx - g.bullets[bi].vx * dt, by - g.bullets[bi].vy * dt);
+            let from = bullet_starts[bi];
+            let to = (from.0 + g.bullets[bi].vx * dt, from.1 + g.bullets[bi].vy * dt);
             let r = if g.saucer.big { 16.0 } else { 9.0 };
-            if segment_circle_overlap(px, py, bx, by, g.saucer.x, g.saucer.y, r) {
+            if wrapped_segment_circle_overlap(from, to, (g.saucer.x, g.saucer.y), r) {
                 g.bullets[bi].active = false;
                 g.saucer.active = false;
                 let (sx, sy, svx) = (g.saucer.x, g.saucer.y, g.saucer.vx);
@@ -1069,5 +1091,36 @@ async fn main() {
         }
 
         blip.next_frame(60).await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_wrapping_shot_hits_rocks_on_both_sides_of_the_seam() {
+        assert!(wrapped_segment_circle_overlap(
+            (PLAY_W as f32 - 3.0, 200.0),
+            (PLAY_W as f32 + 5.0, 200.0),
+            (2.0, 200.0),
+            4.0,
+        ));
+        assert!(wrapped_segment_circle_overlap(
+            (300.0, PLAY_Y0 + 3.0),
+            (300.0, PLAY_Y0 - 5.0),
+            (300.0, PLAY_Y0 + PLAY_H as f32 - 2.0),
+            4.0,
+        ));
+    }
+
+    #[test]
+    fn a_wrapping_shot_does_not_hit_through_the_middle_of_the_screen() {
+        assert!(!wrapped_segment_circle_overlap(
+            (PLAY_W as f32 - 3.0, 200.0),
+            (PLAY_W as f32 + 5.0, 200.0),
+            (PLAY_W as f32 / 2.0, 200.0),
+            4.0,
+        ));
     }
 }

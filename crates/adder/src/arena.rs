@@ -774,6 +774,22 @@ mod tests {
     }
 
     #[test]
+    fn two_humans_steer_their_own_vipers() {
+        let mut w = World::new(2);
+        let before = [w.snakes[0].heading, w.snakes[1].heading];
+        let mut steers = [Steer::default(); SEATS];
+        steers[0].turn = -1.0;
+        steers[1].turn = 1.0;
+
+        w.step(0.1, &steers);
+
+        assert!((w.snakes[0].heading - (before[0] - TURN * 0.1)).abs() < 1e-5);
+        assert!((w.snakes[1].heading - (before[1] + TURN * 0.1)).abs() < 1e-5);
+        assert!(w.snakes[0].human && w.snakes[1].human);
+        assert!(!w.snakes[2].human);
+    }
+
+    #[test]
     fn a_brain_avoids_a_dead_body_in_front_of_it() {
         let mut w = bare();
         w.snakes
