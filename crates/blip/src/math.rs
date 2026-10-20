@@ -5,7 +5,13 @@ use macroquad::rand;
 /// Clamp `v` so it stays within `[lo, hi]`.
 #[inline]
 pub fn clamp(v: f32, lo: f32, hi: f32) -> f32 {
-    if v < lo { lo } else if v > hi { hi } else { v }
+    if v < lo {
+        lo
+    } else if v > hi {
+        hi
+    } else {
+        v
+    }
 }
 
 /// Linear interpolation between `a` and `b`. `t=0` returns `a`, `t=1` returns `b`.
@@ -14,12 +20,69 @@ pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
 }
 
+/// Euclidean distance between two points, without squaring large coordinates.
+#[inline]
+pub fn distance(x0: f32, y0: f32, x1: f32, y1: f32) -> f32 {
+    (x1 - x0).hypot(y1 - y0)
+}
+
+/// Order each roster entry once, separating adjacent home groups and keeping
+/// the requested finalists at the end. Fall back to the roster ring if needed.
+pub fn ordered_ladder(pick: usize, homes: &[usize], finalists: &[usize]) -> Vec<usize> {
+    fn place(ring: &[usize], homes: &[usize], finals: &[usize], out: &mut Vec<usize>) -> bool {
+        if out.len() == ring.len() {
+            return true;
+        }
+        let early = ring.len() - finals.len();
+        for &who in ring {
+            let fits = if out.len() < early {
+                !finals.contains(&who)
+            } else {
+                finals[out.len() - early] == who
+            };
+            if !fits || out.contains(&who) {
+                continue;
+            }
+            if out.last().is_some_and(|&prev| homes[prev] == homes[who]) {
+                continue;
+            }
+            out.push(who);
+            if place(ring, homes, finals, out) {
+                return true;
+            }
+            out.pop();
+        }
+        false
+    }
+
+    if homes.is_empty() {
+        return Vec::new();
+    }
+    let pick = pick % homes.len();
+    let ring = (1..homes.len())
+        .map(|step| (pick + step) % homes.len())
+        .collect::<Vec<_>>();
+    let finals = finalists
+        .iter()
+        .copied()
+        .filter(|who| ring.contains(who))
+        .collect::<Vec<_>>();
+    let mut ladder = Vec::with_capacity(ring.len());
+    if place(&ring, homes, &finals, &mut ladder) {
+        ladder
+    } else {
+        ring
+    }
+}
+
 /// Wrap `v` into `[lo, hi)`, including values multiple spans away.
 /// Returns `lo` when `hi <= lo`.
 #[inline]
 pub fn wrap(v: f32, lo: f32, hi: f32) -> f32 {
     let span = hi - lo;
-    if span <= 0.0 { return lo; }
+    if span <= 0.0 {
+        return lo;
+    }
     (v - lo).rem_euclid(span) + lo
 }
 
@@ -28,15 +91,16 @@ pub fn wrap(v: f32, lo: f32, hi: f32) -> f32 {
 /// Returns `lo` when `hi <= lo`.
 #[inline]
 pub fn rand_range_f32(lo: f32, hi: f32) -> f32 {
-    if hi <= lo { return lo; }
+    if hi <= lo {
+        return lo;
+    }
     rand::gen_range(lo, hi)
 }
 
 /// Shortest signed angle from `from` to `to`, in `[-π, π)`.
 #[inline]
 pub fn angle_diff(from: f32, to: f32) -> f32 {
-    (to - from + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU)
-        - std::f32::consts::PI
+    (to - from + std::f32::consts::PI).rem_euclid(std::f32::consts::TAU) - std::f32::consts::PI
 }
 
 /// Cubic ease-out for normalized input; clamps `t` to `[0, 1]`.
@@ -72,8 +136,14 @@ pub fn rand_int(lo: i32, hi: i32) -> i32 {
 /// Both rectangles are specified as (x, y, width, height) with origin at top-left.
 #[inline]
 pub fn rects_overlap(
-    x1: f32, y1: f32, w1: f32, h1: f32,
-    x2: f32, y2: f32, w2: f32, h2: f32,
+    x1: f32,
+    y1: f32,
+    w1: f32,
+    h1: f32,
+    x2: f32,
+    y2: f32,
+    w2: f32,
+    h2: f32,
 ) -> bool {
     x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2
 }
@@ -81,13 +151,21 @@ pub fn rects_overlap(
 /// Whether the segment from `(x0, y0)` to `(x1, y1)` touches a circle.
 #[inline]
 pub fn segment_circle_overlap(
-    x0: f32, y0: f32, x1: f32, y1: f32, cx: f32, cy: f32, radius: f32,
+    x0: f32,
+    y0: f32,
+    x1: f32,
+    y1: f32,
+    cx: f32,
+    cy: f32,
+    radius: f32,
 ) -> bool {
     let (dx, dy) = (x1 - x0, y1 - y0);
     let len2 = dx * dx + dy * dy;
     let t = if len2 > f32::EPSILON {
         (((cx - x0) * dx + (cy - y0) * dy) / len2).clamp(0.0, 1.0)
-    } else { 0.0 };
+    } else {
+        0.0
+    };
     let (ex, ey) = (cx - (x0 + t * dx), cy - (y0 + t * dy));
     ex * ex + ey * ey <= radius * radius
 }
@@ -95,19 +173,30 @@ pub fn segment_circle_overlap(
 /// Whether a moving point segment touches an axis-aligned rectangle.
 #[inline]
 pub fn segment_rect_overlap(
-    x0: f32, y0: f32, x1: f32, y1: f32, rx: f32, ry: f32, rw: f32, rh: f32,
+    x0: f32,
+    y0: f32,
+    x1: f32,
+    y1: f32,
+    rx: f32,
+    ry: f32,
+    rw: f32,
+    rh: f32,
 ) -> bool {
     let (dx, dy) = (x1 - x0, y1 - y0);
     let (mut enter, mut leave) = (0.0_f32, 1.0_f32);
     for (p, d, lo, hi) in [(x0, dx, rx, rx + rw), (y0, dy, ry, ry + rh)] {
         if d.abs() <= f32::EPSILON {
-            if p < lo || p > hi { return false; }
+            if p < lo || p > hi {
+                return false;
+            }
         } else {
             let a = (lo - p) / d;
             let b = (hi - p) / d;
             enter = enter.max(a.min(b));
             leave = leave.min(a.max(b));
-            if enter > leave { return false; }
+            if enter > leave {
+                return false;
+            }
         }
     }
     true
@@ -126,8 +215,49 @@ pub fn scatter(k: usize, salt: u32) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{angle_diff, ease_out_cubic, rand_range_f32, rand_seed, scatter,
-        segment_circle_overlap, segment_rect_overlap, smoothstep01, wrap};
+    use super::{
+        angle_diff, ease_out_cubic, ordered_ladder, rand_range_f32, rand_seed, scatter,
+        segment_circle_overlap, segment_rect_overlap, smoothstep01, wrap,
+    };
+
+    #[test]
+    fn roster_order_visits_each_other_entry_and_keeps_finalists_last() {
+        let homes = [1, 0, 2, 3, 3, 3, 3, 6, 4, 5];
+        let finalists = [8, 9];
+        for pick in 0..homes.len() {
+            let order = ordered_ladder(pick, &homes, &finalists);
+            let expected = (1..homes.len())
+                .map(|step| (pick + step) % homes.len())
+                .collect::<Vec<_>>();
+            assert_eq!(order.len(), homes.len() - 1);
+            assert_eq!(
+                order
+                    .iter()
+                    .copied()
+                    .collect::<std::collections::HashSet<_>>()
+                    .len(),
+                order.len()
+            );
+            assert!(!order.contains(&pick));
+            assert!(order
+                .windows(2)
+                .all(|pair| homes[pair[0]] != homes[pair[1]]));
+            let ends = finalists
+                .iter()
+                .copied()
+                .filter(|who| expected.contains(who))
+                .collect::<Vec<_>>();
+            assert_eq!(&order[order.len() - ends.len()..], &ends);
+        }
+        assert!(ordered_ladder(0, &[], &finalists).is_empty());
+    }
+
+    #[test]
+    fn point_distance_handles_coincident_negative_and_large_coordinates() {
+        assert_eq!(super::distance(2.0, -3.0, 2.0, -3.0), 0.0);
+        assert_eq!(super::distance(-2.0, -3.0, 1.0, 1.0), 5.0);
+        assert_eq!(super::distance(0.0, 0.0, 3e20, 4e20), 5e20);
+    }
 
     #[test]
     fn angle_and_easing_helpers_cover_wraps_and_endpoints() {
@@ -149,8 +279,12 @@ mod tests {
         assert!(segment_circle_overlap(0.0, 0.0, 10.0, 0.0, 5.0, 1.0, 1.0));
         assert!(!segment_circle_overlap(0.0, 0.0, 10.0, 0.0, 5.0, 2.0, 1.0));
         assert!(segment_circle_overlap(5.0, 0.0, 5.0, 0.0, 5.0, 0.5, 1.0));
-        assert!(segment_rect_overlap(0.0, 5.0, 20.0, 5.0, 8.0, 2.0, 2.0, 6.0));
-        assert!(!segment_rect_overlap(0.0, 0.0, 5.0, 0.0, 8.0, 2.0, 2.0, 6.0));
+        assert!(segment_rect_overlap(
+            0.0, 5.0, 20.0, 5.0, 8.0, 2.0, 2.0, 6.0
+        ));
+        assert!(!segment_rect_overlap(
+            0.0, 0.0, 5.0, 0.0, 8.0, 2.0, 2.0, 6.0
+        ));
         assert!(segment_rect_overlap(9.0, 5.0, 9.0, 5.0, 8.0, 2.0, 2.0, 6.0));
     }
 

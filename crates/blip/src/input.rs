@@ -2,6 +2,44 @@
 //! Web touch controls feed these same key states through `shell.js`.
 
 use macroquad::input::{is_key_down, is_key_pressed, KeyCode};
+use std::collections::HashSet;
+
+/// Preserve press edges while a logical update is waiting or spans several frames.
+#[derive(Default)]
+pub struct PressBuffer {
+    pending: HashSet<KeyCode>,
+    current: HashSet<KeyCode>,
+}
+
+impl PressBuffer {
+    pub fn clear(&mut self) {
+        self.pending.clear();
+        self.current.clear();
+        crate::web::clear_buffered_keys();
+    }
+
+    pub fn capture(&mut self) {
+        self.pending.extend(macroquad::input::get_keys_pressed());
+        use KeyCode::*;
+        // Audio decoding yields inside macroquad and can clear its frame-local edges.
+        let keys = [Up, Down, Left, Right, Space, Enter, Escape,
+            A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z];
+        self.pending.extend(keys.into_iter().filter(|key| crate::web::buffered_key_pressed(*key)));
+        crate::web::clear_buffered_keys();
+    }
+
+    pub fn begin_step(&mut self) {
+        self.current = std::mem::take(&mut self.pending);
+    }
+
+    pub fn pressed(&self, key: KeyCode) -> bool {
+        self.current.contains(&key) || crate::bot::pressed(key)
+    }
+
+    pub fn active(&self, key: KeyCode) -> bool {
+        key_held(key) || self.pressed(key)
+    }
+}
 
 pub const BLIP_KEY_UP:      KeyCode = KeyCode::Up;
 pub const BLIP_KEY_DOWN:    KeyCode = KeyCode::Down;
@@ -45,4 +83,28 @@ pub fn key_pressed(key: KeyCode) -> bool {
 pub fn any_key_pressed() -> bool {
     use macroquad::input::get_last_key_pressed;
     get_last_key_pressed().is_some() || crate::bot::any_pressed()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn press_edges_wait_for_an_update_and_stay_stable_until_the_next_one() {
+        let mut input = PressBuffer::default();
+        input.pending.extend([KeyCode::Left, KeyCode::Space]);
+        assert!(!input.pressed(KeyCode::Left));
+        input.begin_step();
+        assert!(input.pressed(KeyCode::Left));
+        assert!(input.pressed(KeyCode::Space));
+        input.pending.insert(KeyCode::Right);
+        assert!(!input.pressed(KeyCode::Right));
+        assert!(input.pressed(KeyCode::Left));
+        input.begin_step();
+        assert!(!input.pressed(KeyCode::Left));
+        assert!(!input.pressed(KeyCode::Space));
+        assert!(input.pressed(KeyCode::Right));
+        input.begin_step();
+        assert!(!input.pressed(KeyCode::Right));
+    }
 }

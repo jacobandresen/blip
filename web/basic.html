@@ -9,7 +9,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <script src="blip_core.js?v=5"></script>
   <link rel="stylesheet" href="kiosk.css?v=493">
-  <link rel="stylesheet" href="basic.css?v=53">
+  <link rel="stylesheet" href="basic.css?v=56">
   <link rel="stylesheet" href="paint.css?v=4">
   <link rel="stylesheet" href="tune.css?v=1">
 </head>
@@ -79,7 +79,7 @@
             <div class="deck-hinge" aria-hidden="true"><i></i><i></i></div>
             <div class="deck-lid" id="cassette-lid" aria-hidden="true"><span>BLIP DATACORDER</span></div>
           </div>
-          <div class="tape-buttons" aria-label="Tape transport"><span data-key="rec"><b>●</b><small>REC</small></span><span data-key="play"><b>▶</b><small>PLAY</small></span><span data-key="rew"><b>◀◀</b><small>REW</small></span><span data-key="ff"><b>▶▶</b><small>F.FWD</small></span><span data-key="eject"><b>■ ⏏</b><small>STOP/EJECT</small></span></div>
+          <div class="tape-buttons" aria-label="Tape transport"><span data-key="rec"><b>●</b><small>REC</small></span><span data-key="play"><b>▶</b><small>PLAY</small></span><span data-key="rew"><b>◀◀</b><small>REW</small></span><span data-key="ff"><b>▶▶</b><small>F.FWD</small></span><button type="button" data-key="eject" aria-label="Stop and eject tape"><b>■ ⏏</b><small>STOP/EJECT</small></button></div>
         </div>
       </div>
       <div class="computer-edge"></div>
@@ -102,7 +102,9 @@
   </div>
   <script>document.documentElement.setAttribute('data-controls', 'stick');</script>
   <script src="deck.js?v=14"></script>
-  <script src="basic.js?v=84"></script>
+  <script src="basic-language.js?v=1"></script>
+  <script src="blip_controller.js?v=11"></script>
+  <script src="basic.js?v=90"></script>
   <script src="paint.js?v=3"></script>
   <script src="tune.js?v=6"></script>
 </body>

@@ -26,6 +26,7 @@
     ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right'
   };
   var held   = {};                // logical name -> bool
+  var injected = {};             // caps can share one physical key
   var roots  = [];                // containers holding [data-blip] elements, for visual reflect
 
   /* ------------------------------------------------------------------ */
@@ -69,6 +70,14 @@
 
   function injectKey(spec, type) {
     if (!cfg.canvas || !spec) return;
+    var count = injected[spec.code] || 0;
+    if (type === 'keydown') {
+      injected[spec.code] = count + 1;
+      if (count) return;
+    } else {
+      if (count > 1) { injected[spec.code] = count - 1; return; }
+      delete injected[spec.code];
+    }
     cfg.canvas.dispatchEvent(new KeyboardEvent(type, {
       bubbles: true, cancelable: true, key: spec.key, code: spec.code
     }));
@@ -354,6 +363,9 @@
         // such list, so honour its up directly.
         if (e.pointerType !== 'touch') grp.release();
       });
+      ['pointercancel', 'lostpointercapture'].forEach(function (type) {
+        el.addEventListener(type, function (e) { if (e.pointerType !== 'touch') grp.release(); });
+      });
       // pointercancel: deliberately not handled — see "Touch-list authority".
     })(els[i]);
   }
@@ -413,6 +425,11 @@
       pid = null;
       // touch: _syncTouches owns the (deferred) clear; mouse: clear now
       if (e.pointerType !== 'touch') clear();
+    });
+    ['pointercancel', 'lostpointercapture'].forEach(function (type) {
+      pad.addEventListener(type, function (e) {
+        if (e.pointerType !== 'touch' && e.pointerId === pid) { pid = null; clear(); }
+      });
     });
     // pointercancel: deliberately not handled — see "Touch-list authority".
   }
@@ -475,7 +492,7 @@
     });
     function end(e) {
       if (e.type !== 'pointercancel' && e.pointerId !== pid) return;
-      if (total < 0.08) {
+      if (e.type === 'pointerup' && total < 0.08) {
         if (opts2.onTap) opts2.onTap();
         if (opts2.tap) { click('menu'); emitKey(opts2.tap, 'keydown'); emitKey(opts2.tap, 'keyup'); }
       }
@@ -483,6 +500,7 @@
     }
     dialEl.addEventListener('pointerup', end);
     dialEl.addEventListener('pointercancel', end);
+    dialEl.addEventListener('lostpointercapture', function (e) { if (e.pointerId === pid) stop(); });
   }
 
   // Physical keyboard, reflection only: the key already reaches the game;

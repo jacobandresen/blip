@@ -16,22 +16,23 @@ pub mod timer;
 pub mod web;
 
 pub use audio::{
-    play_alert, play_ambient, play_music, play_music_volume, play_sfx, play_sfx_volume, stop_alert, stop_ambient, stop_music,
-    BlipSound, Jukebox,
+    play_alert, play_ambient, play_music, play_music_volume, play_sfx, play_sfx_volume, stop_alert,
+    stop_ambient, stop_music, BlipSound, Jukebox,
 };
 pub use color::{
-    blend, hsv, shade,
-    BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_DARKGRAY, BLIP_GRAY, BLIP_GREEN, BLIP_MAGENTA,
-    BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW, NEON_CYAN, NEON_GREEN, NEON_MAGENTA,
-    NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
+    blend, hsv, shade, BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_DARKGRAY, BLIP_GRAY, BLIP_GREEN,
+    BLIP_MAGENTA, BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW, NEON_CYAN, NEON_GREEN,
+    NEON_MAGENTA, NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
 };
 pub use ctx::{window_conf, Blip};
 pub use draw::{load_png, load_png_smooth};
 pub use fx::Fx;
 pub use fx::{EffectParticle, EffectParticles};
-pub use math::{angle_diff, clamp, ease_out_cubic, lerp, rand_int, rand_range_f32,
-    rects_overlap, rand_seed, scatter, segment_circle_overlap, segment_rect_overlap,
-    smoothstep01, wrap};
+pub use math::{
+    angle_diff, clamp, distance, ease_out_cubic, lerp, ordered_ladder, rand_int, rand_range_f32,
+    rand_seed, rects_overlap, scatter, segment_circle_overlap, segment_rect_overlap, smoothstep01,
+    wrap,
+};
 pub use pool::{pool_iter, pool_iter_mut, pool_spawn, Pooled};
 pub use session::{LifeResult, Session, GAME_OVER_MIN_WAIT};
 pub use timer::Timer;

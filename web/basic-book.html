@@ -123,7 +123,7 @@
               <div class="running-head">BLIP BASIC</div>
               <p class="eyebrow">CHAPTER SEVEN</p><h2>THE /TAPE/GFX DRAWER</h2>
               <p class="lead">The tapes carry the games’ pictures too, a folder for each game, ready to draw.</p>
-              <pre class="listing"><code>DIR /TAPE/GFX<br>DIR /TAPE/GFX/BOUNCER<br>DRAW_TEXTURE("/TAPE/GFX/BOUNCER/BALL.PNG",X,Y,8,8)</code></pre>
+              <pre class="listing"><code>LOAD /TAPE/BOUNCER.BLIP<br>DIR /TAPE/GFX<br>DIR /TAPE/GFX/BOUNCER<br>DRAW_TEXTURE("/TAPE/GFX/BOUNCER/BALL.PNG",X,Y,8,8)</code></pre>
               <div class="primitive-list compact"><div><code>DRAW_TEXTURE(FILE,X,Y,W,H[,TINT])</code><p>Stretch an image; optionally multiply it by a tint.</p></div><div><code>DRAW_TEXTURE(FILE,X,Y,W,H,SX,SY,SW,SH)</code><p>Crop a pixel rectangle from an image and stretch it into the destination.</p></div><div><code>DRAW_TEXTURE(FILE,X,Y,W,H,COL,COLS,ROW,ROWS,ANGLE)</code><p>Draw one sprite-sheet cell; rotation is radians.</p></div></div>
               <p>Texture names are full paths, for example <code>/TAPE/GFX/GALACTIC_DEFENDER/ALIEN_SQUID_A.PNG</code>. Drawing is clipped to the screen.</p>
               <aside class="note"><strong>PICTURE LIBRARY</strong>ADDER · BOUNCER · GALACTIC_DEFENDER · SERPENT · SKY_RAIDER. Other games draw their shapes with BLIP primitives.</aside>
@@ -132,9 +132,9 @@
             <section class="page chapter" id="files" style="--ch:8">
               <div class="running-head">SAVE YOUR PROGRAMS</div>
               <p class="eyebrow">CHAPTER EIGHT</p><h2>SAVE YOUR PROGRAMS</h2>
-              <dl class="definitions"><dt>DIR [PATH]</dt><dd>List a directory: /TAPE, /TAPE/GFX or /USER.</dd><dt>CD [PATH]</dt><dd>Change directory; no path returns to /USER.</dd><dt>MKDIR NAME</dt><dd>Create a folder under /USER.</dd><dt>LOAD FILE</dt><dd>Load a program from /TAPE or /USER.</dd><dt>RUN</dt><dd>Run the program in memory.</dd><dt>SAVE [NAME]</dt><dd>Save the current source under /USER.</dd><dt>DEL FILE</dt><dd>Delete a named file under /USER; /TAPE files cannot be deleted.</dd><dt>SOURCE [FILE]</dt><dd>Print the current source or a named program.</dd><dt>EDIT FILE</dt><dd>Edit a /USER file. Changes save as you type; ESCAPE closes it.</dd><dt>PAINT [FILE]</dt><dd>Draw a 320 × 200 image in the monitor and save it as PNG under /USER/GFX.</dd></dl>
+              <dl class="definitions"><dt>DIR [PATH]</dt><dd>List a directory: /TAPE, /TAPE/GFX or /USER.</dd><dt>CD [PATH]</dt><dd>Change directory; no path returns to /USER.</dd><dt>MKDIR NAME</dt><dd>Create a folder under /USER.</dd><dt>LOAD FILE</dt><dd>Load a program from /TAPE or /USER.</dd><dt>EJECT</dt><dd>Stop the program and remove the inserted cassette.</dd><dt>RUN</dt><dd>Run the program in memory.</dd><dt>SAVE [NAME]</dt><dd>Save the current source under /USER.</dd><dt>DEL FILE</dt><dd>Delete a named file under /USER; /TAPE files cannot be deleted.</dd><dt>SOURCE [FILE]</dt><dd>Print the current source or a named program.</dd><dt>EDIT FILE</dt><dd>Edit a /USER file. Changes save as you type; ESCAPE closes it.</dd><dt>PAINT [FILE]</dt><dd>Draw a 320 × 200 image in the monitor and save it as PNG under /USER/GFX.</dd></dl>
               <pre class="listing"><code>CD /USER<br>MKDIR GAMES<br>CD GAMES<br>SAVE STARFIELD<br>DIR</code></pre>
-              <p><code>/TAPE</code> holds the games, with their pictures in <code>/TAPE/GFX</code>; it is read-only. <code>/USER</code> is kept in this browser. File names and saved source are uppercase. Start with <code>PAINT</code>, accept the suggested <code>/USER/GFX/SPRITE.PNG</code> name or enter your own, then use that PNG with <code>DRAW_TEXTURE</code>.</p>
+              <p><code>/TAPE</code> shows only the inserted cassette’s program and pictures in <code>/TAPE/GFX</code>; it is empty without a cassette and is read-only. <code>/USER</code> is kept in this browser. File names and saved source are uppercase. Start with <code>PAINT</code>, accept the suggested <code>/USER/GFX/SPRITE.PNG</code> name or enter your own, then use that PNG with <code>DRAW_TEXTURE</code>.</p>
               <div class="page-number">9</div>
             </section>
             <section class="page chapter" id="examples" style="--ch:9">
@@ -142,16 +142,16 @@
               <p class="eyebrow">CHAPTER NINE</p><h2>OPEN A GAME. STUDY ITS SOURCE.</h2>
               <p class="lead">The games in <code>/TAPE</code> are ordinary BLIP BASIC source files. Load one, read it, then make a copy in your own drawer before changing it.</p>
               <h3>FIND AND RUN A GAME</h3><pre class="listing"><code>DIR /TAPE<br>LOAD /TAPE/BOUNCER.BLIP<br>RUN</code></pre>
-              <p><code>DIR /TAPE</code> lists the games. Try <code>BOUNCER.BLIP</code>, <code>DEFENDER.BLIP</code>, <code>RALLY.BLIP</code>, or any other in the list. <code>LOAD</code> puts its source into memory; <code>RUN</code> starts it. Press ESCAPE to stop a running game and return to BASIC.</p>
+              <p>Choose a cassette from the pile, or use <code>LOAD /TAPE/BOUNCER.BLIP</code> to insert it. <code>DIR /TAPE</code> lists only that cassette’s files. Ejecting it removes those files from the directory. <code>LOAD</code> puts its source into memory; <code>RUN</code> starts it. Press ESCAPE to stop a running game and return to BASIC.</p>
               <div class="page-number">10</div>
             </section>
             <section class="page chapter" id="source-copy" style="--ch:9">
               <div class="running-head">LEARN FROM GAMES</div>
               <h2 class="section-title">READ THE SOURCE. MAKE A COPY.</h2>
               <h3>READ BEFORE YOU CHANGE</h3><pre class="listing"><code>LOAD /TAPE/BOUNCER.BLIP<br>SOURCE<br>LIST</code></pre>
-              <p><code>SOURCE</code> prints the program; <code>LIST</code> shows its numbered lines. Follow a <code>GOTO</code> jump or a <code>GOSUB</code> routine, then find the main loop that reads input, updates positions and draws each frame.</p>
+              <p><code>SOURCE</code> prints the program; <code>LIST</code> shows its numbered lines. Start with the flow map, then follow the section headings and <code>GOSUB</code> helpers. <code>REM</code> starts a comment: everything after it, including colons, is ignored. Use comments to name sections and explain state.</p>
               <h3>MAKE YOUR OWN COPY</h3><pre class="listing"><code>LOAD /TAPE/BOUNCER.BLIP<br>SAVE MY_BOUNCER<br>EDIT /USER/MY_BOUNCER.BLIP<br>RUN</code></pre>
-              <p><code>SAVE MY_BOUNCER</code> writes the source to <code>/USER/MY_BOUNCER.BLIP</code>. Change that copy; the read-only original is still there to load again. Files in <code>/USER</code> stay in this browser.</p>
+              <p><code>SAVE MY_BOUNCER</code> writes the source to <code>/USER/MY_BOUNCER.BLIP</code>. Keep its <code>REM GAME:</code> line so the copy uses the same controls. Files in <code>/USER</code> stay in this browser.</p>
               <div class="page-number">11</div>
             </section>
             <section class="page chapter" id="editor" style="--ch:10">
@@ -182,6 +182,7 @@
               <div class="running-head">BLIP BASIC</div>
               <p class="eyebrow">CHAPTER ELEVEN</p><h2>COMMANDS AT A GLANCE</h2>
               <div class="columns reference-columns"><div><h3>PROGRAMS</h3><p><code>RUN · LIST · SOURCE · EDIT · PAINT · NEW · CLEAR · END</code></p><h3>FLOW</h3><p><code>IF · THEN · GOTO · GOSUB · RETURN · FOR · TO · STEP · NEXT · WAIT</code></p><h3>INPUT</h3><p><code>INKEY$ · KEY_HELD · KEY_ACTIVE · KEY_PRESSED</code></p></div><div><h3>FILES</h3><p><code>DIR · CD · MKDIR · LOAD · SAVE · DEL</code></p><h3>MATH</h3><p><code>INT · ABS · SQR · SIN · COS · RND · LEN · STR$ · COLOR</code></p><h3>DRAWING</h3><p><code>CLEAR · FILL_RECT · DRAW_RECT · DRAW_LINE · FILL_CIRCLE · DRAW_TEXTURE · DRAW_TEXT</code></p></div></div>
+              <p><code>CLAMP(V,LO,HI)</code> keeps a value in bounds. <code>LERP(A,B,T)</code> blends positions; <code>WRAP(V,LO,HI)</code> wraps them. <code>DISTANCE(X0,Y0,X1,Y1)</code> measures a gap. <code>SCATTER(I,SALT)</code> places repeatable scenery. These functions use the native games’ Rust helpers.</p>
               <aside class="note"><strong>TRY THIS</strong>Load /TAPE/RALLY.BLIP, inspect it with SOURCE, change one line, and save your own copy.</aside>
               <p class="colophon">BLIP BASIC Programming Manual · First edition, 2026. Lessons follow the hands-on style of early home-computer programming books; the primitive reference matches the BLIP Rust API. References: <i>Retro Gamer</i>, issues 164 and 178.</p>
               <div class="page-number">14</div>

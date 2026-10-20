@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/blip",
+    "crates/blip_font",
     "crates/blip_assets",
     "crates/blip_basic",
     "crates/serpent",
@@ -25,6 +26,7 @@ publish = false
 macroquad = { version = "0.4", features = ["audio"] }
 png = "0.17"
 blip = { path = "crates/blip" }
+blip_font = { path = "crates/blip_font" }
 blip_assets = { path = "crates/blip_assets" }
 
 [profile.release]

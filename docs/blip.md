@@ -171,7 +171,7 @@ You can define your own colours directly via `macroquad::color::Color { r, g, b,
 ### `blip::math` — collision and utilities
 
 ```rust
-use blip::{clamp, lerp, rand_int, rects_overlap};
+use blip::{clamp, distance, lerp, rand_int, rects_overlap};
 
 // AABB collision — returns true if the two rectangles overlap:
 if rects_overlap(ball.x, ball.y, BALL_W, BALL_H,
@@ -180,7 +180,10 @@ if rects_overlap(ball.x, ball.y, BALL_W, BALL_H,
 rand_int(1, 6)   // inclusive random integer in [1, 6]
 clamp(v, 0.0, 1.0)
 lerp(a, b, 0.5)  // midpoint between a and b
+distance(0.0, 0.0, 3.0, 4.0) // 5.0
 ```
+
+BASIC's [shared game functions](basic-functions.md) call these same Rust helpers.
 
 ### `blip::web` — kiosk shell
 

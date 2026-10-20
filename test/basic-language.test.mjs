@@ -1,0 +1,40 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import '../web/basic-language.js';
+
+const evaluate = (source, host = {}) => BlipBasicLanguage.evaluate(source, {
+  read: (name) => ({ X: 7, 'NAME$': 'BLIP' })[name] ?? 0,
+  call: (name) => { throw Error('Unknown function ' + name); },
+  ...host,
+});
+
+test('console expressions preserve precedence, unary operators, and string escaping', () => {
+  for (const [source, expected] of [
+    ['1+2*3', 7], ['(1+2)*3', 9], ['10-3-2', 5], ['20/2/5', 2],
+    ['-X+ +3', -4], ['NOT 0 AND 3>2', 1], ['1 OR 0 AND 0', 1],
+    ['"SAY ""HI"" "+NAME$', 'SAY "HI" BLIP'],
+    ['STR$(INT(3.9))+CHR$(65)', '3A'], ['SIN(0)+COS(0)+SQR(9)', 4],
+    ['LEN("A,B:C")', 5], ['"A"<"B"', 1],
+  ]) assert.equal(evaluate(source), expected, source);
+  assert.deepEqual(evaluate('COLOR(0.1,0.2,0.3)'), { blipColor: true, r: 0.1, g: 0.2, b: 0.3, a: 1 });
+});
+
+test('console function arguments reach the host in evaluation order', () => {
+  const calls = [];
+  assert.equal(evaluate('DISTANCE(X,0,WRAP(-21,0,10),4)', {
+    call(name, args) {
+      calls.push([name, args]);
+      return name === 'WRAP' ? 9 : 5;
+    },
+  }), 5);
+  assert.deepEqual(calls, [['WRAP', [-21, 0, 10]], ['DISTANCE', [7, 0, 9, 4]]]);
+});
+
+test('invalid console expressions fail at their syntax or arithmetic error', () => {
+  for (const [source, error] of [
+    ['1/0', /Division by zero/], ['(2+3', /Expected \)/],
+    ['1 2', /Syntax near 2/], ['"UNCLOSED', /Syntax near/],
+    ['1+', /Expression expected/], ['COLOR(1,2)', /COLOR needs/],
+    ['MISSING(3)', /Unknown function MISSING/],
+  ]) assert.throws(() => evaluate(source), error, source);
+});

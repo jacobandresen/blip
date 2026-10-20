@@ -319,7 +319,7 @@ canvas {
   border-radius: 50%;
   transform: translateZ(5px);
   background: conic-gradient(from -50deg, #e4e6e9, #8a8d92 24%, #45474b 50%, #8a8d92 76%, #e4e6e9 100%);
-  box-shadow: 0 3px 7px rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 1px #fff9,0 2px 0 #73757a,0 4px 0 #292b2e,0 6px 0 #101113,2px 9px 6px #000c,4px 14px 13px #0007;
 }
 
 /* the turning top: knurled grip + a domed centre + a pointer groove.
@@ -329,8 +329,9 @@ canvas {
   inset: 2.5px;
   border-radius: 50%;
   background:
-    repeating-conic-gradient(from 0deg, #3c3c40 0 5deg, #212124 5deg 10deg),
-    radial-gradient(circle at 42% 34%, #4c4c50 0%, #1d1d20 60%, #101012 100%);
+    radial-gradient(ellipse at 33% 22%,#ffffff29,transparent 48%),
+    radial-gradient(circle,transparent 61%,#08090a 63% 65%,transparent 67%),
+    repeating-conic-gradient(from 0deg, #48494d 0 3deg, #1a1b1e 5deg 9deg, #35363a 10deg);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.08),
     inset 0 3px 5px rgba(255, 255, 255, 0.12),

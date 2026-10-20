@@ -28,8 +28,8 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <link rel="stylesheet" href="marquee.css?v=1">
-  <link rel="stylesheet" href="kiosk.css?v=153">
-  <link rel="stylesheet" href="wear.css?v=12">
+  <link rel="stylesheet" href="kiosk.css?v=154">
+  <link rel="stylesheet" href="wear.css?v=13">
   <link rel="stylesheet" href="book.css?v=1">
   <link rel="stylesheet" href="manual.css?v=49">
   <!-- Match the shared cabinet controls before first paint. -->
@@ -920,9 +920,9 @@
         radial-gradient(circle at 34% 80%,#b48cff 0 2px,transparent 3px),
         linear-gradient(#17112a,#0d0a19);
       background-size:86px 86px,86px 86px,86px 86px,43px 43px,86px 86px,100% 100%;
-      background-position:var(--aisle-floor-x,0px) 0;
+      background-position:0 0;
       -webkit-mask-image:linear-gradient(transparent,#000 30%);mask-image:linear-gradient(transparent,#000 30%);
-      opacity:.85;transition:background-position .55s cubic-bezier(.22,.68,.17,1);
+      opacity:.85;
     }
 
     /* The cabinet front: black laminate between two strips of T-molding. Nothing here may set filter, opacity,
@@ -936,8 +936,9 @@
         linear-gradient(180deg,#24212b,#131117 38%,#0d0c11);
       box-shadow:inset 6px 0 var(--trim),inset -6px 0 var(--trim),inset 8px 0 #0008,inset -8px 0 #0008;
       filter:none!important;opacity:1;clip-path:none;
-      transition:transform .55s cubic-bezier(.22,.68,.17,1);
+      transition:transform 2.72s cubic-bezier(.4,0,.2,1);
     }
+    #game-grid .card.aisle-wrap {transition:none!important}
     #game-grid .card.rejected {animation:none}
     .machine-launching .jukebox-front {transition:transform .46s cubic-bezier(.55,0,.75,.4);transform:translate(var(--launch-x),var(--launch-y)) scale(var(--launch-zoom))}
     .machine-launching .jukebox-front::after {content:'';position:absolute;inset:-50%;z-index:90;background:#000;pointer-events:none;animation:machine-launch-dark .46s ease-in both}
@@ -991,6 +992,8 @@
     #game-grid .game-rom {position:absolute;inset:13px 14px 22px;display:block;padding:0;border:0;border-radius:16px/20px;overflow:hidden;background:#000;
       box-shadow:0 0 0 3px #000,0 0 14px color-mix(in srgb,var(--trim) 45%,transparent)}
     #game-grid .game-rom .card-shot,#game-grid .card-shot-wrap img.card-shot {position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;border-radius:0;filter:saturate(1.15) contrast(1.06)}
+    #game-grid .card:not(.card-focused) .game-rom .card-shot {opacity:0;transition:opacity .3s ease}
+    #game-grid .card.card-focused .game-rom .card-shot {opacity:1}
     /* Scanlines, the tube's dark corners and a glare off the glass. */
     #game-grid .game-rom::after {content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
       background:linear-gradient(160deg,#ffffff26,#ffffff08 28%,transparent 40%),repeating-linear-gradient(0deg,#0000 0 2px,#00000038 2px 3px),radial-gradient(ellipse at 50% 50%,transparent 58%,#000a);}
@@ -1025,16 +1028,20 @@
     body.cabinet-page {padding-bottom:0!important;--cabinet-bottom-bar-height:0px}
     body.cabinet-page .screen-bezel {bottom:0!important}
 
-    /* Control panel: the game page's own deck (machine-deck.html), on a T-molded lip. The game's stations stay in the
-       markup for its controls' count but are drawn by the deck. */
-    .machine-controls {position:absolute;z-index:5;left:-4%;right:-4%;top:48%;height:calc(var(--deck-height,125px) + 10px);border:0;border-radius:0;transform:none;clip-path:none;
-      background:none;box-shadow:none;}
-    .machine-controls::before {content:none}
-    .machine-controls::after {content:'';position:absolute;left:0;right:0;bottom:0;height:10px;
-      background:linear-gradient(180deg,color-mix(in srgb,var(--trim) 80%,#fff) 0 2px,var(--trim) 2px 7px,color-mix(in srgb,var(--trim) 50%,#000) 7px);box-shadow:0 4px 6px #000a}
+    /* The shared deck slopes out from the monitor; its front apron faces the player. */
+    .machine-controls {position:absolute;z-index:5;left:-4%;right:-4%;top:48%;height:calc(var(--deck-height,125px) + 10px);border:0;border-radius:0;clip-path:none;
+      background:none;box-shadow:none;transform-style:preserve-3d;transform-origin:50% 0;transform:rotateX(32deg) scaleX(.98);}
+    .machine-controls::before {content:'';position:absolute;left:0;right:0;top:0;height:var(--deck-height,125px);border-radius:7px 7px 0 0;
+      background:#1b181b;box-shadow:0 -3px 5px #000b,inset 1px 0 #fff3,inset -1px 0 #000b;transform:translateZ(-1px)}
+    .machine-controls::after {content:'';position:absolute;left:0;right:0;top:var(--deck-height,125px);height:22px;transform-origin:50% 0;transform:rotateX(-32deg);border-radius:0 0 4px 4px;
+      background:linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff) 0 1px,var(--trim) 2px 5px,color-mix(in srgb,var(--trim) 55%,#000) 7px,#151318 9px,#252229 11px,#100e13 100%);
+      box-shadow:inset 1px 0 #fff2,inset -1px 0 #0009,0 8px 10px #000b}
     .machine-deck {position:absolute;left:0;right:0;top:0;height:var(--deck-height,125px);overflow:hidden;pointer-events:none}
     .machine-deck iframe {position:absolute;left:0;top:0;width:390px;height:844px;border:0;background:transparent;
       transform-origin:0 0;transform:scale(var(--deck-scale,.831)) translateY(-694px)}
+    .machine-deck-cheek {position:absolute;top:0;left:0;width:calc(var(--deck-height,125px) * .45);height:var(--deck-height,125px);transform-origin:0 0;transform:rotateY(90deg);
+      clip-path:polygon(0 0,0 100%,100% 72%);background:linear-gradient(90deg,#393039,#17131a 35%,#0b090e);pointer-events:none}
+    .machine-deck-cheek.right {left:100%;background:linear-gradient(90deg,#211c24,#0b090e 80%)}
     .machine-stations {display:none}
     /* A ball-top stick in its dust washer, seen from the player's side. */
     .machine-stick {position:relative;display:block;flex:none;width:34px;height:46px;background:radial-gradient(ellipse 15px 7px at 50% 86%,#09090b 0 60%,#5a5862 70%,transparent 76%)}
@@ -1054,38 +1061,51 @@
     /* On a small screen the cabinet shrinks but Start does not: it stays a thumb wide (30px tall at least). */
     .card {--start-grow:max(1,calc(.76 / var(--arc-scale,1)))}
     .machine-start {appearance:none;position:absolute;z-index:5;left:50%;top:69.5%;bottom:auto;min-width:84px;height:40px;padding:0 8px;transform:translateX(-50%) scale(var(--start-grow));transform-origin:50% 0;
-      border:2px solid #0b0a0e;border-radius:5px;cursor:pointer;
-      background:linear-gradient(#fff6c8,#ffd84a 30%,#e7a91c 80%,#b97c0c);color:#3a2300;
-      font:400 11px/36px 'Press Start 2P','Courier New',monospace;letter-spacing:.04em;text-shadow:0 1px #fff8;
-      box-shadow:0 3px 0 #6d4706,0 5px 6px #000b,inset 0 1px #fff;}
-    .machine-start::before {content:none}
-    .card-focused .machine-start {animation:machine-start-glow 1.1s ease-in-out infinite}
-    @keyframes machine-start-glow {50% {box-shadow:0 3px 0 #6d4706,0 5px 6px #000b,inset 0 1px #fff,0 0 18px 4px #ffd84aaa}}
-    .machine-start:active {transform:translate(-50%,3px) scale(var(--start-grow));box-shadow:0 0 0 #6d4706,0 2px 3px #000b,inset 0 2px 3px #0005;animation:none}
+      border:1px solid #060608;border-radius:7px;cursor:pointer;
+      background:linear-gradient(135deg,#77747a,#36343b 18%,#17161b 60%,#47434b);color:#392507;
+      font:400 10px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.04em;text-shadow:0 1px #fff9;
+      box-shadow:inset 0 1px #d6d0ca88,inset 1px 0 #fff2,inset 0 -2px #08070b,0 2px 0 #050407,1px 5px 5px #000c,3px 8px 10px #0007;}
+    .machine-start::before {content:'';position:absolute;inset:3px;border-radius:4px;background:#151008;box-shadow:inset 0 2px 3px #000,0 1px #c3bdb344;pointer-events:none}
+    .machine-start-cap {position:absolute;inset:4px 5px 7px;display:grid;place-items:center;border:1px solid #fff0b777;border-radius:3px;
+      background:linear-gradient(115deg,#fff8dc66,transparent 36% 70%,#8e450026),radial-gradient(ellipse at 50% 45%,#fff1a6,#f5c83f 65%,#c58b16);
+      box-shadow:inset 0 2px 1px #fff4cd,inset 1px 0 #fff4,inset 0 -2px 3px #b37a13,0 2px 0 #9d6810,0 3px 0 #51360c,0 4px 2px #000a;
+      transition:transform .07s,box-shadow .07s;pointer-events:none}
+    .machine-start-cap::after {content:'';position:absolute;inset:2px 3px;border-radius:2px;background:linear-gradient(172deg,#fff5 0 1px,transparent 2px 45%,#fff1 46%,transparent 48%);pointer-events:none}
+    .card-focused .machine-start-cap {animation:machine-start-glow 1.8s ease-in-out infinite}
+    @keyframes machine-start-glow {50% {filter:brightness(1.15);text-shadow:0 1px #fff9,0 0 7px #fff5}}
+    .machine-start:active .machine-start-cap {transform:translateY(2px);box-shadow:inset 0 1px 3px #9b691b88,0 1px 0 #51360c;animation:none}
 
     /* Coin door: two coin entries, each lit red with its price, coin returns below and a lock between. */
     .machine-coinbox {appearance:none;position:absolute;z-index:5;left:50%;top:78.5%;bottom:auto;width:46%;height:14.5%;min-height:0;padding:0;cursor:pointer;transform:translateX(-50%);
-      border:2px solid #050506;border-radius:4px;
-      background:linear-gradient(115deg,#ffffff24,transparent 30%),linear-gradient(180deg,#5b5a61,#323137 50%,#242328);
-      box-shadow:inset 0 0 0 2px #77767c,inset 0 0 0 4px #1b1a1f,0 4px 8px #000b;filter:none}
-    .machine-coinbox::before,.machine-coinbox::after {content:none}
+      border:2px solid #050506;border-radius:5px;
+      background:radial-gradient(circle at 7px 7px,#d4d0c6 0 .6px,#68676a 1px 1.8px,#09090c 2.5px,transparent 3px),
+        radial-gradient(circle at calc(100% - 7px) 7px,#d4d0c6 0 .6px,#68676a 1px 1.8px,#09090c 2.5px,transparent 3px),
+        repeating-linear-gradient(0deg,#ffffff03 0 1px,transparent 1px 3px),linear-gradient(115deg,#ffffff12,transparent 35%),linear-gradient(#38373e,#24232a 45%,#16151b);
+      box-shadow:inset 0 0 0 1px #959198,inset 0 0 0 3px #424047,inset 0 0 0 4px #09090d,inset 0 -5px 8px #0008,0 2px 0 #070609,2px 5px 6px #000b;filter:none}
+    .machine-coinbox::before {content:'';position:absolute;inset:5px;border:1px solid #09090c;border-radius:2px;box-shadow:0 1px #ffffff12;pointer-events:none}
+    .machine-coinbox::after {content:'';position:absolute;right:-3px;top:24%;width:3px;height:50%;border-radius:1px;background:repeating-linear-gradient(#66636b 0 5px,#16151a 6px 7px);box-shadow:1px 1px 2px #000;pointer-events:none}
     .machine-coin-mech {position:absolute;top:12%;width:31%;height:44%;border-radius:3px;
-      background:linear-gradient(#ff7a5a,#e8231c 40%,#9b0d0b);box-shadow:inset 0 0 0 2px #2a0503,0 0 12px #ff3b2b99,inset 0 1px 3px #fffa}
+      background:linear-gradient(125deg,#eeebe3,#87858b 15%,#302f35 45%,#b8b5b4 73%,#4b494f);
+      box-shadow:inset 0 1px #fff9,inset 0 -1px #151318,0 1px 0 #050406,1px 3px 3px #000b,0 0 5px #ff321b22}
+    .machine-coin-mech::before {content:'';position:absolute;inset:3px;border:1px solid #5a100c;border-radius:1px;
+      background:linear-gradient(115deg,#ffc5ad55,transparent 38%),repeating-linear-gradient(90deg,#ffcfb00c 0 1px,transparent 1px 3px),radial-gradient(ellipse at 50% 65%,#ff6845,#bb241b 65%,#610d0b);
+      box-shadow:inset 0 1px 1px #ffba9b99,inset 0 -2px 3px #430604,0 0 0 1px #1b1315}
     .machine-coin-mech:nth-of-type(1) {left:12%}
     .machine-coin-mech:nth-of-type(2) {right:12%}
-    .machine-coin-slot {position:absolute;top:14%;left:50%;width:14%;height:44%;transform:translateX(-50%);border:0;border-radius:2px;background:#170201;box-shadow:inset 0 1px 2px #000,0 1px #ffb3a588}
-    .machine-coin-slot::before {content:none}
+    .machine-coin-slot {position:absolute;z-index:1;top:17%;left:50%;width:12%;height:39%;transform:translateX(-50%);border:1px solid #0d0b0d;border-radius:2px;background:linear-gradient(90deg,#000 40%,#2a2425 90%,#070608);box-shadow:inset 1px 1px 2px #000,1px 0 #ffdfbd88}
+    .machine-coin-slot::before {content:'';position:absolute;inset:-3px -4px;border:2px solid;border-color:#bab5ae #4f4c50 #777378 #d5d0c5;border-radius:3px;box-shadow:0 1px 2px #000b,inset 1px 0 #050407;pointer-events:none}
     .machine-coin-slot::after {content:'';position:absolute;left:50%;top:-14px;width:12px;height:12px;border:1px solid #f3dc8d;border-radius:50%;
       background:radial-gradient(circle at 35% 30%,#fff3ba,#b68035 70%);opacity:0;transform:translateX(-50%);pointer-events:none}
     .machine-coinbox.coin-inserting .machine-coin-mech:first-of-type .machine-coin-slot::after {animation:machine-coin-drop .3s ease-in both}
     @keyframes machine-coin-drop {0%{opacity:1;transform:translate(-50%,-6px)}75%{opacity:1}100%{opacity:0;transform:translate(-50%,10px)}}
-    .machine-coin-price {position:absolute;left:0;right:0;bottom:9%;color:#fff2e8;font:400 7px/1 'Press Start 2P','Courier New',monospace;text-shadow:0 1px #5a0705}
-    .machine-coin-return {position:absolute;top:66%;width:20%;height:18%;border-radius:2px;background:linear-gradient(#000,#2b2a30);box-shadow:inset 0 2px 2px #000,0 1px #ffffff30}
+    .machine-coin-price {position:absolute;left:0;right:0;bottom:12%;color:#ffe8c6;font:400 7px/1 'Press Start 2P','Courier New',monospace;text-shadow:0 1px #5a0705,0 0 3px #ffb08b66}
+    .machine-coin-return {position:absolute;top:66%;width:20%;height:18%;border:1px solid;border-color:#09090c #454249 #68656a #141217;border-radius:2px;background:linear-gradient(#020204 45%,#17151b 75%,#323037);box-shadow:inset 1px 3px 4px #000,0 -1px #000,0 1px #ffffff18}
+    .machine-coin-return::after {content:'';position:absolute;left:-2px;right:-2px;bottom:-2px;height:3px;border-radius:0 0 2px 2px;background:linear-gradient(#8a8588,#3a373e 40%,#131117);box-shadow:0 2px 2px #0009}
     .machine-coin-return:nth-of-type(3) {left:17.5%}
     .machine-coin-return:nth-of-type(4) {right:17.5%}
-    .machine-coin-lock {position:absolute;left:50%;top:68%;width:9px;height:9px;transform:translateX(-50%);border:1px solid #9b9b91;border-radius:50%;background:radial-gradient(circle,#222 0 1px,#d9d4c4 2px,#66645c);box-shadow:0 1px 2px #000}
-    .machine-coinbox.coin-inserting .machine-coin-mech {background:linear-gradient(#ffd0a0,#ff5a3a 40%,#c2140f);box-shadow:inset 0 0 0 2px #2a0503,0 0 22px #ff6b4b}
-    .machine-coinbox:active {transform:translate(-50%,2px)}
+    .machine-coin-lock {position:absolute;left:50%;top:68%;width:9px;height:9px;transform:translateX(-50%);border:1px solid #1b191d;border-radius:50%;background:conic-gradient(from -35deg,#eee8db,#6a686a,#d3cfc5,#46434a,#eee8db);box-shadow:inset 0 0 0 1px #aaa69c,0 1px 2px #000}
+    .machine-coin-lock::after {content:'';position:absolute;left:3px;top:2px;width:2px;height:5px;background:#141217;border-radius:1px;box-shadow:1px 0 #f0e6d077}
+    .machine-coinbox.coin-inserting .machine-coin-mech::before {filter:brightness(1.4);box-shadow:inset 0 1px #ffdac3,0 0 10px #ff4b2b77}
     #game-grid .card .machine-coinbox,#game-grid .card .machine-start {pointer-events:auto!important;cursor:pointer}
     .machine-coinbox:focus-visible,.machine-start:focus-visible {outline:2px solid #ffe0a1;outline-offset:3px}
 
@@ -1102,7 +1122,7 @@
     :root[data-layout="landscape"] #game-grid .card {flex-direction:column;gap:0}
     @media (prefers-reduced-motion:reduce) {
       #game-grid .card {transition:none!important}
-      .card-focused .machine-attract b,.card-focused .machine-start {animation:none}
+      .card-focused .machine-attract b,.card-focused .machine-start-cap {animation:none}
       .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:none}
     }
   </style>
@@ -1623,11 +1643,12 @@
       var speaker=document.createElement('span');speaker.className='machine-speaker';speaker.setAttribute('aria-hidden','true');card.appendChild(speaker);
       ['left','right'].forEach(function(side){var panelSide=document.createElement('span');panelSide.className='machine-side '+side;panelSide.setAttribute('aria-hidden','true');panelSide.innerHTML='<b>'+name+'</b>';card.appendChild(panelSide);});
       var controls=document.createElement('div');controls.className='machine-controls';controls.dataset.players=String(players);
-      controls.innerHTML='<span class="machine-stations" aria-hidden="true">'+Array.from({length:players},function(){return '<span class="machine-station"><span class="machine-'+panel[1]+'"></span><span class="machine-buttons">'+'<i></i>'.repeat(panel[2])+'</span></span>';}).join('')+'</span><button type="button" class="machine-start" aria-label="Start '+name+'">START</button>';
+      controls.innerHTML='<span class="machine-stations" aria-hidden="true">'+Array.from({length:players},function(){return '<span class="machine-station"><span class="machine-'+panel[1]+'"></span><span class="machine-buttons">'+'<i></i>'.repeat(panel[2])+'</span></span>';}).join('')+'</span><button type="button" class="machine-start" aria-label="Start '+name+'"><span class="machine-start-cap">START</span></button>';
       // The deck is the game page's own, built by deck.js, so the cabinet's controls are the ones the player will use.
       var deck=document.createElement('div');deck.className='machine-deck';
       deck.innerHTML='<iframe src="machine-deck.html?game='+slug+'" tabindex="-1" aria-hidden="true" title=""></iframe>';
       controls.appendChild(deck);
+      ['left','right'].forEach(function(side){var cheek=document.createElement('span');cheek.className='machine-deck-cheek '+side;cheek.setAttribute('aria-hidden','true');controls.appendChild(cheek);});
       card.appendChild(controls.querySelector('.machine-start'));
       card.querySelector('.machine-start').addEventListener('click',function(event){
         event.preventDefault();event.stopPropagation();
@@ -2212,7 +2233,7 @@
       }) : -1;
       var idx = activeIdx >= 0 ? activeIdx : 0;
       var navActive = true;
-      var walkQueue=[],walking=false,walkSteps=0;
+      var walkQueue=[],walking=false;
       // Neighbours stand angled away, as on a showroom floor, so their side art shows; farther ones recede.
       // Where the room is narrow they stand closer, their sides peeking in at the edges.
       function cardPose(c,delta,room) {
@@ -2244,7 +2265,6 @@
         if (cardInFlight&&!force) return;
         var grid=document.getElementById('game-grid');
         grid.scrollLeft=0;
-        grid.style.setProperty('--aisle-floor-x',(-walkSteps*42)+'px');
         var cardHadFocus=cards.indexOf(document.activeElement)>=0,room=aisleRoom();
         cards.forEach(function (c, i) {
           c.tabIndex = i === idx ? 0 : -1;
@@ -2255,15 +2275,28 @@
           // hand it over from the "last played" card.
           if (navActive) c.classList.remove('card-active');
           if(!c.classList.contains('card'))return;
-          var offset=aisleOffset(i),pose=cardPose(c,offset,room);
+          var offset=aisleOffset(i),pose=cardPose(c,offset,room),oldOffset=Number(c.dataset.aisleOffset);
+          if(Number.isFinite(oldOffset)&&Math.abs(offset-oldOffset)>1){
+            c.classList.add('aisle-wrap');
+            requestAnimationFrame(function(){requestAnimationFrame(function(){c.classList.remove('aisle-wrap');});});
+          }
+          c.dataset.aisleOffset=String(offset);
           c.style.setProperty('--arc-x',pose.x+'px');
           c.style.setProperty('--arc-y',pose.y+'px');
           c.style.setProperty('--arc-z',pose.z+'px');
           c.style.setProperty('--arc-turn',pose.turn+'deg');
+          function leanPreview(frame){
+            if(!frame||!frame.contentDocument)return;
+            var root=frame.contentDocument.documentElement;
+            var lean=pose.turn*.55;
+            root.style.setProperty('--preview-lean',lean+'deg');
+          }
+          var deckFrame=c.querySelector('.machine-deck iframe');
+          if(deckFrame){leanPreview(deckFrame);if(!deckFrame.dataset.leanReady){deckFrame.dataset.leanReady='1';deckFrame.addEventListener('load',function(){var current=parseFloat(c.style.getPropertyValue('--arc-turn'))||0;var root=deckFrame.contentDocument&&deckFrame.contentDocument.documentElement;if(root)root.style.setProperty('--preview-lean',current*.55+'deg');});}}
           c.style.setProperty('--arc-tilt',pose.tilt+'deg');
           c.style.setProperty('--arc-pitch',pose.pitch+'deg');
-          c.style.setProperty('--arc-scale',room.scale.toFixed(3));
           var distance=Math.abs(offset);
+          c.style.setProperty('--arc-scale',(room.scale*Math.max(.58,1-distance*.12)).toFixed(3));
           c.style.zIndex=String(30-Math.min(distance,25));
         });
         if(cardHadFocus)cards[idx].focus({preventScroll:true});
@@ -2274,7 +2307,7 @@
         railMotion=requestAnimationFrame(followCards);
       }
       window.addEventListener('resize',function(){highlight(true);});
-      focusArcadeCard=function(card){var selected=cards.indexOf(card);if(selected<0)return;walkSteps+=selected-idx;idx=selected;navActive=true;highlight(true);};
+      focusArcadeCard=function(card){var selected=cards.indexOf(card);if(selected<0)return;idx=selected;navActive=true;highlight(true);};
       highlight();
       cards[idx].focus({preventScroll:true});
 
@@ -2294,11 +2327,10 @@
         var previous=idx;
         idx = (idx + delta + cards.length) % cards.length;
         if(idx!==previous) {
-          walkSteps+=delta;
           highlight();
           if(typeof playMachineStep==='function') playMachineStep(delta);
         }
-        window.setTimeout(walkNext,440);
+        window.setTimeout(walkNext,2240);
       }
 
       // The machines form a single aisle, so the vertical pad also steps along it.
@@ -2347,7 +2379,7 @@
         if(!card || cardInFlight || !manualOverlay.hidden)return;
         var selected=cards.indexOf(card);
         if(selected<0)return;
-        walkSteps+=selected-idx;idx=selected;navActive=true;highlight();
+        idx=selected;navActive=true;highlight();
       }
       function suppressPointerClick() {
         suppressClick=true;window.clearTimeout(suppressClickTimer);

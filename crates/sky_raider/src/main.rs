@@ -20,6 +20,11 @@ use blip::{
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
 mod land;
+mod levels;
+use levels::{
+    BossPattern, BOSS_LASERS, BOSS_SIZES, BOSS_SPECS, BOSS_TURRETS, BOSS_WING_GUNS,
+    BOSS_WINGS, BARRIER_MIN_LEVEL, FLIGHT_BONUS, MAX_LASERS, MAX_LEVEL, WAVE_KILL_BASE,
+};
 
 // ---- layout -------------------------------------------------------------
 const WIN_W: i32 = 480;
@@ -57,9 +62,6 @@ const ENEMY_H: i32 = 52;
 const MAX_ENEMIES: usize = 30;
 const ENEMY_BULLET_SPEED: f32 = 205.0;
 const MAX_ENEMY_BULLETS: usize = 260;
-const WAVE_KILL_BASE: i32 = 60;
-/// Per plane, times the level, for shooting down every plane of a flight.
-const FLIGHT_BONUS: i32 = 50;
 
 // ---- flight model ---------------------------------------------------------
 // Coordinated turn: rate = g tan(bank)/v; load = 1/cos(bank).
@@ -73,41 +75,7 @@ const FLIGHT_THRUST: f32 = 0.5;    // how fast the engine returns it to trim spe
 const MAX_FLIGHTS: usize = 10;
 
 // ---- boss ---------------------------------------------------------------
-// One boss per wave, levels 1-7 — see BOSS_SPECS for the full escalation
-// (size, HP, fire pattern, speed). Sizes must match blip_assets' BOSS_SIZES.
-const MAX_LEVEL: i32 = 7;
-const BOSS_SIZES: [(i32, i32); 7] = [
-    (96, 76), (104, 84), (116, 92), (150, 106), (164, 122), (182, 134), (192, 152),
-];
-// Gun positions per boss (x: fraction of the half span, y: fraction of the
-// length from the nose). Must match blip_assets' BOSS_TURRETS.
-const BOSS_TURRETS: [&[(f32, f32)]; 7] = [
-    &[(0.0, 0.06), (0.0, 0.45), (0.0, 0.97)],
-    &[(0.0, 0.06), (0.0, 0.50), (0.0, 0.97)],
-    &[(0.0, 0.07), (0.0, 0.36), (-0.09, 0.62), (0.09, 0.62), (0.0, 0.98)],
-    &[(0.0, 0.06), (0.0, 0.30), (0.0, 0.60), (0.0, 0.97)],
-    &[(0.0, 0.07), (0.0, 0.36), (-0.07, 0.60), (0.07, 0.60), (0.0, 0.97)],
-    &[(0.0, 0.06), (0.0, 0.28), (0.0, 0.55), (0.0, 0.97)],
-    &[(0.0, 0.05), (0.0, 0.97)],
-];
 const BOSS_INTRO_TIME: f32 = 1.3;
-
-// Wing gun positions are fractions of half-span; fuselage guns use `BOSS_TURRETS`.
-const BOSS_WING_GUNS: [&[f32]; 7] = [
-    &[], &[0.62], &[0.62], &[0.36, 0.72], &[0.31, 0.62], &[0.32, 0.6, 0.8], &[0.62],
-];
-// Laser turrets: one on the second-last boss's spine, one on each of the
-// last boss's wings (x, y as in BOSS_TURRETS).
-const BOSS_LASERS: [&[(f32, f32)]; 7] = [
-    &[], &[], &[], &[], &[], &[(0.0, 0.42)], &[(-0.36, 0.38), (0.36, 0.38)],
-];
-const MAX_LASERS: usize = 2;
-// Wing chords per boss (root LE, root TE, tip LE, tip TE as fractions of
-// the length from the nose). Must match blip_assets' boss_plane().
-const BOSS_WINGS: [(f32, f32, f32, f32); 7] = [
-    (0.30, 0.52, 0.37, 0.46), (0.30, 0.50, 0.37, 0.45), (0.32, 0.54, 0.40, 0.48), (0.30, 0.52, 0.38, 0.46),
-    (0.30, 0.46, 0.34, 0.41), (0.30, 0.48, 0.36, 0.43), (0.30, 0.46, 0.36, 0.41),
-];
 const MAX_TURRETS: usize = 16;
 
 // Each level opens with an Essex-class carrier launch. Sizes match `blip_assets`.
@@ -203,7 +171,6 @@ const MAX_FLAK: usize = 12;
 
 // From level 3, a full-width barrier approaches; destroy its 3–10 HP motor before it reaches you.
 // Barriers never overlap a boss fight.
-const BARRIER_MIN_LEVEL: i32 = 3;
 const BARRIER_MIN_INTERVAL: f32 = 75.0;
 const BARRIER_MAX_INTERVAL: f32 = 140.0;
 const BARRIER_START_Y: f32 = 90.0; // where the beam appears
@@ -499,41 +466,6 @@ struct Boss {
 }
 
 /// How a boss's gunners aim a volley; tougher bosses mix in more of them.
-#[derive(Copy, Clone, PartialEq)]
-enum BossPattern {
-    /// A spread down the bomber's track.
-    Fan,
-    /// Bursts laid on the player.
-    Aimed,
-    /// Each turret traversing slowly across the sky.
-    Sweep,
-    /// A wide barrage from every turret.
-    Curtain,
-}
-
-/// One row per boss (levels 1-7). `patterns` cycle one per volley; `dips` sinks the boss toward
-/// the player now and then; `escorts` calls in a pair of fighters.
-struct BossSpec {
-    hp: i32,
-    speed: f32,
-    fire_min: f32,
-    fire_max: f32,
-    dips: bool,
-    escorts: bool,
-    patterns: &'static [BossPattern],
-    name: &'static str,
-}
-
-const BOSS_SPECS: [BossSpec; 7] = [
-    BossSpec { hp:  80, speed:  76.0, fire_min: 0.48, fire_max: 1.00, dips: false, escorts: false, patterns: &[BossPattern::Fan],                                                name: "KI-49 DONRYU"   },
-    BossSpec { hp: 130, speed:  84.0, fire_min: 0.44, fire_max: 0.92, dips: false, escorts: false, patterns: &[BossPattern::Fan],                                                name: "KI-67 HIRYU"    },
-    BossSpec { hp: 190, speed:  92.0, fire_min: 0.38, fire_max: 0.82, dips: true,  escorts: false, patterns: &[BossPattern::Fan, BossPattern::Aimed],                            name: "G4M BETTY"      },
-    BossSpec { hp: 260, speed: 100.0, fire_min: 0.34, fire_max: 0.72, dips: true,  escorts: false, patterns: &[BossPattern::Fan, BossPattern::Aimed, BossPattern::Sweep],       name: "G8N RENZAN"     },
-    BossSpec { hp: 340, speed: 109.0, fire_min: 0.30, fire_max: 0.64, dips: true,  escorts: true,  patterns: &[BossPattern::Aimed, BossPattern::Sweep],                         name: "H8K EMILY"      },
-    BossSpec { hp: 430, speed: 118.0, fire_min: 0.27, fire_max: 0.58, dips: true,  escorts: true,  patterns: &[BossPattern::Sweep, BossPattern::Aimed, BossPattern::Curtain],   name: "G5N SHINZAN"    },
-    BossSpec { hp: 560, speed: 132.0, fire_min: 0.22, fire_max: 0.47, dips: true,  escorts: true,  patterns: &[BossPattern::Fan, BossPattern::Aimed, BossPattern::Sweep, BossPattern::Curtain], name: "FUGAKU"         },
-];
-
 fn boss_size(tier: usize) -> (f32, f32) {
     let (w, h) = BOSS_SIZES[tier];
     (w as f32, h as f32)
@@ -3251,11 +3183,9 @@ fn draw_bottom_hud(blip: &Blip, g: &Game, player_tex: &Texture2D) {
 }
 
 fn draw_title(
-    blip: &Blip, g: &Game, player_tex: &Texture2D, cloud_tex: &[Texture2D; 3], hi: &web::HighScore,
+    blip: &Blip, backdrop: &Texture2D, player_tex: &Texture2D, hi: &web::HighScore,
 ) {
-    draw_sea(blip, g);
-    draw_clouds(blip, g, cloud_tex);
-    blip.fill_rect(0.0, 0.0, WIN_W as f32, WIN_H as f32, BlipColor::new(0.01, 0.025, 0.08, 0.38));
+    blip.draw_texture(backdrop, 0.0, 0.0, WIN_W as f32, WIN_H as f32);
     blip.draw_centered_outlined(
         "RAIDER", (WIN_W / 2) as f32, (WIN_H / 4) as f32, 5.0, BlipColor::new(0.38, 0.72, 1.0, 1.0),
         BlipColor::new(0.015, 0.045, 0.12, 1.0),
@@ -3296,6 +3226,7 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("RAIDER", WIN_W, WIN_H)
 }
 
+const TITLE_BACKDROP_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/title_backdrop.png"));
 const PLAYER_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/player_plane.png"));
 const ENEMY_GRUNT_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/enemy_grunt.png"));
 const ENEMY_WEAVER_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/enemy_weaver.png"));
@@ -3405,6 +3336,7 @@ async fn main() {
     let mut g = Game::new();
 
     let player_tex = load_png(PLAYER_PNG);
+    let title_backdrop = load_png(TITLE_BACKDROP_PNG);
     let enemy_tex = [load_png(ENEMY_GRUNT_PNG), load_png(ENEMY_WEAVER_PNG), load_png(ENEMY_ACE_PNG)];
     let boss_tex = BOSS_PNGS.map(load_png);
     let boss_name_ja_tex = BOSS_NAME_JA_PNGS.map(load_png);
@@ -3515,7 +3447,7 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title  => draw_title(&blip, &g, &player_tex, &cloud_tex, &web::high_score()),
+            State::Title  => draw_title(&blip, &title_backdrop, &player_tex, &web::high_score()),
             State::Launch => draw_launch(&blip, &g, &player_tex, &enemy_tex, &carrier_tex, &boat_tex, &cloud_tex, &island_tex),
             State::Win    => draw_win(&blip, g.sess.level),
             State::Won    => draw_won(&blip, g.sess.score, &web::high_score(), g.over_timer.active()),

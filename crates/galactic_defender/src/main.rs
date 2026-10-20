@@ -17,6 +17,9 @@ use blip::{
 
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
+mod levels;
+
+use levels::*;
 
 // ---- layout -----------------------------------------------------------
 const WIN_W: i32 = 480;
@@ -40,12 +43,8 @@ const PLAYER_ACCEL: f32 = 2200.0;
 const PLAYER_BRAKE: f32 = 3200.0;
 const TOUCH_CLOSE_SECS: f32 = 0.08;
 const BULLET_SPEED: f32 = 420.0;
-const MARCH_START: i32 = 520;
-const MARCH_MIN: i32 = 65;
 // The formation's step down at each edge: gentle on level 1 (a steady
 // playtest bot was landed on at 16 px), full height from level 4.
-const MARCH_DROP_FIRST: f32 = 10.0;
-const MARCH_DROP: f32 = 16.0;
 const MAX_BOMBS: usize = 4;
 const MAX_PLAYER_BULLETS: usize = 1;
 const SHIELD_COLS: usize = 4;
@@ -74,22 +73,11 @@ const UFO_CHARGE_SECS: f32 = 1.9;    // "gnarly" charge-up before it fires
 const UFO_FIRE_SECS: f32 = 0.4;      // how long the beam itself is on screen
 const LASER_HIT_W: f32 = UFO_W;      // width of the beam's kill zone
 
-// Every fifth level ends with a mothership built from the saucer, bomb and explosion systems.
-const BOSS_EVERY: i32 = 5;            // every fifth level ends with one
 const BOSS_SCALE: f32 = 2.6;          // times the ordinary saucer
 const BOSS_W: f32 = UFO_W * BOSS_SCALE;
 const BOSS_H: f32 = UFO_H * BOSS_SCALE;
 const BOSS_Y: f32 = (PLAY_Y + 46) as f32;
 const BOSS_SWAY: f32 = 26.0;          // how far it rises and falls as it crosses
-const BOSS_HP_BASE: i32 = 16;         // first mothership, level 5
-const BOSS_HP_STEP: i32 = 8;          // each one after that
-const BOSS_SPEED_BASE: f32 = 78.0;
-const BOSS_SPEED_STEP: f32 = 14.0;
-const BOSS_VOLLEY_MIN: f32 = 1.05;    // seconds between volleys, first mothership
-const BOSS_VOLLEY_FLOOR: f32 = 0.42;  // however many it takes, never faster than this
-const BOSS_VOLLEY_STEP: f32 = 0.09;   // taken off the gap per mothership
-const BOSS_HIT_SCORE: i32 = 10;       // per hit, so chipping it down is itself worth points
-const BOSS_KILL_SCORE: i32 = 500;     // x level, on top
 const BOSS_FLASH: f32 = 0.08;         // how long it glows white after a hit
 
 const MAX_UFO_BOMBS: usize = 1;
@@ -103,8 +91,6 @@ const DEATH_EXPLOSION_PHASE: f32 = 0.7; // seconds of that pause spent on the gi
                                          // before the ship starts fading back in — the
                                          // remainder (DEAD_PAUSE - this) is the mist fade-in
 const RESPAWN_GRACE_SECS: f32 = 1.2; // once play resumes, firing stays locked out this long
-// From `DIVE_LEVEL`, one alien telegraphs then dives through shields toward the ship; shoot it for double points.
-const DIVE_LEVEL: i32 = 3;
 const DIVE_EVERY: (i32, i32) = (7, 12); // seconds between dives
 const DIVE_TELL: f32 = 0.8;
 const DIVE_SPEED: f32 = 150.0;
@@ -1301,7 +1287,8 @@ fn draw_boss(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
 
 fn draw_play(blip: &Blip, g: &Game,
              player: &Texture2D, alien: &[[Texture2D; 2]; 3],
-             explosion: &Texture2D, shield: &Texture2D, saucer: &[Texture2D; UFO_N_LIGHTS]) {
+             explosion: &Texture2D, shield: &Texture2D, bullet: &Texture2D,
+             saucer: &[Texture2D; UFO_N_LIGHTS]) {
     // The ground line pulses red while the invaders are close to landing.
     let lowest = g.aliens.iter().filter(|a| a.alive).map(|a| a.y + ALIEN_H as f32).fold(0.0, f32::max);
     let ground = if g.state == State::Play && lowest > (GROUND_Y - LANDING_WARN) as f32
@@ -1366,8 +1353,8 @@ fn draw_play(blip: &Blip, g: &Game,
 
     for b in g.bullets.iter() {
         if !b.active { continue; }
-        let c = if b.player { BLIP_WHITE } else { BLIP_ORANGE };
-        blip.fill_rect(b.x, b.y, 4.0, 12.0, c);
+        let tint = if b.player { BLIP_WHITE } else { BLIP_ORANGE };
+        blip.draw_texture_tinted(bullet, b.x, b.y, 4.0, 12.0, tint);
     }
 
     for e in g.explosions.iter() {
@@ -1472,6 +1459,7 @@ const ALIEN_OCTO_A_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ass
 const ALIEN_OCTO_B_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_octopus_b.png"));
 const EXPLOSION_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/explosion.png"));
 const SHIELD_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/shield_block.png"));
+const BULLET_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/bullet.png"));
 const UFO_SAUCER_0_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_0.png"));
 const UFO_SAUCER_1_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_1.png"));
 const UFO_SAUCER_2_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_2.png"));
@@ -1508,6 +1496,7 @@ async fn main() {
     ];
     let explosion = load_png(EXPLOSION_PNG);
     let shield = load_png(SHIELD_PNG);
+    let bullet = load_png(BULLET_PNG);
     let saucer = [
         load_png(UFO_SAUCER_0_PNG), load_png(UFO_SAUCER_1_PNG),
         load_png(UFO_SAUCER_2_PNG), load_png(UFO_SAUCER_3_PNG),
@@ -1576,7 +1565,7 @@ async fn main() {
             State::Win   => draw_win(&blip, g.sess.level),
             State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
             State::Play | State::Dead => {
-                draw_play(&blip, &g, &player, &alien, &explosion, &shield, &saucer);
+                draw_play(&blip, &g, &player, &alien, &explosion, &shield, &bullet, &saucer);
             }
         }
 

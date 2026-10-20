@@ -7,6 +7,7 @@ const games = selectedGame
   ? [selectedGame]
   : ['ADDER', 'BOUNCER', 'BRAWLER', 'BUBBLER', 'DEFENDER', 'METEORS', 'RALLY', 'SERPENT', 'SKY_RAIDER'];
 
+const failures = [];
 for (const game of games) {
   const code = await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['--test', 'test/visual-parity.mjs'], {
@@ -17,5 +18,7 @@ for (const game of games) {
     child.once('error', reject);
     child.once('close', (status) => resolve(status ?? 1));
   });
-  if (code !== 0) process.exit(code);
+  if (code !== 0) failures.push(game);
 }
+if (failures.length) console.error(`Visual parity failed: ${failures.join(', ')}`);
+process.exitCode = failures.length ? 1 : 0;

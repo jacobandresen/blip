@@ -4,22 +4,24 @@
 
 mod arena;
 mod cpu;
+mod levels;
 
 use blip::input::{
     btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D,
     BLIP_KEY_J, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE,
 };
 use blip::macroquad::input::KeyCode;
+use blip::macroquad::texture::Texture2D;
 use blip::{
     play_sfx, web, window_conf, Blip, BlipColor, Jukebox, Timer,
     GAME_OVER_MIN_WAIT, BLIP_BLACK, BLIP_RED, BLIP_WHITE,
 };
 
 use arena::{Event, Steer, World, SEATS};
+use levels::FAST_ROUND;
 
 const WIN_W: i32 = 480;
 const WIN_H: i32 = 540;
-const FAST_ROUND: i32 = 4; // the tune changes up from here
 const DEMO_SNAKES: usize = 3;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -193,6 +195,7 @@ const GAME_OVER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/so
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
+    let pit = blip::load_png(include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/pit.png")));
 
     let sfx = Sounds {
         through: blip::audio::load_sound(THROUGH_WAV).await,
@@ -224,8 +227,8 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title => draw_title(&blip, &g),
-            State::Play => draw_play(&blip, &g),
+            State::Title => draw_title(&blip, &g, &pit),
+            State::Play => draw_play(&blip, &g, &pit),
             State::Over => draw_over(&blip, &g),
         }
 
@@ -236,38 +239,15 @@ async fn main() {
 // ---- drawing -------------------------------------------------------------
 const BANNER: f32 = 1.6; // a round's name stays up this long
 
-const EARTH: BlipColor = BlipColor { r: 0.085, g: 0.07, b: 0.05, a: 1.0 };
-const DUST: BlipColor = BlipColor { r: 0.145, g: 0.12, b: 0.085, a: 1.0 };
-const TOPSOIL: BlipColor = BlipColor { r: 0.40, g: 0.29, b: 0.15, a: 1.0 };
 const HOLE: BlipColor = BlipColor { r: 1.0, g: 0.86, b: 0.34, a: 1.0 };
 const SAND: BlipColor = BlipColor { r: 0.60, g: 0.52, b: 0.36, a: 1.0 };
-
-/// The pit: dry earth inside a wall of packed earth, flecked so the floor is not
-/// a flat field to read a heading against.
-fn draw_pit(blip: &Blip) {
-    blip.fill_rect(0.0, 0.0, WIN_W as f32, WIN_H as f32, EARTH);
-    for i in 0..110u32 {
-        let h = i.wrapping_mul(2654435761).wrapping_add(12345);
-        let x = arena::PIT_X + (h % 456) as f32;
-        let y = arena::PIT_Y + ((h >> 9) % 488) as f32;
-        blip.fill_rect(x, y, 2.0, 2.0, DUST);
-    }
-    blip.fill_rect(0.0, 28.0, WIN_W as f32, arena::PIT_Y - 28.0, TOPSOIL);
-    blip.fill_rect(0.0, arena::PIT_Y + arena::PIT_H, WIN_W as f32, WIN_H as f32 - arena::PIT_Y - arena::PIT_H, TOPSOIL);
-    blip.fill_rect(0.0, 28.0, arena::PIT_X, WIN_H as f32 - 28.0, TOPSOIL);
-    blip.fill_rect(arena::PIT_X + arena::PIT_W, 28.0, arena::PIT_X, WIN_H as f32 - 28.0, TOPSOIL);
-}
 
 /// Dead trails stay solid; passable gaps keep the seat's colour at 23% brightness.
 fn draw_snake(blip: &Blip, s: &arena::Snake) {
     let c = s.colour();
     let gap = BlipColor { r: c.r * 0.23, g: c.g * 0.23, b: c.b * 0.23, ..c };
     let thick = arena::BODY_R * 2.0;
-    for i in (1..s.path.len()).rev() {
-        let (a, b) = (s.path[i], s.path[i - 1]);
-        let col = if s.in_hole(i) || s.in_hole(i - 1) { gap } else { c };
-        blip.draw_line_ex(a.x, a.y, b.x, b.y, thick, col);
-    }
+    blip.draw_polyline(s.path.iter().enumerate().rev().map(|(i, p)| (p.x, p.y, s.in_hole(i))), thick, c, gap);
     if !s.alive { return; }
     if let Some(p) = s.path.front() {
         blip.draw_line_ex(s.head.x, s.head.y, p.x, p.y, thick, c);
@@ -297,14 +277,14 @@ fn draw_standings(blip: &Blip, w: &World) {
     }
 }
 
-fn draw_world(blip: &Blip, w: &World) {
-    draw_pit(blip);
+fn draw_world(blip: &Blip, w: &World, pit: &Texture2D) {
+    blip.draw_texture(pit, 0.0, 0.0, WIN_W as f32, WIN_H as f32);
     for s in &w.snakes { draw_snake(blip, s); }
     w.fx.draw(blip);
 }
 
-fn draw_play(blip: &Blip, g: &Game) {
-    draw_world(blip, &g.world);
+fn draw_play(blip: &Blip, g: &Game, pit: &Texture2D) {
+    draw_world(blip, &g.world, pit);
     draw_standings(blip, &g.world);
     if g.world.round_wait > 0.0 {
         let won = g.world.snakes.iter().any(|s| s.alive && s.human);
@@ -320,8 +300,8 @@ fn draw_play(blip: &Blip, g: &Game) {
 
 /// The title screen is an attract mode: a real pit, three CPUs, and the game
 /// showing its own movement and its own holes while it waits for a coin.
-fn draw_title(blip: &Blip, g: &Game) {
-    draw_world(blip, &g.demo);
+fn draw_title(blip: &Blip, g: &Game, pit: &Texture2D) {
+    draw_world(blip, &g.demo, pit);
     draw_standings(blip, &g.demo);
     let veil = BlipColor { r: 0.0, g: 0.0, b: 0.0, a: 0.55 };
     blip.fill_rect(0.0, 46.0, WIN_W as f32, 92.0, veil);

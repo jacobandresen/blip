@@ -602,7 +602,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
      panel. */
   transform:
     rotateX(calc(var(--bar-tilt) * -1 - var(--lean) + var(--dy) * -12deg))
-    rotate(calc(var(--dx) * 18deg));
+    rotate(calc(var(--dx) * 18deg + var(--preview-lean, 0deg)));
   transform-style: preserve-3d;
   /* Short, so the lean keeps up with the thumb (the key fires on the first
      frame); eased, so a flick still looks sprung. */
@@ -3389,17 +3389,21 @@ body.need-coin #kiosk-insert-btn,
 :root[data-layout][data-caps] .kiosk-bar > .deck-panel {
   background:
     var(--bolt-l),var(--bolt-r),
+    linear-gradient(115deg,#fff0d315,transparent 32% 68%,#0005),
+    linear-gradient(180deg,#fff2 0 1px,#0007 2px 5px,transparent 12px 78%,#0006),
     var(--cabinet-wood);
   border:1px solid var(--cabinet-trim);
   border-bottom:0;
-  box-shadow:0 0 0 1.5px #0c090e,0 0 0 2.5px rgba(224,183,121,.24),0 0 26px rgba(202,99,50,.1),inset 0 2px rgba(255,239,208,.22),inset 0 -9px 18px rgba(0,0,0,.55),0 -14px 28px -10px rgba(0,0,0,.75);
+  box-shadow:0 0 0 1.5px #0c090e,0 0 0 2.5px rgba(224,183,121,.3),inset 1px 0 #ffe8ba26,inset -2px 0 #0009,inset 0 2px #fff0d552,inset 0 -5px #100d10,inset 0 -7px #ba946c40,inset 0 -13px 18px #0008,0 -10px 24px -10px #000c;
 }
 :root[data-layout][data-caps] .snes-pad .snes-shell {
   border:1px solid var(--cabinet-trim);
   background:
     var(--bolt-l),var(--bolt-r),
+    linear-gradient(115deg,#fff0d315,transparent 32% 68%,#0005),
+    linear-gradient(180deg,#fff2 0 1px,#0007 2px 5px,transparent 12px 78%,#0006),
     var(--cabinet-wood);
-  box-shadow:0 0 0 1.5px #0c090e,0 0 0 2.5px rgba(224,183,121,.24),0 0 26px rgba(202,99,50,.1),inset 0 2px rgba(255,239,208,.22),inset 0 -9px 18px rgba(0,0,0,.55),0 -14px 28px -10px rgba(0,0,0,.75);
+  box-shadow:0 0 0 1.5px #0c090e,0 0 0 2.5px rgba(224,183,121,.3),inset 1px 0 #ffe8ba26,inset -2px 0 #0009,inset 0 2px #fff0d552,inset 0 -5px #100d10,inset 0 -7px #ba946c40,inset 0 -13px 18px #0008,0 -10px 24px -10px #000c;
 }
 
 /* Warm machined bezels and a moulded highlight make each control read as a
@@ -3408,7 +3412,7 @@ body.need-coin #kiosk-insert-btn,
   background:
     radial-gradient(circle at center,#0b0909 0 59%,transparent 61%),
     conic-gradient(from -48deg,#e4c69c 0%,#765a3f 11%,#30251f 24%,#171719 43%,#342920 59%,#947451 76%,#dbc09a 91%,#e4c69c 100%);
-  box-shadow:0 4px 7px rgba(0,0,0,.76),inset 0 1px rgba(255,246,225,.58),inset 0 -4px 6px rgba(0,0,0,.86),inset 0 0 0 1px rgba(16,10,8,.96),0 0 0 1px rgba(0,0,0,.72);
+  box-shadow:0 1px 0 #9b8160,0 3px 0 #352b24,0 5px 0 #100e10,2px 8px 6px #000b,4px 12px 12px #0006,inset 0 1px #fff6e194,inset 0 -3px 4px #000c,inset 0 0 0 1px #100a08,0 0 0 1px #000b;
 }
 :is(#topbar, #kiosk-bar) :is(.arcade-btn .arcade-btn-cap, .snes-btn > span) {
   inset:12%;

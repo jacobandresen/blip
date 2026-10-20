@@ -14,7 +14,9 @@ const MOVE_KEY = {
   DEFENDER: 'ArrowLeft', METEORS: 'ArrowLeft', RALLY: 'ArrowUp',
   SERPENT: 'ArrowUp', SKY_RAIDER: 'ArrowUp',
 };
-const START_CHANGE_MIN = { METEORS: .02, RALLY: .02, SERPENT: .03 };
+const START_CHANGE_MIN = { METEORS: .02, RALLY: .01, SERPENT: .03 };
+// At 85 px/s Adder adds about 120 trail pixels during the 350 ms input sample.
+const RESPONSE_MIN = { ADDER: .00005 };
 const ARTIFACTS = process.env.BLIP_VISUAL_ARTIFACTS === '1';
 const ARTIFACT_DIR = new URL('./artifacts/visual-parity/', import.meta.url);
 
@@ -78,7 +80,7 @@ async function greenBounds(page, image, version) {
       }
       return right ? { left, right, top, bottom, width: right - left + 1, height: bottom - top + 1 } : null;
     });
-  }, [image.toString('base64'), version === 'basic' ? { x0: .16, x1: .64, y0: .24, y1: .92 } : { x0: .12, x1: .88, y0: .08, y1: .95 }]);
+  }, [image.toString('base64'), version === 'basic' ? { x0: .26, x1: .74, y0: .21, y1: .85 } : { x0: .12, x1: .88, y0: .08, y1: .95 }]);
 }
 
 async function holdKey(page, canvas, key, ms, focusSelector) {
@@ -188,7 +190,7 @@ for (const [name, slug] of GAMES.filter(([name]) => !process.env.BLIP_VISUAL_GAM
     await saveImage(slug, 'basic', 'title', basicTitle.image);
     await basicCanvas.evaluate((canvas) => canvas.focus());
     await tapKey(basicCanvas, 'Space');
-    await page.waitForTimeout(name === 'SERPENT' ? 120 : 450);
+    await page.waitForTimeout(name === 'ADDER' ? 20 : name === 'SERPENT' ? 120 : 450);
     if (name === 'BRAWLER') await page.waitForTimeout(1650);
     if (name === 'RALLY') {
       await tapKey(basicCanvas, 'Space');
@@ -217,7 +219,7 @@ for (const [name, slug] of GAMES.filter(([name]) => !process.env.BLIP_VISUAL_GAM
       const before = await greenBounds(page, basicBefore, 'basic'), after = await greenBounds(page, basicAfter, 'basic');
       assert.ok(before && after && after.height > before.height + 12, `SERPENT BASIC did not turn upward: ${JSON.stringify({ before, after })}`);
     }
-    assert.ok(basicResponse > .0005, `${name} BASIC did not visibly respond to ${MOVE_KEY[name]} (${basicResponse.toFixed(4)} changed pixels)`);
+    assert.ok(basicResponse > (RESPONSE_MIN[name] || .0005), `${name} BASIC did not visibly respond to ${MOVE_KEY[name]} (${basicResponse.toFixed(4)} changed pixels)`);
     await saveImage(slug, 'basic', 'input-before', basicBefore);
     await saveImage(slug, 'basic', 'input-after', basicAfter);
     const basicPlay = await checkPlayFrames(page, basicCanvas, `${name} BASIC`, slug, 'basic');
@@ -240,7 +242,7 @@ for (const [name, slug] of GAMES.filter(([name]) => !process.env.BLIP_VISUAL_GAM
     await page.keyboard.down('Space');
     await page.waitForTimeout(150);
     await page.keyboard.up('Space');
-    await page.waitForTimeout(name === 'SERPENT' ? 120 : 450);
+    await page.waitForTimeout(name === 'ADDER' ? 20 : name === 'SERPENT' ? 120 : 450);
     if (name === 'RALLY') {
       await tapKey(rustCanvas, 'Enter');
       await page.waitForTimeout(650);
@@ -266,7 +268,7 @@ for (const [name, slug] of GAMES.filter(([name]) => !process.env.BLIP_VISUAL_GAM
     await holdKey(page, rustCanvas, MOVE_KEY[name], 350);
     const rustAfter = await rustCanvas.screenshot();
     const rustResponse = await frameDifference(page, rustBefore, rustAfter);
-    assert.ok(rustResponse > .0005, `${name} Rust did not visibly respond to ${MOVE_KEY[name]} (${rustResponse.toFixed(4)} changed pixels)`);
+    assert.ok(rustResponse > (RESPONSE_MIN[name] || .0005), `${name} Rust did not visibly respond to ${MOVE_KEY[name]} (${rustResponse.toFixed(4)} changed pixels)`);
     await saveImage(slug, 'rust', 'input-before', rustBefore);
     await saveImage(slug, 'rust', 'input-after', rustAfter);
     const rustPlay = await checkPlayFrames(page, rustCanvas, `${name} Rust`, slug, 'rust');

@@ -8,7 +8,7 @@
 <body>
   <canvas id="glcanvas" tabindex="0"></canvas>
   <script src="mq_js_bundle.js?v=2"></script>
-  <script src="blip_bridge.js?v=19"></script>
+  <script src="blip_bridge.js?v=20"></script>
   <script>
     'use strict';
     window.blipBasicSource = '';
@@ -62,6 +62,7 @@
       imports.env.blip_basic_runtime_error=function(ptr,len){var message=decoder.decode(new Uint8Array(window.wasm_memory.buffer,ptr,len));window.parent.postMessage({type:'blip-basic-runtime-error',message:message},location.origin);};
       imports.env.blip_basic_sound=playBasicTone;
       imports.env.blip_basic_audio_event=function(){window.blipBasicSoundEvents++;};
+      imports.env.blip_basic_file_available=function(ptr,len){var path=decoder.decode(new Uint8Array(window.wasm_memory.buffer,ptr,len));return window.parent.BlipBasic&&window.parent.BlipBasic.isFileAvailable(path)?1:0;};
       imports.env.blip_basic_texture_count=function(){return window.blipBasicTextures.length;};
       imports.env.blip_basic_texture_name_len=function(index){return encoder.encode(String(textureEntry(index).path||'')).length;};
       imports.env.blip_basic_texture_name_copy=function(index,ptr,capacity){var bytes=encoder.encode(String(textureEntry(index).path||'')),size=Math.min(bytes.length,capacity),memory=window.wasm_memory;if(!memory)return 0;new Uint8Array(memory.buffer,ptr,size).set(bytes.subarray(0,size));return size;};

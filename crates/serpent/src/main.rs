@@ -14,6 +14,9 @@ use blip::{
 
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
+mod levels;
+
+use levels::*;
 
 // ---- layout -----------------------------------------------------------
 const COLS: i32 = 20;
@@ -26,28 +29,15 @@ const MAX_LEN: usize = (COLS * ROWS) as usize;
 
 // ---- tuning -----------------------------------------------------------
 const LIVES_START: i32 = 3;
-const SPEED_START: f32 = 180.0;
-const SPEED_MIN: f32 = 70.0;
-const SPEED_STEP: f32 = 10.0;
-const FOODS_PER_LVL: i32 = 5;
-const FRENZY_LEVEL: i32 = 5;     // the fast tune from here on
 
 // ---- bonus fruit --------------------------------------------------------
 // Worth five foods, somewhere else, and leaving: whether to go for it is the
 // game's first real choice.
-const BONUS_EVERY: i32 = 3;      // which food of the level brings one out
-const BONUS_TTL: f32 = 6.0;      // seconds on the board
-const BONUS_WARN: f32 = 2.0;     // when it starts flashing out
-const BONUS_VALUE: i32 = 50;     // x level, against ordinary food's 10
 // A new level's obstacles arrive mid-run; this long to see them before they are solid.
-const OBS_FADE_SECS: f32 = 1.2;
 const BANNER_SECS: f32 = 1.4;
 
 // ---- shears ----------------------------------------------------------------
 // After `SHEARS_FROM`, every second level's first food spawns shears; collecting them cuts `SHEARS_CUT` from the tail.
-const SHEARS_FROM: usize = 25;
-const SHEARS_CUT: usize = 4;
-const SHEARS_TTL: f32 = 7.0;
 const SHEARS_BLUE: BlipColor = BlipColor { r: 0.45, g: 0.85, b: 1.0, a: 1.0 };
 
 // ---- streaks ---------------------------------------------------------------
@@ -534,7 +524,7 @@ fn draw_snake(blip: &Blip, g: &Game) {
     // Glide between cells by step progress; frozen fully arrived once dead
     // (move_timer stalls mid-step on the fatal tick).
     let f = if g.state == State::Play {
-        (g.move_timer / g.move_interval()).clamp(0.0, 1.0)
+        blip::clamp(g.move_timer / g.move_interval(), 0.0, 1.0)
     } else {
         1.0
     };

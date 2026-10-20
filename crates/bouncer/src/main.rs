@@ -18,6 +18,9 @@ use blip::{
 
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
+mod levels;
+
+use levels::*;
 
 // ---- layout -----------------------------------------------------------
 const WIN_W: i32 = 480;
@@ -135,13 +138,9 @@ const DEAD_DROP: Drop = Drop { x: 0.0, y: 0.0, active: false, kind: DropKind::Wi
 // color itself shows how much damage it's absorbed.
 const BRICK_STEEL: usize = 6;
 const BRICK_STEEL_CRACKED: usize = 7;
-// Steel bricks only start showing up from this level on, so new players
-// meet the plain single-hit grid first.
-const STEEL_MIN_LEVEL: i32 = 4;
 // A bomb brick takes the eight round it with it when it breaks (and sets off
 // any bomb among them). From level 2, a few to a level.
 const BRICK_BOMB: usize = 8;
-const BOMB_MIN_LEVEL: i32 = 2;
 const BOMB_CHANCE: u32 = 5; // percent of plain bricks
 const BOMB_MAX: usize = 4;
 

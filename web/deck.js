@@ -16,6 +16,7 @@
   var PER_PLAYER = 2; // caps a player ever gets: no game reads more than two
 
   var root = document.documentElement;
+  if (game) root.setAttribute('data-deck-wear', game.slug);
   root.setAttribute('data-caps', String(CAPS));
   root.setAttribute('data-players', '1');
   if (!seatsTwo) root.setAttribute('data-seats', '1');

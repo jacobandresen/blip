@@ -6,7 +6,7 @@ use blip::input::{
     btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
     BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
-use blip::macroquad::texture::{FilterMode, Texture2D};
+use blip::macroquad::texture::Texture2D;
 use blip::{
     GAME_OVER_MIN_WAIT, hsv,
     Jukebox, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, rand_range_f32, web, window_conf, Blip, Fx,
@@ -16,6 +16,9 @@ use blip::{
 
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
+mod levels;
+
+use levels::*;
 
 // ---- layout -------------------------------------------------------------
 const HUD_H:   i32 = 28;
@@ -46,8 +49,6 @@ const HYPERSPACE_RISK: i32 = 20; // 1-in-N chance of self-destruct
 // ---- asteroids --------------------------------------------------------
 const MAX_ASTEROIDS: usize = 48;
 const MAX_DEBRIS:    usize = 96;
-const WAVE_BASE:     i32 = 3;
-const WAVE_MAX:      i32 = 14;
 
 // ---- saucer -----------------------------------------------------------
 const SAUCER_SPEED:    f32 = 90.0;
@@ -56,8 +57,6 @@ const SAUCER_SPAWN_MIN: f32 = 9.0;
 const SAUCER_SPAWN_MAX: f32 = 18.0;
 /// How long before each shot the saucer's core lights up as a warning.
 const SAUCER_TELL: f32 = 0.4;
-const WAVE_BANNER_SECS: f32 = 1.6;
-const STORM_WAVE: i32 = 5;
 
 // ---- smear --------------------------------------------------------------
 /// Seconds the smear looks back at wave 0, per wave after, and at most.
@@ -71,19 +70,12 @@ const SMEAR_ALPHA: f32 = 0.6;
 
 // ---- haze ---------------------------------------------------------------
 const HAZES: usize = 8;
-/// The wave by which the haze is at its fullest, the black nearly gone.
-const HAZE_FULL_WAVE: i32 = 12;
 /// A patch's alpha at its fullest, on wave 1 and on the full wave.
 const HAZE_ALPHA:     f32 = 0.05;
 const HAZE_ALPHA_MAX: f32 = 0.42;
 /// The same for the mushroom at its centre.
 const SHROOM_ALPHA:     f32 = 0.04;
 const SHROOM_ALPHA_MAX: f32 = 0.50;
-/// Threads join the mushrooms from this wave, and reach for the rocks from
-/// the second; their alpha at first and `THREAD_WAVES` waves on.
-const THREAD_WAVE:      i32 = 3;
-const THREAD_ROCK_WAVE: i32 = 6;
-const THREAD_WAVES:     i32 = 8;
 const THREAD_ALPHA:     f32 = 0.10;
 const THREAD_ALPHA_MAX: f32 = 0.25;
 /// How far a mushroom reaches for a rock.
@@ -740,18 +732,7 @@ fn outline(a: &Asteroid, flower: bool) -> Vec<Seg> {
 }
 
 /// A round white blot thinning to nothing at the rim, with no edge to see.
-fn haze_texture() -> Texture2D {
-    const N: usize = 64;
-    let mut px = Vec::with_capacity(N * N * 4);
-    for i in 0..N * N {
-        let (x, y) = ((i % N) as f32 + 0.5, (i / N) as f32 + 0.5);
-        let d2 = (x / N as f32 * 2.0 - 1.0).powi(2) + (y / N as f32 * 2.0 - 1.0).powi(2);
-        px.extend([255, 255, 255, ((1.0 - d2.min(1.0)).powi(2) * 255.0) as u8]);
-    }
-    let tex = Texture2D::from_rgba8(N as u16, N as u16, &px);
-    tex.set_filter(FilterMode::Linear);
-    tex
-}
+const SOFT_GLOW_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/soft_glow.png"));
 
 /// A mushroom in thin lines, its cap `w` to each side, leaning by `lean`.
 fn draw_mushroom(blip: &Blip, x: f32, y: f32, w: f32, lean: f32, c: BlipColor) {
@@ -913,25 +894,6 @@ fn draw_saucer(blip: &Blip, s: &Saucer, level: i32) {
 
 /// A receding synthwave horizon grid — used only on the title/game-over menu
 /// screens so the vector gameplay itself stays clean and readable.
-fn draw_horizon_grid(blip: &Blip, y0: f32, y1: f32) {
-    let cx = WIN_W as f32 / 2.0;
-    let rows = 7;
-    for i in 0..=rows {
-        let t = i as f32 / rows as f32;
-        let y = y0 + (y1 - y0) * t * t; // ease toward the horizon
-        let half_w = cx * (0.15 + 0.85 * t);
-        let a = 0.10 + 0.35 * t;
-        let c = BlipColor { a, ..NEON_PURPLE };
-        blip.draw_line(cx - half_w, y, cx + half_w, y, c);
-    }
-    let verges = [-1.0_f32, -0.5, 0.5, 1.0];
-    for v in verges {
-        let top = (cx + cx * 0.15 * v, y0);
-        let bot = (cx + cx * v, y1);
-        blip.draw_line(top.0, top.1, bot.0, bot.1, BlipColor { a: 0.20, ..NEON_PURPLE });
-    }
-}
-
 fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
     let t = blip::macroquad::time::get_time() as f32;
     blip.clear(BLIP_BLACK);
@@ -989,9 +951,9 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
     blip.draw_text(&lvl, 12.0, WIN_H as f32 - 22.0, 2.0, BLIP_GRAY);
 }
 
-fn draw_title(blip: &Blip, hi: &web::HighScore) {
+fn draw_title(blip: &Blip, hi: &web::HighScore, art: &[Texture2D; 4]) {
     blip.clear(BLIP_BLACK);
-    draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
+    blip.draw_texture(&art[0], 0.0, 0.0, WIN_W as f32, WIN_H as f32);
     blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, NEON_CYAN);
     // METEORS is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4) as f32 + 50.0, NEON_YELLOW);
@@ -1003,21 +965,15 @@ fn draw_title(blip: &Blip, hi: &web::HighScore) {
     blip.draw_centered(l1, (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
     blip.draw_centered(l2, (WIN_H * 2 / 3) as f32 + 24.0, 2.0, BLIP_GRAY);
     let t = blip::macroquad::time::get_time() as f32;
-    let rocks = [
-        Asteroid { active: true, x: 120.0, y: 606.0, vx: 0.0, vy: 0.0, size: ASize::Large,
-            rot: t * 0.16, spin: 0.16, jag: [0.78, 1.0, 0.88, 1.08, 0.75, 0.96, 1.12, 0.84, 1.0, 0.9] },
-        Asteroid { active: true, x: 560.0, y: 604.0, vx: 0.0, vy: 0.0, size: ASize::Medium,
-            rot: -t * 0.22, spin: -0.22, jag: [0.86, 1.12, 0.78, 0.96, 1.08, 0.82, 1.04, 0.9, 1.14, 0.8] },
-    ];
-    for rock in &rocks { draw_asteroid(blip, rock, 1, t); }
-    let ship = Ship { x: 340.0 + (t * 0.5).sin() * 12.0, y: 608.0,
-        vx: (t * 0.5).cos() * 6.0, vy: 0.0, angle: (t * 0.35).sin() * 0.12, thrusting: false };
-    draw_ship(blip, &ship, 0.0, 1, NEON_CYAN);
+    blip.draw_texture_cell(&art[1], 0, 1, 0, 1, 72.0, 558.0, 96.0, 96.0, t * 0.16);
+    blip.draw_texture_cell(&art[2], 0, 1, 0, 1, 528.0, 572.0, 64.0, 64.0, -t * 0.22);
+    blip.draw_texture_cell(&art[3], 0, 1, 0, 1,
+        316.0 + (t * 0.5).sin() * 12.0, 584.0, 48.0, 48.0, (t * 0.35).sin() * 0.12);
 }
 
-fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
+fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool, grid: &Texture2D) {
     blip.clear(BLIP_BLACK);
-    draw_horizon_grid(blip, (WIN_H / 3) as f32, WIN_H as f32);
+    blip.draw_texture(grid, 0.0, 0.0, WIN_W as f32, WIN_H as f32);
     blip.draw_game_over(score, hi, NEON_PINK, NEON_CYAN, NEON_YELLOW, !waiting);
 }
 
@@ -1042,7 +998,19 @@ const SHIP_EXPLOSION_WAV: &[u8] =
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
-    let blot = haze_texture();
+    let blot = Texture2D::from_file_with_format(SOFT_GLOW_PNG, Some(blip::macroquad::prelude::ImageFormat::Png));
+    blot.set_filter(blip::macroquad::texture::FilterMode::Linear);
+
+    let title_art = [
+        include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/title_grid.png")).as_slice(),
+        include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/title_rock_large.png")).as_slice(),
+        include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/title_rock_medium.png")).as_slice(),
+        include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/title_ship.png")).as_slice(),
+    ].map(|bytes| {
+        let texture = Texture2D::from_file_with_format(bytes, Some(blip::macroquad::prelude::ImageFormat::Png));
+        texture.set_filter(blip::macroquad::texture::FilterMode::Nearest);
+        texture
+    });
 
     // DRIFT, then STORM from wave STORM_WAVE (synthesised here, see blip_assets::meteors).
     let mut music = Jukebox::new(&[blip_assets::meteors::drift_wav, blip_assets::meteors::storm_wav]);
@@ -1095,8 +1063,8 @@ async fn main() {
         }
 
         match g.state {
-            State::Title => draw_title(&blip, &web::high_score()),
-            State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.respawn_t.active()),
+            State::Title => draw_title(&blip, &web::high_score(), &title_art),
+            State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.respawn_t.active(), &title_art[0]),
             State::Play | State::Dead => draw_play(&blip, &g, &blot),
         }
 

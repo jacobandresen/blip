@@ -1,4 +1,4 @@
-:root { color-scheme:dark; --case:#292a31; --case-edge:#15161c; --blue:#1025a5; --ink:#fff5a4; }
+:root { color-scheme:dark; --case:#292a31; --case-edge:#15161c; --blue:#1025a5; --ink:#fff5a4; --basic-top-clearance:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px)); }
 * { box-sizing:border-box; }
 html { min-height:100%; background:#181923; }
 body { margin:0; min-height:100dvh; color:#eee; background:radial-gradient(ellipse at 50% 0,#565c67 0,#30343e 48%,#171821 100%); font-family:Arial,Helvetica,sans-serif; display:flex; flex-direction:column; align-items:center; overflow-x:hidden; text-transform:uppercase; }
@@ -135,7 +135,7 @@ body[data-deck-tape] .deck-inserted-tape { opacity:1; }
 .deck-lid i:first-child { left:10%; }.deck-lid i:nth-child(2) { right:10%; }
 .deck-lid>span { position:absolute; z-index:2; right:6%; bottom:5%; color:#d5d8dc; font:600 5px/1 Arial,sans-serif; letter-spacing:.08em; }
 .tape-buttons { display:flex; flex:none; gap:3px; margin-top:4px; padding:3px 1px 5px; background:#101115; border-radius:3px; }
-.tape-buttons span { display:flex; flex:1; flex-direction:column; justify-content:center; gap:4px; min-width:0; min-height:32px; overflow:hidden; border:1px solid #858991; border-bottom:4px solid #30333a; border-radius:2px; padding:3px 0; background:linear-gradient(#92969e,#62666f 65%,#494d55); box-shadow:inset 0 1px #eee9,0 3px 1px #000; color:#fffdf2; font:600 7px/1 Arial,sans-serif; text-align:center; }
+.tape-buttons :is(span,button) { display:flex; flex:1; flex-direction:column; justify-content:center; gap:4px; min-width:0; min-height:32px; overflow:hidden; border:1px solid #858991; border-bottom:4px solid #30333a; border-radius:2px; padding:3px 0; background:linear-gradient(#92969e,#62666f 65%,#494d55); box-shadow:inset 0 1px #eee9,0 3px 1px #000; color:#fffdf2; font:600 7px/1 Arial,sans-serif; text-align:center; }
 .tape-buttons b { font:700 11px/1 Arial,sans-serif; white-space:nowrap; }
 .tape-buttons small { font:inherit; white-space:nowrap; }
 .tape-buttons [data-key=rec] b { color:#a31812; text-shadow:0 1px #ffc7b9; }
@@ -157,7 +157,7 @@ body[data-playing] .quick-bar { padding-bottom:calc(104px + env(safe-area-inset-
 body[data-playing] .keyboard { display:none; }
 body[data-playing] .computer-body { grid-template-columns:minmax(0,1fr); }
 body:not([data-playing]) .catalog { margin-bottom:110px; }
-@media(max-width:650px) { .front-nav span { font-size:10px; padding:7px 9px; } .setup { flex:none; justify-content:flex-start; padding:8px 6px; } .monitor { width:100%; } .monitor-shell { padding:8px 11px 0; border-radius:17px; } .monitor-ridge { display:none; } .screen-bezel { padding:7px; border-radius:15px; } .screen { border-radius:13px; } .screen-content { font-size:clamp(9px,2.7vw,15px); } .monitor-chin { height:27px; padding:0 11px; } .monitor-brand { width:53px; } .monitor-model { font-size:6px; } .monitor-foot { height:10px; } .computer { width:100%; padding:7px 8px 0; } .computer-top { height:20px; gap:8px; } .computer-brand { width:54px; } .computer-title { font-size:6px; } .computer-body { gap:5px; } .keyboard { gap:2px; padding:3px; } .key-row { gap:2px; } .key { height:clamp(22px,6vw,30px); font-size:clamp(6px,1.9vw,10px); } .key.shift { flex:2.3; } .cassette { padding:3px; gap:2px; } .tape-buttons span { padding:2px 0; } .computer-edge { height:8px; margin:5px -7px 0; } .quick-bar { flex-wrap:wrap; gap:5px; } .quick-bar button { padding:8px 9px; font-size:10px; } }
+@media(max-width:650px) { .front-nav span { font-size:10px; padding:7px 9px; } .setup { flex:none; justify-content:flex-start; padding:8px 6px; } .monitor { width:100%; } .monitor-shell { padding:8px 11px 0; border-radius:17px; } .monitor-ridge { display:none; } .screen-bezel { padding:7px; border-radius:15px; } .screen { border-radius:13px; } .screen-content { font-size:clamp(9px,2.7vw,15px); } .monitor-chin { height:27px; padding:0 11px; } .monitor-brand { width:53px; } .monitor-model { font-size:6px; } .monitor-foot { height:10px; } .computer { width:100%; padding:7px 8px 0; } .computer-top { height:20px; gap:8px; } .computer-brand { width:54px; } .computer-title { font-size:6px; } .computer-body { gap:5px; } .keyboard { gap:2px; padding:3px; } .key-row { gap:2px; } .key { height:clamp(22px,6vw,30px); font-size:clamp(6px,1.9vw,10px); } .key.shift { flex:2.3; } .cassette { padding:3px; gap:2px; } .tape-buttons :is(span,button) { padding:2px 0; } .computer-edge { height:8px; margin:5px -7px 0; } .quick-bar { flex-wrap:wrap; gap:5px; } .quick-bar button { padding:8px 9px; font-size:10px; } }
 @media(prefers-reduced-motion:reduce) { .deck-lid,body[data-deck-open] .deck-lid { transition:none; } .game-tape-flight { animation:none!important; } }
 
 .game-tape .game-tape-reels::before,.game-tape .game-tape-reels::after { background:radial-gradient(circle,#101215 0 12%,#c0c1bb 14% 19%,transparent 20%),conic-gradient(#c3c5be 0 8deg,#34373a 8deg 45deg,#a5a7a1 45deg 53deg,#34373a 53deg 90deg,#c3c5be 90deg 98deg,#34373a 98deg 135deg,#a5a7a1 135deg 143deg,#34373a 143deg 180deg,#c3c5be 180deg 188deg,#34373a 188deg 225deg,#a5a7a1 225deg 233deg,#34373a 233deg 270deg,#c3c5be 270deg 278deg,#34373a 278deg 315deg,#a5a7a1 315deg 323deg,#34373a 323deg); }
@@ -179,18 +179,17 @@ body:not([data-playing]) .catalog { margin-bottom:110px; }
 .quick-bar button { border-color:#69717a; color:#eff1ec; background:linear-gradient(#59616d,#303640); border-radius:3px; }
 .key { border-radius:2px; }
 @media(min-width:651px) { .key { height:clamp(18px,2.6vw,28px); } }
-body[data-playing] .front-nav { opacity:0; transform:translateY(-18px); pointer-events:none; transition:opacity .35s,transform .45s; }
-body[data-playing] .setup { position:fixed; inset:0 0 var(--amstrad-control-clearance,56px); z-index:1; flex:none; width:100%; max-width:none; justify-content:center; padding:0; }
+body[data-playing] .setup { position:fixed; inset:var(--basic-top-clearance) 0 var(--amstrad-control-clearance,56px); z-index:1; display:flex; flex:none; width:100%; max-width:none; justify-content:center; padding:0; }
 body[data-playing] .computer { display:none; }
-body[data-wasm-playing] .front-nav { opacity:0; transform:translateY(-18px); pointer-events:none; transition:opacity .35s,transform .45s; }
-body[data-wasm-playing] .setup { position:fixed; inset:0 0 var(--amstrad-control-clearance,56px); z-index:1; flex:none; width:100%; max-width:none; justify-content:center; padding:0; }
+body[data-wasm-playing] .setup { position:fixed; inset:var(--basic-top-clearance) 0 var(--amstrad-control-clearance,56px); z-index:1; display:flex; flex:none; width:100%; max-width:none; justify-content:center; padding:0; }
 body[data-wasm-playing] .computer { display:none; }
 body[data-wasm-playing] .keyboard,body[data-wasm-playing] .cassette { display:none; }
 body[data-wasm-playing] .computer-body { grid-template-columns:minmax(0,1fr); }
-body[data-wasm-playing] .monitor { width:min(100vw,calc((100dvh - var(--amstrad-control-clearance,56px) - 83px) * 1.333)); transform:none; }
-body[data-playing] .monitor { width:min(100vw,calc((100dvh - var(--amstrad-control-clearance,56px) - 83px) * 1.333)); transform:none; }
+body[data-wasm-playing] .monitor { width:min(100vw,calc((100dvh - var(--basic-top-clearance) - var(--amstrad-control-clearance,56px) - 83px) * 1.333)); transform:none; }
+body[data-playing] .monitor { width:min(100vw,calc((100dvh - var(--basic-top-clearance) - var(--amstrad-control-clearance,56px) - 83px) * 1.333)); transform:none; }
 body[data-playing] #exit-game,body[data-wasm-playing] #exit-game,body[data-basic-running] #exit-game { position:fixed; z-index:300; top:max(10px,env(safe-area-inset-top)); right:max(12px,env(safe-area-inset-right)); display:block; min-height:44px; padding:10px 15px; border:1px solid #cf8783; border-radius:5px; background:linear-gradient(#a43b35,#67211f); color:#fff; font:700 13px/1 Arial,sans-serif; box-shadow:0 2px 6px #000b; touch-action:manipulation; }
-:root[data-fullscreen] .front-nav { display:none; }
+:root[data-fullscreen] { --basic-top-clearance:0px; }
+:root[data-fullscreen] .front-nav,:root[data-fullscreen] .top-marquee-bar { display:none; }
 :root[data-fullscreen] body:not([data-playing]) .setup { flex:1; width:100%; max-width:none; min-height:0; justify-content:center; padding:8px; }
 :root[data-fullscreen] body:not([data-playing]) .monitor { width:min(96vw,calc((100dvh - 100px) * 1.25)); }
 :root[data-fullscreen] .computer { display:none; }
@@ -269,7 +268,7 @@ body[data-playing] #exit-game,body[data-wasm-playing] #exit-game,body[data-basic
   .game-tape-reels::before,.game-tape-reels::after { content:''; position:absolute; top:50%; width:18px; height:18px; border:2px solid #b5b7b4; border-radius:50%; background:radial-gradient(circle,#090a0c 0 12%,#c0c1bb 15% 20%,#34373a 23% 34%,#a5a7a1 38% 43%,#181a1d 47% 56%,#b1b2ac 59% 65%,#393c3e 69%); transform:translateY(-50%); }
   .game-tape-reels::before { left:10%; }.game-tape-reels::after { right:10%; }
   body[data-wasm-playing] .tape-rack { display:none; }
-  body[data-playing] .monitor { width:min(100vw,calc((100dvh - var(--amstrad-control-clearance,56px) - 51px) * 1.333)); }
+  body[data-playing] .monitor,body[data-wasm-playing] .monitor { width:min(100vw,calc((100dvh - var(--basic-top-clearance) - var(--amstrad-control-clearance,56px) - 51px) * 1.333)); }
   body[data-playing] .setup { padding:0; }
 }
 
@@ -283,6 +282,7 @@ body[data-playing] #exit-game,body[data-wasm-playing] #exit-game,body[data-basic
   border-top-color:#d0d1d2;
   box-shadow:inset 0 1px #ffffff55,0 -12px 25px #0009;
 }
+.amstrad-controls #deck-p2[hidden] { display:none; }
 .amstrad-rally-dial {
   display:none;
   position:absolute;
@@ -364,11 +364,11 @@ body[data-wasm-playing][data-rally] .deck-side { display:none!important; }
 .amstrad-controls .arcade-btn { background:conic-gradient(from -50deg,#f1f1ec,#7d8083 20%,#35373b 50%,#7d8083 80%,#f1f1ec); }
 .amstrad-controls .arcade-btn-cap { background:radial-gradient(circle at 34% 25%,#ffad9a 0 8%,transparent 31%),radial-gradient(circle at 50% 45%,#eb4935 0,#c92318 52%,#80140d 100%); }
 #manual-book,.manual-pocket { display:none!important; }
-body[data-playing] #basic-book-peek,body[data-wasm-playing] #basic-book-peek { display:none; }
+body[data-playing] #basic-book-peek,body[data-wasm-playing] #basic-book-peek,body[data-playing] .tape-rack { display:none; }
 
 .deck-seat,.deck-bay .game-tape-inserting,.deck-bay .deck-inserted-tape { left:50%!important; top:50%!important; width:var(--tape-seat-width,84%)!important; height:auto!important; aspect-ratio:1.58!important; transform:translate(-50%,-50%); }
 .deck-seat { position:absolute; visibility:hidden; pointer-events:none; }
-@media(max-width:650px) { .tape-buttons { gap:1px; } .tape-buttons span { min-height:27px; gap:3px; font-size:4px; } .tape-buttons b { font-size:8px; } }
+@media(max-width:650px) { .tape-buttons { gap:1px; } .tape-buttons :is(span,button) { min-height:27px; gap:3px; font-size:4px; } .tape-buttons b { font-size:8px; } }
 
 /* The magnetic tape: a brown pack round each hub, seen through the window, and the run past the head opening.
    Played from the left (supply) spool onto the right (take-up): both turn clockwise, the smaller pack faster. */
@@ -392,7 +392,7 @@ body[data-tape-rewinding] .deck-inserted-tape .game-tape-film { animation:film-r
 @keyframes spool-turn { to { transform:rotate(360deg); } }
 @keyframes film-run { to { background-position-x:13px; } }
 /* PLAY and REW latch down while they run; STOP/EJECT springs back. */
-.tape-buttons span { transition:transform .08s,box-shadow .08s,background .08s; }
+.tape-buttons :is(span,button) { transition:transform .08s,box-shadow .08s,background .08s; }
 body[data-loading-tape] .tape-buttons [data-key=play],body[data-tape-rewinding] .tape-buttons [data-key=rew],body[data-deck-key=eject] .tape-buttons [data-key=eject] { background:#4f5258; box-shadow:inset 0 1px 2px #0009,0 0 #0b0b0e; transform:translateY(2px); }
 @media(prefers-reduced-motion:reduce) { .tape-spool,.tape-spool::before,.game-tape-film { animation:none!important; transition:none!important; } }
 
@@ -404,5 +404,12 @@ body[data-monitor-expanded] { --monitor-bottom:0px; overflow:hidden; }
 /* Maximized, the monitor is all there is: no top bar and no control deck; keys and a gamepad still play. */
 body[data-monitor-expanded] .front-nav,body[data-monitor-expanded] .top-marquee-bar,body[data-monitor-expanded] #kiosk-bar.amstrad-controls,body[data-monitor-expanded] .amstrad-rally-dial,body[data-monitor-expanded] .computer,body[data-monitor-expanded] .tape-rack,body[data-monitor-expanded] #basic-book-peek { display:none; }
 body[data-monitor-expanded] .setup,body[data-monitor-expanded][data-wasm-playing] .setup,body[data-monitor-expanded][data-playing] .setup { position:fixed; inset:0 0 var(--monitor-bottom); z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; max-width:none; min-height:0; padding:0; }
-body[data-monitor-expanded] .monitor,body[data-monitor-expanded][data-wasm-playing] .monitor,body[data-monitor-expanded][data-playing] .monitor { width:min(100vw,calc((100dvh - var(--monitor-bottom) - 65px) * 1.3333)); max-width:none; transform:none; }
+body[data-monitor-expanded] .monitor,body[data-monitor-expanded][data-wasm-playing] .monitor,body[data-monitor-expanded][data-playing] .monitor { width:min(100vw,calc((100dvh - var(--monitor-bottom) - 65px) * 1.3333)); max-width:none; transform:none; transition:none; }
 @media(max-width:650px) { #monitor-fullscreen { top:1px; right:10px; width:26px; height:24px; font-size:21px; } body[data-wasm-playing] #monitor-fullscreen,body[data-playing] #monitor-fullscreen { right:105px; } }
+
+.tape-buttons button { cursor:pointer; }
+.tape-buttons button:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+
+body:not([data-playing]):not([data-wasm-playing]):not([data-basic-running]) #kiosk-bar.amstrad-controls { display:none; }
+
+@media(prefers-reduced-motion:reduce) { .monitor { transition:none; } }

@@ -40,6 +40,22 @@ pub fn draw_line_ex(x1: f32, y1: f32, x2: f32, y2: f32, thickness: f32, c: Color
     mq_draw_line(x1, y1, x2, y2, thickness, c);
 }
 
+/// Join points in order; a marked endpoint selects the alternate colour.
+pub fn draw_polyline(
+    points: impl IntoIterator<Item = (f32, f32, bool)>,
+    thickness: f32,
+    color: Color,
+    alternate: Color,
+) {
+    let mut previous = None;
+    for (x, y, marked) in points {
+        if let Some((px, py, was_marked)) = previous {
+            draw_line_ex(px, py, x, y, thickness, if marked || was_marked { alternate } else { color });
+        }
+        previous = Some((x, y, marked));
+    }
+}
+
 fn glow_colors(c: Color, halo_alpha: f32) -> (Color, Color) {
     (
         Color { a: c.a * halo_alpha, ..c },

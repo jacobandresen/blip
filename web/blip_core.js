@@ -126,7 +126,7 @@ var BLIP_GAMES = {
   adder:              { name: 'ADDER', accent: '224, 160, 52', touchControls: [['STEER',['DRAG']],['START',['TAP']]], controls: [['TURN',['A','D'],['←','→']],['START',['SPACE']],['2ND PLAYER JOINS',['J']]],
                          players: 2,
                          buttons: [{ key: ' ', code: 'Space', label: 'START' }],
-                         keys: TWO_PLAYER_KEYS,
+                         keys: Object.assign({}, TWO_PLAYER_KEYS, { p2button2: TWO_PLAYER_KEYS.p2button1 }),
                          touch: { kind: 'drag', hint: 'Drag left/right to steer &middot; tap to start',
                                   mouseHint: 'Point left/right to steer &middot; click to start' } }
 };

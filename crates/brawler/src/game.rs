@@ -7,12 +7,24 @@ use super::*;
 /// A flash where something connected. `blocked` picks the colour, which
 /// is how a player tells "that cost me nothing" from "that cost me".
 #[derive(Copy, Clone)]
-pub(crate) struct Spark { pub(crate) x: f32, pub(crate) y: f32, pub(crate) ttl: f32, pub(crate) life: f32, pub(crate) blocked: bool }
+pub(crate) struct Spark {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) ttl: f32,
+    pub(crate) life: f32,
+    pub(crate) blocked: bool,
+}
 
 /// One of the other turtles, called in: a fighter run by a script instead of
 /// a stick. He waits his turn, runs in, strikes once and runs off the far side.
 #[derive(Copy, Clone)]
-pub(crate) struct Helper { pub(crate) f: Fighter, pub(crate) side: usize, pub(crate) wait: f32, pub(crate) mv: MoveId, pub(crate) struck: bool }
+pub(crate) struct Helper {
+    pub(crate) f: Fighter,
+    pub(crate) side: usize,
+    pub(crate) wait: f32,
+    pub(crate) mv: MoveId,
+    pub(crate) struck: bool,
+}
 
 /// A barrel in the bonus round. In the first round five stand in a row and
 /// take three blows each; in the second ten come down one at a time, bounce,
@@ -49,31 +61,67 @@ pub(crate) const BONUS_TALLY: f32 = 2.4;
 
 /// A word that pops up where something happened: COUNTER!, a fruit's points.
 #[derive(Copy, Clone)]
-pub(crate) struct Pop { pub(crate) text: &'static str, pub(crate) x: f32, pub(crate) y: f32, pub(crate) ttl: f32 }
+pub(crate) struct Pop {
+    pub(crate) text: &'static str,
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) ttl: f32,
+}
 pub(crate) const POP_SECS: f32 = 0.9;
 
 /// The bonus fruit on the boards: where, how long it has left, and which of
 /// the eight it is.
 #[derive(Copy, Clone)]
-pub(crate) struct Fruit { pub(crate) x: f32, pub(crate) ttl: f32, pub(crate) kind: usize }
+pub(crate) struct Fruit {
+    pub(crate) x: f32,
+    pub(crate) ttl: f32,
+    pub(crate) kind: usize,
+}
 
 /// A projectile in flight.
 #[derive(Copy, Clone)]
-pub(crate) struct Bolt { pub(crate) x: f32, pub(crate) y: f32, pub(crate) vx: f32, pub(crate) vy: f32, pub(crate) owner: usize, pub(crate) active: bool, pub(crate) damage: i32 }
-
+pub(crate) struct Bolt {
+    pub(crate) x: f32,
+    pub(crate) y: f32,
+    pub(crate) vx: f32,
+    pub(crate) vy: f32,
+    pub(crate) owner: usize,
+    pub(crate) active: bool,
+    pub(crate) damage: i32,
+}
 
 /// Which screen the game is on.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(crate) enum State { Title, Select, Vs, RoundIntro, Fight, RoundEnd, MatchEnd, Bonus, Continue, Challenger, Over, Won }
+pub(crate) enum State {
+    Title,
+    Select,
+    Vs,
+    RoundIntro,
+    Fight,
+    RoundEnd,
+    MatchEnd,
+    Bonus,
+    Continue,
+    Challenger,
+    Over,
+    Won,
+}
 
 /// Who took a round.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(crate) enum RoundResult { P1, P2, Draw }
+pub(crate) enum RoundResult {
+    P1,
+    P2,
+    Draw,
+}
 
 /// One player against the ladder (score, difficulty curve) or two in a single
 /// match with a winner; they share only the round.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(crate) enum Mode { Solo, Versus }
+pub(crate) enum Mode {
+    Solo,
+    Versus,
+}
 
 /// The whole session: who is playing whom, how far up the ladder, and
 /// everything on the stage.
@@ -179,7 +227,14 @@ pub(crate) const LAST_RUNG: f32 = 0.8;
 
 /// What the CPU has decided to do until it next thinks.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(crate) enum CpuPlan { Wait, Approach, Retreat, Attack(MoveId), Jump, Block }
+pub(crate) enum CpuPlan {
+    Wait,
+    Approach,
+    Retreat,
+    Attack(MoveId),
+    Jump,
+    Block,
+}
 
 impl Game {
     /// A fresh game at the title screen.
@@ -188,14 +243,31 @@ impl Game {
             state: State::Title,
             sess: Session::new(1),
             p: [Fighter::new(0, 200.0, 1.0), Fighter::new(1, 440.0, -1.0)],
-            bolts: [Bolt { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, owner: 0, active: false, damage: 0 }; 4],
+            bolts: [Bolt {
+                x: 0.0,
+                y: 0.0,
+                vx: 0.0,
+                vy: 0.0,
+                owner: 0,
+                active: false,
+                damage: 0,
+            }; 4],
             demo: false,
             idle: 0.0,
             demo_cpu: (CpuPlan::Wait, 0.0),
             sounds: Vec::new(),
             helpers: [None; 6],
-            barrels: [Barrel { x: 0.0, y: FLOOR_Y, vx: 0.0, vy: 0.0, wait: 0.0, hp: 0, rolls: false,
-                hit_t: 9.0, broke_t: -1.0 }; BARRELS],
+            barrels: [Barrel {
+                x: 0.0,
+                y: FLOOR_Y,
+                vx: 0.0,
+                vy: 0.0,
+                wait: 0.0,
+                hp: 0,
+                rolls: false,
+                hit_t: 9.0,
+                broke_t: -1.0,
+            }; BARRELS],
             bonus_total: 0,
             bonus_done: 0.0,
             poster: false,
@@ -216,7 +288,13 @@ impl Game {
             mercy: 0.0,
             continues: 0,
             result: RoundResult::Draw,
-            hitspark: [Spark { x: 0.0, y: 0.0, ttl: 0.0, life: 1.0, blocked: false }; 4],
+            hitspark: [Spark {
+                x: 0.0,
+                y: 0.0,
+                ttl: 0.0,
+                life: 1.0,
+                blocked: false,
+            }; 4],
             shake: 0.0,
             hitstop: 0.0,
             bowed: false,
@@ -231,8 +309,17 @@ impl Game {
             now: 0.0,
             sel_held: [[false; 2]; 2],
             sel_fire: [false; 2],
-            pops: [Pop { text: "", x: 0.0, y: 0.0, ttl: 0.0 }; 4],
-            fruit: Fruit { x: 0.0, ttl: 0.0, kind: 0 },
+            pops: [Pop {
+                text: "",
+                x: 0.0,
+                y: 0.0,
+                ttl: 0.0,
+            }; 4],
+            fruit: Fruit {
+                x: 0.0,
+                ttl: 0.0,
+                kind: 0,
+            },
             fruit_due: false,
             ghost: [0.0; 2],
             quake_x: 0.0,
@@ -244,11 +331,19 @@ impl Game {
 
     /// The fighter player `side` has the cursor on.
     pub(crate) fn picked(&self, who: usize) -> usize {
-        if who == 0 { self.pick } else { self.pick2 }
+        if who == 0 {
+            self.pick
+        } else {
+            self.pick2
+        }
     }
     /// Move player `who`'s cursor to fighter `v`.
     pub(crate) fn set_pick(&mut self, who: usize, v: usize) {
-        if who == 0 { self.pick = v; } else { self.pick2 = v; }
+        if who == 0 {
+            self.pick = v;
+        } else {
+            self.pick2 = v;
+        }
     }
     /// Has the *other* player already locked this fighter? Two players
     /// cannot bring the same fighter to the same fight.
@@ -260,28 +355,15 @@ impl Game {
     /// reordered so no two fights running are at the same home stage, with
     /// the giant and then the fighter nothing hurts kept for the end.
     pub(crate) fn ladder(&self) -> [usize; RUNGS] {
-        // The fights that close the ladder, in order, and everyone before.
-        fn place(ring: &[usize], ends: &[usize], out: &mut Vec<usize>) -> bool {
-            if out.len() == ring.len() { return true; }
-            let early = ring.len() - ends.len();
-            for &who in ring {
-                let fits = if out.len() < early { !ends.contains(&who) } else { ends[out.len() - early] == who };
-                if !fits || out.contains(&who) { continue; }
-                if out.last().is_some_and(|&prev| home_of(prev) == home_of(who)) { continue; }
-                out.push(who);
-                if place(ring, ends, out) { return true; }
-                out.pop();
-            }
-            false
-        }
         let n = FIGHTERS.len();
-        let ring: Vec<usize> = (1..n).map(|k| (self.pick + k) % n).collect();
-        let mut ends: Vec<usize> = ring.iter().copied()
-            .filter(|&w| FIGHTERS[w].invincible || FIGHTERS[w].build == Build::Giant).collect();
+        let homes: [usize; 10] = std::array::from_fn(home_of);
+        let mut ends: Vec<usize> = (0..n)
+            .filter(|&w| FIGHTERS[w].invincible || FIGHTERS[w].build == Build::Giant)
+            .collect();
         ends.sort_by_key(|&w| FIGHTERS[w].invincible);
-        let mut out = Vec::with_capacity(RUNGS);
-        if !place(&ring, &ends, &mut out) { out = ring; }
-        std::array::from_fn(|i| out[i])
+        blip::ordered_ladder(self.pick, &homes, &ends)
+            .try_into()
+            .expect("the ladder contains every opponent")
     }
 
     /// Two players, one match, no ladder and no difficulty dial.
@@ -308,19 +390,43 @@ impl Game {
         // The first bonus round is the row; the second is the fall.
         let falling = self.opponent_index != BONUS_AFTER[0];
         self.bonus_total = if falling { BARRELS } else { 5 };
-        let none = Barrel { x: 0.0, y: FLOOR_Y, vx: 0.0, vy: 0.0, wait: 0.0, hp: 0, rolls: false,
-            hit_t: 9.0, broke_t: -1.0 };
+        let none = Barrel {
+            x: 0.0,
+            y: FLOOR_Y,
+            vx: 0.0,
+            vy: 0.0,
+            wait: 0.0,
+            hp: 0,
+            rolls: false,
+            hit_t: 9.0,
+            broke_t: -1.0,
+        };
         for (i, b) in self.barrels.iter_mut().enumerate() {
-            *b = if i >= self.bonus_total { none }
-                else if falling {
-                    Barrel { x: 90.0 + blip::scatter(i, 0xb0) * 460.0, y: -30.0, wait: 0.8 + i as f32 * 1.7,
-                        hp: 1, rolls: true, ..none }
-                } else {
-                    Barrel { x: 200.0 + i as f32 * 85.0, hp: BARREL_HP, ..none }
-                };
+            *b = if i >= self.bonus_total {
+                none
+            } else if falling {
+                Barrel {
+                    x: 90.0 + blip::scatter(i, 0xb0) * 460.0,
+                    y: -30.0,
+                    wait: 0.8 + i as f32 * 1.7,
+                    hp: 1,
+                    rolls: true,
+                    ..none
+                }
+            } else {
+                Barrel {
+                    x: 200.0 + i as f32 * 85.0,
+                    hp: BARREL_HP,
+                    ..none
+                }
+            };
         }
-        for b in self.bolts.iter_mut() { b.active = false; }
-        for s in self.hitspark.iter_mut() { s.ttl = 0.0; }
+        for b in self.bolts.iter_mut() {
+            b.active = false;
+        }
+        for s in self.hitspark.iter_mut() {
+            s.ttl = 0.0;
+        }
         self.helpers = [None; 6];
         self.fruit.ttl = 0.0;
         self.hitstop = 0.0;
@@ -335,10 +441,13 @@ impl Game {
     /// The attract mode: a round between two fighters drawn by lot, on the
     /// second one's stage. Nothing is scored and nothing is spent.
     pub(crate) fn start_demo(&mut self) {
-        let fair: Vec<usize> = (0..FIGHTERS.len()).filter(|&w| !FIGHTERS[w].invincible).collect();
+        let fair: Vec<usize> = (0..FIGHTERS.len())
+            .filter(|&w| !FIGHTERS[w].invincible)
+            .collect();
         let a = fair[rand_int(0, fair.len() as i32 - 1) as usize];
         let b = fair[(fair.iter().position(|&w| w == a).unwrap()
-            + rand_int(1, fair.len() as i32 - 1) as usize) % fair.len()];
+            + rand_int(1, fair.len() as i32 - 1) as usize)
+            % fair.len()];
         self.mode = Mode::Solo;
         self.demo = true;
         self.pick = a;
@@ -385,10 +494,16 @@ impl Game {
         self.p[1] = Fighter::new(b, 440.0, -1.0);
         self.p[0].rounds = r0;
         self.p[1].rounds = r1;
-        for b in self.bolts.iter_mut() { b.active = false; }
+        for b in self.bolts.iter_mut() {
+            b.active = false;
+        }
         self.helpers = [None; 6];
-        for s in self.hitspark.iter_mut() { s.ttl = 0.0; }
-        for w in self.pops.iter_mut() { w.ttl = 0.0; }
+        for s in self.hitspark.iter_mut() {
+            s.ttl = 0.0;
+        }
+        for w in self.pops.iter_mut() {
+            w.ttl = 0.0;
+        }
         self.fruit.ttl = 0.0;
         self.fruit_due = true;
         self.untouched = true;
@@ -411,15 +526,23 @@ impl Game {
     /// side has three slots of its own, and the sweep always comes last.
     pub(crate) fn call_turtles(&mut self, side: usize) {
         let (caller, foe) = (self.p[side], self.p[1 - side].who);
-        let from = if caller.facing > 0.0 { -30.0 } else { WIN_W as f32 + 30.0 };
+        let from = if caller.facing > 0.0 {
+            -30.0
+        } else {
+            WIN_W as f32 + 30.0
+        };
         let others: Vec<usize> = (0..FIGHTERS.len())
             .filter(|&w| FIGHTERS[w].build == Build::Turtle && w != caller.who && w != foe)
-            .take(3).collect();
+            .take(3)
+            .collect();
         let first = HELPER_MOVES.len() - others.len();
         for (k, &who) in others.iter().enumerate() {
             self.helpers[side * 3 + k] = Some(Helper {
                 f: Fighter::new(who, from, caller.facing),
-                side, wait: k as f32 * HELPER_GAP, mv: HELPER_MOVES[first + k], struck: false,
+                side,
+                wait: k as f32 * HELPER_GAP,
+                mv: HELPER_MOVES[first + k],
+                struck: false,
             });
         }
     }
@@ -430,7 +553,9 @@ impl Game {
         let laser = self.p[owner].arch().special == Special::LaserVision;
         // From the air the laser is aimed, so he turns to look first: at the
         // spot the stare fixed on, or failing that at the opponent.
-        let (ax, ay) = self.p[owner].aim.unwrap_or((foe.x, foe.y - foe.height() * 0.5));
+        let (ax, ay) = self.p[owner]
+            .aim
+            .unwrap_or((foe.x, foe.y - foe.height() * 0.5));
         if laser && self.p[owner].airborne() {
             self.p[owner].facing = if ax >= self.p[owner].x { 1.0 } else { -1.0 };
         }
@@ -442,7 +567,11 @@ impl Game {
         let (y, vx, vy) = if !laser {
             (f.y - 54.0 * f.size(), f.facing * 300.0, 0.0)
         } else if !f.airborne() {
-            (f.y - LASER_HEIGHT * f.size().min(f.foe_size), f.facing * LASER_SPEED, 0.0)
+            (
+                f.y - LASER_HEIGHT * f.size().min(f.foe_size),
+                f.facing * LASER_SPEED,
+                0.0,
+            )
         } else {
             let y = f.y - 100.0 * f.size();
             let (dx, dy) = (ax - x, ay - y);
@@ -450,24 +579,45 @@ impl Game {
             (y, dx / d * LASER_SPEED, dy / d * LASER_SPEED)
         };
         if let Some(b) = self.bolts.iter_mut().find(|b| !b.active) {
-            *b = Bolt { x, y, vx, vy, owner, active: true, damage };
+            *b = Bolt {
+                x,
+                y,
+                vx,
+                vy,
+                owner,
+                active: true,
+                damage,
+            };
         }
     }
 
     /// How far the picture is thrown down this frame by the last heavy blow:
     /// a few pixels, dying away as it rings.
     pub(crate) fn shake_px(&self) -> f32 {
-        if self.shake > 0.0 { (self.shake * 60.0).sin() * self.shake * 30.0 } else { 0.0 }
+        if self.shake > 0.0 {
+            (self.shake * 60.0).sin() * self.shake * 30.0
+        } else {
+            0.0
+        }
     }
 
     /// Ask for a sound.
-    pub(crate) fn snd(&mut self, s: Sfx) { self.sounds.push((s, 1.0)); }
+    pub(crate) fn snd(&mut self, s: Sfx) {
+        self.sounds.push((s, 1.0));
+    }
     /// Ask for a sound at a volume.
-    pub(crate) fn snd_at(&mut self, s: Sfx, volume: f32) { self.sounds.push((s, volume)); }
+    pub(crate) fn snd_at(&mut self, s: Sfx, volume: f32) {
+        self.sounds.push((s, volume));
+    }
 
     /// A word over (`x`, `y`) for a moment.
     pub(crate) fn pop(&mut self, text: &'static str, x: f32, y: f32) {
-        let fresh = Pop { text, x, y, ttl: POP_SECS };
+        let fresh = Pop {
+            text,
+            x,
+            y,
+            ttl: POP_SECS,
+        };
         let slot = self.pops.iter().position(|w| w.ttl <= 0.0).unwrap_or(0);
         self.pops[slot] = fresh;
     }
@@ -476,9 +626,18 @@ impl Game {
     /// guard.
     pub(crate) fn spark(&mut self, x: f32, y: f32, big: bool, blocked: bool) {
         let life = if big { 0.26 } else { 0.17 };
-        let fresh = Spark { x, y, ttl: life, life, blocked };
+        let fresh = Spark {
+            x,
+            y,
+            ttl: life,
+            life,
+            blocked,
+        };
         for s in self.hitspark.iter_mut() {
-            if s.ttl <= 0.0 { *s = fresh; return; }
+            if s.ttl <= 0.0 {
+                *s = fresh;
+                return;
+            }
         }
         self.hitspark[0] = fresh;
     }

@@ -11,7 +11,7 @@ for (const touch of [false, true]) {
     await page.goto(`${origin}/basic.html`);
     const tape = page.locator('.game-tape[data-tape="ADDER"]:not(.tape-placeholder)');
     const original = await tape.elementHandle();
-    const buttons = await page.locator('.tape-buttons > span').evaluateAll((keys) => keys.map((key) => {
+    const buttons = await page.locator('.tape-buttons > [data-key]').evaluateAll((keys) => keys.map((key) => {
       const r = key.getBoundingClientRect();
       return { height: r.height, visible: Boolean(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest('.tape-buttons')) };
     }));

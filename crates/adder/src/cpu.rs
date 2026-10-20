@@ -22,10 +22,15 @@ fn quarry(w: &World, who: usize) -> Option<Pt> {
     let mut hole = None;
     let mut hole_d = f32::MAX;
     for (j, s) in w.snakes.iter().enumerate() {
-        if j == who { continue; }
+        if j == who {
+            continue;
+        }
         if let Some(c) = s.hole_centre() {
             let d = head.dist(c);
-            if d < hole_d { hole_d = d; hole = Some(c); }
+            if d < hole_d {
+                hole_d = d;
+                hole = Some(c);
+            }
         }
     }
     hole
@@ -43,11 +48,23 @@ pub fn steer(w: &World, who: usize) -> Steer {
         let clear = w.clearance(who, dir, LOOK).min(LOOK);
         let mut score = clear;
         score -= off.abs() * 4.0; // a lazy turn is a cheap turn
-        if let Some(want) = want { score -= angle_diff(dir, want).abs() * 40.0; }
-        if score > best_any.1 { best_any = (off, score); }
-        if clear >= need && score > best_safe.1 { best_safe = (off, score); }
+        if let Some(want) = want {
+            score -= angle_diff(dir, want).abs() * 40.0;
+        }
+        if score > best_any.1 {
+            best_any = (off, score);
+        }
+        if clear >= need && score > best_safe.1 {
+            best_safe = (off, score);
+        }
     }
     // A clear route takes priority over a scoring gap.
-    let off = if best_safe.1 > f32::MIN { best_safe.0 } else { best_any.0 };
-    Steer { turn: (off / 0.5).clamp(-1.0, 1.0) }
+    let off = if best_safe.1 > f32::MIN {
+        best_safe.0
+    } else {
+        best_any.0
+    };
+    Steer {
+        turn: (off / 0.5).clamp(-1.0, 1.0),
+    }
 }

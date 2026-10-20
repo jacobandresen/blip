@@ -47,6 +47,63 @@ var editorPanel=document.getElementById('basic-editor'),editorFile=document.getE
 if (blipHasTouch()) input.readOnly = true;
 var canvas = document.getElementById('basic-graphics');
 var wasmFrame=document.getElementById('basic-wasm-frame'),basicWasmPlaying=false,basicWasmReady=false,basicWasmSource='',basicWasmRunId=0;
+const basicMathNames = [
+  'MIN', 'MAX', 'ATN', 'ATAN2',
+  'CLAMP', 'LERP', 'WRAP', 'DISTANCE', 'ANGLE_DIFF', 'SMOOTHSTEP01',
+  'EASE_OUT_CUBIC', 'SCATTER', 'RECTS_OVERLAP',
+  'SEGMENT_CIRCLE_OVERLAP', 'SEGMENT_RECT_OVERLAP',
+];
+const basicMathPattern = new RegExp('\\b(?:' + basicMathNames.join('|') + ')\\s*\\(');
+let basicMathLoading = null;
+let basicMathCommands = [];
+
+function usesSharedMath(source) {
+  return basicMathPattern.test(source.replace(/"(?:[^"]|"")*"/g, '""'));
+}
+
+function sharedMathReady() {
+  return typeof wasmFrame.contentWindow?.wasm_exports?.blip_basic_math_clamp === 'function';
+}
+
+function needsSharedMath(command) {
+  if (sharedMathReady()) return false;
+  return usesSharedMath(command)
+    || command === 'RUN' && Array.from(lines.values()).some(usesSharedMath);
+}
+
+function loadSharedMath() {
+  return new Promise(function (resolve, reject) {
+    const timer = setTimeout(() => finish(Error('Shared functions could not load')), 20000);
+    function finish(error) {
+      clearTimeout(timer);
+      window.removeEventListener('message', loaded);
+      if (error) reject(error);
+      else resolve();
+    }
+    function loaded(event) {
+      if (event.origin === location.origin && event.source === wasmFrame.contentWindow
+          && event.data?.type === 'blip-basic-wasm-ready') finish();
+    }
+    window.addEventListener('message', loaded);
+    if (!wasmFrame.hasAttribute('src')) wasmFrame.src = 'basic-runtime.html?v=16';
+  });
+}
+
+function queueSharedMathCommand(command) {
+  basicMathCommands.push(command);
+  if (!basicMathLoading) {
+    basicMathLoading = loadSharedMath().then(function () {
+      const commands = basicMathCommands.splice(0);
+      basicMathLoading = null;
+      commands.forEach(submit);
+    }).catch(function (error) {
+      basicMathLoading = null;
+      basicMathCommands = [];
+      fail(error.message);
+    });
+  }
+  return basicMathLoading;
+}
 var exitGameButton = document.getElementById('exit-game');
 var monitorFullscreenButton = document.getElementById('monitor-fullscreen');
 monitorFullscreenButton.addEventListener('click',function(){
@@ -55,6 +112,7 @@ monitorFullscreenButton.addEventListener('click',function(){
   monitorFullscreenButton.setAttribute('aria-label',expanded?'Restore monitor':'Maximize monitor');
   monitorFullscreenButton.title=expanded?'Restore monitor':'Maximize monitor';
   monitorFullscreenButton.textContent=expanded?'⤡':'⤢';
+  updatePlayClearance();
   if(basicWasmPlaying){
     var gameCanvas=wasmFrame.contentDocument&&wasmFrame.contentDocument.querySelector('#glcanvas');
     if(gameCanvas)gameCanvas.focus({preventScroll:true});
@@ -66,72 +124,83 @@ tapeLoadingAudio.preload='auto';
 var controlDeck = document.querySelector('.amstrad-controls');
 var controlStick = controlDeck.querySelector('.stick-base');
 var controlFire = controlDeck.querySelector('.fire-buttons');
+var controlSecond = document.getElementById('deck-p2');
+var controlSticks = Array.from(controlDeck.querySelectorAll('.stick-base'));
 var rallyDialP1 = document.getElementById('amstrad-rally-dial-p1');
 var rallyDialP2 = document.getElementById('amstrad-rally-dial-p2');
-var heldDirections = [];
-var basicRallyDialReleases=[];
-function bindBasicRallyDial(dial, up, down, tap){
-  if(!dial)return;
-  var pointer=null,last=0,acc=0,total=0,active=null,idle=0;
-  function release(){if(idle){clearTimeout(idle);idle=0;}if(active){sendBasicWasmKey(active.key,active.code,false);active=null;}}
-  basicRallyDialReleases.push(function(){release();pointer=null;});
-  function choose(spec){if(active&&active.key===spec.key)return;release();active=spec;sendBasicWasmKey(spec.key,spec.code,true);}
-  dial.addEventListener('pointerdown',function(event){if(!basicWasmPlaying)return;event.preventDefault();event.stopImmediatePropagation();pointer=event.pointerId;try{dial.setPointerCapture(pointer);}catch(e){}var box=dial.getBoundingClientRect();last=Math.atan2(event.clientY-(box.top+box.height/2),event.clientX-(box.left+box.width/2));acc=0;total=0;});
-  dial.addEventListener('pointermove',function(event){if(!basicWasmPlaying||event.pointerId!==pointer)return;event.preventDefault();event.stopImmediatePropagation();var box=dial.getBoundingClientRect(),angle=Math.atan2(event.clientY-(box.top+box.height/2),event.clientX-(box.left+box.width/2)),delta=angle-last;last=angle;if(delta>Math.PI)delta-=Math.PI*2;if(delta< -Math.PI)delta+=Math.PI*2;total+=Math.abs(delta);acc+=delta;if(acc>0.035){acc=0;choose(down);}else if(acc< -0.035){acc=0;choose(up);}if(idle)clearTimeout(idle);idle=setTimeout(release,90);});
-  ['pointerup','pointercancel','lostpointercapture'].forEach(function(type){dial.addEventListener(type,function(event){if(pointer===null)return;if(basicWasmPlaying){event.preventDefault();event.stopImmediatePropagation();if(type==='pointerup'&&total<0.08){sendBasicWasmKey(tap.key,tap.code,true);setTimeout(function(){sendBasicWasmKey(tap.key,tap.code,false);},40);}}release();pointer=null;});});
+function programTape() {
+  var name = String(currentFile || '').split('/').pop().toUpperCase();
+  var identity = Array.from(lines.values()).map(function (source) { return /^REM\s+GAME:\s*([A-Z_]+)\s*$/i.exec(source); }).find(Boolean);
+  if (identity) name = identity[1].toUpperCase() + '.BLIP';
+  return tapePrograms.find(function (item) { return item.file === name; });
 }
-bindBasicRallyDial(rallyDialP1,{key:'ArrowUp',code:'ArrowUp'},{key:'ArrowDown',code:'ArrowDown'},{key:' ',code:'Space'});
-bindBasicRallyDial(rallyDialP2,{key:'i',code:'KeyI'},{key:'k',code:'KeyK'},{key:'i',code:'KeyI'});
-function releaseBasicRallyDials(){basicRallyDialReleases.forEach(function(release){release();});}
+function configureBasicControls() {
+  BlipController.releaseAll();
+  var tape = programTape();
+  var game = tape && BLIP_GAMES[tape.slug] || {};
+  document.body.toggleAttribute('data-rally', !!(tape && tape.slug === 'rally'));
+  showBasicSecondPlayer(!!(tape && tape.players === 2));
+  BlipController.init({
+    canvas: { dispatchEvent: function (event) { sendBasicWasmKey(event.key, event.code, event.type === 'keydown'); } },
+    gate: function () { return !basicWasmPlaying; },
+    buttons: game.buttons,
+    keys: game.keys,
+    click: false,
+    onInput: function () {
+      controlSticks.forEach(function (stick, index) {
+        var prefix = index ? 'p2' : '';
+        stick.style.setProperty('--dx', Number(BlipController.isHeld(prefix + 'right')) - Number(BlipController.isHeld(prefix + 'left')));
+        stick.style.setProperty('--dy', Number(BlipController.isHeld(prefix + 'down')) - Number(BlipController.isHeld(prefix + 'up')));
+      });
+    }
+  });
+  controlDeck.querySelectorAll('.fire-buttons').forEach(function (fire, player) {
+    fire.querySelectorAll('.arcade-btn').forEach(function (button, index) {
+      var spec = game.buttons && (game.buttons[index] || game.buttons[0]);
+      button.classList.remove('spare');
+      button.setAttribute('aria-label', 'Player ' + (player + 1) + ' ' + (spec && spec.label || 'Fire'));
+      button.classList.toggle('alt', index === 1 && !!(game.buttons && game.buttons.length > 1));
+    });
+  });
+}
+function showBasicSecondPlayer(show) {
+  controlSecond.hidden = !show;
+  document.documentElement.toggleAttribute('data-open', show);
+  document.documentElement.setAttribute('data-seats', show ? '2' : '1');
+  document.documentElement.setAttribute('data-players', show ? '2' : '1');
+}
+showBasicSecondPlayer(false);
+function releaseBasicRallyDials() { BlipController.releaseAll(); }
+BlipController.init({ click: false });
+controlSticks.forEach(function (stick, index) {
+  var prefix = index ? 'p2' : '';
+  BlipController.bindDpad(stick, { dead: .19, names: {
+    left: prefix + 'left', right: prefix + 'right', up: prefix + 'up', down: prefix + 'down'
+  } });
+});
+controlDeck.querySelectorAll('.fire-buttons').forEach(function (fire, player) {
+  fire.querySelectorAll('.arcade-btn').forEach(function (button, index) {
+    button.setAttribute('data-blip', (player ? 'p2' : '') + 'button' + (index + 1));
+  });
+  BlipController.bindButtons(fire);
+});
+BlipController.bindDial(rallyDialP1, {
+  up: { key: 'ArrowUp', code: 'ArrowUp' }, down: { key: 'ArrowDown', code: 'ArrowDown' },
+  tap: { key: ' ', code: 'Space' }
+});
+BlipController.bindDial(rallyDialP2, {
+  up: { key: 'i', code: 'KeyI' }, down: { key: 'k', code: 'KeyK' }, tap: { key: 'i', code: 'KeyI' }
+});
+window.addEventListener('blur', function () { BlipController.releaseAll(); });
 function updatePlayClearance(){
   var controls=document.body.hasAttribute('data-rally')?[rallyDialP1,rallyDialP2]:[controlDeck,controlStick,controlFire];
-  var top=Math.min.apply(Math,controls.map(function(el){return el.getBoundingClientRect().top;}));
+  var boxes=controls.map(function(el){return el.getBoundingClientRect();}).filter(function(box){return box.width>0&&box.height>0;});
+  var top=Math.min.apply(Math,[document.documentElement.clientHeight].concat(boxes.map(function(box){return box.top;})));
   document.documentElement.style.setProperty('--amstrad-control-clearance',Math.max(0,document.documentElement.clientHeight-top)+'px');
 }
 updatePlayClearance();
 window.addEventListener('resize',updatePlayClearance);
 window.addEventListener('orientationchange',function(){requestAnimationFrame(updatePlayClearance);});
-function setGameInput(name, down) {
-  if(!basicWasmPlaying)return;
-  var keys={left:['ArrowLeft','ArrowLeft'],right:['ArrowRight','ArrowRight'],up:['ArrowUp','ArrowUp'],down:['ArrowDown','ArrowDown'],button1:[' ','Space'],button2:['z','KeyZ']};
-  if(keys[name])sendBasicWasmKey(keys[name][0],keys[name][1],down);
-}
-function releaseDeck() {
-  heldDirections.forEach(function (name) { setGameInput(name, false); });
-  heldDirections = [];
-  setGameInput('button1', false);
-  setGameInput('button2', false);
-  controlStick.style.setProperty('--dx', '0');
-  controlStick.style.setProperty('--dy', '0');
-}
-controlStick.addEventListener('pointerdown', function (event) {
-  event.preventDefault();
-  try { controlStick.setPointerCapture(event.pointerId); } catch (e) {}
-  moveStick(event);
-});
-function moveStick(event) {
-  var rect = controlStick.getBoundingClientRect();
-  var x = Math.max(-1, Math.min(1, (event.clientX - (rect.left + rect.width / 2)) / (rect.width * .34)));
-  var y = Math.max(-1, Math.min(1, (event.clientY - (rect.top + rect.height / 2)) / (rect.height * .34)));
-  var next = [];
-  if (Math.abs(x) > .28) next.push(x < 0 ? 'left' : 'right');
-  if (Math.abs(y) > .28) next.push(y < 0 ? 'up' : 'down');
-  heldDirections.filter(function (name) { return next.indexOf(name) < 0; }).forEach(function (name) { setGameInput(name, false); });
-  next.filter(function (name) { return heldDirections.indexOf(name) < 0; }).forEach(function (name) { setGameInput(name, true); });
-  heldDirections = next;
-  controlStick.style.setProperty('--dx', String(x));
-  controlStick.style.setProperty('--dy', String(y));
-}
-controlStick.addEventListener('pointermove', function (event) { if (event.buttons) moveStick(event); });
-['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (type) { controlStick.addEventListener(type, releaseDeck); });
-controlFire.querySelectorAll('.arcade-btn').forEach(function (button, index) {
-  var action=index===0?'button1':'button2';
-  button.setAttribute('data-blip', action);
-  button.setAttribute('aria-label', index===0?'Fire':'Alternate fire');
-  button.addEventListener('pointerdown', function (event) { event.preventDefault(); try { button.setPointerCapture(event.pointerId); } catch (e) {} setGameInput(action, true); });
-  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (type) { button.addEventListener(type, function () { setGameInput(action, false); }); });
-});
-window.addEventListener('blur', releaseDeck);
 var gfx = canvas.getContext('2d');
 var palette = ['#101da3','#fff5a4','#00d8e6','#ff5696','#a5ea6a','#ffad44','#e6e6e6','#131313'];
 var pen = 1, paper = 0, gx = 0, gy = 0;
@@ -145,12 +214,12 @@ var DRAFT = 'blip-basic-draft';
 var FS_STORE = 'blip-basic-filesystem';
 var LEGACY_STORE = 'blip-basic-programs';
 var CURRENT_FILE_STORE = 'blip-basic-current-file';
-var tapeFiles=Object.create(null),gfxNames=Object.create(null),tapeNames=[],tapeLoadError=null,tapeBusy=false;
+var tapeFiles=Object.create(null),gfxNames=Object.create(null),tapeNames=[],tapeLoadError=null,tapeBusy=false,tapeLoading=false;
 var tapePrograms=[
-  {file:'ADDER.BLIP',command:'ADDER',slug:'adder',title:'ADDER'},
+  {file:'ADDER.BLIP',command:'ADDER',slug:'adder',title:'ADDER',players:2},
   {file:'BOUNCER.BLIP',command:'BOUNCER',slug:'bouncer',title:'BOUNCER'},
   {file:'BRAWLER.BLIP',command:'BRAWLER',slug:'brawler',title:'BRAWLER'},
-  {file:'BUBBLER.BLIP',command:'BUBBLER',slug:'bubbler',title:'BUBBLER'},
+  {file:'BUBBLER.BLIP',command:'BUBBLER',slug:'bubbler',title:'BUBBLER',players:2},
   {file:'DEFENDER.BLIP',command:'DEFENDER',slug:'galactic_defender',title:'GALACTIC DEFENDER'},
   {file:'METEORS.BLIP',command:'METEORS',slug:'meteors',title:'METEORS'},
   {file:'RALLY.BLIP',command:'RALLY',slug:'rally',title:'RALLY'},
@@ -202,7 +271,7 @@ function resolvePath(path,base){
 }
 function canonicalDirectory(path){
   var target=canonicalRoot(path).toLowerCase();
-  var roots=['/','/TAPE','/TAPE/GFX','/ROM','/ROM/TUNES','/USER'].concat(Object.keys(BLIP_GAMES).map(function(slug){return '/TAPE/GFX/'+slug.toUpperCase();}),filesystem.dirs);
+  var roots=mountedDirectories();
   return roots.find(function(dir){return dir.toLowerCase()===target;})||path;
 }
 function programPath(name){
@@ -213,8 +282,19 @@ function programPath(name){
   return path.slice(0,path.lastIndexOf('/')+1)+path.slice(path.lastIndexOf('/')+1).toUpperCase();
 }
 function findFile(path){
-  var all=tapeNames.map(function(name){return '/TAPE/'+name;}).concat(Object.keys(filesystem.files));
+  var all=(insertedTape?['/TAPE/'+insertedTape.file]:[]).concat(Object.keys(filesystem.files));
   return all.find(function(file){return file.toLowerCase()===path.toLowerCase();})||path;
+}
+function mountedDirectories(){
+  return ['/','/ROM','/ROM/TUNES','/TAPE','/USER'].concat(insertedTape?['/TAPE/GFX','/TAPE/GFX/'+insertedTape.slug.toUpperCase()]:[],filesystem.dirs);
+}
+function isFileAvailable(path){
+  path=String(path).toUpperCase();
+  if(path.indexOf('/TAPE/')!==0)return true;
+  if(!insertedTape)return false;
+  if(path==='/TAPE/'+insertedTape.file.toUpperCase())return true;
+  var prefix='/TAPE/GFX/'+insertedTape.slug.toUpperCase()+'/';
+  return path.indexOf(prefix)===0&&(gfxNames[insertedTape.slug.toUpperCase()]||[]).some(function(name){return prefix+name.toUpperCase()===path;});
 }
 function tapeForPath(path){return tapePrograms.find(function(tape){return ('/TAPE/'+tape.file).toLowerCase()===String(path).toLowerCase();})||null;}
 var tapeOrder=tapePrograms.slice();
@@ -289,6 +369,7 @@ async function returnTapeToPile(keepOpen){
   if(!tapePlaceholder||tapePlaceholder.dataset.tape!==tape.command)leavePile(tape,node);
   var to=tapeBox(tapePlaceholder),s0=from.w/to.w,dx=from.x-to.x,dy=from.y-to.y;
   insertedTape=null;insertedTapeNode=null;
+  if(currentDir.indexOf('/TAPE/')===0)currentDir='/TAPE';
   node.classList.remove('deck-inserted-tape');setFlightBox(node,to);
   // The eject spring pops the top edge up, a hand tips the tape out by it and carries it back to its slot.
   var done=await flyTape(node,[
@@ -332,6 +413,19 @@ async function insertTapeFromPile(tape){
   insertedTape=tape;insertedTapeNode=node;document.body.setAttribute('data-deck-tape','');await closeDeck();
 }
 var tapeDrag=null,tapeDragged=false;
+async function ejectTape(){
+  if(tapeBusy||tapeLoading)throw Error('Tape transport busy');
+  tapeBusy=true;
+  try{
+    if(editor)closeEditor();
+    exitActiveProgram();
+    await returnTapeToPile(false);
+    document.body.removeAttribute('data-tape-loaded');
+    document.body.removeAttribute('data-tape-name');
+    print('Tape ejected');
+  }finally{tapeBusy=false;}
+}
+document.querySelector('.tape-buttons [data-key=eject]').addEventListener('click',function(){ejectTape().then(ready).catch(function(error){fail(error.message);});});
 function shuffleTapePile(){
   var old=tapeOrder.map(function(tape){return tape.file;}).join(',');
   do{for(var i=tapeOrder.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));[tapeOrder[i],tapeOrder[j]]=[tapeOrder[j],tapeOrder[i]];}}while(tapeOrder.map(function(tape){return tape.file;}).join(',')===old);
@@ -435,7 +529,7 @@ async function readProgramSource(path){
   if(path.indexOf('/TAPE/')===0){
     await tapeReady;
     path=findFile(path);
-    if(!tapeNames.some(function(name){return ('/TAPE/'+name).toLowerCase()===path.toLowerCase();})||!tapeForPath(path))throw Error('TAPE NOT FOUND');
+    if(!isFileAvailable(path)||!tapeForPath(path))throw Error('TAPE NOT INSERTED');
     if(tapeFiles[path]===undefined){var tapeResponse=await fetch('TAPE/'+path.slice('/TAPE/'.length));if(!tapeResponse.ok)throw Error('TAPE NOT FOUND');tapeFiles[path]=await tapeResponse.text();}
     return tapeFiles[path];
   }
@@ -443,22 +537,24 @@ async function readProgramSource(path){
 }
 async function loadProgram(name){
   var path=programPath(name);
-  if(path.indexOf('/TAPE/')===0)await tapeReady;
+  if(path.indexOf('/TAPE/')===0)await Promise.all([tapeReady,gfxReady]);
   path=findFile(path);
   var tape=tapeForPath(path);
   if(tape&&!tapeNames.some(function(name){return ('/TAPE/'+name).toLowerCase()===path.toLowerCase();}))throw Error('TAPE NOT FOUND');
+  if(tape&&tapeLoading)throw Error('Tape transport busy');
+  if(tape)tapeLoading=true;
   var tapeLoad=tape?beginTapeLoad(tape):null;
   try{
+    if(tapeLoad)await tapeLoad;
     var source=await readProgramSource(path);
     if(source===undefined)throw Error('Program not found: '+path);
-    if(tapeLoad)await tapeLoad;
     var program=parseProgram(source);
     lines.clear();program.forEach(function(value,key){lines.set(key,value);});
     vars=Object.create(null);run=null;pendingInput=null;currentFile=path;
     storeDraft();
     print('Loaded '+path);
     return true;
-  }finally{if(tape)document.body.removeAttribute('data-loading-tape');}
+  }finally{if(tape){tapeLoading=false;document.body.removeAttribute('data-loading-tape');}}
 }
 function playTapeSeatClick(){
   if(blipMuted())return;
@@ -500,13 +596,13 @@ async function showSource(name){
   source.split(/\r?\n/).forEach(print);
 }
 function editorEscapeHtml(value){return String(value).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});}
-var editorKeywords=new Set(('PRINT INPUT LET IF THEN ELSE FOR TO STEP NEXT GOTO GOSUB RETURN END STOP REM DATA READ RESTORE DIM AND OR NOT MOD ABS INT RND SQR SIN COS TAN ATN LOG EXP LEN STR$ VAL CHR$ ASC LEFT$ RIGHT$ MID$ CLEAR COLOR FILL_RECT DRAW_RECT DRAW_LINE DRAW_LINE_EX DRAW_GLOW_LINE CIRCLE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_CAPSULE FILL_SUNBURST DRAW_TEXT DRAW_CHAR DRAW_NUMBER DRAW_HUD DRAW_TEXTURE TEXT_CX KEY_ACTIVE KEY_HELD KEY_PRESSED LOAD SAVE DIR CD MKDIR DEL MOVE TUNE').split(' '));
+var editorKeywords=new Set(('PRINT INPUT LET IF THEN ELSE FOR TO STEP NEXT GOTO GOSUB RETURN END STOP REM DATA READ RESTORE DIM AND OR NOT MOD ABS INT RND SQR SIN COS TAN ATN LOG EXP LEN STR$ VAL CHR$ ASC LEFT$ RIGHT$ MID$ CLEAR COLOR FILL_RECT DRAW_RECT DRAW_LINE DRAW_LINE_EX DRAW_POLYLINE DRAW_GLOW_LINE FX_CLEAR FX_UPDATE FX_DRAW FX_BURST FX_POPUP FX_RING CIRCLE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_CAPSULE FILL_SUNBURST DRAW_TEXT DRAW_CHAR DRAW_NUMBER DRAW_HUD DRAW_TEXTURE TEXT_CX KEY_ACTIVE KEY_HELD KEY_PRESSED LOAD SAVE DIR CD MKDIR DEL MOVE EJECT TUNE').split(' ').concat(basicMathNames));
 function highlightEditorText(value){
   var pattern=/"[^\"]*"|\bREM\b.*$|\b[A-Z_][A-Z0-9_$]*\b|\b\d+(?:\.\d+)?\b/gi,out='',last=0,match;
   while((match=pattern.exec(value))){out+=editorEscapeHtml(value.slice(last,match.index));var token=match[0],upper=token.toUpperCase(),kind=token[0]==='"'?'editor-string':/^REM\b/i.test(token)?'editor-comment':/^\d/.test(token)?'editor-number':/^\b(?:BLIP_|NEON_)/i.test(token)?'editor-constant':editorKeywords.has(upper)?'editor-keyword':'';out+=kind?'<span class="'+kind+'">'+editorEscapeHtml(token)+'</span>':editorEscapeHtml(token);last=pattern.lastIndex;if(/^REM\b/i.test(token))break;}
   return out+editorEscapeHtml(value.slice(last));
 }
-var editorCompletions=('ABS AND CIRCLE CD CLEAR COLOR COS DATA DEL DIR DRAW_CHAR DRAW_GLOW_LINE DRAW_HUD DRAW_LINE DRAW_LINE_EX DRAW_NUMBER DRAW_RECT DRAW_SUNBURST DRAW_TEXT DRAW_TEXTURE END EXP FILL_CAPSULE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_RECT FILL_SUNBURST FOR GOSUB GOTO IF INPUT INT KEY_ACTIVE KEY_HELD KEY_PRESSED LEFT$ LEN LET LOAD LOG MID$ MKDIR MOD MOVE NEXT NOT OR PRINT READ RETURN RIGHT$ RND SAVE SIN SQR STEP STR$ TAN TEXT_CX THEN TO TUNE VAL').split(' ');
+var editorCompletions=('FX_CLEAR FX_UPDATE FX_DRAW FX_BURST FX_POPUP FX_RING DRAW_POLYLINE ABS AND CIRCLE CD CLEAR COLOR COS DATA DEL DIR DRAW_CHAR DRAW_GLOW_LINE DRAW_HUD DRAW_LINE DRAW_LINE_EX DRAW_NUMBER DRAW_RECT DRAW_SUNBURST DRAW_TEXT DRAW_TEXTURE EJECT END EXP FILL_CAPSULE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_RECT FILL_SUNBURST FOR GOSUB GOTO IF INPUT INT KEY_ACTIVE KEY_HELD KEY_PRESSED LEFT$ LEN LET LOAD LOG MID$ MKDIR MOD MOVE NEXT NOT OR PRINT READ RETURN RIGHT$ RND SAVE SIN SQR STEP STR$ TAN TEXT_CX THEN TO TUNE VAL').split(' ').concat(basicMathNames);
 function editorCompletion(){
   var before=(editor.rows[editor.row]||'').slice(0,editor.column);
   if((before.match(/"/g)||[]).length%2)return null;
@@ -608,10 +704,10 @@ function directoryEntries(path){
   if(path==='/')dirs=['/ROM/','/TAPE/','/USER/'];
   if(path==='/ROM')dirs.push('TUNES/');
   if(path==='/ROM/TUNES')files=files.concat(romTunes);
-  if(path==='/TAPE'){dirs.push('GFX/');files=files.concat(tapeNames);}
-  if(path==='/TAPE/GFX')dirs=dirs.concat(Object.keys(BLIP_GAMES).map(function(slug){return slug.toUpperCase()+'/';}));
+  if(path==='/TAPE'&&insertedTape){dirs.push('GFX/');files.push(insertedTape.file);}
+  if(path==='/TAPE/GFX'&&insertedTape)dirs.push(insertedTape.slug.toUpperCase()+'/');
   var gfxGame=path.match(/^\/TAPE\/GFX\/([A-Z0-9_]+)$/);
-  if(gfxGame)files=files.concat(gfxNames[gfxGame[1]]||[]);
+  if(gfxGame&&insertedTape&&gfxGame[1]===insertedTape.slug.toUpperCase())files=files.concat(gfxNames[gfxGame[1]]||[]);
   filesystem.dirs.forEach(function(dir){
     if(dir==='/USER')return;
     var parent=dir.slice(0,dir.lastIndexOf('/'))||'/';
@@ -636,7 +732,7 @@ async function showDirectory(path){
   else entries.forEach(print);
 }
 function isDirectory(path){
-  return ['/','/ROM','/ROM/TUNES','/TAPE','/TAPE/GFX','/USER'].concat(Object.keys(BLIP_GAMES).map(function(slug){return '/TAPE/GFX/'+slug.toUpperCase();}),filesystem.dirs).some(function(dir){return dir.toLowerCase()===path.toLowerCase();});
+  return mountedDirectories().some(function(dir){return dir.toLowerCase()===path.toLowerCase();});
 }
 function makeDirectory(name){
   var path=canonicalRoot(resolvePath(name));
@@ -682,6 +778,7 @@ function stopProgram(){run=null;pendingInput=null;input.placeholder='';document.
 function splitStatements(s) {
   var out = [], part = '', quoted = false;
   for (var i=0;i<s.length;i++) {
+    if (!part.trim() && /^(?:REM(?=\s|:|$)|')/i.test(s.slice(i).trimStart())) { part += s.slice(i); break; }
     if (s[i] === '"') quoted = !quoted;
     if (s[i] === ':' && !quoted && !/^IF\s+.+\s+THEN\s+/i.test(part.trim())) { out.push(part.trim()); part=''; } else part += s[i];
   }
@@ -697,76 +794,39 @@ function splitArgs(s) {
   }
   out.push(part.trim()); return out;
 }
-function tokenize(s) {
-  var out=[], re=/\s*(?:([0-9]+(?:\.[0-9]*)?|\.[0-9]+)|("(?:[^"]|"")*")|([A-Za-z_][A-Za-z0-9_$]*)|(<=|>=|<>|[+\-*/(),=<>]))/gy;
-  var i=0;
-  while(i<s.length) {
-    re.lastIndex=i; var m=re.exec(s);
-    if(!m) { if(/^\s*$/.test(s.slice(i))) break; throw Error('Syntax near '+s.slice(i, i+12)); }
-    out.push(m[1]!==undefined?{kind:'num',value:Number(m[1])}:m[2]!==undefined?{kind:'str',value:m[2].slice(1,-1).replace(/""/g,'"')}:{kind:'sym',value:(m[3]||m[4]).toUpperCase()});
-    i=re.lastIndex;
-  }
-  return out;
-}
+const consoleHost = {
+  read(name) {
+    if (name === 'INKEY$') {
+      const key = lastKey;
+      lastKey = '';
+      return key;
+    }
+    return Object.hasOwn(vars, name) ? vars[name] : name.endsWith('$') ? '' : 0;
+  },
+
+  call(name, args) {
+    if (basicMathNames.includes(name)) {
+      const shared = wasmFrame.contentWindow?.wasm_exports?.['blip_basic_math_' + name.toLowerCase()];
+      if (typeof shared !== 'function') throw Error('Shared functions are not loaded');
+      if (args.length !== shared.length) throw Error(name + ' needs ' + shared.length + ' arguments');
+      if (args.some((value) => typeof value !== 'number')) throw Error(name + ' needs numeric arguments');
+      return shared(...args);
+    }
+    if (name === 'KEY_HELD' || name === 'KEY_ACTIVE' || name === 'KEY_PRESSED') {
+      const key = blipKeyCode(args[0]);
+      const held = !!heldKeys[key], pressed = !!pressedKeys[key];
+      return Number(name === 'KEY_HELD' ? held : name === 'KEY_PRESSED' ? pressed : held || pressed);
+    }
+    if (Object.hasOwn(arrays, name)) {
+      const key = args.map((index) => Math.floor(Number(index))).join(',');
+      return arrays[name][key] || 0;
+    }
+    throw Error('Unknown function ' + name);
+  },
+};
+
 function evalExpr(source) {
-    var ts=tokenize(source), at=0;
-  function peek(){return ts[at]&&ts[at].value;}
-  function eat(v){if(peek()===v){at++;return true;}return false;}
-  function need(v){if(!eat(v)) throw Error('Expected '+v);}
-  function atom(){
-    var t=ts[at++]; if(!t) throw Error('Expression expected');
-    if(t.kind==='num'||t.kind==='str') return t.value;
-    if(t.value==='('){var v=expr(0);need(')');return v;}
-    if(t.value==='-') return -Number(atom());
-    if(t.value==='+') return Number(atom());
-    if(t.value==='NOT') return Number(!Number(atom()));
-    if(t.kind==='sym' && /^[A-Z_]/.test(t.value)) {
-      var name=t.value;
-      if(eat('(')) {
-        var args=[];if(!eat(')')){do{args.push(expr(0));}while(eat(','));need(')');}
-        if(name==='INT')return Math.floor(Number(args[0]));
-        if(name==='ABS')return Math.abs(Number(args[0]));
-        if(name==='SQR')return Math.sqrt(Number(args[0]));
-        if(name==='SIN')return Math.sin(Number(args[0]));
-        if(name==='COS')return Math.cos(Number(args[0]));
-        if(name==='RND')return Math.random()*(args.length?Number(args[0]):1);
-        if(name==='LEN')return String(args[0]).length;
-        if(name==='STR$')return String(args[0]);
-        if(name==='COLOR'){if(args.length<3||args.length>4)throw Error('COLOR needs red,green,blue[,alpha]');return {blipColor:true,r:Number(args[0]),g:Number(args[1]),b:Number(args[2]),a:args.length===4?Number(args[3]):1};}
-        if(name==='KEY_HELD'||name==='KEY_ACTIVE'||name==='KEY_PRESSED'){
-          var code=blipKeyCode(args[0]);
-          return Number(name==='KEY_HELD'?!!heldKeys[code]:name==='KEY_PRESSED'?!!pressedKeys[code]:!!(heldKeys[code]||pressedKeys[code]));
-        }
-        if(name==='CHR$')return String.fromCharCode(Number(args[0]));
-        if(Object.prototype.hasOwnProperty.call(arrays,name))return arrays[name][args.map(function(index){return Math.floor(Number(index));}).join(',')]||0;
-        throw Error('Unknown function '+name);
-      }
-      if(name==='INKEY$'){var k=lastKey;lastKey='';return k;}
-      return Object.prototype.hasOwnProperty.call(vars,name)?vars[name]:(name.endsWith('$')?'':0);
-    }
-    throw Error('Expression expected');
-  }
-  var prec={OR:1,AND:2,'=':3,'<>':3,'<':3,'>':3,'<=':3,'>=':3,'+':4,'-':4,'*':5,'/':5};
-  function expr(min){
-    var left=atom();
-    while(prec[peek()]>=min && peek()!==undefined){
-      var op=ts[at++].value,right=expr(prec[op]+1);
-      if(op==='+') left=typeof left==='string'||typeof right==='string'?String(left)+String(right):Number(left)+Number(right);
-      else if(op==='-')left=Number(left)-Number(right);
-      else if(op==='*')left=Number(left)*Number(right);
-      else if(op==='/'){if(Number(right)===0)throw Error('Division by zero');left=Number(left)/Number(right);}
-      else if(op==='=')left=Number(left===right);
-      else if(op==='<>')left=Number(left!==right);
-      else if(op==='<')left=Number(left<right);
-      else if(op==='>')left=Number(left>right);
-      else if(op==='<=')left=Number(left<=right);
-      else if(op==='>=')left=Number(left>=right);
-      else if(op==='AND')left=Number(Boolean(left)&&Boolean(right));
-      else if(op==='OR')left=Number(Boolean(left)||Boolean(right));
-    }
-    return left;
-  }
-  var result=expr(0);if(at!==ts.length)throw Error('Syntax near '+ts[at].value);return result;
+  return BlipBasicLanguage.evaluate(source, consoleHost);
 }
 function jump(number) {
   if(!run)throw Error('Not running');
@@ -815,23 +875,24 @@ function exitActiveProgram(){if(basicWasmPlaying)stopBouncerWasm();else if(run)s
 function postBasicWasmSource(){if(basicWasmReady&&wasmFrame.contentWindow)wasmFrame.contentWindow.postMessage({type:'blip-basic-source',source:basicWasmSource,textures:typeof paintTexturePayload==='function'?paintTexturePayload():[],music:typeof blipBasicMusicPayload==='function'?blipBasicMusicPayload():[]},location.origin);}
 function focusBasicWasmCanvas(){try{wasmFrame.contentWindow.focus();wasmFrame.contentDocument.getElementById('glcanvas').focus();}catch(e){}}
 function runBlipInWasm(){
+  configureBasicControls();
   basicWasmRunId++;
   basicWasmSource=Array.from(lines.keys()).sort(function(a,b){return a-b;}).map(function(n){return n+' '+lines.get(n);}).join('\n')+'\nREM RUN '+basicWasmRunId;
-  basicWasmPlaying=true;document.body.setAttribute('data-wasm-playing','');if(/\/RALLY\.BLIP$/i.test(currentFile||''))document.body.setAttribute('data-rally','');else document.body.removeAttribute('data-rally');updatePlayClearance();document.body.removeAttribute('data-wasm-error');document.body.removeAttribute('data-wasm-running');output.textContent='';clear();wasmFrame.hidden=false;
-  if(!wasmFrame.hasAttribute('src')){wasmFrame.addEventListener('load',function loaded(){wasmFrame.removeEventListener('load',loaded);basicWasmReady=true;postBasicWasmSource();focusBasicWasmCanvas();},{once:true});wasmFrame.src='basic-runtime.html?v=13';}
+  basicWasmPlaying=true;document.body.setAttribute('data-wasm-playing','');updatePlayClearance();document.body.removeAttribute('data-wasm-error');document.body.removeAttribute('data-wasm-running');output.textContent='';clear();wasmFrame.hidden=false;
+  if(!wasmFrame.hasAttribute('src')){wasmFrame.addEventListener('load',function loaded(){wasmFrame.removeEventListener('load',loaded);basicWasmReady=true;postBasicWasmSource();focusBasicWasmCanvas();},{once:true});wasmFrame.src='basic-runtime.html?v=16';}
   else {postBasicWasmSource();focusBasicWasmCanvas();}
 }
-var blipPrimitiveNames='clear fill_rect draw_rect draw_line draw_line_ex draw_glow_line fill_circle fill_capsule fill_sunburst fill_glow_circle draw_texture draw_texture_region draw_texture_cell draw_texture_tinted draw_char draw_text draw_text_outlined draw_centered_outlined draw_number draw_centered draw_hud'.split(' ');
+var blipPrimitiveNames='canvas clear fill_rect draw_rect draw_line draw_line_ex draw_polyline draw_glow_line fx_clear fx_update fx_draw fx_burst fx_popup fx_ring fill_circle fill_capsule fill_sunburst fill_glow_circle draw_texture draw_texture_region draw_texture_cell draw_texture_tinted draw_char draw_text draw_text_outlined draw_centered_outlined draw_number draw_centered draw_hud'.split(' ');
 function programUsesBlipPrimitives(){
   var call=new RegExp('\\b(?:'+blipPrimitiveNames.join('|')+')\\s*\\(','i');
   return Array.from(lines.values()).some(function(source){return /\b(?:PLAY_SFX|PLAY_MUSIC|STOP_MUSIC|TEXT_CX)\b/i.test(source)||splitStatements(source).some(function(part){return call.test(part.trim());});});
 }
-function stopBouncerWasm(){if(!basicWasmPlaying)return;releaseBasicRallyDials();basicWasmSource='';postBasicWasmSource();basicWasmPlaying=false;document.body.removeAttribute('data-wasm-playing');document.body.removeAttribute('data-wasm-running');document.body.removeAttribute('data-rally');updatePlayClearance();wasmFrame.hidden=true;clear();output.textContent='';print('BLIP 64K COLOUR PERSONAL COMPUTER');print('BLIP BASIC 1.0');ready();input.focus({preventScroll:true});}
+function stopBouncerWasm(){if(!basicWasmPlaying)return;releaseBasicRallyDials();showBasicSecondPlayer(false);basicWasmSource='';postBasicWasmSource();basicWasmPlaying=false;document.body.removeAttribute('data-wasm-playing');document.body.removeAttribute('data-wasm-running');document.body.removeAttribute('data-rally');updatePlayClearance();wasmFrame.hidden=true;clear();output.textContent='';print('BLIP 64K COLOUR PERSONAL COMPUTER');print('BLIP BASIC 1.0');ready();input.focus({preventScroll:true});}
 function sendBasicWasmKey(key,code,down){var message={type:'blip-basic-key',key:key,code:code,down:!!down};if(basicWasmReady&&wasmFrame.contentWindow)wasmFrame.contentWindow.postMessage(message,location.origin);}
 window.addEventListener('message', function (event) {
   if(event.origin!==location.origin||!event.data)return;
-  if(event.data.type==='blip-basic-wasm-ready'){basicWasmReady=true;postBasicWasmSource();focusBasicWasmCanvas();}
-  if(event.data.type==='blip-basic-program-loaded'){document.body.setAttribute('data-wasm-running','');focusBasicWasmCanvas();}
+  if(event.data.type==='blip-basic-wasm-ready'){basicWasmReady=true;postBasicWasmSource();if(basicWasmPlaying)focusBasicWasmCanvas();}
+  if(event.data.type==='blip-basic-program-loaded'&&basicWasmPlaying){document.body.setAttribute('data-wasm-running','');focusBasicWasmCanvas();}
   if(event.data.type==='blip-basic-runtime-error')document.body.setAttribute('data-wasm-error',event.data.message||'error');
   if(event.data.type==='blip-basic-rom-asset'&&pendingGameCopy){var sourcePath=String(event.data.path||'').toUpperCase(),game=tapeForPath(currentFile),destinationPath=game?sourcePath.replace(/^\/TAPE\/GFX\/[^/]+\//,'/USER/'+game.command+'/GFX/'):'';if(destinationPath.indexOf('/USER/')===0)pendingGameCopy.assets[destinationPath]=pngDataUrl(event.data.bytes);}
   if(event.data.type==='blip-basic-rom-assets-done')finishGameCopy();
@@ -943,10 +1004,13 @@ function tick() {
 function submit(raw) {
   if(editor){Array.from(raw).forEach(editorInsertKey);return;}
   var s=raw.trim().toUpperCase();if(!s)return;
+  var numbered=/^(\d{1,5})(?:\s+(.*))?$/.exec(s);
+  if (!numbered && !pendingInput && (basicMathLoading || needsSharedMath(s))) {
+    return queueSharedMathCommand(s);
+  }
   history.push(s);historyAt=history.length;
   print('> '+s);
   if(pendingInput){vars[pendingInput]=pendingInput.endsWith('$')?s:Number(s)||0;pendingInput=null;input.placeholder='';return;}
-  var numbered=/^(\d{1,5})(?:\s+(.*))?$/.exec(s);
   if(numbered){var number=Number(numbered[1]);if(numbered[2])lines.set(number,numbered[2]);else lines.delete(number);storeDraft();return;}
   try {
     var m;
@@ -978,10 +1042,12 @@ function submit(raw) {
       print('TAB           ACCEPT THE DIMMED EDITOR SUGGESTION');
       print('NAMES ARE UPPERCASE');
       print('/ROM IS READ-ONLY SYSTEM EXAMPLES');
-      print('/TAPE IS READ-ONLY');
+      print('/TAPE IS READ-ONLY; INSERTED CASSETTE ONLY');
+      print('EJECT         REMOVE THE CASSETTE');
       print('/USER PERSISTS IN THIS BROWSER');
       ready();return;
     }
+    if(s==='EJECT')return ejectTape().then(ready).catch(function(error){fail(error.message);});
     if(s.toUpperCase()==='STOP'){run=null;pendingInput=null;document.body.removeAttribute('data-basic-running');ready();return;}
     if((m=/^DIR(?:\s+(.+))?$/i.exec(s))){showDirectory(m[1]?resolvePath(pathArgument(m[1])):currentDir).then(ready).catch(function(error){fail(error.message);});return;}
     if((m=/^CD(?:\s+(.+))?$/i.exec(s))){var dest=canonicalDirectory(m[1]?resolvePath(pathArgument(m[1])):'/USER');if(!isDirectory(dest))throw Error('Directory not found: '+dest);currentDir=dest;print(currentDir);ready();return;}
@@ -1109,7 +1175,7 @@ document.getElementById('basic-screen').addEventListener('click',function(){inpu
 restoreDraft();clear();print('BLIP 64K COLOUR PERSONAL COMPUTER');print('BLIP BASIC 1.0');print('');if(lines.size)print(lines.size+' program lines recovered.');ready();
 if(!blipHasTouch())input.focus();
 requestAnimationFrame(tick);
-window.BlipBasic={submit:submit,lines:lines,output:output,filesystem:filesystem,resolvePath:resolvePath,isDirectory:isDirectory,writeFilesystem:writeFilesystem,refreshTextures:postBasicWasmSource};
+window.BlipBasic={submit:submit,lines:lines,output:output,filesystem:filesystem,resolvePath:resolvePath,isDirectory:isDirectory,isFileAvailable:isFileAvailable,writeFilesystem:writeFilesystem,refreshTextures:postBasicWasmSource};
 }());
 
 // The book in the corner is picked up: it straightens and comes to where basic-book.html lays it, closed.

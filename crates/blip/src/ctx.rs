@@ -1,7 +1,7 @@
 //! Central game context: fixed-size canvas, frame loop and CRT post-processing.
 //! Games draw through `Blip` and read `delta_time` each frame.
 
-use macroquad::camera::{set_camera, Camera2D};
+use macroquad::camera::{set_camera, set_default_camera, Camera2D};
 use macroquad::color::{Color, WHITE};
 use macroquad::material::{
     gl_use_default_material, gl_use_material, load_material, Material, MaterialParams,
@@ -324,6 +324,25 @@ impl Blip {
         b.apply_camera();
         crate::web::picture(width, height);
         b
+    }
+
+    /// Change the logical canvas and its render target together.
+    pub fn resize_canvas(&mut self, width: i32, height: i32) {
+        assert!(width > 0 && height > 0);
+        if (self.width, self.height) == (width, height) { return; }
+        // Flush queued draws before releasing their render pass.
+        set_default_camera();
+        self.rt = render_target_ex(width as u32, height as u32, RenderTargetParams {
+            sample_count: 0,
+            ..Default::default()
+        });
+        self.rt.texture.set_filter(FilterMode::Nearest);
+        self.width = width;
+        self.height = height;
+        self.rt_blended = false;
+        self.apply_camera();
+        clear_background(BLIP_BLACK);
+        crate::web::picture(width, height);
     }
 
     /// Point the camera at the render target so subsequent game draws land there.
@@ -757,6 +776,9 @@ impl Blip {
     #[inline]
     pub fn draw_line_ex(&self, x1: f32, y1: f32, x2: f32, y2: f32, thickness: f32, c: Color) {
         draw::draw_line_ex(x1, y1, x2, y2, thickness, c);
+    }
+    pub fn draw_polyline(&self, points: impl IntoIterator<Item = (f32, f32, bool)>, thickness: f32, color: Color, alternate: Color) {
+        draw::draw_polyline(points, thickness, color, alternate);
     }
     /// Draw a neon glowing line — a soft halo under a bright core. Use for vector
     /// silhouettes (ship outlines, asteroid edges) that should read as "lit up".

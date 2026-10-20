@@ -12,7 +12,7 @@ fn main() {
         ("ADDER", blip_assets::adder::generate()),
         ("BOUNCER", blip_assets::bouncer::generate()),
         ("BRAWLER", blip_assets::brawler::generate()),
-        ("BUBBLER", Vec::new()),
+        ("BUBBLER", blip_assets::bubbler::generate()),
         ("GALACTIC_DEFENDER", blip_assets::galactic_defender::generate()),
         ("METEORS", blip_assets::meteors::generate()),
         ("RALLY", blip_assets::rally::generate()),

@@ -57,6 +57,7 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 name = "blip"
 version = "0.1.0"
 dependencies = [
+ "blip_font",
  "macroquad",
 ]
 
@@ -64,6 +65,7 @@ dependencies = [
 name = "blip_assets"
 version = "0.1.0"
 dependencies = [
+ "blip_font",
  "png",
 ]
 
@@ -75,6 +77,10 @@ dependencies = [
  "blip_assets",
  "macroquad",
 ]
+
+[[package]]
+name = "blip_font"
+version = "0.1.0"
 
 [[package]]
 name = "bouncer"

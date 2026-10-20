@@ -52,6 +52,7 @@ middle. Change one and the other must follow.
 | Wasm <-> JS bridge (`blip_spend_coin`) | `web/blip_bridge.js` |
 | macroquad JS runtime (vendored, do not edit) | `web/mq_js_bundle.js` |
 | Game logic, rendering, audio (Rust side) | `crates/<name>/src/main.rs` |
+| Per-game level and wave progression data | `crates/<name>/src/levels.rs` |
 | Shared engine library (blip API) | `crates/blip/src/*.rs` |
 | Colour maths, deterministic scatter, capsules, outlined text | `crates/blip/src/{color,math,draw,font}.rs` |
 | Brawler: the roster, the move table, the rules, the CPU | `crates/brawler/src/{roster,moves,rules,cpu}.rs` |
@@ -60,7 +61,9 @@ middle. Change one and the other must follow.
 | Brawler: tests, by theme (rules, anatomy, ladder, balance, ...) | `crates/brawler/src/tests/*.rs` |
 | Score popups, bursts, rings (`blip::Fx`) | `crates/blip/src/fx.rs` |
 | Music playback (`blip::Jukebox`) | `crates/blip/src/audio.rs` |
-| Asset generators (sprites + WAV) | `crates/blip_assets/src/<game>.rs` |
+| Build-time game graphics generation | `crates/blip_assets/src/<game>/gfx.rs` |
+| Build-time game music generation | `crates/blip_assets/src/<game>/tunes.rs` |
+| Other build-time game assets and sound effects | `crates/blip_assets/src/<game>.rs` |
 | Songs written as note data (`Song`); `action: true` for the action games' mix | `crates/blip_assets/src/song.rs` |
 | Effect voices, one instrument per game | `crates/blip_assets/src/cosy.rs` |
 | Native playtest autopilot | `crates/blip/src/bot.rs`, `crates/<name>/src/bot.rs` |
@@ -99,6 +102,13 @@ rustup target add wasm32-unknown-unknown   # one-time
 ### Tests
 
 Run the test suite locally before pushing:
+
+`npm run test:all` runs Rust tests, rebuilds the web games, then runs every
+browser suite sequentially and visual checks for all nine games. Approve
+this command with the reusable `npm run test:all` prefix when the sandbox
+blocks local servers or Chromium. To verify access without running the
+full suite, use `npm run test:all -- --check-access`. Database tests still
+need a running local Supabase instance; they skip when it is unavailable.
 
 ```
 npm test                # canvas geometry (unit)

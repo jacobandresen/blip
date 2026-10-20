@@ -10,3 +10,6 @@ macroquad = { workspace = true }
 blip = { workspace = true }
 # The music and effects are synthesised on the device (blip_assets::bubbler).
 blip_assets = { workspace = true }
+
+[build-dependencies]
+blip_assets = { workspace = true }

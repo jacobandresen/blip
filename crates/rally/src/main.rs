@@ -8,7 +8,7 @@ use blip::macroquad::input::KeyCode;
 use blip::macroquad::math::Vec2;
 use blip::macroquad::rand::rand;
 use blip::{
-    GAME_OVER_MIN_WAIT, segment_rect_overlap,
+    GAME_OVER_MIN_WAIT,
     play_sfx, Jukebox, web, window_conf, Blip, BlipColor, Timer, BLIP_BLACK,
     BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
@@ -17,36 +17,8 @@ use blip::{
 mod bot;
 
 // ---- layout -----------------------------------------------------------
-const WIN_W: i32 = 480;
-const WIN_H: i32 = 540;
-const HUD_H: i32 = 28;
-const PLAY_T: f32 = HUD_H as f32;
-const PLAY_B: f32 = WIN_H as f32;
-const PLAY_H: f32 = PLAY_B - PLAY_T;
-
-// ---- objects ----------------------------------------------------------
-const PAD_W: f32 = 12.0;
-const PAD_H: f32 = 72.0;
-const BALL_SZ: f32 = 12.0;
-const PAD_OFF: f32 = 28.0;
-
-// ---- tuning -----------------------------------------------------------
-const SCORE_WIN: i32 = 7;
-const POINT_PAUSE: f32 = 1.2;
-const PAD_SPEED: f32 = 300.0;
-const BALL_SPD0: f32 = 275.0;
-const BALL_INC: f32 = 15.0;
-const BALL_MAX: f32 = 450.0;
-const AI_SPD: f32 = 145.0;
-// A finger drags its bat relatively, geared up so a thumb's sweep of about
-// two thirds of the picture covers the whole field.
-const TOUCH_GAIN: f32 = 1.6;
-
-// ---- derived ----------------------------------------------------------
-const LPAD_X: f32 = PAD_OFF;
-const RPAD_X: f32 = WIN_W as f32 - PAD_OFF - PAD_W;
-const PAD_YMIN: f32 = PLAY_T + 2.0;
-const PAD_YMAX: f32 = PLAY_B - PAD_H - 2.0;
+mod physics;
+use physics::*;
 
 const C_PAD: BlipColor = BlipColor { r: 210.0/255.0, g: 210.0/255.0, b: 210.0/255.0, a: 1.0 };
 const C_NET: BlipColor = BlipColor { r:  42.0/255.0, g:  42.0/255.0, b:  42.0/255.0, a: 1.0 };
@@ -218,61 +190,22 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
     let lpad_vy = (g.lpad_y - lpy0) / dt;
     let rpad_vy = (g.rpad_y - rpy0) / dt;
 
-    // Integrate in substeps so a fast ball can't skip past a paddle or clip
-    // through a wall inside one frame (worst case: a frame-rate dip).
-    let speed = g.ball_vx.hypot(g.ball_vy).max(1.0);
-    let substeps = ((speed * dt / (BALL_SZ * 0.5)).ceil() as i32).clamp(1, 8);
-    let sdt = dt / substeps as f32;
-
-    for _ in 0..substeps {
-        let (prev_x, prev_y) = (g.ball_x + BALL_SZ * 0.5, g.ball_y + BALL_SZ * 0.5);
-        g.ball_x += g.ball_vx * sdt;
-        g.ball_y += g.ball_vy * sdt;
-        let (next_x, next_y) = (g.ball_x + BALL_SZ * 0.5, g.ball_y + BALL_SZ * 0.5);
-
-        // Reflect the overshoot rather than clamp, so no speed is shaved off.
-        if g.ball_y < PLAY_T {
-            g.ball_y = 2.0 * PLAY_T - g.ball_y;
-            g.ball_vy = g.ball_vy.abs();
-            play_sfx(&sfx.wall);
-        }
-        if g.ball_y + BALL_SZ > PLAY_B {
-            g.ball_y = 2.0 * (PLAY_B - BALL_SZ) - g.ball_y;
-            g.ball_vy = -g.ball_vy.abs();
-            play_sfx(&sfx.wall);
-        }
-
-        if g.ball_vx < 0.0
-            && segment_rect_overlap(prev_x, prev_y, next_x, next_y,
-                LPAD_X - BALL_SZ * 0.5, g.lpad_y - BALL_SZ * 0.5,
-                PAD_W + BALL_SZ, PAD_H + BALL_SZ)
-        {
-            g.ball_x = LPAD_X + PAD_W;
-            let py = g.lpad_y;
-            bounce_paddle(g, py, lpad_vy, 1.0);
-            play_sfx(&sfx.hit_l);
-            web::haptic();
-        }
-
-        if g.ball_vx > 0.0
-            && segment_rect_overlap(prev_x, prev_y, next_x, next_y,
-                RPAD_X - BALL_SZ * 0.5, g.rpad_y - BALL_SZ * 0.5,
-                PAD_W + BALL_SZ, PAD_H + BALL_SZ)
-        {
-            g.ball_x = RPAD_X - BALL_SZ;
-            let py = g.rpad_y;
-            bounce_paddle(g, py, rpad_vy, -1.0);
-            play_sfx(&sfx.hit_r);
-            if g.mode == Mode::TwoPlayer { web::haptic(); }
-        }
-
-        if g.ball_x + BALL_SZ < 0.0 {
-            award_point(g, false, &sfx.score_r);
-            return;
-        }
-        if g.ball_x > WIN_W as f32 {
-            award_point(g, true, &sfx.score_l);
-            return;
+    let mut ball = Ball { ball_x: g.ball_x, ball_y: g.ball_y, ball_vx: g.ball_vx, ball_vy: g.ball_vy, ball_spd: g.ball_spd };
+    let events = physics::step(&mut ball, dt, g.lpad_y, g.rpad_y, lpad_vy, rpad_vy);
+    (g.ball_x, g.ball_y, g.ball_vx, g.ball_vy, g.ball_spd) = (ball.ball_x, ball.ball_y, ball.ball_vx, ball.ball_vy, ball.ball_spd);
+    for event in events {
+        match event {
+            Event::Wall => play_sfx(&sfx.wall),
+            Event::LeftHit => {
+                g.ai_err = (rand() % 1000) as f32 / 1000.0 * PAD_H * 0.7 - PAD_H * 0.35;
+                play_sfx(&sfx.hit_l);
+                web::haptic();
+            }
+            Event::RightHit => {
+                play_sfx(&sfx.hit_r);
+                if g.mode == Mode::TwoPlayer { web::haptic(); }
+            }
+            Event::Point(left) => award_point(g, left, if left { &sfx.score_l } else { &sfx.score_r }),
         }
     }
 }
@@ -295,23 +228,6 @@ fn award_point(g: &mut Game, left_scored: bool, sound: &blip::BlipSound) {
         g.reset_for_serve();
         g.point_t.start(POINT_PAUSE);
         g.state = State::Point;
-    }
-}
-
-/// Aim by impact position, increase speed, and add a quarter of paddle velocity.
-/// `dir` is +1 for the left paddle and -1 for the right.
-fn bounce_paddle(g: &mut Game, pad_y: f32, pad_vy: f32, dir: f32) {
-    let rel = ((g.ball_y + BALL_SZ * 0.5 - pad_y) / PAD_H - 0.5).clamp(-0.5, 0.5);
-    g.ball_spd = (g.ball_spd + BALL_INC).min(BALL_MAX);
-    let a = rel * 1.1;
-    g.ball_vx = dir * g.ball_spd * a.cos();
-    g.ball_vy = g.ball_spd * a.sin() + pad_vy * 0.25;
-    // Renormalise so |v| stays exactly on the speed ramp after the english.
-    let m = g.ball_vx.hypot(g.ball_vy).max(1.0);
-    g.ball_vx = g.ball_vx / m * g.ball_spd;
-    g.ball_vy = g.ball_vy / m * g.ball_spd;
-    if dir > 0.0 {
-        g.ai_err = (rand() % 1000) as f32 / 1000.0 * PAD_H * 0.7 - PAD_H * 0.35;
     }
 }
 

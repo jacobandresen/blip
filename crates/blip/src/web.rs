@@ -16,6 +16,20 @@ extern "C" {
     fn blip_picture(width: i32, height: i32);
     fn blip_crt() -> i32;
     fn blip_glitch() -> i32;
+    fn blip_input_pressed(key: i32) -> i32;
+    fn blip_input_clear();
+}
+
+pub(crate) fn buffered_key_pressed(key: macroquad::input::KeyCode) -> bool {
+    #[cfg(target_arch = "wasm32")]
+    unsafe { blip_input_pressed(key as i32) != 0 }
+    #[cfg(not(target_arch = "wasm32"))]
+    { let _ = key; false }
+}
+
+pub(crate) fn clear_buffered_keys() {
+    #[cfg(target_arch = "wasm32")]
+    unsafe { blip_input_clear(); }
 }
 
 /// Whether the picture gets the CRT treatment: curved glass, bloom, scanlines

@@ -2,6 +2,16 @@
 // Loaded BEFORE mq_js_bundle.js so `miniquad_add_plugin` is available.
 
 register_plugin = function (importObject) {
+    var queuedKeys = new Set();
+    var keyCodes = { ArrowLeft: 0xff51, ArrowUp: 0xff52, ArrowRight: 0xff53, ArrowDown: 0xff54,
+                     Space: 32, Enter: 0xff0d, Escape: 0xff1b };
+    document.addEventListener('keydown', function (event) {
+        if (event.target.id !== 'glcanvas' || event.repeat) return;
+        var code = /^Key[A-Z]$/.test(event.code) ? event.code.charCodeAt(3) : keyCodes[event.code];
+        if (code !== undefined) queuedKeys.add(code);
+    }, true);
+    importObject.env.blip_input_pressed = function (key) { return queuedKeys.has(key) ? 1 : 0; };
+    importObject.env.blip_input_clear = function () { queuedKeys.clear(); };
     var drawNames=['glDrawElements','glDrawArrays','glDrawElementsInstanced','glDrawArraysInstanced'],draws={},ready=false;
     drawNames.forEach(function(name){
         var original=importObject.env[name];if(typeof original!=='function')return;draws[name]=original;
@@ -51,9 +61,9 @@ register_plugin = function (importObject) {
     // A game opened as an app (home screen, its own icon) draws a clean,
     // modern picture: no CRT, and at the screen's full pixel density, so
     // the pixels are scaled up sharp rather than shrunk and blurred.
-    // The BASIC monitor keeps its CRT picture but skips disruptive faults during steering.
+    // BASIC draws the same clean game art inside its monitor's glass overlay.
     var basicRuntime = document.documentElement.hasAttribute('data-basic-runtime');
-    var clean = document.documentElement.hasAttribute('data-appstyle') && !basicRuntime;
+    var clean = basicRuntime || document.documentElement.hasAttribute('data-appstyle');
     importObject.env.blip_crt = function () { return clean ? 0 : 1; };
     importObject.env.blip_glitch = function () { return !clean && !basicRuntime ? 1 : 0; };
     var setupCanvas = importObject.env.setup_canvas_size;
@@ -67,7 +77,7 @@ register_plugin = function (importObject) {
     // What the player holds: 0 a keyboard, 1 the deck's pad or stick, 2 the
     // touch surface. A title screen words its prompts by it.
     importObject.env.blip_controls = function () {
-        var root = document.documentElement;
+        var root = basicRuntime ? window.parent.document.documentElement : document.documentElement;
         if (root.hasAttribute('data-touch')) return 2;
         return root.hasAttribute('data-has-touch') ? 1 : 0;
     };
