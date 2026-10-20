@@ -959,6 +959,7 @@
     /* Sides: the classic upright profile, its back sloping down from the marquee, carrying the game's side art. */
     .machine-side {position:absolute;top:0;bottom:0;width:var(--machine-depth,200px);pointer-events:none;backface-visibility:hidden;
       background:color-mix(in srgb,var(--trim) 85%,#fff);}
+    #game-grid .card .machine-side {pointer-events:auto!important;cursor:pointer}
     .machine-side.right {left:100%;transform-origin:0 50%;transform:rotateY(90deg);clip-path:polygon(0 0,58% 0,100% 6%,100% 100%,10% 100%,10% 95.5%,0 95.5%)}
     .machine-side.left {right:100%;transform-origin:100% 50%;transform:rotateY(-90deg);clip-path:polygon(100% 0,42% 0,0 6%,0 100%,90% 100%,90% 95.5%,100% 95.5%)}
     .machine-side::before {content:'';position:absolute;inset:5px;clip-path:inherit;
@@ -2405,6 +2406,7 @@
         }
         if(Math.hypot(dx,dy)>12)return;
         if(e.pointerType!=='touch')return;
+        if(start.card&&!start.card.classList.contains('card-focused')){selectByTouch(start.card);e.preventDefault();suppressPointerClick();return;}
         if(start.screen){activate();e.preventDefault();suppressPointerClick();return;}
         selectByTouch(start.card);
         e.preventDefault();
@@ -2424,8 +2426,8 @@
       track.addEventListener('click',function(e){
         if(suppressClick){suppressClick=false;window.clearTimeout(suppressClickTimer);return;}
         var card=e.target.closest&&e.target.closest('.card');
+        if(card&&!card.classList.contains('card-focused')){if(focusArcadeCard)focusArcadeCard(card);return;}
         if(onScreen(e)){activate();return;}
-        if(card&&focusArcadeCard)focusArcadeCard(card);
       });
 
       document.addEventListener('keydown', function (e) {
