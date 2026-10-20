@@ -308,7 +308,7 @@ function makeTapeNode(tape,index){
 function tapeAngle(index){return Math.sin((index+1)*1.618)*2.2+Math.sin(index*.73)*.65;}
 function updateTapeStackGeometry(){
   var pile=document.getElementById('tape-pile');if(!pile)return;
-  var vertical=window.matchMedia('(min-width:820px)').matches,overlap=vertical?68:(window.matchMedia('(max-width:650px)').matches?116:24),previousDelta=0;
+  var vertical=window.matchMedia('(min-width:820px) and (min-height:501px)').matches,overlap=vertical?68:(window.matchMedia('(max-width:650px)').matches?116:24),previousDelta=0;
   Array.from(pile.children).forEach(function(item,index){
     var angle=tapeAngle(Number(item.style.getPropertyValue('--tape-index'))||index),radians=angle*Math.PI/180,width=item.offsetWidth,height=item.offsetHeight;
     var extent=vertical?height*Math.abs(Math.cos(radians))+width*Math.abs(Math.sin(radians)):width*Math.abs(Math.cos(radians))+height*Math.abs(Math.sin(radians));
@@ -433,20 +433,27 @@ function shuffleTapePile(){
 }
 document.getElementById('tape-pile').addEventListener('pointerdown',function(event){
   var item=event.target.closest('.game-tape');if(!item||tapeBusy)return;
-  tapeDrag={id:event.pointerId,x:event.clientX,y:event.clientY,item:item};
+  var pile=document.getElementById('tape-pile');
+  tapeDrag={id:event.pointerId,x:event.clientX,y:event.clientY,item:item,pile:pile,scroll:pile.scrollLeft,horizontal:!window.matchMedia('(min-width:820px) and (min-height:501px)').matches,scrolling:false};
   try{item.setPointerCapture(event.pointerId);}catch(e){}
 });
 document.getElementById('tape-pile').addEventListener('pointermove',function(event){
   if(!tapeDrag||event.pointerId!==tapeDrag.id)return;
   var dx=event.clientX-tapeDrag.x,dy=event.clientY-tapeDrag.y;
+  if(tapeDrag.horizontal&&Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)*1.2){
+    tapeDrag.scrolling=true;tapeDragged=true;tapeDrag.item.style.removeProperty('--drag-x');tapeDrag.pile.scrollLeft=tapeDrag.scroll-dx;return;
+  }
+  if(tapeDrag.horizontal)return;
   if(Math.abs(dx)>8||Math.abs(dy)>8)tapeDrag.item.style.setProperty('--drag-x',Math.max(-90,Math.min(90,dx))+'px');
   if(Math.abs(dx)>34||Math.abs(dy)>34)tapeDragged=true;
 });
 ['pointerup','pointercancel','lostpointercapture'].forEach(function(type){document.getElementById('tape-pile').addEventListener(type,function(event){
   if(!tapeDrag||event.pointerId!==tapeDrag.id)return;
   var dx=event.clientX-tapeDrag.x,dy=event.clientY-tapeDrag.y,moved=Math.abs(dx)>34||Math.abs(dy)>34;
+  if(tapeDrag.horizontal&&Math.abs(dx)>34&&Math.abs(dx)>Math.abs(dy)*1.2){tapeDrag.scrolling=true;tapeDrag.pile.scrollLeft=tapeDrag.scroll-dx;}
+  var scrolling=tapeDrag.scrolling,horizontal=tapeDrag.horizontal;
   tapeDrag.item.style.removeProperty('--drag-x');tapeDrag=null;
-  if(moved){event.preventDefault();shuffleTapePile();setTimeout(function(){tapeDragged=false;},80);}else setTimeout(function(){tapeDragged=false;},0);
+  if(moved){event.preventDefault();if(!horizontal&&!scrolling)shuffleTapePile();setTimeout(function(){tapeDragged=false;},80);}else setTimeout(function(){tapeDragged=false;},0);
 });});
 async function startTape(tape,item){
   if(tapeBusy)return;

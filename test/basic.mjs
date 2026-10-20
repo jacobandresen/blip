@@ -66,12 +66,16 @@ test('BASIC gameplay stays between the top bar and controls on desktop and phone
       await page.waitForFunction(() => document.querySelector('.monitor').getAnimations().every((animation) => animation.playState === 'finished'));
       const bounds = await page.evaluate(() => {
         const box = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
-        return { bar: box('.top-marquee-bar'), monitor: box('.monitor'), screen: box('.screen'), controls: Math.min(...['.amstrad-controls', '.stick-base', '.fire-buttons'].map((selector) => box(selector).top)) };
+        return { bar: box('.top-marquee-bar'), monitor: box('.monitor'), screen: box('.screen'), stick: box('.stick-base'), buttons: box('.fire-buttons'), controls: Math.min(...['.amstrad-controls', '.stick-base', '.fire-buttons'].map((selector) => box(selector).top)) };
       });
       const label = `${viewport.width} × ${viewport.height}, ${mode}: ${JSON.stringify(bounds)}`;
       assert.ok(bounds.monitor.left >= -1 && bounds.monitor.right <= viewport.width + 1, label);
       assert.ok(bounds.monitor.top >= bounds.bar.bottom - 1, label);
-      assert.ok(bounds.screen.bottom <= bounds.controls + 1, label);
+      if (viewport.width >= 651 && viewport.width > viewport.height && viewport.height <= 500) {
+        assert.ok(bounds.screen.left > bounds.stick.right - 1 && bounds.screen.right < bounds.buttons.left + 1, label);
+      } else {
+        assert.ok(bounds.screen.bottom <= bounds.controls + 1, label);
+      }
     }
   }
 });
@@ -124,8 +128,10 @@ test('the expanded monitor fills the screen during a BASIC game, without the con
     screen: document.querySelector('.screen').getBoundingClientRect().toJSON(),
     bar: document.querySelector('.top-marquee-bar').getBoundingClientRect().bottom,
     controls: document.querySelector('.stick-base').getBoundingClientRect().top,
+    stick: document.querySelector('.stick-base').getBoundingClientRect().right,
+    buttons: document.querySelector('.fire-buttons').getBoundingClientRect().left,
   }));
-  assert.ok(restored.screen.top >= restored.bar && restored.screen.bottom <= restored.controls, `restored after rotation: ${JSON.stringify(restored)}`);
+  assert.ok(restored.screen.top >= restored.bar && restored.screen.left > restored.stick - 1 && restored.screen.right < restored.buttons + 1, `restored after rotation: ${JSON.stringify(restored)}`);
 });
 
 test('BASIC stores and runs a numbered program, then launches a BLIP BASIC game with LOAD and RUN', async (t) => {
@@ -176,7 +182,10 @@ test('BASIC stores and runs a numbered program, then launches a BLIP BASIC game 
   await page.waitForFunction(() => {
     const monitor = document.querySelector('.monitor').getBoundingClientRect();
     const controlsTop = document.querySelector('#stick-base').getBoundingClientRect().top;
-    return monitor.bottom <= controlsTop + 1;
+    const screen = document.querySelector('.screen').getBoundingClientRect();
+    const stickRight = document.querySelector('#stick-base').getBoundingClientRect().right;
+    const buttonsLeft = document.querySelector('.fire-buttons').getBoundingClientRect().left;
+    return screen.left > stickRight - 1 && screen.right < buttonsLeft + 1;
   });
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.locator('#exit-game').click();
