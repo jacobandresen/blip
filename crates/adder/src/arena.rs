@@ -498,7 +498,8 @@ impl World {
         if self.humans_out() {
             self.over = true;
         } else if self.round_done() {
-            if let Some(w) = self.snakes.iter_mut().find(|s| s.alive) {
+            let mut alive = self.snakes.iter_mut().filter(|s| s.alive);
+            if let (Some(w), None) = (alive.next(), alive.next()) {
                 w.score += ROUND_POINTS;
                 self.events.push(Event::RoundWin);
             }
@@ -542,8 +543,10 @@ impl World {
         blip::bot::add("deaths", 1.0);
     }
 
+    /// Once every person in the pit is down, the CPUs' finish is only waiting.
     fn round_done(&self) -> bool {
-        self.snakes.len() > 1 && self.snakes.iter().filter(|s| s.alive).count() <= 1
+        let people_down = self.snakes.iter().any(|s| s.human) && !self.snakes.iter().any(|s| s.human && s.alive);
+        self.snakes.len() > 1 && (people_down || self.snakes.iter().filter(|s| s.alive).count() <= 1)
     }
 
     fn next_round(&mut self) {
@@ -794,6 +797,17 @@ mod tests {
             .snakes
             .iter()
             .all(|s| s.path.len() == START_S && s.holes.is_empty()));
+    }
+
+    #[test]
+    fn the_round_ends_when_the_people_are_down() {
+        let mut w = World::new(1);
+        w.join(2, false);
+        w.die(0, None);
+        w.step(0.0, &[Steer::default(); SEATS]);
+        assert_eq!(w.round_wait, ROUND_WAIT);
+        assert!(w.snakes[1].alive && w.snakes[2].alive);
+        assert!(w.snakes.iter().all(|s| s.score == 0), "no winner while two are still alive");
     }
 
     #[test]

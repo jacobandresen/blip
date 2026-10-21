@@ -55,6 +55,12 @@ if (CABINET_SCREEN) canvas.inert = true;
 
 updateCoinsHud();
 
+// Inside BLIP's monitor the game is a frame: its parent takes it down.
+function leaveGame() {
+  if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
+  else location.href = blipFrontendUrl();
+}
+
 var returningToCabinet = false;
 function returnToCabinet(event) {
   if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
@@ -170,10 +176,7 @@ function returnToCabinet(event) {
       if (out) out.click(); else modal.remove();
       return;
     }
-    if (Date.now() - last >= IDLE_MS) {
-      if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
-      else window.location.href = blipFrontendUrl();
-    }
+    if (Date.now() - last >= IDLE_MS) leaveGame();
   }, 5000);
 }());
 
@@ -744,10 +747,7 @@ function onGameStopped(err) {
   if (loader) loader.style.display = 'flex';
   if (statusEl) statusEl.textContent = 'GAME STOPPED';
   if (barInner && barInner.parentNode) barInner.parentNode.style.display = 'none';
-  setTimeout(function () {
-    if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
-    else window.location.href = blipFrontendUrl();
-  }, 2500);
+  setTimeout(leaveGame, 2500);
 }
 window.addEventListener('error', function (e) { onGameStopped(e.error); });
 window.addEventListener('unhandledrejection', function (e) { onGameStopped(e.reason); });
@@ -836,8 +836,7 @@ canvas.addEventListener('webglcontextlost', function (e) {
   if (statusEl) statusEl.textContent = 'ONE MOMENT';
   setTimeout(function () {
     if (again) window.location.reload();
-    else if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
-    else window.location.href = blipFrontendUrl();
+    else leaveGame();
   }, 1200);
 }, false);
 
@@ -897,19 +896,15 @@ window.addEventListener('keydown', function (e) {
     dispatch(primary, 'keydown');
     setTimeout(function () { dispatch(primary, 'keyup'); }, 60);
   }
-  function goToKiosk() {
-    if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
-    else window.location.href = blipFrontendUrl();
-  }
   // Backspace does it from the keyboard: a kiosk has no mouse for the logo.
   window.addEventListener('keydown', function (e) {
     if (blipAmstradMode() && e.key === 'Escape') {
-      e.preventDefault(); e.stopImmediatePropagation(); goToKiosk(); return;
+      e.preventDefault(); e.stopImmediatePropagation(); leaveGame(); return;
     }
     if (e.key !== 'Backspace' || e.repeat) return;
     if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
     e.preventDefault();
-    goToKiosk();
+    leaveGame();
   }, true);
 
   // Live input -> the stick ball's lean (the pad lights its own buttons in
@@ -964,7 +959,7 @@ window.addEventListener('keydown', function (e) {
     feedback: feedbackTick,
     onInput: reflectInput,
     onStart: tapPrimary,
-    onSelect: goToKiosk
+    onSelect: leaveGame
   });
   BlipController.bindKeyboard();
   BlipController.bindGamepad(pollGamepad);
