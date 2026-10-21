@@ -71,8 +71,8 @@ test('Rally BASIC touch dials move both real paddles independently', async (t) =
   await page.evaluate(() => { BlipBasic.submit('LOAD /TAPE/RALLY.BLIP'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RALLY.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'MODE=2:GOTO 800');
-    BlipBasic.lines.set(589, 'SOUND 1000+(PY>250)+2*(CY>250),0,0');
+    BlipBasic.lines.set(80, 'PLAYERS=2:START_GAME');
+    BlipBasic.lines.set(175, 'SOUND 1000+(LPAD_Y>HOME_Y)+2*(RPAD_Y>HOME_Y),0,0');
     BlipBasic.submit('SAVE MY_PADDLES');
     BlipBasic.submit('RUN');
   });

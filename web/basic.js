@@ -481,7 +481,9 @@ function parseProgram(source){
   source=String(source).toUpperCase();
   source.split(/\r?\n/).forEach(function(row){
     if(!row.trim())return;
-    var match=/^(\d{1,5})(?:\s+(.*))?$/.exec(row);
+    // One space ends the number; any more is the line's indentation.
+    var match=/^(\d{1,5})(?:[ \t](.*))?$/.exec(row.trimEnd());
+    if(match&&match[2]&&!match[2].trim())match[2]='';
     if(!match)throw Error('Bad program line: '+row);
     program.set(Number(match[1]),match[2]||'');
   });
@@ -1011,7 +1013,8 @@ function tick() {
 function submit(raw) {
   if(editor){Array.from(raw).forEach(editorInsertKey);return;}
   var s=raw.trim().toUpperCase();if(!s)return;
-  var numbered=/^(\d{1,5})(?:\s+(.*))?$/.exec(s);
+  var numbered=/^(\d{1,5})(?:[ \t](.*))?$/.exec(s);
+  if(numbered&&numbered[2]&&!numbered[2].trim())numbered[2]='';
   if (!numbered && !pendingInput && (basicMathLoading || needsSharedMath(s))) {
     return queueSharedMathCommand(s);
   }

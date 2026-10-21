@@ -14,7 +14,7 @@ for variables, arrays, input, and Rust function calls.
 | `src/interpreter/syntax.rs` | Tokens and splitting outside strings and parentheses |
 | `src/interpreter/expression.rs` | Precedence, arguments, functions, variable reads |
 | `src/interpreter/statement.rs` | Command dispatch, loops, assignments |
-| `src/interpreter/procedure.rs` | `SUB … END SUB`, `CALL`, `LOCAL`, `EXIT SUB` |
+| `src/interpreter/procedure.rs` | `SUB … END SUB`, `CALL`, `LOCAL`, `EXIT SUB`, `DEF FN` |
 | `src/interpreter/block.rs` | Block `IF … ELSEIF … ELSE … END IF` |
 | `src/interpreter/graphics.rs` | BASIC drawing commands mapped to `blip` |
 | `src/interpreter/value.rs` | Values, conversions, array keys |
@@ -34,6 +34,8 @@ They are found once at load; a missing `END SUB` or a reused name stops the
 load. Normal flow steps over a body. Parameters and `LOCAL` names are saved
 on entry and restored on return, so a `SUB` can recurse; every other name is
 shared with the program. Arguments are typed by name: `C$` takes text.
+`DEF FNNAME(A, B)=expression` is a one-line function, called as `FNNAME(1, 2)`
+inside any expression; its parameters shadow the program's names meanwhile.
 `MOD` is floored, so `-1 MOD 8` is 7.
 
 A line ending in `THEN` opens a block that runs to `ELSEIF … THEN`, `ELSE` or
@@ -66,9 +68,9 @@ under a different name in `/USER`. The browser reads this optional identity.
 1090 END SUB
 ```
 
-`CANVAS(width,height)` selects a logical drawing resolution. A title can use
-the Rust game's native dimensions, then select `CANVAS(320,200)` for its
-existing playfield. `TIME()` reads the engine clock for animation;
+Every program starts on one 640x400 screen, a high-resolution Amiga's, and
+the tapes are drawn for it. `CANVAS(width,height)` picks another size for a
+game that plays better on one. `TIME()` reads the engine clock for animation;
 `CONTROL_TEXT$(keys,pad,touch)` chooses wording through Rust's controls API.
 `DRAW_POLYLINE` renders an array of points through the same Rust path renderer
 as Adder; see the function reference for its array layout.

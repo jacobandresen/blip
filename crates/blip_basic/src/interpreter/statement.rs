@@ -51,6 +51,7 @@ impl Program {
             }
             "FOR" => self.begin_loop(rest, blip),
             "NEXT" => self.next_loop(rest),
+            "DEF" => Ok(()),
             "SUB" => self.skip_procedure(rest),
             "CALL" => self.call_procedure(rest, blip),
             "LOCAL" => self.declare_locals(rest),

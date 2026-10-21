@@ -196,14 +196,14 @@ impl Program {
         for (i, line) in self.output.iter().enumerate() {
             blip.draw_text(
                 &line.to_ascii_uppercase(),
-                4.0,
-                4.0 + i as f32 * 16.0,
-                2.0,
+                8.0,
+                8.0 + i as f32 * 26.0,
+                3.0,
                 BLIP_WHITE,
             );
         }
         if let Some(error) = &self.error {
-            blip.draw_text(&error.to_ascii_uppercase(), 4.0, 180.0, 1.0, BLIP_RED);
+            blip.draw_text(&error.to_ascii_uppercase(), 8.0, 376.0, 2.0, BLIP_RED);
         }
     }
 }

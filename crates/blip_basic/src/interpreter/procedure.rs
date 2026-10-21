@@ -1,8 +1,9 @@
 //! AmigaBASIC-style procedures: `SUB NAME(A, B$) ... END SUB`, entered with
-//! `CALL NAME(1, "X")` or a bare `NAME 1, "X"`. Parameters and `LOCAL` names
-//! belong to the call; every other name is shared with the program.
+//! `CALL NAME(1, "X")` or a bare `NAME 1, "X"`, and one-line functions,
+//! `DEF FNNAME(A)=expression`. Parameters and `LOCAL` names belong to the
+//! call; every other name is shared with the program.
 
-use super::{syntax::split_args, value::Value, Continuation, Program};
+use super::{syntax::{assignment_eq, split_args}, value::Value, Continuation, Program};
 use blip::Blip;
 
 /// Deep enough for any recursive drawing, shallow enough to stop a runaway.
@@ -15,6 +16,13 @@ pub(super) struct Procedure {
     pub(super) body: (usize, usize),
     /// The `END SUB` statement; normal flow resumes after it.
     pub(super) end: (usize, usize),
+}
+
+/// `DEF FNNAME(A, B)=expression`.
+#[derive(Clone, Debug)]
+pub(super) struct Function {
+    pub(super) params: Vec<String>,
+    pub(super) body: String,
 }
 
 pub(super) struct Frame {
@@ -68,10 +76,10 @@ fn is_keyword(word: &str, keyword: &str) -> bool {
 }
 
 /// Names a procedure may not take: statements the interpreter already knows.
-const RESERVED: [&str; 28] = [
+const RESERVED: [&str; 29] = [
     "REM", "IF", "GOTO", "GOSUB", "RETURN", "FOR", "NEXT", "END", "STOP", "CLS", "PAPER", "PEN",
     "INK", "WAIT", "REST", "SOUND", "PRINT", "PLAY_SFX", "PLAY_MUSIC", "STOP_MUSIC", "SUB", "CALL",
-    "EXIT", "LOCAL", "LET", "THEN", "ELSE", "ELSEIF",
+    "EXIT", "LOCAL", "LET", "THEN", "ELSE", "ELSEIF", "DEF",
 ];
 
 impl Program {
@@ -82,7 +90,13 @@ impl Program {
             let number = self.lines[line].0;
             for (at, statement) in statements.iter().enumerate() {
                 let (word, rest) = leading_name(statement);
-                if word == "SUB" {
+                if word == "DEF" {
+                    let (name, function) = Self::def_fn(rest.trim())
+                        .map_err(|error| format!("{error} at line {number}"))?;
+                    if self.functions.insert(name.clone(), function).is_some() {
+                        return Err(format!("{name} is defined twice"));
+                    }
+                } else if word == "SUB" {
                     if let Some((name, _, _)) = &open {
                         return Err(format!("SUB inside SUB {name} at line {number}"));
                     }
@@ -138,6 +152,46 @@ impl Program {
             params
         };
         Ok((name, params))
+    }
+
+    /// `FNNAME(A, B)=expression` → the name and its function.
+    fn def_fn(definition: &str) -> Result<(String, Function), String> {
+        let eq = assignment_eq(definition).ok_or("DEF needs =")?;
+        let (name, params) = Self::sub_header(&definition[..eq])
+            .map_err(|_| format!("DEF needs FNNAME(...), not {}", definition[..eq].trim()))?;
+        if !name.starts_with("FN") {
+            return Err(format!("DEF needs a name starting FN, not {name}"));
+        }
+        let body = definition[eq + 1..].trim().to_string();
+        Ok((name, Function { params, body }))
+    }
+
+    /// Runs `FNNAME(args)`: the parameters shadow the program's names meanwhile.
+    pub(super) fn call_function(&mut self, name: &str, args: &[Value], blip: &Blip) -> Result<Value, String> {
+        let function = self.functions.get(name).cloned().ok_or_else(|| format!("No DEF {name}"))?;
+        if args.len() != function.params.len() {
+            return Err(format!("{name} needs {} values, got {}", function.params.len(), args.len()));
+        }
+        // Each nested FN is a Rust call too: this keeps a runaway off the stack.
+        if self.function_depth >= MAX_DEPTH {
+            return Err(format!("Too many nested calls ({MAX_DEPTH})"));
+        }
+        let saved: Vec<_> = function
+            .params
+            .iter()
+            .zip(args)
+            .map(|(param, value)| (param.clone(), self.vars.insert(param.clone(), value.clone())))
+            .collect();
+        self.function_depth += 1;
+        let result = self.eval(&function.body, blip);
+        self.function_depth -= 1;
+        for (name, old) in saved.into_iter().rev() {
+            match old {
+                Some(value) => self.vars.insert(name, value),
+                None => self.vars.remove(&name),
+            };
+        }
+        result
     }
 
     pub(super) fn is_procedure(&self, name: &str) -> bool {

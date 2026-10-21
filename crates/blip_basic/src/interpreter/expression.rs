@@ -147,6 +147,9 @@ impl Expr<'_, '_> {
     }
 
     fn call(&mut self, name: &str, args: &[Value]) -> Result<Value, String> {
+        if self.program.functions.contains_key(name) {
+            return self.program.call_function(name, args, self.blip);
+        }
         if shared_math::contains(name) {
             if args.iter().any(|arg| !matches!(arg, Value::Num(_))) {
                 return Err(format!("{name} needs numeric arguments"));

@@ -133,32 +133,6 @@ fn serpent_source_loads_as_numbered_program() {
     );
 }
 #[test]
-fn rally_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/RALLY.BLIP"));
-    assert!(p.lines.len() > 35);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 1500);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("CANVAS(480,540)")
-            && source.contains("BALL_Y=410+SIN")
-            && source.contains("KEY_ACTIVE(\"I\")")
-            && source.contains("KEY_ACTIVE(\"K\")")
-            && source.contains("FILL_RECT(28,PY,12,72")
-            && source.contains("HIT_DIR=1")
-            && source.contains("BALL_SPEED=MIN(BALL_SPEED+15,450)")
-            && source.contains("REL*1.1")
-            && source.contains("POINT_WAIT=1.2")
-    );
-}
-#[test]
 fn adder_source_loads_as_numbered_program() {
     let mut p = Program::new();
     p.load(include_str!("../../../../web/TAPE/ADDER.BLIP"));
@@ -433,4 +407,45 @@ fn else_belongs_to_the_nearest_if() {
     assert_eq!(matching_else(nested), nested.rfind("ELSE"));
     assert_eq!(matching_else(" PRINT \"ELSE\""), None);
     assert_eq!(matching_else(" ELSEWHERE=1"), None);
+}
+
+/// The tapes rewritten in the house layout, one by one.
+const HOUSE_TAPES: [(&str, &str); 1] = [("RALLY", include_str!("../../../../web/TAPE/RALLY.BLIP"))];
+
+/// Every tape reads the same way: what the game is, SETUP, one MAIN LOOP that
+/// updates and draws the current screen, and a named SUB for each step.
+#[test]
+fn tapes_follow_the_house_layout() {
+    for (name, source) in HOUSE_TAPES {
+        let mut p = Program::new();
+        p.load(source);
+        assert_eq!(p.error, None, "{name}");
+        assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0), "{name}: line order");
+        assert_eq!(p.lines[1], (2, format!("REM GAME: {name}")), "{name}");
+        for heading in ["10 REM --- SETUP ---", "100 REM --- MAIN LOOP"] {
+            assert!(source.contains(heading), "{name}: {heading}");
+        }
+        for sub in ["START_GAME", "UPDATE_TITLE", "DRAW_TITLE", "UPDATE_PLAY", "DRAW_PLAY", "UPDATE_OVER", "DRAW_OVER"] {
+            assert!(p.is_procedure(sub), "{name}: SUB {sub}");
+        }
+        assert!(!source.contains("GOSUB") && !source.contains("CANVAS("), "{name}: SUBs and the 640x400 screen");
+        // Bodies indent two spaces a level; a line holds one statement, or a short pair.
+        let mut depth = 0usize;
+        for line in source.lines() {
+            let body = line.split_once(' ').map_or("", |(_, body)| body);
+            let code = body.trim_start();
+            let (word, _) = super::procedure::leading_name(code);
+            let closes = matches!(word.as_str(), "NEXT" | "ELSE" | "ELSEIF") || code.starts_with("END SUB") || code.starts_with("END IF");
+            if closes { depth = depth.checked_sub(1).unwrap_or_else(|| panic!("{name}: unopened {line}")); }
+            assert_eq!(body.len() - code.len(), 2 * depth, "{name}: indent {line}");
+            let one_line_for = word == "FOR" && code.contains(":NEXT");
+            let opens = matches!(word.as_str(), "SUB" | "ELSE" | "ELSEIF") || word == "FOR" && !one_line_for
+                || super::block::block_condition(code).is_some();
+            if opens { depth += 1; }
+            let statements = split_statements(code);
+            assert!(statements.len() <= 1 || statements.len() <= 3 && statements.iter().all(|s| s.len() <= 24),
+                "{name}: one statement a line: {line}");
+        }
+        assert_eq!(depth, 0, "{name}: unclosed block");
+    }
 }

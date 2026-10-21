@@ -15,19 +15,19 @@ test('tape programs use uppercase source and unique ascending line numbers', () 
   const rally = readFileSync(new URL('RALLY.BLIP', tape), 'utf8');
   assert.match(rally, /KEY_ACTIVE\("I"\)/, 'Rally should let player 2 move up');
   assert.match(rally, /KEY_ACTIVE\("K"\)/, 'Rally should let player 2 move down');
-  assert.match(rally, /MODE=1 AND STATE=1/);
-  assert.match(rally, /TARGET=BY\+6-36\+AI_ERR/);
-  assert.match(rally, /BALL_SPEED=MIN\(BALL_SPEED\+15,450\)/);
-  assert.match(rally, /REL\*1\.1/);
-  assert.match(rally, /AI_ERR=RND\(1\)\*50\.4-25\.2/);
-  assert.match(rally, /SEGMENT_RECT_OVERLAP/);
+  assert.match(rally, /ELSEIF STATE\$="PLAY" THEN\n4070     TARGET=HOME_Y/, 'the CPU plays only during a rally');
+  assert.match(rally, /TARGET=BALL_Y\+BALL\/2-PAD_H\/2\+AI_ERR/);
+  assert.match(rally, /BALL_SPEED=MIN\(BALL_SPEED\+SPEED_UP,TOP_SPEED\)/);
+  assert.match(rally, /-0\.5,0\.5\)\*1\.1/);
+  assert.match(rally, /AI_ERR=RND\(1\)\*PAD_H\*0\.7-PAD_H\*0\.35/);
+  assert.match(rally, /DEF FNHITS_PADDLE\(X,Y\)=SEGMENT_RECT_OVERLAP/);
   const raider = readFileSync(new URL('SKY_RAIDER.BLIP', tape), 'utf8');
   assert.match(raider, /KILLS>=60\+15\*\(LEVEL-1\)/);
   assert.match(raider, /BOSS_IMAGE\$="\/TAPE\/GFX\/SKY_RAIDER\/BOSS_"\+STR\$\(LEVEL\)/);
   const gfx = JSON.parse(readFileSync(new URL('GFX/manifest.json', tape), 'utf8'));
   for (let level = 1; level <= 7; level++) assert.ok(gfx.SKY_RAIDER.includes(`BOSS_${level}.PNG`));
   assert.ok(gfx.RALLY.includes('BALL.PNG'));
-  assert.match(rally, /FILL_RECT\(BX,BY,12,12,"BLIP_WHITE"/);
+  assert.match(rally, /FILL_RECT\(BALL_X,BALL_Y,BALL,BALL,"BLIP_WHITE"\)/);
   const defender = readFileSync(new URL('DEFENDER.BLIP', tape), 'utf8');
   assert.ok(gfx.GALACTIC_DEFENDER.includes('BULLET.PNG'));
   assert.match(defender, /DRAW_TEXTURE\("\/TAPE\/GFX\/GALACTIC_DEFENDER\/BULLET\.PNG"/);
@@ -536,7 +536,7 @@ test('RALLY.BLIP runs matches and moves both player paddles', async (t) => {
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RALLY'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RALLY.BLIP'));
-  const original = await page.evaluate(() => [BlipBasic.lines.get(150), BlipBasic.lines.get(810)]);
+  const original = await page.evaluate(() => BlipBasic.lines.get(80));
   const turnDial = async (selector, direction) => {
     const box = await page.locator(selector).boundingBox();
     const centerX = box.x + box.width / 2, centerY = box.y + box.height / 2;
@@ -547,13 +547,7 @@ test('RALLY.BLIP runs matches and moves both player paddles', async (t) => {
   for (let round = 1; round <= 3; round++) {
     const soundEventsBefore = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
     await page.evaluate(([testRound, original]) => {
-      if (testRound === 1) {
-        BlipBasic.lines.set(150, 'MODE=2:STOP_MUSIC:GOTO 800');
-        BlipBasic.lines.set(810, 'GOSUB 1500:STATE=0:STOP_MUSIC:LAST_TIME=TIME():GOTO 200');
-      } else {
-        BlipBasic.lines.set(150, original[0]);
-        BlipBasic.lines.set(810, original[1]);
-      }
+      BlipBasic.lines.set(80, testRound === 1 ? 'PLAYERS=2:START_GAME' : original);
       BlipBasic.submit('RUN');
     }, [round, original]);
     try {
@@ -575,10 +569,11 @@ test('RALLY.BLIP runs matches and moves both player paddles', async (t) => {
           const context = sample.getContext('2d'); context.drawImage(bitmap, 0, 0);
           const { data, width, height } = context.getImageData(0, 0, sample.width, sample.height);
           let weightedY = 0, count = 0;
-          const scale = Math.min(width / 480, height / 540), left = (width - 480 * scale) / 2;
-          for (let y = Math.floor(height * .2); y < height * .9; y++) for (let x = Math.ceil(left + 440 * scale); x < left + 452 * scale; x++) {
+          const scale = Math.min(width / 640, height / 400), left = (width - 640 * scale) / 2;
+          for (let y = Math.floor(height * .2); y < height * .9; y++) for (let x = Math.ceil(left + 596 * scale); x < left + 608 * scale; x++) {
             const i = (y * width + x) * 4;
-            if (data[i] >= 195 && data[i] <= 220 && Math.abs(data[i] - data[i + 1]) < 5 && Math.abs(data[i] - data[i + 2]) < 5) { weightedY += y; count++; }
+            // The paddle's grey, dimmed by the curved glass toward the edge.
+            if (data[i] >= 140 && data[i] <= 225 && Math.abs(data[i] - data[i + 1]) < 8 && Math.abs(data[i] - data[i + 2]) < 8) { weightedY += y; count++; }
           }
           return count > 0 ? weightedY / count / height : null;
         }, image.toString('base64'));
@@ -626,9 +621,8 @@ test('RALLY.BLIP awards a point and resets the field after a missed paddle', asy
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(async () => {
     await BlipBasic.submit('LOAD /TAPE/RALLY');
-    BlipBasic.lines.set(10, 'MODE=2:GOTO 800');
-    BlipBasic.lines.set(810, 'GOSUB 1500:STATE=1:STOP_MUSIC:BX=0:BY=400:VX=0-275:VY=0:LAST_TIME=TIME():GOTO 200');
-    BlipBasic.lines.set(589, 'IF CPU_SCORE=1 AND STATE=2 AND BX=234 AND BY=278 THEN SOUND 1234,0,0');
+    BlipBasic.lines.set(90, 'PLAYERS=2:START_GAME:STATE$="PLAY":BALL_X=0:BALL_Y=60:BALL_VX=-360:BALL_VY=0:LPAD_Y=334:LAST_TIME=TIME()');
+    BlipBasic.lines.set(175, 'IF RIGHT_SCORE=1 AND STATE$="POINT" AND BALL_X=314 AND BALL_Y=210 THEN SOUND 1234,0,0');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.querySelector('#basic-wasm-frame').contentWindow.__pointReset === 1234);

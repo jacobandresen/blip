@@ -12,8 +12,9 @@ use music::Music;
 use sounds::Sounds;
 use std::collections::HashMap;
 
-const WIDTH: i32 = 320;
-const HEIGHT: i32 = 200;
+/// Every BLIP BASIC program draws on one 640x400 screen, a high-resolution Amiga's.
+const WIDTH: i32 = 640;
+const HEIGHT: i32 = 400;
 include!(concat!(env!("OUT_DIR"), "/tape_gfx.rs"));
 include!(concat!(env!("OUT_DIR"), "/rom_sfx.rs"));
 

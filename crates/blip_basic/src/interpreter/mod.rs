@@ -13,7 +13,7 @@ mod value;
 
 use self::{
     block::{At, Block},
-    procedure::{Frame, Procedure},
+    procedure::{Frame, Function, Procedure},
     syntax::{split_statements, Token},
     value::Value,
 };
@@ -50,6 +50,8 @@ pub(crate) struct Program {
     loops: Vec<ForLoop>,
     calls: Vec<Continuation>,
     procedures: HashMap<String, Procedure>,
+    functions: HashMap<String, Function>,
+    function_depth: usize,
     blocks: HashMap<At, Block>,
     block_ends: HashMap<At, At>,
     /// The statement being run, when it came from the program rather than a THEN.
