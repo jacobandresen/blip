@@ -759,7 +759,8 @@ test('METEORS.BLIP starts the next wave after the final small asteroid', async (
   });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/METEORS.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.submit('810 FOR I=1 TO 48:ROCK(I)=0:NEXT I:ROCK(1)=1:AX(1)=160:AY(1)=85:AR(1)=8:AVX(1)=0:AVY(1)=0:WAVE=1:GOTO 890');
+    // START_GAME's first wave is one small rock straight ahead of the ship.
+    BlipBasic.submit('2100 CLEAR_ROCKS:SPAWN_ROCK 3,320,150,0,0');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 20000 });
@@ -783,7 +784,7 @@ test('METEORS.BLIP splits a medium asteroid into two small rocks', async (t) => 
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD METEORS'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/METEORS.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.submit('810 FOR I=1 TO 48:ROCK(I)=0:NEXT I:ROCK(1)=1:AX(1)=160:AY(1)=85:AR(1)=12:AVX(1)=0:AVY(1)=0:WAVE=1:GOTO 890');
+    BlipBasic.submit('2100 CLEAR_ROCKS:SPAWN_ROCK 2,320,150,0,0');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 20000 });
@@ -809,8 +810,9 @@ test('METEORS.BLIP launches an animated saucer and aims its shot', async (t) => 
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD METEORS'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/METEORS.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.submit('1480 RETURN');
-    BlipBasic.submit('810 FOR I=1 TO 48:ROCK(I)=0:NEXT I:SAUCER=0:UFO_WAIT=1:UBULLET=0:INVULN=0:GOTO 890');
+    // An empty field that stays empty, and a saucer due at once.
+    BlipBasic.submit('4915 EXIT SUB');
+    BlipBasic.submit('2100 CLEAR_ROCKS:SAUCER_WAIT=0.05');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 20000 });
@@ -834,9 +836,10 @@ test('METEORS.BLIP awards the big saucer hit and plays its original sound', asyn
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD METEORS'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/METEORS.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.submit('10 GOTO 800');
-    BlipBasic.submit('1480 RETURN');
-    BlipBasic.submit('810 FOR I=1 TO 48:ROCK(I)=0:NEXT I:SAUCER=1:UX=160:UYS=85:UY=85:UBIG=1:UWIDTH=24:UHEIGHT=8:UFIRE=80:UBULLET=0:INVULN=0:GOTO 890');
+    // Straight into play, with a big saucer parked ahead of the ship.
+    BlipBasic.submit('85 START_GAME');
+    BlipBasic.submit('4915 EXIT SUB');
+    BlipBasic.submit('2100 CLEAR_ROCKS:SPAWN_SAUCER:SAUCER_X=320:SAUCER_Y=150:SAUCER_VX=0:SAUCER_BIG=1');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 20000 });

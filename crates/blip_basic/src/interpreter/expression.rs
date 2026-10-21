@@ -168,6 +168,11 @@ impl Expr<'_, '_> {
             "SQR" => Value::Num(first.number().sqrt()),
             "SIN" => Value::Num(first.number().sin()),
             "COS" => Value::Num(first.number().cos()),
+            "TAN" => Value::Num(first.number().tan()),
+            "EXP" => Value::Num(first.number().exp()),
+            "LOG" => Value::Num(first.number().ln()),
+            "SGN" => Value::Num(first.number().signum() * (first.number() != 0.0) as u8 as f64),
+            "FIX" => Value::Num(first.number().trunc()),
             "RND" => Value::Num(
                 self.program
                     .random(args.first().map(Value::number).unwrap_or(1.0)),

@@ -46,7 +46,8 @@ A line ending in `THEN` opens a block that runs to `ELSEIF … THEN`, `ELSE` or
 `DATA` items, numbers or quoted text, are gathered at load; `READ` takes the
 next and `RESTORE [line]` rewinds. A `FOR` with nothing to do, `FOR I=1 TO 0`,
 skips to its `NEXT`, as in AmigaBASIC. `WHILE X … WEND` repeats while `X` holds; `EXIT FOR`
-leaves the innermost loop.
+leaves the innermost loop. `TAN`, `EXP`, `LOG`, `SGN` and `FIX` join the
+functions, as in AmigaBASIC.
 
 Expressions cache tokens in `Arc` slices. Each frame allows up to 50,000
 statements and eight milliseconds of interpreter work. A program exceeding

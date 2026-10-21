@@ -99,37 +99,6 @@ fn defender_source_loads_as_numbered_program() {
     assert_eq!(p.lines.last().unwrap().0, 1660);
 }
 #[test]
-fn meteors_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/METEORS.BLIP"));
-    assert!(p.lines.len() > 80);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 1980);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("FOR I=1 TO 48")
-            && source.contains("TITLE_SHIP.PNG")
-            && source.contains("SPLIT_R*0.62")
-    );
-    assert!(
-        source.contains("FOR VERT=1 TO 9")
-            && source.contains("JAG(I,VERT)=0.75+RND(0.5)")
-            && source.contains("ROT+VERT*0.628319")
-    );
-    assert!(source.contains("SCORE=SCORE+20") && source.contains("SCORE=SCORE+100"));
-    assert!(
-        source.contains("METEORS/THRUST")
-            && source.contains("METEORS/HYPERSPACE")
-            && source.contains("METEORS/SAUCER_BIG")
-    );
-}
-#[test]
 fn sky_raider_source_loads_as_numbered_program() {
     let mut p = Program::new();
     p.load(include_str!("../../../../web/TAPE/SKY_RAIDER.BLIP"));
@@ -347,7 +316,8 @@ fn else_belongs_to_the_nearest_if() {
 }
 
 /// The tapes rewritten in the house layout, one by one.
-const HOUSE_TAPES: [(&str, &str); 3] = [
+const HOUSE_TAPES: [(&str, &str); 4] = [
+    ("METEORS", include_str!("../../../../web/TAPE/METEORS.BLIP")),
     ("ADDER", include_str!("../../../../web/TAPE/ADDER.BLIP")),
     ("RALLY", include_str!("../../../../web/TAPE/RALLY.BLIP")),
     ("SERPENT", include_str!("../../../../web/TAPE/SERPENT.BLIP")),
