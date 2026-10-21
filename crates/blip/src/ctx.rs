@@ -14,7 +14,7 @@ use macroquad::texture::{
     RenderTarget, RenderTargetParams,
 };
 use macroquad::time::get_frame_time;
-use macroquad::window::{clear_background, next_frame, screen_height, screen_width, Conf};
+use macroquad::window::{clear_background, get_internal_gl, next_frame, screen_height, screen_width, Conf};
 
 use crate::color::*;
 use crate::draw;
@@ -243,6 +243,18 @@ pub struct Blip {
     screenshot_path:       Option<String>,
 }
 
+/// Free a render target once. Dropped, macroquad 0.4 frees its texture twice:
+/// the render pass deletes it at once, then the texture's handle deletes the
+/// same id at frame end, after a new target may have taken it (a resized
+/// canvas went black under the curved glass).
+fn retire(rt: RenderTarget) {
+    let pass = rt.render_pass.raw_miniquad_id();
+    std::mem::forget(rt);
+    let mut gl = unsafe { get_internal_gl() };
+    gl.flush();
+    gl.quad_context.delete_render_pass(pass);
+}
+
 impl Blip {
     pub fn new(width: i32, height: i32) -> Self {
         // sample_count=0 avoids the MSAA resolve path in miniquad, which calls
@@ -332,10 +344,10 @@ impl Blip {
         if (self.width, self.height) == (width, height) { return; }
         // Flush queued draws before releasing their render pass.
         set_default_camera();
-        self.rt = render_target_ex(width as u32, height as u32, RenderTargetParams {
+        retire(std::mem::replace(&mut self.rt, render_target_ex(width as u32, height as u32, RenderTargetParams {
             sample_count: 0,
             ..Default::default()
-        });
+        })));
         self.rt.texture.set_filter(FilterMode::Nearest);
         self.width = width;
         self.height = height;
@@ -473,7 +485,7 @@ impl Blip {
                 // Free the offscreen composite target — the shader pass that
                 // needed it is off now.
                 if self.fx_level >= 1 {
-                    self.screen_rt   = None;
+                    if let Some(old) = self.screen_rt.take() { retire(old); }
                     self.screen_rt_w = 0;
                     self.screen_rt_h = 0;
                 }
@@ -570,7 +582,7 @@ impl Blip {
                 ..Default::default()
             });
             srt.texture.set_filter(FilterMode::Linear);
-            self.screen_rt   = Some(srt);
+            if let Some(old) = self.screen_rt.replace(srt) { retire(old); }
             self.screen_rt_w = iw;
             self.screen_rt_h = ih;
         }

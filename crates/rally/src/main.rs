@@ -279,7 +279,8 @@ fn draw_title(blip: &Blip) {
     let ball_x = if travel <= WIN_W as f32 { travel } else { WIN_W as f32 * 2.0 - travel };
     let ball_y = cy + 126.0 + (t * 2.1).sin() * 10.0;
     let trail_dir = if travel < WIN_W as f32 { -1.0 } else { 1.0 };
-    for (i, alpha) in [0.12, 0.24, 0.42].into_iter().enumerate() {
+    // Faintest farthest from the ball.
+    for (i, alpha) in [0.36, 0.24, 0.12].into_iter().enumerate() {
         let offset = (i as f32 + 1.0) * 9.0 * trail_dir;
         blip.fill_rect(ball_x + offset, ball_y, BALL_SZ, BALL_SZ,
             BlipColor { r: 0.72, g: 0.92, b: 1.0, a: alpha });
