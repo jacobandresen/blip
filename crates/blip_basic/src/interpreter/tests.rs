@@ -99,53 +99,6 @@ fn defender_source_loads_as_numbered_program() {
     assert_eq!(p.lines.last().unwrap().0, 1660);
 }
 #[test]
-fn sky_raider_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/SKY_RAIDER.BLIP"));
-    assert!(p.lines.len() > 100);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 1970);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(source.contains("ENEMY_WEAVER.PNG") && source.contains("ENEMY_ACE.PNG"));
-    assert!(
-        source.contains("FORMATION_TYPE=INT(RND(3))+1")
-            && source.contains("FORMATION_X+WING*34")
-            && source.contains("FORMATION_DIR")
-    );
-    assert!(
-        source.contains("SPAWN>80")
-            && source.contains("HIT_WAIT=70")
-            && source.contains("SCROLL=SCROLL+1")
-            && source.contains("KILLS>=60+15*(LEVEL-1)")
-            && source.contains("BOSS_WARNING")
-            && source.contains("BOSS_IMAGE$=")
-            && source.contains("LEVEL=LEVEL+1")
-            && source.contains("WEAPON=WEAPON+1")
-            && source.contains("SCORE=SCORE+30*WEAPON")
-            && source.contains("MAX_POWER=120")
-            && source.contains("SKY_RAIDER/POWERUP3")
-            && source.contains("SKY_RAIDER/POWERUP4")
-            && source.contains("SKY_RAIDER/MAX_POWER")
-            && source.contains("GUNS=8")
-            && source.contains("/TAPE/GFX/SKY_RAIDER/POWERUP.PNG")
-    );
-    assert!(
-        source.contains("DRAW_TEXTURE(\"/TAPE/GFX/SKY_RAIDER/PLAYER_PLANE.PNG\",PX,PY,33,29)")
-            && source.contains("DRAW_HUD(SCORE,LIVES)")
-    );
-    assert!(
-        source.contains("COLOR(0.10-0.07*DEPTH,0.24-0.13*DEPTH,0.46-0.16*DEPTH)")
-            && source.contains("EBVX(Q)=DX/DIST*1.8")
-            && source.contains("SKY_RAIDER/ENEMY_GUN")
-    );
-}
-#[test]
 fn brawler_source_loads_as_numbered_program() {
     let mut p = Program::new();
     p.load(include_str!("../../../../web/TAPE/BRAWLER.BLIP"));
@@ -316,7 +269,8 @@ fn else_belongs_to_the_nearest_if() {
 }
 
 /// The tapes rewritten in the house layout, one by one.
-const HOUSE_TAPES: [(&str, &str); 4] = [
+const HOUSE_TAPES: [(&str, &str); 5] = [
+    ("SKY_RAIDER", include_str!("../../../../web/TAPE/SKY_RAIDER.BLIP")),
     ("METEORS", include_str!("../../../../web/TAPE/METEORS.BLIP")),
     ("ADDER", include_str!("../../../../web/TAPE/ADDER.BLIP")),
     ("RALLY", include_str!("../../../../web/TAPE/RALLY.BLIP")),

@@ -894,13 +894,12 @@ test('SKY_RAIDER drops an ACE weapon capsule and upgrades its volley', async (t)
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=99:PX=143:PY=160:VX=0:SPAWN=0:SCROLL=0:FIRE_WAIT=0:SPAWN_SLOT=0:HIT_WAIT=0:LEVEL=1:KILLS=0:BOSS_ACTIVE=0:WON=0:WEAPON=1:POWER_ACTIVE=0:PLAY_MUSIC "SKY_RAIDER_ALT"');
-    BlipBasic.lines.set(820, 'FOR E=1 TO 8:ENEMY(E)=0:ESHOT(E)=0:NEXT E');
-    BlipBasic.lines.set(830, 'ENEMY(1)=1:ETYPE(1)=3:EX(1)=143:EY(1)=120:EDIR(1)=0:ESHOT(1)=999:GOTO 100');
-    BlipBasic.lines.set(150, 'DRAW_HUD(SCORE,LIVES):IF WEAPON=2 AND SCORE>=180 THEN FILL_RECT(4,40,8,8,"#00FF00")');
-    BlipBasic.lines.set(308, 'IF ENEMY(1)=1 THEN SHOT(1)=1:BX(1)=EX(1)+15:BY(1)=EY(1)+10:BT(1)=50');
-    BlipBasic.lines.set(309, 'IF POWER_ACTIVE=1 THEN POWER_X=PX:POWER_Y=PY:GOSUB 1850');
+    // One ACE that never fires, a round put into it each frame, and its capsule
+    // carried to the plane; the marker shows tier two and 120+60 points.
+    BlipBasic.lines.set(85, 'START_GAME:LIVES=99:SPAWN_WAIT=999:SPAWN_ENEMY 3,295,120,0:ENEMY_FIRE(1)=999');
+    BlipBasic.lines.set(175, 'IF ENEMY(1) THEN SHOT(1)=1:SHOT_X(1)=ENEMY_X(1)+20:SHOT_Y(1)=ENEMY_Y(1)+10');
+    BlipBasic.lines.set(176, 'IF CAPSULE_ON THEN CAPSULE_X=PLANE_X+18:CAPSULE_Y=PLANE_Y+15');
+    BlipBasic.lines.set(165, 'IF WEAPON=2 AND SCORE>=180 THEN FILL_RECT(8,60,24,24,"#00FF00")');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
@@ -941,12 +940,11 @@ test('SKY_RAIDER reaches its Rust boss threshold, defeats the boss, and advances
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=99:PX=143:PY=160:VX=0:SPAWN=0:SCROLL=0:FIRE_WAIT=0:SPAWN_SLOT=0:HIT_WAIT=0:LEVEL=1:KILLS=60:BOSS_ACTIVE=0:WON=0:PLAY_MUSIC "SKY_RAIDER_ALT"');
-    BlipBasic.lines.set(820, 'FOR E=1 TO 8:ENEMY(E)=0:ESHOT(E)=0:NEXT E');
-    BlipBasic.lines.set(150, 'DRAW_HUD(SCORE,LIVES):IF BOSS_ACTIVE=1 THEN FILL_RECT(4,4,8,8,"#00FF00")');
-    BlipBasic.lines.set(155, 'IF LEVEL=2 THEN FILL_RECT(4,4,8,8,"#FF00FF")');
-    BlipBasic.lines.set(309, 'IF BOSS_ACTIVE=1 THEN SHOT(1)=1:BX(1)=BOSS_X+BOSS_W/2:BY(1)=BOSS_Y+5:BT(1)=50');
+    // Sixty kills already: the boss comes at once and takes a round each frame.
+    BlipBasic.lines.set(85, 'START_GAME:LIVES=99:KILLS=60');
+    BlipBasic.lines.set(175, 'IF BOSS_ON AND BOSS_IN THEN SHOT(1)=1:SHOT_X(1)=BOSS_X+BOSS_W/2:SHOT_Y(1)=BOSS_Y+5');
+    BlipBasic.lines.set(165, 'IF BOSS_ON THEN FILL_RECT(8,4,24,22,"#00FF00")');
+    BlipBasic.lines.set(166, 'IF LEVEL=2 THEN FILL_RECT(8,4,24,22,"#FF00FF")');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
@@ -985,9 +983,7 @@ test('SKY_RAIDER.BLIP fires aimed enemy rounds with the original gun sound', asy
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:PX=143:PY=160:SPAWN=0:SCROLL=0:FIRE_WAIT=0:SPAWN_SLOT=0:HIT_WAIT=0:ENEMY(1)=1:EX(1)=143:EY(1)=80:ETYPE(1)=1:ESHOT(1)=1:PLAY_MUSIC "SKY_RAIDER_ALT"');
-    BlipBasic.lines.set(820, 'FOR E=2 TO 8:ENEMY(E)=0:ESHOT(E)=0:NEXT E');
+    BlipBasic.lines.set(85, 'START_GAME:SPAWN_WAIT=999:SPAWN_ENEMY 1,295,80,0:ENEMY_FIRE(1)=0.05');
   });
   await page.evaluate(() => BlipBasic.submit('RUN'));
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
@@ -1014,9 +1010,8 @@ test('SKY_RAIDER.BLIP spawns enemy pairs like the Rust formations', async (t) =>
   });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:PX=143:PY=160:VX=0:SPAWN=80:SCROLL=0:FIRE_WAIT=0:SPAWN_SLOT=0:HIT_WAIT=0:PLAY_MUSIC "SKY_RAIDER_ALT"');
-    BlipBasic.lines.set(295, 'IF ENEMY(1)+ENEMY(2)+ENEMY(3)+ENEMY(4)+ENEMY(5)+ENEMY(6)+ENEMY(7)+ENEMY(8)>=2 THEN FILL_RECT(100,40,8,8,"BLIP_YELLOW")');
+    BlipBasic.lines.set(85, 'START_GAME:SPAWN_WAIT=0');
+    BlipBasic.lines.set(165, 'IF (ENEMY(1)>0)+(ENEMY(2)>0)+(ENEMY(3)>0)+(ENEMY(4)>0)>=2 THEN FILL_RECT(200,80,16,16,"BLIP_YELLOW")');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
@@ -1027,9 +1022,9 @@ test('SKY_RAIDER.BLIP spawns enemy pairs like the Rust formations', async (t) =>
     const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
     const { data, width } = context.getImageData(0, 0, sample.width, sample.height);
     let pixels = 0;
-    const scale = Math.min(width / 320, image.height / 200);
-    const left = (width - 320 * scale) / 2, top = (image.height - 200 * scale) / 2;
-    for (let y = Math.floor(top + 40 * scale); y < Math.ceil(top + 48 * scale); y++) for (let x = Math.floor(left + 100 * scale); x < Math.ceil(left + 108 * scale); x++) {
+    const scale = Math.min(width / 640, image.height / 400);
+    const left = (width - 640 * scale) / 2, top = (image.height - 400 * scale) / 2;
+    for (let y = Math.floor(top + 82 * scale); y < Math.ceil(top + 94 * scale); y++) for (let x = Math.floor(left + 202 * scale); x < Math.ceil(left + 214 * scale); x++) {
       const i = (y * width + x) * 4;
       if (data[i] > 150 && data[i + 1] > 110 && data[i + 2] < 100) pixels++;
     }
@@ -1053,9 +1048,11 @@ test('SKY_RAIDER.BLIP gives the plane hit grace against a touching formation', a
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:PX=143:PY=160:VX=0:SPAWN=0:SCROLL=0:FIRE_WAIT=0:SPAWN_SLOT=0:HIT_WAIT=0');
-    BlipBasic.lines.set(820, 'FOR E=1 TO 8:ENEMY(E)=0:ESHOT(E)=999:NEXT E:ENEMY(1)=1:EX(1)=143:EY(1)=159:ETYPE(1)=1:ENEMY(2)=1:EX(2)=143:EY(2)=159:ETYPE(2)=1');
+    // Two quiet grunts on top of the plane, without its spawn grace. No music
+    // starts, so the only sound is the hit.
+    BlipBasic.lines.set(80, 'REM NO TITLE MUSIC');
+    BlipBasic.lines.set(85, 'LIVES=3:LEVEL=1:WEAPON=1:CLEAR_SKY:NEW_PLANE:STATE$="PLAY":SPAWN_WAIT=999:GRACE=0');
+    BlipBasic.lines.set(86, 'SPAWN_ENEMY 1,PLANE_X,PLANE_Y,0:SPAWN_ENEMY 1,PLANE_X,PLANE_Y,0:ENEMY_FIRE(1)=999:ENEMY_FIRE(2)=999');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
