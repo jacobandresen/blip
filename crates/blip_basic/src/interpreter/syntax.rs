@@ -218,3 +218,20 @@ pub(super) fn top_level_word(source: &str, word: &str) -> Option<usize> {
 pub(super) fn top_level_then(source: &str) -> Option<usize> {
     top_level_word(source, "THEN")
 }
+
+/// The `ELSE` that answers this `IF`: a nested `IF … THEN` takes the first
+/// `ELSE` after it, as in every BASIC.
+pub(super) fn matching_else(actions: &str) -> Option<usize> {
+    let mut nested = 0;
+    let mut from = 0;
+    loop {
+        let rest = &actions[from..];
+        let word = |w| top_level_word(rest, w).map(|at| at + from);
+        let (next_if, next_else) = (word("IF"), word("ELSE")?);
+        match next_if {
+            Some(at) if at < next_else => { nested += 1; from = at + 2; }
+            _ if nested > 0 => { nested -= 1; from = next_else + 4; }
+            _ => return Some(next_else),
+        }
+    }
+}

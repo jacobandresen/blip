@@ -423,3 +423,14 @@ fn block_if_structure_errors_stop_the_load() {
     assert_eq!(p.error, None);
     assert_eq!(p.blocks.len(), 2);
 }
+
+#[test]
+fn else_belongs_to_the_nearest_if() {
+    use super::syntax::matching_else;
+    assert_eq!(matching_else(" A ELSE B"), Some(3));
+    assert_eq!(matching_else(" IF B THEN X ELSE Y"), None);
+    let nested = " IF B THEN X ELSE Y ELSE Z";
+    assert_eq!(matching_else(nested), nested.rfind("ELSE"));
+    assert_eq!(matching_else(" PRINT \"ELSE\""), None);
+    assert_eq!(matching_else(" ELSEWHERE=1"), None);
+}

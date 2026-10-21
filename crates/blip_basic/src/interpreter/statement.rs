@@ -4,7 +4,7 @@ use super::{
     block::block_condition,
     color::paper_color,
     procedure::leading_name,
-    syntax::{assignment_eq, method_call, split_args, split_statements, top_level_then, top_level_word},
+    syntax::{assignment_eq, method_call, split_args, matching_else, split_statements, top_level_then},
     ForLoop, MusicRequest, Program, Value,
 };
 use crate::host::audio_event;
@@ -108,7 +108,7 @@ impl Program {
     fn inline_if(&mut self, rest: &str, blip: &Blip) -> Result<(), String> {
         let then = top_level_then(rest).ok_or("IF needs THEN")?;
         let actions = &rest[then + 4..];
-        let (yes, no) = match top_level_word(actions, "ELSE") {
+        let (yes, no) = match matching_else(actions) {
             Some(at) => (&actions[..at], Some(&actions[at + 4..])),
             None => (actions, None),
         };
