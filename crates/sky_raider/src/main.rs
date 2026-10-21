@@ -12,7 +12,7 @@ use blip::macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use blip::{
     load_png, load_png_smooth,
     clamp, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rand_range_f32, rects_overlap, web,
-    window_conf, Blip, BlipColor, Fx, LifeResult, Pooled, Session, Timer,
+    window_conf, Blip, BlipColor, Fx, LifeResult, Pooled, Session, Timer, segment_circle_overlap, segment_rect_overlap,
     BLIP_BLACK, BLIP_CYAN, BLIP_GRAY, BLIP_GREEN, BLIP_ORANGE, BLIP_RED, BLIP_WHITE,
     BLIP_YELLOW,
 };
@@ -1661,7 +1661,32 @@ fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 }
 
+fn round_hits_rect(from: (f32, f32), round: &Round, x: f32, y: f32, w: f32, h: f32) -> bool {
+    let width = round.r * 2.0 + 2.0;
+    segment_rect_overlap(
+        from.0, from.1 + BULLET_H * 0.5,
+        round.x, round.y + BULLET_H * 0.5,
+        x - width * 0.5, y - BULLET_H * 0.5,
+        w + width, h + BULLET_H,
+    )
+}
+
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
+    let player_before = (g.player_x, g.player_y);
+    let powerup_starts: [(f32, f32); MAX_POWERUPS] =
+        std::array::from_fn(|i| (g.powerups[i].x, g.powerups[i].y));
+    let powerup_was_active: [bool; MAX_POWERUPS] =
+        std::array::from_fn(|i| g.powerups[i].active);
+    let health_starts: [(f32, f32); MAX_HEALTH_PICKUPS] =
+        std::array::from_fn(|i| (g.health_pickups[i].x, g.health_pickups[i].y));
+    let health_was_active: [bool; MAX_HEALTH_PICKUPS] =
+        std::array::from_fn(|i| g.health_pickups[i].active);
+    let enemy_starts: [(f32, f32); MAX_ENEMIES] =
+        std::array::from_fn(|i| (g.enemies[i].x, g.enemies[i].y));
+    let enemy_was_active: [bool; MAX_ENEMIES] =
+        std::array::from_fn(|i| g.enemies[i].active);
+    let mut powerup_expired = [false; MAX_POWERUPS];
+    let mut health_expired = [false; MAX_HEALTH_PICKUPS];
     g.fx.update(dt);
     g.respawn_grace.tick(dt);
     g.boss_intro.tick(dt);
@@ -1759,15 +1784,27 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     // ---- simple movement (no cross-entity reads) ----
-    for b in pool_iter_mut(&mut g.bullets) {
+    let bullet_starts: [(f32, f32); MAX_PLAYER_BULLETS] =
+        std::array::from_fn(|i| (g.bullets[i].x, g.bullets[i].y));
+    let enemy_bullet_starts: [(f32, f32); MAX_ENEMY_BULLETS] =
+        std::array::from_fn(|i| (g.enemy_bullets[i].x, g.enemy_bullets[i].y));
+    let mut enemy_bullet_left_screen = [false; MAX_ENEMY_BULLETS];
+    let mut bullet_left_screen = [false; MAX_PLAYER_BULLETS];
+    for (i, b) in g.bullets.iter_mut().enumerate() {
+        if !b.active { continue; }
         b.y -= b.vy * dt;
         b.x += b.vx * dt;
-        if b.y < -BULLET_H || b.y > WIN_H as f32 || b.x < -10.0 || b.x > WIN_W as f32 + 10.0 { b.active = false; }
+        if b.y < -BULLET_H || b.y > WIN_H as f32 || b.x < -10.0 || b.x > WIN_W as f32 + 10.0 {
+            bullet_left_screen[i] = true;
+        }
     }
-    for b in pool_iter_mut(&mut g.enemy_bullets) {
+    for (i, b) in g.enemy_bullets.iter_mut().enumerate() {
+        if !b.active { continue; }
         b.y += b.vy * dt;
         b.x += b.vx * dt;
-        if b.y > WIN_H as f32 + 10.0 || b.y < -20.0 || b.x < -10.0 || b.x > WIN_W as f32 + 10.0 { b.active = false; }
+        if b.y > WIN_H as f32 + 10.0 || b.y < -20.0 || b.x < -10.0 || b.x > WIN_W as f32 + 10.0 {
+            enemy_bullet_left_screen[i] = true;
+        }
     }
 
     // Damaged: smoke from the engine at 3 health, fire with it at 2, more
@@ -1802,13 +1839,15 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             pool_spawn(&mut g.puffs, Puff { x: cx, y: ny, r: 2.5, grow: 14.0, ttl: 0.7, max_ttl: 0.7, fire: false, top: true, active: true });
         }
     }
-    for p in pool_iter_mut(&mut g.powerups) {
+    for (i, p) in g.powerups.iter_mut().enumerate() {
+        if !p.active { continue; }
         p.y += POW_SPEED * dt;
-        if p.y > WIN_H as f32 { p.active = false; }
+        powerup_expired[i] = p.y > WIN_H as f32;
     }
-    for h in pool_iter_mut(&mut g.health_pickups) {
+    for (i, h) in g.health_pickups.iter_mut().enumerate() {
+        if !h.active { continue; }
         h.y += POW_SPEED * dt;
-        if h.y > WIN_H as f32 { h.active = false; }
+        health_expired[i] = h.y > WIN_H as f32;
     }
     for e in pool_iter_mut(&mut g.explosions) {
         e.ttl -= dt;
@@ -1846,10 +1885,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         let bw = g.bullets[bi].r * 2.0 + 2.0;
         let (bx, by) = (g.bullets[bi].x - bw / 2.0, g.bullets[bi].y);
         let mut consumed = false;
+        let mut ricocheted = false;
         for ei in 0..MAX_ENEMIES {
             if !g.enemies[ei].active { continue; }
             let (ex, ey) = (g.enemies[ei].x, g.enemies[ei].y);
-            if rects_overlap(bx, by, bw, BULLET_H, ex, ey, ENEMY_W as f32, ENEMY_H as f32) {
+            if round_hits_rect(bullet_starts[bi], &g.bullets[bi],
+                ex, ey, ENEMY_W as f32, ENEMY_H as f32) {
                 if !g.bullets[bi].bounced && rand_range_f32(0.0, 1.0) < RICOCHET_CHANCE {
                     // Glances off: a spark, and away at 35-80 degrees to
                     // one side, a little slower, the plane unharmed.
@@ -1860,6 +1901,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                     b.vx = side * v * a.sin();
                     b.vy = v * a.cos();
                     b.bounced = true;
+                    bullet_left_screen[bi] = false;
+                    ricocheted = true;
                     let (sx, sy) = (b.x, b.y);
                     g.spawn_explosion(sx, sy, 0.18, BlipColor::new(1.0, 0.95, 0.7, 1.0));
                     let take = &sfx.ricochet[(rand() % sfx.ricochet.len() as u32) as usize];
@@ -1875,8 +1918,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             g.bullets[bi].active = false;
             continue;
         }
+        if ricocheted { continue; }
         let (bossw, bossh) = boss_size(g.boss.tier);
-        if g.boss.active && rects_overlap(bx, by, bw, BULLET_H, g.boss.x, g.boss.y, bossw, bossh) {
+        if g.boss.active && round_hits_rect(bullet_starts[bi], &g.bullets[bi],
+            g.boss.x, g.boss.y, bossw, bossh) {
             g.bullets[bi].active = false;
             g.boss.hp -= 1;
             g.spawn_explosion(bx, by, 0.6, EXPLOSION_ORANGE);
@@ -1944,7 +1989,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             for boi in 0..MAX_BOATS {
                 if !g.boats[boi].active { continue; }
                 let (boat_x, boat_y) = (g.boats[boi].x, g.boats[boi].y);
-                if rects_overlap(bx, by, bw, BULLET_H, boat_x, boat_y, BOAT_W as f32, BOAT_H as f32) {
+                if round_hits_rect(bullet_starts[bi], &g.bullets[bi],
+                    boat_x, boat_y, BOAT_W as f32, BOAT_H as f32) {
                     g.bullets[bi].active = false;
                     g.boats[boi].active = false;
                     g.spawn_explosion(boat_x + BOAT_W as f32 / 2.0, boat_y + BOAT_H as f32 / 2.0, 1.3, EXPLOSION_ORANGE);
@@ -1967,7 +2013,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 if !g.islands[isi].active { continue; }
                 let (iw, ih) = ISLAND_SIZES[g.islands[isi].size as usize];
                 let (ix, iy) = (g.islands[isi].x, g.islands[isi].y);
-                if rects_overlap(bx, by, bw, BULLET_H, ix, iy, iw as f32, ih as f32) {
+                if round_hits_rect(bullet_starts[bi], &g.bullets[bi],
+                    ix, iy, iw as f32, ih as f32) {
                     g.bullets[bi].active = false;
                     g.islands[isi].hp -= 1;
                     g.spawn_explosion(bx, by, 0.5, EXPLOSION_ORANGE);
@@ -1990,7 +2037,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         // beam itself not being able to hurt the player yet either).
         if g.bullets[bi].active && g.barrier.active && !g.barrier.warmup.active() {
             let (mx, my) = (g.barrier.motor_x - MOTOR_W / 2.0, g.barrier.y - MOTOR_H / 2.0);
-            if rects_overlap(bx, by, bw, BULLET_H, mx, my, MOTOR_W, MOTOR_H) {
+            if round_hits_rect(bullet_starts[bi], &g.bullets[bi], mx, my, MOTOR_W, MOTOR_H) {
                 g.bullets[bi].active = false;
                 g.barrier.hp -= 1;
                 g.spawn_explosion(bx, by, 0.6, EXPLOSION_ORANGE);
@@ -2009,10 +2056,28 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
+    for (i, &left_screen) in bullet_left_screen.iter().enumerate() {
+        if left_screen { g.bullets[i].active = false; }
+    }
+
     // ---- power-up catch ----
     for i in 0..MAX_POWERUPS {
         if !g.powerups[i].active { continue; }
-        if rects_overlap(g.player_x, g.player_y, PLAYER_W as f32, PLAYER_H as f32, g.powerups[i].x, g.powerups[i].y, POW_W, POW_H) {
+        let (from_x, from_y) = if powerup_was_active[i] {
+            powerup_starts[i]
+        } else {
+            (g.powerups[i].x, g.powerups[i].y)
+        };
+        if segment_rect_overlap(
+            from_x + POW_W / 2.0 - (player_before.0 + PLAYER_W as f32 / 2.0),
+            from_y + POW_H / 2.0 - (player_before.1 + PLAYER_H as f32 / 2.0),
+            g.powerups[i].x + POW_W / 2.0 - (g.player_x + PLAYER_W as f32 / 2.0),
+            g.powerups[i].y + POW_H / 2.0 - (g.player_y + PLAYER_H as f32 / 2.0),
+            -(PLAYER_W as f32 + POW_W) / 2.0,
+            -(PLAYER_H as f32 + POW_H) / 2.0,
+            PLAYER_W as f32 + POW_W,
+            PLAYER_H as f32 + POW_H,
+        ) {
             g.powerups[i].active = false;
             let (cx, cy) = (g.powerups[i].x + POW_W / 2.0, g.powerups[i].y + POW_H / 2.0);
             if g.weapon_level < MAX_WEAPON_LEVEL {
@@ -2035,13 +2100,33 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     // ---- health pickup catch ----
     for i in 0..MAX_HEALTH_PICKUPS {
         if !g.health_pickups[i].active { continue; }
-        if rects_overlap(g.player_x, g.player_y, PLAYER_W as f32, PLAYER_H as f32, g.health_pickups[i].x, g.health_pickups[i].y, HEALTH_W, HEALTH_H) {
+        let (from_x, from_y) = if health_was_active[i] {
+            health_starts[i]
+        } else {
+            (g.health_pickups[i].x, g.health_pickups[i].y)
+        };
+        if segment_rect_overlap(
+            from_x + HEALTH_W / 2.0 - (player_before.0 + PLAYER_W as f32 / 2.0),
+            from_y + HEALTH_H / 2.0 - (player_before.1 + PLAYER_H as f32 / 2.0),
+            g.health_pickups[i].x + HEALTH_W / 2.0 - (g.player_x + PLAYER_W as f32 / 2.0),
+            g.health_pickups[i].y + HEALTH_H / 2.0 - (g.player_y + PLAYER_H as f32 / 2.0),
+            -(PLAYER_W as f32 + HEALTH_W) / 2.0,
+            -(PLAYER_H as f32 + HEALTH_H) / 2.0,
+            PLAYER_W as f32 + HEALTH_W,
+            PLAYER_H as f32 + HEALTH_H,
+        ) {
             g.health_pickups[i].active = false;
             let (cx, cy) = (g.health_pickups[i].x + HEALTH_W / 2.0, g.health_pickups[i].y + HEALTH_H / 2.0);
             g.health = (g.health + HEALTH_RESTORE).min(PLAYER_HEALTH_MAX);
             g.spawn_explosion(cx, cy, 1.0, BLIP_GREEN);
             play_sfx(&sfx.health_pickup);
         }
+    }
+    for (i, &expired) in powerup_expired.iter().enumerate() {
+        if expired { g.powerups[i].active = false; }
+    }
+    for (i, &expired) in health_expired.iter().enumerate() {
+        if expired { g.health_pickups[i].active = false; }
     }
 
     // ---- player vs hazards ----
@@ -2050,18 +2135,34 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         let (px, py) = (g.player_x, g.player_y);
         let (hw, hh) = PLAYER_HIT;
         let (hx, hy) = (px + (PLAYER_W as f32 - hw) / 2.0, py + PLAYER_H as f32 * 0.47 - hh / 2.0);
+        let (hx0, hy0) = (
+            player_before.0 + (PLAYER_W as f32 - hw) / 2.0,
+            player_before.1 + PLAYER_H as f32 * 0.47 - hh / 2.0,
+        );
         let mut hit = false;
         for i in 0..MAX_ENEMY_BULLETS {
-            if !g.enemy_bullets[i].active { continue; }
-            if rects_overlap(hx, hy, hw, hh, g.enemy_bullets[i].x - 2.0, g.enemy_bullets[i].y - 2.0, 4.0, 4.0) {
+            if !g.enemy_bullets[i].active && !enemy_bullet_left_screen[i] { continue; }
+            let start = enemy_bullet_starts[i];
+            if segment_rect_overlap(start.0 - hx0, start.1 - hy0,
+                g.enemy_bullets[i].x - hx, g.enemy_bullets[i].y - hy,
+                -2.0, -2.0, hw + 4.0, hh + 4.0) {
                 g.enemy_bullets[i].active = false;
+                enemy_bullet_left_screen[i] = false;
                 blip::bot::add(if g.boss.active { "hit_boss_round" } else { "hit_round" }, 1.0);
                 hit = true;
             }
         }
         for b in pool_iter_mut(&mut g.flak_bursts) {
             // a burst hurts once, in its first moments, if the plane is in it
-            if b.t < FLAK_LETHAL && (b.x - (hx + hw / 2.0)).hypot(b.y - (hy + hh / 2.0)) < FLAK_BURST_R {
+            if b.t < FLAK_LETHAL && segment_circle_overlap(
+                hx0 + hw / 2.0 - b.x,
+                hy0 + hh / 2.0 - b.y,
+                hx + hw / 2.0 - b.x,
+                hy + hh / 2.0 - b.y,
+                0.0,
+                0.0,
+                FLAK_BURST_R,
+            ) {
                 b.t = FLAK_LETHAL;
                 blip::bot::add("hit_flak", 1.0);
                 hit = true;
@@ -2070,7 +2171,21 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         for i in 0..MAX_ENEMIES {
             if !g.enemies[i].active { continue; }
             let (ew, eh) = (ENEMY_W as f32 * 0.6, ENEMY_H as f32 * 0.6);
-            if rects_overlap(hx, hy, hw, hh, g.enemies[i].x + ENEMY_W as f32 * 0.2, g.enemies[i].y + ENEMY_H as f32 * 0.2, ew, eh) {
+            let (ex0, ey0) = if enemy_was_active[i] {
+                enemy_starts[i]
+            } else {
+                (g.enemies[i].x, g.enemies[i].y)
+            };
+            if segment_rect_overlap(
+                hx0 - (ex0 + ENEMY_W as f32 * 0.2),
+                hy0 - (ey0 + ENEMY_H as f32 * 0.2),
+                hx - (g.enemies[i].x + ENEMY_W as f32 * 0.2),
+                hy - (g.enemies[i].y + ENEMY_H as f32 * 0.2),
+                -hw,
+                -hh,
+                ew + hw,
+                eh + hh,
+            ) {
                 g.spawn_explosion(g.enemies[i].x, g.enemies[i].y, 1.0, EXPLOSION_ORANGE);
                 g.enemies[i].active = false;
                 blip::bot::add("hit_ram", 1.0);
@@ -2116,6 +2231,9 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 }
             }
         }
+    }
+    for (i, &left_screen) in enemy_bullet_left_screen.iter().enumerate() {
+        if left_screen { g.enemy_bullets[i].active = false; }
     }
 }
 

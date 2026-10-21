@@ -10,7 +10,7 @@ use blip::{
     GAME_OVER_MIN_WAIT,
     load_png,
     clamp, lerp, play_sfx, Jukebox, rand_int, rects_overlap, web, window_conf, Blip, Fx,
-    BlipColor, LifeResult, Session, Timer,
+    BlipColor, LifeResult, Session, Timer, segment_rect_overlap,
     BLIP_BLACK, BLIP_CYAN, BLIP_GREEN, BLIP_MAGENTA, BLIP_ORANGE, BLIP_RED,
     BLIP_WHITE, BLIP_YELLOW,
 };
@@ -535,7 +535,14 @@ fn fire_laser(g: &mut Game) -> bool {
 
 /// Returns `true` if the laser just killed the player this frame — the
 /// caller should stop processing the round immediately when that happens.
-fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
+fn update_ufo(
+    g: &mut Game,
+    dt: f32,
+    sfx: &Sounds,
+    bullet_starts: &[(f32, f32); N_BULLETS],
+    ufo_start_x: f32,
+    ufo_was_active: bool,
+) -> bool {
     g.ufo_score_timer.tick(dt);
 
     if !g.ufo_active {
@@ -647,8 +654,15 @@ fn update_ufo(g: &mut Game, dt: f32, sfx: &Sounds) -> bool {
     if g.ufo_mode != UfoMode::Firing {
         for bi in 0..MAX_PLAYER_BULLETS {
             if !g.bullets[bi].active { continue; }
-            if rects_overlap(g.bullets[bi].x, g.bullets[bi].y, 8.0, 16.0,
-                             g.ufo_x, UFO_Y, UFO_W, UFO_H) {
+            let start_x = if ufo_was_active { ufo_start_x } else { g.ufo_x };
+            if bullet_hits_moving_rect(
+                bullet_starts[bi],
+                (g.bullets[bi].x, g.bullets[bi].y),
+                (start_x, UFO_Y),
+                (g.ufo_x, UFO_Y),
+                UFO_W,
+                UFO_H,
+            ) {
                 play_sfx(&sfx.explosion);
                 let kill_x = g.ufo_x;
                 g.spawn_explosion(kill_x, UFO_Y);
@@ -798,13 +812,13 @@ fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
 
 /// Player shots against the mothership: only the player's slots, which
 /// free_bullet() hands out from the front of the array (bombs from the back).
-fn boss_take_hits(g: &mut Game, sfx: &Sounds) {
+fn boss_take_hits(g: &mut Game, sfx: &Sounds, bullet_starts: &[(f32, f32); N_BULLETS]) {
     if !g.boss_active { return; }
     let (bx, by) = (g.boss_x, g.boss_y());
     for i in 0..MAX_PLAYER_BULLETS {
         if !g.bullets[i].active { continue; }
         let (x, y) = (g.bullets[i].x, g.bullets[i].y);
-        if x < bx || x > bx + BOSS_W || y < by || y > by + BOSS_H { continue; }
+        if !bullet_hits_rect(bullet_starts[i], (x, y), bx, by, BOSS_W, BOSS_H) { continue; }
         g.bullets[i].active = false;
         g.boss_hp -= 1;
         g.boss_flash = BOSS_FLASH;
@@ -839,6 +853,68 @@ fn bomb_hits_ship(bx: f32, by: f32, px: f32) -> bool {
     let half = (1.0 + row * 15.0) * ALIEN_W as f32 / 32.0;
     let dx = (bx + 2.0 - (px + ALIEN_W as f32 / 2.0)).abs();
     dx <= half.max(3.0) + 2.0
+}
+
+fn bomb_hits_ship_swept(
+    from: (f32, f32),
+    to: (f32, f32),
+    player_from: f32,
+    player_to: f32,
+) -> bool {
+    let span = (to.0 - from.0).abs().max((to.1 - from.1).abs())
+        .max((player_to - player_from).abs());
+    let steps = (span / 4.0).ceil().max(1.0) as usize;
+    (0..=steps).any(|i| {
+        let t = i as f32 / steps as f32;
+        bomb_hits_ship(
+            lerp(from.0, to.0, t),
+            lerp(from.1, to.1, t),
+            lerp(player_from, player_to, t),
+        )
+    })
+}
+
+fn bullet_hits_rect(from: (f32, f32), to: (f32, f32), x: f32, y: f32, w: f32, h: f32) -> bool {
+    segment_rect_overlap(from.0 + 4.0, from.1 + 8.0, to.0 + 4.0, to.1 + 8.0,
+        x - 4.0, y - 8.0, w + 8.0, h + 16.0)
+}
+
+fn bullet_hits_moving_rect(
+    from: (f32, f32),
+    to: (f32, f32),
+    rect_from: (f32, f32),
+    rect_to: (f32, f32),
+    w: f32,
+    h: f32,
+) -> bool {
+    segment_rect_overlap(
+        from.0 + 4.0 - rect_from.0,
+        from.1 + 8.0 - rect_from.1,
+        to.0 + 4.0 - rect_to.0,
+        to.1 + 8.0 - rect_to.1,
+        -4.0,
+        -8.0,
+        w + 8.0,
+        h + 16.0,
+    )
+}
+
+fn expire_player_shots(g: &mut Game, went_over_top: &[bool; MAX_PLAYER_BULLETS]) {
+    for (i, &expired) in went_over_top.iter().enumerate() {
+        if expired && g.bullets[i].active {
+            g.bullets[i].active = false;
+            g.streak = 0;
+        }
+    }
+}
+
+fn expire_ground_bombs(g: &mut Game, reached_ground: &[bool; N_BULLETS]) {
+    for (i, &reached) in reached_ground.iter().enumerate() {
+        if reached && g.bullets[i].active {
+            g.bullets[i].active = false;
+            g.fx.burst(g.bullets[i].x + 2.0, GROUND_Y as f32 - 2.0, 6, 60.0, BLIP_ORANGE);
+        }
+    }
 }
 
 /// The ship is hit: the explosion, a life gone, and the pause or the end.
@@ -948,6 +1024,9 @@ fn update_explosions(g: &mut Game, dt: f32) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
+    let player_x_before = g.player_x;
+    let ufo_start_x = g.ufo_x;
+    let ufo_was_active = g.ufo_active;
     g.respawn_grace.tick(dt);
     // Hold to fire, like the cabinet: a new shot goes as soon as the last
     // clears; MAX_PLAYER_BULLETS = 1 is the rate limit.
@@ -993,17 +1072,25 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
-    for b in g.bullets.iter_mut() {
+    let bullet_starts: [(f32, f32); N_BULLETS] =
+        std::array::from_fn(|i| (g.bullets[i].x, g.bullets[i].y));
+    let bullet_was_active: [bool; N_BULLETS] =
+        std::array::from_fn(|i| g.bullets[i].active);
+    let mut player_shot_went_over_top = [false; MAX_PLAYER_BULLETS];
+    let mut bomb_reached_ground = [false; N_BULLETS];
+    for (i, b) in g.bullets.iter_mut().enumerate() {
         if !b.active { continue; }
         b.y += if b.player { -BULLET_SPEED } else { g.bomb_speed } * dt;
         if b.y < PLAY_Y as f32 {
-            b.active = false;
-            if b.player { g.streak = 0; }
+            if b.player {
+                player_shot_went_over_top[i] = true;
+            } else {
+                b.active = false;
+            }
         }
         // A bomb that misses bursts on the ground line.
         if !b.player && b.y + 12.0 > GROUND_Y as f32 {
-            b.active = false;
-            g.fx.burst(b.x + 2.0, GROUND_Y as f32 - 2.0, 6, 60.0, BLIP_ORANGE);
+            bomb_reached_ground[i] = true;
         }
     }
     g.fx.update(dt);
@@ -1070,12 +1157,15 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     // Player bullet vs aliens
     for bi in 0..MAX_PLAYER_BULLETS {
         if !g.bullets[bi].active { continue; }
-        for ai in 0..ALIEN_TOTAL {
-            if !g.aliens[ai].alive { continue; }
-            if rects_overlap(
-                g.bullets[bi].x, g.bullets[bi].y, 8.0, 16.0,
-                g.aliens[ai].x, g.aliens[ai].y, ALIEN_W as f32, ALIEN_H as f32,
-            ) {
+        'rows: for row in (0..g.active_rows).rev() {
+            for col in 0..g.active_cols {
+                let ai = (row * g.active_cols + col) as usize;
+                if !g.aliens[ai].alive { continue; }
+                if !bullet_hits_rect(bullet_starts[bi], (g.bullets[bi].x, g.bullets[bi].y),
+                                     g.aliens[ai].x, g.aliens[ai].y,
+                                     ALIEN_W as f32, ALIEN_H as f32) {
+                    continue;
+                }
                 play_sfx(&sfx.explosion);
                 let (ax, ay, kind) = (g.aliens[ai].x, g.aliens[ai].y, g.aliens[ai].kind);
                 g.spawn_explosion(ax, ay);
@@ -1092,7 +1182,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 } else {
                     g.fx.popup(cx, cy - 6.0, &format!("{pts}"), alien_color(kind));
                 }
-                break;
+                break 'rows;
             }
         }
     }
@@ -1101,7 +1191,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     if let Some(d) = g.diver {
         for bi in 0..MAX_PLAYER_BULLETS {
             if !g.bullets[bi].active { continue; }
-            if rects_overlap(g.bullets[bi].x, g.bullets[bi].y, 8.0, 16.0, d.x, d.y, ALIEN_W as f32, ALIEN_H as f32) {
+            if bullet_hits_rect(bullet_starts[bi], (g.bullets[bi].x, g.bullets[bi].y),
+                                d.x, d.y, ALIEN_W as f32, ALIEN_H as f32) {
                 g.bullets[bi].active = false;
                 g.diver = None;
                 play_sfx(&sfx.explosion);
@@ -1126,10 +1217,15 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                     if !g.shields[s].alive[r][c] { continue; }
                     let bx = g.shields[s].x + (c as i32 * SHIELD_BLOCK) as f32;
                     let by = g.shields[s].y + (r as i32 * SHIELD_BLOCK) as f32;
-                    if rects_overlap(
-                        g.bullets[bi].x, g.bullets[bi].y, 8.0, 16.0,
-                        bx, by, SHIELD_BLOCK as f32, SHIELD_BLOCK as f32,
-                    ) {
+                    let end = (g.bullets[bi].x, g.bullets[bi].y);
+                    let hit = if bullet_was_active[bi] {
+                        bullet_hits_rect(bullet_starts[bi], end, bx, by,
+                            SHIELD_BLOCK as f32, SHIELD_BLOCK as f32)
+                    } else {
+                        rects_overlap(end.0, end.1, 8.0, 16.0, bx, by,
+                            SHIELD_BLOCK as f32, SHIELD_BLOCK as f32)
+                    };
+                    if hit {
                         g.shields[s].alive[r][c] = false;
                         g.bullets[bi].active = false;
                         g.fx.burst(bx + SHIELD_BLOCK as f32 / 2.0, by + SHIELD_BLOCK as f32 / 2.0, 5, 50.0, BLIP_GREEN);
@@ -1164,15 +1260,30 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     // Bombs vs player
     for bi in MAX_PLAYER_BULLETS..N_BULLETS {
         if !g.bullets[bi].active { continue; }
-        if bomb_hits_ship(g.bullets[bi].x, g.bullets[bi].y, g.player_x) {
+        let from = if bullet_was_active[bi] {
+            bullet_starts[bi]
+        } else {
+            (g.bullets[bi].x, g.bullets[bi].y)
+        };
+        let player_from = if bullet_was_active[bi] { player_x_before } else { g.player_x };
+        if bomb_hits_ship_swept(
+            from,
+            (g.bullets[bi].x, g.bullets[bi].y),
+            player_from,
+            g.player_x,
+        ) {
             g.bullets[bi].active = false;
             lose_ship(g, sfx, if bi == UFO_BOMB_IDX { "death_ufo_bomb" } else { "death_bomb" });
+            expire_player_shots(g, &player_shot_went_over_top);
+            expire_ground_bombs(g, &bomb_reached_ground);
             return;
         }
     }
+    expire_ground_bombs(g, &bomb_reached_ground);
 
     if update_diver(g, dt, sfx) {
         lose_ship(g, sfx, "death_diver");
+        expire_player_shots(g, &player_shot_went_over_top);
         return;
     }
 
@@ -1194,12 +1305,15 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
-    if update_ufo(g, dt, sfx) {
+    if update_ufo(g, dt, sfx, &bullet_starts, ufo_start_x, ufo_was_active) {
+        expire_player_shots(g, &player_shot_went_over_top);
         return; // the laser just killed the player this frame
     }
 
     update_boss(g, dt, sfx);
-    boss_take_hits(g, sfx);
+    boss_take_hits(g, sfx, &bullet_starts);
+
+    expire_player_shots(g, &player_shot_went_over_top);
 
     if g.aliens_alive() == 0 && !g.boss_active && g.diver.is_none() {
         // Whichever way this goes the ordinary UFO's pass is over: the

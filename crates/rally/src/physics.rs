@@ -66,7 +66,10 @@ pub fn step(
     let substeps = ((speed * dt / (BALL_SZ * 0.5)).ceil() as i32).clamp(1, 8);
     let sdt = dt / substeps as f32;
 
-    for _ in 0..substeps {
+    for step in 0..substeps {
+        let t = (step as f32 + 0.5) / substeps as f32;
+        let lpad = lpad_y - lpad_vy * dt * (1.0 - t);
+        let rpad = rpad_y - rpad_vy * dt * (1.0 - t);
         let (prev_x, prev_y) = (g.ball_x + BALL_SZ * 0.5, g.ball_y + BALL_SZ * 0.5);
         g.ball_x += g.ball_vx * sdt;
         g.ball_y += g.ball_vy * sdt;
@@ -91,14 +94,13 @@ pub fn step(
                 next_x,
                 next_y,
                 LPAD_X - BALL_SZ * 0.5,
-                lpad_y - BALL_SZ * 0.5,
+                lpad - BALL_SZ * 0.5,
                 PAD_W + BALL_SZ,
                 PAD_H + BALL_SZ,
             )
         {
             g.ball_x = LPAD_X + PAD_W;
-            let py = lpad_y;
-            bounce_paddle(g, py, lpad_vy, 1.0);
+            bounce_paddle(g, lpad, lpad_vy, 1.0);
             events.push(Event::LeftHit);
         }
 
@@ -109,14 +111,13 @@ pub fn step(
                 next_x,
                 next_y,
                 RPAD_X - BALL_SZ * 0.5,
-                rpad_y - BALL_SZ * 0.5,
+                rpad - BALL_SZ * 0.5,
                 PAD_W + BALL_SZ,
                 PAD_H + BALL_SZ,
             )
         {
             g.ball_x = RPAD_X - BALL_SZ;
-            let py = rpad_y;
-            bounce_paddle(g, py, rpad_vy, -1.0);
+            bounce_paddle(g, rpad, rpad_vy, -1.0);
             events.push(Event::RightHit);
         }
 

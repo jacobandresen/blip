@@ -354,6 +354,28 @@ fn wrapped_segment_circle_overlap(
     false
 }
 
+fn wrapped_motion_overlap(
+    a: (f32, f32),
+    b: (f32, f32),
+    a_delta: (f32, f32),
+    b_delta: (f32, f32),
+    radius: f32,
+) -> bool {
+    let (w, h) = (PLAY_W as f32, PLAY_H as f32);
+    let dx = (a.0 - b.0 + w * 0.5).rem_euclid(w) - w * 0.5;
+    let dy = (a.1 - b.1 + h * 0.5).rem_euclid(h) - h * 0.5;
+    let (vx, vy) = (a_delta.0 - b_delta.0, a_delta.1 - b_delta.1);
+    let from = (dx - vx, dy - vy);
+    for ox in [-w, 0.0, w] {
+        for oy in [-h, 0.0, h] {
+            if segment_circle_overlap(from.0, from.1, dx, dy, ox, oy, radius) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// Saucers spawn more often, shoot more often, and skew toward the harder
 /// "small" variant as the level climbs, so late levels keep escalating even
 /// after the asteroid count itself caps out.
@@ -425,6 +447,9 @@ fn update_title(g: &mut Game) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) {
+    let ship_before = (g.ship.x, g.ship.y);
+    let mut ship_delta = (0.0, 0.0);
+    let mut ship_teleported = false;
     if g.ship_alive {
         if key_active(BLIP_KEY_LEFT)  || key_active(BLIP_KEY_A) { g.ship.angle -= SHIP_TURN_RATE * dt; }
         if key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D) { g.ship.angle += SHIP_TURN_RATE * dt; }
@@ -451,6 +476,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
         }
         g.ship.x = wrap(g.ship.x + g.ship.vx * dt, 0.0, PLAY_W as f32);
         g.ship.y = wrap(g.ship.y + g.ship.vy * dt, PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
+        ship_delta = (
+            (g.ship.x - ship_before.0 + PLAY_W as f32 * 0.5).rem_euclid(PLAY_W as f32) - PLAY_W as f32 * 0.5,
+            (g.ship.y - ship_before.1 + PLAY_H as f32 * 0.5).rem_euclid(PLAY_H as f32) - PLAY_H as f32 * 0.5,
+        );
 
         g.fire_cd -= dt;
         if key_active(BLIP_KEY_SPACE) && g.fire_cd <= 0.0 {
@@ -462,10 +491,20 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
         }
         if key_pressed(BLIP_KEY_BUTTON2) {
             hyperspace(g, sfx);
+            ship_delta = (0.0, 0.0);
+            ship_teleported = true;
         }
         if g.invuln_t > 0.0 { g.invuln_t -= dt; }
     }
 
+    let asteroids_before: [bool; MAX_ASTEROIDS] =
+        std::array::from_fn(|i| g.asteroids[i].active);
+    let saucer_before = (g.saucer.x, g.saucer.y);
+    let saucer_was_active = g.saucer.active;
+    let bullet_starts: [(f32, f32); MAX_BULLETS] =
+        std::array::from_fn(|i| (g.bullets[i].x, g.bullets[i].y));
+    let bullets_before: [bool; MAX_BULLETS] =
+        std::array::from_fn(|i| g.bullets[i].active);
     update_world(g, dt, sfx);
 
     // ---- enemy bullets / asteroids / saucer vs ship ----
@@ -473,8 +512,17 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
         for bi in 0..MAX_BULLETS {
             if !g.bullets[bi].active || g.bullets[bi].from_player { continue; }
             let (bx, by) = (g.bullets[bi].x, g.bullets[bi].y);
-            let (px, py) = (bx - g.bullets[bi].vx * dt, by - g.bullets[bi].vy * dt);
-            if segment_circle_overlap(px, py, bx, by, g.ship.x, g.ship.y, SHIP_RADIUS) {
+            let hit = if ship_teleported || !bullets_before[bi] {
+                segment_circle_overlap(bx, by, bx, by, g.ship.x, g.ship.y, SHIP_RADIUS)
+            } else {
+                let start = bullet_starts[bi];
+                let bullet_delta = (g.bullets[bi].vx * dt, g.bullets[bi].vy * dt);
+                let from = (start.0 - ship_before.0, start.1 - ship_before.1);
+                let to = (from.0 + bullet_delta.0 - ship_delta.0,
+                          from.1 + bullet_delta.1 - ship_delta.1);
+                segment_circle_overlap(from.0, from.1, to.0, to.1, 0.0, 0.0, SHIP_RADIUS)
+            };
+            if hit {
                 g.bullets[bi].active = false;
                 blip::bot::add("death_saucer_shot", 1.0);
                 kill_ship(g, sfx);
@@ -482,13 +530,18 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
             }
         }
     }
+    expire_enemy_bullets(g);
     if g.ship_alive && g.invuln_t <= 0.0 {
         for ai in 0..MAX_ASTEROIDS {
-            if !g.asteroids[ai].active { continue; }
+            if !asteroids_before[ai] || !g.asteroids[ai].active { continue; }
             let r = g.asteroids[ai].size.radius();
-            let dx = g.ship.x - g.asteroids[ai].x;
-            let dy = g.ship.y - g.asteroids[ai].y;
-            if dx * dx + dy * dy <= (r + SHIP_RADIUS) * (r + SHIP_RADIUS) {
+            if wrapped_motion_overlap(
+                (g.ship.x, g.ship.y),
+                (g.asteroids[ai].x, g.asteroids[ai].y),
+                ship_delta,
+                (g.asteroids[ai].vx * dt, g.asteroids[ai].vy * dt),
+                r + SHIP_RADIUS,
+            ) {
                 let a = g.asteroids[ai];
                 g.asteroids[ai].active = false;
                 let c = rock_color(&a, g.sess.level, blip::macroquad::time::get_time() as f32);
@@ -502,9 +555,20 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
     }
     if g.ship_alive && g.invuln_t <= 0.0 && g.saucer.active {
         let r = if g.saucer.big { 16.0 } else { 9.0 };
-        let dx = g.ship.x - g.saucer.x;
-        let dy = g.ship.y - g.saucer.y;
-        if dx * dx + dy * dy <= (r + SHIP_RADIUS) * (r + SHIP_RADIUS) {
+        let hit = if saucer_was_active {
+            wrapped_motion_overlap(
+                (g.ship.x, g.ship.y),
+                (g.saucer.x, g.saucer.y),
+                ship_delta,
+                (g.saucer.x - saucer_before.0, g.saucer.y - saucer_before.1),
+                r + SHIP_RADIUS,
+            )
+        } else {
+            let dx = g.ship.x - g.saucer.x;
+            let dy = g.ship.y - g.saucer.y;
+            dx * dx + dy * dy <= (r + SHIP_RADIUS) * (r + SHIP_RADIUS)
+        };
+        if hit {
             g.saucer.active = false;
             let (sx, sy) = (g.saucer.x, g.saucer.y);
             burst(g, sx, sy, g.saucer.vx, 0.0, 6, r, 90.0, NEON_PINK);
@@ -517,10 +581,16 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
 fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.fx.update(dt);
     g.wave_t += dt;
+    let asteroids_at_frame_start: [bool; MAX_ASTEROIDS] =
+        std::array::from_fn(|i| g.asteroids[i].active);
+    let saucer_at_frame_start = (g.saucer.x, g.saucer.y);
+    let saucer_was_active = g.saucer.active;
     let bullet_starts: [(f32, f32); MAX_BULLETS] = std::array::from_fn(|i| {
         (g.bullets[i].x, g.bullets[i].y)
     });
-    for b in pool_iter_mut(&mut g.bullets) {
+    let mut player_bullet_expired = [false; MAX_BULLETS];
+    for (i, b) in g.bullets.iter_mut().enumerate() {
+        if !b.active { continue; }
         b.x += b.vx * dt;
         b.y += b.vy * dt;
         b.ttl -= dt;
@@ -532,7 +602,9 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
             b.y = wrap(b.y, PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
         }
         if b.ttl <= 0.0 || b.x < 0.0 || b.x > PLAY_W as f32 || b.y < PLAY_Y0 || b.y > PLAY_Y0 + PLAY_H as f32 {
-            b.active = false;
+            if b.from_player {
+                player_bullet_expired[i] = true;
+            }
         }
     }
 
@@ -580,12 +652,16 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     // ---- collisions: player bullets vs asteroids ----
     for bi in 0..MAX_BULLETS {
         if !g.bullets[bi].active || !g.bullets[bi].from_player { continue; }
-        let from = bullet_starts[bi];
-        let to = (from.0 + g.bullets[bi].vx * dt, from.1 + g.bullets[bi].vy * dt);
         for ai in 0..MAX_ASTEROIDS {
-            if !g.asteroids[ai].active { continue; }
+            if !asteroids_at_frame_start[ai] || !g.asteroids[ai].active { continue; }
             let r = g.asteroids[ai].size.radius();
-            if wrapped_segment_circle_overlap(from, to, (g.asteroids[ai].x, g.asteroids[ai].y), r) {
+            if wrapped_motion_overlap(
+                (g.bullets[bi].x, g.bullets[bi].y),
+                (g.asteroids[ai].x, g.asteroids[ai].y),
+                (g.bullets[bi].vx * dt, g.bullets[bi].vy * dt),
+                (g.asteroids[ai].vx * dt, g.asteroids[ai].vy * dt),
+                r,
+            ) {
                 g.bullets[bi].active = false;
                 let a = g.asteroids[ai];
                 let size = a.size;
@@ -613,7 +689,18 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
             let from = bullet_starts[bi];
             let to = (from.0 + g.bullets[bi].vx * dt, from.1 + g.bullets[bi].vy * dt);
             let r = if g.saucer.big { 16.0 } else { 9.0 };
-            if wrapped_segment_circle_overlap(from, to, (g.saucer.x, g.saucer.y), r) {
+            let hit = if saucer_was_active {
+                wrapped_motion_overlap(
+                    (g.bullets[bi].x, g.bullets[bi].y),
+                    (g.saucer.x, g.saucer.y),
+                    (g.bullets[bi].vx * dt, g.bullets[bi].vy * dt),
+                    (g.saucer.x - saucer_at_frame_start.0, g.saucer.y - saucer_at_frame_start.1),
+                    r,
+                )
+            } else {
+                wrapped_segment_circle_overlap(from, to, (g.saucer.x, g.saucer.y), r)
+            };
+            if hit {
                 g.bullets[bi].active = false;
                 g.saucer.active = false;
                 let (sx, sy, svx) = (g.saucer.x, g.saucer.y, g.saucer.vx);
@@ -627,6 +714,10 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
+    for (i, &expired) in player_bullet_expired.iter().enumerate() {
+        if expired { g.bullets[i].active = false; }
+    }
+
     if pool_iter(&g.asteroids).count() == 0 {
         blip::bot::set(&format!("t_wave{}", g.sess.level), blip::bot::clock() as f64);
         g.sess.next_level();
@@ -635,8 +726,20 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 }
 
+fn expire_enemy_bullets(g: &mut Game) {
+    for b in &mut g.bullets {
+        if !b.from_player
+            && (b.ttl <= 0.0 || b.x < 0.0 || b.x > PLAY_W as f32
+                || b.y < PLAY_Y0 || b.y > PLAY_Y0 + PLAY_H as f32)
+        {
+            b.active = false;
+        }
+    }
+}
+
 fn update_dead(g: &mut Game, dt: f32, sfx: &Sounds) {
     update_world(g, dt, sfx);
+    expire_enemy_bullets(g);
     if g.respawn_t.tick(dt) {
         let cx = PLAY_W as f32 / 2.0;
         let cy = PLAY_Y0 + PLAY_H as f32 / 2.0;

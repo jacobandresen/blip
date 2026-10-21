@@ -52,9 +52,36 @@ pub(crate) fn clash_bolts(g: &mut Game) -> Option<(f32, f32)> {
         for j in i + 1..g.bolts.len() {
             let (a, b) = (g.bolts[i], g.bolts[j]);
             if !a.active || !b.active || a.owner == b.owner { continue; }
+            if g.p[a.owner].arch().special == Special::LaserVision
+                && g.p[b.owner].arch().special == Special::LaserVision
+            { continue; }
             if !rects_overlap(a.x - 10.0, a.y - 8.0, 20.0, 16.0, b.x - 10.0, b.y - 8.0, 20.0, 16.0) {
                 continue;
             }
+            for k in [i, j] {
+                if g.p[g.bolts[k].owner].arch().special != Special::LaserVision {
+                    g.bolts[k].active = false;
+                }
+            }
+            return Some(((a.x + b.x) / 2.0, (a.y + b.y) / 2.0));
+        }
+    }
+    None
+}
+
+fn clash_bolts_swept(g: &mut Game, starts: &[(f32, f32); 4]) -> Option<(f32, f32)> {
+    for i in 0..g.bolts.len() {
+        for j in i + 1..g.bolts.len() {
+            let (a, b) = (g.bolts[i], g.bolts[j]);
+            if !a.active || !b.active || a.owner == b.owner { continue; }
+            if g.p[a.owner].arch().special == Special::LaserVision
+                && g.p[b.owner].arch().special == Special::LaserVision
+            { continue; }
+            if !segment_rect_overlap(
+                starts[i].0 - starts[j].0, starts[i].1 - starts[j].1,
+                a.x - b.x, a.y - b.y,
+                -20.0, -16.0, 40.0, 32.0,
+            ) { continue; }
             for k in [i, j] {
                 if g.p[g.bolts[k].owner].arch().special != Special::LaserVision {
                     g.bolts[k].active = false;
@@ -360,25 +387,35 @@ fn trade_blows(g: &mut Game, holds: [Input; 2]) {
 /// stage or reach a body, guarded or not.
 fn fly_bolts(g: &mut Game, dt: f32, holds: [Input; 2]) {
     // Projectiles.
-    if let Some((x, y)) = clash_bolts(g) {
+    while let Some((x, y)) = clash_bolts(g) {
+        g.spark(x, y, false, true);
+        g.snd(Sfx::Parry);
+    }
+    let starts: [(f32, f32); 4] = std::array::from_fn(|i| (g.bolts[i].x, g.bolts[i].y));
+    for i in 0..g.bolts.len() {
+        if !g.bolts[i].active { continue; }
+        g.bolts[i].x += g.bolts[i].vx * dt;
+        g.bolts[i].y += g.bolts[i].vy * dt;
+    }
+    while let Some((x, y)) = clash_bolts_swept(g, &starts) {
         g.spark(x, y, false, true);
         g.snd(Sfx::Parry);
     }
     for i in 0..g.bolts.len() {
         if !g.bolts[i].active { continue; }
-        g.bolts[i].x += g.bolts[i].vx * dt;
-        g.bolts[i].y += g.bolts[i].vy * dt;
         // Off the side of the stage, or into the boards.
-        if g.bolts[i].x < -20.0 || g.bolts[i].x > WIN_W as f32 + 20.0 || g.bolts[i].y > FLOOR_Y {
-            g.bolts[i].active = false;
-            continue;
-        }
+        let left_stage = g.bolts[i].x < -20.0 || g.bolts[i].x > WIN_W as f32 + 20.0 || g.bolts[i].y > FLOOR_Y;
         let d = 1 - g.bolts[i].owner;
         let (dx, dy, dw, dh) = g.p[d].hurt_box();
         // A beam is thinner than a ball of chi.
         let tall = if g.p[1 - d].arch().special == Special::LaserVision { LASER_THICK } else { 16.0 };
-        let (bx, by) = (g.bolts[i].x - 10.0, g.bolts[i].y - tall / 2.0);
-        if !rects_overlap(bx, by, 20.0, tall, dx, dy, dw, dh) { continue; }
+        if !segment_rect_overlap(
+            starts[i].0, starts[i].1, g.bolts[i].x, g.bolts[i].y,
+            dx - 10.0, dy - tall / 2.0, dw + 20.0, dh + tall,
+        ) {
+            if left_stage { g.bolts[i].active = false; }
+            continue;
+        }
         g.bolts[i].active = false;
         if invulnerable(&g.p[d]) { continue; }
         let guarding = !g.p[d].airborne()

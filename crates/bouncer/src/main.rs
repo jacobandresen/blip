@@ -11,7 +11,7 @@ use blip::macroquad::texture::Texture2D;
 use blip::{
     GAME_OVER_MIN_WAIT,
     load_png, load_png_smooth,
-    clamp, Fx, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
+    clamp, Fx, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, segment_rect_overlap, web,
     window_conf, Blip, BlipColor, LifeResult, Pooled, Session, Timer, rand_range_f32, BLIP_BLACK, BLIP_CYAN,
     BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
@@ -526,13 +526,15 @@ fn fly_ball(g: &mut Game, dt: f32, active_speed: f32, sfx: &Sounds) -> bool {
     let speed = g.ball_vx.hypot(g.ball_vy).max(1.0);
     let substeps = ((speed * dt / (BALL_W as f32 * 0.4)).ceil() as i32).clamp(1, 8);
     let sdt = dt / substeps as f32;
+    let pad_start_x = g.pad_x - g.pad_vx * dt;
 
-    for _ in 0..substeps {
+    for step in 0..substeps {
         g.ball_x += g.ball_vx * sdt;
         g.ball_y += g.ball_vy * sdt;
 
         ball_walls(g, sfx);
-        ball_paddle(g, active_speed, sfx);
+        let pad_x = pad_start_x + g.pad_vx * dt * (step as f32 + 0.5) / substeps as f32;
+        ball_paddle(g, active_speed, pad_x, sfx);
         ball_bricks(g, active_speed, sfx);
 
         if g.ball_y > WIN_H as f32 {
@@ -644,13 +646,13 @@ fn ball_walls(g: &mut Game, sfx: &Sounds) {
     }
 }
 
-fn ball_paddle(g: &mut Game, speed: f32, sfx: &Sounds) {
+fn ball_paddle(g: &mut Game, speed: f32, pad_x: f32, sfx: &Sounds) {
     if g.ball_vy <= 0.0 {
         return;
     }
     if !rects_overlap(
         g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32,
-        g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32,
+        pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32,
     ) {
         return;
     }
@@ -664,7 +666,7 @@ fn ball_paddle(g: &mut Game, speed: f32, sfx: &Sounds) {
     // Where it landed across the face, -1 (left tip) .. +1 (right tip). The
     // classic "aim by where you hit" english, plus a slice of the paddle's
     // own sideways speed carried into the ball the way a moving bat drags it.
-    let rel = ((g.ball_x + BALL_W as f32 / 2.0 - g.pad_x) / g.pad_w - 0.5) * 2.0;
+    let rel = ((g.ball_x + BALL_W as f32 / 2.0 - pad_x) / g.pad_w - 0.5) * 2.0;
     let steer = rel.clamp(-1.0, 1.0) * 1.15; // radians
     let nvx = speed * steer.sin() + g.pad_vx * 0.18;
     let mut nvy = -(speed * steer.cos()).abs();
@@ -807,11 +809,22 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
 
 fn update_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
     let mut split = false;
+    let pad_start_x = g.pad_x - g.pad_vx * dt;
+    let (pad_x, pad_w) = (g.pad_x, g.pad_w);
     for d in pool_iter_mut(&mut g.drops) {
+        let drop_from = (d.x - pad_start_x, d.y - PAD_Y as f32);
         d.y += DROP_SPEED * dt;
-        if d.y > WIN_H as f32 { d.active = false; continue; }
-        if rects_overlap(d.x, d.y, DROP_W, DROP_H,
-                         g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32) {
+        let expired = d.y > WIN_H as f32;
+        if segment_rect_overlap(
+            drop_from.0,
+            drop_from.1,
+            d.x - pad_x,
+            d.y - PAD_Y as f32,
+            -DROP_W,
+            -DROP_H,
+            pad_w + DROP_W,
+            PAD_H as f32 + DROP_H,
+        ) {
             d.active = false;
             blip::bot::add(["got_wide", "got_narrow", "got_slow", "got_life", "got_multi"][d.kind as usize], 1.0);
             let (label, c) = match d.kind {
@@ -845,6 +858,7 @@ fn update_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
                 DropKind::Multi => split = true,
             }
         }
+        if expired { d.active = false; }
     }
     if split { g.split_ball(); }
 }

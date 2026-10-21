@@ -383,7 +383,18 @@ impl World {
         t.clamp(0.0, 1.0) * from.dist(to)
     }
 
+    #[cfg(test)]
     fn first_hit(&self, who: usize, from: Pt, to: Pt) -> Hit {
+        self.first_hit_with_heads(who, from, to, None)
+    }
+
+    fn first_hit_with_heads(
+        &self,
+        who: usize,
+        from: Pt,
+        to: Pt,
+        moving_heads: Option<&[bool]>,
+    ) -> Hit {
         let r = BODY_R;
         if to.x < PIT_X + r
             || to.x > PIT_X + PIT_W - r
@@ -394,7 +405,13 @@ impl World {
         }
         let mut gap = Hit::None;
         for (j, s) in self.snakes.iter().enumerate() {
-            let skip = if j == who { SELF_SKIP } else { 0 };
+            let skip = if j == who {
+                SELF_SKIP
+            } else if moving_heads.is_some_and(|heads| heads[j]) {
+                1
+            } else {
+                0
+            };
             for (i, q) in s.path.iter().enumerate().skip(skip) {
                 if !segment_circle_overlap(from.x, from.y, to.x, to.y, q.x, q.y, r) {
                     continue;
@@ -423,10 +440,13 @@ impl World {
             return;
         }
         let speed = self.speed_base();
+        let mut moving_heads = [false; MAX_SNAKES];
+        for (i, snake) in self.snakes.iter().enumerate() {
+            moving_heads[i] = snake.alive;
+        }
+        let mut moves = [None; MAX_SNAKES];
         for i in 0..self.snakes.len() {
-            if !self.snakes[i].alive {
-                continue;
-            }
+            if !moving_heads[i] { continue; }
             self.tick_hole(i, dt);
             let seat = self.snakes[i].seat.min(SEATS - 1);
             let from = self.snakes[i].head;
@@ -436,7 +456,26 @@ impl World {
                 from.x + s.heading.cos() * speed * dt,
                 from.y + s.heading.sin() * speed * dt,
             );
-            match self.first_hit(i, from, to) {
+            let hit = self.first_hit_with_heads(i, from, to, Some(&moving_heads));
+            moves[i] = Some((from, to, hit));
+        }
+        for i in 0..moves.len() {
+            let Some((from_i, to_i, _)) = moves[i] else { continue; };
+            for j in i + 1..moves.len() {
+                let Some((from_j, to_j, _)) = moves[j] else { continue; };
+                if segment_circle_overlap(
+                    from_i.x - from_j.x, from_i.y - from_j.y,
+                    to_i.x - to_j.x, to_i.y - to_j.y,
+                    0.0, 0.0, BODY_R * 2.0,
+                ) {
+                    moves[i].as_mut().unwrap().2 = Hit::Body(j);
+                    moves[j].as_mut().unwrap().2 = Hit::Body(i);
+                }
+            }
+        }
+        for i in 0..moves.len() {
+            let Some((_, to, hit)) = moves[i] else { continue; };
+            match hit {
                 Hit::Wall => {
                     self.die(i, None);
                     continue;
@@ -448,7 +487,13 @@ impl World {
                 Hit::Gap(j, k) => self.through(i, j, k, to),
                 Hit::None => {}
             }
-            self.snakes[i].grow(from, to);
+        }
+        for (i, movement) in moves.into_iter().enumerate() {
+            if let Some((from, to, _)) = movement {
+                if self.snakes[i].alive {
+                    self.snakes[i].grow(from, to);
+                }
+            }
         }
         if self.humans_out() {
             self.over = true;

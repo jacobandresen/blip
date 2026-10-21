@@ -20,7 +20,7 @@ use blip::macroquad::input::KeyCode;
 use blip::input::{key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
     BLIP_KEY_DOWN, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_J, BLIP_KEY_K, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W};
-use blip::{clamp, Jukebox, rand_int, rects_overlap, web,
+use blip::{clamp, Jukebox, rand_int, rects_overlap, segment_rect_overlap, web,
     window_conf, Blip,
     BlipColor, Session, Timer, BLIP_BLACK, BLIP_WHITE, BLIP_YELLOW};
 
