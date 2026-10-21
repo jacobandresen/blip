@@ -191,7 +191,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
     let rpad_vy = (g.rpad_y - rpy0) / dt;
 
     let mut ball = Ball { ball_x: g.ball_x, ball_y: g.ball_y, ball_vx: g.ball_vx, ball_vy: g.ball_vy, ball_spd: g.ball_spd };
-    let events = physics::step(&mut ball, dt, g.lpad_y, g.rpad_y, lpad_vy, rpad_vy);
+    let events = physics::step(&COURT, &mut ball, dt, g.lpad_y, g.rpad_y, lpad_vy, rpad_vy);
     (g.ball_x, g.ball_y, g.ball_vx, g.ball_vy, g.ball_spd) = (ball.ball_x, ball.ball_y, ball.ball_vx, ball.ball_vy, ball.ball_spd);
     for event in events {
         match event {

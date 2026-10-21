@@ -33,6 +33,34 @@ pub const RPAD_X: f32 = WIN_W as f32 - PAD_OFF - PAD_W;
 pub const PAD_YMIN: f32 = PLAY_T + 2.0;
 pub const PAD_YMAX: f32 = PLAY_B - PAD_H - 2.0;
 
+/// The court's measurements, so the BASIC tape's court can be traced too.
+#[derive(Clone, Copy, Debug)]
+pub struct Court {
+    pub top: f32,
+    pub bottom: f32,
+    pub width: f32,
+    pub lpad_x: f32,
+    pub rpad_x: f32,
+    pub pad_w: f32,
+    pub pad_h: f32,
+    pub ball: f32,
+    pub speed_up: f32,
+    pub top_speed: f32,
+}
+
+pub const COURT: Court = Court {
+    top: PLAY_T,
+    bottom: PLAY_B,
+    width: WIN_W as f32,
+    lpad_x: LPAD_X,
+    rpad_x: RPAD_X,
+    pad_w: PAD_W,
+    pad_h: PAD_H,
+    ball: BALL_SZ,
+    speed_up: BALL_INC,
+    top_speed: BALL_MAX,
+};
+
 #[derive(Clone, Copy, Debug)]
 pub struct Ball {
     pub ball_x: f32,
@@ -51,6 +79,7 @@ pub enum Event {
 }
 
 pub fn step(
+    c: &Court,
     g: &mut Ball,
     dt: f32,
     lpad_y: f32,
@@ -63,26 +92,26 @@ pub fn step(
     // Integrate in substeps so a fast ball can't skip past a paddle or clip
     // through a wall inside one frame (worst case: a frame-rate dip).
     let speed = g.ball_vx.hypot(g.ball_vy).max(1.0);
-    let substeps = ((speed * dt / (BALL_SZ * 0.5)).ceil() as i32).clamp(1, 8);
+    let substeps = ((speed * dt / (c.ball * 0.5)).ceil() as i32).clamp(1, 8);
     let sdt = dt / substeps as f32;
 
     for step in 0..substeps {
         let t = (step as f32 + 0.5) / substeps as f32;
         let lpad = lpad_y - lpad_vy * dt * (1.0 - t);
         let rpad = rpad_y - rpad_vy * dt * (1.0 - t);
-        let (prev_x, prev_y) = (g.ball_x + BALL_SZ * 0.5, g.ball_y + BALL_SZ * 0.5);
+        let (prev_x, prev_y) = (g.ball_x + c.ball * 0.5, g.ball_y + c.ball * 0.5);
         g.ball_x += g.ball_vx * sdt;
         g.ball_y += g.ball_vy * sdt;
-        let (next_x, next_y) = (g.ball_x + BALL_SZ * 0.5, g.ball_y + BALL_SZ * 0.5);
+        let (next_x, next_y) = (g.ball_x + c.ball * 0.5, g.ball_y + c.ball * 0.5);
 
         // Reflect the overshoot rather than clamp, so no speed is shaved off.
-        if g.ball_y < PLAY_T {
-            g.ball_y = 2.0 * PLAY_T - g.ball_y;
+        if g.ball_y < c.top {
+            g.ball_y = 2.0 * c.top - g.ball_y;
             g.ball_vy = g.ball_vy.abs();
             events.push(Event::Wall);
         }
-        if g.ball_y + BALL_SZ > PLAY_B {
-            g.ball_y = 2.0 * (PLAY_B - BALL_SZ) - g.ball_y;
+        if g.ball_y + c.ball > c.bottom {
+            g.ball_y = 2.0 * (c.bottom - c.ball) - g.ball_y;
             g.ball_vy = -g.ball_vy.abs();
             events.push(Event::Wall);
         }
@@ -93,14 +122,14 @@ pub fn step(
                 prev_y,
                 next_x,
                 next_y,
-                LPAD_X - BALL_SZ * 0.5,
-                lpad - BALL_SZ * 0.5,
-                PAD_W + BALL_SZ,
-                PAD_H + BALL_SZ,
+                c.lpad_x - c.ball * 0.5,
+                lpad - c.ball * 0.5,
+                c.pad_w + c.ball,
+                c.pad_h + c.ball,
             )
         {
-            g.ball_x = LPAD_X + PAD_W;
-            bounce_paddle(g, lpad, lpad_vy, 1.0);
+            g.ball_x = c.lpad_x + c.pad_w;
+            bounce_paddle(c, g, lpad, lpad_vy, 1.0);
             events.push(Event::LeftHit);
         }
 
@@ -110,22 +139,22 @@ pub fn step(
                 prev_y,
                 next_x,
                 next_y,
-                RPAD_X - BALL_SZ * 0.5,
-                rpad - BALL_SZ * 0.5,
-                PAD_W + BALL_SZ,
-                PAD_H + BALL_SZ,
+                c.rpad_x - c.ball * 0.5,
+                rpad - c.ball * 0.5,
+                c.pad_w + c.ball,
+                c.pad_h + c.ball,
             )
         {
-            g.ball_x = RPAD_X - BALL_SZ;
-            bounce_paddle(g, rpad, rpad_vy, -1.0);
+            g.ball_x = c.rpad_x - c.ball;
+            bounce_paddle(c, g, rpad, rpad_vy, -1.0);
             events.push(Event::RightHit);
         }
 
-        if g.ball_x + BALL_SZ < 0.0 {
+        if g.ball_x + c.ball < 0.0 {
             events.push(Event::Point(false));
             return events;
         }
-        if g.ball_x > WIN_W as f32 {
+        if g.ball_x > c.width {
             events.push(Event::Point(true));
             return events;
         }
@@ -133,9 +162,9 @@ pub fn step(
     events
 }
 
-pub fn bounce_paddle(g: &mut Ball, pad_y: f32, pad_vy: f32, dir: f32) {
-    let rel = ((g.ball_y + BALL_SZ * 0.5 - pad_y) / PAD_H - 0.5).clamp(-0.5, 0.5);
-    g.ball_spd = (g.ball_spd + BALL_INC).min(BALL_MAX);
+pub fn bounce_paddle(c: &Court, g: &mut Ball, pad_y: f32, pad_vy: f32, dir: f32) {
+    let rel = ((g.ball_y + c.ball * 0.5 - pad_y) / c.pad_h - 0.5).clamp(-0.5, 0.5);
+    g.ball_spd = (g.ball_spd + c.speed_up).min(c.top_speed);
     let a = rel * 1.1;
     g.ball_vx = dir * g.ball_spd * a.cos();
     g.ball_vy = g.ball_spd * a.sin() + pad_vy * 0.25;

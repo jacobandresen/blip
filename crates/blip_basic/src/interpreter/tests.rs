@@ -99,40 +99,6 @@ fn defender_source_loads_as_numbered_program() {
     assert_eq!(p.lines.last().unwrap().0, 1660);
 }
 #[test]
-fn serpent_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/SERPENT.BLIP"));
-    assert!(p.lines.len() > 60);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 1070);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("NX>20")
-            && source.contains("NY>20")
-            && source.contains("GX=0 TO 160 STEP 8")
-            && source.contains("HEAD_X=10:HEAD_Y=10")
-    );
-    assert!(
-        source.contains("FILL_CIRCLE(SX,SY")
-            && source.contains("LIVES=LIVES-1")
-            && source.contains("LEVEL=LEVEL+1")
-    );
-    assert!(
-        source.contains("SCORE=SCORE+10*LEVEL*STREAK")
-            && source.contains("BONUS_TIME=6")
-            && source.contains("SERPENT/BONUS_EAT")
-            && source.contains("EVENLEVEL=INT(LEVEL/2)*2")
-            && source.contains("SHEARS_TIME=7")
-            && source.contains("BODY_LENGTH=BODY_LENGTH-4")
-    );
-}
-#[test]
 fn adder_source_loads_as_numbered_program() {
     let mut p = Program::new();
     p.load(include_str!("../../../../web/TAPE/ADDER.BLIP"));
@@ -410,7 +376,10 @@ fn else_belongs_to_the_nearest_if() {
 }
 
 /// The tapes rewritten in the house layout, one by one.
-const HOUSE_TAPES: [(&str, &str); 1] = [("RALLY", include_str!("../../../../web/TAPE/RALLY.BLIP"))];
+const HOUSE_TAPES: [(&str, &str); 2] = [
+    ("RALLY", include_str!("../../../../web/TAPE/RALLY.BLIP")),
+    ("SERPENT", include_str!("../../../../web/TAPE/SERPENT.BLIP")),
+];
 
 /// Every tape reads the same way: what the game is, SETUP, one MAIN LOOP that
 /// updates and draws the current screen, and a named SUB for each step.

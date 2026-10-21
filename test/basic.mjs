@@ -329,10 +329,10 @@ test('SERPENT queues two valid corner turns before the next step', async (t) => 
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SERPENT'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(810, 'MOVE_DELAY=0.5:FRAME_TIME=0:FOOD_X=17:FOOD_Y=10');
-    BlipBasic.lines.set(296, 'HEAD_X=NX:HEAD_Y=NY:BODY_X(1)=HEAD_X:BODY_Y(1)=HEAD_Y');
-    BlipBasic.lines.set(389, 'IF HEAD_X=9 AND HEAD_Y=9 THEN QUEUE_OK=1');
-    BlipBasic.lines.set(390, 'DRAW_HUD(SCORE,LIVES):DRAW_TEXT("LEVEL "+STR$(LEVEL),160,191,1,"BLIP_CYAN","CENTER"):IF QUEUE_OK=1 THEN DRAW_TEXT("TURN QUEUE OK",160,30,2,"BLIP_YELLOW","CENTER")');
+    // From (11,11) heading right, up then left reaches (10,10) in two steps.
+    BlipBasic.lines.set(175, 'IF STATE$="PLAY" THEN STEP_TIME=0.5');
+    BlipBasic.lines.set(176, 'IF BODY_X(1)=10 AND BODY_Y(1)=10 THEN QUEUE_OK=1');
+    BlipBasic.lines.set(165, 'IF QUEUE_OK THEN DRAW_TEXT("TURN QUEUE OK",320,30,2,"BLIP_YELLOW","CENTER")');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
@@ -373,7 +373,7 @@ test('SERPENT.BLIP loses a life and resumes play after a collision', async (t) =
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SERPENT'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:BODY_LENGTH=4:HEAD_X=26:HEAD_Y=7:DIR_X=1:DIR_Y=0');
+    BlipBasic.lines.set(90, 'START_GAME:BODY_X(1)=20:LAST_TIME=TIME()');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
@@ -395,9 +395,7 @@ test('SERPENT.BLIP advances to a new level and draws its obstacles after five fo
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SERPENT'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(400, 'FOOD_X=HEAD_X+DIR_X:FOOD_Y=HEAD_Y+DIR_Y:FOOD_BLOCKED=0');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:LEVEL=1:FOODS=4:OB_COUNT=0:BODY_LENGTH=4:HEAD_X=19:HEAD_Y=7:DIR_X=1:DIR_Y=0');
-    BlipBasic.lines.set(810, 'MOVE_DELAY=0.75:FRAME_TIME=0:FOOD_X=20:FOOD_Y=7:GOSUB 860');
+    BlipBasic.lines.set(90, 'START_GAME:FOODS=4:STEP_TIME=0.75:FOOD_X=BODY_X(1)+1:FOOD_Y=BODY_Y(1):LAST_TIME=TIME()');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
@@ -409,7 +407,9 @@ test('SERPENT.BLIP advances to a new level and draws its obstacles after five fo
     const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
     const crop = document.createElement('canvas'); crop.width = image.width; crop.height = image.height;
     const context = crop.getContext('2d'); context.drawImage(image, 0, 0);
-    return Array.from(context.getImageData(0, Math.floor(image.height * 0.9), image.width, Math.ceil(image.height * 0.1)).data);
+    // The LEVEL label, below the board: game rows 372 to 396.
+    const scale = Math.min(image.width / 640, image.height / 400), top = (image.height - 400 * scale) / 2;
+    return Array.from(context.getImageData(0, Math.floor(top + 372 * scale), image.width, Math.ceil(24 * scale)).data);
   }, shot.toString('base64'));
   const originalLabel = await bottomLabel(before);
   let levelChanged = false;
@@ -431,9 +431,7 @@ test('SERPENT cycles the five Rust obstacle layouts', async (t) => {
   const frames = [];
   for (const level of [2, 3, 4, 5, 6]) {
     await page.evaluate((n) => {
-      BlipBasic.lines.set(10, 'GOTO 800');
-      BlipBasic.lines.set(800, `GAME_STATE=1:SCORE=0:LIVES=3:LEVEL=${n}:FOODS=0:OB_COUNT=0:BODY_LENGTH=4:HEAD_X=10:HEAD_Y=10:DIR_X=1:DIR_Y=0:STEPS_SINCE_FOOD=100:STREAK=0:BONUS_TIME=0`);
-      BlipBasic.lines.set(810, 'MOVE_DELAY=10:FRAME_TIME=0:FOOD_X=17:FOOD_Y=10');
+      BlipBasic.lines.set(90, `START_GAME:LEVEL=${n}:RESET_SNAKE:STEP_TIME=10:FOOD_X=20:FOOD_Y=20:LAST_TIME=TIME()`);
       BlipBasic.submit('RUN');
     }, level);
     await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
@@ -453,10 +451,8 @@ test('SERPENT draws long-tail shears in the first eligible even wave', async (t)
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SERPENT'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:LEVEL=6:FOODS=0:OB_COUNT=0:BODY_LENGTH=25:HEAD_X=10:HEAD_Y=10:DIR_X=1:DIR_Y=0:STEPS_SINCE_FOOD=100:STREAK=0:BONUS_TIME=0:SHEARS_TIME=0');
-    BlipBasic.lines.set(810, 'MOVE_DELAY=100:FRAME_TIME=100:FOOD_X=11:FOOD_Y=10');
-    BlipBasic.lines.set(980, 'SHEARS_X=12:SHEARS_Y=10:SHEARS_TIME=7:MOVE_DELAY=100:FRAME_TIME=0:RETURN');
+    // Six levels in, a long snake is offered shears; these sit at cell (13,11).
+    BlipBasic.lines.set(90, 'START_GAME:LEVEL=6:RESET_SNAKE:STEP_TIME=100:SHEARS_X=13:SHEARS_Y=11:SHEARS_LEFT=7:LAST_TIME=TIME()');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
@@ -467,7 +463,8 @@ test('SERPENT draws long-tail shears in the first eligible even wave', async (t)
     const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
     const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
     const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const x = Math.round(image.naturalWidth * .538), y = Math.round(image.naturalHeight * .494);
+    const scale = Math.min(image.naturalWidth / 640, image.naturalHeight / 400);
+    const x = Math.round((image.naturalWidth - 640 * scale) / 2 + 360 * scale), y = Math.round((image.naturalHeight - 400 * scale) / 2 + 216 * scale);
     const { data } = context.getImageData(x - 18, y - 18, 36, 36);
     let count = 0;
     for (let i = 0; i < data.length; i += 4) if (data[i + 2] > data[i] + 55 && data[i + 1] > data[i] + 35) count++;
@@ -486,10 +483,8 @@ test('SERPENT shears trim the tail when collected', async (t) => {
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:LEVEL=6:FOODS=0:OB_COUNT=0:BODY_LENGTH=25:HEAD_X=10:HEAD_Y=10:DIR_X=1:DIR_Y=0:STEPS_SINCE_FOOD=100:STREAK=0:BONUS_TIME=0:SHEARS_TIME=0');
-    BlipBasic.lines.set(810, 'MOVE_DELAY=100:FRAME_TIME=100:FOOD_X=11:FOOD_Y=10');
-    BlipBasic.lines.set(980, 'SHEARS_X=12:SHEARS_Y=10:SHEARS_TIME=7:MOVE_DELAY=0.18:FRAME_TIME=0.18:RETURN');
+    // The shears one step ahead, then food: two sounds.
+    BlipBasic.lines.set(90, 'START_GAME:LEVEL=6:RESET_SNAKE:SHEARS_X=BODY_X(1)+1:SHEARS_Y=BODY_Y(1):SHEARS_LEFT=7:FOOD_X=BODY_X(1)+2:FOOD_Y=BODY_Y(1):LAST_TIME=TIME()');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
@@ -509,10 +504,9 @@ test('SERPENT.BLIP offers and collects its timed bonus fruit', async (t) => {
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SERPENT'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(80, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:LEVEL=1:FOODS=2:OB_COUNT=0:BODY_LENGTH=4:HEAD_X=10:HEAD_Y=10:DIR_X=1:DIR_Y=0:STEPS_SINCE_FOOD=100:STREAK=0:BONUS_TIME=0');
-    BlipBasic.lines.set(810, 'MOVE_DELAY=0.18:FRAME_TIME=0:FOOD_X=11:FOOD_Y=10:GOSUB 860');
-    BlipBasic.lines.set(910, 'BONUS_X=12:BONUS_Y=10:BONUS_TIME=6:RETURN');
+    // The third food offers the bonus; it is moved into the snake's path to be eaten.
+    BlipBasic.lines.set(90, 'START_GAME:FOODS=2:FOOD_X=BODY_X(1)+1:FOOD_Y=BODY_Y(1):LAST_TIME=TIME()');
+    BlipBasic.lines.set(175, 'IF BONUS_LEFT>0 AND NOT MOVED THEN BONUS_X=BODY_X(1)+2:BONUS_Y=BODY_Y(1):MOVED=1');
     window.serpentSoundBaseline = document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0;
     BlipBasic.submit('RUN');
   });
