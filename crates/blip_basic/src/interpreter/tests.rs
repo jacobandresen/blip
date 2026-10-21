@@ -375,3 +375,51 @@ fn hex_colors_support_rgb_and_rgba() {
         128.0 / 255.0
     );
 }
+
+#[test]
+fn procedures_are_found_with_their_parameters() {
+    let mut p = Program::new();
+    p.load("10 CALL BOX(1,2,\"RED\")\n20 END\n100 SUB BOX(X,Y,C$) STATIC\n110 LOCAL I\n120 END SUB\n130 SUB BEEP:END SUB");
+    assert_eq!(p.error, None);
+    assert!(p.is_procedure("BOX") && p.is_procedure("BEEP"));
+    let boxed = &p.procedures["BOX"];
+    assert_eq!(boxed.params, ["X", "Y", "C$"]);
+    assert_eq!((boxed.body, boxed.end), ((2, 1), (4, 0)));
+    assert_eq!(p.procedures["BEEP"].end, (5, 1));
+}
+
+#[test]
+fn procedure_structure_errors_stop_the_load() {
+    for (source, error) in [
+        ("10 SUB A\n20 PRINT 1", "? SUB A needs END SUB at line 10"),
+        ("10 END SUB", "? END SUB without SUB at line 10"),
+        ("10 SUB A\n20 SUB B\n30 END SUB", "? SUB inside SUB A at line 20"),
+        ("10 SUB A:END SUB\n20 SUB A:END SUB", "? SUB A is defined twice"),
+        ("10 SUB PRINT:END SUB", "? SUB needs a name, not PRINT at line 10"),
+        ("10 SUB A(1):END SUB", "? SUB A has a bad parameter 1 at line 10"),
+    ] {
+        let mut p = Program::new();
+        p.load(source);
+        assert_eq!(p.error.as_deref(), Some(error), "{source}");
+        assert!(!p.active);
+    }
+}
+
+#[test]
+fn block_if_structure_errors_stop_the_load() {
+    for (source, error) in [
+        ("10 IF X THEN\n20 PRINT 1", "? IF needs END IF at line 10"),
+        ("10 END IF", "? END IF without IF at line 10"),
+        ("10 ELSE", "? ELSE without IF at line 10"),
+        ("10 IF X THEN\n20 ELSE\n30 ELSEIF Y THEN\n40 END IF", "? ELSEIF after ELSE at line 30"),
+        ("10 IF X THEN\n20 ELSEIF Y\n30 END IF", "? ELSEIF needs THEN at the end of line 20"),
+    ] {
+        let mut p = Program::new();
+        p.load(source);
+        assert_eq!(p.error.as_deref(), Some(error), "{source}");
+    }
+    let mut p = Program::new();
+    p.load("10 IF A THEN\n20 IF B THEN\n30 END IF\n40 ELSE\n50 END IF\n60 IF C THEN PRINT \"THEN\"");
+    assert_eq!(p.error, None);
+    assert_eq!(p.blocks.len(), 2);
+}

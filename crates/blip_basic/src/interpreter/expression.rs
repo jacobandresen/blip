@@ -45,7 +45,7 @@ impl Expr<'_, '_> {
         loop {
             let op = match self.tokens.get(self.at) {
                 Some(Token::Op(op)) => op.clone(),
-                Some(Token::Name(n)) if n == "AND" || n == "OR" => n.clone(),
+                Some(Token::Name(n)) if n == "AND" || n == "OR" || n == "MOD" => n.clone(),
                 _ => break,
             };
             let prec = match op.as_str() {
@@ -53,7 +53,7 @@ impl Expr<'_, '_> {
                 "AND" => 2,
                 "=" | "==" | "<>" | "<" | ">" | "<=" | ">=" => 3,
                 "+" | "-" => 4,
-                "*" | "/" => 5,
+                "*" | "/" | "MOD" => 5,
                 _ => 0,
             };
             if prec < min {
@@ -69,6 +69,11 @@ impl Expr<'_, '_> {
                 "-" => Value::Num(left.number() - right.number()),
                 "*" => Value::Num(left.number() * right.number()),
                 "/" => Value::Num(left.number() / right.number()),
+                // Floored: -1 MOD 8 is 7, so a wrapped position never goes negative.
+                "MOD" => {
+                    let (a, b) = (left.number(), right.number());
+                    Value::Num(a - b * (a / b).floor())
+                }
                 "=" | "==" => Value::Num((left == right) as u8 as f64),
                 "<>" => Value::Num((left != right) as u8 as f64),
                 "<" => Value::Num((left.number() < right.number()) as u8 as f64),

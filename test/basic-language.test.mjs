@@ -15,6 +15,7 @@ test('console expressions preserve precedence, unary operators, and string escap
     ['"SAY ""HI"" "+NAME$', 'SAY "HI" BLIP'],
     ['STR$(INT(3.9))+CHR$(65)', '3A'], ['SIN(0)+COS(0)+SQR(9)', 4],
     ['LEN("A,B:C")', 5], ['"A"<"B"', 1],
+    ['7 MOD 3', 1], ['-1 MOD 8', 7], ['1+10 MOD 4*2', 5],
   ]) assert.equal(evaluate(source), expected, source);
   assert.deepEqual(evaluate('COLOR(0.1,0.2,0.3)'), { blipColor: true, r: 0.1, g: 0.2, b: 0.3, a: 1 });
 });

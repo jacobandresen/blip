@@ -1,8 +1,10 @@
 //! Numbered BASIC programs, their execution state, and frame budget.
 
+mod block;
 mod color;
 mod expression;
 mod graphics;
+mod procedure;
 mod statement;
 mod syntax;
 #[cfg(test)]
@@ -10,6 +12,8 @@ mod tests;
 mod value;
 
 use self::{
+    block::{At, Block},
+    procedure::{Frame, Procedure},
     syntax::{split_statements, Token},
     value::Value,
 };
@@ -45,6 +49,12 @@ pub(crate) struct Program {
     effects: blip::Fx,
     loops: Vec<ForLoop>,
     calls: Vec<Continuation>,
+    procedures: HashMap<String, Procedure>,
+    blocks: HashMap<At, Block>,
+    block_ends: HashMap<At, At>,
+    /// The statement being run, when it came from the program rather than a THEN.
+    here: Option<At>,
+    frames: Vec<Frame>,
     output: Vec<String>,
     wait_until: f64,
     input: blip::input::PressBuffer,
@@ -99,6 +109,10 @@ impl Program {
                     .collect()
             })
             .collect();
+        if let Err(error) = self.find_procedures().and_then(|_| self.find_blocks()) {
+            self.error = Some(format!("? {error}"));
+            self.active = false;
+        }
     }
     fn goto(&mut self, number: f64) -> Result<(), String> {
         let number = number as u16;
@@ -115,9 +129,11 @@ impl Program {
         while self.position.line < self.lines.len() {
             let line = self.position.line;
             if let Some(source) = self.position.pending.pop() {
+                self.here = None;
                 return Some((self.lines[line].0, source));
             }
             if let Some(source) = self.statements[line].get(self.position.statement) {
+                self.here = Some((line, self.position.statement));
                 self.position.statement += 1;
                 return Some((self.lines[line].0, Arc::clone(source)));
             }

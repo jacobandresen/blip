@@ -21,6 +21,8 @@
     '-':  { precedence: 4, apply: (a, b) => Number(a) - Number(b) },
     '*':  { precedence: 5, apply: (a, b) => Number(a) * Number(b) },
     '/':  { precedence: 5, apply: divide },
+    // Floored, like the Rust runtime: -1 MOD 8 is 7, so wrapping never goes negative.
+    MOD:  { precedence: 5, apply: (a, b) => Number(a) - Number(b) * Math.floor(divide(a, b)) },
   };
 
   const functions = {

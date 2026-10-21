@@ -43,9 +43,13 @@ pub(crate) fn host_source() -> Option<String> {
         bytes.truncate(copied.max(0) as usize);
         String::from_utf8(bytes).ok()
     }
+    // BLIP_BASIC_TAPE names a tape to run natively, for playtests.
     #[cfg(not(target_arch = "wasm32"))]
     {
-        Some(include_str!("../../../web/TAPE/BOUNCER.BLIP").to_string())
+        match std::env::var("BLIP_BASIC_TAPE") {
+            Ok(path) => std::fs::read_to_string(&path).ok(),
+            Err(_) => Some(include_str!("../../../web/TAPE/BOUNCER.BLIP").to_string()),
+        }
     }
 }
 

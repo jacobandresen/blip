@@ -1,8 +1,10 @@
 //! Statements change control flow or state; drawing calls go through `graphics`.
 
 use super::{
+    block::block_condition,
     color::paper_color,
-    syntax::{assignment_eq, method_call, split_args, split_statements},
+    procedure::leading_name,
+    syntax::{assignment_eq, method_call, split_args, split_statements, top_level_then, top_level_word},
     ForLoop, MusicRequest, Program, Value,
 };
 use crate::host::audio_event;
@@ -31,21 +33,11 @@ impl Program {
 
         match keyword.to_ascii_uppercase().as_str() {
             "REM" => Ok(()),
-            "IF" => {
-                let then = rest
-                    .to_ascii_uppercase()
-                    .find(" THEN ")
-                    .ok_or("IF needs THEN")?;
-                if self.eval(rest[..then].trim(), blip)?.number() != 0.0 {
-                    self.position.pending.extend(
-                        split_statements(&rest[then + 6..])
-                            .into_iter()
-                            .rev()
-                            .map(Arc::<str>::from),
-                    );
-                }
-                Ok(())
-            }
+            "IF" => match block_condition(source) {
+                Some(condition) => self.enter_block(condition, blip),
+                None => self.inline_if(rest, blip),
+            },
+            "ELSEIF" | "ELSE" => self.leave_block(),
             "GOTO" | "GOSUB" => {
                 let target = self.eval(rest, blip)?.number();
                 if keyword.eq_ignore_ascii_case("GOSUB") {
@@ -59,6 +51,11 @@ impl Program {
             }
             "FOR" => self.begin_loop(rest, blip),
             "NEXT" => self.next_loop(rest),
+            "SUB" => self.skip_procedure(rest),
+            "CALL" => self.call_procedure(rest, blip),
+            "LOCAL" => self.declare_locals(rest),
+            "END" | "EXIT" if rest.eq_ignore_ascii_case("SUB") => self.return_from_procedure(),
+            "END" if rest.eq_ignore_ascii_case("IF") => Ok(()),
             "END" | "STOP" => {
                 self.active = false;
                 Ok(())
@@ -99,11 +96,35 @@ impl Program {
                 self.music_request = Some(MusicRequest::Stop);
                 Ok(())
             }
+            _ if self.is_bare_call(command) => self.call_procedure(command, blip),
             _ => match assignment_eq(command) {
                 Some(eq) => self.assign(command, eq, blip),
                 None => self.draw_statement(command, blip, textures),
             },
         }
+    }
+
+    /// `IF X THEN A:B ELSE C`; a bare line number after THEN or ELSE is a GOTO.
+    fn inline_if(&mut self, rest: &str, blip: &Blip) -> Result<(), String> {
+        let then = top_level_then(rest).ok_or("IF needs THEN")?;
+        let actions = &rest[then + 4..];
+        let (yes, no) = match top_level_word(actions, "ELSE") {
+            Some(at) => (&actions[..at], Some(&actions[at + 4..])),
+            None => (actions, None),
+        };
+        let taken = if self.eval(rest[..then].trim(), blip)?.number() != 0.0 { Some(yes) } else { no };
+        let Some(branch) = taken.map(str::trim) else { return Ok(()) };
+        if let Ok(line) = branch.parse::<u16>() {
+            return self.goto(line as f64);
+        }
+        self.position.pending.extend(split_statements(branch).into_iter().rev().map(Arc::<str>::from));
+        Ok(())
+    }
+
+    /// `NAME 1, 2` or `NAME(1, 2)` for a SUB; `NAME = 1` stays an assignment.
+    fn is_bare_call(&self, command: &str) -> bool {
+        let (name, rest) = leading_name(command);
+        self.is_procedure(&name) && !rest.trim_start().starts_with('=')
     }
 
     fn wait(&mut self, milliseconds: f64) {

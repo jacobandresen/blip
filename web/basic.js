@@ -85,7 +85,7 @@ function loadSharedMath() {
           && event.data?.type === 'blip-basic-wasm-ready') finish();
     }
     window.addEventListener('message', loaded);
-    if (!wasmFrame.hasAttribute('src')) wasmFrame.src = 'basic-runtime.html?v=16';
+    if (!wasmFrame.hasAttribute('src')) wasmFrame.src = 'basic-runtime.html?v=17';
   });
 }
 
@@ -603,13 +603,13 @@ async function showSource(name){
   source.split(/\r?\n/).forEach(print);
 }
 function editorEscapeHtml(value){return String(value).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});}
-var editorKeywords=new Set(('PRINT INPUT LET IF THEN ELSE FOR TO STEP NEXT GOTO GOSUB RETURN END STOP REM DATA READ RESTORE DIM AND OR NOT MOD ABS INT RND SQR SIN COS TAN ATN LOG EXP LEN STR$ VAL CHR$ ASC LEFT$ RIGHT$ MID$ CLEAR COLOR FILL_RECT DRAW_RECT DRAW_LINE DRAW_LINE_EX DRAW_POLYLINE DRAW_GLOW_LINE FX_CLEAR FX_UPDATE FX_DRAW FX_BURST FX_POPUP FX_RING CIRCLE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_CAPSULE FILL_SUNBURST DRAW_TEXT DRAW_CHAR DRAW_NUMBER DRAW_HUD DRAW_TEXTURE TEXT_CX KEY_ACTIVE KEY_HELD KEY_PRESSED LOAD SAVE DIR CD MKDIR DEL MOVE EJECT TUNE').split(' ').concat(basicMathNames));
+var editorKeywords=new Set(('PRINT INPUT LET IF THEN ELSE FOR TO STEP NEXT GOTO GOSUB RETURN SUB CALL EXIT LOCAL STATIC ELSEIF END STOP REM DATA READ RESTORE DIM AND OR NOT MOD ABS INT RND SQR SIN COS TAN ATN LOG EXP LEN STR$ VAL CHR$ ASC LEFT$ RIGHT$ MID$ CLEAR COLOR FILL_RECT DRAW_RECT DRAW_LINE DRAW_LINE_EX DRAW_POLYLINE DRAW_GLOW_LINE FX_CLEAR FX_UPDATE FX_DRAW FX_BURST FX_POPUP FX_RING CIRCLE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_CAPSULE FILL_SUNBURST DRAW_TEXT DRAW_CHAR DRAW_NUMBER DRAW_HUD DRAW_TEXTURE TEXT_CX KEY_ACTIVE KEY_HELD KEY_PRESSED LOAD SAVE DIR CD MKDIR DEL MOVE EJECT TUNE').split(' ').concat(basicMathNames));
 function highlightEditorText(value){
   var pattern=/"[^\"]*"|\bREM\b.*$|\b[A-Z_][A-Z0-9_$]*\b|\b\d+(?:\.\d+)?\b/gi,out='',last=0,match;
   while((match=pattern.exec(value))){out+=editorEscapeHtml(value.slice(last,match.index));var token=match[0],upper=token.toUpperCase(),kind=token[0]==='"'?'editor-string':/^REM\b/i.test(token)?'editor-comment':/^\d/.test(token)?'editor-number':/^\b(?:BLIP_|NEON_)/i.test(token)?'editor-constant':editorKeywords.has(upper)?'editor-keyword':'';out+=kind?'<span class="'+kind+'">'+editorEscapeHtml(token)+'</span>':editorEscapeHtml(token);last=pattern.lastIndex;if(/^REM\b/i.test(token))break;}
   return out+editorEscapeHtml(value.slice(last));
 }
-var editorCompletions=('FX_CLEAR FX_UPDATE FX_DRAW FX_BURST FX_POPUP FX_RING DRAW_POLYLINE ABS AND CIRCLE CD CLEAR COLOR COS DATA DEL DIR DRAW_CHAR DRAW_GLOW_LINE DRAW_HUD DRAW_LINE DRAW_LINE_EX DRAW_NUMBER DRAW_RECT DRAW_SUNBURST DRAW_TEXT DRAW_TEXTURE EJECT END EXP FILL_CAPSULE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_RECT FILL_SUNBURST FOR GOSUB GOTO IF INPUT INT KEY_ACTIVE KEY_HELD KEY_PRESSED LEFT$ LEN LET LOAD LOG MID$ MKDIR MOD MOVE NEXT NOT OR PRINT READ RETURN RIGHT$ RND SAVE SIN SQR STEP STR$ TAN TEXT_CX THEN TO TUNE VAL').split(' ').concat(basicMathNames);
+var editorCompletions=('CALL ELSE ELSEIF EXIT LOCAL SUB FX_CLEAR FX_UPDATE FX_DRAW FX_BURST FX_POPUP FX_RING DRAW_POLYLINE ABS AND CIRCLE CD CLEAR COLOR COS DATA DEL DIR DRAW_CHAR DRAW_GLOW_LINE DRAW_HUD DRAW_LINE DRAW_LINE_EX DRAW_NUMBER DRAW_RECT DRAW_SUNBURST DRAW_TEXT DRAW_TEXTURE EJECT END EXP FILL_CAPSULE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_RECT FILL_SUNBURST FOR GOSUB GOTO IF INPUT INT KEY_ACTIVE KEY_HELD KEY_PRESSED LEFT$ LEN LET LOAD LOG MID$ MKDIR MOD MOVE NEXT NOT OR PRINT READ RETURN RIGHT$ RND SAVE SIN SQR STEP STR$ TAN TEXT_CX THEN TO TUNE VAL').split(' ').concat(basicMathNames);
 function editorCompletion(){
   var before=(editor.rows[editor.row]||'').slice(0,editor.column);
   if((before.match(/"/g)||[]).length%2)return null;
@@ -886,13 +886,13 @@ function runBlipInWasm(){
   basicWasmRunId++;
   basicWasmSource=Array.from(lines.keys()).sort(function(a,b){return a-b;}).map(function(n){return n+' '+lines.get(n);}).join('\n')+'\nREM RUN '+basicWasmRunId;
   basicWasmPlaying=true;document.body.setAttribute('data-wasm-playing','');updatePlayClearance();document.body.removeAttribute('data-wasm-error');document.body.removeAttribute('data-wasm-running');output.textContent='';clear();wasmFrame.hidden=false;
-  if(!wasmFrame.hasAttribute('src')){wasmFrame.addEventListener('load',function loaded(){wasmFrame.removeEventListener('load',loaded);basicWasmReady=true;postBasicWasmSource();focusBasicWasmCanvas();},{once:true});wasmFrame.src='basic-runtime.html?v=16';}
+  if(!wasmFrame.hasAttribute('src')){wasmFrame.addEventListener('load',function loaded(){wasmFrame.removeEventListener('load',loaded);basicWasmReady=true;postBasicWasmSource();focusBasicWasmCanvas();},{once:true});wasmFrame.src='basic-runtime.html?v=17';}
   else {postBasicWasmSource();focusBasicWasmCanvas();}
 }
 var blipPrimitiveNames='canvas clear fill_rect draw_rect draw_line draw_line_ex draw_polyline draw_glow_line fx_clear fx_update fx_draw fx_burst fx_popup fx_ring fill_circle fill_capsule fill_sunburst fill_glow_circle draw_texture draw_texture_region draw_texture_cell draw_texture_tinted draw_char draw_text draw_text_outlined draw_centered_outlined draw_number draw_centered draw_hud'.split(' ');
 function programUsesBlipPrimitives(){
   var call=new RegExp('\\b(?:'+blipPrimitiveNames.join('|')+')\\s*\\(','i');
-  return Array.from(lines.values()).some(function(source){return /\b(?:PLAY_SFX|PLAY_MUSIC|STOP_MUSIC|TEXT_CX)\b/i.test(source)||splitStatements(source).some(function(part){return call.test(part.trim());});});
+  return Array.from(lines.values()).some(function(source){return /\b(?:PLAY_SFX|PLAY_MUSIC|STOP_MUSIC|TEXT_CX)\b/i.test(source)||/\b(?:SUB|CALL|ELSE|ELSEIF|END\s+IF)\b|\bTHEN\s*$/i.test(source.replace(/"(?:[^"]|"")*"/g,'""'))||splitStatements(source).some(function(part){return call.test(part.trim());});});
 }
 function stopBouncerWasm(){if(!basicWasmPlaying)return;releaseBasicRallyDials();showBasicSecondPlayer(false);basicWasmSource='';postBasicWasmSource();basicWasmPlaying=false;document.body.removeAttribute('data-wasm-playing');document.body.removeAttribute('data-wasm-running');document.body.removeAttribute('data-rally');updatePlayClearance();wasmFrame.hidden=true;clear();output.textContent='';print('BLIP 64K COLOUR PERSONAL COMPUTER');print('BLIP BASIC 1.0');ready();input.focus({preventScroll:true});}
 function sendBasicWasmKey(key,code,down){var message={type:'blip-basic-key',key:key,code:code,down:!!down};if(basicWasmReady&&wasmFrame.contentWindow)wasmFrame.contentWindow.postMessage(message,location.origin);}

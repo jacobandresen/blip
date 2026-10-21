@@ -204,3 +204,17 @@ pub(super) fn assignment_eq(source: &str) -> Option<usize> {
         (ch == '=' && !comparison).then_some(at)
     })
 }
+
+/// Where `word` stands on its own outside strings and parentheses.
+pub(super) fn top_level_word(source: &str, word: &str) -> Option<usize> {
+    let ident = |c: Option<char>| c.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$');
+    top_level(source).map(|(at, _)| at).find(|&at| {
+        source.get(at..at + word.len()).is_some_and(|w| w.eq_ignore_ascii_case(word))
+            && !ident(source[..at].chars().next_back())
+            && !ident(source[at + word.len()..].chars().next())
+    })
+}
+
+pub(super) fn top_level_then(source: &str) -> Option<usize> {
+    top_level_word(source, "THEN")
+}

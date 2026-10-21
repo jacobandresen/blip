@@ -132,6 +132,17 @@ async fn main() {
                 blip_basic_export_done();
             }
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        if blip::bot::active() {
+            if let Some(error) = &program.error {
+                eprintln!("BASIC ERROR {error}");
+                std::process::exit(1);
+            }
+            if !program.active {
+                blip::bot::finish("ended");
+            }
+            blip::bot::hold(&[]);
+        }
         program.tick(&mut blip, &textures, &mut sounds);
         if let Err(error) = sounds.flush().await {
             program.error = Some(error);
