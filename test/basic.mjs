@@ -689,8 +689,8 @@ test('ADDER changes to its Rust hunt track on round four', async (t) => {
   });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/ADDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'MODE=1:GOTO 800');
-    BlipBasic.lines.set(830, 'PLAY_MUSIC "ADDER_COIL":WAIT 100:ROUND=3:SEATS=4:GOTO 650');
+    // Round three ends at once, so round four begins on the next frame.
+    BlipBasic.lines.set(85, 'START_GAME 1:ROUND=3:ROUND_WAIT=0.01');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));

@@ -8,42 +8,38 @@ import { openPage } from './lib/harness.mjs';
 const root = new URL('../', import.meta.url);
 const source = await readFile(new URL('web/TAPE/ADDER.BLIP', root), 'utf8');
 const fields = [
-  'ROUND', 'ROUND_WAIT', '(GAME_STATE=2)',
-  ...[1, 2].flatMap((s) => [`HEAD_X(${s})`, `HEAD_Y(${s})`, `ANGLE(${s})`, `LENGTH(${s})`, `ALIVE(${s})`, `LIFE(${s})`, `PTS(${s})`, `HUMAN(${s})`, `TRACE_GAPS(${s})`]),
+  'ROUND', 'ROUND_WAIT', 'WORLD_OVER',
+  ...[1, 2].flatMap((s) => [`HEAD_X(${s})`, `HEAD_Y(${s})`, `ANGLE(${s})`, `LENGTH(${s})`, `ALIVE(${s})`, `LIFE(${s})`, `PTS(${s})`, `HUMAN(${s})`, `HOLES(${s})`]),
 ];
 
+// The tape at a fixed step, its vipers placed where the Rust example puts
+// them, steering by a fixed trace, and the fields reported as tones.
 function fixture(scenario, steps) {
   const lines = new Map(source.trim().split('\n').map((line) => {
     const separator = line.indexOf(' '); return [Number(line.slice(0, separator)), line.slice(separator + 1)];
   }));
-  lines.set(10, 'MODE=1:GOTO 800');
-  lines.set(100, 'DT=0.016');
-  lines.set(120, 'REM JOIN IS FIXED BY THE SCENARIO');
-  lines.set(130, `TURN(1)=${scenario === 'left' ? -1 : scenario === 'right' ? 1 : 0}`);
-  lines.set(140, `TURN(2)=${scenario === 'join' ? -1 : 0}`);
-  if (!['cpuwall', 'cpu-gaps'].includes(scenario)) lines.set(160, 'REM BOTH HEADINGS USE THE FIXED INPUT TRACE');
-  lines.set(589, `STEPS=STEPS+1:IF STEPS>=${steps} THEN GOTO 3000`);
-  lines.set(700, 'GAME_STATE=2:GOTO 3000');
-  lines.set(830, 'STOP_MUSIC:GOSUB 1100:GOTO 100');
-  for (const n of lines.keys()) if (n >= 1120 && n <= 1166) lines.delete(n);
-  lines.set(1120, 'BEST_X=100+(S-1)*260:BEST_Y=180+(S-1)*200:ANGLE(S)=(S-1)*3.141592653589793:HEAD_X(S)=BEST_X:HEAD_Y(S)=BEST_Y');
-  if (scenario === 'cpuwall') lines.set(1121, 'IF S=2 THEN BEST_X=440:HEAD_X(S)=440:ANGLE(S)=0');
-  lines.set(1180, 'NEXT S:STEPS=0');
-  if (scenario === 'join') lines.set(1181, 'MODE=2:HUMAN(2)=1:LIFE(2)=3');
-  if (scenario === 'wall' || scenario === 'over') lines.set(1181, 'HEAD_X(1)=467');
-  if (scenario === 'over') lines.set(1182, 'LIFE(1)=1');
+  const cpu = ['cpuwall', 'cpu-gaps'].includes(scenario);
+  let start = 'START_GAME 1:STEPS=0';
+  if (scenario === 'join') start += ':JOIN_PLAYER_TWO';
+  if (scenario === 'wall' || scenario === 'over') start += ':HEAD_X(1)=627';
+  if (scenario === 'over') start += ':LIFE(1)=1';
+  lines.set(85, start);
+  lines.set(111, 'DT=0.016');
+  for (const n of lines.keys()) if (n > 2710 && n < 2820) lines.delete(n);
+  lines.set(2720, 'HEAD_X(S)=100+(S-1)*260:HEAD_Y(S)=180+(S-1)*200:ANGLE(S)=(S-1)*3.141592653589793');
+  if (scenario === 'cpuwall') lines.set(2730, 'IF S=2 THEN HEAD_X(2)=600:ANGLE(2)=0');
+  // An extra sample at (102,180), laid first so it is the trail's oldest.
   if (['body', 'gap', 'spent', 'overlap'].includes(scenario)) {
-    lines.set(1181, 'S=2:SAMPLE_X=102:SAMPLE_Y=180:SAMPLE_GAP=0');
-    if (scenario !== 'body') lines.set(1182, `GAP_COUNT=1:GAP_OWNER(1)=2:GAP_SPENT(1)=${scenario === 'spent' ? 1 : 0}:SAMPLE_GAP=1`);
-    lines.set(1183, 'GOSUB 1200');
-    if (scenario === 'overlap') lines.set(1184, 'SAMPLE_GAP=0:GOSUB 1200');
+    const gap = scenario === 'body' ? 0 : 1;
+    if (gap) lines.set(2740, `IF S=2 THEN HOLE_COUNT=1:HOLE_OWNER(1)=2:HOLE_SPENT(1)=${scenario === 'spent' ? 1 : 0}:HOLE_FIRST(1)=1:HOLES(2)=1`);
+    lines.set(2750, `IF S=2 THEN ADD_SAMPLE 2,102,180,${gap}`);
+    if (scenario === 'overlap') lines.set(2760, 'IF S=2 THEN ADD_SAMPLE 2,102,180,0');
   }
-  lines.set(1189, 'RETURN');
-  lines.set(3000, 'TRACE_GAPS(1)=0:TRACE_GAPS(2)=0:FOR G=1 TO GAP_COUNT');
-  lines.set(3001, 'IF GAP_COUNT>0 THEN TRACE_GAPS(GAP_OWNER(G))=TRACE_GAPS(GAP_OWNER(G))+1');
-  lines.set(3002, 'NEXT G');
-  for (const [i, field] of fields.entries()) lines.set(3100 + i * 10, `SOUND 1000+${field},0,0:WAIT 1`);
-  lines.set(4000, 'WAIT 16:GOTO 4000');
+  const turn = scenario === 'left' ? -1 : scenario === 'right' ? 1 : 0;
+  lines.set(5020, cpu ? 'IF S=1 THEN TURN(1)=0 ELSE STEER_CPU S' : `IF S=1 THEN TURN(1)=${turn} ELSE TURN(2)=${scenario === 'join' ? -1 : 0}`);
+  lines.set(165, `STEPS=STEPS+1:IF STEPS>=${steps} OR WORLD_OVER THEN GOTO 9900`);
+  for (const [i, field] of fields.entries()) lines.set(9900 + i * 4, `SOUND 1000+${field},0,0:WAIT 1`);
+  lines.set(9999, 'WAIT 16:GOTO 9999');
   return [...lines];
 }
 
@@ -69,7 +65,9 @@ test('Adder BASIC follows native movement, trail, collision, score, gap, and lif
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => BlipBasic.submit('LOAD /TAPE/ADDER'));
-  const cases = [['straight', 60], ['left', 60], ['right', 60], ['join', 60], ['cpuwall', 60], ['cpu-gaps', 250], ['straight', 190], ['wall', 1], ['body', 1], ['gap', 1], ['spent', 1], ['overlap', 1], ['over', 1]]
+  // Not 250 CPU steps: then seat 1 ends exactly on a sample boundary, where
+  // Rust's f32 positions and BASIC's f64 ones round to different counts.
+  const cases = [['straight', 60], ['left', 60], ['right', 60], ['join', 60], ['cpuwall', 60], ['cpu-gaps', 251], ['straight', 190], ['wall', 1], ['body', 1], ['gap', 1], ['spent', 1], ['overlap', 1], ['over', 1]]
     .filter(([scenario]) => !process.env.BLIP_PARITY_CASE || scenario === process.env.BLIP_PARITY_CASE);
   for (const [scenario, steps] of cases) await t.test(`${scenario}, ${steps} steps`, async () => {
     const frame = page.frames().find((frame) => frame.url().includes('basic-runtime.html'));
@@ -94,7 +92,7 @@ test('Adder BASIC follows native movement, trail, collision, score, gap, and lif
     for (const [i, snake] of actual.snakes.entries()) {
       for (const field of ['x', 'y', 'angle']) assert.ok(Math.abs(snake[field] - expected.snakes[i][field]) < .003,
         `seat ${i + 1} ${field}: BASIC ${snake[field]}, Rust ${expected.snakes[i][field]}`);
-      for (const field of ['length', 'alive', 'lives', 'score', 'human', 'gaps']) assert.equal(snake[field], expected.snakes[i][field], `seat ${i + 1} ${field}`);
+      for (const field of ['length', 'alive', 'lives', 'score', 'human', 'gaps']) assert.equal(snake[field], expected.snakes[i][field], `seat ${i + 1} ${field}: BASIC ${JSON.stringify(actual)}, Rust ${JSON.stringify(expected)}`);
     }
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
   });

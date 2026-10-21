@@ -25,6 +25,17 @@ pub const ROUND_WAIT: f32 = 2.0;
 const CLEAR_OF: f32 = 64.0;
 const SELF_SKIP: usize = 4;
 
+/// The pit's floor, inside its walls. The BASIC tape's is wider and lower.
+#[derive(Copy, Clone, Debug)]
+pub struct Pit {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+pub const PIT: Pit = Pit { x: PIT_X, y: PIT_Y, w: PIT_W, h: PIT_H };
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct Pt {
     pub x: f32,
@@ -221,6 +232,7 @@ pub fn seat_name(seat: usize) -> &'static str {
 }
 
 pub struct World {
+    pub pit: Pit,
     pub snakes: Vec<Snake>,
     pub round: i32,
     pub over: bool,
@@ -244,6 +256,7 @@ impl World {
 
     fn empty(humans: usize) -> Self {
         Self {
+            pit: PIT,
             snakes: Vec::new(),
             round: 1,
             over: false,
@@ -307,8 +320,8 @@ impl World {
     }
 
     fn room(&self, p: Pt) -> f32 {
-        let mut d = (p.x - PIT_X).min(PIT_X + PIT_W - p.x);
-        d = d.min(p.y - PIT_Y).min(PIT_Y + PIT_H - p.y);
+        let mut d = (p.x - self.pit.x).min(self.pit.x + self.pit.w - p.x);
+        d = d.min(p.y - self.pit.y).min(self.pit.y + self.pit.h - p.y);
         for s in &self.snakes {
             d = d.min(p.dist(s.head) - BODY_R);
             for q in &s.path {
@@ -319,12 +332,12 @@ impl World {
     }
 
     fn clear_spot(&self) -> (Pt, f32) {
-        let mid = Pt::new(PIT_X + PIT_W / 2.0, PIT_Y + PIT_H / 2.0);
+        let mid = Pt::new(self.pit.x + self.pit.w / 2.0, self.pit.y + self.pit.h / 2.0);
         let mut best = (mid, -1.0);
         for _ in 0..60 {
             let p = Pt::new(
-                rand_range_f32(PIT_X + 50.0, PIT_X + PIT_W - 50.0),
-                rand_range_f32(PIT_Y + 50.0, PIT_Y + PIT_H - 50.0),
+                rand_range_f32(self.pit.x + 50.0, self.pit.x + self.pit.w - 50.0),
+                rand_range_f32(self.pit.y + 50.0, self.pit.y + self.pit.h - 50.0),
             );
             let d = self.room(p);
             if d > best.1 {
@@ -369,16 +382,16 @@ impl World {
         let (dx, dy) = (to.x - from.x, to.y - from.y);
         let mut t = 1.0f32;
         if dx > 0.0001 {
-            t = t.min((PIT_X + PIT_W - BODY_R - from.x) / dx);
+            t = t.min((self.pit.x + self.pit.w - BODY_R - from.x) / dx);
         }
         if dx < -0.0001 {
-            t = t.min((PIT_X + BODY_R - from.x) / dx);
+            t = t.min((self.pit.x + BODY_R - from.x) / dx);
         }
         if dy > 0.0001 {
-            t = t.min((PIT_Y + PIT_H - BODY_R - from.y) / dy);
+            t = t.min((self.pit.y + self.pit.h - BODY_R - from.y) / dy);
         }
         if dy < -0.0001 {
-            t = t.min((PIT_Y + BODY_R - from.y) / dy);
+            t = t.min((self.pit.y + BODY_R - from.y) / dy);
         }
         t.clamp(0.0, 1.0) * from.dist(to)
     }
@@ -396,10 +409,10 @@ impl World {
         moving_heads: Option<&[bool]>,
     ) -> Hit {
         let r = BODY_R;
-        if to.x < PIT_X + r
-            || to.x > PIT_X + PIT_W - r
-            || to.y < PIT_Y + r
-            || to.y > PIT_Y + PIT_H - r
+        if to.x < self.pit.x + r
+            || to.x > self.pit.x + self.pit.w - r
+            || to.y < self.pit.y + r
+            || to.y > self.pit.y + self.pit.h - r
         {
             return Hit::Wall;
         }

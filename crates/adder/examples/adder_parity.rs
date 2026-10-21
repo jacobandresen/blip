@@ -1,4 +1,5 @@
-//! Deterministic rule traces for the BASIC game's browser comparisons.
+//! Deterministic rule traces in the BASIC tape's 640x400 pit, for the
+//! browser comparisons in test/adder-parity.mjs.
 
 #[path = "../src/arena.rs"]
 #[allow(dead_code)]
@@ -8,7 +9,10 @@ mod arena;
 #[allow(dead_code)]
 mod cpu;
 
-use arena::{Pt, Steer, World, SEATS};
+use arena::{Pit, Pt, Steer, World, SEATS};
+
+/// ADDER.BLIP's SETUP lines.
+const TAPE_PIT: Pit = Pit { x: 10.0, y: 40.0, w: 620.0, h: 350.0 };
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
@@ -18,6 +22,7 @@ fn main() {
         .and_then(|value| value.parse().ok())
         .unwrap_or(60);
     let mut world = World::new(1);
+    world.pit = TAPE_PIT;
     for (i, snake) in world.snakes.iter_mut().enumerate() {
         snake.head = if i == 0 {
             Pt::new(100.0, 180.0)
@@ -36,14 +41,14 @@ fn main() {
     }
     if scenario == "cpuwall" {
         let snake = &mut world.snakes[1];
-        snake.head = Pt::new(440.0, 380.0);
+        snake.head = Pt::new(600.0, 380.0);
         snake.heading = 0.0;
         snake.path = (0..17)
-            .map(|i| Pt::new(440.0 - i as f32 * 2.0, 380.0))
+            .map(|i| Pt::new(600.0 - i as f32 * 2.0, 380.0))
             .collect();
     }
     if scenario == "wall" || scenario == "over" {
-        world.snakes[0].head = Pt::new(467.0, 180.0);
+        world.snakes[0].head = Pt::new(627.0, 180.0);
     }
     if scenario == "over" {
         world.snakes[0].lives = 1;

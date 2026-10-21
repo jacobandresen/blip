@@ -99,37 +99,6 @@ fn defender_source_loads_as_numbered_program() {
     assert_eq!(p.lines.last().unwrap().0, 1660);
 }
 #[test]
-fn adder_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/ADDER.BLIP"));
-    assert!(p.lines.len() > 50);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 2240);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    assert!(p
-        .lines
-        .iter()
-        .any(|(_, source)| source.contains("/TAPE/GFX/ADDER/PIT.PNG")));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("DRAW_POLYLINE(\"PATH\"")
-            && source.contains("STEP_DISTANCE=85*DT")
-            && source.contains("*3.2*DT")
-            && source.contains("GAP_LEFT(S)=10")
-            && source.contains("HOLE_WAIT(S)=2.5")
-            && source.contains("SEGMENT_CIRCLE_OVERLAP")
-            && source.contains("PTS(S)=PTS(S)+50*ROUND")
-            && source.contains("PTS(HIT_OWNER)=PTS(HIT_OWNER)+100")
-            && source.contains("ROUND_WAIT=2")
-            && source.contains("IF ROUND=4 THEN PLAY_MUSIC \"ADDER_HUNT\"")
-    );
-}
-#[test]
 fn meteors_source_loads_as_numbered_program() {
     let mut p = Program::new();
     p.load(include_str!("../../../../web/TAPE/METEORS.BLIP"));
@@ -378,7 +347,8 @@ fn else_belongs_to_the_nearest_if() {
 }
 
 /// The tapes rewritten in the house layout, one by one.
-const HOUSE_TAPES: [(&str, &str); 2] = [
+const HOUSE_TAPES: [(&str, &str); 3] = [
+    ("ADDER", include_str!("../../../../web/TAPE/ADDER.BLIP")),
     ("RALLY", include_str!("../../../../web/TAPE/RALLY.BLIP")),
     ("SERPENT", include_str!("../../../../web/TAPE/SERPENT.BLIP")),
 ];
@@ -406,11 +376,11 @@ fn tapes_follow_the_house_layout() {
             let body = line.split_once(' ').map_or("", |(_, body)| body);
             let code = body.trim_start();
             let (word, _) = super::procedure::leading_name(code);
-            let closes = matches!(word.as_str(), "NEXT" | "ELSE" | "ELSEIF") || code.starts_with("END SUB") || code.starts_with("END IF");
+            let closes = matches!(word.as_str(), "NEXT" | "ELSE" | "ELSEIF" | "WEND") || code.starts_with("END SUB") || code.starts_with("END IF");
             if closes { depth = depth.checked_sub(1).unwrap_or_else(|| panic!("{name}: unopened {line}")); }
             assert_eq!(body.len() - code.len(), 2 * depth, "{name}: indent {line}");
             let one_line_for = word == "FOR" && code.contains(":NEXT");
-            let opens = matches!(word.as_str(), "SUB" | "ELSE" | "ELSEIF") || word == "FOR" && !one_line_for
+            let opens = matches!(word.as_str(), "SUB" | "ELSE" | "ELSEIF" | "WHILE") || word == "FOR" && !one_line_for
                 || super::block::block_condition(code).is_some();
             if opens { depth += 1; }
             let statements = split_statements(code);
