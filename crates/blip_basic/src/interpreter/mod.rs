@@ -2,6 +2,7 @@
 
 mod block;
 mod color;
+mod data;
 mod expression;
 mod graphics;
 mod procedure;
@@ -52,6 +53,8 @@ pub(crate) struct Program {
     procedures: HashMap<String, Procedure>,
     functions: HashMap<String, Function>,
     function_depth: usize,
+    data: Vec<(u16, Value)>,
+    data_at: usize,
     blocks: HashMap<At, Block>,
     block_ends: HashMap<At, At>,
     /// The statement being run, when it came from the program rather than a THEN.
@@ -111,7 +114,7 @@ impl Program {
                     .collect()
             })
             .collect();
-        if let Err(error) = self.find_procedures().and_then(|_| self.find_blocks()) {
+        if let Err(error) = self.find_procedures().and_then(|_| self.find_blocks()).and_then(|_| self.find_data()) {
             self.error = Some(format!("? {error}"));
             self.active = false;
         }

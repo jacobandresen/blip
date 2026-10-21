@@ -449,3 +449,13 @@ fn tapes_follow_the_house_layout() {
         assert_eq!(depth, 0, "{name}: unclosed block");
     }
 }
+
+#[test]
+fn data_is_collected_in_order_and_checked_at_load() {
+    let mut p = Program::new();
+    p.load("10 DATA 1, -2.5\n20 PRINT 1:DATA \"A,B\"");
+    assert_eq!(p.error, None);
+    assert_eq!(p.data, [(10, Value::Num(1.0)), (10, Value::Num(-2.5)), (20, Value::Str("A,B".into()))]);
+    p.load("10 DATA X+1");
+    assert_eq!(p.error.as_deref(), Some("? DATA needs numbers or \"text\", not X+1 at line 10"));
+}

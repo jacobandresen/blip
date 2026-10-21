@@ -51,7 +51,9 @@ impl Program {
             }
             "FOR" => self.begin_loop(rest, blip),
             "NEXT" => self.next_loop(rest),
-            "DEF" => Ok(()),
+            "DEF" | "DATA" => Ok(()),
+            "READ" => self.read_data(rest, blip),
+            "RESTORE" => self.restore_data(rest, blip),
             "SUB" => self.skip_procedure(rest),
             "CALL" => self.call_procedure(rest, blip),
             "LOCAL" => self.declare_locals(rest),
@@ -155,6 +157,10 @@ impl Program {
             1.0
         };
         self.vars.insert(name.clone(), Value::Num(start));
+        // FOR I=1 TO 0 does nothing, as in AmigaBASIC: no pass with stale values.
+        if step > 0.0 && start > end || step < 0.0 && start < end {
+            return self.skip_loop();
+        }
         self.loops.push(ForLoop {
             name,
             end,
@@ -162,6 +168,20 @@ impl Program {
             resume: self.position.clone(),
         });
         Ok(())
+    }
+
+    /// Step past the `NEXT` that closes this `FOR`, over any loops nested inside.
+    fn skip_loop(&mut self) -> Result<(), String> {
+        let mut nested = 0;
+        while let Some((_, statement)) = self.next_statement() {
+            match leading_name(&statement).0.as_str() {
+                "FOR" => nested += 1,
+                "NEXT" if nested == 0 => return Ok(()),
+                "NEXT" => nested -= 1,
+                _ => {}
+            }
+        }
+        Err("FOR without NEXT".into())
     }
 
     fn next_loop(&mut self, rest: &str) -> Result<(), String> {
@@ -306,6 +326,11 @@ impl Program {
             lhs
         };
         let value = self.eval(command[eq + 1..].trim(), blip)?;
+        self.store(lhs, value, blip)
+    }
+
+    /// Put a value in a variable or an array element: `X`, `NAME$`, `A(I,J)`.
+    pub(super) fn store(&mut self, lhs: &str, value: Value, blip: &Blip) -> Result<(), String> {
         if let Some(open) = lhs.find('(') {
             let name = lhs[..open].trim().to_ascii_uppercase();
             let arguments = lhs[open + 1..]

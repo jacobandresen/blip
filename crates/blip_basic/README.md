@@ -16,6 +16,7 @@ for variables, arrays, input, and Rust function calls.
 | `src/interpreter/statement.rs` | Command dispatch, loops, assignments |
 | `src/interpreter/procedure.rs` | `SUB … END SUB`, `CALL`, `LOCAL`, `EXIT SUB`, `DEF FN` |
 | `src/interpreter/block.rs` | Block `IF … ELSEIF … ELSE … END IF` |
+| `src/interpreter/data.rs` | `DATA`, `READ`, `RESTORE` |
 | `src/interpreter/graphics.rs` | BASIC drawing commands mapped to `blip` |
 | `src/interpreter/value.rs` | Values, conversions, array keys |
 | `src/interpreter/color.rs` | Palette, named colors, hex colors |
@@ -41,6 +42,10 @@ inside any expression; its parameters shadow the program's names meanwhile.
 A line ending in `THEN` opens a block that runs to `ELSEIF … THEN`, `ELSE` or
 `END IF`; the branches are found at load, like procedures. On one line,
 `IF X THEN A:B ELSE C` takes either side, and `THEN 100` is a `GOTO`.
+
+`DATA` items, numbers or quoted text, are gathered at load; `READ` takes the
+next and `RESTORE [line]` rewinds. A `FOR` with nothing to do, `FOR I=1 TO 0`,
+skips to its `NEXT`, as in AmigaBASIC.
 
 Expressions cache tokens in `Arc` slices. Each frame allows up to 50,000
 statements and eight milliseconds of interpreter work. A program exceeding

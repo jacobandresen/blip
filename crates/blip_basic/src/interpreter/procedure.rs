@@ -76,10 +76,10 @@ fn is_keyword(word: &str, keyword: &str) -> bool {
 }
 
 /// Names a procedure may not take: statements the interpreter already knows.
-const RESERVED: [&str; 29] = [
+const RESERVED: [&str; 32] = [
     "REM", "IF", "GOTO", "GOSUB", "RETURN", "FOR", "NEXT", "END", "STOP", "CLS", "PAPER", "PEN",
     "INK", "WAIT", "REST", "SOUND", "PRINT", "PLAY_SFX", "PLAY_MUSIC", "STOP_MUSIC", "SUB", "CALL",
-    "EXIT", "LOCAL", "LET", "THEN", "ELSE", "ELSEIF", "DEF",
+    "EXIT", "LOCAL", "LET", "THEN", "ELSE", "ELSEIF", "DEF", "DATA", "READ", "RESTORE",
 ];
 
 impl Program {
