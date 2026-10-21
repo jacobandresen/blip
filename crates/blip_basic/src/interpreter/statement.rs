@@ -38,6 +38,12 @@ impl Program {
                 None => self.inline_if(rest, blip),
             },
             "ELSEIF" | "ELSE" => self.leave_block(),
+            "WHILE" => self.enter_while(rest, blip),
+            "WEND" => self.repeat_while(),
+            "EXIT" if rest.eq_ignore_ascii_case("FOR") => {
+                self.loops.pop().ok_or("EXIT FOR outside a FOR")?;
+                self.skip_loop()
+            }
             "GOTO" | "GOSUB" => {
                 let target = self.eval(rest, blip)?.number();
                 if keyword.eq_ignore_ascii_case("GOSUB") {

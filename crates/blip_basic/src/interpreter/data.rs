@@ -33,7 +33,8 @@ impl Program {
         for target in split_args(names) {
             let (_, value) = self.data.get(self.data_at).cloned().ok_or("Out of DATA")?;
             self.data_at += 1;
-            if target.trim().ends_with('$') != matches!(value, Value::Str(_)) {
+            let name = target.split('(').next().unwrap_or_default().trim();
+            if name.ends_with('$') != matches!(value, Value::Str(_)) {
                 return Err(format!("READ {} met the wrong kind of DATA", target.trim()));
             }
             self.store(target.trim(), value, blip)?;

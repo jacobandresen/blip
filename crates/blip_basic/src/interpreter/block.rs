@@ -1,5 +1,5 @@
-//! AmigaBASIC-style block IF: a line ending in `THEN` opens a block that runs
-//! to `ELSEIF … THEN`, `ELSE` or `END IF`. The branches are found at load.
+//! AmigaBASIC-style blocks, found at load: a line ending in `THEN` opens an IF
+//! that runs to `ELSEIF … THEN`, `ELSE` or `END IF`; `WHILE … WEND` repeats.
 
 use super::{procedure::leading_name, syntax::top_level_then, Program};
 use blip::Blip;
@@ -36,12 +36,19 @@ fn is_else(statement: &str) -> bool {
 impl Program {
     pub(super) fn find_blocks(&mut self) -> Result<(), String> {
         let mut open: Vec<(At, Block, bool)> = Vec::new();
+        let mut whiles: Vec<(At, u16)> = Vec::new();
         for (line, statements) in self.statements.iter().enumerate() {
             let number = self.lines[line].0;
             for (at, statement) in statements.iter().enumerate() {
                 let here = (line, at);
                 let (word, _) = leading_name(statement);
-                if word == "IF" && block_condition(statement).is_some() {
+                if word == "WHILE" {
+                    whiles.push((here, number));
+                } else if word == "WEND" {
+                    let (start, _) = whiles.pop().ok_or_else(|| format!("WEND without WHILE at line {number}"))?;
+                    self.block_ends.insert(start, here);
+                    self.block_ends.insert(here, start);
+                } else if word == "IF" && block_condition(statement).is_some() {
                     open.push((here, Block::default(), false));
                 } else if word == "ELSEIF" || is_else(statement) {
                     let Some((_, block, had_else)) = open.last_mut() else {
@@ -66,6 +73,9 @@ impl Program {
                     self.blocks.insert(start, block);
                 }
             }
+        }
+        if let Some((_, number)) = whiles.last() {
+            return Err(format!("WHILE needs WEND at line {number}"));
         }
         match open.last() {
             Some(((line, _), _, _)) => Err(format!("IF needs END IF at line {}", self.lines[*line].0)),
@@ -104,6 +114,28 @@ impl Program {
         let here = self.here.ok_or("ELSE must start its own statement")?;
         let end = *self.block_ends.get(&here).ok_or("ELSE without IF")?;
         self.jump_to(end);
+        Ok(())
+    }
+}
+
+impl Program {
+    /// `WHILE X`: a false condition leaves past its `WEND`.
+    pub(super) fn enter_while(&mut self, condition: &str, blip: &Blip) -> Result<(), String> {
+        let here = self.here.ok_or("WHILE must start its own statement")?;
+        if self.eval(condition, blip)?.number() == 0.0 {
+            let end = *self.block_ends.get(&here).ok_or("WHILE needs WEND")?;
+            self.jump_to(end);
+        }
+        Ok(())
+    }
+
+    /// `WEND` goes back to test its `WHILE` again.
+    pub(super) fn repeat_while(&mut self) -> Result<(), String> {
+        let here = self.here.ok_or("WEND must start its own statement")?;
+        let (line, statement) = *self.block_ends.get(&here).ok_or("WEND without WHILE")?;
+        self.position.line = line;
+        self.position.statement = statement;
+        self.position.pending.clear();
         Ok(())
     }
 }

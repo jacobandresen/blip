@@ -353,6 +353,8 @@ fn block_if_structure_errors_stop_the_load() {
         ("10 ELSE", "? ELSE without IF at line 10"),
         ("10 IF X THEN\n20 ELSE\n30 ELSEIF Y THEN\n40 END IF", "? ELSEIF after ELSE at line 30"),
         ("10 IF X THEN\n20 ELSEIF Y\n30 END IF", "? ELSEIF needs THEN at the end of line 20"),
+        ("10 WHILE X\n20 PRINT 1", "? WHILE needs WEND at line 10"),
+        ("10 WEND", "? WEND without WHILE at line 10"),
     ] {
         let mut p = Program::new();
         p.load(source);
