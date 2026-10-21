@@ -235,3 +235,20 @@ pub(super) fn matching_else(actions: &str) -> Option<usize> {
         }
     }
 }
+
+/// PRINT's items and what follows each: `;` runs on, `,` leaves a space.
+pub(super) fn print_items(source: &str) -> Vec<(String, Option<char>)> {
+    let mut items = Vec::new();
+    let mut start = 0;
+    for (at, ch) in top_level(source) {
+        if ch == ';' || ch == ',' {
+            items.push((source[start..at].trim().to_owned(), Some(ch)));
+            start = at + 1;
+        }
+    }
+    let last = source[start..].trim();
+    if !last.is_empty() {
+        items.push((last.to_owned(), None));
+    }
+    items
+}

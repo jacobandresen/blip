@@ -4,7 +4,7 @@ use super::{
     block::block_condition,
     color::paper_color,
     procedure::leading_name,
-    syntax::{assignment_eq, method_call, split_args, matching_else, split_statements, top_level_then},
+    syntax::{assignment_eq, method_call, split_args, matching_else, print_items, split_statements, top_level_then},
     ForLoop, MusicRequest, Program, Value,
 };
 use crate::host::audio_event;
@@ -240,16 +240,23 @@ impl Program {
     }
 
     fn print(&mut self, rest: &str, blip: &Blip) -> Result<(), String> {
-        let value = if rest.is_empty() {
-            String::new()
-        } else {
-            split_args(rest)
-                .iter()
-                .map(|p| self.eval(p, blip).map(|v| v.string()))
-                .collect::<Result<Vec<_>, _>>()?
-                .join(" ")
-        };
-        self.output.push(value);
+        let mut line = std::mem::take(&mut self.print_run);
+        let mut runs_on = false;
+        for (item, after) in print_items(rest) {
+            if !item.is_empty() {
+                line += &self.eval(&item, blip)?.string();
+            }
+            if after == Some(',') {
+                line.push(' ');
+            }
+            runs_on = after.is_some();
+        }
+        // A PRINT that ends in ; or , carries on the same line next time.
+        if runs_on {
+            self.print_run = line;
+            return Ok(());
+        }
+        self.output.push(line);
         if self.output.len() > 10 {
             self.output.remove(0);
         }

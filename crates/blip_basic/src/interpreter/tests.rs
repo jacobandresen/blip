@@ -91,14 +91,6 @@ fn bouncer_source_loads_as_numbered_program() {
     );
 }
 #[test]
-fn defender_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/DEFENDER.BLIP"));
-    assert!(p.lines.len() > 80);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 1660);
-}
-#[test]
 fn brawler_source_loads_as_numbered_program() {
     let mut p = Program::new();
     p.load(include_str!("../../../../web/TAPE/BRAWLER.BLIP"));
@@ -269,7 +261,8 @@ fn else_belongs_to_the_nearest_if() {
 }
 
 /// The tapes rewritten in the house layout, one by one.
-const HOUSE_TAPES: [(&str, &str); 5] = [
+const HOUSE_TAPES: [(&str, &str); 6] = [
+    ("DEFENDER", include_str!("../../../../web/TAPE/DEFENDER.BLIP")),
     ("SKY_RAIDER", include_str!("../../../../web/TAPE/SKY_RAIDER.BLIP")),
     ("METEORS", include_str!("../../../../web/TAPE/METEORS.BLIP")),
     ("ADDER", include_str!("../../../../web/TAPE/ADDER.BLIP")),
@@ -323,4 +316,13 @@ fn data_is_collected_in_order_and_checked_at_load() {
     assert_eq!(p.data, [(10, Value::Num(1.0)), (10, Value::Num(-2.5)), (20, Value::Str("A,B".into()))]);
     p.load("10 DATA X+1");
     assert_eq!(p.error.as_deref(), Some("? DATA needs numbers or \"text\", not X+1 at line 10"));
+}
+
+#[test]
+fn print_items_keep_their_separators() {
+    use super::syntax::print_items;
+    let items = |s: &str| print_items(s).into_iter().map(|(i, c)| (i, c)).collect::<Vec<_>>();
+    assert_eq!(items("\"LIVES\";L"), [("\"LIVES\"".to_string(), Some(';')), ("L".into(), None)]);
+    assert_eq!(items("A,B;"), [("A".to_string(), Some(',')), ("B".into(), Some(';'))]);
+    assert_eq!(items("\"A;B\",F(1,2)"), [("\"A;B\"".to_string(), Some(',')), ("F(1,2)".into(), None)]);
 }

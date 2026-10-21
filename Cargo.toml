@@ -40,3 +40,8 @@ strip = true
 # there than the few kilobytes "z" saves.
 [profile.release.package.blip_assets]
 opt-level = 3
+
+# BLIP BASIC interprets every statement of a program each frame: speed there
+# is frames drawn on time, worth more than the bytes "z" saves.
+[profile.release.package.blip_basic]
+opt-level = 3

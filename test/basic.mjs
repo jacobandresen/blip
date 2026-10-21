@@ -2049,6 +2049,48 @@ test('BOUNCER clears its last brick and advances to the next level automatically
   assert.ok(colorCounts.next.bricks > colorCounts.win.bricks * 3, `level two should rebuild its brick wall: ${JSON.stringify({ colorCounts, runtime })}`);
 });
 
+// Defender's tests start the tape mid-game through line 85, draw a status
+// marker through line 165 (before the frame's WAIT), and read pixels in the
+// 640x400 game's own coordinates.
+async function openDefender(page, origin, lines = {}) {
+  await page.goto(`${origin}/basic.html`);
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
+  await page.evaluate((lines) => {
+    for (const [n, code] of Object.entries(lines)) BlipBasic.lines.set(Number(n), code);
+    BlipBasic.submit('RUN');
+  }, lines);
+  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
+  return page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+}
+
+/** Green when `condition` holds, red when it does not, at game (580,250). */
+const defenderMarker = (condition) => `FILL_RECT(580,250,40,24,COLOR(1-(${condition}),${condition},0))`;
+const DEFENDER_MARKER = [580, 250, 40, 24];
+
+async function countGamePixels(page, png, rect, colour) {
+  return page.evaluate(async ([base64, rect, colour]) => {
+    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
+    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
+    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
+    const scale = Math.min(sample.width / 640, sample.height / 400);
+    const left = (sample.width - 640 * scale) / 2, top = (sample.height - 400 * scale) / 2;
+    const { data } = context.getImageData(Math.floor(left + rect[0] * scale), Math.floor(top + rect[1] * scale),
+      Math.max(1, Math.ceil(rect[2] * scale)), Math.max(1, Math.ceil(rect[3] * scale)));
+    const is = {
+      red: (r, g, b) => r > 120 && r > g * 1.35 && r > b * 1.2,
+      green: (r, g, b) => g > 120 && g > r * 1.35 && g > b * 1.2,
+      orange: (r, g, b) => r > 120 && g > 45 && g < 190 && b < 110,
+      white: (r, g, b) => r > 190 && g > 190 && b > 190,
+      yellow: (r, g, b) => r > 130 && g > 100 && b < 110,
+      lit: (r, g, b) => r + g + b > 180,
+    }[colour];
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) if (is(data[i], data[i + 1], data[i + 2])) count++;
+    return count;
+  }, [png.toString('base64'), rect, colour]);
+}
+
 test('DEFENDER.BLIP runs a keyboard-controlled game through Rust Blip primitives', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -2058,17 +2100,17 @@ test('DEFENDER.BLIP runs a keyboard-controlled game through Rust Blip primitives
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
   await page.evaluate(() => BlipBasic.submit('DIR'));
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('DEFENDER.BLIP'));
-  assert.match(await page.locator('#basic-output').textContent(), /DEFENDER\.BLIP/);
   assert.ok(await page.evaluate(() => BlipBasic.lines.size > 70));
   await page.locator('#basic-input').fill('RUN');
   await page.locator('#basic-input').press('Enter');
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
   assert.ok(await page.locator('#exit-game').isVisible());
-  await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').press('Space');
+  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  await canvas.press('Space');
   await page.waitForTimeout(120);
-  await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').press('ArrowLeft');
-  await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').press('ArrowUp');
-  await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').press('Space');
+  await canvas.press('ArrowLeft');
+  await canvas.press('ArrowUp');
+  await canvas.press('Space');
   await page.waitForTimeout(500);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the BASIC source should not produce a Rust interpreter error');
   await page.locator('#exit-game').click();
@@ -2081,95 +2123,41 @@ test('DEFENDER renders its alien formation in five fresh playtests', async (t) =
     const handle = await startPage('chromium');
     const { page, origin } = handle;
     try {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto(`${origin}/basic.html`);
-    await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-    await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-    await page.evaluate(() => BlipBasic.submit('RUN'));
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
-    const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-    await canvas.press('Space');
-    await page.waitForTimeout(180);
-    await canvas.focus();
-    await page.keyboard.down('Space');
-    await page.waitForTimeout(260);
-    const playerShot = await canvas.screenshot();
-    await page.keyboard.up('Space');
-    if (round === 1) await import('node:fs/promises').then(({ writeFile }) => writeFile('/tmp/blip-defender-shot.png', playerShot));
-    await page.waitForTimeout(600);
-    const hitShot = await canvas.screenshot();
-    if (round === 1) await import('node:fs/promises').then(({ writeFile }) => writeFile('/tmp/blip-defender-hit.png', hitShot));
-    await page.waitForTimeout(2000);
-    let alienShot, alienShotPixels = 0;
-    for (let attempt = 0; attempt < 20 && alienShotPixels < 5; attempt++) {
-      await page.waitForTimeout(100);
-      alienShot = await canvas.screenshot();
-      alienShotPixels = await page.evaluate(async (base64) => {
-        const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-        const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-        const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-        const { width, height, data } = context.getImageData(0, 0, sample.width, sample.height);
-        let count = 0;
-        for (let y = Math.floor(height * .2); y < Math.floor(height * .9); y++) for (let x = Math.floor(width * .08); x < Math.floor(width * .92); x++) {
-          const i = (y * width + x) * 4;
-          if (data[i] > 140 && data[i + 1] > 55 && data[i + 1] < 180 && data[i + 2] < 110) count++;
-        }
-        return count;
-      }, alienShot.toString('base64'));
-    }
-    if (round === 1) await import('node:fs/promises').then(({ writeFile }) => writeFile('/tmp/blip-defender-alien-shot.png', alienShot));
-    const visual = await page.evaluate(async ([playerBase64, alienBase64, hitBase64]) => {
-      async function pixelsFrom(base64) {
-      const image = new Image();
-      image.src = `data:image/png;base64,${base64}`;
-      await image.decode();
-      const sample = document.createElement('canvas');
-      sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-      const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-      return { width: sample.width, height: sample.height, data: context.getImageData(0, 0, sample.width, sample.height).data };
-      }
-      const playerFrame = await pixelsFrom(playerBase64), enemyFrame = await pixelsFrom(alienBase64);
-      const { width, height, data: pixels } = playerFrame;
-      let occupiedCells = 0;
-      const left = width * .26, top = height * .16;
-      const cellWidth = width * .0469, cellHeight = height * .065;
-      for (let row = 0; row < 4; row++) for (let col = 0; col < 10; col++) {
-        let bright = 0;
-        const x0 = Math.floor(left + col * cellWidth), y0 = Math.floor(top + row * cellHeight);
-        for (let y = y0; y < y0 + cellHeight * .78; y++) {
-          for (let x = x0; x < x0 + cellWidth * .78; x++) {
-            const i = (y * width + x) * 4;
-            if (pixels[i] + pixels[i + 1] + pixels[i + 2] > 180) bright++;
-          }
-        }
-        if (bright > 8) occupiedCells++;
-      }
-      let playerShotPixels = 0, alienShotPixels = 0;
-      for (let y = Math.floor(height * .2); y < Math.floor(height * .9); y++) for (let x = Math.floor(width * .35); x < Math.floor(width * .65); x++) {
-        const i = (y * width + x) * 4;
-        if (pixels[i] > 100 && pixels[i + 1] > 100 && pixels[i + 2] > 100) playerShotPixels++;
-      }
-      const enemyPixels = enemyFrame.data;
-      for (let y = Math.floor(height * .2); y < Math.floor(height * .9); y++) for (let x = Math.floor(width * .08); x < Math.floor(width * .92); x++) {
-        const i = (y * width + x) * 4;
-        if (enemyPixels[i] > 140 && enemyPixels[i + 1] > 55 && enemyPixels[i + 1] < 180 && enemyPixels[i + 2] < 110) alienShotPixels++;
-      }
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const canvas = await openDefender(page, origin);
+      await canvas.press('Space');
+      await page.waitForTimeout(180);
+      await canvas.focus();
+      await page.keyboard.down('Space');
+      await page.waitForTimeout(260);
+      const playerShot = await canvas.screenshot();
+      // An explosion lasts under half a second: watch for one as the shots land.
       let explosionPixels = 0;
-      const hitPixels = (await pixelsFrom(hitBase64)).data;
-      for (let y = Math.floor(height * .15); y < Math.floor(height * .7); y++) for (let x = Math.floor(width * .08); x < Math.floor(width * .92); x++) {
-        const i = (y * width + x) * 4;
-        if (hitPixels[i] > 80 && hitPixels[i + 1] > 35 && hitPixels[i + 1] < 165 && hitPixels[i + 2] < 80) explosionPixels++;
+      for (let attempt = 0; attempt < 30 && explosionPixels < 4; attempt++) {
+        await page.waitForTimeout(60);
+        explosionPixels = await countGamePixels(page, await canvas.screenshot(), [40, 40, 560, 220], 'orange');
       }
-      return { occupiedCells, playerShotPixels, alienShotPixels, explosionPixels, width, height };
-    }, [playerShot.toString('base64'), alienShot.toString('base64'), hitShot.toString('base64')]);
-    const runtimeError = await page.locator('body').getAttribute('data-wasm-error');
-    assert.equal(runtimeError, null, `round ${round}: BASIC runtime error: ${runtimeError}`);
-    assert.ok(visual.occupiedCells >= 20, `round ${round}: expected a visible 4-by-10 alien formation, got ${JSON.stringify(visual)}`);
-    assert.ok(visual.playerShotPixels >= 5, `round ${round}: player shot should be visible, got ${JSON.stringify(visual)}`);
-    assert.ok(visual.explosionPixels >= 4, `round ${round}: alien hit burst should be visible, got ${JSON.stringify(visual)}`);
-    assert.ok(visual.alienShotPixels >= 5, `round ${round}: alien shot should be visible, got ${JSON.stringify(visual)}`);
-    await page.locator('#exit-game').click();
-    await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+      await page.keyboard.up('Space');
+      await page.waitForTimeout(1500);
+      let alienShotPixels = 0;
+      for (let attempt = 0; attempt < 20 && alienShotPixels < 5; attempt++) {
+        await page.waitForTimeout(100);
+        alienShotPixels = await countGamePixels(page, await canvas.screenshot(), [40, 60, 560, 290], 'orange');
+      }
+      // Level one: four rows of ten, 44 by 28 pixels apart, from (104,58).
+      let occupiedCells = 0;
+      for (let row = 0; row < 4; row++) for (let col = 0; col < 10; col++) {
+        if (await countGamePixels(page, playerShot, [104 + col * 44, 58 + row * 28, 34, 22], 'lit') > 8) occupiedCells++;
+      }
+      const playerShotPixels = await countGamePixels(page, playerShot, [220, 60, 200, 300], 'white');
+      const visual = { occupiedCells, playerShotPixels, explosionPixels, alienShotPixels };
+      assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: BASIC runtime error`);
+      assert.ok(occupiedCells >= 20, `round ${round}: expected a visible 4-by-10 alien formation, got ${JSON.stringify(visual)}`);
+      assert.ok(playerShotPixels >= 5, `round ${round}: player shot should be visible, got ${JSON.stringify(visual)}`);
+      assert.ok(explosionPixels >= 4, `round ${round}: alien hit burst should be visible, got ${JSON.stringify(visual)}`);
+      assert.ok(alienShotPixels >= 5, `round ${round}: alien shot should be visible, got ${JSON.stringify(visual)}`);
+      await page.locator('#exit-game').click();
+      await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
     } finally { await handle.close(); }
   }
 });
@@ -2177,247 +2165,105 @@ test('DEFENDER renders its alien formation in five fresh playtests', async (t) =
 test('DEFENDER shots remove individual shield blocks', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(190, 'GOTO 200');
-    BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:B=1:BX=56:BY=160:PX=46:START=1:REST=0:T=0:AF=0:UFO=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=0:DIVCD=420:DTELL=0:DPT=0');
-    BlipBasic.lines.set(598, 'fill_rect(140,130,18,10,COLOR(1-SH(0),SH(0),0))');
-    BlipBasic.submit('RUN');
+  const canvas = await openDefender(page, origin, {
+    85: 'START_GAME:BOMB_WAIT=99:UFO_WAIT=99:SHIP_X=500:SHOT_ON=1:SHOT_X=SHIELD_X(1)+2:SHOT_Y=SHIELD_Y+40',
+    165: defenderMarker('SHIELD(1,3,1)=1') + ':' + defenderMarker('SHIELD(1,2,1)=1').replace('580,250', '580,280'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await page.waitForTimeout(180);
+  await page.waitForTimeout(250);
   const shot = await canvas.screenshot();
-  const pixels = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data } = context.getImageData(0, 0, sample.width, sample.height);
-    let red = 0, green = 0;
-    for (let y = Math.floor(sample.height * .60); y < Math.floor(sample.height * .70); y++) {
-      for (let x = Math.floor(sample.width * .43); x < Math.floor(sample.width * .54); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 120 && data[i] > data[i + 1] * 1.35 && data[i] > data[i + 2] * 1.2) red++;
-        if (data[i + 1] > 120 && data[i + 1] > data[i] * 1.35 && data[i + 1] > data[i + 2] * 1.2) green++;
-      }
-    }
-    return { red, green };
-  }, shot.toString('base64'));
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.ok(pixels.red > 40, `one shot should remove a bunker block, pixels: ${JSON.stringify(pixels)}`);
+  assert.ok(await countGamePixels(page, shot, DEFENDER_MARKER, 'red') > 40, 'one shot should remove the bunker block it meets');
+  assert.ok(await countGamePixels(page, shot, [580, 280, 40, 24], 'green') > 40, 'the block above it should stay');
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER bomb collisions follow the tapered player ship', async (t) => {
-  async function markerFor(bombX) {
+  // A bomb by the ship's empty top corner: a ship sliding away is missed, a still one is hit at its base.
+  async function markerFor(moving) {
     const handle = await startPage('chromium');
     const { page, origin } = handle;
     try {
-      await page.goto(`${origin}/basic.html`);
-      await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-      await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-      await page.evaluate((x) => {
-        BlipBasic.lines.set(190, 'GOTO 200');
-        BlipBasic.lines.set(311, 'BB=1:BBX='+x+':BBY=173:BB2=0:BB3=0:BB4=0:B=0:BY=0:START=1:REST=0:PX=148:T=0:AF=0:UFO=0:UMODE=0:UFB=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=0:DIVCD=420:DTELL=0:DPT=0');
-        BlipBasic.lines.set(715, 'fill_rect(170,130,18,10,COLOR(1-(L=3),(L=3),0))');
-        BlipBasic.submit('RUN');
-      }, bombX);
-      await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-      await page.waitForTimeout(90);
-      const shot = await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').screenshot();
-      return await page.evaluate(async (base64) => {
-        const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-        const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-        const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-        const { data } = context.getImageData(0, 0, sample.width, sample.height);
-        let red = 0, green = 0;
-        for (let y = Math.floor(sample.height * .60); y < Math.floor(sample.height * .70); y++) {
-          for (let x = Math.floor(sample.width * .52); x < Math.floor(sample.width * .62); x++) {
-            const i = (y * sample.width + x) * 4;
-            if (data[i] > data[i + 1] * 1.35 && data[i] > 100) red++;
-            if (data[i + 1] > data[i] * 1.35 && data[i + 1] > 100) green++;
-          }
-        }
-        return { red, green };
-      }, shot.toString('base64'));
+      const canvas = await openDefender(page, origin, {
+        85: 'START_GAME:BOMB_WAIT=99:UFO_WAIT=99:SHIP_X=200:BOMB(1)=1:BOMB_X(1)=203:BOMB_Y(1)=SHIP_Y-10' + (moving ? ':SHIP_VX=200' : ''),
+        165: defenderMarker('LIVES=3'),
+        9720: moving ? 'STICK=1' : 'STICK=0',
+      });
+      await page.waitForTimeout(400);
+      const shot = await canvas.screenshot();
+      return { red: await countGamePixels(page, shot, DEFENDER_MARKER, 'red'), green: await countGamePixels(page, shot, DEFENDER_MARKER, 'green') };
     } finally { await handle.close(); }
   }
-  const topMiss = await markerFor(138);
-  const bodyHit = await markerFor(158);
-  assert.ok(topMiss.green > 40, `a bomb beside the ship's empty top corners should miss: ${JSON.stringify(topMiss)}`);
-  assert.ok(bodyHit.red > 40, `a bomb through the ship body should hit: ${JSON.stringify(bodyHit)}`);
+  const cornerMiss = await markerFor(true);
+  const bodyHit = await markerFor(false);
+  assert.ok(cornerMiss.green > 40, `a bomb through the empty top corner of a ship moving away should miss: ${JSON.stringify(cornerMiss)}`);
+  assert.ok(bodyHit.red > 40, `the same bomb reaches a still ship's body: ${JSON.stringify(bodyHit)}`);
 });
 
 test('DEFENDER renders four simultaneous Rust-sized alien bombs', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(190, 'GOTO 200');
-    BlipBasic.lines.set(311, 'BB=1:BBX=20:BBY=100:BB2=1:BBX2=70:BBY2=110:BB3=1:BBX3=120:BBY3=120:BB4=1:BBX4=230:BBY4=130:B=0:START=1:REST=0:PX=148:T=0:AF=0:UFO=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=0:DIVCD=420:DTELL=0:DPT=0');
-    BlipBasic.lines.set(693, 'FILL_RECT(BBX,BBY,5,6,"BLIP_ORANGE"):FILL_RECT(BBX2,BBY2,5,6,"BLIP_ORANGE"):FILL_RECT(BBX3,BBY3,5,6,"BLIP_ORANGE"):FILL_RECT(BBX4,BBY4,5,6,"BLIP_ORANGE")');
-    BlipBasic.lines.set(694, 'GOTO 697');
-    BlipBasic.submit('RUN');
+  const xs = [40, 140, 240, 460];
+  const canvas = await openDefender(page, origin, {
+    85: 'START_GAME:BOMB_WAIT=99:UFO_WAIT=99:BOMB_SPEED=0:' + xs.map((x, i) => `BOMB(${i + 1})=1:BOMB_X(${i + 1})=${x}:BOMB_Y(${i + 1})=${200 + i * 10}`).join(':'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(150);
   const shot = await canvas.screenshot();
-  const counts = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data } = context.getImageData(0, 0, sample.width, sample.height);
-    return [20,70,120,230].map((x) => {
-      let count = 0;
-      const center = x * sample.width / 320;
-      for (let py = Math.floor(sample.height * .15); py < Math.floor(sample.height * .60); py++) {
-        for (let px = Math.floor(center-10); px < Math.floor(center+13); px++) {
-          const i = (py * sample.width + px) * 4;
-          if (data[i] > 120 && data[i+1] > 45 && data[i+1] < 180 && data[i+2] < 90) count++;
-        }
-      }
-      return count;
-    });
-  }, shot.toString('base64'));
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  counts.forEach((count, i) => assert.ok(count > 3, `alien bomb ${i+1} should be visible, orange pixels: ${counts}`));
+  const counts = [];
+  for (const [i, x] of xs.entries()) counts.push(await countGamePixels(page, shot, [x - 2, 195 + i * 10, 8, 20], 'orange'));
+  counts.forEach((count, i) => assert.ok(count > 3, `alien bomb ${i + 1} should be visible, orange pixels: ${counts}`));
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER UFO laser clears its column and fires a beam', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(190, 'GOTO 200');
-    BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:BB4=0:B=0:BY=0:START=1:REST=0:PX=280:T=0:AF=0:UFO=1:UMODE=2:ULUSED=1:USTART=0:ULX=0:UX=120:UD=1:UTR=0:UCH=1:UFIRE=0:PSTILL=120:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=0:DIVCD=420:DTELL=0:DPT=0');
-    BlipBasic.lines.set(1590, 'REM hold laser for screenshot');
-    BlipBasic.lines.set(680, 'fill_rect(170,130,18,10,COLOR(1-SH(12),SH(12),0)):fill_rect(200,130,18,10,COLOR(UMODE/3,1-UMODE/3,0))');
-    BlipBasic.submit('RUN');
+  const canvas = await openDefender(page, origin, {
+    85: 'START_GAME:BOMB_WAIT=99:SHIP_X=520:UFO_ON=1:UFO_MODE$="CHARGING":UFO_TIMER=0.01:UFO_X=SHIELD_X(2):UFO_DIR=1',
+    6260: 'REM HOLD THE BEAM FOR THE SCREENSHOT',
+    165: defenderMarker('SHIELD(2,1,1)=1'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  await page.waitForTimeout(20);
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  await page.waitForTimeout(200);
   const shot = await canvas.screenshot();
-  const pixels = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data } = context.getImageData(0, 0, sample.width, sample.height);
-    let beam = 0, block = 0;
-    for (let y = Math.floor(sample.height * .05); y < Math.floor(sample.height * .90); y++) {
-      for (let x = Math.floor(sample.width * .38); x < Math.floor(sample.width * .46); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 190 && data[i+1] > 190 && data[i+2] > 190) beam++;
-      }
-    }
-    for (let y = Math.floor(sample.height * .60); y < Math.floor(sample.height * .70); y++) {
-      for (let x = Math.floor(sample.width * .52); x < Math.floor(sample.width * .62); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 120 && data[i] > data[i+1] * 1.35 && data[i] > data[i+2] * 1.2) block++;
-      }
-    }
-    return { beam, block };
-  }, shot.toString('base64'));
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.ok(pixels.beam > 200, `the UFO should fire the white core of its beam, got ${pixels.beam} pixels`);
-  assert.ok(pixels.block > 40, `the beam should clear shield cells across its column, got ${pixels.block} red pixels`);
+  const beam = await countGamePixels(page, shot, [242, 60, 12, 300], 'white');
+  assert.ok(beam > 200, `the UFO should fire the white core of its beam, got ${beam} pixels`);
+  assert.ok(await countGamePixels(page, shot, DEFENDER_MARKER, 'red') > 40, 'the beam should clear the shield cells in its column');
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER UFO drops its delayed bomb and the bomb breaks shields', async (t) => {
-  async function render(kind) {
+  async function render(lines, rect, colour, wait) {
     const handle = await startPage('chromium');
     const { page, origin } = handle;
     try {
-      await page.goto(`${origin}/basic.html`);
-      await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-      await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-      await page.evaluate((scenario) => {
-        BlipBasic.lines.set(190, 'GOTO 200');
-        const flying = scenario === 'flying';
-        BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:BB4=0:B=0:BY=0:START=1:REST=0:PX=280:T=0:AF=0:UFO='+Number(flying)+':UMODE=0:ULUSED=1:USTART=0:ULX=0:UX=105:UD=1:UTR=0:UCH=0:UFIRE=0:PSTILL=0:UFB='+Number(!flying)+':UFBX='+(flying?0:115)+':UFBY='+(flying?0:157)+':UFT='+(flying?180:0)+':UFDROP=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=0:DIVCD=420:DTELL=0:DPT=0');
-        BlipBasic.lines.set(flying ? 680 : 699, flying
-          ? 'fill_rect(170,130,18,10,COLOR(UFB,1-UFB,0))'
-          : 'fill_rect(170,130,18,10,COLOR(1-SH(12),SH(12),0))');
-        BlipBasic.submit('RUN');
-      }, kind);
-      await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-      await page.waitForTimeout(30);
+      const canvas = await openDefender(page, origin, lines);
+      await page.waitForTimeout(wait);
       assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-      const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-      const shot = await canvas.screenshot();
-      return await page.evaluate(async ([base64, scenario]) => {
-        const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-        const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-        const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-        const { data } = context.getImageData(0, 0, sample.width, sample.height);
-        let orange = 0, red = 0;
-        for (let y = Math.floor(sample.height * .05); y < Math.floor(sample.height * .18); y++) {
-          for (let x = Math.floor(sample.width * .32); x < Math.floor(sample.width * .42); x++) {
-            const i = (y * sample.width + x) * 4;
-            if (data[i] > 120 && data[i+1] > 45 && data[i+1] < 180 && data[i+2] < 90) orange++;
-          }
-        }
-        for (let y = Math.floor(sample.height * .60); y < Math.floor(sample.height * .70); y++) {
-          for (let x = Math.floor(sample.width * .52); x < Math.floor(sample.width * .62); x++) {
-            const i = (y * sample.width + x) * 4;
-            if (data[i] > 120 && data[i] > data[i+1] * 1.35 && data[i] > data[i+2] * 1.2) red++;
-          }
-        }
-        return scenario === 'flying' ? { orange } : { red };
-      }, [shot.toString('base64'), kind]);
+      return await countGamePixels(page, await canvas.screenshot(), rect, colour);
     } finally { await handle.close(); }
   }
-  const flying = await render('flying');
-  const shield = await render('shield');
-  assert.ok(flying.orange > 6, `the UFO should drop its orange bomb after three seconds, got ${flying.orange} pixels`);
-  assert.ok(shield.red > 40, `the UFO bomb should remove a shield cell, got ${shield.red} red pixels`);
+  const flying = await render({ 85: 'START_GAME:BOMB_WAIT=99:SHIP_X=520:UFO_ON=1:UFO_MODE$="FLYING":UFO_DIR=1:UFO_X=200:UFO_TIMER=0.01' }, [196, 40, 90, 70], 'orange', 120);
+  const shield = await render({
+    85: 'START_GAME:BOMB_WAIT=99:SHIP_X=520:UFO_BOMB=1:UFO_BOMB_X=SHIELD_X(3)+12:UFO_BOMB_Y=SHIELD_Y-30',
+    165: defenderMarker('SHIELD(3,1,2)=1'),
+  }, DEFENDER_MARKER, 'red', 400);
+  assert.ok(flying > 6, `the UFO should drop its orange bomb, got ${flying} pixels`);
+  assert.ok(shield > 40, `the UFO bomb should remove a shield cell, got ${shield} red pixels`);
 });
 
 test('DEFENDER higher waves initialize each formation theme', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  const countFormationPixels = async (canvas) => {
-    const screenshot = await canvas.screenshot();
-    return page.evaluate(async (base64) => {
-      const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-      const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-      const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-      const { data } = context.getImageData(0, 0, sample.width, sample.height);
-      let count = 0;
-      for (let y = Math.floor(sample.height * .16); y < Math.floor(sample.height * .55); y++) {
-        for (let x = Math.floor(sample.width * .06); x < Math.floor(sample.width * .94); x++) {
-          const i = (y * sample.width + x) * 4;
-          if (data[i] + data[i + 1] + data[i + 2] > 180) count++;
-        }
-      }
-      return count;
-    }, screenshot.toString('base64'));
-  };
   for (const level of [2, 3, 4, 5]) {
-    await page.evaluate((n) => BlipBasic.lines.set(20, `LV=${n}:SC=0:L=3`), level);
-    await page.evaluate(() => BlipBasic.submit('RUN'));
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-    const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-    await canvas.press('Space');
-    let coloredPixels = 0;
-    for (let attempt = 0; attempt < 6 && coloredPixels <= 800; attempt++) {
-      await page.waitForTimeout(attempt === 0 ? 500 : 250);
-      coloredPixels = await countFormationPixels(canvas);
+    const canvas = await openDefender(page, origin, { 85: `START_GAME:LEVEL=${level}:START_WAVE:BOMB_WAIT=99:UFO_WAIT=99` });
+    let lit = 0;
+    for (let attempt = 0; attempt < 6 && lit <= 800; attempt++) {
+      await page.waitForTimeout(attempt === 0 ? 300 : 250);
+      lit = await countGamePixels(page, await canvas.screenshot(), [40, 50, 560, 200], 'lit');
     }
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `level ${level} should run without an interpreter error`);
-    assert.ok(coloredPixels > 800, `level ${level} should render its formation, got ${coloredPixels} lit pixels`);
+    assert.ok(lit > 800, `level ${level} should render its formation, got ${lit} lit pixels`);
     await page.locator('#exit-game').click();
     await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
   }
@@ -2431,160 +2277,73 @@ test('DEFENDER starts a fifth-wave mothership with a visible health bar', async 
     await route.fulfill({ response, body: (await response.text()).replace('imports.env.blip_basic_sound=playBasicTone;',
       'imports.env.blip_basic_sound=function(f,s,v){if(f===1777)window.__mothershipVolley=true;else playBasicTone(f,s,v);};') });
   });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(20, 'LV=5:SC=0:L=3');
-    BlipBasic.lines.set(211, 'MAXI=ROWS*COLS-1:LEFT=0');
-    BlipBasic.lines.set(759, 'IF BB=1 AND BB2=1 AND BB3=1 AND BBY>85 AND BBY<150 THEN SOUND 1777,0,0:WAIT 0:GOTO 3000');
-    BlipBasic.lines.set(3000, 'WAIT 0:GOTO 3000');
-    BlipBasic.submit('RUN');
+  // The fifth wave with its formation gone: the mothership comes; the frame
+  // freezes once its first volley is clear of its hull.
+  const canvas = await openDefender(page, origin, {
+    85: 'START_GAME:LEVEL=5:START_WAVE:FOR I=1 TO ROWS*COLS:ALIVE(I)=0:NEXT I:ALIENS_LEFT=0:SHIP_X=0:UFO_WAIT=99',
+    165: 'IF BOSS_ON AND BOMB(1) AND BOMB(2) AND BOMB(3) AND BOMB_Y(1)>FNBOSS_Y()+BOSS_H+20 THEN SOUND 1777,0,0:WAIT 0:GOTO 9990',
+    9990: 'WAIT 0:GOTO 9990',
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await canvas.press('Space');
   await page.waitForFunction(() => document.querySelector('#basic-wasm-frame').contentWindow.__mothershipVolley, undefined, { timeout: 10000 });
   const shot = await canvas.screenshot();
-  const bossPixels = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data } = context.getImageData(0, 0, sample.width, sample.height);
-    let hull = 0, bombs = 0;
-    for (let y = Math.floor(sample.height * .12); y < Math.floor(sample.height * .34); y++) {
-      for (let x = Math.floor(sample.width * .05); x < Math.floor(sample.width * .55); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 130 && data[i] > data[i + 1] * 1.6 && data[i] > data[i + 2] * 1.4) hull++;
-      }
-    }
-    for (let y = Math.floor(sample.height * .32); y < Math.floor(sample.height * .88); y++) {
-      for (let x = Math.floor(sample.width * .04); x < Math.floor(sample.width * .96); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 150 && data[i + 1] > 55 && data[i + 1] < 190 && data[i + 2] < 110) bombs++;
-      }
-    }
-    return { hull, bombs };
-  }, shot.toString('base64'));
+  const hull = await countGamePixels(page, shot, [0, 40, 640, 130], 'red');
+  const bombs = await countGamePixels(page, shot, [0, 120, 640, 250], 'orange');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the boss encounter should not produce an interpreter error');
-  assert.ok(bossPixels.hull > 100, `the mothership should render its red hull and health bar, got ${bossPixels.hull} red pixels`);
-  assert.ok(bossPixels.bombs > 8, `the mothership should fire a three-shot volley, got ${bossPixels.bombs} orange pixels`);
+  assert.ok(hull > 100, `the mothership should render its red hull and health bar, got ${hull} red pixels`);
+  assert.ok(bombs > 8, `the mothership should fire a three-shot volley, got ${bombs} orange pixels`);
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER telegraphs and resolves its wave-three diver', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(20, 'LV=3:SC=0:L=3');
-    BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:B=0:BY=0:START=1:REST=0:T=0:AF=0:UFO=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=1:DIDX=21:DVT=1:DXD=AX(21):DYD=AY(21):DIVCD=420:DTELL=18:DPT=0');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await canvas.press('Space');
-  await page.waitForTimeout(90);
-  const tell = await canvas.screenshot();
-  await page.waitForTimeout(450);
-  const pixels = await page.evaluate(async (tell64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${tell64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { width, height, data } = context.getImageData(0, 0, sample.width, sample.height);
-    let warningRed = 0;
-    for (let y = Math.floor(height * .16); y < Math.floor(height * .34); y++) {
-      for (let x = Math.floor(width * .74); x < Math.floor(width * .99); x++) {
-        const i = (y * width + x) * 4, [r,g,b] = data.slice(i, i + 3);
-        if (r > 100 && r > g * 1.45 && r > b * 1.35) warningRed++;
-      }
-    }
-    return { warningRed };
-  }, tell.toString('base64'));
+  // Wave three is three rows of eleven from (82,58): the last alien, at (522,114), shakes and flashes.
+  const canvas = await openDefender(page, origin, { 85: 'START_GAME:LEVEL=3:START_WAVE:BOMB_WAIT=99:UFO_WAIT=99:DIVE_PICK=ROWS*COLS:DIVE_TELL=3' });
+  let flash = 0;
+  for (let attempt = 0; attempt < 20 && flash <= 10; attempt++) {
+    await page.waitForTimeout(60);
+    flash = await countGamePixels(page, await canvas.screenshot(), [400, 100, 240, 90], 'white');
+  }
+  assert.ok(flash > 10, `the selected alien should flash white before diving: ${flash} pixels`);
+  // Then it dives, and the game carries on.
+  await page.waitForTimeout(3500);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the diver state should run without an interpreter error');
-  assert.ok(pixels.warningRed > 10, `the selected alien should flash red before diving: ${pixels.warningRed} pixels`);
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER shots award the double value for a diver kill', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(20, 'LV=3:SC=0:L=3');
-    BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:B=1:BX=145:BY=125:START=1:REST=0:T=0:AF=0:UFO=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=2:DVT=0:DXD=140:DYD=120:DIVCD=420:DTELL=0:DPT=0');
-    BlipBasic.lines.set(607, 'IF HITD=1 THEN DPT=600:IF SC<>180 OR DPTS<>180 THEN DRAW_TEXTURE("BAD DIVER SCORE",0,0,1,1)');
-    BlipBasic.submit('RUN');
+  const canvas = await openDefender(page, origin, {
+    85: 'START_GAME:LEVEL=3:START_WAVE:BOMB_WAIT=99:UFO_WAIT=99:DIVER=1:DIVER_KIND=0:DIVER_X=300:DIVER_Y=200:SHOT_ON=1:SHOT_X=314:SHOT_Y=240',
+    165: defenderMarker('SCORE=180'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await canvas.press('Space');
   await page.waitForTimeout(160);
   const shot = await canvas.screenshot();
-  const yellow = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data } = context.getImageData(0, 0, sample.width, sample.height);
-    let count = 0;
-    for (let y = Math.floor(sample.height * .45); y < Math.floor(sample.height * .75); y++) {
-      for (let x = Math.floor(sample.width * .25); x < Math.floor(sample.width * .65); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 130 && data[i + 1] > 100 && data[i + 2] < 110) count++;
-      }
-    }
-    return count;
-  }, shot.toString('base64'));
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'a diver hit should not produce an interpreter error');
+  assert.ok(await countGamePixels(page, shot, DEFENDER_MARKER, 'green') > 40, 'a squid diver at level three should score 30x3x2');
+  const yellow = await countGamePixels(page, shot, [230, 140, 180, 90], 'yellow');
   assert.ok(yellow > 10, `the diver kill should show its bonus score, got ${yellow} yellow pixels`);
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER divers smash through shield blocks', async (t) => {
-  async function shieldPixels(diving) {
+  async function shieldMarker(diving) {
     const handle = await startPage('chromium');
     const { page, origin } = handle;
     try {
-      await page.goto(`${origin}/basic.html`);
-      await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-      await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-      await page.evaluate((active) => {
-        BlipBasic.lines.set(20, 'LV=4:SC=0:L=3');
-        BlipBasic.lines.set(598, 'B=0:fill_rect(140,130,18,10,COLOR(1-SH(14),SH(14),0))');
-        const diver = active ? ':DV=2:DVT=0:DXD=125:DYD=158' : ':DV=0:DXD=125:DYD=158';
-        BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:B=0:BY=0:START=1:REST=0:PX=280:T=0:AF=0:UFO=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DIVCD=420:DTELL=0:DPT=0'+diver);
-        BlipBasic.submit('RUN');
-      }, diving);
-      await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-      assert.match(await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSource), /598 B=0:fill_rect/);
-      const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-      await canvas.press('Space');
-      await page.waitForTimeout(180);
+      const canvas = await openDefender(page, origin, {
+        85: 'START_GAME:LEVEL=4:START_WAVE:BOMB_WAIT=99:UFO_WAIT=99:SHIP_X=600' + (diving ? ':DIVER=1:DIVER_KIND=1:DIVER_X=SHIELD_X(2):DIVER_Y=SHIELD_Y-40' : ''),
+        165: defenderMarker('SHIELD(2,1,2)=1'),
+      });
+      await page.waitForTimeout(400);
       assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the shield dive should not produce an interpreter error');
       const shot = await canvas.screenshot();
-      return await page.evaluate(async (base64) => {
-        const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-        const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-        const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-        const { data } = context.getImageData(0, 0, sample.width, sample.height);
-        let red = 0, green = 0;
-        for (let y = Math.floor(sample.height * .60); y < Math.floor(sample.height * .70); y++) {
-          for (let x = Math.floor(sample.width * .43); x < Math.floor(sample.width * .54); x++) {
-            const i = (y * sample.width + x) * 4;
-            if (data[i] > 120 && data[i] > data[i + 1] * 1.35 && data[i] > data[i + 2] * 1.2) red++;
-            if (data[i + 1] > 120 && data[i + 1] > data[i] * 1.35 && data[i + 1] > data[i + 2] * 1.2) green++;
-          }
-        }
-        return { red, green };
-      }, shot.toString('base64'));
+      return { red: await countGamePixels(page, shot, DEFENDER_MARKER, 'red'), green: await countGamePixels(page, shot, DEFENDER_MARKER, 'green') };
     } finally { await handle.close(); }
   }
-  const intact = await shieldPixels(false);
-  const broken = await shieldPixels(true);
+  const intact = await shieldMarker(false);
+  const broken = await shieldMarker(true);
   assert.ok(intact.green > 40, `the intact shield should report green, got ${JSON.stringify(intact)}`);
   assert.ok(broken.red > 40, `the diver should smash the shield and report red, got ${JSON.stringify(broken)}`);
 });

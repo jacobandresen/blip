@@ -42,13 +42,15 @@ struct Expr<'p, 'b> {
 impl Expr<'_, '_> {
     fn expr(&mut self, min: u8) -> Result<Value, String> {
         let mut left = self.atom()?;
+        // A handle on the tokens, so reading them needs no copies.
+        let tokens = Arc::clone(&self.tokens);
         loop {
-            let op = match self.tokens.get(self.at) {
-                Some(Token::Op(op)) => op.clone(),
-                Some(Token::Name(n)) if n == "AND" || n == "OR" || n == "MOD" => n.clone(),
+            let op: &str = match tokens.get(self.at) {
+                Some(Token::Op(op)) => op,
+                Some(Token::Name(n)) if n == "AND" || n == "OR" || n == "MOD" => n,
                 _ => break,
             };
-            let prec = match op.as_str() {
+            let prec = match op {
                 "OR" => 1,
                 "AND" => 2,
                 "=" | "==" | "<>" | "<" | ">" | "<=" | ">=" => 3,
@@ -61,7 +63,7 @@ impl Expr<'_, '_> {
             }
             self.at += 1;
             let right = self.expr(prec + 1)?;
-            left = match op.as_str() {
+            left = match op {
                 "+" if matches!(left, Value::Str(_)) || matches!(right, Value::Str(_)) => {
                     Value::Str(left.string() + &right.string())
                 }
@@ -88,15 +90,12 @@ impl Expr<'_, '_> {
         Ok(left)
     }
     fn atom(&mut self) -> Result<Value, String> {
-        let token = self
-            .tokens
-            .get(self.at)
-            .cloned()
-            .ok_or("Expression expected")?;
+        let tokens = Arc::clone(&self.tokens);
+        let token = tokens.get(self.at).ok_or("Expression expected")?;
         self.at += 1;
         match token {
-            Token::Num(n) => Ok(Value::Num(n)),
-            Token::Str(s) => Ok(Value::Str(s)),
+            Token::Num(n) => Ok(Value::Num(*n)),
+            Token::Str(s) => Ok(Value::Str(s.clone())),
             Token::Op(op) if op == "-" => Ok(Value::Num(-self.atom()?.number())),
             Token::Op(op) if op == "+" => Ok(Value::Num(self.atom()?.number())),
             Token::LParen => {
@@ -104,7 +103,7 @@ impl Expr<'_, '_> {
                 self.need_rparen()?;
                 Ok(v)
             }
-            Token::Name(name) => self.name(&name),
+            Token::Name(name) => self.name(name),
             _ => Err("Expression expected".into()),
         }
     }

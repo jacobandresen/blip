@@ -31,6 +31,7 @@ async fn main() {
     }));
     let mut blip = Blip::new(WIDTH, HEIGHT);
     blip.set_frame_retention(true);
+    blip.show_committed(true);
     #[cfg(target_arch = "wasm32")]
     unsafe {
         blip_basic_ready();
@@ -177,6 +178,10 @@ async fn main() {
             blip.clear(BLIP_BLACK);
         }
         program.draw_output(&blip);
+        // A frame the program has not finished drawing waits for its WAIT.
+        if program.yielded || !program.active {
+            blip.commit_frame();
+        }
         blip.next_frame(60).await;
         if program_loaded {
             program_loaded = false;

@@ -11,7 +11,7 @@ use macroquad::miniquad::{ShaderSource, UniformDesc, UniformType};
 use macroquad::shapes::draw_rectangle;
 use macroquad::texture::{
     draw_texture_ex, render_target_ex, DrawTextureParams, FilterMode,
-    RenderTarget, RenderTargetParams,
+    RenderTarget, RenderTargetParams, Texture2D,
 };
 use macroquad::time::get_frame_time;
 use macroquad::window::{clear_background, get_internal_gl, next_frame, screen_height, screen_width, Conf};
@@ -195,6 +195,9 @@ pub struct Blip {
     pub delta_time: f32,
     rt:             RenderTarget,
     retain_frame:   bool,
+    /// The last finished picture, shown while the next is still being drawn.
+    shown:          Option<RenderTarget>,
+    show_committed: bool,
     rng:            Lcg,
     crt_look:       bool, // a CRT's picture, or a clean one (crate::web::crt)
     // ---- glitch: horizontal tear ----
@@ -311,7 +314,7 @@ impl Blip {
 
         let b = Self {
             width, height, delta_time: 1.0 / 60.0,
-            rt, retain_frame: false, rng, crt_look: crate::web::crt(),
+            rt, retain_frame: false, shown: None, show_committed: false, rng, crt_look: crate::web::crt(),
             tear_cd,  tear_t: 0.0, tear_y: 0.5, tear_dx: 0.0,
             roll_cd,  roll_t: 0.0, roll_dy: 0.0, roll_spd: 0.0,
             chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
@@ -556,7 +559,7 @@ impl Blip {
         // BLIP_SCREENSHOT_FX is set, which keeps the full pipeline (handy for
         // eyeballing the curved-glass shader from a headless capture).
         if self.screenshot_mode && std::env::var_os("BLIP_SCREENSHOT_FX").is_none() {
-            let tex = self.rt.texture.clone();
+            let tex = self.display_texture();
             draw_texture_ex(&tex, vx, vy, WHITE, DrawTextureParams {
                 dest_size: Some(vec2(vw, vh)),
                 ..Default::default()
@@ -625,17 +628,18 @@ impl Blip {
         // Shrunk (a phone shows Meteors at half size), nearest sampling
         // drops every other pixel and one-pixel lines break up: blend then.
         // Enlarged, pixels stay crisp.
+        let tex = self.display_texture();
         if (scale < 1.0) != self.rt_blended {
             self.rt_blended = scale < 1.0;
-            self.rt.texture.set_filter(if self.rt_blended { FilterMode::Linear } else { FilterMode::Nearest });
+            let filter = if self.rt_blended { FilterMode::Linear } else { FilterMode::Nearest };
+            self.rt.texture.set_filter(filter);
+            if let Some(shown) = &self.shown { shown.texture.set_filter(filter); }
         }
 
         let roll_on   = self.roll_t  > 0.0;
         let tear_on   = self.tear_t  > 0.0 && !roll_on; // don't combine tear + roll
         let chroma_on = self.chroma_t > 0.0;
 
-        // Cloning the texture handle is cheap (it's just a GPU ID).
-        let tex = self.rt.texture.clone();
 
         // ---- chromatic aberration: coloured ghost layers under main image ----
         if chroma_on {
@@ -765,6 +769,42 @@ impl Blip {
 
     /// Keep the last picture visible while an interpreter waits to redraw it.
     pub fn set_frame_retention(&mut self, retain: bool) { self.retain_frame = retain; }
+
+    /// Show only pictures passed to [`Self::commit_frame`], so a frame that
+    /// takes longer than one display frame to draw never shows half done.
+    pub fn show_committed(&mut self, on: bool) { self.show_committed = on; }
+
+    /// The canvas as it stands becomes the picture on screen.
+    pub fn commit_frame(&mut self) {
+        let (w, h) = (self.width as u32, self.height as u32);
+        let fits = self.shown.as_ref().is_some_and(|s| (s.texture.width() as u32, s.texture.height() as u32) == (w, h));
+        if !fits {
+            if let Some(old) = self.shown.take() { retire(old); }
+            let shown = render_target_ex(w, h, RenderTargetParams { sample_count: 0, ..Default::default() });
+            shown.texture.set_filter(if self.rt_blended { FilterMode::Linear } else { FilterMode::Nearest });
+            self.shown = Some(shown);
+        }
+        let shown = self.shown.clone().unwrap();
+        let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, w as f32, h as f32));
+        cam.render_target = Some(shown);
+        set_camera(&cam);
+        clear_background(BLIP_BLACK);
+        // One render target into another turns the picture over; turn it back.
+        draw_texture_ex(&self.rt.texture, 0.0, 0.0, WHITE, DrawTextureParams {
+            dest_size: Some(vec2(w as f32, h as f32)),
+            flip_y: true,
+            ..Default::default()
+        });
+        self.apply_camera();
+    }
+
+    /// Cloning a texture handle is cheap (it's just a GPU ID).
+    fn display_texture(&self) -> Texture2D {
+        match &self.shown {
+            Some(shown) if self.show_committed => shown.texture.clone(),
+            _ => self.rt.texture.clone(),
+        }
+    }
 
     /// Fill the canvas with a solid colour. Call this at the start of your draw pass.
     #[inline]
