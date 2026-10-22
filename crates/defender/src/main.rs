@@ -1038,21 +1038,10 @@ fn update_explosions(g: &mut Game, dt: f32) {
     }
 }
 
-fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    let player_x_before = g.player_x;
-    let ufo_start_x = g.ufo_x;
-    let ufo_was_active = g.ufo_active;
-    g.respawn_grace.tick(dt);
-    // Hold to fire, like the cabinet: a new shot goes as soon as the last
-    // clears; MAX_PLAYER_BULLETS = 1 is the rate limit.
-    let shoot = !g.respawn_grace.active()
-        && (key_active(BLIP_KEY_SPACE)
-            || key_active(BLIP_KEY_UP)
-            || key_active(BLIP_KEY_W));
-
+/// The cannon has mass: it spools up to full speed and brakes over ~0.08 s.
+fn move_cannon(g: &mut Game, dt: f32) {
     let mut moving_left = key_active(BLIP_KEY_LEFT) || key_active(BLIP_KEY_A);
     let mut moving_right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
-    // The cannon has mass: it spools up to full speed and brakes over ~0.08s.
     let dir = moving_right as i32 - moving_left as i32;
     let mut target = dir as f32 * PLAYER_SPEED;
     // A finger asks for the speed that closes the gap in TOUCH_CLOSE_SECS,
@@ -1074,7 +1063,15 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     } else {
         g.player_still_secs += dt;
     }
+}
 
+/// Hold to fire, like the cabinet: a new shot goes as soon as the last clears;
+/// MAX_PLAYER_BULLETS = 1 is the rate limit.
+fn fire(g: &mut Game, sfx: &Sounds) {
+    let shoot = !g.respawn_grace.active()
+        && (key_active(BLIP_KEY_SPACE)
+            || key_active(BLIP_KEY_UP)
+            || key_active(BLIP_KEY_W));
     if shoot {
         if let Some(i) = g.free_bullet(true) {
             play_sfx(&sfx.shoot);
@@ -1086,30 +1083,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             };
         }
     }
+}
 
-    let bullet_starts: [(f32, f32); N_BULLETS] =
-        std::array::from_fn(|i| (g.bullets[i].x, g.bullets[i].y));
-    let bullet_was_active: [bool; N_BULLETS] =
-        std::array::from_fn(|i| g.bullets[i].active);
-    let mut player_shot_went_over_top = [false; MAX_PLAYER_BULLETS];
-    let mut bomb_reached_ground = [false; N_BULLETS];
-    for (i, b) in g.bullets.iter_mut().enumerate() {
-        if !b.active { continue; }
-        b.y += if b.player { -BULLET_SPEED } else { g.bomb_speed } * dt;
-        if b.y < PLAY_Y as f32 {
-            if b.player {
-                player_shot_went_over_top[i] = true;
-            } else {
-                b.active = false;
-            }
-        }
-        // A bomb that misses bursts on the ground line.
-        if !b.player && b.y + 12.0 > GROUND_Y as f32 {
-            bomb_reached_ground[i] = true;
-        }
-    }
-    g.fx.update(dt);
-
+/// The formation steps on the beat, and drops a row at the edge.
+fn march(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.march_timer += dt * 1000.0;
     if g.march_timer >= g.march_interval() {
         g.march_timer = 0.0;
@@ -1138,7 +1115,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             if hit_edge { g.march_drop_next = true; }
         }
     }
+}
 
+/// Every so often the lowest alien of a random column lets a bomb go.
+fn drop_bombs(g: &mut Game, dt: f32) {
     if g.bomb_timer.tick(dt) {
         let r01 = (rand() as f32) / (u32::MAX as f32);
         let (lo, hi) = g.bomb_interval_range;
@@ -1168,6 +1148,42 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             }
         }
     }
+}
+
+fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
+    let player_x_before = g.player_x;
+    let ufo_start_x = g.ufo_x;
+    let ufo_was_active = g.ufo_active;
+    g.respawn_grace.tick(dt);
+    move_cannon(g, dt);
+    fire(g, sfx);
+
+    let bullet_starts: [(f32, f32); N_BULLETS] =
+        std::array::from_fn(|i| (g.bullets[i].x, g.bullets[i].y));
+    let bullet_was_active: [bool; N_BULLETS] =
+        std::array::from_fn(|i| g.bullets[i].active);
+    let mut player_shot_went_over_top = [false; MAX_PLAYER_BULLETS];
+    let mut bomb_reached_ground = [false; N_BULLETS];
+    for (i, b) in g.bullets.iter_mut().enumerate() {
+        if !b.active { continue; }
+        b.y += if b.player { -BULLET_SPEED } else { g.bomb_speed } * dt;
+        if b.y < PLAY_Y as f32 {
+            if b.player {
+                player_shot_went_over_top[i] = true;
+            } else {
+                b.active = false;
+            }
+        }
+        // A bomb that misses bursts on the ground line.
+        if !b.player && b.y + 12.0 > GROUND_Y as f32 {
+            bomb_reached_ground[i] = true;
+        }
+    }
+    g.fx.update(dt);
+
+    march(g, dt, sfx);
+
+    drop_bombs(g, dt);
 
     // Player bullet vs aliens
     for bi in 0..MAX_PLAYER_BULLETS {
