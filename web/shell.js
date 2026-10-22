@@ -363,8 +363,8 @@ var cardApi = (function () {
   if (!list) return null;
   var appStyle = document.documentElement.hasAttribute('data-appstyle');
   var exitLabel = blipAppMode() ? 'BACK TO THE TITLE' : appStyle ? 'HOME' : 'ANOTHER GAME';
-  // A game in its own app has no Home to tap, only Backspace back to its title.
-  if (noTouch || !blipAppMode()) list = list.concat([[exitLabel, noTouch ? ['BACKSPACE'] : [appStyle ? 'TAP ‹ HOME' : 'TAP BLIP LOGO']]]);
+  // A game in its own app has no Home to tap, only Escape or Backspace back to its title.
+  if (noTouch || !blipAppMode()) list = list.concat([[exitLabel, noTouch ? ['ESC'] : [appStyle ? 'TAP ‹ HOME' : 'TAP BLIP LOGO'], noTouch ? ['BACKSPACE'] : null]]);
   var install = blipStandalone() ? '' : '<button type="button" id="cc-install">' +
     (appStyle ? 'Add to Home Screen' : 'ADD ' + GAME.name + ' TO HOME SCREEN') + '</button>';
   // The app's Guide, open at this game's page (the cabinet has its book).
@@ -854,9 +854,10 @@ window.addEventListener('keydown', function (e) {
   var wall = overlay.classList.contains('visible');
   var coinKey = e.key === '5' || (wall && (e.key === ' ' || e.key === 'Enter'));
   var muteKey = e.key === 'm' || e.key === 'M';
+  var leaveKey = e.key === 'Escape' || e.key === 'Backspace';
   // isTrusted: the deck and a gamepad send synthetic keys, gated elsewhere.
   if (coinKey && !e.repeat && e.isTrusted && getCoins() < MAX_COINS) coinIn();
-  if (wall && !coinKey && !muteKey) e.stopImmediatePropagation();
+  if (wall && !coinKey && !muteKey && !leaveKey) e.stopImmediatePropagation();
 }, true);
 
 (function () {
@@ -886,15 +887,17 @@ window.addEventListener('keydown', function (e) {
     dispatch(primary, 'keydown');
     setTimeout(function () { dispatch(primary, 'keyup'); }, 60);
   }
-  // Backspace does it from the keyboard: a kiosk has no mouse for the logo.
+  // Backspace or Escape does it from the keyboard: a kiosk has no mouse for the logo.
   window.addEventListener('keydown', function (e) {
     if (blipAmstradMode() && e.key === 'Escape') {
       e.preventDefault(); e.stopImmediatePropagation(); leaveGame(); return;
     }
-    if (e.key !== 'Backspace' || e.repeat) return;
+    if ((e.key !== 'Backspace' && e.key !== 'Escape') || e.repeat) return;
     if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
+    // Escape first closes what is open over the game (the name prompt, a sheet); the controls card takes it before this.
+    if (e.key === 'Escape' && document.querySelector('.blip-hs-modal, [aria-modal="true"]')) return;
     e.preventDefault();
-    leaveGame();
+    if (e.key === 'Escape') returnToCabinet(); else leaveGame();
   }, true);
 
   // Live input -> the stick ball's lean (the pad lights its own buttons in

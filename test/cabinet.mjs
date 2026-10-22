@@ -498,3 +498,18 @@ test('only the machines near you fetch and play their attract loops', async (t) 
   assert.ok(!fetched.includes('raider') && !fetched.includes('serpent'), `and only that: ${fetched}`);
   assert.equal(await page.evaluate(() => document.querySelector('.card[data-machine="brawler"]').hasAttribute('data-loop')), false, 'the machine left behind stops');
 });
+
+test('Escape leaves a game for the arcade, once the controls card it may have open is put away', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  await page.route('**/*.wasm', () => {});
+  await page.goto(`${origin}/meteors/index.html`);
+  await page.waitForFunction(() => typeof BlipController === 'object');
+  await page.locator('#card-button').click();
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-card'));
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-card'));
+  assert.equal(new URL(page.url()).pathname, '/meteors/index.html', 'the first Escape only closes the card');
+  await page.keyboard.press('Escape');
+  await page.waitForURL(`${origin}/index.html`);
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'meteors/index.html');
+});
