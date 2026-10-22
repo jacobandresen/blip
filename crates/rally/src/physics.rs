@@ -177,3 +177,82 @@ pub fn bounce(c: &Court, g: &mut Ball, pad_y: f32, pad_vy: f32, dir: f32) {
     g.ball_vx = g.ball_vx / m * g.ball_spd;
     g.ball_vy = g.ball_vy / m * g.ball_spd;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ball(x: f32, y: f32, vx: f32, vy: f32) -> Ball {
+        Ball { ball_x: x, ball_y: y, ball_vx: vx, ball_vy: vy, ball_spd: vx.hypot(vy) }
+    }
+
+    /// Paddles parked at the bottom, out of the ball's way.
+    fn fly(b: &mut Ball, dt: f32) -> Vec<Event> {
+        move_ball(&COURT, b, dt, PAD_YMAX, PAD_YMAX, 0.0, 0.0)
+    }
+
+    #[test]
+    fn a_wall_reflects_the_overshoot_and_keeps_the_speed() {
+        let mut b = ball(200.0, PLAY_T + 2.0, 0.0, -300.0);
+        let events = fly(&mut b, 0.02);
+        assert_eq!(events, vec![Event::Wall]);
+        assert!(b.ball_vy > 0.0, "the ball should now head down");
+        assert!(b.ball_y >= PLAY_T, "the ball should be back in the court");
+        assert_eq!(b.ball_vy.abs(), 300.0);
+    }
+
+    #[test]
+    fn the_bottom_wall_sends_the_ball_up() {
+        let mut b = ball(200.0, PLAY_B - BALL_SZ - 1.0, 0.0, 300.0);
+        assert_eq!(fly(&mut b, 0.02), vec![Event::Wall]);
+        assert!(b.ball_vy < 0.0);
+        assert!(b.ball_y + BALL_SZ <= PLAY_B);
+    }
+
+    #[test]
+    fn a_fast_ball_cannot_pass_through_a_paddle_in_one_frame() {
+        // Far enough in one long frame to cross the paddle's whole width.
+        let pad_y = 200.0;
+        let mut b = ball(LPAD_X + PAD_W + 30.0, pad_y + PAD_H / 2.0 - BALL_SZ / 2.0, -BALL_MAX, 0.0);
+        let events = move_ball(&COURT, &mut b, 0.1, pad_y, PAD_YMAX, 0.0, 0.0);
+        assert_eq!(events, vec![Event::LeftHit]);
+        assert!(b.ball_vx > 0.0, "the ball should come back off the paddle");
+    }
+
+    #[test]
+    fn a_ball_past_an_edge_is_the_other_sides_point() {
+        let mut b = ball(-BALL_SZ + 1.0, 300.0, -300.0, 0.0);
+        assert_eq!(fly(&mut b, 0.02), vec![Event::Point(false)]);
+        let mut b = ball(WIN_W as f32 - 1.0, 300.0, 300.0, 0.0);
+        assert_eq!(fly(&mut b, 0.02), vec![Event::Point(true)]);
+    }
+
+    #[test]
+    fn a_bounce_speeds_the_ball_up_to_the_cap_and_no_further() {
+        let mut b = ball(LPAD_X + PAD_W, 200.0, -BALL_SPD0, 0.0);
+        bounce(&COURT, &mut b, 200.0 - PAD_H / 2.0, 0.0, 1.0);
+        assert_eq!(b.ball_spd, BALL_SPD0 + BALL_INC);
+        let mut fast = ball(LPAD_X + PAD_W, 200.0, -BALL_MAX, 0.0);
+        bounce(&COURT, &mut fast, 200.0 - PAD_H / 2.0, 0.0, 1.0);
+        assert_eq!(fast.ball_spd, BALL_MAX);
+    }
+
+    #[test]
+    fn spin_bends_the_ball_without_speeding_it_up() {
+        let mut b = ball(LPAD_X + PAD_W, 200.0, -BALL_SPD0, 0.0);
+        bounce(&COURT, &mut b, 200.0 - PAD_H / 2.0, 600.0, 1.0);
+        assert!(b.ball_vy > 0.0, "a paddle moving down should throw the ball down");
+        assert!((b.ball_vx.hypot(b.ball_vy) - b.ball_spd).abs() < 0.01);
+    }
+
+    #[test]
+    fn the_paddles_edge_sends_the_ball_at_an_angle() {
+        // Off the top of the paddle, the ball leaves upward; off the middle, flat.
+        let mut top = ball(LPAD_X + PAD_W, 200.0, -BALL_SPD0, 0.0);
+        bounce(&COURT, &mut top, 200.0, 0.0, 1.0);
+        assert!(top.ball_vy < 0.0);
+        let mut mid = ball(LPAD_X + PAD_W, 200.0, -BALL_SPD0, 0.0);
+        bounce(&COURT, &mut mid, 200.0 + BALL_SZ / 2.0 - PAD_H / 2.0, 0.0, 1.0);
+        assert!(mid.ball_vy.abs() < 1.0);
+    }
+}
