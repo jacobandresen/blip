@@ -218,6 +218,25 @@ for (const device of mine) {
     if (!(along > .2 && along < .8)) failures.push(`the drag held the aisle at ${along}, not between two machines`);
     await check(page, device, insets, 'cabinet half a machine along', failures);
     await page.mouse.up();
+    await page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
+
+    // Stepped up to the machine: its Start and coin door still in reach.
+    await page.keyboard.press('ArrowUp');
+    await page.waitForFunction(() => document.getElementById('game-grid').hasAttribute('data-stepped-up') &&
+      !document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
+    await settle();
+    await check(page, device, insets, 'cabinet stepped up', failures);
+    const reach = await page.evaluate(() => {
+      const bezel = document.querySelector('.screen-bezel').getBoundingClientRect();
+      return ['.machine-start', '.machine-coinbox'].filter((part) => {
+        const r = document.querySelector('.card-focused ' + part).getBoundingClientRect();
+        return r.top < bezel.top - 1 || r.bottom > bezel.bottom + 1 || r.left < bezel.left - 1 || r.right > bezel.right + 1;
+      });
+    });
+    // A phone on its side stands close already, its coin door below the frame.
+    const close = await page.evaluate(() => document.getElementById('game-grid').hasAttribute('data-close'));
+    for (const part of reach) if (!(close && part === '.machine-coinbox')) failures.push(`stepped up, the machine's ${part.slice(9)} leaves the window`);
+    await page.keyboard.press('ArrowDown');
 
     await page.evaluate(() => sessionStorage.setItem('blip-loaded-card',
       JSON.stringify({ slug: 'bouncer', name: 'BOUNCER', code: 'A2', art: 'bouncer/screenshot.png' })));

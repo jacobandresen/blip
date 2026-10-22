@@ -513,3 +513,17 @@ test('Escape leaves a game for the arcade, once the controls card it may have op
   await page.waitForURL(`${origin}/index.html`);
   await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'meteors/index.html');
 });
+
+test('with reduced motion Up steps up at once, and Escape steps back', async (t) => {
+  const { page } = await openArcade(t, 1280);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const pose = () => page.evaluate(() => document.querySelector('.card-focused').style.transform);
+  const standing = await pose();
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await page.evaluate(() => document.getElementById('game-grid').hasAttribute('data-stepped-up')), true);
+  assert.equal(await page.evaluate(() => document.getElementById('game-grid').hasAttribute('data-aisle-moving')), false);
+  assert.notEqual(await pose(), standing, 'the view leans in');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.evaluate(() => document.getElementById('game-grid').hasAttribute('data-stepped-up')), false);
+  assert.equal(await pose(), standing);
+});

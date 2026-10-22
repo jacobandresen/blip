@@ -182,27 +182,35 @@ As built:
 - Reduced motion: the strips stand still and nothing flickers.
 - The strips are in `ASSETS` in `web/sw.js`.
 
-## 5. Up and down
+## 5. Up and down — done
 
-Nine games need no second row.
+Nine games need no second row. As built:
 
-- Up (ArrowUp, W, stick up, gamepad up) steps up to the faced machine: the
-  view leans in about 15 % (`#jukebox-front`'s `transform`), its deck and
-  Start lamp brighten, and the room sound ducks by half.
-  `data-stepped-up` on `#game-grid` marks the state.
-- A second Up while stepped up plays it (part 3): `activate()`.
-- Down steps back into the aisle. Left or Right while stepped up steps back
-  and walks.
-- This replaces `moveRow`, which repeats left and right.
+- Up (ArrowUp, W, gamepad up, the pad deck's up) steps up to the faced
+  machine: `data-stepped-up` on `#game-grid`. The walking loop eases `lean`
+  from 0 to 1 over about 0.4 s, bringing every cabinet 150 px nearer
+  (`translateZ`) and lifting the view so the faced machine's Start and coin
+  door stay in the window. Its deck lights in its trim colour, and the room's
+  sound ducks by half (`blipArcadeSound.duck`).
+- Up again plays it (`activate()`; pressed mid-lean, it plays on arrival).
+- Down, Escape, or any walk (a key, a tap, a drag, a click on a neighbour)
+  steps back first.
+- The lean is a fixed distance, not scaled with the room: the perspective is
+  fixed at 1100 px, so a scaled lean pushed the coin door out of a 2560 px
+  window.
+- Reduced motion: the lean happens at once.
+- `moveRow` is gone. The bottom deck's stick still maps its stronger axis to
+  left and right, but the arcade hides that deck.
+- A game page also leaves on Escape now (`web/shell.js`), as it did on
+  Backspace.
 
-## To decide
+## Decided while building
 
-- Walking pace: today's deliberate steps, or about twice as fast? The
-  plan's 1 machine/s held is about twice as fast; a tap still moves one.
-- Machine sounds: on from the start, or only after a first key press or tap?
-  Browsers allow only the second. A kiosk could ship with
-  `--autoplay-policy=no-user-gesture-required`, but the page must not
-  depend on it.
+- Walking pace: a held key walks 1 machine/s, and a tap arrives in about
+  0.8 s (it took 2.72 s). Both are constants in `web/aisle.js` (`W`, the
+  `speed` of 1) if the room should feel slower.
+- Machine sounds start on the first key, tap or click, as browsers require.
+  They do not wait for a coin.
 
 ## Files
 
@@ -228,7 +236,7 @@ in `package.json`). Each change to `web/` bumps `CACHE` in `web/sw.js`.
 | 2. Sound | Sound tests pass; heard on an iPhone and the kiosk | Tests pass; listening by hand still to do |
 | 3. Stepping up | The loader shows the faced screen, then the game | Done |
 | 4. Living screens | Nine strips under 60 KB, loaded only nearby, cached offline | Done |
-| 5. Up and down | The new `shell.mjs` test replaces the row test; `moveRow` is gone | |
+| 5. Up and down | The new `shell.mjs` test replaces the row test; `moveRow` is gone | Done |
 
 ## How to test it
 
@@ -274,15 +282,20 @@ steps: `#game-grid` carries `data-aisle-pos` (rounded to 0.01) and
 - `test/shell.mjs`'s title test waits for the walk to arrive before reading
   the picked card.
 
-### Up and down (`test/shell.mjs`)
+### Up and down (`test/shell.mjs`, `test/cabinet.mjs`) ✓
 
-`on the cabinet, up and down move the selection a row` becomes:
+`on the cabinet, up and down move the selection a row` became `on the
+cabinet, up steps up to the machine and up again plays it; down or a walk
+steps back`:
 
-- Up sets `data-stepped-up` and leaves the selection where it was.
-- Down clears it.
-- Up, Up opens the faced game (with a coin inserted first) and spends one
-  coin.
-- Left while stepped up clears it and walks one.
+- ✓ Up sets `data-stepped-up`, keeps the selection and ducks the room.
+- ✓ Down clears it.
+- ✓ Right while stepped up clears it and walks one.
+- ✓ With a coin in, Up, Up opens the faced game.
+- ✓ Reduced motion (`test/cabinet.mjs`): Up leans in at once, Escape steps
+  back to the same pose.
+- ✓ Escape on a game page closes the controls card first, then leaves for
+  the arcade, which faces that game (`test/cabinet.mjs`).
 
 ### Stepping up to play (`test/cabinet.mjs`) ✓
 
@@ -323,7 +336,9 @@ the playing machines with the level and pan each is heading for.
 
 - ✓ Every device's sweep also checks the arcade half a machine along, held
   there by a drag: nothing overlaps or leaves the screen.
-- While stepped up: the same (part 5).
+- ✓ And stepped up: nothing overlaps or leaves the screen, and the faced
+  machine's Start and coin door stay in the window (a phone on its side
+  stands close already, its coin door below the frame).
 
 ### Performance (`test/aisle-perf.mjs`, in `npm run test:web`) ✓
 
