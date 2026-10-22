@@ -514,7 +514,7 @@ impl Game {
         self.state_t = 0.0;
     }
 
-    fn join_p2(&mut self) {
+    fn join_player_two(&mut self) {
         let p = &mut self.p[1];
         p.joined = true;
         p.lives = LIVES;
@@ -547,7 +547,7 @@ impl Game {
 
     /// Integrate a body with one-way platforms: it passes up through
     /// blocks and lands on their tops. Returns (on_ground, hit_wall).
-    fn step_body(
+    fn move_body(
         &self,
         x: &mut f32,
         y: &mut f32,
@@ -698,7 +698,7 @@ fn player_dust(
     }
 }
 
-fn update_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
+fn move_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
     for i in 0..2 {
         if !g.p[i].joined {
             continue;
@@ -737,7 +737,7 @@ fn update_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
         }
         let was_air = !g.p[i].on_ground;
         let fall_speed = vy;
-        let (ground, _) = g.step_body(&mut x, &mut y, &mut vx, &mut vy, P_W, P_H, dt);
+        let (ground, _) = g.move_body(&mut x, &mut y, &mut vx, &mut vy, P_W, P_H, dt);
         if ground && was_air && fall_speed > 150.0 {
             g.p[i].squash = 0.7;
             player_dust(
@@ -800,7 +800,7 @@ fn nearest_player(g: &Game, x: f32, y: f32) -> Option<(f32, f32)> {
         .min_by(|a, b| ((a.0 - x).hypot(a.1 - y)).total_cmp(&(b.0 - x).hypot(b.1 - y)))
 }
 
-fn update_enemies(g: &mut Game, dt: f32) {
+fn move_toys(g: &mut Game, dt: f32) {
     for i in 0..g.enemies.len() {
         let mut e = g.enemies[i];
         if !e.active {
@@ -858,7 +858,7 @@ fn update_enemies(g: &mut Game, dt: f32) {
                     }
                 }
                 let (mut x, mut y, mut vx, mut vy) = (e.x, e.y, e.vx, e.vy);
-                let (ground, wall) = g.step_body(&mut x, &mut y, &mut vx, &mut vy, E_W, E_H, dt);
+                let (ground, wall) = g.move_body(&mut x, &mut y, &mut vx, &mut vy, E_W, E_H, dt);
                 if wall {
                     e.dir = -e.dir;
                 }
@@ -892,7 +892,7 @@ fn update_enemies(g: &mut Game, dt: f32) {
                     }
                 }
                 let (mut x, mut y, mut vx, mut vy) = (e.x, e.y, e.vx, e.vy);
-                let (ground, wall) = g.step_body(&mut x, &mut y, &mut vx, &mut vy, E_W, E_H, dt);
+                let (ground, wall) = g.move_body(&mut x, &mut y, &mut vx, &mut vy, E_W, E_H, dt);
                 if wall {
                     e.dir = -e.dir;
                     vx = -vx;
@@ -979,7 +979,7 @@ fn update_enemies(g: &mut Game, dt: f32) {
 
 /// Rocks roll until they hit a block or a player's bubble; sparks drift
 /// through walls and fade after a few seconds.
-fn update_shots(g: &mut Game, dt: f32, player_starts: [(f32, f32); 2]) -> [bool; 2] {
+fn move_shots(g: &mut Game, dt: f32, player_starts: [(f32, f32); 2]) -> [bool; 2] {
     let mut player_hits = [false; 2];
     for i in 0..g.shots.len() {
         let mut s = g.shots[i];
@@ -1118,7 +1118,7 @@ fn pop_chain(g: &mut Game, start: usize, by: usize, sfx: &Sounds) {
     }
 }
 
-fn update_bubbles(
+fn move_bubbles(
     g: &mut Game,
     dt: f32,
     inp: [Input; 2],
@@ -1308,7 +1308,7 @@ fn update_bubbles(
     g.bubbles.retain(|b| b.active);
 }
 
-fn update_fruit(
+fn move_candies(
     g: &mut Game,
     dt: f32,
     sfx: &Sounds,
@@ -1324,7 +1324,7 @@ fn update_fruit(
         f.t += dt;
         if !f.on_ground {
             let (mut x, mut y, mut vx, mut vy) = (f.x, f.y, f.vx, f.vy);
-            let (ground, _) = g.step_body(&mut x, &mut y, &mut vx, &mut vy, 16.0, 16.0, dt);
+            let (ground, _) = g.move_body(&mut x, &mut y, &mut vx, &mut vy, 16.0, 16.0, dt);
             f.x = x;
             f.y = y;
             f.vx = vx * (1.0 - 0.8 * dt);
@@ -1539,13 +1539,13 @@ fn update_play(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
     let enemy_starts: Vec<(f32, f32)> = g.enemies.iter()
         .map(|e| (e.x + E_W / 2.0, e.y + E_H / 2.0))
         .collect();
-    update_players(g, inp, dt, sfx);
-    update_enemies(g, dt);
-    update_bubbles(g, dt, inp, sfx, &enemy_starts, player_starts);
-    update_fruit(g, dt, sfx, player_starts);
+    move_players(g, inp, dt, sfx);
+    move_toys(g, dt);
+    move_bubbles(g, dt, inp, sfx, &enemy_starts, player_starts);
+    move_candies(g, dt, sfx, player_starts);
     let skull_motion = update_skull(g, dt);
     update_chewing(g, dt);
-    let shot_hits = update_shots(g, dt, player_starts);
+    let shot_hits = move_shots(g, dt, player_starts);
     hurt_players(g, sfx, skull_motion, shot_hits, player_starts, &enemy_starts);
     g.enemies.retain(|e| e.active);
     if !players_left(g) {
@@ -1597,10 +1597,10 @@ fn draw_background(blip: &Blip, g: &Game) {
         let h = WIN_H as f32 / bands as f32;
         blip.fill_rect(0.0, i as f32 * h, WIN_W as f32, h + 1.0, col(c, 1.0));
     }
-    draw_atmosphere(blip, pal);
+    draw_bokeh(blip, pal);
 }
 
-fn draw_atmosphere(blip: &Blip, pal: &levels::Palette) {
+fn draw_bokeh(blip: &Blip, pal: &levels::Palette) {
     // soft bokeh drifting up behind the play field
     let t = now();
     for i in 0..22 {
@@ -2110,7 +2110,7 @@ fn soft(blip: &Blip, text: &str, x: f32, y: f32, sz: f32, c: (u8, u8, u8), a: f3
     blip.draw_text(text, x, y, sz, col(c, a));
 }
 
-fn draw_hud(blip: &Blip, g: &Game, _hi: &web::HighScore) {
+fn draw_scores(blip: &Blip, g: &Game, _hi: &web::HighScore) {
     // one row: P1 on the left, the round in the middle, P2 on the right
     blip.fill_rect(0.0, 0.0, WIN_W as f32, HUD, col((26, 10, 34), 0.92));
     blip.fill_rect(0.0, HUD - 2.0, WIN_W as f32, 2.0, col(PINK, 0.25));
@@ -2167,7 +2167,7 @@ fn draw_hud(blip: &Blip, g: &Game, _hi: &web::HighScore) {
 fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: &web::HighScore) {
     let t = now();
     art.title_background(blip);
-    draw_atmosphere(blip, &PALETTES[0]);
+    draw_bokeh(blip, &PALETTES[0]);
     // bubbles drifting up behind the logo
     for i in 0..14 {
         let s = i as f32 * 53.1;
@@ -2588,7 +2588,7 @@ async fn main() {
                 }
                 State::Play => {
                     if !g.p[1].joined && (key_pressed(BLIP_KEY_J) || key_pressed(BLIP_KEY_K)) {
-                        g.join_p2();
+                        g.join_player_two();
                     }
                     if !blip.screenshot_mode || shot_frame > 400 {
                         update_play(&mut g, dt, inp, &sfx);
@@ -2609,9 +2609,9 @@ async fn main() {
                 }
                 State::Clear => {
                     let player_starts = std::array::from_fn(|i| (g.p[i].cx(), g.p[i].cy()));
-                    update_players(&mut g, inp, dt, &sfx);
-                    update_bubbles(&mut g, dt, inp, &sfx, &[], player_starts);
-                    update_fruit(&mut g, dt, &sfx, player_starts);
+                    move_players(&mut g, inp, dt, &sfx);
+                    move_bubbles(&mut g, dt, inp, &sfx, &[], player_starts);
+                    move_candies(&mut g, dt, &sfx, player_starts);
                     // leftover bubbles pop one by one, for a little applause
                     if g.state_t > 1.0 {
                         if let Some(i) = g.bubbles.iter().position(|b| b.active) {
@@ -2671,7 +2671,7 @@ async fn main() {
             State::Title => draw_title(&blip, &art, &g, &hi),
             _ => {
                 draw_world(&blip, &art, &g);
-                draw_hud(&blip, &g, &hi);
+                draw_scores(&blip, &g, &hi);
                 let st = g.state_t;
                 // the end screens dim the world so their words sit on calm
                 if matches!(g.state, State::Over | State::Won) {
