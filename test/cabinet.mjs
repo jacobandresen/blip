@@ -434,3 +434,41 @@ test('the room is silent while muted and stops while the page is hidden', async 
   });
   await page.waitForFunction(() => blipArcadeSound.state().running);
 });
+
+// ---- Stepping up to play: the game page opens on the picture the arcade's zoom ended on. ----
+test('a machine started from the arcade opens its game on the same screen picture, then the game', async (t) => {
+  const { page, origin } = await openArcade(t, 1280);
+  // Hold the game back a moment, so the picture can be seen waiting for it.
+  await page.route('**/*.wasm', async (route) => { await new Promise((r) => setTimeout(r, 1500)); await route.continue(); });
+  await page.locator('.card-focused .machine-coinbox').click();
+  await page.locator('.card-focused .machine-start').click();
+  await page.waitForURL(`${origin}/rally/index.html`);
+  const shown = await page.waitForFunction(() => {
+    const frame = document.getElementById('launch-frame'), canvas = document.getElementById('glcanvas');
+    if (!frame) return null;
+    const a = frame.getBoundingClientRect(), b = canvas.getBoundingClientRect();
+    return { art: frame.style.backgroundImage, ready: document.documentElement.hasAttribute('data-game-ready'),
+      over: Math.abs(a.left - b.left) < 1 && Math.abs(a.top - b.top) < 1 && Math.abs(a.width - b.width) < 1 && Math.abs(a.height - b.height) < 1 };
+  });
+  const seen = await shown.jsonValue();
+  assert.match(seen.art, /rally\/screenshot\.png/);
+  assert.equal(seen.ready, false, 'the picture waits for the game');
+  assert.equal(seen.over, true, 'exactly where the game will draw');
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await page.waitForFunction(() => !document.getElementById('launch-frame'));
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-launch')), null);
+});
+
+test('a game page opened later, or another game, starts on its plain loader', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  await page.route('**/*.wasm', () => {});
+  await page.goto(`${origin}/index.html`);
+  // Twenty seconds old; and fresh, but for another machine.
+  for (const launch of [{ slug: 'rally', age: 20000 }, { slug: 'serpent', age: 0 }]) {
+    await page.evaluate((l) => sessionStorage.setItem('blip-cabinet-launch',
+      JSON.stringify({ slug: l.slug, at: Date.now() - l.age, art: `${l.slug}/screenshot.png` })), launch);
+    await page.goto(`${origin}/rally/index.html`);
+    await page.waitForFunction(() => typeof BlipController === 'object');
+    assert.equal(await page.locator('#launch-frame').count(), 0, `${launch.slug} handover`);
+  }
+});

@@ -138,19 +138,22 @@ the aisle script):
   the page is hidden. It does not wait for a credit: the machines are on
   whether or not the cabinet has a coin.
 
-## 3. Stepping up to play
+## 3. Stepping up to play — done
 
-The zoom exists (`openMachine`, 0.46 s, then the page loads). What is
-missing is the other half:
+The zoom already existed (`openMachine`, 0.46 s, then the page loads). The
+other half, as built:
 
-- `openMachine` stores the faced screen's picture with the launch, as
-  `blip-cabinet-start` (today only the slug): `{slug, at}` and the
-  `screenshot.png` path it showed.
-- `web/shell.js` reads it on load. When it is fresh (under 15 s, as with
-  `blip-cabinet-return`), the loader shows that picture full-screen and
-  fades it out as the first frame draws, so the zoom flows straight into
-  the game. The mirror of `blip-cabinet-return`.
-- Stretch the zoom to about 0.6 s only if the handover still reads as a cut.
+- `openMachine` stores `blip-cabinet-launch` (`{slug, at, art}`, the faced
+  screen's picture) beside `blip-cabinet-start`, which stays the slug the game
+  page presses Start for.
+- `web/shell.js` reads it on load. When it is under 15 s old, for this game,
+  and the page is neither app style nor a cabinet screen, `#launch-frame`
+  shows that picture where the game will draw (`fillCanvas` places it with
+  `.cabinet-glass`), letterboxed as the game is. When the first frame is
+  drawn (`hideLoader`) it fades out over 0.35 s.
+- The zoom no longer fades to black: its last frame is the screen's picture,
+  and the next page opens on it.
+- The zoom stays at 0.46 s.
 
 ## 4. Living screens
 
@@ -201,7 +204,7 @@ Nine games need no second row.
 | Analogue stick | `web/kiosk.js` (`pollGamepad`) |
 | Machine and room sound, single footstep | `web/kiosk.js` |
 | Screen loops | `tools/make_attract_strips.mjs`, `web/<game>/attract.webp`, `web/index.html` |
-| The game page's first frame | `web/shell.js`, `web/shell.css` |
+| The game page's first frame (`#launch-frame`) | `web/shell.js`, `web/shell.css` |
 
 These files are in the table in `AGENTS.md`, marked "planned". As each part
 lands, drop its mark there. When `test/aisle.test.mjs` and the performance
@@ -214,7 +217,7 @@ in `package.json`). Each change to `web/` bumps `CACHE` in `web/sw.js`.
 |---|---|---|
 | 1. Walking | Unit, arcade, layout and performance tests pass; reduced motion steps as today | Done |
 | 2. Sound | Sound tests pass; heard on an iPhone and the kiosk | Tests pass; listening by hand still to do |
-| 3. Stepping up | The loader shows the faced screen, then the game | |
+| 3. Stepping up | The loader shows the faced screen, then the game | Done |
 | 4. Living screens | Nine strips under 60 KB, loaded only nearby, cached offline | |
 | 5. Up and down | The new `shell.mjs` test replaces the row test; `moveRow` is gone | |
 
@@ -272,12 +275,13 @@ steps: `#game-grid` carries `data-aisle-pos` (rounded to 0.01) and
   coin.
 - Left while stepped up clears it and walks one.
 
-### Stepping up to play (`test/cabinet.mjs`)
+### Stepping up to play (`test/cabinet.mjs`) ✓
 
-- After Start, the game page's `#loader` shows the faced machine's
-  `screenshot.png` before `data-game-ready`, and hides it after.
-- A stale handover (over 15 s, set by hand in `sessionStorage`) shows the
-  plain loader.
+- ✓ After Start (the game's wasm held back 1.5 s), the game page shows
+  `#launch-frame` with the machine's `screenshot.png`, exactly over the
+  canvas, before `data-game-ready`; it is gone after, and so is the handover.
+- ✓ A stale handover (20 s old), or one for another game, shows the plain
+  loader.
 
 ### Sound (`test/cabinet.mjs`) ✓
 

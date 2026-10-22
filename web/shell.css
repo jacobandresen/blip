@@ -1241,3 +1241,17 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
   :root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {padding:0 4px 0 14px}
   :root:not([data-appstyle]) .machine-marquee-name {font-size:12px;text-shadow:-1px -1px #120c18,1px -1px #120c18,-1px 1px #120c18,1px 1px #120c18,2px 2px 0 color-mix(in srgb,var(--trim) 70%,#000)}
 }
+
+/* The arcade's zoom ends on the machine's screen; the game page opens on the same picture, where the game will
+   draw, and fades it as the first frame comes up (#launch-frame, from shell.js). */
+#launch-frame {
+  position: fixed;
+  z-index: 49;
+  background: #000 center / contain no-repeat;
+  image-rendering: pixelated;
+  clip-path: inset(0 round 10px);
+  pointer-events: none;
+  transition: opacity .35s ease-out;
+}
+#launch-frame.launch-frame-out { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { #launch-frame { transition: none; } }

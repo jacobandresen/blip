@@ -939,8 +939,6 @@
     }
     #game-grid .card.rejected {animation:none}
     .machine-launching .jukebox-front {transition:transform .46s cubic-bezier(.55,0,.75,.4);transform:translate(var(--launch-x),var(--launch-y)) scale(var(--launch-zoom))}
-    .machine-launching .jukebox-front::after {content:'';position:absolute;inset:-50%;z-index:90;background:#000;pointer-events:none;animation:machine-launch-dark .46s ease-in both}
-    @keyframes machine-launch-dark {0%,55% {opacity:0} 100% {opacity:1}}
     /* Every cabinet is built at 300×660 and scaled to the room (--arc-scale). */
     #game-grid .card {transform:translateX(calc(-50% + var(--arc-x,0px))) translateY(var(--arc-y,0px)) translateZ(var(--arc-z,0px)) rotateY(var(--arc-turn,0deg)) scale(var(--arc-scale,1));}
     /* A phone on its side: the player stands close, the coin door below the frame. */
@@ -2069,6 +2067,9 @@
         sessionStorage.setItem('blip-cabinet-start',machineSlug);
       } catch(e) {}
       if (matchMedia('(prefers-reduced-motion:reduce)').matches) { window.location.href=gameCardUrl(card); return; }
+      // The game page opens on the picture this zoom ends on (shell.js, #launch-frame).
+      var shot=card.querySelector('.card-shot');
+      try { if(shot)sessionStorage.setItem('blip-cabinet-launch',JSON.stringify({slug:machineSlug,at:Date.now(),art:shot.currentSrc||shot.src})); } catch(e) {}
       // The player leans in until the machine's screen fills the view, then the game takes over the glass.
       var room=document.getElementById('jukebox-front'),frame=room.getBoundingClientRect(),glass=card.querySelector('.game-rom').getBoundingClientRect();
       var zoom=Math.max(frame.width/glass.width,frame.height/glass.height);

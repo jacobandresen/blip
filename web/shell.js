@@ -635,7 +635,7 @@ function fillCanvas() {
     w = frame.width - screenInset * 2;
     h = frame.height - screenInset * 2;
   }
-  document.querySelectorAll('.cabinet-glass, #need-coin-overlay').forEach(function(surface) {
+  document.querySelectorAll('.cabinet-glass, #need-coin-overlay, #launch-frame').forEach(function(surface) {
     surface.style.left = gl + 'px'; surface.style.top = screenTop + 'px';
     surface.style.width = w + 'px'; surface.style.height = h + 'px';
   });
@@ -673,6 +673,34 @@ function refit() {
   if (now === key) return;
   lastFit = now;
 }
+// A machine started from the arcade zooms into its screen; the game page opens on that same picture, where the
+// game will draw, and lets the first frame come up through it (blip-cabinet-launch, set by the arcade).
+var launchFrame = (function () {
+  if (CABINET_SCREEN || blipAppMode() || document.documentElement.hasAttribute('data-appstyle')) return null;
+  var launch = null;
+  try {
+    launch = JSON.parse(sessionStorage.getItem('blip-cabinet-launch') || 'null');
+    sessionStorage.removeItem('blip-cabinet-launch');
+  } catch (e) {}
+  if (!launch || !GAME || launch.slug !== GAME.slug || !(Date.now() - launch.at < 15000) || typeof launch.art !== 'string') return null;
+  var art;
+  try { art = new URL(launch.art, location.href); } catch (e) { return null; }
+  if (art.origin !== location.origin) return null;
+  var frame = document.createElement('div');
+  frame.id = 'launch-frame';
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.backgroundImage = 'url("' + art.href.replace(/["\\]/g, '') + '")';
+  document.body.appendChild(frame);
+  return frame;
+}());
+function dropLaunchFrame() {
+  if (!launchFrame) return;
+  var frame = launchFrame;
+  launchFrame = null;
+  frame.classList.add('launch-frame-out');
+  setTimeout(function () { frame.remove(); }, 400);
+}
+
 window.addEventListener('resize', fillCanvas);
 window.addEventListener('orientationchange', function () { setTimeout(fillCanvas, 60); });
 fillCanvas();
@@ -704,6 +732,7 @@ var gameStopped = false;
 function onGameStopped(err) {
   if (gameStopped || typeof WebAssembly === 'undefined' || !(err instanceof WebAssembly.RuntimeError)) return;
   gameStopped = true;
+  dropLaunchFrame();
   if (loader) loader.style.display = 'flex';
   if (statusEl) statusEl.textContent = 'GAME STOPPED';
   if (barInner && barInner.parentNode) barInner.parentNode.style.display = 'none';
@@ -725,6 +754,7 @@ function hideLoader() {
     }
     loader.style.display = 'none';
     fillCanvas();
+    dropLaunchFrame();
     introduceControls();
     if(!CABINET_SCREEN&&!document.querySelector('.blip-hs-modal'))canvas.focus();
   }
