@@ -47,7 +47,7 @@ fn pit() -> Vec<u8> {
     let mut img = Image::new(480, 540);
     for y in 0..540 {
         for x in 0..480 {
-            let [r, g, b] = if y >= 28 && (!(10..470).contains(&x) || y < 38 || y >= 530) {
+            let [r, g, b] = if y >= 28 && (!(10..470).contains(&x) || !(38..530).contains(&y)) {
                 [102, 73, 38]
             } else {
                 [21, 17, 12]

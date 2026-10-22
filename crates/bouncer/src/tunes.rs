@@ -132,8 +132,6 @@ mod tests {
     }
 }
 
-/// Bat cap width in source pixels; the game stretches only the slice
-/// between the caps, so the ends keep their shape at any bat width.
 // ---- effects --------------------------------------------------------------
 // Pitch variants (`v`) keep repeated hits from sounding identical.
 fn paddle_hit(v: usize) -> Vec<u8> {

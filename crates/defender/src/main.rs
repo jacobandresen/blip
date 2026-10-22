@@ -315,10 +315,7 @@ impl Game {
         } else {
             (MAX_PLAYER_BULLETS, MAX_PLAYER_BULLETS + MAX_BOMBS)
         };
-        for i in start..end {
-            if !self.bullets[i].active { return Some(i); }
-        }
-        None
+        (start..end).find(|&i| !self.bullets[i].active)
     }
 
     fn build_shields(&mut self) {
@@ -697,7 +694,7 @@ fn draw_saucer(blip: &Blip, saucer: &Texture2D, x: f32, y: f32, w: f32, h: f32, 
         let k = i + frame;
         let a = k as f32 / UFO_N_LIGHTS as f32 * std::f32::consts::TAU;
         let (lx, ly) = ((cx + a.cos() * rx).round(), (cy + a.sin() * ry).round());
-        let light = if k % 2 == 0 { BlipColor::new(1.0, 0.9, 0.24, tint.a) } else { BlipColor::new(1.0, 1.0, 1.0, tint.a) };
+        let light = if k.is_multiple_of(2) { BlipColor::new(1.0, 0.9, 0.24, tint.a) } else { BlipColor::new(1.0, 1.0, 1.0, tint.a) };
         blip.fill_rect(x + lx * sx, y + (ly - 1.0) * sy, sx, 2.0 * sy, light);
     }
 }
@@ -1515,7 +1512,7 @@ fn draw_play(blip: &Blip, g: &Game,
 
 /// Score multiple for `streak` hits in a row: one more every `STREAK_PER` hits.
 fn streak_multiple(streak: i32) -> i32 {
-    (1 + (streak - 1) / STREAK_PER).max(1).min(STREAK_MAX)
+    (1 + (streak - 1) / STREAK_PER).clamp(1, STREAK_MAX)
 }
 
 /// The strip under the ground line: the run of hits, the multiple it earns, and how many more raise it.

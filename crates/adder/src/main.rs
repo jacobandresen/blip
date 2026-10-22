@@ -305,7 +305,7 @@ fn draw_play(blip: &Blip, g: &Game, pit: &Texture2D) {
             arena::PIT_Y + arena::PIT_H / 2.0, 4.0, if won { HOLE } else { BLIP_RED });
     } else if g.world.banner_t < BANNER {
         let a = (1.0 - g.world.banner_t / BANNER).min(1.0);
-        blip.draw_centered(&format!("ROUND {}", g.world.round), (arena::PIT_Y + arena::PIT_H / 2.0) as f32, 4.0,
+        blip.draw_centered(&format!("ROUND {}", g.world.round), arena::PIT_Y + arena::PIT_H / 2.0, 4.0,
             BlipColor { a, ..HOLE });
     }
     blip.draw_hud(g.world.score_of(0), g.world.lives_of(0));

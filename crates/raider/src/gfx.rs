@@ -1714,9 +1714,6 @@ fn island_sprite(w: i32, h: i32, seed: u32) -> Vec<u8> {
     img.encode_png()
 }
 
-/// Turret cannon shot — a low tonal thump plus a burst of noise, so it reads
-/// as artillery rather than the player's laser-y "pew".
-
 // Offline-rasterized katakana glyphs; the runtime font supports only A–Z and digits.
 
 /// Katakana glyphs needed for the seven boss names, 10 wide x 12 tall.

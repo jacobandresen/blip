@@ -15,6 +15,7 @@ const D: Chord = major(50);
 const F: Chord = major(41);
 const G: Chord = major(43);
 
+/// The invasion: E minor, a march, the flat sixth (F) for the alien touch.
 pub fn invasion_song() -> Song<'static> {
     Song {
         bpm: 126.0,
@@ -70,6 +71,7 @@ pub fn invasion_wav() -> Vec<u8> {
     invasion_song().render()
 }
 
+/// The mothership: A minor, flat out, circling the leading note.
 pub fn mothership_song() -> Song<'static> {
     Song {
         bpm: 158.0,
@@ -150,10 +152,6 @@ fn march_thump(base_freq: f32) -> Vec<u8> {
 }
 
 // Device-synthesized action tracks use saw lead, theremin and galloping bass; boss levels use the faster theme.
-
-/// The invasion: E minor, a march, the flat sixth (F) for the alien touch.
-
-/// The mothership: A minor, flat out, circling the leading note.
 
 /// Game over: the theremin walking down A minor, slowly.
 fn game_over_sfx() -> Vec<u8> {

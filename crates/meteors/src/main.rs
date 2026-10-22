@@ -868,8 +868,6 @@ fn outline(a: &Asteroid, flower: bool) -> Vec<Seg> {
     }
 }
 
-/// A round white blot thinning to nothing at the rim, with no edge to see.
-
 /// A mushroom in thin lines, its cap `w` to each side, leaning by `lean`.
 fn draw_mushroom(blip: &Blip, x: f32, y: f32, w: f32, lean: f32, c: BlipColor) {
     let (s, k) = lean.sin_cos();

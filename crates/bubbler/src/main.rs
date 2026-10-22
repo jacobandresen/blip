@@ -1612,7 +1612,7 @@ fn draw_atmosphere(blip: &Blip, pal: &levels::Palette) {
 fn draw_tiles(blip: &Blip, art: &art::Art, g: &Game, ox: f32, oy: f32) {
     for r in 0..ROWS {
         for c in 0..COLS {
-            if !g.tiles[r][c] && !(c == 0 || c == COLS - 1) {
+            if !(g.tiles[r][c] || c == 0 || c == COLS - 1) {
                 continue;
             }
             let border = c == 0 || c == COLS - 1 || r == 0 || r == ROWS - 1;

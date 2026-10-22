@@ -1144,9 +1144,11 @@ fn stage_clear_sfx() -> Vec<u8> {
 }
 
 // ---------------------------------------------------------------------- //
-// Sprites                                                                  //
+// Guns and engine                                                          //
 // ---------------------------------------------------------------------- //
 
+/// Turret cannon shot — a low tonal thump plus a burst of noise, so it reads
+/// as artillery rather than the player's laser-y "pew".
 fn turret_fire_sfx() -> Vec<u8> {
     let dur_ms = 140.0;
     let n = ms_to_samples(dur_ms);

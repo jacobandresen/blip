@@ -39,6 +39,7 @@ fn title_grid() -> Vec<u8> {
     image.encode_png()
 }
 
+/// A round white blot thinning to nothing at the rim, with no edge to see.
 pub(crate) fn soft_glow() -> Vec<u8> {
     let mut image = Image::new(64, 64);
     for y in 0..64i32 {

@@ -3,6 +3,8 @@ use std::f32::consts::PI;
 use blip::image::Image;
 use blip::Asset;
 
+/// Bat cap width in source pixels; the game stretches only the slice
+/// between the caps, so the ends keep their shape at any bat width.
 pub const PADDLE_CAP: u32 = 12;
 
 /// Brushed-steel bar (drawn 2x) with a glossy blue top face and dark rubber
