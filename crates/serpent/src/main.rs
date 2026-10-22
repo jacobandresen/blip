@@ -398,8 +398,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.move_timer += dt * 1000.0;
     if g.move_timer < g.move_interval() { return; }
     g.move_timer -= g.move_interval();
-    g.cur_dir = g.take_turn();
+    step_snake(g, sfx);
+}
 
+/// One step: the next turn, then the new head crashes, collects and eats.
+fn step_snake(g: &mut Game, sfx: &Sounds) {
+    g.cur_dir = g.take_turn();
     let mut h = g.snake_at(0);
     match g.cur_dir {
         Dir::Up => h.r -= 1,
@@ -407,40 +411,53 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         Dir::Left => h.c -= 1,
         Dir::Right => h.c += 1,
     }
-
-    let mut dead = h.c < 0 || h.c >= COLS || h.r < 0 || h.r >= ROWS;
-    if !dead {
-        for i in 0..g.snake_len.saturating_sub(1) {
-            let b = g.snake_at(i);
-            if b.c == h.c && b.r == h.r { dead = true; break; }
-        }
-    }
-    if !dead {
-        for i in 0..g.obstacle_count {
-            if g.obs_fade < 1.0 { break; }
-            if g.obstacles[i].c == h.c && g.obstacles[i].r == h.r { dead = true; break; }
-        }
-    }
-    if dead {
-        let why = if h.c < 0 || h.c >= COLS || h.r < 0 || h.r >= ROWS { "wall" }
-            else if g.obs_fade >= 1.0 && g.obstacles[..g.obstacle_count].contains(&h) { "obstacle" } else { "self" };
-        blip::bot::add(&format!("death_{why}"), 1.0);
-        blip::bot::add(&format!("death_len{}", g.snake_len / 10 * 10), 1.0);
-        let (x, y) = cell_centre(g.snake_at(0));
-        g.fx.burst(x, y, 16, 140.0, BLIP_RED);
-        play_sfx(&sfx.game_over);
-        match g.sess.lose_life() {
-            LifeResult::StillAlive => { g.dead_timer.start(1.5); g.state = State::Dead; }
-            LifeResult::GameOver   => {
-                g.dead_timer.start(GAME_OVER_MIN_WAIT);
-                g.state = State::Over;
-                web::report_score(g.sess.score);
-            }
-        }
+    if let Some(why) = check_crash(g, h) {
+        lose_life(g, sfx, why);
         return;
     }
+    // Before the level check so the bonus scores at the level it was offered on.
+    collect_pickups(g, h, sfx);
+    let ate = h == g.food;
+    let offers = if ate { eat_food(g, h, sfx) } else { (false, false) };
+    g.steps_since_food += 1;
+    for k in g.gulps.iter_mut() { *k += 1.0; }
+    let len = g.snake_len as f32;
+    g.gulps.retain(|&k| k < len);
 
-    // Before the level check so it scores at the level it was offered on.
+    // The body follows the head; eating leaves the tail where it was.
+    g.snake_head = (g.snake_head + MAX_LEN - 1) % MAX_LEN;
+    g.snake[g.snake_head] = h;
+    if ate && g.snake_len < MAX_LEN { g.snake_len += 1; }
+    if ate { spawn_after_meal(g, offers, sfx); }
+}
+
+/// What the head at `h` runs into, if anything: a wall, the body, or a
+/// settled obstacle.
+fn check_crash(g: &Game, h: Cell) -> Option<&'static str> {
+    if h.c < 0 || h.c >= COLS || h.r < 0 || h.r >= ROWS { return Some("wall"); }
+    if (0..g.snake_len.saturating_sub(1)).any(|i| g.snake_at(i) == h) { return Some("self"); }
+    if g.obs_fade >= 1.0 && g.obstacles[..g.obstacle_count].contains(&h) { return Some("obstacle"); }
+    None
+}
+
+fn lose_life(g: &mut Game, sfx: &Sounds, why: &str) {
+    blip::bot::add(&format!("death_{why}"), 1.0);
+    blip::bot::add(&format!("death_len{}", g.snake_len / 10 * 10), 1.0);
+    let (x, y) = cell_centre(g.snake_at(0));
+    g.fx.burst(x, y, 16, 140.0, BLIP_RED);
+    play_sfx(&sfx.game_over);
+    match g.sess.lose_life() {
+        LifeResult::StillAlive => { g.dead_timer.start(1.5); g.state = State::Dead; }
+        LifeResult::GameOver   => {
+            g.dead_timer.start(GAME_OVER_MIN_WAIT);
+            g.state = State::Over;
+            web::report_score(g.sess.score);
+        }
+    }
+}
+
+/// The bonus scores; the shears cut the tail, a puff per segment.
+fn collect_pickups(g: &mut Game, h: Cell, sfx: &Sounds) {
     if g.bonus_active() && h == g.bonus {
         play_sfx(&sfx.bonus_eat);
         blip::bot::add("bonus_eaten", 1.0);
@@ -450,12 +467,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.fx.popup(x, y - 10.0, &format!("+{}", BONUS_VALUE * g.sess.level), GOLD);
         g.bonus_ttl = 0.0;
     }
-
     if g.shears_active() && h == g.shears {
         play_sfx(&sfx.bonus_eat);
         blip::bot::add("shears", 1.0);
         g.shears_ttl = 0.0;
-        // The tail end goes, in a puff per segment.
         let cut = SHEARS_CUT.min(g.snake_len.saturating_sub(3));
         for k in 0..cut {
             let (x, y) = cell_centre(g.snake_at(g.snake_len - 1 - k));
@@ -465,62 +480,54 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         let (x, y) = cell_centre(h);
         g.fx.popup(x, y - 10.0, "SNIP", SHEARS_BLUE);
     }
+}
 
-    let ate = h.c == g.food.c && h.r == g.food.r;
-    let mut offer_shears = false;
-    let mut offer_bonus = false;
-    if ate {
-        play_sfx(&sfx.eat);
-        g.gulps.push(0.0);
-        g.streak = if g.steps_since_food <= STREAK_STEPS { (g.streak + 1).min(STREAK_MAX) } else { 1 };
-        g.steps_since_food = 0;
-        let points = 10 * g.sess.level * g.streak;
-        g.sess.add_score(points);
-        let (x, y) = cell_centre(h);
-        g.fx.ring(x, y, CELL as f32 * 1.3, 0.3, BlipColor { r: 1.0, g: 0.85, b: 0.4, a: 1.0 });
-        if g.streak > 1 {
-            g.fx.popup(x, y - 10.0, &format!("+{points} X{}", g.streak), GOLD);
-        } else {
-            g.fx.popup(x, y - 10.0, &format!("+{points}"), BLIP_WHITE);
-        }
-        g.foods_eaten += 1;
-        // One bonus per level, mid-level, away from the level change.
-        if g.foods_eaten == 1 && g.sess.level % 2 == 0 && g.snake_len >= SHEARS_FROM && !g.shears_active() {
-            offer_shears = true;
-        }
-        if g.foods_eaten % BONUS_EVERY == 0 && !g.bonus_active() {
-            offer_bonus = true;
-        }
-        if g.foods_eaten >= FOODS_PER_LVL {
-            g.sess.next_level();
-            g.raise_obstacles();
-            g.banner_t = 0.0;
-            blip::bot::set("level", g.sess.level as f64);
-            blip::bot::set(&format!("t_level{}", g.sess.level), blip::bot::clock() as f64);
-            play_sfx(&sfx.level);
-            g.foods_eaten = 0;
-        }
+/// Points, more for a streak of quick meals; returns whether the meal earns
+/// the shears and the bonus.
+fn eat_food(g: &mut Game, h: Cell, sfx: &Sounds) -> (bool, bool) {
+    play_sfx(&sfx.eat);
+    g.gulps.push(0.0);
+    g.streak = if g.steps_since_food <= STREAK_STEPS { (g.streak + 1).min(STREAK_MAX) } else { 1 };
+    g.steps_since_food = 0;
+    let points = 10 * g.sess.level * g.streak;
+    g.sess.add_score(points);
+    let (x, y) = cell_centre(h);
+    g.fx.ring(x, y, CELL as f32 * 1.3, 0.3, BlipColor { r: 1.0, g: 0.85, b: 0.4, a: 1.0 });
+    if g.streak > 1 {
+        g.fx.popup(x, y - 10.0, &format!("+{points} X{}", g.streak), GOLD);
+    } else {
+        g.fx.popup(x, y - 10.0, &format!("+{points}"), BLIP_WHITE);
     }
-    g.steps_since_food += 1;
-    for k in g.gulps.iter_mut() { *k += 1.0; }
-    let len = g.snake_len as f32;
-    g.gulps.retain(|&k| k < len);
+    g.foods_eaten += 1;
+    // One shears per level, mid-level, away from the level change.
+    let shears = g.foods_eaten == 1 && g.sess.level % 2 == 0 && g.snake_len >= SHEARS_FROM && !g.shears_active();
+    let bonus = g.foods_eaten % BONUS_EVERY == 0 && !g.bonus_active();
+    if g.foods_eaten >= FOODS_PER_LVL { next_level(g, sfx); }
+    (shears, bonus)
+}
 
-    g.snake_head = (g.snake_head + MAX_LEN - 1) % MAX_LEN;
-    g.snake[g.snake_head] = h;
-    if ate && g.snake_len < MAX_LEN { g.snake_len += 1; }
-    if ate {
-        if offer_shears { g.spawn_shears(); }
-        if offer_bonus {
-            g.spawn_bonus();
-            blip::bot::add("bonus_offered", 1.0);
-            play_sfx(&sfx.bonus);
-        }
-        if !g.spawn_food() {
-            g.state = State::Over;
-            g.dead_timer.start(GAME_OVER_MIN_WAIT);
-            web::report_score(g.sess.score);
-        }
+fn next_level(g: &mut Game, sfx: &Sounds) {
+    g.sess.next_level();
+    g.raise_obstacles();
+    g.banner_t = 0.0;
+    blip::bot::set("level", g.sess.level as f64);
+    blip::bot::set(&format!("t_level{}", g.sess.level), blip::bot::clock() as f64);
+    play_sfx(&sfx.level);
+    g.foods_eaten = 0;
+}
+
+/// What the meal earned, then the next food; a full board ends the game.
+fn spawn_after_meal(g: &mut Game, (shears, bonus): (bool, bool), sfx: &Sounds) {
+    if shears { g.spawn_shears(); }
+    if bonus {
+        g.spawn_bonus();
+        blip::bot::add("bonus_offered", 1.0);
+        play_sfx(&sfx.bonus);
+    }
+    if !g.spawn_food() {
+        g.state = State::Over;
+        g.dead_timer.start(GAME_OVER_MIN_WAIT);
+        web::report_score(g.sess.score);
     }
 }
 
@@ -626,22 +633,8 @@ fn draw_snake(blip: &Blip, g: &Game) {
 
 fn draw_play(blip: &Blip, g: &Game, food: &Texture2D) {
     draw_board(blip);
-    // A new layout blinks in, see-through, until it is solid.
-    let solid = g.obs_fade >= 1.0;
-    let a = if solid { 1.0 } else if (g.obs_fade * 8.0) as i32 % 2 == 0 { 0.55 } else { 0.25 };
-    for i in 0..g.obstacle_count {
-        let obs = g.obstacles[i];
-        let (x, y) = ((obs.c * CELL) as f32, (HUD_H + obs.r * CELL) as f32);
-        blip.fill_rect(x + 1.0, y + 1.0, CELL as f32 - 2.0, CELL as f32 - 2.0, BlipColor { a, ..BLIP_GRAY });
-        blip.fill_rect(x + 1.0, y + 1.0, CELL as f32 - 2.0, 3.0, BlipColor { r: 0.75, g: 0.75, b: 0.75, a });
-    }
-    // Food breathes a little so the eye finds it.
-    let breathe = 1.0 + 0.08 * (blip::macroquad::time::get_time() as f32 * 5.0).sin();
-    let fs = CELL as f32 * breathe;
-    let (fcx, fcy) = ((g.food.c * CELL) as f32 + CELL as f32 / 2.0, (HUD_H + g.food.r * CELL) as f32 + CELL as f32 / 2.0);
-    blip.draw_texture(food, fcx - fs / 2.0, fcy - fs / 2.0, fs, fs);
-    draw_bonus(blip, g);
-    draw_shears(blip, g);
+    draw_pickups(blip, g, food);
+    draw_obstacles(blip, g);
     draw_snake(blip, g);
     g.fx.draw(blip);
     if g.banner_t < BANNER_SECS && g.state == State::Play {
@@ -651,6 +644,28 @@ fn draw_play(blip: &Blip, g: &Game, food: &Texture2D) {
             BlipColor { a: a.min(1.0), ..BLIP_YELLOW });
     }
     blip.draw_hud(g.sess.score, g.sess.lives);
+}
+
+/// A new layout blinks in, see-through, until it is solid.
+fn draw_obstacles(blip: &Blip, g: &Game) {
+    let solid = g.obs_fade >= 1.0;
+    let a = if solid { 1.0 } else if (g.obs_fade * 8.0) as i32 % 2 == 0 { 0.55 } else { 0.25 };
+    for i in 0..g.obstacle_count {
+        let obs = g.obstacles[i];
+        let (x, y) = ((obs.c * CELL) as f32, (HUD_H + obs.r * CELL) as f32);
+        blip.fill_rect(x + 1.0, y + 1.0, CELL as f32 - 2.0, CELL as f32 - 2.0, BlipColor { a, ..BLIP_GRAY });
+        blip.fill_rect(x + 1.0, y + 1.0, CELL as f32 - 2.0, 3.0, BlipColor { r: 0.75, g: 0.75, b: 0.75, a });
+    }
+}
+
+/// The food, breathing a little so the eye finds it; the bonus and the shears.
+fn draw_pickups(blip: &Blip, g: &Game, food: &Texture2D) {
+    let breathe = 1.0 + 0.08 * (blip::macroquad::time::get_time() as f32 * 5.0).sin();
+    let fs = CELL as f32 * breathe;
+    let (fcx, fcy) = ((g.food.c * CELL) as f32 + CELL as f32 / 2.0, (HUD_H + g.food.r * CELL) as f32 + CELL as f32 / 2.0);
+    blip.draw_texture(food, fcx - fs / 2.0, fcy - fs / 2.0, fs, fs);
+    draw_bonus(blip, g);
+    draw_shears(blip, g);
 }
 
 /// The timed bonus: shrinks with its clock (drawn in-world, where the
