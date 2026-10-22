@@ -354,7 +354,7 @@ impl Game {
     /// The ladder: every other fighter, once. Round the roster from the pick,
     /// reordered so no two fights running are at the same home stage, with
     /// the giant and then the fighter nothing hurts kept for the end.
-    pub(crate) fn ladder(&self) -> [usize; RUNGS] {
+    pub(crate) fn build_ladder(&self) -> [usize; RUNGS] {
         let n = FIGHTERS.len();
         let homes: [usize; 10] = std::array::from_fn(home_of);
         let mut ends: Vec<usize> = (0..n)
@@ -471,7 +471,7 @@ impl Game {
     /// stage, the difficulty, round one.
     pub(crate) fn start_match(&mut self, opponent_index: usize) {
         self.opponent_index = opponent_index;
-        let foe = self.ladder()[opponent_index];
+        let foe = self.build_ladder()[opponent_index];
         self.stage = home_of(foe);
         // Below zero the CPU also hesitates (see cpu_think): the first fights
         // are ones a newcomer can win. The dial climbs evenly to the last,

@@ -385,7 +385,7 @@ pub(crate) fn playtest_5_one_player_mode_is_untouched() {
     assert_eq!(g.pick, before, "player two's keys moved the solo cursor");
     update_menus(&mut g, [press(false, false, true), NOTHING]);
     assert_eq!(g.state, State::Vs, "the solo game would not start");
-    assert_eq!(g.p[1].who, g.ladder()[0], "the solo ladder picked the wrong opponent");
+    assert_eq!(g.p[1].who, g.build_ladder()[0], "the solo ladder picked the wrong opponent");
 }
 
 #[test]

@@ -548,7 +548,7 @@ pub(crate) fn draw_vs(blip: &Blip, g: &Game) {
     let (cw, gap) = (40.0, 6.0);
     let x0 = (w - RUNGS as f32 * cw - (RUNGS as f32 - 1.0) * gap) / 2.0;
     let y0 = 342.0;
-    for (rung, foe) in g.ladder().into_iter().enumerate() {
+    for (rung, foe) in g.build_ladder().into_iter().enumerate() {
         let a = &FIGHTERS[foe];
         let x = x0 + rung as f32 * (cw + gap);
         let (beaten, next) = (rung < g.opponent_index, rung == g.opponent_index);

@@ -8,7 +8,7 @@ use super::*;
 pub(crate) fn the_ladder_is_everybody_else_once() {
     let boss = FIGHTERS.iter().position(|a| a.invincible).unwrap();
     for pick in 0..FIGHTERS.len() {
-        let ladder = Game { pick, ..Game::new() }.ladder();
+        let ladder = Game { pick, ..Game::new() }.build_ladder();
         assert_eq!(ladder.len(), FIGHTERS.len() - 1);
         let mut met = ladder.to_vec();
         met.sort();
@@ -29,7 +29,7 @@ pub(crate) fn every_fight_is_at_the_opponents_home_and_every_stage_is_somebodys(
     // No ladder has two fights running in one place, whoever climbs it.
     for pick in 0..FIGHTERS.len() {
         let mut g = Game { pick, ..Game::new() };
-        let ladder = g.ladder();
+        let ladder = g.build_ladder();
         let mut seen = vec![];
         for (rung, foe) in ladder.into_iter().enumerate() {
             g.start_match(rung);

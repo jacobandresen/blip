@@ -169,7 +169,7 @@ pub(crate) fn every_round_is_decided_by_something_that_happened() {
                     let r = fight_round(pick, foe, style);
                     rounds += 1;
                     if !r.timed_out { decided_fast += 1; }
-                    let cpu_who = Game { pick, ..Game::new() }.ladder()[foe];
+                    let cpu_who = Game { pick, ..Game::new() }.build_ladder()[foe];
                     let both_healthy = r.player_health as f32
                             > FIGHTERS[pick].health as f32 * 0.55
                         && r.cpu_health as f32 > FIGHTERS[cpu_who].health as f32 * 0.55;
@@ -204,7 +204,7 @@ pub(crate) fn playing_well_beats_playing_badly() {
         // Every rung with such an opponent on it: two rungs alone are
         // mostly turtles.
         for foe in 0..RUNGS - 1 {
-            if !spaces(Game { pick, ..Game::new() }.ladder()[foe]) { continue; }
+            if !spaces(Game { pick, ..Game::new() }.build_ladder()[foe]) { continue; }
             let r = fight_round(pick, foe, rusher);
             rush_margin += r.player_health - r.cpu_health;
             let p = fight_round(pick, foe, poker);
