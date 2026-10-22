@@ -80,7 +80,7 @@ body.info-page .manual-leaf .inline-link {color:#85512e;border-bottom-color:#ad8
 .manual-open-spine {z-index:3;background:linear-gradient(90deg,#4a3528,#201715 42%,#a47b49 49%,#33221c 58%,#5c3e2b);box-shadow:-3px 0 7px #100b0baa,3px 0 8px #100b0baa;}
 .manual-paper-mark {color:#8c6c42;font:700 9px/1.5 'Courier New',monospace;letter-spacing:.17em}
 .manual-open-left h1 {margin:clamp(35px,8vh,90px) 0 22px;color:#513924;font:900 clamp(39px,7vw,82px)/.86 Georgia,serif;letter-spacing:.07em;text-shadow:0 1px #fff8e4,0 3px #8a704333}
-.manual-rule {width:74%;height:3px;background:linear-gradient(90deg,#8c6038,#bd9a62,transparent);box-shadow:0 1px #fff7df}
+
 .manual-open-left h2 {margin:clamp(30px,6vh,66px) 0 18px;color:#8f653c;font:700 11px/1 'Courier New',monospace;letter-spacing:.25em}
 .manual-contents {display:grid;gap:17px;margin:0;padding:0;list-style:none;counter-reset:none}
 .manual-contents li {display:flex;gap:11px;align-items:baseline;padding-bottom:7px;border-bottom:1px solid #856c4b44;color:#544531;font:700 clamp(9px,1vw,12px)/1.4 'Courier New',monospace;letter-spacing:.08em}
@@ -114,7 +114,7 @@ body.info-page .manual-leaf .inline-link {color:#85512e;border-bottom-color:#ad8
   .manual-open-book {grid-template-columns:1fr;grid-template-rows:minmax(100px,18%) 9px minmax(0,1fr);width:100%;height:min(94vh,900px);min-height:0;padding:8px;border-radius:7px}
   .manual-open-left {padding:13px 18px 10px;border-radius:4px 4px 0 0;}
   .manual-paper-mark {font-size:7px}
-  .manual-rule,.manual-stamp,.manual-footnote {display:none}
+  .manual-stamp,.manual-footnote {display:none}
   .manual-open-left h2 {position:absolute;left:18px;top:31px;margin:0;font-size:8px}
   .manual-contents {position:absolute;left:18px;right:28px;top:46px;grid-template-columns:1fr;gap:1px}
   .manual-contents li {gap:7px;padding-bottom:0;border:0;font:italic 10px/1.35 Georgia,serif;white-space:nowrap}
@@ -142,7 +142,7 @@ body.info-page .manual-leaf .inline-link {color:#85512e;border-bottom-color:#ad8
 .manual-open-spine {background:linear-gradient(90deg,#aba89b,#69675b 20%,#302f29 48%,#565449 70%,#b5b2a4);box-shadow:-4px 0 12px #23221b55,4px 0 12px #23221b55}
 .manual-paper-mark,.manual-open-left h2,.manual-page-number,.manual-page-number b {color:#66665d}
 .manual-open-left h1,.manual-page-content h1 {color:#292a26;text-shadow:0 1px #fff9e8,0 2px #34342d22}
-.manual-rule {background:linear-gradient(90deg,#55564e,#8c8a7d,transparent);box-shadow:0 1px #fff}
+
 .manual-contents li {border-bottom-color:#5c5b5130;color:#393a35}
 .manual-contents li > span {display:flex;flex:1;align-items:baseline;gap:7px;min-width:0;white-space:nowrap}
 .manual-contents li > span i {flex:1;border-bottom:1px dotted #747267}
@@ -165,7 +165,7 @@ body.info-page .manual-leaf {filter:grayscale(1)}
 .manual-leaf-sheet {height:100%;overflow:hidden;padding:clamp(18px,3vw,40px) clamp(20px,4vw,58px) 44px;color:#33342f;background:transparent}
 .manual-leaf-sheet > section {margin:0 0 10px}
 .manual-leaf-sheet .divider {display:none}
-.manual-leaf-sheet .manual-running-head {margin:0 0 12px;padding-bottom:6px;border-bottom:1px solid #77766a;color:#66665d;font:700 9px/1 'Courier New',monospace;letter-spacing:.17em}
+
 .manual-page-content img {filter:grayscale(1) contrast(.9)}
 .manual-page-content table {width:100%;border-collapse:collapse;margin:7px 0 12px;font:12px/1.4 'Courier New',monospace}
 .manual-page-content td {padding:5px 6px;border-bottom:1px solid #77766a55;color:#33342f}
@@ -185,7 +185,7 @@ body.info-page .manual-leaf {filter:grayscale(1)}
 .manual-page-content .manual-chapter-deck {margin:0 0 20px;font:italic 14px/1.5 Georgia,serif;color:#66665d}
 .manual-page-content h3 {margin:18px 0 9px;font:700 18px/1.2 Georgia,serif;letter-spacing:0;color:#33342f}
 .manual-page-content .section-label,.manual-page-content .thoughts-label,.manual-page-content .impl-label {margin:16px 0 8px;font:italic 700 15px/1.3 Georgia,serif;letter-spacing:0;color:#41423c}
-.manual-page-content .manual-running-head {font:italic 10px/1.2 Georgia,serif;letter-spacing:.08em}
+
 .manual-footnote {font:italic 11px/1.4 Georgia,serif}
 .manual-footnote::first-letter {font-size:9px}
 @media(max-width:700px) {

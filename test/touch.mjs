@@ -77,7 +77,7 @@ test('Serpent: a swipe on the strip steers, a longer drag chains turns, a tap st
   assert.equal(await p.keys(), '+ArrowRight -ArrowRight', 'a diagonal turns along its longer side');
 });
 
-for (const slug of ['bouncer', 'galactic_defender']) {
+for (const slug of ['bouncer', 'defender']) {
   test(`${slug}: the strip spans the whole width of the picture`, async (t) => {
     const p = await phone(t, slug);
     const { x, y, w, h } = await p.strip();
@@ -200,7 +200,7 @@ test('a long press raises no context menu, except in a text field', async (t) =>
 
 for (const held of [true, false]) {
   test(`fullscreen ${held ? 'stays on the game while a finger is held down' : 'returns to the cabinet after two idle minutes'}`, async (t) => {
-    const p = await phone(t, 'galactic_defender');
+    const p = await phone(t, 'defender');
     await p.page.evaluate(() => blipSetFullscreen(true));
     await p.page.clock.install();
     const { x, y, w, h } = await p.strip();
@@ -208,14 +208,14 @@ for (const held of [true, false]) {
     await p.page.clock.fastForward(180000);
     if (held) {
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      assert.match(p.page.url(), /galactic_defender/);
+      assert.match(p.page.url(), /defender/);
     } else {
-      await p.page.waitForURL((url) => !url.pathname.includes('galactic_defender'), { timeout: 10000 });
+      await p.page.waitForURL((url) => !url.pathname.includes('defender'), { timeout: 10000 });
     }
   });
 }
 
-for (const slug of ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler', 'adder']) {
+for (const slug of ['serpent', 'bouncer', 'rally', 'defender', 'meteors', 'raider', 'brawler', 'bubbler', 'adder']) {
   test(`${slug} keeps running when the clock jumps back and then a long way forward`, async (t) => {
     const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 390, height: 844 } });
     await page.goto(`${origin}/${slug}/index.html`);
@@ -227,7 +227,7 @@ for (const slug of ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors
   });
 }
 
-for (const slug of ['bouncer', 'galactic_defender']) {
+for (const slug of ['bouncer', 'defender']) {
   test(`${slug}: a second finger does not take the ship from the first, or drop it on lifting`, async (t) => {
     const p = await phone(t, slug);
     const { x, y, w, h } = await p.strip();
@@ -273,7 +273,7 @@ async function cardSettled(page) {
   await page.waitForFunction(() => document.getElementById('controls-card').getAnimations().length === 0);
 }
 
-const SLUGS = ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler', 'adder'];
+const SLUGS = ['serpent', 'bouncer', 'rally', 'defender', 'meteors', 'raider', 'brawler', 'bubbler', 'adder'];
 for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
   test(`on ${label} the controls card stays away until its button is pressed, then shows every control`, async (t) => {
     const size = phoneish ? { width: 390, height: 844 } : { width: 1280, height: 800 };

@@ -3,16 +3,15 @@ resolver = "2"
 members = [
     "crates/blip",
     "crates/blip_font",
-    "crates/blip_assets",
     "crates/blip_basic",
     "crates/serpent",
     "crates/bouncer",
     "crates/brawler",
     "crates/bubbler",
-    "crates/galactic_defender",
+    "crates/defender",
     "crates/rally",
     "crates/meteors",
-    "crates/sky_raider",
+    "crates/raider",
     "crates/adder",
 ]
 
@@ -27,7 +26,6 @@ macroquad = { version = "0.4", features = ["audio"] }
 png = "0.17"
 blip = { path = "crates/blip" }
 blip_font = { path = "crates/blip_font" }
-blip_assets = { path = "crates/blip_assets" }
 
 [profile.release]
 opt-level = "z"
@@ -36,7 +34,12 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
-# The synthesis crate renders music on the device at load: speed matters more
-# there than the few kilobytes "z" saves.
-[profile.release.package.blip_assets]
+# BLIP BASIC interprets every statement of a program each frame: speed there
+# is frames drawn on time, worth more than the bytes "z" saves.
+[profile.release.package.blip_basic]
+opt-level = 3
+
+# blip synthesises the games' music on the device at load: speed there
+# is worth more than the bytes "z" saves.
+[profile.release.package.blip]
 opt-level = 3

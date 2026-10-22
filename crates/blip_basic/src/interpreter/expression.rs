@@ -42,18 +42,20 @@ struct Expr<'p, 'b> {
 impl Expr<'_, '_> {
     fn expr(&mut self, min: u8) -> Result<Value, String> {
         let mut left = self.atom()?;
+        // A handle on the tokens, so reading them needs no copies.
+        let tokens = Arc::clone(&self.tokens);
         loop {
-            let op = match self.tokens.get(self.at) {
-                Some(Token::Op(op)) => op.clone(),
-                Some(Token::Name(n)) if n == "AND" || n == "OR" => n.clone(),
+            let op: &str = match tokens.get(self.at) {
+                Some(Token::Op(op)) => op,
+                Some(Token::Name(n)) if n == "AND" || n == "OR" || n == "MOD" => n,
                 _ => break,
             };
-            let prec = match op.as_str() {
+            let prec = match op {
                 "OR" => 1,
                 "AND" => 2,
                 "=" | "==" | "<>" | "<" | ">" | "<=" | ">=" => 3,
                 "+" | "-" => 4,
-                "*" | "/" => 5,
+                "*" | "/" | "MOD" => 5,
                 _ => 0,
             };
             if prec < min {
@@ -61,7 +63,7 @@ impl Expr<'_, '_> {
             }
             self.at += 1;
             let right = self.expr(prec + 1)?;
-            left = match op.as_str() {
+            left = match op {
                 "+" if matches!(left, Value::Str(_)) || matches!(right, Value::Str(_)) => {
                     Value::Str(left.string() + &right.string())
                 }
@@ -69,6 +71,11 @@ impl Expr<'_, '_> {
                 "-" => Value::Num(left.number() - right.number()),
                 "*" => Value::Num(left.number() * right.number()),
                 "/" => Value::Num(left.number() / right.number()),
+                // Floored: -1 MOD 8 is 7, so a wrapped position never goes negative.
+                "MOD" => {
+                    let (a, b) = (left.number(), right.number());
+                    Value::Num(a - b * (a / b).floor())
+                }
                 "=" | "==" => Value::Num((left == right) as u8 as f64),
                 "<>" => Value::Num((left != right) as u8 as f64),
                 "<" => Value::Num((left.number() < right.number()) as u8 as f64),
@@ -83,15 +90,12 @@ impl Expr<'_, '_> {
         Ok(left)
     }
     fn atom(&mut self) -> Result<Value, String> {
-        let token = self
-            .tokens
-            .get(self.at)
-            .cloned()
-            .ok_or("Expression expected")?;
+        let tokens = Arc::clone(&self.tokens);
+        let token = tokens.get(self.at).ok_or("Expression expected")?;
         self.at += 1;
         match token {
-            Token::Num(n) => Ok(Value::Num(n)),
-            Token::Str(s) => Ok(Value::Str(s)),
+            Token::Num(n) => Ok(Value::Num(*n)),
+            Token::Str(s) => Ok(Value::Str(s.clone())),
             Token::Op(op) if op == "-" => Ok(Value::Num(-self.atom()?.number())),
             Token::Op(op) if op == "+" => Ok(Value::Num(self.atom()?.number())),
             Token::LParen => {
@@ -99,7 +103,7 @@ impl Expr<'_, '_> {
                 self.need_rparen()?;
                 Ok(v)
             }
-            Token::Name(name) => self.name(&name),
+            Token::Name(name) => self.name(name),
             _ => Err("Expression expected".into()),
         }
     }
@@ -142,6 +146,9 @@ impl Expr<'_, '_> {
     }
 
     fn call(&mut self, name: &str, args: &[Value]) -> Result<Value, String> {
+        if self.program.functions.contains_key(name) {
+            return self.program.call_function(name, args, self.blip);
+        }
         if shared_math::contains(name) {
             if args.iter().any(|arg| !matches!(arg, Value::Num(_))) {
                 return Err(format!("{name} needs numeric arguments"));
@@ -160,12 +167,21 @@ impl Expr<'_, '_> {
             "SQR" => Value::Num(first.number().sqrt()),
             "SIN" => Value::Num(first.number().sin()),
             "COS" => Value::Num(first.number().cos()),
+            "TAN" => Value::Num(first.number().tan()),
+            "EXP" => Value::Num(first.number().exp()),
+            "LOG" => Value::Num(first.number().ln()),
+            "SGN" => Value::Num(first.number().signum() * (first.number() != 0.0) as u8 as f64),
+            "FIX" => Value::Num(first.number().trunc()),
             "RND" => Value::Num(
                 self.program
                     .random(args.first().map(Value::number).unwrap_or(1.0)),
             ),
             "STR$" => Value::Str(first.string()),
             "LEN" => Value::Num(first.string().chars().count() as f64),
+            "MID$" | "LEFT$" | "RIGHT$" => Value::Str(substring(name, &first.string(), args)),
+            "VAL" => Value::Num(leading_number(&first.string())),
+            "ASC" => Value::Num(first.string().chars().next().map_or(0.0, |c| c as u32 as f64)),
+            "CHR$" => Value::Str(char::from_u32(first.number() as u32).map(String::from).unwrap_or_default()),
             "COLOR" => {
                 if !(3..=4).contains(&args.len()) {
                     return Err("COLOR needs red,green,blue[,alpha]".into());
@@ -236,4 +252,30 @@ fn key_code(name: &str) -> Result<macroquad::input::KeyCode, String> {
         "BUTTON2" | "Z" => BLIP_KEY_BUTTON2,
         _ => return Err(format!("Unknown key {name}")),
     })
+}
+
+/// `MID$(S$, START[, LENGTH])` counts from 1; `LEFT$` and `RIGHT$` take a length.
+fn substring(name: &str, text: &str, args: &[Value]) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let count = |i: usize, default: usize| args.get(i).map_or(default, |v| v.number().max(0.0) as usize);
+    let (from, length) = match name {
+        "LEFT$" => (0, count(1, 0)),
+        "RIGHT$" => {
+            let length = count(1, 0).min(chars.len());
+            (chars.len() - length, length)
+        }
+        _ => (count(1, 1).max(1) - 1, count(2, chars.len())),
+    };
+    chars.iter().skip(from).take(length).collect()
+}
+
+/// `VAL("12.5KG")` is 12.5, as in Amiga BASIC; text that starts with no number is 0.
+fn leading_number(text: &str) -> f64 {
+    let text = text.trim_start();
+    let end = text
+        .char_indices()
+        .take_while(|&(i, c)| c.is_ascii_digit() || c == '.' || (i == 0 && (c == '-' || c == '+')))
+        .last()
+        .map_or(0, |(i, c)| i + c.len_utf8());
+    (1..=end).rev().find_map(|n| text[..n].parse().ok()).unwrap_or(0.0)
 }

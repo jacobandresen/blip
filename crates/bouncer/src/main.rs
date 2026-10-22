@@ -11,11 +11,14 @@ use blip::macroquad::texture::Texture2D;
 use blip::{
     GAME_OVER_MIN_WAIT,
     load_png, load_png_smooth,
-    clamp, Fx, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, web,
+    clamp, Fx, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rects_overlap, segment_rect_overlap, web,
     window_conf, Blip, BlipColor, LifeResult, Pooled, Session, Timer, rand_range_f32, BLIP_BLACK, BLIP_CYAN,
     BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
+mod tunes;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
 mod levels;
@@ -53,14 +56,14 @@ const PAD_SPEED_TOUCH: f32 = PAD_SPEED * (1.0 + DASH_BOOST);
 
 const BALL_W: i32 = 18;
 const BALL_H: i32 = 18;
-const BALL_YAW_N: u32 = 12; // sheet layout: must match blip_assets::bouncer
+const BALL_YAW_N: u32 = 12; // sheet layout: must match gfx.rs
 const BALL_PITCH_N: u32 = 19;
 const BALL_SPEED_0: f32 = 240.0;
 const BALL_SPEED_MAX: f32 = 420.0;
 
 // ---- loot drops -------------------------------------------------------
 const MAX_DROPS: usize = 8;
-const PADDLE_CAP: u32 = 12; // must match blip_assets::bouncer
+const PADDLE_CAP: u32 = 12; // must match gfx.rs
 const DROP_W: f32 = 32.0;
 const DROP_H: f32 = 18.0;
 const DROP_SPEED: f32 = 120.0;
@@ -526,13 +529,15 @@ fn fly_ball(g: &mut Game, dt: f32, active_speed: f32, sfx: &Sounds) -> bool {
     let speed = g.ball_vx.hypot(g.ball_vy).max(1.0);
     let substeps = ((speed * dt / (BALL_W as f32 * 0.4)).ceil() as i32).clamp(1, 8);
     let sdt = dt / substeps as f32;
+    let pad_start_x = g.pad_x - g.pad_vx * dt;
 
-    for _ in 0..substeps {
+    for step in 0..substeps {
         g.ball_x += g.ball_vx * sdt;
         g.ball_y += g.ball_vy * sdt;
 
         ball_walls(g, sfx);
-        ball_paddle(g, active_speed, sfx);
+        let pad_x = pad_start_x + g.pad_vx * dt * (step as f32 + 0.5) / substeps as f32;
+        ball_paddle(g, active_speed, pad_x, sfx);
         ball_bricks(g, active_speed, sfx);
 
         if g.ball_y > WIN_H as f32 {
@@ -644,13 +649,13 @@ fn ball_walls(g: &mut Game, sfx: &Sounds) {
     }
 }
 
-fn ball_paddle(g: &mut Game, speed: f32, sfx: &Sounds) {
+fn ball_paddle(g: &mut Game, speed: f32, pad_x: f32, sfx: &Sounds) {
     if g.ball_vy <= 0.0 {
         return;
     }
     if !rects_overlap(
         g.ball_x, g.ball_y, BALL_W as f32, BALL_H as f32,
-        g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32,
+        pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32,
     ) {
         return;
     }
@@ -664,7 +669,7 @@ fn ball_paddle(g: &mut Game, speed: f32, sfx: &Sounds) {
     // Where it landed across the face, -1 (left tip) .. +1 (right tip). The
     // classic "aim by where you hit" english, plus a slice of the paddle's
     // own sideways speed carried into the ball the way a moving bat drags it.
-    let rel = ((g.ball_x + BALL_W as f32 / 2.0 - g.pad_x) / g.pad_w - 0.5) * 2.0;
+    let rel = ((g.ball_x + BALL_W as f32 / 2.0 - pad_x) / g.pad_w - 0.5) * 2.0;
     let steer = rel.clamp(-1.0, 1.0) * 1.15; // radians
     let nvx = speed * steer.sin() + g.pad_vx * 0.18;
     let mut nvy = -(speed * steer.cos()).abs();
@@ -807,11 +812,22 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
 
 fn update_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
     let mut split = false;
+    let pad_start_x = g.pad_x - g.pad_vx * dt;
+    let (pad_x, pad_w) = (g.pad_x, g.pad_w);
     for d in pool_iter_mut(&mut g.drops) {
+        let drop_from = (d.x - pad_start_x, d.y - PAD_Y as f32);
         d.y += DROP_SPEED * dt;
-        if d.y > WIN_H as f32 { d.active = false; continue; }
-        if rects_overlap(d.x, d.y, DROP_W, DROP_H,
-                         g.pad_x, PAD_Y as f32, g.pad_w, PAD_H as f32) {
+        let expired = d.y > WIN_H as f32;
+        if segment_rect_overlap(
+            drop_from.0,
+            drop_from.1,
+            d.x - pad_x,
+            d.y - PAD_Y as f32,
+            -DROP_W,
+            -DROP_H,
+            pad_w + DROP_W,
+            PAD_H as f32 + DROP_H,
+        ) {
             d.active = false;
             blip::bot::add(["got_wide", "got_narrow", "got_slow", "got_life", "got_multi"][d.kind as usize], 1.0);
             let (label, c) = match d.kind {
@@ -845,6 +861,7 @@ fn update_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
                 DropKind::Multi => split = true,
             }
         }
+        if expired { d.active = false; }
     }
     if split { g.split_ball(); }
 }
@@ -1008,47 +1025,28 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("BOUNCER", WIN_W, WIN_H)
 }
 
-const PADDLE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/paddle.png"));
 const DROP_PNGS: [&[u8]; 5] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_wide.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_narrow.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_slow.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_life.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_multi.png")),
+    blip::png!("drop_wide"),
+    blip::png!("drop_narrow"),
+    blip::png!("drop_slow"),
+    blip::png!("drop_life"),
+    blip::png!("drop_multi"),
 ];
-const BALL_SHADE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ball_shade.png"));
-const BALL_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ball.png"));
-const BRICK_RED_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_red.png"));
-const BRICK_ORANGE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_orange.png"));
-const BRICK_YELLOW_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_yellow.png"));
-const BRICK_GREEN_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_green.png"));
-const BRICK_BLUE_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_blue.png"));
-const BRICK_PURPLE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_purple.png"));
-const BRICK_STEEL_PNG:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_steel.png"));
-const BRICK_STEEL_CRACKED_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_steel_cracked.png"));
-const BRICK_BOMB_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_bomb.png"));
 const PADDLE_HIT_WAV: [&[u8]; 3] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/paddle_hit_0.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/paddle_hit_1.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/paddle_hit_2.wav")),
+    blip::wav!("paddle_hit_0"),
+    blip::wav!("paddle_hit_1"),
+    blip::wav!("paddle_hit_2"),
 ];
 const BRICK_HIT_WAV: [&[u8]; 3] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_hit_0.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_hit_1.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_hit_2.wav")),
+    blip::wav!("brick_hit_0"),
+    blip::wav!("brick_hit_1"),
+    blip::wav!("brick_hit_2"),
 ];
 const BRICK_BREAK_WAV: [&[u8]; 3] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_break_0.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_break_1.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_break_2.wav")),
+    blip::wav!("brick_break_0"),
+    blip::wav!("brick_break_1"),
+    blip::wav!("brick_break_2"),
 ];
-const WALL_HIT_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/wall_hit.wav"));
-const BOMB_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bomb.wav"));
-const LIFE_LOST_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/life_lost.wav"));
-const WIN_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/win.wav"));
-const PICKUP_GOOD_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_good.wav"));
-const PICKUP_BAD_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_bad.wav"));
-const PICKUP_LIFE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_life.wav"));
 
 
 async fn load_takes(wavs: &[&'static [u8]; 3]) -> [blip::BlipSound; 3] {
@@ -1065,37 +1063,36 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let paddle = load_png_smooth(PADDLE_PNG);
-    let ball = load_png_smooth(BALL_PNG);
+    let paddle = load_png_smooth(blip::png!("paddle"));
+    let ball = load_png_smooth(blip::png!("ball"));
     let drops = DROP_PNGS.map(load_png_smooth);
-    let ball_shade = load_png_smooth(BALL_SHADE_PNG);
+    let ball_shade = load_png_smooth(blip::png!("ball_shade"));
     let brick = [
-        load_png(BRICK_RED_PNG),
-        load_png(BRICK_ORANGE_PNG),
-        load_png(BRICK_YELLOW_PNG),
-        load_png(BRICK_GREEN_PNG),
-        load_png(BRICK_BLUE_PNG),
-        load_png(BRICK_PURPLE_PNG),
-        load_png(BRICK_STEEL_PNG),
-        load_png(BRICK_STEEL_CRACKED_PNG),
-        load_png(BRICK_BOMB_PNG),
+        load_png(blip::png!("brick_red")),
+        load_png(blip::png!("brick_orange")),
+        load_png(blip::png!("brick_yellow")),
+        load_png(blip::png!("brick_green")),
+        load_png(blip::png!("brick_blue")),
+        load_png(blip::png!("brick_purple")),
+        load_png(blip::png!("brick_steel")),
+        load_png(blip::png!("brick_steel_cracked")),
+        load_png(blip::png!("brick_bomb")),
     ];
 
     let sfx = Sounds {
         paddle_hit:  load_takes(&PADDLE_HIT_WAV).await,
         brick_hit:   load_takes(&BRICK_HIT_WAV).await,
         brick_break: load_takes(&BRICK_BREAK_WAV).await,
-        wall_hit:    blip::audio::load_sound(WALL_HIT_WAV).await,
-        bomb:        blip::audio::load_sound(BOMB_WAV).await,
-        life_lost:   blip::audio::load_sound(LIFE_LOST_WAV).await,
-        win:         blip::audio::load_sound(WIN_WAV).await,
-        pickup_good: blip::audio::load_sound(PICKUP_GOOD_WAV).await,
-        pickup_bad:  blip::audio::load_sound(PICKUP_BAD_WAV).await,
-        pickup_life: blip::audio::load_sound(PICKUP_LIFE_WAV).await,
+        wall_hit:    blip::audio::load_sound(blip::wav!("wall_hit")).await,
+        bomb:        blip::audio::load_sound(blip::wav!("bomb")).await,
+        life_lost:   blip::audio::load_sound(blip::wav!("life_lost")).await,
+        win:         blip::audio::load_sound(blip::wav!("win")).await,
+        pickup_good: blip::audio::load_sound(blip::wav!("pickup_good")).await,
+        pickup_bad:  blip::audio::load_sound(blip::wav!("pickup_bad")).await,
+        pickup_life: blip::audio::load_sound(blip::wav!("pickup_life")).await,
     };
-    // Two tunes, alternating by level (synthesised here, see blip_assets::bouncer).
-    let mut music = Jukebox::new(&[blip_assets::bouncer::bounce_wav, blip_assets::bouncer::rebound_wav]);
-    music.start(0).await;
+    // Two tunes, alternating by level.
+    let mut music = Jukebox::new("BOUNCER", &["BOUNCE", "REBOUND"]);
 
     let mut shot_frame: u32 = 0;
 
@@ -1103,7 +1100,6 @@ async fn main() {
         let dt = blip.delta_time;
 
         music.play(if g.state == State::Title { 0 } else { (g.sess.level as usize + 1) % 2 });
-        if g.state != State::Play { music.warm_up().await; }
 
         if blip.screenshot_mode {
             shot_frame += 1;

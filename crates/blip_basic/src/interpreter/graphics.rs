@@ -34,11 +34,11 @@ impl Program {
         let c = |i: usize| -> Color { vals.get(i).map(value_color).unwrap_or(BLIP_WHITE) };
         let texture = |i: usize| -> Result<&BlipTex, String> {
             let requested = vals.get(i).map(Value::string).unwrap_or_default();
-            let name = if requested.starts_with('/') {
-                requested.to_ascii_uppercase()
-            } else {
-                requested.to_ascii_lowercase()
-            };
+            // A picture's file: `.PNG` when no other is named.
+            let mut name = requested.to_ascii_uppercase();
+            if !name.contains('.') {
+                name.push_str(".PNG");
+            }
             if !crate::host::file_available(&name) {
                 return Err(format!("File not available {requested}"));
             }
@@ -69,6 +69,10 @@ impl Program {
                 self.effects.popup(n(0), n(1), &vals[2].string(), c(3))
             }
             "FX_RING" if vals.len() == 5 => self.effects.ring(n(0), n(1), n(2), n(3), c(4)),
+            "DRAW_CIRCLE" if (4..=5).contains(&vals.len()) => {
+                let width = if vals.len() == 5 { n(4) } else { 2.0 };
+                macroquad::shapes::draw_circle_lines(n(0), n(1), n(2).max(0.0), width, c(3));
+            }
             "FILL_RECT" if vals.len() == 5 => blip.fill_rect(n(0), n(1), n(2), n(3), c(4)),
             "DRAW_RECT" if vals.len() == 5 => blip.draw_rect(n(0), n(1), n(2), n(3), c(4)),
             "DRAW_LINE" if vals.len() == 5 => blip.draw_line(n(0), n(1), n(2), n(3), c(4)),
@@ -196,14 +200,14 @@ impl Program {
         for (i, line) in self.output.iter().enumerate() {
             blip.draw_text(
                 &line.to_ascii_uppercase(),
-                4.0,
-                4.0 + i as f32 * 16.0,
-                2.0,
+                8.0,
+                8.0 + i as f32 * 26.0,
+                3.0,
                 BLIP_WHITE,
             );
         }
         if let Some(error) = &self.error {
-            blip.draw_text(&error.to_ascii_uppercase(), 4.0, 180.0, 1.0, BLIP_RED);
+            blip.draw_text(&error.to_ascii_uppercase(), 8.0, 376.0, 2.0, BLIP_RED);
         }
     }
 }

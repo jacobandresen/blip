@@ -1,8 +1,11 @@
 //! Numbered BASIC programs, their execution state, and frame budget.
 
+mod block;
 mod color;
+mod data;
 mod expression;
 mod graphics;
+mod procedure;
 mod statement;
 mod syntax;
 #[cfg(test)]
@@ -10,10 +13,12 @@ mod tests;
 mod value;
 
 use self::{
+    block::{At, Block},
+    procedure::{Frame, Function, Procedure},
     syntax::{split_statements, Token},
     value::Value,
 };
-use crate::{music::MusicRequest, shared_math};
+use crate::shared_math;
 use blip::{Blip, BlipTex};
 use crate::sounds::Sounds;
 use std::{collections::HashMap, sync::Arc};
@@ -45,19 +50,28 @@ pub(crate) struct Program {
     effects: blip::Fx,
     loops: Vec<ForLoop>,
     calls: Vec<Continuation>,
+    procedures: HashMap<String, Procedure>,
+    functions: HashMap<String, Function>,
+    function_depth: usize,
+    data: Vec<(u16, Value)>,
+    data_at: usize,
+    blocks: HashMap<At, Block>,
+    block_ends: HashMap<At, At>,
+    /// The statement being run, when it came from the program rather than a THEN.
+    here: Option<At>,
+    frames: Vec<Frame>,
     output: Vec<String>,
+    print_run: String,
     wait_until: f64,
     input: blip::input::PressBuffer,
     input_step: bool,
-    yielded: bool,
+    pub(crate) yielded: bool,
     uninterrupted: u32,
     pub(crate) active: bool,
     pub(crate) error: Option<String>,
     rng: u64,
     pen: i32,
     paper: i32,
-    pub(crate) music_request: Option<MusicRequest>,
-    pub(crate) music_file_request: Option<String>,
     pub(crate) sound_request: Option<(f32, f32, f32)>,
 }
 impl Program {
@@ -99,6 +113,10 @@ impl Program {
                     .collect()
             })
             .collect();
+        if let Err(error) = self.find_procedures().and_then(|_| self.find_blocks()).and_then(|_| self.find_data()) {
+            self.error = Some(format!("? {error}"));
+            self.active = false;
+        }
     }
     fn goto(&mut self, number: f64) -> Result<(), String> {
         let number = number as u16;
@@ -115,9 +133,11 @@ impl Program {
         while self.position.line < self.lines.len() {
             let line = self.position.line;
             if let Some(source) = self.position.pending.pop() {
+                self.here = None;
                 return Some((self.lines[line].0, source));
             }
             if let Some(source) = self.statements[line].get(self.position.statement) {
+                self.here = Some((line, self.position.statement));
                 self.position.statement += 1;
                 return Some((self.lines[line].0, Arc::clone(source)));
             }

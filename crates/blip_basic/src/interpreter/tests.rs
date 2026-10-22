@@ -70,285 +70,6 @@ fn random_reaches_every_spawn_slot_without_exceeding_its_limit() {
 }
 
 #[test]
-fn bouncer_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/BOUNCER.BLIP"));
-    assert!(p.lines.len() > 80);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 2510);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("QUIET>5")
-            && source.contains("TARGETX=6+C*30+14.5")
-            && source.contains("GOSUB 2400")
-            && source.contains("ANGLE=0.024")
-    );
-}
-#[test]
-fn defender_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/DEFENDER.BLIP"));
-    assert!(p.lines.len() > 80);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 1660);
-}
-#[test]
-fn serpent_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/SERPENT.BLIP"));
-    assert!(p.lines.len() > 60);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 1070);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("NX>20")
-            && source.contains("NY>20")
-            && source.contains("GX=0 TO 160 STEP 8")
-            && source.contains("HEAD_X=10:HEAD_Y=10")
-    );
-    assert!(
-        source.contains("FILL_CIRCLE(SX,SY")
-            && source.contains("LIVES=LIVES-1")
-            && source.contains("LEVEL=LEVEL+1")
-    );
-    assert!(
-        source.contains("SCORE=SCORE+10*LEVEL*STREAK")
-            && source.contains("BONUS_TIME=6")
-            && source.contains("SERPENT/BONUS_EAT")
-            && source.contains("EVENLEVEL=INT(LEVEL/2)*2")
-            && source.contains("SHEARS_TIME=7")
-            && source.contains("BODY_LENGTH=BODY_LENGTH-4")
-    );
-}
-#[test]
-fn rally_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/RALLY.BLIP"));
-    assert!(p.lines.len() > 35);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 1500);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("CANVAS(480,540)")
-            && source.contains("BALL_Y=410+SIN")
-            && source.contains("KEY_ACTIVE(\"I\")")
-            && source.contains("KEY_ACTIVE(\"K\")")
-            && source.contains("FILL_RECT(28,PY,12,72")
-            && source.contains("HIT_DIR=1")
-            && source.contains("BALL_SPEED=MIN(BALL_SPEED+15,450)")
-            && source.contains("REL*1.1")
-            && source.contains("POINT_WAIT=1.2")
-    );
-}
-#[test]
-fn adder_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/ADDER.BLIP"));
-    assert!(p.lines.len() > 50);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 2240);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    assert!(p
-        .lines
-        .iter()
-        .any(|(_, source)| source.contains("/TAPE/GFX/ADDER/PIT.PNG")));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("DRAW_POLYLINE(\"PATH\"")
-            && source.contains("STEP_DISTANCE=85*DT")
-            && source.contains("*3.2*DT")
-            && source.contains("GAP_LEFT(S)=10")
-            && source.contains("HOLE_WAIT(S)=2.5")
-            && source.contains("SEGMENT_CIRCLE_OVERLAP")
-            && source.contains("PTS(S)=PTS(S)+50*ROUND")
-            && source.contains("PTS(HIT_OWNER)=PTS(HIT_OWNER)+100")
-            && source.contains("ROUND_WAIT=2")
-            && source.contains("IF ROUND=4 THEN PLAY_MUSIC \"ADDER_HUNT\"")
-    );
-}
-#[test]
-fn meteors_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/METEORS.BLIP"));
-    assert!(p.lines.len() > 80);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 1980);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("FOR I=1 TO 48")
-            && source.contains("TITLE_SHIP.PNG")
-            && source.contains("SPLIT_R*0.62")
-    );
-    assert!(
-        source.contains("FOR VERT=1 TO 9")
-            && source.contains("JAG(I,VERT)=0.75+RND(0.5)")
-            && source.contains("ROT+VERT*0.628319")
-    );
-    assert!(source.contains("SCORE=SCORE+20") && source.contains("SCORE=SCORE+100"));
-    assert!(
-        source.contains("METEORS/THRUST")
-            && source.contains("METEORS/HYPERSPACE")
-            && source.contains("METEORS/SAUCER_BIG")
-    );
-}
-#[test]
-fn sky_raider_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/SKY_RAIDER.BLIP"));
-    assert!(p.lines.len() > 100);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 1970);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(source.contains("ENEMY_WEAVER.PNG") && source.contains("ENEMY_ACE.PNG"));
-    assert!(
-        source.contains("FORMATION_TYPE=INT(RND(3))+1")
-            && source.contains("FORMATION_X+WING*34")
-            && source.contains("FORMATION_DIR")
-    );
-    assert!(
-        source.contains("SPAWN>80")
-            && source.contains("HIT_WAIT=70")
-            && source.contains("SCROLL=SCROLL+1")
-            && source.contains("KILLS>=60+15*(LEVEL-1)")
-            && source.contains("BOSS_WARNING")
-            && source.contains("BOSS_IMAGE$=")
-            && source.contains("LEVEL=LEVEL+1")
-            && source.contains("WEAPON=WEAPON+1")
-            && source.contains("SCORE=SCORE+30*WEAPON")
-            && source.contains("MAX_POWER=120")
-            && source.contains("SKY_RAIDER/POWERUP3")
-            && source.contains("SKY_RAIDER/POWERUP4")
-            && source.contains("SKY_RAIDER/MAX_POWER")
-            && source.contains("GUNS=8")
-            && source.contains("/TAPE/GFX/SKY_RAIDER/POWERUP.PNG")
-    );
-    assert!(
-        source.contains("DRAW_TEXTURE(\"/TAPE/GFX/SKY_RAIDER/PLAYER_PLANE.PNG\",PX,PY,33,29)")
-            && source.contains("DRAW_HUD(SCORE,LIVES)")
-    );
-    assert!(
-        source.contains("COLOR(0.10-0.07*DEPTH,0.24-0.13*DEPTH,0.46-0.16*DEPTH)")
-            && source.contains("EBVX(Q)=DX/DIST*1.8")
-            && source.contains("SKY_RAIDER/ENEMY_GUN")
-    );
-}
-#[test]
-fn brawler_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/BRAWLER.BLIP"));
-    assert!(p.lines.len() > 35);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 2150);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    assert!(p
-        .lines
-        .iter()
-        .any(|(_, source)| source.contains("DRAW_LINE_EX(160+COS")));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("KEY_PRESSED(\"F\")")
-            && source.contains("KEY_PRESSED(\"G\")")
-            && source.contains("KEY_PRESSED(\"Z\")")
-            && source.contains("PUNCH_BUFFER>0")
-            && source.contains("KICK_BUFFER>0")
-    );
-    assert!(
-        source.contains("ROUND_TIME=45")
-            && source.contains("ROUND_TIME<=0")
-            && source.contains("PLAYER_HP>CPU_HP")
-            && source
-                .contains("DRAW_TEXT(NAME$(PICK),25,27,1,\"BLIP_CYAN\",\"LEFT\",\"BLIP_BLACK\")")
-    );
-}
-#[test]
-fn bubbler_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/BUBBLER.BLIP"));
-    assert!(p.lines.len() > 75);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 2083);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("TITLE_LETTER_")
-            && source.contains("EVY(E)=EVY(E)+0.09")
-            && source.contains("EVY(E)=0-2.6")
-    );
-    assert!(
-        source.contains("PYLINE(P)=8+PROW*8")
-            && source.contains("PXLINE(P)=PCOL*12")
-            && source.contains("ENEMY_COUNT=15")
-    );
-    assert!(
-        source.contains("EY_OLD(E)+16<=PYLINE(P)")
-            && source.contains("ETYPE(E)=EREST-ECOL*4")
-            && source.contains("EHOME(E)+SIN(T*3+E)*4")
-    );
-    assert!(
-        source.contains("ROUND>8 THEN GOTO 690")
-            && source.contains("ROUND_TIME>HURRY_AT")
-            && source.contains("BT(B)=600-30*ROUND")
-            && source.contains("EANGRY(TRAPPED)=1")
-            && source.contains("BUNNY_ANGRY.PNG")
-            && source.contains("ROBOT.PNG")
-            && source.contains(r#"TILE_LOW_"+STR$(ROUND)"#)
-            && source.contains(r#"BORDER_LOW_"+STR$(ROUND)"#)
-            && source.contains("DRAW_NUMBER(SCORE,8,8")
-            && !source.contains("DRAW_HUD(SCORE,LIVES)")
-    );
-    assert!(
-        source.contains("SHOT_KIND(BSLOT)=2")
-            && source.contains("ROUND>=4 OR EANGRY(E)=1")
-            && source.contains("ETYPE(E)=3 AND FIRE_CD(E)<=0")
-            && source.contains("BUBBLER/SPARKLE")
-    );
-}
-#[test]
 fn primitive_calls_use_the_crate_method_name() {
     let expected = Some(("fill_rect".into(), "1,2,3,4,color".into()));
     assert_eq!(method_call("fill_rect(1,2,3,4,color)"), expected);
@@ -374,4 +95,138 @@ fn hex_colors_support_rgb_and_rgba() {
         value_color(&Value::Str("#33669980".into())).a,
         128.0 / 255.0
     );
+}
+
+#[test]
+fn procedures_are_found_with_their_parameters() {
+    let mut p = Program::new();
+    p.load("10 CALL BOX(1,2,\"RED\")\n20 END\n100 SUB BOX(X,Y,C$) STATIC\n110 LOCAL I\n120 END SUB\n130 SUB BEEP:END SUB");
+    assert_eq!(p.error, None);
+    assert!(p.is_procedure("BOX") && p.is_procedure("BEEP"));
+    let boxed = &p.procedures["BOX"];
+    assert_eq!(boxed.params, ["X", "Y", "C$"]);
+    assert_eq!((boxed.body, boxed.end), ((2, 1), (4, 0)));
+    assert_eq!(p.procedures["BEEP"].end, (5, 1));
+}
+
+#[test]
+fn procedure_structure_errors_stop_the_load() {
+    for (source, error) in [
+        ("10 SUB A\n20 PRINT 1", "? SUB A needs END SUB at line 10"),
+        ("10 END SUB", "? END SUB without SUB at line 10"),
+        ("10 SUB A\n20 SUB B\n30 END SUB", "? SUB inside SUB A at line 20"),
+        ("10 SUB A:END SUB\n20 SUB A:END SUB", "? SUB A is defined twice"),
+        ("10 SUB PRINT:END SUB", "? SUB needs a name, not PRINT at line 10"),
+        ("10 SUB A(1):END SUB", "? SUB A has a bad parameter 1 at line 10"),
+    ] {
+        let mut p = Program::new();
+        p.load(source);
+        assert_eq!(p.error.as_deref(), Some(error), "{source}");
+        assert!(!p.active);
+    }
+}
+
+#[test]
+fn block_if_structure_errors_stop_the_load() {
+    for (source, error) in [
+        ("10 IF X THEN\n20 PRINT 1", "? IF needs END IF at line 10"),
+        ("10 END IF", "? END IF without IF at line 10"),
+        ("10 ELSE", "? ELSE without IF at line 10"),
+        ("10 IF X THEN\n20 ELSE\n30 ELSEIF Y THEN\n40 END IF", "? ELSEIF after ELSE at line 30"),
+        ("10 IF X THEN\n20 ELSEIF Y\n30 END IF", "? ELSEIF needs THEN at the end of line 20"),
+        ("10 WHILE X\n20 PRINT 1", "? WHILE needs WEND at line 10"),
+        ("10 WEND", "? WEND without WHILE at line 10"),
+    ] {
+        let mut p = Program::new();
+        p.load(source);
+        assert_eq!(p.error.as_deref(), Some(error), "{source}");
+    }
+    let mut p = Program::new();
+    p.load("10 IF A THEN\n20 IF B THEN\n30 END IF\n40 ELSE\n50 END IF\n60 IF C THEN PRINT \"THEN\"");
+    assert_eq!(p.error, None);
+    assert_eq!(p.blocks.len(), 2);
+}
+
+#[test]
+fn else_belongs_to_the_nearest_if() {
+    use super::syntax::matching_else;
+    assert_eq!(matching_else(" A ELSE B"), Some(3));
+    assert_eq!(matching_else(" IF B THEN X ELSE Y"), None);
+    let nested = " IF B THEN X ELSE Y ELSE Z";
+    assert_eq!(matching_else(nested), nested.rfind("ELSE"));
+    assert_eq!(matching_else(" PRINT \"ELSE\""), None);
+    assert_eq!(matching_else(" ELSEWHERE=1"), None);
+}
+
+/// The tapes rewritten in the house layout, one by one.
+const HOUSE_TAPES: [(&str, &str); 9] = [
+    ("BRAWLER", include_str!("../../../../web/TAPE/BRAWLER.BLIP")),
+    ("BUBBLER", include_str!("../../../../web/TAPE/BUBBLER.BLIP")),
+    ("BOUNCER", include_str!("../../../../web/TAPE/BOUNCER.BLIP")),
+    ("DEFENDER", include_str!("../../../../web/TAPE/DEFENDER.BLIP")),
+    ("RAIDER", include_str!("../../../../web/TAPE/RAIDER.BLIP")),
+    ("METEORS", include_str!("../../../../web/TAPE/METEORS.BLIP")),
+    ("ADDER", include_str!("../../../../web/TAPE/ADDER.BLIP")),
+    ("RALLY", include_str!("../../../../web/TAPE/RALLY.BLIP")),
+    ("SERPENT", include_str!("../../../../web/TAPE/SERPENT.BLIP")),
+];
+
+/// Every tape reads the same way: what the game is, SETUP, one MAIN LOOP that
+/// updates and draws the current screen, and a named SUB for each step.
+#[test]
+fn tapes_follow_the_house_layout() {
+    for (name, source) in HOUSE_TAPES {
+        let mut p = Program::new();
+        p.load(source);
+        assert_eq!(p.error, None, "{name}");
+        assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0), "{name}: line order");
+        assert_eq!(p.lines[1], (2, format!("REM GAME: {name}")), "{name}");
+        for heading in ["10 REM --- SETUP ---", "100 REM --- MAIN LOOP"] {
+            assert!(source.contains(heading), "{name}: {heading}");
+        }
+        for sub in ["START_GAME", "UPDATE_TITLE", "DRAW_TITLE", "UPDATE_PLAY", "DRAW_PLAY", "UPDATE_OVER", "DRAW_OVER"] {
+            assert!(p.is_procedure(sub), "{name}: SUB {sub}");
+        }
+        assert!(!source.contains("GOSUB"), "{name}: SUBs, not GOSUB");
+        // 640x400 unless SETUP picks another screen for the game's sake.
+        let canvas = p.lines.iter().filter(|(_, line)| line.contains("CANVAS(")).map(|(n, _)| *n);
+        assert!(canvas.into_iter().all(|n| n < 100), "{name}: CANVAS only in SETUP");
+        // Bodies indent two spaces a level; a line holds one statement, or a short pair.
+        let mut depth = 0usize;
+        for line in source.lines() {
+            let body = line.split_once(' ').map_or("", |(_, body)| body);
+            let code = body.trim_start();
+            let (word, _) = super::procedure::leading_name(code);
+            let closes = matches!(word.as_str(), "NEXT" | "ELSE" | "ELSEIF" | "WEND") || code.starts_with("END SUB") || code.starts_with("END IF");
+            if closes { depth = depth.checked_sub(1).unwrap_or_else(|| panic!("{name}: unopened {line}")); }
+            assert_eq!(body.len() - code.len(), 2 * depth, "{name}: indent {line}");
+            let one_line_for = word == "FOR" && code.contains(":NEXT");
+            let opens = matches!(word.as_str(), "SUB" | "ELSE" | "ELSEIF" | "WHILE") || word == "FOR" && !one_line_for
+                || super::block::block_condition(code).is_some();
+            if opens { depth += 1; }
+            let statements = split_statements(code);
+            assert!(statements.len() <= 1 || statements.len() <= 3 && statements.iter().all(|s| s.len() <= 24),
+                "{name}: one statement a line: {line}");
+        }
+        assert_eq!(depth, 0, "{name}: unclosed block");
+    }
+}
+
+#[test]
+fn data_is_collected_in_order_and_checked_at_load() {
+    let mut p = Program::new();
+    p.load("10 DATA 1, -2.5\n20 PRINT 1:DATA \"A,B\"");
+    assert_eq!(p.error, None);
+    assert_eq!(p.data, [(10, Value::Num(1.0)), (10, Value::Num(-2.5)), (20, Value::Str("A,B".into()))]);
+    p.load("10 DATA X+1");
+    assert_eq!(p.error.as_deref(), Some("? DATA needs numbers or \"text\", not X+1 at line 10"));
+}
+
+#[test]
+fn print_items_keep_their_separators() {
+    use super::syntax::print_items;
+    let items = |s: &str| print_items(s).into_iter().map(|(i, c)| (i, c)).collect::<Vec<_>>();
+    assert_eq!(items("\"LIVES\";L"), [("\"LIVES\"".to_string(), Some(';')), ("L".into(), None)]);
+    assert_eq!(items("A,B;"), [("A".to_string(), Some(',')), ("B".into(), Some(';'))]);
+    assert_eq!(items("\"A;B\",F(1,2)"), [("\"A;B\"".to_string(), Some(',')), ("F(1,2)".into(), None)]);
 }

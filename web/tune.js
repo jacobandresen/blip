@@ -46,8 +46,15 @@
   document.getElementById('tune-cancel').addEventListener('click',function(){confirmPanel.hidden=true;document.getElementById('tune-close').focus();});document.getElementById('tune-discard').addEventListener('click',closeTune);
   confirmPanel.addEventListener('keydown',function(e){if(e.key==='Escape'){e.preventDefault();document.getElementById('tune-cancel').click();}});
   nameField.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();save();}if(e.key==='Escape'){e.preventDefault();document.getElementById('tune-close').click();}});
-  window.startTune=open;
-  window.blipBasicMusicPayload=function(){return Object.keys(basic.filesystem.files).filter(function(path){return /^\/USER\/.*\.WAV$/i.test(path)&&typeof basic.filesystem.files[path]==='string'&&basic.filesystem.files[path].indexOf('data:audio/wav;base64,')===0;}).map(function(path){return {path:path,data:basic.filesystem.files[path]};});};
+  /** TUNE, or TUNE with an .XM from /TAPE/<GAME>/ASSETS or /ROM/TUNES: its notes, ready to change and save in /USER. */
+  window.startTune=function(xm){
+    open();
+    if(!xm)return;
+    var name=xm.slice(xm.lastIndexOf('/')+1).replace(/\.XM$/i,'');
+    fetch(xm.replace(/^\//,'')).then(function(response){if(!response.ok)throw Error('NO SUCH TUNE: '+xm);return response.arrayBuffer();})
+      .then(function(bytes){importXm(new Uint8Array(bytes));nameField.value='/USER/MUSIC/'+name+'.TUNE';})
+      .catch(function(error){status.textContent=error.message;});
+  };
   window.blipBasicTuneExport={waveData:waveData};
   initSong();draw();
 })();

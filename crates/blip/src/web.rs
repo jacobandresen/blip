@@ -39,7 +39,7 @@ pub fn crt() -> bool {
     #[cfg(target_arch = "wasm32")]
     unsafe { blip_crt() != 0 }
     #[cfg(not(target_arch = "wasm32"))]
-    { std::env::var_os("BLIP_CRT").map_or(true, |v| v != "0") }
+    { std::env::var_os("BLIP_CRT").is_none_or(|v| v != "0") }
 }
 
 /// Whether occasional picture faults should interrupt the CRT image.
@@ -47,7 +47,7 @@ pub fn glitches() -> bool {
     #[cfg(target_arch = "wasm32")]
     unsafe { blip_glitch() != 0 }
     #[cfg(not(target_arch = "wasm32"))]
-    { std::env::var_os("BLIP_GLITCH").map_or(true, |v| v != "0") }
+    { std::env::var_os("BLIP_GLITCH").is_none_or(|v| v != "0") }
 }
 
 /// Notify the kiosk shell that the player should be charged a coin.

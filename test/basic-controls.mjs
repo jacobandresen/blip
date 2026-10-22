@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openPage } from './lib/harness.mjs';
 
-const ALL_GAMES = ['ADDER', 'BOUNCER', 'BRAWLER', 'BUBBLER', 'DEFENDER', 'METEORS', 'RALLY', 'SERPENT', 'SKY_RAIDER'];
+const ALL_GAMES = ['ADDER', 'BOUNCER', 'BRAWLER', 'BUBBLER', 'DEFENDER', 'METEORS', 'RALLY', 'SERPENT', 'RAIDER'];
 const GAMES = process.env.BLIP_CONTROL_GAME ? ALL_GAMES.filter((game) => game === process.env.BLIP_CONTROL_GAME) : ALL_GAMES;
 const WASD_DECK = new Set(['ADDER', 'BRAWLER', 'BUBBLER']);
 

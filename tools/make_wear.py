@@ -83,9 +83,9 @@ def deck_wear(seed, count, angle, rings=(), burns=(), polish=()):
 DECK_WEAR = {
     "rally": deck_wear(101, 54, 3, rings=[(72, 68, 25), (24, 76, 17)]),
     "bouncer": deck_wear(102, 36, 2, polish=[(54, 72, 90, 28, "rgba(210,170,110,.15)")]),
-    "galactic_defender": deck_wear(103, 29, -62, burns=[(84, 16, 4, 3)], polish=[(78, 69, 42, 26, "rgba(160,190,220,.10)")]),
+    "defender": deck_wear(103, 29, -62, burns=[(84, 16, 4, 3)], polish=[(78, 69, 42, 26, "rgba(160,190,220,.10)")]),
     "bubbler": deck_wear(104, 44, 118, rings=[(66, 69, 23), (74, 73, 17)], polish=[(68, 68, 70, 33, "rgba(210,190,150,.08)")]),
-    "sky_raider": deck_wear(105, 48, 78, burns=[(17, 13, 4, 3)], polish=[(28, 67, 38, 54, "rgba(150,170,150,.10)")]),
+    "raider": deck_wear(105, 48, 78, burns=[(17, 13, 4, 3)], polish=[(28, 67, 38, 54, "rgba(150,170,150,.10)")]),
     "meteors": deck_wear(106, 41, -34, rings=[(30, 71, 19)], polish=[(72, 68, 60, 28, "rgba(190,170,140,.12)")]),
     "serpent": deck_wear(107, 19, 160, polish=[(49, 68, 130, 36, "rgba(210,185,130,.16)")]),
     "brawler": deck_wear(108, 63, 23, burns=[(42, 12, 5, 3)], polish=[(76, 74, 55, 28, "rgba(170,145,120,.14)")]),

@@ -5,14 +5,14 @@ import { openPage } from './lib/harness.mjs';
 
 const GAMES = [
   ['ADDER', 'adder'], ['BOUNCER', 'bouncer'], ['BRAWLER', 'brawler'],
-  ['BUBBLER', 'bubbler'], ['DEFENDER', 'galactic_defender'],
+  ['BUBBLER', 'bubbler'], ['DEFENDER', 'defender'],
   ['METEORS', 'meteors'], ['RALLY', 'rally'], ['SERPENT', 'serpent'],
-  ['SKY_RAIDER', 'sky_raider'],
+  ['RAIDER', 'raider'],
 ];
 const MOVE_KEY = {
   ADDER: 'ArrowLeft', BOUNCER: 'ArrowLeft', BRAWLER: 'd', BUBBLER: 'ArrowRight',
   DEFENDER: 'ArrowLeft', METEORS: 'ArrowLeft', RALLY: 'ArrowUp',
-  SERPENT: 'ArrowUp', SKY_RAIDER: 'ArrowUp',
+  SERPENT: 'ArrowUp', RAIDER: 'ArrowUp',
 };
 const START_CHANGE_MIN = { METEORS: .02, RALLY: .01, SERPENT: .03 };
 // At 85 px/s Adder adds about 120 trail pixels during the 350 ms input sample.
@@ -64,21 +64,25 @@ async function frameDifference(page, before, after) {
   }, [before.toString('base64'), after.toString('base64')]);
 }
 
-async function greenBounds(page, image, version) {
+async function snakeRows(page, image, version) {
   return page.evaluate(([encoded, bounds]) => {
     const source = new Image(); source.src = `data:image/png;base64,${encoded}`;
     return source.decode().then(() => {
       const canvas = document.createElement('canvas'); canvas.width = source.naturalWidth; canvas.height = source.naturalHeight;
       const context = canvas.getContext('2d'); context.drawImage(source, 0, 0);
       const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
-      let left = width, right = 0, top = height, bottom = 0;
+      // The rows the snake fills: five bright green pixels or more. The grid and border are dim,
+      // and the apple's leaf never fills a row like that.
+      let rows = 0;
       for (let y = Math.floor(height * bounds.y0); y < height * bounds.y1; y++) {
+        let green = 0;
         for (let x = Math.floor(width * bounds.x0); x < width * bounds.x1; x++) {
           const i = (y * width + x) * 4, r = data[i], g = data[i + 1], b = data[i + 2];
-          if (g > 60 && r < g * .72 && b < g * .82) { left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y); }
+          if (g > 110 && r < g * .72 && b < g * .82) green++;
         }
+        if (green >= 5) rows++;
       }
-      return right ? { left, right, top, bottom, width: right - left + 1, height: bottom - top + 1 } : null;
+      return rows;
     });
   }, [image.toString('base64'), version === 'basic' ? { x0: .26, x1: .74, y0: .21, y1: .85 } : { x0: .12, x1: .88, y0: .08, y1: .95 }]);
 }
@@ -216,8 +220,8 @@ for (const [name, slug] of GAMES.filter(([name]) => !process.env.BLIP_VISUAL_GAM
     const basicResponse = await frameDifference(page, basicBefore, basicAfter);
     const basicInputTrace = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.__parityKeys);
     if (name === 'SERPENT') {
-      const before = await greenBounds(page, basicBefore, 'basic'), after = await greenBounds(page, basicAfter, 'basic');
-      assert.ok(before && after && after.height > before.height + 12, `SERPENT BASIC did not turn upward: ${JSON.stringify({ before, after })}`);
+      const before = await snakeRows(page, basicBefore, 'basic'), after = await snakeRows(page, basicAfter, 'basic');
+      assert.ok(after > before + 12, `SERPENT BASIC did not turn upward: the snake fills ${before} rows, then ${after}`);
     }
     assert.ok(basicResponse > (RESPONSE_MIN[name] || .0005), `${name} BASIC did not visibly respond to ${MOVE_KEY[name]} (${basicResponse.toFixed(4)} changed pixels)`);
     await saveImage(slug, 'basic', 'input-before', basicBefore);

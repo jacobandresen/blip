@@ -15,22 +15,22 @@ test('tape programs use uppercase source and unique ascending line numbers', () 
   const rally = readFileSync(new URL('RALLY.BLIP', tape), 'utf8');
   assert.match(rally, /KEY_ACTIVE\("I"\)/, 'Rally should let player 2 move up');
   assert.match(rally, /KEY_ACTIVE\("K"\)/, 'Rally should let player 2 move down');
-  assert.match(rally, /MODE=1 AND STATE=1/);
-  assert.match(rally, /TARGET=BY\+6-36\+AI_ERR/);
-  assert.match(rally, /BALL_SPEED=MIN\(BALL_SPEED\+15,450\)/);
-  assert.match(rally, /REL\*1\.1/);
-  assert.match(rally, /AI_ERR=RND\(1\)\*50\.4-25\.2/);
-  assert.match(rally, /SEGMENT_RECT_OVERLAP/);
-  const raider = readFileSync(new URL('SKY_RAIDER.BLIP', tape), 'utf8');
+  assert.match(rally, /ELSEIF STATE\$="PLAY" THEN\n4070     TARGET=HOME_Y/, 'the CPU plays only during a rally');
+  assert.match(rally, /TARGET=BALL_Y\+BALL\/2-PAD_H\/2\+AI_ERR/);
+  assert.match(rally, /BALL_SPEED=MIN\(BALL_SPEED\+SPEED_UP,TOP_SPEED\)/);
+  assert.match(rally, /-0\.5,0\.5\)\*1\.1/);
+  assert.match(rally, /AI_ERR=RND\(1\)\*PAD_H\*0\.7-PAD_H\*0\.35/);
+  assert.match(rally, /DEF FNHITS_PADDLE\(X,Y\)=SEGMENT_RECT_OVERLAP/);
+  const raider = readFileSync(new URL('RAIDER.BLIP', tape), 'utf8');
   assert.match(raider, /KILLS>=60\+15\*\(LEVEL-1\)/);
-  assert.match(raider, /BOSS_IMAGE\$="\/TAPE\/GFX\/SKY_RAIDER\/BOSS_"\+STR\$\(LEVEL\)/);
-  const gfx = JSON.parse(readFileSync(new URL('GFX/manifest.json', tape), 'utf8'));
-  for (let level = 1; level <= 7; level++) assert.ok(gfx.SKY_RAIDER.includes(`BOSS_${level}.PNG`));
-  assert.ok(gfx.RALLY.includes('BALL.PNG'));
-  assert.match(rally, /FILL_RECT\(BX,BY,12,12,"BLIP_WHITE"/);
+  assert.match(raider, /BOSS_IMAGE\$=ASSETS\$\+"BOSS_"\+STR\$\(LEVEL\)/);
+  const assets = (game) => JSON.parse(readFileSync(new URL(`${game}/ASSETS/manifest.json`, tape), 'utf8'));
+  for (let level = 1; level <= 7; level++) assert.ok(assets('RAIDER').includes(`BOSS_${level}.PNG`));
+  assert.ok(assets('RALLY').includes('BALL.PNG'));
+  assert.match(rally, /FILL_RECT\(BALL_X,BALL_Y,BALL,BALL,"BLIP_WHITE"\)/);
   const defender = readFileSync(new URL('DEFENDER.BLIP', tape), 'utf8');
-  assert.ok(gfx.GALACTIC_DEFENDER.includes('BULLET.PNG'));
-  assert.match(defender, /DRAW_TEXTURE\("\/TAPE\/GFX\/GALACTIC_DEFENDER\/BULLET\.PNG"/);
+  assert.ok(assets('DEFENDER').includes('BULLET.PNG'));
+  assert.match(defender, /DRAW_TEXTURE\(ASSETS\$\+"BULLET\.PNG"/);
 });
 
 test('BASIC uses uppercase text and hides the monitor scrollbar without disabling scrolling', async (t) => {
@@ -190,7 +190,8 @@ test('BASIC stores and runs a numbered program, then launches a BLIP BASIC game 
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.locator('#exit-game').click();
   await page.waitForFunction(() => document.querySelector('#basic-wasm-frame').hidden);
-  assert.equal(await page.evaluate(() => BlipBasic.lines.get(20)), 'GAME_STATE=0');
+  const tapeLine20 = readFileSync(new URL('../web/TAPE/SERPENT.BLIP', import.meta.url), 'utf8').match(/^20 (.*)$/m)[1];
+  assert.equal(await page.evaluate(() => BlipBasic.lines.get(20)), tapeLine20, 'leaving the game keeps the program in memory');
 });
 
 test('CLEAR resets the screen and variables but keeps recoverable program lines', async (t) => {
@@ -329,10 +330,10 @@ test('SERPENT queues two valid corner turns before the next step', async (t) => 
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SERPENT'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(810, 'MOVE_DELAY=0.5:FRAME_TIME=0:FOOD_X=17:FOOD_Y=10');
-    BlipBasic.lines.set(296, 'HEAD_X=NX:HEAD_Y=NY:BODY_X(1)=HEAD_X:BODY_Y(1)=HEAD_Y');
-    BlipBasic.lines.set(389, 'IF HEAD_X=9 AND HEAD_Y=9 THEN QUEUE_OK=1');
-    BlipBasic.lines.set(390, 'DRAW_HUD(SCORE,LIVES):DRAW_TEXT("LEVEL "+STR$(LEVEL),160,191,1,"BLIP_CYAN","CENTER"):IF QUEUE_OK=1 THEN DRAW_TEXT("TURN QUEUE OK",160,30,2,"BLIP_YELLOW","CENTER")');
+    // From (11,11) heading right, up then left reaches (10,10) in two steps.
+    BlipBasic.lines.set(175, 'IF STATE$="PLAY" THEN STEP_TIME=0.5');
+    BlipBasic.lines.set(176, 'IF BODY_X(1)=10 AND BODY_Y(1)=10 THEN QUEUE_OK=1');
+    BlipBasic.lines.set(165, 'IF QUEUE_OK THEN DRAW_TEXT("TURN QUEUE OK",320,30,2,"BLIP_YELLOW","CENTER")');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
@@ -373,7 +374,7 @@ test('SERPENT.BLIP loses a life and resumes play after a collision', async (t) =
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SERPENT'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:BODY_LENGTH=4:HEAD_X=26:HEAD_Y=7:DIR_X=1:DIR_Y=0');
+    BlipBasic.lines.set(90, 'START_GAME:BODY_X(1)=20:LAST_TIME=TIME()');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
@@ -395,9 +396,7 @@ test('SERPENT.BLIP advances to a new level and draws its obstacles after five fo
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SERPENT'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(400, 'FOOD_X=HEAD_X+DIR_X:FOOD_Y=HEAD_Y+DIR_Y:FOOD_BLOCKED=0');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:LEVEL=1:FOODS=4:OB_COUNT=0:BODY_LENGTH=4:HEAD_X=19:HEAD_Y=7:DIR_X=1:DIR_Y=0');
-    BlipBasic.lines.set(810, 'MOVE_DELAY=0.75:FRAME_TIME=0:FOOD_X=20:FOOD_Y=7:GOSUB 860');
+    BlipBasic.lines.set(90, 'START_GAME:FOODS=4:STEP_TIME=0.75:FOOD_X=BODY_X(1)+1:FOOD_Y=BODY_Y(1):LAST_TIME=TIME()');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
@@ -409,7 +408,9 @@ test('SERPENT.BLIP advances to a new level and draws its obstacles after five fo
     const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
     const crop = document.createElement('canvas'); crop.width = image.width; crop.height = image.height;
     const context = crop.getContext('2d'); context.drawImage(image, 0, 0);
-    return Array.from(context.getImageData(0, Math.floor(image.height * 0.9), image.width, Math.ceil(image.height * 0.1)).data);
+    // The LEVEL label, below the board: game rows 372 to 396.
+    const scale = Math.min(image.width / 640, image.height / 400), top = (image.height - 400 * scale) / 2;
+    return Array.from(context.getImageData(0, Math.floor(top + 372 * scale), image.width, Math.ceil(24 * scale)).data);
   }, shot.toString('base64'));
   const originalLabel = await bottomLabel(before);
   let levelChanged = false;
@@ -431,9 +432,7 @@ test('SERPENT cycles the five Rust obstacle layouts', async (t) => {
   const frames = [];
   for (const level of [2, 3, 4, 5, 6]) {
     await page.evaluate((n) => {
-      BlipBasic.lines.set(10, 'GOTO 800');
-      BlipBasic.lines.set(800, `GAME_STATE=1:SCORE=0:LIVES=3:LEVEL=${n}:FOODS=0:OB_COUNT=0:BODY_LENGTH=4:HEAD_X=10:HEAD_Y=10:DIR_X=1:DIR_Y=0:STEPS_SINCE_FOOD=100:STREAK=0:BONUS_TIME=0`);
-      BlipBasic.lines.set(810, 'MOVE_DELAY=10:FRAME_TIME=0:FOOD_X=17:FOOD_Y=10');
+      BlipBasic.lines.set(90, `START_GAME:LEVEL=${n}:RESET_SNAKE:STEP_TIME=10:FOOD_X=20:FOOD_Y=20:LAST_TIME=TIME()`);
       BlipBasic.submit('RUN');
     }, level);
     await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
@@ -453,10 +452,8 @@ test('SERPENT draws long-tail shears in the first eligible even wave', async (t)
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SERPENT'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:LEVEL=6:FOODS=0:OB_COUNT=0:BODY_LENGTH=25:HEAD_X=10:HEAD_Y=10:DIR_X=1:DIR_Y=0:STEPS_SINCE_FOOD=100:STREAK=0:BONUS_TIME=0:SHEARS_TIME=0');
-    BlipBasic.lines.set(810, 'MOVE_DELAY=100:FRAME_TIME=100:FOOD_X=11:FOOD_Y=10');
-    BlipBasic.lines.set(980, 'SHEARS_X=12:SHEARS_Y=10:SHEARS_TIME=7:MOVE_DELAY=100:FRAME_TIME=0:RETURN');
+    // Six levels in, a long snake is offered shears; these sit at cell (13,11).
+    BlipBasic.lines.set(90, 'START_GAME:LEVEL=6:RESET_SNAKE:STEP_TIME=100:SHEARS_X=13:SHEARS_Y=11:SHEARS_LEFT=7:LAST_TIME=TIME()');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
@@ -467,7 +464,8 @@ test('SERPENT draws long-tail shears in the first eligible even wave', async (t)
     const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
     const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
     const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const x = Math.round(image.naturalWidth * .538), y = Math.round(image.naturalHeight * .494);
+    const scale = Math.min(image.naturalWidth / 640, image.naturalHeight / 400);
+    const x = Math.round((image.naturalWidth - 640 * scale) / 2 + 360 * scale), y = Math.round((image.naturalHeight - 400 * scale) / 2 + 216 * scale);
     const { data } = context.getImageData(x - 18, y - 18, 36, 36);
     let count = 0;
     for (let i = 0; i < data.length; i += 4) if (data[i + 2] > data[i] + 55 && data[i + 1] > data[i] + 35) count++;
@@ -486,10 +484,8 @@ test('SERPENT shears trim the tail when collected', async (t) => {
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:LEVEL=6:FOODS=0:OB_COUNT=0:BODY_LENGTH=25:HEAD_X=10:HEAD_Y=10:DIR_X=1:DIR_Y=0:STEPS_SINCE_FOOD=100:STREAK=0:BONUS_TIME=0:SHEARS_TIME=0');
-    BlipBasic.lines.set(810, 'MOVE_DELAY=100:FRAME_TIME=100:FOOD_X=11:FOOD_Y=10');
-    BlipBasic.lines.set(980, 'SHEARS_X=12:SHEARS_Y=10:SHEARS_TIME=7:MOVE_DELAY=0.18:FRAME_TIME=0.18:RETURN');
+    // The shears one step ahead, then food: two sounds.
+    BlipBasic.lines.set(90, 'START_GAME:LEVEL=6:RESET_SNAKE:SHEARS_X=BODY_X(1)+1:SHEARS_Y=BODY_Y(1):SHEARS_LEFT=7:FOOD_X=BODY_X(1)+2:FOOD_Y=BODY_Y(1):LAST_TIME=TIME()');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
@@ -509,10 +505,9 @@ test('SERPENT.BLIP offers and collects its timed bonus fruit', async (t) => {
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SERPENT'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SERPENT.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(80, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:LEVEL=1:FOODS=2:OB_COUNT=0:BODY_LENGTH=4:HEAD_X=10:HEAD_Y=10:DIR_X=1:DIR_Y=0:STEPS_SINCE_FOOD=100:STREAK=0:BONUS_TIME=0');
-    BlipBasic.lines.set(810, 'MOVE_DELAY=0.18:FRAME_TIME=0:FOOD_X=11:FOOD_Y=10:GOSUB 860');
-    BlipBasic.lines.set(910, 'BONUS_X=12:BONUS_Y=10:BONUS_TIME=6:RETURN');
+    // The third food offers the bonus; it is moved into the snake's path to be eaten.
+    BlipBasic.lines.set(90, 'START_GAME:FOODS=2:FOOD_X=BODY_X(1)+1:FOOD_Y=BODY_Y(1):LAST_TIME=TIME()');
+    BlipBasic.lines.set(175, 'IF BONUS_LEFT>0 AND NOT MOVED THEN BONUS_X=BODY_X(1)+2:BONUS_Y=BODY_Y(1):MOVED=1');
     window.serpentSoundBaseline = document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0;
     BlipBasic.submit('RUN');
   });
@@ -536,7 +531,7 @@ test('RALLY.BLIP runs matches and moves both player paddles', async (t) => {
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RALLY'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RALLY.BLIP'));
-  const original = await page.evaluate(() => [BlipBasic.lines.get(150), BlipBasic.lines.get(810)]);
+  const original = await page.evaluate(() => BlipBasic.lines.get(80));
   const turnDial = async (selector, direction) => {
     const box = await page.locator(selector).boundingBox();
     const centerX = box.x + box.width / 2, centerY = box.y + box.height / 2;
@@ -547,13 +542,7 @@ test('RALLY.BLIP runs matches and moves both player paddles', async (t) => {
   for (let round = 1; round <= 3; round++) {
     const soundEventsBefore = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
     await page.evaluate(([testRound, original]) => {
-      if (testRound === 1) {
-        BlipBasic.lines.set(150, 'MODE=2:STOP_MUSIC:GOTO 800');
-        BlipBasic.lines.set(810, 'GOSUB 1500:STATE=0:STOP_MUSIC:LAST_TIME=TIME():GOTO 200');
-      } else {
-        BlipBasic.lines.set(150, original[0]);
-        BlipBasic.lines.set(810, original[1]);
-      }
+      BlipBasic.lines.set(80, testRound === 1 ? 'PLAYERS=2:START_GAME' : original);
       BlipBasic.submit('RUN');
     }, [round, original]);
     try {
@@ -575,10 +564,11 @@ test('RALLY.BLIP runs matches and moves both player paddles', async (t) => {
           const context = sample.getContext('2d'); context.drawImage(bitmap, 0, 0);
           const { data, width, height } = context.getImageData(0, 0, sample.width, sample.height);
           let weightedY = 0, count = 0;
-          const scale = Math.min(width / 480, height / 540), left = (width - 480 * scale) / 2;
-          for (let y = Math.floor(height * .2); y < height * .9; y++) for (let x = Math.ceil(left + 440 * scale); x < left + 452 * scale; x++) {
+          const scale = Math.min(width / 640, height / 400), left = (width - 640 * scale) / 2;
+          for (let y = Math.floor(height * .2); y < height * .9; y++) for (let x = Math.ceil(left + 596 * scale); x < left + 608 * scale; x++) {
             const i = (y * width + x) * 4;
-            if (data[i] >= 195 && data[i] <= 220 && Math.abs(data[i] - data[i + 1]) < 5 && Math.abs(data[i] - data[i + 2]) < 5) { weightedY += y; count++; }
+            // The paddle's grey, dimmed by the curved glass toward the edge.
+            if (data[i] >= 140 && data[i] <= 225 && Math.abs(data[i] - data[i + 1]) < 8 && Math.abs(data[i] - data[i + 2]) < 8) { weightedY += y; count++; }
           }
           return count > 0 ? weightedY / count / height : null;
         }, image.toString('base64'));
@@ -626,9 +616,8 @@ test('RALLY.BLIP awards a point and resets the field after a missed paddle', asy
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(async () => {
     await BlipBasic.submit('LOAD /TAPE/RALLY');
-    BlipBasic.lines.set(10, 'MODE=2:GOTO 800');
-    BlipBasic.lines.set(810, 'GOSUB 1500:STATE=1:STOP_MUSIC:BX=0:BY=400:VX=0-275:VY=0:LAST_TIME=TIME():GOTO 200');
-    BlipBasic.lines.set(589, 'IF CPU_SCORE=1 AND STATE=2 AND BX=234 AND BY=278 THEN SOUND 1234,0,0');
+    BlipBasic.lines.set(90, 'PLAYERS=2:START_GAME:STATE$="PLAY":BALL_X=0:BALL_Y=60:BALL_VX=-360:BALL_VY=0:LPAD_Y=334:LAST_TIME=TIME()');
+    BlipBasic.lines.set(175, 'IF RIGHT_SCORE=1 AND STATE$="POINT" AND BALL_X=314 AND BALL_Y=210 THEN SOUND 1234,0,0');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.querySelector('#basic-wasm-frame').contentWindow.__pointReset === 1234);
@@ -701,8 +690,8 @@ test('ADDER changes to its Rust hunt track on round four', async (t) => {
   });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/ADDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'MODE=1:GOTO 800');
-    BlipBasic.lines.set(830, 'PLAY_MUSIC "ADDER_COIL":WAIT 100:ROUND=3:SEATS=4:GOTO 650');
+    // Round three ends at once, so round four begins on the next frame.
+    BlipBasic.lines.set(85, 'START_GAME 1:ROUND=3:ROUND_WAIT=0.01');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
@@ -771,7 +760,8 @@ test('METEORS.BLIP starts the next wave after the final small asteroid', async (
   });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/METEORS.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.submit('810 FOR I=1 TO 48:ROCK(I)=0:NEXT I:ROCK(1)=1:AX(1)=160:AY(1)=85:AR(1)=8:AVX(1)=0:AVY(1)=0:WAVE=1:GOTO 890');
+    // START_GAME's first wave is one small rock straight ahead of the ship.
+    BlipBasic.submit('2100 CLEAR_ROCKS:SPAWN_ROCK 3,320,150,0,0');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 20000 });
@@ -795,7 +785,7 @@ test('METEORS.BLIP splits a medium asteroid into two small rocks', async (t) => 
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD METEORS'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/METEORS.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.submit('810 FOR I=1 TO 48:ROCK(I)=0:NEXT I:ROCK(1)=1:AX(1)=160:AY(1)=85:AR(1)=12:AVX(1)=0:AVY(1)=0:WAVE=1:GOTO 890');
+    BlipBasic.submit('2100 CLEAR_ROCKS:SPAWN_ROCK 2,320,150,0,0');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 20000 });
@@ -821,8 +811,9 @@ test('METEORS.BLIP launches an animated saucer and aims its shot', async (t) => 
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD METEORS'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/METEORS.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.submit('1480 RETURN');
-    BlipBasic.submit('810 FOR I=1 TO 48:ROCK(I)=0:NEXT I:SAUCER=0:UFO_WAIT=1:UBULLET=0:INVULN=0:GOTO 890');
+    // An empty field that stays empty, and a saucer due at once.
+    BlipBasic.submit('4915 EXIT SUB');
+    BlipBasic.submit('2100 CLEAR_ROCKS:SAUCER_WAIT=0.05');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 20000 });
@@ -846,9 +837,10 @@ test('METEORS.BLIP awards the big saucer hit and plays its original sound', asyn
   await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD METEORS'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/METEORS.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.submit('10 GOTO 800');
-    BlipBasic.submit('1480 RETURN');
-    BlipBasic.submit('810 FOR I=1 TO 48:ROCK(I)=0:NEXT I:SAUCER=1:UX=160:UYS=85:UY=85:UBIG=1:UWIDTH=24:UHEIGHT=8:UFIRE=80:UBULLET=0:INVULN=0:GOTO 890');
+    // Straight into play, with a big saucer parked ahead of the ship.
+    BlipBasic.submit('85 START_GAME');
+    BlipBasic.submit('4915 EXIT SUB');
+    BlipBasic.submit('2100 CLEAR_ROCKS:SPAWN_SAUCER:SAUCER_X=320:SAUCER_Y=150:SAUCER_VX=0:SAUCER_BIG=1');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 20000 });
@@ -861,16 +853,16 @@ test('METEORS.BLIP awards the big saucer hit and plays its original sound', asyn
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
 
-test('SKY_RAIDER.BLIP runs three rounds with flight, shooting, graphics, and sound', async (t) => {
+test('RAIDER.BLIP runs three rounds with flight, shooting, graphics, and sound', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RAIDER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   for (let round = 1; round <= 3; round++) {
     await page.evaluate(() => BlipBasic.submit('RUN'));
     await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
-    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: Sky Raider should launch without errors`);
+    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: Raider should launch without errors`);
     const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
     await page.waitForTimeout(180);
     const title = await canvas.screenshot();
@@ -896,20 +888,19 @@ test('SKY_RAIDER.BLIP runs three rounds with flight, shooting, graphics, and sou
   }
 });
 
-test('SKY_RAIDER drops an ACE weapon capsule and upgrades its volley', async (t) => {
+test('RAIDER drops an ACE weapon capsule and upgrades its volley', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RAIDER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=99:PX=143:PY=160:VX=0:SPAWN=0:SCROLL=0:FIRE_WAIT=0:SPAWN_SLOT=0:HIT_WAIT=0:LEVEL=1:KILLS=0:BOSS_ACTIVE=0:WON=0:WEAPON=1:POWER_ACTIVE=0:PLAY_MUSIC "SKY_RAIDER_ALT"');
-    BlipBasic.lines.set(820, 'FOR E=1 TO 8:ENEMY(E)=0:ESHOT(E)=0:NEXT E');
-    BlipBasic.lines.set(830, 'ENEMY(1)=1:ETYPE(1)=3:EX(1)=143:EY(1)=120:EDIR(1)=0:ESHOT(1)=999:GOTO 100');
-    BlipBasic.lines.set(150, 'DRAW_HUD(SCORE,LIVES):IF WEAPON=2 AND SCORE>=180 THEN FILL_RECT(4,40,8,8,"#00FF00")');
-    BlipBasic.lines.set(308, 'IF ENEMY(1)=1 THEN SHOT(1)=1:BX(1)=EX(1)+15:BY(1)=EY(1)+10:BT(1)=50');
-    BlipBasic.lines.set(309, 'IF POWER_ACTIVE=1 THEN POWER_X=PX:POWER_Y=PY:GOSUB 1850');
+    // One ACE that never fires, a round put into it each frame, and its capsule
+    // carried to the plane; the marker shows tier two and 120+60 points.
+    BlipBasic.lines.set(85, 'START_GAME:LIVES=99:SPAWN_WAIT=999:SPAWN_ENEMY 3,295,120,0:ENEMY_FIRE(1)=999');
+    BlipBasic.lines.set(175, 'IF ENEMY(1) THEN SHOT(1)=1:SHOT_X(1)=ENEMY_X(1)+20:SHOT_Y(1)=ENEMY_Y(1)+10');
+    BlipBasic.lines.set(176, 'IF CAPSULE_ON THEN CAPSULE_X=PLANE_X+18:CAPSULE_Y=PLANE_Y+15');
+    BlipBasic.lines.set(165, 'IF WEAPON=2 AND SCORE>=180 THEN FILL_RECT(8,60,24,24,"#00FF00")');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
@@ -943,19 +934,18 @@ test('SKY_RAIDER drops an ACE weapon capsule and upgrades its volley', async (t)
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
 
-test('SKY_RAIDER reaches its Rust boss threshold, defeats the boss, and advances the wave', async (t) => {
+test('RAIDER reaches its Rust boss threshold, defeats the boss, and advances the wave', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RAIDER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=99:PX=143:PY=160:VX=0:SPAWN=0:SCROLL=0:FIRE_WAIT=0:SPAWN_SLOT=0:HIT_WAIT=0:LEVEL=1:KILLS=60:BOSS_ACTIVE=0:WON=0:PLAY_MUSIC "SKY_RAIDER_ALT"');
-    BlipBasic.lines.set(820, 'FOR E=1 TO 8:ENEMY(E)=0:ESHOT(E)=0:NEXT E');
-    BlipBasic.lines.set(150, 'DRAW_HUD(SCORE,LIVES):IF BOSS_ACTIVE=1 THEN FILL_RECT(4,4,8,8,"#00FF00")');
-    BlipBasic.lines.set(155, 'IF LEVEL=2 THEN FILL_RECT(4,4,8,8,"#FF00FF")');
-    BlipBasic.lines.set(309, 'IF BOSS_ACTIVE=1 THEN SHOT(1)=1:BX(1)=BOSS_X+BOSS_W/2:BY(1)=BOSS_Y+5:BT(1)=50');
+    // Sixty kills already: the boss comes at once and takes a round each frame.
+    BlipBasic.lines.set(85, 'START_GAME:LIVES=99:KILLS=60');
+    BlipBasic.lines.set(175, 'IF BOSS_ON AND BOSS_IN THEN SHOT(1)=1:SHOT_X(1)=BOSS_X+BOSS_W/2:SHOT_Y(1)=BOSS_Y+5');
+    BlipBasic.lines.set(165, 'IF BOSS_ON THEN FILL_RECT(8,4,24,22,"#00FF00")');
+    BlipBasic.lines.set(166, 'IF LEVEL=2 THEN FILL_RECT(8,4,24,22,"#FF00FF")');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
@@ -987,16 +977,14 @@ test('SKY_RAIDER reaches its Rust boss threshold, defeats the boss, and advances
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
 
-test('SKY_RAIDER.BLIP fires aimed enemy rounds with the original gun sound', async (t) => {
+test('RAIDER.BLIP fires aimed enemy rounds with the original gun sound', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RAIDER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:PX=143:PY=160:SPAWN=0:SCROLL=0:FIRE_WAIT=0:SPAWN_SLOT=0:HIT_WAIT=0:ENEMY(1)=1:EX(1)=143:EY(1)=80:ETYPE(1)=1:ESHOT(1)=1:PLAY_MUSIC "SKY_RAIDER_ALT"');
-    BlipBasic.lines.set(820, 'FOR E=2 TO 8:ENEMY(E)=0:ESHOT(E)=0:NEXT E');
+    BlipBasic.lines.set(85, 'START_GAME:SPAWN_WAIT=999:SPAWN_ENEMY 1,295,80,0:ENEMY_FIRE(1)=0.05');
   });
   await page.evaluate(() => BlipBasic.submit('RUN'));
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
@@ -1013,19 +1001,18 @@ test('SKY_RAIDER.BLIP fires aimed enemy rounds with the original gun sound', asy
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
 
-test('SKY_RAIDER.BLIP spawns enemy pairs like the Rust formations', async (t) => {
+test('RAIDER.BLIP spawns enemy pairs like the Rust formations', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => {
     BlipBasic.submit('CD /TAPE');
-    BlipBasic.submit('LOAD SKY_RAIDER');
+    BlipBasic.submit('LOAD RAIDER');
   });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:PX=143:PY=160:VX=0:SPAWN=80:SCROLL=0:FIRE_WAIT=0:SPAWN_SLOT=0:HIT_WAIT=0:PLAY_MUSIC "SKY_RAIDER_ALT"');
-    BlipBasic.lines.set(295, 'IF ENEMY(1)+ENEMY(2)+ENEMY(3)+ENEMY(4)+ENEMY(5)+ENEMY(6)+ENEMY(7)+ENEMY(8)>=2 THEN FILL_RECT(100,40,8,8,"BLIP_YELLOW")');
+    BlipBasic.lines.set(85, 'START_GAME:SPAWN_WAIT=0');
+    BlipBasic.lines.set(165, 'IF (ENEMY(1)>0)+(ENEMY(2)>0)+(ENEMY(3)>0)+(ENEMY(4)>0)>=2 THEN FILL_RECT(200,80,16,16,"BLIP_YELLOW")');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
@@ -1036,9 +1023,9 @@ test('SKY_RAIDER.BLIP spawns enemy pairs like the Rust formations', async (t) =>
     const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
     const { data, width } = context.getImageData(0, 0, sample.width, sample.height);
     let pixels = 0;
-    const scale = Math.min(width / 320, image.height / 200);
-    const left = (width - 320 * scale) / 2, top = (image.height - 200 * scale) / 2;
-    for (let y = Math.floor(top + 40 * scale); y < Math.ceil(top + 48 * scale); y++) for (let x = Math.floor(left + 100 * scale); x < Math.ceil(left + 108 * scale); x++) {
+    const scale = Math.min(width / 640, image.height / 400);
+    const left = (width - 640 * scale) / 2, top = (image.height - 400 * scale) / 2;
+    for (let y = Math.floor(top + 82 * scale); y < Math.ceil(top + 94 * scale); y++) for (let x = Math.floor(left + 202 * scale); x < Math.ceil(left + 214 * scale); x++) {
       const i = (y * width + x) * 4;
       if (data[i] > 150 && data[i + 1] > 110 && data[i + 2] < 100) pixels++;
     }
@@ -1055,16 +1042,18 @@ test('SKY_RAIDER.BLIP spawns enemy pairs like the Rust formations', async (t) =>
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
 
-test('SKY_RAIDER.BLIP gives the plane hit grace against a touching formation', async (t) => {
+test('RAIDER.BLIP gives the plane hit grace against a touching formation', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RAIDER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=3:PX=143:PY=160:VX=0:SPAWN=0:SCROLL=0:FIRE_WAIT=0:SPAWN_SLOT=0:HIT_WAIT=0');
-    BlipBasic.lines.set(820, 'FOR E=1 TO 8:ENEMY(E)=0:ESHOT(E)=999:NEXT E:ENEMY(1)=1:EX(1)=143:EY(1)=159:ETYPE(1)=1:ENEMY(2)=1:EX(2)=143:EY(2)=159:ETYPE(2)=1');
+    // Two quiet grunts on top of the plane, without its spawn grace. No music
+    // starts, so the only sound is the hit.
+    BlipBasic.lines.set(80, 'REM NO TITLE MUSIC');
+    BlipBasic.lines.set(85, 'LIVES=3:LEVEL=1:WEAPON=1:CLEAR_SKY:NEW_PLANE:STATE$="PLAY":SPAWN_WAIT=999:GRACE=0');
+    BlipBasic.lines.set(86, 'SPAWN_ENEMY 1,PLANE_X,PLANE_Y,0:SPAWN_ENEMY 1,PLANE_X,PLANE_Y,0:ENEMY_FIRE(1)=999:ENEMY_FIRE(2)=999');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
@@ -1076,27 +1065,28 @@ test('SKY_RAIDER.BLIP gives the plane hit grace against a touching formation', a
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
 
+const soundCount = (page) => page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
+const exitTape = async (page) => {
+  await page.locator('#exit-game').click();
+  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+};
+/** Ryuka against Giotto, a fixed distance apart; the rival stands still. */
+const brawlerFight = (gap, setup = '') => ({
+  80: 'REM NO MUSIC, SO THE SOUND COUNT IS ONLY THE FIGHT',
+  85: `PICK=1:START_GAME:RIVAL_X=YOU_X+${gap}:SPEED(RIVAL)=0${setup}`,
+});
+
 test('BRAWLER.BLIP supports three rounds of movement and striking', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BRAWLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BRAWLER.BLIP'));
   for (let round = 1; round <= 3; round++) {
-    await page.evaluate(() => {
-      BlipBasic.lines.set(330, 'PLAYER_WAIT=PLAYER_WAIT-1:CPU_WAIT=999:ATTACK=ATTACK-1:PUNCH=0:KICK=0');
-      BlipBasic.submit('RUN');
-    });
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
+    const canvas = await openTape(page, origin, 'BRAWLER', { 166: 'RIVAL_WAIT=999' });
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: Brawler should launch cleanly`);
-    const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
     await page.waitForTimeout(180);
     const title = await canvas.screenshot();
-    if (round === 1) await import('node:fs/promises').then(({ writeFile }) => writeFile('/tmp/brawler-title.png', title));
     let titleAnimated = false;
     for (let frame = 0; frame < 16 && !titleAnimated; frame++) {
       await page.waitForTimeout(250);
-      assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: title scene runtime`);
       titleAnimated = !(await canvas.screenshot()).equals(title);
     }
     assert.ok(titleAnimated, `round ${round}: the title fighters and spotlights should animate`);
@@ -1110,140 +1100,63 @@ test('BRAWLER.BLIP supports three rounds of movement and striking', async (t) =>
     await page.keyboard.down('ArrowDown');
     await page.keyboard.press('z');
     await page.waitForTimeout(1200);
-    await page.keyboard.up('ArrowRight');
-    await page.keyboard.up('ArrowDown');
-    await page.keyboard.up('Space');
-    await page.keyboard.down('f');
-    await page.waitForTimeout(100);
-    await page.keyboard.up('f');
-    await page.keyboard.down('z');
-    await page.waitForTimeout(100);
-    await page.keyboard.up('z');
-    await page.waitForTimeout(250);
-    await page.waitForTimeout(250);
+    for (const key of ['ArrowRight', 'ArrowDown', 'Space']) await page.keyboard.up(key);
+    await page.keyboard.press('f', { delay: 100 });
+    await page.keyboard.press('z', { delay: 100 });
+    await page.waitForTimeout(500);
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: movement, jump, guard, punch, and kick should not fail`);
-    let fight; let brightPixels = 0;
-    for (let frame = 0; frame < 16 && brightPixels <= 500; frame++) {
+    let fight; let lit = 0;
+    for (let frame = 0; frame < 16 && lit <= 2000; frame++) {
       if (frame) await page.waitForTimeout(100);
       fight = await canvas.screenshot();
-      brightPixels = await page.evaluate(async (base64) => {
-        const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-        const sample = document.createElement('canvas'); sample.width = image.width; sample.height = image.height;
-        const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-        const pixels = context.getImageData(image.width * 0.1, image.height * 0.1, image.width * 0.8, image.height * 0.8).data;
-        let count = 0;
-        for (let i = 0; i < pixels.length; i += 4) if (Math.max(pixels[i], pixels[i + 1], pixels[i + 2]) > 50) count++;
-        return count;
-      }, fight.toString('base64'));
+      lit = await countGamePixels(page, fight, [64, 40, 512, 320], 'lit');
     }
     assert.notDeepEqual(fight, title, `round ${round}: pressing Space should enter the fight scene`);
-    assert.ok(brightPixels > 500, `round ${round}: the fight scene should contain visible stage and fighter pixels (got ${brightPixels})`);
-    if (round === 1) await import('node:fs/promises').then(({ writeFile }) => writeFile('/tmp/brawler-fight.png', fight));
-    assert.ok((await canvas.screenshot()).length > 1000);
-    await page.keyboard.up('ArrowRight');
-    await page.keyboard.up('Space');
-    await page.keyboard.up('ArrowDown');
-    await page.locator('#exit-game').click();
-    await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+    assert.ok(lit > 2000, `round ${round}: the fight scene should show its stage and fighters (got ${lit})`);
+    await exitTape(page);
   }
 });
 
 test('BRAWLER punch lands once after its Rust startup frames', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BRAWLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BRAWLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'PICK=1:GOSUB 1490:PLAYER_REACH=REACH(1):PLAYER_POWER=POWER(1):PLAYER_MAXHP=MAXHP(1):PLAYER_SPEED=SPEED(1):PLAYER_JUMP=JUMP(1):GOTO 800');
-    BlipBasic.lines.set(190, 'CX=CX');
-    BlipBasic.lines.set(200, 'CX=CX');
-    BlipBasic.lines.set(810, 'GOSUB 1500:PLAYER_HP=PLAYER_MAXHP:CPU_HP=CPU_MAXHP:PX=120:CX=155:PY=117:CY=117:PVY=0:PLAYER_WAIT=0:CPU_WAIT=999:CPU_ATTACK=0:CPU_HIT=0:ATTACK=0:ATTACK_KIND=0:HIT_DONE=1:PUNCH_BUFFER=0:KICK_BUFFER=0:RESULT_SET=0:ROUND_TIME=45');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  const canvas = await openTape(page, origin, 'BRAWLER', brawlerFight(70, ':RIVAL_WAIT=999'));
+  await waitForPixels(page, canvas, [52, 24, 196, 12], 'cyan', 200);
   await canvas.focus();
-  await page.waitForTimeout(150);
-  const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
+  const before = await soundCount(page);
   await page.keyboard.press('Space');
   await page.waitForTimeout(350);
-  const after = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
+  const after = await soundCount(page);
   assert.equal(after, before + 2, `a close punch should play its windup and exactly one hit sound (${before} -> ${after})`);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the timed punch should not cause an interpreter error');
-  await page.locator('#exit-game').click();
+  await exitTape(page);
 });
 
 test('BRAWLER tape visits the Rust ladder order for all nine matches', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.route('**/basic-runtime.html*', async (route) => {
-    const response = await route.fetch();
-    const body = (await response.text()).replace('imports.env.blip_basic_sound=playBasicTone;',
-      'imports.env.blip_basic_sound=function(f,s,v){window.__ladderOpponent=f;playBasicTone(f,s,v);};');
-    await route.fulfill({ response, body });
-  });
-  const expected = [4, 2, 5, 3, 6, 8, 7, 9, 10];
-  const seen = [];
-  for (let rung = 1; rung <= expected.length; rung++) {
-    await page.goto(`${origin}/basic.html`);
-    await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BRAWLER'); });
-    await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BRAWLER.BLIP'));
-    await page.evaluate((rung) => {
-      BlipBasic.lines.set(10, `TEST_RUNG=${rung}`);
-      BlipBasic.lines.set(75, 'MATCH_NO=TEST_RUNG:GOSUB 1850');
-      // Report the actual opponent through the existing SOUND host call.
-      BlipBasic.lines.set(146, 'SOUND CPU_PICK,0,0');
-      BlipBasic.lines.set(360, 'WAIT 150:GOTO 370');
-      BlipBasic.submit('RUN');
-    }, rung);
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
-    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-    await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').press('Space', { delay: 100 });
-    await page.waitForFunction(() => document.querySelector('#basic-wasm-frame').contentWindow.__ladderOpponent !== undefined);
-    seen.push(await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.__ladderOpponent));
-    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-    await page.locator('#exit-game').click();
-    await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  // blip::ordered_ladder for Ryuka (1) and Gamma (9), one-based.
+  for (const [pick, expected] of [[1, [4, 2, 5, 3, 6, 8, 7, 9, 10]], [9, [1, 4, 2, 5, 3, 6, 8, 7, 10]]]) {
+    const same = expected.map((who, i) => `LADDER(${i + 1})=${who}`).join(' AND ');
+    const canvas = await openTape(page, origin, 'BRAWLER', { 85: `PICK=${pick}:BUILD_LADDER:STATE$="TITLE"`, 165: statusMarker(same) });
+    assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20) > 20, `pick ${pick}: the BASIC search should match Rust ordering and keep Gamma then Zenith last`);
+    await exitTape(page);
   }
-  assert.deepEqual(seen, expected, 'the BASIC search should match Rust ordering and keep Gamma then Zenith last');
 });
 
 test('BRAWLER roster specials land across projectile, rush, kick and laser fighters', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-
   for (const pick of [1, 2, 3, 8, 10]) {
-    await page.goto(`${origin}/basic.html`);
-    await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BRAWLER'); });
-    await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BRAWLER.BLIP'));
-    await page.evaluate((fighter) => {
-      BlipBasic.lines.set(10, `PICK=${fighter}:GOSUB 1490:PLAYER_SUIT$=SUIT$(PICK):PLAYER_TRIM$=TRIM$(PICK):PLAYER_MAXHP=MAXHP(PICK):PLAYER_SPEED=SPEED(PICK):PLAYER_POWER=POWER(PICK):PLAYER_REACH=REACH(PICK):PLAYER_JUMP=JUMP(PICK):PLAYER_SPECIAL=SPEC_KIND(PICK):PLAYER_SPECIAL_SPEED=SPEC_SPEED(PICK):GOTO 800`);
-      BlipBasic.lines.set(190, 'CX=CX');
-      BlipBasic.lines.set(200, 'CX=CX');
-      BlipBasic.lines.set(810, 'GOSUB 1500:PLAYER_HP=PLAYER_MAXHP:CPU_HP=CPU_MAXHP:PX=120:CX=165:PY=117:CY=117:PVY=0:PLAYER_WAIT=0:CPU_WAIT=999:CPU_ATTACK=0:CPU_HIT=0:ATTACK=0:ATTACK_KIND=0:HIT_DONE=1:PUNCH_BUFFER=0:KICK_BUFFER=0:RESULT_SET=0:ROUND_TIME=45');
-      BlipBasic.submit('RUN');
-    }, pick);
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
+    const canvas = await openTape(page, origin, 'BRAWLER', {
+      80: 'REM NO MUSIC',
+      85: `PICK=${pick}:START_GAME:RIVAL_X=YOU_X+110:SPEED(RIVAL)=0:RIVAL_WAIT=999`,
+      165: statusMarker('SPECIAL_HIT=1 AND RIVAL_HP<MAX_HP(RIVAL)'),
+    });
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `fighter ${pick} should start`);
-    const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
     await canvas.focus();
-    let rendered = false;
-    for (let frame = 0; frame < 20 && !rendered; frame++) {
-      await page.waitForTimeout(100);
-      const image = await canvas.screenshot();
-      rendered = await page.evaluate(async (encoded) => {
-        const image = new Image(); image.src = `data:image/png;base64,${encoded}`; await image.decode();
-        const sample = document.createElement('canvas'); sample.width = image.width; sample.height = image.height;
-        const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-        const pixels = context.getImageData(0, 0, image.width, image.height).data;
-        let count = 0;
-        for (let i = 0; i < pixels.length; i += 4) if (Math.max(pixels[i], pixels[i + 1], pixels[i + 2]) > 50) count++;
-        return count > 500;
-      }, image.toString('base64'));
-    }
-    assert.ok(rendered, `fighter ${pick} should render the fight before input`);
-    const beforeSound = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents);
+    await page.waitForTimeout(300);
+    const beforeSound = await soundCount(page);
     await page.keyboard.down('f');
     await page.waitForTimeout(35);
     await page.keyboard.down('g');
@@ -1252,192 +1165,117 @@ test('BRAWLER roster specials land across projectile, rush, kick and laser fight
     await page.keyboard.up('g');
     await page.waitForTimeout(800);
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `fighter ${pick} special should run`);
-    const afterSound = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents);
+    const afterSound = await soundCount(page);
     assert.ok(afterSound >= beforeSound + 2, `fighter ${pick} special should play its startup and hit sounds (${beforeSound} -> ${afterSound})`);
-    await page.locator('#exit-game').click();
-    await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+    assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20) > 20, `fighter ${pick} special should land`);
+    await exitTape(page);
   }
 });
 
 test('BRAWLER guard blocks the CPU attack without chip damage', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BRAWLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BRAWLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'PICK=1:GOSUB 1490:PLAYER_REACH=REACH(1):PLAYER_POWER=POWER(1):PLAYER_MAXHP=MAXHP(1):PLAYER_SPEED=SPEED(1):PLAYER_JUMP=JUMP(1):GOTO 800');
-    BlipBasic.lines.set(190, 'CX=CX');
-    BlipBasic.lines.set(200, 'CX=CX');
-    BlipBasic.lines.set(810, 'GOSUB 1500:PLAYER_HP=PLAYER_MAXHP:CPU_HP=CPU_MAXHP:PX=120:CX=145:PY=117:CY=117:PVY=0:PLAYER_WAIT=0:CPU_WAIT=20:CPU_ATTACK=0:CPU_HIT=0:ATTACK=0:ATTACK_KIND=0:HIT_DONE=1:PUNCH_BUFFER=0:KICK_BUFFER=0:RESULT_SET=0:ROUND_TIME=45');
-    BlipBasic.lines.set(350, BlipBasic.lines.get(350).replace('IF ', 'IF KEY_HELD("DOWN")=1 AND '));
-    BlipBasic.lines.set(351, 'IF CPU_HIT=1 AND ABS(CX-PX)<27 AND PY>108 AND (KEY_HELD("DOWN")=1 OR KEY_HELD("S")=1) THEN CPU_HIT=0:CPU_WAIT=999:BLOCK_FLASH=60:PLAY_SFX "BRAWLER/BLOCK"');
-    BlipBasic.lines.set(353, 'IF BLOCK_FLASH>0 AND PLAYER_HP<>PLAYER_MAXHP THEN DRAW_TEXTURE("CHIP DAMAGE",0,0,1,1)');
-    BlipBasic.submit('RUN');
+  const canvas = await openTape(page, origin, 'BRAWLER', {
+    ...brawlerFight(40, ':RIVAL_WAIT=20'),
+    165: 'IF BLOCK_FLASH>0 THEN BLOCK_FLASH=99',
+    166: statusMarker('YOUR_HP=MAX_HP(PICK)'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
   await canvas.focus();
   await page.waitForTimeout(150);
-  const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
+  const before = await soundCount(page);
   await page.keyboard.down('ArrowDown');
   await page.waitForFunction((initial) => (document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0) >= initial + 2, before, { timeout: 3000 });
-  const blockFrame = await canvas.screenshot();
-  await import('node:fs/promises').then(({ writeFile }) => writeFile('/tmp/brawler-block.png', blockFrame));
+  await page.waitForTimeout(150);
+  const frame = await canvas.screenshot();
   await page.keyboard.up('ArrowDown');
-  const after = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  assert.ok(after >= before + 2, `the CPU should wind up and be blocked (${before} -> ${after})`);
-  const blockPixels = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const x = Math.round(image.naturalWidth * .37), y = Math.round(image.naturalHeight * .64);
-    const { data } = context.getImageData(x, y, Math.round(image.naturalWidth * .09), Math.round(image.naturalHeight * .12));
-    let count = 0;
-    for (let i = 0; i < data.length; i += 4) if (data[i + 1] > 125 && data[i + 2] > 155 && data[i + 1] > data[i] * 1.35) count++;
-    return count;
-  }, blockFrame.toString('base64'));
-  assert.ok(blockPixels > 4, `guard impact should flash cyan at the player's hands, got ${blockPixels} pixels`);
+  assert.ok(await countGamePixels(page, frame, [166, 268, 28, 28], 'cyan') > 4, "guard impact should flash cyan at the player's hands");
+  assert.ok(await countGamePixels(page, frame, STATUS_MARKER, 'green') > 20, 'a blocked blow should do no damage');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'blocking should not cause an interpreter error');
-  await page.locator('#exit-game').click();
+  await exitTape(page);
 });
 
 test('BRAWLER unguarded CPU hits show a red impact cue', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BRAWLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BRAWLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'PICK=1:GOSUB 1490:PLAYER_REACH=REACH(1):PLAYER_POWER=POWER(1):PLAYER_MAXHP=MAXHP(1):PLAYER_SPEED=SPEED(1):PLAYER_JUMP=JUMP(1):GOTO 800');
-    BlipBasic.lines.set(190, 'CX=CX');
-    BlipBasic.lines.set(200, 'CX=CX');
-    BlipBasic.lines.set(351, 'IF CPU_HIT=1 AND ABS(CX-PX)<27 AND PY>108 AND (KEY_HELD("DOWN")=1 OR KEY_HELD("S")=1) THEN CPU_HIT=0:CPU_WAIT=999:BLOCK_FLASH=60:PLAY_SFX "BRAWLER/BLOCK"');
-    BlipBasic.lines.set(352, 'IF CPU_HIT=1 THEN CPU_HIT=0:CPU_WAIT=999:IF ABS(CX-PX)<27 AND PY>108 THEN PLAYER_HP=PLAYER_HP-5*CPU_POWER:PLAYER_HIT_FLASH=60:PLAY_SFX "BRAWLER/HIT_LIGHT2"');
-    BlipBasic.lines.set(810, 'GOSUB 1500:PLAYER_HP=PLAYER_MAXHP:CPU_HP=CPU_MAXHP:PX=120:CX=145:PY=117:CY=117:PVY=0:PLAYER_WAIT=0:CPU_WAIT=20:CPU_ATTACK=0:CPU_HIT=0:ATTACK=0:ATTACK_KIND=0:HIT_DONE=1:PUNCH_BUFFER=0:KICK_BUFFER=0:RESULT_SET=0:ROUND_TIME=45');
-    BlipBasic.submit('RUN');
+  const canvas = await openTape(page, origin, 'BRAWLER', {
+    ...brawlerFight(40, ':RIVAL_WAIT=20'),
+    165: 'IF HURT_FLASH>0 THEN HURT_FLASH=99',
+    166: statusMarker('YOUR_HP<MAX_HP(PICK)'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
   await canvas.focus();
   await page.waitForTimeout(150);
-  const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
+  const before = await soundCount(page);
   await page.waitForFunction((initial) => (document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0) >= initial + 2, before, { timeout: 3000 });
-  const hitFrame = await canvas.screenshot();
-  const hitPixels = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const x = Math.round(image.naturalWidth * .37), y = Math.round(image.naturalHeight * .64);
-    const { data } = context.getImageData(x, y, Math.round(image.naturalWidth * .09), Math.round(image.naturalHeight * .12));
-    let count = 0;
-    for (let i = 0; i < data.length; i += 4) if (data[i] > 125 && data[i] > data[i + 1] * 1.35 && data[i] > data[i + 2] * 1.15) count++;
-    return count;
-  }, hitFrame.toString('base64'));
-  assert.ok(hitPixels > 4, `unguarded CPU hit should flash red between the fighters, got ${hitPixels} pixels`);
+  await page.waitForTimeout(150);
+  const frame = await canvas.screenshot();
+  assert.ok(await countGamePixels(page, frame, [166, 268, 28, 28], 'red') > 4, 'an unguarded CPU hit should flash red between the fighters');
+  assert.ok(await countGamePixels(page, frame, STATUS_MARKER, 'green') > 20, 'the hit should cost health');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the damage animation should not cause an interpreter error');
-  await page.locator('#exit-game').click();
+  await exitTape(page);
 });
 
 test('BRAWLER ends a 45-second round on time and awards the healthier fighter', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BRAWLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BRAWLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'PICK=1:GOSUB 1490:PLAYER_SUIT$="#315BCB":PLAYER_TRIM$="#2345AA":NAME$(1)="RYUKA":GOTO 800');
-    BlipBasic.lines.set(810, 'GOSUB 1500:PLAYER_HP=90:CPU_HP=55:PX=70:CX=232:PY=117:CY=117:PVY=0:PLAYER_WAIT=0:CPU_WAIT=999:CPU_ATTACK=0:CPU_HIT=0:ATTACK=0:ATTACK_KIND=0:HIT_DONE=1:PUNCH_BUFFER=0:KICK_BUFFER=0:RESULT_SET=0:ROUND_TIME=45');
-    BlipBasic.lines.set(740, 'IF PLAYER_ROUNDS=1 AND CPU_ROUNDS=0 THEN DRAW_TEXT("TIME SCORE OK",160,108,2,"BLIP_YELLOW","CENTER")');
-    BlipBasic.submit('RUN');
+  let canvas = await openTape(page, origin, 'BRAWLER', { 85: 'PICK=1:START_GAME:RIVAL_WAIT=999' });
+  assert.ok(await waitForPixels(page, canvas, [52, 24, 196, 12], 'cyan', 200) > 200, 'your health bar should sit on the left');
+  const fight = await canvas.screenshot();
+  assert.ok(await countGamePixels(page, fight, [392, 24, 196, 12], 'red') > 200, "the rival's health bar should sit on the right");
+  assert.ok(await countGamePixels(page, fight, [294, 18, 52, 26], 'white') > 10, 'the round clock should be visible between them');
+  await exitTape(page);
+  canvas = await openTape(page, origin, 'BRAWLER', {
+    85: 'PICK=1:START_GAME:YOUR_HP=90:RIVAL_HP=55:RIVAL_WAIT=999:ROUND_TIME=0.2',
+    165: statusMarker('STATE$="ROUND" AND TIME_UP AND YOUR_ROUNDS=1 AND RIVAL_ROUNDS=0'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await page.waitForTimeout(100);
-  const hudImage = await canvas.screenshot();
-  const hud = await canvas.evaluate(async (_element, encoded) => {
-    const image = new Image(); image.src = `data:image/png;base64,${encoded}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.width; sample.height = image.height;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data, width, height } = context.getImageData(0, 0, sample.width, sample.height);
-    let player = 0, rival = 0, clock = 0;
-    for (let y = Math.floor(height * .14); y < Math.floor(height * .25); y++) for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4;
-      if (x < width * .42 && data[i + 2] > 100 && data[i + 1] > 80 && data[i + 2] > data[i] * 1.3) player++;
-      if (x > width * .58 && data[i] > 150 && data[i] > data[i + 1] * 1.3) rival++;
-      if (x > width * .45 && x < width * .55 && ((data[i] > 150 && data[i] > data[i + 1] * 1.3) || (data[i] > 160 && data[i + 1] > 160 && data[i + 2] > 160))) clock++;
-    }
-    return { player, rival, clock };
-  }, hudImage.toString('base64'));
-  assert.ok(hud.player > 20 && hud.rival > 20, `the Rust-spaced health bars should stay on their own sides (${JSON.stringify(hud)})`);
-  assert.ok(hud.clock > 5, `the Rust-style central round clock should be visible (${JSON.stringify(hud)})`);
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(810, 'GOSUB 1500:PLAYER_HP=90:CPU_HP=55:PX=70:CX=232:PY=117:CY=117:PVY=0:PLAYER_WAIT=0:CPU_WAIT=999:CPU_ATTACK=0:CPU_HIT=0:ATTACK=0:ATTACK_KIND=0:HIT_DONE=1:PUNCH_BUFFER=0:KICK_BUFFER=0:RESULT_SET=0:ROUND_TIME=0');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  await page.waitForTimeout(350);
+  await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the time-up path should not stop with a BASIC error');
-  const image = await canvas.screenshot();
-  const markers = await canvas.evaluate(async (_element, encoded) => {
-    const bitmap = new Image(); bitmap.src = `data:image/png;base64,${encoded}`; await bitmap.decode();
-    const sample = document.createElement('canvas'); sample.width = bitmap.width; sample.height = bitmap.height;
-    const context = sample.getContext('2d'); context.drawImage(bitmap, 0, 0);
-    const { data, width, height } = context.getImageData(0, 0, sample.width, sample.height);
-    const yellowPixels = (from, to) => {
-      let count = 0;
-      for (let y = Math.floor(height * from); y < Math.floor(height * to); y++) for (let x = 0; x < width; x++) {
-        const i = (y * width + x) * 4;
-        if (data[i] > 160 && data[i + 1] > 100 && data[i + 2] < 100) count++;
-      }
-      return count;
-    };
-    return { timeout: yellowPixels(.12, .25), winner: yellowPixels(.45, .62) };
-  }, image.toString('base64'));
-  assert.ok(markers.timeout > 12, `the round should display TIME UP (${markers.timeout} yellow pixels)`);
-  assert.ok(markers.winner > 12, `the higher-health player should win the timed round (${markers.winner} yellow pixels)`);
-  await page.locator('#exit-game').click();
+  const result = await canvas.screenshot();
+  assert.ok(await countGamePixels(page, result, [240, 66, 160, 26], 'yellow') > 12, 'the round should display TIME UP');
+  assert.ok(await countGamePixels(page, result, STATUS_MARKER, 'green') > 20, 'the higher-health player should win the timed round');
+  await exitTape(page);
 });
 
 test('BRAWLER.BLIP draws the turtle shell and mask build', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BRAWLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BRAWLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(15, 'IF PICK=0 THEN PICK=4:CPU_COLOR$="#A3343B":RIVAL$="BRUTUS":NAME$(4)="GIOTTO":SUIT$(4)="#41704A":TRIM$(4)="#2852AC":GOSUB 1490');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
-  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the turtle selection should initialize');
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await canvas.focus();
-  await page.keyboard.press('Space');
-  await page.waitForTimeout(500);
+  const canvas = await openTape(page, origin, 'BRAWLER', { 85: 'PICK=4:START_GAME' });
+  const mask = await waitForPixels(page, canvas, [140, 240, 40, 12], 'blue', 10);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'shell, mask and fight drawing should run without BASIC errors');
-  assert.ok((await canvas.screenshot()).length > 1000, 'the turtle fight should render');
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  assert.ok(mask > 10, 'the turtle should wear its blue mask');
+  await exitTape(page);
 });
+
+/** The numbers of the tape lines whose code is `code`, so a test can replace a line inside a SUB. */
+function tapeLines(tape, code) {
+  const source = readFileSync(new URL(`../web/TAPE/${tape}.BLIP`, import.meta.url), 'utf8');
+  const found = source.split('\n').filter((line) => line.replace(/^\d+\s+/, '').trim() === code);
+  assert.ok(found.length > 0, `${tape} has a line ${code}`);
+  return found.map((line) => Number(line.match(/^\d+/)[0]));
+}
+
+function tapeLine(tape, code) {
+  const [number, ...more] = tapeLines(tape, code);
+  assert.equal(more.length, 0, `${tape} has one line ${code}`);
+  return number;
+}
+
+/** Round one in play at once, with no music, so the sound count is only the game's. */
+/** Bubbler keeps the Rust game's 624x600 arena. */
+const BUBBLER_SIZE = [624, 600];
+const BUBBLER_PLAY = 'START_GAME:SHOW "PLAY"';
+const quietBubbler = (setup, lines = {}) => ({ 80: 'REM NO MUSIC', 85: setup, ...lines });
 
 test('BUBBLER.BLIP runs three rounds of platforming and bubble attacks', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
   for (let round = 1; round <= 3; round++) {
-    await page.evaluate(() => BlipBasic.submit('RUN'));
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
+    const canvas = await openTape(page, origin, 'BUBBLER');
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: Bubbler should launch cleanly`);
-    const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-    await page.waitForTimeout(180);
+    await waitForPixels(page, canvas, [0, 0, 624, 600], 'lit', 2000, { size: BUBBLER_SIZE });
     const title = await canvas.screenshot();
     await page.waitForTimeout(250);
     assert.notDeepEqual(await canvas.screenshot(), title, `round ${round}: the bubbles and dragons should animate on the title screen`);
+    await canvas.focus();
     await page.keyboard.press('Space');
     await page.keyboard.down('ArrowRight');
     await page.keyboard.press('ArrowUp');
@@ -1445,363 +1283,179 @@ test('BUBBLER.BLIP runs three rounds of platforming and bubble attacks', async (
     await page.waitForTimeout(250);
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: jump and bubble controls should not fail`);
     await page.waitForFunction(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents > 0, undefined, { timeout: 2500 });
-    assert.ok((await canvas.screenshot()).length > 1000);
     await page.keyboard.up('ArrowRight');
     await page.keyboard.up('Space');
-    await page.locator('#exit-game').click();
-    await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+    await exitTape(page);
   }
 });
 
-test('BUBBLER advances its preserved score into a faster next wave', async (t) => {
+test('BUBBLER advances its preserved score into a faster next round', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => {
-    BlipBasic.submit('CD /TAPE');
-    BlipBasic.submit('LOAD BUBBLER');
-  });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(895, 'FOR E=1 TO ENEMY_COUNT:MONSTER(E)=0:NEXT E:GOTO 100');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=1234:LIVES=5:ROUND=1:P2SCORE=567:P2LIVES=7:TWO=1:GOTO 810');
-    BlipBasic.lines.set(810, BlipBasic.lines.get(810)+':IF ROUND=2 THEN GOSUB 2090');
-    BlipBasic.lines.set(2090, 'IF SCORE<>1234 OR P2SCORE<>567 OR LIVES<>6 OR P2LIVES<>7 THEN DRAW_TEXTURE("BAD ROUND REWARD",0,0,1,1)');
-    BlipBasic.lines.set(2091, 'SOUND 880,0.01,0.1:RETURN');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await canvas.focus();
-  await page.keyboard.press('Space');
-  const firstWave = await canvas.screenshot();
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-error') || document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundTimes.length > 0, undefined, { timeout: 15000 });
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    'TWO=1:START_GAME:SCORE(1)=1234:SCORE(2)=567:LIVES(2)=7:SHOW "PLAY":FOR I=1 TO TOY_COUNT:TOY_ON(I)=0:NEXT I',
+    { 165: statusMarker('ROUND=2 AND PACE>0.8 AND SCORE(1)=1234 AND SCORE(2)=567 AND LIVES(1)=6 AND LIVES(2)=7') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { timeout: 9000, size: BUBBLER_SIZE }) > 20,
+    'clearing a round should keep the scores, top up lives to seven, and start a quicker round two');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.notDeepEqual(await canvas.screenshot(), firstWave, 'wave number and score should advance when the enemies are cleared');
-  await page.locator('#exit-game').click();
+  await exitTape(page);
 });
 
 test('BUBBLER completes after its eighth Rust level', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => {
-    BlipBasic.submit('CD /TAPE');
-    BlipBasic.submit('LOAD BUBBLER');
-  });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=8:TWO=0:GOTO 810');
-    BlipBasic.lines.set(895, 'FOR E=1 TO ENEMY_COUNT:MONSTER(E)=0:NEXT E:GOTO 100');
-    BlipBasic.lines.set(690, BlipBasic.lines.get(690)+':SOUND 880,0.01,0.1');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  const events = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  const before = await canvas.screenshot();
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-error') || document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundTimes.length > 0, undefined, { timeout: 15000 });
-  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the final wave and win screen should run cleanly');
-  const afterEvents = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  assert.ok(afterEvents > events, 'clearing round eight should play the completion sound');
-  assert.notDeepEqual(await canvas.screenshot(), before, 'the final wave should transition to its win screen');
-  await page.locator('#exit-game').click();
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    'START_GAME:LOAD_ROUND 8:SHOW "PLAY":FOR I=1 TO TOY_COUNT:TOY_ON(I)=0:NEXT I',
+    { 165: statusMarker('STATE$="OVER" AND WON') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { timeout: 9000, size: BUBBLER_SIZE }) > 20, 'clearing round eight should win the game');
+  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the final round and win screen should run cleanly');
+  await exitTape(page);
 });
 
-test('BUBBLER chains five trapped enemies into the Rust score and five fruit drops', async (t) => {
+test('BUBBLER chains five trapped enemies into the Rust score and five candy drops', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(5, 'CLEAR("BLIP_BLACK"):SCORE=0');
-    BlipBasic.lines.set(6, 'FOR I=1 TO 5:BUBBLE(I)=2:TRAP(I)=I:MONSTER(I)=1:ETRAPPED(I)=1:QX(I)=100+I*5:QY(I)=80:NEXT I');
-    BlipBasic.lines.set(7, 'B=1:SCORER=1:GOSUB 2000');
-    BlipBasic.lines.set(8, 'IF SCORE<>31000 OR CHAIN_KILLS<>5 OR FRUIT(5)<>1 OR ETRAPPED(5)<>0 THEN DRAW_TEXTURE("BAD CHAIN",0,0,1,1)');
-    BlipBasic.lines.set(9, 'PLAY_SFX "SERPENT/EAT":WAIT 16:GOTO 9');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-error') || document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents > 0);
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    `${BUBBLER_PLAY}:FOR I=1 TO 5:BUB_ON(I)=1:BUB_HOLDS(I)=I:TOY_ON(I)=0:BUB_X(I)=200+I*20:BUB_Y(I)=200:NEXT I:POP_CHAIN 1,1`,
+    { 165: statusMarker('SCORE(1)=31000 AND CANDY_ON(5)=1 AND CANDY_KIND(5)=3 AND BUB_ON(5)=0 AND CHAIN_SIZE=5') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'five toys should score 1000+2000+4000+8000+16000 and drop five candies');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
+  await exitTape(page);
 });
 
 test('BUBBLER trapped enemies are defeated when a player pops their bubble', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=1:TWO=0:GOTO 810');
-    BlipBasic.lines.set(890, 'FOR B=1 TO 6:BUBBLE(B)=0:QOWNER(B)=1:NEXT B:BUBBLE(1)=2:TRAP(1)=1:ETRAPPED(1)=1:QX(1)=PX+8:QY(1)=PY+8:BT(1)=500');
-  });
-  const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  await page.evaluate(() => BlipBasic.submit('RUN'));
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  await page.waitForFunction((initial) => (document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0) > initial, before, { timeout: 3000 });
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    `${BUBBLER_PLAY}:BUB_ON(1)=1:BUB_HOLDS(1)=1:TOY_ON(1)=0:BUB_PHASE(1)=FLOATING:BUB_X(1)=PX(1)+14:BUB_Y(1)=PY(1)+11`,
+    { 165: statusMarker('SCORE(1)>=1000 AND BUB_ON(1)=0 AND TOY_ON(1)=0') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'touching a caught toy should pop it for points');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'popping a trapped enemy should run without a BASIC error');
-  await page.locator('#exit-game').click();
+  await exitTape(page);
 });
 
 test('BUBBLER physical controls trap a monster, pop it, and collect its candy', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => {
-    BlipBasic.submit('CD /TAPE');
-    BlipBasic.submit('LOAD BUBBLER');
-  });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(870, 'FOR E=1 TO ENEMY_COUNT:MONSTER(E)=0:ETRAPPED(E)=0:NEXT E:EX(1)=32:EY(1)=176:ETYPE(1)=1:MONSTER(1)=1:ETRAPPED(1)=0:EGROUND(1)=1:EDIR(1)=0:EMIN(1)=13:EMAX(1)=292:MSPEED=0');
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(817, 'STOP_MUSIC');
-    BlipBasic.lines.set(2042, 'FRUIT(FRUIT_SLOT)=1:FX(FRUIT_SLOT)=QX(C)-8:FY(FRUIT_SLOT)=QY(C)-8:FRUIT_HOME(FRUIT_SLOT)=FY(FRUIT_SLOT):FVX(FRUIT_SLOT)=0:FVY(FRUIT_SLOT)=0-1.7:FRUIT_KIND(FRUIT_SLOT)=CHAIN_KILLS-1');
-    BlipBasic.lines.set(1886, 'FRUIT(F)=0:PLAY_SFX "BUBBLER/FRUIT":IF SCORE<>1500 THEN DRAW_TEXTURE("BAD FRUIT SCORE",0,0,1,1)');
-    BlipBasic.lines.set(1887, 'SOUND 880,0.01,0.1:RETURN');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'Bubbler should launch without a BASIC error');
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    `${BUBBLER_PLAY}:FOR I=2 TO TOY_COUNT:TOY_ON(I)=0:NEXT I:TOY_X(1)=PX(1)+20:TOY_Y(1)=PY(1)+2:TOY_KIND(1)=1:PACE=0.001`,
+    // The candy hops back to the dragon instead of off to a random side.
+    { [tapeLine('BUBBLER', 'CANDY_VX(I)=RND(220)-110')]: 'CANDY_VX(I)=-60', 165: statusMarker('SCORE(1)=1500') }));
   await canvas.focus();
-  await page.waitForTimeout(200);
-  const initialSounds = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
+  await page.waitForTimeout(300);
+  const before = await soundCount(page);
   await page.keyboard.press('f');
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-error') || document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundTimes.length > 0, undefined, { timeout: 5000 });
-  const finalSounds = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  assert.ok(finalSounds >= initialSounds + 4, `F should blow, trap, pop and pick up candy (sound events ${initialSounds} → ${finalSounds}; error ${await page.locator('body').getAttribute('data-wasm-error')})`);
+  const scored = await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE });
+  const after = await soundCount(page);
+  assert.ok(after >= before + 4, `F should blow, trap, pop and the dragon pick up candy (sound events ${before} -> ${after})`);
+  assert.ok(scored > 20, 'the toy and its bonbon should score 1000 + 500');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'trapping, popping and picking up candy should run without a BASIC error');
-  await page.locator('#exit-game').click();
+  await exitTape(page);
 });
 
 test('BUBBLER trapped enemies escape and return to play when their bubbles expire', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=1:TWO=0:GOTO 810');
-    BlipBasic.lines.set(890, 'FOR B=1 TO 6:BUBBLE(B)=0:QOWNER(B)=1:NEXT B:BUBBLE(1)=2:TRAP(1)=1:ETRAPPED(1)=1:QX(1)=240:QY(1)=80:BT(1)=2');
-  });
-  const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  await page.evaluate(() => BlipBasic.submit('RUN'));
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  await page.waitForFunction((initial) => (document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0) > initial, before, { timeout: 3000 });
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    `${BUBBLER_PLAY}:BUB_ON(1)=1:BUB_HOLDS(1)=1:TOY_ON(1)=0:BUB_PHASE(1)=FLOATING:BUB_X(1)=300:BUB_Y(1)=200:BUB_AGE(1)=TRAP_LIFE-0.2`,
+    { 165: statusMarker('TOY_ON(1)=1 AND TOY_ANGRY(1)=1 AND BUB_ON(1)=0') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'the toy should break out of its bubble, angry');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'an escaped enemy should return without a BASIC error');
-  await page.locator('#exit-game').click();
+  await exitTape(page);
 });
 
 test('BUBBLER changes its palette and platform layout through round eight', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  const playRound = async (round) => {
-    await page.evaluate((level) => {
-      BlipBasic.lines.set(10, 'GOTO 800');
-      BlipBasic.lines.set(800, `GAME_STATE=1:SCORE=0:LIVES=5:ROUND=${level}:TWO=0:GOTO 810`);
-      BlipBasic.submit('RUN');
-    }, round);
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round} should initialize`);
-    const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-    await canvas.focus();
-    await page.keyboard.press('Space');
-    await page.waitForTimeout(250);
-    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round} palette and platforms should draw`);
-    const image = await canvas.screenshot();
-    await page.locator('#exit-game').click();
-    await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
-    return image;
-  };
   const rounds = [];
-  for (let round = 1; round <= 8; round++) rounds.push(await playRound(round));
-  for (let round = 1; round < 8; round++) {
-    assert.notDeepEqual(rounds[round], rounds[0], `round ${round + 1} should use its Rust-aligned palette and platform arrangement`);
+  for (let round = 1; round <= 8; round++) {
+    const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(`START_GAME:LOAD_ROUND ${round}`, { 165: statusMarker(`ROUND=${round}`) }));
+    assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, `round ${round} should load`);
+    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round} palette and platforms should draw`);
+    rounds.push(await countGamePixels(page, await canvas.screenshot(), [24, 48, 576, 480], 'lit', BUBBLER_SIZE));
+    await exitTape(page);
   }
+  assert.equal(new Set(rounds).size, 8, `each round should look its own (${rounds})`);
 });
 
 test('BUBBLER round two mixes walkers, hoppers, and floating ghosts', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=2:GOTO 810');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler('START_GAME:LOAD_ROUND 2:SHOW "PLAY"',
+    { 165: statusMarker('TOY_KIND(1)=3 AND TOY_KIND(3)=1 AND TOY_KIND(5)=2 AND TOY_ON(1)') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'round two should hold ghosts, walkers and hoppers');
   const first = await canvas.screenshot();
   await page.waitForTimeout(450);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'walker, hopper, and ghost updates should run cleanly');
   assert.notDeepEqual(await canvas.screenshot(), first, 'ghost bobbing and enemy motion should animate the round');
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  await exitTape(page);
 });
 
 test('BUBBLER co-op gives player two their own movement, jump, and bubble attack', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  const canvas = await openTape(page, origin, 'BUBBLER', { 165: statusMarker('JOINED(2) AND PX(2)<SPAWN_X(2)') });
+  await canvas.focus();
   await page.keyboard.press('j');
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(2200);
   await page.keyboard.down('ArrowLeft');
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(200);
   await page.keyboard.up('ArrowLeft');
   await page.keyboard.press('k');
   await page.keyboard.press('j');
-  await page.waitForTimeout(160);
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'J should start a game for two, and the arrows move player two');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'co-op key reads and the second player update should run cleanly');
-  assert.ok((await canvas.screenshot()).length > 1000, 'both players and the Bubbler arena should render');
-  const sounds = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  assert.ok(sounds > 0, 'player two jump and bubble actions should use the original sound effects');
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  assert.ok(await soundCount(page) > 0, 'player two jump and bubble actions should use the original sound effects');
+  await exitTape(page);
 });
 
 test('BUBBLER round four ghosts launch aimed sparks with the original sound', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=4:GOTO 810');
-    BlipBasic.lines.set(1135, 'FIRE_CD(E)=0');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  await page.waitForTimeout(500);
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    'START_GAME:LOAD_ROUND 4:SHOW "PLAY":HURRY_UP:FOR I=1 TO TOY_COUNT:TOY_SHOT_WAIT(I)=0:NEXT I',
+    { 165: 'FOR I=1 TO MAX_SHOTS:IF SHOT_ON(I) AND SHOT_SPARK(I) THEN SPARKED=1', 166: 'NEXT I', 167: statusMarker('SPARKED') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'angry ghosts should aim sparks from round four');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'aimed sparks should run without BASIC or runtime errors');
-  const after = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  assert.ok(after > before, `ghost fire should trigger the registered sparkle sound (${before} -> ${after})`);
-  assert.ok((await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').screenshot()).length > 1000);
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  await exitTape(page);
 });
 
 test('BUBBLER round three walkers roll rocks at players on their platform', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=3:GOTO 810');
-    BlipBasic.lines.set(810, 'PX=156:PY=112:VY=0:GROUND=1:FACE=1:HIT_WAIT=0:BLOW_WAIT=0:GAMEOVER=0');
-    BlipBasic.lines.set(870, 'EX(1)=45:EY(1)=112:EMIN(1)=25:EMAX(1)=96:EDIR(1)=1:ETYPE(1)=1');
-    BlipBasic.lines.set(889, 'JUMP_CD(1)=999');
-    BlipBasic.lines.set(1135, 'FIRE_CD(E)=0');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  await page.waitForTimeout(350);
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    'START_GAME:LOAD_ROUND 3:SHOW "PLAY":TOY_X(1)=PX(1)+150:TOY_Y(1)=PY(1)+2:TOY_KIND(1)=1:TOY_SHOT_WAIT(1)=0',
+    { 165: 'FOR I=1 TO MAX_SHOTS:IF SHOT_ON(I) AND NOT SHOT_SPARK(I) THEN ROLLED=1', 166: 'NEXT I', 167: statusMarker('ROLLED') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'a walker in line with a player should wind up and roll a rock');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'rolling rocks should run without BASIC or runtime errors');
-  const after = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  assert.ok(after > before, `the walker rock should play the original bounce sound (${before} -> ${after})`);
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  await exitTape(page);
 });
 
 test('BUBBLER enemies jump between platform heights', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(1101, 'IF ETRAPPED(E)=0 AND EGROUND(E)=1 THEN EVY(E)=0-3.2:EGROUND(E)=0');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await page.keyboard.press('Space');
-  await page.waitForTimeout(250);
-  const firstJump = await canvas.screenshot();
-  await page.waitForTimeout(250);
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler('START_GAME:LOAD_ROUND 2:SHOW "PLAY"',
+    { 165: 'IF TOY_VY(5)<-200 THEN JUMPED=1', 166: statusMarker('JUMPED') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { timeout: 6000, size: BUBBLER_SIZE }) > 20, 'a hopper should crouch and spring into the air');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'enemy jumps and platform landings should run without BASIC errors');
-  assert.notDeepEqual(await canvas.screenshot(), firstJump, 'enemies should move through the air between platforms');
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  await exitTape(page);
 });
 
-test('BOUNCER evaluates paddle steering and screwball math during play', async (t) => {
+test('BOUNCER aims the ball off the paddle and returns it upward', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => {
-    BlipBasic.submit('CD /TAPE');
-    BlipBasic.submit('LOAD BOUNCER');
+  const canvas = await openTape(page, origin, 'BOUNCER', {
+    85: 'START_GAME:STATE$="PLAY":BALL_X(1)=PAD_X+20:BALL_Y(1)=PAD_Y-30:BALL_VX(1)=0:BALL_VY(1)=150',
+    165: statusMarker('BALL_VY(1)<0 AND BALL_VX(1)<0'),
   });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(80, 'LV=1:SC=0:L=3:GOSUB 1000');
-    BlipBasic.lines.set(90, 'GOTO 160');
-    BlipBasic.lines.set(160, 'CLS:PW=60:PX=130:PPX=130:BX=132:BY=167:VX=0:VY=2:SPIN=0:CURVE=0:T=0:ROT=0:REST=0:CHAIN=0:SERVE=0:EXTRA=0:EXTRA2=0:FT=0:POPT=0:LTAP=0:RTAP=0:DASH=0:DT=0');
-    BlipBasic.lines.set(309, 'VX=0:VY=2:BX=132:BY=167');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  assert.match(await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSource), /160 CLS:PW=60:PX=130:PPX=130:BX=132:BY=167/);
-  assert.match(await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSource), /315 IF HITPAD=1 THEN VY=0-ABS\(SP\*COS\(REL\*1\.15\)\)/);
-  await page.waitForTimeout(200);
+  assert.match(await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSource),
+    /AIM=CLAMP\(\(\(BALL_X\(K\)\+BALL\/2-PAD_X\)\/PAD_W-0\.5\)\*2,-1,1\)\*1\.15/);
+  await page.waitForTimeout(400);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 40) > 40, 'a ball landing left of centre goes back up and to the left');
   await page.locator('#exit-game').click();
 });
 
 test('BOUNCER seeks the nearest brick after five seconds without a break', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BOUNCER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(80, 'LV=1:SC=0:L=3:GOSUB 1000');
-    BlipBasic.lines.set(90, 'GOTO 160');
-    BlipBasic.lines.set(160, 'CLS:PW=60:PX=130:PPX=130:BX=132:BY=195:VX=0.2:VY=-0.3:SPIN=0:CURVE=0:T=0:ROT=0:REST=0:CHAIN=0:SERVE=0:EXTRA=0:EXTRA2=0:FT=0:POPT=0:LTAP=0:RTAP=0:DASH=0:DT=0:QUIET=5.1');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await page.waitForTimeout(250);
+  const canvas = await openTape(page, origin, 'BOUNCER', { 85: 'START_GAME:STATE$="PLAY":SINCE_BREAK=6:BALL_X(1)=300:BALL_Y(1)=300:BALL_VX(1)=40:BALL_VY(1)=-60' });
+  let outline = 0;
+  for (let attempt = 0; attempt < 8 && outline <= 8; attempt++) {
+    await page.waitForTimeout(80);
+    outline = await countGamePixels(page, await canvas.screenshot(), [250, 118, 110, 32], 'yellow');
+  }
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'nearest-brick steering should run cleanly');
-  const shot = await canvas.screenshot();
-  const outlinePixels = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.width; sample.height = image.height;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data, width, height } = context.getImageData(0, 0, sample.width, sample.height);
-    let count = 0;
-    const x0 = Math.floor(width * .38), x1 = Math.floor(width * .50);
-    const y0 = Math.floor(height * .45), y1 = Math.floor(height * .49);
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
-      const i = (y * width + x) * 4;
-      if (data[i] > 130 && data[i + 1] > 110 && data[i + 2] < data[i + 1] * .85) count++;
-    }
-    return count;
-  }, shot.toString('base64'));
-  assert.ok(outlinePixels > 8, `the nearest live brick should get a pulsing aim outline (${outlinePixels} gold pixels)`);
+  assert.ok(outline > 8, `the nearest live brick should get a pulsing aim outline (${outline} gold pixels)`);
   await page.locator('#exit-game').click();
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
@@ -1809,257 +1463,152 @@ test('BOUNCER seeks the nearest brick after five seconds without a break', async
 test('BOUNCER later levels render the Rust bomb and steel bricks', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BOUNCER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(80, 'LV=4:SC=0:L=3:GOSUB 1600');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
-  await page.keyboard.press('Space');
-  await page.waitForTimeout(500);
-  await page.keyboard.press('Space');
-  await page.waitForTimeout(250);
+  // Level four, with a bomb at column 1 and steel at column 2 of the second row.
+  const canvas = await openTape(page, origin, 'BOUNCER', { 85: 'START_GAME:LEVEL=4:START_LEVEL:BRICK(1,1)=2:BRICK(2,1)=3' });
+  await page.waitForTimeout(300);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  const shot = await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').screenshot();
-  const counts = await page.evaluate(async (base64) => {
-    const image = new Image();
-    image.src = `data:image/png;base64,${base64}`;
-    await image.decode();
-    const sample = document.createElement('canvas');
-    sample.width = image.width;
-    sample.height = image.height;
-    const context = sample.getContext('2d');
-    context.drawImage(image, 0, 0);
-    const pixels = context.getImageData(0, 0, sample.width, sample.height).data;
-    let steel = 0;
-    let bombs = 0;
-    for (let y = Math.floor(sample.height * .19); y < Math.floor(sample.height * .55); y++) {
-      for (let x = Math.floor(sample.width * .02); x < Math.floor(sample.width * .98); x++) {
-        const i = (y * sample.width + x) * 4;
-        const [r, g, b] = pixels.slice(i, i + 3);
-        if (r > 110 && g > 110 && b > 110 && Math.max(r, g, b) - Math.min(r, g, b) < 80) steel++;
-        if (r > 160 && g > 50 && g < 180 && b < 100) bombs++;
-      }
-    }
-    return { steel, bombs };
-  }, shot.toString('base64'));
-  assert.ok(counts.steel > 500, `steel-brick pixels: ${counts.steel}`);
-  assert.ok(counts.bombs > 500, `bomb-brick pixels: ${counts.bombs}`);
+  const shot = await canvas.screenshot();
+  const bombs = await countGamePixels(page, shot, [169, 64, 36, 14], 'orange');
+  const steel = await countGamePixels(page, shot, [207, 64, 36, 14], 'gray');
+  assert.ok(steel > 100, `steel-brick pixels: ${steel}`);
+  assert.ok(bombs > 10, `bomb-brick pixels: ${bombs}`);
 });
 
-test('BOUNCER bomb hits clear surrounding bricks and return from their subroutine', async (t) => {
+test('BOUNCER bomb hits clear the bricks around them', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BOUNCER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(80, 'LV=1:SC=0:L=3:GOSUB 1600');
-    BlipBasic.lines.set(90, 'GOSUB 1000:B(4,2)=2:B(3,2)=1:B(5,2)=1');
-    BlipBasic.lines.set(160, 'CLS:PX=133:BX=140:BY=74:VX=0:VY=-2.7:T=0:ROT=0:REST=0:CHAIN=0:SERVE=0');
-    BlipBasic.submit('RUN');
+  // A bomb at (4,2) with a clear way up to it from below.
+  const canvas = await openTape(page, origin, 'BOUNCER', {
+    85: 'START_GAME:STATE$="PLAY":BRICK(4,2)=2:BRICK(4,3)=0:BRICK(4,4)=0:BRICK(4,5)=0:BALL_X(1)=FNBRICK_X(4)+11:BALL_Y(1)=200:BALL_VX(1)=0:BALL_VY(1)=-200',
+    165: statusMarker('BRICK(4,2)=0 AND BRICK(3,2)=0 AND BRICK(5,1)=0 AND BRICK(3,3)=0'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
-  await page.keyboard.press('Space');
   await page.waitForTimeout(900);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.equal(await page.locator('body').getAttribute('data-wasm-running'), '');
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 40) > 40, 'the bomb and its eight neighbours should be gone');
 });
 
-test('BOUNCER multi-ball pickup splits into three balls and updates all of them', async (t) => {
+test('BOUNCER multi-ball pickup splits into three balls', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BOUNCER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(80, 'LV=1:SC=0:L=3:GOSUB 1600');
-    BlipBasic.lines.set(90, 'GOSUB 1000:DA(0)=1:DK(0)=4:DX(0)=145:DY(0)=168');
-    BlipBasic.lines.set(160, 'CLS:PW=60:PX=130:PPX=130:BX=160:BY=169:VX=1.6:VY=0:T=0:ROT=0:REST=0:CHAIN=0:SERVE=0:EXTRA=0:EXTRA2=0:FT=0:POPT=0');
-    BlipBasic.submit('RUN');
+  const canvas = await openTape(page, origin, 'BOUNCER', {
+    85: 'START_GAME:STATE$="PLAY":BALL_Y(1)=250:BALL_VY(1)=-200:CATCH 4',
+    165: statusMarker('BALL_ON(1)+BALL_ON(2)+BALL_ON(3)=3'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await canvas.press('Space');
-  await page.waitForTimeout(250);
-  await canvas.press('Space');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(300);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  const visibleBallClusters = async () => {
-    const shot = await canvas.screenshot();
-    return page.evaluate(async (base64) => {
-      const image = new Image();
-      image.src = `data:image/png;base64,${base64}`;
-      await image.decode();
-      const sample = document.createElement('canvas');
-      sample.width = image.width;
-      sample.height = image.height;
-      const context = sample.getContext('2d');
-      context.drawImage(image, 0, 0);
-      const pixels = context.getImageData(0, 0, sample.width, sample.height).data;
-      const tile = 8;
-      const columns = Math.ceil(sample.width / tile);
-      const rows = Math.ceil(sample.height / tile);
-      const mask = new Uint16Array(columns * rows);
-      for (let y = Math.floor(sample.height * .05); y < Math.floor(sample.height * .95); y++) {
-        for (let x = 0; x < sample.width; x++) {
-          const i = (y * sample.width + x) * 4;
-          if (pixels[i] > 100 && pixels[i] > pixels[i + 1] * 1.3 && pixels[i] > pixels[i + 2] * 1.2) {
-            mask[Math.floor(y / tile) * columns + Math.floor(x / tile)]++;
-          }
-        }
-      }
-      const seen = new Uint8Array(mask.length);
-      let count = 0;
-      for (let i = 0; i < mask.length; i++) {
-        if (mask[i] <= 2 || seen[i]) continue;
-        const queue = [i];
-        seen[i] = 1;
-        let tiles = 0, minX = columns, maxX = 0, minY = rows, maxY = 0;
-        while (queue.length) {
-          const at = queue.pop();
-          const tx = at % columns;
-          const ty = Math.floor(at / columns);
-          tiles++;
-          minX = Math.min(minX, tx); maxX = Math.max(maxX, tx);
-          minY = Math.min(minY, ty); maxY = Math.max(maxY, ty);
-          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-            const x = tx + dx;
-            const y = ty + dy;
-            const next = y * columns + x;
-            if (x >= 0 && x < columns && y >= 0 && y < rows && !seen[next] && mask[next] > 2) {
-              seen[next] = 1;
-              queue.push(next);
-            }
-          }
-        }
-        if (tiles <= 12 && maxX - minX <= 6 && maxY - minY <= 6) count++;
-      }
-      return count;
-    }, shot.toString('base64'));
-  };
-  let balls = 0;
-  for (let attempt = 0; attempt < 6 && balls < 3; attempt++) {
-    balls = await visibleBallClusters();
-    if (balls < 3) await page.waitForTimeout(100);
-  }
-  assert.ok(balls >= 3, `visible ball clusters: ${balls}`);
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 40) > 40, 'three balls should be in play');
 });
 
-test('BOUNCER wide, narrow, slow, and life pickups run without errors', async (t) => {
+test('BOUNCER wide, narrow, slow, and life pickups take effect', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BOUNCER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(80, 'LV=1:SC=0:L=3:GOSUB 1600');
-    BlipBasic.lines.set(90, 'GOSUB 1000:DA(0)=1:DK(0)=0:DX(0)=145:DY(0)=168:DA(1)=1:DK(1)=1:DX(1)=145:DY(1)=168:DA(2)=1:DK(2)=2:DX(2)=145:DY(2)=168:DA(3)=1:DK(3)=3:DX(3)=145:DY(3)=168');
-    BlipBasic.submit('RUN');
+  // One pickup of each kind falling onto the paddle; a drop holds its kind plus one.
+  const drops = [1, 2, 3, 4].map((kind) => `DROP(${kind})=${kind}:DROP_X(${kind})=PAD_X+10:DROP_Y(${kind})=PAD_Y-30-${kind * 4}`).join(':');
+  const canvas = await openTape(page, origin, 'BOUNCER', {
+    85: `START_GAME:STATE$="PLAY":BALL_Y(1)=200:BALL_VY(1)=-100:${drops}`,
+    165: statusMarker('LIVES=4 AND SLOW_LEFT>0 AND WIDTH_LEFT>0'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
-  await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').press('Space');
   await page.waitForTimeout(900);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.equal(await page.locator('body').getAttribute('data-wasm-running'), '');
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 40) > 40, 'every pickup should have been caught');
 });
 
-test('BOUNCER win and game-over screens keep rendering while they wait', async (t) => {
-  for (const screen of ['win', 'over']) {
+test('BOUNCER cleared and game-over screens keep rendering while they wait', async (t) => {
+  for (const [screen, lines, colour] of [
+    ['cleared', 'START_GAME:STATE$="CLEAR":WAIT_LEFT=99', 'green'],
+    ['over', 'START_GAME:STATE$="OVER":WAIT_LEFT=2', 'red'],
+  ]) {
     const { page, origin } = await openPage(t, 'chromium');
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto(`${origin}/basic.html`);
-    await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BOUNCER'); });
-    await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
-    await page.evaluate((screen) => {
-      BlipBasic.lines.set(80, 'LV=1:SC=0:L=3:GOSUB 1600');
-      BlipBasic.lines.set(160, screen === 'win'
-        ? 'GOTO 800'
-        : 'CLS:PW=60:PX=130:PPX=130:BX=160:BY=208:VX=1.6:VY=-2.7:T=0:ROT=0:REST=0:CHAIN=0:SERVE=0:EXTRA=0:FT=0:POPT=0:L=1');
-      BlipBasic.submit('RUN');
-    }, screen);
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
-    await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').press('Space');
+    const canvas = await openTape(page, origin, 'BOUNCER', { 85: lines });
     await page.waitForTimeout(900);
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `${screen}: no interpreter error`);
-    let colored = 0;
-    for (let attempt = 0; attempt < 8 && colored <= 100; attempt++) {
-      if (attempt > 0) await page.waitForTimeout(100);
-      const shot = await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').screenshot();
-      colored = await page.evaluate(async ([base64, screen]) => {
-        const image = new Image();
-        image.src = `data:image/png;base64,${base64}`;
-        await image.decode();
-        const sample = document.createElement('canvas');
-        sample.width = image.width;
-        sample.height = image.height;
-        const context = sample.getContext('2d');
-        context.drawImage(image, 0, 0);
-        const pixels = context.getImageData(0, 0, sample.width, sample.height).data;
-        let count = 0;
-        for (let y = Math.floor(sample.height * .2); y < Math.floor(sample.height * .7); y++) {
-          for (let x = Math.floor(sample.width * .1); x < Math.floor(sample.width * .9); x++) {
-            const i = (y * sample.width + x) * 4;
-            const [r, g, b] = pixels.slice(i, i + 3);
-            if (screen === 'win' ? g > 80 && g > r * 1.5 && g > b * 1.2 : r > 100 && r > g * 1.5 && r > b * 1.5) count++;
-          }
-        }
-        return count;
-      }, [shot.toString('base64'), screen]);
-    }
-    assert.ok(colored > 100, `${screen}: expected visible colored title text, found ${colored} pixels`);
+    const coloured = await countGamePixels(page, await canvas.screenshot(), [140, 100, 360, 150], colour);
+    assert.ok(coloured > 100, `${screen}: expected visible coloured title text, found ${coloured} pixels`);
   }
 });
 
 test('BOUNCER clears its last brick and advances to the next level automatically', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BOUNCER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(90, 'GOSUB 1000:FOR R=0 TO 5:FOR C=0 TO 9:B(C,R)=0:NEXT C:NEXT R:B(5,0)=1:LEFT=1');
-    BlipBasic.lines.set(160, BlipBasic.lines.get(160)
-      .replace('BX=160:BY=169:VX=1.6:VY=-2.7', 'BX=171:BY=49:VX=0:VY=-3')
-      .replace('SERVE=1', 'SERVE=0'));
-    BlipBasic.submit('RUN');
+  const canvas = await openTape(page, origin, 'BOUNCER', {
+    85: 'START_GAME:FOR R=0 TO 5:FOR C=0 TO 9:BRICK(C,R)=0:NEXT C:NEXT R:BRICK(5,5)=1:BRICKS_LEFT=1:STATE$="PLAY":BALL_X(1)=FNBRICK_X(5)+11:BALL_Y(1)=200:BALL_VX(1)=0:BALL_VY(1)=-250',
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await canvas.press('Space');
-  await page.waitForTimeout(600);
-  const win = await canvas.screenshot();
-  await page.waitForTimeout(1300);
-  async function colors(base64) {
-    return page.evaluate(async (encoded) => {
-      const image = new Image(); image.src = `data:image/png;base64,${encoded}`; await image.decode();
-      const sample = document.createElement('canvas'); sample.width = image.width; sample.height = image.height;
-      const ctx = sample.getContext('2d'); ctx.drawImage(image, 0, 0);
-      const pixels = ctx.getImageData(0, 0, image.width, image.height).data;
-      let green = 0, bricks = 0;
-      for (let y = Math.floor(image.height * .15); y < Math.floor(image.height * .55); y += 2) {
-        for (let x = Math.floor(image.width * .03); x < Math.floor(image.width * .97); x += 2) {
-          const i = (y * image.width + x) * 4, r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
-          if (g > 80 && g > r * 1.4 && g > b * 1.1) green++;
-          if (r + g + b > 210) bricks++;
-        }
-      }
-      return { green, bricks };
-    }, base64);
+  await page.waitForTimeout(700);
+  const cleared = await canvas.screenshot();
+  const wall = [131, 48, 378, 96];
+  const before = await countGamePixels(page, cleared, wall, 'lit');
+  assert.ok(await countGamePixels(page, cleared, [140, 160, 360, 80], 'green') > 100, 'the cleared screen should show');
+  let after = 0;
+  for (let attempt = 0; attempt < 20 && after <= before * 3; attempt++) {
+    await page.waitForTimeout(150);
+    after = await countGamePixels(page, await canvas.screenshot(), wall, 'lit');
   }
-  const colorCounts = { win: await colors(win.toString('base64')), next: null };
-  for (let attempt = 0; attempt < 20; attempt++) {
-    colorCounts.next = await colors((await canvas.screenshot()).toString('base64'));
-    if (colorCounts.next.bricks > colorCounts.win.bricks * 3) break;
-    await page.waitForTimeout(100);
-  }
-  const runtime = await page.evaluate(() => ({ running: document.body.hasAttribute('data-wasm-running'), playing: document.body.hasAttribute('data-wasm-playing'), output: document.querySelector('#basic-output').textContent }));
-  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `BOUNCER should keep running: ${JSON.stringify({ colorCounts, runtime })}`);
-  assert.ok(colorCounts.win.green > 100, `cleared screen should be visible: ${JSON.stringify(colorCounts)}`);
-  assert.ok(colorCounts.next.bricks > colorCounts.win.bricks * 3, `level two should rebuild its brick wall: ${JSON.stringify({ colorCounts, runtime })}`);
+  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'BOUNCER should keep running');
+  assert.ok(after > before * 3, `level two should rebuild its brick wall: ${before} -> ${after}`);
 });
+
+// Game tests start a tape mid-game through line 85, draw a status marker
+// through line 165 (before the frame's WAIT), and read pixels in the 640x400
+// game's own coordinates.
+async function openTape(page, origin, tape, lines = {}) {
+  await page.goto(`${origin}/basic.html`);
+  await page.evaluate((tape) => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD ' + tape); }, tape);
+  await page.waitForFunction((tape) => document.querySelector('#basic-output').textContent.includes(`LOADED /TAPE/${tape}.BLIP`), tape);
+  await page.evaluate((lines) => {
+    for (const [n, code] of Object.entries(lines)) BlipBasic.lines.set(Number(n), code);
+    BlipBasic.submit('RUN');
+  }, lines);
+  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'));
+  return page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+}
+
+const openDefender = (page, origin, lines) => openTape(page, origin, 'DEFENDER', lines);
+
+/** Green when `condition` holds, red when it does not, at game (580,250). */
+const statusMarker = (condition) => `FILL_RECT(580,250,40,24,COLOR(1-(${condition}),${condition},0))`;
+const STATUS_MARKER = [580, 250, 40, 24];
+const defenderMarker = statusMarker;
+const DEFENDER_MARKER = STATUS_MARKER;
+
+/** Screenshots until `rect` holds more than `least` pixels of `colour`; returns that count. */
+async function waitForPixels(page, canvas, rect, colour, least, { timeout = 4000, size } = {}) {
+  const until = Date.now() + timeout;
+  let count = 0;
+  do {
+    count = await countGamePixels(page, await canvas.screenshot(), rect, colour, size);
+    if (count > least) break;
+    await page.waitForTimeout(100);
+  } while (Date.now() < until);
+  return count;
+}
+
+/** `rect` is in game pixels, on a screen `size` big: 640x400 unless the tape picks another. */
+async function countGamePixels(page, png, rect, colour, size = [640, 400]) {
+  return page.evaluate(async ([base64, rect, colour, [wide, high]]) => {
+    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
+    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
+    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
+    const scale = Math.min(sample.width / wide, sample.height / high);
+    const left = (sample.width - wide * scale) / 2, top = (sample.height - high * scale) / 2;
+    const { data } = context.getImageData(Math.floor(left + rect[0] * scale), Math.floor(top + rect[1] * scale),
+      Math.max(1, Math.ceil(rect[2] * scale)), Math.max(1, Math.ceil(rect[3] * scale)));
+    const is = {
+      red: (r, g, b) => r > 120 && r > g * 1.35 && r > b * 1.2,
+      green: (r, g, b) => g > 120 && g > r * 1.35 && g > b * 1.2,
+      orange: (r, g, b) => r > 120 && g > 45 && g < 190 && b < 110,
+      white: (r, g, b) => r > 190 && g > 190 && b > 190,
+      yellow: (r, g, b) => r > 130 && g > 100 && b < 110,
+      lit: (r, g, b) => r + g + b > 180,
+      cyan: (r, g, b) => g > 120 && b > 120 && r < g * 0.75,
+      blue: (r, g, b) => b > 140 && b > r * 1.5 && b > g * 1.2,
+      gray: (r, g, b) => r > 110 && g > 110 && b > 110 && Math.max(r, g, b) - Math.min(r, g, b) < 60,
+    }[colour];
+    let count = 0;
+    for (let i = 0; i < data.length; i += 4) if (is(data[i], data[i + 1], data[i + 2])) count++;
+    return count;
+  }, [png.toString('base64'), rect, colour, size]);
+}
 
 test('DEFENDER.BLIP runs a keyboard-controlled game through Rust Blip primitives', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
@@ -2070,17 +1619,17 @@ test('DEFENDER.BLIP runs a keyboard-controlled game through Rust Blip primitives
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
   await page.evaluate(() => BlipBasic.submit('DIR'));
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('DEFENDER.BLIP'));
-  assert.match(await page.locator('#basic-output').textContent(), /DEFENDER\.BLIP/);
   assert.ok(await page.evaluate(() => BlipBasic.lines.size > 70));
   await page.locator('#basic-input').fill('RUN');
   await page.locator('#basic-input').press('Enter');
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
   assert.ok(await page.locator('#exit-game').isVisible());
-  await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').press('Space');
+  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  await canvas.press('Space');
   await page.waitForTimeout(120);
-  await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').press('ArrowLeft');
-  await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').press('ArrowUp');
-  await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').press('Space');
+  await canvas.press('ArrowLeft');
+  await canvas.press('ArrowUp');
+  await canvas.press('Space');
   await page.waitForTimeout(500);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the BASIC source should not produce a Rust interpreter error');
   await page.locator('#exit-game').click();
@@ -2093,95 +1642,49 @@ test('DEFENDER renders its alien formation in five fresh playtests', async (t) =
     const handle = await startPage('chromium');
     const { page, origin } = handle;
     try {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto(`${origin}/basic.html`);
-    await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-    await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-    await page.evaluate(() => BlipBasic.submit('RUN'));
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'), undefined, { timeout: 15000 });
-    const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-    await canvas.press('Space');
-    await page.waitForTimeout(180);
-    await canvas.focus();
-    await page.keyboard.down('Space');
-    await page.waitForTimeout(260);
-    const playerShot = await canvas.screenshot();
-    await page.keyboard.up('Space');
-    if (round === 1) await import('node:fs/promises').then(({ writeFile }) => writeFile('/tmp/blip-defender-shot.png', playerShot));
-    await page.waitForTimeout(600);
-    const hitShot = await canvas.screenshot();
-    if (round === 1) await import('node:fs/promises').then(({ writeFile }) => writeFile('/tmp/blip-defender-hit.png', hitShot));
-    await page.waitForTimeout(2000);
-    let alienShot, alienShotPixels = 0;
-    for (let attempt = 0; attempt < 20 && alienShotPixels < 5; attempt++) {
-      await page.waitForTimeout(100);
-      alienShot = await canvas.screenshot();
-      alienShotPixels = await page.evaluate(async (base64) => {
-        const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-        const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-        const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-        const { width, height, data } = context.getImageData(0, 0, sample.width, sample.height);
-        let count = 0;
-        for (let y = Math.floor(height * .2); y < Math.floor(height * .9); y++) for (let x = Math.floor(width * .08); x < Math.floor(width * .92); x++) {
-          const i = (y * width + x) * 4;
-          if (data[i] > 140 && data[i + 1] > 55 && data[i + 1] < 180 && data[i + 2] < 110) count++;
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const canvas = await openDefender(page, origin);
+      await canvas.press('Space');
+      await page.waitForTimeout(180);
+      await canvas.focus();
+      await page.keyboard.down('Space');
+      // Level one: four rows of ten, 44 by 28 pixels apart, from (104,58).
+      const formation = async (png) => {
+        let cells = 0;
+        for (let row = 0; row < 4; row++) for (let col = 0; col < 10; col++) {
+          if (await countGamePixels(page, png, [104 + col * 44, 58 + row * 28, 34, 22], 'lit') > 8) cells++;
         }
-        return count;
-      }, alienShot.toString('base64'));
-    }
-    if (round === 1) await import('node:fs/promises').then(({ writeFile }) => writeFile('/tmp/blip-defender-alien-shot.png', alienShot));
-    const visual = await page.evaluate(async ([playerBase64, alienBase64, hitBase64]) => {
-      async function pixelsFrom(base64) {
-      const image = new Image();
-      image.src = `data:image/png;base64,${base64}`;
-      await image.decode();
-      const sample = document.createElement('canvas');
-      sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-      const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-      return { width: sample.width, height: sample.height, data: context.getImageData(0, 0, sample.width, sample.height).data };
+        return cells;
+      };
+      // Wait for the first frame of play with a shot in flight, not for a clock.
+      let playerShot, occupiedCells = 0, playerShotPixels = 0;
+      for (let attempt = 0; attempt < 40 && (occupiedCells < 20 || playerShotPixels < 5); attempt++) {
+        await page.waitForTimeout(50);
+        playerShot = await canvas.screenshot();
+        occupiedCells = await formation(playerShot);
+        playerShotPixels = await countGamePixels(page, playerShot, [220, 60, 200, 300], 'white');
       }
-      const playerFrame = await pixelsFrom(playerBase64), enemyFrame = await pixelsFrom(alienBase64);
-      const { width, height, data: pixels } = playerFrame;
-      let occupiedCells = 0;
-      const left = width * .26, top = height * .16;
-      const cellWidth = width * .0469, cellHeight = height * .065;
-      for (let row = 0; row < 4; row++) for (let col = 0; col < 10; col++) {
-        let bright = 0;
-        const x0 = Math.floor(left + col * cellWidth), y0 = Math.floor(top + row * cellHeight);
-        for (let y = y0; y < y0 + cellHeight * .78; y++) {
-          for (let x = x0; x < x0 + cellWidth * .78; x++) {
-            const i = (y * width + x) * 4;
-            if (pixels[i] + pixels[i + 1] + pixels[i + 2] > 180) bright++;
-          }
-        }
-        if (bright > 8) occupiedCells++;
-      }
-      let playerShotPixels = 0, alienShotPixels = 0;
-      for (let y = Math.floor(height * .2); y < Math.floor(height * .9); y++) for (let x = Math.floor(width * .35); x < Math.floor(width * .65); x++) {
-        const i = (y * width + x) * 4;
-        if (pixels[i] > 100 && pixels[i + 1] > 100 && pixels[i + 2] > 100) playerShotPixels++;
-      }
-      const enemyPixels = enemyFrame.data;
-      for (let y = Math.floor(height * .2); y < Math.floor(height * .9); y++) for (let x = Math.floor(width * .08); x < Math.floor(width * .92); x++) {
-        const i = (y * width + x) * 4;
-        if (enemyPixels[i] > 140 && enemyPixels[i + 1] > 55 && enemyPixels[i + 1] < 180 && enemyPixels[i + 2] < 110) alienShotPixels++;
-      }
+      // An explosion lasts under half a second: watch for one as the shots land.
       let explosionPixels = 0;
-      const hitPixels = (await pixelsFrom(hitBase64)).data;
-      for (let y = Math.floor(height * .15); y < Math.floor(height * .7); y++) for (let x = Math.floor(width * .08); x < Math.floor(width * .92); x++) {
-        const i = (y * width + x) * 4;
-        if (hitPixels[i] > 80 && hitPixels[i + 1] > 35 && hitPixels[i + 1] < 165 && hitPixels[i + 2] < 80) explosionPixels++;
+      for (let attempt = 0; attempt < 30 && explosionPixels < 4; attempt++) {
+        await page.waitForTimeout(60);
+        explosionPixels = await countGamePixels(page, await canvas.screenshot(), [40, 40, 560, 220], 'orange');
       }
-      return { occupiedCells, playerShotPixels, alienShotPixels, explosionPixels, width, height };
-    }, [playerShot.toString('base64'), alienShot.toString('base64'), hitShot.toString('base64')]);
-    const runtimeError = await page.locator('body').getAttribute('data-wasm-error');
-    assert.equal(runtimeError, null, `round ${round}: BASIC runtime error: ${runtimeError}`);
-    assert.ok(visual.occupiedCells >= 20, `round ${round}: expected a visible 4-by-10 alien formation, got ${JSON.stringify(visual)}`);
-    assert.ok(visual.playerShotPixels >= 5, `round ${round}: player shot should be visible, got ${JSON.stringify(visual)}`);
-    assert.ok(visual.explosionPixels >= 4, `round ${round}: alien hit burst should be visible, got ${JSON.stringify(visual)}`);
-    assert.ok(visual.alienShotPixels >= 5, `round ${round}: alien shot should be visible, got ${JSON.stringify(visual)}`);
-    await page.locator('#exit-game').click();
-    await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+      await page.keyboard.up('Space');
+      await page.waitForTimeout(1500);
+      let alienShotPixels = 0;
+      for (let attempt = 0; attempt < 20 && alienShotPixels < 5; attempt++) {
+        await page.waitForTimeout(100);
+        alienShotPixels = await countGamePixels(page, await canvas.screenshot(), [40, 60, 560, 290], 'orange');
+      }
+      const visual = { occupiedCells, playerShotPixels, explosionPixels, alienShotPixels };
+      assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: BASIC runtime error`);
+      assert.ok(occupiedCells >= 20, `round ${round}: expected a visible 4-by-10 alien formation, got ${JSON.stringify(visual)}`);
+      assert.ok(playerShotPixels >= 5, `round ${round}: player shot should be visible, got ${JSON.stringify(visual)}`);
+      assert.ok(explosionPixels >= 4, `round ${round}: alien hit burst should be visible, got ${JSON.stringify(visual)}`);
+      assert.ok(alienShotPixels >= 5, `round ${round}: alien shot should be visible, got ${JSON.stringify(visual)}`);
+      await page.locator('#exit-game').click();
+      await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
     } finally { await handle.close(); }
   }
 });
@@ -2189,247 +1692,105 @@ test('DEFENDER renders its alien formation in five fresh playtests', async (t) =
 test('DEFENDER shots remove individual shield blocks', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(190, 'GOTO 200');
-    BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:B=1:BX=56:BY=160:PX=46:START=1:REST=0:T=0:AF=0:UFO=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=0:DIVCD=420:DTELL=0:DPT=0');
-    BlipBasic.lines.set(598, 'fill_rect(140,130,18,10,COLOR(1-SH(0),SH(0),0))');
-    BlipBasic.submit('RUN');
+  const canvas = await openDefender(page, origin, {
+    85: 'START_GAME:BOMB_WAIT=99:UFO_WAIT=99:SHIP_X=500:SHOT_ON=1:SHOT_X=SHIELD_X(1)+2:SHOT_Y=SHIELD_Y+40',
+    165: defenderMarker('SHIELD(1,3,1)=1') + ':' + defenderMarker('SHIELD(1,2,1)=1').replace('580,250', '580,280'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await page.waitForTimeout(180);
+  await page.waitForTimeout(250);
   const shot = await canvas.screenshot();
-  const pixels = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data } = context.getImageData(0, 0, sample.width, sample.height);
-    let red = 0, green = 0;
-    for (let y = Math.floor(sample.height * .60); y < Math.floor(sample.height * .70); y++) {
-      for (let x = Math.floor(sample.width * .43); x < Math.floor(sample.width * .54); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 120 && data[i] > data[i + 1] * 1.35 && data[i] > data[i + 2] * 1.2) red++;
-        if (data[i + 1] > 120 && data[i + 1] > data[i] * 1.35 && data[i + 1] > data[i + 2] * 1.2) green++;
-      }
-    }
-    return { red, green };
-  }, shot.toString('base64'));
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.ok(pixels.red > 40, `one shot should remove a bunker block, pixels: ${JSON.stringify(pixels)}`);
+  assert.ok(await countGamePixels(page, shot, DEFENDER_MARKER, 'red') > 40, 'one shot should remove the bunker block it meets');
+  assert.ok(await countGamePixels(page, shot, [580, 280, 40, 24], 'green') > 40, 'the block above it should stay');
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER bomb collisions follow the tapered player ship', async (t) => {
-  async function markerFor(bombX) {
+  // A bomb by the ship's empty top corner: a ship sliding away is missed, a still one is hit at its base.
+  async function markerFor(moving) {
     const handle = await startPage('chromium');
     const { page, origin } = handle;
     try {
-      await page.goto(`${origin}/basic.html`);
-      await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-      await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-      await page.evaluate((x) => {
-        BlipBasic.lines.set(190, 'GOTO 200');
-        BlipBasic.lines.set(311, 'BB=1:BBX='+x+':BBY=173:BB2=0:BB3=0:BB4=0:B=0:BY=0:START=1:REST=0:PX=148:T=0:AF=0:UFO=0:UMODE=0:UFB=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=0:DIVCD=420:DTELL=0:DPT=0');
-        BlipBasic.lines.set(715, 'fill_rect(170,130,18,10,COLOR(1-(L=3),(L=3),0))');
-        BlipBasic.submit('RUN');
-      }, bombX);
-      await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-      await page.waitForTimeout(90);
-      const shot = await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').screenshot();
-      return await page.evaluate(async (base64) => {
-        const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-        const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-        const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-        const { data } = context.getImageData(0, 0, sample.width, sample.height);
-        let red = 0, green = 0;
-        for (let y = Math.floor(sample.height * .60); y < Math.floor(sample.height * .70); y++) {
-          for (let x = Math.floor(sample.width * .52); x < Math.floor(sample.width * .62); x++) {
-            const i = (y * sample.width + x) * 4;
-            if (data[i] > data[i + 1] * 1.35 && data[i] > 100) red++;
-            if (data[i + 1] > data[i] * 1.35 && data[i + 1] > 100) green++;
-          }
-        }
-        return { red, green };
-      }, shot.toString('base64'));
+      const canvas = await openDefender(page, origin, {
+        85: 'START_GAME:BOMB_WAIT=99:UFO_WAIT=99:SHIP_X=200:BOMB(1)=1:BOMB_X(1)=203:BOMB_Y(1)=SHIP_Y-10' + (moving ? ':SHIP_VX=200' : ''),
+        165: defenderMarker('LIVES=3'),
+        9720: moving ? 'STICK=1' : 'STICK=0',
+      });
+      await page.waitForTimeout(400);
+      const shot = await canvas.screenshot();
+      return { red: await countGamePixels(page, shot, DEFENDER_MARKER, 'red'), green: await countGamePixels(page, shot, DEFENDER_MARKER, 'green') };
     } finally { await handle.close(); }
   }
-  const topMiss = await markerFor(138);
-  const bodyHit = await markerFor(158);
-  assert.ok(topMiss.green > 40, `a bomb beside the ship's empty top corners should miss: ${JSON.stringify(topMiss)}`);
-  assert.ok(bodyHit.red > 40, `a bomb through the ship body should hit: ${JSON.stringify(bodyHit)}`);
+  const cornerMiss = await markerFor(true);
+  const bodyHit = await markerFor(false);
+  assert.ok(cornerMiss.green > 40, `a bomb through the empty top corner of a ship moving away should miss: ${JSON.stringify(cornerMiss)}`);
+  assert.ok(bodyHit.red > 40, `the same bomb reaches a still ship's body: ${JSON.stringify(bodyHit)}`);
 });
 
 test('DEFENDER renders four simultaneous Rust-sized alien bombs', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(190, 'GOTO 200');
-    BlipBasic.lines.set(311, 'BB=1:BBX=20:BBY=100:BB2=1:BBX2=70:BBY2=110:BB3=1:BBX3=120:BBY3=120:BB4=1:BBX4=230:BBY4=130:B=0:START=1:REST=0:PX=148:T=0:AF=0:UFO=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=0:DIVCD=420:DTELL=0:DPT=0');
-    BlipBasic.lines.set(693, 'FILL_RECT(BBX,BBY,5,6,"BLIP_ORANGE"):FILL_RECT(BBX2,BBY2,5,6,"BLIP_ORANGE"):FILL_RECT(BBX3,BBY3,5,6,"BLIP_ORANGE"):FILL_RECT(BBX4,BBY4,5,6,"BLIP_ORANGE")');
-    BlipBasic.lines.set(694, 'GOTO 697');
-    BlipBasic.submit('RUN');
+  const xs = [40, 140, 240, 460];
+  const canvas = await openDefender(page, origin, {
+    85: 'START_GAME:BOMB_WAIT=99:UFO_WAIT=99:BOMB_SPEED=0:' + xs.map((x, i) => `BOMB(${i + 1})=1:BOMB_X(${i + 1})=${x}:BOMB_Y(${i + 1})=${200 + i * 10}`).join(':'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(150);
   const shot = await canvas.screenshot();
-  const counts = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data } = context.getImageData(0, 0, sample.width, sample.height);
-    return [20,70,120,230].map((x) => {
-      let count = 0;
-      const center = x * sample.width / 320;
-      for (let py = Math.floor(sample.height * .15); py < Math.floor(sample.height * .60); py++) {
-        for (let px = Math.floor(center-10); px < Math.floor(center+13); px++) {
-          const i = (py * sample.width + px) * 4;
-          if (data[i] > 120 && data[i+1] > 45 && data[i+1] < 180 && data[i+2] < 90) count++;
-        }
-      }
-      return count;
-    });
-  }, shot.toString('base64'));
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  counts.forEach((count, i) => assert.ok(count > 3, `alien bomb ${i+1} should be visible, orange pixels: ${counts}`));
+  const counts = [];
+  for (const [i, x] of xs.entries()) counts.push(await countGamePixels(page, shot, [x - 2, 195 + i * 10, 8, 20], 'orange'));
+  counts.forEach((count, i) => assert.ok(count > 3, `alien bomb ${i + 1} should be visible, orange pixels: ${counts}`));
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER UFO laser clears its column and fires a beam', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(190, 'GOTO 200');
-    BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:BB4=0:B=0:BY=0:START=1:REST=0:PX=280:T=0:AF=0:UFO=1:UMODE=2:ULUSED=1:USTART=0:ULX=0:UX=120:UD=1:UTR=0:UCH=1:UFIRE=0:PSTILL=120:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=0:DIVCD=420:DTELL=0:DPT=0');
-    BlipBasic.lines.set(1590, 'REM hold laser for screenshot');
-    BlipBasic.lines.set(680, 'fill_rect(170,130,18,10,COLOR(1-SH(12),SH(12),0)):fill_rect(200,130,18,10,COLOR(UMODE/3,1-UMODE/3,0))');
-    BlipBasic.submit('RUN');
+  const canvas = await openDefender(page, origin, {
+    85: 'START_GAME:BOMB_WAIT=99:SHIP_X=520:UFO_ON=1:UFO_MODE$="CHARGING":UFO_TIMER=0.01:UFO_X=SHIELD_X(2):UFO_DIR=1',
+    6260: 'REM HOLD THE BEAM FOR THE SCREENSHOT',
+    165: defenderMarker('SHIELD(2,1,1)=1'),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  await page.waitForTimeout(20);
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  await page.waitForTimeout(200);
   const shot = await canvas.screenshot();
-  const pixels = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data } = context.getImageData(0, 0, sample.width, sample.height);
-    let beam = 0, block = 0;
-    for (let y = Math.floor(sample.height * .05); y < Math.floor(sample.height * .90); y++) {
-      for (let x = Math.floor(sample.width * .38); x < Math.floor(sample.width * .46); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 190 && data[i+1] > 190 && data[i+2] > 190) beam++;
-      }
-    }
-    for (let y = Math.floor(sample.height * .60); y < Math.floor(sample.height * .70); y++) {
-      for (let x = Math.floor(sample.width * .52); x < Math.floor(sample.width * .62); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 120 && data[i] > data[i+1] * 1.35 && data[i] > data[i+2] * 1.2) block++;
-      }
-    }
-    return { beam, block };
-  }, shot.toString('base64'));
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.ok(pixels.beam > 200, `the UFO should fire the white core of its beam, got ${pixels.beam} pixels`);
-  assert.ok(pixels.block > 40, `the beam should clear shield cells across its column, got ${pixels.block} red pixels`);
+  const beam = await countGamePixels(page, shot, [242, 60, 12, 300], 'white');
+  assert.ok(beam > 200, `the UFO should fire the white core of its beam, got ${beam} pixels`);
+  assert.ok(await countGamePixels(page, shot, DEFENDER_MARKER, 'red') > 40, 'the beam should clear the shield cells in its column');
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER UFO drops its delayed bomb and the bomb breaks shields', async (t) => {
-  async function render(kind) {
+  async function render(lines, rect, colour, wait) {
     const handle = await startPage('chromium');
     const { page, origin } = handle;
     try {
-      await page.goto(`${origin}/basic.html`);
-      await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-      await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-      await page.evaluate((scenario) => {
-        BlipBasic.lines.set(190, 'GOTO 200');
-        const flying = scenario === 'flying';
-        BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:BB4=0:B=0:BY=0:START=1:REST=0:PX=280:T=0:AF=0:UFO='+Number(flying)+':UMODE=0:ULUSED=1:USTART=0:ULX=0:UX=105:UD=1:UTR=0:UCH=0:UFIRE=0:PSTILL=0:UFB='+Number(!flying)+':UFBX='+(flying?0:115)+':UFBY='+(flying?0:157)+':UFT='+(flying?180:0)+':UFDROP=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=0:DIVCD=420:DTELL=0:DPT=0');
-        BlipBasic.lines.set(flying ? 680 : 699, flying
-          ? 'fill_rect(170,130,18,10,COLOR(UFB,1-UFB,0))'
-          : 'fill_rect(170,130,18,10,COLOR(1-SH(12),SH(12),0))');
-        BlipBasic.submit('RUN');
-      }, kind);
-      await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-      await page.waitForTimeout(30);
+      const canvas = await openDefender(page, origin, lines);
+      await page.waitForTimeout(wait);
       assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-      const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-      const shot = await canvas.screenshot();
-      return await page.evaluate(async ([base64, scenario]) => {
-        const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-        const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-        const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-        const { data } = context.getImageData(0, 0, sample.width, sample.height);
-        let orange = 0, red = 0;
-        for (let y = Math.floor(sample.height * .05); y < Math.floor(sample.height * .18); y++) {
-          for (let x = Math.floor(sample.width * .32); x < Math.floor(sample.width * .42); x++) {
-            const i = (y * sample.width + x) * 4;
-            if (data[i] > 120 && data[i+1] > 45 && data[i+1] < 180 && data[i+2] < 90) orange++;
-          }
-        }
-        for (let y = Math.floor(sample.height * .60); y < Math.floor(sample.height * .70); y++) {
-          for (let x = Math.floor(sample.width * .52); x < Math.floor(sample.width * .62); x++) {
-            const i = (y * sample.width + x) * 4;
-            if (data[i] > 120 && data[i] > data[i+1] * 1.35 && data[i] > data[i+2] * 1.2) red++;
-          }
-        }
-        return scenario === 'flying' ? { orange } : { red };
-      }, [shot.toString('base64'), kind]);
+      return await countGamePixels(page, await canvas.screenshot(), rect, colour);
     } finally { await handle.close(); }
   }
-  const flying = await render('flying');
-  const shield = await render('shield');
-  assert.ok(flying.orange > 6, `the UFO should drop its orange bomb after three seconds, got ${flying.orange} pixels`);
-  assert.ok(shield.red > 40, `the UFO bomb should remove a shield cell, got ${shield.red} red pixels`);
+  const flying = await render({ 85: 'START_GAME:BOMB_WAIT=99:SHIP_X=520:UFO_ON=1:UFO_MODE$="FLYING":UFO_DIR=1:UFO_X=200:UFO_TIMER=0.01' }, [196, 40, 90, 70], 'orange', 120);
+  const shield = await render({
+    85: 'START_GAME:BOMB_WAIT=99:SHIP_X=520:UFO_BOMB=1:UFO_BOMB_X=SHIELD_X(3)+12:UFO_BOMB_Y=SHIELD_Y-30',
+    165: defenderMarker('SHIELD(3,1,2)=1'),
+  }, DEFENDER_MARKER, 'red', 400);
+  assert.ok(flying > 6, `the UFO should drop its orange bomb, got ${flying} pixels`);
+  assert.ok(shield > 40, `the UFO bomb should remove a shield cell, got ${shield} red pixels`);
 });
 
 test('DEFENDER higher waves initialize each formation theme', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  const countFormationPixels = async (canvas) => {
-    const screenshot = await canvas.screenshot();
-    return page.evaluate(async (base64) => {
-      const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-      const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-      const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-      const { data } = context.getImageData(0, 0, sample.width, sample.height);
-      let count = 0;
-      for (let y = Math.floor(sample.height * .16); y < Math.floor(sample.height * .55); y++) {
-        for (let x = Math.floor(sample.width * .06); x < Math.floor(sample.width * .94); x++) {
-          const i = (y * sample.width + x) * 4;
-          if (data[i] + data[i + 1] + data[i + 2] > 180) count++;
-        }
-      }
-      return count;
-    }, screenshot.toString('base64'));
-  };
   for (const level of [2, 3, 4, 5]) {
-    await page.evaluate((n) => BlipBasic.lines.set(20, `LV=${n}:SC=0:L=3`), level);
-    await page.evaluate(() => BlipBasic.submit('RUN'));
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-    const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-    await canvas.press('Space');
-    let coloredPixels = 0;
-    for (let attempt = 0; attempt < 6 && coloredPixels <= 800; attempt++) {
-      await page.waitForTimeout(attempt === 0 ? 500 : 250);
-      coloredPixels = await countFormationPixels(canvas);
+    const canvas = await openDefender(page, origin, { 85: `START_GAME:LEVEL=${level}:START_WAVE:BOMB_WAIT=99:UFO_WAIT=99` });
+    let lit = 0;
+    for (let attempt = 0; attempt < 6 && lit <= 800; attempt++) {
+      await page.waitForTimeout(attempt === 0 ? 300 : 250);
+      lit = await countGamePixels(page, await canvas.screenshot(), [40, 50, 560, 200], 'lit');
     }
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `level ${level} should run without an interpreter error`);
-    assert.ok(coloredPixels > 800, `level ${level} should render its formation, got ${coloredPixels} lit pixels`);
+    assert.ok(lit > 800, `level ${level} should render its formation, got ${lit} lit pixels`);
     await page.locator('#exit-game').click();
     await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
   }
@@ -2443,160 +1804,73 @@ test('DEFENDER starts a fifth-wave mothership with a visible health bar', async 
     await route.fulfill({ response, body: (await response.text()).replace('imports.env.blip_basic_sound=playBasicTone;',
       'imports.env.blip_basic_sound=function(f,s,v){if(f===1777)window.__mothershipVolley=true;else playBasicTone(f,s,v);};') });
   });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(20, 'LV=5:SC=0:L=3');
-    BlipBasic.lines.set(211, 'MAXI=ROWS*COLS-1:LEFT=0');
-    BlipBasic.lines.set(759, 'IF BB=1 AND BB2=1 AND BB3=1 AND BBY>85 AND BBY<150 THEN SOUND 1777,0,0:WAIT 0:GOTO 3000');
-    BlipBasic.lines.set(3000, 'WAIT 0:GOTO 3000');
-    BlipBasic.submit('RUN');
+  // The fifth wave with its formation gone: the mothership comes; the frame
+  // freezes once its first volley is clear of its hull.
+  const canvas = await openDefender(page, origin, {
+    85: 'START_GAME:LEVEL=5:START_WAVE:FOR I=1 TO ROWS*COLS:ALIVE(I)=0:NEXT I:ALIENS_LEFT=0:SHIP_X=0:UFO_WAIT=99',
+    165: 'IF BOSS_ON AND BOMB(1) AND BOMB(2) AND BOMB(3) AND BOMB_Y(1)>FNBOSS_Y()+BOSS_H+20 THEN SOUND 1777,0,0:WAIT 0:GOTO 9990',
+    9990: 'WAIT 0:GOTO 9990',
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await canvas.press('Space');
   await page.waitForFunction(() => document.querySelector('#basic-wasm-frame').contentWindow.__mothershipVolley, undefined, { timeout: 10000 });
   const shot = await canvas.screenshot();
-  const bossPixels = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data } = context.getImageData(0, 0, sample.width, sample.height);
-    let hull = 0, bombs = 0;
-    for (let y = Math.floor(sample.height * .12); y < Math.floor(sample.height * .34); y++) {
-      for (let x = Math.floor(sample.width * .05); x < Math.floor(sample.width * .55); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 130 && data[i] > data[i + 1] * 1.6 && data[i] > data[i + 2] * 1.4) hull++;
-      }
-    }
-    for (let y = Math.floor(sample.height * .32); y < Math.floor(sample.height * .88); y++) {
-      for (let x = Math.floor(sample.width * .04); x < Math.floor(sample.width * .96); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 150 && data[i + 1] > 55 && data[i + 1] < 190 && data[i + 2] < 110) bombs++;
-      }
-    }
-    return { hull, bombs };
-  }, shot.toString('base64'));
+  const hull = await countGamePixels(page, shot, [0, 40, 640, 130], 'red');
+  const bombs = await countGamePixels(page, shot, [0, 120, 640, 250], 'orange');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the boss encounter should not produce an interpreter error');
-  assert.ok(bossPixels.hull > 100, `the mothership should render its red hull and health bar, got ${bossPixels.hull} red pixels`);
-  assert.ok(bossPixels.bombs > 8, `the mothership should fire a three-shot volley, got ${bossPixels.bombs} orange pixels`);
+  assert.ok(hull > 100, `the mothership should render its red hull and health bar, got ${hull} red pixels`);
+  assert.ok(bombs > 8, `the mothership should fire a three-shot volley, got ${bombs} orange pixels`);
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER telegraphs and resolves its wave-three diver', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(20, 'LV=3:SC=0:L=3');
-    BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:B=0:BY=0:START=1:REST=0:T=0:AF=0:UFO=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=1:DIDX=21:DVT=1:DXD=AX(21):DYD=AY(21):DIVCD=420:DTELL=18:DPT=0');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await canvas.press('Space');
-  await page.waitForTimeout(90);
-  const tell = await canvas.screenshot();
-  await page.waitForTimeout(450);
-  const pixels = await page.evaluate(async (tell64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${tell64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { width, height, data } = context.getImageData(0, 0, sample.width, sample.height);
-    let warningRed = 0;
-    for (let y = Math.floor(height * .16); y < Math.floor(height * .34); y++) {
-      for (let x = Math.floor(width * .74); x < Math.floor(width * .99); x++) {
-        const i = (y * width + x) * 4, [r,g,b] = data.slice(i, i + 3);
-        if (r > 100 && r > g * 1.45 && r > b * 1.35) warningRed++;
-      }
-    }
-    return { warningRed };
-  }, tell.toString('base64'));
+  // Wave three is three rows of eleven from (82,58): the last alien, at (522,114), shakes and flashes.
+  const canvas = await openDefender(page, origin, { 85: 'START_GAME:LEVEL=3:START_WAVE:BOMB_WAIT=99:UFO_WAIT=99:DIVE_PICK=ROWS*COLS:DIVE_TELL=3' });
+  let flash = 0;
+  for (let attempt = 0; attempt < 20 && flash <= 10; attempt++) {
+    await page.waitForTimeout(60);
+    flash = await countGamePixels(page, await canvas.screenshot(), [400, 100, 240, 90], 'white');
+  }
+  assert.ok(flash > 10, `the selected alien should flash white before diving: ${flash} pixels`);
+  // Then it dives, and the game carries on.
+  await page.waitForTimeout(3500);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the diver state should run without an interpreter error');
-  assert.ok(pixels.warningRed > 10, `the selected alien should flash red before diving: ${pixels.warningRed} pixels`);
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER shots award the double value for a diver kill', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(20, 'LV=3:SC=0:L=3');
-    BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:B=1:BX=145:BY=125:START=1:REST=0:T=0:AF=0:UFO=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DV=2:DVT=0:DXD=140:DYD=120:DIVCD=420:DTELL=0:DPT=0');
-    BlipBasic.lines.set(607, 'IF HITD=1 THEN DPT=600:IF SC<>180 OR DPTS<>180 THEN DRAW_TEXTURE("BAD DIVER SCORE",0,0,1,1)');
-    BlipBasic.submit('RUN');
+  const canvas = await openDefender(page, origin, {
+    85: 'START_GAME:LEVEL=3:START_WAVE:BOMB_WAIT=99:UFO_WAIT=99:DIVER=1:DIVER_KIND=0:DIVER_X=300:DIVER_Y=200:SHOT_ON=1:SHOT_X=314:SHOT_Y=240',
+    165: defenderMarker('SCORE=180'),
+    // The popup holds still, so the check does not race its 0.8 second life.
+    ...Object.fromEntries(tapeLines('DEFENDER', 'FX_UPDATE(DT)').map((n) => [n, 'REM'])),
   });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await canvas.press('Space');
-  await page.waitForTimeout(160);
-  const shot = await canvas.screenshot();
-  const yellow = await page.evaluate(async (base64) => {
-    const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-    const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-    const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const { data } = context.getImageData(0, 0, sample.width, sample.height);
-    let count = 0;
-    for (let y = Math.floor(sample.height * .45); y < Math.floor(sample.height * .75); y++) {
-      for (let x = Math.floor(sample.width * .25); x < Math.floor(sample.width * .65); x++) {
-        const i = (y * sample.width + x) * 4;
-        if (data[i] > 130 && data[i + 1] > 100 && data[i + 2] < 110) count++;
-      }
-    }
-    return count;
-  }, shot.toString('base64'));
+  assert.ok(await waitForPixels(page, canvas, DEFENDER_MARKER, 'green', 40) > 40, 'a squid diver at level three should score 30x3x2');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'a diver hit should not produce an interpreter error');
+  const yellow = await countGamePixels(page, await canvas.screenshot(), [230, 140, 180, 90], 'yellow');
   assert.ok(yellow > 10, `the diver kill should show its bonus score, got ${yellow} yellow pixels`);
   await page.locator('#exit-game').click();
 });
 
 test('DEFENDER divers smash through shield blocks', async (t) => {
-  async function shieldPixels(diving) {
+  async function shieldMarker(diving) {
     const handle = await startPage('chromium');
     const { page, origin } = handle;
     try {
-      await page.goto(`${origin}/basic.html`);
-      await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD DEFENDER'); });
-      await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/DEFENDER.BLIP'));
-      await page.evaluate((active) => {
-        BlipBasic.lines.set(20, 'LV=4:SC=0:L=3');
-        BlipBasic.lines.set(598, 'B=0:fill_rect(140,130,18,10,COLOR(1-SH(14),SH(14),0))');
-        const diver = active ? ':DV=2:DVT=0:DXD=125:DYD=158' : ':DV=0:DXD=125:DYD=158';
-        BlipBasic.lines.set(311, 'BB=0:BB2=0:BB3=0:B=0:BY=0:START=1:REST=0:PX=280:T=0:AF=0:UFO=0:UT=0:UM=500:MT=0:DROP=0:TURN=0:STREAK=0:MS=0:BOSS=0:DIVCD=420:DTELL=0:DPT=0'+diver);
-        BlipBasic.submit('RUN');
-      }, diving);
-      await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-      assert.match(await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSource), /598 B=0:fill_rect/);
-      const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-      await canvas.press('Space');
-      await page.waitForTimeout(180);
+      const canvas = await openDefender(page, origin, {
+        85: 'START_GAME:LEVEL=4:START_WAVE:BOMB_WAIT=99:UFO_WAIT=99:SHIP_X=600' + (diving ? ':DIVER=1:DIVER_KIND=1:DIVER_X=SHIELD_X(2):DIVER_Y=SHIELD_Y-40' : ''),
+        165: defenderMarker('SHIELD(2,1,2)=1'),
+      });
+      await page.waitForTimeout(400);
       assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the shield dive should not produce an interpreter error');
       const shot = await canvas.screenshot();
-      return await page.evaluate(async (base64) => {
-        const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
-        const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
-        const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-        const { data } = context.getImageData(0, 0, sample.width, sample.height);
-        let red = 0, green = 0;
-        for (let y = Math.floor(sample.height * .60); y < Math.floor(sample.height * .70); y++) {
-          for (let x = Math.floor(sample.width * .43); x < Math.floor(sample.width * .54); x++) {
-            const i = (y * sample.width + x) * 4;
-            if (data[i] > 120 && data[i] > data[i + 1] * 1.35 && data[i] > data[i + 2] * 1.2) red++;
-            if (data[i + 1] > 120 && data[i + 1] > data[i] * 1.35 && data[i + 1] > data[i + 2] * 1.2) green++;
-          }
-        }
-        return { red, green };
-      }, shot.toString('base64'));
+      return { red: await countGamePixels(page, shot, DEFENDER_MARKER, 'red'), green: await countGamePixels(page, shot, DEFENDER_MARKER, 'green') };
     } finally { await handle.close(); }
   }
-  const intact = await shieldPixels(false);
-  const broken = await shieldPixels(true);
+  const intact = await shieldMarker(false);
+  const broken = await shieldMarker(true);
   assert.ok(intact.green > 40, `the intact shield should report green, got ${JSON.stringify(intact)}`);
   assert.ok(broken.red > 40, `the diver should smash the shield and report red, got ${JSON.stringify(broken)}`);
 });
@@ -2685,26 +1959,26 @@ test('DEL removes USER files and protects the tapes', async (t) => {
   assert.match(await page.locator('#basic-output').textContent(), /DIRECTORY OF \/USER\n<EMPTY>/);
 });
 
-test('DIR and CD expose the inserted tape\'s game art under TAPE/GFX', async (t) => {
+test('DIR and CD expose the inserted tape\'s files under TAPE/<GAME>/ASSETS', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => BlipBasic.submit('LOAD /TAPE/BOUNCER'));
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
-  await page.evaluate(() => { BlipBasic.submit('DIR /TAPE/GFX'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('BOUNCER/'));
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE/GFX/BOUNCER'); BlipBasic.submit('DIR'); });
+  await page.evaluate(() => { BlipBasic.submit('DIR /TAPE/BOUNCER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('ASSETS/'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE/BOUNCER/ASSETS'); BlipBasic.submit('DIR'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('PADDLE.PNG'));
   const output = await page.locator('#basic-output').textContent();
-  assert.match(output, /\/TAPE\/GFX[\s\S]*\/TAPE\/GFX\/BOUNCER[\s\S]*BALL\.PNG[\s\S]*BRICK_RED\.PNG/);
+  assert.match(output, /\/TAPE\/BOUNCER[\s\S]*\/TAPE\/BOUNCER\/ASSETS[\s\S]*BALL\.PNG[\s\S]*BRICK_RED\.PNG/);
   await page.evaluate(() => {
     BlipBasic.submit('10 CLEAR("BLIP_BLACK")');
-    BlipBasic.submit('20 DRAW_TEXTURE("/TAPE/GFX/BOUNCER/BALL.PNG",40,40,16,16)');
+    BlipBasic.submit('20 DRAW_TEXTURE("/TAPE/BOUNCER/ASSETS/BALL.PNG",40,40,16,16)');
     BlipBasic.submit('30 WAIT 16');
     BlipBasic.submit('40 GOTO 10');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  assert.match(await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSource), /\/TAPE\/GFX\/BOUNCER\/BALL\.PNG/);
+  assert.match(await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSource), /\/TAPE\/BOUNCER\/ASSETS\/BALL\.PNG/);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
   await page.locator('#exit-game').click();
 });
@@ -2731,15 +2005,15 @@ test('the BASIC book turns one readable page at a time on a phone', async (t) =>
   assert.equal(await page.locator('h1').textContent(), 'CONTENTS');
   assert.equal(await page.locator('.cover-front img').getAttribute('src'), 'blip-basic-cover.svg');
   assert.ok(await page.locator('.cover-front img').evaluate((img) => img.complete && img.naturalWidth > 0));
-  assert.equal(await page.locator('.contents-list li').count(), 13);
+  assert.equal(await page.locator('.contents-list li').count(), 20);
   assert.equal(await page.locator('.reader-page:visible').count(), 0);
   await page.locator('[data-turn="next"]').click();
   assert.equal(await page.locator('.reader-page:visible').count(), 1);
   assert.match(await page.locator('.reader-page:visible').innerText(), /YOUR FIRST PROGRAM/);
-  for (let turn = 0; turn < 8 && !(await page.locator('.reader-page:visible').innerText()).includes('DRAW WITH BLIP'); turn += 1) await page.locator('[data-turn="next"]').click();
+  for (let turn = 0; turn < 20 && !(await page.locator('.reader-page:visible').innerText()).includes('DRAW WITH BLIP'); turn += 1) await page.locator('[data-turn="next"]').click();
   assert.equal(await page.locator('.reader-page:visible').count(), 1);
-  assert.equal(await page.locator('.reader-page:visible .primitive-list > div').count(), 15);
-  for (let turn = 0; turn < 8 && !(await page.locator('.reader-page:visible').innerText()).includes('OPEN A GAME'); turn += 1) await page.locator('[data-turn="next"]').click();
+  assert.equal(await page.locator('.reader-page:visible .primitive-list > div').count(), 16);
+  for (let turn = 0; turn < 20 && !(await page.locator('.reader-page:visible').innerText()).includes('OPEN A GAME'); turn += 1) await page.locator('[data-turn="next"]').click();
   assert.match(await page.locator('.reader-page:visible').innerText(), /LOAD \/TAPE\/BOUNCER\.BLIP[\s\S]*RUN/);
   await page.locator('[data-turn="next"]').click();
   assert.match(await page.locator('.reader-page:visible').innerText(), /SOURCE[\s\S]*SAVE MY_BOUNCER[\s\S]*EDIT \/USER\/MY_BOUNCER\.BLIP[\s\S]*RUN/);
@@ -2767,10 +2041,10 @@ test('the BASIC book shows only its current two-page spread on desktop', async (
   await page.locator('[data-turn="next"]').click();
   await page.waitForTimeout(1000);
   assert.equal(await page.locator('.reader-spread > .reader-page:visible').count(), 2);
-  assert.match(await page.locator('.reader-spread').innerText(), /READ INPUT\. UPDATE\. DRAW\.[\s\S]*THE ARCADE DOESN’T FIT/);
+  assert.match(await page.locator('.reader-spread').innerText(), /NAME YOUR ROUTINES\.[\s\S]*BLOCKS, LOOPS AND DATA\./);
   const fit = await page.locator('.reader-spread > .reader-page').evaluateAll((pages) => pages.map((sheet) => ({ overflow: getComputedStyle(sheet).overflowY, fits: sheet.scrollHeight <= sheet.clientHeight + 1, scroll: sheet.scrollHeight, height: sheet.clientHeight, chapter: sheet.firstElementChild && sheet.firstElementChild.getBoundingClientRect().height })));
   assert.ok(fit.every((sheet) => sheet.overflow === 'hidden' && sheet.fits), JSON.stringify(fit));
-  for (let spread = 0; spread < 5; spread += 1) {
+  for (let spread = 0; spread < 8; spread += 1) {
     await page.locator('[data-turn="next"]').click();
     await page.waitForTimeout(700);
     const pages = await page.locator('.reader-spread > .reader-page').evaluateAll((sheets) => sheets.map((sheet) => ({ fits: sheet.scrollHeight <= sheet.clientHeight + 1, scroll: sheet.scrollHeight, height: sheet.clientHeight, chapter: sheet.firstElementChild && sheet.firstElementChild.id, zoom: sheet.firstElementChild && getComputedStyle(sheet.firstElementChild).zoom, box: sheet.firstElementChild && sheet.firstElementChild.getBoundingClientRect().height })));
@@ -2900,7 +2174,7 @@ test('a game tape launches its BLIP BASIC program on the home computer', async (
   const gameFrame = page.frameLocator('#basic-wasm-frame');
   await gameFrame.locator('#glcanvas').waitFor({ state: 'visible' });
   assert.match(await page.locator('#basic-wasm-frame').getAttribute('src'), /basic-runtime\.html/);
-  assert.equal(await page.evaluate(() => Array.from(BlipBasic.lines.values()).some((line) => line.includes('GALACTIC'))), true);
+  assert.equal(await page.evaluate(() => Array.from(BlipBasic.lines.values()).some((line) => line.startsWith('REM DEFENDER'))), true);
   assert.equal(await page.locator('#basic-keyboard').evaluate((el) => getComputedStyle(el).display), 'none');
   await page.evaluate(() => {
     const frame = document.querySelector('#basic-wasm-frame');
@@ -3083,7 +2357,7 @@ test('Rust BASIC preserves conditional actions through calls, loops, and waits',
       '40 IF 1 THEN FOR I=1 TO 3:X=X+1:NEXT I',
       '50 IF X<>4 THEN DRAW_TEXTURE("BAD LOOP",0,0,1,1)',
       '60 IF 1 THEN WAIT 50:GOSUB 100:IF X<>5 THEN DRAW_TEXTURE("BAD WAIT",0,0,1,1)',
-      '70 PLAY_SFX "SERPENT/EAT"',
+      '70 PLAY_SFX "/TAPE/SERPENT/ASSETS/EAT.WAV"',
       '80 WAIT 16:GOTO 80',
       '100 X=X+1:RETURN',
     ];

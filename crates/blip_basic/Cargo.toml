@@ -8,8 +8,5 @@ publish.workspace = true
 [dependencies]
 macroquad = { workspace = true }
 blip = { workspace = true }
-blip_assets = { workspace = true }
 
-[build-dependencies]
-blip_assets = { workspace = true }
 

@@ -13,6 +13,9 @@ use blip::{
     BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
+mod tunes;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
 
@@ -191,7 +194,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
     let rpad_vy = (g.rpad_y - rpy0) / dt;
 
     let mut ball = Ball { ball_x: g.ball_x, ball_y: g.ball_y, ball_vx: g.ball_vx, ball_vy: g.ball_vy, ball_spd: g.ball_spd };
-    let events = physics::step(&mut ball, dt, g.lpad_y, g.rpad_y, lpad_vy, rpad_vy);
+    let events = physics::step(&COURT, &mut ball, dt, g.lpad_y, g.rpad_y, lpad_vy, rpad_vy);
     (g.ball_x, g.ball_y, g.ball_vx, g.ball_vy, g.ball_spd) = (ball.ball_x, ball.ball_y, ball.ball_vx, ball.ball_vy, ball.ball_spd);
     for event in events {
         match event {
@@ -279,7 +282,8 @@ fn draw_title(blip: &Blip) {
     let ball_x = if travel <= WIN_W as f32 { travel } else { WIN_W as f32 * 2.0 - travel };
     let ball_y = cy + 126.0 + (t * 2.1).sin() * 10.0;
     let trail_dir = if travel < WIN_W as f32 { -1.0 } else { 1.0 };
-    for (i, alpha) in [0.12, 0.24, 0.42].into_iter().enumerate() {
+    // Faintest farthest from the ball.
+    for (i, alpha) in [0.36, 0.24, 0.12].into_iter().enumerate() {
         let offset = (i as f32 + 1.0) * 9.0 * trail_dir;
         blip.fill_rect(ball_x + offset, ball_y, BALL_SZ, BALL_SZ,
             BlipColor { r: 0.72, g: 0.92, b: 1.0, a: alpha });
@@ -334,11 +338,6 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("RALLY", WIN_W, WIN_H)
 }
 
-const WALL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/wall.wav"));
-const HIT_L_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_l.wav"));
-const HIT_R_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_r.wav"));
-const SCORE_L_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/score_l.wav"));
-const SCORE_R_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/score_r.wav"));
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -346,16 +345,14 @@ async fn main() {
     let mut g = Game::new();
 
     let sfx = Beeps {
-        wall:    blip::audio::load_sound(WALL_WAV).await,
-        hit_l:   blip::audio::load_sound(HIT_L_WAV).await,
-        hit_r:   blip::audio::load_sound(HIT_R_WAV).await,
-        score_l: blip::audio::load_sound(SCORE_L_WAV).await,
-        score_r: blip::audio::load_sound(SCORE_R_WAV).await,
+        wall:    blip::audio::load_sound(blip::wav!("wall")).await,
+        hit_l:   blip::audio::load_sound(blip::wav!("hit_l")).await,
+        hit_r:   blip::audio::load_sound(blip::wav!("hit_r")).await,
+        score_l: blip::audio::load_sound(blip::wav!("score_l")).await,
+        score_r: blip::audio::load_sound(blip::wav!("score_r")).await,
     };
-    // Five loops in rotation, synthesised here (see blip_assets::rally).
-    use blip_assets::rally::{music, music2, music3, music4, music5};
-    let mut jukebox = Jukebox::new(&[music, music2, music3, music4, music5]);
-    jukebox.start(0).await;
+    // Five loops in rotation.
+    let mut jukebox = Jukebox::new("RALLY", &["LOOP1", "LOOP2", "LOOP3", "LOOP4", "LOOP5"]);
     #[cfg(not(target_arch = "wasm32"))]
     let mut autopilot = bot::Bot { err: 0.0, last_vx: 0.0, hits: 0 };
 
@@ -394,7 +391,5 @@ async fn main() {
             State::Over  => draw_over(&blip, &g),
         }
         blip.next_frame(60).await;
-        #[cfg(not(target_arch = "wasm32"))]
-        if g.state != State::Play { jukebox.warm_up().await; }
     }
 }

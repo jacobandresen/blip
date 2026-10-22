@@ -94,7 +94,7 @@ var BLIP_GAMES = {
                          touch: { kind: 'swipe', hint: 'Swipe to steer', mouseHint: 'Click and drag to steer' } },
   bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200', touchControls: [['MOVE',['DRAG']],['LAUNCH',['TAP']]], controls: [['MOVE',['←','→'],['A','D']],['LAUNCH',['SPACE']]],
                          touch: { kind: 'drag', hint: 'Tap to launch', mouseHint: 'Point to move &middot; Click to launch' } },
-  galactic_defender:  { name: 'DEFENDER', accent: '200, 50, 200', touchControls: [['MOVE',['DRAG']],['FIRE',['HOLD']]], controls: [['MOVE',['←','→'],['A','D']],['FIRE',['SPACE']]],
+  defender:  { name: 'DEFENDER', accent: '200, 50, 200', touchControls: [['MOVE',['DRAG']],['FIRE',['HOLD']]], controls: [['MOVE',['←','→'],['A','D']],['FIRE',['SPACE']]],
                          touch: { kind: 'drag', hint: 'Hold to fire', mouseHint: 'Point to move &middot; Hold the button to fire' } },
   rally:              { name: 'RALLY',    accent: '220, 50, 50', touchControls: [['1 PLAYER',['TAP LEFT']],['2 PLAYERS',['TAP RIGHT']],['MOVE BAT',['DRAG']]], controls: [['1 PLAYER',['W','S'],['↑','↓']],['2 PLAYERS',['I','K']],['START AND SERVE',['SPACE']]],
                          touch: { kind: 'paddles', hint: 'Drag up or down', mouseHint: 'Point up or down &middot; Click to serve' } },
@@ -119,7 +119,7 @@ var BLIP_GAMES = {
                          keys: TWO_PLAYER_KEYS },
   // A bullet-weaving shooter: fine nudges. A small dead zone, a long pivot
   // leash so re-centring neutralises, and a firm notch so a dodge holds.
-  sky_raider:         { name: 'RAIDER', accent: '50, 100, 220', touchControls: [['STEER AND THROTTLE',['D-PAD']],['FIRE',['RED BUTTON']]], controls: [['STEER',['←','→'],['A','D']],['THROTTLE',['↑','↓'],['W','S']],['FIRE',['SPACE']]],
+  raider:         { name: 'RAIDER', accent: '50, 100, 220', touchControls: [['STEER AND THROTTLE',['D-PAD']],['FIRE',['RED BUTTON']]], controls: [['STEER',['←','→'],['A','D']],['THROTTLE',['↑','↓'],['W','S']],['FIRE',['SPACE']]],
                          stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } },
   // Viper-inspired trail arena: relative left/right turns, passable dim gaps.
   // Space only starts/restarts; J joins player two. Drag steers by horizontal position.
@@ -283,6 +283,11 @@ function blipSetFrontend(which) {
 }
 
 /** Running from a home-screen icon: no browser chrome around the page. */
+// iOS or iPadOS (which reports itself as a Mac with touch).
+function blipIOS() {
+  return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+function blipTitleCase(s) { return s.toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }
 function blipStandalone() {
   if (window.navigator.standalone === true) return true;
   try { return matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches; } catch (e) { return false; }

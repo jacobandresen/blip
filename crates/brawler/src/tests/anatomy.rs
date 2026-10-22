@@ -1005,19 +1005,19 @@ pub(crate) fn a_theme_outlasts_the_round_it_plays_under() {
     // A stage theme longer than the round, so no loop seam is heard (a
     // four-bar loop repeats six times in a round).
     for which in 0..2 {
-        let secs = wav_seconds(&blip_assets::brawler::theme_wav(which));
+        let secs = wav_seconds(&crate::tunes::theme_wav(which));
         assert!(secs > ROUND_SECS,
             "stage theme {which} is {secs:.0}s against a {ROUND_SECS:.0}s round");
     }
     // The menu is not a round, but it is somewhere people sit.
-    let secs = wav_seconds(&blip_assets::brawler::theme_wav(2));
+    let secs = wav_seconds(&crate::tunes::theme_wav(2));
     assert!(secs > 25.0, "the select theme is only {secs:.0}s");
 }
 
 #[test]
 pub(crate) fn the_three_themes_are_actually_different() {
     // Three calls to the same synthesiser could easily be three copies.
-    let w: Vec<Vec<u8>> = (0..3).map(blip_assets::brawler::theme_wav).collect();
+    let w: Vec<Vec<u8>> = (0..3).map(crate::tunes::theme_wav).collect();
     for i in 0..3 {
         for j in i + 1..3 {
             assert_ne!(w[i], w[j], "themes {i} and {j} are the same audio");
@@ -1033,7 +1033,7 @@ pub(crate) fn building_the_themes_is_quick_enough_to_do_at_startup() {
     // They are synthesised on the device instead of shipped, which is
     // only a good trade if the player does not wait for it.
     let t = std::time::Instant::now();
-    for which in 0..3 { std::hint::black_box(blip_assets::brawler::theme_wav(which)); }
+    for which in 0..3 { std::hint::black_box(crate::tunes::theme_wav(which)); }
     let ms = t.elapsed().as_millis();
     // Generous, because this runs in a debug build too; release is
     // about a quarter of a second for all three.

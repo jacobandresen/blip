@@ -1,6 +1,9 @@
 //! One-on-one fighter with ten characters and CPU or local two-player modes.
 //! Attack heights, frame data and poses share the same move definitions.
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
+mod tunes;
 mod moves;
 mod roster;
 mod fighter;
@@ -20,7 +23,7 @@ use blip::macroquad::input::KeyCode;
 use blip::input::{key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
     BLIP_KEY_DOWN, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_J, BLIP_KEY_K, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W};
-use blip::{clamp, Jukebox, rand_int, rects_overlap, web,
+use blip::{clamp, Jukebox, rand_int, rects_overlap, segment_rect_overlap, web,
     window_conf, Blip,
     BlipColor, Session, Timer, BLIP_BLACK, BLIP_WHITE, BLIP_YELLOW};
 
@@ -77,18 +80,14 @@ async fn main() {
     web::set_players(TITLE_OPEN);
 
     let sfx = Sounds::load().await;
-    // The themes are synthesised here rather than shipped: as PCM they would
-    // be most of the download.
-    use blip_assets::brawler::theme_wav;
-    let mut music = Jukebox::new(&[|| theme_wav(0), || theme_wav(1), || theme_wav(2),
-        || theme_wav(3), || theme_wav(4), || theme_wav(5), || theme_wav(6), || theme_wav(7)]);
+    let mut music = Jukebox::new("BRAWLER", &["DOCK", "TEMPLE", "SELECT", "AIRBASE", "BATHHOUSE", "VILLAGE", "FORTRESS", "ROOFTOP"]);
     /// The theme of each stage, in stage order.
     const STAGE_TRACK: [usize; STAGES] = [0, 1, 3, 4, 5, 6, 7];
     /// The title and select screens have a loop of their own: silence in
     /// front of a noisy game reads as not loaded.
     const SELECT_TRACK: usize = 2;
     let (mut ambient, mut alarmed): (Option<usize>, bool) = (None, false);
-    music.start(SELECT_TRACK).await;
+    music.play(SELECT_TRACK);
     let mut shot_frame: u32 = 0;
 
     loop {
@@ -235,12 +234,7 @@ async fn main() {
         } else {
             None
         };
-        // Render each stage theme at billing or intro; warming all seven on the title froze it repeatedly.
-        match want {
-            Some(track) if g.state != State::Fight && !music.ready(track) => music.start(track).await,
-            Some(track) => music.play(track),
-            None => {}
-        }
+        if let Some(track) = want { music.play(track); }
 
         if g.fade > 0.0 { g.fade -= dt; }
         blip.clear(BLIP_BLACK);

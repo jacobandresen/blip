@@ -3,6 +3,8 @@
 use std::f32::consts::PI;
 use std::sync::Mutex;
 
+use macroquad::experimental::coroutines::{start_coroutine, Coroutine};
+
 use macroquad::audio::{
     load_sound_from_bytes, play_sound, play_sound_once, stop_sound, PlaySoundParams, Sound,
 };
@@ -132,66 +134,77 @@ fn encode_wav(sample_rate: u32, samples: &[i16]) -> Vec<u8> {
     out
 }
 
-/// Synthesizes tracks from WAV makers on demand; call `warm_up` on a screen where a short stall is harmless.
+/// Plays a game's tunes from its tape folder. Each loads in the background the
+/// first time it is wanted, and starts once it has: a WAV is megabytes, and the
+/// game must not wait on it.
 pub struct Jukebox {
-    makers: Vec<fn() -> Vec<u8>>,
+    files: Vec<String>,
     tracks: Vec<Option<(BlipSound, f32, f32)>>,
+    loading: Vec<Option<Coroutine<(BlipSound, f32, f32)>>>,
     playing: Option<usize>,
+    wanted: Option<usize>,
     /// Seconds left in the current loop, for `rotate`.
     left: f32,
 }
 
 impl Jukebox {
-    pub fn new(makers: &[fn() -> Vec<u8>]) -> Self {
-        Self { makers: makers.to_vec(), tracks: vec![None; makers.len()], playing: None, left: 0.0 }
+    /// `game`'s tunes `names`, as `web/TAPE/<GAME>/ASSETS/<NAME>.WAV`.
+    pub fn new(game: &str, names: &[&str]) -> Self {
+        let files = names.iter().map(|name| tape_file(game, &format!("{name}.WAV"))).collect();
+        Self { files, tracks: vec![None; names.len()], loading: names.iter().map(|_| None).collect(),
+            playing: None, wanted: None, left: 0.0 }
     }
 
-    /// Render track `first` and play it.
-    pub async fn start(&mut self, first: usize) {
-        if first >= self.tracks.len() { return; }
-        self.render(first).await;
-        self.switch(first);
-    }
-
-    /// Render the next track still missing, if any. Returns true while more remain.
-    pub async fn warm_up(&mut self) -> bool {
-        if let Some(i) = self.tracks.iter().position(|t| t.is_none()) {
-            self.render(i).await;
-        }
-        self.tracks.iter().any(|t| t.is_none())
-    }
-
-    /// Has track `i` been rendered?
-    pub fn ready(&self, i: usize) -> bool {
-        self.tracks.get(i).is_some_and(|t| t.is_some())
-    }
-
-    /// Play track `i` unless it is already playing or not rendered yet.
+    /// Play track `i`: at once if it has loaded, else as soon as it has.
     pub fn play(&mut self, i: usize) {
-        if self.playing != Some(i) && self.tracks.get(i).is_some_and(|t| t.is_some()) { self.switch(i); }
+        if i >= self.tracks.len() { return; }
+        self.wanted = Some(i);
+        self.fetch(i);
+        self.settle();
     }
 
     /// Silence; the next `play` starts again.
     pub fn stop(&mut self) {
         stop_music();
         self.playing = None;
+        self.wanted = None;
     }
 
-    /// Move on to the next ready track each time the current loop ends.
+    /// Play the tracks in turn, moving on each time a loop ends; the next one
+    /// loads while this one plays.
     pub fn rotate(&mut self, dt: f32) {
-        let Some(cur) = self.playing else { return };
-        self.left -= dt;
-        if self.left > 0.0 { return; }
         let n = self.tracks.len();
+        let Some(cur) = self.playing else { return self.play(self.wanted.unwrap_or(0)) };
+        self.fetch((cur + 1) % n);
+        self.left -= dt;
+        if self.left > 0.0 { return self.settle(); }
         let next = (1..=n).map(|k| (cur + k) % n).find(|&i| self.tracks[i].is_some()).unwrap_or(cur);
+        self.wanted = Some(next);
         self.switch(next);
     }
 
-    async fn render(&mut self, i: usize) {
-        let wav = (self.makers[i])();
-        let secs = wav_seconds(&wav);
-        let gain = music_gain(&wav);
-        self.tracks[i] = Some((load_sound(&wav).await, secs, gain));
+    /// Start loading track `i` unless it is loaded or on its way.
+    fn fetch(&mut self, i: usize) {
+        if self.tracks[i].is_some() || self.loading[i].is_some() { return; }
+        let file = self.files[i].clone();
+        self.loading[i] = Some(start_coroutine(async move {
+            // A missing file is a quiet game, not a stopped one.
+            let wav = macroquad::file::load_file(&file).await.unwrap_or_default();
+            (load_sound(&wav).await, wav_seconds(&wav), music_gain(&wav))
+        }));
+    }
+
+    /// Take in whatever has loaded, and play the wanted track if it now can.
+    fn settle(&mut self) {
+        for (track, loading) in self.tracks.iter_mut().zip(&mut self.loading) {
+            if let Some(done) = loading.as_ref().and_then(|c| c.retrieve()) {
+                *track = Some(done);
+                *loading = None;
+            }
+        }
+        if let Some(i) = self.wanted {
+            if self.playing != Some(i) { self.switch(i); }
+        }
     }
 
     fn switch(&mut self, i: usize) {
@@ -200,6 +213,16 @@ impl Jukebox {
             self.playing = Some(i);
             self.left = *secs;
         }
+    }
+}
+
+/// Where a game's generated file is: its tape folder, which on the web is beside
+/// the game's own page.
+pub fn tape_file(game: &str, name: &str) -> String {
+    if cfg!(target_arch = "wasm32") {
+        format!("../TAPE/{game}/ASSETS/{name}")
+    } else {
+        format!("{}/../../web/TAPE/{game}/ASSETS/{name}", env!("CARGO_MANIFEST_DIR"))
     }
 }
 

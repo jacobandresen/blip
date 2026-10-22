@@ -175,6 +175,7 @@ pub(super) fn method_call(command: &str) -> Option<(String, String)> {
         "fx_ring",
         "draw_glow_line",
         "fill_circle",
+        "draw_circle",
         "fill_capsule",
         "fill_sunburst",
         "fill_glow_circle",
@@ -203,4 +204,52 @@ pub(super) fn assignment_eq(source: &str) -> Option<usize> {
             || bytes.get(at + 1) == Some(&b'=');
         (ch == '=' && !comparison).then_some(at)
     })
+}
+
+/// Where `word` stands on its own outside strings and parentheses.
+pub(super) fn top_level_word(source: &str, word: &str) -> Option<usize> {
+    let ident = |c: Option<char>| c.is_some_and(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$');
+    top_level(source).map(|(at, _)| at).find(|&at| {
+        source.get(at..at + word.len()).is_some_and(|w| w.eq_ignore_ascii_case(word))
+            && !ident(source[..at].chars().next_back())
+            && !ident(source[at + word.len()..].chars().next())
+    })
+}
+
+pub(super) fn top_level_then(source: &str) -> Option<usize> {
+    top_level_word(source, "THEN")
+}
+
+/// The `ELSE` that answers this `IF`: a nested `IF … THEN` takes the first
+/// `ELSE` after it, as in every BASIC.
+pub(super) fn matching_else(actions: &str) -> Option<usize> {
+    let mut nested = 0;
+    let mut from = 0;
+    loop {
+        let rest = &actions[from..];
+        let word = |w| top_level_word(rest, w).map(|at| at + from);
+        let (next_if, next_else) = (word("IF"), word("ELSE")?);
+        match next_if {
+            Some(at) if at < next_else => { nested += 1; from = at + 2; }
+            _ if nested > 0 => { nested -= 1; from = next_else + 4; }
+            _ => return Some(next_else),
+        }
+    }
+}
+
+/// PRINT's items and what follows each: `;` runs on, `,` leaves a space.
+pub(super) fn print_items(source: &str) -> Vec<(String, Option<char>)> {
+    let mut items = Vec::new();
+    let mut start = 0;
+    for (at, ch) in top_level(source) {
+        if ch == ';' || ch == ',' {
+            items.push((source[start..at].trim().to_owned(), Some(ch)));
+            start = at + 1;
+        }
+    }
+    let last = source[start..].trim();
+    if !last.is_empty() {
+        items.push((last.to_owned(), None));
+    }
+    items
 }

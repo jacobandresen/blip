@@ -14,7 +14,7 @@ Makefile
 lib/libblip.a
 games/*/bouncer
 games/*/serpent
-games/*/galactic_defender
+games/*/defender
 games/*/gen_assets
 games/*/assets.stamp
 

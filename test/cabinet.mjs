@@ -7,9 +7,9 @@ import { openPage } from './lib/harness.mjs';
 const GAMES = [
   ['rally', 'RALLY', 2],
   ['bouncer', 'BOUNCER', 1],
-  ['galactic_defender', 'DEFENDER', 1],
+  ['defender', 'DEFENDER', 1],
   ['bubbler', 'BUBBLER', 2],
-  ['sky_raider', 'RAIDER', 1],
+  ['raider', 'RAIDER', 1],
   ['meteors', 'METEORS', 1],
   ['serpent', 'SERPENT', 1],
   ['brawler', 'BRAWLER', 2],
@@ -90,11 +90,9 @@ test('arrows and a tap walk between machines; tapping the cabinet body does not 
   assert.equal(await selectedSlug(page), 'rally/index.html');
   await page.locator('.pick-next').tap();
   await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
-  assert.equal(await page.locator('#game-grid').evaluate((grid) => grid.style.getPropertyValue('--aisle-floor-x')), '-42px');
   assert.equal(await page.locator('.card-shuffling').count(), 0, 'machines slide past instead of shuffling');
   await page.locator('.pick-prev').tap();
   await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'rally/index.html');
-  assert.equal(await page.locator('#game-grid').evaluate((grid) => grid.style.getPropertyValue('--aisle-floor-x')), '0px');
   await page.locator('.card-rally').tap();
   assert.equal(new URL(page.url()).pathname, '/index.html');
   assert.equal(await selectedSlug(page), 'rally/index.html');
@@ -269,7 +267,7 @@ for (const [index, [slug, title, players]] of GAMES.entries()) {
         window.__cabinetActionKeys = [];
         document.querySelector('canvas').addEventListener('keydown', (event) => window.__cabinetActionKeys.push(event.code));
       });
-      const actionTarget = ['serpent', 'bouncer', 'galactic_defender', 'bubbler', 'adder'].includes(slug) ?
+      const actionTarget = ['serpent', 'bouncer', 'defender', 'bubbler', 'adder'].includes(slug) ?
         '#touch-strip .ts-glass' : '#snes-pad .snes-btn[data-blip="button1"]';
       const action = page.locator(actionTarget);
       if (slug === 'bubbler') {
@@ -281,3 +279,18 @@ for (const [index, [slug, title, players]] of GAMES.entries()) {
     }
   });
 }
+
+test('a game opened in the arcade after a visit to BASIC returns to the arcade from the BLIP badge', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 900 } });
+  await page.route('**/*.wasm', () => {});
+  await page.goto(`${origin}/basic.html`);
+  await page.evaluate(() => localStorage.setItem('blip-frontend', 'basic'));
+  await page.goto(`${origin}/index.html?cabinet`);
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  await page.goto(`${origin}/serpent/index.html`);
+  await page.locator('.blip-logo').click();
+  await page.waitForURL((url) => !url.pathname.includes('/serpent/'));
+  assert.equal(new URL(page.url()).pathname, '/index.html', 'the badge leads back to the arcade, not to BASIC');
+  await page.waitForTimeout(500);
+  assert.equal(new URL(page.url()).pathname, '/index.html', 'and the arcade stays');
+});

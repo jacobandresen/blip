@@ -7,7 +7,6 @@ name = "adder"
 version = "0.1.0"
 dependencies = [
  "blip",
- "blip_assets",
  "macroquad",
 ]
 
@@ -59,13 +58,6 @@ version = "0.1.0"
 dependencies = [
  "blip_font",
  "macroquad",
-]
-
-[[package]]
-name = "blip_assets"
-version = "0.1.0"
-dependencies = [
- "blip_font",
  "png",
 ]
 
@@ -74,7 +66,6 @@ name = "blip_basic"
 version = "0.1.0"
 dependencies = [
  "blip",
- "blip_assets",
  "macroquad",
 ]
 
@@ -87,7 +78,6 @@ name = "bouncer"
 version = "0.1.0"
 dependencies = [
  "blip",
- "blip_assets",
  "macroquad",
 ]
 
@@ -96,7 +86,6 @@ name = "brawler"
 version = "0.1.0"
 dependencies = [
  "blip",
- "blip_assets",
  "macroquad",
 ]
 
@@ -105,8 +94,8 @@ name = "bubbler"
 version = "0.1.0"
 dependencies = [
  "blip",
- "blip_assets",
  "macroquad",
+ "png",
 ]
 
 [[package]]
@@ -158,6 +147,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c87e182de0887fd5361989c677c4e8f5000cd9491d6d563161a8f3a5519fc7f"
 
 [[package]]
+name = "defender"
+version = "0.1.0"
+dependencies = [
+ "blip",
+ "macroquad",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -196,15 +193,6 @@ checksum = "2e57e16b3fe8ff4364c0661fdaac543fb38b29ea9bc9c2f45612d90adf931d2b"
 dependencies = [
  "hashbrown",
  "ttf-parser",
-]
-
-[[package]]
-name = "galactic_defender"
-version = "0.1.0"
-dependencies = [
- "blip",
- "blip_assets",
- "macroquad",
 ]
 
 [[package]]
@@ -301,7 +289,6 @@ name = "meteors"
 version = "0.1.0"
 dependencies = [
  "blip",
- "blip_assets",
  "macroquad",
 ]
 
@@ -402,11 +389,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "raider"
+version = "0.1.0"
+dependencies = [
+ "blip",
+ "macroquad",
+]
+
+[[package]]
 name = "rally"
 version = "0.1.0"
 dependencies = [
  "blip",
- "blip_assets",
  "macroquad",
 ]
 
@@ -415,7 +409,6 @@ name = "serpent"
 version = "0.1.0"
 dependencies = [
  "blip",
- "blip_assets",
  "macroquad",
 ]
 
@@ -424,15 +417,6 @@ name = "simd-adler32"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "703d5c7ef118737c72f1af64ad2f6f8c5e1921f818cdcb97b8fe6fc69bf66214"
-
-[[package]]
-name = "sky_raider"
-version = "0.1.0"
-dependencies = [
- "blip",
- "blip_assets",
- "macroquad",
-]
 
 [[package]]
 name = "smallvec"

@@ -13,7 +13,7 @@ test('ROM INTERMISSION XM imports notes and plays non-silent audio', async (t) =
   await page.route('**/*.wasm', (route) => route.abort());
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => BlipBasic.submit('TUNE BLUE_INTERMISSION'));
-  assert.match(await page.locator('#basic-output').textContent(), /TUNE TAKES NO FILE; USE IMPORT XM/);
+  assert.match(await page.locator('#basic-output').textContent(), /TUNE OPENS AN \.XM IN \/TAPE OR \/ROM/);
   await page.evaluate(() => BlipBasic.submit('TUNE'));
   await page.locator('#tune').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#tune-name').inputValue(), '/USER/MUSIC/SONG.TUNE');
@@ -25,7 +25,8 @@ test('ROM INTERMISSION XM imports notes and plays non-silent audio', async (t) =
     input.files = transfer.files;
     input.dispatchEvent(new Event('change', { bubbles: true }));
   }, Array.from(xm));
-  await page.waitForFunction(() => document.querySelector('#tune-status').textContent.includes('IMPORTED'));
+  // A long module is cut to its first 32 pages; either way the status names the chip voices.
+  await page.waitForFunction(() => document.querySelector('#tune-status').textContent.includes('CHIP VOICES'));
 
   const track = await page.evaluate(() => {
     const encoded = window.blipBasicTuneExport.waveData().split(',')[1];
@@ -87,4 +88,15 @@ test('ROM INTERMISSION XM imports notes and plays non-silent audio', async (t) =
     await page.locator('#basic-output').textContent(),
   ].join('\n');
   assert.doesNotMatch(visibleErrors, /UNEXPECTED TOKEN|PLAY ERROR/i, 'playback should not display a syntax or audio error');
+});
+
+test('TUNE opens a game\'s tune from its tape folder, its notes ready to save in USER', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium');
+  await page.route('**/*.wasm', (route) => route.abort());
+  await page.goto(`${origin}/basic.html`);
+  await page.evaluate(() => BlipBasic.submit('TUNE /TAPE/SERPENT/ASSETS/SLITHER.XM'));
+  await page.waitForFunction(() => document.querySelector('#tune-status').textContent.includes('IMPORTED'));
+  assert.equal(await page.locator('#tune-name').inputValue(), '/USER/MUSIC/SLITHER.TUNE');
+  assert.equal(await page.locator('#tune-bpm').inputValue(), '108');
+  assert.ok(await page.locator('#tune-grid .has-note').count() > 16, 'the first bar has its melody, arpeggio, bass and drums');
 });

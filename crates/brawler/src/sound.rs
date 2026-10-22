@@ -2,13 +2,6 @@
 
 use blip::audio::load_sound as load;
 
-/// One of the build-time effects, by file name.
-macro_rules! wav {
-    ($name:literal) => {
-        include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/", $name, ".wav"))
-    };
-}
-
 /// A sound the rules ask for. They only name it and the main loop plays it,
 /// so a round can be run, and tested, with no audio device.
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -77,53 +70,51 @@ impl Sounds {
     pub(crate) async fn load() -> Sounds {
         Sounds {
             hit_light: [
-                load(wav!("hit_light")).await,
-                load(wav!("hit_light2")).await,
-                load(wav!("hit_light3")).await,
+                load(blip::wav!("hit_light")).await,
+                load(blip::wav!("hit_light2")).await,
+                load(blip::wav!("hit_light3")).await,
             ],
-            hit_heavy: load(wav!("hit_heavy")).await,
+            hit_heavy: load(blip::wav!("hit_heavy")).await,
             hit_again: [
-                load(wav!("hit_light_b")).await,
-                load(wav!("hit_light2_b")).await,
-                load(wav!("hit_light3_b")).await,
-                load(wav!("hit_heavy_b")).await,
+                load(blip::wav!("hit_light_b")).await,
+                load(blip::wav!("hit_light2_b")).await,
+                load(blip::wav!("hit_light3_b")).await,
+                load(blip::wav!("hit_heavy_b")).await,
             ],
             take: std::cell::Cell::new(false),
-            crunch: load(wav!("crunch")).await,
-            land: load(wav!("land")).await,
-            // Built here rather than shipped, like the music: see
-            // blip_assets::brawler::crowd_wav.
-            cheer: load(&blip_assets::brawler::crowd_wav(false)).await,
-            roar: load(&blip_assets::brawler::crowd_wav(true)).await,
-            whoosh: load(wav!("whoosh")).await,
-            gi: load(wav!("gi")).await,
-            block: load(wav!("block")).await,
-            bell: load(wav!("bell")).await,
-            ko: load(wav!("ko")).await,
-            projectile: load(wav!("projectile")).await,
-            laser: load(wav!("laser")).await,
-            quake: load(wav!("quake")).await,
-            parry: load(wav!("parry")).await,
-            counter: load(wav!("counter")).await,
-            fruit: load(wav!("fruit")).await,
-            tick: load(wav!("tick")).await,
-            gong: load(wav!("gong")).await,
-            whistle: load(wav!("whistle")).await,
-            drums: load(wav!("drums")).await,
-            smash: load(wav!("smash")).await,
-            tweet: load(wav!("tweet")).await,
-            heart: load(wav!("heart")).await,
+            crunch: load(blip::wav!("crunch")).await,
+            land: load(blip::wav!("land")).await,
+            cheer: load(blip::wav!("cheer")).await,
+            roar: load(blip::wav!("roar")).await,
+            whoosh: load(blip::wav!("whoosh")).await,
+            gi: load(blip::wav!("gi")).await,
+            block: load(blip::wav!("block")).await,
+            bell: load(blip::wav!("bell")).await,
+            ko: load(blip::wav!("ko")).await,
+            projectile: load(blip::wav!("projectile")).await,
+            laser: load(blip::wav!("laser")).await,
+            quake: load(blip::wav!("quake")).await,
+            parry: load(blip::wav!("parry")).await,
+            counter: load(blip::wav!("counter")).await,
+            fruit: load(blip::wav!("fruit")).await,
+            tick: load(blip::wav!("tick")).await,
+            gong: load(blip::wav!("gong")).await,
+            whistle: load(blip::wav!("whistle")).await,
+            drums: load(blip::wav!("drums")).await,
+            smash: load(blip::wav!("smash")).await,
+            tweet: load(blip::wav!("tweet")).await,
+            heart: load(blip::wav!("heart")).await,
             ambience: [
-                load(&blip_assets::brawler::ambience_wav(0)).await,
-                load(&blip_assets::brawler::ambience_wav(1)).await,
-            load(&blip_assets::brawler::ambience_wav(2)).await,
-            load(&blip_assets::brawler::ambience_wav(3)).await,
+                load(blip::wav!("ambience_crowd")).await,
+                load(blip::wav!("ambience_wind")).await,
+                load(blip::wav!("ambience_crickets")).await,
+                load(blip::wav!("ambience_city")).await,
             ],
-            bellow: load(wav!("bellow")).await,
-            swing: load(wav!("swing")).await,
-            thwip: load(wav!("thwip")).await,
-            win: load(wav!("win")).await,
-            lose: load(wav!("lose")).await,
+            bellow: load(blip::wav!("bellow")).await,
+            swing: load(blip::wav!("swing")).await,
+            thwip: load(blip::wav!("thwip")).await,
+            win: load(blip::wav!("win")).await,
+            lose: load(blip::wav!("lose")).await,
         }
     }
 

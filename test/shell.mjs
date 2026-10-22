@@ -80,7 +80,7 @@ test('the game shell', async (t) => {
     await open(cdp, 'meteors/index.html', 17000);
     const state = `JSON.stringify((function(){var c=document.getElementById('glcanvas'),r=c.getBoundingClientRect();
       var topbar=document.getElementById('topbar');
-      return {topbarDisplay:getComputedStyle(topbar).display,panel:getComputedStyle(topbar.querySelector('.deck-panel')).display,
+      return {topbarDisplay:getComputedStyle(topbar).display,panel:topbar.querySelector('.deck-panel').checkVisibility()?'shown':'none',
               barHeight:topbar.getBoundingClientRect().height,box:[r.left,r.top,r.width,r.height],buf:[c.width,c.height],
               marqueeBottom:document.getElementById('marquee-bar').getBoundingClientRect().bottom};})())`;
     const before = JSON.parse(await evaluate(cdp, state));
@@ -104,13 +104,13 @@ test('the game shell', async (t) => {
     await open(cdp, 'index.html');
     await evaluate(cdp, "blipSetFullscreen(true); true");
     await sleep(400);
-    assert.equal(await evaluate(cdp, "getComputedStyle(document.querySelector('#kiosk-bar .deck-panel')).display"), 'none');
+    assert.equal(await evaluate(cdp, "!document.querySelector('#kiosk-bar .deck-panel')?.checkVisibility()"), true, 'the arcade still shows a deck');
     assert.equal(await evaluate(cdp, "document.getElementById('kiosk-bar').getBoundingClientRect().height"), 0);
     assert.equal(await evaluate(cdp, 'document.documentElement.scrollHeight <= innerHeight'), true,
       'the catalogue needs scrolling on a 1080p kiosk');
     await open(cdp, 'serpent/index.html', 5000);
     assert.ok(await evaluate(cdp, "document.documentElement.hasAttribute('data-fullscreen')"), 'the game page forgot the choice');
-    assert.equal(await evaluate(cdp, "getComputedStyle(document.querySelector('#topbar .deck-panel')).display"), 'none');
+    assert.equal(await evaluate(cdp, "document.querySelector('#topbar .deck-panel').checkVisibility()"), false, 'the game page still shows its deck');
 
     // A mouse left lying loses its pointer.
     await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 400, y: 400 });
@@ -128,17 +128,18 @@ test('the game shell', async (t) => {
     const n = await evaluate(cdp, "document.querySelectorAll('.card').length");
     assert.equal(cols, n, `the machines should share one horizontal aisle`);
     await key(cdp, 'ArrowRight', 'ArrowRight', 39);
-    await waitFor(cdp, `${lit} === 1`, 1500);
+    // The aisle walks one machine every 2.24 s.
+    await waitFor(cdp, `${lit} === 1`, 3000);
     assert.equal(await evaluate(cdp, lit), 1);
     await key(cdp, 'ArrowDown', 'ArrowDown', 40);
-    await waitFor(cdp, `${lit} === 2`, 1500);
+    await waitFor(cdp, `${lit} === 2`, 3000);
     assert.equal(await evaluate(cdp, lit), 2);
     await key(cdp, 'ArrowUp', 'ArrowUp', 38);
-    await waitFor(cdp, `${lit} === 1`, 1500);
+    await waitFor(cdp, `${lit} === 1`, 3000);
     assert.equal(await evaluate(cdp, lit), 1);
     // Up and down step through the same horizontal aisle.
     await key(cdp, 'ArrowUp', 'ArrowUp', 38);
-    await waitFor(cdp, `${lit} === 0`, 1500);
+    await waitFor(cdp, `${lit} === 0`, 3000);
     assert.equal(await evaluate(cdp, lit), 0);
   });
 
@@ -186,8 +187,8 @@ test('the game shell', async (t) => {
     assert.equal(await evaluate(cdp, 'location.pathname'), '/bouncer/index.html');
     assert.ok([0, 1].includes(await evaluate(cdp, 'getCoins()')), 'the inserted credit reaches the game or starts play');
     const titles = {
-      serpent: 'SERPENT', bouncer: 'BOUNCER', galactic_defender: 'DEFENDER', rally: 'RALLY',
-      meteors: 'METEORS', sky_raider: 'RAIDER', brawler: 'BRAWLER', bubbler: 'BUBBLER',
+      serpent: 'SERPENT', bouncer: 'BOUNCER', defender: 'DEFENDER', rally: 'RALLY',
+      meteors: 'METEORS', raider: 'RAIDER', brawler: 'BRAWLER', bubbler: 'BUBBLER',
       adder: 'ADDER',
     };
     for (const [slug, title] of Object.entries(titles)) {
@@ -198,7 +199,7 @@ test('the game shell', async (t) => {
         return {name:n.getAttribute('aria-label'),box:[r.left,r.top,r.width,r.height],cells:n.querySelectorAll('.marquee-letter').length,
           dots:n.querySelectorAll('.marquee-dot').length,text:Array.prototype.map.call(n.querySelectorAll('.marquee-letter'),function(x){return x.textContent}).join(''),
           duration:getComputedStyle(n.querySelector('.marquee-letter')).animationDuration,
-          delay:getComputedStyle(n.querySelector('.marquee-letter:last-child')).animationDelay};})())`));
+          delay:getComputedStyle([].slice.call(n.querySelectorAll('.marquee-letter')).pop()).animationDelay};})())`));
       assert.equal(state.name, title, `${slug} accessible title`);
       assert.equal(state.cells, 8, `${slug} has eight mechanical cells`);
       assert.equal(state.dots, 0, `${slug} has no dot dividers`);
@@ -213,7 +214,7 @@ test('the game shell', async (t) => {
     const cdp = await browser(t, 9408, { touch: true, width: 390, height: 844 });
     for (const [width,height] of [[390,844],[320,700],[844,390]]) {
       await cdp.send('Emulation.setDeviceMetricsOverride', {width,height,deviceScaleFactor:1,mobile:true});
-      for (const page of ['index.html','about.html','controls.html','history.html','api.html','galactic_defender/index.html']) {
+      for (const page of ['index.html','about.html','controls.html','history.html','api.html','defender/index.html']) {
         await open(cdp,page,1200);
         const expectedTitle = page.includes('/') && width <= 620 ? 'visible' : 'hidden';
         await waitFor(cdp, `getComputedStyle(document.querySelector('#marquee-name')).visibility === '${expectedTitle}'`, 5000);

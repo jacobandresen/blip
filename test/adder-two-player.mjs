@@ -9,6 +9,7 @@ test('Adder opens the second station and joins a human player from the title', a
   await page.addInitScript(() => {
     sessionStorage.setItem('blip-coins', '4');
     localStorage.setItem('blip-controls', 'pad');
+    localStorage.setItem('blip-touch', '0');
   });
   await page.goto(`${origin}/adder/index.html`);
   await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));

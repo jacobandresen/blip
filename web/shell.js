@@ -55,6 +55,12 @@ if (CABINET_SCREEN) canvas.inert = true;
 
 updateCoinsHud();
 
+// Inside BLIP's monitor the game is a frame: its parent takes it down.
+function leaveGame() {
+  if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
+  else location.href = blipFrontendUrl();
+}
+
 var returningToCabinet = false;
 function returnToCabinet(event) {
   if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
@@ -170,10 +176,7 @@ function returnToCabinet(event) {
       if (out) out.click(); else modal.remove();
       return;
     }
-    if (Date.now() - last >= IDLE_MS) {
-      if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
-      else window.location.href = blipFrontendUrl();
-    }
+    if (Date.now() - last >= IDLE_MS) leaveGame();
   }, 5000);
 }());
 
@@ -182,26 +185,13 @@ window.addEventListener('pagehide', function () {
   if (typeof Howler !== 'undefined') Howler.stop();
 });
 
-// ---- UI audio (coin insert / no room) ----
-
-var uiAudio = null;
-function getUiAudio() {
-  if (typeof Howler !== 'undefined' && Howler.ctx) {
-    if (Howler.ctx.state === 'suspended') Howler.ctx.resume();
-    return Howler.ctx;
-  }
-  if (!uiAudio) uiAudio = new (window.AudioContext || window.webkitAudioContext)();
-  if (uiAudio.state === 'suspended') uiAudio.resume();
-  return uiAudio;
-}
-
 function markGameLoaded(game, bar) {
   var receiver=bar.querySelector('.jukebox-receiver');
   receiver.classList.add('stowed');
   blipSetMarquee(game.name, false);
   document.documentElement.removeAttribute('data-card-loading');
   try {
-    var selectionOrder = ['rally', 'bouncer', 'galactic_defender', 'bubbler', 'sky_raider', 'meteors', 'serpent', 'brawler', 'adder'];
+    var selectionOrder = ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder'];
     var code = 'A' + (selectionOrder.indexOf(game.slug) + 1);
     var rom={
       slug: game.slug, name: game.name, code: code,
@@ -224,7 +214,7 @@ function feedbackTick() {
     try { if (navigator.vibrate(7)) return; } catch (e) {}
   }
   try {
-    var ctx = getUiAudio();
+    var ctx = getKioskAudio();
     if (!ctx) return;
     var t = ctx.currentTime;
     var osc = ctx.createOscillator(), gain = ctx.createGain();
@@ -238,9 +228,7 @@ function feedbackTick() {
     osc.start(t); osc.stop(t + 0.055);
   } catch (e) {}
 }
-// The coin that drops into #insert-coin-btn's slot: a real element so a class
-// toggle can animate it, injected here for every game page.
-var coinDropAnim = null;
+// kiosk.js's coin drop (dropCoinAnimation), into #insert-coin-btn's slot.
 (function () {
   var btn = document.getElementById('insert-coin-btn');
   if (!btn) return;
@@ -252,32 +240,6 @@ var coinDropAnim = null;
     btn.appendChild(coinDropAnim);
   }
 }());
-function dropCoinAnimation() {
-  if (!coinDropAnim) return;
-  // The slot is the centre of the coin plate at the button's content edge:
-  // padding-right plus half the plate. Both change across breakpoints.
-  var btn = coinDropAnim.parentElement;
-  var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
-  var plateW = parseFloat(getComputedStyle(btn, '::after').width) || 18;
-  coinDropAnim.style.setProperty('--slot-x', (btn.classList.contains('deck-coin-slot')?btn.offsetWidth/2:padRight+plateW/2)+'px');
-  coinDropAnim.classList.remove('dropping');
-  void coinDropAnim.offsetWidth;
-  coinDropAnim.classList.add('dropping');
-  coinDropAnim.addEventListener('animationend', function () {
-    coinDropAnim.classList.remove('dropping');
-  }, { once: true });
-}
-function playNoRoom() {
-  var ctx = getUiAudio(), t = ctx.currentTime;
-  var osc = ctx.createOscillator(), gain = ctx.createGain();
-  osc.connect(gain); gain.connect(blipOut(ctx));
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(200, t);
-  osc.frequency.exponentialRampToValueAtTime(65, t + 0.38);
-  gain.gain.setValueAtTime(0.32, t);
-  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
-  osc.start(t); osc.stop(t + 0.39);
-}
 // Called from WASM when play starts (from the title or a game-over
 // restart), once more per second player. Out of coins, the debt is
 // kept and the coins that go in next pay it before the game goes on.
@@ -432,9 +394,6 @@ if (document.documentElement.hasAttribute('data-appstyle')) {
 // ---- Saving this game to a home screen ---- Chrome and Android install it
 // from their own prompt; iOS can only be told where Share is. Either way the
 // saved page is ./?app, so the icon opens the game in its own app mode.
-function iosSafari() {
-  return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
 function showInstallSheet() {
   if (CABINET_SCREEN || blipStandalone() || !GAME || document.getElementById('install-sheet')) return;
   try { history.replaceState(null, '', './?app'); } catch (e) {}
@@ -445,7 +404,7 @@ function showInstallSheet() {
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-labelledby', 'install-title');
   var share = '<svg class="install-share" viewBox="0 0 16 20" aria-label="Share"><path d="M8 1v11M4.5 4.5 8 1l3.5 3.5M5 8H2v11h12V8h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  var body = iosSafari()
+  var body = blipIOS()
     ? '<ol class="install-steps"><li>Tap ' + share + ' <b>Share</b> in Safari\'s toolbar.</li><li>Choose <b>Add to Home Screen</b>.</li></ol>'
     : '<p class="install-wait">Use your browser\'s menu: <b>Install app</b> or <b>Add to Home screen</b>.</p>';
   sheet.innerHTML = '<div class="install-card"><img class="install-icon" src="icon-180.png?v=2" alt="">' +
@@ -697,7 +656,11 @@ function syncBuffer() {
   var dpr = window.high_dpi ? window.devicePixelRatio || 1 : 1;   // the runtime's high-DPI buffer (app style)
   if (canvas.width === Math.floor(canvas.clientWidth * dpr) && canvas.height === Math.floor(canvas.clientHeight * dpr)) return;
   if (typeof window.onresize !== 'function') return;
-  try { window.onresize(); } catch (e) { /* the game has not loaded yet */ }
+  // A game's own call (blipSetMode) lands here mid-frame; miniquad's resize
+  // handler run now would re-enter it and panic, so it runs once the frame returns.
+  queueMicrotask(function () {
+    try { window.onresize(); } catch (e) { /* the game has not loaded yet */ }
+  });
 }
 
 /** Re-fit only when inputs change; deck observation and `--topbar-h` writes otherwise form a resize loop. */
@@ -744,10 +707,7 @@ function onGameStopped(err) {
   if (loader) loader.style.display = 'flex';
   if (statusEl) statusEl.textContent = 'GAME STOPPED';
   if (barInner && barInner.parentNode) barInner.parentNode.style.display = 'none';
-  setTimeout(function () {
-    if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
-    else window.location.href = blipFrontendUrl();
-  }, 2500);
+  setTimeout(leaveGame, 2500);
 }
 window.addEventListener('error', function (e) { onGameStopped(e.error); });
 window.addEventListener('unhandledrejection', function (e) { onGameStopped(e.reason); });
@@ -836,8 +796,7 @@ canvas.addEventListener('webglcontextlost', function (e) {
   if (statusEl) statusEl.textContent = 'ONE MOMENT';
   setTimeout(function () {
     if (again) window.location.reload();
-    else if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
-    else window.location.href = blipFrontendUrl();
+    else leaveGame();
   }, 1200);
 }, false);
 
@@ -897,19 +856,15 @@ window.addEventListener('keydown', function (e) {
     dispatch(primary, 'keydown');
     setTimeout(function () { dispatch(primary, 'keyup'); }, 60);
   }
-  function goToKiosk() {
-    if (blipAmstradMode()) parent.postMessage({ type: 'blip-amstrad-exit' }, location.origin);
-    else window.location.href = blipFrontendUrl();
-  }
   // Backspace does it from the keyboard: a kiosk has no mouse for the logo.
   window.addEventListener('keydown', function (e) {
     if (blipAmstradMode() && e.key === 'Escape') {
-      e.preventDefault(); e.stopImmediatePropagation(); goToKiosk(); return;
+      e.preventDefault(); e.stopImmediatePropagation(); leaveGame(); return;
     }
     if (e.key !== 'Backspace' || e.repeat) return;
     if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
     e.preventDefault();
-    goToKiosk();
+    leaveGame();
   }, true);
 
   // Live input -> the stick ball's lean (the pad lights its own buttons in
@@ -964,7 +919,7 @@ window.addEventListener('keydown', function (e) {
     feedback: feedbackTick,
     onInput: reflectInput,
     onStart: tapPrimary,
-    onSelect: goToKiosk
+    onSelect: leaveGame
   });
   BlipController.bindKeyboard();
   BlipController.bindGamepad(pollGamepad);

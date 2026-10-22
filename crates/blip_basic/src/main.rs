@@ -1,21 +1,19 @@
 mod host;
 mod interpreter;
-mod music;
 mod shared_math;
 mod sounds;
 
 use blip::{Blip, BLIP_BLACK};
 use host::*;
 use interpreter::Program;
-use macroquad::{audio::load_sound_from_bytes, texture::Texture2D};
-use music::Music;
+use blip::BlipTex;
+use macroquad::texture::Texture2D;
 use sounds::Sounds;
 use std::collections::HashMap;
 
-const WIDTH: i32 = 320;
-const HEIGHT: i32 = 200;
-include!(concat!(env!("OUT_DIR"), "/tape_gfx.rs"));
-include!(concat!(env!("OUT_DIR"), "/rom_sfx.rs"));
+/// Every BLIP BASIC program draws on one 640x400 screen, a high-resolution Amiga's.
+const WIDTH: i32 = 640;
+const HEIGHT: i32 = 400;
 
 fn conf() -> macroquad::window::Conf {
     blip::window_conf("BLIP BASIC", WIDTH, HEIGHT)
@@ -30,39 +28,13 @@ async fn main() {
     }));
     let mut blip = Blip::new(WIDTH, HEIGHT);
     blip.set_frame_retention(true);
+    blip.show_committed(true);
     #[cfg(target_arch = "wasm32")]
     unsafe {
         blip_basic_ready();
     }
     let mut textures = HashMap::new();
-    for (path, bytes) in TAPE_GFX {
-        let tex =
-            Texture2D::from_file_with_format(bytes, Some(macroquad::prelude::ImageFormat::Png));
-        tex.set_filter(macroquad::texture::FilterMode::Nearest);
-        textures.insert(path.to_string(), tex.clone());
-        let alias = path
-            .rsplit('/')
-            .next()
-            .unwrap_or(path)
-            .trim_end_matches(".PNG")
-            .to_ascii_lowercase();
-        textures.entry(alias).or_insert(tex);
-        let parts: Vec<_> = path.split('/').collect();
-        if parts.len() >= 5 {
-            let prefix = if parts[3] == "GALACTIC_DEFENDER" {
-                "GALACTIC"
-            } else {
-                parts[3]
-            };
-            let qualified =
-                format!("{}_{}", prefix, parts[4].trim_end_matches(".PNG")).to_ascii_lowercase();
-            if let Some(texture) = textures.get(*path).cloned() {
-                textures.entry(qualified).or_insert(texture);
-            }
-        }
-    }
-    let mut sounds = Sounds::new(SFX_NAMES.into_iter().zip(SFX_BYTES));
-    let mut music = Music::new();
+    let mut sounds = Sounds::default();
     let mut program = Program::new();
     let mut old_source = String::new();
     let mut reported_error = String::new();
@@ -71,66 +43,28 @@ async fn main() {
         if let Some(source) = host_source() {
             if source != old_source {
                 old_source = source.clone();
-                music.stop();
-                music.clear_files();
                 blip.resize_canvas(WIDTH, HEIGHT);
                 program.load(&source);
-                for (path, bytes) in host_user_textures() {
-                    let tex = Texture2D::from_file_with_format(
-                        &bytes,
-                        Some(macroquad::prelude::ImageFormat::Png),
-                    );
-                    tex.set_filter(macroquad::texture::FilterMode::Nearest);
-                    textures.insert(path.clone(), tex.clone());
-                    let alias = path
-                        .rsplit('/')
-                        .next()
-                        .unwrap_or(&path)
-                        .trim_end_matches(".PNG")
-                        .to_ascii_lowercase();
-                    textures.entry(alias).or_insert(tex);
-                }
-                for (path, bytes) in host_user_music() {
-                    if let Ok(sound) = load_sound_from_bytes(&bytes).await {
-                        music.insert_file(path, sound);
-                    }
-                }
+                load_files(&source, &mut textures, &mut sounds).await;
                 reported_error.clear();
                 program_loaded = true;
             }
         } else if !old_source.is_empty() {
             old_source.clear();
-            music.stop();
+            sounds.stop_music();
             program = Program::new();
             reported_error.clear();
         }
-        #[cfg(target_arch = "wasm32")]
-        unsafe {
-            if blip_basic_export_requested() != 0 {
-                let game = match blip_basic_export_game() {
-                    1 => "ADDER",
-                    2 => "BOUNCER",
-                    3 => "BRAWLER",
-                    4 => "BUBBLER",
-                    5 => "GALACTIC_DEFENDER",
-                    6 => "METEORS",
-                    7 => "RALLY",
-                    8 => "SERPENT",
-                    9 => "SKY_RAIDER",
-                    _ => "",
-                };
-                for (path, bytes) in TAPE_GFX {
-                    if !game.is_empty() && path.starts_with(&format!("/TAPE/GFX/{game}/")) {
-                        blip_basic_export_rom_asset(
-                            path.as_ptr(),
-                            path.len() as i32,
-                            bytes.as_ptr(),
-                            bytes.len() as i32,
-                        );
-                    }
-                }
-                blip_basic_export_done();
+        #[cfg(not(target_arch = "wasm32"))]
+        if blip::bot::active() {
+            if let Some(error) = &program.error {
+                eprintln!("BASIC ERROR {error}");
+                std::process::exit(1);
             }
+            if !program.active {
+                blip::bot::finish("ended");
+            }
+            blip::bot::hold(&[]);
         }
         program.tick(&mut blip, &textures, &mut sounds);
         if let Err(error) = sounds.flush().await {
@@ -143,15 +77,6 @@ async fn main() {
                 blip_basic_sound(frequency, seconds, volume);
             }
         }
-        if let Some(path) = program.music_file_request.take() {
-            if let Err(error) = music.play_file(path) {
-                program.error = Some(error);
-            }
-        }
-        if let Some(request) = program.music_request.take() {
-            music.play(request).await;
-        }
-        music.warm_up().await;
         #[cfg(target_arch = "wasm32")]
         if let Some(error) = &program.error {
             if *error != reported_error {
@@ -165,6 +90,10 @@ async fn main() {
             blip.clear(BLIP_BLACK);
         }
         program.draw_output(&blip);
+        // A frame the program has not finished drawing waits for its WAIT.
+        if program.yielded || !program.active {
+            blip.commit_frame();
+        }
         blip.next_frame(60).await;
         if program_loaded {
             program_loaded = false;
@@ -172,6 +101,57 @@ async fn main() {
             unsafe {
                 blip_basic_program_loaded();
             }
+        }
+    }
+}
+
+/// A program's pictures and sounds: the user's own from /USER, and every file in
+/// each tape folder (/TAPE/<GAME>/ASSETS/) its source names. A copy's folder
+/// (/USER/<GAME>/ASSETS/) holds what the user changed; the rest comes from the
+/// tape's. A tape's tunes, a WAV with an XM beside it, are fetched only when played.
+async fn load_files(source: &str, textures: &mut HashMap<String, BlipTex>, sounds: &mut Sounds) {
+    textures.clear();
+    sounds.clear();
+    let mut files = host_user_files();
+    let mut folders: Vec<(&str, &str)> = ["/TAPE/", "/USER/"]
+        .iter()
+        .flat_map(|root| source.match_indices(root))
+        .filter_map(|(at, _)| {
+            let game = source[at + 6..].split('/').next()?;
+            let ok = !game.is_empty() && game.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+            let folder = &source[at..at + 6 + game.len() + "/ASSETS/".len()];
+            (ok && source[at + 6 + game.len()..].starts_with("/ASSETS/")).then_some((folder, game))
+        })
+        .collect();
+    folders.sort();
+    folders.dedup();
+    for (folder, game) in folders {
+        let tape = format!("/TAPE/{game}/ASSETS/");
+        let Ok(list) = macroquad::file::load_string(&tape_url(&format!("{tape}manifest.json"))).await else { continue };
+        let names: Vec<&str> = list.split('"').skip(1).step_by(2).collect();
+        for name in &names {
+            let path = format!("{folder}{name}");
+            if files.iter().any(|(user, _)| *user == path) {
+                continue;
+            }
+            let url = tape_url(&format!("{tape}{name}"));
+            let tune = name.strip_suffix(".WAV").is_some_and(|stem| names.contains(&format!("{stem}.XM").as_str()));
+            if tune {
+                sounds.add_later(path, url);
+            } else if name.ends_with(".PNG") || name.ends_with(".WAV") {
+                if let Ok(bytes) = macroquad::file::load_file(&url).await {
+                    files.push((path, bytes));
+                }
+            }
+        }
+    }
+    for (path, bytes) in files {
+        if path.ends_with(".PNG") {
+            let tex = Texture2D::from_file_with_format(&bytes, Some(macroquad::prelude::ImageFormat::Png));
+            tex.set_filter(macroquad::texture::FilterMode::Nearest);
+            textures.insert(path, tex);
+        } else if path.ends_with(".WAV") {
+            sounds.add(path, bytes);
         }
     }
 }

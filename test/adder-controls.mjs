@@ -8,12 +8,10 @@ function scene() {
   const lines = new Map(source.trim().split('\n').map((line) => {
     const at = line.indexOf(' '); return [Number(line.slice(0, at)), line.slice(at + 1)];
   }));
-  lines.set(10, 'MODE=1:GOTO 800');
-  lines.set(830, 'STOP_MUSIC:GOSUB 1100:GOTO 100');
-  for (const n of lines.keys()) if (n >= 1120 && n <= 1166) lines.delete(n);
-  lines.set(1120, 'BEST_X=140+(S-1)*200:BEST_Y=220+(S-1)*160:ANGLE(S)=(S-1)*3.141592653589793');
-  lines.set(1121, 'IF S>=3 THEN BEST_X=100+(S-3)*80:BEST_Y=100:ANGLE(S)=0');
-  lines.set(1165, 'HEAD_X(S)=BEST_X:HEAD_Y(S)=BEST_Y');
+  lines.set(85, 'START_GAME 1');
+  for (const n of lines.keys()) if (n > 2710 && n < 2820) lines.delete(n);
+  lines.set(2720, 'HEAD_X(S)=140+(S-1)*200:HEAD_Y(S)=220+(S-1)*160:ANGLE(S)=(S-1)*3.141592653589793');
+  lines.set(2730, 'IF S>=3 THEN HEAD_X(S)=100+(S-3)*80:HEAD_Y(S)=100:ANGLE(S)=0');
   return lines;
 }
 
@@ -52,7 +50,7 @@ async function open(t, touch) {
 for (const touch of [false, true]) test(`Adder BASIC keeps continuous steering and player-two joining on ${touch ? 'touch' : 'PC'}`, async (t) => {
   const p = await open(t, touch);
   const lines = scene();
-  lines.set(589, 'SOUND 1000+(ANGLE(1)<0-0.15)+2*(ANGLE(1)>0.15)+4*HUMAN(2)+8*(ANGLE(2)>3.3)+16*(ANGLE(2)<2.98)+32*(KEY_HELD("A") AND KEY_HELD("D") AND TURN(1)=0),0,0');
+  lines.set(165, 'SOUND 1000+(ANGLE(1)<-0.15)+2*(ANGLE(1)>0.15)+4*HUMAN(2)+8*(ANGLE(2)>3.3)+16*(ANGLE(2)<2.98)+32*(KEY_HELD("A") AND KEY_HELD("D") AND TURN(1)=0),0,0');
   await p.start(lines);
   const cdp = touch ? await p.page.context().newCDPSession(p.page) : null;
   async function down(key, selector, side = .5) {
@@ -82,8 +80,8 @@ for (const touch of [false, true]) test(`Adder BASIC keeps continuous steering a
 test('Adder BASIC carries lives and scores into the next round and adds a CPU', async (t) => {
   const p = await open(t, false);
   const lines = scene();
-  lines.set(1173, 'IF S=1 AND ROUND=1 THEN HEAD_X(1)=467:ANGLE(1)=0');
-  lines.set(589, 'SOUND 1000+63*(ROUND=2 AND LIFE(1)=2 AND SEATS=3 AND LIFE(2)=1 AND PTS(2)=250 AND ALIVE(1)=1),0,0');
+  lines.set(2740, 'IF S=1 AND ROUND=1 THEN HEAD_X(1)=627:ANGLE(1)=0');
+  lines.set(165, 'SOUND 1000+63*(ROUND=2 AND LIFE(1)=2 AND SEATS=3 AND LIFE(2)=1 AND PTS(2)=250 AND ALIVE(1)=1),0,0');
   await p.start(lines);
   await p.flags(63);
   assert.equal(await p.page.locator('body').getAttribute('data-wasm-error'), null);
@@ -92,8 +90,8 @@ test('Adder BASIC carries lives and scores into the next round and adds a CPU', 
 test('Adder BASIC can start with two humans and a CPU from the title', async (t) => {
   const p = await open(t, false);
   const lines = scene();
-  lines.set(10, 'REM TITLE ENTRY');
-  lines.set(589, 'SOUND 1000+(MODE=2 AND HUMAN(1)=1 AND HUMAN(2)=1 AND LIFE(2)=3 AND SEATS=3),0,0');
+  lines.set(85, 'START_DEMO');
+  lines.set(165, 'SOUND 1000+(STATE$="PLAY" AND HUMAN(1) AND HUMAN(2) AND LIFE(2)=3 AND SEATS=3),0,0');
   await p.start(lines);
   await p.page.keyboard.press('j', { delay: 80 });
   await p.flags(1);

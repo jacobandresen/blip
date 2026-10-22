@@ -2,6 +2,9 @@
 //! that pay to pass through, and up to six vipers in one pit — two of them
 //! people, the rest CPU. The rules are in `arena`, the brains in `cpu`.
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
+mod tunes;
 mod arena;
 mod cpu;
 mod levels;
@@ -54,7 +57,7 @@ impl Game {
         }
     }
 
-    fn start(&mut self) {
+    fn start_game(&mut self) {
         self.world = World::new(self.humans);
         self.state = State::Play;
     }
@@ -142,7 +145,7 @@ fn update_title(g: &mut Game, dt: f32) {
     if blip::bot::active() { blip::bot::hold(&[BLIP_KEY_SPACE]); }
     if btn1_pressed() {
         web::spend_coin();
-        g.start();
+        g.start_game();
     }
 }
 
@@ -180,17 +183,13 @@ fn update_over(g: &mut Game, dt: f32) {
     g.timer.tick(dt);
     if g.timer.active() || !btn1_pressed() { return; }
     web::spend_coin();
-    g.start();
+    g.start_game();
 }
 
 fn conf() -> blip::macroquad::window::Conf {
     window_conf("ADDER", WIN_W, WIN_H)
 }
 
-const THROUGH_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/through.wav"));
-const STRIKE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/strike.wav"));
-const ROUND_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pit.wav"));
-const GAME_OVER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -198,16 +197,15 @@ async fn main() {
     let mut g = Game::new();
     // Leave station two available for a mid-game join from the title screen.
     web::set_players(2);
-    let pit = blip::load_png(include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/pit.png")));
+    let pit = blip::load_png(blip::png!("pit"));
 
     let sfx = Sounds {
-        through: blip::audio::load_sound(THROUGH_WAV).await,
-        kill: blip::audio::load_sound(STRIKE_WAV).await,
-        round: blip::audio::load_sound(ROUND_WAV).await,
-        game_over: blip::audio::load_sound(GAME_OVER_WAV).await,
+        through: blip::audio::load_sound(blip::wav!("through")).await,
+        kill: blip::audio::load_sound(blip::wav!("strike")).await,
+        round: blip::audio::load_sound(blip::wav!("pit")).await,
+        game_over: blip::audio::load_sound(blip::wav!("game_over")).await,
     };
-    let mut music = Jukebox::new(&[blip_assets::adder::coil_wav, blip_assets::adder::hunt_wav]);
-    music.start(0).await;
+    let mut music = Jukebox::new("ADDER", &["COIL", "HUNT"]);
 
     let mut shot_frame: u32 = 0;
 
@@ -216,7 +214,7 @@ async fn main() {
 
         if blip.screenshot_mode {
             shot_frame += 1;
-            if shot_frame == 1 { g.start(); }
+            if shot_frame == 1 { g.start_game(); }
         }
 
         match g.state {
@@ -226,7 +224,6 @@ async fn main() {
         }
 
         music.play(g.track());
-        if g.state != State::Play { music.warm_up().await; }
 
         blip.clear(BLIP_BLACK);
         match g.state {
@@ -306,7 +303,7 @@ fn draw_play(blip: &Blip, g: &Game, pit: &Texture2D) {
             arena::PIT_Y + arena::PIT_H / 2.0, 4.0, if won { HOLE } else { BLIP_RED });
     } else if g.world.banner_t < BANNER {
         let a = (1.0 - g.world.banner_t / BANNER).min(1.0);
-        blip.draw_centered(&format!("ROUND {}", g.world.round), (arena::PIT_Y + arena::PIT_H / 2.0) as f32, 4.0,
+        blip.draw_centered(&format!("ROUND {}", g.world.round), arena::PIT_Y + arena::PIT_H / 2.0, 4.0,
             BlipColor { a, ..HOLE });
     }
     blip.draw_hud(g.world.score_of(0), g.world.lives_of(0));

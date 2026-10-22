@@ -12,6 +12,9 @@ use blip::{
     Timer, BLIP_BLACK, BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
+mod tunes;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
 mod levels;
@@ -169,27 +172,48 @@ impl Game {
         true
     }
 
-    fn spawn_food(&mut self) {
-        loop {
-            let f = Cell { c: rand_int(0, COLS - 1), r: rand_int(0, ROWS - 1) };
-            if self.cell_is_free(f) && !(self.bonus_active() && f == self.bonus) {
-                self.food = f;
-                return;
+    fn spawn_food(&mut self) -> bool {
+        let mut free = Vec::new();
+        let mut item_cells = Vec::new();
+        for r in 0..ROWS {
+            for c in 0..COLS {
+                let f = Cell { c, r };
+                if !self.cell_is_free(f) { continue; }
+                item_cells.push(f);
+                if !(self.bonus_active() && f == self.bonus)
+                    && !(self.shears_active() && f == self.shears) {
+                    free.push(f);
+                }
             }
         }
+        let choices = if free.is_empty() { &item_cells } else { &free };
+        if choices.is_empty() { return false; }
+        self.food = choices[rand_int(0, choices.len() as i32 - 1) as usize];
+        if free.is_empty() {
+            if self.bonus_active() && self.food == self.bonus { self.bonus_ttl = 0.0; }
+            if self.shears_active() && self.food == self.shears { self.shears_ttl = 0.0; }
+        }
+        true
     }
 
     fn bonus_active(&self) -> bool { self.bonus_ttl > 0.0 }
     fn shears_active(&self) -> bool { self.shears_ttl > 0.0 }
 
     fn spawn_shears(&mut self) {
-        for _ in 0..64 {
-            let c = Cell { c: rand_int(0, COLS - 1), r: rand_int(0, ROWS - 1) };
-            if !self.cell_is_free(c) || c == self.food || (self.bonus_active() && c == self.bonus) { continue; }
-            self.shears = c;
-            self.shears_ttl = SHEARS_TTL;
-            return;
+        let mut free = Vec::new();
+        for r in 0..ROWS {
+            for c in 0..COLS {
+                let cell = Cell { c, r };
+                if self.cell_is_free(cell) && cell != self.food
+                    && !(self.bonus_active() && cell == self.bonus)
+                {
+                    free.push(cell);
+                }
+            }
         }
+        if free.is_empty() { return; }
+        self.shears = free[rand_int(0, free.len() as i32 - 1) as usize];
+        self.shears_ttl = SHEARS_TTL;
     }
 
     /// Put a bonus somewhere the snake must travel to: aim for a third of the
@@ -198,19 +222,26 @@ impl Game {
     fn spawn_bonus(&mut self) {
         let head = self.snake_at(0);
         let far_enough = (COLS + ROWS) / 3;
-        // Two passes: worth travelling to, then anywhere, so a long-snake
-        // level still gets its bonus.
-        for relaxed in [false, true] {
-            for _ in 0..64 {
-                let b = Cell { c: rand_int(0, COLS - 1), r: rand_int(0, ROWS - 1) };
-                if !self.cell_is_free(b) || b == self.food { continue; }
-                let dist = (b.c - head.c).abs() + (b.r - head.r).abs();
-                if !relaxed && dist < far_enough { continue; }
-                self.bonus = b;
-                self.bonus_ttl = BONUS_TTL;
-                return;
+        let mut free = Vec::new();
+        let mut distant = Vec::new();
+        for r in 0..ROWS {
+            for c in 0..COLS {
+                let cell = Cell { c, r };
+                if !self.cell_is_free(cell) || cell == self.food
+                    || (self.shears_active() && cell == self.shears)
+                {
+                    continue;
+                }
+                free.push(cell);
+                if (cell.c - head.c).abs() + (cell.r - head.r).abs() >= far_enough {
+                    distant.push(cell);
+                }
             }
         }
+        let choices = if distant.is_empty() { &free } else { &distant };
+        if choices.is_empty() { return; }
+        self.bonus = choices[rand_int(0, choices.len() as i32 - 1) as usize];
+        self.bonus_ttl = BONUS_TTL;
     }
 
     /// Set the obstacle field from a list of (dc, dr) offsets from the board centre.
@@ -254,9 +285,7 @@ impl Game {
         }
     }
 
-    /// The next level's layout, arriving under a moving snake: cells on the
-    /// snake, the food, the bonus or the head's next three steps are left
-    /// out, and the rest fade in harmless (see OBS_FADE_SECS).
+    /// The next layout leaves the snake, its items and the next three steps clear.
     fn raise_obstacles(&mut self) {
         self.build_obstacles();
         let head = self.snake_at(0);
@@ -266,7 +295,9 @@ impl Game {
         for i in 0..self.obstacle_count {
             let o = self.obstacles[i];
             let on_snake = (0..self.snake_len).any(|j| self.snake_at(j) == o);
-            let on_item = o == self.food || (self.bonus_active() && o == self.bonus);
+            let on_item = o == self.food
+                || (self.bonus_active() && o == self.bonus)
+                || (self.shears_active() && o == self.shears);
             if on_snake || on_item || ahead.contains(&o) { continue; }
             self.obstacles[kept] = o;
             kept += 1;
@@ -436,6 +467,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     let ate = h.c == g.food.c && h.r == g.food.r;
+    let mut offer_shears = false;
+    let mut offer_bonus = false;
     if ate {
         play_sfx(&sfx.eat);
         g.gulps.push(0.0);
@@ -453,12 +486,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.foods_eaten += 1;
         // One bonus per level, mid-level, away from the level change.
         if g.foods_eaten == 1 && g.sess.level % 2 == 0 && g.snake_len >= SHEARS_FROM && !g.shears_active() {
-            g.spawn_shears();
+            offer_shears = true;
         }
         if g.foods_eaten % BONUS_EVERY == 0 && !g.bonus_active() {
-            g.spawn_bonus();
-            blip::bot::add("bonus_offered", 1.0);
-            play_sfx(&sfx.bonus);
+            offer_bonus = true;
         }
         if g.foods_eaten >= FOODS_PER_LVL {
             g.sess.next_level();
@@ -469,7 +500,6 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             play_sfx(&sfx.level);
             g.foods_eaten = 0;
         }
-        g.spawn_food();
     }
     g.steps_since_food += 1;
     for k in g.gulps.iter_mut() { *k += 1.0; }
@@ -479,6 +509,19 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.snake_head = (g.snake_head + MAX_LEN - 1) % MAX_LEN;
     g.snake[g.snake_head] = h;
     if ate && g.snake_len < MAX_LEN { g.snake_len += 1; }
+    if ate {
+        if offer_shears { g.spawn_shears(); }
+        if offer_bonus {
+            g.spawn_bonus();
+            blip::bot::add("bonus_offered", 1.0);
+            play_sfx(&sfx.bonus);
+        }
+        if !g.spawn_food() {
+            g.state = State::Over;
+            g.dead_timer.start(GAME_OVER_MIN_WAIT);
+            web::report_score(g.sess.score);
+        }
+    }
 }
 
 fn update_dead(g: &mut Game, dt: f32) {
@@ -675,6 +718,15 @@ fn draw_title_snake(blip: &Blip, t: f32) {
 
 fn draw_over(blip: &Blip, g: &Game, hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
+    if g.snake_len + g.obstacle_count == MAX_LEN {
+        blip.draw_centered("FIELD CLEARED", (WIN_H / 4) as f32, 5.0, BLIP_GREEN);
+        blip.draw_hi(hi, (WIN_H / 4 + 52) as f32, BLIP_YELLOW);
+        blip.draw_centered(&format!("SCORE {}", g.sess.score), (WIN_H / 2 + 4) as f32, 3.0, BLIP_WHITE);
+        if !g.dead_timer.active() {
+            blip.draw_centered("PRESS FIRE TO PLAY AGAIN", (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
+        }
+        return;
+    }
     blip.draw_game_over(g.sess.score, hi, BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active());
     blip.draw_centered(&format!("LEVEL {}   LENGTH {}", g.sess.level, g.snake_len),
         (WIN_H / 2 + 54) as f32, 2.0, BLIP_GRAY);
@@ -684,12 +736,6 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("SERPENT", WIN_W, WIN_H)
 }
 
-const FOOD_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/food.png"));
-const EAT_WAV: &[u8]  = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/eat.wav"));
-const GAME_OVER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
-const BONUS_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bonus.wav"));
-const BONUS_EAT_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bonus_eat.wav"));
-const LEVEL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/level.wav"));
 
 
 #[blip::macroquad::main(conf)]
@@ -697,17 +743,16 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let food = load_png(FOOD_PNG);
+    let food = load_png(blip::png!("food"));
 
     let sfx = Sounds {
-        eat:       blip::audio::load_sound(EAT_WAV).await,
-        game_over: blip::audio::load_sound(GAME_OVER_WAV).await,
-        bonus:     blip::audio::load_sound(BONUS_WAV).await,
-        bonus_eat: blip::audio::load_sound(BONUS_EAT_WAV).await,
-        level:     blip::audio::load_sound(LEVEL_WAV).await,
+        eat:       blip::audio::load_sound(blip::wav!("eat")).await,
+        game_over: blip::audio::load_sound(blip::wav!("game_over")).await,
+        bonus:     blip::audio::load_sound(blip::wav!("bonus")).await,
+        bonus_eat: blip::audio::load_sound(blip::wav!("bonus_eat")).await,
+        level:     blip::audio::load_sound(blip::wav!("level")).await,
     };
-    let mut music = Jukebox::new(&[blip_assets::serpent::slither_wav, blip_assets::serpent::frenzy_wav]);
-    music.start(0).await;
+    let mut music = Jukebox::new("SERPENT", &["SLITHER", "FRENZY"]);
 
     let mut shot_frame: u32 = 0;
 
@@ -733,7 +778,6 @@ async fn main() {
         if was_playing && g.state != State::Play { web::haptic(); }
 
         music.play(g.track());
-        if g.state != State::Play { music.warm_up().await; }
 
         blip.clear(BLIP_BLACK);
         match g.state {

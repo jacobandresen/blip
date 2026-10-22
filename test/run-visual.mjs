@@ -5,7 +5,7 @@ const selectedGame = gameArg >= 0 ? process.argv[gameArg + 1] : process.env.BLIP
 const artifacts = process.argv.includes('--artifacts') || process.env.BLIP_VISUAL_ARTIFACTS === '1';
 const games = selectedGame
   ? [selectedGame]
-  : ['ADDER', 'BOUNCER', 'BRAWLER', 'BUBBLER', 'DEFENDER', 'METEORS', 'RALLY', 'SERPENT', 'SKY_RAIDER'];
+  : ['ADDER', 'BOUNCER', 'BRAWLER', 'BUBBLER', 'DEFENDER', 'METEORS', 'RALLY', 'SERPENT', 'RAIDER'];
 
 const failures = [];
 for (const game of games) {

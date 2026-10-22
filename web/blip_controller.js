@@ -245,9 +245,6 @@
   var _tDpads = [];   // one { pad, calc, clear, _pend } per bound d-pad
   var _tDials = [];
 
-  function _hit(r, x, y, m) {
-    return x >= r.left - m && x <= r.right + m && y >= r.top - m && y <= r.bottom + m;
-  }
   // Releases wait a frame: iOS cancels every touch when a multi-touch gesture
   // moves, then re-fires touchstart for the fingers still down.
   function _defer(o, fn) {

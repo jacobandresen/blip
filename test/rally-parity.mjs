@@ -7,32 +7,36 @@ import { openPage } from './lib/harness.mjs';
 
 const root = new URL('../', import.meta.url);
 const source = await readFile(new URL('web/TAPE/RALLY.BLIP', root), 'utf8');
-const fields = ['BX', 'BY', 'VX', 'VY', 'BALL_SPEED', 'PLAYER_SCORE', 'CPU_SCORE', 'PY', 'CY'];
+const fields = ['BALL_X', 'BALL_Y', 'BALL_VX', 'BALL_VY', 'BALL_SPEED', 'LEFT_SCORE', 'RIGHT_SCORE', 'LPAD_Y', 'RPAD_Y'];
+// The tape with its main loop cut down to MOVE_BALL at a fixed step, its
+// scorer reduced to the count, and the fields reported as tones.
 function fixture(scenario, steps) {
   const lines = new Map(source.trim().split('\n').map((line) => {
     const at = line.indexOf(' '); return [Number(line.slice(0, at)), line.slice(at + 1)];
   }));
-  lines.set(10, 'MODE=2:GOTO 800');
-  lines.set(200, `DT=${scenario === 'fast' ? '.1' : '.016'}:GOSUB 1100:GOTO 500`);
-  let setup = 'GOSUB 1500:STATE=1:STOP_MUSIC:VX=250:VY=80:LPAD_VY=0:RPAD_VY=0';
-  if (scenario === 'top') setup += ':BY=29:VY=0-200';
-  if (scenario === 'bottom') setup += ':BY=527:VY=200';
-  if (['left', 'edge', 'spin', 'cap', 'fast', 'miss', 'corner'].includes(scenario)) setup += ':BX=41:VX=0-275:VY=0';
-  if (scenario === 'edge') setup += ':BY=245.5';
+  let setup = 'PLAYERS=2:START_GAME:STATE$="PLAY":BALL_VX=250:BALL_VY=80:LPAD_VY=0:RPAD_VY=0';
+  if (scenario === 'top') setup += ':BALL_Y=33:BALL_VY=-200';
+  if (scenario === 'bottom') setup += ':BALL_Y=387:BALL_VY=200';
+  if (['left', 'edge', 'spin', 'cap', 'fast', 'miss', 'corner'].includes(scenario)) setup += ':BALL_X=45:BALL_VX=-360:BALL_VY=0';
+  if (scenario === 'edge') setup += ':BALL_Y=181.5';
   if (scenario === 'spin') setup += ':LPAD_VY=300';
-  if (scenario === 'cap') setup += ':VX=0-445:BALL_SPEED=445';
-  if (scenario === 'fast') setup += ':BX=65:VX=0-450:BALL_SPEED=450';
-  if (scenario === 'miss') setup += ':BY=400';
-  if (scenario === 'corner') setup += ':PY=30:BY=27:VY=0-80';
-  if (['right', 'right-spin'].includes(scenario)) setup += ':BX=427:VX=275:VY=0';
-  if (scenario === 'right-spin') setup += ':RPAD_VY=0-300';
-  if (scenario === 'point-left') setup += ':BX=0-11:BY=400:VX=0-275:VY=0';
-  if (scenario === 'point-right') setup += ':BX=479:BY=400:VX=275:VY=0';
-  lines.set(810, setup + ':GOTO 200');
-  lines.set(1400, 'RETURN'); // Compare the ball at the instant the native scorer receives the point.
-  lines.set(589, `STEPS=STEPS+1:IF STEPS>=${steps} THEN GOTO 3000`);
-  for (const [i, field] of fields.entries()) lines.set(3000 + i * 10, `SOUND 1000+${field},0,0:WAIT 0`);
-  lines.set(4000, 'WAIT 0:GOTO 4000');
+  if (scenario === 'cap') setup += ':BALL_VX=-590:BALL_SPEED=590';
+  if (scenario === 'fast') setup += ':BALL_X=85:BALL_VX=-600:BALL_SPEED=600';
+  if (scenario === 'miss') setup += ':BALL_Y=330';
+  if (scenario === 'corner') setup += ':LPAD_Y=34:BALL_Y=31:BALL_VY=-80';
+  if (['right', 'right-spin'].includes(scenario)) setup += ':BALL_X=583:BALL_VX=360:BALL_VY=0';
+  if (scenario === 'right-spin') setup += ':RPAD_VY=-300';
+  if (scenario === 'point-left') setup += ':BALL_X=-11:BALL_Y=330:BALL_VX=-360:BALL_VY=0';
+  if (scenario === 'point-right') setup += ':BALL_X=639:BALL_Y=330:BALL_VX=360:BALL_VY=0';
+  lines.set(80, setup);
+  lines.set(110, `DT=${scenario === 'fast' ? '.1' : '.016'}`);
+  for (let n = 111; n <= 160; n++) lines.delete(n);
+  lines.set(130, 'MOVE_BALL');
+  lines.set(165, `STEPS=STEPS+1:IF STEPS>=${steps} THEN GOTO 9900`);
+  for (let n = 7020; n <= 7180; n += 10) lines.delete(n);
+  lines.set(7020, 'IF LEFT_SCORED THEN LEFT_SCORE=LEFT_SCORE+1 ELSE RIGHT_SCORE=RIGHT_SCORE+1');
+  for (const [i, field] of fields.entries()) lines.set(9900 + i * 10, `SOUND 1000+${field},0,0:WAIT 0`);
+  lines.set(9995, 'WAIT 0:GOTO 9995');
   return [...lines];
 }
 
