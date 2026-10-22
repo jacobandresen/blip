@@ -403,9 +403,9 @@ fn spawn_saucer(g: &mut Game) {
     g.saucer = Saucer { active: true, x, y, vx, wave_t: 0.0, fire_t: fire_cd * 0.5, big };
 }
 
-fn hyperspace(g: &mut Game, sfx: &Sounds) {
-    play_sfx(&sfx.hyperspace);
-    // Land in clear space: the gamble is the 1-in-N blow-up, not a rock you could not see.
+/// Where a jump lands: clear space, so the gamble is the 1-in-N blow-up, not
+/// a rock the player could not see.
+fn landing_spot(g: &Game) -> (f32, f32) {
     let clear = |x: f32, y: f32| g.asteroids.iter().filter(|a| a.active).all(|a| {
         let (dx, dy) = (x - a.x, y - a.y);
         dx * dx + dy * dy > (a.size.radius() + SHIP_RADIUS + 40.0).powi(2)
@@ -415,7 +415,12 @@ fn hyperspace(g: &mut Game, sfx: &Sounds) {
         spot = (rand_range_f32(0.0, PLAY_W as f32), rand_range_f32(PLAY_Y0, PLAY_Y0 + PLAY_H as f32));
         if clear(spot.0, spot.1) { break; }
     }
-    (g.ship.x, g.ship.y) = spot;
+    spot
+}
+
+fn hyperspace(g: &mut Game, sfx: &Sounds) {
+    play_sfx(&sfx.hyperspace);
+    (g.ship.x, g.ship.y) = landing_spot(g);
     g.ship.vx = 0.0;
     g.ship.vy = 0.0;
     if rand_int(1, HYPERSPACE_RISK) == 1 {
@@ -1227,5 +1232,65 @@ mod tests {
             (PLAY_W as f32 / 2.0, 200.0),
             4.0,
         ));
+    }
+
+    fn rocks(g: &Game) -> Vec<ASize> {
+        g.asteroids.iter().filter(|a| a.active).map(|a| a.size).collect()
+    }
+
+    #[test]
+    fn a_jump_lands_clear_of_every_rock() {
+        let mut g = Game::new();
+        g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
+        for (x, y) in [(100.0, 150.0), (300.0, 300.0), (500.0, 200.0), (200.0, 400.0)] {
+            spawn_asteroid_v(&mut g, x, PLAY_Y0 + y - 100.0, ASize::Large, 0.0, 0.0);
+        }
+        for _ in 0..200 {
+            let (x, y) = landing_spot(&g);
+            for a in g.asteroids.iter().filter(|a| a.active) {
+                assert!((x - a.x).hypot(y - a.y) > a.size.radius() + SHIP_RADIUS,
+                    "landed on a rock at ({x}, {y})");
+            }
+        }
+    }
+
+    #[test]
+    fn a_rock_splits_into_two_of_the_next_size_and_the_smallest_into_none() {
+        let mut g = Game::new();
+        g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
+        split_asteroid(&mut g, 300.0, 300.0, ASize::Large, 10.0, 0.0);
+        assert!(rocks(&g) == vec![ASize::Medium, ASize::Medium]);
+        g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
+        split_asteroid(&mut g, 300.0, 300.0, ASize::Small, 10.0, 0.0);
+        assert!(rocks(&g).is_empty());
+    }
+
+    #[test]
+    fn the_halves_fly_apart_on_top_of_the_parents_drift() {
+        let mut g = Game::new();
+        g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
+        split_asteroid(&mut g, 300.0, 300.0, ASize::Large, 40.0, -20.0);
+        let halves: Vec<_> = g.asteroids.iter().filter(|a| a.active).collect();
+        // Each half's kick is along the same axis, in opposite directions.
+        let k0 = (halves[0].vx - 40.0, halves[0].vy + 20.0);
+        let k1 = (halves[1].vx - 40.0, halves[1].vy + 20.0);
+        assert!(k0.0 * k1.0 + k0.1 * k1.1 < 0.0, "the halves should part");
+    }
+
+    #[test]
+    fn a_ship_and_rock_touching_across_the_edge_collide() {
+        let r = ASize::Large.radius() + SHIP_RADIUS;
+        assert!(wrapped_motion_overlap((2.0, 300.0), (PLAY_W as f32 - 2.0, 300.0), (0.0, 0.0), (0.0, 0.0), r));
+        assert!(!wrapped_motion_overlap((2.0, 300.0), (PLAY_W as f32 / 2.0, 300.0), (0.0, 0.0), (0.0, 0.0), r));
+    }
+
+    #[test]
+    fn saucers_come_and_shoot_more_often_each_level_down_to_a_floor() {
+        for level in 1..8 {
+            assert!(saucer_fire_cooldown(level + 1) <= saucer_fire_cooldown(level));
+            assert!(saucer_spawn_range(level + 1).0 <= saucer_spawn_range(level).0);
+        }
+        assert!(saucer_fire_cooldown(50) >= 0.7);
+        assert!(saucer_spawn_range(50).0 >= 4.0);
     }
 }
