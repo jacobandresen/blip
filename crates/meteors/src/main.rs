@@ -333,11 +333,11 @@ fn burst(g: &mut Game, x: f32, y: f32, vx: f32, vy: f32, n: usize, len: f32, spe
     }
 }
 
-/// Whether segment `p0 -> p1` passes within `r` of `(cx, cy)`; this prevents fast bullets tunnelling through rocks.
 fn spawn_bullet(bullets: &mut [Bullet; MAX_BULLETS], x: f32, y: f32, vx: f32, vy: f32, from_player: bool) {
     pool_spawn(bullets, Bullet { active: true, x, y, vx, vy, ttl: BULLET_TTL, from_player });
 }
 
+/// Whether segment `from -> to` passes within `radius` of `centre`; this prevents fast bullets tunnelling through rocks.
 fn wrapped_segment_circle_overlap(
     from: (f32, f32),
     to: (f32, f32),
@@ -405,11 +405,21 @@ fn spawn_saucer(g: &mut Game) {
 
 fn hyperspace(g: &mut Game, sfx: &Sounds) {
     play_sfx(&sfx.hyperspace);
-    g.ship.x = rand_range_f32(0.0, PLAY_W as f32);
-    g.ship.y = rand_range_f32(PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
+    // Land in clear space: the gamble is the 1-in-N blow-up, not a rock you could not see.
+    let clear = |x: f32, y: f32| g.asteroids.iter().filter(|a| a.active).all(|a| {
+        let (dx, dy) = (x - a.x, y - a.y);
+        dx * dx + dy * dy > (a.size.radius() + SHIP_RADIUS + 40.0).powi(2)
+    });
+    let mut spot = (0.0, 0.0);
+    for _ in 0..16 {
+        spot = (rand_range_f32(0.0, PLAY_W as f32), rand_range_f32(PLAY_Y0, PLAY_Y0 + PLAY_H as f32));
+        if clear(spot.0, spot.1) { break; }
+    }
+    (g.ship.x, g.ship.y) = spot;
     g.ship.vx = 0.0;
     g.ship.vy = 0.0;
     if rand_int(1, HYPERSPACE_RISK) == 1 {
+        blip::bot::add("death_hyperspace", 1.0);
         kill_ship(g, sfx);
     }
 }

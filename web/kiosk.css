@@ -23,19 +23,6 @@ html {
   z-index: 200;
 }
 
-/* Panel legends are printed plastic, not lit phosphor: an engraved look (dark
-   impression below, faint highlight above). */
-.kiosk-hud {
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: 2px;
-  color: #e6dc32;
-  text-shadow: 0 -1px 0 rgba(255,255,255,0.1), 0 1px 1px rgba(0,0,0,0.85);
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
 .kiosk-btn {
   font-family: 'Courier New', Courier, monospace;
   font-size: 18px;
@@ -302,7 +289,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    shortens to "BLIP" to clear the centred game name. .top-marquee-bar states
    the same height. */
 @media (max-width: 480px) {
-  .blip-logo .ba-rest { display: none; }
   .blip-logo {
     height: calc(46px + env(safe-area-inset-top, 0px));
     font-size: 22px;
@@ -766,23 +752,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     radial-gradient(circle at 50% 44%, #3d8cd6 0%, #14539c 44%, #092c57 78%, #04182f 100%);
 }
 
-/* The legend under each cap. A four-button deck is only easy to use if
-   the deck says what the buttons do without the player leaving the
-   fight to find out. */
-.arcade-btn-label {
-  position: absolute;
-  left: 50%;
-  top: 100%;
-  transform: translateX(-50%);
-  margin-top: 3px;
-  font: 700 8px/1 'Courier New', monospace;
-  letter-spacing: 0.06em;
-  color: rgba(226, 232, 240, 0.72);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  pointer-events: none;
-  white-space: nowrap;
-}
-
 /* Pressed: the button flattens toward the deck and the cap dishes in. */
 .arcade-btn.active {
   box-shadow:
@@ -839,7 +808,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-.snes-pad .snes-cord { display: none; }
 
 /* A faint moulded "BLIP" debossed into the empty middle of the panel —
    just enough to read as a brand mark, never enough to compete with the
@@ -966,8 +934,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   height: var(--sf-btn);
   pointer-events: none;
 }
-.snes-pad .snes-x,
-.snes-pad .snes-y { display: none; }   /* dropped */
 
 /* A and B: the Atari 2600 CX40 button — a plain, unlabelled, low-domed
    matte-red button sitting proud of a black moulded collar that's
@@ -1016,11 +982,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset 0 -1px 2px rgba(255, 200, 190, 0.15),
     0 1px 2px rgba(0, 0, 0, 0.4);
 }
-
-/* SELECT / START, L / R — all dropped. A / B do the title-screen "press
-   fire"; the BLIP logo goes back to the grid. */
-.snes-pad .snes-mid,
-.snes-pad .snes-shoulder { display: none; }
 
 /* Keep the controller picker at the lower-right edge, above the deck. */
 #control-toggle {
@@ -1170,24 +1131,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   .arcade-btn { width: 92px; height: 92px; }
 }
 
-/* ---- Side badges: CONTROLS / ABOUT / HISTORY on the left, the language
-   flags mirroring them on the right ---- One definition for the front page
-   and the info pages. Each column is centred on its 64px cabinet rail
-   (10px either side of a 44px badge), and the two share a baseline, 16px
-   above the deck (kiosk.js measures it into --side-badges-bottom). */
-.left-badges,
-.lang-switcher {
-  position: fixed;
-  bottom: var(--side-badges-bottom, calc(92px + env(safe-area-inset-bottom, 0px)));
-  z-index: 10000;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-.left-badges   { left: 10px; }
-.lang-switcher { right: 10px; }
-
 /* A flag is a round badge like the avatars: dimmed until it is the page's
    language, which gets the green ring. */
 .lang-btn {
@@ -1216,92 +1159,11 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   cursor: default;
 }
 
-.controls-badge,
-.about-badge,
-.history-badge {
-  position: relative;
-  display: block;
-  text-decoration: none;
-  color: #444;
-  font-size: 10px;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  transition: color .2s;
-}
-
-.controls-avatar,
-.about-avatar,
-.history-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 1px solid #222;
-  display: block;
-  transition: border-color .2s, box-shadow .2s, filter .2s;
-}
-.controls-avatar { filter: grayscale(35%) brightness(0.8); }
-.about-avatar    { filter: grayscale(40%) brightness(0.8); }
-.history-avatar  { filter: grayscale(20%) brightness(0.7); }
-
 /* Phones — smaller avatars so they sit inside a game card's left padding
    zone on the landing page. After the 44px base so this @media wins. */
 @media (max-width: 600px) {
-  .controls-avatar,
-  .about-avatar,
-  .history-avatar,
   .lang-btn { width: 32px; height: 32px; }
   .lang-btn { font-size: 18px; }
-  .controls-label,
-  .about-label,
-  .history-label { left: 42px; }
-}
-
-.controls-label,
-.about-label,
-.history-label {
-  position: absolute;
-  left: 54px;
-  top: 50%;
-  opacity: 0;
-  transform: translateY(-50%) translateX(-6px);
-  transition: opacity .2s, transform .2s;
-  white-space: nowrap;
-  /* Solid backing so the revealed label stays legible over page text. */
-  padding: 4px 9px;
-  border-radius: 3px;
-  background: rgba(5, 5, 8, 0.92);
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 4px 14px rgba(0,0,0,0.6);
-}
-.controls-label { text-shadow: 0 0 8px #32c832; color: #32c832; }
-.about-label    { text-shadow: 0 0 8px #D97757; color: #D97757; }
-.history-label  { text-shadow: 0 0 8px #e6dc32; color: #e6dc32; }
-
-/* hover + active (current page) both reveal the label and light the ring */
-.controls-badge:hover, .controls-badge.active { color: #32c832; }
-.about-badge:hover,    .about-badge.active    { color: #D97757; }
-.history-badge:hover,  .history-badge.active  { color: #e6dc32; }
-.controls-badge.active, .about-badge.active, .history-badge.active { cursor: default; }
-
-.controls-badge:hover .controls-label, .controls-badge.active .controls-label,
-.about-badge:hover .about-label,       .about-badge.active .about-label,
-.history-badge:hover .history-label,   .history-badge.active .history-label {
-  opacity: 1;
-  transform: translateY(-50%) translateX(0);
-}
-.controls-badge:hover .controls-avatar, .controls-badge.active .controls-avatar {
-  border-color: #32c832;
-  box-shadow: 0 0 12px rgba(50,200,50,0.45);
-  filter: none;
-}
-.about-badge:hover .about-avatar, .about-badge.active .about-avatar {
-  border-color: #D97757;
-  box-shadow: 0 0 12px rgba(217,119,87,0.45);
-  filter: none;
-}
-.history-badge:hover .history-avatar, .history-badge.active .history-avatar {
-  border-color: #e6dc32;
-  box-shadow: 0 0 12px rgba(230,220,50,0.45);
-  filter: none;
 }
 
 /* ======================================================================
@@ -1409,19 +1271,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   grid-template-columns: repeat(2, 44px);
   gap: 7px;
 }
-.arcade-btn.lettered .arcade-btn-label {
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  margin: 0;
-  transform: none;
-  display: grid;
-  place-items: center;
-  font: 700 9px/1 'Courier New', monospace;
-  color: rgba(255, 255, 255, 0.92);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-}
+
 /* Red punches, blue kicks — the split every Street Fighter cabinet used.
    The heavy of each pair is the darker cap, so the square reads as two
    pairs before a legend is read at all. */
@@ -1457,17 +1307,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   height: auto;
 }
 .snes-pad .snes-face.four::before { inset: -12% -12%; border-radius: 16px; }
-.snes-pad .snes-legend {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  font: 700 8px/1 'Courier New', monospace;
-  font-style: normal;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
-  pointer-events: none;
-}
+
 .snes-pad .snes-btn.cap2 > span {
   background:
     radial-gradient(circle at 46% 30%, rgba(255, 210, 200, 0.34) 0%, rgba(255, 210, 200, 0) 44%),
@@ -1511,7 +1351,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     gap: clamp(5px, 1.8vw, 10px);
   }
   :root[data-players] .arcade-btn { width: var(--cap); height: var(--cap); }
-  :root[data-players] .arcade-btn.lettered .arcade-btn-label { font-size: 8px; }
+
   :root[data-players] .deck-side {
     gap: clamp(6px, 2vw, 14px);
     padding: 0 clamp(5px, 1.2vw, 12px);
@@ -1590,8 +1430,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   padding: 0 max(10px, env(safe-area-inset-left, 0px))
              calc(env(safe-area-inset-bottom, 0px) + 10px);
 }
-:root[data-layout="landscape"] .snes-pad .snes-wordmark,
-:root[data-layout="landscape"] .snes-pad .snes-cord { display: none; }
+:root[data-layout="landscape"] .snes-pad .snes-wordmark { display: none; }
 
 /* Bigger sideways: a gutter is about 100px wide. */
 :root[data-layout="landscape"] .snes-pad { --sf-btn: 40px; --sf-gap: 12px; --sf-dpad: 76px; }
@@ -1765,12 +1604,12 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   }
   .deck-side { gap: 26px; }
   .arcade-btn { width: 64px; height: 64px; }
-  .arcade-btn.lettered .arcade-btn-label { font-size: 12px; }
+
   /* `:root[data-players] .snes-pad` out-specifies a bare `.snes-pad`, so the
      big-screen sizes are written at the same weight. */
   .snes-pad,
   :root[data-players] .snes-pad { --sf-btn: 62px; --sf-gap: 24px; --sf-dpad: 104px; }
-  .snes-pad .snes-legend { font-size: 12px; }
+
   :root[data-players] .snes-pad .snes-face.four { gap: 18px var(--sf-gap); }
 
   :root[data-controls="stick"] #topbar.kiosk-bar,
@@ -1779,7 +1618,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   :root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
     height: calc(200px + env(safe-area-inset-bottom, 0px));
   }
-
 
   /* The washer stays well under the ball; scaled up with it, it read as a
      hole in the panel. */
@@ -1970,8 +1808,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     inset 0 1px 0 rgba(0, 0, 0, 0.9),
     inset 0 -2px 0 rgba(255, 255, 255, 0.07);
 }
-
-
 
 /* The legend goes above the controls. At the bottom it landed on top
    of the caps' own row once they became a square. */
@@ -2806,11 +2642,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
              max(22px, calc(env(safe-area-inset-left, 0px) + 10px));
 }
 
-/* At 320px the slot with its word left 39px for a game's name. */
-@media (max-width: 350px) {
-  .coins-word { display: none; }
-}
-
 .blip-power-indicator {
   position:fixed;top:calc(env(safe-area-inset-top,0px) + 3px);z-index:700;
   display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #524435;border-radius:12px;
@@ -2818,13 +2649,13 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   color:#776b58;font:700 9px/1 system-ui,sans-serif;letter-spacing:.11em;pointer-events:none;
 }
 .power-bulb {width:12px;height:12px;border-radius:50%;border:1px solid #553329;background:radial-gradient(circle at 35% 30%,#57372e,#241612 62%,#100d0b);box-shadow:inset 0 1px 2px #000b}
-.power-state {color:#95604d}
+
 :root[data-credit] .blip-power-indicator {border-color:#866c43;color:#c3b08d;box-shadow:0 2px 9px #000b,inset 0 1px #fff2d42b}
 :root[data-credit] .power-bulb {border-color:#edcd83;background:radial-gradient(circle at 34% 28%,#fff8d7 0 18%,#ffd879 42%,#bb672d 75%);box-shadow:0 0 5px 2px #ffc857aa,0 0 15px #ffb43b88,inset 0 0 2px #fff}
-:root[data-credit] .power-state {color:#ffe09b;text-shadow:0 0 6px #ffc45d99}
+
 @media(max-width:480px) {
   .blip-power-indicator {gap:0;padding:2px;border:0;background:none;box-shadow:none}
-  .power-label,.power-state {display:none}
+  .power-label {display:none}
   .power-bulb {width:16px;height:16px}
 }
 
@@ -2838,7 +2669,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   background: linear-gradient(180deg, rgba(55,32,28,.97), rgba(17,13,17,.98));
   border-top-color: rgba(226,158,91,.56);
 }
-.kiosk-hud { color:#f4c779; }
+
 .kiosk-btn {
   color:#fff1ce;
   text-shadow:0 0 4px #fff, 0 0 10px #ffc45d, 0 0 24px rgba(255,169,65,.9);
@@ -2906,7 +2737,7 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   text-shadow:0 0 4px #fff,0 0 10px #ffc36a,0 0 22px rgba(230,137,67,.68);
   animation:blip-logo-beckon 3.2s ease-in-out infinite;
 }
-.blip-logo .ba-rest { color:#f0c27c; }
+
 .blip-logo:hover {
   color:#fff8e9;
   border-color:rgba(255,225,173,.82);
@@ -2945,7 +2776,6 @@ body:has(.game-grid) .blip-logo { animation:blip-logo-beckon 3.2s ease-in-out in
     repeating-linear-gradient(0deg,rgba(255,255,255,.06) 0 1px,rgba(0,0,0,.05) 1px 2px),
     linear-gradient(135deg,#efd4ad 0%,#a88159 38%,#e2c49c 55%,#75573b 100%);
 }
-.coins-word { color:#f7cb80; text-shadow:none; font-weight:900; }
 
 /* The three info pages use the same padded, softly lit cabinet panels. */
 body.info-page {
@@ -2987,15 +2817,15 @@ body.info-page .divider {
 body.info-page :is(.intro p,.thoughts-body p,.section-body p) { color:#d4c0ad; }
 body.info-page :is(.thoughts-label,.section-label,.impl-label) { color:#e8b474; opacity:1; }
 body.info-page :is(.thoughts-body,.section-body) { border-left-color:rgba(226,158,91,.48); }
-body.info-page :is(.game-origin,.studio-dates,.profile-role) { color:#a98e79; }
+body.info-page :is(.game-origin,.studio-dates) { color:#a98e79; }
 body.info-page .impl-list li { color:#c9b19a; border-bottom-color:rgba(255,211,158,.1); }
 body.info-page .impl-list li::before { color:#dfa45f; }
 body.info-page .keytable td { border-bottom-color:rgba(255,211,158,.13); }
 body.info-page .keytable td:first-child { color:#e4bd85; }
 body.info-page .keytable td:last-child { color:#eadac8; }
 body.info-page kbd { background:rgba(202,137,77,.13); border-color:#79553c; color:#fff0d2; }
-body.info-page :is(.profile-name,.studio-name) { color:#f0dfcc; }
-body.info-page .profile-desc { color:#c7b19e; }
+body.info-page .studio-name { color:#f0dfcc; }
+
 :root[data-fullscreen] body.info-page #kiosk-bar { display:none; }
 
 /* The controls are shallow pockets cut into the wood fascia, not buttons
@@ -3193,43 +3023,35 @@ body.need-coin #kiosk-insert-btn,
   box-shadow:0 1px 2px #000c;
 }
 .top-marquee-bar .marquee-bulbs,#marquee-bar.jukebox-marquee .marquee-bulbs {display:none}
-.marquee-dot {
-  display:inline-block;
-  flex:0 0 2px;
-  color:#f18bff;
-  font-size:8px;
-  line-height:1;
-  text-shadow:0 0 4px #e34cff,0 0 8px rgba(46,224,255,.72);
-}
-.jukebox-transfer,
-.jukebox-insert-overlay {
+
+.jukebox-transfer {
   position:fixed;inset:0;z-index:150;pointer-events:none;overflow:hidden;
   opacity:0;background:radial-gradient(ellipse at 50% 18%,rgba(30,20,17,.13),rgba(5,4,5,.3) 72%);
   transition:opacity .24s ease-out;
 }
-.jukebox-transfer.active,.jukebox-insert-overlay.active { opacity:1; }
-.jukebox-flight-card,.jukebox-insert-card {
+.jukebox-transfer.active { opacity:1; }
+.jukebox-flight-card {
   position:fixed;z-index:2;display:flex;flex-direction:column;align-items:stretch;gap:8px;
   padding:10px;border:2px solid #c6a46f;border-radius:9px;
   background:linear-gradient(135deg,rgba(255,255,255,.21),transparent 22%),linear-gradient(150deg,#554238,#171316 68%,#080809);
   box-shadow:0 12px 32px rgba(0,0,0,.8),inset 0 1px rgba(255,239,207,.48),inset 0 0 0 2px rgba(12,9,10,.84),0 0 0 1px rgba(248,219,165,.24);
   transform-style:preserve-3d;transform-origin:center;transition:transform 1.45s cubic-bezier(.55,.03,.25,1),opacity 1.45s ease-in;
 }
-.jukebox-flight-card::after,.jukebox-insert-card::after {
+.jukebox-flight-card::after {
   content:'';position:absolute;inset:2px;border-radius:6px;pointer-events:none;
   background:linear-gradient(118deg,rgba(255,255,255,.24),transparent 23% 71%,rgba(255,255,255,.045));
   box-shadow:inset 0 0 0 1px rgba(255,237,196,.16);
 }
-.jukebox-flight-card img,.jukebox-insert-card img {
+.jukebox-flight-card img {
   width:100%;height:calc(100% - 28px);min-height:0;object-fit:cover;border:1px solid rgba(238,204,148,.65);
   box-shadow:0 2px 6px #080708;image-rendering:auto;
 }
-.jukebox-flight-card strong,.jukebox-insert-card strong {
+.jukebox-flight-card strong {
   display:block;overflow:hidden;text-align:center;white-space:nowrap;text-overflow:ellipsis;
   color:#f1dfbd;font:900 12px/1.2 'Courier New',monospace;letter-spacing:.13em;
   text-shadow:0 1px #080708,0 0 8px rgba(229,179,107,.28);
 }
-.jukebox-transfer-arm,.jukebox-insert-arm {
+.jukebox-transfer-arm {
   position:fixed;z-index:3;width:var(--arm-length,180px);height:22px;pointer-events:none;
   transform-origin:12px 50%;transition:transform 1.2s cubic-bezier(.6,.02,.2,1);
   filter:drop-shadow(0 4px 4px rgba(0,0,0,.72));
@@ -3261,22 +3083,17 @@ body.need-coin #kiosk-insert-btn,
 }
 .jukebox-arm-grip::before {top:1px;transform:rotate(20deg)}
 .jukebox-arm-grip::after {bottom:1px;transform:rotate(-20deg)}
-.jukebox-transfer-arm.retract,.jukebox-insert-arm.retract { transform:rotate(var(--seat-angle,var(--rest-angle,0deg))); }
-.jukebox-insert-card { z-index:4; }
-.jukebox-insert-overlay.active .jukebox-insert-card { transform:translate(var(--card-x,0px),var(--card-y,0px)) rotateY(5deg) rotateZ(0);opacity:1; }
-.jukebox-insert-overlay.active .jukebox-insert-card.seated {opacity:0;transform:translate(var(--card-x,0px),var(--card-y,0px)) scale(.98)}
-.jukebox-insert-overlay.active .jukebox-arm-shaft { animation:jukebox-seating .95s cubic-bezier(.55,.02,.25,1) both; }
+
 @keyframes jukebox-seating { to { transform:scaleX(.08); } }
 @media (prefers-reduced-motion:reduce) {
-  .jukebox-transfer,.jukebox-insert-overlay,.jukebox-flight-card,.jukebox-insert-card,.jukebox-transfer-arm { transition-duration:.01ms!important; }
-  .jukebox-insert-overlay.active .jukebox-arm-shaft { animation-duration:.01ms; }
+  .jukebox-transfer,.jukebox-flight-card,.jukebox-transfer-arm { transition-duration:.01ms!important; }
 }
 @media (max-width:520px) {
   .top-marquee-bar,.top-marquee-bar #marquee-name,#marquee-bar { --marquee-side-gap:57px; }
   .top-marquee-bar .marquee-bulbs,#marquee-bar .marquee-bulbs { width:min(40px,calc(50vw - 57px));max-width:40px; }
   #marquee-name,.marquee-empty { font-size:10px;gap:0; }
   .marquee-letter { font-size:10px; }
-  .marquee-dot { flex-basis:1.5px;font-size:6px; }
+
   .top-marquee-bar #marquee-name,
   #marquee-bar.jukebox-marquee #marquee-name { padding-left:8px;padding-right:8px; }
 }
@@ -3342,16 +3159,8 @@ body.need-coin #kiosk-insert-btn,
 .jukebox-seated-card img {width:32px;height:24px;object-fit:cover;border:1px solid rgba(255,235,194,.62);box-shadow:0 1px 3px #080707}
 .jukebox-seated-card strong {overflow:hidden;color:#fff0d2;text-overflow:ellipsis;white-space:nowrap;font:900 9px/1 'Courier New',monospace;letter-spacing:.08em;text-shadow:0 1px #080707}
 .jukebox-seated-card small {justify-self:end;color:#f4dba9;font:700 8px/1 'Courier New',monospace;letter-spacing:.05em}
-.jukebox-insert-overlay {background:none;perspective:700px}
-.jukebox-insert-card {
-  gap:4px;padding:5px;border-width:1px;border-radius:4px;
-  transition:transform 1.05s cubic-bezier(.38,.02,.19,1),opacity .28s ease-out;
-}
-.jukebox-insert-card img {height:calc(100% - 25px)}
-.jukebox-insert-card strong {font-size:8px;letter-spacing:.07em}
-.jukebox-insert-card small {align-self:center;color:#f3d7a6;font:700 7px/1 'Courier New',monospace;letter-spacing:.12em}
-.jukebox-insert-card.seated {opacity:0;transform:translateY(-2px) scale(.98)}
-.jukebox-transfer-arm,.jukebox-insert-arm {height:25px}
+
+.jukebox-transfer-arm {height:25px}
 .jukebox-arm-shaft {
   height:15px;top:5px;
   background:linear-gradient(180deg,#fff0cb 0%,#d0b078 17%,#80623d 33%,#352a24 52%,#c6a06a 68%,#f0d6a0 78%,#4a3828 100%);
@@ -3362,26 +3171,25 @@ body.need-coin #kiosk-insert-btn,
 .jukebox-arm-forearm {position:absolute;left:58%;top:8px;width:39%;height:10px;border:1px solid #e2c38c;border-radius:8px;background:linear-gradient(180deg,#f5e0b3,#96764b 40%,#332822 65%,#d0aa70);box-shadow:0 2px 4px #050405}
 .jukebox-arm-grip {top:4px;width:17px;height:22px;background:linear-gradient(90deg,#271e19,#d7b77f 46%,#403024)}
 .jukebox-transfer-arm > .jukebox-flight-card {position:absolute;z-index:5;left:calc(100% - 66px);top:-129px;width:132px;height:258px;padding:29px 9px 11px;gap:10px;border-radius:7px;transform-origin:center;transition:transform .78s cubic-bezier(.55,.04,.2,1)}
-.jukebox-insert-arm > .jukebox-insert-card {position:absolute;z-index:5;left:calc(100% - 66px);top:-129px;width:132px;height:258px;padding:29px 9px 11px;gap:10px;border-radius:7px;transform-origin:center;transition:transform 1.05s cubic-bezier(.48,.04,.2,1)}
-.jukebox-transfer-arm > .jukebox-flight-card img,.jukebox-insert-arm > .jukebox-insert-card img {height:120px;flex:none}
-.jukebox-transfer-arm > .jukebox-flight-card strong,.jukebox-insert-arm > .jukebox-insert-card strong {font-size:12px;letter-spacing:.11em}
-.jukebox-transfer-arm > .jukebox-flight-card small,.jukebox-insert-arm > .jukebox-insert-card small {align-self:flex-end;color:#f3d7a6;font:700 8px/1 'Courier New',monospace;letter-spacing:.12em}
-.jukebox-flight-card.seating,.jukebox-insert-card.seating {transform:rotate(var(--card-counter,0deg)) rotateX(82deg) translateY(12px)!important;transition:transform .24s cubic-bezier(.35,.02,.25,1)!important}
+
+.jukebox-transfer-arm > .jukebox-flight-card img {height:120px;flex:none}
+.jukebox-transfer-arm > .jukebox-flight-card strong {font-size:12px;letter-spacing:.11em}
+.jukebox-transfer-arm > .jukebox-flight-card small {align-self:flex-end;color:#f3d7a6;font:700 8px/1 'Courier New',monospace;letter-spacing:.12em}
+.jukebox-flight-card.seating {transform:rotate(var(--card-counter,0deg)) rotateX(82deg) translateY(12px)!important;transition:transform .24s cubic-bezier(.35,.02,.25,1)!important}
 .jukebox-flight-card.seated {opacity:0}
 .jukebox-transfer-arm {transform-origin:12px 50%;transition:transform .78s cubic-bezier(.55,.04,.2,1)}
-.jukebox-insert-arm {transform-origin:12px 50%;transition:transform 1.05s cubic-bezier(.48,.04,.2,1)}
-.jukebox-transfer-arm.retract,.jukebox-insert-arm.retract {transform:rotate(var(--seat-angle,0deg)) scaleX(var(--seat-scale,1))}
-.jukebox-transfer-arm.park,.jukebox-insert-arm.park {transform:rotate(var(--park-angle,-90deg)) scaleX(.12)}
-.jukebox-transfer-arm.park .jukebox-flight-card,.jukebox-insert-arm.park .jukebox-insert-card {opacity:0}
+
+.jukebox-transfer-arm.park {transform:rotate(var(--park-angle,-90deg)) scaleX(.12)}
+.jukebox-transfer-arm.park .jukebox-flight-card {opacity:0}
 @media (max-width:620px) {
-  .jukebox-transfer-arm > .jukebox-flight-card,.jukebox-insert-arm > .jukebox-insert-card {left:calc(100% - 55px);top:-123px;width:110px;height:246px;padding:29px 9px 11px}
-  .jukebox-transfer-arm > .jukebox-flight-card img,.jukebox-insert-arm > .jukebox-insert-card img {height:112px}
+  .jukebox-transfer-arm > .jukebox-flight-card {left:calc(100% - 55px);top:-123px;width:110px;height:246px;padding:29px 9px 11px}
+  .jukebox-transfer-arm > .jukebox-flight-card img {height:112px}
 }
 .jukebox-receiver.loaded {box-shadow:0 3px 0 #100b0a,0 5px 8px rgba(0,0,0,.72),inset 0 1px rgba(255,244,218,.3),inset 0 0 9px rgba(231,183,112,.14)}
 @media (max-width:520px) {
   .top-marquee-bar #marquee-name,#marquee-bar.jukebox-marquee #marquee-name {padding:5px 0 6px}
   .top-marquee-bar #marquee-name,#marquee-bar.jukebox-marquee #marquee-name {left:calc(50% - 11px)}
-  .marquee-dot {flex-basis:0;font-size:4px}
+
   .jukebox-receiver {width:136px}
   .jukebox-receiver {top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px))}
   .top-marquee-bar,#marquee-bar.jukebox-marquee {height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px))}
@@ -3445,7 +3253,7 @@ body:has(.top-marquee-bar) .blip-logo {
   text-shadow:0 1px 0 #fff1d1,0 -1px 0 #71604b,1px 0 0 #a18b6c,-1px 0 0 #6f5b43,0 2px 2px rgba(0,0,0,.8);
   animation:none;
 }
-body:has(.top-marquee-bar) .blip-logo .ba-rest { color:#bca681; }
+
 body:has(.top-marquee-bar) .blip-logo:hover {
   color:#f0e5cd;
   text-shadow:0 1px 0 #fff4d9,0 -1px 0 #71604b,1px 0 0 #a18b6c,-1px 0 0 #6f5b43,0 2px 2px rgba(0,0,0,.8);
@@ -3465,8 +3273,7 @@ body:has(#marquee-bar) .blip-logo {
   animation:none;
   will-change:auto;
 }
-body:has(.top-marquee-bar) .blip-logo .ba-rest,
-body:has(#marquee-bar) .blip-logo .ba-rest { color:#bca681; }
+
 body:has(.top-marquee-bar) #kiosk-insert-btn,
 body:has(#marquee-bar) #insert-coin-btn {
   right:calc(env(safe-area-inset-right,0px) + 10px);
@@ -3477,13 +3284,6 @@ body:has(#marquee-bar) #insert-coin-btn {
 }
 body:has(.top-marquee-bar) .blip-logo:hover,
 body:has(#marquee-bar) .blip-logo:hover { color:#f0e5cd; }
-body :is(.about-label,.controls-label) {
-  color:#ffe2b7;
-  font-weight:900;
-  text-shadow:0 1px 0 #3a2119,0 -1px 0 rgba(255,247,225,.22);
-  background:linear-gradient(180deg,rgba(62,38,31,.98),rgba(24,17,18,.98));
-  box-shadow:0 0 0 1px rgba(224,183,121,.62),0 3px 10px rgba(0,0,0,.72),inset 0 1px rgba(255,235,198,.15);
-}
 @media (max-width:480px) {
   body:has(.top-marquee-bar) .blip-logo,
   body:has(#marquee-bar) .blip-logo,
@@ -3491,8 +3291,6 @@ body :is(.about-label,.controls-label) {
   body:has(#marquee-bar) #insert-coin-btn {
     height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
   }
-  body:has(.top-marquee-bar) .blip-logo .ba-rest,
-  body:has(#marquee-bar) .blip-logo .ba-rest { display:inline; }
 }
 
 /* Each link rotates about a bearing; card travel never scales the hardware. */
@@ -3734,21 +3532,7 @@ body :is(.about-label,.controls-label) {
   content:'▼';position:absolute;left:0;right:0;top:calc(50% - 12px);text-align:center;
   color:#4b4539;font:900 8px/8px Arial,sans-serif;text-shadow:0 1px #fff4d7;
 }
-.coin-mouth {
-  position:absolute;left:50%;top:calc(50% - 4px);width:min(calc(100% - 12px),calc(var(--coin-size) + 8px));height:8px;transform:translateX(-50%);
-  border:1px solid #fff0c4;border-radius:2px;
-  background:linear-gradient(180deg,#020202 0 25%,#1b160d 47%,#030302 75%);
-  box-shadow:0 0 0 1px #49463e,0 0 5px #ffbd5c99,inset 0 1px 2px #000,0 1px 0 #fff9e8;
-}
-.coin-mouth::before {
-  content:'';position:absolute;inset:-2px -4px;border:1px solid #f0ecdc;border-radius:3px;
-  box-shadow:0 0 0 1px #555247,0 1px 3px #0009,inset 0 1px #fff,inset 0 -1px #6b6658;
-}
-.coin-instruction {
-  position:absolute;left:1px;right:1px;top:calc(50% - 22px);display:block;
-  color:#24221d;font:900 clamp(10px,2.8vw,11px)/11px 'Arial Narrow',Arial,sans-serif;letter-spacing:.15px;
-  text-align:center;text-shadow:0 1px #fff8e7,0 -1px #797365;white-space:nowrap;overflow:hidden;
-}
+
 .coin-return::after {
   content:'RETURN';position:absolute;left:0;right:0;top:-7px;
   color:#4c4336;font:900 4.5px/6px Arial,sans-serif;letter-spacing:.5px;text-align:center;
@@ -3758,9 +3542,7 @@ body :is(.about-label,.controls-label) {
   background:linear-gradient(#ae6750,#713d2e 50%,#4c251d);
   box-shadow:0 1px 0 #342016,inset 0 1px #d99479,inset -1px -1px #4c251d;
 }
-.coin-fastener {position:absolute;width:5px;height:5px;border:1px solid #5b5548;border-radius:50%;background:linear-gradient(120deg,#cec5af 38%,#504737 43% 56%,#b3a88f 61%);box-shadow:inset 0 1px #ebe3ce}
-.coin-fastener.upper {left:3px;top:3px}
-.coin-fastener.lower {right:3px;bottom:3px}
+
 .deck-coin-slot #coin-drop-anim {left:calc(50% - 40px);right:auto;top:50%}
 .kiosk-bar:has(.deck-coin-slot) :is(.deck-side,.snes-shell) {padding-bottom:24px!important}
 :root[data-layout="landscape"] .kiosk-bar #insert-coin-btn.deck-coin-slot,
@@ -3848,7 +3630,6 @@ body .blip-logo.led-logo {
 .jukebox-receiver::after {content:none}
 .jukebox-receiver[href],#marquee-bar #marquee-name[href] {cursor:pointer;text-decoration:none;pointer-events:auto}
 .jukebox-receiver[href]:focus-visible,#marquee-bar #marquee-name[href]:focus-visible {outline:1px solid #dfc799;outline-offset:3px}
-
 
 .manual-pocket {position:fixed;right:calc(env(safe-area-inset-right,0px) + 92px);top:calc((var(--cabinet-fascia-height) - 32px) / 2 + env(safe-area-inset-top,0px));z-index:520;
   display:flex;align-items:center;justify-content:center;width:144px;height:32px;padding:4px 7px 5px;box-sizing:border-box;
@@ -3994,7 +3775,6 @@ body.cabinet-page::after {
     @media (min-width: 1180px) {
       .cab-rail { display: block; }
     }
-
 
 .cabinet-glass {
   position: fixed; pointer-events: none; z-index: 8; border-radius: 10px;
@@ -4175,7 +3955,7 @@ body.cabinet-page #control-toggle > button {
 /* ---- Phones: room for a big thumb ---- */
 /* The coin bay is narrower on a phone, and the width goes to the controls. */
 .kiosk-bar:has(.deck-coin-slot) {--coin-width:clamp(62px,17vw,88px)}
-.coin-instruction {font-size:clamp(7px,calc(var(--coin-width,88px) * .122),11px)}
+
 /* Two players on a phone: bigger caps and cross. */
 @media (pointer: coarse) and (max-width: 520px) {
   :root {--coin-width: clamp(62px, 17vw, 88px)}
@@ -4298,10 +4078,6 @@ body:has(.card-loaded):has(.jukebox-game-screen.game-ready) #card-button {
 .pc-legend kbd.red::before, .pc-legend kbd.blue::before {content:'';width:9px;height:9px;margin-right:7px;border:0;border-radius:50%;background:#c93a2f}
 .pc-legend kbd.blue::before {background:#3f6fd1}
 .pc-label {color:#30251d;font-size:11px;font-weight:700;letter-spacing:.2em}
-
-.cc-lines {margin:0;padding:12px 4px 0;border-top:1px solid #65807777;list-style:none;text-align:left}
-.cc-lines li {margin:0 0 9px;font:13px/1.45 'Courier New',monospace;color:#30251d}
-.cc-lines b {color:#742e36}
 
 /* The cabinet's switch to the home screen: a brass button like the "?",
    placed beside the logo by index.html. */

@@ -18,7 +18,6 @@ var DOCK_GAMES = 1;   // one recent game fits beside the four fixed apps on a ph
 blipSetFrontend('home');
 
 function titleCase(s) { return s.toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }
-function accentOf(slug) { return 'rgb(' + BLIP_GAMES[slug].accent + ')'; }
 // Two can play: a second station, or a key for the second player (Rally's dials share one).
 function twoPlayer(slug) {
   var g = BLIP_GAMES[slug];
