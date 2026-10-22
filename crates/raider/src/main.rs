@@ -1696,96 +1696,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.boss_intro.tick(dt);
     g.max_power_banner.tick(dt);
 
-    // ---- movement ----
-    if g.stall_fall > 0.0 {
-        update_stall(g, dt, sfx);
-    } else {
-        let left  = key_active(BLIP_KEY_LEFT)  || key_active(BLIP_KEY_A);
-        let right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
-        let up    = key_active(BLIP_KEY_UP)    || key_active(BLIP_KEY_W);
-        let down  = key_active(BLIP_KEY_DOWN)  || key_active(BLIP_KEY_S);
-        let throttle = up as i32 as f32 - down as i32 as f32;
-        if g.engine_out() {
-            // No thrust: the plane sheds speed whatever the throttle, but
-            // a splutter never stalls it on its own.
-            g.airspeed = (g.airspeed - SPLUTTER_DRAG * dt).max(g.airspeed.min(SPLUTTER_FLOOR));
-        } else if throttle != 0.0 {
-            g.airspeed += throttle * AIRSPEED_RATE * dt;
-        } else {
-            g.airspeed += (1.0 - g.airspeed).clamp(-AIRSPEED_RELAX * dt, AIRSPEED_RELAX * dt);
-        }
-        g.airspeed = g.airspeed.clamp(0.0, AIRSPEED_MAX);
-        update_splutter(g, dt, sfx);
-        // Sideways: spool up and brake over ~0.1s so the plane has weight.
-        let dx = right as i32 as f32 - left as i32 as f32;
-        let target = dx * PLAYER_SPEED;
-        let rate = if dx == 0.0 || target * g.player_vx < 0.0 { PLAYER_BRAKE } else { PLAYER_ACCEL } * dt;
-        g.player_vx += clamp(target - g.player_vx, -rate, rate);
-        // Up and down the screen is only gaining on or falling behind the
-        // scrolling world.
-        let vy_target = (1.0 - g.airspeed) * AIRSPEED_DRIFT;
-        g.player_vy += (vy_target - g.player_vy) * (6.0 * dt).min(1.0);
-        g.player_x += g.player_vx * dt;
-        g.player_y += g.player_vy * dt;
-        let (max_x, max_y) = ((WIN_W - PLAYER_W) as f32, PLAYER_MAX_Y);
-        if g.player_x < 0.0 || g.player_x > max_x { g.player_vx = 0.0; }
-        g.player_x = clamp(g.player_x, 0.0, max_x);
-        g.player_y = clamp(g.player_y, PLAYER_MIN_Y, max_y);
-
-        // Bank follows lateral velocity.
-        let target_bank = g.player_vx / PLAYER_SPEED * 0.30;
-        g.player_bank += (target_bank - g.player_bank) * (dt * 9.0).min(1.0);
-
-        if g.airspeed <= STALL_SPEED { g.stall_t += dt; } else { g.stall_t = 0.0; }
-        if g.stall_t >= STALL_HOLD {
-            g.stall_fall = 1e-4;
-            g.stall_spin = if rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
-        }
-    }
-    g.scroll_k = if g.airspeed < 1.0 { 0.25 + 0.75 * g.airspeed } else { 1.0 + 0.5 * (g.airspeed - 1.0) };
-    g.prop_angle = (g.prop_angle + blip::lerp(40.0, 7.0, glide(g)) * dt) % std::f32::consts::TAU;
-
-    // ---- firing ----
-    g.fire_cd.tick(dt);
-    if g.stall_fall == 0.0 && key_active(BLIP_KEY_SPACE) && !g.fire_cd.active() && !g.respawn_grace.active() {
-        g.fire_cd.start(weapon_cooldown(g.weapon_level));
-        let (n, fan, r) = weapon_guns(g.weapon_level);
-        let cx = g.player_x + PLAYER_W as f32 / 2.0;
-        for i in 0..n {
-            let dx = if n > 1 { (i as f32 / (n - 1) as f32 - 0.5) * fan } else { 0.0 };
-            // Guns are not lasers: each round leaves a little off true.
-            pool_spawn(&mut g.bullets, Round {
-                x: cx + dx + (rand_range_f32(0.0, 1.0) - 0.5) * 3.0,
-                y: g.player_y + rand_range_f32(0.0, 1.0) * 6.0,
-                vx: dx * 2.2 + (rand_range_f32(0.0, 1.0) - 0.5) * 28.0 + g.player_vx * 0.15,
-                vy: BULLET_SPEED,
-                r,
-                bounced: false,
-                active: true,
-            });
-        }
-        g.muzzle_t = 0.05;
-        g.eject_left = !g.eject_left;
-        let side = if g.eject_left { -1.0 } else { 1.0 };
-        pool_spawn(&mut g.casings, Casing {
-            x: cx + side * 6.0, y: g.player_y + PLAYER_H as f32 * 0.45,
-            vx: side * (70.0 + rand_range_f32(0.0, 1.0) * 50.0) + g.player_vx * 0.5,
-            vy: 20.0 + rand_range_f32(0.0, 1.0) * 40.0,
-            rot: rand_range_f32(0.0, 1.0) * 3.0, ttl: 0.45, active: true,
-        });
-        let takes = &sfx.shoot[(g.weapon_level.clamp(1, MAX_WEAPON_LEVEL) - 1) as usize];
-        play_sfx_volume(&takes[(rand() % takes.len() as u32) as usize], 0.8 + 0.04 * g.weapon_level as f32);
-    }
-    g.muzzle_t = (g.muzzle_t - dt).max(0.0);
-    for c in pool_iter_mut(&mut g.casings) {
-        c.x += c.vx * dt;
-        c.y += c.vy * dt;
-        c.vy += SEA_SCROLL_SPEED * 3.0 * dt;
-        c.vx *= 1.0 - 2.5 * dt;
-        c.rot += 14.0 * dt;
-        c.ttl -= dt;
-        if c.ttl <= 0.0 { c.active = false; }
-    }
+    fly(g, dt, sfx);
+    fire(g, dt, sfx);
 
     // ---- simple movement (no cross-entity reads) ----
     let bullet_starts: [(f32, f32); MAX_PLAYER_BULLETS] =
@@ -1811,38 +1723,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
-    // Damaged: smoke from the engine at 3 health, fire with it at 2, more
-    // of both at 1.
-    if g.health <= 3 && g.stall_fall == 0.0 {
-        g.smoke_t -= dt;
-        if g.smoke_t <= 0.0 {
-            let hurt = (PLAYER_HEALTH_MAX - g.health) as f32; // 2..4
-            g.smoke_t = 0.13 - 0.025 * hurt;
-            let (cx, ny) = (g.player_x + PLAYER_W as f32 / 2.0 + (rand_range_f32(0.0, 1.0) - 0.5) * 6.0, g.player_y + PLAYER_H as f32 * 0.3);
-            let dark = if g.health <= 2 { 1.0 } else { 0.6 };
-            pool_spawn(&mut g.puffs, Puff { x: cx, y: ny, r: 2.5 * dark + 1.0, grow: 12.0 + 8.0 * dark,
-                ttl: 0.9, max_ttl: 0.9, fire: false, top: true, active: true });
-            if g.health <= 2 {
-                // flames licking back from both sides of the cowling
-                for side in [-1.0f32, 1.0] {
-                    let fx = g.player_x + PLAYER_W as f32 / 2.0 + side * (3.0 + rand_range_f32(0.0, 1.0) * 3.0);
-                    pool_spawn(&mut g.puffs, Puff { x: fx, y: g.player_y + PLAYER_H as f32 * 0.2, r: 2.5 + hurt * 0.9 + rand_range_f32(0.0, 1.0) * 2.0,
-                        grow: -9.0, ttl: 0.28, max_ttl: 0.28, fire: true, top: true, active: true });
-                }
-            }
-        }
-    }
-    // Near a stall the engine starts to backfire.
-    if g.airspeed < STALL_WARN && g.stall_fall == 0.0 {
-        g.backfire_t -= dt;
-        if g.backfire_t <= 0.0 {
-            g.backfire_t = 0.18 + rand_range_f32(0.0, 1.0) * 0.35;
-            play_sfx_volume(&sfx.backfire, 0.75);
-            let (cx, ny) = (g.player_x + PLAYER_W as f32 / 2.0, g.player_y + PLAYER_H as f32 * 0.2);
-            pool_spawn(&mut g.puffs, Puff { x: cx, y: ny, r: 3.0, grow: -8.0, ttl: 0.12, max_ttl: 0.12, fire: true, top: true, active: true });
-            pool_spawn(&mut g.puffs, Puff { x: cx, y: ny, r: 2.5, grow: 14.0, ttl: 0.7, max_ttl: 0.7, fire: false, top: true, active: true });
-        }
-    }
+    damage_smoke(g, dt, sfx);
     for (i, p) in g.powerups.iter_mut().enumerate() {
         if !p.active { continue; }
         p.y += POW_SPEED * dt;
@@ -1927,65 +1808,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if g.boss.active && round_hits_rect(bullet_starts[bi], &g.bullets[bi],
             g.boss.x, g.boss.y, bossw, bossh) {
             g.bullets[bi].active = false;
-            g.boss.hp -= 1;
-            g.spawn_explosion(bx, by, 0.6, EXPLOSION_ORANGE);
-            // a round on a laser turret damages it; enough and it is out
-            let lr = laser_radius(g.boss.tier) + 3.0;
-            for i in 0..g.boss.n_lasers {
-                if g.boss.lasers[i].hp <= 0 { continue; }
-                let (lx, ly) = mount_pos(g, g.boss.lasers[i].fx, g.boss.lasers[i].fy);
-                if (lx - bx).hypot(ly - by) < lr {
-                    g.boss.lasers[i].hp -= 1;
-                    if g.boss.lasers[i].hp <= 0 {
-                        g.spawn_explosion(lx, ly, 1.4, EXPLOSION_ORANGE);
-                        g.score_at(lx, ly, 150 * g.sess.level);
-                        play_take(&sfx.enemy_explode, 0.9);
-                    }
-                }
-            }
-            // a round on a turret damages the turret too; enough and it is out
-            let r = turret_radius(g.boss.tier) + 3.0;
-            for k in 0..g.boss.n_turrets {
-                if g.boss.turrets[k].hp <= 0 { continue; }
-                let (tx, ty) = turret_pos(g, k);
-                if (tx - bx).hypot(ty - by) < r {
-                    g.boss.turrets[k].hp -= 1;
-                    if g.boss.turrets[k].hp <= 0 {
-                        g.spawn_explosion(tx, ty, 1.0, EXPLOSION_ORANGE);
-                        g.score_at(tx, ty, 50 * g.sess.level);
-                        play_take(&sfx.enemy_explode, 0.7);
-                    }
-                    break;
-                }
-            }
-            if g.boss.hp <= 0 {
-                let (cx, cy) = (g.boss.x + bossw / 2.0, g.boss.y + bossh / 2.0);
-                g.boss.active = false;
-                // A bigger, longer death for a bigger boss.
-                let burst = 1.6 + g.boss.tier as f32 * 0.3;
-                g.spawn_explosion(cx, cy, burst, EXPLOSION_ORANGE);
-                g.spawn_explosion(cx - 14.0, cy - 8.0, burst * 0.6, EXPLOSION_ORANGE);
-                g.spawn_explosion(cx + 14.0, cy + 6.0, burst * 0.6, EXPLOSION_ORANGE);
-                g.score_at(cx, cy, 500 * g.sess.level);
-                play_take(&sfx.boss_explode, 1.0);
-                if g.sess.level >= MAX_LEVEL {
-                    // The final boss is down — the game is won.
-                    g.sess.add_score(2000);
-                    blip::bot::set("score", g.sess.score as f64);
-                    blip::bot::finish("won");
-                    play_sfx(&sfx.victory);
-                    g.over_timer.start(OVER_MIN_WAIT);
-                    g.state = State::Won;
-                } else {
-                    blip::bot::set(&format!("t_boss{}", g.sess.level), blip::bot::clock() as f64);
-                    g.sess.next_level();
-                    blip::bot::set("level", g.sess.level as f64);
-                    g.wave_kills = 0;
-                    g.wave_target = wave_target_for(g.sess.level);
-                    g.win_timer.start(WIN_PAUSE);
-                    g.state = State::Win;
-                }
-            }
+            hit_boss(g, bx, by, sfx);
         }
 
         // Boats don't fight back — a quick bonus target for a stray shot.
@@ -2072,16 +1895,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         } else {
             (g.powerups[i].x, g.powerups[i].y)
         };
-        if segment_rect_overlap(
-            from_x + POW_W / 2.0 - (player_before.0 + PLAYER_W as f32 / 2.0),
-            from_y + POW_H / 2.0 - (player_before.1 + PLAYER_H as f32 / 2.0),
-            g.powerups[i].x + POW_W / 2.0 - (g.player_x + PLAYER_W as f32 / 2.0),
-            g.powerups[i].y + POW_H / 2.0 - (g.player_y + PLAYER_H as f32 / 2.0),
-            -(PLAYER_W as f32 + POW_W) / 2.0,
-            -(PLAYER_H as f32 + POW_H) / 2.0,
-            PLAYER_W as f32 + POW_W,
-            PLAYER_H as f32 + POW_H,
-        ) {
+        if caught(g, player_before, (from_x, from_y), (g.powerups[i].x, g.powerups[i].y), POW_W, POW_H) {
             g.powerups[i].active = false;
             let (cx, cy) = (g.powerups[i].x + POW_W / 2.0, g.powerups[i].y + POW_H / 2.0);
             if g.weapon_level < MAX_WEAPON_LEVEL {
@@ -2109,16 +1923,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         } else {
             (g.health_pickups[i].x, g.health_pickups[i].y)
         };
-        if segment_rect_overlap(
-            from_x + HEALTH_W / 2.0 - (player_before.0 + PLAYER_W as f32 / 2.0),
-            from_y + HEALTH_H / 2.0 - (player_before.1 + PLAYER_H as f32 / 2.0),
-            g.health_pickups[i].x + HEALTH_W / 2.0 - (g.player_x + PLAYER_W as f32 / 2.0),
-            g.health_pickups[i].y + HEALTH_H / 2.0 - (g.player_y + PLAYER_H as f32 / 2.0),
-            -(PLAYER_W as f32 + HEALTH_W) / 2.0,
-            -(PLAYER_H as f32 + HEALTH_H) / 2.0,
-            PLAYER_W as f32 + HEALTH_W,
-            PLAYER_H as f32 + HEALTH_H,
-        ) {
+        if caught(g, player_before, (from_x, from_y), (g.health_pickups[i].x, g.health_pickups[i].y), HEALTH_W, HEALTH_H) {
             g.health_pickups[i].active = false;
             let (cx, cy) = (g.health_pickups[i].x + HEALTH_W / 2.0, g.health_pickups[i].y + HEALTH_H / 2.0);
             g.health = (g.health + HEALTH_RESTORE).min(PLAYER_HEALTH_MAX);
@@ -2214,31 +2019,241 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             hit = true;
             g.health = 1;
         }
-        if hit {
-            g.health -= 1;
-            // A non-fatal hit drops the gun one tier, never below 2; a fatal
-            // one leaves it.
-            if g.health > 0 && g.weapon_level > 2 {
-                g.weapon_level -= 1;
-            }
-            if g.health > 0 {
-                // Still flying: a flinch of invulnerability (with the usual
-                // respawn blink) instead of going down outright.
-                play_sfx(&sfx.player_hit);
-                g.respawn_grace.start(HIT_GRACE);
-            } else {
-                g.spawn_player_death(px + PLAYER_W as f32 / 2.0, py + PLAYER_H as f32 / 2.0);
-                play_take(&sfx.player_explode, 1.0);
-                match g.sess.lose_life() {
-                    LifeResult::StillAlive => { g.dead_timer.start(DEAD_PAUSE); g.state = State::Dead; }
-                    LifeResult::GameOver   => { g.over_timer.start(OVER_MIN_WAIT); g.state = State::Over; }
-                }
-            }
-        }
+        if hit { take_hit(g, px, py, sfx); }
     }
     for (i, &left_screen) in enemy_bullet_left_screen.iter().enumerate() {
         if left_screen { g.enemy_bullets[i].active = false; }
     }
+}
+
+/// The plane: throttle and airspeed, a weighty sideways slide, the bank, and a
+/// stall when it flies too slow for too long.
+fn fly(g: &mut Game, dt: f32, sfx: &Sounds) {
+    if g.stall_fall > 0.0 {
+        update_stall(g, dt, sfx);
+    } else {
+        let left  = key_active(BLIP_KEY_LEFT)  || key_active(BLIP_KEY_A);
+        let right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
+        let up    = key_active(BLIP_KEY_UP)    || key_active(BLIP_KEY_W);
+        let down  = key_active(BLIP_KEY_DOWN)  || key_active(BLIP_KEY_S);
+        let throttle = up as i32 as f32 - down as i32 as f32;
+        if g.engine_out() {
+            // No thrust: the plane sheds speed whatever the throttle, but
+            // a splutter never stalls it on its own.
+            g.airspeed = (g.airspeed - SPLUTTER_DRAG * dt).max(g.airspeed.min(SPLUTTER_FLOOR));
+        } else if throttle != 0.0 {
+            g.airspeed += throttle * AIRSPEED_RATE * dt;
+        } else {
+            g.airspeed += (1.0 - g.airspeed).clamp(-AIRSPEED_RELAX * dt, AIRSPEED_RELAX * dt);
+        }
+        g.airspeed = g.airspeed.clamp(0.0, AIRSPEED_MAX);
+        update_splutter(g, dt, sfx);
+        // Sideways: spool up and brake over ~0.1s so the plane has weight.
+        let dx = right as i32 as f32 - left as i32 as f32;
+        let target = dx * PLAYER_SPEED;
+        let rate = if dx == 0.0 || target * g.player_vx < 0.0 { PLAYER_BRAKE } else { PLAYER_ACCEL } * dt;
+        g.player_vx += clamp(target - g.player_vx, -rate, rate);
+        // Up and down the screen is only gaining on or falling behind the
+        // scrolling world.
+        let vy_target = (1.0 - g.airspeed) * AIRSPEED_DRIFT;
+        g.player_vy += (vy_target - g.player_vy) * (6.0 * dt).min(1.0);
+        g.player_x += g.player_vx * dt;
+        g.player_y += g.player_vy * dt;
+        let (max_x, max_y) = ((WIN_W - PLAYER_W) as f32, PLAYER_MAX_Y);
+        if g.player_x < 0.0 || g.player_x > max_x { g.player_vx = 0.0; }
+        g.player_x = clamp(g.player_x, 0.0, max_x);
+        g.player_y = clamp(g.player_y, PLAYER_MIN_Y, max_y);
+
+        // Bank follows lateral velocity.
+        let target_bank = g.player_vx / PLAYER_SPEED * 0.30;
+        g.player_bank += (target_bank - g.player_bank) * (dt * 9.0).min(1.0);
+
+        if g.airspeed <= STALL_SPEED { g.stall_t += dt; } else { g.stall_t = 0.0; }
+        if g.stall_t >= STALL_HOLD {
+            g.stall_fall = 1e-4;
+            g.stall_spin = if rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
+        }
+}
+g.scroll_k = if g.airspeed < 1.0 { 0.25 + 0.75 * g.airspeed } else { 1.0 + 0.5 * (g.airspeed - 1.0) };
+g.prop_angle = (g.prop_angle + blip::lerp(40.0, 7.0, glide(g)) * dt) % std::f32::consts::TAU;
+}
+
+/// The guns: a volley while fire is held and they are ready, and the brass it throws.
+fn fire(g: &mut Game, dt: f32, sfx: &Sounds) {
+    g.fire_cd.tick(dt);
+    if g.stall_fall == 0.0 && key_active(BLIP_KEY_SPACE) && !g.fire_cd.active() && !g.respawn_grace.active() {
+        g.fire_cd.start(weapon_cooldown(g.weapon_level));
+        let (n, fan, r) = weapon_guns(g.weapon_level);
+        let cx = g.player_x + PLAYER_W as f32 / 2.0;
+        for i in 0..n {
+            let dx = if n > 1 { (i as f32 / (n - 1) as f32 - 0.5) * fan } else { 0.0 };
+            // Guns are not lasers: each round leaves a little off true.
+            pool_spawn(&mut g.bullets, Round {
+                x: cx + dx + (rand_range_f32(0.0, 1.0) - 0.5) * 3.0,
+                y: g.player_y + rand_range_f32(0.0, 1.0) * 6.0,
+                vx: dx * 2.2 + (rand_range_f32(0.0, 1.0) - 0.5) * 28.0 + g.player_vx * 0.15,
+                vy: BULLET_SPEED,
+                r,
+                bounced: false,
+                active: true,
+            });
+        }
+        g.muzzle_t = 0.05;
+        g.eject_left = !g.eject_left;
+        let side = if g.eject_left { -1.0 } else { 1.0 };
+        pool_spawn(&mut g.casings, Casing {
+            x: cx + side * 6.0, y: g.player_y + PLAYER_H as f32 * 0.45,
+            vx: side * (70.0 + rand_range_f32(0.0, 1.0) * 50.0) + g.player_vx * 0.5,
+            vy: 20.0 + rand_range_f32(0.0, 1.0) * 40.0,
+            rot: rand_range_f32(0.0, 1.0) * 3.0, ttl: 0.45, active: true,
+        });
+        let takes = &sfx.shoot[(g.weapon_level.clamp(1, MAX_WEAPON_LEVEL) - 1) as usize];
+        play_sfx_volume(&takes[(rand() % takes.len() as u32) as usize], 0.8 + 0.04 * g.weapon_level as f32);
+}
+g.muzzle_t = (g.muzzle_t - dt).max(0.0);
+for c in pool_iter_mut(&mut g.casings) {
+    c.x += c.vx * dt;
+    c.y += c.vy * dt;
+    c.vy += SEA_SCROLL_SPEED * 3.0 * dt;
+    c.vx *= 1.0 - 2.5 * dt;
+    c.rot += 14.0 * dt;
+    c.ttl -= dt;
+    if c.ttl <= 0.0 { c.active = false; }
+}
+}
+
+/// Damaged: smoke from the engine at 3 health, fire with it at 2, more of
+/// both at 1; near a stall, backfires.
+fn damage_smoke(g: &mut Game, dt: f32, sfx: &Sounds) {
+    if g.health <= 3 && g.stall_fall == 0.0 {
+        g.smoke_t -= dt;
+        if g.smoke_t <= 0.0 {
+            let hurt = (PLAYER_HEALTH_MAX - g.health) as f32; // 2..4
+            g.smoke_t = 0.13 - 0.025 * hurt;
+            let (cx, ny) = (g.player_x + PLAYER_W as f32 / 2.0 + (rand_range_f32(0.0, 1.0) - 0.5) * 6.0, g.player_y + PLAYER_H as f32 * 0.3);
+            let dark = if g.health <= 2 { 1.0 } else { 0.6 };
+            pool_spawn(&mut g.puffs, Puff { x: cx, y: ny, r: 2.5 * dark + 1.0, grow: 12.0 + 8.0 * dark,
+                ttl: 0.9, max_ttl: 0.9, fire: false, top: true, active: true });
+            if g.health <= 2 {
+                // flames licking back from both sides of the cowling
+                for side in [-1.0f32, 1.0] {
+                    let fx = g.player_x + PLAYER_W as f32 / 2.0 + side * (3.0 + rand_range_f32(0.0, 1.0) * 3.0);
+                    pool_spawn(&mut g.puffs, Puff { x: fx, y: g.player_y + PLAYER_H as f32 * 0.2, r: 2.5 + hurt * 0.9 + rand_range_f32(0.0, 1.0) * 2.0,
+                        grow: -9.0, ttl: 0.28, max_ttl: 0.28, fire: true, top: true, active: true });
+                }
+            }
+        }
+}
+// Near a stall the engine starts to backfire.
+if g.airspeed < STALL_WARN && g.stall_fall == 0.0 {
+    g.backfire_t -= dt;
+    if g.backfire_t <= 0.0 {
+        g.backfire_t = 0.18 + rand_range_f32(0.0, 1.0) * 0.35;
+        play_sfx_volume(&sfx.backfire, 0.75);
+        let (cx, ny) = (g.player_x + PLAYER_W as f32 / 2.0, g.player_y + PLAYER_H as f32 * 0.2);
+        pool_spawn(&mut g.puffs, Puff { x: cx, y: ny, r: 3.0, grow: -8.0, ttl: 0.12, max_ttl: 0.12, fire: true, top: true, active: true });
+        pool_spawn(&mut g.puffs, Puff { x: cx, y: ny, r: 2.5, grow: 14.0, ttl: 0.7, max_ttl: 0.7, fire: false, top: true, active: true });
+    }
+}
+}
+
+/// A round on the boss at `bx`,`by`: the hull, a laser or turret near it, and
+/// the boss's end, which wins the game on the last level.
+fn hit_boss(g: &mut Game, bx: f32, by: f32, sfx: &Sounds) {
+    let (bossw, bossh) = boss_size(g.boss.tier);
+    g.boss.hp -= 1;
+    g.spawn_explosion(bx, by, 0.6, EXPLOSION_ORANGE);
+    // a round on a laser turret damages it; enough and it is out
+    let lr = laser_radius(g.boss.tier) + 3.0;
+    for i in 0..g.boss.n_lasers {
+        if g.boss.lasers[i].hp <= 0 { continue; }
+        let (lx, ly) = mount_pos(g, g.boss.lasers[i].fx, g.boss.lasers[i].fy);
+        if (lx - bx).hypot(ly - by) < lr {
+            g.boss.lasers[i].hp -= 1;
+            if g.boss.lasers[i].hp <= 0 {
+                g.spawn_explosion(lx, ly, 1.4, EXPLOSION_ORANGE);
+                g.score_at(lx, ly, 150 * g.sess.level);
+                play_take(&sfx.enemy_explode, 0.9);
+            }
+        }
+    }
+    // a round on a turret damages the turret too; enough and it is out
+    let r = turret_radius(g.boss.tier) + 3.0;
+    for k in 0..g.boss.n_turrets {
+        if g.boss.turrets[k].hp <= 0 { continue; }
+        let (tx, ty) = turret_pos(g, k);
+        if (tx - bx).hypot(ty - by) < r {
+            g.boss.turrets[k].hp -= 1;
+            if g.boss.turrets[k].hp <= 0 {
+                g.spawn_explosion(tx, ty, 1.0, EXPLOSION_ORANGE);
+                g.score_at(tx, ty, 50 * g.sess.level);
+                play_take(&sfx.enemy_explode, 0.7);
+            }
+            break;
+        }
+    }
+    if g.boss.hp <= 0 {
+        let (cx, cy) = (g.boss.x + bossw / 2.0, g.boss.y + bossh / 2.0);
+        g.boss.active = false;
+        // A bigger, longer death for a bigger boss.
+        let burst = 1.6 + g.boss.tier as f32 * 0.3;
+        g.spawn_explosion(cx, cy, burst, EXPLOSION_ORANGE);
+        g.spawn_explosion(cx - 14.0, cy - 8.0, burst * 0.6, EXPLOSION_ORANGE);
+        g.spawn_explosion(cx + 14.0, cy + 6.0, burst * 0.6, EXPLOSION_ORANGE);
+        g.score_at(cx, cy, 500 * g.sess.level);
+        play_take(&sfx.boss_explode, 1.0);
+        if g.sess.level >= MAX_LEVEL {
+            // The final boss is down — the game is won.
+            g.sess.add_score(2000);
+            blip::bot::set("score", g.sess.score as f64);
+            blip::bot::finish("won");
+            play_sfx(&sfx.victory);
+            g.over_timer.start(OVER_MIN_WAIT);
+            g.state = State::Won;
+        } else {
+            blip::bot::set(&format!("t_boss{}", g.sess.level), blip::bot::clock() as f64);
+            g.sess.next_level();
+            blip::bot::set("level", g.sess.level as f64);
+            g.wave_kills = 0;
+            g.wave_target = wave_target_for(g.sess.level);
+            g.win_timer.start(WIN_PAUSE);
+            g.state = State::Win;
+        }
+    }
+}
+
+/// The plane is hit at `px`,`py`: a health point and a gun tier, or the plane.
+fn take_hit(g: &mut Game, px: f32, py: f32, sfx: &Sounds) {
+    g.health -= 1;
+    // A non-fatal hit drops the gun one tier, never below 2; a fatal
+    // one leaves it.
+    if g.health > 0 && g.weapon_level > 2 {
+        g.weapon_level -= 1;
+    }
+    if g.health > 0 {
+        // Still flying: a flinch of invulnerability (with the usual
+        // respawn blink) instead of going down outright.
+        play_sfx(&sfx.player_hit);
+        g.respawn_grace.start(HIT_GRACE);
+    } else {
+        g.spawn_player_death(px + PLAYER_W as f32 / 2.0, py + PLAYER_H as f32 / 2.0);
+        play_take(&sfx.player_explode, 1.0);
+        match g.sess.lose_life() {
+            LifeResult::StillAlive => { g.dead_timer.start(DEAD_PAUSE); g.state = State::Dead; }
+            LifeResult::GameOver   => { g.over_timer.start(OVER_MIN_WAIT); g.state = State::Over; }
+        }
+    }
+}
+
+/// Whether a pickup `w` by `h`, moving `from` -> `to` this frame, met the
+/// plane on its way from `before`: both move, so the test is swept.
+fn caught(g: &Game, before: (f32, f32), from: (f32, f32), to: (f32, f32), w: f32, h: f32) -> bool {
+    let (pw, ph) = (PLAYER_W as f32, PLAYER_H as f32);
+    segment_rect_overlap(
+        from.0 + w / 2.0 - (before.0 + pw / 2.0), from.1 + h / 2.0 - (before.1 + ph / 2.0),
+        to.0 + w / 2.0 - (g.player_x + pw / 2.0), to.1 + h / 2.0 - (g.player_y + ph / 2.0),
+        -(pw + w) / 2.0, -(ph + h) / 2.0, pw + w, ph + h,
+    )
 }
 
 /// An enemy is down: points, the kill count, its drop, and either a fireball
