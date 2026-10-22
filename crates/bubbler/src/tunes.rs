@@ -5,7 +5,7 @@ use std::f32::consts::PI;
 
 use blip::cosy::{midi_hz, note, pulse, Voice, SR};
 use blip::song::{hat, kick, snare};
-use blip::wav::{encode_pcm16_mono, encode_pcm16_music, soft_limit_to_pcm16, warm, Rng, MIX_KNEE};
+use blip::wav::{encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, soft_limit_to_pcm16, warm, Rng, MIX_KNEE};
 use blip::Asset;
 
 const H: i32 = -2;
@@ -286,7 +286,9 @@ pub fn sfx_wav(which: usize) -> Vec<u8> {
         };
     }
     let scaled: Vec<f32> = buf.iter().map(|v| v * 20_000.0).collect();
-    encode_pcm16_mono(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
+    let pcm = soft_limit_to_pcm16(&scaled, MIX_KNEE);
+    // Fruit, bounce and sparkle are 39 dB or more quieter above 10 kHz.
+    if matches!(which, 4 | 7 | 8) { encode_pcm16_half(&pcm) } else { encode_pcm16_mono(&pcm) }
 }
 
 /// The music: each tune as a WAV to play and an XM of its notes for TUNE.
