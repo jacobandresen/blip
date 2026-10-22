@@ -100,7 +100,7 @@ const PULL_FLAT: f32 = 260.0;    // extra when |vy| is under 40% of the speed
 const SCREW_GAIN: f32 = 0.18;    // fraction of speed gained per second, spinning
 const PULL_CAP: f32 = 1.3;       // times BALL_SPEED_MAX, whatever the pull
 
-// A playtest took 190s to hit the last three bricks; after a delay, rising balls seek the nearest brick.
+// A playtest took 190s to hit the last three bricks; after a delay, rising balls seek_brick the nearest brick.
 const SEEK_AFTER: f32 = 5.0;
 const SEEK_RATE: f32 = 1.5; // radians/sec of bend at most
 
@@ -314,7 +314,7 @@ impl Game {
         }
     }
 
-    fn launch_ball(&mut self) {
+    fn new_ball(&mut self) {
         self.extra.clear();
         self.since_break = 0.0;
         self.ball_x = self.pad_x + (self.pad_w / 2.0 - BALL_W as f32 / 2.0);
@@ -337,7 +337,7 @@ impl Game {
         self.reset_drops();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
         self.build_bricks();
-        self.launch_ball();
+        self.new_ball();
         self.state = State::Launch;
     }
 
@@ -348,7 +348,7 @@ impl Game {
         self.reset_drops();
         self.build_bricks();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
-        self.launch_ball();
+        self.new_ball();
         self.state = State::Launch;
     }
 }
@@ -379,7 +379,7 @@ fn update_title(g: &mut Game) {
     }
 }
 
-fn paddle_input(g: &mut Game, dt: f32) {
+fn move_paddle(g: &mut Game, dt: f32) {
     let prev_x = g.pad_x;
     for (i, pressed) in [
         key_pressed(BLIP_KEY_LEFT) || key_pressed(BLIP_KEY_A),
@@ -414,7 +414,7 @@ fn paddle_input(g: &mut Game, dt: f32) {
 
 fn update_launch(g: &mut Game, dt: f32) {
     g.chain = 0;
-    paddle_input(g, dt);
+    move_paddle(g, dt);
     g.fx.update(dt);
     g.ball_x = g.pad_x + (g.pad_w / 2.0 - BALL_W as f32 / 2.0);
     g.ball_y = (PAD_Y - BALL_H - 2) as f32;
@@ -424,7 +424,7 @@ fn update_launch(g: &mut Game, dt: f32) {
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
-    paddle_input(g, dt);
+    move_paddle(g, dt);
 
     // Recoil spring, ~5 Hz and well damped: one dip, no bounce.
     g.pad_kick_v += (-1000.0 * g.pad_kick - 28.0 * g.pad_kick_v) * dt;
@@ -432,7 +432,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     if g.pad_effect_timer.tick(dt) { g.pad_w = PAD_W as f32; }
     g.slow_timer.tick(dt);
-    update_drops(g, dt, sfx);
+    move_drops(g, dt, sfx);
     g.fx.update(dt);
     g.since_break += dt;
 
@@ -481,14 +481,10 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 }
 
-/// One frame of the ball in hand: seeking, spin, pull, and the move itself
-/// against walls, paddle and bricks. Returns true if it fell out the bottom.
-fn fly_ball(g: &mut Game, dt: f32, active_speed: f32, sfx: &Sounds) -> bool {
-    seek(g, dt);
-
-    // ---- screwball curve: rotate the velocity vector (speed preserved) by
-    //      the current spin rate, capped at SCREW_MAX_CURVE, spin bleeding
-    //      off over time so the curve eases out instead of looping ----
+/// The screwball curve: the velocity turns (speed kept) at the spin's rate,
+/// up to SCREW_MAX_CURVE, the spin bleeding off so the curve eases out
+/// instead of looping.
+fn curve_ball(g: &mut Game, dt: f32) {
     if g.ball_spin.abs() > 0.001 {
         let remaining = (SCREW_MAX_CURVE - g.ball_curve_used).max(0.0);
         let mut ang = g.ball_spin * dt;
@@ -503,22 +499,30 @@ fn fly_ball(g: &mut Game, dt: f32, active_speed: f32, sfx: &Sounds) -> bool {
         g.ball_vy = vx * s + vy * c;
         g.ball_spin *= (1.0 - SCREW_SPIN_DECAY * dt).max(0.0);
     }
+}
 
-    // ---- pull: steepen and quicken the flight (see PULL) ----
-    {
-        let sp = g.ball_vx.hypot(g.ball_vy).max(1.0);
-        let flat = (1.0 - (g.ball_vy.abs() / sp) / 0.4).clamp(0.0, 1.0);
-        let dir = if g.ball_vy < 0.0 { -1.0 } else { 1.0 };
-        g.ball_vy += dir * (PULL + PULL_FLAT * flat) * dt;
-        if g.ball_spin.abs() > 0.001 || g.ball_curve_used > 0.0 {
-            let k = 1.0 + SCREW_GAIN * dt;
-            g.ball_vx *= k;
-            g.ball_vy *= k;
-        }
-        let sp = g.ball_vx.hypot(g.ball_vy);
-        let cap = BALL_SPEED_MAX * PULL_CAP;
-        if sp > cap { g.ball_vx *= cap / sp; g.ball_vy *= cap / sp; }
+/// The pull: the flight steepens and quickens (see PULL).
+fn pull_ball(g: &mut Game, dt: f32) {
+    let sp = g.ball_vx.hypot(g.ball_vy).max(1.0);
+    let flat = (1.0 - (g.ball_vy.abs() / sp) / 0.4).clamp(0.0, 1.0);
+    let dir = if g.ball_vy < 0.0 { -1.0 } else { 1.0 };
+    g.ball_vy += dir * (PULL + PULL_FLAT * flat) * dt;
+    if g.ball_spin.abs() > 0.001 || g.ball_curve_used > 0.0 {
+        let k = 1.0 + SCREW_GAIN * dt;
+        g.ball_vx *= k;
+        g.ball_vy *= k;
     }
+    let sp = g.ball_vx.hypot(g.ball_vy);
+    let cap = BALL_SPEED_MAX * PULL_CAP;
+    if sp > cap { g.ball_vx *= cap / sp; g.ball_vy *= cap / sp; }
+}
+
+/// One frame of the ball in hand: seeking, spin, pull, and the move itself
+/// against walls, paddle and bricks. Returns true if it fell out the bottom.
+fn fly_ball(g: &mut Game, dt: f32, active_speed: f32, sfx: &Sounds) -> bool {
+    seek_brick(g, dt);
+    curve_ball(g, dt);
+    pull_ball(g, dt);
 
     // Rolling-mark spin (visual only): angular rate = speed / radius, driven
     // by the horizontal component so a curving shot visibly spins faster.
@@ -535,10 +539,10 @@ fn fly_ball(g: &mut Game, dt: f32, active_speed: f32, sfx: &Sounds) -> bool {
         g.ball_x += g.ball_vx * sdt;
         g.ball_y += g.ball_vy * sdt;
 
-        ball_walls(g, sfx);
+        bounce_off_walls(g, sfx);
         let pad_x = pad_start_x + g.pad_vx * dt * (step as f32 + 0.5) / substeps as f32;
-        ball_paddle(g, active_speed, pad_x, sfx);
-        ball_bricks(g, active_speed, sfx);
+        bounce_off_paddle(g, active_speed, pad_x, sfx);
+        hit_bricks(g, active_speed, sfx);
 
         if g.ball_y > WIN_H as f32 {
             g.fx.burst(g.ball_x + BALL_W as f32 / 2.0, WIN_H as f32 - 4.0, 14, 160.0, BLIP_RED);
@@ -555,7 +559,7 @@ fn brick_rect(i: usize) -> (f32, f32) {
 }
 
 /// While seeking, bend a rising ball toward the nearest brick.
-fn seek(g: &mut Game, dt: f32) {
+fn seek_brick(g: &mut Game, dt: f32) {
     if !g.seeking() || g.ball_vy >= 0.0 { return; }
     let Some((tx, ty)) = g.nearest_brick() else { return };
     let (cx, cy, _) = ball_circle(g);
@@ -629,7 +633,7 @@ fn ball_circle(g: &Game) -> (f32, f32, f32) {
 
 /// Left / right / top walls. The overshoot past the wall is reflected back
 /// rather than clamped flat, so no speed is lost to the ball "sticking".
-fn ball_walls(g: &mut Game, sfx: &Sounds) {
+fn bounce_off_walls(g: &mut Game, sfx: &Sounds) {
     if g.ball_x < 0.0 {
         g.ball_x = -g.ball_x;
         g.ball_vx = g.ball_vx.abs();
@@ -649,7 +653,7 @@ fn ball_walls(g: &mut Game, sfx: &Sounds) {
     }
 }
 
-fn ball_paddle(g: &mut Game, speed: f32, pad_x: f32, sfx: &Sounds) {
+fn bounce_off_paddle(g: &mut Game, speed: f32, pad_x: f32, sfx: &Sounds) {
     if g.ball_vy <= 0.0 {
         return;
     }
@@ -747,7 +751,7 @@ fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds, blasted: bool) 
 }
 
 /// Resolve one ball/brick contact using the closest-point normal for corner hits.
-fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
+fn hit_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
     let (cx, cy, rad) = ball_circle(g);
 
     for i in 0..BRICK_TOTAL {
@@ -810,7 +814,7 @@ fn ball_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
     }
 }
 
-fn update_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
+fn move_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
     let mut split = false;
     let pad_start_x = g.pad_x - g.pad_vx * dt;
     let (pad_x, pad_w) = (g.pad_x, g.pad_w);
@@ -871,12 +875,12 @@ fn update_dead(g: &mut Game, dt: f32) {
     if g.dead_timer.tick(dt) {
         g.ball_speed = (g.ball_speed - SPEED_LIFE_RELIEF).max(BALL_SPEED_0);
         g.pad_x = ((WIN_W - PAD_W) / 2) as f32;
-        g.launch_ball();
+        g.new_ball();
         g.state = State::Launch;
     }
 }
 
-fn update_win(g: &mut Game, dt: f32) {
+fn update_clear(g: &mut Game, dt: f32) {
     if g.dead_timer.tick(dt) { g.next_level(); }
 }
 
@@ -1009,7 +1013,7 @@ fn draw_title(blip: &Blip, hi: &web::HighScore, paddle: &Texture2D, ball: &Textu
     blip.draw_texture_region(paddle, sw - cap, 0.0, cap, 24.0, pad_x + PAD_W as f32 - cap * 0.5, PAD_Y as f32, cap * 0.5, PAD_H as f32);
 }
 
-fn draw_win(blip: &Blip, level: i32) {
+fn draw_clear(blip: &Blip, level: i32) {
     let buf = format!("LEVEL {}", level + 1);  // level just incremented in next_level
     blip.clear(BLIP_BLACK);
     blip.draw_centered("CLEARED", (WIN_H / 3) as f32, 5.0, BLIP_GREEN);
@@ -1119,14 +1123,14 @@ async fn main() {
             State::Launch => update_launch(&mut g, dt),
             State::Play   => update_play(&mut g, dt, &sfx),
             State::Dead   => update_dead(&mut g, dt),
-            State::Win    => update_win(&mut g, dt),
+            State::Win    => update_clear(&mut g, dt),
             State::Over   => update_over(&mut g, dt),
         }
 
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip, &web::high_score(), &paddle, &ball, &ball_shade, &brick),
-            State::Win   => draw_win(&blip, g.sess.level),
+            State::Win   => draw_clear(&blip, g.sess.level),
             State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
             State::Launch | State::Play | State::Dead => {
                 draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick, &drops);
@@ -1182,7 +1186,7 @@ mod tests {
         g.split_ball();
         assert_eq!(1 + g.extra.len(), MULTI_BALLS);
         // A new ball starts alone.
-        g.launch_ball();
+        g.new_ball();
         assert!(g.extra.is_empty());
     }
 
