@@ -1196,4 +1196,57 @@ mod tests {
         g.swap_ball(0);
         assert_eq!((g.ball_x, g.ball_vx, g.extra[0].x, g.extra[0].vx), (10.0, 1.0, 99.0, -7.0));
     }
+
+    fn layout(level: i32) -> Game {
+        let mut g = Game::new();
+        g.sess.level = level;
+        g.build_bricks();
+        g
+    }
+
+    #[test]
+    fn the_brick_grid_sits_inside_the_screen_without_overlaps() {
+        let (x0, y0) = brick_rect(0);
+        let (x1, y1) = brick_rect(BRICK_TOTAL - 1);
+        assert!(x0 >= 0.0 && x1 + BRICK_W as f32 <= WIN_W as f32);
+        assert!(y0 > HUD_H as f32 && y1 + (BRICK_H as f32) < WIN_H as f32 / 2.0);
+        assert_eq!(brick_rect(1).0 - x0, (BRICK_W + BRICK_GAP) as f32);
+    }
+
+    #[test]
+    fn every_layout_has_bricks_and_can_be_cleared() {
+        for level in 1..=16 {
+            let g = layout(level);
+            let alive: Vec<_> = g.bricks.iter().filter(|b| b.alive).collect();
+            assert!(!alive.is_empty(), "level {level} has no bricks");
+            assert!(alive.iter().all(|b| b.hp >= 1 && b.hp <= 2), "level {level}: a brick that never breaks");
+            assert!(alive.iter().filter(|b| b.kind == BRICK_BOMB).count() <= BOMB_MAX, "level {level}: too many bombs");
+        }
+    }
+
+    #[test]
+    fn steel_and_bombs_arrive_only_at_their_levels() {
+        for _ in 0..20 {
+            assert!(layout(1).bricks.iter().all(|b| b.kind != BRICK_STEEL && b.kind != BRICK_BOMB));
+            assert!(layout(STEEL_MIN_LEVEL - 1).bricks.iter().all(|b| b.kind != BRICK_STEEL));
+        }
+    }
+
+    #[test]
+    fn the_layouts_cycle_after_eight_levels() {
+        let shape = |level| layout(level).bricks.iter().map(|b| b.alive).collect::<Vec<_>>();
+        assert_eq!(shape(2), shape(10));
+        assert_ne!(shape(1), shape(2));
+    }
+
+    #[test]
+    fn the_nearest_brick_is_the_one_closest_to_the_ball() {
+        let mut g = layout(1);
+        let (x, y) = brick_rect(BRICK_TOTAL - 1);
+        (g.ball_x, g.ball_y) = (x, y + 40.0);
+        let (bx, by) = g.nearest_brick().unwrap();
+        assert_eq!((bx, by), (x + BRICK_W as f32 / 2.0, y + BRICK_H as f32 / 2.0));
+        for b in g.bricks.iter_mut() { b.alive = false; }
+        assert!(g.nearest_brick().is_none());
+    }
 }
