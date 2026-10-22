@@ -3607,4 +3607,77 @@ mod tests {
     }
 
     const F: f32 = 1.0 / 60.0;
+
+    #[test]
+    fn each_gun_tier_is_at_least_the_last_one() {
+        for level in 1..MAX_WEAPON_LEVEL {
+            let (n0, fan0, r0) = weapon_guns(level);
+            let (n1, fan1, r1) = weapon_guns(level + 1);
+            assert!(n1 >= n0 && fan1 >= fan0 && r1 >= r0, "tier {} is weaker than {level}", level + 1);
+            assert!(weapon_cooldown(level + 1) <= weapon_cooldown(level));
+        }
+    }
+
+    #[test]
+    fn waves_grow_and_the_last_is_the_long_flight_in() {
+        for level in 1..MAX_LEVEL - 1 {
+            assert!(wave_target_for(level + 1) >= wave_target_for(level));
+        }
+        assert!(wave_target_for(MAX_LEVEL) > wave_target_for(MAX_LEVEL - 1));
+        assert!(wave_target_for(40) <= 160, "the cap holds before the last level");
+    }
+
+    #[test]
+    fn flights_come_closer_together_each_level_and_never_overlap_their_range() {
+        for level in 1..10 {
+            let (lo, hi) = spawn_interval_range(level);
+            assert!(lo > 0.0 && lo < hi, "level {level}");
+            assert!(spawn_interval_range(level + 1).1 <= hi);
+        }
+    }
+
+    #[test]
+    fn no_two_planes_in_a_formation_touch() {
+        use Formation::*;
+        for f in [Vic, Pair, Echelon, Abreast, FingerFour, Solo] {
+            let s = slots(f);
+            for (i, a) in s.iter().enumerate() {
+                for b in &s[i + 1..] {
+                    let apart = (a.0 - b.0).abs() >= ENEMY_W as f32 || (a.1 - b.1).abs() >= ENEMY_H as f32 * 0.85;
+                    assert!(apart, "two slots overlap: {a:?} and {b:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_slot_turns_with_its_leader() {
+        // Flying down the screen, "behind" is up it.
+        let (x, y) = slot_pos(100.0, 100.0, 0.0, (0.0, 50.0));
+        assert!((x - 100.0).abs() < 1e-4 && (y - 50.0).abs() < 1e-4);
+        // Any heading keeps the wingman the same distance from the leader.
+        for k in 0..12 {
+            let (x, y) = slot_pos(0.0, 0.0, k as f32 * 0.5, (62.0, 50.0));
+            assert!((x.hypot(y) - 62.0f32.hypot(50.0)).abs() < 1e-3);
+        }
+    }
+
+    #[test]
+    fn a_flak_gun_fires_only_once_it_has_reloaded() {
+        let mut gun = FlakGun { angle: 0.0, reload: 0.5, flash: 0.0 };
+        assert!(!aim_flak_gun(&mut gun, 0.0, 0.0, 100.0, 100.0, 0.1, (1.0, 2.0)));
+        assert!(aim_flak_gun(&mut gun, 0.0, 0.0, 100.0, 100.0, 0.5, (1.0, 2.0)));
+        assert!((1.0..=2.0).contains(&gun.reload), "reload {}", gun.reload);
+        assert!(gun.flash > 0.0);
+    }
+
+    #[test]
+    fn a_straight_leg_holds_its_heading_and_stays_above_the_stall() {
+        let mut f = Game::new().flights[0];
+        f = Flight { active: true, x: 200.0, y: 0.0, heading: 0.2, bank: 0.0, speed: 115.0, trim: 115.0,
+            legs: [Leg::Straight(5.0); 4], n: 1, leg: 0, leg_t: 0.0, turned: 0.0, ..f };
+        for _ in 0..120 { update_flight(&mut f, F, (200.0, 400.0, 0.0)); }
+        assert!((f.heading - 0.2).abs() < 1e-4);
+        assert!(f.speed >= FLIGHT_STALL);
+    }
 }
