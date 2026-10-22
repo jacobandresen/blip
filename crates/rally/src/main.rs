@@ -131,7 +131,7 @@ fn touch_drag(g: &Game, slot: usize) -> f32 {
 }
 
 /// Keys and fingers on the bats, for the serve and the rally.
-fn move_pads(g: &mut Game, dt: f32) {
+fn move_paddles(g: &mut Game, dt: f32) {
     if key_active(BLIP_KEY_UP)   || key_active(BLIP_KEY_W) { g.lpad_y -= PAD_SPEED * dt; }
     if key_active(BLIP_KEY_DOWN) || key_active(BLIP_KEY_S) { g.lpad_y += PAD_SPEED * dt; }
     g.lpad_y += touch_drag(g, 0);
@@ -162,7 +162,7 @@ fn update_title(g: &mut Game) {
 
 
 fn update_serve(g: &mut Game, dt: f32) {
-    move_pads(g, dt);
+    move_paddles(g, dt);
     g.clamp_pads();
     if any_key_pressed() || touch_began(g, 0) || touch_began(g, 1) {
         g.launch();
@@ -174,7 +174,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
     let dt = dt.max(1e-4);
     let (lpy0, rpy0) = (g.lpad_y, g.rpad_y);
 
-    move_pads(g, dt);
+    move_paddles(g, dt);
     if g.mode == Mode::OnePlayer {
         // Tracks the ball only while it is coming; otherwise drifts to centre.
         let target = if g.ball_vx > 0.0 {
@@ -194,7 +194,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Beeps) {
     let rpad_vy = (g.rpad_y - rpy0) / dt;
 
     let mut ball = Ball { ball_x: g.ball_x, ball_y: g.ball_y, ball_vx: g.ball_vx, ball_vy: g.ball_vy, ball_spd: g.ball_spd };
-    let events = physics::step(&COURT, &mut ball, dt, g.lpad_y, g.rpad_y, lpad_vy, rpad_vy);
+    let events = physics::move_ball(&COURT, &mut ball, dt, g.lpad_y, g.rpad_y, lpad_vy, rpad_vy);
     (g.ball_x, g.ball_y, g.ball_vx, g.ball_vy, g.ball_spd) = (ball.ball_x, ball.ball_y, ball.ball_vx, ball.ball_vy, ball.ball_spd);
     for event in events {
         match event {
@@ -254,7 +254,7 @@ fn draw_net(blip: &Blip) {
     }
 }
 
-fn draw_hud(blip: &Blip, score_l: i32, score_r: i32) {
+fn draw_scores(blip: &Blip, score_l: i32, score_r: i32) {
     blip.fill_rect(0.0, (HUD_H - 1) as f32, WIN_W as f32, 1.0, C_HUD_LINE);
     let buf_l = format!("{}:{}", score_l, SCORE_WIN);
     blip.draw_text(&buf_l, (WIN_W / 2 - 72) as f32, 5.0, 2.0, BLIP_YELLOW);
@@ -264,7 +264,7 @@ fn draw_hud(blip: &Blip, score_l: i32, score_r: i32) {
 
 fn draw_field(blip: &Blip, g: &Game) {
     draw_net(blip);
-    draw_hud(blip, g.score_l, g.score_r);
+    draw_scores(blip, g.score_l, g.score_r);
     blip.fill_rect(LPAD_X, g.lpad_y, PAD_W, PAD_H, C_PAD);
     blip.fill_rect(RPAD_X, g.rpad_y, PAD_W, PAD_H, C_PAD);
 }
@@ -272,7 +272,7 @@ fn draw_field(blip: &Blip, g: &Game) {
 fn draw_title(blip: &Blip) {
     blip.clear(BLIP_BLACK);
     draw_net(blip);
-    draw_hud(blip, 0, 0);
+    draw_scores(blip, 0, 0);
     let py = PLAY_T + PLAY_H * 0.5 - PAD_H * 0.5;
     blip.fill_rect(LPAD_X, py, PAD_W, PAD_H, C_PAD);
     blip.fill_rect(RPAD_X, py, PAD_W, PAD_H, C_PAD);
@@ -312,7 +312,7 @@ fn draw_play(blip: &Blip, g: &Game) {
 fn draw_point(blip: &Blip, g: &Game) {
     blip.clear(BLIP_BLACK);
     draw_net(blip);
-    draw_hud(blip, g.score_l, g.score_r);
+    draw_scores(blip, g.score_l, g.score_r);
     if (g.point_t.remaining() * 6.0) as i32 % 2 == 0 {
         blip.draw_centered("POINT!", PLAY_T + PLAY_H * 0.5, 3.0, BLIP_YELLOW);
     }
@@ -321,7 +321,7 @@ fn draw_point(blip: &Blip, g: &Game) {
 fn draw_over(blip: &Blip, g: &Game) {
     blip.clear(BLIP_BLACK);
     draw_net(blip);
-    draw_hud(blip, g.score_l, g.score_r);
+    draw_scores(blip, g.score_l, g.score_r);
     let cy = PLAY_T + PLAY_H * 0.5;
     let msg = if g.mode == Mode::TwoPlayer {
         if g.score_l >= SCORE_WIN { "P1 WINS!" } else { "P2 WINS!" }

@@ -53,7 +53,7 @@ fn main() {
     }
     let (mut score_l, mut score_r) = (0, 0);
     for _ in 0..steps {
-        for event in physics::step(&TAPE, &mut ball, dt, left_y, right_y, left_vy, right_vy) {
+        for event in physics::move_ball(&TAPE, &mut ball, dt, left_y, right_y, left_vy, right_vy) {
             if let Event::Point(left) = event {
                 if left {
                     score_l += 1;

@@ -78,7 +78,7 @@ pub enum Event {
     Point(bool),
 }
 
-pub fn step(
+pub fn move_ball(
     c: &Court,
     g: &mut Ball,
     dt: f32,
@@ -104,17 +104,7 @@ pub fn step(
         g.ball_y += g.ball_vy * sdt;
         let (next_x, next_y) = (g.ball_x + c.ball * 0.5, g.ball_y + c.ball * 0.5);
 
-        // Reflect the overshoot rather than clamp, so no speed is shaved off.
-        if g.ball_y < c.top {
-            g.ball_y = 2.0 * c.top - g.ball_y;
-            g.ball_vy = g.ball_vy.abs();
-            events.push(Event::Wall);
-        }
-        if g.ball_y + c.ball > c.bottom {
-            g.ball_y = 2.0 * (c.bottom - c.ball) - g.ball_y;
-            g.ball_vy = -g.ball_vy.abs();
-            events.push(Event::Wall);
-        }
+        bounce_off_walls(c, g, &mut events);
 
         if g.ball_vx < 0.0
             && segment_rect_overlap(
@@ -129,7 +119,7 @@ pub fn step(
             )
         {
             g.ball_x = c.lpad_x + c.pad_w;
-            bounce_paddle(c, g, lpad, lpad_vy, 1.0);
+            bounce(c, g, lpad, lpad_vy, 1.0);
             events.push(Event::LeftHit);
         }
 
@@ -146,7 +136,7 @@ pub fn step(
             )
         {
             g.ball_x = c.rpad_x - c.ball;
-            bounce_paddle(c, g, rpad, rpad_vy, -1.0);
+            bounce(c, g, rpad, rpad_vy, -1.0);
             events.push(Event::RightHit);
         }
 
@@ -162,7 +152,21 @@ pub fn step(
     events
 }
 
-pub fn bounce_paddle(c: &Court, g: &mut Ball, pad_y: f32, pad_vy: f32, dir: f32) {
+/// Reflect the overshoot rather than clamp, so no speed is shaved off.
+fn bounce_off_walls(c: &Court, g: &mut Ball, events: &mut Vec<Event>) {
+    if g.ball_y < c.top {
+        g.ball_y = 2.0 * c.top - g.ball_y;
+        g.ball_vy = g.ball_vy.abs();
+        events.push(Event::Wall);
+    }
+    if g.ball_y + c.ball > c.bottom {
+        g.ball_y = 2.0 * (c.bottom - c.ball) - g.ball_y;
+        g.ball_vy = -g.ball_vy.abs();
+        events.push(Event::Wall);
+    }
+}
+
+pub fn bounce(c: &Court, g: &mut Ball, pad_y: f32, pad_vy: f32, dir: f32) {
     let rel = ((g.ball_y + c.ball * 0.5 - pad_y) / c.pad_h - 0.5).clamp(-0.5, 0.5);
     g.ball_spd = (g.ball_spd + c.speed_up).min(c.top_speed);
     let a = rel * 1.1;
