@@ -1580,29 +1580,6 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("DEFENDER", WIN_W, WIN_H)
 }
 
-const PLAYER_SHIP_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/player_ship.png"));
-const ALIEN_SQUID_A_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_squid_a.png"));
-const ALIEN_SQUID_B_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_squid_b.png"));
-const ALIEN_CRAB_A_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_crab_a.png"));
-const ALIEN_CRAB_B_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_crab_b.png"));
-const ALIEN_OCTO_A_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_octopus_a.png"));
-const ALIEN_OCTO_B_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/alien_octopus_b.png"));
-const EXPLOSION_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/explosion.png"));
-const SHIELD_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/shield_block.png"));
-const BULLET_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/bullet.png"));
-const UFO_SAUCER_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer.png"));
-const SHOOT_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot.wav"));
-const EXPLOSION_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/explosion.wav"));
-const DIVE_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/dive.wav"));
-const LEVEL_CLEAR_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/level_clear.wav"));
-const UFO_SIREN_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ufo_siren.wav"));
-const LASER_CHARGE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/laser_charge.wav"));
-const LASER_BLAST_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/laser_blast.wav"));
-const MARCH1_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march1.wav"));
-const MARCH2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march2.wav"));
-const MARCH3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march3.wav"));
-const MARCH4_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/march4.wav"));
-const GAME_OVER_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
 
 
 
@@ -1611,32 +1588,32 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let player = load_png(PLAYER_SHIP_PNG);
+    let player = load_png(blip::png!("player_ship"));
     let alien = [
-        [load_png(ALIEN_SQUID_A_PNG), load_png(ALIEN_SQUID_B_PNG)],
-        [load_png(ALIEN_CRAB_A_PNG),  load_png(ALIEN_CRAB_B_PNG)],
-        [load_png(ALIEN_OCTO_A_PNG),  load_png(ALIEN_OCTO_B_PNG)],
+        [load_png(blip::png!("alien_squid_a")), load_png(blip::png!("alien_squid_b"))],
+        [load_png(blip::png!("alien_crab_a")),  load_png(blip::png!("alien_crab_b"))],
+        [load_png(blip::png!("alien_octopus_a")),  load_png(blip::png!("alien_octopus_b"))],
     ];
-    let explosion = load_png(EXPLOSION_PNG);
-    let shield = load_png(SHIELD_PNG);
-    let bullet = load_png(BULLET_PNG);
-    let saucer = load_png(UFO_SAUCER_PNG);
+    let explosion = load_png(blip::png!("explosion"));
+    let shield = load_png(blip::png!("shield_block"));
+    let bullet = load_png(blip::png!("bullet"));
+    let saucer = load_png(blip::png!("ufo_saucer"));
 
     let sfx = Sounds {
-        shoot:       blip::audio::load_sound(SHOOT_WAV).await,
-        explosion:   blip::audio::load_sound(EXPLOSION_WAV).await,
-        dive:        blip::audio::load_sound(DIVE_WAV).await,
-        level_clear: blip::audio::load_sound(LEVEL_CLEAR_WAV).await,
-        ufo_siren:   blip::audio::load_sound(UFO_SIREN_WAV).await,
+        shoot:       blip::audio::load_sound(blip::wav!("shoot")).await,
+        explosion:   blip::audio::load_sound(blip::wav!("explosion")).await,
+        dive:        blip::audio::load_sound(blip::wav!("dive")).await,
+        level_clear: blip::audio::load_sound(blip::wav!("level_clear")).await,
+        ufo_siren:   blip::audio::load_sound(blip::wav!("ufo_siren")).await,
         march: [
-            blip::audio::load_sound(MARCH1_WAV).await,
-            blip::audio::load_sound(MARCH2_WAV).await,
-            blip::audio::load_sound(MARCH3_WAV).await,
-            blip::audio::load_sound(MARCH4_WAV).await,
+            blip::audio::load_sound(blip::wav!("march1")).await,
+            blip::audio::load_sound(blip::wav!("march2")).await,
+            blip::audio::load_sound(blip::wav!("march3")).await,
+            blip::audio::load_sound(blip::wav!("march4")).await,
         ],
-        laser_charge: blip::audio::load_sound(LASER_CHARGE_WAV).await,
-        laser_blast:  blip::audio::load_sound(LASER_BLAST_WAV).await,
-        game_over:    blip::audio::load_sound(GAME_OVER_WAV).await,
+        laser_charge: blip::audio::load_sound(blip::wav!("laser_charge")).await,
+        laser_blast:  blip::audio::load_sound(blip::wav!("laser_blast")).await,
+        game_over:    blip::audio::load_sound(blip::wav!("game_over")).await,
     };
     // The invasion tune, and the mothership's on boss levels.
     let mut music = Jukebox::new("DEFENDER", &["INVASION", "MOTHERSHIP"]);

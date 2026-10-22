@@ -2342,27 +2342,22 @@ async fn main() {
     let mut g = Game::new();
     web::set_players(2);
 
-    macro_rules! wav {
-        ($name:literal) => {
-            include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/", $name, ".wav"))
-        };
-    }
     let load = |b: &'static [u8]| async move { blip::audio::load_sound(b).await };
     let sfx = Sounds {
-        blow: load(wav!("blow")).await,
-        pop: load(wav!("pop")).await,
-        trap: load(wav!("trap")).await,
-        kill: load(wav!("defeated")).await,
-        fruit: load(wav!("fruit")).await,
-        jump: load(wav!("jump")).await,
-        lose: load(wav!("lost")).await,
-        bounce: load(wav!("bounce")).await,
-        sparkle: load(wav!("sparkle")).await,
-        round: load(wav!("jingle_round")).await,
-        clear: load(wav!("jingle_clear")).await,
-        hurry: load(wav!("jingle_hurry")).await,
-        over: load(wav!("jingle_over")).await,
-        won: load(wav!("jingle_won")).await,
+        blow: load(blip::wav!("blow")).await,
+        pop: load(blip::wav!("pop")).await,
+        trap: load(blip::wav!("trap")).await,
+        kill: load(blip::wav!("defeated")).await,
+        fruit: load(blip::wav!("fruit")).await,
+        jump: load(blip::wav!("jump")).await,
+        lose: load(blip::wav!("lost")).await,
+        bounce: load(blip::wav!("bounce")).await,
+        sparkle: load(blip::wav!("sparkle")).await,
+        round: load(blip::wav!("jingle_round")).await,
+        clear: load(blip::wav!("jingle_clear")).await,
+        hurry: load(blip::wav!("jingle_hurry")).await,
+        over: load(blip::wav!("jingle_over")).await,
+        won: load(blip::wav!("jingle_won")).await,
     };
     // The theme, and the same tune faster for HURRY UP.
     let mut music = Jukebox::new("BUBBLER", &["THEME", "HURRY"]);

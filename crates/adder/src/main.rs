@@ -190,10 +190,6 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("ADDER", WIN_W, WIN_H)
 }
 
-const THROUGH_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/through.wav"));
-const STRIKE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/strike.wav"));
-const ROUND_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pit.wav"));
-const GAME_OVER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -201,13 +197,13 @@ async fn main() {
     let mut g = Game::new();
     // Leave station two available for a mid-game join from the title screen.
     web::set_players(2);
-    let pit = blip::load_png(include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/pit.png")));
+    let pit = blip::load_png(blip::png!("pit"));
 
     let sfx = Sounds {
-        through: blip::audio::load_sound(THROUGH_WAV).await,
-        kill: blip::audio::load_sound(STRIKE_WAV).await,
-        round: blip::audio::load_sound(ROUND_WAV).await,
-        game_over: blip::audio::load_sound(GAME_OVER_WAV).await,
+        through: blip::audio::load_sound(blip::wav!("through")).await,
+        kill: blip::audio::load_sound(blip::wav!("strike")).await,
+        round: blip::audio::load_sound(blip::wav!("pit")).await,
+        game_over: blip::audio::load_sound(blip::wav!("game_over")).await,
     };
     let mut music = Jukebox::new("ADDER", &["COIL", "HUNT"]);
     music.start(0).await;

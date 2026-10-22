@@ -3348,105 +3348,71 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("RAIDER", WIN_W, WIN_H)
 }
 
-const TITLE_BACKDROP_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/title_backdrop.png"));
-const PLAYER_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/player_plane.png"));
-const ENEMY_GRUNT_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/enemy_grunt.png"));
-const ENEMY_WEAVER_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/enemy_weaver.png"));
-const ENEMY_ACE_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/enemy_ace.png"));
-const POWERUP_PNG:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/powerup.png"));
-const HEALTH_PACK_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/health_pack.png"));
-const CARRIER_PNG:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/carrier.png"));
-const BOAT_PNG:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boat.png"));
 const CLOUD_PNGS: [&[u8]; 3] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/cloud_1.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/cloud_2.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/cloud_3.png")),
+    blip::png!("cloud_1"),
+    blip::png!("cloud_2"),
+    blip::png!("cloud_3"),
 ];
 // One sprite per island size (small/medium/large) — see ISLAND_SIZES above.
 const ISLAND_PNGS: [&[u8]; 3] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/island_small.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/island_medium.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/island_large.png")),
+    blip::png!("island_small"),
+    blip::png!("island_medium"),
+    blip::png!("island_large"),
 ];
 
 // One sprite per boss tier (levels 1-7) — see BOSS_SPECS / BOSS_SIZES above.
 const BOSS_PNGS: [&[u8]; 7] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_1.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_2.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_3.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_4.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_5.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_6.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_7.png")),
+    blip::png!("boss_1"),
+    blip::png!("boss_2"),
+    blip::png!("boss_3"),
+    blip::png!("boss_4"),
+    blip::png!("boss_5"),
+    blip::png!("boss_6"),
+    blip::png!("boss_7"),
 ];
 
 // The Japanese banner for each boss name — see draw_play()'s WARNING banner.
 const BOSS_NAME_JA_PNGS: [&[u8]; 7] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_name_ja_1.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_name_ja_2.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_name_ja_3.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_name_ja_4.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_name_ja_5.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_name_ja_6.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/boss_name_ja_7.png")),
+    blip::png!("boss_name_ja_1"),
+    blip::png!("boss_name_ja_2"),
+    blip::png!("boss_name_ja_3"),
+    blip::png!("boss_name_ja_4"),
+    blip::png!("boss_name_ja_5"),
+    blip::png!("boss_name_ja_6"),
+    blip::png!("boss_name_ja_7"),
 ];
 
-macro_rules! burst_wav {
-    ($t:literal, $k:literal) => {
-        include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/burst", $t, "_", $k, ".wav"))
-    };
-}
 const SHOOT_WAV: [[&[u8]; 2]; 5] = [
-    [burst_wav!("1", "1"), burst_wav!("1", "2")],
-    [burst_wav!("2", "1"), burst_wav!("2", "2")],
-    [burst_wav!("3", "1"), burst_wav!("3", "2")],
-    [burst_wav!("4", "1"), burst_wav!("4", "2")],
-    [burst_wav!("5", "1"), burst_wav!("5", "2")],
+    [blip::wav!("burst1_1"), blip::wav!("burst1_2")],
+    [blip::wav!("burst2_1"), blip::wav!("burst2_2")],
+    [blip::wav!("burst3_1"), blip::wav!("burst3_2")],
+    [blip::wav!("burst4_1"), blip::wav!("burst4_2")],
+    [blip::wav!("burst5_1"), blip::wav!("burst5_2")],
 ];
 const ENEMY_EXPLODE_WAV: [&[u8]; 4] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/enemy_explode0.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/enemy_explode1.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/enemy_explode2.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/enemy_explode3.wav")),
+    blip::wav!("enemy_explode0"),
+    blip::wav!("enemy_explode1"),
+    blip::wav!("enemy_explode2"),
+    blip::wav!("enemy_explode3"),
 ];
 const PLAYER_EXPLODE_WAV: [&[u8]; 2] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/player_explode0.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/player_explode1.wav")),
+    blip::wav!("player_explode0"),
+    blip::wav!("player_explode1"),
 ];
-const PLAYER_HIT_WAV:     &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/player_hit.wav"));
 const RICOCHET_WAV: [&[u8]; 2] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ricochet1.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ricochet2.wav")),
+    blip::wav!("ricochet1"),
+    blip::wav!("ricochet2"),
 ];
 const BOSS_EXPLODE_WAV: [&[u8]; 2] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/boss_explode0.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/boss_explode1.wav")),
+    blip::wav!("boss_explode0"),
+    blip::wav!("boss_explode1"),
 ];
-const BOSS_WARNING_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/boss_warning.wav"));
-const POWERUP2_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/powerup2.wav"));
-const POWERUP3_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/powerup3.wav"));
-const POWERUP4_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/powerup4.wav"));
-const MAX_POWER_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/max_power.wav"));
-const HEALTH_PICKUP_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/health_pickup.wav"));
-const STAGE_CLEAR_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/stage_clear.wav"));
-const VICTORY_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/victory.wav"));
-const GAME_OVER_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
-const TURRET_FIRE_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/turret_fire.wav"));
-const FLAK_BURST_WAV:     &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/flak_burst.wav"));
-const LASER_CHARGE_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/laser_charge.wav"));
-const LASER_FIRE_WAV:     &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/laser_fire.wav"));
-const BARRIER_HUM_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/barrier_hum.wav"));
-const BARRIER_HUM2_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/barrier_hum2.wav"));
-const ENGINE_START_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine_start.wav"));
-const ENGINE_SPLUTTER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine_splutter.wav"));
-const ENEMY_GUN_WAV:      &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/enemy_gun.wav"));
-const BACKFIRE_WAV:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/backfire.wav"));
 const ENGINE_WAV: [&[u8]; 5] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine0.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine1.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine2.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine3.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/engine4.wav")),
+    blip::wav!("engine0"),
+    blip::wav!("engine1"),
+    blip::wav!("engine2"),
+    blip::wav!("engine3"),
+    blip::wav!("engine4"),
 ];
 
 
@@ -3457,15 +3423,15 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let player_tex = load_png(PLAYER_PNG);
-    let title_backdrop = load_png(TITLE_BACKDROP_PNG);
-    let enemy_tex = [load_png(ENEMY_GRUNT_PNG), load_png(ENEMY_WEAVER_PNG), load_png(ENEMY_ACE_PNG)];
+    let player_tex = load_png(blip::png!("player_plane"));
+    let title_backdrop = load_png(blip::png!("title_backdrop"));
+    let enemy_tex = [load_png(blip::png!("enemy_grunt")), load_png(blip::png!("enemy_weaver")), load_png(blip::png!("enemy_ace"))];
     let boss_tex = BOSS_PNGS.map(load_png);
     let boss_name_ja_tex = BOSS_NAME_JA_PNGS.map(load_png);
-    let powerup_tex = load_png(POWERUP_PNG);
-    let health_tex = load_png(HEALTH_PACK_PNG);
-    let carrier_tex = load_png(CARRIER_PNG);
-    let boat_tex = load_png(BOAT_PNG);
+    let powerup_tex = load_png(blip::png!("powerup"));
+    let health_tex = load_png(blip::png!("health_pack"));
+    let carrier_tex = load_png(blip::png!("carrier"));
+    let boat_tex = load_png(blip::png!("boat"));
     let cloud_tex = CLOUD_PNGS.map(load_png_smooth);
     let island_tex = ISLAND_PNGS.map(load_png);
 
@@ -3477,33 +3443,33 @@ async fn main() {
         shoot,
         enemy_explode:  load_takes(&ENEMY_EXPLODE_WAV).await.try_into().unwrap(),
         player_explode: load_takes(&PLAYER_EXPLODE_WAV).await.try_into().unwrap(),
-        player_hit:     blip::audio::load_sound(PLAYER_HIT_WAV).await,
+        player_hit:     blip::audio::load_sound(blip::wav!("player_hit")).await,
         ricochet: [
             blip::audio::load_sound(RICOCHET_WAV[0]).await,
             blip::audio::load_sound(RICOCHET_WAV[1]).await,
         ],
         boss_explode:   load_takes(&BOSS_EXPLODE_WAV).await.try_into().unwrap(),
-        boss_warning:   blip::audio::load_sound(BOSS_WARNING_WAV).await,
+        boss_warning:   blip::audio::load_sound(blip::wav!("boss_warning")).await,
         powerup_up: [
-            blip::audio::load_sound(POWERUP2_WAV).await,
-            blip::audio::load_sound(POWERUP3_WAV).await,
-            blip::audio::load_sound(POWERUP4_WAV).await,
-            blip::audio::load_sound(MAX_POWER_WAV).await,
+            blip::audio::load_sound(blip::wav!("powerup2")).await,
+            blip::audio::load_sound(blip::wav!("powerup3")).await,
+            blip::audio::load_sound(blip::wav!("powerup4")).await,
+            blip::audio::load_sound(blip::wav!("max_power")).await,
         ],
-        health_pickup:  blip::audio::load_sound(HEALTH_PICKUP_WAV).await,
-        stage_clear:    blip::audio::load_sound(STAGE_CLEAR_WAV).await,
-        victory:        blip::audio::load_sound(VICTORY_WAV).await,
-        game_over:      blip::audio::load_sound(GAME_OVER_WAV).await,
-        turret_fire:    blip::audio::load_sound(TURRET_FIRE_WAV).await,
-        flak_burst:     blip::audio::load_sound(FLAK_BURST_WAV).await,
-        laser_charge:   blip::audio::load_sound(LASER_CHARGE_WAV).await,
-        laser_fire:     blip::audio::load_sound(LASER_FIRE_WAV).await,
-        barrier_hum:    blip::audio::load_sound(BARRIER_HUM_WAV).await,
-        barrier_hum2:   blip::audio::load_sound(BARRIER_HUM2_WAV).await,
-        engine_start:   blip::audio::load_sound(ENGINE_START_WAV).await,
-        engine_splutter: blip::audio::load_sound(ENGINE_SPLUTTER_WAV).await,
-        enemy_gun:      blip::audio::load_sound(ENEMY_GUN_WAV).await,
-        backfire:       blip::audio::load_sound(BACKFIRE_WAV).await,
+        health_pickup:  blip::audio::load_sound(blip::wav!("health_pickup")).await,
+        stage_clear:    blip::audio::load_sound(blip::wav!("stage_clear")).await,
+        victory:        blip::audio::load_sound(blip::wav!("victory")).await,
+        game_over:      blip::audio::load_sound(blip::wav!("game_over")).await,
+        turret_fire:    blip::audio::load_sound(blip::wav!("turret_fire")).await,
+        flak_burst:     blip::audio::load_sound(blip::wav!("flak_burst")).await,
+        laser_charge:   blip::audio::load_sound(blip::wav!("laser_charge")).await,
+        laser_fire:     blip::audio::load_sound(blip::wav!("laser_fire")).await,
+        barrier_hum:    blip::audio::load_sound(blip::wav!("barrier_hum")).await,
+        barrier_hum2:   blip::audio::load_sound(blip::wav!("barrier_hum2")).await,
+        engine_start:   blip::audio::load_sound(blip::wav!("engine_start")).await,
+        engine_splutter: blip::audio::load_sound(blip::wav!("engine_splutter")).await,
+        enemy_gun:      blip::audio::load_sound(blip::wav!("enemy_gun")).await,
+        backfire:       blip::audio::load_sound(blip::wav!("backfire")).await,
         engine: [
             blip::audio::load_sound(ENGINE_WAV[0]).await,
             blip::audio::load_sound(ENGINE_WAV[1]).await,

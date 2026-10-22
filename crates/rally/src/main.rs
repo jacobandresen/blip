@@ -338,11 +338,6 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("RALLY", WIN_W, WIN_H)
 }
 
-const WALL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/wall.wav"));
-const HIT_L_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_l.wav"));
-const HIT_R_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hit_r.wav"));
-const SCORE_L_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/score_l.wav"));
-const SCORE_R_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/score_r.wav"));
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -350,11 +345,11 @@ async fn main() {
     let mut g = Game::new();
 
     let sfx = Beeps {
-        wall:    blip::audio::load_sound(WALL_WAV).await,
-        hit_l:   blip::audio::load_sound(HIT_L_WAV).await,
-        hit_r:   blip::audio::load_sound(HIT_R_WAV).await,
-        score_l: blip::audio::load_sound(SCORE_L_WAV).await,
-        score_r: blip::audio::load_sound(SCORE_R_WAV).await,
+        wall:    blip::audio::load_sound(blip::wav!("wall")).await,
+        hit_l:   blip::audio::load_sound(blip::wav!("hit_l")).await,
+        hit_r:   blip::audio::load_sound(blip::wav!("hit_r")).await,
+        score_l: blip::audio::load_sound(blip::wav!("score_l")).await,
+        score_r: blip::audio::load_sound(blip::wav!("score_r")).await,
     };
     // Five loops in rotation.
     let mut jukebox = Jukebox::new("RALLY", &["LOOP1", "LOOP2", "LOOP3", "LOOP4", "LOOP5"]);

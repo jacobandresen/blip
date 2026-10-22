@@ -736,12 +736,6 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("SERPENT", WIN_W, WIN_H)
 }
 
-const FOOD_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/food.png"));
-const EAT_WAV: &[u8]  = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/eat.wav"));
-const GAME_OVER_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/game_over.wav"));
-const BONUS_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bonus.wav"));
-const BONUS_EAT_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bonus_eat.wav"));
-const LEVEL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/level.wav"));
 
 
 #[blip::macroquad::main(conf)]
@@ -749,14 +743,14 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let food = load_png(FOOD_PNG);
+    let food = load_png(blip::png!("food"));
 
     let sfx = Sounds {
-        eat:       blip::audio::load_sound(EAT_WAV).await,
-        game_over: blip::audio::load_sound(GAME_OVER_WAV).await,
-        bonus:     blip::audio::load_sound(BONUS_WAV).await,
-        bonus_eat: blip::audio::load_sound(BONUS_EAT_WAV).await,
-        level:     blip::audio::load_sound(LEVEL_WAV).await,
+        eat:       blip::audio::load_sound(blip::wav!("eat")).await,
+        game_over: blip::audio::load_sound(blip::wav!("game_over")).await,
+        bonus:     blip::audio::load_sound(blip::wav!("bonus")).await,
+        bonus_eat: blip::audio::load_sound(blip::wav!("bonus_eat")).await,
+        level:     blip::audio::load_sound(blip::wav!("level")).await,
     };
     let mut music = Jukebox::new("SERPENT", &["SLITHER", "FRENZY"]);
     music.start(0).await;

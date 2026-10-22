@@ -1025,47 +1025,28 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("BOUNCER", WIN_W, WIN_H)
 }
 
-const PADDLE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/paddle.png"));
 const DROP_PNGS: [&[u8]; 5] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_wide.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_narrow.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_slow.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_life.png")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/drop_multi.png")),
+    blip::png!("drop_wide"),
+    blip::png!("drop_narrow"),
+    blip::png!("drop_slow"),
+    blip::png!("drop_life"),
+    blip::png!("drop_multi"),
 ];
-const BALL_SHADE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ball_shade.png"));
-const BALL_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ball.png"));
-const BRICK_RED_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_red.png"));
-const BRICK_ORANGE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_orange.png"));
-const BRICK_YELLOW_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_yellow.png"));
-const BRICK_GREEN_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_green.png"));
-const BRICK_BLUE_PNG:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_blue.png"));
-const BRICK_PURPLE_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_purple.png"));
-const BRICK_STEEL_PNG:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_steel.png"));
-const BRICK_STEEL_CRACKED_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_steel_cracked.png"));
-const BRICK_BOMB_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/brick_bomb.png"));
 const PADDLE_HIT_WAV: [&[u8]; 3] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/paddle_hit_0.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/paddle_hit_1.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/paddle_hit_2.wav")),
+    blip::wav!("paddle_hit_0"),
+    blip::wav!("paddle_hit_1"),
+    blip::wav!("paddle_hit_2"),
 ];
 const BRICK_HIT_WAV: [&[u8]; 3] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_hit_0.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_hit_1.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_hit_2.wav")),
+    blip::wav!("brick_hit_0"),
+    blip::wav!("brick_hit_1"),
+    blip::wav!("brick_hit_2"),
 ];
 const BRICK_BREAK_WAV: [&[u8]; 3] = [
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_break_0.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_break_1.wav")),
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/brick_break_2.wav")),
+    blip::wav!("brick_break_0"),
+    blip::wav!("brick_break_1"),
+    blip::wav!("brick_break_2"),
 ];
-const WALL_HIT_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/wall_hit.wav"));
-const BOMB_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bomb.wav"));
-const LIFE_LOST_WAV:   &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/life_lost.wav"));
-const WIN_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/win.wav"));
-const PICKUP_GOOD_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_good.wav"));
-const PICKUP_BAD_WAV:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_bad.wav"));
-const PICKUP_LIFE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/pickup_life.wav"));
 
 
 async fn load_takes(wavs: &[&'static [u8]; 3]) -> [blip::BlipSound; 3] {
@@ -1082,33 +1063,33 @@ async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
-    let paddle = load_png_smooth(PADDLE_PNG);
-    let ball = load_png_smooth(BALL_PNG);
+    let paddle = load_png_smooth(blip::png!("paddle"));
+    let ball = load_png_smooth(blip::png!("ball"));
     let drops = DROP_PNGS.map(load_png_smooth);
-    let ball_shade = load_png_smooth(BALL_SHADE_PNG);
+    let ball_shade = load_png_smooth(blip::png!("ball_shade"));
     let brick = [
-        load_png(BRICK_RED_PNG),
-        load_png(BRICK_ORANGE_PNG),
-        load_png(BRICK_YELLOW_PNG),
-        load_png(BRICK_GREEN_PNG),
-        load_png(BRICK_BLUE_PNG),
-        load_png(BRICK_PURPLE_PNG),
-        load_png(BRICK_STEEL_PNG),
-        load_png(BRICK_STEEL_CRACKED_PNG),
-        load_png(BRICK_BOMB_PNG),
+        load_png(blip::png!("brick_red")),
+        load_png(blip::png!("brick_orange")),
+        load_png(blip::png!("brick_yellow")),
+        load_png(blip::png!("brick_green")),
+        load_png(blip::png!("brick_blue")),
+        load_png(blip::png!("brick_purple")),
+        load_png(blip::png!("brick_steel")),
+        load_png(blip::png!("brick_steel_cracked")),
+        load_png(blip::png!("brick_bomb")),
     ];
 
     let sfx = Sounds {
         paddle_hit:  load_takes(&PADDLE_HIT_WAV).await,
         brick_hit:   load_takes(&BRICK_HIT_WAV).await,
         brick_break: load_takes(&BRICK_BREAK_WAV).await,
-        wall_hit:    blip::audio::load_sound(WALL_HIT_WAV).await,
-        bomb:        blip::audio::load_sound(BOMB_WAV).await,
-        life_lost:   blip::audio::load_sound(LIFE_LOST_WAV).await,
-        win:         blip::audio::load_sound(WIN_WAV).await,
-        pickup_good: blip::audio::load_sound(PICKUP_GOOD_WAV).await,
-        pickup_bad:  blip::audio::load_sound(PICKUP_BAD_WAV).await,
-        pickup_life: blip::audio::load_sound(PICKUP_LIFE_WAV).await,
+        wall_hit:    blip::audio::load_sound(blip::wav!("wall_hit")).await,
+        bomb:        blip::audio::load_sound(blip::wav!("bomb")).await,
+        life_lost:   blip::audio::load_sound(blip::wav!("life_lost")).await,
+        win:         blip::audio::load_sound(blip::wav!("win")).await,
+        pickup_good: blip::audio::load_sound(blip::wav!("pickup_good")).await,
+        pickup_bad:  blip::audio::load_sound(blip::wav!("pickup_bad")).await,
+        pickup_life: blip::audio::load_sound(blip::wav!("pickup_life")).await,
     };
     // Two tunes, alternating by level.
     let mut music = Jukebox::new("BOUNCER", &["BOUNCE", "REBOUND"]);

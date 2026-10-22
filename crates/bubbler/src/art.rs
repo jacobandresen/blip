@@ -3,13 +3,6 @@ use blip::{Blip, BlipColor};
 
 use super::{Kind, E_H, E_W};
 
-/// A picture made by build.rs (see gfx.rs), built into the game.
-macro_rules! png {
-    ($name:literal) => {
-        &include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/", $name, ".png"))[..]
-    };
-}
-
 pub(super) struct Art {
     title_letters: [Texture2D; 7],
     title_info: [Texture2D; 3],
@@ -31,40 +24,40 @@ impl Art {
             texture
         };
         Self {
-            title_sky: load(png!("TITLE_SKY")),
-            title_info: [png!("TITLE_INFO_KEYS"), png!("TITLE_INFO_PAD"), png!("TITLE_INFO_TOUCH")].map(load),
-            title_start: [png!("TITLE_START_KEYS"), png!("TITLE_START_PAD"), png!("TITLE_START_TOUCH")].map(load),
+            title_sky: load(blip::png!("TITLE_SKY")),
+            title_info: [blip::png!("TITLE_INFO_KEYS"), blip::png!("TITLE_INFO_PAD"), blip::png!("TITLE_INFO_TOUCH")].map(load),
+            title_start: [blip::png!("TITLE_START_KEYS"), blip::png!("TITLE_START_PAD"), blip::png!("TITLE_START_TOUCH")].map(load),
             title_letters: [
-                png!("TITLE_LETTER_1"), png!("TITLE_LETTER_2"), png!("TITLE_LETTER_3"),
-                png!("TITLE_LETTER_4"), png!("TITLE_LETTER_5"), png!("TITLE_LETTER_6"),
-                png!("TITLE_LETTER_7"),
+                blip::png!("TITLE_LETTER_1"), blip::png!("TITLE_LETTER_2"), blip::png!("TITLE_LETTER_3"),
+                blip::png!("TITLE_LETTER_4"), blip::png!("TITLE_LETTER_5"), blip::png!("TITLE_LETTER_6"),
+                blip::png!("TITLE_LETTER_7"),
             ].map(load),
-            players: [load(png!("PLAYER_GREEN")), load(png!("PLAYER_BLUE"))],
+            players: [load(blip::png!("PLAYER_GREEN")), load(blip::png!("PLAYER_BLUE"))],
             enemies: [
-                [load(png!("ROBOT")), load(png!("ROBOT_ANGRY"))],
-                [load(png!("BUNNY")), load(png!("BUNNY_ANGRY"))],
-                [load(png!("GHOST")), load(png!("GHOST_ANGRY"))],
+                [load(blip::png!("ROBOT")), load(blip::png!("ROBOT_ANGRY"))],
+                [load(blip::png!("BUNNY")), load(blip::png!("BUNNY_ANGRY"))],
+                [load(blip::png!("GHOST")), load(blip::png!("GHOST_ANGRY"))],
             ],
             tiles: std::array::from_fn(|i| {
                 let normal = [
-                    png!("TILE_1"),
-                    png!("TILE_2"),
-                    png!("TILE_3"),
-                    png!("TILE_4"),
-                    png!("TILE_5"),
-                    png!("TILE_6"),
-                    png!("TILE_7"),
-                    png!("TILE_8"),
+                    blip::png!("TILE_1"),
+                    blip::png!("TILE_2"),
+                    blip::png!("TILE_3"),
+                    blip::png!("TILE_4"),
+                    blip::png!("TILE_5"),
+                    blip::png!("TILE_6"),
+                    blip::png!("TILE_7"),
+                    blip::png!("TILE_8"),
                 ][i];
                 let border = [
-                    png!("BORDER_1"),
-                    png!("BORDER_2"),
-                    png!("BORDER_3"),
-                    png!("BORDER_4"),
-                    png!("BORDER_5"),
-                    png!("BORDER_6"),
-                    png!("BORDER_7"),
-                    png!("BORDER_8"),
+                    blip::png!("BORDER_1"),
+                    blip::png!("BORDER_2"),
+                    blip::png!("BORDER_3"),
+                    blip::png!("BORDER_4"),
+                    blip::png!("BORDER_5"),
+                    blip::png!("BORDER_6"),
+                    blip::png!("BORDER_7"),
+                    blip::png!("BORDER_8"),
                 ][i];
                 [load(normal), load(border)]
             }),

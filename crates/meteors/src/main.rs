@@ -860,7 +860,6 @@ fn outline(a: &Asteroid, flower: bool) -> Vec<Seg> {
 }
 
 /// A round white blot thinning to nothing at the rim, with no edge to see.
-const SOFT_GLOW_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/soft_glow.png"));
 
 /// A mushroom in thin lines, its cap `w` to each side, leaning by `lean`.
 fn draw_mushroom(blip: &Blip, x: f32, y: f32, w: f32, lean: f32, c: BlipColor) {
@@ -1110,30 +1109,19 @@ fn conf() -> blip::macroquad::window::Conf {
 }
 
 
-const FIRE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/fire.wav"));
-const THRUST_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/thrust.wav"));
-const BANG_LARGE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bang_large.wav"));
-const BANG_MEDIUM_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bang_medium.wav"));
-const BANG_SMALL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/bang_small.wav"));
-const SAUCER_BIG_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/saucer_big.wav"));
-const SAUCER_SMALL_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/saucer_small.wav"));
-const HYPERSPACE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/hyperspace.wav"));
-const EXTRA_LIFE_WAV: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/extra_life.wav"));
-const SHIP_EXPLOSION_WAV: &[u8] =
-    include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/ship_explosion.wav"));
 
 #[blip::macroquad::main(conf)]
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
-    let blot = Texture2D::from_file_with_format(SOFT_GLOW_PNG, Some(blip::macroquad::prelude::ImageFormat::Png));
+    let blot = Texture2D::from_file_with_format(blip::png!("soft_glow"), Some(blip::macroquad::prelude::ImageFormat::Png));
     blot.set_filter(blip::macroquad::texture::FilterMode::Linear);
 
     let title_art = [
-        include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/title_grid.png")).as_slice(),
-        include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/title_rock_large.png")).as_slice(),
-        include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/title_rock_medium.png")).as_slice(),
-        include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/title_ship.png")).as_slice(),
+        blip::png!("title_grid"),
+        blip::png!("title_rock_large"),
+        blip::png!("title_rock_medium"),
+        blip::png!("title_ship"),
     ].map(|bytes| {
         let texture = Texture2D::from_file_with_format(bytes, Some(blip::macroquad::prelude::ImageFormat::Png));
         texture.set_filter(blip::macroquad::texture::FilterMode::Nearest);
@@ -1145,16 +1133,16 @@ async fn main() {
     music.start(0).await;
 
     let mut sfx = Sounds {
-        fire:         blip::audio::load_sound(FIRE_WAV).await,
-        thrust:       blip::audio::load_sound(THRUST_WAV).await,
-        bang_large:   blip::audio::load_sound(BANG_LARGE_WAV).await,
-        bang_medium:  blip::audio::load_sound(BANG_MEDIUM_WAV).await,
-        bang_small:   blip::audio::load_sound(BANG_SMALL_WAV).await,
-        saucer_big:   blip::audio::load_sound(SAUCER_BIG_WAV).await,
-        saucer_small: blip::audio::load_sound(SAUCER_SMALL_WAV).await,
-        ship_boom:    blip::audio::load_sound(SHIP_EXPLOSION_WAV).await,
-        hyperspace:   blip::audio::load_sound(HYPERSPACE_WAV).await,
-        extra_life:   blip::audio::load_sound(EXTRA_LIFE_WAV).await,
+        fire:         blip::audio::load_sound(blip::wav!("fire")).await,
+        thrust:       blip::audio::load_sound(blip::wav!("thrust")).await,
+        bang_large:   blip::audio::load_sound(blip::wav!("bang_large")).await,
+        bang_medium:  blip::audio::load_sound(blip::wav!("bang_medium")).await,
+        bang_small:   blip::audio::load_sound(blip::wav!("bang_small")).await,
+        saucer_big:   blip::audio::load_sound(blip::wav!("saucer_big")).await,
+        saucer_small: blip::audio::load_sound(blip::wav!("saucer_small")).await,
+        ship_boom:    blip::audio::load_sound(blip::wav!("ship_explosion")).await,
+        hyperspace:   blip::audio::load_sound(blip::wav!("hyperspace")).await,
+        extra_life:   blip::audio::load_sound(blip::wav!("extra_life")).await,
     };
     let mut thrust_snd_t = 0.0f32;
 

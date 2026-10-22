@@ -9,6 +9,22 @@ pub mod techno;
 pub mod wav;
 pub mod xm;
 
+/// A picture its build script made (see `build_assets`), built into the game.
+#[macro_export]
+macro_rules! png {
+    ($name:expr) => {
+        (include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/", $name, ".png")) as &[u8])
+    };
+}
+
+/// An effect its build script made, built into the game.
+#[macro_export]
+macro_rules! wav {
+    ($name:expr) => {
+        (include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/", $name, ".wav")) as &[u8])
+    };
+}
+
 /// A generated file: its path under the asset folder, and its bytes.
 pub type Asset = (&'static str, Vec<u8>);
 
