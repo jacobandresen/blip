@@ -19,7 +19,6 @@ var SOURCES = ['controls.html', 'history.html', 'about.html'];
 var GROUPS = ['Getting started', 'Games', 'History', 'About'];
 var topics = [], byId = {};
 
-function titleCase(s) { return s.toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }
 function sentence(s) {
   s = s.replace(/[►▶►]/g, '').replace(/\s+/g, ' ').trim();
   return /^[^a-z]*$/.test(s) ? s.charAt(0) + s.slice(1).toLowerCase() : s;
@@ -126,7 +125,7 @@ function readGames(controls, history) {
     var slug = gameSlugByName(text(s, '.game-title'));
     if (slug) origins[slug] = s;
   });
-  Object.keys(BLIP_GAMES).map(function (slug) { return { slug: slug, name: titleCase(BLIP_GAMES[slug].name) }; })
+  Object.keys(BLIP_GAMES).map(function (slug) { return { slug: slug, name: blipTitleCase(BLIP_GAMES[slug].name) }; })
     .sort(function (a, b) { return a.name.localeCompare(b.name); })
     .forEach(function (g) {
       var left = controls.querySelector('[data-manual-game="' + g.slug + '"][data-side="left"]');
@@ -289,7 +288,6 @@ if (EMBED) {
 /* ---- The Guide on a home screen of its own ---- A row at the end of the
  * contents, unless it is there already or open over a game. */
 var installSheet = document.getElementById('install-sheet');
-function iosSafari() { return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
 function offerInstall() {
   if (EMBED || blipStandalone() || search.value) return;
   toc.appendChild(el('h2', 'group-title', 'This guide'));
@@ -302,7 +300,7 @@ function offerInstall() {
 }
 function openInstall() {
   var go = document.getElementById('install-go');
-  var ios = iosSafari();
+  var ios = blipIOS();
   document.getElementById('install-steps').hidden = !ios;
   document.getElementById('install-other').hidden = ios || !!window.blipInstallPrompt;
   go.hidden = !window.blipInstallPrompt;

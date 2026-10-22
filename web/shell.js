@@ -185,19 +185,6 @@ window.addEventListener('pagehide', function () {
   if (typeof Howler !== 'undefined') Howler.stop();
 });
 
-// ---- UI audio (coin insert / no room) ----
-
-var uiAudio = null;
-function getUiAudio() {
-  if (typeof Howler !== 'undefined' && Howler.ctx) {
-    if (Howler.ctx.state === 'suspended') Howler.ctx.resume();
-    return Howler.ctx;
-  }
-  if (!uiAudio) uiAudio = new (window.AudioContext || window.webkitAudioContext)();
-  if (uiAudio.state === 'suspended') uiAudio.resume();
-  return uiAudio;
-}
-
 function markGameLoaded(game, bar) {
   var receiver=bar.querySelector('.jukebox-receiver');
   receiver.classList.add('stowed');
@@ -227,7 +214,7 @@ function feedbackTick() {
     try { if (navigator.vibrate(7)) return; } catch (e) {}
   }
   try {
-    var ctx = getUiAudio();
+    var ctx = getKioskAudio();
     if (!ctx) return;
     var t = ctx.currentTime;
     var osc = ctx.createOscillator(), gain = ctx.createGain();
@@ -241,9 +228,7 @@ function feedbackTick() {
     osc.start(t); osc.stop(t + 0.055);
   } catch (e) {}
 }
-// The coin that drops into #insert-coin-btn's slot: a real element so a class
-// toggle can animate it, injected here for every game page.
-var coinDropAnim = null;
+// kiosk.js's coin drop (dropCoinAnimation), into #insert-coin-btn's slot.
 (function () {
   var btn = document.getElementById('insert-coin-btn');
   if (!btn) return;
@@ -255,32 +240,6 @@ var coinDropAnim = null;
     btn.appendChild(coinDropAnim);
   }
 }());
-function dropCoinAnimation() {
-  if (!coinDropAnim) return;
-  // The slot is the centre of the coin plate at the button's content edge:
-  // padding-right plus half the plate. Both change across breakpoints.
-  var btn = coinDropAnim.parentElement;
-  var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
-  var plateW = parseFloat(getComputedStyle(btn, '::after').width) || 18;
-  coinDropAnim.style.setProperty('--slot-x', (btn.classList.contains('deck-coin-slot')?btn.offsetWidth/2:padRight+plateW/2)+'px');
-  coinDropAnim.classList.remove('dropping');
-  void coinDropAnim.offsetWidth;
-  coinDropAnim.classList.add('dropping');
-  coinDropAnim.addEventListener('animationend', function () {
-    coinDropAnim.classList.remove('dropping');
-  }, { once: true });
-}
-function playNoRoom() {
-  var ctx = getUiAudio(), t = ctx.currentTime;
-  var osc = ctx.createOscillator(), gain = ctx.createGain();
-  osc.connect(gain); gain.connect(blipOut(ctx));
-  osc.type = 'sawtooth';
-  osc.frequency.setValueAtTime(200, t);
-  osc.frequency.exponentialRampToValueAtTime(65, t + 0.38);
-  gain.gain.setValueAtTime(0.32, t);
-  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
-  osc.start(t); osc.stop(t + 0.39);
-}
 // Called from WASM when play starts (from the title or a game-over
 // restart), once more per second player. Out of coins, the debt is
 // kept and the coins that go in next pay it before the game goes on.
@@ -435,9 +394,6 @@ if (document.documentElement.hasAttribute('data-appstyle')) {
 // ---- Saving this game to a home screen ---- Chrome and Android install it
 // from their own prompt; iOS can only be told where Share is. Either way the
 // saved page is ./?app, so the icon opens the game in its own app mode.
-function iosSafari() {
-  return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
 function showInstallSheet() {
   if (CABINET_SCREEN || blipStandalone() || !GAME || document.getElementById('install-sheet')) return;
   try { history.replaceState(null, '', './?app'); } catch (e) {}
@@ -448,7 +404,7 @@ function showInstallSheet() {
   sheet.setAttribute('aria-modal', 'true');
   sheet.setAttribute('aria-labelledby', 'install-title');
   var share = '<svg class="install-share" viewBox="0 0 16 20" aria-label="Share"><path d="M8 1v11M4.5 4.5 8 1l3.5 3.5M5 8H2v11h12V8h-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  var body = iosSafari()
+  var body = blipIOS()
     ? '<ol class="install-steps"><li>Tap ' + share + ' <b>Share</b> in Safari\'s toolbar.</li><li>Choose <b>Add to Home Screen</b>.</li></ol>'
     : '<p class="install-wait">Use your browser\'s menu: <b>Install app</b> or <b>Add to Home screen</b>.</p>';
   sheet.innerHTML = '<div class="install-card"><img class="install-icon" src="icon-180.png?v=2" alt="">' +

@@ -17,7 +17,6 @@ var DOCK_GAMES = 1;   // one recent game fits beside the four fixed apps on a ph
 // Being here is the choice: a game played from here comes back here.
 blipSetFrontend('home');
 
-function titleCase(s) { return s.toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }
 // Two can play: a second station, or a key for the second player (Rally's dials share one).
 function twoPlayer(slug) {
   var g = BLIP_GAMES[slug];
@@ -37,7 +36,7 @@ function remember(slug) {
 
 /* ---- Icons ---- */
 function gameApp(slug, inDock) {
-  var game = BLIP_GAMES[slug], name = titleCase(game.name);
+  var game = BLIP_GAMES[slug], name = blipTitleCase(game.name);
   var li = document.createElement('li');
   li.className = 'app';
   var button = document.createElement('button');
@@ -367,7 +366,7 @@ function openActions(slug, from) {
   actionSlug = slug; actionFrom = from;
   if (navigator.vibrate) try { navigator.vibrate(8); } catch (e) {}
   var game = BLIP_GAMES[slug];
-  document.getElementById('action-title').textContent = titleCase(game.name) + ' \u00b7 ' + (twoPlayer(slug) ? '1 or 2 players' : '1 player');
+  document.getElementById('action-title').textContent = blipTitleCase(game.name) + ' \u00b7 ' + (twoPlayer(slug) ? '1 or 2 players' : '1 player');
   var icon = from.querySelector('.app-icon').getBoundingClientRect();
   lift.querySelector('img').src = slug + '/icon-192.png?v=2';
   Object.assign(lift.style, { left: icon.left + 'px', top: icon.top + 'px', width: icon.width + 'px', height: icon.height + 'px' });
@@ -507,7 +506,7 @@ function renderSearch() {
   });
   searchResults.innerHTML = hits.length ? hits.map(function (slug, i) {
     return '<li><button type="button" data-slug="' + slug + '"' + (i === 0 && q ? ' class="first"' : '') + '><img src="' + slug + '/icon-192.png?v=2" alt=""><span>' +
-      titleCase(BLIP_GAMES[slug].name) + '<small>' + genreOf(slug) + '</small></span></button></li>';
+      blipTitleCase(BLIP_GAMES[slug].name) + '<small>' + genreOf(slug) + '</small></span></button></li>';
   }).join('') : '<li class="search-none">No games match “' + escapeHtml(searchInput.value.trim()) + '”.</li>';
 }
 function openSearch(first) {

@@ -347,8 +347,25 @@ impl World {
                 break;
             }
         }
-        let heading = (mid.y - best.0.y).atan2(mid.x - best.0.x);
-        (best.0, heading)
+        (best.0, self.open_heading(best.0))
+    }
+
+    /// The way out of `p` with the longest run to the wall whose path, a second
+    /// on, keeps furthest from where the others will be: aimed at the middle,
+    /// three snakes met there before anyone could steer.
+    fn open_heading(&self, p: Pt) -> f32 {
+        let ahead = |q: Pt, a: f32| Pt::new(q.x + a.cos() * 120.0, q.y + a.sin() * 120.0);
+        let score = |a: f32| {
+            let wall = self.wall_hit(p, ahead(p, a)).min(120.0);
+            let mine = ahead(p, a);
+            let apart = self.snakes.iter().filter(|s| s.alive)
+                .map(|s| mine.dist(ahead(s.head, s.heading)).min(mine.dist(s.head)))
+                .fold(240.0f32, f32::min);
+            wall * 2.0 + apart
+        };
+        (0..16).map(|k| k as f32 * std::f32::consts::TAU / 16.0)
+            .max_by(|a, b| score(*a).total_cmp(&score(*b)))
+            .unwrap_or(0.0)
     }
 
     fn tick_hole(&mut self, i: usize, dt: f32) {

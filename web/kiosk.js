@@ -341,8 +341,8 @@ var coinDropAnim = null;
 }());
 function dropCoinAnimation() {
   if (!coinDropAnim) return;
-  // Measured, like shell.js's copy: the slot is the centre of the coin plate,
-  // padding-right plus half the plate, and both change across breakpoints.
+  // The slot is the centre of the coin plate, padding-right plus half the
+  // plate; both change across breakpoints.
   var btn = coinDropAnim.parentElement;
   var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
   var plateW = parseFloat(getComputedStyle(btn, '::after').width) || 18;
