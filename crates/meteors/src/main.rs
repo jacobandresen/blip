@@ -591,6 +591,37 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
     }
 }
 
+/// The saucer crosses on a wave, firing at the ship (the big one wildly, the
+/// small one true); when gone, the next is on its way.
+fn fly_saucer(g: &mut Game, dt: f32) {
+    if g.saucer.active {
+        g.saucer.x += g.saucer.vx * dt;
+        g.saucer.wave_t += dt;
+        g.saucer.y += (g.saucer.wave_t * 2.0).sin() * 24.0 * dt;
+        g.saucer.fire_t -= dt;
+        if g.saucer.fire_t <= 0.0 && g.ship_alive {
+            let dx = g.ship.x - g.saucer.x;
+            let dy = g.ship.y - g.saucer.y;
+            let spread = if g.saucer.big { 0.35 } else { 0.04 };
+            let jitter = rand_range_f32(-spread, spread);
+            let base = dy.atan2(dx) + jitter;
+            let speed = 260.0;
+            spawn_bullet(&mut g.bullets, g.saucer.x, g.saucer.y, base.cos() * speed, base.sin() * speed, false);
+            g.saucer.fire_t = saucer_fire_cooldown(g.sess.level);
+        }
+        if g.saucer.x < -40.0 || g.saucer.x > PLAY_W as f32 + 40.0 {
+            g.saucer.active = false;
+        }
+    } else {
+        g.saucer_cd -= dt;
+        if g.saucer_cd <= 0.0 {
+            spawn_saucer(g);
+            let (lo, hi) = saucer_spawn_range(g.sess.level);
+            g.saucer_cd = rand_range_f32(lo, hi);
+        }
+    }
+}
+
 fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.fx.update(dt);
     g.wave_t += dt;
@@ -634,32 +665,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
         a.rot += a.spin * dt;
     }
 
-    if g.saucer.active {
-        g.saucer.x += g.saucer.vx * dt;
-        g.saucer.wave_t += dt;
-        g.saucer.y += (g.saucer.wave_t * 2.0).sin() * 24.0 * dt;
-        g.saucer.fire_t -= dt;
-        if g.saucer.fire_t <= 0.0 && g.ship_alive {
-            let dx = g.ship.x - g.saucer.x;
-            let dy = g.ship.y - g.saucer.y;
-            let spread = if g.saucer.big { 0.35 } else { 0.04 };
-            let jitter = rand_range_f32(-spread, spread);
-            let base = dy.atan2(dx) + jitter;
-            let speed = 260.0;
-            spawn_bullet(&mut g.bullets, g.saucer.x, g.saucer.y, base.cos() * speed, base.sin() * speed, false);
-            g.saucer.fire_t = saucer_fire_cooldown(g.sess.level);
-        }
-        if g.saucer.x < -40.0 || g.saucer.x > PLAY_W as f32 + 40.0 {
-            g.saucer.active = false;
-        }
-    } else {
-        g.saucer_cd -= dt;
-        if g.saucer_cd <= 0.0 {
-            spawn_saucer(g);
-            let (lo, hi) = saucer_spawn_range(g.sess.level);
-            g.saucer_cd = rand_range_f32(lo, hi);
-        }
-    }
+    fly_saucer(g, dt);
 
     // ---- collisions: player bullets vs asteroids ----
     for bi in 0..MAX_BULLETS {
