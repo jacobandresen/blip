@@ -1236,7 +1236,7 @@ if (document.readyState === 'loading') {
     function fitName(from) {
       var sign = document.querySelector('#marquee-name.machine-marquee'), name = sign && sign.querySelector('.machine-marquee-name');
       if (!name) return;
-      ['left', 'width', 'transform', 'paddingLeft'].forEach(function (k) { sign.style[k] = ''; });
+      ['left', 'width', 'transform', 'paddingLeft', 'visibility'].forEach(function (k) { sign.style[k] = ''; });
       name.style.fontSize = '';
       if (from) {
         var next = ['#card-button', '.manual-pocket', '.blip-power-indicator'].map(function (q) { return shown(document.querySelector(q)); })
@@ -1248,8 +1248,13 @@ if (document.readyState === 'loading') {
       // Whole pixels only: the pixel font blurs between.
       for (var size = parseFloat(getComputedStyle(name).fontSize); size > 7 && name.scrollWidth > sign.clientWidth - 8; size--)
         name.style.fontSize = (size - 1) + 'px';
+      // Smaller than 7px cannot be read: a name that still does not fit gives way; the logo leads back.
+      if (sign.scrollWidth > sign.clientWidth + 1) sign.style.setProperty('visibility', 'hidden', 'important');
     }
     function place() {
+      // The sign is placed for as if shown: hidden, it would free its own space for the switches.
+      var sign = document.querySelector('#marquee-name');
+      if (sign) sign.style.removeProperty('visibility');
       var logo = document.querySelector('.blip-logo').getBoundingClientRect();
       var manual = shown(document.querySelector('.manual-pocket'));
       var blockers = ['#card-button', '.manual-pocket', '#marquee-name', '.blip-power-indicator']

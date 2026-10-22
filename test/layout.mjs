@@ -323,7 +323,11 @@ for (const device of mine) {
         return {
           covered: covering.length ? [...new Set(covering)].join(' and ') : '',
           title: el.querySelector('.card-title').textContent,
-          inBezel: box.left >= bezel.left - 1 && box.right <= bezel.right + 1 && box.top >= bezel.top - 1 && box.bottom <= bezel.bottom + 1,
+          // The cabinet stands on the floor, its plinth under the window's edge: what must show is down to
+          // the coin door, or, with a phone on its side and the player close, down to Start.
+          inBezel: box.left >= bezel.left - 1 && box.right <= bezel.right + 1 && box.top >= bezel.top - 1
+            && el.querySelector(document.getElementById('game-grid').hasAttribute('data-close') ? '.machine-start' : '.machine-coinbox')
+              .getBoundingClientRect().bottom <= bezel.bottom + 1,
           textOnCard: text.every((r) => r.left >= box.left - 1 && r.right <= box.right + 1 && r.top >= box.top - 1 && r.bottom <= box.bottom + 1),
           fontPx: parseFloat(getComputedStyle(el.querySelector('.card-desc')).fontSize),
         };

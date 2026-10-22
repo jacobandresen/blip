@@ -1245,12 +1245,18 @@ test('BRAWLER.BLIP draws the turtle shell and mask build', async (t) => {
   await exitTape(page);
 });
 
-/** The number of the tape line whose code is `code`, so a test can replace a line inside a SUB. */
-function tapeLine(tape, code) {
+/** The numbers of the tape lines whose code is `code`, so a test can replace a line inside a SUB. */
+function tapeLines(tape, code) {
   const source = readFileSync(new URL(`../web/TAPE/${tape}.BLIP`, import.meta.url), 'utf8');
   const found = source.split('\n').filter((line) => line.replace(/^\d+\s+/, '').trim() === code);
-  assert.equal(found.length, 1, `${tape} has one line ${code}`);
-  return Number(found[0].match(/^\d+/)[0]);
+  assert.ok(found.length > 0, `${tape} has a line ${code}`);
+  return found.map((line) => Number(line.match(/^\d+/)[0]));
+}
+
+function tapeLine(tape, code) {
+  const [number, ...more] = tapeLines(tape, code);
+  assert.equal(more.length, 0, `${tape} has one line ${code}`);
+  return number;
 }
 
 /** Round one in play at once, with no music, so the sound count is only the game's. */
@@ -1435,7 +1441,7 @@ test('BOUNCER aims the ball off the paddle and returns it upward', async (t) => 
     /AIM=CLAMP\(\(\(BALL_X\(K\)\+BALL\/2-PAD_X\)\/PAD_W-0\.5\)\*2,-1,1\)\*1\.15/);
   await page.waitForTimeout(400);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.ok(await countGamePixels(page, await canvas.screenshot(), STATUS_MARKER, 'green') > 40, 'a ball landing left of centre goes back up and to the left');
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 40) > 40, 'a ball landing left of centre goes back up and to the left');
   await page.locator('#exit-game').click();
 });
 
@@ -1478,7 +1484,7 @@ test('BOUNCER bomb hits clear the bricks around them', async (t) => {
   });
   await page.waitForTimeout(900);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.ok(await countGamePixels(page, await canvas.screenshot(), STATUS_MARKER, 'green') > 40, 'the bomb and its eight neighbours should be gone');
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 40) > 40, 'the bomb and its eight neighbours should be gone');
 });
 
 test('BOUNCER multi-ball pickup splits into three balls', async (t) => {
@@ -1490,7 +1496,7 @@ test('BOUNCER multi-ball pickup splits into three balls', async (t) => {
   });
   await page.waitForTimeout(300);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.ok(await countGamePixels(page, await canvas.screenshot(), STATUS_MARKER, 'green') > 40, 'three balls should be in play');
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 40) > 40, 'three balls should be in play');
 });
 
 test('BOUNCER wide, narrow, slow, and life pickups take effect', async (t) => {
@@ -1504,7 +1510,7 @@ test('BOUNCER wide, narrow, slow, and life pickups take effect', async (t) => {
   });
   await page.waitForTimeout(900);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.ok(await countGamePixels(page, await canvas.screenshot(), STATUS_MARKER, 'green') > 40, 'every pickup should have been caught');
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 40) > 40, 'every pickup should have been caught');
 });
 
 test('BOUNCER cleared and game-over screens keep rendering while they wait', async (t) => {
@@ -1830,12 +1836,12 @@ test('DEFENDER shots award the double value for a diver kill', async (t) => {
   const canvas = await openDefender(page, origin, {
     85: 'START_GAME:LEVEL=3:START_WAVE:BOMB_WAIT=99:UFO_WAIT=99:DIVER=1:DIVER_KIND=0:DIVER_X=300:DIVER_Y=200:SHOT_ON=1:SHOT_X=314:SHOT_Y=240',
     165: defenderMarker('SCORE=180'),
+    // The popup holds still, so the check does not race its 0.8 second life.
+    ...Object.fromEntries(tapeLines('DEFENDER', 'FX_UPDATE(DT)').map((n) => [n, 'REM'])),
   });
-  await page.waitForTimeout(160);
-  const shot = await canvas.screenshot();
+  assert.ok(await waitForPixels(page, canvas, DEFENDER_MARKER, 'green', 40) > 40, 'a squid diver at level three should score 30x3x2');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'a diver hit should not produce an interpreter error');
-  assert.ok(await countGamePixels(page, shot, DEFENDER_MARKER, 'green') > 40, 'a squid diver at level three should score 30x3x2');
-  const yellow = await countGamePixels(page, shot, [230, 140, 180, 90], 'yellow');
+  const yellow = await countGamePixels(page, await canvas.screenshot(), [230, 140, 180, 90], 'yellow');
   assert.ok(yellow > 10, `the diver kill should show its bonus score, got ${yellow} yellow pixels`);
   await page.locator('#exit-game').click();
 });

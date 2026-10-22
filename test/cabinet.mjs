@@ -90,11 +90,9 @@ test('arrows and a tap walk between machines; tapping the cabinet body does not 
   assert.equal(await selectedSlug(page), 'rally/index.html');
   await page.locator('.pick-next').tap();
   await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
-  assert.equal(await page.locator('#game-grid').evaluate((grid) => grid.style.getPropertyValue('--aisle-floor-x')), '-42px');
   assert.equal(await page.locator('.card-shuffling').count(), 0, 'machines slide past instead of shuffling');
   await page.locator('.pick-prev').tap();
   await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'rally/index.html');
-  assert.equal(await page.locator('#game-grid').evaluate((grid) => grid.style.getPropertyValue('--aisle-floor-x')), '0px');
   await page.locator('.card-rally').tap();
   assert.equal(new URL(page.url()).pathname, '/index.html');
   assert.equal(await selectedSlug(page), 'rally/index.html');

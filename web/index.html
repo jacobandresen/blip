@@ -1015,7 +1015,7 @@
     #game-grid .card-badges,#game-grid .badge-touch,#game-grid .badge-pad {display:none!important}
     #game-grid .card-copy {display:contents}
     #game-grid .card-punch {display:none!important}
-    .card-pick {left:14px;right:14px;bottom:10px;z-index:70;width:auto;max-width:none;justify-content:space-between;transform:none;
+    .card-pick {left:calc(14px + env(safe-area-inset-left,0px));right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:70;width:auto;max-width:none;justify-content:space-between;transform:none;
       padding:0;border:0;background:none;box-shadow:none;pointer-events:none;}
     .card-pick::before,.card-pick::after {display:none}
     .card-pick .pick-arrow {pointer-events:auto}
@@ -1348,7 +1348,7 @@
 
   <script src="howler.min.js"></script>
   <script src="blip_core.js?v=4"></script>
-  <script src="kiosk.js?v=97"></script>
+  <script src="kiosk.js?v=98"></script>
   <script src="blip_controller.js?v=10"></script>
   <!-- Git-ignored, written at deploy: absent means no leaderboard. -->
   <script src="blip_config.js?v=1"></script>

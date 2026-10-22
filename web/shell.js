@@ -700,7 +700,11 @@ function syncBuffer() {
   var dpr = window.high_dpi ? window.devicePixelRatio || 1 : 1;   // the runtime's high-DPI buffer (app style)
   if (canvas.width === Math.floor(canvas.clientWidth * dpr) && canvas.height === Math.floor(canvas.clientHeight * dpr)) return;
   if (typeof window.onresize !== 'function') return;
-  try { window.onresize(); } catch (e) { /* the game has not loaded yet */ }
+  // A game's own call (blipSetMode) lands here mid-frame; miniquad's resize
+  // handler run now would re-enter it and panic, so it runs once the frame returns.
+  queueMicrotask(function () {
+    try { window.onresize(); } catch (e) { /* the game has not loaded yet */ }
+  });
 }
 
 /** Re-fit only when inputs change; deck observation and `--topbar-h` writes otherwise form a resize loop. */
