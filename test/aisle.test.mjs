@@ -1,0 +1,134 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+
+const Aisle = createRequire(import.meta.url)('../web/aisle.js');
+const N = 9;
+
+function run(s, input, seconds, dt = 1 / 60) {
+  for (let t = 0; t < seconds; t += dt) Aisle.step(s, input, dt);
+  return s;
+}
+function settle(s, limit = 5) {
+  for (let t = 0; t < limit && !s.settled; t += 1 / 60) Aisle.step(s, {}, 1 / 60);
+  assert.ok(s.settled, `settled at ${s.pos}`);
+  return s;
+}
+
+test('a tap from rest settles one machine on, from every machine and across the wrap', () => {
+  for (let start = 0; start < N; start++) {
+    for (const dir of [1, -1]) {
+      const s = Aisle.create(N, start);
+      Aisle.press(s, dir);
+      settle(s);
+      assert.equal(s.pos, (start + dir + N) % N);
+    }
+  }
+});
+
+test('a tap arrives within a second and never overshoots', () => {
+  const s = Aisle.create(N, 2);
+  Aisle.press(s, 1);
+  let most = 2, t = 0;
+  while (!s.settled) { Aisle.step(s, {}, 1 / 60); t += 1 / 60; most = Math.max(most, s.pos); }
+  assert.ok(t < 1, `took ${t.toFixed(2)} s`);
+  assert.ok(most <= 3 + 2e-3, `reached ${most}`);
+});
+
+test('two quick taps move exactly two', () => {
+  const s = Aisle.create(N, 0);
+  Aisle.press(s, 1);
+  run(s, {}, 0.1);
+  Aisle.press(s, 1);
+  assert.equal(settle(s).pos, 2);
+});
+
+test('a tap the other way while walking turns back', () => {
+  const s = Aisle.create(N, 4);
+  Aisle.press(s, 1);
+  run(s, {}, 0.2);
+  Aisle.press(s, -1);
+  assert.equal(settle(s).pos, 4);
+});
+
+test('holding walks about a machine a second, and letting go stops on a machine ahead', () => {
+  const s = Aisle.create(N, 0);
+  Aisle.press(s, 1);
+  let held = 0;
+  for (; held < 3; held += 1 / 60) Aisle.step(s, { dir: 1, heldFor: held }, 1 / 60);
+  assert.ok(Math.abs(s.v - 1) < 0.02, `speed ${s.v}`);
+  assert.ok(s.pos > 2.5 && s.pos < 3.2, `walked ${s.pos}`);
+  const released = s.pos;
+  settle(s);
+  // The next machine, or the one after when the next is too close to stop at gently.
+  assert.ok([Math.ceil(released) % N, (Math.ceil(released) + 1) % N].includes(s.pos), `${released} -> ${s.pos}`);
+});
+
+test('a held walk picks its speed', () => {
+  const slow = Aisle.create(N, 0), fast = Aisle.create(N, 0);
+  run(slow, { dir: 1, heldFor: 1, speed: 0.4 }, 2);
+  run(fast, { dir: 1, heldFor: 1, speed: 1.5 }, 2);
+  assert.ok(fast.pos > slow.pos * 2.5, `${fast.pos} vs ${slow.pos}`);
+});
+
+test('a flick settles on a whole machine ahead within a second', () => {
+  const s = Aisle.create(N, 0);
+  Aisle.dragStart(s, 0);
+  for (let t = 0; t <= 150; t += 16) Aisle.dragTo(s, t / 1000 * 4, t);
+  Aisle.dragEnd(s, 150);
+  assert.ok(s.v > 3, `kept ${s.v}`);
+  const from = s.pos;
+  let t = 0;
+  while (!s.settled) { Aisle.step(s, {}, 1 / 60); t += 1 / 60; }
+  assert.ok(t < 1, `took ${t.toFixed(2)} s`);
+  assert.ok(Number.isInteger(s.pos));
+  assert.ok((s.pos - Math.floor(from) + N) % N >= 1, `${from} -> ${s.pos}`);
+});
+
+test('a slow drag past half a machine still moves one; a short one springs back', () => {
+  const on = Aisle.create(N, 3);
+  Aisle.dragStart(on, 0);
+  Aisle.dragTo(on, 3.3, 500);
+  Aisle.dragTo(on, 3.3, 900);
+  Aisle.dragEnd(on, 1000);
+  assert.equal(settle(on).pos, 4);
+  const back = Aisle.create(N, 3);
+  Aisle.dragStart(back, 0);
+  Aisle.dragTo(back, 3.05, 50);
+  Aisle.dragEnd(back, 60, true);
+  assert.equal(settle(back).pos, 3);
+});
+
+test('a long gap or none at all leaves the walk sound', () => {
+  const s = Aisle.create(N, 0);
+  Aisle.press(s, 1);
+  Aisle.step(s, {}, 0);
+  Aisle.step(s, {}, 2);
+  Aisle.step(s, { dir: 1, heldFor: 5 }, 2);
+  assert.ok(Number.isFinite(s.pos) && Number.isFinite(s.v));
+  settle(s);
+});
+
+test('every machine stands within half the aisle of you', () => {
+  for (let pos = 0; pos < N; pos += 0.01) {
+    const seen = [];
+    for (let i = 0; i < N; i++) {
+      const off = Aisle.offset(i, pos, N);
+      assert.ok(off >= -N / 2 && off < N / 2, `${i} at ${pos}: ${off}`);
+      seen.push(Math.round(off * 100));
+    }
+    assert.equal(new Set(seen).size, N);
+  }
+  assert.equal(Aisle.offset(0, 8, N), 1);
+  assert.equal(Aisle.index(8.6, N), 0);
+});
+
+test('the faced machine is loudest and the others fall away and pan apart', () => {
+  assert.equal(Aisle.machineLevel(0), 1);
+  assert.equal(Aisle.machineLevel(1), 0.5);
+  for (let d = 0; d < 4; d += 0.25) assert.ok(Aisle.machineLevel(d + 0.25) < Aisle.machineLevel(d));
+  for (let off = -5; off <= 5; off += 0.5) {
+    assert.equal(Aisle.machinePan(-off), -Aisle.machinePan(off));
+    assert.ok(Math.abs(Aisle.machinePan(off)) <= 1);
+  }
+});

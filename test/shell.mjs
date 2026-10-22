@@ -181,7 +181,8 @@ test('the game shell', async (t) => {
     await evaluate(cdp, "document.querySelector('.card-focused .machine-coinbox').click(); true");
     await sleep(300);
     await key(cdp, 'ArrowRight', 'ArrowRight', 39);
-    assert.equal(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent"), 'BOUNCER');
+    // The machine is picked when the walk arrives at it.
+    await waitFor(cdp, "document.querySelector('.card-focused .card-title').textContent === 'BOUNCER'", 3000);
     await key(cdp, ' ', 'Space', 32);
     await arrivedAt(cdp, '/bouncer/index.html');
     assert.equal(await evaluate(cdp, 'location.pathname'), '/bouncer/index.html');

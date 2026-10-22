@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "test:all": "node test/run-all.mjs",
-    "test": "node --test test/fill-canvas.test.mjs test/basic-language.test.mjs",
+    "test": "node --test test/fill-canvas.test.mjs test/basic-language.test.mjs test/aisle.test.mjs",
     "test:web": "node test/run-web.mjs",
     "test:visual": "node test/run-visual.mjs",
     "test:layout": "node test/shard.mjs 4 test/layout.mjs",

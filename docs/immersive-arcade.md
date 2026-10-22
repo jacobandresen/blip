@@ -34,104 +34,109 @@ ships on its own and leaves the suite green.
   (`blip-cabinet-return`).
 - Up and down repeat left and right (`moveRow`).
 
-## 1. Walking
+## 1. Walking — done
+
+As built (`web/aisle.js`, the aisle script in `web/index.html`):
 
 ### Position
 
-- Where you stand becomes a decimal, `aislePos` (3.4 is between the fourth
-  and fifth machine), kept modulo nine. `idx` stays the faced machine:
-  `Math.round(aislePos)`, updated as you pass the halfway point.
-- `aisleOffset(i)` returns `i - aislePos`, wrapped into −4.5…4.5.
-  `cardPose` already works on a fractional `delta` once `turn` and `z` blend
-  instead of switching at zero: `turn = clamp(delta, −1, 1) × 32` and `z`
+- Where you stand is a decimal, `aisle.pos` (3.4 is between the fourth and
+  fifth machine), published as `data-aisle-pos` on `#game-grid`, with
+  `data-aisle-moving` while the aisle moves. `idx`, the faced machine, changes
+  only on arrival.
+- `aisleOffset(i)` is `BlipAisle.offset`, wrapped into −4.5…4.5. `cardPose`
+  blends on a fractional `delta`: `turn = clamp(delta, −1, 1) × 32`, and `z`
   eases from 40 to −90 over the first machine.
-- A machine near the wrap (|offset| > 3.5) fades to `opacity: 0`, so its
-  jump from +4.5 to −4.5 is never seen. This replaces `aisle-wrap`.
+- Past 3.5 machines a cabinet is `visibility: hidden`, so its jump across the
+  wrap is never seen. Not `opacity`: below 1 it flattens the cabinet's 3D
+  sides. This replaces `aisle-wrap`.
 
 ### Motion
 
-- One `requestAnimationFrame` loop owns the aisle. It runs only while the
-  aisle moves and stops when it settles. The CSS transition on the cards
-  goes; the loop writes the pose every frame.
-- The loop integrates a velocity `v` (machines per second) towards a target
-  speed:
-  - a held arrow or stick: 1 machine/s, reached in about 0.4 s;
-  - nothing held: `v` decays and the aisle springs to the nearest whole
-    machine in the direction it was going (critically damped, settling in
-    about 0.5 s);
-  - a tap (press and release inside 200 ms) sets the target to the next
-    whole machine, so a tap still moves exactly one;
-  - a second tap while moving adds one more machine to the target, as the
-    queue does now.
-- The walking maths lives in a new `web/aisle.js`, with no DOM: a
-  `step(state, input, dt)` that returns the next `{pos, v, target}`. The
-  page feeds it keys, pointer and gamepad; tests feed it numbers.
+- One `requestAnimationFrame` loop (`aisleTick`) owns the aisle while it
+  moves and stops when it settles. The cards' CSS transition is gone; the loop
+  writes each card's `transform` inline.
+- `BlipAisle.step(state, input, dt)`:
+  - while a key is down, the walk ramps to 1 machine/s (0.4 s);
+  - a press let go within 0.2 s is a tap: the aisle settles exactly one
+    machine on (a critically damped spring, about 0.8 s, never overshooting);
+  - held longer, letting go coasts to the nearest machine ahead it can reach
+    without overshooting;
+  - each further tap adds one machine to where the walk will stop, and a tap
+    the other way turns back.
 
 ### Inputs
 
-- Keys: `keydown` and `keyup` on ArrowLeft/Right and A/D set "held", with
-  key repeat ignored.
-- Drag: on `pointerdown` the aisle follows the finger, one machine per
-  0.34 × the track's width as now. On `pointerup` the last 100 ms of
-  movement becomes `v`, and the spring picks the machine it coasts to. A
-  drag shorter than the swipe threshold is still a tap on a machine or its
-  screen (`selectByTouch`, `activate`). `touch-action: pan-y` stays.
-- Deck stick: `setDir` sets "held" instead of repeating `move`.
-- Gamepad: `pollGamepad` also reports `axes[0]` past its dead zone, and the
-  arcade maps it to a target speed from 0.3 to 1.5 machines/s. Other
-  callers of `pollGamepad` are unchanged.
+- Keys: `keydown` (not its repeats) is a tap and starts a hold; `keyup` ends
+  it. `blur` lets go of everything.
+- Drag: past 12 px sideways the aisle follows the pointer, a machine per
+  0.34 × the track's width; on release the last 0.1 s of movement carries on.
+  A drag short of the swipe threshold springs back. Taps on a machine or its
+  screen work as before.
+- The deck's stick and the pad deck hold the walk instead of repeating `move`.
+- Gamepad: the arcade reads `axes[0]` itself while the pad holds the walk,
+  from 0.3 to 1.5 machines/s; `pollGamepad` is unchanged.
+- Clicking a neighbour walks to it (`walkTo`). Start pressed mid-walk starts
+  the machine the walk arrives at.
 
 ### Feel
 
-- A footstep each half machine walked: `playMachineStep` gains a
-  single-step form, panned by direction; at rest, nothing.
-- The view bobs 2–3 px in time with the footsteps, on `#jukebox-front`
-  (a `translateY`).
-- Parallax: the carpet moves at 1.3× the machines, the back wall at 0.5×.
-  Each is an oversized layer moved by `transform`, never by
-  `background-position`, which repaints.
-- Arriving (the spring settles) flips the marquee and picks the card, as
-  `highlight` does now; passing a machine without stopping does neither.
-- The deck iframe's `--preview-lean` and `fitSelectorRails` are written on
-  arrival and on the frames where the faced machine changes, not every frame:
-  both touch layout.
+- A footstep each half machine walked (`playMachineStep(dir, 1)`, feet
+  alternating).
+- The view bobs up to 2.5 px with the steps. It is written into the cards',
+  carpet's and wall's transforms, not `#jukebox-front`'s, whose transform is
+  the launch zoom.
+- Parallax: the carpet (`.aisle-carpet`, formerly `#game-grid::after`) moves at
+  1.3× the machines, the back wall's ribs (`.aisle-wall`) at 0.5×.
+- On arrival `highlight` picks the card, sets `--arc-scale`, the deck's lean
+  and `fitSelectorRails`, once.
 
 ### Reduced motion
 
-`prefers-reduced-motion: reduce` keeps today's behaviour: whole-machine
-steps, no transition, no bob, no parallax. A held key repeats at the
-current 2.24 s.
+Today's behaviour, unchanged: whole-machine steps (`move`, `walkNext`), no
+bob, no parallax.
 
 ### Performance
 
-Only `transform` and `opacity` change per frame (see the touch performance
-notes). Nine cards, one carpet and one wall layer are the whole budget.
+- No layout while walking; about 1 ms of style and 1 ms of layerizing a
+  frame, on a desktop CPU.
+- On the real GPU (GTX 1660, headless) the walk holds 60 fps, as the old CSS
+  transition did. Headless software GL draws it at 30 fps, so the test checks
+  main-thread cost, not frame rate.
+- The lit Start cap's glow animated `text-shadow`, which forced a layout every
+  frame even at rest; it is now an opacity pulse.
 
-## 2. Sound from the machines
+## 2. Sound from the machines — done, not yet heard on a phone or the kiosk
+
+As built (`blipArcadeSound` and `BLIP_ATTRACT` in `web/kiosk.js`, enabled by
+the aisle script):
 
 ### Attract loops
 
-- Each machine gets a short attract jingle, four to eight bars, made in
-  `kiosk.js` with Web Audio from a few notes per game in its own
-  instrument (the game tunes are megabytes each; these are a few hundred
-  bytes of note data). Rally keeps a plain beep, per its "keep it simple" rule.
-- A jingle repeats every 6–10 s with silence between, so the room never
-  becomes a wall of music.
+- Each machine has a jingle of 7 to 15 notes in its own instrument
+  (`BLIP_ATTRACT`: wave, root, beat, decay, level), played through a 2.6 kHz
+  low-pass to keep it warm. Rally's is two plain beeps; Meteors' a low
+  heartbeat; Bubbler's a music box; the action games' saw and square riffs.
+- After each jingle a machine is quiet for 6–10 s, and machines start out of
+  step, so the room never plays in unison.
+- A 200 ms look-ahead scheduler (`schedule`) books each note on the audio
+  clock.
 
 ### Mixing
 
-- Each machine's level is `1 / (1 + d²)` for `d = |offset|`, and its pan is
-  `clamp(offset / 2, −1, 1)` (a `StereoPannerNode`). Both are ramped
-  (`setTargetAtTime`, 50 ms) from the walking loop, not set.
-- Only machines with `d ≤ 2.5` play; the rest are stopped and disconnected,
-  which caps the graph at about five voices on a phone.
-- A room bed under it: a murmur (filtered noise), a coin drop now and then
-  (`playCoinInsert`'s clink, quiet, panned at random), and `cabinetHum`.
-- Everything connects through `blipOut(ctx)`, so `blip-mute` silences it.
-  Like the hum, it waits for `blipPowered()`, a visible page and the first
-  key or tap.
-- The mix and the jingle choice are pure functions in `web/aisle.js`
-  (`machineLevel(d)`, `machinePan(offset)`), tested without audio.
+- Each machine's level is `BlipAisle.machineLevel(d)` = `1 / (1 + d²)`, its
+  pan `BlipAisle.machinePan(offset)` = `clamp(offset / 2, −1, 1)`, both ramped
+  over 50 ms. `place(pos)` is called from `poseCards`, every frame of a walk.
+- Only machines within 2.5 play (five at once); the rest are dropped and
+  disconnected.
+- The room bed: a murmur (noise in a 520 Hz band, swelling at 0.13 Hz), and
+  every 12–30 s a coin dropped in somewhere off to one side. `cabinetHum` is
+  unchanged.
+- The whole room goes through one gain (0.22, halved by `duck(true)` for
+  stepping up) into `blipOut(ctx)`, so `blip-mute` silences it.
+- It starts on the first key, tap or click, like the hum, and stops while
+  the page is hidden. It does not wait for a credit: the machines are on
+  whether or not the cabinet has a coin.
 
 ## 3. Stepping up to play
 
@@ -205,57 +210,57 @@ in `package.json`). Each change to `web/` bumps `CACHE` in `web/sw.js`.
 
 ## Done when
 
-| Part | Done when |
-|---|---|
-| 1. Walking | Unit, arcade, layout and performance tests pass; reduced motion steps as today |
-| 2. Sound | Sound tests pass; heard on an iPhone and the kiosk |
-| 3. Stepping up | The loader shows the faced screen, then the game |
-| 4. Living screens | Nine strips under 60 KB, loaded only nearby, cached offline |
-| 5. Up and down | The new `shell.mjs` test replaces the row test; `moveRow` is gone |
+| Part | Done when | Status |
+|---|---|---|
+| 1. Walking | Unit, arcade, layout and performance tests pass; reduced motion steps as today | Done |
+| 2. Sound | Sound tests pass; heard on an iPhone and the kiosk | Tests pass; listening by hand still to do |
+| 3. Stepping up | The loader shows the faced screen, then the game | |
+| 4. Living screens | Nine strips under 60 KB, loaded only nearby, cached offline | |
+| 5. Up and down | The new `shell.mjs` test replaces the row test; `moveRow` is gone | |
 
 ## How to test it
 
-The walk becomes time-based, so the tests stop waiting on wall-clock steps
-(today's `waitFor(…, 3000)` after each key) and read state instead.
-`#game-grid` carries `data-aisle-pos` (rounded to 0.01) and
-`data-aisle-moving` while the loop runs; tests wait on those. Tests that
-check a moment mid-walk use Playwright's `page.clock`, which also drives
-`requestAnimationFrame`, to hold time still.
+Done items are marked ✓.
 
-### Unit (`npm test`, new `test/aisle.test.mjs`)
+The walk is time-based, so the tests read state instead of waiting out
+steps: `#game-grid` carries `data-aisle-pos` (rounded to 0.01) and
+`data-aisle-moving` while the aisle moves.
+
+### Unit (`npm test`, `test/aisle.test.mjs`) ✓
 
 `web/aisle.js` with no browser:
 
-- A tap from rest settles at exactly ±1, for every starting machine,
-  including across the wrap (8 → 0, 0 → 8).
-- Holding for 3 s from rest covers about 2.6 machines (0.4 s ramp to
-  1 machine/s); letting go settles on a whole machine ahead, never behind.
-- A flick with `v = 4` settles within 0.6 s and on a whole machine.
-- Two taps in quick succession move exactly two.
-- Reduced motion: every `step` lands on a whole number.
-- `aisleOffset` stays in −4.5…4.5 for every `pos` in steps of 0.01.
-- `machineLevel(0) = 1`, `machineLevel(1) = 0.5`, decreasing; `machinePan`
+- ✓ A tap from rest settles at exactly ±1, for every starting machine,
+  including across the wrap (8 → 0, 0 → 8); it arrives within a second and
+  never overshoots.
+- ✓ Holding for 3 s walks 2.5–3.2 machines at 1 machine/s; letting go stops
+  on the next machine ahead or the one after, never behind.
+- ✓ A held walk's pace follows `speed`.
+- ✓ A flick settles within a second, on a whole machine ahead.
+- ✓ Two quick taps move exactly two; a tap the other way turns back.
+- ✓ A slow drag past a third of a machine moves one; a short drag springs back.
+- ✓ `offset` stays in −4.5…4.5 for every `pos` in steps of 0.01.
+- ✓ `machineLevel(0) = 1`, `machineLevel(1) = 0.5`, decreasing; `machinePan`
   is antisymmetric and clamped.
-- No `NaN` for `dt = 0` or a 2 s `dt` (a tab coming back).
+- ✓ No `NaN` for `dt = 0` or a 2 s `dt` (a tab coming back).
 
-### Arcade (`test/cabinet.mjs`, `test/touch.mjs`)
+### Arcade (`test/cabinet.mjs`) ✓
 
-- A tap on `.pick-next`, an ArrowRight press and a short swipe each move
-  exactly one machine; the existing tests keep passing with the new waits.
-- Holding ArrowRight for 3 s (keydown, `page.clock.runFor(3000)`, keyup)
-  ends between two and four machines on, on a whole machine.
-- A drag: `pointerdown`, 10 `pointermove`s over half the width, then a check
-  that `data-aisle-pos` has moved by the finger before `pointerup`; after
-  release, it settles on a whole machine.
-- Gamepad: a stubbed `navigator.getGamepads` with `axes[0] = 0.5` walks
-  slower than with `1.0`.
-- Deck stick held: walks while held, settles on release.
-- Reduced motion (`page.emulateMedia({ reducedMotion: 'reduce' })`): one
-  press moves one, with no frames where `data-aisle-pos` is fractional.
-- The marquee and `.card-focused` change only on arrival, not when a
-  machine is passed at speed.
-- Returning from a game (`blip-cabinet-return`) still lands on its machine
-  and does not start a walk.
+- ✓ A tap on `.pick-next`, an ArrowRight press and walking the whole aisle
+  each move one machine at a time (the existing tests, unchanged).
+- ✓ Holding ArrowRight for 3 s ends two to four machines on, on a whole
+  machine; at 1.2 s the card is still the first one (picked on arrival, not
+  in passing).
+- ✓ A mouse drag moves `data-aisle-pos` before release and settles on the
+  next machine; a 30 px drag springs back.
+- ✓ A stubbed gamepad at `axes[0] = 1` walks more than 1.8× as far as at 0.4.
+- ✓ Reduced motion: one press moves one, and `data-aisle-pos` is never
+  fractional.
+- ✓ Returning from a game still lands on its machine (the existing test).
+- The bottom deck's stick and pad hold the walk too, but the arcade hides the
+  bottom deck (`body.cabinet-page #kiosk-bar`), so there is nothing to test.
+- `test/shell.mjs`'s title test waits for the walk to arrive before reading
+  the picked card.
 
 ### Up and down (`test/shell.mjs`)
 
@@ -274,18 +279,18 @@ check a moment mid-walk use Playwright's `page.clock`, which also drives
 - A stale handover (over 15 s, set by hand in `sessionStorage`) shows the
   plain loader.
 
-### Sound (`test/cabinet.mjs`)
+### Sound (`test/cabinet.mjs`) ✓
 
-Audio is checked by the graph, not by ear. A test hook,
-`window.blipArcadeSound`, lists the playing machines with their gain and pan
-values.
+Audio is checked by the graph, not by ear: `blipArcadeSound.state()` lists
+the playing machines with the level and pan each is heading for.
 
-- Before any input, no `AudioContext` exists.
-- After a key: the faced machine is loudest, its neighbours at about half,
-  pans opposite in sign, nothing past `d = 2.5`.
-- After walking one machine, the levels follow.
-- With `blip-mute`, `blipOut`'s gain is 0.
-- With the page hidden (`visibilitychange`), the loops stop.
+- ✓ Before any input, no `AudioContext` exists and the room is silent.
+- ✓ After a key: the faced machine at level 1 and centred, its neighbours at
+  0.5 on their own sides, the ones beyond quieter, nothing past 2.5.
+- ✓ After walking one machine, the levels follow; one machine comes into
+  earshot and another leaves it.
+- ✓ With `blip-mute`, `blipOut`'s gain is 0.
+- ✓ With the page hidden the room stops, and it starts again when shown.
 
 ### Living screens
 
@@ -297,18 +302,17 @@ values.
 
 ### Layout (`test/layout.mjs`)
 
-- The existing device sweep also runs at `aislePos` = n + 0.5 (the clock
-  held mid-walk) and while stepped up: nothing overlaps the deck or leaves
-  the screen, and the faced machine's Start and coin door stay in reach.
+- ✓ Every device's sweep also checks the arcade half a machine along, held
+  there by a drag: nothing overlaps or leaves the screen.
+- While stepped up: the same (part 5).
 
-### Performance (new test over CDP, as in the touch performance checks)
+### Performance (`test/aisle-perf.mjs`, in `npm run test:web`) ✓
 
-- Hold ArrowRight for 3 s on an emulated phone with
-  `Emulation.setCPUThrottlingRate(4)`. `Performance.getMetrics` must show
-  `LayoutCount` unchanged during the walk except on arrivals (at most one per
-  machine reached), and the 95th percentile of frame intervals under 20 ms.
-- The same at idle for 2 s: no layouts, and no `requestAnimationFrame`
-  running (the loop has stopped).
+- ✓ At rest for 2 s on an emulated phone: no layouts.
+- ✓ Holding ArrowRight for 3 s: at most three layouts (one on arrival), and
+  under 8 ms of script and style a frame.
+- Frame rate is checked by hand on the real GPU (see Performance in part 1):
+  software GL in headless Chromium halves it whatever the page does.
 
 ### By hand
 

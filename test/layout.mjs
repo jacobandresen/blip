@@ -208,6 +208,17 @@ for (const device of mine) {
     await settle();
     await check(page, device, insets, 'cabinet', failures);
 
+    // Half a machine along the aisle, held there by a drag.
+    const aisle = await page.locator('#game-grid').boundingBox();
+    await page.mouse.move(aisle.x + aisle.width * .6, aisle.y + aisle.height * .3);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(aisle.x + aisle.width * (.6 - .17 * i / 8) - 12, aisle.y + aisle.height * .3);
+    await settle();
+    const along = await page.evaluate(() => Number(document.getElementById('game-grid').dataset.aislePos));
+    if (!(along > .2 && along < .8)) failures.push(`the drag held the aisle at ${along}, not between two machines`);
+    await check(page, device, insets, 'cabinet half a machine along', failures);
+    await page.mouse.up();
+
     await page.evaluate(() => sessionStorage.setItem('blip-loaded-card',
       JSON.stringify({ slug: 'bouncer', name: 'BOUNCER', code: 'A2', art: 'bouncer/screenshot.png' })));
     await page.goto(`${origin}/index.html`);
