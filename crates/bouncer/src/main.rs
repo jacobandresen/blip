@@ -1093,7 +1093,6 @@ async fn main() {
     };
     // Two tunes, alternating by level.
     let mut music = Jukebox::new("BOUNCER", &["BOUNCE", "REBOUND"]);
-    music.start(0).await;
 
     let mut shot_frame: u32 = 0;
 
@@ -1101,7 +1100,6 @@ async fn main() {
         let dt = blip.delta_time;
 
         music.play(if g.state == State::Title { 0 } else { (g.sess.level as usize + 1) % 2 });
-        if g.state != State::Play { music.warm_up().await; }
 
         if blip.screenshot_mode {
             shot_frame += 1;

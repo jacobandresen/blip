@@ -2361,7 +2361,6 @@ async fn main() {
     };
     // The theme, and the same tune faster for HURRY UP.
     let mut music = Jukebox::new("BUBBLER", &["THEME", "HURRY"]);
-    music.start(0).await;
     let mut shot_frame = 0u32;
     #[cfg(not(target_arch = "wasm32"))]
     let mut scene_set = false;
@@ -2656,9 +2655,6 @@ async fn main() {
             });
         } else {
             music.stop();
-        }
-        if g.state == State::Title {
-            music.warm_up().await;
         }
 
         blip.clear(BlipColor::new(0.0, 0.0, 0.0, 1.0));

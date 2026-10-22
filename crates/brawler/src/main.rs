@@ -87,7 +87,7 @@ async fn main() {
     /// front of a noisy game reads as not loaded.
     const SELECT_TRACK: usize = 2;
     let (mut ambient, mut alarmed): (Option<usize>, bool) = (None, false);
-    music.start(SELECT_TRACK).await;
+    music.play(SELECT_TRACK);
     let mut shot_frame: u32 = 0;
 
     loop {
@@ -234,12 +234,7 @@ async fn main() {
         } else {
             None
         };
-        // Render each stage theme at billing or intro; warming all seven on the title froze it repeatedly.
-        match want {
-            Some(track) if g.state != State::Fight && !music.ready(track) => music.start(track).await,
-            Some(track) => music.play(track),
-            None => {}
-        }
+        if let Some(track) = want { music.play(track); }
 
         if g.fade > 0.0 { g.fade -= dt; }
         blip.clear(BLIP_BLACK);

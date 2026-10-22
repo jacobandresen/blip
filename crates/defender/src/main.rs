@@ -1614,7 +1614,6 @@ async fn main() {
     };
     // The invasion tune, and the mothership's on boss levels.
     let mut music = Jukebox::new("DEFENDER", &["INVASION", "MOTHERSHIP"]);
-    music.start(0).await;
 
     let mut shot_frame: u32 = 0;
 
@@ -1629,7 +1628,6 @@ async fn main() {
         }
 
         music.play(if g.state != State::Title && g.is_boss_level() { 1 } else { 0 });
-        if g.state != State::Play { music.warm_up().await; }
         g.touch_x = blip.touch(0).map(|p| p.x);
         #[cfg(not(target_arch = "wasm32"))]
         if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }

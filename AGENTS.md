@@ -165,8 +165,10 @@ A game's pictures are made by its `src/gfx.rs`, its effects and music by its
   like the wasm: change `gfx.rs` or `tunes.rs` and build, never the files.
 
 Build scripts use `blip` without its `engine` feature, so they do not compile
-macroquad. A game loads its tunes from its tape folder through a
-`blip::Jukebox` (`blip::tape_file`); BLIP BASIC reads the same folders.
+macroquad. A game plays its tunes from its tape folder through a
+`blip::Jukebox` (`blip::tape_file`), each loaded in the background the first
+time it is played, so the game never waits on a download; BLIP BASIC reads
+the same folders.
 
 A PNG is a still picture. What changes with the game (the saucer's turning
 lights, a bubble's sheen) is drawn at runtime over it, in the game and its tape

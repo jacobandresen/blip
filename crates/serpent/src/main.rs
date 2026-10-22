@@ -753,7 +753,6 @@ async fn main() {
         level:     blip::audio::load_sound(blip::wav!("level")).await,
     };
     let mut music = Jukebox::new("SERPENT", &["SLITHER", "FRENZY"]);
-    music.start(0).await;
 
     let mut shot_frame: u32 = 0;
 
@@ -779,7 +778,6 @@ async fn main() {
         if was_playing && g.state != State::Play { web::haptic(); }
 
         music.play(g.track());
-        if g.state != State::Play { music.warm_up().await; }
 
         blip.clear(BLIP_BLACK);
         match g.state {

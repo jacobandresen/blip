@@ -353,7 +353,6 @@ async fn main() {
     };
     // Five loops in rotation.
     let mut jukebox = Jukebox::new("RALLY", &["LOOP1", "LOOP2", "LOOP3", "LOOP4", "LOOP5"]);
-    jukebox.start(0).await;
     #[cfg(not(target_arch = "wasm32"))]
     let mut autopilot = bot::Bot { err: 0.0, last_vx: 0.0, hits: 0 };
 
@@ -392,7 +391,5 @@ async fn main() {
             State::Over  => draw_over(&blip, &g),
         }
         blip.next_frame(60).await;
-        #[cfg(not(target_arch = "wasm32"))]
-        if g.state != State::Play { jukebox.warm_up().await; }
     }
 }

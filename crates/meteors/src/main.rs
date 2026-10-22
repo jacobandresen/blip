@@ -1137,7 +1137,6 @@ async fn main() {
 
     // DRIFT, then STORM from wave STORM_WAVE.
     let mut music = Jukebox::new("METEORS", &["DRIFT", "STORM"]);
-    music.start(0).await;
 
     let mut sfx = Sounds {
         fire:         blip::audio::load_sound(blip::wav!("fire")).await,
@@ -1159,7 +1158,6 @@ async fn main() {
         let dt = blip.delta_time;
 
         music.play(if g.state != State::Title && g.sess.level >= STORM_WAVE { 1 } else { 0 });
-        if g.state != State::Play { music.warm_up().await; }
 
         if blip.screenshot_mode {
             shot_frame += 1;

@@ -3481,7 +3481,6 @@ async fn main() {
     // Two loops in rotation,
     // so a long level doesn't hear the same ~40s on repeat.
     let mut music = Jukebox::new("RAIDER", &["LOOP1", "LOOP2"]);
-    music.start(0).await;
 
     let mut shot_frame: u32 = 0;
 
@@ -3489,7 +3488,6 @@ async fn main() {
         let dt = blip.delta_time;
 
         music.rotate(dt);
-        if g.state != State::Play { music.warm_up().await; }
 
         if blip.screenshot_mode {
             shot_frame += 1;

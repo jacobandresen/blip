@@ -206,7 +206,6 @@ async fn main() {
         game_over: blip::audio::load_sound(blip::wav!("game_over")).await,
     };
     let mut music = Jukebox::new("ADDER", &["COIL", "HUNT"]);
-    music.start(0).await;
 
     let mut shot_frame: u32 = 0;
 
@@ -225,7 +224,6 @@ async fn main() {
         }
 
         music.play(g.track());
-        if g.state != State::Play { music.warm_up().await; }
 
         blip.clear(BLIP_BLACK);
         match g.state {
