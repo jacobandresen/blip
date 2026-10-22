@@ -614,10 +614,9 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
             b.x = wrap(b.x, 0.0, PLAY_W as f32);
             b.y = wrap(b.y, PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
         }
-        if b.ttl <= 0.0 || b.x < 0.0 || b.x > PLAY_W as f32 || b.y < PLAY_Y0 || b.y > PLAY_Y0 + PLAY_H as f32 {
-            if b.from_player {
-                player_bullet_expired[i] = true;
-            }
+        // The saucer's go in expire_enemy_bullets.
+        if b.from_player && b.ttl <= 0.0 {
+            player_bullet_expired[i] = true;
         }
     }
 

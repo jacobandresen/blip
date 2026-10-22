@@ -1648,8 +1648,22 @@ test('DEFENDER renders its alien formation in five fresh playtests', async (t) =
       await page.waitForTimeout(180);
       await canvas.focus();
       await page.keyboard.down('Space');
-      await page.waitForTimeout(260);
-      const playerShot = await canvas.screenshot();
+      // Level one: four rows of ten, 44 by 28 pixels apart, from (104,58).
+      const formation = async (png) => {
+        let cells = 0;
+        for (let row = 0; row < 4; row++) for (let col = 0; col < 10; col++) {
+          if (await countGamePixels(page, png, [104 + col * 44, 58 + row * 28, 34, 22], 'lit') > 8) cells++;
+        }
+        return cells;
+      };
+      // Wait for the first frame of play with a shot in flight, not for a clock.
+      let playerShot, occupiedCells = 0, playerShotPixels = 0;
+      for (let attempt = 0; attempt < 40 && (occupiedCells < 20 || playerShotPixels < 5); attempt++) {
+        await page.waitForTimeout(50);
+        playerShot = await canvas.screenshot();
+        occupiedCells = await formation(playerShot);
+        playerShotPixels = await countGamePixels(page, playerShot, [220, 60, 200, 300], 'white');
+      }
       // An explosion lasts under half a second: watch for one as the shots land.
       let explosionPixels = 0;
       for (let attempt = 0; attempt < 30 && explosionPixels < 4; attempt++) {
@@ -1663,12 +1677,6 @@ test('DEFENDER renders its alien formation in five fresh playtests', async (t) =
         await page.waitForTimeout(100);
         alienShotPixels = await countGamePixels(page, await canvas.screenshot(), [40, 60, 560, 290], 'orange');
       }
-      // Level one: four rows of ten, 44 by 28 pixels apart, from (104,58).
-      let occupiedCells = 0;
-      for (let row = 0; row < 4; row++) for (let col = 0; col < 10; col++) {
-        if (await countGamePixels(page, playerShot, [104 + col * 44, 58 + row * 28, 34, 22], 'lit') > 8) occupiedCells++;
-      }
-      const playerShotPixels = await countGamePixels(page, playerShot, [220, 60, 200, 300], 'white');
       const visual = { occupiedCells, playerShotPixels, explosionPixels, alienShotPixels };
       assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: BASIC runtime error`);
       assert.ok(occupiedCells >= 20, `round ${round}: expected a visible 4-by-10 alien formation, got ${JSON.stringify(visual)}`);
