@@ -144,6 +144,18 @@ pub fn draw_texture_tinted(tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, tint
     );
 }
 
+/// The same, mirrored when `face` is negative: a figure drawn facing right
+/// turns to the way it is going.
+pub fn draw_texture_facing(tex: &Texture2D, x: f32, y: f32, w: f32, h: f32, tint: Color, face: f32) {
+    draw_texture_ex(
+        tex,
+        x,
+        y,
+        tint,
+        DrawTextureParams { dest_size: Some(vec2(w, h)), flip_x: face < 0.0, ..Default::default() },
+    );
+}
+
 /// Draw cell (`col`, `row`) of a `cols` x `rows` sprite sheet, rotated by
 /// `rotation` radians (clockwise) about its centre.
 #[allow(clippy::too_many_arguments)]

@@ -889,6 +889,15 @@ impl Blip {
     ) {
         draw::draw_texture_tinted(tex, x, y, w, h, tint);
     }
+    /// Draw a tinted texture mirrored when `face` is negative, for a figure
+    /// drawn facing right.
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_texture_facing(
+        &self, tex: &macroquad::texture::Texture2D, x: f32, y: f32, w: f32, h: f32, tint: Color, face: f32,
+    ) {
+        draw::draw_texture_facing(tex, x, y, w, h, tint, face);
+    }
 
     // ----- font helpers -----
 

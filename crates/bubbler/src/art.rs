@@ -86,13 +86,30 @@ impl Art {
         blip.draw_texture(&self.tiles[round][usize::from(border)], x, y, size, size);
     }
 
-    pub(super) fn player(&self, blip: &Blip, x: f32, foot: f32, player: usize, scale: f32) {
-        blip.draw_texture(
+    /// A dragon, its feet at `foot`, turned the way `face` points.
+    pub(super) fn player(&self, blip: &Blip, x: f32, foot: f32, player: usize, scale: f32, face: f32) {
+        blip.draw_texture_facing(
             &self.players[player],
             x - 16.0 * scale,
             foot - 36.0 * scale,
             32.0 * scale,
             36.0 * scale,
+            BlipColor::new(1.0, 1.0, 1.0, 1.0),
+            face,
+        );
+    }
+
+    /// A trapped toy, its middle at `cx`,`cy`.
+    pub(super) fn toy_in_bubble(&self, blip: &Blip, kind: Kind, angry: bool, cx: f32, cy: f32, scale: f32) {
+        let (w, h) = (32.0 * scale, 36.0 * scale);
+        blip.draw_texture_facing(
+            &self.enemies[kind as usize][usize::from(angry)],
+            cx - 16.5 * scale,
+            cy - 17.0 * scale,
+            w,
+            h,
+            BlipColor::new(1.0, 1.0, 1.0, 1.0),
+            1.0,
         );
     }
 
@@ -105,14 +122,11 @@ impl Art {
         scale: f32,
         alpha: f32,
         angry: bool,
+        face: f32,
     ) {
-        let index = match kind {
-            Kind::Walker => 0,
-            Kind::Hopper => 1,
-            Kind::Ghost => 2,
-        };
+        let index = kind as usize;
         let (w, h) = (32.0 * scale, 36.0 * scale);
-        blip.draw_texture_tinted(
+        blip.draw_texture_facing(
             &self.enemies[index][usize::from(angry)],
             x + (E_W - w) * 0.5,
             y + E_H - h,
@@ -124,6 +138,7 @@ impl Art {
                 b: 1.0,
                 a: alpha,
             },
+            face,
         );
     }
 }

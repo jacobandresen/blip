@@ -45,6 +45,8 @@ const RESPAWN_SAFE: f32 = 3.5;
 
 // ---- bubbles --------------------------------------------------------------
 const BUB_R: f32 = 12.0;
+/// A bubble with a toy in it swells to hold the whole toy.
+const TRAP_R: f32 = 19.0;
 const SHOOT_V: f32 = 340.0;
 const SHOOT_T: f32 = 0.4; // the blown bubble traps only while it is still flying
 const RISE: f32 = 44.0;
@@ -54,7 +56,6 @@ const FREE_LIFE: f32 = 9.0;
 const TRAP_LIFE: f32 = 10.0; // round 1; then the monster breaks out, angry
 const BLOW_CD: f32 = 0.24;
 const MAX_BUBBLES: usize = 36;
-const TOP_Y: f32 = HUD + TILE + BUB_R + 4.0;
 
 // ---- pressure -----------------------------------------------------------
 const HURRY_AT: f32 = 70.0; // round 1: little players take their time
@@ -277,6 +278,16 @@ struct Bubble {
     active: bool,
     wob: f32,
     squish: f32,
+}
+
+impl Bubble {
+    fn radius(&self) -> f32 {
+        if self.trapped.is_some() { TRAP_R } else { BUB_R }
+    }
+    /// Where it rests against the ceiling.
+    fn top_y(&self) -> f32 {
+        HUD + TILE + self.radius() + 4.0
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -994,7 +1005,7 @@ fn update_shots(g: &mut Game, dt: f32, player_starts: [(f32, f32); 2]) -> [bool;
                 b.active
                     && b.phase == Phase::Shoot
                     && b.trapped.is_none()
-                    && (b.x - s.x).hypot(b.y - s.y) < BUB_R + 5.0
+                    && (b.x - s.x).hypot(b.y - s.y) < b.radius() + 5.0
             })
         {
             s.active = false;
@@ -1039,7 +1050,7 @@ fn pop_chain(g: &mut Game, start: usize, by: usize, sfx: &Sounds) {
                 continue;
             }
             let b = g.bubbles[j];
-            if blip::distance(a.x, a.y, b.x, b.y) < BUB_R * 2.0 * CHAIN_REACH {
+            if blip::distance(a.x, a.y, b.x, b.y) < (a.radius() + b.radius()) * CHAIN_REACH {
                 chain.push(j);
             }
         }
@@ -1058,7 +1069,7 @@ fn pop_chain(g: &mut Game, start: usize, by: usize, sfx: &Sounds) {
             rgba(0.6, 0.85, 1.0, 0.9)
         };
         g.burst(b.x, b.y, 8, ring, 90.0, false);
-        g.ring(b.x, b.y, ring, BUB_R);
+        g.ring(b.x, b.y, ring, b.radius());
         if b.trapped.is_some() {
             let value = 1000 << kills.min(4);
             g.p[by].score += value;
@@ -1175,17 +1186,20 @@ fn update_bubbles(
                     RISE
                 } * dt;
                 b.x += (b.wob * 2.2).sin() * 10.0 * dt;
-                if b.y <= TOP_Y {
-                    b.y = TOP_Y;
+                if b.y <= b.top_y() {
+                    b.y = b.top_y();
                     b.phase = Phase::Top;
                 }
             }
             Phase::Top => {
                 let d = gather - b.x;
                 b.x += d.signum() * d.abs().min(38.0) * dt + (b.wob * 1.7).sin() * 6.0 * dt;
-                b.y = TOP_Y + (b.wob * 2.0).sin() * 1.5;
+                b.y = b.top_y() + (b.wob * 2.0).sin() * 1.5;
             }
         }
+        // inside the walls, at whatever size it now is
+        let r = b.radius();
+        b.x = b.x.clamp(TILE + r, WIN_W as f32 - TILE - r);
         if was_free && b.trapped.is_some() {
             g.stats.traps += 1;
         }
@@ -1243,7 +1257,7 @@ fn update_bubbles(
             }
             let (dx, dy) = (b.x - a.x, b.y - a.y);
             let d = dx.hypot(dy).max(0.1);
-            let min = BUB_R * 2.0 - 1.0;
+            let min = a.radius() + b.radius() - 1.0;
             if d < min {
                 let push = (min - d) * 0.5;
                 g.bubbles[i].x -= dx / d * push;
@@ -1272,7 +1286,7 @@ fn update_bubbles(
                 player_starts[pi].0 - bubble_from.0,
                 player_starts[pi].1 - bubble_from.1,
                 px - b.x, py - b.y,
-                0.0, 0.0, BUB_R + 11.0,
+                0.0, 0.0, b.radius() + 11.0,
             ) {
                 continue;
             }
@@ -1672,19 +1686,11 @@ fn draw_bubble(blip: &Blip, art: &art::Art, b: &Bubble, ox: f32, oy: f32, t: f32
     } else {
         1.0
     };
-    let r = (BUB_R + (b.wob * 3.0).sin() * 0.6) * grow;
+    let r = (b.radius() + (b.wob * 3.0).sin() * 0.6) * grow;
     let (rx, ry) = (r * (1.0 + b.squish * 0.25), r * (1.0 - b.squish * 0.25));
     if let Some((kind, angry)) = b.trapped {
-        // centred in its bubble (draw_enemy stands a toy on its feet)
-        art.enemy(
-            blip,
-            kind,
-            x - E_W / 2.0 + shake,
-            y - E_H + E_H / 2.0 * 0.78 + (b.wob * 5.0).sin(),
-            0.78 * TOY_SCALE,
-            1.0,
-            angry,
-        );
+        // the whole toy inside: it reaches 18 px from its middle at full size
+        art.toy_in_bubble(blip, kind, angry, x + shake, y + (b.wob * 5.0).sin() * 0.6, (TRAP_R - 2.0) / 18.0);
     }
     let rim = if escaping && (t * 10.0) as i32 % 2 == 0 {
         rgba(1.0, 0.3, 0.3, 0.95)
@@ -1942,6 +1948,8 @@ fn draw_world(blip: &Blip, art: &art::Art, g: &Game) {
             s.max(0.05) * TOY_SCALE * k,
             s,
             e.angry,
+            // the way it is going; a ghost drifting nearly still keeps its heading
+            if e.vx.abs() > 1.0 { e.vx.signum() } else { e.dir },
         );
     }
     for (i, p) in g.p.iter().enumerate() {
@@ -1954,7 +1962,7 @@ fn draw_world(blip: &Blip, art: &art::Art, g: &Game) {
         if p.safe > 0.0 && (p.safe * 12.0) as i32 % 2 == 0 && p.dead_t <= 0.0 {
             continue;
         }
-        art.player(blip, p.cx() + ox, p.y + P_H + oy, i, TOY_SCALE);
+        art.player(blip, p.cx() + ox, p.y + P_H + oy, i, TOY_SCALE, p.face);
         // the candy flying into the open mouth
         if p.eat >= 0.0 && p.eat < EAT_FLY {
             let (mx, my) = mouth_pos(p);
@@ -2180,7 +2188,8 @@ fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: &web::HighScore) {
     {
         let hop = ((t * 3.2 + i as f32 * 1.6).sin()).max(0.0);
         let foot = 278.0 + DY - hop * 34.0;
-        art.player(blip, *x, foot, i, 2.4);
+        // the two of them face each other
+        art.player(blip, *x, foot, i, 2.4, if i == 0 { 1.0 } else { -1.0 });
     }
     let glow = 0.65 + 0.35 * (t * 2.5).sin().abs();
     art.title_panels(blip, web::controls(), glow);

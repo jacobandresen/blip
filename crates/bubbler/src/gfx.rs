@@ -115,6 +115,8 @@ fn line(img: &mut Image, x0: i32, y0: i32, x1: i32, y1: i32, color: (u8, u8, u8)
     }
 }
 
+/// A plush toy turned a little to the right, its face off-centre that way, so
+/// mirrored it plainly faces left.
 fn plush(body: (u8, u8, u8), angry_body: (u8, u8, u8), kind: usize, angry: bool) -> Vec<u8> {
     let body = if angry { angry_body } else { body };
     let mut img = Image::new(32, 36);
@@ -142,20 +144,21 @@ fn plush(body: (u8, u8, u8), angry_body: (u8, u8, u8), kind: usize, angry: bool)
         line(&mut img, 16, 8, 16, 12, (230, 180, 70));
         disc(&mut img, 7, 28, 5, 3, dark);
         disc(&mut img, 25, 28, 5, 3, dark);
-        disc(&mut img, 16, 18, 8, 6, (250, 245, 255));
+        disc(&mut img, 18, 18, 8, 6, (250, 245, 255));
     } else if kind == 1 {
-        disc(&mut img, 26, 23, 3, 3, (255, 250, 250));
+        // the tail, behind it
+        disc(&mut img, 5, 24, 3, 3, (255, 250, 250));
     }
-    for x in [13, 21] {
+    for x in [15, 22] {
         disc(&mut img, x, 16, 2, 3, (40, 25, 45));
         disc(&mut img, x, 15, 1, 1, (255, 255, 255));
     }
     if angry {
-        line(&mut img, 9, 13, 14, 15, (90, 40, 60));
-        line(&mut img, 23, 13, 18, 15, (90, 40, 60));
+        line(&mut img, 11, 13, 16, 15, (90, 40, 60));
+        line(&mut img, 24, 13, 19, 15, (90, 40, 60));
     }
-    disc(&mut img, 11, 20, 2, 1, (255, 150, 165));
-    disc(&mut img, 16, 22, 1, 1, (120, 40, 60));
+    disc(&mut img, 12, 20, 2, 1, (255, 150, 165));
+    disc(&mut img, 19, 22, 1, 1, (120, 40, 60));
     img.encode_png()
 }
 

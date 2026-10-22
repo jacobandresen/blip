@@ -123,11 +123,10 @@ impl Program {
                 blip.fill_sunburst(n(0), n(1), n(2).max(1.0) as usize, n(3), n(4), [c(5), c(6)])
             }
             "DRAW_HUD" if vals.len() == 2 => blip.draw_hud(n(0) as i32, n(1) as i32),
-            "DRAW_TEXTURE" if vals.len() == 5 => {
-                blip.draw_texture(texture(0)?, n(1), n(2), n(3), n(4))
-            }
-            "DRAW_TEXTURE" if vals.len() == 6 => {
-                blip.draw_texture_tinted(texture(0)?, n(1), n(2), n(3), n(4), c(5))
+            // A negative width mirrors the picture, in the box a positive one would fill.
+            "DRAW_TEXTURE" if (5..=6).contains(&vals.len()) => {
+                let tint = if vals.len() == 6 { c(5) } else { BLIP_WHITE };
+                blip.draw_texture_facing(texture(0)?, n(1), n(2), n(3).abs(), n(4), tint, n(3).signum())
             }
             "DRAW_TEXTURE" if vals.len() == 9 => blip.draw_texture_region(
                 texture(0)?,
