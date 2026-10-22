@@ -3,6 +3,8 @@
 
 use std::f32::consts::PI;
 
+use crate::xm::{heard, heard_hz, Part, HAT, KICK, SNARE};
+
 use crate::wav::{env, mix_into_f32, tame, Rng, SAMPLE_RATE};
 
 /// Select a hook note; every fourth bar answers the phrase backwards, a diatonic fifth higher.
@@ -34,6 +36,7 @@ fn dark(lp: &mut f32, x: f32, a: f32) -> f32 { *lp += a * (x - *lp); *lp }
 /// Punchy pitch-swept kick with a short click on the attack and gentle
 /// saturation, so it cuts through a dense mix.
 pub fn kick(buf: &mut [f32], off: usize, vol: f32) {
+    heard(off, KICK, Part::Drums);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.15) as usize;
     let click_n = (sr * 0.0025) as usize;
@@ -59,6 +62,7 @@ pub fn kick(buf: &mut [f32], off: usize, vol: f32) {
 
 /// Closed hi-hat — short, bright noise tick.
 pub fn hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
+    heard(off, HAT, Part::Drums);
     let n = (SAMPLE_RATE as f32 * 0.045) as usize;
     let mut lp = 0.0;
     for i in 0..n {
@@ -71,6 +75,7 @@ pub fn hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
 
 /// Open hi-hat — longer decay, washier than the closed hat.
 pub fn open_hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
+    heard(off, HAT, Part::Drums);
     let n = (SAMPLE_RATE as f32 * 0.16) as usize;
     let mut lp = 0.0;
     for i in 0..n {
@@ -83,6 +88,7 @@ pub fn open_hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
 
 /// Clap — a few staggered noise bursts layered together, classic house/techno snap.
 pub fn clap(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
+    heard(off, SNARE, Part::Drums);
     let sr = SAMPLE_RATE as f32;
     let burst_n = (sr * 0.03) as usize;
     let spread = [0usize, (sr * 0.008) as usize, (sr * 0.018) as usize];
@@ -108,6 +114,7 @@ pub fn clap(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
 /// TB-303 roll), gently saturated, over a clean sub-octave sine that makes it
 /// read as a bassline. Mixed in f32 and limited once, so it can run hot.
 pub fn bass_note(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
+    heard_hz(off, freq, Part::Bass);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
     let att = (sr * 0.003) as usize;
@@ -153,6 +160,7 @@ pub fn sidechain_duck(buf: &mut [f32], kick_offsets: &[usize], depth: f32, relea
 
 /// Bright additive lead/stab voice, for hooks and tension hits.
 pub fn lead_stab(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
+    heard_hz(off, freq, Part::Tune);
     let freq = tame(freq);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
@@ -174,6 +182,7 @@ pub fn lead_stab(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
 /// ms) is a plucked arp, long (200 ms+) a swelling pad; `detune` is the
 /// spread as a fraction of `freq` (0.006-0.01 classic).
 pub fn supersaw(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, att_ms: f32, detune: f32) {
+    heard_hz(off, freq, Part::Tune);
     let freq = tame(freq);
     let a = 1.0 - (-2.0 * PI * (freq * 4.0).min(1800.0) / SAMPLE_RATE as f32).exp();
     let (mut l1, mut l2) = (0.0f32, 0.0f32);

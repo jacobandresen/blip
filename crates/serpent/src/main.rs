@@ -12,6 +12,8 @@ use blip::{
     Timer, BLIP_BLACK, BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
 mod tunes;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
@@ -756,7 +758,7 @@ async fn main() {
         bonus_eat: blip::audio::load_sound(BONUS_EAT_WAV).await,
         level:     blip::audio::load_sound(LEVEL_WAV).await,
     };
-    let mut music = Jukebox::new(&[crate::tunes::slither_wav, crate::tunes::frenzy_wav]);
+    let mut music = Jukebox::new("SERPENT", &["SLITHER", "FRENZY"]);
     music.start(0).await;
 
     let mut shot_frame: u32 = 0;

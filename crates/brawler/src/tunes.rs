@@ -1,4 +1,4 @@
-// The game plays its tunes and build.rs writes its effects: each uses part of this file.
+// Compiled by build.rs, and by the game for its tests: each uses part of this file.
 #![allow(dead_code)]
 
 use blip::wav::{
@@ -6,11 +6,13 @@ use blip::wav::{
     soft_limit_to_pcm16, tame, warm, Rng, MIX_KNEE, SAMPLE_RATE,
 };
 use blip::Asset;
+use blip::xm::{heard, heard_hz, tempo, Part, KICK, SNARE};
 
 const SRF: f32 = SAMPLE_RATE as f32;
 
 /// Plucked string using Karplus–Strong averaging; upper harmonics decay first.
 pub(super) fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut Rng) {
+    heard_hz(off, freq, Part::Tune);
     let freq = tame(freq);
     let period = (SAMPLE_RATE as f32 / freq).max(2.0) as usize;
     let n = ms_to_samples(ms).min(buf.len().saturating_sub(off));
@@ -43,6 +45,7 @@ pub(super) fn pluck(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, 
 /// A taiko: a low body tone falling in pitch as the head relaxes, a noise
 /// crack for the stick, and a room-length tail.
 pub(super) fn taiko(buf: &mut [f32], off: usize, freq: f32, gain: f32, rng: &mut Rng) {
+    heard(off, KICK, Part::Drums);
     let n = ms_to_samples(460.0).min(buf.len().saturating_sub(off));
     let mut phase = 0.0f32;
     for i in 0..n {
@@ -57,6 +60,7 @@ pub(super) fn taiko(buf: &mut [f32], off: usize, freq: f32, gain: f32, rng: &mut
 
 /// The rim — a dry wooden click, the sound of the stick on the hoop.
 pub(super) fn rim(buf: &mut [f32], off: usize, gain: f32, rng: &mut Rng) {
+    heard(off, SNARE, Part::Drums);
     let n = ms_to_samples(45.0).min(buf.len().saturating_sub(off));
     let mut prev = 0.0f32;
     for i in 0..n {
@@ -90,6 +94,7 @@ pub(super) fn degree(scale: &[f32; 5], root: f32, step: i32) -> f32 {
 /// A shakuhachi: a breathy tone that swells in, wavers once it is held and
 /// dies away, with the air of the player's breath round it.
 pub(super) fn flute(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, rng: &mut Rng) {
+    heard_hz(off, freq, Part::Tune);
     let n = ms_to_samples(ms).min(buf.len().saturating_sub(off));
     let (mut ph, mut air) = (0.0f32, 0.0f32);
     for i in 0..n {
@@ -109,6 +114,7 @@ pub(super) fn flute(buf: &mut [f32], off: usize, freq: f32, ms: f32, gain: f32, 
 /// A struck glass: one clear partial and its octave, gone in half a second.
 /// Not tamed like the koto, so it can sit above the tune.
 fn chime(buf: &mut [f32], off: usize, freq: f32, gain: f32) {
+    heard_hz(off, freq, Part::Harmony);
     let n = ms_to_samples(520.0).min(buf.len().saturating_sub(off));
     for i in 0..n {
         let t = i as f32 / SRF;
@@ -158,6 +164,7 @@ impl Theme<'_> {
             drive,
             feel,
         } = *self;
+        tempo(bpm);
         let step = (SAMPLE_RATE as f32 * 60.0 / bpm / 4.0) as usize; // 16ths
         let bars = 4 * order.len();
         let steps = bars * 16;
@@ -1259,8 +1266,7 @@ fn heartbeat() -> Vec<i16> {
 
 /// The effects, as `sounds/NAME.wav`.
 pub fn sounds() -> Vec<Asset> {
-    let mut assets = Vec::new();
-    assets.extend(vec![
+    vec![
         // Three light hits, the thud climbing a combo step each, so a string
         // sounds like it is going somewhere.
         ("sounds/hit_light.wav",  encode_pcm16_half(&hit(300.0, 0.15, 0x11))),
@@ -1302,6 +1308,26 @@ pub fn sounds() -> Vec<Asset> {
         ("sounds/thwip.wav",     encode_pcm16_mono(&thwip())),
         ("sounds/win.wav",       encode_pcm16_music(&verdict(true))),
         ("sounds/lose.wav",      encode_pcm16_music(&verdict(false))),
-    ]);
-    assets
+        // The crowd, and the four stages' ambience under the music.
+        ("sounds/cheer.wav", crowd_wav(false)),
+        ("sounds/roar.wav", crowd_wav(true)),
+        ("sounds/ambience_crowd.wav", ambience_wav(0)),
+        ("sounds/ambience_wind.wav", ambience_wav(1)),
+        ("sounds/ambience_crickets.wav", ambience_wav(2)),
+        ("sounds/ambience_city.wav", ambience_wav(3)),
+    ]
+}
+
+/// The music: each tune as a WAV to play and an XM of its notes for TUNE.
+pub fn music() -> Vec<(String, Vec<u8>)> {
+    blip::xm::tunes(&[
+        ("DOCK", &|| theme_wav(0)),
+        ("TEMPLE", &|| theme_wav(1)),
+        ("SELECT", &|| theme_wav(2)),
+        ("AIRBASE", &|| theme_wav(3)),
+        ("BATHHOUSE", &|| theme_wav(4)),
+        ("VILLAGE", &|| theme_wav(5)),
+        ("FORTRESS", &|| theme_wav(6)),
+        ("ROOFTOP", &|| theme_wav(7)),
+    ])
 }

@@ -34,11 +34,11 @@ impl Program {
         let c = |i: usize| -> Color { vals.get(i).map(value_color).unwrap_or(BLIP_WHITE) };
         let texture = |i: usize| -> Result<&BlipTex, String> {
             let requested = vals.get(i).map(Value::string).unwrap_or_default();
-            let name = if requested.starts_with('/') {
-                requested.to_ascii_uppercase()
-            } else {
-                requested.to_ascii_lowercase()
-            };
+            // A picture's file: `.PNG` when no other is named.
+            let mut name = requested.to_ascii_uppercase();
+            if !name.contains('.') {
+                name.push_str(".PNG");
+            }
             if !crate::host::file_available(&name) {
                 return Err(format!("File not available {requested}"));
             }

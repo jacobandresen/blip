@@ -38,5 +38,4 @@
   confirmPanel.addEventListener('keydown',function(e){if(e.key==='Escape'){e.preventDefault();document.getElementById('paint-confirm-cancel').click();}});
   nameField.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();save();canvas.focus();}if(e.key==='Escape'){e.preventDefault();document.getElementById('paint-close').click();}});
   window.startPaint=open;
-  window.paintTexturePayload=function(){return Object.keys(basic.filesystem.files).filter(function(path){return /^\/USER\/.*\.PNG$/i.test(path)&&typeof basic.filesystem.files[path]==='string'&&basic.filesystem.files[path].indexOf('data:image/png')===0;}).map(function(path){return {path:path,data:basic.filesystem.files[path]};});};
 })();

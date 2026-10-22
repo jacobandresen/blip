@@ -85,7 +85,7 @@ function loadSharedMath() {
           && event.data?.type === 'blip-basic-wasm-ready') finish();
     }
     window.addEventListener('message', loaded);
-    if (!wasmFrame.hasAttribute('src')) wasmFrame.src = 'basic-runtime.html?v=18';
+    if (!wasmFrame.hasAttribute('src')) wasmFrame.src = 'basic-runtime.html?v=19';
   });
 }
 
@@ -214,7 +214,7 @@ var DRAFT = 'blip-basic-draft';
 var FS_STORE = 'blip-basic-filesystem';
 var LEGACY_STORE = 'blip-basic-programs';
 var CURRENT_FILE_STORE = 'blip-basic-current-file';
-var tapeFiles=Object.create(null),gfxNames=Object.create(null),tapeNames=[],tapeLoadError=null,tapeBusy=false,tapeLoading=false;
+var tapeFiles=Object.create(null),assetNames=Object.create(null),tapeNames=[],tapeLoadError=null,tapeBusy=false,tapeLoading=false;
 var tapePrograms=[
   {file:'ADDER.BLIP',command:'ADDER',slug:'adder',title:'ADDER',players:2},
   {file:'BOUNCER.BLIP',command:'BOUNCER',slug:'bouncer',title:'BOUNCER'},
@@ -227,7 +227,13 @@ var tapePrograms=[
   {file:'RAIDER.BLIP',command:'RAIDER',slug:'raider',title:'RAIDER'}
 ];
 var tapeReady=fetch('TAPE/manifest.json').then(function(response){if(!response.ok)throw Error('TAPE DIRECTORY UNAVAILABLE');return response.json();}).then(function(names){if(!Array.isArray(names))throw Error('BAD TAPE MANIFEST');tapeNames=names.filter(function(name){return tapePrograms.some(function(tape){return tape.file===name;});});}).catch(function(error){tapeLoadError=error.message;});
-var gfxReady=fetch('TAPE/GFX/manifest.json').then(function(response){if(!response.ok)throw Error('GFX directory unavailable');return response.json();}).then(function(games){if(games&&typeof games==='object')gfxNames=games;}).catch(function(){});
+// Each tape's own folder, /TAPE/<GAME>/ASSETS: its pictures, sounds and tunes, listed once.
+var assetLists=Object.create(null);
+function assetsReady(tape){
+  if(!tape)return Promise.resolve();
+  var game=tape.command;
+  return assetLists[game]||(assetLists[game]=fetch('TAPE/'+game+'/ASSETS/manifest.json').then(function(response){return response.ok?response.json():[];}).then(function(names){assetNames[game]=Array.isArray(names)?names:[];}).catch(function(){assetNames[game]=[];}));
+}
 var romTunes=[];
 var romTunesReady=fetch('ROM/TUNES/manifest.json').then(function(response){if(!response.ok)throw Error('ROM TUNES unavailable');return response.json();}).then(function(files){if(Array.isArray(files))romTunes=files.filter(function(name){return typeof name==='string'&&/\.xm$/i.test(name);});}).catch(function(){});
 var currentDir = '/USER';
@@ -286,15 +292,15 @@ function findFile(path){
   return all.find(function(file){return file.toLowerCase()===path.toLowerCase();})||path;
 }
 function mountedDirectories(){
-  return ['/','/ROM','/ROM/TUNES','/TAPE','/USER'].concat(insertedTape?['/TAPE/GFX','/TAPE/GFX/'+insertedTape.slug.toUpperCase()]:[],filesystem.dirs);
+  return ['/','/ROM','/ROM/TUNES','/TAPE','/USER'].concat(insertedTape?['/TAPE/'+insertedTape.command,'/TAPE/'+insertedTape.command+'/ASSETS']:[],filesystem.dirs);
 }
 function isFileAvailable(path){
   path=String(path).toUpperCase();
   if(path.indexOf('/TAPE/')!==0)return true;
   if(!insertedTape)return false;
   if(path==='/TAPE/'+insertedTape.file.toUpperCase())return true;
-  var prefix='/TAPE/GFX/'+insertedTape.slug.toUpperCase()+'/';
-  return path.indexOf(prefix)===0&&(gfxNames[insertedTape.slug.toUpperCase()]||[]).some(function(name){return prefix+name.toUpperCase()===path;});
+  var prefix='/TAPE/'+insertedTape.command+'/ASSETS/';
+  return path.indexOf(prefix)===0&&(assetNames[insertedTape.command]||[]).some(function(name){return prefix+name===path;});
 }
 function tapeForPath(path){return tapePrograms.find(function(tape){return ('/TAPE/'+tape.file).toLowerCase()===String(path).toLowerCase();})||null;}
 var tapeOrder=tapePrograms.slice();
@@ -546,9 +552,10 @@ async function readProgramSource(path){
 }
 async function loadProgram(name){
   var path=programPath(name);
-  if(path.indexOf('/TAPE/')===0)await Promise.all([tapeReady,gfxReady]);
+  if(path.indexOf('/TAPE/')===0)await tapeReady;
   path=findFile(path);
   var tape=tapeForPath(path);
+  await assetsReady(tape);
   if(tape&&!tapeNames.some(function(name){return ('/TAPE/'+name).toLowerCase()===path.toLowerCase();}))throw Error('TAPE NOT FOUND');
   if(tape&&tapeLoading)throw Error('Tape transport busy');
   if(tape)tapeLoading=true;
@@ -713,10 +720,9 @@ function directoryEntries(path){
   if(path==='/')dirs=['/ROM/','/TAPE/','/USER/'];
   if(path==='/ROM')dirs.push('TUNES/');
   if(path==='/ROM/TUNES')files=files.concat(romTunes);
-  if(path==='/TAPE'&&insertedTape){dirs.push('GFX/');files.push(insertedTape.file);}
-  if(path==='/TAPE/GFX'&&insertedTape)dirs.push(insertedTape.slug.toUpperCase()+'/');
-  var gfxGame=path.match(/^\/TAPE\/GFX\/([A-Z0-9_]+)$/);
-  if(gfxGame&&insertedTape&&gfxGame[1]===insertedTape.slug.toUpperCase())files=files.concat(gfxNames[gfxGame[1]]||[]);
+  if(path==='/TAPE'&&insertedTape){dirs.push(insertedTape.command+'/');files.push(insertedTape.file);}
+  if(insertedTape&&path==='/TAPE/'+insertedTape.command)dirs.push('ASSETS/');
+  if(insertedTape&&path==='/TAPE/'+insertedTape.command+'/ASSETS')files=files.concat(assetNames[insertedTape.command]||[]);
   filesystem.dirs.forEach(function(dir){
     if(dir==='/USER')return;
     var parent=dir.slice(0,dir.lastIndexOf('/'))||'/';
@@ -730,7 +736,7 @@ function directoryEntries(path){
 }
 async function showDirectory(path){
   await tapeReady;
-  if(path.toUpperCase().indexOf('/TAPE/GFX')===0)await gfxReady;
+  if(path.toUpperCase().indexOf('/TAPE/')===0)await assetsReady(insertedTape);
   if(path.toUpperCase().indexOf('/ROM/TUNES')===0)await romTunesReady;
   if(tapeLoadError)throw Error(tapeLoadError);
   path=canonicalDirectory(path||currentDir);
@@ -842,53 +848,51 @@ function jump(number) {
   var i=run.numbers.indexOf(Number(number)); if(i<0)throw Error('Line '+number+' not found');
   run.index=i;run.statement=0;
 }
-var pendingGameCopy=null;
+var copyingGame=false;
 function ensureUserDirectory(path){
   var parts=path.split('/').filter(Boolean),current='';
   parts.forEach(function(part){current+='/'+part;if(current!=='/USER'&&!filesystem.dirs.some(function(dir){return dir.toUpperCase()===current;}))filesystem.dirs.push(current);});
 }
-function pngDataUrl(buffer){
+function dataUrl(buffer,type){
   var bytes=new Uint8Array(buffer),binary='';
   for(var start=0;start<bytes.length;start+=0x8000)binary+=String.fromCharCode.apply(null,bytes.subarray(start,Math.min(start+0x8000,bytes.length)));
-  return 'data:image/png;base64,'+btoa(binary);
+  return 'data:'+type+';base64,'+btoa(binary);
 }
-function finishGameCopy(){
-  var pending=pendingGameCopy;if(!pending)return;
-  try{
-    Object.keys(pending.assets).forEach(function(path){var name=path.slice(path.lastIndexOf('/')+1),alias=name.replace(/\.PNG$/,'');pending.source=pending.source.replaceAll('"'+alias+'"','"'+path+'"');});
-    Object.keys(pending.assets).forEach(function(path){filesystem.files[path]=pending.assets[path];});
-    filesystem.files[pending.destination]=pending.source;
-    writeFilesystem();currentFile=pending.destination;storeDraft();
-    pendingGameCopy=null;stopBouncerWasm();openEditor(currentFile);
-  }catch(error){pendingGameCopy=null;stopBouncerWasm();print('? GAME COPY FAILED: '+error.message);}
-}
-function escapeFromBasicGame(){
-  if(!basicWasmPlaying||pendingGameCopy)return;
-  var tape=tapeForPath(currentFile),destination=currentFile;
-  if(tape){destination='/USER/'+tape.command+'/'+tape.file;ensureUserDirectory('/USER/'+tape.command+'/GFX');}
+/** ESCAPE from a tape's game: the game and its pictures are copied to /USER/<GAME>/, to change and repaint;
+    whatever the copy's ASSETS folder lacks still comes from the tape's (see the runtime's load_files). */
+async function escapeFromBasicGame(){
+  if(!basicWasmPlaying||copyingGame)return;
+  var tape=tapeForPath(currentFile),destination=tape?'/USER/'+tape.command+'/'+tape.file:currentFile;
   if(!destination||destination.indexOf('/USER/')!==0){stopBouncerWasm();return;}
-  var source=filesystem.files[destination];
-  if(source===undefined){
-    source=programSource();
-    if(tape)source=source.replaceAll('/TAPE/GFX/'+tape.slug.toUpperCase()+'/',destination.slice(0,destination.lastIndexOf('/'))+'/GFX/');
-  }
-  pendingGameCopy={destination:destination,source:source,assets:{}};
-  if(tape&&filesystem.files[destination]===undefined&&basicWasmReady){
-    var gameId={adder:1,bouncer:2,brawler:3,bubbler:4,defender:5,meteors:6,rally:7,serpent:8,raider:9}[tape.slug]||0;
-    wasmFrame.contentWindow.postMessage({type:'blip-basic-export-rom-assets',game:gameId},location.origin);
-    return;
-  }
-  finishGameCopy();
+  copyingGame=true;
+  try{
+    if(tape&&filesystem.files[destination]===undefined){
+      var from='/TAPE/'+tape.command+'/ASSETS/',to='/USER/'+tape.command+'/ASSETS/';
+      ensureUserDirectory(to.slice(0,-1));
+      await assetsReady(tape);
+      var pictures=(assetNames[tape.command]||[]).filter(function(name){return /\.PNG$/.test(name);});
+      await Promise.all(pictures.map(function(name){return fetch(from.slice(1)+name).then(function(response){return response.arrayBuffer();}).then(function(buffer){filesystem.files[to+name]=dataUrl(buffer,'image/png');});}));
+      filesystem.files[destination]=programSource().replaceAll(from,to);
+      writeFilesystem();
+    }
+    currentFile=destination;storeDraft();
+    stopBouncerWasm();openEditor(currentFile);
+  }catch(error){stopBouncerWasm();print('? GAME COPY FAILED: '+error.message);}
+  copyingGame=false;
 }
 function exitActiveProgram(){if(basicWasmPlaying)stopBouncerWasm();else if(run)stopProgram();}
-function postBasicWasmSource(){if(basicWasmReady&&wasmFrame.contentWindow)wasmFrame.contentWindow.postMessage({type:'blip-basic-source',source:basicWasmSource,textures:typeof paintTexturePayload==='function'?paintTexturePayload():[],music:typeof blipBasicMusicPayload==='function'?blipBasicMusicPayload():[]},location.origin);}
+/** The user's pictures and sounds, for the runtime: every /USER PNG and WAV. */
+function userFiles(){
+  return Object.keys(filesystem.files).filter(function(path){var data=filesystem.files[path];return /^\/USER\/.*\.(PNG|WAV)$/i.test(path)&&typeof data==='string'&&data.indexOf('data:')===0;}).map(function(path){return {path:path,data:filesystem.files[path]};});
+}
+function postBasicWasmSource(){if(basicWasmReady&&wasmFrame.contentWindow)wasmFrame.contentWindow.postMessage({type:'blip-basic-source',source:basicWasmSource,files:userFiles()},location.origin);}
 function focusBasicWasmCanvas(){try{wasmFrame.contentWindow.focus();wasmFrame.contentDocument.getElementById('glcanvas').focus();}catch(e){}}
 function runBlipInWasm(){
   configureBasicControls();
   basicWasmRunId++;
   basicWasmSource=Array.from(lines.keys()).sort(function(a,b){return a-b;}).map(function(n){return n+' '+lines.get(n);}).join('\n')+'\nREM RUN '+basicWasmRunId;
   basicWasmPlaying=true;document.body.setAttribute('data-wasm-playing','');updatePlayClearance();document.body.removeAttribute('data-wasm-error');document.body.removeAttribute('data-wasm-running');output.textContent='';clear();wasmFrame.hidden=false;
-  if(!wasmFrame.hasAttribute('src')){wasmFrame.addEventListener('load',function loaded(){wasmFrame.removeEventListener('load',loaded);basicWasmReady=true;postBasicWasmSource();focusBasicWasmCanvas();},{once:true});wasmFrame.src='basic-runtime.html?v=18';}
+  if(!wasmFrame.hasAttribute('src')){wasmFrame.addEventListener('load',function loaded(){wasmFrame.removeEventListener('load',loaded);basicWasmReady=true;postBasicWasmSource();focusBasicWasmCanvas();},{once:true});wasmFrame.src='basic-runtime.html?v=19';}
   else {postBasicWasmSource();focusBasicWasmCanvas();}
 }
 var blipPrimitiveNames='canvas clear fill_rect draw_rect draw_line draw_line_ex draw_polyline draw_glow_line fx_clear fx_update fx_draw fx_burst fx_popup fx_ring fill_circle draw_circle fill_capsule fill_sunburst fill_glow_circle draw_texture draw_texture_region draw_texture_cell draw_texture_tinted draw_char draw_text draw_text_outlined draw_centered_outlined draw_number draw_centered draw_hud'.split(' ');
@@ -903,8 +907,6 @@ window.addEventListener('message', function (event) {
   if(event.data.type==='blip-basic-wasm-ready'){basicWasmReady=true;postBasicWasmSource();if(basicWasmPlaying)focusBasicWasmCanvas();}
   if(event.data.type==='blip-basic-program-loaded'&&basicWasmPlaying){document.body.setAttribute('data-wasm-running','');focusBasicWasmCanvas();}
   if(event.data.type==='blip-basic-runtime-error')document.body.setAttribute('data-wasm-error',event.data.message||'error');
-  if(event.data.type==='blip-basic-rom-asset'&&pendingGameCopy){var sourcePath=String(event.data.path||'').toUpperCase(),game=tapeForPath(currentFile),destinationPath=game?sourcePath.replace(/^\/TAPE\/GFX\/[^/]+\//,'/USER/'+game.command+'/GFX/'):'';if(destinationPath.indexOf('/USER/')===0)pendingGameCopy.assets[destinationPath]=pngDataUrl(event.data.bytes);}
-  if(event.data.type==='blip-basic-rom-assets-done')finishGameCopy();
   if(event.data.type==='blip-basic-escape')escapeFromBasicGame();
   if(event.data.type==='blip-basic-stop')stopBouncerWasm();
 });
@@ -1025,7 +1027,7 @@ function submit(raw) {
   try {
     var m;
     if((m=/^PAINT(?:\s+(.+))?$/i.exec(s))){if(typeof startPaint!=='function')throw Error('PAINT is unavailable');if(run||basicWasmPlaying)exitActiveProgram();startPaint(m[1]?pathArgument(m[1]):null);return;}
-    if((m=/^TUNE(?:\s+(.+))?$/i.exec(s))){if(m[1])throw Error('TUNE TAKES NO FILE; USE IMPORT XM');if(typeof startTune!=='function')throw Error('TUNE is unavailable');if(run||basicWasmPlaying)exitActiveProgram();startTune();return;}
+    if((m=/^TUNE(?:\s+(.+))?$/i.exec(s))){var xm=m[1]?resolvePath(pathArgument(m[1])):null;if(xm&&!/^\/(TAPE\/[A-Z0-9_]+\/ASSETS|ROM\/TUNES)\/[^/]+\.XM$/i.test(xm))throw Error('TUNE OPENS AN .XM IN /TAPE OR /ROM; USE IMPORT XM FOR YOUR OWN');if(typeof startTune!=='function')throw Error('TUNE is unavailable');if(run||basicWasmPlaying)exitActiveProgram();startTune(xm&&xm.toUpperCase());return;}
     if(s.toUpperCase()==='RUN'){
       if(!lines.size)throw Error('No program');
       if(programUsesBlipPrimitives()){runBlipInWasm();return;}
@@ -1048,7 +1050,7 @@ function submit(raw) {
       print('MOVE FROM TO  MOVE A FILE IN /USER');
       print('EDIT FILE     EDIT A /USER FILE; CHANGES AUTO-SAVE; ESC CLOSES');
       print('PAINT [FILE]  OPEN THE PIXEL ART EDITOR');
-      print('TUNE          OPEN THE MUSIC EDITOR');
+      print('TUNE [FILE]   OPEN THE MUSIC EDITOR, OR AN .XM FROM /TAPE OR /ROM');
       print('TAB           ACCEPT THE DIMMED EDITOR SUGGESTION');
       print('NAMES ARE UPPERCASE');
       print('/ROM IS READ-ONLY SYSTEM EXAMPLES');

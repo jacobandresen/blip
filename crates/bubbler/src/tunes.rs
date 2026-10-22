@@ -1,4 +1,4 @@
-// The game plays its tunes and build.rs writes its effects: each uses part of this file.
+// Compiled by build.rs, and by the game for its tests: each uses part of this file.
 #![allow(dead_code)]
 
 use std::f32::consts::PI;
@@ -25,6 +25,7 @@ pub fn hurry_wav() -> Vec<u8> {
 }
 
 fn theme(bpm: f32) -> Vec<u8> {
+    blip::xm::tempo(bpm);
     let lead: [[i32; 8]; 16] = [
         [76, H, 79, H, 84, H, 79, 76],
         [81, H, 76, H, 72, H, 76, 81],
@@ -192,10 +193,17 @@ pub fn jingle_wav(which: usize) -> Vec<u8> {
     blip::cosy::jingle(notes, step)
 }
 
-/// The effects, as `sounds/NAME.wav` (see `sfx_wav`).
+/// The effects (see `sfx_wav`) and the jingles, as `sounds/NAME.wav`.
 pub fn sounds() -> Vec<Asset> {
-    SOUND_PATHS.iter().enumerate().map(|(i, path)| (*path, sfx_wav(i))).collect()
+    let effects = SOUND_PATHS.iter().enumerate().map(|(i, path)| (*path, sfx_wav(i)));
+    let jingles = JINGLE_PATHS.iter().enumerate().map(|(i, path)| (*path, jingle_wav(i)));
+    effects.chain(jingles).collect()
 }
+
+const JINGLE_PATHS: [&str; 5] = [
+    "sounds/jingle_round.wav", "sounds/jingle_clear.wav", "sounds/jingle_hurry.wav",
+    "sounds/jingle_over.wav", "sounds/jingle_won.wav",
+];
 
 const SOUND_PATHS: [&str; 9] = [
     "sounds/blow.wav", "sounds/pop.wav", "sounds/trap.wav", "sounds/defeated.wav", "sounds/fruit.wav",
@@ -279,4 +287,12 @@ pub fn sfx_wav(which: usize) -> Vec<u8> {
     }
     let scaled: Vec<f32> = buf.iter().map(|v| v * 20_000.0).collect();
     encode_pcm16_mono(&soft_limit_to_pcm16(&scaled, MIX_KNEE))
+}
+
+/// The music: each tune as a WAV to play and an XM of its notes for TUNE.
+pub fn music() -> Vec<(String, Vec<u8>)> {
+    blip::xm::tunes(&[
+        ("THEME", &theme_wav),
+        ("HURRY", &hurry_wav),
+    ])
 }

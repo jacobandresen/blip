@@ -1,4 +1,4 @@
-var CACHE = "blip-v689";
+var CACHE = "blip-v692";
 
 var ASSETS = [
   "/blip/",
@@ -36,7 +36,6 @@ var ASSETS = [
   "/blip/TAPE/SERPENT.BLIP",
   "/blip/TAPE/RAIDER.BLIP",
   "/blip/TAPE/manifest.json",
-  "/blip/TAPE/GFX/manifest.json",
   "/blip/blip-tape-load.mp3",
   "/blip/blip-wordmark.svg",
   "/blip/guide.html",

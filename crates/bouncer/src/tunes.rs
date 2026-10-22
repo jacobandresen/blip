@@ -1,4 +1,4 @@
-// The game plays its tunes and build.rs writes its effects: each uses part of this file.
+// Compiled by build.rs, and by the game for its tests: each uses part of this file.
 #![allow(dead_code)]
 
 use blip::song::{major, minor, Chord, Groove, Song, H, R};
@@ -207,8 +207,7 @@ fn bomb_sfx() -> Vec<u8> {
 
 /// The effects, as `sounds/NAME.wav`.
 pub fn sounds() -> Vec<Asset> {
-    let mut assets = Vec::new();
-    assets.extend([
+    vec![
         ("sounds/paddle_hit_0.wav", paddle_hit(0)),
         ("sounds/paddle_hit_1.wav", paddle_hit(1)),
         ("sounds/paddle_hit_2.wav", paddle_hit(2)),
@@ -225,6 +224,13 @@ pub fn sounds() -> Vec<Asset> {
         ("sounds/pickup_good.wav", pickup_good()),
         ("sounds/pickup_bad.wav", pickup_bad()),
         ("sounds/pickup_life.wav", pickup_life()),
-    ]);
-    assets
+    ]
+}
+
+/// The music: each tune as a WAV to play and an XM of its notes for TUNE.
+pub fn music() -> Vec<(String, Vec<u8>)> {
+    blip::xm::tunes(&[
+        ("BOUNCE", &bounce_wav),
+        ("REBOUND", &rebound_wav),
+    ])
 }

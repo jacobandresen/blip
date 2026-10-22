@@ -1,6 +1,8 @@
 //! One-on-one fighter with ten characters and CPU or local two-player modes.
 //! Attack heights, frame data and poses share the same move definitions.
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
 mod tunes;
 mod moves;
 mod roster;
@@ -78,11 +80,7 @@ async fn main() {
     web::set_players(TITLE_OPEN);
 
     let sfx = Sounds::load().await;
-    // The themes are synthesised here rather than shipped: as PCM they would
-    // be most of the download.
-    use crate::tunes::theme_wav;
-    let mut music = Jukebox::new(&[|| theme_wav(0), || theme_wav(1), || theme_wav(2),
-        || theme_wav(3), || theme_wav(4), || theme_wav(5), || theme_wav(6), || theme_wav(7)]);
+    let mut music = Jukebox::new("BRAWLER", &["DOCK", "TEMPLE", "SELECT", "AIRBASE", "BATHHOUSE", "VILLAGE", "FORTRESS", "ROOFTOP"]);
     /// The theme of each stage, in stage order.
     const STAGE_TRACK: [usize; STAGES] = [0, 1, 3, 4, 5, 6, 7];
     /// The title and select screens have a loop of their own: silence in

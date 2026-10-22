@@ -5,7 +5,6 @@ const ALIEN_W: i32 = 36;
 const ALIEN_H: i32 = 28;
 const UFO_W: i32 = 36;
 const UFO_H: i32 = 20;
-const UFO_N_LIGHTS: usize = 8;
 
 // Dimensions match the Rust game's sprite constants.
 fn player_ship() -> Vec<u8> {
@@ -176,8 +175,8 @@ fn alien(kind: usize, frame: usize) -> Vec<u8> {
     img.encode_png()
 }
 
-/// Saucer frame with its light ring shifted for animation.
-fn ufo_saucer(frame: usize) -> Vec<u8> {
+/// The saucer without its rim lights, which the game turns as it flies (see `draw_saucer`).
+fn ufo_saucer() -> Vec<u8> {
     let w: i32 = UFO_W;
     let h: i32 = UFO_H;
     let mut img = Image::new(w as u32, h as u32);
@@ -222,21 +221,6 @@ fn ufo_saucer(frame: usize) -> Vec<u8> {
         255,
     );
 
-    // Rim lights, evenly spaced and alternating colour, offset by `frame`
-    // so the ring appears to rotate as frames advance.
-    for i in 0..UFO_N_LIGHTS {
-        let idx = i + frame;
-        let a = (idx as f32 / UFO_N_LIGHTS as f32) * std::f32::consts::PI * 2.0;
-        let lx = (cx + a.cos() * disc_rx * 0.88).round() as i32;
-        let ly = (cy + a.sin() * disc_ry * 0.88).round() as i32;
-        let (r, g, b) = if idx.is_multiple_of(2) {
-            (255u8, 230, 60)
-        } else {
-            (255, 255, 255)
-        };
-        img.set(lx, ly, r, g, b);
-        img.set(lx, ly - 1, r, g, b);
-    }
     img.encode_png()
 }
 
@@ -302,13 +286,6 @@ pub fn generate() -> Vec<Asset> {
         ("images/bullet.png", bullet()),
         ("images/explosion.png", explosion()),
         ("images/shield_block.png", shield_block()),
-        ("images/ufo_saucer_0.png", ufo_saucer(0)),
-        ("images/ufo_saucer_1.png", ufo_saucer(1)),
-        ("images/ufo_saucer_2.png", ufo_saucer(2)),
-        ("images/ufo_saucer_3.png", ufo_saucer(3)),
-        ("images/ufo_saucer_4.png", ufo_saucer(4)),
-        ("images/ufo_saucer_5.png", ufo_saucer(5)),
-        ("images/ufo_saucer_6.png", ufo_saucer(6)),
-        ("images/ufo_saucer_7.png", ufo_saucer(7)),
+        ("images/ufo_saucer.png", ufo_saucer()),
     ]
 }

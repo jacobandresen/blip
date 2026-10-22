@@ -18,7 +18,7 @@ use self::{
     syntax::{split_statements, Token},
     value::Value,
 };
-use crate::{music::MusicRequest, shared_math};
+use crate::shared_math;
 use blip::{Blip, BlipTex};
 use crate::sounds::Sounds;
 use std::{collections::HashMap, sync::Arc};
@@ -72,8 +72,6 @@ pub(crate) struct Program {
     rng: u64,
     pen: i32,
     paper: i32,
-    pub(crate) music_request: Option<MusicRequest>,
-    pub(crate) music_file_request: Option<String>,
     pub(crate) sound_request: Option<(f32, f32, f32)>,
 }
 impl Program {

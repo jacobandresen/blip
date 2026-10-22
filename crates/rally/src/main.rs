@@ -13,6 +13,8 @@ use blip::{
     BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
 mod tunes;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
@@ -354,9 +356,8 @@ async fn main() {
         score_l: blip::audio::load_sound(SCORE_L_WAV).await,
         score_r: blip::audio::load_sound(SCORE_R_WAV).await,
     };
-    // Five loops in rotation, synthesised here (see tunes.rs).
-    use crate::tunes::{music, music2, music3, music4, music5};
-    let mut jukebox = Jukebox::new(&[music, music2, music3, music4, music5]);
+    // Five loops in rotation.
+    let mut jukebox = Jukebox::new("RALLY", &["LOOP1", "LOOP2", "LOOP3", "LOOP4", "LOOP5"]);
     jukebox.start(0).await;
     #[cfg(not(target_arch = "wasm32"))]
     let mut autopilot = bot::Bot { err: 0.0, last_vx: 0.0, hits: 0 };

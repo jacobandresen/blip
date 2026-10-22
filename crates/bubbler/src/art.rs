@@ -3,15 +3,17 @@ use blip::{Blip, BlipColor};
 
 use super::{Kind, E_H, E_W};
 
-mod assets {
-    include!(concat!(env!("OUT_DIR"), "/gfx.rs"));
+/// A picture made by build.rs (see gfx.rs), built into the game.
+macro_rules! png {
+    ($name:literal) => {
+        &include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/", $name, ".png"))[..]
+    };
 }
 
 pub(super) struct Art {
     title_letters: [Texture2D; 7],
     title_info: [Texture2D; 3],
     title_start: [Texture2D; 3],
-    title_bubbles: Texture2D,
     title_sky: Texture2D,
     players: [Texture2D; 2],
     enemies: [[Texture2D; 2]; 3],
@@ -29,41 +31,40 @@ impl Art {
             texture
         };
         Self {
-            title_sky: load(assets::TITLE_SKY),
-            title_bubbles: load(assets::TITLE_BUBBLES),
-            title_info: [assets::TITLE_INFO_KEYS, assets::TITLE_INFO_PAD, assets::TITLE_INFO_TOUCH].map(load),
-            title_start: [assets::TITLE_START_KEYS, assets::TITLE_START_PAD, assets::TITLE_START_TOUCH].map(load),
+            title_sky: load(png!("TITLE_SKY")),
+            title_info: [png!("TITLE_INFO_KEYS"), png!("TITLE_INFO_PAD"), png!("TITLE_INFO_TOUCH")].map(load),
+            title_start: [png!("TITLE_START_KEYS"), png!("TITLE_START_PAD"), png!("TITLE_START_TOUCH")].map(load),
             title_letters: [
-                assets::TITLE_LETTER_1, assets::TITLE_LETTER_2, assets::TITLE_LETTER_3,
-                assets::TITLE_LETTER_4, assets::TITLE_LETTER_5, assets::TITLE_LETTER_6,
-                assets::TITLE_LETTER_7,
+                png!("TITLE_LETTER_1"), png!("TITLE_LETTER_2"), png!("TITLE_LETTER_3"),
+                png!("TITLE_LETTER_4"), png!("TITLE_LETTER_5"), png!("TITLE_LETTER_6"),
+                png!("TITLE_LETTER_7"),
             ].map(load),
-            players: [load(assets::PLAYER_GREEN), load(assets::PLAYER_BLUE)],
+            players: [load(png!("PLAYER_GREEN")), load(png!("PLAYER_BLUE"))],
             enemies: [
-                [load(assets::ROBOT), load(assets::ROBOT_ANGRY)],
-                [load(assets::BUNNY), load(assets::BUNNY_ANGRY)],
-                [load(assets::GHOST), load(assets::GHOST_ANGRY)],
+                [load(png!("ROBOT")), load(png!("ROBOT_ANGRY"))],
+                [load(png!("BUNNY")), load(png!("BUNNY_ANGRY"))],
+                [load(png!("GHOST")), load(png!("GHOST_ANGRY"))],
             ],
             tiles: std::array::from_fn(|i| {
                 let normal = [
-                    assets::TILE_1,
-                    assets::TILE_2,
-                    assets::TILE_3,
-                    assets::TILE_4,
-                    assets::TILE_5,
-                    assets::TILE_6,
-                    assets::TILE_7,
-                    assets::TILE_8,
+                    png!("TILE_1"),
+                    png!("TILE_2"),
+                    png!("TILE_3"),
+                    png!("TILE_4"),
+                    png!("TILE_5"),
+                    png!("TILE_6"),
+                    png!("TILE_7"),
+                    png!("TILE_8"),
                 ][i];
                 let border = [
-                    assets::BORDER_1,
-                    assets::BORDER_2,
-                    assets::BORDER_3,
-                    assets::BORDER_4,
-                    assets::BORDER_5,
-                    assets::BORDER_6,
-                    assets::BORDER_7,
-                    assets::BORDER_8,
+                    png!("BORDER_1"),
+                    png!("BORDER_2"),
+                    png!("BORDER_3"),
+                    png!("BORDER_4"),
+                    png!("BORDER_5"),
+                    png!("BORDER_6"),
+                    png!("BORDER_7"),
+                    png!("BORDER_8"),
                 ][i];
                 [load(normal), load(border)]
             }),
@@ -86,13 +87,6 @@ impl Art {
         };
         blip.draw_texture(&self.title_info[mode], 0.0, 400.0, 624.0, 92.0);
         blip.draw_texture_tinted(&self.title_start[mode], 0.0, 359.0, 624.0, 40.0, BlipColor::new(1.0, 1.0, 1.0, glow));
-    }
-
-    pub(super) fn title_bubble(&self, blip: &Blip, index: usize, x: f32, y: f32, wobble: f32) {
-        let frame = ((wobble * 0.15 + x * 0.002).rem_euclid(1.0) * 24.0) as u32;
-        let size = (12.0 + (wobble * 3.0).sin() * 0.6) * (32.0 / 12.0);
-        blip.draw_texture_cell(&self.title_bubbles, frame, 24, (index % 2) as u32, 2,
-            x - size / 2.0, y - size / 2.0, size, size, 0.0);
     }
 
     pub(super) fn tile(&self, blip: &Blip, round: usize, border: bool, x: f32, y: f32, size: f32) {

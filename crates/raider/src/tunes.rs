@@ -1,4 +1,4 @@
-// The game plays its tunes and build.rs writes its effects: each uses part of this file.
+// Compiled by build.rs, and by the game for its tests and its few shared numbers.
 #![allow(dead_code)]
 
 use std::f32::consts::PI;
@@ -8,6 +8,7 @@ use blip::wav::{
     ms_to_samples, soft_limit_to_pcm16, tame, warm, Rng, MIX_KNEE, SAMPLE_RATE,
 };
 use blip::Asset;
+use blip::xm::{heard, heard_hz, tempo, Part, HAT, KICK, SNARE};
 
 // Rock music uses detuned saws or saw/square guitars, tanh drive and a low-pass cabinet filter.
 // Voices mix in f32 and are limited once at the end.
@@ -15,6 +16,7 @@ use blip::Asset;
 /// Rock kick: tight and dry with a hard beater click that cuts through
 /// distorted guitar; much less boom than `techno::kick`.
 fn rock_kick(buf: &mut [f32], off: usize, vol: f32) {
+    heard(off, KICK, Part::Drums);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.11) as usize;
     let click_n = (sr * 0.004) as usize;
@@ -45,6 +47,7 @@ fn rock_kick(buf: &mut [f32], off: usize, vol: f32) {
 /// real ringing decay (unlike the dry, choked `march_snare`): this is the
 /// backbeat the whole groove leans on, so it needs to carry.
 fn rock_snare(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
+    heard(off, SNARE, Part::Drums);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.15) as usize;
     let mut prev = 0.0f32;
@@ -69,6 +72,7 @@ fn rock_snare(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
 /// Hi-hat / ride tick — bright filtered noise. `open` swaps the tight
 /// closed-hat blip for a longer, washier decay.
 fn rock_hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32, open: bool) {
+    heard(off, HAT, Part::Drums);
     let n = (SAMPLE_RATE as f32 * if open { 0.19 } else { 0.038 }) as usize;
     let mut prev = 0.0f32;
     for i in 0..n {
@@ -86,6 +90,7 @@ fn rock_hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32, open: bool) {
 /// Crash cymbal — a long noise wash with a couple of inharmonic partials
 /// for shimmer. Marks the top of a section.
 fn crash(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
+    heard(off, HAT, Part::Drums);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.85) as usize;
     let mut prev = 0.0f32;
@@ -105,6 +110,7 @@ fn crash(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
 
 /// Distorted root/fifth/octave power chord; `palm` selects muted or open articulation.
 fn power_chord(buf: &mut [f32], off: usize, root: f32, ms: f32, vol: f32, palm: bool) {
+    heard_hz(off, root, Part::Harmony);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
     if n == 0 {
@@ -149,6 +155,7 @@ fn power_chord(buf: &mut [f32], off: usize, root: f32, ms: f32, vol: f32, palm: 
 
 /// Driven saw/square solo with delayed vibrato and optional attack bend in semitones.
 fn lead_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, bend: f32) {
+    heard_hz(off, freq, Part::Tune);
     let mut freq = freq;
     while freq > 660.0 {
         freq *= 0.5;
@@ -201,6 +208,7 @@ fn lead_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, bend: 
 /// at the fundamental, locked to the rhythm-guitar root. Medium decay, a
 /// little pick grit; sits under the guitars without fighting them.
 fn bass_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
+    heard_hz(off, freq, Part::Bass);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
     if n == 0 {
@@ -232,6 +240,7 @@ fn bass_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
 /// Guitar dive bomb — the whammy-bar drop that ends a solo: pitch craters
 /// from `freq` toward nothing while the note blooms once and then chokes.
 fn dive_bomb(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
+    heard_hz(off, freq, Part::Tune);
     let (freq, vol) = (tame(freq), vol * 0.6);
     let sr = SAMPLE_RATE as f32;
     let n = (sr * ms / 1000.0) as usize;
@@ -296,10 +305,11 @@ fn drum_fill(buf: &mut [f32], bar_off: usize, step_samples: usize, rng: &mut Rng
 
 /// Main Raider theme in E minor: intro, verse, chorus, solo, chorus.
 /// The fixed gallop hook anchors the verse; the chorus moves Em–C–G–D.
-pub fn music() -> Vec<u8> {
+pub fn loop1_wav() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let bpm = 150.0_f32;
     let steps_per_bar = 16usize;
+    tempo(bpm);
     let step_ms = 60_000.0 / bpm / 4.0; // 16th note = 100 ms
     let step_samples = (sr * step_ms / 1000.0) as usize;
 
@@ -543,10 +553,11 @@ pub fn music() -> Vec<u8> {
 }
 
 /// Second Raider loop: 176 BPM drop-D thrash in D minor, with a chromatic break and solo.
-pub fn music2() -> Vec<u8> {
+pub fn loop2_wav() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let bpm = 176.0_f32;
     let steps_per_bar = 16usize;
+    tempo(bpm);
     let step_ms = 60_000.0 / bpm / 4.0;
     let step_samples = (sr * step_ms / 1000.0) as usize;
 
@@ -1425,8 +1436,7 @@ fn half_rate(pcm: &[i16]) -> Vec<u8> {
 
 /// The effects, as `sounds/NAME.wav`.
 pub fn sounds() -> Vec<Asset> {
-    let mut assets = Vec::new();
-    assets.extend(vec![
+    vec![
         ("sounds/turret_fire.wav",    turret_fire_sfx()),
         ("sounds/barrier_hum.wav",    barrier_hum_sfx()),
         ("sounds/barrier_hum2.wav",   barrier_hum2_sfx()),
@@ -1472,6 +1482,13 @@ pub fn sounds() -> Vec<Asset> {
         ("sounds/stage_clear.wav",    halved(&stage_clear_sfx())),
         ("sounds/victory.wav",        halved(&victory_sfx())),
         ("sounds/game_over.wav",      halved(&game_over_sfx())),
-    ]);
-    assets
+    ]
+}
+
+/// The music: each tune as a WAV to play and an XM of its notes for TUNE.
+pub fn music() -> Vec<(String, Vec<u8>)> {
+    blip::xm::tunes(&[
+        ("LOOP1", &loop1_wav),
+        ("LOOP2", &loop2_wav),
+    ])
 }

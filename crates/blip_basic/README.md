@@ -9,7 +9,7 @@ for variables, arrays, input, and Rust function calls.
 
 | File | Responsibility |
 | --- | --- |
-| `src/main.rs` | Load assets, accept source, run a frame |
+| `src/main.rs` | Accept source, load its files (`load_files`), run a frame |
 | `src/interpreter/mod.rs` | Program state, continuations, frame budget |
 | `src/interpreter/syntax.rs` | Tokens and splitting outside strings and parentheses |
 | `src/interpreter/expression.rs` | Precedence, arguments, functions, variable reads |
@@ -21,9 +21,8 @@ for variables, arrays, input, and Rust function calls.
 | `src/interpreter/value.rs` | Values, conversions, array keys |
 | `src/interpreter/color.rs` | Palette, named colors, hex colors |
 | `src/shared_math.rs` | Bindings to the native games' math functions |
-| `src/music.rs` | Native jukeboxes and user music |
-| `src/sounds.rs` | Generated effect bytes, lazy decoding, playback |
-| `src/host.rs` | Browser imports and user files |
+| `src/sounds.rs` | Every WAV by its path: effects once, music looped, decoded on first use |
+| `src/host.rs` | Browser imports, the user's files, where /TAPE files are |
 
 A continuation holds the next line, the next statement, and pending actions
 from `IF … THEN`. Calls save one; loops remember one. `WAIT` yields without
@@ -73,6 +72,14 @@ a level and a line holds one statement, or a short pair. `REM` lines say what
 the code cannot: a rule, a measured number, what a `SUB` leaves in shared names.
 `REM GAME: BUBBLER` keeps the control layout when a tape is saved under another
 name in `/USER`.
+
+A tape's files are in its own folder, `/TAPE/<GAME>/ASSETS/`, which SETUP names
+once: `ASSETS$="/TAPE/BUBBLER/ASSETS/"`, then `DRAW_TEXTURE(ASSETS$+"ROBOT",...)`,
+`PLAY_SFX ASSETS$+"POP.WAV"` and `PLAY_MUSIC ASSETS$+"THEME.WAV"`. A picture
+without an extension is a `.PNG` and a sound a `.WAV`. When a program loads, the
+runtime reads every such folder its source names; a tune (a WAV with an XM beside
+it) is fetched the first time it plays. A copy's folder, `/USER/<GAME>/ASSETS/`,
+holds the pictures the user changed; anything else in it comes from the tape's.
 
 Every program starts on one 640x400 screen, a high-resolution Amiga's, and
 the tapes are drawn for it. `CANVAS(width,height)` picks another size for a

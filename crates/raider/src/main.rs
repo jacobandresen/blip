@@ -3512,9 +3512,9 @@ async fn main() {
             blip::audio::load_sound(ENGINE_WAV[4]).await,
         ],
     };
-    // Two loops in rotation (synthesised here, see tunes.rs),
+    // Two loops in rotation,
     // so a long level doesn't hear the same ~40s on repeat.
-    let mut music = Jukebox::new(&[crate::tunes::music, crate::tunes::music2]);
+    let mut music = Jukebox::new("RAIDER", &["LOOP1", "LOOP2"]);
     music.start(0).await;
 
     let mut shot_frame: u32 = 0;

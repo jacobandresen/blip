@@ -63,6 +63,8 @@ middle. Change one and the other must follow.
 | Music playback (`blip::Jukebox`) | `crates/blip/src/audio.rs` |
 | A game's generated pictures | `crates/<name>/src/gfx.rs` |
 | A game's music and sound effects | `crates/<name>/src/tunes.rs` |
+| The generated files (PNG, WAV, XM) the game and BLIP BASIC read | `web/TAPE/<GAME>/ASSETS/` (build outputs) |
+| A tune's notes as an XM for TUNE | `crates/blip/src/xm.rs` |
 | Shared generators: PNG images, WAV encoding, songs (`Song`; `action: true` for the action games' mix), effect voices | `crates/blip/src/{image,wav,song,cosy,techno}.rs` |
 | Native playtest autopilot | `crates/blip/src/bot.rs`, `crates/<name>/src/bot.rs` |
 | Per-game asset build step | `crates/<name>/build.rs` |
@@ -151,29 +153,35 @@ node tools/make_game_icons.mjs
 
 ### Asset pipeline
 
-Each game's `build.rs` includes its `src/gfx.rs` and `src/tunes.rs` by path
-and writes `gfx::generate()` and `tunes::sounds()` (PNG / WAV bytes, via `blip::write_assets`) into
-`$OUT_DIR/assets/{images,sounds}/`. It builds against `blip` without its
-`engine` feature, so a build script does not compile macroquad. The game's
-`main.rs` embeds those bytes via `include_bytes!(concat!(env!("OUT_DIR"), ...))`,
-so wasm builds carry every asset inside the single `index.wasm` and need no
-separate preload step.
+A game's pictures are made by its `src/gfx.rs`, its effects and music by its
+`src/tunes.rs`. Its `build.rs` includes both by path and hands them to
+`blip::build_assets`, which writes:
+
+- the pictures and effects to `$OUT_DIR/assets/{images,sounds}/`, which the
+  game embeds with `include_bytes!(concat!(env!("OUT_DIR"), ...))`;
+- every file to `web/TAPE/<GAME>/ASSETS/` (upper-case names and a
+  `manifest.json`): each picture a PNG, each effect a WAV, each tune a WAV to
+  play and an XM of its notes for TUNE. These are build outputs, committed
+  like the wasm: change `gfx.rs` or `tunes.rs` and build, never the files.
+
+Build scripts use `blip` without its `engine` feature, so they do not compile
+macroquad. A game loads its tunes from its tape folder through a
+`blip::Jukebox` (`blip::tape_file`); BLIP BASIC reads the same folders.
+
+A PNG is a still picture. What changes with the game (the saucer's turning
+lights, a bubble's sheen) is drawn at runtime over it, in the game and its tape
+alike, not made as a PNG per frame.
+
+A tune's XM is recorded as it renders: every instrument reports its notes with
+`blip::xm::heard` (the tune, harmony, bass or drums: TUNE's four voices) and
+`blip::xm::record` keeps them, a step to a sixteenth at the tempo the tune
+gives `blip::xm::tempo`. A new instrument reports its notes the same way.
 
 Effects are most of a game's download, so the warm ones
 (`cosy::finish_warm`, low-passed at 3 kHz) are encoded at 22 kHz, and so are
 Raider's and Brawler's low effects (`wav::encode_pcm16_half`, flat to 8 kHz).
 A new effect goes at half rate if its energy above 10 kHz is 33 dB or more
 under the rest; snaps, whistles and gunfire keep the full rate.
-
-Music is the exception: a WAV loop is megabytes, so a game includes its
-`tunes.rs` at runtime too and synthesises its tunes on the device through
-a `blip::Jukebox` (first track at load, the rest on the title screen). Most
-tunes are `song::Song` values — a melody of MIDI notes over chords, played on
-the game's own instrument. To hear them all without a game:
-
-```
-cargo run --release -p blip_basic --example render_music -- /tmp/music
-```
 
 ### Playtesting with the autopilot
 

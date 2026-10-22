@@ -23,14 +23,14 @@ test('tape programs use uppercase source and unique ascending line numbers', () 
   assert.match(rally, /DEF FNHITS_PADDLE\(X,Y\)=SEGMENT_RECT_OVERLAP/);
   const raider = readFileSync(new URL('RAIDER.BLIP', tape), 'utf8');
   assert.match(raider, /KILLS>=60\+15\*\(LEVEL-1\)/);
-  assert.match(raider, /BOSS_IMAGE\$="\/TAPE\/GFX\/RAIDER\/BOSS_"\+STR\$\(LEVEL\)/);
-  const gfx = JSON.parse(readFileSync(new URL('GFX/manifest.json', tape), 'utf8'));
-  for (let level = 1; level <= 7; level++) assert.ok(gfx.RAIDER.includes(`BOSS_${level}.PNG`));
-  assert.ok(gfx.RALLY.includes('BALL.PNG'));
+  assert.match(raider, /BOSS_IMAGE\$=ASSETS\$\+"BOSS_"\+STR\$\(LEVEL\)/);
+  const assets = (game) => JSON.parse(readFileSync(new URL(`${game}/ASSETS/manifest.json`, tape), 'utf8'));
+  for (let level = 1; level <= 7; level++) assert.ok(assets('RAIDER').includes(`BOSS_${level}.PNG`));
+  assert.ok(assets('RALLY').includes('BALL.PNG'));
   assert.match(rally, /FILL_RECT\(BALL_X,BALL_Y,BALL,BALL,"BLIP_WHITE"\)/);
   const defender = readFileSync(new URL('DEFENDER.BLIP', tape), 'utf8');
-  assert.ok(gfx.DEFENDER.includes('BULLET.PNG'));
-  assert.match(defender, /DRAW_TEXTURE\("\/TAPE\/GFX\/DEFENDER\/BULLET\.PNG"/);
+  assert.ok(assets('DEFENDER').includes('BULLET.PNG'));
+  assert.match(defender, /DRAW_TEXTURE\(ASSETS\$\+"BULLET\.PNG"/);
 });
 
 test('BASIC uses uppercase text and hides the monitor scrollbar without disabling scrolling', async (t) => {
@@ -1951,26 +1951,26 @@ test('DEL removes USER files and protects the tapes', async (t) => {
   assert.match(await page.locator('#basic-output').textContent(), /DIRECTORY OF \/USER\n<EMPTY>/);
 });
 
-test('DIR and CD expose the inserted tape\'s game art under TAPE/GFX', async (t) => {
+test('DIR and CD expose the inserted tape\'s files under TAPE/<GAME>/ASSETS', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => BlipBasic.submit('LOAD /TAPE/BOUNCER'));
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BOUNCER.BLIP'));
-  await page.evaluate(() => { BlipBasic.submit('DIR /TAPE/GFX'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('BOUNCER/'));
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE/GFX/BOUNCER'); BlipBasic.submit('DIR'); });
+  await page.evaluate(() => { BlipBasic.submit('DIR /TAPE/BOUNCER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('ASSETS/'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE/BOUNCER/ASSETS'); BlipBasic.submit('DIR'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('PADDLE.PNG'));
   const output = await page.locator('#basic-output').textContent();
-  assert.match(output, /\/TAPE\/GFX[\s\S]*\/TAPE\/GFX\/BOUNCER[\s\S]*BALL\.PNG[\s\S]*BRICK_RED\.PNG/);
+  assert.match(output, /\/TAPE\/BOUNCER[\s\S]*\/TAPE\/BOUNCER\/ASSETS[\s\S]*BALL\.PNG[\s\S]*BRICK_RED\.PNG/);
   await page.evaluate(() => {
     BlipBasic.submit('10 CLEAR("BLIP_BLACK")');
-    BlipBasic.submit('20 DRAW_TEXTURE("/TAPE/GFX/BOUNCER/BALL.PNG",40,40,16,16)');
+    BlipBasic.submit('20 DRAW_TEXTURE("/TAPE/BOUNCER/ASSETS/BALL.PNG",40,40,16,16)');
     BlipBasic.submit('30 WAIT 16');
     BlipBasic.submit('40 GOTO 10');
     BlipBasic.submit('RUN');
   });
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  assert.match(await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSource), /\/TAPE\/GFX\/BOUNCER\/BALL\.PNG/);
+  assert.match(await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSource), /\/TAPE\/BOUNCER\/ASSETS\/BALL\.PNG/);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
   await page.locator('#exit-game').click();
 });
@@ -2349,7 +2349,7 @@ test('Rust BASIC preserves conditional actions through calls, loops, and waits',
       '40 IF 1 THEN FOR I=1 TO 3:X=X+1:NEXT I',
       '50 IF X<>4 THEN DRAW_TEXTURE("BAD LOOP",0,0,1,1)',
       '60 IF 1 THEN WAIT 50:GOSUB 100:IF X<>5 THEN DRAW_TEXTURE("BAD WAIT",0,0,1,1)',
-      '70 PLAY_SFX "SERPENT/EAT"',
+      '70 PLAY_SFX "/TAPE/SERPENT/ASSETS/EAT.WAV"',
       '80 WAIT 16:GOTO 80',
       '100 X=X+1:RETURN',
     ];

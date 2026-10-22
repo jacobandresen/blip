@@ -4,6 +4,8 @@
 
 use std::f32::consts::PI;
 
+use crate::xm::{heard, Part};
+
 use crate::wav::{fade_out as fade_out_samples, warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_mono, encode_pcm16_music, soft_limit_to_pcm16, SAMPLE_RATE};
 
@@ -34,6 +36,8 @@ pub enum Voice { Lead, Bass, Arp, Bell, Marimba, Glock, Theremin, Glass, Pluck, 
 
 /// A note into `buf` at `start`, held `len` samples.
 pub fn note(buf: &mut [f32], start: usize, len: usize, midi: i32, vol: f32, v: Voice) {
+    let part = match v { Voice::Bass => Part::Bass, Voice::Arp => Part::Harmony, _ => Part::Tune };
+    heard(start, midi, part);
     let f = midi_hz(midi);
     let mut ph = 0.0f32;
     let tail = match v {

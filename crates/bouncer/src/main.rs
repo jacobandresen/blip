@@ -16,6 +16,8 @@ use blip::{
     BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
 mod tunes;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
@@ -1108,8 +1110,8 @@ async fn main() {
         pickup_bad:  blip::audio::load_sound(PICKUP_BAD_WAV).await,
         pickup_life: blip::audio::load_sound(PICKUP_LIFE_WAV).await,
     };
-    // Two tunes, alternating by level (synthesised here, see tunes.rs).
-    let mut music = Jukebox::new(&[crate::tunes::bounce_wav, crate::tunes::rebound_wav]);
+    // Two tunes, alternating by level.
+    let mut music = Jukebox::new("BOUNCER", &["BOUNCE", "REBOUND"]);
     music.start(0).await;
 
     let mut shot_frame: u32 = 0;

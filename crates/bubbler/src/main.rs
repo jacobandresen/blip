@@ -8,8 +8,9 @@ use blip::macroquad::input::KeyCode;
 use blip::macroquad::math::vec2;
 use blip::macroquad::shapes::{draw_ellipse, draw_triangle};
 use blip::{play_sfx, play_sfx_volume, segment_circle_overlap, segment_rect_overlap, web, window_conf, Blip, BlipColor, Jukebox};
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
 mod tunes;
-// The pictures are made by build.rs; the tests check them here.
 #[cfg(test)]
 mod gfx;
 mod art;
@@ -1685,39 +1686,23 @@ fn draw_bubble(blip: &Blip, art: &art::Art, b: &Bubble, ox: f32, oy: f32, t: f32
             angry,
         );
     }
-    let tint_c = if b.owner == 0 {
-        (120, 255, 140)
-    } else {
-        (120, 200, 255)
-    };
-    draw_ellipse(
-        x + shake,
-        y,
-        rx,
-        ry,
-        0.0,
-        col(tint_c, if b.trapped.is_some() { 0.16 } else { 0.22 }),
-    );
     let rim = if escaping && (t * 10.0) as i32 % 2 == 0 {
         rgba(1.0, 0.3, 0.3, 0.95)
     } else {
         hsv(b.wob * 0.15 + x * 0.002, 0.45, 1.0, 0.85)
     };
-    blip::macroquad::shapes::draw_ellipse_lines(x + shake, y, rx, ry, 0.0, 1.8, rim);
-    draw_ellipse(
-        x - r * 0.38 + shake,
-        y - r * 0.42,
-        r * 0.3,
-        r * 0.17,
-        -35.0,
-        rgba(1.0, 1.0, 1.0, 0.85),
-    );
-    blip::macroquad::shapes::draw_circle(
-        x + r * 0.45 + shake,
-        y + r * 0.35,
-        1.2,
-        rgba(1.0, 1.0, 1.0, 0.6),
-    );
+    let body = if b.trapped.is_some() { 0.16 } else { 0.22 };
+    draw_glass(x + shake, y, rx, ry, b.owner, body, rim);
+}
+
+/// A bubble's glass: tinted with its owner's colour, a rim, and the window's shine.
+fn draw_glass(x: f32, y: f32, rx: f32, ry: f32, owner: usize, body: f32, rim: BlipColor) {
+    let tint = if owner == 0 { (120, 255, 140) } else { (120, 200, 255) };
+    draw_ellipse(x, y, rx, ry, 0.0, col(tint, body));
+    blip::macroquad::shapes::draw_ellipse_lines(x, y, rx, ry, 0.0, 1.8, rim);
+    let r = (rx + ry) / 2.0;
+    draw_ellipse(x - r * 0.38, y - r * 0.42, r * 0.3, r * 0.17, -35.0, rgba(1.0, 1.0, 1.0, 0.85));
+    blip::macroquad::shapes::draw_circle(x + r * 0.45, y + r * 0.35, 1.2, rgba(1.0, 1.0, 1.0, 0.6));
 }
 
 /// Candy colours, picked per drop so a shower of them is a pick-and-mix.
@@ -2180,7 +2165,9 @@ fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: &web::HighScore) {
         let s = i as f32 * 53.1;
         let x = (s * 11.3) % WIN_W as f32;
         let y = WIN_H as f32 - ((s * 9.1 + t * 30.0) % (WIN_H as f32 + 40.0)) + 20.0;
-        art.title_bubble(blip, i, x, y, t + s);
+        // the sheen drifts round the colours as each bubble wobbles
+        let (wob, r) = (t + s, 12.0 + ((t + s) * 3.0).sin() * 0.6);
+        draw_glass(x, y, r, r, i % 2, 0.22, hsv(wob * 0.15 + x * 0.002, 0.45, 1.0, 0.85));
     }
     for letter in 0..7 {
         let bob = (t * 3.0 + letter as f32 * 0.6).sin() * 5.0;
@@ -2355,26 +2342,30 @@ async fn main() {
     let mut g = Game::new();
     web::set_players(2);
 
-    use crate::tunes::{jingle_wav, sfx_wav, theme_wav};
-    let load = |b: Vec<u8>| async move { blip::audio::load_sound(&b).await };
+    macro_rules! wav {
+        ($name:literal) => {
+            include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/", $name, ".wav"))
+        };
+    }
+    let load = |b: &'static [u8]| async move { blip::audio::load_sound(b).await };
     let sfx = Sounds {
-        blow: load(sfx_wav(0)).await,
-        pop: load(sfx_wav(1)).await,
-        trap: load(sfx_wav(2)).await,
-        kill: load(sfx_wav(3)).await,
-        fruit: load(sfx_wav(4)).await,
-        jump: load(sfx_wav(5)).await,
-        lose: load(sfx_wav(6)).await,
-        bounce: load(sfx_wav(7)).await,
-        sparkle: load(sfx_wav(8)).await,
-        round: load(jingle_wav(0)).await,
-        clear: load(jingle_wav(1)).await,
-        hurry: load(jingle_wav(2)).await,
-        over: load(jingle_wav(3)).await,
-        won: load(jingle_wav(4)).await,
+        blow: load(wav!("blow")).await,
+        pop: load(wav!("pop")).await,
+        trap: load(wav!("trap")).await,
+        kill: load(wav!("defeated")).await,
+        fruit: load(wav!("fruit")).await,
+        jump: load(wav!("jump")).await,
+        lose: load(wav!("lost")).await,
+        bounce: load(wav!("bounce")).await,
+        sparkle: load(wav!("sparkle")).await,
+        round: load(wav!("jingle_round")).await,
+        clear: load(wav!("jingle_clear")).await,
+        hurry: load(wav!("jingle_hurry")).await,
+        over: load(wav!("jingle_over")).await,
+        won: load(wav!("jingle_won")).await,
     };
     // The theme, and the same tune faster for HURRY UP.
-    let mut music = Jukebox::new(&[theme_wav, crate::tunes::hurry_wav]);
+    let mut music = Jukebox::new("BUBBLER", &["THEME", "HURRY"]);
     music.start(0).await;
     let mut shot_frame = 0u32;
     #[cfg(not(target_arch = "wasm32"))]

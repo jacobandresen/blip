@@ -15,6 +15,8 @@ use blip::{
     BLIP_WHITE, BLIP_YELLOW,
 };
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
 mod tunes;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
@@ -685,14 +687,29 @@ fn update_ufo(
     false
 }
 
-fn draw_ufo(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
+/// The saucer at `x`,`y`, `w` by `h`: its body, then its rim lights, yellow and
+/// white by turns, turned `frame` steps round the disc.
+fn draw_saucer(blip: &Blip, saucer: &Texture2D, x: f32, y: f32, w: f32, h: f32, frame: usize, tint: BlipColor) {
+    blip.draw_texture_tinted(saucer, x, y, w, h, tint);
+    let (sx, sy) = (w / UFO_W, h / UFO_H);
+    let (cx, cy, rx, ry) = (UFO_W / 2.0, UFO_H * 0.62, (UFO_W / 2.0 - 1.0) * 0.88, UFO_H * 0.30 * 0.88);
+    for i in 0..UFO_N_LIGHTS {
+        let k = i + frame;
+        let a = k as f32 / UFO_N_LIGHTS as f32 * std::f32::consts::TAU;
+        let (lx, ly) = ((cx + a.cos() * rx).round(), (cy + a.sin() * ry).round());
+        let light = if k % 2 == 0 { BlipColor::new(1.0, 0.9, 0.24, tint.a) } else { BlipColor::new(1.0, 1.0, 1.0, tint.a) };
+        blip.fill_rect(x + lx * sx, y + (ly - 1.0) * sy, sx, 2.0 * sy, light);
+    }
+}
+
+fn draw_ufo(blip: &Blip, g: &Game, saucer: &Texture2D) {
     if g.ufo_active {
         match g.ufo_mode {
             UfoMode::Flying => {
-                blip.draw_texture(&saucer[g.ufo_frame], g.ufo_x, UFO_Y, UFO_W, UFO_H);
+                draw_saucer(blip, saucer, g.ufo_x, UFO_Y, UFO_W, UFO_H, g.ufo_frame, BLIP_WHITE);
             }
             UfoMode::Tracking => {
-                blip.draw_texture(&saucer[g.ufo_frame], g.ufo_x, UFO_Y, UFO_W, UFO_H);
+                draw_saucer(blip, saucer, g.ufo_x, UFO_Y, UFO_W, UFO_H, g.ufo_frame, BLIP_WHITE);
                 // A faint lock-on reticle down toward the player — a quiet
                 // "it's noticed you" tell, well before the loud charge-up.
                 let cx = g.ufo_x + UFO_W / 2.0;
@@ -705,7 +722,7 @@ fn draw_ufo(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
                 // The whole ship shakes as it powers up.
                 let jx = (rand() % 5) as f32 - 2.0;
                 let jy = (rand() % 3) as f32 - 1.0;
-                blip.draw_texture(&saucer[g.ufo_frame], g.ufo_x + jx, UFO_Y + jy, UFO_W, UFO_H);
+                draw_saucer(blip, saucer, g.ufo_x + jx, UFO_Y + jy, UFO_W, UFO_H, g.ufo_frame, BLIP_WHITE);
 
                 let progress = 1.0 - (g.ufo_charge_timer.remaining() / UFO_CHARGE_SECS).max(0.0);
                 let cx = g.ufo_x + UFO_W / 2.0;
@@ -1370,7 +1387,7 @@ fn update_over(g: &mut Game, dt: f32) {
 
 /// The mothership and its health bar, drawn under the ship so it is in the
 /// same glance: without it, slowly winning looks like doing nothing.
-fn draw_boss(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
+fn draw_boss(blip: &Blip, g: &Game, saucer: &Texture2D) {
     if !g.boss_active { return; }
     let (x, y) = (g.boss_x, g.boss_y());
 
@@ -1384,7 +1401,7 @@ fn draw_boss(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
         let hurt = 1.0 - (g.boss_hp as f32 / g.boss_hp_max.max(1) as f32);
         BlipColor { r: 1.0, g: 1.0 - hurt * 0.55, b: 1.0 - hurt * 0.65, a: 1.0 }
     };
-    blip.draw_texture_tinted(&saucer[g.ufo_frame], x, y, BOSS_W, BOSS_H, tint);
+    draw_saucer(blip, saucer, x, y, BOSS_W, BOSS_H, g.ufo_frame, tint);
 
     let frac = (g.boss_hp as f32 / g.boss_hp_max.max(1) as f32).clamp(0.0, 1.0);
     let (bw, bh) = (BOSS_W, 4.0);
@@ -1403,7 +1420,7 @@ fn draw_boss(blip: &Blip, g: &Game, saucer: &[Texture2D; UFO_N_LIGHTS]) {
 fn draw_play(blip: &Blip, g: &Game,
              player: &Texture2D, alien: &[[Texture2D; 2]; 3],
              explosion: &Texture2D, shield: &Texture2D, bullet: &Texture2D,
-             saucer: &[Texture2D; UFO_N_LIGHTS]) {
+             saucer: &Texture2D) {
     // The ground line pulses red while the invaders are close to landing.
     let lowest = g.aliens.iter().filter(|a| a.alive).map(|a| a.y + ALIEN_H as f32).fold(0.0, f32::max);
     let ground = if g.state == State::Play && lowest > (GROUND_Y - LANDING_WARN) as f32
@@ -1573,14 +1590,7 @@ const ALIEN_OCTO_B_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ass
 const EXPLOSION_PNG:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/explosion.png"));
 const SHIELD_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/shield_block.png"));
 const BULLET_PNG:       &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/bullet.png"));
-const UFO_SAUCER_0_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_0.png"));
-const UFO_SAUCER_1_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_1.png"));
-const UFO_SAUCER_2_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_2.png"));
-const UFO_SAUCER_3_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_3.png"));
-const UFO_SAUCER_4_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_4.png"));
-const UFO_SAUCER_5_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_5.png"));
-const UFO_SAUCER_6_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_6.png"));
-const UFO_SAUCER_7_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer_7.png"));
+const UFO_SAUCER_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/ufo_saucer.png"));
 const SHOOT_WAV:        &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/shoot.wav"));
 const EXPLOSION_WAV:    &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/explosion.wav"));
 const DIVE_WAV:         &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/sounds/dive.wav"));
@@ -1610,12 +1620,7 @@ async fn main() {
     let explosion = load_png(EXPLOSION_PNG);
     let shield = load_png(SHIELD_PNG);
     let bullet = load_png(BULLET_PNG);
-    let saucer = [
-        load_png(UFO_SAUCER_0_PNG), load_png(UFO_SAUCER_1_PNG),
-        load_png(UFO_SAUCER_2_PNG), load_png(UFO_SAUCER_3_PNG),
-        load_png(UFO_SAUCER_4_PNG), load_png(UFO_SAUCER_5_PNG),
-        load_png(UFO_SAUCER_6_PNG), load_png(UFO_SAUCER_7_PNG),
-    ];
+    let saucer = load_png(UFO_SAUCER_PNG);
 
     let sfx = Sounds {
         shoot:       blip::audio::load_sound(SHOOT_WAV).await,
@@ -1633,12 +1638,8 @@ async fn main() {
         laser_blast:  blip::audio::load_sound(LASER_BLAST_WAV).await,
         game_over:    blip::audio::load_sound(GAME_OVER_WAV).await,
     };
-    // The invasion tune, and the mothership's on boss levels (synthesised
-    // here, see tunes.rs).
-    let mut music = Jukebox::new(&[
-        crate::tunes::invasion_wav,
-        crate::tunes::mothership_wav,
-    ]);
+    // The invasion tune, and the mothership's on boss levels.
+    let mut music = Jukebox::new("DEFENDER", &["INVASION", "MOTHERSHIP"]);
     music.start(0).await;
 
     let mut shot_frame: u32 = 0;

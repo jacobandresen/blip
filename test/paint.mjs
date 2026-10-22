@@ -8,7 +8,7 @@ test('PAINT stays in the monitor and saves game-size PNG textures in /USER', asy
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => BlipBasic.submit('PAINT'));
   assert.equal(await page.locator('#paint-name').inputValue(), '/USER/GFX/SPRITE.PNG');
-  await page.evaluate(() => BlipBasic.submit('PAINT "/TAPE/GFX/SERPENT/FOOD.PNG"'));
+  await page.evaluate(() => BlipBasic.submit('PAINT "/TAPE/SERPENT/ASSETS/FOOD.PNG"'));
   assert.match(await page.locator('#paint-status').textContent(), /only saves in \/USER/i);
   assert.deepEqual(await page.locator('#paint').evaluate((el) => {
     const a=el.getBoundingClientRect(),b=document.querySelector('#basic-screen').getBoundingClientRect();

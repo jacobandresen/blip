@@ -7,19 +7,40 @@ pub mod image;
 pub mod song;
 pub mod techno;
 pub mod wav;
+pub mod xm;
 
 /// A generated file: its path under the asset folder, and its bytes.
 pub type Asset = (&'static str, Vec<u8>);
 
-/// Write generated files under `dir`, making folders as needed.
-pub fn write_assets(dir: &std::path::Path, assets: &[Asset]) {
-    for (path, bytes) in assets {
-        let dest = dir.join(path);
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent).expect("create asset folder");
+/// A game's build script: the pictures and effects go to OUT_DIR/assets for the
+/// game to embed, and every file, the music too, to web/TAPE/<GAME>/ASSETS, the
+/// folder BLIP BASIC reads, with a manifest.json listing them.
+pub fn build_assets(assets: Vec<Asset>, music: Vec<(String, Vec<u8>)>) {
+    use std::{env, fs, path::PathBuf};
+    let var = |name| env::var(name).expect(name);
+    let out = PathBuf::from(var("OUT_DIR")).join("assets");
+    let game = var("CARGO_PKG_NAME").to_ascii_uppercase();
+    let tape = PathBuf::from(var("CARGO_MANIFEST_DIR")).join("../../web/TAPE").join(game).join("ASSETS");
+    let write = |path: PathBuf, bytes: &[u8]| {
+        fs::create_dir_all(path.parent().expect("a folder")).expect("make the folder");
+        fs::write(path, bytes).expect("write the file");
+    };
+    // The folder holds exactly what the game makes now.
+    let _ = fs::remove_dir_all(&tape);
+    let files = assets.into_iter().map(|(path, bytes)| (path.to_string(), bytes)).chain(music);
+    let mut names = Vec::new();
+    for (path, bytes) in files {
+        if !path.starts_with("music/") {
+            write(out.join(&path), &bytes);
         }
-        std::fs::write(&dest, bytes).expect("write asset");
+        let name = path.rsplit('/').next().expect("a name").to_ascii_uppercase();
+        assert!(!names.contains(&name), "two files called {name}");
+        write(tape.join(&name), &bytes);
+        names.push(name);
     }
+    names.sort();
+    let list = names.iter().map(|n| format!("\"{n}\"")).collect::<Vec<_>>().join(", ");
+    write(tape.join("manifest.json"), format!("[{list}]\n").as_bytes());
 }
 
 #[cfg(feature = "engine")]

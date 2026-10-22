@@ -1,4 +1,4 @@
-// The game plays its tunes and build.rs writes its effects: each uses part of this file.
+// Compiled by build.rs, and by the game for its tests: each uses part of this file.
 #![allow(dead_code)]
 
 use blip::cosy::{self, Voice, H};
@@ -16,9 +16,10 @@ const LIFT_BAR: usize = BARS / 2;
 const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
 
 /// Four-on-the-floor rally loop with Em–Am hook, octave harmony and a final hat roll.
-pub fn music() -> Vec<u8> {
+pub fn loop1_wav() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let step_ms = 60_000.0 / BPM / 4.0;
+    blip::xm::tempo(BPM);
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
@@ -101,13 +102,14 @@ pub fn music() -> Vec<u8> {
 }
 
 /// Turbo Boost: syncopated bass and bright `lead_stab` hook in a new key.
-pub fn music2() -> Vec<u8> {
+pub fn loop2_wav() -> Vec<u8> {
     const BPM: f32 = 146.0;
     const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 16;
     const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
     let sr = SAMPLE_RATE as f32;
     let step_ms = 60_000.0 / BPM / 4.0;
+    blip::xm::tempo(BPM);
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
@@ -155,13 +157,14 @@ pub fn music2() -> Vec<u8> {
 }
 
 /// Night Circuit: half-time kick, held bass notes and a spaced `lead_stab` motif.
-pub fn music3() -> Vec<u8> {
+pub fn loop3_wav() -> Vec<u8> {
     const BPM: f32 = 108.0;
     const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 12;
     const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
     let sr = SAMPLE_RATE as f32;
     let step_ms = 60_000.0 / BPM / 4.0;
+    blip::xm::tempo(BPM);
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
@@ -204,13 +207,14 @@ pub fn music3() -> Vec<u8> {
 }
 
 /// Photo Finish: a `riser` builds through the last two bars before a hard cut to the top.
-pub fn music4() -> Vec<u8> {
+pub fn loop4_wav() -> Vec<u8> {
     const BPM: f32 = 140.0;
     const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 18;
     const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
     let sr = SAMPLE_RATE as f32;
     let step_ms = 60_000.0 / BPM / 4.0;
+    blip::xm::tempo(BPM);
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
@@ -270,13 +274,14 @@ pub fn music4() -> Vec<u8> {
 }
 
 /// Pit Stop Groove: syncopated bass and a call-and-response `lead_stab` hook.
-pub fn music5() -> Vec<u8> {
+pub fn loop5_wav() -> Vec<u8> {
     const BPM: f32 = 122.0;
     const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 16;
     const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
     let sr = SAMPLE_RATE as f32;
     let step_ms = 60_000.0 / BPM / 4.0;
+    blip::xm::tempo(BPM);
     let step_samples = (sr * step_ms / 1000.0) as usize;
     let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
     let mut buf = vec![0f32; total];
@@ -382,13 +387,22 @@ fn point_lost() -> Vec<u8> {
 
 /// The effects, as `sounds/NAME.wav`.
 pub fn sounds() -> Vec<Asset> {
-    let mut assets = Vec::new();
-    assets.extend(vec![
+    vec![
         ("sounds/wall.wav", wall()),
         ("sounds/hit_l.wav", hit(false)),
         ("sounds/hit_r.wav", hit(true)),
         ("sounds/score_l.wav", point_won()),
         ("sounds/score_r.wav", point_lost()),
-    ]);
-    assets
+    ]
+}
+
+/// The music: each tune as a WAV to play and an XM of its notes for TUNE.
+pub fn music() -> Vec<(String, Vec<u8>)> {
+    blip::xm::tunes(&[
+        ("LOOP1", &loop1_wav),
+        ("LOOP2", &loop2_wav),
+        ("LOOP3", &loop3_wav),
+        ("LOOP4", &loop4_wav),
+        ("LOOP5", &loop5_wav),
+    ])
 }

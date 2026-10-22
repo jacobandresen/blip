@@ -8,6 +8,7 @@
 use std::f32::consts::PI;
 
 use crate::cosy::{note, Voice, SR};
+use crate::xm::{heard, tempo, Part, HAT, KICK, SNARE};
 use crate::wav::{bright, warm, Rng, MIX_KNEE};
 use crate::wav::{encode_pcm16_music, soft_limit_to_pcm16};
 
@@ -95,6 +96,7 @@ impl Song<'_> {
     /// The whole loop as a WAV, seamless when played looped.
     pub fn render(&self) -> Vec<u8> {
         assert_eq!(self.melody.len(), self.chords.len(), "one chord pair per melody bar");
+        tempo(self.bpm);
         let eighth = (60.0 / self.bpm / 2.0 * SR) as usize;
         let bar = eighth * 8;
         let bars = self.melody.len();
@@ -192,6 +194,7 @@ impl Song<'_> {
 
 /// A soft round kick: a sine sweeping down from 160 Hz, lightly saturated.
 pub fn kick(buf: &mut [f32], start: usize, vol: f32) {
+    heard(start, KICK, Part::Drums);
     let n = (0.16 * SR) as usize;
     let mut ph = 0.0f32;
     for i in 0..n {
@@ -205,6 +208,7 @@ pub fn kick(buf: &mut [f32], start: usize, vol: f32) {
 
 /// The action kick: a faster, deeper sweep with a click on the front.
 pub fn punch(buf: &mut [f32], start: usize, vol: f32) {
+    heard(start, KICK, Part::Drums);
     let n = (0.14 * SR) as usize;
     let mut ph = 0.0f32;
     for i in 0..n {
@@ -219,6 +223,7 @@ pub fn punch(buf: &mut [f32], start: usize, vol: f32) {
 
 /// The action snare: bright noise that cracks, over a 220 Hz body.
 pub fn crack(buf: &mut [f32], start: usize, rng: &mut Rng, vol: f32) {
+    heard(start, SNARE, Part::Drums);
     let n = (0.16 * SR) as usize;
     let mut prev = 0.0f32;
     for i in 0..n {
@@ -235,6 +240,7 @@ pub fn crack(buf: &mut [f32], start: usize, rng: &mut Rng, vol: f32) {
 
 /// A snare: softened noise over a short 190 Hz body.
 pub fn snare(buf: &mut [f32], start: usize, rng: &mut Rng, vol: f32) {
+    heard(start, SNARE, Part::Drums);
     let n = (0.14 * SR) as usize;
     let mut lp = 0.0f32;
     for i in 0..n {
@@ -250,6 +256,7 @@ pub fn snare(buf: &mut [f32], start: usize, rng: &mut Rng, vol: f32) {
 
 /// A closed hat: a 35 ms tick of high-passed noise.
 pub fn hat(buf: &mut [f32], start: usize, rng: &mut Rng, vol: f32) {
+    heard(start, HAT, Part::Drums);
     let n = (0.035 * SR) as usize;
     let mut prev = 0.0f32;
     for i in 0..n {

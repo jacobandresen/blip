@@ -5,9 +5,8 @@ use super::{
     color::paper_color,
     procedure::leading_name,
     syntax::{assignment_eq, method_call, split_args, matching_else, print_items, split_statements, top_level_then},
-    ForLoop, MusicRequest, Program, Value,
+    ForLoop, Program, Value,
 };
-use crate::host::audio_event;
 use crate::sounds::Sounds;
 use blip::{Blip, BlipTex};
 use std::{collections::HashMap, sync::Arc};
@@ -99,10 +98,9 @@ impl Program {
             "SOUND" => self.sound(rest, blip),
             "PRINT" => self.print(rest, blip),
             "PLAY_SFX" => self.play_sfx(rest, blip, sounds),
-            "PLAY_MUSIC" => self.play_music(rest, blip),
+            "PLAY_MUSIC" => self.play_music(rest, blip, sounds),
             "STOP_MUSIC" => {
-                self.music_file_request = None;
-                self.music_request = Some(MusicRequest::Stop);
+                sounds.stop_music();
                 Ok(())
             }
             _ if self.is_bare_call(command) => self.call_procedure(command, blip),
@@ -266,66 +264,20 @@ impl Program {
     fn play_sfx(&mut self, rest: &str, blip: &Blip, sounds: &mut Sounds) -> Result<(), String> {
         let args = split_args(rest);
         if args.is_empty() || args.len() > 2 {
-            return Err("PLAY_SFX needs name[,volume]".into());
+            return Err("PLAY_SFX needs file[,volume]".into());
         }
-        let name = self.eval(&args[0], blip)?.string().to_ascii_lowercase();
+        let path = sound_path(&self.eval(&args[0], blip)?.string());
         let volume = args
             .get(1)
             .map(|value| self.eval(value, blip).map(|v| v.number() as f32))
             .transpose()?
             .unwrap_or(1.0)
             .clamp(0.0, 1.0);
-        sounds.play(name, volume)?;
-        audio_event();
-        Ok(())
+        sounds.play(path, volume)
     }
 
-    fn play_music(&mut self, rest: &str, blip: &Blip) -> Result<(), String> {
-        let name = self.eval(rest, blip)?.string();
-        let builtin = name.to_ascii_uppercase();
-        let level = self
-            .vars
-            .get("LV")
-            .or_else(|| self.vars.get("ROUND"))
-            .map(Value::number)
-            .unwrap_or(1.0) as i32;
-        self.music_file_request = None;
-        self.music_request = Some(match builtin.as_str() {
-            "BOUNCER_TITLE" => MusicRequest::Bouncer(0),
-            "BOUNCER_GAME" => MusicRequest::Bouncer((level + 1).rem_euclid(2) as usize),
-            "BOUNCER_ALT" => MusicRequest::Bouncer(1),
-            "DEFENDER_MAIN" => MusicRequest::Defender(0),
-            "DEFENDER_BOSS" => MusicRequest::Defender(1),
-            "ADDER_COIL" => MusicRequest::Adder(0),
-            "ADDER_HUNT" => MusicRequest::Adder(1),
-            "SERPENT_MAIN" => MusicRequest::Serpent(0),
-            "SERPENT_FRENZY" => MusicRequest::Serpent(1),
-            "RALLY_MAIN" => MusicRequest::Rally(0),
-            "RALLY_ALT" => MusicRequest::Rally(1),
-            "METEORS_DRIFT" => MusicRequest::Meteors(0),
-            "METEORS_STORM" => MusicRequest::Meteors(1),
-            "RAIDER_MAIN" => MusicRequest::SkyRaider(0),
-            "RAIDER_ALT" => MusicRequest::SkyRaider(1),
-            "BRAWLER_ARENA" => MusicRequest::Brawler(0),
-            "BUBBLER_MAIN" => MusicRequest::Bubbler(0),
-            "BUBBLER_HURRY" => MusicRequest::Bubbler(1),
-            _ => {
-                let mut path = builtin;
-                if !path.starts_with("/USER/") {
-                    return Err(format!("Unknown music track {name}"));
-                }
-                if path.ends_with(".TUNE") {
-                    path.truncate(path.len() - 5);
-                    path.push_str(".WAV");
-                } else if !path.ends_with(".WAV") {
-                    path.push_str(".WAV");
-                }
-                self.music_request = None;
-                self.music_file_request = Some(path);
-                return Ok(());
-            }
-        });
-        Ok(())
+    fn play_music(&mut self, rest: &str, blip: &Blip, sounds: &mut Sounds) -> Result<(), String> {
+        sounds.play_music(sound_path(&self.eval(rest, blip)?.string()))
     }
 
     fn assign(&mut self, command: &str, eq: usize, blip: &Blip) -> Result<(), String> {
@@ -359,4 +311,11 @@ impl Program {
         }
         Ok(())
     }
+}
+
+/// A sound's file: upper case, `.WAV` when no other is named; a saved tune plays its WAV.
+fn sound_path(name: &str) -> String {
+    let path = name.to_ascii_uppercase();
+    let stem = path.strip_suffix(".TUNE").unwrap_or(&path);
+    if stem.ends_with(".WAV") { stem.to_string() } else { format!("{stem}.WAV") }
 }

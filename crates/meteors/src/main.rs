@@ -14,6 +14,8 @@ use blip::{
     NEON_GREEN, NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
 };
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
 mod tunes;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
@@ -1138,8 +1140,8 @@ async fn main() {
         texture
     });
 
-    // DRIFT, then STORM from wave STORM_WAVE (synthesised here, see tunes.rs).
-    let mut music = Jukebox::new(&[crate::tunes::drift_wav, crate::tunes::storm_wav]);
+    // DRIFT, then STORM from wave STORM_WAVE.
+    let mut music = Jukebox::new("METEORS", &["DRIFT", "STORM"]);
     music.start(0).await;
 
     let mut sfx = Sounds {

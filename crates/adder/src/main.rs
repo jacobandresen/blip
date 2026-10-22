@@ -2,6 +2,8 @@
 //! that pay to pass through, and up to six vipers in one pit — two of them
 //! people, the rest CPU. The rules are in `arena`, the brains in `cpu`.
 
+// The effects and music are made by build.rs; the tests check them here.
+#[cfg(test)]
 mod tunes;
 mod arena;
 mod cpu;
@@ -207,7 +209,7 @@ async fn main() {
         round: blip::audio::load_sound(ROUND_WAV).await,
         game_over: blip::audio::load_sound(GAME_OVER_WAV).await,
     };
-    let mut music = Jukebox::new(&[crate::tunes::coil_wav, crate::tunes::hunt_wav]);
+    let mut music = Jukebox::new("ADDER", &["COIL", "HUNT"]);
     music.start(0).await;
 
     let mut shot_frame: u32 = 0;

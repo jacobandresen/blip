@@ -86,38 +86,6 @@ fn title_start(mode: usize) -> Vec<u8> {
     image.encode_png()
 }
 
-fn title_bubbles() -> Vec<u8> {
-    let mut image = Image::new(24 * 32, 2 * 32);
-    for owner in 0..2 {
-        for frame in 0..24 {
-            let h = frame as f32 / 4.0;
-            let x = 0.45 * (1.0 - ((h % 2.0) - 1.0).abs());
-            let (r, g, b) = match h as i32 {
-                0 => (0.45, x, 0.0), 1 => (x, 0.45, 0.0), 2 => (0.0, 0.45, x),
-                3 => (0.0, x, 0.45), 4 => (x, 0.0, 0.45), _ => (0.45, 0.0, x),
-            };
-            let rim = [((r + 0.55) * 255.0) as u8, ((g + 0.55) * 255.0) as u8, ((b + 0.55) * 255.0) as u8];
-            for y in 0..32 {
-                for x in 0..32 {
-                    let (dx, dy) = (x as f32 + 0.5 - 16.0, y as f32 + 0.5 - 16.0);
-                    let d = dx.hypot(dy);
-                    let (px, py) = (frame * 32 + x, owner * 32 + y);
-                    if d <= 12.0 { image.blend(px, py, [120, if owner == 0 { 255 } else { 200 }, if owner == 0 { 140 } else { 255 }, 56]); }
-                    let coverage = (1.4 - (d - 12.0).abs()).clamp(0.0, 1.0);
-                    image.blend(px, py, [rim[0], rim[1], rim[2], (coverage * 217.0) as u8]);
-                    let angle = -35.0_f32.to_radians();
-                    let (hx, hy) = (dx + 4.56, dy + 5.04);
-                    let ex = (hx * angle.cos() + hy * angle.sin()) / 3.6;
-                    let ey = (-hx * angle.sin() + hy * angle.cos()) / 2.04;
-                    if ex * ex + ey * ey <= 1.0 { image.blend(px, py, [255, 255, 255, 217]); }
-                    if (dx - 5.4).hypot(dy - 4.2) <= 1.2 { image.blend(px, py, [255, 255, 255, 153]); }
-                }
-            }
-        }
-    }
-    image.encode_png()
-}
-
 fn title_sky() -> Vec<u8> {
     let mut image = Image::new(624, 600);
     for y in 0..600 {
@@ -264,48 +232,10 @@ fn tile(round: usize, border: bool) -> Vec<u8> {
     img.encode_png()
 }
 
-fn compact_tile(round: usize, border: bool) -> Vec<u8> {
-    let (mut block, mut light, dark) = TILES[round];
-    if border {
-        block = (
-            (block.0 as f32 * 0.62) as u8,
-            (block.1 as f32 * 0.62) as u8,
-            (block.2 as f32 * 0.62) as u8,
-        );
-        light = (
-            (light.0 as f32 * 0.7) as u8,
-            (light.1 as f32 * 0.7) as u8,
-            (light.2 as f32 * 0.7) as u8,
-        );
-    }
-    let mut img = Image::new(12, 8);
-    for y in 1..7 {
-        for x in 1..11 {
-            let c = if y == 1 {
-                light
-            } else if y == 6 || x == 10 {
-                dark
-            } else {
-                block
-            };
-            img.set(x, y, c.0, c.1, c.2);
-        }
-    }
-    let dot = (
-        ((block.0 as u16 * 55 + light.0 as u16 * 45) / 100) as u8,
-        ((block.1 as u16 * 55 + light.1 as u16 * 45) / 100) as u8,
-        ((block.2 as u16 * 55 + light.2 as u16 * 45) / 100) as u8,
-    );
-    img.set(5, 4, dot.0, dot.1, dot.2);
-    img.set(4, 3, 255, 255, 255);
-    img.encode_png()
-}
-
 /// Sprites used by the Rust game and BASIC tape.
 pub fn generate() -> Vec<Asset> {
     let mut assets = vec![
         ("images/TITLE_SKY.png", title_sky()),
-        ("images/TITLE_BUBBLES.png", title_bubbles()),
         ("images/TITLE_INFO_KEYS.png", title_info(0)),
         ("images/TITLE_INFO_PAD.png", title_info(1)),
         ("images/TITLE_INFO_TOUCH.png", title_info(2)),
@@ -367,30 +297,8 @@ pub fn generate() -> Vec<Asset> {
             "images/BORDER_7.png",
             "images/BORDER_8.png",
         ][round];
-        let compact_name = [
-            "images/TILE_LOW_1.png",
-            "images/TILE_LOW_2.png",
-            "images/TILE_LOW_3.png",
-            "images/TILE_LOW_4.png",
-            "images/TILE_LOW_5.png",
-            "images/TILE_LOW_6.png",
-            "images/TILE_LOW_7.png",
-            "images/TILE_LOW_8.png",
-        ][round];
-        let compact_border_name = [
-            "images/BORDER_LOW_1.png",
-            "images/BORDER_LOW_2.png",
-            "images/BORDER_LOW_3.png",
-            "images/BORDER_LOW_4.png",
-            "images/BORDER_LOW_5.png",
-            "images/BORDER_LOW_6.png",
-            "images/BORDER_LOW_7.png",
-            "images/BORDER_LOW_8.png",
-        ][round];
         assets.push((tile_name, tile(round, false)));
         assets.push((border_name, tile(round, true)));
-        assets.push((compact_name, compact_tile(round, false)));
-        assets.push((compact_border_name, compact_tile(round, true)));
     }
     assets
 }
@@ -402,7 +310,7 @@ mod tests {
     #[test]
     fn sprites_and_round_tiles_have_their_intended_png_sizes() {
         let assets = generate();
-        assert_eq!(assets.len(), 55);
+        assert_eq!(assets.len(), 38);
         for (path, bytes) in assets {
             assert!(path.starts_with("images/"));
             let mut reader = png::Decoder::new(bytes.as_slice()).read_info().unwrap();
@@ -415,12 +323,8 @@ mod tests {
                 (624, 92)
             } else if path.contains("TITLE_START_") {
                 (624, 40)
-            } else if path.contains("TITLE_BUBBLES") {
-                (768, 64)
             } else if path.contains("TITLE_SKY") {
                 (624, 600)
-            } else if path.contains("_LOW_") {
-                (12, 8)
             } else if is_tile {
                 (32, 32)
             } else {

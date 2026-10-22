@@ -132,9 +132,10 @@ fn encode_wav(sample_rate: u32, samples: &[i16]) -> Vec<u8> {
     out
 }
 
-/// Synthesizes tracks from WAV makers on demand; call `warm_up` on a screen where a short stall is harmless.
+/// Plays a game's tunes from its tape folder, each loaded when first wanted;
+/// call `warm_up` on a screen where a short stall is harmless.
 pub struct Jukebox {
-    makers: Vec<fn() -> Vec<u8>>,
+    files: Vec<String>,
     tracks: Vec<Option<(BlipSound, f32, f32)>>,
     playing: Option<usize>,
     /// Seconds left in the current loop, for `rotate`.
@@ -142,8 +143,10 @@ pub struct Jukebox {
 }
 
 impl Jukebox {
-    pub fn new(makers: &[fn() -> Vec<u8>]) -> Self {
-        Self { makers: makers.to_vec(), tracks: vec![None; makers.len()], playing: None, left: 0.0 }
+    /// `game`'s tunes `names`, as `web/TAPE/<GAME>/ASSETS/<NAME>.WAV`.
+    pub fn new(game: &str, names: &[&str]) -> Self {
+        let files = names.iter().map(|name| tape_file(game, &format!("{name}.WAV"))).collect();
+        Self { files, tracks: vec![None; names.len()], playing: None, left: 0.0 }
     }
 
     /// Render track `first` and play it.
@@ -188,7 +191,8 @@ impl Jukebox {
     }
 
     async fn render(&mut self, i: usize) {
-        let wav = (self.makers[i])();
+        // A missing file is a quiet game, not a stopped one.
+        let wav = macroquad::file::load_file(&self.files[i]).await.unwrap_or_default();
         let secs = wav_seconds(&wav);
         let gain = music_gain(&wav);
         self.tracks[i] = Some((load_sound(&wav).await, secs, gain));
@@ -200,6 +204,16 @@ impl Jukebox {
             self.playing = Some(i);
             self.left = *secs;
         }
+    }
+}
+
+/// Where a game's generated file is: its tape folder, which on the web is beside
+/// the game's own page.
+pub fn tape_file(game: &str, name: &str) -> String {
+    if cfg!(target_arch = "wasm32") {
+        format!("../TAPE/{game}/ASSETS/{name}")
+    } else {
+        format!("{}/../../web/TAPE/{game}/ASSETS/{name}", env!("CARGO_MANIFEST_DIR"))
     }
 }
 

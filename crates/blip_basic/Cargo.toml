@@ -9,6 +9,4 @@ publish.workspace = true
 macroquad = { workspace = true }
 blip = { workspace = true }
 
-[build-dependencies]
-blip = { path = "../blip", default-features = false }
 
