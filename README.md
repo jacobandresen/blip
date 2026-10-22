@@ -11,7 +11,7 @@ Nine arcade games built with the Rust `blip` engine and compiled to WebAssembly.
 - **Serpent** — guide a snake through a maze.
 - **Adder** — two vipers, and CPU ones to fill the pit: free movement, holes in the bodies to pass through.
 - **Bouncer** — brick breaker with pickups and multi-ball.
-- **Galactic Defender** — shoot the alien formation and its motherships.
+- **Defender** — shoot the alien formation and its motherships.
 - **Meteors** — steer and fire through drifting asteroids.
 - **Raider** — vertical shooter with formations, flak and bosses.
 - **Brawler** — one-on-one fighting with ten fighters and a nine-fight ladder.

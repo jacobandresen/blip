@@ -220,11 +220,11 @@ var tapePrograms=[
   {file:'BOUNCER.BLIP',command:'BOUNCER',slug:'bouncer',title:'BOUNCER'},
   {file:'BRAWLER.BLIP',command:'BRAWLER',slug:'brawler',title:'BRAWLER'},
   {file:'BUBBLER.BLIP',command:'BUBBLER',slug:'bubbler',title:'BUBBLER',players:2},
-  {file:'DEFENDER.BLIP',command:'DEFENDER',slug:'galactic_defender',title:'GALACTIC DEFENDER'},
+  {file:'DEFENDER.BLIP',command:'DEFENDER',slug:'galactic_defender',title:'DEFENDER'},
   {file:'METEORS.BLIP',command:'METEORS',slug:'meteors',title:'METEORS'},
   {file:'RALLY.BLIP',command:'RALLY',slug:'rally',title:'RALLY'},
   {file:'SERPENT.BLIP',command:'SERPENT',slug:'serpent',title:'SERPENT'},
-  {file:'SKY_RAIDER.BLIP',command:'SKY_RAIDER',slug:'sky_raider',title:'SKY RAIDER'}
+  {file:'SKY_RAIDER.BLIP',command:'SKY_RAIDER',slug:'sky_raider',title:'RAIDER'}
 ];
 var tapeReady=fetch('TAPE/manifest.json').then(function(response){if(!response.ok)throw Error('TAPE DIRECTORY UNAVAILABLE');return response.json();}).then(function(names){if(!Array.isArray(names))throw Error('BAD TAPE MANIFEST');tapeNames=names.filter(function(name){return tapePrograms.some(function(tape){return tape.file===name;});});}).catch(function(error){tapeLoadError=error.message;});
 var gfxReady=fetch('TAPE/GFX/manifest.json').then(function(response){if(!response.ok)throw Error('GFX directory unavailable');return response.json();}).then(function(games){if(games&&typeof games==='object')gfxNames=games;}).catch(function(){});

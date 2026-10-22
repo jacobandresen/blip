@@ -53,7 +53,7 @@ html, body { width: 512px; height: 512px; overflow: hidden; background: #000; }
 </style></head><body><div class="icon"><div class="card">
 <div class="window"><img alt=""></div><div class="band"><div class="title"></div></div></div></div></body></html>`;
 
-/** Title case for the label under the icon: SKY RAIDER -> Sky Raider. */
+/** Title case for the label under the icon: BUBBLER -> Bubbler. */
 const titleCase = (s) => s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
 
 const server = createFileServer();

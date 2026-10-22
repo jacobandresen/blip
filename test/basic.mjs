@@ -862,7 +862,7 @@ test('SKY_RAIDER.BLIP runs three rounds with flight, shooting, graphics, and sou
   for (let round = 1; round <= 3; round++) {
     await page.evaluate(() => BlipBasic.submit('RUN'));
     await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
-    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: Sky Raider should launch without errors`);
+    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: Raider should launch without errors`);
     const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
     await page.waitForTimeout(180);
     const title = await canvas.screenshot();
@@ -2166,7 +2166,7 @@ test('a game tape launches its BLIP BASIC program on the home computer', async (
   const gameFrame = page.frameLocator('#basic-wasm-frame');
   await gameFrame.locator('#glcanvas').waitFor({ state: 'visible' });
   assert.match(await page.locator('#basic-wasm-frame').getAttribute('src'), /basic-runtime\.html/);
-  assert.equal(await page.evaluate(() => Array.from(BlipBasic.lines.values()).some((line) => line.includes('GALACTIC'))), true);
+  assert.equal(await page.evaluate(() => Array.from(BlipBasic.lines.values()).some((line) => line.startsWith('REM DEFENDER'))), true);
   assert.equal(await page.locator('#basic-keyboard').evaluate((el) => getComputedStyle(el).display), 'none');
   await page.evaluate(() => {
     const frame = document.querySelector('#basic-wasm-frame');

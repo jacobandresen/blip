@@ -18,6 +18,8 @@
       var q = new URLSearchParams(location.search);
       var front = localStorage.getItem('blip-frontend');
       if (!q.has('cabinet') && !q.has('manual') && (front === 'home' || front === 'basic')) location.replace(front + '.html');
+      // Staying: the arcade is the front end now, so a game's BLIP badge comes back here.
+      else localStorage.setItem('blip-frontend', 'cabinet');
     } catch (e) {}
     try { sessionStorage.setItem('blip-freeplay', '0'); } catch (e) {}   // this session plays the cabinet's way
     document.documentElement.setAttribute('data-cabinet-arranging', '');
@@ -1181,11 +1183,11 @@
       <div class="card-desc"   data-i18n="bouncerDesc"></div>
     </article>
 
-    <!-- GALACTIC DEFENDER -->
+    <!-- DEFENDER -->
     <article class="card card-galactic" data-game-url="galactic_defender/index.html">
       <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
-        <img class="card-shot" src="galactic_defender/screenshot.png?v=7" alt="Galactic Defender gameplay">
+        <img class="card-shot" src="galactic_defender/screenshot.png?v=7" alt="Defender gameplay">
       </div>
       <div class="card-title">DEFENDER</div>
       <div class="card-genre"  data-i18n="galacticGenre"></div>

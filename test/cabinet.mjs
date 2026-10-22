@@ -279,3 +279,18 @@ for (const [index, [slug, title, players]] of GAMES.entries()) {
     }
   });
 }
+
+test('a game opened in the arcade after a visit to BASIC returns to the arcade from the BLIP badge', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 900 } });
+  await page.route('**/*.wasm', () => {});
+  await page.goto(`${origin}/basic.html`);
+  await page.evaluate(() => localStorage.setItem('blip-frontend', 'basic'));
+  await page.goto(`${origin}/index.html?cabinet`);
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  await page.goto(`${origin}/serpent/index.html`);
+  await page.locator('.blip-logo').click();
+  await page.waitForURL((url) => !url.pathname.includes('/serpent/'));
+  assert.equal(new URL(page.url()).pathname, '/index.html', 'the badge leads back to the arcade, not to BASIC');
+  await page.waitForTimeout(500);
+  assert.equal(new URL(page.url()).pathname, '/index.html', 'and the arcade stays');
+});

@@ -28,7 +28,6 @@ function slugify(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace
 function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 function gameSlugByName(name) {
   name = name.trim().toLowerCase();
-  // History names some in full: Galactic Defender is DEFENDER.
   return Object.keys(BLIP_GAMES).filter(function (s) {
     var n = BLIP_GAMES[s].name.toLowerCase();
     return name === n || name.split(' ').indexOf(n) >= 0;

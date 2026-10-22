@@ -1510,10 +1510,8 @@ fn streak_label(streak: i32) -> String {
 
 fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
     blip.clear(BLIP_BLACK);
-    blip.draw_centered("GALACTIC", (WIN_H / 5) as f32,        5.0, BLIP_CYAN);
-    blip.draw_centered("DEFENDER", (WIN_H / 5 + 50) as f32,   5.0, BLIP_MAGENTA);
-    // DEFENDER (the lower title line) is sz=5 (35px tall) — clear its
-    // bottom by a real margin.
+    blip.draw_centered("DEFENDER", (WIN_H / 5 + 14) as f32, 6.0, BLIP_MAGENTA);
+    // The title is 6 x 7 = 42px tall: the high score clears it by a real margin.
     blip.draw_hi(hi, (WIN_H / 5 + 93) as f32, BLIP_YELLOW);
 
     let dw = (ALIEN_W / 2) as f32;
@@ -1561,7 +1559,7 @@ fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
 }
 
 fn conf() -> blip::macroquad::window::Conf {
-    window_conf("GALACTIC DEFENDER", WIN_W, WIN_H)
+    window_conf("DEFENDER", WIN_W, WIN_H)
 }
 
 const PLAYER_SHIP_PNG:  &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/assets/images/player_ship.png"));
