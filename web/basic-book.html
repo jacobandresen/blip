@@ -182,7 +182,7 @@
               <p class="eyebrow">CHAPTER SEVEN</p><h2>A TAPE’S ASSETS</h2>
               <p class="lead">A tape carries its game’s pictures, effects and tunes in one folder, ready to use.</p>
               <pre class="listing"><code>LOAD /TAPE/BOUNCER.BLIP<br>DIR /TAPE/BOUNCER/ASSETS<br>DRAW_TEXTURE("/TAPE/BOUNCER/ASSETS/BALL.PNG",X,Y,8,8)</code></pre>
-              <div class="primitive-list compact"><div><code>DRAW_TEXTURE(FILE,X,Y,W,H[,TINT])</code><p>Stretch an image; optionally multiply it by a tint.</p></div><div><code>DRAW_TEXTURE(FILE,X,Y,W,H,SX,SY,SW,SH)</code><p>Crop a pixel rectangle from an image and stretch it into the destination.</p></div><div><code>DRAW_TEXTURE(FILE,X,Y,W,H,COL,COLS,ROW,ROWS,ANGLE)</code><p>Draw one sprite-sheet cell; rotation is radians.</p></div></div>
+              <div class="primitive-list compact"><div><code>DRAW_TEXTURE(FILE,X,Y,W,H[,TINT])</code><p>Stretch an image; optionally multiply it by a tint. A negative width mirrors it, so a figure turns to face the other way.</p></div><div><code>DRAW_TEXTURE(FILE,X,Y,W,H,SX,SY,SW,SH)</code><p>Crop a pixel rectangle from an image and stretch it into the destination.</p></div><div><code>DRAW_TEXTURE(FILE,X,Y,W,H,COL,COLS,ROW,ROWS,ANGLE)</code><p>Draw one sprite-sheet cell; rotation is radians.</p></div></div>
               <p>A name without <code>.PNG</code> gets it. Drawing is clipped to the screen.</p>
               <aside class="note"><strong>ONE NAME FOR THE FOLDER</strong>Each game names its folder once, as <code>ASSETS$="/TAPE/DEFENDER/ASSETS/"</code>, and then each file as <code>ASSETS$+"BULLET.PNG"</code>.</aside>
               <div class="page-number">13</div>
