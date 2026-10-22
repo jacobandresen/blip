@@ -1991,15 +1991,15 @@ test('the BASIC book turns one readable page at a time on a phone', async (t) =>
   assert.equal(await page.locator('h1').textContent(), 'CONTENTS');
   assert.equal(await page.locator('.cover-front img').getAttribute('src'), 'blip-basic-cover.svg');
   assert.ok(await page.locator('.cover-front img').evaluate((img) => img.complete && img.naturalWidth > 0));
-  assert.equal(await page.locator('.contents-list li').count(), 14);
+  assert.equal(await page.locator('.contents-list li').count(), 20);
   assert.equal(await page.locator('.reader-page:visible').count(), 0);
   await page.locator('[data-turn="next"]').click();
   assert.equal(await page.locator('.reader-page:visible').count(), 1);
   assert.match(await page.locator('.reader-page:visible').innerText(), /YOUR FIRST PROGRAM/);
-  for (let turn = 0; turn < 8 && !(await page.locator('.reader-page:visible').innerText()).includes('DRAW WITH BLIP'); turn += 1) await page.locator('[data-turn="next"]').click();
+  for (let turn = 0; turn < 20 && !(await page.locator('.reader-page:visible').innerText()).includes('DRAW WITH BLIP'); turn += 1) await page.locator('[data-turn="next"]').click();
   assert.equal(await page.locator('.reader-page:visible').count(), 1);
-  assert.equal(await page.locator('.reader-page:visible .primitive-list > div').count(), 15);
-  for (let turn = 0; turn < 8 && !(await page.locator('.reader-page:visible').innerText()).includes('OPEN A GAME'); turn += 1) await page.locator('[data-turn="next"]').click();
+  assert.equal(await page.locator('.reader-page:visible .primitive-list > div').count(), 16);
+  for (let turn = 0; turn < 20 && !(await page.locator('.reader-page:visible').innerText()).includes('OPEN A GAME'); turn += 1) await page.locator('[data-turn="next"]').click();
   assert.match(await page.locator('.reader-page:visible').innerText(), /LOAD \/TAPE\/BOUNCER\.BLIP[\s\S]*RUN/);
   await page.locator('[data-turn="next"]').click();
   assert.match(await page.locator('.reader-page:visible').innerText(), /SOURCE[\s\S]*SAVE MY_BOUNCER[\s\S]*EDIT \/USER\/MY_BOUNCER\.BLIP[\s\S]*RUN/);
@@ -2027,10 +2027,10 @@ test('the BASIC book shows only its current two-page spread on desktop', async (
   await page.locator('[data-turn="next"]').click();
   await page.waitForTimeout(1000);
   assert.equal(await page.locator('.reader-spread > .reader-page:visible').count(), 2);
-  assert.match(await page.locator('.reader-spread').innerText(), /NAME YOUR ROUTINES\.[\s\S]*READ INPUT\. UPDATE\. DRAW\./);
+  assert.match(await page.locator('.reader-spread').innerText(), /NAME YOUR ROUTINES\.[\s\S]*BLOCKS, LOOPS AND DATA\./);
   const fit = await page.locator('.reader-spread > .reader-page').evaluateAll((pages) => pages.map((sheet) => ({ overflow: getComputedStyle(sheet).overflowY, fits: sheet.scrollHeight <= sheet.clientHeight + 1, scroll: sheet.scrollHeight, height: sheet.clientHeight, chapter: sheet.firstElementChild && sheet.firstElementChild.getBoundingClientRect().height })));
   assert.ok(fit.every((sheet) => sheet.overflow === 'hidden' && sheet.fits), JSON.stringify(fit));
-  for (let spread = 0; spread < 5; spread += 1) {
+  for (let spread = 0; spread < 8; spread += 1) {
     await page.locator('[data-turn="next"]').click();
     await page.waitForTimeout(700);
     const pages = await page.locator('.reader-spread > .reader-page').evaluateAll((sheets) => sheets.map((sheet) => ({ fits: sheet.scrollHeight <= sheet.clientHeight + 1, scroll: sheet.scrollHeight, height: sheet.clientHeight, chapter: sheet.firstElementChild && sheet.firstElementChild.id, zoom: sheet.firstElementChild && getComputedStyle(sheet.firstElementChild).zoom, box: sheet.firstElementChild && sheet.firstElementChild.getBoundingClientRect().height })));
