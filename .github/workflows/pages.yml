@@ -29,8 +29,8 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
           if [ -z "$SUPABASE_DB_URL" ]; then
-            echo "::error::Set the SUPABASE_DB_URL secret (the database connection string) to deploy."
-            exit 1
+            echo "::warning::No SUPABASE_DB_URL secret: new migrations were not applied."
+            exit 0
           fi
           supabase db push --db-url "$SUPABASE_DB_URL" --include-all
 
