@@ -277,7 +277,7 @@ impl World {
     }
 
     fn join(&mut self, seat: usize, human: bool) {
-        let (head, heading) = self.clear_spot();
+        let (head, heading) = self.find_spawn();
         self.snakes.push(Snake::new(seat, human, head, heading));
     }
 
@@ -319,7 +319,7 @@ impl World {
         self.snakes.iter().any(|s| s.human) && !self.snakes.iter().any(|s| s.human && s.lives > 0)
     }
 
-    fn room(&self, p: Pt) -> f32 {
+    fn room_at(&self, p: Pt) -> f32 {
         let mut d = (p.x - self.pit.x).min(self.pit.x + self.pit.w - p.x);
         d = d.min(p.y - self.pit.y).min(self.pit.y + self.pit.h - p.y);
         for s in &self.snakes {
@@ -331,7 +331,7 @@ impl World {
         d
     }
 
-    fn clear_spot(&self) -> (Pt, f32) {
+    fn find_spawn(&self) -> (Pt, f32) {
         let mid = Pt::new(self.pit.x + self.pit.w / 2.0, self.pit.y + self.pit.h / 2.0);
         let mut best = (mid, -1.0);
         for _ in 0..60 {
@@ -339,7 +339,7 @@ impl World {
                 rand_range_f32(self.pit.x + 50.0, self.pit.x + self.pit.w - 50.0),
                 rand_range_f32(self.pit.y + 50.0, self.pit.y + self.pit.h - 50.0),
             );
-            let d = self.room(p);
+            let d = self.room_at(p);
             if d > best.1 {
                 best = (p, d);
             }
@@ -507,14 +507,14 @@ impl World {
             let Some((_, to, hit)) = moves[i] else { continue; };
             match hit {
                 Hit::Wall => {
-                    self.die(i, None);
+                    self.eliminate(i, None);
                     continue;
                 }
                 Hit::Body(j) => {
-                    self.die(i, Some(j));
+                    self.eliminate(i, Some(j));
                     continue;
                 }
-                Hit::Gap(j, k) => self.through(i, j, k, to),
+                Hit::Gap(j, k) => self.go_through(i, j, k, to),
                 Hit::None => {}
             }
         }
@@ -537,7 +537,7 @@ impl World {
         }
     }
 
-    fn through(&mut self, i: usize, j: usize, k: usize, at: Pt) {
+    fn go_through(&mut self, i: usize, j: usize, k: usize, at: Pt) {
         let hole = &mut self.snakes[j].holes[k];
         if hole.spent {
             return;
@@ -555,7 +555,7 @@ impl World {
         blip::bot::add("through", 1.0);
     }
 
-    fn die(&mut self, i: usize, killer: Option<usize>) {
+    fn eliminate(&mut self, i: usize, killer: Option<usize>) {
         if !self.snakes[i].alive {
             return;
         }
@@ -584,7 +584,7 @@ impl World {
         self.banner_t = 0.0;
         let old = std::mem::take(&mut self.snakes);
         for s in old {
-            let (head, heading) = self.clear_spot();
+            let (head, heading) = self.find_spawn();
             let mut fresh = Snake::new(s.seat, s.human, head, heading);
             fresh.score = s.score;
             if s.human {
@@ -672,8 +672,8 @@ mod tests {
         });
         w.snakes
             .push(Snake::new(0, true, Pt::new(84.0, 250.0), 0.0));
-        w.through(1, 0, 0, Pt::new(84.0, 270.0));
-        w.through(1, 0, 0, Pt::new(84.0, 270.0));
+        w.go_through(1, 0, 0, Pt::new(84.0, 270.0));
+        w.go_through(1, 0, 0, Pt::new(84.0, 270.0));
         assert_eq!(w.snakes[1].score, HOLE_POINTS);
         assert_eq!(w.events, vec![Event::Through]);
         assert_eq!(
@@ -792,8 +792,8 @@ mod tests {
         w.snakes
             .push(Snake::new(2, false, Pt::new(300.0, 400.0), 0.0));
         let path = w.snakes[0].path.clone();
-        w.die(0, None);
-        w.die(0, None);
+        w.eliminate(0, None);
+        w.eliminate(0, None);
         w.step(0.1, &[Steer::default(); SEATS]);
         assert!(!w.snakes[0].alive);
         assert_eq!(w.snakes[0].lives, LIVES - 1);
@@ -809,7 +809,7 @@ mod tests {
     fn last_alive_wins_then_the_next_round_clears_trails_and_preserves_lives() {
         let mut w = World::new(1);
         let score = w.snakes[1].score;
-        w.die(0, None);
+        w.eliminate(0, None);
         w.step(0.0, &[Steer::default(); SEATS]);
         assert_eq!(w.round, 1);
         assert_eq!(w.round_wait, ROUND_WAIT);
@@ -833,7 +833,7 @@ mod tests {
     fn the_round_ends_when_the_people_are_down() {
         let mut w = World::new(1);
         w.join(2, false);
-        w.die(0, None);
+        w.eliminate(0, None);
         w.step(0.0, &[Steer::default(); SEATS]);
         assert_eq!(w.round_wait, ROUND_WAIT);
         assert!(w.snakes[1].alive && w.snakes[2].alive);
@@ -844,7 +844,7 @@ mod tests {
     fn no_human_lives_left_ends_the_run() {
         let mut w = World::new(1);
         w.snakes[0].lives = 1;
-        w.die(0, None);
+        w.eliminate(0, None);
         w.step(0.0, &[Steer::default(); SEATS]);
         assert!(w.over);
         assert_eq!(w.round, 1);
@@ -854,7 +854,7 @@ mod tests {
     fn player_two_can_join_without_reviving_an_eliminated_seat() {
         let mut w = World::new(1);
         w.join(2, false);
-        w.die(1, None);
+        w.eliminate(1, None);
         assert!(w.join_human(1));
         assert_eq!(w.humans, 2);
         assert_eq!(w.snakes[1].lives, LIVES);
@@ -893,7 +893,7 @@ mod tests {
         square.lay_path();
         square.alive = false;
         w.snakes.push(square);
-        assert!(crate::cpu::steer(&w, 0).turn.abs() > 0.0);
+        assert!(crate::cpu::steer_cpu(&w, 0).turn.abs() > 0.0);
     }
 
     #[test]
@@ -903,7 +903,7 @@ mod tests {
             let mut steers = [Steer::default(); SEATS];
             for (i, s) in w.snakes.iter().enumerate() {
                 if s.alive {
-                    steers[s.seat] = crate::cpu::steer(&w, i);
+                    steers[s.seat] = crate::cpu::steer_cpu(&w, i);
                 }
             }
             w.step(1.0 / 60.0, &steers);

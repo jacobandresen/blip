@@ -79,7 +79,7 @@ fn seat_keys(seat: usize) -> [KeyCode; 3] {
 }
 
 /// Left and right curve the viper; it keeps its heading when neither is held.
-fn human_steer(seat: usize, solo: bool) -> Steer {
+fn steer_person(seat: usize, solo: bool) -> Steer {
     let [left, right, _] = seat_keys(seat);
     // Alone, the arrows turn too; once player two joins they are theirs.
     let arrows = solo && seat == 0;
@@ -105,7 +105,7 @@ fn gather(g: &Game) -> [Steer; SEATS] {
     for (i, s) in g.world.snakes.iter().enumerate() {
         if !s.alive { continue; }
         let seat = s.seat.min(SEATS - 1);
-        steers[seat] = if s.human { human_steer(s.seat, g.humans < 2) } else { cpu::steer(&g.world, i) };
+        steers[seat] = if s.human { steer_person(s.seat, g.humans < 2) } else { cpu::steer_cpu(&g.world, i) };
     }
     steers
 }
@@ -114,7 +114,7 @@ fn gather(g: &Game) -> [Steer; SEATS] {
 fn cpu_steers(w: &World) -> [Steer; SEATS] {
     let mut steers = [Steer::default(); SEATS];
     for (i, s) in w.snakes.iter().enumerate() {
-        if s.alive { steers[s.seat.min(SEATS - 1)] = cpu::steer(w, i); }
+        if s.alive { steers[s.seat.min(SEATS - 1)] = cpu::steer_cpu(w, i); }
     }
     steers
 }
@@ -126,7 +126,7 @@ fn autopilot(w: &World) {
     let mut held = Vec::new();
     for (i, s) in w.snakes.iter().enumerate() {
         if !s.human || !s.alive { continue; }
-        let st = cpu::steer(w, i);
+        let st = cpu::steer_cpu(w, i);
         let [left, right, _] = seat_keys(s.seat);
         if st.turn < -0.15 { held.push(left); }
         if st.turn > 0.15 { held.push(right); }
@@ -254,7 +254,7 @@ const HOLE: BlipColor = BlipColor { r: 1.0, g: 0.86, b: 0.34, a: 1.0 };
 const SAND: BlipColor = BlipColor { r: 0.60, g: 0.52, b: 0.36, a: 1.0 };
 
 /// Dead trails stay solid; passable gaps keep the seat's colour at 23% brightness.
-fn draw_snake(blip: &Blip, s: &arena::Snake) {
+fn draw_viper(blip: &Blip, s: &arena::Snake) {
     let c = s.colour();
     let gap = BlipColor { r: c.r * 0.23, g: c.g * 0.23, b: c.b * 0.23, ..c };
     let thick = arena::BODY_R * 2.0;
@@ -290,7 +290,7 @@ fn draw_standings(blip: &Blip, w: &World) {
 
 fn draw_world(blip: &Blip, w: &World, pit: &Texture2D) {
     blip.draw_texture(pit, 0.0, 0.0, WIN_W as f32, WIN_H as f32);
-    for s in &w.snakes { draw_snake(blip, s); }
+    for s in &w.snakes { draw_viper(blip, s); }
     w.fx.draw(blip);
 }
 

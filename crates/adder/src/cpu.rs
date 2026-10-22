@@ -37,7 +37,7 @@ fn quarry(w: &World, who: usize) -> Option<Pt> {
 }
 
 /// Safe headings take priority over scoring through a gap.
-pub fn steer(w: &World, who: usize) -> Steer {
+pub fn steer_cpu(w: &World, who: usize) -> Steer {
     let s = &w.snakes[who];
     let want = quarry(w, who).map(|q| (q.y - s.head.y).atan2(q.x - s.head.x));
     let need = w.speed_base() * SAFE_SECS * 1.3;

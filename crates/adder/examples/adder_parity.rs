@@ -81,7 +81,7 @@ fn main() {
     }
     for _ in 0..steps {
         if scenario == "cpuwall" || scenario == "cpu-gaps" {
-            steers[1] = cpu::steer(&world, 1);
+            steers[1] = cpu::steer_cpu(&world, 1);
         }
         world.step(0.016, &steers);
     }
