@@ -215,7 +215,7 @@ impl Game {
         }
     }
 
-    fn spawn_wave(&mut self) {
+    fn start_wave(&mut self) {
         for a in self.asteroids.iter_mut() { a.active = false; }
         self.wave_t = 0.0;
         let count = (WAVE_BASE + self.sess.level - 1).min(WAVE_MAX);
@@ -223,8 +223,9 @@ impl Game {
         // instant the last rock dies, and the centre may be nowhere near it.
         let (sx, sy) = if self.ship_alive { (self.ship.x, self.ship.y) } else { field_centre() };
         for _ in 0..count {
-            let (x, y) = spawn_pos_away_from(sx, sy);
-            spawn_asteroid(self, x, y, ASize::Large);
+            let (x, y) = find_clear_spot(sx, sy);
+            let (vx, vy) = random_velocity(ASize::Large);
+            spawn_rock(self, x, y, ASize::Large, vx, vy);
         }
     }
 
@@ -250,7 +251,7 @@ impl Game {
         let (lo, hi) = saucer_spawn_range(self.sess.level);
         self.saucer_cd = rand_range_f32(lo, hi);
         self.respawn_ship();
-        self.spawn_wave();
+        self.start_wave();
         self.state = State::Play;
     }
 }
@@ -273,7 +274,7 @@ fn field_centre() -> (f32, f32) {
 }
 
 /// A point at least SAFE_RADIUS from (cx, cy), measured across the wrap.
-fn spawn_pos_away_from(cx: f32, cy: f32) -> (f32, f32) {
+fn find_clear_spot(cx: f32, cy: f32) -> (f32, f32) {
     let (w, h) = (PLAY_W as f32, PLAY_H as f32);
     loop {
     let x = rand_range_f32(0.0, w);
@@ -286,14 +287,15 @@ fn spawn_pos_away_from(cx: f32, cy: f32) -> (f32, f32) {
     }
 }
 
-fn spawn_asteroid(g: &mut Game, x: f32, y: f32, size: ASize) {
+/// A rock's speed for its size, in any direction.
+fn random_velocity(size: ASize) -> (f32, f32) {
     let (smin, smax) = size.speed_range();
     let speed = rand_range_f32(smin, smax);
     let dir = rand_range_f32(0.0, PI * 2.0);
-    spawn_asteroid_v(g, x, y, size, dir.cos() * speed, dir.sin() * speed);
+    (dir.cos() * speed, dir.sin() * speed)
 }
 
-fn spawn_asteroid_v(g: &mut Game, x: f32, y: f32, size: ASize, vx: f32, vy: f32) {
+fn spawn_rock(g: &mut Game, x: f32, y: f32, size: ASize, vx: f32, vy: f32) {
     let mut jag = [1.0f32; 10];
     for j in jag.iter_mut() { *j = rand_range_f32(0.75, 1.25); }
     pool_spawn(&mut g.asteroids, Asteroid {
@@ -307,14 +309,14 @@ fn spawn_asteroid_v(g: &mut Game, x: f32, y: f32, size: ASize, vx: f32, vy: f32)
 
 /// Fragments leave along opposite sides of a random axis, on top of the
 /// parent's velocity (plus a share of the impactor's), so momentum carries through.
-fn split_asteroid(g: &mut Game, x: f32, y: f32, size: ASize, pvx: f32, pvy: f32) {
+fn split_rock(g: &mut Game, x: f32, y: f32, size: ASize, pvx: f32, pvy: f32) {
     let Some(child) = size.child() else { return };
     let axis = rand_range_f32(0.0, PI * 2.0);
     let (ax, ay) = (axis.cos(), axis.sin());
     let (smin, smax) = child.speed_range();
     for sign in [1.0_f32, -1.0] {
         let kick = rand_range_f32(smin, smax) * 0.6;
-        spawn_asteroid_v(g, x + ax * sign * 6.0, y + ay * sign * 6.0, child,
+        spawn_rock(g, x + ax * sign * 6.0, y + ay * sign * 6.0, child,
             pvx + ax * sign * kick, pvy + ay * sign * kick);
     }
 }
@@ -464,49 +466,59 @@ fn update_title(g: &mut Game) {
     }
 }
 
+/// Turn, thrust, a little drag and the speed limit; the field wraps. Returns
+/// how far the ship moved, across the seam if it wrapped.
+fn fly_ship(g: &mut Game, dt: f32, sfx: &Sounds, thrust_snd_t: &mut f32) -> (f32, f32) {
+    let before = (g.ship.x, g.ship.y);
+    if key_active(BLIP_KEY_LEFT)  || key_active(BLIP_KEY_A) { g.ship.angle -= SHIP_TURN_RATE * dt; }
+    if key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D) { g.ship.angle += SHIP_TURN_RATE * dt; }
+
+    g.ship.thrusting = key_active(BLIP_KEY_UP) || key_active(BLIP_KEY_W);
+    if g.ship.thrusting {
+        g.ship.vx += g.ship.angle.sin() * SHIP_ACCEL * dt;
+        g.ship.vy -= g.ship.angle.cos() * SHIP_ACCEL * dt;
+        *thrust_snd_t -= dt;
+        if *thrust_snd_t <= 0.0 {
+            play_sfx(&sfx.thrust);
+            *thrust_snd_t = 0.18;
+        }
+    }
+    // Light drag; a frictionless hull is unforgiving to steer.
+    let drag = (-0.35 * dt).exp();
+    g.ship.vx *= drag;
+    g.ship.vy *= drag;
+    let speed = (g.ship.vx * g.ship.vx + g.ship.vy * g.ship.vy).sqrt();
+    if speed > SHIP_MAX_SPEED {
+        let s = SHIP_MAX_SPEED / speed;
+        g.ship.vx *= s;
+        g.ship.vy *= s;
+    }
+    g.ship.x = wrap(g.ship.x + g.ship.vx * dt, 0.0, PLAY_W as f32);
+    g.ship.y = wrap(g.ship.y + g.ship.vy * dt, PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
+    (
+        (g.ship.x - before.0 + PLAY_W as f32 * 0.5).rem_euclid(PLAY_W as f32) - PLAY_W as f32 * 0.5,
+        (g.ship.y - before.1 + PLAY_H as f32 * 0.5).rem_euclid(PLAY_H as f32) - PLAY_H as f32 * 0.5,
+    )
+}
+
+fn fire_shot(g: &mut Game, dt: f32, sfx: &Sounds) {
+    g.fire_cd -= dt;
+    if key_active(BLIP_KEY_SPACE) && g.fire_cd <= 0.0 {
+        let vx = g.ship.angle.sin() * BULLET_SPEED + g.ship.vx * 0.3;
+        let vy = -g.ship.angle.cos() * BULLET_SPEED + g.ship.vy * 0.3;
+        spawn_bullet(&mut g.bullets, g.ship.x, g.ship.y, vx, vy, true);
+        g.fire_cd = FIRE_COOLDOWN;
+        play_sfx(&sfx.fire);
+    }
+}
+
 fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) {
     let ship_before = (g.ship.x, g.ship.y);
     let mut ship_delta = (0.0, 0.0);
     let mut ship_teleported = false;
     if g.ship_alive {
-        if key_active(BLIP_KEY_LEFT)  || key_active(BLIP_KEY_A) { g.ship.angle -= SHIP_TURN_RATE * dt; }
-        if key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D) { g.ship.angle += SHIP_TURN_RATE * dt; }
-
-        g.ship.thrusting = key_active(BLIP_KEY_UP) || key_active(BLIP_KEY_W);
-        if g.ship.thrusting {
-            g.ship.vx += g.ship.angle.sin() * SHIP_ACCEL * dt;
-            g.ship.vy -= g.ship.angle.cos() * SHIP_ACCEL * dt;
-            *thrust_snd_t -= dt;
-            if *thrust_snd_t <= 0.0 {
-                play_sfx(&sfx.thrust);
-                *thrust_snd_t = 0.18;
-            }
-        }
-        // Light drag; a frictionless hull is unforgiving to steer.
-        let drag = (-0.35 * dt).exp();
-        g.ship.vx *= drag;
-        g.ship.vy *= drag;
-        let speed = (g.ship.vx * g.ship.vx + g.ship.vy * g.ship.vy).sqrt();
-        if speed > SHIP_MAX_SPEED {
-            let s = SHIP_MAX_SPEED / speed;
-            g.ship.vx *= s;
-            g.ship.vy *= s;
-        }
-        g.ship.x = wrap(g.ship.x + g.ship.vx * dt, 0.0, PLAY_W as f32);
-        g.ship.y = wrap(g.ship.y + g.ship.vy * dt, PLAY_Y0, PLAY_Y0 + PLAY_H as f32);
-        ship_delta = (
-            (g.ship.x - ship_before.0 + PLAY_W as f32 * 0.5).rem_euclid(PLAY_W as f32) - PLAY_W as f32 * 0.5,
-            (g.ship.y - ship_before.1 + PLAY_H as f32 * 0.5).rem_euclid(PLAY_H as f32) - PLAY_H as f32 * 0.5,
-        );
-
-        g.fire_cd -= dt;
-        if key_active(BLIP_KEY_SPACE) && g.fire_cd <= 0.0 {
-            let vx = g.ship.angle.sin() * BULLET_SPEED + g.ship.vx * 0.3;
-            let vy = -g.ship.angle.cos() * BULLET_SPEED + g.ship.vy * 0.3;
-            spawn_bullet(&mut g.bullets, g.ship.x, g.ship.y, vx, vy, true);
-            g.fire_cd = FIRE_COOLDOWN;
-            play_sfx(&sfx.fire);
-        }
+        ship_delta = fly_ship(g, dt, sfx, thrust_snd_t);
+        fire_shot(g, dt, sfx);
         if key_pressed(BLIP_KEY_BUTTON2) {
             hyperspace(g, sfx);
             ship_delta = (0.0, 0.0);
@@ -564,7 +576,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &mut Sounds, thrust_snd_t: &mut f32) 
                 g.asteroids[ai].active = false;
                 let c = rock_color(&a, g.sess.level, blip::macroquad::time::get_time() as f32);
                 burst(g, a.x, a.y, a.vx, a.vy, 6, a.size.radius() * 0.5, 70.0, c);
-                split_asteroid(g, a.x, a.y, a.size, a.vx, a.vy);
+                split_rock(g, a.x, a.y, a.size, a.vx, a.vy);
                 blip::bot::add("death_rock", 1.0);
                 kill_ship(g, sfx);
                 break;
@@ -699,7 +711,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
                     ASize::Medium => play_sfx(&sfx.bang_medium),
                     ASize::Small  => play_sfx(&sfx.bang_small),
                 }
-                split_asteroid(g, a.x, a.y, size, pvx, pvy);
+                split_rock(g, a.x, a.y, size, pvx, pvy);
                 break;
             }
         }
@@ -745,7 +757,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
         blip::bot::set(&format!("t_wave{}", g.sess.level), blip::bot::clock() as f64);
         g.sess.next_level();
         blip::bot::set("level", g.sess.level as f64);
-        g.spawn_wave();
+        g.start_wave();
     }
 }
 
@@ -977,7 +989,7 @@ fn draw_haze(blip: &Blip, blot: &Texture2D, rocks: &[Asteroid], level: i32, t: f
     }
 }
 
-fn draw_asteroid(blip: &Blip, a: &Asteroid, level: i32, t: f32) {
+fn draw_rock(blip: &Blip, a: &Asteroid, level: i32, t: f32) {
     let c = rock_color(a, level, t);
     let flower = is_flower(a, level);
     let lines = outline(a, flower);
@@ -1043,7 +1055,7 @@ fn draw_play(blip: &Blip, g: &Game, blot: &Texture2D) {
     let t = blip::macroquad::time::get_time() as f32;
     blip.clear(BLIP_BLACK);
     draw_haze(blip, blot, &g.asteroids, g.sess.level, t);
-    for a in pool_iter(&g.asteroids) { draw_asteroid(blip, a, g.sess.level, t); }
+    for a in pool_iter(&g.asteroids) { draw_rock(blip, a, g.sess.level, t); }
     for d in pool_iter(&g.debris) {
         let h = d.len * 0.5;
         let col = BlipColor { a: d.ttl / d.ttl0, ..d.color };
@@ -1176,7 +1188,7 @@ async fn main() {
                 g.start_game();
                 // The card's picture: a late wave, flowers and haze and all.
                 g.sess.level = 8;
-                g.spawn_wave();
+                g.start_wave();
                 g.wave_t = WAVE_BANNER_SECS;
                 g.ship.angle = -0.4;
                 g.ship.thrusting = true;
@@ -1243,7 +1255,7 @@ mod tests {
         let mut g = Game::new();
         g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
         for (x, y) in [(100.0, 150.0), (300.0, 300.0), (500.0, 200.0), (200.0, 400.0)] {
-            spawn_asteroid_v(&mut g, x, PLAY_Y0 + y - 100.0, ASize::Large, 0.0, 0.0);
+            spawn_rock(&mut g, x, PLAY_Y0 + y - 100.0, ASize::Large, 0.0, 0.0);
         }
         for _ in 0..200 {
             let (x, y) = landing_spot(&g);
@@ -1258,10 +1270,10 @@ mod tests {
     fn a_rock_splits_into_two_of_the_next_size_and_the_smallest_into_none() {
         let mut g = Game::new();
         g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
-        split_asteroid(&mut g, 300.0, 300.0, ASize::Large, 10.0, 0.0);
+        split_rock(&mut g, 300.0, 300.0, ASize::Large, 10.0, 0.0);
         assert!(rocks(&g) == vec![ASize::Medium, ASize::Medium]);
         g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
-        split_asteroid(&mut g, 300.0, 300.0, ASize::Small, 10.0, 0.0);
+        split_rock(&mut g, 300.0, 300.0, ASize::Small, 10.0, 0.0);
         assert!(rocks(&g).is_empty());
     }
 
@@ -1269,7 +1281,7 @@ mod tests {
     fn the_halves_fly_apart_on_top_of_the_parents_drift() {
         let mut g = Game::new();
         g.asteroids = [ASTEROID_OFF; MAX_ASTEROIDS];
-        split_asteroid(&mut g, 300.0, 300.0, ASize::Large, 40.0, -20.0);
+        split_rock(&mut g, 300.0, 300.0, ASize::Large, 40.0, -20.0);
         let halves: Vec<_> = g.asteroids.iter().filter(|a| a.active).collect();
         // Each half's kick is along the same axis, in opposite directions.
         let k0 = (halves[0].vx - 40.0, halves[0].vy + 20.0);
