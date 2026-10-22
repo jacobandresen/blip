@@ -1,4 +1,4 @@
-var CACHE = "blip-v703";
+var CACHE = "blip-v705";
 
 var ASSETS = [
   "/blip/",
@@ -96,6 +96,7 @@ var ASSETS = [
   "/blip/bouncer/icon-512.png",
   "/blip/bouncer/icon-maskable-512.png",
   "/blip/bouncer/screenshot.png",
+  "/blip/bouncer/attract.webp",
   "/blip/defender/index.html",
   "/blip/defender/index.wasm",
   "/blip/defender/manifest.json",
@@ -104,6 +105,7 @@ var ASSETS = [
   "/blip/defender/icon-512.png",
   "/blip/defender/icon-maskable-512.png",
   "/blip/defender/screenshot.png",
+  "/blip/defender/attract.webp",
   "/blip/rally/index.html",
   "/blip/rally/index.wasm",
   "/blip/rally/manifest.json",
@@ -112,6 +114,7 @@ var ASSETS = [
   "/blip/rally/icon-512.png",
   "/blip/rally/icon-maskable-512.png",
   "/blip/rally/screenshot.png",
+  "/blip/rally/attract.webp",
   "/blip/serpent/index.html",
   "/blip/serpent/index.wasm",
   "/blip/serpent/manifest.json",
@@ -120,6 +123,7 @@ var ASSETS = [
   "/blip/serpent/icon-512.png",
   "/blip/serpent/icon-maskable-512.png",
   "/blip/serpent/screenshot.png",
+  "/blip/serpent/attract.webp",
   "/blip/meteors/index.html",
   "/blip/meteors/index.wasm",
   "/blip/meteors/manifest.json",
@@ -128,6 +132,7 @@ var ASSETS = [
   "/blip/meteors/icon-512.png",
   "/blip/meteors/icon-maskable-512.png",
   "/blip/meteors/screenshot.png",
+  "/blip/meteors/attract.webp",
   "/blip/brawler/index.html",
   "/blip/brawler/index.wasm",
   "/blip/brawler/manifest.json",
@@ -136,6 +141,7 @@ var ASSETS = [
   "/blip/brawler/icon-512.png",
   "/blip/brawler/icon-maskable-512.png",
   "/blip/brawler/screenshot.png",
+  "/blip/brawler/attract.webp",
   "/blip/brawler/card.png",
   "/blip/bubbler/index.html",
   "/blip/bubbler/index.wasm",
@@ -145,6 +151,7 @@ var ASSETS = [
   "/blip/bubbler/icon-512.png",
   "/blip/bubbler/icon-maskable-512.png",
   "/blip/bubbler/screenshot.png",
+  "/blip/bubbler/attract.webp",
   "/blip/raider/index.html",
   "/blip/raider/index.wasm",
   "/blip/raider/manifest.json",
@@ -153,6 +160,7 @@ var ASSETS = [
   "/blip/raider/icon-512.png",
   "/blip/raider/icon-maskable-512.png",
   "/blip/raider/screenshot.png",
+  "/blip/raider/attract.webp",
   "/blip/adder/index.html",
   "/blip/adder/index.wasm",
   "/blip/adder/manifest.json",
@@ -161,6 +169,7 @@ var ASSETS = [
   "/blip/adder/icon-512.png",
   "/blip/adder/icon-maskable-512.png",
   "/blip/adder/screenshot.png",
+  "/blip/adder/attract.webp",
 ];
 
 self.addEventListener("install", function (e) {

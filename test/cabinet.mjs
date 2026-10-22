@@ -472,3 +472,29 @@ test('a game page opened later, or another game, starts on its plain loader', as
     assert.equal(await page.locator('#launch-frame').count(), 0, `${launch.slug} handover`);
   }
 });
+
+// ---- Living screens: a machine within two plays its strip; farther ones keep their still. ----
+test('only the machines near you fetch and play their attract loops', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  const fetched = [];
+  page.on('request', (r) => { const m = r.url().match(/\/(\w+)\/attract\.webp$/); if (m) fetched.push(m[1]); });
+  await page.goto(`${origin}/index.html`);
+  await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') && !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  await page.waitForFunction(() => document.querySelectorAll('#game-grid .card[data-loop-ready]').length === 5);
+  assert.deepEqual([...fetched].sort(), ['adder', 'bouncer', 'brawler', 'defender', 'rally']);
+  const strip = await page.evaluate(() => {
+    const card = document.querySelector('.card[data-machine="rally"]'), img = card.querySelector('.card-loop-strip');
+    return { frames: img.naturalHeight / (img.naturalWidth / (480 / 540)), playing: getComputedStyle(img).animationPlayState,
+      shown: getComputedStyle(card.querySelector('.card-loop')).visibility };
+  });
+  assert.ok(Math.abs(strip.frames - 12) < 0.5, `${strip.frames} frames`);
+  assert.equal(strip.playing, 'running');
+  assert.equal(strip.shown, 'visible');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.card[data-machine="raider"] .card-loop')).visibility), 'hidden');
+  await page.keyboard.press('ArrowRight');
+  await aisleStill(page);
+  await page.waitForFunction(() => document.querySelector('.card[data-machine="bubbler"][data-loop-ready]'));
+  assert.ok(fetched.includes('bubbler'), 'walking on fetches the next one');
+  assert.ok(!fetched.includes('raider') && !fetched.includes('serpent'), `and only that: ${fetched}`);
+  assert.equal(await page.evaluate(() => document.querySelector('.card[data-machine="brawler"]').hasAttribute('data-loop')), false, 'the machine left behind stops');
+});

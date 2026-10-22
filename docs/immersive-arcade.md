@@ -155,23 +155,32 @@ other half, as built:
   and the next page opens on it.
 - The zoom stays at 0.46 s.
 
-## 4. Living screens
+## 4. Living screens — done
 
-- `tools/make_attract_strips.mjs` runs each game's native autopilot
-  (`BLIP_BOT=1 BLIP_BOT_SHOTS=dir BLIP_BOT_SHOT_EVERY=0.25`, one game at a
-  time), takes 12–16 frames from the first minute of play, scales them to the
-  screen's 290×164 and writes `web/<game>/attract.webp`, one strip per game,
-  under 60 KB.
-- Machines with `d ≤ 2` show the strip at 3 fps (`steps()` on a
-  `transform` of the strip inside the screen's box). Farther ones keep
-  `screenshot.png`, and their strips are not requested until they come near
-  (`loading="lazy"` does not apply to backgrounds, so the image is set on
-  approach).
-- The faced machine shows its strip under PRESS START.
-- Light: each machine casts a soft pool of `rgb(BLIP_GAMES[slug].accent)` on
-  the carpet, an `opacity` from `1 / (1 + d²)`; now and then (every 20–40 s,
-  per machine) a marquee or screen flickers for 120 ms.
-- Strips are added to `ASSETS` in `web/sw.js` so the arcade works offline.
+As built:
+
+- `tools/make_attract_strips.mjs` runs each game's native autopilot under
+  `xvfb-run`, one game at a time (`BLIP_BOT=1 BLIP_CRT=0
+  BLIP_BOT_SHOT_EVERY=0.25`; Bubbler also `BUBBLER_BOT=1`, its own
+  autopilot). It keeps 12 frames from a point past each title screen (`FROM`)
+  and writes `web/<game>/attract.webp`, the frames stacked, 240 px wide. A
+  strip over 60 KB is made at a lower quality, then narrower (Raider's is
+  160 px, its scenery being busy).
+- Each screen gets a `.card-loop` over its still. A machine within two
+  (`LOOP_NEAR`) sets `data-loop`, fetches its strip the first time, and plays
+  it at 3 frames a second (`steps(12)` on the strip's `transform`); the strip
+  covers the screen as the still does. Farther machines keep their still,
+  which now shows on every screen (dimmed to 0.8), not only the faced one.
+- PRESS START and the credit stay over the faced machine's loop.
+- Light: each cabinet casts a pool of its trim colour on the carpet
+  (`.card-pool`, an `opacity` of `machineLevel(d)`, written only when it
+  changes).
+- Every 4–12 s a machine within 2.5 flickers its sign or screen for 0.18 s:
+  a dark veil (`.machine-veil`) on a layer of its own, animated with
+  `element.animate`. Animating the screen or sign itself cost a layout each
+  time.
+- Reduced motion: the strips stand still and nothing flickers.
+- The strips are in `ASSETS` in `web/sw.js`.
 
 ## 5. Up and down
 
@@ -203,7 +212,7 @@ Nine games need no second row.
 | Walking loop, inputs, stepping up, up and down | `web/index.html` (the aisle script and its styles) |
 | Analogue stick | `web/kiosk.js` (`pollGamepad`) |
 | Machine and room sound, single footstep | `web/kiosk.js` |
-| Screen loops | `tools/make_attract_strips.mjs`, `web/<game>/attract.webp`, `web/index.html` |
+| Screen loops, pools of light, flicker | `tools/make_attract_strips.mjs`, `web/<game>/attract.webp`, `web/index.html` |
 | The game page's first frame (`#launch-frame`) | `web/shell.js`, `web/shell.css` |
 
 These files are in the table in `AGENTS.md`, marked "planned". As each part
@@ -218,7 +227,7 @@ in `package.json`). Each change to `web/` bumps `CACHE` in `web/sw.js`.
 | 1. Walking | Unit, arcade, layout and performance tests pass; reduced motion steps as today | Done |
 | 2. Sound | Sound tests pass; heard on an iPhone and the kiosk | Tests pass; listening by hand still to do |
 | 3. Stepping up | The loader shows the faced screen, then the game | Done |
-| 4. Living screens | Nine strips under 60 KB, loaded only nearby, cached offline | |
+| 4. Living screens | Nine strips under 60 KB, loaded only nearby, cached offline | Done |
 | 5. Up and down | The new `shell.mjs` test replaces the row test; `moveRow` is gone | |
 
 ## How to test it
@@ -296,13 +305,19 @@ the playing machines with the level and pan each is heading for.
 - ✓ With `blip-mute`, `blipOut`'s gain is 0.
 - ✓ With the page hidden the room stops, and it starts again when shown.
 
-### Living screens
+### Living screens ✓
 
-- `tools/make_attract_strips.mjs` checks its own output: nine strips, each
-  the right size and under 60 KB.
-- On load, the arcade requests strips only for machines with `d ≤ 2` (count
-  `page.on('request')`); walking requests the next one.
-- Every strip is listed in `web/sw.js`.
+- ✓ `tools/make_attract_strips.mjs` checks its own output: twelve frames,
+  under 60 KB.
+- ✓ `test/aisle.test.mjs`: all nine strips exist, are WebP, under 60 KB, and
+  are listed in `web/sw.js`.
+- ✓ `test/cabinet.mjs`: on load the arcade fetches only the five strips
+  within two; each has twelve frames and plays; a machine farther off shows
+  no loop. Walking one machine fetches only the next, and the machine left
+  behind stops.
+- ✓ `test/aisle-perf.mjs`: at rest, flickers included, no layouts. A strip's
+  first load costs one layout, once a visit, so the walk is measured over
+  loaded screens.
 
 ### Layout (`test/layout.mjs`)
 

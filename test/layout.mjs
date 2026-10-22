@@ -316,6 +316,8 @@ for (const device of mine) {
     await page.waitForFunction(() => document.querySelector('.card-focused')?.offsetWidth > 0);
     await settled(page);
     for (let step = 0; step < 9; step++) {
+      // The machine is picked when the walk arrives at it.
+      await page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
       await page.waitForFunction(() => [...document.querySelectorAll('.card')].every((card) => card.getAnimations().length === 0));
       const card = await page.evaluate(() => {
         const el = document.querySelector('.card-focused');

@@ -32,7 +32,7 @@ change will be overwritten the next time the project is built.
 | Stepping up to a machine — planned | `web/index.html` (the aisle script) |
 | The game page opening on the arcade screen's picture (`blip-cabinet-launch`, `#launch-frame`) | `web/index.html` (`openMachine`), `web/shell.js`, `web/shell.css` |
 | Each machine's attract jingle (`BLIP_ATTRACT`) and the room's sound (`blipArcadeSound`) | `web/kiosk.js` |
-| Each machine's attract loop on its screen — planned | `tools/make_attract_strips.mjs`, which writes `web/<game>/attract.webp` (generated, not edited by hand) |
+| Each machine's attract loop on its screen | `tools/make_attract_strips.mjs`, which writes `web/<game>/attract.webp` (generated, not edited by hand; run after a game's look changes); the arcade plays it (`.card-loop` in `web/index.html`) |
 | A machine's marquee, the same sign on its cabinet and as its game page's top bar; each game's colours (`data-machine`) | `web/marquee.css` |
 | The deck on each cabinet: the game page's own, rendered per game | `web/machine-deck.html` (builds it with `web/deck.js`) |
 | Each game as its own home-screen app: icons (a small game card) and `manifest.json` | `tools/make_game_icons.mjs`, which writes `web/<game>/icon-*.png` and `manifest.json`, and the Guide's (generated, not edited by hand) |

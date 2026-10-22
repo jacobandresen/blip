@@ -132,3 +132,16 @@ test('the faced machine is loudest and the others fall away and pan apart', () =
     assert.ok(Math.abs(Aisle.machinePan(off)) <= 1);
   }
 });
+
+test('every machine has an attract strip of twelve frames, small enough to fetch as you walk, cached offline', async () => {
+  const { readFileSync, statSync } = await import('node:fs');
+  const web = new URL('../web/', import.meta.url);
+  const sw = readFileSync(new URL('sw.js', web), 'utf8');
+  for (const slug of ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder']) {
+    const file = new URL(`${slug}/attract.webp`, web);
+    const bytes = readFileSync(file);
+    assert.equal(bytes.toString('latin1', 8, 12), 'WEBP', `${slug} is a WebP`);
+    assert.ok(statSync(file).size <= 60 * 1024, `${slug}: ${statSync(file).size} bytes`);
+    assert.ok(sw.includes(`"/blip/${slug}/attract.webp"`), `${slug}'s strip is in sw.js`);
+  }
+});

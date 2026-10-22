@@ -924,6 +924,20 @@
       opacity:.85;
     }
 
+    /* Living screens (cards' .card-loop): the strip's 12 frames at 3 a second, over the still. */
+    #game-grid .card-loop {position:absolute;inset:0;z-index:1;overflow:hidden;visibility:hidden;pointer-events:none}
+    #game-grid .card[data-loop][data-loop-ready] .card-loop {visibility:visible}
+    #game-grid .card-loop-frame {position:absolute;left:50%;top:50%;width:100%;height:100%;overflow:hidden;transform:translate(-50%,-50%)}
+    #game-grid .card-loop-strip {display:block;width:100%;height:auto;filter:saturate(1.15) contrast(1.06);animation:card-loop 4s steps(12) infinite paused}
+    #game-grid .card[data-loop] .card-loop-strip {animation-play-state:running}
+    @keyframes card-loop {to {transform:translateY(-100%)}}
+    /* Each machine's pool of light on the carpet, its opacity set by the walk. */
+    #game-grid .card-pool {position:absolute;z-index:0;left:-35%;right:-35%;bottom:-70px;height:140px;pointer-events:none;opacity:0;
+      background:radial-gradient(closest-side,color-mix(in srgb,var(--trim) 62%,transparent),transparent);transform:rotateX(78deg);transform-origin:50% 50%}
+    #game-grid .machine-veil {position:absolute;inset:0;z-index:5;border-radius:inherit;background:#000;opacity:0;pointer-events:none;will-change:opacity}
+    #game-grid .machine-veil-sign {left:-3%;right:-3%;bottom:auto;height:8.5%;border-radius:4px 4px 2px 2px}
+    @media (prefers-reduced-motion:reduce) {#game-grid .card-loop-strip {animation:none}}
+
     /* The cabinet front: black laminate between two strips of T-molding. Nothing here may set filter, opacity,
        overflow or clip-path, which would flatten the 3D side panels. */
     #game-grid .card,#game-grid .card:is(:hover,.card-focused,.card-active,.no-credit) {
@@ -989,7 +1003,8 @@
     #game-grid .game-rom {position:absolute;inset:13px 14px 22px;display:block;padding:0;border:0;border-radius:16px/20px;overflow:hidden;background:#000;
       box-shadow:0 0 0 3px #000,0 0 14px color-mix(in srgb,var(--trim) 45%,transparent)}
     #game-grid .game-rom .card-shot,#game-grid .card-shot-wrap img.card-shot {position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;border-radius:0;filter:saturate(1.15) contrast(1.06)}
-    #game-grid .card:not(.card-focused) .game-rom .card-shot {opacity:0;transition:opacity .3s ease}
+    /* A machine you are not facing shows its still a little dimmer; within two it plays (.card-loop). */
+    #game-grid .card:not(.card-focused) .game-rom .card-shot {opacity:.8;transition:opacity .3s ease}
     #game-grid .card.card-focused .game-rom .card-shot {opacity:1}
     /* Scanlines, the tube's dark corners and a glare off the glass. */
     #game-grid .game-rom::after {content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
@@ -2246,6 +2261,33 @@
       var wall=document.createElement('i');wall.className='aisle-wall';wall.setAttribute('aria-hidden','true');
       var carpet=document.createElement('i');carpet.className='aisle-carpet';carpet.setAttribute('aria-hidden','true');
       grid.insertBefore(carpet,grid.firstChild);grid.insertBefore(wall,carpet);
+      // Living screens: a machine within two plays a few seconds of its game (tools/make_attract_strips.mjs, 12 frames),
+      // farther ones show their still; each casts a pool of its colour on the carpet, brighter as you come near.
+      var LOOP_NEAR=2;
+      var screens=cards.map(function(c){
+        var rom=c.querySelector('.game-rom');
+        if(!rom)return null;
+        var box=document.createElement('span'),frame=document.createElement('span'),strip=document.createElement('img');
+        box.className='card-loop';box.setAttribute('aria-hidden','true');frame.className='card-loop-frame';
+        strip.className='card-loop-strip';strip.alt='';strip.decoding='async';
+        // The strip covers the screen as the still does (object-fit: cover), worked out once from the frame's shape.
+        strip.addEventListener('load',function(){
+          var shape=strip.naturalWidth/(strip.naturalHeight/12),glass=rom.clientWidth/Math.max(1,rom.clientHeight);
+          frame.style.width=(shape<glass?100:100*shape/glass).toFixed(2)+'%';
+          frame.style.height=(shape<glass?100*glass/shape:100).toFixed(2)+'%';
+          c.setAttribute('data-loop-ready','');
+        });
+        frame.appendChild(strip);box.appendChild(frame);
+        var still=rom.querySelector('.card-shot');
+        rom.insertBefore(box,still?still.nextSibling:rom.firstChild);
+        var pool=document.createElement('span');pool.className='card-pool';pool.setAttribute('aria-hidden','true');c.appendChild(pool);
+        // A dark veil over the screen and one over the sign, each on a layer of its own, for the flicker (flickerSoon).
+        // The sign's lies over it rather than in it, which would make it part of the title.
+        [[rom,'machine-veil'],[c,'machine-veil machine-veil-sign']].forEach(function(part){
+          var veil=document.createElement('span');veil.className=part[1];veil.setAttribute('aria-hidden','true');part[0].appendChild(veil);
+        });
+        return {strip:strip,pool:pool,near:false,glow:'',src:(c.getAttribute('data-game-url')||'').split('/')[0]+'/attract.webp'};
+      });
       // Neighbours stand angled away, as on a showroom floor, so their side art shows; farther ones recede.
       // Where the room is narrow they stand closer, their sides peeking in at the edges.
       function aisleSpacing(room) {
@@ -2286,6 +2328,16 @@
           // Past three and a half machines a cabinet is out of sight, and crosses to the aisle's other end unseen.
           var away=distance>3.5;
           if(c.aisleAway!==away){c.aisleAway=away;c.style.visibility=away?'hidden':'';}
+          var screen=screens[i];
+          if(!screen)return;
+          var near=distance<=LOOP_NEAR;
+          if(screen.near!==near){
+            screen.near=near;
+            if(near&&!screen.strip.getAttribute('src'))screen.strip.src=screen.src;
+            c.toggleAttribute('data-loop',near);
+          }
+          var glow=BlipAisle.machineLevel(distance).toFixed(2);
+          if(screen.glow!==glow){screen.glow=glow;screen.pool.style.opacity=glow;}
         });
         var carpetX=-((aisle.pos*spacing*1.3)%86+86)%86,wallX=-((aisle.pos*spacing*.5)%120+120)%120;
         carpet.style.transform='perspective(300px) rotateX(55deg) translate('+carpetX.toFixed(1)+'px,'+(bob||0).toFixed(2)+'px)';
@@ -2328,6 +2380,18 @@
       highlight();
       cards[idx].focus({preventScroll:true});
 
+      // Now and then a nearby machine's sign or screen flickers, as old tubes do.
+      (function flickerSoon(){
+        window.setTimeout(function(){
+          if(!stepWalk.matches&&!document.hidden){
+            var near=cards.filter(function(c,i){return c.classList.contains('card')&&Math.abs(aisleOffset(i))<=2.5;});
+            // The veil's own opacity: a class on the cabinet, or a new animated layer, costs a layout.
+            var c=near[Math.floor(Math.random()*near.length)],veil=c&&c.querySelector(Math.random()<.5?'.machine-veil-sign':'.game-rom .machine-veil');
+            if(veil&&veil.animate)veil.animate([{opacity:0},{opacity:.55},{opacity:.15},{opacity:0}],{duration:180,easing:'steps(3)'});
+          }
+          flickerSoon();
+        },4000+Math.random()*8000);
+      }());
       function canWalk() {
         return !(cardInFlight||!manualOverlay.hidden||document.body.classList.contains('cabinet-return'));
       }

@@ -9,7 +9,7 @@ async function metrics(cdp) {
   return Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
 }
 
-test('walking the aisle on a phone lays nothing out, nor does the arcade at rest', async (t) => {
+test('walking the aisle on a phone lays nothing out once its screens have loaded, nor does the arcade at rest', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 390, height: 844 }, hasTouch: true });
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable');
@@ -24,15 +24,22 @@ test('walking the aisle on a phone lays nothing out, nor does the arcade at rest
   let after = await metrics(cdp);
   assert.equal(after.LayoutCount - before.LayoutCount, 0, 'layouts while standing still');
 
+  // Out first, so the screens on the way back have loaded: a strip's first load costs a layout, once.
+  const still = () => page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'), null, { timeout: 8000 });
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(3600);
+  await page.keyboard.up('ArrowRight');
+  await still();
+  await page.waitForFunction(() => [...document.querySelectorAll('#game-grid .card[data-loop]')].every((c) => c.hasAttribute('data-loop-ready')));
   await page.evaluate(() => {
     window.__frames = 0;
     (function count() { if (document.getElementById('game-grid').hasAttribute('data-aisle-moving')) window.__frames++; requestAnimationFrame(count); })();
   });
   before = await metrics(cdp);
-  await page.keyboard.down('ArrowRight');
-  await page.waitForTimeout(3000);
-  await page.keyboard.up('ArrowRight');
-  await page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'), null, { timeout: 8000 });
+  await page.keyboard.down('ArrowLeft');
+  await page.waitForTimeout(2500);
+  await page.keyboard.up('ArrowLeft');
+  await still();
   after = await metrics(cdp);
   const frames = await page.evaluate(() => window.__frames);
   const layouts = after.LayoutCount - before.LayoutCount;
