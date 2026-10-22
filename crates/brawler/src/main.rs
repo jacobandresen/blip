@@ -1,6 +1,7 @@
 //! One-on-one fighter with ten characters and CPU or local two-player modes.
 //! Attack heights, frame data and poses share the same move definitions.
 
+mod tunes;
 mod moves;
 mod roster;
 mod fighter;
@@ -79,7 +80,7 @@ async fn main() {
     let sfx = Sounds::load().await;
     // The themes are synthesised here rather than shipped: as PCM they would
     // be most of the download.
-    use blip_assets::brawler::theme_wav;
+    use crate::tunes::theme_wav;
     let mut music = Jukebox::new(&[|| theme_wav(0), || theme_wav(1), || theme_wav(2),
         || theme_wav(3), || theme_wav(4), || theme_wav(5), || theme_wav(6), || theme_wav(7)]);
     /// The theme of each stage, in stage order.

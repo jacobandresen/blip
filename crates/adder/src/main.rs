@@ -2,6 +2,7 @@
 //! that pay to pass through, and up to six vipers in one pit — two of them
 //! people, the rest CPU. The rules are in `arena`, the brains in `cpu`.
 
+mod tunes;
 mod arena;
 mod cpu;
 mod levels;
@@ -206,7 +207,7 @@ async fn main() {
         round: blip::audio::load_sound(ROUND_WAV).await,
         game_over: blip::audio::load_sound(GAME_OVER_WAV).await,
     };
-    let mut music = Jukebox::new(&[blip_assets::adder::coil_wav, blip_assets::adder::hunt_wav]);
+    let mut music = Jukebox::new(&[crate::tunes::coil_wav, crate::tunes::hunt_wav]);
     music.start(0).await;
 
     let mut shot_frame: u32 = 0;

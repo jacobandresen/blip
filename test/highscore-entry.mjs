@@ -43,9 +43,9 @@ const F = { key: 'f', code: 'KeyF', vk: 70 };
 const ALL = {
   serpent:           { fire: SPACE, presses: 1 },
   bouncer:           { fire: SPACE, presses: Infinity },
-  galactic_defender: { fire: SPACE, presses: 1 },
+  defender: { fire: SPACE, presses: 1 },
   meteors:           { fire: SPACE, presses: 1 },
-  sky_raider:        { fire: SPACE, presses: Infinity },
+  raider:        { fire: SPACE, presses: Infinity },
   brawler:           { fire: F, presses: 7 },
   bubbler:           { fire: F, presses: 2 },
   adder:             { fire: SPACE, presses: 1 },

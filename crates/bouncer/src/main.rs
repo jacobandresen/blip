@@ -16,6 +16,7 @@ use blip::{
     BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
 };
 
+mod tunes;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
 mod levels;
@@ -53,14 +54,14 @@ const PAD_SPEED_TOUCH: f32 = PAD_SPEED * (1.0 + DASH_BOOST);
 
 const BALL_W: i32 = 18;
 const BALL_H: i32 = 18;
-const BALL_YAW_N: u32 = 12; // sheet layout: must match blip_assets::bouncer
+const BALL_YAW_N: u32 = 12; // sheet layout: must match gfx.rs
 const BALL_PITCH_N: u32 = 19;
 const BALL_SPEED_0: f32 = 240.0;
 const BALL_SPEED_MAX: f32 = 420.0;
 
 // ---- loot drops -------------------------------------------------------
 const MAX_DROPS: usize = 8;
-const PADDLE_CAP: u32 = 12; // must match blip_assets::bouncer
+const PADDLE_CAP: u32 = 12; // must match gfx.rs
 const DROP_W: f32 = 32.0;
 const DROP_H: f32 = 18.0;
 const DROP_SPEED: f32 = 120.0;
@@ -1107,8 +1108,8 @@ async fn main() {
         pickup_bad:  blip::audio::load_sound(PICKUP_BAD_WAV).await,
         pickup_life: blip::audio::load_sound(PICKUP_LIFE_WAV).await,
     };
-    // Two tunes, alternating by level (synthesised here, see blip_assets::bouncer).
-    let mut music = Jukebox::new(&[blip_assets::bouncer::bounce_wav, blip_assets::bouncer::rebound_wav]);
+    // Two tunes, alternating by level (synthesised here, see tunes.rs).
+    let mut music = Jukebox::new(&[crate::tunes::bounce_wav, crate::tunes::rebound_wav]);
     music.start(0).await;
 
     let mut shot_frame: u32 = 0;

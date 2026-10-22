@@ -21,10 +21,10 @@ import { createFileServer, listenOn, WEB_DIR } from '../test/lib/harness.mjs';
 const CROPS = {
   serpent:           { art: 'screenshot.png', cx: 0.55, cy: 0.40, w: 0.62 },
   bouncer:           { art: 'screenshot.png', cx: 0.50, cy: 0.42, w: 0.92 },
-  galactic_defender: { art: 'screenshot.png', cx: 0.52, cy: 0.40, w: 0.80 },
+  defender: { art: 'screenshot.png', cx: 0.52, cy: 0.40, w: 0.80 },
   rally:             { art: 'screenshot.png', cx: 0.50, cy: 0.50, w: 0.98 },
   meteors:           { art: 'screenshot.png', cx: 0.70, cy: 0.24, w: 0.52 },
-  sky_raider:        { art: 'screenshot.png', cx: 0.46, cy: 0.30, w: 0.56 },
+  raider:        { art: 'screenshot.png', cx: 0.46, cy: 0.30, w: 0.56 },
   brawler:           { art: 'card.png',       cx: 0.50, cy: 0.36, w: 0.82 },
   bubbler:           { art: 'screenshot.png', cx: 0.50, cy: 0.70, w: 0.56 },
   adder:             { art: 'screenshot.png', cx: 0.50, cy: 0.40, w: 0.86 },

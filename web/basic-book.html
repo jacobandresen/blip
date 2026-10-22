@@ -161,7 +161,7 @@
               <p class="eyebrow">CHAPTER SIX</p><h2>SOUND &amp; MUSIC</h2>
               <p>Use short effects for game events, and leave room for each new sound to be heard.</p>
               <pre class="listing"><code>100 PLAY_SFX "SERPENT/EAT",0.8<br>110 SOUND 660,0.12,0.5<br>120 PLAY_MUSIC "SERPENT_MAIN"<br>130 REST 0.2</code></pre>
-              <dl class="definitions"><dt>SOUND HZ,SECONDS[,VOLUME]</dt><dd>Play a simple tone. Volume is from 0 to 1.</dd><dt>PLAY_SFX "GAME/EFFECT"[,VOLUME]</dt><dd>Play one of a game’s own effects. Banks: ADDER, BOUNCER, BRAWLER, BUBBLER, GALACTIC_DEFENDER, METEORS, RALLY, SERPENT and SKY_RAIDER.</dd><dt>REST SECONDS</dt><dd>Pause between notes and effects.</dd><dt>PLAY_MUSIC NAME</dt><dd>Start a loop: a built-in track name or a saved path such as <code>"/USER/MUSIC/SONG.TUNE"</code>.</dd><dt>STOP_MUSIC</dt><dd>Stop the current music track.</dd></dl>
+              <dl class="definitions"><dt>SOUND HZ,SECONDS[,VOLUME]</dt><dd>Play a simple tone. Volume is from 0 to 1.</dd><dt>PLAY_SFX "GAME/EFFECT"[,VOLUME]</dt><dd>Play one of a game’s own effects. Banks: ADDER, BOUNCER, BRAWLER, BUBBLER, DEFENDER, METEORS, RALLY, SERPENT and RAIDER.</dd><dt>REST SECONDS</dt><dd>Pause between notes and effects.</dd><dt>PLAY_MUSIC NAME</dt><dd>Start a loop: a built-in track name or a saved path such as <code>"/USER/MUSIC/SONG.TUNE"</code>.</dd><dt>STOP_MUSIC</dt><dd>Stop the current music track.</dd></dl>
               <p>To make a loop of your own, enter <code>TUNE</code>: over the page.</p>
               <p>Names are checked when the program runs. An unknown effect or track reports an error.</p>
               <div class="page-number">11</div>
@@ -182,8 +182,8 @@
               <p class="lead">The tapes carry the games’ pictures too, a folder for each game, ready to draw.</p>
               <pre class="listing"><code>LOAD /TAPE/BOUNCER.BLIP<br>DIR /TAPE/GFX<br>DIR /TAPE/GFX/BOUNCER<br>DRAW_TEXTURE("/TAPE/GFX/BOUNCER/BALL.PNG",X,Y,8,8)</code></pre>
               <div class="primitive-list compact"><div><code>DRAW_TEXTURE(FILE,X,Y,W,H[,TINT])</code><p>Stretch an image; optionally multiply it by a tint.</p></div><div><code>DRAW_TEXTURE(FILE,X,Y,W,H,SX,SY,SW,SH)</code><p>Crop a pixel rectangle from an image and stretch it into the destination.</p></div><div><code>DRAW_TEXTURE(FILE,X,Y,W,H,COL,COLS,ROW,ROWS,ANGLE)</code><p>Draw one sprite-sheet cell; rotation is radians.</p></div></div>
-              <p>Texture names are full paths, for example <code>/TAPE/GFX/GALACTIC_DEFENDER/ALIEN_SQUID_A.PNG</code>. Drawing is clipped to the screen.</p>
-              <aside class="note"><strong>PICTURE LIBRARY</strong>Every game has a folder: ADDER · BOUNCER · BRAWLER · BUBBLER · GALACTIC_DEFENDER · METEORS · RALLY · SERPENT · SKY_RAIDER.</aside>
+              <p>Texture names are full paths, for example <code>/TAPE/GFX/DEFENDER/ALIEN_SQUID_A.PNG</code>. Drawing is clipped to the screen.</p>
+              <aside class="note"><strong>PICTURE LIBRARY</strong>Every game has a folder: ADDER · BOUNCER · BRAWLER · BUBBLER · DEFENDER · METEORS · RALLY · SERPENT · RAIDER.</aside>
               <div class="page-number">13</div>
             </section>
             <section class="page chapter" id="paint-own" style="--ch:7">

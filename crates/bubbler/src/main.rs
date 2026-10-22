@@ -8,7 +8,11 @@ use blip::macroquad::input::KeyCode;
 use blip::macroquad::math::vec2;
 use blip::macroquad::shapes::{draw_ellipse, draw_triangle};
 use blip::{play_sfx, play_sfx_volume, segment_circle_overlap, segment_rect_overlap, web, window_conf, Blip, BlipColor, Jukebox};
+mod tunes;
+// The pictures are made by build.rs; the tests check them here.
+#[cfg(test)]
 mod gfx;
+mod art;
 mod levels;
 
 use levels::{LEVELS, PALETTES, ROCKS_FROM, ROUNDS, ROWS, SPARKS_FROM};
@@ -1604,7 +1608,7 @@ fn draw_atmosphere(blip: &Blip, pal: &levels::Palette) {
     }
 }
 
-fn draw_tiles(blip: &Blip, art: &gfx::Art, g: &Game, ox: f32, oy: f32) {
+fn draw_tiles(blip: &Blip, art: &art::Art, g: &Game, ox: f32, oy: f32) {
     for r in 0..ROWS {
         for c in 0..COLS {
             if !g.tiles[r][c] && !(c == 0 || c == COLS - 1) {
@@ -1649,7 +1653,7 @@ fn mouth_pos(p: &Player) -> (f32, f32) {
     )
 }
 
-fn draw_bubble(blip: &Blip, art: &gfx::Art, b: &Bubble, ox: f32, oy: f32, t: f32, round: usize) {
+fn draw_bubble(blip: &Blip, art: &art::Art, b: &Bubble, ox: f32, oy: f32, t: f32, round: usize) {
     let (x, y) = (b.x + ox, b.y + oy);
     let life = if b.trapped.is_some() {
         trap_life(round)
@@ -1918,7 +1922,7 @@ fn draw_skull(s: &Skull, ox: f32, oy: f32, t: f32) {
     }
 }
 
-fn draw_world(blip: &Blip, art: &gfx::Art, g: &Game) {
+fn draw_world(blip: &Blip, art: &art::Art, g: &Game) {
     let t = now();
     let (ox, oy) = if g.shake > 0.0 {
         (
@@ -2167,7 +2171,7 @@ fn draw_hud(blip: &Blip, g: &Game, _hi: &web::HighScore) {
     );
 }
 
-fn draw_title(blip: &Blip, art: &gfx::Art, g: &Game, hi: &web::HighScore) {
+fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: &web::HighScore) {
     let t = now();
     art.title_background(blip);
     draw_atmosphere(blip, &PALETTES[0]);
@@ -2345,13 +2349,13 @@ fn conf() -> blip::macroquad::window::Conf {
 #[blip::macroquad::main(conf)]
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
-    let art = gfx::Art::load();
+    let art = art::Art::load();
     // Bright filled blocks twitter under the full interlace (see Brawler).
     blip.set_interlace(0.5);
     let mut g = Game::new();
     web::set_players(2);
 
-    use blip_assets::bubbler::{jingle_wav, sfx_wav, theme_wav};
+    use crate::tunes::{jingle_wav, sfx_wav, theme_wav};
     let load = |b: Vec<u8>| async move { blip::audio::load_sound(&b).await };
     let sfx = Sounds {
         blow: load(sfx_wav(0)).await,
@@ -2370,7 +2374,7 @@ async fn main() {
         won: load(jingle_wav(4)).await,
     };
     // The theme, and the same tune faster for HURRY UP.
-    let mut music = Jukebox::new(&[theme_wav, blip_assets::bubbler::hurry_wav]);
+    let mut music = Jukebox::new(&[theme_wav, crate::tunes::hurry_wav]);
     music.start(0).await;
     let mut shot_frame = 0u32;
     #[cfg(not(target_arch = "wasm32"))]

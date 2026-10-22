@@ -186,8 +186,8 @@ test('the game shell', async (t) => {
     assert.equal(await evaluate(cdp, 'location.pathname'), '/bouncer/index.html');
     assert.ok([0, 1].includes(await evaluate(cdp, 'getCoins()')), 'the inserted credit reaches the game or starts play');
     const titles = {
-      serpent: 'SERPENT', bouncer: 'BOUNCER', galactic_defender: 'DEFENDER', rally: 'RALLY',
-      meteors: 'METEORS', sky_raider: 'RAIDER', brawler: 'BRAWLER', bubbler: 'BUBBLER',
+      serpent: 'SERPENT', bouncer: 'BOUNCER', defender: 'DEFENDER', rally: 'RALLY',
+      meteors: 'METEORS', raider: 'RAIDER', brawler: 'BRAWLER', bubbler: 'BUBBLER',
       adder: 'ADDER',
     };
     for (const [slug, title] of Object.entries(titles)) {
@@ -213,7 +213,7 @@ test('the game shell', async (t) => {
     const cdp = await browser(t, 9408, { touch: true, width: 390, height: 844 });
     for (const [width,height] of [[390,844],[320,700],[844,390]]) {
       await cdp.send('Emulation.setDeviceMetricsOverride', {width,height,deviceScaleFactor:1,mobile:true});
-      for (const page of ['index.html','about.html','controls.html','history.html','api.html','galactic_defender/index.html']) {
+      for (const page of ['index.html','about.html','controls.html','history.html','api.html','defender/index.html']) {
         await open(cdp,page,1200);
         const expectedTitle = page.includes('/') && width <= 620 ? 'visible' : 'hidden';
         await waitFor(cdp, `getComputedStyle(document.querySelector('#marquee-name')).visibility === '${expectedTitle}'`, 5000);

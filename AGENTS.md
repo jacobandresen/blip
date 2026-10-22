@@ -3,7 +3,7 @@
 ## Web `.wasm` output is compiled — do not edit it directly
 
 The `index.wasm` and `index.html` files under each game's directory in `web/`
-(`serpent`, `bouncer`, `galactic_defender`, `rally`, `meteors`, `sky_raider`,
+(`serpent`, `bouncer`, `defender`, `rally`, `meteors`, `raider`,
 `brawler`, `bubbler`, `adder`) are **build outputs**. They are
 produced by compiling Rust source with `cargo build --release --target
 wasm32-unknown-unknown` and copying `target/wasm32-unknown-unknown/release/<game>.wasm`
@@ -61,11 +61,9 @@ middle. Change one and the other must follow.
 | Brawler: tests, by theme (rules, anatomy, ladder, balance, ...) | `crates/brawler/src/tests/*.rs` |
 | Score popups, bursts, rings (`blip::Fx`) | `crates/blip/src/fx.rs` |
 | Music playback (`blip::Jukebox`) | `crates/blip/src/audio.rs` |
-| Build-time game graphics generation | `crates/blip_assets/src/<game>/gfx.rs` |
-| Build-time game music generation | `crates/blip_assets/src/<game>/tunes.rs` |
-| Other build-time game assets and sound effects | `crates/blip_assets/src/<game>.rs` |
-| Songs written as note data (`Song`); `action: true` for the action games' mix | `crates/blip_assets/src/song.rs` |
-| Effect voices, one instrument per game | `crates/blip_assets/src/cosy.rs` |
+| A game's generated pictures | `crates/<name>/src/gfx.rs` |
+| A game's music and sound effects | `crates/<name>/src/tunes.rs` |
+| Shared generators: PNG images, WAV encoding, songs (`Song`; `action: true` for the action games' mix), effect voices | `crates/blip/src/{image,wav,song,cosy,techno}.rs` |
 | Native playtest autopilot | `crates/blip/src/bot.rs`, `crates/<name>/src/bot.rs` |
 | Per-game asset build step | `crates/<name>/build.rs` |
 | Brawler's kiosk card poster and screenshot (captured from the game) | `./brawler_card.sh` |
@@ -137,8 +135,8 @@ free play, each game as an installable app).
 For native development:
 
 ```
-cargo run -p serpent            # or bouncer, rally, galactic_defender,
-                                # meteors, sky_raider, brawler, bubbler, adder
+cargo run -p serpent            # or bouncer, rally, defender,
+                                # meteors, raider, brawler, bubbler, adder
 ```
 
 ### Home-screen icons
@@ -153,8 +151,10 @@ node tools/make_game_icons.mjs
 
 ### Asset pipeline
 
-Each game's `build.rs` calls `blip_assets::<game>::generate()` and writes the
-returned PNG / WAV bytes into `$OUT_DIR/assets/{images,sounds}/`. The game's
+Each game's `build.rs` includes its `src/gfx.rs` and `src/tunes.rs` by path
+and writes `gfx::generate()` and `tunes::sounds()` (PNG / WAV bytes, via `blip::write_assets`) into
+`$OUT_DIR/assets/{images,sounds}/`. It builds against `blip` without its
+`engine` feature, so a build script does not compile macroquad. The game's
 `main.rs` embeds those bytes via `include_bytes!(concat!(env!("OUT_DIR"), ...))`,
 so wasm builds carry every asset inside the single `index.wasm` and need no
 separate preload step.
@@ -165,14 +165,14 @@ Raider's and Brawler's low effects (`wav::encode_pcm16_half`, flat to 8 kHz).
 A new effect goes at half rate if its energy above 10 kHz is 33 dB or more
 under the rest; snaps, whistles and gunfire keep the full rate.
 
-Music is the exception: a WAV loop is megabytes, so games depend on
-`blip_assets` at runtime too and synthesise their tunes on the device through
+Music is the exception: a WAV loop is megabytes, so a game includes its
+`tunes.rs` at runtime too and synthesises its tunes on the device through
 a `blip::Jukebox` (first track at load, the rest on the title screen). Most
 tunes are `song::Song` values — a melody of MIDI notes over chords, played on
 the game's own instrument. To hear them all without a game:
 
 ```
-cargo run --release -p blip_assets --example render_music -- /tmp/music
+cargo run --release -p blip_basic --example render_music -- /tmp/music
 ```
 
 ### Playtesting with the autopilot

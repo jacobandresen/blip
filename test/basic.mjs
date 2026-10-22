@@ -21,16 +21,16 @@ test('tape programs use uppercase source and unique ascending line numbers', () 
   assert.match(rally, /-0\.5,0\.5\)\*1\.1/);
   assert.match(rally, /AI_ERR=RND\(1\)\*PAD_H\*0\.7-PAD_H\*0\.35/);
   assert.match(rally, /DEF FNHITS_PADDLE\(X,Y\)=SEGMENT_RECT_OVERLAP/);
-  const raider = readFileSync(new URL('SKY_RAIDER.BLIP', tape), 'utf8');
+  const raider = readFileSync(new URL('RAIDER.BLIP', tape), 'utf8');
   assert.match(raider, /KILLS>=60\+15\*\(LEVEL-1\)/);
-  assert.match(raider, /BOSS_IMAGE\$="\/TAPE\/GFX\/SKY_RAIDER\/BOSS_"\+STR\$\(LEVEL\)/);
+  assert.match(raider, /BOSS_IMAGE\$="\/TAPE\/GFX\/RAIDER\/BOSS_"\+STR\$\(LEVEL\)/);
   const gfx = JSON.parse(readFileSync(new URL('GFX/manifest.json', tape), 'utf8'));
-  for (let level = 1; level <= 7; level++) assert.ok(gfx.SKY_RAIDER.includes(`BOSS_${level}.PNG`));
+  for (let level = 1; level <= 7; level++) assert.ok(gfx.RAIDER.includes(`BOSS_${level}.PNG`));
   assert.ok(gfx.RALLY.includes('BALL.PNG'));
   assert.match(rally, /FILL_RECT\(BALL_X,BALL_Y,BALL,BALL,"BLIP_WHITE"\)/);
   const defender = readFileSync(new URL('DEFENDER.BLIP', tape), 'utf8');
-  assert.ok(gfx.GALACTIC_DEFENDER.includes('BULLET.PNG'));
-  assert.match(defender, /DRAW_TEXTURE\("\/TAPE\/GFX\/GALACTIC_DEFENDER\/BULLET\.PNG"/);
+  assert.ok(gfx.DEFENDER.includes('BULLET.PNG'));
+  assert.match(defender, /DRAW_TEXTURE\("\/TAPE\/GFX\/DEFENDER\/BULLET\.PNG"/);
 });
 
 test('BASIC uses uppercase text and hides the monitor scrollbar without disabling scrolling', async (t) => {
@@ -853,12 +853,12 @@ test('METEORS.BLIP awards the big saucer hit and plays its original sound', asyn
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
 
-test('SKY_RAIDER.BLIP runs three rounds with flight, shooting, graphics, and sound', async (t) => {
+test('RAIDER.BLIP runs three rounds with flight, shooting, graphics, and sound', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RAIDER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   for (let round = 1; round <= 3; round++) {
     await page.evaluate(() => BlipBasic.submit('RUN'));
     await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
@@ -888,12 +888,12 @@ test('SKY_RAIDER.BLIP runs three rounds with flight, shooting, graphics, and sou
   }
 });
 
-test('SKY_RAIDER drops an ACE weapon capsule and upgrades its volley', async (t) => {
+test('RAIDER drops an ACE weapon capsule and upgrades its volley', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RAIDER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   await page.evaluate(() => {
     // One ACE that never fires, a round put into it each frame, and its capsule
     // carried to the plane; the marker shows tier two and 120+60 points.
@@ -934,12 +934,12 @@ test('SKY_RAIDER drops an ACE weapon capsule and upgrades its volley', async (t)
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
 
-test('SKY_RAIDER reaches its Rust boss threshold, defeats the boss, and advances the wave', async (t) => {
+test('RAIDER reaches its Rust boss threshold, defeats the boss, and advances the wave', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RAIDER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   await page.evaluate(() => {
     // Sixty kills already: the boss comes at once and takes a round each frame.
     BlipBasic.lines.set(85, 'START_GAME:LIVES=99:KILLS=60');
@@ -977,12 +977,12 @@ test('SKY_RAIDER reaches its Rust boss threshold, defeats the boss, and advances
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
 
-test('SKY_RAIDER.BLIP fires aimed enemy rounds with the original gun sound', async (t) => {
+test('RAIDER.BLIP fires aimed enemy rounds with the original gun sound', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RAIDER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   await page.evaluate(() => {
     BlipBasic.lines.set(85, 'START_GAME:SPAWN_WAIT=999:SPAWN_ENEMY 1,295,80,0:ENEMY_FIRE(1)=0.05');
   });
@@ -1001,15 +1001,15 @@ test('SKY_RAIDER.BLIP fires aimed enemy rounds with the original gun sound', asy
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
 
-test('SKY_RAIDER.BLIP spawns enemy pairs like the Rust formations', async (t) => {
+test('RAIDER.BLIP spawns enemy pairs like the Rust formations', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => {
     BlipBasic.submit('CD /TAPE');
-    BlipBasic.submit('LOAD SKY_RAIDER');
+    BlipBasic.submit('LOAD RAIDER');
   });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   await page.evaluate(() => {
     BlipBasic.lines.set(85, 'START_GAME:SPAWN_WAIT=0');
     BlipBasic.lines.set(165, 'IF (ENEMY(1)>0)+(ENEMY(2)>0)+(ENEMY(3)>0)+(ENEMY(4)>0)>=2 THEN FILL_RECT(200,80,16,16,"BLIP_YELLOW")');
@@ -1042,12 +1042,12 @@ test('SKY_RAIDER.BLIP spawns enemy pairs like the Rust formations', async (t) =>
   await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
 });
 
-test('SKY_RAIDER.BLIP gives the plane hit grace against a touching formation', async (t) => {
+test('RAIDER.BLIP gives the plane hit grace against a touching formation', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD SKY_RAIDER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/SKY_RAIDER.BLIP'));
+  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD RAIDER'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RAIDER.BLIP'));
   await page.evaluate(() => {
     // Two quiet grunts on top of the plane, without its spawn grace. No music
     // starts, so the only sound is the hit.

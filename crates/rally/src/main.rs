@@ -13,6 +13,7 @@ use blip::{
     BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
 
+mod tunes;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
 
@@ -353,8 +354,8 @@ async fn main() {
         score_l: blip::audio::load_sound(SCORE_L_WAV).await,
         score_r: blip::audio::load_sound(SCORE_R_WAV).await,
     };
-    // Five loops in rotation, synthesised here (see blip_assets::rally).
-    use blip_assets::rally::{music, music2, music3, music4, music5};
+    // Five loops in rotation, synthesised here (see tunes.rs).
+    use crate::tunes::{music, music2, music3, music4, music5};
     let mut jukebox = Jukebox::new(&[music, music2, music3, music4, music5]);
     jukebox.start(0).await;
     #[cfg(not(target_arch = "wasm32"))]

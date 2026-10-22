@@ -35,7 +35,7 @@ const DEVICES = [
 ];
 
 const TWO_SEATS = ['rally', 'brawler', 'bubbler', 'adder'];
-const GAMES = ['serpent', 'bouncer', 'rally', 'galactic_defender', 'meteors', 'sky_raider', 'brawler', 'bubbler', 'adder'];
+const GAMES = ['serpent', 'bouncer', 'rally', 'defender', 'meteors', 'raider', 'brawler', 'bubbler', 'adder'];
 
 // The pieces of interface that must each have their own space.
 const PIECES = {

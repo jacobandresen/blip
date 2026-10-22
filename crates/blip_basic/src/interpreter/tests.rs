@@ -164,7 +164,7 @@ const HOUSE_TAPES: [(&str, &str); 9] = [
     ("BUBBLER", include_str!("../../../../web/TAPE/BUBBLER.BLIP")),
     ("BOUNCER", include_str!("../../../../web/TAPE/BOUNCER.BLIP")),
     ("DEFENDER", include_str!("../../../../web/TAPE/DEFENDER.BLIP")),
-    ("SKY_RAIDER", include_str!("../../../../web/TAPE/SKY_RAIDER.BLIP")),
+    ("RAIDER", include_str!("../../../../web/TAPE/RAIDER.BLIP")),
     ("METEORS", include_str!("../../../../web/TAPE/METEORS.BLIP")),
     ("ADDER", include_str!("../../../../web/TAPE/ADDER.BLIP")),
     ("RALLY", include_str!("../../../../web/TAPE/RALLY.BLIP")),

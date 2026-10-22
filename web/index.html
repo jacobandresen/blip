@@ -1184,10 +1184,10 @@
     </article>
 
     <!-- DEFENDER -->
-    <article class="card card-galactic" data-game-url="galactic_defender/index.html">
+    <article class="card card-galactic" data-game-url="defender/index.html">
       <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
-        <img class="card-shot" src="galactic_defender/screenshot.png?v=7" alt="Defender gameplay">
+        <img class="card-shot" src="defender/screenshot.png?v=7" alt="Defender gameplay">
       </div>
       <div class="card-title">DEFENDER</div>
       <div class="card-genre"  data-i18n="galacticGenre"></div>
@@ -1210,13 +1210,13 @@
     </article>
 
     <!-- BOUNCER -->
-    <article class="card card-sky-raider" data-game-url="sky_raider/index.html">
+    <article class="card card-sky-raider" data-game-url="raider/index.html">
       <span class="badge-pad"><svg class="bp-dualsense" viewBox="0 0 30 19" aria-hidden="true"><path class="bp-body" d="M7 2.2C10 1.2 20 1.2 23 2.2C26.2 3.3 28.3 8.5 29 13.6C29.5 17.4 26.8 18.6 24.6 16.4L21.4 13.1C18.6 12 11.4 12 8.6 13.1L5.4 16.4C3.2 18.6.5 17.4 1 13.6C1.7 8.5 3.8 3.3 7 2.2Z"/><path class="bp-centre" d="M10.2 3.4H19.8L19 9.6C16.4 10.4 13.6 10.4 11 9.6Z"/><path class="bp-light" d="M10.8 3.9Q15 5 19.2 3.9"/><circle class="bp-stick" cx="11.2" cy="11.2" r="1.7"/><circle class="bp-stick" cx="18.8" cy="11.2" r="1.7"/><path class="bp-dpad" d="M5.4 7.6h2.6M6.7 6.3v2.6"/><circle class="bp-btn" cx="23.3" cy="6.2" r=".8"/><circle class="bp-btn" cx="23.3" cy="9" r=".8"/><circle class="bp-btn" cx="21.9" cy="7.6" r=".8"/><circle class="bp-btn" cx="24.7" cy="7.6" r=".8"/></svg><span class="bp-text" data-i18n="badgePad">CONTROLLER<small>RECOMMENDED</small></span></span>
       <div class="card-badges">
         <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
       </div>
       <div class="card-shot-wrap">
-        <img class="card-shot" src="sky_raider/screenshot.png?v=12" alt="Raider gameplay">
+        <img class="card-shot" src="raider/screenshot.png?v=12" alt="Raider gameplay">
       </div>
       <div class="card-title">RAIDER</div>
       <div class="card-genre"  data-i18n="skyRaiderGenre"></div>
@@ -1635,11 +1635,11 @@
       card.appendChild(copy);
       var title=card.querySelector('.card-title'),slug=(card.getAttribute('data-game-url')||'').split('/')[0];
       // Each panel carries what its game is played with: a stick or a spinner and up to two buttons a player.
-      var panel={rally:[2,'dial',1],bouncer:[1,'dial',1],galactic_defender:[1,'stick',1],bubbler:[2,'stick',2],sky_raider:[1,'stick',1],
+      var panel={rally:[2,'dial',1],bouncer:[1,'dial',1],defender:[1,'stick',1],bubbler:[2,'stick',2],raider:[1,'stick',1],
         meteors:[1,'stick',2],serpent:[1,'stick',0],brawler:[2,'stick',2],adder:[2,'dial',1]}[slug]||[1,'stick',1];
       var players=panel[0],name=title?title.textContent.trim():'';
       card.dataset.machine=slug;title.classList.add('machine-marquee');
-      var legend={rally:'BAT · SERVE',bouncer:'MOVE · LAUNCH',galactic_defender:'MOVE · FIRE',bubbler:'RUN · BUBBLE · JUMP',sky_raider:'STEER · FIRE',meteors:'TURN · THRUST · FIRE',serpent:'STEER',brawler:'MOVE · PUNCH · KICK',adder:'TURN LEFT · RIGHT'};
+      var legend={rally:'BAT · SERVE',bouncer:'MOVE · LAUNCH',defender:'MOVE · FIRE',bubbler:'RUN · BUBBLE · JUMP',raider:'STEER · FIRE',meteors:'TURN · THRUST · FIRE',serpent:'STEER',brawler:'MOVE · PUNCH · KICK',adder:'TURN LEFT · RIGHT'};
       var screen=card.querySelector('.card-shot-wrap');
       var instructions=document.createElement('span');instructions.className='machine-instructions';instructions.setAttribute('aria-hidden','true');instructions.textContent=(players>1?'1 OR 2 PLAYERS · ':'')+(legend[slug]||'');screen.appendChild(instructions);
       var attract=document.createElement('span');attract.className='machine-attract';attract.setAttribute('aria-hidden','true');attract.innerHTML='<b>PRESS START</b><span class="machine-credit">CREDIT 0</span>';card.querySelector('.game-rom').appendChild(attract);

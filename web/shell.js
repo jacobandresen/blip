@@ -204,7 +204,7 @@ function markGameLoaded(game, bar) {
   blipSetMarquee(game.name, false);
   document.documentElement.removeAttribute('data-card-loading');
   try {
-    var selectionOrder = ['rally', 'bouncer', 'galactic_defender', 'bubbler', 'sky_raider', 'meteors', 'serpent', 'brawler', 'adder'];
+    var selectionOrder = ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder'];
     var code = 'A' + (selectionOrder.indexOf(game.slug) + 1);
     var rom={
       slug: game.slug, name: game.name, code: code,

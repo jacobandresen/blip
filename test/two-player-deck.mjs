@@ -836,7 +836,7 @@ test(`the deck never laps over the picture`, async (t) => {
   // fillCanvas() must reserve what the deck covers (the caps sit proud of the
   // bar), not just the bar's height.
   const { cdp } = await openPage(t);
-  const GAMES = ['bouncer', 'serpent', 'brawler', 'meteors', 'rally', 'sky_raider'];
+  const GAMES = ['bouncer', 'serpent', 'brawler', 'meteors', 'rally', 'raider'];
   const EXTENT = `(function () {
     var c = document.getElementById('glcanvas').getBoundingClientRect();
     // Seeded from the bottom of the screen: every control is INSIDE the

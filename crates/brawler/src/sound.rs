@@ -92,9 +92,9 @@ impl Sounds {
             crunch: load(wav!("crunch")).await,
             land: load(wav!("land")).await,
             // Built here rather than shipped, like the music: see
-            // blip_assets::brawler::crowd_wav.
-            cheer: load(&blip_assets::brawler::crowd_wav(false)).await,
-            roar: load(&blip_assets::brawler::crowd_wav(true)).await,
+            // crate::tunes::crowd_wav.
+            cheer: load(&crate::tunes::crowd_wav(false)).await,
+            roar: load(&crate::tunes::crowd_wav(true)).await,
             whoosh: load(wav!("whoosh")).await,
             gi: load(wav!("gi")).await,
             block: load(wav!("block")).await,
@@ -114,10 +114,10 @@ impl Sounds {
             tweet: load(wav!("tweet")).await,
             heart: load(wav!("heart")).await,
             ambience: [
-                load(&blip_assets::brawler::ambience_wav(0)).await,
-                load(&blip_assets::brawler::ambience_wav(1)).await,
-            load(&blip_assets::brawler::ambience_wav(2)).await,
-            load(&blip_assets::brawler::ambience_wav(3)).await,
+                load(&crate::tunes::ambience_wav(0)).await,
+                load(&crate::tunes::ambience_wav(1)).await,
+            load(&crate::tunes::ambience_wav(2)).await,
+            load(&crate::tunes::ambience_wav(3)).await,
             ],
             bellow: load(wav!("bellow")).await,
             swing: load(wav!("swing")).await,

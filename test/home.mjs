@@ -14,7 +14,7 @@ import { chromium } from 'playwright';
 import { openPage, WEB_DIR, listenOn } from './lib/harness.mjs';
 import { chromiumBinary } from './lib/chromium-binary.mjs';
 
-const GAMES = ['serpent', 'bouncer', 'galactic_defender', 'rally', 'meteors', 'sky_raider', 'brawler', 'bubbler', 'adder'];
+const GAMES = ['serpent', 'bouncer', 'defender', 'rally', 'meteors', 'raider', 'brawler', 'bubbler', 'adder'];
 
 /** A phone with the games' wasm held back: these tests read the pages, not play them. */
 async function phone(t, opts = {}) {
@@ -82,7 +82,7 @@ test('Search finds a game by name, and Enter opens it', async (t) => {
   assert.equal(await page.locator('#search-input').inputValue(), 'r');
   await page.locator('#search-input').fill('raid');
   await page.locator('#search-input').press('Enter');
-  await page.waitForURL(`${origin}/sky_raider/`);
+  await page.waitForURL(`${origin}/raider/`);
 });
 
 test('the context menu sits beside its icon and inside the screen', async (t) => {

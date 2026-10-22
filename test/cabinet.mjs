@@ -7,9 +7,9 @@ import { openPage } from './lib/harness.mjs';
 const GAMES = [
   ['rally', 'RALLY', 2],
   ['bouncer', 'BOUNCER', 1],
-  ['galactic_defender', 'DEFENDER', 1],
+  ['defender', 'DEFENDER', 1],
   ['bubbler', 'BUBBLER', 2],
-  ['sky_raider', 'RAIDER', 1],
+  ['raider', 'RAIDER', 1],
   ['meteors', 'METEORS', 1],
   ['serpent', 'SERPENT', 1],
   ['brawler', 'BRAWLER', 2],
@@ -267,7 +267,7 @@ for (const [index, [slug, title, players]] of GAMES.entries()) {
         window.__cabinetActionKeys = [];
         document.querySelector('canvas').addEventListener('keydown', (event) => window.__cabinetActionKeys.push(event.code));
       });
-      const actionTarget = ['serpent', 'bouncer', 'galactic_defender', 'bubbler', 'adder'].includes(slug) ?
+      const actionTarget = ['serpent', 'bouncer', 'defender', 'bubbler', 'adder'].includes(slug) ?
         '#touch-strip .ts-glass' : '#snes-pad .snes-btn[data-blip="button1"]';
       const action = page.locator(actionTarget);
       if (slug === 'bubbler') {

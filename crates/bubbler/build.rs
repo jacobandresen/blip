@@ -1,9 +1,12 @@
 use std::{env, fs, path::PathBuf};
 
+#[path = "src/gfx.rs"]
+mod gfx;
+
 fn main() {
     let out = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"));
     let mut registry = String::new();
-    for (path, bytes) in blip_assets::bubbler::gfx::generate() {
+    for (path, bytes) in gfx::generate() {
         if path.contains("_LOW_") {
             continue;
         }
@@ -18,5 +21,5 @@ fn main() {
     }
     fs::write(out.join("gfx.rs"), registry).expect("write sprite registry");
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=../blip_assets/src/bubbler/gfx.rs");
+    println!("cargo:rerun-if-changed=src/gfx.rs");
 }

@@ -220,11 +220,11 @@ var tapePrograms=[
   {file:'BOUNCER.BLIP',command:'BOUNCER',slug:'bouncer',title:'BOUNCER'},
   {file:'BRAWLER.BLIP',command:'BRAWLER',slug:'brawler',title:'BRAWLER'},
   {file:'BUBBLER.BLIP',command:'BUBBLER',slug:'bubbler',title:'BUBBLER',players:2},
-  {file:'DEFENDER.BLIP',command:'DEFENDER',slug:'galactic_defender',title:'DEFENDER'},
+  {file:'DEFENDER.BLIP',command:'DEFENDER',slug:'defender',title:'DEFENDER'},
   {file:'METEORS.BLIP',command:'METEORS',slug:'meteors',title:'METEORS'},
   {file:'RALLY.BLIP',command:'RALLY',slug:'rally',title:'RALLY'},
   {file:'SERPENT.BLIP',command:'SERPENT',slug:'serpent',title:'SERPENT'},
-  {file:'SKY_RAIDER.BLIP',command:'SKY_RAIDER',slug:'sky_raider',title:'RAIDER'}
+  {file:'RAIDER.BLIP',command:'RAIDER',slug:'raider',title:'RAIDER'}
 ];
 var tapeReady=fetch('TAPE/manifest.json').then(function(response){if(!response.ok)throw Error('TAPE DIRECTORY UNAVAILABLE');return response.json();}).then(function(names){if(!Array.isArray(names))throw Error('BAD TAPE MANIFEST');tapeNames=names.filter(function(name){return tapePrograms.some(function(tape){return tape.file===name;});});}).catch(function(error){tapeLoadError=error.message;});
 var gfxReady=fetch('TAPE/GFX/manifest.json').then(function(response){if(!response.ok)throw Error('GFX directory unavailable');return response.json();}).then(function(games){if(games&&typeof games==='object')gfxNames=games;}).catch(function(){});
@@ -874,7 +874,7 @@ function escapeFromBasicGame(){
   }
   pendingGameCopy={destination:destination,source:source,assets:{}};
   if(tape&&filesystem.files[destination]===undefined&&basicWasmReady){
-    var gameId={adder:1,bouncer:2,brawler:3,bubbler:4,galactic_defender:5,meteors:6,rally:7,serpent:8,sky_raider:9}[tape.slug]||0;
+    var gameId={adder:1,bouncer:2,brawler:3,bubbler:4,defender:5,meteors:6,rally:7,serpent:8,raider:9}[tape.slug]||0;
     wasmFrame.contentWindow.postMessage({type:'blip-basic-export-rom-assets',game:gameId},location.origin);
     return;
   }

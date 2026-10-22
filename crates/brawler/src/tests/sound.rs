@@ -50,7 +50,7 @@ pub(crate) fn dominant(wav: &[u8], lo: f32, hi: f32) -> (f32, f32) {
 }
 
 pub(crate) fn asset(name: &str) -> Vec<u8> {
-    blip_assets::brawler::generate().into_iter()
+    crate::tunes::sounds().into_iter()
         .find(|(n, _)| n.ends_with(name))
         .unwrap_or_else(|| panic!("no asset {name}")).1
 }
@@ -90,8 +90,8 @@ pub(crate) fn the_crowd_reacts_for_longer_than_it_takes_to_notice() {
     // Thirty-odd onlookers have been drawn watching every round in
     // silence. A cheer that is over before the eye reaches them is the
     // same as no cheer.
-    let cheer = blip_assets::brawler::crowd_wav(false);
-    let roar = blip_assets::brawler::crowd_wav(true);
+    let cheer = crate::tunes::crowd_wav(false);
+    let roar = crate::tunes::crowd_wav(true);
     assert!(wav_seconds(&cheer) > 0.6, "the knockdown cheer is {:.2}s", wav_seconds(&cheer));
     assert!(wav_seconds(&roar) > wav_seconds(&cheer) * 1.5,
         "a KO gets no more of a reaction than a knockdown");
@@ -114,8 +114,8 @@ pub(crate) fn building_the_crowd_is_quick_enough_to_do_at_startup() {
     // megabyte that never crosses the wire — which is only a good trade
     // if the player does not wait for it.
     let t = std::time::Instant::now();
-    std::hint::black_box(blip_assets::brawler::crowd_wav(false));
-    std::hint::black_box(blip_assets::brawler::crowd_wav(true));
+    std::hint::black_box(crate::tunes::crowd_wav(false));
+    std::hint::black_box(crate::tunes::crowd_wav(true));
     let ms = t.elapsed().as_millis();
     assert!(ms < 400, "the crowd took {ms}ms to build");
 }

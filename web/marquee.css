@@ -5,9 +5,9 @@
 [data-machine="rally"] {--machine-trim:#e2513a;--marquee-art:repeating-linear-gradient(90deg,transparent 0 46%,#fff4 46% 47%,transparent 47%)}
 [data-machine="serpent"] {--machine-trim:#3ec44f;--marquee-ink:#f3ffdc;--marquee-art:repeating-linear-gradient(90deg,#0002 0 12px,transparent 12px 24px)}
 [data-machine="bouncer"] {--machine-trim:#1fb7c4;--marquee-ink:#efffff;--marquee-art:linear-gradient(90deg,#ff5a5a55 0 20%,#ffd25a55 20% 40%,#5aff8a55 40% 60%,#5ab4ff55 60% 80%,#c45aff55 80%) 0 0/100% 22% no-repeat}
-[data-machine="galactic_defender"] {--machine-trim:#b046d6;--marquee-ink:#fbeaff;--marquee-art:radial-gradient(circle at 12% 30%,#fff 0 1px,transparent 2px),radial-gradient(circle at 86% 65%,#fff 0 1px,transparent 2px),radial-gradient(circle at 70% 20%,#fff9 0 1px,transparent 2px)}
+[data-machine="defender"] {--machine-trim:#b046d6;--marquee-ink:#fbeaff;--marquee-art:radial-gradient(circle at 12% 30%,#fff 0 1px,transparent 2px),radial-gradient(circle at 86% 65%,#fff 0 1px,transparent 2px),radial-gradient(circle at 70% 20%,#fff9 0 1px,transparent 2px)}
 [data-machine="meteors"] {--machine-trim:#8e98b3;--marquee-ink:#fff;--marquee-art:radial-gradient(circle at 20% 60%,transparent 0 7px,#fff8 8px 9px,transparent 10px),radial-gradient(circle at 82% 35%,transparent 0 5px,#fff8 6px 7px,transparent 8px)}
-[data-machine="sky_raider"] {--machine-trim:#3a6fe0;--marquee-ink:#eef4ff;--marquee-art:repeating-linear-gradient(0deg,transparent 0 6px,#fff2 6px 7px)}
+[data-machine="raider"] {--machine-trim:#3a6fe0;--marquee-ink:#eef4ff;--marquee-art:repeating-linear-gradient(0deg,transparent 0 6px,#fff2 6px 7px)}
 [data-machine="brawler"] {--machine-trim:#e0362a;--marquee-ink:#fff3c4;--marquee-art:repeating-conic-gradient(from 0deg at 50% 120%,#fff1 0 6deg,transparent 6deg 12deg)}
 [data-machine="bubbler"] {--machine-trim:#45b6f0;--marquee-ink:#ffffff;--marquee-art:radial-gradient(circle at 12% 40%,transparent 0 7px,#fff9 8px 9px,transparent 10px),radial-gradient(circle at 90% 62%,transparent 0 5px,#fff9 6px 7px,transparent 8px)}
 [data-machine="adder"] {--machine-trim:#e09a2a;--marquee-ink:#fff5d8;--marquee-art:repeating-linear-gradient(45deg,transparent 0 14px,#fff2 14px 16px)}

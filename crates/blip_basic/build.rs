@@ -1,23 +1,72 @@
 use std::{collections::{BTreeMap, HashMap}, env, fs, path::PathBuf};
 
+use blip::Asset;
+
+// Every game's pictures and effects, from its own gfx.rs and tunes.rs.
+#[path = "../adder/src/gfx.rs"]
+mod adder_gfx;
+#[path = "../adder/src/tunes.rs"]
+mod adder_tunes;
+#[path = "../bouncer/src/gfx.rs"]
+mod bouncer_gfx;
+#[path = "../bouncer/src/tunes.rs"]
+mod bouncer_tunes;
+#[path = "../brawler/src/gfx.rs"]
+mod brawler_gfx;
+#[path = "../brawler/src/tunes.rs"]
+mod brawler_tunes;
+#[path = "../bubbler/src/gfx.rs"]
+mod bubbler_gfx;
+#[path = "../bubbler/src/tunes.rs"]
+mod bubbler_tunes;
+#[path = "../defender/src/gfx.rs"]
+mod defender_gfx;
+#[path = "../defender/src/tunes.rs"]
+mod defender_tunes;
+#[path = "../meteors/src/gfx.rs"]
+mod meteors_gfx;
+#[path = "../meteors/src/tunes.rs"]
+mod meteors_tunes;
+#[path = "../rally/src/gfx.rs"]
+mod rally_gfx;
+#[path = "../rally/src/tunes.rs"]
+mod rally_tunes;
+#[path = "../serpent/src/gfx.rs"]
+mod serpent_gfx;
+#[path = "../serpent/src/tunes.rs"]
+mod serpent_tunes;
+#[path = "../raider/src/gfx.rs"]
+mod raider_gfx;
+#[path = "../raider/src/tunes.rs"]
+mod raider_tunes;
+
+/// A game's pictures, then its effects.
+fn both(mut gfx: Vec<Asset>, sounds: Vec<Asset>) -> Vec<Asset> {
+    gfx.extend(sounds);
+    gfx
+}
+
 fn main() {
     let root = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("manifest dir"))
         .parent().expect("crates dir").parent().expect("workspace root").to_path_buf();
     let out = PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR"));
     let assets_dir = out.join("assets");
-    println!("cargo:rerun-if-changed={}", root.join("crates/blip_assets/src").display());
+    for game in ["adder", "bouncer", "brawler", "bubbler", "defender", "meteors", "rally", "serpent", "raider"] {
+        println!("cargo:rerun-if-changed={}", root.join(format!("crates/{game}/src/gfx.rs")).display());
+        println!("cargo:rerun-if-changed={}", root.join(format!("crates/{game}/src/tunes.rs")).display());
+    }
     println!("cargo:rerun-if-changed=build.rs");
 
-    let games: [(&str, Vec<blip_assets::Asset>); 9] = [
-        ("ADDER", blip_assets::adder::generate()),
-        ("BOUNCER", blip_assets::bouncer::generate()),
-        ("BRAWLER", blip_assets::brawler::generate()),
-        ("BUBBLER", blip_assets::bubbler::generate()),
-        ("GALACTIC_DEFENDER", blip_assets::galactic_defender::generate()),
-        ("METEORS", blip_assets::meteors::generate()),
-        ("RALLY", blip_assets::rally::generate()),
-        ("SERPENT", blip_assets::serpent::generate()),
-        ("SKY_RAIDER", blip_assets::sky_raider::generate()),
+    let games: [(&str, Vec<Asset>); 9] = [
+        ("ADDER", both(adder_gfx::generate(), adder_tunes::sounds())),
+        ("BOUNCER", both(bouncer_gfx::generate(), bouncer_tunes::sounds())),
+        ("BRAWLER", both(brawler_gfx::generate(), brawler_tunes::sounds())),
+        ("BUBBLER", both(bubbler_gfx::generate(), bubbler_tunes::sounds())),
+        ("DEFENDER", both(defender_gfx::generate(), defender_tunes::sounds())),
+        ("METEORS", both(meteors_gfx::generate(), meteors_tunes::sounds())),
+        ("RALLY", both(rally_gfx::generate(), rally_tunes::sounds())),
+        ("SERPENT", both(serpent_gfx::generate(), serpent_tunes::sounds())),
+        ("RAIDER", both(raider_gfx::generate(), raider_tunes::sounds())),
     ];
     let mut manifest = BTreeMap::<&str, Vec<String>>::new();
     let mut sfx = HashMap::<String, String>::new();
@@ -39,13 +88,6 @@ fn main() {
             }
         }
     }
-    for (name, index) in [("blow", 0), ("pop", 1), ("trap", 2), ("defeated", 3), ("fruit", 4), ("jump", 5), ("lost", 6), ("bounce", 7), ("sparkle", 8)] {
-        let bytes = blip_assets::bubbler::sfx_wav(index);
-        let path = assets_dir.join("bubbler").join(format!("{name}.wav"));
-        fs::create_dir_all(path.parent().expect("asset parent")).expect("create asset directory");
-        fs::write(&path, bytes).expect("write generated Bubbler sound");
-        sfx.insert(format!("BUBBLER/{name}"), path.to_string_lossy().into_owned());
-    }
     gfx_source.push_str("];\n");
     fs::write(out.join("tape_gfx.rs"), gfx_source).expect("write GFX registry");
 
@@ -53,17 +95,17 @@ fn main() {
         ("wall_hit", "BOUNCER/wall_hit"), ("paddle_hit_0", "BOUNCER/paddle_hit_0"), ("paddle_hit_1", "BOUNCER/paddle_hit_1"),
         ("paddle_hit_2", "BOUNCER/paddle_hit_2"), ("brick_break_0", "BOUNCER/brick_break_0"), ("brick_break_1", "BOUNCER/brick_break_1"),
         ("brick_break_2", "BOUNCER/brick_break_2"), ("life_lost", "BOUNCER/life_lost"), ("win", "BOUNCER/win"), ("bomb", "BOUNCER/bomb"),
-        ("shoot", "GALACTIC_DEFENDER/shoot"), ("explosion", "GALACTIC_DEFENDER/explosion"), ("dive", "GALACTIC_DEFENDER/dive"),
-        ("game_over", "GALACTIC_DEFENDER/game_over"), ("march1", "GALACTIC_DEFENDER/march1"), ("march2", "GALACTIC_DEFENDER/march2"),
-        ("march3", "GALACTIC_DEFENDER/march3"), ("march4", "GALACTIC_DEFENDER/march4"), ("level_clear", "GALACTIC_DEFENDER/level_clear"),
-        ("ufo_siren", "GALACTIC_DEFENDER/ufo_siren"), ("pickup_good", "BOUNCER/pickup_good"), ("pickup_bad", "BOUNCER/pickup_bad"),
+        ("shoot", "DEFENDER/shoot"), ("explosion", "DEFENDER/explosion"), ("dive", "DEFENDER/dive"),
+        ("game_over", "DEFENDER/game_over"), ("march1", "DEFENDER/march1"), ("march2", "DEFENDER/march2"),
+        ("march3", "DEFENDER/march3"), ("march4", "DEFENDER/march4"), ("level_clear", "DEFENDER/level_clear"),
+        ("ufo_siren", "DEFENDER/ufo_siren"), ("pickup_good", "BOUNCER/pickup_good"), ("pickup_bad", "BOUNCER/pickup_bad"),
         ("pickup_life", "BOUNCER/pickup_life"), ("brick_hit_0", "BOUNCER/brick_hit_0"), ("brick_hit_1", "BOUNCER/brick_hit_1"),
-        ("brick_hit_2", "BOUNCER/brick_hit_2"), ("laser_charge", "GALACTIC_DEFENDER/laser_charge"), ("laser_blast", "GALACTIC_DEFENDER/laser_blast"),
+        ("brick_hit_2", "BOUNCER/brick_hit_2"), ("laser_charge", "DEFENDER/laser_charge"), ("laser_blast", "DEFENDER/laser_blast"),
         ("adder/eat", "ADDER/eat"), ("adder/through", "ADDER/through"), ("adder/strike", "ADDER/strike"), ("adder/pit", "ADDER/pit"), ("adder/game_over", "ADDER/game_over"),
         ("serpent/eat", "SERPENT/eat"), ("serpent/bonus", "SERPENT/bonus"), ("serpent/bonus_eat", "SERPENT/bonus_eat"), ("serpent/level", "SERPENT/level"), ("serpent/game_over", "SERPENT/game_over"),
         ("rally/wall", "RALLY/wall"), ("rally/hit_l", "RALLY/hit_l"), ("rally/hit_r", "RALLY/hit_r"), ("rally/score_l", "RALLY/score_l"), ("rally/score_r", "RALLY/score_r"),
         ("meteors/fire", "METEORS/fire"), ("meteors/thrust", "METEORS/thrust"), ("meteors/bang_small", "METEORS/bang_small"), ("meteors/bang_medium", "METEORS/bang_medium"), ("meteors/bang_large", "METEORS/bang_large"), ("meteors/hyperspace", "METEORS/hyperspace"), ("meteors/ship_explosion", "METEORS/ship_explosion"), ("meteors/saucer_big", "METEORS/saucer_big"), ("meteors/saucer_small", "METEORS/saucer_small"), ("meteors/extra_life", "METEORS/extra_life"),
-        ("sky_raider/burst1_1", "SKY_RAIDER/burst1_1"), ("sky_raider/burst2_1", "SKY_RAIDER/burst2_1"), ("sky_raider/burst3_1", "SKY_RAIDER/burst3_1"), ("sky_raider/burst4_1", "SKY_RAIDER/burst4_1"), ("sky_raider/burst5_1", "SKY_RAIDER/burst5_1"), ("sky_raider/enemy_explode0", "SKY_RAIDER/enemy_explode0"), ("sky_raider/enemy_gun", "SKY_RAIDER/enemy_gun"), ("sky_raider/player_explode0", "SKY_RAIDER/player_explode0"), ("sky_raider/player_hit", "SKY_RAIDER/player_hit"), ("sky_raider/stage_clear", "SKY_RAIDER/stage_clear"), ("sky_raider/boss_warning", "SKY_RAIDER/boss_warning"), ("sky_raider/game_over", "SKY_RAIDER/game_over"), ("sky_raider/powerup2", "SKY_RAIDER/powerup2"), ("sky_raider/powerup3", "SKY_RAIDER/powerup3"), ("sky_raider/powerup4", "SKY_RAIDER/powerup4"), ("sky_raider/max_power", "SKY_RAIDER/max_power"),
+        ("raider/burst1_1", "RAIDER/burst1_1"), ("raider/burst2_1", "RAIDER/burst2_1"), ("raider/burst3_1", "RAIDER/burst3_1"), ("raider/burst4_1", "RAIDER/burst4_1"), ("raider/burst5_1", "RAIDER/burst5_1"), ("raider/enemy_explode0", "RAIDER/enemy_explode0"), ("raider/enemy_gun", "RAIDER/enemy_gun"), ("raider/player_explode0", "RAIDER/player_explode0"), ("raider/player_hit", "RAIDER/player_hit"), ("raider/stage_clear", "RAIDER/stage_clear"), ("raider/boss_warning", "RAIDER/boss_warning"), ("raider/game_over", "RAIDER/game_over"), ("raider/powerup2", "RAIDER/powerup2"), ("raider/powerup3", "RAIDER/powerup3"), ("raider/powerup4", "RAIDER/powerup4"), ("raider/max_power", "RAIDER/max_power"),
         ("brawler/hit_light", "BRAWLER/hit_light"), ("brawler/hit_light2", "BRAWLER/hit_light2"), ("brawler/hit_heavy", "BRAWLER/hit_heavy"), ("brawler/block", "BRAWLER/block"), ("brawler/whoosh", "BRAWLER/whoosh"), ("brawler/land", "BRAWLER/land"), ("brawler/ko", "BRAWLER/ko"), ("brawler/swing", "BRAWLER/swing"), ("brawler/bell", "BRAWLER/bell"),
         ("bubbler/blow", "BUBBLER/blow"), ("bubbler/pop", "BUBBLER/pop"), ("bubbler/trap", "BUBBLER/trap"), ("bubbler/defeated", "BUBBLER/defeated"), ("bubbler/fruit", "BUBBLER/fruit"), ("bubbler/jump", "BUBBLER/jump"), ("bubbler/lost", "BUBBLER/lost"), ("bubbler/bounce", "BUBBLER/bounce"), ("bubbler/sparkle", "BUBBLER/sparkle"),
     ];

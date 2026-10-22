@@ -1,3 +1,22 @@
+// Every game's music, from its own tunes.rs.
+#[path = "../../adder/src/tunes.rs"]
+mod adder_tunes;
+#[path = "../../bouncer/src/tunes.rs"]
+mod bouncer_tunes;
+#[path = "../../brawler/src/tunes.rs"]
+mod brawler_tunes;
+#[path = "../../bubbler/src/tunes.rs"]
+mod bubbler_tunes;
+#[path = "../../defender/src/tunes.rs"]
+mod defender_tunes;
+#[path = "../../meteors/src/tunes.rs"]
+mod meteors_tunes;
+#[path = "../../rally/src/tunes.rs"]
+mod rally_tunes;
+#[path = "../../serpent/src/tunes.rs"]
+mod serpent_tunes;
+#[path = "../../raider/src/tunes.rs"]
+mod raider_tunes;
 mod host;
 mod interpreter;
 mod music;
@@ -51,13 +70,8 @@ async fn main() {
         textures.entry(alias).or_insert(tex);
         let parts: Vec<_> = path.split('/').collect();
         if parts.len() >= 5 {
-            let prefix = if parts[3] == "GALACTIC_DEFENDER" {
-                "GALACTIC"
-            } else {
-                parts[3]
-            };
             let qualified =
-                format!("{}_{}", prefix, parts[4].trim_end_matches(".PNG")).to_ascii_lowercase();
+                format!("{}_{}", parts[3], parts[4].trim_end_matches(".PNG")).to_ascii_lowercase();
             if let Some(texture) = textures.get(*path).cloned() {
                 textures.entry(qualified).or_insert(texture);
             }
@@ -114,11 +128,11 @@ async fn main() {
                     2 => "BOUNCER",
                     3 => "BRAWLER",
                     4 => "BUBBLER",
-                    5 => "GALACTIC_DEFENDER",
+                    5 => "DEFENDER",
                     6 => "METEORS",
                     7 => "RALLY",
                     8 => "SERPENT",
-                    9 => "SKY_RAIDER",
+                    9 => "RAIDER",
                     _ => "",
                 };
                 for (path, bytes) in TAPE_GFX {
