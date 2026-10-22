@@ -70,39 +70,6 @@ fn random_reaches_every_spawn_slot_without_exceeding_its_limit() {
 }
 
 #[test]
-fn brawler_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/BRAWLER.BLIP"));
-    assert!(p.lines.len() > 35);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 2150);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    assert!(p
-        .lines
-        .iter()
-        .any(|(_, source)| source.contains("DRAW_LINE_EX(160+COS")));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("KEY_PRESSED(\"F\")")
-            && source.contains("KEY_PRESSED(\"G\")")
-            && source.contains("KEY_PRESSED(\"Z\")")
-            && source.contains("PUNCH_BUFFER>0")
-            && source.contains("KICK_BUFFER>0")
-    );
-    assert!(
-        source.contains("ROUND_TIME=45")
-            && source.contains("ROUND_TIME<=0")
-            && source.contains("PLAYER_HP>CPU_HP")
-            && source
-                .contains("DRAW_TEXT(NAME$(PICK),25,27,1,\"BLIP_CYAN\",\"LEFT\",\"BLIP_BLACK\")")
-    );
-}
-#[test]
 fn bubbler_source_loads_as_numbered_program() {
     let mut p = Program::new();
     p.load(include_str!("../../../../web/TAPE/BUBBLER.BLIP"));
@@ -240,7 +207,8 @@ fn else_belongs_to_the_nearest_if() {
 }
 
 /// The tapes rewritten in the house layout, one by one.
-const HOUSE_TAPES: [(&str, &str); 7] = [
+const HOUSE_TAPES: [(&str, &str); 8] = [
+    ("BRAWLER", include_str!("../../../../web/TAPE/BRAWLER.BLIP")),
     ("BOUNCER", include_str!("../../../../web/TAPE/BOUNCER.BLIP")),
     ("DEFENDER", include_str!("../../../../web/TAPE/DEFENDER.BLIP")),
     ("SKY_RAIDER", include_str!("../../../../web/TAPE/SKY_RAIDER.BLIP")),
