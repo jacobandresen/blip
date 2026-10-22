@@ -476,7 +476,7 @@ impl Game {
         }
     }
 
-    fn start(&mut self, two: bool) {
+    fn start_game(&mut self, two: bool) {
         for i in 0..2 {
             self.p[i].joined = i == 0 || two;
             self.p[i].lives = LIVES;
@@ -2402,7 +2402,7 @@ async fn main() {
         if blip.screenshot_mode {
             shot_frame += 1;
             if shot_frame == 1 {
-                g.start(true);
+                g.start_game(true);
                 g.state = State::Play;
                 g.p[0].x = 150.0;
                 g.p[0].y = HUD + 19.0 * TILE - P_H;
@@ -2468,7 +2468,7 @@ async fn main() {
             if !scene_set {
                 scene_set = true;
                 if scene != "title" {
-                    g.start(true);
+                    g.start_game(true);
                     g.state = State::Play;
                 }
                 for e in g.enemies.iter_mut() {
@@ -2565,11 +2565,11 @@ async fn main() {
                 State::Title => {
                     // A game is paid for as it starts: one coin, two for two players.
                     if p2_start {
-                        g.start(true);
+                        g.start_game(true);
                         web::spend_coin();
                         web::spend_coin();
                     } else if inp[0].blow || inp[0].jump || key_pressed(BLIP_KEY_SPACE) {
-                        g.start(false);
+                        g.start_game(false);
                         web::spend_coin();
                     }
                 }

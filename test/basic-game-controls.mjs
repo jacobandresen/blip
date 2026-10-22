@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { openPage } from './lib/harness.mjs';
 
 for (const touch of [false, true]) test(`Bubbler BASIC players move, jump, join, and blow bubbles with ${touch ? 'touch' : 'PC keys'}`, async (t) => {
@@ -15,16 +16,17 @@ for (const touch of [false, true]) test(`Bubbler BASIC players move, jump, join,
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => { BlipBasic.submit('LOAD /TAPE/BUBBLER.BLIP'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    // Keep the real player updates; isolate them from monsters and round transitions.
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(817, 'STOP_MUSIC');
-    BlipBasic.lines.set(870, 'FOR E=1 TO ENEMY_COUNT:MONSTER(E)=0:NEXT E');
-    BlipBasic.lines.set(367, 'ALIVE_COUNT=1');
-    BlipBasic.lines.set(375, 'SOUND 1000+TWO+2*(PX>20)+4*(PY<170)+8*(P2X<280)+16*(P2Y<170)+32*(BLOW_WAIT>0)+64*(P2_BLOW_WAIT>0),0,0');
+  // Keep the real player updates; isolate them from the toys and the end of the round.
+  const roundWon = readFileSync(new URL('../web/TAPE/BUBBLER.BLIP', import.meta.url), 'utf8')
+    .split('\n').find((line) => line.replace(/^\d+\s+/, '').trim() === 'ROUND_WON').match(/^\d+/)[0];
+  await page.evaluate((roundWon) => {
+    BlipBasic.lines.set(80, 'REM NO MUSIC');
+    BlipBasic.lines.set(85, 'START_GAME:SHOW "PLAY":FOR I=1 TO TOY_COUNT:TOY_ON(I)=0:NEXT I');
+    BlipBasic.lines.set(Number(roundWon), 'REM THE ROUND NEVER ENDS');
+    BlipBasic.lines.set(165, 'SOUND 1000+TWO+2*(PX(1)>SPAWN_X(1)+10)+4*(PY(1)<SPAWN_Y(1)-10)+8*(PX(2)<SPAWN_X(2)-10)+16*(PY(2)<SPAWN_Y(2)-10)+32*(BLOW_WAIT(1)>0)+64*(BLOW_WAIT(2)>0),0,0');
     BlipBasic.submit('SAVE MY_BUBBLES');
     BlipBasic.submit('RUN');
-  });
+  }, roundWon);
   await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
   const frame = page.frames().find((frame) => frame.url().includes('basic-runtime.html'));
   const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');

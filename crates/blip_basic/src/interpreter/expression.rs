@@ -178,6 +178,10 @@ impl Expr<'_, '_> {
             ),
             "STR$" => Value::Str(first.string()),
             "LEN" => Value::Num(first.string().chars().count() as f64),
+            "MID$" | "LEFT$" | "RIGHT$" => Value::Str(substring(name, &first.string(), args)),
+            "VAL" => Value::Num(leading_number(&first.string())),
+            "ASC" => Value::Num(first.string().chars().next().map_or(0.0, |c| c as u32 as f64)),
+            "CHR$" => Value::Str(char::from_u32(first.number() as u32).map(String::from).unwrap_or_default()),
             "COLOR" => {
                 if !(3..=4).contains(&args.len()) {
                     return Err("COLOR needs red,green,blue[,alpha]".into());
@@ -248,4 +252,30 @@ fn key_code(name: &str) -> Result<macroquad::input::KeyCode, String> {
         "BUTTON2" | "Z" => BLIP_KEY_BUTTON2,
         _ => return Err(format!("Unknown key {name}")),
     })
+}
+
+/// `MID$(S$, START[, LENGTH])` counts from 1; `LEFT$` and `RIGHT$` take a length.
+fn substring(name: &str, text: &str, args: &[Value]) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let count = |i: usize, default: usize| args.get(i).map_or(default, |v| v.number().max(0.0) as usize);
+    let (from, length) = match name {
+        "LEFT$" => (0, count(1, 0)),
+        "RIGHT$" => {
+            let length = count(1, 0).min(chars.len());
+            (chars.len() - length, length)
+        }
+        _ => (count(1, 1).max(1) - 1, count(2, chars.len())),
+    };
+    chars.iter().skip(from).take(length).collect()
+}
+
+/// `VAL("12.5KG")` is 12.5, as in Amiga BASIC; text that starts with no number is 0.
+fn leading_number(text: &str) -> f64 {
+    let text = text.trim_start();
+    let end = text
+        .char_indices()
+        .take_while(|&(i, c)| c.is_ascii_digit() || c == '.' || (i == 0 && (c == '-' || c == '+')))
+        .last()
+        .map_or(0, |(i, c)| i + c.len_utf8());
+    (1..=end).rev().find_map(|n| text[..n].parse().ok()).unwrap_or(0.0)
 }

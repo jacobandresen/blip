@@ -175,6 +175,7 @@ pub(super) fn method_call(command: &str) -> Option<(String, String)> {
         "fx_ring",
         "draw_glow_line",
         "fill_circle",
+        "draw_circle",
         "fill_capsule",
         "fill_sunburst",
         "fill_glow_circle",

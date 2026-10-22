@@ -47,7 +47,8 @@ A line ending in `THEN` opens a block that runs to `ELSEIF … THEN`, `ELSE` or
 next and `RESTORE [line]` rewinds. A `FOR` with nothing to do, `FOR I=1 TO 0`,
 skips to its `NEXT`, as in AmigaBASIC. `WHILE X … WEND` repeats while `X` holds; `EXIT FOR`
 leaves the innermost loop. `TAN`, `EXP`, `LOG`, `SGN` and `FIX` join the
-functions, as in AmigaBASIC.
+functions, as in AmigaBASIC, and so do the text ones: `MID$(S$,START[,LENGTH])`
+counting from 1, `LEFT$`, `RIGHT$`, `VAL`, `ASC` and `CHR$`.
 
 Expressions cache tokens in `Arc` slices. Each frame allows up to 50,000
 statements and eight milliseconds of interpreter work. A program exceeding
@@ -56,31 +57,30 @@ render frame; positive waits measure milliseconds from the command.
 
 ## Reading a game tape
 
-Numbered `REM --- ... ---` lines mark each logical section. Reusable steps
-are named `SUB`s whose parameters say what they take; the opening map gives
-the control flow and names the procedures.
-Section headings identify setup, input,
-the frame loop, rendering, collisions, and object pools. Keep comments short
-and keep existing line numbers stable so `GOTO` and `GOSUB` remain easy to follow.
-Use ordinary `REM` lines for array states and what a `SUB` leaves behind in
-shared names, its outputs.
-`REM GAME: BUBBLER` preserves the control layout when a tape is saved
-under a different name in `/USER`. The browser reads this optional identity.
+Every tape has the same layout, and so do the Rust games it mirrors:
 
-```basic
-1 REM FLOW: TITLE 10 -> SETUP 800 -> PLAY 100 -> RESULT 700.
-999 REM --- OBJECT UPDATE - MOVE, COLLIDE, AND DRAW; SCORER GETS THE POINTS ---
-1000 SUB UPDATE_OBJECT(B)
-1010 LOCAL HIT
-1090 END SUB
-```
+| Lines | What is there |
+| --- | --- |
+| 1-9 | What the game is, its keys, its screens; `2 REM GAME: NAME` |
+| 10 | `SETUP`: constants, then `80` music, `85` the first screen, `90` the clock |
+| 100 | `MAIN LOOP`: read the keys, `UPDATE_` the screen we are on, then `DRAW_` it |
+| 1000 up | One section per screen or thing: `TITLE`, `START`, `PLAY`, `OVER`, ... |
+
+Each screen has an `UPDATE_` and a `DRAW_` `SUB` (`UPDATE_TITLE`, `DRAW_PLAY`);
+`START_GAME` begins a game. Lines 85 and 165 are free for tests: 85 replaces
+the first screen, 165 runs after the frame is drawn. A body indents two spaces
+a level and a line holds one statement, or a short pair. `REM` lines say what
+the code cannot: a rule, a measured number, what a `SUB` leaves in shared names.
+`REM GAME: BUBBLER` keeps the control layout when a tape is saved under another
+name in `/USER`.
 
 Every program starts on one 640x400 screen, a high-resolution Amiga's, and
 the tapes are drawn for it. `CANVAS(width,height)` picks another size for a
-game that plays better on one. `TIME()` reads the engine clock for animation;
+game that plays better on one, as Bubbler keeps the Rust arena at 624x600. `TIME()` reads the engine clock for animation;
 `CONTROL_TEXT$(keys,pad,touch)` chooses wording through Rust's controls API.
 `DRAW_POLYLINE` renders an array of points through the same Rust path renderer
-as Adder; see the function reference for its array layout.
+as Adder; see the function reference for its array layout. `DRAW_CIRCLE(x,y,r,
+colour[,width])` draws a ring.
 
 ## Shared functions
 

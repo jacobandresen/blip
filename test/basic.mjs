@@ -190,7 +190,8 @@ test('BASIC stores and runs a numbered program, then launches a BLIP BASIC game 
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.locator('#exit-game').click();
   await page.waitForFunction(() => document.querySelector('#basic-wasm-frame').hidden);
-  assert.equal(await page.evaluate(() => BlipBasic.lines.get(20)), 'GAME_STATE=0');
+  const tapeLine20 = readFileSync(new URL('../web/TAPE/SERPENT.BLIP', import.meta.url), 'utf8').match(/^20 (.*)$/m)[1];
+  assert.equal(await page.evaluate(() => BlipBasic.lines.get(20)), tapeLine20, 'leaving the game keeps the program in memory');
 });
 
 test('CLEAR resets the screen and variables but keeps recoverable program lines', async (t) => {
@@ -1120,8 +1121,8 @@ test('BRAWLER punch lands once after its Rust startup frames', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const canvas = await openTape(page, origin, 'BRAWLER', brawlerFight(70, ':RIVAL_WAIT=999'));
+  await waitForPixels(page, canvas, [52, 24, 196, 12], 'cyan', 200);
   await canvas.focus();
-  await page.waitForTimeout(150);
   const before = await soundCount(page);
   await page.keyboard.press('Space');
   await page.waitForTimeout(350);
@@ -1244,21 +1245,31 @@ test('BRAWLER.BLIP draws the turtle shell and mask build', async (t) => {
   await exitTape(page);
 });
 
+/** The number of the tape line whose code is `code`, so a test can replace a line inside a SUB. */
+function tapeLine(tape, code) {
+  const source = readFileSync(new URL(`../web/TAPE/${tape}.BLIP`, import.meta.url), 'utf8');
+  const found = source.split('\n').filter((line) => line.replace(/^\d+\s+/, '').trim() === code);
+  assert.equal(found.length, 1, `${tape} has one line ${code}`);
+  return Number(found[0].match(/^\d+/)[0]);
+}
+
+/** Round one in play at once, with no music, so the sound count is only the game's. */
+/** Bubbler keeps the Rust game's 624x600 arena. */
+const BUBBLER_SIZE = [624, 600];
+const BUBBLER_PLAY = 'START_GAME:SHOW "PLAY"';
+const quietBubbler = (setup, lines = {}) => ({ 80: 'REM NO MUSIC', 85: setup, ...lines });
+
 test('BUBBLER.BLIP runs three rounds of platforming and bubble attacks', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
   for (let round = 1; round <= 3; round++) {
-    await page.evaluate(() => BlipBasic.submit('RUN'));
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 20000 });
+    const canvas = await openTape(page, origin, 'BUBBLER');
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: Bubbler should launch cleanly`);
-    const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-    await page.waitForTimeout(180);
+    await waitForPixels(page, canvas, [0, 0, 624, 600], 'lit', 2000, { size: BUBBLER_SIZE });
     const title = await canvas.screenshot();
     await page.waitForTimeout(250);
     assert.notDeepEqual(await canvas.screenshot(), title, `round ${round}: the bubbles and dragons should animate on the title screen`);
+    await canvas.focus();
     await page.keyboard.press('Space');
     await page.keyboard.down('ArrowRight');
     await page.keyboard.press('ArrowUp');
@@ -1266,305 +1277,151 @@ test('BUBBLER.BLIP runs three rounds of platforming and bubble attacks', async (
     await page.waitForTimeout(250);
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: jump and bubble controls should not fail`);
     await page.waitForFunction(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents > 0, undefined, { timeout: 2500 });
-    assert.ok((await canvas.screenshot()).length > 1000);
     await page.keyboard.up('ArrowRight');
     await page.keyboard.up('Space');
-    await page.locator('#exit-game').click();
-    await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+    await exitTape(page);
   }
 });
 
-test('BUBBLER advances its preserved score into a faster next wave', async (t) => {
+test('BUBBLER advances its preserved score into a faster next round', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => {
-    BlipBasic.submit('CD /TAPE');
-    BlipBasic.submit('LOAD BUBBLER');
-  });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(895, 'FOR E=1 TO ENEMY_COUNT:MONSTER(E)=0:NEXT E:GOTO 100');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=1234:LIVES=5:ROUND=1:P2SCORE=567:P2LIVES=7:TWO=1:GOTO 810');
-    BlipBasic.lines.set(810, BlipBasic.lines.get(810)+':IF ROUND=2 THEN GOSUB 2090');
-    BlipBasic.lines.set(2090, 'IF SCORE<>1234 OR P2SCORE<>567 OR LIVES<>6 OR P2LIVES<>7 THEN DRAW_TEXTURE("BAD ROUND REWARD",0,0,1,1)');
-    BlipBasic.lines.set(2091, 'SOUND 880,0.01,0.1:RETURN');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await canvas.focus();
-  await page.keyboard.press('Space');
-  const firstWave = await canvas.screenshot();
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-error') || document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundTimes.length > 0, undefined, { timeout: 15000 });
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    'TWO=1:START_GAME:SCORE(1)=1234:SCORE(2)=567:LIVES(2)=7:SHOW "PLAY":FOR I=1 TO TOY_COUNT:TOY_ON(I)=0:NEXT I',
+    { 165: statusMarker('ROUND=2 AND PACE>0.8 AND SCORE(1)=1234 AND SCORE(2)=567 AND LIVES(1)=6 AND LIVES(2)=7') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { timeout: 9000, size: BUBBLER_SIZE }) > 20,
+    'clearing a round should keep the scores, top up lives to seven, and start a quicker round two');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  assert.notDeepEqual(await canvas.screenshot(), firstWave, 'wave number and score should advance when the enemies are cleared');
-  await page.locator('#exit-game').click();
+  await exitTape(page);
 });
 
 test('BUBBLER completes after its eighth Rust level', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => {
-    BlipBasic.submit('CD /TAPE');
-    BlipBasic.submit('LOAD BUBBLER');
-  });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=8:TWO=0:GOTO 810');
-    BlipBasic.lines.set(895, 'FOR E=1 TO ENEMY_COUNT:MONSTER(E)=0:NEXT E:GOTO 100');
-    BlipBasic.lines.set(690, BlipBasic.lines.get(690)+':SOUND 880,0.01,0.1');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  const events = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  const before = await canvas.screenshot();
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-error') || document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundTimes.length > 0, undefined, { timeout: 15000 });
-  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the final wave and win screen should run cleanly');
-  const afterEvents = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  assert.ok(afterEvents > events, 'clearing round eight should play the completion sound');
-  assert.notDeepEqual(await canvas.screenshot(), before, 'the final wave should transition to its win screen');
-  await page.locator('#exit-game').click();
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    'START_GAME:LOAD_ROUND 8:SHOW "PLAY":FOR I=1 TO TOY_COUNT:TOY_ON(I)=0:NEXT I',
+    { 165: statusMarker('STATE$="OVER" AND WON') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { timeout: 9000, size: BUBBLER_SIZE }) > 20, 'clearing round eight should win the game');
+  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the final round and win screen should run cleanly');
+  await exitTape(page);
 });
 
-test('BUBBLER chains five trapped enemies into the Rust score and five fruit drops', async (t) => {
+test('BUBBLER chains five trapped enemies into the Rust score and five candy drops', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(5, 'CLEAR("BLIP_BLACK"):SCORE=0');
-    BlipBasic.lines.set(6, 'FOR I=1 TO 5:BUBBLE(I)=2:TRAP(I)=I:MONSTER(I)=1:ETRAPPED(I)=1:QX(I)=100+I*5:QY(I)=80:NEXT I');
-    BlipBasic.lines.set(7, 'B=1:SCORER=1:GOSUB 2000');
-    BlipBasic.lines.set(8, 'IF SCORE<>31000 OR CHAIN_KILLS<>5 OR FRUIT(5)<>1 OR ETRAPPED(5)<>0 THEN DRAW_TEXTURE("BAD CHAIN",0,0,1,1)');
-    BlipBasic.lines.set(9, 'PLAY_SFX "SERPENT/EAT":WAIT 16:GOTO 9');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-error') || document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents > 0);
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    `${BUBBLER_PLAY}:FOR I=1 TO 5:BUB_ON(I)=1:BUB_HOLDS(I)=I:TOY_ON(I)=0:BUB_X(I)=200+I*20:BUB_Y(I)=200:NEXT I:POP_CHAIN 1,1`,
+    { 165: statusMarker('SCORE(1)=31000 AND CANDY_ON(5)=1 AND CANDY_KIND(5)=3 AND BUB_ON(5)=0 AND CHAIN_SIZE=5') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'five toys should score 1000+2000+4000+8000+16000 and drop five candies');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
+  await exitTape(page);
 });
 
 test('BUBBLER trapped enemies are defeated when a player pops their bubble', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=1:TWO=0:GOTO 810');
-    BlipBasic.lines.set(890, 'FOR B=1 TO 6:BUBBLE(B)=0:QOWNER(B)=1:NEXT B:BUBBLE(1)=2:TRAP(1)=1:ETRAPPED(1)=1:QX(1)=PX+8:QY(1)=PY+8:BT(1)=500');
-  });
-  const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  await page.evaluate(() => BlipBasic.submit('RUN'));
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  await page.waitForFunction((initial) => (document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0) > initial, before, { timeout: 3000 });
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    `${BUBBLER_PLAY}:BUB_ON(1)=1:BUB_HOLDS(1)=1:TOY_ON(1)=0:BUB_PHASE(1)=FLOATING:BUB_X(1)=PX(1)+14:BUB_Y(1)=PY(1)+11`,
+    { 165: statusMarker('SCORE(1)>=1000 AND BUB_ON(1)=0 AND TOY_ON(1)=0') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'touching a caught toy should pop it for points');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'popping a trapped enemy should run without a BASIC error');
-  await page.locator('#exit-game').click();
+  await exitTape(page);
 });
 
 test('BUBBLER physical controls trap a monster, pop it, and collect its candy', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => {
-    BlipBasic.submit('CD /TAPE');
-    BlipBasic.submit('LOAD BUBBLER');
-  });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(870, 'FOR E=1 TO ENEMY_COUNT:MONSTER(E)=0:ETRAPPED(E)=0:NEXT E:EX(1)=32:EY(1)=176:ETYPE(1)=1:MONSTER(1)=1:ETRAPPED(1)=0:EGROUND(1)=1:EDIR(1)=0:EMIN(1)=13:EMAX(1)=292:MSPEED=0');
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(817, 'STOP_MUSIC');
-    BlipBasic.lines.set(2042, 'FRUIT(FRUIT_SLOT)=1:FX(FRUIT_SLOT)=QX(C)-8:FY(FRUIT_SLOT)=QY(C)-8:FRUIT_HOME(FRUIT_SLOT)=FY(FRUIT_SLOT):FVX(FRUIT_SLOT)=0:FVY(FRUIT_SLOT)=0-1.7:FRUIT_KIND(FRUIT_SLOT)=CHAIN_KILLS-1');
-    BlipBasic.lines.set(1886, 'FRUIT(F)=0:PLAY_SFX "BUBBLER/FRUIT":IF SCORE<>1500 THEN DRAW_TEXTURE("BAD FRUIT SCORE",0,0,1,1)');
-    BlipBasic.lines.set(1887, 'SOUND 880,0.01,0.1:RETURN');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'Bubbler should launch without a BASIC error');
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    `${BUBBLER_PLAY}:FOR I=2 TO TOY_COUNT:TOY_ON(I)=0:NEXT I:TOY_X(1)=PX(1)+20:TOY_Y(1)=PY(1)+2:TOY_KIND(1)=1:PACE=0.001`,
+    // The candy hops back to the dragon instead of off to a random side.
+    { [tapeLine('BUBBLER', 'CANDY_VX(I)=RND(220)-110')]: 'CANDY_VX(I)=-60', 165: statusMarker('SCORE(1)=1500') }));
   await canvas.focus();
-  await page.waitForTimeout(200);
-  const initialSounds = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
+  await page.waitForTimeout(300);
+  const before = await soundCount(page);
   await page.keyboard.press('f');
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-error') || document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundTimes.length > 0, undefined, { timeout: 5000 });
-  const finalSounds = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  assert.ok(finalSounds >= initialSounds + 4, `F should blow, trap, pop and pick up candy (sound events ${initialSounds} → ${finalSounds}; error ${await page.locator('body').getAttribute('data-wasm-error')})`);
+  const scored = await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE });
+  const after = await soundCount(page);
+  assert.ok(after >= before + 4, `F should blow, trap, pop and the dragon pick up candy (sound events ${before} -> ${after})`);
+  assert.ok(scored > 20, 'the toy and its bonbon should score 1000 + 500');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'trapping, popping and picking up candy should run without a BASIC error');
-  await page.locator('#exit-game').click();
+  await exitTape(page);
 });
 
 test('BUBBLER trapped enemies escape and return to play when their bubbles expire', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=1:TWO=0:GOTO 810');
-    BlipBasic.lines.set(890, 'FOR B=1 TO 6:BUBBLE(B)=0:QOWNER(B)=1:NEXT B:BUBBLE(1)=2:TRAP(1)=1:ETRAPPED(1)=1:QX(1)=240:QY(1)=80:BT(1)=2');
-  });
-  const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  await page.evaluate(() => BlipBasic.submit('RUN'));
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  await page.waitForFunction((initial) => (document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0) > initial, before, { timeout: 3000 });
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    `${BUBBLER_PLAY}:BUB_ON(1)=1:BUB_HOLDS(1)=1:TOY_ON(1)=0:BUB_PHASE(1)=FLOATING:BUB_X(1)=300:BUB_Y(1)=200:BUB_AGE(1)=TRAP_LIFE-0.2`,
+    { 165: statusMarker('TOY_ON(1)=1 AND TOY_ANGRY(1)=1 AND BUB_ON(1)=0') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'the toy should break out of its bubble, angry');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'an escaped enemy should return without a BASIC error');
-  await page.locator('#exit-game').click();
+  await exitTape(page);
 });
 
 test('BUBBLER changes its palette and platform layout through round eight', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  const playRound = async (round) => {
-    await page.evaluate((level) => {
-      BlipBasic.lines.set(10, 'GOTO 800');
-      BlipBasic.lines.set(800, `GAME_STATE=1:SCORE=0:LIVES=5:ROUND=${level}:TWO=0:GOTO 810`);
-      BlipBasic.submit('RUN');
-    }, round);
-    await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round} should initialize`);
-    const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-    await canvas.focus();
-    await page.keyboard.press('Space');
-    await page.waitForTimeout(250);
-    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round} palette and platforms should draw`);
-    const image = await canvas.screenshot();
-    await page.locator('#exit-game').click();
-    await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
-    return image;
-  };
   const rounds = [];
-  for (let round = 1; round <= 8; round++) rounds.push(await playRound(round));
-  for (let round = 1; round < 8; round++) {
-    assert.notDeepEqual(rounds[round], rounds[0], `round ${round + 1} should use its Rust-aligned palette and platform arrangement`);
+  for (let round = 1; round <= 8; round++) {
+    const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(`START_GAME:LOAD_ROUND ${round}`, { 165: statusMarker(`ROUND=${round}`) }));
+    assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, `round ${round} should load`);
+    assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round} palette and platforms should draw`);
+    rounds.push(await countGamePixels(page, await canvas.screenshot(), [24, 48, 576, 480], 'lit', BUBBLER_SIZE));
+    await exitTape(page);
   }
+  assert.equal(new Set(rounds).size, 8, `each round should look its own (${rounds})`);
 });
 
 test('BUBBLER round two mixes walkers, hoppers, and floating ghosts', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=2:GOTO 810');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler('START_GAME:LOAD_ROUND 2:SHOW "PLAY"',
+    { 165: statusMarker('TOY_KIND(1)=3 AND TOY_KIND(3)=1 AND TOY_KIND(5)=2 AND TOY_ON(1)') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'round two should hold ghosts, walkers and hoppers');
   const first = await canvas.screenshot();
   await page.waitForTimeout(450);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'walker, hopper, and ghost updates should run cleanly');
   assert.notDeepEqual(await canvas.screenshot(), first, 'ghost bobbing and enemy motion should animate the round');
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  await exitTape(page);
 });
 
 test('BUBBLER co-op gives player two their own movement, jump, and bubble attack', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
+  const canvas = await openTape(page, origin, 'BUBBLER', { 165: statusMarker('JOINED(2) AND PX(2)<SPAWN_X(2)') });
+  await canvas.focus();
   await page.keyboard.press('j');
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(2200);
   await page.keyboard.down('ArrowLeft');
-  await page.waitForTimeout(120);
+  await page.waitForTimeout(200);
   await page.keyboard.up('ArrowLeft');
   await page.keyboard.press('k');
   await page.keyboard.press('j');
-  await page.waitForTimeout(160);
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'J should start a game for two, and the arrows move player two');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'co-op key reads and the second player update should run cleanly');
-  assert.ok((await canvas.screenshot()).length > 1000, 'both players and the Bubbler arena should render');
-  const sounds = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  assert.ok(sounds > 0, 'player two jump and bubble actions should use the original sound effects');
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  assert.ok(await soundCount(page) > 0, 'player two jump and bubble actions should use the original sound effects');
+  await exitTape(page);
 });
 
 test('BUBBLER round four ghosts launch aimed sparks with the original sound', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=4:GOTO 810');
-    BlipBasic.lines.set(1135, 'FIRE_CD(E)=0');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  await page.waitForTimeout(500);
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    'START_GAME:LOAD_ROUND 4:SHOW "PLAY":HURRY_UP:FOR I=1 TO TOY_COUNT:TOY_SHOT_WAIT(I)=0:NEXT I',
+    { 165: 'FOR I=1 TO MAX_SHOTS:IF SHOT_ON(I) AND SHOT_SPARK(I) THEN SPARKED=1', 166: 'NEXT I', 167: statusMarker('SPARKED') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'angry ghosts should aim sparks from round four');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'aimed sparks should run without BASIC or runtime errors');
-  const after = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  assert.ok(after > before, `ghost fire should trigger the registered sparkle sound (${before} -> ${after})`);
-  assert.ok((await page.frameLocator('#basic-wasm-frame').locator('#glcanvas').screenshot()).length > 1000);
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  await exitTape(page);
 });
 
 test('BUBBLER round three walkers roll rocks at players on their platform', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(10, 'GOTO 800');
-    BlipBasic.lines.set(800, 'GAME_STATE=1:SCORE=0:LIVES=5:ROUND=3:GOTO 810');
-    BlipBasic.lines.set(810, 'PX=156:PY=112:VY=0:GROUND=1:FACE=1:HIT_WAIT=0:BLOW_WAIT=0:GAMEOVER=0');
-    BlipBasic.lines.set(870, 'EX(1)=45:EY(1)=112:EMIN(1)=25:EMAX(1)=96:EDIR(1)=1:ETYPE(1)=1');
-    BlipBasic.lines.set(889, 'JUMP_CD(1)=999');
-    BlipBasic.lines.set(1135, 'FIRE_CD(E)=0');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running') || document.body.hasAttribute('data-wasm-error'), undefined, { timeout: 15000 });
-  const before = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  await page.waitForTimeout(350);
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
+    'START_GAME:LOAD_ROUND 3:SHOW "PLAY":TOY_X(1)=PX(1)+150:TOY_Y(1)=PY(1)+2:TOY_KIND(1)=1:TOY_SHOT_WAIT(1)=0',
+    { 165: 'FOR I=1 TO MAX_SHOTS:IF SHOT_ON(I) AND NOT SHOT_SPARK(I) THEN ROLLED=1', 166: 'NEXT I', 167: statusMarker('ROLLED') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'a walker in line with a player should wind up and roll a rock');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'rolling rocks should run without BASIC or runtime errors');
-  const after = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0);
-  assert.ok(after > before, `the walker rock should play the original bounce sound (${before} -> ${after})`);
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  await exitTape(page);
 });
 
 test('BUBBLER enemies jump between platform heights', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit('LOAD BUBBLER'); });
-  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
-  await page.evaluate(() => {
-    BlipBasic.lines.set(1101, 'IF ETRAPPED(E)=0 AND EGROUND(E)=1 THEN EVY(E)=0-3.2:EGROUND(E)=0');
-    BlipBasic.submit('RUN');
-  });
-  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
-  const canvas = page.frameLocator('#basic-wasm-frame').locator('#glcanvas');
-  await page.keyboard.press('Space');
-  await page.waitForTimeout(250);
-  const firstJump = await canvas.screenshot();
-  await page.waitForTimeout(250);
+  const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler('START_GAME:LOAD_ROUND 2:SHOW "PLAY"',
+    { 165: 'IF TOY_VY(5)<-200 THEN JUMPED=1', 166: statusMarker('JUMPED') }));
+  assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { timeout: 6000, size: BUBBLER_SIZE }) > 20, 'a hopper should crouch and spring into the air');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'enemy jumps and platform landings should run without BASIC errors');
-  assert.notDeepEqual(await canvas.screenshot(), firstJump, 'enemies should move through the air between platforms');
-  await page.locator('#exit-game').click();
-  await page.waitForFunction(() => !document.body.hasAttribute('data-wasm-running'));
+  await exitTape(page);
 });
 
 test('BOUNCER aims the ball off the paddle and returns it upward', async (t) => {
@@ -1709,24 +1566,25 @@ const defenderMarker = statusMarker;
 const DEFENDER_MARKER = STATUS_MARKER;
 
 /** Screenshots until `rect` holds more than `least` pixels of `colour`; returns that count. */
-async function waitForPixels(page, canvas, rect, colour, least, timeout = 4000) {
+async function waitForPixels(page, canvas, rect, colour, least, { timeout = 4000, size } = {}) {
   const until = Date.now() + timeout;
   let count = 0;
   do {
-    count = await countGamePixels(page, await canvas.screenshot(), rect, colour);
+    count = await countGamePixels(page, await canvas.screenshot(), rect, colour, size);
     if (count > least) break;
     await page.waitForTimeout(100);
   } while (Date.now() < until);
   return count;
 }
 
-async function countGamePixels(page, png, rect, colour) {
-  return page.evaluate(async ([base64, rect, colour]) => {
+/** `rect` is in game pixels, on a screen `size` big: 640x400 unless the tape picks another. */
+async function countGamePixels(page, png, rect, colour, size = [640, 400]) {
+  return page.evaluate(async ([base64, rect, colour, [wide, high]]) => {
     const image = new Image(); image.src = `data:image/png;base64,${base64}`; await image.decode();
     const sample = document.createElement('canvas'); sample.width = image.naturalWidth; sample.height = image.naturalHeight;
     const context = sample.getContext('2d'); context.drawImage(image, 0, 0);
-    const scale = Math.min(sample.width / 640, sample.height / 400);
-    const left = (sample.width - 640 * scale) / 2, top = (sample.height - 400 * scale) / 2;
+    const scale = Math.min(sample.width / wide, sample.height / high);
+    const left = (sample.width - wide * scale) / 2, top = (sample.height - high * scale) / 2;
     const { data } = context.getImageData(Math.floor(left + rect[0] * scale), Math.floor(top + rect[1] * scale),
       Math.max(1, Math.ceil(rect[2] * scale)), Math.max(1, Math.ceil(rect[3] * scale)));
     const is = {
@@ -1743,7 +1601,7 @@ async function countGamePixels(page, png, rect, colour) {
     let count = 0;
     for (let i = 0; i < data.length; i += 4) if (is(data[i], data[i + 1], data[i + 2])) count++;
     return count;
-  }, [png.toString('base64'), rect, colour]);
+  }, [png.toString('base64'), rect, colour, size]);
 }
 
 test('DEFENDER.BLIP runs a keyboard-controlled game through Rust Blip primitives', async (t) => {

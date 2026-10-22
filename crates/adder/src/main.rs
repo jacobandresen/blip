@@ -54,7 +54,7 @@ impl Game {
         }
     }
 
-    fn start(&mut self) {
+    fn start_game(&mut self) {
         self.world = World::new(self.humans);
         self.state = State::Play;
     }
@@ -142,7 +142,7 @@ fn update_title(g: &mut Game, dt: f32) {
     if blip::bot::active() { blip::bot::hold(&[BLIP_KEY_SPACE]); }
     if btn1_pressed() {
         web::spend_coin();
-        g.start();
+        g.start_game();
     }
 }
 
@@ -180,7 +180,7 @@ fn update_over(g: &mut Game, dt: f32) {
     g.timer.tick(dt);
     if g.timer.active() || !btn1_pressed() { return; }
     web::spend_coin();
-    g.start();
+    g.start_game();
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -216,7 +216,7 @@ async fn main() {
 
         if blip.screenshot_mode {
             shot_frame += 1;
-            if shot_frame == 1 { g.start(); }
+            if shot_frame == 1 { g.start_game(); }
         }
 
         match g.state {

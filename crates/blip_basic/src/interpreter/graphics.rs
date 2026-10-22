@@ -69,6 +69,10 @@ impl Program {
                 self.effects.popup(n(0), n(1), &vals[2].string(), c(3))
             }
             "FX_RING" if vals.len() == 5 => self.effects.ring(n(0), n(1), n(2), n(3), c(4)),
+            "DRAW_CIRCLE" if (4..=5).contains(&vals.len()) => {
+                let width = if vals.len() == 5 { n(4) } else { 2.0 };
+                macroquad::shapes::draw_circle_lines(n(0), n(1), n(2).max(0.0), width, c(3));
+            }
             "FILL_RECT" if vals.len() == 5 => blip.fill_rect(n(0), n(1), n(2), n(3), c(4)),
             "DRAW_RECT" if vals.len() == 5 => blip.draw_rect(n(0), n(1), n(2), n(3), c(4)),
             "DRAW_LINE" if vals.len() == 5 => blip.draw_line(n(0), n(1), n(2), n(3), c(4)),

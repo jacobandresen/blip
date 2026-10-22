@@ -40,6 +40,11 @@
     LEN: (value) => String(value).length,
     'STR$': (value) => String(value),
     'CHR$': (value) => String.fromCharCode(Number(value)),
+    'MID$': (text, start = 1, length = Infinity) => [...String(text)].slice(Math.max(1, Number(start)) - 1).slice(0, Math.max(0, Number(length))).join(''),
+    'LEFT$': (text, length = 0) => [...String(text)].slice(0, Math.max(0, Number(length))).join(''),
+    'RIGHT$': (text, length = 0) => { const chars = [...String(text)]; return chars.slice(chars.length - Math.min(chars.length, Math.max(0, Number(length)))).join(''); },
+    VAL: (text) => { const match = /^\s*[-+]?(\d+\.?\d*|\.\d+)/.exec(String(text)); return match ? Number(match[0]) : 0; },
+    ASC: (text) => (String(text).codePointAt(0) ?? 0),
     COLOR(...args) {
       if (args.length < 3 || args.length > 4) throw Error('COLOR needs red,green,blue[,alpha]');
       const [r, g, b, a = 1] = args.map(Number);
