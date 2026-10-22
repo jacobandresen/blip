@@ -27,6 +27,10 @@ change will be overwritten the next time the project is built.
 | App style: a game opened from the home screen or its own icon (`data-appstyle`), with `‹ Home`, a frosted title bar and a launch screen | `web/shell.css` (the `App style` section), `web/shell.js` |
 | The Home Screen and BLIP switches on the top bar (`#home-switch-btn`, `#basic-switch-btn`), arcade and game pages | `web/kiosk.js`, `web/kiosk.css` |
 | The arcade's aisle of cabinets: marquee, screen, deck, Start, coin door, side art | `web/index.html` |
+| Walking the aisle: position, speed, settling; the machines' sound mix (no DOM, unit-tested) — planned | `web/aisle.js` |
+| The aisle's walking loop, its inputs (keys, drag, stick, gamepad), stepping up to a machine — planned | `web/index.html` (the aisle script) |
+| Each machine's attract jingle and the room's sound — planned | `web/kiosk.js` |
+| Each machine's attract loop on its screen — planned | `tools/make_attract_strips.mjs`, which writes `web/<game>/attract.webp` (generated, not edited by hand) |
 | A machine's marquee, the same sign on its cabinet and as its game page's top bar; each game's colours (`data-machine`) | `web/marquee.css` |
 | The deck on each cabinet: the game page's own, rendered per game | `web/machine-deck.html` (builds it with `web/deck.js`) |
 | Each game as its own home-screen app: icons (a small game card) and `manifest.json` | `tools/make_game_icons.mjs`, which writes `web/<game>/icon-*.png` and `manifest.json`, and the Guide's (generated, not edited by hand) |
@@ -79,6 +83,15 @@ to boot the macroquad runtime. All of them are referenced with
 saved to a home screen is its own app. `kiosk.js`
 and `kiosk.css` are also loaded by `web/index.html` (without the `../` prefix)
 to share the nav bar between the landing page and game pages.
+
+### Plans
+
+Larger changes are planned in `docs/` before they are built. Rows marked
+"planned" above name files a plan will add; drop the mark once they exist.
+
+- `docs/immersive-arcade.md`: walking the aisle, sound from the machines,
+  stepping up to play, living screens, up and down. Read it before touching
+  the aisle script; it says how each part is tested.
 
 ### One manual, two bindings
 
