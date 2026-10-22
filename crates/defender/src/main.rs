@@ -333,7 +333,7 @@ impl Game {
         }
     }
 
-    fn init_aliens(&mut self) {
+    fn build_formation(&mut self) {
         let theme = (self.sess.level - 1).rem_euclid(5);
         // Level 1 gets a smaller formation than a later trip through theme 0,
         // so a first-time player isn't faced with a full 5x11 wall immediately.
@@ -386,7 +386,7 @@ impl Game {
         self.march_timer = 0.0;
     }
 
-    fn start_round_common(&mut self) {
+    fn start_wave(&mut self) {
         self.player_x = ((WIN_W - ALIEN_W) / 2) as f32;
         self.player_vx = 0.0;
         self.bullets.iter_mut().for_each(|b| b.active = false);
@@ -396,7 +396,7 @@ impl Game {
         self.dive_cd = rand_int(DIVE_EVERY.0, DIVE_EVERY.1) as f32;
         self.dive_pick = None;
         self.diver = None;
-        self.init_aliens();
+        self.build_formation();
         let theme = (self.sess.level - 1).rem_euclid(5);
         if theme != 2 && theme != 4 {
             self.build_shields();
@@ -428,7 +428,7 @@ impl Game {
     /// How many motherships deep this run is — the first is 1.
     fn boss_number(&self) -> i32 { (self.sess.level / BOSS_EVERY).max(1) }
 
-    fn spawn_boss(&mut self) {
+    fn start_boss(&mut self) {
         let n = self.boss_number();
         self.boss_hp_max = BOSS_HP_BASE + BOSS_HP_STEP * (n - 1);
         self.boss_hp = self.boss_hp_max;
@@ -459,7 +459,7 @@ impl Game {
 
     fn start_game(&mut self) {
         self.sess.reset(LIVES_START);
-        self.start_round_common();
+        self.start_wave();
     }
 }
 
@@ -827,7 +827,7 @@ fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
 
 /// Player shots against the mothership: only the player's slots, which
 /// free_bullet() hands out from the front of the array (bombs from the back).
-fn boss_take_hits(g: &mut Game, sfx: &Sounds, bullet_starts: &[(f32, f32); N_BULLETS]) {
+fn hit_boss(g: &mut Game, sfx: &Sounds, bullet_starts: &[(f32, f32); N_BULLETS]) {
     if !g.boss_active { return; }
     let (bx, by) = (g.boss_x, g.boss_y());
     for i in 0..MAX_PLAYER_BULLETS {
@@ -1039,7 +1039,7 @@ fn update_explosions(g: &mut Game, dt: f32) {
 }
 
 /// The cannon has mass: it spools up to full speed and brakes over ~0.08 s.
-fn move_cannon(g: &mut Game, dt: f32) {
+fn move_ship(g: &mut Game, dt: f32) {
     let mut moving_left = key_active(BLIP_KEY_LEFT) || key_active(BLIP_KEY_A);
     let mut moving_right = key_active(BLIP_KEY_RIGHT) || key_active(BLIP_KEY_D);
     let dir = moving_right as i32 - moving_left as i32;
@@ -1155,7 +1155,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     let ufo_start_x = g.ufo_x;
     let ufo_was_active = g.ufo_active;
     g.respawn_grace.tick(dt);
-    move_cannon(g, dt);
+    move_ship(g, dt);
     fire(g, sfx);
 
     let bullet_starts: [(f32, f32); N_BULLETS] =
@@ -1342,7 +1342,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     update_boss(g, dt, sfx);
-    boss_take_hits(g, sfx, &bullet_starts);
+    hit_boss(g, sfx, &bullet_starts);
 
     expire_player_shots(g, &player_shot_went_over_top);
 
@@ -1355,7 +1355,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         // On a boss level the formation is the doorway, not the level.
         if g.is_boss_level() && !g.boss_done {
             g.bullets[UFO_BOMB_IDX].active = false;
-            g.spawn_boss();
+            g.start_boss();
             blip::play_alert(&sfx.ufo_siren);
         } else {
             play_sfx(&sfx.level_clear);
@@ -1387,8 +1387,8 @@ fn update_dead(g: &mut Game, dt: f32) {
     }
 }
 
-fn update_win(g: &mut Game, dt: f32) {
-    if g.dead_timer.tick(dt) { g.start_round_common(); }
+fn update_clear(g: &mut Game, dt: f32) {
+    if g.dead_timer.tick(dt) { g.start_wave(); }
 }
 
 fn update_over(g: &mut Game, dt: f32) {
@@ -1577,7 +1577,7 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
     }
 }
 
-fn draw_win(blip: &Blip, level: i32) {
+fn draw_clear(blip: &Blip, level: i32) {
     let buf = format!("LEVEL {}", level);
     blip.clear(BLIP_BLACK);
     blip.draw_centered("WAVE CLEAR", (WIN_H / 3) as f32, 4.0, BLIP_CYAN);
@@ -1652,7 +1652,7 @@ async fn main() {
             State::Title => update_title(&mut g),
             State::Play  => update_play(&mut g, dt, &sfx),
             State::Dead  => update_dead(&mut g, dt),
-            State::Win   => update_win(&mut g, dt),
+            State::Win   => update_clear(&mut g, dt),
             State::Over  => update_over(&mut g, dt),
         }
         if prev_state == State::Play && matches!(g.state, State::Dead | State::Over) { web::haptic(); }
@@ -1664,7 +1664,7 @@ async fn main() {
         blip.clear(BLIP_BLACK);
         match g.state {
             State::Title => draw_title(&blip, &alien, &web::high_score()),
-            State::Win   => draw_win(&blip, g.sess.level),
+            State::Win   => draw_clear(&blip, g.sess.level),
             State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player, &alien, &explosion, &shield, &bullet, &saucer);
@@ -1722,7 +1722,7 @@ mod tests {
         let mut prev = None;
         for level in [5, 10, 15, 20, 25] {
             let mut g = at_level(level);
-            g.spawn_boss();
+            g.start_boss();
             let now = (g.boss_hp, g.boss_speed(), g.boss_volley_gap());
             if let Some((hp, speed, gap)) = prev {
                 assert!(now.0 > hp, "level {level}'s mothership has no more health than the last");
@@ -1739,7 +1739,7 @@ mod tests {
         // volleys has a floor, so the difficulty curve flattens instead
         // of eventually firing every frame.
         let mut g = at_level(500);
-        g.spawn_boss();
+        g.start_boss();
         assert!(
             g.boss_volley_gap() >= BOSS_VOLLEY_FLOOR,
             "the volley gap fell through its floor at level 500 ({}s)", g.boss_volley_gap()
@@ -1749,7 +1749,7 @@ mod tests {
     #[test]
     fn a_mothership_starts_at_full_health_and_on_screen() {
         let mut g = at_level(10);
-        g.spawn_boss();
+        g.start_boss();
         assert!(g.boss_active);
         assert_eq!(g.boss_hp, g.boss_hp_max);
         // It flies in from whichever side it starts on, so it is allowed
@@ -1764,7 +1764,7 @@ mod tests {
     #[test]
     fn a_mothership_hangs_above_the_player_not_on_top_of_them() {
         let mut g = at_level(5);
-        g.spawn_boss();
+        g.start_boss();
         for _ in 0..600 {
             g.boss_phase += 0.05;
             let y = g.boss_y();
@@ -1781,7 +1781,7 @@ mod tests {
         // Once the mothership is down the formation-cleared check keeps
         // passing; without boss_done the level would summon one forever.
         let mut g = at_level(5);
-        g.spawn_boss();
+        g.start_boss();
         g.boss_active = false;
         g.boss_done = true;
         assert!(g.is_boss_level() && g.boss_done,
@@ -1791,10 +1791,10 @@ mod tests {
     #[test]
     fn a_new_level_forgets_the_last_mothership() {
         let mut g = at_level(5);
-        g.spawn_boss();
+        g.start_boss();
         g.boss_done = true;
         g.sess.next_level();
-        g.start_round_common();
+        g.start_wave();
         assert!(!g.boss_active, "the old mothership survived into the next level");
         assert!(!g.boss_done, "the next boss level would be skipped entirely");
     }
