@@ -314,7 +314,7 @@ impl Program {
 }
 
 /// A sound's file: upper case, `.WAV` when no other is named; a saved tune plays its WAV.
-fn sound_path(name: &str) -> String {
+pub(super) fn sound_path(name: &str) -> String {
     let path = name.to_ascii_uppercase();
     let stem = path.strip_suffix(".TUNE").unwrap_or(&path);
     if stem.ends_with(".WAV") { stem.to_string() } else { format!("{stem}.WAV") }

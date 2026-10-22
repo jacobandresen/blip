@@ -230,3 +230,12 @@ fn print_items_keep_their_separators() {
     assert_eq!(items("A,B;"), [("A".to_string(), Some(',')), ("B".into(), Some(';'))]);
     assert_eq!(items("\"A;B\",F(1,2)"), [("\"A;B\"".to_string(), Some(',')), ("F(1,2)".into(), None)]);
 }
+
+#[test]
+fn a_sound_is_named_by_its_file_wav_when_none_is_given() {
+    use super::statement::sound_path;
+    assert_eq!(sound_path("/TAPE/SERPENT/ASSETS/EAT"), "/TAPE/SERPENT/ASSETS/EAT.WAV");
+    assert_eq!(sound_path("/tape/serpent/assets/eat.wav"), "/TAPE/SERPENT/ASSETS/EAT.WAV");
+    // A tune saved from TUNE plays its sound.
+    assert_eq!(sound_path("/USER/MUSIC/THEME.TUNE"), "/USER/MUSIC/THEME.WAV");
+}
