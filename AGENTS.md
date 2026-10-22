@@ -30,7 +30,7 @@ change will be overwritten the next time the project is built.
 | Walking the aisle: position, speed, settling; the machines' sound mix (no DOM, unit-tested) | `web/aisle.js` |
 | The aisle's walking loop (`aisleTick`, `poseCards`), its inputs (keys, drag, gamepad), the carpet and wall parallax | `web/index.html` (the aisle script) |
 | Stepping up to a machine (`stepUp`, `stepBack`, `lean`): Up, Up plays; Down, Escape or a walk steps back | `web/index.html` (the aisle script) |
-| The game page opening on the arcade screen's picture (`blip-cabinet-launch`, `#launch-frame`) | `web/index.html` (`openMachine`), `web/shell.js`, `web/shell.css` |
+| Starting a machine: the zoom onto the game page's screen (`launchScreen`, `blip-screen-box`), the prerender, the page opening on the screen's picture (`blip-cabinet-launch`, `#launch-frame`, `data-launching`); the game page as its machine up close (`data-machine`) | `web/index.html` (`openMachine`), `web/shell.html`, `web/shell.js`, `web/shell.css` |
 | Each machine's attract jingle (`BLIP_ATTRACT`) and the room's sound (`blipArcadeSound`) | `web/kiosk.js` |
 | Each machine's attract loop on its screen | `tools/make_attract_strips.mjs`, which writes `web/<game>/attract.webp` (generated, not edited by hand; run after a game's look changes); the arcade plays it (`.card-loop` in `web/index.html`) |
 | A machine's marquee, the same sign on its cabinet and as its game page's top bar; each game's colours (`data-machine`) | `web/marquee.css` |

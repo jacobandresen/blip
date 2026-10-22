@@ -955,7 +955,9 @@
       transition:none;
     }
     #game-grid .card.rejected {animation:none}
-    .machine-launching .jukebox-front {transition:transform .46s cubic-bezier(.55,0,.75,.4);transform:translate(var(--launch-x),var(--launch-y)) scale(var(--launch-zoom))}
+    .machine-launching .jukebox-front {transition:transform .76s cubic-bezier(.45,0,.25,1);transform:translate(var(--launch-x),var(--launch-y)) scale(var(--launch-zoom))}
+    /* The screen being stepped into shows the game's picture, which the game page opens on. */
+    #game-grid .card.card-launching :is(.card-loop,.machine-attract,.machine-instructions) {opacity:0;transition:opacity .25s}
     /* Every cabinet is built at 300×660 and scaled to the room (--arc-scale). */
     #game-grid .card {transform:translateX(calc(-50% + var(--arc-x,0px))) translateY(var(--arc-y,0px)) translateZ(var(--arc-z,0px)) rotateY(var(--arc-turn,0deg)) scale(var(--arc-scale,1));}
     /* A phone on its side: the player stands close, the coin door below the frame. */
@@ -1005,7 +1007,8 @@
     #game-grid .card-shot-wrap::after {content:none}
     #game-grid .game-rom {position:absolute;inset:13px 14px 22px;display:block;padding:0;border:0;border-radius:16px/20px;overflow:hidden;background:#000;
       box-shadow:0 0 0 3px #000,0 0 14px color-mix(in srgb,var(--trim) 45%,transparent)}
-    #game-grid .game-rom .card-shot,#game-grid .card-shot-wrap img.card-shot {position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;border-radius:0;filter:saturate(1.15) contrast(1.06)}
+    /* Letterboxed, as the game draws itself on its page. */
+    #game-grid .game-rom .card-shot,#game-grid .card-shot-wrap img.card-shot {position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;border-radius:0;filter:saturate(1.15) contrast(1.06)}
     /* A machine you are not facing shows its still a little dimmer; within two it plays (.card-loop). */
     #game-grid .card:not(.card-focused) .game-rom .card-shot {opacity:.8;transition:opacity .3s ease}
     #game-grid .card.card-focused .game-rom .card-shot {opacity:1}
@@ -2085,24 +2088,55 @@
         sessionStorage.setItem('blip-cabinet-start',machineSlug);
       } catch(e) {}
       if (matchMedia('(prefers-reduced-motion:reduce)').matches) { window.location.href=gameCardUrl(card); return; }
-      // The game page opens on the picture this zoom ends on (shell.js, #launch-frame).
-      var shot=card.querySelector('.card-shot');
-      try { if(shot)sessionStorage.setItem('blip-cabinet-launch',JSON.stringify({slug:machineSlug,at:Date.now(),art:shot.currentSrc||shot.src})); } catch(e) {}
-      // The player leans in until the machine's screen fills the view, then the game takes over the glass.
+      // The screen settles on the game's own picture, which the game page opens on (shell.js, #launch-frame).
+      var shot=card.querySelector('.card-shot'),art=machineSlug+'/screenshot.png';
+      if(shot&&shot.getAttribute('src')!==art){shot.dataset.still=shot.getAttribute('src');shot.src=art;}
+      card.classList.add('card-launching');
+      try { sessionStorage.setItem('blip-cabinet-launch',JSON.stringify({slug:machineSlug,at:Date.now(),art:new URL(art,location.href).href})); } catch(e) {}
+      // The player steps in until the picture on this screen is where the game page will show it, then the page
+      // takes over: the same machine, near.
       var room=document.getElementById('jukebox-front'),frame=room.getBoundingClientRect(),glass=card.querySelector('.game-rom').getBoundingClientRect();
-      var zoom=Math.max(frame.width/glass.width,frame.height/glass.height);
-      room.style.transformOrigin=(glass.left+glass.width/2-frame.left)+'px '+(glass.top+glass.height/2-frame.top)+'px';
-      room.style.setProperty('--launch-x',(frame.left+frame.width/2-glass.left-glass.width/2)+'px');
-      room.style.setProperty('--launch-y',(frame.top+frame.height/2-glass.top-glass.height/2)+'px');
+      var aspect=shot&&shot.naturalWidth?shot.naturalWidth/shot.naturalHeight:480/540;
+      var from=fitPicture(glass,aspect),to=fitPicture(launchScreen(),aspect),zoom=to.width/from.width;
+      room.style.transformOrigin=(from.left+from.width/2-frame.left)+'px '+(from.top+from.height/2-frame.top)+'px';
+      room.style.setProperty('--launch-x',(to.left+to.width/2-from.left-from.width/2)+'px');
+      room.style.setProperty('--launch-y',(to.top+to.height/2-from.top-from.height/2)+'px');
       room.style.setProperty('--launch-zoom',zoom.toFixed(3));
+      // Where the browser can, the game page is made ready during the zoom, so it is whole the moment it shows.
+      if(HTMLScriptElement.supports&&HTMLScriptElement.supports('speculationrules')){
+        var rules=document.createElement('script');rules.type='speculationrules';
+        rules.textContent=JSON.stringify({prerender:[{source:'list',urls:[new URL(gameCardUrl(card),location.href).href]}]});
+        document.head.appendChild(rules);
+      }
       document.body.classList.add('machine-launching');
-      window.setTimeout(function(){window.location.href=gameCardUrl(card);},460);
+      window.setTimeout(function(){window.location.href=gameCardUrl(card);},LAUNCH_MS);
+    }
+    var LAUNCH_MS=760;
+    // A picture of this shape, letterboxed in a box, as the game draws itself.
+    function fitPicture(box,aspect) {
+      var width=Math.min(box.width,box.height*aspect),height=width/aspect;
+      return {left:box.left+(box.width-width)/2,top:box.top+(box.height-height)/2,width:width,height:height};
+    }
+    // Where the game page's screen will be: as it last measured itself at this window size (shell.js,
+    // blip-screen-box), or else inside this window's frame above a deck of the depth it last had.
+    function launchScreen() {
+      var saved=null;
+      try { saved=JSON.parse(localStorage.getItem('blip-screen-box')||'null'); } catch(e) {}
+      if(saved&&saved.w===innerWidth&&saved.h===innerHeight&&saved.box)return {left:saved.box[0],top:saved.box[1],width:saved.box[2],height:saved.box[3]};
+      var bezel=document.getElementById('screen-bezel').getBoundingClientRect(),inset=15;
+      var deck=saved&&saved.deck>0?saved.deck:Math.min(170,Math.round(innerHeight*.16));
+      return {left:bezel.left+inset,top:bezel.top+inset,width:bezel.width-inset*2,height:innerHeight-deck-bezel.top-inset*2};
     }
     // Back from a game through the browser's page cache: stand back from the machine.
     window.addEventListener('pageshow',function(event){
       if(!event.persisted)return;
       if(typeof arcadeStepBack==='function')arcadeStepBack();
       document.body.classList.remove('machine-launching');
+      document.querySelectorAll('#game-grid .card-launching').forEach(function(card){
+        card.classList.remove('card-launching');
+        var shot=card.querySelector('.card-shot');
+        if(shot&&shot.dataset.still){shot.src=shot.dataset.still;delete shot.dataset.still;}
+      });
       cardInFlight=false;
     });
 
@@ -2276,11 +2310,11 @@
         var box=document.createElement('span'),frame=document.createElement('span'),strip=document.createElement('img');
         box.className='card-loop';box.setAttribute('aria-hidden','true');frame.className='card-loop-frame';
         strip.className='card-loop-strip';strip.alt='';strip.decoding='async';
-        // The strip covers the screen as the still does (object-fit: cover), worked out once from the frame's shape.
+        // The strip is letterboxed as the still is (object-fit: contain), worked out once from the frame's shape.
         strip.addEventListener('load',function(){
           var shape=strip.naturalWidth/(strip.naturalHeight/12),glass=rom.clientWidth/Math.max(1,rom.clientHeight);
-          frame.style.width=(shape<glass?100:100*shape/glass).toFixed(2)+'%';
-          frame.style.height=(shape<glass?100*glass/shape:100).toFixed(2)+'%';
+          frame.style.width=(shape<glass?100*shape/glass:100).toFixed(2)+'%';
+          frame.style.height=(shape<glass?100:100*glass/shape).toFixed(2)+'%';
           c.setAttribute('data-loop-ready','');
         });
         frame.appendChild(strip);box.appendChild(frame);

@@ -15,6 +15,10 @@
   <link rel="icon" type="image/svg+xml" href="../favicon.svg?v=2">
   <link rel="apple-touch-icon" href="icon-180.png?v=2">
   <script>if(new URLSearchParams(location.search).get('cabinet')==='1') document.documentElement.setAttribute('data-cabinet-screen','');</script>
+  <!-- Stepped into from the arcade: nothing is painted until shell.js has laid the page out, so the browser keeps the
+       arcade's last frame up meanwhile (data-launching, cleared by shell.js). -->
+  <script>try{var l=JSON.parse(sessionStorage.getItem('blip-cabinet-launch')||'null');if(l&&Date.now()-l.at<15000){document.documentElement.setAttribute('data-launching','');setTimeout(function(){document.documentElement.removeAttribute('data-launching');},3000);}}catch(e){}</script>
+  <style>:root[data-launching] body{visibility:hidden}</style>
   <script src="../howler.min.js"></script>
   <script src="../blip_core.js?v=6"></script>
   <script>(function () {
@@ -27,7 +31,7 @@
   <script src="../kiosk.js?v=100"></script>
   <link rel="stylesheet" href="../marquee.css?v=1">
   <link rel="stylesheet" href="../kiosk.css?v=155">
-  <link rel="stylesheet" href="../shell.css?v=107">
+  <link rel="stylesheet" href="../shell.css?v=108">
   <link rel="stylesheet" href="../wear.css?v=13">
   <script>if (document.documentElement.hasAttribute('data-appstyle')) document.querySelector('link[href*="wear.css"]').disabled = true;</script>
 </head>
@@ -90,7 +94,7 @@
   <script src="../vendor/supabase.js?v=1"></script>
   <script src="../blip_config.js?v=1"></script>
   <script src="../blip_scores.js?v=9"></script>
-  <script src="../shell.js?v=128"></script>
+  <script src="../shell.js?v=132"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
   <script src="../blip_bridge.js?v=20"></script>

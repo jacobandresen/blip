@@ -140,20 +140,31 @@ the aisle script):
 
 ## 3. Stepping up to play — done
 
-The zoom already existed (`openMachine`, 0.46 s, then the page loads). The
-other half, as built:
+The arcade's machine and its game page are one physical machine, and starting
+it is one steady movement:
 
-- `openMachine` stores `blip-cabinet-launch` (`{slug, at, art}`, the faced
-  screen's picture) beside `blip-cabinet-start`, which stays the slug the game
-  page presses Start for.
-- `web/shell.js` reads it on load. When it is under 15 s old, for this game,
-  and the page is neither app style nor a cabinet screen, `#launch-frame`
-  shows that picture where the game will draw (`fillCanvas` places it with
-  `.cabinet-glass`), letterboxed as the game is. When the first frame is
-  drawn (`hideLoader`) it fades out over 0.35 s.
-- The zoom no longer fades to black: its last frame is the screen's picture,
-  and the next page opens on it.
-- The zoom stays at 0.46 s.
+- The game page, in the arcade front end, wears its machine's colours
+  (`data-machine` on its root, from `shell.js`): its frame is the cabinet's
+  black laminate edged in the machine's T-molding colour, and its screen has
+  the cabinet monitor's ring. Cabinet screens letterbox their picture
+  (`object-fit: contain`), as the game does on its page.
+- Start: the faced screen fades its printing (PRESS START, the credit, the
+  legend) and its loop, and shows the game's `screenshot.png`. The room then
+  zooms over 0.76 s, easing in and out, until that picture lies exactly where
+  the game page will show it (`launchScreen`): as the page last measured itself
+  at this window size (`blip-screen-box`, saved by `fillCanvas`), or else
+  inside this window's frame above a deck of the last known depth.
+- Meanwhile the game page is prerendered (speculation rules), so it is whole
+  the moment it shows. Until it has laid itself out and its picture has loaded
+  it keeps itself hidden (`data-launching`, set in `shell.html`'s head).
+  Without prerendering (Safari, Firefox), the swap may show one dark frame.
+- It opens on that picture (`blip-cabinet-launch`, `#launch-frame`, letterboxed
+  where the game draws). With a coin in, the picture stays until the game's
+  Start has been pressed for the player, so the title screen never flashes;
+  then it fades into play over 0.35 s.
+- Chrome turns prerendering off while DevTools is attached, so this was
+  checked in a plain Chromium on Xvfb, recorded with `ffmpeg` and driven with
+  `xdotool`: no black frames.
 
 ## 4. Living screens — done
 
@@ -304,6 +315,8 @@ steps back`:
   canvas, before `data-game-ready`; it is gone after, and so is the handover.
 - ✓ A stale handover (20 s old), or one for another game, shows the plain
   loader.
+- ✓ The zoom aims exactly at the screen of the game page, measured on an
+  earlier visit; the game page wears its machine's colours.
 
 ### Sound (`test/cabinet.mjs`) ✓
 

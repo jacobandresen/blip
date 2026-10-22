@@ -527,3 +527,20 @@ test('with reduced motion Up steps up at once, and Escape steps back', async (t)
   assert.equal(await page.evaluate(() => document.getElementById('game-grid').hasAttribute('data-stepped-up')), false);
   assert.equal(await pose(), standing);
 });
+
+test('the step into a machine ends on the screen of its game page, which is that machine up close', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  await page.route('**/*.wasm', () => {});
+  await page.goto(`${origin}/bouncer/index.html`);
+  await page.waitForFunction(() => typeof BlipController === 'object');
+  const screen = await page.evaluate(() => {
+    const r = document.getElementById('glcanvas').getBoundingClientRect();
+    return { box: [r.left, r.top, r.width, r.height], machine: document.documentElement.getAttribute('data-machine'),
+      trim: getComputedStyle(document.getElementById('arcade-bezel')).borderTopColor };
+  });
+  assert.equal(screen.machine, 'bouncer', 'the game page wears its machine\'s colours');
+  await page.goto(`${origin}/index.html`);
+  await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') && !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  const aim = await page.evaluate(() => { const b = launchScreen(); return [b.left, b.top, b.width, b.height]; });
+  aim.forEach((v, i) => assert.ok(Math.abs(v - screen.box[i]) < 1, `the zoom aims at ${aim}, the screen is at ${screen.box}`));
+});

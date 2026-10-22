@@ -87,6 +87,9 @@ function returnToCabinet(event) {
   var game = GAME;
   if (!game) return;
   document.documentElement.style.setProperty('--cab', game.accent);
+  // In the arcade the page is the machine up close, in its own colours (marquee.css).
+  if (!document.documentElement.hasAttribute('data-appstyle') && !blipAmstradMode())
+    document.documentElement.setAttribute('data-machine', game.slug);
   var bar = document.createElement('div');
   bar.id = 'marquee-bar';
   bar.className = 'jukebox-marquee';
@@ -646,6 +649,10 @@ function fillCanvas() {
   canvas.style.setProperty('transform', 'none', 'important');
   // The controls position themselves off --topbar-h, the bar's real height.
   document.documentElement.style.setProperty('--topbar-h', TOPBAR_H + 'px');
+  // Where the screen is, for the arcade to zoom its cabinet's screen onto (openMachine in index.html).
+  if (!bare && document.documentElement.hasAttribute('data-machine')) {
+    try { localStorage.setItem('blip-screen-box', JSON.stringify({ w: innerWidth, h: innerHeight, box: [gl, screenTop, w, h], deck: TOPBAR_H })); } catch (e) {}
+  }
   syncBuffer();
 }
 
@@ -688,9 +695,16 @@ var launchFrame = (function () {
   if (art.origin !== location.origin) return null;
   var frame = document.createElement('div');
   frame.id = 'launch-frame';
+  // Started with a coin in: the picture stays until the game is playing, so its title screen never shows.
+  try { if (sessionStorage.getItem('blip-cabinet-start') === GAME.slug && getCoins() > 0) frame.dataset.hold = ''; } catch (e) {}
   frame.setAttribute('aria-hidden', 'true');
   frame.style.backgroundImage = 'url("' + art.href.replace(/["\\]/g, '') + '")';
   document.body.appendChild(frame);
+  // The page shows once the picture has loaded, or the screen would come up black for a frame. Not decode():
+  // a prerendered page (index.html's speculation rules) decodes nothing until it is shown.
+  var picture = new Image();
+  picture.onload = picture.onerror = function () { document.documentElement.removeAttribute('data-launching'); };
+  picture.src = art.href;
   return frame;
 }());
 function dropLaunchFrame() {
@@ -704,6 +718,7 @@ function dropLaunchFrame() {
 window.addEventListener('resize', fillCanvas);
 window.addEventListener('orientationchange', function () { setTimeout(fillCanvas, 60); });
 fillCanvas();
+if (!launchFrame) document.documentElement.removeAttribute('data-launching');
 
 // Re-fit whenever the deck changes shape (marquee injected, caps added,
 // controller switched) instead of at guessed moments.
@@ -754,7 +769,7 @@ function hideLoader() {
     }
     loader.style.display = 'none';
     fillCanvas();
-    dropLaunchFrame();
+    if (!launchFrame || !launchFrame.hasAttribute('data-hold')) dropLaunchFrame();
     introduceControls();
     if(!CABINET_SCREEN&&!document.querySelector('.blip-hs-modal'))canvas.focus();
   }
@@ -790,6 +805,7 @@ window.blipCanvasReady=function(){
         cabinetStart=sessionStorage.getItem('blip-cabinet-start')===slug;
         sessionStorage.removeItem('blip-cabinet-start');
       } catch(e) {}
+      if(!(cabinetStart && getCoins()>0)) dropLaunchFrame();
       if(cabinetStart && getCoins()>0) {
         function pressStart() {
           canvas.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:' ',code:'Space'}));
@@ -800,10 +816,11 @@ window.blipCanvasReady=function(){
             document.addEventListener('visibilitychange',beginCabinetPlay,{once:true});
             return;
           }
-          if(getCoins()<=0 || document.querySelector('.blip-hs-modal'))return;
+          if(getCoins()<=0 || document.querySelector('.blip-hs-modal')){dropLaunchFrame();return;}
           canvas.focus({preventScroll:true});
           pressStart();
           if(slug==='brawler')setTimeout(pressStart,320);
+          setTimeout(dropLaunchFrame,slug==='brawler'?700:400);
         }
         setTimeout(beginCabinetPlay,180);
       }
