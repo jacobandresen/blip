@@ -187,4 +187,64 @@ mod tests {
         let cell = 60 + 276 + 9;
         assert_eq!(&xm[cell..cell + 2], &[61, 1]);
     }
+
+    /// The notes on each of the four voices, in pattern order, read back from an XM.
+    fn voices(xm: &[u8]) -> Vec<Vec<i32>> {
+        let patterns = u16::from_le_bytes([xm[70], xm[71]]) as usize;
+        let mut at = 60 + 276;
+        let mut out = vec![Vec::new(); VOICES];
+        for _ in 0..patterns {
+            let len = u16::from_le_bytes([xm[at + 7], xm[at + 8]]) as usize;
+            let data = &xm[at + 9..at + 9 + len];
+            let (mut i, mut c) = (0, 0);
+            while i < data.len() {
+                if data[i] == 0x80 { i += 1; } else { out[c].push(data[i] as i32 - 1); i += 5; }
+                c = (c + 1) % VOICES;
+            }
+            at += 9 + len;
+        }
+        out
+    }
+
+    #[test]
+    fn a_recording_sorts_notes_onto_tunes_four_voices() {
+        let step = (SAMPLE_RATE as f32 * 15.0 / 120.0) as usize;
+        let (_, xm) = record("T", || {
+            tempo(120.0);
+            heard(0, 72, Part::Tune);
+            heard(0, 67, Part::Tune); // a second note at once is the harmony
+            heard(step, 40, Part::Tune); // a low note on the tune's instrument is the bass
+            heard(2 * step, KICK, Part::Drums);
+            vec![]
+        });
+        assert_eq!(voices(&xm), vec![vec![72], vec![67], vec![40], vec![KICK]]);
+    }
+
+    #[test]
+    fn notes_land_on_the_step_the_tempo_gives_them() {
+        let step = (SAMPLE_RATE as f32 * 15.0 / 90.0) as usize;
+        let (_, xm) = record("T", || {
+            tempo(90.0);
+            heard(17 * step, 60, Part::Tune);
+            vec![]
+        });
+        // Step 17 is the second row of the second pattern.
+        assert_eq!(u16::from_le_bytes([xm[70], xm[71]]), 2);
+        assert_eq!(u16::from_le_bytes([xm[78], xm[79]]), 90);
+        assert_eq!(voices(&xm)[0], vec![60]);
+    }
+
+    #[test]
+    fn nothing_is_kept_outside_a_recording() {
+        heard(0, 60, Part::Tune);
+        let (_, xm) = record("T", || vec![]);
+        assert!(voices(&xm).iter().all(|v| v.is_empty()));
+    }
+
+    #[test]
+    fn a_hertz_note_is_its_nearest_midi_key() {
+        let (_, xm) = record("T", || { heard_hz(0, 440.0, Part::Bass); heard_hz(0, 261.0, Part::Tune); vec![] });
+        let v = voices(&xm);
+        assert_eq!((v[0].clone(), v[2].clone()), (vec![60], vec![69]));
+    }
 }
