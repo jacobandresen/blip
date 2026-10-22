@@ -15,7 +15,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The live database takes the new migrations before the site that needs
+  # them goes out. db push applies only those missing from its history.
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Apply new migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Set the SUPABASE_DB_URL secret (the database connection string) to deploy."
+            exit 1
+          fi
+          supabase db push --db-url "$SUPABASE_DB_URL" --include-all
+
   deploy:
+    needs: migrate
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
