@@ -1,9 +1,10 @@
 //! Every WAV a program can play, by its path: effects once, music looped, one
 //! tune at a time. Each is decoded on first use; a tape's tunes are only
-//! fetched then too.
+//! fetched then too, in the background, so the program never waits on one.
 
 use crate::host::audio_event;
 use macroquad::audio::{load_sound_from_bytes, play_sound, stop_sound, PlaySoundParams, Sound};
+use macroquad::experimental::coroutines::{start_coroutine, Coroutine};
 use std::collections::HashMap;
 
 #[derive(Default)]
@@ -12,6 +13,7 @@ pub(crate) struct Sounds {
     /// Known, but fetched (from this URL) only when first played.
     later: HashMap<String, String>,
     decoded: HashMap<String, Sound>,
+    fetching: HashMap<String, Coroutine<Result<Sound, String>>>,
     pending: Vec<(String, f32, bool)>,
     music: Option<String>,
 }
@@ -57,18 +59,18 @@ impl Sounds {
     }
 
     pub(crate) async fn flush(&mut self) -> Result<(), String> {
+        let mut waiting = Vec::new();
         for (path, volume, looped) in std::mem::take(&mut self.pending) {
             if !self.decoded.contains_key(&path) {
-                let bytes = match self.bytes.remove(&path) {
-                    Some(bytes) => bytes,
-                    None => macroquad::file::load_file(&self.later[&path])
+                if let Some(bytes) = self.bytes.remove(&path) {
+                    let sound = load_sound_from_bytes(&bytes)
                         .await
-                        .map_err(|error| format!("Could not load {path}: {error}"))?,
-                };
-                let sound = load_sound_from_bytes(&bytes)
-                    .await
-                    .map_err(|error| format!("Could not load {path}: {error}"))?;
-                self.decoded.insert(path.clone(), sound);
+                        .map_err(|error| format!("Could not load {path}: {error}"))?;
+                    self.decoded.insert(path.clone(), sound);
+                } else if !self.fetch(&path)? {
+                    waiting.push((path, volume, looped));
+                    continue;
+                }
             }
             // A tune stopped before it had loaded stays stopped.
             if looped && self.music.as_ref() != Some(&path) {
@@ -76,6 +78,25 @@ impl Sounds {
             }
             play_sound(&self.decoded[&path], PlaySoundParams { looped, volume });
         }
+        self.pending = waiting;
         Ok(())
+    }
+
+    /// Whether the file at `path`'s URL has arrived and decoded; the first ask
+    /// starts fetching it.
+    fn fetch(&mut self, path: &str) -> Result<bool, String> {
+        let job = self.fetching.entry(path.to_string()).or_insert_with(|| {
+            let (path, url) = (path.to_string(), self.later[path].clone());
+            start_coroutine(async move {
+                let bytes = macroquad::file::load_file(&url)
+                    .await
+                    .map_err(|error| format!("Could not load {path}: {error}"))?;
+                load_sound_from_bytes(&bytes).await.map_err(|error| format!("Could not load {path}: {error}"))
+            })
+        });
+        let Some(done) = job.retrieve() else { return Ok(false) };
+        self.fetching.remove(path);
+        self.decoded.insert(path.to_string(), done?);
+        Ok(true)
     }
 }

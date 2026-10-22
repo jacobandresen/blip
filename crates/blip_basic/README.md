@@ -21,7 +21,7 @@ for variables, arrays, input, and Rust function calls.
 | `src/interpreter/value.rs` | Values, conversions, array keys |
 | `src/interpreter/color.rs` | Palette, named colors, hex colors |
 | `src/shared_math.rs` | Bindings to the native games' math functions |
-| `src/sounds.rs` | Every WAV by its path: effects once, music looped, decoded on first use |
+| `src/sounds.rs` | Every WAV by its path: effects once, music looped, decoded on first use; a tape's tunes fetched in the background |
 | `src/host.rs` | Browser imports, the user's files, where /TAPE files are |
 
 A continuation holds the next line, the next statement, and pending actions

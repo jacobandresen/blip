@@ -1750,12 +1750,10 @@ test('DEFENDER UFO laser clears its column and fires a beam', async (t) => {
     6260: 'REM HOLD THE BEAM FOR THE SCREENSHOT',
     165: defenderMarker('SHIELD(2,1,1)=1'),
   });
-  await page.waitForTimeout(200);
-  const shot = await canvas.screenshot();
+  const beam = await waitForPixels(page, canvas, [242, 60, 12, 300], 'white', 200);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
-  const beam = await countGamePixels(page, shot, [242, 60, 12, 300], 'white');
   assert.ok(beam > 200, `the UFO should fire the white core of its beam, got ${beam} pixels`);
-  assert.ok(await countGamePixels(page, shot, DEFENDER_MARKER, 'red') > 40, 'the beam should clear the shield cells in its column');
+  assert.ok(await waitForPixels(page, canvas, DEFENDER_MARKER, 'red', 40) > 40, 'the beam should clear the shield cells in its column');
   await page.locator('#exit-game').click();
 });
 
