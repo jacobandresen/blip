@@ -70,27 +70,6 @@ fn random_reaches_every_spawn_slot_without_exceeding_its_limit() {
 }
 
 #[test]
-fn bouncer_source_loads_as_numbered_program() {
-    let mut p = Program::new();
-    p.load(include_str!("../../../../web/TAPE/BOUNCER.BLIP"));
-    assert!(p.lines.len() > 80);
-    assert_eq!(p.lines[0].0, 1);
-    assert_eq!(p.lines.last().unwrap().0, 2510);
-    assert!(p.lines.windows(2).all(|pair| pair[0].0 < pair[1].0));
-    let source = p
-        .lines
-        .iter()
-        .map(|(_, line)| line.as_str())
-        .collect::<Vec<_>>()
-        .join(" ");
-    assert!(
-        source.contains("QUIET>5")
-            && source.contains("TARGETX=6+C*30+14.5")
-            && source.contains("GOSUB 2400")
-            && source.contains("ANGLE=0.024")
-    );
-}
-#[test]
 fn brawler_source_loads_as_numbered_program() {
     let mut p = Program::new();
     p.load(include_str!("../../../../web/TAPE/BRAWLER.BLIP"));
@@ -261,7 +240,8 @@ fn else_belongs_to_the_nearest_if() {
 }
 
 /// The tapes rewritten in the house layout, one by one.
-const HOUSE_TAPES: [(&str, &str); 6] = [
+const HOUSE_TAPES: [(&str, &str); 7] = [
+    ("BOUNCER", include_str!("../../../../web/TAPE/BOUNCER.BLIP")),
     ("DEFENDER", include_str!("../../../../web/TAPE/DEFENDER.BLIP")),
     ("SKY_RAIDER", include_str!("../../../../web/TAPE/SKY_RAIDER.BLIP")),
     ("METEORS", include_str!("../../../../web/TAPE/METEORS.BLIP")),
