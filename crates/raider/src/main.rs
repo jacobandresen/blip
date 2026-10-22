@@ -735,7 +735,7 @@ impl Game {
         self.spawn_explosion(x, y, 1.3 + level as f32 * 0.22, color);
     }
 
-    fn reset_player(&mut self) {
+    fn new_plane(&mut self) {
         self.player_x = ((WIN_W - PLAYER_W) / 2) as f32;
         self.player_y = PLAYER_MAX_Y;
         self.splutter_t = -1.0;
@@ -811,7 +811,7 @@ impl Game {
     /// Just after a death: put the player back without touching the wave in
     /// progress (enemies and the boss, if any, keep going).
     fn respawn(&mut self) {
-        self.reset_player();
+        self.new_plane();
         self.health = PLAYER_HEALTH_MAX;
         self.respawn_grace.start(RESPAWN_GRACE);
         self.state = State::Play;
@@ -1161,7 +1161,7 @@ fn spawn_opening_wave(g: &mut Game) {
 /// One spawner tick: a flight of Zeros diving on the player (a finger-four
 /// from level 2), Ki-43s crossing in echelon or turning back in a vic, or a
 /// lone Ki-84; from level 2 more and more often a second flight with it.
-fn spawn_wave_tick(g: &mut Game) {
+fn send_flights(g: &mut Game) {
     let level = g.sess.level;
     let flights = if rand_range_f32(0.0, 1.0) < (0.15 * (level - 1) as f32).min(0.6) { 2 } else { 1 };
     for _ in 0..flights {
@@ -1234,7 +1234,7 @@ fn fly_wing(e: &mut Enemy, f: &Flight, dt: f32) -> (f32, f32) {
     (cx + e.heading.sin() * e.speed * dt, cy + e.heading.cos() * e.speed * dt)
 }
 
-fn update_enemies(g: &mut Game, dt: f32, allow_fire: bool, sfx: &Sounds) {
+fn move_enemies(g: &mut Game, dt: f32, allow_fire: bool, sfx: &Sounds) {
     let player = (g.player_x + PLAYER_W as f32 / 2.0, g.player_y + PLAYER_H as f32 / 2.0, g.player_vx);
     for f in g.flights.iter_mut() {
         if f.active { update_flight(f, dt, player); }
@@ -1301,7 +1301,7 @@ fn update_enemies(g: &mut Game, dt: f32, allow_fire: bool, sfx: &Sounds) {
     }
 }
 
-fn spawn_boss(g: &mut Game, sfx: &Sounds) {
+fn start_boss(g: &mut Game, sfx: &Sounds) {
     let tier = ((g.sess.level - 1) as usize).min(BOSS_SPECS.len() - 1);
     let spec = &BOSS_SPECS[tier];
     let (bw, bh) = boss_size(tier);
@@ -1627,7 +1627,7 @@ fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.launch_wave_up = true;
     }
     if g.launch_wave_up {
-        update_enemies(g, dt, false, sfx);
+        move_enemies(g, dt, false, sfx);
     }
 
     if t >= LAUNCH_TIME {
@@ -1696,8 +1696,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.boss_intro.tick(dt);
     g.max_power_banner.tick(dt);
 
-    fly(g, dt, sfx);
-    fire(g, dt, sfx);
+    fly_plane(g, dt, sfx);
+    fire_volley(g, dt, sfx);
 
     // ---- simple movement (no cross-entity reads) ----
     let bullet_starts: [(f32, f32); MAX_PLAYER_BULLETS] =
@@ -1741,7 +1741,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     update_wrecks(g, dt, sfx);
     update_background(g, dt);
 
-    update_enemies(g, dt, true, sfx);
+    move_enemies(g, dt, true, sfx);
     update_boss(g, dt, sfx);
     update_islands(g, dt, sfx);
     land::update_batteries(g, dt, sfx);
@@ -1750,12 +1750,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
     if !g.boss.active {
         if g.spawn_timer.tick(dt) {
-            spawn_wave_tick(g);
+            send_flights(g);
             let (mn, mx) = spawn_interval_range(g.sess.level);
             g.spawn_timer.start(mn + rand_range_f32(0.0, 1.0) * (mx - mn));
         }
         if g.wave_kills >= g.wave_target {
-            spawn_boss(g, sfx);
+            start_boss(g, sfx);
         }
         // A seldom, higher-level set-piece: checked only when nothing else
         // is already claiming the screen (no boss, no barrier already up).
@@ -2019,7 +2019,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             hit = true;
             g.health = 1;
         }
-        if hit { take_hit(g, px, py, sfx); }
+        if hit { hurt_plane(g, px, py, sfx); }
     }
     for (i, &left_screen) in enemy_bullet_left_screen.iter().enumerate() {
         if left_screen { g.enemy_bullets[i].active = false; }
@@ -2028,7 +2028,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 
 /// The plane: throttle and airspeed, a weighty sideways slide, the bank, and a
 /// stall when it flies too slow for too long.
-fn fly(g: &mut Game, dt: f32, sfx: &Sounds) {
+fn fly_plane(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.stall_fall > 0.0 {
         update_stall(g, dt, sfx);
     } else {
@@ -2079,7 +2079,7 @@ g.prop_angle = (g.prop_angle + blip::lerp(40.0, 7.0, glide(g)) * dt) % std::f32:
 }
 
 /// The guns: a volley while fire is held and they are ready, and the brass it throws.
-fn fire(g: &mut Game, dt: f32, sfx: &Sounds) {
+fn fire_volley(g: &mut Game, dt: f32, sfx: &Sounds) {
     g.fire_cd.tick(dt);
     if g.stall_fall == 0.0 && key_active(BLIP_KEY_SPACE) && !g.fire_cd.active() && !g.respawn_grace.active() {
         g.fire_cd.start(weapon_cooldown(g.weapon_level));
@@ -2223,7 +2223,7 @@ fn hit_boss(g: &mut Game, bx: f32, by: f32, sfx: &Sounds) {
 }
 
 /// The plane is hit at `px`,`py`: a health point and a gun tier, or the plane.
-fn take_hit(g: &mut Game, px: f32, py: f32, sfx: &Sounds) {
+fn hurt_plane(g: &mut Game, px: f32, py: f32, sfx: &Sounds) {
     g.health -= 1;
     // A non-fatal hit drops the gun one tier, never below 2; a fatal
     // one leaves it.
