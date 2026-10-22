@@ -449,8 +449,8 @@ test(`a phone on its side puts the controls beside the picture`, async (t) => {
   await t.test('the caps sit inside the panel, not over it', async () => {
     // The square of caps needs a bar deep enough on an ordinary desktop too
     // (neither phone nor touch), or the top row sits above the panel's edge.
-    for (const [page, w, h] of [['index.html', 1280, 900],
-                                ['brawler/index.html', 1280, 900],
+    // The arcade has no bottom deck: each cabinet carries its own.
+    for (const [page, w, h] of [['brawler/index.html', 1280, 900],
                                 ['brawler/index.html', 390, 844],
                                 ['serpent/index.html', 768, 700]]) {
       await cdp.page.setViewportSize({ width: w, height: h });
@@ -479,11 +479,10 @@ test(`a phone on its side puts the controls beside the picture`, async (t) => {
   });
 
   await t.test('every page carries the same deck', async () => {
-    // One cabinet, one panel: the front page, the info pages and every game
-    // but Rally show the identical deck; a game that reads fewer caps leaves
-    // the spares blank.
-    const PAGES = ['index.html', 'about.html', 'serpent/index.html',
-                   'meteors/index.html', 'brawler/index.html'];
+    // One cabinet, one panel: every game but Rally shows the identical deck;
+    // a game that reads fewer caps leaves the spares blank. The arcade has
+    // none of its own: each cabinet carries its deck.
+    const PAGES = ['serpent/index.html', 'meteors/index.html', 'brawler/index.html'];
     const shape = async (page) => {
       await cdp.page.setViewportSize({ width: 1280, height: 800 });
       await evaluate(cdp, 'true');

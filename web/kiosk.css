@@ -4320,3 +4320,8 @@ body:has(.card-loaded):has(.jukebox-game-screen.game-ready) #card-button {
 .home-switch:focus-visible {outline:2px solid #fff3ca;outline-offset:3px}
 /* A thumb needs more than the 22px disc. */
 .home-switch::after {content:'';position:absolute;inset:-10px}
+
+/* Two players upright: each station's steering sits at its left and its caps
+   at its right, so without a wider channel the gap between the players equals
+   the gap inside a station and nobody can tell whose caps are whose. */
+:root[data-layout="upright"][data-controls][data-caps="4"][data-players="2"] { --mid: 48px; }
