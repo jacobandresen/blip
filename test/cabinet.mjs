@@ -294,3 +294,15 @@ test('a game opened in the arcade after a visit to BASIC returns to the arcade f
   await page.waitForTimeout(500);
   assert.equal(new URL(page.url()).pathname, '/index.html', 'and the arcade stays');
 });
+
+test('every visit starts in the arcade, whichever front end was open last', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 900 } });
+  await page.route('**/*.wasm', () => {});
+  for (const last of ['basic', 'home']) {
+    await page.goto(`${origin}/${last}.html`);
+    await page.goto(`${origin}/index.html`);
+    await page.waitForFunction(() => !document.documentElement.hasAttribute('data-cabinet-arranging'));
+    assert.equal(new URL(page.url()).pathname, '/index.html', `after ${last}, BLIP opened somewhere else`);
+    assert.equal(await page.evaluate(() => blipFrontend()), 'cabinet');
+  }
+});

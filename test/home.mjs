@@ -144,15 +144,13 @@ test('a tap on an icon starts the game on free play, and the logo brings it back
   assert.equal(await page.locator('#dock-row [data-slug="serpent"]').count(), 1, 'the game just played is in the dock');
 });
 
-test('the cabinet switches to the home screen, which then opens first, and the BLIP Home icon switches back', async (t) => {
+test('the cabinet switches to the home screen, BLIP still opens in the arcade, and the BLIP Home icon switches back', async (t) => {
   const { page, origin } = await phone(t);
   await page.goto(`${origin}/index.html`);
   await page.locator('#home-switch-btn').click();
   await page.waitForURL(`${origin}/home.html`);
   await page.goto(`${origin}/index.html`);
-  await page.waitForURL(`${origin}/home.html`);
-  await page.goto(`${origin}/index.html?cabinet`);
-  assert.equal(new URL(page.url()).pathname, '/index.html', '?cabinet opens the cabinet anyway');
+  assert.equal(new URL(page.url()).pathname, '/index.html', 'every visit starts in the arcade');
 
   await page.goto(`${origin}/home.html`);
   await page.locator('#dock-arcade').click();

@@ -282,12 +282,12 @@ function blipSetFrontend(which) {
   } catch (e) {}
 }
 
-/** Running from a home-screen icon: no browser chrome around the page. */
 // iOS or iPadOS (which reports itself as a Mac with touch).
 function blipIOS() {
   return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 function blipTitleCase(s) { return s.toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); }); }
+/** Running from a home-screen icon: no browser chrome around the page. */
 function blipStandalone() {
   if (window.navigator.standalone === true) return true;
   try { return matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches; } catch (e) { return false; }

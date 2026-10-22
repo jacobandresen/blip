@@ -13,14 +13,9 @@
     :root[data-cabinet-arranging] body { opacity:0; pointer-events:none; }
   </style>
   <script>
-    // The home screen was chosen: go there before the rack starts to build.
-    try {
-      var q = new URLSearchParams(location.search);
-      var front = localStorage.getItem('blip-frontend');
-      if (!q.has('cabinet') && !q.has('manual') && (front === 'home' || front === 'basic')) location.replace(front + '.html');
-      // Staying: the arcade is the front end now, so a game's BLIP badge comes back here.
-      else localStorage.setItem('blip-frontend', 'cabinet');
-    } catch (e) {}
+    // Every visit starts in the arcade, whatever was open last; the Home
+    // Screen and BLIP are a switch away. A game's BLIP badge comes back here.
+    try { localStorage.setItem('blip-frontend', 'cabinet'); } catch (e) {}
     try { sessionStorage.setItem('blip-freeplay', '0'); } catch (e) {}   // this session plays the cabinet's way
     document.documentElement.setAttribute('data-cabinet-arranging', '');
   </script>
@@ -1349,7 +1344,7 @@
   <script src="manual-motion.js?v=3"></script>
 
   <script src="howler.min.js"></script>
-  <script src="blip_core.js?v=5"></script>
+  <script src="blip_core.js?v=6"></script>
   <script src="kiosk.js?v=99"></script>
   <script src="blip_controller.js?v=10"></script>
   <!-- Git-ignored, written at deploy: absent means no leaderboard. -->
