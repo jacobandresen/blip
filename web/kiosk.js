@@ -635,8 +635,7 @@ window.addEventListener('load', updateCoinPrompt);
       thump.start(t + 0.02); thump.stop(t + 0.33);
     }
 
-    function zap(forced) {
-      if (document.hidden && !forced) return;
+    function zap() {
       var el = chars[Math.floor(Math.random() * chars.length)];
       logo.classList.add('lg-surge');
       el.classList.add('lg-zap');
@@ -661,10 +660,6 @@ window.addEventListener('load', updateCoinPrompt);
       }, delay);
     }
     scheduleNext();
-
-    // Manual trigger for testing/demoing, since the real thing is 45s-3min
-    // apart by design: run `blipZapLogo()` in the console to fire one now.
-    window.blipZapLogo = function () { zap(true); };
   });
 }());
 

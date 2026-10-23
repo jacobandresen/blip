@@ -3789,8 +3789,7 @@ body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin
   font:700 14px/1 Georgia,serif;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s,border-color .2s;
 }
 #card-button:hover, #card-button:focus-visible, :root[data-card] #card-button,
-body:has(#glcanvas) #card-button,
-body:has(.card-loaded):has(.jukebox-game-screen.game-ready) #card-button {
+body:has(#glcanvas) #card-button {
   border-color:#ffe2a0;color:#fff9df;
   background:radial-gradient(circle at 35% 28%,#ffe8af,#bc752a 65%,#724015);
   box-shadow:0 0 5px 2px #ffc85799,0 0 13px #ffb43b77,inset 0 1px 3px #fff6;

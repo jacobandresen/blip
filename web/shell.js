@@ -440,7 +440,6 @@ function showInstallSheet() {
   offer();
   if (go.hidden) close.focus();
 }
-window.blipShowInstallSheet = showInstallSheet;
 document.addEventListener('click', function (e) {
   if (e.target.closest && e.target.closest('#cc-install')) showInstallSheet();
   if (e.target.closest && e.target.closest('#cc-guide')) showGuide();

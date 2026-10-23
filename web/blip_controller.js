@@ -539,17 +539,12 @@
       return this;
     },
     set: set,
-    press:   function (n) { set(n, true); },
-    release: function (n) { set(n, false); },
-    isHeld:  function (n) { return !!held[n]; },
     releaseAll: releaseAll,
-    reflect: reflect,
     registerVisual: function (root) { if (root && roots.indexOf(root) === -1) roots.push(root); },
     bindButtons: bindButtons,
     bindDpad: bindDpad,
     bindDial: bindDial,
     bindKeyboard: bindKeyboard,
-    bindGamepad: bindGamepad,
-    click: click
+    bindGamepad: bindGamepad
   };
 }());
