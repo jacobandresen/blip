@@ -47,7 +47,7 @@ middle. Change one and the other must follow.
 | Bottom control deck markup (stations, stick, pad, caps) — one builder for every page | `web/deck.js` |
 | Kiosk / landing page | `web/index.html` |
 | Fullscreen button and the stored choice (`blip-fullscreen`), on every page | `web/blip_core.js` |
-| Sound on / off (`blip-mute`); `blipOut(ctx)`, where the cabinet's own sounds must connect | `web/blip_core.js` |
+| Sound on / off (`blip-mute`); `blipOut(ctx)`, where the cabinet's own sounds must connect; `blipNoise(ctx, seconds, shape)`, their noise | `web/blip_core.js` |
 | What fullscreen hides on a game page; the idle return to the cabinet; Escape and Backspace back to the arcade | `web/shell.css`, `web/shell.js` |
 | Cabinet wear: scratches, burns, rings, scuffs, thumbed cards and manual | `tools/make_wear.py`, which writes `web/wear.css` (generated, not edited by hand) |
 | Field manual: spreads, the three page-turn styles, the torn leaf, contents, notes pages | `web/index.html` (the manual script), `web/manual.css` |
