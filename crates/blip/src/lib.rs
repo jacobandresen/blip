@@ -28,6 +28,26 @@ macro_rules! wav {
 /// A generated file: its path under the asset folder, and its bytes.
 pub type Asset = (&'static str, Vec<u8>);
 
+/// A game's whole build script (`blip::build_script!();`): its pictures (src/gfx.rs) and its effects and music
+/// (src/tunes.rs) become its assets, through `build_assets`.
+#[macro_export]
+macro_rules! build_script {
+    () => {
+        #[path = "src/gfx.rs"]
+        mod gfx;
+        #[path = "src/tunes.rs"]
+        mod tunes;
+
+        fn main() {
+            println!("cargo:rerun-if-changed=src/gfx.rs");
+            println!("cargo:rerun-if-changed=src/tunes.rs");
+            let mut assets = gfx::generate();
+            assets.extend(tunes::sounds());
+            $crate::build_assets(assets, tunes::music());
+        }
+    };
+}
+
 /// A game's build script: the pictures and effects go to OUT_DIR/assets for the
 /// game to embed, and every file, the music too, to web/TAPE/<GAME>/ASSETS, the
 /// folder BLIP BASIC reads, with a manifest.json listing them.

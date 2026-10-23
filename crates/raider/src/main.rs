@@ -12,7 +12,7 @@ use blip::macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use blip::{
     load_png, load_png_smooth,
     clamp, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rand_range_f32, rects_overlap, web,
-    window_conf, Blip, BlipColor, Fx, LifeResult, Pooled, Session, Timer, segment_circle_overlap, segment_rect_overlap,
+    window_conf, Blip, BlipColor, Fx, LifeResult, Session, Timer, segment_circle_overlap, segment_rect_overlap,
     BLIP_BLACK, BLIP_CYAN, BLIP_GRAY, BLIP_GREEN, BLIP_ORANGE, BLIP_RED, BLIP_WHITE,
     BLIP_YELLOW,
 };
@@ -218,25 +218,17 @@ enum EnemyKind { Grunt, Weaver, Ace }
 
 #[derive(Copy, Clone)]
 struct Bullet { x: f32, y: f32, vx: f32, vy: f32, active: bool }
-impl Pooled for Bullet {
-    fn is_active(&self) -> bool { self.active }
-}
+blip::pooled!(Bullet, Round, Casing, Enemy, Wreck, Puff, Explosion, Powerup, HealthPickup, Boat, Island, FlakShell, FlakBurst);
 
 /// A player round: centred on x, moving at (vx, -vy), calibre r (drawn
 /// radius; hit box 2r + 2 wide). `bounced` once it has ricocheted: it can
 /// still hit, not glance off again.
 #[derive(Copy, Clone)]
 struct Round { x: f32, y: f32, vx: f32, vy: f32, r: f32, bounced: bool, active: bool }
-impl Pooled for Round {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// A spent brass casing kicked out of the guns, tumbling away and fading.
 #[derive(Copy, Clone)]
 struct Casing { x: f32, y: f32, vx: f32, vy: f32, rot: f32, ttl: f32, active: bool }
-impl Pooled for Casing {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// A leader follows its flight path; wingmen steer toward their leader-relative `slot`.
 /// Both use the same flight physics and move along their nose direction.
@@ -278,9 +270,6 @@ struct Flight {
     /// them is a formation bonus (see FLIGHT_BONUS).
     members: u8, downed: u8,
 }
-impl Pooled for Enemy {
-    fn is_active(&self) -> bool { self.active }
-}
 
 #[derive(Copy, Clone)]
 struct Explosion { x: f32, y: f32, ttl: f32, max_ttl: f32, scale: f32, color: BlipColor, active: bool }
@@ -317,19 +306,10 @@ enum Fall {
 
 const DEAD_WRECK: Wreck = Wreck { x: 0.0, y: 0.0, heading: 0.0, spin: 0.0, speed: 0.0, t: 0.0, kind: EnemyKind::Grunt,
     puff_t: 0.0, active: false, course: 0.0, bend: 0.0, wobble: 0.0, dur: 1.0, fall: Fall::Roll, flip_t: 0.0 };
-impl Pooled for Wreck {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// Fire (short, bright, shrinking) or smoke (dark, growing, drifting with the sea).
 #[derive(Copy, Clone)]
 struct Puff { x: f32, y: f32, r: f32, grow: f32, ttl: f32, max_ttl: f32, fire: bool, top: bool, active: bool }  // top: drawn over the player (its own damage)
-impl Pooled for Puff {
-    fn is_active(&self) -> bool { self.active }
-}
-impl Pooled for Explosion {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// Standard fireball orange, the default for combat explosions.
 const EXPLOSION_ORANGE: BlipColor = BlipColor { r: 1.0, g: 0.6, b: 0.15, a: 1.0 };
@@ -337,15 +317,9 @@ const POPUP_GOLD: BlipColor = BlipColor { r: 1.0, g: 0.9, b: 0.45, a: 1.0 };
 
 #[derive(Copy, Clone)]
 struct Powerup { x: f32, y: f32, active: bool }
-impl Pooled for Powerup {
-    fn is_active(&self) -> bool { self.active }
-}
 
 #[derive(Copy, Clone)]
 struct HealthPickup { x: f32, y: f32, active: bool }
-impl Pooled for HealthPickup {
-    fn is_active(&self) -> bool { self.active }
-}
 
 #[derive(Copy, Clone)]
 struct Cloud { x: f32, y: f32, r: f32, speed: f32, variant: u8 }
@@ -354,18 +328,12 @@ struct Cloud { x: f32, y: f32, r: f32, speed: f32, variant: u8 }
 /// shootable for a small bonus. `bob_phase` keeps a flotilla out of step.
 #[derive(Copy, Clone)]
 struct Boat { x: f32, y: f32, active: bool, vx: f32, bob_phase: f32 }
-impl Pooled for Boat {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// An island drifting down with the current, its flak cannons firing on
 /// their own timers; shootable for a bonus. `size` indexes ISLAND_SIZES /
 /// HP / SCORE / FLAK_GUNS.
 #[derive(Copy, Clone)]
 struct Island { x: f32, y: f32, size: u8, active: bool, hp: i32, guns: [FlakGun; 3] }
-impl Pooled for Island {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// A flak cannon: its barrel follows the player; `reload` counts to the next shot.
 #[derive(Copy, Clone)]
@@ -375,16 +343,10 @@ struct FlakGun { angle: f32, reload: f32, flash: f32 }
 /// the player was when it was fired (a real shell is not steered).
 #[derive(Copy, Clone)]
 struct FlakShell { x: f32, y: f32, vx: f32, vy: f32, left: f32, active: bool }
-impl Pooled for FlakShell {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// A flak burst: lethal for FLAK_LETHAL, then a drifting smoke ball.
 #[derive(Copy, Clone)]
 struct FlakBurst { x: f32, y: f32, t: f32, active: bool }
-impl Pooled for FlakBurst {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// A laser barrier across the full width of the screen at row `y`, and
 /// the "motor" powering it — the only part of it that's shootable. Only one

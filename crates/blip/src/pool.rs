@@ -5,6 +5,12 @@ pub trait Pooled {
     fn is_active(&self) -> bool;
 }
 
+/// `Pooled` for each type whose `active` field marks a live slot: `blip::pooled!(Bullet, Enemy);`.
+#[macro_export]
+macro_rules! pooled {
+    ($($t:ty),+ $(,)?) => { $(impl $crate::Pooled for $t { fn is_active(&self) -> bool { self.active } })+ };
+}
+
 /// Copies `item` into the first inactive slot, or returns `false` if full.
 pub fn pool_spawn<T: Pooled + Copy>(pool: &mut [T], item: T) -> bool {
     if let Some(slot) = pool.iter_mut().find(|slot| !slot.is_active()) {

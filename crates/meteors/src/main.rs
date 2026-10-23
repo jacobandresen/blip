@@ -10,7 +10,7 @@ use blip::macroquad::texture::Texture2D;
 use blip::{
     GAME_OVER_MIN_WAIT, hsv,
     Jukebox, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, rand_range_f32, web, window_conf, Blip, Fx,
-    BlipColor, LifeResult, Pooled, Session, Timer, segment_circle_overlap, wrap, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
+    BlipColor, LifeResult, Session, Timer, segment_circle_overlap, wrap, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
     NEON_GREEN, NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
 };
 
@@ -129,7 +129,7 @@ struct Bullet {
     ttl: f32,
     from_player: bool,
 }
-impl Pooled for Bullet { fn is_active(&self) -> bool { self.active } }
+blip::pooled!(Bullet, Asteroid, Debris);
 const BULLET_OFF: Bullet = Bullet { active: false, x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, ttl: 0.0, from_player: true };
 
 #[derive(Copy, Clone)]
@@ -142,7 +142,6 @@ struct Asteroid {
     spin: f32,
     jag: [f32; 10],
 }
-impl Pooled for Asteroid { fn is_active(&self) -> bool { self.active } }
 const ASTEROID_OFF: Asteroid = Asteroid {
     active: false, x: 0.0, y: 0.0, vx: 0.0, vy: 0.0,
     size: ASize::Large, rot: 0.0, spin: 0.0, jag: [1.0; 10],
@@ -159,7 +158,6 @@ struct Debris {
     ttl: f32, ttl0: f32,
     color: BlipColor,
 }
-impl Pooled for Debris { fn is_active(&self) -> bool { self.active } }
 const DEBRIS_OFF: Debris = Debris {
     active: false, x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, rot: 0.0, spin: 0.0,
     len: 0.0, ttl: 0.0, ttl0: 1.0, color: BLIP_WHITE,

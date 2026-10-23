@@ -67,10 +67,6 @@ pub fn invasion_song() -> Song<'static> {
     }
 }
 
-pub fn invasion_wav() -> Vec<u8> {
-    invasion_song().render()
-}
-
 /// The mothership: A minor, flat out, circling the leading note.
 pub fn mothership_song() -> Song<'static> {
     Song {
@@ -104,21 +100,6 @@ pub fn mothership_song() -> Song<'static> {
         action: true,
         seed: 0xDEF0_2002,
         ..Song::DEFAULT
-    }
-}
-
-pub fn mothership_wav() -> Vec<u8> {
-    mothership_song().render()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn wav_tracks_render_the_exposed_song_data() {
-        assert_eq!(invasion_wav(), invasion_song().render());
-        assert_eq!(mothership_wav(), mothership_song().render());
     }
 }
 
@@ -221,7 +202,7 @@ pub fn sounds() -> Vec<Asset> {
 /// The music: each tune as a WAV to play and an XM of its notes for TUNE.
 pub fn music() -> Vec<(String, Vec<u8>)> {
     blip::xm::tunes(&[
-        ("INVASION", &invasion_wav),
-        ("MOTHERSHIP", &mothership_wav),
+        ("INVASION", &|| invasion_song().render()),
+        ("MOTHERSHIP", &|| mothership_song().render()),
     ])
 }

@@ -63,10 +63,6 @@ pub fn drift_song() -> Song<'static> {
     }
 }
 
-pub fn drift_wav() -> Vec<u8> {
-    drift_song().render()
-}
-
 /// Driving: the same scale in a rolling figure over a steady kick.
 pub fn storm_song() -> Song<'static> {
     Song {
@@ -101,21 +97,6 @@ pub fn storm_song() -> Song<'static> {
         action: true,
         seed: 0x3E7E_0002,
         ..Song::DEFAULT
-    }
-}
-
-pub fn storm_wav() -> Vec<u8> {
-    storm_song().render()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn wav_tracks_render_the_exposed_song_data() {
-        assert_eq!(drift_wav(), drift_song().render());
-        assert_eq!(storm_wav(), storm_song().render());
     }
 }
 
@@ -208,7 +189,7 @@ pub fn sounds() -> Vec<Asset> {
 /// The music: each tune as a WAV to play and an XM of its notes for TUNE.
 pub fn music() -> Vec<(String, Vec<u8>)> {
     blip::xm::tunes(&[
-        ("DRIFT", &drift_wav),
-        ("STORM", &storm_wav),
+        ("DRIFT", &|| drift_song().render()),
+        ("STORM", &|| storm_song().render()),
     ])
 }

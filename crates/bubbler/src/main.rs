@@ -7,7 +7,7 @@ use blip::input::{
 use blip::macroquad::input::KeyCode;
 use blip::macroquad::math::vec2;
 use blip::macroquad::shapes::{draw_ellipse, draw_triangle};
-use blip::{play_sfx, play_sfx_volume, segment_circle_overlap, segment_rect_overlap, web, window_conf, Blip, BlipColor, Jukebox};
+use blip::{hsv, play_sfx, play_sfx_volume, segment_circle_overlap, segment_rect_overlap, web, window_conf, Blip, BlipColor, Jukebox};
 // The effects and music are made by build.rs; the tests check them here.
 #[cfg(test)]
 mod tunes;
@@ -1640,22 +1640,6 @@ fn draw_tiles(blip: &Blip, art: &art::Art, g: &Game, ox: f32, oy: f32) {
 }
 
 // ---- plush toys ------------------------------------------------------------
-// Felt-toy drawing helpers shared by players and monsters.
-fn hsv(h: f32, s: f32, v: f32, a: f32) -> BlipColor {
-    let h = (h.rem_euclid(1.0)) * 6.0;
-    let c = v * s;
-    let x = c * (1.0 - ((h % 2.0) - 1.0).abs());
-    let (r, g, b) = match h as i32 {
-        0 => (c, x, 0.0),
-        1 => (x, c, 0.0),
-        2 => (0.0, c, x),
-        3 => (0.0, x, c),
-        4 => (x, 0.0, c),
-        _ => (c, 0.0, x),
-    };
-    let m = v - c;
-    rgba(r + m, g + m, b + m, a)
-}
 
 const EAT_SECS: f32 = 0.6;
 const EAT_FLY: f32 = 0.15;

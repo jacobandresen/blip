@@ -64,10 +64,6 @@ pub fn bounce_song() -> Song<'static> {
     }
 }
 
-pub fn bounce_wav() -> Vec<u8> {
-    bounce_song().render()
-}
-
 /// Even levels: G major, quicker, climbing in thirds.
 pub fn rebound_song() -> Song<'static> {
     Song {
@@ -114,21 +110,6 @@ pub fn rebound_song() -> Song<'static> {
         groove: Groove::FourFloor,
         seed: 0xB0DE_5678,
         ..Song::DEFAULT
-    }
-}
-
-pub fn rebound_wav() -> Vec<u8> {
-    rebound_song().render()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn wav_tracks_render_the_exposed_song_data() {
-        assert_eq!(bounce_wav(), bounce_song().render());
-        assert_eq!(rebound_wav(), rebound_song().render());
     }
 }
 
@@ -228,7 +209,7 @@ pub fn sounds() -> Vec<Asset> {
 /// The music: each tune as a WAV to play and an XM of its notes for TUNE.
 pub fn music() -> Vec<(String, Vec<u8>)> {
     blip::xm::tunes(&[
-        ("BOUNCE", &bounce_wav),
-        ("REBOUND", &rebound_wav),
+        ("BOUNCE", &|| bounce_song().render()),
+        ("REBOUND", &|| rebound_song().render()),
     ])
 }

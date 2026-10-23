@@ -67,10 +67,6 @@ pub fn coil_song() -> Song<'static> {
     }
 }
 
-pub fn coil_wav() -> Vec<u8> {
-    coil_song().render()
-}
-
 /// The fast tune, from pit 4: the same five notes run in eighths.
 pub fn hunt_song() -> Song<'static> {
     Song {
@@ -118,21 +114,6 @@ pub fn hunt_song() -> Song<'static> {
         groove: Groove::FourFloor,
         seed: 0xADD0_0002,
         ..Song::DEFAULT
-    }
-}
-
-pub fn hunt_wav() -> Vec<u8> {
-    hunt_song().render()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn wav_tracks_render_the_exposed_song_data() {
-        assert_eq!(coil_wav(), coil_song().render());
-        assert_eq!(hunt_wav(), hunt_song().render());
     }
 }
 
@@ -223,7 +204,7 @@ pub fn sounds() -> Vec<Asset> {
 /// The music: each tune as a WAV to play and an XM of its notes for TUNE.
 pub fn music() -> Vec<(String, Vec<u8>)> {
     blip::xm::tunes(&[
-        ("COIL", &coil_wav),
-        ("HUNT", &hunt_wav),
+        ("COIL", &|| coil_song().render()),
+        ("HUNT", &|| hunt_song().render()),
     ])
 }
