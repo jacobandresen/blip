@@ -219,7 +219,7 @@ test('the game shell', async (t) => {
     const cdp = await browser(t, 9408, { touch: true, width: 390, height: 844 });
     for (const [width,height] of [[390,844],[320,700],[844,390]]) {
       await cdp.send('Emulation.setDeviceMetricsOverride', {width,height,deviceScaleFactor:1,mobile:true});
-      for (const page of ['index.html','about.html','controls.html','history.html','api.html','defender/index.html']) {
+      for (const page of ['index.html','about.html','controls.html','history.html','defender/index.html']) {
         await open(cdp,page,1200);
         const expectedTitle = page.includes('/') && width <= 620 ? 'visible' : 'hidden';
         await waitFor(cdp, `getComputedStyle(document.querySelector('#marquee-name')).visibility === '${expectedTitle}'`, 5000);
@@ -251,7 +251,7 @@ test('the game shell', async (t) => {
 
   await t.test('no page is wider than a 360px phone', async (t) => {
     const cdp = await browser(t, 9409, { touch: true, width: 360, height: 760 });
-    for (const page of ['index.html', 'controls.html', 'about.html', 'history.html']) {
+    for (const page of ['index.html', 'controls.html', 'about.html', 'history.html', 'api.html']) {
       await open(cdp, page, 2500);
       // A page that overflows makes a phone lay it out wider and zoom out.
       assert.deepEqual(JSON.parse(await evaluate(cdp, 'JSON.stringify([innerWidth, document.documentElement.scrollWidth])')),
