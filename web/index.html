@@ -576,7 +576,7 @@
     /* The arcade's top bar stays whole in fullscreen too: logo, switches, manual and power. */
     :is(:root[data-fullscreen]:not([data-has-touch]),:root[data-bare]) body.cabinet-page .manual-pocket {display:flex}
     /* The controls and coin door are the machines' own: no deck along the bottom. */
-    body.cabinet-page #kiosk-bar,body.cabinet-page #kiosk-insert-btn {display:none!important}
+    body.cabinet-page #kiosk-insert-btn {display:none!important}
     body.cabinet-page {padding-bottom:0!important;--cabinet-bottom-bar-height:0px}
     body.cabinet-page .screen-bezel {bottom:0!important}
 
@@ -765,10 +765,6 @@
   </div>
 
   <!-- The landing page's controls let the player walk the aisle and start a machine. -->
-  <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
-   <div class="deck-panel"></div>
-
-  </div>
   <div class="manual-overlay" id="manual-overlay" hidden role="dialog" aria-modal="true" aria-label="BLIP Arcade Manual">
     <div class="manual-open-book" role="document">
       <section class="manual-open-page manual-open-left" id="manual-contents-page" aria-label="Manual left page">
@@ -832,7 +828,7 @@
     </div>
     </div>
   </template>
-  <script src="deck.js?v=15"></script>
+  <script src="deck.js?v=16"></script>
   <script src="book.js?v=3"></script>
   <script src="manual-motion.js?v=3"></script>
 
@@ -840,7 +836,6 @@
   <script src="blip_core.js?v=7"></script>
   <script src="kiosk.js?v=100"></script>
   <script src="aisle.js?v=1"></script>
-  <script src="blip_controller.js?v=10"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Coin / credits                                                       */
@@ -1439,13 +1434,9 @@
     function fitRoom(){
       fitCardText();
       var bezel=document.getElementById('screen-bezel');
-      var panel=document.getElementById('kiosk-bar');
-      if(panel)bezel.style.setProperty('--cabinet-panel-depth',!panel.getClientRects().length||document.documentElement.getAttribute('data-layout')==='landscape'?'0px':Math.max(0,innerHeight-panel.getBoundingClientRect().top)+'px');
       bezel.style.setProperty('--arcade-travel',(selectorPlane.offsetHeight+30)+'px');
     }
     new ResizeObserver(fitRoom).observe(selectorPlane);
-    var cabinetPanel=document.getElementById('kiosk-bar');
-    if(cabinetPanel)new ResizeObserver(fitRoom).observe(cabinetPanel);
     window.addEventListener('resize',fitRoom);
     fitRoom();
 
@@ -1875,136 +1866,6 @@
           if ((code === 'ArrowRight'||code === 'ArrowLeft') && held.pad) hold('pad',0);
         }
       );
-
-      // ---- The landing page's stick and caps drive the selection ---- The
-      // stick steps through the games (auto-repeating while held), fire opens
-      // the lit one; the lean uses the deck's --dx / --dy like a game page.
-      (function () {
-        var bar  = document.getElementById('kiosk-bar');
-        var base = document.getElementById('stick-base');
-        var fire = document.getElementById('fire-buttons');
-        if (bar && base) {
-          var ENGAGE = 15, RELEASE = 8, MAX_LEAN = 34;
-          var pivot = null, activeId = null, dir = 0, repeatT = null;
-
-          function lean(x, y) {
-            base.style.setProperty('--dx', Math.max(-1, Math.min(1, x / MAX_LEAN)));
-            base.style.setProperty('--dy', Math.max(-1, Math.min(1, y / MAX_LEAN)));
-          }
-          function setDir(d) {
-            if (d === dir) return;
-            dir = d;
-            clearTimeout(repeatT);
-            if (!stepWalk.matches) {
-              if (d !== 0) step(d);
-              hold('stick', d);
-            } else if (d !== 0) {
-              move(d);
-              repeatT = setTimeout(function tick() {
-                move(dir);
-                repeatT = setTimeout(tick, 150);
-              }, 340);
-            }
-          }
-          function apply(e) {
-            var dx = e.clientX - pivot.x, dy = e.clientY - pivot.y;
-            var along = Math.abs(dy) >= Math.abs(dx) ? dy : dx; // whichever axis is pushed harder
-            var mag = Math.abs(along);
-            var engaged = dir !== 0 ? mag > RELEASE : mag > ENGAGE;
-            setDir(engaged ? (along < 0 ? -1 : 1) : 0);
-            lean(dx, dy);
-          }
-          function release() {
-            activeId = null; pivot = null;
-            setDir(0); lean(0, 0);
-            window.removeEventListener('pointermove', onMove, true);
-            window.removeEventListener('pointerup', release, true);
-            window.removeEventListener('pointercancel', release, true);
-          }
-          function onMove(e) {
-            if (e.pointerId === activeId && pivot) { e.preventDefault(); apply(e); }
-          }
-          // The ball stands above the base's own box, over the cabinet's frame: a press on any part of it is the stick's.
-          function onStick(e) {
-            if (e.target.closest && e.target.closest('.stick-base') === base) return true;
-            var ball = base.querySelector('.stick-ball'), rect = ball && ball.getBoundingClientRect();
-            return !!rect && rect.width > 0 && e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
-          }
-          window.addEventListener('pointerdown', function (e) {
-            if (!manualOverlay.hidden || !onStick(e)) return;
-            if (blipControls() !== 'stick') return;   // pad mode — deck shows the SNES pad
-            // Stick half only — the right half is the fire buttons.
-            if (fire && e.target.closest && e.target.closest('#fire-buttons')) return;
-            if (fire) {
-              var r = fire.getBoundingClientRect();
-              if (r.width && e.clientX >= r.left - 6) return;
-            }
-            if (activeId !== null) release();
-            e.preventDefault();
-            activeId = e.pointerId;
-            pivot = { x: e.clientX, y: e.clientY };
-            window.addEventListener('pointermove', onMove, true);
-            window.addEventListener('pointerup', release, true);
-            window.addEventListener('pointercancel', release, true);
-          });
-          window.addEventListener('blur', release);
-          document.addEventListener('visibilitychange', function () {
-            if (document.hidden) release();
-          });
-        }
-
-        if (fire) {
-          fire.querySelectorAll('.arcade-btn').forEach(function (btn) {
-            btn.addEventListener('pointerdown', function (e) {
-              e.preventDefault();
-              btn.classList.add('active');
-              activate();
-            });
-            ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
-              btn.addEventListener(ev, function () { btn.classList.remove('active'); });
-            });
-          });
-        }
-      }());
-
-      // ---- The SNES pad drives the same selection, through BlipController.
-      // d-pad steps the cards (with key-style auto-repeat while held);
-      // A / B open the lit card. ----
-      (function () {
-        var pad = document.getElementById('snes-pad');
-        if (!pad || typeof BlipController === 'undefined') return;
-
-        var navDir = 0, repeatT = null;
-        function navHold(d) {
-          if (d === navDir) return;
-          navDir = d;
-          clearTimeout(repeatT);
-          if (!stepWalk.matches) {
-            if (d !== 0) step(d);
-            hold('deck', d);
-          } else if (d !== 0) {
-            move(d);
-            repeatT = setTimeout(function tick() {
-              move(navDir);
-              repeatT = setTimeout(tick, 150);
-            }, 340);
-          }
-        }
-
-        BlipController.init({
-          buttons: [{ key: ' ', code: 'Space' }],
-          onInput: function (name, down) {
-            if (name === 'up') { if (down) stepUp(); return; }
-            if (name === 'down') { if (down) stepBack(); return; }
-            if (name === 'left')  { navHold(down ? -1 : 0); return; }
-            if (name === 'right') { navHold(down ? 1 : 0); return; }
-            if ((name === 'button1' || name === 'button2') && down) activate();
-          }
-        });
-        BlipController.bindButtons(pad);
-        BlipController.bindDpad(pad.querySelector('.snes-dpad'));
-        BlipController.registerVisual(pad);
-      }());
     }());
 
     function insertFocusedCoin() {

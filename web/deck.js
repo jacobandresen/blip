@@ -3,7 +3,9 @@
  * Both stations are always on the panel; station two is inert unless the game seats two. */
 (function () {
   var panel = document.querySelector('.deck-panel');
-  if (!panel || document.getElementById('deck-p1')) return;
+  if (document.getElementById('deck-p1')) return;
+  // The arcade has no deck (its cabinets have their own) but keeps the manual's book.
+  if (!panel) { if (document.getElementById('manual-overlay')) pocketBook(null); return; }
 
   // A cabinet in the arcade's aisle shows its game's deck (machine-deck.html?game=<slug>).
   var game = (typeof blipGameFromPath === 'function')
@@ -21,6 +23,19 @@
   // Every deck seats two, as a two-player cabinet does; a one-player game's second station takes no input.
   root.setAttribute('data-players', '2');
   if (!seatsTwo) root.setAttribute('data-seats', '1');
+
+  // The manual, in its pocket on the top bar: opened in place where the page has it, else in a new tab.
+  function pocketBook(game) {
+    var book=el(document.getElementById('manual-overlay')?'button':'a','cabinet-manual',
+      '<span class="manual-book-spine" aria-hidden="true"></span><span class="manual-book-copy"><strong>MANUAL</strong><small>BLIP · OPERATOR’S COPY</small></span><span class="manual-page-edges" aria-hidden="true"></span>',
+      {id:'manual-book','data-page-card':'true','aria-label':'Lift the BLIP Arcade Manual'});
+    if(book.tagName==='BUTTON')book.type='button';
+    else {
+      book.href=(game?'../':'')+'index.html?manual=controls'+(game?'&game='+game.slug:'');
+      if(game){book.target='_blank';book.rel='noopener';book.title='Manual (opens in a new tab)';book.setAttribute('aria-label','Open manual in a new tab');}
+    }
+    var bookPocket=el('div','manual-pocket','');bookPocket.appendChild(book);document.body.appendChild(bookPocket);
+  }
 
   function el(tag, cls, html, attrs) {
     var e = document.createElement(tag);
@@ -125,15 +140,7 @@
 
   panel.insertBefore(frag, panel.firstChild);
   panel.parentElement.prepend(el('div', 'deck-housing', '', { 'aria-hidden':'true' }));
-  var book=el(document.getElementById('manual-overlay')?'button':'a','cabinet-manual',
-    '<span class="manual-book-spine" aria-hidden="true"></span><span class="manual-book-copy"><strong>MANUAL</strong><small>BLIP · OPERATOR’S COPY</small></span><span class="manual-page-edges" aria-hidden="true"></span>',
-    {id:'manual-book','data-page-card':'true','aria-label':'Lift the BLIP Arcade Manual'});
-  if(book.tagName==='BUTTON')book.type='button';
-  else {
-    book.href=(game?'../':'')+'index.html?manual=controls'+(game?'&game='+game.slug:'');
-    if(game){book.target='_blank';book.rel='noopener';book.title='Manual (opens in a new tab)';book.setAttribute('aria-label','Open manual in a new tab');}
-  }
-  var bookPocket=el('div','manual-pocket','');bookPocket.appendChild(book);document.body.appendChild(bookPocket);
+  pocketBook(game);
   var coin=document.getElementById('insert-coin-btn')||document.getElementById('kiosk-insert-btn');
   if(coin) {
     try {root.toggleAttribute('data-credit',Number(sessionStorage.getItem('blip-coins'))>0);}catch(e){}

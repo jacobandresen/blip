@@ -104,8 +104,7 @@ test('the game shell', async (t) => {
     await open(cdp, 'index.html');
     await evaluate(cdp, "blipSetFullscreen(true); true");
     await sleep(400);
-    assert.equal(await evaluate(cdp, "!document.querySelector('#kiosk-bar .deck-panel')?.checkVisibility()"), true, 'the arcade still shows a deck');
-    assert.equal(await evaluate(cdp, "document.getElementById('kiosk-bar').getBoundingClientRect().height"), 0);
+    assert.equal(await evaluate(cdp, "document.querySelector('.deck-panel')"), null, 'the arcade has a deck of its own');
     assert.equal(await evaluate(cdp, 'document.documentElement.scrollHeight <= innerHeight'), true,
       'the catalogue needs scrolling on a 1080p kiosk');
     await open(cdp, 'serpent/index.html', 5000);
