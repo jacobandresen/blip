@@ -20,8 +20,8 @@ jobs:
   migrate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
         with:
           version: latest
       - name: Apply new migrations
@@ -38,7 +38,7 @@ jobs:
     needs: migrate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # web/blip_config.js is git-ignored; write it from repo secrets so the
       # Supabase URL + anon key live only in the deployed site, not the repo.
       # Missing secrets → blank config → the leaderboard just stays disabled.

@@ -25,7 +25,7 @@ jobs:
   cleanup:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: gh-pages
           fetch-depth: 1
@@ -54,6 +54,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -q --orphan squashed
-          git commit -qm "Site and previews of PRs: $(echo $keep)"
+          previews=$(ls -d pr-preview/pr-* 2>/dev/null | sed 's|pr-preview/pr-|#|' | xargs)
+          git commit -qm "Site${previews:+ and previews of $previews}"
           # Fails if a deploy pushed meanwhile; that deploy's run starts this again.
           git push --force-with-lease="gh-pages:$head" origin squashed:gh-pages
