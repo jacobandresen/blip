@@ -55,7 +55,7 @@ middle. Change one and the other must follow.
 | The manual's last page, the operators (a `data-manual-sheet`: never split, its type shrinks to fit) | `web/about.html` |
 | A game's manual pages: screenshot, blurb, controls, tip | `web/controls.html`: a `data-side="left"` and a `data-side="right"` section per game |
 | The controls card (the "?" under the top bar, its arm and whirr): the cabinet's welcome and each game's keys (`controls`, `touchControls` in `BLIP_GAMES`) | `web/kiosk.js`, `web/kiosk.css` |
-| Publishing the site; PR previews | `.github/workflows/pages.yml`, `.github/workflows/preview.yml` |
+| Publishing the site; PR previews; how many previews stay (`KEEP`) | `.github/workflows/pages.yml`, `.github/workflows/preview.yml`, `.github/workflows/preview-cleanup.yml` |
 | Wasm <-> JS bridge (`blip_spend_coin`) | `web/blip_bridge.js` |
 | macroquad JS runtime (vendored, do not edit) | `web/mq_js_bundle.js` |
 | Game logic, rendering, audio (Rust side) | `crates/<name>/src/main.rs` |
@@ -120,7 +120,10 @@ rustup target add wasm32-unknown-unknown   # one-time
 Pages serves the `gh-pages` branch, which only the workflows write. A push to
 `main` runs `pages.yml`: migrations, then `web/` to the branch's root, leaving
 `pr-preview/` alone. Each same-repo pull request is published by `preview.yml`
-to `pr-preview/pr-<number>/` and removed on close.
+to `pr-preview/pr-<number>/` and removed on close. After each deploy (and
+daily) `preview-cleanup.yml` keeps the previews of the five most recently
+updated open pull requests and squashes `gh-pages` to one commit, since every
+preview copies all of `web/`. `web/.nojekyll` keeps Pages from running Jekyll.
 
 A preview shares production's origin, so:
 

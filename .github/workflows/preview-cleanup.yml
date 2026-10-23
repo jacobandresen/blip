@@ -1,0 +1,59 @@
+name: PR preview cleanup
+
+# Keeps the previews of the KEEP most recently updated open pull requests, and
+# gh-pages at one commit: a removed preview still weighs ~74 MB in history.
+on:
+  workflow_run:
+    workflows: [PR preview, Deploy to GitHub Pages]
+    types: [completed]
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: preview-cleanup
+  cancel-in-progress: false
+
+env:
+  KEEP: 5
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 1
+      - name: Remove old previews and squash gh-pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          keep=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 200 \
+            --json number,updatedAt --jq "sort_by(.updatedAt) | reverse | .[:$KEEP][] | .number")
+          removed=0
+          for dir in pr-preview/pr-*/; do
+            [ -d "$dir" ] || continue
+            n=${dir#pr-preview/pr-}; n=${n%/}
+            if ! grep -qx "$n" <<< "$keep"; then
+              echo "Removing the preview of PR $n"
+              git rm -rq "$dir"
+              removed=1
+            fi
+          done
+          head=$(git rev-parse HEAD)
+          parents=$(gh api "repos/$GITHUB_REPOSITORY/commits/$head" --jq '.parents | length')
+          if [ "$removed" = 0 ] && [ "$parents" = 0 ]; then
+            echo "Nothing to remove, already one commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q --orphan squashed
+          git commit -qm "Site and previews of PRs: $(echo $keep)"
+          # Fails if a deploy pushed meanwhile; that deploy's run starts this again.
+          git push --force-with-lease="gh-pages:$head" origin squashed:gh-pages
