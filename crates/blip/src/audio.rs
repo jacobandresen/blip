@@ -108,30 +108,7 @@ fn synth_beep_wav(freq: f32, duration_ms: f32) -> Vec<u8> {
         let s = (env * 11_500.0 * shaped) as i16;
         samples.push(s);
     }
-    encode_wav(SR, &samples)
-}
-
-fn encode_wav(sample_rate: u32, samples: &[i16]) -> Vec<u8> {
-    let n = samples.len();
-    let data_bytes = (n * 2) as u32;
-    let mut out = Vec::with_capacity(44 + n * 2);
-    out.extend_from_slice(b"RIFF");
-    out.extend_from_slice(&(36 + data_bytes).to_le_bytes());
-    out.extend_from_slice(b"WAVE");
-    out.extend_from_slice(b"fmt ");
-    out.extend_from_slice(&16u32.to_le_bytes());
-    out.extend_from_slice(&1u16.to_le_bytes()); // PCM
-    out.extend_from_slice(&1u16.to_le_bytes()); // mono
-    out.extend_from_slice(&sample_rate.to_le_bytes());
-    out.extend_from_slice(&(sample_rate * 2).to_le_bytes());
-    out.extend_from_slice(&2u16.to_le_bytes());
-    out.extend_from_slice(&16u16.to_le_bytes());
-    out.extend_from_slice(b"data");
-    out.extend_from_slice(&data_bytes.to_le_bytes());
-    for s in samples {
-        out.extend_from_slice(&s.to_le_bytes());
-    }
-    out
+    crate::wav::encode_at(&samples, SR)
 }
 
 /// Plays a game's tunes from its tape folder. Each loads in the background the
@@ -254,14 +231,14 @@ fn music_gain(wav: &[u8]) -> f32 {
 mod tests {
     #[test]
     fn a_wav_header_gives_its_length() {
-        let wav = super::encode_wav(22_050, &vec![0i16; 22_050 * 3]);
+        let wav = crate::wav::encode_at(&vec![0i16; 22_050 * 3], 22_050);
         assert!((super::wav_seconds(&wav) - 3.0).abs() < 1e-4);
     }
 
     #[test]
     fn jukebox_gain_balances_track_loudness_without_large_boosts() {
-        let quiet = super::encode_wav(22_050, &vec![4_000i16; 100]);
-        let loud = super::encode_wav(22_050, &vec![8_000i16; 100]);
+        let quiet = crate::wav::encode_at(&vec![4_000i16; 100], 22_050);
+        let loud = crate::wav::encode_at(&vec![8_000i16; 100], 22_050);
         let q = super::music_gain(&quiet);
         let l = super::music_gain(&loud);
         assert!((q / l - 2.0).abs() < 0.02, "the louder track should receive half the gain: {q} vs {l}");

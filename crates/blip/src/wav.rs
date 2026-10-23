@@ -108,7 +108,8 @@ pub fn halved(wav: &[u8]) -> Vec<u8> {
     encode_pcm16_half(&pcm)
 }
 
-fn encode_at(samples: &[i16], rate: u32) -> Vec<u8> {
+/// A mono 16-bit WAV of `samples` at `rate`.
+pub fn encode_at(samples: &[i16], rate: u32) -> Vec<u8> {
     let n = samples.len();
     let data_bytes = (n * 2) as u32;
     let mut out = Vec::with_capacity(44 + n * 2);
