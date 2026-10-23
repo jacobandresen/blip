@@ -159,10 +159,8 @@ var blipArcadeSound=(function(){
   }
   // Talk across the room: noise in the voice band, swelling and falling slowly.
   function makeMurmur() {
-    var buffer=ctx.createBuffer(1,ctx.sampleRate*3,ctx.sampleRate),data=buffer.getChannelData(0);
-    for(var i=0;i<data.length;i++)data[i]=Math.random()*2-1;
-    var noise=ctx.createBufferSource(),band=ctx.createBiquadFilter(),level=ctx.createGain(),swell=ctx.createOscillator(),depth=ctx.createGain();
-    noise.buffer=buffer;noise.loop=true;band.type='bandpass';band.frequency.value=520;band.Q.value=.8;
+    var noise=blipNoise(ctx,3),band=ctx.createBiquadFilter(),level=ctx.createGain(),swell=ctx.createOscillator(),depth=ctx.createGain();
+    noise.loop=true;band.type='bandpass';band.frequency.value=520;band.Q.value=.8;
     level.gain.value=.05;swell.frequency.value=.13;depth.gain.value=.025;
     swell.connect(depth);depth.connect(level.gain);noise.connect(band);band.connect(level);level.connect(room);
     noise.start();swell.start();
@@ -255,11 +253,7 @@ function playCoinInsert() {
   var ctx = getKioskAudio();
   var t   = ctx.currentTime;
 
-  var noiseBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.045), ctx.sampleRate);
-  var noiseData = noiseBuf.getChannelData(0);
-  for (var i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
-  var noise = ctx.createBufferSource();
-  noise.buffer = noiseBuf;
+  var noise = blipNoise(ctx, 0.045);
   var noiseFilter = ctx.createBiquadFilter();
   noiseFilter.type = 'bandpass';
   noiseFilter.frequency.value = 4200;
@@ -281,10 +275,8 @@ function playCoinInsert() {
   });
 
   function boxHit(at, strength) {
-    var size=Math.ceil(ctx.sampleRate*.035),buffer=ctx.createBuffer(1,size,ctx.sampleRate),data=buffer.getChannelData(0);
-    for(var i=0;i<size;i++)data[i]=(Math.random()*2-1)*(1-i/size);
-    var noise=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
-    noise.buffer=buffer;filter.type='bandpass';filter.frequency.value=2600;filter.Q.value=1.4;
+    var noise=blipNoise(ctx,.035,function(t,p){return 1-p;}),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+    filter.type='bandpass';filter.frequency.value=2600;filter.Q.value=1.4;
     gain.gain.setValueAtTime(strength,at);gain.gain.exponentialRampToValueAtTime(.001,at+.035);
     noise.connect(filter);filter.connect(gain);gain.connect(blipOut(ctx));noise.start(at);noise.stop(at+.036);
     [[920,.12,.19],[1470,.075,.15],[2240,.045,.105]].forEach(function(partial){
@@ -316,11 +308,8 @@ function playCoinInsert() {
 function playCardMechanism() {
   try {
     var ctx = getKioskAudio(), t = ctx.currentTime;
-    var size = Math.ceil(ctx.sampleRate * 0.026), buffer = ctx.createBuffer(1, size, ctx.sampleRate);
-    var data = buffer.getChannelData(0);
-    for (var i = 0; i < size; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / size);
-    var noise = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), snap = ctx.createGain();
-    noise.buffer = buffer; filter.type = 'bandpass'; filter.frequency.value = 1750; filter.Q.value = 1.3;
+    var noise = blipNoise(ctx, 0.026, function (t, p) { return 1 - p; }), filter = ctx.createBiquadFilter(), snap = ctx.createGain();
+    filter.type = 'bandpass'; filter.frequency.value = 1750; filter.Q.value = 1.3;
     snap.gain.setValueAtTime(0.12, t); snap.gain.exponentialRampToValueAtTime(0.0001, t + 0.027);
     noise.connect(filter); filter.connect(snap); snap.connect(blipOut(ctx));
     noise.start(t); noise.stop(t + 0.028);
@@ -434,10 +423,8 @@ function playControlsCard(out) {
     motor.start(t);cog.start(t);motor.stop(t+dur+.05);cog.stop(t+dur+.05);
     motor.onended=function(){motor.disconnect();tone.disconnect();volume.disconnect();cog.disconnect();teeth.disconnect();};
     // The latch: a short tick and a low knock as the card seats.
-    var size=Math.ceil(ctx.sampleRate*.05),buffer=ctx.createBuffer(1,size,ctx.sampleRate),data=buffer.getChannelData(0);
-    for(var i=0;i<size;i++)data[i]=(Math.random()*2-1)*Math.pow(1-i/size,3);
-    var tick=ctx.createBufferSource(),hp=ctx.createBiquadFilter(),tickGain=ctx.createGain();
-    tick.buffer=buffer;hp.type='highpass';hp.frequency.value=1500;tickGain.gain.value=.18*level;
+    var tick=blipNoise(ctx,.05,function(t,p){return Math.pow(1-p,3);}),hp=ctx.createBiquadFilter(),tickGain=ctx.createGain();
+    hp.type='highpass';hp.frequency.value=1500;tickGain.gain.value=.18*level;
     tick.connect(hp);hp.connect(tickGain);tickGain.connect(sink);tick.start(t+dur);
     tick.onended=function(){tick.disconnect();hp.disconnect();tickGain.disconnect();};
     var knock=ctx.createOscillator(),knockGain=ctx.createGain();
@@ -451,11 +438,9 @@ function playControlsCard(out) {
 function playManualPaper(lift) {
   // Page turns are a whisper: soft air through paper, quieter and rounder than the lift of the whole book.
   try {
-    var ctx=getKioskAudio(),duration=lift?.4:.34,size=Math.ceil(ctx.sampleRate*duration);
-    var buffer=ctx.createBuffer(1,size,ctx.sampleRate),data=buffer.getChannelData(0);
-    for(var i=0;i<size;i++){var p=i/size;data[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*Math.pow(p,lift?1:.8)),1.8)*(.7+.3*Math.sin(p*(lift?31:22)));}
-    var paper=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),soften=ctx.createBiquadFilter(),gain=ctx.createGain();
-    paper.buffer=buffer;filter.type='bandpass';filter.frequency.value=lift?1000:1250;filter.Q.value=.4;
+    var ctx=getKioskAudio(),duration=lift?.4:.34;
+    var paper=blipNoise(ctx,duration,function(t,p){return Math.pow(Math.sin(Math.PI*Math.pow(p,lift?1:.8)),1.8)*(.7+.3*Math.sin(p*(lift?31:22)));}),filter=ctx.createBiquadFilter(),soften=ctx.createBiquadFilter(),gain=ctx.createGain();
+    filter.type='bandpass';filter.frequency.value=lift?1000:1250;filter.Q.value=.4;
     soften.type='lowpass';soften.frequency.value=lift?3200:2300;gain.gain.value=lift?.085:.04;
     paper.connect(filter);filter.connect(soften);soften.connect(gain);gain.connect(blipOut(ctx));paper.start();
     paper.onended=function(){paper.disconnect();filter.disconnect();soften.disconnect();gain.disconnect();};
@@ -463,25 +448,19 @@ function playManualPaper(lift) {
 }
 
 // The coin that drops into the slot (kiosk.css #coin-drop-anim): a real
-// element so a class toggle can animate it, injected once for every non-game
-// page.
-var coinDropAnim = null;
-(function () {
-  var btn = document.getElementById('kiosk-insert-btn');
+// element so a class toggle can animate it, made on first use in the page's slot.
+function dropCoinAnimation() {
+  var btn = document.getElementById('kiosk-insert-btn') || document.getElementById('insert-coin-btn');
   if (!btn) return;
-  coinDropAnim = btn.querySelector('#coin-drop-anim');
-  if(!coinDropAnim) {
+  var coinDropAnim = btn.querySelector('#coin-drop-anim');
+  if (!coinDropAnim) {
     coinDropAnim = document.createElement('span');
     coinDropAnim.id = 'coin-drop-anim';
     coinDropAnim.setAttribute('aria-hidden', 'true');
     btn.appendChild(coinDropAnim);
   }
-}());
-function dropCoinAnimation() {
-  if (!coinDropAnim) return;
   // The slot is the centre of the coin plate, padding-right plus half the
   // plate; both change across breakpoints.
-  var btn = coinDropAnim.parentElement;
   var padRight = parseFloat(getComputedStyle(btn).paddingRight) || 8;
   var plateW = parseFloat(getComputedStyle(btn, '::after').width) || 18;
   coinDropAnim.style.setProperty('--slot-x', (btn.classList.contains('deck-coin-slot')?btn.offsetWidth/2:padRight+plateW/2)+'px');
@@ -594,11 +573,7 @@ window.addEventListener('load', updateCoinPrompt);
       // coin sfx's — this has to carry across a whole room, not just
       // confirm a tap.
       function crackle(start, dur, gain) {
-        var buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate);
-        var data = buf.getChannelData(0);
-        for (var i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
-        var noise = ctx.createBufferSource();
-        noise.buffer = buf;
+        var noise = blipNoise(ctx, dur, function (t, p) { return 1 - p; });
         var filt = ctx.createBiquadFilter();
         filt.type = 'highpass';
         filt.frequency.value = 2200;
@@ -1129,10 +1104,8 @@ function blipArmJointSound() {
       motor.start();cog.start();sources.push(motor,cog);nodes.push(tone,volume,teeth);
       motors.push({motor: motor,tone:tone,volume:volume,cog:cog,teeth:teeth,base:base});
     });
-    var buffer=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate),data=buffer.getChannelData(0);
-    for(var i=0;i<data.length;i++)data[i]=Math.random()*2-1;
-    var air=ctx.createBufferSource(),valve=ctx.createBiquadFilter(),pressure=ctx.createGain();
-    air.buffer=buffer;air.loop=true;valve.type='bandpass';valve.frequency.value=2400;valve.Q.value=.65;
+    var air=blipNoise(ctx,1),valve=ctx.createBiquadFilter(),pressure=ctx.createGain();
+    air.loop=true;valve.type='bandpass';valve.frequency.value=2400;valve.Q.value=.65;
     pressure.gain.value=0;air.connect(valve);valve.connect(pressure);pressure.connect(output);
     air.start();sources.push(air);nodes.push(valve,pressure);
     var stopped=false,timer=setTimeout(stop,18000);
@@ -1179,10 +1152,8 @@ function playRomLoading(duration) {
     rotor.frequency.setValueAtTime(12,start);rotor.frequency.linearRampToValueAtTime(34,start+.7);
     rotor.frequency.linearRampToValueAtTime(9,end);ripple.gain.value=7;
     rotor.connect(ripple);ripple.connect(motor.frequency);sources.push(rotor);nodes.push(ripple);
-    var buffer=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate),data=buffer.getChannelData(0);
-    for(var i=0;i<data.length;i++)data[i]=Math.random()*2-1;
-    var air=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),breath=ctx.createGain();
-    air.buffer=buffer;air.loop=true;filter.type='bandpass';filter.frequency.value=2100;filter.Q.value=.6;breath.gain.value=.18;
+    var air=blipNoise(ctx,1),filter=ctx.createBiquadFilter(),breath=ctx.createGain();
+    air.loop=true;filter.type='bandpass';filter.frequency.value=2100;filter.Q.value=.6;breath.gain.value=.18;
     air.connect(filter);filter.connect(breath);breath.connect(output);sources.push(air);nodes.push(filter,breath);
     sources.forEach(function(source){source.start(start);source.stop(end+.02);});
     var stopped=false,timer=setTimeout(stop,(duration+.2)*1000);
@@ -1202,10 +1173,8 @@ function playRomCoupling(kind) {
     var offsets=isValve?[0]:kind==='attach'?[0,.045,.095]:kind==='release'?[0,.055]:[0,.025,.08];
     offsets.forEach(function(offset,index){
       var t=now+offset,duration=isValve?.22:.12;
-      var buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*duration),ctx.sampleRate),data=buffer.getChannelData(0);
-      for(var i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*(isValve?.05:.008)));
-      var noise=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),snap=ctx.createGain();
-      noise.buffer=buffer;filter.type='bandpass';filter.frequency.value=isValve?3300:kind==='release'?2100:1250+index*480;filter.Q.value=.8;
+      var noise=blipNoise(ctx,duration,function(t){return Math.exp(-t/(isValve?.05:.008));}),filter=ctx.createBiquadFilter(),snap=ctx.createGain();
+      filter.type='bandpass';filter.frequency.value=isValve?3300:kind==='release'?2100:1250+index*480;filter.Q.value=.8;
       snap.gain.value=isValve?.22:(kind==='attach'?.42:.23)/(1+index*.3);
       noise.connect(filter);filter.connect(snap);snap.connect(blipOut(ctx));noise.start(t);
       noise.onended=function(){noise.disconnect();filter.disconnect();snap.disconnect();};
@@ -1230,10 +1199,8 @@ function blipCardDrive(duration) {
     motor.type='sine'; harmonic.type='triangle';
     var overtone=ctx.createGain(); overtone.gain.value=.22;
     motor.connect(filter); harmonic.connect(overtone); overtone.connect(filter);
-    var buffer=ctx.createBuffer(1,ctx.sampleRate*.4,ctx.sampleRate), data=buffer.getChannelData(0);
-    for(var i=0;i<data.length;i++) data[i]=Math.random()*2-1;
-    var friction=ctx.createBufferSource(), rub=ctx.createGain();
-    friction.buffer=buffer; friction.loop=true; rub.gain.value=.12;
+    var friction=blipNoise(ctx,.4), rub=ctx.createGain();
+    friction.loop=true; rub.gain.value=.12;
     friction.connect(rub); rub.connect(filter);
     motor.start(); harmonic.start(); friction.start();
     var stopped=false;
@@ -1260,10 +1227,8 @@ function playArcadeDock(attached) {
     output.gain.value=.85;output.connect(blipOut(ctx));
     // Both catches engage together; a short second strike is the latch's rebound.
     [0,attached ? .065 : .032].forEach(function(offset,index){
-      var at=start+offset,buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.09),ctx.sampleRate),data=buffer.getChannelData(0);
-      for(var i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.009));
-      var snap=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
-      snap.buffer=buffer;filter.type='highpass';filter.frequency.value=950;gain.gain.value=index?.28:.9;
+      var at=start+offset,snap=blipNoise(ctx,.09,function(t){return Math.exp(-t/.009);}),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+      filter.type='highpass';filter.frequency.value=950;gain.gain.value=index?.28:.9;
       snap.connect(filter);filter.connect(gain);gain.connect(output);snap.start(at);nodes.push(snap,filter,gain);
       (attached ? [92,287,741] : [163,431,1187]).forEach(function(frequency,partial){
         var tone=ctx.createOscillator(),body=ctx.createGain();tone.type='triangle';tone.frequency.value=frequency;
@@ -1278,10 +1243,8 @@ function playArcadeDock(attached) {
 function playCardLatch(guide) {
   try {
     var ctx=getKioskAudio(), t=ctx.currentTime;
-    var buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.06),ctx.sampleRate), data=buffer.getChannelData(0);
-    for(var i=0;i<data.length;i++) data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.012));
-    var noise=ctx.createBufferSource(), filter=ctx.createBiquadFilter(), gain=ctx.createGain();
-    noise.buffer=buffer; filter.type='bandpass'; filter.frequency.value=guide?1500:950; filter.Q.value=.7;
+    var noise=blipNoise(ctx,.06,function(t){return Math.exp(-t/.012);}), filter=ctx.createBiquadFilter(), gain=ctx.createGain();
+    filter.type='bandpass'; filter.frequency.value=guide?1500:950; filter.Q.value=.7;
     gain.gain.value=guide ? .045 : .16;
     noise.connect(filter); filter.connect(gain); gain.connect(blipOut(ctx)); noise.start(t);
     (guide?[270]:[118,283,517]).forEach(function(frequency,index){

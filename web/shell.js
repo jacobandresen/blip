@@ -231,18 +231,6 @@ function feedbackTick() {
     osc.start(t); osc.stop(t + 0.055);
   } catch (e) {}
 }
-// kiosk.js's coin drop (dropCoinAnimation), into #insert-coin-btn's slot.
-(function () {
-  var btn = document.getElementById('insert-coin-btn');
-  if (!btn) return;
-  coinDropAnim = btn.querySelector('#coin-drop-anim');
-  if(!coinDropAnim) {
-    coinDropAnim = document.createElement('span');
-    coinDropAnim.id = 'coin-drop-anim';
-    coinDropAnim.setAttribute('aria-hidden', 'true');
-    btn.appendChild(coinDropAnim);
-  }
-}());
 // Called from WASM when play starts (from the title or a game-over
 // restart), once more per second player. Out of coins, the debt is
 // kept and the coins that go in next pay it before the game goes on.

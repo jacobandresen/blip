@@ -132,11 +132,7 @@
     })[kind] || { hp: 1800, ng: 0.14, nd: 0.020, thk: 120, tg: 0.09, td: 0.045 };
 
     // The plastic contact transient: a very short filtered-noise tick.
-    var len = Math.ceil(ctx.sampleRate * spec.nd);
-    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    var d = buf.getChannelData(0);
-    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    var src = ctx.createBufferSource(); src.buffer = buf;
+    var src = blipNoise(ctx, spec.nd, function (t, p) { return 1 - p; });
     var hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = spec.hp;
     var ng = ctx.createGain();
     ng.gain.setValueAtTime(spec.ng, t);

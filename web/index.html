@@ -833,8 +833,8 @@
   <script src="manual-motion.js?v=3"></script>
 
   <script src="howler.min.js"></script>
-  <script src="blip_core.js?v=7"></script>
-  <script src="kiosk.js?v=100"></script>
+  <script src="blip_core.js?v=8"></script>
+  <script src="kiosk.js?v=101"></script>
   <script src="aisle.js?v=1"></script>
   <script>
     /* ------------------------------------------------------------------ */
@@ -848,11 +848,7 @@
       var ctx = getKioskAudio();
       var t = ctx.currentTime;
 
-      var noiseBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.14), ctx.sampleRate);
-      var noiseData = noiseBuf.getChannelData(0);
-      for (var i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
-      var noise = ctx.createBufferSource();
-      noise.buffer = noiseBuf;
+      var noise = blipNoise(ctx, 0.14);
       var noiseFilter = ctx.createBiquadFilter();
       noiseFilter.type = 'lowpass';
       noiseFilter.frequency.setValueAtTime(2200, t);
