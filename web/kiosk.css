@@ -3049,7 +3049,6 @@ body.need-coin #kiosk-insert-btn,
 .jukebox-arm-grip::before {top:1px;transform:rotate(20deg)}
 .jukebox-arm-grip::after {bottom:1px;transform:rotate(-20deg)}
 
-@keyframes jukebox-seating { to { transform:scaleX(.08); } }
 @media (prefers-reduced-motion:reduce) {
   .jukebox-transfer,.jukebox-flight-card,.jukebox-transfer-arm { transition-duration:.01ms!important; }
 }
@@ -3487,26 +3486,7 @@ body:has(#marquee-bar) .blip-logo:hover { color:#f0e5cd; }
 .kiosk-bar .deck-coin-slot::after {content:none!important}
 .kiosk-bar .deck-coin-slot::before {content:'';position:absolute;inset:-3px;pointer-events:auto}
 .kiosk-bar .deck-coin-slot:focus-visible {outline:2px solid #e5cf9e;outline-offset:3px}
-.coin-plate {
-  position:absolute;inset:2px;border:1px solid #a59b82;border-radius:3px;
-  background:repeating-linear-gradient(0deg,#ffffff12 0 1px,#00000008 1px 2px),linear-gradient(110deg,#e0ded3,#8c897e 24%,#f0eee4 42%,#aaa697 70%,#777061);
-  box-shadow:inset 1px 1px #fff8e7,inset -1px -2px #51483a,0 1px 2px #0009;
-  pointer-events:none;
-}
-.coin-plate::before {
-  content:'▼';position:absolute;left:0;right:0;top:calc(50% - 12px);text-align:center;
-  color:#4b4539;font:900 8px/8px Arial,sans-serif;text-shadow:0 1px #fff4d7;
-}
 
-.coin-return::after {
-  content:'RETURN';position:absolute;left:0;right:0;top:-7px;
-  color:#4c4336;font:900 4.5px/6px Arial,sans-serif;letter-spacing:.5px;text-align:center;
-}
-.coin-return {
-  position:absolute;left:50%;bottom:4px;width:22px;height:5px;transform:translateX(-50%);border:1px solid #4d3022;border-radius:2px;
-  background:linear-gradient(#ae6750,#713d2e 50%,#4c251d);
-  box-shadow:0 1px 0 #342016,inset 0 1px #d99479,inset -1px -1px #4c251d;
-}
 
 .deck-coin-slot #coin-drop-anim {left:calc(50% - 40px);right:auto;top:50%}
 .kiosk-bar:has(.deck-coin-slot) :is(.deck-side,.snes-shell) {padding-bottom:24px!important}
