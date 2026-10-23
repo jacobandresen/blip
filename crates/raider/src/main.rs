@@ -214,7 +214,7 @@ const OVER_MIN_WAIT: f32 = 3.0;
 enum State { Title, Launch, Play, Dead, Win, Won, Over }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-enum EnemyKind { Grunt, Weaver, Ace }
+enum EnemyKind { Grunt, Weaver, Ace } // also the index of its sprite
 
 #[derive(Copy, Clone)]
 struct Bullet { x: f32, y: f32, vx: f32, vy: f32, active: bool }
@@ -2779,16 +2779,11 @@ fn draw_launch(
     if g.launch_climb > 0.05 { draw_clouds(blip, g, cloud_tex); }
 
     // the opening wave, streaming in from the top while the player climbs
-    let enemy_tex_of = |e: &Enemy| match e.kind {
-        EnemyKind::Grunt => &enemy_tex[0],
-        EnemyKind::Weaver => &enemy_tex[1],
-        EnemyKind::Ace => &enemy_tex[2],
-    };
     for e in pool_iter(&g.enemies) {
-        draw_shadow(enemy_tex_of(e), e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, -e.heading);
+        draw_shadow(&enemy_tex[e.kind as usize], e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, -e.heading);
     }
     for e in pool_iter(&g.enemies) {
-        draw_plane(enemy_tex_of(e), e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, e.heading, e.bank, BLIP_WHITE);
+        draw_plane(&enemy_tex[e.kind as usize], e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, e.heading, e.bank, BLIP_WHITE);
     }
 
     // the plane: its shadow under it on the deck, falling behind as it climbs

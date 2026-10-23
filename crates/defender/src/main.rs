@@ -203,6 +203,15 @@ struct Game {
 }
 
 impl Game {
+    /// The saucer's lights step round, one every UFO_SPIN_STEP_MS.
+    fn spin_lights(&mut self, dt: f32) {
+        self.ufo_spin_timer += dt * 1000.0;
+        if self.ufo_spin_timer >= UFO_SPIN_STEP_MS {
+            self.ufo_spin_timer = 0.0;
+            self.ufo_frame = (self.ufo_frame + 1) % UFO_N_LIGHTS;
+        }
+    }
+
     fn new() -> Self {
         let alien_default = Alien { x: 0.0, y: 0.0, alive: false, kind: 0, anim: 0 };
         let bullet_default = Bullet { x: 0.0, y: 0.0, active: false, player: false };
@@ -571,11 +580,7 @@ fn update_ufo(
     match g.ufo_mode {
         UfoMode::Flying => {
             g.ufo_x += 80.0 * g.ufo_dir as f32 * dt;
-            g.ufo_spin_timer += dt * 1000.0;
-            if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
-                g.ufo_spin_timer = 0.0;
-                g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
-            }
+            g.spin_lights(dt);
 
             if g.ufo_x > WIN_W as f32 || g.ufo_x + UFO_W < 0.0 {
                 g.ufo_active = false;
@@ -604,11 +609,7 @@ fn update_ufo(
             let step = UFO_TRACK_SPEED * dt;
             g.ufo_x += (target - g.ufo_x).clamp(-step, step);
 
-            g.ufo_spin_timer += dt * 1000.0;
-            if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
-                g.ufo_spin_timer = 0.0;
-                g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
-            }
+            g.spin_lights(dt);
 
             let expired = g.ufo_track_timer.tick(dt);
             let elapsed = UFO_TRACK_MAX_SECS - g.ufo_track_timer.remaining();
@@ -800,11 +801,7 @@ fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.boss_x < 0.0 { g.boss_x = 0.0; g.boss_dir = 1; }
     if g.boss_x + BOSS_W > WIN_W as f32 { g.boss_x = WIN_W as f32 - BOSS_W; g.boss_dir = -1; }
 
-    g.ufo_spin_timer += dt * 1000.0;
-    if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
-        g.ufo_spin_timer = 0.0;
-        g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
-    }
+    g.spin_lights(dt);
 
     if g.boss_fire.tick(dt) {
         // Three bombs: one under each wingtip and one under the middle.
