@@ -3,7 +3,7 @@
 use std::f32::consts::PI;
 
 use blip::input::{
-    btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
+    coin_start, play_again, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::rand::rand;
@@ -373,10 +373,7 @@ fn play_variant(takes: &[blip::BlipSound; 3], speed: f32) {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() {
-        web::spend_coin();
-        g.start_game();
-    }
+    if coin_start() { g.start_game(); }
 }
 
 fn move_paddle(g: &mut Game, dt: f32) {
@@ -885,10 +882,7 @@ fn update_clear(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game, dt: f32) {
-    g.dead_timer.tick(dt);
-    if g.dead_timer.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.dead_timer, dt) { g.start_game(); }
 }
 
 fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9], drops: &[Texture2D; 5]) {

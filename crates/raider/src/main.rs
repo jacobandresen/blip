@@ -1,7 +1,7 @@
 //! Raider — a 1942-style vertical dogfighting shoot-'em-up.
 
 use blip::input::{
-    btn1_pressed, key_active, key_held, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
+    coin_start, play_again, key_active, key_held, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::audio::{play_sound, set_sound_volume, stop_sound, PlaySoundParams};
@@ -1518,10 +1518,7 @@ fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() {
-        web::spend_coin();
-        g.start_game();
-    }
+    if coin_start() { g.start_game(); }
 }
 
 /// Animate engine start, signal, deck run and climb; the opening wave holds fire until the launch ends.
@@ -2484,20 +2481,14 @@ fn update_win(g: &mut Game, dt: f32) {
 }
 
 fn update_won(g: &mut Game, dt: f32) {
-    g.over_timer.tick(dt);
-    if g.over_timer.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.over_timer, dt) { g.start_game(); }
 }
 
 fn update_over(g: &mut Game, dt: f32) {
-    g.over_timer.tick(dt);
     // OVER_MIN_WAIT has to actually elapse before any key can dismiss this —
     // otherwise the fire button still held down from the fight that killed
     // you bounces straight back to the title screen.
-    if g.over_timer.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.over_timer, dt) { g.start_game(); }
 }
 
 /// The ocean: a gradient lighter and hazier toward the top (distance), two

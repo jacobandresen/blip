@@ -60,6 +60,19 @@ pub const BLIP_KEY_K:       KeyCode = KeyCode::K;
 #[inline]
 pub fn btn1_pressed() -> bool { key_pressed(BLIP_KEY_SPACE) }
 
+/// Fire on a title or game-over screen starts a game, for the coin it costs.
+pub fn coin_start() -> bool {
+    if !btn1_pressed() { return false; }
+    crate::web::spend_coin();
+    true
+}
+
+/// The game-over screen: fire starts again once `wait` has run out.
+pub fn play_again(wait: &mut crate::Timer, dt: f32) -> bool {
+    wait.tick(dt);
+    !wait.active() && coin_start()
+}
+
 /// True every frame the key is held down — good for movement.
 #[inline]
 pub fn key_held(key: KeyCode) -> bool {

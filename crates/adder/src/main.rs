@@ -10,7 +10,7 @@ mod cpu;
 mod levels;
 
 use blip::input::{
-    btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D,
+    coin_start, play_again, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D,
     BLIP_KEY_J, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE,
 };
 use blip::macroquad::input::KeyCode;
@@ -144,10 +144,7 @@ fn update_title(g: &mut Game, dt: f32) {
     g.demo.events.clear();
     #[cfg(not(target_arch = "wasm32"))]
     if blip::bot::active() { blip::bot::hold(&[BLIP_KEY_SPACE]); }
-    if btn1_pressed() {
-        web::spend_coin();
-        g.start_game();
-    }
+    if coin_start() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
@@ -181,10 +178,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_over(g: &mut Game, dt: f32) {
-    g.timer.tick(dt);
-    if g.timer.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.timer, dt) { g.start_game(); }
 }
 
 fn conf() -> blip::macroquad::window::Conf {

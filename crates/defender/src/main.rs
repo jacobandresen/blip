@@ -1,7 +1,7 @@
 //! Space Invaders-inspired shooter.
 
 use blip::input::{
-    btn1_pressed, key_active, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
+    coin_start, play_again, key_active, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::rand::rand;
@@ -768,10 +768,7 @@ fn draw_ufo(blip: &Blip, g: &Game, saucer: &Texture2D) {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() {
-        web::spend_coin();
-        g.start_game();
-    }
+    if coin_start() { g.start_game(); }
 }
 
 /// An alien kind's colour, and so its score: magenta 30, cyan 20, green 10,
@@ -1392,10 +1389,7 @@ fn update_clear(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game, dt: f32) {
-    g.dead_timer.tick(dt);
-    if g.dead_timer.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.dead_timer, dt) { g.start_game(); }
 }
 
 /// The mothership and its health bar, drawn under the ship so it is in the

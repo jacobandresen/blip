@@ -3,7 +3,7 @@
 use std::f32::consts::PI;
 
 use blip::input::{
-    btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
+    coin_start, play_again, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
     BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::texture::Texture2D;
@@ -458,10 +458,7 @@ fn award(g: &mut Game, sfx: &Sounds, pts: i32) {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() {
-        web::spend_coin();
-        g.start_game();
-    }
+    if coin_start() { g.start_game(); }
 }
 
 /// Turn, thrust, a little drag and the speed limit; the field wraps. Returns
@@ -791,10 +788,7 @@ fn update_dead(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_over(g: &mut Game, dt: f32) {
-    g.respawn_t.tick(dt);
-    if g.respawn_t.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.respawn_t, dt) { g.start_game(); }
 }
 
 fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, level: i32, color: BlipColor) {
