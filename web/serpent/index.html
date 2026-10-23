@@ -20,7 +20,7 @@
   <script>try{var l=JSON.parse(sessionStorage.getItem('blip-cabinet-launch')||'null');if(l&&Date.now()-l.at<15000){document.documentElement.setAttribute('data-launching','');setTimeout(function(){document.documentElement.removeAttribute('data-launching');},3000);}}catch(e){}</script>
   <style>:root[data-launching] body{visibility:hidden}</style>
   <script src="../howler.min.js"></script>
-  <script src="../blip_core.js?v=6"></script>
+  <script src="../blip_core.js?v=7"></script>
   <script>(function () {
     var g = blipGameFromPath(location.pathname);
     if (!g) return;
@@ -30,8 +30,8 @@
   }());</script>
   <script src="../kiosk.js?v=100"></script>
   <link rel="stylesheet" href="../marquee.css?v=1">
-  <link rel="stylesheet" href="../kiosk.css?v=155">
-  <link rel="stylesheet" href="../shell.css?v=108">
+  <link rel="stylesheet" href="../kiosk.css?v=156">
+  <link rel="stylesheet" href="../shell.css?v=109">
   <link rel="stylesheet" href="../wear.css?v=13">
   <script>if (document.documentElement.hasAttribute('data-appstyle')) document.querySelector('link[href*="wear.css"]').disabled = true;</script>
 </head>
@@ -67,10 +67,7 @@
    </div>
 
   </div>
-  <script src="../deck.js?v=14"></script>
-
-  <!-- Subtle: pick the controller (pad, stick, touch strip). shell.js fills it. -->
-  <div id="control-toggle" role="radiogroup" aria-label="On-screen controller"></div>
+  <script src="../deck.js?v=15"></script>
 
   <div id="need-coin-overlay">
     <div class="nco-panel">
@@ -94,7 +91,7 @@
   <script src="../vendor/supabase.js?v=1"></script>
   <script src="../blip_config.js?v=1"></script>
   <script src="../blip_scores.js?v=9"></script>
-  <script src="../shell.js?v=132"></script>
+  <script src="../shell.js?v=133"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
   <script src="../blip_bridge.js?v=20"></script>

@@ -18,8 +18,7 @@ for (const layout of layouts) {
     });
     t.after(handle.close);
     const { page, origin } = handle;
-    await page.addInitScript(() => localStorage.setItem('blip-touch', '1'));
-    await page.goto(`${origin}/bubbler/index.html`);
+    await page.goto(`${origin}/bubbler/index.html?controls=touch`);
     await page.waitForFunction(() => document.documentElement.dataset.touch === 'platform');
     await page.waitForFunction(() => document.documentElement.hasAttribute('data-open'));
     await page.evaluate(() => document.getElementById('insert-coin-btn').click());

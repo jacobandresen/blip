@@ -35,7 +35,7 @@ for (const touch of [false, true]) test(`Bubbler BASIC players move, jump, join,
     try {
       await frame.waitForFunction((bits) => (window.__gameFlags & bits) === bits, bits, { timeout: 4000 });
     } catch {
-      const controls = await page.evaluate(() => Array.from(document.querySelectorAll('.amstrad-controls .stick-base,.amstrad-controls .arcade-btn')).map((el) => ({ id: el.id, player: el.closest('.deck-station')?.id, rect: el.getBoundingClientRect().toJSON(), pressed: el.classList.contains('blip-pressed') })));
+      const controls = await page.evaluate(() => Array.from(document.querySelectorAll('.amstrad-controls .snes-dpad,.amstrad-controls .snes-btn')).map((el) => ({ id: el.id, player: el.closest('.snes-pad')?.id, rect: el.getBoundingClientRect().toJSON(), pressed: el.classList.contains('blip-pressed') })));
       assert.fail(`Missing gameplay flags ${bits}; observed ${await frame.evaluate(() => window.__gameFlags)}; ${await page.locator('body').getAttribute('data-wasm-error')}; ${JSON.stringify(controls)}`);
     }
   }
@@ -52,12 +52,12 @@ for (const touch of [false, true]) test(`Bubbler BASIC players move, jump, join,
     if (!touch) return page.keyboard.up(key);
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   }
-  await down('d', '#stick-base', .9); await observed(2); await up('d');
-  await down('g', '#fire-buttons .arcade-btn:nth-child(2)'); await observed(4); await up('g');
-  await down('f', '#fire-buttons .arcade-btn:first-child'); await observed(32); await up('f');
-  await down('j', '#deck-p2 .fire-buttons .arcade-btn:first-child'); await observed(1 | 64); await up('j');
-  await down('ArrowLeft', '#deck-p2 .stick-base', .1); await observed(8); await up('ArrowLeft');
-  await down('k', '#deck-p2 .fire-buttons .arcade-btn:nth-child(2)'); await observed(16); await up('k');
+  await down('d', '#snes-pad .snes-dpad', .9); await observed(2); await up('d');
+  await down('g', '#snes-pad .snes-btn.cap2'); await observed(4); await up('g');
+  await down('f', '#snes-pad .snes-btn.cap1'); await observed(32); await up('f');
+  await down('j', '#snes-pad-p2 .snes-btn.cap1'); await observed(1 | 64); await up('j');
+  await down('ArrowLeft', '#snes-pad-p2 .snes-dpad', .1); await observed(8); await up('ArrowLeft');
+  await down('k', '#snes-pad-p2 .snes-btn.cap2'); await observed(16); await up('k');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
 });
 

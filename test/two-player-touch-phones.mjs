@@ -18,8 +18,7 @@ for (const phone of PHONES) {
       const context = await browser.newContext({ viewport, hasTouch: true });
       const page = await context.newPage();
       t.after(() => context.close());
-      await page.addInitScript(() => localStorage.setItem('blip-touch', '1'));
-      await page.goto(`${origin}/rally/index.html`);
+      await page.goto(`${origin}/rally/index.html?controls=touch`);
       await page.waitForFunction(() => document.querySelector('#glcanvas') &&
         getComputedStyle(document.querySelector('#loader')).display === 'none');
       await page.evaluate(() => document.getElementById('insert-coin-btn').click());
@@ -73,8 +72,7 @@ for (const phone of PHONES) {
       const context = await browser.newContext({ viewport, hasTouch: true });
       const page = await context.newPage();
       t.after(() => context.close());
-      await page.addInitScript(() => localStorage.setItem('blip-controls', 'pad'));
-      await page.goto(`${origin}/brawler/index.html`);
+      await page.goto(`${origin}/brawler/index.html?controls=pad`);
       await page.waitForFunction(() => document.querySelector('#glcanvas') &&
         getComputedStyle(document.querySelector('#loader')).display === 'none');
       if (await page.locator('#need-coin-overlay.visible').count()) {
@@ -123,43 +121,4 @@ for (const phone of PHONES) {
       }
     });
   }
-}
-
-for (const viewport of [
-  { name: 'iPhone SE', width: 320, height: 568 },
-  { name: 'iPhone 8', width: 375, height: 667 },
-  { name: 'iPhone 14', width: 390, height: 844 },
-]) {
-  test(`Brawler controller selector stays clear of Manual on ${viewport.name}`, async (t) => {
-    const { browser, origin } = await openPage(t, 'chromium');
-    const context = await browser.newContext({ viewport, hasTouch: true });
-    const page = await context.newPage();
-    t.after(() => context.close());
-    await page.addInitScript(() => localStorage.setItem('blip-controls', 'pad'));
-    await page.goto(`${origin}/brawler/index.html`);
-    await page.waitForFunction(() => document.getElementById('loader').style.display === 'none');
-    if (await page.locator('#need-coin-overlay.visible').count()) {
-      await page.evaluate(() => document.getElementById('insert-coin-btn').click());
-    }
-    await page.evaluate(() => window.blipSetMode(1));
-    const overlap = await page.evaluate(() => {
-      const picker = document.querySelector('#control-toggle');
-      const manual = document.querySelector('#manual-book');
-      const a = picker.getBoundingClientRect(), b = manual.getBoundingClientRect();
-      return { picker: { x: a.x, y: a.y, right: a.right, bottom: a.bottom },
-        manual: { x: b.x, y: b.y, right: b.right, bottom: b.bottom },
-        intersects: a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top };
-    });
-    assert.equal(overlap.intersects, false,
-      `${viewport.name}: controller selector overlaps Manual: ${JSON.stringify(overlap)}`);
-    for (const mode of ['stick', 'pad']) {
-      const button = page.locator(`#control-toggle [data-mode="${mode}"]`);
-      assert.equal(await button.count(), 1, `${mode} selector missing`);
-      const box = await button.boundingBox();
-      assert.ok(box && box.width > 0 && box.height > 0, `${mode} selector is not visible`);
-      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
-      assert.equal(await button.getAttribute('aria-checked'), 'true',
-        `${mode} selector is obstructed or does not respond to touch`);
-    }
-  });
 }

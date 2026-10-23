@@ -23,7 +23,7 @@ async function browser(t, port, { touch = false, width = 1280, height = 800 } = 
 
 async function open(cdp, page, settle = 4000) {
   await cdp.send('Page.navigate', { url: `${ORIGIN}/${page}` });
-  if (page.endsWith('/index.html')) {
+  if (/\/index\.html(\?|$)/.test(page)) {
     await waitFor(cdp, "document.documentElement.hasAttribute('data-game-ready')", 60000);
   }
   await sleep(settle);
@@ -55,7 +55,7 @@ test('the game shell', async (t) => {
 
   await t.test('the name prompt takes a tap while touch play is on, and its keys while the coin wall is up', async (t) => {
     const cdp = await browser(t, 9401, { touch: true, width: 390, height: 844 });
-    await open(cdp, 'bouncer/index.html');
+    await open(cdp, 'bouncer/index.html?controls=touch');
     assert.equal(await evaluate(cdp, "document.documentElement.getAttribute('data-touch')"), 'drag');
 
     // Coins left, so touch play is live: every tap that is not a button plays.

@@ -89,8 +89,8 @@ test('BASIC touch movement and buttons remain independent for every deck', async
   for (const game of GAMES.filter((game) => game !== 'RALLY')) await t.test(game, async (subtest) => {
     subtest.after(() => p.exit());
     await p.load(game);
-    const box = await p.page.locator('#stick-base').boundingBox();
-    const buttons = await p.page.locator('#fire-buttons .arcade-btn').evaluateAll((buttons) => buttons.map((button) => {
+    const box = await p.page.locator('#snes-pad .snes-dpad').boundingBox();
+    const buttons = await p.page.locator('#snes-pad .snes-btn').evaluateAll((buttons) => buttons.map((button) => {
       const r = button.getBoundingClientRect();
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     }));

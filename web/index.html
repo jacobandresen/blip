@@ -25,7 +25,7 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <link rel="stylesheet" href="marquee.css?v=1">
-  <link rel="stylesheet" href="kiosk.css?v=155">
+  <link rel="stylesheet" href="kiosk.css?v=156">
   <link rel="stylesheet" href="wear.css?v=13">
   <link rel="stylesheet" href="book.css?v=1">
   <link rel="stylesheet" href="manual.css?v=49">
@@ -928,7 +928,7 @@
     #game-grid .card-loop {position:absolute;inset:0;z-index:1;overflow:hidden;visibility:hidden;pointer-events:none}
     #game-grid .card[data-loop][data-loop-ready] .card-loop {visibility:visible}
     #game-grid .card-loop-frame {position:absolute;left:50%;top:50%;width:100%;height:100%;overflow:hidden;transform:translate(-50%,-50%)}
-    #game-grid .card-loop-strip {display:block;width:100%;height:auto;filter:saturate(1.15) contrast(1.06);animation:card-loop 4s steps(12) infinite paused}
+    #game-grid .card-loop-strip {display:block;width:100%;height:auto;animation:card-loop 4s steps(12) infinite paused}
     #game-grid .card[data-loop] .card-loop-strip {animation-play-state:running}
     @keyframes card-loop {to {transform:translateY(-100%)}}
     /* Each machine's pool of light on the carpet, its opacity set by the walk. */
@@ -937,8 +937,6 @@
     /* Stepped up to a machine: its deck lights. */
     #game-grid .machine-deck {transition:box-shadow .4s}
     #game-grid[data-stepped-up] .card-focused .machine-deck {box-shadow:0 0 0 2px color-mix(in srgb,var(--trim) 70%,#fff),0 0 26px color-mix(in srgb,var(--trim) 70%,transparent)}
-    #game-grid .machine-veil {position:absolute;inset:0;z-index:5;border-radius:inherit;background:#000;opacity:0;pointer-events:none;will-change:opacity}
-    #game-grid .machine-veil-sign {left:-3%;right:-3%;bottom:auto;height:8.5%;border-radius:4px 4px 2px 2px}
     @media (prefers-reduced-motion:reduce) {#game-grid .card-loop-strip {animation:none}}
 
     /* The cabinet front: black laminate between two strips of T-molding. Nothing here may set filter, opacity,
@@ -957,7 +955,8 @@
     #game-grid .card.rejected {animation:none}
     .machine-launching .jukebox-front {transition:transform .76s cubic-bezier(.45,0,.25,1);transform:translate(var(--launch-x),var(--launch-y)) scale(var(--launch-zoom))}
     /* The screen being stepped into shows the game's picture, which the game page opens on. */
-    #game-grid .card.card-launching :is(.card-loop,.machine-attract,.machine-instructions) {opacity:0;transition:opacity .25s}
+    #game-grid .card.card-launching .card-loop {visibility:hidden}
+    #game-grid .card.card-launching :is(.machine-attract,.machine-instructions) {opacity:0;transition:opacity .25s}
     /* Every cabinet is built at 300×660 and scaled to the room (--arc-scale). */
     #game-grid .card {transform:translateX(calc(-50% + var(--arc-x,0px))) translateY(var(--arc-y,0px)) translateZ(var(--arc-z,0px)) rotateY(var(--arc-turn,0deg)) scale(var(--arc-scale,1));}
     /* A phone on its side: the player stands close, the coin door below the frame. */
@@ -1008,10 +1007,8 @@
     #game-grid .game-rom {position:absolute;inset:13px 14px 22px;display:block;padding:0;border:0;border-radius:16px/20px;overflow:hidden;background:#000;
       box-shadow:0 0 0 3px #000,0 0 14px color-mix(in srgb,var(--trim) 45%,transparent)}
     /* Letterboxed, as the game draws itself on its page. */
-    #game-grid .game-rom .card-shot,#game-grid .card-shot-wrap img.card-shot {position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;border-radius:0;filter:saturate(1.15) contrast(1.06)}
-    /* A machine you are not facing shows its still a little dimmer; within two it plays (.card-loop). */
-    #game-grid .card:not(.card-focused) .game-rom .card-shot {opacity:.8;transition:opacity .3s ease}
-    #game-grid .card.card-focused .game-rom .card-shot {opacity:1}
+    /* No filter or opacity on a screen: inside the turned cabinets iOS Safari drew a filtered or fading screen black. */
+    #game-grid .game-rom .card-shot,#game-grid .card-shot-wrap img.card-shot {position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;border-radius:0}
     /* Scanlines, the tube's dark corners and a glare off the glass. */
     #game-grid .game-rom::after {content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
       background:linear-gradient(160deg,#ffffff26,#ffffff08 28%,transparent 40%),repeating-linear-gradient(0deg,#0000 0 2px,#00000038 2px 3px),radial-gradient(ellipse at 50% 50%,transparent 58%,#000a);}
@@ -1361,12 +1358,12 @@
     </div>
     </div>
   </template>
-  <script src="deck.js?v=14"></script>
+  <script src="deck.js?v=15"></script>
   <script src="book.js?v=3"></script>
   <script src="manual-motion.js?v=3"></script>
 
   <script src="howler.min.js"></script>
-  <script src="blip_core.js?v=6"></script>
+  <script src="blip_core.js?v=7"></script>
   <script src="kiosk.js?v=100"></script>
   <script src="aisle.js?v=1"></script>
   <script src="blip_controller.js?v=10"></script>
@@ -1652,9 +1649,9 @@
       Array.from(card.querySelectorAll('.card-title,.card-genre,.card-hi,.card-desc')).forEach(function(part){copy.appendChild(part);});
       card.appendChild(copy);
       var title=card.querySelector('.card-title'),slug=(card.getAttribute('data-game-url')||'').split('/')[0];
-      // Each panel carries what its game is played with: a stick or a spinner and up to two buttons a player.
-      var panel={rally:[2,'dial',1],bouncer:[1,'dial',1],defender:[1,'stick',1],bubbler:[2,'stick',2],raider:[1,'stick',1],
-        meteors:[1,'stick',2],serpent:[1,'stick',0],brawler:[2,'stick',2],adder:[2,'dial',1]}[slug]||[1,'stick',1];
+      // Every panel seats two at joysticks, as the game page's deck does; Rally keeps its spinners. Up to two buttons a player.
+      var panel={rally:[2,'dial',1],bouncer:[2,'stick',1],defender:[2,'stick',1],bubbler:[2,'stick',2],raider:[2,'stick',1],
+        meteors:[2,'stick',2],serpent:[2,'stick',0],brawler:[2,'stick',2],adder:[2,'stick',1]}[slug]||[2,'stick',1];
       var players=panel[0],name=title?title.textContent.trim():'';
       card.dataset.machine=slug;title.classList.add('machine-marquee');
       var legend={rally:'BAT · SERVE',bouncer:'MOVE · LAUNCH',defender:'MOVE · FIRE',bubbler:'RUN · BUBBLE · JUMP',raider:'STEER · FIRE',meteors:'TURN · THRUST · FIRE',serpent:'STEER',brawler:'MOVE · PUNCH · KICK',adder:'TURN LEFT · RIGHT'};
@@ -2321,11 +2318,6 @@
         var still=rom.querySelector('.card-shot');
         rom.insertBefore(box,still?still.nextSibling:rom.firstChild);
         var pool=document.createElement('span');pool.className='card-pool';pool.setAttribute('aria-hidden','true');c.appendChild(pool);
-        // A dark veil over the screen and one over the sign, each on a layer of its own, for the flicker (flickerSoon).
-        // The sign's lies over it rather than in it, which would make it part of the title.
-        [[rom,'machine-veil'],[c,'machine-veil machine-veil-sign']].forEach(function(part){
-          var veil=document.createElement('span');veil.className=part[1];veil.setAttribute('aria-hidden','true');part[0].appendChild(veil);
-        });
         return {strip:strip,pool:pool,near:false,glow:'',src:(c.getAttribute('data-game-url')||'').split('/')[0]+'/attract.webp'};
       });
       // Neighbours stand angled away, as on a showroom floor, so their side art shows; farther ones recede.
@@ -2420,18 +2412,6 @@
       highlight();
       cards[idx].focus({preventScroll:true});
 
-      // Now and then a nearby machine's sign or screen flickers, as old tubes do.
-      (function flickerSoon(){
-        window.setTimeout(function(){
-          if(!stepWalk.matches&&!document.hidden){
-            var near=cards.filter(function(c,i){return c.classList.contains('card')&&Math.abs(aisleOffset(i))<=2.5;});
-            // The veil's own opacity: a class on the cabinet, or a new animated layer, costs a layout.
-            var c=near[Math.floor(Math.random()*near.length)],veil=c&&c.querySelector(Math.random()<.5?'.machine-veil-sign':'.game-rom .machine-veil');
-            if(veil&&veil.animate)veil.animate([{opacity:0},{opacity:.55},{opacity:.15},{opacity:0}],{duration:180,easing:'steps(3)'});
-          }
-          flickerSoon();
-        },4000+Math.random()*8000);
-      }());
       function canWalk() {
         return !(cardInFlight||!manualOverlay.hidden||document.body.classList.contains('cabinet-return'));
       }

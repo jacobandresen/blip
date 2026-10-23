@@ -52,7 +52,6 @@ const PIECES = {
   stick: '.stick-base',
   strip: '.ts-glass',
   join: '.ts-join',
-  toggle: '#control-toggle',
   creditLamp: '.deck-credit-lamp, .deck-second-lamp',
   homeSwitch: '#home-switch-btn',
 };
@@ -74,7 +73,7 @@ const THUMB = { button: { w: 38, h: 34 }, dpad: { w: 52, h: 46 }, stick: { w: 52
 const APART = 4;
 
 // Where the controls must not reach: under the home bar.
-const CONTROLS = ['coin', 'dpad', 'button', 'stick', 'strip', 'join', 'toggle'];
+const CONTROLS = ['coin', 'dpad', 'button', 'stick', 'strip', 'join'];
 
 function collect(core) {
   const visible = (el) => {
@@ -169,8 +168,9 @@ async function check(page, device, insets, label, failures) {
   if (covered) failures.push(`${label}: the middle of the picture is covered by ${covered}`);
   const result = await page.evaluate(collect, CORE);
   for (const line of result.overlaps) failures.push(`${label}: ${line}`);
-  // Two players share 320px on the smallest phones: each gets about 110px, so their controls may be small and close, though never overlapping.
-  const squeezed = device.w < 340 && label.startsWith('brawler');
+  // Two players share 320px on the smallest phones (every deck seats two): each gets about 110px, so their controls may
+  // be small and close, though never overlapping.
+  const squeezed = device.w < 340;
   if (!squeezed) for (const line of result.thumbs) failures.push(`${label}: ${line}`);
   for (const line of result.clipped) failures.push(`${label}: ${line}`);
   if (!device.desktop && !squeezed) {
@@ -245,11 +245,11 @@ for (const device of mine) {
     await check(page, device, insets, 'cabinet with a ROM seated', failures);
     await page.evaluate(() => sessionStorage.clear());
 
-    const controllers = device.desktop ? [null] : [null, 'stick', 'pad'];
+    // The arcade's sticks everywhere; on a phone also the home screen's touch and BASIC's pads.
+    const controllers = device.desktop ? [null] : [null, 'touch', 'pad'];
     for (const slug of GAMES) {
       for (const controller of controllers) {
-        await page.addInitScript((mode) => { if (mode) localStorage.setItem('blip-controls', mode); else localStorage.removeItem('blip-controls'); }, controller);
-        await page.goto(`${origin}/${slug}/index.html`);
+        await page.goto(`${origin}/${slug}/index.html${controller ? '?controls=' + controller : ''}`);
         await page.waitForFunction(() => typeof BlipController === 'object', null, { timeout: 30000 });
         await settle();
         await check(page, device, insets, `${slug}${controller ? ' with the ' + controller : ''}`, failures);

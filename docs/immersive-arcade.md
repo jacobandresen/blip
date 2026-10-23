@@ -180,17 +180,16 @@ As built:
 - Each screen gets a `.card-loop` over its still. A machine within two
   (`LOOP_NEAR`) sets `data-loop`, fetches its strip the first time, and plays
   it at 3 frames a second (`steps(12)` on the strip's `transform`); the strip
-  covers the screen as the still does. Farther machines keep their still,
-  which now shows on every screen (dimmed to 0.8), not only the faced one.
+  is letterboxed as the still is. Farther machines keep their still, which now
+  shows on every screen, not only the faced one.
 - PRESS START and the credit stay over the faced machine's loop.
 - Light: each cabinet casts a pool of its trim colour on the carpet
   (`.card-pool`, an `opacity` of `machineLevel(d)`, written only when it
   changes).
-- Every 4–12 s a machine within 2.5 flickers its sign or screen for 0.18 s:
-  a dark veil (`.machine-veil`) on a layer of its own, animated with
-  `element.animate`. Animating the screen or sign itself cost a layout each
-  time.
-- Reduced motion: the strips stand still and nothing flickers.
+- Screens carry no `filter` and no opacity change: on an iPhone the faced
+  machine's screen came up black. The flicker of signs and screens was taken
+  out with them.
+- Reduced motion: the strips stand still.
 - The strips are in `ASSETS` in `web/sw.js`.
 
 ## 5. Up and down — done
@@ -215,6 +214,24 @@ Nine games need no second row. As built:
 - A game page also leaves on Escape now (`web/shell.js`), as it did on
   Backspace.
 
+## Controls: one controller per front end, two players on every deck — done
+
+Asked for after the five parts; as built:
+
+- `blipFrontendControls` (`web/blip_core.js`) picks the controller: the
+  arcade's joysticks, the home screen's (and a game's own app's) touch, BASIC's
+  pads. Rally keeps its dials and its split touch strip. `?controls=stick|pad|touch`
+  on a game's URL overrides it (the tests use it). The controller toggle is gone.
+- Every deck has two stations (`data-players="2"`, `deck.js`, `shell.js`, the
+  cabinets' panels in `index.html`, BASIC's two pads). A one-player game's
+  second station is drawn, its caps blank, and takes no input
+  (`data-seats="1"`); a two-player game's is live on its title screen and in a
+  two-player match, not against the CPU.
+- By touch, Adder splits its strip in a two-player match like Rally's; each
+  seat steers on its own half (`touch_fraction(seat)` in `crates/adder`).
+- At 320 px two stations leave each stick about 51 px across, a pixel under
+  the thumb target; the layout sweep allows it there, as it did for Brawler.
+
 ## Decided while building
 
 - Walking pace: a held key walks 1 machine/s, and a tap arrives in about
@@ -231,7 +248,7 @@ Nine games need no second row. As built:
 | Walking loop, inputs, stepping up, up and down | `web/index.html` (the aisle script and its styles) |
 | Analogue stick | `web/kiosk.js` (`pollGamepad`) |
 | Machine and room sound, single footstep | `web/kiosk.js` |
-| Screen loops, pools of light, flicker | `tools/make_attract_strips.mjs`, `web/<game>/attract.webp`, `web/index.html` |
+| Screen loops, pools of light | `tools/make_attract_strips.mjs`, `web/<game>/attract.webp`, `web/index.html` |
 | The game page's first frame (`#launch-frame`) | `web/shell.js`, `web/shell.css` |
 
 These files are in the table in `AGENTS.md`, marked "planned". As each part
@@ -341,7 +358,7 @@ the playing machines with the level and pan each is heading for.
   within two; each has twelve frames and plays; a machine farther off shows
   no loop. Walking one machine fetches only the next, and the machine left
   behind stops.
-- ✓ `test/aisle-perf.mjs`: at rest, flickers included, no layouts. A strip's
+- ✓ `test/aisle-perf.mjs`: at rest, no layouts. A strip's
   first load costs one layout, once a visit, so the walk is measured over
   loaded screens.
 

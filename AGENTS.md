@@ -21,7 +21,7 @@ change will be overwritten the next time the project is built.
 | JavaScript (canvas scaling, touch controls, coin handling) | `web/shell.js` |
 | Shared nav bar styles (`.kiosk-bar`, `.kiosk-btn`, `.kiosk-hud`) | `web/kiosk.css` |
 | The game list (`BLIP_GAMES`), coins (`getCoins`, `saveCoins`), layout rule, mute, fullscreen | `web/blip_core.js` (every page; the home screen loads only this) |
-| Which front end a game returns to (`blip-frontend`, `blipFrontendUrl`), free play, a game's own app mode (`blipAppMode`) | `web/blip_core.js` |
+| Which front end a game returns to (`blip-frontend`, `blipFrontendUrl`), free play, a game's own app mode (`blipAppMode`); the controller each front end plays with (`blipFrontendControls`: arcade sticks, home-screen touch, BASIC pads; `?controls=` overrides) | `web/blip_core.js` |
 | Cabinet parts: power lamp, coin HUD (`updateCoinsHud`), card arm, hum | `web/kiosk.js` |
 | The home screen: icons, dock, Search, the long-press menu, edit mode (`blip-home-order`), Settings | `web/home.html`, `web/home.css`, `web/home.js` (nothing from the cabinet) |
 | App style: a game opened from the home screen or its own icon (`data-appstyle`), with `‹ Home`, a frosted title bar and a launch screen | `web/shell.css` (the `App style` section), `web/shell.js` |

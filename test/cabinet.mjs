@@ -5,15 +5,15 @@ import assert from 'node:assert/strict';
 import { openPage } from './lib/harness.mjs';
 
 const GAMES = [
-  ['rally', 'RALLY', 2],
-  ['bouncer', 'BOUNCER', 1],
-  ['defender', 'DEFENDER', 1],
-  ['bubbler', 'BUBBLER', 2],
-  ['raider', 'RAIDER', 1],
-  ['meteors', 'METEORS', 1],
-  ['serpent', 'SERPENT', 1],
-  ['brawler', 'BRAWLER', 2],
-  ['adder', 'ADDER', 2],
+  ['rally', 'RALLY'],
+  ['bouncer', 'BOUNCER'],
+  ['defender', 'DEFENDER'],
+  ['bubbler', 'BUBBLER'],
+  ['raider', 'RAIDER'],
+  ['meteors', 'METEORS'],
+  ['serpent', 'SERPENT'],
+  ['brawler', 'BRAWLER'],
+  ['adder', 'ADDER'],
 ];
 
 async function openArcade(t, width = 390, height = 844) {
@@ -39,8 +39,8 @@ test('the aisle shows one complete, selectable cabinet for every game', async (t
     hasStart: !!card.querySelector('.machine-start'),
     deck: card.querySelector('.machine-controls iframe')?.getAttribute('src'),
   })));
-  assert.deepEqual(cabinets, GAMES.map(([slug, title, stations]) => ({
-    slug, title, stations, hasScreen: true, hasCoinDoor: true, hasStart: true, deck: `machine-deck.html?game=${slug}`,
+  assert.deepEqual(cabinets, GAMES.map(([slug, title]) => ({
+    slug, title, stations: 2, hasScreen: true, hasCoinDoor: true, hasStart: true, deck: `machine-deck.html?game=${slug}`,
   })));
   const marqueeArt = await page.locator('#game-grid .card').evaluateAll((cards) =>
     cards.map((card) => getComputedStyle(card).getPropertyValue('--marquee-art').trim()));
@@ -207,13 +207,13 @@ for (const width of [1280, 390, 320]) {
   });
 }
 
-for (const [index, [slug, title, players]] of GAMES.entries()) {
+for (const [index, [slug, title]] of GAMES.entries()) {
   test(`${title}: press its Start and reach playable controls`, async (t) => {
     const { page, origin } = await openArcade(t);
     for (let step = 0; step < index; step++) await page.keyboard.press('ArrowRight');
     await page.waitForFunction((game) => document.querySelector('.card-focused')?.dataset.gameUrl === `${game}/index.html`, slug);
     const machine = page.locator('.card-focused');
-    assert.equal(await machine.locator('.machine-station').count(), players);
+    assert.equal(await machine.locator('.machine-station').count(), 2, 'every cabinet seats two');
     assert.equal(await page.evaluate(() => getCoins()), 0);
 
     if (index % 2) {
@@ -251,32 +251,14 @@ for (const [index, [slug, title, players]] of GAMES.entries()) {
     await page.waitForFunction(() => getCoins() === 0, null, { timeout: 5000 });
     assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-start')), null,
       `${title} consumed the cabinet Start action`);
-    if (slug === 'rally') {
-      const touchState = await page.locator('#touch-strip .ts-glass').evaluate((surface) => {
-        const box = surface.getBoundingClientRect();
-        const details = { bubbles: true, pointerId: 71, pointerType: 'touch',
-          clientX: box.left + box.width / 4, clientY: box.top + box.height / 2 };
-        surface.dispatchEvent(new PointerEvent('pointerdown', details));
-        const held = window.blipTouchDown(0);
-        surface.dispatchEvent(new PointerEvent('pointerup', details));
-        return held;
-      });
-      assert.equal(touchState, 2, 'Rally’s paddle strip reaches the game as a pressed touch');
-    } else {
-      await page.evaluate(() => {
-        window.__cabinetActionKeys = [];
-        document.querySelector('canvas').addEventListener('keydown', (event) => window.__cabinetActionKeys.push(event.code));
-      });
-      const actionTarget = ['serpent', 'bouncer', 'defender', 'bubbler', 'adder'].includes(slug) ?
-        '#touch-strip .ts-glass' : '#snes-pad .snes-btn[data-blip="button1"]';
-      const action = page.locator(actionTarget);
-      if (slug === 'bubbler') {
-        const box = await action.boundingBox();
-        await action.tap({ timeout: 3000, position: { x: box.width * .9, y: box.height * .8 } });
-      } else await action.tap({ timeout: 3000 });
-      const expected = await page.evaluate(() => BLIP_GAMES[blipGameFromPath(location.pathname).slug]?.buttons?.[0]?.code || 'Space');
-      await page.waitForFunction((code) => window.__cabinetActionKeys?.includes(code), expected, { timeout: 2000 });
-    }
+    // The arcade plays with the cabinet's own controls: player one's first cap, or Rally's dial.
+    await page.evaluate(() => {
+      window.__cabinetActionKeys = [];
+      document.querySelector('canvas').addEventListener('keydown', (event) => window.__cabinetActionKeys.push(event.code));
+    });
+    await page.locator(slug === 'rally' ? '#paddle-dial' : '#fire-buttons .arcade-btn[data-blip="button1"]').tap({ timeout: 3000 });
+    const expected = await page.evaluate(() => BLIP_GAMES[blipGameFromPath(location.pathname).slug]?.buttons?.[0]?.code || 'Space');
+    await page.waitForFunction((code) => window.__cabinetActionKeys?.includes(code), expected, { timeout: 2000 });
   });
 }
 

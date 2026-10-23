@@ -65,14 +65,14 @@ test('a running BASIC game keeps its playfield between the side controls in land
     };
     return {
       screen: rect('.screen'),
-      stick: rect('.stick-base'),
-      buttons: rect('.fire-buttons'),
+      stick: rect('#snes-pad .snes-face'),
+      buttons: rect('#snes-pad-p2 .snes-dpad'),
       width: document.documentElement.scrollWidth,
       height: document.documentElement.scrollHeight,
     };
   });
   assert.ok(game.screen.width > 200, 'the BASIC screen stays large enough to play');
-  assert.ok(game.stick.right < game.screen.left, 'the stick stays in the left gutter');
-  assert.ok(game.buttons.left > game.screen.right, 'the action buttons stay in the right gutter');
+  assert.ok(game.stick.right < game.screen.left, "player one's pad stays in the left gutter");
+  assert.ok(game.buttons.left > game.screen.right, "player two's pad stays in the right gutter");
   assert.deepEqual([game.width, game.height], [844, 390], 'the play view fits the landscape viewport');
 });

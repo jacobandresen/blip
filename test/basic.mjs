@@ -66,7 +66,7 @@ test('BASIC gameplay stays between the top bar and controls on desktop and phone
       await page.waitForFunction(() => document.querySelector('.monitor').getAnimations().every((animation) => animation.playState === 'finished'));
       const bounds = await page.evaluate(() => {
         const box = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON();
-        return { bar: box('.top-marquee-bar'), monitor: box('.monitor'), screen: box('.screen'), stick: box('.stick-base'), buttons: box('.fire-buttons'), controls: Math.min(...['.amstrad-controls', '.stick-base', '.fire-buttons'].map((selector) => box(selector).top)) };
+        return { bar: box('.top-marquee-bar'), monitor: box('.monitor'), screen: box('.screen'), stick: box('#snes-pad .snes-face'), buttons: box('#snes-pad-p2 .snes-dpad'), controls: Math.min(...['.amstrad-controls', '#snes-pad .snes-dpad', '#snes-pad .snes-face'].map((selector) => box(selector).top)) };
       });
       const label = `${viewport.width} × ${viewport.height}, ${mode}: ${JSON.stringify(bounds)}`;
       assert.ok(bounds.monitor.left >= -1 && bounds.monitor.right <= viewport.width + 1, label);
@@ -127,9 +127,9 @@ test('the expanded monitor fills the screen during a BASIC game, without the con
   const restored = await page.evaluate(() => ({
     screen: document.querySelector('.screen').getBoundingClientRect().toJSON(),
     bar: document.querySelector('.top-marquee-bar').getBoundingClientRect().bottom,
-    controls: document.querySelector('.stick-base').getBoundingClientRect().top,
-    stick: document.querySelector('.stick-base').getBoundingClientRect().right,
-    buttons: document.querySelector('.fire-buttons').getBoundingClientRect().left,
+    controls: document.querySelector('#snes-pad .snes-dpad').getBoundingClientRect().top,
+    stick: document.querySelector('#snes-pad .snes-face').getBoundingClientRect().right,
+    buttons: document.querySelector('#snes-pad-p2 .snes-dpad').getBoundingClientRect().left,
   }));
   assert.ok(restored.screen.top >= restored.bar && restored.screen.left > restored.stick - 1 && restored.screen.right < restored.buttons + 1, `restored after rotation: ${JSON.stringify(restored)}`);
 });
@@ -140,7 +140,7 @@ test('BASIC stores and runs a numbered program, then launches a BLIP BASIC game 
   await page.goto(`${origin}/basic.html`);
   const startupMonitorWidth = await page.locator('.monitor').evaluate((el) => el.getBoundingClientRect().width);
   assert.ok(startupMonitorWidth >= 600, 'the front-page monitor uses the available desktop width');
-  assert.notEqual(await page.evaluate(() => document.activeElement.id), 'stick-base');
+  assert.notEqual(await page.evaluate(() => document.activeElement.closest('.snes-pad')?.id ?? ''), 'snes-pad');
   await page.evaluate(() => {
     BlipBasic.submit('10 FOR I=1 TO 3');
     BlipBasic.submit('20 PRINT "BLIP";I');
@@ -181,10 +181,10 @@ test('BASIC stores and runs a numbered program, then launches a BLIP BASIC game 
   await page.setViewportSize({ width: 844, height: 390 });
   await page.waitForFunction(() => {
     const monitor = document.querySelector('.monitor').getBoundingClientRect();
-    const controlsTop = document.querySelector('#stick-base').getBoundingClientRect().top;
+    const controlsTop = document.querySelector('#snes-pad .snes-dpad').getBoundingClientRect().top;
     const screen = document.querySelector('.screen').getBoundingClientRect();
-    const stickRight = document.querySelector('#stick-base').getBoundingClientRect().right;
-    const buttonsLeft = document.querySelector('.fire-buttons').getBoundingClientRect().left;
+    const stickRight = document.querySelector('#snes-pad .snes-face').getBoundingClientRect().right;
+    const buttonsLeft = document.querySelector('#snes-pad-p2 .snes-dpad').getBoundingClientRect().left;
     return screen.left > stickRight - 1 && screen.right < buttonsLeft + 1;
   });
   await page.setViewportSize({ width: 1000, height: 900 });
@@ -2179,7 +2179,7 @@ test('a game tape launches its BLIP BASIC program on the home computer', async (
     const canvas = frame.contentDocument.querySelector('#glcanvas');
     frame.contentWindow.__amstradKeys = [];
     canvas.addEventListener('keydown', (event) => frame.contentWindow.__amstradKeys.push(event.code));
-    document.querySelector('.fire-buttons .arcade-btn').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
+    document.querySelector('#snes-pad .snes-btn').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1 }));
   });
   await page.waitForFunction(() => document.querySelector('#basic-wasm-frame').contentWindow.__amstradKeys.includes('Space'));
   await gameFrame.locator('#glcanvas').evaluate((canvas) => canvas.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape', code: 'Escape' })));

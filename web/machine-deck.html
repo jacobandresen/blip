@@ -7,14 +7,14 @@
   <!-- One game's control deck, built and styled exactly as on its game page; each cabinet in the aisle shows it.
        The coin mechanism is the cabinet's own door, below the deck. -->
   <script>window.BLIP_DECK_GAME = new URLSearchParams(location.search).get('game'); document.documentElement.setAttribute('data-deck-preview','');</script>
-  <script src="blip_core.js?v=6"></script>
-  <link rel="stylesheet" href="kiosk.css?v=154">
-  <link rel="stylesheet" href="shell.css?v=106">
+  <script src="blip_core.js?v=7"></script>
+  <link rel="stylesheet" href="kiosk.css?v=156">
+  <link rel="stylesheet" href="shell.css?v=109">
   <link rel="stylesheet" href="wear.css?v=13">
   <style>
     html,body {background:transparent!important;overflow:hidden}
     html[data-deck-preview] .stick-handle {transition:transform 2.48s cubic-bezier(.4,0,.2,1)}
-    body::before,body::after,.manual-pocket,#control-toggle {display:none!important}
+    body::before,body::after,.manual-pocket {display:none!important}
   </style>
 </head>
 <body class="cabinet-page">
@@ -25,6 +25,6 @@
    </div>
   </div>
   <script>if (window.BLIP_DECK_GAME === 'rally') document.documentElement.setAttribute('data-dials', '');</script>
-  <script src="deck.js?v=14"></script>
+  <script src="deck.js?v=15"></script>
 </body>
 </html>

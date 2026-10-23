@@ -89,8 +89,9 @@ fn steer_person(seat: usize, solo: bool) -> Steer {
         (false, true) => 1.0,
         _ => 0.0,
     };
-    if seat == 0 && web::controls() == web::Controls::Touch {
-        if let Some((x, _, _)) = web::touch_fraction(0) {
+    // By touch, alone the whole strip is player one's; two playing, each has a half of it (shell.js).
+    if (seat == 0 || !solo) && web::controls() == web::Controls::Touch {
+        if let Some((x, _, _)) = web::touch_fraction(seat) {
             turn = if x < 0.45 { -1.0 } else if x > 0.55 { 1.0 } else { 0.0 };
         }
     }

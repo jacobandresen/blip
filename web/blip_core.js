@@ -37,50 +37,32 @@ function blipControls() {
   return root.getAttribute('data-controls') === 'stick' ? 'stick' : 'pad';
 }
 
-/** The pad or stick chosen, which a game without a touch strip keeps using
- * while touch is chosen. */
-function blipPhysicalControls() {
-  var m = 'pad';
-  try { m = localStorage.getItem('blip-controls') || 'pad'; } catch (e) {}
-  return m === 'stick' ? 'stick' : 'pad';
-}
-
-/** A touch screen: the only place TOUCH is offered. */
+/** A touch screen: the only place the touch strip is offered. */
 function blipHasTouch() {
   return ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 }
 
-/** On a touch screen: touch was chosen, or no choice has been made yet. */
-function blipTouchChosen() {
-  if (!blipHasTouch()) return false;
-  var v = null;
-  try { v = localStorage.getItem('blip-touch'); } catch (e) {}
-  return v !== '0';
+/** Each front end plays with one controller, every deck seating two: the arcade's joysticks, the home screen's
+ * and an app's touch, BASIC's pads. Rally keeps its dials and its split strip (shell.js). */
+function blipFrontendControls() {
+  // ?controls= overrides it, for the tests and for trying another deck.
+  var asked = new URLSearchParams(location.search).get('controls');
+  if (asked === 'stick' || asked === 'pad' || asked === 'touch') return asked;
+  if (blipAmstradMode() || /\/basic\.html$/.test(location.pathname)) return 'pad';
+  if (!blipFreePlay()) return 'stick';
+  return blipFrontend() === 'basic' && !blipAppMode() ? 'pad' : 'touch';
 }
 
-/** Apply the stored choice as <html data-controls> (+ data-touch). Touch
- * borrows the pad's bar so the picture is fitted the same. */
+/** Apply the front end's controller as <html data-controls> (+ data-touch). Touch borrows the pad's bar so the
+ * picture is fitted the same; a game with no strip is touched through its pad. */
 function blipApplyControls() {
   var root = document.documentElement;
   var game = blipGameFromPath(window.location.pathname);
-  var touch = !!(game && game.touch) && blipTouchChosen();
-  root.setAttribute('data-controls', touch ? 'pad' : blipPhysicalControls());
+  var fixed = blipFrontendControls();
+  var touch = fixed === 'touch' && !!(game && game.touch) && blipHasTouch();
+  root.setAttribute('data-controls', fixed === 'stick' ? 'stick' : 'pad');
   if (touch) root.setAttribute('data-touch', game.touch.kind);
   else root.removeAttribute('data-touch');
-}
-
-function blipSetControls(mode) {
-  try {
-    if (mode === 'touch') localStorage.setItem('blip-touch', '1');
-    else {
-      localStorage.setItem('blip-touch', '0');
-      if (mode === 'pad' || mode === 'stick') localStorage.setItem('blip-controls', mode);
-    }
-  } catch (e) {}
-  blipApplyControls();
-  if (typeof window.onBlipControlsChange === 'function') {
-    try { window.onBlipControlsChange(blipControls()); } catch (e) {}
-  }
 }
 
 /* ---- Per-game cabinet identity ---- Card colours on the landing page,

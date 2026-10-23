@@ -6,12 +6,8 @@ test('Adder opens the second station and joins a human player from the title', a
   const { page, origin } = await openPage(t, 'chromium', {
     hasTouch: true, viewport: { width: 390, height: 844 },
   });
-  await page.addInitScript(() => {
-    sessionStorage.setItem('blip-coins', '4');
-    localStorage.setItem('blip-controls', 'pad');
-    localStorage.setItem('blip-touch', '0');
-  });
-  await page.goto(`${origin}/adder/index.html`);
+  await page.addInitScript(() => sessionStorage.setItem('blip-coins', '4'));
+  await page.goto(`${origin}/adder/index.html?controls=pad`);
   await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
   assert.equal(await page.locator('html').getAttribute('data-players'), '2',
     'the second station must be available before the game starts');

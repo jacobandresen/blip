@@ -982,52 +982,11 @@ window.addEventListener('keydown', function (e) {
     }));
   });
 
-  // ---- The controller selector ----
-  // Oldest to newest: JOYSTICK · PAD (· TOUCH on a game with a strip, on a
-  // touch screen); Rally has DIAL · TOUCH there and nothing to pick elsewhere.
-  var picker = document.getElementById('control-toggle');
+  // No controller to choose: the front end decides it (blipFrontendControls).
   var touchSpec = game && game.touch;
-  function syncPicker() {
-    if (!picker) return;
-    var now = blipControls();
-    Array.prototype.forEach.call(picker.children, function (b) {
-      var on = b.getAttribute('data-mode') === now ||
-               (b.getAttribute('data-mode') === 'dial' && now !== 'touch');
-      b.setAttribute('aria-checked', on ? 'true' : 'false');
-    });
-  }
-  if (picker) {
-    var modes = isRally ? ['dial'] : ['stick', 'pad'];
-    var LABEL = { stick: 'joystick', pad: 'd-pad' };
-    if (touchSpec && blipHasTouch()) modes.push('touch');
-    if (modes.length < 2) modes = [];
-    modes.forEach(function (m) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.setAttribute('role', 'radio');
-      b.setAttribute('data-mode', m);
-      b.title = { stick:'Use the joystick', pad:'Use the directional pad', touch:'Use touch gestures', dial:'Use the paddle dial' }[m];
-      b.textContent = LABEL[m] || m;
-      b.addEventListener('click', function () {
-        blipSetControls(m === 'dial' ? blipPhysicalControls() : m);
-        // Back to the game, so the keyboard and gamepad drive it at once.
-        try { canvas.focus({ preventScroll: true }); } catch (e) {}
-      });
-      picker.appendChild(b);
-    });
-    syncPicker();
-  }
   var touchPlay = bindTouchPlay();
   window.blipReleaseTouch = touchPlay.release;
-  window.onBlipControlsChange = function () {
-    BlipController.releaseAll();
-    touchPlay.release();
-    stations.forEach(function (st) { st.held = {}; leanStick(st); });
-    syncPicker();
-    // The controllers are different heights, so the picture has to be
-    // re-fitted or it keeps the other one's reservation.
-    if (typeof fillCanvas === 'function') fillCanvas();
-  };
+
 
   // Touch drag/paddles send positions; swipe sends keys. Serpent accepts picture swipes in every mode.
   // Touch screens only; a touchscreen laptop's mouse may hover-play the trackpad.
@@ -1044,7 +1003,9 @@ window.addEventListener('keydown', function (e) {
     var strip = document.createElement('div');
     strip.id = 'touch-strip';
     strip.setAttribute('aria-hidden', 'true');
-    var halves = kind === 'paddles' || kind === 'platform' ? ['P1', '2P'] : [''];
+    // Adder steers two snakes: in a two-player match each player drags on their own half, as in Rally.
+    var twoSteer = kind === 'drag' && !!(game && game.players === 2);
+    var halves = kind === 'paddles' || kind === 'platform' || twoSteer ? ['P1', '2P'] : [''];
     strip.innerHTML = '<div class="ts-glass">' +
       halves.map(function (h, i) {
         return '<div class="ts-half" data-slot="' + i + '">' +
@@ -1134,17 +1095,25 @@ window.addEventListener('keydown', function (e) {
       var onStrip = e.target && e.target.closest && e.target.closest('.ts-glass');
       return (kind === 'drag' && onStrip ? glass : canvas).getBoundingClientRect();
     }
-    function frac(e) {
-      return { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
+    function frac(e, r) {
+      r = r || rect;
+      return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
     }
     // Rally: each player drags on their own half, except against the CPU,
     // where the whole screen is player one's.
     function slotFor(e) {
-      if (kind !== 'paddles' || root.hasAttribute('data-cpu')) return 0;
+      if (twoSteer ? !root.hasAttribute('data-versus') : (kind !== 'paddles' || root.hasAttribute('data-cpu'))) return 0;
       var onStrip = e.target && e.target.closest && e.target.closest('.ts-glass');
       var g = glass.getBoundingClientRect();
       var middle = onStrip ? g.left + g.width / 2 : window.innerWidth / 2;
       return e.clientX < middle ? 0 : 1;
+    }
+    // Where a finger steers from: a split strip's half (Adder, two playing), else the whole surface.
+    function slotRect(e, slot) {
+      var whole = surfaceRect(e);
+      if (!twoSteer || !root.hasAttribute('data-versus')) return whole;
+      var half = whole.width / 2;
+      return { left: whole.left + half * slot, top: whole.top, width: half, height: whole.height };
     }
     function setFire(down) {
       if (down === fireHeld) return;
@@ -1177,7 +1146,7 @@ window.addEventListener('keydown', function (e) {
     }
     function ignored(e) {
       return e.target && e.target.closest &&
-        e.target.closest('a, button, #need-coin-overlay, #rotate-hint, #control-toggle, .blip-hs-modal');
+        e.target.closest('a, button, #need-coin-overlay, #rotate-hint, .blip-hs-modal');
     }
 
     // A PC plays the trackpad like a laptop's: the pointer moves the paddle
@@ -1310,9 +1279,9 @@ window.addEventListener('keydown', function (e) {
         var slot = slotFor(e);
         // A second finger would take the control from the first, and lifting it would drop both.
         if (slots[slot] && !slots[slot].mouse) return;
-        var f = frac(e);
-        slots[slot] = { id: e.pointerId, x: f.x, y: f.y, pressed: true, mouse: false };
-        if (kind === 'drag') setFire(true);
+        var r = slotRect(e, slot), f = frac(e, r);
+        slots[slot] = { id: e.pointerId, x: f.x, y: f.y, pressed: true, mouse: false, rect: r };
+        if (kind === 'drag' && slot === 0) setFire(true);
       }
       showThumb(slots[0]);
     }, { passive: false });
@@ -1345,7 +1314,7 @@ window.addEventListener('keydown', function (e) {
         var t = slots[i];
         if (!t || t.id !== e.pointerId) continue;
         e.preventDefault();
-        var f = frac(e);
+        var f = frac(e, t.rect);
         t.x = f.x; t.y = f.y;
         if (i === 0) showThumb(t);
       }
@@ -1474,12 +1443,10 @@ window.addEventListener('keydown', function (e) {
     rotateHint();
   };
 
-  // The open title screen shows both stations so player two can join in either
-  // orientation; one-player matches hide the second station.
+  // Both stations stay on the panel in every mode (deck.js), so player two can join at any time.
   var open = false;
   function applyPlayers() {
-    var both = versus || open;
-    root.setAttribute('data-players', both ? '2' : '1');
+    root.setAttribute('data-players', '2');
   }
   window.addEventListener('resize', applyPlayers);
 
