@@ -3316,71 +3316,37 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("RAIDER", WIN_W, WIN_H)
 }
 
-const CLOUD_PNGS: [&[u8]; 3] = [
-    blip::png!("cloud_1"),
-    blip::png!("cloud_2"),
-    blip::png!("cloud_3"),
-];
+const CLOUD_PNGS: [&[u8]; 3] = [blip::png!("cloud_1"), blip::png!("cloud_2"), blip::png!("cloud_3")];
 // One sprite per island size (small/medium/large) — see ISLAND_SIZES above.
-const ISLAND_PNGS: [&[u8]; 3] = [
-    blip::png!("island_small"),
-    blip::png!("island_medium"),
-    blip::png!("island_large"),
-];
+const ISLAND_PNGS: [&[u8]; 3] = [blip::png!("island_small"), blip::png!("island_medium"), blip::png!("island_large")];
 
 // One sprite per boss tier (levels 1-7) — see BOSS_SPECS / BOSS_SIZES above.
 const BOSS_PNGS: [&[u8]; 7] = [
-    blip::png!("boss_1"),
-    blip::png!("boss_2"),
-    blip::png!("boss_3"),
-    blip::png!("boss_4"),
-    blip::png!("boss_5"),
-    blip::png!("boss_6"),
-    blip::png!("boss_7"),
+    blip::png!("boss_1"), blip::png!("boss_2"), blip::png!("boss_3"), blip::png!("boss_4"), blip::png!("boss_5"),
+    blip::png!("boss_6"), blip::png!("boss_7"),
 ];
 
 // The Japanese banner for each boss name — see draw_play()'s WARNING banner.
 const BOSS_NAME_JA_PNGS: [&[u8]; 7] = [
-    blip::png!("boss_name_ja_1"),
-    blip::png!("boss_name_ja_2"),
-    blip::png!("boss_name_ja_3"),
-    blip::png!("boss_name_ja_4"),
-    blip::png!("boss_name_ja_5"),
-    blip::png!("boss_name_ja_6"),
+    blip::png!("boss_name_ja_1"), blip::png!("boss_name_ja_2"), blip::png!("boss_name_ja_3"),
+    blip::png!("boss_name_ja_4"), blip::png!("boss_name_ja_5"), blip::png!("boss_name_ja_6"),
     blip::png!("boss_name_ja_7"),
 ];
 
 const SHOOT_WAV: [[&[u8]; 2]; 5] = [
-    [blip::wav!("burst1_1"), blip::wav!("burst1_2")],
-    [blip::wav!("burst2_1"), blip::wav!("burst2_2")],
-    [blip::wav!("burst3_1"), blip::wav!("burst3_2")],
-    [blip::wav!("burst4_1"), blip::wav!("burst4_2")],
+    [blip::wav!("burst1_1"), blip::wav!("burst1_2")], [blip::wav!("burst2_1"), blip::wav!("burst2_2")],
+    [blip::wav!("burst3_1"), blip::wav!("burst3_2")], [blip::wav!("burst4_1"), blip::wav!("burst4_2")],
     [blip::wav!("burst5_1"), blip::wav!("burst5_2")],
 ];
 const ENEMY_EXPLODE_WAV: [&[u8]; 4] = [
-    blip::wav!("enemy_explode0"),
-    blip::wav!("enemy_explode1"),
-    blip::wav!("enemy_explode2"),
+    blip::wav!("enemy_explode0"), blip::wav!("enemy_explode1"), blip::wav!("enemy_explode2"),
     blip::wav!("enemy_explode3"),
 ];
-const PLAYER_EXPLODE_WAV: [&[u8]; 2] = [
-    blip::wav!("player_explode0"),
-    blip::wav!("player_explode1"),
-];
-const RICOCHET_WAV: [&[u8]; 2] = [
-    blip::wav!("ricochet1"),
-    blip::wav!("ricochet2"),
-];
-const BOSS_EXPLODE_WAV: [&[u8]; 2] = [
-    blip::wav!("boss_explode0"),
-    blip::wav!("boss_explode1"),
-];
+const PLAYER_EXPLODE_WAV: [&[u8]; 2] = [blip::wav!("player_explode0"), blip::wav!("player_explode1")];
+const RICOCHET_WAV: [&[u8]; 2] = [blip::wav!("ricochet1"), blip::wav!("ricochet2")];
+const BOSS_EXPLODE_WAV: [&[u8]; 2] = [blip::wav!("boss_explode0"), blip::wav!("boss_explode1")];
 const ENGINE_WAV: [&[u8]; 5] = [
-    blip::wav!("engine0"),
-    blip::wav!("engine1"),
-    blip::wav!("engine2"),
-    blip::wav!("engine3"),
-    blip::wav!("engine4"),
+    blip::wav!("engine0"), blip::wav!("engine1"), blip::wav!("engine2"), blip::wav!("engine3"), blip::wav!("engine4"),
 ];
 
 #[blip::macroquad::main(conf)]
@@ -3409,10 +3375,7 @@ async fn main() {
         enemy_explode:  load_takes(&ENEMY_EXPLODE_WAV).await.try_into().unwrap(),
         player_explode: load_takes(&PLAYER_EXPLODE_WAV).await.try_into().unwrap(),
         player_hit:     blip::audio::load_sound(blip::wav!("player_hit")).await,
-        ricochet: [
-            blip::audio::load_sound(RICOCHET_WAV[0]).await,
-            blip::audio::load_sound(RICOCHET_WAV[1]).await,
-        ],
+        ricochet:       load_takes(&RICOCHET_WAV).await.try_into().unwrap(),
         boss_explode:   load_takes(&BOSS_EXPLODE_WAV).await.try_into().unwrap(),
         boss_warning:   blip::audio::load_sound(blip::wav!("boss_warning")).await,
         powerup_up: [
@@ -3435,13 +3398,7 @@ async fn main() {
         engine_splutter: blip::audio::load_sound(blip::wav!("engine_splutter")).await,
         enemy_gun:      blip::audio::load_sound(blip::wav!("enemy_gun")).await,
         backfire:       blip::audio::load_sound(blip::wav!("backfire")).await,
-        engine: [
-            blip::audio::load_sound(ENGINE_WAV[0]).await,
-            blip::audio::load_sound(ENGINE_WAV[1]).await,
-            blip::audio::load_sound(ENGINE_WAV[2]).await,
-            blip::audio::load_sound(ENGINE_WAV[3]).await,
-            blip::audio::load_sound(ENGINE_WAV[4]).await,
-        ],
+        engine:         load_takes(&ENGINE_WAV).await.try_into().unwrap(),
     };
     // Two loops in rotation,
     // so a long level doesn't hear the same ~40s on repeat.

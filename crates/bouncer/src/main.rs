@@ -1024,26 +1024,13 @@ fn conf() -> blip::macroquad::window::Conf {
 }
 
 const DROP_PNGS: [&[u8]; 5] = [
-    blip::png!("drop_wide"),
-    blip::png!("drop_narrow"),
-    blip::png!("drop_slow"),
-    blip::png!("drop_life"),
+    blip::png!("drop_wide"), blip::png!("drop_narrow"), blip::png!("drop_slow"), blip::png!("drop_life"),
     blip::png!("drop_multi"),
 ];
-const PADDLE_HIT_WAV: [&[u8]; 3] = [
-    blip::wav!("paddle_hit_0"),
-    blip::wav!("paddle_hit_1"),
-    blip::wav!("paddle_hit_2"),
-];
-const BRICK_HIT_WAV: [&[u8]; 3] = [
-    blip::wav!("brick_hit_0"),
-    blip::wav!("brick_hit_1"),
-    blip::wav!("brick_hit_2"),
-];
+const PADDLE_HIT_WAV: [&[u8]; 3] = [blip::wav!("paddle_hit_0"), blip::wav!("paddle_hit_1"), blip::wav!("paddle_hit_2")];
+const BRICK_HIT_WAV: [&[u8]; 3] = [blip::wav!("brick_hit_0"), blip::wav!("brick_hit_1"), blip::wav!("brick_hit_2")];
 const BRICK_BREAK_WAV: [&[u8]; 3] = [
-    blip::wav!("brick_break_0"),
-    blip::wav!("brick_break_1"),
-    blip::wav!("brick_break_2"),
+    blip::wav!("brick_break_0"), blip::wav!("brick_break_1"), blip::wav!("brick_break_2"),
 ];
 
 async fn load_takes(wavs: &[&'static [u8]; 3]) -> [blip::BlipSound; 3] {
@@ -1064,14 +1051,9 @@ async fn main() {
     let drops = DROP_PNGS.map(load_png_smooth);
     let ball_shade = load_png_smooth(blip::png!("ball_shade"));
     let brick = [
-        load_png(blip::png!("brick_red")),
-        load_png(blip::png!("brick_orange")),
-        load_png(blip::png!("brick_yellow")),
-        load_png(blip::png!("brick_green")),
-        load_png(blip::png!("brick_blue")),
-        load_png(blip::png!("brick_purple")),
-        load_png(blip::png!("brick_steel")),
-        load_png(blip::png!("brick_steel_cracked")),
+        load_png(blip::png!("brick_red")), load_png(blip::png!("brick_orange")), load_png(blip::png!("brick_yellow")),
+        load_png(blip::png!("brick_green")), load_png(blip::png!("brick_blue")), load_png(blip::png!("brick_purple")),
+        load_png(blip::png!("brick_steel")), load_png(blip::png!("brick_steel_cracked")),
         load_png(blip::png!("brick_bomb")),
     ];
 
