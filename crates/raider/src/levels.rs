@@ -85,12 +85,7 @@ pub const BOSS_SPECS: [BossSpec; 7] = [
         fire_max: 0.47,
         dips: true,
         escorts: true,
-        patterns: &[
-            BossPattern::Fan,
-            BossPattern::Aimed,
-            BossPattern::Sweep,
-            BossPattern::Curtain,
-        ],
+        patterns: &[BossPattern::Fan, BossPattern::Aimed, BossPattern::Sweep, BossPattern::Curtain],
         name: "FUGAKU",
     },
 ];
@@ -103,25 +98,10 @@ pub const FLIGHT_BONUS: i32 = 50;
 pub const BARRIER_MIN_LEVEL: i32 = 3;
 pub const MAX_LASERS: usize = 2;
 
-pub const BOSS_WING_GUNS: [&[f32]; 7] = [
-    &[],
-    &[0.62],
-    &[0.62],
-    &[0.36, 0.72],
-    &[0.31, 0.62],
-    &[0.32, 0.6, 0.8],
-    &[0.62],
-];
+pub const BOSS_WING_GUNS: [&[f32]; 7] =
+    [&[], &[0.62], &[0.62], &[0.36, 0.72], &[0.31, 0.62], &[0.32, 0.6, 0.8], &[0.62]];
 
-pub const BOSS_LASERS: [&[(f32, f32)]; 7] = [
-    &[],
-    &[],
-    &[],
-    &[],
-    &[],
-    &[(0.0, 0.42)],
-    &[(-0.36, 0.38), (0.36, 0.38)],
-];
+pub const BOSS_LASERS: [&[(f32, f32)]; 7] = [&[], &[], &[], &[], &[], &[(0.0, 0.42)], &[(-0.36, 0.38), (0.36, 0.38)]];
 
 pub const BOSS_WINGS: [(f32, f32, f32, f32); 7] = [
     (0.30, 0.52, 0.37, 0.46),

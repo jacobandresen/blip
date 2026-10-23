@@ -4,7 +4,7 @@ use super::{
     block::block_condition,
     color::paper_color,
     procedure::leading_name,
-    syntax::{assignment_eq, method_call, split_args, matching_else, print_items, split_statements, top_level_then},
+    syntax::{assignment_eq, matching_else, method_call, print_items, split_args, split_statements, top_level_then},
     ForLoop, Program, Value,
 };
 use crate::sounds::Sounds;
@@ -25,9 +25,7 @@ impl Program {
         }
         let command = method_call(source).map(|(name, args)| format!("{name} {args}"));
         let command = command.as_deref().unwrap_or(source);
-        let (keyword, rest) = command
-            .split_once(char::is_whitespace)
-            .unwrap_or((command, ""));
+        let (keyword, rest) = command.split_once(char::is_whitespace).unwrap_or((command, ""));
         let rest = rest.trim();
 
         match keyword.to_ascii_uppercase().as_str() {
@@ -145,32 +143,18 @@ impl Program {
         let eq = rest.find('=').ok_or("FOR needs =")?;
         let name = rest[..eq].trim().to_ascii_uppercase();
         let tail = rest[eq + 1..].trim();
-        let to = tail
-            .to_ascii_uppercase()
-            .find(" TO ")
-            .ok_or("FOR needs TO")?;
+        let to = tail.to_ascii_uppercase().find(" TO ").ok_or("FOR needs TO")?;
         let start = self.eval(tail[..to].trim(), blip)?.number();
         let tail = &tail[to + 4..];
         let step_at = tail.to_ascii_uppercase().find(" STEP ");
-        let end = self
-            .eval(step_at.map_or(tail, |i| &tail[..i]).trim(), blip)?
-            .number();
-        let step = if let Some(i) = step_at {
-            self.eval(tail[i + 6..].trim(), blip)?.number()
-        } else {
-            1.0
-        };
+        let end = self.eval(step_at.map_or(tail, |i| &tail[..i]).trim(), blip)?.number();
+        let step = if let Some(i) = step_at { self.eval(tail[i + 6..].trim(), blip)?.number() } else { 1.0 };
         self.vars.insert(name.clone(), Value::Num(start));
         // FOR I=1 TO 0 does nothing, as in AmigaBASIC: no pass with stale values.
         if step > 0.0 && start > end || step < 0.0 && start < end {
             return self.skip_loop();
         }
-        self.loops.push(ForLoop {
-            name,
-            end,
-            step,
-            resume: self.position.clone(),
-        });
+        self.loops.push(ForLoop { name, end, step, resume: self.position.clone() });
         Ok(())
     }
 
@@ -189,11 +173,7 @@ impl Program {
     }
 
     fn next_loop(&mut self, rest: &str) -> Result<(), String> {
-        let frame = self
-            .loops
-            .last()
-            .cloned()
-            .ok_or_else(|| format!("NEXT {} without FOR", rest))?;
+        let frame = self.loops.last().cloned().ok_or_else(|| format!("NEXT {} without FOR", rest))?;
         if let Some(name) = rest.split_whitespace().next() {
             if !name.is_empty() && name.to_ascii_uppercase() != frame.name {
                 return Err("NEXT variable mismatch".into());
@@ -201,13 +181,7 @@ impl Program {
         }
         let current = self.vars.get(&frame.name).map(Value::number).unwrap_or(0.0) + frame.step;
         self.vars.insert(frame.name.clone(), Value::Num(current));
-        if frame.step != 0.0
-            && if frame.step > 0.0 {
-                current <= frame.end
-            } else {
-                current >= frame.end
-            }
-        {
+        if frame.step != 0.0 && if frame.step > 0.0 { current <= frame.end } else { current >= frame.end } {
             self.position = frame.resume;
         } else {
             self.loops.pop();
@@ -222,15 +196,8 @@ impl Program {
         }
         let frequency = self.eval(&args[0], blip)?.number();
         let seconds = self.eval(&args[1], blip)?.number();
-        let volume = args
-            .get(2)
-            .map(|value| self.eval(value, blip).map(|v| v.number()))
-            .transpose()?
-            .unwrap_or(0.35);
-        if !(0.0..=12000.0).contains(&frequency)
-            || !(0.0..=10.0).contains(&seconds)
-            || !(0.0..=1.0).contains(&volume)
-        {
+        let volume = args.get(2).map(|value| self.eval(value, blip).map(|v| v.number())).transpose()?.unwrap_or(0.35);
+        if !(0.0..=12000.0).contains(&frequency) || !(0.0..=10.0).contains(&seconds) || !(0.0..=1.0).contains(&volume) {
             return Err("SOUND values are out of range".into());
         }
         self.sound_request = Some((frequency as f32, seconds as f32, volume as f32));
@@ -282,14 +249,8 @@ impl Program {
 
     fn assign(&mut self, command: &str, eq: usize, blip: &Blip) -> Result<(), String> {
         let lhs = command[..eq].trim();
-        let lhs = if lhs
-            .get(..4)
-            .is_some_and(|prefix| prefix.eq_ignore_ascii_case("LET "))
-        {
-            lhs[4..].trim()
-        } else {
-            lhs
-        };
+        let lhs =
+            if lhs.get(..4).is_some_and(|prefix| prefix.eq_ignore_ascii_case("LET ")) { lhs[4..].trim() } else { lhs };
         let value = self.eval(command[eq + 1..].trim(), blip)?;
         self.store(lhs, value, blip)
     }
@@ -298,9 +259,7 @@ impl Program {
     pub(super) fn store(&mut self, lhs: &str, value: Value, blip: &Blip) -> Result<(), String> {
         if let Some(open) = lhs.find('(') {
             let name = lhs[..open].trim().to_ascii_uppercase();
-            let arguments = lhs[open + 1..]
-                .strip_suffix(')')
-                .ok_or("Array assignment needs )")?;
+            let arguments = lhs[open + 1..].strip_suffix(')').ok_or("Array assignment needs )")?;
             let indices = split_args(arguments.trim())
                 .iter()
                 .map(|source| self.eval(source, blip))
@@ -317,5 +276,9 @@ impl Program {
 pub(super) fn sound_path(name: &str) -> String {
     let path = name.to_ascii_uppercase();
     let stem = path.strip_suffix(".TUNE").unwrap_or(&path);
-    if stem.ends_with(".WAV") { stem.to_string() } else { format!("{stem}.WAV") }
+    if stem.ends_with(".WAV") {
+        stem.to_string()
+    } else {
+        format!("{stem}.WAV")
+    }
 }

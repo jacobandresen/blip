@@ -11,7 +11,6 @@ mod syntax;
 #[cfg(test)]
 mod tests;
 mod value;
-
 use self::{
     block::{At, Block},
     procedure::{Frame, Function, Procedure},
@@ -19,8 +18,8 @@ use self::{
     value::Value,
 };
 use crate::shared_math;
-use blip::{Blip, BlipTex};
 use crate::sounds::Sounds;
+use blip::{Blip, BlipTex};
 use std::{collections::HashMap, sync::Arc};
 
 // Calls and loops save the pending THEN actions as well as the source position.
@@ -76,12 +75,7 @@ pub(crate) struct Program {
 }
 impl Program {
     pub(crate) fn new() -> Self {
-        Self {
-            rng: 0x5eed,
-            pen: 1,
-            input_step: true,
-            ..Self::default()
-        }
+        Self { rng: 0x5eed, pen: 1, input_step: true, ..Self::default() }
     }
 
     fn random(&mut self, max: f64) -> f64 {
@@ -89,11 +83,7 @@ impl Program {
         (self.rng >> 32) as f64 / (u32::MAX as f64 + 1.0) * max
     }
     pub(crate) fn load(&mut self, source: &str) {
-        *self = Self {
-            rng: self.rng,
-            active: true,
-            ..Self::new()
-        };
+        *self = Self { rng: self.rng, active: true, ..Self::new() };
         self.input.clear();
         self.lines = source
             .lines()
@@ -106,12 +96,7 @@ impl Program {
         self.statements = self
             .lines
             .iter()
-            .map(|(_, source)| {
-                split_statements(source)
-                    .into_iter()
-                    .map(Arc::<str>::from)
-                    .collect()
-            })
+            .map(|(_, source)| split_statements(source).into_iter().map(Arc::<str>::from).collect())
             .collect();
         if let Err(error) = self.find_procedures().and_then(|_| self.find_blocks()).and_then(|_| self.find_data()) {
             self.error = Some(format!("? {error}"));
@@ -120,11 +105,8 @@ impl Program {
     }
     fn goto(&mut self, number: f64) -> Result<(), String> {
         let number = number as u16;
-        self.position.line = self
-            .lines
-            .iter()
-            .position(|(n, _)| *n == number)
-            .ok_or_else(|| format!("Line {number} not found"))?;
+        self.position.line =
+            self.lines.iter().position(|(n, _)| *n == number).ok_or_else(|| format!("Line {number} not found"))?;
         self.position.statement = 0;
         self.position.pending.clear();
         Ok(())
@@ -152,12 +134,7 @@ impl Program {
         self.active = false;
     }
 
-    pub(crate) fn tick(
-        &mut self,
-        blip: &mut Blip,
-        textures: &HashMap<String, BlipTex>,
-        sounds: &mut Sounds,
-    ) {
+    pub(crate) fn tick(&mut self, blip: &mut Blip, textures: &HashMap<String, BlipTex>, sounds: &mut Sounds) {
         const FRAME_BUDGET: usize = 50_000;
         const RUNAWAY_LIMIT: u32 = 100_000;
 

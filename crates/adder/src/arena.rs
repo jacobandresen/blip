@@ -122,10 +122,7 @@ impl Snake {
         self.path.clear();
         for i in 0..self.len_s {
             let d = i as f32 * SAMPLE;
-            self.path.push_back(Pt::new(
-                self.head.x - self.heading.cos() * d,
-                self.head.y - self.heading.sin() * d,
-            ));
+            self.path.push_back(Pt::new(self.head.x - self.heading.cos() * d, self.head.y - self.heading.sin() * d));
         }
     }
 
@@ -160,11 +157,7 @@ impl Snake {
             ));
             if self.gap_left > 0 {
                 if self.gap_left == HOLE_S {
-                    self.holes.push(Hole {
-                        at: 0,
-                        len: 1,
-                        spent: false,
-                    });
+                    self.holes.push(Hole { at: 0, len: 1, spent: false });
                 } else if let Some(h) = self.holes.last_mut() {
                     h.at = 0;
                     h.len += 1;
@@ -181,42 +174,12 @@ impl Snake {
 
 pub fn seat_colour(seat: usize) -> BlipColor {
     match seat {
-        0 => BlipColor {
-            r: 0.62,
-            g: 0.73,
-            b: 0.28,
-            a: 1.0,
-        },
-        1 => BlipColor {
-            r: 0.45,
-            g: 0.85,
-            b: 1.0,
-            a: 1.0,
-        },
-        2 => BlipColor {
-            r: 0.78,
-            g: 0.55,
-            b: 1.0,
-            a: 1.0,
-        },
-        3 => BlipColor {
-            r: 0.45,
-            g: 0.95,
-            b: 0.55,
-            a: 1.0,
-        },
-        4 => BlipColor {
-            r: 0.95,
-            g: 0.45,
-            b: 0.35,
-            a: 1.0,
-        },
-        _ => BlipColor {
-            r: 0.78,
-            g: 0.78,
-            b: 0.84,
-            a: 1.0,
-        },
+        0 => BlipColor { r: 0.62, g: 0.73, b: 0.28, a: 1.0 },
+        1 => BlipColor { r: 0.45, g: 0.85, b: 1.0, a: 1.0 },
+        2 => BlipColor { r: 0.78, g: 0.55, b: 1.0, a: 1.0 },
+        3 => BlipColor { r: 0.45, g: 0.95, b: 0.55, a: 1.0 },
+        4 => BlipColor { r: 0.95, g: 0.45, b: 0.35, a: 1.0 },
+        _ => BlipColor { r: 0.78, g: 0.78, b: 0.84, a: 1.0 },
     }
 }
 
@@ -298,17 +261,11 @@ impl World {
     }
 
     pub fn score_of(&self, seat: usize) -> i32 {
-        self.snakes
-            .iter()
-            .find(|s| s.seat == seat)
-            .map_or(0, |s| s.score)
+        self.snakes.iter().find(|s| s.seat == seat).map_or(0, |s| s.score)
     }
 
     pub fn lives_of(&self, seat: usize) -> i32 {
-        self.snakes
-            .iter()
-            .find(|s| s.seat == seat)
-            .map_or(0, |s| s.lives)
+        self.snakes.iter().find(|s| s.seat == seat).map_or(0, |s| s.lives)
     }
 
     pub fn speed_base(&self) -> f32 {
@@ -358,12 +315,16 @@ impl World {
         let score = |a: f32| {
             let wall = self.wall_hit(p, ahead(p, a)).min(120.0);
             let mine = ahead(p, a);
-            let apart = self.snakes.iter().filter(|s| s.alive)
+            let apart = self
+                .snakes
+                .iter()
+                .filter(|s| s.alive)
                 .map(|s| mine.dist(ahead(s.head, s.heading)).min(mine.dist(s.head)))
                 .fold(240.0f32, f32::min);
             wall * 2.0 + apart
         };
-        (0..16).map(|k| k as f32 * std::f32::consts::TAU / 16.0)
+        (0..16)
+            .map(|k| k as f32 * std::f32::consts::TAU / 16.0)
             .max_by(|a, b| score(*a).total_cmp(&score(*b)))
             .unwrap_or(0.0)
     }
@@ -418,13 +379,7 @@ impl World {
         self.first_hit_with_heads(who, from, to, None)
     }
 
-    fn first_hit_with_heads(
-        &self,
-        who: usize,
-        from: Pt,
-        to: Pt,
-        moving_heads: Option<&[bool]>,
-    ) -> Hit {
+    fn first_hit_with_heads(&self, who: usize, from: Pt, to: Pt, moving_heads: Option<&[bool]>) -> Hit {
         let r = BODY_R;
         if to.x < self.pit.x + r
             || to.x > self.pit.x + self.pit.w - r
@@ -476,27 +431,34 @@ impl World {
         }
         let mut moves = [None; MAX_SNAKES];
         for i in 0..self.snakes.len() {
-            if !moving_heads[i] { continue; }
+            if !moving_heads[i] {
+                continue;
+            }
             self.tick_hole(i, dt);
             let seat = self.snakes[i].seat.min(SEATS - 1);
             let from = self.snakes[i].head;
             let s = &mut self.snakes[i];
             s.heading += steers[seat].turn.clamp(-1.0, 1.0) * TURN * dt;
-            let to = Pt::new(
-                from.x + s.heading.cos() * speed * dt,
-                from.y + s.heading.sin() * speed * dt,
-            );
+            let to = Pt::new(from.x + s.heading.cos() * speed * dt, from.y + s.heading.sin() * speed * dt);
             let hit = self.first_hit_with_heads(i, from, to, Some(&moving_heads));
             moves[i] = Some((from, to, hit));
         }
         for i in 0..moves.len() {
-            let Some((from_i, to_i, _)) = moves[i] else { continue; };
+            let Some((from_i, to_i, _)) = moves[i] else {
+                continue;
+            };
             for j in i + 1..moves.len() {
-                let Some((from_j, to_j, _)) = moves[j] else { continue; };
+                let Some((from_j, to_j, _)) = moves[j] else {
+                    continue;
+                };
                 if segment_circle_overlap(
-                    from_i.x - from_j.x, from_i.y - from_j.y,
-                    to_i.x - to_j.x, to_i.y - to_j.y,
-                    0.0, 0.0, BODY_R * 2.0,
+                    from_i.x - from_j.x,
+                    from_i.y - from_j.y,
+                    to_i.x - to_j.x,
+                    to_i.y - to_j.y,
+                    0.0,
+                    0.0,
+                    BODY_R * 2.0,
                 ) {
                     moves[i].as_mut().unwrap().2 = Hit::Body(j);
                     moves[j].as_mut().unwrap().2 = Hit::Body(i);
@@ -504,7 +466,9 @@ impl World {
             }
         }
         for i in 0..moves.len() {
-            let Some((_, to, hit)) = moves[i] else { continue; };
+            let Some((_, to, hit)) = moves[i] else {
+                continue;
+            };
             match hit {
                 Hit::Wall => {
                     self.eliminate(i, None);
@@ -545,12 +509,7 @@ impl World {
         hole.spent = true;
         let pts = HOLE_POINTS * self.round;
         self.snakes[i].score += pts;
-        self.fx.popup(
-            at.x,
-            at.y - 14.0,
-            &format!("+{pts}"),
-            self.snakes[i].colour(),
-        );
+        self.fx.popup(at.x, at.y - 14.0, &format!("+{pts}"), self.snakes[i].colour());
         self.events.push(Event::Through);
         blip::bot::add("through", 1.0);
     }
@@ -620,14 +579,8 @@ mod tests {
     fn body_collisions_follow_the_thin_width() {
         let mut w = bare();
         w.snakes.push(wall());
-        assert_eq!(
-            w.first_hit(0, Pt::new(76.0, 273.0), Pt::new(88.0, 273.0)),
-            Hit::None
-        );
-        assert!(matches!(
-            w.first_hit(0, Pt::new(76.0, 271.0), Pt::new(88.0, 271.0)),
-            Hit::Body(0)
-        ));
+        assert_eq!(w.first_hit(0, Pt::new(76.0, 273.0), Pt::new(88.0, 273.0)), Hit::None);
+        assert!(matches!(w.first_hit(0, Pt::new(76.0, 271.0), Pt::new(88.0, 271.0)), Hit::Body(0)));
     }
 
     #[test]
@@ -637,11 +590,7 @@ mod tests {
         let from = Pt::new(84.0, 250.0);
         let to = Pt::new(84.0, 280.0);
         assert_eq!(w.first_hit(0, from, to), Hit::Body(0));
-        w.snakes[0].holes.push(Hole {
-            at: 5,
-            len: 7,
-            spent: false,
-        });
+        w.snakes[0].holes.push(Hole { at: 5, len: 7, spent: false });
         assert_eq!(w.first_hit(0, from, to), Hit::Gap(0, 0));
     }
 
@@ -649,37 +598,22 @@ mod tests {
     fn a_solid_trail_is_not_masked_by_an_overlapping_gap() {
         let mut w = bare();
         w.snakes.push(wall());
-        w.snakes[0].holes.push(Hole {
-            at: 5,
-            len: 7,
-            spent: false,
-        });
+        w.snakes[0].holes.push(Hole { at: 5, len: 7, spent: false });
         w.snakes.push(wall());
-        assert_eq!(
-            w.first_hit(0, Pt::new(84.0, 250.0), Pt::new(84.0, 280.0)),
-            Hit::Body(1)
-        );
+        assert_eq!(w.first_hit(0, Pt::new(84.0, 250.0), Pt::new(84.0, 280.0)), Hit::Body(1));
     }
 
     #[test]
     fn a_gap_pays_once_but_stays_passable() {
         let mut w = bare();
         w.snakes.push(wall());
-        w.snakes[0].holes.push(Hole {
-            at: 5,
-            len: 7,
-            spent: false,
-        });
-        w.snakes
-            .push(Snake::new(0, true, Pt::new(84.0, 250.0), 0.0));
+        w.snakes[0].holes.push(Hole { at: 5, len: 7, spent: false });
+        w.snakes.push(Snake::new(0, true, Pt::new(84.0, 250.0), 0.0));
         w.go_through(1, 0, 0, Pt::new(84.0, 270.0));
         w.go_through(1, 0, 0, Pt::new(84.0, 270.0));
         assert_eq!(w.snakes[1].score, HOLE_POINTS);
         assert_eq!(w.events, vec![Event::Through]);
-        assert_eq!(
-            w.first_hit(1, Pt::new(84.0, 260.0), Pt::new(84.0, 280.0)),
-            Hit::Gap(0, 0)
-        );
+        assert_eq!(w.first_hit(1, Pt::new(84.0, 260.0), Pt::new(84.0, 280.0)), Hit::Gap(0, 0));
         w.tick_hole(0, 10.0);
         assert!(w.snakes[0].in_hole(8));
     }
@@ -687,8 +621,7 @@ mod tests {
     #[test]
     fn moving_keeps_the_tail_and_grows_without_food() {
         let mut w = bare();
-        w.snakes
-            .push(Snake::new(0, true, Pt::new(200.0, 200.0), 0.0));
+        w.snakes.push(Snake::new(0, true, Pt::new(200.0, 200.0), 0.0));
         let tail = w.snakes[0].path.back().copied();
         for _ in 0..60 {
             w.step(1.0 / 60.0, &[Steer::default(); SEATS]);
@@ -710,11 +643,7 @@ mod tests {
     #[test]
     fn growth_keeps_gaps_at_their_original_position() {
         let mut s = wall();
-        s.holes.push(Hole {
-            at: 5,
-            len: 7,
-            spent: false,
-        });
+        s.holes.push(Hole { at: 5, len: 7, spent: false });
         let centre = s.hole_centre();
         s.grow(Pt::new(100.0, 270.0), Pt::new(120.0, 270.0));
         assert_eq!(s.hole_centre(), centre);
@@ -755,15 +684,7 @@ mod tests {
         assert!(!w.snakes[0].in_hole(0));
         assert!(w.snakes[0].in_hole(2));
         assert!(!w.snakes[0].in_hole(12));
-        assert_eq!(
-            w.snakes[0]
-                .path
-                .iter()
-                .skip(12)
-                .copied()
-                .collect::<VecDeque<_>>(),
-            old_path
-        );
+        assert_eq!(w.snakes[0].path.iter().skip(12).copied().collect::<VecDeque<_>>(), old_path);
         for i in 12..w.snakes[0].path.len() {
             assert!(!w.snakes[0].in_hole(i));
         }
@@ -772,10 +693,8 @@ mod tests {
     #[test]
     fn all_seats_and_rounds_move_at_the_same_speed() {
         let mut w = bare();
-        w.snakes
-            .push(Snake::new(0, true, Pt::new(200.0, 200.0), 0.0));
-        w.snakes
-            .push(Snake::new(1, false, Pt::new(200.0, 400.0), 0.0));
+        w.snakes.push(Snake::new(0, true, Pt::new(200.0, 200.0), 0.0));
+        w.snakes.push(Snake::new(1, false, Pt::new(200.0, 400.0), 0.0));
         w.round = 12;
         w.step(0.1, &[Steer::default(); SEATS]);
         assert_eq!(w.speed_base(), GLIDE);
@@ -786,11 +705,9 @@ mod tests {
     #[test]
     fn an_eliminated_worm_keeps_its_trail_and_never_revives_in_round() {
         let mut w = bare();
-        w.snakes
-            .push(Snake::new(0, true, Pt::new(200.0, 200.0), 0.0));
+        w.snakes.push(Snake::new(0, true, Pt::new(200.0, 200.0), 0.0));
         w.snakes.push(wall());
-        w.snakes
-            .push(Snake::new(2, false, Pt::new(300.0, 400.0), 0.0));
+        w.snakes.push(Snake::new(2, false, Pt::new(300.0, 400.0), 0.0));
         let path = w.snakes[0].path.clone();
         w.eliminate(0, None);
         w.eliminate(0, None);
@@ -799,10 +716,7 @@ mod tests {
         assert_eq!(w.snakes[0].lives, LIVES - 1);
         assert_eq!(w.snakes[0].path, path);
         assert_eq!(w.round, 1);
-        assert_eq!(
-            w.first_hit(1, Pt::new(184.0, 190.0), Pt::new(184.0, 210.0)),
-            Hit::Body(0)
-        );
+        assert_eq!(w.first_hit(1, Pt::new(184.0, 190.0), Pt::new(184.0, 210.0)), Hit::Body(0));
     }
 
     #[test]
@@ -823,10 +737,7 @@ mod tests {
         assert_eq!(w.snakes.len(), 3);
         assert!(w.snakes[0].alive);
         assert_eq!(w.snakes[0].lives, LIVES - 1);
-        assert!(w
-            .snakes
-            .iter()
-            .all(|s| s.path.len() == START_S && s.holes.is_empty()));
+        assert!(w.snakes.iter().all(|s| s.path.len() == START_S && s.holes.is_empty()));
     }
 
     #[test]
@@ -881,14 +792,8 @@ mod tests {
     #[test]
     fn a_brain_avoids_a_dead_body_in_front_of_it() {
         let mut w = bare();
-        w.snakes
-            .push(Snake::new(0, false, Pt::new(120.0, 270.0), 0.0));
-        let mut square = Snake::new(
-            1,
-            false,
-            Pt::new(150.0, 230.0),
-            -std::f32::consts::FRAC_PI_2,
-        );
+        w.snakes.push(Snake::new(0, false, Pt::new(120.0, 270.0), 0.0));
+        let mut square = Snake::new(1, false, Pt::new(150.0, 230.0), -std::f32::consts::FRAC_PI_2);
         square.len_s = 46;
         square.lay_path();
         square.alive = false;

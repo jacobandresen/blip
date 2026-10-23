@@ -5,8 +5,8 @@ use blip::wav::{
     encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, env, fade_out, low_pass, ms_to_samples,
     soft_limit_to_pcm16, tame, warm, Rng, MIX_KNEE, SAMPLE_RATE,
 };
-use blip::Asset;
 use blip::xm::{heard, heard_hz, tempo, Part, KICK, SNARE};
+use blip::Asset;
 
 const SRF: f32 = SAMPLE_RATE as f32;
 
@@ -154,16 +154,7 @@ enum Feel {
 /// outlast the round, so no seam is heard.
 impl Theme<'_> {
     fn pcm(&self) -> Vec<i16> {
-        let Theme {
-            bpm,
-            root,
-            scale,
-            phrases,
-            bass,
-            order,
-            drive,
-            feel,
-        } = *self;
+        let Theme { bpm, root, scale, phrases, bass, order, drive, feel } = *self;
         tempo(bpm);
         let step = (SAMPLE_RATE as f32 * 60.0 / bpm / 4.0) as usize; // 16ths
         let bars = 4 * order.len();
@@ -210,13 +201,7 @@ impl Theme<'_> {
 
             // The pulse: a heavy taiko on one, an answer past the middle.
             if b == 0 {
-                taiko(
-                    &mut buf,
-                    off,
-                    96.0,
-                    if bar == 0 && !hush { 1.0 } else { 0.8 },
-                    &mut rng,
-                );
+                taiko(&mut buf, off, 96.0, if bar == 0 && !hush { 1.0 } else { 0.8 }, &mut rng);
             }
             if b == 8 && !lull {
                 taiko(&mut buf, off, 104.0, 0.7, &mut rng);
@@ -259,12 +244,7 @@ impl Theme<'_> {
                 Feel::Chime => {
                     if b % 8 == 4 {
                         let d = line[bar % line.len()];
-                        chime(
-                            &mut buf,
-                            off,
-                            degree(scale, root, d + 4) * 2.0,
-                            if lull { 0.35 } else { 0.5 },
-                        );
+                        chime(&mut buf, off, degree(scale, root, d + 4) * 2.0, if lull { 0.35 } else { 0.5 });
                     }
                 }
                 // Rim on the off-beats, denser on a driving stage.
@@ -285,37 +265,16 @@ impl Theme<'_> {
             let note = melody[within % melody.len()];
             if note > -90 {
                 let gain = if lull { 0.62 } else { 0.85 };
-                pluck(
-                    &mut buf,
-                    off,
-                    degree(scale, root, note),
-                    beat_ms * 1.6,
-                    gain,
-                    &mut rng,
-                );
+                pluck(&mut buf, off, degree(scale, root, note), beat_ms * 1.6, gain, &mut rng);
                 // Doubled an octave up on the last bar of a phrase, so the
                 // tune has a top to it once every four bars.
                 if last_bar && b == 0 {
-                    pluck(
-                        &mut buf,
-                        off,
-                        degree(scale, root, note + 5),
-                        beat_ms * 1.2,
-                        0.4,
-                        &mut rng,
-                    );
+                    pluck(&mut buf, off, degree(scale, root, note + 5), beat_ms * 1.2, 0.4, &mut rng);
                 }
                 // A second koto answers the tune three steps behind it, on the
                 // phrases after the first: the tune comes back with company.
                 if order[slot] != 0 && !lull && s + 3 < steps {
-                    pluck(
-                        &mut buf,
-                        off + 3 * step,
-                        degree(scale, root, note),
-                        beat_ms * 0.9,
-                        0.22,
-                        &mut rng,
-                    );
+                    pluck(&mut buf, off + 3 * step, degree(scale, root, note), beat_ms * 0.9, 0.22, &mut rng);
                 }
             }
 
@@ -352,24 +311,10 @@ impl Theme<'_> {
 
             // The bass walks a note a bar.
             if b == 0 {
-                pluck(
-                    &mut buf,
-                    off,
-                    degree(scale, root, d) * 0.5,
-                    beat_ms * 3.6,
-                    0.55,
-                    &mut rng,
-                );
+                pluck(&mut buf, off, degree(scale, root, d) * 0.5, beat_ms * 3.6, 0.55, &mut rng);
             }
             if b == 10 && !lull {
-                pluck(
-                    &mut buf,
-                    off,
-                    degree(scale, root, d + 2) * 0.5,
-                    beat_ms * 1.2,
-                    0.3,
-                    &mut rng,
-                );
+                pluck(&mut buf, off, degree(scale, root, d + 2) * 0.5, beat_ms * 1.2, 0.3, &mut rng);
             }
         }
         wrap_tail(&mut buf, body);
@@ -400,168 +345,138 @@ pub fn theme_wav(which: usize) -> Vec<u8> {
 
     // -- the docks ------------------------------------------------------
     let d_a = [
-        0, R, R, 2, 1, R, 0, R, 3, R, 2, R, 0, R, R, 1, 4, R, 3, R, 2, R, R, 0, 1, R, 0, R, R, 2,
-        R, R, 0, R, R, 2, 1, R, 0, R, 3, R, 4, R, 3, R, R, 2, 4, R, 5, R, 4, R, 3, R, 2, R, R, 1,
-        0, R, R, R,
+        0, R, R, 2, 1, R, 0, R, 3, R, 2, R, 0, R, R, 1, 4, R, 3, R, 2, R, R, 0, 1, R, 0, R, R, 2, R, R, 0, R, R, 2, 1,
+        R, 0, R, 3, R, 4, R, 3, R, R, 2, 4, R, 5, R, 4, R, 3, R, 2, R, R, 1, 0, R, R, R,
     ];
     let d_b = [
-        2, R, 3, R, 4, R, R, 3, 2, R, R, 4, 5, R, R, R, 4, R, 3, R, 2, R, 1, R, 0, R, R, 2, 1, R,
-        R, R, 3, R, R, 4, 5, R, 4, R, 3, R, R, 2, 1, R, 2, R, 0, R, 1, R, 2, R, R, 3, 2, R, 1, R,
-        0, R, R, R,
+        2, R, 3, R, 4, R, R, 3, 2, R, R, 4, 5, R, R, R, 4, R, 3, R, 2, R, 1, R, 0, R, R, 2, 1, R, R, R, 3, R, R, 4, 5,
+        R, 4, R, 3, R, R, 2, 1, R, 2, R, 0, R, 1, R, 2, R, R, 3, 2, R, 1, R, 0, R, R, R,
     ];
     let d_c = [
-        5, R, R, R, 4, R, R, R, 3, R, R, R, 2, R, R, R, 4, R, R, 3, R, R, 2, R, R, R, 1, R, R, R,
-        R, R, 0, R, R, 1, 2, R, R, 3, 4, R, R, R, 3, R, R, R, 2, R, R, R, 1, R, R, R, 0, R, R, R,
-        R, R, R, R,
+        5, R, R, R, 4, R, R, R, 3, R, R, R, 2, R, R, R, 4, R, R, 3, R, R, 2, R, R, R, 1, R, R, R, R, R, 0, R, R, 1, 2,
+        R, R, 3, 4, R, R, R, 3, R, R, R, 2, R, R, R, 1, R, R, R, 0, R, R, R, R, R, R, R,
     ];
     let d_d = [
-        0, R, R, R, R, R, 2, R, R, R, 1, R, R, R, R, R, 0, R, R, R, R, R, R, R, 2, R, R, R, R, R,
-        R, R, 3, R, R, R, R, R, 2, R, R, R, R, R, 1, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R,
-        R, R, R, R,
+        0, R, R, R, R, R, 2, R, R, R, 1, R, R, R, R, R, 0, R, R, R, R, R, R, R, 2, R, R, R, R, R, R, R, 3, R, R, R, R,
+        R, 2, R, R, R, R, R, 1, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R,
     ];
 
     // -- the temple -----------------------------------------------------
     let t_a = [
-        3, R, R, R, 2, R, 4, R, 3, R, R, 1, 0, R, R, R, 1, R, 2, R, R, 3, R, 2, 0, R, R, R, R, R,
-        1, R, 3, R, R, R, 4, R, R, 3, 5, R, R, 4, 3, R, R, R, 2, R, R, 1, R, R, 2, R, 0, R, R, R,
-        R, R, R, R,
+        3, R, R, R, 2, R, 4, R, 3, R, R, 1, 0, R, R, R, 1, R, 2, R, R, 3, R, 2, 0, R, R, R, R, R, 1, R, 3, R, R, R, 4,
+        R, R, 3, 5, R, R, 4, 3, R, R, R, 2, R, R, 1, R, R, 2, R, 0, R, R, R, R, R, R, R,
     ];
     let t_b = [
-        5, R, R, 4, R, R, 3, R, R, R, 4, R, 5, R, R, R, 4, R, R, R, 3, R, R, 2, R, R, 3, R, R, R,
-        R, R, 2, R, R, 3, 4, R, R, 5, R, R, 4, R, 3, R, R, R, 1, R, R, R, 2, R, R, R, 0, R, R, R,
-        R, R, R, R,
+        5, R, R, 4, R, R, 3, R, R, R, 4, R, 5, R, R, R, 4, R, R, R, 3, R, R, 2, R, R, 3, R, R, R, R, R, 2, R, R, 3, 4,
+        R, R, 5, R, R, 4, R, 3, R, R, R, 1, R, R, R, 2, R, R, R, 0, R, R, R, R, R, R, R,
     ];
     let t_c = [
-        0, R, R, R, 1, R, R, R, 2, R, R, R, 3, R, R, R, 2, R, R, 1, R, R, 0, R, R, R, R, R, 1, R,
-        R, R, 4, R, R, R, 3, R, R, R, 2, R, R, 1, R, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R,
-        R, R, R, R,
+        0, R, R, R, 1, R, R, R, 2, R, R, R, 3, R, R, R, 2, R, R, 1, R, R, 0, R, R, R, R, R, 1, R, R, R, 4, R, R, R, 3,
+        R, R, R, 2, R, R, 1, R, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R,
     ];
     let t_d = [
-        3, R, R, R, R, R, R, R, 2, R, R, R, R, R, R, R, 1, R, R, R, R, R, R, R, 0, R, R, R, R, R,
-        R, R, 2, R, R, R, R, R, R, R, 1, R, R, R, R, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R,
-        R, R, R, R,
+        3, R, R, R, R, R, R, R, 2, R, R, R, R, R, R, R, 1, R, R, R, R, R, R, R, 0, R, R, R, R, R, R, R, 2, R, R, R, R,
+        R, R, R, 1, R, R, R, R, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R,
     ];
 
     // -- the select screen ----------------------------------------------
     let s_a = [
-        0, R, R, R, 3, R, 2, R, R, R, 1, R, 0, R, R, R, 2, R, R, R, 1, R, R, 0, R, R, R, R, 3, R,
-        R, R, 4, R, R, 3, R, R, 2, R, R, R, 3, R, 4, R, R, R, 2, R, R, R, 0, R, R, 1, R, R, R, R,
-        R, R, R, R,
+        0, R, R, R, 3, R, 2, R, R, R, 1, R, 0, R, R, R, 2, R, R, R, 1, R, R, 0, R, R, R, R, 3, R, R, R, 4, R, R, 3, R,
+        R, 2, R, R, R, 3, R, 4, R, R, R, 2, R, R, R, 0, R, R, 1, R, R, R, R, R, R, R, R,
     ];
     let s_b = [
-        3, R, R, R, 4, R, R, R, 5, R, R, 4, 3, R, R, R, 2, R, R, 3, R, R, 4, R, R, R, 3, R, R, R,
-        R, R, 1, R, R, R, 2, R, R, 1, 0, R, R, R, R, R, 2, R, 1, R, R, R, R, R, 0, R, R, R, R, R,
-        R, R, R, R,
+        3, R, R, R, 4, R, R, R, 5, R, R, 4, 3, R, R, R, 2, R, R, 3, R, R, 4, R, R, R, 3, R, R, R, R, R, 1, R, R, R, 2,
+        R, R, 1, 0, R, R, R, R, R, 2, R, 1, R, R, R, R, R, 0, R, R, R, R, R, R, R, R, R,
     ];
 
     // -- the air base: a march on the minor pentatonic -------------------
     let a_a = [
-        0, R, 0, R, 2, R, 3, R, 4, R, R, 3, R, R, 2, R, 0, R, 0, R, 2, R, 3, R, 5, R, R, 4, R, R,
-        3, R, 4, R, 4, R, 5, R, 6, R, 5, R, R, 4, R, R, 3, R, 2, R, 3, R, 4, R, R, 2, 0, R, R, R,
-        R, R, R, R,
+        0, R, 0, R, 2, R, 3, R, 4, R, R, 3, R, R, 2, R, 0, R, 0, R, 2, R, 3, R, 5, R, R, 4, R, R, 3, R, 4, R, 4, R, 5,
+        R, 6, R, 5, R, R, 4, R, R, 3, R, 2, R, 3, R, 4, R, R, 2, 0, R, R, R, R, R, R, R,
     ];
     let a_b = [
-        5, R, R, R, 4, R, 5, R, 6, R, R, R, 5, R, 4, R, 3, R, R, R, 2, R, 3, R, 4, R, R, R, R, R,
-        2, R, 5, R, R, R, 4, R, 5, R, 6, R, R, 5, R, R, 4, R, 3, R, 2, R, 3, R, 4, R, 5, R, R, R,
-        R, R, R, R,
+        5, R, R, R, 4, R, 5, R, 6, R, R, R, 5, R, 4, R, 3, R, R, R, 2, R, 3, R, 4, R, R, R, R, R, 2, R, 5, R, R, R, 4,
+        R, 5, R, 6, R, R, 5, R, R, 4, R, 3, R, 2, R, 3, R, 4, R, 5, R, R, R, R, R, R, R,
     ];
     let a_c = [
-        0, R, R, 2, R, R, 3, R, 4, R, R, R, 3, R, 2, R, 0, R, R, 2, R, R, 3, R, 2, R, R, R, R, R,
-        R, R, 3, R, R, 4, R, R, 5, R, 6, R, R, R, 5, R, 4, R, 3, R, R, 2, R, R, 0, R, 0, R, R, R,
-        R, R, R, R,
+        0, R, R, 2, R, R, 3, R, 4, R, R, R, 3, R, 2, R, 0, R, R, 2, R, R, 3, R, 2, R, R, R, R, R, R, R, 3, R, R, 4, R,
+        R, 5, R, 6, R, R, R, 5, R, 4, R, 3, R, R, 2, R, R, 0, R, 0, R, R, R, R, R, R, R,
     ];
     let a_d = [
-        0, R, R, R, R, R, R, R, 3, R, R, R, R, R, R, R, 2, R, R, R, R, R, R, R, 0, R, R, R, R, R,
-        R, R, 4, R, R, R, R, R, R, R, 3, R, R, R, R, R, R, R, 2, R, R, R, R, R, 3, R, 0, R, R, R,
-        R, R, R, R,
+        0, R, R, R, R, R, R, R, 3, R, R, R, R, R, R, R, 2, R, R, R, R, R, R, R, 0, R, R, R, R, R, R, R, 4, R, R, R, R,
+        R, R, R, 3, R, R, R, R, R, R, R, 2, R, R, R, R, R, 3, R, 0, R, R, R, R, R, R, R,
     ];
 
     // -- the bath house: bright and easy, on yo --------------------------
     let h_a = [
-        2, R, R, 3, 4, R, R, R, 3, R, 2, R, 0, R, R, R, 2, R, R, 3, 4, R, 5, R, 4, R, R, R, R, R,
-        3, R, 2, R, R, 3, 4, R, R, R, 5, R, 4, R, 3, R, R, 2, 3, R, 2, R, 1, R, R, 2, 0, R, R, R,
-        R, R, R, R,
+        2, R, R, 3, 4, R, R, R, 3, R, 2, R, 0, R, R, R, 2, R, R, 3, 4, R, 5, R, 4, R, R, R, R, R, 3, R, 2, R, R, 3, 4,
+        R, R, R, 5, R, 4, R, 3, R, R, 2, 3, R, 2, R, 1, R, R, 2, 0, R, R, R, R, R, R, R,
     ];
     let h_b = [
-        5, R, R, R, 4, R, 3, R, 4, R, R, R, 2, R, R, R, 3, R, R, R, 2, R, 1, R, 2, R, R, R, R, R,
-        R, R, 5, R, R, R, 4, R, 3, R, 4, R, R, 5, 6, R, R, R, 5, R, 4, R, 3, R, 2, R, 0, R, R, R,
-        R, R, R, R,
+        5, R, R, R, 4, R, 3, R, 4, R, R, R, 2, R, R, R, 3, R, R, R, 2, R, 1, R, 2, R, R, R, R, R, R, R, 5, R, R, R, 4,
+        R, 3, R, 4, R, R, 5, 6, R, R, R, 5, R, 4, R, 3, R, 2, R, 0, R, R, R, R, R, R, R,
     ];
     let h_c = [
-        0, R, 2, R, 3, R, 2, R, 0, R, R, R, R, R, 1, R, 0, R, 2, R, 3, R, 4, R, 3, R, R, R, R, R,
-        R, R, 4, R, 3, R, 2, R, 3, R, 4, R, R, R, 5, R, R, R, 4, R, R, 3, R, R, 2, R, 0, R, R, R,
-        R, R, R, R,
+        0, R, 2, R, 3, R, 2, R, 0, R, R, R, R, R, 1, R, 0, R, 2, R, 3, R, 4, R, 3, R, R, R, R, R, R, R, 4, R, 3, R, 2,
+        R, 3, R, 4, R, R, R, 5, R, R, R, 4, R, R, 3, R, R, 2, R, 0, R, R, R, R, R, R, R,
     ];
     let h_d = [
-        2, R, R, R, R, R, R, R, 3, R, R, R, R, R, R, R, 4, R, R, R, R, R, R, R, 2, R, R, R, R, R,
-        R, R, 3, R, R, R, R, R, R, R, 1, R, R, R, R, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R,
-        R, R, R, R,
+        2, R, R, R, R, R, R, R, 3, R, R, R, R, R, R, R, 4, R, R, R, R, R, R, R, 2, R, R, R, R, R, R, R, 3, R, R, R, R,
+        R, R, R, 1, R, R, R, R, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R,
     ];
 
     // -- the river village: slow and heavy, on in ------------------------
     let v_a = [
-        0, R, R, R, 0, R, 1, R, 2, R, R, R, R, R, R, R, 3, R, R, R, 2, R, 1, R, 0, R, R, R, R, R,
-        R, R, 0, R, R, R, 0, R, 1, R, 2, R, R, R, 3, R, R, R, 4, R, R, 3, R, R, 2, R, 0, R, R, R,
-        R, R, R, R,
+        0, R, R, R, 0, R, 1, R, 2, R, R, R, R, R, R, R, 3, R, R, R, 2, R, 1, R, 0, R, R, R, R, R, R, R, 0, R, R, R, 0,
+        R, 1, R, 2, R, R, R, 3, R, R, R, 4, R, R, 3, R, R, 2, R, 0, R, R, R, R, R, R, R,
     ];
     let v_b = [
-        4, R, R, R, 3, R, R, R, 4, R, R, R, 5, R, R, R, 4, R, R, 3, R, R, 2, R, 3, R, R, R, R, R,
-        R, R, 2, R, R, R, 3, R, R, R, 4, R, R, R, 6, R, R, R, 5, R, R, 4, R, R, 3, R, 2, R, R, R,
-        R, R, R, R,
+        4, R, R, R, 3, R, R, R, 4, R, R, R, 5, R, R, R, 4, R, R, 3, R, R, 2, R, 3, R, R, R, R, R, R, R, 2, R, R, R, 3,
+        R, R, R, 4, R, R, R, 6, R, R, R, 5, R, R, 4, R, R, 3, R, 2, R, R, R, R, R, R, R,
     ];
     let v_c = [
-        0, R, 2, R, R, R, 3, R, R, R, 2, R, 0, R, R, R, 0, R, 2, R, R, R, 3, R, R, R, 4, R, 3, R,
-        R, R, 5, R, R, R, 4, R, R, R, 3, R, R, R, 2, R, R, R, 1, R, R, R, 0, R, R, R, 0, R, R, R,
-        R, R, R, R,
+        0, R, 2, R, R, R, 3, R, R, R, 2, R, 0, R, R, R, 0, R, 2, R, R, R, 3, R, R, R, 4, R, 3, R, R, R, 5, R, R, R, 4,
+        R, R, R, 3, R, R, R, 2, R, R, R, 1, R, R, R, 0, R, R, R, 0, R, R, R, R, R, R, R,
     ];
     let v_d = [
-        0, R, R, R, R, R, R, R, R, R, R, R, 1, R, R, R, 2, R, R, R, R, R, R, R, R, R, R, R, R, R,
-        R, R, 3, R, R, R, R, R, R, R, 2, R, R, R, 1, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R,
-        R, R, R, R,
+        0, R, R, R, R, R, R, R, R, R, R, R, 1, R, R, R, 2, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R, 3, R, R, R, R,
+        R, R, R, 2, R, R, R, 1, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R,
     ];
 
     // -- the crystal fortress: slow and open, on the major pentatonic ------
     let f_a = [
-        0, R, R, R, 3, R, R, R, R, R, R, R, 4, R, 3, R, 5, R, R, R, R, R, R, R, 4, R, R, R, 3, R,
-        R, R, 0, R, R, R, 3, R, R, R, R, R, R, R, 4, R, 5, R, 6, R, R, R, R, R, 5, R, 5, R, R, R,
-        R, R, R, R,
+        0, R, R, R, 3, R, R, R, R, R, R, R, 4, R, 3, R, 5, R, R, R, R, R, R, R, 4, R, R, R, 3, R, R, R, 0, R, R, R, 3,
+        R, R, R, R, R, R, R, 4, R, 5, R, 6, R, R, R, R, R, 5, R, 5, R, R, R, R, R, R, R,
     ];
     let f_b = [
-        5, R, R, R, 4, R, R, R, 3, R, R, R, R, R, 2, R, 3, R, R, R, R, R, R, R, 2, R, R, R, 0, R,
-        R, R, 5, R, R, R, 4, R, R, R, 3, R, R, R, 4, R, 5, R, 6, R, R, R, R, R, R, R, 5, R, R, R,
-        R, R, R, R,
+        5, R, R, R, 4, R, R, R, 3, R, R, R, R, R, 2, R, 3, R, R, R, R, R, R, R, 2, R, R, R, 0, R, R, R, 5, R, R, R, 4,
+        R, R, R, 3, R, R, R, 4, R, 5, R, 6, R, R, R, R, R, R, R, 5, R, R, R, R, R, R, R,
     ];
     let f_c = [
-        2, R, R, R, 3, R, R, R, 4, R, R, R, R, R, R, R, 3, R, R, R, 4, R, R, R, 5, R, R, R, R, R,
-        R, R, 4, R, R, R, 5, R, R, R, 6, R, R, R, R, R, 5, R, 4, R, R, R, 3, R, R, R, 0, R, R, R,
-        R, R, R, R,
+        2, R, R, R, 3, R, R, R, 4, R, R, R, R, R, R, R, 3, R, R, R, 4, R, R, R, 5, R, R, R, R, R, R, R, 4, R, R, R, 5,
+        R, R, R, 6, R, R, R, R, R, 5, R, 4, R, R, R, 3, R, R, R, 0, R, R, R, R, R, R, R,
     ];
     let f_d = [
-        0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R, 3, R, R, R, R, R, R, R, R, R, R, R, R, R,
-        R, R, 2, R, R, R, R, R, R, R, 4, R, R, R, R, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R,
-        R, R, R, R,
+        0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R, 3, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R, 2, R, R, R, R,
+        R, R, R, 4, R, R, R, R, R, R, R, 0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R,
     ];
 
     // -- the rooftop: pushed off the beat, on the blues -------------------
     let q_a = [
-        0, R, R, 0, R, R, 1, R, 2, R, 3, R, 2, R, 1, R, 0, R, R, R, R, R, 4, R, R, R, 3, R, 2, R,
-        R, R, 0, R, R, 0, R, R, 1, R, 2, R, 3, R, 4, R, 5, R, 4, R, R, 3, R, R, 2, R, 0, R, R, R,
-        R, R, R, R,
+        0, R, R, 0, R, R, 1, R, 2, R, 3, R, 2, R, 1, R, 0, R, R, R, R, R, 4, R, R, R, 3, R, 2, R, R, R, 0, R, R, 0, R,
+        R, 1, R, 2, R, 3, R, 4, R, 5, R, 4, R, R, 3, R, R, 2, R, 0, R, R, R, R, R, R, R,
     ];
     let q_b = [
-        5, R, R, R, 4, R, R, 5, R, R, 4, R, 3, R, 2, R, 4, R, R, R, 3, R, R, 4, R, R, 3, R, 2, R,
-        1, R, 5, R, R, R, 4, R, R, 5, R, R, 6, R, 5, R, 4, R, 3, R, 2, R, 1, R, 2, R, 0, R, R, R,
-        R, R, R, R,
+        5, R, R, R, 4, R, R, 5, R, R, 4, R, 3, R, 2, R, 4, R, R, R, 3, R, R, 4, R, R, 3, R, 2, R, 1, R, 5, R, R, R, 4,
+        R, R, 5, R, R, 6, R, 5, R, 4, R, 3, R, 2, R, 1, R, 2, R, 0, R, R, R, R, R, R, R,
     ];
     let q_c = [
-        2, R, 2, R, R, R, 3, R, 2, R, R, R, 1, R, 0, R, 2, R, 2, R, R, R, 3, R, 4, R, R, R, R, R,
-        R, R, 5, R, 5, R, R, R, 4, R, 3, R, R, R, 2, R, 1, R, 0, R, R, 1, R, R, 2, R, 0, R, R, R,
-        R, R, R, R,
+        2, R, 2, R, R, R, 3, R, 2, R, R, R, 1, R, 0, R, 2, R, 2, R, R, R, 3, R, 4, R, R, R, R, R, R, R, 5, R, 5, R, R,
+        R, 4, R, 3, R, R, R, 2, R, 1, R, 0, R, R, 1, R, R, 2, R, 0, R, R, R, R, R, R, R,
     ];
     let q_d = [
-        0, R, R, R, R, R, R, R, 2, R, R, R, R, R, 1, R, 0, R, R, R, R, R, R, R, R, R, R, R, R, R,
-        R, R, 3, R, R, R, R, R, R, R, 2, R, R, R, R, R, 1, R, 0, R, R, R, R, R, R, R, R, R, R, R,
-        R, R, R, R,
+        0, R, R, R, R, R, R, R, 2, R, R, R, R, R, 1, R, 0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R, 3, R, R, R, R,
+        R, R, R, 2, R, R, R, R, R, 1, R, 0, R, R, R, R, R, R, R, R, R, R, R, R, R, R, R,
     ];
 
     // A note a bar under each, so the ground moves.
@@ -575,61 +490,16 @@ pub fn theme_wav(which: usize) -> Vec<u8> {
     let order = [0usize, 1, 0, 3, 2, 1, 0, 1];
     let bass: [&[i32]; 4] = [&b0, &b1, &b2, &b3];
     let stage = |bpm, root, scale, phrases: [&[i32]; 4], drive, feel| {
-        Theme {
-            bpm,
-            root,
-            scale,
-            phrases: &phrases,
-            bass: &bass,
-            order: &order,
-            drive,
-            feel,
-        }
-        .pcm()
+        Theme { bpm, root, scale, phrases: &phrases, bass: &bass, order: &order, drive, feel }.pcm()
     };
     encode_pcm16_music(&match which {
-        0 => stage(
-            148.0,
-            196.00,
-            &HIRAJOSHI,
-            [&d_a, &d_b, &d_c, &d_d],
-            1.0,
-            Feel::Rim,
-        ),
-        1 => stage(
-            128.0,
-            220.00,
-            &HIRAJOSHI,
-            [&t_a, &t_b, &t_c, &t_d],
-            0.6,
-            Feel::Rim,
-        ),
-        3 => stage(
-            156.0,
-            174.61,
-            &MINOR,
-            [&a_a, &a_b, &a_c, &a_d],
-            1.0,
-            Feel::March,
-        ),
+        0 => stage(148.0, 196.00, &HIRAJOSHI, [&d_a, &d_b, &d_c, &d_d], 1.0, Feel::Rim),
+        1 => stage(128.0, 220.00, &HIRAJOSHI, [&t_a, &t_b, &t_c, &t_d], 0.6, Feel::Rim),
+        3 => stage(156.0, 174.61, &MINOR, [&a_a, &a_b, &a_c, &a_d], 1.0, Feel::March),
         4 => stage(136.0, 196.00, &YO, [&h_a, &h_b, &h_c, &h_d], 0.7, Feel::Rim),
         5 => stage(124.0, 164.81, &IN, [&v_a, &v_b, &v_c, &v_d], 0.8, Feel::Rim),
-        6 => stage(
-            120.0,
-            196.00,
-            &MAJOR,
-            [&f_a, &f_b, &f_c, &f_d],
-            0.5,
-            Feel::Chime,
-        ),
-        7 => stage(
-            142.0,
-            185.00,
-            &BLUES,
-            [&q_a, &q_b, &q_c, &q_d],
-            0.9,
-            Feel::Push,
-        ),
+        6 => stage(120.0, 196.00, &MAJOR, [&f_a, &f_b, &f_c, &f_d], 0.5, Feel::Chime),
+        7 => stage(142.0, 185.00, &BLUES, [&q_a, &q_b, &q_c, &q_d], 0.9, Feel::Push),
         _ => Theme {
             bpm: 118.0,
             root: 207.65,
@@ -659,9 +529,8 @@ pub fn ambience_wav(kind: usize) -> Vec<u8> {
             // Voices: the middle of the band, swelling here and there.
             lp += (noise - lp) * 0.30;
             hp += (lp - hp) * 0.030;
-            let crowd = (lp - hp)
-                * (1.0 + 0.25 * turn(3.0, 0.0) + 0.18 * turn(7.0, 0.3) + 0.12 * turn(11.0, 0.7))
-                * 5200.0;
+            let crowd =
+                (lp - hp) * (1.0 + 0.25 * turn(3.0, 0.0) + 0.18 * turn(7.0, 0.3) + 0.12 * turn(11.0, 0.7)) * 5200.0;
             let secs = t * 4.0;
             crowd
                 + match kind {
@@ -677,8 +546,7 @@ pub fn ambience_wav(kind: usize) -> Vec<u8> {
                     }
                     // The city: a low drone that beats slowly against itself.
                     3 => {
-                        ((std::f32::consts::TAU * 58.0 * secs).sin()
-                            + (std::f32::consts::TAU * 61.25 * secs).sin())
+                        ((std::f32::consts::TAU * 58.0 * secs).sin() + (std::f32::consts::TAU * 61.25 * secs).sin())
                             * 800.0
                     }
                     _ => 0.0,
@@ -706,11 +574,7 @@ pub fn ambience_wav(kind: usize) -> Vec<u8> {
 /// The crowd, built at startup: 2.5 s of PCM is a quarter of a megabyte for a
 /// few lines of filtered noise.
 pub fn crowd_wav(long: bool) -> Vec<u8> {
-    let s = if long {
-        crowd(1600.0, 1.0, 0xFEED)
-    } else {
-        crowd(900.0, 0.85, 0xC0DE)
-    };
+    let s = if long { crowd(1600.0, 1.0, 0xFEED) } else { crowd(900.0, 0.85, 0xC0DE) };
     encode_pcm16_mono(&s)
 }
 
@@ -725,7 +589,9 @@ fn band(buf: &mut [f32], at: f32, center: f32, q: f32, amp: f32, attack: f32, de
     let damp = 1.0 / q;
     let (mut low, mut bp) = (0.0f32, 0.0f32);
     for i in 0..n {
-        if off + i >= buf.len() { break; }
+        if off + i >= buf.len() {
+            break;
+        }
         let t = i as f32 / SRF;
         let x = rng.next_f32() * 2.0 - 1.0;
         let high = x - low - damp * bp;
@@ -757,7 +623,11 @@ fn room(buf: &mut Vec<f32>, wet: f32) {
 fn soften(buf: &mut [f32], hz: f32) {
     let a = 1.0 - (-2.0 * std::f32::consts::PI * hz / SRF).exp();
     let (mut l1, mut l2) = (0.0f32, 0.0f32);
-    for v in buf.iter_mut() { l1 += a * (*v - l1); l2 += a * (l1 - l2); *v = l2; }
+    for v in buf.iter_mut() {
+        l1 += a * (*v - l1);
+        l2 += a * (l1 - l2);
+        *v = l2;
+    }
 }
 
 fn render(mut buf: Vec<f32>, gain: f32) -> Vec<i16> {
@@ -773,22 +643,35 @@ fn knock(buf: &mut [f32], at: f32, f: f32, amp: f32, tau: f32) {
     let off = (at * SRF) as usize;
     let n = ((tau * 5.0) * SRF) as usize;
     for i in 0..n {
-        if off + i >= buf.len() { break; }
+        if off + i >= buf.len() {
+            break;
+        }
         let t = i as f32 / SRF;
         buf[off + i] += (2.0 * std::f32::consts::PI * f * t).sin() * amp * (-t / tau).exp() * (t / 0.0008).min(1.0);
     }
 }
 
 /// Synthesize a formant-shaped voice from `f0` to `f1`; `breath` controls the noise mix.
-fn voice(buf: &mut [f32], at: f32, dur: f32, f0: f32, f1: f32, vowel: (f32, f32, f32), breath: f32,
-         amp: f32, rng: &mut Rng) {
+fn voice(
+    buf: &mut [f32],
+    at: f32,
+    dur: f32,
+    f0: f32,
+    f1: f32,
+    vowel: (f32, f32, f32),
+    breath: f32,
+    amp: f32,
+    rng: &mut Rng,
+) {
     let off = (at * SRF) as usize;
     let n = (dur * SRF) as usize;
     let formants = [(vowel.0, 80.0, 1.0), (vowel.1, 110.0, 0.55), (vowel.2, 160.0, 0.3)];
     let mut state = [(0.0f32, 0.0f32); 3];
     let (mut ph, mut jit) = (0.0f32, 0.0f32);
     for i in 0..n {
-        if off + i >= buf.len() { break; }
+        if off + i >= buf.len() {
+            break;
+        }
         let k = i as f32 / n as f32;
         jit = jit * 0.995 + (rng.next_f32() - 0.5) * 0.004;
         let f = (f0 + (f1 - f0) * k) * (1.0 + jit);
@@ -818,7 +701,7 @@ fn voice(buf: &mut [f32], at: f32, dur: f32, f0: f32, f1: f32, vowel: (f32, f32,
 
 // Vowels as formant triples.
 const UH: (f32, f32, f32) = (640.0, 1190.0, 2390.0); // "uh", the grunt of a blow
-const OO: (f32, f32, f32) = (380.0, 900.0, 2300.0);  // "oof", winded
+const OO: (f32, f32, f32) = (380.0, 900.0, 2300.0); // "oof", winded
 const AH: (f32, f32, f32) = (760.0, 1150.0, 2500.0); // "ah", the cry going down
 
 /// A blow landing on a body. `thud` is the centre of the muffled flesh thud
@@ -949,10 +832,7 @@ fn crowd(ms: f32, vol: f32, seed: u32) -> Vec<i16> {
         let voices = lp - hp;
         // Several slow wobbles at once — individual voices coming and
         // going out of the mass.
-        let w = 1.0
-            + 0.22 * (t * 37.0).sin()
-            + 0.15 * (t * 23.0 + 1.7).sin()
-            + 0.10 * (t * 61.0 + 0.4).sin();
+        let w = 1.0 + 0.22 * (t * 37.0).sin() + 0.15 * (t * 23.0 + 1.7).sin() + 0.10 * (t * 61.0 + 0.4).sin();
         *out = voices * w * e * vol * 5200.0;
     }
     soft_limit_to_pcm16(&buf, MIX_KNEE)
@@ -1199,7 +1079,9 @@ fn smash() -> Vec<i16> {
         let at = 0.012 + 0.022 * k as f32;
         band(&mut buf, at, 1100.0 + 380.0 * ((k * 5) % 4) as f32, 2.2, 0.9 - 0.1 * k as f32, 0.0004, 0.006, &mut rng);
     }
-    for (at, f) in [(0.16f32, 1900.0f32), (0.24, 2300.0)] { knock(&mut buf, at, f, 0.25, 0.03); }
+    for (at, f) in [(0.16f32, 1900.0f32), (0.24, 2300.0)] {
+        knock(&mut buf, at, f, 0.25, 0.03);
+    }
     render(buf, 8_000.0)
 }
 
@@ -1235,8 +1117,14 @@ fn gong() -> Vec<i16> {
     let n = ms_to_samples(1500.0);
     let mut buf = vec![0.0f32; n];
     let mut rng = Rng(0x6046);
-    for (freq, amp, tau) in [(110.0f32, 1.0f32, 0.55f32), (164.0, 0.7, 0.5), (233.0, 0.55, 0.42),
-                             (331.0, 0.4, 0.34), (447.0, 0.25, 0.26), (452.0, 0.2, 0.26)] {
+    for (freq, amp, tau) in [
+        (110.0f32, 1.0f32, 0.55f32),
+        (164.0, 0.7, 0.5),
+        (233.0, 0.55, 0.42),
+        (331.0, 0.4, 0.34),
+        (447.0, 0.25, 0.26),
+        (452.0, 0.2, 0.26),
+    ] {
         for (i, out) in buf.iter_mut().enumerate() {
             let t = i as f32 / SRF;
             // The shimmer blooms a moment after the stroke.
@@ -1246,7 +1134,9 @@ fn gong() -> Vec<i16> {
     }
     let mut thump = vec![0.0f32; n];
     band(&mut thump, 0.0, 140.0, 1.0, 1.0, 0.001, 0.02, &mut rng);
-    for (out, x) in buf.iter_mut().zip(&thump) { *out += x * 5000.0; }
+    for (out, x) in buf.iter_mut().zip(&thump) {
+        *out += x * 5000.0;
+    }
     soft_limit_to_pcm16(&buf, MIX_KNEE)
 }
 
@@ -1269,45 +1159,45 @@ pub fn sounds() -> Vec<Asset> {
     vec![
         // Three light hits, the thud climbing a combo step each, so a string
         // sounds like it is going somewhere.
-        ("sounds/hit_light.wav",  encode_pcm16_half(&hit(300.0, 0.15, 0x11))),
+        ("sounds/hit_light.wav", encode_pcm16_half(&hit(300.0, 0.15, 0x11))),
         ("sounds/hit_light2.wav", encode_pcm16_half(&hit(380.0, 0.2, 0x1b))),
         ("sounds/hit_light3.wav", encode_pcm16_half(&hit(470.0, 0.25, 0x2f))),
         // A second take of each, a shade lower and from another seed: the
         // same blow twice running should not be the same recording twice.
-        ("sounds/hit_light_b.wav",  encode_pcm16_half(&hit(284.0, 0.18, 0x51))),
+        ("sounds/hit_light_b.wav", encode_pcm16_half(&hit(284.0, 0.18, 0x51))),
         ("sounds/hit_light2_b.wav", encode_pcm16_half(&hit(360.0, 0.23, 0x5b))),
         ("sounds/hit_light3_b.wav", encode_pcm16_half(&hit(446.0, 0.28, 0x6f))),
-        ("sounds/hit_heavy_b.wav",  encode_pcm16_half(&hit(216.0, 1.0, 0x62))),
-        ("sounds/hit_heavy.wav",  encode_pcm16_half(&hit(230.0, 1.0, 0x22))),
+        ("sounds/hit_heavy_b.wav", encode_pcm16_half(&hit(216.0, 1.0, 0x62))),
+        ("sounds/hit_heavy.wav", encode_pcm16_half(&hit(230.0, 1.0, 0x22))),
         // A knockdown: a body on the boards, lower and longer than any hit.
-        ("sounds/crunch.wav",    encode_pcm16_half(&crunch())),
-        ("sounds/land.wav",      encode_pcm16_mono(&land(0x71))),
-        ("sounds/whoosh.wav",    encode_pcm16_half(&whoosh(150.0, 0.7, 0x33))),
-        ("sounds/gi.wav",        encode_pcm16_mono(&gi_snap(0x6C1D))),
-        ("sounds/block.wav",     encode_pcm16_mono(&block_sfx())),
-        ("sounds/bell.wav",      encode_pcm16_half(&bell())),
-        ("sounds/ko.wav",        encode_pcm16_half(&ko())),
+        ("sounds/crunch.wav", encode_pcm16_half(&crunch())),
+        ("sounds/land.wav", encode_pcm16_mono(&land(0x71))),
+        ("sounds/whoosh.wav", encode_pcm16_half(&whoosh(150.0, 0.7, 0x33))),
+        ("sounds/gi.wav", encode_pcm16_mono(&gi_snap(0x6C1D))),
+        ("sounds/block.wav", encode_pcm16_mono(&block_sfx())),
+        ("sounds/bell.wav", encode_pcm16_half(&bell())),
+        ("sounds/ko.wav", encode_pcm16_half(&ko())),
         ("sounds/projectile.wav", encode_pcm16_half(&projectile())),
         // Stored at half the rate: everything whose energy above 10 kHz is
         // 33 dB or more under the rest (render() rolls off from 5 kHz). The
         // snaps, whistles and swishes keep the full rate.
-        ("sounds/laser.wav",     encode_pcm16_half(&laser())),
-        ("sounds/quake.wav",     encode_pcm16_music(&quake())),
-        ("sounds/parry.wav",     encode_pcm16_half(&parry())),
-        ("sounds/counter.wav",   encode_pcm16_half(&counter())),
-        ("sounds/fruit.wav",     encode_pcm16_mono(&run_up(&[0, 2, 3, 5], 220.0, 55.0, 420.0, 0xF2))),
-        ("sounds/tick.wav",      encode_pcm16_half(&tick())),
-        ("sounds/gong.wav",      encode_pcm16_music(&gong())),
-        ("sounds/bellow.wav",    encode_pcm16_music(&bellow())),
-        ("sounds/swing.wav",     encode_pcm16_mono(&heavy_swing())),
-        ("sounds/drums.wav",     encode_pcm16_music(&drum_call())),
-        ("sounds/smash.wav",     encode_pcm16_half(&smash())),
-        ("sounds/tweet.wav",     encode_pcm16_half(&tweet())),
-        ("sounds/heart.wav",     encode_pcm16_music(&heartbeat())),
-        ("sounds/whistle.wav",   encode_pcm16_mono(&whistle())),
-        ("sounds/thwip.wav",     encode_pcm16_mono(&thwip())),
-        ("sounds/win.wav",       encode_pcm16_music(&verdict(true))),
-        ("sounds/lose.wav",      encode_pcm16_music(&verdict(false))),
+        ("sounds/laser.wav", encode_pcm16_half(&laser())),
+        ("sounds/quake.wav", encode_pcm16_music(&quake())),
+        ("sounds/parry.wav", encode_pcm16_half(&parry())),
+        ("sounds/counter.wav", encode_pcm16_half(&counter())),
+        ("sounds/fruit.wav", encode_pcm16_mono(&run_up(&[0, 2, 3, 5], 220.0, 55.0, 420.0, 0xF2))),
+        ("sounds/tick.wav", encode_pcm16_half(&tick())),
+        ("sounds/gong.wav", encode_pcm16_music(&gong())),
+        ("sounds/bellow.wav", encode_pcm16_music(&bellow())),
+        ("sounds/swing.wav", encode_pcm16_mono(&heavy_swing())),
+        ("sounds/drums.wav", encode_pcm16_music(&drum_call())),
+        ("sounds/smash.wav", encode_pcm16_half(&smash())),
+        ("sounds/tweet.wav", encode_pcm16_half(&tweet())),
+        ("sounds/heart.wav", encode_pcm16_music(&heartbeat())),
+        ("sounds/whistle.wav", encode_pcm16_mono(&whistle())),
+        ("sounds/thwip.wav", encode_pcm16_mono(&thwip())),
+        ("sounds/win.wav", encode_pcm16_music(&verdict(true))),
+        ("sounds/lose.wav", encode_pcm16_music(&verdict(false))),
         // The crowd, and the four stages' ambience under the music.
         ("sounds/cheer.wav", crowd_wav(false)),
         ("sounds/roar.wav", crowd_wav(true)),

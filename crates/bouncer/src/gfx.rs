@@ -46,11 +46,7 @@ fn paddle() -> Vec<u8> {
                     };
                     // Specular line just under the top edge, on the body only.
                     if !end && (2.2..4.2).contains(&y) {
-                        c = (
-                            c.0 + (1.0 - c.0) * 0.7,
-                            c.1 + (1.0 - c.1) * 0.7,
-                            c.2 + (1.0 - c.2) * 0.7,
-                        );
+                        c = (c.0 + (1.0 - c.0) * 0.7, c.1 + (1.0 - c.1) * 0.7, c.2 + (1.0 - c.2) * 0.7);
                     }
                     // Seam where the bumper meets the bar.
                     if (x - cap).abs() < 0.9 || (x - (w as f32 - cap)).abs() < 0.9 {
@@ -67,14 +63,7 @@ fn paddle() -> Vec<u8> {
             }
             if cov > 0.0 {
                 let k = |v: f32| (v / cov * 255.0).clamp(0.0, 255.0) as u8;
-                img.set_rgba(
-                    px,
-                    py,
-                    k(cr),
-                    k(cg),
-                    k(cb),
-                    (cov / (N * N) as f32 * 255.0) as u8,
-                );
+                img.set_rgba(px, py, k(cr), k(cg), k(cb), (cov / (N * N) as f32 * 255.0) as u8);
             }
         }
     }
@@ -127,11 +116,8 @@ fn ball() -> Vec<u8> {
                             let t = (x2.atan2(z2) + PI) / (PI / 3.0);
                             let cap = y1.abs() > 0.88;
                             let seam = t.fract();
-                            let (mut cr, mut cg, mut cb_) = if cap || t.floor() as i32 % 2 == 0 {
-                                (0.97, 0.96, 0.92)
-                            } else {
-                                (0.9, 0.17, 0.13)
-                            };
+                            let (mut cr, mut cg, mut cb_) =
+                                if cap || t.floor() as i32 % 2 == 0 { (0.97, 0.96, 0.92) } else { (0.9, 0.17, 0.13) };
                             if !cap && !(0.025..=0.975).contains(&seam) {
                                 cr *= 0.7;
                                 cg *= 0.7;
@@ -178,8 +164,7 @@ fn ball_shade() -> Vec<u8> {
                         continue;
                     };
                     let diff = (x * light.0 + y * light.1 + z * light.2).max(0.0);
-                    let spec = ((x * half.0 + y * half.1 + z * half.2).max(0.0).powf(40.0) * 0.85)
-                        .min(1.0);
+                    let spec = ((x * half.0 + y * half.1 + z * half.2).max(0.0).powf(40.0) * 0.85).min(1.0);
                     let lit = (0.32 + 0.78 * diff - (1.0 - z).powf(2.0) * 0.25).clamp(0.0, 1.0);
                     // Black at (1-lit), then white at `spec` over it, as one grey layer.
                     let a = 1.0 - lit * (1.0 - spec);
@@ -190,11 +175,7 @@ fn ball_shade() -> Vec<u8> {
             }
             if cov > 0.0 {
                 let a = a_sum / cov;
-                let c = if a > 0.0 {
-                    (c_sum / cov / a).min(1.0)
-                } else {
-                    0.0
-                };
+                let c = if a > 0.0 { (c_sum / cov / a).min(1.0) } else { 0.0 };
                 let v = (c * 255.0) as u8;
                 img.set_rgba(px, py, v, v, v, (a * cov / (SS * SS) as f32 * 255.0) as u8);
             }
@@ -275,9 +256,7 @@ pub fn generate() -> Vec<Asset> {
 }
 
 fn in_tri(p: (f32, f32), a: (f32, f32), b: (f32, f32), c: (f32, f32)) -> bool {
-    let s = |p: (f32, f32), q: (f32, f32), r: (f32, f32)| {
-        (p.0 - r.0) * (q.1 - r.1) - (q.0 - r.0) * (p.1 - r.1)
-    };
+    let s = |p: (f32, f32), q: (f32, f32), r: (f32, f32)| (p.0 - r.0) * (q.1 - r.1) - (q.0 - r.0) * (p.1 - r.1);
     let (d1, d2, d3) = (s(p, a, b), s(p, b, c), s(p, c, a));
     !((d1 < 0.0 || d2 < 0.0 || d3 < 0.0) && (d1 > 0.0 || d2 > 0.0 || d3 > 0.0))
 }
@@ -291,8 +270,7 @@ fn pickup_icon(kind: Pickup, p: (f32, f32)) -> bool {
     // Arrow along x from `tail` to `tip`: 3-thick shaft, 6-long 9-tall head.
     let arrow = |tail: f32, tip: f32, p: (f32, f32)| {
         let head = tip - (tip - tail).signum() * 6.0;
-        in_bar(p, tail.min(head), tail.max(head), 1.5)
-            || in_tri(p, (tip, 0.0), (head, -4.5), (head, 4.5))
+        in_bar(p, tail.min(head), tail.max(head), 1.5) || in_tri(p, (tip, 0.0), (head, -4.5), (head, 4.5))
     };
     match kind {
         Pickup::Wide => arrow(0.0, -13.0, p) || arrow(0.0, 13.0, p),
@@ -309,9 +287,7 @@ fn pickup_icon(kind: Pickup, p: (f32, f32)) -> bool {
             q * q * q - x * x * y * y * y <= 0.0
         }
         // three balls in a row
-        Pickup::Multi => [-12.0f32, 0.0, 12.0]
-            .iter()
-            .any(|&cx| (p.0 - cx).hypot(p.1) <= 4.6),
+        Pickup::Multi => [-12.0f32, 0.0, 12.0].iter().any(|&cx| (p.0 - cx).hypot(p.1) <= 4.6),
     }
 }
 
@@ -342,11 +318,7 @@ fn pickup(kind: Pickup) -> Vec<u8> {
                         continue;
                     }
                     let t = ((y - (cy - r)) / (2.0 * r)).clamp(0.0, 1.0);
-                    let mut c = (
-                        top.0 + (bot.0 - top.0) * t,
-                        top.1 + (bot.1 - top.1) * t,
-                        top.2 + (bot.2 - top.2) * t,
-                    );
+                    let mut c = (top.0 + (bot.0 - top.0) * t, top.1 + (bot.1 - top.1) * t, top.2 + (bot.2 - top.2) * t);
                     if kind == Pickup::Narrow && ((x + y) / 7.0).floor() as i32 % 2 == 0 {
                         c = (c.0 * 0.28, c.1 * 0.28, c.2 * 0.28);
                     }
@@ -354,11 +326,7 @@ fn pickup(kind: Pickup) -> Vec<u8> {
                     let inner = (x - cx).abs() / (w as f32 / 2.0 - r);
                     if (y - cy + r) > 3.0 && (y - cy + r) < 9.5 && inner < 1.0 {
                         let k = 0.4 * (1.0 - inner * inner);
-                        c = (
-                            c.0 + (1.0 - c.0) * k,
-                            c.1 + (1.0 - c.1) * k,
-                            c.2 + (1.0 - c.2) * k,
-                        );
+                        c = (c.0 + (1.0 - c.0) * k, c.1 + (1.0 - c.1) * k, c.2 + (1.0 - c.2) * k);
                     }
                     if d > -1.8 {
                         c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35);
@@ -369,11 +337,7 @@ fn pickup(kind: Pickup) -> Vec<u8> {
                         c = (c.0 * 0.35, c.1 * 0.35, c.2 * 0.35);
                     }
                     if pickup_icon(kind, p) {
-                        c = if kind == Pickup::Life {
-                            (0.85, 0.08, 0.15)
-                        } else {
-                            (1.0, 1.0, 1.0)
-                        };
+                        c = if kind == Pickup::Life { (0.85, 0.08, 0.15) } else { (1.0, 1.0, 1.0) };
                     }
                     cr += c.0;
                     cg += c.1;
@@ -383,14 +347,7 @@ fn pickup(kind: Pickup) -> Vec<u8> {
             }
             if cov > 0.0 {
                 let k = |v: f32| (v / cov * 255.0).min(255.0) as u8;
-                img.set_rgba(
-                    px,
-                    py,
-                    k(cr),
-                    k(cg),
-                    k(cb),
-                    (cov / (N * N) as f32 * 255.0) as u8,
-                );
+                img.set_rgba(px, py, k(cr), k(cg), k(cb), (cov / (N * N) as f32 * 255.0) as u8);
             }
         }
     }
@@ -424,13 +381,7 @@ fn brick_bomb() -> Vec<u8> {
             if d < 3.4 {
                 (r, g, b) = (255.0, 235.0, 120.0);
             }
-            img.set(
-                x,
-                y,
-                r.min(255.0) as u8,
-                g.min(255.0) as u8,
-                b.min(255.0) as u8,
-            );
+            img.set(x, y, r.min(255.0) as u8, g.min(255.0) as u8, b.min(255.0) as u8);
         }
     }
     for x in 0..w {
@@ -449,11 +400,7 @@ fn brick_steel(cracked: bool) -> Vec<u8> {
     let w: i32 = 72;
     let h: i32 = 22;
     let mut img = Image::new(w as u32, h as u32);
-    let base: (u8, u8, u8) = if cracked {
-        (108, 122, 136)
-    } else {
-        (150, 170, 190)
-    };
+    let base: (u8, u8, u8) = if cracked { (108, 122, 136) } else { (150, 170, 190) };
     for y in 1..h - 1 {
         for x in 1..w - 1 {
             let mut shade = 1.0_f32;

@@ -15,16 +15,10 @@ impl Program {
             Arc::clone(tokens)
         } else {
             let tokens: Arc<[Token]> = tokenize(source)?.into();
-            self.expressions
-                .insert(source.to_string(), Arc::clone(&tokens));
+            self.expressions.insert(source.to_string(), Arc::clone(&tokens));
             tokens
         };
-        let mut parser = Expr {
-            tokens,
-            at: 0,
-            program: self,
-            blip,
-        };
+        let mut parser = Expr { tokens, at: 0, program: self, blip };
         let value = parser.expr(0)?;
         if parser.at != parser.tokens.len() {
             return Err("Unexpected expression token".into());
@@ -118,12 +112,7 @@ impl Expr<'_, '_> {
             _ => {}
         }
         if !matches!(self.tokens.get(self.at), Some(Token::LParen)) {
-            return Ok(self
-                .program
-                .vars
-                .get(name)
-                .cloned()
-                .unwrap_or_else(|| Value::empty(name)));
+            return Ok(self.program.vars.get(name).cloned().unwrap_or_else(|| Value::empty(name)));
         }
         self.at += 1;
         let args = self.arguments()?;
@@ -172,10 +161,7 @@ impl Expr<'_, '_> {
             "LOG" => Value::Num(first.number().ln()),
             "SGN" => Value::Num(first.number().signum() * (first.number() != 0.0) as u8 as f64),
             "FIX" => Value::Num(first.number().trunc()),
-            "RND" => Value::Num(
-                self.program
-                    .random(args.first().map(Value::number).unwrap_or(1.0)),
-            ),
+            "RND" => Value::Num(self.program.random(args.first().map(Value::number).unwrap_or(1.0))),
             "STR$" => Value::Str(first.string()),
             "LEN" => Value::Num(first.string().chars().count() as f64),
             "MID$" | "LEFT$" | "RIGHT$" => Value::Str(substring(name, &first.string(), args)),
@@ -206,18 +192,9 @@ impl Expr<'_, '_> {
                 if args.len() != 2 {
                     return Err("TEXT_CX needs text,size".into());
                 }
-                Value::Num(
-                    self.blip
-                        .text_cx(&args[0].string(), args[1].number() as i32)
-                        as f64,
-                )
+                Value::Num(self.blip.text_cx(&args[0].string(), args[1].number() as i32) as f64)
             }
-            _ => self
-                .program
-                .arrays
-                .get(&Value::array_key(name, args))
-                .cloned()
-                .unwrap_or_else(|| Value::empty(name)),
+            _ => self.program.arrays.get(&Value::array_key(name, args)).cloned().unwrap_or_else(|| Value::empty(name)),
         })
     }
 

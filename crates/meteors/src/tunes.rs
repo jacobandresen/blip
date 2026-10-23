@@ -77,16 +77,7 @@ pub fn storm_song() -> Song<'static> {
             [85, H, 83, H, 82, H, 78, H],
             [76, H, H, H, R, R, R, R],
         ],
-        chords: &[
-            [E, E],
-            [FS, FS],
-            [GSM, GSM],
-            [CSM, B],
-            [E, E],
-            [FS, FS],
-            [CSM, FS],
-            [E, E],
-        ],
+        chords: &[[E, E], [FS, FS], [GSM, GSM], [CSM, B], [E, E], [FS, FS], [CSM, FS], [E, E]],
         lead: Voice::Glass,
         lead_vol: 0.30,
         harmony: Some((Voice::Saw, -12)),
@@ -107,10 +98,7 @@ pub fn storm_song() -> Song<'static> {
 /// The ship's shot: one clean glassy "pew", a pure sine sliding down and
 /// fading to nothing (it fires fast, so it must end cleanly and quickly).
 fn fire_zap() -> Vec<u8> {
-    cosy::finish_warm(
-        cosy::glide(0.09, 1400.0, 880.0, Tone::Sine, 1.6, 0.0),
-        13_000.0,
-    )
+    cosy::finish_warm(cosy::glide(0.09, 1400.0, 880.0, Tone::Sine, 1.6, 0.0), 13_000.0)
 }
 
 /// Thrust, retriggered while held: a soft low triangle hum.
@@ -123,34 +111,20 @@ fn thrust() -> Vec<u8> {
 fn bang(size: usize) -> Vec<u8> {
     let (f0, dur, chime) = [(170.0, 0.4, 64), (240.0, 0.28, 71), (360.0, 0.18, 76)][size];
     let thud = cosy::glide(dur, f0, f0 * 0.45, Tone::Sine, 1.3, 0.0);
-    cosy::sfx(&cosy::mix(
-        thud,
-        &cosy::run(&[chime], 0.05, Voice::Glass, 0.18),
-        0.0,
-        1.0,
-    ))
+    cosy::sfx(&cosy::mix(thud, &cosy::run(&[chime], 0.05, Voice::Glass, 0.18), 0.0, 1.0))
 }
 
 /// The saucers, heard in passing: a slow wobbling whistle, higher and
 /// faster for the small one.
 fn saucer(small: bool) -> Vec<u8> {
-    let (f, depth, dur) = if small {
-        (760.0, 110.0, 0.22)
-    } else {
-        (330.0, 45.0, 0.3)
-    };
+    let (f, depth, dur) = if small { (760.0, 110.0, 0.22) } else { (330.0, 45.0, 0.3) };
     cosy::finish_warm(cosy::glide(dur, f, f, Tone::Sine, 0.4, depth), 13_000.0)
 }
 
 /// The ship lost: a long glassy fall with a low chime under it.
 fn ship_explosion() -> Vec<u8> {
     let fall = cosy::glide(1.2, 820.0, 90.0, Tone::Sine, 0.9, 18.0);
-    cosy::sfx(&cosy::mix(
-        fall,
-        &cosy::run(&[52], 0.05, Voice::Glass, 0.5),
-        0.0,
-        1.0,
-    ))
+    cosy::sfx(&cosy::mix(fall, &cosy::run(&[52], 0.05, Voice::Glass, 0.5), 0.0, 1.0))
 }
 
 /// Hyperspace: a sweep up into a shower of glass.
@@ -161,13 +135,7 @@ fn hyperspace() -> Vec<u8> {
 
 /// An extra ship: a glass fanfare in E lydian.
 fn extra_life() -> Vec<u8> {
-    cosy::jingle_with(
-        &[76, 83, 88, H, 90, 88, 95, H, H],
-        0.09,
-        Voice::Glass,
-        0,
-        Some((Voice::Bell, -1)),
-    )
+    cosy::jingle_with(&[76, 83, 88, H, 90, 88, 95, H, H], 0.09, Voice::Glass, 0, Some((Voice::Bell, -1)))
 }
 
 /// The effects, as `sounds/NAME.wav`.
@@ -188,8 +156,5 @@ pub fn sounds() -> Vec<Asset> {
 
 /// The music: each tune as a WAV to play and an XM of its notes for TUNE.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::xm::tunes(&[
-        ("DRIFT", &|| drift_song().render()),
-        ("STORM", &|| storm_song().render()),
-    ])
+    blip::xm::tunes(&[("DRIFT", &|| drift_song().render()), ("STORM", &|| storm_song().render())])
 }

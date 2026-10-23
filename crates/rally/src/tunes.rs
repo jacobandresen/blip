@@ -3,8 +3,7 @@
 
 use blip::cosy::{self, Voice, H};
 use blip::techno::{
-    bass_note, clap, hat, kick, lead_stab, lift_fill, open_hat, phrase_note, riser, sidechain_duck,
-    supersaw,
+    bass_note, clap, hat, kick, lead_stab, lift_fill, open_hat, phrase_note, riser, sidechain_duck, supersaw,
 };
 use blip::wav::{encode_pcm16_mono, low_pass, soft_limit_to_pcm16, Rng, MIX_KNEE, SAMPLE_RATE};
 use blip::Asset;
@@ -29,10 +28,8 @@ pub fn loop1_wav() -> Vec<u8> {
     // E - A, a two-chord vamp, one root every 2 bars.
     let bass_roots = [82.41_f32, 110.0]; // E2, A2
                                          // Galloping 16th pattern: hit, hit, rest, hit — repeated across the bar.
-    const BASS_HIT: [bool; STEPS_PER_BAR] = [
-        true, true, false, true, true, true, false, true, true, true, false, true, true, true,
-        false, true,
-    ];
+    const BASS_HIT: [bool; STEPS_PER_BAR] =
+        [true, true, false, true, true, true, false, true, true, true, false, true, true, true, false, true];
     // The hook: a driving 4-note riff, identical every bar.
     const HOOK: [f32; 4] = [329.63, 392.00, 493.88, 392.00]; // E4 G4 B4 G4
 
@@ -59,38 +56,16 @@ pub fn loop1_wav() -> Vec<u8> {
             bass_note(&mut buf, off, root, step_ms * 0.6, 0.60);
         }
         if pos.is_multiple_of(4) {
-            supersaw(
-                &mut buf,
-                off,
-                phrase_note(&HOOK, bar, pos / 4),
-                step_ms * 3.0,
-                0.18,
-                6.0,
-                0.008,
-            );
+            supersaw(&mut buf, off, phrase_note(&HOOK, bar, pos / 4), step_ms * 3.0, 0.18, 6.0, 0.008);
             if lifted {
-                supersaw(
-                    &mut buf,
-                    off,
-                    phrase_note(&HOOK, bar, pos / 4) * 2.0,
-                    step_ms * 3.0,
-                    0.09,
-                    6.0,
-                    0.008,
-                );
+                supersaw(&mut buf, off, phrase_note(&HOOK, bar, pos / 4) * 2.0, step_ms * 3.0, 0.09, 6.0, 0.008);
             }
         }
     }
 
     // One bar of climbing hats before the lift, so the busier half
     // arrives as a change rather than as the loop restarting.
-    lift_fill(
-        &mut buf,
-        (LIFT_BAR - 1) * 16 * step_samples,
-        step_samples,
-        &mut rng,
-        0.24,
-    );
+    lift_fill(&mut buf, (LIFT_BAR - 1) * 16 * step_samples, step_samples, &mut rng, 0.24);
 
     sidechain_duck(&mut buf, &kick_offsets, 0.55, step_ms * 0.85);
     for &off in &kick_offsets {
@@ -118,10 +93,8 @@ pub fn loop2_wav() -> Vec<u8> {
 
     // C - Am, a two-chord vamp, one root every 2 bars.
     let bass_roots = [65.41_f32, 55.00]; // C2, A1
-    const BASS_HIT: [bool; STEPS_PER_BAR] = [
-        true, false, true, false, false, true, false, true, false, true, false, false, true, false,
-        true, false,
-    ];
+    const BASS_HIT: [bool; STEPS_PER_BAR] =
+        [true, false, true, false, false, true, false, true, false, true, false, false, true, false, true, false];
     const HOOK: [f32; 3] = [523.25, 587.33, 659.25]; // C5 D5 E5
 
     for step in 0..TOTAL_STEPS {
@@ -241,26 +214,14 @@ pub fn loop4_wav() -> Vec<u8> {
             open_hat(&mut buf, off, &mut rng, if in_lift { 0.26 } else { 0.17 });
         }
         if pos.is_multiple_of(4) {
-            bass_note(
-                &mut buf,
-                off,
-                bass_roots[(bar / 2) % 2],
-                step_ms * 3.5,
-                0.55,
-            );
+            bass_note(&mut buf, off, bass_roots[(bar / 2) % 2], step_ms * 3.5, 0.55);
         }
         if (bar.is_multiple_of(2) || in_lift) && (pos == 8 || pos == 9 || pos == 10 || pos == 11) {
             let note = HOOK[pos - 8];
             supersaw(&mut buf, off, note, step_ms * 1.4, 0.15, 7.0, 0.009);
         }
         if bar == BARS - 2 && pos == 0 {
-            riser(
-                &mut buf,
-                off,
-                step_ms * (STEPS_PER_BAR * 2) as f32,
-                0.3,
-                &mut rng,
-            );
+            riser(&mut buf, off, step_ms * (STEPS_PER_BAR * 2) as f32, 0.3, &mut rng);
         }
     }
 
@@ -290,10 +251,8 @@ pub fn loop5_wav() -> Vec<u8> {
 
     // G mixolydian vamp: root off the beat, not on it.
     let root = 98.00_f32; // G2
-    const BASS_HIT: [bool; 16] = [
-        false, false, true, false, false, true, false, true, false, false, true, false, false,
-        true, false, false,
-    ];
+    const BASS_HIT: [bool; 16] =
+        [false, false, true, false, false, true, false, true, false, false, true, false, false, true, false, false];
     const CALL: [f32; 3] = [587.33, 698.46, 783.99]; // D5 F5 G5
     const RESPONSE: [f32; 3] = [659.25, 587.33, 493.88]; // E5 D5 B4
 
@@ -315,19 +274,9 @@ pub fn loop5_wav() -> Vec<u8> {
             open_hat(&mut buf, off, &mut rng, 0.2);
         }
         if BASS_HIT[pos] {
-            bass_note(
-                &mut buf,
-                off,
-                root * if pos == 7 || pos == 13 { 1.5 } else { 1.0 },
-                step_ms * 0.6,
-                0.55,
-            );
+            bass_note(&mut buf, off, root * if pos == 7 || pos == 13 { 1.5 } else { 1.0 }, step_ms * 0.6, 0.55);
         }
-        let phrase = if bar.is_multiple_of(2) {
-            &CALL
-        } else {
-            &RESPONSE
-        };
+        let phrase = if bar.is_multiple_of(2) { &CALL } else { &RESPONSE };
         if pos == 9 || pos == 10 || pos == 11 {
             lead_stab(&mut buf, off, phrase[pos - 9], step_ms * 1.3, 0.19);
         }
@@ -355,34 +304,17 @@ fn wall() -> Vec<u8> {
 /// the right paddle so the rally ping-pongs.
 fn hit(right: bool) -> Vec<u8> {
     let (f, n) = if right { (262.0, 74) } else { (220.0, 71) };
-    cosy::sfx(&cosy::mix(
-        cosy::boing(0.09, f),
-        &cosy::run(&[n], 0.03, Voice::Pluck, 0.35),
-        0.0,
-        1.0,
-    ))
+    cosy::sfx(&cosy::mix(cosy::boing(0.09, f), &cosy::run(&[n], 0.03, Voice::Pluck, 0.35), 0.0, 1.0))
 }
 
 /// A point to the left player (the one at the controls): a bright run up.
 fn point_won() -> Vec<u8> {
-    cosy::jingle_with(
-        &[79, 83, 86, 91, H],
-        0.06,
-        Voice::Pluck,
-        0,
-        Some((Voice::Bell, -1)),
-    )
+    cosy::jingle_with(&[79, 83, 86, 91, H], 0.06, Voice::Pluck, 0, Some((Voice::Bell, -1)))
 }
 
 /// A point to the right: a short fall.
 fn point_lost() -> Vec<u8> {
-    cosy::jingle_with(
-        &[74, H, 71, H, 67, H, H],
-        0.07,
-        Voice::Pluck,
-        -1,
-        Some((Voice::Bell, -2)),
-    )
+    cosy::jingle_with(&[74, H, 71, H, 67, H, H], 0.07, Voice::Pluck, -1, Some((Voice::Bell, -2)))
 }
 
 /// The effects, as `sounds/NAME.wav`.

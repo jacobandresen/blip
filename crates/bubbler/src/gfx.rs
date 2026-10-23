@@ -9,18 +9,28 @@ fn title_letter(ch: char, index: usize) -> Vec<u8> {
     let hue = ((0.9 + index as f32 * 0.06) % 1.0) * 6.0;
     let x = 0.45 * (1.0 - ((hue % 2.0) - 1.0).abs());
     let (r, g, b) = match hue as i32 {
-        0 => (0.45, x, 0.0), 1 => (x, 0.45, 0.0), 2 => (0.0, 0.45, x),
-        3 => (0.0, x, 0.45), 4 => (x, 0.0, 0.45), _ => (0.45, 0.0, x),
+        0 => (0.45, x, 0.0),
+        1 => (x, 0.45, 0.0),
+        2 => (0.0, 0.45, x),
+        3 => (0.0, x, 0.45),
+        4 => (x, 0.0, 0.45),
+        _ => (0.45, 0.0, x),
     };
     let color = [((r + 0.55) * 255.0) as u8, ((g + 0.55) * 255.0) as u8, ((b + 0.55) * 255.0) as u8];
     let mut shape = |rgb: [u8; 3], alpha: f32, inside: &dyn Fn(f32, f32) -> bool| {
         for y in 0..74 {
             for x in 0..68 {
                 let mut covered = 0;
-                for sy in 0..3 { for sx in 0..3 {
-                    if inside(x as f32 + (sx as f32 + 0.5) / 3.0, y as f32 + (sy as f32 + 0.5) / 3.0) { covered += 1; }
-                } }
-                if covered > 0 { image.blend(x, y, [rgb[0], rgb[1], rgb[2], (alpha * covered as f32 / 9.0 * 255.0).round() as u8]); }
+                for sy in 0..3 {
+                    for sx in 0..3 {
+                        if inside(x as f32 + (sx as f32 + 0.5) / 3.0, y as f32 + (sy as f32 + 0.5) / 3.0) {
+                            covered += 1;
+                        }
+                    }
+                }
+                if covered > 0 {
+                    image.blend(x, y, [rgb[0], rgb[1], rgb[2], (alpha * covered as f32 / 9.0 * 255.0).round() as u8]);
+                }
             }
         }
     };
@@ -91,7 +101,9 @@ fn title_sky() -> Vec<u8> {
     for y in 0..600 {
         let t = (((y as f32 + 0.5) * 18.0 / 600.0).floor() / 17.0).min(1.0);
         let color = ((18.0 + 30.0 * t) as u8, (12.0 + 8.0 * t) as u8, (52.0 + 32.0 * t) as u8);
-        for x in 0..624 { image.set(x, y, color.0, color.1, color.2); }
+        for x in 0..624 {
+            image.set(x, y, color.0, color.1, color.2);
+        }
     }
     image.encode_png()
 }
@@ -120,11 +132,7 @@ fn line(img: &mut Image, x0: i32, y0: i32, x1: i32, y1: i32, color: (u8, u8, u8)
 fn plush(body: (u8, u8, u8), angry_body: (u8, u8, u8), kind: usize, angry: bool) -> Vec<u8> {
     let body = if angry { angry_body } else { body };
     let mut img = Image::new(32, 36);
-    let dark = (
-        (body.0 as f32 * 0.68) as u8,
-        (body.1 as f32 * 0.68) as u8,
-        (body.2 as f32 * 0.68) as u8,
-    );
+    let dark = ((body.0 as f32 * 0.68) as u8, (body.1 as f32 * 0.68) as u8, (body.2 as f32 * 0.68) as u8);
     if kind == 1 {
         disc(&mut img, 11, 7, 3, 8, dark);
         disc(&mut img, 21, 7, 3, 8, dark);
@@ -164,11 +172,7 @@ fn plush(body: (u8, u8, u8), angry_body: (u8, u8, u8), kind: usize, angry: bool)
 
 fn dragon(body: (u8, u8, u8)) -> Vec<u8> {
     let mut img = Image::new(32, 36);
-    let dark = (
-        (body.0 as f32 * 0.68) as u8,
-        (body.1 as f32 * 0.68) as u8,
-        (body.2 as f32 * 0.68) as u8,
-    );
+    let dark = ((body.0 as f32 * 0.68) as u8, (body.1 as f32 * 0.68) as u8, (body.2 as f32 * 0.68) as u8);
     disc(&mut img, 9, 30, 5, 3, dark);
     disc(&mut img, 23, 30, 5, 3, dark);
     for (x, y) in [(7, 13), (10, 9), (14, 7)] {
@@ -200,18 +204,9 @@ const TILES: [((u8, u8, u8), (u8, u8, u8), (u8, u8, u8)); 8] = [
 
 fn tile(round: usize, border: bool) -> Vec<u8> {
     let (block, light, dark) = TILES[round];
-    let shade = |c: (u8, u8, u8), k: f32| {
-        (
-            (c.0 as f32 * k) as u8,
-            (c.1 as f32 * k) as u8,
-            (c.2 as f32 * k) as u8,
-        )
-    };
-    let (block, light, dark) = if border {
-        (shade(block, 0.62), shade(light, 0.7), dark)
-    } else {
-        (block, light, dark)
-    };
+    let shade = |c: (u8, u8, u8), k: f32| ((c.0 as f32 * k) as u8, (c.1 as f32 * k) as u8, (c.2 as f32 * k) as u8);
+    let (block, light, dark) =
+        if border { (shade(block, 0.62), shade(light, 0.7), dark) } else { (block, light, dark) };
     let mut img = Image::new(32, 32);
     for y in 1..31 {
         for x in 1..31 {
@@ -254,30 +249,12 @@ pub fn generate() -> Vec<Asset> {
         ("images/TITLE_LETTER_7.png", title_letter('R', 6)),
         ("images/PLAYER_GREEN.png", dragon((90, 210, 110))),
         ("images/PLAYER_BLUE.png", dragon((90, 170, 255))),
-        (
-            "images/ROBOT.png",
-            plush((200, 190, 245), (255, 150, 140), 0, false),
-        ),
-        (
-            "images/ROBOT_ANGRY.png",
-            plush((200, 190, 245), (255, 150, 140), 0, true),
-        ),
-        (
-            "images/BUNNY.png",
-            plush((255, 195, 220), (255, 140, 160), 1, false),
-        ),
-        (
-            "images/BUNNY_ANGRY.png",
-            plush((255, 195, 220), (255, 140, 160), 1, true),
-        ),
-        (
-            "images/GHOST.png",
-            plush((215, 245, 255), (255, 190, 235), 2, false),
-        ),
-        (
-            "images/GHOST_ANGRY.png",
-            plush((215, 245, 255), (255, 190, 235), 2, true),
-        ),
+        ("images/ROBOT.png", plush((200, 190, 245), (255, 150, 140), 0, false)),
+        ("images/ROBOT_ANGRY.png", plush((200, 190, 245), (255, 150, 140), 0, true)),
+        ("images/BUNNY.png", plush((255, 195, 220), (255, 140, 160), 1, false)),
+        ("images/BUNNY_ANGRY.png", plush((255, 195, 220), (255, 140, 160), 1, true)),
+        ("images/GHOST.png", plush((215, 245, 255), (255, 190, 235), 2, false)),
+        ("images/GHOST_ANGRY.png", plush((215, 245, 255), (255, 190, 235), 2, true)),
     ];
     for round in 0..TILES.len() {
         let tile_name = [

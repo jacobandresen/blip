@@ -1,8 +1,8 @@
 // Compiled by build.rs, and by the game for its tests: each uses part of this file.
 #![allow(dead_code)]
 
-use blip::song::{major, minor, Chord, Groove, Song, H, R};
 use blip::cosy::{self, Tone, Voice};
+use blip::song::{major, minor, Chord, Groove, Song, H, R};
 use blip::Asset;
 
 const EM: Chord = minor(40);
@@ -81,16 +81,7 @@ pub fn mothership_song() -> Song<'static> {
             [72, H, 74, H, 75, H, 76, H],
             [69, H, H, H, R, R, R, R],
         ],
-        chords: &[
-            [AM, AM],
-            [F, E],
-            [AM, AM],
-            [F, E],
-            [AM, AM],
-            [DM, E],
-            [F, E],
-            [AM, AM],
-        ],
+        chords: &[[AM, AM], [F, E], [AM, AM], [F, E], [AM, AM], [DM, E], [F, E], [AM, AM]],
         lead: Voice::Saw,
         lead_vol: 0.30,
         harmony: Some((Voice::Saw, -12)),
@@ -126,42 +117,24 @@ fn laser_blast_sfx() -> Vec<u8> {
 /// One march step: a soft triangle thud falling onto `base_freq`. Four
 /// descending ones cycle as the aliens advance.
 fn march_thump(base_freq: f32) -> Vec<u8> {
-    cosy::finish_warm(
-        cosy::glide(0.16, base_freq * 1.4, base_freq, Tone::Tri, 1.4, 0.0),
-        24_000.0,
-    )
+    cosy::finish_warm(cosy::glide(0.16, base_freq * 1.4, base_freq, Tone::Tri, 1.4, 0.0), 24_000.0)
 }
 
 // Device-synthesized action tracks use saw lead, theremin and galloping bass; boss levels use the faster theme.
 
 /// Game over: the theremin walking down A minor, slowly.
 fn game_over_sfx() -> Vec<u8> {
-    cosy::jingle_with(
-        &[81, H, 77, H, 76, H, 72, H, 69, H, H, H],
-        0.14,
-        Voice::Theremin,
-        -1,
-        Some((Voice::Bell, -2)),
-    )
+    cosy::jingle_with(&[81, H, 77, H, 76, H, 72, H, 69, H, H, H], 0.14, Voice::Theremin, -1, Some((Voice::Bell, -2)))
 }
 
 /// Wave cleared: the theremin climbing A minor to a held note.
 fn level_clear_sfx() -> Vec<u8> {
-    cosy::jingle_with(
-        &[69, 72, 76, 81, H, 79, 81, H, H],
-        0.1,
-        Voice::Theremin,
-        -1,
-        Some((Voice::Bell, -2)),
-    )
+    cosy::jingle_with(&[69, 72, 76, 81, H, 79, 81, H, H], 0.1, Voice::Theremin, -1, Some((Voice::Bell, -2)))
 }
 
 /// The player's shot: a quick theremin "pew" falling an octave.
 fn shoot_sfx() -> Vec<u8> {
-    cosy::finish_warm(
-        cosy::glide(0.11, 1300.0, 620.0, Tone::Sine, 1.2, 25.0),
-        15_000.0,
-    )
+    cosy::finish_warm(cosy::glide(0.11, 1300.0, 620.0, Tone::Sine, 1.2, 25.0), 15_000.0)
 }
 
 /// A diver leaving the formation: the theremin swooping down a ninth, with
@@ -173,12 +146,7 @@ fn dive_sfx() -> Vec<u8> {
 /// An alien hit: a soft pop and a bloop tumbling down, no hiss.
 fn explosion_sfx() -> Vec<u8> {
     let pop = cosy::snap(0.06, 900.0, 0xDEF1);
-    cosy::sfx(&cosy::mix(
-        pop,
-        &cosy::bloop(0.3, 360.0, 80.0, 0xDEF2),
-        0.02,
-        0.9,
-    ))
+    cosy::sfx(&cosy::mix(pop, &cosy::bloop(0.3, 360.0, 80.0, 0xDEF2), 0.02, 0.9))
 }
 
 /// The effects, as `sounds/NAME.wav`.
@@ -201,8 +169,5 @@ pub fn sounds() -> Vec<Asset> {
 
 /// The music: each tune as a WAV to play and an XM of its notes for TUNE.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::xm::tunes(&[
-        ("INVASION", &|| invasion_song().render()),
-        ("MOTHERSHIP", &|| mothership_song().render()),
-    ])
+    blip::xm::tunes(&[("INVASION", &|| invasion_song().render()), ("MOTHERSHIP", &|| mothership_song().render())])
 }

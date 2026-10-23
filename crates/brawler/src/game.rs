@@ -243,15 +243,7 @@ impl Game {
             state: State::Title,
             sess: Session::new(1),
             p: [Fighter::new(0, 200.0, 1.0), Fighter::new(1, 440.0, -1.0)],
-            bolts: [Bolt {
-                x: 0.0,
-                y: 0.0,
-                vx: 0.0,
-                vy: 0.0,
-                owner: 0,
-                active: false,
-                damage: 0,
-            }; 4],
+            bolts: [Bolt { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, owner: 0, active: false, damage: 0 }; 4],
             demo: false,
             idle: 0.0,
             demo_cpu: (CpuPlan::Wait, 0.0),
@@ -288,13 +280,7 @@ impl Game {
             mercy: 0.0,
             continues: 0,
             result: RoundResult::Draw,
-            hitspark: [Spark {
-                x: 0.0,
-                y: 0.0,
-                ttl: 0.0,
-                life: 1.0,
-                blocked: false,
-            }; 4],
+            hitspark: [Spark { x: 0.0, y: 0.0, ttl: 0.0, life: 1.0, blocked: false }; 4],
             shake: 0.0,
             hitstop: 0.0,
             bowed: false,
@@ -309,17 +295,8 @@ impl Game {
             now: 0.0,
             sel_held: [[false; 2]; 2],
             sel_fire: [false; 2],
-            pops: [Pop {
-                text: "",
-                x: 0.0,
-                y: 0.0,
-                ttl: 0.0,
-            }; 4],
-            fruit: Fruit {
-                x: 0.0,
-                ttl: 0.0,
-                kind: 0,
-            },
+            pops: [Pop { text: "", x: 0.0, y: 0.0, ttl: 0.0 }; 4],
+            fruit: Fruit { x: 0.0, ttl: 0.0, kind: 0 },
             fruit_due: false,
             ghost: [0.0; 2],
             quake_x: 0.0,
@@ -357,13 +334,10 @@ impl Game {
     pub(crate) fn build_ladder(&self) -> [usize; RUNGS] {
         let n = FIGHTERS.len();
         let homes: [usize; 10] = std::array::from_fn(home_of);
-        let mut ends: Vec<usize> = (0..n)
-            .filter(|&w| FIGHTERS[w].invincible || FIGHTERS[w].build == Build::Giant)
-            .collect();
+        let mut ends: Vec<usize> =
+            (0..n).filter(|&w| FIGHTERS[w].invincible || FIGHTERS[w].build == Build::Giant).collect();
         ends.sort_by_key(|&w| FIGHTERS[w].invincible);
-        blip::ordered_ladder(self.pick, &homes, &ends)
-            .try_into()
-            .expect("the ladder contains every opponent")
+        blip::ordered_ladder(self.pick, &homes, &ends).try_into().expect("the ladder contains every opponent")
     }
 
     /// Two players, one match, no ladder and no difficulty dial.
@@ -390,17 +364,8 @@ impl Game {
         // The first bonus round is the row; the second is the fall.
         let falling = self.opponent_index != BONUS_AFTER[0];
         self.bonus_total = if falling { BARRELS } else { 5 };
-        let none = Barrel {
-            x: 0.0,
-            y: FLOOR_Y,
-            vx: 0.0,
-            vy: 0.0,
-            wait: 0.0,
-            hp: 0,
-            rolls: false,
-            hit_t: 9.0,
-            broke_t: -1.0,
-        };
+        let none =
+            Barrel { x: 0.0, y: FLOOR_Y, vx: 0.0, vy: 0.0, wait: 0.0, hp: 0, rolls: false, hit_t: 9.0, broke_t: -1.0 };
         for (i, b) in self.barrels.iter_mut().enumerate() {
             *b = if i >= self.bonus_total {
                 none
@@ -414,11 +379,7 @@ impl Game {
                     ..none
                 }
             } else {
-                Barrel {
-                    x: 200.0 + i as f32 * 85.0,
-                    hp: BARREL_HP,
-                    ..none
-                }
+                Barrel { x: 200.0 + i as f32 * 85.0, hp: BARREL_HP, ..none }
             };
         }
         for b in self.bolts.iter_mut() {
@@ -441,13 +402,10 @@ impl Game {
     /// The attract mode: a round between two fighters drawn by lot, on the
     /// second one's stage. Nothing is scored and nothing is spent.
     pub(crate) fn start_demo(&mut self) {
-        let fair: Vec<usize> = (0..FIGHTERS.len())
-            .filter(|&w| !FIGHTERS[w].invincible)
-            .collect();
+        let fair: Vec<usize> = (0..FIGHTERS.len()).filter(|&w| !FIGHTERS[w].invincible).collect();
         let a = fair[rand_int(0, fair.len() as i32 - 1) as usize];
-        let b = fair[(fair.iter().position(|&w| w == a).unwrap()
-            + rand_int(1, fair.len() as i32 - 1) as usize)
-            % fair.len()];
+        let b = fair
+            [(fair.iter().position(|&w| w == a).unwrap() + rand_int(1, fair.len() as i32 - 1) as usize) % fair.len()];
         self.mode = Mode::Solo;
         self.demo = true;
         self.pick = a;
@@ -476,9 +434,8 @@ impl Game {
         // Below zero the CPU also hesitates (see cpu_think): the first fights
         // are ones a newcomer can win. The dial climbs evenly to the last,
         // less a little for each continue.
-        self.difficulty = FIRST_RUNG
-            + (LAST_RUNG - FIRST_RUNG) * opponent_index as f32 / (RUNGS - 1) as f32
-            - self.mercy;
+        self.difficulty =
+            FIRST_RUNG + (LAST_RUNG - FIRST_RUNG) * opponent_index as f32 / (RUNGS - 1) as f32 - self.mercy;
         self.p[0] = Fighter::new(self.pick, 200.0, 1.0);
         self.p[1] = Fighter::new(foe, 440.0, -1.0);
         self.round = 1;
@@ -526,11 +483,7 @@ impl Game {
     /// side has three slots of its own, and the sweep always comes last.
     pub(crate) fn call_turtles(&mut self, side: usize) {
         let (caller, foe) = (self.p[side], self.p[1 - side].who);
-        let from = if caller.facing > 0.0 {
-            -30.0
-        } else {
-            WIN_W as f32 + 30.0
-        };
+        let from = if caller.facing > 0.0 { -30.0 } else { WIN_W as f32 + 30.0 };
         let others: Vec<usize> = (0..FIGHTERS.len())
             .filter(|&w| FIGHTERS[w].build == Build::Turtle && w != caller.who && w != foe)
             .take(3)
@@ -553,9 +506,7 @@ impl Game {
         let laser = self.p[owner].arch().special == Special::LaserVision;
         // From the air the laser is aimed, so he turns to look first: at the
         // spot the stare fixed on, or failing that at the opponent.
-        let (ax, ay) = self.p[owner]
-            .aim
-            .unwrap_or((foe.x, foe.y - foe.height() * 0.5));
+        let (ax, ay) = self.p[owner].aim.unwrap_or((foe.x, foe.y - foe.height() * 0.5));
         if laser && self.p[owner].airborne() {
             self.p[owner].facing = if ax >= self.p[owner].x { 1.0 } else { -1.0 };
         }
@@ -567,11 +518,7 @@ impl Game {
         let (y, vx, vy) = if !laser {
             (f.y - 54.0 * f.size(), f.facing * 300.0, 0.0)
         } else if !f.airborne() {
-            (
-                f.y - LASER_HEIGHT * f.size().min(f.foe_size),
-                f.facing * LASER_SPEED,
-                0.0,
-            )
+            (f.y - LASER_HEIGHT * f.size().min(f.foe_size), f.facing * LASER_SPEED, 0.0)
         } else {
             let y = f.y - 100.0 * f.size();
             let (dx, dy) = (ax - x, ay - y);
@@ -579,15 +526,7 @@ impl Game {
             (y, dx / d * LASER_SPEED, dy / d * LASER_SPEED)
         };
         if let Some(b) = self.bolts.iter_mut().find(|b| !b.active) {
-            *b = Bolt {
-                x,
-                y,
-                vx,
-                vy,
-                owner,
-                active: true,
-                damage,
-            };
+            *b = Bolt { x, y, vx, vy, owner, active: true, damage };
         }
     }
 
@@ -612,12 +551,7 @@ impl Game {
 
     /// A word over (`x`, `y`) for a moment.
     pub(crate) fn pop(&mut self, text: &'static str, x: f32, y: f32) {
-        let fresh = Pop {
-            text,
-            x,
-            y,
-            ttl: POP_SECS,
-        };
+        let fresh = Pop { text, x, y, ttl: POP_SECS };
         let slot = self.pops.iter().position(|w| w.ttl <= 0.0).unwrap_or(0);
         self.pops[slot] = fresh;
     }
@@ -626,13 +560,7 @@ impl Game {
     /// guard.
     pub(crate) fn spark(&mut self, x: f32, y: f32, big: bool, blocked: bool) {
         let life = if big { 0.26 } else { 0.17 };
-        let fresh = Spark {
-            x,
-            y,
-            ttl: life,
-            life,
-            blocked,
-        };
+        let fresh = Spark { x, y, ttl: life, life, blocked };
         for s in self.hitspark.iter_mut() {
             if s.ttl <= 0.0 {
                 *s = fresh;

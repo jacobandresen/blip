@@ -23,17 +23,9 @@ fn separators_ignore_quoted_text_and_nested_expressions() {
 }
 #[test]
 fn comments_own_colons_quotes_and_executable_looking_text() {
-    for comment in [
-        "REM INPUT: B=2:GOTO 800",
-        "rem DON'T SPLIT: PRINT \"HI\"",
-        "' STATE: A=1",
-        "REM:END",
-    ] {
+    for comment in ["REM INPUT: B=2:GOTO 800", "rem DON'T SPLIT: PRINT \"HI\"", "' STATE: A=1", "REM:END"] {
         assert_eq!(split_statements(comment), [comment]);
-        assert_eq!(
-            split_statements(&format!("A=1:{comment}")),
-            ["A=1", comment]
-        );
+        assert_eq!(split_statements(&format!("A=1:{comment}")), ["A=1", comment]);
     }
     assert_eq!(split_statements("REMAINDER=1:A=2"), ["REMAINDER=1", "A=2"]);
 }
@@ -44,10 +36,7 @@ fn conditional_after_an_assignment_keeps_the_rest_of_the_line() {
         split_statements("FRAME_TIME=0:IF QN>0 THEN DIR_X=QX(1):QN=QN-1"),
         ["FRAME_TIME=0", "IF QN>0 THEN DIR_X=QX(1):QN=QN-1"]
     );
-    assert_eq!(
-        split_statements("A=1:IF B THEN C=2:IF D THEN E=3:F=4"),
-        ["A=1", "IF B THEN C=2:IF D THEN E=3:F=4"]
-    );
+    assert_eq!(split_statements("A=1:IF B THEN C=2:IF D THEN E=3:F=4"), ["A=1", "IF B THEN C=2:IF D THEN E=3:F=4"]);
     assert_eq!(
         split_statements("DRAW_TEXT(\"IF A:B\",1,2,3,\"WHITE\"):WAIT 16"),
         ["DRAW_TEXT(\"IF A:B\",1,2,3,\"WHITE\")", "WAIT 16"]
@@ -63,10 +52,7 @@ fn random_reaches_every_spawn_slot_without_exceeding_its_limit() {
         assert!((0.0..20.0).contains(&value));
         slots[value.floor() as usize] += 1;
     }
-    assert!(
-        slots.iter().all(|count| (800..1200).contains(count)),
-        "{slots:?}"
-    );
+    assert!(slots.iter().all(|count| (800..1200).contains(count)), "{slots:?}");
 }
 
 #[test]
@@ -75,32 +61,23 @@ fn primitive_calls_use_the_crate_method_name() {
     assert_eq!(method_call("fill_rect(1,2,3,4,color)"), expected);
     assert_eq!(method_call("FILL_RECT(1,2,3,4,color)"), expected);
     assert_eq!(method_call("BLIP.fill_rect(1,2,3,4,color)"), None);
-    assert_eq!(
-        method_call("CANVAS(480,540)"),
-        Some(("canvas".into(), "480,540".into()))
-    );
+    assert_eq!(method_call("CANVAS(480,540)"), Some(("canvas".into(), "480,540".into())));
 }
 #[test]
 fn hex_colors_support_rgb_and_rgba() {
     assert_eq!(
         value_color(&Value::Str("#336699".into())),
-        Color::new(
-            0x33 as f32 / 255.0,
-            0x66 as f32 / 255.0,
-            0x99 as f32 / 255.0,
-            1.0
-        )
+        Color::new(0x33 as f32 / 255.0, 0x66 as f32 / 255.0, 0x99 as f32 / 255.0, 1.0)
     );
-    assert_eq!(
-        value_color(&Value::Str("#33669980".into())).a,
-        128.0 / 255.0
-    );
+    assert_eq!(value_color(&Value::Str("#33669980".into())).a, 128.0 / 255.0);
 }
 
 #[test]
 fn procedures_are_found_with_their_parameters() {
     let mut p = Program::new();
-    p.load("10 CALL BOX(1,2,\"RED\")\n20 END\n100 SUB BOX(X,Y,C$) STATIC\n110 LOCAL I\n120 END SUB\n130 SUB BEEP:END SUB");
+    p.load(
+        "10 CALL BOX(1,2,\"RED\")\n20 END\n100 SUB BOX(X,Y,C$) STATIC\n110 LOCAL I\n120 END SUB\n130 SUB BEEP:END SUB",
+    );
     assert_eq!(p.error, None);
     assert!(p.is_procedure("BOX") && p.is_procedure("BEEP"));
     let boxed = &p.procedures["BOX"];
@@ -184,7 +161,8 @@ fn tapes_follow_the_house_layout() {
         for heading in ["10 REM --- SETUP ---", "100 REM --- MAIN LOOP"] {
             assert!(source.contains(heading), "{name}: {heading}");
         }
-        for sub in ["START_GAME", "UPDATE_TITLE", "DRAW_TITLE", "UPDATE_PLAY", "DRAW_PLAY", "UPDATE_OVER", "DRAW_OVER"] {
+        for sub in ["START_GAME", "UPDATE_TITLE", "DRAW_TITLE", "UPDATE_PLAY", "DRAW_PLAY", "UPDATE_OVER", "DRAW_OVER"]
+        {
             assert!(p.is_procedure(sub), "{name}: SUB {sub}");
         }
         assert!(!source.contains("GOSUB"), "{name}: SUBs, not GOSUB");
@@ -197,16 +175,25 @@ fn tapes_follow_the_house_layout() {
             let body = line.split_once(' ').map_or("", |(_, body)| body);
             let code = body.trim_start();
             let (word, _) = super::procedure::leading_name(code);
-            let closes = matches!(word.as_str(), "NEXT" | "ELSE" | "ELSEIF" | "WEND") || code.starts_with("END SUB") || code.starts_with("END IF");
-            if closes { depth = depth.checked_sub(1).unwrap_or_else(|| panic!("{name}: unopened {line}")); }
+            let closes = matches!(word.as_str(), "NEXT" | "ELSE" | "ELSEIF" | "WEND")
+                || code.starts_with("END SUB")
+                || code.starts_with("END IF");
+            if closes {
+                depth = depth.checked_sub(1).unwrap_or_else(|| panic!("{name}: unopened {line}"));
+            }
             assert_eq!(body.len() - code.len(), 2 * depth, "{name}: indent {line}");
             let one_line_for = word == "FOR" && code.contains(":NEXT");
-            let opens = matches!(word.as_str(), "SUB" | "ELSE" | "ELSEIF" | "WHILE") || word == "FOR" && !one_line_for
+            let opens = matches!(word.as_str(), "SUB" | "ELSE" | "ELSEIF" | "WHILE")
+                || word == "FOR" && !one_line_for
                 || super::block::block_condition(code).is_some();
-            if opens { depth += 1; }
+            if opens {
+                depth += 1;
+            }
             let statements = split_statements(code);
-            assert!(statements.len() <= 1 || statements.len() <= 3 && statements.iter().all(|s| s.len() <= 24),
-                "{name}: one statement a line: {line}");
+            assert!(
+                statements.len() <= 1 || statements.len() <= 3 && statements.iter().all(|s| s.len() <= 24),
+                "{name}: one statement a line: {line}"
+            );
         }
         assert_eq!(depth, 0, "{name}: unclosed block");
     }
