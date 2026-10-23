@@ -1531,7 +1531,6 @@ fn streak_label(streak: i32) -> String {
 }
 
 fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
-    blip.clear(BLIP_BLACK);
     blip.draw_centered("DEFENDER", (WIN_H / 5 + 14) as f32, 6.0, BLIP_MAGENTA);
     // The title is 6 x 7 = 42px tall: the high score clears it by a real margin.
     blip.draw_hi(hi, (WIN_H / 5 + 93) as f32, BLIP_YELLOW);
@@ -1570,14 +1569,8 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
 
 fn draw_clear(blip: &Blip, level: i32) {
     let buf = format!("LEVEL {}", level);
-    blip.clear(BLIP_BLACK);
     blip.draw_centered("WAVE CLEAR", (WIN_H / 3) as f32, 4.0, BLIP_CYAN);
     blip.draw_centered(&buf,         (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
-}
-
-fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
-    blip.clear(BLIP_BLACK);
-    blip.draw_game_over(score, hi, BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !waiting);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -1648,7 +1641,7 @@ async fn main() {
         match g.state {
             State::Title => draw_title(&blip, &alien, &web::high_score()),
             State::Win   => draw_clear(&blip, g.sess.level),
-            State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
+            State::Over  => blip.draw_game_over(g.sess.score, &web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active()),
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player, &alien, &explosion, &shield, &bullet, &saucer);
             }

@@ -966,7 +966,6 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
 }
 
 fn draw_title(blip: &Blip, hi: &web::HighScore, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9]) {
-    blip.clear(BLIP_BLACK);
     for (row, (start, count)) in [(1, 8), (2, 6)].into_iter().enumerate() {
         let x0 = (WIN_W - count * (BRICK_W + BRICK_GAP) + BRICK_GAP) / 2;
         for col in 0..count {
@@ -1009,14 +1008,8 @@ fn draw_title(blip: &Blip, hi: &web::HighScore, paddle: &Texture2D, ball: &Textu
 
 fn draw_clear(blip: &Blip, level: i32) {
     let buf = format!("LEVEL {}", level + 1);  // level just incremented in next_level
-    blip.clear(BLIP_BLACK);
     blip.draw_centered("CLEARED", (WIN_H / 3) as f32, 5.0, BLIP_GREEN);
     blip.draw_centered(&buf,      (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
-}
-
-fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
-    blip.clear(BLIP_BLACK);
-    blip.draw_game_over(score, hi, BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !waiting);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -1100,7 +1093,7 @@ async fn main() {
         match g.state {
             State::Title => draw_title(&blip, &web::high_score(), &paddle, &ball, &ball_shade, &brick),
             State::Win   => draw_clear(&blip, g.sess.level),
-            State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
+            State::Over  => blip.draw_game_over(g.sess.score, &web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active()),
             State::Launch | State::Play | State::Dead => {
                 draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick, &drops);
                 // The ball waits on the paddle after every lost life; say so.

@@ -3287,24 +3287,17 @@ fn draw_title(
 
 fn draw_win(blip: &Blip, level: i32) {
     let buf = format!("WAVE {level}");
-    blip.clear(BLIP_BLACK);
     blip.draw_centered("STAGE CLEAR", (WIN_H / 3) as f32, 5.0, BLIP_GREEN);
     blip.draw_centered(&buf,          (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
 }
 
 fn draw_won(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
     let buf = format!("SCORE {score}");
-    blip.clear(BLIP_BLACK);
     blip.draw_centered("YOU WON!!",           (WIN_H / 4) as f32,      6.0, BLIP_YELLOW);
     blip.draw_centered("ALL 7 WAVES CLEARED", (WIN_H / 2 - 20) as f32, 3.0, BLIP_GREEN);
     blip.draw_centered(&buf,                  (WIN_H / 2 + 14) as f32, 3.0, BLIP_WHITE);
     blip.draw_best(score, hi, (WIN_H / 2 + 40) as f32, BLIP_GREEN);
     if !waiting { blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_CYAN); }
-}
-
-fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
-    blip.clear(BLIP_BLACK);
-    blip.draw_game_over(score, hi, BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !waiting);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -3449,7 +3442,7 @@ async fn main() {
             State::Launch => draw_launch(&blip, &g, &player_tex, &enemy_tex, &carrier_tex, &boat_tex, &cloud_tex, &island_tex),
             State::Win    => draw_win(&blip, g.sess.level),
             State::Won    => draw_won(&blip, g.sess.score, &web::high_score(), g.over_timer.active()),
-            State::Over   => draw_over(&blip, g.sess.score, &web::high_score(), g.over_timer.active()),
+            State::Over   => blip.draw_game_over(g.sess.score, &web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.over_timer.active()),
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player_tex, &enemy_tex, &boss_tex, &powerup_tex, &health_tex, &boss_name_ja_tex, &boat_tex, &cloud_tex, &island_tex);
             }

@@ -321,7 +321,6 @@ fn draw_title(blip: &Blip, g: &Game, pit: &Texture2D) {
 }
 
 fn draw_over(blip: &Blip, g: &Game) {
-    blip.clear(BLIP_BLACK);
     blip.draw_game_over(g.world.score_of(0), &web::high_score(), BLIP_RED, arena::seat_colour(0), HOLE,
         !g.timer.active());
     blip.draw_centered(&format!("ROUND {}   LENGTH {}", g.world.round, g.world.snakes.first().map_or(0, |s| s.len_s)),
