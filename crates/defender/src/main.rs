@@ -1,7 +1,7 @@
 //! Space Invaders-inspired shooter.
 
 use blip::input::{
-    btn1_pressed, key_active, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
+    coin_start, play_again, key_active, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::rand::rand;
@@ -203,6 +203,15 @@ struct Game {
 }
 
 impl Game {
+    /// The saucer's lights step round, one every UFO_SPIN_STEP_MS.
+    fn spin_lights(&mut self, dt: f32) {
+        self.ufo_spin_timer += dt * 1000.0;
+        if self.ufo_spin_timer >= UFO_SPIN_STEP_MS {
+            self.ufo_spin_timer = 0.0;
+            self.ufo_frame = (self.ufo_frame + 1) % UFO_N_LIGHTS;
+        }
+    }
+
     fn new() -> Self {
         let alien_default = Alien { x: 0.0, y: 0.0, alive: false, kind: 0, anim: 0 };
         let bullet_default = Bullet { x: 0.0, y: 0.0, active: false, player: false };
@@ -571,11 +580,7 @@ fn update_ufo(
     match g.ufo_mode {
         UfoMode::Flying => {
             g.ufo_x += 80.0 * g.ufo_dir as f32 * dt;
-            g.ufo_spin_timer += dt * 1000.0;
-            if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
-                g.ufo_spin_timer = 0.0;
-                g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
-            }
+            g.spin_lights(dt);
 
             if g.ufo_x > WIN_W as f32 || g.ufo_x + UFO_W < 0.0 {
                 g.ufo_active = false;
@@ -604,11 +609,7 @@ fn update_ufo(
             let step = UFO_TRACK_SPEED * dt;
             g.ufo_x += (target - g.ufo_x).clamp(-step, step);
 
-            g.ufo_spin_timer += dt * 1000.0;
-            if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
-                g.ufo_spin_timer = 0.0;
-                g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
-            }
+            g.spin_lights(dt);
 
             let expired = g.ufo_track_timer.tick(dt);
             let elapsed = UFO_TRACK_MAX_SECS - g.ufo_track_timer.remaining();
@@ -768,10 +769,7 @@ fn draw_ufo(blip: &Blip, g: &Game, saucer: &Texture2D) {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() {
-        web::spend_coin();
-        g.start_game();
-    }
+    if coin_start() { g.start_game(); }
 }
 
 /// An alien kind's colour, and so its score: magenta 30, cyan 20, green 10,
@@ -803,11 +801,7 @@ fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
     if g.boss_x < 0.0 { g.boss_x = 0.0; g.boss_dir = 1; }
     if g.boss_x + BOSS_W > WIN_W as f32 { g.boss_x = WIN_W as f32 - BOSS_W; g.boss_dir = -1; }
 
-    g.ufo_spin_timer += dt * 1000.0;
-    if g.ufo_spin_timer >= UFO_SPIN_STEP_MS {
-        g.ufo_spin_timer = 0.0;
-        g.ufo_frame = (g.ufo_frame + 1) % UFO_N_LIGHTS;
-    }
+    g.spin_lights(dt);
 
     if g.boss_fire.tick(dt) {
         // Three bombs: one under each wingtip and one under the middle.
@@ -1392,10 +1386,7 @@ fn update_clear(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game, dt: f32) {
-    g.dead_timer.tick(dt);
-    if g.dead_timer.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.dead_timer, dt) { g.start_game(); }
 }
 
 /// The mothership and its health bar, drawn under the ship so it is in the
@@ -1540,7 +1531,6 @@ fn streak_label(streak: i32) -> String {
 }
 
 fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
-    blip.clear(BLIP_BLACK);
     blip.draw_centered("DEFENDER", (WIN_H / 5 + 14) as f32, 6.0, BLIP_MAGENTA);
     // The title is 6 x 7 = 42px tall: the high score clears it by a real margin.
     blip.draw_hi(hi, (WIN_H / 5 + 93) as f32, BLIP_YELLOW);
@@ -1579,22 +1569,13 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
 
 fn draw_clear(blip: &Blip, level: i32) {
     let buf = format!("LEVEL {}", level);
-    blip.clear(BLIP_BLACK);
     blip.draw_centered("WAVE CLEAR", (WIN_H / 3) as f32, 4.0, BLIP_CYAN);
     blip.draw_centered(&buf,         (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
-}
-
-fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
-    blip.clear(BLIP_BLACK);
-    blip.draw_game_over(score, hi, BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !waiting);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
     window_conf("DEFENDER", WIN_W, WIN_H)
 }
-
-
-
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -1631,17 +1612,12 @@ async fn main() {
     // The invasion tune, and the mothership's on boss levels.
     let mut music = Jukebox::new("DEFENDER", &["INVASION", "MOTHERSHIP"]);
 
-    let mut shot_frame: u32 = 0;
+    if blip.screenshot_mode {
+        g.start_game();
+    }
 
     loop {
         let dt = blip.delta_time;
-
-        if blip.screenshot_mode {
-            shot_frame += 1;
-            if shot_frame == 1 {
-                g.start_game();
-            }
-        }
 
         music.play(if g.state != State::Title && g.is_boss_level() { 1 } else { 0 });
         g.touch_x = blip.touch(0).map(|p| p.x);
@@ -1665,7 +1641,7 @@ async fn main() {
         match g.state {
             State::Title => draw_title(&blip, &alien, &web::high_score()),
             State::Win   => draw_clear(&blip, g.sess.level),
-            State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
+            State::Over  => blip.draw_game_over(g.sess.score, &web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active()),
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player, &alien, &explosion, &shield, &bullet, &saucer);
             }

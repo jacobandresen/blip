@@ -62,51 +62,21 @@ mod tests {
         assert_eq!(call("MIN", &[-3.0, 2.0]), Some(Ok(-3.0)));
         assert_eq!(call("MAX", &[-3.0, 2.0]), Some(Ok(2.0)));
         assert_eq!(call("ATN", &[1.0]), Some(Ok(std::f64::consts::FRAC_PI_4)));
-        assert_eq!(
-            call("ATAN2", &[1.0, -1.0]),
-            Some(Ok(3.0 * std::f64::consts::FRAC_PI_4))
-        );
+        assert_eq!(call("ATAN2", &[1.0, -1.0]), Some(Ok(3.0 * std::f64::consts::FRAC_PI_4)));
         assert_eq!(call("CLAMP", &[8.0, -2.0, 3.0]), Some(Ok(3.0)));
         assert_eq!(call("DISTANCE", &[-2.0, -3.0, 1.0, 1.0]), Some(Ok(5.0)));
         assert_eq!(call("WRAP", &[-21.0, 0.0, 10.0]), Some(Ok(9.0)));
-        assert_eq!(
-            call("LERP", &[0.1, 0.9, 0.3]),
-            Some(Ok(blip::lerp(0.1, 0.9, 0.3) as f64))
-        );
-        assert_eq!(
-            call("RECTS_OVERLAP", &[0.0, 0.0, 2.0, 2.0, 2.0, 0.0, 1.0, 1.0]),
-            Some(Ok(0.0))
-        );
-        assert_eq!(
-            call(
-                "SEGMENT_CIRCLE_OVERLAP",
-                &[0.0, 0.0, 10.0, 0.0, 5.0, 1.0, 1.0]
-            ),
-            Some(Ok(1.0))
-        );
-        assert_eq!(
-            call(
-                "SEGMENT_RECT_OVERLAP",
-                &[0.0, 5.0, 20.0, 5.0, 8.0, 2.0, 2.0, 6.0]
-            ),
-            Some(Ok(1.0))
-        );
-        assert_eq!(
-            call("SCATTER", &[17.0, u32::MAX as f64]),
-            Some(Ok(blip::scatter(17, u32::MAX) as f64))
-        );
+        assert_eq!(call("LERP", &[0.1, 0.9, 0.3]), Some(Ok(blip::lerp(0.1, 0.9, 0.3) as f64)));
+        assert_eq!(call("RECTS_OVERLAP", &[0.0, 0.0, 2.0, 2.0, 2.0, 0.0, 1.0, 1.0]), Some(Ok(0.0)));
+        assert_eq!(call("SEGMENT_CIRCLE_OVERLAP", &[0.0, 0.0, 10.0, 0.0, 5.0, 1.0, 1.0]), Some(Ok(1.0)));
+        assert_eq!(call("SEGMENT_RECT_OVERLAP", &[0.0, 5.0, 20.0, 5.0, 8.0, 2.0, 2.0, 6.0]), Some(Ok(1.0)));
+        assert_eq!(call("SCATTER", &[17.0, u32::MAX as f64]), Some(Ok(blip::scatter(17, u32::MAX) as f64)));
     }
 
     #[test]
     fn bad_arity_is_an_error_and_array_names_stay_available() {
-        assert_eq!(
-            call("CLAMP", &[1.0]),
-            Some(Err("CLAMP needs 3 arguments".into()))
-        );
-        assert_eq!(
-            call("SCATTER", &[]),
-            Some(Err("SCATTER needs 2 arguments".into()))
-        );
+        assert_eq!(call("CLAMP", &[1.0]), Some(Err("CLAMP needs 3 arguments".into())));
+        assert_eq!(call("SCATTER", &[]), Some(Err("SCATTER needs 2 arguments".into())));
         assert_eq!(call("BODY_X", &[1.0]), None);
         assert_eq!(call("BRAWLER_OPPONENT", &[0.0, 0.0]), None);
     }

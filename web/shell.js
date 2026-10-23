@@ -231,18 +231,6 @@ function feedbackTick() {
     osc.start(t); osc.stop(t + 0.055);
   } catch (e) {}
 }
-// kiosk.js's coin drop (dropCoinAnimation), into #insert-coin-btn's slot.
-(function () {
-  var btn = document.getElementById('insert-coin-btn');
-  if (!btn) return;
-  coinDropAnim = btn.querySelector('#coin-drop-anim');
-  if(!coinDropAnim) {
-    coinDropAnim = document.createElement('span');
-    coinDropAnim.id = 'coin-drop-anim';
-    coinDropAnim.setAttribute('aria-hidden', 'true');
-    btn.appendChild(coinDropAnim);
-  }
-}());
 // Called from WASM when play starts (from the title or a game-over
 // restart), once more per second player. Out of coins, the debt is
 // kept and the coins that go in next pay it before the game goes on.
@@ -440,7 +428,6 @@ function showInstallSheet() {
   offer();
   if (go.hidden) close.focus();
 }
-window.blipShowInstallSheet = showInstallSheet;
 document.addEventListener('click', function (e) {
   if (e.target.closest && e.target.closest('#cc-install')) showInstallSheet();
   if (e.target.closest && e.target.closest('#cc-guide')) showGuide();
@@ -532,10 +519,8 @@ if (!FREE_PLAY && getCoins() <= 0) overlay.classList.add('visible');
 // plus full clearance for the bar so it never overlaps the canvas.
 
 // Sideways the deck moves into the picture's side gutters (one layout rule
-// for every page, in kiosk.js).
-function landscape() { return blipLandscape(); }
-function applyLayout() { blipApplyLayout(); }
-applyLayout();
+// for every page, in blip_core.js).
+blipApplyLayout();
 
 /** Reserve the panel through the highest visible control, including any part
  * that rises above its fixed box. */
@@ -584,7 +569,7 @@ function fillCanvas() {
     canvas.style.setProperty('top','0','important');canvas.style.setProperty('left','0','important');
     canvas.style.setProperty('transform','none','important');syncBuffer();return;
   }
-  applyLayout();
+  blipApplyLayout();
   var tb = document.getElementById('topbar');
   var amstrad = blipAmstradMode();
   var bare = bareScreen() || amstrad;
@@ -595,7 +580,7 @@ function fillCanvas() {
   // the display below the arcade on the landing page.
   var GAP = 0;
   // Sideways the deck sits in the gutters. Upright, reserve its full panel.
-  TOPBAR_H = bare || landscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
+  TOPBAR_H = bare || blipLandscape() ? 0 : (tb ? Math.max(deckCover(tb), 56) : 56);
   var mb = document.getElementById('marquee-bar');
   if (mb && !amstrad) {
     var receiver = bare ? null : mb.querySelector('.jukebox-receiver');
@@ -607,7 +592,7 @@ function fillCanvas() {
   // Sideways the controls stand in the two gutters; keep the picture out
   // of them (a wide game like Brawler would otherwise run under the cross).
   var gl = PAD, gr = PAD;
-  if (landscape() && tb) {
+  if (blipLandscape() && tb) {
     var mid = window.innerWidth / 2;
     var ctl = tb.querySelectorAll('.snes-dpad, .snes-face, .stick-base, .stick-ball, .fire-buttons, #paddle-dial, #paddle-dial-p2, #touch-strip .ts-half');
     for (var i = 0; i < ctl.length; i++) {
@@ -618,7 +603,7 @@ function fillCanvas() {
     }
   }
   var w = window.innerWidth - gl - gr;
-  if (!bare && !landscape()) {
+  if (!bare && !blipLandscape()) {
     var cabinetWidth = parseFloat(getComputedStyle(document.documentElement)
       .getPropertyValue('--cabinet-width')) || innerWidth - 32;
     var screenWidth = Math.min(innerWidth - 32, cabinetWidth) - screenInset * 2;
@@ -628,7 +613,7 @@ function fillCanvas() {
   var h = window.innerHeight - TOPBAR_H - MARQUEE_H - GAP - screenInset * 2;
   var screenTop = MARQUEE_H + GAP + screenInset;
   var bezel = document.getElementById('arcade-bezel');
-  if (!bare && !landscape() && bezel) {
+  if (!bare && !blipLandscape() && bezel) {
     // Match the landing page's panel boundary, including the 1px bezel border.
     bezel.style.setProperty('--cabinet-panel-depth',
       TOPBAR_H + 'px');
@@ -1423,7 +1408,6 @@ window.addEventListener('keydown', function (e) {
   if (twoUp) window.blipSetMode = function (code) {
     open = code === 2;
     versus = code === 1;
-    applyPlayers();
     if (open) root.setAttribute('data-open', '');
     else root.removeAttribute('data-open');
     if (versus) root.setAttribute('data-versus', '');
@@ -1445,15 +1429,11 @@ window.addEventListener('keydown', function (e) {
 
   // Both stations stay on the panel in every mode (deck.js), so player two can join at any time.
   var open = false;
-  function applyPlayers() {
-    root.setAttribute('data-players', '2');
-  }
-  window.addEventListener('resize', applyPlayers);
 
   var hint = null, hintDismissed = false;
   function rotateHint() {
     // The touch trackpad splits for two upright, so it needs no turning.
-    var want = versus && !hintDismissed && !landscape() && blipControls() !== 'touch' &&
+    var want = versus && !hintDismissed && !blipLandscape() && blipControls() !== 'touch' &&
                matchMedia('(pointer: coarse)').matches;
     if (want && !hint) {
       hint = document.createElement('div');

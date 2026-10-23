@@ -1,7 +1,7 @@
 //! Serpent (Snake), Rust port of `games/serpent/main.c` on macroquad.
 
 use blip::input::{
-    btn1_pressed, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
+    coin_start, play_again, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::texture::Texture2D;
@@ -372,10 +372,7 @@ struct Sounds {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() {
-        web::spend_coin();
-        g.start_game();
-    }
+    if coin_start() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
@@ -540,10 +537,7 @@ fn update_dead(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game, dt: f32) {
-    g.dead_timer.tick(dt);
-    if g.dead_timer.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.dead_timer, dt) { g.start_game(); }
 }
 
 fn draw_board(blip: &Blip) {
@@ -701,7 +695,6 @@ fn draw_shears(blip: &Blip, g: &Game) {
 }
 
 fn draw_title(blip: &Blip, hi: &web::HighScore) {
-    blip.clear(BLIP_BLACK);
     blip.draw_centered("SERPENT",            (WIN_H / 4) as f32,       6.0, BLIP_GREEN);
     // SERPENT is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
@@ -732,7 +725,6 @@ fn draw_title_snake(blip: &Blip, t: f32) {
 }
 
 fn draw_over(blip: &Blip, g: &Game, hi: &web::HighScore) {
-    blip.clear(BLIP_BLACK);
     if g.snake_len + g.obstacle_count == MAX_LEN {
         blip.draw_centered("FIELD CLEARED", (WIN_H / 4) as f32, 5.0, BLIP_GREEN);
         blip.draw_hi(hi, (WIN_H / 4 + 52) as f32, BLIP_YELLOW);
@@ -751,8 +743,6 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("SERPENT", WIN_W, WIN_H)
 }
 
-
-
 #[blip::macroquad::main(conf)]
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
@@ -769,17 +759,12 @@ async fn main() {
     };
     let mut music = Jukebox::new("SERPENT", &["SLITHER", "FRENZY"]);
 
-    let mut shot_frame: u32 = 0;
+    if blip.screenshot_mode {
+        g.start_game();
+    }
 
     loop {
         let dt = blip.delta_time;
-
-        if blip.screenshot_mode {
-            shot_frame += 1;
-            if shot_frame == 1 {
-                g.start_game();
-            }
-        }
 
         #[cfg(not(target_arch = "wasm32"))]
         if blip::bot::active() { bot::drive(&g); }

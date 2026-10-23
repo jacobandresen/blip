@@ -3,7 +3,7 @@
 use std::f32::consts::PI;
 
 use blip::input::{
-    btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
+    coin_start, play_again, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::rand::rand;
@@ -373,10 +373,7 @@ fn play_variant(takes: &[blip::BlipSound; 3], speed: f32) {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() {
-        web::spend_coin();
-        g.start_game();
-    }
+    if coin_start() { g.start_game(); }
 }
 
 fn move_paddle(g: &mut Game, dt: f32) {
@@ -885,10 +882,7 @@ fn update_clear(g: &mut Game, dt: f32) {
 }
 
 fn update_over(g: &mut Game, dt: f32) {
-    g.dead_timer.tick(dt);
-    if g.dead_timer.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.dead_timer, dt) { g.start_game(); }
 }
 
 fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9], drops: &[Texture2D; 5]) {
@@ -972,7 +966,6 @@ fn draw_play(blip: &Blip, g: &Game, paddle: &Texture2D, ball: &Texture2D, shade:
 }
 
 fn draw_title(blip: &Blip, hi: &web::HighScore, paddle: &Texture2D, ball: &Texture2D, shade: &Texture2D, brick: &[Texture2D; 9]) {
-    blip.clear(BLIP_BLACK);
     for (row, (start, count)) in [(1, 8), (2, 6)].into_iter().enumerate() {
         let x0 = (WIN_W - count * (BRICK_W + BRICK_GAP) + BRICK_GAP) / 2;
         for col in 0..count {
@@ -1015,14 +1008,8 @@ fn draw_title(blip: &Blip, hi: &web::HighScore, paddle: &Texture2D, ball: &Textu
 
 fn draw_clear(blip: &Blip, level: i32) {
     let buf = format!("LEVEL {}", level + 1);  // level just incremented in next_level
-    blip.clear(BLIP_BLACK);
     blip.draw_centered("CLEARED", (WIN_H / 3) as f32, 5.0, BLIP_GREEN);
     blip.draw_centered(&buf,      (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
-}
-
-fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
-    blip.clear(BLIP_BLACK);
-    blip.draw_game_over(score, hi, BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !waiting);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -1030,28 +1017,14 @@ fn conf() -> blip::macroquad::window::Conf {
 }
 
 const DROP_PNGS: [&[u8]; 5] = [
-    blip::png!("drop_wide"),
-    blip::png!("drop_narrow"),
-    blip::png!("drop_slow"),
-    blip::png!("drop_life"),
+    blip::png!("drop_wide"), blip::png!("drop_narrow"), blip::png!("drop_slow"), blip::png!("drop_life"),
     blip::png!("drop_multi"),
 ];
-const PADDLE_HIT_WAV: [&[u8]; 3] = [
-    blip::wav!("paddle_hit_0"),
-    blip::wav!("paddle_hit_1"),
-    blip::wav!("paddle_hit_2"),
-];
-const BRICK_HIT_WAV: [&[u8]; 3] = [
-    blip::wav!("brick_hit_0"),
-    blip::wav!("brick_hit_1"),
-    blip::wav!("brick_hit_2"),
-];
+const PADDLE_HIT_WAV: [&[u8]; 3] = [blip::wav!("paddle_hit_0"), blip::wav!("paddle_hit_1"), blip::wav!("paddle_hit_2")];
+const BRICK_HIT_WAV: [&[u8]; 3] = [blip::wav!("brick_hit_0"), blip::wav!("brick_hit_1"), blip::wav!("brick_hit_2")];
 const BRICK_BREAK_WAV: [&[u8]; 3] = [
-    blip::wav!("brick_break_0"),
-    blip::wav!("brick_break_1"),
-    blip::wav!("brick_break_2"),
+    blip::wav!("brick_break_0"), blip::wav!("brick_break_1"), blip::wav!("brick_break_2"),
 ];
-
 
 async fn load_takes(wavs: &[&'static [u8]; 3]) -> [blip::BlipSound; 3] {
     [
@@ -1060,7 +1033,6 @@ async fn load_takes(wavs: &[&'static [u8]; 3]) -> [blip::BlipSound; 3] {
         blip::audio::load_sound(wavs[2]).await,
     ]
 }
-
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -1072,14 +1044,9 @@ async fn main() {
     let drops = DROP_PNGS.map(load_png_smooth);
     let ball_shade = load_png_smooth(blip::png!("ball_shade"));
     let brick = [
-        load_png(blip::png!("brick_red")),
-        load_png(blip::png!("brick_orange")),
-        load_png(blip::png!("brick_yellow")),
-        load_png(blip::png!("brick_green")),
-        load_png(blip::png!("brick_blue")),
-        load_png(blip::png!("brick_purple")),
-        load_png(blip::png!("brick_steel")),
-        load_png(blip::png!("brick_steel_cracked")),
+        load_png(blip::png!("brick_red")), load_png(blip::png!("brick_orange")), load_png(blip::png!("brick_yellow")),
+        load_png(blip::png!("brick_green")), load_png(blip::png!("brick_blue")), load_png(blip::png!("brick_purple")),
+        load_png(blip::png!("brick_steel")), load_png(blip::png!("brick_steel_cracked")),
         load_png(blip::png!("brick_bomb")),
     ];
 
@@ -1098,22 +1065,17 @@ async fn main() {
     // Two tunes, alternating by level.
     let mut music = Jukebox::new("BOUNCER", &["BOUNCE", "REBOUND"]);
 
-    let mut shot_frame: u32 = 0;
+    if blip.screenshot_mode {
+        g.start_game();
+        for (i, kind) in [DropKind::Wide, DropKind::Narrow, DropKind::Slow, DropKind::Life, DropKind::Multi].into_iter().enumerate() {
+            pool_spawn(&mut g.drops, Drop { x: 70.0 + i as f32 * 75.0, y: 250.0 + i as f32 * 22.0, active: true, kind });
+        }
+    }
 
     loop {
         let dt = blip.delta_time;
 
         music.play(if g.state == State::Title { 0 } else { (g.sess.level as usize + 1) % 2 });
-
-        if blip.screenshot_mode {
-            shot_frame += 1;
-            if shot_frame == 1 {
-                g.start_game();
-                for (i, kind) in [DropKind::Wide, DropKind::Narrow, DropKind::Slow, DropKind::Life, DropKind::Multi].into_iter().enumerate() {
-                    pool_spawn(&mut g.drops, Drop { x: 70.0 + i as f32 * 75.0, y: 250.0 + i as f32 * 22.0, active: true, kind });
-                }
-            }
-        }
 
         g.touch_x = blip.touch(0).map(|p| p.x);
         #[cfg(not(target_arch = "wasm32"))]
@@ -1131,7 +1093,7 @@ async fn main() {
         match g.state {
             State::Title => draw_title(&blip, &web::high_score(), &paddle, &ball, &ball_shade, &brick),
             State::Win   => draw_clear(&blip, g.sess.level),
-            State::Over  => draw_over(&blip, g.sess.score, &web::high_score(), g.dead_timer.active()),
+            State::Over  => blip.draw_game_over(g.sess.score, &web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active()),
             State::Launch | State::Play | State::Dead => {
                 draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick, &drops);
                 // The ball waits on the paddle after every lost life; say so.

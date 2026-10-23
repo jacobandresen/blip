@@ -64,10 +64,6 @@ pub fn bounce_song() -> Song<'static> {
     }
 }
 
-pub fn bounce_wav() -> Vec<u8> {
-    bounce_song().render()
-}
-
 /// Even levels: G major, quicker, climbing in thirds.
 pub fn rebound_song() -> Song<'static> {
     Song {
@@ -117,21 +113,6 @@ pub fn rebound_song() -> Song<'static> {
     }
 }
 
-pub fn rebound_wav() -> Vec<u8> {
-    rebound_song().render()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn wav_tracks_render_the_exposed_song_data() {
-        assert_eq!(bounce_wav(), bounce_song().render());
-        assert_eq!(rebound_wav(), rebound_song().render());
-    }
-}
-
 // ---- effects --------------------------------------------------------------
 // Pitch variants (`v`) keep repeated hits from sounding identical.
 fn paddle_hit(v: usize) -> Vec<u8> {
@@ -162,13 +143,7 @@ fn life_lost() -> Vec<u8> {
 }
 
 fn win() -> Vec<u8> {
-    cosy::jingle_with(
-        &[72, 76, 79, 84, H, 79, 84, 88, H, H],
-        0.09,
-        Voice::Glock,
-        0,
-        Some((Voice::Bell, -1)),
-    )
+    cosy::jingle_with(&[72, 76, 79, 84, H, 79, 84, 88, H, H], 0.09, Voice::Glock, 0, Some((Voice::Bell, -1)))
 }
 
 /// Pickups caught: a good one sparkles up the glockenspiel, the narrow bat
@@ -182,25 +157,14 @@ fn pickup_bad() -> Vec<u8> {
 }
 
 fn pickup_life() -> Vec<u8> {
-    cosy::jingle_with(
-        &[79, 84, 88, 91, H, 96, H, H],
-        0.07,
-        Voice::Glock,
-        0,
-        Some((Voice::Bell, -1)),
-    )
+    cosy::jingle_with(&[79, 84, 88, 91, H, 96, H, H], 0.07, Voice::Glock, 0, Some((Voice::Bell, -1)))
 }
 
 /// A bomb brick going off: a soft pop over a low boom tumbling down. One
 /// sound for the whole blast, not nine bricks at once.
 fn bomb_sfx() -> Vec<u8> {
     let pop = cosy::snap(0.07, 700.0, 0xB0B1);
-    cosy::sfx(&cosy::mix(
-        pop,
-        &cosy::bloop(0.42, 220.0, 55.0, 0xB0B2),
-        0.01,
-        1.0,
-    ))
+    cosy::sfx(&cosy::mix(pop, &cosy::bloop(0.42, 220.0, 55.0, 0xB0B2), 0.01, 1.0))
 }
 
 /// The effects, as `sounds/NAME.wav`.
@@ -227,8 +191,5 @@ pub fn sounds() -> Vec<Asset> {
 
 /// The music: each tune as a WAV to play and an XM of its notes for TUNE.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::xm::tunes(&[
-        ("BOUNCE", &bounce_wav),
-        ("REBOUND", &rebound_wav),
-    ])
+    blip::xm::tunes(&[("BOUNCE", &|| bounce_song().render()), ("REBOUND", &|| rebound_song().render())])
 }

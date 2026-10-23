@@ -1,7 +1,7 @@
 //! Raider — a 1942-style vertical dogfighting shoot-'em-up.
 
 use blip::input::{
-    btn1_pressed, key_active, key_held, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
+    coin_start, play_again, key_active, key_held, BLIP_KEY_A, BLIP_KEY_D, BLIP_KEY_DOWN, BLIP_KEY_LEFT,
     BLIP_KEY_RIGHT, BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::audio::{play_sound, set_sound_volume, stop_sound, PlaySoundParams};
@@ -12,7 +12,7 @@ use blip::macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use blip::{
     load_png, load_png_smooth,
     clamp, Jukebox, play_sfx, play_sfx_volume, pool_iter, pool_iter_mut, pool_spawn, rand_range_f32, rects_overlap, web,
-    window_conf, Blip, BlipColor, Fx, LifeResult, Pooled, Session, Timer, segment_circle_overlap, segment_rect_overlap,
+    window_conf, Blip, BlipColor, Fx, LifeResult, Session, Timer, segment_circle_overlap, segment_rect_overlap,
     BLIP_BLACK, BLIP_CYAN, BLIP_GRAY, BLIP_GREEN, BLIP_ORANGE, BLIP_RED, BLIP_WHITE,
     BLIP_YELLOW,
 };
@@ -214,29 +214,21 @@ const OVER_MIN_WAIT: f32 = 3.0;
 enum State { Title, Launch, Play, Dead, Win, Won, Over }
 
 #[derive(Copy, Clone, PartialEq, Eq)]
-enum EnemyKind { Grunt, Weaver, Ace }
+enum EnemyKind { Grunt, Weaver, Ace } // also the index of its sprite
 
 #[derive(Copy, Clone)]
 struct Bullet { x: f32, y: f32, vx: f32, vy: f32, active: bool }
-impl Pooled for Bullet {
-    fn is_active(&self) -> bool { self.active }
-}
+blip::pooled!(Bullet, Round, Casing, Enemy, Wreck, Puff, Explosion, Powerup, HealthPickup, Boat, Island, FlakShell, FlakBurst);
 
 /// A player round: centred on x, moving at (vx, -vy), calibre r (drawn
 /// radius; hit box 2r + 2 wide). `bounced` once it has ricocheted: it can
 /// still hit, not glance off again.
 #[derive(Copy, Clone)]
 struct Round { x: f32, y: f32, vx: f32, vy: f32, r: f32, bounced: bool, active: bool }
-impl Pooled for Round {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// A spent brass casing kicked out of the guns, tumbling away and fading.
 #[derive(Copy, Clone)]
 struct Casing { x: f32, y: f32, vx: f32, vy: f32, rot: f32, ttl: f32, active: bool }
-impl Pooled for Casing {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// A leader follows its flight path; wingmen steer toward their leader-relative `slot`.
 /// Both use the same flight physics and move along their nose direction.
@@ -278,9 +270,6 @@ struct Flight {
     /// them is a formation bonus (see FLIGHT_BONUS).
     members: u8, downed: u8,
 }
-impl Pooled for Enemy {
-    fn is_active(&self) -> bool { self.active }
-}
 
 #[derive(Copy, Clone)]
 struct Explosion { x: f32, y: f32, ttl: f32, max_ttl: f32, scale: f32, color: BlipColor, active: bool }
@@ -317,19 +306,10 @@ enum Fall {
 
 const DEAD_WRECK: Wreck = Wreck { x: 0.0, y: 0.0, heading: 0.0, spin: 0.0, speed: 0.0, t: 0.0, kind: EnemyKind::Grunt,
     puff_t: 0.0, active: false, course: 0.0, bend: 0.0, wobble: 0.0, dur: 1.0, fall: Fall::Roll, flip_t: 0.0 };
-impl Pooled for Wreck {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// Fire (short, bright, shrinking) or smoke (dark, growing, drifting with the sea).
 #[derive(Copy, Clone)]
 struct Puff { x: f32, y: f32, r: f32, grow: f32, ttl: f32, max_ttl: f32, fire: bool, top: bool, active: bool }  // top: drawn over the player (its own damage)
-impl Pooled for Puff {
-    fn is_active(&self) -> bool { self.active }
-}
-impl Pooled for Explosion {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// Standard fireball orange, the default for combat explosions.
 const EXPLOSION_ORANGE: BlipColor = BlipColor { r: 1.0, g: 0.6, b: 0.15, a: 1.0 };
@@ -337,15 +317,9 @@ const POPUP_GOLD: BlipColor = BlipColor { r: 1.0, g: 0.9, b: 0.45, a: 1.0 };
 
 #[derive(Copy, Clone)]
 struct Powerup { x: f32, y: f32, active: bool }
-impl Pooled for Powerup {
-    fn is_active(&self) -> bool { self.active }
-}
 
 #[derive(Copy, Clone)]
 struct HealthPickup { x: f32, y: f32, active: bool }
-impl Pooled for HealthPickup {
-    fn is_active(&self) -> bool { self.active }
-}
 
 #[derive(Copy, Clone)]
 struct Cloud { x: f32, y: f32, r: f32, speed: f32, variant: u8 }
@@ -354,18 +328,12 @@ struct Cloud { x: f32, y: f32, r: f32, speed: f32, variant: u8 }
 /// shootable for a small bonus. `bob_phase` keeps a flotilla out of step.
 #[derive(Copy, Clone)]
 struct Boat { x: f32, y: f32, active: bool, vx: f32, bob_phase: f32 }
-impl Pooled for Boat {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// An island drifting down with the current, its flak cannons firing on
 /// their own timers; shootable for a bonus. `size` indexes ISLAND_SIZES /
 /// HP / SCORE / FLAK_GUNS.
 #[derive(Copy, Clone)]
 struct Island { x: f32, y: f32, size: u8, active: bool, hp: i32, guns: [FlakGun; 3] }
-impl Pooled for Island {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// A flak cannon: its barrel follows the player; `reload` counts to the next shot.
 #[derive(Copy, Clone)]
@@ -375,16 +343,10 @@ struct FlakGun { angle: f32, reload: f32, flash: f32 }
 /// the player was when it was fired (a real shell is not steered).
 #[derive(Copy, Clone)]
 struct FlakShell { x: f32, y: f32, vx: f32, vy: f32, left: f32, active: bool }
-impl Pooled for FlakShell {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// A flak burst: lethal for FLAK_LETHAL, then a drifting smoke ball.
 #[derive(Copy, Clone)]
 struct FlakBurst { x: f32, y: f32, t: f32, active: bool }
-impl Pooled for FlakBurst {
-    fn is_active(&self) -> bool { self.active }
-}
 
 /// A laser barrier across the full width of the screen at row `y`, and
 /// the "motor" powering it — the only part of it that's shootable. Only one
@@ -1556,10 +1518,7 @@ fn update_boss(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() {
-        web::spend_coin();
-        g.start_game();
-    }
+    if coin_start() { g.start_game(); }
 }
 
 /// Animate engine start, signal, deck run and climb; the opening wave holds fire until the launch ends.
@@ -2522,20 +2481,14 @@ fn update_win(g: &mut Game, dt: f32) {
 }
 
 fn update_won(g: &mut Game, dt: f32) {
-    g.over_timer.tick(dt);
-    if g.over_timer.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.over_timer, dt) { g.start_game(); }
 }
 
 fn update_over(g: &mut Game, dt: f32) {
-    g.over_timer.tick(dt);
     // OVER_MIN_WAIT has to actually elapse before any key can dismiss this —
     // otherwise the fire button still held down from the fight that killed
     // you bounces straight back to the title screen.
-    if g.over_timer.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.over_timer, dt) { g.start_game(); }
 }
 
 /// The ocean: a gradient lighter and hazier toward the top (distance), two
@@ -2826,16 +2779,11 @@ fn draw_launch(
     if g.launch_climb > 0.05 { draw_clouds(blip, g, cloud_tex); }
 
     // the opening wave, streaming in from the top while the player climbs
-    let enemy_tex_of = |e: &Enemy| match e.kind {
-        EnemyKind::Grunt => &enemy_tex[0],
-        EnemyKind::Weaver => &enemy_tex[1],
-        EnemyKind::Ace => &enemy_tex[2],
-    };
     for e in pool_iter(&g.enemies) {
-        draw_shadow(enemy_tex_of(e), e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, -e.heading);
+        draw_shadow(&enemy_tex[e.kind as usize], e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, -e.heading);
     }
     for e in pool_iter(&g.enemies) {
-        draw_plane(enemy_tex_of(e), e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, e.heading, e.bank, BLIP_WHITE);
+        draw_plane(&enemy_tex[e.kind as usize], e.x, e.y, ENEMY_W as f32, ENEMY_H as f32, e.heading, e.bank, BLIP_WHITE);
     }
 
     // the plane: its shadow under it on the deck, falling behind as it climbs
@@ -3339,14 +3287,12 @@ fn draw_title(
 
 fn draw_win(blip: &Blip, level: i32) {
     let buf = format!("WAVE {level}");
-    blip.clear(BLIP_BLACK);
     blip.draw_centered("STAGE CLEAR", (WIN_H / 3) as f32, 5.0, BLIP_GREEN);
     blip.draw_centered(&buf,          (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
 }
 
 fn draw_won(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
     let buf = format!("SCORE {score}");
-    blip.clear(BLIP_BLACK);
     blip.draw_centered("YOU WON!!",           (WIN_H / 4) as f32,      6.0, BLIP_YELLOW);
     blip.draw_centered("ALL 7 WAVES CLEARED", (WIN_H / 2 - 20) as f32, 3.0, BLIP_GREEN);
     blip.draw_centered(&buf,                  (WIN_H / 2 + 14) as f32, 3.0, BLIP_WHITE);
@@ -3354,84 +3300,42 @@ fn draw_won(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
     if !waiting { blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_CYAN); }
 }
 
-fn draw_over(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
-    blip.clear(BLIP_BLACK);
-    blip.draw_game_over(score, hi, BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !waiting);
-}
-
 fn conf() -> blip::macroquad::window::Conf {
     window_conf("RAIDER", WIN_W, WIN_H)
 }
 
-const CLOUD_PNGS: [&[u8]; 3] = [
-    blip::png!("cloud_1"),
-    blip::png!("cloud_2"),
-    blip::png!("cloud_3"),
-];
+const CLOUD_PNGS: [&[u8]; 3] = [blip::png!("cloud_1"), blip::png!("cloud_2"), blip::png!("cloud_3")];
 // One sprite per island size (small/medium/large) — see ISLAND_SIZES above.
-const ISLAND_PNGS: [&[u8]; 3] = [
-    blip::png!("island_small"),
-    blip::png!("island_medium"),
-    blip::png!("island_large"),
-];
+const ISLAND_PNGS: [&[u8]; 3] = [blip::png!("island_small"), blip::png!("island_medium"), blip::png!("island_large")];
 
 // One sprite per boss tier (levels 1-7) — see BOSS_SPECS / BOSS_SIZES above.
 const BOSS_PNGS: [&[u8]; 7] = [
-    blip::png!("boss_1"),
-    blip::png!("boss_2"),
-    blip::png!("boss_3"),
-    blip::png!("boss_4"),
-    blip::png!("boss_5"),
-    blip::png!("boss_6"),
-    blip::png!("boss_7"),
+    blip::png!("boss_1"), blip::png!("boss_2"), blip::png!("boss_3"), blip::png!("boss_4"), blip::png!("boss_5"),
+    blip::png!("boss_6"), blip::png!("boss_7"),
 ];
 
 // The Japanese banner for each boss name — see draw_play()'s WARNING banner.
 const BOSS_NAME_JA_PNGS: [&[u8]; 7] = [
-    blip::png!("boss_name_ja_1"),
-    blip::png!("boss_name_ja_2"),
-    blip::png!("boss_name_ja_3"),
-    blip::png!("boss_name_ja_4"),
-    blip::png!("boss_name_ja_5"),
-    blip::png!("boss_name_ja_6"),
+    blip::png!("boss_name_ja_1"), blip::png!("boss_name_ja_2"), blip::png!("boss_name_ja_3"),
+    blip::png!("boss_name_ja_4"), blip::png!("boss_name_ja_5"), blip::png!("boss_name_ja_6"),
     blip::png!("boss_name_ja_7"),
 ];
 
 const SHOOT_WAV: [[&[u8]; 2]; 5] = [
-    [blip::wav!("burst1_1"), blip::wav!("burst1_2")],
-    [blip::wav!("burst2_1"), blip::wav!("burst2_2")],
-    [blip::wav!("burst3_1"), blip::wav!("burst3_2")],
-    [blip::wav!("burst4_1"), blip::wav!("burst4_2")],
+    [blip::wav!("burst1_1"), blip::wav!("burst1_2")], [blip::wav!("burst2_1"), blip::wav!("burst2_2")],
+    [blip::wav!("burst3_1"), blip::wav!("burst3_2")], [blip::wav!("burst4_1"), blip::wav!("burst4_2")],
     [blip::wav!("burst5_1"), blip::wav!("burst5_2")],
 ];
 const ENEMY_EXPLODE_WAV: [&[u8]; 4] = [
-    blip::wav!("enemy_explode0"),
-    blip::wav!("enemy_explode1"),
-    blip::wav!("enemy_explode2"),
+    blip::wav!("enemy_explode0"), blip::wav!("enemy_explode1"), blip::wav!("enemy_explode2"),
     blip::wav!("enemy_explode3"),
 ];
-const PLAYER_EXPLODE_WAV: [&[u8]; 2] = [
-    blip::wav!("player_explode0"),
-    blip::wav!("player_explode1"),
-];
-const RICOCHET_WAV: [&[u8]; 2] = [
-    blip::wav!("ricochet1"),
-    blip::wav!("ricochet2"),
-];
-const BOSS_EXPLODE_WAV: [&[u8]; 2] = [
-    blip::wav!("boss_explode0"),
-    blip::wav!("boss_explode1"),
-];
+const PLAYER_EXPLODE_WAV: [&[u8]; 2] = [blip::wav!("player_explode0"), blip::wav!("player_explode1")];
+const RICOCHET_WAV: [&[u8]; 2] = [blip::wav!("ricochet1"), blip::wav!("ricochet2")];
+const BOSS_EXPLODE_WAV: [&[u8]; 2] = [blip::wav!("boss_explode0"), blip::wav!("boss_explode1")];
 const ENGINE_WAV: [&[u8]; 5] = [
-    blip::wav!("engine0"),
-    blip::wav!("engine1"),
-    blip::wav!("engine2"),
-    blip::wav!("engine3"),
-    blip::wav!("engine4"),
+    blip::wav!("engine0"), blip::wav!("engine1"), blip::wav!("engine2"), blip::wav!("engine3"), blip::wav!("engine4"),
 ];
-
-
-
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -3459,10 +3363,7 @@ async fn main() {
         enemy_explode:  load_takes(&ENEMY_EXPLODE_WAV).await.try_into().unwrap(),
         player_explode: load_takes(&PLAYER_EXPLODE_WAV).await.try_into().unwrap(),
         player_hit:     blip::audio::load_sound(blip::wav!("player_hit")).await,
-        ricochet: [
-            blip::audio::load_sound(RICOCHET_WAV[0]).await,
-            blip::audio::load_sound(RICOCHET_WAV[1]).await,
-        ],
+        ricochet:       load_takes(&RICOCHET_WAV).await.try_into().unwrap(),
         boss_explode:   load_takes(&BOSS_EXPLODE_WAV).await.try_into().unwrap(),
         boss_warning:   blip::audio::load_sound(blip::wav!("boss_warning")).await,
         powerup_up: [
@@ -3485,31 +3386,20 @@ async fn main() {
         engine_splutter: blip::audio::load_sound(blip::wav!("engine_splutter")).await,
         enemy_gun:      blip::audio::load_sound(blip::wav!("enemy_gun")).await,
         backfire:       blip::audio::load_sound(blip::wav!("backfire")).await,
-        engine: [
-            blip::audio::load_sound(ENGINE_WAV[0]).await,
-            blip::audio::load_sound(ENGINE_WAV[1]).await,
-            blip::audio::load_sound(ENGINE_WAV[2]).await,
-            blip::audio::load_sound(ENGINE_WAV[3]).await,
-            blip::audio::load_sound(ENGINE_WAV[4]).await,
-        ],
+        engine:         load_takes(&ENGINE_WAV).await.try_into().unwrap(),
     };
     // Two loops in rotation,
     // so a long level doesn't hear the same ~40s on repeat.
     let mut music = Jukebox::new("RAIDER", &["LOOP1", "LOOP2"]);
 
-    let mut shot_frame: u32 = 0;
+    if blip.screenshot_mode {
+        g.start_game();
+    }
 
     loop {
         let dt = blip.delta_time;
 
         music.rotate(dt);
-
-        if blip.screenshot_mode {
-            shot_frame += 1;
-            if shot_frame == 1 {
-                g.start_game();
-            }
-        }
 
         #[cfg(not(target_arch = "wasm32"))]
         if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }
@@ -3552,7 +3442,7 @@ async fn main() {
             State::Launch => draw_launch(&blip, &g, &player_tex, &enemy_tex, &carrier_tex, &boat_tex, &cloud_tex, &island_tex),
             State::Win    => draw_win(&blip, g.sess.level),
             State::Won    => draw_won(&blip, g.sess.score, &web::high_score(), g.over_timer.active()),
-            State::Over   => draw_over(&blip, g.sess.score, &web::high_score(), g.over_timer.active()),
+            State::Over   => blip.draw_game_over(g.sess.score, &web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.over_timer.active()),
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player_tex, &enemy_tex, &boss_tex, &powerup_tex, &health_tex, &boss_name_ja_tex, &boat_tex, &cloud_tex, &island_tex);
             }

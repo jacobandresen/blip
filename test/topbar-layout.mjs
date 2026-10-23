@@ -16,8 +16,8 @@ const GAME_PAGES = readdirSync(WEB_DIR, { withFileTypes: true })
   .filter((d) => d.isDirectory() && existsSync(path.join(WEB_DIR, d.name, 'index.html')))
   .map((d) => `${d.name}/index.html`);
 
-const KIOSK_PAGES = ['index.html', 'about.html', 'history.html', 'controls.html']
-  .filter((f) => existsSync(path.join(WEB_DIR, f)));
+// The manual's pages send a visitor to the arcade's book, so the arcade stands for them.
+const KIOSK_PAGES = ['index.html'];
 
 const VIEWPORTS = [
   { name: 'desktop', width: 1280, height: 800 },
@@ -96,7 +96,7 @@ test(`the BLIP logo stays on the marquee and the deck carries no coin box`, asyn
         await evaluate(cdp, FREEZE_ANIMATIONS);
         // The game pages build their marquee from shell.js after load.
         await waitFor(cdp, `!!(document.querySelector('#marquee-bar') || document.querySelector('.top-marquee-bar'))`, 15000);
-        await waitFor(cdp, `!!document.querySelector('.deck-housing')`, 15000);
+        if (rel !== 'index.html') await waitFor(cdp, `!!document.querySelector('.deck-housing')`, 15000); // the arcade has no deck
         await sleep(120); // let the strip's own layout settle before measuring
 
         const m = await evaluate(cdp, MEASURE);

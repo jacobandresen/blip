@@ -5,12 +5,7 @@
 use macroquad::color::Color;
 
 const fn rgb(r: u8, g: u8, b: u8) -> Color {
-    Color {
-        r: r as f32 / 255.0,
-        g: g as f32 / 255.0,
-        b: b as f32 / 255.0,
-        a: 1.0,
-    }
+    Color { r: r as f32 / 255.0, g: g as f32 / 255.0, b: b as f32 / 255.0, a: 1.0 }
 }
 
 pub const BLIP_BLACK: Color = rgb(0, 0, 0); // background / clear colour
@@ -51,33 +46,18 @@ pub fn hsv(h: f32, s: f32, v: f32, a: f32) -> Color {
         _ => (c, 0.0, x),
     };
     let m = v - c;
-    Color {
-        r: r + m,
-        g: g + m,
-        b: b + m,
-        a,
-    }
+    Color { r: r + m, g: g + m, b: b + m, a }
 }
 
 /// `c` darkened (`k` < 1) or brightened (`k` > 1), alpha untouched: the shadow
 /// side of a flat-coloured shape.
 pub fn shade(c: Color, k: f32) -> Color {
-    Color {
-        r: c.r * k,
-        g: c.g * k,
-        b: c.b * k,
-        a: c.a,
-    }
+    Color { r: c.r * k, g: c.g * k, b: c.b * k, a: c.a }
 }
 
 /// A colour `k` of the way from `a` to `b`, alpha included.
 pub fn blend(a: Color, b: Color, k: f32) -> Color {
-    Color {
-        r: a.r + (b.r - a.r) * k,
-        g: a.g + (b.g - a.g) * k,
-        b: a.b + (b.b - a.b) * k,
-        a: a.a + (b.a - a.a) * k,
-    }
+    Color { r: a.r + (b.r - a.r) * k, g: a.g + (b.g - a.g) * k, b: a.b + (b.b - a.b) * k, a: a.a + (b.a - a.a) * k }
 }
 
 #[cfg(test)]
@@ -86,18 +66,8 @@ mod tests {
 
     #[test]
     fn blend_runs_from_one_colour_to_the_other_and_shade_keeps_alpha() {
-        let (a, b) = (
-            BLIP_RED,
-            Color {
-                a: 0.5,
-                ..BLIP_BLUE
-            },
-        );
-        let near = |x: Color, y: Color| {
-            [x.r - y.r, x.g - y.g, x.b - y.b, x.a - y.a]
-                .iter()
-                .all(|d| d.abs() < 1e-6)
-        };
+        let (a, b) = (BLIP_RED, Color { a: 0.5, ..BLIP_BLUE });
+        let near = |x: Color, y: Color| [x.r - y.r, x.g - y.g, x.b - y.b, x.a - y.a].iter().all(|d| d.abs() < 1e-6);
         assert!(near(blend(a, b, 0.0), a));
         assert!(near(blend(a, b, 1.0), b));
         let mid = blend(a, b, 0.5);

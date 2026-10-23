@@ -66,10 +66,6 @@ pub fn slither_song() -> Song<'static> {
     }
 }
 
-pub fn slither_wav() -> Vec<u8> {
-    slither_song().render()
-}
-
 /// The fast tune: the same scale, running and leaping.
 pub fn frenzy_song() -> Song<'static> {
     Song {
@@ -117,21 +113,6 @@ pub fn frenzy_song() -> Song<'static> {
         groove: Groove::FourFloor,
         seed: 0xF6E2_9000,
         ..Song::DEFAULT
-    }
-}
-
-pub fn frenzy_wav() -> Vec<u8> {
-    frenzy_song().render()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn wav_tracks_render_the_exposed_song_data() {
-        assert_eq!(slither_wav(), slither_song().render());
-        assert_eq!(frenzy_wav(), frenzy_song().render());
     }
 }
 
@@ -193,7 +174,7 @@ pub fn sounds() -> Vec<Asset> {
 /// The music: each tune as a WAV to play and an XM of its notes for TUNE.
 pub fn music() -> Vec<(String, Vec<u8>)> {
     blip::xm::tunes(&[
-        ("SLITHER", &slither_wav),
-        ("FRENZY", &frenzy_wav),
+        ("SLITHER", &|| slither_song().render()),
+        ("FRENZY", &|| frenzy_song().render()),
     ])
 }

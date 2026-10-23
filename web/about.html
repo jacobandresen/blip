@@ -2,154 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="google" content="notranslate">
   <title>ABOUT — BLIP ARCADE</title>
-  <link rel="icon" type="image/x-icon" href="favicon.ico?v=2">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
-  <link rel="stylesheet" href="kiosk.css?v=153">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --green:   #32c832;
-      --yellow:  #e6dc32;
-      --orange:  #D97757;
-      --copilot: #6e40c9;
-    }
-
-    html, body {
-      min-height: 100%;
-      background: #050508;
-      color: #ccc;
-      font-family: 'Courier New', Courier, monospace;
-    }
-    /* No rubber-band overscroll, so the fixed bottom bar stays pinned. */
-    html { overscroll-behavior: none; }
-
-    /* CRT scanlines */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent 0px, transparent 3px,
-        rgba(0,0,0,0.14) 3px, rgba(0,0,0,0.14) 4px
-      );
-      pointer-events: none;
-      z-index: 100;
-    }
-
-    .page {
-      max-width: 720px;
-      margin: 0 auto;
-      /* Top pad clears the fixed BLIP ARCADE logo / coin button (which is
-         the way back to the arcade now that the text back-link is gone). */
-      padding: calc(72px + env(safe-area-inset-top, 0px)) 24px calc(80px + env(safe-area-inset-bottom, 0px));
-    }
-
-    /* ---- headings ---- */
-    h1 {
-      font-size: clamp(2rem, 8vw, 3.5rem);
-      font-weight: 900;
-      letter-spacing: .18em;
-      color: var(--green);
-      text-shadow: 0 0 20px var(--green), 0 0 60px rgba(50,200,50,0.3);
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-    h2 {
-      font-size: 11px;
-      letter-spacing: 6px;
-      color: #444;
-      text-transform: uppercase;
-      margin-bottom: 28px;
-    }
-
-    .divider {
-      height: 1px;
-      background: #1a1a1a;
-      margin: 48px 0;
-    }
-
-    /* ---- intro ---- */
-    .intro p {
-      font-size: 13px;
-      line-height: 1.9;
-      letter-spacing: 1px;
-      color: #888;
-      max-width: 560px;
-    }
-    .intro p + p { margin-top: 16px; }
-
-    /* ---- sections ---- */
-    .thoughts-label {
-      font-size: 9px;
-      letter-spacing: 5px;
-      color: var(--orange);
-      text-transform: uppercase;
-      margin-bottom: 20px;
-      opacity: 0.8;
-    }
-
-    .thoughts-body {
-      border-left: 2px solid rgba(217,119,87,0.3);
-      padding-left: 20px;
-    }
-    .thoughts-body p {
-      font-size: 13px;
-      line-height: 1.95;
-      letter-spacing: .5px;
-      color: #aaa;
-      margin-bottom: 16px;
-    }
-    .thoughts-body p:last-child { margin-bottom: 0; }
-
-
-    .inline-link {
-      color: var(--orange);
-      text-decoration: none;
-      border-bottom: 1px solid rgba(217,119,87,0.3);
-      transition: border-color .2s, color .2s;
-    }
-    .inline-link:hover {
-      color: #f0a882;
-      border-bottom-color: rgba(217,119,87,0.8);
-    }
-
-    /* ---- language switcher ---- */
-
-  </style>
-  <link rel="stylesheet" href="manual.css?v=7">
+  <!-- The book and the Guide read this page's words; a visitor is sent to the book. -->
   <script>location.replace('index.html?manual=about')</script>
 </head>
-<body class="info-page manual-chapter-about">
-
-<a class="blip-logo led-logo" href="index.html" aria-label="BLIP — cabinet"><svg class="blip-led-display" viewBox="0 0 100 32" aria-hidden="true"><circle class="led-on" cx="4" cy="4" r="1.35"/><circle class="led-on" cx="8" cy="4" r="1.35"/><circle class="led-on" cx="12" cy="4" r="1.35"/><circle class="led-on" cx="16" cy="4" r="1.35"/><circle class="led-off" cx="20" cy="4" r="1.35"/><circle class="led-on" cx="4" cy="8" r="1.35"/><circle class="led-off" cx="8" cy="8" r="1.35"/><circle class="led-off" cx="12" cy="8" r="1.35"/><circle class="led-off" cx="16" cy="8" r="1.35"/><circle class="led-on" cx="20" cy="8" r="1.35"/><circle class="led-on" cx="4" cy="12" r="1.35"/><circle class="led-off" cx="8" cy="12" r="1.35"/><circle class="led-off" cx="12" cy="12" r="1.35"/><circle class="led-off" cx="16" cy="12" r="1.35"/><circle class="led-on" cx="20" cy="12" r="1.35"/><circle class="led-on" cx="4" cy="16" r="1.35"/><circle class="led-on" cx="8" cy="16" r="1.35"/><circle class="led-on" cx="12" cy="16" r="1.35"/><circle class="led-on" cx="16" cy="16" r="1.35"/><circle class="led-off" cx="20" cy="16" r="1.35"/><circle class="led-on" cx="4" cy="20" r="1.35"/><circle class="led-off" cx="8" cy="20" r="1.35"/><circle class="led-off" cx="12" cy="20" r="1.35"/><circle class="led-off" cx="16" cy="20" r="1.35"/><circle class="led-on" cx="20" cy="20" r="1.35"/><circle class="led-on" cx="4" cy="24" r="1.35"/><circle class="led-off" cx="8" cy="24" r="1.35"/><circle class="led-off" cx="12" cy="24" r="1.35"/><circle class="led-off" cx="16" cy="24" r="1.35"/><circle class="led-on" cx="20" cy="24" r="1.35"/><circle class="led-on" cx="4" cy="28" r="1.35"/><circle class="led-on" cx="8" cy="28" r="1.35"/><circle class="led-on" cx="12" cy="28" r="1.35"/><circle class="led-on" cx="16" cy="28" r="1.35"/><circle class="led-off" cx="20" cy="28" r="1.35"/><circle class="led-on" cx="28" cy="4" r="1.35"/><circle class="led-off" cx="32" cy="4" r="1.35"/><circle class="led-off" cx="36" cy="4" r="1.35"/><circle class="led-off" cx="40" cy="4" r="1.35"/><circle class="led-off" cx="44" cy="4" r="1.35"/><circle class="led-on" cx="28" cy="8" r="1.35"/><circle class="led-off" cx="32" cy="8" r="1.35"/><circle class="led-off" cx="36" cy="8" r="1.35"/><circle class="led-off" cx="40" cy="8" r="1.35"/><circle class="led-off" cx="44" cy="8" r="1.35"/><circle class="led-on" cx="28" cy="12" r="1.35"/><circle class="led-off" cx="32" cy="12" r="1.35"/><circle class="led-off" cx="36" cy="12" r="1.35"/><circle class="led-off" cx="40" cy="12" r="1.35"/><circle class="led-off" cx="44" cy="12" r="1.35"/><circle class="led-on" cx="28" cy="16" r="1.35"/><circle class="led-off" cx="32" cy="16" r="1.35"/><circle class="led-off" cx="36" cy="16" r="1.35"/><circle class="led-off" cx="40" cy="16" r="1.35"/><circle class="led-off" cx="44" cy="16" r="1.35"/><circle class="led-on" cx="28" cy="20" r="1.35"/><circle class="led-off" cx="32" cy="20" r="1.35"/><circle class="led-off" cx="36" cy="20" r="1.35"/><circle class="led-off" cx="40" cy="20" r="1.35"/><circle class="led-off" cx="44" cy="20" r="1.35"/><circle class="led-on" cx="28" cy="24" r="1.35"/><circle class="led-off" cx="32" cy="24" r="1.35"/><circle class="led-off" cx="36" cy="24" r="1.35"/><circle class="led-off" cx="40" cy="24" r="1.35"/><circle class="led-off" cx="44" cy="24" r="1.35"/><circle class="led-on" cx="28" cy="28" r="1.35"/><circle class="led-on" cx="32" cy="28" r="1.35"/><circle class="led-on" cx="36" cy="28" r="1.35"/><circle class="led-on" cx="40" cy="28" r="1.35"/><circle class="led-on" cx="44" cy="28" r="1.35"/><circle class="led-on" cx="52" cy="4" r="1.35"/><circle class="led-on" cx="56" cy="4" r="1.35"/><circle class="led-on" cx="60" cy="4" r="1.35"/><circle class="led-on" cx="64" cy="4" r="1.35"/><circle class="led-on" cx="68" cy="4" r="1.35"/><circle class="led-off" cx="52" cy="8" r="1.35"/><circle class="led-off" cx="56" cy="8" r="1.35"/><circle class="led-on" cx="60" cy="8" r="1.35"/><circle class="led-off" cx="64" cy="8" r="1.35"/><circle class="led-off" cx="68" cy="8" r="1.35"/><circle class="led-off" cx="52" cy="12" r="1.35"/><circle class="led-off" cx="56" cy="12" r="1.35"/><circle class="led-on" cx="60" cy="12" r="1.35"/><circle class="led-off" cx="64" cy="12" r="1.35"/><circle class="led-off" cx="68" cy="12" r="1.35"/><circle class="led-off" cx="52" cy="16" r="1.35"/><circle class="led-off" cx="56" cy="16" r="1.35"/><circle class="led-on" cx="60" cy="16" r="1.35"/><circle class="led-off" cx="64" cy="16" r="1.35"/><circle class="led-off" cx="68" cy="16" r="1.35"/><circle class="led-off" cx="52" cy="20" r="1.35"/><circle class="led-off" cx="56" cy="20" r="1.35"/><circle class="led-on" cx="60" cy="20" r="1.35"/><circle class="led-off" cx="64" cy="20" r="1.35"/><circle class="led-off" cx="68" cy="20" r="1.35"/><circle class="led-off" cx="52" cy="24" r="1.35"/><circle class="led-off" cx="56" cy="24" r="1.35"/><circle class="led-on" cx="60" cy="24" r="1.35"/><circle class="led-off" cx="64" cy="24" r="1.35"/><circle class="led-off" cx="68" cy="24" r="1.35"/><circle class="led-on" cx="52" cy="28" r="1.35"/><circle class="led-on" cx="56" cy="28" r="1.35"/><circle class="led-on" cx="60" cy="28" r="1.35"/><circle class="led-on" cx="64" cy="28" r="1.35"/><circle class="led-on" cx="68" cy="28" r="1.35"/><circle class="led-on" cx="76" cy="4" r="1.35"/><circle class="led-on" cx="80" cy="4" r="1.35"/><circle class="led-on" cx="84" cy="4" r="1.35"/><circle class="led-on" cx="88" cy="4" r="1.35"/><circle class="led-off" cx="92" cy="4" r="1.35"/><circle class="led-on" cx="76" cy="8" r="1.35"/><circle class="led-off" cx="80" cy="8" r="1.35"/><circle class="led-off" cx="84" cy="8" r="1.35"/><circle class="led-off" cx="88" cy="8" r="1.35"/><circle class="led-on" cx="92" cy="8" r="1.35"/><circle class="led-on" cx="76" cy="12" r="1.35"/><circle class="led-off" cx="80" cy="12" r="1.35"/><circle class="led-off" cx="84" cy="12" r="1.35"/><circle class="led-off" cx="88" cy="12" r="1.35"/><circle class="led-on" cx="92" cy="12" r="1.35"/><circle class="led-on" cx="76" cy="16" r="1.35"/><circle class="led-on" cx="80" cy="16" r="1.35"/><circle class="led-on" cx="84" cy="16" r="1.35"/><circle class="led-on" cx="88" cy="16" r="1.35"/><circle class="led-off" cx="92" cy="16" r="1.35"/><circle class="led-on" cx="76" cy="20" r="1.35"/><circle class="led-off" cx="80" cy="20" r="1.35"/><circle class="led-off" cx="84" cy="20" r="1.35"/><circle class="led-off" cx="88" cy="20" r="1.35"/><circle class="led-off" cx="92" cy="20" r="1.35"/><circle class="led-on" cx="76" cy="24" r="1.35"/><circle class="led-off" cx="80" cy="24" r="1.35"/><circle class="led-off" cx="84" cy="24" r="1.35"/><circle class="led-off" cx="88" cy="24" r="1.35"/><circle class="led-off" cx="92" cy="24" r="1.35"/><circle class="led-on" cx="76" cy="28" r="1.35"/><circle class="led-off" cx="80" cy="28" r="1.35"/><circle class="led-off" cx="84" cy="28" r="1.35"/><circle class="led-off" cx="88" cy="28" r="1.35"/><circle class="led-off" cx="92" cy="28" r="1.35"/></svg></a>
-<!-- Coin slot: top-right corner, mirroring the BLIP ARCADE logo. -->
-<button class="kiosk-btn" id="kiosk-insert-btn"></button>
-<div class="top-marquee-bar"><span class="marquee-bulbs" aria-hidden="true"></span><span id="marquee-name" class="marquee-empty" aria-label="No game selected"><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span></span><span class="marquee-bulbs" aria-hidden="true"></span></div>
-
-<div class="manual-book">
-  <aside class="manual-index">
-    <div class="manual-brand">BLIP ARCADE</div>
-    <div class="manual-index-title">FIELD<br>MANUAL</div>
-    <div class="manual-printed-contents" aria-label="Contents"><b>CONTENTS</b><span>01 &nbsp; ABOUT</span><span>02 &nbsp; CONTROLS</span><span>03 &nbsp; HISTORY</span></div>
-    <small class="manual-edition">OPERATOR'S COPY<br>EDITION 01</small>
-  </aside>
-  <div class="manual-leaf">
+<body>
+<div class="manual-leaf">
 <div class="page">
 
   <h1>BLIP</h1>
-  <h2 data-i18n="pageSubtitle">ABOUT THIS EXPERIMENT</h2>
+  <h2>ABOUT THIS EXPERIMENT</h2>
 
   <section class="intro">
-    <p data-i18n="introP1">
+    <p>
         Blip Arcade is an experiment in making software together with machines. Every game, every line of code and every pixel of the interface was made in conversation with Claude (Anthropic), Codex (OpenAI) and GitHub Copilot (GitHub). The human brought the ideas; the machines did most of the typing.
       </p>
-    <p data-i18n="introP2">
+    <p>
         The question behind it: how far can a conversation go before it becomes a piece of software? Quite far, as it turns out.
       </p>
   </section>
@@ -157,15 +25,15 @@
   <div class="divider"></div>
 
   <section>
-    <div class="thoughts-label" data-i18n="copyrightLabel">&#x25BA; A tribute, not a copy</div>
+    <div class="thoughts-label">&#x25BA; A tribute, not a copy</div>
     <div class="thoughts-body">
-      <p data-i18n="copyrightP1">
+      <p>
         Blip Arcade is a tribute to the golden age of arcade games: Pong, Breakout, Snake, Space Invaders, 1942 and the many games they inspired. The studios and engineers who made the originals shaped the whole history of interactive entertainment.
       </p>
-      <p data-i18n="copyrightP2">
+      <p>
         The games here are new works inspired by those classics. They contain no code, graphics or sound from the originals; everything was written from scratch for this project.
       </p>
-      <p data-i18n="copyrightP3">
+      <p>
         Blip Arcade is strictly non-commercial. It charges no admission, serves no advertising and keeps nothing about you but the name you enter on a high-score table. It exists as a technical and creative experiment, and as a small thank-you to the people who invented the medium.
       </p>
     </div>
@@ -174,15 +42,15 @@
   <div class="divider"></div>
 
   <section>
-    <div class="thoughts-label" data-i18n="contribLabel">&#x25BA; Add a game</div>
+    <div class="thoughts-label">&#x25BA; Add a game</div>
     <div class="thoughts-body">
-      <p data-i18n="contribP1">
+      <p>
         Want to add a game? Pull requests are welcome at <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. The Blip library takes care of the <a href="https://macroquad.rs/">Macroquad</a> and Rust plumbing, so you can concentrate on the game itself.
       </p>
-      <p data-i18n="contribP2">
+      <p>
         For inspiration, look to the <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">golden age of arcade video games</a> (roughly 1978–1986), which produced hundreds of titles worth revisiting: Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest and many more.
       </p>
-      <p data-i18n="contribP3">
+      <p>
         Please respect copyright. Reimplement the mechanics and the style from scratch, and never copy proprietary code, graphics or audio. Original names are trademarked, so give your game a title of its own, as this project does: Rally for Pong, Serpent for Snake, Raider for 1942. When in doubt, make it a tribute, not a reproduction.
       </p>
     </div>
@@ -253,96 +121,6 @@
   </section>
 
 </div>
-  </div>
-  <button class="manual-return" type="button" onclick="location.href='index.html'"><span>↩&nbsp; CLOSE BOOK · RETURN TO ARCADE</span></button>
 </div>
-
-  <!-- Decorative arcade stick + buttons, matching the game shell's bar
-       (kiosk.css) — static here (no game to drive them), just cabinet
-       flavor so the bar looks the same on every page. -->
-  <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
-   <div class="deck-panel"></div>
-  </div>
-  <script src="deck.js?v=10"></script>
-
-  <script src="blip_core.js?v=7"></script>
-  <script src="kiosk.js?v=97"></script>
-  <script src="blip_controller.js?v=10"></script>
-  <script>
-    var i18n = {
-      en: {
-        pageSubtitle:    'ABOUT THIS EXPERIMENT',
-        introP1:         'BLIP ARCADE is an experiment in human–AI collaboration. Every game, every line of code, every pixel of the UI was built together with Claude (Anthropic), Codex (OpenAI) and GitHub Copilot (GitHub). The human had the ideas. The AIs did most of the typing.',
-        introP2:         'The question behind the experiment: how far can a conversation go before it becomes a piece of software? Turns out, pretty far.',
-        copyrightLabel:  '&#x25BA; Copyright &amp; tribute',
-        copyrightP1:     'BLIP ARCADE is a tribute to the classic arcade games that defined a generation — Pong, Breakout, Snake, Space Invaders, 1942, and their many descendants. The original games were created by pioneering studios and engineers whose work shaped the entire history of interactive entertainment.',
-        copyrightP2:     'The games on this site are original reimplementations inspired by those classics. They are not copies, ports, or reproductions of any proprietary code or assets. All graphics, sounds, and game logic were written from scratch as part of this experiment.',
-        copyrightP3:     'This project is strictly non-commercial. No admission is charged, no data is collected, no advertising is served. It exists purely as a technical and creative experiment, and as a small act of appreciation for the people who invented the medium.',
-        contribLabel:    '&#x25BA; Contributions',
-        contribP1:       'Want to add a game? Pull requests are welcome at <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. The blip library handles the <a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a> and Rust plumbing so you can focus on game logic.',
-        contribP2:       'For inspiration, the <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Golden Age of Arcade Video Games</a> (roughly 1978–1986) produced hundreds of titles worth revisiting — Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest, and many more. That era is a deep well.',
-        contribP3:       'Please honour copyrights when contributing. Reimplement mechanics and aesthetics from scratch — do not copy proprietary code, graphics, or audio. Original names are trademarked; use alternative titles as this project does (Rally instead of Pong, Serpent instead of Snake, Raider instead of 1942, and so on). When in doubt, treat your implementation as a tribute, not a reproduction.',
-      },
-
-      da: {
-        pageSubtitle:    'OM DETTE EKSPERIMENT',
-        introP1:         'BLIP ARCADE er et eksperiment i samarbejde mellem menneske og AI. Hvert spil, hver linje kode og hvert pixel i brugerfladen er bygget i fællesskab med Claude (Anthropic) og GitHub Copilot (GitHub). Mennesket kom med ideerne. AI\'erne stod for det meste af skrivningen.',
-        introP2:         'Spørgsmålet bag eksperimentet: hvor langt kan en samtale gå, inden den bliver til software? Det viser sig, ret langt.',
-        copyrightLabel:  '&#x25BA; Ophavsret &amp; hyldest',
-        copyrightP1:     'BLIP ARCADE er en hyldest til de klassiske arkadespil, der definerede en generation — Pong, Breakout, Snake, Space Invaders, 1942 og deres mange efterkommere. De originale spil blev skabt af banebrydende studier og programmører, hvis arbejde formede hele den interaktive underholdnings historie.',
-        copyrightP2:     'Spillene på dette sted er originale genimplementeringer inspireret af disse klassikere. De er ikke kopier eller reproduktioner af proprietær kode eller aktiver. Al grafik, alle lyde og al spillogik er skrevet fra bunden som en del af dette eksperiment.',
-        copyrightP3:     'Dette projekt er strengt ikke-kommercielt. Der opkræves ingen entré, indsamles ingen data og vises ingen reklamer. Det eksisterer udelukkende som et teknisk og kreativt eksperiment — og som en lille kærlighedserklæring til de mennesker, der opfandt mediet.',
-        contribLabel:    '&#x25BA; Bidrag',
-        contribP1:       'Vil du tilføje et spil? Pull requests er velkomne på <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. blip-biblioteket håndterer <a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a> og Rust, så du kan fokusere på spillogikken.',
-        contribP2:       'Til inspiration producerede <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">Arkadespillenes Guldalder</a> (ca. 1978–1986) hundredvis af titler, der er værd at genbesøge — Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest og mange flere. Den æra er et dybt brønd.',
-        contribP3:       'Respektér venligst ophavsretten, når du bidrager. Genimplementer mekanikker og æstetik fra bunden — kopier ikke proprietær kode, grafik eller lyd. Originale navne er varemærker; brug alternative titler, som dette projekt gør (Rally i stedet for Pong, Serpent i stedet for Snake, Raider i stedet for 1942 osv.). Tvivler du, så behandl din implementering som en hyldest, ikke en reproduktion.',
-      },
-
-      ja: {
-        pageSubtitle:    'この実験について',
-        introP1:         'BLIP ARCADEは、人間とAIの協働実験です。すべてのゲーム、すべてのコード、UIのすべてのピクセルが、Claude（Anthropic）とGitHub Copilot（GitHub）との共同作業で構築されました。アイデアを出したのは人間で、タイピングのほとんどはAIが担いました。',
-        introP2:         'この実験の背後にある問いかけ：会話はどこまで続ければソフトウェアになるのか？思ったよりずっと遠くまで行けることがわかりました。',
-        copyrightLabel:  '&#x25BA; 著作権とトリビュート',
-        copyrightP1:     'BLIP ARCADEは、一世代を定義したクラシックアーケードゲーム——Pong、Breakout、Snake、Space Invaders、1942、そしてその多くの後継者——へのトリビュートです。オリジナルゲームは、インタラクティブエンターテインメントの歴史全体を形作った先駆的なスタジオとプログラマーによって作られました。',
-        copyrightP2:     'このサイトのゲームは、それらのクラシックにインスパイアされたオリジナルの再実装です。独自コードやアセットのコピーや複製ではありません。すべてのグラフィックス、サウンド、ゲームロジックは、この実験の一環としてゼロから書かれました。',
-        copyrightP3:     'このプロジェクトは厳密に非商業的です。入場料は徴収されず、データは収集されず、広告は表示されません。純粋に技術的・創造的な実験として、そしてこのメディアを発明した人々への小さな感謝として存在しています。',
-        contribLabel:    '&#x25BA; コントリビューション',
-        contribP1:       'ゲームを追加したいですか？プルリクエストは <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a> で歓迎します。blipライブラリが<a class="inline-link" href="https://macroquad.rs/" target="_blank" rel="noopener">Macroquad</a>とRustの基盤を担当するので、ゲームロジックに集中できます。',
-        contribP2:       'インスピレーションとして、<a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">アーケードビデオゲームの黄金時代</a>（おおよそ1978–1986年）には再訪する価値のある作品が何百もあります——Asteroids、Centipede、Frogger、Pac-Man、Donkey Kong、Tempestなど。あの時代は深い井戸です。',
-        contribP3:       'コントリビュートの際は著作権を尊重してください。メカニクスと美学をゼロから再実装し——独自コード、グラフィックス、オーディオはコピーしないでください。オリジナルの名前は商標登録されています。このプロジェクトのように代替タイトルを使用してください（PongのかわりにRally、SnakeのかわりにSerpent、1942のかわりにRaiderなど）。迷ったときは、実装を複製ではなくトリビュートとして扱ってください。',
-      }
-    };
-
-    function applyLang(lang) {
-      var t = i18n[lang];
-      if (!t) return;
-      document.querySelectorAll('[data-i18n]').forEach(function(el) {
-        var key = el.getAttribute('data-i18n');
-        if (t[key] !== undefined) el.innerHTML = t[key];
-      });
-      document.querySelectorAll('.lang-btn').forEach(function(btn) {
-        btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
-      });
-      document.documentElement.lang = lang;
-      try { localStorage.setItem('blip-lang', lang); } catch(e) {}
-    }
-
-    applyLang('en');
-
-    updateCoinsHud();
-    document.addEventListener('keydown', function(e) {
-      if (e.key === '5' || e.key === 'c' || e.key === 'C') insertCoin();
-    });
-
-    (function () {
-      var pad = document.getElementById('snes-pad');
-      if (pad && typeof BlipController !== 'undefined') {
-        BlipController.init({ buttons: [{ key: ' ', code: 'Space' }], kioskHref: 'index.html' });
-        BlipController.bindButtons(pad);
-        BlipController.bindDpad(pad.querySelector('.snes-dpad'));
-        BlipController.registerVisual(pad);
-      }
-    }());
-  </script>
 </body>
 </html>

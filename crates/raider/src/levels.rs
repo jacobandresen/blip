@@ -85,25 +85,12 @@ pub const BOSS_SPECS: [BossSpec; 7] = [
         fire_max: 0.47,
         dips: true,
         escorts: true,
-        patterns: &[
-            BossPattern::Fan,
-            BossPattern::Aimed,
-            BossPattern::Sweep,
-            BossPattern::Curtain,
-        ],
+        patterns: &[BossPattern::Fan, BossPattern::Aimed, BossPattern::Sweep, BossPattern::Curtain],
         name: "FUGAKU",
     },
 ];
 
-pub const BOSS_SIZES: [(i32, i32); 7] = [
-    (96, 76),
-    (104, 84),
-    (116, 92),
-    (150, 106),
-    (164, 122),
-    (182, 134),
-    (192, 152),
-];
+include!("boss_shape.rs");
 
 pub const MAX_LEVEL: i32 = BOSS_SPECS.len() as i32;
 pub const WAVE_KILL_BASE: i32 = 60;
@@ -111,47 +98,10 @@ pub const FLIGHT_BONUS: i32 = 50;
 pub const BARRIER_MIN_LEVEL: i32 = 3;
 pub const MAX_LASERS: usize = 2;
 
-pub const BOSS_TURRETS: [&[(f32, f32)]; 7] = [
-    &[(0.0, 0.06), (0.0, 0.45), (0.0, 0.97)],
-    &[(0.0, 0.06), (0.0, 0.50), (0.0, 0.97)],
-    &[
-        (0.0, 0.07),
-        (0.0, 0.36),
-        (-0.09, 0.62),
-        (0.09, 0.62),
-        (0.0, 0.98),
-    ],
-    &[(0.0, 0.06), (0.0, 0.30), (0.0, 0.60), (0.0, 0.97)],
-    &[
-        (0.0, 0.07),
-        (0.0, 0.36),
-        (-0.07, 0.60),
-        (0.07, 0.60),
-        (0.0, 0.97),
-    ],
-    &[(0.0, 0.06), (0.0, 0.28), (0.0, 0.55), (0.0, 0.97)],
-    &[(0.0, 0.05), (0.0, 0.97)],
-];
+pub const BOSS_WING_GUNS: [&[f32]; 7] =
+    [&[], &[0.62], &[0.62], &[0.36, 0.72], &[0.31, 0.62], &[0.32, 0.6, 0.8], &[0.62]];
 
-pub const BOSS_WING_GUNS: [&[f32]; 7] = [
-    &[],
-    &[0.62],
-    &[0.62],
-    &[0.36, 0.72],
-    &[0.31, 0.62],
-    &[0.32, 0.6, 0.8],
-    &[0.62],
-];
-
-pub const BOSS_LASERS: [&[(f32, f32)]; 7] = [
-    &[],
-    &[],
-    &[],
-    &[],
-    &[],
-    &[(0.0, 0.42)],
-    &[(-0.36, 0.38), (0.36, 0.38)],
-];
+pub const BOSS_LASERS: [&[(f32, f32)]; 7] = [&[], &[], &[], &[], &[], &[(0.0, 0.42)], &[(-0.36, 0.38), (0.36, 0.38)]];
 
 pub const BOSS_WINGS: [(f32, f32, f32, f32); 7] = [
     (0.30, 0.52, 0.37, 0.46),

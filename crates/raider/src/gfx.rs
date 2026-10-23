@@ -12,42 +12,7 @@ const PLAYER_H: i32 = 58;
 // Must match crates/raider/src/main.rs's ENEMY_W / ENEMY_H.
 const ENEMY_W: i32 = 62;
 const ENEMY_H: i32 = 52;
-// Must match crates/raider/src/main.rs's BOSS_SIZES.
-// (span, length), growing with the level; the last, the Fugaku, is twice
-// the first.
-const BOSS_SIZES: [(i32, i32); 7] = [
-    (96, 76),
-    (104, 84),
-    (116, 92),
-    (150, 106),
-    (164, 122),
-    (182, 134),
-    (192, 152),
-];
-// Gun positions per boss: (x as a fraction of the half span from the
-// centreline, y as a fraction of the length from the nose). The game fires
-// from the same points (crates/raider/src/main.rs BOSS_TURRETS).
-const BOSS_TURRETS: [&[(f32, f32)]; 7] = [
-    &[(0.0, 0.06), (0.0, 0.45), (0.0, 0.97)],
-    &[(0.0, 0.06), (0.0, 0.50), (0.0, 0.97)],
-    &[
-        (0.0, 0.07),
-        (0.0, 0.36),
-        (-0.09, 0.62),
-        (0.09, 0.62),
-        (0.0, 0.98),
-    ],
-    &[(0.0, 0.06), (0.0, 0.30), (0.0, 0.60), (0.0, 0.97)],
-    &[
-        (0.0, 0.07),
-        (0.0, 0.36),
-        (-0.07, 0.60),
-        (0.07, 0.60),
-        (0.0, 0.97),
-    ],
-    &[(0.0, 0.06), (0.0, 0.28), (0.0, 0.55), (0.0, 0.97)],
-    &[(0.0, 0.05), (0.0, 0.97)],
-];
+include!("boss_shape.rs");
 // Must match crates/raider/src/main.rs's POW_W / POW_H.
 const POW_W: i32 = 14;
 const POW_H: i32 = 14;
@@ -84,13 +49,7 @@ impl Canvas {
     }
     fn scaled(w: i32, h: i32, k: f32) -> Self {
         let (w, h) = (w as usize, h as usize);
-        Self {
-            w,
-            h,
-            k,
-            clip: (0.0, 0.0, 1e9, 1e9),
-            buf: vec![[0.0; 4]; w * h * SS * SS],
-        }
+        Self { w, h, k, clip: (0.0, 0.0, 1e9, 1e9), buf: vec![[0.0; 4]; w * h * SS * SS] }
     }
     fn clip(&mut self, x0: f32, y0: f32, x1: f32, y1: f32) {
         self.clip = (x0, y0, x1, y1);
@@ -100,12 +59,7 @@ impl Canvas {
     }
     /// Paint `col` (straight RGBA, 0..1) wherever `inside(x, y)` holds,
     /// with `shade(x, y)` scaling its RGB.
-    fn fill(
-        &mut self,
-        inside: impl Fn(f32, f32) -> bool,
-        shade: impl Fn(f32, f32) -> f32,
-        col: [f32; 4],
-    ) {
+    fn fill(&mut self, inside: impl Fn(f32, f32) -> bool, shade: impl Fn(f32, f32) -> f32, col: [f32; 4]) {
         let sw = self.w * SS;
         let unit = self.k * SS as f32;
         let (cx0, cy0, cx1, cy1) = self.clip;
@@ -151,11 +105,8 @@ impl Canvas {
                     }
                 }
                 let a = acc[3] / (SS * SS) as f32;
-                px[y * w + x] = if acc[3] > 0.0 {
-                    [acc[0] / acc[3], acc[1] / acc[3], acc[2] / acc[3], a]
-                } else {
-                    [0.0; 4]
-                };
+                px[y * w + x] =
+                    if acc[3] > 0.0 { [acc[0] / acc[3], acc[1] / acc[3], acc[2] / acc[3], a] } else { [0.0; 4] };
             }
         }
         let mut img = Image::new(w as u32, h as u32);
@@ -171,11 +122,7 @@ impl Canvas {
                 }
                 let outline = (near - p[3]).max(0.0) * 0.55;
                 let a = p[3] + outline * (1.0 - p[3]);
-                let rgb = if a > 0.0 {
-                    [p[0] * p[3] / a, p[1] * p[3] / a, p[2] * p[3] / a]
-                } else {
-                    [0.0; 3]
-                };
+                let rgb = if a > 0.0 { [p[0] * p[3] / a, p[1] * p[3] / a, p[2] * p[3] / a] } else { [0.0; 3] };
                 let oy = if flip { h - 1 - y } else { y } as i32;
                 img.set_rgba(
                     x as i32,
@@ -192,12 +139,7 @@ impl Canvas {
 }
 
 fn rgb(c: (u8, u8, u8)) -> [f32; 4] {
-    [
-        c.0 as f32 / 255.0,
-        c.1 as f32 / 255.0,
-        c.2 as f32 / 255.0,
-        1.0,
-    ]
+    [c.0 as f32 / 255.0, c.1 as f32 / 255.0, c.2 as f32 / 255.0, 1.0]
 }
 fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
@@ -220,16 +162,10 @@ impl Surface {
         if t > 1.0 {
             return false;
         }
-        let (mut le, mut te) = (
-            lerp(self.root.0, self.tip.0, t),
-            lerp(self.root.1, self.tip.1, t),
-        );
+        let (mut le, mut te) = (lerp(self.root.0, self.tip.0, t), lerp(self.root.1, self.tip.1, t));
         if self.round > 0.0 && t > 1.0 - self.round {
             let u = (t - (1.0 - self.round)) / self.round;
-            let (mid, half) = (
-                (le + te) / 2.0,
-                (te - le) / 2.0 * (1.0 - u * u).max(0.0).sqrt(),
-            );
+            let (mid, half) = ((le + te) / 2.0, (te - le) / 2.0 * (1.0 - u * u).max(0.0).sqrt());
             le = mid - half;
             te = mid + half;
         }
@@ -238,10 +174,7 @@ impl Surface {
     /// Lit leading edge, darker toward the trailing edge and the tip.
     fn shade(&self, cx: f32, x: f32, y: f32) -> f32 {
         let t = (x - cx).abs() / self.half_span;
-        let (le, te) = (
-            lerp(self.root.0, self.tip.0, t),
-            lerp(self.root.1, self.tip.1, t),
-        );
+        let (le, te) = (lerp(self.root.0, self.tip.0, t), lerp(self.root.1, self.tip.1, t));
         let c = ((y - le) / (te - le).max(0.1)).clamp(0.0, 1.0);
         1.12 - 0.22 * c - 0.08 * t
     }
@@ -280,17 +213,12 @@ impl Fighter {
             let s = y / self.widest;
             if self.radial {
                 // a blunt round cowl that is nearly full width at once
-                lerp(self.nose_half, self.body_half, s)
-                    * (1.0 - (1.0 - (s * 4.0).min(1.0)).powi(2) * 0.55)
+                lerp(self.nose_half, self.body_half, s) * (1.0 - (1.0 - (s * 4.0).min(1.0)).powi(2) * 0.55)
             } else {
                 lerp(0.9, self.body_half, s.sqrt())
             }
         } else {
-            lerp(
-                self.body_half,
-                self.tail_half,
-                (y - self.widest) / (self.tail_y - self.widest),
-            )
+            lerp(self.body_half, self.tail_half, (y - self.widest) / (self.tail_y - self.widest))
         }
     }
 
@@ -298,22 +226,12 @@ impl Fighter {
         let cx = self.w as f32 / 2.0;
         // propeller disc: a faint blur ahead of the nose
         c.solid(
-            |x, y| {
-                ((x - cx) / (self.wing.half_span * 0.36)).powi(2) + ((y - 1.0) / 0.9).powi(2) <= 1.0
-            },
+            |x, y| ((x - cx) / (self.wing.half_span * 0.36)).powi(2) + ((y - 1.0) / 0.9).powi(2) <= 1.0,
             [0.75, 0.75, 0.72, 0.28],
         );
         let (wing, tp) = (self.wing, self.tailplane);
-        c.fill(
-            |x, y| tp.contains(cx, x, y),
-            |x, y| tp.shade(cx, x, y),
-            rgb(self.wing_col),
-        );
-        c.fill(
-            |x, y| wing.contains(cx, x, y),
-            |x, y| wing.shade(cx, x, y),
-            rgb(self.wing_col),
-        );
+        c.fill(|x, y| tp.contains(cx, x, y), |x, y| tp.shade(cx, x, y), rgb(self.wing_col));
+        c.fill(|x, y| wing.contains(cx, x, y), |x, y| wing.shade(cx, x, y), rgb(self.wing_col));
         // control-surface hinge line along the trailing edge
         c.solid(
             |x, y| {
@@ -347,22 +265,12 @@ impl Fighter {
         // spinner
         // spinner: small in the middle of a radial's cowl ring, long on an inline nose
         let (sw, sl) = if self.radial { (0.75, 0.9) } else { (1.1, 1.5) };
-        c.solid(
-            |x, y| ((x - cx) / sw).powi(2) + ((y - sl * 0.7) / sl).powi(2) <= 1.0,
-            rgb(self.spinner),
-        );
+        c.solid(|x, y| ((x - cx) / sw).powi(2) + ((y - sl * 0.7) / sl).powi(2) <= 1.0, rgb(self.spinner));
         // canopy glass with a highlight
         let (cy, cl, cw) = self.canopy;
+        c.solid(|x, y| ((x - cx) / cw).powi(2) + ((y - cy) / cl).powi(2) <= 1.0, [0.16, 0.24, 0.32, 1.0]);
         c.solid(
-            |x, y| ((x - cx) / cw).powi(2) + ((y - cy) / cl).powi(2) <= 1.0,
-            [0.16, 0.24, 0.32, 1.0],
-        );
-        c.solid(
-            |x, y| {
-                ((x - cx + cw * 0.3) / (cw * 0.35)).powi(2)
-                    + ((y - cy + cl * 0.25) / (cl * 0.45)).powi(2)
-                    <= 1.0
-            },
+            |x, y| ((x - cx + cw * 0.3) / (cw * 0.35)).powi(2) + ((y - cy + cl * 0.25) / (cl * 0.45)).powi(2) <= 1.0,
             [0.75, 0.88, 1.0, 0.85],
         );
         self.details(c);
@@ -378,20 +286,14 @@ impl Fighter {
         // chordwise panel lines and the main spar
         for t in [0.34f32, 0.62, 0.82] {
             c.solid(
-                |x, y| {
-                    ((x - cx).abs() / wing.half_span - t).abs() * wing.half_span < 0.13
-                        && wing.contains(cx, x, y)
-                },
+                |x, y| ((x - cx).abs() / wing.half_span - t).abs() * wing.half_span < 0.13 && wing.contains(cx, x, y),
                 line,
             );
         }
         c.solid(
             |x, y| {
                 let t = (x - cx).abs() / wing.half_span;
-                let (le, te) = (
-                    lerp(wing.root.0, wing.tip.0, t),
-                    lerp(wing.root.1, wing.tip.1, t),
-                );
+                let (le, te) = (lerp(wing.root.0, wing.tip.0, t), lerp(wing.root.1, wing.tip.1, t));
                 (y - (le + (te - le) * 0.3)).abs() < 0.12 && t > 0.12 && wing.contains(cx, x, y)
             },
             [0.0, 0.0, 0.0, 0.12],
@@ -407,19 +309,10 @@ impl Fighter {
         );
         // the fin, edge-on down the tail
         let (fy0, fy1) = (tp.root.0 - 1.0, self.tail_y);
-        c.solid(
-            |x, y| y > fy0 && y < fy1 && (x - cx).abs() < 0.35,
-            [0.1, 0.1, 0.1, 0.45],
-        );
+        c.solid(|x, y| y > fy0 && y < fy1 && (x - cx).abs() < 0.35, [0.1, 0.1, 0.1, 0.45]);
         // fuselage panel bands
-        for yb in [
-            self.widest + 0.5,
-            self.widest + (self.tail_y - self.widest) * 0.5,
-        ] {
-            c.solid(
-                |x, y| (y - yb).abs() < 0.12 && (x - cx).abs() <= self.fuselage_half(y),
-                line,
-            );
+        for yb in [self.widest + 0.5, self.widest + (self.tail_y - self.widest) * 0.5] {
+            c.solid(|x, y| (y - yb).abs() < 0.12 && (x - cx).abs() <= self.fuselage_half(y), line);
         }
         // gun ports: dark muzzles just behind the leading edge
         for &t in self.guns {
@@ -449,19 +342,12 @@ impl Fighter {
                 let ey = 3.2 + k as f32 * 0.9;
                 for sgn in [-1.0f32, 1.0] {
                     let ex = cx + sgn * (self.fuselage_half(ey) + 0.1);
-                    c.solid(
-                        |x, y| ((x - ex) / 0.35).powi(2) + ((y - ey) / 0.3).powi(2) <= 1.0,
-                        [0.12, 0.1, 0.08, 0.9],
-                    );
+                    c.solid(|x, y| ((x - ex) / 0.35).powi(2) + ((y - ey) / 0.3).powi(2) <= 1.0, [0.12, 0.1, 0.08, 0.9]);
                 }
             }
             for sgn in [-1.0f32, 1.0] {
                 c.solid(
-                    |x, y| {
-                        y > 6.5
-                            && y < 10.0
-                            && ((x - cx) * sgn - self.fuselage_half(y) * 0.85).abs() < 0.3
-                    },
+                    |x, y| y > 6.5 && y < 10.0 && ((x - cx) * sgn - self.fuselage_half(y) * 0.85).abs() < 0.3,
                     [0.1, 0.09, 0.08, 0.35],
                 );
             }
@@ -470,10 +356,7 @@ impl Fighter {
         let (cy, cl, cw) = self.canopy;
         for fy in [cy - cl * 0.35, cy + cl * 0.25] {
             c.solid(
-                |x, y| {
-                    (y - fy).abs() < 0.14
-                        && ((x - cx) / cw).powi(2) + ((y - cy) / cl).powi(2) <= 1.0
-                },
+                |x, y| (y - fy).abs() < 0.14 && ((x - cx) / cw).powi(2) + ((y - cy) / cl).powi(2) <= 1.0,
                 [0.1, 0.1, 0.12, 0.8],
             );
         }
@@ -494,14 +377,8 @@ impl Fighter {
 fn us_star(c: &mut Canvas, x0: f32, y0: f32) {
     let r = 2.1;
     let blue = [0.10, 0.16, 0.42, 1.0];
-    c.solid(
-        |x, y| (x - x0).abs() <= r + 1.8 && (y - y0).abs() <= 0.75,
-        blue,
-    );
-    c.solid(
-        |x, y| (x - x0).abs() <= r + 1.4 && (y - y0).abs() <= 0.42,
-        [1.0, 1.0, 1.0, 1.0],
-    );
+    c.solid(|x, y| (x - x0).abs() <= r + 1.8 && (y - y0).abs() <= 0.75, blue);
+    c.solid(|x, y| (x - x0).abs() <= r + 1.4 && (y - y0).abs() <= 0.42, [1.0, 1.0, 1.0, 1.0]);
     c.solid(|x, y| (x - x0).powi(2) + (y - y0).powi(2) <= r * r, blue);
     c.solid(|x, y| star(x - x0, y - y0, r * 0.95), [1.0, 1.0, 1.0, 1.0]);
 }
@@ -530,14 +407,8 @@ fn star(x: f32, y: f32, r: f32) -> bool {
 /// A hinomaru with a thin white surround, on each wing.
 fn hinomaru(c: &mut Canvas, cx: f32, dx: f32, y0: f32, r: f32) {
     for x0 in [cx - dx, cx + dx] {
-        c.solid(
-            |x, y| (x - x0).powi(2) + (y - y0).powi(2) <= (r + 0.55).powi(2),
-            [0.97, 0.97, 0.95, 1.0],
-        );
-        c.solid(
-            |x, y| (x - x0).powi(2) + (y - y0).powi(2) <= r * r,
-            [0.80, 0.08, 0.10, 1.0],
-        );
+        c.solid(|x, y| (x - x0).powi(2) + (y - y0).powi(2) <= (r + 0.55).powi(2), [0.97, 0.97, 0.95, 1.0]);
+        c.solid(|x, y| (x - x0).powi(2) + (y - y0).powi(2) <= r * r, [0.80, 0.08, 0.10, 1.0]);
     }
 }
 
@@ -560,18 +431,8 @@ fn player_plane() -> Vec<u8> {
         radial: false,
         nose_half: 1.2,
         nose_len: 4.2,
-        wing: Surface {
-            half_span: 17.6,
-            root: (10.0, 18.6),
-            tip: (11.4, 15.0),
-            round: 0.06,
-        },
-        tailplane: Surface {
-            half_span: 6.6,
-            root: (25.6, 30.4),
-            tip: (26.9, 29.4),
-            round: 0.12,
-        },
+        wing: Surface { half_span: 17.6, root: (10.0, 18.6), tip: (11.4, 15.0), round: 0.06 },
+        tailplane: Surface { half_span: 6.6, root: (25.6, 30.4), tip: (26.9, 29.4), round: 0.12 },
         canopy: (13.2, 2.6, 1.45),
         body: metal,
         wing_col: (206, 212, 222),
@@ -581,10 +442,7 @@ fn player_plane() -> Vec<u8> {
     };
     f.paint(&mut c);
     // olive-drab anti-glare panel from the nose band to the windscreen
-    c.solid(
-        |x, y| y > 4.2 && y < 10.8 && (x - cx).abs() <= 0.8,
-        [0.34, 0.36, 0.22, 1.0],
-    );
+    c.solid(|x, y| y > 4.2 && y < 10.8 && (x - cx).abs() <= 0.8, [0.34, 0.36, 0.22, 1.0]);
     us_star(&mut c, cx - 11.5, 13.6);
     c.finish(false)
 }
@@ -606,18 +464,8 @@ fn enemy_plane(kind: usize) -> Vec<u8> {
             radial: true,
             nose_half: 1.8,
             nose_len: 3.4,
-            wing: Surface {
-                half_span: 12.8,
-                root: (5.6, 11.4),
-                tip: (7.4, 10.4),
-                round: 0.38,
-            },
-            tailplane: Surface {
-                half_span: 5.0,
-                root: (16.6, 20.0),
-                tip: (17.6, 19.4),
-                round: 0.45,
-            },
+            wing: Surface { half_span: 12.8, root: (5.6, 11.4), tip: (7.4, 10.4), round: 0.38 },
+            tailplane: Surface { half_span: 5.0, root: (16.6, 20.0), tip: (17.6, 19.4), round: 0.45 },
             canopy: (8.6, 2.3, 1.1),
             body,
             wing_col: wing,
@@ -634,18 +482,8 @@ fn enemy_plane(kind: usize) -> Vec<u8> {
             radial: true,
             nose_half: 1.5,
             nose_len: 2.8,
-            wing: Surface {
-                half_span: 11.8,
-                root: (5.4, 10.8),
-                tip: (7.8, 9.8),
-                round: 0.3,
-            },
-            tailplane: Surface {
-                half_span: 4.4,
-                root: (16.2, 19.2),
-                tip: (17.0, 18.8),
-                round: 0.4,
-            },
+            wing: Surface { half_span: 11.8, root: (5.4, 10.8), tip: (7.8, 9.8), round: 0.3 },
+            tailplane: Surface { half_span: 4.4, root: (16.2, 19.2), tip: (17.0, 18.8), round: 0.4 },
             canopy: (8.4, 2.4, 0.95),
             body,
             wing_col: wing,
@@ -662,18 +500,8 @@ fn enemy_plane(kind: usize) -> Vec<u8> {
             radial: true,
             nose_half: 1.6,
             nose_len: 3.2,
-            wing: Surface {
-                half_span: 12.0,
-                root: (6.0, 11.6),
-                tip: (7.6, 10.4),
-                round: 0.32,
-            },
-            tailplane: Surface {
-                half_span: 4.8,
-                root: (16.8, 20.4),
-                tip: (17.8, 19.8),
-                round: 0.4,
-            },
+            wing: Surface { half_span: 12.0, root: (6.0, 11.6), tip: (7.6, 10.4), round: 0.32 },
+            tailplane: Surface { half_span: 4.8, root: (16.8, 20.4), tip: (17.8, 19.8), round: 0.4 },
             canopy: (9.0, 2.2, 1.15),
             body,
             wing_col: wing,
@@ -692,13 +520,7 @@ fn enemy_plane(kind: usize) -> Vec<u8> {
         },
         [0.95, 0.72, 0.12, if kind == 2 { 1.0 } else { 0.8 }],
     );
-    hinomaru(
-        &mut c,
-        cx,
-        wg.half_span * 0.62,
-        lerp(wg.root.0, wg.root.1, 0.5) + 0.4,
-        1.7,
-    );
+    hinomaru(&mut c, cx, wg.half_span * 0.62, lerp(wg.root.0, wg.root.1, 0.5) + 0.4, 1.7);
     c.finish(true)
 }
 
@@ -710,11 +532,7 @@ pub(super) fn enemy_colors(kind: usize) -> ((u8, u8, u8), (u8, u8, u8)) {
         1 => (205, 158, 68),
         _ => (214, 218, 224), // natural metal: the ace's Ki-84 is left unpainted
     };
-    let wing = (
-        body.0.saturating_add(38),
-        body.1.saturating_add(38),
-        body.2.saturating_add(38),
-    );
+    let wing = (body.0.saturating_add(38), body.1.saturating_add(38), body.2.saturating_add(38));
     (body, wing)
 }
 
@@ -742,20 +560,12 @@ impl Bomber {
         if y < 0.0 || y > self.tail_y {
             return -1.0;
         }
-        let hw = if self.hull {
-            self.fus_half * 1.25
-        } else {
-            self.fus_half
-        };
+        let hw = if self.hull { self.fus_half * 1.25 } else { self.fus_half };
         if y < self.fus_widest {
             let s = y / self.fus_widest;
             hw * (1.0 - (1.0 - s).powi(2)).sqrt().max(0.25)
         } else {
-            lerp(
-                hw,
-                hw * 0.3,
-                ((y - self.fus_widest) / (self.tail_y - self.fus_widest)).powf(1.3),
-            )
+            lerp(hw, hw * 0.3, ((y - self.fus_widest) / (self.tail_y - self.fus_widest)).powf(1.3))
         }
     }
 
@@ -772,18 +582,11 @@ impl Bomber {
             for sgn in [-1.0f32, 1.0] {
                 let (ex, ey) = (cx + sgn * t * hs, le(t) - self.cowl * 1.4);
                 let r = self.cowl * 2.3;
-                c.solid(
-                    |x, y| ((x - ex) / r).powi(2) + ((y - ey) / (r * 0.18)).powi(2) <= 1.0,
-                    [0.8, 0.8, 0.78, 0.22],
-                );
+                c.solid(|x, y| ((x - ex) / r).powi(2) + ((y - ey) / (r * 0.18)).powi(2) <= 1.0, [0.8, 0.8, 0.78, 0.22]);
             }
         }
         // tail surfaces and fins
-        c.fill(
-            |x, y| tp.contains(cx, x, y),
-            |x, y| tp.shade(cx, x, y),
-            rgb(green_w),
-        );
+        c.fill(|x, y| tp.contains(cx, x, y), |x, y| tp.shade(cx, x, y), rgb(green_w));
         c.solid(
             |x, y| {
                 let t = (x - cx).abs() / tp.half_span;
@@ -793,20 +596,12 @@ impl Bomber {
             [0.0, 0.0, 0.0, 0.25],
         );
         // wings, with floats under the tips of a flying boat
-        c.fill(
-            |x, y| wing.contains(cx, x, y),
-            |x, y| wing.shade(cx, x, y),
-            rgb(green_w),
-        );
+        c.fill(|x, y| wing.contains(cx, x, y), |x, y| wing.shade(cx, x, y), rgb(green_w));
         if self.floats {
             for sgn in [-1.0f32, 1.0] {
                 let (fx, fy) = (cx + sgn * 0.84 * hs, (le(0.84) + te(0.84)) / 2.0);
                 c.solid(
-                    |x, y| {
-                        ((x - fx) / (self.cowl * 0.8)).powi(2)
-                            + ((y - fy) / (self.cowl * 2.4)).powi(2)
-                            <= 1.0
-                    },
+                    |x, y| ((x - fx) / (self.cowl * 0.8)).powi(2) + ((y - fy) / (self.cowl * 2.4)).powi(2) <= 1.0,
                     [0.55, 0.6, 0.52, 1.0],
                 );
             }
@@ -815,10 +610,7 @@ impl Bomber {
         let line = [0.0, 0.0, 0.0, 0.18];
         for k in 1..8 {
             let t = k as f32 / 8.0;
-            c.solid(
-                |x, y| ((x - cx).abs() / hs - t).abs() * hs < 0.35 && wing.contains(cx, x, y),
-                line,
-            );
+            c.solid(|x, y| ((x - cx).abs() / hs - t).abs() * hs < 0.35 && wing.contains(cx, x, y), line);
         }
         c.solid(
             |x, y| {
@@ -830,9 +622,7 @@ impl Bomber {
         c.solid(
             |x, y| {
                 let t = (x - cx).abs() / hs;
-                (y - (te(t) - (te(t) - le(t)) * 0.25)).abs() < 0.4
-                    && t > 0.12
-                    && wing.contains(cx, x, y)
+                (y - (te(t) - (te(t) - le(t)) * 0.25)).abs() < 0.4 && t > 0.12 && wing.contains(cx, x, y)
             },
             [0.0, 0.0, 0.0, 0.28],
         );
@@ -851,18 +641,14 @@ impl Bomber {
                 let (y0, y1) = (le(t) - self.cowl * 1.3, le(t) + self.nacelle_len);
                 c.fill(
                     |x, y| {
-                        y > y0
-                            && y < y1
-                            && ((x - ex).abs() / self.cowl)
-                                <= (1.0 - ((y - y0) / (y1 - y0)).powi(3) * 0.7)
+                        y > y0 && y < y1 && ((x - ex).abs() / self.cowl) <= (1.0 - ((y - y0) / (y1 - y0)).powi(3) * 0.7)
                     },
                     |x, _| 0.7 + 0.4 * (1.0 - ((x - ex) / self.cowl).powi(2)).max(0.0).sqrt(),
                     rgb(green),
                 );
                 c.solid(
                     |x, y| {
-                        ((x - ex) / self.cowl).powi(2)
-                            + ((y - y0 - self.cowl * 0.3) / (self.cowl * 0.45)).powi(2)
+                        ((x - ex) / self.cowl).powi(2) + ((y - y0 - self.cowl * 0.3) / (self.cowl * 0.45)).powi(2)
                             <= 1.0
                     },
                     [0.12, 0.12, 0.13, 1.0],
@@ -876,11 +662,7 @@ impl Bomber {
                     [0.5, 0.45, 0.35, 1.0],
                 );
                 c.solid(
-                    |x, y| {
-                        y > y1 - 1.0
-                            && y < y1 + self.nacelle_len * 0.18
-                            && (x - ex).abs() < self.cowl * 0.3
-                    },
+                    |x, y| y > y1 - 1.0 && y < y1 + self.nacelle_len * 0.18 && (x - ex).abs() < self.cowl * 0.3,
                     [0.08, 0.07, 0.06, 0.16],
                 );
             }
@@ -909,23 +691,14 @@ impl Bomber {
             rgb(green),
         );
         if self.hull {
-            c.solid(
-                |x, y| (x - cx).abs() < 0.5 && y > self.fus_widest && y < self.tail_y * 0.8,
-                [0.0, 0.0, 0.0, 0.2],
-            );
+            c.solid(|x, y| (x - cx).abs() < 0.5 && y > self.fus_widest && y < self.tail_y * 0.8, [0.0, 0.0, 0.0, 0.2]);
         }
         for k in 1..6 {
             let yb = self.tail_y * k as f32 / 6.0;
-            c.solid(
-                |x, y| (y - yb).abs() < 0.3 && (x - cx).abs() <= self.fuselage_half(y),
-                line,
-            );
+            c.solid(|x, y| (y - yb).abs() < 0.3 && (x - cx).abs() <= self.fuselage_half(y), line);
         }
         // glazed nose with its frames, then the cockpit
-        c.solid(
-            |x, y| y < self.nose_glaze && (x - cx).abs() <= self.fuselage_half(y) * 0.92,
-            [0.3, 0.42, 0.5, 1.0],
-        );
+        c.solid(|x, y| y < self.nose_glaze && (x - cx).abs() <= self.fuselage_half(y) * 0.92, [0.3, 0.42, 0.5, 1.0]);
         for k in 1..4 {
             let fy = self.nose_glaze * k as f32 / 4.0;
             c.solid(
@@ -933,10 +706,7 @@ impl Bomber {
                 [0.15, 0.18, 0.2, 0.9],
             );
         }
-        c.solid(
-            |x, y| y < self.nose_glaze && (x - cx).abs() < 0.3,
-            [0.15, 0.18, 0.2, 0.9],
-        );
+        c.solid(|x, y| y < self.nose_glaze && (x - cx).abs() < 0.3, [0.15, 0.18, 0.2, 0.9]);
         let (cy, cl) = (self.nose_glaze + self.fus_half * 1.6, self.fus_half * 1.1);
         c.solid(
             |x, y| ((x - cx) / (self.fus_half * 0.55)).powi(2) + ((y - cy) / cl).powi(2) <= 1.0,
@@ -959,24 +729,13 @@ impl Bomber {
             let dir = if back { 1.0 } else { -1.0 };
             for off in [-0.9f32, 0.9] {
                 c.solid(
-                    |x, y| {
-                        (x - gx - off).abs() < 0.45
-                            && (y - gy) * dir > 0.0
-                            && (y - gy).abs() < r * 2.4
-                    },
+                    |x, y| (x - gx - off).abs() < 0.45 && (y - gy) * dir > 0.0 && (y - gy).abs() < r * 2.4,
                     [0.08, 0.08, 0.08, 1.0],
                 );
             }
+            c.solid(|x, y| ((x - gx) / r).powi(2) + ((y - gy) / r).powi(2) <= 1.0, [0.35, 0.48, 0.56, 1.0]);
             c.solid(
-                |x, y| ((x - gx) / r).powi(2) + ((y - gy) / r).powi(2) <= 1.0,
-                [0.35, 0.48, 0.56, 1.0],
-            );
-            c.solid(
-                |x, y| {
-                    ((x - gx + r * 0.3) / (r * 0.35)).powi(2)
-                        + ((y - gy - r * 0.3) / (r * 0.35)).powi(2)
-                        <= 1.0
-                },
+                |x, y| ((x - gx + r * 0.3) / (r * 0.35)).powi(2) + ((y - gy - r * 0.3) / (r * 0.35)).powi(2) <= 1.0,
                 [0.85, 0.95, 1.0, 0.7],
             );
         }
@@ -1186,26 +945,13 @@ fn carrier_ship() -> Vec<u8> {
     let white = [0.92, 0.92, 0.88, 1.0];
     // the hull below the deck: a sharp bow and a rounded stern
     c.clip(0.0, 0.0, wf, 70.0);
-    c.solid(
-        |x, y| y > 2.0 && y < 70.0 && (x - cx).abs() < (y - 2.0) * 1.3,
-        hull,
-    );
+    c.solid(|x, y| y > 2.0 && y < 70.0 && (x - cx).abs() < (y - 2.0) * 1.3, hull);
     c.clip(0.0, stern - 20.0, wf, hf);
-    c.solid(
-        |x, y| {
-            y > stern - 20.0
-                && ((x - cx) / 72.0).powi(2) + ((y - (stern - 20.0)) / 36.0).powi(2) <= 1.0
-        },
-        hull,
-    );
+    c.solid(|x, y| y > stern - 20.0 && ((x - cx) / 72.0).powi(2) + ((y - (stern - 20.0)) / 36.0).powi(2) <= 1.0, hull);
     // sponsons and catwalks along both sides
     c.clip(0.0, 0.0, wf, hf);
     c.solid(
-        |x, y| {
-            y > bow + 30.0
-                && y < stern - 10.0
-                && ((x > dl - 9.0 && x < dl) || (x > dr && x < dr + 9.0))
-        },
+        |x, y| y > bow + 30.0 && y < stern - 10.0 && ((x > dl - 9.0 && x < dl) || (x > dr && x < dr + 9.0)),
         [0.3, 0.33, 0.37, 1.0],
     );
     for k in 0..90 {
@@ -1215,10 +961,7 @@ fn carrier_ship() -> Vec<u8> {
         }
         c.clip(0.0, y0 - 1.0, wf, y0 + 1.0);
         c.solid(
-            |x, y| {
-                (y - y0).abs() < 0.5
-                    && ((x - (dl - 8.0)).abs() < 0.6 || (x - (dr + 8.0)).abs() < 0.6)
-            },
+            |x, y| (y - y0).abs() < 0.5 && ((x - (dl - 8.0)).abs() < 0.6 || (x - (dr + 8.0)).abs() < 0.6),
             [0.62, 0.64, 0.66, 1.0],
         );
     }
@@ -1238,11 +981,7 @@ fn carrier_ship() -> Vec<u8> {
             // planking: a slightly different tone every strip, seams between
             let strip = ((x - cx + 80.0) / 2.6).floor();
             let tone = 0.94 + 0.06 * ((strip * 12.9898).sin() * 43758.5).fract();
-            let seam = if ((x - cx + 80.0) % 2.6) < 0.35 {
-                0.82
-            } else {
-                1.0
-            };
+            let seam = if ((x - cx + 80.0) % 2.6) < 0.35 { 0.82 } else { 1.0 };
             tone * seam
         },
         [0.29, 0.34, 0.42, 1.0],
@@ -1254,17 +993,11 @@ fn carrier_ship() -> Vec<u8> {
             break;
         }
         c.clip(0.0, y0 - 1.0, wf, y0 + 1.0);
-        c.solid(
-            |x, y| (y - y0).abs() < 0.35 && deck(x, y),
-            [0.55, 0.58, 0.62, 0.28],
-        );
+        c.solid(|x, y| (y - y0).abs() < 0.35 && deck(x, y), [0.55, 0.58, 0.62, 0.28]);
     }
     c.clip(0.0, bow - 2.0, wf, stern + 2.0);
     // deck edge lines
-    c.solid(
-        |x, y| deck(x, y) && (deck_half(y) - (x - cx).abs()) < 1.2,
-        [0.8, 0.8, 0.78, 0.8],
-    );
+    c.solid(|x, y| deck(x, y) && (deck_half(y) - (x - cx).abs()) < 1.2, [0.8, 0.8, 0.78, 0.8]);
     // elevators: centreline forward and aft, deck-edge to port
     for (y0, y1) in [(bow + 110.0, bow + 158.0), (stern - 196.0, stern - 148.0)] {
         c.clip(cx - 30.0, y0 - 2.0, cx + 30.0, y1 + 2.0);
@@ -1280,17 +1013,11 @@ fn carrier_ship() -> Vec<u8> {
             },
             [0.1, 0.12, 0.15, 0.9],
         );
-        c.solid(
-            |x, y| y > y0 + 1.0 && y < y1 - 1.0 && (x - cx).abs() < 24.0,
-            [0.0, 0.0, 0.0, 0.08],
-        );
+        c.solid(|x, y| y > y0 + 1.0 && y < y1 - 1.0 && (x - cx).abs() < 24.0, [0.0, 0.0, 0.0, 0.08]);
     }
     let (ey0, ey1) = (bow + 250.0, bow + 292.0);
     c.clip(0.0, ey0 - 2.0, dl + 2.0, ey1 + 2.0);
-    c.solid(
-        |x, y| y > ey0 && y < ey1 && x > dl - 20.0 && x < dl + 1.0,
-        [0.29, 0.34, 0.42, 1.0],
-    );
+    c.solid(|x, y| y > ey0 && y < ey1 && x > dl - 20.0 && x < dl + 1.0, [0.29, 0.34, 0.42, 1.0]);
     c.solid(
         |x, y| {
             y > ey0
@@ -1303,42 +1030,25 @@ fn carrier_ship() -> Vec<u8> {
     );
     // centreline: dashed white
     c.clip(cx - 2.0, bow, cx + 2.0, stern);
-    c.solid(
-        |x, y| {
-            (x - cx).abs() < 0.9 && y > bow + 50.0 && y < stern - 40.0 && ((y - bow) % 22.0) < 13.0
-        },
-        white,
-    );
+    c.solid(|x, y| (x - cx).abs() < 0.9 && y > bow + 50.0 && y < stern - 40.0 && ((y - bow) % 22.0) < 13.0, white);
     // catapult tracks at the bow
     for off in [-34.0f32, 34.0] {
         c.clip(cx + off - 2.0, bow, cx + off + 2.0, bow + 90.0);
-        c.solid(
-            |x, y| (x - cx - off).abs() < 0.6 && y > bow + 10.0 && y < bow + 84.0,
-            [0.08, 0.08, 0.1, 0.8],
-        );
+        c.solid(|x, y| (x - cx - off).abs() < 0.6 && y > bow + 10.0 && y < bow + 84.0, [0.08, 0.08, 0.1, 0.8]);
     }
     // arresting wires aft, with their sheaves at the deck edge
     for k in 0..9 {
         let y0 = stern - 130.0 + k as f32 * 10.0;
         c.clip(0.0, y0 - 2.0, wf, y0 + 2.0);
-        c.solid(
-            |x, y| (y - y0).abs() < 0.45 && deck(x, y) && (x - cx).abs() < 70.0,
-            [0.75, 0.76, 0.74, 0.8],
-        );
+        c.solid(|x, y| (y - y0).abs() < 0.45 && deck(x, y) && (x - cx).abs() < 70.0, [0.75, 0.76, 0.74, 0.8]);
         for sgn in [-1.0f32, 1.0] {
-            c.solid(
-                |x, y| ((x - cx - sgn * 70.0).powi(2) + (y - y0).powi(2)) < 2.2,
-                [0.12, 0.12, 0.12, 1.0],
-            );
+            c.solid(|x, y| ((x - cx - sgn * 70.0).powi(2) + (y - y0).powi(2)) < 2.2, [0.12, 0.12, 0.12, 1.0]);
         }
     }
     // barriers forward of the wires
     for y0 in [stern - 150.0, stern - 143.0] {
         c.clip(0.0, y0 - 2.0, wf, y0 + 2.0);
-        c.solid(
-            |x, y| (y - y0).abs() < 0.6 && deck(x, y) && (x - cx).abs() < 66.0,
-            [0.85, 0.75, 0.2, 0.8],
-        );
+        c.solid(|x, y| (y - y0).abs() < 0.6 && deck(x, y) && (x - cx).abs() < 66.0, [0.85, 0.75, 0.2, 0.8]);
     }
     // the hull number, "9", fore and aft
     let nine = |x: f32, y: f32, x0: f32, y0: f32| -> bool {
@@ -1358,79 +1068,33 @@ fn carrier_ship() -> Vec<u8> {
     c.solid(|x, y| nine(x, y, cx - 7.0, bow + 22.0), white);
     c.clip(cx - 10.0, stern - 34.0, cx + 10.0, stern - 4.0);
     // aft, turned round to read from astern
-    c.solid(
-        |x, y| {
-            nine(
-                cx * 2.0 - x,
-                (stern - 20.0) * 2.0 - y,
-                cx - 7.0,
-                stern - 32.0,
-            )
-        },
-        white,
-    );
+    c.solid(|x, y| nine(cx * 2.0 - x, (stern - 20.0) * 2.0 - y, cx - 7.0, stern - 32.0), white);
     // the island, to starboard, its shadow on the deck
     let (ix0, ix1, iy0, iy1) = (dr - 12.0, dr + 22.0, bow + 200.0, bow + 330.0);
     c.clip(ix0 - 8.0, iy0 - 4.0, ix1 + 2.0, iy1 + 8.0);
-    c.solid(
-        |x, y| x > ix0 - 6.0 && x < ix0 && y > iy0 + 6.0 && y < iy1 + 6.0,
-        [0.0, 0.0, 0.0, 0.25],
-    );
+    c.solid(|x, y| x > ix0 - 6.0 && x < ix0 && y > iy0 + 6.0 && y < iy1 + 6.0, [0.0, 0.0, 0.0, 0.25]);
     c.fill(
-        |x, y| {
-            x > ix0
-                && x < ix1
-                && y > iy0
-                && y < iy1
-                && !(y < iy0 + 20.0 && x < ix0 + (iy0 + 20.0 - y) * 0.5)
-        },
+        |x, y| x > ix0 && x < ix1 && y > iy0 && y < iy1 && !(y < iy0 + 20.0 && x < ix0 + (iy0 + 20.0 - y) * 0.5),
         |x, _| 0.85 + 0.25 * ((x - ix0) / (ix1 - ix0)),
         grey,
     );
     // bridge windows, the funnel with its soot, radar and mast
     c.solid(
-        |x, y| {
-            y > iy0 + 22.0
-                && y < iy0 + 25.0
-                && x > ix0 + 3.0
-                && x < ix1 - 3.0
-                && ((x - ix0) % 3.5) < 2.0
-        },
+        |x, y| y > iy0 + 22.0 && y < iy0 + 25.0 && x > ix0 + 3.0 && x < ix1 - 3.0 && ((x - ix0) % 3.5) < 2.0,
         [0.1, 0.14, 0.2, 1.0],
     );
     let (fx, fy) = ((ix0 + ix1) / 2.0 + 2.0, iy0 + 78.0);
-    c.solid(
-        |x, y| ((x - fx) / 10.0).powi(2) + ((y - fy) / 20.0).powi(2) <= 1.0,
-        [0.36, 0.38, 0.42, 1.0],
-    );
-    c.solid(
-        |x, y| ((x - fx) / 7.0).powi(2) + ((y - fy) / 16.0).powi(2) <= 1.0,
-        [0.06, 0.06, 0.07, 1.0],
-    );
+    c.solid(|x, y| ((x - fx) / 10.0).powi(2) + ((y - fy) / 20.0).powi(2) <= 1.0, [0.36, 0.38, 0.42, 1.0]);
+    c.solid(|x, y| ((x - fx) / 7.0).powi(2) + ((y - fy) / 16.0).powi(2) <= 1.0, [0.06, 0.06, 0.07, 1.0]);
     let (ry, rx) = (iy0 + 44.0, (ix0 + ix1) / 2.0);
     c.solid(
-        |x, y| {
-            (x - rx).abs() < 9.0
-                && (y - ry).abs() < 3.0
-                && (((x - rx + 9.0) % 2.0) < 0.6 || (y - ry).abs() > 2.4)
-        },
+        |x, y| (x - rx).abs() < 9.0 && (y - ry).abs() < 3.0 && (((x - rx + 9.0) % 2.0) < 0.6 || (y - ry).abs() > 2.4),
         [0.7, 0.72, 0.75, 1.0],
     );
-    c.solid(
-        |x, y| (x - rx).abs() < 0.6 && y > ry - 10.0 && y < ry + 30.0,
-        [0.2, 0.2, 0.22, 1.0],
-    );
-    c.solid(
-        |x, y| (y - (ry - 8.0)).abs() < 0.5 && (x - rx).abs() < 6.0,
-        [0.2, 0.2, 0.22, 1.0],
-    );
+    c.solid(|x, y| (x - rx).abs() < 0.6 && y > ry - 10.0 && y < ry + 30.0, [0.2, 0.2, 0.22, 1.0]);
+    c.solid(|x, y| (y - (ry - 8.0)).abs() < 0.5 && (x - rx).abs() < 6.0, [0.2, 0.2, 0.22, 1.0]);
     // twin 5-inch mounts, two forward of the island, two aft
-    for (my, fwd) in [
-        (iy0 - 36.0, true),
-        (iy0 - 16.0, true),
-        (iy1 + 12.0, false),
-        (iy1 + 32.0, false),
-    ] {
+    for (my, fwd) in [(iy0 - 36.0, true), (iy0 - 16.0, true), (iy1 + 12.0, false), (iy1 + 32.0, false)] {
         let mx = dr + 4.0;
         c.clip(mx - 12.0, my - 20.0, mx + 12.0, my + 20.0);
         let dir = if fwd { -1.0 } else { 1.0 };
@@ -1440,11 +1104,7 @@ fn carrier_ship() -> Vec<u8> {
                 [0.15, 0.15, 0.16, 1.0],
             );
         }
-        c.fill(
-            |x, y| ((x - mx) / 8.0).powi(2) + ((y - my) / 6.5).powi(2) <= 1.0,
-            |_, y| 1.1 - 0.02 * (y - my),
-            grey,
-        );
+        c.fill(|x, y| ((x - mx) / 8.0).powi(2) + ((y - my) / 6.5).powi(2) <= 1.0, |_, y| 1.1 - 0.02 * (y - my), grey);
     }
     // 40 mm quad mounts in the sponsons and at bow and stern
     let quads = [
@@ -1462,16 +1122,10 @@ fn carrier_ship() -> Vec<u8> {
     ];
     for (qx, qy) in quads {
         c.clip(qx - 8.0, qy - 10.0, qx + 8.0, qy + 8.0);
-        c.solid(
-            |x, y| ((x - qx).powi(2) + (y - qy).powi(2)) < 20.0,
-            [0.4, 0.42, 0.45, 1.0],
-        );
+        c.solid(|x, y| ((x - qx).powi(2) + (y - qy).powi(2)) < 20.0, [0.4, 0.42, 0.45, 1.0]);
         for k in 0..4 {
             let bx = qx - 2.4 + k as f32 * 1.6;
-            c.solid(
-                |x, y| (x - bx).abs() < 0.35 && y < qy - 2.0 && y > qy - 8.0,
-                [0.12, 0.12, 0.13, 1.0],
-            );
+            c.solid(|x, y| (x - bx).abs() < 0.35 && y < qy - 2.0 && y > qy - 8.0, [0.12, 0.12, 0.13, 1.0]);
         }
     }
     // Hellcats spotted aft, wings folded back along their sides
@@ -1479,28 +1133,13 @@ fn carrier_ship() -> Vec<u8> {
         c.clip(px - 12.0, py - 16.0, px + 12.0, py + 16.0);
         let blue = [0.18, 0.25, 0.4, 1.0];
         c.solid(
-            |x, y| {
-                (y - py).abs() < 13.0
-                    && (x - px).abs() < 3.4 - ((y - py + 4.0) / 13.0).abs().powi(2) * 1.6
-            },
+            |x, y| (y - py).abs() < 13.0 && (x - px).abs() < 3.4 - ((y - py + 4.0) / 13.0).abs().powi(2) * 1.6,
             blue,
         );
-        c.solid(
-            |x, y| y > py - 7.0 && y < py + 9.0 && ((x - px).abs() - 5.5).abs() < 1.6,
-            [0.2, 0.28, 0.44, 1.0],
-        );
-        c.solid(
-            |x, y| y > py + 9.0 && y < py + 12.5 && (x - px).abs() < 7.0,
-            blue,
-        );
-        c.solid(
-            |x, y| ((x - px) / 1.6).powi(2) + ((y - py + 3.0) / 3.0).powi(2) <= 1.0,
-            [0.5, 0.65, 0.8, 0.9],
-        );
-        c.solid(
-            |x, y| ((x - px) / 3.2).powi(2) + ((y - py + 12.5) / 1.4).powi(2) <= 1.0,
-            [0.12, 0.12, 0.12, 1.0],
-        );
+        c.solid(|x, y| y > py - 7.0 && y < py + 9.0 && ((x - px).abs() - 5.5).abs() < 1.6, [0.2, 0.28, 0.44, 1.0]);
+        c.solid(|x, y| y > py + 9.0 && y < py + 12.5 && (x - px).abs() < 7.0, blue);
+        c.solid(|x, y| ((x - px) / 1.6).powi(2) + ((y - py + 3.0) / 3.0).powi(2) <= 1.0, [0.5, 0.65, 0.8, 0.9]);
+        c.solid(|x, y| ((x - px) / 3.2).powi(2) + ((y - py + 12.5) / 1.4).powi(2) <= 1.0, [0.12, 0.12, 0.12, 1.0]);
     };
     for (k, (dx, dy)) in [
         (-44.0f32, -104.0f32),
@@ -1673,13 +1312,7 @@ fn island_sprite(w: i32, h: i32, seed: u32) -> Vec<u8> {
                 let dark = n * 46.0;
                 (60.0 - dark * 0.5, 98.0 - dark, 50.0 - dark * 0.5)
             };
-            img.set(
-                x,
-                y,
-                r.max(20.0) as u8,
-                g.max(30.0) as u8,
-                b.max(18.0) as u8,
-            );
+            img.set(x, y, r.max(20.0) as u8, g.max(30.0) as u8, b.max(18.0) as u8);
         }
     }
 
@@ -1718,122 +1351,47 @@ fn island_sprite(w: i32, h: i32, seed: u32) -> Vec<u8> {
 
 /// Katakana glyphs needed for the seven boss names, 10 wide x 12 tall.
 const KATAKANA_CHARS: [char; 37] = [
-    'ス', 'カ', 'ウ', 'ト', 'ボ', 'マ', 'ー', 'イ', 'ン', 'タ', 'セ', 'プ', 'ガ', 'シ', 'ッ', 'ド',
-    'レ', 'ノ', 'バ', 'ル', 'ク', 'ザ', 'ゥ', 'ム', 'キ', 'ャ', 'リ', 'ア', 'ペ', 'デ', 'ロ', 'ヤ',
-    'ュ', 'ヒ', 'テ', 'コ', 'フ',
+    'ス', 'カ', 'ウ', 'ト', 'ボ', 'マ', 'ー', 'イ', 'ン', 'タ', 'セ', 'プ', 'ガ', 'シ', 'ッ', 'ド', 'レ', 'ノ', 'バ',
+    'ル', 'ク', 'ザ', 'ゥ', 'ム', 'キ', 'ャ', 'リ', 'ア', 'ペ', 'デ', 'ロ', 'ヤ', 'ュ', 'ヒ', 'テ', 'コ', 'フ',
 ];
 const KATAKANA_GLYPHS: [[u16; 12]; 37] = [
-    [
-        0x000, 0x000, 0x000, 0x0FC, 0x018, 0x008, 0x018, 0x038, 0x06C, 0x0C4, 0x080, 0x000,
-    ], // ス
-    [
-        0x000, 0x000, 0x020, 0x020, 0x0FC, 0x064, 0x024, 0x064, 0x044, 0x0DC, 0x098, 0x000,
-    ], // カ
-    [
-        0x000, 0x000, 0x020, 0x030, 0x0FC, 0x084, 0x084, 0x00C, 0x018, 0x030, 0x020, 0x000,
-    ], // ウ
-    [
-        0x000, 0x000, 0x000, 0x060, 0x060, 0x070, 0x07C, 0x06C, 0x060, 0x060, 0x020, 0x000,
-    ], // ト
-    [
-        0x000, 0x000, 0x006, 0x034, 0x0FC, 0x030, 0x030, 0x0B4, 0x1B6, 0x030, 0x060, 0x000,
-    ], // ボ
-    [
-        0x000, 0x000, 0x000, 0x0FC, 0x0FE, 0x00C, 0x048, 0x078, 0x030, 0x018, 0x008, 0x000,
-    ], // マ
-    [
-        0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x0FC, 0x000, 0x000, 0x000, 0x000, 0x000,
-    ], // ー
-    [
-        0x000, 0x000, 0x000, 0x00C, 0x018, 0x030, 0x0F0, 0x090, 0x010, 0x010, 0x010, 0x000,
-    ], // イ
-    [
-        0x000, 0x000, 0x000, 0x0C0, 0x060, 0x006, 0x004, 0x00C, 0x038, 0x0E0, 0x0C0, 0x000,
-    ], // ン
-    [
-        0x000, 0x000, 0x020, 0x03C, 0x07C, 0x0CC, 0x0B8, 0x018, 0x03C, 0x060, 0x040, 0x000,
-    ], // タ
-    [
-        0x000, 0x000, 0x000, 0x040, 0x07C, 0x1FC, 0x0CC, 0x048, 0x040, 0x07C, 0x03C, 0x000,
-    ], // セ
-    [
-        0x000, 0x000, 0x006, 0x0FE, 0x0FC, 0x00C, 0x008, 0x018, 0x010, 0x070, 0x040, 0x000,
-    ], // プ
-    [
-        0x000, 0x000, 0x026, 0x024, 0x0FC, 0x07C, 0x024, 0x064, 0x044, 0x0DC, 0x098, 0x000,
-    ], // ガ
-    [
-        0x000, 0x000, 0x000, 0x060, 0x020, 0x084, 0x0C4, 0x00C, 0x038, 0x0F0, 0x0C0, 0x000,
-    ], // シ
-    [
-        0x000, 0x000, 0x000, 0x000, 0x000, 0x0A4, 0x0D4, 0x00C, 0x008, 0x030, 0x060, 0x000,
-    ], // ッ
-    [
-        0x000, 0x000, 0x000, 0x04C, 0x040, 0x060, 0x078, 0x04C, 0x040, 0x040, 0x040, 0x000,
-    ], // ド
-    [
-        0x000, 0x000, 0x000, 0x0C0, 0x0C0, 0x0C0, 0x0C4, 0x0CC, 0x0D8, 0x0F0, 0x040, 0x000,
-    ], // レ
-    [
-        0x000, 0x000, 0x000, 0x00C, 0x008, 0x008, 0x018, 0x030, 0x060, 0x0C0, 0x000, 0x000,
-    ], // ノ
-    [
-        0x000, 0x000, 0x006, 0x00C, 0x048, 0x048, 0x04C, 0x0C4, 0x084, 0x186, 0x000, 0x000,
-    ], // バ
-    [
-        0x000, 0x000, 0x000, 0x050, 0x050, 0x050, 0x050, 0x052, 0x0DC, 0x098, 0x010, 0x000,
-    ], // ル
-    [
-        0x000, 0x000, 0x020, 0x030, 0x07C, 0x0CC, 0x08C, 0x018, 0x010, 0x070, 0x040, 0x000,
-    ], // ク
-    [
-        0x000, 0x000, 0x000, 0x04C, 0x0FC, 0x1FC, 0x048, 0x048, 0x018, 0x010, 0x020, 0x000,
-    ], // ザ
-    [
-        0x000, 0x000, 0x000, 0x000, 0x030, 0x0FC, 0x0CC, 0x08C, 0x008, 0x018, 0x030, 0x000,
-    ], // ゥ
-    [
-        0x000, 0x000, 0x000, 0x020, 0x020, 0x060, 0x048, 0x04C, 0x0CC, 0x1FE, 0x000, 0x000,
-    ], // ム
-    [
-        0x000, 0x000, 0x020, 0x020, 0x0FC, 0x0F0, 0x03C, 0x0FC, 0x0B0, 0x010, 0x010, 0x000,
-    ], // キ
-    [
-        0x000, 0x000, 0x000, 0x000, 0x040, 0x07C, 0x0FC, 0x028, 0x020, 0x020, 0x030, 0x000,
-    ], // ャ
-    [
-        0x000, 0x000, 0x000, 0x0CC, 0x0CC, 0x0CC, 0x0CC, 0x008, 0x008, 0x038, 0x020, 0x000,
-    ], // リ
-    [
-        0x000, 0x000, 0x000, 0x0FE, 0x004, 0x03C, 0x038, 0x020, 0x020, 0x060, 0x040, 0x000,
-    ], // ア
-    [
-        0x000, 0x000, 0x000, 0x004, 0x06C, 0x070, 0x0D8, 0x18C, 0x004, 0x006, 0x000, 0x000,
-    ], // ペ
-    [
-        0x000, 0x000, 0x006, 0x0FC, 0x000, 0x0FC, 0x0FC, 0x030, 0x020, 0x060, 0x040, 0x000,
-    ], // デ
-    [
-        0x000, 0x000, 0x000, 0x0FC, 0x0FC, 0x084, 0x084, 0x084, 0x084, 0x0FC, 0x084, 0x000,
-    ], // ロ
-    [
-        0x000, 0x000, 0x040, 0x044, 0x07C, 0x1EC, 0x068, 0x020, 0x020, 0x030, 0x030, 0x000,
-    ], // ヤ
-    [
-        0x000, 0x000, 0x000, 0x000, 0x000, 0x0F8, 0x018, 0x018, 0x018, 0x1FC, 0x000, 0x000,
-    ], // ュ
-    [
-        0x000, 0x000, 0x080, 0x080, 0x08C, 0x0F0, 0x080, 0x080, 0x080, 0x0FE, 0x07E, 0x000,
-    ], // ヒ
-    [
-        0x000, 0x000, 0x078, 0x000, 0x1FE, 0x030, 0x030, 0x030, 0x060, 0x0C0, 0x000, 0x000,
-    ], // テ
-    [
-        0x000, 0x000, 0x000, 0x0FC, 0x00C, 0x00C, 0x00C, 0x00C, 0x0FC, 0x000, 0x000, 0x000,
-    ], // コ
-    [
-        0x000, 0x000, 0x000, 0x1FC, 0x00C, 0x00C, 0x018, 0x030, 0x060, 0x0C0, 0x000, 0x000,
-    ], // フ
+    [0x000, 0x000, 0x000, 0x0FC, 0x018, 0x008, 0x018, 0x038, 0x06C, 0x0C4, 0x080, 0x000], // ス
+    [0x000, 0x000, 0x020, 0x020, 0x0FC, 0x064, 0x024, 0x064, 0x044, 0x0DC, 0x098, 0x000], // カ
+    [0x000, 0x000, 0x020, 0x030, 0x0FC, 0x084, 0x084, 0x00C, 0x018, 0x030, 0x020, 0x000], // ウ
+    [0x000, 0x000, 0x000, 0x060, 0x060, 0x070, 0x07C, 0x06C, 0x060, 0x060, 0x020, 0x000], // ト
+    [0x000, 0x000, 0x006, 0x034, 0x0FC, 0x030, 0x030, 0x0B4, 0x1B6, 0x030, 0x060, 0x000], // ボ
+    [0x000, 0x000, 0x000, 0x0FC, 0x0FE, 0x00C, 0x048, 0x078, 0x030, 0x018, 0x008, 0x000], // マ
+    [0x000, 0x000, 0x000, 0x000, 0x000, 0x000, 0x0FC, 0x000, 0x000, 0x000, 0x000, 0x000], // ー
+    [0x000, 0x000, 0x000, 0x00C, 0x018, 0x030, 0x0F0, 0x090, 0x010, 0x010, 0x010, 0x000], // イ
+    [0x000, 0x000, 0x000, 0x0C0, 0x060, 0x006, 0x004, 0x00C, 0x038, 0x0E0, 0x0C0, 0x000], // ン
+    [0x000, 0x000, 0x020, 0x03C, 0x07C, 0x0CC, 0x0B8, 0x018, 0x03C, 0x060, 0x040, 0x000], // タ
+    [0x000, 0x000, 0x000, 0x040, 0x07C, 0x1FC, 0x0CC, 0x048, 0x040, 0x07C, 0x03C, 0x000], // セ
+    [0x000, 0x000, 0x006, 0x0FE, 0x0FC, 0x00C, 0x008, 0x018, 0x010, 0x070, 0x040, 0x000], // プ
+    [0x000, 0x000, 0x026, 0x024, 0x0FC, 0x07C, 0x024, 0x064, 0x044, 0x0DC, 0x098, 0x000], // ガ
+    [0x000, 0x000, 0x000, 0x060, 0x020, 0x084, 0x0C4, 0x00C, 0x038, 0x0F0, 0x0C0, 0x000], // シ
+    [0x000, 0x000, 0x000, 0x000, 0x000, 0x0A4, 0x0D4, 0x00C, 0x008, 0x030, 0x060, 0x000], // ッ
+    [0x000, 0x000, 0x000, 0x04C, 0x040, 0x060, 0x078, 0x04C, 0x040, 0x040, 0x040, 0x000], // ド
+    [0x000, 0x000, 0x000, 0x0C0, 0x0C0, 0x0C0, 0x0C4, 0x0CC, 0x0D8, 0x0F0, 0x040, 0x000], // レ
+    [0x000, 0x000, 0x000, 0x00C, 0x008, 0x008, 0x018, 0x030, 0x060, 0x0C0, 0x000, 0x000], // ノ
+    [0x000, 0x000, 0x006, 0x00C, 0x048, 0x048, 0x04C, 0x0C4, 0x084, 0x186, 0x000, 0x000], // バ
+    [0x000, 0x000, 0x000, 0x050, 0x050, 0x050, 0x050, 0x052, 0x0DC, 0x098, 0x010, 0x000], // ル
+    [0x000, 0x000, 0x020, 0x030, 0x07C, 0x0CC, 0x08C, 0x018, 0x010, 0x070, 0x040, 0x000], // ク
+    [0x000, 0x000, 0x000, 0x04C, 0x0FC, 0x1FC, 0x048, 0x048, 0x018, 0x010, 0x020, 0x000], // ザ
+    [0x000, 0x000, 0x000, 0x000, 0x030, 0x0FC, 0x0CC, 0x08C, 0x008, 0x018, 0x030, 0x000], // ゥ
+    [0x000, 0x000, 0x000, 0x020, 0x020, 0x060, 0x048, 0x04C, 0x0CC, 0x1FE, 0x000, 0x000], // ム
+    [0x000, 0x000, 0x020, 0x020, 0x0FC, 0x0F0, 0x03C, 0x0FC, 0x0B0, 0x010, 0x010, 0x000], // キ
+    [0x000, 0x000, 0x000, 0x000, 0x040, 0x07C, 0x0FC, 0x028, 0x020, 0x020, 0x030, 0x000], // ャ
+    [0x000, 0x000, 0x000, 0x0CC, 0x0CC, 0x0CC, 0x0CC, 0x008, 0x008, 0x038, 0x020, 0x000], // リ
+    [0x000, 0x000, 0x000, 0x0FE, 0x004, 0x03C, 0x038, 0x020, 0x020, 0x060, 0x040, 0x000], // ア
+    [0x000, 0x000, 0x000, 0x004, 0x06C, 0x070, 0x0D8, 0x18C, 0x004, 0x006, 0x000, 0x000], // ペ
+    [0x000, 0x000, 0x006, 0x0FC, 0x000, 0x0FC, 0x0FC, 0x030, 0x020, 0x060, 0x040, 0x000], // デ
+    [0x000, 0x000, 0x000, 0x0FC, 0x0FC, 0x084, 0x084, 0x084, 0x084, 0x0FC, 0x084, 0x000], // ロ
+    [0x000, 0x000, 0x040, 0x044, 0x07C, 0x1EC, 0x068, 0x020, 0x020, 0x030, 0x030, 0x000], // ヤ
+    [0x000, 0x000, 0x000, 0x000, 0x000, 0x0F8, 0x018, 0x018, 0x018, 0x1FC, 0x000, 0x000], // ュ
+    [0x000, 0x000, 0x080, 0x080, 0x08C, 0x0F0, 0x080, 0x080, 0x080, 0x0FE, 0x07E, 0x000], // ヒ
+    [0x000, 0x000, 0x078, 0x000, 0x1FE, 0x030, 0x030, 0x030, 0x060, 0x0C0, 0x000, 0x000], // テ
+    [0x000, 0x000, 0x000, 0x0FC, 0x00C, 0x00C, 0x00C, 0x00C, 0x0FC, 0x000, 0x000, 0x000], // コ
+    [0x000, 0x000, 0x000, 0x1FC, 0x00C, 0x00C, 0x018, 0x030, 0x060, 0x0C0, 0x000, 0x000], // フ
 ];
 
 /// The seven boss aircraft's Japanese names, in katakana, in the order of
@@ -1874,13 +1432,7 @@ fn katakana_image(text: &[char], scale: u32) -> Image {
                 }
                 for sy in 0..scale {
                     for sx in 0..scale {
-                        img.set(
-                            (ox + col * scale + sx) as i32,
-                            (row * scale + sy) as i32,
-                            255,
-                            255,
-                            255,
-                        );
+                        img.set((ox + col * scale + sx) as i32, (row * scale + sy) as i32, 255, 255, 255);
                     }
                 }
             }
@@ -1898,15 +1450,21 @@ fn title_backdrop(clouds: &[Vec<u8>; 3]) -> Vec<u8> {
     let mut image = Image::new(480, 540);
     for y in 0..540 {
         let t = (((y as f32 + 0.5) * 14.0 / 540.0).floor() / 13.0).min(1.0);
-        let color = (((0.10 - 0.07 * t) * 255.0) as u8,
-            ((0.24 - 0.13 * t) * 255.0) as u8, ((0.46 - 0.16 * t) * 255.0) as u8);
-        for x in 0..480 { image.set(x, y, color.0, color.1, color.2); }
+        let color =
+            (((0.10 - 0.07 * t) * 255.0) as u8, ((0.24 - 0.13 * t) * 255.0) as u8, ((0.46 - 0.16 * t) * 255.0) as u8);
+        for x in 0..480 {
+            image.set(x, y, color.0, color.1, color.2);
+        }
     }
     for row in -1..20 {
         let y = row as f32 * 30.0;
         let depth = (y / 540.0).clamp(0.0, 1.0);
-        let color = [((0.55 + depth * 0.15) * 255.0) as u8,
-            ((0.72 + depth * 0.12) * 255.0) as u8, 235, ((0.22 + depth * 0.30) * 255.0) as u8];
+        let color = [
+            ((0.55 + depth * 0.15) * 255.0) as u8,
+            ((0.72 + depth * 0.12) * 255.0) as u8,
+            235,
+            ((0.22 + depth * 0.30) * 255.0) as u8,
+        ];
         let wave = |x: f32| y + (x * 0.045 + y * 0.05).sin() * 3.2 + (x * 0.11 - y * 0.14).sin() * 1.1;
         for segment in 0..12 {
             let x = segment as f32 * 40.0;
@@ -1920,8 +1478,12 @@ fn title_backdrop(clouds: &[Vec<u8>; 3]) -> Vec<u8> {
         let twinkle = seed.sin() * 0.5 + 0.5;
         let (radius, alpha) = if distance < 60.0 {
             (1.9 - distance / 60.0, (0.55 + twinkle * 0.35) * (1.0 - distance / 60.0))
-        } else { (1.1, 0.20 + twinkle * 0.10) };
-        if radius > 0.2 { image.circle(x, y, radius, [217, 240, 255, (alpha * 255.0) as u8]); }
+        } else {
+            (1.1, 0.20 + twinkle * 0.10)
+        };
+        if radius > 0.2 {
+            image.circle(x, y, radius, [217, 240, 255, (alpha * 255.0) as u8]);
+        }
     }
     for i in 0..8 {
         let (x, y) = ((i as f32 * 71.0) % 480.0, (i as f32 * 53.0) % 540.0);
@@ -1934,7 +1496,11 @@ fn title_backdrop(clouds: &[Vec<u8>; 3]) -> Vec<u8> {
         let radius = if i % 3 != 0 { 22.0 } else { 36.0 };
         image.blit(&decoded[i % 3], x - radius * 1.8, y - radius * 0.85, radius * 3.6, radius * 1.7);
     }
-    for y in 0..540 { for x in 0..480 { image.blend(x, y, [3, 6, 20, 97]); } }
+    for y in 0..540 {
+        for x in 0..480 {
+            image.blend(x, y, [3, 6, 20, 97]);
+        }
+    }
     image.encode_png()
 }
 
@@ -1969,18 +1535,9 @@ pub fn generate() -> Vec<Asset> {
         ("images/cloud_1.png", cloud1),
         ("images/cloud_2.png", cloud2),
         ("images/cloud_3.png", cloud3),
-        (
-            "images/island_small.png",
-            island_sprite(ISLAND_SIZES[0].0, ISLAND_SIZES[0].1, 0x9A17_1DE0),
-        ),
-        (
-            "images/island_medium.png",
-            island_sprite(ISLAND_SIZES[1].0, ISLAND_SIZES[1].1, 0x9A17_2DE0),
-        ),
-        (
-            "images/island_large.png",
-            island_sprite(ISLAND_SIZES[2].0, ISLAND_SIZES[2].1, 0x9A17_3DE0),
-        ),
+        ("images/island_small.png", island_sprite(ISLAND_SIZES[0].0, ISLAND_SIZES[0].1, 0x9A17_1DE0)),
+        ("images/island_medium.png", island_sprite(ISLAND_SIZES[1].0, ISLAND_SIZES[1].1, 0x9A17_2DE0)),
+        ("images/island_large.png", island_sprite(ISLAND_SIZES[2].0, ISLAND_SIZES[2].1, 0x9A17_3DE0)),
     ]
 }
 
@@ -1997,7 +1554,11 @@ mod tests {
     fn luminance((r, g, b): (u8, u8, u8)) -> f64 {
         fn channel(v: u8) -> f64 {
             let c = v as f64 / 255.0;
-            if c <= 0.04045 { c / 12.92 } else { ((c + 0.055) / 1.055).powf(2.4) }
+            if c <= 0.04045 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
         }
         0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
     }
@@ -2051,9 +1612,8 @@ mod tests {
         for a in 0..colors.len() {
             for b in (a + 1)..colors.len() {
                 let (x, y) = (colors[a], colors[b]);
-                let far_apart = (x.0 as i32 - y.0 as i32).abs()
-                    + (x.1 as i32 - y.1 as i32).abs()
-                    + (x.2 as i32 - y.2 as i32).abs();
+                let far_apart =
+                    (x.0 as i32 - y.0 as i32).abs() + (x.1 as i32 - y.1 as i32).abs() + (x.2 as i32 - y.2 as i32).abs();
                 assert!(
                     far_apart >= 120,
                     "enemy kinds {a} and {b} are within {far_apart} of each other — lifting them \

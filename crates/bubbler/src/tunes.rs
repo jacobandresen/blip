@@ -84,24 +84,10 @@ fn theme(bpm: f32) -> Vec<u8> {
                 while k + len < 8 && lead[b][k + len] == H {
                     len += 1;
                 }
-                note(
-                    &mut buf,
-                    b0 + k * eighth,
-                    len * eighth - eighth / 6,
-                    n - 12,
-                    0.30,
-                    Voice::Lead,
-                );
+                note(&mut buf, b0 + k * eighth, len * eighth - eighth / 6, n - 12, 0.30, Voice::Lead);
                 // a harmony a third below in the second half, bell-soft
                 if b >= 8 {
-                    note(
-                        &mut buf,
-                        b0 + k * eighth,
-                        len * eighth,
-                        n - 16,
-                        0.10,
-                        Voice::Bell,
-                    );
+                    note(&mut buf, b0 + k * eighth, len * eighth, n - 16, 0.10, Voice::Bell);
                 }
                 k += len;
             } else {
@@ -113,26 +99,12 @@ fn theme(bpm: f32) -> Vec<u8> {
             let h0 = b0 + half * 4 * eighth;
             // bass: root, octave, fifth, octave
             for (s, off) in [0, 12, 7, 12].iter().enumerate() {
-                note(
-                    &mut buf,
-                    h0 + s * eighth,
-                    eighth - eighth / 4,
-                    root + off,
-                    0.34,
-                    Voice::Bass,
-                );
+                note(&mut buf, h0 + s * eighth, eighth - eighth / 4, root + off, 0.34, Voice::Bass);
             }
             // arpeggio in sixteenths, an octave above middle
             for s in 0..8 {
                 let n = root + 12 + iv[s % 3] + if s % 6 >= 3 { 12 } else { 0 };
-                note(
-                    &mut buf,
-                    h0 + s * eighth / 2,
-                    eighth / 2,
-                    n,
-                    0.06,
-                    Voice::Arp,
-                );
+                note(&mut buf, h0 + s * eighth / 2, eighth / 2, n, 0.06, Voice::Arp);
             }
         }
         // drums
@@ -149,12 +121,7 @@ fn theme(bpm: f32) -> Vec<u8> {
         if b % 4 == 3 {
             // a snare fill into the next phrase
             for s in 0..4 {
-                snare(
-                    &mut buf,
-                    b0 + 6 * eighth + s * eighth / 2,
-                    &mut rng,
-                    0.14 + 0.05 * s as f32,
-                );
+                snare(&mut buf, b0 + 6 * eighth + s * eighth / 2, &mut rng, 0.14 + 0.05 * s as f32);
             }
             kick(&mut buf, b0 + 7 * eighth, 0.4);
         }
@@ -181,14 +148,8 @@ pub fn jingle_wav(which: usize) -> Vec<u8> {
         0 => (&[72, 76, 79, 84, H, 79, 84, H], 0.09),
         1 => (&[79, 84, 88, 91, H, 88, 91, 96, H, H], 0.085),
         2 => (&[84, 83, 84, 83, 84, 83, 84, 83, 91, H], 0.06),
-        3 => (
-            &[72, H, 71, H, 69, H, 67, H, 65, H, 64, H, 60, H, H, H],
-            0.13,
-        ),
-        _ => (
-            &[72, 76, 79, 84, 79, 84, 88, 91, H, 88, 91, 96, H, H, H, H],
-            0.1,
-        ),
+        3 => (&[72, H, 71, H, 69, H, 67, H, 65, H, 64, H, 60, H, H, H], 0.13),
+        _ => (&[72, 76, 79, 84, 79, 84, 88, 91, H, 88, 91, 96, H, H, H, H], 0.1),
     };
     blip::cosy::jingle(notes, step)
 }
@@ -201,13 +162,23 @@ pub fn sounds() -> Vec<Asset> {
 }
 
 const JINGLE_PATHS: [&str; 5] = [
-    "sounds/jingle_round.wav", "sounds/jingle_clear.wav", "sounds/jingle_hurry.wav",
-    "sounds/jingle_over.wav", "sounds/jingle_won.wav",
+    "sounds/jingle_round.wav",
+    "sounds/jingle_clear.wav",
+    "sounds/jingle_hurry.wav",
+    "sounds/jingle_over.wav",
+    "sounds/jingle_won.wav",
 ];
 
 const SOUND_PATHS: [&str; 9] = [
-    "sounds/blow.wav", "sounds/pop.wav", "sounds/trap.wav", "sounds/defeated.wav", "sounds/fruit.wav",
-    "sounds/jump.wav", "sounds/lost.wav", "sounds/bounce.wav", "sounds/sparkle.wav",
+    "sounds/blow.wav",
+    "sounds/pop.wav",
+    "sounds/trap.wav",
+    "sounds/defeated.wav",
+    "sounds/fruit.wav",
+    "sounds/jump.wav",
+    "sounds/lost.wav",
+    "sounds/bounce.wav",
+    "sounds/sparkle.wav",
 ];
 
 /// Effects. `which`: 0 blow a bubble, 1 pop, 2 trap an enemy, 3 an enemy
@@ -258,9 +229,7 @@ pub fn sfx_wav(which: usize) -> Vec<u8> {
             // fruit: a bell ding
             4 => {
                 ph += 1568.0 / SR;
-                ((2.0 * PI * ph).sin() + 0.4 * (2.0 * PI * ph * 2.0).sin())
-                    * (-t / 0.09).exp()
-                    * 0.6
+                ((2.0 * PI * ph).sin() + 0.4 * (2.0 * PI * ph * 2.0).sin()) * (-t / 0.09).exp() * 0.6
             }
             // jump: a springy upward sweep
             5 => {
@@ -288,13 +257,14 @@ pub fn sfx_wav(which: usize) -> Vec<u8> {
     let scaled: Vec<f32> = buf.iter().map(|v| v * 20_000.0).collect();
     let pcm = soft_limit_to_pcm16(&scaled, MIX_KNEE);
     // Fruit, bounce and sparkle are 39 dB or more quieter above 10 kHz.
-    if matches!(which, 4 | 7 | 8) { encode_pcm16_half(&pcm) } else { encode_pcm16_mono(&pcm) }
+    if matches!(which, 4 | 7 | 8) {
+        encode_pcm16_half(&pcm)
+    } else {
+        encode_pcm16_mono(&pcm)
+    }
 }
 
 /// The music: each tune as a WAV to play and an XM of its notes for TUNE.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::xm::tunes(&[
-        ("THEME", &theme_wav),
-        ("HURRY", &hurry_wav),
-    ])
+    blip::xm::tunes(&[("THEME", &theme_wav), ("HURRY", &hurry_wav)])
 }

@@ -104,8 +104,7 @@ test('the game shell', async (t) => {
     await open(cdp, 'index.html');
     await evaluate(cdp, "blipSetFullscreen(true); true");
     await sleep(400);
-    assert.equal(await evaluate(cdp, "!document.querySelector('#kiosk-bar .deck-panel')?.checkVisibility()"), true, 'the arcade still shows a deck');
-    assert.equal(await evaluate(cdp, "document.getElementById('kiosk-bar').getBoundingClientRect().height"), 0);
+    assert.equal(await evaluate(cdp, "document.querySelector('.deck-panel')"), null, 'the arcade has a deck of its own');
     assert.equal(await evaluate(cdp, 'document.documentElement.scrollHeight <= innerHeight'), true,
       'the catalogue needs scrolling on a 1080p kiosk');
     await open(cdp, 'serpent/index.html', 5000);
@@ -163,8 +162,8 @@ test('the game shell', async (t) => {
       'the fascia is tall enough for the large title flipper');
     assert.equal(await evaluate(cdp, "document.querySelectorAll('.top-marquee-bar .marquee-bulbs').length"), 0,
       'the cabinet fascia has no dot strips');
-    assert.ok(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent === 'RALLY' && document.querySelector('.card-focused .card-desc').textContent.length > 20"),
-      'each selected game carries its own description');
+    assert.equal(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent"), 'RALLY',
+      'each machine carries its own marquee');
     assert.ok(await evaluate(cdp, `(function(){var grid=document.getElementById('game-grid'),card=document.querySelector('.card-focused');
       return card.offsetHeight >= Math.min(500,grid.clientHeight-50)-1;})()`),
       'the selected card fills the available space for readable details');

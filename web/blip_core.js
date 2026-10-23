@@ -153,6 +153,14 @@ function blipOut(ctx) {
   _blipOut.gain.value = blipMuted() ? 0 : 1;
   return _blipOut;
 }
+/** A source of white noise `seconds` long, scaled by shape(t, p) (seconds in, share done) when given. */
+function blipNoise(ctx, seconds, shape) {
+  var buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * seconds), ctx.sampleRate), data = buffer.getChannelData(0);
+  for (var i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (shape ? shape(i / ctx.sampleRate, i / data.length) : 1);
+  var source = ctx.createBufferSource();
+  source.buffer = buffer;
+  return source;
+}
 function blipSetMuted(on) {
   try { localStorage.setItem('blip-mute', on ? '1' : '0'); } catch (e) {}
   if (typeof Howler !== 'undefined') Howler.mute(on);

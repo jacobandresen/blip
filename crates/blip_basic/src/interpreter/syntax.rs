@@ -27,11 +27,7 @@ pub(super) fn tokenize(source: &str) -> Result<Vec<Token>, String> {
                 i += 1;
             }
             out.push(Token::Num(
-                chars[start..i]
-                    .iter()
-                    .collect::<String>()
-                    .parse()
-                    .map_err(|_| "Bad number".to_string())?,
+                chars[start..i].iter().collect::<String>().parse().map_err(|_| "Bad number".to_string())?,
             ));
             continue;
         }
@@ -63,24 +59,13 @@ pub(super) fn tokenize(source: &str) -> Result<Vec<Token>, String> {
         if chars[i].is_ascii_alphabetic() || chars[i] == '_' {
             let start = i;
             i += 1;
-            while i < chars.len()
-                && (chars[i].is_ascii_alphanumeric() || chars[i] == '_' || chars[i] == '$')
-            {
+            while i < chars.len() && (chars[i].is_ascii_alphanumeric() || chars[i] == '_' || chars[i] == '$') {
                 i += 1;
             }
-            out.push(Token::Name(
-                chars[start..i]
-                    .iter()
-                    .collect::<String>()
-                    .to_ascii_uppercase(),
-            ));
+            out.push(Token::Name(chars[start..i].iter().collect::<String>().to_ascii_uppercase()));
             continue;
         }
-        let pair = if i + 1 < chars.len() {
-            format!("{}{}", chars[i], chars[i + 1])
-        } else {
-            String::new()
-        };
+        let pair = if i + 1 < chars.len() { format!("{}{}", chars[i], chars[i + 1]) } else { String::new() };
         if ["<=", ">=", "<>", "=="].contains(&pair.as_str()) {
             out.push(Token::Op(pair));
             i += 2;
@@ -122,13 +107,9 @@ fn split_top_level(source: &str, separator: char) -> Vec<String> {
         if separator == ':' {
             // THEN actions and comments both own the remainder of the line.
             let rest = source[start..].trim_start();
-            let keyword = rest
-                .split(|ch: char| ch.is_whitespace() || ch == ':')
-                .next();
+            let keyword = rest.split(|ch: char| ch.is_whitespace() || ch == ':').next();
             if rest.starts_with('\'')
-                || keyword.is_some_and(|word| {
-                    word.eq_ignore_ascii_case("REM") || word.eq_ignore_ascii_case("IF")
-                })
+                || keyword.is_some_and(|word| word.eq_ignore_ascii_case("REM") || word.eq_ignore_ascii_case("IF"))
             {
                 break;
             }
@@ -141,10 +122,7 @@ fn split_top_level(source: &str, separator: char) -> Vec<String> {
 }
 
 pub(super) fn split_statements(source: &str) -> Vec<String> {
-    split_top_level(source, ':')
-        .into_iter()
-        .filter(|part| !part.is_empty())
-        .collect()
+    split_top_level(source, ':').into_iter().filter(|part| !part.is_empty()).collect()
 }
 
 pub(super) fn split_args(source: &str) -> Vec<String> {
@@ -191,17 +169,13 @@ pub(super) fn method_call(command: &str) -> Option<(String, String)> {
         "draw_centered",
         "draw_hud",
     ];
-    methods
-        .contains(&name.as_str())
-        .then(|| (name, command[start + 1..command.len() - 1].to_string()))
+    methods.contains(&name.as_str()).then(|| (name, command[start + 1..command.len() - 1].to_string()))
 }
 pub(super) fn assignment_eq(source: &str) -> Option<usize> {
     let bytes = source.as_bytes();
     top_level(source).find_map(|(at, ch)| {
-        let comparison = bytes
-            .get(at.wrapping_sub(1))
-            .is_some_and(|ch| b"<>=".contains(ch))
-            || bytes.get(at + 1) == Some(&b'=');
+        let comparison =
+            bytes.get(at.wrapping_sub(1)).is_some_and(|ch| b"<>=".contains(ch)) || bytes.get(at + 1) == Some(&b'=');
         (ch == '=' && !comparison).then_some(at)
     })
 }
@@ -230,8 +204,14 @@ pub(super) fn matching_else(actions: &str) -> Option<usize> {
         let word = |w| top_level_word(rest, w).map(|at| at + from);
         let (next_if, next_else) = (word("IF"), word("ELSE")?);
         match next_if {
-            Some(at) if at < next_else => { nested += 1; from = at + 2; }
-            _ if nested > 0 => { nested -= 1; from = next_else + 4; }
+            Some(at) if at < next_else => {
+                nested += 1;
+                from = at + 2;
+            }
+            _ if nested > 0 => {
+                nested -= 1;
+                from = next_else + 4;
+            }
             _ => return Some(next_else),
         }
     }

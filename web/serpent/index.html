@@ -20,7 +20,7 @@
   <script>try{var l=JSON.parse(sessionStorage.getItem('blip-cabinet-launch')||'null');if(l&&Date.now()-l.at<15000){document.documentElement.setAttribute('data-launching','');setTimeout(function(){document.documentElement.removeAttribute('data-launching');},3000);}}catch(e){}</script>
   <style>:root[data-launching] body{visibility:hidden}</style>
   <script src="../howler.min.js"></script>
-  <script src="../blip_core.js?v=7"></script>
+  <script src="../blip_core.js?v=8"></script>
   <script>(function () {
     var g = blipGameFromPath(location.pathname);
     if (!g) return;
@@ -28,9 +28,9 @@
     document.title = name + ' \u00b7 BLIP';
     document.querySelector('meta[name=apple-mobile-web-app-title]').content = name;
   }());</script>
-  <script src="../kiosk.js?v=100"></script>
+  <script src="../kiosk.js?v=101"></script>
   <link rel="stylesheet" href="../marquee.css?v=1">
-  <link rel="stylesheet" href="../kiosk.css?v=156">
+  <link rel="stylesheet" href="../kiosk.css?v=158">
   <link rel="stylesheet" href="../shell.css?v=109">
   <link rel="stylesheet" href="../wear.css?v=13">
   <script>if (document.documentElement.hasAttribute('data-appstyle')) document.querySelector('link[href*="wear.css"]').disabled = true;</script>
@@ -67,7 +67,7 @@
    </div>
 
   </div>
-  <script src="../deck.js?v=15"></script>
+  <script src="../deck.js?v=16"></script>
 
   <div id="need-coin-overlay">
     <div class="nco-panel">
@@ -87,11 +87,11 @@
   <div class="cabinet-glass"></div>
   <canvas id="glcanvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
 
-  <script src="../blip_controller.js?v=11"></script>
+  <script src="../blip_controller.js?v=12"></script>
   <script src="../vendor/supabase.js?v=1"></script>
   <script src="../blip_config.js?v=1"></script>
   <script src="../blip_scores.js?v=9"></script>
-  <script src="../shell.js?v=133"></script>
+  <script src="../shell.js?v=137"></script>
   <script src="../mq_js_bundle.js?v=1"></script>
   <script src="../howler_audio_plugin.js"></script>
   <script src="../blip_bridge.js?v=20"></script>

@@ -3,14 +3,14 @@
 use std::f32::consts::PI;
 
 use blip::input::{
-    btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
+    coin_start, play_again, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
     BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::texture::Texture2D;
 use blip::{
     GAME_OVER_MIN_WAIT, hsv,
     Jukebox, pool_iter, pool_iter_mut, pool_spawn, play_sfx, rand_int, rand_range_f32, web, window_conf, Blip, Fx,
-    BlipColor, LifeResult, Pooled, Session, Timer, segment_circle_overlap, wrap, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
+    BlipColor, LifeResult, Session, Timer, segment_circle_overlap, wrap, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, NEON_CYAN,
     NEON_GREEN, NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
 };
 
@@ -129,7 +129,7 @@ struct Bullet {
     ttl: f32,
     from_player: bool,
 }
-impl Pooled for Bullet { fn is_active(&self) -> bool { self.active } }
+blip::pooled!(Bullet, Asteroid, Debris);
 const BULLET_OFF: Bullet = Bullet { active: false, x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, ttl: 0.0, from_player: true };
 
 #[derive(Copy, Clone)]
@@ -142,7 +142,6 @@ struct Asteroid {
     spin: f32,
     jag: [f32; 10],
 }
-impl Pooled for Asteroid { fn is_active(&self) -> bool { self.active } }
 const ASTEROID_OFF: Asteroid = Asteroid {
     active: false, x: 0.0, y: 0.0, vx: 0.0, vy: 0.0,
     size: ASize::Large, rot: 0.0, spin: 0.0, jag: [1.0; 10],
@@ -159,7 +158,6 @@ struct Debris {
     ttl: f32, ttl0: f32,
     color: BlipColor,
 }
-impl Pooled for Debris { fn is_active(&self) -> bool { self.active } }
 const DEBRIS_OFF: Debris = Debris {
     active: false, x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, rot: 0.0, spin: 0.0,
     len: 0.0, ttl: 0.0, ttl0: 1.0, color: BLIP_WHITE,
@@ -460,10 +458,7 @@ fn award(g: &mut Game, sfx: &Sounds, pts: i32) {
 }
 
 fn update_title(g: &mut Game) {
-    if btn1_pressed() {
-        web::spend_coin();
-        g.start_game();
-    }
+    if coin_start() { g.start_game(); }
 }
 
 /// Turn, thrust, a little drag and the speed limit; the field wraps. Returns
@@ -793,10 +788,7 @@ fn update_dead(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_over(g: &mut Game, dt: f32) {
-    g.respawn_t.tick(dt);
-    if g.respawn_t.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.respawn_t, dt) { g.start_game(); }
 }
 
 fn draw_ship(blip: &Blip, ship: &Ship, invuln_t: f32, level: i32, color: BlipColor) {
@@ -1138,8 +1130,6 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("METEORS", WIN_W, WIN_H)
 }
 
-
-
 #[blip::macroquad::main(conf)]
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
@@ -1175,27 +1165,22 @@ async fn main() {
     };
     let mut thrust_snd_t = 0.0f32;
 
-    let mut shot_frame: u32 = 0;
+    if blip.screenshot_mode {
+        g.start_game();
+        // The card's picture: a late wave, flowers and haze and all.
+        g.sess.level = 8;
+        g.start_wave();
+        g.wave_t = WAVE_BANNER_SECS;
+        g.ship.angle = -0.4;
+        g.ship.thrusting = true;
+        g.invuln_t = 0.0;
+        spawn_bullet(&mut g.bullets, g.ship.x, g.ship.y - 40.0, 0.0, -BULLET_SPEED, true);
+    }
 
     loop {
         let dt = blip.delta_time;
 
         music.play(if g.state != State::Title && g.sess.level >= STORM_WAVE { 1 } else { 0 });
-
-        if blip.screenshot_mode {
-            shot_frame += 1;
-            if shot_frame == 1 {
-                g.start_game();
-                // The card's picture: a late wave, flowers and haze and all.
-                g.sess.level = 8;
-                g.start_wave();
-                g.wave_t = WAVE_BANNER_SECS;
-                g.ship.angle = -0.4;
-                g.ship.thrusting = true;
-                g.invuln_t = 0.0;
-                spawn_bullet(&mut g.bullets, g.ship.x, g.ship.y - 40.0, 0.0, -BULLET_SPEED, true);
-            }
-        }
 
         #[cfg(not(target_arch = "wasm32"))]
         if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }

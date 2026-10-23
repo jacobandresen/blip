@@ -20,10 +20,7 @@ fn rock_kick(buf: &mut [f32], off: usize, vol: f32) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.11) as usize;
     let click_n = (sr * 0.004) as usize;
-    for i in 0..n {
-        if off + i >= buf.len() {
-            break;
-        }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let t = i as f32 / sr;
         let e = (1.0 - i as f32 / n as f32).powf(2.1);
         let freq = 48.0 + 95.0 * (-t / 0.028).exp(); // 143 Hz -> 48 Hz, fast
@@ -51,10 +48,7 @@ fn rock_snare(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.15) as usize;
     let mut prev = 0.0f32;
-    for i in 0..n {
-        if off + i >= buf.len() {
-            break;
-        }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let t = i as f32 / sr;
         let e = (1.0 - i as f32 / n as f32).powf(1.5);
         let white = rng.next_f32() * 2.0 - 1.0;
@@ -75,10 +69,7 @@ fn rock_hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32, open: bool) {
     heard(off, HAT, Part::Drums);
     let n = (SAMPLE_RATE as f32 * if open { 0.19 } else { 0.038 }) as usize;
     let mut prev = 0.0f32;
-    for i in 0..n {
-        if off + i >= buf.len() {
-            break;
-        }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let e = (1.0 - i as f32 / n as f32).powf(if open { 1.4 } else { 3.2 });
         let white = rng.next_f32() * 2.0 - 1.0;
         let hp = white - prev;
@@ -94,10 +85,7 @@ fn crash(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.85) as usize;
     let mut prev = 0.0f32;
-    for i in 0..n {
-        if off + i >= buf.len() {
-            break;
-        }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let t = i as f32 / sr;
         let e = (1.0 - i as f32 / n as f32).powf(1.7);
         let white = rng.next_f32() * 2.0 - 1.0;
@@ -127,10 +115,7 @@ fn power_chord(buf: &mut [f32], off: usize, root: f32, ms: f32, vol: f32, palm: 
     const DETUNE: f32 = 0.004;
     let mut ph = [0.0f32; 6];
     let mut lp = 0.0f32;
-    for i in 0..n {
-        if off + i >= buf.len() {
-            break;
-        }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let a = if i < att {
             i as f32 / att as f32
         } else {
@@ -171,10 +156,7 @@ fn lead_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, bend: 
     let alpha = 1.0 - (-2.0 * PI * 3_200.0 / sr).exp();
     let mut ph = 0.0f32;
     let mut lp = 0.0f32;
-    for i in 0..n {
-        if off + i >= buf.len() {
-            break;
-        }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let t = i as f32 / sr;
         let prog = i as f32 / n as f32;
         let a = if i < att {
@@ -218,10 +200,7 @@ fn bass_guitar(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
     let alpha = 1.0 - (-2.0 * PI * 1_700.0 / sr).exp();
     let mut ph = 0.0f32;
     let mut lp = 0.0f32;
-    for i in 0..n {
-        if off + i >= buf.len() {
-            break;
-        }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let t = i as f32 / sr;
         let a = if i < att {
             i as f32 / att as f32
@@ -250,10 +229,7 @@ fn dive_bomb(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
     let alpha = 1.0 - (-2.0 * PI * 2_600.0 / sr).exp();
     let mut ph = 0.0f32;
     let mut lp = 0.0f32;
-    for i in 0..n {
-        if off + i >= buf.len() {
-            break;
-        }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let prog = i as f32 / n as f32;
         let f = (freq * (1.0 - prog).powf(2.2)).max(18.0);
         let e = (1.0 - prog).powf(1.3) * (1.0 + 0.4 * prog);

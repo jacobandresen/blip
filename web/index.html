@@ -25,10 +25,10 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <link rel="stylesheet" href="marquee.css?v=1">
-  <link rel="stylesheet" href="kiosk.css?v=156">
+  <link rel="stylesheet" href="kiosk.css?v=158">
   <link rel="stylesheet" href="wear.css?v=13">
   <link rel="stylesheet" href="book.css?v=1">
-  <link rel="stylesheet" href="manual.css?v=49">
+  <link rel="stylesheet" href="manual.css?v=50">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
@@ -91,10 +91,6 @@
       position: relative;
     }
 
-    /* The top bar, logo and coin-slot heights and the corner badges live in
-       kiosk.css, shared with the info pages. */
-
-
     .divider {
       width: 100%;
       max-width: 900px;
@@ -114,7 +110,6 @@
       transition:none;
       backface-visibility:hidden;
     }
-    .screen-bezel.jukebox-open .jukebox-front { animation:arcade-stow 4.8s linear both;transform:translateY(calc(-1 * var(--arcade-travel, 500px)));opacity:1;pointer-events:none;visibility:hidden; }
     :root[data-fullscreen] body { height:100vh;min-height:100vh;padding:0; }
     :root[data-fullscreen] :is(header,.divider,footer) { display:none; }
     :root[data-fullscreen] .screen-bezel {
@@ -126,48 +121,6 @@
     :root[data-fullscreen] #game-grid .card {height:min(500px,calc(100% - 50px));}
     @media(max-width:480px) { :root { --cabinet-bottom-bar-height:82px; } }
     @media(min-width:768px) and (min-height:700px) and (pointer:coarse) { :root { --cabinet-bottom-bar-height:112px; } }
-    .jukebox-storage {
-      position:absolute;inset:14px;z-index:1;display:flex;flex-direction:column;align-items:stretch;gap:10px;padding:14px 12px;
-      border:1px solid rgba(228,192,133,.48);border-radius:10px;opacity:0;transform:translateZ(-3px);
-      background:radial-gradient(ellipse at 50% 0,rgba(193,147,88,.19),transparent 58%),linear-gradient(180deg,#151317,#09090b 58%,#1d1715);
-      box-shadow:inset 0 0 0 5px rgba(4,4,6,.8),inset 0 12px 24px rgba(0,0,0,.8);
-      transition:opacity .24s .22s ease,transform .55s ease;
-    }
-    .screen-bezel.jukebox-open .jukebox-storage {opacity:1;transform:translateZ(0);}
-    .jukebox-rack {position:relative;flex:1;min-height:0;width:100%;display:flex;justify-content:flex-start;align-items:stretch;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;scroll-snap-type:x proximity;perspective:1000px;isolation:isolate;}
-    .jukebox-rack::-webkit-scrollbar {display:none}
-    .jukebox-rack::before {content:'';position:absolute;left:5%;right:5%;top:8%;height:9px;z-index:9;border:1px solid #94764d;border-radius:7px;
-      background:linear-gradient(180deg,#f4dfb3,#89704c 35%,#3d3027 65%,#d6b67c);box-shadow:0 4px 7px #050405,inset 0 1px #fff0c8;}
-    .jukebox-rack::after {content:'';position:absolute;left:4%;right:4%;top:10%;height:4px;z-index:10;pointer-events:none;
-      background:repeating-linear-gradient(90deg,transparent 0 32px,rgba(20,15,13,.8) 33px 36px);}
-    .jukebox-bay {position:relative;display:flex;align-items:flex-start;justify-content:center;min-width:0;flex:0 0 clamp(112px,10.5vw,134px);height:100%;padding-top:7%;margin-left:-2px;scroll-snap-align:center;
-      background:none;transform:rotateY(var(--fan-y,0deg)) rotateZ(var(--fan-z,0deg));transform-origin:50% 8%;}
-    .jukebox-bay:first-child {margin-left:0}
-    .jukebox-bay:nth-child(1) {--fan-y:-24deg;--fan-z:-6deg;z-index:1}
-    .jukebox-bay:nth-child(2) {--fan-y:-18deg;--fan-z:-4.5deg;z-index:2}
-    .jukebox-bay:nth-child(3) {--fan-y:-12deg;--fan-z:-3deg;z-index:3}
-    .jukebox-bay:nth-child(4) {--fan-y:-6deg;--fan-z:-1.5deg;z-index:4}
-    .jukebox-bay:nth-child(5) {--fan-y:6deg;--fan-z:1.5deg;z-index:5}
-    .jukebox-bay:nth-child(6) {--fan-y:12deg;--fan-z:3deg;z-index:4}
-    .jukebox-bay:nth-child(7) {--fan-y:18deg;--fan-z:4.5deg;z-index:3}
-    .jukebox-bay:nth-child(8) {--fan-y:24deg;--fan-z:6deg;z-index:2}
-    .jukebox-bay:nth-child(9) {--fan-y:30deg;--fan-z:9deg;z-index:1}
-    .jukebox-bay:nth-child(10) {--fan-y:36deg;--fan-z:11deg;z-index:1}
-    .jukebox-bay:nth-child(11) {--fan-y:42deg;--fan-z:13deg;z-index:1}
-    .jukebox-module {position:relative;display:flex;flex-direction:column;align-items:center;justify-content:space-between;
-      width:calc(100% - 2px);height:258px;flex:none;box-sizing:border-box;padding:29px 9px 11px;border:1px solid rgba(224,183,121,.58);border-radius:7px;
-      background:linear-gradient(118deg,rgba(255,255,255,.085),transparent 24% 70%,rgba(255,255,255,.035)),linear-gradient(155deg,#30251f,#171419 74%);
-      box-shadow:0 7px 12px rgba(0,0,0,.38),inset 0 1px rgba(255,239,208,.3),inset 0 -2px rgba(0,0,0,.65);
-      transition:transform .35s,filter .35s,box-shadow .35s;}
-    .jukebox-module::before {content:'';position:absolute;left:50%;top:4px;width:36px;height:9px;transform:translateX(-50%);
-      background:radial-gradient(circle at 5px 4px,#080707 0 2px,#d7bc8b 2.5px 3.5px,transparent 4px),radial-gradient(circle at 30px 4px,#080707 0 2px,#d7bc8b 2.5px 3.5px,transparent 4px);}
-    .jukebox-module img {width:100%;height:120px;flex:none;object-fit:cover;border:1px solid rgba(255,231,188,.42);box-shadow:0 2px 5px #080708;}
-    .jukebox-module strong {max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f2dfbd;font:900 12px/1.25 'Courier New',monospace;letter-spacing:.11em;text-shadow:0 1px #090708;}
-    .jukebox-module small {color:#d8b778;font:700 8px/1 'Courier New',monospace;letter-spacing:.12em;}
-    .jukebox-module.selected {transform:translateY(-7px) rotateY(0) rotateZ(0) scale(1.045);filter:brightness(1.2);z-index:20;
-      box-shadow:0 0 0 2px rgba(241,202,135,.64),0 10px 20px rgba(0,0,0,.9),0 0 22px rgba(232,184,106,.42);}
-    .jukebox-module.picked {opacity:0;transform:translateY(-24px) scale(.94);filter:brightness(.5)}
-    .jukebox-module.selected::after {content:'';position:absolute;inset:-5px;border:1px solid rgba(248,218,166,.62);border-radius:6px;box-shadow:0 0 13px rgba(244,192,106,.42);}
     /* ---- card ---- */
     .card {
       display: flex;
@@ -190,7 +143,6 @@
     }
 
     .card:hover, .card.card-focused { transform:translateY(-4px) rotateX(1deg); }
-    .card-picked { opacity:0!important; transform:translateY(-34px) rotateY(12deg) scale(.96)!important; }
 
     .card::before, .card::after {
       content: '';
@@ -210,21 +162,6 @@
     .card-brawler    { --c: #dc3c28;        }
     .card-bubbler    { --c: #78d2ff;        }
     .card-adder      { --c: #e0a034;        }
-
-    /* ---- keyboard-recommended chip ---- */
-    .badge-kb {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 10px;
-      letter-spacing: 2px;
-      color: #7a7a7a;
-      border: 1px solid #2c2c2c;
-      padding: 3px 10px 3px 8px;
-      margin-bottom: 14px;
-      text-transform: uppercase;
-      background: rgba(255,255,255,0.02);
-    }
 
     .card::before, .card::after { border-color: var(--c); }
 
@@ -352,290 +289,21 @@
       width: 100%;
     }
 
-    .card-selector {
-      position:absolute;top:9px;right:11px;width:28px;height:28px;z-index:5;
-      display:grid;place-items:center;border-radius:50%;opacity:0;transform:scale(.75);
-      border:1px solid rgba(243,208,151,.58);
-      background:radial-gradient(circle at 35% 25%,#6e5b40,#211a18 65%,#100d0d);
-      box-shadow:inset 0 1px rgba(255,242,213,.3),0 2px 5px #090707;
-      transition:opacity .18s,transform .22s cubic-bezier(.2,1.6,.4,1);
-    }
-    .card-selector::before { content:'';width:5px;height:15px;border-radius:4px;
-      background:linear-gradient(90deg,#726d63,#f3e7cf 46%,#786d5e);
-      box-shadow:0 1px 2px #000;transform:rotate(-34deg);transform-origin:50% 90%;transition:transform .28s; }
-    .card:is(:hover,.card-focused,.card-active) .card-selector { opacity:1;transform:scale(1); }
-    .card-picked .card-selector::before { transform:rotate(48deg); }
-    .card-code {position:absolute;top:14px;right:48px;z-index:5;padding:3px 5px;border:1px solid rgba(220,185,129,.64);border-radius:2px;
-      color:#f0d6a4;background:linear-gradient(180deg,rgba(17,13,12,.94),rgba(48,35,27,.9));font:700 9px/1 'Courier New',monospace;
-      letter-spacing:.1em;text-shadow:0 1px #090708;box-shadow:inset 0 1px rgba(255,242,211,.25),0 1px 3px #090707;}
     .card { padding-bottom:20px; }
-
-    /* Card copy sits on the tube: the same phosphor glow as the titles,
-       dimmer. */
-    .card-genre, .card-desc {
-      text-shadow: 0 0 5px currentColor;
-    }
-
-    .card-genre {
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 3px;
-      color: #e6b76e;
-      text-transform: uppercase;
-      margin-bottom: 16px;
-      text-align: left;
-    }
-
-    /* The record to beat, when one is known (set by the script below). */
-    .card-hi {
-      font-size: 11px;
-      font-weight: 900;
-      letter-spacing: 2px;
-      color: var(--yellow);
-      text-shadow: 0 0 6px color-mix(in srgb, var(--yellow) 60%, transparent);
-      margin: -8px 0 14px;
-      text-align: left;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .card-desc {
-      font-size: 11px;
-      font-weight: 700;
-      line-height: 1.75;
-      color: #d5b9a2;
-      text-align: left;
-      letter-spacing: .04em;
-      margin-bottom: 24px;
-      flex: 1;
-    }
 
     /* No credits: cards dimmed and desaturated like an unpowered cabinet but
        still legible; a click nudges toward the coin slot. */
     .card.no-credit { filter: grayscale(60%) brightness(0.72); }
-    /* Pressing a dark card while broke: it drops almost out entirely for a
-       beat — a dead, unlit "nothing happens here, put a coin in" thunk —
-       then eases back to its resting dim. */
-    .card.rejected { animation: card-reject 0.55s ease-out; }
-    @keyframes card-reject {
-      0%   { filter: grayscale(60%) brightness(0.72); }
-      22%  { filter: grayscale(90%) brightness(0.4); transform: scale(0.97); }
-      100% { filter: grayscale(60%) brightness(0.72); }
-    }
 
     @media (max-width: 520px) {
       .card        { padding-left: 40px; }
     }
 
-    /* ---- 2-player seal ---- */
-    /* All of a card's badges, stacked down from the top-right corner: each
-       one tucks a few pixels under the one before and paints over it, so
-       however many there are, every one stays readable. */
-    .card-badges {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      z-index: 3;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      pointer-events: none;
-    }
-    .card-badges > * { position: relative; flex: none; }
-    .card-badges > * + * { margin-top: -7px; }
-    .card-badges > :nth-child(2) { z-index: 2; margin-right: 4px; }
-    .card-badges > :nth-child(3) { z-index: 3; }
-    .card-badges > :nth-child(4) { z-index: 4; margin-right: 4px; }
-
-    .badge-2p {
-      width: 52px;
-      height: 52px;
-      border: 2px solid var(--yellow);
-      border-radius: 50%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: 9px;
-      font-weight: 900;
-      letter-spacing: 1px;
-      color: var(--yellow);
-      text-shadow: 0 0 6px var(--yellow);
-      box-shadow:
-        0 0 0 3px rgba(0,0,0,0.85),
-        0 0 0 5px color-mix(in srgb, var(--yellow) 35%, transparent),
-        0 0 14px color-mix(in srgb, var(--yellow) 35%, transparent);
-      transform: rotate(12deg);
-      text-align: center;
-      line-height: 1.3;
-      background: rgba(0,0,0,0.85);
-      z-index: 1;
-    }
-
-    /* Genre stickers, slapped on at a tilt.
-       ACTION: a hot slanted sticker with a quick flash now and then.
-       COSY: a soft pastel pill with a heart, floating gently. */
-    .badge-genre {
-      font-weight: 900;
-      text-align: center;
-      white-space: nowrap;
-    }
-    .badge-action {
-      padding: 7px 12px 6px 14px;
-      font-size: 11px;
-      font-style: italic;
-      letter-spacing: 1.5px;
-      color: #fff8d6;
-      background: linear-gradient(135deg, #ff3b1f 0%, #ff7a1a 55%, #ffb21a 100%);
-      clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%);
-      transform: rotate(-9deg) skewX(-8deg);
-      text-shadow: 1px 1px 0 #7a1200, -1px 0 0 #7a1200, 0 -1px 0 #7a1200, 0 0 6px rgba(255, 220, 120, 0.8);
-      filter: drop-shadow(0 0 0 #ffe066) drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.85))
-              drop-shadow(0 0 8px rgba(255, 110, 40, 0.55));
-      animation: action-flash 3.2s ease-in-out infinite;
-    }
-    /* the same sticker slapped on the other way round on Raider */
-    .card-sky-raider .badge-action { transform: rotate(8deg) skewX(-8deg); }
-    @keyframes action-flash {
-      0%, 86%, 100% { filter: drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.85)) drop-shadow(0 0 8px rgba(255, 110, 40, 0.55)); }
-      90% { filter: drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.85)) drop-shadow(0 0 16px rgba(255, 240, 160, 1)) brightness(1.35); }
-    }
-    .badge-cosy {
-      padding: 6px 12px 6px 10px;
-      font-size: 11px;
-      letter-spacing: 1.5px;
-      color: #7a2e55;
-      background: linear-gradient(180deg, #ffe6f0 0%, #ffcfe3 100%);
-      border: 2px solid #fff4f9;
-      border-radius: 999px;
-      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.55), 0 0 12px rgba(255, 180, 215, 0.55);
-      transform: rotate(-6deg);
-      animation: cosy-float 3.6s ease-in-out infinite;
-    }
-    .badge-cosy::before {
-      content: '\2665';
-      margin-right: 5px;
-      color: #ff6fa8;
-      text-shadow: 0 0 4px rgba(255, 140, 190, 0.8);
-    }
-    @keyframes cosy-float {
-      0%, 100% { transform: rotate(-6deg) translateY(0); }
-      50%      { transform: rotate(-4deg) translateY(-3px); }
-    }
-    /* TRIPPY: a melting blob of swirling rainbow, its colours cycling, the
-       letters printed slightly out of register. */
-    .badge-trippy {
-      padding: 6px 13px 6px 11px;
-      font-size: 11px;
-      letter-spacing: 2px;
-      color: #fff;
-      background: conic-gradient(from 30deg, #ff3cac, #ffd23f, #3cff9e, #2bd2ff, #a64bff, #ff3cac);
-      border: 2px solid #fff6fd;
-      border-radius: 42% 58% 55% 45% / 55% 45% 58% 42%;
-      text-shadow: -1.5px 0 #ff00c8, 1.5px 0 #00e5ff, 0 0 6px rgba(255, 255, 255, 0.9);
-      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.55), 0 0 14px rgba(190, 80, 255, 0.65);
-      transform: rotate(7deg);
-      animation: trippy-hue 4s linear infinite, trippy-melt 3s ease-in-out infinite;
-    }
-    /* a hypnotic pinwheel, spinning */
-    .badge-trippy::before {
-      content: '';
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      margin-right: 6px;
-      vertical-align: -1px;
-      border-radius: 50%;
-      background: repeating-conic-gradient(#1a0030 0 22.5deg, #fff 22.5deg 45deg);
-      box-shadow: 0 0 0 1px #fff;
-      animation: trippy-spin 1.6s linear infinite;
-    }
-    @keyframes trippy-hue { to { filter: hue-rotate(360deg); } }
-    @keyframes trippy-spin { to { transform: rotate(360deg); } }
-    @keyframes trippy-melt {
-      0%, 100% { border-radius: 42% 58% 55% 45% / 55% 45% 58% 42%; transform: rotate(7deg) scale(1, 1); }
-      33%      { border-radius: 58% 42% 40% 60% / 45% 60% 40% 55%; transform: rotate(4deg) scale(1.05, 0.96); }
-      66%      { border-radius: 50% 50% 62% 38% / 60% 40% 55% 45%; transform: rotate(10deg) scale(0.97, 1.04); }
-    }
-    /* TOUCH: a quiet tablet mark in the card's lower-right corner, a
-       fingertip tapping its screen. */
-    .badge-touch {
-      position: absolute;
-      right: 12px;
-      bottom: 9px;
-      z-index: 3;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      font-size: 9px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      color: #6e737a;
-      pointer-events: none;
-      transition: color .2s;
-    }
-    .card:hover .badge-touch, .card-focused .badge-touch { color: #b8bec6; }
-
-    /* CONTROLLER: a real gamepad is recommended. A DualSense in the same
-       quiet corner as the TOUCH mark; its light bar comes on with the card. */
-    .badge-pad {
-      position: absolute;
-      right: 12px;
-      bottom: 8px;
-      z-index: 3;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      color: #6e737a;
-      pointer-events: none;
-      transition: color .2s;
-    }
-    .card:hover .badge-pad, .card-focused .badge-pad { color: #b8bec6; }
-    .bp-text {
-      display: flex;
-      flex-direction: column;
-      font-size: 9px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      line-height: 1.15;
-    }
-    .bp-text small { font-size: 7px; font-weight: 500; letter-spacing: 0.8px; opacity: 0.75; }
-    .bp-dualsense { width: 27px; height: 17px; overflow: visible; }
-    .bp-body { fill: currentColor; opacity: 0.55; }
-    .bp-centre { fill: #0a0a0c; stroke: currentColor; stroke-width: 0.5; }
-    .bp-light { fill: none; stroke: #4f8bff; stroke-width: 1.2; stroke-linecap: round; opacity: 0.5; transition: opacity .2s; }
-    .card:hover .bp-light, .card-focused .bp-light { opacity: 1; filter: drop-shadow(0 0 1.5px #5b8cff); }
-    .bp-stick { fill: #0a0a0c; stroke: currentColor; stroke-width: 0.6; }
-    .bp-dpad { stroke: #0a0a0c; stroke-width: 0.9; stroke-linecap: round; }
-    .bp-btn { fill: #0a0a0c; }
-    /* Only where TOUCH can be picked (kiosk.js sets data-has-touch). */
-    :root:not([data-has-touch]) .badge-touch { display: none; }
-    .bt-ipad { width: 12px; height: 15px; overflow: visible; }
-    .bt-ipad rect { fill: none; stroke: currentColor; stroke-width: 1.4; }
-    .bt-tip { fill: currentColor; }
-    .bt-ring {
-      fill: none;
-      stroke: currentColor;
-      stroke-width: 1;
-      opacity: 0;
-      transform-origin: 8px 10px;
-      animation: bt-ripple 2.8s ease-out infinite;
-    }
-    @keyframes bt-ripple {
-      0%, 60% { opacity: 0; transform: scale(0.4); }
-      64%     { opacity: 0.9; transform: scale(0.5); }
-      100%    { opacity: 0; transform: scale(1.1); }
-    }
     @media (prefers-reduced-motion: reduce) {
-      .badge-action, .badge-cosy, .badge-trippy, .badge-trippy::before, .bt-ring { animation: none; }
       .card-brawler .card-shot-wrap::after { animation: none !important; }
       .card-brawler .card-shot { transition: none; transform: none !important; }
     }
 
-    /* ---- footer ---- */
     footer {
       margin-top: 48px;
       text-align: center;
@@ -662,7 +330,7 @@
     }
     body.konami-shake { animation: konami-shake 0.55s ease; }
 
-    :root[data-cabinet-arranging] :is(.card,.jukebox-front,.arcade-guides) {transition:none!important;animation:none!important}
+    :root[data-cabinet-arranging] :is(.card,.jukebox-front) {transition:none!important;animation:none!important}
     /* The cards carry game descriptions; full instructions live in the manual. */
     #game-grid {position:relative;display:block;flex:none;width:100%;height:100%;min-height:0;overflow:visible;padding:0;perspective:1100px;transform-style:preserve-3d;}
     #game-grid::-webkit-scrollbar {display:none}
@@ -682,119 +350,33 @@
     #game-grid .card-active:not(:hover):not(.card-focused) {z-index:19}
     #game-grid .card-shot-wrap {flex:none;width:100%;height:164px;aspect-ratio:auto;margin:0 0 10px;padding:5px;border-radius:3px;}
     #game-grid .card-title {font-size:16px;letter-spacing:.12em;line-height:1.25;margin:2px 0 6px;min-height:0;text-align:left;color:color-mix(in srgb,var(--c) 48%,#fff0d3);background:none!important;-webkit-background-clip:border-box!important;background-clip:border-box!important;-webkit-text-fill-color:currentColor!important;font-style:normal;filter:none;text-shadow:0 1px #100b09,0 2px 1px #0009;}
-    #game-grid .arcade-page-card {border-color:#a9936d;background-color:#30271f;background-image:linear-gradient(118deg,rgba(255,245,220,.14),transparent 22% 72%,rgba(255,245,220,.035)),linear-gradient(155deg,#403128,#241d1a 55%,#30251f)}
-    #game-grid .arcade-page-card .card-title {color:#e5d4b5;text-shadow:0 1px #080708,0 2px 1px #0009}
-    #game-grid .arcade-page-card .card-shot-wrap img {filter:sepia(.25) saturate(.7)}
-    #game-grid .card-genre,#game-grid .card-desc {display:block!important;min-width:0;overflow-wrap:anywhere;white-space:normal;text-shadow:none;}
-    #game-grid .card-genre {flex:none;margin:0 0 9px;color:#765733;font:700 12px/1.35 'Courier New',monospace;letter-spacing:.075em;text-shadow:none;}
-    #game-grid .card-desc {flex:1;margin:0 0 11px;padding:11px 12px;border:1px solid #a88b61;border-radius:3px;color:#30251d;font:14px/1.48 'Courier New',monospace;letter-spacing:0;text-shadow:none;background:linear-gradient(135deg,#f1e6ce,#d9c7a5);box-shadow:inset 0 1px #fff8e8,0 2px 4px #120d0b99;}
-    #game-grid .card-hi {flex:none;margin:0 0 8px;font-size:10px;}
-    #game-grid .card-badges,#game-grid .badge-touch,#game-grid .badge-pad {display:none!important}
-    .card-punch {position:absolute;top:7px;left:50%;width:40px;height:10px;z-index:6;transform:translateX(-50%);pointer-events:none;}
-    .card-punch::before,.card-punch::after {content:'';position:absolute;top:1px;width:8px;height:8px;border-radius:50%;
-      background:radial-gradient(circle at 35% 30%,#e8d6ae 0 1px,#171313 2px 3px,#b49565 3.5px 4px,transparent 4.5px);}
-    .card-punch::before {left:3px}.card-punch::after {right:3px}
     @media (max-width:620px) {
       #game-grid .card {width:min(300px,calc(100% - 20px));height:min(540px,calc(100% - 50px));padding:35px 16px 16px!important;}
       :root[data-fullscreen] #game-grid .card {height:min(540px,calc(100% - 50px));}
       #game-grid .card-shot-wrap {height:124px}
-      #game-grid .card-genre {font-size:11px;}
-      #game-grid .card-desc {font-size:14px;line-height:1.48}
     }
     @media (max-width:520px) {
       .top-marquee-bar #marquee-name,#marquee-bar.jukebox-marquee #marquee-name {left:calc(50% - 2px);padding-left:2px;padding-right:2px}
     }
 
-    .screen-bezel.jukebox-open .jukebox-rack {visibility:hidden}
-    :root[data-cabinet-return] :is(.jukebox-front,.arcade-guides) {visibility:hidden}
+    :root[data-cabinet-return] .jukebox-front {visibility:hidden}
     :root[data-cabinet-return] .jukebox-game-screen,.cabinet-return .jukebox-game-screen {visibility:visible}
     .cabinet-return .jukebox-front {visibility:visible;transition:none;animation:arcade-return 1.1s cubic-bezier(.22,.72,.2,1) both}
-    @keyframes arcade-stow {
-      0% {visibility:visible;transform:translateY(0);animation-timing-function:cubic-bezier(.4,0,.4,1);}
-      65% {transform:translateY(calc(-0.84 * var(--arcade-travel,500px)));animation-timing-function:cubic-bezier(.3,0,.35,1);}
-      88% {transform:translateY(calc(-0.966 * var(--arcade-travel,500px)));animation-timing-function:ease-out;}
-      96% {transform:translateY(calc(-0.994 * var(--arcade-travel,500px)));animation-timing-function:ease-in-out;}
-      100% {visibility:visible;transform:translateY(calc(-1 * var(--arcade-travel,500px)));}
-    }
-    @keyframes arcade-guides-stow {
-      0% {transform:translateX(-50%) translateY(0);animation-timing-function:cubic-bezier(.4,0,.4,1);}
-      65% {transform:translateX(-50%) translateY(calc(-0.84 * var(--arcade-travel,500px)));animation-timing-function:cubic-bezier(.3,0,.35,1);}
-      88% {transform:translateX(-50%) translateY(calc(-0.966 * var(--arcade-travel,500px)));animation-timing-function:ease-out;}
-      96% {transform:translateX(-50%) translateY(calc(-0.994 * var(--arcade-travel,500px)));animation-timing-function:ease-in-out;}
-      100% {transform:translateX(-50%) translateY(calc(-1 * var(--arcade-travel,500px)));}
-    }
-    .screen-bezel.arcade-stowing::after {
-      inset:0 0 auto;height:24px;border-radius:0;z-index:4;
-      background:linear-gradient(#080607e6,#08060777 35%,transparent);
-      box-shadow:inset 0 2px #000;
-    }
     @keyframes arcade-return {
       from {transform:translateY(calc(-1 * var(--arcade-travel, 500px)));opacity:1}
       to {transform:translateY(0);opacity:1}
     }
     @media(prefers-reduced-motion:reduce) {
-      .jukebox-front,.arcade-guides {transition-duration:.01ms!important}
-      .cabinet-return .jukebox-front,.cabinet-return .arcade-guides,.screen-bezel.jukebox-open .jukebox-front,.screen-bezel.jukebox-open .arcade-guides {animation-duration:.01ms!important}
+      .jukebox-front {transition-duration:.01ms!important}
+      .cabinet-return .jukebox-front {animation-duration:.01ms!important}
     }
-    .arcade-empty-bay {position:absolute;z-index:18;border:1px solid #b2956244;border-radius:7px;pointer-events:none;
-      transform-origin:50% 8%;background:linear-gradient(90deg,#1c181a55,transparent 15% 85%,#1c181a55)}
-    .arcade-empty-bay::before,.arcade-empty-bay::after {content:'';position:absolute;top:4px;width:9px;height:15px;
-      border:1px solid #bda171;border-radius:3px;background:linear-gradient(90deg,#58442c,#e0c393,#58442c)}
-    .arcade-empty-bay::before {left:calc(50% - 18px)}.arcade-empty-bay::after {right:calc(50% - 18px)}
-    #game-grid .card.card-loaded .game-rom {visibility:hidden}
     .jukebox-game-screen {position:absolute;inset:14px;z-index:1;overflow:hidden;border-radius:10px;background:#09090b;visibility:hidden;
       box-shadow:inset 0 0 25px #000,inset 0 0 0 2px #261d18}
-    .screen-bezel.jukebox-open .jukebox-game-screen {visibility:visible}
     .jukebox-game-screen {background-position:center;background-size:contain;background-repeat:no-repeat}
-    .screen-bezel.jukebox-open .jukebox-storage {opacity:0;visibility:hidden}
     .jukebox-front::before {content:'';position:absolute;inset:-10px -7px;z-index:-1;border:1px solid #b39461;border-radius:8px;
       background:linear-gradient(135deg,#332922,#141216 65%);box-shadow:0 8px 18px #000b,inset 0 1px #f0d9ad55}
-    .arcade-guides {position:absolute;inset:0 auto 0 50%;width:min(410px,calc(100% - 24px));transform:translateX(-50%);z-index:3;pointer-events:none;transition:transform 4s cubic-bezier(.45,.02,.25,1)}
-    .screen-bezel.jukebox-open .arcade-guides {animation:arcade-guides-stow 4.8s linear both;transform:translateX(-50%) translateY(calc(-1 * var(--arcade-travel, 500px)))}
-    .cabinet-return .arcade-guides {animation:arcade-guides-return 1.1s cubic-bezier(.22,.72,.2,1) both}
-    @keyframes arcade-guides-return {from{transform:translateX(-50%) translateY(calc(-1 * var(--arcade-travel, 500px)))}to{transform:translateX(-50%) translateY(0)}}
-    .arcade-guide {position:absolute;top:0;bottom:0;width:10px;border:1px solid #806647;border-radius:4px;
-      background:linear-gradient(90deg,#281e18,#c4aa7f 22%,#756049 40%,#302820 64%,#d9bf92 84%,#32231b);
-      box-shadow:2px 0 4px #000b,inset 1px 0 #eddbb7}
-    .arcade-guide.left {left:0}.arcade-guide.right {right:0}
-    .arcade-guide::before,.arcade-guide::after {content:'';position:absolute;left:-2px;width:12px;height:13px;border:1px solid #c0a06e;border-radius:3px;
-      background:radial-gradient(circle,#35271b 0 2px,#e2c591 2.5px 3.5px,#6a4d30 4px)}
-    .arcade-guide::before {top:0}.arcade-guide::after {bottom:4px}
-    .arcade-stay {position:absolute;z-index:2;width:0;height:8px;border:1px solid #b99966;border-radius:6px;transform-origin:0 50%;
-      background:linear-gradient(180deg,#f3dfb7 0%,#9b7950 27%,#3c2d22 56%,#d0ad75 82%,#59422c 100%);
-      box-shadow:0 4px 7px #000d,inset 0 1px #fff0ce,inset 0 -2px #291e17;}
-    .arcade-stay::before,.arcade-stay::after {content:'';position:absolute;top:50%;width:13px;height:13px;transform:translateY(-50%);border:2px solid #c4a570;border-radius:50%;
-      background:radial-gradient(circle at 32% 27%,#f7e7c5,#80623e 45%,#211814 72%);box-shadow:0 3px 5px #000d,inset 0 1px #fff0ca;}
-    .arcade-stay::before {left:-5px}.arcade-stay::after {right:-5px}
-    .arcade-carriage {position:absolute;top:27px;width:17px;height:40px;border:1px solid #d4b585;border-radius:4px;
-      background:linear-gradient(90deg,#57412d,#ddc399 34%,#6c5337 60%,#2d231b);box-shadow:0 5px 6px #000c,inset 0 1px #fff0ce;
-      transition:transform 4s cubic-bezier(.45,.02,.25,1)}
-    .arcade-carriage.left {left:0}.arcade-carriage.right {right:0}
-    .arcade-carriage::after {content:'';position:absolute;top:10px;width:15px;height:19px;border:1px solid #b69361;
-      background:linear-gradient(#d5b78a,#51402c);box-shadow:0 4px 5px #000b}
-    .arcade-carriage.left::after {left:12px}.arcade-carriage.right::after {right:12px}
     #game-grid::before {content:none}
-    .arcade-spindle {position:absolute;left:0;top:0;height:100%;z-index:0;overflow:visible;pointer-events:none;filter:drop-shadow(0 4px 3px #080606)}
-    .arcade-spindle .rail-shadow {fill:none;stroke:#30241b;stroke-width:15;stroke-linecap:round;stroke-linejoin:round}
-    .arcade-spindle .rail-metal {fill:none;stroke:url(#arcade-metal);stroke-width:9;stroke-linecap:round;stroke-linejoin:round}
-    .arcade-spindle .stay-shadow {fill:none;stroke:#201812;stroke-width:10;stroke-linecap:round;stroke-linejoin:round}
-    .arcade-spindle .stay-metal {fill:none;stroke:url(#arcade-metal);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
-    .arcade-pin {position:absolute;top:5px;width:9px;height:12px;z-index:7;pointer-events:none;
-      border:2px solid #bda780;border-radius:5px;background:linear-gradient(90deg,#483c2d,#ebdabc 38%,#806c4f 68%,#30271e);
-      box-shadow:1px 2px 2px #0008,inset 0 1px #fff4dd}
-    .arcade-pin::after {content:'';position:absolute;left:1px;top:2px;width:3px;height:5px;border-radius:2px;background:#211b17;box-shadow:inset 1px 1px #000}
-    .arcade-lights {position:absolute;top:10px;right:15px;z-index:8;display:flex;gap:4px;pointer-events:none}
-    .arcade-lights i {width:3px;height:3px;border-radius:50%;background:#181a16;box-shadow:inset 0 0 1px #000;transition:background .3s,box-shadow .3s}
-    :root[data-credit] .arcade-lights i {background:#e7bd75;box-shadow:0 0 4px #e7bd7566}
-    :root[data-credit] .arcade-lights i:nth-child(2) {background:#a5c18b;box-shadow:0 0 4px #a5c18b66}
-    :root[data-credit] .arcade-lights i:nth-child(3) {background:#e7bd75;box-shadow:0 0 4px #e7bd7566}
-    .arcade-spindle .hanger-shadow {fill:none;stroke:#201812;stroke-width:5;stroke-linecap:round}
-    .arcade-spindle .hanger-metal {fill:none;stroke:#ac9672;stroke-width:2;stroke-linecap:round}
-    .arcade-bearing {position:absolute;top:17px;width:22px;height:24px;border:1px solid #ae9267;border-radius:4px;
-      background:linear-gradient(90deg,#3d3227,#b9a282 36%,#62503d 70%,#32291f);box-shadow:0 5px 5px #000b,inset 0 1px #f3e1bf}
-    .arcade-bearing::before {content:'';position:absolute;inset:5px;border:2px solid #c4af8a;border-radius:50%;background:radial-gradient(circle,#30271e 0 2px,#928063 3px,#47392a 5px);box-shadow:inset 0 1px 2px #000}
-    .arcade-bearing::after {content:'';position:absolute;top:1px;left:3px;width:3px;height:3px;border-radius:50%;background:#342c23;box-shadow:12px 17px #342c23}
-    #game-grid .card {--index-stock:#55716a;overflow:visible;border:2px solid #b5aa8d;border-radius:11px;background:#243e3c;
+    #game-grid .card {overflow:visible;border:2px solid #b5aa8d;border-radius:11px;background:#243e3c;
       box-shadow:0 12px 20px #000b,0 2px 0 #d8d3b9,0 4px 0 #738980,0 5px 0 #172d2b,inset 0 0 0 2px #f9edcf44,inset 0 -2px #142826;transition:transform .95s cubic-bezier(.25,.65,.25,1),box-shadow .35s,border-color .35s}
     #game-grid .card::before {inset:3px;width:auto;height:auto;border:1px solid #f5edda55;border-radius:7px;
       background:linear-gradient(112deg,#fff8e924,transparent 19% 67%,#fff8e91b 69%,#fff8e92b 72%,transparent 76%),linear-gradient(178deg,#fff9ec1a,transparent 18% 91%,#fff9ec14);pointer-events:none;z-index:4;
@@ -802,8 +384,6 @@
     #game-grid .card::after {left:9px;right:9px;top:auto;bottom:2px;width:auto;height:2px;border:0;border-radius:50%;background:linear-gradient(90deg,transparent,#fff6d9aa 20% 75%,transparent);pointer-events:none}
     #game-grid .card:is(.card-focused,.card-active) {border-color:#e1d8b8;box-shadow:0 18px 24px #000c,0 2px 0 #eee8d0,0 4px 0 #8da69a,0 5px 0 #172d2b,inset 0 0 0 2px #fff4dc55,inset 0 -2px #211a14}
     #game-grid .card.card-focused::before {background-position:0 0,0 0}
-    #game-grid .card-genre {color:#c9b391}
-    #game-grid .card-desc {background:linear-gradient(105deg,#e9ddc1,#f2e7cf 46%,#dfd0af);border-color:#bcaa88;box-shadow:inset 0 0 0 2px #fff6e344,0 1px 2px #0005}
     #game-grid .card .card-shot {transform:none!important;transition:none;filter:none}
     #game-grid .card-shot-wrap::after {content:none;animation:none!important}
     #game-grid .card.no-credit {filter:grayscale(.62) brightness(.68)}
@@ -813,35 +393,11 @@
     #game-grid .card-shot-wrap::before {inset:auto auto 11px 50%;width:56px;height:6px;transform:translateX(-50%);z-index:0;background:repeating-linear-gradient(90deg,#9b7942 0 3px,#e4c78b 3px 5px,#171410 5px 8px);box-shadow:0 -1px #423725}
     .game-rom {position:absolute;inset:5px;display:flex;flex-direction:column;gap:2px;padding:3px;border:1px solid #aa9270;border-radius:3px;background:#25231e;box-shadow:0 2px 4px #000c,inset 0 1px #ecdbb580;overflow:hidden}
     #game-grid .game-rom .card-shot {flex:1;min-height:0;width:100%;height:calc(100% - 13px);object-fit:contain}
-    .rom-label {flex:none;height:11px;color:#d5c5a4;font:700 7px/11px 'Courier New',monospace;letter-spacing:.12em;text-align:center;background:linear-gradient(#403a2e,#29251e)}
     @media(max-width:620px) {#game-grid .card-shot-wrap {width:128px}}
-    #game-grid .card-copy {position:relative;flex:1;min-height:0;padding:14px 14px 18px;border:1px solid #b9a888;border-radius:3px;
-      background:
-        radial-gradient(ellipse at 2% 94%,#88602a26,transparent 29%),
-        radial-gradient(ellipse at 98% 6%,#91632624,transparent 24%),
-        radial-gradient(circle at 11% 81%,#8c642c2b 0 .7px,transparent 1.3px),
-        radial-gradient(circle at 92% 19%,#8c642c22 0 1px,transparent 1.7px),
-        radial-gradient(circle at 84% 91%,#8c642c26 0 .8px,transparent 1.5px),
-        repeating-linear-gradient(83deg,#6f542908 0 1px,transparent 1px 5px),
-        linear-gradient(100deg,#cdb77e,#e9d8a7 8%,#ecdeb7 48%,#e6d4a3 91%,#cdb87f);
-      box-shadow:inset 0 0 0 2px #f5e8c544,inset 0 0 13px #87612522,0 1px 1px #fff0cf66;}
-    #game-grid .card-copy::before {content:'';position:absolute;inset:2px;border-radius:2px;border:1px solid #fff9e833;background:linear-gradient(112deg,#fffdf00e,transparent 40% 78%,#fffdf012 81% 83%,transparent 87%);pointer-events:none}
-    #game-grid .card-copy::after {content:'';position:absolute;left:14px;right:14px;bottom:8px;height:1px;background:#99836666;pointer-events:none}
-    #game-grid .card-copy .card-genre {margin:0 0 12px;padding-bottom:9px;border-bottom:1px solid #65807777;color:#3e5f59;font:700 10px/1.4 'Courier New',monospace;letter-spacing:.08em;}
-    #game-grid .card-copy .card-desc {margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;color:#302f29;font:16px/1.5 Georgia,'Times New Roman',serif;overflow-wrap:normal;}
-    #game-grid .card-copy .card-hi {color:#3e5f59;font:700 9px/1.4 'Courier New',monospace;letter-spacing:.025em;text-shadow:none;}
     #game-grid .game-rom {background:linear-gradient(125deg,#393329,#24221d 40%,#171613);border-color:#a18c6b;box-shadow:0 3px 5px #000b,inset 0 1px #efdfbe99,inset 0 -2px #0b0b09;}
     #game-grid .game-rom::after {content:'';position:absolute;inset:3px;border-radius:1px;background:linear-gradient(115deg,#fff2cf0c,transparent 35% 76%,#fff2cf06);pointer-events:none}
-    #game-grid .card-code {left:13px;right:auto;top:10px;color:#742e36;background:#e0cd9d;border-color:#aa9466;box-shadow:inset 0 1px #fff2d2,0 1px 2px #0005;text-shadow:none}
 
-    #game-grid :is(.card-rally,.card-brawler,.card-galactic,.card-meteors) {--index-stock:#854851}
-    .card-index-tab {position:absolute;top:-16px;left:calc(1% + var(--tab-lane)*24%);width:23%;height:21px;padding:0 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;border:1px solid #c8b78f;border-bottom:0;border-radius:4px 4px 0 0;
-      background:linear-gradient(#ffffff20,transparent 48%,#00000014),var(--index-stock);color:#fff3d9;font:700 11px/20px 'Courier New',monospace;letter-spacing:.03em;text-shadow:0 1px 0 #0006;box-shadow:0 -1px 0 #fff2d355,inset 0 1px #fff6df55,2px -2px 3px #0007;pointer-events:auto}
 
-    /* The card's own small print: who can play. */
-    .card-meta {display:block;margin-top:12px;padding-top:7px;border-top:1px dotted #a88b6199;color:#765733;font:700 10px/1.3 'Courier New',monospace;letter-spacing:.12em;text-transform:uppercase}
-    :root[data-layout="landscape"] .card-meta {margin-top:5px;padding-top:3px;font-size:9px}
-    @media (max-width:340px) {.card-meta {display:none}}
     /* The pick panel: a carriage of the arcade, umber with brass rods above and below, two brass pegs to step through the cards and a START key. */
     .card-pick {position:absolute;left:50%;bottom:7px;z-index:60;display:flex;align-items:center;gap:9px;transform:translateX(-50%);max-width:calc(100% - 26px);
       padding:9px 20px 9px 22px;border:1px solid #806647;border-radius:5px;white-space:nowrap;color:#f0d6a4;
@@ -862,21 +418,10 @@
     .pick-prev i {border-right:9px solid #f0d6a4;border-left:0;margin-left:-1px}
     .pick-next i {border-left:9px solid #f0d6a4;border-right:0;margin-left:1px}
     .pick-arrow:hover,.pick-arrow:focus-visible {border-color:#f7e7c5;outline:0}
-    .pick-text {margin:0 8px 0 3px}
-    /* START: a plunger key in the carriage, its lamp lit while a credit is waiting, like the arcade's own lights. */
-    .pick-start {position:relative;display:flex;align-items:center;gap:8px;height:28px;padding:0 14px 0 11px;border:2px solid #c4a570;border-radius:6px;cursor:pointer;
-      color:#f0d6a4;font:700 11px/1 'Courier New',monospace;letter-spacing:.2em;text-shadow:0 1px #090708;
-      background:linear-gradient(180deg,#6b5238,#2a2018 55%,#150f0c);box-shadow:0 4px 0 #0b0806,0 6px 6px #000c,inset 0 1px #fff0ce66,inset 0 -2px #0007;
-      transition:transform .06s,box-shadow .06s}
-    .pick-start:active {transform:translateY(3px);box-shadow:0 1px 0 #0b0806,0 2px 3px #000c,inset 0 1px #fff0ce44,inset 0 -2px #0007}
-    .pick-start:hover,.pick-start:focus-visible {border-color:#f7e7c5;outline:0}
-    .pick-lamp {width:7px;height:7px;border-radius:50%;background:#18110d;box-shadow:inset 0 1px #000,0 0 0 1px #5a422b}
-    :root[data-credit] .pick-lamp {background:#e7bd75;box-shadow:0 0 7px #e7bd75cc,0 0 0 1px #8a6a3c}
     /* Unpowered, the panel sits dark; a credit brings it up, as the rest of the cabinet comes up. */
     .card-pick {transition:filter .7s ease-out,opacity .7s ease-out}
     :root:not([data-credit]) .card-pick {filter:brightness(.5) saturate(.6)}
-    :root:not([data-credit]) .pick-start {filter:brightness(.75)}
-    @media (max-width:520px) {.pick-long {display:none}.card-pick {font-size:10px;padding:8px 18px 8px 20px;gap:7px}.pick-arrow {width:30px;height:30px}.pick-start {height:30px;padding:0 11px 0 9px;letter-spacing:.14em}}
+    @media (max-width:520px) {.card-pick {font-size:10px;padding:8px 18px 8px 20px;gap:7px}.pick-arrow {width:30px;height:30px}}
     @media (prefers-reduced-motion:no-preference) {
       .pick-arrow {animation:pick-nudge 1.8s ease-in-out 5}
       .pick-next {animation-name:pick-nudge-r}
@@ -887,8 +432,6 @@
 
     /* BLIP's floor: a row of upright cabinets; the chosen one stands square to the player. */
     .divider {opacity:.3}
-    .jukebox-storage,.arcade-guides,.arcade-spindle,.arcade-pin,.arcade-lights,
-    .arcade-empty-bay,.card-index-tab,.card-code,.card-selector,.rom-label {display:none!important}
     .jukebox-front {inset:0!important}
     .jukebox-front::before {content:none}
     #game-grid {overflow:hidden!important;perspective:1100px!important;perspective-origin:50% 38%;transform-style:flat!important;touch-action:pan-y!important;
@@ -952,7 +495,6 @@
       filter:none!important;opacity:1;clip-path:none;
       transition:none;
     }
-    #game-grid .card.rejected {animation:none}
     .machine-launching .jukebox-front {transition:transform .76s cubic-bezier(.45,0,.25,1);transform:translate(var(--launch-x),var(--launch-y)) scale(var(--launch-zoom))}
     /* The screen being stepped into shows the game's picture, which the game page opens on. */
     #game-grid .card.card-launching .card-loop {visibility:hidden}
@@ -1006,8 +548,7 @@
     #game-grid .card-shot-wrap::after {content:none}
     #game-grid .game-rom {position:absolute;inset:13px 14px 22px;display:block;padding:0;border:0;border-radius:16px/20px;overflow:hidden;background:#000;
       box-shadow:0 0 0 3px #000,0 0 14px color-mix(in srgb,var(--trim) 45%,transparent)}
-    /* Letterboxed, as the game draws itself on its page. */
-    /* No filter or opacity on a screen: inside the turned cabinets iOS Safari drew a filtered or fading screen black. */
+    /* Letterboxed, as the game draws itself. No filter or opacity: inside the turned cabinets iOS Safari drew a filtered or fading screen black. */
     #game-grid .game-rom .card-shot,#game-grid .card-shot-wrap img.card-shot {position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;border-radius:0}
     /* Scanlines, the tube's dark corners and a glare off the glass. */
     #game-grid .game-rom::after {content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
@@ -1025,10 +566,6 @@
     .machine-credit {position:static;transform:none;min-width:0;padding:3px 5px 2px;border:0;border-radius:0;background:#000b;box-shadow:none;
       color:#ffe066;font:400 7px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.06em;text-shadow:none;white-space:nowrap}
 
-    #game-grid .card-genre,#game-grid .card-desc,#game-grid .card-hi {display:none!important}
-    #game-grid .card-badges,#game-grid .badge-touch,#game-grid .badge-pad {display:none!important}
-    #game-grid .card-copy {display:contents}
-    #game-grid .card-punch {display:none!important}
     .card-pick {left:calc(14px + env(safe-area-inset-left,0px));right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:70;width:auto;max-width:none;justify-content:space-between;transform:none;
       padding:0;border:0;background:none;box-shadow:none;pointer-events:none;}
     .card-pick::before,.card-pick::after {display:none}
@@ -1039,7 +576,7 @@
     /* The arcade's top bar stays whole in fullscreen too: logo, switches, manual and power. */
     :is(:root[data-fullscreen]:not([data-has-touch]),:root[data-bare]) body.cabinet-page .manual-pocket {display:flex}
     /* The controls and coin door are the machines' own: no deck along the bottom. */
-    body.cabinet-page #kiosk-bar,body.cabinet-page #kiosk-insert-btn {display:none!important}
+    body.cabinet-page #kiosk-insert-btn {display:none!important}
     body.cabinet-page {padding-bottom:0!important;--cabinet-bottom-bar-height:0px}
     body.cabinet-page .screen-bezel {bottom:0!important}
 
@@ -1057,22 +594,6 @@
     .machine-deck-cheek {position:absolute;top:0;left:0;width:calc(var(--deck-height,125px) * .45);height:var(--deck-height,125px);transform-origin:0 0;transform:rotateY(90deg);
       clip-path:polygon(0 0,0 100%,100% 72%);background:linear-gradient(90deg,#393039,#17131a 35%,#0b090e);pointer-events:none}
     .machine-deck-cheek.right {left:100%;background:linear-gradient(90deg,#211c24,#0b090e 80%)}
-    .machine-stations {display:none}
-    /* A ball-top stick in its dust washer, seen from the player's side. */
-    .machine-stick {position:relative;display:block;flex:none;width:34px;height:46px;background:radial-gradient(ellipse 15px 7px at 50% 86%,#09090b 0 60%,#5a5862 70%,transparent 76%)}
-    .machine-stick::before {content:'';position:absolute;left:14px;bottom:5px;width:6px;height:28px;border-radius:3px;background:linear-gradient(90deg,#3d3c42,#d4d2cf 45%,#4b4a50);box-shadow:1px 1px 2px #000}
-    .machine-stick::after {content:'';position:absolute;top:0;left:6px;width:22px;height:22px;border-radius:50%;
-      background:radial-gradient(circle at 34% 28%,#fff9 0 2px,var(--ball,#e8352c) 5px,color-mix(in srgb,var(--ball,#e8352c) 50%,#000) 85%);box-shadow:0 3px 3px #000a}
-    /* A spinner knob for the paddle games. */
-    .machine-dial {position:relative;display:block;flex:none;width:36px;height:36px;border-radius:50%;
-      background:radial-gradient(circle at 40% 32%,#fff 0 2px,transparent 3px),repeating-conic-gradient(#d9d8de 0 7deg,#77767e 7deg 14deg);
-      box-shadow:0 0 0 2px #111,0 0 0 4px #3a3940,0 5px 5px #000c}
-    .machine-dial::after {content:'';position:absolute;inset:8px;border-radius:50%;background:radial-gradient(circle at 38% 30%,#f2f1f4,#8f8e96 60%,#4a4950);box-shadow:0 1px 2px #000a}
-    .machine-buttons {display:flex;gap:7px;transform:none}
-    .machine-buttons i {display:block;width:22px;height:22px;border:2px solid #0b0a0e;border-radius:50%;
-      background:radial-gradient(circle at 50% 40%,color-mix(in srgb,var(--button,#f0342a) 80%,#000) 0 38%,var(--button,#f0342a) 46%,color-mix(in srgb,var(--button,#f0342a) 55%,#fff) 66%,var(--button,#f0342a) 82%);
-      box-shadow:0 0 0 2px #2a2c30,0 0 0 3px #c9ccd2,0 3px 0 3px #3a3c42,0 6px 5px 2px #000a;filter:none}
-    .machine-buttons i:nth-child(2) {--button:#2f7cf0}
     /* On a small screen the cabinet shrinks but Start does not: it stays a thumb wide (30px tall at least). */
     .card {--start-grow:max(1,calc(.76 / var(--arc-scale,1)))}
     .machine-start {appearance:none;position:absolute;z-index:5;left:50%;top:69.5%;bottom:auto;min-width:84px;height:40px;padding:0 8px;transform:translateX(-50%) scale(var(--start-grow));transform-origin:50% 0;
@@ -1127,15 +648,15 @@
     .machine-coinbox:focus-visible,.machine-start:focus-visible {outline:2px solid #ffe0a1;outline-offset:3px}
 
     .pick-arrow {width:38px;height:38px;border-color:#8f7fb0;background:radial-gradient(circle at 50% 35%,#4a3f63,#1a1524)}
-    #game-grid .card-rally {--ball:#e2513a;--side-art:linear-gradient(transparent 30%,#fff2 30% 31%,transparent 31%),radial-gradient(circle at 60% 52%,#fff 0 9px,transparent 10px),linear-gradient(90deg,transparent 18%,#fffb 18% 24%,transparent 24%) 0 40%/100% 22% no-repeat}
+    #game-grid .card-rally {--side-art:linear-gradient(transparent 30%,#fff2 30% 31%,transparent 31%),radial-gradient(circle at 60% 52%,#fff 0 9px,transparent 10px),linear-gradient(90deg,transparent 18%,#fffb 18% 24%,transparent 24%) 0 40%/100% 22% no-repeat}
     #game-grid .card-serpent {--side-art:repeating-linear-gradient(90deg,transparent 0 20px,#0000 20px),linear-gradient(90deg,transparent 30%,#9dff7a 30% 42%,transparent 42%) 0 20%/100% 26% no-repeat,linear-gradient(transparent 46%,#9dff7a 46% 54%,transparent 54%) 0 32%/60% 60% no-repeat,radial-gradient(circle at 36% 18%,#fff 0 4px,transparent 5px)}
     #game-grid .card-bouncer {--side-art:linear-gradient(90deg,#ff5a5a 0 33%,#ffd25a 33% 66%,#5aff8a 66%) 12% 12%/76% 4% no-repeat,linear-gradient(90deg,#5ab4ff 0 50%,#c45aff 50%) 12% 18%/76% 4% no-repeat,radial-gradient(circle at 55% 52%,#fff 0 8px,transparent 9px)}
     #game-grid .card-galactic {--side-art:radial-gradient(circle at 20% 15%,#fff 0 1.5px,transparent 2.5px) 0 0/60px 70px,radial-gradient(circle at 70% 60%,#fff9 0 1px,transparent 2px) 0 0/45px 50px,linear-gradient(160deg,transparent 40%,#ff5af1aa 40% 46%,transparent 46%)}
     #game-grid .card-meteors {--side-art:radial-gradient(circle at 40% 30%,transparent 0 26px,#fffc 27px 30px,transparent 31px),radial-gradient(circle at 70% 62%,transparent 0 16px,#fff9 17px 19px,transparent 20px),radial-gradient(circle at 25% 75%,transparent 0 10px,#fff8 11px 13px,transparent 14px)}
     #game-grid .card-sky-raider {--side-art:linear-gradient(transparent 60%,#3f7a35 60%),repeating-linear-gradient(0deg,transparent 0 40px,#ffffff22 40px 42px),linear-gradient(180deg,transparent 18%,#ff5a3a 18% 21%,transparent 21%) 0 0/100% 100% no-repeat}
     #game-grid .card-brawler {--side-art:repeating-conic-gradient(from 0deg at 50% 45%,#ffd84a33 0 8deg,transparent 8deg 16deg),radial-gradient(circle at 50% 45%,#ffd84a 0 14%,transparent 15%)}
-    #game-grid .card-bubbler {--ball:#45b6f0;--side-art:radial-gradient(circle at 30% 30%,#fff6 0 3px,transparent 4px,transparent 0 24px,#fffb 25px 28px,transparent 29px),radial-gradient(circle at 66% 58%,transparent 0 18px,#fff9 19px 21px,transparent 22px),radial-gradient(circle at 40% 80%,transparent 0 11px,#fff8 12px 14px,transparent 15px)}
-    #game-grid .card-adder {--ball:#e09a2a;--side-art:radial-gradient(ellipse 60% 30% at 40% 30%,transparent 0 62%,#ffe08a 63% 70%,transparent 71%),radial-gradient(ellipse 50% 40% at 60% 64%,transparent 0 62%,#7ad8ff 63% 70%,transparent 71%)}
+    #game-grid .card-bubbler {--side-art:radial-gradient(circle at 30% 30%,#fff6 0 3px,transparent 4px,transparent 0 24px,#fffb 25px 28px,transparent 29px),radial-gradient(circle at 66% 58%,transparent 0 18px,#fff9 19px 21px,transparent 22px),radial-gradient(circle at 40% 80%,transparent 0 11px,#fff8 12px 14px,transparent 15px)}
+    #game-grid .card-adder {--side-art:radial-gradient(ellipse 60% 30% at 40% 30%,transparent 0 62%,#ffe08a 63% 70%,transparent 71%),radial-gradient(ellipse 50% 40% at 60% 64%,transparent 0 62%,#7ad8ff 63% 70%,transparent 71%)}
     :root[data-layout="landscape"] #game-grid .card {flex-direction:column;gap:0}
     @media (prefers-reduced-motion:reduce) {
       #game-grid .card {transition:none!important}
@@ -1165,125 +686,78 @@
     <span class="screw tl"></span><span class="screw tr"></span>
     <span class="screw bl"></span><span class="screw br"></span>
     <div class="jukebox-game-screen"><div class="cabinet-glass" aria-hidden="true"></div></div>
-    <div class="arcade-guides" aria-hidden="true"><i class="arcade-guide left"></i><i class="arcade-guide right"></i><i class="arcade-carriage left"></i><i class="arcade-carriage right"></i><i class="arcade-stay left"></i><i class="arcade-stay right"></i></div>
     <div class="jukebox-front" id="jukebox-front">
   <div class="game-grid" id="game-grid" aria-label="Arcade machines. Use the left and right arrows to walk between games.">
 
     <!-- RALLY -->
     <article class="card card-rally" data-game-url="rally/index.html">
-      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
-      <div class="card-badges">
-        <div class="badge-2p">2<br>PLAYER</div>
-      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="rally/screenshot.png" alt="Rally gameplay">
       </div>
       <div class="card-title">RALLY</div>
-      <div class="card-genre"  data-i18n="rallyGenre"></div>
-      <div class="card-desc"   data-i18n="rallyDesc"></div>
     </article>
 
     <!-- BUBBLER -->
     <article class="card card-bouncer" data-game-url="bouncer/index.html">
-      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
-      <div class="card-badges">
-        <div class="badge-genre badge-cosy" data-i18n="badgeCosy">COSY</div>
-      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="bouncer/screenshot.png?v=4" alt="Bouncer gameplay">
       </div>
       <div class="card-title">BOUNCER</div>
-      <div class="card-genre"  data-i18n="bouncerGenre"></div>
-      <div class="card-desc"   data-i18n="bouncerDesc"></div>
     </article>
 
     <!-- DEFENDER -->
     <article class="card card-galactic" data-game-url="defender/index.html">
-      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
         <img class="card-shot" src="defender/screenshot.png?v=7" alt="Defender gameplay">
       </div>
       <div class="card-title">DEFENDER</div>
-      <div class="card-genre"  data-i18n="galacticGenre"></div>
-      <div class="card-desc"   data-i18n="galacticDesc"></div>
     </article>
 
     <!-- RAIDER -->
     <article class="card card-bubbler" data-game-url="bubbler/index.html">
-      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
-      <div class="card-badges">
-        <div class="badge-2p">2<br>PLAYER</div>
-        <div class="badge-genre badge-cosy" data-i18n="badgeCosy">COSY</div>
-      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="bubbler/screenshot.png?v=4" alt="Bubbler gameplay">
       </div>
       <div class="card-title">BUBBLER</div>
-      <div class="card-genre"  data-i18n="bubblerGenre"></div>
-      <div class="card-desc"   data-i18n="bubblerDesc"></div>
     </article>
 
     <!-- BOUNCER -->
     <article class="card card-sky-raider" data-game-url="raider/index.html">
-      <span class="badge-pad"><svg class="bp-dualsense" viewBox="0 0 30 19" aria-hidden="true"><path class="bp-body" d="M7 2.2C10 1.2 20 1.2 23 2.2C26.2 3.3 28.3 8.5 29 13.6C29.5 17.4 26.8 18.6 24.6 16.4L21.4 13.1C18.6 12 11.4 12 8.6 13.1L5.4 16.4C3.2 18.6.5 17.4 1 13.6C1.7 8.5 3.8 3.3 7 2.2Z"/><path class="bp-centre" d="M10.2 3.4H19.8L19 9.6C16.4 10.4 13.6 10.4 11 9.6Z"/><path class="bp-light" d="M10.8 3.9Q15 5 19.2 3.9"/><circle class="bp-stick" cx="11.2" cy="11.2" r="1.7"/><circle class="bp-stick" cx="18.8" cy="11.2" r="1.7"/><path class="bp-dpad" d="M5.4 7.6h2.6M6.7 6.3v2.6"/><circle class="bp-btn" cx="23.3" cy="6.2" r=".8"/><circle class="bp-btn" cx="23.3" cy="9" r=".8"/><circle class="bp-btn" cx="21.9" cy="7.6" r=".8"/><circle class="bp-btn" cx="24.7" cy="7.6" r=".8"/></svg><span class="bp-text" data-i18n="badgePad">CONTROLLER<small>RECOMMENDED</small></span></span>
-      <div class="card-badges">
-        <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
-      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="raider/screenshot.png?v=12" alt="Raider gameplay">
       </div>
       <div class="card-title">RAIDER</div>
-      <div class="card-genre"  data-i18n="skyRaiderGenre"></div>
-      <div class="card-desc"   data-i18n="skyRaiderDesc"></div>
     </article>
     <!-- METEORS -->
     <article class="card card-meteors" data-game-url="meteors/index.html">
-      <div class="card-badges">
-        <div class="badge-genre badge-trippy" data-i18n="badgeTrippy">TRIPPY</div>
-      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="meteors/screenshot.png?v=6" alt="Meteors gameplay">
       </div>
       <div class="card-title">METEORS</div>
-      <div class="card-genre"  data-i18n="meteorsGenre"></div>
-      <div class="card-desc"   data-i18n="meteorsDesc"></div>
     </article>
 
     <!-- SERPENT -->
     <article class="card card-serpent" data-game-url="serpent/index.html">
-      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
         <img class="card-shot" src="serpent/screenshot.png?v=4" alt="Serpent gameplay">
       </div>
       <div class="card-title">SERPENT</div>
-      <div class="card-genre"  data-i18n="serpentGenre"></div>
-      <div class="card-desc"   data-i18n="serpentDesc"></div>
     </article>
 
     <!-- BRAWLER -->
     <article class="card card-brawler" data-game-url="brawler/index.html">
-      <span class="badge-pad"><svg class="bp-dualsense" viewBox="0 0 30 19" aria-hidden="true"><path class="bp-body" d="M7 2.2C10 1.2 20 1.2 23 2.2C26.2 3.3 28.3 8.5 29 13.6C29.5 17.4 26.8 18.6 24.6 16.4L21.4 13.1C18.6 12 11.4 12 8.6 13.1L5.4 16.4C3.2 18.6.5 17.4 1 13.6C1.7 8.5 3.8 3.3 7 2.2Z"/><path class="bp-centre" d="M10.2 3.4H19.8L19 9.6C16.4 10.4 13.6 10.4 11 9.6Z"/><path class="bp-light" d="M10.8 3.9Q15 5 19.2 3.9"/><circle class="bp-stick" cx="11.2" cy="11.2" r="1.7"/><circle class="bp-stick" cx="18.8" cy="11.2" r="1.7"/><path class="bp-dpad" d="M5.4 7.6h2.6M6.7 6.3v2.6"/><circle class="bp-btn" cx="23.3" cy="6.2" r=".8"/><circle class="bp-btn" cx="23.3" cy="9" r=".8"/><circle class="bp-btn" cx="21.9" cy="7.6" r=".8"/><circle class="bp-btn" cx="24.7" cy="7.6" r=".8"/></svg><span class="bp-text" data-i18n="badgePad">CONTROLLER<small>RECOMMENDED</small></span></span>
-      <div class="card-badges">
-        <div class="badge-2p">2<br>PLAYER</div>
-        <div class="badge-genre badge-action" data-i18n="badgeAction">ACTION!</div>
-      </div>
       <div class="card-shot-wrap">
         <img class="card-shot" src="brawler/card.png?v=14" alt="Brawler: a high kick, over the sign">
       </div>
       <div class="card-title">BRAWLER</div>
-      <div class="card-genre"  data-i18n="brawlerGenre"></div>
-      <div class="card-desc"   data-i18n="brawlerDesc"></div>
     </article>
 
     <!-- ADDER -->
     <article class="card card-adder" data-game-url="adder/index.html">
-      <span class="badge-touch"><svg class="bt-ipad" viewBox="0 0 16 20" aria-hidden="true"><rect x="1" y="1" width="14" height="18" rx="2.6"/><circle class="bt-tip" cx="8" cy="10" r="1.7"/><circle class="bt-ring" cx="8" cy="10" r="4"/></svg><span data-i18n="badgeTouch">TOUCH</span></span>
       <div class="card-shot-wrap">
         <img class="card-shot" src="adder/screenshot.png" alt="Adder gameplay">
       </div>
       <div class="card-title">ADDER</div>
-      <div class="card-genre"  data-i18n="adderGenre"></div>
-      <div class="card-desc"   data-i18n="adderDesc"></div>
     </article>
 
   </div>
@@ -1291,10 +765,6 @@
   </div>
 
   <!-- The landing page's controls let the player walk the aisle and start a machine. -->
-  <div id="kiosk-bar" class="kiosk-bar kiosk-bar-main">
-   <div class="deck-panel"></div>
-
-  </div>
   <div class="manual-overlay" id="manual-overlay" hidden role="dialog" aria-modal="true" aria-label="BLIP Arcade Manual">
     <div class="manual-open-book" role="document">
       <section class="manual-open-page manual-open-left" id="manual-contents-page" aria-label="Manual left page">
@@ -1358,201 +828,15 @@
     </div>
     </div>
   </template>
-  <script src="deck.js?v=15"></script>
+  <script src="deck.js?v=16"></script>
   <script src="book.js?v=3"></script>
   <script src="manual-motion.js?v=3"></script>
 
   <script src="howler.min.js"></script>
-  <script src="blip_core.js?v=7"></script>
-  <script src="kiosk.js?v=100"></script>
+  <script src="blip_core.js?v=8"></script>
+  <script src="kiosk.js?v=101"></script>
   <script src="aisle.js?v=1"></script>
-  <script src="blip_controller.js?v=10"></script>
-  <!-- Git-ignored, written at deploy: absent means no leaderboard. -->
-  <script src="blip_config.js?v=1"></script>
   <script>
-    /* ------------------------------------------------------------------ */
-    /* Translations                                                         */
-    /* ------------------------------------------------------------------ */
-    var i18n = {
-
-      en: {
-        badgeAction:      'ACTION!',
-        badgeCosy:        'COSY',
-        badgeTrippy:      'TRIPPY',
-        badgeTouch:       'TOUCH',
-        badgePad:         'CONTROLLER<small>RECOMMENDED</small>',
-        serpentGenre:     'SNAKE CHASE',
-        serpentDesc:      'Feed your snake and watch it grow! Keep clear of the walls and your own tail. How long can you keep this slippery customer on the move?',
-        serpentControls:  'PUSH WASD / ARROW KEY FOR MOVE',
-
-        bouncerGenre:     'BRICK-BREAKING ACTION',
-        bouncerDesc:      'Smash every brick and clear the board! Keep that ball in play—let it slip past your paddle and you’re out. Clear one rack and the next is waiting!',
-        bouncerControls:  'A/D OR ARROW &middot; [1] LAUNCH',
-
-        galacticGenre:    'SPACE INVADERS',
-        galacticDesc:     'Alert! The alien fleet is closing in on Earth. Blast every saucer before it lands. Our planet is counting on you, space cadet!',
-        galacticControls: 'A/D OR ARROW &middot; [1] SHOOT',
-
-        rallyGenre:        'PADDLE DUEL',
-        rallyDesc:         'Serve it up! First player to seven takes the match. Every volley sends that ball screaming faster!',
-        rallyControls:     'P1 W/S OR ARROW &middot; P2 I/K &middot; [1] SERVE',
-
-        meteorsGenre:      'ASTEROID BLAST',
-        meteorsDesc:       'Take the controls, pilot! Blast the rock field and watch each asteroid split into smaller chunks. Keep clear—or it’s a one-way trip!',
-        meteorsControls:   'A/D ROTATE &middot; W THRUST &middot; [1] FIRE &middot; [2] HYPERSPACE',
-
-        brawlerGenre:      'CHAMPIONSHIP FIGHTING',
-        brawlerDesc:       'Choose your champ, then take on nine challengers on their own turf. Smash barrels for bonus points, and guard high or low—there’s no blocking both. A new challenger is stepping up!',
-        brawlerControls:   '1P WASD + F/G &middot; 2P ARROWS + J/K &middot; BOTH = SPECIAL',
-        bubblerGenre:      'BUBBLE-BLASTING ADVENTURE',
-        bubblerDesc:       'Two bubble-blowing dragons take on a gang of toy monsters. Trap ’em, pop ’em, and turn the whole bunch into candy. Pop a cluster and double your haul!',
-        bubblerControls:   '1P WASD+F BUBBLE+G JUMP &middot; 2P ARROWS+J+K &middot; HOLD JUMP TO RIDE BUBBLES',
-
-        skyRaiderGenre:    'HIGH-FLYING AIR COMBAT',
-        skyRaiderDesc:     'Climb into the cockpit and send enemy planes packing! Watch for island and coastal flak—and the boss’s gun turret. Your final run takes you over the mainland to the big city!',
-        skyRaiderControls: 'ARROW OR WASD MOVE &middot; [1] FIRE',
-
-        adderGenre:        'VENOMOUS FREE-FOR-ALL',
-        adderDesc:         'All vipers move at 85 px/s, leaving thin solid trails that grow all round—even dead worms leave theirs behind. Dim gaps stay open; only the first crossing pays 50 × round. Last alive wins, then trails reset. Three lives per human; lose one on elimination. Game over when none have lives.',
-        adderControls:     'P1 A/D TURN &middot; P2 LEFT/RIGHT TURN &middot; J JOIN &middot; SPACE START/RESTART',
-
-        serpentControlsTouch: 'SWIPE FOR TURN SNAKE &middot; TAP FOR START',
-        bouncerControlsTouch: 'DRAG FOR MOVE PADDLE &middot; TAP FOR LAUNCH',
-        galacticControlsTouch: 'DRAG FOR MOVE CANNON &middot; HOLD FINGER FOR SHOOT',
-        rallyControlsTouch: 'DRAG UP OR DOWN &middot; 2 PLAYER = HALF SCREEN EACH',
-        meteorsControlsTouch: 'D-PAD ROTATE+THRUST &middot; RED FIRE &middot; BLUE HYPERSPACE',
-        brawlerControlsTouch: 'D-PAD MOVE &middot; LEFT BUTTON PUNCH &middot; RIGHT BUTTON KICK &middot; TOWARD+BUTTON = HIGH',
-        bubblerControlsTouch: 'TOUCH = BUBBLE &middot; SLIDE = RUN &middot; SWIPE UP = JUMP &middot; 2P JOIN FOR FRIEND',
-        skyRaiderControlsTouch: 'D-PAD FLY &middot; BUTTON FIRE',
-        adderControlsTouch: 'HORIZONTAL POSITION STEERS &middot; TAP TO START',
-      },
-
-      ja: {
-        badgeAction:      'アクション!',
-        badgeCosy:        'ほっこり',
-        badgeTrippy:      'サイケ',
-        badgeTouch:       'タッチ',
-        badgePad:         'コントローラー<small>推奨</small>',
-
-        serpentGenre:     'スネークゲーム',
-        serpentDesc:      'ヘビを操作してエサを食べ、どんどん成長しよう。<br>壁や自分の体にぶつかってはいけない。<br>どこまで長くなれるか？',
-        serpentControls:  'WASD / 矢印キー',
-
-        bouncerGenre:     'ブロック崩し',
-        bouncerDesc:      'ボールで全てのブロックを壊せ。<br>ボールをパドルの下に落とすな。<br>全部壊してステージクリア。',
-        bouncerControls:  'A/D または矢印 &middot; [1] 発射',
-
-        galacticGenre:    'スペースインベーダー',
-        galacticDesc:     'エイリアンの大群が迫ってくる。<br>着地する前に全滅させろ。<br>地球を守り抜け。',
-        galacticControls: 'A/D または矢印 &middot; [1] 射撃',
-
-        rallyGenre:        'ピンポンゲーム',
-        rallyDesc:         '先に7点取った方が勝ち。<br>打つたびにボールは速くなる。',
-        rallyControls:     'P1 W/S または矢印 &middot; P2 I/K &middot; [1] サーブ',
-
-        meteorsGenre:      '隕石破壊ゲーム',
-        meteorsDesc:       '宇宙船で岩石地帯を漂流する。<br>岩を撃って小さく砕け。<br>衝突は禁物、慎重に操縦せよ。',
-        meteorsControls:   'A/D 回転 &middot; W 推進 &middot; [1] 発射 &middot; [2] ワープ',
-
-        brawlerGenre:      '一対一格闘ゲーム',
-        brawlerDesc:       '十人から一人を選び、残る九人とそれぞれの本拠地で戦え。途中には樽割りのボーナスステージも。上段か下段か、両方は防げない。<br>挑戦者、あらわる。',
-        brawlerControls:   '1P WASD + F/G &middot; 2P 矢印 + J/K &middot; 同時押しで必殺技',
-        bubblerGenre:      '二匹の竜のアクションゲーム',
-        bubblerDesc:       'ふわふわの竜が泡を吹いて、おもちゃのモンスターをつかまえ、割ってキャンディーに。まとめて割るほど点が倍になる。',
-        bubblerControls:   '1P WASD+F 泡+G ジャンプ &middot; 2P 矢印+J+K &middot; ジャンプ長押しで泡に乗る',
-
-        skyRaiderGenre:    '空中戦闘ゲーム',
-        skyRaiderDesc:     '戦闘機で空を飛び、敵機を撃墜せよ。<br>島や海岸の対空砲火、ボスの銃塔に注意。<br>最後の任務は陸地を越えて大都市へ。',
-        skyRaiderControls: '矢印またはWASD移動 &middot; [1] 発射',
-
-        adderGenre:        '自由自在の毒蛇',
-        adderDesc:         '全ての蛇は毎秒85pxの一定速度で進み、細い実線の軌跡をラウンド中ずっと伸ばす。倒れても軌跡は残る。<br>薄暗い隙間は閉じず、最初の通過だけ50×ラウンド数の得点。最後の一匹が勝ち、次のラウンドで軌跡はリセット。<br>人間は各3ライフ、脱落で1つ失う。全員のライフがなくなるとゲームオーバー。',
-        adderControls:     '1P A/Dで旋回 &middot; 2P 左右で旋回 &middot; Jで参加 &middot; SPACEで開始/やり直し',
-
-        serpentControlsTouch: 'スワイプで曲がる &middot; タップでスタート',
-        bouncerControlsTouch: 'ドラッグでパドル移動 &middot; タップで発射',
-        galacticControlsTouch: 'ドラッグで砲台移動 &middot; 指を置くと射撃',
-        rallyControlsTouch: '上下にドラッグ &middot; 2人なら画面を半分ずつ',
-        meteorsControlsTouch: '方向キーで回転・推進 &middot; 赤で発射 &middot; 青でワープ',
-        brawlerControlsTouch: '方向キーで移動 &middot; 左ボタンでパンチ &middot; 右ボタンでキック &middot; 前+ボタンで上段',
-        bubblerControlsTouch: 'タッチで泡 &middot; スライドで走る &middot; 上スワイプでジャンプ &middot; 2P JOINで友だち参加',
-        skyRaiderControlsTouch: '方向キーで飛行 &middot; ボタンで発射',
-        adderControlsTouch: '指の左右の位置で旋回 &middot; タップでスタート',
-      },
-
-      da: {
-        badgeAction:      'ACTION!',
-        badgeCosy:        'HYGGE',
-        badgeTrippy:      'SYRET',
-        badgeTouch:       'TOUCH',
-        badgePad:         'CONTROLLER<small>ANBEFALES</small>',
-
-        serpentGenre:     'SLANGEBANE',
-        serpentDesc:      'Styr slangen til at spise og vokse.<br>Undg&aring; at ramme v&aelig;ggene eller dig selv.<br>Hvor lang kan du blive?',
-        serpentControls:  'WASD / PILETASTER',
-
-        bouncerGenre:     'KLODSBRÆKKER',
-        bouncerDesc:      'Br&aelig;k alle klodser med bolden.<br>Lad ikke bolden slippe forbi dit bat.<br>Ryd banen for at avancere.',
-        bouncerControls:  'A/D ELLER PILE &middot; [1] START',
-
-        galacticGenre:    'RUMANGRIBER',
-        galacticDesc:     'Alienbølger er på vej ind.<br>Skyd dem ned inden de lander.<br>Forsvar Jorden for enhver pris.',
-        galacticControls: 'A/D ELLER PILE &middot; [1] SKYD',
-
-        rallyGenre:        'BORDTENNISSPIL',
-        rallyDesc:         'F&oslash;rst til syv point vinder.<br>Bolden accelererer for hvert slag.',
-        rallyControls:     'P1 W/S ELLER PILE &middot; P2 I/K &middot; [1] SERV',
-
-        meteorsGenre:      'STENSKYDNINGSSPIL',
-        meteorsDesc:       'Rumskib driver i et felt af sten.<br>Skyd stenene i mindre stykker.<br>Und&aring; sammenst&oslash;d &mdash; det er farligt.',
-        meteorsControls:   'A/D DREJ &middot; W FREMDRIFT &middot; [1] SKYD &middot; [2] HYPERSPACE',
-
-        brawlerGenre:      'EN MOD EN KAMPSPIL',
-        brawlerDesc:       'V&aelig;lg en af ti k&aelig;mpere og m&oslash;d de ni andre, hver p&aring; hjemmebane, med t&oslash;nder at smadre undervejs. Hold h&oslash;jt eller lavt &mdash; ingen blokering d&aelig;kker begge.<br>Her kommer en ny udfordrer.',
-        brawlerControls:   '1P WASD + F/G &middot; 2P PILE + J/K &middot; BEGGE = SPECIAL',
-        bubblerGenre:      'PLATFORMSPIL FOR TO DRAGER',
-        bubblerDesc:       'To bl&oslash;de drager puster bobler, fanger legetøjsmonstrene og prikker dem til slik. Prik en hel klynge, og hver fangst t&aelig;ller dobbelt.',
-        bubblerControls:   '1P WASD+F BOBLE+G HOP &middot; 2P PILE+J+K &middot; HOLD HOP FOR AT RIDE P&Aring; BOBLER',
-
-        skyRaiderGenre:    'LUFTKAMPSPIL',
-        skyRaiderDesc:     'Styr jagerflyet op gennem himlen og skyd fjendens fly.<br>Pas p&aring; antiluftskyts fra &oslash;er og kyst og bossernes kanont&aring;rne.<br>Sidste mission g&aring;r ind over land til den store by.',
-        skyRaiderControls: 'PILE ELLER WASD &middot; [1] SKYD',
-
-        adderGenre:        'GIFTIG SLANGEFEST',
-        adderDesc:         'Alle slanger bevæger sig med 85 px/s og efterlader tynde, faste spor, der vokser hele runden—og bliver liggende efter døden.<br>Dæmpede huller forbliver åbne; kun første passage giver 50 × rundenummer. Den sidste i live vinder, så nulstilles sporene.<br>Tre liv per menneske; ét mistes ved eliminering. Spillet slutter, når ingen har liv tilbage.',
-        adderControls:     '1P A/D DREJ &middot; 2P VENSTRE/H&Oslash;JRE DREJ &middot; J DELTAG &middot; MELLEMRUM START/GENSTART',
-
-        serpentControlsTouch: 'SWIPE FOR AT DREJE &middot; TRYK FOR AT STARTE',
-        bouncerControlsTouch: 'TR&AElig;K FOR AT FLYTTE BAT &middot; TRYK FOR AT STARTE',
-        galacticControlsTouch: 'TR&AElig;K FOR AT FLYTTE KANONEN &middot; HOLD FINGEREN FOR AT SKYDE',
-        rallyControlsTouch: 'TR&AElig;K OP ELLER NED &middot; 2 SPILLERE = HALV SK&AElig;RM HVER',
-        meteorsControlsTouch: 'RETNINGSKORS DREJ+FREMDRIFT &middot; R&Oslash;D SKYD &middot; BL&Aring; HYPERSPACE',
-        brawlerControlsTouch: 'RETNINGSKORS BEV&AElig;G &middot; VENSTRE KNAP SLAG &middot; H&Oslash;JRE KNAP SPARK &middot; FREM+KNAP = H&Oslash;JT',
-        bubblerControlsTouch: 'BER&Oslash;RING = BOBLE &middot; GLID = L&Oslash;B &middot; SWIPE OP = HOP &middot; 2P JOIN FOR EN VEN',
-        skyRaiderControlsTouch: 'RETNINGSKORS FLYV &middot; KNAP SKYD',
-        adderControlsTouch: 'VANDRET POSITION STYRER &middot; TRYK FOR AT STARTE',
-      }
-    };
-
-    /* ------------------------------------------------------------------ */
-    /* Language application                                                 */
-    /* ------------------------------------------------------------------ */
-    function applyLang() {
-      var lang = 'en';
-      var t = i18n.en;
-
-      // A touch screen gets the touch version of a hint where there is one.
-      var touch = document.documentElement.hasAttribute('data-has-touch');
-      document.querySelectorAll('[data-i18n]').forEach(function(el) {
-        var key = el.getAttribute('data-i18n');
-        var text = touch && t[key + 'Touch'] !== undefined ? t[key + 'Touch'] : t[key];
-        if (text !== undefined) el.innerHTML = text;
-      });
-
-      document.documentElement.lang = lang;
-    }
-    applyLang();
-
     /* ------------------------------------------------------------------ */
     /* Coin / credits                                                       */
     /* ------------------------------------------------------------------ */
@@ -1564,11 +848,7 @@
       var ctx = getKioskAudio();
       var t = ctx.currentTime;
 
-      var noiseBuf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.14), ctx.sampleRate);
-      var noiseData = noiseBuf.getChannelData(0);
-      for (var i = 0; i < noiseData.length; i++) noiseData[i] = Math.random() * 2 - 1;
-      var noise = ctx.createBufferSource();
-      noise.buffer = noiseBuf;
+      var noise = blipNoise(ctx, 0.14);
       var noiseFilter = ctx.createBiquadFilter();
       noiseFilter.type = 'lowpass';
       noiseFilter.frequency.setValueAtTime(2200, t);
@@ -1643,16 +923,11 @@
 
     // Start opens the selected machine; its credit is spent by the game after the first frame.
     var cardInFlight = false, pendingCard = null, focusArcadeCard = null, arcadeStepBack = null;
-    document.querySelectorAll('#game-grid .card').forEach(function(card){var tray=card.querySelector('.card-shot-wrap'),image=tray.querySelector('.card-shot'),rom=document.createElement('div'),label=document.createElement('span');rom.className='game-rom';label.className='rom-label';label.textContent=card.querySelector('.card-title').textContent.trim();rom.append(image,label);tray.appendChild(rom);});
+    document.querySelectorAll('#game-grid .card').forEach(function(card){var tray=card.querySelector('.card-shot-wrap'),image=tray.querySelector('.card-shot'),rom=document.createElement('div');rom.className='game-rom';rom.append(image);tray.appendChild(rom);});
     document.querySelectorAll('#game-grid .card').forEach(function(card){
-      var copy=document.createElement('div');copy.className='card-copy';
-      Array.from(card.querySelectorAll('.card-title,.card-genre,.card-hi,.card-desc')).forEach(function(part){copy.appendChild(part);});
-      card.appendChild(copy);
       var title=card.querySelector('.card-title'),slug=(card.getAttribute('data-game-url')||'').split('/')[0];
-      // Every panel seats two at joysticks, as the game page's deck does; Rally keeps its spinners. Up to two buttons a player.
-      var panel={rally:[2,'dial',1],bouncer:[2,'stick',1],defender:[2,'stick',1],bubbler:[2,'stick',2],raider:[2,'stick',1],
-        meteors:[2,'stick',2],serpent:[2,'stick',0],brawler:[2,'stick',2],adder:[2,'stick',1]}[slug]||[2,'stick',1];
-      var players=panel[0],name=title?title.textContent.trim():'';
+      // Rally seats two at its own dials; the others that do say so in BLIP_GAMES.
+      var players=slug==='rally'||BLIP_GAMES[slug]&&BLIP_GAMES[slug].players===2?2:1,name=title?title.textContent.trim():'';
       card.dataset.machine=slug;title.classList.add('machine-marquee');
       var legend={rally:'BAT · SERVE',bouncer:'MOVE · LAUNCH',defender:'MOVE · FIRE',bubbler:'RUN · BUBBLE · JUMP',raider:'STEER · FIRE',meteors:'TURN · THRUST · FIRE',serpent:'STEER',brawler:'MOVE · PUNCH · KICK',adder:'TURN LEFT · RIGHT'};
       var screen=card.querySelector('.card-shot-wrap');
@@ -1660,8 +935,8 @@
       var attract=document.createElement('span');attract.className='machine-attract';attract.setAttribute('aria-hidden','true');attract.innerHTML='<b>PRESS START</b><span class="machine-credit">CREDIT 0</span>';card.querySelector('.game-rom').appendChild(attract);
       var speaker=document.createElement('span');speaker.className='machine-speaker';speaker.setAttribute('aria-hidden','true');card.appendChild(speaker);
       ['left','right'].forEach(function(side){var panelSide=document.createElement('span');panelSide.className='machine-side '+side;panelSide.setAttribute('aria-hidden','true');panelSide.innerHTML='<b>'+name+'</b>';card.appendChild(panelSide);});
-      var controls=document.createElement('div');controls.className='machine-controls';controls.dataset.players=String(players);
-      controls.innerHTML='<span class="machine-stations" aria-hidden="true">'+Array.from({length:players},function(){return '<span class="machine-station"><span class="machine-'+panel[1]+'"></span><span class="machine-buttons">'+'<i></i>'.repeat(panel[2])+'</span></span>';}).join('')+'</span><button type="button" class="machine-start" aria-label="Start '+name+'"><span class="machine-start-cap">START</span></button>';
+      var controls=document.createElement('div');controls.className='machine-controls';
+      controls.innerHTML='<button type="button" class="machine-start" aria-label="Start '+name+'"><span class="machine-start-cap">START</span></button>';
       // The deck is the game page's own, built by deck.js, so the cabinet's controls are the ones the player will use.
       var deck=document.createElement('div');deck.className='machine-deck';
       deck.innerHTML='<iframe src="machine-deck.html?game='+slug+'" tabindex="-1" aria-hidden="true" title=""></iframe>';
@@ -1786,7 +1061,6 @@
           chapterIndex--;
           var doc=new DOMParser().parseFromString(markup,'text/html'),source=doc.querySelector('.manual-leaf .page');
           if(!source)return;
-          source.querySelectorAll('[data-i18n]').forEach(function(el){var key=el.getAttribute('data-i18n'),text=i18n.en[key];if(document.documentElement.hasAttribute('data-has-touch')&&i18n.en[key+'Touch']!==undefined)text=i18n.en[key+'Touch'];if(text!==undefined)el.innerHTML=text;});
           source.querySelectorAll('[data-manual-game]').forEach(function(game){var h3=game.querySelector('h3');if(!h3)return;var heading=h3.textContent,number=heading.match(/^\s*(\d+\.\d+)/);manualGameNumbers[game.dataset.manualGame]=number?number[1]:'';manualGameNames[game.dataset.manualGame]=heading.replace(/^\s*\d+\.\d+\s*/, '').trim();});
           source.querySelectorAll('a').forEach(function(link){var print=document.createElement('span');print.className=link.className;print.innerHTML=link.innerHTML;link.replaceWith(print);});
           var titles=['PLAYING THE GAMES','THE GOLDEN AGE OF ARCADE GAMES','ABOUT BLIP'];
@@ -2138,21 +1412,6 @@
     });
 
     var selectorPlane=document.getElementById('jukebox-front');
-    var spindle=document.createElement('div');spindle.className='arcade-spindle';spindle.setAttribute('aria-hidden','true');
-    var rodSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');rodSvg.setAttribute('aria-hidden','true');
-    rodSvg.innerHTML='<defs><linearGradient id="arcade-metal" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f7e4bd"/><stop offset=".34" stop-color="#a8895d"/><stop offset=".66" stop-color="#33271e"/><stop offset="1" stop-color="#ddbd83"/></linearGradient></defs><path class="rail-shadow"></path><path class="rail-metal"></path><path class="stay-shadow"></path><path class="stay-metal"></path><path class="hanger-shadow"></path><path class="hanger-metal"></path>';
-    rodSvg.style.cssText='display:block;width:100%;height:100%;overflow:visible';spindle.appendChild(rodSvg);
-    var bearings=['left','right'].map(function(side){var bearing=document.createElement('i');bearing.className='arcade-bearing '+side;spindle.appendChild(bearing);return bearing;});
-    document.getElementById('game-grid').appendChild(spindle);
-    var bindings=Array.from(document.querySelectorAll('#game-grid .card')).map(function(card){
-      var lights=document.createElement('span');lights.className='arcade-lights';lights.setAttribute('aria-hidden','true');lights.innerHTML='<i></i><i></i><i></i>';card.appendChild(lights);
-      return {card:card,pins:[-13,13].map(function(offset){
-        var pin=document.createElement('i');pin.className='arcade-pin';pin.setAttribute('aria-hidden','true');
-        pin.style.left='calc(50% + '+(offset-4.5)+'px)';card.appendChild(pin);return pin;
-      })};
-    });
-    var railLeft=0,railRight=0,railY=28;
-
     // The instructions printed on each bezel step down a whole pixel at a time until they fit; the pixel font blurs between.
     var cardFitKey='';
     function fitCardText() {
@@ -2167,58 +1426,15 @@
       });
     }
     if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){cardFitKey='';fitCardText();});
-    function fitSelectorRails(){
+    // The room drops back in from above when a game returns to it (arcade-return), by its own height.
+    function fitRoom(){
       fitCardText();
       var bezel=document.getElementById('screen-bezel');
-      var panel=document.getElementById('kiosk-bar');
-      if(panel)bezel.style.setProperty('--cabinet-panel-depth',!panel.getClientRects().length||document.documentElement.getAttribute('data-layout')==='landscape'?'0px':Math.max(0,innerHeight-panel.getBoundingClientRect().top)+'px');
-      var guides=document.querySelector('.arcade-guides');
-      var bezelBox=bezel.getBoundingClientRect(),guideBox=guides.getBoundingClientRect();
-      bezel.style.setProperty('--arcade-travel',(Math.max(selectorPlane.offsetHeight,guideBox.bottom-bezelBox.top)+30)+'px');
-      var track=document.getElementById('game-grid');
-      var width=track.clientWidth;
-      spindle.style.width=width+'px';rodSvg.setAttribute('viewBox','0 0 '+width+' '+track.clientHeight);
-      var frame=track.getBoundingClientRect();
-      var hangers=[];
-      bindings.forEach(function(binding){
-        binding.pins.forEach(function(pin){
-          var box=pin.getBoundingClientRect(),x=(box.left+box.right)/2-frame.left,y=box.top+box.height/2-frame.top;
-          var halfSpan=Math.min(width/2-12,190),t=Math.max(0,Math.min(1,(x-width/2+halfSpan)/(halfSpan*2)));
-          var railTop=28-64*t*(1-t);
-          hangers.push('M '+x+' '+railTop+' L '+x+' '+y);
-        });
-      });
-      rodSvg.querySelector('.hanger-shadow').setAttribute('d',hangers.join(' '));
-      rodSvg.querySelector('.hanger-metal').setAttribute('d',hangers.join(' '));
-      var halfSpan=Math.min(width/2-12,190);railLeft=width/2-halfSpan;railRight=width/2+halfSpan;
-      bearings[0].style.left=(railLeft-11)+'px';bearings[1].style.left=(railRight-11)+'px';
-      var d='M '+railLeft+' '+railY+' Q '+width/2+' -4 '+railRight+' '+railY;
-      rodSvg.querySelector('.rail-shadow').setAttribute('d',d);rodSvg.querySelector('.rail-metal').setAttribute('d',d);
-      updateRailSupports();
+      bezel.style.setProperty('--arcade-travel',(selectorPlane.offsetHeight+30)+'px');
     }
-    function updateRailSupports(){
-      var track=document.getElementById('game-grid'),frame=track.getBoundingClientRect(),guides=document.querySelector('.arcade-guides').getBoundingClientRect();
-      var leftX=guides.left+8-frame.left,rightX=guides.right-8-frame.left;
-      var jointY=guides.top+47-frame.top;
-      var stays='M '+leftX+' '+jointY+' L '+railLeft+' '+railY+' M '+rightX+' '+jointY+' L '+railRight+' '+railY;
-      rodSvg.querySelector('.stay-shadow').setAttribute('d',stays);rodSvg.querySelector('.stay-metal').setAttribute('d',stays);
-      var guideBox=document.querySelector('.arcade-guides').getBoundingClientRect();
-      function setStay(side,end){
-        var element=document.querySelector('.arcade-stay.'+side),startX=side==='left'?guideBox.left+16:guideBox.right-16,startY=guideBox.top+47;
-        var endX=frame.left+end;
-        var endY=frame.top+railY;
-        var dx=endX-startX,dy=endY-startY;element.style.left=(startX-guideBox.left)+'px';element.style.top=(startY-guideBox.top)+'px';
-        element.style.width=Math.hypot(dx,dy)+'px';element.style.transform='rotate('+Math.atan2(dy,dx)+'rad)';
-      }
-      setStay('left',railLeft);setStay('right',railRight);
-    }
-    new ResizeObserver(fitSelectorRails).observe(selectorPlane);
-    var cabinetPanel=document.getElementById('kiosk-bar');
-    if(cabinetPanel)new ResizeObserver(fitSelectorRails).observe(cabinetPanel);
-    window.addEventListener('resize',fitSelectorRails);
-    fitSelectorRails();
-    var supportFrame=0,railMotion=0;
-    document.getElementById('game-grid').addEventListener('scroll',function(){if(supportFrame)return;supportFrame=requestAnimationFrame(function(){supportFrame=0;updateRailSupports();});},{passive:true});
+    new ResizeObserver(fitRoom).observe(selectorPlane);
+    window.addEventListener('resize',fitRoom);
+    fitRoom();
 
     /* Light up the card of the game you're currently in (last started). */
     (function () {
@@ -2232,46 +1448,6 @@
 
     document.getElementById('manual-book').addEventListener('click',function(event){event.preventDefault();attemptStart(this);});
 
-
-    // ---- The record on each card ---- "HI 12,340 NAME": the leaderboard's
-    // top as a game page last cached it (or this browser's own best), then
-    // every game's current top in one request where the backend is set up.
-    (function () {
-      function show(slug, top) {
-        var card = document.querySelector('.card[data-game-url^="' + slug + '/"]');
-        if (!card || !top || !(top.score > 0)) return;
-        var el = card.querySelector('.card-hi');
-        if (!el) {
-          el = document.createElement('div');
-          el.className = 'card-hi';
-          var description=card.querySelector('.card-desc');description.parentElement.insertBefore(el,description);
-        }
-        el.textContent = 'HI ' + Number(top.score).toLocaleString('en-US') +
-          (top.handle ? ' ' + String(top.handle).toUpperCase() : '');
-      }
-      function cached(slug) {
-        try {
-          var t = JSON.parse(localStorage.getItem('blip-top-' + slug) || 'null');
-          if (t && t.score > 0) return t;
-          var best = parseInt(localStorage.getItem('blip-best-' + slug) || '0', 10);
-          return best > 0 ? { score: best, handle: localStorage.getItem('blip-handle') || '' } : null;
-        } catch (e) { return null; }
-      }
-      Object.keys(BLIP_GAMES).forEach(function (slug) { show(slug, cached(slug)); });
-      var cfg = window.BLIP_SUPABASE;
-      if (!cfg || !cfg.url || !cfg.anonKey || !window.fetch) return;
-      fetch(cfg.url + '/rest/v1/leaderboard_top?select=game,handle,score&rank=eq.1',
-            { headers: { apikey: cfg.anonKey, Authorization: 'Bearer ' + cfg.anonKey } })
-        .then(function (r) { return r.ok ? r.json() : []; })
-        .then(function (rows) {
-          rows.forEach(function (row) {
-            var top = { handle: row.handle || '', score: row.score | 0 };
-            try { localStorage.setItem('blip-top-' + row.game, JSON.stringify(top)); } catch (e) {}
-            show(row.game, top);
-          });
-        })
-        .catch(function () {});
-    }());
 
     // ---- Card navigation: keyboard arrows + joystick/gamepad ----
     (function () {
@@ -2404,7 +1580,7 @@
         });
         if(!aisleFrame)poseCards(room);
         if(cardHadFocus)cards[idx].focus({preventScroll:true});
-        fitSelectorRails();
+        fitRoom();
       }
       window.addEventListener('resize',function(){highlight(true);});
       focusArcadeCard=function(card){var selected=cards.indexOf(card);if(selected<0)return;walkTo(selected);};
@@ -2557,15 +1733,6 @@
         });
       }());
 
-      // Each card's small print: who can play.
-      cards.forEach(function (card) {
-        var desc=card.querySelector&&card.querySelector('.card-desc'),url=card.getAttribute('data-game-url');
-        if(!desc||!url)return;
-        var meta=document.createElement('span');meta.className='card-meta';
-        meta.textContent=['rally','brawler','bubbler','adder'].indexOf(url.split('/')[0])>=0?'1\u20132 PLAYERS':'1 PLAYER';
-        desc.appendChild(meta);
-      });
-
       // A horizontal swipe walks one or more machines down the aisle.
       var track = document.getElementById('game-grid');
       var touchStart = null, suppressClick = false, suppressClickTimer = 0;
@@ -2617,6 +1784,13 @@
         wakeAisle();
         suppressPointerClick();
       }
+      // Walking a step at a time, a swipe moves one machine per machine-width it covered.
+      function stepSwipe(start,dx,dy) {
+        if(!stepWalk.matches || !swipeEnough(dx,dy))return false;
+        for(var n=Math.max(1,Math.round(Math.abs(dx)/start.unit));n>0;n--)move(dx<0?1:-1);
+        suppressPointerClick();
+        return true;
+      }
       track.addEventListener('pointerup', function (e) {
         var start=touchStart;
         touchStart=null;
@@ -2624,18 +1798,11 @@
         if(start.dragging){endDrag(start,e);e.preventDefault();return;}
         if(cardInFlight || !manualOverlay.hidden)return;
         var dx=e.clientX-start.x,dy=e.clientY-start.y;
-        if(stepWalk.matches && swipeEnough(dx,dy)) {
-          var steps=Math.max(1,Math.round(Math.abs(dx)/start.unit));
-          for(var n=0;n<steps;n++)move(dx<0?1:-1);
-          e.preventDefault();
-          suppressPointerClick();
-          return;
-        }
-        if(Math.hypot(dx,dy)>12)return;
-        if(e.pointerType!=='touch')return;
-        if(start.card&&!start.card.classList.contains('card-focused')){selectByTouch(start.card);e.preventDefault();suppressPointerClick();return;}
-        if(start.screen){activate();e.preventDefault();suppressPointerClick();return;}
-        selectByTouch(start.card);
+        if(stepSwipe(start,dx,dy)){e.preventDefault();return;}
+        if(Math.hypot(dx,dy)>12 || e.pointerType!=='touch')return;
+        // A tap on a machine's screen plays it, once that machine is the one in front.
+        if(start.screen && !(start.card&&!start.card.classList.contains('card-focused')))activate();
+        else selectByTouch(start.card);
         e.preventDefault();
         suppressPointerClick();
       });
@@ -2645,12 +1812,7 @@
         if(!start || start.id!==e.pointerId)return;
         if(start.dragging){endDrag(start,e);return;}
         if(e.pointerType!=='touch' || cardInFlight || !manualOverlay.hidden)return;
-        var dx=e.clientX-start.x,dy=e.clientY-start.y;
-        if(stepWalk.matches && swipeEnough(dx,dy)) {
-          var steps=Math.max(1,Math.round(Math.abs(dx)/start.unit));
-          for(var n=0;n<steps;n++)move(dx<0?1:-1);
-          suppressPointerClick();
-        }
+        stepSwipe(start,e.clientX-start.x,e.clientY-start.y);
       });
       track.addEventListener('click',function(e){
         if(suppressClick){suppressClick=false;window.clearTimeout(suppressClickTimer);return;}
@@ -2695,136 +1857,6 @@
           if ((code === 'ArrowRight'||code === 'ArrowLeft') && held.pad) hold('pad',0);
         }
       );
-
-      // ---- The landing page's stick and caps drive the selection ---- The
-      // stick steps through the games (auto-repeating while held), fire opens
-      // the lit one; the lean uses the deck's --dx / --dy like a game page.
-      (function () {
-        var bar  = document.getElementById('kiosk-bar');
-        var base = document.getElementById('stick-base');
-        var fire = document.getElementById('fire-buttons');
-        if (bar && base) {
-          var ENGAGE = 15, RELEASE = 8, MAX_LEAN = 34;
-          var pivot = null, activeId = null, dir = 0, repeatT = null;
-
-          function lean(x, y) {
-            base.style.setProperty('--dx', Math.max(-1, Math.min(1, x / MAX_LEAN)));
-            base.style.setProperty('--dy', Math.max(-1, Math.min(1, y / MAX_LEAN)));
-          }
-          function setDir(d) {
-            if (d === dir) return;
-            dir = d;
-            clearTimeout(repeatT);
-            if (!stepWalk.matches) {
-              if (d !== 0) step(d);
-              hold('stick', d);
-            } else if (d !== 0) {
-              move(d);
-              repeatT = setTimeout(function tick() {
-                move(dir);
-                repeatT = setTimeout(tick, 150);
-              }, 340);
-            }
-          }
-          function apply(e) {
-            var dx = e.clientX - pivot.x, dy = e.clientY - pivot.y;
-            var along = Math.abs(dy) >= Math.abs(dx) ? dy : dx; // whichever axis is pushed harder
-            var mag = Math.abs(along);
-            var engaged = dir !== 0 ? mag > RELEASE : mag > ENGAGE;
-            setDir(engaged ? (along < 0 ? -1 : 1) : 0);
-            lean(dx, dy);
-          }
-          function release() {
-            activeId = null; pivot = null;
-            setDir(0); lean(0, 0);
-            window.removeEventListener('pointermove', onMove, true);
-            window.removeEventListener('pointerup', release, true);
-            window.removeEventListener('pointercancel', release, true);
-          }
-          function onMove(e) {
-            if (e.pointerId === activeId && pivot) { e.preventDefault(); apply(e); }
-          }
-          // The ball stands above the base's own box, over the cabinet's frame: a press on any part of it is the stick's.
-          function onStick(e) {
-            if (e.target.closest && e.target.closest('.stick-base') === base) return true;
-            var ball = base.querySelector('.stick-ball'), rect = ball && ball.getBoundingClientRect();
-            return !!rect && rect.width > 0 && e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom;
-          }
-          window.addEventListener('pointerdown', function (e) {
-            if (!manualOverlay.hidden || !onStick(e)) return;
-            if (blipControls() !== 'stick') return;   // pad mode — deck shows the SNES pad
-            // Stick half only — the right half is the fire buttons.
-            if (fire && e.target.closest && e.target.closest('#fire-buttons')) return;
-            if (fire) {
-              var r = fire.getBoundingClientRect();
-              if (r.width && e.clientX >= r.left - 6) return;
-            }
-            if (activeId !== null) release();
-            e.preventDefault();
-            activeId = e.pointerId;
-            pivot = { x: e.clientX, y: e.clientY };
-            window.addEventListener('pointermove', onMove, true);
-            window.addEventListener('pointerup', release, true);
-            window.addEventListener('pointercancel', release, true);
-          });
-          window.addEventListener('blur', release);
-          document.addEventListener('visibilitychange', function () {
-            if (document.hidden) release();
-          });
-        }
-
-        if (fire) {
-          fire.querySelectorAll('.arcade-btn').forEach(function (btn) {
-            btn.addEventListener('pointerdown', function (e) {
-              e.preventDefault();
-              btn.classList.add('active');
-              activate();
-            });
-            ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) {
-              btn.addEventListener(ev, function () { btn.classList.remove('active'); });
-            });
-          });
-        }
-      }());
-
-      // ---- The SNES pad drives the same selection, through BlipController.
-      // d-pad steps the cards (with key-style auto-repeat while held);
-      // A / B open the lit card. ----
-      (function () {
-        var pad = document.getElementById('snes-pad');
-        if (!pad || typeof BlipController === 'undefined') return;
-
-        var navDir = 0, repeatT = null;
-        function navHold(d) {
-          if (d === navDir) return;
-          navDir = d;
-          clearTimeout(repeatT);
-          if (!stepWalk.matches) {
-            if (d !== 0) step(d);
-            hold('deck', d);
-          } else if (d !== 0) {
-            move(d);
-            repeatT = setTimeout(function tick() {
-              move(navDir);
-              repeatT = setTimeout(tick, 150);
-            }, 340);
-          }
-        }
-
-        BlipController.init({
-          buttons: [{ key: ' ', code: 'Space' }],
-          onInput: function (name, down) {
-            if (name === 'up') { if (down) stepUp(); return; }
-            if (name === 'down') { if (down) stepBack(); return; }
-            if (name === 'left')  { navHold(down ? -1 : 0); return; }
-            if (name === 'right') { navHold(down ? 1 : 0); return; }
-            if ((name === 'button1' || name === 'button2') && down) activate();
-          }
-        });
-        BlipController.bindButtons(pad);
-        BlipController.bindDpad(pad.querySelector('.snes-dpad'));
-        BlipController.registerVisual(pad);
-      }());
     }());
 
     function insertFocusedCoin() {
@@ -2877,7 +1909,7 @@
       })).then(function () {
         requestAnimationFrame(function () {
           cardFitKey='';
-          fitSelectorRails();
+          fitRoom();
           requestAnimationFrame(rollOutArcade);
         });
       });

@@ -10,7 +10,7 @@ mod cpu;
 mod levels;
 
 use blip::input::{
-    btn1_pressed, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D,
+    coin_start, play_again, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D,
     BLIP_KEY_J, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE,
 };
 use blip::macroquad::input::KeyCode;
@@ -144,10 +144,7 @@ fn update_title(g: &mut Game, dt: f32) {
     g.demo.events.clear();
     #[cfg(not(target_arch = "wasm32"))]
     if blip::bot::active() { blip::bot::hold(&[BLIP_KEY_SPACE]); }
-    if btn1_pressed() {
-        web::spend_coin();
-        g.start_game();
-    }
+    if coin_start() { g.start_game(); }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
@@ -181,16 +178,12 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
 }
 
 fn update_over(g: &mut Game, dt: f32) {
-    g.timer.tick(dt);
-    if g.timer.active() || !btn1_pressed() { return; }
-    web::spend_coin();
-    g.start_game();
+    if play_again(&mut g.timer, dt) { g.start_game(); }
 }
 
 fn conf() -> blip::macroquad::window::Conf {
     window_conf("ADDER", WIN_W, WIN_H)
 }
-
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -208,15 +201,12 @@ async fn main() {
     };
     let mut music = Jukebox::new("ADDER", &["COIL", "HUNT"]);
 
-    let mut shot_frame: u32 = 0;
+    if blip.screenshot_mode {
+        g.start_game();
+    }
 
     loop {
         let dt = blip.delta_time;
-
-        if blip.screenshot_mode {
-            shot_frame += 1;
-            if shot_frame == 1 { g.start_game(); }
-        }
 
         match g.state {
             State::Title => update_title(&mut g, dt),
@@ -331,7 +321,6 @@ fn draw_title(blip: &Blip, g: &Game, pit: &Texture2D) {
 }
 
 fn draw_over(blip: &Blip, g: &Game) {
-    blip.clear(BLIP_BLACK);
     blip.draw_game_over(g.world.score_of(0), &web::high_score(), BLIP_RED, arena::seat_colour(0), HOLE,
         !g.timer.active());
     blip.draw_centered(&format!("ROUND {}   LENGTH {}", g.world.round, g.world.snakes.first().map_or(0, |s| s.len_s)),

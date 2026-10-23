@@ -28,6 +28,26 @@ macro_rules! wav {
 /// A generated file: its path under the asset folder, and its bytes.
 pub type Asset = (&'static str, Vec<u8>);
 
+/// A game's whole build script (`blip::build_script!();`): its pictures (src/gfx.rs) and its effects and music
+/// (src/tunes.rs) become its assets, through `build_assets`.
+#[macro_export]
+macro_rules! build_script {
+    () => {
+        #[path = "src/gfx.rs"]
+        mod gfx;
+        #[path = "src/tunes.rs"]
+        mod tunes;
+
+        fn main() {
+            println!("cargo:rerun-if-changed=src/gfx.rs");
+            println!("cargo:rerun-if-changed=src/tunes.rs");
+            let mut assets = gfx::generate();
+            assets.extend(tunes::sounds());
+            $crate::build_assets(assets, tunes::music());
+        }
+    };
+}
+
 /// A game's build script: the pictures and effects go to OUT_DIR/assets for the
 /// game to embed, and every file, the music too, to web/TAPE/<GAME>/ASSETS, the
 /// folder BLIP BASIC reads, with a manifest.json listing them.
@@ -85,17 +105,16 @@ pub mod session;
 pub mod timer;
 #[cfg(feature = "engine")]
 pub mod web;
-
 #[cfg(feature = "engine")]
 pub use audio::{
-    play_alert, play_ambient, play_music, play_music_volume, play_sfx, play_sfx_volume, stop_alert,
-    stop_ambient, stop_music, BlipSound, Jukebox,
+    play_alert, play_ambient, play_music, play_music_volume, play_sfx, play_sfx_volume, stop_alert, stop_ambient,
+    stop_music, BlipSound, Jukebox,
 };
 #[cfg(feature = "engine")]
 pub use color::{
-    blend, hsv, shade, BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_DARKGRAY, BLIP_GRAY, BLIP_GREEN,
-    BLIP_MAGENTA, BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW, NEON_CYAN, NEON_GREEN,
-    NEON_MAGENTA, NEON_ORANGE, NEON_PINK, NEON_PURPLE, NEON_YELLOW,
+    blend, hsv, shade, BLIP_BLACK, BLIP_BLUE, BLIP_CYAN, BLIP_DARKGRAY, BLIP_GRAY, BLIP_GREEN, BLIP_MAGENTA,
+    BLIP_ORANGE, BLIP_RED, BLIP_WHITE, BLIP_YELLOW, NEON_CYAN, NEON_GREEN, NEON_MAGENTA, NEON_ORANGE, NEON_PINK,
+    NEON_PURPLE, NEON_YELLOW,
 };
 #[cfg(feature = "engine")]
 pub use ctx::{window_conf, Blip};
@@ -107,9 +126,8 @@ pub use fx::Fx;
 pub use fx::{EffectParticle, EffectParticles};
 #[cfg(feature = "engine")]
 pub use math::{
-    angle_diff, clamp, distance, ease_out_cubic, lerp, ordered_ladder, rand_int, rand_range_f32,
-    rand_seed, rects_overlap, scatter, segment_circle_overlap, segment_rect_overlap, smoothstep01,
-    wrap,
+    angle_diff, clamp, distance, ease_out_cubic, lerp, ordered_ladder, rand_int, rand_range_f32, rand_seed,
+    rects_overlap, scatter, segment_circle_overlap, segment_rect_overlap, smoothstep01, wrap,
 };
 #[cfg(feature = "engine")]
 pub use pool::{pool_iter, pool_iter_mut, pool_spawn, Pooled};

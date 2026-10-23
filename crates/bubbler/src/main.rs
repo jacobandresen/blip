@@ -1,13 +1,16 @@
 //! Bubble Bobble-inspired platform game with one- or two-player co-op.
 
 use blip::input::{
-    key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D, BLIP_KEY_F, BLIP_KEY_G,
-    BLIP_KEY_J, BLIP_KEY_K, BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
+    key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_J, BLIP_KEY_K,
+    BLIP_KEY_LEFT, BLIP_KEY_RIGHT, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
 use blip::macroquad::input::KeyCode;
 use blip::macroquad::math::vec2;
 use blip::macroquad::shapes::{draw_ellipse, draw_triangle};
-use blip::{play_sfx, play_sfx_volume, segment_circle_overlap, segment_rect_overlap, web, window_conf, Blip, BlipColor, Jukebox};
+use blip::{
+    hsv, play_sfx, play_sfx_volume, segment_circle_overlap, segment_rect_overlap, web, window_conf, Blip, BlipColor,
+    Jukebox,
+};
 // The effects and music are made by build.rs; the tests check them here.
 #[cfg(test)]
 mod tunes;
@@ -15,7 +18,6 @@ mod tunes;
 mod gfx;
 mod art;
 mod levels;
-
 use levels::{LEVELS, PALETTES, ROCKS_FROM, ROUNDS, ROWS, SPARKS_FROM};
 
 // ---- layout -----------------------------------------------------------
@@ -83,12 +85,7 @@ const EXTEND_MAX: i32 = 7; // lives a round clear can top a player up to
 const SPARK_V: f32 = 95.0;
 
 fn col(c: (u8, u8, u8), a: f32) -> BlipColor {
-    BlipColor::new(
-        c.0 as f32 / 255.0,
-        c.1 as f32 / 255.0,
-        c.2 as f32 / 255.0,
-        a,
-    )
+    BlipColor::new(c.0 as f32 / 255.0, c.1 as f32 / 255.0, c.2 as f32 / 255.0, a)
 }
 fn rgba(r: f32, g: f32, b: f32, a: f32) -> BlipColor {
     BlipColor::new(r, g, b, a)
@@ -142,12 +139,8 @@ const P1_KEYS: KeySet = KeySet {
     jump: &[BLIP_KEY_W, BLIP_KEY_G, BLIP_KEY_BUTTON2],
     blow: &[BLIP_KEY_F, BLIP_KEY_SPACE],
 };
-const P2_KEYS: KeySet = KeySet {
-    left: &[BLIP_KEY_LEFT],
-    right: &[BLIP_KEY_RIGHT],
-    jump: &[BLIP_KEY_UP, BLIP_KEY_K],
-    blow: &[BLIP_KEY_J],
-};
+const P2_KEYS: KeySet =
+    KeySet { left: &[BLIP_KEY_LEFT], right: &[BLIP_KEY_RIGHT], jump: &[BLIP_KEY_UP, BLIP_KEY_K], blow: &[BLIP_KEY_J] };
 fn read(k: &KeySet) -> Input {
     let any_held = |ks: &[KeyCode]| ks.iter().any(|c| key_held(*c) || key_pressed(*c));
     let any_pressed = |ks: &[KeyCode]| ks.iter().any(|c| key_pressed(*c));
@@ -205,16 +198,7 @@ impl Player {
             squash: 1.0,
             walk: 0.0,
             eat: -1.0,
-            eaten: Fruit {
-                x: 0.0,
-                y: 0.0,
-                vx: 0.0,
-                vy: 0.0,
-                kind: 0,
-                t: 0.0,
-                on_ground: true,
-                active: false,
-            },
+            eaten: Fruit { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, kind: 0, t: 0.0, on_ground: true, active: false },
             blink: blip::rand_range_f32(1.0, 4.0),
             spawn,
         }
@@ -282,7 +266,11 @@ struct Bubble {
 
 impl Bubble {
     fn radius(&self) -> f32 {
-        if self.trapped.is_some() { TRAP_R } else { BUB_R }
+        if self.trapped.is_some() {
+            TRAP_R
+        } else {
+            BUB_R
+        }
     }
     /// Where it rests against the ceiling.
     fn top_y(&self) -> f32 {
@@ -422,12 +410,7 @@ impl Game {
             fruits: Vec::new(),
             parts: blip::EffectParticles::new(60.0, 2.0),
             pops: Vec::new(),
-            skull: Skull {
-                active: false,
-                x: 0.0,
-                y: 0.0,
-                speed: 0.0,
-            },
+            skull: Skull { active: false, x: 0.0, y: 0.0, speed: 0.0 },
             shots: Vec::new(),
             round_t: 0.0,
             state_t: 0.0,
@@ -538,25 +521,13 @@ impl Game {
         if ((HUD + r as f32 * TILE) - foot).abs() > 0.5 {
             return false;
         }
-        let (c0, c1) = (
-            (x0 / TILE).floor() as i32,
-            ((x1 - 0.01) / TILE).floor() as i32,
-        );
+        let (c0, c1) = ((x0 / TILE).floor() as i32, ((x1 - 0.01) / TILE).floor() as i32);
         (c0..=c1).any(|c| self.platform(c, r))
     }
 
     /// Integrate a body with one-way platforms: it passes up through
     /// blocks and lands on their tops. Returns (on_ground, hit_wall).
-    fn move_body(
-        &self,
-        x: &mut f32,
-        y: &mut f32,
-        vx: &mut f32,
-        vy: &mut f32,
-        w: f32,
-        h: f32,
-        dt: f32,
-    ) -> (bool, bool) {
+    fn move_body(&self, x: &mut f32, y: &mut f32, vx: &mut f32, vy: &mut f32, w: f32, h: f32, dt: f32) -> (bool, bool) {
         *vy = (*vy + GRAV * dt).min(MAX_FALL);
         *x += *vx * dt;
         let mut wall = false;
@@ -578,10 +549,7 @@ impl Game {
             let r1 = ((foot - HUD) / TILE).floor() as i32;
             for r in r0..=r1 {
                 let top = HUD + r as f32 * TILE;
-                let (c0, c1) = (
-                    ((*x + 3.0) / TILE).floor() as i32,
-                    ((*x + w - 3.0) / TILE).floor() as i32,
-                );
+                let (c0, c1) = (((*x + 3.0) / TILE).floor() as i32, ((*x + w - 3.0) / TILE).floor() as i32);
                 if (c0..=c1).any(|c| self.platform(c, r)) {
                     *y = top - h;
                     *vy = 0.0;
@@ -591,8 +559,7 @@ impl Game {
             }
         }
         // the ceiling (except the hole in it)
-        let in_gap =
-            (*x + w / 2.0) >= GAP.0 as f32 * TILE && (*x + w / 2.0) < (GAP.1 + 1) as f32 * TILE;
+        let in_gap = (*x + w / 2.0) >= GAP.0 as f32 * TILE && (*x + w / 2.0) < (GAP.1 + 1) as f32 * TILE;
         if !in_gap && *y < HUD + TILE {
             *y = HUD + TILE;
             if *vy < 0.0 {
@@ -615,12 +582,7 @@ impl Game {
             vy: 0.0,
             life: 0.35,
             max_life: 0.35,
-            data: ParticleStyle {
-                c,
-                size,
-                star: false,
-                ring: true,
-            },
+            data: ParticleStyle { c, size, star: false, ring: true },
         });
     }
 
@@ -638,11 +600,7 @@ impl Game {
                 max_life: life,
                 data: ParticleStyle {
                     c,
-                    size: if star {
-                        blip::rand_range_f32(2.5, 4.0)
-                    } else {
-                        blip::rand_range_f32(1.2, 2.6)
-                    },
+                    size: if star { blip::rand_range_f32(2.5, 4.0) } else { blip::rand_range_f32(1.2, 2.6) },
                     star,
                     ring: false,
                 },
@@ -670,16 +628,7 @@ struct Sounds {
 
 // ---- update ------------------------------------------------------------
 
-fn player_dust(
-    g: &mut Game,
-    x: f32,
-    y: f32,
-    speed: (f32, f32),
-    lift: (f32, f32),
-    life: f32,
-    alpha: f32,
-    size: f32,
-) {
+fn player_dust(g: &mut Game, x: f32, y: f32, speed: (f32, f32), lift: (f32, f32), life: f32, alpha: f32, size: f32) {
     for side in [-1.0, 1.0] {
         g.parts.push(blip::EffectParticle {
             x,
@@ -688,12 +637,7 @@ fn player_dust(
             vy: -blip::rand_range_f32(lift.0, lift.1),
             life,
             max_life: life,
-            data: ParticleStyle {
-                c: rgba(1.0, 1.0, 1.0, alpha),
-                size,
-                star: false,
-                ring: false,
-            },
+            data: ParticleStyle { c: rgba(1.0, 1.0, 1.0, alpha), size, star: false, ring: false },
         });
     }
 }
@@ -740,16 +684,7 @@ fn move_players(g: &mut Game, inp: [Input; 2], dt: f32, sfx: &Sounds) {
         let (ground, _) = g.move_body(&mut x, &mut y, &mut vx, &mut vy, P_W, P_H, dt);
         if ground && was_air && fall_speed > 150.0 {
             g.p[i].squash = 0.7;
-            player_dust(
-                g,
-                x + P_W / 2.0,
-                y + P_H,
-                (30.0, 60.0),
-                (10.0, 30.0),
-                0.3,
-                0.5,
-                2.0,
-            );
+            player_dust(g, x + P_W / 2.0, y + P_H, (30.0, 60.0), (10.0, 30.0), 0.3, 0.5, 2.0);
         }
         let p = &mut g.p[i];
         p.x = x;
@@ -823,17 +758,9 @@ fn move_toys(g: &mut Game, dt: f32) {
         match e.kind {
             Kind::Walker => {
                 if e.on_ground && e.crouch <= 0.0 {
-                    e.vx = if e.windup > 0.0 {
-                        0.0
-                    } else {
-                        e.dir * 58.0 * fast
-                    };
+                    e.vx = if e.windup > 0.0 { 0.0 } else { e.dir * 58.0 * fast };
                     e.edge_cd -= dt;
-                    let ahead = if e.dir > 0.0 {
-                        e.x + E_W + 2.0
-                    } else {
-                        e.x - 2.0
-                    };
+                    let ahead = if e.dir > 0.0 { e.x + E_W + 2.0 } else { e.x - 2.0 };
                     if e.edge_cd <= 0.0 && !g.floor_at(ahead, ahead + 1.0, e.y + E_H) {
                         e.edge_cd = 0.6;
                         if blip::rand_range_f32(0.0, 1.0) < 0.55 {
@@ -845,10 +772,7 @@ fn move_toys(g: &mut Game, dt: f32) {
                     if e.jump_cd <= 0.0 {
                         e.jump_cd = blip::rand_range_f32(1.0, 2.4) / fast;
                         if let Some((px, py)) = target {
-                            if py < e.y - 30.0
-                                && (px - e.x).abs() < 150.0
-                                && blip::rand_range_f32(0.0, 1.0) < 0.7
-                            {
+                            if py < e.y - 30.0 && (px - e.x).abs() < 150.0 && blip::rand_range_f32(0.0, 1.0) < 0.7 {
                                 e.crouch = JUMP_TELL;
                                 e.leap = (e.dir * 58.0 * fast, -JUMP_V);
                             } else if blip::rand_range_f32(0.0, 1.0) < 0.15 {
@@ -874,21 +798,12 @@ fn move_toys(g: &mut Game, dt: f32) {
                     e.jump_cd -= dt;
                     if e.jump_cd <= 0.0 {
                         e.jump_cd = blip::rand_range_f32(0.6, 1.3) / fast;
-                        let toward = target
-                            .map(|(px, _)| if px > e.x { 1.0 } else { -1.0 })
-                            .unwrap_or(e.dir);
-                        e.dir = if blip::rand_range_f32(0.0, 1.0) < 0.75 {
-                            toward
-                        } else {
-                            -toward
-                        };
+                        let toward = target.map(|(px, _)| if px > e.x { 1.0 } else { -1.0 }).unwrap_or(e.dir);
+                        e.dir = if blip::rand_range_f32(0.0, 1.0) < 0.75 { toward } else { -toward };
                         let high = target.map(|(_, py)| py < e.y - 20.0).unwrap_or(false)
                             || blip::rand_range_f32(0.0, 1.0) < 0.3;
                         e.crouch = JUMP_TELL;
-                        e.leap = (
-                            e.dir * 85.0 * fast,
-                            if high { -JUMP_V * 0.98 } else { -300.0 },
-                        );
+                        e.leap = (e.dir * 85.0 * fast, if high { -JUMP_V * 0.98 } else { -300.0 });
                     }
                 }
                 let (mut x, mut y, mut vx, mut vy) = (e.x, e.y, e.vx, e.vy);
@@ -987,14 +902,10 @@ fn move_shots(g: &mut Game, dt: f32, player_starts: [(f32, f32); 2]) -> [bool; 2
         s.t += dt;
         s.x += s.vx * dt;
         s.y += s.vy * dt;
-        let expired = (s.spark && s.t > 4.0)
-            || s.x < -10.0 || s.x > WIN_W as f32 + 10.0
-            || s.y < HUD || s.y > WIN_H as f32;
+        let expired =
+            (s.spark && s.t > 4.0) || s.x < -10.0 || s.x > WIN_W as f32 + 10.0 || s.y < HUD || s.y > WIN_H as f32;
         if !s.spark {
-            let (c, r) = (
-                ((s.x + s.vx.signum() * 5.0) / TILE).floor() as i32,
-                ((s.y - HUD) / TILE).floor() as i32,
-            );
+            let (c, r) = (((s.x + s.vx.signum() * 5.0) / TILE).floor() as i32, ((s.y - HUD) / TILE).floor() as i32);
             if g.platform(c, r) || c <= 0 || c >= COLS as i32 - 1 {
                 s.active = false;
             }
@@ -1013,13 +924,18 @@ fn move_shots(g: &mut Game, dt: f32, player_starts: [(f32, f32); 2]) -> [bool; 2
         if s.active {
             for pi in 0..2 {
                 let p = &g.p[pi];
-                if !p.joined || !p.alive || p.dead_t > 0.0 || p.safe > 0.0 { continue; }
+                if !p.joined || !p.alive || p.dead_t > 0.0 || p.safe > 0.0 {
+                    continue;
+                }
                 if segment_rect_overlap(
                     from.0 - player_starts[pi].0,
                     from.1 - player_starts[pi].1,
-                    s.x - p.cx(), s.y - p.cy(),
-                    -P_W / 2.0 - 3.0, -P_H / 2.0 - 2.0,
-                    P_W + 6.0, P_H + 4.0,
+                    s.x - p.cx(),
+                    s.y - p.cy(),
+                    -P_W / 2.0 - 3.0,
+                    -P_H / 2.0 - 2.0,
+                    P_W + 6.0,
+                    P_H + 4.0,
                 ) {
                     player_hits[pi] = true;
                     s.active = false;
@@ -1027,7 +943,9 @@ fn move_shots(g: &mut Game, dt: f32, player_starts: [(f32, f32); 2]) -> [bool; 2
                 }
             }
         }
-        if expired { s.active = false; }
+        if expired {
+            s.active = false;
+        }
         if !s.active {
             let (x, y) = (s.x, s.y);
             g.burst(x, y, 5, rgba(1.0, 0.85, 0.6, 0.8), 70.0, s.spark);
@@ -1063,11 +981,7 @@ fn pop_chain(g: &mut Game, start: usize, by: usize, sfx: &Sounds) {
     for &j in &chain {
         let b = g.bubbles[j];
         g.bubbles[j].active = false;
-        let ring = if b.owner == 0 {
-            rgba(0.6, 1.0, 0.6, 0.9)
-        } else {
-            rgba(0.6, 0.85, 1.0, 0.9)
-        };
+        let ring = if b.owner == 0 { rgba(0.6, 1.0, 0.6, 0.9) } else { rgba(0.6, 0.85, 1.0, 0.9) };
         g.burst(b.x, b.y, 8, ring, 90.0, false);
         g.ring(b.x, b.y, ring, b.radius());
         if b.trapped.is_some() {
@@ -1094,13 +1008,7 @@ fn pop_chain(g: &mut Game, start: usize, by: usize, sfx: &Sounds) {
         }
     }
     if chain_total > 0 {
-        g.pops.push(Popup {
-            x: chain_at.0,
-            y: chain_at.1,
-            t: 0.0,
-            value: chain_total,
-            c: rgba(1.0, 0.95, 0.4, 1.0),
-        });
+        g.pops.push(Popup { x: chain_at.0, y: chain_at.1, t: 0.0, value: chain_total, c: rgba(1.0, 0.95, 0.4, 1.0) });
     }
     play_sfx(&sfx.pop);
     g.stats.pops += 1;
@@ -1163,9 +1071,14 @@ fn move_bubbles(
                         let enemy_from = enemy_starts.get(ei).copied().unwrap_or((ex, ey));
                         let (rx, ry) = (BUB_R + E_W / 2.0 - 2.0, BUB_R + E_H / 2.0 - 2.0);
                         if segment_rect_overlap(
-                            from.0 - enemy_from.0, from.1 - enemy_from.1,
-                            b.x - ex, b.y - ey,
-                            -rx, -ry, rx * 2.0, ry * 2.0,
+                            from.0 - enemy_from.0,
+                            from.1 - enemy_from.1,
+                            b.x - ex,
+                            b.y - ey,
+                            -rx,
+                            -ry,
+                            rx * 2.0,
+                            ry * 2.0,
                         ) {
                             e.active = false;
                             b.trapped = Some((e.kind, e.angry));
@@ -1180,11 +1093,7 @@ fn move_bubbles(
                 }
             }
             Phase::Float => {
-                b.y -= if b.trapped.is_some() {
-                    RISE_TRAPPED
-                } else {
-                    RISE
-                } * dt;
+                b.y -= if b.trapped.is_some() { RISE_TRAPPED } else { RISE } * dt;
                 b.x += (b.wob * 2.2).sin() * 10.0 * dt;
                 if b.y <= b.top_y() {
                     b.y = b.top_y();
@@ -1203,11 +1112,7 @@ fn move_bubbles(
         if was_free && b.trapped.is_some() {
             g.stats.traps += 1;
         }
-        let life = if b.trapped.is_some() {
-            trap_life(g.round)
-        } else {
-            FREE_LIFE
-        };
+        let life = if b.trapped.is_some() { trap_life(g.round) } else { FREE_LIFE };
         if b.age > life && b.phase != Phase::Shoot {
             if b.trapped.is_some() {
                 g.stats.escapes += 1;
@@ -1221,11 +1126,7 @@ fn move_bubbles(
                     y: b.y - E_H / 2.0,
                     vx: 0.0,
                     vy: 0.0,
-                    dir: if blip::rand_range_f32(0.0, 1.0) < 0.5 {
-                        -1.0
-                    } else {
-                        1.0
-                    },
+                    dir: if blip::rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 },
                     on_ground: false,
                     angry: true,
                     t: 0.0,
@@ -1285,8 +1186,11 @@ fn move_bubbles(
             if !segment_circle_overlap(
                 player_starts[pi].0 - bubble_from.0,
                 player_starts[pi].1 - bubble_from.1,
-                px - b.x, py - b.y,
-                0.0, 0.0, b.radius() + 11.0,
+                px - b.x,
+                py - b.y,
+                0.0,
+                0.0,
+                b.radius() + 11.0,
             ) {
                 continue;
             }
@@ -1308,12 +1212,7 @@ fn move_bubbles(
     g.bubbles.retain(|b| b.active);
 }
 
-fn move_candies(
-    g: &mut Game,
-    dt: f32,
-    sfx: &Sounds,
-    player_starts: [(f32, f32); 2],
-) {
+fn move_candies(g: &mut Game, dt: f32, sfx: &Sounds, player_starts: [(f32, f32); 2]) {
     const VALUE: [i32; 4] = [500, 1000, 2000, 4000];
     for i in 0..g.fruits.len() {
         let mut f = g.fruits[i];
@@ -1357,26 +1256,15 @@ fn move_candies(
                 g.p[pi].eat = 0.0;
                 g.p[pi].eaten = f;
                 g.stats.fruit += 1;
-                g.pops.push(Popup {
-                    x: f.x + 8.0,
-                    y: f.y,
-                    t: 0.0,
-                    value: v,
-                    c: rgba(1.0, 1.0, 1.0, 1.0),
-                });
-                g.burst(
-                    f.x + 8.0,
-                    f.y + 8.0,
-                    5,
-                    rgba(1.0, 1.0, 0.6, 1.0),
-                    60.0,
-                    true,
-                );
+                g.pops.push(Popup { x: f.x + 8.0, y: f.y, t: 0.0, value: v, c: rgba(1.0, 1.0, 1.0, 1.0) });
+                g.burst(f.x + 8.0, f.y + 8.0, 5, rgba(1.0, 1.0, 0.6, 1.0), 60.0, true);
                 play_sfx(&sfx.fruit);
                 break;
             }
         }
-        if f.t > 9.0 { f.active = false; }
+        if f.t > 9.0 {
+            f.active = false;
+        }
         g.fruits[i] = f;
     }
     g.fruits.retain(|f| f.active);
@@ -1401,12 +1289,7 @@ fn update_chewing(g: &mut Game, dt: f32) {
 fn update_skull(g: &mut Game, dt: f32) -> Option<((f32, f32), (f32, f32))> {
     if !g.skull.active {
         if g.round_t >= skull_at(g.round) {
-            g.skull = Skull {
-                active: true,
-                x: WIN_W as f32 / 2.0,
-                y: HUD + 10.0,
-                speed: 45.0,
-            };
+            g.skull = Skull { active: true, x: WIN_W as f32 / 2.0, y: HUD + 10.0, speed: 45.0 };
             g.stats.skulls += 1;
         }
         return None;
@@ -1437,11 +1320,7 @@ fn hurt_players(
 ) {
     #[cfg(not(target_arch = "wasm32"))]
     if std::env::var_os("BUBBLER_GOD").is_some() {
-        if g.skull.active
-            && g.p
-                .iter()
-                .any(|p| p.alive && (g.skull.x - p.cx()).hypot(g.skull.y - p.cy()) < 18.0)
-        {
+        if g.skull.active && g.p.iter().any(|p| p.alive && (g.skull.x - p.cx()).hypot(g.skull.y - p.cy()) < 18.0) {
             g.stats.deaths_skull += 1; // would have been caught
         }
         return;
@@ -1452,26 +1331,43 @@ fn hurt_players(
             continue;
         }
         let (px, py) = (p.cx(), p.cy());
-        let killer = g.enemies.iter().enumerate().find(|(ei, e)| {
-            if !e.active || e.pop_in < 1.0 { return false; }
-            let end = (e.x + E_W / 2.0, e.y + E_H / 2.0);
-            let start = enemy_starts.get(*ei).copied().unwrap_or(end);
-            segment_rect_overlap(
-                player_starts[pi].0 - start.0, player_starts[pi].1 - start.1,
-                px - end.0, py - end.1,
-                -((E_W + P_W) / 2.0 - 7.0), -((E_H + P_H) / 2.0 - 10.0),
-                2.0 * ((E_W + P_W) / 2.0 - 7.0),
-                2.0 * ((E_H + P_H) / 2.0 - 10.0),
-            )
-        }).map(|(_, e)| e.kind);
-        let hit_skull = g.skull.active && skull_motion.map_or_else(
-            || (g.skull.x - px).hypot(g.skull.y - py) < 18.0,
-            |(from, to)| segment_circle_overlap(
-                from.0 - player_starts[pi].0, from.1 - player_starts[pi].1,
-                to.0 - px, to.1 - py,
-                0.0, 0.0, 18.0,
-            ),
-        );
+        let killer = g
+            .enemies
+            .iter()
+            .enumerate()
+            .find(|(ei, e)| {
+                if !e.active || e.pop_in < 1.0 {
+                    return false;
+                }
+                let end = (e.x + E_W / 2.0, e.y + E_H / 2.0);
+                let start = enemy_starts.get(*ei).copied().unwrap_or(end);
+                segment_rect_overlap(
+                    player_starts[pi].0 - start.0,
+                    player_starts[pi].1 - start.1,
+                    px - end.0,
+                    py - end.1,
+                    -((E_W + P_W) / 2.0 - 7.0),
+                    -((E_H + P_H) / 2.0 - 10.0),
+                    2.0 * ((E_W + P_W) / 2.0 - 7.0),
+                    2.0 * ((E_H + P_H) / 2.0 - 10.0),
+                )
+            })
+            .map(|(_, e)| e.kind);
+        let hit_skull = g.skull.active
+            && skull_motion.map_or_else(
+                || (g.skull.x - px).hypot(g.skull.y - py) < 18.0,
+                |(from, to)| {
+                    segment_circle_overlap(
+                        from.0 - player_starts[pi].0,
+                        from.1 - player_starts[pi].1,
+                        to.0 - px,
+                        to.1 - py,
+                        0.0,
+                        0.0,
+                        18.0,
+                    )
+                },
+            );
         let hit_shot = shot_hits[pi] || g.shots.iter().any(|s| shot_hits_player(s, px, py));
         if hit_shot {
             g.shots.retain(|s| !shot_hits_player(s, px, py));
@@ -1489,14 +1385,24 @@ fn hurt_players(
             #[cfg(not(target_arch = "wasm32"))]
             if std::env::var_os("BUBBLER_BOT").is_some() {
                 let p = &g.p[pi];
-                let e = g.enemies.iter().filter(|e| e.active).min_by(|a, b| {
-                    (a.x - p.x)
-                        .hypot(a.y - p.y)
-                        .total_cmp(&(b.x - p.x).hypot(b.y - p.y))
-                });
-                println!("DEATH round={} t={:.1} p{} at ({:.0},{:.0}) v=({:.0},{:.0}) ground={} face={} | {:?}",
-                    g.round + 1, g.round_t, pi + 1, p.x, p.y, p.vx, p.vy, p.on_ground, p.face,
-                    e.map(|e| (e.kind, e.x as i32, e.y as i32, e.vx as i32, e.vy as i32, e.angry)));
+                let e = g
+                    .enemies
+                    .iter()
+                    .filter(|e| e.active)
+                    .min_by(|a, b| (a.x - p.x).hypot(a.y - p.y).total_cmp(&(b.x - p.x).hypot(b.y - p.y)));
+                println!(
+                    "DEATH round={} t={:.1} p{} at ({:.0},{:.0}) v=({:.0},{:.0}) ground={} face={} | {:?}",
+                    g.round + 1,
+                    g.round_t,
+                    pi + 1,
+                    p.x,
+                    p.y,
+                    p.vx,
+                    p.vy,
+                    p.on_ground,
+                    p.face,
+                    e.map(|e| (e.kind, e.x as i32, e.y as i32, e.vx as i32, e.vy as i32, e.angry))
+                );
             }
             g.stats.deaths_round[g.round] += 1;
             let p = &mut g.p[pi];
@@ -1521,8 +1427,7 @@ fn update_fx(g: &mut Game, dt: f32) {
 }
 
 fn players_left(g: &Game) -> bool {
-    g.p.iter()
-        .any(|p| p.joined && (p.lives > 0 || p.dead_t > 0.0))
+    g.p.iter().any(|p| p.joined && (p.lives > 0 || p.dead_t > 0.0))
 }
 
 fn update_play(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
@@ -1536,9 +1441,7 @@ fn update_play(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
         play_sfx(&sfx.hurry);
     }
     let player_starts = std::array::from_fn(|i| (g.p[i].cx(), g.p[i].cy()));
-    let enemy_starts: Vec<(f32, f32)> = g.enemies.iter()
-        .map(|e| (e.x + E_W / 2.0, e.y + E_H / 2.0))
-        .collect();
+    let enemy_starts: Vec<(f32, f32)> = g.enemies.iter().map(|e| (e.x + E_W / 2.0, e.y + E_H / 2.0)).collect();
     move_players(g, inp, dt, sfx);
     move_toys(g, dt);
     move_bubbles(g, dt, inp, sfx, &enemy_starts, player_starts);
@@ -1577,11 +1480,7 @@ fn update_play(g: &mut Game, dt: f32, inp: [Input; 2], sfx: &Sounds) {
 // ---- drawing -------------------------------------------------------------
 
 fn tint(c: (u8, u8, u8), k: f32) -> (u8, u8, u8) {
-    (
-        ((c.0 as f32) * k).min(255.0) as u8,
-        ((c.1 as f32) * k).min(255.0) as u8,
-        ((c.2 as f32) * k).min(255.0) as u8,
-    )
+    (((c.0 as f32) * k).min(255.0) as u8, ((c.1 as f32) * k).min(255.0) as u8, ((c.2 as f32) * k).min(255.0) as u8)
 }
 
 fn draw_background(blip: &Blip, g: &Game) {
@@ -1606,9 +1505,7 @@ fn draw_bokeh(blip: &Blip, pal: &levels::Palette) {
     for i in 0..22 {
         let s = i as f32 * 37.7;
         let x = (s * 13.1) % WIN_W as f32;
-        let y = WIN_H as f32
-            - ((s * 7.3 + t * (6.0 + (i % 5) as f32 * 3.0)) % (WIN_H as f32 + 40.0))
-            + 20.0;
+        let y = WIN_H as f32 - ((s * 7.3 + t * (6.0 + (i % 5) as f32 * 3.0)) % (WIN_H as f32 + 40.0)) + 20.0;
         let r = 3.0 + (i % 4) as f32 * 3.0;
         let a = 0.05 + 0.04 * ((t * 0.8 + s).sin() * 0.5 + 0.5);
         blip.fill_circle(x, y, r, col(pal.glow, a));
@@ -1640,47 +1537,20 @@ fn draw_tiles(blip: &Blip, art: &art::Art, g: &Game, ox: f32, oy: f32) {
 }
 
 // ---- plush toys ------------------------------------------------------------
-// Felt-toy drawing helpers shared by players and monsters.
-fn hsv(h: f32, s: f32, v: f32, a: f32) -> BlipColor {
-    let h = (h.rem_euclid(1.0)) * 6.0;
-    let c = v * s;
-    let x = c * (1.0 - ((h % 2.0) - 1.0).abs());
-    let (r, g, b) = match h as i32 {
-        0 => (c, x, 0.0),
-        1 => (x, c, 0.0),
-        2 => (0.0, c, x),
-        3 => (0.0, x, c),
-        4 => (x, 0.0, c),
-        _ => (c, 0.0, x),
-    };
-    let m = v - c;
-    rgba(r + m, g + m, b + m, a)
-}
 
 const EAT_SECS: f32 = 0.6;
 const EAT_FLY: f32 = 0.15;
 const CHOMPS: [f32; 2] = [0.28, 0.45];
 
 fn mouth_pos(p: &Player) -> (f32, f32) {
-    (
-        p.cx() + p.face * 10.5 * TOY_SCALE,
-        p.y + P_H - 9.0 * TOY_SCALE,
-    )
+    (p.cx() + p.face * 10.5 * TOY_SCALE, p.y + P_H - 9.0 * TOY_SCALE)
 }
 
 fn draw_bubble(blip: &Blip, art: &art::Art, b: &Bubble, ox: f32, oy: f32, t: f32, round: usize) {
     let (x, y) = (b.x + ox, b.y + oy);
-    let life = if b.trapped.is_some() {
-        trap_life(round)
-    } else {
-        FREE_LIFE
-    };
+    let life = if b.trapped.is_some() { trap_life(round) } else { FREE_LIFE };
     let escaping = b.trapped.is_some() && b.age > life - 1.6;
-    let shake = if escaping {
-        (t * 50.0).sin() * 1.5
-    } else {
-        0.0
-    };
+    let shake = if escaping { (t * 50.0).sin() * 1.5 } else { 0.0 };
     let grow = if b.phase == Phase::Shoot && b.trapped.is_none() {
         0.35 + 0.65 * blip::ease_out_cubic(b.age / 0.12)
     } else {
@@ -1712,14 +1582,8 @@ fn draw_glass(x: f32, y: f32, rx: f32, ry: f32, owner: usize, body: f32, rim: Bl
 }
 
 /// Candy colours, picked per drop so a shower of them is a pick-and-mix.
-const CANDY: [(u8, u8, u8); 6] = [
-    (255, 120, 160),
-    (120, 200, 255),
-    (255, 200, 80),
-    (150, 230, 140),
-    (200, 150, 255),
-    (255, 150, 90),
-];
+const CANDY: [(u8, u8, u8); 6] =
+    [(255, 120, 160), (120, 200, 255), (255, 200, 80), (150, 230, 140), (200, 150, 255), (255, 150, 90)];
 
 /// A dropped treat, sweeter the bigger the chain that made it (see VALUE):
 /// a wrapped bonbon, a swirled lollipop, a sprinkled donut, a cupcake with
@@ -1728,19 +1592,8 @@ fn draw_fruit(f: &Fruit, ox: f32, oy: f32) {
     if f.t > 7.0 && (f.t * 10.0) as i32 % 2 == 0 {
         return;
     }
-    let bob = if f.on_ground {
-        (f.t * 4.0).sin() * 1.0
-    } else {
-        0.0
-    };
-    draw_candy(
-        f.kind,
-        candy_pick(f),
-        f.t,
-        f.x + 8.0 + ox,
-        f.y + 8.0 + oy + bob,
-        true,
-    );
+    let bob = if f.on_ground { (f.t * 4.0).sin() * 1.0 } else { 0.0 };
+    draw_candy(f.kind, candy_pick(f), f.t, f.x + 8.0 + ox, f.y + 8.0 + oy + bob, true);
 }
 
 /// Which colour a candy is: fixed by where it dropped.
@@ -1771,41 +1624,20 @@ fn draw_candy(kind: usize, pick: usize, t: f32, x: f32, y: f32, halo: bool) {
                     vec2(x + s * 12.0, y + 5.0),
                     col(tint(c, 1.15), 1.0),
                 );
-                draw_line(
-                    x + s * 9.0,
-                    y - 3.0,
-                    x + s * 9.0,
-                    y + 3.0,
-                    1.0,
-                    col(tint(c, 0.75), 1.0),
-                );
+                draw_line(x + s * 9.0, y - 3.0, x + s * 9.0, y + 3.0, 1.0, col(tint(c, 0.75), 1.0));
             }
             draw_circle(x, y, 7.5, col(tint(c, 0.8), 1.0));
             draw_circle(x, y, 6.6, col(c, 1.0));
             for k in 0..3 {
                 // candy stripes
                 let dx = -4.0 + k as f32 * 4.0;
-                draw_line(
-                    x + dx - 1.5,
-                    y - 5.0,
-                    x + dx + 1.5,
-                    y + 5.0,
-                    1.6,
-                    col((255, 255, 255), 0.55),
-                );
+                draw_line(x + dx - 1.5, y - 5.0, x + dx + 1.5, y + 5.0, 1.6, col((255, 255, 255), 0.55));
             }
             draw_ellipse(x - 2.6, y - 3.0, 2.4, 1.4, -30.0, shine);
         }
         1 => {
             // a lollipop: a spiral of two colours on a stick
-            draw_line(
-                x,
-                y + 4.0,
-                x + 1.0,
-                y + 14.0,
-                2.2,
-                col((250, 245, 235), 1.0),
-            );
+            draw_line(x, y + 4.0, x + 1.0, y + 14.0, 2.2, col((250, 245, 235), 1.0));
             draw_circle(x, y - 1.0, 8.0, col(tint(c, 0.8), 1.0));
             draw_circle(x, y - 1.0, 7.2, col(c, 1.0));
             let turn = t * 1.5;
@@ -1833,42 +1665,18 @@ fn draw_candy(kind: usize, pick: usize, t: f32, x: f32, y: f32, halo: bool) {
         }
         _ => {
             // a cupcake: a pleated case, swirled frosting, a cherry
-            draw_triangle(
-                vec2(x - 8.0, y + 1.0),
-                vec2(x + 8.0, y + 1.0),
-                vec2(x + 6.0, y + 10.0),
-                col(c2, 1.0),
-            );
-            draw_triangle(
-                vec2(x - 8.0, y + 1.0),
-                vec2(x - 6.0, y + 10.0),
-                vec2(x + 6.0, y + 10.0),
-                col(c2, 1.0),
-            );
+            draw_triangle(vec2(x - 8.0, y + 1.0), vec2(x + 8.0, y + 1.0), vec2(x + 6.0, y + 10.0), col(c2, 1.0));
+            draw_triangle(vec2(x - 8.0, y + 1.0), vec2(x - 6.0, y + 10.0), vec2(x + 6.0, y + 10.0), col(c2, 1.0));
             for k in 0..5 {
                 let px = x - 6.0 + k as f32 * 3.0;
-                draw_line(
-                    px,
-                    y + 2.0,
-                    px + (k as f32 - 2.0) * 0.4,
-                    y + 9.5,
-                    1.0,
-                    col(tint(c2, 0.75), 1.0),
-                );
+                draw_line(px, y + 2.0, px + (k as f32 - 2.0) * 0.4, y + 9.5, 1.0, col(tint(c2, 0.75), 1.0));
             }
             for (dy, r) in [(-1.0f32, 8.0f32), (-4.5, 6.0), (-7.5, 3.8)] {
                 draw_ellipse(x, y + dy, r, r * 0.6, 0.0, col(tint(c, 0.9), 1.0));
                 draw_ellipse(x, y + dy - 0.6, r * 0.9, r * 0.5, 0.0, col(c, 1.0));
             }
             draw_circle(x + 0.5, y - 11.0, 2.8, col((220, 30, 60), 1.0));
-            draw_line(
-                x + 0.5,
-                y - 13.5,
-                x + 2.5,
-                y - 16.0,
-                1.0,
-                col((80, 140, 50), 1.0),
-            );
+            draw_line(x + 0.5, y - 13.5, x + 2.5, y - 16.0, 1.0, col((80, 140, 50), 1.0));
             draw_circle(x - 0.4, y - 11.8, 0.8, shine);
             draw_ellipse(x - 3.0, y - 4.5, 2.0, 1.0, -15.0, shine);
         }
@@ -1892,37 +1700,18 @@ fn draw_skull(s: &Skull, ox: f32, oy: f32, t: f32) {
     draw_ellipse(x, y, 12.0, 11.0, 0.0, rgba(0.95, 0.95, 1.0, 1.0));
     draw_ellipse(x, y + 8.0, 7.0, 4.0, 0.0, rgba(0.95, 0.95, 1.0, 1.0));
     for sgn in [-1.0f32, 1.0] {
-        draw_ellipse(
-            x + sgn * 4.5,
-            y - 1.0,
-            3.5,
-            4.2,
-            0.0,
-            rgba(0.15, 0.0, 0.25, 1.0),
-        );
+        draw_ellipse(x + sgn * 4.5, y - 1.0, 3.5, 4.2, 0.0, rgba(0.15, 0.0, 0.25, 1.0));
         draw_circle(x + sgn * 4.5, y - 1.0, 1.4, hsv(t * 0.5, 0.7, 1.0, 1.0));
     }
     for k in -1..=1 {
-        blip::macroquad::shapes::draw_rectangle(
-            x + k as f32 * 3.0 - 1.0,
-            y + 7.0,
-            2.0,
-            4.0,
-            rgba(0.2, 0.1, 0.3, 1.0),
-        );
+        blip::macroquad::shapes::draw_rectangle(x + k as f32 * 3.0 - 1.0, y + 7.0, 2.0, 4.0, rgba(0.2, 0.1, 0.3, 1.0));
     }
 }
 
 fn draw_world(blip: &Blip, art: &art::Art, g: &Game) {
     let t = now();
-    let (ox, oy) = if g.shake > 0.0 {
-        (
-            (t * 90.0).sin() * g.shake * 8.0,
-            (t * 77.0).cos() * g.shake * 8.0,
-        )
-    } else {
-        (0.0, 0.0)
-    };
+    let (ox, oy) =
+        if g.shake > 0.0 { ((t * 90.0).sin() * g.shake * 8.0, (t * 77.0).cos() * g.shake * 8.0) } else { (0.0, 0.0) };
     draw_background(blip, g);
     draw_tiles(blip, art, g, ox, oy);
     for f in &g.fruits {
@@ -1933,11 +1722,7 @@ fn draw_world(blip: &Blip, art: &art::Art, g: &Game) {
             continue;
         }
         let s = blip::ease_out_cubic(e.pop_in);
-        let shake = if e.windup > 0.0 || e.crouch > 0.0 {
-            (e.t * 70.0).sin() * 1.4
-        } else {
-            0.0
-        };
+        let shake = if e.windup > 0.0 || e.crouch > 0.0 { (e.t * 70.0).sin() * 1.4 } else { 0.0 };
         // crouching to jump: drawn smaller, feet still on the platform
         let k = if e.crouch > 0.0 { 0.82 } else { 1.0 };
         art.enemy(
@@ -1996,21 +1781,13 @@ fn draw_world(blip: &Blip, art: &art::Art, g: &Game) {
             blip::macroquad::shapes::draw_circle(x + 1.0, y + 2.0, 6.0, rgba(0.1, 0.05, 0.15, 0.4));
             blip::macroquad::shapes::draw_circle(x, y, 6.0, col((150, 120, 110), 1.0));
             let a = s.x / 6.0;
-            blip::macroquad::shapes::draw_circle(
-                x + a.cos() * 2.5,
-                y + a.sin() * 2.5,
-                1.6,
-                col((110, 85, 80), 1.0),
-            );
+            blip::macroquad::shapes::draw_circle(x + a.cos() * 2.5, y + a.sin() * 2.5, 1.6, col((110, 85, 80), 1.0));
             blip::macroquad::shapes::draw_circle(x - 2.0, y - 2.2, 1.5, rgba(1.0, 0.95, 0.9, 0.7));
         }
     }
     for p in g.parts.iter() {
         let a = (p.life / p.max_life).clamp(0.0, 1.0);
-        let c = BlipColor {
-            a: p.data.c.a * a,
-            ..p.data.c
-        };
+        let c = BlipColor { a: p.data.c.a * a, ..p.data.c };
         if p.data.ring {
             let r = p.data.size + (1.0 - a) * 16.0;
             blip::macroquad::shapes::draw_circle_lines(p.x + ox, p.y + oy, r, 2.0 * a + 0.5, c);
@@ -2052,44 +1829,23 @@ fn pill(cx: f32, y: f32, w: f32, h: f32, edge: BlipColor, a: f32) {
     let r = (h / 2.0).min(14.0);
     let x = cx - w / 2.0;
     let fill = col((34, 14, 44), 0.82 * a);
-    let rim = BlipColor {
-        a: edge.a * a * 0.9,
-        ..edge
-    };
+    let rim = BlipColor { a: edge.a * a * 0.9, ..edge };
     // border: the same shape one pixel-and-a-half bigger, underneath
     for (grow, c) in [(1.6f32, rim), (0.0, fill)] {
         let (xx, yy, ww, hh, rr) = (x - grow, y - grow, w + grow * 2.0, h + grow * 2.0, r + grow);
         draw_rectangle(xx + rr, yy, ww - rr * 2.0, hh, c);
         draw_rectangle(xx, yy + rr, ww, hh - rr * 2.0, c);
-        for (px, py) in [
-            (xx + rr, yy + rr),
-            (xx + ww - rr, yy + rr),
-            (xx + rr, yy + hh - rr),
-            (xx + ww - rr, yy + hh - rr),
-        ] {
+        for (px, py) in
+            [(xx + rr, yy + rr), (xx + ww - rr, yy + rr), (xx + rr, yy + hh - rr), (xx + ww - rr, yy + hh - rr)]
+        {
             draw_circle(px, py, rr, c);
         }
     }
-    draw_rectangle(
-        x + r,
-        y + 2.0,
-        w - r * 2.0,
-        1.5,
-        rgba(1.0, 1.0, 1.0, 0.08 * a),
-    );
+    draw_rectangle(x + r, y + 2.0, w - r * 2.0, 1.5, rgba(1.0, 1.0, 1.0, 0.08 * a));
 }
 
 /// Text on its own pill, centred on the screen, popping in with `pop`.
-fn cosy(
-    blip: &Blip,
-    text: &str,
-    y: f32,
-    sz: f32,
-    c: (u8, u8, u8),
-    edge: (u8, u8, u8),
-    pop: f32,
-    a: f32,
-) {
+fn cosy(blip: &Blip, text: &str, y: f32, sz: f32, c: (u8, u8, u8), edge: (u8, u8, u8), pop: f32, a: f32) {
     if a <= 0.01 {
         return;
     }
@@ -2131,11 +1887,7 @@ fn draw_scores(blip: &Blip, g: &Game, _hi: &web::HighScore) {
         let score = format!("{}", p.score);
         let (sw, lives) = (text_w(&score, sz), p.lives.max(0));
         let lw = lives as f32 * 11.0;
-        let x0 = if i == 0 {
-            10.0
-        } else {
-            WIN_W as f32 - 10.0 - sw - 8.0 - lw
-        };
+        let x0 = if i == 0 { 10.0 } else { WIN_W as f32 - 10.0 - sw - 8.0 - lw };
         soft(blip, &score, x0, y, sz, colr, 1.0);
         for k in 0..lives {
             // a little heart per life, in the player's colour
@@ -2143,25 +1895,12 @@ fn draw_scores(blip: &Blip, g: &Game, _hi: &web::HighScore) {
             let c = col(life, 1.0);
             draw_circle(hx - 2.0, hy, 2.6, c);
             draw_circle(hx + 2.0, hy, 2.6, c);
-            draw_triangle(
-                vec2(hx - 4.5, hy + 0.8),
-                vec2(hx + 4.5, hy + 0.8),
-                vec2(hx, hy + 5.5),
-                c,
-            );
+            draw_triangle(vec2(hx - 4.5, hy + 0.8), vec2(hx + 4.5, hy + 0.8), vec2(hx, hy + 5.5), c);
             draw_circle(hx - 2.6, hy - 0.8, 0.9, rgba(1.0, 1.0, 1.0, 0.7));
         }
     }
     let round = format!("ROUND {}", g.round + 1);
-    soft(
-        blip,
-        &round,
-        (WIN_W as f32 - text_w(&round, sz)) / 2.0,
-        y,
-        sz,
-        PEACH,
-        1.0,
-    );
+    soft(blip, &round, (WIN_W as f32 - text_w(&round, sz)) / 2.0, y, sz, PEACH, 1.0);
 }
 
 fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: &web::HighScore) {
@@ -2182,10 +1921,7 @@ fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: &web::HighScore) {
         art.title_letter(blip, letter, 186.0 + letter as f32 * 36.0, 88.0 + DY + bob);
     }
     // the two of them, bouncing
-    for (i, x) in [WIN_W as f32 / 2.0 - 70.0, WIN_W as f32 / 2.0 + 70.0]
-        .iter()
-        .enumerate()
-    {
+    for (i, x) in [WIN_W as f32 / 2.0 - 70.0, WIN_W as f32 / 2.0 + 70.0].iter().enumerate() {
         let hop = ((t * 3.2 + i as f32 * 1.6).sin()).max(0.0);
         let foot = 278.0 + DY - hop * 34.0;
         // the two of them face each other
@@ -2195,15 +1931,7 @@ fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: &web::HighScore) {
     art.title_panels(blip, web::controls(), glow);
     if hi.score > 0 {
         let h = hi.label("HI");
-        soft(
-            blip,
-            &h,
-            (WIN_W as f32 - text_w(&h, 2.0)) / 2.0,
-            428.0 + DY,
-            2.0,
-            PEACH,
-            1.0,
-        );
+        soft(blip, &h, (WIN_W as f32 - text_w(&h, 2.0)) / 2.0, 428.0 + DY, 2.0, PEACH, 1.0);
     }
     let _ = g;
 }
@@ -2227,11 +1955,8 @@ fn bot_input(g: &Game, pi: usize, mem: &mut [f32; 4]) -> Input {
         .map(|e| (e.x + E_W / 2.0 - px, e.y + E_H / 2.0 - py))
         .find(|(dx, dy)| dx.abs() < 34.0 && dy.abs() < 22.0);
     // trapped bubbles are the priority: go and pop them
-    let trapped = g
-        .bubbles
-        .iter()
-        .filter(|b| b.trapped.is_some())
-        .min_by(|a, b| (a.x - px).abs().total_cmp(&(b.x - px).abs()));
+    let trapped =
+        g.bubbles.iter().filter(|b| b.trapped.is_some()).min_by(|a, b| (a.x - px).abs().total_cmp(&(b.x - px).abs()));
     let fruit = g
         .fruits
         .iter()
@@ -2245,9 +1970,7 @@ fn bot_input(g: &Game, pi: usize, mem: &mut [f32; 4]) -> Input {
         g.enemies
             .iter()
             .filter(|e| e.active && e.pop_in >= 1.0)
-            .min_by(|a, b| {
-                ((a.x - px).hypot((a.y - py) * 1.6)).total_cmp(&(b.x - px).hypot((b.y - py) * 1.6))
-            })
+            .min_by(|a, b| ((a.x - px).hypot((a.y - py) * 1.6)).total_cmp(&(b.x - px).hypot((b.y - py) * 1.6)))
             .map(|e| (e.x + E_W / 2.0, e.y + E_H / 2.0, false))
     };
     // in the air over a monster: steer clear of it
@@ -2313,11 +2036,7 @@ fn bot_input(g: &Game, pi: usize, mem: &mut [f32; 4]) -> Input {
                     k.left = dir < 0.0;
                     k.right = dir > 0.0;
                 }
-                if dy < -30.0
-                    && p.on_ground
-                    && mem[0] <= 0.0
-                    && blip::rand_range_f32(0.0, 1.0) < 0.12
-                {
+                if dy < -30.0 && p.on_ground && mem[0] <= 0.0 && blip::rand_range_f32(0.0, 1.0) < 0.12 {
                     k.jump = true;
                     mem[0] = 0.4;
                 }
@@ -2327,11 +2046,7 @@ fn bot_input(g: &Game, pi: usize, mem: &mut [f32; 4]) -> Input {
         mem[1] -= 1.0 / 60.0;
         if (p.vx.abs() < 5.0 && (k.left || k.right)) && mem[1] <= 0.0 {
             mem[1] = 0.8;
-            mem[2] = if blip::rand_range_f32(0.0, 1.0) < 0.5 {
-                -1.0
-            } else {
-                1.0
-            };
+            mem[2] = if blip::rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
         }
     }
     k.jump_held = k.jump_held || k.jump;
@@ -2374,18 +2089,11 @@ async fn main() {
     #[cfg(not(target_arch = "wasm32"))]
     let mut scene_set = false;
     #[cfg(not(target_arch = "wasm32"))]
-    let bot: u32 = std::env::var("BUBBLER_BOT")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
+    let bot: u32 = std::env::var("BUBBLER_BOT").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
     #[cfg(not(target_arch = "wasm32"))]
-    let speed: u32 = std::env::var("BUBBLER_SPEED")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(1);
+    let speed: u32 = std::env::var("BUBBLER_SPEED").ok().and_then(|v| v.parse().ok()).unwrap_or(1);
     #[cfg(not(target_arch = "wasm32"))]
-    let (mut bot_mem, mut bot_clock, mut bot_rounds) =
-        ([[0.0f32; 4]; 2], 0.0f32, Vec::<u32>::new());
+    let (mut bot_mem, mut bot_clock, mut bot_rounds) = ([[0.0f32; 4]; 2], 0.0f32, Vec::<u32>::new());
 
     loop {
         #[cfg(not(target_arch = "wasm32"))]
@@ -2416,15 +2124,8 @@ async fn main() {
                     }
                     e.pop_in = 1.0;
                 }
-                for (k, (x, y)) in [
-                    (282.0, 70.0),
-                    (306.0, 72.0),
-                    (330.0, 70.0),
-                    (200.0, 260.0),
-                    (230.0, 390.0),
-                ]
-                .iter()
-                .enumerate()
+                for (k, (x, y)) in
+                    [(282.0, 70.0), (306.0, 72.0), (330.0, 70.0), (200.0, 260.0), (230.0, 390.0)].iter().enumerate()
                 {
                     g.bubbles.push(Bubble {
                         x: *x,
@@ -2433,11 +2134,7 @@ async fn main() {
                         age: 1.0,
                         phase: if k < 3 { Phase::Top } else { Phase::Float },
                         owner: k % 2,
-                        trapped: if k < 3 {
-                            Some((Kind::Walker, false))
-                        } else {
-                            None
-                        },
+                        trapped: if k < 3 { Some((Kind::Walker, false)) } else { None },
                         active: true,
                         wob: k as f32,
                         squish: 0.0,
@@ -2521,10 +2218,7 @@ async fn main() {
         let mut p2_start = key_pressed(BLIP_KEY_J) || key_pressed(BLIP_KEY_K);
         #[cfg(not(target_arch = "wasm32"))]
         if bot > 0
-            && std::env::var("BUBBLER_MAXT")
-                .ok()
-                .and_then(|v| v.parse::<f32>().ok())
-                .is_some_and(|m| bot_clock > m)
+            && std::env::var("BUBBLER_MAXT").ok().and_then(|v| v.parse::<f32>().ok()).is_some_and(|m| bot_clock > m)
         {
             g.state = State::Over;
         }
@@ -2547,10 +2241,7 @@ async fn main() {
                     std::process::exit(0);
                 }
                 _ => {
-                    inp = [
-                        bot_input(&g, 0, &mut bot_mem[0]),
-                        bot_input(&g, 1, &mut bot_mem[1]),
-                    ];
+                    inp = [bot_input(&g, 0, &mut bot_mem[0]), bot_input(&g, 1, &mut bot_mem[1])];
                 }
             }
             if g.state == State::Clear && g.state_t < dt * 1.5 {
@@ -2598,10 +2289,7 @@ async fn main() {
                         if g.state != State::Play {
                             break;
                         }
-                        let extra = [
-                            bot_input(&g, 0, &mut bot_mem[0]),
-                            bot_input(&g, 1, &mut bot_mem[1]),
-                        ];
+                        let extra = [bot_input(&g, 0, &mut bot_mem[0]), bot_input(&g, 1, &mut bot_mem[1])];
                         update_play(&mut g, dt, extra, &sfx);
                         update_fx(&mut g, dt);
                         bot_clock += dt;
@@ -2638,9 +2326,7 @@ async fn main() {
                     }
                 }
                 State::Over | State::Won => {
-                    if g.state_t > 2.5
-                        && (inp[0].blow || inp[0].jump || key_pressed(BLIP_KEY_SPACE) || p2_start)
-                    {
+                    if g.state_t > 2.5 && (inp[0].blow || inp[0].jump || key_pressed(BLIP_KEY_SPACE) || p2_start) {
                         g.state = State::Title;
                         g.two_up = false;
                         web::set_players(2);
@@ -2652,16 +2338,9 @@ async fn main() {
             update_fx(&mut g, dt);
         }
 
-        let want_music = matches!(
-            g.state,
-            State::Play | State::Intro | State::Clear | State::Title
-        );
+        let want_music = matches!(g.state, State::Play | State::Intro | State::Clear | State::Title);
         if want_music {
-            music.play(if g.state == State::Play && g.hurry {
-                1
-            } else {
-                0
-            });
+            music.play(if g.state == State::Play && g.hurry { 1 } else { 0 });
         } else {
             music.stop();
         }
@@ -2710,31 +2389,13 @@ async fn main() {
                     }
                     State::Play if g.hurry && g.round_t < hurry_at(g.round) + 2.4 => {
                         let a = 0.6 + 0.4 * (g.round_t * 8.0).sin().abs();
-                        cosy(
-                            &blip,
-                            "HURRY UP!",
-                            196.0 + DY,
-                            3.2,
-                            (255, 150, 150),
-                            (255, 110, 120),
-                            1.0,
-                            a,
-                        );
+                        cosy(&blip, "HURRY UP!", 196.0 + DY, 3.2, (255, 150, 150), (255, 110, 120), 1.0, a);
                     }
                     _ => {}
                 }
                 if g.chain.1 > 0.0 {
                     let text = format!("{} CHAIN!", g.chain.0);
-                    cosy(
-                        &blip,
-                        &text,
-                        262.0 + DY,
-                        2.6,
-                        CREAM,
-                        PINK,
-                        (1.2 - g.chain.1) * 5.0,
-                        g.chain.1.min(1.0),
-                    );
+                    cosy(&blip, &text, 262.0 + DY, 2.6, CREAM, PINK, (1.2 - g.chain.1) * 5.0, g.chain.1.min(1.0));
                 }
                 // bubble wipe: out at the end of a round, back in at the start of the next
                 let wipe = match g.state {
@@ -2749,28 +2410,13 @@ async fn main() {
                             let (cx, cy) = (i as f32 * 60.0, j as f32 * 57.0);
                             let r = wipe * 46.0 * (0.8 + 0.2 * ((i * 7 + j * 3) % 5) as f32 / 4.0);
                             blip::macroquad::shapes::draw_circle(cx, cy, r, col(pal.sky0, 1.0));
-                            blip::macroquad::shapes::draw_circle_lines(
-                                cx,
-                                cy,
-                                r,
-                                2.0,
-                                col(pal.glow, 0.5 * wipe),
-                            );
+                            blip::macroquad::shapes::draw_circle_lines(cx, cy, r, 2.0, col(pal.glow, 0.5 * wipe));
                         }
                     }
                 }
                 match g.state {
                     State::Clear => {
-                        cosy(
-                            &blip,
-                            "CLEAR!",
-                            186.0 + DY,
-                            4.0,
-                            CREAM,
-                            MINT,
-                            st * 3.0,
-                            (st * 4.0).min(1.0),
-                        );
+                        cosy(&blip, "CLEAR!", 186.0 + DY, 4.0, CREAM, MINT, st * 3.0, (st * 4.0).min(1.0));
                         if g.extend && st > 0.6 {
                             cosy(
                                 &blip,
@@ -2785,16 +2431,7 @@ async fn main() {
                         }
                     }
                     State::Over => {
-                        cosy(
-                            &blip,
-                            "GAME OVER",
-                            160.0 + DY,
-                            3.8,
-                            PINK,
-                            PINK,
-                            st * 2.0,
-                            (st * 3.0).min(1.0),
-                        );
+                        cosy(&blip, "GAME OVER", 160.0 + DY, 3.8, PINK, PINK, st * 2.0, (st * 3.0).min(1.0));
                         if hi.score > 0 {
                             cosy(
                                 &blip,
@@ -2821,16 +2458,7 @@ async fn main() {
                         }
                     }
                     State::Won => {
-                        cosy(
-                            &blip,
-                            "ALL ROUNDS CLEAR!",
-                            120.0 + DY,
-                            2.6,
-                            CREAM,
-                            MINT,
-                            st * 2.0,
-                            (st * 3.0).min(1.0),
-                        );
+                        cosy(&blip, "ALL ROUNDS CLEAR!", 120.0 + DY, 2.6, CREAM, MINT, st * 2.0, (st * 3.0).min(1.0));
                         cosy(
                             &blip,
                             "HAPPY END",
@@ -2873,7 +2501,11 @@ mod tests {
     #[test]
     fn every_round_is_a_full_grid_with_both_players_and_something_to_trap() {
         for (round, rows) in LEVELS.iter().enumerate() {
-            assert!(rows.iter().all(|row| row.chars().count() == COLS), "round {}: a row is not {COLS} wide", round + 1);
+            assert!(
+                rows.iter().all(|row| row.chars().count() == COLS),
+                "round {}: a row is not {COLS} wide",
+                round + 1
+            );
             let text = rows.concat();
             assert_eq!(text.matches('A').count(), 1, "round {}: player one's start", round + 1);
             assert_eq!(text.matches('B').count(), 1, "round {}: player two's start", round + 1);
@@ -2898,8 +2530,11 @@ mod tests {
             let (a, b, monsters) = level_spawns(round);
             for &(_, x, y) in &monsters {
                 for p in [a, b] {
-                    assert!((x - p.0).hypot(y - p.1) > 3.0 * TILE,
-                        "round {}: a monster starts within three tiles of a player", round + 1);
+                    assert!(
+                        (x - p.0).hypot(y - p.1) > 3.0 * TILE,
+                        "round {}: a monster starts within three tiles of a player",
+                        round + 1
+                    );
                 }
             }
         }
