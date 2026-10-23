@@ -40,8 +40,7 @@ pub fn kick(buf: &mut [f32], off: usize, vol: f32) {
     let sr = SAMPLE_RATE as f32;
     let n = (sr * 0.15) as usize;
     let click_n = (sr * 0.0025) as usize;
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let t = i as f32 / sr;
         let e = (1.0 - i as f32 / n as f32).powf(1.7);
         let freq = 42.0 + 130.0 * (-t / 0.045).exp(); // pitch sweep 172Hz -> 42Hz
@@ -65,8 +64,7 @@ pub fn hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
     heard(off, HAT, Part::Drums);
     let n = (SAMPLE_RATE as f32 * 0.045) as usize;
     let mut lp = 0.0;
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let e = (1.0 - i as f32 / n as f32).powf(2.2);
         let noise = dark(&mut lp, rng.next_f32() * 2.0 - 1.0, 0.35);
         mix_into_f32(buf, off + i, noise * e * vol * 6500.0);
@@ -78,8 +76,7 @@ pub fn open_hat(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
     heard(off, HAT, Part::Drums);
     let n = (SAMPLE_RATE as f32 * 0.16) as usize;
     let mut lp = 0.0;
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let e = (1.0 - i as f32 / n as f32).powf(1.3);
         let noise = dark(&mut lp, rng.next_f32() * 2.0 - 1.0, 0.3);
         mix_into_f32(buf, off + i, noise * e * vol * 5000.0);
@@ -102,8 +99,7 @@ pub fn clap(buf: &mut [f32], off: usize, rng: &mut Rng, vol: f32) {
     }
     // Tail wash so the clap doesn't cut off too abruptly.
     let tail_n = (sr * 0.09) as usize;
-    for i in 0..tail_n {
-        if off + i >= buf.len() { break; }
+    for i in 0..tail_n.min(buf.len().saturating_sub(off)) {
         let e = (1.0 - i as f32 / tail_n as f32).powf(2.5);
         let noise = rng.next_f32() * 2.0 - 1.0;
         mix_into_f32(buf, off + i, noise * e * vol * 4000.0);
@@ -123,8 +119,7 @@ pub fn bass_note(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
     let cutoff_lo = freq * 2.2;
     let mut lp = 0f32;
     let mut phase = 0f32;
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let t = i as f32 / sr;
         let e = env(i, n, att.max(1), rel);
         let close = (i as f32 / n as f32).powf(1.5);
@@ -149,8 +144,7 @@ pub fn sidechain_duck(buf: &mut [f32], kick_offsets: &[usize], depth: f32, relea
     let sr = SAMPLE_RATE as f32;
     let rel_n = ((sr * release_ms / 1000.0) as usize).max(1);
     for &off in kick_offsets {
-        for i in 0..rel_n {
-            if off + i >= buf.len() { break; }
+        for i in 0..rel_n.min(buf.len().saturating_sub(off)) {
             let frac = i as f32 / rel_n as f32;
             let duck = 1.0 - depth * (1.0 - frac).powf(2.5);
             buf[off + i] *= duck;
@@ -166,8 +160,7 @@ pub fn lead_stab(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32) {
     let n = (sr * ms / 1000.0) as usize;
     let att = (sr * 0.02) as usize;
     let rel = (n * 3 / 4).max(1);
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let t = i as f32 / sr;
         let e = env(i, n, att.max(1), rel);
         // sine and a soft octave: round, not buzzy
@@ -192,8 +185,7 @@ pub fn supersaw(buf: &mut [f32], off: usize, freq: f32, ms: f32, vol: f32, att_m
     let rel = (n / 3).max(1);
     const SPREAD: [f32; 7] = [-1.0, -0.66, -0.33, 0.0, 0.33, 0.66, 1.0];
     let mut phases = [0f32; 7];
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let e = env(i, n, att, rel);
         let mut s = 0f32;
         for (v, ph) in SPREAD.iter().zip(phases.iter_mut()) {
@@ -215,8 +207,7 @@ pub fn riser(buf: &mut [f32], off: usize, dur_ms: f32, vol: f32, rng: &mut Rng) 
     let sr = SAMPLE_RATE as f32;
     let n = (sr * dur_ms / 1000.0) as usize;
     let mut lp = 0f32;
-    for i in 0..n {
-        if off + i >= buf.len() { break; }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let frac = i as f32 / n as f32;
         let e = frac.powf(1.5);
         let cutoff = 200.0 + 2600.0 * frac.powf(1.8);

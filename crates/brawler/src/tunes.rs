@@ -588,10 +588,7 @@ fn band(buf: &mut [f32], at: f32, center: f32, q: f32, amp: f32, attack: f32, de
     let f = 2.0 * (std::f32::consts::PI * center / SRF).sin();
     let damp = 1.0 / q;
     let (mut low, mut bp) = (0.0f32, 0.0f32);
-    for i in 0..n {
-        if off + i >= buf.len() {
-            break;
-        }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let t = i as f32 / SRF;
         let x = rng.next_f32() * 2.0 - 1.0;
         let high = x - low - damp * bp;
@@ -642,10 +639,7 @@ fn render(mut buf: Vec<f32>, gain: f32) -> Vec<i16> {
 fn knock(buf: &mut [f32], at: f32, f: f32, amp: f32, tau: f32) {
     let off = (at * SRF) as usize;
     let n = ((tau * 5.0) * SRF) as usize;
-    for i in 0..n {
-        if off + i >= buf.len() {
-            break;
-        }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let t = i as f32 / SRF;
         buf[off + i] += (2.0 * std::f32::consts::PI * f * t).sin() * amp * (-t / tau).exp() * (t / 0.0008).min(1.0);
     }
@@ -668,10 +662,7 @@ fn voice(
     let formants = [(vowel.0, 80.0, 1.0), (vowel.1, 110.0, 0.55), (vowel.2, 160.0, 0.3)];
     let mut state = [(0.0f32, 0.0f32); 3];
     let (mut ph, mut jit) = (0.0f32, 0.0f32);
-    for i in 0..n {
-        if off + i >= buf.len() {
-            break;
-        }
+    for i in 0..n.min(buf.len().saturating_sub(off)) {
         let k = i as f32 / n as f32;
         jit = jit * 0.995 + (rng.next_f32() - 0.5) * 0.004;
         let f = (f0 + (f1 - f0) * k) * (1.0 + jit);
