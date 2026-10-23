@@ -87,6 +87,9 @@ function returnToCabinet(event) {
   var game = GAME;
   if (!game) return;
   document.documentElement.style.setProperty('--cab', game.accent);
+  // In the arcade the page is the machine up close, in its own colours (marquee.css).
+  if (!document.documentElement.hasAttribute('data-appstyle') && !blipAmstradMode())
+    document.documentElement.setAttribute('data-machine', game.slug);
   var bar = document.createElement('div');
   bar.id = 'marquee-bar';
   bar.className = 'jukebox-marquee';
@@ -363,8 +366,8 @@ var cardApi = (function () {
   if (!list) return null;
   var appStyle = document.documentElement.hasAttribute('data-appstyle');
   var exitLabel = blipAppMode() ? 'BACK TO THE TITLE' : appStyle ? 'HOME' : 'ANOTHER GAME';
-  // A game in its own app has no Home to tap, only Backspace back to its title.
-  if (noTouch || !blipAppMode()) list = list.concat([[exitLabel, noTouch ? ['BACKSPACE'] : [appStyle ? 'TAP ‹ HOME' : 'TAP BLIP LOGO']]]);
+  // A game in its own app has no Home to tap, only Escape or Backspace back to its title.
+  if (noTouch || !blipAppMode()) list = list.concat([[exitLabel, noTouch ? ['ESC'] : [appStyle ? 'TAP ‹ HOME' : 'TAP BLIP LOGO'], noTouch ? ['BACKSPACE'] : null]]);
   var install = blipStandalone() ? '' : '<button type="button" id="cc-install">' +
     (appStyle ? 'Add to Home Screen' : 'ADD ' + GAME.name + ' TO HOME SCREEN') + '</button>';
   // The app's Guide, open at this game's page (the cabinet has its book).
@@ -635,7 +638,7 @@ function fillCanvas() {
     w = frame.width - screenInset * 2;
     h = frame.height - screenInset * 2;
   }
-  document.querySelectorAll('.cabinet-glass, #need-coin-overlay').forEach(function(surface) {
+  document.querySelectorAll('.cabinet-glass, #need-coin-overlay, #launch-frame').forEach(function(surface) {
     surface.style.left = gl + 'px'; surface.style.top = screenTop + 'px';
     surface.style.width = w + 'px'; surface.style.height = h + 'px';
   });
@@ -646,6 +649,10 @@ function fillCanvas() {
   canvas.style.setProperty('transform', 'none', 'important');
   // The controls position themselves off --topbar-h, the bar's real height.
   document.documentElement.style.setProperty('--topbar-h', TOPBAR_H + 'px');
+  // Where the screen is, for the arcade to zoom its cabinet's screen onto (openMachine in index.html).
+  if (!bare && document.documentElement.hasAttribute('data-machine')) {
+    try { localStorage.setItem('blip-screen-box', JSON.stringify({ w: innerWidth, h: innerHeight, box: [gl, screenTop, w, h], deck: TOPBAR_H })); } catch (e) {}
+  }
   syncBuffer();
 }
 
@@ -673,9 +680,45 @@ function refit() {
   if (now === key) return;
   lastFit = now;
 }
+// A machine started from the arcade zooms into its screen; the game page opens on that same picture, where the
+// game will draw, and lets the first frame come up through it (blip-cabinet-launch, set by the arcade).
+var launchFrame = (function () {
+  if (CABINET_SCREEN || blipAppMode() || document.documentElement.hasAttribute('data-appstyle')) return null;
+  var launch = null;
+  try {
+    launch = JSON.parse(sessionStorage.getItem('blip-cabinet-launch') || 'null');
+    sessionStorage.removeItem('blip-cabinet-launch');
+  } catch (e) {}
+  if (!launch || !GAME || launch.slug !== GAME.slug || !(Date.now() - launch.at < 15000) || typeof launch.art !== 'string') return null;
+  var art;
+  try { art = new URL(launch.art, location.href); } catch (e) { return null; }
+  if (art.origin !== location.origin) return null;
+  var frame = document.createElement('div');
+  frame.id = 'launch-frame';
+  // Started with a coin in: the picture stays until the game is playing, so its title screen never shows.
+  try { if (sessionStorage.getItem('blip-cabinet-start') === GAME.slug && getCoins() > 0) frame.dataset.hold = ''; } catch (e) {}
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.backgroundImage = 'url("' + art.href.replace(/["\\]/g, '') + '")';
+  document.body.appendChild(frame);
+  // The page shows once the picture has loaded, or the screen would come up black for a frame. Not decode():
+  // a prerendered page (index.html's speculation rules) decodes nothing until it is shown.
+  var picture = new Image();
+  picture.onload = picture.onerror = function () { document.documentElement.removeAttribute('data-launching'); };
+  picture.src = art.href;
+  return frame;
+}());
+function dropLaunchFrame() {
+  if (!launchFrame) return;
+  var frame = launchFrame;
+  launchFrame = null;
+  frame.classList.add('launch-frame-out');
+  setTimeout(function () { frame.remove(); }, 400);
+}
+
 window.addEventListener('resize', fillCanvas);
 window.addEventListener('orientationchange', function () { setTimeout(fillCanvas, 60); });
 fillCanvas();
+if (!launchFrame) document.documentElement.removeAttribute('data-launching');
 
 // Re-fit whenever the deck changes shape (marquee injected, caps added,
 // controller switched) instead of at guessed moments.
@@ -704,6 +747,7 @@ var gameStopped = false;
 function onGameStopped(err) {
   if (gameStopped || typeof WebAssembly === 'undefined' || !(err instanceof WebAssembly.RuntimeError)) return;
   gameStopped = true;
+  dropLaunchFrame();
   if (loader) loader.style.display = 'flex';
   if (statusEl) statusEl.textContent = 'GAME STOPPED';
   if (barInner && barInner.parentNode) barInner.parentNode.style.display = 'none';
@@ -725,6 +769,7 @@ function hideLoader() {
     }
     loader.style.display = 'none';
     fillCanvas();
+    if (!launchFrame || !launchFrame.hasAttribute('data-hold')) dropLaunchFrame();
     introduceControls();
     if(!CABINET_SCREEN&&!document.querySelector('.blip-hs-modal'))canvas.focus();
   }
@@ -760,6 +805,7 @@ window.blipCanvasReady=function(){
         cabinetStart=sessionStorage.getItem('blip-cabinet-start')===slug;
         sessionStorage.removeItem('blip-cabinet-start');
       } catch(e) {}
+      if(!(cabinetStart && getCoins()>0)) dropLaunchFrame();
       if(cabinetStart && getCoins()>0) {
         function pressStart() {
           canvas.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,cancelable:true,key:' ',code:'Space'}));
@@ -770,10 +816,11 @@ window.blipCanvasReady=function(){
             document.addEventListener('visibilitychange',beginCabinetPlay,{once:true});
             return;
           }
-          if(getCoins()<=0 || document.querySelector('.blip-hs-modal'))return;
+          if(getCoins()<=0 || document.querySelector('.blip-hs-modal')){dropLaunchFrame();return;}
           canvas.focus({preventScroll:true});
           pressStart();
           if(slug==='brawler')setTimeout(pressStart,320);
+          setTimeout(dropLaunchFrame,slug==='brawler'?700:400);
         }
         setTimeout(beginCabinetPlay,180);
       }
@@ -824,9 +871,10 @@ window.addEventListener('keydown', function (e) {
   var wall = overlay.classList.contains('visible');
   var coinKey = e.key === '5' || (wall && (e.key === ' ' || e.key === 'Enter'));
   var muteKey = e.key === 'm' || e.key === 'M';
+  var leaveKey = e.key === 'Escape' || e.key === 'Backspace';
   // isTrusted: the deck and a gamepad send synthetic keys, gated elsewhere.
   if (coinKey && !e.repeat && e.isTrusted && getCoins() < MAX_COINS) coinIn();
-  if (wall && !coinKey && !muteKey) e.stopImmediatePropagation();
+  if (wall && !coinKey && !muteKey && !leaveKey) e.stopImmediatePropagation();
 }, true);
 
 (function () {
@@ -856,15 +904,17 @@ window.addEventListener('keydown', function (e) {
     dispatch(primary, 'keydown');
     setTimeout(function () { dispatch(primary, 'keyup'); }, 60);
   }
-  // Backspace does it from the keyboard: a kiosk has no mouse for the logo.
+  // Backspace or Escape does it from the keyboard: a kiosk has no mouse for the logo.
   window.addEventListener('keydown', function (e) {
     if (blipAmstradMode() && e.key === 'Escape') {
       e.preventDefault(); e.stopImmediatePropagation(); leaveGame(); return;
     }
-    if (e.key !== 'Backspace' || e.repeat) return;
+    if ((e.key !== 'Backspace' && e.key !== 'Escape') || e.repeat) return;
     if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
+    // Escape first closes what is open over the game (the name prompt, a sheet); the controls card takes it before this.
+    if (e.key === 'Escape' && document.querySelector('.blip-hs-modal, [aria-modal="true"]')) return;
     e.preventDefault();
-    leaveGame();
+    if (e.key === 'Escape') returnToCabinet(); else leaveGame();
   }, true);
 
   // Live input -> the stick ball's lean (the pad lights its own buttons in
@@ -932,52 +982,11 @@ window.addEventListener('keydown', function (e) {
     }));
   });
 
-  // ---- The controller selector ----
-  // Oldest to newest: JOYSTICK · PAD (· TOUCH on a game with a strip, on a
-  // touch screen); Rally has DIAL · TOUCH there and nothing to pick elsewhere.
-  var picker = document.getElementById('control-toggle');
+  // No controller to choose: the front end decides it (blipFrontendControls).
   var touchSpec = game && game.touch;
-  function syncPicker() {
-    if (!picker) return;
-    var now = blipControls();
-    Array.prototype.forEach.call(picker.children, function (b) {
-      var on = b.getAttribute('data-mode') === now ||
-               (b.getAttribute('data-mode') === 'dial' && now !== 'touch');
-      b.setAttribute('aria-checked', on ? 'true' : 'false');
-    });
-  }
-  if (picker) {
-    var modes = isRally ? ['dial'] : ['stick', 'pad'];
-    var LABEL = { stick: 'joystick', pad: 'd-pad' };
-    if (touchSpec && blipHasTouch()) modes.push('touch');
-    if (modes.length < 2) modes = [];
-    modes.forEach(function (m) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.setAttribute('role', 'radio');
-      b.setAttribute('data-mode', m);
-      b.title = { stick:'Use the joystick', pad:'Use the directional pad', touch:'Use touch gestures', dial:'Use the paddle dial' }[m];
-      b.textContent = LABEL[m] || m;
-      b.addEventListener('click', function () {
-        blipSetControls(m === 'dial' ? blipPhysicalControls() : m);
-        // Back to the game, so the keyboard and gamepad drive it at once.
-        try { canvas.focus({ preventScroll: true }); } catch (e) {}
-      });
-      picker.appendChild(b);
-    });
-    syncPicker();
-  }
   var touchPlay = bindTouchPlay();
   window.blipReleaseTouch = touchPlay.release;
-  window.onBlipControlsChange = function () {
-    BlipController.releaseAll();
-    touchPlay.release();
-    stations.forEach(function (st) { st.held = {}; leanStick(st); });
-    syncPicker();
-    // The controllers are different heights, so the picture has to be
-    // re-fitted or it keeps the other one's reservation.
-    if (typeof fillCanvas === 'function') fillCanvas();
-  };
+
 
   // Touch drag/paddles send positions; swipe sends keys. Serpent accepts picture swipes in every mode.
   // Touch screens only; a touchscreen laptop's mouse may hover-play the trackpad.
@@ -994,7 +1003,9 @@ window.addEventListener('keydown', function (e) {
     var strip = document.createElement('div');
     strip.id = 'touch-strip';
     strip.setAttribute('aria-hidden', 'true');
-    var halves = kind === 'paddles' || kind === 'platform' ? ['P1', '2P'] : [''];
+    // Adder steers two snakes: in a two-player match each player drags on their own half, as in Rally.
+    var twoSteer = kind === 'drag' && !!(game && game.players === 2);
+    var halves = kind === 'paddles' || kind === 'platform' || twoSteer ? ['P1', '2P'] : [''];
     strip.innerHTML = '<div class="ts-glass">' +
       halves.map(function (h, i) {
         return '<div class="ts-half" data-slot="' + i + '">' +
@@ -1084,17 +1095,25 @@ window.addEventListener('keydown', function (e) {
       var onStrip = e.target && e.target.closest && e.target.closest('.ts-glass');
       return (kind === 'drag' && onStrip ? glass : canvas).getBoundingClientRect();
     }
-    function frac(e) {
-      return { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height };
+    function frac(e, r) {
+      r = r || rect;
+      return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
     }
     // Rally: each player drags on their own half, except against the CPU,
     // where the whole screen is player one's.
     function slotFor(e) {
-      if (kind !== 'paddles' || root.hasAttribute('data-cpu')) return 0;
+      if (twoSteer ? !root.hasAttribute('data-versus') : (kind !== 'paddles' || root.hasAttribute('data-cpu'))) return 0;
       var onStrip = e.target && e.target.closest && e.target.closest('.ts-glass');
       var g = glass.getBoundingClientRect();
       var middle = onStrip ? g.left + g.width / 2 : window.innerWidth / 2;
       return e.clientX < middle ? 0 : 1;
+    }
+    // Where a finger steers from: a split strip's half (Adder, two playing), else the whole surface.
+    function slotRect(e, slot) {
+      var whole = surfaceRect(e);
+      if (!twoSteer || !root.hasAttribute('data-versus')) return whole;
+      var half = whole.width / 2;
+      return { left: whole.left + half * slot, top: whole.top, width: half, height: whole.height };
     }
     function setFire(down) {
       if (down === fireHeld) return;
@@ -1127,7 +1146,7 @@ window.addEventListener('keydown', function (e) {
     }
     function ignored(e) {
       return e.target && e.target.closest &&
-        e.target.closest('a, button, #need-coin-overlay, #rotate-hint, #control-toggle, .blip-hs-modal');
+        e.target.closest('a, button, #need-coin-overlay, #rotate-hint, .blip-hs-modal');
     }
 
     // A PC plays the trackpad like a laptop's: the pointer moves the paddle
@@ -1260,9 +1279,9 @@ window.addEventListener('keydown', function (e) {
         var slot = slotFor(e);
         // A second finger would take the control from the first, and lifting it would drop both.
         if (slots[slot] && !slots[slot].mouse) return;
-        var f = frac(e);
-        slots[slot] = { id: e.pointerId, x: f.x, y: f.y, pressed: true, mouse: false };
-        if (kind === 'drag') setFire(true);
+        var r = slotRect(e, slot), f = frac(e, r);
+        slots[slot] = { id: e.pointerId, x: f.x, y: f.y, pressed: true, mouse: false, rect: r };
+        if (kind === 'drag' && slot === 0) setFire(true);
       }
       showThumb(slots[0]);
     }, { passive: false });
@@ -1295,7 +1314,7 @@ window.addEventListener('keydown', function (e) {
         var t = slots[i];
         if (!t || t.id !== e.pointerId) continue;
         e.preventDefault();
-        var f = frac(e);
+        var f = frac(e, t.rect);
         t.x = f.x; t.y = f.y;
         if (i === 0) showThumb(t);
       }
@@ -1424,12 +1443,10 @@ window.addEventListener('keydown', function (e) {
     rotateHint();
   };
 
-  // The open title screen shows both stations so player two can join in either
-  // orientation; one-player matches hide the second station.
+  // Both stations stay on the panel in every mode (deck.js), so player two can join at any time.
   var open = false;
   function applyPlayers() {
-    var both = versus || open;
-    root.setAttribute('data-players', both ? '2' : '1');
+    root.setAttribute('data-players', '2');
   }
   window.addEventListener('resize', applyPlayers);
 

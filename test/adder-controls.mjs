@@ -64,11 +64,11 @@ for (const touch of [false, true]) test(`Adder BASIC keeps continuous steering a
     if (!touch) return p.page.keyboard.up(key);
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   }
-  await down('a', '#stick-base', .1); await p.flags(1); await up('a');
-  await down('d', '#stick-base', .9); await p.flags(2); await up('d');
-  await down('j', '#deck-p2 .arcade-btn:first-child'); await p.flags(4); await up('j');
-  await down('ArrowLeft', '#stick-base-p2', .1); await p.flags(16); await up('ArrowLeft');
-  await down('ArrowRight', '#stick-base-p2', .9); await p.flags(8); await up('ArrowRight');
+  await down('a', '#snes-pad .snes-dpad', .1); await p.flags(1); await up('a');
+  await down('d', '#snes-pad .snes-dpad', .9); await p.flags(2); await up('d');
+  await down('j', '#snes-pad-p2 .snes-btn.cap1'); await p.flags(4); await up('j');
+  await down('ArrowLeft', '#snes-pad-p2 .snes-dpad', .1); await p.flags(16); await up('ArrowLeft');
+  await down('ArrowRight', '#snes-pad-p2 .snes-dpad', .9); await p.flags(8); await up('ArrowRight');
   if (!touch) {
     await p.page.keyboard.down('a'); await p.page.keyboard.down('d');
     await p.flags(32);

@@ -21,12 +21,18 @@ change will be overwritten the next time the project is built.
 | JavaScript (canvas scaling, touch controls, coin handling) | `web/shell.js` |
 | Shared nav bar styles (`.kiosk-bar`, `.kiosk-btn`, `.kiosk-hud`) | `web/kiosk.css` |
 | The game list (`BLIP_GAMES`), coins (`getCoins`, `saveCoins`), layout rule, mute, fullscreen | `web/blip_core.js` (every page; the home screen loads only this) |
-| Which front end a game returns to (`blip-frontend`, `blipFrontendUrl`), free play, a game's own app mode (`blipAppMode`) | `web/blip_core.js` |
+| Which front end a game returns to (`blip-frontend`, `blipFrontendUrl`), free play, a game's own app mode (`blipAppMode`); the controller each front end plays with (`blipFrontendControls`: arcade sticks, home-screen touch, BASIC pads; `?controls=` overrides) | `web/blip_core.js` |
 | Cabinet parts: power lamp, coin HUD (`updateCoinsHud`), card arm, hum | `web/kiosk.js` |
 | The home screen: icons, dock, Search, the long-press menu, edit mode (`blip-home-order`), Settings | `web/home.html`, `web/home.css`, `web/home.js` (nothing from the cabinet) |
 | App style: a game opened from the home screen or its own icon (`data-appstyle`), with `‹ Home`, a frosted title bar and a launch screen | `web/shell.css` (the `App style` section), `web/shell.js` |
 | The Home Screen and BLIP switches on the top bar (`#home-switch-btn`, `#basic-switch-btn`), arcade and game pages | `web/kiosk.js`, `web/kiosk.css` |
 | The arcade's aisle of cabinets: marquee, screen, deck, Start, coin door, side art | `web/index.html` |
+| Walking the aisle: position, speed, settling; the machines' sound mix (no DOM, unit-tested) | `web/aisle.js` |
+| The aisle's walking loop (`aisleTick`, `poseCards`), its inputs (keys, drag, gamepad), the carpet and wall parallax | `web/index.html` (the aisle script) |
+| Stepping up to a machine (`stepUp`, `stepBack`, `lean`): Up, Up plays; Down, Escape or a walk steps back | `web/index.html` (the aisle script) |
+| Starting a machine: the zoom onto the game page's screen (`launchScreen`, `blip-screen-box`), the prerender, the page opening on the screen's picture (`blip-cabinet-launch`, `#launch-frame`, `data-launching`); the game page as its machine up close (`data-machine`) | `web/index.html` (`openMachine`), `web/shell.html`, `web/shell.js`, `web/shell.css` |
+| Each machine's attract jingle (`BLIP_ATTRACT`) and the room's sound (`blipArcadeSound`) | `web/kiosk.js` |
+| Each machine's attract loop on its screen | `tools/make_attract_strips.mjs`, which writes `web/<game>/attract.webp` (generated, not edited by hand; run after a game's look changes); the arcade plays it (`.card-loop` in `web/index.html`) |
 | A machine's marquee, the same sign on its cabinet and as its game page's top bar; each game's colours (`data-machine`) | `web/marquee.css` |
 | The deck on each cabinet: the game page's own, rendered per game | `web/machine-deck.html` (builds it with `web/deck.js`) |
 | Each game as its own home-screen app: icons (a small game card) and `manifest.json` | `tools/make_game_icons.mjs`, which writes `web/<game>/icon-*.png` and `manifest.json`, and the Guide's (generated, not edited by hand) |
@@ -42,7 +48,7 @@ middle. Change one and the other must follow.
 | Kiosk / landing page | `web/index.html` |
 | Fullscreen button and the stored choice (`blip-fullscreen`), on every page | `web/blip_core.js` |
 | Sound on / off (`blip-mute`); `blipOut(ctx)`, where the cabinet's own sounds must connect | `web/blip_core.js` |
-| What fullscreen hides on a game page; the idle return to the cabinet | `web/shell.css`, `web/shell.js` |
+| What fullscreen hides on a game page; the idle return to the cabinet; Escape and Backspace back to the arcade | `web/shell.css`, `web/shell.js` |
 | Cabinet wear: scratches, burns, rings, scuffs, thumbed cards and manual | `tools/make_wear.py`, which writes `web/wear.css` (generated, not edited by hand) |
 | Field manual: spreads, the three page-turn styles, the torn leaf, contents, notes pages | `web/index.html` (the manual script), `web/manual.css` |
 | The book leaving its pocket, its cover swinging open and shut | `web/manual-motion.js` |
@@ -80,6 +86,15 @@ saved to a home screen is its own app. `kiosk.js`
 and `kiosk.css` are also loaded by `web/index.html` (without the `../` prefix)
 to share the nav bar between the landing page and game pages.
 
+### Plans
+
+Larger changes are planned in `docs/` before they are built. Rows marked
+"planned" above name files a plan will add; drop the mark once they exist.
+
+- `docs/immersive-arcade.md`: walking the aisle, sound from the machines,
+  stepping up to play, living screens, up and down. Read it before touching
+  the aisle script; it says how each part is tested.
+
 ### One manual, two bindings
 
 The cabinet's book (`index.html`) and the app's Guide (`guide.js`) both read
@@ -111,7 +126,7 @@ full suite, use `npm run test:all -- --check-access`. Database tests still
 need a running local Supabase instance; they skip when it is unavailable.
 
 ```
-npm test                # canvas geometry (unit)
+npm test                # canvas geometry, BASIC, the aisle's walk (unit)
 cargo test --release    # game rules (Brawler's balance, Serpent's turns, ...)
 npm run test:web        # cabinet, home screen, manual, top bar, controls, decks (after ./build_web.sh; six minutes, in two lanes: one for the tests that run a game, one for the rest)
 npm run test:layout     # nothing overlaps or leaves the screen: 21 devices, notches, every page and controller (seven minutes, four processes)
@@ -132,7 +147,8 @@ The browser suites need Playwright and a Chromium binary (`BLIP_CHROMIUM`
 names one outside `PATH`). Test files are `node:test` suites, one theme
 each: `cabinet.mjs` (the card rack), `manual.mjs`, `touch.mjs` (fingers on the strip and deck), `layout.mjs` (every page on every device: overlaps, thumbs, safe areas), `topbar-layout.mjs`,
 `controls.mjs`, `two-player-*.mjs` (decks and phones), `home.mjs` (the home screen,
-free play, each game as an installable app).
+free play, each game as an installable app), `aisle-perf.mjs` (no layout while
+walking the arcade).
 
 For native development:
 

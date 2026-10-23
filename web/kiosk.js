@@ -115,6 +115,141 @@ window.addEventListener('pagehide',function(){
   cabinetHum.nodes.forEach(function(node){node.disconnect();});cabinetHum=null;
 });
 
+/* ---- The arcade's room ---- Each machine within two and a half of you plays a short attract jingle in its own
+ * instrument, louder and more central the nearer it is; under them a murmur and now and then a coin. Like the hum it
+ * starts on the first key or tap and stops with the page hidden; blipOut() carries the mute. */
+// wave, root (Hz), beat (s), notes (semitones from the root, null a rest), decay (s), level.
+var BLIP_ATTRACT = {
+  rally:    {wave:'square',   root:440, beat:.18, decay:.06, level:.35, notes:[0,null,null,0,null,null,7]},
+  bouncer:  {wave:'triangle', root:523, beat:.12, decay:.18, level:.8,  notes:[0,4,7,12,7,4,0,null,0,4,7,12,16]},
+  defender: {wave:'sawtooth', root:220, beat:.1,  decay:.09, level:.3,  notes:[0,0,12,0,10,0,7,0,0,0,12,15,12,10,7]},
+  bubbler:  {wave:'sine',     root:784, beat:.22, decay:.5,  level:.7,  notes:[0,4,7,4,9,7,4,null,2,5,9,7]},
+  raider:   {wave:'square',   root:196, beat:.13, decay:.1,  level:.3,  notes:[0,null,0,3,null,5,null,7,5,3,0]},
+  meteors:  {wave:'triangle', root:62,  beat:.45, decay:.22, level:1.4, notes:[0,1,0,1,0,1,0,1]},
+  serpent:  {wave:'triangle', root:392, beat:.14, decay:.14, level:.8,  notes:[0,2,4,7,9,7,4,2,0,null,-5,0]},
+  brawler:  {wave:'sawtooth', root:110, beat:.15, decay:.12, level:.35, notes:[0,null,0,7,null,5,3,null,0,null,12,10]},
+  adder:    {wave:'sine',     root:659, beat:.2,  decay:.4,  level:.7,  notes:[0,7,4,12,null,7,9,7]}
+};
+var blipArcadeSound=(function(){
+  var ROOM=.22,HEARD=2.5;
+  var slugs=[],pos=0,placed=NaN,enabled=false,ducked=false,ctx=null,room=null,machines={},murmur=null,timer=null,coinAt=0;
+  function wanted() { return enabled&&!document.hidden; }
+  function wake(unlock) {
+    if(!wanted()){sleep();return;}
+    if(room)return;
+    try {
+      var existing=_kioskAudioCtx||(typeof Howler!=='undefined'&&Howler.ctx);
+      if(!existing&&!unlock)return;
+      ctx=getKioskAudio();
+      if(ctx.state!=='running'){ctx.resume().then(function(){wake();}).catch(function(){});return;}
+      room=ctx.createGain();room.gain.value=ROOM*(ducked?.5:1);room.connect(blipOut(ctx));
+      murmur=makeMurmur();
+      coinAt=ctx.currentTime+8+Math.random()*12;
+      placed=NaN;place(pos);
+      timer=setInterval(schedule,200);schedule();
+    } catch(e) {}
+  }
+  function sleep() {
+    if(!room)return;
+    clearInterval(timer);timer=null;
+    Object.keys(machines).forEach(drop);
+    murmur.forEach(function(node){if(node.stop)node.stop();node.disconnect();});murmur=null;
+    var fading=room;fading.gain.setTargetAtTime(0,ctx.currentTime,.1);setTimeout(function(){fading.disconnect();},600);
+    room=null;
+  }
+  // Talk across the room: noise in the voice band, swelling and falling slowly.
+  function makeMurmur() {
+    var buffer=ctx.createBuffer(1,ctx.sampleRate*3,ctx.sampleRate),data=buffer.getChannelData(0);
+    for(var i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+    var noise=ctx.createBufferSource(),band=ctx.createBiquadFilter(),level=ctx.createGain(),swell=ctx.createOscillator(),depth=ctx.createGain();
+    noise.buffer=buffer;noise.loop=true;band.type='bandpass';band.frequency.value=520;band.Q.value=.8;
+    level.gain.value=.05;swell.frequency.value=.13;depth.gain.value=.025;
+    swell.connect(depth);depth.connect(level.gain);noise.connect(band);band.connect(level);level.connect(room);
+    noise.start();swell.start();
+    return [noise,band,level,swell,depth];
+  }
+  function machine(slug) {
+    var tune=BLIP_ATTRACT[slug];
+    if(!tune)return null;
+    var gain=ctx.createGain(),pan=ctx.createStereoPanner?ctx.createStereoPanner():null,warm=ctx.createBiquadFilter();
+    warm.type='lowpass';warm.frequency.value=2600;gain.gain.value=0;
+    warm.connect(gain);if(pan){gain.connect(pan);pan.connect(room);}else gain.connect(room);
+    // Machines start out of step, so the room never plays in unison.
+    return {slug:slug,tune:tune,gain:gain,pan:pan,warm:warm,level:0,panAt:0,offset:0,next:ctx.currentTime+.3+Math.random()*3};
+  }
+  function drop(slug) {
+    var m=machines[slug];delete machines[slug];
+    m.gain.gain.setTargetAtTime(0,ctx.currentTime,.05);
+    setTimeout(function(){m.warm.disconnect();m.gain.disconnect();if(m.pan)m.pan.disconnect();},400);
+  }
+  // Where you stand (in machines, as BlipAisle): who is heard, how loud and from which side.
+  function place(at) {
+    pos=at;
+    // Small moves wait for the next; arriving on a machine always counts.
+    if(!room||at===placed||(Math.abs(at-placed)<.01&&at!==Math.round(at)))return;
+    placed=at;
+    slugs.forEach(function(slug,i){
+      var offset=BlipAisle.offset(i,at,slugs.length),d=Math.abs(offset),m=machines[slug];
+      if(d>HEARD){if(m)drop(slug);return;}
+      if(!m){m=machine(slug);if(!m)return;machines[slug]=m;}
+      m.offset=offset;m.level=BlipAisle.machineLevel(d);m.panAt=BlipAisle.machinePan(offset);
+      m.gain.gain.setTargetAtTime(m.level,ctx.currentTime,.05);
+      if(m.pan)m.pan.pan.setTargetAtTime(m.panAt,ctx.currentTime,.05);
+    });
+  }
+  function note(m,freq,at) {
+    var tune=m.tune,osc=ctx.createOscillator(),env=ctx.createGain(),peak=.22*tune.level;
+    osc.type=tune.wave;osc.frequency.value=freq;
+    env.gain.setValueAtTime(.0001,at);env.gain.exponentialRampToValueAtTime(peak,at+.006);
+    env.gain.exponentialRampToValueAtTime(.0001,at+tune.decay);
+    osc.connect(env);env.connect(m.warm);osc.start(at);osc.stop(at+tune.decay+.02);
+    osc.onended=function(){osc.disconnect();env.disconnect();};
+  }
+  // A look-ahead of 0.4 s: each machine's jingle, then six to ten seconds of quiet.
+  function schedule() {
+    if(!room)return;
+    var horizon=ctx.currentTime+.4;
+    Object.keys(machines).forEach(function(slug){
+      var m=machines[slug],tune=m.tune;
+      while(m.next<horizon){
+        tune.notes.forEach(function(step,i){if(step!==null)note(m,tune.root*Math.pow(2,step/12),m.next+i*tune.beat);});
+        m.next+=tune.notes.length*tune.beat+6+Math.random()*4;
+      }
+    });
+    if(coinAt<horizon){coinDrop(coinAt);coinAt+=12+Math.random()*18;}
+  }
+  // Someone down the aisle drops a coin in.
+  function coinDrop(at) {
+    var side=ctx.createStereoPanner?ctx.createStereoPanner():null;
+    if(side){side.pan.value=(Math.random()<.5?-1:1)*(.5+Math.random()*.4);side.connect(room);}
+    [2400,3550,4900].forEach(function(freq,i){
+      var osc=ctx.createOscillator(),ring=ctx.createGain(),start=at+i*.006;
+      osc.type='triangle';osc.frequency.value=freq;
+      ring.gain.setValueAtTime(.05/(i+1),start);ring.gain.exponentialRampToValueAtTime(.0004,start+.08);
+      osc.connect(ring);ring.connect(side||room);osc.start(start);osc.stop(start+.09);
+      osc.onended=function(){osc.disconnect();ring.disconnect();if(side&&i===2)side.disconnect();};
+    });
+  }
+  function duck(on) {
+    ducked=!!on;
+    if(room)room.gain.setTargetAtTime(ROOM*(ducked?.5:1),ctx.currentTime,.15);
+  }
+  // For the tests: who is playing, and the level and pan each is heading for.
+  function state() {
+    return {running:!!room,ducked:ducked,machines:Object.keys(machines).map(function(slug){var m=machines[slug];return {slug:slug,offset:m.offset,level:m.level,pan:m.panAt};})};
+  }
+  function enable(names,at) {
+    slugs=names.slice();pos=at||0;enabled=true;
+    ['pointerdown','keydown','touchstart'].forEach(function(event){
+      document.addEventListener(event,function(){wake(true);},{capture:true,passive:true});
+    });
+    document.addEventListener('visibilitychange',function(){wake();});
+    window.addEventListener('pagehide',sleep);
+    wake();
+  }
+  return {enable:enable,place:place,duck:duck,state:state};
+}());
+
 // Chute clink, collection-box rattle, then the credit chime.
 function playCoinInsert() {
   var ctx = getKioskAudio();
@@ -198,13 +333,16 @@ function playCardMechanism() {
   } catch (e) {}
 }
 
-function playMachineStep(direction) {
+// Two footsteps, or one (count 1) when the aisle is walked a half machine at a time; feet alternate.
+var machineStepFoot=0;
+function playMachineStep(direction,count) {
   try {
     var ctx=getKioskAudio(), start=ctx.currentTime, output=blipOut(ctx);
     var buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.095),ctx.sampleRate), data=buffer.getChannelData(0);
     for(var i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*.022));
-    for(var step=0;step<2;step++) {
-      let at=start+step*.19, foot=ctx.createOscillator(), body=ctx.createGain();
+    for(var n=0;n<(count||2);n++) {
+      let step=machineStepFoot=1-machineStepFoot;
+      let at=start+n*.19, foot=ctx.createOscillator(), body=ctx.createGain();
       let grit=ctx.createBufferSource(), low=ctx.createBiquadFilter(), gritGain=ctx.createGain();
       let pan=ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       if(pan){pan.pan.value=(direction<0?-1:1)*(step?-.16:.16);pan.connect(output);}

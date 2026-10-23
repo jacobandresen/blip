@@ -7,13 +7,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openPage } from './lib/harness.mjs';
 
-/** A game page on a 390x844 phone with five coins in and the canvas's keys recorded. */
+/** A game page on a 390x844 phone, played by touch (the home screen's controller), with five coins in and the
+ * canvas's keys recorded. */
 async function phone(t, slug) {
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 390, height: 844 } });
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
-  await page.goto(`${origin}/${slug}/index.html`);
+  await page.goto(`${origin}/${slug}/index.html?controls=touch`);
   await page.waitForFunction(() =>
     typeof BlipController === 'object' && document.getElementById('loader').style.display === 'none', null, { timeout: 30000 });
   await page.evaluate(() => {
@@ -323,3 +324,27 @@ for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
     assert.deepEqual(failures, []);
   });
 }
+
+test('Adder: in a two-player match each player steers on their own half of the strip', async (t) => {
+  const p = await phone(t, 'adder');
+  const s = await p.strip();
+  const y = s.y + s.h / 2;
+  // Alone, the whole strip is player one's: its left edge turns left.
+  await p.down(1, s.x + s.w * 0.6, y);
+  assert.ok(await p.page.evaluate(() => blipTouchDown(0) === 2 && blipTouchPos(0, 0) > 0.55 && blipTouchDown(1) === 0));
+  await p.up(1);
+  await p.page.evaluate(() => window.blipSetMode(1));
+  await p.page.waitForTimeout(150);
+  assert.equal(await p.page.evaluate(() => getComputedStyle(document.querySelector('.ts-half[data-slot="1"]')).display), 'block',
+    'the strip splits for two');
+  // Two playing: the left of the right half is player two turning left; player one still has the left half.
+  await p.down(1, s.x + s.w * 0.6, y);
+  await p.down(2, s.x + s.w * 0.4, y);
+  const got = await p.page.evaluate(() => [blipTouchDown(0), blipTouchPos(0, 0), blipTouchDown(1), blipTouchPos(1, 0)]);
+  assert.equal(got[0], 2);
+  assert.ok(got[1] > 0.55, `player one at ${got[1]} of their half`);
+  assert.equal(got[2], 2);
+  assert.ok(got[3] < 0.45, `player two at ${got[3]} of their half`);
+  await p.up(1);
+  await p.up(2);
+});

@@ -776,8 +776,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* ======================================================================
    The pad: the default on-screen controller
    ======================================================================
-   #control-toggle switches to the stick; the choice is `blip-controls` in
-   localStorage, applied as <html data-controls>. The pad sits in .deck-panel
+   The front end picks the controller (blipFrontendControls), applied as
+   <html data-controls>. The pad sits in .deck-panel
    with the stick deck and is sized off the same --cap: a cross and four caps
    (a game's unused caps are `spare`). Atari palette: matte black body, red
    caps. */
@@ -983,44 +983,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
     0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
-/* Keep the controller picker at the lower-right edge, above the deck. */
-#control-toggle {
-  position: fixed;
-  right: max(10px, calc(env(safe-area-inset-right, 0px) + 10px));
-  bottom: calc(var(--topbar-h, var(--cabinet-bottom-bar-height, 56px)) + env(safe-area-inset-bottom, 0px) + 5px);
-  z-index: 205;
-  display: flex;
-  margin: 0;
-  padding: 0;
-  border: 1px solid rgba(120, 130, 120, 0.3);
-  border-radius: 3px;
-  background: rgba(6, 8, 6, 0.72);
-  opacity: 0.8;
-  transition: opacity .2s, border-color .2s;
-}
-#control-toggle:hover { opacity: 1; border-color: rgba(50, 200, 50, 0.5); }
-#control-toggle:empty { display: none; }
-#control-toggle > button {
-  margin: 0;
-  padding: 8px 9px;    /* a real tap target; the type stays 6px */
-  border: 0;
-  background: none;
-  font-family: 'Press Start 2P', 'Courier New', monospace;
-  font-size: 6px;
-  line-height: 1.5;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: rgba(150, 165, 150, 0.6);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-font-smoothing: none;
-}
-#control-toggle > button + button { border-left: 1px solid rgba(120, 130, 120, 0.25); }
-#control-toggle > button[aria-checked="true"] {
-  color: #7be07b;
-  background: rgba(50, 200, 50, 0.12);
-  text-shadow: 0 0 4px rgba(80, 230, 80, 0.6);
-}
 
 /* Phones: a taller bar and a bigger cross and caps, hard against the two
    edges. */
@@ -1231,13 +1193,20 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-players] #deck-p2 { display: flex; }
 :root[data-players][data-controls="pad"] .snes-pad.second { display: block; }
 
+/* A one-player game's second station is on the panel, as on a two-player cabinet, but takes no input. */
+:root[data-seats="1"] :is(#deck-p2 .arcade-btn, #deck-p2 .stick-base, .snes-pad.second .snes-btn, .snes-pad.second .snes-dpad, .snes-pad.second .snes-dp-seg) {
+  pointer-events: none;
+}
+
 /* Dead to the touch, aimed at the controls rather than at the panel
    they sit on: `pointer-events: none` on a parent does NOT disable a
    child that sets `auto`, and every button on the pad sets `auto`. */
-:root[data-players="1"]:not([data-open]) #deck-p2,
-:root[data-players="1"]:not([data-open]) .snes-pad.second .snes-btn,
-:root[data-players="1"]:not([data-open]) .snes-pad.second .snes-dpad,
-:root[data-players="1"]:not([data-open]) .snes-pad.second .snes-dp-seg {
+/* A two-player game's second station is live on its title screen (data-open) and in a two-player match
+   (data-versus); against the CPU nobody sits there. */
+:root:not([data-open]):not([data-versus]) #deck-p2,
+:root:not([data-open]):not([data-versus]) .snes-pad.second .snes-btn,
+:root:not([data-open]):not([data-versus]) .snes-pad.second .snes-dpad,
+:root:not([data-open]):not([data-versus]) .snes-pad.second .snes-dp-seg {
   pointer-events: none;
 }
 
@@ -1476,10 +1445,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 /* The toggle back to the joystick goes with the deck: sideways there is
    no bar under it to sit above, so it sits in the middle of the screen's
    bottom edge, between the two gutters where nothing else is. */
-/* Sideways the middle of the bottom edge is the picture: no toggle there
-   (the controller is switched upright). */
-:root[data-layout="landscape"] #control-toggle { display: none; }
-
 /* Rally's spinners sideways: thumb-sized, in the bottom corners. */
 :root[data-layout="landscape"] #paddle-dial,
 :root[data-layout="landscape"] #paddle-dial-p2 {
@@ -1979,8 +1944,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* Aimed at the controls: .arcade-btn sets pointer-events:auto for
    itself, and a parent's `none` does not override a child that does. */
-:root[data-players="1"]:not([data-open]) #deck-p2 .arcade-btn,
-:root[data-players="1"]:not([data-open]) #deck-p2 .stick-base {
+:root:not([data-open]):not([data-versus]) #deck-p2 .arcade-btn,
+:root:not([data-open]):not([data-versus]) #deck-p2 .stick-base {
   pointer-events: none;
 }
 
@@ -2525,8 +2490,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 :root[data-players="2"] #snes-pad .snes-shell { --bolt-r: none; }
 :root[data-players="2"] #snes-pad-p2 .snes-shell { --bolt-l: none; }
 
-:root[data-layout="upright"] #control-toggle > button { padding: 5px 6px; letter-spacing: 0.5px; }
-
 /* ---- Thumb-sized on a phone ---- One player upright on a touch phone:
    equipment sized off the whole width, and the bar grows to seat the bigger
    cross. */
@@ -2614,6 +2577,8 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* Every game reads at most two caps, so a station shows only its live ones. */
 :is(.snes-btn, .arcade-btn).spare { display: none; }
+/* Except a one-player game's second station: its two caps are unlit blanks, as on a two-player cabinet. */
+:root[data-seats="1"] :is(#deck-p2 .arcade-btn, .snes-pad.second .snes-btn).spare { display: block; }
 
 /* ---- Breathing room (one seat) ---- The plate's sides slope with the
    deck's tilt, so a cross or caps set nearer than ~30px to the bar's edge
@@ -3849,25 +3814,6 @@ body.cabinet-page .deck-housing {
 body.cabinet-page .kiosk-bar .deck-coin-slot {
   box-shadow:0 0 0 1px #0c0a09,2px 4px 6px #000b,5px 8px 10px #0005,inset 0 1px #cbbb9c;
 }
-body.cabinet-page #control-toggle {
-  border-color:#aa8d603b;
-  background:linear-gradient(#29231e,#141214);
-  box-shadow:0 2px 4px #0008,inset 0 1px #e4caa312;
-  opacity:1;
-}
-body.cabinet-page #control-toggle > button {color:#a7977d; text-shadow:0 1px #000;}
-body.cabinet-page #control-toggle > button + button {border-left-color:#aa8d6033;}
-body.cabinet-page #control-toggle > button[aria-checked="true"] {
-  color:#edd6a6;
-  background:linear-gradient(#a5803829,#a5803810);
-  text-shadow:0 0 5px #e8b66533;
-  box-shadow:inset 0 -1px #c39f6759;
-}
-body.cabinet-page #control-toggle:hover {border-color:#b59a7180;}
-body.cabinet-page #control-toggle > button:focus-visible {outline:1px solid #e1c18e; outline-offset:-3px;}
-:root[data-layout="upright"] body.cabinet-page #control-toggle {
-  right:max(24px, calc((100% - var(--cabinet-width)) / 2 + 8px));
-}
 
 :root[data-layout="landscape"] .deck-housing,
 :is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .deck-housing {display:none;}
@@ -3885,13 +3831,6 @@ body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin
   right:4px;padding:3px;
 }
 
-body.cabinet-page #control-toggle > button {
-  min-height:28px;padding:6px 9px;
-  font:700 9px/1.2 'Courier New',monospace;letter-spacing:.04em;
-}
-@media(pointer:coarse) {
-  body.cabinet-page #control-toggle > button {min-height:36px;padding:8px 10px;}
-}
 @media(max-width:360px) {
   :root[data-layout="upright"][data-caps="4"][data-controls][data-players="1"] {
     --dpad:72px;--ctl-cx:calc(8px + var(--dpad) / 2);--ctl-pr:16px;
@@ -3944,11 +3883,6 @@ body.cabinet-page #control-toggle > button {
   #marquee-bar.jukebox-marquee #marquee-name {left:50%}
 }
 
-/* The mode switch looks small but takes a 44px-tall touch, through padding that draws nothing. */
-@media (pointer: coarse) {
-  #control-toggle > button { position: relative; }
-  #control-toggle > button::after { content: ''; position: absolute; inset: -4px -1px; }
-}
 
 .manual-open-book { touch-action: pan-y; }
 

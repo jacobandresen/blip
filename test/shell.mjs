@@ -23,7 +23,7 @@ async function browser(t, port, { touch = false, width = 1280, height = 800 } = 
 
 async function open(cdp, page, settle = 4000) {
   await cdp.send('Page.navigate', { url: `${ORIGIN}/${page}` });
-  if (page.endsWith('/index.html')) {
+  if (/\/index\.html(\?|$)/.test(page)) {
     await waitFor(cdp, "document.documentElement.hasAttribute('data-game-ready')", 60000);
   }
   await sleep(settle);
@@ -55,7 +55,7 @@ test('the game shell', async (t) => {
 
   await t.test('the name prompt takes a tap while touch play is on, and its keys while the coin wall is up', async (t) => {
     const cdp = await browser(t, 9401, { touch: true, width: 390, height: 844 });
-    await open(cdp, 'bouncer/index.html');
+    await open(cdp, 'bouncer/index.html?controls=touch');
     assert.equal(await evaluate(cdp, "document.documentElement.getAttribute('data-touch')"), 'drag');
 
     // Coins left, so touch play is live: every tap that is not a button plays.
@@ -119,28 +119,33 @@ test('the game shell', async (t) => {
     assert.equal(await evaluate(cdp, "document.documentElement.hasAttribute('data-cursor-idle')"), true);
   });
 
-  await t.test('on the cabinet, up and down move the selection a row', async (t) => {
+  await t.test('on the cabinet, up steps up to the machine and up again plays it; down or a walk steps back', async (t) => {
     const cdp = await browser(t, 9407);
     await open(cdp, 'index.html');
     const lit = "Array.prototype.findIndex.call(document.querySelectorAll('.card'), function (c) { return c.classList.contains('card-focused'); })";
+    const up = "document.getElementById('game-grid').hasAttribute('data-stepped-up')";
+    const still = "!document.getElementById('game-grid').hasAttribute('data-aisle-moving')";
     const cols = await evaluate(cdp, `(function(){var c=document.querySelectorAll('.card'),t=c[0].offsetTop,n=0;
       while(n<c.length&&c[n].offsetTop===t)n++;return n;})()`);
     const n = await evaluate(cdp, "document.querySelectorAll('.card').length");
     assert.equal(cols, n, `the machines should share one horizontal aisle`);
-    await key(cdp, 'ArrowRight', 'ArrowRight', 39);
-    // The aisle walks one machine every 2.24 s.
-    await waitFor(cdp, `${lit} === 1`, 3000);
-    assert.equal(await evaluate(cdp, lit), 1);
+    await key(cdp, 'ArrowUp', 'ArrowUp', 38);
+    await waitFor(cdp, `${up} && ${still}`, 3000);
+    assert.equal(await evaluate(cdp, lit), 0, 'stepping up keeps the machine');
+    assert.equal(await evaluate(cdp, 'blipArcadeSound.state().ducked'), true, 'and quietens the room');
     await key(cdp, 'ArrowDown', 'ArrowDown', 40);
-    await waitFor(cdp, `${lit} === 2`, 3000);
-    assert.equal(await evaluate(cdp, lit), 2);
+    await waitFor(cdp, `!${up} && ${still}`, 3000);
     await key(cdp, 'ArrowUp', 'ArrowUp', 38);
-    await waitFor(cdp, `${lit} === 1`, 3000);
-    assert.equal(await evaluate(cdp, lit), 1);
-    // Up and down step through the same horizontal aisle.
+    await waitFor(cdp, up, 3000);
+    await key(cdp, 'ArrowRight', 'ArrowRight', 39);
+    await waitFor(cdp, `!${up} && ${still} && ${lit} === 1`, 3000);
+    // Up, up: with a coin in, the second Up plays the machine.
+    await evaluate(cdp, "document.querySelector('.card-focused .machine-coinbox').click(); true");
+    await sleep(500);
     await key(cdp, 'ArrowUp', 'ArrowUp', 38);
-    await waitFor(cdp, `${lit} === 0`, 3000);
-    assert.equal(await evaluate(cdp, lit), 0);
+    await waitFor(cdp, `${up} && ${still}`, 3000);
+    await key(cdp, 'ArrowUp', 'ArrowUp', 38);
+    await arrivedAt(cdp, '/bouncer/index.html');
   });
 
   await t.test('the mechanical title stays in place and flips through every game', async (t) => {
@@ -181,7 +186,8 @@ test('the game shell', async (t) => {
     await evaluate(cdp, "document.querySelector('.card-focused .machine-coinbox').click(); true");
     await sleep(300);
     await key(cdp, 'ArrowRight', 'ArrowRight', 39);
-    assert.equal(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent"), 'BOUNCER');
+    // The machine is picked when the walk arrives at it.
+    await waitFor(cdp, "document.querySelector('.card-focused .card-title').textContent === 'BOUNCER'", 3000);
     await key(cdp, ' ', 'Space', 32);
     await arrivedAt(cdp, '/bouncer/index.html');
     assert.equal(await evaluate(cdp, 'location.pathname'), '/bouncer/index.html');

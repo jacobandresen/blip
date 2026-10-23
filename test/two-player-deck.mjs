@@ -14,9 +14,8 @@ async function loadGame(cdp, slug, controls, { real = false } = {}) {
   if (!real && !held.has(cdp.page)) { await cdp.page.route('**/*.wasm', () => {}); held.add(cdp.page); }
   if (real && held.has(cdp.page)) { await cdp.page.unroute('**/*.wasm'); held.delete(cdp.page); }
   await evaluate(cdp, 'true');
-  await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/${slug}/index.html` });
+  await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/${slug}/index.html?controls=${controls}` });
   await waitFor(cdp, "document.readyState === 'complete'", 15000);
-  await evaluate(cdp, `blipSetControls(${JSON.stringify(controls)})`);
   await waitFor(cdp, "typeof window.BlipController === 'object'", 15000);
   // Controls stay gated until a credit enters through the coin button.
   if (await evaluate(cdp, "document.getElementById('need-coin-overlay').classList.contains('visible')")) {
@@ -280,14 +279,14 @@ test(`brawler's deck seats two players`, async (t) => {
   });
 });
 
-test(`a one-player cabinet still has one station`, async (t) => {
+test(`a one-player game's second station is there but dead`, async (t) => {
   const { cdp } = await openPage(t);
 
-  await t.test('serpent hides the unused second station', async () => {
+  await t.test('serpent shows a second station, as a two-player cabinet does, that nobody can play', async () => {
     // Serpent reads one button; both cabinet action caps map to fire.
     await loadGame(cdp, 'serpent', 'stick');
-    assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), false,
-      'a one-player game shows a second station');
+    assert.equal(await evaluate(cdp, VISIBLE('#deck-p2')), true,
+      'a one-player game hides its second station');
     assert.equal(await evaluate(cdp, LIVE('#deck-p2')), false,
       'a game with no second player has a live second station');
     const deck = await evaluate(cdp, DECK_NAMES);
@@ -300,7 +299,6 @@ test(`a one-player cabinet still has one station`, async (t) => {
     assert.equal(await evaluate(cdp,
       "document.querySelectorAll('#fire-buttons-p2 .arcade-btn[data-blip]').length"), 0,
       "player two's caps are wired on a game with no player two");
-    // Nobody can ever sit there, so it must not look like somebody could.
   });
 
   await t.test("brawler's idle station two is not dimmed", async () => {
@@ -736,10 +734,7 @@ test(`a big touch screen gets a deck sized for a finger`, async (t) => {
     for (const controls of ['stick', 'pad']) {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, hasTouch: true });
       const page = await ctx.newPage();
-      await page.addInitScript((m) => {
-        try { localStorage.setItem('blip-controls', m); } catch (e) {}
-      }, controls);
-      await page.goto(`http://127.0.0.1:${HTTP_PORT}/brawler/index.html`);
+      await page.goto(`http://127.0.0.1:${HTTP_PORT}/brawler/index.html?controls=${controls}`);
       await page.waitForTimeout(1600);
       await page.evaluate(() => window.blipSetMode(1));
       await page.waitForTimeout(250);
@@ -781,10 +776,7 @@ test(`a second player joins by reaching for their own stick`, async (t) => {
   for (const controls of ['stick', 'pad']) {
     const ctx = await browser.newContext({ viewport: { width: 900, height: 800 }, hasTouch: true });
     const page = await ctx.newPage();
-    await page.addInitScript((m) => {
-      try { localStorage.setItem('blip-controls', m); } catch (e) {}
-    }, controls);
-    await page.goto(`http://127.0.0.1:${HTTP_PORT}/brawler/index.html`);
+    await page.goto(`http://127.0.0.1:${HTTP_PORT}/brawler/index.html?controls=${controls}`);
     await page.waitForFunction(() => document.getElementById('loader').style.display === 'none',
       null, { timeout: 20000 });
     if (await page.locator('#need-coin-overlay.visible').count()) await page.evaluate(() => document.getElementById('insert-coin-btn').click());

@@ -1,6 +1,6 @@
 /* Shared control-deck builder; game pages configure it through BLIP_GAMES.
  * Each station has a stick or pad and at most two caps; unused caps are hidden.
- * Station two is inert unless the game supports two players. */
+ * Both stations are always on the panel; station two is inert unless the game seats two. */
 (function () {
   var panel = document.querySelector('.deck-panel');
   if (!panel || document.getElementById('deck-p1')) return;
@@ -18,7 +18,8 @@
   var root = document.documentElement;
   if (game) root.setAttribute('data-deck-wear', game.slug);
   root.setAttribute('data-caps', String(CAPS));
-  root.setAttribute('data-players', '1');
+  // Every deck seats two, as a two-player cabinet does; a one-player game's second station takes no input.
+  root.setAttribute('data-players', '2');
   if (!seatsTwo) root.setAttribute('data-seats', '1');
 
   function el(tag, cls, html, attrs) {

@@ -52,7 +52,6 @@ const PIECES = {
   stick: '.stick-base',
   strip: '.ts-glass',
   join: '.ts-join',
-  toggle: '#control-toggle',
   creditLamp: '.deck-credit-lamp, .deck-second-lamp',
   homeSwitch: '#home-switch-btn',
 };
@@ -74,7 +73,7 @@ const THUMB = { button: { w: 38, h: 34 }, dpad: { w: 52, h: 46 }, stick: { w: 52
 const APART = 4;
 
 // Where the controls must not reach: under the home bar.
-const CONTROLS = ['coin', 'dpad', 'button', 'stick', 'strip', 'join', 'toggle'];
+const CONTROLS = ['coin', 'dpad', 'button', 'stick', 'strip', 'join'];
 
 function collect(core) {
   const visible = (el) => {
@@ -169,8 +168,9 @@ async function check(page, device, insets, label, failures) {
   if (covered) failures.push(`${label}: the middle of the picture is covered by ${covered}`);
   const result = await page.evaluate(collect, CORE);
   for (const line of result.overlaps) failures.push(`${label}: ${line}`);
-  // Two players share 320px on the smallest phones: each gets about 110px, so their controls may be small and close, though never overlapping.
-  const squeezed = device.w < 340 && label.startsWith('brawler');
+  // Two players share 320px on the smallest phones (every deck seats two): each gets about 110px, so their controls may
+  // be small and close, though never overlapping.
+  const squeezed = device.w < 340;
   if (!squeezed) for (const line of result.thumbs) failures.push(`${label}: ${line}`);
   for (const line of result.clipped) failures.push(`${label}: ${line}`);
   if (!device.desktop && !squeezed) {
@@ -208,6 +208,36 @@ for (const device of mine) {
     await settle();
     await check(page, device, insets, 'cabinet', failures);
 
+    // Half a machine along the aisle, held there by a drag.
+    const aisle = await page.locator('#game-grid').boundingBox();
+    await page.mouse.move(aisle.x + aisle.width * .6, aisle.y + aisle.height * .3);
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) await page.mouse.move(aisle.x + aisle.width * (.6 - .17 * i / 8) - 12, aisle.y + aisle.height * .3);
+    await settle();
+    const along = await page.evaluate(() => Number(document.getElementById('game-grid').dataset.aislePos));
+    if (!(along > .2 && along < .8)) failures.push(`the drag held the aisle at ${along}, not between two machines`);
+    await check(page, device, insets, 'cabinet half a machine along', failures);
+    await page.mouse.up();
+    await page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
+
+    // Stepped up to the machine: its Start and coin door still in reach.
+    await page.keyboard.press('ArrowUp');
+    await page.waitForFunction(() => document.getElementById('game-grid').hasAttribute('data-stepped-up') &&
+      !document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
+    await settle();
+    await check(page, device, insets, 'cabinet stepped up', failures);
+    const reach = await page.evaluate(() => {
+      const bezel = document.querySelector('.screen-bezel').getBoundingClientRect();
+      return ['.machine-start', '.machine-coinbox'].filter((part) => {
+        const r = document.querySelector('.card-focused ' + part).getBoundingClientRect();
+        return r.top < bezel.top - 1 || r.bottom > bezel.bottom + 1 || r.left < bezel.left - 1 || r.right > bezel.right + 1;
+      });
+    });
+    // A phone on its side stands close already, its coin door below the frame.
+    const close = await page.evaluate(() => document.getElementById('game-grid').hasAttribute('data-close'));
+    for (const part of reach) if (!(close && part === '.machine-coinbox')) failures.push(`stepped up, the machine's ${part.slice(9)} leaves the window`);
+    await page.keyboard.press('ArrowDown');
+
     await page.evaluate(() => sessionStorage.setItem('blip-loaded-card',
       JSON.stringify({ slug: 'bouncer', name: 'BOUNCER', code: 'A2', art: 'bouncer/screenshot.png' })));
     await page.goto(`${origin}/index.html`);
@@ -215,11 +245,11 @@ for (const device of mine) {
     await check(page, device, insets, 'cabinet with a ROM seated', failures);
     await page.evaluate(() => sessionStorage.clear());
 
-    const controllers = device.desktop ? [null] : [null, 'stick', 'pad'];
+    // The arcade's sticks everywhere; on a phone also the home screen's touch and BASIC's pads.
+    const controllers = device.desktop ? [null] : [null, 'touch', 'pad'];
     for (const slug of GAMES) {
       for (const controller of controllers) {
-        await page.addInitScript((mode) => { if (mode) localStorage.setItem('blip-controls', mode); else localStorage.removeItem('blip-controls'); }, controller);
-        await page.goto(`${origin}/${slug}/index.html`);
+        await page.goto(`${origin}/${slug}/index.html${controller ? '?controls=' + controller : ''}`);
         await page.waitForFunction(() => typeof BlipController === 'object', null, { timeout: 30000 });
         await settle();
         await check(page, device, insets, `${slug}${controller ? ' with the ' + controller : ''}`, failures);
@@ -305,6 +335,8 @@ for (const device of mine) {
     await page.waitForFunction(() => document.querySelector('.card-focused')?.offsetWidth > 0);
     await settled(page);
     for (let step = 0; step < 9; step++) {
+      // The machine is picked when the walk arrives at it.
+      await page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
       await page.waitForFunction(() => [...document.querySelectorAll('.card')].every((card) => card.getAnimations().length === 0));
       const card = await page.evaluate(() => {
         const el = document.querySelector('.card-focused');

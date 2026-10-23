@@ -194,7 +194,7 @@ canvas {
    the deck, its picker and the cabinet frame go. A touch screen keeps them
    (data-has-touch), since the deck is what it plays on. App mode does the
    same on a PC, or on a tablet with a gamepad in hand (data-bare). */
-:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) :is(#topbar, #control-toggle, #arcade-bezel, .cabinet-glass, .cab-rail) {
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) :is(#topbar, #arcade-bezel, .cabinet-glass, .cab-rail) {
   display: none;
 }
 /* No cabinet behind the picture either. */
@@ -785,7 +785,10 @@ canvas {
 :root[data-touch="platform"] .ts-demo { animation: ts-demo-run 3s ease-in-out infinite; }
 /* Bubbler: one surface for one player; the P1 / 2P halves once two are in. */
 :root[data-touch="platform"]:not([data-versus]) .ts-half + .ts-half,
-:root[data-touch="platform"]:not([data-versus]) .ts-tag { display: none; }
+:root[data-touch="platform"]:not([data-versus]) .ts-tag,
+:root[data-touch="drag"]:not([data-versus]) .ts-half + .ts-half,
+:root[data-touch="drag"]:not([data-versus]) .ts-tag { display: none; }
+:root[data-touch="drag"][data-versus] .ts-half.held { background: rgba(255, 255, 255, 0.05); }
 :root[data-touch="platform"][data-versus] .ts-half.held { background: rgba(255, 255, 255, 0.05); }
 :root[data-touch="platform"][data-versus] .ts-demo { display: none; }
 /* 2P JOIN has its own target; the rest of the strip stays with P1 until P2 joins. */
@@ -903,7 +906,7 @@ canvas {
 
 /* Amstrad mode is a game inside the CPC monitor; the host keeps the case. */
 :root[data-amstrad] body::after,
-:root[data-amstrad] :is(.blip-logo,#insert-coin-btn,#topbar,#control-toggle,#controls-card,#marquee-bar,#arcade-bezel,.cabinet-glass,.cab-rail,#need-coin-overlay) { display:none!important; }
+:root[data-amstrad] :is(.blip-logo,#insert-coin-btn,#topbar,#controls-card,#marquee-bar,#arcade-bezel,.cabinet-glass,.cab-rail,#need-coin-overlay) { display:none!important; }
 :root[data-amstrad] body { background:#000; }
 :root[data-amstrad] canvas { clip-path:none; }
 :root[data-amstrad] .app-back { display:none!important; }
@@ -1041,19 +1044,6 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 :root[data-appstyle] .kiosk-bar > .deck-panel::before,
 :root[data-appstyle] .kiosk-bar > .deck-panel::after { display: none; }
 
-/* The controller picker as a segmented control. */
-:root[data-appstyle] #control-toggle {
-  padding: 2px; border: 0; border-radius: 9px; background: rgba(118, 118, 128, .24); opacity: 1;
-}
-:root[data-appstyle] #control-toggle > button {
-  padding: 6px 10px; border: 0; border-radius: 7px;
-  font: 600 11px/1.2 var(--app-font); letter-spacing: 0; text-transform: none; color: #fff;
-  -webkit-font-smoothing: auto;
-}
-:root[data-appstyle] #control-toggle > button + button { border-left: 0; }
-:root[data-appstyle] #control-toggle > button[aria-checked="true"] {
-  background: #636366; color: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, .12), 0 3px 1px rgba(0, 0, 0, .04);
-}
 
 /* The launch screen: the icon on black while the game loads. */
 :root[data-appstyle] #loader { background: #000; gap: 28px; }
@@ -1240,4 +1230,36 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 @media (max-width:520px) {
   :root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {padding:0 4px 0 14px}
   :root:not([data-appstyle]) .machine-marquee-name {font-size:12px;text-shadow:-1px -1px #120c18,1px -1px #120c18,-1px 1px #120c18,1px 1px #120c18,2px 2px 0 color-mix(in srgb,var(--trim) 70%,#000)}
+}
+
+/* The arcade's zoom ends on the machine's screen; the game page opens on the same picture, where the game will
+   draw, and fades it as the first frame comes up (#launch-frame, from shell.js). */
+#launch-frame {
+  position: fixed;
+  z-index: 49;
+  background: #000 center / contain no-repeat;
+  image-rendering: pixelated;
+  clip-path: inset(0 round 10px);
+  pointer-events: none;
+  transition: opacity .35s ease-out;
+}
+#launch-frame.launch-frame-out { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { #launch-frame { transition: none; } }
+/* While the picture waits for the game, no loading words over it. */
+body:has(#launch-frame:not(.launch-frame-out)) #loader { visibility: hidden; }
+
+/* In the arcade the game page is its machine up close (data-machine, from shell.js): the frame round the screen is
+   the cabinet's black laminate edged in its T-molding colour, and the monitor has the cabinet's ring, as on the
+   cabinet in index.html. */
+:root[data-machine]:not([data-appstyle]) #arcade-bezel {
+  border-color: color-mix(in srgb, var(--machine-trim) 80%, #fff);
+  background: linear-gradient(90deg, #ffffff12, transparent 7% 93%, #0000004d), linear-gradient(180deg, #24212b, #131117 38%, #0d0c11);
+  box-shadow: 0 20px 52px rgba(0,0,0,.72), 0 0 0 5px #0c090e, 0 0 0 7px var(--machine-trim),
+    0 0 46px color-mix(in srgb, var(--machine-trim) 22%, transparent), inset 0 0 0 5px var(--machine-trim),
+    inset 0 0 0 7px #0008, inset 0 -9px 18px rgba(0,0,0,.58);
+}
+:root[data-machine]:not([data-appstyle]) #arcade-bezel .screw { display: none; }
+:root[data-machine]:not([data-appstyle]) .cabinet-glass {
+  box-shadow: inset 0 0 25px #000, 0 0 0 3px #000, 0 0 0 4px color-mix(in srgb, var(--machine-trim) 70%, #fff),
+    0 0 14px 3px color-mix(in srgb, var(--machine-trim) 45%, transparent);
 }

@@ -122,10 +122,8 @@ var soundContext=null,soundCursor=0;
 var tapeLoadingAudio=new Audio('blip-tape-load.mp3');
 tapeLoadingAudio.preload='auto';
 var controlDeck = document.querySelector('.amstrad-controls');
-var controlStick = controlDeck.querySelector('.stick-base');
-var controlFire = controlDeck.querySelector('.fire-buttons');
-var controlSecond = document.getElementById('deck-p2');
-var controlSticks = Array.from(controlDeck.querySelectorAll('.stick-base'));
+// BASIC plays from the pads, two of them, as every deck seats two (blipFrontendControls).
+var controlPads = Array.from(controlDeck.querySelectorAll('.snes-pad'));
 var rallyDialP1 = document.getElementById('amstrad-rally-dial-p1');
 var rallyDialP2 = document.getElementById('amstrad-rally-dial-p2');
 function programTape() {
@@ -145,17 +143,10 @@ function configureBasicControls() {
     gate: function () { return !basicWasmPlaying; },
     buttons: game.buttons,
     keys: game.keys,
-    click: false,
-    onInput: function () {
-      controlSticks.forEach(function (stick, index) {
-        var prefix = index ? 'p2' : '';
-        stick.style.setProperty('--dx', Number(BlipController.isHeld(prefix + 'right')) - Number(BlipController.isHeld(prefix + 'left')));
-        stick.style.setProperty('--dy', Number(BlipController.isHeld(prefix + 'down')) - Number(BlipController.isHeld(prefix + 'up')));
-      });
-    }
+    click: false
   });
-  controlDeck.querySelectorAll('.fire-buttons').forEach(function (fire, player) {
-    fire.querySelectorAll('.arcade-btn').forEach(function (button, index) {
+  controlPads.forEach(function (pad, player) {
+    pad.querySelectorAll('.snes-btn').forEach(function (button, index) {
       var spec = game.buttons && (game.buttons[index] || game.buttons[0]);
       button.classList.remove('spare');
       button.setAttribute('aria-label', 'Player ' + (player + 1) + ' ' + (spec && spec.label || 'Fire'));
@@ -163,26 +154,25 @@ function configureBasicControls() {
     });
   });
 }
+// Both pads are always on the deck; the second takes input only for a game that seats two.
 function showBasicSecondPlayer(show) {
-  controlSecond.hidden = !show;
   document.documentElement.toggleAttribute('data-open', show);
   document.documentElement.setAttribute('data-seats', show ? '2' : '1');
-  document.documentElement.setAttribute('data-players', show ? '2' : '1');
+  document.documentElement.setAttribute('data-players', '2');
 }
 showBasicSecondPlayer(false);
 function releaseBasicRallyDials() { BlipController.releaseAll(); }
 BlipController.init({ click: false });
-controlSticks.forEach(function (stick, index) {
-  var prefix = index ? 'p2' : '';
-  BlipController.bindDpad(stick, { dead: .19, names: {
+controlPads.forEach(function (pad, player) {
+  var prefix = player ? 'p2' : '';
+  pad.querySelectorAll('.snes-btn').forEach(function (button, index) {
+    button.setAttribute('data-blip', prefix + 'button' + (index + 1));
+  });
+  BlipController.bindButtons(pad);
+  BlipController.bindDpad(pad.querySelector('.snes-dpad'), { names: {
     left: prefix + 'left', right: prefix + 'right', up: prefix + 'up', down: prefix + 'down'
   } });
-});
-controlDeck.querySelectorAll('.fire-buttons').forEach(function (fire, player) {
-  fire.querySelectorAll('.arcade-btn').forEach(function (button, index) {
-    button.setAttribute('data-blip', (player ? 'p2' : '') + 'button' + (index + 1));
-  });
-  BlipController.bindButtons(fire);
+  BlipController.registerVisual(pad);
 });
 BlipController.bindDial(rallyDialP1, {
   up: { key: 'ArrowUp', code: 'ArrowUp' }, down: { key: 'ArrowDown', code: 'ArrowDown' },
@@ -193,7 +183,7 @@ BlipController.bindDial(rallyDialP2, {
 });
 window.addEventListener('blur', function () { BlipController.releaseAll(); });
 function updatePlayClearance(){
-  var controls=document.body.hasAttribute('data-rally')?[rallyDialP1,rallyDialP2]:[controlDeck,controlStick,controlFire];
+  var controls=document.body.hasAttribute('data-rally')?[rallyDialP1,rallyDialP2]:[controlDeck].concat(controlPads);
   var boxes=controls.map(function(el){return el.getBoundingClientRect();}).filter(function(box){return box.width>0&&box.height>0;});
   var top=Math.min.apply(Math,[document.documentElement.clientHeight].concat(boxes.map(function(box){return box.top;})));
   document.documentElement.style.setProperty('--amstrad-control-clearance',Math.max(0,document.documentElement.clientHeight-top)+'px');

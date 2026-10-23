@@ -5,15 +5,15 @@ import assert from 'node:assert/strict';
 import { openPage } from './lib/harness.mjs';
 
 const GAMES = [
-  ['rally', 'RALLY', 2],
-  ['bouncer', 'BOUNCER', 1],
-  ['defender', 'DEFENDER', 1],
-  ['bubbler', 'BUBBLER', 2],
-  ['raider', 'RAIDER', 1],
-  ['meteors', 'METEORS', 1],
-  ['serpent', 'SERPENT', 1],
-  ['brawler', 'BRAWLER', 2],
-  ['adder', 'ADDER', 2],
+  ['rally', 'RALLY'],
+  ['bouncer', 'BOUNCER'],
+  ['defender', 'DEFENDER'],
+  ['bubbler', 'BUBBLER'],
+  ['raider', 'RAIDER'],
+  ['meteors', 'METEORS'],
+  ['serpent', 'SERPENT'],
+  ['brawler', 'BRAWLER'],
+  ['adder', 'ADDER'],
 ];
 
 async function openArcade(t, width = 390, height = 844) {
@@ -39,8 +39,8 @@ test('the aisle shows one complete, selectable cabinet for every game', async (t
     hasStart: !!card.querySelector('.machine-start'),
     deck: card.querySelector('.machine-controls iframe')?.getAttribute('src'),
   })));
-  assert.deepEqual(cabinets, GAMES.map(([slug, title, stations]) => ({
-    slug, title, stations, hasScreen: true, hasCoinDoor: true, hasStart: true, deck: `machine-deck.html?game=${slug}`,
+  assert.deepEqual(cabinets, GAMES.map(([slug, title]) => ({
+    slug, title, stations: 2, hasScreen: true, hasCoinDoor: true, hasStart: true, deck: `machine-deck.html?game=${slug}`,
   })));
   const marqueeArt = await page.locator('#game-grid .card').evaluateAll((cards) =>
     cards.map((card) => getComputedStyle(card).getPropertyValue('--marquee-art').trim()));
@@ -207,13 +207,13 @@ for (const width of [1280, 390, 320]) {
   });
 }
 
-for (const [index, [slug, title, players]] of GAMES.entries()) {
+for (const [index, [slug, title]] of GAMES.entries()) {
   test(`${title}: press its Start and reach playable controls`, async (t) => {
     const { page, origin } = await openArcade(t);
     for (let step = 0; step < index; step++) await page.keyboard.press('ArrowRight');
     await page.waitForFunction((game) => document.querySelector('.card-focused')?.dataset.gameUrl === `${game}/index.html`, slug);
     const machine = page.locator('.card-focused');
-    assert.equal(await machine.locator('.machine-station').count(), players);
+    assert.equal(await machine.locator('.machine-station').count(), 2, 'every cabinet seats two');
     assert.equal(await page.evaluate(() => getCoins()), 0);
 
     if (index % 2) {
@@ -251,32 +251,14 @@ for (const [index, [slug, title, players]] of GAMES.entries()) {
     await page.waitForFunction(() => getCoins() === 0, null, { timeout: 5000 });
     assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-start')), null,
       `${title} consumed the cabinet Start action`);
-    if (slug === 'rally') {
-      const touchState = await page.locator('#touch-strip .ts-glass').evaluate((surface) => {
-        const box = surface.getBoundingClientRect();
-        const details = { bubbles: true, pointerId: 71, pointerType: 'touch',
-          clientX: box.left + box.width / 4, clientY: box.top + box.height / 2 };
-        surface.dispatchEvent(new PointerEvent('pointerdown', details));
-        const held = window.blipTouchDown(0);
-        surface.dispatchEvent(new PointerEvent('pointerup', details));
-        return held;
-      });
-      assert.equal(touchState, 2, 'Rally’s paddle strip reaches the game as a pressed touch');
-    } else {
-      await page.evaluate(() => {
-        window.__cabinetActionKeys = [];
-        document.querySelector('canvas').addEventListener('keydown', (event) => window.__cabinetActionKeys.push(event.code));
-      });
-      const actionTarget = ['serpent', 'bouncer', 'defender', 'bubbler', 'adder'].includes(slug) ?
-        '#touch-strip .ts-glass' : '#snes-pad .snes-btn[data-blip="button1"]';
-      const action = page.locator(actionTarget);
-      if (slug === 'bubbler') {
-        const box = await action.boundingBox();
-        await action.tap({ timeout: 3000, position: { x: box.width * .9, y: box.height * .8 } });
-      } else await action.tap({ timeout: 3000 });
-      const expected = await page.evaluate(() => BLIP_GAMES[blipGameFromPath(location.pathname).slug]?.buttons?.[0]?.code || 'Space');
-      await page.waitForFunction((code) => window.__cabinetActionKeys?.includes(code), expected, { timeout: 2000 });
-    }
+    // The arcade plays with the cabinet's own controls: player one's first cap, or Rally's dial.
+    await page.evaluate(() => {
+      window.__cabinetActionKeys = [];
+      document.querySelector('canvas').addEventListener('keydown', (event) => window.__cabinetActionKeys.push(event.code));
+    });
+    await page.locator(slug === 'rally' ? '#paddle-dial' : '#fire-buttons .arcade-btn[data-blip="button1"]').tap({ timeout: 3000 });
+    const expected = await page.evaluate(() => BLIP_GAMES[blipGameFromPath(location.pathname).slug]?.buttons?.[0]?.code || 'Space');
+    await page.waitForFunction((code) => window.__cabinetActionKeys?.includes(code), expected, { timeout: 2000 });
   });
 }
 
@@ -305,4 +287,242 @@ test('every visit starts in the arcade, whichever front end was open last', asyn
     assert.equal(new URL(page.url()).pathname, '/index.html', `after ${last}, BLIP opened somewhere else`);
     assert.equal(await page.evaluate(() => blipFrontend()), 'cabinet');
   }
+});
+
+// ---- Walking: the aisle's position is a decimal (data-aisle-pos); data-aisle-moving is set while it moves. ----
+const aislePos = (page) => page.evaluate(() => Number(document.getElementById('game-grid').dataset.aislePos));
+const aisleStill = (page) => page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'), null, { timeout: 8000 });
+
+test('holding an arrow walks the aisle, and letting go stops on a machine', async (t) => {
+  const { page } = await openArcade(t, 1280);
+  await page.keyboard.down('ArrowRight');
+  await page.waitForTimeout(1200);
+  const passing = await aislePos(page);
+  assert.ok(passing > 0.4 && passing < 2, `walked ${passing} machines in 1.2 s`);
+  assert.equal(await selectedSlug(page), 'rally/index.html', 'the machine is picked on arrival, not in passing');
+  await page.waitForTimeout(1800);
+  await page.keyboard.up('ArrowRight');
+  await aisleStill(page);
+  const stop = await aislePos(page);
+  assert.ok(Number.isInteger(stop) && stop >= 2 && stop <= 4, `stopped at ${stop}`);
+  assert.equal(await selectedSlug(page), `${GAMES[stop][0]}/index.html`);
+});
+
+test('a drag moves the aisle with the pointer and lets go on a machine; a short one springs back', async (t) => {
+  const { page } = await openArcade(t, 1280);
+  await page.mouse.move(640, 300);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) { await page.mouse.move(640 - i * 20, 300); await page.waitForTimeout(30); }
+  const held = await aislePos(page);
+  assert.ok(held > 0.2 && held < 1, `the aisle followed to ${held}`);
+  await page.waitForTimeout(300);
+  await page.mouse.up();
+  await aisleStill(page);
+  assert.equal(await aislePos(page), 1);
+  assert.equal(await selectedSlug(page), 'bouncer/index.html');
+  await page.mouse.move(640, 300);
+  await page.mouse.down();
+  await page.mouse.move(620, 300);
+  await page.mouse.move(610, 300);
+  await page.mouse.up();
+  await aisleStill(page);
+  assert.equal(await aislePos(page), 1);
+});
+
+test('a gamepad stick walks at the pace it is pushed', async (t) => {
+  const walk = async (push) => {
+    const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+    await page.addInitScript((x) => {
+      const pad = { connected: true, axes: [0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) };
+      window.__pad = pad;
+      navigator.getGamepads = () => [pad];
+    }, push);
+    await page.goto(`${origin}/index.html`);
+    await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') && !document.documentElement.hasAttribute('data-cabinet-arranging'));
+    await page.evaluate((x) => { window.__pad.axes[0] = x; }, push);
+    // Its pace once up to speed, timed by the page's own clock.
+    await page.waitForFunction(() => document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
+    await page.waitForTimeout(700);
+    const pace = await page.evaluate(() => new Promise((done) => {
+      const read = () => [performance.now(), Number(document.getElementById('game-grid').dataset.aislePos)];
+      const [t0, p0] = read();
+      setTimeout(() => { const [t1, p1] = read(); done((((p1 - p0) % 9) + 9) % 9 / ((t1 - t0) / 1000)); }, 1000);
+    }));
+    await page.evaluate(() => { window.__pad.axes[0] = 0; });
+    await aisleStill(page);
+    assert.ok(Number.isInteger(await aislePos(page)));
+    return pace;
+  };
+  const stroll = await walk(0.4), stride = await walk(1);
+  assert.ok(stride > stroll * 1.8, `full push ${stride.toFixed(2)}, light push ${stroll.toFixed(2)} machines a second`);
+});
+
+test('with reduced motion an arrow still steps exactly one whole machine', async (t) => {
+  const { page } = await openArcade(t, 1280);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.evaluate(() => {
+    window.__seen = [];
+    new MutationObserver(() => window.__seen.push(document.getElementById('game-grid').dataset.aislePos))
+      .observe(document.getElementById('game-grid'), { attributes: true, attributeFilter: ['data-aisle-pos'] });
+  });
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
+  assert.deepEqual(await page.evaluate(() => window.__seen.filter((p) => !Number.isInteger(Number(p)))), []);
+  assert.equal(await page.evaluate(() => document.getElementById('game-grid').hasAttribute('data-aisle-moving')), false);
+});
+
+// ---- Sound from the machines: checked by the graph (blipArcadeSound.state()), not by ear. ----
+const room = (page) => page.evaluate(() => blipArcadeSound.state());
+
+test('the machines are silent until the first key, then the nearest is loudest and the rest pan to their sides', async (t) => {
+  const { page } = await openArcade(t, 1280);
+  assert.equal(await page.evaluate(() => _kioskAudioCtx === null && !(window.Howler && Howler.ctx)), true, 'no audio before any input');
+  assert.equal((await room(page)).running, false);
+  await page.keyboard.press('Shift');
+  await page.waitForFunction(() => blipArcadeSound.state().running);
+  const heard = (await room(page)).machines;
+  const by = Object.fromEntries(heard.map((m) => [m.slug, m]));
+  assert.deepEqual(heard.map((m) => m.slug).sort(), ['adder', 'bouncer', 'brawler', 'defender', 'rally'],
+    'the faced machine and two either side');
+  assert.equal(by.rally.level, 1);
+  assert.equal(by.rally.pan, 0);
+  assert.equal(by.bouncer.level, 0.5);
+  assert.ok(by.bouncer.pan > 0 && by.adder.pan < 0, 'neighbours on their own sides');
+  assert.ok(by.defender.level < by.bouncer.level);
+  await page.keyboard.press('ArrowRight');
+  await aisleStill(page);
+  const moved = Object.fromEntries((await room(page)).machines.map((m) => [m.slug, m]));
+  assert.equal(moved.bouncer.level, 1, 'walking on brings the next machine to the front');
+  assert.ok(moved.rally.pan < 0);
+  assert.ok(moved.bubbler, 'and the next but one into earshot');
+  assert.ok(!moved.brawler, 'while the far side falls out of it');
+});
+
+test('the room is silent while muted and stops while the page is hidden', async (t) => {
+  const { page } = await openArcade(t, 1280);
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => blipArcadeSound.state().running);
+  await page.evaluate(() => blipSetMuted(true));
+  assert.equal(await page.evaluate(() => blipOut(getKioskAudio()).gain.value), 0);
+  await page.evaluate(() => blipSetMuted(false));
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  assert.equal((await room(page)).running, false);
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.waitForFunction(() => blipArcadeSound.state().running);
+});
+
+// ---- Stepping up to play: the game page opens on the picture the arcade's zoom ended on. ----
+test('a machine started from the arcade opens its game on the same screen picture, then the game', async (t) => {
+  const { page, origin } = await openArcade(t, 1280);
+  // Hold the game back a moment, so the picture can be seen waiting for it.
+  await page.route('**/*.wasm', async (route) => { await new Promise((r) => setTimeout(r, 1500)); await route.continue(); });
+  await page.locator('.card-focused .machine-coinbox').click();
+  await page.locator('.card-focused .machine-start').click();
+  await page.waitForURL(`${origin}/rally/index.html`);
+  const shown = await page.waitForFunction(() => {
+    const frame = document.getElementById('launch-frame'), canvas = document.getElementById('glcanvas');
+    if (!frame) return null;
+    const a = frame.getBoundingClientRect(), b = canvas.getBoundingClientRect();
+    return { art: frame.style.backgroundImage, ready: document.documentElement.hasAttribute('data-game-ready'),
+      over: Math.abs(a.left - b.left) < 1 && Math.abs(a.top - b.top) < 1 && Math.abs(a.width - b.width) < 1 && Math.abs(a.height - b.height) < 1 };
+  });
+  const seen = await shown.jsonValue();
+  assert.match(seen.art, /rally\/screenshot\.png/);
+  assert.equal(seen.ready, false, 'the picture waits for the game');
+  assert.equal(seen.over, true, 'exactly where the game will draw');
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await page.waitForFunction(() => !document.getElementById('launch-frame'));
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-launch')), null);
+});
+
+test('a game page opened later, or another game, starts on its plain loader', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  await page.route('**/*.wasm', () => {});
+  await page.goto(`${origin}/index.html`);
+  // Twenty seconds old; and fresh, but for another machine.
+  for (const launch of [{ slug: 'rally', age: 20000 }, { slug: 'serpent', age: 0 }]) {
+    await page.evaluate((l) => sessionStorage.setItem('blip-cabinet-launch',
+      JSON.stringify({ slug: l.slug, at: Date.now() - l.age, art: `${l.slug}/screenshot.png` })), launch);
+    await page.goto(`${origin}/rally/index.html`);
+    await page.waitForFunction(() => typeof BlipController === 'object');
+    assert.equal(await page.locator('#launch-frame').count(), 0, `${launch.slug} handover`);
+  }
+});
+
+// ---- Living screens: a machine within two plays its strip; farther ones keep their still. ----
+test('only the machines near you fetch and play their attract loops', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  const fetched = [];
+  page.on('request', (r) => { const m = r.url().match(/\/(\w+)\/attract\.webp$/); if (m) fetched.push(m[1]); });
+  await page.goto(`${origin}/index.html`);
+  await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') && !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  await page.waitForFunction(() => document.querySelectorAll('#game-grid .card[data-loop-ready]').length === 5);
+  assert.deepEqual([...fetched].sort(), ['adder', 'bouncer', 'brawler', 'defender', 'rally']);
+  const strip = await page.evaluate(() => {
+    const card = document.querySelector('.card[data-machine="rally"]'), img = card.querySelector('.card-loop-strip');
+    return { frames: img.naturalHeight / (img.naturalWidth / (480 / 540)), playing: getComputedStyle(img).animationPlayState,
+      shown: getComputedStyle(card.querySelector('.card-loop')).visibility };
+  });
+  assert.ok(Math.abs(strip.frames - 12) < 0.5, `${strip.frames} frames`);
+  assert.equal(strip.playing, 'running');
+  assert.equal(strip.shown, 'visible');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.card[data-machine="raider"] .card-loop')).visibility), 'hidden');
+  await page.keyboard.press('ArrowRight');
+  await aisleStill(page);
+  await page.waitForFunction(() => document.querySelector('.card[data-machine="bubbler"][data-loop-ready]'));
+  assert.ok(fetched.includes('bubbler'), 'walking on fetches the next one');
+  assert.ok(!fetched.includes('raider') && !fetched.includes('serpent'), `and only that: ${fetched}`);
+  assert.equal(await page.evaluate(() => document.querySelector('.card[data-machine="brawler"]').hasAttribute('data-loop')), false, 'the machine left behind stops');
+});
+
+test('Escape leaves a game for the arcade, once the controls card it may have open is put away', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  await page.route('**/*.wasm', () => {});
+  await page.goto(`${origin}/meteors/index.html`);
+  await page.waitForFunction(() => typeof BlipController === 'object');
+  await page.locator('#card-button').click();
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-card'));
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-card'));
+  assert.equal(new URL(page.url()).pathname, '/meteors/index.html', 'the first Escape only closes the card');
+  await page.keyboard.press('Escape');
+  await page.waitForURL(`${origin}/index.html`);
+  await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'meteors/index.html');
+});
+
+test('with reduced motion Up steps up at once, and Escape steps back', async (t) => {
+  const { page } = await openArcade(t, 1280);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const pose = () => page.evaluate(() => document.querySelector('.card-focused').style.transform);
+  const standing = await pose();
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await page.evaluate(() => document.getElementById('game-grid').hasAttribute('data-stepped-up')), true);
+  assert.equal(await page.evaluate(() => document.getElementById('game-grid').hasAttribute('data-aisle-moving')), false);
+  assert.notEqual(await pose(), standing, 'the view leans in');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.evaluate(() => document.getElementById('game-grid').hasAttribute('data-stepped-up')), false);
+  assert.equal(await pose(), standing);
+});
+
+test('the step into a machine ends on the screen of its game page, which is that machine up close', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });
+  await page.route('**/*.wasm', () => {});
+  await page.goto(`${origin}/bouncer/index.html`);
+  await page.waitForFunction(() => typeof BlipController === 'object');
+  const screen = await page.evaluate(() => {
+    const r = document.getElementById('glcanvas').getBoundingClientRect();
+    return { box: [r.left, r.top, r.width, r.height], machine: document.documentElement.getAttribute('data-machine'),
+      trim: getComputedStyle(document.getElementById('arcade-bezel')).borderTopColor };
+  });
+  assert.equal(screen.machine, 'bouncer', 'the game page wears its machine\'s colours');
+  await page.goto(`${origin}/index.html`);
+  await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') && !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  const aim = await page.evaluate(() => { const b = launchScreen(); return [b.left, b.top, b.width, b.height]; });
+  aim.forEach((v, i) => assert.ok(Math.abs(v - screen.box[i]) < 1, `the zoom aims at ${aim}, the screen is at ${screen.box}`));
 });
