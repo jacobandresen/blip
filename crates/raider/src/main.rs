@@ -3383,9 +3383,6 @@ const ENGINE_WAV: [&[u8]; 5] = [
     blip::wav!("engine4"),
 ];
 
-
-
-
 #[blip::macroquad::main(conf)]
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
@@ -3450,19 +3447,14 @@ async fn main() {
     // so a long level doesn't hear the same ~40s on repeat.
     let mut music = Jukebox::new("RAIDER", &["LOOP1", "LOOP2"]);
 
-    let mut shot_frame: u32 = 0;
+    if blip.screenshot_mode {
+        g.start_game();
+    }
 
     loop {
         let dt = blip.delta_time;
 
         music.rotate(dt);
-
-        if blip.screenshot_mode {
-            shot_frame += 1;
-            if shot_frame == 1 {
-                g.start_game();
-            }
-        }
 
         #[cfg(not(target_arch = "wasm32"))]
         if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }

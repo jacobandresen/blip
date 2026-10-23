@@ -745,8 +745,6 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("SERPENT", WIN_W, WIN_H)
 }
 
-
-
 #[blip::macroquad::main(conf)]
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
@@ -763,17 +761,12 @@ async fn main() {
     };
     let mut music = Jukebox::new("SERPENT", &["SLITHER", "FRENZY"]);
 
-    let mut shot_frame: u32 = 0;
+    if blip.screenshot_mode {
+        g.start_game();
+    }
 
     loop {
         let dt = blip.delta_time;
-
-        if blip.screenshot_mode {
-            shot_frame += 1;
-            if shot_frame == 1 {
-                g.start_game();
-            }
-        }
 
         #[cfg(not(target_arch = "wasm32"))]
         if blip::bot::active() { bot::drive(&g); }

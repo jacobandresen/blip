@@ -1046,7 +1046,6 @@ const BRICK_BREAK_WAV: [&[u8]; 3] = [
     blip::wav!("brick_break_2"),
 ];
 
-
 async fn load_takes(wavs: &[&'static [u8]; 3]) -> [blip::BlipSound; 3] {
     [
         blip::audio::load_sound(wavs[0]).await,
@@ -1054,7 +1053,6 @@ async fn load_takes(wavs: &[&'static [u8]; 3]) -> [blip::BlipSound; 3] {
         blip::audio::load_sound(wavs[2]).await,
     ]
 }
-
 
 #[blip::macroquad::main(conf)]
 async fn main() {
@@ -1092,22 +1090,17 @@ async fn main() {
     // Two tunes, alternating by level.
     let mut music = Jukebox::new("BOUNCER", &["BOUNCE", "REBOUND"]);
 
-    let mut shot_frame: u32 = 0;
+    if blip.screenshot_mode {
+        g.start_game();
+        for (i, kind) in [DropKind::Wide, DropKind::Narrow, DropKind::Slow, DropKind::Life, DropKind::Multi].into_iter().enumerate() {
+            pool_spawn(&mut g.drops, Drop { x: 70.0 + i as f32 * 75.0, y: 250.0 + i as f32 * 22.0, active: true, kind });
+        }
+    }
 
     loop {
         let dt = blip.delta_time;
 
         music.play(if g.state == State::Title { 0 } else { (g.sess.level as usize + 1) % 2 });
-
-        if blip.screenshot_mode {
-            shot_frame += 1;
-            if shot_frame == 1 {
-                g.start_game();
-                for (i, kind) in [DropKind::Wide, DropKind::Narrow, DropKind::Slow, DropKind::Life, DropKind::Multi].into_iter().enumerate() {
-                    pool_spawn(&mut g.drops, Drop { x: 70.0 + i as f32 * 75.0, y: 250.0 + i as f32 * 22.0, active: true, kind });
-                }
-            }
-        }
 
         g.touch_x = blip.touch(0).map(|p| p.x);
         #[cfg(not(target_arch = "wasm32"))]

@@ -1130,8 +1130,6 @@ fn conf() -> blip::macroquad::window::Conf {
     window_conf("METEORS", WIN_W, WIN_H)
 }
 
-
-
 #[blip::macroquad::main(conf)]
 async fn main() {
     let mut blip = Blip::new(WIN_W, WIN_H);
@@ -1167,27 +1165,22 @@ async fn main() {
     };
     let mut thrust_snd_t = 0.0f32;
 
-    let mut shot_frame: u32 = 0;
+    if blip.screenshot_mode {
+        g.start_game();
+        // The card's picture: a late wave, flowers and haze and all.
+        g.sess.level = 8;
+        g.start_wave();
+        g.wave_t = WAVE_BANNER_SECS;
+        g.ship.angle = -0.4;
+        g.ship.thrusting = true;
+        g.invuln_t = 0.0;
+        spawn_bullet(&mut g.bullets, g.ship.x, g.ship.y - 40.0, 0.0, -BULLET_SPEED, true);
+    }
 
     loop {
         let dt = blip.delta_time;
 
         music.play(if g.state != State::Title && g.sess.level >= STORM_WAVE { 1 } else { 0 });
-
-        if blip.screenshot_mode {
-            shot_frame += 1;
-            if shot_frame == 1 {
-                g.start_game();
-                // The card's picture: a late wave, flowers and haze and all.
-                g.sess.level = 8;
-                g.start_wave();
-                g.wave_t = WAVE_BANNER_SECS;
-                g.ship.angle = -0.4;
-                g.ship.thrusting = true;
-                g.invuln_t = 0.0;
-                spawn_bullet(&mut g.bullets, g.ship.x, g.ship.y - 40.0, 0.0, -BULLET_SPEED, true);
-            }
-        }
 
         #[cfg(not(target_arch = "wasm32"))]
         if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }
