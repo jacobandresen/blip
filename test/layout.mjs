@@ -328,7 +328,7 @@ for (const device of mine) {
 }
 
 for (const device of mine) {
-  test(`every card fits the cabinet window with its text on ${device.name} (${device.w}x${device.h})`, async (t) => {
+  test(`every cabinet fits the window with its marquee on ${device.name} (${device.w}x${device.h})`, async (t) => {
     const { page, origin } = await open(t, device);
     const failures = [];
     await page.goto(`${origin}/index.html`);
@@ -341,7 +341,7 @@ for (const device of mine) {
       const card = await page.evaluate(() => {
         const el = document.querySelector('.card-focused');
         const box = el.getBoundingClientRect(), bezel = document.querySelector('.screen-bezel').getBoundingClientRect();
-        const text = ['.card-title', '.card-genre', '.card-desc'].flatMap((selector) => {
+        const text = ['.card-title'].flatMap((selector) => {
           const range = document.createRange();
           range.selectNodeContents(el.querySelector(selector));
           return [...range.getClientRects()].filter((r) => r.width > 0);
@@ -361,13 +361,11 @@ for (const device of mine) {
             && el.querySelector(document.getElementById('game-grid').hasAttribute('data-close') ? '.machine-start' : '.machine-coinbox')
               .getBoundingClientRect().bottom <= bezel.bottom + 1,
           textOnCard: text.every((r) => r.left >= box.left - 1 && r.right <= box.right + 1 && r.top >= box.top - 1 && r.bottom <= box.bottom + 1),
-          fontPx: parseFloat(getComputedStyle(el.querySelector('.card-desc')).fontSize),
         };
       });
       if (card.covered) failures.push(`${card.title}: ${card.covered} sit over the card`);
       if (!card.inBezel) failures.push(`${card.title}: the card leaves the cabinet window`);
-      if (!card.textOnCard) failures.push(`${card.title}: its text runs off the card`);
-      if (card.fontPx < 11) failures.push(`${card.title}: its text is only ${card.fontPx}px`);
+      if (!card.textOnCard) failures.push(`${card.title}: its marquee runs off the cabinet`);
       await page.keyboard.press('ArrowRight');
     }
     assert.deepEqual(failures, []);

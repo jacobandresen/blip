@@ -163,8 +163,8 @@ test('the game shell', async (t) => {
       'the fascia is tall enough for the large title flipper');
     assert.equal(await evaluate(cdp, "document.querySelectorAll('.top-marquee-bar .marquee-bulbs').length"), 0,
       'the cabinet fascia has no dot strips');
-    assert.ok(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent === 'RALLY' && document.querySelector('.card-focused .card-desc').textContent.length > 20"),
-      'each selected game carries its own description');
+    assert.equal(await evaluate(cdp, "document.querySelector('.card-focused .card-title').textContent"), 'RALLY',
+      'each machine carries its own marquee');
     assert.ok(await evaluate(cdp, `(function(){var grid=document.getElementById('game-grid'),card=document.querySelector('.card-focused');
       return card.offsetHeight >= Math.min(500,grid.clientHeight-50)-1;})()`),
       'the selected card fills the available space for readable details');

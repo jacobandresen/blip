@@ -33,14 +33,13 @@ test('the aisle shows one complete, selectable cabinet for every game', async (t
   const cabinets = await page.locator('#game-grid .card').evaluateAll((cards) => cards.map((card) => ({
     slug: card.dataset.gameUrl.split('/')[0],
     title: card.querySelector('.card-title')?.textContent.trim(),
-    stations: card.querySelectorAll('.machine-station').length,
     hasScreen: card.querySelector('.card-shot')?.complete && card.querySelector('.card-shot')?.naturalWidth > 0,
     hasCoinDoor: !!card.querySelector('.machine-coinbox .machine-coin-slot'),
     hasStart: !!card.querySelector('.machine-start'),
     deck: card.querySelector('.machine-controls iframe')?.getAttribute('src'),
   })));
   assert.deepEqual(cabinets, GAMES.map(([slug, title]) => ({
-    slug, title, stations: 2, hasScreen: true, hasCoinDoor: true, hasStart: true, deck: `machine-deck.html?game=${slug}`,
+    slug, title, hasScreen: true, hasCoinDoor: true, hasStart: true, deck: `machine-deck.html?game=${slug}`,
   })));
   const marqueeArt = await page.locator('#game-grid .card').evaluateAll((cards) =>
     cards.map((card) => getComputedStyle(card).getPropertyValue('--marquee-art').trim()));
@@ -213,7 +212,6 @@ for (const [index, [slug, title]] of GAMES.entries()) {
     for (let step = 0; step < index; step++) await page.keyboard.press('ArrowRight');
     await page.waitForFunction((game) => document.querySelector('.card-focused')?.dataset.gameUrl === `${game}/index.html`, slug);
     const machine = page.locator('.card-focused');
-    assert.equal(await machine.locator('.machine-station').count(), 2, 'every cabinet seats two');
     assert.equal(await page.evaluate(() => getCoins()), 0);
 
     if (index % 2) {

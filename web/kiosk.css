@@ -2160,7 +2160,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
   box-shadow:0 0 5px 2px #56bdf899,0 0 13px #56bdf866,inset 0 0 2px #fff;
 }
 @property --on { syntax: '<number>'; inherits: true; initial-value: 1; }
-@keyframes lamp-join { 0%, 100% { --on: 0.15; } 50% { --on: 1; } }
 
 :root[data-layout="landscape"] .deck-credit-lamp,
 :root[data-layout="landscape"] .deck-second-lamp {top:56px;transform:translateX(-50%)}
@@ -2397,7 +2396,6 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
    and a carriage bolt in each top corner; with two stations each half keeps
    its outer bolt. */
 :is(#topbar, .kiosk-bar-main) {
-  --bolt: #0b0b0c;
   --bolt-l: radial-gradient(circle at 12px 11px, #9a9aa0 0 0.8px, #4a4a4f 1.8px, #19191b 3.2px, rgba(0, 0, 0, 0.75) 3.9px, transparent 4.8px);
   --bolt-r: radial-gradient(circle at calc(100% - 12px) 11px, #9a9aa0 0 0.8px, #4a4a4f 1.8px, #19191b 3.2px, rgba(0, 0, 0, 0.75) 3.9px, transparent 4.8px);
 }
