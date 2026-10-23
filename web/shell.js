@@ -1423,7 +1423,6 @@ window.addEventListener('keydown', function (e) {
   if (twoUp) window.blipSetMode = function (code) {
     open = code === 2;
     versus = code === 1;
-    applyPlayers();
     if (open) root.setAttribute('data-open', '');
     else root.removeAttribute('data-open');
     if (versus) root.setAttribute('data-versus', '');
@@ -1445,10 +1444,6 @@ window.addEventListener('keydown', function (e) {
 
   // Both stations stay on the panel in every mode (deck.js), so player two can join at any time.
   var open = false;
-  function applyPlayers() {
-    root.setAttribute('data-players', '2');
-  }
-  window.addEventListener('resize', applyPlayers);
 
   var hint = null, hintDismissed = false;
   function rotateHint() {

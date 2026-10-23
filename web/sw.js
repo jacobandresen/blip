@@ -1,4 +1,4 @@
-var CACHE = "blip-v713";
+var CACHE = "blip-v714";
 
 var ASSETS = [
   "/blip/",
