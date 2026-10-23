@@ -14,16 +14,38 @@ const BARS: usize = 16;
 const LIFT_BAR: usize = BARS / 2;
 const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
 
+struct Loop {
+    buf: Vec<f32>,
+    rng: Rng,
+    step_ms: f32,
+    step_samples: usize,
+    kick_offsets: Vec<usize>,
+}
+
+impl Loop {
+    /// Sixteenth-note steps at `bpm`, with a quarter second of tail.
+    fn new(bpm: f32, steps: usize, rng: Rng) -> Self {
+        let step_ms = 60_000.0 / bpm / 4.0;
+        blip::xm::tempo(bpm);
+        let step_samples = (SAMPLE_RATE as f32 * step_ms / 1000.0) as usize;
+        let buf = vec![0f32; step_samples * steps + SAMPLE_RATE as usize / 4];
+        Loop { buf, rng, step_ms, step_samples, kick_offsets: Vec::new() }
+    }
+}
+
+/// Ducks the mix under the kicks (`duck` deep, released over `release` steps), lays the kicks on top and limits.
+fn mix(mut buf: Vec<f32>, kicks: &[usize], step_ms: f32, duck: f32, release: f32, kick_level: f32) -> Vec<u8> {
+    sidechain_duck(&mut buf, kicks, duck, step_ms * release);
+    for &off in kicks {
+        kick(&mut buf, off, kick_level);
+    }
+    low_pass(&mut buf, 6500.0); // techno: the hats and the lead keep their edge
+    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+}
+
 /// Four-on-the-floor rally loop with Em–Am hook, octave harmony and a final hat roll.
 pub fn loop1_wav() -> Vec<u8> {
-    let sr = SAMPLE_RATE as f32;
-    let step_ms = 60_000.0 / BPM / 4.0;
-    blip::xm::tempo(BPM);
-    let step_samples = (sr * step_ms / 1000.0) as usize;
-    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0f32; total];
-    let mut rng = Rng(0xFA57_CA12);
-    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 4);
+    let Loop { mut buf, mut rng, step_ms, step_samples, mut kick_offsets } = Loop::new(BPM, TOTAL_STEPS, Rng(0xFA57_CA12));
 
     // E - A, a two-chord vamp, one root every 2 bars.
     let bass_roots = [82.41_f32, 110.0]; // E2, A2
@@ -67,29 +89,14 @@ pub fn loop1_wav() -> Vec<u8> {
     // arrives as a change rather than as the loop restarting.
     lift_fill(&mut buf, (LIFT_BAR - 1) * 16 * step_samples, step_samples, &mut rng, 0.24);
 
-    sidechain_duck(&mut buf, &kick_offsets, 0.55, step_ms * 0.85);
-    for &off in &kick_offsets {
-        kick(&mut buf, off, 0.95);
-    }
-
-    low_pass(&mut buf, 6500.0); // techno: the hats and the lead keep their edge
-    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+    mix(buf, &kick_offsets, step_ms, 0.55, 0.85, 0.95)
 }
 
 /// Turbo Boost: syncopated bass and bright `lead_stab` hook in a new key.
 pub fn loop2_wav() -> Vec<u8> {
-    const BPM: f32 = 146.0;
-    const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 16;
     const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
-    let sr = SAMPLE_RATE as f32;
-    let step_ms = 60_000.0 / BPM / 4.0;
-    blip::xm::tempo(BPM);
-    let step_samples = (sr * step_ms / 1000.0) as usize;
-    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0f32; total];
-    let mut rng = Rng(0x7080_0002);
-    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 4);
+    let Loop { mut buf, mut rng, step_ms, step_samples, mut kick_offsets } = Loop::new(146.0, TOTAL_STEPS, Rng(0x7080_0002));
 
     // C - Am, a two-chord vamp, one root every 2 bars.
     let bass_roots = [65.41_f32, 55.00]; // C2, A1
@@ -120,29 +127,14 @@ pub fn loop2_wav() -> Vec<u8> {
         }
     }
 
-    sidechain_duck(&mut buf, &kick_offsets, 0.55, step_ms * 0.8);
-    for &off in &kick_offsets {
-        kick(&mut buf, off, 0.95);
-    }
-
-    low_pass(&mut buf, 6500.0); // techno: the hats and the lead keep their edge
-    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+    mix(buf, &kick_offsets, step_ms, 0.55, 0.8, 0.95)
 }
 
 /// Night Circuit: half-time kick, held bass notes and a spaced `lead_stab` motif.
 pub fn loop3_wav() -> Vec<u8> {
-    const BPM: f32 = 108.0;
-    const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 12;
     const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
-    let sr = SAMPLE_RATE as f32;
-    let step_ms = 60_000.0 / BPM / 4.0;
-    blip::xm::tempo(BPM);
-    let step_samples = (sr * step_ms / 1000.0) as usize;
-    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0f32; total];
-    let mut rng = Rng(0x7080_0003);
-    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 8);
+    let Loop { mut buf, mut rng, step_ms, step_samples, mut kick_offsets } = Loop::new(108.0, TOTAL_STEPS, Rng(0x7080_0003));
 
     // Dm - Bb - F - C, one held chord (as a bass note) per bar.
     let roots = [73.42_f32, 58.27, 87.31, 65.41]; // D2 Bb1 F2 C2
@@ -170,29 +162,14 @@ pub fn loop3_wav() -> Vec<u8> {
         }
     }
 
-    sidechain_duck(&mut buf, &kick_offsets, 0.3, step_ms * 2.0);
-    for &off in &kick_offsets {
-        kick(&mut buf, off, 0.75);
-    }
-
-    low_pass(&mut buf, 6500.0); // techno: the hats and the lead keep their edge
-    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+    mix(buf, &kick_offsets, step_ms, 0.3, 2.0, 0.75)
 }
 
 /// Photo Finish: a `riser` builds through the last two bars before a hard cut to the top.
 pub fn loop4_wav() -> Vec<u8> {
-    const BPM: f32 = 140.0;
-    const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 18;
     const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
-    let sr = SAMPLE_RATE as f32;
-    let step_ms = 60_000.0 / BPM / 4.0;
-    blip::xm::tempo(BPM);
-    let step_samples = (sr * step_ms / 1000.0) as usize;
-    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0f32; total];
-    let mut rng = Rng(0x7080_0004);
-    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 4);
+    let Loop { mut buf, mut rng, step_ms, step_samples, mut kick_offsets } = Loop::new(140.0, TOTAL_STEPS, Rng(0x7080_0004));
 
     // D - A, a two-chord vamp, one root every 2 bars.
     let bass_roots = [73.42_f32, 110.00]; // D2, A2
@@ -225,29 +202,14 @@ pub fn loop4_wav() -> Vec<u8> {
         }
     }
 
-    sidechain_duck(&mut buf, &kick_offsets, 0.6, step_ms * 0.9);
-    for &off in &kick_offsets {
-        kick(&mut buf, off, 0.95);
-    }
-
-    low_pass(&mut buf, 6500.0); // techno: the hats and the lead keep their edge
-    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+    mix(buf, &kick_offsets, step_ms, 0.6, 0.9, 0.95)
 }
 
 /// Pit Stop Groove: syncopated bass and a call-and-response `lead_stab` hook.
 pub fn loop5_wav() -> Vec<u8> {
-    const BPM: f32 = 122.0;
-    const STEPS_PER_BAR: usize = 16;
     const BARS: usize = 16;
     const TOTAL_STEPS: usize = BARS * STEPS_PER_BAR;
-    let sr = SAMPLE_RATE as f32;
-    let step_ms = 60_000.0 / BPM / 4.0;
-    blip::xm::tempo(BPM);
-    let step_samples = (sr * step_ms / 1000.0) as usize;
-    let total = step_samples * TOTAL_STEPS + SAMPLE_RATE as usize / 4;
-    let mut buf = vec![0f32; total];
-    let mut rng = Rng(0x7080_0005);
-    let mut kick_offsets = Vec::with_capacity(TOTAL_STEPS / 4);
+    let Loop { mut buf, mut rng, step_ms, step_samples, mut kick_offsets } = Loop::new(122.0, TOTAL_STEPS, Rng(0x7080_0005));
 
     // G mixolydian vamp: root off the beat, not on it.
     let root = 98.00_f32; // G2
@@ -282,13 +244,7 @@ pub fn loop5_wav() -> Vec<u8> {
         }
     }
 
-    sidechain_duck(&mut buf, &kick_offsets, 0.5, step_ms * 0.9);
-    for &off in &kick_offsets {
-        kick(&mut buf, off, 0.9);
-    }
-
-    low_pass(&mut buf, 6500.0); // techno: the hats and the lead keep their edge
-    encode_pcm16_mono(&soft_limit_to_pcm16(&buf, MIX_KNEE))
+    mix(buf, &kick_offsets, step_ms, 0.5, 0.9, 0.9)
 }
 
 // ---- effects: a pluck ----------------------------------------------------
