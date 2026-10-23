@@ -17,7 +17,7 @@
 .paint-side select{width:100%;padding:2px;font-size:inherit}
 .paint-sheet canvas{display:block;width:100%;height:100%;image-rendering:pixelated;touch-action:none;cursor:crosshair}
 .paint-side{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:3px 1px}
-.paint-resolution,.paint-side small{font:inherit}
+.paint-side small{font:inherit}
 .paint-side #paint-palette{display:grid;grid-template-columns:repeat(4,clamp(11px,2.6vw,20px));gap:3px}
 .paint-swatch{width:clamp(11px,2.6vw,20px);height:clamp(11px,2.6vw,20px);padding:0!important;border:1px solid var(--ink)!important;background:var(--swatch)!important}
 .paint-swatch.selected{outline:2px solid var(--ink)!important;outline-offset:1px}

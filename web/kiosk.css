@@ -1095,38 +1095,10 @@ body:has(.top-marquee-bar) #kiosk-insert-btn {
 
 /* A flag is a round badge like the avatars: dimmed until it is the page's
    language, which gets the green ring. */
-.lang-btn {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border-radius: 50%;
-  border: 1px solid #222;
-  background: radial-gradient(circle at 50% 30%, #1d1d23, #09090c 72%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-  filter: grayscale(55%) brightness(0.7);
-  transition: border-color .2s, box-shadow .2s, filter .2s;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-}
-.lang-btn:hover { filter: none; border-color: #4a4a52; }
-.lang-btn.active {
-  filter: none;
-  border-color: #32c832;
-  box-shadow: 0 0 12px rgba(50,200,50,0.45);
-  cursor: default;
-}
 
 /* Phones — smaller avatars so they sit inside a game card's left padding
    zone on the landing page. After the 44px base so this @media wins. */
-@media (max-width: 600px) {
-  .lang-btn { width: 32px; height: 32px; }
-  .lang-btn { font-size: 18px; }
-}
+
 
 /* ======================================================================
    Two-player deck
