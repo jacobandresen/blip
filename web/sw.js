@@ -1,4 +1,4 @@
-var CACHE = "blip-v722";
+var CACHE = "blip-v723";
 
 var ASSETS = [
   "/blip/",
@@ -208,6 +208,9 @@ self.addEventListener("fetch", function (e) {
   if (e.request.method !== "GET") return;
   var url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;
+  // PR previews live inside this worker's scope; cache-first would pin a
+  // preview to its first version.
+  if (url.pathname.indexOf("/pr-preview/") !== -1) return;
   var key = url.origin + url.pathname;
   e.respondWith(
     caches.open(CACHE).then(function (cache) {

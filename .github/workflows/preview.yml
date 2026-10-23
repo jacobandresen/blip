@@ -1,0 +1,32 @@
+name: PR preview
+
+# Each pull request is served at /blip/pr-preview/pr-<number>/ from the
+# gh-pages branch, and removed when it closes.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: preview-${{ github.event.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    # A fork's token is read-only and cannot push to gh-pages.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Blank config: a preview keeps its scores off the live leaderboard.
+      - name: Disable the leaderboard
+        run: |
+          echo "window.BLIP_SUPABASE = { url: '', anonKey: '' };" > web/blip_config.js
+      - uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: web/
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview

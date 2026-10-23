@@ -55,6 +55,7 @@ middle. Change one and the other must follow.
 | The manual's last page, the operators (a `data-manual-sheet`: never split, its type shrinks to fit) | `web/about.html` |
 | A game's manual pages: screenshot, blurb, controls, tip | `web/controls.html`: a `data-side="left"` and a `data-side="right"` section per game |
 | The controls card (the "?" under the top bar, its arm and whirr): the cabinet's welcome and each game's keys (`controls`, `touchControls` in `BLIP_GAMES`) | `web/kiosk.js`, `web/kiosk.css` |
+| Publishing the site; PR previews | `.github/workflows/pages.yml`, `.github/workflows/preview.yml` |
 | Wasm <-> JS bridge (`blip_spend_coin`) | `web/blip_bridge.js` |
 | macroquad JS runtime (vendored, do not edit) | `web/mq_js_bundle.js` |
 | Game logic, rendering, audio (Rust side) | `crates/<name>/src/main.rs` |
@@ -113,6 +114,22 @@ sentence-case headings, "tap" and "touch and hold", "Home Screen".
 rustup target add wasm32-unknown-unknown   # one-time
 ./build_web.sh                              # recompile all nine games
 ```
+
+### Deploying and PR previews
+
+Pages serves the `gh-pages` branch, which only the workflows write. A push to
+`main` runs `pages.yml`: migrations, then `web/` to the branch's root, leaving
+`pr-preview/` alone. Each same-repo pull request is published by `preview.yml`
+to `pr-preview/pr-<number>/` and removed on close.
+
+A preview shares production's origin, so:
+
+- it registers no service worker, and production's `sw.js` passes
+  `/pr-preview/` requests to the network (`blip_core.js`, `sw.js`);
+- its `blip_config.js` is blank, so its scores never reach the live leaderboard;
+- local storage (coins, mute, home order) is shared with the live site.
+
+Any change under `web/` still bumps `CACHE` in `web/sw.js` for production.
 
 ### Tests
 

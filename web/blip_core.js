@@ -350,6 +350,12 @@ window.addEventListener('beforeinstallprompt', function (e) {
 });
 
 // The worker lives beside this script, whichever page (or game app) loads it.
-if ('serviceWorker' in navigator && document.querySelector('link[rel=manifest]')) {
+// A PR preview shares production's origin and caches: its worker would wipe
+// production's cache on activate, so previews run without one.
+if ('serviceWorker' in navigator && /\/pr-preview\//.test(location.pathname)) {
+  navigator.serviceWorker.getRegistrations().then(function (regs) {
+    regs.forEach(function (r) { if (/\/pr-preview\//.test(r.scope)) r.unregister(); });
+  });
+} else if ('serviceWorker' in navigator && document.querySelector('link[rel=manifest]')) {
   navigator.serviceWorker.register(new URL('sw.js', BLIP_CORE_SRC).href);
 }
