@@ -42,6 +42,12 @@ python3 -m http.server -d web 8080
 
 The build places each game's `index.wasm` in `web/<game>/`; the shared shell and macroquad runtime are served from `web/`.
 
+### Deployment and previews
+
+GitHub Pages serves the `gh-pages` branch. A push to `main` applies new database migrations, then publishes `web/` to the branch's root ([pages.yml](.github/workflows/pages.yml)); the site is at <https://jacobandresen.github.io/blip/>.
+
+Each pull request from a branch of this repository gets a preview at `https://jacobandresen.github.io/blip/pr-preview/pr-<number>/`, linked in a comment on the pull request and removed when it closes ([preview.yml](.github/workflows/preview.yml)). Previews have no high scores and no offline cache, and share saved settings (coins, sound, home-screen order) with the live site. Pull requests from forks get no preview.
+
 ### Kiosk controls
 
 Use the stick or arrows to select a game and fire to start. Fire, Enter or `5` inserts a coin; Backspace returns to the cabinet; `M` toggles sound. The fullscreen choice persists across pages, and idle games return to the cabinet.
