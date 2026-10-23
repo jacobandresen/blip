@@ -1784,6 +1784,13 @@
         wakeAisle();
         suppressPointerClick();
       }
+      // Walking a step at a time, a swipe moves one machine per machine-width it covered.
+      function stepSwipe(start,dx,dy) {
+        if(!stepWalk.matches || !swipeEnough(dx,dy))return false;
+        for(var n=Math.max(1,Math.round(Math.abs(dx)/start.unit));n>0;n--)move(dx<0?1:-1);
+        suppressPointerClick();
+        return true;
+      }
       track.addEventListener('pointerup', function (e) {
         var start=touchStart;
         touchStart=null;
@@ -1791,18 +1798,11 @@
         if(start.dragging){endDrag(start,e);e.preventDefault();return;}
         if(cardInFlight || !manualOverlay.hidden)return;
         var dx=e.clientX-start.x,dy=e.clientY-start.y;
-        if(stepWalk.matches && swipeEnough(dx,dy)) {
-          var steps=Math.max(1,Math.round(Math.abs(dx)/start.unit));
-          for(var n=0;n<steps;n++)move(dx<0?1:-1);
-          e.preventDefault();
-          suppressPointerClick();
-          return;
-        }
-        if(Math.hypot(dx,dy)>12)return;
-        if(e.pointerType!=='touch')return;
-        if(start.card&&!start.card.classList.contains('card-focused')){selectByTouch(start.card);e.preventDefault();suppressPointerClick();return;}
-        if(start.screen){activate();e.preventDefault();suppressPointerClick();return;}
-        selectByTouch(start.card);
+        if(stepSwipe(start,dx,dy)){e.preventDefault();return;}
+        if(Math.hypot(dx,dy)>12 || e.pointerType!=='touch')return;
+        // A tap on a machine's screen plays it, once that machine is the one in front.
+        if(start.screen && !(start.card&&!start.card.classList.contains('card-focused')))activate();
+        else selectByTouch(start.card);
         e.preventDefault();
         suppressPointerClick();
       });
@@ -1812,12 +1812,7 @@
         if(!start || start.id!==e.pointerId)return;
         if(start.dragging){endDrag(start,e);return;}
         if(e.pointerType!=='touch' || cardInFlight || !manualOverlay.hidden)return;
-        var dx=e.clientX-start.x,dy=e.clientY-start.y;
-        if(stepWalk.matches && swipeEnough(dx,dy)) {
-          var steps=Math.max(1,Math.round(Math.abs(dx)/start.unit));
-          for(var n=0;n<steps;n++)move(dx<0?1:-1);
-          suppressPointerClick();
-        }
+        stepSwipe(start,e.clientX-start.x,e.clientY-start.y);
       });
       track.addEventListener('click',function(e){
         if(suppressClick){suppressClick=false;window.clearTimeout(suppressClickTimer);return;}
