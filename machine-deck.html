@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Machine deck</title>
+  <!-- One game's control deck, built and styled exactly as on its game page; each cabinet in the aisle shows it.
+       The coin mechanism is the cabinet's own door, below the deck. -->
+  <script>window.BLIP_DECK_GAME = new URLSearchParams(location.search).get('game'); document.documentElement.setAttribute('data-deck-preview','');</script>
+  <script src="blip_core.js?v=8"></script>
+  <link rel="stylesheet" href="kiosk.css?v=158">
+  <link rel="stylesheet" href="shell.css?v=109">
+  <link rel="stylesheet" href="wear.css?v=13">
+  <style>
+    html,body {background:transparent!important;overflow:hidden}
+    html[data-deck-preview] .stick-handle {transition:transform 2.48s cubic-bezier(.4,0,.2,1)}
+    body::before,body::after,.manual-pocket {display:none!important}
+  </style>
+</head>
+<body class="cabinet-page">
+  <div id="topbar" class="kiosk-bar">
+   <div class="deck-panel">
+    <div id="paddle-dial"><div class="dial-cap"><div id="dial-hand"></div></div><div id="dial-label">P1</div></div>
+    <div id="paddle-dial-p2"><div class="dial-cap"><div id="dial-hand-p2"></div></div><div id="dial-label-p2">2P</div></div>
+   </div>
+  </div>
+  <script>if (window.BLIP_DECK_GAME === 'rally') document.documentElement.setAttribute('data-dials', '');</script>
+  <script src="deck.js?v=16"></script>
+</body>
+</html>

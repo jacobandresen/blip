@@ -1,0 +1,23 @@
+.tune{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;gap:5px;overflow:hidden;padding:clamp(5px,1vw,12px);background:var(--blue);color:var(--ink);font:clamp(9px,1.45vw,16px)/1.24 'Courier New',monospace;text-shadow:0 0 4px #fff9ad77}
+.tune[hidden]{display:none!important}
+.tune-head,.tune-controls{display:flex;align-items:center;gap:5px;min-height:1.6em;padding-bottom:4px;border-bottom:1px solid var(--ink)}
+.tune-head>strong{margin-right:auto;font:inherit}
+.tune label{display:flex;align-items:center;gap:3px;white-space:nowrap}
+.tune input,.tune select,.tune button{min-width:0;padding:3px 5px;border:1px solid var(--ink);border-radius:0;background:var(--blue);color:var(--ink);font:inherit;text-transform:uppercase;text-shadow:inherit}
+.tune-head input{width:min(24vw,180px)}
+.tune-controls input{width:4em}
+.tune button{cursor:pointer}
+.tune button:hover,.tune button:focus-visible,.tune-grid button.active{background:#243bb6;outline:1px solid var(--ink);outline-offset:1px}
+.tune-grid{display:grid;grid-template-columns:2.7em repeat(16,minmax(0,1fr));gap:2px;align-content:center;flex:1;min-height:0}
+.tune-grid span,.tune-grid button{display:grid;place-items:center;min-width:0;height:1.65em;padding:0;border:1px solid #a9b5c977;background:#101da344;color:var(--ink);font:inherit;font-size:clamp(7px,1vw,11px);overflow:hidden}
+.tune-grid .tune-lane{justify-content:start;padding-left:3px}
+.tune-grid .tune-beat{border-left-color:var(--ink)}
+.tune-grid button{cursor:pointer}
+.tune-grid button.has-note{background:#243bb6}
+.tune footer{min-height:1.5em;padding:3px 5px;border-top:1px solid var(--ink);font:inherit}
+.tune-hint{margin:0;text-align:center;font:inherit}
+.tune-confirm{position:absolute;inset:0;z-index:2;display:grid;place-items:center;background:#101da3cc}
+.tune-confirm[hidden]{display:none}
+.tune-confirm>div{min-width:min(80%,280px);padding:14px;border:2px solid var(--ink);background:var(--blue);text-align:center}
+.tune-confirm p{margin:12px 0}
+@media(max-width:650px){.tune{font-size:clamp(8px,2.35vw,13px);padding:4px;gap:3px}.tune-head,.tune-controls{gap:2px;flex-wrap:wrap}.tune-head input{width:17vw}.tune-grid{grid-template-columns:2.2em repeat(16,minmax(0,1fr));gap:1px}.tune-grid span,.tune-grid button{height:1.5em;font-size:7px}.tune input,.tune select,.tune button{padding:2px 3px}}

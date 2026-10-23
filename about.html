@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ABOUT — BLIP ARCADE</title>
+  <!-- The book and the Guide read this page's words; a visitor is sent to the book. -->
+  <script>location.replace('index.html?manual=about')</script>
+</head>
+<body>
+<div class="manual-leaf">
+<div class="page">
+
+  <h1>BLIP</h1>
+  <h2>ABOUT THIS EXPERIMENT</h2>
+
+  <section class="intro">
+    <p>
+        Blip Arcade is an experiment in making software together with machines. Every game, every line of code and every pixel of the interface was made in conversation with Claude (Anthropic), Codex (OpenAI) and GitHub Copilot (GitHub). The human brought the ideas; the machines did most of the typing.
+      </p>
+    <p>
+        The question behind it: how far can a conversation go before it becomes a piece of software? Quite far, as it turns out.
+      </p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="thoughts-label">&#x25BA; A tribute, not a copy</div>
+    <div class="thoughts-body">
+      <p>
+        Blip Arcade is a tribute to the golden age of arcade games: Pong, Breakout, Snake, Space Invaders, 1942 and the many games they inspired. The studios and engineers who made the originals shaped the whole history of interactive entertainment.
+      </p>
+      <p>
+        The games here are new works inspired by those classics. They contain no code, graphics or sound from the originals; everything was written from scratch for this project.
+      </p>
+      <p>
+        Blip Arcade is strictly non-commercial. It charges no admission, serves no advertising and keeps nothing about you but the name you enter on a high-score table. It exists as a technical and creative experiment, and as a small thank-you to the people who invented the medium.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="thoughts-label">&#x25BA; Add a game</div>
+    <div class="thoughts-body">
+      <p>
+        Want to add a game? Pull requests are welcome at <a class="inline-link" href="https://github.com/jacobandresen/blip" target="_blank" rel="noopener">github.com/jacobandresen/blip</a>. The Blip library takes care of the <a href="https://macroquad.rs/">Macroquad</a> and Rust plumbing, so you can concentrate on the game itself.
+      </p>
+      <p>
+        For inspiration, look to the <a class="inline-link" href="https://en.wikipedia.org/wiki/Golden_age_of_arcade_video_games" target="_blank" rel="noopener">golden age of arcade video games</a> (roughly 1978–1986), which produced hundreds of titles worth revisiting: Asteroids, Centipede, Frogger, Pac-Man, Donkey Kong, Tempest and many more.
+      </p>
+      <p>
+        Please respect copyright. Reimplement the mechanics and the style from scratch, and never copy proprietary code, graphics or audio. Original names are trademarked, so give your game a title of its own, as this project does: Rally for Pong, Serpent for Snake, Raider for 1942. When in doubt, make it a tribute, not a reproduction.
+      </p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="thoughts-label">&#x25BA; Build with Blip</div>
+    <div class="thoughts-body">
+      <p>Making an arcade game of your own? The <a class="inline-link" href="api.html">Blip API</a> has illustrated examples from these games and a quick start for working with an agent such as Claude Code or Codex. Pick a reference game, describe what you want to play, and build from there.</p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="manual-operators" data-manual-sheet data-side="right">
+    <h3 class="manual-operators-title">The operators</h3>
+    <p class="manual-operators-intro">Every game in this cabinet was made at one table, by people and machines taking turns. This is the crew on the night shift.</p>
+    <table class="operators">
+      <tr>
+        <td class="operator">
+          <img class="operator-photo" src="operator-jacob.jpg" alt="Jacob Andresen" width="120" height="120">
+          <b class="operator-name">Jacob Andresen</b>
+          <span class="operator-role">Human operator</span>
+          <span class="operator-job">Ideas, taste, and the finger on the coin slot.</span>
+        </td>
+        <td class="operator">
+          <img class="operator-photo" src="operator-bjorn.jpg" alt="Bj&ouml;rn Harrtell" width="120" height="120">
+          <b class="operator-name">Bj&ouml;rn Harrtell</b>
+          <span class="operator-role">Human operator</span>
+          <span class="operator-job">Rust enthusiast and GIS expert. Driving force behind the Rust port.</span>
+        </td>
+      </tr>
+      <tr>
+        <td class="operator">
+          <img class="operator-photo" src="claude-avatar.svg" alt="Claude" width="120" height="120">
+          <b class="operator-name">Claude</b>
+          <span class="operator-role">AI collaborator</span>
+          <span class="operator-job">Writes the code, has opinions about game feel. Cannot insert coins.</span>
+        </td>
+        <td class="operator">
+          <img class="operator-photo" src="copilot-avatar.svg" alt="GitHub Copilot" width="120" height="120">
+          <b class="operator-name">Copilot</b>
+          <span class="operator-role">AI collaborator</span>
+          <span class="operator-job">Completions, refactoring, and vague prompts turned into code.</span>
+        </td>
+      </tr>
+      <tr>
+        <td class="operator">
+          <img class="operator-photo" src="codex-avatar.svg" alt="Codex" width="120" height="120">
+          <b class="operator-name">Codex</b>
+          <span class="operator-role">AI collaborator</span>
+          <span class="operator-job">Works inside the project: reads, shapes a game, checks the result.</span>
+        </td>
+        <td class="operator operator-you">
+          <span class="operator-photo operator-photo-you" aria-hidden="true"></span>
+          <b class="operator-name">You?</b>
+          <span class="operator-role">Operator wanted</span>
+          <span class="operator-job">Your name goes here.</span>
+        </td>
+      </tr>
+    </table>
+    <aside class="operators-pitch">
+      <p class="operators-pitch-title">HELP WANTED</p>
+      <p>One more operator, please. There is always room for one more card in the rack, and the next game could be yours. Pick the arcade game you loved best when you were twelve, tell an AI agent what made it fun, and watch it turn into pixels, sound and a high score table. Blip does the plumbing, so all you bring is the idea. Fork <b>github.com/jacobandresen/blip</b>, read the Blip API, and send your game in. We still cannot insert coins for you.</p>
+    </aside>
+  </section>
+
+</div>
+</div>
+</body>
+</html>

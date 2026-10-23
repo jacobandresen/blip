@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>HISTORY — BLIP ARCADE</title>
+  <!-- The book and the Guide read this page's words; a visitor is sent to the book. -->
+  <script>location.replace('index.html?manual=history')</script>
+</head>
+<body>
+<div class="manual-leaf">
+<div class="page">
+
+  <h1>HISTORY</h1>
+  <h2>THE GAMES BEHIND THE GAMES</h2>
+
+  <section class="intro">
+    <p>
+      The games in BLIP ARCADE did not arrive from nowhere.
+      Each one is the shadow of a game that changed the industry —
+      designed under impossible constraints by engineers who were,
+      in many cases, inventing the medium as they went.
+    </p>
+    <p>
+      This chapter traces where they came from: the studios that built them,
+      the people who designed them, and the small decisions that
+      became the foundations of an entire art form.
+    </p>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="section-label">► The studios</div>
+    <div class="section-body">
+      <div class="studios">
+
+        <div class="studio">
+          <div class="studio-name">Atari</div>
+          <div class="studio-dates">Founded 1972 &mdash; Sunnyvale, California</div>
+          <p>Nolan Bushnell and Ted Dabney founded Atari with $250 in capital and a single engineer, Allan Alcorn, whose training project — a table-tennis simulation — became Pong. In four years the company went from a rented cheese factory to the fastest-growing company in American history. Atari defined the arcade era and later the home console market with the Atari 2600. Three games in BLIP ARCADE trace their lineage directly to Atari: Rally (Pong, 1972), Bouncer (Breakout, 1976) and Meteors (Asteroids, 1979).</p>
+        </div>
+
+        <div class="studio">
+          <div class="studio-name">Taito Corporation</div>
+          <div class="studio-dates">Founded 1953 &mdash; Tokyo, Japan</div>
+          <p>Taito began as a vending machine and jukebox importer. By the late 1970s it was one of the dominant forces in Japanese arcade gaming. Tomohiro Nishikado, a staff engineer with no formal game design training, spent nearly a year hand-designing the hardware and software for Space Invaders (1978). The game caused a national coin shortage in Japan and exported the arcade boom to the rest of the world. Galactic Defender in BLIP ARCADE is inspired by that work. Eight years later Taito shipped Fukio Mitsuji&#39;s Bubble Bobble (1986), the two-dragon co-op game Bubbler pays tribute to.</p>
+        </div>
+
+        <div class="studio">
+          <div class="studio-name">Gremlin Industries &amp; Nokia</div>
+          <div class="studio-dates">1976 / 1997</div>
+          <p>The snake concept was born at Gremlin Industries as Blockade (1976), a two-player arcade game where each player's trail became an obstacle. The mechanic lay dormant for two decades until Nokia engineer Taneli Armanto wrote a solo version for the Nokia 6110 in 1997. Preinstalled on hundreds of millions of handsets, Snake became one of the most widely played games in history before smartphones existed. Serpent in BLIP ARCADE follows that thread.</p>
+        </div>
+
+        <div class="studio">
+          <div class="studio-name">Capcom</div>
+          <div class="studio-dates">Founded 1983 &mdash; Osaka, Japan</div>
+          <p>Capcom grew out of Kenzo Tsujimoto&#39;s 1979 electronics venture I.R.M. Corporation and was formally established in 1983 to publish arcade software. A year later, director Yoshiki Okamoto shipped 1942 (1984) &mdash; Capcom&#39;s first game built deliberately for Western arcades, casting the studio&#39;s own home air force as the enemy so American players would be shooting the other side. It set the template for the vertical-scrolling shoot-&#39;em-up: a lone fighter climbing through wave after wave of enemy planes, a barrel-roll dodge held in reserve, and formation-flying power-ups. Raider in BLIP ARCADE takes off from that runway. Seven years later Street Fighter II (1991) made the one-on-one fighting game an arcade institution; Brawler is built in its honour.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section>
+    <div class="section-label">► Learn more: Code the Classics</div>
+    <div class="section-body">
+      <p>If you want to understand the algorithms behind these games — the collision detection, the sprite rendering, the enemy AI — the best starting point is <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-I-2ed" target="_blank" rel="noopener">Code the Classics</a> (Raspberry Pi Press, 2019), edited by Eben Upton and David Crookes.</p>
+      <p>The book rebuilds games like Boing! (Pong), Cavern (Manic Miner), and Infinite Bunner (Frogger) in Python, explaining every algorithmic decision along the way. It is not a nostalgic coffee-table book — it is a working technical guide with full source code for each title. A second volume followed in 2022 and is available at <a class="inline-link" href="https://magazine.raspberrypi.com/books/code-the-classics-vol-ii" target="_blank" rel="noopener">magazine.raspberrypi.com</a>.</p>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== RALLY ====== -->
+  <section class="game-section rally">
+    <div class="game-header">
+      <div class="game-title">Rally</div>
+      <div class="game-origin">Based on Pong &mdash; Atari, 1972</div>
+    </div>
+    <h2 style="margin-bottom:24px;">THE FIRST COMMERCIALLY SUCCESSFUL ARCADE GAME</h2>
+    <div class="section-body">
+      <p>Nolan Bushnell hired Allan Alcorn in 1972 as his first engineer and gave him a simple brief: build a table-tennis game as a learning exercise. Alcorn added an AI opponent, a scoring system, and a ball that changed angle based on where it struck the paddle — none of which Bushnell had asked for. The result was Pong, installed in a Sunnyvale bar called Andy Capp&#39;s Tavern. It stopped working within two days. The coin box was overflowing.</p>
+      <p>Pong was not the first video game, but it was the first to reach mainstream audiences. The 1975 home version became Sears&#39; best-selling product that Christmas. Its physics model — a ball whose angle and speed vary with paddle position — remains the template for every digital table-tennis game made since.</p>
+      <div class="impl-label">► Other implementations online</div>
+      <ul class="impl-list">
+        <li><a class="inline-link" href="https://www.ponggame.org" target="_blank" rel="noopener">ponggame.org</a> — A faithful browser-based Pong with single and two-player modes.</li>
+        <li><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=pong" target="_blank" rel="noopener">MIT Scratch &mdash; Pong projects</a> — Hundreds of community-built variants, many with annotated source code.</li>
+        <li><a class="inline-link" href="https://github.com/search?q=pong+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Pong repositories</a> — Open-source implementations in JavaScript, C, Python and more, sortable by stars.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== BOUNCER ====== -->
+  <section class="game-section bouncer">
+    <div class="game-header">
+      <div class="game-title">Bouncer</div>
+      <div class="game-origin">Based on Breakout &mdash; Atari, 1976</div>
+    </div>
+    <h2 style="margin-bottom:24px;">BUILT IN FOUR DAYS BY APPLE&#39;S FUTURE FOUNDERS</h2>
+    <div class="section-body">
+      <p>Breakout was designed by Nolan Bushnell and Steve Bristow in 1975. Bushnell offered Steve Jobs a bonus to minimise the number of chips on the board — the fewer the chips, the larger the bonus. Jobs hired his friend Steve Wozniak, who redesigned the entire circuit to use 46 chips (well below the typical 150–170) over four days of around-the-clock work. Jobs told Wozniak the bonus was $700 and paid him $350. The actual bonus was $5,000. Wozniak did not learn this until years later.</p>
+      <p>Wozniak&#39;s chip-reduction techniques proved too complex to manufacture at scale, and Atari quietly released a standard version instead. The game itself was a sensation: take Pong, add bricks, remove the second paddle. Its mechanic — clearing a field by angle and momentum — inspired Arkanoid (1986) and an entire genre of physics-based puzzle games.</p>
+      <div class="impl-label">► Other implementations online</div>
+      <ul class="impl-list">
+        <li><a class="inline-link" href="https://www.coolmathgames.com/0-atari-breakout" target="_blank" rel="noopener">Coolmath Games &mdash; Atari Breakout</a> — The official Atari Breakout, playable in the browser.</li>
+        <li><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=breakout" target="_blank" rel="noopener">MIT Scratch &mdash; Breakout projects</a> — Community implementations ranging from faithful recreations to creative variants.</li>
+        <li><a class="inline-link" href="https://github.com/search?q=breakout+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Breakout repositories</a> — Open-source Breakout and Arkanoid clones, including full HTML5 Canvas tutorials.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== DEFENDER ====== -->
+  <section class="game-section galactic">
+    <div class="game-header">
+      <div class="game-title">Defender</div>
+      <div class="game-origin">Based on Space Invaders &mdash; Taito, 1978</div>
+    </div>
+    <h2 style="margin-bottom:24px;">THE GAME THAT CAUSED A COIN SHORTAGE</h2>
+    <div class="section-body">
+      <p>Tomohiro Nishikado spent nearly a year designing the hardware and software for Space Invaders simultaneously — the existing microprocessors were not fast enough to move many objects, so he designed a custom CPU. The aliens moved faster as their numbers dwindled, an artefact of the hardware running fewer calculations per frame rather than a deliberate design decision. Players found the mechanic so compelling that Nishikado kept it.</p>
+      <p>Space Invaders reached Japan in 1978 and caused a nationwide shortage of 100-yen coins. Banks had to triple production. When Atari licensed it for the 2600 in 1980, it became the first killer app for a home console — quadrupling 2600 sales. The game introduced persistent high scores, the first attempt at in-game tension through music, and the concept of a wave of enemies as a pacing mechanism.</p>
+      <div class="impl-label">► Other implementations online</div>
+      <ul class="impl-list">
+        <li><a class="inline-link" href="https://freeinvaders.org" target="_blank" rel="noopener">freeinvaders.org</a> — Browser-based Space Invaders with optional touch controls.</li>
+        <li><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=space+invaders" target="_blank" rel="noopener">MIT Scratch &mdash; Space Invaders projects</a> — Dozens of community implementations, many from computer science classrooms.</li>
+        <li><a class="inline-link" href="https://github.com/search?q=space+invaders+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Space Invaders repositories</a> — Open-source clones in JavaScript, Rust, C++ and Python, many with full writeups.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== METEORS ====== -->
+  <section class="game-section meteors">
+    <div class="game-header">
+      <div class="game-title">Meteors</div>
+      <div class="game-origin">Based on Asteroids &mdash; Atari, 1979</div>
+    </div>
+    <h2 style="margin-bottom:24px;">THE GAME THAT MADE VECTOR GRAPHICS FAMOUS</h2>
+    <div class="section-body">
+      <p>Lyle Rains conceived the game as raster graphics, but lead programmer Ed Logg — working with designer Dominic Walsh — pushed for the sharp, glowing lines of a vector display instead, arguing the precision would matter for a game built entirely around aiming. Hardware engineer Howard Delman adapted the vector generator he had built for Lunar Lander, giving Asteroids a look unlike anything else in the arcade: crisp, high-contrast lines instead of blocky sprites. Its inertia-based flight — no friction, no grid, just momentum — was also a first, forcing players to learn physics that Pac-Man and Space Invaders never asked of them.</p>
+      <p>Released in November 1979, Asteroids became Atari&#39;s best-selling arcade game of all time, moving more than 70,000 cabinets and briefly dethroning Space Invaders as the highest-earning game in North American arcades. Its wraparound playfield, escalating asteroid splits, and a last-resort hyperspace jump — which carried a small chance of self-destruction — became a template the genre never really moved past. Meteors in BLIP ARCADE follows it line for line: vector outlines, momentum-based flight, and a jump button you only press when you&#39;re desperate.</p>
+      <div class="impl-label">► Other implementations online</div>
+      <ul class="impl-list">
+        <li><a class="inline-link" href="https://games.aarp.org/games/atari-asteroids" target="_blank" rel="noopener">AARP Games &mdash; Atari&reg; Asteroids</a> — A licensed browser version of the 1979 original.</li>
+        <li><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=asteroids" target="_blank" rel="noopener">MIT Scratch &mdash; Asteroids projects</a> — Community recreations exploring vector-style movement and screen wrapping.</li>
+        <li><a class="inline-link" href="https://github.com/search?q=asteroids+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Asteroids repositories</a> — Open-source clones in JavaScript, Rust, C++ and Python, sortable by stars.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== SERPENT ====== -->
+  <section class="game-section serpent">
+    <div class="game-header">
+      <div class="game-title">Serpent</div>
+      <div class="game-origin">Based on Snake &mdash; Nokia, 1997 (concept: Gremlin, 1976)</div>
+    </div>
+    <h2 style="margin-bottom:24px;">FROM ARCADE CABINET TO FOUR BILLION PHONES</h2>
+    <div class="section-body">
+      <p>The snake mechanic began as Blockade, a two-player arcade game released by Gremlin Industries in 1976. Players steered trails that grew longer with each move; touching a trail meant death. The concept spread through numerous clones — Nibbler (Rock-Ola, 1982) made it a solo survival game and introduced the score-per-pellet structure that Nokia would later inherit.</p>
+      <p>In 1997, Nokia engineer Taneli Armanto was tasked with creating a game for the Nokia 6110. The phone had a monochrome display, no touchscreen, and a numpad. Armanto wrote Snake in a matter of weeks. Nokia preinstalled it on the 6110 and its successors; by the early 2000s an estimated 350 million handsets carried it, making Snake one of the most distributed games in history — entirely without an app store, a download, or a purchase.</p>
+      <div class="impl-label">► Other implementations online</div>
+      <ul class="impl-list">
+        <li><a class="inline-link" href="https://playsnake.org" target="_blank" rel="noopener">playsnake.org</a> — A clean browser Snake with a classic Nokia-style look and feel.</li>
+        <li><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=snake" target="_blank" rel="noopener">MIT Scratch &mdash; Snake projects</a> — The most common first-game project in computer science education, hundreds of examples.</li>
+        <li><a class="inline-link" href="https://github.com/search?q=snake+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Snake repositories</a> — Implementations ranging from 20-line minimal versions to AI-controlled solvers.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== RAIDER ====== -->
+  <section class="game-section raider">
+    <div class="game-header">
+      <div class="game-title">Raider</div>
+      <div class="game-origin">Inspired by 1942 &mdash; Capcom, 1984</div>
+    </div>
+    <h2 style="margin-bottom:24px;">THE SHOOT-&#39;EM-UP THAT PUT A JAPANESE STUDIO&#39;S OWN AIR FORCE IN THE CROSSHAIRS</h2>
+    <div class="section-body">
+      <p>Yoshiki Okamoto designed 1942 as Capcom&#39;s first title built with Western arcades in mind: a lone fighter climbing alone through the Pacific sky, fighting through wave after wave of enemy planes toward Tokyo. Its signature move — holding the stick to loop the plane into a brief, screen-clearing barrel roll — became a genre fixture, alongside the trailing &quot;power plane&quot; escorts a player could collect and lose. Released in November 1984, it sold well enough to spawn 1943: The Battle of Midway two years later and the whole 194X lineage after it.</p>
+      <p>Raider borrows 1942&#39;s chassis — a lone fighter climbing through wave after wave of enemy aircraft over open water — without attempting a faithful recreation of it. In its place: a coordinated-turn flight model (bank drives heading, not the other way round) instead of fixed movement paths, seven escalating bosses with bilingual name banners, a carrier launch that opens every stage, and a sea layer with drifting boats, procedurally-generated cumulus clouds, and rare turret-armed islands that shoot back.</p>
+      <div class="impl-label">► Other implementations online</div>
+      <ul class="impl-list">
+        <li><a class="inline-link" href="https://classicgame.online/games/1942" target="_blank" rel="noopener">classicgame.online &mdash; 1942</a> — Play the 1984 original straight in the browser, no emulator setup.</li>
+        <li><a class="inline-link" href="https://github.com/iainbx/1942" target="_blank" rel="noopener">GitHub &mdash; iainbx/1942</a> — An HTML5/JavaScript recreation of the arcade original, fully in-browser.</li>
+        <li><a class="inline-link" href="https://github.com/search?q=1942+arcade+shooter&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; 1942 repositories</a> — Open-source clones and tributes across languages, sortable by stars.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== BRAWLER ====== -->
+  <section class="game-section brawler">
+    <div class="game-header">
+      <div class="game-title">Brawler</div>
+      <div class="game-origin">Inspired by Street Fighter II &mdash; Capcom, 1991</div>
+    </div>
+    <h2 style="margin-bottom:24px;">THE GAME THAT TURNED THE ARCADE INTO A TOURNAMENT</h2>
+    <div class="section-body">
+      <p>The first Street Fighter (1987) was a curiosity with pressure-sensitive punch pads. Its sequel, directed by Akira Nishitani with characters drawn by Akira Yasuda, gave players eight distinct fighters, each with their own reach, speed and special moves entered as joystick motions. During development the team noticed that a special move could interrupt the end of a normal attack, letting two hits land before the opponent could react. It was left in. The combo was born as a side effect, and a whole genre grew around it.</p>
+      <p>Street Fighter II turned arcades into places where strangers queued to challenge whoever was winning, a coin on the cabinet to hold their turn. Brawler keeps the part that made it last: the argument about distance. Every attack is low, mid or overhead, a block only works at the right height, and every move carries real startup, active and recovery frames, so a whiffed sweep can be punished and a jab cannot. The fighter&#39;s pose is built from the same numbers as the hitboxes, three fighters wait in two locations to a soundtrack on the hirajōshi scale, and two players can share one cabinet, sideways on a phone.</p>
+      <div class="impl-label">► Other implementations online</div>
+      <ul class="impl-list">
+        <li><a class="inline-link" href="https://en.wikipedia.org/wiki/Street_Fighter_II" target="_blank" rel="noopener">Wikipedia &mdash; Street Fighter II</a> — The development story, the characters and the revisions that followed.</li>
+        <li><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=fighting+game" target="_blank" rel="noopener">MIT Scratch &mdash; fighting game projects</a> — Community fighters, many showing how hitboxes and frame timing work.</li>
+        <li><a class="inline-link" href="https://github.com/search?q=fighting+game+javascript&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; fighting game repositories</a> — Open-source fighting games and engines, sortable by stars.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== BUBBLER ====== -->
+  <section class="game-section bubbler">
+    <div class="game-header">
+      <div class="game-title">Bubbler</div>
+      <div class="game-origin">Inspired by Bubble Bobble &mdash; Taito, 1986</div>
+    </div>
+    <h2 style="margin-bottom:24px;">TWO DRAGONS, ONE SCREEN, AND A REASON TO PLAY TOGETHER</h2>
+    <div class="section-body">
+      <p>Fukio Mitsuji designed Bubble Bobble around two little dragons, Bub and Bob, who trap monsters in bubbles and pop them to turn them into fruit. It was built for two: both players on the screen at once, working together across a hundred single-screen rounds rather than taking turns. Linger too long in a round and a HURRY UP warning sounds, the monsters turn angry, and an unkillable ghost comes looking for you. The game hid secrets everywhere, and its best ending could only be reached by two players finishing together.</p>
+      <p>Bubbler is a small love letter rather than a remake: two dragons drawn live, squashing and stretching with every jump and blinking as they go, five rounds of one-way platforms with their own colour schemes, and the original&#39;s core rules. Bubbles float to the ceiling and gather; you can ride them by holding jump; pop a whole cluster of trapped monsters at once and every catch doubles the last. Hurry up and something skull-shaped comes hunting. Player two drops in at any time, and the bouncy chiptune theme is synthesised on the device as the game loads.</p>
+      <div class="impl-label">► Other implementations online</div>
+      <ul class="impl-list">
+        <li><a class="inline-link" href="https://en.wikipedia.org/wiki/Bubble_Bobble" target="_blank" rel="noopener">Wikipedia &mdash; Bubble Bobble</a> — The original, its secrets, and the sequels it led to.</li>
+        <li><a class="inline-link" href="https://scratch.mit.edu/search/projects?q=bubble+bobble" target="_blank" rel="noopener">MIT Scratch &mdash; Bubble Bobble projects</a> — Community tributes, a favourite for learning platformer physics.</li>
+        <li><a class="inline-link" href="https://github.com/search?q=bubble+bobble&type=repositories&s=stars" target="_blank" rel="noopener">GitHub &mdash; Bubble Bobble repositories</a> — Open-source remakes and tributes across languages, sortable by stars.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ====== ADDER ====== -->
+  <section class="game-section adder">
+    <div class="game-header">
+      <div class="game-title">Adder</div>
+      <div class="game-origin">Inspired by Viper &mdash; 1994</div>
+    </div>
+    <h2 style="margin-bottom:24px;">THE SNAKE THAT COULD GO ANYWHERE</h2>
+    <div class="section-body">
+      <p>Viper is a top-down snake for the Amiga and DOS: shareware, 1994, and remembered by very few. Three things set it apart from the snake games around it. The vipers move freely in any direction rather than along a grid. The bodies have holes in them, and passing through one pays. And a pit holds several vipers at once, computer-controlled ones included &mdash; its MobyGames entry lists up to six players, on one screen. It was played with a keyboard or a mouse.</p>
+      <p>Adder makes the pit a trail arena: all worms move at a constant 85 px/s, leaving thin solid trails that grow throughout the round. No food, eggs, shedding or boost/strike. Dim gaps stay passable after crossing; only the first pass scores 50 &times; round. Dead worms leave their trails and stay out until next round. Last alive wins; trails reset next round. Two humans can play against CPUs, each with three lives across rounds, losing one on elimination. Game over when no human has lives left.</p>
+      <div class="impl-label">► Other implementations online</div>
+      <ul class="impl-list">
+        <li><a class="inline-link" href="https://www.mobygames.com/game/72914/viper/" target="_blank" rel="noopener">MobyGames &mdash; Viper</a> — The original: a single-player shareware snake variant whose tail grows as it feeds.</li>
+        <li><a class="inline-link" href="https://www.myabandonware.com/game/viper-7ge" target="_blank" rel="noopener">My Abandonware &mdash; Viper</a> — The 1994 shareware download, for an Amiga or DOS emulator.</li>
+      </ul>
+    </div>
+  </section>
+
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,32 @@
+.paint{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;gap:5px;overflow:hidden;padding:clamp(5px,1vw,12px);background:var(--blue);color:var(--ink);font:clamp(9px,1.45vw,16px)/1.24 'Courier New',monospace;text-shadow:0 0 4px #fff9ad77}
+.paint[hidden]{display:none!important}
+.paint-head{display:flex;align-items:center;gap:6px;min-height:1.5em;padding-bottom:4px;border-bottom:1px solid var(--ink)}
+.paint-head>strong{margin-right:auto;font:inherit}
+.paint-head label,.paint-side label{display:flex;align-items:center;gap:5px;font:inherit}
+.paint input,.paint select{min-width:0;padding:3px 5px;border:1px solid var(--ink);border-radius:0;background:var(--blue);color:var(--ink);font:inherit;text-transform:uppercase;text-shadow:inherit}
+.paint-head input{width:min(36%,260px)}
+.paint button{padding:3px 5px;border:1px solid var(--ink);border-radius:0;background:var(--blue);color:var(--ink);font:inherit;text-transform:uppercase;text-shadow:inherit;cursor:pointer}
+.paint button:hover,.paint button:focus-visible,.paint-tools button.selected{background:#243bb6;outline:1px solid var(--ink);outline-offset:1px}
+.paint-workspace{display:grid;grid-template-columns:clamp(38px,7vw,62px) minmax(0,1fr) clamp(68px,13vw,104px);gap:5px;flex:1;min-height:0}
+.paint-tools{display:flex;flex-direction:column;gap:3px}
+.paint-tools button{min-height:1.5em;padding:2px;white-space:nowrap}
+.paint-tools button span{font:inherit}
+.paint-stage{display:flex;align-items:center;justify-content:center;overflow:auto;min-width:0;min-height:0;padding:4px;border:1px solid var(--ink);background:#0d208f}
+.paint-sheet{width:min(100%,56vh,48vw);max-height:100%;aspect-ratio:16/10;background-color:#2539a5;background-image:linear-gradient(45deg,#142b94 25%,transparent 25%),linear-gradient(-45deg,#142b94 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#142b94 75%),linear-gradient(-45deg,transparent 75%,#142b94 75%);background-size:12px 12px;background-position:0 0,0 6px,6px -6px,-6px 0}
+.paint-side label{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.paint-side select{width:100%;padding:2px;font-size:inherit}
+.paint-sheet canvas{display:block;width:100%;height:100%;image-rendering:pixelated;touch-action:none;cursor:crosshair}
+.paint-side{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:3px 1px}
+.paint-side small{font:inherit}
+.paint-side #paint-palette{display:grid;grid-template-columns:repeat(4,clamp(11px,2.6vw,20px));gap:3px}
+.paint-swatch{width:clamp(11px,2.6vw,20px);height:clamp(11px,2.6vw,20px);padding:0!important;border:1px solid var(--ink)!important;background:var(--swatch)!important}
+.paint-swatch.selected{outline:2px solid var(--ink)!important;outline-offset:1px}
+.paint footer{min-height:1.5em;padding:3px 5px;border-top:1px solid var(--ink);color:var(--ink);font:inherit}
+.paint-hint{margin:0;text-align:center;font:inherit}
+.paint-confirm{position:absolute;inset:0;z-index:2;display:grid;place-items:center;background:#101da3cc}
+.paint-confirm[hidden]{display:none}
+.paint-confirm-box{min-width:min(80%,280px);padding:14px;border:2px solid var(--ink);background:var(--blue);text-align:center}
+.paint-confirm-box p{margin:12px 0}
+.paint-confirm-box>div{display:flex;justify-content:center;gap:8px}
+body[data-paint] .screen-content,body[data-paint] .screen-glass,body[data-tune] .screen-content,body[data-tune] .screen-glass{display:none}
+@media(max-width:650px){.paint{font-size:clamp(9px,2.7vw,15px);padding:4px;gap:3px}.paint-head{gap:3px}.paint-head label{flex:1}.paint-head input{width:0;flex:1}.paint-workspace{grid-template-columns:38px minmax(0,1fr) 74px;gap:3px}.paint-tools{gap:2px}.paint-tools button{padding:1px;font-size:clamp(8px,2.2vw,11px)}.paint-stage{padding:2px}.paint-sheet{width:min(100%,56vh)}.paint-side{gap:4px}.paint-side #paint-palette{grid-template-columns:repeat(4,13px);gap:2px}.paint-swatch{width:13px;height:13px}.paint button{padding:2px 3px}}

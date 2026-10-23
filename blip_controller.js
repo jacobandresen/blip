@@ -1,0 +1,546 @@
+/* Shared input layer for pad, stick, keyboard and gamepad.
+ * Inputs: directions, button1–4 (button2 falls back), p2up–p2button4, start/select edges.
+ * `init` injects per-game key events; start/select can call callbacks. Without a canvas, callers handle logical events. */
+(function () {
+  'use strict';
+
+  // Directional names — the click flavour depends on it. A second
+  // player's stick carries the same four under a p2 prefix.
+  var DIR = { up: 1, down: 1, left: 1, right: 1,
+              p2up: 1, p2down: 1, p2left: 1, p2right: 1 };
+
+  var cfg = {
+    canvas: null,       // where synthetic KeyboardEvents go (null = don't inject)
+    gate: null,         // fn -> bool ; true = swallow game input (e.g. INSERT COIN up)
+    kioskHref: '../index.html',
+    onInput: null,      // fn(name, down) — every logical state change, for the consumer
+    onStart: null,      // fn() — overrides the default start action
+    onSelect: null,     // fn() — overrides the default select action
+    feedback: null,     // fn() — a haptic/detent tick, fired with the click on a real press
+    click: true         // play a soft button click on every press
+  };
+
+  var keymap = null;              // logical name -> { key, code }
+  var ARROW_NAME = {
+    ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
+    ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right'
+  };
+  var held   = {};                // logical name -> bool
+  var injected = {};             // caps can share one physical key
+  var roots  = [];                // containers holding [data-blip] elements, for visual reflect
+
+  /* ------------------------------------------------------------------ */
+  /* Key map — arrows are fixed, the action buttons come per game         */
+  /* ------------------------------------------------------------------ */
+
+  function buildKeymap(buttons, extra) {
+    var list = (buttons && buttons.length) ? buttons : [{ key: ' ', code: 'Space' }];
+    var map = {
+      up:      { key: 'ArrowUp',    code: 'ArrowUp' },
+      down:    { key: 'ArrowDown',  code: 'ArrowDown' },
+      left:    { key: 'ArrowLeft',  code: 'ArrowLeft' },
+      right:   { key: 'ArrowRight', code: 'ArrowRight' }
+    };
+    // One logical name per button the game declares.
+    for (var i = 0; i < list.length; i++) {
+      map['button' + (i + 1)] = { key: list[i].key, code: list[i].code };
+    }
+    // A one-button game still answers to button2: deck.js gives it two
+    // live caps that both fire.
+    if (!map.button2) map.button2 = map.button1;
+    // Anything else the game names itself — a second player's stick and
+    // buttons (p2up … p2button4), or its own keys for player one's
+    // directions when the arrows belong to player two.
+    for (var n in extra) { if (extra[n]) map[n] = extra[n]; }
+    return map;
+  }
+
+  /* Which logical name a physical key code belongs to. The arrows are
+     fixed; the action keys are whatever this game declared, so the
+     deck lights the right cap when a keyboard player presses one. */
+  function nameForCode(code) {
+    // What this game declared wins over the default arrows: in a game
+    // where the arrows are player two's, ArrowUp must light player two's
+    // stick, not player one's.
+    for (var n in keymap || {}) {
+      if (keymap[n] && keymap[n].code === code) return n;
+    }
+    return ARROW_NAME[code] || null;
+  }
+
+  function injectKey(spec, type) {
+    if (!cfg.canvas || !spec) return;
+    var count = injected[spec.code] || 0;
+    if (type === 'keydown') {
+      injected[spec.code] = count + 1;
+      if (count) return;
+    } else {
+      if (count > 1) { injected[spec.code] = count - 1; return; }
+      delete injected[spec.code];
+    }
+    cfg.canvas.dispatchEvent(new KeyboardEvent(type, {
+      bubbles: true, cancelable: true, key: spec.key, code: spec.code
+    }));
+  }
+
+  /* select is a plain navigation out — always allowed, even off the coin
+     wall. Everything else is swallowed while the gate says so. */
+  function swallowed(name) {
+    if (name === 'select') return false;
+    return cfg.gate ? !!cfg.gate() : false;
+  }
+
+  /* A raw key injection that still respects the coin wall — used by the
+     rally dial and by the default start action, both of which drive
+     explicit key specs rather than a logical name. */
+  function emitKey(spec, type) {
+    if (type === 'keydown' && cfg.gate && cfg.gate()) return;
+    injectKey(spec, type);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Click sounds — a soft plastic "clack" per press                     */
+  /* ------------------------------------------------------------------ */
+
+  var _actx = null;
+  function actx() {
+    if (typeof Howler !== 'undefined' && Howler.ctx) {
+      if (Howler.ctx.state === 'suspended') Howler.ctx.resume();
+      return Howler.ctx;
+    }
+    try {
+      if (!_actx) _actx = new (window.AudioContext || window.webkitAudioContext)();
+      if (_actx.state === 'suspended') _actx.resume();
+    } catch (e) { return null; }
+    return _actx;
+  }
+
+  // kind: 'face' | 'dpad' | 'shoulder' | 'menu' — each pad button has its
+  // own weight of clack, the way a real controller's do.
+  function tick() { if (cfg.feedback) { try { cfg.feedback(); } catch (e) {} } }
+
+  function click(kind) {
+    if (!cfg.click) { return; }
+    var ctx = actx();
+    if (!ctx) return;
+    var t = ctx.currentTime;
+    var spec = ({
+      face:     { hp: 1900, ng: 0.16, nd: 0.020, thk: 128, tg: 0.10, td: 0.045 },
+      dpad:     { hp: 1400, ng: 0.11, nd: 0.028, thk: 92,  tg: 0.09, td: 0.055 },
+      shoulder: { hp: 1200, ng: 0.13, nd: 0.024, thk: 78,  tg: 0.11, td: 0.060 },
+      menu:     { hp: 2600, ng: 0.10, nd: 0.014, thk: 180, tg: 0.05, td: 0.030 }
+    })[kind] || { hp: 1800, ng: 0.14, nd: 0.020, thk: 120, tg: 0.09, td: 0.045 };
+
+    // The plastic contact transient: a very short filtered-noise tick.
+    var src = blipNoise(ctx, spec.nd, function (t, p) { return 1 - p; });
+    var hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = spec.hp;
+    var ng = ctx.createGain();
+    ng.gain.setValueAtTime(spec.ng, t);
+    ng.gain.exponentialRampToValueAtTime(0.0006, t + spec.nd);
+    src.connect(hp); hp.connect(ng); ng.connect(blipOut(ctx));
+    src.start(t); src.stop(t + spec.nd + 0.01);
+
+    // The muted thock of the cap bottoming out.
+    var osc = ctx.createOscillator(), og = ctx.createGain();
+    osc.type = 'sine'; osc.frequency.setValueAtTime(spec.thk, t);
+    osc.frequency.exponentialRampToValueAtTime(spec.thk * 0.6, t + spec.td);
+    og.gain.setValueAtTime(spec.tg, t);
+    og.gain.exponentialRampToValueAtTime(0.0006, t + spec.td);
+    osc.connect(og); og.connect(blipOut(ctx));
+    osc.start(t); osc.stop(t + spec.td + 0.02);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Visual reflection — light up every [data-blip] for a logical name    */
+  /* ------------------------------------------------------------------ */
+
+  function reflect(name, down) {
+    for (var r = 0; r < roots.length; r++) {
+      var els = roots[r].querySelectorAll('[data-blip~="' + name + '"]');
+      for (var i = 0; i < els.length; i++) els[i].classList.toggle('blip-pressed', down);
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* The one entry point every source calls                              */
+  /* ------------------------------------------------------------------ */
+
+  function edgeAction(name) {
+    if (name === 'start') {
+      if (cfg.onStart) { cfg.onStart(); return; }
+      // default: tap the primary action, i.e. "PRESS FIRE" on a title screen
+      emitKey(keymap.button1, 'keydown');
+      emitKey(keymap.button1, 'keyup');
+      return;
+    }
+    if (name === 'select') {
+      if (cfg.onSelect) { cfg.onSelect(); return; }
+      // default: leave for the arcade's game grid (kioskHref is relative to
+      // the current page — '../index.html' from a game, 'index.html' from
+      // the info pages).
+      if (cfg.kioskHref) window.location.href = cfg.kioskHref;
+    }
+  }
+
+  // opts.silent — reflect + emit but don't inject a key or click. Used by
+  // the keyboard mirror: the real keypress already reached the game, we
+  // only want the on-screen pad/stick to light up in sympathy.
+  function set(name, down, opts) {
+    opts = opts || {};
+    down = !!down;
+    if (!keymap) return;
+
+    // Name entry must receive deck input even after the last credit is spent.
+    if(!opts.silent&&down!==!!held[name]&&window.blipScores&&
+       window.blipScores.handleControl&&window.blipScores.handleControl(name,down)) {
+      held[name]=down;reflect(name,down);
+      if(cfg.onInput)cfg.onInput(name,down);
+      if(down){click(DIR[name]?'dpad':'face');tick();}
+      return;
+    }
+
+    if (name === 'start' || name === 'select') {
+      if (down === !!held[name]) return;
+      held[name] = down;
+      reflect(name, down);
+      if (cfg.onInput) { try { cfg.onInput(name, down); } catch (e) {} }
+      if (down && !swallowed(name)) {
+        if (!opts.silent) { click('menu'); tick(); }
+        edgeAction(name);
+      }
+      return;
+    }
+
+    if (!keymap[name]) return;
+    if (down === !!held[name]) return;
+    held[name] = down;
+
+    reflect(name, down);
+    if (cfg.onInput) { try { cfg.onInput(name, down); } catch (e) {} }
+
+    if (swallowed(name)) return;
+    if (!opts.silent) {
+      injectKey(keymap[name], down ? 'keydown' : 'keyup');
+      if (down) { if (!opts.silentClick) click(DIR[name] ? 'dpad' : 'face'); tick(); }
+    }
+  }
+
+  function releaseAll() {
+    _tBtns.forEach(function (g) { g._pend = false; g.release(); });
+    _tDpads.forEach(function (d) { d._pend = false; d.clear(); });
+    _tDials.forEach(function (release) { release(); });
+    Object.keys(held).forEach(function (n) { if (held[n]) set(n, false); });
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Touch-list authority                                                */
+  /* ------------------------------------------------------------------ */
+  // iOS cancels pointers during multi-touch; derive held state from `TouchEvent.touches` and ignore `pointercancel`.
+
+  var _tBtns = [];    // { el, on, press, release, _pend }
+  var _tDpads = [];   // one { pad, calc, clear, _pend } per bound d-pad
+  var _tDials = [];
+
+  // Releases wait a frame: iOS cancels every touch when a multi-touch gesture
+  // moves, then re-fires touchstart for the fingers still down.
+  function _defer(o, fn) {
+    if (o._pend) return;
+    o._pend = true;
+    requestAnimationFrame(function () { if (o._pend) { o._pend = false; fn(); } });
+  }
+  // Slop past a control's edge that still counts as touching it; each touch
+  // belongs to the one control whose edge is nearest (0 inside), so
+  // neighbours never both fire.
+  var BTN_SLOP = 12, DPAD_SLOP = 14;
+  function _edgeDist(r, x, y) {
+    var dx = Math.max(r.left - x, 0, x - r.right);
+    var dy = Math.max(r.top - y, 0, y - r.bottom);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  // Control rects, read on touchstart / resize only: a touchmove arrives at
+  // up to 120 Hz per finger, and reading them there forced a layout per move.
+  var _brects = null, _drects = null;
+  function _readRects() {
+    _brects = _tBtns.map(function (b) { return b.el.getBoundingClientRect(); });
+    _drects = _tDpads.map(function (p) { return p.pad.getBoundingClientRect(); });
+  }
+  window.addEventListener('resize', function () { _brects = null; });
+  function _syncTouches(list, fresh) {
+    var i, j, r, x, y, d, best, bestD, bestC;
+    if (fresh || !_brects || _brects.length !== _tBtns.length || _drects.length !== _tDpads.length) _readRects();
+    var brects = _brects, drects = _drects;
+    var bDown = [], dTouch = [];
+    for (j = 0; j < list.length; j++) {
+      x = list[j].clientX; y = list[j].clientY;
+      best = null; bestD = Infinity; bestC = Infinity;
+      for (i = 0; i < brects.length; i++) {
+        r = brects[i];
+        if (!r.width) continue;
+        d = _edgeDist(r, x, y);
+        if (d > BTN_SLOP) continue;
+        var c = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+        if (d < bestD || (d === bestD && c < bestC)) { bestD = d; bestC = c; best = { b: i }; }
+      }
+      for (i = 0; i < drects.length; i++) {
+        r = drects[i];
+        if (!r.width) continue;
+        d = _edgeDist(r, x, y);
+        if (d > DPAD_SLOP) continue;
+        var c2 = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+        if (d < bestD || (d === bestD && c2 < bestC)) { bestD = d; bestC = c2; best = { p: i }; }
+      }
+      if (!best) continue;
+      if (best.b !== undefined) bDown[best.b] = true;
+      else if (!dTouch[best.p]) dTouch[best.p] = list[j];
+    }
+    for (i = 0; i < _tBtns.length; i++) {
+      if (!brects[i].width) continue;
+      if (bDown[i]) { _tBtns[i]._pend = false; _tBtns[i].press(); }
+      else if (_tBtns[i].on) _defer(_tBtns[i], _tBtns[i].release);
+    }
+    for (i = 0; i < _tDpads.length; i++) {
+      var dp = _tDpads[i];
+      if (dTouch[i]) { dp._pend = false; dp.calc(dTouch[i], drects[i]); }
+      else if (drects[i].width) _defer(dp, dp.clear);
+    }
+  }
+  ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) { _syncTouches(e.touches, ev === 'touchstart'); }, { passive: true });
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Binders — connect a source surface to set()                         */
+  /* ------------------------------------------------------------------ */
+
+  // Any container of elements with data-blip="<logical name>"
+  // (space-separated for several). On touch the live touch list is the
+  // authority, on a mouse the pointer events. A cross uses bindDpad().
+  function bindButtons(root) {
+    if (!root) return;
+    if (roots.indexOf(root) === -1) roots.push(root);
+    var els = root.querySelectorAll('[data-blip]');
+    for (var i = 0; i < els.length; i++) (function (el) {
+      var raw = el.getAttribute('data-blip');
+      // data-blip-nopress: reflect-only (the d-pad arms — their input
+      // comes from bindDpad's floating pivot, not a discrete tap).
+      if (raw === 'dpad' || el.hasAttribute('data-blip-nopress')) return;
+      var names = raw.split(/\s+/).filter(Boolean);
+      // data-blip-kind overrides the click flavour (shoulder / menu); the
+      // logical name picks it otherwise (face for buttons, dpad for a d-pad
+      // segment bound individually).
+      var kind = el.getAttribute('data-blip-kind');
+      var grp = { el: el, on: false };
+      grp.press = function () {
+        if (grp.on) return;
+        grp.on = true;
+        if (kind) { click(kind); names.forEach(function (n) { set(n, true, { silentClick: true }); }); }
+        else      { names.forEach(function (n) { set(n, true); }); }
+      };
+      grp.release = function () {
+        if (!grp.on) return;
+        grp.on = false;
+        names.forEach(function (n) { set(n, false); });
+      };
+      _tBtns.push(grp);
+      el.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        try { el.setPointerCapture(e.pointerId); } catch (x) {}
+        // A touch is resolved (nearest control wins) by _syncTouches on the
+        // touchstart that follows; pressing the element under the finger
+        // here would light a neighbour the touch is not nearest to.
+        if (e.pointerType !== 'touch') grp.press();
+      });
+      el.addEventListener('pointerup', function (e) {
+        // touch releases are owned by _syncTouches (a real lift comes with
+        // a touchend that drops the finger from the list); the mouse has no
+        // such list, so honour its up directly.
+        if (e.pointerType !== 'touch') grp.release();
+      });
+      ['pointercancel', 'lostpointercapture'].forEach(function (type) {
+        el.addEventListener(type, function (e) { if (e.pointerType !== 'touch') grp.release(); });
+      });
+      // pointercancel: deliberately not handled — see "Touch-list authority".
+    })(els[i]);
+  }
+
+  // The cross: one pivot at the centre of `pad`, the thumb resolved to four
+  // ways with a dead centre; toward a corner both axes engage, so you can
+  // roll round the rim.
+  function bindDpad(pad, o) {
+    if (!pad) return;
+    o = o || {};
+    var dead = o.dead != null ? o.dead : 0.32;
+    // Which logical name each arm drives — a second player's cross runs
+    // the same four arms under its own names.
+    var names = o.names || { up: 'up', down: 'down', left: 'left', right: 'right' };
+    var pid = null;
+    // Light the matching d-pad arm (.dp-up … .dp-right inside `pad`) the
+    // instant a direction engages — a local, precise reflection that
+    // doesn't depend on the pad being a registered [data-blip] root.
+    var segs = {};
+    ['up', 'down', 'left', 'right'].forEach(function (n) {
+      segs[n] = pad.querySelector('.dp-' + n);
+    });
+    function put(n, on) {
+      set(names[n], on);
+      if (segs[n]) segs[n].classList.toggle('blip-pressed', on);
+    }
+    // e is a PointerEvent or a Touch — both carry clientX / clientY; r is
+    // the pad's rect when the caller already has it.
+    function calc(e, r) {
+      r = r || pad.getBoundingClientRect();
+      var nx = (e.clientX - (r.left + r.width  / 2)) / (r.width  / 2);
+      var ny = (e.clientY - (r.top  + r.height / 2)) / (r.height / 2);
+      put('left',  nx < -dead);
+      put('right', nx >  dead);
+      put('up',    ny < -dead);
+      put('down',  ny >  dead);
+      if (!pad.classList.contains('blip-touched')) pad.classList.add('blip-touched');
+    }
+    function clear() {
+      ['up', 'down', 'left', 'right'].forEach(function (n) { put(n, false); });
+      pad.classList.remove('blip-touched');
+    }
+    _tDpads.push({ pad: pad, calc: calc, clear: clear, _pend: false });
+    pad.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      pid = e.pointerId;
+      try { pad.setPointerCapture(pid); } catch (x) {}
+      if (e.pointerType !== 'touch') calc(e);
+    });
+    pad.addEventListener('pointermove', function (e) {
+      if (e.pointerId !== pid) return;
+      e.preventDefault();
+      if (e.pointerType !== 'touch') calc(e);
+    });
+    pad.addEventListener('pointerup', function (e) {
+      if (e.pointerId !== pid) return;
+      pid = null;
+      // touch: _syncTouches owns the (deferred) clear; mouse: clear now
+      if (e.pointerType !== 'touch') clear();
+    });
+    ['pointercancel', 'lostpointercapture'].forEach(function (type) {
+      pad.addEventListener(type, function (e) {
+        if (e.pointerType !== 'touch' && e.pointerId === pid) { pid = null; clear(); }
+      });
+    });
+    // pointercancel: deliberately not handled — see "Touch-list authority".
+  }
+
+  // Rally dial: angle past `dead` injects up/down; small movement calls `onTap`.
+  // Options: injected `up`/`down` keys, `onTap`/`onInteract` callbacks, `dead` radians (default 0.018).
+  function bindDial(dialEl, opts2) {
+    if (!dialEl) return;
+    opts2 = opts2 || {};
+    var dead = opts2.dead != null ? opts2.dead : 0.018;
+    // How long a direction keeps being held after the finger stops
+    // moving. See the accumulator in pointermove for why this exists.
+    var IDLE_RELEASE_MS = opts2.idleMs != null ? opts2.idleMs : 70;
+    var last = null, pid = null, total = 0, upHeld = false, downHeld = false;
+    var acc = 0, idleTimer = null;
+
+    var rect = null; // read once per grab, not per pointermove
+    function angleAt(x, y) {
+      var r = rect || dialEl.getBoundingClientRect();
+      return Math.atan2(y - (r.top + r.height / 2), x - (r.left + r.width / 2));
+    }
+    function dir(u, d) {
+      if (u !== upHeld)   { upHeld = u;   if (u) click('dpad'); emitKey(opts2.up,   u ? 'keydown' : 'keyup'); }
+      if (d !== downHeld) { downHeld = d; if (d) click('dpad'); emitKey(opts2.down, d ? 'keydown' : 'keyup'); }
+    }
+    function clearIdle() { if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; } }
+    function stop() { clearIdle(); dir(false, false); dialEl.classList.remove('active'); last = null; pid = null; acc = 0; rect = null; }
+    _tDials.push(stop);
+
+    dialEl.addEventListener('pointerdown', function (e) {
+      e.preventDefault();
+      if (pid !== null) return;
+      if (opts2.onInteract) opts2.onInteract();
+      pid = e.pointerId;
+      try { dialEl.setPointerCapture(pid); } catch (x) {}
+      rect = dialEl.getBoundingClientRect();
+      last = angleAt(e.clientX, e.clientY);
+      total = 0;
+      dialEl.classList.add('active');
+    });
+    dialEl.addEventListener('pointermove', function (e) {
+      if (e.pointerId !== pid || last === null) return;
+      e.preventDefault();
+      var a = angleAt(e.clientX, e.clientY);
+      var d = a - last;
+      if (d >  Math.PI) d -= 2 * Math.PI;
+      if (d < -Math.PI) d += 2 * Math.PI;
+      last = a;
+      total += Math.abs(d);
+
+      // Rotation accumulates rather than being tested per event, so a slow,
+      // careful turn still crosses the dead band; the direction then holds
+      // until the finger stops (IDLE_RELEASE_MS) or reverses.
+      acc += d;
+      if (acc > dead) { acc = 0; dir(false, true); }
+      else if (acc < -dead) { acc = 0; dir(true, false); }
+
+      clearIdle();
+      idleTimer = setTimeout(function () { idleTimer = null; acc = 0; dir(false, false); }, IDLE_RELEASE_MS);
+    });
+    function end(e) {
+      if (e.type !== 'pointercancel' && e.pointerId !== pid) return;
+      if (e.type === 'pointerup' && total < 0.08) {
+        if (opts2.onTap) opts2.onTap();
+        if (opts2.tap) { click('menu'); emitKey(opts2.tap, 'keydown'); emitKey(opts2.tap, 'keyup'); }
+      }
+      stop();
+    }
+    dialEl.addEventListener('pointerup', end);
+    dialEl.addEventListener('pointercancel', end);
+    dialEl.addEventListener('lostpointercapture', function (e) { if (e.pointerId === pid) stop(); });
+  }
+
+  // Physical keyboard, reflection only: the key already reaches the game;
+  // this lights the deck to match.
+  function bindKeyboard() {
+    document.addEventListener('keydown', function (e) {
+      var n = nameForCode(e.code); if (n) set(n, true, { silent: true });
+    });
+    document.addEventListener('keyup', function (e) {
+      var n = nameForCode(e.code); if (n) set(n, false, { silent: true });
+    });
+  }
+
+  // Map gamepad codes to player one directly; Bubbler and Brawler bind arrows to player two.
+  var GP_NAME = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+                  Space: 'button1', KeyZ: 'button2', Start: 'start', Select: 'select' };
+  function bindGamepad(poll) {
+    if (typeof poll !== 'function') return;
+    function name(code) { return GP_NAME[code] || null; }
+    poll(
+      function (code) { var n = name(code); if (n) set(n, true); },
+      function (code) { var n = name(code); if (n) set(n, false); }
+    );
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Public surface                                                      */
+  /* ------------------------------------------------------------------ */
+
+  window.BlipController = {
+    init: function (opts) {
+      opts = opts || {};
+      ['canvas', 'gate', 'onInput', 'onStart', 'onSelect', 'kioskHref'].forEach(function (k) {
+        if (opts[k] !== undefined) cfg[k] = opts[k];
+      });
+      if (opts.feedback !== undefined) cfg.feedback = opts.feedback;
+      if (opts.click !== undefined) cfg.click = !!opts.click;
+      keymap = buildKeymap(opts.buttons, opts.keys);
+      return this;
+    },
+    set: set,
+    releaseAll: releaseAll,
+    registerVisual: function (root) { if (root && roots.indexOf(root) === -1) roots.push(root); },
+    bindButtons: bindButtons,
+    bindDpad: bindDpad,
+    bindDial: bindDial,
+    bindKeyboard: bindKeyboard,
+    bindGamepad: bindGamepad
+  };
+}());

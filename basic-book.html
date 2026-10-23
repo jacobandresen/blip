@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1c1915">
+  <title>BLIP BASIC · Programming Manual</title>
+  <link rel="stylesheet" href="book.css?v=1">
+  <link rel="stylesheet" href="basic-book.css?v=11">
+  <script src="book.js?v=3" defer></script>
+  <script src="basic-book.js?v=5" defer></script>
+</head>
+<body>
+  <main class="book-layout">
+    <div class="book-frame">
+      <div class="book-stage">
+        <div class="book-body" id="book-body">
+          <div class="book-case" aria-hidden="true"></div>
+          <i class="page-stack page-stack-left" aria-hidden="true"></i>
+          <i class="page-stack page-stack-right" aria-hidden="true"></i>
+          <i class="ribbon" aria-hidden="true"></i>
+          <div class="opening-spread" aria-label="BLIP BASIC programming manual, opening cover">
+            <section class="page blank-page verso" aria-label="Inside front cover">
+              <figure class="inscription"><p class="inscription-body">Welcome to your programming adventure.</p><p class="inscription-regards">Kind regards,</p><span class="inscription-signature">Jacob Andresen</span></figure>
+            </section>
+            <section class="page contents-page recto" aria-label="Printed contents">
+              <p class="eyebrow">A PRACTICAL PROGRAMMING COURSE</p>
+              <h1>CONTENTS</h1>
+              <ol class="contents-list">
+                <li><button type="button" data-go="0"><i>1</i><span>YOUR FIRST PROGRAM</span><b>2</b></button></li>
+                <li><button type="button" data-go="1"><i>2</i><span>NUMBERS, CHOICES &amp; LOOPS</span><b>3</b></button></li>
+                <li class="sub"><button type="button" data-go="2"><i></i><span>Name your routines.</span><b>4</b></button></li>
+                <li class="sub"><button type="button" data-go="3"><i></i><span>Blocks, loops and data.</span><b>5</b></button></li>
+                <li><button type="button" data-go="4"><i>3</i><span>READ INPUT. UPDATE. DRAW.</span><b>6</b></button></li>
+                <li class="sub"><button type="button" data-go="5"><i></i><span>Every game, the same shape.</span><b>7</b></button></li>
+                <li class="sub"><button type="button" data-go="6"><i></i><span>Names that tell.</span><b>8</b></button></li>
+                <li><button type="button" data-go="7"><i>4</i><span>THE CONVERSION CAPERS</span><b>9</b></button></li>
+                <li><button type="button" data-go="8"><i>5</i><span>THE BLIP DRAWING SET</span><b>10</b></button></li>
+                <li><button type="button" data-go="9"><i>6</i><span>SOUND &amp; MUSIC</span><b>11</b></button></li>
+                <li class="sub"><button type="button" data-go="10"><i></i><span>Write a tune.</span><b>12</b></button></li>
+                <li><button type="button" data-go="11"><i>7</i><span>A TAPE’S ASSETS</span><b>13</b></button></li>
+                <li class="sub"><button type="button" data-go="12"><i></i><span>Paint your own.</span><b>14</b></button></li>
+                <li class="sub"><button type="button" data-go="13"><i></i><span>Repaint a game.</span><b>15</b></button></li>
+                <li><button type="button" data-go="14"><i>8</i><span>SAVE YOUR PROGRAMS</span><b>16</b></button></li>
+                <li><button type="button" data-go="15"><i>9</i><span>OPEN A GAME. STUDY ITS SOURCE.</span><b>17</b></button></li>
+                <li class="sub"><button type="button" data-go="16"><i></i><span>Read the source. Make a copy.</span><b>18</b></button></li>
+                <li><button type="button" data-go="17"><i>10</i><span>MOVE, TYPE, SAVE AS YOU GO</span><b>19</b></button></li>
+                <li class="sub"><button type="button" data-go="18"><i></i><span>Try a change. Run it.</span><b>20</b></button></li>
+                <li><button type="button" data-go="19"><i>11</i><span>COMMANDS AT A GLANCE</span><b>21</b></button></li>
+              </ol>
+              <p class="imprint">BLIP COMPUTER SYSTEMS · FIRST EDITION 2026</p>
+              <div class="page-number">1</div>
+            </section>
+          </div>
+          <div class="book-cover" id="book-cover" aria-hidden="true">
+            <div class="cover-face cover-front"><img src="blip-basic-cover.svg" alt=""></div>
+            <div class="cover-face cover-back"><div class="pastedown"></div></div>
+          </div>
+          <article class="pages">
+            <section class="page chapter" id="start" style="--ch:1">
+              <div class="running-head">BLIP BASIC</div>
+              <p class="eyebrow">CHAPTER ONE</p><h2>YOUR FIRST PROGRAM</h2>
+              <p class="lead">BASIC lets you give the computer a short list of instructions. Type a line, press RETURN, then ask BLIP to run the lines in order.</p>
+              <pre class="listing"><code>10 PRINT "HELLO WORLD"<br>20 GOTO 10</code></pre>
+              <ol class="steps"><li>Type <code>10 PRINT "HELLO WORLD"</code> and press RETURN.</li><li>Type <code>20 GOTO 10</code> and press RETURN.</li><li>Type <code>RUN</code> to start.</li><li>Press ESCAPE to stop and return to BASIC.</li></ol>
+              <aside class="note"><strong>LINE NUMBERS</strong>The number at the start tells BASIC where each instruction belongs. Leave gaps—10, 20, 30—so you can add a line later.</aside>
+              <p>Type <code>LIST</code> to see the program. Enter a line again to replace it. <code>NEW</code> deletes the program; <code>CLEAR</code> resets variables and the screen but keeps its lines.</p>
+              <div class="page-number">2</div>
+            </section>
+            <section class="page chapter" id="programming" style="--ch:2">
+              <div class="running-head">NUMBERS, CHOICES &amp; LOOPS</div>
+              <p class="eyebrow">CHAPTER TWO</p><h2>NUMBERS, CHOICES &amp; LOOPS</h2>
+              <p>A variable is a named place to keep a value. Use words to make a program easier to follow.</p>
+              <pre class="listing"><code>10 PLAYER_X=150<br>20 LIVES=3<br>30 PRINT "LIVES";LIVES</code></pre>
+              <div class="columns"><div><h3>MAKE A DECISION</h3><pre class="listing"><code>10 IF LIVES=0 THEN 100<br>20 PRINT "PLAYING"<br>30 GOTO 10<br>100 PRINT "GAME OVER"</code></pre></div><div><h3>REPEAT A GROUP</h3><pre class="listing"><code>10 FOR STAR=1 TO 8<br>20 PRINT "*";<br>30 NEXT STAR<br>40 PRINT</code></pre></div></div>
+              <p><code>GOTO</code> jumps to a line. <code>GOSUB</code> calls a numbered helper; <code>RETURN</code> comes back. A named <code>SUB</code>, over the page, is easier to read. Put multiple statements on a line with colons. <code>IF … THEN</code> controls the rest of that line.</p>
+              <div class="columns"><div><h3>EXPRESSIONS</h3><p><code>+ − * / MOD</code>, comparisons <code>= &lt;&gt; &lt; &gt; &lt;= &gt;=</code>, and <code>AND</code>/<code>OR</code>.</p></div><div><h3>FUNCTIONS</h3><p><code>ABS</code>, <code>INT</code>, <code>SQR</code>, <code>SIN</code>, <code>COS</code>, <code>RND</code>, <code>LEN</code>, <code>STR$</code>, <code>COLOR</code>.</p></div></div>
+              <p>BLIP BASIC stores source and string values in capitals. Commands and variable names are case-insensitive.</p>
+              <div class="page-number">3</div>
+            </section>
+            <section class="page chapter" id="procedures" style="--ch:2">
+              <div class="running-head">NUMBERS, CHOICES &amp; LOOPS</div>
+              <h2 class="section-title">NAME YOUR ROUTINES.</h2>
+              <p class="lead">A <code>SUB</code> is a routine with a name and its own values. Call it by name; BASIC comes back when it reaches <code>END SUB</code>.</p>
+              <pre class="listing"><code>10 FOR ROW=0 TO 4<br>20   CALL STRIPE(ROW*80,"BLIP_CYAN")<br>30 NEXT ROW<br>40 END<br>100 SUB STRIPE(Y,C$)<br>110   FILL_RECT(0,Y,640,40,C$)<br>120 END SUB</code></pre>
+              <div class="columns"><div><h3>CALL IT EITHER WAY</h3><p><code>CALL STRIPE(0,"BLIP_RED")</code> or just <code>STRIPE 0,"BLIP_RED"</code>. Normal flow steps over a <code>SUB</code>; only a call runs it.</p></div><div><h3>ITS OWN VALUES</h3><p>Parameters and names after <code>LOCAL</code> belong to the call and are put back afterwards. Every other name is shared with the program.</p></div></div>
+              <aside class="note"><strong>LEAVE EARLY</strong><code>EXIT SUB</code> returns at once. A <code>SUB</code> may call itself: each call keeps its own parameters.</aside>
+              <p><code>A MOD B</code> is the remainder after dividing, always from 0 up to <code>B</code>: <code>X MOD 640</code> wraps a position around the screen.</p>
+              <div class="page-number">4</div>
+            </section>
+            <section class="page chapter" id="blocks" style="--ch:2">
+              <div class="running-head">NUMBERS, CHOICES &amp; LOOPS</div>
+              <h2 class="section-title">BLOCKS, LOOPS AND DATA.</h2>
+              <p class="lead">When a choice needs more than one line, end the <code>IF</code> line with <code>THEN</code> and close the block with <code>END IF</code>.</p>
+              <pre class="listing"><code>10 IF LIVES=0 THEN<br>20   PRINT "GAME OVER"<br>30 ELSEIF LIVES=1 THEN<br>40   PRINT "LAST LIFE"<br>50 ELSE<br>60   PRINT "PLAYING"<br>70 END IF</code></pre>
+              <div class="columns"><div><h3>REPEAT WHILE</h3><p><code>WHILE X&lt;100 … WEND</code> repeats while the test holds. <code>EXIT FOR</code> leaves a <code>FOR</code> loop early.</p></div><div><h3>A ONE-LINE FUNCTION</h3><p><code>DEF FNSQUARE(N)=N*N</code>, then use <code>FNSQUARE(4)</code> in any expression.</p></div></div>
+              <h3>KEEP TABLES IN DATA</h3>
+              <pre class="listing"><code>10 FOR I=1 TO 3:READ NAME$(I),SPEED(I):NEXT I<br>20 DATA "RYUKA",1.1, "BRUTUS",0.8, "KESTREL",1.36</code></pre>
+              <p><code>READ</code> takes the next <code>DATA</code> item; <code>RESTORE 900</code> starts again at line 900. For text there are <code>MID$(S$,START,LENGTH)</code>, <code>LEFT$</code>, <code>RIGHT$</code>, <code>VAL</code>, <code>ASC</code> and <code>CHR$</code>.</p>
+              <div class="page-number">5</div>
+            </section>
+            <section class="page chapter" id="motion" style="--ch:3">
+              <div class="running-head">BLIP BASIC</div>
+              <p class="eyebrow">CHAPTER THREE</p><h2>READ INPUT. UPDATE. DRAW.</h2>
+              <p class="lead">A game runs one frame at a time. Check the controls, change the game state, and draw a new picture.</p>
+              <pre class="listing"><code>10 CLEAR("BLIP_BLACK")<br>20 IF KEY_HELD("LEFT") THEN PLAYER_X=PLAYER_X-4<br>30 IF KEY_HELD("RIGHT") THEN PLAYER_X=PLAYER_X+4<br>40 DRAW_TEXTURE("/TAPE/BOUNCER/ASSETS/PADDLE.PNG",PLAYER_X,360,100,16)<br>50 WAIT 16<br>60 GOTO 10</code></pre>
+              <h3>KEYBOARD CONTROLS</h3><p><code>KEY_HELD("LEFT")</code> stays true while a key is down; <code>KEY_PRESSED</code> reads a new press and <code>KEY_ACTIVE</code> either. <code>"SPACE"</code> or <code>"FIRE"</code> is fire, <code>"BUTTON2"</code> is Z, and letters A–G, I, J and K work too. <code>INKEY$</code> returns a pressed key as text.</p>
+              <p><code>WAIT 16</code> pauses about one frame at 60 frames per second. <code>END</code> finishes the program. ESCAPE and EXIT GAME leave a running game.</p>
+              <aside class="note"><strong>COORDINATES</strong>The screen is 640 × 400 pixels, a high-resolution Amiga’s. The origin is at the upper left; x grows right and y grows down. <code>CANVAS(W,H)</code> picks another size: Bubbler keeps its arcade arena, 624 × 600.</aside>
+              <div class="page-number">6</div>
+            </section>
+            <section class="page chapter" id="layout" style="--ch:3">
+              <div class="running-head">READ INPUT. UPDATE. DRAW.</div>
+              <h2 class="section-title">EVERY GAME, THE SAME SHAPE.</h2>
+              <p class="lead">Open any tape and you find the same plan. Learn it once and you can find your way round all nine games.</p>
+              <dl class="definitions"><dt>LINES 1–9</dt><dd>What the game is, its keys and its screens. Line 2 says <code>REM GAME:</code> and the game’s name.</dd><dt>LINE 10 · SETUP</dt><dd>Sizes, speeds and colours, each with a name. Music starts at line 80; line 85 picks the first screen.</dd><dt>LINE 100 · MAIN LOOP</dt><dd>Read the keys, update the screen we are on, draw it, <code>WAIT 0</code>, and round again.</dd><dt>LINE 1000 ON</dt><dd>A section for each screen and each thing in the game, under a <code>REM ---</code> heading.</dd></dl>
+              <pre class="listing"><code>130 IF STATE$="TITLE" THEN<br>131   UPDATE_TITLE<br>132 ELSEIF STATE$="PLAY" THEN<br>133   UPDATE_PLAY<br>134 ELSE<br>135   UPDATE_OVER<br>136 END IF</code></pre>
+              <p>Each screen is a pair of routines: <code>UPDATE_PLAY</code> changes the game and <code>DRAW_PLAY</code> paints it. <code>START_GAME</code> sets up a new game. A routine’s body is indented two spaces, and a line holds one statement.</p>
+              <div class="page-number">7</div>
+            </section>
+            <section class="page chapter" id="names" style="--ch:3">
+              <div class="running-head">READ INPUT. UPDATE. DRAW.</div>
+              <h2 class="section-title">NAMES THAT TELL.</h2>
+              <p class="lead">A good name says what a routine does, so a routine that calls others reads like a list of jobs.</p>
+              <pre class="listing"><code>4210 SUB UPDATE_PLAY<br>4220   MOVE_PLAYERS<br>4230   MOVE_TOYS<br>4240   MOVE_BUBBLES<br>4250   HURT_PLAYERS<br>4260 END SUB</code></pre>
+              <div class="columns"><div><h3>VERB FIRST</h3><p><code>MOVE_</code>, <code>DRAW_</code>, <code>START_</code>, <code>FIRE</code>, <code>POP_CHAIN</code>: say what happens. The plural moves them all; the singular moves one, <code>MOVE_TOY I</code>.</p></div><div><h3>QUESTIONS AS FN</h3><p>A <code>DEF FN</code> answers yes or no: <code>FNIN_PLAY(P)</code>, <code>FNBLOCK(C,R)</code>. Read it aloud in an <code>IF</code>.</p></div></div>
+              <h3>THE SAME NAMES IN RUST</h3><p>The arcade games are written in Rust to the same plan, with <code>update_play</code>, <code>draw_play</code> and <code>start_game</code>. Read a tape, then its Rust game, and the parts line up.</p>
+              <aside class="note"><strong>SAY WHY, NOT WHAT</strong>A <code>REM</code> earns its place with a rule or a reason, such as “A JUMP IS TOLD BEFORE IT HAPPENS”. The code already says what it does.</aside>
+              <div class="page-number">8</div>
+            </section>
+            <section class="page chapter" id="conversion" style="--ch:4">
+              <div class="running-head">THE CONVERSION CAPERS</div>
+              <p class="eyebrow">CHAPTER FOUR</p><h2>THE ARCADE DOESN’T FIT</h2>
+              <p class="lead">An arcade game is tuned to its own cabinet. Bringing it home means rebuilding it around a smaller memory, a different screen, new controls and a very different sound chip.</p>
+              <div class="conversion-compare"><section><b>KEEP</b><span>THE GAME’S RHYTHM</span><small>Movement, danger, reward</small></section><i aria-hidden="true">›</i><section><b>RETHINK</b><span>WHAT THE MACHINE CAN DO</span><small>Screen, colour, memory, time</small></section><i aria-hidden="true">›</i><section><b>REBUILD</b><span>THE FEELING</span><small>Clear cues, responsive play</small></section></div>
+              <h3 class="callout">THE HARD PART IS THE TRADE-OFF</h3>
+              <p>Fewer colours may change a scene; slower drawing can change the timing; one-button controls can change a move. A faithful screenshot is not enough if the game no longer feels right. Good conversions simplify detail, protect the essential motion, and keep the controls immediate.</p>
+              <aside class="note"><strong>THE CONVERSION CAPERS</strong><i>Retro Gamer</i> issue 164 praises the CPC <em>Gauntlet II</em> for combining C64-like detail with Spectrum-like speed. Issue 178’s <em>Enduro Racer</em> comparison shows the other side: similar graphics cannot hide slower, less responsive play.</aside>
+              <p class="colophon">For Mev Dinc, Alan Laird, and the programmers, artists, composers and testers who made each machine feel like a place arcade games could live.</p>
+              <div class="page-number">9</div>
+            </section>
+            <section class="page chapter" id="graphics" style="--ch:5">
+              <div class="running-head">BLIP BASIC</div>
+              <p class="eyebrow">CHAPTER FIVE</p><h2>DRAW WITH BLIP</h2>
+              <p>Each primitive is a statement on a numbered line, measured in game pixels and named as in the Rust BLIP crate.</p>
+              <div class="primitive-list">
+                <div><code>CLEAR(COLOR)</code><p>Fill the screen with one colour.</p></div><div><code>FILL_RECT(X,Y,W,H,COLOR)</code><p>Draw a solid rectangle.</p></div>
+                <div><code>DRAW_RECT(X,Y,W,H,COLOR)</code><p>Draw a one-pixel outline.</p></div><div><code>DRAW_LINE(X1,Y1,X2,Y2,COLOR)</code><p>Draw a one-pixel line.</p></div>
+                <div><code>DRAW_LINE_EX(X1,Y1,X2,Y2,WIDTH,COLOR)</code><p>Draw a line with a chosen thickness.</p></div><div><code>DRAW_GLOW_LINE(X1,Y1,X2,Y2,COLOR)</code><p>A bright line with a soft halo.</p></div>
+                <div><code>FILL_CIRCLE(CX,CY,R,COLOR)</code><p>A filled circle from centre and radius.</p></div><div><code>DRAW_CIRCLE(CX,CY,R,COLOR[,WIDTH])</code><p>A ring: the outline of a circle.</p></div><div><code>FILL_CAPSULE(X1,Y1,X2,Y2,R1,R2,COLOR)</code><p>A tapered capsule between two points.</p></div>
+                <div><code>FILL_SUNBURST(CX,CY,RAYS,TURN,REACH,COLOR_A,COLOR_B)</code><p>Alternating rays; TURN is radians.</p></div><div><code>FILL_GLOW_CIRCLE(CX,CY,R,COLOR)</code><p>A soft halo around a bright core.</p></div>
+                <div><code>DRAW_CHAR(CHAR,X,Y,SIZE,COLOR)</code><p>One character in the BLIP pixel font.</p></div><div><code>DRAW_TEXT(TEXT,X,Y,SIZE,COLOR[,ALIGN[,OUTLINE]])</code><p>ALIGN is LEFT or CENTER; OUTLINE adds an ink colour.</p></div>
+                <div><code>DRAW_NUMBER(N,X,Y,SIZE,COLOR)</code><p>Draw an integer directly.</p></div><div><code>DRAW_HUD(SCORE,LIVES)</code><p>The standard BLIP score and lives bar.</p></div>
+                <div><code>TEXT_CX(TEXT,SIZE)</code><p>The x coordinate that centres text.</p></div>
+              </div>
+              <p>A colour is a name like <code>"BLIP_CYAN"</code>, a palette number 0–7, <code>COLOR(R,G,B[,A])</code> from 0 to 1, or hex <code>"#36A9D6"</code>.</p>
+              <div class="page-number">10</div>
+            </section>
+            <section class="page chapter" id="sound" style="--ch:6">
+              <div class="running-head">SOUND &amp; MUSIC</div>
+              <p class="eyebrow">CHAPTER SIX</p><h2>SOUND &amp; MUSIC</h2>
+              <p>Use short effects for game events, and leave room for each new sound to be heard.</p>
+              <pre class="listing"><code>100 PLAY_SFX "/TAPE/SERPENT/ASSETS/EAT.WAV",0.8<br>110 SOUND 660,0.12,0.5<br>120 PLAY_MUSIC "/TAPE/SERPENT/ASSETS/SLITHER.WAV"<br>130 REST 0.2</code></pre>
+              <dl class="definitions"><dt>SOUND HZ,SECONDS[,VOLUME]</dt><dd>Play a simple tone. Volume is from 0 to 1.</dd><dt>PLAY_SFX FILE[,VOLUME]</dt><dd>Play a WAV once: one of a tape’s effects, or your own.</dd><dt>REST SECONDS</dt><dd>Pause between notes and effects.</dd><dt>PLAY_MUSIC FILE</dt><dd>Play a WAV round and round: a tape’s tune, or one saved from TUNE such as <code>"/USER/MUSIC/SONG"</code>.</dd><dt>STOP_MUSIC</dt><dd>Stop the current music track.</dd></dl>
+              <p>To make a loop of your own, enter <code>TUNE</code>: over the page.</p>
+              <p>A name without <code>.WAV</code> gets it. An unknown file reports an error when the program runs.</p>
+              <div class="page-number">11</div>
+            </section>
+            <section class="page chapter" id="tune" style="--ch:6">
+              <div class="running-head">SOUND &amp; MUSIC</div>
+              <h2 class="section-title">WRITE A TUNE.</h2>
+              <p class="lead"><code>TUNE</code> opens a small tracker: four chip voices, each playing down sixteen steps.</p>
+              <ol class="steps"><li>Enter <code>TUNE</code>.</li><li>Choose a NOTE, from C2 to B5.</li><li>Click a cell to put the note there; click again to clear it. The rows are the voices: square, pulse, triangle and noise.</li><li>▶ adds a pattern and PAT moves between them, up to 32. BPM sets the speed, from 50 to 240.</li><li>PLAY listens and STOP stops.</li><li>Name it, for example <code>/USER/MUSIC/THEME.TUNE</code>, and SAVE.</li></ol>
+              <pre class="listing"><code>80 PLAY_MUSIC "/USER/MUSIC/THEME"</code></pre>
+              <p>SAVE keeps the notes in <code>THEME.TUNE</code>, to edit later, and the sound in <code>THEME.WAV</code>, which <code>PLAY_MUSIC</code> plays round and round. Change line 80 in your copy of a game and it plays your theme.</p>
+              <p>Every tune on a tape has its notes beside it: <code>TUNE /TAPE/SERPENT/ASSETS/SLITHER.XM</code> opens them to read, play and save as your own.</p>
+              <aside class="note"><strong>FROM A TRACKER</strong>IMPORT XM brings in the notes of a MilkyTracker module: its first four channels and up to 32 patterns, at its tempo. BLIP’s chip voices play them.</aside>
+              <div class="page-number">12</div>
+            </section>
+            <section class="page chapter" id="pictures" style="--ch:7">
+              <div class="running-head">BLIP BASIC</div>
+              <p class="eyebrow">CHAPTER SEVEN</p><h2>A TAPE’S ASSETS</h2>
+              <p class="lead">A tape carries its game’s pictures, effects and tunes in one folder, ready to use.</p>
+              <pre class="listing"><code>LOAD /TAPE/BOUNCER.BLIP<br>DIR /TAPE/BOUNCER/ASSETS<br>DRAW_TEXTURE("/TAPE/BOUNCER/ASSETS/BALL.PNG",X,Y,8,8)</code></pre>
+              <div class="primitive-list compact"><div><code>DRAW_TEXTURE(FILE,X,Y,W,H[,TINT])</code><p>Stretch an image; optionally multiply it by a tint. A negative width mirrors it, so a figure turns to face the other way.</p></div><div><code>DRAW_TEXTURE(FILE,X,Y,W,H,SX,SY,SW,SH)</code><p>Crop a pixel rectangle from an image and stretch it into the destination.</p></div><div><code>DRAW_TEXTURE(FILE,X,Y,W,H,COL,COLS,ROW,ROWS,ANGLE)</code><p>Draw one sprite-sheet cell; rotation is radians.</p></div></div>
+              <p>A name without <code>.PNG</code> gets it. Drawing is clipped to the screen.</p>
+              <aside class="note"><strong>ONE NAME FOR THE FOLDER</strong>Each game names its folder once, as <code>ASSETS$="/TAPE/DEFENDER/ASSETS/"</code>, and then each file as <code>ASSETS$+"BULLET.PNG"</code>.</aside>
+              <div class="page-number">13</div>
+            </section>
+            <section class="page chapter" id="paint-own" style="--ch:7">
+              <div class="running-head">A TAPE’S ASSETS</div>
+              <h2 class="section-title">PAINT YOUR OWN.</h2>
+              <p class="lead"><code>PAINT</code> opens a pixel editor on the monitor. Each picture is a PNG file in your <code>/USER</code> drawer.</p>
+              <div class="primitive-list compact"><div><code>PEN · ERASE</code><p>Draw or clear pixels; drag to draw a line.</p></div><div><code>FILL · PICK</code><p>Flood an area with the colour, or pick a colour up from the picture.</p></div><div><code>UNDO · CLEAR</code><p>Step back, up to thirty times, or start again.</p></div><div><code>SIZE</code><p>From 16 × 16 for a sprite to 320 × 200 for a scene.</p></div></div>
+              <pre class="listing"><code>PAINT /USER/GFX/HERO.PNG<br><i>… draw, SAVE, then DONE …</i><br>10 CLEAR("BLIP_BLACK")<br>20 DRAW_TEXTURE("/USER/GFX/HERO.PNG",304,184,32,32)<br>30 WAIT 0:GOTO 10</code></pre>
+              <p>Erased pixels are see-through, so a sprite shows the scene behind it. Draw small and let <code>DRAW_TEXTURE</code> make it bigger: a 16 × 16 sprite drawn at 32 × 32 keeps sharp, square pixels.</p>
+              <div class="page-number">14</div>
+            </section>
+            <section class="page chapter" id="repaint" style="--ch:7">
+              <div class="running-head">A TAPE’S ASSETS</div>
+              <h2 class="section-title">REPAINT A GAME.</h2>
+              <p class="lead">A tape’s pictures are read-only, but your own copy of a game is yours to repaint.</p>
+              <ol class="steps"><li>Enter <code>LOAD /TAPE/BUBBLER.BLIP</code>, then <code>RUN</code>.</li><li>Press ESCAPE. BASIC copies the game to <code>/USER/BUBBLER/BUBBLER.BLIP</code> and its pictures to <code>/USER/BUBBLER/ASSETS</code>, then opens the copy in the editor.</li><li>Enter <code>PAINT /USER/BUBBLER/ASSETS/ROBOT.PNG</code>, change the robot, SAVE, then DONE.</li><li>Enter <code>RUN</code>. The robots wear your paint.</li></ol>
+              <pre class="listing"><code>55 ASSETS$="/USER/BUBBLER/ASSETS/"</code></pre>
+              <p>In the copy, the line that named the tape’s picture folder now names yours, so every picture comes from your drawer. Effects and tunes still play from the tape. Keep a picture the same size and the game keeps its spacing.</p>
+              <aside class="note"><strong>START AGAIN</strong>Delete a picture with <code>DEL</code> and draw it fresh, or load the tape again: the original is never changed.</aside>
+              <div class="page-number">15</div>
+            </section>
+            <section class="page chapter" id="files" style="--ch:8">
+              <div class="running-head">SAVE YOUR PROGRAMS</div>
+              <p class="eyebrow">CHAPTER EIGHT</p><h2>SAVE YOUR PROGRAMS</h2>
+              <dl class="definitions"><dt>DIR [PATH]</dt><dd>List a directory: /TAPE, a tape’s ASSETS or /USER.</dd><dt>CD [PATH]</dt><dd>Change directory; no path returns to /USER.</dd><dt>MKDIR NAME</dt><dd>Create a folder under /USER.</dd><dt>LOAD FILE</dt><dd>Load a program from /TAPE or /USER.</dd><dt>EJECT</dt><dd>Stop the program and remove the inserted cassette.</dd><dt>RUN</dt><dd>Run the program in memory.</dd><dt>SAVE [NAME]</dt><dd>Save the current source under /USER.</dd><dt>DEL FILE</dt><dd>Delete a named file under /USER; /TAPE files cannot be deleted.</dd><dt>SOURCE [FILE]</dt><dd>Print the current source or a named program.</dd><dt>EDIT FILE</dt><dd>Edit a /USER file. Changes save as you type; ESCAPE closes it.</dd><dt>PAINT [FILE]</dt><dd>Draw a picture, from 16 × 16 to 320 × 200, and save it as a PNG under /USER/GFX.</dd><dt>TUNE [FILE]</dt><dd>Write a loop of music and save it under /USER/MUSIC, or open a tape’s .XM.</dd></dl>
+              <pre class="listing"><code>CD /USER<br>MKDIR GAMES<br>CD GAMES<br>SAVE STARFIELD<br>DIR</code></pre>
+              <p><code>/TAPE</code> shows only the inserted cassette’s program and its <code>ASSETS</code> folder; it is empty without a cassette and is read-only. <code>/USER</code> is kept in this browser. File names and saved source are uppercase. Start with <code>PAINT</code>, accept the suggested <code>/USER/GFX/SPRITE.PNG</code> name or enter your own, then use that PNG with <code>DRAW_TEXTURE</code>.</p>
+              <div class="page-number">16</div>
+            </section>
+            <section class="page chapter" id="examples" style="--ch:9">
+              <div class="running-head">BLIP BASIC</div>
+              <p class="eyebrow">CHAPTER NINE</p><h2>OPEN A GAME. STUDY ITS SOURCE.</h2>
+              <p class="lead">The games in <code>/TAPE</code> are ordinary BLIP BASIC source files. Load one, read it, then make a copy in your own drawer before changing it.</p>
+              <h3>FIND AND RUN A GAME</h3><pre class="listing"><code>DIR /TAPE<br>LOAD /TAPE/BOUNCER.BLIP<br>RUN</code></pre>
+              <p>Choose a cassette from the pile, or use <code>LOAD /TAPE/BOUNCER.BLIP</code> to insert it. <code>DIR /TAPE</code> lists only that cassette’s files. Ejecting it removes those files from the directory. <code>LOAD</code> puts its source into memory; <code>RUN</code> starts it. Press ESCAPE to stop a running game and return to BASIC.</p>
+              <div class="page-number">17</div>
+            </section>
+            <section class="page chapter" id="source-copy" style="--ch:9">
+              <div class="running-head">LEARN FROM GAMES</div>
+              <h2 class="section-title">READ THE SOURCE. MAKE A COPY.</h2>
+              <h3>READ BEFORE YOU CHANGE</h3><pre class="listing"><code>LOAD /TAPE/BOUNCER.BLIP<br>SOURCE<br>LIST</code></pre>
+              <p><code>SOURCE</code> prints the program; <code>LIST</code> shows its numbered lines. Start with the lines at the top, then the main loop at line 100, then each screen’s <code>UPDATE_</code> and <code>DRAW_</code> routine. <code>REM</code> starts a comment: everything after it, including colons, is ignored. Use comments to name sections and explain state.</p>
+              <h3>MAKE YOUR OWN COPY</h3><pre class="listing"><code>LOAD /TAPE/BOUNCER.BLIP<br>SAVE MY_BOUNCER<br>EDIT /USER/MY_BOUNCER.BLIP<br>RUN</code></pre>
+              <p><code>SAVE MY_BOUNCER</code> writes the source to <code>/USER/MY_BOUNCER.BLIP</code>. Keep its <code>REM GAME:</code> line so the copy uses the same controls. Files in <code>/USER</code> stay in this browser.</p>
+              <div class="page-number">18</div>
+            </section>
+            <section class="page chapter" id="editor" style="--ch:10">
+              <div class="running-head">BLIP BASIC</div>
+              <p class="eyebrow">CHAPTER TEN</p><h2>MOVE, TYPE, SAVE AS YOU GO</h2>
+              <p class="lead"><code>EDIT FILE</code> opens a full-screen source editor on the monitor, for example <code>EDIT /USER/MY_BOUNCER.BLIP</code>. It opens an existing file or creates a new one under <code>/USER</code>.</p>
+              <div class="primitive-list compact">
+                <div><code>ARROW KEYS</code><p>Move the caret. Up and down keep it as near as possible to the same column.</p></div>
+                <div><code>HOME / END</code><p>Move to the start or end of the line.</p></div>
+                <div><code>TYPE / RETURN</code><p>Insert uppercase text at the caret. RETURN splits the line.</p></div>
+                <div><code>BACKSPACE / DEL</code><p>Remove text. At a line boundary, the line joins its neighbour.</p></div>
+                <div><code>TAB</code><p>Accept the dimmed completion suggestion, or insert spaces.</p></div>
+                <div><code>ESCAPE</code><p>Close the editor and return to the BASIC prompt.</p></div>
+              </div>
+              <p>Every edit is saved to the open <code>/USER</code> file. Keywords and strings are highlighted; dimmed completion text joins the source only when you press TAB.</p>
+              <div class="page-number">19</div>
+            </section>
+            <section class="page chapter" id="editor-practice" style="--ch:10">
+              <div class="running-head">USING THE EDITOR</div>
+              <h2 class="section-title">TRY A CHANGE. RUN IT.</h2>
+              <p>Change one small thing, press ESCAPE, then enter <code>RUN</code>. If the game behaves differently than you expect, reopen the file and correct the line.</p>
+              <pre class="listing"><code>EDIT /USER/MY_BOUNCER.BLIP<br><i>… change a speed or a colour, then ESCAPE …</i><br>RUN</code></pre>
+              <h3>KEEP A CLEAN COPY</h3><p>Before a larger experiment, load the tape again and use <code>SAVE BOUNCER_SAFE</code>. You can always begin again from the untouched example.</p>
+              <aside class="note"><strong>THE ORIGINAL IS SAFE</strong>Only files in <code>/USER</code> can be edited or deleted. A tape is never overwritten.</aside>
+              <div class="page-number">20</div>
+            </section>
+            <section class="page chapter" id="reference" style="--ch:11">
+              <div class="running-head">BLIP BASIC</div>
+              <p class="eyebrow">CHAPTER ELEVEN</p><h2>COMMANDS AT A GLANCE</h2>
+              <div class="columns reference-columns"><div><h3>PROGRAMS</h3><p><code>RUN · LIST · SOURCE · EDIT · PAINT · TUNE · NEW · CLEAR · END</code></p><h3>FLOW</h3><p><code>IF · THEN · ELSEIF · ELSE · END IF · GOTO · GOSUB · RETURN · SUB · CALL · LOCAL · EXIT SUB · END SUB · DEF FN · FOR · TO · STEP · NEXT · EXIT FOR · WHILE · WEND · WAIT</code></p><h3>DATA</h3><p><code>DATA · READ · RESTORE</code></p><h3>INPUT</h3><p><code>INKEY$ · KEY_HELD · KEY_ACTIVE · KEY_PRESSED</code></p></div><div><h3>FILES</h3><p><code>DIR · CD · MKDIR · LOAD · SAVE · DEL</code></p><h3>MATH</h3><p><code>INT · ABS · SQR · SIN · COS · TAN · EXP · LOG · SGN · FIX · MOD · RND · COLOR</code></p><h3>TEXT</h3><p><code>LEN · STR$ · VAL · MID$ · LEFT$ · RIGHT$ · ASC · CHR$</code></p><h3>DRAWING</h3><p><code>CLEAR · FILL_RECT · DRAW_RECT · DRAW_LINE · FILL_CIRCLE · DRAW_CIRCLE · DRAW_TEXTURE · DRAW_TEXT</code></p></div></div>
+              <p><code>CLAMP(V,LO,HI)</code> keeps a value in bounds. <code>LERP(A,B,T)</code> blends positions; <code>WRAP(V,LO,HI)</code> wraps them. <code>DISTANCE(X0,Y0,X1,Y1)</code> measures a gap. <code>SCATTER(I,SALT)</code> places repeatable scenery. These functions use the native games’ Rust helpers.</p>
+              <aside class="note"><strong>TRY THIS</strong>Load /TAPE/RALLY.BLIP, inspect it with SOURCE, change one line, and save your own copy.</aside>
+              <p class="colophon">BLIP BASIC Programming Manual · First edition, 2026. Lessons follow the hands-on style of early home-computer programming books; the primitive reference matches the BLIP Rust API. References: <i>Retro Gamer</i>, issues 164 and 178.</p>
+              <div class="page-number">21</div>
+            </section>
+          </article>
+        </div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+<title id="title">BLIP 64 computer</title>
+<defs>
+  <linearGradient id="back" x2="0" y2="1"><stop stop-color="#41444a"/><stop offset="1" stop-color="#17191e"/></linearGradient>
+  <linearGradient id="ivory" x2=".2" y2="1"><stop stop-color="#565a63"/><stop offset=".24" stop-color="#34373f"/><stop offset=".78" stop-color="#24262d"/><stop offset="1" stop-color="#111319"/></linearGradient>
+  <linearGradient id="bezel" x2="0" y2="1"><stop stop-color="#7e8186"/><stop offset=".12" stop-color="#34373d"/><stop offset=".8" stop-color="#15171b"/><stop offset="1" stop-color="#565a5f"/></linearGradient>
+  <linearGradient id="glass" x2="0" y2="1"><stop stop-color="#2449df"/><stop offset=".45" stop-color="#1029bd"/><stop offset="1" stop-color="#07147a"/></linearGradient>
+  <linearGradient id="keys" x2="0" y2="1"><stop stop-color="#555962"/><stop offset=".35" stop-color="#30333a"/><stop offset="1" stop-color="#181a20"/></linearGradient>
+  <linearGradient id="keycap" x2="0" y2="1"><stop stop-color="#b9bbc0"/><stop offset=".4" stop-color="#797d84"/><stop offset="1" stop-color="#44474e"/></linearGradient>
+  <linearGradient id="deck" x2="0" y2="1"><stop stop-color="#70747a"/><stop offset=".18" stop-color="#282b30"/><stop offset=".82" stop-color="#191b1f"/><stop offset="1" stop-color="#4d5054"/></linearGradient>
+  <radialGradient id="lamp" cx=".35" cy=".28"><stop stop-color="#ffd8a0"/><stop offset=".4" stop-color="#ff673e"/><stop offset="1" stop-color="#a51720"/></radialGradient>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="155%"><feDropShadow dx="0" dy="13" stdDeviation="10" flood-color="#000" flood-opacity=".62"/></filter>
+  <filter id="screenGlow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="7"/></filter>
+</defs>
+<rect width="512" height="512" rx="108" fill="url(#back)"/>
+<path d="M38 435h436" stroke="#ffffff" stroke-opacity=".08" stroke-width="2"/>
+<g filter="url(#shadow)">
+  <path d="M79 64q0-23 23-23h308q23 0 23 23v233q0 23-23 23H102q-23 0-23-23z" fill="url(#ivory)" stroke="#777b83" stroke-opacity=".75" stroke-width="3"/>
+  <path d="M91 74q0-17 18-17h294q18 0 18 17v183H91z" fill="url(#bezel)" stroke="#777b83" stroke-opacity=".7" stroke-width="3"/>
+  <path d="M108 83q0-9 10-9h276q10 0 10 9v155H108z" fill="#06091c" stroke="#777c88" stroke-width="2"/>
+  <path d="M117 90h278v141H117z" fill="#2450ff" opacity=".25" filter="url(#screenGlow)"/>
+  <path d="M119 91h274v137H119z" fill="url(#glass)" stroke="#08104b" stroke-width="2"/>
+  <path d="M126 97h260v125H126z" fill="none" stroke="#8ca0ff" stroke-opacity=".18" stroke-width="2"/>
+  <g fill="#fff5a4" font-family="monospace" font-weight="700" letter-spacing="1">
+    <text x="139" y="127" font-size="18">BLIP 64</text>
+    <text x="139" y="153" font-size="14">2026 COLOUR COMPUTER</text>
+    <text x="139" y="184" font-size="17">READY</text>
+    <path d="M197 191h10v3h-10z"/>
+  </g>
+  <path d="M121 95h218l-98 82H121z" fill="#fff" opacity=".055"/>
+  <path d="M207 302h98l18 32H189z" fill="url(#ivory)" stroke="#17191e" stroke-width="2"/>
+  <path d="M176 328q0-8 10-8h130q10 0 10 8v17H176z" fill="#777b80"/>
+  <path d="M28 350q0-15 15-15h426q15 0 15 15v105q0 17-17 17H45q-17 0-17-17z" fill="url(#ivory)" stroke="#70747d" stroke-opacity=".65" stroke-width="3"/>
+  <path d="M42 350h428v91H42z" fill="url(#keys)" stroke="#111319" stroke-width="2"/>
+  <path d="M50 356h284v71H50z" fill="#292b30" stroke="#111318" stroke-width="2"/>
+  <g fill="url(#keycap)" stroke="#14161a" stroke-width="2">
+    <path d="M58 362h23v12H58zM85 362h23v12H85zM112 362h23v12h-23zM139 362h23v12h-23zM166 362h23v12h-23zM193 362h23v12h-23zM220 362h23v12h-23zM247 362h23v12h-23zM274 362h23v12h-23zM301 362h23v12h-23z"/>
+    <path d="M58 379h25v12H58zM87 379h23v12H87zM114 379h23v12h-23zM141 379h23v12h-23zM168 379h23v12h-23zM195 379h23v12h-23zM222 379h23v12h-23zM249 379h23v12h-23zM276 379h23v12h-23zM303 379h21v12h-21z"/>
+    <path d="M58 396h30v12H58zM92 396h23v12H92zM119 396h23v12h-23zM146 396h23v12h-23zM173 396h23v12h-23zM200 396h23v12h-23zM227 396h23v12h-23zM254 396h23v12h-23zM281 396h43v12h-43z"/>
+    <path d="M58 413h33v10H58zM95 413h115v10H95zM214 413h34v10h-34zM252 413h72v10h-72z"/>
+  </g>
+  <path d="M58 362h23v3H58zM85 362h23v3H85zM112 362h23v3h-23zM139 362h23v3h-23zM166 362h23v3h-23zM193 362h23v3h-23zM220 362h23v3h-23zM247 362h23v3h-23zM274 362h23v3h-23zM301 362h23v3h-23z" fill="#fff" opacity=".28"/>
+  <path d="M344 355h116v75H344z" fill="url(#deck)" stroke="#656970" stroke-width="2"/>
+  <path d="M352 361h100v48H352z" fill="#121519" stroke="#9b9d9b" stroke-width="2"/>
+  <path d="M359 367h86v35H359z" fill="#53575a" stroke="#17191d" stroke-width="2"/>
+  <circle cx="376" cy="384" r="11" fill="#202327" stroke="#bdc0b8" stroke-width="2"/>
+  <circle cx="428" cy="384" r="11" fill="#202327" stroke="#bdc0b8" stroke-width="2"/>
+  <circle cx="376" cy="384" r="3.5" fill="#9b9e9b"/><circle cx="428" cy="384" r="3.5" fill="#9b9e9b"/>
+  <path d="M359 415h86" stroke="#090b0f" stroke-width="4"/>
+  <g fill="#272a2e" stroke="#aeb0aa" stroke-width="1"><rect x="352" y="420" width="19" height="8" rx="2"/><rect x="375" y="420" width="19" height="8" rx="2"/><rect x="398" y="420" width="19" height="8" rx="2"/><rect x="421" y="420" width="24" height="8" rx="2"/></g>
+  <text x="171" y="339" fill="#b7bac0" font-family="Arial,sans-serif" font-size="8" font-weight="700" letter-spacing="2">BLIP 64 PERSONAL COMPUTER</text>
+  <circle cx="462" cy="448" r="5" fill="#242629" stroke="#686c70" stroke-width="2"/>
+  <circle cx="462" cy="448" r="2.8" fill="url(#lamp)"/>
+  <path d="M41 445h5m0 0v5m420-5h5m-5 0v5" stroke="#676a6d" stroke-width="2"/>
+</g>
+</svg>
