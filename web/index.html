@@ -635,7 +635,7 @@
       .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:none}
     }
   </style>
-  <link rel="stylesheet" href="arcade-room.css?v=3">
+  <link rel="stylesheet" href="arcade-room.css?v=4">
 </head>
 <body class="cabinet-page">
 
@@ -1482,9 +1482,9 @@
       var wall=roomLayer('i','aisle-wall','wall','wall'),trim=roomLayer('i','aisle-trim','trim','trim'),carpet=roomLayer('i','aisle-carpet','carpet','floor');
       grid.insertBefore(carpet,grid.firstChild);grid.insertBefore(trim,carpet);grid.insertBefore(wall,trim);
       var signs=document.getElementById('room-signs').content.cloneNode(true);
-      [['.aisle-neon','neon'],['.aisle-open','open']].forEach(function(sign){
+      var roomSignEls=[['.aisle-neon','neon'],['.aisle-open','open']].map(function(sign){
         var el=signs.querySelector(sign[0]);el.dataset.roomLayer=sign[1];el.dataset.zone='sign';
-        grid.insertBefore(el,carpet);
+        grid.insertBefore(el,carpet);return el;
       });
       // How far the room has scrolled, in machines. The aisle's own position wraps round the loop when it
       // settles; this keeps counting, so the room never jumps between the last machine and the first.
@@ -1583,6 +1583,12 @@
         var carpetX=BlipAisle.layerOffset(roomTravel,spacing,1.3,room.carpetPeriod),wallX=BlipAisle.layerOffset(roomTravel,spacing,.5,room.wallPeriod);
         carpet.style.transform='perspective(300px) rotateX(55deg) translate('+carpetX.toFixed(1)+'px,'+(bob||0).toFixed(2)+'px)';
         wall.style.transform='translate('+wallX.toFixed(1)+'px,'+((bob||0)*.4).toFixed(2)+'px)';
+        // The signs hang on the wall, so they scroll with it, coming round once a lap of the aisle: never more
+        // than half a lap from where they hang beside the first machine, so the wrap happens out of sight.
+        var lap=cards.length*spacing*.5,signX=BlipAisle.layerOffset(roomTravel,spacing,.5,lap);
+        if(signX<-lap/2)signX+=lap;
+        var signMove='translate('+signX.toFixed(1)+'px,'+((bob||0)*.4).toFixed(2)+'px)';
+        roomSignEls.forEach(function(el){el.style.transform=signMove;});
         grid.dataset.aislePos=(((aisle.pos%cards.length)+cards.length)%cards.length).toFixed(2);
         grid.dataset.roomTravel=roomTravel.toFixed(3);
         if(typeof blipArcadeSound!=='undefined')blipArcadeSound.place(aisle.pos);

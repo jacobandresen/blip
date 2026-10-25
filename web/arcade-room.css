@@ -98,13 +98,14 @@
 /* Signs hang on the wall under the trim, where the cabinets leave it in view: beside the faced cabinet
    (BLIP to its left, OPEN to its right) above the neighbours' tops, or on a phone, where there is room,
    above it. The aisle script sets --room-cab-w, --room-cab-top and --room-side-top: the faced cabinet's
-   width and top and the neighbours' top at rest, as seen. Signs belong to the wall and stay put as you walk. */
+   width and top and the neighbours' top at rest, as seen, beside the first machine. They are fixed to the
+   wall: as you walk they scroll with it, at half the machines' pace, and come round once a lap. */
 #game-grid {
   --room-side: calc((100% - var(--room-cab-w, 300px)) / 2);
   --room-sign-y: calc(var(--room-trim-h) + 6px);
   --room-sign-box: calc(var(--room-side-top, 17%) - var(--room-trim-h) - 14px);
 }
-#game-grid :is(.aisle-neon,.aisle-open) {position:absolute;z-index:0;pointer-events:none;overflow:visible}
+#game-grid :is(.aisle-neon,.aisle-open) {position:absolute;z-index:0;pointer-events:none;overflow:visible;will-change:transform}
 
 /* neon: cream-white core in an orange tube, with an amber halo on the wall; it warms up once on arrival. */
 #game-grid .aisle-neon {left:calc(var(--room-side) * .1);width:calc(var(--room-side) * .8);top:var(--room-sign-y);height:var(--room-sign-box);

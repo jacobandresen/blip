@@ -167,12 +167,13 @@ function sampleRoom() {
   const x = (el) => Number((/translate\(\s*(-?[\d.]+)px/.exec(el.style.transform) || [0, NaN])[1]);
   (function tick() {
     window.__room.push({ wall: x(grid.querySelector('.aisle-wall')), carpet: x(grid.querySelector('.aisle-carpet')),
+      neon: x(grid.querySelector('.aisle-neon')), open: x(grid.querySelector('.aisle-open')),
       travel: Number(grid.dataset.roomTravel), pos: Number(grid.dataset.aislePos) });
     if (window.__room.length < 4000) requestAnimationFrame(tick);
   })();
 }
 
-test('the room scrolls on without a jump past the last machine and the first, both ways', async (t) => {
+test('the room and its signs scroll on without a jump past the last machine and the first, both ways', async (t) => {
   const page = await openArcade(t);
   // The room's layers, how fast each moves against the machines, and the machines' spacing (the next one's pose).
   const room = await page.evaluate(() => {
@@ -180,6 +181,7 @@ test('the room scrolls on without a jump past the last machine and the first, bo
     const next = document.querySelector('#game-grid .card[data-aisle-offset="1"]');
     return {
       spacing: Number(/calc\(-50% \+ (-?[\d.]+)px\)/.exec(next.style.transform)[1]),
+      cabinets: document.querySelectorAll('#game-grid .card').length,
       layers: { wall: [0.5, parseFloat(cs.getPropertyValue('--room-wall-period'))], carpet: [1.3, parseFloat(cs.getPropertyValue('--room-carpet-period'))] },
     };
   });
@@ -209,6 +211,8 @@ test('the room scrolls on without a jump past the last machine and the first, bo
     assert.ok(Math.abs(samples[i].travel - samples[i - 1].travel) < 1, `travel ${samples[i - 1].travel} → ${samples[i].travel}`);
   }
   const Aisle = (await import('../web/aisle.js')).default;
+  // The signs hang on the wall: they scroll at its pace and come round once a lap of the aisle.
+  room.layers.neon = room.layers.open = [0.5, room.cabinets * room.spacing * 0.5];
   for (const [name, [rate, period]] of Object.entries(room.layers)) {
     let worst = 0;
     for (const s of samples) {
