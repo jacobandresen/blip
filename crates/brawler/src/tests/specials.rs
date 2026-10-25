@@ -41,6 +41,37 @@ pub(crate) fn the_projectile_pool_cannot_be_overrun() {
 }
 
 #[test]
+pub(crate) fn mack_calls_a_slow_counterable_drive_by() {
+    let who = FIGHTERS.iter().position(|a| a.special == Special::DriveBy).unwrap();
+    assert_eq!(FIGHTERS[who].name, "MACK");
+    assert_eq!(FIGHTERS[who].special_name, "YO! HOMIES!");
+    assert_eq!(STAGE_NAMES[home_of(who)], "THE HOOD");
+    let mut g = Game::new();
+    g.p[0] = at(who, 220.0, 1.0);
+    let stop = driveby_car_x(&g.p[0], DRIVEBY_ARRIVE);
+    assert_eq!(stop, 90.0, "the car pulls in beside MACK and pauses");
+    assert!(driveby_car_x(&g.p[0], DRIVEBY_ARRIVE - 0.1) < stop);
+    assert!(driveby_car_x(&g.p[0], DRIVEBY_TOTAL) > WIN_W as f32 + 64.0,
+        "the car drives off the far edge after firing");
+    let mut reversed = g.p[0];
+    reversed.facing = -1.0;
+    assert!(driveby_car_x(&reversed, DRIVEBY_TOTAL) < -64.0,
+        "the car exits the opposite edge when MACK faces left");
+    assert!(driveby_bounce(DRIVEBY_ARRIVE + 0.08).abs() > 4.0,
+        "the lowrider bounces during its pause");
+    g.spawn_driveby_round(0, 16, 0, DRIVEBY_SHOT_TIMES[0]);
+    let shot = g.bolts.iter().find(|b| b.active).unwrap();
+    assert_eq!(shot.vx, 520.0);
+    assert_eq!(shot.damage, 5);
+    let shot_y = FLOOR_Y - 57.0 + driveby_bounce(DRIVEBY_SHOT_TIMES[0]) - 5.0;
+    assert!(shot.x > stop && (shot.y - shot_y).abs() < 0.01);
+    g.p[0].facing = -1.0;
+    g.spawn_driveby_round(0, 16, 1, DRIVEBY_SHOT_TIMES[1]);
+    let reverse = g.bolts.iter().filter(|b| b.active).last().unwrap();
+    assert_eq!(reverse.vx, -520.0, "the drive-by follows MACK's facing");
+}
+
+#[test]
 pub(crate) fn every_special_is_something_the_shared_table_cannot_do() {
     // Each special breaks a rule the normals obey (the bolt leaves the
     // fighter, the rush crosses the stage, the talon kick goes airborne), or
@@ -202,12 +233,12 @@ pub(crate) fn the_last_quarter_of_the_bar_hits_harder() {
     assert!(f.enraged() && f.scaled(base).damage > fresh);
     f.health = FIGHTERS[0].health / 4 + 1;
     assert!(!f.enraged() && f.scaled(base).damage == fresh);
-    // Out is out, and the fighter nothing hurts has nothing to be angry about.
+    // Out is out; even Zenith can get angry when his health is low.
     f.health = 0;
     assert!(!f.enraged());
-    let mut z = at(FIGHTERS.iter().position(|a| a.invincible).unwrap(), 200.0, 1.0);
+    let mut z = at(FIGHTERS.iter().position(|a| a.boss).unwrap(), 200.0, 1.0);
     z.health = 1;
-    assert!(!z.enraged());
+    assert!(z.enraged());
 }
 
 #[test]

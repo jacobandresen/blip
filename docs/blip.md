@@ -127,6 +127,7 @@ All coordinates are in virtual-canvas pixels. The canvas origin (0, 0) is the to
 blip.fill_rect(x, y, w, h, BLIP_RED);          // filled rectangle
 blip.draw_rect(x, y, w, h, BLIP_WHITE);         // outline only
 blip.draw_line(x1, y1, x2, y2, BLIP_GRAY);
+blip.draw_circle(cx, cy, radius, width, BLIP_WHITE);
 blip.fill_circle(cx, cy, radius, BLIP_YELLOW);
 blip.draw_texture(&tex, x, y, w, h);            // stretch texture to fit w×h
 blip.draw_texture_tinted(&tex, x, y, w, h, tint);
@@ -183,7 +184,8 @@ lerp(a, b, 0.5)  // midpoint between a and b
 distance(0.0, 0.0, 3.0, 4.0) // 5.0
 ```
 
-BASIC's [shared game functions](basic-functions.md) call these same Rust helpers.
+BASIC's [shared game functions](../crates/blip_basic/README.md#shared-helpers)
+call these same Rust helpers.
 
 ### `blip::web` — kiosk shell
 
@@ -215,8 +217,8 @@ Native builds show a resizable window with the CRT effect. The kiosk shell calls
 
 ```bash
 rustup target add wasm32-unknown-unknown   # one-time setup
-./build_web.sh                             # compiles all games → web/
-python3 -m http.server -d web 8080         # serve locally
+cargo build-web                            # compiles all games → web/
+node tools/serve_web.mjs                    # serve locally
 ```
 
 Each game is compiled to `web/<gamename>/index.wasm`; the shared shell and macroquad runtime are served from `web/`.

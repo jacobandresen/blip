@@ -2,6 +2,127 @@
 
 use super::*;
 
+#[test]
+fn active_attacks_trade_on_the_real_fight_loop() {
+    let mut g = Game::new();
+    g.start_match(0);
+    g.state = State::Fight;
+    g.p = [at(0, 200.0, 1.0), at(1, 248.0, -1.0)];
+    for f in &mut g.p { wind_to_active(f, MoveId::LowPunch); }
+    let before = g.p.map(|f| f.health);
+    step_fight(&mut g, F, Input::default(), Input::default());
+    assert!(g.p[0].health < before[0], "player one must take the answering hit");
+    assert!(g.p[1].health < before[1], "player two must take the first hit");
+}
+
+#[test]
+fn mack_special_stops_bounces_fires_in_sequence_then_exits() {
+    let who = FIGHTERS.iter().position(|a| a.name == "MACK").unwrap();
+    let mut g = Game::new();
+    g.start_match(0);
+    g.state = State::Fight;
+    g.p = [at(who, 200.0, 1.0), at(1, 510.0, -1.0)];
+    g.p[0].start_attack(MoveId::Special);
+    assert!(g.p[0].hit_done, "the fighter waits while the car handles the attack");
+    for _ in 0..54 { step_fight(&mut g, F, Input::default(), Input::default()); }
+    assert_eq!(g.bolts.iter().filter(|b| b.active).count(), 0, "the car pauses before firing");
+    for _ in 0..4 { step_fight(&mut g, F, Input::default(), Input::default()); }
+    assert_eq!(g.bolts.iter().filter(|b| b.active).count(), 1);
+    for _ in 0..15 { step_fight(&mut g, F, Input::default(), Input::default()); }
+    assert_eq!(g.bolts.iter().filter(|b| b.active).count(), 2);
+    for _ in 0..15 { step_fight(&mut g, F, Input::default(), Input::default()); }
+    assert_eq!(g.bolts.iter().filter(|b| b.active).count(), 3);
+    for _ in 0..86 { step_fight(&mut g, F, Input::default(), Input::default()); }
+    assert_eq!(g.p[0].act, Act::Attack, "the drive-by keeps its long recovery while the car exits");
+    assert!(driveby_car_x(&g.p[0], g.p[0].t) > WIN_W as f32 + 64.0);
+    for _ in 0..10 { step_fight(&mut g, F, Input::default(), Input::default()); }
+    assert_eq!(g.p[0].act, Act::Idle);
+}
+
+#[test]
+fn mack_driveby_keeps_going_after_he_is_knocked_down() {
+    let who = FIGHTERS.iter().position(|a| a.name == "MACK").unwrap();
+    let mut g = Game::new();
+    g.start_match(0);
+    g.state = State::Fight;
+    g.p = [at(who, 460.0, -1.0), at(1, 600.0, 1.0)];
+    g.p[0].start_attack(MoveId::Special);
+    step_fight(&mut g, F, Input::default(), Input::default());
+    assert!(g.drivebys[0].active, "the lowrider call starts with the special");
+
+    g.p[0].act = Act::Knockdown;
+    g.p[0].stun = 0.25;
+    for _ in 0..90 { step_fight(&mut g, F, Input::default(), Input::default()); }
+    assert_ne!(g.p[0].act, Act::Attack, "MACK is down while his homies finish the burst");
+    assert_eq!(g.bolts.iter().filter(|b| b.active).count(), 3,
+        "all three rounds fire even after MACK is knocked down");
+    assert!(g.drivebys[0].active && g.drivebys[0].t > 1.4,
+        "the car keeps its independent timeline after the caller falls");
+
+    for _ in 0..100 { step_fight(&mut g, F, Input::default(), Input::default()); }
+    assert!(!g.drivebys[0].active, "the lowrider finishes its exit after the caller falls");
+    assert!(g.bolts.iter().all(|b| !b.active), "the rounds also leave the stage");
+}
+
+#[test]
+fn ten_mack_circuits_run_every_rung_through_the_fight_loop() {
+    let who = FIGHTERS.iter().position(|a| a.name == "MACK").unwrap();
+    for run in 0..10 {
+        let mut g = Game::new();
+        g.pick = who;
+        let mut specials = 0;
+        let mut rounds = 0;
+        for rung in 0..RUNGS {
+            g.start_match(rung);
+            g.state = State::Fight;
+            let mut frames = 0;
+            while g.p[0].rounds < 2 && g.p[1].rounds < 2 && frames < 8100 {
+                let before = g.p[0].rounds + g.p[1].rounds;
+                let p = bot::fight(&g, F);
+                if p.special { specials += 1; }
+                let cpu = cpu_turn(&mut g, 1, F);
+                step_fight(&mut g, F, p, cpu);
+                frames += 1;
+                let after = g.p[0].rounds + g.p[1].rounds;
+                if after > before {
+                    rounds += after - before;
+                    if g.p[0].rounds < 2 && g.p[1].rounds < 2 {
+                        g.start_round();
+                        g.state = State::Fight;
+                    }
+                }
+            }
+            assert!(g.p[0].rounds >= 2 || g.p[1].rounds >= 2,
+                "circuit {}, rung {} did not finish in {frames} frames", run + 1, rung + 1);
+        }
+        assert!(specials > 0, "MACK never called YO! HOMIES! in circuit {}", run + 1);
+        eprintln!("MACK circuit {}/10: {} specials, {} round transitions", run + 1, specials, rounds);
+    }
+}
+
+#[test]
+fn an_uppercut_rises_after_its_windup_and_recovers_on_landing() {
+    let mut g = Game::new();
+    g.start_match(0);
+    g.state = State::Fight;
+    g.p = [at(0, 150.0, 1.0), at(1, 500.0, -1.0)];
+    g.p[0].start_attack(MoveId::Uppercut);
+    for _ in 0..3 { step_fight(&mut g, F, Input::default(), Input::default()); }
+    assert!(!g.p[0].airborne(), "the windup stays planted");
+    let mut rose = false;
+    let mut apex = FLOOR_Y;
+    for _ in 0..60 {
+        step_fight(&mut g, F, Input::default(), Input::default());
+        apex = apex.min(g.p[0].y);
+        rose |= g.p[0].airborne();
+        if rose && !g.p[0].airborne() { break; }
+    }
+    assert!(rose && (25.0..50.0).contains(&(FLOOR_Y - apex)), "the uppercut must follow a short jump arc");
+    assert_eq!(g.p[0].act, Act::Attack, "landing still has recovery to pay");
+    for _ in 0..10 { step_fight(&mut g, F, Input::default(), Input::default()); }
+    assert_eq!(g.p[0].act, Act::Idle);
+}
+
 // ---- a whole fight -------------------------------------------------------
 
 /// Run the simulation the way update_fight() does, minus the sound and
@@ -27,12 +148,7 @@ pub(crate) fn spar(a_who: usize, b_who: usize, gap: f32, frames: usize,
             p[i].x = clamp(p[i].x, WALL_MARGIN, WIN_W as f32 - WALL_MARGIN);
         }
         separate(&mut p);
-        for atk in 0..2 {
-            let def = 1 - atk;
-            let (mut a, mut d) = (p[atk], p[def]);
-            let (dmg, blocked, _) = resolve_hit(&mut a, &mut d, ins[def]);
-            p[atk] = a;
-            p[def] = d;
+        for (dmg, blocked, _) in resolve_trades(&mut p, ins) {
             if dmg > 0 || blocked { push_apart(&mut p, if blocked { 6.0 } else { 9.0 }); }
         }
     }
@@ -147,7 +263,7 @@ pub(crate) fn special() -> Input { Input { special: true, ..Input::default() } }
 /// RYUKA presses `keys` for three frames from frame `delay`. Returns what
 /// health that left.
 pub(crate) fn under_the_stare(x: f32, up: f32, delay: usize, keys: Input) -> i32 {
-    let zenith = FIGHTERS.iter().position(|a| a.invincible).unwrap();
+    let zenith = FIGHTERS.iter().position(|a| a.boss).unwrap();
     let mut g = round(zenith, 0);
     g.p[0].x = x;
     g.p[0].y = FLOOR_Y - up;
@@ -212,7 +328,7 @@ pub(crate) fn the_web_shot_wraps_whoever_it_reaches_and_two_blows_cut_them_out()
 
 #[test]
 pub(crate) fn the_laser_ends_the_round_for_whoever_stands_in_it_and_only_costs_a_guard() {
-    let zenith = FIGHTERS.iter().position(|a| a.invincible).unwrap();
+    let zenith = FIGHTERS.iter().position(|a| a.boss).unwrap();
     // Standing there: gone.
     let mut g = round(zenith, 0);
     play(&mut g, 120, |f, _| [if f == 0 { special() } else { Input::default() }, Input::default()]);
@@ -261,7 +377,7 @@ pub(crate) fn the_demo_is_a_round_between_two_different_fair_fighters_and_both_o
         assert!(g.demo && g.state == State::RoundIntro);
         let (a, b) = (g.p[0].who, g.p[1].who);
         assert_ne!(a, b, "a fighter was drawn against themselves");
-        assert!(!FIGHTERS[a].invincible && !FIGHTERS[b].invincible);
+        assert!(!FIGHTERS[a].boss && !FIGHTERS[b].boss);
         assert_eq!(g.stage, home_of(b));
     }
 
@@ -311,7 +427,7 @@ pub(crate) fn nobody_on_the_roster_is_hopeless_or_unbeatable() {
     // is the ladder's second-to-last fight and is meant to be the strongest;
     // even he has to lose sometimes.
     let _sim = simulating(0xBA1A);
-    let fair: Vec<usize> = (0..FIGHTERS.len()).filter(|&w| !FIGHTERS[w].invincible).collect();
+    let fair: Vec<usize> = (0..FIGHTERS.len()).filter(|&w| !FIGHTERS[w].boss).collect();
     const N: usize = 10;
     for &a in &fair {
         let mut won = 0.0;
@@ -418,11 +534,11 @@ pub(crate) fn the_announcer_calls_a_perfect_and_a_great() {
     assert_eq!(round_call(&g), "GREAT");
     g.result = RoundResult::Draw;
     assert_eq!(round_call(&g), "");
-    // Untouched is nothing to shout about when nothing can touch you.
-    let z = FIGHTERS.iter().position(|a| a.invincible).unwrap();
+    // Zenith is still a fighter, even when selected as the boss.
+    let z = FIGHTERS.iter().position(|a| a.boss).unwrap();
     g.p[1] = at(z, 440.0, -1.0);
     g.result = RoundResult::P2;
-    assert_eq!(round_call(&g), "");
+    assert_eq!(round_call(&g), "PERFECT");
 }
 
 #[test]

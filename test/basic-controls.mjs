@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openPage } from './lib/harness.mjs';
+import { instrumentBasicSound } from './lib/basic-runtime.mjs';
 
 const ALL_GAMES = ['ADDER', 'BOUNCER', 'BRAWLER', 'BUBBLER', 'DEFENDER', 'METEORS', 'RALLY', 'SERPENT', 'RAIDER'];
 const GAMES = process.env.BLIP_CONTROL_GAME ? ALL_GAMES.filter((game) => game === process.env.BLIP_CONTROL_GAME) : ALL_GAMES;
@@ -12,12 +13,7 @@ async function probe(t, touch) {
   });
   const { page } = handle;
   // Observe the interpreter's actual key reads through its existing SOUND host call.
-  await page.route('**/basic-runtime.html*', async (route) => {
-    const response = await route.fetch();
-    const body = (await response.text()).replace('imports.env.blip_basic_sound=playBasicTone;',
-      'imports.env.blip_basic_sound=function(f,s,v){window.__controlMask=f-1000;window.__controlSamples=(window.__controlSamples||0)+1;playBasicTone(f,s,v);};');
-    await route.fulfill({ response, body });
-  });
+  await instrumentBasicSound(page, 'function(f,s,v){window.__controlMask=f-1000;window.__controlSamples=(window.__controlSamples||0)+1;playBasicTone(f,s,v);}');
   await page.goto(`${handle.origin}/basic.html`);
   const frame = () => page.frames().find((frame) => frame.url().includes('basic-runtime.html'));
   return {

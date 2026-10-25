@@ -73,12 +73,7 @@ pub(crate) fn fight_round_seen(pick: usize, foe_index: usize, style: fn(usize, &
         }
         separate(&mut g.p);
 
-        for a in 0..2 {
-            let d = 1 - a;
-            let (mut atk, mut def) = (g.p[a], g.p[d]);
-            let (dmg, blocked, knock) = resolve_hit(&mut atk, &mut def, ins[d]);
-            g.p[a] = atk;
-            g.p[d] = def;
+        for (a, (dmg, blocked, knock)) in resolve_trades(&mut g.p, ins).into_iter().enumerate() {
             if dmg > 0 {
                 if a == 0 { stats.player_hits += 1; } else { stats.cpu_hits += 1; }
                 seen(a, &g.p[a], dmg);
@@ -163,7 +158,7 @@ pub(crate) fn every_round_is_decided_by_something_that_happened() {
 
     for s in 0..4u64 {
         let _sim = simulating(0xB4A17E + s * 0x9E37);
-        for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].invincible) {
+        for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].boss) {
             for foe in [0, RUNGS - 3] {
                 for (name, style) in styles {
                     let r = fight_round(pick, foe, style);
@@ -199,7 +194,7 @@ pub(crate) fn playing_well_beats_playing_badly() {
     let mut poke_margin = 0;
     // Between fighters who have a range to keep: a half-size one is built
     // to leap in behind every blow, on either side of the fight.
-    let spaces = |who: usize| !FIGHTERS[who].invincible && FIGHTERS[who].size >= 1.0;
+    let spaces = |who: usize| !FIGHTERS[who].boss && FIGHTERS[who].size >= 1.0;
     for pick in (0..FIGHTERS.len()).filter(|&i| spaces(i)) {
         // Every rung with such an opponent on it: two rungs alone are
         // mostly turtles.
@@ -217,14 +212,13 @@ pub(crate) fn playing_well_beats_playing_badly() {
 
 #[test]
 pub(crate) fn turtling_does_not_win_on_its_own() {
-    // Blocking has to be worth doing and not worth doing *only*: a player
-    // who crouch-blocks all round lasts it out twice as often as one who
-    // stands there, and never takes it.
+    // One held guard must improve survival by ten percentage points,
+    // without winning a round or making overheads irrelevant.
     fn idle(_frame: usize, _p: &[Fighter; 2]) -> Input { Input::default() }
     let rounds_survived = |style: fn(usize, &[Fighter; 2]) -> Input| {
         let _sim = simulating(0x5EED03);
         let (mut survived, mut won, mut rounds) = (0, 0, 0);
-        for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].invincible) {
+        for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].boss) {
             for foe in 0..RUNGS - 1 {
                 let r = fight_round(pick, foe, style);
                 rounds += 1;
@@ -237,7 +231,7 @@ pub(crate) fn turtling_does_not_win_on_its_own() {
     let (guarded, won, rounds) = rounds_survived(turtle);
     let (stood, _, _) = rounds_survived(idle);
     assert_eq!(won, 0, "a fighter who never attacked won {won} rounds");
-    assert!(guarded >= stood * 2 && guarded * 4 >= rounds,
+    assert!(guarded >= stood + rounds / 10 && guarded * 4 >= rounds,
         "crouch-blocking survived {guarded} of {rounds} rounds, standing still {stood}: blocking is not working");
 }
 

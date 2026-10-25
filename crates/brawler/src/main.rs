@@ -1,4 +1,4 @@
-//! One-on-one fighter with ten characters and CPU or local two-player modes.
+//! One-on-one fighter with fourteen characters and CPU or local two-player modes.
 //! Attack heights, frame data and poses share the same move definitions.
 
 // The effects and music are made by build.rs; the tests check them here.
@@ -16,6 +16,8 @@ mod flow;
 mod sound;
 mod shots;
 mod draw;
+#[cfg(not(target_arch = "wasm32"))]
+mod export;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
 
@@ -73,6 +75,11 @@ async fn main() {
     blip.set_bloom(0.15);
     // And the interlace's rows swap half as far, or the lit scenes twitter.
     blip.set_interlace(0.5);
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(folder) = std::env::var_os("BLIP_EXPORT_BASIC") {
+        export::tape_art(&blip, std::path::Path::new(&folder));
+        return;
+    }
     let mut g = Game::new();
 
     // Say so before the slow part (the themes take a second or two), or the
@@ -80,12 +87,12 @@ async fn main() {
     web::set_players(TITLE_OPEN);
 
     let sfx = Sounds::load().await;
-    let mut music = Jukebox::new("BRAWLER", &["DOCK", "TEMPLE", "SELECT", "AIRBASE", "BATHHOUSE", "VILLAGE", "FORTRESS", "ROOFTOP"]);
+    let mut music = Jukebox::new("BRAWLER", &["DOCK", "TEMPLE", "SELECT", "AIRBASE", "BATHHOUSE", "VILLAGE", "FORTRESS", "ROOFTOP", "HOOD", "WALKOUT"]);
     /// The theme of each stage, in stage order.
-    const STAGE_TRACK: [usize; STAGES] = [0, 1, 3, 4, 5, 6, 7];
+    const STAGE_TRACK: [usize; STAGES] = [0, 1, 3, 4, 5, 6, 7, 8];
     /// The title and select screens have a loop of their own: silence in
     /// front of a noisy game reads as not loaded.
-    const SELECT_TRACK: usize = 2;
+    const SELECT_TRACK: usize = 9;
     let (mut ambient, mut alarmed): (Option<usize>, bool) = (None, false);
     music.play(SELECT_TRACK);
     let mut shot_frame: u32 = 0;
@@ -237,6 +244,8 @@ async fn main() {
         if let Some(track) = want { music.play(track); }
 
         if g.fade > 0.0 { g.fade -= dt; }
+        #[cfg(not(target_arch = "wasm32"))]
+        if blip.screenshot_mode { shots::compare(&mut g); }
         blip.clear(BLIP_BLACK);
         draw::draw(&blip, &g);
         blip.next_frame(60).await;

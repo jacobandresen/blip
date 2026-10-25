@@ -1547,6 +1547,7 @@ window.addEventListener('keydown', function (e) {
     // ball. Otherwise use the station half, excluding its action caps.
     function isStickTouch(e) {
       if (base.getBoundingClientRect().width === 0) return false;
+      if (e.target.closest && e.target.closest('.blip-hs-modal')) return false;
       var ball = base.querySelector('.stick-ball');
       var ballRect = ball && ball.getBoundingClientRect();
       var onStick = e.target === base || (e.target.closest && e.target.closest('.stick-base') === base) ||

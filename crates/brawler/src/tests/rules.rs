@@ -2,6 +2,18 @@
 
 use super::*;
 
+#[test]
+fn overheads_reach_a_real_crouching_body() {
+    for mv in [MoveId::HighPunch, MoveId::HighKick] {
+        let mut atk = at(0, 200.0, 1.0);
+        let mut def = at(1, 248.0, -1.0);
+        def.act = Act::Crouch;
+        wind_to_active(&mut atk, mv);
+        let (damage, blocked, _) = resolve_hit(&mut atk, &mut def, back_input(-1.0, true));
+        assert!(damage > 0 && !blocked, "{mv:?} must catch the crouching guard it is meant to beat");
+    }
+}
+
 // ---- blocking is a choice ------------------------------------------------
 
 #[test]
@@ -396,7 +408,10 @@ pub(crate) fn a_flurry_leaves_a_fighter_dizzy_once_a_round_and_a_jab_now_and_the
     // The next blow wakes them, and there is no second spell this round.
     land(&mut p, MoveId::LowPunch);
     assert_eq!(p[1].dizzy, 0.0);
-    for _ in 0..8 { land(&mut p, MoveId::HighKick); }
+    for _ in 0..20 {
+        land(&mut p, MoveId::HighKick);
+        if p[1].dizzy > 0.0 { break; }
+    }
     assert_eq!(p[1].dizzy, 0.0, "dizzy twice in a round");
 
     // A jab a second never adds up.
@@ -407,12 +422,15 @@ pub(crate) fn a_flurry_leaves_a_fighter_dizzy_once_a_round_and_a_jab_now_and_the
         for _ in 0..60 { advance(&mut p[1], F); }
         assert_eq!(p[1].dizzy, 0.0);
     }
-    // Nor does anything make the one nothing hurts see stars.
-    let boss = FIGHTERS.iter().position(|a| a.invincible).unwrap();
+    // The boss can be dizzied too; the high stats make him hard, not immune.
+    let boss = FIGHTERS.iter().position(|a| a.boss).unwrap();
     let mut p = [at(8, 300.0, 1.0), at(boss, 340.0, -1.0)];
     face_off(&mut p);
-    for _ in 0..8 { land(&mut p, MoveId::HighKick); }
-    assert_eq!(p[1].dizzy, 0.0);
+    for _ in 0..8 {
+        land(&mut p, MoveId::HighKick);
+        if p[1].dizzy > 0.0 { break; }
+    }
+    assert!(p[1].dizzy > 0.0, "the boss cannot be dizzied");
 }
 
 // ---- the uppercut ------------------------------------------------------------

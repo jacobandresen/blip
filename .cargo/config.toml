@@ -13,3 +13,6 @@
 # See: https://blog.rust-lang.org/2026/04/04/changes-to-webassembly-targets-and-handling-undefined-symbols/
 [target.wasm32-unknown-unknown]
 rustflags = ["-C", "link-arg=--import-undefined"]
+
+[alias]
+build-web = "run --release -p blip_build"

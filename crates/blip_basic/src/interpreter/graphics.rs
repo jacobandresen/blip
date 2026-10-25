@@ -53,21 +53,14 @@ impl Program {
             "FX_RING" if vals.len() == 5 => self.effects.ring(n(0), n(1), n(2), n(3), c(4)),
             "DRAW_CIRCLE" if (4..=5).contains(&vals.len()) => {
                 let width = if vals.len() == 5 { n(4) } else { 2.0 };
-                macroquad::shapes::draw_circle_lines(n(0), n(1), n(2).max(0.0), width, c(3));
+                blip.draw_circle(n(0), n(1), n(2), width, c(3));
             }
             "FILL_RECT" if vals.len() == 5 => blip.fill_rect(n(0), n(1), n(2), n(3), c(4)),
             "DRAW_RECT" if vals.len() == 5 => blip.draw_rect(n(0), n(1), n(2), n(3), c(4)),
             "DRAW_LINE" if vals.len() == 5 => blip.draw_line(n(0), n(1), n(2), n(3), c(4)),
             "CIRCLE" if vals.len() == 3 => {
                 let (cx, cy, r) = (n(0), n(1), n(2).max(0.0));
-                let color = paper_color(self.pen);
-                let mut last = (cx + r, cy);
-                for step in 1..=32 {
-                    let angle = std::f32::consts::TAU * step as f32 / 32.0;
-                    let point = (cx + angle.cos() * r, cy + angle.sin() * r);
-                    blip.draw_line(last.0, last.1, point.0, point.1, color);
-                    last = point;
-                }
+                blip.draw_circle(cx, cy, r, 1.0, paper_color(self.pen));
             }
             "DRAW_LINE_EX" if vals.len() == 6 => blip.draw_line_ex(n(0), n(1), n(2), n(3), n(4), c(5)),
             "DRAW_POLYLINE" if vals.len() == 6 => {

@@ -1,261 +1,134 @@
-# Agent guidance
+# Agent guide
 
-## Web `.wasm` output is compiled — do not edit it directly
+Keep changes small, follow the nearest game's conventions, and verify the
+affected paths. Write repository scripts in Node.js `.mjs`; keep them
+cross-platform and document any external tools they need. Do not add Bash or
+Python wrappers. Do not publish or push unless the user asks.
 
-The `index.wasm` and `index.html` files under each game's directory in `web/`
-(`serpent`, `bouncer`, `defender`, `rally`, `meteors`, `raider`,
-`brawler`, `bubbler`, `adder`) are **build outputs**. They are
-produced by compiling Rust source with `cargo build --release --target
-wasm32-unknown-unknown` and copying `target/wasm32-unknown-unknown/release/<game>.wasm`
-into the game's web directory; `index.html` is a copy of `web/shell.html`.
+## Build outputs
 
-**Do not patch `web/*/index.html` or `web/*/index.wasm` by hand.** Any manual
-change will be overwritten the next time the project is built.
+Do not edit generated files by hand. Web game WASM is compiled from Rust;
+per-game `index.html` files are copied from `web/shell.html`. BASIC tape assets
+are generated from the Rust asset sources.
 
-### Where to make changes
+- `web/<game>/index.html`, `web/<game>/index.wasm`, `web/basic-runtime.wasm`:
+  `cargo build-web`
+- `web/TAPE/<GAME>/ASSETS/*`: `crates/<game>/src/gfx.rs`, `tunes.rs`, and
+  `build.rs`; run the package build that writes them.
+- `web/<game>/icon-*`, `manifest.json`, and guide icons:
+  `node tools/make_game_icons.mjs`
+- `web/<game>/attract.webp`:
+  `node tools/make_attract_strips.mjs <game>`
+- `web/wear.css`: `node tools/make_wear.mjs`
+- Brawler's BASIC pose sheets, stages, card, and poster:
+  `node tools/make_brawler_art.mjs`
 
-| What you want to change | Edit this file |
+Changes under `web/` require a cache version bump in `web/sw.js`.
+
+## Start a new game
+
+Use the smallest similar game as a model. Serpent is a compact Rust game;
+BASIC tapes and their shared APIs are documented in
+[`crates/blip_basic/README.md`](crates/blip_basic/README.md).
+
+1. Pick a lowercase URL slug and uppercase tape name. Add
+   `crates/<slug>` to `Cargo.toml`'s workspace members. Create its package
+   manifest with workspace package metadata, `macroquad` and `blip`
+   dependencies, plus `blip` as a build dependency with default features off.
+2. Add `build.rs` containing `blip::build_script!();`, then implement
+   `src/main.rs`, `src/gfx.rs`, and `src/tunes.rs`. Add `src/levels.rs` for
+   authored progression data and `src/bot.rs` for a native playtest bot when
+   the game needs them. Keep game rules and rendering in the Rust crate;
+   reusable engine behavior belongs in `crates/blip`.
+3. Register the slug in `crates/blip_build/src/main.rs` so `cargo build-web`
+   builds and copies its WASM. Register its title, accent, and controls in
+   `web/blip_core.js` (`BLIP_GAMES`). Add its marquee colors and manual spread
+   in `web/marquee.css` and `web/controls.html`.
+4. If the game has a BASIC edition, add `web/TAPE/<NAME>.BLIP`; put its
+   generated images and sounds under `web/TAPE/<NAME>/ASSETS/` through the
+   Rust asset build. Start with `REM GAME: <NAME>`, keep numbered sections
+   ordered, and use `CONTROL_TEXT$` for platform-specific control hints.
+5. Add a card crop in `tools/make_game_icons.mjs` and an attract capture
+   setup in `tools/make_attract_strips.mjs`. Add the game to
+   `test/visual-parity.mjs` and `test/run-visual.mjs`; add focused tests and
+   place browser tests in the appropriate lane in `test/run-web.mjs`.
+6. Build with `cargo build-web`; generate icons and attract art; verify the
+   Rust package, BASIC tape if present, web page, and relevant browser tests.
+   Read [`test/visual-parity.md`](test/visual-parity.md) before judging
+   screenshots. Check `rg` for other slug registries before calling the game
+   integrated.
+
+## Where to edit
+
+| Area | Source of truth |
 |---|---|
-| Page structure and markup | `web/shell.html` |
-| Styles (layout, touch controls, topbar, loading screen) | `web/shell.css` |
-| JavaScript (canvas scaling, touch controls, coin handling) | `web/shell.js` |
-| Shared nav bar styles (`.kiosk-bar`, `.kiosk-btn`, `.kiosk-hud`) | `web/kiosk.css` |
-| The game list (`BLIP_GAMES`), coins (`getCoins`, `saveCoins`), layout rule, mute, fullscreen | `web/blip_core.js` (every page; the home screen loads only this) |
-| Which front end a game returns to (`blip-frontend`, `blipFrontendUrl`), free play, a game's own app mode (`blipAppMode`); the controller each front end plays with (`blipFrontendControls`: arcade sticks, home-screen touch, BASIC pads; `?controls=` overrides) | `web/blip_core.js` |
-| Cabinet parts: power lamp, coin HUD (`updateCoinsHud`), card arm, hum | `web/kiosk.js` |
-| The home screen: icons, dock, Search, the long-press menu, edit mode (`blip-home-order`), Settings | `web/home.html`, `web/home.css`, `web/home.js` (nothing from the cabinet) |
-| App style: a game opened from the home screen or its own icon (`data-appstyle`), with `‹ Home`, a frosted title bar and a launch screen | `web/shell.css` (the `App style` section), `web/shell.js` |
-| The Home Screen and BLIP switches on the top bar (`#home-switch-btn`, `#basic-switch-btn`), arcade and game pages | `web/kiosk.js`, `web/kiosk.css` |
-| The arcade's aisle of cabinets: marquee, screen, deck, Start, coin door, side art | `web/index.html` |
-| Walking the aisle: position, speed, settling; the machines' sound mix (no DOM, unit-tested) | `web/aisle.js` |
-| The aisle's walking loop (`aisleTick`, `poseCards`), its inputs (keys, drag, gamepad), the carpet and wall parallax | `web/index.html` (the aisle script) |
-| Stepping up to a machine (`stepUp`, `stepBack`, `lean`): Up, Up plays; Down, Escape or a walk steps back | `web/index.html` (the aisle script) |
-| Starting a machine: the zoom onto the game page's screen (`launchScreen`, `blip-screen-box`), the prerender, the page opening on the screen's picture (`blip-cabinet-launch`, `#launch-frame`, `data-launching`); the game page as its machine up close (`data-machine`) | `web/index.html` (`openMachine`), `web/shell.html`, `web/shell.js`, `web/shell.css` |
-| Each machine's attract jingle (`BLIP_ATTRACT`) and the room's sound (`blipArcadeSound`) | `web/kiosk.js` |
-| Each machine's attract loop on its screen | `tools/make_attract_strips.mjs`, which writes `web/<game>/attract.webp` (generated, not edited by hand; run after a game's look changes); the arcade plays it (`.card-loop` in `web/index.html`) |
-| A machine's marquee, the same sign on its cabinet and as its game page's top bar; each game's colours (`data-machine`) | `web/marquee.css` |
-| The deck on each cabinet: the game page's own, rendered per game | `web/machine-deck.html` (builds it with `web/deck.js`) |
-| Each game as its own home-screen app: icons (a small game card) and `manifest.json` | `tools/make_game_icons.mjs`, which writes `web/<game>/icon-*.png` and `manifest.json`, and the Guide's (generated, not edited by hand) |
-| The "Add to Home Screen" sheet, free play and app mode on a game page | `web/shell.js`, `web/shell.css` |
-| App style's clean picture: no CRT (`blip_crt`), drawn at the screen's pixel density | `web/blip_bridge.js`, `crates/blip/src/ctx.rs` (`crt_look`); natively `BLIP_CRT=0` |
-| The app's Guide: the manual's chapters set as an iOS guide (also a sheet over an app-style game), an app of its own (`guide-manifest.json`, `guide-icon-*.png` from `tools/make_game_icons.mjs`) | `web/guide.html`, `web/guide.css`, `web/guide.js`; its words stay in `controls.html`, `history.html`, `about.html` |
-| App mode's game page: no deck on a PC or with a gamepad (`data-bare`), the pause (`blipPause`, for the controls card, the Guide and a hidden page), the controls card on first open (`blip-seen-<slug>`), the score to beat under the title | `web/shell.js`, `web/shell.css` |
+| Game rules, rendering, sound | `crates/<game>/src/` |
+| Game artwork and sound generation | `crates/<game>/src/gfx.rs`, `tunes.rs` |
+| Shared engine, drawing, effects, audio | `crates/blip/src/` |
+| BASIC interpreter and Rust bindings | `crates/blip_basic/src/`; API guide in `crates/blip_basic/README.md` |
+| BASIC game program | `web/TAPE/<GAME>.BLIP` |
+| Shared BASIC assets | generated under `web/TAPE/<GAME>/ASSETS/` |
+| Game shell markup, styles, behavior | `web/shell.html`, `web/shell.css`, `web/shell.js` |
+| Game metadata, controls, front-end routing, fullscreen, sound | `web/blip_core.js` |
+| Cabinet cards, aisle, landing page | `web/index.html` and `web/aisle.js` |
+| Home Screen | `web/home.html`, `web/home.css`, `web/home.js` |
+| Shared game deck | `web/deck.js`, `web/machine-deck.html` |
+| Marquees and machine colors | `web/marquee.css` |
+| Shared game controls and manual pages | `web/controls.html`; cabinet book in `web/index.html`, app Guide in `web/guide.*` |
+| Browser test helpers | `test/lib/` |
+| Browser suites | `test/*.mjs` (`node:test`) |
+| Build and asset tools | `tools/*.mjs` |
 
-The home screen's zoom into a game ends with the icon where the game's
-launch screen (`#loader` in app style) shows it: 108px, 16px above the
-middle. Change one and the other must follow.
-| Bottom control deck markup (stations, stick, pad, caps) — one builder for every page | `web/deck.js` |
-| Kiosk / landing page | `web/index.html` |
-| Fullscreen button and the stored choice (`blip-fullscreen`), on every page | `web/blip_core.js` |
-| Sound on / off (`blip-mute`); `blipOut(ctx)`, where the cabinet's own sounds must connect; `blipNoise(ctx, seconds, shape)`, their noise | `web/blip_core.js` |
-| What fullscreen hides on a game page; the idle return to the cabinet; Escape and Backspace back to the arcade | `web/shell.css`, `web/shell.js` |
-| Cabinet wear: scratches, burns, rings, scuffs, thumbed cards and manual | `tools/make_wear.py`, which writes `web/wear.css` (generated, not edited by hand) |
-| Field manual: spreads, the three page-turn styles, the torn leaf, contents, notes pages | `web/index.html` (the manual script), `web/manual.css` |
-| The book leaving its pocket, its cover swinging open and shut | `web/manual-motion.js` |
-| The manual's last page, the operators (a `data-manual-sheet`: never split, its type shrinks to fit) | `web/about.html` |
-| A game's manual pages: screenshot, blurb, controls, tip | `web/controls.html`: a `data-side="left"` and a `data-side="right"` section per game |
-| The controls card (the "?" under the top bar, its arm and whirr): the cabinet's welcome and each game's keys (`controls`, `touchControls` in `BLIP_GAMES`) | `web/kiosk.js`, `web/kiosk.css` |
-| Publishing the site; PR previews; how many previews stay (`KEEP`) | `.github/workflows/pages.yml`, `.github/workflows/preview.yml`, `.github/workflows/preview-cleanup.yml` |
-| Wasm <-> JS bridge (`blip_spend_coin`) | `web/blip_bridge.js` |
-| macroquad JS runtime (vendored, do not edit) | `web/mq_js_bundle.js` |
-| Game logic, rendering, audio (Rust side) | `crates/<name>/src/main.rs` |
-| Per-game level and wave progression data | `crates/<name>/src/levels.rs` |
-| Shared engine library (blip API) | `crates/blip/src/*.rs` |
-| Colour maths, deterministic scatter, capsules, outlined text | `crates/blip/src/{color,math,draw,font}.rs` |
-| Brawler: the roster, the move table, the rules, the CPU | `crates/brawler/src/{roster,moves,rules,cpu}.rs` |
-| Brawler: stages, fighter parts, poses, screens | `crates/brawler/src/draw/{stage,parts,pose,screens}.rs` |
-| Brawler: screenshot scenes (`BLIP_SHOT_SCENE`) | `crates/brawler/src/shots.rs` |
-| Brawler: tests, by theme (rules, anatomy, ladder, balance, ...) | `crates/brawler/src/tests/*.rs` |
-| Score popups, bursts, rings (`blip::Fx`) | `crates/blip/src/fx.rs` |
-| Music playback (`blip::Jukebox`) | `crates/blip/src/audio.rs` |
-| A game's generated pictures | `crates/<name>/src/gfx.rs` |
-| A game's music and sound effects | `crates/<name>/src/tunes.rs` |
-| The generated files (PNG, WAV, XM) the game and BLIP BASIC read | `web/TAPE/<GAME>/ASSETS/` (build outputs) |
-| A tune's notes as an XM for TUNE | `crates/blip/src/xm.rs` |
-| Shared generators: PNG images, WAV encoding, songs (`Song`; `action: true` for the action games' mix), effect voices | `crates/blip/src/{image,wav,song,cosy,techno}.rs` |
-| Native playtest autopilot | `crates/blip/src/bot.rs`, `crates/<name>/src/bot.rs` |
-| Per-game asset build step | `crates/<name>/build.rs` |
-| Brawler's kiosk card poster and screenshot (captured from the game) | `./brawler_card.sh` |
+The cabinet book and app Guide both read `controls.html`, `history.html`, and
+`about.html`. Write shared copy once; use `data-guide="cabinet"` or
+`data-guide="app"` only for content exclusive to that binding.
 
-`web/shell.html` is a static template — it loads `blip_core.js` and `kiosk.js` in the head,
-then `deck.js`, `blip_controller.js`, the high-score scripts, `shell.js`,
-`mq_js_bundle.js` and `blip_bridge.js`, and finally calls `load("index.wasm")`
-to boot the macroquad runtime. All of them are referenced with
-`../` paths so they resolve from inside each game's subdirectory; only
-`manifest.json` and `icon-180.png` are the game directory's own, so a game
-saved to a home screen is its own app. `kiosk.js`
-and `kiosk.css` are also loaded by `web/index.html` (without the `../` prefix)
-to share the nav bar between the landing page and game pages.
+## Build and verify
 
-### Plans
-
-Larger changes are planned in `docs/` before they are built. Rows marked
-"planned" above name files a plan will add; drop the mark once they exist.
-
-- `docs/immersive-arcade.md`: walking the aisle, sound from the machines,
-  stepping up to play, living screens, up and down. Read it before touching
-  the aisle script; it says how each part is tested.
-
-### One manual, two bindings
-
-The cabinet's book (`index.html`) and the app's Guide (`guide.js`) both read
-`controls.html`, `history.html` and `about.html`. Write the words there once.
-Mark what belongs to one binding only: `data-guide="cabinet"` (coins, the card
-rack, the BLIP logo) is left out of the Guide, `data-guide="app"` (the Home
-Screen, Add to Home Screen) out of the book. The Guide follows Apple's
-[Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines)
-(typography, lists and tables, navigation bars, sidebars, dark mode); text
-written for it follows the [Apple Style Guide](https://support.apple.com/guide/applestyleguide/welcome/web):
-sentence-case headings, "tap" and "touch and hold", "Home Screen".
-
-### Rebuilding
-
-```
-rustup target add wasm32-unknown-unknown   # one-time
-./build_web.sh                              # recompile all nine games
+```sh
+cargo test --release -p <game>
+cargo build-web
+npm test
+npm run test:visual
 ```
 
-### Deploying and PR previews
+`cargo build-web` builds all nine Rust games and the BASIC runtime for the
+`wasm32-unknown-unknown` target. Install that target once with
+`rustup target add wasm32-unknown-unknown`. `npm test` runs the fast unit
+suites. `npm run test:visual` checks all games in muted headless Chromium;
+select one with `BLIP_VISUAL_GAME=BRAWLER npm run test:visual`. The full
+browser suite is `npm run test:web`; `npm run test:all` also runs Rust tests
+and rebuilds the web games. Database tests need a local Supabase instance.
 
-Pages serves the `gh-pages` branch, which only the workflows write. A push to
-`main` runs `pages.yml`: migrations, then `web/` to the branch's root, leaving
-`pr-preview/` alone. Each same-repo pull request is published by `preview.yml`
-to `pr-preview/pr-<number>/` and removed on close. After each deploy (and
-daily) `preview-cleanup.yml` keeps the previews of the five most recently
-updated open pull requests and squashes `gh-pages` to one commit, since every
-preview copies all of `web/`. `web/.nojekyll` keeps Pages from running Jekyll.
+Use the narrowest relevant checks while iterating, then broaden verification
+for shared code. Read `package.json` for current test commands and
+`test/run-web.mjs` for browser-suite lanes. Tests that start Chromium mute
+audio. Native screenshots and playtests set `BLIP_SILENT=1` where supported.
 
-A preview shares production's origin, so:
+For Brawler, Rust/BASIC parity captures are generated by
+`node tools/compare_brawler.mjs`; select one with `--scene jade-kick`, or set
+the shared clock with `--clock 8`. Review the paired images in
+`test/artifacts/brawler-compare/index.html`. Verify Rust with
+`cargo test --release -p brawler` and BASIC interactions with
+`node --test test/brawler-basic.mjs`.
 
-- it registers no service worker, and production's `sw.js` passes
-  `/pr-preview/` requests to the network (`blip_core.js`, `sw.js`);
-- its `blip_config.js` is blank, so its scores never reach the live leaderboard;
-- local storage (coins, mute, home order) is shared with the live site.
+On Linux, `xvfb-run` can provide a hidden display for native playtests. It is
+optional on Windows and macOS, and on Linux with an available desktop display.
+The web build and browser tests do not need a visible window.
 
-Any change under `web/` still bumps `CACHE` in `web/sw.js` for production.
+For a Rust game's bot, run a release build with `BLIP_BOT=1`; it plays through
+normal inputs and prints a `RESULT` line. Set `BLIP_BOT_SHOTS=<dir>` to save
+frames or `BLIP_BOT_FUZZ=<seed>` to exercise random inputs. See the game bot
+and test files for supported variables.
 
-### Tests
+## Code and review conventions
 
-Run the test suite locally before pushing:
-
-`npm run test:all` runs Rust tests, rebuilds the web games, then runs every
-browser suite sequentially and visual checks for all nine games. Approve
-this command with the reusable `npm run test:all` prefix when the sandbox
-blocks local servers or Chromium. To verify access without running the
-full suite, use `npm run test:all -- --check-access`. Database tests still
-need a running local Supabase instance; they skip when it is unavailable.
-
-```
-npm test                # canvas geometry, BASIC, the aisle's walk (unit)
-cargo test --release    # game rules (Brawler's balance, Serpent's turns, ...)
-npm run test:web        # cabinet, home screen, manual, top bar, controls, decks (after ./build_web.sh; six minutes, in two lanes: one for the tests that run a game, one for the rest)
-npm run test:layout     # nothing overlaps or leaves the screen: 21 devices, notches, every page and controller (seven minutes, four processes)
-npm run test:shell      # the game shell in headless Chromium (four minutes)
-npm run test:scores     # high-score entry in all eight scoring games (three minutes, three processes)
-npm run test:scores-db  # the score backend, against `npx supabase start` (skipped without it)
-```
-
-`test:scores` plays each built game until it ends and enters a name typed,
-from the stick and by touch, against `test/lib/fake-supabase.js`. Run it
-after touching `blip_scores.js`, the shell's key handling, or a game's
-game-over path. A game hears keys only while the canvas has focus: anything
-that takes focus (a prompt, a button) must leave it back there.
-
-Tests that read the shell's layout hold the game's wasm back (`page.route('**/*.wasm', () => {})`) and wait for the page to go still instead of for a clock; only tests that need a running game load it.
-
-The browser suites need Playwright and a Chromium binary (`BLIP_CHROMIUM`
-names one outside `PATH`). Test files are `node:test` suites, one theme
-each: `cabinet.mjs` (the card rack), `manual.mjs`, `touch.mjs` (fingers on the strip and deck), `layout.mjs` (every page on every device: overlaps, thumbs, safe areas), `topbar-layout.mjs`,
-`controls.mjs`, `two-player-*.mjs` (decks and phones), `home.mjs` (the home screen,
-free play, each game as an installable app), `aisle-perf.mjs` (no layout while
-walking the arcade).
-
-For native development:
-
-```
-cargo run -p serpent            # or bouncer, rally, defender,
-                                # meteors, raider, brawler, bubbler, adder
-```
-
-### Home-screen icons
-
-Each game's icon is a small version of its cabinet card, drawn from its
-screenshot (Brawler's from `card.png`). After a screenshot changes, or a game
-is added (give it a crop in `CROPS`):
-
-```
-node tools/make_game_icons.mjs
-```
-
-### Asset pipeline
-
-A game's pictures are made by its `src/gfx.rs`, its effects and music by its
-`src/tunes.rs`. Its `build.rs` includes both by path and hands them to
-`blip::build_assets`, which writes:
-
-- the pictures and effects to `$OUT_DIR/assets/{images,sounds}/`, which the
-  game embeds with `include_bytes!(concat!(env!("OUT_DIR"), ...))`;
-- every file to `web/TAPE/<GAME>/ASSETS/` (upper-case names and a
-  `manifest.json`): each picture a PNG, each effect a WAV, each tune a WAV to
-  play and an XM of its notes for TUNE. These are build outputs, committed
-  like the wasm: change `gfx.rs` or `tunes.rs` and build, never the files.
-
-Build scripts use `blip` without its `engine` feature, so they do not compile
-macroquad. A game plays its tunes from its tape folder through a
-`blip::Jukebox` (`blip::tape_file`), each loaded in the background the first
-time it is played, so the game never waits on a download; BLIP BASIC reads
-the same folders.
-
-A PNG is a still picture. What changes with the game (the saucer's turning
-lights, a bubble's sheen) is drawn at runtime over it, in the game and its tape
-alike, not made as a PNG per frame.
-
-A tune's XM is recorded as it renders: every instrument reports its notes with
-`blip::xm::heard` (the tune, harmony, bass or drums: TUNE's four voices) and
-`blip::xm::record` keeps them, a step to a sixteenth at the tempo the tune
-gives `blip::xm::tempo`. A new instrument reports its notes the same way.
-
-Effects are most of a game's download, so the warm ones
-(`cosy::finish_warm`, low-passed at 3 kHz) are encoded at 22 kHz, and so are
-Raider's and Brawler's low effects (`wav::encode_pcm16_half`, flat to 8 kHz).
-A new effect goes at half rate if its energy above 10 kHz is 33 dB or more
-under the rest; snaps, whistles and gunfire keep the full rate.
-
-### Playtesting with the autopilot
-
-Native builds carry a bot per game (`crates/<name>/src/bot.rs`; Bubbler has
-its own, `BUBBLER_BOT=1`). It plays through the normal input path and prints
-one `RESULT` line of stats at game over:
-
-```
-BLIP_BOT=1 BLIP_BOT_MAXT=300 xvfb-run -a -s "-screen 0 720x810x24" target/release/serpent
-```
-
-`BLIP_BOT_SHOTS=dir` saves a frame every `BLIP_BOT_SHOT_EVERY` seconds. Run
-one game at a time.
-
-`BLIP_BOT_FUZZ=<seed>` swaps the autopilot for random key mashing, which finds
-panics and stuck screens the bot's good play never reaches. Bubbler's own bot
-has no fuzz mode.
-
-## Pixel text
-
-Draw text at whole-number sizes (`draw_text(.., 2.0, ..)`). The font is a
-pixel grid: at 1.5 or 2.5 its rows come out uneven, and a phone shows a
-680px game at half size, where anything under 2 cannot be read.
-
-## Comments
-
-Keep them short. A comment earns its place by saying something the code
-cannot: the measured number behind a constant, the constraint that rules
-out the obvious alternative, the failure that a rule is there to prevent.
-
-- One to three lines. A block longer than that is almost always narrative.
-- State the fact, not the story. "At 320px two stations fit `--cap: 32`
-  and no further" — not an account of how that was discovered.
-- No round-by-round history, no "this used to be X", no restating what
-  the next line plainly does.
-- Delete a comment that has become an anecdote rather than a reason.
-
-The same goes for commit messages: say what changed and why, not the
-path taken to get there.
+- Keep numbered BASIC tape lines unique and ascending. Group screens and
+  systems into `UPDATE_*` and `DRAW_*` subs; `WAIT 0` yields a frame.
+- Draw pixel text at whole-number sizes. Avoid sizes below 2 for text that
+  must remain readable on a phone.
+- Generate changing visual details at runtime; PNGs are still images.
+- Keep comments brief and factual. Explain measured constants or constraints,
+  not the code that follows.
+- Keep generated artifacts in their designated output paths and regenerate
+  them from source rather than hand-editing them.

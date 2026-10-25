@@ -244,7 +244,7 @@
       image-rendering: auto;
     }
 
-    /* Brawler's card is a fight poster (brawler_card.sh), not one frame: it
+    /* Brawler's card is a fight poster composed from captured game scenes, not one frame: it
        fills the frame, leans its title like a marquee, and a light sweeps
        across it while the card is lit. */
     .card-brawler .card-shot-wrap { overflow: hidden; }
@@ -473,6 +473,8 @@
     #game-grid .card-loop-frame {position:absolute;left:50%;top:50%;width:100%;height:100%;overflow:hidden;transform:translate(-50%,-50%)}
     #game-grid .card-loop-strip {display:block;width:100%;height:auto;animation:card-loop 4s steps(12) infinite paused}
     #game-grid .card[data-loop] .card-loop-strip {animation-play-state:running}
+    #game-grid .card[data-machine="brawler"] .card-loop-strip {height:1200%;object-fit:cover}
+    #game-grid .card[data-machine="brawler"]:not(.card-launching) .card-shot {visibility:hidden}
     @keyframes card-loop {to {transform:translateY(-100%)}}
     /* Each machine's pool of light on the carpet, its opacity set by the walk. */
     #game-grid .card-pool {position:absolute;z-index:0;left:-35%;right:-35%;bottom:-70px;height:140px;pointer-events:none;opacity:0;
@@ -1483,11 +1485,14 @@
         var box=document.createElement('span'),frame=document.createElement('span'),strip=document.createElement('img');
         box.className='card-loop';box.setAttribute('aria-hidden','true');frame.className='card-loop-frame';
         strip.className='card-loop-strip';strip.alt='';strip.decoding='async';
-        // The strip is letterboxed as the still is (object-fit: contain), worked out once from the frame's shape.
+        // Brawler fills its CRT; the other cabinets preserve their stills' aspect ratio.
         strip.addEventListener('load',function(){
           var shape=strip.naturalWidth/(strip.naturalHeight/12),glass=rom.clientWidth/Math.max(1,rom.clientHeight);
-          frame.style.width=(shape<glass?100*shape/glass:100).toFixed(2)+'%';
-          frame.style.height=(shape<glass?100:100*glass/shape).toFixed(2)+'%';
+          if(c.dataset.machine==='brawler') { frame.style.width='100%'; frame.style.height='100%'; }
+          else {
+            frame.style.width=(shape<glass?100*shape/glass:100).toFixed(2)+'%';
+            frame.style.height=(shape<glass?100:100*glass/shape).toFixed(2)+'%';
+          }
           c.setAttribute('data-loop-ready','');
         });
         frame.appendChild(strip);box.appendChild(frame);

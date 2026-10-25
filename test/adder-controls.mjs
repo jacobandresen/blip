@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { openPage } from './lib/harness.mjs';
+import { numberedTape } from './lib/basic-tape.mjs';
+import { instrumentBasicSound } from './lib/basic-runtime.mjs';
 
 const source = await readFile(new URL('../web/TAPE/ADDER.BLIP', import.meta.url), 'utf8');
 function scene() {
-  const lines = new Map(source.trim().split('\n').map((line) => {
-    const at = line.indexOf(' '); return [Number(line.slice(0, at)), line.slice(at + 1)];
-  }));
+  const lines = numberedTape(source);
   lines.set(85, 'START_GAME 1');
   for (const n of lines.keys()) if (n > 2710 && n < 2820) lines.delete(n);
   lines.set(2720, 'HEAD_X(S)=140+(S-1)*200:HEAD_Y(S)=220+(S-1)*160:ANGLE(S)=(S-1)*3.141592653589793');
@@ -17,12 +17,7 @@ function scene() {
 
 async function open(t, touch) {
   const handle = await openPage(t, 'chromium', { hasTouch: touch, viewport: touch ? { width: 390, height: 844 } : { width: 1000, height: 900 } });
-  await handle.page.route('**/basic-runtime.html*', async (route) => {
-    const response = await route.fetch();
-    const body = (await response.text()).replace('imports.env.blip_basic_sound=playBasicTone;',
-      'imports.env.blip_basic_sound=function(f,s,v){window.__adderFlags=(window.__adderFlags||0)|(f-1000);};');
-    await route.fulfill({ response, body });
-  });
+  await instrumentBasicSound(handle.page, 'function(f,s,v){window.__adderFlags=(window.__adderFlags||0)|(f-1000);}');
   await handle.page.emulateMedia({ reducedMotion: 'reduce' });
   await handle.page.goto(`${handle.origin}/basic.html`);
   await handle.page.evaluate(() => BlipBasic.submit('LOAD /TAPE/ADDER'));

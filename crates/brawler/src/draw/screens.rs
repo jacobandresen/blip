@@ -3,6 +3,10 @@
 
 use super::*;
 
+pub(crate) fn select_info_size(text: &str, width: f32) -> f32 {
+    if text_w(text, 2.0) <= width { 2.0 } else { 1.0 }
+}
+
 /// Text as a lit tube. blip's `draw_text_glow` is a one-pixel halo, lost
 /// under a big logo: this blooms outward in colour over several passes, lays
 /// fattened glass, and puts a near-white core inside.
@@ -31,13 +35,18 @@ pub(crate) fn tube(t: f32, phase: f32) -> f32 {
 
 /// How long each pair of fighters holds the title screen.
 pub(crate) const TITLE_TURN: f32 = 4.0;
+pub(crate) const TITLE_LEFT_MOVES: [MoveId; 6] = [MoveId::HighKick, MoveId::LowKick,
+    MoveId::HighPunch, MoveId::LowPunch, MoveId::Sweep, MoveId::Uppercut];
+pub(crate) const TITLE_RIGHT_MOVES: [MoveId; 6] = [MoveId::Special, MoveId::JumpKick,
+    MoveId::HighKick, MoveId::Sweep, MoveId::LowKick, MoveId::Uppercut];
 
 /// One of the title's two fighters, `u` seconds into its turn: stands in,
 /// shows a move, and takes the win before the next pair arrives.
 pub(crate) fn title_fighter(who: usize, x: f32, facing: f32, u: f32, first: bool) -> Fighter {
     let mut f = Fighter::new(who, x, facing);
-    // The left one kicks, then the right one answers with their special.
-    let (mv, at) = if first { (MoveId::HighKick, 0.7) } else { (MoveId::Special, 1.7) };
+    let mv = if first { TITLE_LEFT_MOVES[who % TITLE_LEFT_MOVES.len()] }
+        else { TITLE_RIGHT_MOVES[who % TITLE_RIGHT_MOVES.len()] };
+    let at = (if first { 0.55 } else { 1.55 }) + (who % 4) as f32 * 0.08;
     let m = move_data(mv);
     let len = (m.startup + m.active + m.recovery) * F;
     if u >= at && u < at + len {
@@ -87,7 +96,7 @@ pub(crate) fn draw_title(blip: &Blip, g: &Game) {
         blip.fill_glow_circle(cx, cy + 6.0, r, BlipColor { a: a * glow, ..sign });
     }
     neon(blip, "BRAWLER", 22.0, 9.0, sign, glow);
-    neon(blip, "TEN FIGHTERS   ONE CHAMPION", 100.0, 2.0,
+    neon(blip, "FIFTEEN FIGHTERS   ONE CHAMPION", 100.0, 2.0,
         BlipColor { r: 0.35, g: 0.95, b: 1.0, a: 1.0 }, tube(now, 2.1));
 
     // The roster, one face each, with the pair on stage lit.
@@ -196,43 +205,51 @@ pub(crate) fn draw_select(blip: &Blip, g: &Game) {
         if versus {
             let lit = if g.locked[side] { 1.0 } else { 0.45 + 0.55 * (g.now * 5.0).sin().max(0.0) };
             let tag = if g.locked[side] { ["P1 READY", "P2 READY"][side] } else { ["P1", "P2"][side] };
-            blip.draw_text(tag, tx, 112.0, 2.0, BlipColor { a: lit, ..col });
+            blip.draw_text(tag, tx, 82.0, 2.0, BlipColor { a: lit, ..col });
         }
         // A plate under the words: the stage behind them is not black.
-        blip.fill_rect(tx - 8.0, 128.0, 142.0, 108.0, BlipColor { r: 0.02, g: 0.02, b: 0.05, a: 0.72 });
-        blip.draw_text(a.name, tx, 136.0, 3.0, rgb(a.trim));
-        let special = if a.build == Build::Turtle { format!("TURTLE CALL, {}", a.special_name) }
-                      else { a.special_name.to_string() };
-        blip.draw_text(&special, tx, 164.0, 1.0, grey);
-        blip.draw_text(STAGE_NAMES[home_of(who)], tx, 174.0, 1.0, BlipColor { r: 0.55, g: 0.58, b: 0.66, a: 1.0 });
-        // Show move speed, reach and damage; Full leads the fair fighters, while the invincible fighter exceeds all three.
+        let plate_w = if versus { 184.0 } else { 268.0 };
+        blip.fill_rect(tx - 8.0, 100.0, plate_w, 136.0, BlipColor { r: 0.02, g: 0.02, b: 0.05, a: 0.72 });
+        blip.draw_text(a.name, tx, 112.0, 3.0, rgb(a.trim));
+        let info_w = plate_w - 16.0;
+        blip.draw_text(a.special_name, tx, 146.0, select_info_size(a.special_name, info_w), grey);
+        blip.draw_text(a.power_desc, tx, 162.0, select_info_size(a.power_desc, info_w), rgb(a.trim));
+        let stage = STAGE_NAMES[home_of(who)];
+        blip.draw_text(stage, tx, 178.0, select_info_size(stage, info_w), BlipColor { r: 0.55, g: 0.58, b: 0.66, a: 1.0 });
+        // Show move speed, reach and damage; Full leads the fair fighters, while the boss fighter exceeds all three.
         let stats = [("PWR", a.power / 1.45), ("SPD", a.walk / 250.0),
-                     ("HP ", if a.invincible { 2.0 } else { a.health as f32 / 130.0 })];
+                     ("HP ", if a.boss { 2.0 } else { a.health as f32 / 130.0 })];
         for (r, (label, v)) in stats.iter().enumerate() {
-            let sy = 190.0 + r as f32 * 14.0;
-            blip.draw_text(label, tx, sy, 1.0, grey);
-            blip.fill_rect(tx + 28.0, sy, 90.0 * v.clamp(0.0, 1.25), 8.0, rgb(a.trim));
-            blip.draw_rect(tx + 28.0, sy, 90.0, 8.0, BlipColor { r: 0.3, g: 0.3, b: 0.36, a: 1.0 });
+            let sy = 194.0 + r as f32 * 14.0;
+            blip.draw_text(label, tx, sy, 2.0, grey);
+            blip.fill_rect(tx + 46.0, sy, 60.0 * v.clamp(0.0, 1.25), 8.0, rgb(a.trim));
+            blip.draw_rect(tx + 46.0, sy, 60.0, 8.0, BlipColor { r: 0.3, g: 0.3, b: 0.36, a: 1.0 });
+            let value = match r {
+                0 => format!("{:.1}X", a.power),
+                1 => format!("{:.0}", a.walk),
+                _ => format!("{}", a.health),
+            };
+            blip.draw_text(&value, tx + 130.0, sy, 2.0, grey);
         }
     }
 
-    // The roster: one face each.
-    let n = FIGHTERS.len() as f32;
-    let (cw, ch, gap) = (58.0, 58.0, 4.0);
-    let x0 = (WIN_W as f32 - n * cw - (n - 1.0) * gap) / 2.0;
-    let y0 = 258.0;
+    let columns = 8;
+    let (cw, ch, gap) = (74.0, 44.0, 4.0);
+    let x0 = (WIN_W as f32 - columns as f32 * (cw + gap) + gap) / 2.0;
     for (i, a) in FIGHTERS.iter().enumerate() {
-        let x = x0 + i as f32 * (cw + gap);
+        let x = x0 + (i % columns) as f32 * (cw + gap);
+        let y0 = 250.0 + (i / columns) as f32 * (ch + gap);
         let on1 = g.pick == i;
         let on2 = versus && g.pick2 == i;
         blip.fill_rect(x, y0, cw, ch, BlipColor { r: 0.12, g: 0.12, b: 0.17, a: 1.0 });
         let cx = x + cw / 2.0;
         // Faces all one size here, whatever the fighter's.
         let look = Look { bulk: a.bulk, size: 1.0, ..look_of(a, 0.0) };
-        let head = V(cx - 2.0, y0 + 24.0);
+        let head = V(cx - 2.0, y0 + 14.0);
         draw_head(blip, &look, 1.0, head, V(head.0 - 3.0, head.1 + 16.0), Mood::Calm);
-        blip.fill_rect(x, y0 + ch - 14.0, cw, 14.0, BlipColor { r: 0.07, g: 0.07, b: 0.10, a: 1.0 });
-        blip.draw_text(a.name, cx - text_w(a.name, 1.0) / 2.0, y0 + ch - 10.0, 1.0,
+        blip.fill_rect(x, y0 + ch - 16.0, cw, 16.0, BlipColor { r: 0.07, g: 0.07, b: 0.10, a: 1.0 });
+        let name_size = select_info_size(a.name, cw - 4.0);
+        blip.draw_text(a.name, cx - text_w(a.name, name_size) / 2.0, y0 + ch - 15.0, name_size,
             if on1 || on2 { BLIP_WHITE } else { BlipColor { r: 0.6, g: 0.6, b: 0.66, a: 1.0 } });
         let frame = if on1 && on2 { BLIP_WHITE }
             else if on1 { if versus { p1c } else { rgb(a.trim) } }
@@ -247,16 +264,14 @@ pub(crate) fn draw_select(blip: &Blip, g: &Game) {
 
     // The rules a player cannot find by pressing buttons, put where there is
     // nothing else to do but read them.
-    blip.draw_centered("PUNCH AND KICK TOGETHER IS THE SPECIAL   DOWN AND PUNCH THE UPPERCUT", 326.0, 1.0, grey);
-    blip.draw_centered("HOLD AWAY TO GUARD   WALK IN CLOSE AND PUNCH TO THROW", 340.0, 1.0, grey);
-    blip.draw_centered("TAP TOWARD AS A BLOW LANDS TO TURN IT ASIDE", 354.0, 1.0, grey);
+    blip.draw_centered("BACK GUARDS   BOTH BUTTONS: SPECIAL", 348.0, 2.0, grey);
     let prompt = if !versus { "PRESS FIRE TO START" }
         else if !g.locked[0] || !g.locked[1] { "PRESS TO LOCK IN" }
         else { "FIGHT" };
     blip.draw_centered(prompt, 374.0, 2.0, BLIP_WHITE);
 }
 
-/// The kiosk card's picture (see brawler_card.sh): the first fighter of the
+/// The kiosk card's picture: the first fighter of the
 /// roster in a flying kick, out of a burst in his own red. Drawn small and
 /// enlarged by the script, so it keeps the game's pixels.
 pub(crate) fn draw_poster(blip: &Blip, g: &Game) {
@@ -316,6 +331,11 @@ pub(crate) const QUOTES: [[&str; 2]; FIGHTERS.len()] = [
     ["STUCK FOR AN ANSWER.", "IT HAPPENS."],
     ["GAMMA STRONGEST.", "GROUND AGREES."],
     ["STAY DOWN.", "I WOULD RATHER NOT DO THAT TWICE."],
+    ["KEEP UP.", "THE NEXT KICK IS ALREADY COMING."],
+    ["YOUR DEFEAT WAS INEVITABLE.", "I MERELY CHOSE THE HOUR."],
+    ["MISSION COMPLETE.", "YOU NEVER SAW ME COMING."],
+    ["STAND TALL.", "EVEN WHEN THE EARTH DISAGREES."],
+    ["THE BLOCK RAISED ME.", "THE BELL SETTLES IT."],
 ];
 
 /// The winner's word on the match, along the foot of the screen.
@@ -430,6 +450,11 @@ const ENDINGS: [&str; FIGHTERS.len()] = [
     "BACK ON THE ROOF BEFORE THE STREETLIGHTS.",
     "GAMMA SLEEPS. THE VILLAGE DOES NOT.",
     "HE HANGS UP THE CAPE FOR ONE EVENING.",
+    "SHE TAKES THE NIGHT TRAIN HOME. JUSTICE NEVER RESTS.",
+    "THE GENERAL SALUTES. FOR ONCE, THE CROWD DOES NOT.",
+    "THE BERET IS ON THE HOOK BEFORE ANYBODY NOTICES.",
+    "THE BRONZE BELT IS HEAVY. SHE CARRIES IT LIGHTLY.",
+    "THE LOWRIDER ROLLS HOME UNDER THE DUSK LIGHT.",
 ];
 
 /// The ladder cleared: the champion at home with a fist in the air, the nine

@@ -80,3 +80,17 @@ test('a copied game keeps its exported pictures after the cassette is ejected', 
   assert.equal(await page.evaluate(() => BlipBasic.isFileAvailable('/TAPE/BOUNCER/ASSETS/BALL.PNG')), false);
   assert.ok(await page.evaluate(() => BlipBasic.filesystem.files['/USER/BOUNCER/ASSETS/BALL.PNG']?.startsWith('data:image/png')));
 });
+
+test('PLAY restarts the inserted game after EXIT GAME stops it', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1000, height: 900 } });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(`${origin}/basic.html`);
+  await page.evaluate(async () => { await BlipBasic.submit('LOAD /TAPE/BRAWLER'); BlipBasic.submit('RUN'); });
+  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
+  await page.locator('#exit-game').click();
+  await page.waitForFunction(() => document.querySelector('#basic-wasm-frame').hidden);
+  assert.equal(await page.evaluate(() => document.body.hasAttribute('data-deck-tape')), true);
+  await page.getByRole('button', { name: 'Play inserted tape' }).click();
+  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
+  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
+});

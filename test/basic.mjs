@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { openPage, startPage } from './lib/harness.mjs';
+import { instrumentBasicSound } from './lib/basic-runtime.mjs';
 
 test('tape programs use uppercase source and unique ascending line numbers', () => {
   const tape = new URL('../web/TAPE/', import.meta.url);
@@ -608,11 +609,7 @@ test('RALLY.BLIP runs matches and moves both player paddles', async (t) => {
 test('RALLY.BLIP awards a point and resets the field after a missed paddle', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.route('**/basic-runtime.html*', async (route) => {
-    const response = await route.fetch();
-    await route.fulfill({ response, body: (await response.text()).replace('imports.env.blip_basic_sound=playBasicTone;',
-      'imports.env.blip_basic_sound=function(f,s,v){window.__pointReset=f;};') });
-  });
+  await instrumentBasicSound(page, 'function(f,s,v){window.__pointReset=f;}');
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(async () => {
     await BlipBasic.submit('LOAD /TAPE/RALLY');
@@ -1073,14 +1070,14 @@ const exitTape = async (page) => {
 /** Ryuka against Giotto, a fixed distance apart; the rival stands still. */
 const brawlerFight = (gap, setup = '') => ({
   80: 'REM NO MUSIC, SO THE SOUND COUNT IS ONLY THE FIGHT',
-  85: `PICK=1:START_GAME:RIVAL_X=YOU_X+${gap}:SPEED(RIVAL)=0${setup}`,
+  85: `MODE=2:PICK2=4:PICK=1:START_GAME:X(2)=X(1)+${gap}${setup}`,
 });
 
 test('BRAWLER.BLIP supports three rounds of movement and striking', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   for (let round = 1; round <= 3; round++) {
-    const canvas = await openTape(page, origin, 'BRAWLER', { 166: 'RIVAL_WAIT=999' });
+    const canvas = await openTape(page, origin, 'BRAWLER');
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `round ${round}: Brawler should launch cleanly`);
     await page.waitForTimeout(180);
     const title = await canvas.screenshot();
@@ -1120,8 +1117,9 @@ test('BRAWLER.BLIP supports three rounds of movement and striking', async (t) =>
 test('BRAWLER punch lands once after its Rust startup frames', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  const canvas = await openTape(page, origin, 'BRAWLER', brawlerFight(70, ':RIVAL_WAIT=999'));
-  await waitForPixels(page, canvas, [52, 24, 196, 12], 'cyan', 200);
+  const canvas = await openTape(page, origin, 'BRAWLER', brawlerFight(70, ':CPU_DELAY=999'));
+  await waitForPixels(page, canvas, [52, 24, 196, 12], 'yellow', 200);
+  await page.waitForTimeout(1300);
   await canvas.focus();
   const before = await soundCount(page);
   await page.keyboard.press('Space');
@@ -1150,12 +1148,12 @@ test('BRAWLER roster specials land across projectile, rush, kick and laser fight
   for (const pick of [1, 2, 3, 8, 10]) {
     const canvas = await openTape(page, origin, 'BRAWLER', {
       80: 'REM NO MUSIC',
-      85: `PICK=${pick}:START_GAME:RIVAL_X=YOU_X+110:SPEED(RIVAL)=0:RIVAL_WAIT=999`,
-      165: statusMarker('SPECIAL_HIT=1 AND RIVAL_HP<MAX_HP(RIVAL)'),
+      85: `MODE=2:PICK2=1:PICK=${pick}:START_GAME:X(2)=X(1)+${pick === 2 ? 65 : pick === 3 ? 45 : 110}`,
+      285: statusMarker('HEALTH(2)<MAX_HP(WHO(2))'),
     });
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, `fighter ${pick} should start`);
     await canvas.focus();
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(1300); // START_ROUND holds input through its 75-frame entrance.
     const beforeSound = await soundCount(page);
     await page.keyboard.down('f');
     await page.waitForTimeout(35);
@@ -1176,19 +1174,20 @@ test('BRAWLER guard blocks the CPU attack without chip damage', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const canvas = await openTape(page, origin, 'BRAWLER', {
-    ...brawlerFight(40, ':RIVAL_WAIT=20'),
-    165: 'IF BLOCK_FLASH>0 THEN BLOCK_FLASH=99',
-    166: statusMarker('YOUR_HP=MAX_HP(PICK)'),
+    85: 'MODE=1:PICK=1:START_GAME:WHO(2)=2:X(2)=X(1)+30:CPU_DELAY=24',
+    285: statusMarker('HEALTH(1)=MAX_HP(WHO(1))'),
+    286: 'IF SPARK_T>0 THEN SPARK_T=99:CPU_DELAY=999',
   });
   await canvas.focus();
-  await page.waitForTimeout(150);
   const before = await soundCount(page);
+  await page.keyboard.down('ArrowLeft');
   await page.keyboard.down('ArrowDown');
   await page.waitForFunction((initial) => (document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0) >= initial + 2, before, { timeout: 3000 });
   await page.waitForTimeout(150);
   const frame = await canvas.screenshot();
   await page.keyboard.up('ArrowDown');
-  assert.ok(await countGamePixels(page, frame, [166, 268, 28, 28], 'cyan') > 4, "guard impact should flash cyan at the player's hands");
+  await page.keyboard.up('ArrowLeft');
+  assert.ok(await countGamePixels(page, frame, [170, 250, 60, 65], 'cyan') > 4, "guard impact should flash cyan at the player's hands");
   assert.ok(await countGamePixels(page, frame, STATUS_MARKER, 'green') > 20, 'a blocked blow should do no damage');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'blocking should not cause an interpreter error');
   await exitTape(page);
@@ -1198,17 +1197,17 @@ test('BRAWLER unguarded CPU hits show a red impact cue', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const canvas = await openTape(page, origin, 'BRAWLER', {
-    ...brawlerFight(40, ':RIVAL_WAIT=20'),
-    165: 'IF HURT_FLASH>0 THEN HURT_FLASH=99',
-    166: statusMarker('YOUR_HP<MAX_HP(PICK)'),
+    85: 'MODE=1:PICK=1:START_GAME:WHO(2)=2:X(2)=X(1)+30:CPU_DELAY=0',
+    285: statusMarker('HEALTH(1)<MAX_HP(WHO(1))'),
+    286: 'IF SPARK_T>0 THEN SPARK_T=99',
   });
   await canvas.focus();
-  await page.waitForTimeout(150);
+  await page.waitForTimeout(1300);
   const before = await soundCount(page);
   await page.waitForFunction((initial) => (document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSoundEvents || 0) >= initial + 2, before, { timeout: 3000 });
   await page.waitForTimeout(150);
   const frame = await canvas.screenshot();
-  assert.ok(await countGamePixels(page, frame, [166, 268, 28, 28], 'red') > 4, 'an unguarded CPU hit should flash red between the fighters');
+  assert.ok(await countGamePixels(page, frame, [170, 250, 60, 65], 'yellow') > 4, 'an unguarded CPU hit should flash yellow between the fighters');
   assert.ok(await countGamePixels(page, frame, STATUS_MARKER, 'green') > 20, 'the hit should cost health');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the damage animation should not cause an interpreter error');
   await exitTape(page);
@@ -1217,21 +1216,46 @@ test('BRAWLER unguarded CPU hits show a red impact cue', async (t) => {
 test('BRAWLER ends a 45-second round on time and awards the healthier fighter', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  let canvas = await openTape(page, origin, 'BRAWLER', { 85: 'PICK=1:START_GAME:RIVAL_WAIT=999' });
-  assert.ok(await waitForPixels(page, canvas, [52, 24, 196, 12], 'cyan', 200) > 200, 'your health bar should sit on the left');
+  let canvas = await openTape(page, origin, 'BRAWLER', { 85: 'MODE=2:PICK2=4:PICK=1:START_GAME:CPU_DELAY=999' });
+  assert.ok(await waitForPixels(page, canvas, [52, 24, 196, 12], 'yellow', 200) > 200, 'your health bar should sit on the left');
   const fight = await canvas.screenshot();
-  assert.ok(await countGamePixels(page, fight, [392, 24, 196, 12], 'red') > 200, "the rival's health bar should sit on the right");
+  assert.ok(await countGamePixels(page, fight, [392, 24, 196, 12], 'yellow') > 200, "the rival's health bar should sit on the right");
   assert.ok(await countGamePixels(page, fight, [294, 18, 52, 26], 'white') > 10, 'the round clock should be visible between them');
   await exitTape(page);
   canvas = await openTape(page, origin, 'BRAWLER', {
-    85: 'PICK=1:START_GAME:YOUR_HP=90:RIVAL_HP=55:RIVAL_WAIT=999:ROUND_TIME=0.2',
-    165: statusMarker('STATE$="ROUND" AND TIME_UP AND YOUR_ROUNDS=1 AND RIVAL_ROUNDS=0'),
+    85: 'MODE=2:PICK2=4:PICK=1:START_GAME:HEALTH(1)=90:HEALTH(2)=55:CPU_DELAY=999:CLOCK=0.2',
+    285: statusMarker('STATE$="ROUND" AND CLOCK<=0 AND ROUNDS(1)=1 AND ROUNDS(2)=0'),
   });
   await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the time-up path should not stop with a BASIC error');
   const result = await canvas.screenshot();
-  assert.ok(await countGamePixels(page, result, [240, 66, 160, 26], 'yellow') > 12, 'the round should display TIME UP');
+  assert.ok(await countGamePixels(page, result, [240, 176, 160, 20], 'yellow') > 12, 'the round should display TIME UP');
   assert.ok(await countGamePixels(page, result, STATUS_MARKER, 'green') > 20, 'the higher-health player should win the timed round');
+  await exitTape(page);
+});
+
+test('BRAWLER keeps ladder progress in the round intro without cluttering the fight', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  let canvas = await openTape(page, origin, 'BRAWLER', {
+    85: 'PICK=1:START_GAME',
+    1590: 'INTRO=999:HITSTOP=0',
+    285: statusMarker('INTRO>20 AND MODE=1'),
+  });
+  await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20);
+  let frame = await canvas.screenshot();
+  assert.ok(await countGamePixels(page, frame, [240, 94, 160, 18], 'white') > 8,
+    'the round intro should show ladder progress above the round call');
+  await exitTape(page);
+
+  canvas = await openTape(page, origin, 'BRAWLER', {
+    85: 'PICK=1:START_GAME:INTRO=0',
+    285: statusMarker('STATE$="PLAY" AND INTRO=0'),
+  });
+  await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20);
+  frame = await canvas.screenshot();
+  assert.ok(await countGamePixels(page, frame, [30, 374, 150, 24], 'yellow') < 5,
+    'solo ladder text should not sit in the fight scene margin');
   await exitTape(page);
 });
 
@@ -1239,7 +1263,7 @@ test('BRAWLER.BLIP draws the turtle shell and mask build', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const canvas = await openTape(page, origin, 'BRAWLER', { 85: 'PICK=4:START_GAME' });
-  const mask = await waitForPixels(page, canvas, [140, 240, 40, 12], 'blue', 10);
+  const mask = await waitForPixels(page, canvas, [130, 250, 100, 74], 'blue', 10);
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'shell, mask and fight drawing should run without BASIC errors');
   assert.ok(mask > 10, 'the turtle should wear its blue mask');
   await exitTape(page);
@@ -1797,11 +1821,7 @@ test('DEFENDER higher waves initialize each formation theme', async (t) => {
 test('DEFENDER starts a fifth-wave mothership with a visible health bar', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.route('**/basic-runtime.html*', async (route) => {
-    const response = await route.fetch();
-    await route.fulfill({ response, body: (await response.text()).replace('imports.env.blip_basic_sound=playBasicTone;',
-      'imports.env.blip_basic_sound=function(f,s,v){if(f===1777)window.__mothershipVolley=true;else playBasicTone(f,s,v);};') });
-  });
+  await instrumentBasicSound(page, 'function(f,s,v){if(f===1777)window.__mothershipVolley=true;else playBasicTone(f,s,v);}');
   // The fifth wave with its formation gone: the mothership comes; the frame
   // freezes once its first volley is clear of its hull.
   const canvas = await openDefender(page, origin, {

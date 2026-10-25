@@ -61,11 +61,13 @@ checks listings, swapping, ejection, inaccessible graphics, and a portable copy.
 
 ## Frame timing
 
-Brawler's frame-counted startup, recovery, and round timer, and Defender's
-frame-counted movement and firing, now use `WAIT 0`
-so each update waits for the next rendered frame. A fixed 16 ms delay after
-the work could skip another display frame. Full rules and CPU parity remain
-unfinished; the current BASIC mode still differs from Rust's complete game.
+Brawler's frame-counted startup, recovery and round timer, and Defender's
+frame-counted movement and firing, use `WAIT 0` so each update waits for the
+next rendered frame. A fixed 16 ms delay after the work could skip another
+display frame. Brawler BASIC has its own complete playable ladder and shares
+the Rust roster, move table, captured poses, stages and music assets. Its combat
+and CPU are implemented separately, so the focused browser and visual checks
+do not establish frame-by-frame state parity with Rust.
 
 ## Other games
 

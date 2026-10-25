@@ -24,6 +24,68 @@
 
 use super::*;
 
+/// Deterministic comparison frames, photographed from the game's normal drawing path.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn compare(g: &mut Game) {
+    let Ok(scene) = std::env::var("BLIP_COMPARE") else { return };
+    let number = |key: &str, default| std::env::var(key).ok().and_then(|s| s.parse::<usize>().ok()).unwrap_or(default);
+    let who = number("BLIP_COMPARE_WHO", 0) % FIGHTERS.len();
+    let row = scene.parse::<usize>().unwrap_or(0).min(crate::export::POSES.len() - 1);
+    let frame = number("BLIP_COMPARE_FRAME", 3) % crate::export::FRAMES;
+    if scene == "TITLE" {
+        g.now = 2.0;
+        g.state = State::Title;
+        g.menu = 0;
+        return;
+    }
+    let mut f = crate::export::sample(who, row, frame);
+    f.alt_kick = std::env::var("BLIP_COMPARE_ALT_KICK").is_ok_and(|value| value == "1");
+    let timeline = number("BLIP_COMPARE_TICK", 0) as f32 / 60.0;
+    if row == 11 && who == 14 && std::env::var("BLIP_COMPARE_TICK").is_ok() {
+        f.t = timeline;
+        f.hit_done = true;
+    }
+    g.now = if row == 0 { f.t } else { 2.0 };
+    g.state = if scene == "SELECT" { State::Select } else { State::Fight };
+    g.mode = if std::env::var("BLIP_COMPARE_MODE").is_ok_and(|mode| mode == "VERSUS") {
+        Mode::Versus
+    } else {
+        Mode::Solo
+    };
+    g.pick = who;
+    g.pick2 = number("BLIP_COMPARE_FOE", 1) % FIGHTERS.len();
+    g.stage = if who == 14 { home_of(who) } else { home_of(g.pick2) };
+    f.x += if matches!(row, 1 | 17) { draw::STEP * 12.0 * f.size() } else { 240.0 };
+    if matches!(f.act, Act::Air) || f.mv == MoveId::JumpKick { f.y = FLOOR_Y - 70.0; }
+    g.p = [f, Fighter::new(g.pick2, 400.0, -1.0)];
+    if row == 11 && who == 14 && std::env::var("BLIP_COMPARE_TICK").is_ok() {
+        g.drivebys[0] = DriveBy { active: timeline < DRIVEBY_TOTAL, t: timeline,
+            start_x: g.p[0].x, facing: g.p[0].facing,
+            damage: g.p[0].scaled(move_data(MoveId::Special)).damage };
+        let damage = g.p[0].scaled(move_data(MoveId::Special)).damage / 3;
+        for (shot, at) in DRIVEBY_SHOT_TIMES.into_iter().enumerate() {
+            if timeline < at { continue; }
+            let x = driveby_car_x(&g.p[0], at) + g.p[0].facing * 39.0
+                + g.p[0].facing * 520.0 * (timeline - at);
+            if !(0.0..=WIN_W as f32).contains(&x) { continue; }
+            if let Some(b) = g.bolts.get_mut(shot) {
+                *b = Bolt { x, y: FLOOR_Y - 57.0 + driveby_bounce(at) + [-5.0, 0.0, 5.0][shot],
+                    vx: g.p[0].facing * 520.0, vy: 0.0, owner: 0, active: true, damage };
+            }
+        }
+    }
+    g.ghost = g.p.map(|f| f.health as f32);
+    g.hitstop = 0.0;
+    g.fade = 0.0;
+    g.clock = number("BLIP_COMPARE_CLOCK", 32) as f32;
+    g.round = 1;
+    g.opponent_index = 0;
+    g.demo = false;
+    g.fruit_due = false;
+    g.hitspark.iter_mut().for_each(|s| s.ttl = 0.0);
+    g.pops.iter_mut().for_each(|p| p.ttl = 0.0);
+}
+
 /// Set this frame's scene up. Called every frame of a screenshot run with
 /// the count of frames so far.
 pub(crate) fn pose(g: &mut Game, shot_frame: &mut u32) {

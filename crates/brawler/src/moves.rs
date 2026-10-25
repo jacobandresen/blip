@@ -115,11 +115,11 @@ pub(crate) fn move_data(id: MoveId) -> MoveData {
     match id {
         // High punch is the quickest overhead (11f) and deals the least damage.
         MoveId::LowPunch  => mv(5.0,  3.0,  9.0,  5,  12.0, 7.0,  48.0, 30.0, 14.0, Level::Low,      false),
-        MoveId::HighPunch => mv(11.0, 3.0, 16.0,  9,  16.0, 10.0, 50.0, 92.0, 14.0, Level::Overhead, false),
+        MoveId::HighPunch => mv(11.0, 3.0, 16.0,  9,  16.0, 10.0, 50.0, 70.0, 14.0, Level::Overhead, false),
         // Low kick is a safe poke; high kick is a punishable overhead.
         MoveId::LowKick   => mv(6.0,  3.0, 10.0,  7,  14.0, 9.0,  58.0, 26.0, 14.0, Level::Low,      false),
         // Crouch-blockers survived this 17-damage overhead in one fight out of six; it causes no knockdown.
-        MoveId::HighKick  => mv(14.0, 5.0, 22.0, 17,  22.0, 13.0, 62.0, 98.0, 18.0, Level::Overhead, false),
+        MoveId::HighKick  => mv(14.0, 5.0, 22.0, 17,  22.0, 13.0, 62.0, 70.0, 18.0, Level::Overhead, false),
         MoveId::Sweep     => mv(10.0, 4.0, 22.0, 13,  0.0,  12.0, 72.0, 18.0, 16.0, Level::Low,      true),
         // The uppercut hits jump-ins, misses crouchers, and has 24 frames of recovery.
         MoveId::Uppercut  => mv(6.0,  6.0, 24.0, 15,  0.0,  12.0, 30.0, 110.0, 40.0, Level::Mid,     true),
@@ -136,4 +136,31 @@ pub(crate) fn move_data(id: MoveId) -> MoveData {
         // of the one move a guard cannot answer.
         MoveId::Throw     => mv(3.0,  2.0, 20.0, 18,  0.0,  0.0,  40.0, 58.0, 26.0, Level::Mid,      true),
     }
+}
+
+pub(crate) const DRIVEBY_ARRIVE: f32 = 0.38;
+pub(crate) const DRIVEBY_SHOT_TIMES: [f32; 3] = [56.0 / 60.0, 71.0 / 60.0, 86.0 / 60.0];
+pub(crate) const DRIVEBY_DEPART: f32 = 1.70;
+pub(crate) const DRIVEBY_TOTAL: f32 = 3.05;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn driveby_car_x(f: &Fighter, t: f32) -> f32 {
+    driveby_car_x_at(f.x, f.facing, t)
+}
+
+pub(crate) fn driveby_car_x_at(start_x: f32, face: f32, t: f32) -> f32 {
+    let stop = (start_x - face * 130.0).clamp(90.0, 550.0);
+    if t < DRIVEBY_ARRIVE {
+        stop - face * 150.0 * (1.0 - t / DRIVEBY_ARRIVE)
+    } else if t < DRIVEBY_DEPART {
+        stop
+    } else {
+        stop + face * 520.0 * (t - DRIVEBY_DEPART)
+    }
+}
+
+pub(crate) fn driveby_bounce(t: f32) -> f32 {
+    if t < DRIVEBY_ARRIVE { return (t * 10.5).sin() * 1.8; }
+    let amp = if t < DRIVEBY_DEPART { 6.5 } else { (6.5 - (t - DRIVEBY_DEPART) * 4.0).max(2.0) };
+    ((t - DRIVEBY_ARRIVE) * 10.5).sin() * amp
 }

@@ -22,6 +22,7 @@ export async function launchEngine(engineName, { headless = true, hasTouch = fal
     // "visible" keeps running the game loop.
     args.push('--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding', '--disable-background-timer-throttling');
+    args.push('--mute-audio');
     args.push(hasTouch ? '--touch-events=enabled' : '--touch-events=disabled');
     if (!hasTouch) args.push('--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=1,availablePointerTypes=1');
   }

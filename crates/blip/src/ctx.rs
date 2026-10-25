@@ -819,6 +819,11 @@ impl Blip {
     pub fn draw_rect(&self, x: f32, y: f32, w: f32, h: f32, c: Color) {
         draw::draw_rect(x, y, w, h, c);
     }
+    /// Draw a circle outline with the given radius and line width.
+    #[inline]
+    pub fn draw_circle(&self, cx: f32, cy: f32, r: f32, width: f32, c: Color) {
+        draw::draw_circle(cx, cy, r, width, c);
+    }
     /// Draw a 1-pixel line between two points.
     #[inline]
     pub fn draw_line(&self, x1: f32, y1: f32, x2: f32, y2: f32, c: Color) {

@@ -37,8 +37,7 @@ pub(crate) fn mood_of(f: &Fighter) -> Mood {
 pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop: f32, i: usize, shadow: bool) {
     let a = f.arch();
     let prone = down_time(f).is_some_and(|t| t < 0.9);
-    let rig = Rig::upright(f.x, f.y + shift, f.facing, if prone { -f.facing } else { f.facing },
-        a.size);
+    let rig = Rig::upright(f.x, f.y + shift, f.facing, f.facing, a.size);
 
     let flash = if hitstop > 0.0 && f.act == Act::Hitstun { 0.5 }
                 else if invulnerable(f) && ((now * 30.0) as i32) % 2 == 0 { 0.3 }
@@ -54,8 +53,14 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
                 -(rise / 600.0).clamp(-1.0, 1.0) * 0.7);
     // A blink every three seconds or so, the two fighters out of step.
     let blink = (now * 0.31 + i as f32 * 0.37).fract() < 0.035;
-    let near = Look { wind, blink, ..look_of(&a, flash) };
+    let near = Look { wind, blink, prone, floor: FLOOR_Y + shift, ..look_of(&a, flash) };
     let far = Look { far: true, tone: FAR, ..near };
+
+    if shadow && a.build == Build::Uniform && f.act == Act::Attack && f.mv == MoveId::Special {
+        let pulse = 38.0 + 4.0 * (now * 14.0).sin();
+        blip.fill_glow_circle(f.x, f.y + shift - 60.0, pulse,
+            BlipColor { r: 0.62, g: 0.22, b: 0.94, a: 0.53 });
+    }
 
     // Dust off the boards where a body lands. Knockdowns are the one
     // moment the floor is part of the fight.
@@ -137,7 +142,9 @@ pub(crate) fn draw_body(blip: &Blip, f: &Fighter, now: f32, shift: f32, hitstop:
 
     let q = pose_of(now, f, i);
     let k = skeleton(rig, &q);
-    if a.build == Build::Caped { draw_cape(blip, &far, k.hip, k.neck, rig.fwd, f.soar, now); }
+    if matches!(a.build, Build::Caped | Build::Uniform) {
+        draw_cape(blip, &far, k.hip, k.neck, rig.fwd, if prone { 1.0 } else { f.soar }, now, FLOOR_Y + shift);
+    }
     draw_leg(blip, &far, k.hip_rear, k.knee_rear, k.ankle_rear, rig.fwd, rig.ground, q.rear_heel);
     // The far arm is beyond the chest: what shows of it is what clears it.
     draw_arm(blip, &far, k.sh_rear, k.elbow_rear, k.hand_rear, q.open, rig.fwd);
@@ -201,6 +208,13 @@ pub(crate) fn draw_bolt(blip: &Blip, who: usize, at: V, dir: f32, now: f32, from
     let a = &FIGHTERS[who];
     let spin = now * 14.0 * dir;
     let arm = |ang: f32, r: f32| V(at.0 + ang.cos() * r, at.1 + ang.sin() * r);
+    if a.special == Special::DriveBy {
+        let hot = BlipColor { r: 1.0, g: 0.66, b: 0.22, a: 1.0 };
+        blip.fill_glow_circle(at.0, at.1, 8.0, BlipColor { a: 0.52, ..hot });
+        stroke(blip, V(at.0 - dir * 27.0, at.1), at, 5.0, 3.0, hot);
+        blip.fill_rect(at.0 - 3.5, at.1 - 1.5, 7.0, 3.0, BLIP_WHITE);
+        return;
+    }
     match a.special_name {
         // A slice-less pizza, spinning flat.
         "PIZZA TOSS" => {
@@ -347,6 +361,9 @@ pub(crate) fn draw_fight(blip: &Blip, g: &Game) {
         let shake = g.shake_px();
         draw_fruit(blip, g.fruit.kind, g.fruit.x, FLOOR_Y + shake);
     }
+    for driveby in g.drivebys.iter().filter(|driveby| driveby.active) {
+        draw_lowrider(blip, driveby, g.shake_px());
+    }
     for i in 0..2 { draw_fighter(blip, g, i); }
     let shake = g.shake_px();
     for (k, h) in g.helpers.iter().enumerate() {
@@ -376,7 +393,9 @@ pub(crate) fn draw_fight(blip: &Blip, g: &Game) {
         let f = &g.p[b.owner];
         let speed = b.vx.hypot(b.vy).max(1.0);
         let tail = V(b.x - b.vx / speed * 54.0, b.y - b.vy / speed * 54.0);
-        let from = if f.act == Act::Attack && f.mv == MoveId::Special {
+        let from = if f.arch().special == Special::DriveBy {
+            tail
+        } else if f.act == Act::Attack && f.mv == MoveId::Special {
             V(f.x + f.facing * 14.0 * f.size(), f.y - 104.0 * f.size())
         } else {
             tail
@@ -408,6 +427,85 @@ pub(crate) fn draw_fight(blip: &Blip, g: &Game) {
         if g.combo_t > 0.25 || (g.now * 20.0) as i32 % 2 == 0 {
             stamp_at(blip, &text, f.x, f.y - STAND_H * f.size() - 26.0 - rise, 2.0,
                 BlipColor { r: 1.0, g: 0.85, b: 0.25, a: 1.0 });
+        }
+    }
+}
+
+fn draw_lowrider(blip: &Blip, driveby: &DriveBy, shake: f32) {
+    let face = driveby.facing;
+    let x = driveby_car_x_at(driveby.start_x, face, driveby.t);
+    let y = FLOOR_Y + shake - 35.0 + driveby_bounce(driveby.t);
+    let roll = if driveby.t < DRIVEBY_ARRIVE { driveby.t * 16.0 }
+        else if driveby.t < DRIVEBY_DEPART { DRIVEBY_ARRIVE * 16.0 }
+        else { DRIVEBY_ARRIVE * 16.0 + (driveby.t - DRIVEBY_DEPART) * 16.0 };
+    let body = BlipColor { r: 0.30, g: 0.07, b: 0.12, a: 1.0 };
+    let dark = BlipColor { r: 0.07, g: 0.08, b: 0.12, a: 1.0 };
+    let glass = BlipColor { r: 0.42, g: 0.68, b: 0.70, a: 1.0 };
+    let chrome = BlipColor { r: 0.78, g: 0.77, b: 0.68, a: 1.0 };
+    blip.fill_rect(x - 64.0, y - 17.0, 128.0, 24.0, body);
+    blip.fill_rect(x - 35.0, y - 34.0, 70.0, 19.0, body);
+    blip.fill_rect(x - 31.0, y - 31.0, 28.0, 13.0, glass);
+    blip.fill_rect(x + 3.0, y - 31.0, 31.0, 13.0, glass);
+    // Three riders have distinct faces, bandanas and shoulders behind glass.
+    for (j, sx) in [-22.0f32, 11.0, 27.0].into_iter().enumerate() {
+        let skin = if j == 1 { BlipColor { r: 0.56, g: 0.36, b: 0.25, a: 1.0 } }
+            else { BlipColor { r: 0.39, g: 0.24, b: 0.18, a: 1.0 } };
+        let shirt = [
+            BlipColor { r: 0.45, g: 0.14, b: 0.18, a: 1.0 },
+            BlipColor { r: 0.56, g: 0.40, b: 0.21, a: 1.0 },
+            BlipColor { r: 0.14, g: 0.25, b: 0.36, a: 1.0 },
+        ][j];
+        blip.fill_rect(x + sx - 5.0, y - 23.0, 10.0, 8.0, dark);
+        blip.fill_rect(x + sx - 4.0, y - 22.0, 8.0, 6.0, shirt);
+        blip.draw_line_ex(x + sx - 3.0, y - 20.0, x + sx + 3.0, y - 18.0, 1.0, chrome);
+        blip.fill_circle(x + sx, y - 26.0, 3.6, skin);
+        blip.fill_rect(x + sx - 4.0, y - 30.0, 8.0, 2.0, dark);
+        blip.fill_rect(x + sx - 3.5, y - 26.0, 7.0, 1.6,
+            if j == 1 { chrome } else { BlipColor { r: 0.82, g: 0.12, b: 0.18, a: 1.0 } });
+        blip.fill_rect(x + sx + face * 1.0, y - 26.8, 1.0, 1.0, BLIP_WHITE);
+        if j > 0 {
+            stroke(blip, V(x + sx, y - 22.0), V(x + sx + face * 9.0, y - 21.0), 2.6, 1.8, dark);
+            blip.draw_line_ex(x + sx + face * 7.0, y - 22.0,
+                x + sx + face * 14.0, y - 22.0, 1.0, chrome);
+        }
+    }
+    // Glass rails, door seams and a gold side pinstripe keep the car legible in motion.
+    for (x1, x2) in [(-33.0f32, -1.0f32), (1.0, 36.0)] {
+        blip.draw_line_ex(x + x1, y - 32.0, x + x2, y - 32.0, 1.0, chrome);
+        blip.draw_line_ex(x + x1, y - 17.0, x + x2, y - 17.0, 1.0, chrome);
+    }
+    blip.draw_line_ex(x - 5.0, y - 15.0, x - 5.0, y + 1.0, 1.0, dark);
+    blip.draw_line_ex(x + 34.0, y - 15.0, x + 34.0, y + 1.0, 1.0, dark);
+    blip.draw_line_ex(x - 55.0, y - 4.0, x + 51.0, y - 4.0, 2.0,
+        BlipColor { r: 0.95, g: 0.70, b: 0.28, a: 1.0 });
+    for wx in [-38.0f32, 39.0] {
+        let wheel_x = x + wx;
+        let wheel_y = y + 5.0;
+        blip.fill_circle(wheel_x, wheel_y, 12.0, dark);
+        blip.fill_circle(wheel_x, wheel_y, 6.0, chrome);
+        blip.fill_circle(wheel_x, wheel_y, 2.0, BlipColor { r: 0.75, g: 0.16, b: 0.18, a: 1.0 });
+        for spoke in 0..4 {
+            let a = roll + spoke as f32 * std::f32::consts::FRAC_PI_2;
+            stroke(blip, V(wheel_x, wheel_y), V(wheel_x + a.cos() * 4.4, wheel_y + a.sin() * 4.4),
+                1.0, 1.0, dark);
+        }
+    }
+    blip.fill_rect(x - face * 59.0, y - 12.0, 5.0, 5.0,
+        BlipColor { r: 1.0, g: 0.24, b: 0.12, a: 1.0 });
+    blip.fill_glow_circle(x + face * 59.0, y - 10.0, 9.0,
+        BlipColor { r: 1.0, g: 0.78, b: 0.35, a: 0.50 });
+    blip.fill_rect(x + face * 57.0, y - 12.0, 6.0, 4.0,
+        BlipColor { r: 1.0, g: 0.78, b: 0.35, a: 1.0 });
+    blip.draw_line_ex(x + face * 54.0, y - 10.0, x + face * 54.0, y - 3.0, 3.0, dark);
+    for grille_y in [-9.0f32, -7.0, -5.0] {
+        blip.draw_line_ex(x + face * 54.0, y + grille_y, x + face * 60.0, y + grille_y, 1.0, chrome);
+    }
+    blip.draw_line_ex(x + face * 53.0, y - 3.0, x + face * 66.0, y - 3.0, 3.0, chrome);
+    for at in DRIVEBY_SHOT_TIMES {
+        if driveby.t >= at && driveby.t < at + 0.12 {
+            let flash = V(x + face * 39.0, y - 23.0);
+            blip.fill_glow_circle(flash.0, flash.1, 14.0, BlipColor { r: 1.0, g: 0.68, b: 0.25, a: 0.9 });
+            blip.fill_rect(flash.0, flash.1 - 2.0, face * 18.0, 4.0, BLIP_WHITE);
         }
     }
 }

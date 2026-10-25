@@ -119,3 +119,15 @@ pub(crate) fn building_the_crowd_is_quick_enough_to_do_at_startup() {
     let ms = t.elapsed().as_millis();
     assert!(ms < 400, "the crowd took {ms}ms to build");
 }
+
+#[test]
+pub(crate) fn the_hood_and_walkout_tracks_carry_their_hip_hop_hats_into_tune() {
+    let (hood, hood_xm) = blip::xm::record("HOOD", || crate::tunes::theme_wav(8));
+    let (walkout, walkout_xm) = blip::xm::record("WALKOUT", &crate::tunes::walkout_wav);
+    let hat_events = |xm: &[u8]| xm.windows(2).filter(|event| *event == [73, 4]).count();
+    assert!(wav_seconds(&hood) > ROUND_SECS, "THE HOOD theme ends before the round");
+    assert!(wav_seconds(&walkout) > 30.0, "the walkout groove is too short to loop");
+    assert_ne!(hood, walkout, "the walkout is just THE HOOD again");
+    assert!(hat_events(&hood_xm) > 100, "THE HOOD has only {} hats in TUNE", hat_events(&hood_xm));
+    assert!(hat_events(&walkout_xm) > 40, "the walkout has only {} hats in TUNE", hat_events(&walkout_xm));
+}

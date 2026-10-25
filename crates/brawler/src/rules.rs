@@ -307,6 +307,7 @@ pub(crate) fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
 
 /// Advance one fighter's physics and action timer.
 pub(crate) fn advance(f: &mut Fighter, dt: f32) {
+    f.stumble = (f.stumble - dt).max(0.0);
     if f.land > 0.0 { f.land = (f.land - dt).max(0.0); }
     if f.throw_rest > 0.0 { f.throw_rest = (f.throw_rest - dt).max(0.0); }
     f.daze = (f.daze - DAZE_DRAIN * dt).max(0.0);
@@ -349,12 +350,14 @@ pub(crate) fn advance(f: &mut Fighter, dt: f32) {
             f.vx = 0.0;
             // Landing cancels an air attack, except the flying kick: its
             // recovery plays out on the ground, the price of the distance.
-            if f.act == Act::Attack && f.mv == MoveId::FlyingKick {
+            if f.act == Act::Attack && matches!(f.mv, MoveId::FlyingKick | MoveId::Uppercut) {
                 let m = f.scaled(move_data(f.mv));
                 let total = (m.startup + m.active + m.recovery) * F;
                 // Blocked or whiffed: at least this much left to pay.
                 // Connected: at most this much.
-                f.t = if f.hit_clean {
+                f.t = if f.mv == MoveId::Uppercut {
+                    f.t.min(total - 8.0 * F)
+                } else if f.hit_clean {
                     f.t.max(total - FLY_HIT_LAG)
                 } else {
                     f.t.min(total - FLY_LAND_LAG)
@@ -377,8 +380,13 @@ pub(crate) fn advance(f: &mut Fighter, dt: f32) {
     match f.act {
         Act::Attack => {
             let m = f.scaled(move_data(f.mv));
-            let total = (m.startup + m.active + m.recovery) * F;
-            if !f.airborne() && f.t >= total { f.act = Act::Idle; f.t = 0.0; f.vx = 0.0; }
+            let total = if f.mv == MoveId::Special && f.arch().special == Special::DriveBy {
+                DRIVEBY_TOTAL
+            } else { (m.startup + m.active + m.recovery) * F };
+            if !f.airborne() && f.t >= total {
+                if !f.hit_done && f.stumble_roll < 4 { f.stumble = 0.34; }
+                f.act = Act::Idle; f.t = 0.0; f.vx = 0.0;
+            }
             // In the air a flier's attack ends on its own clock, not on landing.
             else if f.soaring() && f.t >= total { f.act = Act::Air; f.t = 0.0; }
         }
@@ -520,7 +528,7 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
         defender.daze += damage as f32;
         if defender.dizzy > 0.0 {
             defender.dizzy = 0.0;
-        } else if defender.daze >= DAZE_AT && !defender.dazed && !defender.arch().invincible
+        } else if defender.daze >= DAZE_AT && !defender.dazed
             && defender.health > 0 {
             defender.dazed = true;
             defender.daze = 0.0;
@@ -529,6 +537,23 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
         }
     }
     (damage, false, floored)
+}
+
+/// Judge both blows before either can interrupt the other: active windows trade.
+pub(crate) fn resolve_trades(p: &mut [Fighter; 2], holds: [Input; 2]) -> [(i32, bool, bool); 2] {
+    let before = *p;
+    let (mut attackers, mut defenders) = (before, before);
+    let hits = std::array::from_fn(|a| resolve_hit(&mut attackers[a], &mut defenders[1 - a], holds[1 - a]));
+    for i in 0..2 {
+        let incoming = hits[1 - i].0 > 0 || hits[1 - i].1;
+        p[i] = if incoming { defenders[i] } else { attackers[i] };
+        p[i].hit_done = attackers[i].hit_done;
+        p[i].hit_clean = attackers[i].hit_clean;
+        p[i].countered = attackers[i].countered;
+        p[i].turned = attackers[i].turned;
+        if incoming { p[i].cancel_t = 0.0; }
+    }
+    hits
 }
 
 /// Push the two apart after a hit, and if one of them is against a wall,

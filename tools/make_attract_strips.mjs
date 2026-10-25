@@ -2,8 +2,8 @@
 //
 //   node tools/make_attract_strips.mjs [game ...]     (after a game's look changes)
 //
-// Runs each game's autopilot in turn (never two at once) under xvfb-run, keeps FRAMES frames from
-// FROM seconds on, and writes web/<slug>/attract.webp: the frames stacked top to bottom. The arcade
+// Runs each game's autopilot in turn (never two at once), keeps FRAMES frames
+// from FROM seconds on, and writes web/<slug>/attract.webp: the frames stacked top to bottom. The arcade
 // plays FRAMES of them (its card-loop animation) and reads their shape from the image.
 // Generated: edit this file, not its output.
 
@@ -12,6 +12,7 @@ import { mkdtempSync, readdirSync, rmSync, statSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { displayCommand } from './lib/process.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GAMES = ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder'];
@@ -27,11 +28,12 @@ for (const slug of GAMES.filter((g) => !only.length || only.includes(g))) {
   const shots = mkdtempSync(path.join(tmpdir(), `blip-attract-${slug}-`));
   try {
     const from = FROM[slug];
+    const [command, args] = displayCommand(bin, [], { cwd: ROOT, screen: '1024x900x24' });
     try {
-      execFileSync('xvfb-run', ['-a', '-s', '-screen 0 1024x900x24', bin], {
+      execFileSync(command, args, {
         stdio: ['ignore', 'ignore', 'inherit'], timeout: 120000,
         // Bubbler plays with an autopilot of its own; BLIP_BOT still takes the shots.
-        env: { ...process.env, BLIP_BOT: '1', BLIP_CRT: '0', BLIP_BOT_SHOTS: shots, BLIP_BOT_SHOT_EVERY: String(EVERY), BLIP_BOT_MAXT: String(from + FRAMES * EVERY + 2),
+        env: { ...process.env, BLIP_BOT: '1', BLIP_CRT: '0', BLIP_SILENT: '1', BLIP_BOT_SHOTS: shots, BLIP_BOT_SHOT_EVERY: String(EVERY), BLIP_BOT_MAXT: String(from + FRAMES * EVERY + 2),
           ...(slug === 'bubbler' ? { BUBBLER_BOT: '1' } : {}) },
       });
     } catch (error) {

@@ -258,9 +258,20 @@ fn swing_sounds(g: &mut Game, dt: f32) {
 /// A special does what it does at the end of its startup: the bolt leaves,
 /// the rush starts, the kick takes off, the turtles are called.
 fn fire_specials(g: &mut Game, dt: f32) {
+    tick_drivebys(g, dt);
     // Specials fire their effect at the end of startup.
     for i in 0..2 {
         let f = g.p[i];
+        if f.act == Act::Attack && f.mv == MoveId::Uppercut {
+            let at = f.scaled(move_data(f.mv)).startup * F;
+            if f.t >= at && f.t - dt < at && !f.airborne() {
+                g.p[i].vy = -348.0;
+                g.p[i].y -= 0.5;
+            }
+        }
+        if f.act == Act::Attack && f.mv == MoveId::Special && f.arch().special == Special::DriveBy {
+            continue;
+        }
         if f.act == Act::Attack && f.mv == MoveId::Special && !f.hit_done {
             let m = f.scaled(move_data(MoveId::Special));
             let at = m.startup * F;
@@ -287,6 +298,7 @@ fn fire_specials(g: &mut Game, dt: f32) {
                         g.snd(match f.arch().build {
                             Build::Caped => Sfx::Laser,
                             Build::Spider => Sfx::Thwip,
+                            Build::Ganger => Sfx::Projectile,
                             _ => Sfx::Projectile,
                         });
                     }
@@ -300,9 +312,45 @@ fn fire_specials(g: &mut Game, dt: f32) {
                         g.p[i].vx = f.facing * 150.0;
                         g.snd(Sfx::Whoosh);
                     }
+                    Special::DriveBy => unreachable!("drive-by has its own timeline"),
                 }
             }
         }
+    }
+}
+
+fn tick_drivebys(g: &mut Game, dt: f32) {
+    for owner in 0..2 {
+        if !g.drivebys[owner].active {
+            let f = g.p[owner];
+            if f.act != Act::Attack || f.mv != MoveId::Special || f.arch().special != Special::DriveBy {
+                continue;
+            }
+            g.drivebys[owner] = DriveBy {
+                active: true,
+                t: 0.0,
+                start_x: f.x,
+                facing: f.facing,
+                damage: f.scaled(move_data(MoveId::Special)).damage,
+            };
+        }
+        let mut driveby = g.drivebys[owner];
+        let before = driveby.t;
+        driveby.t += dt;
+        for (shot, at) in DRIVEBY_SHOT_TIMES.into_iter().enumerate() {
+            if driveby.t >= at && before < at {
+                g.spawn_driveby_round_from(owner, driveby.start_x, driveby.facing,
+                    driveby.damage, shot, at);
+                g.snd(Sfx::Projectile);
+            }
+        }
+        if before < DRIVEBY_ARRIVE && driveby.t >= DRIVEBY_ARRIVE {
+            let x = driveby_car_x_at(driveby.start_x, driveby.facing, DRIVEBY_ARRIVE);
+            g.pop("YO! HOMIES!", x, FLOOR_Y - 110.0);
+            g.snd(Sfx::Whoosh);
+        }
+        driveby.active = driveby.t < DRIVEBY_TOTAL;
+        g.drivebys[owner] = driveby;
     }
 }
 
@@ -310,17 +358,17 @@ fn fire_specials(g: &mut Game, dt: f32) {
 /// frame: trades are part of the game. `holds` is what each is pressing, for
 /// the guard.
 fn trade_blows(g: &mut Game, holds: [Input; 2]) {
+    let before = g.p;
+    let hits = resolve_trades(&mut g.p, holds);
     for a in 0..2 {
         let d = 1 - a;
-        let (mut atk, mut def) = (g.p[a], g.p[d]);
-        let reach = atk.hit_box();
-        let (dmg, blocked, knock) = resolve_hit(&mut atk, &mut def, holds[d]);
-        if def.dizzy > 0.0 && g.p[d].dizzy <= 0.0 {
+        let def = g.p[d];
+        let reach = before[a].hit_box();
+        let (dmg, blocked, knock) = hits[a];
+        if def.dizzy > 0.0 && before[d].dizzy <= 0.0 {
             g.pop("DIZZY!", def.x, def.y - def.height() - 34.0);
             g.snd(Sfx::Tweet);
         }
-        g.p[a] = atk;
-        g.p[d] = def;
         if dmg > 0 || blocked {
             let x = (g.p[a].x + g.p[d].x) / 2.0;
             let (sx, sy) = contact(reach, &g.p[a], &g.p[d]);
@@ -488,7 +536,7 @@ fn call_round(g: &mut Game) {
             g.bonus = round_bonus(g.clock, g.p[0].health, g.p[0].arch().health);
             g.sess.add_score(g.bonus[0] + g.bonus[1]);
         }
-        g.banner = if ko { "K.O." } else if survived(g) { "SURVIVED" } else { "TIME UP" };
+        g.banner = if ko { "K.O." } else { "TIME UP" };
         g.state = State::RoundEnd;
         g.phase.start(2.2);
         // Surviving a round is worth something, and so is surviving it
@@ -559,26 +607,15 @@ pub(crate) fn update_helpers(g: &mut Game, dt: f32, holds: [Input; 2]) -> Vec<(i
     landed
 }
 
-/// Against the CPU fighter nothing can hurt, the player has only to be
-/// standing at the bell.
-pub(crate) fn survived(g: &Game) -> bool {
-    g.mode == Mode::Solo && g.p[1].arch().invincible && !g.p[0].arch().invincible
-        && g.p[0].health > 0 && g.p[1].health > 0
-}
-
-/// Who took the round: whoever has more health left, by knockout or at the
-/// bell. The one exception is `survived`: a round nobody could have won on
-/// health goes to the player for lasting it out.
-pub(crate) fn round_result(g: &Game, ko: bool) -> RoundResult {
-    if !ko && survived(g) { return RoundResult::P1; }
+/// Who took the round: whoever has more health left, by knockout or at the bell.
+pub(crate) fn round_result(g: &Game, _ko: bool) -> RoundResult {
     if g.p[0].health == g.p[1].health { RoundResult::Draw }
     else if g.p[0].health > g.p[1].health { RoundResult::P1 }
     else { RoundResult::P2 }
 }
 
 /// The announcer's verdict, Tekken's: PERFECT for a round won untouched,
-/// GREAT for one won on the last sliver of the bar. Nothing for the fighter
-/// who cannot be hurt; it is no achievement of his.
+/// GREAT for one won on the last sliver of the bar.
 pub(crate) fn round_call(g: &Game) -> &'static str {
     let winner = match g.result {
         RoundResult::P1 => g.p[0],
@@ -586,8 +623,7 @@ pub(crate) fn round_call(g: &Game) -> &'static str {
         RoundResult::Draw => return "",
     };
     let max = winner.arch().health;
-    if winner.arch().invincible { "" }
-    else if winner.health >= max { "PERFECT" }
+    if winner.health >= max { "PERFECT" }
     else if winner.health * 10 <= max { "GREAT" }
     else { "" }
 }

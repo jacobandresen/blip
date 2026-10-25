@@ -2,17 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { openPage } from './lib/harness.mjs';
+import { instrumentBasicSound } from './lib/basic-runtime.mjs';
 
 for (const touch of [false, true]) test(`Bubbler BASIC players move, jump, join, and blow bubbles with ${touch ? 'touch' : 'PC keys'}`, async (t) => {
   const { page, origin } = await openPage(t, 'chromium', {
     hasTouch: touch, viewport: touch ? { width: 390, height: 844 } : { width: 1000, height: 900 },
   });
-  await page.route('**/basic-runtime.html*', async (route) => {
-    const response = await route.fetch();
-    const body = (await response.text()).replace('imports.env.blip_basic_sound=playBasicTone;',
-      'imports.env.blip_basic_sound=function(f,s,v){window.__gameFlags=(window.__gameFlags||0)|(f-1000);};');
-    await route.fulfill({ response, body });
-  });
+  await instrumentBasicSound(page, 'function(f,s,v){window.__gameFlags=(window.__gameFlags||0)|(f-1000);}');
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => { BlipBasic.submit('LOAD /TAPE/BUBBLER.BLIP'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/BUBBLER.BLIP'));
@@ -63,12 +59,7 @@ for (const touch of [false, true]) test(`Bubbler BASIC players move, jump, join,
 
 test('Rally BASIC touch dials move both real paddles independently', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 390, height: 844 } });
-  await page.route('**/basic-runtime.html*', async (route) => {
-    const response = await route.fetch();
-    const body = (await response.text()).replace('imports.env.blip_basic_sound=playBasicTone;',
-      'imports.env.blip_basic_sound=function(f,s,v){window.__paddleFlags=(window.__paddleFlags||0)|(f-1000);};');
-    await route.fulfill({ response, body });
-  });
+  await instrumentBasicSound(page, 'function(f,s,v){window.__paddleFlags=(window.__paddleFlags||0)|(f-1000);}');
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => { BlipBasic.submit('LOAD /TAPE/RALLY.BLIP'); });
   await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/RALLY.BLIP'));

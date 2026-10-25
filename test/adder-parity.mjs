@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openPage } from './lib/harness.mjs';
+import { numberedTape } from './lib/basic-tape.mjs';
+import { instrumentBasicSound } from './lib/basic-runtime.mjs';
 
 const root = new URL('../', import.meta.url);
 const source = await readFile(new URL('web/TAPE/ADDER.BLIP', root), 'utf8');
@@ -15,9 +17,7 @@ const fields = [
 // The tape at a fixed step, its vipers placed where the Rust example puts
 // them, steering by a fixed trace, and the fields reported as tones.
 function fixture(scenario, steps) {
-  const lines = new Map(source.trim().split('\n').map((line) => {
-    const separator = line.indexOf(' '); return [Number(line.slice(0, separator)), line.slice(separator + 1)];
-  }));
+  const lines = numberedTape(source);
   const cpu = ['cpuwall', 'cpu-gaps'].includes(scenario);
   let start = 'START_GAME 1:STEPS=0';
   if (scenario === 'join') start += ':JOIN_PLAYER_TWO';
@@ -56,12 +56,7 @@ function unpack(values) {
 test('Adder BASIC follows native movement, trail, collision, score, gap, and life rules', async (t) => {
   execFileSync('cargo', ['build', '--release', '-p', 'adder', '--example', 'adder_parity'], { cwd: root, stdio: 'pipe' });
   const { page, origin } = await openPage(t, 'chromium');
-  await page.route('**/basic-runtime.html*', async (route) => {
-    const response = await route.fetch();
-    const body = (await response.text()).replace('imports.env.blip_basic_sound=playBasicTone;',
-      'imports.env.blip_basic_sound=function(f,s,v){(window.__traceRows ||= []).push(f-1000);};');
-    await route.fulfill({ response, body });
-  });
+  await instrumentBasicSound(page, 'function(f,s,v){(window.__traceRows ||= []).push(f-1000);}');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => BlipBasic.submit('LOAD /TAPE/ADDER'));
