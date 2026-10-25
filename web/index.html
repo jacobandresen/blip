@@ -43,6 +43,11 @@
       }
     } catch (e) {}
 
+    // The room's look: ?room=lite or ?room=full, anything else full.
+    var roomMode = 'full';
+    try { if (new URLSearchParams(location.search).get('room') === 'lite') roomMode = 'lite'; } catch (e) {}
+    document.documentElement.setAttribute('data-room', roomMode);
+
     try {
       if (localStorage.getItem('blip-fullscreen') === '1')
         document.documentElement.setAttribute('data-fullscreen', '');
@@ -434,38 +439,8 @@
     .divider {opacity:.3}
     .jukebox-front {inset:0!important}
     .jukebox-front::before {content:none}
-    #game-grid {overflow:hidden!important;perspective:1100px!important;perspective-origin:50% 38%;transform-style:flat!important;touch-action:pan-y!important;
-      background:
-        radial-gradient(ellipse 46% 30% at 50% 0,#8d3fb055,transparent),
-        radial-gradient(ellipse 30% 24% at 12% 22%,#1e7fb033,transparent),
-        radial-gradient(ellipse 30% 24% at 88% 22%,#c0306e33,transparent),
-        linear-gradient(180deg,#120e1b,#0b0911 62%,#07060a);
-    }
-    /* The back wall's ribs, which drift past at half the machines' pace (aisle-wall, moved by the walk). */
-    #game-grid .aisle-wall {position:absolute;z-index:0;top:0;bottom:0;left:-120px;right:-120px;pointer-events:none;
-      background:repeating-linear-gradient(90deg,#ffffff05 0 1px,transparent 1px 120px)}
-    /* A neon tube along the back wall. */
-    #game-grid::before {
-      left:50%;top:5%;width:min(560px,70%);height:3px;z-index:0;border:0;border-radius:3px;
-      transform:translateX(-50%);background:#ff8fd8;opacity:.75;filter:none;
-      box-shadow:0 0 6px #ff6fcf,0 0 22px #e04fb6,0 0 60px 8px #b13a9a55;
-    }
-    /* Black-light carpet: neon confetti on midnight, walked past as the aisle moves. */
-    #game-grid .aisle-carpet {
-      position:absolute;z-index:0;left:-40%;right:-40%;bottom:-6%;height:40%;pointer-events:none;
-      transform:perspective(300px) rotateX(55deg);transform-origin:50% 100%;
-      background:
-        radial-gradient(circle at 18% 22%,#ff4fb0 0 3px,transparent 4px),
-        radial-gradient(circle at 64% 70%,#3fe0ff 0 2.5px,transparent 3.5px),
-        radial-gradient(circle at 80% 18%,transparent 0 6px,#ffd84a 7px 8.5px,transparent 9.5px),
-        linear-gradient(35deg,transparent 46%,#7dff6a 47% 49%,transparent 50%),
-        radial-gradient(circle at 34% 80%,#b48cff 0 2px,transparent 3px),
-        linear-gradient(#17112a,#0d0a19);
-      background-size:86px 86px,86px 86px,86px 86px,43px 43px,86px 86px,100% 100%;
-      background-position:0 0;
-      -webkit-mask-image:linear-gradient(transparent,#000 30%);mask-image:linear-gradient(transparent,#000 30%);
-      opacity:.85;
-    }
+    #game-grid {overflow:hidden!important;perspective:1100px!important;perspective-origin:50% 38%;transform-style:flat!important;touch-action:pan-y!important}
+    /* The room behind the cabinets (wall, signs, wall art, carpet, light pools) is arcade-room.css. */
 
     /* Living screens (cards' .card-loop): the strip's 12 frames at 3 a second, over the still. */
     #game-grid .card-loop {position:absolute;inset:0;z-index:1;overflow:hidden;visibility:hidden;pointer-events:none}
@@ -476,9 +451,6 @@
     #game-grid .card[data-machine="brawler"] .card-loop-strip {height:1200%;object-fit:cover}
     #game-grid .card[data-machine="brawler"]:not(.card-launching) .card-shot {visibility:hidden}
     @keyframes card-loop {to {transform:translateY(-100%)}}
-    /* Each machine's pool of light on the carpet, its opacity set by the walk. */
-    #game-grid .card-pool {position:absolute;z-index:0;left:-35%;right:-35%;bottom:-70px;height:140px;pointer-events:none;opacity:0;
-      background:radial-gradient(closest-side,color-mix(in srgb,var(--trim) 62%,transparent),transparent);transform:rotateX(78deg);transform-origin:50% 50%}
     /* Stepped up to a machine: its deck lights. */
     #game-grid .machine-deck {transition:box-shadow .4s}
     #game-grid[data-stepped-up] .card-focused .machine-deck {box-shadow:0 0 0 2px color-mix(in srgb,var(--trim) 70%,#fff),0 0 26px color-mix(in srgb,var(--trim) 70%,transparent)}
@@ -666,6 +638,7 @@
       .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:none}
     }
   </style>
+  <link rel="stylesheet" href="arcade-room.css?v=1">
 </head>
 <body class="cabinet-page">
 
@@ -837,7 +810,7 @@
   <script src="howler.min.js"></script>
   <script src="blip_core.js?v=8"></script>
   <script src="kiosk.js?v=101"></script>
-  <script src="aisle.js?v=1"></script>
+  <script src="aisle.js?v=2"></script>
   <script>
     /* ------------------------------------------------------------------ */
     /* Coin / credits                                                       */
@@ -1472,10 +1445,16 @@
       var held={},walked=0,stride=0,pendingStart=false;
       // Stepped up to the faced machine: lean 0 standing in the aisle, 1 at the machine.
       var steppedUp=false,lean=0,LEAN_Z=150,LEAN_LIFT=60;
-      // The parallax layers: confetti carpet nearer than the machines, the back wall's ribs farther.
-      var wall=document.createElement('i');wall.className='aisle-wall';wall.setAttribute('aria-hidden','true');
-      var carpet=document.createElement('i');carpet.className='aisle-carpet';carpet.setAttribute('aria-hidden','true');
+      // The room's layers (arcade-room.css): the carpet nearer than the machines, the wall's joints farther.
+      function roomLayer(tag,className,layer,zone){
+        var el=document.createElement(tag);el.className=className;el.setAttribute('aria-hidden','true');
+        el.dataset.roomLayer=layer;el.dataset.zone=zone;return el;
+      }
+      var wall=roomLayer('i','aisle-wall','wall','wall'),carpet=roomLayer('i','aisle-carpet','carpet','floor');
       grid.insertBefore(carpet,grid.firstChild);grid.insertBefore(wall,carpet);
+      // How far the room has scrolled, in machines. The aisle's own position wraps round the loop when it
+      // settles; this keeps counting, so the room never jumps between the last machine and the first.
+      var roomTravel=aisle.pos,roomFrom=aisle.pos;
       // Living screens: a machine within two plays a few seconds of its game (tools/make_attract_strips.mjs, 12 frames),
       // farther ones show their still; each casts a pool of its colour on the carpet, brighter as you come near.
       var LOOP_NEAR=2;
@@ -1498,7 +1477,7 @@
         frame.appendChild(strip);box.appendChild(frame);
         var still=rom.querySelector('.card-shot');
         rom.insertBefore(box,still?still.nextSibling:rom.firstChild);
-        var pool=document.createElement('span');pool.className='card-pool';pool.setAttribute('aria-hidden','true');c.appendChild(pool);
+        var pool=roomLayer('span','card-pool','pool','floor');c.appendChild(pool);
         return {strip:strip,pool:pool,near:false,glow:'',src:(c.getAttribute('data-game-url')||'').split('/')[0]+'/attract.webp'};
       });
       // Neighbours stand angled away, as on a showroom floor, so their side art shows; farther ones recede.
@@ -1523,7 +1502,10 @@
         var track=document.getElementById('game-grid'),w=track.clientWidth,h=track.clientHeight;
         var close=w>h*1.4&&h<520;
         track.toggleAttribute('data-close',close);
-        return {width:w,scale:Math.max(.3,Math.min(close?h*.95/510:h*.92/660,(w-56)/300))};
+        var css=getComputedStyle(track);
+        return {width:w,scale:Math.max(.3,Math.min(close?h*.95/510:h*.92/660,(w-56)/300)),
+          wallPeriod:parseFloat(css.getPropertyValue('--room-wall-period'))||120,
+          carpetPeriod:parseFloat(css.getPropertyValue('--room-carpet-period'))||86};
       }
       function aisleOffset(index) {
         return BlipAisle.offset(index,aisle.pos,cards.length);
@@ -1552,10 +1534,12 @@
           var glow=BlipAisle.machineLevel(distance).toFixed(2);
           if(screen.glow!==glow){screen.glow=glow;screen.pool.style.opacity=glow;}
         });
-        var carpetX=-((aisle.pos*spacing*1.3)%86+86)%86,wallX=-((aisle.pos*spacing*.5)%120+120)%120;
+        roomTravel+=BlipAisle.offset(aisle.pos,roomFrom,cards.length);roomFrom=aisle.pos;
+        var carpetX=BlipAisle.layerOffset(roomTravel,spacing,1.3,room.carpetPeriod),wallX=BlipAisle.layerOffset(roomTravel,spacing,.5,room.wallPeriod);
         carpet.style.transform='perspective(300px) rotateX(55deg) translate('+carpetX.toFixed(1)+'px,'+(bob||0).toFixed(2)+'px)';
         wall.style.transform='translate('+wallX.toFixed(1)+'px,'+((bob||0)*.4).toFixed(2)+'px)';
         grid.dataset.aislePos=(((aisle.pos%cards.length)+cards.length)%cards.length).toFixed(2);
+        grid.dataset.roomTravel=roomTravel.toFixed(3);
         if(typeof blipArcadeSound!=='undefined')blipArcadeSound.place(aisle.pos);
       }
       function highlight(force) {

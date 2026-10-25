@@ -93,13 +93,20 @@ var BlipAisle = (function () {
   function offset(i, pos, n) { return mod(i - pos + n / 2, n) - n / 2; }
   function index(pos, n) { return mod(Math.round(pos), n); }
 
+  // How far a room layer that repeats every `period` px has scrolled when you have walked `travel` machines,
+  // `spacing` px apart, the layer moving at `rate` times the machines' pace: a translateX in (-period, 0].
+  function layerOffset(travel, spacing, rate, period) {
+    var x = -mod(travel * spacing * rate, period);
+    return x === 0 ? 0 : x;
+  }
+
   function machineLevel(d) { return 1 / (1 + d * d); }
   function machinePan(off) { return Math.max(-1, Math.min(1, off / 2)); }
 
   return {
     HOLD: HOLD, create: create, press: press, step: step,
     dragStart: dragStart, dragTo: dragTo, dragEnd: dragEnd,
-    offset: offset, index: index, machineLevel: machineLevel, machinePan: machinePan
+    offset: offset, index: index, layerOffset: layerOffset, machineLevel: machineLevel, machinePan: machinePan
   };
 }());
 if (typeof module !== 'undefined') module.exports = BlipAisle;
