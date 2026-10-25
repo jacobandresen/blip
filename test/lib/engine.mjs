@@ -11,7 +11,7 @@ const ENGINES = { chromium, webkit, firefox };
  * @param {'chromium'|'webkit'|'firefox'} engineName
  * @param {{ headless?: boolean }} opts
  */
-export async function launchEngine(engineName, { headless = true, hasTouch = false, viewport } = {}) {
+export async function launchEngine(engineName, { headless = true, hasTouch = false, viewport, deviceScaleFactor, userAgent, isMobile } = {}) {
   const engine = ENGINES[engineName];
   if (!engine) throw new Error(`unknown engine ${engineName}`);
 
@@ -28,7 +28,9 @@ export async function launchEngine(engineName, { headless = true, hasTouch = fal
   }
 
   const browser = await engine.launch({ headless, args, ...(engineName === 'chromium' ? { executablePath: chromiumBinary() } : {}) });
-  const page = await (await browser.newContext({ hasTouch, ...(viewport ? { viewport } : {}) })).newPage();
+  const page = await (await browser.newContext({ hasTouch, ...(viewport ? { viewport } : {}),
+    ...(deviceScaleFactor === undefined ? {} : { deviceScaleFactor }), ...(userAgent ? { userAgent } : {}),
+    ...(isMobile === undefined ? {} : { isMobile }) })).newPage();
   return { browser, page, cdp: wrapPage(page, engineName) };
 }
 

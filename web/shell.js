@@ -1004,11 +1004,11 @@ window.addEventListener('keydown', function (e) {
     if (bar) bar.appendChild(strip);
     var glass = strip.querySelector('.ts-glass');
 
-    // Bubbler: while a second seat is open, a button seats player two (their
-    // own bubble key). Upright it sits in the trackpad, sideways in the
+    // While a second seat is open, a button seats player two (their
+    // own join key). Upright it sits in the trackpad, sideways in the
     // bottom-right corner of the screen.
     var join = null;
-    if (kind === 'platform') {
+    if (kind === 'platform' || twoSteer) {
       join = document.createElement('button');
       join.type = 'button';
       join.className = 'ts-join';

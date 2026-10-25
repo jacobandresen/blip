@@ -249,12 +249,18 @@ for (const [index, [slug, title]] of GAMES.entries()) {
     await page.waitForFunction(() => getCoins() === 0, null, { timeout: 5000 });
     assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-start')), null,
       `${title} consumed the cabinet Start action`);
-    // The arcade plays with the cabinet's own controls: player one's first cap, or Rally's dial.
+    // Use the controls offered on this device: a gesture strip, touch buttons, or Rally's dial.
     await page.evaluate(() => {
       window.__cabinetActionKeys = [];
       document.querySelector('canvas').addEventListener('keydown', (event) => window.__cabinetActionKeys.push(event.code));
     });
-    await page.locator(slug === 'rally' ? '#paddle-dial' : '#fire-buttons .arcade-btn[data-blip="button1"]').tap({ timeout: 3000 });
+    const mode = await page.evaluate(() => blipControls());
+    if (slug === 'rally') await page.locator('#paddle-dial').tap({ timeout: 3000 });
+    else if (mode === 'touch') {
+      const strip = await page.locator('#touch-strip .ts-glass').boundingBox();
+      assert.ok(strip, `${title} exposes its touch surface`);
+      await page.touchscreen.tap(strip.x + strip.width * .2, strip.y + strip.height * .7);
+    } else await page.locator(mode === 'pad' ? '#snes-pad .snes-btn[data-blip="button1"]' : '#fire-buttons .arcade-btn[data-blip="button1"]').first().tap({ timeout: 3000 });
     const expected = await page.evaluate(() => BLIP_GAMES[blipGameFromPath(location.pathname).slug]?.buttons?.[0]?.code || 'Space');
     await page.waitForFunction((code) => window.__cabinetActionKeys?.includes(code), expected, { timeout: 2000 });
   });

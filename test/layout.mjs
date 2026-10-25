@@ -251,9 +251,10 @@ for (const device of mine) {
     await check(page, device, insets, 'cabinet with a ROM seated', failures);
     await page.evaluate(() => sessionStorage.clear());
 
-    // The arcade's sticks everywhere; on a phone also the home screen's touch and BASIC's pads.
-    const controllers = device.desktop ? [null] : [null, 'touch', 'pad'];
+    // Exercise each game with the controls offered on this device.
     for (const slug of GAMES) {
+      // Touchscreen games have one control mode; Rally retains its alternate dial/strip layouts.
+      const controllers = device.desktop || slug !== 'rally' ? [null] : [null, 'touch', 'pad'];
       for (const controller of controllers) {
         await page.goto(`${origin}/${slug}/index.html${controller ? '?controls=' + controller : ''}`);
         await page.waitForFunction(() => typeof BlipController === 'object', null, { timeout: 30000 });

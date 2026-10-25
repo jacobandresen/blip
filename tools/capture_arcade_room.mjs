@@ -2,6 +2,8 @@
 // Screenshots of the arcade room (web/index.html) for review beside the photographs in issue #65.
 //
 //   node tools/capture_arcade_room.mjs [--still] [--lite] [--guides] [--perf] [--out <dir>]
+//   node tools/capture_arcade_room.mjs --still --perf --runs 3 --trace [--baseline <commit>]
+//   node tools/capture_arcade_room.mjs --still --soak [--soak-minutes 30] [--baseline <commit>]
 //
 // Four configurations (phone portrait, touch landscape, desktop, kiosk) × two aisle positions (at rest on
 // Rally, and held exactly halfway to Bouncer) × two credit states (none, one) = 16 PNGs per mode, in
@@ -14,18 +16,26 @@
 //   --guides  draws the room's shared regions (arcade-room.css --room-* tokens) over each picture
 //   --perf    instead of pictures, replays a fixed touch drag on the phone and writes perf.json: layouts,
 //             style recalculations and their time per touchmove, and frame intervals
+//   --trace   saves a compressed CDP trace for each performance run
+//   --warm-screens visits every machine and returns before measuring, separating first image loads from walking
+//   --baseline serves room sources from a commit over the same server/assets, with no checkout
+//   --soak    samples kiosk heap once a minute, identical double GC at minute 1/end, then a 30s frame trace
 //
 // Needs Node 18+, the repo's Playwright package and Chromium: $BLIP_CHROMIUM, else `chromium` on PATH, else
 // Playwright's own (`npx playwright install chromium`). It serves web/ itself on port 8197.
+// Historical --baseline runs also need Git on PATH.
 
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createFileServer, listenOn } from '../test/lib/harness.mjs';
 import { chromiumBinary } from '../test/lib/chromium-binary.mjs';
+import { holdHalfway, ROOM_SOURCES as DEFAULT_ROOM_SOURCES } from '../test/lib/arcade-room.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -34,8 +44,29 @@ const flag = (name) => args.includes(name);
 const outIndex = args.indexOf('--out');
 const OUT = outIndex >= 0 ? path.resolve(args[outIndex + 1]) : path.join(ROOT, 'test/artifacts/arcade-room');
 const MODE = flag('--lite') ? 'lite' : 'full';
+const option = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
+const BASELINE = option('--baseline', null);
+if (BASELINE && !/^[a-f\d]{7,40}$/i.test(BASELINE)) throw new Error('--baseline must be a hexadecimal commit ID');
+const RUNS = Number(option('--runs', 1)), SOAK_MINUTES = Number(option('--soak-minutes', 30));
+if (!Number.isInteger(RUNS) || RUNS < 1 || RUNS > 10) throw new Error('--runs must be 1–10');
+if (!Number.isInteger(SOAK_MINUTES) || SOAK_MINUTES < 1) throw new Error('--soak-minutes must be a positive integer');
 const PORT = 8197;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
+const changedSources = BASELINE ? execFileSync('git', ['diff', '--name-only', BASELINE, '--', 'web'], { cwd: ROOT })
+  .toString().trim().split('\n').filter((file) => /\.(html|css|js|json|svg)$/.test(file)).map((file) => file.slice(4)) : [];
+const ROOM_SOURCES = [...new Set([...DEFAULT_ROOM_SOURCES, ...changedSources])];
+const baselineSources = Object.fromEntries(BASELINE ? ROOM_SOURCES.flatMap((file) => {
+  try { execFileSync('git', ['cat-file', '-e', `${BASELINE}:web/${file}`], { cwd: ROOT, stdio: 'ignore' }); }
+  catch { return []; }
+  return [[`/${file}`, execFileSync('git', ['show', `${BASELINE}:web/${file}`], { cwd: ROOT }).toString()]];
+}) : []);
+
+function sourceHash() {
+  const hash = createHash('sha256');
+  for (const file of ROOM_SOURCES) hash.update(file).update(BASELINE ? baselineSources[`/${file}`] ?? '(absent)' : fs.readFileSync(path.join(ROOT, 'web', file)));
+  return hash.digest('hex');
+}
+const SOURCE_HASH = sourceHash();
 
 const CONFIGS = [
   { name: 'phone', width: 390, height: 844, touch: true, layout: 'upright' },
@@ -65,6 +96,7 @@ const CHECKLIST = [
 
 function gitCommit() {
   try {
+    if (BASELINE) return execFileSync('git', ['rev-parse', BASELINE], { cwd: ROOT }).toString().trim();
     const head = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ROOT }).toString().trim();
     const dirty = execFileSync('git', ['status', '--porcelain', '--', 'web'], { cwd: ROOT }).toString().trim();
     return dirty ? `${head}+changes` : head;
@@ -91,25 +123,11 @@ async function openArcade(browser, config, query = '') {
   return { context, page };
 }
 
-// Holds the aisle exactly half a machine on, by the same drag a finger or mouse makes (BlipAisle stops
-// stepping while a drag is held).
-async function holdHalfway(page) {
-  const track = await page.evaluate(() => {
-    const r = document.getElementById('game-grid').getBoundingClientRect();
-    return { x: r.left + r.width / 2, y: r.top + r.height * 0.3, unit: document.getElementById('game-grid').clientWidth * 0.34 };
-  });
-  await page.mouse.move(track.x, track.y);
-  await page.mouse.down();
-  await page.mouse.move(track.x - 20, track.y, { steps: 2 });
-  await page.mouse.move(track.x - 20 - track.unit / 2, track.y, { steps: 6 });
-  await page.waitForFunction(() => Math.abs(Number(document.getElementById('game-grid').dataset.aislePos) - 0.5) < 0.01);
-}
-
 // Every animation, here and in the decks' frames: finite ones finished, endless ones (attract loops, blinks)
 // paused one second in.
 async function freeze(page) {
   await page.waitForFunction(() => [...document.querySelectorAll('#game-grid .card[data-loop]')]
-    .every((c) => c.hasAttribute('data-loop-ready')), null, { timeout: 15000 });
+    .every((c) => c.hasAttribute('data-loop-ready')), null, { timeout: 60000 });
   for (const frame of page.frames()) {
     await frame.evaluate(() => {
       for (const a of document.getAnimations()) {
@@ -205,7 +223,7 @@ async function capture(browser) {
   for (const config of CONFIGS) {
     for (const credits of CREDITS) {
       for (const position of POSITIONS) {
-        const { context, page } = await openArcade(browser, config, MODE === 'lite' ? '?room=lite' : '');
+        const { context, page } = await openArcade(browser, config, `?room=${MODE}`);
         for (let i = 0; i < credits; i++) await page.keyboard.press('5');
         if (credits) await page.waitForFunction(() => document.documentElement.hasAttribute('data-credit'));
         if (position === 'half') await holdHalfway(page);
@@ -214,8 +232,9 @@ async function capture(browser) {
         if (flag('--still')) await freeze(page);
         if (flag('--guides')) await drawGuides(page);
         const file = `${config.name}-${position}-${credits ? 'credit' : 'nocredit'}.png`;
-        await page.screenshot({ path: path.join(dir, file) });
+        await page.screenshot({ path: path.join(dir, file), timeout: 60000 });
         const m = await measure(page);
+        if (m.room !== MODE) throw new Error(`${file}: expected ${MODE}, got ${m.room}`);
         if (credits && !m.credit) throw new Error(`${file}: the credit did not register`);
         shots.push({ file: `${MODE}/${file}`, config: config.name, viewport: `${config.width}×${config.height}`, dpr: 1,
           position, credits, mode: MODE, ...m });
@@ -224,21 +243,30 @@ async function capture(browser) {
       }
     }
   }
-  const meta = { commit: gitCommit(), browser: browser.version(), platform: `${os.platform()} ${os.release()}`,
+  const meta = { commit: gitCommit(), sourceHash: SOURCE_HASH, browser: browser.version(), platform: `${os.platform()} ${os.release()}`,
     still: flag('--still'), guides: flag('--guides'), taken: new Date().toISOString(), shots };
   fs.writeFileSync(path.join(dir, 'metrics.json'), JSON.stringify(meta, null, 1));
   writeGallery();
 }
 
 // A fixed touch drag on the phone: 60 moves of 6px left, then 60 back, each a frame apart.
-async function perf(browser) {
+async function perf(browser, run = 1) {
   const config = CONFIGS[0];
-  const { context, page } = await openArcade(browser, config, MODE === 'lite' ? '?room=lite' : '');
+  const { context, page } = await openArcade(browser, config, `?room=${MODE}`);
   const cdp = await context.newCDPSession(page);
   await cdp.send('Performance.enable');
   await page.waitForTimeout(9500);       // the arrows' nudge has finished
   await page.waitForFunction(() => [...document.querySelectorAll('#game-grid .card[data-loop]')].every((c) => c.hasAttribute('data-loop-ready')));
+  if (flag('--warm-screens')) {
+    const count = await page.locator('#game-grid .card').count();
+    for (const key of ['ArrowRight', 'ArrowLeft']) for (let i = 0; i < count; i++) {
+      await page.keyboard.press(key);
+      await page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'), null, { timeout: 15000 });
+    }
+    await page.waitForFunction(() => [...document.querySelectorAll('#game-grid .card')].every((card) => card.hasAttribute('data-loop-ready')));
+  }
   const read = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
+  if (flag('--trace')) await startTrace(cdp);
   await page.evaluate(() => {
     window.__frames = [];
     let last = 0;
@@ -261,7 +289,8 @@ async function perf(browser) {
   frames.sort((a, b) => a - b);
   const per = (name) => (after[name] - before[name]) / moves;
   const result = {
-    commit: gitCommit(), browser: browser.version(), platform: `${os.platform()} ${os.release()}`, mode: MODE,
+    commit: gitCommit(), sourceHash: SOURCE_HASH, run, browser: browser.version(), platform: `${os.platform()} ${os.release()}`, mode: MODE,
+    hardware: await hardware(browser), screensWarmed: flag('--warm-screens'),
     viewport: `${config.width}×${config.height}`, moves,
     layoutsPerMove: per('LayoutCount'), styleRecalcsPerMove: per('RecalcStyleCount'),
     layoutMsPerMove: per('LayoutDuration') * 1000, styleMsPerMove: per('RecalcStyleDuration') * 1000,
@@ -270,10 +299,94 @@ async function perf(browser) {
     taken: new Date().toISOString(),
   };
   fs.mkdirSync(OUT, { recursive: true });
-  const file = path.join(OUT, `perf-${MODE}-${result.commit.replace(/\W/g, '_')}.json`);
+  const name = `perf-${MODE}-${result.commit.replace(/\W/g, '_')}-run-${run}`;
+  if (flag('--trace')) result.trace = await finishTrace(cdp, name);
+  const file = path.join(OUT, `${name}.json`);
   fs.writeFileSync(file, JSON.stringify(result, null, 1));
   console.log(JSON.stringify(result, null, 1));
   console.log(`wrote ${path.relative(ROOT, file)}`);
+  await context.close();
+}
+
+async function hardware(browser) {
+  const session = await browser.newBrowserCDPSession();
+  try {
+    const info = await session.send('SystemInfo.getInfo');
+    return { cpu: [...new Set(os.cpus().map((c) => c.model))], cpuCount: os.cpus().length,
+      renderer: info.gpu.auxAttributes?.glRenderer || '(not reported)', vendor: info.gpu.auxAttributes?.glVendor,
+      devices: info.gpu.devices.map((device) => device.deviceString), features: info.gpu.featureStatus };
+  } finally { await session.detach(); }
+}
+
+async function startTrace(cdp) {
+  await cdp.send('Tracing.start', { categories: 'devtools.timeline,disabled-by-default-devtools.timeline.frame,blink.user_timing', transferMode: 'ReturnAsStream' });
+}
+
+async function finishTrace(cdp, name) {
+  const complete = new Promise((resolve) => cdp.once('Tracing.tracingComplete', resolve));
+  await cdp.send('Tracing.end');
+  const { stream } = await complete, chunks = [];
+  try {
+    for (;;) {
+      const chunk = await cdp.send('IO.read', { handle: stream, size: 65536 });
+      chunks.push(Buffer.from(chunk.data, chunk.base64Encoded ? 'base64' : 'utf8'));
+      if (chunk.eof) break;
+    }
+  } finally { await cdp.send('IO.close', { handle: stream }); }
+  const data = Buffer.concat(chunks), events = JSON.parse(data).traceEvents || [];
+  fs.mkdirSync(OUT, { recursive: true });
+  const file = `${name}.trace.json.gz`; fs.writeFileSync(path.join(OUT, file), gzipSync(data));
+  const count = (name) => events.filter((event) => event.name === name && event.ph === 'X').length;
+  return { file, events: events.length, layouts: count('Layout'), styles: count('UpdateLayoutTree') };
+}
+
+function frameStats(frames) {
+  const sorted = frames.slice().sort((a, b) => a - b);
+  return { count: frames.length, median: sorted[sorted.length >> 1], p95: sorted[Math.floor(sorted.length * .95)],
+    over50ms: frames.filter((n) => n > 50).length, over250ms: frames.filter((n) => n > 250).length };
+}
+
+async function soak(browser) {
+  const { context, page } = await openArcade(browser, CONFIGS[3], `?room=${MODE}`);
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Performance.enable'); await cdp.send('HeapProfiler.enable');
+  await page.waitForFunction(() => [...document.querySelectorAll('.card[data-loop]')].every((card) => card.hasAttribute('data-loop-ready')));
+  await page.waitForTimeout(9500);
+  const result = { commit: gitCommit(), sourceHash: SOURCE_HASH, browser: browser.version(), hardware: await hardware(browser),
+    platform: `${os.platform()} ${os.release()}`, mode: MODE, viewport: '1080×1920', minutes: SOAK_MINUTES,
+    gc: 'HeapProfiler.collectGarbage twice at minute 1 and the final minute', samples: [], started: new Date().toISOString() };
+  const name = `soak-${MODE}-${result.commit.replace(/\W/g, '_')}-${SOAK_MINUTES}min`;
+  fs.mkdirSync(OUT, { recursive: true });
+  const file = path.join(OUT, `${name}.json`), start = Date.now();
+  for (let minute = 1; minute <= SOAK_MINUTES; minute++) {
+    while (Date.now() < start + minute * 60000) await new Promise((done) => setTimeout(done, Math.min(1000, start + minute * 60000 - Date.now())));
+    const gc = minute === 1 || minute === SOAK_MINUTES;
+    if (gc) { await cdp.send('HeapProfiler.collectGarbage'); await cdp.send('HeapProfiler.collectGarbage'); }
+    const metrics = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
+    const dom = await cdp.send('Memory.getDOMCounters');
+    const visibility = await page.evaluate(() => document.visibilityState);
+    result.samples.push({ minute, elapsedMs: Date.now() - start, gc, heapBytes: metrics.JSHeapUsedSize, dom, visibility });
+    fs.writeFileSync(file, JSON.stringify(result, null, 1));
+    console.log(`soak ${minute}/${SOAK_MINUTES}: heap=${metrics.JSHeapUsedSize} nodes=${dom.nodes} visibility=${visibility}${gc ? ' after GC' : ''}`);
+  }
+  const first = result.samples[0], last = result.samples.at(-1);
+  result.retainedGrowth = (last.heapBytes - first.heapBytes) / first.heapBytes;
+  result.withinHeapTarget = result.retainedGrowth <= .1;
+  await startTrace(cdp);
+  await page.evaluate(() => {
+    window.__soakFrames = [];
+    let last = performance.now();
+    const end = last + 30000;
+    function frame(now) { window.__soakFrames.push(now - last); last = now; if (now < end) requestAnimationFrame(frame); }
+    requestAnimationFrame(frame);
+  });
+  await page.waitForTimeout(30500);
+  result.frames = frameStats(await page.evaluate(() => window.__soakFrames));
+  result.trace = await finishTrace(cdp, name);
+  result.finished = new Date().toISOString();
+  fs.writeFileSync(file, JSON.stringify(result, null, 1));
+  console.log(JSON.stringify({ file: path.relative(ROOT, file), retainedGrowth: result.retainedGrowth, frames: result.frames }, null, 1));
+  if (!result.withinHeapTarget || result.samples.some((sample) => sample.visibility !== 'visible')) process.exitCode = 1;
   await context.close();
 }
 
@@ -326,11 +439,13 @@ ${sections}
   console.log(`wrote ${path.relative(ROOT, path.join(OUT, 'index.html'))}`);
 }
 
-const server = await listenOn(createFileServer(), PORT);
+const server = await listenOn(createFileServer({ overrides: baselineSources }), PORT);
 const browser = await chromium.launch({ executablePath: chromiumBinary(), headless: true, args: ['--mute-audio'] });
 try {
-  if (flag('--perf')) await perf(browser);
+  if (flag('--soak')) await soak(browser);
+  else if (flag('--perf')) for (let run = 1; run <= RUNS; run++) await perf(browser, run);
   else await capture(browser);
+  if (sourceHash() !== SOURCE_HASH) throw new Error('Room sources changed during verification; rerun against a stable revision');
 } finally {
   await browser.close();
   server.close();

@@ -43,9 +43,15 @@
       }
     } catch (e) {}
 
-    // The room's look: ?room=lite or ?room=full, anything else full.
+    // Resolve the room before paint: explicit mode wins, otherwise use lite on a small supported device.
     var roomMode = 'full';
-    try { if (new URLSearchParams(location.search).get('room') === 'lite') roomMode = 'lite'; } catch (e) {}
+    var roomAsked = null;
+    try { roomAsked = new URLSearchParams(location.search).get('room'); } catch (e) {}
+    if (roomAsked === 'full' || roomAsked === 'lite') roomMode = roomAsked;
+    else if (['hardwareConcurrency','deviceMemory'].some(function (name) {
+      try { var value = navigator[name]; return typeof value === 'number' && isFinite(value) && value > 0 && value <= 2; }
+      catch (e) { return false; }
+    })) roomMode = 'lite';
     document.documentElement.setAttribute('data-room', roomMode);
 
     try {
@@ -443,11 +449,13 @@
     #game-grid .card-loop {position:absolute;inset:0;z-index:1;overflow:hidden;visibility:hidden;pointer-events:none}
     #game-grid .card[data-loop][data-loop-ready] .card-loop {visibility:visible}
     #game-grid .card-loop-frame {position:absolute;left:50%;top:50%;width:100%;height:100%;overflow:hidden;transform:translate(-50%,-50%)}
-    #game-grid .card-loop-strip {display:block;width:100%;height:auto;animation:card-loop 4s steps(12) infinite paused}
-    #game-grid .card[data-loop] .card-loop-strip {animation-play-state:running}
+    #game-grid .card-loop-picture {display:block;width:100%;height:100%}
+    #game-grid .card-loop-strip {display:block;width:100%;height:auto;transform:translateY(0);animation:card-loop 4s steps(12) infinite paused}
+    #game-grid .card[data-loop][data-loop-ready] .card-loop-strip {animation-play-state:running}
     #game-grid .card[data-machine="brawler"] .card-loop-strip {height:1200%;object-fit:cover}
-    #game-grid .card[data-machine="brawler"]:not(.card-launching) .card-shot {visibility:hidden}
-    @keyframes card-loop {to {transform:translateY(-100%)}}
+    #game-grid .card[data-machine="brawler"][data-loop][data-loop-ready]:not(.card-launching) .card-shot {visibility:hidden}
+    /* Explicit start transform keeps clipped sprite animations paintable in WebKit (bug 260981). */
+    @keyframes card-loop {from {transform:translateY(0)} to {transform:translateY(-100%)}}
     /* Stepped up to a machine: its deck lights. */
     #game-grid .machine-deck {transition:box-shadow .4s}
     #game-grid[data-stepped-up] .card-focused .machine-deck {box-shadow:0 0 0 2px color-mix(in srgb,var(--trim) 70%,#fff),0 0 26px color-mix(in srgb,var(--trim) 70%,transparent)}
@@ -550,6 +558,7 @@
     body.cabinet-page #kiosk-insert-btn {display:none!important}
     body.cabinet-page {padding-bottom:0!important;--cabinet-bottom-bar-height:0px}
     body.cabinet-page .screen-bezel {bottom:0!important}
+    :root[data-layout="landscape"] body.cabinet-page .screen-bezel {bottom:env(safe-area-inset-bottom,0px)!important}
 
     /* The shared deck slopes out from the monitor; its front apron faces the player. */
     .machine-controls {position:absolute;z-index:5;left:-4%;right:-4%;top:48%;height:calc(var(--deck-height,125px) + 10px);border:0;border-radius:0;clip-path:none;
@@ -635,7 +644,7 @@
       .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:none}
     }
   </style>
-  <link rel="stylesheet" href="arcade-room.css?v=7">
+  <link rel="stylesheet" href="arcade-room.css?v=12">
 </head>
 <body class="cabinet-page">
 
@@ -690,6 +699,85 @@
       <use href="#neon-open-letters" class="open-letter-tube"/>
       <use href="#neon-open-letters" class="open-letter-core"/>
     </svg>
+  </template>
+  <template id="room-decals">
+    <svg class="aisle-decal decal-left" viewBox="0 0 180 180" aria-hidden="true" focusable="false">
+      <path class="decal-paper" d="M90 3L106 36L146 9L139 49L175 41L155 77L177 97L146 110L168 150L126 139L118 177L90 148L51 175L58 133L13 145L32 107L3 84L32 72L13 40L57 39L55 5L78 34Z"/>
+      <text class="decal-text" x="90" y="82" font-size="28">INSERT</text>
+      <text class="decal-text" x="90" y="114" font-size="32">COIN</text>
+    </svg>
+    <svg class="aisle-decal decal-right" viewBox="0 0 180 180" aria-hidden="true" focusable="false">
+      <path class="decal-paper" d="M84 4L105 34L145 12L137 53L176 47L153 78L177 109L143 115L162 153L121 139L107 176L83 147L43 173L51 132L8 139L30 105L3 78L38 64L21 25L62 39Z"/>
+      <text class="decal-text" x="91" y="106" font-size="42">PLAY!</text>
+    </svg>
+  </template>
+  <template id="room-mural">
+    <svg viewBox="0 0 720 480" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <g class="mural-beams" fill="none" stroke-width="3">
+        <path d="M0 38H720M0 80L360 12L720 80M0 0L180 72M720 0L540 72M0 390H720M0 448L360 390L720 448"/>
+      </g>
+      <g class="mural-cabinet mural-portrait-first" stroke-width="4" stroke-linejoin="round">
+        <path class="mural-side" d="M138 70L184 90V382L138 364V254L152 236L138 214Z"/>
+        <path class="mural-body" d="M14 70H138V104L124 120V210L146 232V254H138V364H14V254H8V232L28 212V120L14 104Z"/>
+        <path class="mural-marquee" d="M24 80H128V99H24Z"/>
+        <path class="mural-screen" d="M34 127H118L112 200H34Z"/>
+        <path class="mural-panel" d="M28 212H124L146 232H8Z"/>
+        <path class="mural-detail" fill="none" d="M42 145L68 169L98 153M46 183H100M52 280H92V324H52ZM60 291H84M40 90H110"/>
+        <circle class="mural-screen" cx="62" cy="224" r="5"/><circle class="mural-screen" cx="100" cy="223" r="4"/>
+      </g>
+      <g class="mural-cabinet mural-portrait-second" transform="translate(240 -10)" stroke-width="4" stroke-linejoin="round">
+        <path class="mural-side" d="M130 82L182 105V392L130 374V258L148 240L130 218Z"/>
+        <path class="mural-body" d="M6 82H130V114L116 128V218L148 240V258H130V374H6V258H0V240L20 220V128L6 114Z"/>
+        <path class="mural-marquee" d="M16 92H120V109H16Z"/>
+        <path class="mural-screen" d="M26 135H110L104 208H26Z"/>
+        <path class="mural-panel" d="M20 220H116L148 240H0Z"/>
+        <path class="mural-detail" fill="none" d="M38 190L58 150L88 180L98 145M44 290H84V334H44ZM52 300H76M32 100H104"/>
+        <circle class="mural-screen" cx="50" cy="232" r="5"/><circle class="mural-screen" cx="96" cy="230" r="4"/>
+      </g>
+      <g class="mural-cabinet" transform="translate(480 10)" stroke-width="4" stroke-linejoin="round">
+        <path class="mural-side" d="M144 58L190 84V374L144 356V248L158 230L144 208Z"/>
+        <path class="mural-body" d="M20 58H144V100L130 116V208L158 230V248H144V356H20V248H14V230L34 210V116L20 100Z"/>
+        <path class="mural-marquee" d="M30 68H134V94H30Z"/>
+        <path class="mural-screen" d="M40 124H124L118 198H40Z"/>
+        <path class="mural-panel" d="M34 210H130L158 230H14Z"/>
+        <path class="mural-detail" fill="none" d="M48 178L70 143L98 181L112 151M58 276H98V320H58ZM66 286H90M48 82H118"/>
+        <circle class="mural-screen" cx="68" cy="222" r="5"/><circle class="mural-screen" cx="110" cy="221" r="4"/>
+      </g>
+    </svg>
+  </template>
+  <!-- One opening into the next room per lap: an original 14-column mosaic above white ceramic tiles. -->
+  <template id="room-tiles">
+    <div class="aisle-tiles" aria-hidden="true">
+      <svg viewBox="0 0 560 680" aria-hidden="true" focusable="false">
+        <defs>
+          <pattern id="tile-joints" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M0 40V0H40" fill="none" class="tile-grout" stroke-width="1.4"/>
+          </pattern>
+          <linearGradient id="tile-glaze" x2=".3" y2="1">
+            <stop stop-color="#fff2d6" stop-opacity=".18"/>
+            <stop offset=".35" stop-color="#fff2d6" stop-opacity="0"/>
+            <stop offset="1" stop-color="#000" stop-opacity=".18"/>
+          </linearGradient>
+          <radialGradient id="tile-reflection">
+            <stop stop-color="#fff4dc" stop-opacity=".52"/>
+            <stop offset=".2" stop-color="#fff4dc" stop-opacity=".16"/>
+            <stop offset="1" stop-color="#fff4dc" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <path class="tile-white" d="M0 0H560V680H0Z"/>
+        <path class="tile-black" d="M0 0H560V400H0Z"/>
+        <path class="tile-green" d="M0 40H40V80H80V160H40V200H0ZM200 80H280V120H320V200H360V280H280V320H240V280H160V240H120V160H160V120H200Z"/>
+        <path class="tile-purple" d="M0 200H40V240H80V280H120V360H80V400H0ZM440 80H520V120H560V240H520V200H480V160H440Z"/>
+        <path class="tile-red" d="M320 0H440V40H400V120H360V80H320ZM440 280H480V320H520V360H440Z"/>
+        <path class="tile-white" d="M80 0H120V40H160V80H120V120H80V80H40V40H80ZM400 160H440V200H480V240H440V280H400V240H360V200H400Z"/>
+        <g class="tile-glaze">
+          <path d="M0 0H560V680H0Z" fill="url(#tile-glaze)"/>
+          <ellipse cx="110" cy="150" rx="74" ry="98" fill="url(#tile-reflection)"/>
+          <ellipse cx="430" cy="70" rx="46" ry="110" fill="url(#tile-reflection)"/>
+        </g>
+        <path d="M0 0H560V680H0Z" fill="url(#tile-joints)"/>
+      </svg>
+    </div>
   </template>
   <!-- What stands round the machines (arcade-room.css): a power cord to the wall, and what visitors left behind. -->
   <template id="room-dressing">
@@ -1549,6 +1637,13 @@
       }
       var wall=roomLayer('i','aisle-wall','wall','wall'),trim=roomLayer('i','aisle-trim','trim','trim'),carpet=roomLayer('i','aisle-carpet','carpet','floor');
       grid.insertBefore(carpet,grid.firstChild);grid.insertBefore(trim,carpet);grid.insertBefore(wall,trim);
+      var mural=roomLayer('div','aisle-mural','mural','wall');grid.insertBefore(mural,trim);
+      var tiles=document.getElementById('room-tiles').content.firstElementChild.cloneNode(true);
+      tiles.dataset.roomLayer='tiles';tiles.dataset.zone='wall';grid.insertBefore(tiles,trim);
+      var stepEdge=roomLayer('i','aisle-step','step','floor');grid.insertBefore(stepEdge,carpet);
+      Array.prototype.forEach.call(document.getElementById('room-decals').content.children,function(source){
+        var el=source.cloneNode(true);el.dataset.roomLayer='decal';el.dataset.zone='edge';grid.insertBefore(el,carpet);
+      });
       var signs=document.getElementById('room-signs').content.cloneNode(true);
       var roomSignEls=[['.aisle-neon','neon'],['.aisle-open','open']].map(function(sign){
         var el=signs.querySelector(sign[0]);el.dataset.roomLayer=sign[1];el.dataset.zone='sign';
@@ -1616,11 +1711,18 @@
       var screens=cards.map(function(c){
         var rom=c.querySelector('.game-rom');
         if(!rom)return null;
-        var box=document.createElement('span'),frame=document.createElement('span'),strip=document.createElement('img');
+        var box=document.createElement('span'),frame=document.createElement('span'),picture=document.createElement('picture'),source=document.createElement('source'),strip=document.createElement('img');
         box.className='card-loop';box.setAttribute('aria-hidden','true');frame.className='card-loop-frame';
+        picture.className='card-loop-picture';source.type='image/webp';
         strip.className='card-loop-strip';strip.alt='';strip.decoding='async';
+        var fallbackUsed=false;
+        function fallbackLoop(){
+          if(fallbackUsed)return;
+          fallbackUsed=true;
+          if(source.parentNode)source.remove();
+        }
         // Brawler fills its CRT; the other cabinets preserve their stills' aspect ratio.
-        strip.addEventListener('load',function(){
+        function showLoop(){
           var shape=strip.naturalWidth/(strip.naturalHeight/12),glass=rom.clientWidth/Math.max(1,rom.clientHeight);
           if(c.dataset.machine==='brawler') { frame.style.width='100%'; frame.style.height='100%'; }
           else {
@@ -1628,13 +1730,19 @@
             frame.style.height=(shape<glass?100:100*glass/shape).toFixed(2)+'%';
           }
           c.setAttribute('data-loop-ready','');
+        }
+        strip.addEventListener('load',function(){
+          if(strip.decode)strip.decode().then(showLoop,fallbackLoop);
+          else showLoop();
         });
-        frame.appendChild(strip);box.appendChild(frame);
+        strip.addEventListener('error',fallbackLoop);
+        picture.appendChild(source);picture.appendChild(strip);frame.appendChild(picture);box.appendChild(frame);
         var still=rom.querySelector('.card-shot');
         rom.insertBefore(box,still?still.nextSibling:rom.firstChild);
         var pool=roomLayer('span','card-pool','pool','floor');c.appendChild(pool);
         dressCabinet(c);
-        return {strip:strip,pool:pool,near:false,glow:'',src:(c.getAttribute('data-game-url')||'').split('/')[0]+'/attract.webp'};
+        var slug=(c.getAttribute('data-game-url')||'').split('/')[0];
+        return {strip:strip,source:source,pool:pool,near:false,glow:'',src:slug+'/attract.webp',fallback:slug+'/attract.png'};
       });
       // Room between the machines for two players at each.
       function aisleSpacing(room) {
@@ -1649,9 +1757,21 @@
         var track=document.getElementById('game-grid'),w=track.clientWidth,h=track.clientHeight;
         var close=w>h*1.4&&h<520;
         track.toggleAttribute('data-close',close);
-        var css=getComputedStyle(track),scale=Math.max(.3,Math.min(close?h*.95/510:h*.78/660,(w-56)/300));
-        var depth=roomGeometry(track,w,h,scale,close);
-        return {width:w,scale:scale,wallRate:depth.rate,wallZ:depth.z,
+        // Start sits 459 authored pixels down, with a minimum 30.4px touch target.
+        var css=getComputedStyle(track),closeScale=Math.min(h*.95/510,(h*.97-32)/459);
+        var scale=Math.max(.3,Math.min(close?closeScale:h*.78/660,(w-56)/300));
+        var trimHeight=Math.max(parseFloat(css.getPropertyValue('--room-trim-min'))||24,
+          Math.min(h*(parseFloat(css.getPropertyValue('--room-trim-bottom'))-parseFloat(css.getPropertyValue('--room-trim-top')))/100,
+            parseFloat(css.getPropertyValue('--room-trim-max'))||96));
+        var depth=roomGeometry(track,w,h,scale,close,trimHeight);
+        var muralPeriod=parseFloat(css.getPropertyValue('--room-mural-period'))||720;
+        var muralCopies=Math.ceil((w+2*muralPeriod)/muralPeriod);
+        while(mural.children.length<muralCopies)mural.appendChild(document.getElementById('room-mural').content.firstElementChild.cloneNode(true));
+        while(mural.children.length>muralCopies)mural.lastElementChild.remove();
+        // One tiled opening per aisle lap (#76). Its transparent remainder is the orange room.
+        var tilesPeriod=cards.length*aisleSpacing({scale:scale})*depth.rate;
+        track.style.setProperty('--room-tiles-period',tilesPeriod+'px');
+        return {width:w,scale:scale,wallRate:depth.rate,wallZ:depth.z,tilesPeriod:tilesPeriod,muralPeriod:muralPeriod,
           wallPeriod:parseFloat(css.getPropertyValue('--room-wall-period'))||120,
           carpetPeriod:parseFloat(css.getPropertyValue('--room-carpet-period'))||86};
       }
@@ -1659,9 +1779,10 @@
       // is 200 deep), seen through #game-grid's perspective, 1100px from 38% of its height. The wall therefore
       // scrolls at wallRate of the machines' pace, and its foot, where the floor meets it, is --room-floor-y.
       var WALL_BACK=215;
-      function roomGeometry(track,w,h,scale,close) {
+      function roomGeometry(track,w,h,scale,close,trimHeight) {
         var feet=close?h*.03+660*scale:h*.97,top=feet-660*scale,wallZ=WALL_BACK*scale,wallRate=1100/(1100+wallZ),origin=h*.38;
         var place={'--room-cab-w':Math.round(300*scale)+'px','--room-cab-top':Math.round(top)+'px','--room-side-top':Math.round(top)+'px',
+          '--room-trim-px':trimHeight+'px','--room-headroom-px':Math.max(0,top-trimHeight)+'px',
           '--room-feet-y':Math.round(feet)+'px','--room-wall-z':Math.round(wallZ)+'px','--room-floor-y':Math.round(origin+(feet-origin)*wallRate)+'px'};
         for(var name in place)if(track.style.getPropertyValue(name)!==place[name])track.style.setProperty(name,place[name]);
         track.dataset.wallRate=wallRate.toFixed(4);
@@ -1688,7 +1809,10 @@
           var near=distance<=LOOP_NEAR;
           if(screen.near!==near){
             screen.near=near;
-            if(near&&!screen.strip.getAttribute('src'))screen.strip.src=screen.src;
+            if(near&&!screen.strip.getAttribute('src')){
+              screen.source.srcset=screen.src;
+              screen.strip.src=screen.fallback;
+            }
             c.toggleAttribute('data-loop',near);
           }
           var glow=BlipAisle.machineLevel(distance).toFixed(2);
@@ -1700,12 +1824,16 @@
         var carpetX=BlipAisle.layerOffset(roomTravel,spacing,1,room.carpetPeriod),wallX=BlipAisle.layerOffset(roomTravel,spacing,room.wallRate,room.wallPeriod);
         carpet.style.transform='translateZ(-'+room.wallZ+'px) rotateX(90deg) translate('+carpetX.toFixed(1)+'px,0px)';
         wall.style.transform='translate('+wallX.toFixed(1)+'px,'+((bob||0)*.4).toFixed(2)+'px)';
+        mural.style.transform='translate('+BlipAisle.layerOffset(roomTravel,spacing,.3,room.muralPeriod).toFixed(1)+'px,0px)';
         // The signs hang on the wall, so they scroll with it, coming round once a lap of the aisle: never more
         // than half a lap from where they hang beside the first machine, so the wrap happens out of sight.
         var lap=cards.length*spacing*room.wallRate,signX=BlipAisle.layerOffset(roomTravel,spacing,room.wallRate,lap);
         if(signX<-lap/2)signX+=lap;
         var signMove='translate('+signX.toFixed(1)+'px,'+((bob||0)*.4).toFixed(2)+'px)';
         roomSignEls.forEach(function(el){el.style.transform=signMove;});
+        var tileX=BlipAisle.layerOffset(roomTravel,spacing,room.wallRate,room.tilesPeriod);
+        if(tileX<-room.tilesPeriod/2)tileX+=room.tilesPeriod;
+        tiles.style.transform='translate('+tileX.toFixed(1)+'px,'+((bob||0)*.4).toFixed(2)+'px)';
         grid.dataset.aislePos=(((aisle.pos%cards.length)+cards.length)%cards.length).toFixed(2);
         grid.dataset.roomTravel=roomTravel.toFixed(3);
         if(typeof blipArcadeSound!=='undefined')blipArcadeSound.place(aisle.pos);

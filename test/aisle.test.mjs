@@ -167,5 +167,10 @@ test('every machine has an attract strip of twelve frames, small enough to fetch
     assert.equal(bytes.toString('latin1', 8, 12), 'WEBP', `${slug} is a WebP`);
     assert.ok(statSync(file).size <= 60 * 1024, `${slug}: ${statSync(file).size} bytes`);
     assert.ok(sw.includes(`"/blip/${slug}/attract.webp"`), `${slug}'s strip is in sw.js`);
+    const png = readFileSync(new URL(`${slug}/attract.png`, web));
+    assert.equal(png.toString('latin1', 1, 4), 'PNG', `${slug} has a PNG fallback`);
+    assert.ok(png.length <= 256 * 1024, `${slug}: PNG fallback is ${png.length} bytes`);
+    assert.equal(png.readUInt32BE(20) % 12, 0, `${slug}'s PNG contains twelve equal-height frames`);
+    assert.ok(sw.includes(`"/blip/${slug}/attract.png"`), `${slug}'s PNG fallback is cached offline`);
   }
 });

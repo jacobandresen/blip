@@ -42,10 +42,12 @@ function blipHasTouch() {
   return ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 }
 
-/** Each front end plays with one controller, every deck seating two: the arcade's joysticks, the home screen's
- * and an app's touch, BASIC's pads. Rally keeps its dials and its split strip (shell.js). */
+/** Touchscreens use gesture strips or the on-screen pad. Rally keeps its dials and split strip;
+ * elsewhere the front end selects the arcade's joysticks, home/app touch or BASIC's pads. */
 function blipFrontendControls() {
-  // ?controls= overrides it, for the tests and for trying another deck.
+  var game = blipGameFromPath(location.pathname);
+  if (game && game.slug !== 'rally' && blipHasTouch()) return 'touch';
+  // Rally and non-touch devices can override the front end for another deck.
   var asked = new URLSearchParams(location.search).get('controls');
   if (asked === 'stick' || asked === 'pad' || asked === 'touch') return asked;
   if (blipAmstradMode() || /\/basic\.html$/.test(location.pathname)) return 'pad';
@@ -177,7 +179,10 @@ if (blipMuted()) {
   var root = document.documentElement;
   var KEY = 'blip-fullscreen';
   var enter = root.requestFullscreen || root.webkitRequestFullscreen;
-  function wanted() { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } }
+  function wanted() {
+    if (root.hasAttribute('data-deck-preview')) return false;
+    try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; }
+  }
   function inBrowserFullscreen() {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   }
