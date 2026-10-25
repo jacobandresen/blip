@@ -215,6 +215,9 @@ test('BASIC selects MACK with his named special and THE HOOD home stage', async 
   });
   await p.press('f');
   assert.equal((await p.state()).bits, 511, 'selection must identify MACK, his drive-by, and THE HOOD');
+  const still = await p.canvas.screenshot();
+  await p.page.waitForTimeout(300);
+  assert.notDeepEqual(await p.canvas.screenshot(), still, 'MACK should keep his fighter-specific idle animation moving while selected');
   await p.press('f');
   await p.frame.waitForFunction(() => (window.__brawler.bits & 16) === 0);
   assert.equal((await p.state()).bits & 15, 15, 'MACK starts as the chosen fighter');

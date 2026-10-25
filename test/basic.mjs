@@ -21,6 +21,9 @@ test('tape programs use uppercase source and unique ascending line numbers', () 
   assert.match(rally, /BALL_SPEED=MIN\(BALL_SPEED\+SPEED_UP,TOP_SPEED\)/);
   assert.match(rally, /-0\.5,0\.5\)\*1\.1/);
   assert.match(rally, /AI_ERR=RND\(1\)\*PAD_H\*0\.7-PAD_H\*0\.35/);
+  const brawler = readFileSync(new URL('BRAWLER.BLIP', tape), 'utf8');
+  assert.equal([...brawler.matchAll(/INT\(NOW\*IDLE_RATE\((?:W|V|PICK|PICK2)\)\*6\/6\.283\) MOD 6/g)].length, 6,
+    'title, fighter choice and the fight should use each Rust fighter’s six-frame idle cadence');
   assert.match(rally, /DEF FNHITS_PADDLE\(X,Y\)=SEGMENT_RECT_OVERLAP/);
   const raider = readFileSync(new URL('RAIDER.BLIP', tape), 'utf8');
   assert.match(raider, /KILLS>=60\+15\*\(LEVEL-1\)/);
