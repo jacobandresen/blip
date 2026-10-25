@@ -177,10 +177,10 @@
 #game-grid .cord-plug-shadow {fill:rgb(0 0 0 / .4)}
 
 /* prop: a can somebody forgot on top of Defender, standing a little back from the front edge (so the edge hides its
-   foot from below), with the dusk on its far side and a soft shadow on the wall behind; and a sweet's wrapper lying
-   on the carpet beside Serpent. */
+   foot from below): necked-in shoulder and rolled rim, a sharp highlight and the room warm in the metal, with a
+   soft shadow on the wall behind. And an empty sweet's wrapper, crumpled foil, on the carpet beside Serpent. */
 #game-grid .room-can {position:absolute;left:62%;bottom:100%;width:11%;pointer-events:none;overflow:visible;transform:translateZ(-70px)}
 #game-grid .room-can-shadow {position:absolute;left:58%;bottom:100%;width:22%;height:14%;pointer-events:none;transform:translateZ(-214px);
   background:radial-gradient(ellipse 50% 70% at 50% 100%,rgb(6 2 1 / .55),transparent 72%)}
 #game-grid .room-wrapper {position:absolute;left:104%;top:100%;width:30%;pointer-events:none;overflow:visible;transform-origin:50% 0;
-  transform:translateZ(70px) rotateX(-90deg) rotateZ(-14deg)}
+  transform:translateZ(20px) rotateX(-90deg) rotateZ(-14deg)}

@@ -635,7 +635,7 @@
       .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:none}
     }
   </style>
-  <link rel="stylesheet" href="arcade-room.css?v=6">
+  <link rel="stylesheet" href="arcade-room.css?v=7">
 </head>
 <body class="cabinet-page">
 
@@ -693,26 +693,70 @@
   </template>
   <!-- What stands round the machines (arcade-room.css): a power cord to the wall, and what visitors left behind. -->
   <template id="room-dressing">
-    <svg class="room-can" viewBox="0 0 34 60" aria-hidden="true" focusable="false">
-      <defs><linearGradient id="can-shade" x1="0" x2="1"><stop offset="0" stop-color="#5e0a0d"/><stop offset=".28" stop-color="#d21c22"/><stop offset=".42" stop-color="#ff7a6e"/><stop offset=".56" stop-color="#c4161c"/><stop offset="1" stop-color="#3e0608"/></linearGradient>
-        <linearGradient id="can-dusk" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></linearGradient></defs>
-      <path d="M3 9Q3 6 6 5H28Q31 6 31 9V52Q31 55 28 56H6Q3 55 3 52Z" fill="url(#can-shade)"/>
-      <rect x="3" y="24" width="28" height="11" fill="#e9e1d4" opacity=".9"/>
-      <text x="17" y="32.6" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-size="7.6" font-weight="900" fill="#c4161c">COLA</text>
-      <path d="M6 5Q17 1 28 5L28 7Q17 4 6 7Z" fill="#c9ccd2"/>
-      <ellipse cx="17" cy="5.4" rx="11" ry="2.2" fill="#e3e5ea"/>
-      <ellipse cx="19" cy="5.2" rx="3.4" ry="1.1" fill="#9a9ea8"/>
-      <path d="M3 9Q3 6 6 5H28Q31 6 31 9V52Q31 55 28 56H6Q3 55 3 52Z" fill="url(#can-dusk)"/>
+    <svg class="room-can" viewBox="0 0 34 63" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="can-metal" x1="0" x2="1">
+          <stop offset="0" stop-color="#2a0305"/><stop offset=".1" stop-color="#7a0a10"/><stop offset=".22" stop-color="#c8141c"/>
+          <stop offset=".29" stop-color="#ff9c8f"/><stop offset=".31" stop-color="#fff1ec"/><stop offset=".335" stop-color="#ff8a7c"/>
+          <stop offset=".42" stop-color="#d0161e"/><stop offset=".66" stop-color="#a80f17"/><stop offset=".74" stop-color="#e04a3c"/>
+          <stop offset=".8" stop-color="#9c0e15"/><stop offset=".93" stop-color="#4c0609"/><stop offset="1" stop-color="#1c0203"/>
+        </linearGradient>
+        <linearGradient id="can-alu" x1="0" x2="1">
+          <stop offset="0" stop-color="#3a3c42"/><stop offset=".2" stop-color="#8d929c"/><stop offset=".3" stop-color="#f4f5f7"/>
+          <stop offset=".36" stop-color="#a9adb6"/><stop offset=".7" stop-color="#7d828c"/><stop offset=".78" stop-color="#c3c7ce"/><stop offset="1" stop-color="#2e3035"/>
+        </linearGradient>
+        <linearGradient id="can-room" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ff9a4a" stop-opacity=".22"/><stop offset=".35" stop-color="#ff9a4a" stop-opacity="0"/>
+          <stop offset=".8" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".5"/>
+        </linearGradient>
+        <clipPath id="can-body"><path d="M2 13Q2 10.5 4.6 9.2L6.2 7.4H27.8L29.4 9.2Q32 10.5 32 13V56.5Q32 58.5 30 59.6L28 61H6L4 59.6Q2 58.5 2 56.5Z"/></clipPath>
+      </defs>
+      <!-- body -->
+      <path d="M2 13Q2 10.5 4.6 9.2L6.2 7.4H27.8L29.4 9.2Q32 10.5 32 13V56.5Q32 58.5 30 59.6L28 61H6L4 59.6Q2 58.5 2 56.5Z" fill="url(#can-metal)"/>
+      <g clip-path="url(#can-body)">
+        <!-- the print: a white band with the name, wrapping round the cylinder -->
+        <path d="M2 26Q17 29 32 26V35Q17 38 2 35Z" fill="#efe9df" opacity=".9"/>
+        <text x="17" y="34.6" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-size="7" font-weight="900" fill="#b3121a" letter-spacing=".3" transform="translate(17 0) scale(.92 1) translate(-17 0)">COLA</text>
+        <!-- the room in the metal: warm light from above, darkness below, the highlight over the print -->
+        <rect x="0" y="0" width="34" height="63" fill="url(#can-room)"/>
+        <rect x="2" y="9" width="1.1" height="51" fill="#ff9a4a" opacity=".45"/>
+      </g>
+      <!-- necked-in shoulder and the rolled rim, seen from below -->
+      <path d="M4.6 9.2L6.2 7.4Q7 5.4 8.4 4.6H25.6Q27 5.4 27.8 7.4L29.4 9.2Q17 11 4.6 9.2Z" fill="url(#can-alu)"/>
+      <path d="M8 4.8Q17 6.6 26 4.8L26 3.2Q17 4.6 8 3.2Z" fill="url(#can-alu)"/>
+      <path d="M8 3.2Q17 4.6 26 3.2" stroke="#45484f" stroke-width=".5" fill="none"/>
+      <path d="M4.6 9.2Q17 11 29.4 9.2" stroke="#2a0a0b" stroke-width=".6" fill="none" opacity=".7"/>
     </svg>
     <span class="room-can-shadow" aria-hidden="true"></span>
-    <svg class="room-wrapper" viewBox="0 0 70 30" aria-hidden="true" focusable="false">
-      <path d="M7 16L16 12L15 17L19 21L8 23L12 18Z" fill="rgb(0 0 0 / .4)"/>
-      <path d="M17 13Q24 11 29 14Q35 9 42 13Q50 10 57 12Q59 16 56 20Q49 23 43 20Q36 24 29 21Q23 24 18 21Q15 17 17 13Z" fill="rgb(0 0 0 / .4)"/>
-      <path d="M5 13L14 9L13 14L17 18L6 20L10 15Z" fill="#ffd23f"/>
-      <path d="M65 9L56 7L57 12L53 16L64 19L60 13Z" fill="#e8b92c"/>
-      <path d="M15 10Q22 8 27 11Q33 6 40 10Q48 7 55 9Q57 13 54 17Q47 20 41 17Q34 21 27 18Q21 21 16 18Q13 14 15 10Z" fill="#ff4fa3"/>
-      <path d="M19 12L26 14L31 11L37 15L44 12L51 14M21 16L28 17" stroke="#ffd0e6" stroke-width="1.1" fill="none" opacity=".85"/>
-      <path d="M27 11Q29 15 27 18M41 10Q43 14 41 17" stroke="#b1286c" stroke-width="1" fill="none"/>
+    <svg class="room-wrapper" viewBox="0 0 84 40" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="foil" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ff6cb6"/><stop offset=".45" stop-color="#e02a86"/><stop offset=".55" stop-color="#ffd2ea"/><stop offset=".65" stop-color="#d6237c"/><stop offset="1" stop-color="#8e1452"/>
+        </linearGradient>
+        <linearGradient id="foil-end" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#b78a12"/><stop offset=".5" stop-color="#ffe27a"/><stop offset="1" stop-color="#c99a1c"/>
+        </linearGradient>
+      </defs>
+      <!-- its shadow on the carpet -->
+      <path d="M10 22L22 15L30 18L42 13L56 17L66 14L77 20L68 27L56 25L44 30L31 26L20 29Z" fill="rgb(0 0 0 / .45)" transform="translate(2 3)"/>
+      <!-- the twisted ends, crumpled flat -->
+      <path d="M4 17L14 12L17 15L21 14L22 22L18 24L15 27L6 25L9 21Z" fill="url(#foil-end)"/>
+      <path d="M14 12L17 15L15 19L9 21Z" fill="#fff3b8" opacity=".55"/>
+      <path d="M80 15L70 11L68 14L63 13L62 21L66 23L68 26L78 23L74 19Z" fill="url(#foil-end)"/>
+      <path d="M70 11L68 14L71 18L74 19Z" fill="#7a5a0a" opacity=".5"/>
+      <!-- the opened middle: foil facets catching the light -->
+      <path d="M21 14L31 10L43 12L55 9L63 13L62 21L54 26L42 24L31 27L22 22Z" fill="url(#foil)"/>
+      <g opacity=".85">
+        <path d="M31 10L36 17L43 12Z" fill="#ffc2e0"/>
+        <path d="M43 12L48 19L55 9Z" fill="#ff8cc8"/>
+        <path d="M36 17L42 24L48 19Z" fill="#b51b68"/>
+        <path d="M22 22L31 27L28 18Z" fill="#a1175c"/>
+        <path d="M55 9L63 13L57 16Z" fill="#fff0f7"/>
+        <path d="M48 19L54 26L57 16Z" fill="#ff5aa8"/>
+      </g>
+      <!-- crinkle lines and the print's white stripe, broken by the folds -->
+      <path d="M24 16L30 15L35 19M40 14L46 17L52 13M38 22L44 20L50 23M27 21L33 22" stroke="#fff" stroke-width=".7" fill="none" opacity=".75"/>
+      <path d="M25 18Q33 15 38 18T52 16L60 17" stroke="#fff6fb" stroke-width="1.8" fill="none" opacity=".55" stroke-dasharray="7 2 5 3"/>
     </svg>
   </template>
   <div class="game-grid" id="game-grid" aria-label="Arcade machines. Use the left and right arrows to walk between games.">
