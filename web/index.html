@@ -635,7 +635,7 @@
       .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:none}
     }
   </style>
-  <link rel="stylesheet" href="arcade-room.css?v=4">
+  <link rel="stylesheet" href="arcade-room.css?v=6">
 </head>
 <body class="cabinet-page">
 
@@ -689,6 +689,30 @@
       <use href="#neon-open-frame" class="open-frame-core"/>
       <use href="#neon-open-letters" class="open-letter-tube"/>
       <use href="#neon-open-letters" class="open-letter-core"/>
+    </svg>
+  </template>
+  <!-- What stands round the machines (arcade-room.css): a power cord to the wall, and what visitors left behind. -->
+  <template id="room-dressing">
+    <svg class="room-can" viewBox="0 0 34 60" aria-hidden="true" focusable="false">
+      <defs><linearGradient id="can-shade" x1="0" x2="1"><stop offset="0" stop-color="#5e0a0d"/><stop offset=".28" stop-color="#d21c22"/><stop offset=".42" stop-color="#ff7a6e"/><stop offset=".56" stop-color="#c4161c"/><stop offset="1" stop-color="#3e0608"/></linearGradient>
+        <linearGradient id="can-dusk" x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/></linearGradient></defs>
+      <path d="M3 9Q3 6 6 5H28Q31 6 31 9V52Q31 55 28 56H6Q3 55 3 52Z" fill="url(#can-shade)"/>
+      <rect x="3" y="24" width="28" height="11" fill="#e9e1d4" opacity=".9"/>
+      <text x="17" y="32.6" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-size="7.6" font-weight="900" fill="#c4161c">COLA</text>
+      <path d="M6 5Q17 1 28 5L28 7Q17 4 6 7Z" fill="#c9ccd2"/>
+      <ellipse cx="17" cy="5.4" rx="11" ry="2.2" fill="#e3e5ea"/>
+      <ellipse cx="19" cy="5.2" rx="3.4" ry="1.1" fill="#9a9ea8"/>
+      <path d="M3 9Q3 6 6 5H28Q31 6 31 9V52Q31 55 28 56H6Q3 55 3 52Z" fill="url(#can-dusk)"/>
+    </svg>
+    <span class="room-can-shadow" aria-hidden="true"></span>
+    <svg class="room-wrapper" viewBox="0 0 70 30" aria-hidden="true" focusable="false">
+      <path d="M7 16L16 12L15 17L19 21L8 23L12 18Z" fill="rgb(0 0 0 / .4)"/>
+      <path d="M17 13Q24 11 29 14Q35 9 42 13Q50 10 57 12Q59 16 56 20Q49 23 43 20Q36 24 29 21Q23 24 18 21Q15 17 17 13Z" fill="rgb(0 0 0 / .4)"/>
+      <path d="M5 13L14 9L13 14L17 18L6 20L10 15Z" fill="#ffd23f"/>
+      <path d="M65 9L56 7L57 12L53 16L64 19L60 13Z" fill="#e8b92c"/>
+      <path d="M15 10Q22 8 27 11Q33 6 40 10Q48 7 55 9Q57 13 54 17Q47 20 41 17Q34 21 27 18Q21 21 16 18Q13 14 15 10Z" fill="#ff4fa3"/>
+      <path d="M19 12L26 14L31 11L37 15L44 12L51 14M21 16L28 17" stroke="#ffd0e6" stroke-width="1.1" fill="none" opacity=".85"/>
+      <path d="M27 11Q29 15 27 18M41 10Q43 14 41 17" stroke="#b1286c" stroke-width="1" fill="none"/>
     </svg>
   </template>
   <div class="game-grid" id="game-grid" aria-label="Arcade machines. Use the left and right arrows to walk between games.">
@@ -1489,6 +1513,59 @@
       // How far the room has scrolled, in machines. The aisle's own position wraps round the loop when it
       // settles; this keeps counting, so the room never jumps between the last machine and the first.
       var roomTravel=aisle.pos,roomFrom=aisle.pos;
+      // Round each machine: its shadow on the wall behind, its power cord to a socket in the gap beside it, and
+      // whatever visitors left behind (a can on Defender, a sweet's wrapper by Serpent).
+      var dressing=document.getElementById('room-dressing').content;
+      function dressCabinet(c) {
+        c.appendChild(roomLayer('span','card-backlight','shadow','wall'));
+        powerCord(c);
+        var props=[];
+        if(c.dataset.machine==='defender')props.push(['.room-can','prop','wall'],['.room-can-shadow','prop','wall']);
+        if(c.dataset.machine==='serpent')props.push(['.room-wrapper','prop','floor']);
+        props.forEach(function(prop){
+          var el=dressing.querySelector(prop[0]).cloneNode(true);
+          el.dataset.roomLayer=prop[1];el.dataset.zone=prop[2];c.appendChild(el);
+        });
+      }
+      // Each machine's cord, laid its own way: out of a small junction box on the cabinet's right side by the deck,
+      // down the side to the floor, slack across the floor of the gap and back to the wall's foot, then up into a
+      // socket. The machine's name seeds the shape, so a cabinet keeps its cord. Each piece lies on its own plane
+      // (arcade-room.css): the drop 52px behind the front, the floor seen from above (0 the cabinets' fronts, 215 the
+      // wall, x 0 at 92% of the cabinet's width) and the wall (0 the floor); they meet where one ends.
+      function powerCord(c) {
+        var seed=0,name=c.dataset.machine||'';
+        for(var i=0;i<name.length;i++)seed=(seed*31+name.charCodeAt(i))>>>0;
+        function rand(){seed=(seed+0x6D2B79F5)>>>0;var t=seed;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}
+        function between(a,b){return a+(b-a)*rand();}
+        var startX=36,startZ=52,socketX=between(52,96),socketUp=between(30,46),reach=between(26,60);
+        var bendX=startX+between(10,30),loop=rand()<.25;
+        var p=[[startX,startZ],[bendX,reach+between(-8,8)],[(bendX+socketX)/2+between(-12,12),reach+between(30,80)],[socketX+between(-6,6),between(198,207)],[socketX,214]];
+        if(loop)p.splice(2,0,[bendX+between(10,18),reach-between(4,10)],[bendX+between(-4,4),reach-between(12,18)]);
+        var d='M'+p[0][0].toFixed(1)+' '+p[0][1].toFixed(1);
+        for(var k=0;k<p.length-1;k++){
+          var a=p[k-1]||p[k],b=p[k],e=p[k+1],f=p[k+2]||e;
+          d+='C'+(b[0]+(e[0]-a[0])/6).toFixed(1)+' '+(b[1]+(e[1]-a[1])/6).toFixed(1)+' '+(e[0]-(f[0]-b[0])/6).toFixed(1)+' '+(e[1]-(f[1]-b[1])/6).toFixed(1)+' '+e[0].toFixed(1)+' '+e[1].toFixed(1);
+        }
+        var floor=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        floor.setAttribute('viewBox','0 0 168 215');floor.setAttribute('class','cord-floor');floor.setAttribute('aria-hidden','true');
+        floor.innerHTML='<path class="cord-shadow" d="'+d+'" transform="translate(1.5 3)"/><path class="cord-wire" d="'+d+'"/><path class="cord-shine" d="'+d+'" transform="translate(-.6 -.8)"/>';
+        var bow=between(-7,7),up='M'+socketX.toFixed(1)+' 100C'+(socketX+bow).toFixed(1)+' '+(100-socketUp*.35).toFixed(1)+' '+(socketX+bow*.4).toFixed(1)+' '+(100-socketUp*.8).toFixed(1)+' '+socketX.toFixed(1)+' '+(100-socketUp+6).toFixed(1);
+        var wallPiece=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        wallPiece.setAttribute('viewBox','0 0 168 100');wallPiece.setAttribute('class','cord-wall');wallPiece.setAttribute('aria-hidden','true');
+        var sy=100-socketUp;
+        wallPiece.innerHTML='<g class="cord-socket" transform="translate('+socketX.toFixed(1)+' '+sy.toFixed(1)+')"><rect class="socket-shadow" x="-8" y="-9" width="18" height="21" rx="2.6"/><rect x="-9" y="-11" width="18" height="21" rx="2.6"/><circle cx="-3" cy="-2" r="1.5"/><circle cx="3" cy="-2" r="1.5"/></g>'+
+          '<path class="cord-shadow" d="'+up+'" transform="translate(2.5 1.5)"/><path class="cord-wire" d="'+up+'"/><path class="cord-shine" d="'+up+'" transform="translate(-.8 0)"/>'+
+          '<rect class="cord-plug-shadow" x="'+(socketX-3.5).toFixed(1)+'" y="'+(sy-3).toFixed(1)+'" width="9" height="13" rx="1.8"/><rect class="cord-plug" x="'+(socketX-4.5).toFixed(1)+'" y="'+(sy-5).toFixed(1)+'" width="9" height="13" rx="1.8"/>';
+        var sway=between(3,9),drop=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        drop.setAttribute('viewBox','0 0 24 262');drop.setAttribute('class','cord-drop');drop.setAttribute('aria-hidden','true');
+        var hang='M6 0C'+(6+sway).toFixed(1)+' 70 '+(12+sway).toFixed(1)+' 170 12 262';
+        drop.innerHTML='<path class="cord-wire" d="'+hang+'"/><path class="cord-shine" d="'+hang+'" transform="translate(-.7 0)"/>';
+        var box=document.createElement('span');box.className='cord-box';
+        var boxFront=document.createElement('span');boxFront.className='cord-box-front';
+        [[box,'wall'],[boxFront,'wall'],[drop,'wall'],[floor,'floor'],[wallPiece,'wall']].forEach(function(piece){
+          piece[0].setAttribute('aria-hidden','true');piece[0].dataset.roomLayer='cord';piece[0].dataset.zone=piece[1];c.appendChild(piece[0]);
+        });
+      }
       // Living screens: a machine within two plays a few seconds of its game (tools/make_attract_strips.mjs, 12 frames),
       // farther ones show their still; each casts a pool of its colour on the carpet, brighter as you come near.
       var LOOP_NEAR=2;
@@ -1512,6 +1589,7 @@
         var still=rom.querySelector('.card-shot');
         rom.insertBefore(box,still?still.nextSibling:rom.firstChild);
         var pool=roomLayer('span','card-pool','pool','floor');c.appendChild(pool);
+        dressCabinet(c);
         return {strip:strip,pool:pool,near:false,glow:'',src:(c.getAttribute('data-game-url')||'').split('/')[0]+'/attract.webp'};
       });
       // Room between the machines for two players at each.
@@ -1528,16 +1606,22 @@
         var close=w>h*1.4&&h<520;
         track.toggleAttribute('data-close',close);
         var css=getComputedStyle(track),scale=Math.max(.3,Math.min(close?h*.95/510:h*.78/660,(w-56)/300));
-        roomSigns(track,w,h,scale,close);
-        return {width:w,scale:scale,
+        var depth=roomGeometry(track,w,h,scale,close);
+        return {width:w,scale:scale,wallRate:depth.rate,wallZ:depth.z,
           wallPeriod:parseFloat(css.getPropertyValue('--room-wall-period'))||120,
           carpetPeriod:parseFloat(css.getPropertyValue('--room-carpet-period'))||86};
       }
-      // Where the row of machines stands, so the room's signs hang on the wall above it.
-      function roomSigns(track,w,h,scale,close) {
-        var top=close?h*.03:h*.97-660*scale;
-        var place={'--room-cab-w':Math.round(300*scale)+'px','--room-cab-top':Math.round(top)+'px','--room-side-top':Math.round(top)+'px'};
+      // The room in depth: the machines' fronts stand at the grid's plane and the wall 215px behind them (a cabinet
+      // is 200 deep), seen through #game-grid's perspective, 1100px from 38% of its height. The wall therefore
+      // scrolls at wallRate of the machines' pace, and its foot, where the floor meets it, is --room-floor-y.
+      var WALL_BACK=215;
+      function roomGeometry(track,w,h,scale,close) {
+        var feet=close?h*.03+660*scale:h*.97,top=feet-660*scale,wallZ=WALL_BACK*scale,wallRate=1100/(1100+wallZ),origin=h*.38;
+        var place={'--room-cab-w':Math.round(300*scale)+'px','--room-cab-top':Math.round(top)+'px','--room-side-top':Math.round(top)+'px',
+          '--room-feet-y':Math.round(feet)+'px','--room-wall-z':Math.round(wallZ)+'px','--room-floor-y':Math.round(origin+(feet-origin)*wallRate)+'px'};
         for(var name in place)if(track.style.getPropertyValue(name)!==place[name])track.style.setProperty(name,place[name]);
+        track.dataset.wallRate=wallRate.toFixed(4);
+        return {rate:wallRate,z:Math.round(wallZ)};
       }
       function aisleOffset(index) {
         return BlipAisle.offset(index,aisle.pos,cards.length);
@@ -1567,12 +1651,14 @@
           if(screen.glow!==glow){screen.glow=glow;screen.pool.style.opacity=glow;}
         });
         roomTravel+=BlipAisle.offset(aisle.pos,roomFrom,cards.length);roomFrom=aisle.pos;
-        var carpetX=BlipAisle.layerOffset(roomTravel,spacing,1.3,room.carpetPeriod),wallX=BlipAisle.layerOffset(roomTravel,spacing,.5,room.wallPeriod);
-        carpet.style.transform='perspective(300px) rotateX(55deg) translate('+carpetX.toFixed(1)+'px,'+(bob||0).toFixed(2)+'px)';
+        // The floor lies from the wall's foot towards you and moves with the machines; the perspective makes its
+        // near side sweep past faster than its far one.
+        var carpetX=BlipAisle.layerOffset(roomTravel,spacing,1,room.carpetPeriod),wallX=BlipAisle.layerOffset(roomTravel,spacing,room.wallRate,room.wallPeriod);
+        carpet.style.transform='translateZ(-'+room.wallZ+'px) rotateX(90deg) translate('+carpetX.toFixed(1)+'px,0px)';
         wall.style.transform='translate('+wallX.toFixed(1)+'px,'+((bob||0)*.4).toFixed(2)+'px)';
         // The signs hang on the wall, so they scroll with it, coming round once a lap of the aisle: never more
         // than half a lap from where they hang beside the first machine, so the wrap happens out of sight.
-        var lap=cards.length*spacing*.5,signX=BlipAisle.layerOffset(roomTravel,spacing,.5,lap);
+        var lap=cards.length*spacing*room.wallRate,signX=BlipAisle.layerOffset(roomTravel,spacing,room.wallRate,lap);
         if(signX<-lap/2)signX+=lap;
         var signMove='translate('+signX.toFixed(1)+'px,'+((bob||0)*.4).toFixed(2)+'px)';
         roomSignEls.forEach(function(el){el.style.transform=signMove;});

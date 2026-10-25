@@ -12,9 +12,14 @@ const LAYERS = {
   trim: ['shown', 'shown', 'shown'],
   neon: ['shown', 'hidden', 'shown'],     // no wall shows in landscape (#68)
   open: ['shown', 'hidden', 'shown'],
-  carpet: ['shown', 'shown', 'shown'],
+  // On its side the phone shows each machine close up, cut off below Start: its feet and the floor are below the room.
+  carpet: ['shown', 'either', 'shown'],
   // On its side the phone shows each machine close up, cut off below Start, so the pools are out of sight.
   pool: ['shown', 'either', 'shown'],
+  shadow: ['shown', 'either', 'shown'],
+  cord: ['either', 'either', 'shown'],
+  // A can on Defender and a wrapper by Serpent: in view only near those machines.
+  prop: ['either', 'either', 'either'],
 };
 const ZONES = ['trim', 'sign', 'wall', 'floor', 'edge'];
 const CONFIGS = [
@@ -184,7 +189,9 @@ test('the room and its signs scroll on without a jump past the last machine and 
     return {
       spacing: Number(/calc\(-50% \+ (-?[\d.]+)px\)/.exec(next.style.transform)[1]),
       cabinets: document.querySelectorAll('#game-grid .card').length,
-      layers: { wall: [0.5, parseFloat(cs.getPropertyValue('--room-wall-period'))], carpet: [1.3, parseFloat(cs.getPropertyValue('--room-carpet-period'))] },
+      // The wall stands behind the machines and scrolls at the rate its depth gives it; the floor moves with them.
+      wallRate: Number(document.getElementById('game-grid').dataset.wallRate),
+      layers: { wall: [Number(document.getElementById('game-grid').dataset.wallRate), parseFloat(cs.getPropertyValue('--room-wall-period'))], carpet: [1, parseFloat(cs.getPropertyValue('--room-carpet-period'))] },
     };
   });
   await page.evaluate(sampleRoom);
@@ -214,7 +221,8 @@ test('the room and its signs scroll on without a jump past the last machine and 
   }
   const Aisle = (await import('../web/aisle.js')).default;
   // The signs hang on the wall: they scroll at its pace and come round once a lap of the aisle.
-  room.layers.neon = room.layers.open = [0.5, room.cabinets * room.spacing * 0.5];
+  room.layers.neon = room.layers.open = [room.wallRate, room.cabinets * room.spacing * room.wallRate];
+  assert.ok(room.wallRate > 0.5 && room.wallRate < 1, `the wall scrolls at ${room.wallRate} of the machines' pace`);
   for (const [name, [rate, period]] of Object.entries(room.layers)) {
     let worst = 0;
     for (const s of samples) {
