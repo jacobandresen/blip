@@ -6,7 +6,7 @@ use super::*;
 
 #[test]
 pub(crate) fn the_ladder_is_everybody_else_once() {
-    let boss = FIGHTERS.iter().position(|a| a.invincible).unwrap();
+    let boss = FIGHTERS.iter().position(|a| a.boss).unwrap();
     for pick in 0..FIGHTERS.len() {
         let ladder = Game { pick, ..Game::new() }.build_ladder();
         assert_eq!(ladder.len(), FIGHTERS.len() - 1);
@@ -15,8 +15,8 @@ pub(crate) fn the_ladder_is_everybody_else_once() {
         met.dedup();
         assert_eq!(met.len(), ladder.len(), "{} meets somebody twice", FIGHTERS[pick].name);
         assert!(!ladder.contains(&pick), "{} fights themself", FIGHTERS[pick].name);
-        // The one nothing hurts is the last fight, never an earlier one, and
-        // the giant is the one before: nobody opens against either.
+        // The OVERPOWERED boss is last, the giant is before him, and neither
+        // appears in the opening fights.
         let giant = FIGHTERS.iter().position(|a| a.build == Build::Giant).unwrap();
         let ends: Vec<usize> = [giant, boss].into_iter().filter(|&w| w != pick).collect();
         assert_eq!(&ladder[RUNGS - ends.len()..], &ends[..],

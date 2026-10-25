@@ -114,15 +114,37 @@ pub(crate) fn hinges_stay_inside_their_range() {
             let la = (ax * ax + ay * ay).sqrt().max(0.001);
             let lb = (bx * bx + by * by).sqrt().max(0.001);
             let ang = ((ax * bx + ay * by) / (la * lb)).clamp(-1.0, 1.0).acos();
-            // Straight is PI. Anything under `shut` is a joint folded
-            // past the point flesh gets in the way.
+            // Interior angle is zero when folded and PI when straight;
+            // `shut` is the minimum interior angle enforced by the solver.
             if ang < shut - 0.02 {
-                bad.push(format!("{label}: {name} folded to {:.0}deg (limit {:.0})",
+                bad.push(format!("{label}: {name} folded to {:.0}deg (minimum {:.0})",
                     ang.to_degrees(), shut.to_degrees()));
             }
         }
     }
     assert!(bad.is_empty(), "joints folded past their limit:\n  {}", bad.join("\n  "));
+}
+
+#[test]
+pub(crate) fn limb_solver_keeps_bone_lengths_when_targets_coincide() {
+    let root = draw::V(4.0, -7.0);
+    for toward in [draw::V(0.0, 0.0), draw::V(0.0, 1.0), draw::V(-3.0, 4.0)] {
+        let (joint, end) = draw::solve(root, root, 30.0, 29.0, draw::KNEE_SHUT, toward);
+        assert!((draw::dist(root, joint) - 30.0).abs() < 0.01);
+        assert!((draw::dist(joint, end) - 29.0).abs() < 0.01);
+        assert!((draw::dist(root, end) - (30.0f32.powi(2) + 29.0f32.powi(2)
+            - 2.0 * 30.0 * 29.0 * draw::KNEE_SHUT.cos()).sqrt()).abs() < 0.01);
+        if toward.0 != 0.0 || toward.1 != 0.0 {
+            assert!((joint.0 - root.0) * toward.0 + (joint.1 - root.1) * toward.1 > 0.0,
+                "coincident target ignored bend direction {toward:?}");
+        }
+    }
+
+    let (joint, end) = draw::solve(root, draw::V(104.0, -7.0), 30.0, 29.0,
+        draw::KNEE_SHUT, draw::V(0.0, 1.0));
+    assert!((draw::dist(root, joint) - 30.0).abs() < 0.01);
+    assert!((draw::dist(joint, end) - 29.0).abs() < 0.01);
+    assert!((draw::dist(root, end) - 59.0).abs() < 0.01);
 }
 
 #[test]
@@ -651,7 +673,7 @@ pub(crate) fn the_cpu_throws_the_flying_kick_too() {
     // just never uses it — and the move becomes a player-only tool.
     let _sim = simulating(0x5EED07);
     let mut seen = 0;
-    for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].invincible) {
+    for pick in (0..FIGHTERS.len()).filter(|&i| !FIGHTERS[i].boss) {
         for foe in [0, RUNGS - 3] {
             let mut g = Game::new();
             g.pick = pick;
@@ -1159,11 +1181,38 @@ pub(crate) fn a_walk_leaves_whichever_foot_it_stopped_on_in_front_and_the_kick_c
         let mut f = at(0, 300.0, 1.0);
         f.far_leads = far;
         wind_to_active(&mut f, MoveId::HighKick);
+        f.alt_kick = false;
         let k = bones_of(&f);
         let (kicking, standing) = if far { (k.ankle_rear, k.ankle_lead) } else { (k.ankle_lead, k.ankle_rear) };
         assert!(kicking.1 < standing.1 - 40.0 && kicking.0 > standing.0 + 30.0,
             "far_leads {far}: the kicking foot is at {kicking:?}, the standing one at {standing:?}");
     }
+}
+
+#[test]
+pub(crate) fn grounded_high_kicks_alternate_legs_and_a_whiff_can_stumble() {
+    let mut f = at(0, 300.0, 1.0);
+    f.start_attack(MoveId::HighKick);
+    f.t = 12.0 * F;
+    let first = bones_of(&f);
+    assert!(f.alt_kick);
+    f.act = Act::Idle;
+    f.start_attack(MoveId::HighKick);
+    f.t = 12.0 * F;
+    let second = bones_of(&f);
+    assert!(!f.alt_kick);
+    assert!((first.ankle_lead.0 - second.ankle_lead.0).abs() > 20.0
+        || (first.ankle_rear.0 - second.ankle_rear.0).abs() > 20.0,
+        "successive high kicks did not switch the extended leg");
+
+    f.act = Act::Idle;
+    f.stumble = 0.17;
+    let stagger = bones_of(&f);
+    f.stumble = 0.0;
+    let stance = bones_of(&f);
+    assert!((stagger.head.0 - stance.head.0).abs() > 1.0
+        || (stagger.head.1 - stance.head.1).abs() > 1.0,
+        "the stumble timer did not alter the standing pose");
 }
 
 #[test]

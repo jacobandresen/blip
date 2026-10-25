@@ -1,7 +1,7 @@
 // Nothing overlaps and nothing is pushed off screen: every page of the cabinet on a spread of real
 // devices, with their notches, in portrait and landscape, with each controller.
 //
-//   node --test --test-concurrency=1 test/layout.mjs        (after ./build_web.sh)
+//   node --test --test-concurrency=1 test/layout.mjs        (after cargo build-web)
 //   LAYOUT=iPad node --test test/layout.mjs                  (only the devices whose name has "iPad")
 //   node test/shard.mjs 2 test/layout.mjs                    (the devices shared between two processes)
 

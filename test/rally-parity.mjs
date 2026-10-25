@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { openPage } from './lib/harness.mjs';
+import { numberedTape } from './lib/basic-tape.mjs';
+import { instrumentBasicSound } from './lib/basic-runtime.mjs';
 
 const root = new URL('../', import.meta.url);
 const source = await readFile(new URL('web/TAPE/RALLY.BLIP', root), 'utf8');
@@ -11,9 +13,7 @@ const fields = ['BALL_X', 'BALL_Y', 'BALL_VX', 'BALL_VY', 'BALL_SPEED', 'LEFT_SC
 // The tape with its main loop cut down to MOVE_BALL at a fixed step, its
 // scorer reduced to the count, and the fields reported as tones.
 function fixture(scenario, steps) {
-  const lines = new Map(source.trim().split('\n').map((line) => {
-    const at = line.indexOf(' '); return [Number(line.slice(0, at)), line.slice(at + 1)];
-  }));
+  const lines = numberedTape(source);
   let setup = 'PLAYERS=2:START_GAME:STATE$="PLAY":BALL_VX=250:BALL_VY=80:LPAD_VY=0:RPAD_VY=0';
   if (scenario === 'top') setup += ':BALL_Y=33:BALL_VY=-200';
   if (scenario === 'bottom') setup += ':BALL_Y=387:BALL_VY=200';
@@ -43,11 +43,7 @@ function fixture(scenario, steps) {
 test('Rally BASIC matches native swept collisions, spin, speed, walls, and points', async (t) => {
   execFileSync('cargo', ['build', '--release', '-p', 'rally', '--example', 'rally_parity'], { cwd: root, stdio: 'pipe' });
   const { page, origin } = await openPage(t, 'chromium');
-  await page.route('**/basic-runtime.html*', async (route) => {
-    const response = await route.fetch();
-    await route.fulfill({ response, body: (await response.text()).replace('imports.env.blip_basic_sound=playBasicTone;',
-      'imports.env.blip_basic_sound=function(f,s,v){(window.__trace ||= []).push(f-1000);};') });
-  });
+  await instrumentBasicSound(page, 'function(f,s,v){(window.__trace ||= []).push(f-1000);}');
   await page.goto(`${origin}/basic.html`);
   for (const [scenario, steps] of [['flight', 30], ...['top', 'bottom', 'left', 'edge', 'spin', 'cap', 'fast', 'miss', 'corner', 'right', 'right-spin', 'point-left', 'point-right'].map((name) => [name, 1])]) {
     await t.test(`${scenario}, ${steps} steps`, async () => {

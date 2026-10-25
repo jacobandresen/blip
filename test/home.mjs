@@ -1,17 +1,15 @@
 // The home screen: games as apps, the switch to and from the cabinet, free
 // play, and each game saved as its own home-screen app.
 //
-//   node --test test/home.mjs        (after ./build_web.sh and node tools/make_game_icons.mjs)
+//   node --test test/home.mjs        (after cargo build-web and node tools/make_game_icons.mjs)
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { openPage, WEB_DIR, listenOn } from './lib/harness.mjs';
+import { createFileServer, openPage, WEB_DIR, listenOn } from './lib/harness.mjs';
 import { chromiumBinary } from './lib/chromium-binary.mjs';
 
 const GAMES = ['serpent', 'bouncer', 'defender', 'rally', 'meteors', 'raider', 'brawler', 'bubbler', 'adder'];
@@ -452,20 +450,10 @@ test('each game page names itself and links its own manifest and icon', async (t
 
 test('Chrome finds each game installable as its own app', async (t) => {
   // The service worker caches /blip/...: serve web/ there, as GitHub Pages does.
-  const server = createServer(async (req, res) => {
-    let p = decodeURIComponent(req.url.split('?')[0]);
-    if (!p.startsWith('/blip/')) { res.writeHead(404); res.end(); return; }
-    p = p.slice('/blip'.length);
-    if (p.endsWith('/')) p += 'index.html';
-    const full = path.join(WEB_DIR, p);
-    const type = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.wasm': 'application/wasm', '.svg': 'image/svg+xml' }[path.extname(full)] || 'application/octet-stream';
-    if (p === '/blip_config.js' && !existsSync(full)) { res.writeHead(200, { 'Content-Type': type }); res.end(''); return; }
-    try { const data = await readFile(full); res.writeHead(200, { 'Content-Type': type }); res.end(data); }
-    catch { res.writeHead(404); res.end(); }
-  });
+  const server = createFileServer({ basePath: '/blip', blankMissingConfig: true });
   await listenOn(server, 0);
   const origin = `http://127.0.0.1:${server.address().port}`;
-  const context = await chromium.launchPersistentContext('', { executablePath: chromiumBinary(), headless: true });
+  const context = await chromium.launchPersistentContext('', { executablePath: chromiumBinary(), headless: true, args: ['--mute-audio'] });
   t.after(async () => { await context.close(); await new Promise((r) => server.close(r)); });
   const page = context.pages()[0] || await context.newPage();
   await page.route('**/*.wasm', () => {});

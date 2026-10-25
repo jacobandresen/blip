@@ -470,6 +470,18 @@ test('only the machines near you fetch and play their attract loops', async (t) 
   assert.ok(Math.abs(strip.frames - 12) < 0.5, `${strip.frames} frames`);
   assert.equal(strip.playing, 'running');
   assert.equal(strip.shown, 'visible');
+  const brawlerFill = await page.evaluate(() => {
+    const card = document.querySelector('.card[data-machine="brawler"]');
+    const rom = card.querySelector('.game-rom').getBoundingClientRect();
+    const frame = card.querySelector('.card-loop-frame').getBoundingClientRect();
+    return { width: frame.width / rom.width, height: frame.height / rom.height,
+      still: getComputedStyle(card.querySelector('.card-shot')).visibility,
+      loop: getComputedStyle(card.querySelector('.card-loop')).visibility };
+  });
+  assert.ok(Math.abs(brawlerFill.width - 1) < 0.02 && Math.abs(brawlerFill.height - 1) < 0.02,
+    `Brawler's attract loop fills its CRT without the poster showing around it: ${JSON.stringify(brawlerFill)}`);
+  assert.equal(brawlerFill.still, 'hidden', 'Brawler uses its attract video instead of the Ryuka and Brutus startup still');
+  assert.equal(brawlerFill.loop, 'visible');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.card[data-machine="raider"] .card-loop')).visibility), 'hidden');
   await page.keyboard.press('ArrowRight');
   await aisleStill(page);

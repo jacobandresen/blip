@@ -195,7 +195,10 @@ for (const [name, slug] of GAMES.filter(([name]) => !process.env.BLIP_VISUAL_GAM
     await basicCanvas.evaluate((canvas) => canvas.focus());
     await tapKey(basicCanvas, 'Space');
     await page.waitForTimeout(name === 'ADDER' ? 20 : name === 'SERPENT' ? 120 : 450);
-    if (name === 'BRAWLER') await page.waitForTimeout(1650);
+    if (name === 'BRAWLER') {
+      await tapKey(basicCanvas, 'Space');
+      await page.waitForTimeout(1650);
+    }
     if (name === 'RALLY') {
       await tapKey(basicCanvas, 'Space');
       await page.waitForTimeout(650);

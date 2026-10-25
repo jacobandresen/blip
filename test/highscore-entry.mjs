@@ -3,35 +3,25 @@
 // with a stick and fire, by touch) against a stand-in backend
 // (lib/fake-supabase.js) that answers as supabase/migrations do.
 //
-//   node --test --test-concurrency=1 test/highscore-entry.mjs     (after ./build_web.sh)
+//   node --test --test-concurrency=1 test/highscore-entry.mjs     (after cargo build-web)
 //   GAMES=serpent,brawler node --test test/highscore-entry.mjs
 //
 // A game is left to lose on its own, so the run takes ten minutes or so.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { evaluate, sleep, waitFor } from './lib/playwright-utils.mjs';
-import { launchEngine } from './lib/engine.mjs';
+import { createFileServer, listenOn, openBrowser } from './lib/harness.mjs';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const WEB = path.join(HERE, '..', 'web');
 // TEST_SHARD=1/3 plays every third game, on a port of its own, for test/shard.mjs.
 const [shard, shards] = (process.env.TEST_SHARD || '0/1').split('/').map(Number);
 const PORT = 8098 + shard;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
-const MIME = {
-  '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css',
-  '.wasm': 'application/wasm', '.json': 'application/json', '.png': 'image/png',
-  '.svg': 'image/svg+xml', '.woff2': 'font/woff2',
-};
 // The backend's two files are replaced; everything else is the built site.
 const FAKES = {
-  '/vendor/supabase.js': () => readFile(path.join(HERE, 'lib', 'fake-supabase.js')),
-  '/blip_config.js': async () => "window.BLIP_SUPABASE = { url: 'http://fake.invalid', anonKey: 'fake' };",
+  '/vendor/supabase.js': () => readFile(new URL('./lib/fake-supabase.js', import.meta.url)),
+  '/blip_config.js': "window.BLIP_SUPABASE = { url: 'http://fake.invalid', anonKey: 'fake' };",
 };
 
 const SPACE = { key: ' ', code: 'Space', vk: 32 };
@@ -54,20 +44,11 @@ const only = (process.env.GAMES || '').split(',').filter(Boolean);
 const GAMES = Object.entries(ALL).filter(([slug]) => !only.length || only.includes(slug));
 
 function serve() {
-  const server = createServer(async (req, res) => {
-    const url = decodeURIComponent(req.url.split('?')[0]);
-    try {
-      const body = FAKES[url] ? await FAKES[url]() : await readFile(path.join(WEB, url));
-      res.writeHead(200, { 'content-type': MIME[path.extname(url)] || 'application/octet-stream' });
-      res.end(body);
-    } catch { res.writeHead(404); res.end(); }
-  });
-  return new Promise((ok) => server.listen(PORT, () => ok(server)));
+  return listenOn(createFileServer({ overrides: FAKES }), PORT);
 }
 
-async function browser(t, port, { touch = false, width = 1280, height = 800 } = {}) {
-  const handle = await launchEngine('chromium', { hasTouch: touch, viewport: { width, height } });
-  t.after(() => handle.browser.close().catch(() => {}));
+async function browser(t, _port, { touch = false, width = 1280, height = 800 } = {}) {
+  const handle = await openBrowser(t, 'chromium', { hasTouch: touch, viewport: { width, height } });
   return handle.cdp;
 }
 

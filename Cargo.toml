@@ -13,6 +13,7 @@ members = [
     "crates/meteors",
     "crates/raider",
     "crates/adder",
+    "crates/blip_build",
 ]
 
 [workspace.package]

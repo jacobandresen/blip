@@ -1,7 +1,7 @@
 // The manual: its book on the fascia, the chapters it opens to, and
 // the printed leaves.
 //
-//   node --test test/manual.mjs        (after ./build_web.sh)
+//   node --test test/manual.mjs        (after cargo build-web)
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

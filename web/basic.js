@@ -422,6 +422,13 @@ async function ejectTape(){
   }finally{tapeBusy=false;}
 }
 document.querySelector('.tape-buttons [data-key=eject]').addEventListener('click',function(){ejectTape().then(ready).catch(function(error){fail(error.message);});});
+async function playInsertedTape(){
+  if(!insertedTape||tapeBusy||tapeLoading||run||basicWasmPlaying)return;
+  var tape=insertedTape;
+  if(tapeForPath(currentFile)!==tape)await loadProgram('/TAPE/'+tape.command);
+  if(insertedTape===tape&&!run&&!basicWasmPlaying)submit('RUN');
+}
+document.querySelector('.tape-buttons [data-key=play]').addEventListener('click',function(){playInsertedTape().catch(function(error){fail(error.message);});});
 function shuffleTapePile(){
   var old=tapeOrder.map(function(tape){return tape.file;}).join(',');
   do{for(var i=tapeOrder.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));[tapeOrder[i],tapeOrder[j]]=[tapeOrder[j],tapeOrder[i]];}}while(tapeOrder.map(function(tape){return tape.file;}).join(',')===old);

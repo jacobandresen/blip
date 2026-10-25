@@ -1,7 +1,7 @@
 //! Load sounds at startup and play them synchronously during the game loop.
 
 use std::f32::consts::PI;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use macroquad::experimental::coroutines::{start_coroutine, Coroutine};
 
@@ -11,6 +11,11 @@ use macroquad::audio::{
 
 /// An opaque handle to a decoded sound. Store these at startup; replaying them is free.
 pub type BlipSound = Sound;
+
+fn silent() -> bool {
+    static SILENT: OnceLock<bool> = OnceLock::new();
+    *SILENT.get_or_init(|| std::env::var("BLIP_SILENT").is_ok_and(|value| value == "1"))
+}
 
 /// Decode a WAV byte slice into a `BlipSound`. Await it at startup, not in
 /// the game loop. The bytes are copied into the audio engine, so they only
@@ -23,12 +28,12 @@ pub async fn load_sound(bytes: &[u8]) -> BlipSound {
 
 /// Play a sound effect once at full volume.
 pub fn play_sfx(s: &BlipSound) {
-    play_sound_once(s);
+    if !silent() { play_sound_once(s); }
 }
 
 /// Play a sound effect once at a specific volume (0.0 = silent, 1.0 = full).
 pub fn play_sfx_volume(s: &BlipSound, volume: f32) {
-    play_sound(s, PlaySoundParams { looped: false, volume });
+    if !silent() { play_sound(s, PlaySoundParams { looped: false, volume }); }
 }
 
 static CURRENT_MUSIC: Mutex<Option<Sound>> = Mutex::new(None);
@@ -42,6 +47,7 @@ const MUSIC_GAIN_MAX: f32 = 1.3;
 
 fn play_loop(current: &Mutex<Option<Sound>>, sound: &BlipSound, volume: f32) {
     stop_loop(current);
+    if silent() { return; }
     play_sound(sound, PlaySoundParams { looped: true, volume });
     if let Ok(mut guard) = current.lock() {
         *guard = Some(sound.clone());

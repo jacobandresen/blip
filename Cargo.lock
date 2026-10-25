@@ -70,6 +70,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "blip_build"
+version = "0.1.0"
+
+[[package]]
 name = "blip_font"
 version = "0.1.0"
 
@@ -87,6 +91,7 @@ version = "0.1.0"
 dependencies = [
  "blip",
  "macroquad",
+ "png",
 ]
 
 [[package]]

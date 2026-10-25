@@ -54,8 +54,8 @@ pub(crate) fn draw_hud(blip: &Blip, g: &Game) {
         blip.draw_rect(x, y, bar_w, bar_h, BlipColor { r: 0.8, g: 0.8, b: 0.85, a: 0.7 });
 
         let name = f.arch().name;
-        let nx = if i == 0 { inset } else { WIN_W as f32 - inset - text_w(name, 1.0) };
-        blip.draw_text(name, nx, y + bar_h + 6.0, 1.0, BLIP_WHITE);
+        let nx = if i == 0 { inset } else { WIN_W as f32 - inset - text_w(name, 2.0) };
+        blip.draw_text_outlined(name, nx, y + bar_h + 6.0, 2.0, BLIP_WHITE, INK);
 
         // Round pips: a fighter needs two, so two lamps say everything.
         for r in 0..ROUNDS_TO_WIN {
@@ -70,22 +70,22 @@ pub(crate) fn draw_hud(blip: &Blip, g: &Game) {
 
     // The run's score, in a solo game: under the player's own name.
     if g.mode == Mode::Solo && !g.demo {
-        blip.draw_text(&format!("{}", g.sess.score), inset, y + bar_h + 17.0, 1.0,
+        blip.draw_text(&format!("{}", g.sess.score), inset, 64.0, 2.0,
             BlipColor { r: 0.98, g: 0.90, b: 0.40, a: 1.0 });
     }
 
     let secs = g.clock.max(0.0).ceil() as i32;
     let cx = WIN_W as f32 / 2.0;
-    blip.fill_rect(cx - 26.0, y - 4.0, 52.0, bar_h + 12.0,
+    blip.fill_rect(cx - 26.0, y - 6.0, 52.0, 34.0,
         BlipColor { r: 0.10, g: 0.10, b: 0.12, a: 1.0 });
     let tc = if secs <= 10 { BlipColor { r: 1.0, g: 0.35, b: 0.3, a: 1.0 } } else { BLIP_WHITE };
     let text = format!("{secs}");
-    blip.draw_text(&text, cx - text_w(&text, 2.0) / 2.0, y + 2.0, 2.0, tc);
+    blip.draw_text(&text, cx - text_w(&text, 4.0) / 2.0, 20.0, 4.0, tc);
 
     let stage = STAGE_NAMES[g.stage % STAGES];
-    blip.fill_rect(cx - text_w(stage, 1.0) / 2.0 - 5.0, y + bar_h + 11.0,
-        text_w(stage, 1.0) + 10.0, 12.0, BlipColor { r: 0.08, g: 0.08, b: 0.10, a: 0.75 });
-    blip.draw_text(stage, cx - text_w(stage, 1.0) / 2.0, y + bar_h + 14.0, 1.0,
+    blip.fill_rect(cx - text_w(stage, 2.0) / 2.0 - 5.0, 61.0,
+        text_w(stage, 2.0) + 10.0, 20.0, BlipColor { r: 0.08, g: 0.08, b: 0.10, a: 0.75 });
+    blip.draw_text(stage, cx - text_w(stage, 2.0) / 2.0, 64.0, 2.0,
         PALE);
 }
 

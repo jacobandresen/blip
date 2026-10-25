@@ -7,17 +7,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluate, sleep, waitFor } from './lib/playwright-utils.mjs';
-import { launchEngine } from './lib/engine.mjs';
-import { createFileServer, listenOn } from './lib/harness.mjs';
+import { createFileServer, listenOn, openBrowser } from './lib/harness.mjs';
 
 let ORIGIN;
 
 /** A fresh Playwright context for one shell case. */
 async function browser(t, port, { touch = false, width = 1280, height = 800 } = {}) {
-  const { browser, cdp } = await launchEngine('chromium', { hasTouch: touch, viewport: { width, height } });
-  t.after(async () => {
-    await browser.close().catch(() => {});
-  });
+  const { cdp } = await openBrowser(t, 'chromium', { hasTouch: touch, viewport: { width, height } });
   return cdp;
 }
 

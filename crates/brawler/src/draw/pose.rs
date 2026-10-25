@@ -137,6 +137,12 @@ pub(crate) const STYLES: [Style; FIGHTERS.len()] = [
     style(2.6, 1.2, 4.0, 6.0, 9.0, p(-8.0, -14.0), p(-4.0, -20.0), false, true),
     // ZENITH: upright and unbothered, the fists low.
     style(3.2, 0.7, 0.0, -3.0, -3.0, p(-8.0, -14.0), p(-5.0, -22.0), false, false),
+    style(6.0, 1.2, 0.0, 1.0, -2.0, p(1.0, 7.0), p(-1.0, 8.0), true, false),
+    style(2.8, 0.5, 2.0, 5.0, 3.0, p(-5.0, -2.0), p(-4.0, -10.0), false, true),
+    style(6.4, 1.0, 0.0, 0.0, -2.0, p(1.0, 7.0), p(3.0, 3.0), false, false),
+    style(2.7, 0.7, 4.0, 5.0, 1.0, p(-1.0, -3.0), p(-4.0, -9.0), true, true),
+    // MACK: loose, grounded boxer's guard; weight rides the beat.
+    style(4.8, 1.1, 1.0, 2.0, 1.0, p(-3.0, -1.0), p(1.0, -5.0), false, false),
 ];
 
 /// The stance: weight back, knees bent, both hands up, side on. Everything
@@ -340,6 +346,8 @@ pub(crate) fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
             Special::ChiBolt => Shape::Bolt,
             Special::LaserVision => Shape::Laser,
             Special::BullRush => Shape::Rush,
+            Special::TalonKick if f.arch().build == Build::Commando => Shape::Fly,
+            Special::DriveBy => Shape::Bolt,
             Special::TalonKick => Shape::Kick(false, 1.25),
         },
     };
@@ -826,10 +834,24 @@ pub(crate) fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
         q.lead_foot.u = q.lead_foot.u.max(0.0);
         q.rear_foot.u = q.rear_foot.u.max(0.0);
     }
-    // The other foot forward: every pose that stands on the stance changes
-    // legs, and a kick comes off whichever leg is in front. (A walk is
+    if f.stumble > 0.0 && f.act != Act::Attack {
+        let k = (1.0 - f.stumble / 0.34).clamp(0.0, 1.0);
+        let sway = (std::f32::consts::PI * k).sin();
+        q.hip.f -= 7.0 * sway;
+        q.hip.u -= 3.5 * sway;
+        q.head.f += 5.0 * sway;
+        q.head.u += 2.5 * sway;
+        q.lead_hand.f -= 5.0 * sway;
+        q.lead_hand.u += 6.0 * sway;
+        q.rear_hand.f += 5.0 * sway;
+        q.lead_foot.f -= 9.0 * sway;
+        q.rear_foot.f += 6.0 * sway;
+    }
+    // The other foot forward: a high kick can switch lead legs. (A walk is
     // already on both; the bow and the end of the round stand square.)
-    if f.far_leads && !f.airborne()
+    let kick = f.mv == MoveId::HighKick;
+    let far_leads = f.far_leads ^ (f.act == Act::Attack && kick && !f.airborne() && f.alt_kick);
+    if far_leads && !f.airborne()
         && matches!(f.act, Act::Idle | Act::Crouch | Act::Block | Act::Hitstun | Act::Attack) {
         std::mem::swap(&mut q.lead_foot, &mut q.rear_foot);
         std::mem::swap(&mut q.lead_heel, &mut q.rear_heel);

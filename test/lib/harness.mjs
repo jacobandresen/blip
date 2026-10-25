@@ -40,13 +40,28 @@ export function listenOn(server, port) {
   });
 }
 
-export function createFileServer() {
+export function createFileServer({ overrides = {}, basePath = '/', blankMissingConfig = false } = {}) {
   return createServer(async (req, res) => {
     try {
       let p = decodeURIComponent(req.url.split('?')[0]);
-      if (p.endsWith('/')) p += 'index.html';
-      const full = path.join(WEB_DIR, p);
-      if (!full.startsWith(WEB_DIR)) { res.writeHead(403); res.end(); return; }
+      if (basePath !== '/') {
+        if (p !== basePath && !p.startsWith(`${basePath}/`)) { res.writeHead(404); res.end(); return; }
+        p = p.slice(basePath.length) || '/';
+      }
+      if (Object.hasOwn(overrides, p)) {
+        const value = overrides[p];
+        const body = typeof value === 'function' ? await value() : value;
+        res.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/javascript' });
+        res.end(body);
+        return;
+      }
+      let file = p;
+      if (file.endsWith('/')) file += 'index.html';
+      const full = path.resolve(WEB_DIR, `.${file}`);
+      if (!full.startsWith(`${WEB_DIR}${path.sep}`)) { res.writeHead(403); res.end(); return; }
+      if (blankMissingConfig && p === '/blip_config.js') {
+        try { await readFile(full); } catch { res.writeHead(200, { 'Content-Type': 'application/javascript' }); res.end(''); return; }
+      }
       const data = await readFile(full);
       res.writeHead(200, { 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream' });
       res.end(data);
@@ -79,6 +94,12 @@ export async function openPage(t, engine = 'chromium', opts = {}) {
   t.after(async () => {
     await handle.close();
   });
+  return handle;
+}
+
+export async function openBrowser(t, engine = 'chromium', opts = {}) {
+  const handle = await launchEngine(engine, opts);
+  t.after(() => handle.browser.close().catch(() => {}));
   return handle;
 }
 

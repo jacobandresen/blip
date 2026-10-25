@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import '../web/basic-language.js';
+import { numberedTape } from './lib/basic-tape.mjs';
 
 const evaluate = (source, host = {}) => BlipBasicLanguage.evaluate(source, {
   read: (name) => ({ X: 7, 'NAME$': 'BLIP' })[name] ?? 0,
@@ -41,4 +42,13 @@ test('invalid console expressions fail at their syntax or arithmetic error', () 
     ['1+', /Expression expected/], ['COLOR(1,2)', /COLOR needs/],
     ['MISSING(3)', /Unknown function MISSING/],
   ]) assert.throws(() => evaluate(source), error, source);
+});
+
+test('numbered tape parsing rejects duplicate or out-of-order lines', () => {
+  assert.deepEqual([...numberedTape('10 REM START\n\n20 WAIT 0')], [
+    [10, 'REM START'], [20, 'WAIT 0'],
+  ]);
+  assert.throws(() => numberedTape('10 GOTO 20\n10 WAIT 0'), /unique and ascending/);
+  assert.throws(() => numberedTape('20 WAIT 0\n10 END'), /unique and ascending/);
+  assert.throws(() => numberedTape('INVALID'), /invalid numbered tape line/);
 });

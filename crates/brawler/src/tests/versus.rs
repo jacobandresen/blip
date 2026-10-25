@@ -366,6 +366,16 @@ pub(crate) fn playtest_4_each_player_drives_only_their_own_fighter() {
 }
 
 #[test]
+pub(crate) fn title_arrow_changes_mode_without_selecting_a_fighter() {
+    let mut g = Game::new();
+    let pick = g.pick;
+    update_menus(&mut g, [press(false, true, false), NOTHING]);
+    assert_eq!(g.state, State::Title);
+    assert_eq!(g.pick, pick);
+    assert_eq!(g.mode, Mode::Solo, "the title arrow only highlights the player mode");
+}
+
+#[test]
 pub(crate) fn playtest_5_one_player_mode_is_untouched() {
     // The whole feature is worthless if it broke the game that was
     // already there. Walk the solo path through the same real flow.

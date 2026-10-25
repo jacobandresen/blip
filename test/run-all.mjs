@@ -17,7 +17,7 @@ async function checkAccess() {
   try {
     browser = await chromium.launch({
       executablePath: chromiumBinary(), headless: true, timeout: 30000,
-      args: ['--no-sandbox', '--disable-dev-shm-usage'],
+      args: ['--no-sandbox', '--disable-dev-shm-usage', '--mute-audio'],
     });
     const page = await browser.newPage();
     const response = await page.goto(`http://127.0.0.1:${server.address().port}/basic.html`, {
@@ -44,7 +44,7 @@ await checkAccess();
 if (!args.includes('--check-access')) {
   const failures = [];
   if (await run('cargo', ['test', '--release'])) failures.push('Rust');
-  if (await run('./build_web.sh', [])) throw new Error('Web build failed');
+  if (await run('cargo', ['build-web'])) throw new Error('Web build failed');
   const files = (await readdir(new URL('./', import.meta.url)))
     .filter((name) => name.endsWith('.mjs') && !name.startsWith('run-')
       && name !== 'shard.mjs' && name !== 'visual-parity.mjs')

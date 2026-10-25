@@ -90,6 +90,16 @@ pub(crate) struct Bolt {
     pub(crate) damage: i32,
 }
 
+/// A called lowrider keeps its own clock and launch mark if its caller is hit.
+#[derive(Copy, Clone, Default)]
+pub(crate) struct DriveBy {
+    pub(crate) active: bool,
+    pub(crate) t: f32,
+    pub(crate) start_x: f32,
+    pub(crate) facing: f32,
+    pub(crate) damage: i32,
+}
+
 /// Which screen the game is on.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) enum State {
@@ -130,6 +140,7 @@ pub(crate) struct Game {
     pub(crate) sess: Session,
     pub(crate) p: [Fighter; 2],
     pub(crate) bolts: [Bolt; 4],
+    pub(crate) drivebys: [DriveBy; 2],
     /// The attract mode: two CPU fighters playing a round behind the title's
     /// invitation. `idle` is how long the title has been left alone, and
     /// `demo_cpu` the first fighter's plan and its delay.
@@ -244,6 +255,7 @@ impl Game {
             sess: Session::new(1),
             p: [Fighter::new(0, 200.0, 1.0), Fighter::new(1, 440.0, -1.0)],
             bolts: [Bolt { x: 0.0, y: 0.0, vx: 0.0, vy: 0.0, owner: 0, active: false, damage: 0 }; 4],
+            drivebys: [DriveBy::default(); 2],
             demo: false,
             idle: 0.0,
             demo_cpu: (CpuPlan::Wait, 0.0),
@@ -330,13 +342,13 @@ impl Game {
 
     /// The ladder: every other fighter, once. Round the roster from the pick,
     /// reordered so no two fights running are at the same home stage, with
-    /// the giant and then the fighter nothing hurts kept for the end.
+    /// the giant and then the OVERPOWERED boss kept for the end.
     pub(crate) fn build_ladder(&self) -> [usize; RUNGS] {
         let n = FIGHTERS.len();
-        let homes: [usize; 10] = std::array::from_fn(home_of);
+        let homes: [usize; FIGHTERS.len()] = std::array::from_fn(home_of);
         let mut ends: Vec<usize> =
-            (0..n).filter(|&w| FIGHTERS[w].invincible || FIGHTERS[w].build == Build::Giant).collect();
-        ends.sort_by_key(|&w| FIGHTERS[w].invincible);
+            (0..n).filter(|&w| FIGHTERS[w].boss || FIGHTERS[w].build == Build::Giant).collect();
+        ends.sort_by_key(|&w| FIGHTERS[w].boss);
         blip::ordered_ladder(self.pick, &homes, &ends).try_into().expect("the ladder contains every opponent")
     }
 
@@ -385,6 +397,7 @@ impl Game {
         for b in self.bolts.iter_mut() {
             b.active = false;
         }
+        self.drivebys = [DriveBy::default(); 2];
         for s in self.hitspark.iter_mut() {
             s.ttl = 0.0;
         }
@@ -402,7 +415,7 @@ impl Game {
     /// The attract mode: a round between two fighters drawn by lot, on the
     /// second one's stage. Nothing is scored and nothing is spent.
     pub(crate) fn start_demo(&mut self) {
-        let fair: Vec<usize> = (0..FIGHTERS.len()).filter(|&w| !FIGHTERS[w].invincible).collect();
+        let fair: Vec<usize> = (0..FIGHTERS.len()).filter(|&w| !FIGHTERS[w].boss).collect();
         let a = fair[rand_int(0, fair.len() as i32 - 1) as usize];
         let b = fair
             [(fair.iter().position(|&w| w == a).unwrap() + rand_int(1, fair.len() as i32 - 1) as usize) % fair.len()];
@@ -527,6 +540,25 @@ impl Game {
         };
         if let Some(b) = self.bolts.iter_mut().find(|b| !b.active) {
             *b = Bolt { x, y, vx, vy, owner, active: true, damage };
+        }
+    }
+
+    /// One Uzi round from the stopped lowrider; each uses normal hit rules.
+    #[cfg(test)]
+    pub(crate) fn spawn_driveby_round(&mut self, owner: usize, damage: i32, shot: usize, t: f32) {
+        let f = self.p[owner];
+        self.spawn_driveby_round_from(owner, f.x, f.facing, damage, shot, t);
+    }
+
+    pub(crate) fn spawn_driveby_round_from(&mut self, owner: usize, start_x: f32, facing: f32,
+        damage: i32, shot: usize, t: f32) {
+        let dy = [-5.0f32, 0.0, 5.0][shot.min(2)];
+        let car_x = driveby_car_x_at(start_x, facing, t);
+        let x = car_x + facing * 39.0;
+        let y = FLOOR_Y - 57.0 + driveby_bounce(t) + dy;
+        if let Some(b) = self.bolts.iter_mut().find(|b| !b.active) {
+            *b = Bolt { x, y, vx: facing * 520.0, vy: 0.0, owner, active: true,
+                damage: (damage / 3).max(2) };
         }
     }
 

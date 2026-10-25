@@ -1,4 +1,4 @@
-//! The fighters themselves: what power, reach and size do, and the one nothing hurts.
+//! The fighters themselves: what power, reach and size do.
 
 use super::*;
 
@@ -8,8 +8,8 @@ use super::*;
 pub(crate) fn the_fighters_are_actually_different() {
     // Palette swaps would not be fighters. Somebody has to be the best at
     // each thing, and pay for it.
-    // (The invincible one is outside every trade, on purpose.)
-    let fair = || FIGHTERS.iter().enumerate().filter(|(_, a)| !a.invincible);
+    // (The boss is tuned outside the fair roster, on purpose.)
+    let fair = || FIGHTERS.iter().enumerate().filter(|(_, a)| !a.boss);
     let fastest = fair().max_by(|a, b| a.1.walk.total_cmp(&b.1.walk)).unwrap().0;
     let strongest = fair().max_by(|a, b| a.1.power.total_cmp(&b.1.power)).unwrap().0;
     let toughest = fair().max_by_key(|(_, a)| a.health).unwrap().0;
@@ -106,11 +106,11 @@ pub(crate) fn a_throw_is_offered_only_where_it_reaches() {
     assert!(throw_range(&small) < throw_range(&big));
 }
 
-// ---- the one nothing hurts -----------------------------------------------
+// ---- the hardest boss ----------------------------------------------------
 
 #[test]
-pub(crate) fn only_the_giant_hurts_the_invincible_fighter_but_blows_still_land() {
-    let who = FIGHTERS.iter().position(|a| a.invincible).expect("somebody is invincible");
+pub(crate) fn the_boss_takes_damage_from_every_fighter() {
+    let who = FIGHTERS.iter().position(|a| a.boss).expect("somebody is boss");
     let full = FIGHTERS[who].health;
     for mv in [MoveId::LowPunch, MoveId::HighKick, MoveId::Sweep, MoveId::Throw, MoveId::Special] {
         let mut p = [at(1, 200.0, 1.0), at(who, 300.0, -1.0)];
@@ -120,28 +120,9 @@ pub(crate) fn only_the_giant_hurts_the_invincible_fighter_but_blows_still_land()
         let [atk, def] = &mut p;
         let (dmg, blocked, _) = resolve_hit(atk, def, Input::default());
         assert!(dmg > 0 && !blocked, "{mv:?} did not land");
-        assert_eq!(def.health, full, "{mv:?} hurt the fighter nothing hurts");
+        assert!(def.health < full, "{mv:?} did no damage to the boss");
         assert!(matches!(def.act, Act::Hitstun | Act::Knockdown), "{mv:?} did not move them");
     }
-    // Chip through a guard costs nothing either.
-    let mut p = [at(1, 200.0, 1.0), at(who, 300.0, -1.0)];
-    face_off(&mut p);
-    p[1].x = p[0].x + attack_range(&p[0], MoveId::Special) - 3.0;
-    wind_to_active(&mut p[0], MoveId::Special);
-    let [atk, def] = &mut p;
-    resolve_hit(atk, def, back_input(-1.0, false));
-    assert_eq!(def.health, full);
-
-    // Only someone bigger gets through, and only a little.
-    let giant = FIGHTERS.iter().position(|a| a.size > FIGHTERS[who].size).unwrap();
-    let mut p = [at(giant, 200.0, 1.0), at(who, 300.0, -1.0)];
-    face_off(&mut p);
-    p[1].x = p[0].x + attack_range(&p[0], MoveId::HighKick) - 3.0;
-    wind_to_active(&mut p[0], MoveId::HighKick);
-    let [atk, def] = &mut p;
-    let (dmg, _, _) = resolve_hit(atk, def, Input::default());
-    let lost = full - def.health;
-    assert!(lost > 0 && lost * 3 < dmg, "the giant's {dmg} cost them {lost}");
 }
 
 #[test]
@@ -244,29 +225,23 @@ pub(crate) fn the_fliers_kick_is_the_laser_and_his_punch_hits_three_times_as_har
 }
 
 #[test]
-pub(crate) fn the_last_fight_is_won_by_being_on_your_feet_at_the_bell() {
-    // Nobody but the giant can knock out the fighter nothing hurts, so a
-    // round against him goes to the player who lasts it out.
-    let boss = FIGHTERS.iter().position(|a| a.invincible).unwrap();
+pub(crate) fn the_last_fight_is_a_boss_and_the_bell_uses_health() {
+    let boss = FIGHTERS.iter().position(|a| a.boss).unwrap();
     let mut g = Game::new();
     g.pick = 0;
     g.start_match(RUNGS - 1);
     assert_eq!(g.p[1].who, boss);
     g.p[0].health = 7;
-    assert!(survived(&g));
-    assert_eq!(round_result(&g, false), RoundResult::P1, "time ran out and he still took the round");
-    // Knocked out is knocked out.
+    assert!(FIGHTERS[boss].boss);
+    assert_eq!(round_result(&g, false), RoundResult::P2, "the boss still leads on health");
+    // A player who lands more damage wins at the bell.
+    g.p[1].health = 1;
+    assert_eq!(round_result(&g, false), RoundResult::P1);
     g.p[0].health = 0;
     assert_eq!(round_result(&g, true), RoundResult::P2);
-    // Against anyone else the bell goes to whoever has more left.
-    g.start_match(0);
-    g.p[0].health = 7;
-    assert!(!survived(&g));
-    assert_eq!(round_result(&g, false), RoundResult::P2);
-    // And two players settle it on health, whoever they picked.
+    // Two players settle it on health, whoever they picked.
     g.mode = Mode::Versus;
     g.p[1] = at(boss, 440.0, -1.0);
-    assert!(!survived(&g));
 }
 
 #[test]
@@ -279,4 +254,26 @@ pub(crate) fn the_ladder_gets_harder_all_the_way_up() {
         last = g.difficulty;
     }
     assert!((last - LAST_RUNG).abs() < 1e-4);
+}
+
+#[test]
+pub(crate) fn fighter_chooser_text_stays_inside_its_stats_plate() {
+    for versus in [false, true] {
+        let plate_w = if versus { 184.0 } else { 268.0 };
+        let inner_w = plate_w - 16.0;
+        for (who, fighter) in FIGHTERS.iter().enumerate() {
+            let stage = STAGE_NAMES[home_of(who)];
+            for (text, size) in [
+                (fighter.name, 3.0),
+                (fighter.special_name, draw::select_info_size(fighter.special_name, inner_w)),
+                (fighter.power_desc, draw::select_info_size(fighter.power_desc, inner_w)),
+                (stage, draw::select_info_size(stage, inner_w)),
+            ] {
+                assert!(draw::text_w(text, size) <= inner_w,
+                    "{} chooser text {text:?} exceeds the {plate_w}px plate", fighter.name);
+            }
+            assert!(draw::text_w(fighter.name, draw::select_info_size(fighter.name, 70.0)) <= 70.0,
+                "{} fighter name exceeds its roster card", fighter.name);
+        }
+    }
 }

@@ -6,6 +6,12 @@ use crate::host::audio_event;
 use macroquad::audio::{load_sound_from_bytes, play_sound, stop_sound, PlaySoundParams, Sound};
 use macroquad::experimental::coroutines::{start_coroutine, Coroutine};
 use std::collections::HashMap;
+use std::sync::OnceLock;
+
+fn silent() -> bool {
+    static SILENT: OnceLock<bool> = OnceLock::new();
+    *SILENT.get_or_init(|| std::env::var("BLIP_SILENT").is_ok_and(|value| value == "1"))
+}
 
 #[derive(Default)]
 pub(crate) struct Sounds {
@@ -76,7 +82,9 @@ impl Sounds {
             if looped && self.music.as_ref() != Some(&path) {
                 continue;
             }
-            play_sound(&self.decoded[&path], PlaySoundParams { looped, volume });
+            if !silent() {
+                play_sound(&self.decoded[&path], PlaySoundParams { looped, volume });
+            }
         }
         self.pending = waiting;
         Ok(())

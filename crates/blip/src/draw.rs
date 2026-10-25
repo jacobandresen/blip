@@ -4,7 +4,8 @@
 
 use macroquad::color::Color;
 use macroquad::shapes::{
-    draw_circle, draw_line as mq_draw_line, draw_rectangle, draw_rectangle_lines,
+    draw_circle as mq_fill_circle, draw_circle_lines as mq_draw_circle,
+    draw_line as mq_draw_line, draw_rectangle, draw_rectangle_lines,
 };
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use macroquad::math::{vec2, Rect};
@@ -26,6 +27,12 @@ pub fn fill_rect(x: f32, y: f32, w: f32, h: f32, c: Color) {
 #[inline]
 pub fn draw_rect(x: f32, y: f32, w: f32, h: f32, c: Color) {
     draw_rectangle_lines(x, y, w, h, 1.0, c);
+}
+
+/// Draw a circle outline with the given radius and line width.
+#[inline]
+pub fn draw_circle(cx: f32, cy: f32, r: f32, width: f32, c: Color) {
+    mq_draw_circle(cx, cy, r.max(0.0), width.max(0.0), c);
 }
 
 /// Draw a 1-pixel line between two points.
@@ -75,7 +82,7 @@ pub fn draw_glow_line(x1: f32, y1: f32, x2: f32, y2: f32, c: Color) {
 /// Draw a solid filled circle. (`cx`, `cy`) is the centre.
 #[inline]
 pub fn fill_circle(cx: f32, cy: f32, r: f32, c: Color) {
-    draw_circle(cx, cy, r, c);
+    mq_fill_circle(cx, cy, r, c);
 }
 
 /// Draw a capsule from (`x1`, `y1`) to (`x2`, `y2`), tapering from `r1` to `r2`.
@@ -88,7 +95,7 @@ pub fn fill_capsule(x1: f32, y1: f32, x2: f32, y2: f32, r1: f32, r2: f32, c: Col
     loop {
         let t = if len > 0.0 { (d / len).min(1.0) } else { 1.0 };
         let r = r1 + (r2 - r1) * t;
-        draw_circle(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, r, c);
+        mq_fill_circle(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, r, c);
         if t >= 1.0 { break; }
         d += (r * 0.3).max(1.7);
     }
@@ -106,7 +113,7 @@ pub fn fill_sunburst(cx: f32, cy: f32, rays: usize, turn: f32, reach: f32, color
         let mut d = 16.0;
         while d < reach {
             let r = d * spread;
-            draw_circle(cx + dx * d, cy + dy * d, r, colors[j % 2]);
+            mq_fill_circle(cx + dx * d, cy + dy * d, r, colors[j % 2]);
             d += r * 0.7;
         }
     }
@@ -116,9 +123,9 @@ pub fn fill_sunburst(cx: f32, cy: f32, rays: usize, turn: f32, reach: f32, color
 /// flames, muzzle flashes, and other small neon-lit particles.
 pub fn fill_glow_circle(cx: f32, cy: f32, r: f32, c: Color) {
     let (halo, mid) = glow_colors(c, 0.15);
-    draw_circle(cx, cy, r * 2.6, halo);
-    draw_circle(cx, cy, r * 1.5, mid);
-    draw_circle(cx, cy, r, c);
+    mq_fill_circle(cx, cy, r * 2.6, halo);
+    mq_fill_circle(cx, cy, r * 1.5, mid);
+    mq_fill_circle(cx, cy, r, c);
 }
 
 /// Draw a texture stretched to fill the given rectangle.
@@ -189,8 +196,9 @@ pub fn draw_texture_region(
         y,
         macroquad::color::WHITE,
         DrawTextureParams {
-            dest_size: Some(vec2(w, h)),
+            dest_size: Some(vec2(w.abs(), h)),
             source: Some(Rect::new(sx, sy, sw, sh)),
+            flip_x: w < 0.0,
             ..Default::default()
         },
     );

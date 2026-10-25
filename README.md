@@ -14,7 +14,7 @@ Nine arcade games built with the Rust `blip` engine and compiled to WebAssembly.
 - **Defender** — shoot the alien formation and its motherships.
 - **Meteors** — steer and fire through drifting asteroids.
 - **Raider** — vertical shooter with formations, flak and bosses.
-- **Brawler** — one-on-one fighting with ten fighters and a nine-fight ladder.
+- **Brawler** — one-on-one fighting with 15 fighters and a 14-match ladder in Rust and BLIP BASIC.
 - **Bubbler** — bubble-blowing platformer for one or two players.
 
 ---
@@ -36,8 +36,8 @@ See the [Blip API page](https://jacobandresen.github.io/blip/api.html) or [sourc
 
 ```bash
 rustup target add wasm32-unknown-unknown
-./build_web.sh
-python3 -m http.server -d web 8080
+cargo build-web
+node tools/serve_web.mjs
 ```
 
 The build places each game's `index.wasm` in `web/<game>/`; the shared shell and macroquad runtime are served from `web/`.

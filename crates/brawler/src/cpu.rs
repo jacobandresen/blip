@@ -164,6 +164,7 @@ pub(crate) fn cpu_think(g: &mut Game) -> CpuPlan {
         Special::BullRush => (0.08, 0.11),
         Special::TalonKick => (0.12, 0.06),
         Special::LaserVision => (0.10, 0.09),
+        Special::DriveBy => (0.11, 0.05),
     };
     // The bands must leave room for the last two arms, or `Block` becomes
     // unreachable and the CPU stops guarding up close.

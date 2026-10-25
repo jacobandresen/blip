@@ -5,7 +5,7 @@ use blip::wav::{
     encode_pcm16_half, encode_pcm16_mono, encode_pcm16_music, env, fade_out, low_pass, ms_to_samples,
     soft_limit_to_pcm16, tame, warm, Rng, MIX_KNEE, SAMPLE_RATE,
 };
-use blip::xm::{heard, heard_hz, tempo, Part, KICK, SNARE};
+use blip::xm::{heard, heard_hz, tempo, Part, HAT, KICK, SNARE};
 use blip::Asset;
 
 const SRF: f32 = SAMPLE_RATE as f32;
@@ -70,6 +70,22 @@ pub(super) fn rim(buf: &mut [f32], off: usize, gain: f32, rng: &mut Rng) {
         let hp = x - prev;
         prev = x;
         buf[off + i] += hp * (-t * 14.0).exp() * gain * 3400.0;
+    }
+}
+
+/// A short, metallic hat: filtered noise with inharmonic cymbal partials.
+fn hi_hat(buf: &mut [f32], off: usize, gain: f32, rng: &mut Rng) {
+    heard(off, HAT, Part::Drums);
+    let n = ms_to_samples(38.0).min(buf.len().saturating_sub(off));
+    let (mut prev, mut phase) = (0.0f32, 0.0f32);
+    for i in 0..n {
+        let t = i as f32 / SRF;
+        let noise = rng.next_f32() * 2.0 - 1.0;
+        let high = noise - prev;
+        prev = noise;
+        phase += std::f32::consts::TAU / SRF;
+        let metal = (phase * 5_317.0).sin() + (phase * 7_691.0).sin() + (phase * 9_211.0).sin();
+        buf[off + i] += (high * 0.24 + metal * 0.12) * (-t * 72.0).exp() * gain * 2500.0;
     }
 }
 
@@ -148,6 +164,7 @@ enum Feel {
     March,
     Push,
     Chime,
+    HipHop,
 }
 
 /// A theme sequenced by `order` rather than looped: eight slots of four bars
@@ -245,6 +262,18 @@ impl Theme<'_> {
                     if b % 8 == 4 {
                         let d = line[bar % line.len()];
                         chime(&mut buf, off, degree(scale, root, d + 4) * 2.0, if lull { 0.35 } else { 0.5 });
+                    }
+                }
+                // A slow backbeat, shuffled hi-hat and deep kick for THE HOOD.
+                Feel::HipHop => {
+                    if b == 0 || b == 10 { taiko(&mut buf, off, 58.0, if b == 0 { 0.9 } else { 0.55 }, &mut rng); }
+                    if b == 8 { rim(&mut buf, off, 0.72, &mut rng); }
+                    if matches!(b, 2 | 6 | 14) { rim(&mut buf, off, 0.16, &mut rng); }
+                    if b % 2 == 0 && !hush {
+                        let swung = b % 4 == 2;
+                        // Half a step rounds back at 92 BPM; 0.6 survives XM's quantization.
+                        hi_hat(&mut buf, off + if swung { step * 3 / 5 } else { 0 },
+                            if lull { 0.12 } else if swung { 0.24 } else { 0.16 }, &mut rng);
                     }
                 }
                 // Rim on the off-beats, denser on a driving stage.
@@ -500,6 +529,8 @@ pub fn theme_wav(which: usize) -> Vec<u8> {
         5 => stage(124.0, 164.81, &IN, [&v_a, &v_b, &v_c, &v_d], 0.8, Feel::Rim),
         6 => stage(120.0, 196.00, &MAJOR, [&f_a, &f_b, &f_c, &f_d], 0.5, Feel::Chime),
         7 => stage(142.0, 185.00, &BLUES, [&q_a, &q_b, &q_c, &q_d], 0.9, Feel::Push),
+        // Original West Coast-flavoured hip-hop groove: swung bass, dry rim and warm keys.
+        8 => stage(92.0, 110.00, &MINOR, [&q_a, &v_a, &q_c, &v_d], 0.8, Feel::HipHop),
         _ => Theme {
             bpm: 118.0,
             root: 207.65,
@@ -1199,6 +1230,64 @@ pub fn sounds() -> Vec<Asset> {
     ]
 }
 
+/// Original walkout: swung breakbeat, sub bass and a sparse, minor-key piano hook.
+pub fn walkout_wav() -> Vec<u8> {
+    const BPM: f32 = 96.0;
+    const BARS: usize = 16;
+    const HOOK: [(usize, i32); 8] = [(0, 62), (3, 69), (7, 65), (10, 67),
+        (16, 60), (22, 65), (26, 64), (30, 57)];
+    tempo(BPM);
+    let step = (SRF * 60.0 / BPM / 4.0) as usize;
+    let body = step * BARS * 16;
+    let mut buf = vec![0.0; body + ms_to_samples(1800.0)];
+    let mut rng = Rng(0x2026);
+    let hz = |note: i32| 440.0 * 2.0f32.powf((note as f32 - 69.0) / 12.0);
+    for tick in 0..BARS * 16 {
+        let beat = tick % 16;
+        let swing = if tick % 2 == 1 { step / 7 } else { 0 };
+        let off = tick * step + swing;
+        if matches!(beat, 0 | 6 | 10) || beat == 15 && tick / 16 % 2 == 1 {
+            taiko(&mut buf, off, 75.0, 1.15, &mut rng);
+        }
+        if matches!(beat, 4 | 12) {
+            rim(&mut buf, off, 0.9, &mut rng);
+            heard(off, SNARE, Part::Drums);
+            let n = ms_to_samples(135.0);
+            for i in 0..n {
+                let t = i as f32 / n as f32;
+                buf[off + i] += (rng.next_f32() * 2.0 - 1.0) * (-t * 6.0).exp() * 3700.0;
+            }
+        }
+        if tick % 2 == 0 {
+            heard(off, HAT, Part::Drums);
+            let n = ms_to_samples(26.0);
+            for i in 0..n {
+                let t = i as f32 / n as f32;
+                buf[off + i] += (rng.next_f32() * 2.0 - 1.0) * (-t * 9.0).exp() * 650.0;
+            }
+        }
+        if matches!(beat, 0 | 7 | 10) {
+            let note = [38, 38, 36, 41][tick / 16 % 4];
+            let freq = hz(note);
+            heard_hz(off, freq, Part::Bass);
+            let n = step * if beat == 0 { 6 } else { 3 };
+            for i in 0..n {
+                let phase = std::f32::consts::TAU * freq * i as f32 / SRF;
+                let attack = (i as f32 / (SRF * 0.008)).min(1.0);
+                let decay = (1.0 - i as f32 / n as f32).powf(1.4);
+                buf[off + i] += (phase.sin() + 0.18 * (phase * 2.0).sin()) * attack * decay * 5400.0;
+            }
+        }
+        for &(at, note) in &HOOK {
+            if tick % 32 != at { continue; }
+            pluck(&mut buf, off, hz(note), 520.0, 0.72, &mut rng);
+            pluck(&mut buf, off + step * 3, hz(note), 420.0, 0.15, &mut rng);
+        }
+    }
+    wrap_tail(&mut buf, body);
+    encode_pcm16_music(&soft_limit_to_pcm16(&buf[..body], MIX_KNEE))
+}
+
 /// The music: each tune as a WAV to play and an XM of its notes for TUNE.
 pub fn music() -> Vec<(String, Vec<u8>)> {
     blip::xm::tunes(&[
@@ -1210,5 +1299,7 @@ pub fn music() -> Vec<(String, Vec<u8>)> {
         ("VILLAGE", &|| theme_wav(5)),
         ("FORTRESS", &|| theme_wav(6)),
         ("ROOFTOP", &|| theme_wav(7)),
+        ("HOOD", &|| theme_wav(8)),
+        ("WALKOUT", &walkout_wav),
     ])
 }

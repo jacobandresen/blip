@@ -1,5 +1,5 @@
 //! One fighter in a round: where they are, what they are doing, and the
-//! questions the rules ask of them (how tall, how far, can it be hit).
+//! questions the rules ask of them (how tall, how far, what can they do).
 
 use super::*;
 
@@ -90,6 +90,10 @@ pub(crate) struct Fighter {
     /// Punches thrown in quick succession change hands: this one is with the
     /// far hand. `since_punch` is the time since the last one started.
     pub(crate) alt_punch: bool,
+    /// Alternating high-kick leg, including while standing still.
+    pub(crate) alt_kick: bool,
+    pub(crate) stumble_roll: u8,
+    pub(crate) stumble: f32,
     pub(crate) since_punch: f32,
     /// The far leg is the one in front: whichever foot a walk stopped on.
     /// Kicks come off the front leg.
@@ -160,7 +164,8 @@ impl Fighter {
             blend_len: POSE_BLEND, land: 0.0, land_force: 0.0,
             soar: 0.0, stomp: false, parry_t: 0.0, throw_rest: 0.0,
             webbed: 0.0, web_hits: 0, web_rest: 0.0, called: false, calling: false, aim: None,
-            alt_punch: false, since_punch: 9.0, far_leads: false,
+            alt_punch: false, alt_kick: false, stumble_roll: 0, stumble: 0.0,
+            since_punch: 9.0, far_leads: false,
             daze: 0.0, dizzy: 0.0, dazed: false, was_toward: false, countered: false, turned: false,
             foe_size: FIGHTERS[who].size,
         }
@@ -193,7 +198,7 @@ impl Fighter {
     /// Down to the last quarter of the bar (see `RAGE`).
     pub(crate) fn enraged(&self) -> bool {
         let a = self.arch();
-        !a.invincible && self.health > 0 && self.health * 4 <= a.health
+        self.health > 0 && self.health * 4 <= a.health
     }
     /// A turtle guarding low is inside its shell, where nothing chips it.
     pub(crate) fn shelled(&self) -> bool {
@@ -209,17 +214,13 @@ impl Fighter {
     pub(crate) fn epic_punch(&self) -> bool {
         self.flies() && matches!(self.mv, MoveId::HighPunch | MoveId::LowPunch | MoveId::JumpPunch | MoveId::Uppercut)
     }
-    /// Lose health to a blow from a fighter of size `from`. The invincible
-    /// feel only someone bigger than themselves, and then a quarter of it.
-    pub(crate) fn hurt(&mut self, damage: i32, from: f32) {
+    /// Lose health to a blow; webbing ends after two landed hits.
+    pub(crate) fn hurt(&mut self, damage: i32, _from: f32) {
         // A web takes two blows and no more, whatever they cost.
         if self.webbed > 0.0 && damage > 0 {
             self.web_hits += 1;
             if self.web_hits >= WEB_HITS { self.unweb(); }
         }
-        let damage = if !self.arch().invincible { damage }
-            else if from > self.size() { (damage / 4).max(1) }
-            else { 0 };
         self.health = (self.health - damage).max(0);
     }
     /// Wrap this fighter up, unless a web has only just come off.
@@ -295,6 +296,7 @@ impl Fighter {
     /// Begin move `id`: reset the clocks, and set what depends on how it
     /// started (the chain hand, the call, the lunge, the flying arc).
     pub(crate) fn start_attack(&mut self, id: MoveId) {
+        self.stumble_roll = self.stumble_roll.wrapping_mul(5).wrapping_add(3) % 17;
         // A turtle's first special of the round calls the others in.
         self.calling = id == MoveId::Special && self.arch().build == Build::Turtle && !self.called;
         if self.calling { self.called = true; }
@@ -303,11 +305,14 @@ impl Fighter {
             self.alt_punch = self.since_punch < CHAIN_PUNCH && !self.alt_punch;
             self.since_punch = 0.0;
         }
+        if id == MoveId::HighKick {
+            self.alt_kick = !self.alt_kick;
+        }
         self.aim = None;
         self.act = Act::Attack;
         self.mv = id;
         self.t = 0.0;
-        self.hit_done = false;
+        self.hit_done = id == MoveId::Special && self.arch().special == Special::DriveBy;
         self.hit_clean = false;
         self.countered = false;
         self.stomp = id == MoveId::JumpKick && self.arch().build == Build::Giant;

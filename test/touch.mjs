@@ -1,7 +1,7 @@
 // Touch input in the games: what a finger on the touch strip or the deck sends
 // to the canvas.
 //
-//   node --test --test-concurrency=1 test/touch.mjs        (after ./build_web.sh)
+//   node --test --test-concurrency=1 test/touch.mjs        (after cargo build-web)
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
