@@ -6,8 +6,8 @@
 import { spawn } from 'node:child_process';
 
 const LANES = [
-  { name: 'game', concurrency: 1, files: ['touch', 'controls', 'two-player-touch-phones', 'bubbler-two-player-iphone', 'basic-controls', 'basic-game-controls', 'basic-canvas', 'basic-tape', 'basic-mobile-layout', 'brawler-basic', 'adder-controls', 'adder-parity', 'rally-parity'] },
-  { name: 'layout', concurrency: 2, files: ['manual', 'cabinet', 'aisle-perf', 'arcade-room', 'two-player-deck', 'topbar-layout', 'home', 'basic', 'basic-shared-functions', 'tape-motion'] },
+  { name: 'game', concurrency: 1, files: ['touch', 'controls', 'two-player-touch-phones', 'bubbler-two-player-iphone', 'basic-controls', 'basic-game-controls', 'basic-canvas', 'basic-tape', 'basic-mobile-layout', 'brawler-basic', 'adder-controls', 'adder-two-player', 'adder-parity', 'rally-parity'] },
+  { name: 'layout', concurrency: 2, files: ['manual', 'cabinet', 'attract', 'iphone14-room', 'kiosk-room', 'touch-controls', 'aisle-perf', 'arcade-room', 'two-player-deck', 'topbar-layout', 'home', 'basic', 'basic-shared-functions', 'tape-motion'] },
 ];
 
 const codes = await Promise.all(LANES.map((lane) => new Promise((done) => {

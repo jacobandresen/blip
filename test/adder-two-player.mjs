@@ -15,7 +15,8 @@ test('Adder opens the second station and joins a human player from the title', a
   await page.locator('#glcanvas').focus();
   await page.keyboard.press('Space');
   await page.waitForFunction(() => sessionStorage.getItem('blip-coins') === '3');
-  const p2Join = page.locator('#snes-pad-p2 .snes-btn').first();
+  assert.equal(await page.evaluate(() => blipControls()), 'touch');
+  const p2Join = page.locator('#touch-strip .ts-join');
   await p2Join.waitFor({ state: 'visible' });
   const joinBox = await p2Join.boundingBox();
   assert.ok(joinBox && joinBox.width > 0, 'the player-two join button must be visible');

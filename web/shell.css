@@ -781,7 +781,7 @@ canvas {
 :root[data-touch="platform"][data-versus] .ts-demo { display: none; }
 /* 2P JOIN has its own target; the rest of the strip stays with P1 until P2 joins. */
 .ts-join { display: none; }
-:root[data-touch="platform"][data-open] .ts-join {
+:root[data-touch][data-open] .ts-join {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -808,7 +808,7 @@ canvas {
   -webkit-tap-highlight-color: transparent;
   animation: tj-glow 2.4s ease-in-out infinite;
 }
-:root[data-touch="platform"][data-open][data-layout="landscape"] .ts-join {
+:root[data-touch][data-open][data-layout="landscape"] .ts-join {
   position: fixed;
   top: max(100px, calc(env(safe-area-inset-top, 0px) + 12px));
   left: auto;

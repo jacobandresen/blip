@@ -1,10 +1,14 @@
 // Each machine's attract loop on its arcade screen: a few seconds of the native autopilot's play, as one strip.
 //
 //   node tools/make_attract_strips.mjs [game ...]     (after a game's look changes)
+//   node tools/make_attract_strips.mjs --fallbacks-only [game ...]
+// Needs ImageMagick 7 (`magick`) and release game binaries for a fresh capture.
+// --fallbacks-only derives PNG strips from the existing WebP captures, with no native playtest.
 //
 // Runs each game's autopilot in turn (never two at once), keeps FRAMES frames
 // from FROM seconds on, and writes web/<slug>/attract.webp: the frames stacked top to bottom. The arcade
 // plays FRAMES of them (its card-loop animation) and reads their shape from the image.
+// Also writes an indexed PNG strip for browsers without WebP or when decoding fails.
 // Generated: edit this file, not its output.
 
 import { execFileSync } from 'node:child_process';
@@ -20,9 +24,20 @@ const FRAMES = 12, EVERY = 0.25, WIDTH = 240, LIMIT = 60 * 1024;
 // Where the loop starts, past each game's title screen and into play.
 const FROM = { rally: 6, bouncer: 6, defender: 8, bubbler: 8, raider: 8, meteors: 3, serpent: 6, brawler: 10, adder: 8 };
 
-const only = process.argv.slice(2);
+const args = process.argv.slice(2), fallbacksOnly = args.includes('--fallbacks-only');
+const only = args.filter((arg) => arg !== '--fallbacks-only');
+
+function writeFallback(inputs, out, width) {
+  execFileSync('magick', [...inputs, ...(width ? ['-filter', 'Box', '-resize', `${width}x`, '-append'] : []),
+    '-dither', 'None', '-colors', '128', '-strip', `PNG8:${out}`]);
+  console.log(`${path.relative(ROOT, out)}: ${(statSync(out).size / 1024).toFixed(1)} KB`);
+}
 
 for (const slug of GAMES.filter((g) => !only.length || only.includes(g))) {
+  if (fallbacksOnly) {
+    writeFallback([path.join(ROOT, 'web', slug, 'attract.webp')], path.join(ROOT, 'web', slug, 'attract.png'));
+    continue;
+  }
   const bin = path.join(ROOT, 'target/release', slug);
   if (!existsSync(bin)) throw new Error(`${bin} is missing: cargo build --release -p ${slug}`);
   const shots = mkdtempSync(path.join(tmpdir(), `blip-attract-${slug}-`));
@@ -57,6 +72,7 @@ for (const slug of GAMES.filter((g) => !only.length || only.includes(g))) {
       else throw new Error(`${slug}: ${size} bytes at ${width}px and quality ${quality}, over ${LIMIT}`);
     }
     console.log(`${slug}: ${FRAMES} frames of ${w}x${h} from ${from} s, ${width}px at quality ${quality}, ${(size / 1024).toFixed(1)} KB`);
+    writeFallback(picked, path.join(ROOT, 'web', slug, 'attract.png'), width);
   } finally {
     rmSync(shots, { recursive: true, force: true });
   }
