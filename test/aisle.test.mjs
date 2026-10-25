@@ -123,6 +123,30 @@ test('every machine stands within half the aisle of you', () => {
   assert.equal(Aisle.index(8.6, N), 0);
 });
 
+test('a room layer scrolls within one repeat of its pattern, the way the old formulas did', () => {
+  const spacing = 414;
+  const old = (pos, rate, period) => -((pos * spacing * rate) % period + period) % period;
+  for (const [rate, period] of [[0.5, 120], [1.3, 86], [0.3, 480]]) {
+    for (let travel = -20; travel <= 20; travel += 0.013) {
+      const x = Aisle.layerOffset(travel, spacing, rate, period);
+      assert.ok(x > -period && x <= 0, `${travel}: ${x}`);
+      assert.ok(Math.abs(x - old(travel, rate, period)) < 1e-9 || Math.abs(Math.abs(x - old(travel, rate, period)) - period) < 1e-9,
+        `${travel}: ${x} vs ${old(travel, rate, period)}`);
+      // One repeat of the pattern later, in machines walked, the layer looks the same.
+      const repeat = period / (spacing * rate);
+      const later = Aisle.layerOffset(travel + repeat, spacing, rate, period);
+      const apart = Math.abs(later - x);
+      assert.ok(apart < 1e-6 || Math.abs(apart - period) < 1e-6, `${travel} and one repeat on: ${x}, ${later}`);
+    }
+  }
+  assert.ok(Object.is(Aisle.layerOffset(0, spacing, 1, 120), 0), 'no negative zero');
+  assert.ok(Object.is(Aisle.layerOffset(-2, 60, 1, 120), 0), 'no negative zero walking back');
+  // Walking on moves the layer left until it wraps; walking back moves it right.
+  const a = Aisle.layerOffset(0.1, spacing, 0.5, 120), b = Aisle.layerOffset(0.15, spacing, 0.5, 120);
+  assert.ok(b < a, `${a} then ${b}`);
+  assert.ok(Aisle.layerOffset(-0.15, spacing, 0.5, 120) > Aisle.layerOffset(-0.1, spacing, 0.5, 120));
+});
+
 test('the faced machine is loudest and the others fall away and pan apart', () => {
   assert.equal(Aisle.machineLevel(0), 1);
   assert.equal(Aisle.machineLevel(1), 0.5);

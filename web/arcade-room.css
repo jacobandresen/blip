@@ -1,0 +1,100 @@
+/* The arcade room behind and under the cabinets (issue #65): wall, signs, wall art, floor and the light
+   pools. Linked after index.html's inline styles, so these rules keep the place they had there.
+
+   Every decorative layer is an element with data-room-layer and data-zone, aria-hidden and no pointer
+   events; test/arcade-room.mjs finds the layers by that attribute. Each layer owns:
+     wall    #game-grid's own background and .aisle-wall's panel joints (#67)
+     trim    .aisle-trim, the lit ceiling edge (#67)
+     carpet  .aisle-carpet (#71)
+     pool    each machine's .card-pool (#71)
+   Back to front: wall → mural/tiles → signs/decals → floor/pools → cabinets.
+
+   :root[data-room="lite"] (?room=lite, set in index.html's head) drops room blur, glow and fine texture;
+   each layer writes its own lite rules beside its look. Cabinet styling is not the room's. */
+
+#game-grid {
+  /* Colours. The owner in brackets sets the final value. */
+  --room-wall-lit: #d9693f;        /* [#67] by the ceiling, where the trim lights it */
+  --room-wall: #b9482b;            /* [#67] terracotta */
+  --room-wall-low: #7c2b1b;        /* [#67] red-brown behind the cabinets' feet */
+  --room-wall-shade: #44160e;      /* [#67] at the floor */
+  --room-ceiling: #2b0d09;         /* [#67] above the fascia */
+  --room-trim-red: #c3302a;        /* [#67] */
+  --room-trim-yellow: #ffd36b;     /* [#67] */
+  --room-neon: #ff8fd8;            /* [#68] */
+  --room-neon-core: #fff6e8;       /* [#68] */
+  --room-neon-glow: #e04fb6;       /* [#68] */
+  --room-carpet-a: #17112a;        /* [#71] */
+  --room-carpet-b: #0d0a19;        /* [#71] */
+  --room-grout: #d8d2c4;           /* [#69] */
+
+  /* Shared regions, as a share of the room's height. The cabinets stand about 92% of the room's height and
+     their neighbours' sides cover the rest, so at rest the wall shows only in the band under the trim; a
+     full-height strip opens between machines as you walk (#67's checkpoint). Tiles and mural therefore
+     start under the trim, read within the band at rest, and run down the wall to fill the walking gaps,
+     beside the sign rather than under it. */
+  --room-trim-top: 0%;    --room-trim-bottom: 9%;
+  --room-sign-top: 9%;    --room-sign-bottom: 25%;
+  --room-wall-top: 9%;    --room-wall-bottom: 68%;
+  --room-band-bottom: 22%;         /* the band under the trim that shows at rest */
+  --room-floor-top: 65%;  --room-floor-bottom: 100%;
+  --room-edge-width: 14%;          /* decals, at the outer edges */
+
+  /* Repeats that the walk scrolls through (index.html reads them on layout, BlipAisle.layerOffset). */
+  --room-wall-period: 120px;
+  --room-carpet-period: 86px;
+
+  /* wall: orange-red panels lit from the ceiling, deepening to red-brown at the floor, a little darker at the
+     room's sides. The midtones stay warm where tiles and mural will hang. */
+  background:
+    linear-gradient(90deg,rgb(30 8 4 / .5),transparent 13% 87%,rgb(30 8 4 / .5)),
+    radial-gradient(ellipse 75% 26% at 50% var(--room-trim-bottom),rgb(255 200 130 / .3),transparent 72%),
+    linear-gradient(180deg,var(--room-wall-lit) var(--room-trim-bottom),var(--room-wall) 30%,var(--room-wall-low) var(--room-wall-bottom),var(--room-wall-shade));
+}
+:root[data-room="lite"] #game-grid {
+  background:
+    linear-gradient(90deg,rgb(30 8 4 / .5),transparent 13% 87%,rgb(30 8 4 / .5)),
+    linear-gradient(180deg,var(--room-wall-lit) var(--room-trim-bottom),var(--room-wall) 30%,var(--room-wall-low) var(--room-wall-bottom),var(--room-wall-shade));
+}
+
+/* wall: the panels' joints, a dark groove with a lit edge, drifting past at half the machines' pace. */
+#game-grid .aisle-wall {position:absolute;z-index:0;top:0;bottom:0;left:-120px;right:-120px;pointer-events:none;
+  background:repeating-linear-gradient(90deg,rgb(74 18 9 / .5) 0 2px,rgb(255 196 150 / .09) 2px 3px,transparent 3px var(--room-wall-period))}
+
+/* trim: the lowered ceiling's edge, a broad red fascia over a strip of yellow light that washes the wall. It
+   belongs to the building, so it stays put as you walk. */
+#game-grid .aisle-trim {position:absolute;z-index:0;left:0;right:0;top:var(--room-trim-top);pointer-events:none;
+  height:clamp(24px,calc(var(--room-trim-bottom) - var(--room-trim-top)),96px);
+  background:linear-gradient(180deg,var(--room-ceiling) 0 16%,#d63c31 16%,var(--room-trim-red) 42%,#8f1d17 72%,
+    #6e140f 74%,#fff3c8 76%,var(--room-trim-yellow) 86%,#e7a23e 100%);
+  box-shadow:0 4px 18px -2px rgb(255 198 104 / .6),0 1px 0 #ffe6a0}
+:root[data-room="lite"] #game-grid .aisle-trim {box-shadow:none}
+
+/* An old neon tube along the back wall, never drawn: an earlier rule in index.html sets its content to none. */
+#game-grid::before {
+  left:50%;top:5%;width:min(560px,70%);height:3px;z-index:0;border:0;border-radius:3px;
+  transform:translateX(-50%);background:var(--room-neon);opacity:.75;filter:none;
+  box-shadow:0 0 6px #ff6fcf,0 0 22px var(--room-neon-glow),0 0 60px 8px #b13a9a55;
+}
+
+/* carpet: black-light confetti on midnight, walked past as the aisle moves. */
+#game-grid .aisle-carpet {
+  position:absolute;z-index:0;left:-40%;right:-40%;bottom:-6%;height:40%;pointer-events:none;
+  transform:perspective(300px) rotateX(55deg);transform-origin:50% 100%;
+  background:
+    radial-gradient(circle at 18% 22%,#ff4fb0 0 3px,transparent 4px),
+    radial-gradient(circle at 64% 70%,#3fe0ff 0 2.5px,transparent 3.5px),
+    radial-gradient(circle at 80% 18%,transparent 0 6px,#ffd84a 7px 8.5px,transparent 9.5px),
+    linear-gradient(35deg,transparent 46%,#7dff6a 47% 49%,transparent 50%),
+    radial-gradient(circle at 34% 80%,#b48cff 0 2px,transparent 3px),
+    linear-gradient(var(--room-carpet-a),var(--room-carpet-b));
+  --p:var(--room-carpet-period);
+  background-size:var(--p) var(--p),var(--p) var(--p),var(--p) var(--p),calc(var(--p) / 2) calc(var(--p) / 2),var(--p) var(--p),100% 100%;
+  background-position:0 0;
+  -webkit-mask-image:linear-gradient(transparent,#000 30%);mask-image:linear-gradient(transparent,#000 30%);
+  opacity:.85;
+}
+
+/* pool: each machine's pool of light on the carpet, its opacity set by the walk. */
+#game-grid .card-pool {position:absolute;z-index:0;left:-35%;right:-35%;bottom:-70px;height:140px;pointer-events:none;opacity:0;
+  background:radial-gradient(closest-side,color-mix(in srgb,var(--trim) 62%,transparent),transparent);transform:rotateX(78deg);transform-origin:50% 50%}
