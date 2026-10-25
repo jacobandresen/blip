@@ -163,6 +163,12 @@ async function check(page, device, insets, label, failures) {
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       return hit && !hit.closest('.card, #glcanvas, #need-coin-overlay, #loader, .blip-hs-modal, #rotate-hint') ? hit.tagName + '.' + String(hit.className).slice(0, 30) : null;
     };
+    // In the arcade, the middle of the room: a machine, or the wall between two when you stand between them.
+    const grid = document.getElementById('game-grid');
+    if (grid) {
+      const g = grid.getBoundingClientRect(), hit = document.elementFromPoint(g.left + g.width / 2, g.top + g.height / 2);
+      return hit && hit.closest('#game-grid') ? null : hit ? hit.tagName + '.' + String(hit.className).slice(0, 30) : 'nothing';
+    }
     return onTop(document.querySelector('.card-focused')) || onTop(document.getElementById('glcanvas'));
   });
   if (covered) failures.push(`${label}: the middle of the picture is covered by ${covered}`);

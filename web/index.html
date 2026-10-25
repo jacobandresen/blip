@@ -1514,42 +1514,29 @@
         var pool=roomLayer('span','card-pool','pool','floor');c.appendChild(pool);
         return {strip:strip,pool:pool,near:false,glow:'',src:(c.getAttribute('data-game-url')||'').split('/')[0]+'/attract.webp'};
       });
-      // Neighbours stand angled away, as on a showroom floor, so their side art shows; farther ones recede.
-      // Where the room is narrow they stand closer, their sides peeking in at the edges.
+      // Room between the machines for two players at each.
       function aisleSpacing(room) {
-        var width=300*room.scale;
-        return width*(room.width-width<400?1.08:1.38);
+        return 300*room.scale*1.6;
       }
+      // The machines stand in a row against the wall, side by side and all alike: walking slides the row past.
       function cardPose(c,delta,room) {
-        var distance=Math.abs(delta);
-        return {
-          x:delta*aisleSpacing(room),
-          y:0,
-          z:(distance<1?40-130*distance:-distance*90)*room.scale,
-          turn:Math.max(-1,Math.min(1,delta))*32,
-          tilt:0,
-          pitch:0
-        };
+        return {x:delta*aisleSpacing(room),y:0,z:0,turn:0,tilt:0,pitch:0};
       }
       // The cabinet's scale for the room. Short and wide (a phone on its side): the player stands close, cut off below Start.
       function aisleRoom() {
         var track=document.getElementById('game-grid'),w=track.clientWidth,h=track.clientHeight;
         var close=w>h*1.4&&h<520;
         track.toggleAttribute('data-close',close);
-        var css=getComputedStyle(track),scale=Math.max(.3,Math.min(close?h*.95/510:h*.92/660,(w-56)/300));
+        var css=getComputedStyle(track),scale=Math.max(.3,Math.min(close?h*.95/510:h*.78/660,(w-56)/300));
         roomSigns(track,w,h,scale,close);
         return {width:w,scale:scale,
           wallPeriod:parseFloat(css.getPropertyValue('--room-wall-period'))||120,
           carpetPeriod:parseFloat(css.getPropertyValue('--room-carpet-period'))||86};
       }
-      // Where the faced cabinet and its neighbours' tops stand at rest, seen through #game-grid's perspective
-      // (1100px from 38% of its height), so the room's signs hang where the cabinets leave the wall in view.
+      // Where the row of machines stands, so the room's signs hang on the wall above it.
       function roomSigns(track,w,h,scale,close) {
-        var origin=h*.38,seen=function(y,z){return origin+(y-origin)*1100/(1100-z);};
-        var bottom=close?h*.03:h*.97,faced=seen(close?bottom:bottom-660*scale,40*scale);
-        // A neighbour stands 90px back, turned 32° so its inner edge comes forward and stands highest.
-        var side=close?faced:seen(bottom-660*scale*.88,(-90+150*.88*Math.sin(32*Math.PI/180))*scale);
-        var place={'--room-cab-w':Math.round(300*scale*1100/(1100-40*scale))+'px','--room-cab-top':Math.round(faced)+'px','--room-side-top':Math.round(side)+'px'};
+        var top=close?h*.03:h*.97-660*scale;
+        var place={'--room-cab-w':Math.round(300*scale)+'px','--room-cab-top':Math.round(top)+'px','--room-side-top':Math.round(top)+'px'};
         for(var name in place)if(track.style.getPropertyValue(name)!==place[name])track.style.setProperty(name,place[name]);
       }
       function aisleOffset(index) {
@@ -1561,7 +1548,7 @@
         cards.forEach(function(c,i){
           if(!c.classList.contains('card'))return;
           var offset=aisleOffset(i),pose=cardPose(c,offset,room),distance=Math.abs(offset);
-          var scale=room.scale*Math.max(.58,1-distance*.12);
+          var scale=room.scale;
           c.style.transform='translateX(calc(-50% + '+pose.x.toFixed(1)+'px)) translateY('+((bob||0)+lift).toFixed(2)+'px) translateZ('+(pose.z+closer).toFixed(1)+'px) rotateY('+pose.turn.toFixed(2)+'deg) scale('+scale.toFixed(4)+')';
           var z=String(30-Math.min(Math.round(distance*2),25));
           if(c.style.zIndex!==z)c.style.zIndex=z;
@@ -1606,17 +1593,9 @@
           // hand it over from the "last played" card.
           if (navActive) c.classList.remove('card-active');
           if(!c.classList.contains('card'))return;
-          var offset=Math.round(aisleOffset(i)),pose=cardPose(c,offset,room);
+          var offset=Math.round(aisleOffset(i));
           c.dataset.aisleOffset=String(offset);
-          function leanPreview(frame){
-            if(!frame||!frame.contentDocument)return;
-            var root=frame.contentDocument.documentElement;
-            var lean=pose.turn*.55;
-            root.style.setProperty('--preview-lean',lean+'deg');
-          }
-          var deckFrame=c.querySelector('.machine-deck iframe');
-          if(deckFrame){leanPreview(deckFrame);if(!deckFrame.dataset.leanReady){deckFrame.dataset.leanReady='1';deckFrame.addEventListener('load',function(){var current=Math.max(-1,Math.min(1,Number(c.dataset.aisleOffset)||0))*32;var root=deckFrame.contentDocument&&deckFrame.contentDocument.documentElement;if(root)root.style.setProperty('--preview-lean',current*.55+'deg');});}}
-          c.style.setProperty('--arc-scale',(room.scale*Math.max(.58,1-Math.abs(offset)*.12)).toFixed(3));
+          c.style.setProperty('--arc-scale',room.scale.toFixed(3));
         });
         if(!aisleFrame)poseCards(room);
         if(cardHadFocus)cards[idx].focus({preventScroll:true});
