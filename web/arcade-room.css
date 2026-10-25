@@ -5,6 +5,8 @@
    events; test/arcade-room.mjs finds the layers by that attribute. Each layer owns:
      wall    #game-grid's own background and .aisle-wall's panel joints (#67)
      trim    .aisle-trim, the lit ceiling edge (#67)
+     neon    .aisle-neon, the BLIP script sign (#68)
+     open    .aisle-open, the OPEN sign, lit while a credit is banked (#68)
      carpet  .aisle-carpet (#71)
      pool    each machine's .card-pool (#71)
    Back to front: wall → mural/tiles → signs/decals → floor/pools → cabinets.
@@ -21,9 +23,9 @@
   --room-ceiling: #2b0d09;         /* [#67] above the fascia */
   --room-trim-red: #c3302a;        /* [#67] */
   --room-trim-yellow: #ffd36b;     /* [#67] */
-  --room-neon: #ff8fd8;            /* [#68] */
-  --room-neon-core: #fff6e8;       /* [#68] */
-  --room-neon-glow: #e04fb6;       /* [#68] */
+  --room-neon: #ff8a3d;            /* [#68] the orange tube */
+  --room-neon-core: #fff3dc;       /* [#68] its white-hot core */
+  --room-neon-glow: rgb(255 128 46 / .62); /* [#68] the halo on the wall */
   --room-carpet-a: #17112a;        /* [#71] */
   --room-carpet-b: #0d0a19;        /* [#71] */
   --room-grout: #d8d2c4;           /* [#69] */
@@ -33,9 +35,10 @@
      full-height strip opens between machines as you walk (#67's checkpoint). Tiles and mural therefore
      start under the trim, read within the band at rest, and run down the wall to fill the walking gaps,
      beside the sign rather than under it. */
-  --room-trim-top: 0%;    --room-trim-bottom: 9%;
-  --room-sign-top: 9%;    --room-sign-bottom: 25%;
-  --room-wall-top: 9%;    --room-wall-bottom: 68%;
+  --room-trim-top: 0%;    --room-trim-bottom: 7%;
+  --room-sign-top: 7%;    --room-sign-bottom: 17%;
+  --room-wall-top: 7%;    --room-wall-bottom: 68%;
+  --room-trim-h: clamp(24px, calc(var(--room-trim-bottom) - var(--room-trim-top)), 96px);
   --room-band-bottom: 22%;         /* the band under the trim that shows at rest */
   --room-floor-top: 65%;  --room-floor-bottom: 100%;
   --room-edge-width: 14%;          /* decals, at the outer edges */
@@ -64,18 +67,11 @@
 /* trim: the lowered ceiling's edge, a broad red fascia over a strip of yellow light that washes the wall. It
    belongs to the building, so it stays put as you walk. */
 #game-grid .aisle-trim {position:absolute;z-index:0;left:0;right:0;top:var(--room-trim-top);pointer-events:none;
-  height:clamp(24px,calc(var(--room-trim-bottom) - var(--room-trim-top)),96px);
+  height:var(--room-trim-h);
   background:linear-gradient(180deg,var(--room-ceiling) 0 16%,#d63c31 16%,var(--room-trim-red) 42%,#8f1d17 72%,
     #6e140f 74%,#fff3c8 76%,var(--room-trim-yellow) 86%,#e7a23e 100%);
   box-shadow:0 4px 18px -2px rgb(255 198 104 / .6),0 1px 0 #ffe6a0}
 :root[data-room="lite"] #game-grid .aisle-trim {box-shadow:none}
-
-/* An old neon tube along the back wall, never drawn: an earlier rule in index.html sets its content to none. */
-#game-grid::before {
-  left:50%;top:5%;width:min(560px,70%);height:3px;z-index:0;border:0;border-radius:3px;
-  transform:translateX(-50%);background:var(--room-neon);opacity:.75;filter:none;
-  box-shadow:0 0 6px #ff6fcf,0 0 22px var(--room-neon-glow),0 0 60px 8px #b13a9a55;
-}
 
 /* carpet: black-light confetti on midnight, walked past as the aisle moves. */
 #game-grid .aisle-carpet {
@@ -98,3 +94,51 @@
 /* pool: each machine's pool of light on the carpet, its opacity set by the walk. */
 #game-grid .card-pool {position:absolute;z-index:0;left:-35%;right:-35%;bottom:-70px;height:140px;pointer-events:none;opacity:0;
   background:radial-gradient(closest-side,color-mix(in srgb,var(--trim) 62%,transparent),transparent);transform:rotateX(78deg);transform-origin:50% 50%}
+
+/* Signs hang on the wall under the trim, where the cabinets leave it in view: beside the faced cabinet
+   (BLIP to its left, OPEN to its right) above the neighbours' tops, or on a phone, where there is room,
+   above it. The aisle script sets --room-cab-w, --room-cab-top and --room-side-top: the faced cabinet's
+   width and top and the neighbours' top at rest, as seen. Signs belong to the wall and stay put as you walk. */
+#game-grid {
+  --room-side: calc((100% - var(--room-cab-w, 300px)) / 2);
+  --room-sign-y: calc(var(--room-trim-h) + 6px);
+  --room-sign-box: calc(var(--room-side-top, 17%) - var(--room-trim-h) - 14px);
+}
+#game-grid :is(.aisle-neon,.aisle-open) {position:absolute;z-index:0;pointer-events:none;overflow:visible}
+
+/* neon: cream-white core in an orange tube, with an amber halo on the wall; it warms up once on arrival. */
+#game-grid .aisle-neon {left:calc(var(--room-side) * .1);width:calc(var(--room-side) * .8);top:var(--room-sign-y);height:var(--room-sign-box);
+  filter:drop-shadow(0 0 2px #ffb070) drop-shadow(0 0 8px var(--room-neon-glow)) drop-shadow(0 0 22px rgb(255 120 40 / .38));
+  animation:neon-warm .6s linear 1}
+#game-grid .aisle-neon .neon-tube {stroke:var(--room-neon);stroke-width:8.5}
+#game-grid .aisle-neon .neon-core {stroke:var(--room-neon-core);stroke-width:3.4}
+#game-grid .aisle-neon .neon-supports {fill:#3a1a10}
+@keyframes neon-warm {0% {opacity:.12} 14% {opacity:.85} 22% {opacity:.25} 38% {opacity:1} 46% {opacity:.55} 60% {opacity:1}}
+
+/* open: a blue angular frame round red letters, smaller than BLIP. Unlit tubes until a credit is banked. */
+#game-grid .aisle-open {right:calc(var(--room-side) * .18);width:calc(var(--room-side) * .64);
+  top:calc(var(--room-sign-y) + var(--room-sign-box) * .15);height:calc(var(--room-sign-box) * .7);
+  opacity:.35;transition:opacity .3s}
+:root[data-credit] #game-grid .aisle-open {opacity:1;
+  filter:drop-shadow(0 0 2px rgb(120 180 255 / .9)) drop-shadow(0 0 8px rgb(255 60 60 / .5)) drop-shadow(0 0 16px rgb(60 140 255 / .32))}
+#game-grid .aisle-open .open-frame-tube {stroke:#2f8cff;stroke-width:5}
+#game-grid .aisle-open .open-frame-core {stroke:#dff1ff;stroke-width:1.8}
+#game-grid .aisle-open .open-letter-tube {stroke:#ff3434;stroke-width:5}
+#game-grid .aisle-open .open-letter-core {stroke:#ffe3da;stroke-width:1.8}
+
+/* A phone held upright: BLIP hangs centred above the cabinet, OPEN in the corner. */
+@media (max-width:499px) {
+  :root:not([data-layout="landscape"]) #game-grid {--room-trim-bottom:5%;
+    --room-sign-box:calc(var(--room-cab-top, 15%) - var(--room-trim-h) - 14px)}
+  :root:not([data-layout="landscape"]) #game-grid .aisle-neon {left:22%;width:56%}
+  :root:not([data-layout="landscape"]) #game-grid .aisle-open {right:3%;width:19%}
+}
+/* On its side the phone shows no wall: the cabinets reach the ceiling, and a sign could only hang behind a
+   neighbour's title. Both signs go. */
+:root[data-layout="landscape"] #game-grid :is(.aisle-neon,.aisle-open) {display:none}
+
+:root[data-room="lite"] #game-grid :is(.aisle-neon,.aisle-open) {filter:none}
+@media (prefers-reduced-motion:reduce) {
+  #game-grid .aisle-neon {animation:none}
+  #game-grid .aisle-open {transition:none}
+}

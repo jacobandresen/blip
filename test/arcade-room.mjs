@@ -10,6 +10,8 @@ import { openPage } from './lib/harness.mjs';
 const LAYERS = {
   wall: ['shown', 'shown', 'shown'],
   trim: ['shown', 'shown', 'shown'],
+  neon: ['shown', 'hidden', 'shown'],     // no wall shows in landscape (#68)
+  open: ['shown', 'hidden', 'shown'],
   carpet: ['shown', 'shown', 'shown'],
   pool: ['shown', 'shown', 'shown'],
 };
@@ -148,7 +150,12 @@ test('?room picks the room\'s look: lite drops its blur and glow, and leaves the
       const look = await page.evaluate(cabinetLook);
       if (!full) full = look;
       else assert.deepEqual(look, full, 'the cabinet looks the same in either mode');
-      if (mode === 'lite') assert.deepEqual(await page.evaluate(roomBlur), [], 'nothing in the room is blurred or glows');
+      if (mode === 'lite') {
+        // With a credit banked, so the OPEN sign is lit.
+        await page.keyboard.press('5');
+        await page.waitForFunction(() => document.documentElement.hasAttribute('data-credit'));
+        assert.deepEqual(await page.evaluate(roomBlur), [], 'nothing in the room is blurred or glows');
+      }
     });
   }
 });
@@ -234,3 +241,67 @@ test('the wall is warm: none of the old purple room is left', async (t) => {
     assert.ok(!wall.includes(purple), `the wall still holds ${purple}`);
   }
 });
+
+const neonAnimations = (page) => page.evaluate(() => document.querySelector('.aisle-neon').getAnimations().map((a) => a.animationName));
+
+test('the BLIP sign warms up once on arrival, then stays lit as you walk and pay', async (t) => {
+  const page = await openArcade(t);
+  await page.waitForTimeout(1500);
+  assert.deepEqual(await neonAnimations(page), [], 'the warm-up is over');
+  await page.keyboard.press('ArrowRight');
+  await settled(page);
+  await page.keyboard.press('5');
+  await page.waitForTimeout(400);
+  assert.deepEqual(await neonAnimations(page), [], 'walking and a coin do not start it again');
+});
+
+const openLit = (page) => page.evaluate(() => Number(getComputedStyle(document.querySelector('.aisle-open')).opacity));
+
+test('OPEN lights with a credit and goes dark again once a game spends it', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
+  const arcade = async () => {
+    await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') &&
+      !document.documentElement.hasAttribute('data-cabinet-arranging'));
+    await page.waitForTimeout(400);
+  };
+  await page.goto(`${origin}/index.html`);
+  await arcade();
+  assert.ok(await openLit(page) < 0.5, 'dim with no credit');
+  await page.keyboard.press('5');
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-credit') &&
+    !document.querySelector('.aisle-open').getAnimations().length);
+  assert.equal(await openLit(page), 1, 'lit with a credit');
+  await page.locator('.card-focused .machine-start').click();
+  await page.waitForURL(`${origin}/rally/index.html`);
+  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await page.goto(`${origin}/index.html`);
+  await arcade();
+  assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-credit')), false);
+  assert.ok(await openLit(page) < 0.5, 'dim again once the game took the credit');
+});
+
+// Where the signs must not reach: the top bar and its marquee, the walk arrows, the faced cabinet and its
+// controls, and the neighbours' titles.
+for (const config of [...CONFIGS, { name: 'iPhone SE', width: 320, height: 568, touch: true },
+  { name: 'iPhone 14 Pro Max', width: 430, height: 932, touch: true }, { name: 'iPhone SE landscape', width: 667, height: 375, touch: true }]) {
+  test(`the signs hang clear of the cabinets and controls on ${config.name}`, async (t) => {
+    const page = await openArcade(t, config);
+    await page.waitForTimeout(800);
+    const clashes = await page.evaluate(() => {
+      const box = (el) => el.getBoundingClientRect();
+      const meet = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+      const keepOut = [['top bar', document.querySelector('.top-marquee-bar')], ...[...document.querySelectorAll('.pick-arrow')].map((e) => ['walk arrow', e]),
+        ['faced cabinet', document.querySelector('.card-focused')],
+        ...[...document.querySelectorAll('#game-grid .card[data-aisle-offset="-1"] .card-title, #game-grid .card[data-aisle-offset="1"] .card-title')].map((e) => ['neighbour title', e])];
+      const found = [];
+      for (const sign of document.querySelectorAll('.aisle-neon, .aisle-open')) {
+        const s = box(sign);
+        // Where the cabinets leave no wall (an iPhone SE's cabinet reaches the ceiling) a sign has no room at all.
+        if (getComputedStyle(sign).display === 'none' || s.width < 1 || s.height < 1) continue;
+        for (const [name, el] of keepOut) if (el && meet(s, box(el))) found.push(`${sign.dataset.roomLayer} meets the ${name}`);
+      }
+      return found;
+    });
+    assert.deepEqual(clashes, []);
+  });
+}
