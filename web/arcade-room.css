@@ -9,14 +9,13 @@
      open    .aisle-open, the OPEN sign, lit while a credit is banked (#68)
      tiles   .aisle-tiles, one opening into the tiled next room per lap (#69, #76)
      mural   .aisle-mural, a repeating painted arcade scene (#70)
-     decal   .aisle-decal, printed entrance stickers fixed on the glazing (#72)
      shadow  each machine's .card-backlight: its shadow on the wall and its marquee's glow above
      cord    each machine's .card-cord, to a socket on the wall beside it
      prop    what visitors left: .room-can on Defender, .room-wrapper on the floor by Serpent
      carpet  .aisle-carpet (#71)
      step    .aisle-step, the warm wall/floor nosing (#71)
      pool    each machine's .card-pool (#71)
-   Back to front: wall → mural/tiles → signs/decals → floor/pools → cabinets.
+   Back to front: wall → mural/tiles → signs → floor/pools → cabinets.
 
    :root[data-room="lite"] (?room=lite, set in index.html's head) drops room blur, glow and fine texture;
    each layer writes its own lite rules beside its look. Cabinet styling is not the room's. */
@@ -54,11 +53,12 @@
   --room-trim-h: clamp(var(--room-trim-min), calc(var(--room-trim-bottom) - var(--room-trim-top)), var(--room-trim-max));
   --room-band-bottom: 22%;         /* the band under the trim that shows at rest */
   --room-floor-top: 65%;  --room-floor-bottom: 100%;
-  --room-edge-width: 14%;          /* decals, at the outer edges */
+  --room-edge-width: 14%;          /* outer room edges */
 
   /* Repeats that the walk scrolls through (index.html reads them on layout, BlipAisle.layerOffset). */
   --room-wall-period: 120px;
   --room-mural-period: 720px;
+  --room-mural-offset: 0px;
   --room-carpet-period: 240px;
   /* Three 80px columns × four 40px courses: offset red/black rectangles, seamless horizontally. */
   --room-carpet-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='160' viewBox='0 0 240 160'%3E%3Cpath fill='%23180b08' d='M0 0h240v160H0z'/%3E%3Cpath fill='%236b211c' d='M0 0h160v32H0zM80 80h160v32H80z'/%3E%3Cpath fill='%238d3026' d='M80 40h160v32H80zM0 120h80v32H0z'/%3E%3Cpath fill='%234b1713' d='M0 32h80v8H0zM160 112h80v8h-80zM160 120h80v32h-80z'/%3E%3C/svg%3E");
@@ -95,9 +95,9 @@
    The ceiling/floor lines meet at the repeat edges. Copies fill the overscan on layout only; the walk
    translates the scene at .3 of the cabinets' pace, with no independent animation or blur. */
 #game-grid .aisle-mural {position:absolute;z-index:0;top:var(--room-trim-h);
-  height:calc(var(--room-floor-y,68%) - var(--room-trim-h));left:calc(-1 * var(--room-mural-period));right:calc(-1 * var(--room-mural-period));
-  display:flex;pointer-events:none;opacity:.72;will-change:transform}
-#game-grid .aisle-mural > svg {flex:0 0 var(--room-mural-period);width:var(--room-mural-period);height:100%}
+  height:calc(var(--room-floor-y,68%) - var(--room-trim-h));left:calc(-1 * var(--room-mural-period) - var(--room-mural-offset));right:calc(-1 * var(--room-mural-period));
+  display:flex;overflow:hidden;pointer-events:none;opacity:.72;will-change:transform}
+#game-grid .aisle-mural > svg {flex:0 0 var(--room-mural-period);width:var(--room-mural-period);height:calc(var(--room-mural-period) * 2 / 3)}
 #game-grid .mural-beams {stroke:#d28a40;opacity:.7}
 #game-grid .mural-cabinet {stroke:#572413}
 #game-grid .mural-side {fill:#993a23}
@@ -106,32 +106,17 @@
 #game-grid .mural-screen {fill:#61301b}
 #game-grid .mural-panel {fill:#cf873c}
 #game-grid .mural-detail {stroke:#d58b3e;stroke-width:2}
+#game-grid .mural-control {stroke:#572413;stroke-width:4}
 @media (max-width:499px) {
-  #game-grid {--room-mural-period:480px}
-  #game-grid .mural-portrait-first {transform:translate(10px,0) scale(.6,.205)}
-  #game-grid .mural-portrait-second {transform:translate(120px,0) scale(.6,.205)}
+  #game-grid {--room-mural-period:360px;--room-mural-offset:24px}
 }
 @media (min-height:1200px) {#game-grid {--room-mural-period:1440px}}
 :root[data-layout="landscape"] #game-grid .aisle-mural {display:none}
 
-/* Printed yellow/red starbursts on the entrance glazing, outside the focused machine's path. */
-#game-grid {--room-decal-size:clamp(90px,calc(var(--room-cab-w,300px) * .36),140px)}
-#game-grid .aisle-decal {position:absolute;z-index:40;top:36%;
-  --decal-size:var(--room-decal-size);
-  width:var(--decal-size);height:var(--decal-size);pointer-events:none;overflow:visible}
-#game-grid .decal-left {left:3px;transform:rotate(-8deg)}
-#game-grid .decal-right {right:3px;transform:rotate(6deg)}
-#game-grid .decal-paper {fill:#ffd746;stroke:#ad281c;stroke-width:5;stroke-linejoin:round}
-#game-grid .decal-text {fill:#af251b;stroke:#fff0b3;stroke-width:1.3;paint-order:stroke;
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:900;text-anchor:middle}
 @media (min-height:1000px) {
-  #game-grid {--room-decal-size:clamp(70px,calc(var(--room-headroom-px,180px) - 64px),140px);
-    --room-tall-sign-h:max(36px,calc(var(--room-headroom-px,180px) - var(--room-decal-size) - 24px))}
-  #game-grid .aisle-decal {
-    top:calc(var(--room-cab-top,20%) - var(--decal-size) - 12px)}
+  #game-grid {--room-tall-sign-gap:clamp(70px,calc(var(--room-headroom-px,180px) - 64px),140px);
+    --room-tall-sign-h:max(36px,calc(var(--room-headroom-px,180px) - var(--room-tall-sign-gap) - 24px))}
 }
-@media (max-width:499px) {#game-grid .aisle-decal {display:none}}
-:root[data-layout="landscape"] #game-grid .aisle-decal {display:none}
 
 /* Tiles belong to the next room (#76): a single short opening, not a band around the orange hall.
    The authored map is 14 × 10 squares above seven white rows, each 40 SVG units. Its section is 14 cells

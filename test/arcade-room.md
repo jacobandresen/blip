@@ -1,9 +1,48 @@
 # Arcade room (#65)
 
 This work continues #65 from `f891e01`: the tiled next room, illustrated mural,
-carpet, entrance decals, automatic lite selection and release evidence. It
+carpet, automatic lite selection and release evidence. It
 retains the foundation/wall/sign work from #75/#76. Native game rules and WASM
 are unchanged. Repo-owner visual approval is required before closing #65.
+
+## Follow-up after PR #78
+
+The owner requested removal of the PLAY!/INSERT COIN starbursts and reported
+that the focused attract screen does not render in desktop Safari. They also
+requested more coherent mural cabinets, preserving the machines' placement
+against the wall and the room's perspective.
+
+The starburst SVGs, construction and styling have been removed. The mural now
+keeps its authored aspect ratio, with a shared vanishing point and back edges
+at the painted wall/floor junction. The foreground cabinets and their physical
+wall/floor geometry are unchanged.
+
+Attract strips now paint frames using background position inside the CRT,
+instead of animating a separately transformed image layer. Picture selection,
+decode gating and PNG recovery remain. Screen tests keep the focused overlay
+visible; only its text/shadow pixels are excluded from image comparisons.
+Additional desktop checks cover normal focus, hover and the close view with
+natural playback, without hiding the overlay or pausing the sprite animation.
+
+Installed SafariDriver reports Safari 27.0.1, but both attempts to create an
+automation session timed out connecting to Safari. Native Safari verification
+is therefore still unavailable here; Playwright WebKit results remain engine
+coverage, not proof of the reported installed-Safari fix.
+
+The original approved gallery is preserved locally at
+`test/artifacts/arcade-room/approved-with-decals/index.html`. The performance,
+soak and comprehensive test results under the approved-baseline headings below
+describe commit `66b58ab`, source fingerprint `0264c454…`, before this follow-up.
+
+The follow-up run passed 50/51 checks, including all twenty attract checks
+and natural desktop playback for all nine machines in focus, hover and close
+view in both engines. One phone mural check found the painted screen covered
+by the tiles halfway through a walk. A 24px composition offset and matching
+overscan coverage address that placement. The owner then requested skipping
+further checks and pushing the code, so this final adjustment has not been
+rerun. The follow-up TAP log is `artifacts/arcade-room/safari-followup.tap`.
+The current gallery/soak evidence remains the earlier approved baseline;
+new captures and a new soak have not been produced for this follow-up.
 
 ## R2: tiled next room (#69)
 
@@ -43,12 +82,15 @@ The [mural/carpet reference](https://cdn.masto.host/mastodongamedevplace/media_a
 shows painted cabinets with angled sides, screens, bright marquees and warm
 ceiling lines. The original inline illustration uses three generic uprights
 with ochre/orange/red planes and brown outlines. It includes no game logos,
-characters or copied cabinet artwork. Its seamless 720px scene (480px on
+characters or copied cabinet artwork. Its seamless 720px scene (360px on
 phones, 1440px on tall kiosks) is shared between rendering and movement.
 Copies are adjusted on layout; walking translates the mural at rate 0.3.
-Portrait recomposes two small painted cabinets into the visible upper wall,
-instead of relying on narrow strips behind the real cabinet. There is no blur
-or idle mural loop, and lite retains its contrast.
+The scene keeps its 3:2 aspect ratio rather than stretching to the wall height.
+Cabinet sides recede toward the same authored vanishing point (360,170); their
+backs meet the painted wall/floor line at y=324. The center cabinet faces
+forward, and the left/right cabinets expose the corresponding inward side.
+Portrait scales the complete scene uniformly into the upper wall. There is
+no blur or idle mural loop, and lite retains its contrast.
 
 The carpet replaces confetti with offset red/black rectangular courses.
 Its authored 240×160px repeat is shared with the walk; the 3px woven grain
@@ -63,18 +105,10 @@ the real projected floor in both directions, full and lite.
 
 ## R1/R4: entrance decals (#72)
 
-The [entrance](https://cdn.masto.host/mastodongamedevplace/media_attachments/files/113/753/045/647/958/720/original/67d31b64e0ba39a1.jpg)
-and [close-up](https://commons.wikimedia.org/wiki/File:Video_Game_Museum_in_Berlin_(45946108581)_(Arcade_Focus).jpg)
-show large angular yellow/red stickers on the glazing. Two original irregular
-starbursts read INSERT COIN and PLAY!, using the existing system font stack.
-They have flat printed colours, opposite rotations and no glow. Their messages
-remain inside the clipped room. They are hidden on phones and in landscape,
-as agreed in #76, and sit above the machines on tall portrait displays.
-Tall-layout sign sizing leaves room for the stickers without covering neon.
-
-Geometry checks cover desktop, tablet and kiosk, at rest and halfway walking:
-decals avoid the focused cabinet, visible Start/coin controls and walk arrows.
-Lite keeps the same printed artwork.
+The owner requested that both starbursts be dropped after reviewing PR #78.
+This supersedes #72's decal requirement. They are removed from the markup,
+runtime construction, styles and layer contract. The tall-layout neon signs
+retain their established size and placement.
 
 ## Release mode and credit (#73)
 
@@ -104,13 +138,15 @@ in `test/run-web.mjs`; running those files through `node --test
 
 ## iPhone Safari attract report
 
-The live site's blank attract screen was reported during this work. The local
-desktop WebKit build paints Rally's strip; it does not reproduce the reported
-iPhone failure. The compatibility changes give the clipped animation an
-explicit start transform, wait for image decoding before revealing/playing the
-strip, and retain Brawler's still until its strip is ready. The transform change is
-informed by [WebKit bug 260981](https://bugs.webkit.org/show_bug.cgi?id=260981);
-it is a possible compatibility cause, not a confirmed device diagnosis.
+The original iPhone report was not reproduced by desktop WebKit. The first
+compatibility pass added an explicit starting transform and decode gating,
+informed by [WebKit bug 260981](https://bugs.webkit.org/show_bug.cgi?id=260981).
+The owner subsequently reported the focused screen failing in desktop Safari.
+The follow-up removes the animated sprite transform entirely: the decoded
+strip becomes the CRT frame's background, advancing through twelve positions.
+The original image remains the format-selection/decoding source. Brawler's
+still remains until its decoded background is ready. Native-Safari confirmation
+of this revised painting path remains required.
 
 Each attract picture offers WebP through `<picture>/<source type="image/webp">`
 with an indexed PNG strip as its `<img>` fallback. A failed WebP load/decode
@@ -167,7 +203,7 @@ legacy stick link still lets player two join through their touch buttons.
 Adder's gesture strip also exposes 2P JOIN while its second station is open;
 `test/adder-two-player.mjs` verifies the real game accepts it.
 
-## Performance and kiosk evidence
+## Performance and kiosk evidence (approved baseline)
 
 `tools/capture_arcade_room.mjs` can serve historical room sources with
 `--baseline <commit>`, replay the same 120-move CDP touch trace with `--perf
@@ -252,7 +288,7 @@ preference; game pages still restore it normally. The kiosk suite checks all
 nine physical deck controls in Chromium and WebKit, their painted screenshots,
 and that the parent's saved fullscreen preference remains enabled.
 
-## Verification log
+## Verification log (approved baseline)
 
 The serialized full web run (the 28 files registered in `test/run-web.mjs`,
 plus `test/shell.mjs`) finished with 484/497 passing. Its log is
@@ -314,8 +350,8 @@ phone/landscape composition. The repo owner approved the final R1–R4 gallery
 in this session on 2026-10-25 at 19:04 UTC ("i approve"). This approval applies
 to the 32-image gallery with source fingerprint `0264c454…`.
 
-The local implementation and verification handoff are complete. After visual
-approval, the owner requested a branch push and pull request in this session.
-Production deployment and issue closure remain separate actions. Physical
-iPhone 14 Safari confirmation is still unavailable here; the supplied WebKit
-results are explicitly emulated.
+After the initial approval, the owner requested a branch push and pull request;
+PR #78 contains that implementation. The subsequent follow-up is described
+above. Production deployment and issue closure remain separate actions.
+Physical iPhone 14 Safari confirmation is still unavailable here; the supplied
+WebKit results are explicitly emulated.

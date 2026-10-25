@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openPage } from './lib/harness.mjs';
-import { imageDifference } from './lib/arcade-room.mjs';
+import { attractMask, imageDifference } from './lib/arcade-room.mjs';
 
 const orientations = [
   { name: 'portrait', width: 390, height: 844 },
@@ -27,17 +27,17 @@ for (const engine of ['webkit', 'chromium']) {
         });
         await page.goto(`${origin}/index.html?room=full`);
         await page.waitForSelector('.card-focused[data-loop-ready]');
-        await page.addStyleTag({ content: '.machine-attract {visibility:hidden!important}' });
         const strip = page.locator('.card-focused .card-loop-strip');
-        const selected = await strip.evaluate((image) => ({ src: image.currentSrc, start: image.getAnimations()[0].effect.getKeyframes()[0].transform }));
+        const selected = await strip.evaluate((image) => ({ src: image.currentSrc }));
         assert.ok(selected.src.endsWith(format === 'webp' ? '.webp' : '.png'), selected.src);
-        assert.equal(selected.start, 'translateY(0px)', 'the clipped animation starts with an explicit transform');
         if (format === 'webp') assert.ok(!requests.some((r) => r.endsWith('.png')), 'supporting browsers fetch only WebP');
         if (format === 'png-unsupported-type') assert.ok(!requests.some((r) => r.endsWith('.webp')), 'an unsupported source type is skipped');
         const screen = page.locator('.card-focused .card-loop-frame');
+        assert.equal(await screen.evaluate((element) => element.getAnimations()[0].effect.getKeyframes()[0].backgroundPositionY), '0%');
+        const mask = await attractMask(page);
         const shots = [];
         for (const time of [0, 1000, 2000]) {
-          await strip.evaluate((image, time) => {
+          await screen.evaluate((image, time) => {
             const animation = image.getAnimations()[0]; animation.pause(); animation.currentTime = time;
           }, time);
           await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
@@ -47,10 +47,50 @@ for (const engine of ['webkit', 'chromium']) {
           await writeFile(new URL(`${engine}-${orientation.name}-${format}-${time}.png`, dir), shot);
           shots.push(shot);
         }
-        assert.ok(!shots[0].equals(shots[1]) && !shots[1].equals(shots[2]), 'successive attract frames paint different game pictures');
+        assert.ok((await imageDifference(page, shots[0], shots[1], 12, mask)).fraction > 0 &&
+          (await imageDifference(page, shots[1], shots[2], 12, mask)).fraction > 0,
+        'successive game frames paint differently with the focused overlay present');
       });
     }
   }
+
+  test(`desktop focused screens keep playing with their overlay, hover and close view in ${engine}`, async (t) => {
+    const { page, origin } = await openPage(t, engine, { viewport: { width: 1280, height: 800 } });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto(`${origin}/index.html?room=full`);
+    const games = await page.locator('#game-grid .card').evaluateAll((cards) => cards.map((card) => card.dataset.machine));
+    const dir = new URL('artifacts/attract/', import.meta.url), report = [];
+    await mkdir(dir, { recursive: true });
+    for (const game of games) {
+      await page.waitForFunction((game) => document.querySelector('.card-focused[data-loop-ready]')?.dataset.machine === game &&
+        !document.getElementById('game-grid').hasAttribute('data-aisle-moving'), game);
+      const card = page.locator('.card-focused'), screen = card.locator('.card-loop-frame');
+      await page.mouse.move(0, 0); await card.focus();
+      for (const state of ['focused', 'hover', 'close']) {
+        if (state === 'hover') {
+          const r = await screen.boundingBox();
+          await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
+          assert.equal(await card.evaluate((element) => element.matches(':hover')), true);
+        }
+        if (state === 'close') {
+          await page.keyboard.press('ArrowUp');
+          await page.waitForFunction(() => document.getElementById('game-grid').hasAttribute('data-stepped-up') &&
+            !document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
+        }
+        const mask = await attractMask(page), first = await screen.screenshot();
+        await page.waitForTimeout(1200);
+        const second = await screen.screenshot();
+        await writeFile(new URL(`${engine}-desktop-${game}-${state}.png`, dir), second);
+        const difference = await imageDifference(page, first, second, 12, mask);
+        assert.ok(difference.fraction > 0, `${game}, ${state}: game pixels change while the overlay is present`);
+        report.push({ game, state, difference });
+      }
+      await page.keyboard.press('ArrowDown');
+      await page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
+      await page.keyboard.press('ArrowRight');
+    }
+    await writeFile(new URL(`${engine}-desktop-focus.json`, dir), JSON.stringify(report, null, 2));
+  });
 
   test(`failed WebP and PNG attract images retain Brawler's still in ${engine}`, async (t) => {
     const { page, origin } = await openPage(t, engine, { viewport: { width: 390, height: 844 }, hasTouch: true });
@@ -68,7 +108,6 @@ for (const engine of ['webkit', 'chromium']) {
     const { page, origin } = await openPage(t, engine, { viewport: { width: 390, height: 844 }, hasTouch: true });
     await page.route('**/attract.webp', (route) => route.abort());
     await page.goto(`${origin}/index.html?room=full`);
-    await page.addStyleTag({ content: '.machine-attract {visibility:hidden!important}' });
     const dir = new URL('artifacts/attract/', import.meta.url), report = [];
     const games = await page.locator('#game-grid .card').evaluateAll((cards) => cards.map((card) => card.dataset.machine));
     await mkdir(dir, { recursive: true });
@@ -82,8 +121,9 @@ for (const engine of ['webkit', 'chromium']) {
         const source = await strip.evaluate((image) => image.currentSrc);
         assert.ok(source.endsWith(`/${machine}/attract.png`), source);
         const shots = [];
+        const mask = await attractMask(page);
         for (const time of [0, 2000]) {
-          await strip.evaluate((image, time) => {
+          await card.locator('.card-loop-frame').evaluate((image, time) => {
             const animation = image.getAnimations()[0]; animation.pause(); animation.currentTime = time;
           }, time);
           await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
@@ -91,7 +131,7 @@ for (const engine of ['webkit', 'chromium']) {
           await writeFile(new URL(`${engine}-${orientation.name}-png-${machine}-${time}.png`, dir), shot);
           shots.push(shot);
         }
-        const difference = await imageDifference(page, shots[0], shots[1], 12);
+        const difference = await imageDifference(page, shots[0], shots[1], 12, mask);
         assert.ok(difference.fraction > 0, `${orientation.name}, ${machine}: ${JSON.stringify(difference)}`);
         report.push({ orientation: orientation.name, machine, source, difference });
         await page.keyboard.press('ArrowRight');
@@ -113,7 +153,7 @@ for (const engine of ['webkit', 'chromium']) {
     await page.goto(`${origin}/index.html`);
     await page.waitForFunction(() => typeof window.__releaseAttractDecode === 'function');
     const state = () => page.locator('.card-focused').evaluate((card) => ({ ready: card.hasAttribute('data-loop-ready'),
-      playback: card.querySelector('.card-loop-strip').getAnimations()[0].playState }));
+      playback: card.querySelector('.card-loop-frame').getAnimations()[0].playState }));
     assert.deepEqual(await state(), { ready: false, playback: 'paused' });
     await page.evaluate(() => window.__releaseAttractDecode());
     await page.waitForSelector('.card-focused[data-loop-ready]');

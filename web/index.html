@@ -448,18 +448,18 @@
     /* Living screens (cards' .card-loop): the strip's 12 frames at 3 a second, over the still. */
     #game-grid .card-loop {position:absolute;inset:0;z-index:1;overflow:hidden;visibility:hidden;pointer-events:none}
     #game-grid .card[data-loop][data-loop-ready] .card-loop {visibility:visible}
-    #game-grid .card-loop-frame {position:absolute;left:50%;top:50%;width:100%;height:100%;overflow:hidden;transform:translate(-50%,-50%)}
-    #game-grid .card-loop-picture {display:block;width:100%;height:100%}
-    #game-grid .card-loop-strip {display:block;width:100%;height:auto;transform:translateY(0);animation:card-loop 4s steps(12) infinite paused}
-    #game-grid .card[data-loop][data-loop-ready] .card-loop-strip {animation-play-state:running}
-    #game-grid .card[data-machine="brawler"] .card-loop-strip {height:1200%;object-fit:cover}
+    #game-grid .card-loop-frame {position:absolute;left:50%;top:50%;width:100%;height:100%;overflow:hidden;transform:translate(-50%,-50%);
+      background-repeat:no-repeat;background-size:auto 1200%;background-position:50% 0%;animation:card-loop 4s steps(12) infinite paused}
+    #game-grid .card-loop-picture {display:none}
+    #game-grid .card[data-loop][data-loop-ready] .card-loop-frame {animation-play-state:running}
     #game-grid .card[data-machine="brawler"][data-loop][data-loop-ready]:not(.card-launching) .card-shot {visibility:hidden}
-    /* Explicit start transform keeps clipped sprite animations paintable in WebKit (bug 260981). */
-    @keyframes card-loop {from {transform:translateY(0)} to {transform:translateY(-100%)}}
+    /* Paint frames in place inside clipped 3D screens, without a separately transformed image layer.
+       A background spans eleven frame-to-frame intervals; twelve steps reach the last frame before wrapping. */
+    @keyframes card-loop {from {background-position:50% 0%} to {background-position:50% 109.090909%}}
     /* Stepped up to a machine: its deck lights. */
     #game-grid .machine-deck {transition:box-shadow .4s}
     #game-grid[data-stepped-up] .card-focused .machine-deck {box-shadow:0 0 0 2px color-mix(in srgb,var(--trim) 70%,#fff),0 0 26px color-mix(in srgb,var(--trim) 70%,transparent)}
-    @media (prefers-reduced-motion:reduce) {#game-grid .card-loop-strip {animation:none}}
+    @media (prefers-reduced-motion:reduce) {#game-grid .card-loop-frame {animation:none}}
 
     /* The cabinet front: black laminate between two strips of T-molding. Nothing here may set filter, opacity,
        overflow or clip-path, which would flatten the 3D side panels. */
@@ -644,7 +644,7 @@
       .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:none}
     }
   </style>
-  <link rel="stylesheet" href="arcade-room.css?v=12">
+  <link rel="stylesheet" href="arcade-room.css?v=13">
 </head>
 <body class="cabinet-page">
 
@@ -700,48 +700,41 @@
       <use href="#neon-open-letters" class="open-letter-core"/>
     </svg>
   </template>
-  <template id="room-decals">
-    <svg class="aisle-decal decal-left" viewBox="0 0 180 180" aria-hidden="true" focusable="false">
-      <path class="decal-paper" d="M90 3L106 36L146 9L139 49L175 41L155 77L177 97L146 110L168 150L126 139L118 177L90 148L51 175L58 133L13 145L32 107L3 84L32 72L13 40L57 39L55 5L78 34Z"/>
-      <text class="decal-text" x="90" y="82" font-size="28">INSERT</text>
-      <text class="decal-text" x="90" y="114" font-size="32">COIN</text>
-    </svg>
-    <svg class="aisle-decal decal-right" viewBox="0 0 180 180" aria-hidden="true" focusable="false">
-      <path class="decal-paper" d="M84 4L105 34L145 12L137 53L176 47L153 78L177 109L143 115L162 153L121 139L107 176L83 147L43 173L51 132L8 139L30 105L3 78L38 64L21 25L62 39Z"/>
-      <text class="decal-text" x="91" y="106" font-size="42">PLAY!</text>
-    </svg>
-  </template>
   <template id="room-mural">
-    <svg viewBox="0 0 720 480" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+    <svg viewBox="0 0 720 480" aria-hidden="true" focusable="false">
+      <g class="mural-scene">
       <g class="mural-beams" fill="none" stroke-width="3">
-        <path d="M0 38H720M0 80L360 12L720 80M0 0L180 72M720 0L540 72M0 390H720M0 448L360 390L720 448"/>
+        <path d="M0 50H720M0 60H720M0 0L106 50M720 0L614 50M0 324H720M0 480L181 324M720 480L539 324M360 480V324"/>
       </g>
-      <g class="mural-cabinet mural-portrait-first" stroke-width="4" stroke-linejoin="round">
-        <path class="mural-side" d="M138 70L184 90V382L138 364V254L152 236L138 214Z"/>
+      <g class="mural-cabinet" stroke-width="4" stroke-linejoin="round">
+        <path class="mural-side" d="M138 70L184 91V324L138 364V254L152 236L138 214Z"/>
         <path class="mural-body" d="M14 70H138V104L124 120V210L146 232V254H138V364H14V254H8V232L28 212V120L14 104Z"/>
         <path class="mural-marquee" d="M24 80H128V99H24Z"/>
         <path class="mural-screen" d="M34 127H118L112 200H34Z"/>
         <path class="mural-panel" d="M28 212H124L146 232H8Z"/>
         <path class="mural-detail" fill="none" d="M42 145L68 169L98 153M46 183H100M52 280H92V324H52ZM60 291H84M40 90H110"/>
         <circle class="mural-screen" cx="62" cy="224" r="5"/><circle class="mural-screen" cx="100" cy="223" r="4"/>
+        <path class="mural-control" d="M45 220V207"/><circle class="mural-screen" cx="45" cy="206" r="6"/>
       </g>
-      <g class="mural-cabinet mural-portrait-second" transform="translate(240 -10)" stroke-width="4" stroke-linejoin="round">
-        <path class="mural-side" d="M130 82L182 105V392L130 374V258L148 240L130 218Z"/>
+      <g class="mural-cabinet" transform="translate(240 -10)" stroke-width="4" stroke-linejoin="round">
         <path class="mural-body" d="M6 82H130V114L116 128V218L148 240V258H130V374H6V258H0V240L20 220V128L6 114Z"/>
         <path class="mural-marquee" d="M16 92H120V109H16Z"/>
         <path class="mural-screen" d="M26 135H110L104 208H26Z"/>
         <path class="mural-panel" d="M20 220H116L148 240H0Z"/>
         <path class="mural-detail" fill="none" d="M38 190L58 150L88 180L98 145M44 290H84V334H44ZM52 300H76M32 100H104"/>
         <circle class="mural-screen" cx="50" cy="232" r="5"/><circle class="mural-screen" cx="96" cy="230" r="4"/>
+        <path class="mural-control" d="M34 230V217"/><circle class="mural-screen" cx="34" cy="216" r="6"/>
       </g>
-      <g class="mural-cabinet" transform="translate(480 10)" stroke-width="4" stroke-linejoin="round">
-        <path class="mural-side" d="M144 58L190 84V374L144 356V248L158 230L144 208Z"/>
+      <g class="mural-cabinet" transform="translate(712 10) scale(-1 1)" stroke-width="4" stroke-linejoin="round">
+        <path class="mural-side" d="M144 58L190 81V313L144 356V248L158 230L144 208Z"/>
         <path class="mural-body" d="M20 58H144V100L130 116V208L158 230V248H144V356H20V248H14V230L34 210V116L20 100Z"/>
         <path class="mural-marquee" d="M30 68H134V94H30Z"/>
         <path class="mural-screen" d="M40 124H124L118 198H40Z"/>
         <path class="mural-panel" d="M34 210H130L158 230H14Z"/>
         <path class="mural-detail" fill="none" d="M48 178L70 143L98 181L112 151M58 276H98V320H58ZM66 286H90M48 82H118"/>
         <circle class="mural-screen" cx="68" cy="222" r="5"/><circle class="mural-screen" cx="110" cy="221" r="4"/>
+        <path class="mural-control" d="M50 218V205"/><circle class="mural-screen" cx="50" cy="204" r="6"/>
+      </g>
       </g>
     </svg>
   </template>
@@ -1641,9 +1634,6 @@
       var tiles=document.getElementById('room-tiles').content.firstElementChild.cloneNode(true);
       tiles.dataset.roomLayer='tiles';tiles.dataset.zone='wall';grid.insertBefore(tiles,trim);
       var stepEdge=roomLayer('i','aisle-step','step','floor');grid.insertBefore(stepEdge,carpet);
-      Array.prototype.forEach.call(document.getElementById('room-decals').content.children,function(source){
-        var el=source.cloneNode(true);el.dataset.roomLayer='decal';el.dataset.zone='edge';grid.insertBefore(el,carpet);
-      });
       var signs=document.getElementById('room-signs').content.cloneNode(true);
       var roomSignEls=[['.aisle-neon','neon'],['.aisle-open','open']].map(function(sign){
         var el=signs.querySelector(sign[0]);el.dataset.roomLayer=sign[1];el.dataset.zone='sign';
@@ -1729,6 +1719,7 @@
             frame.style.width=(shape<glass?100*shape/glass:100).toFixed(2)+'%';
             frame.style.height=(shape<glass?100:100*glass/shape).toFixed(2)+'%';
           }
+          frame.style.backgroundImage='url('+JSON.stringify(strip.currentSrc||strip.src)+')';
           c.setAttribute('data-loop-ready','');
         }
         strip.addEventListener('load',function(){
@@ -1765,7 +1756,7 @@
             parseFloat(css.getPropertyValue('--room-trim-max'))||96));
         var depth=roomGeometry(track,w,h,scale,close,trimHeight);
         var muralPeriod=parseFloat(css.getPropertyValue('--room-mural-period'))||720;
-        var muralCopies=Math.ceil((w+2*muralPeriod)/muralPeriod);
+        var muralCopies=Math.ceil((w+2*muralPeriod+(parseFloat(css.getPropertyValue('--room-mural-offset'))||0))/muralPeriod);
         while(mural.children.length<muralCopies)mural.appendChild(document.getElementById('room-mural').content.firstElementChild.cloneNode(true));
         while(mural.children.length>muralCopies)mural.lastElementChild.remove();
         // One tiled opening per aisle lap (#76). Its transparent remainder is the orange room.

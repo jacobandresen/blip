@@ -470,7 +470,7 @@ test('only the machines near you fetch and play their attract loops', async (t) 
   assert.deepEqual([...fetched].sort(), ['adder', 'bouncer', 'brawler', 'defender', 'rally']);
   const strip = await page.evaluate(() => {
     const card = document.querySelector('.card[data-machine="rally"]'), img = card.querySelector('.card-loop-strip');
-    return { frames: img.naturalHeight / (img.naturalWidth / (480 / 540)), playing: getComputedStyle(img).animationPlayState,
+    return { frames: img.naturalHeight / (img.naturalWidth / (480 / 540)), playing: getComputedStyle(card.querySelector('.card-loop-frame')).animationPlayState,
       shown: getComputedStyle(card.querySelector('.card-loop')).visibility };
   });
   assert.ok(Math.abs(strip.frames - 12) < 0.5, `${strip.frames} frames`);

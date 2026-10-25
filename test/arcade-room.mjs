@@ -16,7 +16,6 @@ const LAYERS = {
   open: ['shown', 'hidden', 'shown'],
   tiles: ['shown', 'hidden', 'shown'],
   mural: ['shown', 'hidden', 'shown'],
-  decal: ['hidden', 'hidden', 'shown'],
   // On its side the phone shows each machine close up, cut off below Start: its feet and the floor are below the room.
   carpet: ['shown', 'either', 'shown'],
   step: ['shown', 'either', 'shown'],
@@ -70,6 +69,12 @@ for (const config of CONFIGS) {
       });
     });
     for (const name of Object.keys(LAYERS)) assert.ok(layers.some((l) => l.layer === name), `the ${name} layer is on the page`);
+    if (config.column !== 1) {
+      const muralAspect = await page.locator('.aisle-mural > svg').first().evaluate((svg) => {
+        const r = svg.getBoundingClientRect(); return r.width / r.height;
+      });
+      assert.ok(Math.abs(muralAspect - 1.5) < .01, 'painted cabinets keep their proportions on this wall');
+    }
     for (const l of layers) {
       assert.ok(LAYERS[l.layer], `${l.layer} is a known room layer`);
       assert.ok(ZONES.includes(l.zone), `${l.layer} names its zone (${l.zone})`);
@@ -426,36 +431,6 @@ test('portrait keeps a recognizable painted cabinet in view at rest and halfway 
     assert.ok(painted > 0, `${position}: an illustrated screen and cabinet planes remain visible`);
   }
 });
-
-for (const config of [CONFIGS[2], CONFIGS[3], { width: 820, height: 1180, name: 'tablet', touch: true }]) {
-  test(`the printed entrance decals stay clear of machines and controls on ${config.name}`, async (t) => {
-    const page = await openArcade(t, config);
-    for (const position of ['rest', 'half']) {
-      if (position === 'half') await holdHalfway(page);
-      const collisions = await page.evaluate(() => {
-        const grid = document.getElementById('game-grid').getBoundingClientRect();
-        const clip = (r) => ({ left: Math.max(r.left, grid.left), right: Math.min(r.right, grid.right),
-          top: Math.max(r.top, grid.top), bottom: Math.min(r.bottom, grid.bottom) });
-        const meets = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-        const keepOut = [document.querySelector('.card-focused'), ...document.querySelectorAll('.machine-start,.machine-coinbox,.pick-arrow')]
-          .filter((el) => el && getComputedStyle(el).visibility !== 'hidden')
-          .map((el) => [el.className, clip(el.getBoundingClientRect())]).filter(([, r]) => r.right > r.left && r.bottom > r.top);
-        const found = [];
-        for (const decal of document.querySelectorAll('.aisle-decal')) {
-          const rect = clip(decal.getBoundingClientRect());
-          if (rect.right - rect.left < 60 || rect.bottom - rect.top < 60) found.push('decal too small');
-          for (const [name, r] of keepOut) if (meets(rect, r)) found.push(`${decal.classList[1]} meets ${name}`);
-          for (const text of decal.querySelectorAll('text')) {
-            const r = text.getBoundingClientRect();
-            if (r.left < grid.left || r.right > grid.right || r.top < grid.top || r.bottom > grid.bottom) found.push(`${text.textContent} clipped`);
-          }
-        }
-        return found;
-      });
-      assert.deepEqual(collisions, [], position);
-    }
-  });
-}
 
 test('OPEN lights with a credit and goes dark again once a game spends it', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });

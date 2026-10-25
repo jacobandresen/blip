@@ -5,7 +5,7 @@ import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { devices } from 'playwright';
 import { openPage } from './lib/harness.mjs';
-import { holdHalfway, imageDifference, currentRoomHash } from './lib/arcade-room.mjs';
+import { attractMask, holdHalfway, imageDifference, currentRoomHash } from './lib/arcade-room.mjs';
 
 const DIR = new URL('artifacts/iphone14-room/', import.meta.url);
 const steps = [
@@ -23,14 +23,13 @@ const steps = [
 async function paintedRegion(page, region, shot) {
   return page.evaluate(async ({ region, png }) => {
     const image = document.querySelector(`.card[data-machine="${region.machine}"] .card-loop-strip`);
-    const rect = image.getBoundingClientRect(), style = getComputedStyle(image), clip = region.clip;
-    let sx = rect.width / image.naturalWidth, sy = rect.height / image.naturalHeight;
-    if (style.objectFit === 'cover') sx = sy = Math.max(sx, sy);
-    const x = rect.left + (rect.width - image.naturalWidth * sx) / 2 - clip.x;
-    const y = rect.top + (rect.height - image.naturalHeight * sy) / 2 - clip.y;
+    const frame = image.closest('.card-loop-frame'), rect = frame.getBoundingClientRect(), clip = region.clip;
+    const scale = rect.height * 12 / image.naturalHeight;
+    const x = rect.left + (rect.width - image.naturalWidth * scale) / 2 - clip.x;
+    const y = rect.top + (rect.height - image.naturalHeight * scale) * parseFloat(getComputedStyle(frame).backgroundPositionY) / 100 - clip.y;
     const canvas = document.createElement('canvas'); canvas.width = clip.width; canvas.height = clip.height;
     const context = canvas.getContext('2d');
-    context.drawImage(image, x, y, image.naturalWidth * sx, image.naturalHeight * sy);
+    context.drawImage(image, x, y, image.naturalWidth * scale, image.naturalHeight * scale);
     const expected = context.getImageData(0, 0, clip.width, clip.height).data;
     const screenshot = new Image(); screenshot.src = png; await screenshot.decode();
     context.clearRect(0, 0, clip.width, clip.height); context.drawImage(screenshot, 0, 0, clip.width, clip.height);
@@ -62,7 +61,6 @@ for (const engine of ['webkit', 'chromium']) {
     await page.goto(`${origin}/index.html?room=full`);
     await page.waitForFunction(() => document.querySelector('.card-focused[data-loop-ready]') &&
       !document.documentElement.hasAttribute('data-cabinet-arranging'));
-    await page.addStyleTag({ content: '.machine-attract {visibility:hidden!important}' });
     await mkdir(DIR, { recursive: true });
     const count = await page.locator('#game-grid .card').count(), report = [];
     for (const config of steps) {
@@ -84,7 +82,7 @@ for (const engine of ['webkit', 'chromium']) {
         await holdHalfway(page);
         await page.waitForFunction(() => [...document.querySelectorAll('.card[data-loop]')].every((card) => card.hasAttribute('data-loop-ready')));
         await page.evaluate(() => {
-          for (const strip of document.querySelectorAll('.card[data-loop-ready] .card-loop-strip')) {
+          for (const strip of document.querySelectorAll('.card[data-loop-ready] .card-loop-frame')) {
             const animation = strip.getAnimations()[0]; animation.pause(); animation.currentTime = 1000;
           }
         });
@@ -109,7 +107,7 @@ for (const engine of ['webkit', 'chromium']) {
         }
         await page.screenshot({ path: fileURLToPath(new URL(`${engine}-${config.name}-${config.mode}-${i}-half.png`, DIR)) });
         await page.evaluate(() => {
-          for (const strip of document.querySelectorAll('.card-loop-strip')) for (const animation of strip.getAnimations()) animation.play();
+          for (const strip of document.querySelectorAll('.card-loop-frame')) for (const animation of strip.getAnimations()) animation.play();
         });
         await page.mouse.up();
         await page.waitForFunction(() => !document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
@@ -133,17 +131,18 @@ for (const engine of ['webkit', 'chromium']) {
           assert.ok(target.inside && target.reachesCard, `${config.name}: safe, unobstructed ${JSON.stringify(target)}`);
         }
         const screen = page.locator('.card-focused .card-loop-frame'), pictures = [];
+        const mask = await attractMask(page);
         for (const time of [0, 2000]) {
-          await page.locator('.card-focused .card-loop-strip').evaluate((image, time) => {
+          await screen.evaluate((image, time) => {
             const animation = image.getAnimations()[0]; animation.pause(); animation.currentTime = time;
           }, time);
           await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
           pictures.push(await screen.screenshot());
         }
-        const difference = await imageDifference(page, pictures[0], pictures[1], 12);
+        const difference = await imageDifference(page, pictures[0], pictures[1], 12, mask);
         const machine = await page.locator('.card-focused').getAttribute('data-machine');
         assert.ok(difference.fraction > 0, `${config.name}: ${machine}'s attract picture changes, ${JSON.stringify(difference)}`);
-        await page.locator('.card-focused .card-loop-strip').evaluate((image) => image.getAnimations()[0].play());
+        await screen.evaluate((image) => image.getAnimations()[0].play());
       }
     }
     assert.deepEqual(errors, [], 'no browser errors while walking and rotating');

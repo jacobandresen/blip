@@ -89,7 +89,6 @@ const CHECKLIST = [
   'Large glossy mosaic blocks with pale grout',
   'A recognizable illustrated cabinet mural',
   'Offset red/black carpet meeting the wall at a warm step',
-  'Edge decals where the layout allows them',
   'The focused cabinet, its screen, title, coin door and Start stay readable',
   'Lite keeps the palette and materials; check both at actual display size',
 ];
