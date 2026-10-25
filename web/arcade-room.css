@@ -5,6 +5,11 @@
    events; test/arcade-room.mjs finds the layers by that attribute. Each layer owns:
      wall    #game-grid's own background and .aisle-wall's panel joints (#67)
      trim    .aisle-trim, the lit ceiling edge (#67)
+     neon    .aisle-neon, the BLIP script sign (#68)
+     open    .aisle-open, the OPEN sign, lit while a credit is banked (#68)
+     shadow  each machine's .card-backlight: its shadow on the wall and its marquee's glow above
+     cord    each machine's .card-cord, to a socket on the wall beside it
+     prop    what visitors left: .room-can on Defender, .room-wrapper on the floor by Serpent
      carpet  .aisle-carpet (#71)
      pool    each machine's .card-pool (#71)
    Back to front: wall → mural/tiles → signs/decals → floor/pools → cabinets.
@@ -14,16 +19,16 @@
 
 #game-grid {
   /* Colours. The owner in brackets sets the final value. */
-  --room-wall-lit: #d9693f;        /* [#67] by the ceiling, where the trim lights it */
-  --room-wall: #b9482b;            /* [#67] terracotta */
-  --room-wall-low: #7c2b1b;        /* [#67] red-brown behind the cabinets' feet */
-  --room-wall-shade: #44160e;      /* [#67] at the floor */
+  --room-wall-lit: #b8582f;        /* [#67] by the ceiling, where the trim lights it */
+  --room-wall: #8e3720;            /* [#67] terracotta, in the room's low light */
+  --room-wall-low: #561d12;        /* [#67] red-brown behind the cabinets' feet */
+  --room-wall-shade: #260a07;      /* [#67] at the floor */
   --room-ceiling: #2b0d09;         /* [#67] above the fascia */
   --room-trim-red: #c3302a;        /* [#67] */
   --room-trim-yellow: #ffd36b;     /* [#67] */
-  --room-neon: #ff8fd8;            /* [#68] */
-  --room-neon-core: #fff6e8;       /* [#68] */
-  --room-neon-glow: #e04fb6;       /* [#68] */
+  --room-neon: #ff8a3d;            /* [#68] the orange tube */
+  --room-neon-core: #fff3dc;       /* [#68] its white-hot core */
+  --room-neon-glow: rgb(255 128 46 / .62); /* [#68] the halo on the wall */
   --room-carpet-a: #17112a;        /* [#71] */
   --room-carpet-b: #0d0a19;        /* [#71] */
   --room-grout: #d8d2c4;           /* [#69] */
@@ -33,9 +38,10 @@
      full-height strip opens between machines as you walk (#67's checkpoint). Tiles and mural therefore
      start under the trim, read within the band at rest, and run down the wall to fill the walking gaps,
      beside the sign rather than under it. */
-  --room-trim-top: 0%;    --room-trim-bottom: 9%;
-  --room-sign-top: 9%;    --room-sign-bottom: 25%;
-  --room-wall-top: 9%;    --room-wall-bottom: 68%;
+  --room-trim-top: 0%;    --room-trim-bottom: 7%;
+  --room-sign-top: 7%;    --room-sign-bottom: 17%;
+  --room-wall-top: 7%;    --room-wall-bottom: 68%;
+  --room-trim-h: clamp(24px, calc(var(--room-trim-bottom) - var(--room-trim-top)), 96px);
   --room-band-bottom: 22%;         /* the band under the trim that shows at rest */
   --room-floor-top: 65%;  --room-floor-bottom: 100%;
   --room-edge-width: 14%;          /* decals, at the outer edges */
@@ -47,14 +53,16 @@
   /* wall: orange-red panels lit from the ceiling, deepening to red-brown at the floor, a little darker at the
      room's sides. The midtones stay warm where tiles and mural will hang. */
   background:
-    linear-gradient(90deg,rgb(30 8 4 / .5),transparent 13% 87%,rgb(30 8 4 / .5)),
-    radial-gradient(ellipse 75% 26% at 50% var(--room-trim-bottom),rgb(255 200 130 / .3),transparent 72%),
-    linear-gradient(180deg,var(--room-wall-lit) var(--room-trim-bottom),var(--room-wall) 30%,var(--room-wall-low) var(--room-wall-bottom),var(--room-wall-shade));
+    linear-gradient(90deg,rgb(20 5 3 / .62),transparent 16% 84%,rgb(20 5 3 / .62)),
+    linear-gradient(180deg,transparent calc(var(--room-floor-y,66%) - 7%),rgb(12 3 2 / .55) var(--room-floor-y,66%)),
+    radial-gradient(ellipse 75% 26% at 50% var(--room-trim-bottom),rgb(255 200 130 / .26),transparent 72%),
+    linear-gradient(180deg,var(--room-wall-lit) var(--room-trim-bottom),var(--room-wall) 30%,var(--room-wall-low) var(--room-floor-y,68%),var(--room-wall-shade));
 }
 :root[data-room="lite"] #game-grid {
   background:
-    linear-gradient(90deg,rgb(30 8 4 / .5),transparent 13% 87%,rgb(30 8 4 / .5)),
-    linear-gradient(180deg,var(--room-wall-lit) var(--room-trim-bottom),var(--room-wall) 30%,var(--room-wall-low) var(--room-wall-bottom),var(--room-wall-shade));
+    linear-gradient(90deg,rgb(20 5 3 / .62),transparent 16% 84%,rgb(20 5 3 / .62)),
+    linear-gradient(180deg,transparent calc(var(--room-floor-y,66%) - 7%),rgb(12 3 2 / .55) var(--room-floor-y,66%)),
+    linear-gradient(180deg,var(--room-wall-lit) var(--room-trim-bottom),var(--room-wall) 30%,var(--room-wall-low) var(--room-floor-y,68%),var(--room-wall-shade));
 }
 
 /* wall: the panels' joints, a dark groove with a lit edge, drifting past at half the machines' pace. */
@@ -64,24 +72,19 @@
 /* trim: the lowered ceiling's edge, a broad red fascia over a strip of yellow light that washes the wall. It
    belongs to the building, so it stays put as you walk. */
 #game-grid .aisle-trim {position:absolute;z-index:0;left:0;right:0;top:var(--room-trim-top);pointer-events:none;
-  height:clamp(24px,calc(var(--room-trim-bottom) - var(--room-trim-top)),96px);
+  height:var(--room-trim-h);
   background:linear-gradient(180deg,var(--room-ceiling) 0 16%,#d63c31 16%,var(--room-trim-red) 42%,#8f1d17 72%,
     #6e140f 74%,#fff3c8 76%,var(--room-trim-yellow) 86%,#e7a23e 100%);
   box-shadow:0 4px 18px -2px rgb(255 198 104 / .6),0 1px 0 #ffe6a0}
 :root[data-room="lite"] #game-grid .aisle-trim {box-shadow:none}
 
-/* An old neon tube along the back wall, never drawn: an earlier rule in index.html sets its content to none. */
-#game-grid::before {
-  left:50%;top:5%;width:min(560px,70%);height:3px;z-index:0;border:0;border-radius:3px;
-  transform:translateX(-50%);background:var(--room-neon);opacity:.75;filter:none;
-  box-shadow:0 0 6px #ff6fcf,0 0 22px var(--room-neon-glow),0 0 60px 8px #b13a9a55;
-}
-
-/* carpet: black-light confetti on midnight, walked past as the aisle moves. */
+/* carpet: black-light confetti on midnight. The floor is a plane in the room's perspective, from the wall's foot
+   towards you (the aisle script lays it there and moves it with the machines), darker where it meets the wall. */
 #game-grid .aisle-carpet {
-  position:absolute;z-index:0;left:-40%;right:-40%;bottom:-6%;height:40%;pointer-events:none;
-  transform:perspective(300px) rotateX(55deg);transform-origin:50% 100%;
+  position:absolute;z-index:0;left:-150%;right:-150%;top:var(--room-feet-y,97%);height:calc(var(--room-wall-z,190px) + 900px);pointer-events:none;
+  transform-origin:50% 0;transform:translateZ(calc(-1 * var(--room-wall-z,190px))) rotateX(90deg);
   background:
+    linear-gradient(180deg,rgb(6 2 2 / .7),transparent 90px),
     radial-gradient(circle at 18% 22%,#ff4fb0 0 3px,transparent 4px),
     radial-gradient(circle at 64% 70%,#3fe0ff 0 2.5px,transparent 3.5px),
     radial-gradient(circle at 80% 18%,transparent 0 6px,#ffd84a 7px 8.5px,transparent 9.5px),
@@ -89,12 +92,95 @@
     radial-gradient(circle at 34% 80%,#b48cff 0 2px,transparent 3px),
     linear-gradient(var(--room-carpet-a),var(--room-carpet-b));
   --p:var(--room-carpet-period);
-  background-size:var(--p) var(--p),var(--p) var(--p),var(--p) var(--p),calc(var(--p) / 2) calc(var(--p) / 2),var(--p) var(--p),100% 100%;
-  background-position:0 0;
-  -webkit-mask-image:linear-gradient(transparent,#000 30%);mask-image:linear-gradient(transparent,#000 30%);
-  opacity:.85;
+  background-size:100% 100%,var(--p) var(--p),var(--p) var(--p),var(--p) var(--p),calc(var(--p) / 2) calc(var(--p) / 2),var(--p) var(--p),100% 100%;
+  opacity:.9;
 }
 
 /* pool: each machine's pool of light on the carpet, its opacity set by the walk. */
 #game-grid .card-pool {position:absolute;z-index:0;left:-35%;right:-35%;bottom:-70px;height:140px;pointer-events:none;opacity:0;
   background:radial-gradient(closest-side,color-mix(in srgb,var(--trim) 62%,transparent),transparent);transform:rotateX(78deg);transform-origin:50% 50%}
+
+/* Signs hang on the wall under the trim, where the cabinets leave it in view: beside the faced cabinet
+   (BLIP to its left, OPEN to its right) above the neighbours' tops, or on a phone, where there is room,
+   above it. The aisle script sets --room-cab-w, --room-cab-top and --room-side-top: the faced cabinet's
+   width and top and the neighbours' top at rest, as seen, beside the first machine. They are fixed to the
+   wall: as you walk they scroll with it, at half the machines' pace, and come round once a lap. */
+#game-grid {
+  --room-side: calc((100% - var(--room-cab-w, 300px)) / 2);
+  --room-sign-y: calc(var(--room-trim-h) + 6px);
+  --room-sign-box: calc(var(--room-side-top, 17%) - var(--room-trim-h) - 14px);
+}
+#game-grid :is(.aisle-neon,.aisle-open) {position:absolute;z-index:0;pointer-events:none;overflow:visible;will-change:transform}
+
+/* neon: cream-white core in an orange tube, with an amber halo on the wall; it warms up once on arrival. */
+#game-grid .aisle-neon {left:calc(var(--room-side) * .1);width:calc(var(--room-side) * .8);top:var(--room-sign-y);height:var(--room-sign-box);
+  filter:drop-shadow(0 0 2px #ffb070) drop-shadow(0 0 8px var(--room-neon-glow)) drop-shadow(0 0 22px rgb(255 120 40 / .38));
+  animation:neon-warm .6s linear 1}
+#game-grid .aisle-neon .neon-tube {stroke:var(--room-neon);stroke-width:8.5}
+#game-grid .aisle-neon .neon-core {stroke:var(--room-neon-core);stroke-width:3.4}
+#game-grid .aisle-neon .neon-supports {fill:#3a1a10}
+@keyframes neon-warm {0% {opacity:.12} 14% {opacity:.85} 22% {opacity:.25} 38% {opacity:1} 46% {opacity:.55} 60% {opacity:1}}
+
+/* open: a blue angular frame round red letters, smaller than BLIP. Unlit tubes until a credit is banked. */
+#game-grid .aisle-open {right:calc(var(--room-side) * .18);width:calc(var(--room-side) * .64);
+  top:calc(var(--room-sign-y) + var(--room-sign-box) * .15);height:calc(var(--room-sign-box) * .7);
+  opacity:.35;transition:opacity .3s}
+:root[data-credit] #game-grid .aisle-open {opacity:1;
+  filter:drop-shadow(0 0 2px rgb(120 180 255 / .9)) drop-shadow(0 0 8px rgb(255 60 60 / .5)) drop-shadow(0 0 16px rgb(60 140 255 / .32))}
+#game-grid .aisle-open .open-frame-tube {stroke:#2f8cff;stroke-width:5}
+#game-grid .aisle-open .open-frame-core {stroke:#dff1ff;stroke-width:1.8}
+#game-grid .aisle-open .open-letter-tube {stroke:#ff3434;stroke-width:5}
+#game-grid .aisle-open .open-letter-core {stroke:#ffe3da;stroke-width:1.8}
+
+/* A phone held upright: BLIP hangs centred above the cabinet, OPEN in the corner. */
+@media (max-width:499px) {
+  :root:not([data-layout="landscape"]) #game-grid {--room-trim-bottom:5%;
+    --room-sign-box:calc(var(--room-cab-top, 15%) - var(--room-trim-h) - 14px)}
+  :root:not([data-layout="landscape"]) #game-grid .aisle-neon {left:22%;width:56%}
+  :root:not([data-layout="landscape"]) #game-grid .aisle-open {right:3%;width:19%}
+}
+/* On its side the phone shows no wall: the cabinets reach the ceiling, and a sign could only hang behind a
+   neighbour's title. Both signs go. */
+:root[data-layout="landscape"] #game-grid :is(.aisle-neon,.aisle-open) {display:none}
+
+:root[data-room="lite"] #game-grid :is(.aisle-neon,.aisle-open) {filter:none}
+@media (prefers-reduced-motion:reduce) {
+  #game-grid .aisle-neon {animation:none}
+  #game-grid .aisle-open {transition:none}
+}
+
+/* shadow: lit from the trim above, each machine darkens the wall behind it, deepest low down, and its marquee
+   throws a little of its colour onto the wall over it. Both lie on the wall, 214px behind the machine's front. */
+#game-grid .card-backlight {position:absolute;left:-40%;right:-40%;top:-16%;bottom:0;pointer-events:none;transform:translateZ(-214px);
+  background:
+    radial-gradient(ellipse 40% 9% at 50% 10%,color-mix(in srgb,var(--trim) 34%,transparent),transparent 78%),
+    radial-gradient(ellipse 40% 62% at 50% 72%,rgb(8 2 1 / .72),rgb(8 2 1 / .36) 58%,transparent 84%)}
+
+/* cord: each machine's own, generated by the aisle script. It leaves a small junction box on the cabinet's right
+   side, by the control deck, hangs to the floor, lies slack across the floor of the gap (a plane seen from above:
+   y 0 the machines' fronts, 215 the wall) and climbs the wall's foot into a socket (a plane on the wall). */
+#game-grid .cord-box {position:absolute;left:100%;top:57%;width:30px;height:24px;pointer-events:none;transform-origin:0 0;
+  transform:rotateY(90deg) translate3d(34px,0,7px);background:linear-gradient(180deg,#3b3a40,#1d1c21);border:1px solid #0c0b0e;border-radius:2px;
+  box-shadow:inset 0 1px #6a6870,inset 0 -2px #0008}
+#game-grid .cord-box-front {position:absolute;left:100%;top:57%;width:7px;height:24px;pointer-events:none;transform:translateZ(-34px);
+  background:linear-gradient(90deg,#4a4950,#26252b);border-radius:1px}
+#game-grid .cord-drop {position:absolute;left:100%;top:calc(57% + 22px);width:24px;bottom:0;pointer-events:none;overflow:visible;transform:translateZ(-52px)}
+#game-grid .cord-floor {position:absolute;left:92%;top:100%;width:56%;height:215px;pointer-events:none;overflow:visible;transform-origin:50% 0;transform:rotateX(-90deg)}
+#game-grid .cord-wall {position:absolute;left:92%;bottom:0;width:56%;height:100px;pointer-events:none;overflow:visible;transform:translateZ(-214px)}
+#game-grid :is(.cord-floor,.cord-wall,.cord-drop) .cord-wire {fill:none;stroke:#0b0a0c;stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round}
+#game-grid :is(.cord-floor,.cord-wall,.cord-drop) .cord-shine {fill:none;stroke:#7a655c;stroke-width:1.1;stroke-linecap:round;opacity:.6}
+#game-grid :is(.cord-floor,.cord-wall) .cord-shadow {fill:none;stroke:rgb(0 0 0 / .45);stroke-width:6;stroke-linecap:round}
+#game-grid .cord-socket rect {fill:#bfb093;stroke:#5f503d;stroke-width:.9}
+#game-grid .cord-socket .socket-shadow {fill:rgb(0 0 0 / .35);stroke:none}
+#game-grid .cord-socket circle {fill:#2e221b}
+#game-grid .cord-plug {fill:#151317}
+#game-grid .cord-plug-shadow {fill:rgb(0 0 0 / .4)}
+
+/* prop: a can somebody forgot on top of Defender, standing a little back from the front edge (so the edge hides its
+   foot from below): necked-in shoulder and rolled rim, a sharp highlight and the room warm in the metal, with a
+   soft shadow on the wall behind. And an empty sweet's wrapper, crumpled foil, on the carpet beside Serpent. */
+#game-grid .room-can {position:absolute;left:62%;bottom:100%;width:11%;pointer-events:none;overflow:visible;transform:translateZ(-70px)}
+#game-grid .room-can-shadow {position:absolute;left:58%;bottom:100%;width:22%;height:14%;pointer-events:none;transform:translateZ(-214px);
+  background:radial-gradient(ellipse 50% 70% at 50% 100%,rgb(6 2 1 / .55),transparent 72%)}
+#game-grid .room-wrapper {position:absolute;left:104%;top:100%;width:30%;pointer-events:none;overflow:visible;transform-origin:50% 0;
+  transform:translateZ(20px) rotateX(-90deg) rotateZ(-14deg)}
