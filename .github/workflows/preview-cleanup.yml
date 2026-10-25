@@ -56,5 +56,13 @@ jobs:
           git checkout -q --orphan squashed
           previews=$(ls -d pr-preview/pr-* 2>/dev/null | sed 's|pr-preview/pr-|#|' | xargs)
           git commit -qm "Site${previews:+ and previews of $previews}"
-          # Fails if a deploy pushed meanwhile; that deploy's run starts this again.
-          git push --force-with-lease="gh-pages:$head" origin squashed:gh-pages
+          # A deploy or preview that pushed meanwhile wins the race: its own run starts this cleanup again, so a
+          # stale lease is not a failure. Any other refusal is.
+          if ! git push --force-with-lease="gh-pages:$head" origin squashed:gh-pages 2> push.log; then
+            cat push.log >&2
+            if grep -q 'stale info' push.log; then
+              echo "::notice::gh-pages moved on while cleaning up; the run that moved it cleans up again."
+              exit 0
+            fi
+            exit 1
+          fi
