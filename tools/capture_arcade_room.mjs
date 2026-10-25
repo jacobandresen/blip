@@ -143,7 +143,26 @@ async function measure(page) {
     for (const name of ['trim', 'sign', 'wall', 'floor']) {
       regions[name] = [css.getPropertyValue(`--room-${name}-top`).trim(), css.getPropertyValue(`--room-${name}-bottom`).trim()];
     }
+    regions.band = [css.getPropertyValue('--room-wall-top').trim(), css.getPropertyValue('--room-band-bottom').trim()];
+    // How much of each region the cabinets leave in view: a 48×40 grid of points, each either on a cabinet or
+    // through to the room (the room's layers take no pointer events).
+    const seen = {};
+    for (const name of Object.keys(regions)) {
+      const top = parseFloat(regions[name][0]) / 100, bottom = parseFloat(regions[name][1]) / 100;
+      let open = 0, all = 0;
+      for (let r = 0; r < 40; r++) {
+        const fy = (r + 0.5) / 40;
+        if (fy < top || fy > bottom) continue;
+        for (let c = 0; c < 48; c++) {
+          const hit = document.elementFromPoint(g.left + (c + 0.5) * g.width / 48, g.top + fy * g.height);
+          all++;
+          if (hit && !hit.closest('.card') && hit.closest('.screen-bezel')) open++;
+        }
+      }
+      seen[name] = all ? Math.round(100 * open / all) : null;
+    }
     return {
+      seen,
       layout: document.documentElement.dataset.layout,
       fullscreen: document.documentElement.hasAttribute('data-fullscreen'),
       close: grid.hasAttribute('data-close'),
@@ -163,9 +182,10 @@ async function drawGuides(page) {
   await page.evaluate(() => {
     const grid = document.getElementById('game-grid');
     const css = getComputedStyle(grid);
-    const colours = { trim: '#ffe24a', sign: '#5fd0ff', wall: '#7dff7a', floor: '#ff7ad8' };
+    const colours = { trim: '#ffe24a', sign: '#5fd0ff', wall: '#7dff7a', floor: '#ff7ad8', band: '#ffffff' };
     for (const [name, colour] of Object.entries(colours)) {
-      const top = css.getPropertyValue(`--room-${name}-top`).trim(), bottom = css.getPropertyValue(`--room-${name}-bottom`).trim();
+      const top = css.getPropertyValue(`--room-${name === 'band' ? 'wall' : name}-top`).trim();
+      const bottom = css.getPropertyValue(`--room-${name}-bottom`).trim();
       if (!top || !bottom) continue;
       const band = document.createElement('div');
       band.setAttribute('aria-hidden', 'true');
@@ -275,6 +295,7 @@ function writeGallery() {
     <article>
       <a href="${esc(s.file)}"><img src="${esc(s.file)}" alt="${esc(s.file)}" loading="lazy"></a>
       <p><b>${esc(s.config)}</b> ${esc(s.viewport)} · ${esc(s.position)} · ${s.credits ? 'one credit' : 'no credit'}<br>
+      in view: ${Object.entries(s.seen || {}).map(([k, v]) => `${esc(k)} ${v}%`).join(' · ')}<br>
       ${esc(s.cabinet)} @ ${s.aislePos} · layout ${esc(s.layout)}${s.fullscreen ? ' · kiosk' : ''}${s.close ? ' · close' : ''} · room ${esc(s.room)}</p>
       <div class="crops">${crops(s)}</div>
     </article>`).join('')}

@@ -9,6 +9,7 @@ import { openPage } from './lib/harness.mjs';
 // A layer a later issue adds goes here; an unlisted layer on the page fails, so does a listed one missing.
 const LAYERS = {
   wall: ['shown', 'shown', 'shown'],
+  trim: ['shown', 'shown', 'shown'],
   carpet: ['shown', 'shown', 'shown'],
   pool: ['shown', 'shown', 'shown'],
 };
@@ -224,4 +225,12 @@ test('the room scrolls on without a jump past the last machine and the first, bo
     });
   });
   for (const [sel, covers] of cover) assert.ok(covers, `${sel} still spans the room`);
+});
+
+test('the wall is warm: none of the old purple room is left', async (t) => {
+  const page = await openArcade(t);
+  const wall = await page.evaluate(() => getComputedStyle(document.getElementById('game-grid')).backgroundImage);
+  for (const purple of ['rgba(141, 63, 176', 'rgb(18, 14, 27)', 'rgba(30, 127, 176', 'rgba(192, 48, 110']) {
+    assert.ok(!wall.includes(purple), `the wall still holds ${purple}`);
+  }
 });

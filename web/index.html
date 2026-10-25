@@ -638,7 +638,7 @@
       .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:none}
     }
   </style>
-  <link rel="stylesheet" href="arcade-room.css?v=1">
+  <link rel="stylesheet" href="arcade-room.css?v=2">
 </head>
 <body class="cabinet-page">
 
@@ -1450,8 +1450,8 @@
         var el=document.createElement(tag);el.className=className;el.setAttribute('aria-hidden','true');
         el.dataset.roomLayer=layer;el.dataset.zone=zone;return el;
       }
-      var wall=roomLayer('i','aisle-wall','wall','wall'),carpet=roomLayer('i','aisle-carpet','carpet','floor');
-      grid.insertBefore(carpet,grid.firstChild);grid.insertBefore(wall,carpet);
+      var wall=roomLayer('i','aisle-wall','wall','wall'),trim=roomLayer('i','aisle-trim','trim','trim'),carpet=roomLayer('i','aisle-carpet','carpet','floor');
+      grid.insertBefore(carpet,grid.firstChild);grid.insertBefore(trim,carpet);grid.insertBefore(wall,trim);
       // How far the room has scrolled, in machines. The aisle's own position wraps round the loop when it
       // settles; this keeps counting, so the room never jumps between the last machine and the first.
       var roomTravel=aisle.pos,roomFrom=aisle.pos;

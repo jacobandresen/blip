@@ -4,6 +4,7 @@
    Every decorative layer is an element with data-room-layer and data-zone, aria-hidden and no pointer
    events; test/arcade-room.mjs finds the layers by that attribute. Each layer owns:
      wall    #game-grid's own background and .aisle-wall's panel joints (#67)
+     trim    .aisle-trim, the lit ceiling edge (#67)
      carpet  .aisle-carpet (#71)
      pool    each machine's .card-pool (#71)
    Back to front: wall → mural/tiles → signs/decals → floor/pools → cabinets.
@@ -13,10 +14,13 @@
 
 #game-grid {
   /* Colours. The owner in brackets sets the final value. */
-  --room-wall: #120e1b;            /* [#67] */
-  --room-wall-shade: #07060a;      /* [#67] */
-  --room-trim-red: #b3261e;        /* [#67] */
-  --room-trim-yellow: #ffd166;     /* [#67] */
+  --room-wall-lit: #d9693f;        /* [#67] by the ceiling, where the trim lights it */
+  --room-wall: #b9482b;            /* [#67] terracotta */
+  --room-wall-low: #7c2b1b;        /* [#67] red-brown behind the cabinets' feet */
+  --room-wall-shade: #44160e;      /* [#67] at the floor */
+  --room-ceiling: #2b0d09;         /* [#67] above the fascia */
+  --room-trim-red: #c3302a;        /* [#67] */
+  --room-trim-yellow: #ffd36b;     /* [#67] */
   --room-neon: #ff8fd8;            /* [#68] */
   --room-neon-core: #fff6e8;       /* [#68] */
   --room-neon-glow: #e04fb6;       /* [#68] */
@@ -24,11 +28,15 @@
   --room-carpet-b: #0d0a19;        /* [#71] */
   --room-grout: #d8d2c4;           /* [#69] */
 
-  /* Shared regions, as a share of the room's height. Starting guides: #67's composition checkpoint
-     records the final ones. Tiles and mural may share the wall region side by side. */
-  --room-trim-top: 0%;    --room-trim-bottom: 8%;
-  --room-sign-top: 8%;    --room-sign-bottom: 25%;
-  --room-wall-top: 25%;   --room-wall-bottom: 68%;
+  /* Shared regions, as a share of the room's height. The cabinets stand about 92% of the room's height and
+     their neighbours' sides cover the rest, so at rest the wall shows only in the band under the trim; a
+     full-height strip opens between machines as you walk (#67's checkpoint). Tiles and mural therefore
+     start under the trim, read within the band at rest, and run down the wall to fill the walking gaps,
+     beside the sign rather than under it. */
+  --room-trim-top: 0%;    --room-trim-bottom: 9%;
+  --room-sign-top: 9%;    --room-sign-bottom: 25%;
+  --room-wall-top: 9%;    --room-wall-bottom: 68%;
+  --room-band-bottom: 22%;         /* the band under the trim that shows at rest */
   --room-floor-top: 65%;  --room-floor-bottom: 100%;
   --room-edge-width: 14%;          /* decals, at the outer edges */
 
@@ -36,16 +44,31 @@
   --room-wall-period: 120px;
   --room-carpet-period: 86px;
 
+  /* wall: orange-red panels lit from the ceiling, deepening to red-brown at the floor, a little darker at the
+     room's sides. The midtones stay warm where tiles and mural will hang. */
   background:
-    radial-gradient(ellipse 46% 30% at 50% 0,#8d3fb055,transparent),
-    radial-gradient(ellipse 30% 24% at 12% 22%,#1e7fb033,transparent),
-    radial-gradient(ellipse 30% 24% at 88% 22%,#c0306e33,transparent),
-    linear-gradient(180deg,var(--room-wall),#0b0911 62%,var(--room-wall-shade));
+    linear-gradient(90deg,rgb(30 8 4 / .5),transparent 13% 87%,rgb(30 8 4 / .5)),
+    radial-gradient(ellipse 75% 26% at 50% var(--room-trim-bottom),rgb(255 200 130 / .3),transparent 72%),
+    linear-gradient(180deg,var(--room-wall-lit) var(--room-trim-bottom),var(--room-wall) 30%,var(--room-wall-low) var(--room-wall-bottom),var(--room-wall-shade));
+}
+:root[data-room="lite"] #game-grid {
+  background:
+    linear-gradient(90deg,rgb(30 8 4 / .5),transparent 13% 87%,rgb(30 8 4 / .5)),
+    linear-gradient(180deg,var(--room-wall-lit) var(--room-trim-bottom),var(--room-wall) 30%,var(--room-wall-low) var(--room-wall-bottom),var(--room-wall-shade));
 }
 
-/* wall: the back wall's joints, which drift past at half the machines' pace. */
+/* wall: the panels' joints, a dark groove with a lit edge, drifting past at half the machines' pace. */
 #game-grid .aisle-wall {position:absolute;z-index:0;top:0;bottom:0;left:-120px;right:-120px;pointer-events:none;
-  background:repeating-linear-gradient(90deg,#ffffff05 0 1px,transparent 1px var(--room-wall-period))}
+  background:repeating-linear-gradient(90deg,rgb(74 18 9 / .5) 0 2px,rgb(255 196 150 / .09) 2px 3px,transparent 3px var(--room-wall-period))}
+
+/* trim: the lowered ceiling's edge, a broad red fascia over a strip of yellow light that washes the wall. It
+   belongs to the building, so it stays put as you walk. */
+#game-grid .aisle-trim {position:absolute;z-index:0;left:0;right:0;top:var(--room-trim-top);pointer-events:none;
+  height:clamp(24px,calc(var(--room-trim-bottom) - var(--room-trim-top)),96px);
+  background:linear-gradient(180deg,var(--room-ceiling) 0 16%,#d63c31 16%,var(--room-trim-red) 42%,#8f1d17 72%,
+    #6e140f 74%,#fff3c8 76%,var(--room-trim-yellow) 86%,#e7a23e 100%);
+  box-shadow:0 4px 18px -2px rgb(255 198 104 / .6),0 1px 0 #ffe6a0}
+:root[data-room="lite"] #game-grid .aisle-trim {box-shadow:none}
 
 /* An old neon tube along the back wall, never drawn: an earlier rule in index.html sets its content to none. */
 #game-grid::before {
