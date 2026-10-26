@@ -18,6 +18,7 @@
   var PER_PLAYER = 2; // caps a player ever gets: no game reads more than two
 
   var root = document.documentElement;
+  if (game && root.hasAttribute('data-deck-preview')) root.setAttribute('data-machine', game.slug);
   if (game) root.setAttribute('data-deck-wear', game.slug);
   root.setAttribute('data-caps', String(CAPS));
   // Every deck seats two, as a two-player cabinet does; a one-player game's second station takes no input.
@@ -140,6 +141,18 @@
 
   panel.insertBefore(frag, panel.firstChild);
   panel.parentElement.prepend(el('div', 'deck-housing', '', { 'aria-hidden':'true' }));
+  if (game && game.touch && blipHasTouch()) {
+    var kind = game.touch.kind;
+    var halves = kind === 'paddles' || kind === 'platform' || (kind === 'drag' && game.players === 2) ? ['P1', '2P'] : [''];
+    var strip = el('div', '', '<div class="ts-glass">' + halves.map(function (label, i) {
+      return '<div class="ts-half" data-slot="' + i + '">' + (label ? '<span class="ts-tag">' + label + '</span>' : '') + '</div>';
+    }).join('') + '<span class="ts-demo"></span><span class="ts-thumb"></span><span class="ts-arrow"></span>' +
+      '<span class="ts-hint for-touch">' + (kind === 'drag' ? 'Drag to move &middot; ' : '') + game.touch.hint + '</span>' +
+      '<span class="ts-hint for-mouse">' + game.touch.mouseHint + '</span></div>', { id:'touch-strip', 'aria-hidden':'true' });
+    panel.parentElement.appendChild(strip);
+    if (kind === 'platform' || (kind === 'drag' && game.players === 2))
+      strip.querySelector('.ts-glass').appendChild(el('button','ts-join','<span class="tj-plus">+</span>2P JOIN',{type:'button'}));
+  }
   pocketBook(game);
   var coin=document.getElementById('insert-coin-btn')||document.getElementById('kiosk-insert-btn');
   if(coin) {

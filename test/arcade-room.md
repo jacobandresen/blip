@@ -1,5 +1,69 @@
 # Arcade room (#65)
 
+## Current follow-up: pixel maze wall
+
+The owner's [latest comment on #65](https://github.com/jacobandresen/blip/issues/65#issuecomment-6402971375)
+replaces the painted cabinet mural with mosaics across the whole wall. The
+subsequent request adds a Pac-Man tribute: stepped yellow mouths, pellets,
+red/cyan/purple ghosts and blue maze corridors, all drawn as ceramic cells.
+This supersedes the earlier next-room-only tile placement and mural requirements.
+The trim, signs and carpet remain. Landscape still hides the mosaic where the
+cabinets reach the ceiling. Lite removes glaze while preserving the motif.
+
+Each circuit contains a whole number of mosaic repeats. Layout sizes the square
+cells and overscan; walking translates the existing layer at the wall's depth
+rate. The mural SVG, styling and runtime copies have been removed.
+
+Safari 27.0.1 also reproduced the blank cabinet front: the background covered
+coplanar front details despite successfully decoded images. Moving the marquee,
+speaker and screen bezel forward by 1px restores them. A native SafariDriver
+capture verified the source change, and the owner confirmed the fix. Both
+existing desktop attract playback tests subsequently passed in WebKit and
+Chromium. The earlier Safari unavailability notes below are historical.
+
+The following sections describe previous artwork and approval evidence; they
+do not establish approval of this new wall.
+
+### One cabinet in both views
+
+`web/machine.css` owns the laminate, bezel ring, CRT glass, speaker grille,
+marquee surface and coloured deck apron for the overview and game shell.
+The game shell now shows the overview's speaker and molding instead of a
+different wooden surround. Deck previews resolve their own game metadata,
+including touch strips, and share the same strip and join-button markup
+as the live controls. All nine machines are compared in both browser engines,
+with and without touch, by `test/machine-identity.mjs`.
+
+Entry freezes the actual decoded attract frame. Cross-document transitions
+move the monitor, picture, sign, lettering and deck to their measured game-page
+bounds over 760ms. The shell initializes before the first render, reserves the
+correct dial layout, and keeps the frozen picture until the handoff and game
+startup finish. Reduced motion enters directly; older browsers retain the
+camera zoom. `test/machine-launch.mjs` checks portrait and wide games, stale
+geometry caches, the final screen size and reduced motion in both engines.
+Sequential native Safari 27.0.1 captures are in
+`test/artifacts/safari/launch/index.html`; timestamps include screenshot cost.
+
+The shared Rust CRT now uses briefer, rarer and smaller tears and colour
+offsets. Full vertical rolls become tiny nudges; mains flicker and the shared
+CSS glass overlay are softer. Game rules and input mappings are unchanged.
+
+Validation for this follow-up: `npm test` passed all 20 checks; the shared
+Rust package passed 32 tests; `cargo build-web` rebuilt all nine games and
+the BASIC runtime. The final identity/entry run passed all 14 cases, including
+every game's hardware and surfaces in both engines, wide/portrait entry and
+reduced motion. Three existing startup/entry checks also passed. Earlier room,
+cabinet/performance and touch/deck runs passed 30, 38 and 41 checks respectively.
+The device matrix passed 104/105; the isolated iPad manual rerun passed.
+
+The broad iPhone sweep found a narrow crop containing only a clipped paddle
+at its first column. CSS rounding/DPR resampling left that column partly
+covered, rather than fully lit as the ideal-image comparison predicted.
+The paint comparison now excludes the one-pixel crop boundary, while retaining
+the interior brightness assertion and failure screenshots. The isolated
+WebKit landscape-toolbar circuit passes. A full final nine-circuit sweep and
+real iPhone verification have not been repeated after this follow-up.
+
 This work continues #65 from `f891e01`: the tiled next room, illustrated mural,
 carpet, automatic lite selection and release evidence. It
 retains the foundation/wall/sign work from #75/#76. Native game rules and WASM

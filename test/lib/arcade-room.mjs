@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
-export const ROOM_SOURCES = ['index.html', 'arcade-room.css', 'blip_core.js', 'shell.css', 'shell.js', 'history.html', 'sw.js',
+export const ROOM_SOURCES = ['index.html', 'arcade-room.css', 'machine.css', 'blip_core.js', 'shell.css', 'shell.js', 'history.html', 'sw.js',
   'aisle.js', 'machine-deck.html', 'deck.js', 'kiosk.css', 'kiosk.js', 'blip_controller.js'];
 
 export function currentRoomHash() {

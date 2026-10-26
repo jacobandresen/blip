@@ -15,7 +15,6 @@ const LAYERS = {
   neon: ['shown', 'hidden', 'shown'],     // no wall shows in landscape (#68)
   open: ['shown', 'hidden', 'shown'],
   tiles: ['shown', 'hidden', 'shown'],
-  mural: ['shown', 'hidden', 'shown'],
   // On its side the phone shows each machine close up, cut off below Start: its feet and the floor are below the room.
   carpet: ['shown', 'either', 'shown'],
   step: ['shown', 'either', 'shown'],
@@ -69,12 +68,7 @@ for (const config of CONFIGS) {
       });
     });
     for (const name of Object.keys(LAYERS)) assert.ok(layers.some((l) => l.layer === name), `the ${name} layer is on the page`);
-    if (config.column !== 1) {
-      const muralAspect = await page.locator('.aisle-mural > svg').first().evaluate((svg) => {
-        const r = svg.getBoundingClientRect(); return r.width / r.height;
-      });
-      assert.ok(Math.abs(muralAspect - 1.5) < .01, 'painted cabinets keep their proportions on this wall');
-    }
+    assert.equal(await page.locator('.aisle-mural').count(), 0, 'the mosaic replaces the painted mural');
     for (const l of layers) {
       assert.ok(LAYERS[l.layer], `${l.layer} is a known room layer`);
       assert.ok(ZONES.includes(l.zone), `${l.layer} names its zone (${l.zone})`);
@@ -188,7 +182,7 @@ function sampleRoom() {
   const x = (el) => Number((/translate\(\s*(-?[\d.]+)px/.exec(el.style.transform) || [0, NaN])[1]);
   (function tick() {
     window.__room.push({ wall: x(grid.querySelector('.aisle-wall')), carpet: x(grid.querySelector('.aisle-carpet')),
-      neon: x(grid.querySelector('.aisle-neon')), open: x(grid.querySelector('.aisle-open')), tiles: x(grid.querySelector('.aisle-tiles')), mural: x(grid.querySelector('.aisle-mural')),
+      neon: x(grid.querySelector('.aisle-neon')), open: x(grid.querySelector('.aisle-open')), tiles: x(grid.querySelector('.aisle-tiles')),
       travel: Number(grid.dataset.roomTravel), pos: Number(grid.dataset.aislePos) });
     if (window.__room.length < 4000) requestAnimationFrame(tick);
   })();
@@ -205,7 +199,7 @@ test('the room and its signs scroll on without a jump past the last machine and 
       cabinets: document.querySelectorAll('#game-grid .card').length,
       // The wall stands behind the machines and scrolls at the rate its depth gives it; the floor moves with them.
       wallRate: Number(document.getElementById('game-grid').dataset.wallRate),
-      layers: { wall: [Number(document.getElementById('game-grid').dataset.wallRate), parseFloat(cs.getPropertyValue('--room-wall-period'))], carpet: [1, parseFloat(cs.getPropertyValue('--room-carpet-period'))], mural: [.3, parseFloat(cs.getPropertyValue('--room-mural-period'))] },
+      layers: { wall: [Number(document.getElementById('game-grid').dataset.wallRate), parseFloat(cs.getPropertyValue('--room-wall-period'))], carpet: [1, parseFloat(cs.getPropertyValue('--room-carpet-period'))], tiles: [Number(document.getElementById('game-grid').dataset.wallRate), parseFloat(cs.getPropertyValue('--room-tiles-period'))] },
     };
   });
   await page.evaluate(sampleRoom);
@@ -235,7 +229,7 @@ test('the room and its signs scroll on without a jump past the last machine and 
   }
   const Aisle = (await import('../web/aisle.js')).default;
   // The signs hang on the wall: they scroll at its pace and come round once a lap of the aisle.
-  room.layers.neon = room.layers.open = room.layers.tiles = [room.wallRate, room.cabinets * room.spacing * room.wallRate];
+  room.layers.neon = room.layers.open = [room.wallRate, room.cabinets * room.spacing * room.wallRate];
   assert.ok(room.wallRate > 0.5 && room.wallRate < 1, `the wall scrolls at ${room.wallRate} of the machines' pace`);
   for (const [name, [rate, period]] of Object.entries(room.layers)) {
     let worst = 0;
@@ -254,7 +248,7 @@ test('the room and its signs scroll on without a jump past the last machine and 
   assert.equal(await roomTravel(page), before);
   const cover = await page.evaluate(() => {
     const g = document.getElementById('game-grid').getBoundingClientRect();
-    return ['.aisle-wall', '.aisle-carpet', '.aisle-mural'].map((sel) => {
+    return ['.aisle-wall', '.aisle-carpet', '.aisle-tiles'].map((sel) => {
       const r = document.querySelector(sel).getBoundingClientRect();
       return [sel, r.left <= g.left + 0.5 && r.right >= g.right - 0.5];
     });
@@ -300,23 +294,27 @@ test('the wall is warm: none of the old purple room is left', async (t) => {
   }
 });
 
-test('the tiled next room keeps square cells, a single opening per lap, and flat ceramic in lite mode', async (t) => {
+test('the full maze wall keeps square cells, seamless circuit repeats, and flat ceramic in lite mode', async (t) => {
   const page = await openArcade(t);
   const read = () => page.evaluate(() => {
     const grid = document.getElementById('game-grid'), tiles = grid.querySelector('.aisle-tiles');
     const cs = getComputedStyle(grid), r = tiles.getBoundingClientRect(), g = grid.getBoundingClientRect();
     const svg = tiles.querySelector('svg').getBoundingClientRect();
-    return { period: parseFloat(cs.getPropertyValue('--room-tiles-period')), width: r.width,
-      cellX: svg.width / 14, cellY: svg.height / 17,
+    const next = grid.querySelector('.card[data-aisle-offset="1"]');
+    const spacing = Number(/calc\(-50% \+ (-?[\d.]+)px\)/.exec(next.style.transform)[1]);
+    return { period: parseFloat(cs.getPropertyValue('--room-tiles-period')), width: r.width, roomWidth: g.width,
+      repeats: grid.querySelectorAll('.card').length * spacing * Number(grid.dataset.wallRate) / parseFloat(cs.getPropertyValue('--room-tiles-period')),
+      cellX: svg.width / 32, cellY: svg.height / 17,
       visible: Math.min(r.right, g.right) - Math.max(r.left, g.left),
       glaze: getComputedStyle(tiles.querySelector('.tile-glaze')).display,
       grout: getComputedStyle(tiles.querySelector('.tile-grout')).stroke,
-      faces: [...tiles.querySelectorAll('svg > path[class]')].map((el) => getComputedStyle(el).fill) };
+      faces: [...tiles.firstElementChild.querySelectorAll(':scope > path[class]')].map((el) => getComputedStyle(el).fill) };
   });
   const full = await read();
-  assert.ok(full.period > full.width * 3, 'most of the lap stays orange');
+  assert.ok(full.width > full.roomWidth + full.period, 'the mosaic includes overscan beyond both edges');
+  assert.ok(Math.abs(full.repeats - Math.round(full.repeats)) < .001, 'a circuit contains whole mosaic repeats');
   assert.ok(Math.abs(full.cellX - full.cellY) < .01, 'ceramic faces remain square');
-  assert.ok(full.visible > full.cellX * 2, 'a substantial section is inside the desktop room');
+  assert.ok(full.visible >= full.roomWidth - 1, 'tiles cover the entire desktop wall');
   assert.notEqual(full.glaze, 'none');
   await page.goto(new URL('?room=lite', page.url()).href);
   await page.waitForSelector('.aisle-tiles');
@@ -327,7 +325,7 @@ test('the tiled next room keeps square cells, a single opening per lap, and flat
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(300);
   const phone = await read();
-  assert.ok(phone.visible > phone.cellX, 'portrait retains a recognizable crop');
+  assert.ok(phone.visible >= phone.roomWidth - 1, 'tiles cover the entire portrait wall');
 });
 
 test('the rendered mosaic repeats after an actual aisle lap in either direction, including after resize', async (t) => {
@@ -414,21 +412,21 @@ test('automatic lite selection is resolved once before the room appears, with ex
   }
 });
 
-test('portrait keeps a recognizable painted cabinet in view at rest and halfway walking', async (t) => {
+test('portrait keeps the maze mosaic across the wall at rest and halfway walking', async (t) => {
   const page = await openArcade(t, { width: 390, height: 844, touch: true });
   for (const position of ['rest', 'half']) {
     if (position === 'half') await holdHalfway(page);
-    const painted = await page.evaluate(() => {
+    const mosaic = await page.evaluate(() => {
       const grid = document.getElementById('game-grid').getBoundingClientRect();
-      const tile = document.querySelector('.aisle-tiles').getBoundingClientRect();
-      return [...document.querySelectorAll('.aisle-mural .mural-screen')].filter((shape) => {
-        const r = shape.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
-        if (r.width < 20 || r.height < 12 || r.left < grid.left || r.right > grid.right || r.top < grid.top || r.bottom > grid.bottom) return false;
-        if (x >= tile.left && x <= tile.right && y >= tile.top && y <= tile.bottom) return false;
-        return !document.elementFromPoint(x, y)?.closest('.card');
-      }).length;
+      const tiles = document.querySelector('.aisle-tiles'), r = tiles.getBoundingClientRect();
+      return { covers: r.left <= grid.left && r.right >= grid.right,
+        characters: [...tiles.querySelectorAll('.tile-yellow,.tile-red,.tile-cyan,.tile-purple')].filter((el) => {
+          const p = el.getBoundingClientRect();
+          return p.right > grid.left && p.left < grid.right && p.top < grid.bottom && p.bottom > grid.top;
+        }).length };
     });
-    assert.ok(painted > 0, `${position}: an illustrated screen and cabinet planes remain visible`);
+    assert.ok(mosaic.covers, position + ': no bare wall is exposed');
+    assert.ok(mosaic.characters >= 2, position + ': the chase motif spans the portrait wall');
   }
 });
 

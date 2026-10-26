@@ -45,7 +45,7 @@ function blipHasTouch() {
 /** Touchscreens use gesture strips or the on-screen pad. Rally keeps its dials and split strip;
  * elsewhere the front end selects the arcade's joysticks, home/app touch or BASIC's pads. */
 function blipFrontendControls() {
-  var game = blipGameFromPath(location.pathname);
+  var game = blipGameFromPath(window.BLIP_DECK_GAME ? '/' + window.BLIP_DECK_GAME + '/' : location.pathname);
   if (game && game.slug !== 'rally' && blipHasTouch()) return 'touch';
   // Rally and non-touch devices can override the front end for another deck.
   var asked = new URLSearchParams(location.search).get('controls');
@@ -59,7 +59,7 @@ function blipFrontendControls() {
  * picture is fitted the same; a game with no strip is touched through its pad. */
 function blipApplyControls() {
   var root = document.documentElement;
-  var game = blipGameFromPath(window.location.pathname);
+  var game = blipGameFromPath(window.BLIP_DECK_GAME ? '/' + window.BLIP_DECK_GAME + '/' : window.location.pathname);
   var fixed = blipFrontendControls();
   var touch = fixed === 'touch' && !!(game && game.touch) && blipHasTouch();
   root.setAttribute('data-controls', fixed === 'stick' ? 'stick' : 'pad');

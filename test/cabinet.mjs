@@ -437,7 +437,7 @@ test('a machine started from the arcade opens its game on the same screen pictur
       over: Math.abs(a.left - b.left) < 1 && Math.abs(a.top - b.top) < 1 && Math.abs(a.width - b.width) < 1 && Math.abs(a.height - b.height) < 1 };
   });
   const seen = await shown.jsonValue();
-  assert.match(seen.art, /rally\/screenshot\.png/);
+  assert.match(seen.art, /data:image\/png;base64,|rally\/screenshot\.png/);
   assert.equal(seen.ready, false, 'the picture waits for the game');
   assert.equal(seen.over, true, 'exactly where the game will draw');
   await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));

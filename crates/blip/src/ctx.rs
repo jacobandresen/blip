@@ -148,7 +148,7 @@ void main() {
     col += glare * 0.18 * dot(col, vec3(0.333));
 
     // gentle mains-hum brightness flicker + a touch of gain
-    col *= 1.08 + 0.008 * sin(_Time.x * 10.7);
+    col *= 1.08 + 0.002 * sin(_Time.x * 10.7);
 
     // dither the near-black gradients so the vignette doesn't step
     col += (dither(gl_FragCoord.xy) - 0.5) * (1.0 / 255.0);
@@ -296,9 +296,9 @@ impl Blip {
         macroquad::rand::srand((macroquad::miniquad::date::now() * 1000.0) as u64);
         let mut rng = Lcg(0xdead_beef);
         // Stagger initial cooldowns so effects don't all fire at once.
-        let tear_cd   =  5.0 + rng.next() * 10.0;
-        let roll_cd   = 15.0 + rng.next() * 20.0;
-        let chroma_cd =  2.0 + rng.next() *  4.0;
+        let tear_cd   = 20.0 + rng.next() * 30.0;
+        let roll_cd   = 60.0 + rng.next() * 60.0;
+        let chroma_cd = 15.0 + rng.next() * 15.0;
 
         #[cfg(not(target_arch = "wasm32"))]
         let (screenshot_mode, screenshot_path, screenshot_frame_target) = {
@@ -512,25 +512,24 @@ impl Blip {
         } else {
             self.tear_cd -= dt;
             if self.tear_cd <= 0.0 {
-                self.tear_t  = 0.08 + self.rng.next() * 0.20;
+                self.tear_t  = 0.025 + self.rng.next() * 0.035;
                 self.tear_y  = 0.15 + self.rng.next() * 0.70;
-                self.tear_dx = (self.rng.next() - 0.5) * 60.0;
-                self.tear_cd = 14.0 + self.rng.next() * 30.0;
+                self.tear_dx = (self.rng.next() - 0.5) * 6.0;
+                self.tear_cd = 45.0 + self.rng.next() * 60.0;
             }
         }
 
-        // Roll — kept rare enough that it reads as a genuine "something's
-        // wrong" moment rather than a recurring tic.
+        // A brief vertical nudge, rather than rolling the whole picture out of view.
         if self.roll_t > 0.0 {
             self.roll_t  -= dt;
             self.roll_dy  = (self.roll_dy + self.roll_spd * dt) % lh;
         } else {
             self.roll_cd -= dt;
             if self.roll_cd <= 0.0 {
-                self.roll_t   = 0.5 + self.rng.next() * 1.3;
-                self.roll_spd = 180.0 + self.rng.next() * 320.0;
+                self.roll_t   = 0.08 + self.rng.next() * 0.06;
+                self.roll_spd = 4.0 + self.rng.next() * 8.0;
                 self.roll_dy  = 0.0;
-                self.roll_cd  = 60.0 + self.rng.next() * 90.0;
+                self.roll_cd  = 120.0 + self.rng.next() * 180.0;
             }
         }
 
@@ -540,9 +539,9 @@ impl Blip {
         } else {
             self.chroma_cd -= dt;
             if self.chroma_cd <= 0.0 {
-                self.chroma_t  = 0.06 + self.rng.next() * 0.18;
-                self.chroma_dx = 4.0  + self.rng.next() * 8.0;
-                self.chroma_cd =  7.0 + self.rng.next() * 15.0;
+                self.chroma_t  = 0.025 + self.rng.next() * 0.05;
+                self.chroma_dx = 0.5 + self.rng.next() * 1.5;
+                self.chroma_cd = 30.0 + self.rng.next() * 45.0;
             }
         }
     }
@@ -645,10 +644,10 @@ impl Blip {
         if chroma_on {
             let dx = self.chroma_dx * scale;
             draw_texture_ex(&tex, vx - dx, vy,
-                Color::new(1.0, 0.0, 0.0, 0.35),
+                Color::new(1.0, 0.0, 0.0, 0.12),
                 DrawTextureParams { dest_size: Some(vec2(vw, vh)), ..Default::default() });
             draw_texture_ex(&tex, vx + dx, vy,
-                Color::new(0.0, 0.4, 1.0, 0.35),
+                Color::new(0.0, 0.4, 1.0, 0.12),
                 DrawTextureParams { dest_size: Some(vec2(vw, vh)), ..Default::default() });
         }
 
@@ -700,9 +699,9 @@ impl Blip {
             // scanline-shaded texture, so reset first (its own alpha needs
             // to blend normally; SCANLINE_FRAGMENT doesn't handle that).
             if scanline_shader_active { gl_use_default_material(); }
-            let gw = vw * (0.4 + self.rng.next() * 0.6);
-            let gh = 1.0 + (self.rng.next() * 2.0).floor();
-            let ga = 0.5 + self.rng.next() * 0.5;
+            let gw = vw * (0.2 + self.rng.next() * 0.3);
+            let gh = 1.0;
+            let ga = 0.1 + self.rng.next() * 0.1;
             draw_rectangle(vx, vy + split_vh - gh * 0.5, gw, gh,
                 Color::new(1.0, 1.0, 1.0, ga));
         } else {

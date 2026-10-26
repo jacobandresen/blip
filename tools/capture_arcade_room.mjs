@@ -84,10 +84,10 @@ const REFERENCES = [
   ['R4 entrance close-up', 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/49/Video_Game_Museum_in_Berlin_%2845946108581%29_%28Arcade_Focus%29.jpg/960px-Video_Game_Museum_in_Berlin_%2845946108581%29_%28Arcade_Focus%29.jpg'],
 ];
 const CHECKLIST = [
-  'A warm, enclosed room: orange/red wall midtones, not a dark void',
+  'A tiled arcade wall with warm red/yellow ceiling trim and readable chase silhouettes',
   'Ceiling trim and sign read as lit materials (red fascia, yellow underside, neon tube)',
   'Large glossy mosaic blocks with pale grout',
-  'A recognizable illustrated cabinet mural',
+  'A continuous tiled maze tribute with yellow character, pellets and colourful ghosts',
   'Offset red/black carpet meeting the wall at a warm step',
   'The focused cabinet, its screen, title, coin door and Start stay readable',
   'Lite keeps the palette and materials; check both at actual display size',

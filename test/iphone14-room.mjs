@@ -19,6 +19,9 @@ const steps = [
   { name: 'landscape-toolbar', ...devices['iPhone 14 landscape'].viewport, mode: 'lite' },
   { name: 'portrait-return', width: 390, height: 844, mode: 'full' },
 ];
+// Select one circuit while diagnosing a layout: BLIP_ROOM_CASE=landscape-toolbar-full.
+const cases = process.env.BLIP_ROOM_CASE ? steps.filter(s => `${s.name}-${s.mode}` === process.env.BLIP_ROOM_CASE) : steps;
+if (!cases.length) throw new Error(`Unknown BLIP_ROOM_CASE: ${process.env.BLIP_ROOM_CASE}`);
 
 async function paintedRegion(page, region, shot) {
   return page.evaluate(async ({ region, png }) => {
@@ -35,12 +38,20 @@ async function paintedRegion(page, region, shot) {
     context.clearRect(0, 0, clip.width, clip.height); context.drawImage(screenshot, 0, 0, clip.width, clip.height);
     const actual = context.getImageData(0, 0, clip.width, clip.height).data;
     let lit = 0, painted = 0;
+    const samples = [];
     for (let i = 0; i < expected.length; i += 4) {
+      const px=i/4%clip.width,py=Math.floor(i/4/clip.width);
+      // CSS rounding and DPR downsampling can move a clipped one-pixel paddle across the crop boundary.
+      if(px<1||py<1||px>=clip.width-1||py>=clip.height-1)continue;
       if (Math.max(expected[i], expected[i + 1], expected[i + 2]) <= 100) continue;
       lit++;
       if (Math.max(actual[i], actual[i + 1], actual[i + 2]) > 45) painted++;
+      if(samples.length<16){
+        const x=i/4%clip.width,y=Math.floor(i/4/clip.width),hit=document.elementFromPoint(clip.x+x+.5,clip.y+y+.5);
+        samples.push({x,y,expected:[...expected.slice(i,i+3)],actual:[...actual.slice(i,i+3)],hit:hit?.className,machine:hit?.closest('.card')?.dataset.machine});
+      }
     }
-    return { lit, painted, fraction: lit ? painted / lit : null, source: image.currentSrc };
+    return { lit, painted, fraction: lit ? painted / lit : null, source: image.currentSrc, samples };
   }, { region, png: 'data:image/png;base64,' + shot.toString('base64') });
 }
 
@@ -63,7 +74,7 @@ for (const engine of ['webkit', 'chromium']) {
       !document.documentElement.hasAttribute('data-cabinet-arranging'));
     await mkdir(DIR, { recursive: true });
     const count = await page.locator('#game-grid .card').count(), report = [];
-    for (const config of steps) {
+    for (const config of cases) {
       await page.setViewportSize({ width: config.width, height: config.height });
       const insets = config.width > config.height ? { top: 0, bottom: 21, left: 47, right: 47 }
         : { top: 47, bottom: 34, left: 0, right: 0 };
@@ -102,6 +113,11 @@ for (const engine of ['webkit', 'chromium']) {
           const shot = await page.screenshot({ clip: region.clip });
           const paint = await paintedRegion(page, region, shot);
           // A partial crop can legitimately contain only the game's black background.
+          if (paint.lit >= 10 && paint.fraction <= .2) {
+            await writeFile(new URL('failed-region.png', DIR), shot);
+            await page.screenshot({path:fileURLToPath(new URL('failed-room.png', DIR))});
+            await writeFile(new URL('failed-region.json', DIR),JSON.stringify({config,region,paint},null,2));
+          }
           if (paint.lit >= 10) assert.ok(paint.fraction > .2, `${config.name}, passing ${region.machine}: ${JSON.stringify(paint)}`);
           report.push({ orientation: config.name, mode: config.mode, insets, position: 'half', machine: region.machine, ...paint });
         }
@@ -154,7 +170,7 @@ for (const engine of ['webkit', 'chromium']) {
     await writeFile(new URL('index.html', DIR), `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">
       <title>iPhone 14 room checks</title><style>body{background:#21150f;color:#fff1df;font:15px system-ui;margin:20px}main{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}img{width:100%}figure{margin:0}a{color:#ffd37a}</style>
       <h1>iPhone 14 room checks</h1><p>Desktop WebKit/Chromium at 390×844 and 844×390 with touch enabled. These are emulations, not real-device captures.</p>
-      <p>${steps.length} circuits per engine: portrait and landscape, full/lite, full-screen dimensions and Playwright's smaller browser viewports, then portrait again. Each passing screen is checked against its decoded game strip; centered screens must paint changing frames.</p>
+      <p>${cases.length} circuits per engine. Each passing screen is checked against its decoded game strip; centered screens must paint changing frames.</p>
       <p><a href="../arcade-room/index.html">Room/reference gallery</a> · <a href="webkit.json">WebKit measurements</a> · <a href="chromium.json">Chromium measurements</a></p>
       <main>${images.map((name) => `<figure><a href="${name}"><img src="${name}" loading="lazy" alt="${name}"></a><figcaption>${name}</figcaption></figure>`).join('')}</main>`);
   });

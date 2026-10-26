@@ -7,15 +7,14 @@
      trim    .aisle-trim, the lit ceiling edge (#67)
      neon    .aisle-neon, the BLIP script sign (#68)
      open    .aisle-open, the OPEN sign, lit while a credit is banked (#68)
-     tiles   .aisle-tiles, one opening into the tiled next room per lap (#69, #76)
-     mural   .aisle-mural, a repeating painted arcade scene (#70)
+     tiles   .aisle-tiles, a pixel maze mosaic covering the wall (#65, #69)
      shadow  each machine's .card-backlight: its shadow on the wall and its marquee's glow above
      cord    each machine's .card-cord, to a socket on the wall beside it
      prop    what visitors left: .room-can on Defender, .room-wrapper on the floor by Serpent
      carpet  .aisle-carpet (#71)
      step    .aisle-step, the warm wall/floor nosing (#71)
      pool    each machine's .card-pool (#71)
-   Back to front: wall → mural/tiles → signs → floor/pools → cabinets.
+   Back to front: wall → tiles → signs → floor/pools → cabinets.
 
    :root[data-room="lite"] (?room=lite, set in index.html's head) drops room blur, glow and fine texture;
    each layer writes its own lite rules beside its look. Cabinet styling is not the room's. */
@@ -34,16 +33,18 @@
   --room-neon-glow: rgb(255 128 46 / .62); /* [#68] the halo on the wall */
   --room-carpet-a: #6b211c;        /* [#71] */
   --room-carpet-b: #180b08;        /* [#71] */
-  --room-grout: #d8d2c4;           /* [#69] */
+  --room-grout: #77746d;           /* [#69] */
   --room-tile-black: #242526;
   --room-tile-white: #dedbd0;
-  --room-tile-green: #73b83d;
   --room-tile-purple: #80528f;
-  --room-tile-red: #cb3527;
+  --room-tile-red: #d44b42;
+  --room-tile-yellow: #edc849;
+  --room-tile-blue: #355eab;
+  --room-tile-cyan: #5db5ba;
 
   /* Shared regions, as a share of the room's height. The cabinets stand about 92% of the room's height and
      their neighbours' sides cover the rest, so at rest the wall shows only in the band under the trim; a
-     full-height strip opens between machines as you walk (#67's checkpoint). Tiles and mural therefore
+     full-height strip opens between machines as you walk (#67's checkpoint). The tiles therefore
      start under the trim, read within the band at rest, and run down the wall to fill the walking gaps,
      beside the sign rather than under it. */
   --room-trim-top: 0%;    --room-trim-bottom: 7%;
@@ -57,14 +58,12 @@
 
   /* Repeats that the walk scrolls through (index.html reads them on layout, BlipAisle.layerOffset). */
   --room-wall-period: 120px;
-  --room-mural-period: 720px;
-  --room-mural-offset: 0px;
   --room-carpet-period: 240px;
   /* Three 80px columns × four 40px courses: offset red/black rectangles, seamless horizontally. */
   --room-carpet-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='160' viewBox='0 0 240 160'%3E%3Cpath fill='%23180b08' d='M0 0h240v160H0z'/%3E%3Cpath fill='%236b211c' d='M0 0h160v32H0zM80 80h160v32H80z'/%3E%3Cpath fill='%238d3026' d='M80 40h160v32H80zM0 120h80v32H0z'/%3E%3Cpath fill='%234b1713' d='M0 32h80v8H0zM160 112h80v8h-80zM160 120h80v32h-80z'/%3E%3C/svg%3E");
 
   /* wall: orange-red panels lit from the ceiling, deepening to red-brown at the floor, a little darker at the
-     room's sides. The midtones stay warm where tiles and mural will hang. */
+     room's sides. The midtones stay warm behind the mosaic. */
   background:
     linear-gradient(90deg,rgb(20 5 3 / .62),transparent 16% 84%,rgb(20 5 3 / .62)),
     linear-gradient(180deg,transparent calc(var(--room-floor-y,66%) - 7%),rgb(12 3 2 / .55) var(--room-floor-y,66%)),
@@ -91,59 +90,33 @@
   box-shadow:0 4px 18px -2px rgb(255 198 104 / .6),0 1px 0 #ffe6a0}
 :root[data-room="lite"] #game-grid .aisle-trim {box-shadow:none}
 
-/* Three original painted uprights per repeat, with outlined screens, control slopes and cabinet sides.
-   The ceiling/floor lines meet at the repeat edges. Copies fill the overscan on layout only; the walk
-   translates the scene at .3 of the cabinets' pace, with no independent animation or blur. */
-#game-grid .aisle-mural {position:absolute;z-index:0;top:var(--room-trim-h);
-  height:calc(var(--room-floor-y,68%) - var(--room-trim-h));left:calc(-1 * var(--room-mural-period) - var(--room-mural-offset));right:calc(-1 * var(--room-mural-period));
-  display:flex;overflow:hidden;pointer-events:none;opacity:.72;will-change:transform}
-#game-grid .aisle-mural > svg {flex:0 0 var(--room-mural-period);width:var(--room-mural-period);height:calc(var(--room-mural-period) * 2 / 3)}
-#game-grid .mural-beams {stroke:#d28a40;opacity:.7}
-#game-grid .mural-cabinet {stroke:#572413}
-#game-grid .mural-side {fill:#993a23}
-#game-grid .mural-body {fill:#b65c29}
-#game-grid .mural-marquee {fill:#dba24f}
-#game-grid .mural-screen {fill:#61301b}
-#game-grid .mural-panel {fill:#cf873c}
-#game-grid .mural-detail {stroke:#d58b3e;stroke-width:2}
-#game-grid .mural-control {stroke:#572413;stroke-width:4}
-@media (max-width:499px) {
-  #game-grid {--room-mural-period:360px;--room-mural-offset:24px}
-}
-@media (min-height:1200px) {#game-grid {--room-mural-period:1440px}}
-:root[data-layout="landscape"] #game-grid .aisle-mural {display:none}
-
 @media (min-height:1000px) {
   #game-grid {--room-tall-sign-gap:clamp(70px,calc(var(--room-headroom-px,180px) - 64px),140px);
     --room-tall-sign-h:max(36px,calc(var(--room-headroom-px,180px) - var(--room-tall-sign-gap) - 24px))}
 }
 
-/* Tiles belong to the next room (#76): a single short opening, not a band around the orange hall.
-   The authored map is 14 × 10 squares above seven white rows, each 40 SVG units. Its section is 14 cells
-   wide; the full horizontal repeat includes the orange remainder, one aisle lap (--room-tiles-period,
-   set on layout). Like the signs and panel joints it travels at the wall's perspective rate (#76).
-   Clip the ceramic plane at the wall's foot; don't stretch its squares to fit the available height. */
+/* A continuous ceramic maze wall. Copies fill one repeat of overscan on either side;
+   layout sets the repeat and cell size together so the grout stays square through resize and walking. */
 #game-grid .aisle-tiles {position:absolute;z-index:0;pointer-events:none;overflow:hidden;
-  --tile-size:clamp(24px,calc(var(--room-cab-w,300px) * .14),56px);
-  --tile-cell:calc(var(--tile-size) - 6px / 14);
-  --tile-joint:calc(var(--tile-cell) * .035);
-  left:calc(50% + var(--room-cab-w,300px) * .35);top:var(--room-trim-h);
-  width:calc(var(--tile-size) * 14);height:calc(var(--room-floor-y,68%) - var(--room-trim-h));
-  background-color:color-mix(in srgb,var(--room-tile-white) 82%,#000);
-  background-image:linear-gradient(90deg,var(--room-grout) var(--tile-joint),transparent var(--tile-joint)),
-    linear-gradient(var(--room-grout) var(--tile-joint),transparent var(--tile-joint));
-  background-size:var(--tile-cell) var(--tile-cell);
-  border-inline:3px solid #5b2a18;box-sizing:border-box;
-  box-shadow:inset 8px 0 9px -9px #281207;will-change:transform}
-#game-grid .aisle-tiles svg {display:block;width:100%;height:auto}
+  display:flex;align-items:flex-start;
+  left:calc(-1 * var(--room-tiles-period));right:calc(-1 * var(--room-tiles-period));top:var(--room-trim-h);
+  height:calc(var(--room-floor-y,68%) - var(--room-trim-h));
+  background-color:var(--room-tile-black);
+  background-image:linear-gradient(90deg,var(--room-grout) 1.75%,transparent 1.75%),
+    linear-gradient(var(--room-grout) 1.75%,transparent 1.75%);
+  background-size:var(--room-tile-size) var(--room-tile-size);
+  will-change:transform}
+#game-grid .aisle-tiles svg {display:block;flex:0 0 var(--room-tiles-period);width:var(--room-tiles-period);height:auto}
 #game-grid .tile-black {fill:var(--room-tile-black)}
 #game-grid .tile-white {fill:var(--room-tile-white)}
-#game-grid .tile-green {fill:var(--room-tile-green)}
 #game-grid .tile-purple {fill:var(--room-tile-purple)}
 #game-grid .tile-red {fill:var(--room-tile-red)}
+#game-grid .tile-yellow {fill:var(--room-tile-yellow)}
+#game-grid .tile-blue {fill:var(--room-tile-blue)}
+#game-grid .tile-cyan {fill:var(--room-tile-cyan)}
+#game-grid .tile-pupil {fill:#17213a}
 #game-grid .tile-grout {stroke:var(--room-grout)}
 :root[data-layout="landscape"] #game-grid .aisle-tiles {display:none}
-:root[data-room="lite"] #game-grid .aisle-tiles {box-shadow:none;background-color:var(--room-tile-white)}
 :root[data-room="lite"] #game-grid .tile-glaze {display:none}
 
 /* Carpet: broad offset red/black textile courses (R3). The floor moves with the machines, as established in

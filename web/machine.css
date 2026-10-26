@@ -1,0 +1,80 @@
+/* Physical surfaces shared by the overview cabinet and its game page. Layout stays with each view. */
+[data-machine] {
+  --trim:var(--machine-trim,#9a9aa6);
+  --machine-body:linear-gradient(90deg,#ffffff12,transparent 7% 93%,#0000004d),linear-gradient(180deg,#24212b,#131117 38%,#0d0c11);
+  --machine-monitor:radial-gradient(ellipse at 30% 0,#ffffff12,transparent 50%),#09090c;
+  --machine-monitor-ring:inset 0 0 0 4px #000,inset 0 0 0 5px color-mix(in srgb,var(--trim) 70%,#fff),inset 0 0 0 8px #050507,0 0 0 2px #2c2a31,0 4px 10px #000c;
+  --machine-glare:linear-gradient(160deg,#ffffff1a,#ffffff06 28%,transparent 40%),repeating-linear-gradient(0deg,#0000 0 2px,#00000024 2px 3px),radial-gradient(ellipse at 50% 50%,transparent 58%,#0008);
+  --machine-speaker:radial-gradient(circle,#000 0 1.4px,transparent 1.8px) 0 50%/6px 6px,linear-gradient(#3a3940,#1d1c22);
+  --machine-apron:linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff) 0 1px,var(--trim) 2px 5px,color-mix(in srgb,var(--trim) 55%,#000) 7px,#151318 9px,#252229 11px,#100e13 100%);
+  --machine-marquee:radial-gradient(ellipse 62% 85% at 50% 50%,#ffffff40,transparent 72%),var(--marquee-art,linear-gradient(transparent,transparent)),linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff),var(--trim) 40%,color-mix(in srgb,var(--trim) 45%,#000));
+}
+
+/* The overview's dimensions and 3D transforms are defined in index.html. */
+#game-grid .card {background:var(--machine-body)}
+#game-grid .card-shot-wrap {background:var(--machine-monitor);box-shadow:var(--machine-monitor-ring)}
+#game-grid .game-rom::after {background:var(--machine-glare)}
+#game-grid .machine-speaker {background:var(--machine-speaker)}
+#game-grid .machine-controls::after {background:var(--machine-apron)}
+#game-grid .card-title.machine-marquee,
+:root[data-machine]:not([data-appstyle]) #marquee-bar.jukebox-marquee {background:var(--machine-marquee)!important}
+#game-grid .machine-marquee-name {font:inherit}
+
+/* Up close: the same laminate, narrow coloured molding, speaker and CRT pinstripe. */
+:root {--machine-speaker-band:18px}
+:root[data-layout="landscape"],:root[data-bare],:root[data-fullscreen]:not([data-has-touch]) {--machine-speaker-band:0px}
+:root[data-machine]:not([data-appstyle],[data-amstrad],[data-cabinet-screen],[data-deck-preview]) body {
+  background:var(--machine-body);
+  box-shadow:inset 6px 0 var(--trim),inset -6px 0 var(--trim),inset 8px 0 #0008,inset -8px 0 #0008;
+}
+:root[data-machine]:not([data-appstyle]) #arcade-bezel {
+  top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px) + var(--machine-speaker-band,0px));
+  background:var(--machine-monitor);border:0;border-radius:6px;box-shadow:var(--machine-monitor-ring);
+}
+:root[data-machine]:not([data-appstyle]) #arcade-bezel::before,
+:root[data-machine]:not([data-appstyle]) #arcade-bezel::after {content:none}
+:root[data-machine]:not([data-appstyle]) .cabinet-glass {
+  background:var(--machine-glare);border-radius:16px/20px;box-shadow:0 0 0 3px #000,0 0 14px color-mix(in srgb,var(--trim) 45%,transparent);
+}
+:root[data-machine]:not([data-appstyle]) canvas {clip-path:inset(0 round 16px / 20px)}
+:root[data-machine]:not([data-appstyle]) .cab-rail {
+  background:var(--machine-body);box-shadow:inset 6px 0 var(--trim),inset -2px 0 #0008;
+}
+:root[data-machine]:not([data-appstyle]) .cab-rail::after {background:var(--trim)}
+body > .machine-speaker {
+  position:fixed;z-index:4;pointer-events:none;
+  top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px) + 3px);
+  left:20%;right:20%;height:10px;border-radius:2px;background:var(--machine-speaker);
+  box-shadow:inset 0 1px 2px #000,0 1px #ffffff1c;
+}
+:is(:root[data-layout="landscape"],:root[data-appstyle],:root[data-amstrad],:root[data-cabinet-screen],:root[data-bare],:root[data-fullscreen]:not([data-has-touch])) body > .machine-speaker {display:none}
+:root[data-machine]:not([data-appstyle])[data-layout="upright"] #topbar .deck-housing {
+  border-inline:3px solid var(--trim);border-top-color:#060608;
+  box-shadow:0 0 0 1px #0a080b,0 -4px 9px #0007,inset 1px 0 #fff2,inset -1px 0 #0009;
+}
+:root[data-machine]:not([data-appstyle])[data-layout="upright"] #topbar .deck-housing::before {
+  left:0;right:0;top:auto;bottom:0;height:12px;background:var(--machine-apron);border-radius:0;
+}
+/* Fullscreen and embedded games retain their edge-to-edge play surface. */
+:is(:root[data-bare],:root[data-fullscreen]:not([data-has-touch]),:root[data-amstrad],:root[data-cabinet-screen]) body {box-shadow:none}
+:is(:root[data-bare],:root[data-fullscreen]:not([data-has-touch]),:root[data-amstrad],:root[data-cabinet-screen]) canvas {clip-path:none}
+
+/* The browser matches these physical parts across navigation using their actual rendered bounds. */
+@view-transition {navigation:auto}
+.card-launching .card-shot-wrap {view-transition-name:machine-monitor}
+.card-launching .game-rom {view-transition-name:machine-picture}
+.card-launching .card-title {view-transition-name:machine-title}
+.card-launching .machine-marquee-name {view-transition-name:machine-name}
+.card-launching .machine-controls {view-transition-name:machine-deck}
+:root[data-machine-handoff] #arcade-bezel {view-transition-name:machine-monitor}
+:root[data-machine-handoff] #launch-frame {view-transition-name:machine-picture}
+:root[data-machine-handoff] #marquee-bar {view-transition-name:machine-title}
+:root[data-machine-handoff] .machine-marquee-name {view-transition-name:machine-name}
+:root[data-machine-handoff] #topbar {view-transition-name:machine-deck}
+::view-transition-group(machine-monitor),::view-transition-group(machine-picture),::view-transition-group(machine-title),::view-transition-group(machine-name),::view-transition-group(machine-deck) {
+  animation-duration:760ms;animation-timing-function:cubic-bezier(.22,.7,.2,1);
+}
+::view-transition-old(root),::view-transition-new(root) {animation-duration:760ms;animation-timing-function:ease-in-out}
+@media (prefers-reduced-motion:reduce) {
+  @view-transition {navigation:none}
+}

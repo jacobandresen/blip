@@ -667,6 +667,15 @@ function refit() {
 }
 // A machine started from the arcade zooms into its screen; the game page opens on that same picture, where the
 // game will draw, and lets the first frame come up through it (blip-cabinet-launch, set by the arcade).
+var cabinetTransition = null;
+window.addEventListener('pageswap',function(event){if(event.viewTransition)event.viewTransition.skipTransition();});
+window.addEventListener('pagereveal',function(event){
+  fillCanvas();
+  if(!event.viewTransition){document.documentElement.removeAttribute('data-machine-handoff');return;}
+  if(!document.documentElement.hasAttribute('data-machine-handoff')){event.viewTransition.skipTransition();return;}
+  cabinetTransition=event.viewTransition.finished.catch(function(){});
+  cabinetTransition.then(function(){document.documentElement.removeAttribute('data-machine-handoff');});
+});
 var launchFrame = (function () {
   if (CABINET_SCREEN || blipAppMode() || document.documentElement.hasAttribute('data-appstyle')) return null;
   var launch = null;
@@ -676,24 +685,34 @@ var launchFrame = (function () {
   } catch (e) {}
   if (!launch || !GAME || launch.slug !== GAME.slug || !(Date.now() - launch.at < 15000) || typeof launch.art !== 'string') return null;
   var art;
-  try { art = new URL(launch.art, location.href); } catch (e) { return null; }
-  if (art.origin !== location.origin) return null;
+  if(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(launch.art))art=launch.art;
+  else {
+    try { var url = new URL(launch.art, location.href); } catch (e) { return null; }
+    if (url.origin !== location.origin) return null;
+    art=url.href;
+  }
+  if(launch.native)document.documentElement.setAttribute('data-machine-handoff','');
   var frame = document.createElement('div');
   frame.id = 'launch-frame';
   // Started with a coin in: the picture stays until the game is playing, so its title screen never shows.
   try { if (sessionStorage.getItem('blip-cabinet-start') === GAME.slug && getCoins() > 0) frame.dataset.hold = ''; } catch (e) {}
   frame.setAttribute('aria-hidden', 'true');
-  frame.style.backgroundImage = 'url("' + art.href.replace(/["\\]/g, '') + '")';
+  frame.style.backgroundImage = 'url(' + JSON.stringify(art) + ')';
   document.body.appendChild(frame);
-  // The page shows once the picture has loaded, or the screen would come up black for a frame. Not decode():
-  // a prerendered page (index.html's speculation rules) decodes nothing until it is shown.
+  // Reveal the fallback page only after its frozen picture has loaded.
   var picture = new Image();
   picture.onload = picture.onerror = function () { document.documentElement.removeAttribute('data-launching'); };
-  picture.src = art.href;
+  picture.src = art;
   return frame;
 }());
 function dropLaunchFrame() {
   if (!launchFrame) return;
+  if(document.documentElement.hasAttribute('data-machine-handoff')){
+    requestAnimationFrame(function(){
+      (cabinetTransition||Promise.resolve()).then(function(){document.documentElement.removeAttribute('data-machine-handoff');dropLaunchFrame();});
+    });
+    return;
+  }
   var frame = launchFrame;
   launchFrame = null;
   frame.classList.add('launch-frame-out');
@@ -703,7 +722,10 @@ function dropLaunchFrame() {
 window.addEventListener('resize', fillCanvas);
 window.addEventListener('orientationchange', function () { setTimeout(fillCanvas, 60); });
 fillCanvas();
-if (!launchFrame) document.documentElement.removeAttribute('data-launching');
+if (!launchFrame) {
+  document.documentElement.removeAttribute('data-launching');
+  document.documentElement.removeAttribute('data-machine-handoff');
+}
 
 // Re-fit whenever the deck changes shape (marquee injected, caps added,
 // controller switched) instead of at guessed moments.
@@ -985,34 +1007,17 @@ window.addEventListener('keydown', function (e) {
     var fireHeld = false;
     var rect = null;
 
-    var strip = document.createElement('div');
-    strip.id = 'touch-strip';
-    strip.setAttribute('aria-hidden', 'true');
+    var strip = document.getElementById('touch-strip');
     // Adder steers two snakes: in a two-player match each player drags on their own half, as in Rally.
     var twoSteer = kind === 'drag' && !!(game && game.players === 2);
-    var halves = kind === 'paddles' || kind === 'platform' || twoSteer ? ['P1', '2P'] : [''];
-    strip.innerHTML = '<div class="ts-glass">' +
-      halves.map(function (h, i) {
-        return '<div class="ts-half" data-slot="' + i + '">' +
-          (h ? '<span class="ts-tag">' + h + '</span>' : '') + '</div>';
-      }).join('') +
-      '<span class="ts-demo"></span><span class="ts-thumb"></span><span class="ts-arrow"></span>' +
-      '<span class="ts-hint for-touch">' + (kind === 'drag' ? 'Drag to move &middot; ' : '') +
-      touchSpec.hint + '</span>' +
-      '<span class="ts-hint for-mouse">' + touchSpec.mouseHint + '</span></div>';
     var bar = document.getElementById('topbar');
-    if (bar) bar.appendChild(strip);
     var glass = strip.querySelector('.ts-glass');
 
     // While a second seat is open, a button seats player two (their
     // own join key). Upright it sits in the trackpad, sideways in the
     // bottom-right corner of the screen.
-    var join = null;
-    if (kind === 'platform' || twoSteer) {
-      join = document.createElement('button');
-      join.type = 'button';
-      join.className = 'ts-join';
-      join.innerHTML = '<span class="tj-plus">+</span>2P JOIN';
+    var join = strip.querySelector('.ts-join');
+    if (join) {
       join.addEventListener('pointerdown', function (e) {
         e.preventDefault();
         if (coinGated()) return;
