@@ -65,6 +65,41 @@ test('the home screen shows every game as an app with its own icon, and nothing 
   assert.equal(await page.evaluate(() => blipFrontend()), 'basic');
 });
 
+test('API examples return to the API after opening a game', async (t) => {
+  const { page, origin } = await phone(t);
+  await page.goto(`${origin}/api.html`);
+  const games = await page.locator('a[href*="/index.html?from=api"]').evaluateAll((links) =>
+    [...new Set(links.map((link) => link.getAttribute('href').split('/')[0]))].sort());
+  assert.deepEqual(games, ['bouncer', 'bubbler', 'meteors', 'serpent']);
+  await page.getByRole('link', { name: 'Play Serpent' }).click();
+  await page.waitForURL(`${origin}/serpent/index.html?from=api`);
+  const back = page.locator('.app-back');
+  assert.equal(await back.getAttribute('href'), '../api.html');
+  assert.match(await back.textContent(), /API/);
+  await back.click();
+  await page.waitForURL(`${origin}/api.html`);
+});
+
+test('the Guide can open the API and return to its source chapter', async (t) => {
+  const { page, origin } = await phone(t);
+  await page.goto(`${origin}/guide.html#/t/build-with-blip`);
+  await page.locator('#guide[data-ready]').waitFor();
+  const link = page.locator('#pane-detail a[href="api.html?from=guide"]');
+  await link.waitFor();
+  await link.click();
+  await page.waitForURL(`${origin}/api.html?from=guide`);
+  const back = page.locator('.api-bar a').first();
+  assert.match(await back.textContent(), /Guide/);
+  await back.click();
+  await page.waitForURL(`${origin}/guide.html#/t/build-with-blip`);
+  await page.locator('#guide[data-ready]').waitFor();
+
+  await page.goto(`${origin}/guide.html?embed#/t/build-with-blip`);
+  await page.locator('#guide[data-ready]').waitFor();
+  assert.equal(await page.locator('#pane-detail a[href="api.html?from=guide"]').getAttribute('target'), '_blank',
+    'a Guide sheet keeps its game open when visiting the API');
+});
+
 test('Search finds a game by name, and Enter opens it', async (t) => {
   const { page, origin } = await phone(t);
   await page.goto(`${origin}/home.html`);

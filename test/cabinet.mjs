@@ -333,6 +333,34 @@ test('a drag moves the aisle with the pointer and lets go on a machine; a short 
   assert.equal(await aislePos(page), 1);
 });
 
+test('a quick portrait swipe stops at the next machine', async (t) => {
+  const { page } = await openArcade(t, 390, 844);
+  await page.mouse.move(310, 300);
+  await page.mouse.down();
+  for (let i = 1; i <= 5; i++) await page.mouse.move(310 - i * 22, 300);
+  await page.mouse.up();
+  await aisleStill(page);
+  assert.equal(await aislePos(page), 1);
+  assert.equal(await selectedSlug(page), 'bouncer/index.html');
+});
+
+test('a portrait touch swipe advances one machine without skipping', async (t) => {
+  const { page } = await openArcade(t, 390, 844);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
+  const track = await page.locator('#game-grid').boundingBox();
+  const x = track.x + track.width * .8, y = track.y + 300;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, x, y }] });
+  for (let i = 1; i <= 5; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ id: 1, x: x - i * 22, y }] });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [{ id: 1, x: x - 110, y }] });
+  await aisleStill(page);
+  assert.equal(await aislePos(page), 1);
+  assert.equal(await selectedSlug(page), 'bouncer/index.html');
+});
+
 test('a gamepad stick walks at the pace it is pushed', async (t) => {
   const walk = async (push) => {
     const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 844 } });

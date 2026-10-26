@@ -143,14 +143,20 @@
   panel.parentElement.prepend(el('div', 'deck-housing', '', { 'aria-hidden':'true' }));
   if (game && game.touch && blipHasTouch()) {
     var kind = game.touch.kind;
-    var halves = kind === 'paddles' || kind === 'platform' || (kind === 'drag' && game.players === 2) ? ['P1', '2P'] : [''];
+    var twoTouch = game.players === 2 && (kind === 'drag' || kind === 'action');
+    var halves = kind === 'paddles' || kind === 'platform' || twoTouch ? ['P1', '2P'] : [''];
+    var actions = kind === 'action' ? Array.from({ length: twoTouch ? 2 : 1 }, function (_, player) {
+      return '<div class="ts-actions" data-player="' + player + '">' + game.touch.actions.map(function (label, i) {
+        return '<div class="ts-action" data-button="' + (i + 1) + '">' + label + '</div>';
+      }).join('') + '</div>';
+    }).join('') : '';
     var strip = el('div', '', '<div class="ts-glass">' + halves.map(function (label, i) {
       return '<div class="ts-half" data-slot="' + i + '">' + (label ? '<span class="ts-tag">' + label + '</span>' : '') + '</div>';
-    }).join('') + '<span class="ts-demo"></span><span class="ts-thumb"></span><span class="ts-arrow"></span>' +
+    }).join('') + actions + '<span class="ts-demo"></span><span class="ts-thumb"></span><span class="ts-arrow"></span>' +
       '<span class="ts-hint for-touch">' + (kind === 'drag' ? 'Drag to move &middot; ' : '') + game.touch.hint + '</span>' +
-      '<span class="ts-hint for-mouse">' + game.touch.mouseHint + '</span></div>', { id:'touch-strip', 'aria-hidden':'true' });
+      '<span class="ts-hint for-mouse">' + (game.touch.mouseHint || game.touch.hint) + '</span></div>', { id:'touch-strip', 'aria-hidden':'true' });
     panel.parentElement.appendChild(strip);
-    if (kind === 'platform' || (kind === 'drag' && game.players === 2))
+    if (kind === 'platform' || twoTouch)
       strip.querySelector('.ts-glass').appendChild(el('button','ts-join','<span class="tj-plus">+</span>2P JOIN',{type:'button'}));
   }
   pocketBook(game);

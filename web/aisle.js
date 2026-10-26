@@ -86,7 +86,12 @@ var BlipAisle = (function () {
     if (snapBack) { s.v = 0; s.target = from; return; }
     s.target = coastTarget(s);
     var dir = Math.sign(s.pos - from);
-    if (s.target === from && dir) s.target = from + dir;
+    if (dir) {
+      // Let the distance dragged set the farthest stop. A phone flick can have
+      // high release velocity without the finger ever passing a second machine.
+      var furthest = from + dir * Math.max(1, Math.round(Math.abs(s.pos - from)));
+      if (dir * (s.target - furthest) > 0 || s.target === from) s.target = furthest;
+    }
   }
 
   // Where machine i stands from you, in machines: -n/2 up to n/2.

@@ -42,21 +42,24 @@ function blipHasTouch() {
   return ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 }
 
-/** Touchscreens use gesture strips or the on-screen pad. Rally keeps its dials and split strip;
- * elsewhere the front end selects the arcade's joysticks, home/app touch or BASIC's pads. */
+var blipControlOverride = null;
+/** Touch devices start in touch mode, with a remembered player choice. */
 function blipFrontendControls() {
   var game = blipGameFromPath(window.BLIP_DECK_GAME ? '/' + window.BLIP_DECK_GAME + '/' : location.pathname);
-  if (game && game.slug !== 'rally' && blipHasTouch()) return 'touch';
-  // Rally and non-touch devices can override the front end for another deck.
-  var asked = new URLSearchParams(location.search).get('controls');
+  var asked = blipControlOverride || new URLSearchParams(location.search).get('controls');
+  if (game && game.slug !== 'rally' && blipHasTouch()) {
+    if (asked === 'stick' || asked === 'pad' || asked === 'touch') return asked;
+    try { asked = localStorage.getItem('blip-touch-controls'); } catch (e) {}
+    return asked === 'stick' || asked === 'pad' ? asked : 'touch';
+  }
+  // Rally and non-touch devices keep their established deck selection.
   if (asked === 'stick' || asked === 'pad' || asked === 'touch') return asked;
   if (blipAmstradMode() || /\/basic\.html$/.test(location.pathname)) return 'pad';
   if (!blipFreePlay()) return 'stick';
   return blipFrontend() === 'basic' && !blipAppMode() ? 'pad' : 'touch';
 }
 
-/** Apply the front end's controller as <html data-controls> (+ data-touch). Touch borrows the pad's bar so the
- * picture is fitted the same; a game with no strip is touched through its pad. */
+/** Apply the front end's controller as <html data-controls> (+ data-touch). */
 function blipApplyControls() {
   var root = document.documentElement;
   var game = blipGameFromPath(window.BLIP_DECK_GAME ? '/' + window.BLIP_DECK_GAME + '/' : window.location.pathname);
@@ -66,12 +69,29 @@ function blipApplyControls() {
   if (touch) root.setAttribute('data-touch', game.touch.kind);
   else root.removeAttribute('data-touch');
 }
+function blipSetControls(choice) {
+  if (!blipHasTouch() || !/^(touch|stick|pad)$/.test(choice)) return;
+  var game = blipGameFromPath(location.pathname);
+  if (!game || game.slug === 'rally') return;
+  if (window.blipReleaseTouch) window.blipReleaseTouch();
+  if (window.BlipController) BlipController.releaseAll();
+  blipControlOverride = choice;
+  try { localStorage.setItem('blip-touch-controls', choice); } catch (e) {}
+  if (new URLSearchParams(location.search).has('controls')) {
+    var url = new URL(location.href);
+    url.searchParams.delete('controls');
+    history.replaceState(null, '', url.pathname + url.search + url.hash);
+  }
+  blipApplyControls();
+  window.dispatchEvent(new Event('blip-controls-changed'));
+}
 
 /* ---- Per-game cabinet identity ---- Card colours on the landing page,
  * marquee and bezel glow on each game page. `accent` is an "r, g, b" triple
  * so CSS can build solid and translucent colours. */
 // `buttons` map deck caps; `stick` accepts engage/release and maxR pixels plus hysteresis degrees.
-// `touch.kind`: drag follows a finger, swipe steers by flick, paddles split bats, platform runs/blows/jumps.
+// `touch.kind`: drag follows a finger, swipe steers by flick, paddles split bats,
+// platform runs/blows/jumps, action steers by dragging and has holdable actions.
 // `controls` is the key legend a PC sees after the first coin: [label, keys, alternative keys]; `hint` labels the touch strip; `mouseHint` labels a touchscreen laptop's mouse controls.
 var BLIP_GAMES = {
   serpent:            { name: 'SERPENT',  accent: '50, 200, 50', touchControls: [['STEER',['SWIPE']],['START',['TAP']]], controls: [['STEER',['↑','←','↓','→'],['W','A','S','D']],['START',['SPACE']]],
@@ -82,11 +102,13 @@ var BLIP_GAMES = {
                          touch: { kind: 'drag', hint: 'Hold to fire', mouseHint: 'Point to move &middot; Hold the button to fire' } },
   rally:              { name: 'RALLY',    accent: '220, 50, 50', touchControls: [['1 PLAYER',['TAP LEFT']],['2 PLAYERS',['TAP RIGHT']],['MOVE BAT',['DRAG']]], controls: [['1 PLAYER',['W','S'],['↑','↓']],['2 PLAYERS',['I','K']],['START AND SERVE',['SPACE']]],
                          touch: { kind: 'paddles', hint: 'Drag up or down', mouseHint: 'Point up or down &middot; Click to serve' } },
-  meteors:            { name: 'METEORS',  accent: '180, 180, 180', touchControls: [['TURN AND THRUST',['D-PAD']],['FIRE',['RED BUTTON']],['HYPERSPACE',['BLUE BUTTON']]], controls: [['TURN',['←','→'],['A','D']],['THRUST',['↑'],['W']],['FIRE',['SPACE']],['HYPERSPACE',['Z']]],
+  meteors:            { name: 'METEORS',  accent: '180, 180, 180', touchControls: [['TURN AND THRUST',['DRAG']],['FIRE',['TOUCH FIRE']],['HYPERSPACE',['TOUCH HYPERSPACE']]], controls: [['TURN',['←','→'],['A','D']],['THRUST',['↑'],['W']],['FIRE',['SPACE']],['HYPERSPACE',['Z']]],
+                         touch: { kind: 'action', hint: 'Drag to turn and thrust', actions: ['FIRE', 'HYPER'] },
                          buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }] },
   // Two caps; holding toward hits high. `players: 2` enables the second station; `keys` maps P1 to WASD.
-  brawler:            { name: 'BRAWLER', accent: '220, 60, 40', touchControls: [['MOVE',['D-PAD']],['PUNCH',['RED BUTTON']],['KICK',['BLUE BUTTON']]], controls: [['MOVE',['←','→'],['A','D']],['PUNCH',['SPACE'],['F']],['KICK',['Z'],['G']]],
+  brawler:            { name: 'BRAWLER', accent: '220, 60, 40', touchControls: [['MOVE',['DRAG']],['PUNCH',['TOUCH PUNCH']],['KICK',['TOUCH KICK']]], controls: [['MOVE',['←','→'],['A','D']],['PUNCH',['SPACE'],['F']],['KICK',['Z'],['G']]],
                          players: 2,
+                         touch: { kind: 'action', hint: 'Drag to move', actions: ['PUNCH', 'KICK'] },
                          buttons: [{ key: 'f', code: 'KeyF', label: 'PUNCH' },
                                    { key: 'g', code: 'KeyG', label: 'KICK' }],
                          keys: TWO_PLAYER_KEYS,
@@ -103,7 +125,8 @@ var BLIP_GAMES = {
                          keys: TWO_PLAYER_KEYS },
   // A bullet-weaving shooter: fine nudges. A small dead zone, a long pivot
   // leash so re-centring neutralises, and a firm notch so a dodge holds.
-  raider:         { name: 'RAIDER', accent: '50, 100, 220', touchControls: [['STEER AND THROTTLE',['D-PAD']],['FIRE',['RED BUTTON']]], controls: [['STEER',['←','→'],['A','D']],['THROTTLE',['↑','↓'],['W','S']],['FIRE',['SPACE']]],
+  raider:         { name: 'RAIDER', accent: '50, 100, 220', touchControls: [['STEER AND THROTTLE',['DRAG']],['FIRE',['TOUCH FIRE']]], controls: [['STEER',['←','→'],['A','D']],['THROTTLE',['↑','↓'],['W','S']],['FIRE',['SPACE']]],
+                         touch: { kind: 'action', hint: 'Drag to steer and throttle', actions: ['FIRE'] },
                          stick: { engage: 11, release: 6, maxR: 58, hyst: 12 } },
   // Viper-inspired trail arena: relative left/right turns, passable dim gaps.
   // Space only starts/restarts; J joins player two. Drag steers by horizontal position.
@@ -314,6 +337,7 @@ function blipFreePlay() {
   if (blipAppMode()) return true;
   var q = new URLSearchParams(location.search);
   if (q.get('cabinet') === '1') return false;
+  if (q.get('from') === 'api') return true;
   if (q.has('app')) return true;
   var session = null;
   try { session = sessionStorage.getItem('blip-freeplay'); } catch (e) {}
@@ -324,6 +348,7 @@ function blipFreePlay() {
 /** Where a game page goes back to, relative to the game's directory. */
 function blipFrontendUrl() {
   if (blipAppMode()) return './?app';
+  if (blipGameFromPath(location.pathname) && new URLSearchParams(location.search).get('from') === 'api') return '../api.html';
   if (!blipFreePlay()) return '../index.html';
   return blipFrontend() === 'basic' ? '../basic.html' : '../home.html';
 }

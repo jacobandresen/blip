@@ -39,6 +39,7 @@ var MARQUEE_H  = 94; // marquee and the card receiver beneath it
 var CABINET_SCREEN = new URLSearchParams(location.search).get('cabinet') === '1';
 var GAME = (typeof blipGameFromPath === 'function')
   ? blipGameFromPath(location.pathname) : null;
+var RETURN_TO_API = new URLSearchParams(location.search).get('from') === 'api';
 if (CABINET_SCREEN) document.documentElement.setAttribute('data-cabinet-screen','');
 var FRAME_PAD  = 14; // matches the cabinet screen's inset below the arcade
 
@@ -69,7 +70,9 @@ function returnToCabinet(event) {
   if (CABINET_SCREEN || returningToCabinet) return;
   returningToCabinet = true;
   var departure = { slug:GAME && GAME.slug, at:Date.now() };
-  if (blipAppMode()) {
+  if (RETURN_TO_API) {
+    // The API examples return to the page that launched them.
+  } else if (blipAppMode()) {
     // The game's own app has nowhere else to go: back to its title.
   } else if (blipFrontend() === 'home' && document.documentElement.hasAttribute('data-appstyle')) {
     try { sessionStorage.setItem('blip-home-return', JSON.stringify(departure)); } catch (e) {}
@@ -95,7 +98,7 @@ function returnToCabinet(event) {
   bar.className = 'jukebox-marquee';
   bar.dataset.machine = game.slug;
   var sign = document.createElement('a');
-  sign.href=blipFrontendUrl();sign.title=blipAppMode()?'Back to the title':'Return to the '+({home:'home screen',basic:'BLIP',cabinet:'cabinet'}[blipFrontend()]);
+  sign.href=blipFrontendUrl();sign.title=blipAppMode()?'Back to the title':RETURN_TO_API?'Return to the BLIP API':'Return to the '+({home:'home screen',basic:'BLIP',cabinet:'cabinet'}[blipFrontend()]);
   sign.id = 'marquee-name';
   sign.setAttribute('aria-label', game.name);
   sign.dataset.title = game.name.charAt(0) + game.name.slice(1).toLowerCase();
@@ -129,7 +132,7 @@ function returnToCabinet(event) {
     var back = document.createElement('a');
     back.className = 'app-back';
     back.href = blipFrontendUrl();
-    back.innerHTML = '<svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' + (blipFrontend() === 'basic' ? 'BLIP' : 'Home');
+    back.innerHTML = '<svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' + (RETURN_TO_API ? 'API' : blipFrontend() === 'basic' ? 'BLIP' : 'Home');
     back.addEventListener('click', returnToCabinet);
     document.body.appendChild(back);
   }
@@ -347,27 +350,60 @@ overlay.addEventListener('click', function (e) {
   try { canvas.focus(); } catch (err) {}
 });
 
-// The controls card (kiosk.js builds it): this game's keys, or its touch gestures on a phone.
+// The controls card (kiosk.js builds it): this game's keys and touch choices.
 var cardApi = (function () {
   var noTouch = !document.documentElement.hasAttribute('data-has-touch');
-  var list = GAME && (noTouch ? GAME.controls : GAME.touchControls);
-  if (!list) return null;
+  if (!GAME) return null;
   var appStyle = document.documentElement.hasAttribute('data-appstyle');
   var exitLabel = blipAppMode() ? 'BACK TO THE TITLE' : appStyle ? 'HOME' : 'ANOTHER GAME';
-  // A game in its own app has no Home to tap, only Escape or Backspace back to its title.
-  if (noTouch || !blipAppMode()) list = list.concat([[exitLabel, noTouch ? ['ESC'] : [appStyle ? 'TAP ‹ HOME' : 'TAP BLIP LOGO'], noTouch ? ['BACKSPACE'] : null]]);
+  function cardLegend() {
+    var touch = !noTouch && blipControls() === 'touch';
+    var list = (noTouch ? GAME.controls : GAME.touchControls).slice();
+    if (!noTouch && !touch) {
+      var drive = blipControls() === 'stick' ? 'JOYSTICK' : 'D-PAD';
+      var button = { TAP: 'RED BUTTON', HOLD: 'RED BUTTON', 'FLICK UP': 'BLUE BUTTON',
+        'TOUCH FIRE': 'RED BUTTON', 'TOUCH PUNCH': 'RED BUTTON',
+        'TOUCH HYPERSPACE': 'BLUE BUTTON', 'TOUCH KICK': 'BLUE BUTTON' };
+      list = list.map(function (row) {
+        return [row[0], row[1].map(function (key) { return button[key] || (/^(SWIPE|DRAG|SLIDE)$/.test(key) ? drive : key); })];
+      });
+    }
+    // A game in its own app has no Home to tap, only Escape or Backspace back to its title.
+    if (noTouch || !blipAppMode()) list.push([exitLabel, noTouch ? ['ESC'] : [appStyle ? 'TAP ‹ HOME' : 'TAP BLIP LOGO'], noTouch ? ['BACKSPACE'] : null]);
+    return legendHtml(list);
+  }
+  var canChoose = !noTouch && GAME.slug !== 'rally';
+  var choices = canChoose ? '<div class="cc-control-options" role="group" aria-label="Control style">' +
+    [['touch', 'TOUCH'], ['stick', 'JOYSTICK'], ['pad', 'D-PAD']].map(function (entry) {
+      return '<button type="button" data-control-choice="' + entry[0] + '" aria-pressed="' + (blipControls() === entry[0]) + '">' + entry[1] + '</button>';
+    }).join('') + '</div>' : '';
   var install = blipStandalone() ? '' : '<button type="button" id="cc-install">' +
     (appStyle ? 'Add to Home Screen' : 'ADD ' + GAME.name + ' TO HOME SCREEN') + '</button>';
   // The app's Guide, open at this game's page (the cabinet has its book).
   var guide = appStyle ? '<button type="button" id="cc-guide">Guide</button>' : '';
   install = install || guide ? '<p class="cc-install">' + guide + install + '</p>' : '';
-  return blipControlsCard({
-    label: 'HOW TO PLAY', name: GAME.name, html: '<div class="pc-legend">' + legendHtml(list) + '</div>' + install,
+  var api = blipControlsCard({
+    label: 'HOW TO PLAY', name: GAME.name, html: choices + '<div class="pc-legend">' + cardLegend() + '</div>' + install,
     after: function (open) {
       if (document.documentElement.hasAttribute('data-appstyle')) window.blipPause(open);
       try { canvas.focus({ preventScroll: true }); } catch (e) {}
     }
   });
+  if (canChoose) {
+    var card = document.getElementById('controls-card');
+    Array.prototype.forEach.call(card.querySelectorAll('[data-control-choice]'), function (button) {
+      button.addEventListener('click', function (e) {
+        e.stopPropagation();
+        blipSetControls(button.dataset.controlChoice);
+        card.querySelector('.pc-legend').innerHTML = cardLegend();
+        Array.prototype.forEach.call(card.querySelectorAll('[data-control-choice]'), function (item) {
+          item.setAttribute('aria-pressed', String(item === button));
+        });
+        fillCanvas();
+      });
+    });
+  }
+  return api;
 }());
 
 // ---- The score prompts as iOS alerts (app style) ---- Their labels stay
@@ -1035,6 +1071,11 @@ window.addEventListener('keydown', function (e) {
     // letterboxed to the size the game reported (blip_picture).
     function fitStrip() {
       placeJoin();
+      if (kind === 'action' && blipLandscape()) {
+        glass.style.left = '0px';
+        glass.style.width = '100%';
+        return;
+      }
       if (!bar) return;
       var cr = canvas.getBoundingClientRect(), br = bar.getBoundingClientRect();
       var pic = window.blipPicture, w = cr.width;
@@ -1239,7 +1280,108 @@ window.addEventListener('keydown', function (e) {
     // running picks up again on its next move.
     function resync() {
       for (var id in plat) plat[id].dir = null;
+      if (kind === 'action') Object.keys(actionSteer).forEach(function (who) { actionSteer[who].held = {}; });
     }
+
+    // Action games share a relative thumb area and holdable touch actions.
+    var actionSteer = {}, actionFingers = {};
+    function actionWho(e) {
+      if (!root.hasAttribute('data-versus')) return 0;
+      var bounds = glass.getBoundingClientRect();
+      return e.clientX < bounds.left + bounds.width / 2 ? 0 : 1;
+    }
+    function actionName(who, name) { return who ? 'p2' + name : name; }
+    function steerAction(e) {
+      var steer = Object.values(actionSteer).find(function (item) { return item.id === e.pointerId; });
+      if (!steer) return;
+      var dx = e.clientX - steer.x, dy = e.clientY - steer.y;
+      var next = { left: dx < -14, right: dx > 14, up: dy < -14, down: dy > 14 };
+      ['left', 'right', 'up', 'down'].forEach(function (name) {
+        if (next[name] === steer.held[name]) return;
+        BlipController.set(actionName(steer.who, name), next[name], { silentClick: true });
+        steer.held[name] = next[name];
+      });
+      strip.classList.add('used');
+      strip.classList.add('held');
+    }
+    function releaseAction(id) {
+      Object.keys(actionSteer).forEach(function (who) {
+        var steer = actionSteer[who];
+        if (steer.id !== id) return;
+        Object.keys(steer.held).forEach(function (name) {
+          if (steer.held[name]) BlipController.set(actionName(steer.who, name), false, { silentClick: true });
+        });
+        delete actionSteer[who];
+      });
+      if (actionFingers[id]) {
+        var entry = actionFingers[id], button = entry.button, who = entry.who;
+        delete actionFingers[id];
+        if (!Object.keys(actionFingers).some(function (key) {
+          return actionFingers[key].who === who && actionFingers[key].button === button;
+        })) {
+          BlipController.set(actionName(who, 'button' + button), false);
+          var zone = strip.querySelector('.ts-actions[data-player="' + who + '"] .ts-action[data-button="' + button + '"]');
+          if (zone) zone.classList.remove('held');
+        }
+      }
+      if (!Object.keys(actionSteer).length && !Object.keys(actionFingers).length) strip.classList.remove('held');
+    }
+    function actionDown(e) {
+      if (kind !== 'action' || blipControls() !== 'touch' || ignored(e) || coinGated()) return false;
+      var zone = e.target.closest && e.target.closest('.ts-action');
+      if (zone) {
+        var button = Number(zone.dataset.button), who = Number(zone.parentElement.dataset.player);
+        actionFingers[e.pointerId] = { who: who, button: button };
+        BlipController.set(actionName(who, 'button' + button), true);
+        zone.classList.add('held');
+        strip.classList.add('held', 'used');
+        return true;
+      } else if (onSurface(e)) {
+        var side = actionWho(e);
+        if (actionSteer[side]) return true;
+        actionSteer[side] = { id: e.pointerId, who: side, x: e.clientX, y: e.clientY, held: {} };
+        strip.classList.add('held', 'used');
+        return true;
+      }
+      return false;
+    }
+    function actionTouch(t) {
+      return { target: t.target, pointerId: 'touch-' + t.identifier, clientX: t.clientX, clientY: t.clientY };
+    }
+    // iOS may cancel PointerEvents when another finger lands. The TouchList
+    // keeps each thumb's identity through simultaneous steering and attacks.
+    document.addEventListener('touchstart', function (e) {
+      if (kind !== 'action') return;
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        if (actionDown(actionTouch(e.changedTouches[i]))) e.preventDefault();
+      }
+    }, { passive: false });
+    document.addEventListener('touchmove', function (e) {
+      if (kind !== 'action') return;
+      for (var i = 0; i < e.changedTouches.length; i++) {
+        var touch = actionTouch(e.changedTouches[i]);
+        if (Object.values(actionSteer).some(function (item) { return item.id === touch.pointerId; })) {
+          steerAction(touch); e.preventDefault();
+        }
+      }
+    }, { passive: false });
+    ['touchend', 'touchcancel'].forEach(function (type) {
+      document.addEventListener(type, function (e) {
+        if (kind !== 'action') return;
+        for (var i = 0; i < e.changedTouches.length; i++) releaseAction('touch-' + e.changedTouches[i].identifier);
+      });
+    });
+    window.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'mouse') return;
+      if (actionDown(e)) e.preventDefault();
+    }, { passive: false });
+    window.addEventListener('pointermove', function (e) {
+      if (kind === 'action' && e.pointerType === 'mouse' && Object.values(actionSteer).some(function (item) { return item.id === e.pointerId; })) {
+        e.preventDefault(); steerAction(e);
+      }
+    }, { passive: false });
+    window.addEventListener('pointerup', function (e) { if (kind === 'action' && e.pointerType === 'mouse') releaseAction(e.pointerId); });
+    window.addEventListener('pointercancel', function (e) { if (kind === 'action' && e.pointerType === 'mouse') releaseAction(e.pointerId); });
 
     window.addEventListener('pointerdown', function (e) {
       if (kind !== 'platform') return;
@@ -1253,7 +1395,7 @@ window.addEventListener('keydown', function (e) {
     window.addEventListener('pointerup', function (e) { if (kind === 'platform') platUp(e); });
 
     window.addEventListener('pointerdown', function (e) {
-      if (kind === 'platform') return;
+      if (kind === 'platform' || kind === 'action') return;
       var on = blipControls() === 'touch';
       if (!on && !(kind === 'swipe' && e.target === canvas && e.pointerType !== 'mouse')) return;
       if (ignored(e) || coinGated()) return;
@@ -1340,6 +1482,10 @@ window.addEventListener('keydown', function (e) {
 
     function release() {
       platRelease();
+      if (kind === 'action') {
+        Object.keys(actionSteer).forEach(function (who) { releaseAction(actionSteer[who].id); });
+        Object.keys(actionFingers).forEach(releaseAction);
+      }
       slots[0] = slots[1] = null;
       swipe = null;
       setFire(false);

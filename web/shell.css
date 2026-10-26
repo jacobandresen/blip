@@ -658,6 +658,40 @@ canvas {
     linear-gradient(180deg, #3b3c40 0%, #34353a 100%);
 }
 .ts-half { flex: 1; position: relative; transition: background .12s; }
+.ts-actions { display: none; }
+:root[data-touch="action"] .ts-glass { padding-right: min(38%, 180px); }
+:root[data-touch="action"] .ts-actions {
+  display: flex; gap: 6px;
+  position: absolute; top: 8px; right: 8px; bottom: 26px; width: min(35%, 166px);
+}
+:root[data-touch="action"] .ts-action {
+  flex: 1; display: grid; place-items: center; min-width: 0;
+  border: 1px solid rgba(255,255,255,.22); border-radius: 14px;
+  color: rgba(255,255,255,.85); background: rgba(255,255,255,.09);
+  font: 600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  letter-spacing: .06em; touch-action: none;
+}
+:root[data-touch="action"] .ts-action.held { background: rgba(255,255,255,.26); }
+:root[data-touch="action"] .ts-actions[data-player="1"] { display: none; }
+:root[data-touch="action"] .ts-half + .ts-half { display: none; }
+:root[data-touch="action"] .ts-half.held { background: rgba(255,255,255,.05); }
+:root[data-touch="action"][data-versus] .ts-glass { padding-right: 0; }
+:root[data-touch="action"][data-versus] .ts-half + .ts-half { display: block; }
+:root[data-touch="action"][data-versus] .ts-actions { width: 20%; }
+:root[data-touch="action"][data-versus] .ts-actions[data-player="0"] { right: 52%; }
+:root[data-touch="action"][data-versus] .ts-actions[data-player="1"] { display: flex; right: 2%; }
+:root[data-touch="action"][data-open] .ts-join { left: 10px; right: auto; }
+@media (max-width: 500px) {
+  :root[data-touch="action"][data-versus] .ts-actions { flex-direction: column; width: 23%; gap: 4px; }
+}
+:root[data-touch="action"][data-layout="landscape"] #touch-strip {
+  display: block; position: fixed;
+  left: env(safe-area-inset-left, 0px); right: env(safe-area-inset-right, 0px);
+  bottom: env(safe-area-inset-bottom, 0px); height: 112px; z-index: 6; pointer-events: none;
+}
+:root[data-touch="action"][data-layout="landscape"] .ts-glass {
+  top: 0; bottom: 8px; pointer-events: auto;
+}
 .ts-half + .ts-half { border-left: 1px solid rgba(0, 0, 0, 0.3); box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05); }
 :root[data-touch="paddles"] .ts-half.held { background: rgba(255, 255, 255, 0.05); }
 .ts-tag, .ts-hint {
@@ -681,7 +715,7 @@ canvas {
    the picture fitted between them (fillCanvas measures .ts-half). Below the
    station lamps. */
 :root[data-touch="paddles"][data-layout="landscape"] #touch-strip,
-:root[data-touch][data-layout="landscape"][data-versus] #touch-strip {
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] #touch-strip {
   display: block;
   position: fixed;
   inset: 0;
@@ -690,9 +724,9 @@ canvas {
   pointer-events: none;
 }
 :root[data-touch="paddles"][data-layout="landscape"] .ts-glass,
-:root[data-touch][data-layout="landscape"][data-versus] .ts-glass { display: contents; }
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-glass { display: contents; }
 :root[data-touch="paddles"][data-layout="landscape"] .ts-half,
-:root[data-touch][data-layout="landscape"][data-versus] .ts-half {
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half {
   display: block;
   position: fixed;
   top: 140px;
@@ -711,20 +745,20 @@ canvas {
   touch-action: none;
 }
 :root[data-touch="paddles"][data-layout="landscape"] .ts-half:first-child,
-:root[data-touch][data-layout="landscape"][data-versus] .ts-half:first-child {
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half:first-child {
   left: max(12px, calc(env(safe-area-inset-left, 0px) + 6px));
 }
 :root[data-touch="paddles"][data-layout="landscape"] .ts-half + .ts-half,
-:root[data-touch][data-layout="landscape"][data-versus] .ts-half + .ts-half {
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half + .ts-half {
   right: max(12px, calc(env(safe-area-inset-right, 0px) + 6px));
 }
-:root[data-touch][data-layout="landscape"][data-versus] .ts-half.held {
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half.held {
   background:
     radial-gradient(ellipse 120% 70% at 50% 0%, rgba(255, 255, 255, 0.1), transparent 65%),
     linear-gradient(180deg, #3d3e43 0%, #36373b 100%);
 }
 :root[data-touch="paddles"][data-layout="landscape"] :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow),
-:root[data-touch][data-layout="landscape"][data-versus] :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow) { display: none; }
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow) { display: none; }
 /* Rally has no P2 lamp in that corner: the trackpad says whose it is. */
 :root[data-touch="paddles"][data-layout="landscape"][data-versus] .ts-half + .ts-half .ts-tag { display: block; }
 
@@ -942,12 +976,27 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 .install-close { background: rgba(255, 255, 255, .1); color: #f2f2f7; }
 .install-actions button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .cc-install { margin: 10px 0 0; text-align: center; }
+.cc-control-options { display: flex; gap: 5px; margin: 8px 0 10px; }
+.cc-control-options button {
+  flex: 1; min-width: 0; min-height: 44px; padding: 5px 3px;
+  border: 1px solid currentColor; border-radius: 6px;
+  background: transparent; color: inherit; opacity: .62;
+  font: 600 10px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  letter-spacing: .03em; cursor: pointer;
+}
+.cc-control-options button[aria-pressed="true"] { opacity: 1; background: rgba(255,255,255,.18); }
+.cc-control-options button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .cc-install button {
   padding: 6px 10px; border: 1px solid currentColor; border-radius: 6px; background: none;
   color: inherit; font: inherit; font-size: 11px; letter-spacing: .06em; cursor: pointer;
 }
 /* A phone on its side has no height to spare on the card. */
 :root[data-layout="landscape"] .cc-install { display: none; }
+:root[data-layout="landscape"] #controls-card {
+  top: calc(var(--marquee-h) + env(safe-area-inset-top, 0px) + 10px);
+  padding: 12px 10px 8px;
+}
+:root[data-layout="landscape"] #controls-card .cc-foot { display: none; }
 
 /* ---- App style ---- A game opened from the home screen or its own icon
    wears an app's look: a frosted title bar with a way Home, the game on

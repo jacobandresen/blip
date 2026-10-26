@@ -127,16 +127,16 @@ async fn main() {
         blip.next_frame(60).await;
     }
 }</code></pre>
-          <div class="links"><a href="serpent/index.html">Play Serpent ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/serpent/src/main.rs">See its loop in Rust ↗</a></div>
+          <div class="links"><a href="serpent/index.html?from=api">Play Serpent ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/serpent/src/main.rs">See its loop in Rust ↗</a></div>
         </div>
-        <figure><a href="serpent/index.html"><img src="serpent/screenshot.png" alt="Serpent running on Blip's virtual canvas"></a><figcaption>Serpent draws a crisp 480-pixel board through the same canvas on desktop and phone.</figcaption></figure>
+        <figure><a href="serpent/index.html?from=api"><img src="serpent/screenshot.png" alt="Serpent running on Blip's virtual canvas"></a><figcaption>Serpent draws a crisp 480-pixel board through the same canvas on desktop and phone.</figcaption></figure>
       </div>
     </section>
 
     <section class="section">
       <div class="section-head"><span class="num">02</span><h2>Input that meets players where they are</h2></div>
       <div class="feature reverse">
-        <figure><a href="bouncer/index.html"><img src="bouncer/screenshot.png" alt="Bouncer with paddle, ball, bricks, and score HUD"></a><figcaption>Bouncer reads the same movement from keys, a stick, or a finger dragging the paddle.</figcaption></figure>
+        <figure><a href="bouncer/index.html?from=api"><img src="bouncer/screenshot.png" alt="Bouncer with paddle, ball, bricks, and score HUD"></a><figcaption>Bouncer reads the same movement from keys, a stick, or a finger dragging the paddle.</figcaption></figure>
         <div>
           <p>Pressed-this-frame input is handy for actions; held input is for movement. The browser cabinet maps its controls into the same key events, so your game logic stays portable.</p>
           <pre><code>use blip::input::{key_active, key_pressed,
@@ -148,7 +148,7 @@ if key_active(BLIP_KEY_LEFT) {
 if key_pressed(BLIP_KEY_SPACE) {
     player.fire();
 }</code></pre>
-          <div class="links"><a href="bouncer/index.html">Play Bouncer ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/bouncer/src/main.rs">See input in Rust ↗</a><a href="controls.html">See all controls ↗</a></div>
+          <div class="links"><a href="bouncer/index.html?from=api">Play Bouncer ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/bouncer/src/main.rs">See input in Rust ↗</a><a href="controls.html">See all controls ↗</a></div>
         </div>
       </div>
     </section>
@@ -166,7 +166,7 @@ blip.draw_texture(&amp;ship, x, y, w, h);</code></pre></div>
 blip.draw_centered("PRESS FIRE", 280.0,
                    3.0, BLIP_WHITE);</code></pre></div>
       </div>
-      <div class="links"><a href="meteors/index.html">Play Meteors ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/meteors/src/main.rs">See vector drawing in Rust ↗</a></div>
+      <div class="links"><a href="meteors/index.html?from=api">Play Meteors ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/meteors/src/main.rs">See vector drawing in Rust ↗</a></div>
     </section>
 
     <section class="section">
@@ -188,10 +188,10 @@ web::set_players(1);
 web::report_score(session.score);</code></pre><span class="pill">blip::web</span></div>
       </div>
       <div class="effect-example">
-        <figure><a href="bubbler/index.html"><img src="bubbler/screenshot.png" alt="Bubbler's colorful platforms, bubbles, and pop effects"></a><figcaption>Bubbler keeps its own soft, colorful look while using shared particle motion and lifetime updates.</figcaption></figure>
-        <p>The effect layer handles common motion and timing; a game can keep its own drawing style. This is useful when a stock burst is close, but your particles need custom colors, shapes, or animation. <a href="bubbler/index.html">See it in Bubbler ↗</a></p>
+        <figure><a href="bubbler/index.html?from=api"><img src="bubbler/screenshot.png" alt="Bubbler's colorful platforms, bubbles, and pop effects"></a><figcaption>Bubbler keeps its own soft, colorful look while using shared particle motion and lifetime updates.</figcaption></figure>
+        <p>The effect layer handles common motion and timing; a game can keep its own drawing style. This is useful when a stock burst is close, but your particles need custom colors, shapes, or animation. <a href="bubbler/index.html?from=api">See it in Bubbler ↗</a></p>
       </div>
-      <div class="links"><a href="bubbler/index.html">Play Bubbler ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/bubbler/src/main.rs">See shared effects in use ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/blip/src/lib.rs">Browse the crate exports ↗</a></div>
+      <div class="links"><a href="bubbler/index.html?from=api">Play Bubbler ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/bubbler/src/main.rs">See shared effects in use ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/blip/src/lib.rs">Browse the crate exports ↗</a></div>
     </section>
 
     <section class="section">
@@ -205,7 +205,7 @@ web::report_score(session.score);</code></pre><span class="pill">blip::web</span
             <li>Compare outcomes and relevant counters; keep the change only if the evidence supports it.</li>
           </ol>
           <p>Bouncer records lost lives, the speed at each loss, and level clear times. Add <code>BLIP_BOT_SHOTS</code> to save frames for visual review too. The bot runs only in native builds.</p>
-          <div class="links"><a href="bouncer/index.html">Play Bouncer ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/bouncer/src/bot.rs">Read its bot ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/blip/src/bot.rs">Read bot playtesting API ↗</a></div>
+          <div class="links"><a href="bouncer/index.html?from=api">Play Bouncer ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/bouncer/src/bot.rs">Read its bot ↗</a><a href="https://github.com/jacobandresen/blip/blob/main/crates/blip/src/bot.rs">Read bot playtesting API ↗</a></div>
         </div>
         <pre><code>cargo build --release -p bouncer
 BLIP_BOT=1 BLIP_BOT_MAXT=300 \
@@ -251,5 +251,12 @@ Do not edit generated files under web/.</code></pre>
   </main>
 
   <script src="blip_core.js?v=8"></script>
+  <script>
+    if (new URLSearchParams(location.search).get('from') === 'guide') {
+      var back = document.querySelector('.api-bar a');
+      back.href = 'guide.html#/t/build-with-blip';
+      back.textContent = '‹ Guide';
+    }
+  </script>
 </body>
 </html>

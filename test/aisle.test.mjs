@@ -85,6 +85,20 @@ test('a flick settles on a whole machine ahead within a second', () => {
   assert.ok((s.pos - Math.floor(from) + N) % N >= 1, `${from} -> ${s.pos}`);
 });
 
+test('a quick phone-sized flick cannot skip a machine it never passed', () => {
+  const s = Aisle.create(N, 0);
+  Aisle.dragStart(s, 0);
+  Aisle.dragTo(s, 0.8, 100);
+  Aisle.dragEnd(s, 100);
+  assert.equal(s.target, 1);
+  assert.equal(settle(s).pos, 1);
+  const long = Aisle.create(N, 0);
+  Aisle.dragStart(long, 0);
+  Aisle.dragTo(long, 1.8, 200);
+  Aisle.dragEnd(long, 200);
+  assert.equal(settle(long).pos, 2);
+});
+
 test('a slow drag past half a machine still moves one; a short one springs back', () => {
   const on = Aisle.create(N, 3);
   Aisle.dragStart(on, 0);

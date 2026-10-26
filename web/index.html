@@ -2043,6 +2043,7 @@
       });
       function endDrag(start,e) {
         var dx=e.clientX-start.x,dy=e.clientY-start.y;
+        BlipAisle.dragTo(aisle,start.from-(dx-start.dx0)/start.unit,performance.now());
         BlipAisle.dragEnd(aisle,performance.now(),!swipeEnough(dx,dy));
         wakeAisle();
         suppressPointerClick();

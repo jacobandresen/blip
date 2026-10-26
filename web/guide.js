@@ -78,8 +78,9 @@ function convert(node) {
   if (tag === 'a') {
     var href = node.getAttribute('href') || '';
     var internal = /^(history|controls|about)\.html/.test(href);
-    out.setAttribute('href', internal ? '#/t/' + (href.indexOf('history') === 0 ? 'history-intro' : href.indexOf('about') === 0 ? 'about-intro' : 'getting-started') : href);
-    if (/^https?:/.test(href)) { out.target = '_blank'; out.rel = 'noopener'; }
+    out.setAttribute('href', internal ? '#/t/' + (href.indexOf('history') === 0 ? 'history-intro' : href.indexOf('about') === 0 ? 'about-intro' : 'getting-started')
+      : href === 'api.html' ? 'api.html?from=guide' : href);
+    if (/^https?:/.test(href) || (EMBED && href === 'api.html')) { out.target = '_blank'; out.rel = 'noopener'; }
   }
   if (tag === 'img') { out.src = node.getAttribute('src'); out.alt = node.getAttribute('alt') || ''; return out; }
   Array.prototype.forEach.call(node.childNodes, function (child) { var c = convert(child); if (c) out.appendChild(c); });
