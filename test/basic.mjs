@@ -2026,7 +2026,7 @@ test('the BASIC book turns one readable page at a time on a phone', async (t) =>
   assert.equal(await page.locator('h1').textContent(), 'CONTENTS');
   assert.equal(await page.locator('.cover-front img').getAttribute('src'), 'blip-basic-cover.svg');
   assert.ok(await page.locator('.cover-front img').evaluate((img) => img.complete && img.naturalWidth > 0));
-  assert.equal(await page.locator('.contents-list li').count(), 20);
+  assert.equal(await page.locator('.contents-list li').count(), 23);
   assert.equal(await page.locator('.reader-page:visible').count(), 0);
   await page.locator('[data-turn="next"]').click();
   assert.equal(await page.locator('.reader-page:visible').count(), 1);
@@ -2042,6 +2042,23 @@ test('the BASIC book turns one readable page at a time on a phone', async (t) =>
   assert.match(await page.locator('.reader-page:visible').innerText(), /ARROW KEYS[\s\S]*HOME \/ END[\s\S]*TAB[\s\S]*ESCAPE[\s\S]*saved to the open/);
   await page.locator('[data-turn="prev"]').click();
   assert.match(await page.locator('.reader-page:visible').innerText(), /READ BEFORE YOU CHANGE[\s\S]*MAKE YOUR OWN COPY/);
+  const appendixPages = [];
+  const bouncerPages = [];
+  const meteorsPages = [];
+  while (!(await page.locator('[data-turn="next"]').isDisabled())) {
+    await page.locator('[data-turn="next"]').click();
+    const chapter = page.locator('.reader-page:visible .chapter');
+    const id = await chapter.getAttribute('id');
+    if (id.startsWith('rally-')) appendixPages.push(id);
+    if (id.startsWith('bouncer-')) bouncerPages.push(id);
+    if (id.startsWith('meteors-')) meteorsPages.push(id);
+    assert.equal(await page.locator('.reader-page:visible').count(), 1);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  }
+  assert.deepEqual(appendixPages, ['rally-tour', 'rally-setup', 'rally-serve', 'rally-paddles', 'rally-collisions', 'rally-spin', 'rally-scoring', 'rally-experiments']);
+  assert.deepEqual(bouncerPages, ['bouncer-tour', 'bouncer-levels', 'bouncer-paddle', 'bouncer-flight', 'bouncer-collisions', 'bouncer-bricks', 'bouncer-pickups', 'bouncer-multiball', 'bouncer-art', 'bouncer-experiments']);
+  assert.deepEqual(meteorsPages, ['meteors-tour', 'meteors-waves', 'meteors-flight', 'meteors-shots', 'meteors-rocks', 'meteors-saucer', 'meteors-hyperspace', 'meteors-lives', 'meteors-drawing', 'meteors-experiments']);
+  assert.match(await page.locator('.reader-page:visible').innerText(), /SHOT_LIFE=1.2:FIRE_GAP=0.22/);
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
 });
 
@@ -2065,7 +2082,7 @@ test('the BASIC book shows only its current two-page spread on desktop', async (
   assert.match(await page.locator('.reader-spread').innerText(), /NAME YOUR ROUTINES\.[\s\S]*BLOCKS, LOOPS AND DATA\./);
   const fit = await page.locator('.reader-spread > .reader-page').evaluateAll((pages) => pages.map((sheet) => ({ overflow: getComputedStyle(sheet).overflowY, fits: sheet.scrollHeight <= sheet.clientHeight + 1, scroll: sheet.scrollHeight, height: sheet.clientHeight, chapter: sheet.firstElementChild && sheet.firstElementChild.getBoundingClientRect().height })));
   assert.ok(fit.every((sheet) => sheet.overflow === 'hidden' && sheet.fits), JSON.stringify(fit));
-  for (let spread = 0; spread < 8; spread += 1) {
+  while (!(await page.locator('[data-turn="next"]').isDisabled())) {
     await page.locator('[data-turn="next"]').click();
     await page.waitForTimeout(700);
     const pages = await page.locator('.reader-spread > .reader-page').evaluateAll((sheets) => sheets.map((sheet) => ({ fits: sheet.scrollHeight <= sheet.clientHeight + 1, scroll: sheet.scrollHeight, height: sheet.clientHeight, chapter: sheet.firstElementChild && sheet.firstElementChild.id, zoom: sheet.firstElementChild && getComputedStyle(sheet.firstElementChild).zoom, box: sheet.firstElementChild && sheet.firstElementChild.getBoundingClientRect().height })));

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#1c1915">
   <title>BLIP BASIC · Programming Manual</title>
   <link rel="stylesheet" href="book.css?v=1">
-  <link rel="stylesheet" href="basic-book.css?v=11">
+  <link rel="stylesheet" href="basic-book.css?v=13">
   <script src="book.js?v=3" defer></script>
   <script src="basic-book.js?v=5" defer></script>
 </head>
@@ -47,6 +47,9 @@
                 <li><button type="button" data-go="17"><i>10</i><span>MOVE, TYPE, SAVE AS YOU GO</span><b>19</b></button></li>
                 <li class="sub"><button type="button" data-go="18"><i></i><span>Try a change. Run it.</span><b>20</b></button></li>
                 <li><button type="button" data-go="19"><i>11</i><span>COMMANDS AT A GLANCE</span><b>21</b></button></li>
+                <li><button type="button" data-go="20"><i>A</i><span>INSIDE RALLY · A CODE WALK</span><b>22</b></button></li>
+                <li><button type="button" data-go="28"><i>B</i><span>INSIDE BOUNCER · A CODE WALK</span><b>30</b></button></li>
+                <li><button type="button" data-go="38"><i>C</i><span>INSIDE METEORS · A CODE WALK</span><b>40</b></button></li>
               </ol>
               <p class="imprint">BLIP COMPUTER SYSTEMS · FIRST EDITION 2026</p>
               <div class="page-number">1</div>
@@ -61,16 +64,19 @@
               <div class="running-head">BLIP BASIC</div>
               <p class="eyebrow">CHAPTER ONE</p><h2>YOUR FIRST PROGRAM</h2>
               <p class="lead">BASIC lets you give the computer a short list of instructions. Type a line, press RETURN, then ask BLIP to run the lines in order.</p>
+              <p>You do not need a whole game in your head to begin. Give the machine one small job and see what happens. A greeting today, a bouncing ball tomorrow: both begin with you telling the computer what to do next.</p>
               <pre class="listing"><code>10 PRINT "HELLO WORLD"<br>20 GOTO 10</code></pre>
               <ol class="steps"><li>Type <code>10 PRINT "HELLO WORLD"</code> and press RETURN.</li><li>Type <code>20 GOTO 10</code> and press RETURN.</li><li>Type <code>RUN</code> to start.</li><li>Press ESCAPE to stop and return to BASIC.</li></ol>
               <aside class="note"><strong>LINE NUMBERS</strong>The number at the start tells BASIC where each instruction belongs. Leave gaps—10, 20, 30—so you can add a line later.</aside>
               <p>Type <code>LIST</code> to see the program. Enter a line again to replace it. <code>NEW</code> deletes the program; <code>CLEAR</code> resets variables and the screen but keeps its lines.</p>
+              <p>Try replacing HELLO WORLD with your own message. The computer will repeat it with heroic enthusiasm until you press ESCAPE. You have just changed a program and tested the result. Keep that habit; it takes you a long way.</p>
               <div class="page-number">2</div>
             </section>
             <section class="page chapter" id="programming" style="--ch:2">
               <div class="running-head">NUMBERS, CHOICES &amp; LOOPS</div>
               <p class="eyebrow">CHAPTER TWO</p><h2>NUMBERS, CHOICES &amp; LOOPS</h2>
               <p>A variable is a named place to keep a value. Use words to make a program easier to follow.</p>
+              <p>Think of a scoreboard with room for more than scores. It can remember a player’s position, how many lives remain, or whether the monster has noticed you. Assigning a new value changes what the program remembers.</p>
               <pre class="listing"><code>10 PLAYER_X=150<br>20 LIVES=3<br>30 PRINT "LIVES";LIVES</code></pre>
               <div class="columns"><div><h3>MAKE A DECISION</h3><pre class="listing"><code>10 IF LIVES=0 THEN 100<br>20 PRINT "PLAYING"<br>30 GOTO 10<br>100 PRINT "GAME OVER"</code></pre></div><div><h3>REPEAT A GROUP</h3><pre class="listing"><code>10 FOR STAR=1 TO 8<br>20 PRINT "*";<br>30 NEXT STAR<br>40 PRINT</code></pre></div></div>
               <p><code>GOTO</code> jumps to a line. <code>GOSUB</code> calls a numbered helper; <code>RETURN</code> comes back. A named <code>SUB</code>, over the page, is easier to read. Put multiple statements on a line with colons. <code>IF … THEN</code> controls the rest of that line.</p>
@@ -82,6 +88,7 @@
               <div class="running-head">NUMBERS, CHOICES &amp; LOOPS</div>
               <h2 class="section-title">NAME YOUR ROUTINES.</h2>
               <p class="lead">A <code>SUB</code> is a routine with a name and its own values. Call it by name; BASIC comes back when it reaches <code>END SUB</code>.</p>
+              <p>Imagine shouting “paint a stripe!” to a very literal assistant. The routine is its recipe; the parameters tell it where to paint and which colour to use. Write the recipe once, then call for as many stripes as you need.</p>
               <pre class="listing"><code>10 FOR ROW=0 TO 4<br>20   CALL STRIPE(ROW*80,"BLIP_CYAN")<br>30 NEXT ROW<br>40 END<br>100 SUB STRIPE(Y,C$)<br>110   FILL_RECT(0,Y,640,40,C$)<br>120 END SUB</code></pre>
               <div class="columns"><div><h3>CALL IT EITHER WAY</h3><p><code>CALL STRIPE(0,"BLIP_RED")</code> or just <code>STRIPE 0,"BLIP_RED"</code>. Normal flow steps over a <code>SUB</code>; only a call runs it.</p></div><div><h3>ITS OWN VALUES</h3><p>Parameters and names after <code>LOCAL</code> belong to the call and are put back afterwards. Every other name is shared with the program.</p></div></div>
               <aside class="note"><strong>LEAVE EARLY</strong><code>EXIT SUB</code> returns at once. A <code>SUB</code> may call itself: each call keeps its own parameters.</aside>
@@ -103,6 +110,7 @@
               <div class="running-head">BLIP BASIC</div>
               <p class="eyebrow">CHAPTER THREE</p><h2>READ INPUT. UPDATE. DRAW.</h2>
               <p class="lead">A game runs one frame at a time. Check the controls, change the game state, and draw a new picture.</p>
+              <p>A moving paddle is a sequence of still pictures with a little arithmetic between them. Each trip around the loop asks where it should be now. Draw those answers quickly enough and your eyes supply the movement. No tiny stagehands required.</p>
               <pre class="listing"><code>10 CLEAR("BLIP_BLACK")<br>20 IF KEY_HELD("LEFT") THEN PLAYER_X=PLAYER_X-4<br>30 IF KEY_HELD("RIGHT") THEN PLAYER_X=PLAYER_X+4<br>40 DRAW_TEXTURE("/TAPE/BOUNCER/ASSETS/PADDLE.PNG",PLAYER_X,360,100,16)<br>50 WAIT 16<br>60 GOTO 10</code></pre>
               <h3>KEYBOARD CONTROLS</h3><p><code>KEY_HELD("LEFT")</code> stays true while a key is down; <code>KEY_PRESSED</code> reads a new press and <code>KEY_ACTIVE</code> either. <code>"SPACE"</code> or <code>"FIRE"</code> is fire, <code>"BUTTON2"</code> is Z, and letters A–G, I, J and K work too. <code>INKEY$</code> returns a pressed key as text.</p>
               <p><code>WAIT 16</code> pauses about one frame at 60 frames per second. <code>END</code> finishes the program. ESCAPE and EXIT GAME leave a running game.</p>
@@ -113,9 +121,10 @@
               <div class="running-head">READ INPUT. UPDATE. DRAW.</div>
               <h2 class="section-title">EVERY GAME, THE SAME SHAPE.</h2>
               <p class="lead">Open any tape and you find the same plan. Learn it once and you can find your way round all nine games.</p>
-              <dl class="definitions"><dt>LINES 1–9</dt><dd>What the game is, its keys and its screens. Line 2 says <code>REM GAME:</code> and the game’s name.</dd><dt>LINE 10 · SETUP</dt><dd>Sizes, speeds and colours, each with a name. Music starts at line 80; line 85 picks the first screen.</dd><dt>LINE 100 · MAIN LOOP</dt><dd>Read the keys, update the screen we are on, draw it, <code>WAIT 0</code>, and round again.</dd><dt>LINE 1000 ON</dt><dd>A section for each screen and each thing in the game, under a <code>REM ---</code> heading.</dd></dl>
+              <dl class="definitions"><dt>LINES 1–9</dt><dd>What the game is, its keys and its screens. The <code>REM GAME:</code> comment identifies its controls.</dd><dt>LINE 10 · SETUP</dt><dd>Sizes, speeds and colours, each with a name. Near the end of setup, the music starts and the first screen is chosen; exact line numbers vary by tape.</dd><dt>LINE 100 · MAIN LOOP</dt><dd>Read the keys, update the screen we are on, draw it, <code>WAIT 0</code>, and round again.</dd><dt>LINE 1000 ON</dt><dd>A section for each screen and each thing in the game, under a <code>REM ---</code> heading.</dd></dl>
               <pre class="listing"><code>130 IF STATE$="TITLE" THEN<br>131   UPDATE_TITLE<br>132 ELSEIF STATE$="PLAY" THEN<br>133   UPDATE_PLAY<br>134 ELSE<br>135   UPDATE_OVER<br>136 END IF</code></pre>
               <p>Each screen is a pair of routines: <code>UPDATE_PLAY</code> changes the game and <code>DRAW_PLAY</code> paints it. <code>START_GAME</code> sets up a new game. A routine’s body is indented two spaces, and a line holds one statement.</p>
+              <p>Read the main loop like a contents page. When a name catches your eye, visit that routine, then come back. You can understand the match before you understand every bounce.</p>
               <div class="page-number">7</div>
             </section>
             <section class="page chapter" id="names" style="--ch:3">
@@ -218,8 +227,10 @@
               <div class="running-head">BLIP BASIC</div>
               <p class="eyebrow">CHAPTER NINE</p><h2>OPEN A GAME. STUDY ITS SOURCE.</h2>
               <p class="lead">The games in <code>/TAPE</code> are ordinary BLIP BASIC source files. Load one, read it, then make a copy in your own drawer before changing it.</p>
+              <p>These tapes are invitations to investigate. Play a round first and pick something you recognise: the serve, the score, the moment a brick disappears. Now hunt for the routine that makes it happen. Familiar action gives unfamiliar code a place to land.</p>
               <h3>FIND AND RUN A GAME</h3><pre class="listing"><code>DIR /TAPE<br>LOAD /TAPE/BOUNCER.BLIP<br>RUN</code></pre>
               <p>Choose a cassette from the pile, or use <code>LOAD /TAPE/BOUNCER.BLIP</code> to insert it. <code>DIR /TAPE</code> lists only that cassette’s files. Ejecting it removes those files from the directory. <code>LOAD</code> puts its source into memory; <code>RUN</code> starts it. Press ESCAPE to stop a running game and return to BASIC.</p>
+              <p>Rally makes a friendly first expedition: two paddles, one ball, and a scoreboard with nowhere to hide. Appendix A walks through its actual tape, from the opening instructions to the final point.</p>
               <div class="page-number">17</div>
             </section>
             <section class="page chapter" id="source-copy" style="--ch:9">
@@ -250,9 +261,11 @@
               <div class="running-head">USING THE EDITOR</div>
               <h2 class="section-title">TRY A CHANGE. RUN IT.</h2>
               <p>Change one small thing, press ESCAPE, then enter <code>RUN</code>. If the game behaves differently than you expect, reopen the file and correct the line.</p>
+              <p>Before you run it, make a prediction. Will a bigger number make the paddle faster, wider, or simply very confused? Watch what actually changes. That little conversation between an idea and a running program is how you learn what the code means.</p>
               <pre class="listing"><code>EDIT /USER/MY_BOUNCER.BLIP<br><i>… change a speed or a colour, then ESCAPE …</i><br>RUN</code></pre>
               <h3>KEEP A CLEAN COPY</h3><p>Before a larger experiment, load the tape again and use <code>SAVE BOUNCER_SAFE</code>. You can always begin again from the untouched example.</p>
               <aside class="note"><strong>THE ORIGINAL IS SAFE</strong>Only files in <code>/USER</code> can be edited or deleted. A tape is never overwritten.</aside>
+              <p>If an experiment goes sideways, read the changed line slowly and compare it with the original. Check names, brackets, and quotation marks. Even a stubborn bug becomes less mysterious when you can say exactly what you expected and what happened instead.</p>
               <div class="page-number">20</div>
             </section>
             <section class="page chapter" id="reference" style="--ch:11">
@@ -263,6 +276,342 @@
               <aside class="note"><strong>TRY THIS</strong>Load /TAPE/RALLY.BLIP, inspect it with SOURCE, change one line, and save your own copy.</aside>
               <p class="colophon">BLIP BASIC Programming Manual · First edition, 2026. Lessons follow the hands-on style of early home-computer programming books; the primitive reference matches the BLIP Rust API. References: <i>Retro Gamer</i>, issues 164 and 178.</p>
               <div class="page-number">21</div>
+            </section>
+            <section class="page chapter" id="rally-tour" style="--ch:12">
+              <div class="running-head">INSIDE RALLY</div>
+              <p class="eyebrow">APPENDIX A · THE RALLY CODE WALK</p><h2>TWO PADDLES. ONE PROGRAM.</h2>
+              <p class="lead">Let’s lift the lid on Rally. Everything in this walkthrough comes from <code>/TAPE/RALLY.BLIP</code>: a complete game built from numbers, choices, and a very persistent loop.</p>
+              <pre class="listing"><code>LOAD /TAPE/RALLY.BLIP<br>SAVE MY_RALLY<br>SOURCE<br>EDIT /USER/MY_RALLY.BLIP</code></pre>
+              <p>Load the tape and save your own copy before tinkering. <code>SOURCE</code> lets you read it; <code>EDIT</code> opens your copy. Keep <code>REM GAME: RALLY</code> so BLIP knows which controls belong to it.</p>
+              <h3>YOUR MAP OF THE COURT</h3>
+              <p>Lines 10–90 set the rules. Lines 100–180 run the frame loop. The 1000s draw the title and choose players; the 2000s prepare a match and serve. The 3000s run play, the 4000s move paddles, and the 5000s handle the ball.</p>
+              <p>The 7000s award points, the 8000s finish the match, and the 9000s read keys and draw the court. Follow the routine names as signposts. We will take this tour one bounce at a time.</p>
+              <div class="page-number">22</div>
+            </section>
+            <section class="page chapter" id="rally-setup" style="--ch:12">
+              <div class="running-head">INSIDE RALLY · SETUP AND TIME</div>
+              <h2 class="section-title">GIVE THE GAME ITS RULES.</h2>
+              <p>Setup is the game’s control panel. Line 20 sets <code>WIN=7</code>. Lines 30–45 set paddle size, court positions, and ball size. Line 50 gives the player a speed of 320 pixels per second and the CPU 170. The machine gets a sporting chance, not a teleport button.</p>
+              <pre class="listing"><code>55 SERVE_SPEED=360:SPEED_UP=20:TOP_SPEED=600<br>80 STATE$="TITLE"<br>90 LAST_TIME=TIME()</code></pre>
+              <p>The three speed settings describe the opening serve, the increase after each paddle hit, and the ceiling. <code>STATE$</code> remembers which screen is running. <code>LAST_TIME</code> remembers when the previous frame began.</p>
+              <pre class="listing"><code>110 NOW=TIME()<br>111 DT=CLAMP(NOW-LAST_TIME,0.0001,0.1)<br>112 LAST_TIME=NOW<br>120 READ_KEYS</code></pre>
+              <p><code>DT</code> is elapsed time in seconds. Movement uses speed times <code>DT</code>, so a paddle travels roughly the same distance per second at different frame rates. The clamp limits a single update to a tenth of a second after a long pause.</p>
+              <p>Lines 130–160 choose an update routine and a drawing routine using <code>STATE$</code>. Then <code>WAIT 0</code> yields a frame and <code>GOTO 110</code> starts the next lap. That is the engine room.</p>
+              <div class="page-number">23</div>
+            </section>
+            <section class="page chapter" id="rally-serve" style="--ch:12">
+              <div class="running-head">INSIDE RALLY · INPUT AND SERVING</div>
+              <h2 class="section-title">WHO’S HOLDING THE PADDLE?</h2>
+              <p><code>READ_KEYS</code>, at line 9010, gathers input once per frame. W/S or the arrows control the left paddle; I/K control the right. <code>KEY_ACTIVE</code> supplies movement, while <code>KEY_PRESSED</code> notices a fresh press for choosing players and serving.</p>
+              <p>On the title screen, <code>UPDATE_TITLE</code> checks the right paddle first. Move it and <code>PLAYERS=2</code>; otherwise a left-paddle press or fire chooses one player. One routine, two ways to start a rivalry.</p>
+              <p><code>START_GAME</code> clears both scores, clears the CPU’s aiming error, and randomly picks a serve direction. <code>RESET_FOR_SERVE</code> centres the paddles and ball, stops the ball, and restores its opening speed.</p>
+              <pre class="listing"><code>3030   IF FIRE OR LEFT_MOVED OR RIGHT_MOVED THEN<br>3040     LAUNCH<br>3050     STATE$="PLAY"<br>3060   END IF</code></pre>
+              <p>The serve screen lets you position the paddles before play. A fresh movement press or fire calls <code>LAUNCH</code>. That routine picks a small random angle and uses <code>COS</code> and <code>SIN</code> to split <code>BALL_SPEED</code> into horizontal and vertical velocity.</p>
+              <p>Now <code>STATE$</code> says PLAY. The next update moves a live ball; the drawing code shows the same court without the serve prompt. The match is underway.</p>
+              <div class="page-number">24</div>
+            </section>
+            <section class="page chapter" id="rally-paddles" style="--ch:12">
+              <div class="running-head">INSIDE RALLY · PADDLES AND CPU</div>
+              <h2 class="section-title">A RIVAL WITH LIMITS.</h2>
+              <pre class="listing"><code>4030   LPAD_Y=LPAD_Y+PAD_SPEED*DT*(LEFT_DOWN-LEFT_UP)</code></pre>
+              <p>This line packs a whole control scheme into one expression. Down contributes 1, up contributes −1, and neither contributes 0. Holding both cancels out. Multiplying by speed and elapsed time turns that direction into a distance.</p>
+              <p>In two-player mode the right paddle uses the same recipe. In one-player mode the CPU moves only during PLAY. When the ball travels right, it aims its paddle centre at the ball centre, with <code>AI_ERR</code> nudging the target off perfection.</p>
+              <pre class="listing"><code>4130     RPAD_Y=RPAD_Y+CLAMP(TARGET-RPAD_Y,-REACH,REACH)</code></pre>
+              <p><code>REACH</code> is how far the CPU may travel this frame. The clamp stops it jumping straight to the target. When the ball travels away, the CPU drifts towards <code>HOME_Y</code> at half speed. It has a plan, but it still has to get there.</p>
+              <p>Lines 4150–4160 clamp both paddles inside the court. Because a paddle’s Y value describes its top edge, the lower limit subtracts <code>PAD_H</code> from the screen height.</p>
+              <p>Back in <code>UPDATE_PLAY</code>, Rally compares each paddle’s old and new Y positions and divides by <code>DT</code>. That gives its vertical velocity. Keep that number handy: a moving paddle is about to give the ball some spin.</p>
+              <div class="page-number">25</div>
+            </section>
+            <section class="page chapter" id="rally-collisions" style="--ch:12">
+              <div class="running-head">INSIDE RALLY · BALL AND COLLISIONS</div>
+              <h2 class="section-title">DON’T SKIP THE PADDLE.</h2>
+              <p>A fast ball can cross a thin paddle between pictures. <code>MOVE_BALL</code> deals with this by splitting a frame into smaller steps, aiming for about six pixels of travel per step and allowing at most eight steps.</p>
+              <pre class="listing"><code>5030   SPEED=MAX(1,SQR(BALL_VX*BALL_VX+BALL_VY*BALL_VY))<br>5040   STEPS=CLAMP(-INT(-SPEED*DT/6),1,8)<br>5050   SDT=DT/STEPS</code></pre>
+              <p>The square root measures velocity’s length. <code>-INT(-…)</code> rounds the positive step count up. Each step advances the ball by velocity times <code>SDT</code>, while estimating where the moving paddles were partway through the frame.</p>
+              <p>Before moving, line 5100 saves the ball’s centre as <code>X0,Y0</code>. <code>FNHITS_PADDLE</code>, defined at line 5710, checks the segment from that old centre to the new one against a rectangle expanded by half a ball on every side.</p>
+              <p>Picture the ball’s centre travelling through a slightly fatter paddle. This checks its path, not just its landing spot. Direction checks also make sure a ball moving away does not hit the same paddle again.</p>
+              <p><code>BOUNCE_OFF_WALLS</code> mirrors any overshoot back into the court and points the vertical velocity inward. Paddle hits place the ball just outside the paddle, call <code>BOUNCE</code>, and play the appropriate hit sound.</p>
+              <div class="page-number">26</div>
+            </section>
+            <section class="page chapter" id="rally-spin" style="--ch:12">
+              <div class="running-head">INSIDE RALLY · ANGLES AND SPIN</div>
+              <h2 class="section-title">PUT A LITTLE ENGLISH ON IT.</h2>
+              <p><code>BOUNCE</code>, at line 5510, turns a collision into the next shot. First it adds <code>SPEED_UP</code> to <code>BALL_SPEED</code>, stopping at <code>TOP_SPEED</code>. A long rally gets livelier, but there is a speed limit.</p>
+              <pre class="listing"><code>5540   ANGLE=CLAMP((BALL_Y+BALL/2-PAD_Y)/PAD_H-0.5,-0.5,0.5)*1.1<br>5550   BALL_VX=DIR*BALL_SPEED*COS(ANGLE)<br>5560   BALL_VY=BALL_SPEED*SIN(ANGLE)+PAD_VY*0.25</code></pre>
+              <p>The first expression asks where the ball’s centre struck the paddle. Near the middle, the angle is near zero: a fairly flat return. Near the ends, the return climbs or dives. <code>DIR</code> sends it away from the paddle.</p>
+              <p>The last part adds a quarter of the paddle’s vertical velocity. Sweep upward as you hit and you bend the shot upward. The game calls this spin; here it changes the outgoing direction rather than curving the ball throughout its flight.</p>
+              <p>Adding spin also changes the velocity’s length. Lines 5580–5600 measure that length, divide both components by it, then multiply them by <code>BALL_SPEED</code>. The shot keeps its new direction at the intended speed.</p>
+              <p>After a left-paddle hit, line 5170 chooses a fresh <code>AI_ERR</code>. The CPU now chases a target that may be slightly off centre. A small mistake makes a much better opponent than an all-seeing wall.</p>
+              <div class="page-number">27</div>
+            </section>
+            <section class="page chapter" id="rally-scoring" style="--ch:12">
+              <div class="running-head">INSIDE RALLY · SCORING AND DRAWING</div>
+              <h2 class="section-title">POINT! TAKE A BREATHER.</h2>
+              <pre class="listing"><code>5240     IF BALL_X+BALL&lt;0 THEN AWARD_POINT 0:EXIT SUB<br>5250     IF BALL_X&gt;640 THEN AWARD_POINT 1:EXIT SUB</code></pre>
+              <p>The whole ball must leave the court before a point counts. <code>AWARD_POINT</code> receives a flag: 1 means the left player scored, 0 means the right player scored. It updates the score, aims the next serve towards the player who lost the point, and plays a scoring sound.</p>
+              <p>If either score reaches <code>WIN</code>, the game enters OVER with a two-second timer. Otherwise it resets the court, enters POINT, and waits 1.2 seconds. <code>UPDATE_POINT</code> subtracts <code>DT</code> until the timer reaches zero, then selects SERVE.</p>
+              <p>During POINT, the drawing routine blinks its message using <code>INT(WAIT_LEFT*6) MOD 2</code>. During OVER, it chooses a result message for one or two players. Once the timer expires, a fresh paddle press starts another match with the same player count.</p>
+              <h3>PAINT WHAT THE NUMBERS SAY</h3>
+              <p><code>DRAW_PLAY</code> clears the screen, calls <code>DRAW_NET</code> and <code>DRAW_SCORES</code>, then draws three rectangles: two paddles and the ball. Those simple shapes need no image files. Music and effects come from the tape’s <code>ASSETS</code> folder.</p>
+              <p>The routines that draw the court do not move the ball or award points. Keeping those jobs in update routines makes it easier to change how a match looks without changing its rules.</p>
+              <div class="page-number">28</div>
+            </section>
+            <section class="page chapter" id="rally-experiments" style="--ch:12">
+              <div class="running-head">INSIDE RALLY · YOUR TURN</div>
+              <h2 class="section-title">MAKE A RACKET.</h2>
+              <p class="lead">You have followed an entire match through the code. Now give your copy a personality. Try one change at a time, predict the result, and play a few points before judging it.</p>
+              <h3>A QUICK LUNCHTIME MATCH</h3>
+              <pre class="listing"><code>20 WIN=3</code></pre>
+              <p>Replace line 20 with this and run again. The winning-score check and scoreboard both use <code>WIN</code>, so one change reaches both. That is the reward for naming a rule.</p>
+              <h3>A GENTLER OPENING SERVE</h3>
+              <pre class="listing"><code>55 SERVE_SPEED=240:SPEED_UP=20:TOP_SPEED=600</code></pre>
+              <p>The opening ball slows down, but each return still adds 20. Does the match feel friendlier at first? Play a long rally and notice how the pressure returns.</p>
+              <h3>COACH THE COMPUTER</h3>
+              <pre class="listing"><code>50 PAD_SPEED=320:CPU_SPEED=220</code></pre>
+              <p>The CPU can reach more shots. Its aiming error remains, and it still drifts home at half speed when the ball is moving away. Faster feet do not make it perfect.</p>
+              <aside class="note"><strong>FOLLOW A POINT YOURSELF</strong>Find the line that sends play to POINT, then the line that sends POINT to SERVE. Finally find the call that launches the ball. If you can explain that journey aloud, you can already read a game.</aside>
+              <div class="page-number">29</div>
+            </section>
+            <section class="page chapter" id="bouncer-tour" data-appendix="B" style="--ch:13">
+              <div class="running-head">INSIDE BOUNCER</div>
+              <p class="eyebrow">APPENDIX B · THE BOUNCER CODE WALK</p><h2>BRICKS, BALLS &amp; BEAUTIFUL TROUBLE.</h2>
+              <p class="lead">Rally gave us a ball to return. Bouncer gives us a wall to demolish, presents falling from the rubble, and room for three balls at once. Time to put on your imaginary hard hat.</p>
+              <pre class="listing"><code>LOAD /TAPE/BOUNCER.BLIP<br>SAVE MY_BOUNCER<br>SOURCE<br>EDIT /USER/MY_BOUNCER.BLIP</code></pre>
+              <p>Work in this saved copy and keep <code>REM GAME: BOUNCER</code> intact. Play a round before reading: notice the launch, the paddle’s dash, and what happens when a pickup reaches you. Those are our landmarks.</p>
+              <p>Setup and the frame loop occupy lines 10–180. The 2000s start games and build levels; the 3000s update play and move the paddle. Ball movement continues through the 4000s, and the 5000s handle bricks and scoring.</p>
+              <p>The 6000s manage pickups and extra balls. The 7000s handle lost lives and cleared levels, the 8000s draw the game, and the 9000s finish the display, read controls, and load tables.</p>
+              <p>As in Rally, read the routine names first. You can follow “move paddle, move drops, fly balls” before tackling the geometry that makes a corner bounce look right.</p>
+              <div class="page-number">30</div>
+            </section>
+            <section class="page chapter" id="bouncer-levels" data-appendix="B" style="--ch:13">
+              <div class="running-head">INSIDE BOUNCER · SETUP AND LEVELS</div>
+              <h2 class="section-title">BUILD A WALL WORTH BREAKING.</h2>
+              <p>The screen is 640 × 400, but the court is only 400 pixels wide, beginning at <code>FIELD_X=120</code>. The side panels hold scores and hints. <code>COLS=10</code> and <code>ROWS=6</code> describe the brick grid; they are counts, not screen coordinates.</p>
+              <pre class="listing"><code>2020   SCORE=0:LIVES=3<br>2030   LEVEL=1<br>2040   START_LEVEL</code></pre>
+              <p><code>START_LEVEL</code> builds the wall, restores <code>BALL_SPEED</code> to <code>BALL_START</code>, clears old particles, chooses a tune, and prepares a ball. Odd and even levels alternate the two music tracks. Even demolition deserves a soundtrack.</p>
+              <pre class="listing"><code>2465       IN_LAYOUT (LEVEL-1) MOD 8,C,R<br>2470       BRICK(C,R)=PLACED</code></pre>
+              <p><code>IN_LAYOUT</code> answers whether a grid square contains a brick. Its eight patterns include a full wall, a checkerboard, stripes, and diagonals. <code>MOD 8</code> cycles through them as levels increase.</p>
+              <p><code>BUILD_BRICKS</code> visits each square and may replace a placed brick with a bomb from level two, or steel from level four. It counts every occupied square in <code>BRICKS_LEFT</code>. That number will tell us when the wall is gone.</p>
+              <p>The main loop measures <code>DT</code>, capped at 0.05 seconds, then updates and draws the current state. DEAD and CLEAR share <code>UPDATE_PAUSE</code>; they need a timer rather than a flying ball.</p>
+              <div class="page-number">31</div>
+            </section>
+            <section class="page chapter" id="bouncer-paddle" data-appendix="B" style="--ch:13">
+              <div class="running-head">INSIDE BOUNCER · LAUNCH AND DASH</div>
+              <h2 class="section-title">READY, AIM, SCOOT.</h2>
+              <p><code>NEW_BALL</code> clears temporary effects, centres the paddle, disables all three ball slots, then enables slot 1. It prepares an upward velocity at a small random angle and selects LAUNCH. The ball has its marching orders, but has not marched anywhere yet.</p>
+              <pre class="listing"><code>3040   BALL_X(1)=PAD_X+PAD_W/2-BALL/2<br>3050   BALL_Y(1)=PAD_Y-BALL-2<br>3060   IF FIRE OR KEY_PRESSED("UP") OR KEY_PRESSED("W") THEN STATE$="PLAY"</code></pre>
+              <p>While waiting, these positions keep the ball perched on the moving paddle. Fire, Up, or W changes the state to PLAY. The next play update lets it fly.</p>
+              <p><code>READ_KEYS</code>, at line 9510, separates held directions from fresh taps. Left/Right or A/D move the paddle. <code>MOVE_PADDLE</code> also measures the time between taps of each direction.</p>
+              <p>Tap the same direction twice within 0.28 seconds and a 0.35-second dash begins. <code>BOOST</code> fades as its timer runs down; <code>FNBOOST</code> applies it only in the chosen direction. Keep holding that direction to use the burst of speed.</p>
+              <pre class="listing"><code>3550   PAD_X=CLAMP(PAD_X,FIELD_X,FIELD_X+FIELD_W-PAD_W)<br>3560   PAD_VX=(PAD_X-OLD_X)/DT</code></pre>
+              <p>The clamp keeps the whole paddle inside the court. The final line measures its actual speed after clamping, ready to influence the next rebound. A dash into the wall cannot invent extra movement.</p>
+              <div class="page-number">32</div>
+            </section>
+            <section class="page chapter" id="bouncer-flight" data-appendix="B" style="--ch:13">
+              <div class="running-head">INSIDE BOUNCER · BALL FLIGHT</div>
+              <h2 class="section-title">THIS BALL HAS PLACES TO BE.</h2>
+              <p><code>UPDATE_PLAY</code> moves the paddle, ticks effect timers, moves falling pickups, and updates particles. It then chooses the rebound speed: normally <code>BALL_SPEED</code>, or 60 percent of it while SLOW is active.</p>
+              <pre class="listing"><code>3180   FOR K=1 TO 3<br>3190     IF BALL_ON(K) THEN FLY_BALL K,SPEED<br>3200   NEXT K</code></pre>
+              <p>Each ball has its own positions and velocities in arrays such as <code>BALL_X(K)</code>. The same routine can fly ball 1, 2, or 3. <code>BALL_ON(K)</code> says whether that slot is in use.</p>
+              <p><code>FLY_BALL</code> first calls <code>SEEK_BRICK</code>, <code>CURVE_BALL</code>, and <code>PULL_BALL</code>. After five seconds without breaking a brick, a rising ball gently steers towards the nearest remaining one. This helps finish those awkward last-brick hunts.</p>
+              <p>Spin rotates the velocity a little each frame, fades over time, and allows a total turn of at most 0.75 radians. Pull steepens flat flights. Curving balls also quicken, with actual speed capped at <code>BALL_MAX*1.3</code>.</p>
+              <pre class="listing"><code>3670   STEPS=CLAMP(-INT(-FNSPEED(K)*DT/(BALL*0.4)),1,8)<br>3680   SDT=DT/STEPS</code></pre>
+              <p>The journey is split into small steps, aiming for no more than 40 percent of a ball’s width per step, up to eight steps. Each step moves the ball and checks walls, paddle, and bricks. Smaller hops make thin obstacles harder to skip.</p>
+              <div class="page-number">33</div>
+            </section>
+            <section class="page chapter" id="bouncer-collisions" data-appendix="B" style="--ch:13">
+              <div class="running-head">INSIDE BOUNCER · REBOUNDS</div>
+              <h2 class="section-title">A GOOD BOUNCE NEEDS DIRECTION.</h2>
+              <p><code>BOUNCE_OFF_WALLS</code> mirrors a ball’s overshoot at the left, right, and top boundaries, then points its velocity back inside. There is no bottom wall. Miss the paddle and the ball can leave the screen.</p>
+              <p><code>BOUNCE_OFF_PADDLE</code> checks only falling balls and uses <code>RECTS_OVERLAP</code> to test contact. It resets the brick chain and creates a ring of light. The hit position sets the outgoing angle: the middle sends a steeper shot; the ends aim farther sideways.</p>
+              <p>The paddle’s horizontal velocity adds to the shot. Its motion relative to the incoming ball also sets spin. <code>SET_SPEED</code> gives the new velocity its intended length, and the ball is placed just above the paddle to avoid another immediate collision.</p>
+              <h3>FIND THE NEAREST POINT</h3>
+              <pre class="listing"><code>5190         X=CLAMP(CX,FNBRICK_X(C),FNBRICK_X(C)+BRICK_W)<br>5200         Y=CLAMP(CY,FNBRICK_Y(R),FNBRICK_Y(R)+BRICK_H)<br>5210         DX=CX-X:DY=CY-Y<br>5220         D=SQR(DX*DX+DY*DY)</code></pre>
+              <p>For bricks, the ball is treated as a circle. Clamping its centre to the brick’s bounds finds the nearest point on that rectangle. If the distance <code>D</code> is smaller than the ball’s radius, they overlap.</p>
+              <p>The code reflects velocity away from the contact and pushes the ball outside the brick. It handles the first brick touched, then returns. Corners now have a direction to bounce along, rather than a guess about left versus right.</p>
+              <div class="page-number">34</div>
+            </section>
+            <section class="page chapter" id="bouncer-bricks" data-appendix="B" style="--ch:13">
+              <div class="running-head">INSIDE BOUNCER · BRICKS AND CHAINS</div>
+              <h2 class="section-title">ONE HIT CAN START A PARTY.</h2>
+              <p><code>BRICK(C,R)</code> stores a kind: 0 is empty, 1 plain, 2 bomb, 3 steel, and 4 cracked steel. A hit on kind 3 calls <code>CRACK_BRICK</code>, changing it to 4. The next hit can break it. Steel is stubborn, not immortal.</p>
+              <pre class="listing"><code>5540   BRICK(C,R)=0<br>5550   BRICKS_LEFT=BRICKS_LEFT-1<br>5560   SINCE_BREAK=0<br>5570   CHAIN=CHAIN+1<br>5580   TIMES=MIN(CHAIN,5)<br>5590   POINTS=(ROWS-R)*10*LEVEL*TIMES</code></pre>
+              <p><code>BREAK_BRICK</code> removes the brick before doing anything explosive. It resets the time since the last break and increases the chain. The multiplier stops at five; the next paddle contact resets the chain to zero.</p>
+              <p>The score formula rewards higher rows, later levels, and longer chains. At level one, row 0 is worth 60 points before the multiplier; row 5 is worth 10. <code>SCORE</code> receives the result, particles burst, and a popup celebrates it.</p>
+              <p>Each break raises the base ball speed by 5.5, up to <code>BALL_MAX</code>, and may release a pickup. A bomb also visits its surrounding grid squares and calls <code>BREAK_BRICK</code> on occupied neighbours. Another bomb can continue the chain reaction.</p>
+              <p>Removing each brick first means later calls see an empty square instead of detonating it again. <code>FNON_GRID</code> keeps the search within the array. A little housekeeping lets the fireworks get wonderfully out of hand.</p>
+              <div class="page-number">35</div>
+            </section>
+            <section class="page chapter" id="bouncer-pickups" data-appendix="B" style="--ch:13">
+              <div class="running-head">INSIDE BOUNCER · FALLING PICKUPS</div>
+              <h2 class="section-title">CATCH THE PRESENT. READ THE LABEL.</h2>
+              <p>Line 5650 gives each broken brick a 3-in-10 chance to try dropping a pickup. <code>DROP_PICKUP</code> looks for an unused slot among eight; if all are busy, it returns. A crowded sky does not need an endless array.</p>
+              <pre class="listing"><code>6080   ROLL=INT(RND(10))<br>6090   DROP(D)=DROP_FOR_ROLL(ROLL)+1<br>6100   DROP_X(D)=X:DROP_Y(D)=Y</code></pre>
+              <p>The roll selects a kind through a lookup table. Adding one leaves zero available to mean “unused slot.” When the paddle catches a drop, the code subtracts one again before calling <code>CATCH</code>.</p>
+              <p><code>MOVE_DROPS</code> lowers each active pickup by <code>94*DT</code>. Rectangle overlap with the paddle collects it; falling below the screen simply frees the slot. Either way, setting <code>DROP(D)=0</code> makes room for another.</p>
+              <h3>FIVE KINDS OF SURPRISE</h3>
+              <p>WIDE sets the paddle width to 102; NARROW shrinks it to 36. Both last eight seconds. SLOW has its own eight-second timer. LIFE adds one life, and MULTI asks <code>SPLIT_BALL</code> to fill spare ball slots.</p>
+              <p><code>TICK_EFFECTS</code> counts timers down during play. When the width timer reaches zero, the paddle returns to 64 pixels. <code>CLEAR_EFFECTS</code> restores normal width, clears both timers, and removes falling drops when a fresh ball is prepared.</p>
+              <p>The wide paddle is tempting, but chasing it still takes you away from the ball. The code hands out possibilities; you supply the questionable decisions.</p>
+              <div class="page-number">36</div>
+            </section>
+            <section class="page chapter" id="bouncer-multiball" data-appendix="B" style="--ch:13">
+              <div class="running-head">INSIDE BOUNCER · MULTIBALL AND LIVES</div>
+              <h2 class="section-title">THREE BALLS. STILL ONE PADDLE.</h2>
+              <p><code>SPLIT_BALL</code> finds the first active ball, then copies its position and velocity into unused slots. Each new ball turns to one side; the next turns to the other. The original keeps flying. If no slots are free, there is nothing to add.</p>
+              <pre class="listing"><code>6630       TURN_BALL K,0.45*SIDE<br>6640       REM NEVER STRAIGHT ALONG THE PADDLE LINE<br>6650       IF ABS(BALL_VY(K))&lt;FNSPEED(K)*0.3 THEN BALL_VY(K)=-FNSPEED(K)*0.3<br>6660       BALL_SPIN(K)=0:BALL_CURVE(K)=0<br>6670       SIDE=-SIDE</code></pre>
+              <p>The vertical-speed check keeps a new ball from travelling almost horizontally. Its spin and curve history start at zero. Now the ordinary ball loop can handle all three without a special multiball movement routine.</p>
+              <p>A ball below the screen sets its own <code>BALL_ON(K)</code> to zero. After moving the balls, <code>UPDATE_PLAY</code> adds up those flags. A life is lost only when no balls remain. One survivor is enough to keep the demolition crew working.</p>
+              <p><code>LOSE_LIFE</code> removes a life and selects DEAD for a 1.2-second pause, or OVER for a two-second pause if none remain. After DEAD, <code>UPDATE_PAUSE</code> prepares another launch on the same wall.</p>
+              <p>When <code>BRICKS_LEFT</code> reaches zero, CLEAR pauses for 1.5 seconds. Then <code>LEVEL</code> increases and <code>START_LEVEL</code> builds the next wall. Game over waits for its timer and a fresh fire press before resetting the score and lives.</p>
+              <div class="page-number">37</div>
+            </section>
+            <section class="page chapter" id="bouncer-art" data-appendix="B" style="--ch:13">
+              <div class="running-head">INSIDE BOUNCER · DRAWING AND DATA</div>
+              <h2 class="section-title">DRESS UP THE DEMOLITION.</h2>
+              <p><code>DRAW_PLAY</code> visits the brick grid, draws falling pickups, paints the paddle and active balls, then adds effects, panels, and scores. It reads the same arrays the update routines changed. The picture is a report of the game’s current state.</p>
+              <p><code>DRAW_BALL</code> selects one of twelve rolling frames from <code>BALL.PNG</code>, then overlays <code>BALL_SHADE.PNG</code>. Horizontal velocity advances the roll value during flight. The sphere appears to turn without needing a different file for every moment.</p>
+              <p><code>DRAW_PADDLE</code> draws three pieces from one texture: left cap, middle, right cap. Stretching only the middle lets WIDE and NARROW change the paddle’s size while keeping tidy ends. The artwork and the rule share the same <code>PAD_W</code>.</p>
+              <h3>A SMALL TABLE DOES A BIG JOB</h3>
+              <pre class="listing"><code>9692 DATA "WIDE","NARROW","SLOW","LIFE","MULTI"<br>9693 DATA 0,0, 2,2, 4,4, 1,1,1, 3</code></pre>
+              <p><code>LOAD_TABLES</code> reads names and roll results into arrays. The ten entries on line 9693 make WIDE, SLOW, and MULTI each appear on two rolls, NARROW on three, and LIFE on one. These are the odds after a drop has been created.</p>
+              <p>The same setup builds image filenames for each brick kind and row. Changing a table can change the game’s personality without rewriting the loops that move or draw its objects. Data can be a designer’s favourite shortcut.</p>
+              <div class="page-number">38</div>
+            </section>
+            <section class="page chapter" id="bouncer-experiments" data-appendix="B" style="--ch:13">
+              <div class="running-head">INSIDE BOUNCER · YOUR TURN</div>
+              <h2 class="section-title">YOUR WALL. YOUR RULES.</h2>
+              <p class="lead">Keep your saved copy handy. Try these changes separately, run the game, and explain the result before reaching for another number.</p>
+              <h3>GIVE YOURSELF A LITTLE BREATHING ROOM</h3>
+              <pre class="listing"><code>2020   SCORE=0:LIVES=5</code></pre>
+              <p>Replace line 2020, then start a new game. You have five lives, although the side panel draws at most four little ball icons. Find <code>MIN(LIVES,4)</code> in <code>DRAW_SCORES</code>: the display and the rule have separate limits.</p>
+              <h3>LET THE PRESENTS TAKE THEIR TIME</h3>
+              <pre class="listing"><code>6240       DROP_Y(D)=DROP_Y(D)+60*DT</code></pre>
+              <p>Replace the original fall speed of 94 with 60. Pickups stay aloft longer, giving you more time to catch them. With only eight drop slots, what happens during a very busy chain reaction?</p>
+              <h3>HOLD THE NARROW</h3>
+              <pre class="listing"><code>9693 DATA 0,0, 2,2, 4,4, 0,0,0, 3</code></pre>
+              <p>Replace the three kind-1 entries with kind 0. Rolls that gave NARROW now give WIDE. Keep ten entries, then run again so <code>LOAD_TABLES</code> reads your new recipe.</p>
+              <aside class="note"><strong>FOLLOW THE WHOLE CHAIN</strong>Trace one brick from <code>HIT_BRICKS</code> through <code>BREAK_BRICK</code>, <code>DROP_PICKUP</code>, and <code>CATCH</code>. Then find where a width effect expires. You have followed a rule from collision to reward and back to normal.</aside>
+              <div class="page-number">39</div>
+            </section>
+            <section class="page chapter" id="meteors-tour" data-appendix="C" style="--ch:14">
+              <div class="running-head">INSIDE METEORS</div>
+              <p class="eyebrow">APPENDIX C · THE METEORS CODE WALK</p><h2>SMALL SHIP. BIG ROCK PROBLEM.</h2>
+              <p class="lead">Welcome aboard. Your ship turns, thrusts, and drifts; the rocks split when shot; the saucer has opinions about your continued existence. Let’s find the code behind all that commotion.</p>
+              <pre class="listing"><code>LOAD /TAPE/METEORS.BLIP<br>SAVE MY_METEORS<br>SOURCE<br>EDIT /USER/MY_METEORS.BLIP</code></pre>
+              <p>Save a copy before experimenting and keep <code>REM GAME: METEORS</code> so it retains the game’s controls. Try a short flight first. Notice how turning changes your heading before it changes your direction of travel.</p>
+              <p>Lines 10–180 set up the game and run the frame loop. The 2000s start waves, prepare the ship, and create rocks. The 3000s fly the ship, fire shots, jump to hyperspace, and check what struck you.</p>
+              <p>The 4000s move the world and split rocks. The 5000s run the saucer, the 6000s award points and remove lives, and the 7000s arrange a return after a crash. The 8000s draw the action; the 9000s handle game over, controls, and helper functions.</p>
+              <p>We will follow one flight from its first puff of thrust to a new wave. Keep an eye on the difference between where something points, how fast it moves, and where it is. Space is quite particular about those details.</p>
+              <div class="page-number">40</div>
+            </section>
+            <section class="page chapter" id="meteors-waves" data-appendix="C" style="--ch:14">
+              <div class="running-head">INSIDE METEORS · SETUP AND WAVES</div>
+              <h2 class="section-title">FILL THE SKY, LEAVE SOME ROOM.</h2>
+              <p>The playfield begins below the score display at <code>TOP=28</code>. It is 640 pixels wide and 372 high. Setup names the ship’s turning rate, acceleration, speed limit, and collision radius, then loads the three rock sizes from DATA.</p>
+              <p><code>START_GAME</code> clears the score, gives you three lives, starts wave one, and sets the first bonus-life target. It clears shots, resets the saucer, prepares the ship, and selects PLAY.</p>
+              <pre class="listing"><code>2250   FOR K=1 TO MIN(WAVE+2,12)<br>2260     FIND_CLEAR_SPOT<br>2265     RANDOM_VELOCITY 1<br>2270     SPAWN_ROCK 1,SPOT_X,SPOT_Y,VEL_X,VEL_Y<br>2280   NEXT K</code></pre>
+              <p>Wave one begins with three large rocks. Each later wave adds one, up to twelve. <code>FIND_CLEAR_SPOT</code> chooses a position more than <code>SAFE_R</code> from the ship’s centre, or from the middle of the field if the ship is absent.</p>
+              <p><code>RANDOM_VELOCITY</code> chooses an angle and a speed appropriate to the rock’s size. <code>SPAWN_ROCK</code> looks for a free slot in the 48-rock array and stores its size, position, velocity, spin, and jagged outline.</p>
+              <p>The frame loop measures <code>DT</code>, capped at 0.05 seconds, reads controls, then updates and draws its state. <code>WAIT 0</code> yields the frame. This familiar loop now has a whole asteroid field to supervise.</p>
+              <div class="page-number">41</div>
+            </section>
+            <section class="page chapter" id="meteors-flight" data-appendix="C" style="--ch:14">
+              <div class="running-head">INSIDE METEORS · THRUST AND DRIFT</div>
+              <h2 class="section-title">POINTING ISN’T TRAVELLING.</h2>
+              <p><code>READ_KEYS</code> maps Left/Right or A/D to turning, Up or W to thrust, and Space to shooting. A fresh second-button press requests hyperspace. <code>UPDATE_PLAY</code> flies the ship, updates the world, then checks collisions if protection has expired.</p>
+              <pre class="listing"><code>3130   SHIP_ANGLE=SHIP_ANGLE+(TURN_RIGHT-TURN_LEFT)*TURN_RATE*DT<br>3140   IF THRUST THEN<br>3150     SHIP_VX=SHIP_VX+SIN(SHIP_ANGLE)*ACCEL*DT<br>3160     SHIP_VY=SHIP_VY-COS(SHIP_ANGLE)*ACCEL*DT<br>3190   END IF</code></pre>
+              <p>Turning changes <code>SHIP_ANGLE</code>. Thrust adds to velocity along that heading. At angle zero, sine is zero and cosine is one, so thrust points up the screen: negative Y.</p>
+              <p>Your old velocity remains when you turn. Point left while drifting right and you must thrust to change course. That gap between heading and momentum is the heart of the controls.</p>
+              <pre class="listing"><code>3200   DRAG=EXP(-0.35*DT)<br>3210   SHIP_VX=SHIP_VX*DRAG:SHIP_VY=SHIP_VY*DRAG</code></pre>
+              <p>A little drag gently reduces velocity even without thrust. The exponential makes that damping depend on elapsed time. The next lines measure speed and scale both components down together if it exceeds <code>MAX_SPEED</code>.</p>
+              <p>Finally, velocity times <code>DT</code> advances position. <code>WRAP</code> brings the ship back through the opposite edge. The screen has boundaries, but your flight does not have to stop at them.</p>
+              <div class="page-number">42</div>
+            </section>
+            <section class="page chapter" id="meteors-shots" data-appendix="C" style="--ch:14">
+              <div class="running-head">INSIDE METEORS · SHOTS AND HITS</div>
+              <h2 class="section-title">A SHOT NEEDS MORE THAN A DOT.</h2>
+              <p>Holding fire requests shots repeatedly, but <code>FIRE_WAIT</code> enforces a gap of 0.22 seconds. <code>FIRE_SHOT</code> searches ten shot slots and returns if all are occupied. A free slot gets the ship’s position and a short lifetime.</p>
+              <pre class="listing"><code>3480   SHOT_VX(B)=SIN(SHIP_ANGLE)*SHOT_SPEED+SHIP_VX*0.3<br>3490   SHOT_VY(B)=-COS(SHIP_ANGLE)*SHOT_SPEED+SHIP_VY*0.3<br>3500   SHOT_LEFT(B)=SHOT_LIFE<br>3510   FIRE_WAIT=FIRE_GAP</code></pre>
+              <p>The shot leaves along the ship’s heading and inherits 30 percent of its velocity. Firing while moving therefore changes the shot’s path. <code>SHOT_LIFE=0.85</code> keeps a missed shot from touring the universe forever.</p>
+              <p><code>MOVE_SHOTS</code> wraps player shots around the playfield and counts their lives down. The saucer’s shot behaves differently: it moves without wrapping and disappears when it leaves the field.</p>
+              <p><code>SHOTS_HIT</code> visits active shots and rocks. Its <code>FNSHOT_HITS</code> helper reconstructs a segment using the shot’s position, velocity, and <code>DT</code>, then calls <code>SEGMENT_CIRCLE_OVERLAP</code>. Checking a path helps catch fast shots that pass through a target between pictures.</p>
+              <p>A rock hit disables the shot, awards that size’s points, plays a bang, and calls <code>BREAK_ROCK</code>. Only a shot still active after the rock checks can hit the saucer. One little flag prevents the same shot collecting two targets in that pass.</p>
+              <div class="page-number">43</div>
+            </section>
+            <section class="page chapter" id="meteors-rocks" data-appendix="C" style="--ch:14">
+              <div class="running-head">INSIDE METEORS · ROCKS AND FRAGMENTS</div>
+              <h2 class="section-title">CONGRATULATIONS. MORE ROCKS.</h2>
+              <p><code>ROCK(I)</code> is both an activity flag and a size code: 0 is free, 1 large, 2 medium, and 3 small. The size selects radius, scoring, sound, and a speed range from tables.</p>
+              <pre class="listing"><code>9890 DATA 30, 20,44, 20, "LARGE"<br>9891 DATA 17, 36,76, 50, "MEDIUM"<br>9892 DATA 9, 64,120, 100, "SMALL"</code></pre>
+              <p>Read each row as radius, slowest speed, fastest speed, points, and sound name. Smaller rocks are worth more and have faster speed ranges. Their fragments also inherit motion, so these ranges are not a universal speed limit.</p>
+              <pre class="listing"><code>4730   SIZE=ROCK(I)<br>4740   ROCK(I)=0<br>4760   IF SIZE=3 THEN EXIT SUB</code></pre>
+              <p><code>BREAK_ROCK</code> remembers the size, frees the parent slot, and creates a burst. A small rock ends there. Larger rocks split into two children of size <code>SIZE+1</code>.</p>
+              <p>The routine chooses a random axis. Each child receives a kick on an opposite side of it, plus inherited rock velocity and a little of the shot’s velocity. Splitting a rock changes the traffic instead of merely replacing one drawing with two smaller ones.</p>
+              <p><code>MOVE_ROCKS</code> advances and wraps positions, then updates rotation. After the shot checks, <code>CHECK_WAVE</code> scans all rock slots. If none remain, it increases <code>WAVE</code> and starts another field. The saucer does not have to be gone.</p>
+              <div class="page-number">44</div>
+            </section>
+            <section class="page chapter" id="meteors-saucer" data-appendix="C" style="--ch:14">
+              <div class="running-head">INSIDE METEORS · THE SAUCER</div>
+              <h2 class="section-title">THE NEIGHBOURS HAVE ARRIVED.</h2>
+              <p><code>FLY_SAUCER</code> counts down a waiting timer while no saucer is active. When it expires, <code>SPAWN_SAUCER</code> chooses a side and height. The visitor crosses horizontally with a little vertical bobbing, then leaves beyond the opposite edge.</p>
+              <p>Below 5,000 points, the saucer is always big. After that, a wave-dependent chance can produce the small version. Smaller means harder to hit and better at aiming. Apparently the compact model costs extra.</p>
+              <pre class="listing"><code>5420   IF SAUCER_BIG THEN SPREAD=0.35 ELSE SPREAD=0.04<br>5430   AIM=ATAN2(SHIP_Y-SAUCER_Y,SHIP_X-SAUCER_X)+RND(2*SPREAD)-SPREAD</code></pre>
+              <p><code>ATAN2</code> finds the direction from saucer to ship. A random offset adds aiming error. The big saucer gets a wider spread; the small one shoots much closer to that direction.</p>
+              <p>The enemy has a single shot slot. Firing writes a position and velocity into it, replacing an earlier enemy shot if one is still flying. There is no hidden enemy bullet array to hunt through.</p>
+              <p>Later waves shorten the saucer’s waiting range and firing gap, within limits. <code>DRAW_SAUCER</code> lights its core during the last <code>TELL=0.4</code> seconds before a shot, while the ship is present. That flash is information you can use.</p>
+              <p>Destroying a big saucer awards 200 points; a small one awards 1,000. Both use <code>AWARD</code>, the same scoring routine as the rocks. Shared rules keep the scorekeeper honest.</p>
+              <div class="page-number">45</div>
+            </section>
+            <section class="page chapter" id="meteors-hyperspace" data-appendix="C" style="--ch:14">
+              <div class="running-head">INSIDE METEORS · HYPERSPACE AND DAMAGE</div>
+              <h2 class="section-title">THE BIG RED MAYBE BUTTON.</h2>
+              <p>Hyperspace is an escape with a gamble attached. A fresh second-button press calls <code>HYPERSPACE</code>, which tries up to sixteen random destinations. At each, it checks whether rocks are farther away than their radius, the ship’s radius, and a 40-pixel margin.</p>
+              <pre class="listing"><code>3628     IF FREE THEN EXIT FOR<br>3630   NEXT TRY<br>3640   SHIP_VX=0:SHIP_VY=0<br>3650   IF RND(20)&lt;1 THEN KILL_SHIP</code></pre>
+              <p>A clear candidate ends the search early. If all sixteen fail, the last candidate remains; this is a limited search, not a promise of safety. The test looks at rocks, not the saucer or its shot.</p>
+              <p>The jump cancels your velocity. It then has a one-in-twenty chance of calling <code>KILL_SHIP</code> outright. This deliberate risk is separate from landing near a hazard. Hyperspace is a dramatic exit, not an insurance policy.</p>
+              <h3>WHAT COUNTS AS A CRASH?</h3>
+              <p><code>CHECK_SHIP</code> checks the enemy shot, rocks, then the saucer itself. Distances between centres are compared with collision radii. A rock collision also calls <code>BREAK_ROCK</code>, but does not award shooting points.</p>
+              <p>The main play update calls these collision checks only while <code>INVULN</code> is zero. Hyperspace’s random failure calls <code>KILL_SHIP</code> directly, so the blinking protection does not cancel that gamble. Following the caller explains which rules apply.</p>
+              <div class="page-number">46</div>
+            </section>
+            <section class="page chapter" id="meteors-lives" data-appendix="C" style="--ch:14">
+              <div class="running-head">INSIDE METEORS · LIVES AND RETURNING</div>
+              <h2 class="section-title">SPACE CARRIES ON WITHOUT YOU.</h2>
+              <p><code>AWARD</code> adds points and compares the new score with <code>NEXT_LIFE</code>. Crossing the target adds a life, plays a sound, and moves the target forward by <code>EXTRA_LIFE</code>, initially 10,000.</p>
+              <p><code>KILL_SHIP</code> first checks whether the ship is already absent. That guard prevents a second call from removing another life for the same explosion. It switches the ship off, creates particles, and subtracts one life.</p>
+              <pre class="listing"><code>6160   IF LIVES&gt;0 THEN<br>6170     STATE$="DEAD"<br>6180     WAIT_LEFT=RESPAWN_TIME<br>6190   ELSE<br>6200     STATE$="OVER"<br>6210     WAIT_LEFT=2<br>6220   END IF</code></pre>
+              <p>With lives remaining, DEAD begins a 1.6-second wait. <code>UPDATE_DEAD</code> still calls <code>UPDATE_WORLD</code>: shots fly, rocks drift, and the saucer moves. Losing a ship does not freeze the field.</p>
+              <p>After the wait, the routine checks rocks around the centre. If one is within <code>SAFE_R</code>, it waits another 0.4 seconds and tries again. Otherwise <code>RESPAWN_SHIP</code> puts you in the middle, stationary and pointing upward, with 2.5 seconds of protection.</p>
+              <p>With no lives left, OVER shows the final score and wave. Its two-second timer gives you a moment to read the result before a fresh fire press starts again. Even an enthusiastic Space bar needs to let the scoreboard have its moment.</p>
+              <div class="page-number">47</div>
+            </section>
+            <section class="page chapter" id="meteors-drawing" data-appendix="C" style="--ch:14">
+              <div class="running-head">INSIDE METEORS · VECTOR DRAWING</div>
+              <h2 class="section-title">DRAW A UNIVERSE WITH LINES.</h2>
+              <p><code>DRAW_PLAY</code> clears to black, draws active rocks and shots, adds the saucer and ship, then paints effects and the score display. A fading wave announcement uses <code>WAVE_TIME</code> to ease into the action.</p>
+              <p>The ship is three lines joining a nose and two rear corners. <code>FNSHIP_X</code> and <code>FNSHIP_Y</code> turn a heading and a reach into screen coordinates. The drawing turns with the same <code>SHIP_ANGLE</code> that controls thrust and shots.</p>
+              <p>While protected, <code>DRAW_SHIP</code> skips alternating slices of time to make the ship blink. This is a display choice: the actual collision gate lives in <code>UPDATE_PLAY</code>. Hiding the drawing alone would not make a ship safe.</p>
+              <pre class="listing"><code>8460     A=ROCK_TURN(I)+K*0.628319<br>8470     X=ROCK_X(I)+COS(A)*R*JAG(I,(K MOD 10)+1)<br>8480     Y=ROCK_Y(I)+SIN(A)*R*JAG(I,(K MOD 10)+1)</code></pre>
+              <p>Each rock has ten outline points. <code>JAG</code> stores a random reach for each one, chosen when the rock is spawned. Rotation changes the angles every frame, while those reaches stay put. The rock turns without continually changing its shape.</p>
+              <p>The loop visits point zero again at its end, closing the outline. <code>FNROCK_COLOR</code> gives each wave a colour. The title uses texture assets for its decorative scene, but the playing field builds its ships and rocks from lines. A modest drawing kit can keep a very busy sky alive.</p>
+              <div class="page-number">48</div>
+            </section>
+            <section class="page chapter" id="meteors-experiments" data-appendix="C" style="--ch:14">
+              <div class="running-head">INSIDE METEORS · YOUR TURN</div>
+              <h2 class="section-title">FLIGHT SCHOOL IS OPEN.</h2>
+              <p class="lead">Make one change in your saved copy, predict its effect, then RUN. Restore the original line before trying the next experiment so you can tell which rule changed the flight.</p>
+              <h3>A MORE PATIENT SHIP</h3>
+              <pre class="listing"><code>20 TURN_RATE=2.4:ACCEL=260:MAX_SPEED=340</code></pre>
+              <p>Lower the turning rate from 3.6 to 2.4. Does aiming become easier? Your existing velocity still points where it did before, so a slower turn does not act as a brake.</p>
+              <h3>MORE TIME TO FIND YOUR FEET</h3>
+              <pre class="listing"><code>27 INVULN_TIME=4:RESPAWN_TIME=1.6</code></pre>
+              <p>Increase protection from 2.5 to four seconds. Watch the blinking last longer after a return. The delay before respawning stays the same, and hyperspace’s random failure is still a gamble.</p>
+              <h3>LET A SHOT TRAVEL FARTHER</h3>
+              <pre class="listing"><code>32 SHOT_LIFE=1.2:FIRE_GAP=0.22</code></pre>
+              <p>Shots live longer without changing the firing gap. Miss a few and watch them wrap. There are still only ten shot slots: keeping objects longer can change how often a free slot is available.</p>
+              <aside class="note"><strong>TRACE ONE SHOT</strong>Follow a Space press through <code>READ_KEYS</code>, <code>FLY_SHIP</code>, <code>FIRE_SHOT</code>, <code>MOVE_SHOTS</code>, and <code>SHOTS_HIT</code>. Then follow the points into <code>AWARD</code>. One button press has taken you through input, motion, collision, and reward.</aside>
+              <div class="page-number">49</div>
             </section>
           </article>
         </div>
