@@ -1,0 +1,3834 @@
+/* No double-tap-to-zoom: an iPad fires it on fast repeated taps and jumps the
+   viewport mid-play. Pinch-zoom still works; the deck and canvas set the
+   stricter `touch-action: none` themselves. */
+html {
+  touch-action: manipulation;
+}
+
+/* ---- Shared kiosk navigation bar ---- */
+
+.kiosk-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding: 0 14px env(safe-area-inset-bottom, 0px);
+  background: rgba(0,0,0,0.96);
+  border-top: 1px solid #1e5c1e;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  z-index: 200;
+}
+
+.kiosk-btn {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  /* A lit fixture: near-white core, the colour in a layered glow (same recipe
+     as .blip-logo), and a glow on the button edge too. */
+  color: #f6ffb8;
+  text-shadow:
+    0 0 4px #fff,
+    0 0 10px #e6dc32,
+    0 0 20px #e6dc32,
+    0 0 42px rgba(230, 220, 50, 0.75);
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  white-space: nowrap;
+  padding: 9px 16px;
+  border-radius: 5px;
+  background: linear-gradient(to bottom, #172017, #0c150c);
+  border: 1px solid #4a9a3a;
+  border-bottom: 3px solid #060e06;
+  box-shadow:
+    0 4px 10px rgba(0,0,0,0.75),
+    inset 0 1px 0 rgba(50,200,50,0.08),
+    0 0 12px rgba(230, 220, 50, 0.35),
+    0 0 26px rgba(230, 220, 50, 0.2);
+  transition: box-shadow .1s, transform .1s, border-color .15s, text-shadow .15s;
+}
+.kiosk-btn:hover {
+  border-color: #6acf5a;
+  border-bottom-color: #0a1e0a;
+}
+.kiosk-btn:active {
+  transform: translateY(2px);
+  border-bottom-width: 1px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.75), inset 0 2px 5px rgba(0,0,0,0.5);
+}
+
+/* Zero-credit cues stay highlighted without moving or flashing. */
+#kiosk-insert-btn.needs-coin,
+#insert-coin-btn.needs-coin {
+  border-color:#e3a457;
+  color:#fff0d2;
+  text-shadow:0 1px 0 rgba(0,0,0,.72);
+  animation:none!important;
+  transform:rotateX(var(--bar-tilt,26deg))!important;
+}
+@media (prefers-reduced-motion: reduce) {
+  #need-coin-overlay,
+  #need-coin-overlay .nco-msg { animation: none; }
+}
+/* Keep the coin control visible as a steady physical highlight while locked. */
+body.need-coin #insert-coin-btn,
+body.need-coin #kiosk-insert-btn {
+  border-color:#e3a457;
+  color:#fff0d2;
+  text-shadow:0 1px 0 rgba(0,0,0,.72);
+  animation:none!important;
+  transform:rotateX(var(--bar-tilt,26deg))!important;
+}
+
+/* ---- BLIP logo ---- Same 28px strip, font and glow as the game shell's
+   #marquee-name (in green), and the tap back to the arcade. Above the marquee
+   (9), scanlines (98-100) and the bar (200). */
+.blip-logo {
+  position: fixed;
+  top: 0;
+  left: 8px;
+  /* Sit below the iPhone status bar / Dynamic Island inset (0 everywhere
+     else) so the logo stays aligned with the marquee strip it overlays
+     rather than disappearing behind the clock in home-screen mode. */
+  box-sizing: border-box;
+  height: calc(32px + env(safe-area-inset-top, 0px));
+  z-index: 500;
+  display: inline-flex;
+  align-items: center;
+  /* Tap size comes from the width; the top pad is the status-bar inset (0
+     outside iPhone home-screen mode). */
+  padding: env(safe-area-inset-top, 0px) 8px 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: 2px;
+  /* Off the front page the logo is the way back, so it pulses; the front page
+     swaps in the idle flicker below. */
+  animation: blip-logo-beckon 1.9s ease-in-out infinite;
+  will-change: opacity;
+  /* Fluorescent tube: a near-white core with the colour in the glow; green
+     text with a green shadow reads as printed. */
+  color: #eafff0;
+  text-decoration: none;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 4px #fff,
+    0 0 9px #32c832,
+    0 0 19px #32c832,
+    0 0 38px rgba(50, 200, 50, 0.75),
+    0 0 70px rgba(50, 200, 50, 0.4);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: text-shadow .15s, transform .08s;
+}
+.blip-logo:hover {
+  text-shadow:
+    0 0 5px #fff,
+    0 0 11px #32c832,
+    0 0 24px #32c832,
+    0 0 46px rgba(50, 200, 50, 0.85),
+    0 0 84px rgba(50, 200, 50, 0.5);
+}
+.blip-logo:active { transform: translateY(1px); }
+
+@keyframes blip-logo-flicker {
+  0%, 92%, 100% { opacity: 1; }
+  93% { opacity: 0.4; }
+  94% { opacity: 0.85; }
+  95% { opacity: 0.3; }
+  96% { opacity: 1; }
+}
+
+/* The front page (it has the .game-grid) keeps the quiet all-night
+   flicker — there the logo is decoration, not the way back. */
+body:has(.game-grid) .blip-logo {
+  animation: blip-logo-flicker 6.5s ease-in-out infinite;
+}
+/* Opacity only: animating the wide text-shadow changed the logo's ink
+   overflow every frame, a layout per frame on every game page. */
+@keyframes blip-logo-beckon {
+  0%, 100% { opacity: 0.72; }
+  50%      { opacity: 1; }
+}
+
+/* Power-on double blink, added by shell.js on game pages only. */
+.blip-logo.boot {
+  transform-origin: left center;
+  animation: blip-logo-boot 1.8s ease-out;
+}
+@keyframes blip-logo-boot {
+  0%   { opacity: 0.3; transform: scale(1.2); }
+  25%  { opacity: 1; }
+  45%  { opacity: 0.5; }
+  65%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* ---- Overcharge glitch ---- A rare electrical fault on one letter (kiosk.js
+   picks it); `steps()` for stutter, not a fade. .lg-surge flashes the whole
+   logo while it lasts. It fires every couple of minutes, so it must read at a
+   glance. */
+.blip-logo .lg-ch {
+  position: relative;
+  display: inline-block;
+}
+.blip-logo.lg-surge::before {
+  content: '';
+  position: absolute;
+  inset: -10px -16px;
+  background: radial-gradient(ellipse at center, rgba(180, 235, 255, 0.9), rgba(120, 210, 255, 0.25) 45%, transparent 75%);
+  animation: lg-flash 0.6s steps(3, end);
+  pointer-events: none;
+}
+.blip-logo.lg-surge .lg-ch {
+  animation: lg-dim 0.6s steps(3, end);
+}
+.blip-logo .lg-ch.lg-zap {
+  animation: lg-letter-zap 0.6s steps(3, end);
+  z-index: 1;
+}
+.blip-logo .lg-ch.lg-zap::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -46px;
+  width: 20px;
+  height: 62px;
+  margin-left: -10px;
+  /* a jagged bolt, drawn rather than an image asset, tall enough to
+     strike down through the top of the letter it hits */
+  background: linear-gradient(180deg, #fff 0%, #bdf3ff 40%, #4ad8ff 100%);
+  clip-path: polygon(60% 0%, 10% 50%, 42% 50%, 0% 100%, 100% 38%, 52% 38%);
+  filter:
+    drop-shadow(0 0 5px #fff)
+    drop-shadow(0 0 14px #4ad8ff)
+    drop-shadow(0 0 30px rgba(74, 216, 255, 0.9))
+    drop-shadow(0 0 55px rgba(74, 216, 255, 0.5));
+  animation: lg-bolt 0.6s steps(3, end);
+  pointer-events: none;
+}
+@keyframes lg-letter-zap {
+  0%, 100% { color: inherit; transform: none; }
+  8%  { color: #fff; text-shadow: 0 0 10px #fff, 0 0 26px #8eefff, 0 0 50px #4ad8ff, 0 0 80px rgba(74, 216, 255, 0.7); transform: translate(-2px, 1px) scale(1.08); }
+  18% { color: inherit; transform: translate(2px, -1px) scale(1); }
+  28% { color: #fff; text-shadow: 0 0 10px #fff, 0 0 26px #8eefff, 0 0 50px #4ad8ff; transform: translate(-1px, 0) scale(1.05); }
+  38% { color: inherit; transform: none; }
+  50% { color: #fff; text-shadow: 0 0 12px #fff, 0 0 30px #8eefff, 0 0 60px #4ad8ff, 0 0 100px rgba(74, 216, 255, 0.8); transform: translate(1px, -1px) scale(1.1); }
+  63% { color: inherit; transform: none; }
+  78% { color: #fff; text-shadow: 0 0 10px #fff, 0 0 24px #8eefff, 0 0 46px #4ad8ff; }
+  90% { color: inherit; }
+}
+@keyframes lg-dim {
+  0%, 100% { opacity: 1; }
+  15% { opacity: 0.08; }
+  30% { opacity: 1; }
+  45% { opacity: 0.15; }
+  60% { opacity: 1; }
+  75% { opacity: 0.25; }
+  88% { opacity: 1; }
+}
+@keyframes lg-bolt {
+  0%, 100% { opacity: 0; transform: scaleY(0.4); }
+  8%  { opacity: 1; transform: scaleY(1.1); }
+  18% { opacity: 0.3; transform: scaleY(0.7); }
+  28% { opacity: 1; transform: scaleY(1); }
+  38% { opacity: 0; }
+  50% { opacity: 1; transform: scaleY(1.15); }
+  63% { opacity: 0; }
+  78% { opacity: 0.8; transform: scaleY(0.8); }
+}
+@keyframes lg-flash {
+  0%, 100% { opacity: 0; }
+  8%, 50% { opacity: 1; }
+  28%, 63% { opacity: 0; }
+  78% { opacity: 0.6; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blip-logo.lg-surge::before,
+  .blip-logo.lg-surge .lg-ch,
+  .blip-logo .lg-ch.lg-zap,
+  .blip-logo .lg-ch.lg-zap::after { animation: none; }
+}
+
+/* ---- Top marquee strip ---- The lit sign the logo (left) and coin slot
+   (right) sit in on the non-game pages; game pages use shell.js's
+   #marquee-bar. Above the scanline/vignette overlays; pointer-events: none,
+   the logo and coin button float above it. */
+.top-marquee-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  box-sizing: border-box;
+  height: calc(40px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  z-index: 201;
+  pointer-events: none;
+  background: linear-gradient(180deg, #101010, #000 92%);
+  border-bottom: 1px solid rgba(230, 220, 50, 0.35);
+  box-shadow: 0 0 16px rgba(230, 220, 50, 0.25), 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+/* Where the strip is present, the logo and coin slot match its 40px box
+   (vs the 32px they use against a game page's shorter #marquee-bar). */
+body:has(.top-marquee-bar) .blip-logo,
+body:has(.top-marquee-bar) #kiosk-insert-btn {
+  height: calc(40px + env(safe-area-inset-top, 0px));
+}
+
+/* Phones: a fat strip so logo and coin slot are thumb targets; the logo
+   shortens to "BLIP" to clear the centred game name. .top-marquee-bar states
+   the same height. */
+@media (max-width: 480px) {
+  .blip-logo {
+    height: calc(46px + env(safe-area-inset-top, 0px));
+    font-size: 22px;
+    letter-spacing: 2px;
+    padding-left: 12px;
+    padding-right: 14px;
+  }
+  #insert-coin-btn,
+  #kiosk-insert-btn {
+    height: calc(46px + env(safe-area-inset-top, 0px));
+    font-size: 13px;
+  }
+  .top-marquee-bar { height: calc(46px + env(safe-area-inset-top, 0px)); }
+  body:has(.top-marquee-bar) .blip-logo,
+  body:has(.top-marquee-bar) #kiosk-insert-btn {
+    height: calc(46px + env(safe-area-inset-top, 0px));
+  }
+}
+
+@media (max-width: 380px) {
+  .blip-logo { font-size: 20px; letter-spacing: 1.5px; }
+}
+
+/* ---- Coin slot + drop animation ---- Shared by #insert-coin-btn (games) and
+   #kiosk-insert-btn (other pages), pinned top right to mirror the logo; the
+   slot graphic (::after) is at its right end. position: fixed anchors
+   #coin-drop-anim. */
+#insert-coin-btn,
+#kiosk-insert-btn {
+  position: fixed;
+  /* Mirror .blip-logo: top 0, same height, 8px from the edge, same top pad. */
+  top: 0;
+  right: calc(env(safe-area-inset-right, 0px) + 8px);
+  z-index: 500;
+  box-sizing: border-box;
+  height: calc(32px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) 8px 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  overflow: visible;
+  font-size: 12px;
+  letter-spacing: 1px;
+  /* Idle it is part of the strip (hairline underline, no lift); it lights up
+     on hover or while beckoning. */
+  border: 0;
+  border-bottom: 1px solid rgba(230, 220, 50, 0.30);
+  border-radius: 0;
+  background: linear-gradient(180deg, #101010 0%, #000 92%);
+  box-shadow: none;
+  color: #bdbd93;
+  text-shadow: 0 -1px 0 rgba(255,255,255,0.06), 0 1px 1px rgba(0,0,0,0.8);
+  animation: none;
+  transition: color .2s, text-shadow .2s, box-shadow .2s, border-color .2s;
+}
+#insert-coin-btn:hover,
+#kiosk-insert-btn:hover {
+  color: #f6ffb8;
+  border-color: #6acf5a;
+  text-shadow: 0 0 4px #fff, 0 0 12px #e6dc32, 0 0 24px #e6dc32;
+}
+#insert-coin-btn:active,
+#kiosk-insert-btn:active {
+  transform: perspective(180vw) rotateX(var(--bar-tilt,26deg));
+  box-shadow: none;
+  color: #fff;
+  text-shadow: 0 0 6px #fff, 0 0 18px #e6dc32, 0 0 40px #e6dc32;
+}
+/* The coin mechanism, as on a real coin door: a small brushed-chrome plate
+   with a screw at each corner, a red reject button, and the coin entry, a
+   narrow recessed slot backlit orange so it can be found in a dark arcade. */
+#insert-coin-btn::after,
+#kiosk-insert-btn::after {
+  content: '';
+  display: inline-block;
+  flex-shrink: 0;
+  width: 26px;
+  height: 18px;
+  border-radius: 3px;
+  background:
+    /* screws */
+    radial-gradient(circle at 3px 3px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 23px 3px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 3px 15px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    radial-gradient(circle at 23px 15px, #f2f4f6 0 0.6px, #5a5f66 1.2px, transparent 1.7px),
+    /* reject button: a red dome with a highlight */
+    radial-gradient(circle at 5px 9px, #ffd0c8 0 0.5px, #ff4a36 1.2px, #a3160c 2.4px, #3a0804 2.9px, transparent 3.3px),
+    /* the slot: dark inside, lit orange at its lips */
+    linear-gradient(180deg, transparent 5px, #ffb347 6px, #120600 7px, #000 9px, #120600 11px, #ffb347 12px, transparent 13px)
+      center / 100% 100% no-repeat,
+    radial-gradient(ellipse 12px 4px at 14px 9px, rgba(255, 150, 40, 0.55), transparent 70%),
+    /* brushed steel */
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.07) 0 1px, rgba(0, 0, 0, 0.05) 1px 2px),
+    linear-gradient(135deg, #e3e6ea 0%, #9aa0a7 38%, #d4d8dd 55%, #7d838b 100%);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.55),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 6px rgba(255, 150, 40, 0.18);
+}
+
+/* The coin slides across the face, turns edge-on, and recedes into the slit. */
+#coin-drop-anim {
+  --coin-size: clamp(34px,var(--cap,44px),48px);
+  position: absolute;
+  right: calc(var(--slot-x, 13px) - 40px);
+  top: 50%;
+  width: 80px;
+  height: 56px;
+  overflow: hidden;
+  perspective: 120px;
+  transform:translateY(-50%);
+  pointer-events: none;
+  z-index: 5;
+}
+#coin-drop-anim::before {
+  content: '';
+  position: absolute;
+  left: calc((80px - var(--coin-size))/2);
+  top: calc((56px - var(--coin-size))/2);
+  width: var(--coin-size);
+  height: var(--coin-size);
+  border-radius: 50%;
+  transform-origin: 50% 50%;
+  opacity: 0;
+  background:url("quarter-1964.svg") center/contain no-repeat;
+  box-shadow:0 0 2px #000a,inset 0 0 0 1px #f4f3e9;
+  filter:drop-shadow(0 1px 1px #000);
+}
+#coin-drop-anim.dropping::before {
+  animation: coin-drop .82s cubic-bezier(.3,.55,.4,1) both;
+}
+@keyframes coin-drop {
+  0%   { opacity:1; transform:translate3d(-14px,0,0) rotateX(0deg) scale(1); }
+  34%  { opacity:1; transform:translate3d(-5px,0,0) rotateX(0deg) scale(1); }
+  50%  { opacity:1; transform:translate3d(0,0,0) rotateX(78deg) scale(.96); }
+  68%  { opacity:1; transform:translate3d(0,0,-3px) rotateX(82deg) scale(.92); }
+  78%  { opacity:.9; transform:translate3d(0,0,-7px) rotateX(82deg) scale(.9); }
+  100% { opacity:0; transform:translate3d(0,0,-30px) rotateX(84deg) scale(.75); }
+}
+
+/* Narrow portrait phones (≤ 480 px) — shrink text so all three bar items fit */
+@media (max-width: 480px) {
+  .kiosk-btn { font-size: 13px; letter-spacing: 0; padding: 7px 10px; }
+}
+
+/* ---- Control deck: stick + caps in the bar ---- The game shell's #topbar
+   and the landing page's .kiosk-bar-main (history/about keep a flat
+   .kiosk-bar). Always shown: the stick and caps also mirror keyboard and
+   gamepad input (shell.js reflect()). */
+
+#topbar,
+.kiosk-bar-main {
+  /* One tilt everywhere; the stick, caps and shadows are drawn against it. */
+  --bar-tilt: 26deg;
+  /* The same 14px inset as the game canvas, so the deck sits
+     under the screen, on every page. */
+  left: 16px;
+  right: 16px;
+  overflow: visible;
+  /* No transform on the fixed bar: iOS Safari misplaces and clips a fixed
+     element with a transform (worst in a home-screen PWA). The tilt lives on
+     .deck-panel. */
+  background: none;
+  border-top: 0;
+  box-shadow: none;
+}
+
+/* The visible deck: glossy black, rotated back around its bottom edge.
+   preserve-3d so the stick handle can stand up out of it. */
+.kiosk-bar > .deck-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  /* One station per player, each filling its share of the panel; the
+     stick and the caps are pushed to the two ends of that share (see
+     .deck-side), so the deck matches the game pad's layout exactly. */
+  justify-content: space-between;
+  gap: 0;
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
+  overflow: visible;
+  border-radius: 10px 10px 0 0;
+  transform-style: preserve-3d;
+  transform-origin: 50% 100%;
+  /* Perspective scales with the viewport: a fixed 640px was a fisheye at
+     1280px wide; 180vw is about 640px on a phone. */
+  transform: perspective(180vw) rotateX(var(--bar-tilt));
+  /* The tilt never changes, so a fixed layer rasterises it once, and hidden
+     backfaces cannot flash during the stick's lean. */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.06) 0px, transparent 10px),
+    radial-gradient(ellipse 130% 70% at 50% 60%, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 45%, transparent 72%),
+    linear-gradient(0deg, #1a1c1f 0%, #0c0d0f 55%, #030304 100%);
+  border-top: 1px solid rgba(255,255,255,0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    0 -14px 28px -10px rgba(0,0,0,0.75);
+}
+
+/* ---- Stick ---- */
+
+/* The drag region covers the floating ball as well as the boot, and is
+   thumb-sized. Anchored to the bar's bottom so its extra height rises over
+   the game. */
+.stick-base {
+  --dx: 0;
+  --dy: 0;
+  position: relative;
+  align-self: flex-end;
+  flex-shrink: 0;
+  width: 100px;
+  height: 210px;
+  transform-style: preserve-3d;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The ball's shadow on the deck: slides and grows a little with the lean;
+   lies in the deck plane so it foreshortens with it. */
+.stick-base::before {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  width: 66px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse,
+    rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.45) 40%, rgba(0,0,0,0.16) 64%, transparent 80%);
+  filter: blur(2px);
+  transform: translate(calc(-50% + var(--dx) * 11px), calc(var(--dy) * 6px));
+  transition: transform 55ms ease-out;
+  pointer-events: none;
+}
+
+/* The boot: a black gate plate flush in the bar — the only part of the
+   stick with a background of its own. */
+.stick-boot {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  width: 42px;
+  height: 42px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  border-radius: 9px;
+  background: linear-gradient(155deg, #3a3a3e 0%, #1c1c1e 45%, #0b0b0c 100%);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* The restrictor gate: an octagonal cutout the shaft rides in — the
+   classic 8-way arcade mechanism. */
+.stick-boot::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  clip-path: polygon(
+    30% 0%, 70% 0%, 100% 30%, 100% 70%,
+    70% 100%, 30% 100%, 0% 70%, 0% 30%
+  );
+  background: #040404;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.14),
+    inset 0 2px 5px rgba(0, 0, 0, 0.85);
+}
+
+/* Shaft + ball pivot at the boot on --dx / --dy (each -1, 0 or 1, set by
+   shell.js). .stick-handle is a 0x0 point at the pivot; rotating it swings
+   the rigid stick while the boot stays put. */
+.stick-handle {
+  /* Backward lean of the standing stick. Perspective slides anything above
+     the deck plane sideways away from the panel centre, so a large lean
+     parks the ball off the shaft's foot. */
+  --lean: 3deg;
+  position: absolute;
+  left: 50%;
+  /* The boot's vertical centre (bottom:6px + height:42px / 2), not its
+     top edge — rooted inside the gate mechanism like a real stick, not
+     hinged off the top rim of the boot. */
+  bottom: 27px;
+  width: 0;
+  height: 0;
+  /* rotateX(-tilt - lean) stands the stick up out of the tilted deck with a
+     slight lean toward the player; rotate(dx) leans it sideways. preserve-3d
+     here keeps it true 3D; without it some leans sank the stick behind the
+     panel. */
+  transform:
+    rotateX(calc(var(--bar-tilt) * -1 - var(--lean) + var(--dy) * -12deg))
+    rotate(calc(var(--dx) * 18deg + var(--preview-lean, 0deg)));
+  transform-style: preserve-3d;
+  /* Short, so the lean keeps up with the thumb (the key fires on the first
+     frame); eased, so a flick still looks sprung. */
+  transition: transform 55ms ease-out;
+  /* This is the one element in the deck that actually animates — tell the
+     compositor up front so the lean doesn't trigger a layer rebuild (and
+     a one-frame flash) each time a direction engages. */
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  pointer-events: none;
+}
+
+/* Rubber dust skirt where the shaft leaves the gate; it leans with the stick. */
+.stick-handle::before {
+  content: '';
+  position: absolute;
+  left: -15px;
+  bottom: -7px;
+  width: 30px;
+  height: 17px;
+  border-radius: 50% 50% 40% 40% / 90% 90% 30% 30%;
+  background: radial-gradient(ellipse at 40% 25%, #4a4a4f 0%, #1d1d20 55%, #08080a 100%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.18), 0 2px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* Chrome rod, tapered slightly toward the top for perspective. Hard-edged
+   highlight and dark reflection bands read as a polished cylinder. */
+.stick-shaft {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 11px;
+  height: 30px;
+  transform: translateX(-50%);
+  clip-path: polygon(28% 0%, 72% 0%, 100% 100%, 0% 100%);
+  background: linear-gradient(90deg,
+    #2c2c30 0%, #8e9096 14%, #f4f5f7 30%, #b9bbc0 46%, #5c5e64 66%, #1f2023 84%, #74767c 100%);
+}
+
+/* Ball-top: glossy red bakelite. The sphere billboards to the camera (it
+   projects as a circle at any tilt), so it cancels the --lean the
+   handle leaves it with; translateZ keeps the shaft tip from poking through. */
+.stick-ball {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  width: 42px;
+  height: 42px;
+  transform: translate(-50%, calc(22% + var(--dy) * 8px)) rotateX(calc(var(--lean) + var(--dy) * 12deg)) translateZ(3px);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 108%, rgba(255, 120, 100, 0.55) 0%, transparent 42%),
+    radial-gradient(circle at 36% 28%, #ff6d58 0%, #e0301f 30%, #a5150b 62%, #560a05 100%);
+  box-shadow:
+    0 6px 10px rgba(0, 0, 0, 0.5),
+    0 14px 22px rgba(0, 0, 0, 0.3),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(60, 0, 0, 0.35);
+}
+
+/* Window-shaped specular glint plus a faint secondary on the lower rim. */
+.stick-ball::after {
+  content: '';
+  position: absolute;
+  left: 17%;
+  top: 11%;
+  width: 40%;
+  height: 26%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.45) 45%, transparent 75%);
+  transform: rotate(-32deg);
+}
+
+/* ---- Fire buttons: flush in the bar, right of INSERT COIN ---- */
+
+.fire-buttons {
+  display: flex;
+  align-items: center;
+  /* Anchored to the bar's bottom edge with its bulk going upward, like
+     the stick's gate — so the button caps never project below the
+     viewport edge and clip on a short screen. */
+  align-self: flex-end;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.arcade-btn {
+  position: relative;
+  /* Apple's ~44px touch-target guidance — a real thumb hit-area, not just
+     a visually-sized cap. */
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  /* The polished-chrome bezel ring the cap is set into — the depth is all
+     in the shadows/gradients (no translateZ: it'd project the button off
+     the bottom edge of the deck on a short screen). */
+  background: conic-gradient(from -50deg, #eceef1, #9a9ea6 20%, #33363b 50%, #9a9ea6 80%, #eceef1 100%);
+  box-shadow:
+    0 3px 6px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.55);
+  transition: transform .06s ease-out, box-shadow .06s ease-out;
+}
+
+.arcade-btn-cap {
+  position: absolute;
+  /* A percentage, so the bezel keeps its share at every cap size. */
+  inset: 12%;
+  border-radius: 50%;
+  /* Convex dome: a tight specular hot-spot up-left where the light hits,
+     rolling through the body colour to a dark far rim. */
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #ff6a58 0%, #e5361f 44%, #a3160b 78%, #6b0c05 100%);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.45),
+    inset 0 3px 4px rgba(255,255,255,0.4),
+    inset 0 -5px 8px rgba(0,0,0,0.45);
+  transition: transform .06s ease-out, box-shadow .06s ease-out;
+}
+
+/* Second button (e.g. Meteors' hyperspace): ivory instead of red, the
+   classic two-tone competition-cabinet pairing. */
+.arcade-btn:nth-child(2) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.15) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #fffdf6 0%, #e7ddc6 46%, #b6ab90 80%, #8b8270 100%);
+}
+
+/* Three or more caps is a fighting deck: red punches, blue kicks, darkening
+   left to right (low, mid, high). */
+.arcade-btn:nth-child(n+3) ~ .arcade-btn:nth-child(2) .arcade-btn-cap,
+.arcade-btn:nth-child(2):not(:last-child) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #7fc4ff 0%, #2f86d8 44%, #14508c 78%, #0a2e52 100%);
+}
+.arcade-btn:nth-child(3) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #5aa8ef 0%, #1f6bbd 44%, #0e3d72 78%, #072342 100%);
+}
+.arcade-btn:nth-child(4) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #3d8cd6 0%, #14539c 44%, #092c57 78%, #04182f 100%);
+}
+
+/* Pressed: the button flattens toward the deck and the cap dishes in. */
+.arcade-btn.active {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.2);
+}
+.arcade-btn.active .arcade-btn-cap,
+.arcade-btn.blip-pressed .arcade-btn-cap {
+  transform: scale(0.94);
+  box-shadow:
+    inset 0 4px 7px rgba(0, 0, 0, 0.55),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.14);
+}
+.arcade-btn.blip-pressed {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.2);
+}
+
+/* ======================================================================
+   The pad: the default on-screen controller
+   ======================================================================
+   The front end picks the controller (blipFrontendControls), applied as
+   <html data-controls>. The pad sits in .deck-panel
+   with the stick deck and is sized off the same --cap: a cross and four caps
+   (a game's unused caps are `spare`). Atari palette: matte black body, red
+   caps. */
+
+:root[data-controls="pad"] .stick-base,
+:root[data-controls="pad"] .fire-buttons { display: none !important; }
+:root[data-controls="stick"] .snes-pad { display: none !important; }
+
+/* In pad mode the bar is taller to seat the controller; fillCanvas() reserves
+   it. The panel casts a soft shadow up onto the screen. */
+:root[data-controls="pad"] #topbar.kiosk-bar,
+:root[data-controls="pad"] .kiosk-bar-main {
+  height: calc(82px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -16px 26px -8px rgba(0, 0, 0, 0.7), 0 -1px 0 rgba(0, 0, 0, 0.9);
+}
+
+.snes-pad {
+  --sf-btn: 42px;   /* face-button (A / B) diameter */
+  --sf-gap: 18px;   /* space between A and B */
+  --sf-dpad: 58px;  /* d-pad cross bounding box */
+  --sf-edge: clamp(18px, 5vw, 46px);  /* inset of the d-pad / buttons from the edges */
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;                 /* only the buttons take input */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* A faint moulded "BLIP" debossed into the empty middle of the panel —
+   just enough to read as a brand mark, never enough to compete with the
+   controls. Absolutely centred, so it's out of the d-pad / A-B flex row. */
+.snes-pad .snes-wordmark {
+  position: absolute;
+  left: 46%;   /* the middle of the gap between the d-pad and A / B */
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 4px;
+  color: rgba(255, 255, 255, 0.028);
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.04);
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Below ~360px the gap between the d-pad and A / B is too tight to seat
+   the mark without it crowding a button — drop it there. */
+@media (max-width: 359px) { .snes-pad .snes-wordmark { display: none; } }
+
+/* The panel face: moulded black plastic with a lit top edge, a pool of
+   overhead light and a fine grain. */
+.snes-pad .snes-shell {
+  position: absolute;
+  inset: 0;
+  border-radius: 13px 13px 0 0;
+  background:
+    /* faint moulding grain */
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px),
+    /* overhead light pool */
+    radial-gradient(ellipse 70% 120% at 50% 8%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 38%, transparent 68%),
+    /* edge vignette */
+    radial-gradient(ellipse 120% 150% at 50% 40%, transparent 40%, rgba(0,0,0,0.45) 100%),
+    /* base tone, lighter at top */
+    linear-gradient(180deg, #2b2b2c 0%, #1c1c1d 34%, #141415 62%, #0b0b0c 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),      /* lit top edge */
+    inset 0 3px 1px -1px rgba(224, 60, 49, 0.28), /* warm accent under it */
+    inset 0 -14px 22px rgba(0, 0, 0, 0.6),        /* deep shade toward the player */
+    inset 6px 0 14px -6px rgba(0, 0, 0, 0.55),    /* left edge shade */
+    inset -6px 0 14px -6px rgba(0, 0, 0, 0.55),   /* right edge shade */
+    inset 0 0 0 1px rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Clear of the glass edge on phones without a home-indicator inset (the
+     inset adds ~34px on a notched iPhone). */
+  padding: 7px var(--sf-edge) calc(env(safe-area-inset-bottom, 0px) + 11px);
+}
+/* a recessed "mounting plate" under the A / B buttons — a subtle darker
+   inset so the buttons sit IN the surface, not on it (the d-pad has its
+   own round recess, .snes-dpad::before) */
+.snes-pad .snes-face::before {
+  content: '';
+  position: absolute;
+  inset: -26% -16%;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+}
+
+/* ---- D-pad — a clean black plus (two overlapping arm bars), no rotation ---- */
+.snes-pad .snes-dpad {
+  position: relative;
+  flex: none;
+  width: var(--sf-dpad);
+  height: var(--sf-dpad);
+  pointer-events: auto;
+  touch-action: none;
+}
+.snes-pad .snes-dpad::before {   /* shallow round recess behind the cross */
+  content: '';
+  position: absolute;
+  inset: -5%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #262626, #131313 60%, #0a0a0a);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.7), 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.snes-pad .snes-dp-body {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.snes-pad .dp-s0 { stop-color: var(--dp-s0, #4c4c52); }
+.snes-pad .dp-s1 { stop-color: var(--dp-s1, #2d2d31); }
+.snes-pad .dp-s2 { stop-color: var(--dp-s2, #1b1b1e); }
+.snes-pad .dp-rim { fill: none; stroke: rgba(255, 255, 255, 0.13); stroke-width: 0.9; }
+.snes-pad .dp-dimple { fill: rgba(0, 0, 0, 0.32); stroke: rgba(255, 255, 255, 0.06); stroke-width: 0.8; }
+/* Arm segments: touch targets over the cross, lit only when pressed, the
+   light fading out toward the centre. */
+.snes-pad .snes-dp-seg {
+  position: absolute;
+  opacity: 0;
+  background: linear-gradient(var(--fade), #f08a3a 0%, #e4342b 45%, rgba(228, 52, 43, 0) 100%);
+  transition: opacity .05s;
+}
+.snes-pad .snes-dp-seg.dp-up    { --fade: 180deg; left: 32%; right: 32%; top: 2%;  bottom: 50%; border-radius: 6px 6px 0 0; }
+.snes-pad .snes-dp-seg.dp-down  { --fade: 0deg;   left: 32%; right: 32%; top: 50%; bottom: 2%;  border-radius: 0 0 6px 6px; }
+.snes-pad .snes-dp-seg.dp-left  { --fade: 90deg;  top: 32%; bottom: 32%; left: 2%;  right: 50%; border-radius: 6px 0 0 6px; }
+.snes-pad .snes-dp-seg.dp-right { --fade: 270deg; top: 32%; bottom: 32%; left: 50%; right: 2%;  border-radius: 0 6px 6px 0; }
+.snes-pad .snes-dp-seg.blip-pressed { opacity: 0.95; }
+/* The whole cross picks up a warm cast while a thumb is on it (or a
+   direction key is held), so the lit arm never floats alone. */
+.snes-pad .snes-dpad.blip-touched,
+.snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) {
+  --dp-s0: #8a5a3a;
+  --dp-s1: #5c3a2c;
+  --dp-s2: #3c2620;
+}
+
+/* ---- Face buttons — just B and A, side by side with a big gap ---- */
+.snes-pad .snes-face {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sf-gap);
+  height: var(--sf-btn);
+  pointer-events: none;
+}
+
+/* A and B: the Atari 2600 CX40 button — a plain, unlabelled, low-domed
+   matte-red button sitting proud of a black moulded collar that's
+   recessed into the panel. No lettering (an Atari stick had none). */
+.snes-pad .snes-btn {
+  position: relative;
+  flex: none;
+  width: var(--sf-btn);
+  height: var(--sf-btn);
+  margin: 0; padding: 0;
+  border: 0;
+  border-radius: 50%;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* the black collar, sunk into the panel */
+  background: radial-gradient(circle at 50% 40%, #262626 0%, #121212 62%, #080808 100%);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.85),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.07);
+  transition: transform .05s, filter .05s;
+}
+/* the red button cap — proud of the collar, low broad dome, matte */
+.snes-pad .snes-btn > span {
+  position: absolute;
+  inset: 13%;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 46% 30%, rgba(255, 210, 200, 0.4) 0%, rgba(255, 210, 200, 0) 44%),
+    radial-gradient(circle at 50% 62%, #c22a1f 0%, #d8352a 40%, #cc3225 70%, #a81d12 100%);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 200, 190, 0.28),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.3),
+    0 2px 3px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  transition: transform .05s, box-shadow .05s, filter .05s;
+}
+.snes-pad .snes-btn.blip-pressed > span {
+  transform: scale(0.94);
+  filter: brightness(0.82);
+  box-shadow:
+    inset 0 5px 9px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 2px rgba(255, 200, 190, 0.15),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+
+/* Phones: a taller bar and a bigger cross and caps, hard against the two
+   edges. */
+@media (max-width: 560px) {
+  :root[data-controls="pad"] #topbar.kiosk-bar,
+  :root[data-controls="pad"] .kiosk-bar-main {
+    height: calc(114px + env(safe-area-inset-bottom, 0px));
+  }
+  .snes-pad {
+    --sf-btn: 52px;
+    --sf-gap: 30px;   /* room for a big thumb between A and B */
+    --sf-dpad: 90px;
+    --sf-edge: 20px;
+  }
+}
+
+/* Small phones (iPhone SE / mini) — trim the face buttons and edges, but
+   keep the d-pad big; it's the control you steer with. */
+@media (max-width: 380px) {
+  .snes-pad { --sf-btn: 46px; --sf-gap: 22px; --sf-dpad: 86px; --sf-edge: 14px; }
+}
+
+/* Tablet — a bigger two-handed surface. */
+@media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
+  :root[data-controls="pad"] #topbar.kiosk-bar,
+  :root[data-controls="pad"] .kiosk-bar-main {
+    height: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+  .snes-pad {
+    --sf-btn: 64px;
+    --sf-gap: 40px;
+    --sf-dpad: 110px;
+    --sf-edge: clamp(28px, 7vw, 80px);
+  }
+}
+
+/* Short / landscape — compact so it doesn't eat the playfield. The bar is
+   too shallow here for the portrait breathing room, so trim the shell
+   padding back down. */
+@media (max-height: 450px) {
+  :root[data-controls="pad"] #topbar.kiosk-bar,
+  :root[data-controls="pad"] .kiosk-bar-main {
+    height: calc(66px + env(safe-area-inset-bottom, 0px));
+  }
+  .snes-pad { --sf-btn: 40px; --sf-gap: 18px; --sf-dpad: 54px; --sf-edge: 14px; }
+  .snes-pad .snes-shell { padding: 3px var(--sf-edge) calc(env(safe-area-inset-bottom, 0px) + 3px); }
+  .snes-pad .snes-wordmark { display: none; }
+}
+
+/* The landing page's .kiosk-bar-main shares every deck dimension with the
+   game shell's #topbar, so the deck looks the same everywhere; the tiers
+   below only shrink it. */
+
+/* Phones: the bar grows to seat a full-size stick and thumb-wide caps (44px
+   or more at every tier); only the stick's swing and hit width shrink. */
+@media (max-width: 480px) {
+  #topbar.kiosk-bar, .kiosk-bar-main { height: calc(82px + env(safe-area-inset-bottom, 0px)); }
+  .kiosk-bar > .deck-panel { gap: 56px; padding-left: 6px; padding-right: 6px; }
+  .stick-base { width: 122px; }
+  .stick-boot { width: 54px; height: 54px; }
+  .stick-handle { bottom: 33px; }
+  .stick-shaft { width: 13px; height: 37px; }
+  .stick-ball  { width: 66px; height: 66px; bottom: 37px; }
+  .fire-buttons { gap: 12px; }
+  .arcade-btn { width: 66px; height: 66px; }
+}
+
+/* Smallest phones (iPhone SE/mini class) — a 2-button game plus the coin
+   readout is tight, so trim the stick's footprint and the button gap a
+   little, but keep both stick and buttons above the touch minimum. */
+@media (max-width: 380px) {
+  .kiosk-bar > .deck-panel { gap: 40px; padding-left: 5px; padding-right: 5px; }
+  .stick-base { width: 108px; }
+  .stick-boot { width: 50px; height: 50px; }
+  .stick-handle { bottom: 31px; }
+  .stick-shaft { width: 12px; height: 34px; }
+  .stick-ball  { width: 60px; height: 60px; bottom: 34px; }
+  .fire-buttons { gap: 9px; }
+  .arcade-btn { width: 60px; height: 60px; }
+}
+
+/* Below any current iPhone (kept as a graceful floor, not a target) */
+@media (max-width: 340px) {
+  .kiosk-bar > .deck-panel { gap: 22px; padding-left: 4px; padding-right: 4px; }
+  .stick-base { width: 90px; }
+  .stick-boot { width: 40px; height: 40px; }
+  .stick-handle { bottom: 26px; }
+  .stick-shaft { width: 9px; height: 28px; }
+  .stick-ball  { width: 48px; height: 48px; bottom: 28px; }
+  .fire-buttons { gap: 7px; }
+  .arcade-btn { width: 48px; height: 48px; }
+}
+
+/* Tablets (coarse pointer, tablet-sized either way round): a two-handed
+   surface, so stick and caps are about twice the desktop size and spread to
+   the edges. */
+@media (min-width: 768px) and (min-height: 700px) and (pointer: coarse) {
+  #topbar.kiosk-bar, .kiosk-bar-main { height: calc(112px + env(safe-area-inset-bottom, 0px)); }
+  .kiosk-bar > .deck-panel { gap: clamp(84px, 13vw, 210px); padding-left: 16px; padding-right: 16px; }
+  .stick-base { width: 194px; height: 252px; }
+  .stick-base::before { width: 52px; height: 14px; }
+  .stick-boot { width: 78px; height: 78px; }
+
+  .stick-handle { bottom: 45px; }
+  .stick-shaft { width: 18px; height: 58px; }
+  .stick-ball  { width: 90px; height: 90px; bottom: 58px; }
+  .fire-buttons { gap: 24px; }
+  .arcade-btn { width: 92px; height: 92px; }
+}
+
+/* A flag is a round badge like the avatars: dimmed until it is the page's
+   language, which gets the green ring. */
+
+/* Phones — smaller avatars so they sit inside a game card's left padding
+   zone on the landing page. After the 44px base so this @media wins. */
+
+
+/* ======================================================================
+   Two-player deck
+   ======================================================================
+   Both stations are built up front; the second goes live when the game
+   reports a second player (blip_set_mode -> <html data-players>). Both are
+   the same: stick left, caps right. */
+/* Anchored to the panel's front edge, so tall parts (the shaft, a square of
+   caps) grow up over the game rather than off the bottom. A station fills its
+   share of the panel, stick at one end and caps at the other, like the pad. */
+/* preserve-3d, or the stick is flattened to a sprite before the panel's tilt
+   applies (see .stick-handle). */
+.deck-side {
+  position: relative;
+  transform-style: preserve-3d;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  align-self: flex-end;
+  justify-content: space-between;
+  padding: 0 var(--sf-edge, clamp(18px, 5vw, 46px));
+  gap: 12px;
+}
+
+/* Silkscreened station number, printed on the panel between the stick
+   and the caps — it lies in the deck plane, so the 3D tilt foreshortens
+   it exactly like the rest of the moulding. */
+.deck-tag {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 7px;
+  letter-spacing: 2px;
+  color: rgba(226, 232, 240, 0.34);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+/* Every two-seat cabinet shows both stations even in a one-player game;
+   `data-players` says whether the second is in play. */
+/* Gamepad lamp on station one's tag (data-pad, set by pollGamepad):
+   dim when a pad is connected, lit while it is in use. */
+:root[data-pad] #deck-p1 .deck-tag::after,
+:root[data-pad] #snes-pad .deck-tag::after {
+  content: '';
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-left: 2px;
+  vertical-align: 1px;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, 0.35);
+}
+:root[data-pad="active"] #deck-p1 .deck-tag::after,
+:root[data-pad="active"] #snes-pad .deck-tag::after {
+  background: #4ade80;
+  box-shadow: 0 0 4px #4ade80;
+}
+
+#deck-p2, .snes-pad.second, :root:not([data-players]) .deck-tag { display: none; }
+:root[data-players] #deck-p2 { display: flex; }
+:root[data-players][data-controls="pad"] .snes-pad.second { display: block; }
+
+/* A one-player game's second station is on the panel, as on a two-player cabinet, but takes no input. */
+:root[data-seats="1"] :is(#deck-p2 .arcade-btn, #deck-p2 .stick-base, .snes-pad.second .snes-btn, .snes-pad.second .snes-dpad, .snes-pad.second .snes-dp-seg) {
+  pointer-events: none;
+}
+
+/* Dead to the touch, aimed at the controls rather than at the panel
+   they sit on: `pointer-events: none` on a parent does NOT disable a
+   child that sets `auto`, and every button on the pad sets `auto`. */
+/* A two-player game's second station is live on its title screen (data-open) and in a two-player match
+   (data-versus); against the CPU nobody sits there. */
+:root:not([data-open]):not([data-versus]) #deck-p2,
+:root:not([data-open]):not([data-versus]) .snes-pad.second .snes-btn,
+:root:not([data-open]):not([data-versus]) .snes-pad.second .snes-dpad,
+:root:not([data-open]):not([data-versus]) .snes-pad.second .snes-dp-seg {
+  pointer-events: none;
+}
+
+/* Two stations share the panel's width: each pad takes half of the bar,
+   and the sticks pull their gaps in so both fit on a phone. */
+/* With two players each station is a compact group against its outside edge,
+   so the gap in the middle is between the players. */
+:root[data-players] .deck-side {
+  flex: 0 0 auto;
+  justify-content: flex-start;
+  gap: clamp(10px, 3vw, 22px);
+  padding: 0 clamp(4px, 2.5vw, 26px);
+}
+:root[data-players] .snes-pad { width: 50%; --sf-edge: clamp(6px, 2.5vw, 22px); }
+:root[data-players] #snes-pad { right: 50%; }
+:root[data-players] .snes-pad.second { left: 50%; }
+/* Cross and caps together against the station's outside edge, a size down so
+   the two players have a gap between them. */
+:root[data-players] .snes-pad { --sf-btn: 36px; --sf-gap: 10px; --sf-dpad: 52px; }
+:root[data-players] .snes-pad .snes-shell {
+  justify-content: flex-start;
+  gap: clamp(10px, 3.5vw, 26px);
+}
+:root[data-players] .snes-pad.second .snes-shell { justify-content: flex-end; }
+
+/* ---- Four caps: the fighting deck ---- Punches on top, kicks below, light
+   to heavy left to right; the legend is printed on the cap. */
+
+.fire-buttons.four {
+  display: grid;
+  grid-template-columns: repeat(2, 44px);
+  gap: 7px;
+}
+
+/* Red punches, blue kicks — the split every Street Fighter cabinet used.
+   The heavy of each pair is the darker cap, so the square reads as two
+   pairs before a legend is read at all. */
+.fire-buttons.four .arcade-btn:nth-child(1) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #ff6a58 0%, #e5361f 44%, #a3160b 78%, #6b0c05 100%);
+}
+.fire-buttons.four .arcade-btn:nth-child(2) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.1) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #d04434 0%, #ad2010 44%, #720c04 78%, #470702 100%);
+}
+.fire-buttons.four .arcade-btn:nth-child(3) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #7fc4ff 0%, #2f86d8 44%, #14508c 78%, #0a2e52 100%);
+}
+.fire-buttons.four .arcade-btn:nth-child(4) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.1) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #4a93d8 0%, #175ea6 44%, #0a3466 78%, #041d3b 100%);
+}
+
+/* The pad's face carries the same square. Four caps need more panel than
+   two, so the pad-mode bar grows to seat them. */
+:root[data-caps="4"] .snes-pad { --sf-btn: 34px; --sf-gap: 9px; --sf-dpad: 52px; }
+
+.snes-pad .snes-face.four {
+  display: grid;
+  grid-template-columns: repeat(2, var(--sf-btn));
+  gap: 7px var(--sf-gap);
+  height: auto;
+}
+.snes-pad .snes-face.four::before { inset: -12% -12%; border-radius: 16px; }
+
+.snes-pad .snes-btn.cap2 > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(255, 210, 200, 0.34) 0%, rgba(255, 210, 200, 0) 44%),
+    radial-gradient(circle at 50% 62%, #97241a 0%, #ac2b20 40%, #a0261c 70%, #78120a 100%);
+}
+.snes-pad .snes-btn.cap3 > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(215, 238, 255, 0.45) 0%, rgba(215, 238, 255, 0) 44%),
+    radial-gradient(circle at 50% 62%, #2f79cf 0%, #3a8ce0 40%, #2f7ac8 70%, #1b4f9e 100%);
+}
+.snes-pad .snes-btn.cap4 > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(215, 238, 255, 0.35) 0%, rgba(215, 238, 255, 0) 44%),
+    radial-gradient(circle at 50% 62%, #1f568f 0%, #26669f 40%, #1e548a 70%, #113663 100%);
+}
+
+/* A square of caps is twice as deep as a row, so the stick deck's bar grows
+   to seat it. */
+:root[data-controls="stick"][data-caps="4"] #topbar.kiosk-bar,
+:root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
+  height: calc(152px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Two stations on a phone: everything comes in a size, and the gap
+   between the stations stays wider than the gap inside one — otherwise
+   eight caps in a row read as one player's deck. */
+:root[data-players] .snes-pad .snes-wordmark { display: none; }
+
+@media (max-width: 620px) {
+  /* Two stations on a phone, sized off the screen width so they fit at 320px. */
+  :root[data-players] {
+    /* The caps get the width: the stick's drag region is everything left of
+       its caps (isStickTouch in shell.js), so its box only needs the boot. */
+    --cap: clamp(36px, 10.6vw, 50px);
+    --stick-w: clamp(34px, 9.4vw, 48px);
+  }
+  :root[data-players] .fire-buttons.four {
+    grid-template-columns: repeat(2, var(--cap));
+    /* Real space between the caps. Four circles a few pixels apart is
+       one target with lines on it as far as a thumb is concerned. */
+    gap: clamp(5px, 1.8vw, 10px);
+  }
+  :root[data-players] .arcade-btn { width: var(--cap); height: var(--cap); }
+
+  :root[data-players] .deck-side {
+    gap: clamp(6px, 2vw, 14px);
+    padding: 0 clamp(5px, 1.2vw, 12px);
+  }
+  :root[data-players] .stick-base { width: var(--stick-w); }
+  :root[data-players] .stick-boot {
+    width: calc(var(--stick-w) * 1.08);
+    height: calc(var(--stick-w) * 1.08);
+  }
+  :root[data-players] .stick-shaft { width: 10px; }
+  /* The ball and washer may be wider than the base: the base is a drag
+     region, and held to its width the stick looked like a lollipop. */
+  :root[data-players] .stick-ball {
+    width: calc(var(--stick-w) * 1.24);
+    height: calc(var(--stick-w) * 1.24);
+  }
+  :root[data-players] .stick-shaft { height: 26px; }
+  :root[data-players] .stick-base::before { width: calc(var(--stick-w) * 0.9); }
+  :root[data-players] .deck-tag { font-size: 6px; }
+}
+
+/* ======================================================================
+   Landscape on a phone: the deck moves into the letterbox
+   ======================================================================
+   A 5:4 picture on a 2:1 screen leaves a gutter down each side, where the
+   thumbs already are. Sideways the bar is the whole screen, transparent, with
+   the stick or cross in the left gutter and the caps in the right; shell.js
+   reserves no height for it. */
+
+/* [data-controls] is carried only to out-weigh the two rules above that
+   set a bar height per controller — sideways there is no bar to have a
+   height, and the taller of them would otherwise win. */
+:root[data-layout="landscape"][data-controls] #topbar.kiosk-bar,
+:root[data-layout="landscape"][data-controls] .kiosk-bar-main {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: auto;
+  padding: 0;
+  background: none;
+  border-top: 0;
+  box-shadow: none;
+  pointer-events: none;   /* the controls take input; the gap does not */
+}
+
+/* No tilt sideways: the controls sit over the picture, and the rotate pushed
+   tall parts off a short screen. */
+:root[data-layout="landscape"] .kiosk-bar > .deck-panel {
+  transform: none;
+  background: none;
+  border-top: 0;
+  box-shadow: none;
+  align-items: flex-end;
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
+}
+:root[data-layout="landscape"] .stick-base,
+:root[data-layout="landscape"] .fire-buttons,
+:root[data-layout="landscape"] .snes-btn,
+:root[data-layout="landscape"] .arcade-btn,
+:root[data-layout="landscape"] .snes-dpad { pointer-events: auto; }
+
+/* The gutter is as wide as the picture's own letterbox: half of what is
+   left over when a 5:4 picture is fitted into the screen. The controls
+   live inside it, hard against the outside edge. */
+:root[data-layout="landscape"] .deck-side {
+  padding: 0 max(10px, env(safe-area-inset-left, 0px)) 8px;
+}
+
+/* The pad, sideways: the shell stops being a moulded panel across the
+   bottom and becomes the same two controls in the same two gutters. */
+:root[data-layout="landscape"] .snes-pad .snes-shell {
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  align-items: flex-end;
+  padding: 0 max(10px, env(safe-area-inset-left, 0px))
+             calc(env(safe-area-inset-bottom, 0px) + 10px);
+}
+:root[data-layout="landscape"] .snes-pad .snes-wordmark { display: none; }
+
+/* Bigger sideways: a gutter is about 100px wide. */
+:root[data-layout="landscape"] .snes-pad { --sf-btn: 40px; --sf-gap: 12px; --sf-dpad: 76px; }
+:root[data-layout="landscape"] .stick-base { width: 86px; height: 150px; }
+:root[data-layout="landscape"] .stick-boot { width: 46px; height: 46px; bottom: 6px; }
+:root[data-layout="landscape"] .stick-handle { bottom: 46px; }
+:root[data-layout="landscape"] .stick-shaft { width: 11px; height: 34px; }
+:root[data-layout="landscape"] .stick-ball { width: 52px; height: 52px; bottom: 34px; }
+
+/* Two players sideways: a station per gutter, the middle of the screen is the
+   fight. Up to 2:1 each station stacks its caps above its stick (see the
+   max-aspect-ratio rule). */
+:root[data-layout="landscape"][data-players] .deck-side {
+  flex: 0 0 auto;
+  gap: 8px;
+  padding: 0 max(6px, env(safe-area-inset-left, 0px)) 8px;
+}
+:root[data-layout="landscape"][data-players] .fire-buttons.four {
+  grid-template-columns: repeat(2, 34px);
+  gap: 5px;
+}
+:root[data-layout="landscape"][data-players] .arcade-btn { width: 34px; height: 34px; }
+:root[data-layout="landscape"][data-players] .stick-base { width: 62px; }
+:root[data-layout="landscape"][data-players] .stick-boot { width: 38px; height: 38px; }
+:root[data-layout="landscape"][data-players] .stick-ball { width: 42px; height: 42px; }
+:root[data-layout="landscape"][data-players] .stick-shaft { width: 9px; }
+
+/* Two pads, one per gutter. Each keeps its cross on the left and its
+   caps on the right; they are just half a screen apart instead of
+   shoulder to shoulder. */
+:root[data-layout="landscape"][data-players] .snes-pad { --sf-btn: 33px; --sf-dpad: 62px; --sf-gap: 8px; }
+:root[data-layout="landscape"][data-players] .snes-pad .snes-shell {
+  padding: 0 max(6px, env(safe-area-inset-left, 0px))
+             calc(env(safe-area-inset-bottom, 0px) + 8px);
+  justify-content: flex-start;
+  gap: 10px;
+}
+:root[data-layout="landscape"][data-players] .snes-pad.second .snes-shell {
+  justify-content: flex-end;
+}
+:root[data-layout="landscape"] .deck-tag { bottom: 0; }
+
+/* The toggle back to the joystick goes with the deck: sideways there is
+   no bar under it to sit above, so it sits in the middle of the screen's
+   bottom edge, between the two gutters where nothing else is. */
+/* Rally's spinners sideways: thumb-sized, in the bottom corners. */
+:root[data-layout="landscape"] #paddle-dial,
+:root[data-layout="landscape"] #paddle-dial-p2 {
+  width: 96px;
+  height: 96px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+}
+:root[data-layout="landscape"] #paddle-dial    { left: max(8px, env(safe-area-inset-left, 0px)); }
+:root[data-layout="landscape"] #paddle-dial-p2 { right: max(8px, env(safe-area-inset-right, 0px)); }
+:root[data-layout="landscape"] #paddle-dial::before,
+:root[data-layout="landscape"] #paddle-dial-p2::before { width: 88px; height: 18px; }
+:root[data-layout="landscape"] #dial-label,
+:root[data-layout="landscape"] #dial-label-p2 { top: -14px; font-size: 8px; }
+:root[data-layout="landscape"] #paddle-dial,
+:root[data-layout="landscape"] #paddle-dial-p2 { pointer-events: auto; }
+
+/* The station tag on a pad sits on the panel itself, low and central
+   over that station's own half, so the two halves are named the same
+   way in both controllers. */
+.snes-pad .deck-tag {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 3px);
+  transform: translateX(-50%);
+}
+
+/* One panel, two stations: each half keeps only its outer corner and edge
+   shade, so the two read as one continuous surface. */
+:root[data-players] #snes-pad .snes-shell {
+  border-radius: 13px 0 0 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 3px 1px -1px rgba(224, 60, 49, 0.28),
+    inset 0 -14px 22px rgba(0, 0, 0, 0.6),
+    inset 6px 0 14px -6px rgba(0, 0, 0, 0.55);
+}
+:root[data-players] .snes-pad.second .snes-shell {
+  border-radius: 0 13px 0 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 3px 1px -1px rgba(224, 60, 49, 0.28),
+    inset 0 -14px 22px rgba(0, 0, 0, 0.6),
+    inset -6px 0 14px -6px rgba(0, 0, 0, 0.55);
+}
+
+/* The tilt is a projection: at 56deg a 37px button renders 17px tall.
+   Flatter on a phone, which nearly doubles every control's height. */
+
+@media (max-height: 450px) {
+  #topbar, .kiosk-bar-main { --bar-tilt: 20deg; }
+}
+
+/* On a phone the stick deck's bar grows for the square of caps: a little game
+   height for caps about a third bigger. */
+@media (max-width: 620px) {
+  :root[data-controls="stick"][data-caps="4"] #topbar.kiosk-bar,
+  :root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
+    height: calc(120px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ---- The stick ---- A round dust washer, a visible shaft, and a ball
+   standing proud of the cup. */
+
+/* The dust washer: a round rubber cup sunk in the panel, lying flat so the
+   tilt foreshortens it. */
+.stick-boot {
+  border-radius: 50%;
+  /* Mostly rubber, with only the shaft's hole actually black. Taken
+     wider, the dark core stops being a hole for the shaft and becomes a
+     hole in the panel. */
+  background:
+    radial-gradient(circle at 50% 44%,
+      #040405 0%, #08080a 20%, #24242a 38%, #3c3c44 62%, #4e4e58 80%, #1a1a1e 100%);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.65),
+    inset 0 2px 3px rgba(0, 0, 0, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.10),
+    0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+/* The shaft: a chromed rod, not a grey wedge. One bright band down the
+   left of centre where the light runs along it, and a dark side beyond
+   the turn — which is the whole of what makes a cylinder read as metal. */
+.stick-shaft {
+  background: linear-gradient(90deg,
+    #4a4a50 0%, #9ea0a8 22%, #f2f4f8 38%, #c6c8d0 52%, #74767e 72%, #2e2e34 100%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+/* The ball: a hard specular, and a rim of bounced light underneath —
+   without that last one a sphere reads as a disc with a gradient. */
+.stick-ball {
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 16%),
+    radial-gradient(circle at 34% 24%, #ff9c8c 0%, #f46b56 22%, #d9351f 52%, #9c1409 82%, #5f0b05 100%);
+  box-shadow:
+    0 6px 10px rgba(0, 0, 0, 0.5),
+    0 14px 22px rgba(0, 0, 0, 0.35),
+    inset 0 -7px 10px rgba(0, 0, 0, 0.45),
+    inset 0 -9px 7px -6px rgba(255, 150, 130, 0.5),
+    inset 0 3px 4px rgba(255, 255, 255, 0.28);
+}
+
+/* A real cap is nearly all plunger in a thin rim. */
+.arcade-btn { background: conic-gradient(from -50deg, #d8dade, #8c9098 18%, #2a2c30 50%, #8c9098 82%, #d8dade 100%); }
+.arcade-btn-cap { inset: 8%; }
+
+/* A finger is the same size on a big screen as on a small one — but
+   here there is room. Keyed on the pointer, not the viewport width. */
+@media (pointer: coarse) and (min-width: 621px) {
+  :root[data-players] {
+    --cap: clamp(56px, 5.6vw, 92px);
+    --stick-w: clamp(60px, 6.4vw, 104px);
+  }
+  /* One station or two, the caps are sized for a hand — and the grid
+     has to be told, or the columns stay at the mouse-sized 44px and
+     four 64px caps overlap inside them. */
+  .fire-buttons.four {
+    grid-template-columns: repeat(2, 64px);
+    gap: 16px;
+  }
+  .deck-side { gap: 26px; }
+  .arcade-btn { width: 64px; height: 64px; }
+
+  /* `:root[data-players] .snes-pad` out-specifies a bare `.snes-pad`, so the
+     big-screen sizes are written at the same weight. */
+  .snes-pad,
+  :root[data-players] .snes-pad { --sf-btn: 62px; --sf-gap: 24px; --sf-dpad: 104px; }
+
+  :root[data-players] .snes-pad .snes-face.four { gap: 18px var(--sf-gap); }
+
+  :root[data-controls="stick"] #topbar.kiosk-bar,
+  :root[data-controls="stick"] .kiosk-bar-main,
+  :root[data-controls="stick"][data-caps="4"] #topbar.kiosk-bar,
+  :root[data-controls="stick"][data-caps="4"] .kiosk-bar-main {
+    height: calc(200px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* The washer stays well under the ball; scaled up with it, it read as a
+     hole in the panel. */
+  .stick-base { width: 130px; height: 250px; }
+  .stick-boot { width: 76px; height: 76px; bottom: 10px; }
+  .stick-handle { bottom: 48px; }
+  .stick-shaft { width: 19px; height: 66px; }
+  .stick-ball { width: 100px; height: 100px; bottom: 66px; }
+  .stick-base::before { width: 84px; }
+}
+
+/* ---- Caps set into the panel ---- A darker inset plate behind the square,
+   lit along its bottom lip, puts the caps in the surface instead of on it
+   (the pad has .snes-face::before). */
+.fire-buttons.four { position: relative; }
+.fire-buttons.four::before {
+  content: '';
+  position: absolute;
+  /* The sides are a fixed few pixels rather than a share of the caps,
+     so the plate cannot grow past the edge of the panel it is set into
+     as the caps grow — which on a 320px phone it did, by six. */
+  inset: -12% -6px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow:
+    inset 0 2px 7px rgba(0, 0, 0, 0.62),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+}
+.arcade-btn { z-index: 1; }
+
+/* On the narrowest phone the plate is exactly as wide as the caps. */
+@media (max-width: 400px) {
+  .fire-buttons.four::before { left: 0; right: 0; }
+}
+
+/* The washer: a rubber ring, lit at the rim. A filled dark disc reads
+   as a hole in the panel rather than as the cup the shaft stands in. */
+.stick-boot {
+  /* The dark core is only the shaft's hole; any wider and it reads as a hole
+     in the panel. */
+  background:
+    radial-gradient(circle at 50% 44%,
+      #000 0%, #030304 11%,
+      #1d1d22 17%, #33333b 30%,
+      #4b4b56 48%, #5d5d69 64%, #3a3a43 82%, #17171b 100%);
+  box-shadow:
+    0 3px 7px rgba(0, 0, 0, 0.7),
+    inset 0 3px 5px rgba(0, 0, 0, 0.85),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.13),
+    0 0 0 1px rgba(0, 0, 0, 0.6);
+}
+
+/* The shaft: a cylinder, not a taper. One hard bright line down it and
+   a dark side past the turn is the whole of what says "metal". */
+.stick-shaft {
+  clip-path: none;
+  border-radius: 40% 40% 12% 12% / 18% 18% 6% 6%;
+  background: linear-gradient(90deg,
+    #24242a 0%, #5c5e66 12%, #b9bcc6 30%, #ffffff 42%,
+    #d2d5dd 52%, #8a8c95 68%, #4a4c54 84%, #1c1c21 100%);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.75),
+    inset 0 -6px 8px -4px rgba(0, 0, 0, 0.5);
+}
+
+/* The gate opening, not a gate plate: a small dark recess in the washer, as
+   wide as the throw. */
+.stick-boot::before {
+  inset: 28%;
+  background: radial-gradient(circle at 50% 40%, #0c0c0f 0%, #050506 60%, #0a0a0d 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
+    inset 0 3px 5px rgba(0, 0, 0, 0.9);
+}
+
+/* The light is above and behind, so the ball's shadow lands in front
+   of the stick and slides further than the ball does. */
+.stick-base::before {
+  width: 120%;
+  height: 30%;
+  bottom: -2%;
+  background: radial-gradient(ellipse,
+    rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.5) 38%,
+    rgba(0, 0, 0, 0.18) 62%, transparent 78%);
+  filter: blur(4px);
+  /* It moves further than the ball does and the other way up: a shadow
+     cast by an overhead light runs out ahead of whatever is leaning. */
+  transform: translate(calc(-50% + var(--dx) * 16px), calc(var(--dy) * -9px));
+}
+
+/* A tight contact patch under the rim. */
+.arcade-btn {
+  box-shadow:
+    0 3px 5px rgba(0, 0, 0, 0.75),
+    0 8px 16px -4px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 2px 2px rgba(255, 255, 255, 0.35),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.55);
+}
+.arcade-btn.blip-pressed,
+.arcade-btn.active {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.8),
+    0 3px 7px -3px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.2);
+}
+
+/* Each cap's own reflection, pooled on the panel just below its rim and
+   taking that cap's colour. currentColor is set per cap below, so one
+   rule serves a red row and a blue one. */
+.arcade-btn::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 82%;
+  height: 46%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 0%,
+    currentColor 0%, transparent 72%);
+  /* Faint, but not so faint it may as well not be there: on a panel
+     this dark a reflection at three tenths is invisible and at nine is
+     a lamp. */
+  opacity: 0.52;
+  filter: blur(2.5px);
+  pointer-events: none;
+  z-index: -1;
+}
+.fire-buttons.four .arcade-btn:nth-child(1),
+.fire-buttons.four .arcade-btn:nth-child(2) { color: #e5361f; }
+.fire-buttons.four .arcade-btn:nth-child(3),
+.fire-buttons.four .arcade-btn:nth-child(4) { color: #2f86d8; }
+.fire-buttons .arcade-btn { color: #e5361f; }
+
+/* A game's unused caps are unlit blanks, same size and place. */
+.fire-buttons.four .arcade-btn.spare .arcade-btn-cap,
+.arcade-btn.spare .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%,
+      rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 16%, transparent 34%),
+    radial-gradient(circle at 50% 44%, #4b4d53 0%, #33353a 44%, #212327 78%, #16171a 100%);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    inset 0 3px 4px rgba(255, 255, 255, 0.12),
+    inset 0 -5px 8px rgba(0, 0, 0, 0.5);
+}
+.arcade-btn.spare { opacity: 0.92; }
+.arcade-btn.spare::after { display: none; }   /* nothing lit, nothing reflected */
+
+.snes-pad .snes-btn.spare > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0) 44%),
+    radial-gradient(circle at 50% 62%, #3d3f45 0%, #4a4c52 40%, #35373c 70%, #1e1f23 100%);
+}
+
+/* Caps sit in recesses (darker, shadowed at the top, lit inside the bottom);
+   the ball stands above the panel, so it keeps its reflection. */
+.arcade-btn {
+  box-shadow:
+    0 2px 3px rgba(0, 0, 0, 0.8),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.45),
+    inset 0 2px 2px rgba(255, 255, 255, 0.32),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.55);
+}
+.arcade-btn.blip-pressed,
+.arcade-btn.active {
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.45),
+    inset 0 -2px 3px rgba(255, 255, 255, 0.18);
+}
+.arcade-btn::after { display: none; }
+
+.fire-buttons.four::before {
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(0, 0, 0, 0.9),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.07);
+}
+.snes-pad .snes-face.four::before {
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.75),
+    inset 0 1px 0 rgba(0, 0, 0, 0.9),
+    inset 0 -2px 0 rgba(255, 255, 255, 0.07);
+}
+
+/* The legend goes above the controls. At the bottom it landed on top
+   of the caps' own row once they became a square. */
+.deck-tag {
+  top: 3px;
+  bottom: auto;
+}
+.snes-pad .deck-tag {
+  top: 4px;
+  bottom: auto;
+}
+:root[data-layout="landscape"] .deck-tag { top: auto; bottom: 0; }
+
+/* And the square lifts clear of the panel's front edge, so the recess
+   it sits in has a lip below it rather than running off the end. */
+.fire-buttons.four { margin-bottom: 20px; }
+
+/* The stick's box is mostly empty air above the ball, so bottom-
+   aligning the boxes does not centre what is drawn in them. */
+.stick-base { margin-bottom: 14px; }
+
+@media (max-width: 620px) {
+  /* The phone's stick and caps already line up: both are sized off the
+     same --stick-w / --cap clamps. */
+  :root[data-players] .stick-base { margin-bottom: 0; }
+}
+
+/* ======================================================================
+   Real proportions, Atari colours
+   ======================================================================
+   A real panel: 30mm buttons on 36mm centres and a 35mm ball-top, so cap
+   spacing is a fifth of a cap and the ball is 1.17 caps. Everything hangs off
+   --cap. */
+:root[data-caps="4"] { --cap: 46px; }
+
+:root[data-caps="4"] .arcade-btn { width: var(--cap); height: var(--cap); }
+:root[data-caps="4"] .fire-buttons.four {
+  grid-template-columns: repeat(2, var(--cap));
+  gap: calc(var(--cap) * 0.2);                 /* 36mm centres on 30mm caps */
+}
+:root[data-caps="4"] .stick-ball {
+  width: calc(var(--cap) * 1.17);              /* a 35mm ball on 30mm caps */
+  height: calc(var(--cap) * 1.17);
+}
+:root[data-caps="4"] .stick-boot {
+  width: calc(var(--cap) * 1.12);
+  height: calc(var(--cap) * 1.12);
+}
+:root[data-caps="4"] .stick-shaft {
+  width: calc(var(--cap) * 0.21);
+  height: calc(var(--cap) * 0.62);
+}
+:root[data-caps="4"] .stick-handle { bottom: calc(6px + var(--cap) * 0.56); } /* boot centre */
+/* The base is a drag region, not a footprint: the ball may overhang it and
+   the hit test is "left of this station's caps". */
+:root[data-caps="4"] .stick-base {
+  width: calc(var(--cap) * 1.05);
+  height: calc(var(--cap) * 3.4);
+}
+:root[data-caps="4"] .stick-base::before { width: calc(var(--cap) * 1.2); }
+/* Stick centre to the nearest cap centre: the panel standard is 59-95mm
+   from a 30mm button, so a shade over two caps. */
+:root[data-caps="4"] .deck-side { gap: calc(var(--cap) * 0.5); }
+
+@media (pointer: coarse) and (min-width: 621px) {
+  :root[data-caps="4"] { --cap: 62px; }
+}
+@media (max-width: 620px) {
+  :root[data-caps="4"] { --cap: clamp(38px, 10.6vw, 50px); }
+}
+
+/* ---- Atari caps ---- Per-position colours in the Atari rainbow order;
+   the red caps rule below repaints them. */
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(1) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #ff7a5e 0%, #e03c31 44%, #a21409 78%, #6b0a04 100%);
+}
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(2) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #ffb066 0%, #f07e26 44%, #b04f06 78%, #6d2f02 100%);
+}
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(3) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #7fe0d8 0%, #24a39b 44%, #0c5d59 78%, #05332f 100%);
+}
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(4) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #7fb8ff 0%, #2170c4 44%, #0d3b78 78%, #051e42 100%);
+}
+/* The ball-top is the Atari CX40's red, the one everybody has held. */
+:root[data-caps="4"] .stick-ball {
+  background:
+    radial-gradient(circle at 30% 18%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0) 16%),
+    radial-gradient(circle at 34% 24%, #ff9078 0%, #f0523c 22%, #d6291a 52%, #97130a 82%, #5c0904 100%);
+}
+
+/* The pad is a sibling of the tilted panel, not a child, so the two
+   controllers lay out in different coordinate systems. Anchor both to
+   the panel's front edge by the same fraction of --cap. */
+:root[data-caps="4"] .snes-pad .snes-shell {
+  align-items: flex-end;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--cap) * 0.30);
+}
+:root[data-caps="4"] .snes-pad .snes-dpad,
+:root[data-caps="4"] .snes-pad .snes-face { margin-bottom: calc(var(--cap) * 0.22); }
+
+/* Two stations of four caps at 320px: same ratios, smaller scale. */
+@media (max-width: 620px) {
+  :root[data-caps="4"] { --cap: clamp(32px, 9vw, 50px); }
+  :root[data-caps="4"] .deck-side { gap: calc(var(--cap) * 0.34); }
+}
+
+/* At 320px two stations fit --cap: 32 and no further, which at 26deg
+   renders 25.8px tall. Width cannot buy that back; flattening the tilt
+   can, because the tilt is what the height is being lost to. */
+@media (max-width: 400px) {
+  #topbar, .kiosk-bar-main { --bar-tilt: 12deg; }
+  :root[data-caps="4"] { --cap: clamp(32px, 9vw, 50px); }
+}
+
+/* The plate hugs the caps. Sized off a percentage of the block it grew
+   with the square and read as a black box laid on the panel. */
+:root[data-caps="4"] .fire-buttons.four::before {
+  inset: calc(var(--cap) * -0.18) calc(var(--cap) * -0.16);
+  border-radius: calc(var(--cap) * 0.42);
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+:root[data-caps="4"] .snes-pad .snes-face.four::before {
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.55),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Red caps (the CX40's red), repainting the rainbow above; the heavy cap of
+   each pair is the darker one. */
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(1) .arcade-btn-cap,
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(3) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.12) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #ff7a5e 0%, #e03c31 44%, #a21409 78%, #6b0a04 100%);
+}
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(2) .arcade-btn-cap,
+:root[data-caps="4"] .fire-buttons.four .arcade-btn:nth-child(4) .arcade-btn-cap {
+  background:
+    radial-gradient(circle at 33% 26%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.1) 13%, transparent 30%),
+    radial-gradient(circle at 50% 44%, #d8503c 0%, #b32a1e 44%, #7d0f06 78%, #4d0703 100%);
+}
+
+/* The ball sits on top of the shaft, so its offset has to follow the
+   shaft's height. Left at a fixed value it dropped down over it. */
+:root[data-caps="4"] .stick-ball { bottom: calc(var(--cap) * 0.62); }
+
+/* The tag sits just above the caps. The station's box is three caps
+   tall to give the ball room to float, so its top is well clear of the
+   panel and a tag pinned there lands on the game. */
+:root[data-caps="4"] .deck-tag {
+  top: auto;
+  bottom: calc(var(--cap) * 2.6);
+}
+:root[data-layout="landscape"][data-caps="4"] .deck-tag { top: auto; bottom: 0; }
+
+/* Aimed at the controls: .arcade-btn sets pointer-events:auto for
+   itself, and a parent's `none` does not override a child that does. */
+:root:not([data-open]):not([data-versus]) #deck-p2 .arcade-btn,
+:root:not([data-open]):not([data-versus]) #deck-p2 .stick-base {
+  pointer-events: none;
+}
+
+/* ---- One deck, two controllers ---- The pad sits in .deck-panel and is
+   sized off --cap like the stick deck, so switching moves nothing under the
+   thumbs. */
+:root[data-caps="4"] .snes-pad {
+  --sf-btn: var(--cap);
+  --sf-gap: calc(var(--cap) * 0.2);
+  --sf-dpad: calc(var(--cap) * 1.17);
+  --sf-edge: 0px;
+}
+:root[data-caps="4"] .snes-pad .snes-shell {
+  align-items: flex-end;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+}
+/* The cross and the caps sit in a .deck-side-shaped row of their own, so
+   they land where the stick and its caps land. */
+:root[data-caps="4"] .snes-pad .snes-dpad,
+:root[data-caps="4"] .snes-pad .snes-face {
+  margin-bottom: 20px;
+}
+:root[data-caps="4"] .snes-pad .snes-dpad { margin-bottom: 26px; }
+
+/* Both controllers get the same bar height, so switching does not move the
+   picture. */
+:root[data-caps="4"][data-controls="pad"] #topbar.kiosk-bar,
+:root[data-caps="4"][data-controls="pad"] .kiosk-bar-main {
+  height: calc(152px + env(safe-area-inset-bottom, 0px));
+}
+:root[data-caps="4"][data-controls="stick"] #topbar.kiosk-bar,
+:root[data-caps="4"][data-controls="stick"] .kiosk-bar-main {
+  height: calc(152px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Only the controller on show names its stations (both decks are in the
+   panel). */
+:root[data-controls="pad"] .deck-side .deck-tag { display: none; }
+:root[data-controls="stick"] .snes-pad .deck-tag { display: none; }
+
+/* The pad's caps are the same red as the joystick deck's. */
+:root[data-caps="4"] .snes-pad .snes-btn.cap1 > span,
+:root[data-caps="4"] .snes-pad .snes-btn.cap3 > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(255, 210, 200, 0.42) 0%, rgba(255, 210, 200, 0) 44%),
+    radial-gradient(circle at 50% 62%, #e8503c 0%, #d8352a 40%, #b4241a 70%, #7d1109 100%);
+}
+:root[data-caps="4"] .snes-pad .snes-btn.cap2 > span,
+:root[data-caps="4"] .snes-pad .snes-btn.cap4 > span {
+  background:
+    radial-gradient(circle at 46% 30%, rgba(255, 210, 200, 0.34) 0%, rgba(255, 210, 200, 0) 44%),
+    radial-gradient(circle at 50% 62%, #bc3a2a 0%, #a8261b 40%, #841409 70%, #560b04 100%);
+}
+
+/* The tag paints over the deck, not under it. It is a sibling of the
+   caps and comes first in the DOM, so the mounting plate was drawn on
+   top of it and cut it in half. */
+.deck-tag { z-index: 3; }
+/* In the gap between the stick and the caps, level with them. There is
+   no room above: the square of caps reaches within a few pixels of the
+   panel's own top edge, so a tag put there is cut in half by it. */
+:root[data-caps="4"] .deck-tag {
+  bottom: calc(var(--cap) * 1.05);
+  /* Measured from the left of the station, not 50% of it: the caps are
+     twice the stick's width, so the station's midpoint falls inside
+     them and the tag landed on the LK cap. */
+  left: calc(var(--cap) * 1.25);
+}
+
+/* Small phones, upright: cross at the station's outer edge, caps at its inner
+   edge. */
+@media (max-width: 420px) {
+  :root[data-layout="upright"] .snes-pad:not(.second) .snes-shell {
+    justify-content: space-between;
+    padding-right: clamp(8px, 3vw, 16px);
+  }
+  :root[data-layout="upright"] #deck-p1 { flex: 1 1 0; justify-content: space-between; }
+}
+
+/* Sideways on a 16:9 phone the gutter is ~100px, and cross + caps side
+   by side are ~145px, which laps onto the picture. Stack them instead:
+   caps above, cross at the bottom corner. */
+@media (max-aspect-ratio: 2/1) {
+  :root[data-layout="landscape"] .snes-pad .snes-shell,
+  :root[data-layout="landscape"] .deck-side {
+    flex-direction: column-reverse;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  :root[data-layout="landscape"][data-players] .snes-pad.second .snes-shell,
+  :root[data-layout="landscape"] #deck-p2 { align-items: flex-end; justify-content: flex-start; }
+  :root[data-layout="landscape"][data-caps="4"] .deck-tag { bottom: 5px; }
+}
+
+/* The per-caps bar heights above out-weigh the landscape rule, which left
+   the deck a 152px strip pinned to the top of the screen. Stretch it over
+   the whole height so the controls sit in the bottom corners. */
+:root[data-layout="landscape"][data-caps][data-controls] #topbar.kiosk-bar,
+:root[data-layout="landscape"][data-caps][data-controls] .kiosk-bar-main {
+  top: 0;
+  bottom: 0;
+  height: auto;
+}
+
+/* The pad's controls only fill the bottom ~95px of the 152px bar it shared
+   with the joystick deck (whose ball floats higher), leaving a dead band
+   of panel above the caps. */
+:root[data-caps="4"][data-controls="pad"][data-layout="upright"] #topbar.kiosk-bar,
+:root[data-caps="4"][data-controls="pad"][data-layout="upright"] .kiosk-bar-main {
+  height: calc(118px + env(safe-area-inset-bottom, 0px));
+}
+
+/* ---- Thumb-sized controls on phones (upright) ---- A one-seat game
+   (data-seats="1") gives station one the whole bar and drops the dead station
+   and unused caps. Touches get 12-14px of slop (blip_controller.js). */
+
+
+/* A fighter seats two, so both stations stay; they just use what the
+   half-width bar has (caps 2x2), and the bar grows to seat the taller cross. */
+@media all {
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] #topbar.kiosk-bar,
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .kiosk-bar-main {
+    height: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad {
+    --sf-btn: 42px;
+    --sf-gap: 8px;
+    --sf-dpad: 66px;
+  }
+}
+@media (max-width: 360px) {
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad {
+    --sf-btn: 38px;
+    --sf-dpad: 60px;
+  }
+}
+
+/* Same for the joystick deck: one station, bigger caps (and, since every
+   deck dimension hangs off --cap, a bigger stick), no unused caps. */
+
+@media (max-width: 340px) {
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad {
+    --sf-btn: 34px;
+    --sf-gap: 6px;
+    --sf-dpad: 52px;
+  }
+}
+
+/* Landscape, one seat: cross under the left thumb, the two live caps
+   stacked under the right, each in its own gutter. */
+
+/* ---- Station lamps ---- P1 and P2 lamps on the panel's top edge replace the
+   silkscreened tags. P1 is lit while the deck is live (out behind the coin
+   wall); P2 when a second player is in, pulsing on a title screen that takes
+   one. */
+.deck-tag { display: none !important; }
+
+.deck-credit-lamp,
+.deck-second-lamp {
+  --lamp:74,222,128;
+  --on:0;
+  position: absolute;
+  top: 5px;
+  z-index: 6;
+  width:42px;
+  height:14px;
+  padding:0 4px 0 16px;
+  border: 1px solid #8e9291;
+  border-radius:9px;
+  box-sizing: border-box;
+  font:700 6px/12px 'Courier New',monospace;
+  letter-spacing:.7px;
+  pointer-events: none;
+  color: rgba(226, 232, 240, calc(0.28 + 0.55 * var(--on)));
+  text-shadow: 0 1px 1px #000;
+  /* A raised steel bezel and a glass lens seated against the panel. */
+  background:
+    radial-gradient(ellipse at 32% 25%,rgba(255,255,255,.9),transparent 24%),
+    radial-gradient(circle at 34% 28%,rgba(255,255,225,var(--on)) 0 18%,rgba(var(--lamp),var(--on)) 42%,rgba(var(--lamp),calc(var(--on) * .65)) 70%,#211c16 100%)
+    no-repeat 2px 50% / 10px 10px,
+    radial-gradient(circle,rgba(var(--lamp),calc(var(--on) * .42)),transparent 72%)
+      no-repeat 0 50% / 14px 14px,
+    linear-gradient(180deg, #d2d5d2 0%, #777e7d 24%, #343a39 54%, #a5aaa7 78%, #4a504e 100%);
+  background-clip: border-box;
+  box-shadow:
+    0 2px 0 #2a2d2b,
+    0 5px 6px #000c,
+    inset 0 1px 1px #f4f5f2aa,
+    inset 0 -2px 2px #101312;
+}
+:root[data-credit] .deck-credit-lamp,
+:root[data-pad="active"] .deck-credit-lamp {--on:1;border-color:#a7b7a2;color:#f1f5df}
+.deck-credit-lamp::before,
+.deck-second-lamp::before {
+  content:'';position:absolute;box-sizing:border-box;left:2px;top:1px;width:10px;height:10px;
+  border:1px solid #553329;border-radius:50%;
+  background:radial-gradient(circle at 34% 28%,#57372e,#241612 62%,#100d0b);
+  box-shadow:inset 0 1px 2px #000b,0 1px 1px #000;
+}
+:root[data-credit] .deck-credit-lamp::before,
+:root[data-pad="active"] .deck-credit-lamp::before {
+  background:radial-gradient(circle at 34% 28%,#f3ffe0 0 18%,#b6f285 42%,#55a84d 75%);
+  box-shadow:0 0 5px 2px #8dd76c99,0 0 13px #8dd76c66,inset 0 0 2px #fff;
+}
+.deck-second-lamp {--lamp:56,189,248}
+:root[data-players="2"] .deck-second-lamp {--on:1;border-color:#a7b7a2;color:#f1f5df}
+:root[data-players="2"] .deck-second-lamp::before {
+  background:radial-gradient(circle at 34% 28%,#e4f8ff 0 18%,#79cefa 42%,#347fae 75%);
+  box-shadow:0 0 5px 2px #56bdf899,0 0 13px #56bdf866,inset 0 0 2px #fff;
+}
+@property --on { syntax: '<number>'; inherits: true; initial-value: 1; }
+
+:root[data-layout="landscape"] .deck-credit-lamp,
+:root[data-layout="landscape"] .deck-second-lamp {top:56px;transform:translateX(-50%)}
+
+/* ---- Joystick base: symmetric, and centred in the bar ---- */
+
+/* The rubber gaiter, flat in the deck plane so the whole ring shows, with a
+   short cone that rises and leans with the shaft. */
+.stick-boot::before {
+  clip-path: none;
+  border-radius: 50%;
+  inset: 19%;
+  background: radial-gradient(circle at 44% 38%, #5a5a63 0%, #393940 34%, #1c1c21 66%, #08080a 100%);
+  box-shadow:
+    0 0 0 1.5px #030304,
+    inset 0 2px 3px rgba(255, 255, 255, 0.10),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.6);
+}
+.stick-handle::before {
+  left: calc(var(--boot, 50px) * -0.15);
+  width: calc(var(--boot, 50px) * 0.30);
+  height: calc(var(--boot, 50px) * 0.26);
+  bottom: 0;
+  border-radius: 0;
+  clip-path: polygon(24% 0, 76% 0, 100% 100%, 0 100%);
+  background: linear-gradient(90deg, #17171b 0%, #4a4a52 34%, #2a2a30 62%, #0e0e11 100%);
+  box-shadow: none;
+}
+
+/* Upright: the boot's centre is the bar's vertical centre. The base fills
+   the bar's height instead of towering over it; the ball and shaft rise
+   from the pivot and may overlap the game. */
+:root[data-caps="4"] { --boot: calc(var(--cap) * 1.12); }
+:root[data-layout="upright"][data-caps="4"] .deck-side { align-self: stretch; }
+:root[data-layout="upright"][data-caps="4"] .stick-base { height: 100%; }
+:root[data-layout="upright"][data-caps="4"] .stick-boot { bottom: calc(50% - var(--boot) / 2); }
+:root[data-layout="upright"][data-caps="4"] .stick-handle { bottom: 50%; }
+:root[data-layout="upright"][data-caps="4"] .stick-base::before {
+  bottom: calc(50% - var(--boot) / 2 - 6px);
+  height: calc(var(--boot) * 0.5);
+}
+
+/* ---- One place for the controls ---- Upright, the stick's base and the
+   cross share a centre and the caps share a spot, centred on the bar's
+   middle. --ctl-cx: cross / base centre from the station's left edge;
+   --ctl-pr: the caps' right margin. */
+@media all {
+  :root[data-layout="upright"][data-caps="4"] { --ctl-cx: 40px; --ctl-pr: 10px; }
+
+  /* Same bar height in both modes, so the middle is the same screen row. */
+  :root[data-layout="upright"][data-controls="stick"][data-players="2"] #topbar.kiosk-bar,
+  :root[data-layout="upright"][data-controls="stick"][data-players="2"] .kiosk-bar-main {
+    height: calc(128px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Pad: centred in the bar, cross centre at --ctl-cx. */
+  :root[data-layout="upright"][data-caps="4"] .snes-pad .snes-shell {
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 var(--ctl-pr) env(safe-area-inset-bottom, 0px) calc(var(--ctl-cx) - var(--sf-dpad) / 2);
+  }
+  :root[data-layout="upright"][data-caps="4"] .snes-pad .snes-dpad,
+  :root[data-layout="upright"][data-caps="4"] .snes-pad .snes-face { margin-bottom: 0; }
+
+  /* The pad fills the panel edge to edge; the stations must too. */
+  :root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel { padding-left: 0; padding-right: 0; gap: 0; }
+
+  /* Joystick: the same, with the base as wide as its boot so the boot's
+     centre is the base's centre. */
+  :root[data-layout="upright"][data-caps="4"] .deck-side {
+    flex: 1 1 0;
+    justify-content: space-between;
+    padding: 0 var(--ctl-pr) 0 calc(var(--ctl-cx) - var(--boot) / 2);
+  }
+  :root[data-layout="upright"][data-caps="4"] .stick-base { width: var(--boot); }
+  :root[data-layout="upright"][data-caps="4"] .deck-side .fire-buttons {
+    align-self: center;
+    margin: 0;
+  }
+}
+
+/* Caps the same size and spacing as the pad's (58 / 22 alone, 42 / 8 with
+   two stations, shrinking with the pad). */
+@media all {
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] { --cap: 40px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] :is(#topbar, #kiosk-bar) .fire-buttons.four { gap: 7px 8px; }
+}
+@media (max-width: 360px) {
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] { --cap: 38px; }
+}
+@media (max-width: 340px) {
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] { --cap: 34px; }
+}
+
+/* Two stations share 171px on a 375px phone: sizes tuned so cross + caps fit
+   a half with a little air, in both controllers. */
+@media all {
+  :root[data-layout="upright"][data-caps="4"][data-players="2"] { --ctl-cx: 36px; --ctl-pr: 6px; }
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad { --sf-btn: 40px; --sf-dpad: 60px; }
+}
+@media (max-width: 360px) {
+  :root[data-layout="upright"][data-caps="4"][data-players="2"] { --ctl-cx: 34px; }
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad { --sf-btn: 38px; --sf-dpad: 56px; }
+}
+@media (max-width: 340px) {
+  :root[data-layout="upright"][data-caps="4"][data-players="2"] { --ctl-cx: 31px; --ctl-pr: 5px; }
+  :root[data-layout="upright"][data-controls="pad"][data-players="2"] .snes-pad { --sf-btn: 34px; --sf-dpad: 52px; --sf-gap: 6px; }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] :is(#topbar, #kiosk-bar) .fire-buttons.four { gap: 7px 6px; }
+}
+
+/* ---- One set of equipment everywhere ---- Caps, cross and stick are the
+   same size on the landing page and in one- and two-player games. Sized as a
+   share of half the bar, so two stations fit the narrowest deck; --cap,
+   --dpad and the boot derive from it. */
+@media all {
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players] {
+    --cap: clamp(32px, calc(0.29 * (50vw - 63px)), 54px);
+    --dpad: clamp(46px, calc(0.42 * (50vw - 63px)), 92px);
+    --ctl-cx: calc(6px + var(--dpad) / 2);
+    --ctl-pr: 16px;
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players] :is(#snes-pad, #snes-pad-p2) {
+    --sf-btn: var(--cap);
+    --sf-dpad: var(--dpad);
+    --sf-gap: 8px;
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players] :is(#snes-pad, #snes-pad-p2) .snes-face.four {
+    gap: 8px;
+  }
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players] :is(#topbar, #kiosk-bar) .fire-buttons.four {
+    gap: 8px;
+  }
+}
+
+/* One deck at every width: on a wide screen the panel is a centred slab the
+   size of a big phone's, so the equipment sits where it does everywhere. */
+:root[data-layout="upright"][data-caps="4"] .kiosk-bar > .deck-panel {
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+}
+/* Stick base as wide as the cross, so the two controllers' caps line up. */
+:root[data-layout="upright"][data-caps="4"] .stick-base { width: var(--dpad, var(--boot)); margin: 0; }
+:root[data-layout="upright"][data-caps="4"] .deck-side {
+  padding-left: calc(var(--ctl-cx) - var(--dpad, var(--boot)) / 2);
+}
+
+/* Two players on one screen: a clear channel between P1's caps and P2's
+   cross. The size formula always reserves it; it is laid out only when P2 is
+   in. */
+:root[data-layout="upright"][data-caps="4"][data-players="2"] { --mid: 26px; }
+:root[data-layout="upright"][data-caps="4"][data-players="2"] #deck-p1,
+:root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] #snes-pad .snes-shell {
+  padding-right: calc(var(--ctl-pr) + var(--mid) / 2);
+}
+:root[data-layout="upright"][data-caps="4"][data-players="2"] #deck-p2,
+:root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] #snes-pad-p2 .snes-shell {
+  padding-left: calc(var(--ctl-cx) - var(--dpad) / 2 + var(--mid) / 2);
+}
+
+/* ---- One button, both controllers ---- The same part on stick and pad:
+   gunmetal lip, dark collar, glossy red dome. Sizes come from --cap. */
+:is(#topbar, #kiosk-bar) :is(.arcade-btn, .snes-btn) {
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #0b0b0c 0 66%, transparent 67%),
+    conic-gradient(from -50deg, #8d9098, #4a4d54 28%, #212327 52%, #4a4d54 78%, #8d9098 100%);
+  box-shadow:
+    0 3px 5px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.22),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.55);
+  transition: transform .05s, box-shadow .05s, filter .05s;
+}
+:is(#topbar, #kiosk-bar) :is(.arcade-btn .arcade-btn-cap, .snes-btn > span) {
+  position: absolute;
+  inset: 11%;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.08) 16%, transparent 34%),
+    radial-gradient(circle at 50% 46%, #ee5a48 0%, #d63a2a 46%, #a51c10 80%, #6a0f07 100%);
+  box-shadow:
+    0 2px 3px rgba(0, 0, 0, 0.5),
+    inset 0 2px 2px rgba(255, 255, 255, 0.16),
+    inset 0 -4px 6px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(0, 0, 0, 0.45);
+  transition: transform .05s, box-shadow .05s, filter .05s;
+}
+:is(#topbar, #kiosk-bar) :is(.arcade-btn.blip-pressed .arcade-btn-cap, .arcade-btn.active .arcade-btn-cap, .snes-btn.blip-pressed > span) {
+  transform: scale(0.94);
+  filter: brightness(0.82);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    inset 0 4px 7px rgba(0, 0, 0, 0.5),
+    inset 0 -1px 2px rgba(255, 190, 180, 0.15);
+}
+/* a second action (Meteors' hyperspace) has a cool-blue cap on both */
+:is(#topbar, #kiosk-bar) :is(.arcade-btn, .snes-btn).alt :is(.arcade-btn-cap, span) {
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.08) 16%, transparent 34%),
+    radial-gradient(circle at 50% 46%, #5aa2ee 0%, #2f76d0 46%, #1a4f9e 80%, #0d2c60 100%);
+}
+/* No reflection puddle: stick and pad share one plain cap. */
+:is(#topbar, #kiosk-bar) .arcade-btn::after { display: none; }
+
+/* A slimmer plate behind the caps, so the group has air to the panel's corner
+   (the right margin above is wider too). */
+:is(#topbar, #kiosk-bar) .fire-buttons.four::before {
+  inset: calc(var(--cap) * -0.10) calc(var(--cap) * -0.09);
+  border-radius: calc(var(--cap) * 0.36);
+}
+:is(#topbar, #kiosk-bar) .snes-face.four::before {
+  inset: calc(var(--cap) * -0.10) calc(var(--cap) * -0.09);
+  border-radius: calc(var(--cap) * 0.36);
+}
+
+/* Lamps go under their controller: level with each other, centred on the
+   cross / stick base, in the panel's lower part. */
+:root[data-layout="upright"][data-caps="4"] .deck-credit-lamp,
+:root[data-layout="upright"][data-caps="4"] .deck-second-lamp {
+  top:calc(50% + var(--dpad) * 0.55 - 12px);
+}
+:root[data-layout="upright"][data-caps="4"] .deck-credit-lamp {
+  left: var(--ctl-cx);
+  transform: translateX(-50%);
+}
+:root[data-layout="upright"][data-players="2"] .deck-second-lamp {
+  left: calc(50% + var(--ctl-cx) + var(--mid) / 2);
+  transform:translateX(-50%);
+}
+
+/* ---- The plate is bolted to the cabinet ---- A dark seam round the plate
+   and a carriage bolt in each top corner; with two stations each half keeps
+   its outer bolt. */
+:is(#topbar, .kiosk-bar-main) {
+  --bolt-l: radial-gradient(circle at 12px 11px, #9a9aa0 0 0.8px, #4a4a4f 1.8px, #19191b 3.2px, rgba(0, 0, 0, 0.75) 3.9px, transparent 4.8px);
+  --bolt-r: radial-gradient(circle at calc(100% - 12px) 11px, #9a9aa0 0 0.8px, #4a4a4f 1.8px, #19191b 3.2px, rgba(0, 0, 0, 0.75) 3.9px, transparent 4.8px);
+}
+:root[data-layout="upright"] .kiosk-bar > .deck-panel {
+  border-radius: 13px 13px 0 0;
+  background:
+    var(--bolt-l), var(--bolt-r),
+    linear-gradient(180deg, rgba(255,255,255,0.06) 0px, transparent 10px),
+    radial-gradient(ellipse 130% 70% at 50% 60%, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 45%, transparent 72%),
+    linear-gradient(0deg, #1a1c1f 0%, #0c0d0f 55%, #030304 100%);
+  box-shadow:
+    0 0 0 1.5px #000,
+    0 0 0 2.5px rgba(255, 255, 255, 0.07),
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    0 -14px 28px -10px rgba(0,0,0,0.75);
+}
+:root[data-layout="upright"] .snes-pad .snes-shell {
+  background:
+    var(--bolt-l), var(--bolt-r),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse 70% 120% at 50% 8%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 38%, transparent 68%),
+    radial-gradient(ellipse 120% 150% at 50% 40%, transparent 40%, rgba(0,0,0,0.45) 100%),
+    linear-gradient(180deg, #2b2b2c 0%, #1c1c1d 34%, #141415 62%, #0b0b0c 100%);
+}
+:root[data-players="2"] #snes-pad .snes-shell { --bolt-r: none; }
+:root[data-players="2"] #snes-pad-p2 .snes-shell { --bolt-l: none; }
+
+/* ---- Thumb-sized on a phone ---- One player upright on a touch phone:
+   equipment sized off the whole width, and the bar grows to seat the bigger
+   cross. */
+
+
+/* Two players upright on a touch phone: each station stacks cross over caps
+   on a diagonal (the picture is width-bound, so there is height). At 375px:
+   cross 77px, caps 42px. */
+@media (pointer: coarse) and (max-width: 520px) {
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players="2"] {
+    --cap: clamp(38px, 11.2vw, 46px);
+    --dpad: clamp(66px, 20.5vw, 84px);
+    --ctl-cx: calc(6px + var(--dpad) / 2);
+    --mid: 18px;
+  }
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players="2"] :is(#topbar, .kiosk-bar-main) {
+    height: calc(var(--dpad) + var(--cap) + 56px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] :is(#snes-pad, #snes-pad-p2) .snes-shell,
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] :is(#deck-p1, #deck-p2) {
+    display: grid;
+    grid-template: 1fr / 1fr;
+    align-items: stretch;
+    padding-top: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] .snes-shell > .snes-dpad,
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] .deck-side > .stick-base {
+    grid-area: 1 / 1;
+    justify-self: start;
+    align-self: start;
+  }
+  /* the boot where the cross is, in the top-left box */
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] .deck-side > .stick-base { height: var(--dpad); }
+  :root[data-layout="upright"][data-controls="pad"][data-caps="4"][data-players="2"] .snes-shell > .snes-face,
+  :root[data-layout="upright"][data-controls="stick"][data-caps="4"][data-players="2"] .deck-side > .fire-buttons {
+    grid-area: 1 / 1;
+    justify-self: end;
+    align-self: end;
+  }
+}
+
+/* Two players sideways: a station per gutter, each as big as a thumb
+   wants; the picture is fitted between them (fillCanvas). */
+:root[data-layout="landscape"][data-players="2"] .snes-pad { --sf-btn: 46px; --sf-dpad: 96px; --sf-gap: 10px; }
+:root[data-layout="landscape"][data-players="2"] .snes-pad .snes-face.four { gap: 8px; }
+:root[data-layout="landscape"][data-players="2"] .fire-buttons.four { grid-template-columns: repeat(2, 44px); gap: 8px; }
+:root[data-layout="landscape"][data-players="2"] .arcade-btn { width: 44px; height: 44px; }
+:root[data-layout="landscape"][data-players="2"] .stick-base { width: 80px; }
+:root[data-layout="landscape"][data-players="2"] .stick-boot { width: 48px; height: 48px; }
+:root[data-layout="landscape"][data-players="2"] .stick-ball { width: 52px; height: 52px; }
+/* One player sideways on the stick deck, laid out like the pad: stick in
+   the left gutter, the live caps stacked in the right, no dead station;
+   sizes match the pad's cross (84) and caps (52). */
+
+/* Every game reads at most two caps, so a station shows only its live ones. */
+:is(.snes-btn, .arcade-btn).spare { display: none; }
+/* Except a one-player game's second station: its two caps are unlit blanks, as on a two-player cabinet. */
+:root[data-seats="1"] :is(#deck-p2 .arcade-btn, .snes-pad.second .snes-btn).spare { display: block; }
+
+/* ---- Breathing room (one seat) ---- The plate's sides slope with the
+   deck's tilt, so a cross or caps set nearer than ~30px to the bar's edge
+   overhang it. Sideways, controls keep 22px off the glass's edges, clear of
+   the rounded corners. */
+@media (pointer: coarse) and (max-width: 520px) {
+  /* 27vw keeps the cross clear of the picker at the bar's bottom centre. */
+}
+
+.blip-power-indicator {
+  position:fixed;top:calc(env(safe-area-inset-top,0px) + 3px);z-index:700;
+  display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #524435;border-radius:12px;
+  background:linear-gradient(#181512ee,#090a09ee);box-shadow:0 2px 7px #000b,inset 0 1px #ffffff12;
+  color:#776b58;font:700 9px/1 system-ui,sans-serif;letter-spacing:.11em;pointer-events:none;
+}
+.power-bulb {width:12px;height:12px;border-radius:50%;border:1px solid #553329;background:radial-gradient(circle at 35% 30%,#57372e,#241612 62%,#100d0b);box-shadow:inset 0 1px 2px #000b}
+
+:root[data-credit] .blip-power-indicator {border-color:#866c43;color:#c3b08d;box-shadow:0 2px 9px #000b,inset 0 1px #fff2d42b}
+:root[data-credit] .power-bulb {border-color:#edcd83;background:radial-gradient(circle at 34% 28%,#fff8d7 0 18%,#ffd879 42%,#bb672d 75%);box-shadow:0 0 5px 2px #ffc857aa,0 0 15px #ffb43b88,inset 0 0 2px #fff}
+
+@media(max-width:480px) {
+  .blip-power-indicator {gap:0;padding:2px;border:0;background:none;box-shadow:none}
+  .power-label {display:none}
+  .power-bulb {width:16px;height:16px}
+}
+
+/* In fullscreen an idle mouse pointer is hidden (kiosk.js sets the attribute). */
+:root[data-fullscreen][data-cursor-idle],
+:root[data-fullscreen][data-cursor-idle] * { cursor: none !important; }
+
+/* Warm bakelite, woodgrain trim and amber lamps carry the Atari cabinet feel
+   through the shared controls without changing their input or geometry. */
+.kiosk-bar {
+  background: linear-gradient(180deg, rgba(55,32,28,.97), rgba(17,13,17,.98));
+  border-top-color: rgba(226,158,91,.56);
+}
+
+.kiosk-btn {
+  color:#fff1ce;
+  text-shadow:0 0 4px #fff, 0 0 10px #ffc45d, 0 0 24px rgba(255,169,65,.9);
+  background:linear-gradient(180deg,#503326,#261a1b);
+  border-color:#bd814b;
+  box-shadow:0 4px 10px rgba(0,0,0,.75), inset 0 1px rgba(255,234,190,.18), 0 0 12px rgba(255,174,78,.24);
+}
+.kiosk-btn:hover { border-color:#f0bb73; border-bottom-color:#251414; }
+.kiosk-btn:active { border-bottom-color:#180e10; }
+#kiosk-insert-btn.needs-coin,
+#insert-coin-btn.needs-coin {
+  border-color:#e3a457;
+  background:linear-gradient(180deg,#694327,#35201b);
+  color:#fff0d2;
+  text-shadow:0 1px 0 rgba(0,0,0,.72);
+  animation:none!important;
+}
+.kiosk-bar > .deck-panel {
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, #9a6040 0 2px, #412b27 3px 12px, #282124 13px 18px, #171519 19px 100%);
+  border-top-color:rgba(255,207,135,.68);
+  box-shadow:inset 0 1px rgba(255,238,199,.22), 0 -14px 28px -10px rgba(0,0,0,.75);
+}
+.stick-boot {
+  background:linear-gradient(155deg,#714a35 0%,#382722 48%,#171315 100%);
+  box-shadow:0 2px 5px rgba(0,0,0,.6),inset 0 1px rgba(255,226,180,.2),inset 0 -2px 3px rgba(0,0,0,.6);
+}
+.stick-boot::before { background:#120d10; }
+.stick-handle::before { background:radial-gradient(ellipse at 40% 25%,#725039 0%,#35251f 55%,#100c0e 100%); }
+.stick-shaft { background:linear-gradient(90deg,#503c31 0%,#bda27d 14%,#fff0c7 30%,#c9b28c 46%,#6c5544 66%,#292126 84%,#a58a69 100%); }
+.arcade-btn {
+  background:conic-gradient(from -50deg,#f0d5a8,#9a7650 20%,#352925 50%,#9a7650 80%,#f0d5a8);
+  box-shadow:0 3px 6px rgba(0,0,0,.65),inset 0 0 0 1px rgba(31,17,13,.65),inset 0 2px 2px rgba(255,244,218,.5),inset 0 -3px 4px rgba(0,0,0,.6);
+}
+.snes-pad .snes-shell {
+  border:1px solid rgba(209,151,92,.48);
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.02) 0 1px,transparent 1px 3px),
+    repeating-linear-gradient(175deg,transparent 0 3px,rgba(255,202,140,.11) 4px,transparent 5px 8px),
+    linear-gradient(180deg,#754a33 0 7%,#392823 8% 12%,transparent 13%),
+    radial-gradient(ellipse 70% 120% at 50% 8%,rgba(255,231,188,.09) 0%,rgba(255,255,255,.025) 38%,transparent 68%),
+    radial-gradient(ellipse 120% 150% at 50% 40%,transparent 40%,rgba(0,0,0,.48) 100%),
+    linear-gradient(180deg,#262022 0%,#1a171a 40%,#100e11 100%);
+  box-shadow:inset 0 1px rgba(255,231,192,.25),inset 0 3px 1px -1px rgba(230,145,79,.4),inset 0 -14px 22px rgba(0,0,0,.65),inset 6px 0 14px -6px rgba(0,0,0,.55),inset -6px 0 14px -6px rgba(0,0,0,.55);
+}
+
+/* The top marquee and utility controls share one warm wood-and-bakelite look. */
+.top-marquee-bar {
+  background:
+    repeating-linear-gradient(174deg, transparent 0 7px, rgba(255,210,154,.045) 8px, transparent 10px 15px),
+    linear-gradient(180deg,#684430 0%,#392721 48%,#1a1519 100%);
+  border-bottom-color:rgba(255,205,132,.62);
+  box-shadow:0 0 20px rgba(224,139,72,.24),0 2px 10px rgba(0,0,0,.72),inset 0 1px rgba(255,231,188,.22);
+}
+.blip-logo {
+  left:10px;
+  padding-left:12px;
+  padding-right:12px;
+  border:1px solid rgba(255,207,143,.45);
+  border-top:0;
+  border-radius:0 0 8px 8px;
+  background:linear-gradient(180deg,rgba(78,45,35,.96),rgba(35,24,25,.96));
+  color:#fff0d2;
+  text-shadow:0 0 4px #fff,0 0 10px #ffc36a,0 0 22px rgba(230,137,67,.68);
+  animation:blip-logo-beckon 3.2s ease-in-out infinite;
+}
+
+.blip-logo:hover {
+  color:#fff8e9;
+  border-color:rgba(255,225,173,.82);
+  text-shadow:0 0 5px #fff,0 0 12px #ffd17a,0 0 28px rgba(240,146,71,.9);
+}
+body:has(.game-grid) .blip-logo { animation:blip-logo-beckon 3.2s ease-in-out infinite; }
+#insert-coin-btn,
+#kiosk-insert-btn {
+  border:1px solid rgba(255,207,143,.45);
+  border-top:0;
+  border-radius:0 0 8px 8px;
+  background:linear-gradient(180deg,rgba(78,45,35,.96),rgba(35,24,25,.96));
+  color:#ffe2ad;
+  text-shadow:0 0 8px rgba(255,188,100,.55);
+  box-shadow:0 5px 12px rgba(0,0,0,.38),inset 0 -1px rgba(255,226,176,.12);
+}
+#insert-coin-btn:hover,
+#kiosk-insert-btn:hover,
+#insert-coin-btn:focus-visible,
+#kiosk-insert-btn:focus-visible {
+  color:#fff8e9;
+  border-color:rgba(255,229,179,.9);
+  text-shadow:0 0 5px #fff,0 0 13px #ffd17a,0 0 25px #e88c4d;
+  box-shadow:0 5px 16px rgba(0,0,0,.42),0 0 18px rgba(237,161,83,.24);
+}
+#insert-coin-btn::after,
+#kiosk-insert-btn::after {
+  background:
+    radial-gradient(circle at 3px 3px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
+    radial-gradient(circle at 15px 3px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
+    radial-gradient(circle at 3px 23px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
+    radial-gradient(circle at 15px 23px,#ffe9c7 0 .6px,#826142 1.2px,transparent 1.7px),
+    radial-gradient(circle at 8.3px 5.3px,#ffd7b9 0 .5px,#ff6545 1.2px,#a3160c 2.4px,#3a0804 2.9px,transparent 3.3px),
+    linear-gradient(90deg,transparent 7px,#ffc267 7px,#120600 7.8px,#000 9px,#120600 10.2px,#ffc267 11px,transparent 11px) center 11px / 100% 12px no-repeat,
+    radial-gradient(ellipse 5px 9px at 9px 17px,rgba(255,169,67,.62),transparent 70%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.06) 0 1px,rgba(0,0,0,.05) 1px 2px),
+    linear-gradient(135deg,#efd4ad 0%,#a88159 38%,#e2c49c 55%,#75573b 100%);
+}
+
+/* The three info pages use the same padded, softly lit cabinet panels. */
+body.info-page {
+  background:radial-gradient(ellipse at 50% 4%,rgba(164,78,37,.2),transparent 45%),
+             radial-gradient(ellipse at 50% 72%,rgba(74,38,80,.17),transparent 62%),#100c12;
+  color:#f0dfcc;
+}
+body.info-page::after {
+  content:'';
+  position:fixed;
+  inset:0;
+  z-index:99;
+  pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 45%,rgba(12,5,11,.54) 100%);
+}
+body.info-page .page {
+  position:relative;
+  z-index:1;
+  max-width:780px;
+}
+body.info-page .page > section {
+  margin:16px 0;
+  padding:clamp(16px,3vw,24px);
+  border:1px solid rgba(226,158,91,.19);
+  border-radius:12px;
+  background:linear-gradient(145deg,rgba(39,27,29,.94),rgba(19,15,20,.96));
+  box-shadow:0 12px 32px rgba(0,0,0,.2),inset 0 1px rgba(255,229,192,.045);
+}
+body.info-page .page > h1 {
+  color:#fff0d2;
+  text-shadow:0 0 12px rgba(255,182,99,.45),0 2px 0 #633a30;
+}
+body.info-page .page > h2 { color:#e7b56f; }
+body.info-page .divider {
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(239,177,104,.36),transparent);
+  margin:24px 0;
+}
+body.info-page :is(.intro p,.thoughts-body p,.section-body p) { color:#d4c0ad; }
+body.info-page :is(.thoughts-label,.section-label,.impl-label) { color:#e8b474; opacity:1; }
+body.info-page :is(.thoughts-body,.section-body) { border-left-color:rgba(226,158,91,.48); }
+body.info-page :is(.game-origin,.studio-dates) { color:#a98e79; }
+body.info-page .impl-list li { color:#c9b19a; border-bottom-color:rgba(255,211,158,.1); }
+body.info-page .impl-list li::before { color:#dfa45f; }
+body.info-page .keytable td { border-bottom-color:rgba(255,211,158,.13); }
+body.info-page .keytable td:first-child { color:#e4bd85; }
+body.info-page .keytable td:last-child { color:#eadac8; }
+body.info-page kbd { background:rgba(202,137,77,.13); border-color:#79553c; color:#fff0d2; }
+body.info-page .studio-name { color:#f0dfcc; }
+
+:root[data-fullscreen] body.info-page #kiosk-bar { display:none; }
+
+/* The controls are shallow pockets cut into the wood fascia, not buttons
+   sitting on top of it. Keep the grain visible and the bevel inside. */
+body:has(.top-marquee-bar) .blip-logo,
+body:has(#marquee-bar) .blip-logo,
+body:has(.top-marquee-bar) #kiosk-insert-btn,
+#insert-coin-btn,
+#kiosk-insert-btn {
+  border-left:1px solid rgba(25,13,11,.78);
+  border-right:1px solid rgba(25,13,11,.78);
+  border-bottom:1px solid rgba(255,207,143,.32);
+  border-radius:0 0 7px 7px;
+  background:
+    repeating-linear-gradient(174deg,rgba(255,213,160,.055) 0 1px,transparent 1px 8px),
+    linear-gradient(180deg,rgba(24,12,12,.58),rgba(51,28,24,.3)),
+    linear-gradient(180deg,#684430,#392721);
+  box-shadow:inset 0 3px 7px rgba(12,6,7,.58),inset 0 1px rgba(9,5,5,.72),inset 0 -1px rgba(255,220,166,.1);
+}
+body:has(.top-marquee-bar) .blip-logo:hover,
+body:has(#marquee-bar) .blip-logo:hover,
+body:has(.top-marquee-bar) #kiosk-insert-btn:hover,
+#insert-coin-btn:hover,
+body:has(.top-marquee-bar) #kiosk-insert-btn:focus-visible,
+#kiosk-insert-btn:hover,
+#insert-coin-btn:focus-visible,
+#kiosk-insert-btn:focus-visible {
+  border-color:rgba(255,213,153,.62);
+  background:
+    repeating-linear-gradient(174deg,rgba(255,225,180,.07) 0 1px,transparent 1px 8px),
+    linear-gradient(180deg,rgba(24,12,12,.46),rgba(62,35,27,.24)),
+    linear-gradient(180deg,#704932,#432c25);
+  box-shadow:inset 0 3px 7px rgba(12,6,7,.5),inset 0 1px rgba(9,5,5,.62),inset 0 -1px rgba(255,220,166,.16);
+}
+#insert-coin-btn:active,
+#kiosk-insert-btn:active { transform:translateY(1px); }
+body.need-coin #kiosk-insert-btn,
+#insert-coin-btn.needs-coin,
+#kiosk-insert-btn.needs-coin {
+  background:
+    repeating-linear-gradient(174deg,rgba(255,213,160,.055) 0 1px,transparent 1px 8px),
+    linear-gradient(180deg,rgba(47,22,14,.42),rgba(80,40,22,.24)),
+    linear-gradient(180deg,#684430,#392721);
+}
+
+/* More tangible deck hardware: machined joystick fittings and moulded
+   plastic controls, with the existing hit areas and motion left intact. */
+.stick-boot {
+  border:1px solid rgba(203,174,128,.34);
+  border-radius:11px;
+  background:
+    linear-gradient(135deg,rgba(255,255,255,.12),transparent 24% 74%,rgba(0,0,0,.38)),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 4px),
+    linear-gradient(155deg,#5a5147 0%,#282522 45%,#100f10 100%);
+  box-shadow:0 5px 8px rgba(0,0,0,.68),inset 0 1px rgba(255,255,255,.19),inset 0 -3px 5px rgba(0,0,0,.78);
+}
+.stick-boot::before {
+  inset:5px;
+  background:
+    radial-gradient(ellipse at center,transparent 0 28%,rgba(0,0,0,.92) 31% 55%,transparent 59%),
+    conic-gradient(from 22.5deg,#9d927e 0 2deg,#282522 3deg 43deg,#9d927e 44deg 46deg,#282522 47deg 88deg,#9d927e 89deg 91deg,#282522 92deg 133deg,#9d927e 134deg 136deg,#282522 137deg 178deg,#9d927e 179deg 181deg,#282522 182deg 223deg,#9d927e 224deg 226deg,#282522 227deg 268deg,#9d927e 269deg 271deg,#282522 272deg 313deg,#9d927e 314deg 316deg,#282522 317deg 358deg,#9d927e 359deg);
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.92),0 0 0 1px rgba(0,0,0,.8);
+}
+.stick-handle::before {
+  left:-17px;
+  bottom:-9px;
+  width:34px;
+  height:19px;
+  background:
+    repeating-linear-gradient(90deg,transparent 0 4px,rgba(0,0,0,.34) 4px 5px),
+    radial-gradient(ellipse at 40% 22%,#5a5851 0%,#292827 50%,#0b0b0c 100%);
+  box-shadow:inset 0 2px 2px rgba(255,255,255,.2),inset 0 -4px 5px rgba(0,0,0,.8),0 2px 4px rgba(0,0,0,.7);
+}
+.stick-shaft {
+  width:12px;
+  background:linear-gradient(90deg,#161719 0%,#65696b 12%,#e5e5df 29%,#fffef2 39%,#9da1a0 52%,#393c3e 73%,#171719 88%,#888a86 100%);
+  filter:drop-shadow(1px 2px 1px rgba(0,0,0,.55));
+}
+.stick-ball {
+  background:
+    radial-gradient(ellipse at 29% 19%,rgba(255,255,255,.8) 0 2%,rgba(255,255,255,.24) 8%,transparent 23%),
+    radial-gradient(circle at 35% 29%,#ff8069 0%,#df3829 34%,#a91b13 68%,#4a0806 100%);
+  box-shadow:0 7px 12px rgba(0,0,0,.56),0 15px 20px rgba(0,0,0,.32),inset -5px -7px 12px rgba(25,0,0,.58),inset 2px 3px 5px rgba(255,205,184,.4),inset 0 0 0 1px rgba(70,0,0,.48);
+}
+.stick-ball::after {
+  left:19%;top:10%;width:34%;height:18%;
+  background:linear-gradient(145deg,rgba(255,255,255,.86),rgba(255,255,255,.16) 50%,transparent 75%);
+  filter:blur(.3px);
+}
+.arcade-btn {
+  background:
+    radial-gradient(circle at center,#08090a 0 57%,transparent 59%),
+    conic-gradient(from -50deg,#f1e6d2,#6f6250 18%,#17181a 34%,#a99a7f 52%,#37312a 70%,#e5d4ba 86%,#f1e6d2);
+  box-shadow:0 5px 9px rgba(0,0,0,.72),inset 0 1px rgba(255,255,255,.6),inset 0 -4px 5px rgba(0,0,0,.76),0 0 0 1px rgba(0,0,0,.8);
+}
+.arcade-btn-cap {
+  inset:14%;
+  background:
+    radial-gradient(ellipse at 33% 24%,rgba(255,255,255,.88),rgba(255,255,255,.19) 12%,transparent 28%),
+    radial-gradient(circle at 40% 35%,#f35b49 0%,#d42b1d 43%,#8d160d 79%,#4b0a07 100%);
+  box-shadow:inset 0 2px 3px rgba(255,255,255,.52),inset 0 -7px 9px rgba(0,0,0,.54),0 2px 3px rgba(0,0,0,.62),0 0 0 1px rgba(20,10,8,.9);
+}
+.snes-pad .snes-shell {
+  background:
+    repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 1px,transparent 1px 4px),
+    linear-gradient(180deg,rgba(255,255,255,.08),transparent 18%),
+    radial-gradient(ellipse 78% 100% at 50% 0%,rgba(134,87,54,.17),transparent 72%),
+    radial-gradient(ellipse 120% 150% at 50% 40%,transparent 40%,rgba(0,0,0,.58) 100%),
+    linear-gradient(180deg,#342923 0%,#211c1a 36%,#141212 74%,#0b0a0a 100%);
+  border:1px solid rgba(217,177,131,.3);
+  box-shadow:inset 0 1px rgba(255,237,207,.26),inset 0 4px 1px -1px rgba(234,158,91,.3),inset 0 -15px 22px rgba(0,0,0,.72),inset 6px 0 14px -6px rgba(0,0,0,.62),inset -6px 0 14px -6px rgba(0,0,0,.62),0 -2px 8px rgba(0,0,0,.45);
+}
+.snes-pad .snes-dpad::before {
+  background:radial-gradient(circle at 42% 32%,#34302b,#171513 63%,#080808);
+  box-shadow:inset 0 3px 7px rgba(0,0,0,.85),inset 0 0 0 1px rgba(255,236,207,.09),0 1px 0 rgba(255,255,255,.13);
+}
+.snes-pad .dp-rim { stroke:rgba(255,231,201,.19); }
+.snes-pad .snes-btn {
+  background:radial-gradient(circle at 45% 35%,#36302a 0%,#181513 60%,#070707 100%);
+  box-shadow:inset 0 3px 6px rgba(0,0,0,.9),inset 0 -1px rgba(255,239,211,.09),0 1px 0 rgba(255,255,255,.13),0 3px 5px rgba(0,0,0,.4);
+}
+.snes-pad .snes-btn > span {
+  background:radial-gradient(ellipse at 32% 22%,rgba(255,224,211,.68),rgba(255,198,183,.12) 19%,transparent 36%),radial-gradient(circle at 45% 38%,#e74a39 0%,#b52318 56%,#64100b 100%);
+  box-shadow:inset 0 2px 3px rgba(255,222,206,.39),inset -3px -7px 10px rgba(45,0,0,.6),0 2px 4px rgba(0,0,0,.68),0 0 0 1px rgba(0,0,0,.72);
+}
+
+/* Carry the fascia finish through every controller layout. The top marquee
+   and deck share the same grain, amber edge and dark cabinet shadow. */
+.top-marquee-bar,
+#marquee-bar {
+  background:
+    var(--cabinet-shell);
+  border-bottom-color:rgba(224,183,121,.72);
+  box-shadow:0 0 0 1px rgba(224,183,121,.2),0 5px 18px rgba(0,0,0,.68),inset 0 2px rgba(255,239,208,.22),inset 0 -1px rgba(15,8,8,.8);
+}
+.top-marquee-bar {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+}
+#marquee-name,.marquee-empty {
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+}
+.marquee-empty {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:1px;
+  perspective:280px;
+  font:13px/1 'Courier New',monospace;
+}
+.top-marquee-bar .marquee-bulbs,#marquee-bar .marquee-bulbs {
+  position:absolute;
+  top:50%;
+  width:min(110px,calc(50vw - var(--marquee-side-gap,77px)));
+  max-width:110px;
+  height:4px;
+  background-image:radial-gradient(circle,#8dfaff 0 1.6px,transparent 2px);
+  background-size:18px 4px;
+  background-repeat:repeat-x;
+  background-position:center;
+  filter:drop-shadow(0 0 4px #28dff5) drop-shadow(0 0 8px rgba(220,61,255,.42));
+  transform:translateY(-50%);
+}
+.top-marquee-bar,.top-marquee-bar #marquee-name { --marquee-side-gap:77px; }
+#marquee-bar { --marquee-side-gap:77px; }
+.top-marquee-bar .marquee-bulbs:first-of-type,#marquee-bar .marquee-bulbs:first-of-type { right:calc(50% + var(--marquee-side-gap)); }
+.top-marquee-bar .marquee-bulbs:last-of-type,#marquee-bar .marquee-bulbs:last-of-type { left:calc(50% + var(--marquee-side-gap)); }
+.marquee-letter {
+  position:relative;
+  display:grid;
+  place-items:center;
+  flex:0 0 .78em;
+  height:1.12em;
+  overflow:hidden;
+  font:900 13px/1 'Courier New',monospace;
+  border:1px solid #927650;
+  border-radius:2px;
+  background:linear-gradient(180deg,#25201d 0 47%,#c4a16b 48% 51%,#171312 52% 100%);
+  box-shadow:0 2px 3px #090707,inset 0 1px rgba(255,239,208,.24),inset 0 -2px #080708;
+  color:#f1dfbd;
+  font-weight:900;
+  text-shadow:0 1px #090707,0 2px #4d3925;
+  transform-origin:50% 0;
+  backface-visibility:hidden;
+}
+.marquee-letter::after {
+  content:'';
+  position:absolute;
+  left:0;right:0;top:50%;height:1px;
+  background:linear-gradient(90deg,#241a14,#d3b47d 45%,#241a14);
+  box-shadow:0 1px 2px #000c;
+}
+.top-marquee-bar .marquee-bulbs,#marquee-bar.jukebox-marquee .marquee-bulbs {display:none}
+
+.jukebox-transfer {
+  position:fixed;inset:0;z-index:150;pointer-events:none;overflow:hidden;
+  opacity:0;background:radial-gradient(ellipse at 50% 18%,rgba(30,20,17,.13),rgba(5,4,5,.3) 72%);
+  transition:opacity .24s ease-out;
+}
+.jukebox-transfer.active { opacity:1; }
+.jukebox-flight-card {
+  position:fixed;z-index:2;display:flex;flex-direction:column;align-items:stretch;gap:8px;
+  padding:10px;border:2px solid #c6a46f;border-radius:9px;
+  background:linear-gradient(135deg,rgba(255,255,255,.21),transparent 22%),linear-gradient(150deg,#554238,#171316 68%,#080809);
+  box-shadow:0 12px 32px rgba(0,0,0,.8),inset 0 1px rgba(255,239,207,.48),inset 0 0 0 2px rgba(12,9,10,.84),0 0 0 1px rgba(248,219,165,.24);
+  transform-style:preserve-3d;transform-origin:center;transition:transform 1.45s cubic-bezier(.55,.03,.25,1),opacity 1.45s ease-in;
+}
+.jukebox-flight-card::after {
+  content:'';position:absolute;inset:2px;border-radius:6px;pointer-events:none;
+  background:linear-gradient(118deg,rgba(255,255,255,.24),transparent 23% 71%,rgba(255,255,255,.045));
+  box-shadow:inset 0 0 0 1px rgba(255,237,196,.16);
+}
+.jukebox-flight-card img {
+  width:100%;height:calc(100% - 28px);min-height:0;object-fit:cover;border:1px solid rgba(238,204,148,.65);
+  box-shadow:0 2px 6px #080708;image-rendering:auto;
+}
+.jukebox-flight-card strong {
+  display:block;overflow:hidden;text-align:center;white-space:nowrap;text-overflow:ellipsis;
+  color:#f1dfbd;font:900 12px/1.2 'Courier New',monospace;letter-spacing:.13em;
+  text-shadow:0 1px #080708,0 0 8px rgba(229,179,107,.28);
+}
+.jukebox-transfer-arm {
+  position:fixed;z-index:3;width:var(--arm-length,180px);height:22px;pointer-events:none;
+  transform-origin:12px 50%;transition:transform 1.2s cubic-bezier(.6,.02,.2,1);
+  filter:drop-shadow(0 4px 4px rgba(0,0,0,.72));
+}
+.jukebox-arm-pivot {
+  position:absolute;left:-8px;top:-7px;width:36px;height:36px;border-radius:50%;
+  border:2px solid #b28b54;background:radial-gradient(circle at 34% 28%,#f0d9ad,#6e573b 34%,#201819 72%);
+  box-shadow:inset 0 2px 3px rgba(255,246,224,.4),0 0 0 3px rgba(11,8,8,.88),0 2px 8px #050405;
+}
+.jukebox-arm-pivot::after {
+  content:'';position:absolute;inset:11px;border-radius:50%;border:1px solid rgba(245,222,180,.7);
+  background:radial-gradient(circle at 35% 30%,#d9c49f,#483a2c 65%,#171415);
+}
+.jukebox-arm-shaft {
+  position:absolute;left:12px;top:6px;width:calc(100% - 22px);height:10px;border-radius:8px;
+  background:linear-gradient(180deg,#f0d7a4 0%,#8c6a3f 24%,#40332a 52%,#b28b54 78%,#503b29 100%);
+  box-shadow:inset 0 1px rgba(255,248,222,.7),inset 0 -2px rgba(12,9,8,.85),0 0 0 1px rgba(16,12,11,.9);
+}
+.jukebox-arm-shaft::after {
+  content:'';position:absolute;left:14%;right:12%;top:3px;height:2px;border-radius:2px;
+  background:linear-gradient(90deg,transparent,rgba(255,239,197,.68),transparent);
+}
+.jukebox-arm-grip {
+  position:absolute;right:-1px;top:1px;width:15px;height:20px;border:2px solid #c4a06a;border-radius:3px 8px 8px 3px;
+  background:linear-gradient(90deg,#281f1b,#d0ad75 48%,#54402c);box-shadow:inset 0 1px rgba(255,243,212,.48);
+}
+.jukebox-arm-grip::before,.jukebox-arm-grip::after {
+  content:'';position:absolute;right:-4px;width:8px;height:5px;border:1px solid #d5b982;border-radius:2px;background:#4b3c2e;
+}
+.jukebox-arm-grip::before {top:1px;transform:rotate(20deg)}
+.jukebox-arm-grip::after {bottom:1px;transform:rotate(-20deg)}
+
+@media (prefers-reduced-motion:reduce) {
+  .jukebox-transfer,.jukebox-flight-card,.jukebox-transfer-arm { transition-duration:.01ms!important; }
+}
+@media (max-width:520px) {
+  .top-marquee-bar,.top-marquee-bar #marquee-name,#marquee-bar { --marquee-side-gap:57px; }
+  .top-marquee-bar .marquee-bulbs,#marquee-bar .marquee-bulbs { width:min(40px,calc(50vw - 57px));max-width:40px; }
+  #marquee-name,.marquee-empty { font-size:10px;gap:0; }
+  .marquee-letter { font-size:10px; }
+
+  .top-marquee-bar #marquee-name,
+  #marquee-bar.jukebox-marquee #marquee-name { padding-left:8px;padding-right:8px; }
+}
+
+:root {--cabinet-fascia-height:52px;--marquee-h:var(--cabinet-fascia-height)}
+/* Raised title glass and the recessed jukebox card receiver. */
+.top-marquee-bar,
+#marquee-bar.jukebox-marquee {
+  width:100%;
+  right:0;
+  height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+  align-items:center;
+  background:
+    var(--cabinet-shell);
+  border-bottom:2px solid #120c0d;
+  box-shadow:0 7px 20px rgba(0,0,0,.76),inset 0 2px rgba(255,239,208,.3),inset 0 -2px #100b0c,inset 0 -4px rgba(196,151,93,.22);
+}
+.top-marquee-bar #marquee-name,
+#marquee-bar.jukebox-marquee #marquee-name {
+  top:calc(6px + env(safe-area-inset-top,0px));
+  z-index:2;
+  box-sizing:border-box;width:164px;height:40px;min-height:40px;
+  justify-content:center;gap:2px;
+  padding:5px 14px 6px;
+  border:1px solid rgba(229,191,131,.76);
+  border-radius:5px;
+  background:linear-gradient(180deg,#17161a 0%,#090a0d 54%,#211a18 100%);
+  box-shadow:0 3px 0 #130e0d,0 6px 12px rgba(0,0,0,.82),inset 0 1px rgba(255,245,219,.46),inset 0 -2px rgba(0,0,0,.9),inset 0 0 0 2px #352720;
+}
+.top-marquee-bar .marquee-bulbs,
+#marquee-bar.jukebox-marquee .marquee-bulbs { margin-top:18px; }
+.jukebox-receiver {
+  position:fixed;
+  left:50%;top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));bottom:auto;z-index:501;
+  width:150px;height:43px;
+  transform:translateX(-50%);
+  padding:3px 5px;
+  border:1px solid rgba(226,190,136,.78);
+  border-radius:5px;
+  background:linear-gradient(180deg,#08090b,#211a16 14%,#0a090a 45%,#3e2a1e 48%,#160f0e 100%);
+  box-shadow:0 3px 0 #100b0a,0 7px 11px rgba(0,0,0,.82),inset 0 1px rgba(255,244,218,.38),inset 0 -2px rgba(0,0,0,.96),inset 0 0 0 2px #3a2b21;
+}
+.jukebox-receiver::before {
+  content:'';position:absolute;left:7px;right:7px;top:3px;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,#39271c,#e3c28c 18%,#796044 50%,#e3c28c 82%,#39271c);
+  box-shadow:0 1px 3px #000;
+}
+.jukebox-receiver::after {content:'';position:absolute;right:-17px;top:50%;width:30px;height:20px;transform:translateY(-50%);z-index:0;
+  border:1px solid rgba(218,185,130,.76);border-left:0;border-radius:0 6px 6px 0;
+  background:linear-gradient(180deg,#e2c48e,#705536 35%,#241b17 72%,#c8a36a);box-shadow:2px 3px 5px rgba(0,0,0,.7),inset 0 1px rgba(255,245,220,.55)}
+.jukebox-receiver-lip {position:absolute;inset:6px 7px auto;height:5px;border-radius:2px;background:#050506;box-shadow:inset 0 1px 2px #000,0 1px rgba(255,226,175,.16)}
+.jukebox-receiver-lip i {position:absolute;top:1px;width:14px;height:2px;background:linear-gradient(90deg,#62472f,#dec18f,#62472f)}
+.jukebox-receiver-lip i:first-child {left:10px}.jukebox-receiver-lip i:last-child {right:10px}
+.jukebox-seated-card {
+  position:absolute;inset:8px 9px 3px;display:grid;grid-template-columns:32px 1fr 20px;gap:5px;align-items:center;
+  overflow:hidden;padding:2px 4px;border:1px solid rgba(241,218,177,.52);border-radius:2px;
+  opacity:0;transform:translateY(-10px);
+  background:linear-gradient(115deg,rgba(255,255,255,.26),transparent 35%),linear-gradient(180deg,#947757,#34261e);
+  box-shadow:inset 0 1px rgba(255,255,255,.35),0 1px 3px #050404;
+  transition:opacity .2s,transform .32s cubic-bezier(.2,.9,.25,1.25);
+}
+.jukebox-receiver.loaded .jukebox-receiver-lip {height:7px;box-shadow:inset 0 2px 3px #000,0 0 5px rgba(244,208,143,.35)}
+.jukebox-seated-card img {width:32px;height:24px;object-fit:cover;border:1px solid rgba(255,235,194,.62);box-shadow:0 1px 3px #080707}
+.jukebox-seated-card strong {overflow:hidden;color:#fff0d2;text-overflow:ellipsis;white-space:nowrap;font:900 9px/1 'Courier New',monospace;letter-spacing:.08em;text-shadow:0 1px #080707}
+.jukebox-seated-card small {justify-self:end;color:#f4dba9;font:700 8px/1 'Courier New',monospace;letter-spacing:.05em}
+
+.jukebox-transfer-arm {height:25px}
+.jukebox-arm-shaft {
+  height:15px;top:5px;
+  background:linear-gradient(180deg,#fff0cb 0%,#d0b078 17%,#80623d 33%,#352a24 52%,#c6a06a 68%,#f0d6a0 78%,#4a3828 100%);
+  box-shadow:inset 0 1px rgba(255,255,235,.86),inset 0 -3px rgba(15,10,8,.88),0 0 0 1px #17100e,0 3px 6px #050405;
+}
+.jukebox-arm-pivot {width:42px;height:42px;left:-11px;top:-9px;border:3px solid #d2b27c}
+.jukebox-arm-pivot::before {content:'';position:absolute;inset:5px;border-radius:50%;border:1px solid rgba(255,241,204,.46);box-shadow:inset 0 0 5px #080707}
+.jukebox-arm-forearm {position:absolute;left:58%;top:8px;width:39%;height:10px;border:1px solid #e2c38c;border-radius:8px;background:linear-gradient(180deg,#f5e0b3,#96764b 40%,#332822 65%,#d0aa70);box-shadow:0 2px 4px #050405}
+.jukebox-arm-grip {top:4px;width:17px;height:22px;background:linear-gradient(90deg,#271e19,#d7b77f 46%,#403024)}
+.jukebox-transfer-arm > .jukebox-flight-card {position:absolute;z-index:5;left:calc(100% - 66px);top:-129px;width:132px;height:258px;padding:29px 9px 11px;gap:10px;border-radius:7px;transform-origin:center;transition:transform .78s cubic-bezier(.55,.04,.2,1)}
+
+.jukebox-transfer-arm > .jukebox-flight-card img {height:120px;flex:none}
+.jukebox-transfer-arm > .jukebox-flight-card strong {font-size:12px;letter-spacing:.11em}
+.jukebox-transfer-arm > .jukebox-flight-card small {align-self:flex-end;color:#f3d7a6;font:700 8px/1 'Courier New',monospace;letter-spacing:.12em}
+.jukebox-flight-card.seating {transform:rotate(var(--card-counter,0deg)) rotateX(82deg) translateY(12px)!important;transition:transform .24s cubic-bezier(.35,.02,.25,1)!important}
+.jukebox-flight-card.seated {opacity:0}
+.jukebox-transfer-arm {transform-origin:12px 50%;transition:transform .78s cubic-bezier(.55,.04,.2,1)}
+
+.jukebox-transfer-arm.park {transform:rotate(var(--park-angle,-90deg)) scaleX(.12)}
+.jukebox-transfer-arm.park .jukebox-flight-card {opacity:0}
+@media (max-width:620px) {
+  .jukebox-transfer-arm > .jukebox-flight-card {left:calc(100% - 55px);top:-123px;width:110px;height:246px;padding:29px 9px 11px}
+  .jukebox-transfer-arm > .jukebox-flight-card img {height:112px}
+}
+.jukebox-receiver.loaded {box-shadow:0 3px 0 #100b0a,0 5px 8px rgba(0,0,0,.72),inset 0 1px rgba(255,244,218,.3),inset 0 0 9px rgba(231,183,112,.14)}
+@media (max-width:520px) {
+  .top-marquee-bar #marquee-name,#marquee-bar.jukebox-marquee #marquee-name {padding:5px 0 6px}
+  .top-marquee-bar #marquee-name,#marquee-bar.jukebox-marquee #marquee-name {left:calc(50% - 11px)}
+
+  .jukebox-receiver {width:136px}
+  .jukebox-receiver {top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px))}
+  .top-marquee-bar,#marquee-bar.jukebox-marquee {height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px))}
+}
+:root[data-layout][data-caps] .kiosk-bar > .deck-panel {
+  background:
+    var(--bolt-l),var(--bolt-r),
+    linear-gradient(115deg,#fff0d315,transparent 32% 68%,#0005),
+    linear-gradient(180deg,#fff2 0 1px,#0007 2px 5px,transparent 12px 78%,#0006),
+    var(--cabinet-shell);
+  border:1px solid var(--cabinet-trim);
+  border-bottom:0;
+  box-shadow:0 0 0 1.5px #0c090e,0 0 0 2.5px rgba(224,183,121,.3),inset 1px 0 #ffe8ba26,inset -2px 0 #0009,inset 0 2px #fff0d552,inset 0 -5px #100d10,inset 0 -7px #ba946c40,inset 0 -13px 18px #0008,0 -10px 24px -10px #000c;
+}
+:root[data-layout][data-caps] .snes-pad .snes-shell {
+  border:1px solid var(--cabinet-trim);
+  background:
+    var(--bolt-l),var(--bolt-r),
+    linear-gradient(115deg,#fff0d315,transparent 32% 68%,#0005),
+    linear-gradient(180deg,#fff2 0 1px,#0007 2px 5px,transparent 12px 78%,#0006),
+    var(--cabinet-shell);
+  box-shadow:0 0 0 1.5px #0c090e,0 0 0 2.5px rgba(224,183,121,.3),inset 1px 0 #ffe8ba26,inset -2px 0 #0009,inset 0 2px #fff0d552,inset 0 -5px #100d10,inset 0 -7px #ba946c40,inset 0 -13px 18px #0008,0 -10px 24px -10px #000c;
+}
+
+/* Warm machined bezels and a moulded highlight make each control read as a
+   separate physical part, shared by stick caps and pad buttons. */
+:is(#topbar, #kiosk-bar) :is(.arcade-btn, .snes-btn) {
+  background:
+    radial-gradient(circle at center,#0b0909 0 59%,transparent 61%),
+    conic-gradient(from -48deg,#e4c69c 0%,#765a3f 11%,#30251f 24%,#171719 43%,#342920 59%,#947451 76%,#dbc09a 91%,#e4c69c 100%);
+  box-shadow:0 1px 0 #9b8160,0 3px 0 #352b24,0 5px 0 #100e10,2px 8px 6px #000b,4px 12px 12px #0006,inset 0 1px #fff6e194,inset 0 -3px 4px #000c,inset 0 0 0 1px #100a08,0 0 0 1px #000b;
+}
+:is(#topbar, #kiosk-bar) :is(.arcade-btn .arcade-btn-cap, .snes-btn > span) {
+  inset:12%;
+  border:1px solid rgba(255,225,195,.2);
+  box-shadow:inset 0 2px 3px rgba(255,245,230,.46),inset 1px 0 2px rgba(255,220,204,.18),inset 0 -7px 10px rgba(20,0,0,.57),0 2px 4px rgba(0,0,0,.65),0 0 0 1px rgba(14,7,6,.92);
+}
+:is(#topbar, #kiosk-bar) :is(.arcade-btn .arcade-btn-cap, .snes-btn > span)::before {
+  content:'';
+  position:absolute;
+  left:17%;top:10%;
+  width:34%;height:17%;
+  border-radius:50%;
+  background:linear-gradient(145deg,rgba(255,255,255,.84),rgba(255,246,233,.34) 40%,transparent 78%);
+  filter:blur(.45px);
+  pointer-events:none;
+}
+:is(#topbar, #kiosk-bar) :is(.arcade-btn.blip-pressed, .arcade-btn.active, .snes-btn.blip-pressed) {
+  transform:translateY(1px);
+  box-shadow:0 1px 2px rgba(0,0,0,.88),inset 0 2px 6px rgba(0,0,0,.86),inset 0 -1px rgba(255,239,211,.1);
+}
+:is(#topbar, #kiosk-bar) :is(.arcade-btn.blip-pressed .arcade-btn-cap, .arcade-btn.active .arcade-btn-cap, .snes-btn.blip-pressed > span) {
+  transform:scale(.91);
+  filter:brightness(.76) saturate(.92);
+  box-shadow:inset 0 5px 9px rgba(0,0,0,.64),inset 0 -1px 2px rgba(255,225,211,.12),0 0 0 1px rgba(0,0,0,.74);
+}
+
+/* Fixed metal lettering on the fascia; the game marquee is a steady LED sign. */
+body:has(.top-marquee-bar) .blip-logo {
+  color:#e4d6bb;
+  text-shadow:0 1px 0 #fff1d1,0 -1px 0 #71604b,1px 0 0 #a18b6c,-1px 0 0 #6f5b43,0 2px 2px rgba(0,0,0,.8);
+  animation:none;
+}
+
+body:has(.top-marquee-bar) .blip-logo:hover {
+  color:#f0e5cd;
+  text-shadow:0 1px 0 #fff4d9,0 -1px 0 #71604b,1px 0 0 #a18b6c,-1px 0 0 #6f5b43,0 2px 2px rgba(0,0,0,.8);
+}
+
+/* Keep the fascia and its mounted controls identical on every page. */
+body:has(.top-marquee-bar) .blip-logo,
+body:has(#marquee-bar) .blip-logo {
+  left:10px;
+  height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+  padding-left:12px;
+  padding-right:12px;
+  font-size:18px;
+  letter-spacing:2px;
+  color:#e4d6bb;
+  text-shadow:0 1px 0 #fff1d1,0 -1px 0 #71604b,1px 0 0 #a18b6c,-1px 0 0 #6f5b43,0 2px 2px rgba(0,0,0,.8);
+  animation:none;
+  will-change:auto;
+}
+
+body:has(.top-marquee-bar) #kiosk-insert-btn,
+body:has(#marquee-bar) #insert-coin-btn {
+  right:calc(env(safe-area-inset-right,0px) + 10px);
+  height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+  padding-left:10px;
+  padding-right:10px;
+  font-size:12px;
+}
+body:has(.top-marquee-bar) .blip-logo:hover,
+body:has(#marquee-bar) .blip-logo:hover { color:#f0e5cd; }
+@media (max-width:480px) {
+  body:has(.top-marquee-bar) .blip-logo,
+  body:has(#marquee-bar) .blip-logo,
+  body:has(.top-marquee-bar) #kiosk-insert-btn,
+  body:has(#marquee-bar) #insert-coin-btn {
+    height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+  }
+}
+
+/* Each link rotates about a bearing; card travel never scales the hardware. */
+.jukebox-transfer-arm.articulated {
+  inset:0;width:auto;height:auto;transform:none;transition:none;filter:none;
+}
+.articulated .jukebox-arm-mount {
+  position:absolute;width:76px;height:34px;transform:translate(-50%,-50%);
+  border:2px solid #af8955;border-radius:7px;
+  background:radial-gradient(circle at 9px 9px,#181312 0 2px,#e2c99a 3px,transparent 4px),radial-gradient(circle at calc(100% - 9px) calc(100% - 9px),#181312 0 2px,#e2c99a 3px,transparent 4px),linear-gradient(#bea175,#5d4934 45%,#241d19);
+  box-shadow:0 5px 10px #000c,inset 0 1px #fff0cc,inset 0 -3px #201713,0 0 0 2px #241b16;
+}
+.articulated .jukebox-arm-shaft,.articulated .jukebox-arm-forearm {
+  position:absolute;height:18px;border:1px solid #c4a06e;border-radius:5px;
+  transform-origin:0 50%;margin-top:-9px;animation:none!important;
+  background:linear-gradient(#f5e2b8,#b49362 18%,#4d3c2b 43%,#241c18 56%,#b89661 79%,#715234);
+  box-shadow:0 5px 7px #0009,inset 0 1px #ffedc5,inset 0 -2px #1b1411;
+}
+.articulated .jukebox-arm-forearm {height:14px;margin-top:-7px}
+.articulated .jukebox-arm-forearm::after {
+  content:'';position:absolute;inset:4px 20px;border-top:1px solid #e6c992;border-bottom:1px solid #211811;
+}
+.articulated .jukebox-arm-pivot {
+  transform:translate(-50%,-50%);box-sizing:border-box;
+}
+.articulated .jukebox-arm-pivot {z-index:3}
+.articulated .jukebox-arm-wrist {position:absolute;width:0;height:0;z-index:4}
+.articulated .jukebox-flight-card {
+  position:absolute;left:0;top:0;box-sizing:border-box;padding:29px 9px 11px;gap:10px;
+  border-radius:7px;transform:translate(-50%,-100%);transition:none;
+}
+.articulated .jukebox-flight-card img {height:120px;flex:none}
+.articulated .jukebox-flight-card small {align-self:flex-end;color:#f3d7a6;font:700 8px/1 'Courier New',monospace;letter-spacing:.12em}
+.articulated .jukebox-flight-card.seated {visibility:hidden}
+.articulated .jukebox-arm-grip {
+  left:-16px;top:-11px;right:auto;width:32px;height:22px;box-sizing:border-box;
+  z-index:6;border:2px solid #b99563;border-radius:4px;
+  background:linear-gradient(#ead3a7,#82643f 36%,#30261d 55%,#b18d59);
+  box-shadow:0 3px 5px #000a,inset 0 1px #fff0c9;
+}
+.articulated .jukebox-arm-grip::before,.articulated .jukebox-arm-grip::after {
+  top:-17px;bottom:auto;width:7px;height:24px;transform:none;border-radius:3px;
+  background:linear-gradient(90deg,#322821,#d9bc8b,#74583a);transition:left .16s,right .16s;
+  box-shadow:inset 0 -4px #171414;
+}
+.articulated .jukebox-arm-grip::before {left:-9px;right:auto}
+.articulated .jukebox-arm-grip::after {right:-9px}
+.articulated.clamped .jukebox-arm-grip::before {left:3px}
+.articulated.clamped .jukebox-arm-grip::after {right:3px}
+@media(max-width:620px) {
+  .articulated .jukebox-flight-card img {height:112px}
+}
+.articulated .jukebox-arm-shaft,.articulated .jukebox-arm-forearm {box-sizing:border-box}
+.jukebox-transfer.idle {background:none}
+.jukebox-transfer {clip-path:inset(calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px)) 0 0)}
+.jukebox-mechanics-bar {
+  position:fixed;left:max(16px,calc((100% - var(--cabinet-width))/2));right:max(16px,calc((100% - var(--cabinet-width))/2));top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));height:var(--mechanics-layer-height);
+  border-bottom:2px solid #99754a;
+  background:repeating-linear-gradient(90deg,transparent 0 28px,#080709 29px 31px),linear-gradient(#231c18,#50402e 12%,#171315 45%,#08090b 80%,#b18b58);
+  box-shadow:0 8px 14px #000d,inset 0 1px #fff0d0,inset 0 -2px #100c0d,0 1px 0 #b18b58;
+  clip-path:polygon(0 0,calc(50% - var(--dock-clearance)) 0,calc(50% - var(--dock-clearance)) 30px,calc(50% + var(--dock-clearance)) 30px,calc(50% + var(--dock-clearance)) 0,100% 0,100% 100%,0 100%);
+}
+.jukebox-mechanics-bar::before,.jukebox-mechanics-bar::after {
+  content:'';position:absolute;top:10px;width:8px;height:8px;border:1px solid #e1c28d;border-radius:50%;
+  background:linear-gradient(110deg,#423526 40%,#ebd0a0 45% 55%,#423526 60%);
+}
+.jukebox-mechanics-bar::before {left:18px}
+.jukebox-mechanics-bar::after {right:18px}
+.jukebox-receiver.stowed {visibility:hidden;pointer-events:none}
+.jukebox-receiver.stowed::after {visibility:hidden}
+@media(max-width:520px) {
+  .jukebox-transfer {clip-path:inset(calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px)) 0 0)}
+  .jukebox-mechanics-bar {top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px))}
+}
+.articulated .jukebox-arm-shaft::before,.articulated .jukebox-arm-forearm::before {
+  content:'';position:absolute;left:-2px;top:-3px;width:40px;height:22px;border:1px solid #a98758;border-radius:5px;
+  background:linear-gradient(#e7cea2,#8e7049 23%,#30261e 52%,#9d7a4c 81%,#473324);
+  box-shadow:0 3px 5px #0009,inset 0 1px #f9e8c6;
+}
+.articulated .jukebox-arm-forearm::before {width:34px;height:18px}
+.articulated .jukebox-arm-tool {position:absolute;height:7px;margin-top:-3.5px;transform-origin:0 50%;border:1px solid #b69b70;border-radius:3px;z-index:29;background:linear-gradient(#ead9b5,#756047 45%,#2b251d 60%,#b69b70);box-shadow:0 3px 4px #0009}
+.articulated .jukebox-arm-tool::before {content:'';position:absolute;left:-3px;top:-3px;width:13px;height:11px;border:1px solid #cbb083;border-radius:3px;background:linear-gradient(90deg,#66513a,#dbc69d,#66513a)}
+:root[data-cabinet-mechanism] body {padding-top:calc(var(--cabinet-fascia-height) + 70px + env(safe-area-inset-top,0px))}
+.jukebox-receiver-lip {left:5px;right:5px}
+
+#marquee-name.marquee-engage .marquee-letter {
+  animation: marquee-flap 1s cubic-bezier(.34,.02,.2,1) both;
+  animation-delay:calc(var(--flap-index) * 190ms);
+}
+@keyframes marquee-flap {
+  0% { transform:rotateX(88deg); filter:brightness(1.8); opacity:.2; }
+  46% { transform:rotateX(-13deg); filter:brightness(1.35); opacity:1; }
+  68% { transform:rotateX(6deg); filter:brightness(1.08); }
+  84% { transform:rotateX(-2deg); filter:brightness(1); }
+  100% { transform:rotateX(0); filter:brightness(1); opacity:1; }
+}
+
+@media(prefers-reduced-motion:reduce) {#marquee-name.marquee-engage .marquee-letter {animation:none}}
+.articulated .jukebox-arm-wrist {z-index:20;filter:drop-shadow(3px 9px 4px #000b)}
+.articulated .jukebox-arm-mount {z-index:8}
+.articulated .jukebox-arm-shaft {z-index:22;filter:drop-shadow(0 6px 4px #000b)}
+.articulated .jukebox-arm-forearm {z-index:23;filter:drop-shadow(0 5px 3px #000c)}
+.articulated .jukebox-arm-pivot {z-index:27;box-shadow:0 5px 8px #000c,inset 0 1px #ffe9bd,0 0 0 2px #241b14}
+.articulated .jukebox-arm-grip {z-index:30;box-shadow:0 3px 4px #000c,inset 0 1px #fff0c9,inset 0 -2px #251b13}
+.articulated .jukebox-arm-bearing {
+  position:absolute;width:22px;height:22px;transform:translate(-50%,-50%);z-index:28;
+  border:2px solid #d2b27c;border-radius:50%;
+  background:radial-gradient(circle at 35% 25%,#f5e2b8,#927149 50%,#211a16 76%);
+  box-shadow:0 4px 0 #30251b,0 7px 5px #000b,inset 0 1px #fff0c9;
+}
+.articulated .jukebox-arm-bearing::after {
+  content:'';position:absolute;inset:5px;border:1px solid #dec18f;border-radius:50%;
+  background:linear-gradient(90deg,#392d22 40%,#e6cc9d 45% 55%,#392d22 60%);
+  transform:rotate(var(--bearing-angle,0deg));
+}
+.articulated .jukebox-arm-pivot::before {
+  background:linear-gradient(90deg,transparent 44%,#1b1510 46% 54%,transparent 56%);
+  transform:rotate(var(--bearing-angle,0deg));
+}
+.articulated .jukebox-arm-grip {border-bottom-width:5px}
+.articulated .jukebox-arm-grip::before,
+.articulated.clamped .jukebox-arm-grip::before {left:calc(-9px + var(--jaw-travel,0px));transition:none}
+.articulated .jukebox-arm-grip::after,
+.articulated.clamped .jukebox-arm-grip::after {right:calc(-9px + var(--jaw-travel,0px));transition:none}
+.articulated .jukebox-arm-grip::before,.articulated .jukebox-arm-grip::after {
+  content:none;
+}
+.jukebox-claw-rail {
+  box-sizing:border-box;
+  position:absolute;left:50%;top:8px;width:calc(var(--rom-half)*2 + 36px);height:7px;
+  transform:translateX(-50%);border:1px solid #c5ae88;border-radius:3px;
+  background:repeating-linear-gradient(90deg,transparent 0 3px,#291f1680 4px 5px),linear-gradient(#e4cfaa,#715b3d 50%,#30271c 55%,#c3a77c);
+  box-shadow:0 3px 4px #0009,inset 0 1px #fff0ca;
+}
+.jukebox-claw-jaw {
+  box-sizing:border-box;
+  position:absolute;top:3px;width:6px;height:28px;border:1px solid #ccb38b;border-radius:3px;
+  background:linear-gradient(90deg,#32281c,#e1cda7 40%,#816442 80%);
+  box-shadow:0 3px 4px #0009,inset 0 1px #fff3d4;
+}
+.jukebox-claw-jaw.left {left:calc(50% - var(--rom-half) - 18px + var(--jaw-travel,0px))}
+.jukebox-claw-jaw.right {left:calc(50% + var(--rom-half) + 12px - var(--jaw-travel,0px))}
+.jukebox-claw-jaw::before {
+  content:'';position:absolute;left:-3px;top:3px;width:10px;height:10px;border:1px solid #cbb38c;border-radius:50%;
+  background:radial-gradient(circle,#30261a 0 1px,#e5cea4 2px,#6e5639 4px);
+}
+.jukebox-claw-jaw b {
+  position:absolute;bottom:0;width:6px;height:11px;border:1px solid #27231b;border-radius:2px;
+  background:repeating-linear-gradient(#332f27 0 2px,#161510 3px 4px);
+  box-shadow:inset 0 1px #817761,0 1px 2px #0009;
+}
+.jukebox-claw-jaw.left b {left:3px}
+.jukebox-claw-jaw.right b {right:3px}
+.jukebox-claw-lock {
+  position:absolute;left:10px;top:3px;width:8px;height:8px;border:1px solid #d2b788;border-radius:50%;
+  background:linear-gradient(90deg,#281f16 40%,#d4bc93 45% 55%,#281f16 60%);
+  transform:rotate(calc(var(--jaw-close,0)*90deg));box-shadow:inset 0 1px #f3dfbb;
+}
+.jukebox-receiver-lip i {top:2px;width:3px;height:18px;border-radius:0 0 2px 2px;
+  background:linear-gradient(90deg,#32281d,#dbc298,#4d3a26);box-shadow:1px 3px 3px #000b}
+.jukebox-receiver-lip i:first-child {left:0}
+.jukebox-receiver-lip i:last-child {right:0}
+.articulated .jukebox-joint-lift {
+  position:absolute;width:38px;height:calc(38px + var(--joint-rise,0px));
+  transform:translate(-50%,-19px);z-index:9;border:1px solid #b5976b;border-radius:19px;
+  background:repeating-linear-gradient(0deg,#272019 0 2px,#c3aa83 3px,#66533a 4px 6px);
+  box-shadow:0 5px 6px #000a,inset 3px 0 #e7d0a27a,inset -4px 0 #17120dc0;
+}
+.jukebox-receiver,.jukebox-receiver.loaded {
+  width:148px;height:17px;border-radius:0 0 3px 3px;
+  background:linear-gradient(#493e2f,#161310 45%,#080809 70%,#67533b);
+  box-shadow:0 2px 0 #211911,0 4px 6px #000a,inset 0 1px #ead7ae66;
+}
+.jukebox-seated-card {
+  inset:7px auto auto 50%;width:130px;height:18px;padding:0;display:block;
+  transform:translateX(-50%);
+  border:1px solid #aa9270;border-bottom:3px solid #4b4030;border-radius:1px 1px 3px 3px;
+  background:repeating-linear-gradient(90deg,transparent 0 4px,#11100d55 5px 6px),linear-gradient(#25231e,#403a2e 65%,#29251e);
+  box-shadow:0 2px 2px #000b,inset 0 1px #ecdbb580;transition:none;
+}
+.jukebox-receiver.loaded .jukebox-seated-card {opacity:1;transform:translateX(-50%)}
+.jukebox-seated-card i {position:absolute;bottom:1px;width:5px;height:11px;border:1px solid #776247;background:#15130f;box-shadow:inset 0 1px 2px #000}
+.jukebox-seated-card i:first-child {left:1px}
+.jukebox-seated-card i:last-child {right:1px}
+.jukebox-receiver-lip,.jukebox-receiver.loaded .jukebox-receiver-lip {
+  top:4px;left:50%;right:auto;width:138px;height:6px;transform:translateX(-50%);
+  box-shadow:inset 0 2px 3px #000,0 1px #dcc29a44;
+}
+@media(max-width:620px) {
+  .jukebox-receiver,.jukebox-receiver.loaded {width:134px}
+  .jukebox-seated-card {width:116px}
+  .jukebox-receiver-lip,.jukebox-receiver.loaded .jukebox-receiver-lip {width:124px}
+}
+.jukebox-receiver::after {
+  top:27px;right:-37px;width:50px;
+  box-shadow:2px 7px 0 #261d15,2px 10px 7px #000b,inset 0 1px #fff5dc8c;
+}
+
+@media (max-width:620px), (pointer:coarse) and (max-width:950px) and (max-height:520px) {
+  #marquee-name {visibility:hidden!important;pointer-events:none}
+}
+
+/* The coin mechanism occupies its own bay beside every control deck. */
+.kiosk-bar:has(.deck-coin-slot) {
+  --coin-width:clamp(80px,22vw,88px);
+  --coin-bay:calc(var(--coin-width) + 4px);
+  perspective:180vw;
+  perspective-origin:50% 100%;
+}
+#topbar.kiosk-bar:has(.deck-coin-slot) {--coin-bay:calc(var(--coin-width) + 4px)}
+.kiosk-bar:has(.deck-coin-slot) > .deck-panel {
+  right:var(--coin-bay)!important;
+  transform:rotateX(var(--bar-tilt,26deg));
+}
+.kiosk-bar:has(.deck-coin-slot) > .deck-panel::before {content:none}
+.kiosk-bar #insert-coin-btn.deck-coin-slot,
+.kiosk-bar #kiosk-insert-btn.deck-coin-slot {
+  --coin-size:clamp(34px,var(--cap,44px),48px);
+  position:absolute;top:4px;right:4px;bottom:0;box-sizing:border-box;
+  width:var(--coin-width);height:auto!important;margin:0;padding:3px;display:block;z-index:520;
+  pointer-events:auto;
+  border:1px solid #30281d;border-radius:5px;cursor:pointer;overflow:visible;
+  background:linear-gradient(110deg,#665d4b,#2d271e 45%,#91816a 92%,#332b21);
+  box-shadow:0 3px 0 #211a12,0 5px 8px #000c,inset 0 1px #cbbb9c;
+  color:inherit;text-shadow:none;animation:none;transition:none;
+  transform:rotateX(var(--bar-tilt,26deg));transform-origin:50% 100%;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+.kiosk-bar .deck-coin-slot::after {content:none!important}
+.kiosk-bar .deck-coin-slot::before {content:'';position:absolute;inset:-3px;pointer-events:auto}
+.kiosk-bar .deck-coin-slot:focus-visible {outline:2px solid #e5cf9e;outline-offset:3px}
+
+
+.deck-coin-slot #coin-drop-anim {left:calc(50% - 40px);right:auto;top:50%}
+.kiosk-bar:has(.deck-coin-slot) :is(.deck-side,.snes-shell) {padding-bottom:24px!important}
+:root[data-layout="landscape"] .kiosk-bar #insert-coin-btn.deck-coin-slot,
+:root[data-layout="landscape"] .kiosk-bar #kiosk-insert-btn.deck-coin-slot {
+  top:auto;bottom:calc(12px + env(safe-area-inset-bottom,0px));height:62px!important;transform:none!important;
+}
+@media(max-width:600px) {
+  :root[data-layout="upright"][data-players="2"] :is(.snes-face.four,.fire-buttons.four) {grid-template-columns:var(--cap)!important}
+  :root[data-layout="upright"][data-players="2"] {--mid:8px;--ctl-pr:8px}
+}
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .kiosk-bar:has(.deck-coin-slot) {
+  display:block!important;height:0!important;background:none!important;border:0;
+}
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .kiosk-bar:has(.deck-coin-slot) > .deck-panel {display:none!important}
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .kiosk-bar #insert-coin-btn.deck-coin-slot,
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .kiosk-bar #kiosk-insert-btn.deck-coin-slot {
+  top:auto;bottom:0;height:56px!important;
+}
+
+/* The badge is the BLIP name plate (blip-logo.svg), the same on every screen. */
+body .blip-logo.led-logo {
+  top:calc(6px + env(safe-area-inset-top,0px));left:10px;width:116px;height:40px!important;
+  padding:0!important;display:inline-flex;align-items:center;justify-content:center;
+  border:0;border-radius:6px;background:none;box-shadow:none;
+  text-shadow:none;animation:none!important;overflow:visible;filter:drop-shadow(0 2px 3px #000a);
+}
+.blip-logo-mark {display:block;width:100%;height:auto}
+@media(max-width:600px) {
+  body .blip-logo.led-logo {top:calc(9px + env(safe-area-inset-top,0px));left:8px;width:86px;height:34px!important}
+}
+
+:root {--cabinet-width:960px;--dock-clearance:82px;--mechanics-layer-height:54px}
+/* The fascia casts onto the recessed mechanisms without enlarging the bar. */
+.top-marquee-bar::before,#marquee-bar.jukebox-marquee::before {
+  content:'';position:absolute;left:0;right:0;bottom:0;height:6px;pointer-events:none;
+  background:linear-gradient(#15151b,#4b4b5a 25%,#25252e 45%,#0b0b0e 85%);
+  box-shadow:inset 0 1px #ffffff26;
+}
+.top-marquee-bar::after,#marquee-bar.jukebox-marquee::after,.jukebox-transfer::after {
+  content:'';position:absolute;left:0;right:0;top:100%;height:36px;pointer-events:none;
+  background:linear-gradient(#0009,#0005 20%,#0002 58%,transparent);
+}
+.jukebox-transfer::after {
+  position:fixed;top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));z-index:100;
+}
+@media(max-width:620px) {:root {--dock-clearance:75px}}
+
+/* One shoulder drives a nested slide; the head is levelled inside the boom. */
+.articulated .jukebox-arm-mount {width:48px;height:34px}
+.articulated .jukebox-arm-anchor {
+  position:absolute;height:14px;transform:translateY(-50%);z-index:7;border:1px solid #b09670;border-radius:3px;
+  background:linear-gradient(#dac09a,#554431 45%,#29231b 60%,#9a8059);
+  box-shadow:0 4px 5px #0009,inset 0 1px #f5e5c2;
+}
+.jukebox-arm-anchor::after {content:'';position:absolute;right:3px;top:3px;width:6px;height:6px;border:1px solid #bca681;border-radius:50%;background:linear-gradient(125deg,#514331 40%,#dfc59a 44% 56%,#514331 60%)}
+.articulated .jukebox-arm-forearm::before {content:none}
+.articulated .jukebox-arm-forearm::after {inset:4px 4px}
+.articulated .jukebox-arm-bearing {width:16px;height:14px;border-radius:3px;background:linear-gradient(#d5c09b,#706044 40%,#302a21 60%,#a18a65);box-shadow:0 3px 4px #0009}
+.articulated .jukebox-arm-bearing::before,.articulated .jukebox-arm-bearing::after {content:none}
+.jukebox-transfer.idle .jukebox-claw-jaw {height:16px}
+.jukebox-receiver::after {content:none}
+.jukebox-receiver[href],#marquee-bar #marquee-name[href] {cursor:pointer;text-decoration:none;pointer-events:auto}
+.jukebox-receiver[href]:focus-visible,#marquee-bar #marquee-name[href]:focus-visible {outline:1px solid #dfc799;outline-offset:3px}
+
+.manual-pocket {position:fixed;right:calc(env(safe-area-inset-right,0px) + 92px);top:calc((var(--cabinet-fascia-height) - 32px) / 2 + env(safe-area-inset-top,0px));z-index:520;
+  display:flex;align-items:center;justify-content:center;width:144px;height:32px;padding:4px 7px 5px;box-sizing:border-box;
+  border:1px solid #806849;border-top-color:#33271d;border-bottom-color:#b1976b;border-radius:4px;
+  background:linear-gradient(90deg,#080505,#1a100d 8%,#20140e 80%,#080505);
+  box-shadow:inset 0 5px 7px #000,inset 3px 0 4px #0009,inset -3px 0 4px #000a,0 0 0 1px #140d09,0 -1px 1px #1b100c,0 1px 0 #c8a87133;}
+.manual-pocket::before {content:'';position:absolute;inset:0 0 auto;height:8px;z-index:3;pointer-events:none;border-radius:2px 2px 0 0;
+  background:linear-gradient(#080504dd,#08050488 35%,transparent);box-shadow:inset 0 1px #060303}
+.manual-pocket::after {content:'';position:absolute;left:2px;right:2px;bottom:2px;height:5px;z-index:2;pointer-events:none;border-radius:1px 1px 3px 3px;
+  background:radial-gradient(ellipse 7px 5px at 50% 0,#110b08 75%,transparent 85%),repeating-linear-gradient(174deg,#e5b37b08 0 1px,transparent 1px 6px),linear-gradient(#67472e,#38251c 65%,#22150f);
+  box-shadow:0 -1px 2px #000b,inset 0 1px #aa82524d}
+.cabinet-manual {position:relative;z-index:1;display:flex;align-items:center;justify-content:center;width:126px;height:23px;margin:0 0 2px;padding:0 8px;
+  border:1px solid #353021;border-bottom-color:#8c8060;border-radius:3px 2px 2px 3px;color:#e0dcc9;text-align:center;text-decoration:none;white-space:nowrap;transform:none;
+  appearance:none;cursor:pointer;font:900 8px/1 'Courier New',monospace;letter-spacing:.08em;
+  background:repeating-linear-gradient(0deg,#ddd2a208 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,#0002 0 1px,transparent 1px 3px),linear-gradient(90deg,#302e21 0 7px,#7b7458 7px 9px,#645e43 10px,#514c35 60%,#3f3c2a);
+  box-shadow:0 2px 2px #000c,2px 0 3px #000b,inset 0 1px #b9b38c33,inset 0 -2px #20281b;
+  transition:transform .22s cubic-bezier(.2,.7,.15,1),filter .2s,box-shadow .2s;box-sizing:border-box}
+.cabinet-manual:focus-visible {outline:1px solid #e0c48b;outline-offset:2px}
+.cabinet-manual::before {content:'';position:absolute;left:7px;top:2px;bottom:2px;width:2px;border-left:1px solid #c0b18d;border-right:1px solid #302f25;pointer-events:none}
+.cabinet-manual::after {content:'';position:absolute;right:-3px;top:2px;bottom:2px;width:4px;border:1px solid #aaa48b;border-left:0;border-radius:0 2px 2px 0;background:repeating-linear-gradient(0deg,#ded6be 0 1px,#888777 1px 2px);box-shadow:1px 1px 2px #0009;pointer-events:none}
+.manual-book-spine {position:absolute;left:0;top:0;bottom:0;width:7px;border-right:1px solid #a99c78;border-radius:4px 0 0 2px;background:linear-gradient(90deg,#242216,#5e583d 56%,#302f20)}
+.manual-page-edges {display:none}
+.manual-book-copy {display:flex;align-items:center;justify-content:center;min-width:0;white-space:nowrap}
+.manual-book-copy strong {color:#cabc94;font:700 8px/1 Georgia,serif;letter-spacing:.1em;text-shadow:0 1px #182011,0 -1px #cbb78322}
+.manual-book-copy small {display:none}
+.cabinet-manual:is(:hover,:focus-visible,.card-focused) {transform:translateY(-1px);filter:brightness(1.12)}
+.cabinet-manual.manual-away {visibility:hidden;pointer-events:none}
+.manual-transit {position:fixed;left:0;top:0;right:auto;margin:0;z-index:20001;pointer-events:none;transition:none;transform-origin:50% 75%}
+.manual-transit .manual-book-copy strong {font-size:inherit}
+:root[data-cabinet-screen] .manual-pocket,:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .manual-pocket {display:none}
+@media(max-width:480px) {
+  .manual-pocket {right:calc(env(safe-area-inset-right,0px) + 42px);top:calc((var(--cabinet-fascia-height) - 27px) / 2 + env(safe-area-inset-top,0px));width:94px;height:27px;padding:4px 4px 5px}
+  .cabinet-manual {width:82px;height:19px;padding:0 4px 0 10px;font-size:7px}
+  .manual-book-copy strong {font-size:8px;letter-spacing:.02em}
+}
+@media(prefers-reduced-motion:reduce) {.cabinet-manual {transition:none}}
+
+/* The selector and the games occupy the same physical cabinet. */
+body.cabinet-page {
+  background: radial-gradient(ellipse at 50% 8%, rgba(164,78,37,.19), transparent 43%),
+              radial-gradient(ellipse at 50% 72%, rgba(74,38,80,.18), transparent 60%), #100c12;
+  background-attachment: fixed;
+}
+body.cabinet-page::after {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 98;
+  background: radial-gradient(ellipse at center, transparent 43%, rgba(12,5,11,.58) 100%);
+}
+    /* ---- screen bezel — frames the game grid like a monitor set into the
+       cabinet, complete with corner screws and a glass glare ---- */
+    .screen-bezel {
+      position: fixed;
+      top: calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+      bottom: var(--cabinet-panel-depth,56px);
+      left: 50%;
+      transform: translateX(-50%);
+      flex-shrink:0;
+      perspective: 1500px;
+      transform-style:preserve-3d;
+      overflow:hidden;
+      width: min(calc(100% - 32px), var(--cabinet-width));
+      max-width: var(--cabinet-width);
+      margin: 0;
+      padding: 27px 22px 54px;
+      border: 1px solid var(--cabinet-trim);
+      border-radius: 22px;
+      background: var(--cabinet-shell);
+      box-shadow:
+        0 20px 52px rgba(0,0,0,.72), 0 0 0 5px #0c090e,
+        0 0 0 7px rgba(255,255,255,.1), 0 0 46px rgba(120,105,196,.12),
+        inset 0 2px rgba(255,255,255,.12), inset 0 -9px 18px rgba(0,0,0,.58);
+    }
+    .screen-bezel::before {
+      content: '';
+      position: absolute;
+      inset: 12px;
+      border-radius: 10px;
+        box-shadow: inset 0 0 26px rgba(0,0,0,.84), inset 0 2px 0 rgba(255,255,255,.12), inset 0 0 0 1px rgba(255,255,255,.08);
+      pointer-events: none;
+    }
+    .screen-bezel::after {
+      content: '';
+      position: absolute;
+      inset: 12px;
+      border-radius: 10px;
+        background: linear-gradient(115deg,
+        rgba(255,255,255,.05) 0%, transparent 16%,
+        transparent 82%, rgba(255,255,255,.02) 100%);
+      pointer-events: none;
+    }
+    .screen-bezel .screw {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #f0d7a8, #92734d 34%, #281816 72%);
+      box-shadow: 0 1px 1px rgba(255,239,208,.62), 0 1px 3px rgba(0,0,0,.88), inset 0 0 0 1px rgba(255,222,167,.25);
+    }
+    .screen-bezel .screw::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 6px;
+      height: 1px;
+      background: #000;
+      transform: translate(-50%, -50%) rotate(35deg);
+    }
+    .screen-bezel .screw.tl { top: 9px; left: 9px; }
+    .screen-bezel .screw.tr { top: 9px; right: 9px; }
+    .screen-bezel .screw.bl { bottom: 9px; left: 9px; }
+    .screen-bezel .screw.br { bottom: 9px; right: 9px; }
+    @media (max-width: 520px) {
+      .screen-bezel { padding: 20px 14px 48px; border-radius: 14px; }
+    }
+
+    .cab-rail {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      width: 64px;
+      display: none;
+      pointer-events: none;
+      z-index: 4;
+      background:
+        linear-gradient(90deg, transparent 0 10%, rgba(255,201,117,.22) 10.5%, transparent 11.5% 89%, rgba(255,201,117,.18) 90%, transparent 91%),
+        repeating-linear-gradient(173deg, transparent 0 8px, rgba(236,164,102,.075) 9px, transparent 11px 18px),
+        radial-gradient(circle at 50% 0, #ffca73 0 2.4px, rgba(255,202,116,.18) 3px, transparent 4px) 0 44px / 100% 150px repeat-y,
+        linear-gradient(90deg, #8a5937, #4b2d29 52%, #1c1417);
+    }
+    /* bright seam where the rail meets the screen — sells it as a distinct panel */
+    .cab-rail::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(180deg, transparent, rgba(255,218,160,.42) 15%, rgba(255,218,160,.42) 85%, transparent);
+    }
+    .cab-rail.left  { left: 0; box-shadow: inset -14px 0 28px rgba(0,0,0,.75), inset 9px 0 18px rgba(255,174,97,.11); }
+    .cab-rail.left::after  { right: 0; }
+    .cab-rail.right { right: 0; box-shadow: inset 14px 0 28px rgba(0,0,0,.75), inset 9px 0 18px rgba(255,174,97,.11); transform: scaleX(-1); }
+    .cab-rail.right::after { right: 0; }
+    @media (min-width: 1180px) {
+      .cab-rail { display: block; }
+    }
+
+.cabinet-glass {
+  position: fixed; pointer-events: none; z-index: 8; border-radius: 10px;
+  background: linear-gradient(115deg, rgba(255,239,208,.065), transparent 16% 82%, rgba(255,196,132,.025));
+  box-shadow: inset 0 0 25px #000, inset 0 0 0 2px #261d18;
+}
+.jukebox-game-screen > .cabinet-glass { position:absolute; inset:0; }
+
+.cabinet-stars {
+  position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:0;
+}
+.cabinet-stars i {
+  position:absolute; width:1px; height:1px; border-radius:50%; background:#ffe1a5;
+}
+:root[data-cabinet-screen] .cabinet-stars { display:none; }
+
+:root[data-layout="upright"] body.cabinet-page :is(#topbar, .kiosk-bar-main) {
+  left:max(16px, calc((100% - var(--cabinet-width)) / 2));
+  right:max(16px, calc((100% - var(--cabinet-width)) / 2));
+}
+
+/* The cabinet's shell: matte charcoal moulded plastic, finely textured, as on a modern two-player cabinet. */
+:root {
+  --cabinet-trim:rgba(255,255,255,.1);
+  --plastic-grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --cabinet-shell:
+    var(--plastic-grain),
+    linear-gradient(110deg, rgba(255,255,255,.04), transparent 35% 75%, rgba(0,0,0,.14)),
+    linear-gradient(180deg, #353542 0%, #2a2a36 22%, #22212b 68%, #1a1a22 100%);
+}
+body.cabinet-page .kiosk-bar {--bolt-l:none;--bolt-r:none}
+body.cabinet-page .cab-rail {
+  background:
+    var(--plastic-grain),
+    linear-gradient(90deg,#ffffff0d,transparent 14% 80%,#0000004d),
+    linear-gradient(180deg,#2e2f33,#202124 60%,#18191b);
+}
+
+body.cabinet-page :is(#topbar, .kiosk-bar-main) { background:none; border:0; box-shadow:none; }
+body.cabinet-page .deck-housing {
+  position:absolute;inset:-10px -8px 0;z-index:-1;pointer-events:none;
+  transform:rotateX(var(--bar-tilt,26deg));transform-origin:50% 100%;
+  backface-visibility:hidden;
+  background:
+    linear-gradient(90deg,#0005,transparent 12% 86%,#0006),
+    repeating-linear-gradient(176deg,transparent 0 8px,#e2b77e06 9px,transparent 10px 21px),
+    radial-gradient(ellipse at 28% 0,#b8864c12,transparent 65%),
+    linear-gradient(180deg,#403026,#29211f 26%,#191518 78%,#100f12);
+  border:1px solid #95764f66;
+  border-bottom:0;
+  border-radius:10px 10px 0 0;
+  box-shadow:
+    0 0 0 1px #0a080b,0 -4px 9px #0007,
+    inset 1px 0 #efd1a312,inset -1px 0 #0009,
+    inset 0 2px #e6c39019,inset 0 8px 10px -8px #000;
+}
+/* Housing, controls and coin plate share the bar's perspective and hinge. */
+:root[data-layout="upright"] body.cabinet-page .deck-housing::before {
+  content:'';position:absolute;left:5px;right:5px;top:0;height:6px;
+  border-radius:6px 6px 0 0;pointer-events:none;
+  background:linear-gradient(#d3b18340,#5b4530 1px,#30231c 3px,#171113 5px);
+  box-shadow:0 3px 5px #0006;
+}
+:root[data-layout="upright"] body.cabinet-page .deck-housing::after {
+  content:'';position:absolute;right:9px;top:13px;bottom:0;width:calc(var(--coin-width) + 10px);
+  border-left:1px solid #b8966429;border-radius:5px 7px 0 0;pointer-events:none;z-index:-1;
+  background:linear-gradient(90deg,#08070899,#17121066 12%,#35292133 85%,#08070866);
+  box-shadow:inset 3px 0 5px #0006,inset 0 2px 5px #0008;
+}
+body.cabinet-page .kiosk-bar .deck-coin-slot {
+  box-shadow:0 0 0 1px #0c0a09,2px 4px 6px #000b,5px 8px 10px #0005,inset 0 1px #cbbb9c;
+}
+
+:root[data-layout="landscape"] .deck-housing,
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) .deck-housing {display:none;}
+
+
+body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin-btn,#kiosk-insert-btn).deck-coin-slot {
+  right:4px;padding:3px;
+}
+
+
+
+@media(max-width:620px) {
+  :root {--title-left:126px;--title-right:236px;}
+  #marquee-bar.jukebox-marquee #marquee-name {
+    visibility:visible!important;
+    left:calc((var(--title-left) + 100% - var(--title-right)) / 2);
+    width:min(164px,calc(100% - var(--title-left) - var(--title-right) - 12px));
+    top:calc(9px + env(safe-area-inset-top,0px));height:34px;min-height:34px;
+    padding:4px 2px;gap:1px;font-size:10px;
+  }
+}
+@media(max-width:480px) {
+  :root {--title-right:128px;}
+  #marquee-bar.jukebox-marquee #marquee-name {font-size:8px;}
+}
+@media(min-width:601px) and (max-width:620px) {:root {--title-left:158px;}}
+
+/* The title flipper: a wide, lit split-flap window. */
+:root {--cabinet-fascia-height:60px}
+.top-marquee-bar #marquee-name,
+#marquee-bar.jukebox-marquee #marquee-name {
+  width:256px;height:50px;min-height:50px;gap:3px;padding:6px 12px;font-size:30px;
+  background:linear-gradient(180deg,#1d1a1c 0%,#050506 52%,#1a1413 100%);
+  box-shadow:0 3px 0 #130e0d,0 6px 14px rgba(0,0,0,.85),0 0 14px rgba(255,196,110,.16),inset 0 1px rgba(255,245,219,.5),inset 0 -2px rgba(0,0,0,.9),inset 0 0 0 2px #4a362a;
+}
+#marquee-name .marquee-letter {
+  font-size:30px;color:#ffe9b5;
+  background:linear-gradient(180deg,#34292a 0 47%,#e0b97a 48% 52%,#1d1514 53% 100%);
+  text-shadow:0 0 6px rgba(255,201,110,.7),0 1px #090707;
+}
+/* Phones: the title takes the gap between the logo and the manual book, and its letters size to it. */
+@media (max-width:520px) {
+  .top-marquee-bar #marquee-name,
+  #marquee-bar.jukebox-marquee #marquee-name {
+    --flip:clamp(10px,calc((100vw - 296px) / 6.4),19px);
+    left:calc(50% - 34px);top:calc(env(safe-area-inset-top,0px) + 25px - var(--flip) * .56);
+    width:auto;height:auto;min-height:0;gap:1px;padding:4px 6px;font-size:var(--flip);
+  }
+  #marquee-name .marquee-letter {font-size:var(--flip)}
+}
+/* Under 340px there is no room for the manual book beside the title on a game page: the title is centred, the book waits on the cabinet. */
+@media (max-width:340px) {
+  body:has(#glcanvas) .manual-pocket {display:none}
+  .top-marquee-bar #marquee-name,
+  #marquee-bar.jukebox-marquee #marquee-name {left:50%}
+}
+
+
+.manual-open-book { touch-action: pan-y; }
+
+/* ---- Phones: room for a big thumb ---- */
+/* The coin bay is narrower on a phone, and the width goes to the controls. */
+.kiosk-bar:has(.deck-coin-slot) {--coin-width:clamp(62px,17vw,88px)}
+
+/* Two players on a phone: bigger caps and cross. */
+@media (pointer: coarse) and (max-width: 520px) {
+  :root {--coin-width: clamp(62px, 17vw, 88px)}
+  /* A station is half of what the coin bay leaves; the cross and one cap share it. */
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players="2"] {
+    --room: calc((100vw - 36px - var(--coin-width)) / 2 - 10px);
+    --dpad: clamp(50px, calc(var(--room) * .52), 88px);
+    --cap: clamp(40px, calc(var(--room) * .38), 52px);
+  }
+}
+/* Controls stand above the home bar. */
+.kiosk-bar:has(.deck-coin-slot) :is(.deck-side,.snes-shell) {padding-bottom:calc(24px + env(safe-area-inset-bottom,0px))!important}
+/* The credit lamps sit under the touch strip's glass, where nobody sees them. */
+:root[data-touch] :is(.deck-credit-lamp,.deck-second-lamp) {display:none}
+/* A landscape notch or island: the logo, the power lamp and the coin box stay clear of it. */
+body .blip-logo.led-logo,
+body:has(#marquee-bar,.top-marquee-bar) .blip-logo.led-logo {left:max(8px,calc(env(safe-area-inset-left,0px) + 6px))}
+.kiosk-bar .deck-coin-slot,
+body.cabinet-page:has(.top-marquee-bar,#marquee-bar) .kiosk-bar :is(#insert-coin-btn,#kiosk-insert-btn).deck-coin-slot {right:max(4px,env(safe-area-inset-right,0px))}
+@media (max-width: 340px) {
+  .deck-credit-lamp, .deck-second-lamp {width:36px;padding-left:14px}
+  :root[data-layout="upright"][data-caps="4"] .deck-credit-lamp {left:calc(var(--ctl-cx) - 8px)}
+  :root[data-layout="upright"][data-players="2"] .deck-second-lamp {left:calc(50% + var(--ctl-cx) + var(--mid) / 2 - 8px)}
+}
+/* A small phone on its side with two players: the lamps go under the caps, not behind them. */
+@media (max-width: 700px) {
+  :root[data-layout="landscape"][data-players="2"] :is(.deck-credit-lamp, .deck-second-lamp) {top: 104px}
+}
+
+/* Sideways, the cabinet's deck is controls over the picture, not a panel. */
+:root[data-layout="landscape"] body.cabinet-page .kiosk-bar > .deck-panel,
+:root[data-layout="landscape"] body.cabinet-page .snes-pad .snes-shell {
+  background: none;
+  box-shadow: none;
+  border: 0;
+}
+
+/* The controls card: printed paper that slides out from under the top bar when asked for. */
+#card-button {
+  position:fixed;z-index:521;width:22px;height:22px;padding:0;display:grid;place-items:center;
+  right:calc(env(safe-area-inset-right,0px) + 246px);
+  top:calc((var(--cabinet-fascia-height) - 22px) / 2 + env(safe-area-inset-top,0px));
+  border:1px solid #b79865;border-radius:50%;background:radial-gradient(circle at 35% 28%,#57432a,#24180e 75%);color:#eed4a3;
+  box-shadow:0 1px 3px #000b,inset 0 1px #fff3;
+  font:700 14px/1 Georgia,serif;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s,border-color .2s;
+}
+#card-button:hover, #card-button:focus-visible, :root[data-card] #card-button,
+body:has(#glcanvas) #card-button {
+  border-color:#ffe2a0;color:#fff9df;
+  background:radial-gradient(circle at 35% 28%,#ffe8af,#bc752a 65%,#724015);
+  box-shadow:0 0 5px 2px #ffc85799,0 0 13px #ffb43b77,inset 0 1px 3px #fff6;
+  text-shadow:0 0 4px #fff1b8;
+}
+#card-button:focus-visible {outline:2px solid #fff3ca;outline-offset:3px}
+:root[data-cabinet-screen] #card-button {display:none}
+/* Wide: beside the title window, away from the manual. Phones: between the title and the manual book. */
+@media (min-width:521px) {#card-button {right:auto;left:calc(50% - 168px)}}
+@media (max-width:520px) {#card-button {right:calc(env(safe-area-inset-right,0px) + 146px)}}
+@media (max-width:340px) {
+  body:has(#glcanvas) #card-button {right:calc(env(safe-area-inset-right,0px) + 42px)}
+  body:not(:has(#glcanvas)) #card-button {right:calc(env(safe-area-inset-right,0px) + 144px)}
+}
+
+#controls-card {
+  position:fixed;left:50%;z-index:160;width:min(480px,calc(100vw - 32px));box-sizing:border-box;
+  top:calc(var(--marquee-h) + env(safe-area-inset-top,0px) + 22px);padding:26px 13px 14px;
+  border:2px solid #b5aa8d;border-radius:11px;background:#243e3c;text-align:center;font-family:'Courier New',monospace;
+  box-shadow:0 14px 28px #000b,0 3px 0 #8f754e,inset 0 1px #fff4dc77,inset 0 -3px #0b0909;
+  transform:translate(-50%,calc(-100% - 110px)) rotate(-2.2deg);transform-origin:50% 0;
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:transform .6s cubic-bezier(.2,.85,.25,1.04),opacity .25s,visibility 0s .6s;
+}
+#controls-card::before {content:'';position:absolute;inset:3px;border:1px solid #f5edda55;border-radius:7px;pointer-events:none}
+:root[data-card] #controls-card {
+  transform:translate(-50%,0) rotate(-.6deg);opacity:1;visibility:visible;pointer-events:auto;cursor:pointer;
+  transition:transform .6s cubic-bezier(.2,.85,.25,1.04),opacity .25s,visibility 0s;
+}
+.cc-paper {position:relative;padding:12px 12px 10px;border:1px solid #a88b61;border-radius:3px;color:#30251d;
+  background:linear-gradient(135deg,#f1e6ce,#d9c7a5);box-shadow:inset 0 1px #fff8e8,0 2px 4px #120d0b99}
+.cc-punch {position:absolute;top:7px;left:50%;width:40px;height:10px;transform:translateX(-50%);pointer-events:none}
+.cc-punch::before, .cc-punch::after {content:'';position:absolute;top:1px;width:8px;height:8px;border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#e8d6ae 0 1px,#171313 2px 3px,#b49565 3.5px 4px,transparent 4.5px)}
+.cc-punch::before {left:3px}
+.cc-punch::after {right:3px}
+.cc-title {margin:0;color:#3e5f59;font-size:10px;font-weight:700;letter-spacing:.3em}
+.cc-game {margin:5px 0 12px;color:#742e36;font:900 clamp(20px,5.5vw,28px)/1 'Courier New',monospace;letter-spacing:.14em}
+.cc-foot {margin:12px 0 0;color:#765733;font-size:8px;letter-spacing:.2em}
+#controls-card .pc-legend {padding-top:12px;border-top:1px solid #65807777}
+
+/* The arm: a rod fixed to the card slides out of a brass sleeve under the top bar, so the card is carried down. */
+.cc-rod {position:absolute;left:50%;bottom:calc(100% - 4px);width:9px;height:240px;margin-left:-4.5px;z-index:-1;
+  background:linear-gradient(90deg,#51483a,#d8cba8 40%,#8c7d5e 70%,#2f2a22);border-radius:2px 2px 0 0;box-shadow:1px 0 2px #0008}
+.cc-clamp {position:absolute;left:50%;top:-9px;width:42px;height:13px;margin-left:-21px;border:1px solid #6e5a38;border-radius:4px;
+  background:linear-gradient(180deg,#e2cf9f,#9d8454 55%,#6b5738);box-shadow:0 2px 3px #000a,inset 0 1px #fff6;
+  background-image:radial-gradient(circle at 20% 50%,#2a2118 0 1.5px,transparent 2px),radial-gradient(circle at 80% 50%,#2a2118 0 1.5px,transparent 2px),linear-gradient(180deg,#e2cf9f,#9d8454 55%,#6b5738)}
+#card-sleeve {position:fixed;left:50%;z-index:161;width:20px;height:34px;margin-left:-10px;border:1px solid #6e5a38;border-radius:0 0 4px 4px;
+  top:calc(var(--marquee-h) + env(safe-area-inset-top,0px) - 12px);
+  background:linear-gradient(90deg,#4a3d27,#e8d6a8 35%,#a58d5c 65%,#3b2f1d);box-shadow:0 3px 4px #000a;
+  visibility:hidden;transition:visibility 0s .6s}
+:root[data-card] #card-sleeve {visibility:visible;transition:none}
+@media (prefers-reduced-motion:reduce) {#controls-card, :root[data-card] #controls-card {transition:opacity .2s}}
+
+.pc-legend {display:flex;gap:12px 24px;flex-wrap:wrap;justify-content:center}
+.pc-group {display:flex;flex-direction:column;align-items:center;gap:7px}
+.pc-keys {display:flex;align-items:center;gap:4px}
+.pc-keys i {margin:0 4px;color:#765733;font:700 10px/1 'Courier New',monospace;font-style:normal;letter-spacing:.1em;text-transform:uppercase}
+.pc-legend kbd {
+  position:relative;min-width:30px;height:30px;padding:0 7px;display:inline-grid;place-items:center;
+  border:1.5px solid #30251d;border-bottom-width:3px;border-radius:5px;background:#fbf4e2;color:#30251d;
+  font:700 15px/1 'Courier New',monospace;
+}
+.pc-legend kbd.wide {padding:0 12px;letter-spacing:.12em;font-size:12px;white-space:nowrap}
+.pc-legend kbd.space {min-width:84px}
+.pc-legend kbd.arrow::before {content:'';width:0;height:0;border:6px solid transparent}
+.pc-legend kbd.left::before {border-right:9px solid #30251d;border-left:0}
+.pc-legend kbd.right::before {border-left:9px solid #30251d;border-right:0}
+.pc-legend kbd.up::before {border-bottom:9px solid #30251d;border-top:0}
+.pc-legend kbd.down::before {border-top:9px solid #30251d;border-bottom:0}
+.pc-legend kbd.red::before, .pc-legend kbd.blue::before {content:'';width:9px;height:9px;margin-right:7px;border:0;border-radius:50%;background:#c93a2f}
+.pc-legend kbd.blue::before {background:#3f6fd1}
+.pc-label {color:#30251d;font-size:11px;font-weight:700;letter-spacing:.2em}
+
+/* The cabinet's switch to the home screen: a brass button like the "?",
+   placed beside the logo by index.html. */
+.home-switch {
+  position:fixed;z-index:521;width:22px;height:22px;padding:0;display:grid;place-items:center;left:110px;
+  top:calc((var(--cabinet-fascia-height) - 22px) / 2 + env(safe-area-inset-top,0px));
+  border:1px solid #b79865;border-radius:50%;background:radial-gradient(circle at 35% 28%,#57432a,#24180e 75%);color:#eed4a3;
+  box-shadow:0 1px 3px #000b,inset 0 1px #fff3;cursor:pointer;transition:background .2s,color .2s,box-shadow .2s,border-color .2s;
+}
+.home-switch svg {width:12px;height:12px;fill:currentColor}
+.basic-switch {font:700 12px/1 'Courier New',monospace}
+.home-switch:hover, .home-switch:focus-visible {
+  border-color:#ffe2a0;color:#fff9df;background:radial-gradient(circle at 35% 28%,#ffe8af,#bc752a 65%,#724015);
+  box-shadow:0 0 5px 2px #ffc85799,0 0 13px #ffb43b77,inset 0 1px 3px #fff6;
+}
+.home-switch:focus-visible {outline:2px solid #fff3ca;outline-offset:3px}
+/* A thumb needs more than the 22px disc. */
+.home-switch::after {content:'';position:absolute;inset:-10px}
+
+/* Two players upright: each station's steering sits at its left and its caps
+   at its right, so without a wider channel the gap between the players equals
+   the gap inside a station and nobody can tell whose caps are whose. */
+:root[data-layout="upright"][data-controls][data-caps="4"][data-players="2"] { --mid: 48px; }

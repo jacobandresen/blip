@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="google" content="notranslate">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BLIP">
+  <title>BLIP ARCADE</title>
+  <!-- The game's own folder: saved to a home screen, it is its own app. -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/x-icon" href="../favicon.ico?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png?v=3">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg?v=3">
+  <link rel="apple-touch-icon" href="icon-180.png?v=2">
+  <script>if(new URLSearchParams(location.search).get('cabinet')==='1') document.documentElement.setAttribute('data-cabinet-screen','');</script>
+  <!-- Stepped into from the arcade: nothing is painted until shell.js has laid the page out, so the browser keeps the
+       arcade's last frame up meanwhile (data-launching, cleared by shell.js). -->
+  <script>
+    try {
+      var l=JSON.parse(sessionStorage.getItem('blip-cabinet-launch')||'null');
+      if(l&&Date.now()-l.at<15000&&location.pathname.endsWith('/'+l.slug+'/index.html')){
+        if(l.native){
+          document.documentElement.setAttribute('data-machine-handoff','');
+          var p=new Image();p.src=l.art;
+        } else {
+          document.documentElement.setAttribute('data-launching','');
+          setTimeout(function(){document.documentElement.removeAttribute('data-launching');},3000);
+        }
+      }
+    } catch(e) {}
+  </script>
+  <style>:root[data-launching] body{visibility:hidden}</style>
+  <script src="../howler.min.js"></script>
+  <script src="../blip_core.js?v=10"></script>
+  <script>(function () {
+    var g = blipGameFromPath(location.pathname);
+    if (!g) return;
+    if (g.name === 'RALLY') document.documentElement.setAttribute('data-dials','');
+    var name = g.name.toLowerCase().replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
+    document.title = name + ' \u00b7 BLIP';
+    document.querySelector('meta[name=apple-mobile-web-app-title]').content = name;
+  }());</script>
+  <script src="../kiosk.js?v=102"></script>
+  <link rel="stylesheet" href="../marquee.css?v=1">
+  <link rel="stylesheet" href="../kiosk.css?v=159">
+  <link rel="stylesheet" href="../shell.css?v=110">
+  <link rel="stylesheet" href="../wear.css?v=14">
+  <link rel="stylesheet" href="../machine.css?v=4">
+  <script>if (document.documentElement.hasAttribute('data-appstyle')) document.querySelector('link[href*="wear.css"]').disabled = true;</script>
+  <script src="../shell.js?v=141" defer blocking="render"></script>
+</head>
+<body class="cabinet-page">
+
+  <a class="blip-logo led-logo" href="../index.html" aria-label="BLIP — cabinet"><img class="blip-logo-mark" src="../blip-logo.svg" alt=""></a>
+
+  <!-- deck.js mounts the shared coin mechanism beside the controls. -->
+  <button id="insert-coin-btn" class="kiosk-btn"></button>
+
+
+
+  <div id="loader">
+    <div id="status">LOADING</div>
+    <div id="bar-outer"><div id="bar-inner"></div></div>
+  </div>
+
+  <!-- The fixed bar has no transform (iOS Safari clips a transformed fixed
+       box); .deck-panel inside it carries the tilt. -->
+  <div id="topbar" class="kiosk-bar">
+   <div class="deck-panel">
+    <!-- Paddle dials: rally only. Mounted in the deck like the stick —
+         two spinner knobs on the tilted panel, P1 left / P2 right.
+         shell.js reveals them and wires the touch spin. -->
+    <div id="paddle-dial">
+      <div class="dial-cap"><div id="dial-hand"></div></div>
+      <div id="dial-label">P1</div>
+    </div>
+    <div id="paddle-dial-p2">
+      <div class="dial-cap"><div id="dial-hand-p2"></div></div>
+      <div id="dial-label-p2">2P</div>
+    </div>
+   </div>
+
+  </div>
+  <script src="../deck.js?v=19"></script>
+
+  <div id="need-coin-overlay">
+    <div class="nco-panel">
+      <div class="nco-msg">POWER OFF</div>
+      <div class="nco-sub nco-go"><span class="nco-pc">PRESS <kbd>SPACE</kbd> TO INSERT A COIN</span><span class="nco-touch">TAP HERE TO INSERT A COIN</span></div>
+      <div class="nco-sub nco-how"><span class="nco-pc">Or click here, or press 5</span><span class="nco-touch">Controls resume when credit is added</span></div>
+    </div>
+  </div>
+
+  <!-- #marquee-bar (per-game backlit name sign) is injected by shell.js -->
+  <span class="machine-speaker" aria-hidden="true"></span>
+  <div class="cab-rail left"></div>
+  <div class="cab-rail right"></div>
+  <div id="arcade-bezel" class="screen-bezel">
+    <span class="screw tl"></span><span class="screw tr"></span>
+    <span class="screw bl"></span><span class="screw br"></span>
+  </div>
+  <div class="cabinet-glass"></div>
+  <canvas id="glcanvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
+
+  <script src="../blip_controller.js?v=12"></script>
+  <script src="../vendor/supabase.js?v=1"></script>
+  <script src="../blip_config.js?v=1"></script>
+  <script src="../blip_scores.js?v=9"></script>
+  <script src="../mq_js_bundle.js?v=1"></script>
+  <script src="../howler_audio_plugin.js"></script>
+  <script src="../blip_bridge.js?v=20"></script>
+  <script>document.addEventListener('DOMContentLoaded',function(){load("index.wasm");},{once:true});</script>
+
+</body>
+</html>

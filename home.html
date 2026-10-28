@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="google" content="notranslate">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BLIP">
+  <meta name="theme-color" content="#120f24">
+  <title>BLIP</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/x-icon" href="favicon.ico?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=3">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=3">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
+  <script src="blip_core.js?v=10"></script>
+  <link rel="stylesheet" href="home.css?v=11">
+</head>
+<body class="home-page">
+  <button type="button" class="edit-done" id="edit-done" hidden>Done</button>
+  <header class="status-bar">
+    <time id="home-clock" class="status-time">9:41</time>
+    <span class="status-right" aria-hidden="true">
+      <svg class="status-signal" viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx=".8"/><rect x="5" y="5.5" width="3" height="6.5" rx=".8"/><rect x="10" y="3" width="3" height="9" rx=".8"/><rect x="15" y="0" width="3" height="12" rx=".8"/></svg>
+      <svg class="status-wifi" viewBox="0 0 16 12"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.8 10.8 0 0 0 8 .4 10.8 10.8 0 0 0 .5 3.4l1.2 1.3A9 9 0 0 1 8 2.2zm0 3.5c1.4 0 2.7.5 3.8 1.4L13 5.8a7.5 7.5 0 0 0-10 0l1.2 1.3c1-.9 2.4-1.4 3.8-1.4zm0 3.4c.6 0 1.1.2 1.5.5L8 11.6 6.5 9.6c.4-.3.9-.5 1.5-.5z"/></svg>
+      <svg class="status-battery" viewBox="0 0 27 13"><rect class="shell" x=".5" y=".5" width="23" height="12" rx="3.6"/><rect class="charge" x="2.5" y="2.5" width="19" height="8" rx="2"/><path class="nub" d="M25 4.5v4c.8-.3 1.4-1.1 1.4-2s-.6-1.7-1.4-2z"/></svg>
+    </span>
+  </header>
+
+  <main class="springboard">
+    <ul class="app-grid" id="app-grid" aria-label="Games"></ul>
+  </main>
+
+  <div class="home-actions"><button type="button" class="search-pill" id="search-pill"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m10.6 10.6 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Search</button><a class="basic-pill" id="basic-switch" href="basic.html" aria-label="BLIP"><img src="blip-wordmark.svg" alt="BLIP"></a></div>
+
+  <nav class="dock" aria-label="Dock">
+    <ul class="dock-row" id="dock-row"></ul>
+  </nav>
+
+  <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+
+  <!-- A long press: the icon lifts over a blur, its menu beside it. -->
+  <div class="context-lift" id="context-lift" hidden aria-hidden="true"><img alt=""></div>
+  <section class="context-menu" id="action-sheet" hidden role="menu" aria-labelledby="action-title">
+    <p class="context-title" id="action-title"></p>
+    <button type="button" role="menuitem" data-action="play">Play<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.8v12.4c0 .8.9 1.3 1.6.8l9.4-6.2c.6-.4.6-1.2 0-1.6L7.6 3c-.7-.5-1.6 0-1.6.8z"/></svg></button>
+    <button type="button" role="menuitem" data-action="guide">How to Play<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4.6C8.6 3.5 6.5 3.1 4 3.4c-.5 0-.8.4-.8.9v9.6c0 .5.5.9 1 .8 2.2-.2 4.2.2 5.5 1.2.2.2.6.2.8 0 1.3-1 3.3-1.4 5.5-1.2.5.1 1-.3 1-.8V4.3c0-.5-.3-.9-.8-.9-2.5-.3-4.6.1-6.2 1.2zm-.7 1.3v8.1a9 9 0 0 0-5-1V4.8c2.1 0 3.8.4 5 1.1zm1.4 0c1.2-.8 2.9-1.2 5-1.1v8.1a9 9 0 0 0-5 1z"/></svg></button>
+    <button type="button" role="menuitem" data-action="install">Add to Home Screen<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="2.5" width="15" height="15" rx="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 6.5v7M6.5 10h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+    <button type="button" role="menuitem" data-action="edit">Edit Home Screen<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="2.5" width="6" height="6" rx="1.8"/><rect x="11.5" y="2.5" width="6" height="6" rx="1.8"/><rect x="2.5" y="11.5" width="6" height="6" rx="1.8"/><rect x="11.5" y="11.5" width="6" height="6" rx="1.8"/></svg></button>
+  </section>
+
+  <section class="settings-sheet" id="settings-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+    <h2 id="settings-title">Settings</h2>
+    <ul class="settings-list">
+      <li><label for="set-sound">Sound</label><input type="checkbox" role="switch" id="set-sound"></li>
+      <li><label for="set-fullscreen">Fullscreen</label><input type="checkbox" role="switch" id="set-fullscreen"></li>
+      <li><label for="set-cabinet">Start in the arcade cabinet</label><input type="checkbox" role="switch" id="set-cabinet"></li>
+    </ul>
+    <ul class="settings-list settings-actions">
+      <li><button type="button" id="set-reset">Reset Home Screen Layout</button></li>
+    </ul>
+    <button type="button" class="settings-done" id="settings-done">Done</button>
+  </section>
+
+  <section class="search-sheet" id="search-sheet" hidden role="dialog" aria-modal="true" aria-label="Search">
+    <div class="search-field">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m10.6 10.6 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <input type="search" id="search-input" placeholder="Search" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Search games">
+      <button type="button" class="search-cancel" id="search-cancel">Cancel</button>
+    </div>
+    <p class="search-heading">Games</p>
+    <ul class="search-results" id="search-results"></ul>
+  </section>
+
+  <div class="launch-zoom" id="launch-zoom" hidden><img alt=""></div>
+
+  <script src="home.js?v=12"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="google" content="notranslate">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Guide">
+  <meta name="color-scheme" content="light dark">
+  <title>BLIP Guide</title>
+  <!-- Its own app: saved to a home screen it is the Guide, not the arcade. -->
+  <link rel="manifest" href="guide-manifest.json">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=3">
+  <link rel="apple-touch-icon" href="guide-icon-180.png?v=1">
+  <script src="blip_core.js?v=10"></script>
+  <link rel="stylesheet" href="guide.css?v=2">
+</head>
+<body class="guide-page">
+  <!-- The manual's own chapters (controls, history, about), read and set in
+       the style of an iOS guide: a list to choose from, a page to read. -->
+  <div class="guide" id="guide">
+    <nav class="sidebar pane" id="pane-root" aria-label="Contents">
+      <header class="navbar">
+        <a class="nav-back" id="nav-home" href="home.html"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>Home</a>
+        <button type="button" class="nav-done" hidden>Done</button>
+        <h1 class="nav-inline-title" aria-hidden="true">Guide</h1>
+      </header>
+      <div class="scroller">
+        <h1 class="large-title">Guide</h1>
+        <label class="search">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="6.8" cy="6.8" r="5"/><path d="m10.6 10.6 4 4"/></svg>
+          <input type="search" id="guide-search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search the guide">
+        </label>
+        <div id="toc"><p class="loading">Loading…</p></div>
+      </div>
+    </nav>
+    <main class="detail pane" id="pane-detail" aria-live="polite">
+      <header class="navbar">
+        <a class="nav-back" id="nav-back" href="#/"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8"/></svg>Guide</a>
+        <button type="button" class="nav-done" hidden>Done</button>
+        <h1 class="nav-inline-title" id="detail-inline-title" aria-hidden="true"></h1>
+      </header>
+      <div class="scroller" id="detail-scroller">
+        <article id="article"></article>
+      </div>
+    </main>
+  </div>
+  <section class="install-sheet" id="install-sheet" hidden role="dialog" aria-modal="true" aria-labelledby="install-title">
+    <img src="guide-icon-180.png?v=1" alt="">
+    <h2 id="install-title">Add Guide to Home Screen</h2>
+    <p>The Guide gets its own icon and opens on its own, ready to read.</p>
+    <ol class="install-steps" id="install-steps">
+      <li>Tap <svg viewBox="0 0 16 20" aria-label="Share"><path d="M8 1v11M4.5 4.5 8 1l3.5 3.5M5 8H2v11h12V8h-3"/></svg> <b>Share</b> in Safari’s toolbar.</li>
+      <li>Choose <b>Add to Home Screen</b>.</li>
+    </ol>
+    <p class="install-other" id="install-other" hidden>Use your browser’s menu: <b>Install app</b> or <b>Add to Home screen</b>.</p>
+    <button type="button" class="install-go" id="install-go" hidden>Install</button>
+    <button type="button" class="install-close" id="install-close">Not Now</button>
+  </section>
+  <script src="guide.js?v=3"></script>
+</body>
+</html>

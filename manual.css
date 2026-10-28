@@ -1,0 +1,510 @@
+body.info-page {
+  background:radial-gradient(ellipse at 50% 28%,#3a2920,#110d0f 72%);
+}
+.manual-book {
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(185px,.38fr) minmax(0,1fr);
+  gap:3px;
+  width:min(1120px,calc(100% - 36px));
+  margin:calc(94px + env(safe-area-inset-top,0px)) auto 110px;
+  padding:13px;
+  border:1px solid #b49563;
+  border-radius:8px;
+  background:linear-gradient(110deg,#4b3226,#201817 48%,#65452d);
+  box-shadow:0 22px 44px #000c,0 0 0 5px #0c0909,inset 0 1px #f3dfb766,inset 0 -5px #0b090a;
+}
+.manual-leaf {min-width:0;padding:0 0 26px;border:1px solid #c5ad82;border-radius:0 4px 4px 0;background:repeating-linear-gradient(0deg,transparent 0 27px,#876b4510 28px,#876b4510 29px),linear-gradient(105deg,#cbb893 0,#f0e4cb 4%,#ecdfc4 100%);box-shadow:inset 10px 0 15px #70573833,inset 0 1px #fff9e8}
+body.info-page .manual-leaf .page {max-width:none;margin:0;padding:clamp(24px,4vw,50px) clamp(22px,5vw,66px) 44px;color:#443629;background:transparent}
+body.info-page .manual-leaf h1 {margin-bottom:9px;color:#473322;font:900 clamp(30px,5vw,54px)/1 Georgia,serif;letter-spacing:.09em;text-shadow:0 1px #fff0d2,0 2px #8c745233}
+body.info-page .manual-leaf h2 {margin-bottom:26px;color:#896b48;font:700 11px/1.5 'Courier New',monospace;letter-spacing:.24em}
+body.info-page .manual-leaf p,body.info-page .manual-leaf li {color:#4c4032}
+body.info-page .manual-leaf .thoughts-label,body.info-page .manual-leaf .section-label {color:#8d5837}
+body.info-page .manual-leaf .thoughts-body p {color:#4c4032}
+body.info-page .manual-leaf .divider {background:#a38b67;opacity:.5}
+body.info-page .manual-leaf .inline-link {color:#85512e;border-bottom-color:#ad8055}
+@media(max-width:700px) {
+  .manual-book {grid-template-columns:minmax(0,1fr);width:calc(100% - 24px);margin-top:calc(84px + env(safe-area-inset-top,0px));padding:8px}
+  .manual-leaf {border-radius:0 0 4px 4px}
+  body.info-page .manual-leaf .page {padding:26px 18px 32px}
+  body.info-page .manual-leaf h1 {font-size:32px}
+}
+
+/* The shelf manual opens as a book above the cabinet. */
+.manual-overlay {position:fixed;inset:0;z-index:20000;display:grid;place-items:center;padding:clamp(8px,3vw,34px);background:radial-gradient(ellipse at 50% 42%,#291e1bdc,#080809f5 75%);backdrop-filter:blur(5px);perspective:1800px;}
+.manual-overlay[hidden] {display:none}
+.manual-overlay .manual-open-book {animation:none}
+.manual-open-book {position:absolute;left:50%;top:50%;translate:-50% -50%;display:grid;grid-template-columns:minmax(0,1fr) 17px minmax(0,1fr);width:min(1320px,96vw);height:min(850px,88vh);min-height:min(520px,90vh);padding:13px;border:1px solid #c09b63;border-radius:9px;background:linear-gradient(90deg,#38271f,#765537 2%,#2d201b 3%,#261b18 50%,#765537 50.5%,#34231d 51%,#785538 98%,#261b19);box-shadow:0 30px 90px #000e,0 0 0 5px #100d0c,0 0 0 7px #735436,inset 0 2px #f6d9a166,inset 0 -8px #120d0d;transform-origin:50% 100%;animation:manual-lift-open .85s cubic-bezier(.18,.76,.22,1) both;}
+@keyframes manual-lift-open {from{opacity:0;translate:-50% calc(-50% + 100px);scale:.78;rotate:x 10deg}to{opacity:1;translate:-50% -50%;scale:1;rotate:x 0deg}}
+.manual-open-page {position:relative;min-width:0;min-height:0;overflow:hidden;color:#45382c;background:repeating-linear-gradient(0deg,transparent 0 27px,#705a3c0d 28px,#705a3c0d 29px),linear-gradient(100deg,#c9b58f,#f1e5ca 7%,#f2e7d0 88%,#d5c29e);box-shadow:inset 0 1px #fff9e8,inset 0 -2px #b29a71,0 4px 9px #09070799;}
+.manual-open-left {padding:clamp(24px,5vw,66px);border-radius:5px 0 0 5px;background:repeating-linear-gradient(0deg,transparent 0 31px,#725d4110 32px,#725d4110 33px),linear-gradient(90deg,#dfd0af,#f2e6cd 8%,#ecdfc4);box-shadow:inset 0 1px #fff9e8,inset -18px 0 24px #7b62402b,0 4px 9px #09070799;}
+.manual-open-right {border-radius:0 5px 5px 0;box-shadow:inset 17px 0 21px #735a3624,inset 0 1px #fff9e8,0 4px 9px #09070799;}
+.manual-open-spine {z-index:3;background:linear-gradient(90deg,#4a3528,#201715 42%,#a47b49 49%,#33221c 58%,#5c3e2b);box-shadow:-3px 0 7px #100b0baa,3px 0 8px #100b0baa;}
+.manual-paper-mark {color:#8c6c42;font:700 9px/1.5 'Courier New',monospace;letter-spacing:.17em}
+.manual-open-left h1 {margin:clamp(35px,8vh,90px) 0 22px;color:#513924;font:900 clamp(39px,7vw,82px)/.86 Georgia,serif;letter-spacing:.07em;text-shadow:0 1px #fff8e4,0 3px #8a704333}
+
+.manual-open-left h2 {margin:clamp(30px,6vh,66px) 0 18px;color:#8f653c;font:700 11px/1 'Courier New',monospace;letter-spacing:.25em}
+.manual-contents {display:grid;gap:17px;margin:0;padding:0;list-style:none;counter-reset:none}
+.manual-contents li {display:flex;gap:11px;align-items:baseline;padding-bottom:7px;border-bottom:1px solid #856c4b44;color:#544531;font:700 clamp(9px,1vw,12px)/1.4 'Courier New',monospace;letter-spacing:.08em}
+.manual-contents li span {color:#9a7044;font-size:10px}
+.manual-stamp {position:absolute;right:clamp(26px,5vw,62px);bottom:clamp(64px,11vh,110px);width:85px;height:85px;display:grid;place-content:center;border:2px double #a66345;border-radius:50%;transform:rotate(-12deg);color:#a66345;text-align:center;font:900 19px/.85 Georgia,serif;opacity:.76}
+.manual-stamp small {margin-top:5px;font:700 7px/1 'Courier New',monospace;letter-spacing:.1em}
+.manual-footnote {position:absolute;left:clamp(24px,5vw,66px);bottom:22px;color:#92754e;font:italic 11px Georgia,serif}
+.manual-page-number {height:36px;display:flex;justify-content:space-between;align-items:center;margin:0 clamp(18px,3vw,46px);border-bottom:1px solid #987b5344;color:#98764a;font:700 8px/1 'Courier New',monospace;letter-spacing:.13em}
+.manual-page-number b {font-size:10px}
+.manual-page-content {height:calc(100% - 36px);overflow:hidden;}
+.manual-page-content .page {max-width:none;margin:0;padding:clamp(24px,4vw,50px) clamp(20px,4vw,58px) 52px;color:#4c4032;background:transparent}
+.manual-page-content h1 {margin:0 0 9px;color:#473322;font:900 clamp(30px,4vw,50px)/1 Georgia,serif;letter-spacing:.08em;text-shadow:0 1px #fff0d2,0 2px #8c745233}
+.manual-page-content h2 {margin:0 0 24px;color:#896b48;font:700 10px/1.5 'Courier New',monospace;letter-spacing:.19em}
+.manual-page-content p,.manual-page-content li {color:#4c4032;font:15px/1.7 Georgia,serif}
+.manual-page-content section {margin-bottom:22px}
+.manual-page-content .section-label,.manual-page-content .thoughts-label {color:#8d5837;font:700 10px/1.5 'Courier New',monospace;letter-spacing:.16em}
+.manual-page-content .divider {height:1px;margin:19px 0;background:#a38b67;opacity:.55}
+.manual-page-content a {color:#85512e}
+.manual-page-turning .manual-open-right {animation:manual-page-turn .55s cubic-bezier(.4,.1,.2,1)}
+@keyframes manual-page-turn {0%{transform:rotateY(0);filter:brightness(1)}45%{transform:rotateY(-8deg);filter:brightness(.72)}100%{transform:rotateY(0);filter:brightness(1)}}
+.manual-turn,.manual-close {position:absolute;z-index:5;border:1px solid #ae8c5a;color:#f1dfbd;background:linear-gradient(#60432d,#30211c);box-shadow:0 3px 7px #000b,inset 0 1px #fff3d433;font:700 9px/1 'Courier New',monospace;letter-spacing:.08em;cursor:pointer}
+.manual-close {top:19px;right:20px;padding:8px 11px;border-radius:3px;color:#f0dabc}
+.manual-close span {margin-left:5px;color:#e2bd79;font:700 13px/1 Arial,sans-serif}
+.manual-turn {bottom:19px;display:flex;align-items:center;gap:7px;padding:9px 12px;border-radius:3px}
+.manual-turn small {font:700 7px/1 'Courier New',monospace;letter-spacing:.1em}
+.manual-turn-prev {left:28px}.manual-turn-next {right:28px}
+.manual-turn:disabled {opacity:.38;cursor:default}
+.manual-page-corner {position:absolute;right:0;bottom:0;width:34px;height:34px;background:linear-gradient(135deg,transparent 48%,#bda77d 50%,#f3e7cf 76%);filter:drop-shadow(-2px -2px 2px #604a2b55)}
+@media(max-width:700px) {
+  .manual-overlay {padding:7px}
+  .manual-open-book {grid-template-columns:1fr;grid-template-rows:minmax(100px,18%) 9px minmax(0,1fr);width:100%;height:min(94vh,900px);min-height:0;padding:8px;border-radius:7px}
+  .manual-open-left {padding:13px 18px 10px;border-radius:4px 4px 0 0;}
+  .manual-paper-mark {font-size:7px}
+  .manual-stamp,.manual-footnote {display:none}
+  .manual-open-left h2 {position:absolute;left:18px;top:31px;margin:0;font-size:8px}
+  .manual-contents {position:absolute;left:18px;right:28px;top:46px;grid-template-columns:1fr;gap:1px}
+  .manual-contents li {gap:7px;padding-bottom:0;border:0;font:italic 10px/1.35 Georgia,serif;white-space:nowrap}
+  .manual-contents li span {font:italic 10px/1.35 Georgia,serif}
+  .manual-open-spine {margin:0 -1px}
+  .manual-open-right {border-radius:0 0 4px 4px}
+  .manual-page-number {height:29px;margin:0 16px}
+  .manual-page-content {height:calc(100% - 29px)}
+  .manual-page-content .page {padding:21px 17px 48px}
+  .manual-page-content h1 {font-size:31px}
+  .manual-page-content p,.manual-page-content li {font-size:14px;line-height:1.6}
+  .manual-close {top:12px;right:12px;padding:6px 8px;font-size:8px}
+  .manual-turn {bottom:11px;padding:8px 10px}
+  .manual-turn-prev {left:14px}.manual-turn-next {right:14px}
+}
+@media(prefers-reduced-motion:reduce) {.manual-open-book,.manual-page-turning .manual-open-right {animation-duration:.01ms}}
+
+/* A printed field book uses paper, cloth and ink rather than cabinet lights. */
+.manual-overlay {background:rgba(12,12,10,.99);backdrop-filter:none}
+.manual-open-book {border-color:#444;border-radius:6px;background:repeating-linear-gradient(0deg,#ffffff06 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,#00000015 0 1px,transparent 1px 3px),#383838;box-shadow:0 30px 70px #000d,0 0 0 3px #252525,inset 0 1px #898989,inset 0 -5px #202020}
+.manual-open-book::before {content:"";position:absolute;inset:6px 9px;border:1px solid #b8b8b8;border-radius:3px;background:repeating-linear-gradient(0deg,#c5c5c5 0 1px,#e2e2e2 1px 3px);box-shadow:0 3px 3px #0008;pointer-events:none}
+.manual-open-page {color:#292a26;background:repeating-linear-gradient(112deg,#00000003 0 1px,transparent 1px 4px),radial-gradient(ellipse at 75% 15%,#f3f0e6,transparent 80%),linear-gradient(100deg,#c6c4b8,#e7e4d9 7%,#ebe8df 88%,#d6d3c7);box-shadow:inset 0 1px #fff,inset 0 -2px #aaa593,0 4px 9px #09090799}
+.manual-open-page::after {content:'';position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.72;background:radial-gradient(ellipse 43px 34px at 86% 16%,transparent 55%,#786c4b18 58% 62%,transparent 66%),radial-gradient(ellipse 31px 25px at 12% 83%,transparent 54%,#786c4b10 57% 61%,transparent 65%)}
+.manual-open-left {background:repeating-linear-gradient(72deg,#00000003 0 1px,transparent 1px 4px),radial-gradient(ellipse at 25% 15%,#f1eee4,transparent 80%),linear-gradient(90deg,#d4d1c5,#e9e6dc 8%,#e1ded2);box-shadow:inset 0 1px #fff,inset -18px 0 24px #45423816,0 4px 9px #09090799}
+.manual-open-spine {background:linear-gradient(90deg,#aba89b,#69675b 20%,#302f29 48%,#565449 70%,#b5b2a4);box-shadow:-4px 0 12px #23221b55,4px 0 12px #23221b55}
+.manual-paper-mark,.manual-open-left h2,.manual-page-number,.manual-page-number b {color:#66665d}
+.manual-open-left h1,.manual-page-content h1 {color:#292a26;text-shadow:0 1px #fff9e8,0 2px #34342d22}
+
+.manual-contents li {border-bottom-color:#5c5b5130;color:#393a35}
+.manual-contents li > span {display:flex;flex:1;align-items:baseline;gap:7px;min-width:0;white-space:nowrap}
+.manual-contents li > span i {flex:1;border-bottom:1px dotted #747267}
+.manual-contents li > b {font:700 10px/1 'Courier New',monospace;color:#464740}
+.manual-contents li > span i {display:block;min-width:18px}
+/* The print is black and white but the cover is not: the grey is put on the pages, not the whole book. The turning leaf and the cover
+   keep their 3D, so their faces carry it. */
+.manual-open-book > :not(.manual-flip):not(.manual-cover), .manual-flip-face, .manual-cover-back {filter:grayscale(1)}
+.manual-page-content {overflow:hidden;filter:grayscale(1)}
+.manual-page-content .manual-leaf-sheet {margin:0}
+.manual-page-content .manual-leaf-sheet h1 {margin:0 0 12px}
+.manual-page-content .manual-leaf-sheet h2 {margin:0 0 12px}
+.manual-page-content .manual-leaf-sheet p {margin:0 0 10px;line-height:1.55}
+.manual-page-content .manual-leaf-sheet table {margin:5px 0 9px}
+.manual-page-content .manual-leaf-sheet td {padding:4px 5px}
+body.info-page .manual-leaf {filter:grayscale(1)}
+.manual-contents li span,.manual-footnote,.manual-page-content h2,.manual-page-content .section-label,.manual-page-content .thoughts-label {color:#66665d}
+.manual-stamp {border-color:#68675e;color:#68675e}
+.manual-page-content {position:absolute;inset:36px 0 0;z-index:1;overflow:hidden}
+.manual-leaf-sheet {height:100%;overflow:hidden;padding:clamp(18px,3vw,40px) clamp(20px,4vw,58px) 44px;color:#33342f;background:transparent}
+.manual-leaf-sheet > section {margin:0 0 10px}
+.manual-leaf-sheet .divider {display:none}
+
+.manual-page-content img {filter:grayscale(1) contrast(.9)}
+.manual-page-content table {width:100%;border-collapse:collapse;margin:7px 0 12px;font:12px/1.4 'Courier New',monospace}
+.manual-page-content td {padding:5px 6px;border-bottom:1px solid #77766a55;color:#33342f}
+.manual-page-content kbd {padding:1px 4px;border:1px solid #77766a;border-radius:2px;background:#d6d3c5;color:#292a26;font:700 10px 'Courier New',monospace}
+.manual-page-content .studio-name,.manual-page-content .game-title {color:#292a26;font:900 17px/1.2 Georgia,serif}
+.manual-page-content .studio-dates,.manual-page-content .game-origin {margin:2px 0 7px;color:#66665d;font:700 9px/1.4 'Courier New',monospace;letter-spacing:.08em}
+.manual-page-content .manual-leaf-sheet *, .manual-page-content .manual-leaf-sheet *::before,.manual-page-content .manual-leaf-sheet *::after {text-shadow:none!important;box-shadow:none}
+.manual-measure {position:fixed!important;left:-200vw!important;top:0!important;inset:auto!important;overflow:hidden!important;pointer-events:none!important}
+.manual-page-content p,.manual-page-content li {color:#33342f;font-size:16px;line-height:1.6;hyphens:auto;overflow-wrap:break-word}
+
+/* Chapter furniture follows a printed field guide's hierarchy. */
+.manual-open-left h2 {font:700 12px/1 Georgia,serif;letter-spacing:.2em;color:#55564e}
+.manual-contents li,.manual-contents li span {font:italic 12px/1.4 Georgia,serif;letter-spacing:0;color:#3f403a}
+.manual-contents li > b {font:10px/1 Georgia,serif;color:#464740}
+.manual-page-content .manual-chapter-number {margin:0 0 8px;font:italic 700 11px/1.2 Georgia,serif;letter-spacing:.2em;color:#66665d}
+.manual-page-content .manual-subchapter-title {margin:0 0 5px;font:700 clamp(22px,2.7vw,32px)/1.1 Georgia,serif;letter-spacing:0;color:#292a26}
+.manual-page-content .manual-chapter-deck {margin:0 0 20px;font:italic 14px/1.5 Georgia,serif;color:#66665d}
+.manual-page-content h3 {margin:18px 0 9px;font:700 18px/1.2 Georgia,serif;letter-spacing:0;color:#33342f}
+.manual-page-content .section-label,.manual-page-content .thoughts-label,.manual-page-content .impl-label {margin:16px 0 8px;font:italic 700 15px/1.3 Georgia,serif;letter-spacing:0;color:#41423c}
+
+.manual-footnote {font:italic 11px/1.4 Georgia,serif}
+.manual-footnote::first-letter {font-size:9px}
+@media(max-width:700px) {
+  .manual-open-left h2 {left:18px;top:31px;font-size:8px}
+  .manual-contents {left:18px;right:28px;top:46px}
+  .manual-contents li,.manual-contents li span {font-size:9px}
+  .manual-contents li > b {font-size:8px}
+  .manual-page-content .manual-subchapter-title {font-size:24px}
+  .manual-page-content p,.manual-page-content li {font-size:14px;line-height:1.55}
+}
+.manual-page-content .divider {background:#77766a}
+.manual-page-content a {color:#45463f;text-decoration-thickness:1px}
+.manual-turn,.manual-close {border-color:#77766b;color:#292a26;background:linear-gradient(#d3d0c2,#aaa797);box-shadow:0 3px 7px #0007,inset 0 1px #fff9}
+.manual-turn {width:42px;height:56px;justify-content:center;padding:0;border:0;background:transparent;box-shadow:none;color:transparent;font-size:0}
+.manual-turn::before {content:'';width:25px;height:31px;border:1px solid #77766b;background:linear-gradient(135deg,#e8e4d5 0 69%,#aaa797 71%);box-shadow:-2px -2px 4px #36363022;transform:rotate(-8deg);transition:transform .2s}
+.manual-turn-next::before {transform:rotate(8deg) scaleX(-1)}
+.manual-turn:hover::before,.manual-turn:focus-visible::before {transform:translateY(-3px) rotate(-12deg)}
+.manual-turn-next:hover::before,.manual-turn-next:focus-visible::before {transform:translateY(-3px) rotate(12deg) scaleX(-1)}
+.manual-turn:disabled::before {opacity:.25}
+.manual-turn small {display:none}
+.manual-close span {color:#363731}
+.manual-close {top:14px;right:12px;width:37px;height:30px;padding:0;border-radius:2px 7px 7px 2px;font-size:0}
+.manual-close span {position:absolute;inset:7px 9px;border:1px solid #5c5c53;border-radius:2px;box-shadow:inset 0 1px #fff9,1px 1px #77766a}
+.manual-page-corner {background:linear-gradient(135deg,transparent 48%,#aaa794 50%,#e7e2d2 76%)}
+.manual-book {border-color:#77766a;background:linear-gradient(110deg,#55554d,#282924 48%,#66655a);box-shadow:0 22px 44px #000c,0 0 0 5px #191a17,inset 0 1px #e1decc66,inset 0 -5px #10110f}
+.manual-leaf {background:repeating-linear-gradient(0deg,transparent 0 27px,#3c3b330b 28px,#3c3b330b 29px),linear-gradient(100deg,#c7c4b4,#e3dfce 7%,#e8e4d5 88%,#c9c5b5);box-shadow:inset 10px 0 15px #45423818,inset 0 1px #fff}
+body.info-page .manual-leaf h1 {color:#292a26;text-shadow:0 1px #fff9e8,0 2px #34342d22}
+body.info-page .manual-leaf h2,body.info-page .manual-leaf .thoughts-label,body.info-page .manual-leaf .section-label {color:#66665d}
+body.info-page .manual-leaf p,body.info-page .manual-leaf li,body.info-page .manual-leaf .thoughts-body p {color:#33342f}
+body.info-page .manual-leaf .divider {background:#77766a}
+body.info-page .manual-leaf .inline-link {color:#45463f;border-bottom-color:#77766a}
+body.info-page .manual-book {position:fixed;z-index:5000;left:50%;top:50%;width:min(1320px,96vw);height:min(850px,88vh);min-height:min(520px,88vh);margin:0;padding:13px;transform:translate(-50%,-50%);overflow:hidden}
+body.info-page {background:#242520}
+body.info-page .blip-logo,body.info-page .top-marquee-bar,body.info-page #kiosk-insert-btn,body.info-page #kiosk-bar {display:none!important}
+body.info-page .manual-leaf {min-height:0;overflow:hidden}
+body.info-page {overflow:hidden}
+body.info-page .manual-leaf .page {height:100%;overflow:hidden}
+body.info-page .manual-leaf .page img {filter:grayscale(1) contrast(.9)}
+@media(max-width:700px) {.manual-page-content {top:29px;height:auto;bottom:0}}
+@media(max-width:700px) {
+  .manual-open-book {grid-template-rows:minmax(100px,18%) 9px minmax(0,1fr)}
+  .manual-open-page::after {opacity:.6}
+  .manual-open-left h1 {color:#292a26}
+  body.info-page .manual-book {grid-template-columns:minmax(0,1fr);grid-template-rows:105px minmax(0,1fr);width:calc(100% - 14px);height:94vh;min-height:0;padding:8px}
+  body.info-page .manual-leaf {border-radius:0 0 4px 4px}
+}
+
+/* Printed entries turn to leaves; the narrow book shows one leaf at a time. */
+.manual-open-left h2 {margin:28px 0 14px;font-size:16px;letter-spacing:.12em}
+.manual-contents {position:static;display:grid;gap:1px;list-style:none;margin:0;padding:0}
+.manual-contents li {display:block;padding:0;border:0}
+.manual-contents button {display:flex;align-items:baseline;gap:10px;width:100%;min-height:30px;padding:5px 0;border:0;background:none;box-shadow:none;color:#393a35;cursor:pointer;text-align:left;font:14px/1.4 Georgia,serif;}
+.manual-contents button > span {display:flex;align-items:baseline;gap:8px;flex:1;min-width:0;color:inherit;font:inherit;white-space:nowrap}
+.manual-contents button i {flex:1;min-width:12px;border-bottom:1px dotted #77766b}
+.manual-contents button b {flex:none;color:inherit;font:12px/1.4 Georgia,serif;font-variant-numeric:tabular-nums}
+.manual-contents button:hover > span,.manual-contents button[aria-current] > span {text-decoration:underline;text-underline-offset:3px}
+.manual-contents button:focus-visible {outline:1px dashed #66665d;outline-offset:2px}
+.manual-contents button:disabled {cursor:default;opacity:.6}
+.manual-game-index-title {margin:22px 0 8px;font:italic 16px/1.3 Georgia,serif;color:#55564e}
+.manual-game-contents button {font-size:14px;min-height:32px}
+.manual-stamp {top:22px;right:24px;bottom:auto;width:52px;height:52px;font-size:13px;opacity:.3}
+.manual-contents-tab {display:none;position:absolute;left:24px;top:-8px;z-index:5;padding:7px 12px;border:1px solid #6a6a60;border-radius:2px 2px 4px 4px;background:linear-gradient(#c7c4b6,#979589);color:#292a26;box-shadow:0 3px 5px #0006;font:italic 12px/1 Georgia,serif;cursor:pointer}
+.manual-game-notes h3 {margin-top:0}
+.manual-game-notes td:first-child {width:42%;font-weight:700}
+.manual-page-number {margin-right:56px}
+@media(max-width:700px) {
+  .manual-open-book {grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+  .manual-open-spine {display:none}
+  .manual-open-left,.manual-open-right {grid-area:1/1;border-radius:4px}
+  .manual-open-left {display:none;padding:24px;z-index:2}
+  .manual-open-book[data-show-contents] .manual-open-left {display:block}
+  .manual-open-book[data-show-contents] .manual-open-right {visibility:hidden}
+  .manual-open-book[data-show-contents] .manual-turn {visibility:hidden}
+  .manual-open-left h2 {position:static;margin:28px 0 14px;font-size:18px}
+  .manual-paper-mark {max-width:calc(100% - 30px);font-size:8px;letter-spacing:.08em}
+  .manual-game-index-title {margin-top:20px}
+  .manual-contents-tab {display:block}
+  .manual-page-number {height:52px;margin:0 56px 0 18px;align-items:flex-end;padding-bottom:8px}
+  .manual-page-content {inset:52px 0 0;height:auto}
+  .manual-footnote {left:24px;bottom:24px;font-size:10px}
+  .manual-stamp {top:auto;bottom:48px;right:25px}
+}
+@media(max-height:520px) {
+  .manual-open-left {padding:20px 24px}
+  .manual-open-left h2 {margin:12px 0 8px;font-size:14px}
+  .manual-game-index-title {margin:12px 0 5px;font-size:13px}
+  .manual-game-contents {grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:16px}
+  .manual-contents button,.manual-game-contents button {min-height:24px;padding:3px 0;font-size:11px}
+  .manual-contents button b {font-size:10px}
+  .manual-stamp,.manual-footnote {display:none}
+  .manual-page-content .page {padding:18px 24px 38px}
+  .manual-page-content p,.manual-page-content li {font-size:14px;line-height:1.45}
+  .manual-page-content .manual-subchapter-title {font-size:24px}
+}
+
+/* Cloth tabs sit beyond the paper; neither obscures the running head. */
+.manual-contents-tab,.manual-close {top:-8px;height:28px;padding:6px 10px;border:1px solid #33342d;border-bottom-width:3px;border-radius:1px 1px 4px 4px;background:repeating-linear-gradient(90deg,#ffffff09 0 1px,transparent 1px 3px),#55554b;color:#f0eee4;box-shadow:0 3px 4px #0006;font:italic 12px/1 Georgia,serif}
+.manual-close {right:22px;width:auto;min-width:138px;white-space:nowrap}
+.manual-close span {position:static;inset:auto;border:0;border-radius:0;box-shadow:none;color:inherit;font:inherit}
+.manual-contents-tab:focus-visible,.manual-close:focus-visible {outline:1px dashed #bbb8ad;outline-offset:3px}
+.manual-open-page::after {opacity:.45}
+.manual-page-content h1,.manual-page-content h2,.manual-page-content h3 {text-wrap:balance}
+.manual-back-contents {margin-top:20px;padding-top:12px;border-top:1px solid #77766b55}
+.manual-page-content .manual-first-edition {font:11px/1.4 'Courier New',monospace;letter-spacing:.08em;margin-bottom:20px}
+.manual-page-content .manual-first-edition + h2 {font:700 32px/1.1 Georgia,serif;letter-spacing:0;color:#292a26;margin-bottom:12px}
+.manual-page-content .manual-first-intro {font-style:italic}
+.manual-first-steps {margin:18px 0;padding:0}
+.manual-first-step {margin-bottom:14px}
+.manual-first-steps h3 {margin:0 0 5px}
+@media(max-height:520px) {.manual-back-contents {margin-top:8px;padding-top:6px}}
+@media(max-height:360px) {
+  .manual-open-left {padding:12px 18px}
+  .manual-open-left h2 {margin:8px 0 6px;font-size:12px}
+  .manual-game-index-title {margin:8px 0 4px;font-size:11px}
+  .manual-contents button,.manual-game-contents button {min-height:22px;padding:2px 0;font-size:10px}
+}
+
+/* ---- The open book: contents inside the front cover, then a leaf on each side ---- */
+.manual-open-book {perspective:2600px;perspective-origin:50% 38%}
+.manual-open-left {padding:0}
+.manual-left-contents {position:absolute;inset:0;display:none;padding:clamp(24px,5vw,66px);overflow:hidden}
+.manual-open-left[data-face="contents"] .manual-left-contents {display:block}
+.manual-open-left[data-face="contents"] :is(.manual-left-head,.manual-left-content,.manual-folio) {display:none}
+.manual-left-head {margin:0 clamp(18px,3vw,46px)}
+.manual-left-content {z-index:1}
+.manual-folio {position:absolute;z-index:2;bottom:15px;color:#66665d;font:italic 12px/1 Georgia,serif;font-variant-numeric:oldstyle-nums}
+#manual-left-folio,#manual-right-folio {left:0;right:0;text-align:center}
+/* The page block is thicker on the side that has more of it: the stacks follow the reader. */
+.manual-open-left::before,.manual-open-right::before {content:'';position:absolute;z-index:4;top:3px;bottom:3px;pointer-events:none;background:repeating-linear-gradient(90deg,#77766b 0 1px,#e4e1d3 1px 2px)}
+.manual-open-left::before {left:0;width:calc(2px + var(--read,0) * 8px)}
+.manual-open-right::before {right:0;width:calc(2px + (1 - var(--read,0)) * 8px)}
+.manual-open-left[data-face="contents"]::before {width:2px}
+/* A leaf turning about the spine, over the page it lands on. */
+.manual-flip {z-index:6;transform-style:preserve-3d;pointer-events:none;will-change:transform}
+.manual-flip-face {position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 0 18px #0006}
+.manual-flip-back {transform:rotateY(180deg)}
+.manual-flip-shade {position:absolute;inset:0;z-index:9;opacity:0;pointer-events:none;background:linear-gradient(90deg,#000a,#0002 55%,#0000)}
+.manual-flip-back .manual-flip-shade {background:linear-gradient(270deg,#000a,#0002 55%,#0000)}
+.manual-flip-cover {z-index:5;pointer-events:none}
+.manual-page-turning .manual-open-right {animation:none}
+/* The notes pages: ruled, with a few words in pencil. */
+.manual-notes {position:relative;min-height:calc(100% - 8px);margin-top:4px;background:repeating-linear-gradient(0deg,transparent 0 33px,#77766a55 33px 34px)}
+.manual-notes p {margin:0 0 24px!important;color:#77766b!important;font:700 10px/1 'Courier New',monospace!important;letter-spacing:.3em}
+.manual-notes q {position:absolute;left:8%;top:76px;max-width:84%;transform:rotate(-1.4deg);color:#44453f;opacity:.62;quotes:none;font:italic 19px/1.6 'Bradley Hand','Segoe Print','Chalkboard SE','Comic Sans MS',cursive}
+/* A game: its screen in black and white on the left page, its controls on the right. */
+.manual-figure {margin:2px 0 16px;text-align:center}
+.manual-figure img {display:block;max-width:100%;max-height:min(320px,38vh);width:auto;height:auto;margin:0 auto;padding:5px;border:1px solid #55564e;background:#ecead9;image-rendering:pixelated;filter:grayscale(1) contrast(1.3) brightness(1.05)!important;box-shadow:0 1px 3px #0004}
+.manual-figure figcaption {margin-top:7px;color:#55564e;font:italic 12px/1.4 Georgia,serif}
+.manual-game-blurb::first-letter {float:left;padding:3px 7px 0 0;font:700 2.7em/.8 Georgia,serif;color:#292a26}
+.manual-controls-title {margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #77766a;color:#41423c;font:italic 700 16px/1.3 Georgia,serif}
+@media(max-width:700px) {
+  .manual-open-left::before,.manual-open-right::before {display:none}
+  .manual-open-left {padding:0}
+  .manual-left-contents {padding:24px}
+  .manual-open-book[data-show-contents] .manual-left-contents {display:block}
+  .manual-open-book[data-show-contents] :is(.manual-left-head,.manual-left-content,.manual-folio) {display:none}
+  .manual-folio {display:none}
+  .manual-figure img {max-height:min(220px,30vh)}
+}
+.manual-tip {margin-top:30px;padding-top:16px;border-top:1px dashed #77766a}
+.manual-tip p {margin:0 0 8px!important;color:#77766b!important;font:700 9px/1 'Courier New',monospace!important;letter-spacing:.25em}
+.manual-tip q {display:block;transform:rotate(-.8deg);color:#44453f;opacity:.7;quotes:none;font:italic 19px/1.55 'Bradley Hand','Segoe Print','Chalkboard SE','Comic Sans MS',cursive}
+/* The Contents tab takes a reader back to the front cover, so it is not shown there. */
+.manual-contents-tab {display:block}
+@media(min-width:701px) {.manual-open-book:has(.manual-open-left[data-face="contents"]) .manual-contents-tab {visibility:hidden}}
+
+/* Handled, not stained: the thumbed corners and yellowed edges stay, and each spread carries its own few smudges. */
+.manual-open-page::after {background:none}
+.manual-open-book::after {content:'';position:absolute;inset:13px;z-index:5;pointer-events:none;
+  background:
+    radial-gradient(ellipse 34px 46px at 3% 95%,#3c3c3624,#3c3c3600),
+    radial-gradient(ellipse 30px 40px at 97% 94%,#3c3c3620,#3c3c3600),
+    linear-gradient(90deg,#3a3a3a29,#3a3a3a00 5%,#3a3a3a00 95%,#3a3a3a29),
+    var(--smudges,linear-gradient(#0000,#0000))}
+.manual-open-book[data-smudge="0"] {--smudges:radial-gradient(ellipse 30px 17px at 18% 38%,#37372f20,#37372f00),radial-gradient(ellipse 20px 12px at 21% 40%,#37372f18,#37372f00),radial-gradient(ellipse 22px 13px at 72% 64%,#37372f1c,#37372f00),radial-gradient(ellipse 16px 24px at 91% 30%,#37372f18,#37372f00)}
+.manual-open-book[data-smudge="1"] {--smudges:radial-gradient(ellipse 26px 15px at 38% 72%,#37372f20,#37372f00),radial-gradient(ellipse 36px 12px at 66% 22%,#37372f1a,#37372f00),radial-gradient(ellipse 14px 20px at 8% 52%,#37372f1c,#37372f00)}
+.manual-open-book[data-smudge="2"] {--smudges:radial-gradient(ellipse 28px 16px at 29% 18%,#37372f1c,#37372f00),radial-gradient(ellipse 20px 28px at 80% 78%,#37372f20,#37372f00),radial-gradient(ellipse 24px 12px at 56% 48%,#37372f16,#37372f00)}
+.manual-open-book[data-smudge="3"] {--smudges:radial-gradient(ellipse 20px 12px at 12% 70%,#37372f18,#37372f00)}
+
+/* The note: a card taped near the foot of the notes page, in ballpoint, signed. The fonts are Caveat and
+   Mrs Saint Delafield, both under the SIL Open Font License (fonts-OFL.txt). */
+@font-face {font-family:'Caveat';src:url(caveat.woff2) format('woff2');font-display:swap}
+@font-face {font-family:'Mrs Saint Delafield';src:url(mrs-saint-delafield.woff2) format('woff2');font-display:swap}
+.manual-note-card {position:absolute;left:6%;right:6%;bottom:36px;margin:0;padding:34px 30px 22px;transform:rotate(-1deg);color:#14192b;
+  background:repeating-linear-gradient(0deg,transparent 0 33px,#14192b1c 33px 34px) 0 12px,linear-gradient(170deg,#f6f4ea,#e9e6d7);
+  box-shadow:0 1px 2px #0005,0 9px 16px #0003,inset 0 0 22px #8b87731f}
+.manual-note-card::before,.manual-note-card::after {content:'';position:absolute;top:-13px;width:84px;height:26px;background:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2080%2026'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0%200%20L5%203%20L0%206%20L5%209%20L0%2012%20L5%2015%20L0%2018%20L5%2021%20L0%2026%20L80%2026%20L75%2022%20L80%2018%20L75%2014%20L80%2010%20L75%206%20L80%200%20Z'%20fill='%23e4e1d2'%20fill-opacity='.8'/%3E%3C/svg%3E") center / 100% 100% no-repeat;filter:drop-shadow(0 1px 1px #0003)}
+.manual-note-card::before {left:-18px;transform:rotate(-34deg)}
+.manual-note-card::after {right:-18px;transform:rotate(31deg) scaleX(-1)}
+.manual-doodle {position:absolute;top:12px;right:30px;width:34px;height:27px;transform:rotate(7deg);background:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='-0.5%20-0.5%2012%209'%20fill='%2338392f'%20fill-opacity='.55'%3E%3Crect%20x='2'%20y='0'%20width='1'%20height='1'/%3E%3Crect%20x='8'%20y='0'%20width='1'%20height='1'/%3E%3Crect%20x='3'%20y='1'%20width='1'%20height='1'/%3E%3Crect%20x='7'%20y='1'%20width='1'%20height='1'/%3E%3Crect%20x='2'%20y='2'%20width='1'%20height='1'/%3E%3Crect%20x='3'%20y='2'%20width='1'%20height='1'/%3E%3Crect%20x='4'%20y='2'%20width='1'%20height='1'/%3E%3Crect%20x='5'%20y='2'%20width='1'%20height='1'/%3E%3Crect%20x='6'%20y='2'%20width='1'%20height='1'/%3E%3Crect%20x='7'%20y='2'%20width='1'%20height='1'/%3E%3Crect%20x='8'%20y='2'%20width='1'%20height='1'/%3E%3Crect%20x='1'%20y='3'%20width='1'%20height='1'/%3E%3Crect%20x='2'%20y='3'%20width='1'%20height='1'/%3E%3Crect%20x='4'%20y='3'%20width='1'%20height='1'/%3E%3Crect%20x='5'%20y='3'%20width='1'%20height='1'/%3E%3Crect%20x='6'%20y='3'%20width='1'%20height='1'/%3E%3Crect%20x='8'%20y='3'%20width='1'%20height='1'/%3E%3Crect%20x='9'%20y='3'%20width='1'%20height='1'/%3E%3Crect%20x='0'%20y='4'%20width='1'%20height='1'/%3E%3Crect%20x='1'%20y='4'%20width='1'%20height='1'/%3E%3Crect%20x='2'%20y='4'%20width='1'%20height='1'/%3E%3Crect%20x='3'%20y='4'%20width='1'%20height='1'/%3E%3Crect%20x='4'%20y='4'%20width='1'%20height='1'/%3E%3Crect%20x='5'%20y='4'%20width='1'%20height='1'/%3E%3Crect%20x='6'%20y='4'%20width='1'%20height='1'/%3E%3Crect%20x='7'%20y='4'%20width='1'%20height='1'/%3E%3Crect%20x='8'%20y='4'%20width='1'%20height='1'/%3E%3Crect%20x='9'%20y='4'%20width='1'%20height='1'/%3E%3Crect%20x='10'%20y='4'%20width='1'%20height='1'/%3E%3Crect%20x='0'%20y='5'%20width='1'%20height='1'/%3E%3Crect%20x='2'%20y='5'%20width='1'%20height='1'/%3E%3Crect%20x='3'%20y='5'%20width='1'%20height='1'/%3E%3Crect%20x='4'%20y='5'%20width='1'%20height='1'/%3E%3Crect%20x='5'%20y='5'%20width='1'%20height='1'/%3E%3Crect%20x='6'%20y='5'%20width='1'%20height='1'/%3E%3Crect%20x='7'%20y='5'%20width='1'%20height='1'/%3E%3Crect%20x='8'%20y='5'%20width='1'%20height='1'/%3E%3Crect%20x='10'%20y='5'%20width='1'%20height='1'/%3E%3Crect%20x='0'%20y='6'%20width='1'%20height='1'/%3E%3Crect%20x='2'%20y='6'%20width='1'%20height='1'/%3E%3Crect%20x='8'%20y='6'%20width='1'%20height='1'/%3E%3Crect%20x='10'%20y='6'%20width='1'%20height='1'/%3E%3Crect%20x='3'%20y='7'%20width='1'%20height='1'/%3E%3Crect%20x='4'%20y='7'%20width='1'%20height='1'/%3E%3Crect%20x='6'%20y='7'%20width='1'%20height='1'/%3E%3Crect%20x='7'%20y='7'%20width='1'%20height='1'/%3E%3C/svg%3E") center / contain no-repeat}
+.manual-note-body,.manual-note-regards {font:500 25px/34px 'Caveat','Bradley Hand','Segoe Print',cursive;letter-spacing:.01em}
+.manual-note-body span,.manual-note-regards span {display:inline-block;transform:translateY(var(--dy)) rotate(var(--r));opacity:var(--o)}
+.manual-note-regards {margin-top:22px}
+.manual-signature {position:relative;display:block;width:max-content;margin:14px 0 0 24%;padding:4px 14px 12px 6px;transform:rotate(-4deg);transform-origin:left bottom;white-space:nowrap;
+  font:400 58px/50px 'Mrs Saint Delafield','Segoe Script','Brush Script MT',cursive;color:#12172a;opacity:.92}
+.manual-signature::after {content:'';position:absolute;left:0;right:-4%;bottom:-4px;height:20px;background:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20260%2034'%20preserveAspectRatio='none'%3E%3Cpath%20d='M4%2024%20C46%206%20104%203%20160%2011%20C198%2016%20232%2012%20256%205'%20fill='none'%20stroke='%2314192b'%20stroke-opacity='.85'%20stroke-width='2.6'%20stroke-linecap='round'/%3E%3Cpath%20d='M60%2029%20C112%2019%20178%2019%20228%2024'%20fill='none'%20stroke='%2314192b'%20stroke-opacity='.55'%20stroke-width='1.4'%20stroke-linecap='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat}
+.manual-heart {position:absolute;right:28px;bottom:26px;width:32px;height:29px;transform:rotate(8deg);background:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%2036'%3E%3Cpath%20d='M20%2031%20C6%2021%203%2014%206%208.5%20C9.5%203%2017%204%2020%2010%20C23%203.5%2031%203%2034%208.5%20C37%2014.5%2033%2021.5%2020%2031%20Z'%20fill='none'%20stroke='%2314192b'%20stroke-opacity='.8'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3Cpath%20d='M8%2011%20C9%208%2012%207%2014%208'%20fill='none'%20stroke='%2314192b'%20stroke-opacity='.5'%20stroke-width='1.3'%20stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat}
+
+/* The operators: the last page. A roster of six cards and a notice; its type is sized to fit the page. */
+.manual-operators {font-size:16px}
+.manual-operators[data-compact] :is(.manual-operators-intro,.operator-role) {display:none}
+.manual-page-content .manual-operators .manual-operators-title {margin:0 0 .3em;padding-bottom:.25em;border-bottom:3px double #55564e;color:#292a26;font:900 1.9em/1.1 Georgia,serif;letter-spacing:0}
+.manual-page-content .manual-operators .manual-operators-intro {margin:0 0 .5em;color:#55564e;font:italic .92em/1.4 Georgia,serif}
+.manual-page-content .manual-operators table.operators {width:calc(100% + 1.1em);margin:0 -.55em;border-collapse:separate;border-spacing:.55em;font:inherit}
+.manual-page-content .manual-operators td.operator {width:50%;padding:.55em .65em .6em;vertical-align:top;border:1px solid #77766a;background:linear-gradient(170deg,#f4f2e8,#e6e3d4);box-shadow:1px 2px 0 #0002}
+.manual-operators .operator-photo {float:left;width:3.3em;height:3.3em;margin:0 .6em .25em 0;padding:2px;border:1px solid #55564e;background:#ecead9;object-fit:cover}
+.manual-operators .operator-name {display:block;color:#292a26;font:700 1.02em/1.25 Georgia,serif}
+.manual-operators .operator-role {display:block;margin:.15em 0 .35em;color:#66665d;font:700 .6em/1.35 'Courier New',monospace;letter-spacing:.12em;text-transform:uppercase}
+.manual-operators .operator-job {display:block;clear:left;color:#3a3b35;font:italic .8em/1.35 Georgia,serif}
+.manual-page-content .manual-operators td.operator-you {border-style:dashed;border-color:#55564e;background:transparent;box-shadow:none}
+.manual-operators .operator-photo-you {display:grid;place-items:center;box-sizing:border-box;border:2px dashed #55564e;border-radius:50%;background:none}
+.manual-operators .operator-photo-you::after {content:'?';color:#34352f;font:500 2.1em/1 'Caveat','Bradley Hand',cursive}
+.manual-operators .operator-you .operator-name {font:600 1.55em/1 'Caveat','Bradley Hand',cursive;color:#14192b}
+.manual-operators .operator-you .operator-job {color:#14192b;font:500 1.15em/1.15 'Caveat','Bradley Hand',cursive}
+.manual-page-content .manual-operators .operators-pitch {margin:.7em 0 0;padding:.75em 1em .7em;border:3px double #3f403a;background:#efede2;transform:rotate(-.5deg)}
+.manual-page-content .manual-operators .operators-pitch p {margin:0;color:#33342f;font:.88em/1.42 Georgia,serif}
+.manual-page-content .manual-operators .operators-pitch .operators-pitch-title {margin:0 0 .4em;color:#292a26;font:700 .72em/1 'Courier New',monospace;letter-spacing:.38em;text-align:center}
+
+/* The book stays inside the safe area: clear of a notch or island, the status bar and the home bar. */
+.manual-open-book {
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);--safe-r:env(safe-area-inset-right,0px);
+  top:calc(50% + (var(--safe-t) - var(--safe-b)) / 2);
+  left:calc(50% + (var(--safe-l) - var(--safe-r)) / 2);
+  width:min(1320px,96vw,calc(100vw - var(--safe-l) - var(--safe-r) - 14px));
+  height:min(850px,88vh,calc(100dvh - var(--safe-t) - var(--safe-b) - 40px));
+}
+@media(max-width:700px) {
+  .manual-open-book {width:calc(100vw - var(--safe-l) - var(--safe-r) - 14px);height:min(900px,calc(100dvh - var(--safe-t) - var(--safe-b) - 40px))}
+}
+
+/* One narrow page: the signature is scaled to the card's width. */
+@media (max-width:700px) {
+  .manual-signature {margin-left:2%;font-size:44px;line-height:40px}
+}
+
+/* The landing page darkens a little under the turning leaf. */
+.manual-flip-cast {position:absolute;inset:0;z-index:8;opacity:0;pointer-events:none}
+.manual-flip-cast-left {background:linear-gradient(270deg,#000b,#0003 45%,#0000)}
+.manual-flip-cast-right {background:linear-gradient(90deg,#000b,#0003 45%,#0000)}
+
+/* A leaf with its outer corner torn away at the foot: the leaf beneath shows, darker, past a ragged edge. Only the margin is lost. */
+.manual-tear {display:none;position:absolute;bottom:0;z-index:4;width:clamp(56px,17%,118px);height:clamp(64px,12%,104px);pointer-events:none;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23a9a79c'/%3E%3Cstop offset='.5' stop-color='%23c9c7bb'/%3E%3Cstop offset='1' stop-color='%23d8d6ca'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M100 0 92 9 88 14 80 16 74 27 69 30 61 38 55 37 47 50 40 57 33 56 24 69 17 73 10 86 4 88 0 100H100Z' fill='url(%23g)'/%3E%3Cpath d='M100 0 92 9 88 14 80 16 74 27 69 30 61 38 55 37 47 50 40 57 33 56 24 69 17 73 10 86 4 88 0 100' fill='none' stroke='%23000' stroke-opacity='.28' stroke-width='3.5' vector-effect='non-scaling-stroke' transform='translate(1.5 1.5)'/%3E%3Cpath d='M100 0 92 9 88 14 80 16 74 27 69 30 61 38 55 37 47 50 40 57 33 56 24 69 17 73 10 86 4 88 0 100' fill='none' stroke='%23fbfaf3' stroke-width='1.6' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat}
+[data-torn="br"] > .manual-tear {display:block;right:0}
+[data-torn="bl"] > .manual-tear {display:block;left:0;transform:scaleX(-1)}
+
+/* The cover of the opening book: the closed book in front, the left-hand page inside. */
+.manual-cover-face {position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 0 22px #0007}
+.manual-cover-back {transform:rotateY(180deg)}
+
+.manual-cover-book {position:absolute!important;inset:0;width:100%!important;height:100%!important;margin:0!important;transform:none!important;font-size:30px!important;box-shadow:none!important}
+.manual-cover-book .manual-book-copy strong {font-size:inherit}
+
+/* No icons in the lower corners: the leaves turn by the arrow keys, a swipe, the contents, or a press on the corner itself. */
+.manual-turn::before {display:none}
+.manual-turn {cursor:pointer}
+.manual-turn:disabled {cursor:default}
+.manual-turn:focus-visible {outline:1px dotted #77766b;outline-offset:-6px}
+
+/* ---- The BASIC book's edition ----
+   The manual is printed as a companion to the BLIP BASIC programming book: the same tan cloth, cream paper,
+   navy sans headings over red eyebrows, Georgia text, Courier tables and dark pill tabs. */
+.manual-overlay {
+  --paper:#f4ebd4;--ink:#26241f;--ink-soft:#5f5848;--red:#8f3a2e;--blue:#2f4a66;--head:#1f2a36;
+  --display:"Helvetica Neue",Arial,sans-serif;
+  --cloth:repeating-linear-gradient(0deg,#ffffff0d 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,#0000000f 0 1px,transparent 1px 3px);
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .36 0 0 0 0 .28 0 0 0 0 .16 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background:radial-gradient(ellipse 75% 65% at 50% 40%,#4b4337 0,#2b261f 55%,#141210 100%) #1c1915;
+}
+.manual-open-book > :not(.manual-flip):not(.manual-cover),.manual-flip-face,.manual-cover-back,.manual-page-content,
+.manual-page-content img,.manual-figure img,body.info-page .manual-leaf {filter:none!important}
+.manual-open-book {border:0;border-radius:7px;background:var(--cloth),linear-gradient(90deg,#8d7448,#c4a86f 3%,#d2b77e 50%,#c4a86f 97%,#8d7448);
+  box-shadow:0 34px 44px -18px #000d,0 10px 18px #0007,inset 0 0 0 1px #5d4a2c,inset 2px 2px 3px #fff3d455}
+.manual-open-book::before {border:0;background:repeating-linear-gradient(0deg,#f7efda 0 1px,#cdbf9a 1px 2px);box-shadow:0 1px 2px #0004}
+.manual-open-book::after {background:none}
+.manual-open-page,.manual-open-left {color:var(--ink);background:var(--grain),radial-gradient(ellipse at 60% 8%,#fffaea80,transparent 50%),var(--paper);box-shadow:none}
+.manual-open-left {box-shadow:inset -1px 0 #9d8c6488}
+.manual-open-left::after {content:'';position:absolute;inset:0;z-index:3;pointer-events:none;background:linear-gradient(270deg,#3b2a1050 0,#3b2a1018 3%,#3b2a1000 10%),linear-gradient(90deg,#4b3a1a1c,#0000 5%)}
+.manual-open-right::after {background:linear-gradient(90deg,#3b2a1050 0,#3b2a1018 3%,#3b2a1000 10%),linear-gradient(270deg,#4b3a1a1c,#0000 5%);opacity:1}
+.manual-open-spine {background:linear-gradient(90deg,#c9b78f,#8c7a55 40%,#5f5039 50%,#8c7a55 60%,#c9b78f);box-shadow:none}
+.manual-open-left::before,.manual-open-right::before {background:repeating-linear-gradient(90deg,#f7efda 0 1px,#cdbf9a 1px 2px)}
+.manual-page-corner {background:linear-gradient(135deg,transparent 48%,#2a221626 50%,#fbf4df 52%,#e3d4ad)}
+
+/* Running heads, folios and the contents */
+.manual-paper-mark,.manual-page-number,.manual-page-number b {color:#7a705a;font:700 7.5px/1 var(--display);letter-spacing:.22em}
+.manual-page-number {border-bottom-color:#8f846655}
+.manual-folio {color:#6f6550;font:italic 11px/1 Georgia,serif}
+.manual-open-left h2 {color:var(--head);font:800 30px/1 var(--display);letter-spacing:.16em}
+.manual-open-left h2 + .manual-contents {margin-top:16px;padding-top:6px;border-top:3px double #5f5848}
+.manual-contents button {color:var(--ink);font:700 10px/1.3 var(--display);letter-spacing:.07em;text-transform:uppercase}
+.manual-contents button i {border-bottom:1px dotted #8a7b58}
+.manual-contents button b {color:var(--red);font:italic 400 12px/1 Georgia,serif}
+.manual-contents button:hover > span,.manual-contents button[aria-current] > span {color:var(--red);text-decoration:none}
+.manual-contents button:focus-visible {outline:1px dotted var(--red)}
+.manual-game-contents button {font:italic 12px/1.3 Georgia,serif;letter-spacing:0;text-transform:none;color:var(--ink-soft)}
+.manual-game-index-title {color:var(--red);font:700 8.5px/1 var(--display);letter-spacing:.26em;text-transform:uppercase}
+.manual-stamp {border-color:var(--red);color:var(--red);opacity:.5}
+.manual-footnote {color:#8a7f66}
+
+/* Chapter type: a red eyebrow, a navy sans title over a rule, an italic lead, Georgia text. */
+.manual-page-content .manual-chapter-number,.manual-page-content .manual-first-edition {color:var(--red);font:700 8.5px/1 var(--display);font-style:normal;letter-spacing:.26em;text-transform:uppercase}
+.manual-page-content h1,.manual-page-content .manual-subchapter-title,.manual-page-content .manual-first-edition + h2 {
+  padding-bottom:10px;border-bottom:1px solid #8f846688;color:var(--head);font:800 clamp(22px,2.6vw,30px)/1.08 var(--display);letter-spacing:.005em;text-shadow:none}
+.manual-page-content .manual-chapter-deck,.manual-page-content .manual-first-intro {color:#3a362d;font:italic 15px/1.45 Georgia,serif}
+.manual-page-content h2 {color:var(--red);font:700 9px/1.4 var(--display);letter-spacing:.2em}
+.manual-page-content h3,.manual-controls-title {margin:16px 0 6px;padding:0;border:0;color:var(--blue);font:700 10px/1.2 var(--display);letter-spacing:.16em;text-transform:uppercase}
+.manual-page-content .section-label,.manual-page-content .thoughts-label,.manual-page-content .impl-label {color:var(--red);font:700 9px/1.3 var(--display);letter-spacing:.18em;text-transform:uppercase}
+.manual-page-content p,.manual-page-content li {color:var(--ink);font-family:Georgia,serif}
+.manual-page-content a {color:var(--red)}
+.manual-page-content .divider {background:#8f846688}
+.manual-page-content table {font:700 11px/1.5 'Courier New',monospace;border-top:1px solid #6e5f3c55}
+.manual-page-content td {border-bottom-color:#6e5f3c40;color:#1b2430}
+.manual-page-content kbd {border-color:#8f8466;border-bottom-width:2px;border-radius:3px;background:#fffaea;color:#1d3550}
+.manual-page-content .studio-name,.manual-page-content .game-title {color:var(--head);font:800 16px/1.2 var(--display)}
+.manual-page-content .studio-dates,.manual-page-content .game-origin {color:var(--red)}
+.manual-game-blurb::first-letter {color:var(--red);font-family:var(--display);font-weight:800}
+.manual-figure img {border-color:#5d4a2c;background:#1b1a20;filter:none!important}
+.manual-figure figcaption {color:var(--ink-soft)}
+.manual-notes {background:repeating-linear-gradient(0deg,transparent 0 33px,#8f846655 33px 34px)}
+.manual-notes p,.manual-tip p {color:#7a705a!important;font:700 8px/1 var(--display)!important;letter-spacing:.24em}
+.manual-notes q,.manual-tip q {color:#1c2550}
+.manual-tip {border-top-color:#8f846688}
+.manual-page-content .manual-operators .manual-operators-title {border-bottom-color:#5f5848;color:var(--head);font:800 1.7em/1.1 var(--display)}
+.manual-page-content .manual-operators td.operator {border-color:#8f8466;background:#fffaea80}
+.manual-page-content .manual-operators .operators-pitch {border-color:var(--red);background:#8f3a2e0d}
+
+/* Tabs and buttons: the BASIC book's dark pills. */
+.manual-contents-tab,.manual-close {top:-14px;height:30px;padding:0 15px;border:1px solid #ffffff24;border-radius:15px;color:#eadcbb;background:#2b261f;
+  box-shadow:0 3px 8px #0008;font:700 9px/28px var(--display);letter-spacing:.14em;text-transform:uppercase}
+.manual-contents-tab:hover,.manual-close:hover {border-color:#ffffff44;background:#3a3329}
+.manual-contents-tab:focus-visible,.manual-close:focus-visible {outline:2px solid #dfc47e;outline-offset:2px}
+
+/* The closed book that lifts from the pocket and opens: its front is the printed cover. */
+:is(.manual-cover-book,.manual-transit) {background:url(blip-manual-cover.svg) center/100% 100% no-repeat!important;border:0!important;border-radius:2px 7px 7px 2px!important}
+:is(.manual-cover-book,.manual-transit) > *,:is(.manual-cover-book,.manual-transit)::before,:is(.manual-cover-book,.manual-transit)::after {display:none!important}
+/* The tabs sit together at the right, clear of the BLIP plate in the top-left corner. */
+.manual-contents-tab {left:auto;right:172px}
+@media(max-width:700px) {.manual-contents-tab {right:170px}}
+/* The book in flight: its spine leaves the pocket, then the closed book itself is carried to the table. */
+.manual-lift {position:fixed;z-index:20002;margin:0;pointer-events:none;transition:none;transform-origin:50% 100%}
+.manual-transit {position:fixed;z-index:20001;margin:0;pointer-events:none;will-change:transform,opacity;backface-visibility:hidden}
+.manual-cover-front .manual-cover-book {box-shadow:inset 0 0 0 1px #5d4a2c,inset 3px 0 6px #0005}
+/* Landed closed: the front cover waits to be opened, and lifts a little at its edge under the pointer. */
+.manual-cover-closed {cursor:pointer}
+.manual-cover-closed .manual-cover-front {transition:transform .25s ease-out;transform-origin:left center}
+.manual-cover-closed:hover .manual-cover-front {transform:perspective(1600px) rotateY(-7deg)}
+.manual-cover-closed:focus-visible {outline:none}
+.manual-cover-closed::after {content:'Click to open';position:absolute;left:calc(var(--cw,100%) / 2);bottom:-34px;translate:-50% 0;padding:7px 14px;border:1px solid #ffffff24;border-radius:15px;
+  color:#eadcbb;background:#2b261f;font:700 9px/1 "Helvetica Neue",Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;pointer-events:none}
+/* The contents and its footnote share the front page: rows a little tighter, the footnote below the last. */
+@media(min-width:701px) {
+  .manual-contents button {min-height:24px;padding:3px 0}
+  .manual-game-index-title {margin:14px 0 6px}
+  .manual-open-left h2 + .manual-contents {margin-top:12px}
+}
+/* A closed book: the cover over a block of cream page edges, a little thick at the fore-edge and the foot. */
+.manual-cover-closed .manual-cover-front {box-shadow:1px 0 0 #fbf4df,2px 1px 0 #cdbf9a,3px 1px 0 #f7efda,4px 2px 0 #cdbf9a,5px 2px 0 #f7efda,6px 3px 0 #b9a77c,0 24px 40px #000b}
+/* A short screen has no room above the book: the tabs sit just inside its top edge. */
+@media(max-height:520px) {.manual-contents-tab,.manual-close {top:4px}}

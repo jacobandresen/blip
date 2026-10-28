@@ -1,0 +1,1300 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* @font-face for Press Start 2P (the games' pixel-font look) lives in
+   kiosk.css now — loaded first on every page. */
+
+/* Cabinet accent — "r, g, b" so rgba(var(--cab), a) works. shell.js overrides
+   this per game (see BLIP_GAMES in kiosk.js); this green is just the default
+   before that runs. */
+:root {
+  --cab: 50, 200, 50;
+  /* Height of the marquee strip, and so of the BLIP logo and coin slot
+     mounted on its ends; one variable so they cannot drift apart. Redefined
+     per breakpoint below. */
+  --marquee-h: var(--cabinet-fascia-height);
+  --marquee-gap: 8px;
+}
+
+html {
+  /* overflow:hidden only on html, not body — iOS Safari anchors position:fixed
+     to the body when body has overflow:hidden, shifting fixed elements off-position */
+  overflow: hidden;
+  height: 100%;
+  background-color: #000;
+  /* A game page has nothing to select or copy — kill the iOS text loupe,
+     the selection handles and the copy/look-up callout that a drag or a
+     long-press on the joystick would otherwise pop up. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* No browser gesture (double-tap zoom, pan, long-press menu) starts from a
+   touch on the deck or the canvas — every touch there is game input. */
+#topbar, #topbar *, canvas {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  width: 100%; height: 100%;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+/* ---- Marquee: the per-game name sign above the screen ---- Built in
+   shell.js; fillCanvas() reserves its rendered height. */
+#marquee-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  /* Installed to the home screen the page runs under the status bar: the sign
+     draws in the strip below the inset and its background fills behind the
+     clock. fillCanvas() measures offsetHeight, so the canvas follows. */
+  box-sizing: border-box;
+  height: calc(var(--marquee-h) + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  /* Above the scanline (100) and vignette (99) overlays: cabinet hardware,
+     not screen content. */
+  z-index: 201;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(174deg, transparent 0 7px, rgba(255,210,154,.045) 8px, transparent 10px 15px),
+    linear-gradient(180deg,#684430 0%,#392721 48%,#1a1519 100%);
+  border-bottom: 1px solid rgba(var(--cab), 0.48);
+  box-shadow: 0 0 20px rgba(var(--cab), 0.22), 0 2px 10px rgba(0,0,0,.72), inset 0 1px rgba(255,231,188,.2);
+}
+
+#marquee-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  perspective: 280px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: 1;
+}
+.marquee-letter {
+  -webkit-text-stroke:.25px rgba(81,245,255,.6);
+  text-shadow:-1px 0 rgba(255,49,198,.7),1px 0 rgba(37,225,255,.78),0 0 3px #fff,0 0 9px rgba(67,235,255,.9),0 0 20px rgba(var(--cab),.78),0 0 30px rgba(214,52,255,.42);
+  transform-origin:50% 50%;
+  backface-visibility:hidden;
+}
+.marquee-letter::after {
+  content:'';
+  position:absolute;
+  left:0;right:0;top:50%;height:1px;
+  background:linear-gradient(90deg,rgba(2,7,10,.95),rgba(196,247,245,.56),rgba(2,7,10,.95));
+  box-shadow:0 1px 2px rgba(0,0,0,.8);
+}
+
+/* Neon pinstripes flank the mechanical title cells. */
+.marquee-bulbs {
+  flex: 1 1 auto;
+  max-width: 110px;
+  height: 4px;
+  background-image: radial-gradient(circle, #8dfaff 0 1.6px, transparent 2px);
+  background-size: 18px 4px;
+  background-repeat: repeat-x;
+  background-position: center;
+  filter: drop-shadow(0 0 4px #28dff5) drop-shadow(0 0 8px rgba(220,61,255,.42));
+  animation: none;
+}
+:root[data-live] :is(.blip-logo, .marquee-bulbs) { animation-play-state: paused; }
+
+@keyframes marquee-bulbs {
+  50% { filter: drop-shadow(0 0 1px #ffd16a); opacity: .5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #marquee-name.marquee-engage .marquee-letter { animation:none; }
+}
+
+/* The shared bezel stays behind the separately positioned game canvas. */
+#arcade-bezel { z-index: 0; pointer-events: none; }
+
+canvas {
+  background:#09090b;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  outline: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform-origin: 0 0;
+  touch-action: none;
+  /* Match the glass opening on the selector page. */
+  clip-path: inset(0 round 10px);
+  z-index: 1;
+}
+
+/* ---- Loading screen ---- */
+
+#loader {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  z-index: 50;
+}
+
+#status {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  letter-spacing: 6px;
+  color: #32c832;
+  text-shadow: 0 0 10px #e6dc32;
+  text-transform: uppercase;
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink      { 50% { opacity: 0.25; } }
+
+#bar-outer {
+  width: 260px;
+  height: 5px;
+  border: 1px solid #1c1c1c;
+  background: #080808;
+}
+
+#bar-inner {
+  height: 100%;
+  width: 0%;
+  background: #32c832;
+  box-shadow: 0 0 8px #32c832;
+  transition: width .12s linear;
+}
+
+/* The logo and coin slot are exactly as tall as the strip they sit on;
+   --marquee-h is 44px on phones, and width carries the rest of the tap
+   target. */
+.blip-logo,
+#insert-coin-btn { height: calc(var(--marquee-h) + env(safe-area-inset-top, 0px)); }
+
+/* Fullscreen on a PC is the top bar and the picture: the keyboard plays, so
+   the deck, its picker and the cabinet frame go. A touch screen keeps them
+   (data-has-touch), since the deck is what it plays on. App mode does the
+   same on a PC, or on a tablet with a gamepad in hand (data-bare). */
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) :is(#topbar, #arcade-bezel, .cabinet-glass, .cab-rail) {
+  display: none;
+}
+/* No cabinet behind the picture either. */
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) body { background: #000; }
+/* The picture starts right under the bar and runs to every edge, so nothing
+   may lap over it: no vignette, no edge trim, and the bar's glows, the coin
+   slot's swell and the logo's hint are cut off at the bar's own bottom. */
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) body::after { display: none; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) canvas { clip-path: none; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) #marquee-bar { box-shadow: none; }
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) :is(.blip-logo, #insert-coin-btn) {
+  clip-path: inset(0 -80px);
+  transform: none !important;   /* beats the beckon's scale */
+}
+/* ---- Bottom bar — game-page overrides ---- */
+
+/* Coin slot + drop animation: shared with the kiosk landing/history/about
+   pages' own insert-coin button, so it lives in kiosk.css (scoped to
+   "#insert-coin-btn, #kiosk-insert-btn") rather than duplicated here. */
+
+/* Lock the playfield while preserving the coin slot and physical controls. */
+#need-coin-overlay {
+  position:fixed;left:0;right:0;top:calc(var(--marquee-h) + env(safe-area-inset-top,0px));
+  bottom: calc(var(--topbar-h, 56px) + env(safe-area-inset-bottom, 0px));
+  z-index:150;display:none;place-items:center;padding:24px;
+  color:#c6b89d;background:#000;pointer-events:auto;touch-action:none;
+}
+#need-coin-overlay.visible {display:grid}
+.nco-panel {text-align:center;font-family:'Courier New',monospace;text-transform:uppercase;letter-spacing:.14em}
+.nco-msg {color:#7d3025;font-size:clamp(18px,4vw,30px);font-weight:900;letter-spacing:.2em}
+.nco-sub {margin-top:13px;font-size:11px;font-weight:700}
+.nco-how {color:#777064;font-size:9px;letter-spacing:.08em}
+.nco-go {margin-top:22px;color:#f1e3c0;font-size:clamp(13px,2.2vw,18px);animation:nco-blink 1.2s steps(2,jump-none) infinite}
+.nco-go kbd {padding:2px 8px;border:1px solid #c6b89d;border-radius:4px;background:#2a2218;font:inherit}
+.nco-how {font-size:11px}
+:root[data-has-touch] .nco-pc, :root:not([data-has-touch]) .nco-touch {display:none}
+#need-coin-overlay.visible {cursor:pointer}
+@keyframes nco-blink {50% {opacity:.35}}
+@media (prefers-reduced-motion:reduce) {.nco-go {animation:none}}
+:is(:root[data-fullscreen]:not([data-has-touch]), :root[data-bare]) #need-coin-overlay {
+  bottom:0;
+}
+
+/* ---- On-screen controls ---- The deck itself is shared with the landing
+   page and lives in kiosk.css ("Control deck"); only game-page tweaks are
+   here. */
+
+#topbar {
+  overflow: visible;
+  /* The whole deck drives game input (shell.js binds the stick drag to
+     #topbar) — no browser gesture should ever start from a touch on it. */
+  touch-action: none;
+}
+#topbar .deck-panel { touch-action: none; }
+
+/* ---- Paddle dials (Rally) ---- Two spinner knobs lying on the tilted
+   .deck-panel, chrome caps standing proud on translateZ, P1 left and P2
+   right. shell.js shows them and drives the spin. */
+#paddle-dial, #paddle-dial-p2 {
+  display: none;
+  position: absolute;
+  z-index: 4;
+  bottom: calc(50% - var(--dial) / 2);
+  width: var(--dial);
+  height: var(--dial);
+  border-radius: 50%;
+  /* the housing the knob sits in, sunk into the deck */
+  background: radial-gradient(circle at 50% 40%, #313136 0%, #17171a 55%, #08080a 100%);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.6),
+    inset 0 2px 5px rgba(0, 0, 0, 0.75),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  transform-style: preserve-3d;
+}
+#paddle-dial    { left: calc(var(--ctl-cx) - var(--dial) / 2); }
+#paddle-dial-p2 { right: calc(var(--ctl-cx) - var(--dial) / 2); }
+
+/* Rally: the same panel as every game, the dials in the cross's slots and
+   the cross's size. Its sticks, pads and caps are hidden, not removed. */
+:root { --dial: var(--dpad, 58px); --ctl-cx: 36px; }
+:root[data-dials] #paddle-dial, :root[data-dials] #paddle-dial-p2 { display: block; }
+:root[data-dials] :is(.deck-side, .snes-dpad, .snes-face, .snes-wordmark, .snes-pad.second) { display: none !important; }
+:root[data-dials] #snes-pad { left: 0; right: 0; width: 100%; }
+:root[data-dials] #dial-label, :root[data-dials] #dial-label-p2 { display: none; }
+/* P2 lamp under the right dial, dim while the CPU has it. */
+:root[data-dials][data-layout="upright"] .kiosk-bar > .deck-panel::after {
+  display: block;
+  left: calc(100% - var(--ctl-cx));
+  --on: 1;
+}
+:root[data-dials][data-cpu] .kiosk-bar > .deck-panel::after { --on: 0.25; }
+:root[data-dials][data-layout="landscape"] { --dial: 84px; --ctl-cx: calc(max(10px, env(safe-area-inset-left, 0px)) + 42px); }
+:root[data-dials][data-layout="landscape"] :is(#paddle-dial, #paddle-dial-p2) {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+}
+
+/* soft contact shadow on the panel below the raised cap */
+#paddle-dial::before, #paddle-dial-p2::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 92%;
+  height: 12px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.5) 0%, transparent 72%);
+  pointer-events: none;
+}
+
+/* the raised knob body — brushed-chrome rim, lifted off the deck plane */
+.dial-cap {
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  transform: translateZ(5px);
+  background: conic-gradient(from -50deg, #e4e6e9, #8a8d92 24%, #45474b 50%, #8a8d92 76%, #e4e6e9 100%);
+  box-shadow: inset 0 1px #fff9,0 2px 0 #73757a,0 4px 0 #292b2e,0 6px 0 #101113,2px 9px 6px #000c,4px 14px 13px #0007;
+}
+
+/* the turning top: knurled grip + a domed centre + a pointer groove.
+   shell.js sets transform:rotate() here, so nothing else may set transform. */
+#dial-hand, #dial-hand-p2 {
+  position: absolute;
+  inset: 2.5px;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 33% 22%,#ffffff29,transparent 48%),
+    radial-gradient(circle,transparent 61%,#08090a 63% 65%,transparent 67%),
+    repeating-conic-gradient(from 0deg, #48494d 0 3deg, #1a1b1e 5deg 9deg, #35363a 10deg);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 3px 5px rgba(255, 255, 255, 0.12),
+    inset 0 -4px 7px rgba(0, 0, 0, 0.55);
+  transform-origin: 50% 50%;
+  transition: box-shadow .05s;
+}
+/* pointer groove — points to 12 o'clock at rotate(0), in the cabinet accent */
+#dial-hand::before, #dial-hand-p2::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 4px;
+  height: 42%;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background: rgb(var(--cab));
+  box-shadow: 0 0 6px rgba(var(--cab), 0.85);
+}
+/* domed centre hub */
+#dial-hand::after, #dial-hand-p2::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 34%;
+  height: 34%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #58585c, #232326 70%, #141416);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+#paddle-dial.active #dial-hand,
+#paddle-dial-p2.active #dial-hand-p2 {
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--cab), 0.5),
+    inset 0 3px 5px rgba(255, 255, 255, 0.14),
+    inset 0 -4px 7px rgba(0, 0, 0, 0.55),
+    0 0 12px rgba(var(--cab), 0.4);
+}
+
+#dial-label, #dial-label-p2 {
+  position: absolute;
+  top: -13px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 6px;
+  letter-spacing: 1px;
+  color: rgba(var(--cab), 0.8);
+  text-shadow: 0 0 6px rgba(var(--cab), 0.5);
+  -webkit-font-smoothing: none;
+  pointer-events: none;
+}
+
+/* P2 dial in one-player mode: not grabbable and cooled in colour, but it
+   turns with the CPU's paddle (window.blipPaddles). The label reads CPU. */
+#paddle-dial-p2.cpu-mode {
+  pointer-events: none;
+}
+#paddle-dial-p2.cpu-mode .dial-cap {
+  background: conic-gradient(from -50deg, #b9bcc2, #6d7076 24%, #3a3c40 50%, #6d7076 76%, #b9bcc2);
+}
+#paddle-dial-p2.cpu-mode #dial-hand-p2::before {
+  background: rgba(var(--cab), 0.55);
+  box-shadow: 0 0 4px rgba(var(--cab), 0.4);
+}
+
+/* Shrink controls in landscape / short screens */
+@media (max-height: 450px) {
+  :root { --marquee-gap: 6px; }
+  #marquee-bar { gap: 8px; }
+  .marquee-bulbs { max-width: 60px; }
+  /* Landscape still gets a real thumb target — the ball floats above the
+     bar over the game, so it can stay large even though vertical room is
+     tight; only the shaft's swing shrinks. */
+  .stick-base { width: 72px; height: 148px; }
+  .stick-boot { width: 38px; height: 38px; bottom: 5px; }
+  .stick-handle { bottom: 43px; } /* = boot's bottom + height, its top surface */
+  .stick-shaft { width: 9px; height: 30px; }
+  .stick-ball  { width: 42px; height: 42px; bottom: 30px; }
+
+  .fire-buttons { gap: 10px; }
+  .arcade-btn { width: 46px; height: 46px; }
+}
+
+/* Phones — a fatter marquee strip so the BLIP logo and coin slot over its
+   ends are easy thumb targets (kiosk.css bumps those to a 46px box). The
+   bezel and top screws follow it down. */
+@media (max-width: 480px) {
+  :root { --marquee-h: var(--cabinet-fascia-height); }
+}
+
+/* Narrow phones — DEFENDER at 5px letter-spacing is the widest name; give it room */
+@media (max-width: 380px) {
+  .marquee-bulbs { max-width: 40px; }
+}
+
+/* ---- High-score board + name prompt (blip_scores.js) ---- A modal at game
+   over: this cabinet's top 10, or a one-field name prompt the first time. */
+.blip-hs-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;   /* over the INSERT COIN attract overlay (150), under the coin button (500) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+.blip-hs-panel {
+  width: min(92vw, 340px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  /* Still scrollable for tall content, but keep the scrollbar out of the
+     fixed kiosk panel. */
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* legacy Edge/IE */
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 18px 18px 16px;
+  border: 2px solid rgba(120, 220, 255, 0.5);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #0b1016 0%, #05070a 100%);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 12px 40px rgba(0, 0, 0, 0.6),
+              inset 0 0 24px rgba(60, 160, 220, 0.09);
+  color: #cfe6ef;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  text-align: center;
+}
+.blip-hs-panel::-webkit-scrollbar { display: none; } /* Chrome/Safari/Edge */
+.blip-hs-panel.wide { width: min(94vw, 380px); }
+
+/* While a recovery code is shown the panel grows as big as the screen allows:
+   more pixels per QR module is what lets another phone's camera read it at a
+   glance. */
+.blip-hs-title {
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: #ffd94a;
+  text-shadow: 0 0 8px rgba(255, 200, 60, 0.5);
+  margin-bottom: 10px;
+}
+.blip-hs-sub {
+  font-size: 8px;
+  line-height: 1.6;
+  letter-spacing: 1px;
+  color: #7fa6b5;
+  margin: 8px 0;
+}
+/* How to enter a name without a keyboard: quieter than the line above. */
+.blip-hs-stick { margin-top: 8px; opacity: 0.6; }
+.blip-hs-err {
+  min-height: 12px;
+  margin: 6px 0 2px;
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #ff6b6b;
+}
+.blip-hs-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 10px 8px;
+  border: 2px solid rgba(120, 220, 255, 0.4);
+  border-radius: 4px;
+  background: #04070b;
+  color: #eafff8;
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-align: center;
+  text-transform: uppercase;
+  /* <html> turns selection off for the whole page; iOS will not type into a
+     field that inherits it. */
+  -webkit-user-select: text;
+  user-select: text;
+}.blip-hs-input:focus { outline: none; border-color: #ffd94a; }.blip-hs-code {
+  margin: 10px 0 2px;
+  padding: 12px 8px;
+  border: 2px dashed rgba(120, 220, 255, 0.55);
+  border-radius: 4px;
+  background: #04070b;
+  color: #eafff8;
+  font-family: inherit;
+  font-size: 15px;
+  letter-spacing: 4px;
+  text-align: center;
+  word-break: break-all;
+  text-shadow: 0 0 8px rgba(120, 220, 255, 0.55);
+  -webkit-user-select: text;   /* the code is there to be copied */
+  user-select: text;
+}.blip-hs-list {
+  list-style: none;
+  margin: 8px 0 4px;
+  padding: 0;
+  text-align: left;
+}.blip-hs-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 4px;
+  font-size: 9px;
+  letter-spacing: 1px;
+  border-bottom: 1px solid rgba(120, 220, 255, 0.12);
+}.blip-hs-item .hs-rank { width: 22px; color: #7fa6b5; flex: none; }.blip-hs-item .hs-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}.blip-hs-item .hs-score { color: #ffd94a; flex: none; }.blip-hs-item.me { color: #6dffa8; }.blip-hs-item.me .hs-rank, .blip-hs-item.me .hs-score { color: #6dffa8; }.blip-hs-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+}.blip-hs-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: 2px solid rgba(120, 220, 255, 0.5);
+  border-radius: 4px;
+  background: #10202c;
+  color: #eafff8;
+  font-family: inherit;
+  font-size: 9px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.blip-hs-btn:hover { background: #16303f; }
+.blip-hs-btn:disabled { opacity: 0.5; }
+.blip-hs-btn.ghost { background: transparent; border-color: rgba(120, 220, 255, 0.25); color: #7fa6b5; }
+
+@media (max-width: 380px) {
+  .blip-hs-title { font-size: 11px; }
+  .blip-hs-item { font-size: 8px; }
+  .blip-hs-code { font-size: 12px; letter-spacing: 2px; }
+}
+
+/* ---- Two players on a phone: turn it sideways (shell.js rotateHint) ---- */
+#rotate-hint {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  top: calc(var(--marquee-h, 28px) + var(--marquee-gap, 8px) + 20px + env(safe-area-inset-top, 0px));
+  bottom: calc(var(--topbar-h, 56px) + 12px + env(safe-area-inset-bottom, 0px));
+  z-index: 140;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.82);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  color: #e6dc32;
+  text-align: center;
+  touch-action: manipulation;
+}
+#rotate-hint.show { display: flex; }
+#rotate-hint .rh-text { font-size: 13px; line-height: 1.9; letter-spacing: 1px; text-shadow: 0 0 8px rgba(230, 220, 50, 0.6); }
+#rotate-hint .rh-phone {
+  width: 38px;
+  height: 64px;
+  border: 3px solid #cfe6ef;
+  border-radius: 7px;
+  box-shadow: inset 0 -6px 0 -3px #cfe6ef;
+  animation: rh-turn 2.2s ease-in-out infinite;
+}
+@keyframes rh-turn {
+  0%, 25% { transform: rotate(0deg); }
+  55%, 100% { transform: rotate(-90deg); }
+}
+@media (prefers-reduced-motion: reduce) { #rotate-hint .rh-phone { animation: none; transform: rotate(-90deg); } }
+#rotate-hint .rh-stay {
+  margin-top: 8px;
+  padding: 10px 14px;
+  border: 1px solid rgba(150, 165, 150, 0.5);
+  border-radius: 4px;
+  background: rgba(12, 16, 12, 0.9);
+  color: rgba(190, 205, 190, 0.85);
+  font: 8px 'Press Start 2P', 'Courier New', monospace;
+  letter-spacing: 1px;
+}
+
+/* ---- Touch strip ---- TOUCH chosen on a game that has one (<html
+   data-touch>): the pad's bar with its controls removed (blip_controller.js
+   hit-tests touches by rect, so hidden is not enough), dressed as a laptop's
+   palm rest with a glass trackpad as wide as the picture (shell.js sizes it).
+   A finger anywhere off the buttons plays. */
+#touch-strip { display: none; }
+:root[data-touch] :is(.snes-pad, .deck-side, #paddle-dial, #paddle-dial-p2) { display: none !important; }
+:root[data-touch][data-layout="upright"] #touch-strip {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  /* space-grey anodised aluminium */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0, rgba(255, 255, 255, 0) 2px),
+    linear-gradient(180deg, #4a4b4f 0%, #3d3e42 60%, #36373b 100%);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ts-glass {
+  position: absolute;
+  top: 9px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 27px);
+  display: flex;
+  overflow: hidden;
+  container-type: size;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse 90% 120% at 50% 0%, rgba(255, 255, 255, 0.07), transparent 65%),
+    linear-gradient(180deg, #37383c 0%, #313236 100%);
+  /* the diamond-cut chamfer: a bright hairline, a dark seam inside it */
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 1px 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 1px 2px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  transition: background-color .15s;
+}
+#touch-strip.held .ts-glass {
+  background:
+    radial-gradient(ellipse 90% 120% at 50% 0%, rgba(255, 255, 255, 0.1), transparent 65%),
+    linear-gradient(180deg, #3b3c40 0%, #34353a 100%);
+}
+.ts-half { flex: 1; position: relative; transition: background .12s; }
+.ts-actions { display: none; }
+:root[data-touch="action"] .ts-glass { padding-right: min(38%, 180px); }
+:root[data-touch="action"] .ts-actions {
+  display: flex; gap: 6px;
+  position: absolute; top: 8px; right: 8px; bottom: 26px; width: min(35%, 166px);
+}
+:root[data-touch="action"] .ts-action {
+  flex: 1; display: grid; place-items: center; min-width: 0;
+  border: 1px solid rgba(255,255,255,.22); border-radius: 14px;
+  color: rgba(255,255,255,.85); background: rgba(255,255,255,.09);
+  font: 600 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  letter-spacing: .06em; touch-action: none;
+}
+:root[data-touch="action"] .ts-action.held { background: rgba(255,255,255,.26); }
+:root[data-touch="action"] .ts-actions[data-player="1"] { display: none; }
+:root[data-touch="action"] .ts-half + .ts-half { display: none; }
+:root[data-touch="action"] .ts-half.held { background: rgba(255,255,255,.05); }
+:root[data-touch="action"][data-versus] .ts-glass { padding-right: 0; }
+:root[data-touch="action"][data-versus] .ts-half + .ts-half { display: block; }
+:root[data-touch="action"][data-versus] .ts-actions { width: 20%; }
+:root[data-touch="action"][data-versus] .ts-actions[data-player="0"] { right: 52%; }
+:root[data-touch="action"][data-versus] .ts-actions[data-player="1"] { display: flex; right: 2%; }
+:root[data-touch="action"][data-open] .ts-join { left: 10px; right: auto; }
+@media (max-width: 500px) {
+  :root[data-touch="action"][data-versus] .ts-actions { flex-direction: column; width: 23%; gap: 4px; }
+}
+:root[data-touch="action"][data-layout="landscape"] #touch-strip {
+  display: block; position: fixed;
+  left: env(safe-area-inset-left, 0px); right: env(safe-area-inset-right, 0px);
+  bottom: env(safe-area-inset-bottom, 0px); height: 112px; z-index: 6; pointer-events: none;
+}
+:root[data-touch="action"][data-layout="landscape"] .ts-glass {
+  top: 0; bottom: 8px; pointer-events: auto;
+}
+.ts-half + .ts-half { border-left: 1px solid rgba(0, 0, 0, 0.3); box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.05); }
+:root[data-touch="paddles"] .ts-half.held { background: rgba(255, 255, 255, 0.05); }
+.ts-tag, .ts-hint {
+  position: absolute;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.42);
+  pointer-events: none;
+}
+.ts-tag { top: 8px; left: 11px; font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
+.ts-half + .ts-half .ts-tag { left: auto; right: 11px; }
+.ts-hint {
+  bottom: 9px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+/* Two players sideways: a trackpad in each gutter, P1 left and P2 right,
+   the picture fitted between them (fillCanvas measures .ts-half). Below the
+   station lamps. */
+:root[data-touch="paddles"][data-layout="landscape"] #touch-strip,
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] #touch-strip {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  background: none;
+  pointer-events: none;
+}
+:root[data-touch="paddles"][data-layout="landscape"] .ts-glass,
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-glass { display: contents; }
+:root[data-touch="paddles"][data-layout="landscape"] .ts-half,
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half {
+  display: block;
+  position: fixed;
+  top: 140px;
+  bottom: max(16px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+  width: clamp(110px, 24vw, 240px);
+  border: 0;
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse 120% 70% at 50% 0%, rgba(255, 255, 255, 0.07), transparent 65%),
+    linear-gradient(180deg, #37383c 0%, #313236 100%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.16),
+    inset 0 1px 2px rgba(0, 0, 0, 0.45),
+    0 4px 14px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  touch-action: none;
+}
+:root[data-touch="paddles"][data-layout="landscape"] .ts-half:first-child,
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half:first-child {
+  left: max(12px, calc(env(safe-area-inset-left, 0px) + 6px));
+}
+:root[data-touch="paddles"][data-layout="landscape"] .ts-half + .ts-half,
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half + .ts-half {
+  right: max(12px, calc(env(safe-area-inset-right, 0px) + 6px));
+}
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] .ts-half.held {
+  background:
+    radial-gradient(ellipse 120% 70% at 50% 0%, rgba(255, 255, 255, 0.1), transparent 65%),
+    linear-gradient(180deg, #3d3e43 0%, #36373b 100%);
+}
+:root[data-touch="paddles"][data-layout="landscape"] :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow),
+:root[data-touch]:not([data-touch="action"])[data-layout="landscape"][data-versus] :is(.ts-tag, .ts-hint, .ts-thumb, .ts-demo, .ts-arrow) { display: none; }
+/* Rally has no P2 lamp in that corner: the trackpad says whose it is. */
+:root[data-touch="paddles"][data-layout="landscape"][data-versus] .ts-half + .ts-half .ts-tag { display: block; }
+
+/* A PC reads the pointer's hint, a touch screen the finger's, until one
+   is used (data-input, set by shell.js). */
+.ts-hint.for-mouse { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .ts-hint.for-touch { display: none; }
+  .ts-hint.for-mouse { display: block; }
+}
+#touch-strip[data-input="mouse"] .ts-hint.for-touch { display: none; }
+#touch-strip[data-input="mouse"] .ts-hint.for-mouse { display: block; }
+#touch-strip[data-input="touch"] .ts-hint.for-touch { display: block; }
+#touch-strip[data-input="touch"] .ts-hint.for-mouse { display: none; }
+/* the fingertip on the glass while touching (drag games) */
+.ts-thumb {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: -20px;
+  width: 40px;
+  height: 40px;
+  margin-top: -20px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  pointer-events: none;
+}
+:root[data-touch="drag"] #touch-strip.held .ts-thumb { display: block; }
+/* A demo fingertip showing the gesture until the player first touches. */
+.ts-demo {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -20px 0 0 -13px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28), 0 0 12px rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+  opacity: 0;
+}
+:root[data-touch="drag"] .ts-demo    { animation: ts-demo-drag 3.2s ease-in-out infinite; }
+:root[data-touch="swipe"] .ts-demo   { animation: ts-demo-swipe 2.4s ease-out infinite; }
+:root[data-touch="paddles"] .ts-demo { margin-left: -13px; left: 25%; animation: ts-demo-bat 2.8s ease-in-out infinite; }
+:root[data-touch="platform"] .ts-demo { animation: ts-demo-run 3s ease-in-out infinite; }
+/* Bubbler: one surface for one player; the P1 / 2P halves once two are in. */
+:root[data-touch="platform"]:not([data-versus]) .ts-half + .ts-half,
+:root[data-touch="platform"]:not([data-versus]) .ts-tag,
+:root[data-touch="drag"]:not([data-versus]) .ts-half + .ts-half,
+:root[data-touch="drag"]:not([data-versus]) .ts-tag { display: none; }
+:root[data-touch="drag"][data-versus] .ts-half.held { background: rgba(255, 255, 255, 0.05); }
+:root[data-touch="platform"][data-versus] .ts-half.held { background: rgba(255, 255, 255, 0.05); }
+:root[data-touch="platform"][data-versus] .ts-demo { display: none; }
+/* 2P JOIN has its own target; the rest of the strip stays with P1 until P2 joins. */
+.ts-join { display: none; }
+:root[data-touch][data-open] .ts-join {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: absolute;
+  left: auto;
+  right: 10px;
+  top: 10px;
+  z-index: 2;
+  margin: 0;
+  min-width: 96px;
+  min-height: 52px;
+  padding: 7px 12px 7px 9px;
+  border: 0;
+  border-radius: 999px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #fff;
+  background: linear-gradient(180deg, #4d8dff, #2f6fe8);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 2px 6px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  animation: tj-glow 2.4s ease-in-out infinite;
+}
+:root[data-touch][data-open][data-layout="landscape"] .ts-join {
+  position: fixed;
+  top: max(100px, calc(env(safe-area-inset-top, 0px) + 12px));
+  left: auto;
+  right: max(16px, calc(env(safe-area-inset-right, 0px) + 8px));
+  bottom: auto;
+  z-index: 210;
+}
+.ts-join:active { transform: scale(0.96); }
+.tj-plus { font-size: 14px; line-height: 1; font-weight: 500; }
+@keyframes tj-glow {
+  0%, 100% { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 2px 6px rgba(0, 0, 0, 0.45); }
+  50%      { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 2px 6px rgba(0, 0, 0, 0.45), 0 0 12px rgba(80, 140, 255, 0.6); }
+}
+@media (prefers-reduced-motion: reduce) { .ts-join { animation: none !important; } }
+#touch-strip.used .ts-demo, #touch-strip.held .ts-demo { animation: none; opacity: 0; }
+@keyframes ts-demo-drag {
+  0%   { opacity: 0; transform: translateX(-30cqw) scale(1.25); }
+  10%  { opacity: 1; transform: translateX(-30cqw) scale(1); }
+  45%  { transform: translateX(30cqw); }
+  80%  { opacity: 1; transform: translateX(-10cqw); }
+  90%, 100% { opacity: 0; transform: translateX(-10cqw) scale(1.25); }
+}
+@keyframes ts-demo-swipe {
+  0%   { opacity: 0; transform: translateX(-12cqw) scale(1.25); }
+  12%  { opacity: 1; transform: translateX(-12cqw) scale(1); }
+  45%  { opacity: 0; transform: translateX(14cqw); }
+  100% { opacity: 0; transform: translateX(14cqw); }
+}
+@keyframes ts-demo-run {
+  0%   { opacity: 0; transform: translateX(0) scale(1.25); }
+  10%  { opacity: 1; transform: translateX(0) scale(1); }
+  35%  { transform: translateX(12cqw); }
+  60%  { transform: translateX(-12cqw); }
+  72%  { transform: translate(-12cqw, 0); }
+  80%  { opacity: 1; transform: translate(-12cqw, -22cqh); }
+  90%, 100% { opacity: 0; transform: translate(-12cqw, -22cqh) scale(1.25); }
+}
+@keyframes ts-demo-bat {
+  0%   { opacity: 0; transform: translateY(-18cqh) scale(1.25); }
+  10%  { opacity: 1; transform: translateY(-18cqh) scale(1); }
+  50%  { transform: translateY(18cqh); }
+  85%  { opacity: 1; transform: translateY(-8cqh); }
+  95%, 100% { opacity: 0; transform: translateY(-8cqh) scale(1.25); }
+}
+/* the flick just read (swipe games) */
+.ts-arrow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  border: 12px solid transparent;
+  border-bottom: 18px solid rgba(255, 255, 255, 0.55);
+  border-top-width: 0;
+  pointer-events: none;
+  transform: translate(-50%, -70%) rotate(var(--rot, 0deg));
+}
+.ts-arrow[data-dir="right"] { --rot: 90deg; }
+.ts-arrow[data-dir="down"]  { --rot: 180deg; }
+.ts-arrow[data-dir="left"]  { --rot: 270deg; }
+.ts-arrow.flash { animation: ts-flash .35s ease-out; }
+@keyframes ts-flash { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .ts-demo { animation: none !important; }
+}
+
+:root[data-card-loading] canvas {visibility:hidden}
+
+/* The cabinet's screen stays fixed behind the selector. */
+:root[data-cabinet-screen] :is(.blip-logo,#insert-coin-btn,#topbar,#marquee-bar,#arcade-bezel,.cabinet-glass,.cab-rail,#need-coin-overlay,#loader) {display:none!important}
+:root[data-cabinet-screen] canvas {clip-path:none}
+
+/* The shared cabinet skin gives the deck a body background after its
+   landscape rule; in landscape the deck covers the viewport above the game. */
+:root[data-layout="landscape"][data-caps][data-controls] .kiosk-bar > .deck-panel {
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+:root[data-cabinet-screen] body::after { display:none; }
+
+/* Amstrad mode is a game inside the CPC monitor; the host keeps the case. */
+:root[data-amstrad] body::after,
+:root[data-amstrad] :is(.blip-logo,#insert-coin-btn,#topbar,#controls-card,#marquee-bar,#arcade-bezel,.cabinet-glass,.cab-rail,#need-coin-overlay) { display:none!important; }
+:root[data-amstrad] body { background:#000; }
+:root[data-amstrad] canvas { clip-path:none; }
+:root[data-amstrad] .app-back { display:none!important; }
+
+:root[data-touch][data-layout="upright"] #touch-strip {
+  background:none;
+  transform:rotateX(var(--bar-tilt,26deg));transform-origin:50% 100%;
+}
+body.cabinet-page .ts-glass {
+  background:radial-gradient(ellipse at 30% 0,#e7d3a30c,transparent 70%),linear-gradient(#24201e,#151315);
+  box-shadow:0 0 0 1px #ab8f6159,0 1px #e5c79d1f,inset 0 2px 5px #000b,inset 0 0 0 1px #0008;
+}
+body.cabinet-page #touch-strip.held .ts-glass {
+  background:radial-gradient(ellipse at 30% 0,#e7d3a314,transparent 70%),linear-gradient(#29241f,#191619);
+}
+body.cabinet-page :is(.ts-tag,.ts-hint) {color:#c2b49c;font-family:'Courier New',monospace;}
+body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,0 0 12px #e8cea41a;}
+
+/* Free play (home screen, a game's own icon): no coin to put in. Hidden,
+   not removed, so the deck keeps the layout the layout tests measure. */
+:root[data-freeplay] .deck-coin-slot,
+:root[data-freeplay] .blip-power-indicator { visibility: hidden; }
+
+/* "Add to Home Screen": the game's icon and how to save it. */
+#install-sheet {
+  position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; padding: 16px;
+  background: rgba(0, 0, 0, .62);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+.install-card {
+  width: min(360px, 100%); padding: 22px 20px 16px; border-radius: 18px; text-align: center;
+  background: #1f1d26; color: #f2f2f7; box-shadow: 0 12px 40px rgba(0, 0, 0, .6);
+}
+.install-icon { width: 76px; height: 76px; border-radius: 17px; box-shadow: 0 4px 12px rgba(0, 0, 0, .5); }
+.install-card h2 { margin: 12px 0 6px; font-size: 19px; line-height: 1.25; }
+.install-lede, .install-wait { margin: 0 0 12px; font-size: 14px; line-height: 1.4; color: #c7c7cc; }
+.install-steps { margin: 0 0 14px; padding: 0 0 0 22px; text-align: left; font-size: 15px; line-height: 1.6; }
+.install-share { width: 14px; height: 18px; vertical-align: -3px; color: #0a84ff; }
+.install-actions { display: flex; flex-direction: column; gap: 8px; }
+.install-actions button {
+  min-height: 46px; border: 0; border-radius: 12px; font: 600 16px/1 inherit; cursor: pointer;
+  font-family: inherit;
+}
+.install-go { background: #0a84ff; color: #fff; }
+.install-close { background: rgba(255, 255, 255, .1); color: #f2f2f7; }
+.install-actions button:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.cc-install { margin: 10px 0 0; text-align: center; }
+.cc-control-options { display: flex; gap: 5px; margin: 8px 0 10px; }
+.cc-control-options button {
+  flex: 1; min-width: 0; min-height: 44px; padding: 5px 3px;
+  border: 1px solid currentColor; border-radius: 6px;
+  background: transparent; color: inherit; opacity: .62;
+  font: 600 10px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  letter-spacing: .03em; cursor: pointer;
+}
+.cc-control-options button[aria-pressed="true"] { opacity: 1; background: rgba(255,255,255,.18); }
+.cc-control-options button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.cc-install button {
+  padding: 6px 10px; border: 1px solid currentColor; border-radius: 6px; background: none;
+  color: inherit; font: inherit; font-size: 11px; letter-spacing: .06em; cursor: pointer;
+}
+/* A phone on its side has no height to spare on the card. */
+:root[data-layout="landscape"] .cc-install { display: none; }
+:root[data-layout="landscape"] #controls-card {
+  top: calc(var(--marquee-h) + env(safe-area-inset-top, 0px) + 10px);
+  padding: 12px 10px 8px;
+}
+:root[data-layout="landscape"] #controls-card .cc-foot { display: none; }
+
+/* ---- App style ---- A game opened from the home screen or its own icon
+   wears an app's look: a frosted title bar with a way Home, the game on
+   black, a plain deck. Sizes stay the cabinet's, so the picture is fitted
+   the same. */
+:root[data-appstyle] {
+  --app-font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --app-tint: #0a84ff;
+  background: #000;
+}
+:root[data-appstyle] body { background: #000; }
+:root[data-appstyle] .cabinet-stars,
+:root[data-appstyle] .cab-rail,
+:root[data-appstyle] .screen-bezel .screw,
+:root[data-appstyle] .cabinet-glass,
+:root[data-appstyle] .manual-pocket,
+:root[data-appstyle] .marquee-bulbs,
+:root[data-appstyle] .jukebox-receiver,
+:root[data-appstyle] #card-sleeve,
+:root[data-appstyle] .blip-logo-mark { display: none !important; }
+:root[data-appstyle] #arcade-bezel { background: #000; border: 0; box-shadow: none; border-radius: 0; }
+:root[data-appstyle] #arcade-bezel::before, :root[data-appstyle] #arcade-bezel::after { display: none; }
+
+:root[data-appstyle] #marquee-bar {
+  background: rgba(22, 22, 24, .78);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8);
+  border: 0; border-bottom: .5px solid rgba(255, 255, 255, .14); box-shadow: none;
+}
+:root[data-appstyle] #marquee-bar::before, :root[data-appstyle] #marquee-bar::after { display: none; }
+:root[data-appstyle] #marquee-bar.jukebox-marquee #marquee-name {
+  background: none; border: 0; box-shadow: none; pointer-events: none;
+}
+:root[data-appstyle] #marquee-name::before { display: none; }
+:root[data-appstyle] #marquee-name .marquee-letter { display: none; }
+:root[data-appstyle] #marquee-name::after {
+  content: attr(data-title);
+  font: 600 17px/1 var(--app-font); color: #fff; letter-spacing: -.01em;
+}
+/* Home: an app's back button, where the logo stands. */
+:root[data-appstyle] .blip-logo { display: none !important; }
+.app-back { display: none; }
+:root[data-appstyle] .app-back {
+  position: fixed; z-index: 520; display: flex; align-items: center; gap: 5px;
+  left: calc(env(safe-area-inset-left, 0px) + 8px);
+  top: calc(env(safe-area-inset-top, 0px) + (var(--cabinet-fascia-height, 52px) - 44px) / 2);
+  height: 44px; padding: 0 8px;
+  color: var(--app-tint); font: 400 17px/1 var(--app-font); text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+:root[data-appstyle] .app-back svg { width: 11px; height: 19px; }
+:root[data-appstyle] .app-back:active { opacity: .45; }
+:root[data-appstyle] .app-back:focus-visible { outline: 2px solid var(--app-tint); outline-offset: 2px; border-radius: 8px; }
+/* The controls card's "?" as an app's info button. */
+:root[data-appstyle] #card-button {
+  border: 1.5px solid var(--app-tint); background: none; box-shadow: none; color: var(--app-tint);
+  font: 600 13px/1 var(--app-font); text-shadow: none;
+}
+:root[data-appstyle] #card-button:hover, :root[data-appstyle][data-card] #card-button,
+:root[data-appstyle] body:has(#glcanvas) #card-button {
+  border-color: var(--app-tint); background: none; color: var(--app-tint); box-shadow: none; text-shadow: none;
+}
+:root[data-appstyle][data-card] #card-button { background: var(--app-tint); color: #fff; }
+
+/* The deck: matte black glass, no wood, no wear. */
+:root[data-appstyle] body.cabinet-page .deck-housing { background: #000 !important; box-shadow: none !important; border: 0 !important; }
+:root[data-appstyle] body.cabinet-page .deck-housing::before,
+:root[data-appstyle] body.cabinet-page .deck-housing::after { display: none !important; }
+/* The touch strip: a black trackpad. */
+:root[data-appstyle][data-touch] #touch-strip { background: #0e0e10; }
+:root[data-appstyle] .ts-glass {
+  background: #1c1c1e; box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .14); border-radius: 18px;
+}
+:root[data-appstyle] #touch-strip.held .ts-glass { background: #242426; }
+:root[data-appstyle][data-layout="upright"] .kiosk-bar > .deck-panel {
+  background: linear-gradient(180deg, #1c1c1e, #0e0e10) !important;
+  box-shadow: inset 0 .5px rgba(255, 255, 255, .16) !important;
+  border: 0 !important;
+  border-radius: 22px 22px 0 0;
+}
+:root[data-appstyle] .ts-hint, :root[data-appstyle] .ts-tag { font-family: var(--app-font) !important; }
+:root[data-appstyle] .kiosk-bar > .deck-panel::before,
+:root[data-appstyle] .kiosk-bar > .deck-panel::after { display: none; }
+
+
+/* The launch screen: the icon on black while the game loads. */
+:root[data-appstyle] #loader { background: #000; gap: 28px; }
+:root[data-appstyle] #loader::before {
+  content: ''; width: 108px; height: 108px; border-radius: 24px;
+  background: var(--app-icon) center / cover no-repeat;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .6);
+}
+:root[data-appstyle] #status { display: none; }
+:root[data-appstyle] #bar-outer { width: 120px; height: 4px; border: 0; border-radius: 2px; background: rgba(255, 255, 255, .16); overflow: hidden; }
+:root[data-appstyle] #bar-inner { background: #fff; box-shadow: none; border-radius: 2px; }
+:root[data-appstyle][data-layout="upright"] .snes-pad .snes-shell {
+  background: linear-gradient(180deg, #242426, #121214) !important;
+  border: .5px solid rgba(255, 255, 255, .12) !important;
+  box-shadow: inset 0 .5px rgba(255, 255, 255, .14) !important;
+}
+:root[data-appstyle] .kiosk-bar { background: #000; border-top: 0; box-shadow: none; }
+
+/* The controls card as an app's panel: frosted, system type, plain keys. */
+:root[data-appstyle] #controls-card {
+  border: .5px solid rgba(255, 255, 255, .16); border-radius: 20px; padding: 16px 14px 14px;
+  background: rgba(30, 30, 32, .82);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .55); font-family: var(--app-font);
+  transform: translate(-50%, -24px) scale(.96);
+  transition: transform .32s cubic-bezier(.32, .72, 0, 1), opacity .2s, visibility 0s .32s;
+}
+:root[data-appstyle][data-card] #controls-card {
+  transform: translate(-50%, 0); transition: transform .32s cubic-bezier(.32, .72, 0, 1), opacity .2s, visibility 0s;
+}
+:root[data-appstyle] #controls-card::before,
+:root[data-appstyle] #controls-card .cc-rod,
+:root[data-appstyle] #controls-card .cc-clamp,
+:root[data-appstyle] #controls-card .cc-punch,
+:root[data-appstyle] #controls-card .cc-foot { display: none; }
+:root[data-appstyle] .cc-paper { padding: 0; border: 0; background: none; box-shadow: none; color: #fff; }
+:root[data-appstyle] .cc-title { color: rgba(235, 235, 245, .6); font: 600 12px/1 var(--app-font); letter-spacing: .02em; text-transform: uppercase; }
+:root[data-appstyle] .cc-game { margin: 6px 0 14px; color: #fff; font: 700 24px/1.1 var(--app-font); letter-spacing: -.01em; text-transform: capitalize; }
+:root[data-appstyle] #controls-card .pc-legend { border-top: .5px solid rgba(255, 255, 255, .14); }
+:root[data-appstyle] .pc-label { color: rgba(235, 235, 245, .6); font: 500 12px/1 var(--app-font); letter-spacing: 0; text-transform: capitalize; }
+:root[data-appstyle] .pc-keys i { color: rgba(235, 235, 245, .45); font: 400 12px/1 var(--app-font); text-transform: none; }
+:root[data-appstyle] .pc-legend kbd {
+  border: 0; border-radius: 8px; background: rgba(118, 118, 128, .3); color: #fff;
+  font: 600 14px/1 var(--app-font); box-shadow: inset 0 -1px rgba(0, 0, 0, .3);
+}
+:root[data-appstyle] .pc-legend kbd.wide { font-size: 12px; letter-spacing: .02em; }
+:root[data-appstyle] .pc-legend kbd.left::before { border-right-color: #fff; }
+:root[data-appstyle] .pc-legend kbd.right::before { border-left-color: #fff; }
+:root[data-appstyle] .pc-legend kbd.up::before { border-bottom-color: #fff; }
+:root[data-appstyle] .pc-legend kbd.down::before { border-top-color: #fff; }
+:root[data-appstyle] .cc-install button {
+  border: 0; border-radius: 10px; padding: 9px 14px; background: var(--app-tint); color: #fff;
+  font: 600 13px/1 var(--app-font); letter-spacing: 0;
+}
+/* The cabinet hides its title tiles where the bar is crowded; an app's
+   title bar has room for its name. */
+:root[data-appstyle] #marquee-name { visibility: visible !important; }
+
+/* The Guide over a game: a sheet that rises from the bottom, its top edge
+   showing the game still underneath. */
+#guide-sheet {
+  position: fixed; inset: 0; z-index: 950; display: flex; align-items: flex-end;
+  background: rgba(0, 0, 0, .4);
+  animation: guide-dim .3s ease-out;
+}
+#guide-sheet iframe {
+  display: block; width: 100%; height: calc(100% - env(safe-area-inset-top, 0px) - 12px);
+  border: 0; border-radius: 12px 12px 0 0; background: #000;
+  animation: guide-up .42s cubic-bezier(.32, .72, 0, 1);
+}
+#guide-sheet.closing { animation: guide-dim .26s ease-in reverse forwards; }
+#guide-sheet.closing iframe { animation: guide-up .26s ease-in reverse forwards; }
+@keyframes guide-dim { from { background: transparent; } }
+@keyframes guide-up { from { transform: translateY(100%); } }
+@media (min-width: 768px) and (min-height: 700px) {
+  #guide-sheet { align-items: center; justify-content: center; }
+  #guide-sheet iframe { width: min(720px, 92vw); height: min(860px, 88vh); border-radius: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { #guide-sheet, #guide-sheet iframe { animation: none !important; } }
+:root[data-appstyle]:not([data-layout="landscape"]) .cc-install { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+:root[data-appstyle] #cc-guide { background: rgba(118, 118, 128, .3); }
+/* The "?" is the bar's trailing button, as in an iOS navigation bar. */
+:root[data-appstyle] #card-button { left: auto !important; right: calc(env(safe-area-inset-right, 0px) + 16px) !important; width: 26px; height: 26px; top: calc((var(--cabinet-fascia-height) - 26px) / 2 + env(safe-area-inset-top, 0px)); }
+
+/* The launch screen's copy, fading into the game's first frame. */
+.launch-fade {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+  background: #000; pointer-events: none; animation: launch-fade .35s ease-out .05s forwards;
+}
+.launch-fade::before { content: ''; width: 108px; height: 108px; border-radius: 24px; background: var(--app-icon) center / cover no-repeat; }
+.launch-fade > * { visibility: hidden; }
+@keyframes launch-fade { to { opacity: 0; } }
+
+/* The score to beat, under the title, as a navigation bar's subtitle. */
+:root[data-appstyle] #marquee-bar.jukebox-marquee #marquee-name {
+  flex-direction: column; gap: 3px; width: min(230px, calc(100vw - 210px)); padding: 0;
+  /* The same 44px line as the back button beside it. */
+  top: calc(env(safe-area-inset-top, 0px) + (var(--cabinet-fascia-height, 52px) - 44px) / 2) !important;
+  height: 44px !important; min-height: 44px !important;
+}
+:root[data-appstyle] #marquee-name::after { order: 1; }
+:root[data-appstyle] #marquee-name[data-best]::before {
+  display: block !important; order: 2; content: attr(data-best); max-width: 100%;
+  font: 400 12px/1 var(--app-font); color: rgba(235, 235, 245, .6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ---- Score prompts as iOS alerts (app style) ---- */
+:root[data-appstyle] .blip-hs-modal { background: rgba(0, 0, 0, .45); -webkit-backdrop-filter: none; backdrop-filter: none; }
+:root[data-appstyle] .blip-hs-panel {
+  width: min(300px, 92vw); padding: 20px 16px 0; border: 0; border-radius: 14px;
+  background: rgba(37, 37, 41, .86); -webkit-backdrop-filter: blur(40px) saturate(1.8); backdrop-filter: blur(40px) saturate(1.8);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .4); color: #fff; font-family: var(--app-font);
+}
+:root[data-appstyle] .blip-hs-title { font: 600 17px/1.3 var(--app-font); letter-spacing: 0; color: #fff; text-shadow: none; text-transform: lowercase; margin-bottom: 4px; }
+:root[data-appstyle] .blip-hs-sub { font: 400 13px/1.35 var(--app-font); letter-spacing: 0; color: rgba(235, 235, 245, .6); text-transform: lowercase; margin: 2px 0 10px; }
+:root[data-appstyle] .blip-hs-title::first-letter, :root[data-appstyle] .blip-hs-sub::first-letter { text-transform: uppercase; }
+:root[data-appstyle] .blip-hs-err { font: 400 13px/1.3 var(--app-font); color: #ff453a; }
+:root[data-appstyle] .blip-hs-input {
+  font: 400 17px/1 var(--app-font); letter-spacing: .04em; height: 36px; border: .5px solid rgba(255, 255, 255, .2);
+  border-radius: 8px; background: rgba(0, 0, 0, .35); color: #fff; text-shadow: none; box-shadow: none;
+}
+:root[data-appstyle] .blip-hs-input:focus { border-color: #0a84ff; }
+:root[data-appstyle] .blip-hs-row { margin: 14px -16px 0; gap: 0; border-top: .5px solid rgba(84, 84, 88, .65); flex-direction: row-reverse; }   /* the action on the right */
+:root[data-appstyle] .blip-hs-row + .blip-hs-row { margin-top: 0; }
+:root[data-appstyle] .blip-hs-btn {
+  flex: 1; min-height: 44px; margin: 0; padding: 0 8px; border: 0; border-radius: 0; background: none; box-shadow: none;
+  color: #0a84ff; font-size: 0; letter-spacing: 0; text-shadow: none;
+}
+:root[data-appstyle] .blip-hs-btn::after { content: attr(data-ios); font: 600 17px/1 var(--app-font); }
+:root[data-appstyle] .blip-hs-btn.ghost::after { font-weight: 400; }
+:root[data-appstyle] .blip-hs-btn + .blip-hs-btn { border-right: .5px solid rgba(84, 84, 88, .65); }
+:root[data-appstyle] .blip-hs-btn:focus-visible, :root[data-appstyle] .blip-hs-btn:active { background: rgba(255, 255, 255, .1); outline: none; }
+:root[data-appstyle] .blip-hs-btn:disabled { color: rgba(235, 235, 245, .3); }
+:root[data-appstyle] .blip-hs-list { font-family: var(--app-font); }
+:root[data-appstyle] .blip-hs-item { font: 400 15px/1.3 var(--app-font); color: #fff; letter-spacing: 0; }
+:root[data-appstyle] .blip-hs-item .hs-score { color: rgba(235, 235, 245, .6); }
+:root[data-appstyle] .blip-hs-item.me, :root[data-appstyle] .blip-hs-item.me .hs-rank, :root[data-appstyle] .blip-hs-item.me .hs-score { color: #30d158; }
+:root[data-appstyle] .blip-hs-stick { display: none; }
+
+/* "Turn sideways" in app style: a frosted card in system type. */
+:root[data-appstyle] #rotate-hint {
+  background: rgba(30, 30, 32, .82); -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px);
+  border-radius: 20px; font-family: var(--app-font); color: #fff;
+}
+:root[data-appstyle] #rotate-hint .rh-text { font: 600 17px/1.35 var(--app-font); letter-spacing: 0; text-shadow: none; text-transform: lowercase; }
+:root[data-appstyle] #rotate-hint .rh-text::first-letter { text-transform: uppercase; }
+:root[data-appstyle] #rotate-hint .rh-phone { border-color: #fff; box-shadow: inset 0 -6px 0 -3px #fff; border-radius: 9px; }
+:root[data-appstyle] #rotate-hint .rh-stay {
+  border: 0; border-radius: 12px; padding: 11px 18px; background: rgba(118, 118, 128, .3); color: #fff;
+  font: 600 15px/1 var(--app-font); letter-spacing: 0; text-transform: lowercase;
+}
+:root[data-appstyle] #rotate-hint .rh-stay::first-letter { text-transform: uppercase; }
+/* The first time: the card says how to begin. */
+:root[data-appstyle][data-intro] .cc-paper::after {
+  content: 'Press any key to play'; display: block; margin-top: 12px;
+  font: 400 13px/1.3 var(--app-font); color: rgba(235, 235, 245, .6);
+}
+:root[data-appstyle][data-intro][data-has-touch] .cc-paper::after { content: 'Tap to play'; }
+
+/* The top bar is the machine's marquee (marquee.css), the sign it wears in the arcade, lit across the whole bar
+   with the game's name; the flip tiles and the ROM slot are gone. App style keeps its own title bar. */
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee :is(.marquee-bulbs,.jukebox-receiver),
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee::before,
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee::after,
+:root:not([data-appstyle]) #marquee-name.machine-marquee::before,
+:root:not([data-appstyle]) #marquee-name.machine-marquee::after,
+:root:not([data-appstyle]) #marquee-name.machine-marquee .marquee-letter {display:none!important}
+:root[data-appstyle] .machine-marquee-name {display:none}
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee {
+  --trim:var(--machine-trim,#9a9aa6);
+  background:radial-gradient(ellipse 38% 95% at 50% 50%,#ffffff40,transparent 72%),var(--marquee-art,linear-gradient(transparent,transparent)),
+    linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff),var(--trim) 40%,color-mix(in srgb,var(--trim) 45%,#000))!important;
+  border:0!important;border-bottom:3px solid #09080c!important;
+  box-shadow:inset 0 0 0 1px #ffffff40,inset 0 -5px 9px #0006,0 0 30px color-mix(in srgb,var(--trim) 45%,transparent)!important;
+}
+:root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {
+  gap:0;padding:0 14px;background:none!important;border:0!important;box-shadow:none!important;
+}
+:root:not([data-appstyle]) .machine-marquee-name {
+  font:400 20px/1 'Press Start 2P','Courier New',monospace;letter-spacing:.02em;color:var(--marquee-ink,#fff7d6);-webkit-text-fill-color:currentColor;
+  text-shadow:-2px -2px #120c18,2px -2px #120c18,-2px 2px #120c18,2px 2px #120c18,3px 4px 0 color-mix(in srgb,var(--trim) 70%,#000),0 0 18px color-mix(in srgb,var(--trim) 80%,#fff);
+}
+@media (max-width:520px) {
+  :root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {padding:0 4px 0 14px}
+  :root:not([data-appstyle]) .machine-marquee-name {font-size:12px;text-shadow:-1px -1px #120c18,1px -1px #120c18,-1px 1px #120c18,1px 1px #120c18,2px 2px 0 color-mix(in srgb,var(--trim) 70%,#000)}
+}
+
+/* The arcade's zoom ends on the machine's screen; the game page opens on the same picture, where the game will
+   draw, and fades it as the first frame comes up (#launch-frame, from shell.js). */
+#launch-frame {
+  position: fixed;
+  z-index: 49;
+  background: #000 center / contain no-repeat;
+  image-rendering: pixelated;
+  clip-path: inset(0 round 10px);
+  pointer-events: none;
+  transition: opacity .35s ease-out;
+}
+#launch-frame.launch-frame-out { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { #launch-frame { transition: none; } }
+/* While the picture waits for the game, no loading words over it. */
+body:has(#launch-frame:not(.launch-frame-out)) #loader { visibility: hidden; }
+
+/* In the arcade the game page is its machine up close (data-machine, from shell.js): the frame round the screen is
+   the cabinet's black laminate edged in its T-molding colour, and the monitor has the cabinet's ring, as on the
+   cabinet in index.html. */
+:root[data-machine]:not([data-appstyle]) #arcade-bezel {
+  border-color: color-mix(in srgb, var(--machine-trim) 80%, #fff);
+  background: linear-gradient(90deg, #ffffff12, transparent 7% 93%, #0000004d), linear-gradient(180deg, #24212b, #131117 38%, #0d0c11);
+  box-shadow: 0 20px 52px rgba(0,0,0,.72), 0 0 0 5px #0c090e, 0 0 0 7px var(--machine-trim),
+    0 0 46px color-mix(in srgb, var(--machine-trim) 22%, transparent), inset 0 0 0 5px var(--machine-trim),
+    inset 0 0 0 7px #0008, inset 0 -9px 18px rgba(0,0,0,.58);
+}
+:root[data-machine]:not([data-appstyle]) #arcade-bezel .screw { display: none; }
+:root[data-machine]:not([data-appstyle]) .cabinet-glass {
+  box-shadow: inset 0 0 25px #000, 0 0 0 3px #000, 0 0 0 4px color-mix(in srgb, var(--machine-trim) 70%, #fff),
+    0 0 14px 3px color-mix(in srgb, var(--machine-trim) 45%, transparent);
+}

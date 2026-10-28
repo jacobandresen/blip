@@ -1,0 +1,15 @@
+.manual-flip {z-index:6;transform-style:preserve-3d;pointer-events:none;will-change:transform}
+.manual-flip-face {position:absolute;inset:0;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 0 18px #0006}
+.manual-flip-back {transform:rotateY(180deg)}
+.manual-flip-shade {position:absolute;inset:0;z-index:9;opacity:0;pointer-events:none;background:linear-gradient(90deg,#000a,#0002 55%,#0000)}
+.manual-flip-back .manual-flip-shade {background:linear-gradient(270deg,#000a,#0002 55%,#0000)}
+.manual-flip-cover {z-index:5;pointer-events:none}
+.manual-flip-cast {position:absolute;inset:0;z-index:8;opacity:0;pointer-events:none}
+.manual-flip-cast-left {background:linear-gradient(270deg,#000b,#0003 45%,#0000)}
+.manual-flip-cast-right {background:linear-gradient(90deg,#000b,#0003 45%,#0000)}
+
+/* The BLIP name plate in the top-left corner, at the cabinet badge's place, over both books. */
+.book-logo {position:fixed;z-index:20001;top:calc(6px + env(safe-area-inset-top,0px));left:max(10px,calc(env(safe-area-inset-left,0px) + 6px));width:116px;filter:drop-shadow(0 2px 3px #000a)}
+.book-logo img {display:block;width:100%;height:auto}
+.book-logo:focus-visible {outline:2px solid #dfc47e;outline-offset:3px;border-radius:6px}
+@media(max-width:600px) {.book-logo {top:calc(9px + env(safe-area-inset-top,0px));left:8px;width:86px}}

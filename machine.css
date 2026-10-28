@@ -1,0 +1,426 @@
+/* Physical surfaces shared by the overview cabinet and its game page. Layout stays with each view. */
+[data-machine] {
+  --trim:var(--machine-trim,#9a9aa6);
+  --machine-body:linear-gradient(90deg,#ffffff12,transparent 7% 93%,#0000004d),linear-gradient(180deg,#24212b,#131117 38%,#0d0c11);
+  --machine-monitor:radial-gradient(ellipse at 30% 0,#ffffff12,transparent 50%),#09090c;
+  --machine-monitor-ring:inset 0 0 0 4px #000,inset 0 0 0 5px color-mix(in srgb,var(--trim) 70%,#fff),inset 0 0 0 8px #050507,0 0 0 2px #2c2a31,0 4px 10px #000c;
+  --machine-glare:linear-gradient(160deg,#ffffff1a,#ffffff06 28%,transparent 40%),repeating-linear-gradient(0deg,#0000 0 2px,#00000024 2px 3px),radial-gradient(ellipse at 50% 50%,transparent 58%,#0008);
+  --machine-speaker:radial-gradient(circle,#000 0 1.4px,transparent 1.8px) 0 50%/6px 6px,linear-gradient(#3a3940,#1d1c22);
+  --machine-apron:linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff) 0 1px,var(--trim) 2px 5px,color-mix(in srgb,var(--trim) 55%,#000) 7px,#151318 9px,#252229 11px,#100e13 100%);
+  --machine-marquee:radial-gradient(ellipse 62% 85% at 50% 50%,#ffffff40,transparent 72%),var(--marquee-art,linear-gradient(transparent,transparent)),linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff),var(--trim) 40%,color-mix(in srgb,var(--trim) 45%,#000));
+}
+
+/* The overview's dimensions and 3D transforms are defined in index.html. */
+#game-grid .card {background:var(--machine-body)}
+#game-grid .card-shot-wrap {background:var(--machine-monitor);box-shadow:var(--machine-monitor-ring)}
+#game-grid .game-rom::after {background:var(--machine-glare)}
+#game-grid .machine-speaker {background:var(--machine-speaker)}
+#game-grid .machine-controls::after {background:var(--machine-apron)}
+#game-grid .card-title.machine-marquee,
+:root[data-machine]:not([data-appstyle]) #marquee-bar.jukebox-marquee {background:var(--machine-marquee)!important}
+#game-grid .machine-marquee-name {font:inherit}
+
+/* Up close: the same laminate, narrow coloured molding, speaker and CRT pinstripe. */
+:root {--machine-speaker-band:18px}
+:root[data-layout="landscape"],:root[data-bare],:root[data-fullscreen]:not([data-has-touch]) {--machine-speaker-band:0px}
+:root[data-machine]:not([data-appstyle],[data-amstrad],[data-cabinet-screen],[data-deck-preview]) body {
+  background:var(--machine-body);
+  box-shadow:inset 6px 0 var(--trim),inset -6px 0 var(--trim),inset 8px 0 #0008,inset -8px 0 #0008;
+}
+:root[data-machine]:not([data-appstyle]) #arcade-bezel {
+  top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px) + var(--machine-speaker-band,0px));
+  background:var(--machine-monitor);border:0;border-radius:6px;box-shadow:var(--machine-monitor-ring);
+}
+:root[data-machine]:not([data-appstyle]) #arcade-bezel::before,
+:root[data-machine]:not([data-appstyle]) #arcade-bezel::after {content:none}
+:root[data-machine]:not([data-appstyle]) .cabinet-glass {
+  background:var(--machine-glare);border-radius:16px/20px;box-shadow:0 0 0 3px #000,0 0 14px color-mix(in srgb,var(--trim) 45%,transparent);
+}
+:root[data-machine]:not([data-appstyle]) canvas {clip-path:inset(0 round 16px / 20px)}
+:root[data-machine]:not([data-appstyle]) .cab-rail {
+  background:var(--machine-body);box-shadow:inset 6px 0 var(--trim),inset -2px 0 #0008;
+}
+:root[data-machine]:not([data-appstyle]) .cab-rail::after {background:var(--trim)}
+body > .machine-speaker {
+  position:fixed;z-index:4;pointer-events:none;
+  top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px) + 3px);
+  left:20%;right:20%;height:10px;border-radius:2px;background:var(--machine-speaker);
+  box-shadow:inset 0 1px 2px #000,0 1px #ffffff1c;
+}
+:is(:root[data-layout="landscape"],:root[data-appstyle],:root[data-amstrad],:root[data-cabinet-screen],:root[data-bare],:root[data-fullscreen]:not([data-has-touch])) body > .machine-speaker {display:none}
+:root[data-machine]:not([data-appstyle])[data-layout="upright"] #topbar .deck-housing {
+  border-inline:3px solid var(--trim);border-top-color:#060608;
+  box-shadow:0 0 0 1px #0a080b,0 -4px 9px #0007,inset 1px 0 #fff2,inset -1px 0 #0009;
+}
+:root[data-machine]:not([data-appstyle])[data-layout="upright"] #topbar .deck-housing::before {
+  left:0;right:0;top:auto;bottom:0;height:12px;background:var(--machine-apron);border-radius:0;
+}
+/* Fullscreen and embedded games retain their edge-to-edge play surface. */
+:is(:root[data-bare],:root[data-fullscreen]:not([data-has-touch]),:root[data-amstrad],:root[data-cabinet-screen]) body {box-shadow:none}
+:is(:root[data-bare],:root[data-fullscreen]:not([data-has-touch]),:root[data-amstrad],:root[data-cabinet-screen]) canvas {clip-path:none}
+
+/* The browser matches these physical parts across navigation using their actual rendered bounds. */
+@view-transition {navigation:auto}
+.card-launching .card-shot-wrap {view-transition-name:machine-monitor}
+.card-launching .game-rom {view-transition-name:machine-picture}
+.card-launching .card-title {view-transition-name:machine-title}
+.card-launching .machine-marquee-name {view-transition-name:machine-name}
+.card-launching .machine-controls {view-transition-name:machine-deck}
+/* The way back is the same move reversed: the game page names the same parts as it leaves (data-machine-leaving)
+   and the arcade names its machine's (.card-launching) as it comes back. */
+:root[data-machine-leaving] #arcade-bezel {view-transition-name:machine-monitor}
+:root[data-machine-leaving] #glcanvas {view-transition-name:machine-picture}
+:root[data-machine-leaving] #marquee-bar {view-transition-name:machine-title}
+:root[data-machine-leaving] .machine-marquee-name {view-transition-name:machine-name}
+:root[data-machine-leaving] #topbar {view-transition-name:machine-deck}
+:root[data-machine-handoff] #arcade-bezel {view-transition-name:machine-monitor}
+:root[data-machine-handoff] #launch-frame {view-transition-name:machine-picture}
+:root[data-machine-handoff] #marquee-bar {view-transition-name:machine-title}
+:root[data-machine-handoff] .machine-marquee-name {view-transition-name:machine-name}
+:root[data-machine-handoff] #topbar {view-transition-name:machine-deck}
+/* The fascia's fittings stand at the same pixels on both pages: named, they hold still over the moving sign. */
+:is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) body > .blip-logo {view-transition-name:fascia-logo}
+:is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) #home-switch-btn {view-transition-name:fascia-home}
+:is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) #basic-switch-btn {view-transition-name:fascia-basic}
+:is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) .manual-pocket {view-transition-name:fascia-manual}
+:is(:root:has(.card-launching),:root[data-machine-handoff],:root[data-machine-leaving]) .blip-power-indicator {view-transition-name:fascia-power}
+:is(:root[data-machine-handoff],:root[data-machine-leaving]) #card-button {view-transition-name:fascia-card}
+/* One picture through the move: both ends are letterboxed alike. Going in, the frozen frame is the same on both
+   sides, so it does not cross-fade; coming back, the game's last frame holds until the machine has settled. */
+::view-transition-old(machine-picture),::view-transition-new(machine-picture) {width:100%;height:100%;object-fit:contain}
+:root[data-machine-handoff]::view-transition-old(machine-picture) {animation:none;opacity:0}
+:root[data-machine-handoff]::view-transition-new(machine-picture) {animation:none;opacity:1}
+:root:has(.card-launching)::view-transition-old(machine-picture) {animation:machine-picture-hold 900ms both}
+:root:has(.card-launching)::view-transition-new(machine-picture) {animation:machine-picture-show 900ms both}
+@keyframes machine-picture-hold {0%,75% {opacity:1} 100% {opacity:0}}
+@keyframes machine-picture-show {0%,75% {opacity:0} 100% {opacity:1}}
+::view-transition-group(machine-monitor),::view-transition-group(machine-picture),::view-transition-group(machine-title),::view-transition-group(machine-name),::view-transition-group(machine-deck) {
+  animation-duration:900ms;animation-timing-function:cubic-bezier(.45,0,.2,1);
+}
+::view-transition-old(root),::view-transition-new(root) {animation-duration:900ms;animation-timing-function:ease-in-out}
+@media (prefers-reduced-motion:reduce) {
+  @view-transition {navigation:none}
+}
+
+/* ---- The control panel ----
+   After a modern two-player cabinet: a matte charcoal moulded panel, black dust washers under red
+   ball-tops, and domed buttons in coloured bezels. Stick, cross and touch decks share the finish. */
+:root:not([data-appstyle])[data-layout="upright"][data-caps] .kiosk-bar > .deck-panel,
+:root:not([data-appstyle])[data-layout="upright"][data-caps] .snes-pad .snes-shell {
+  background:
+    linear-gradient(180deg,#000a 0,#0000 16px),
+    linear-gradient(0deg,#ffffff14 0 1px,#0007 2px,#ffffff0d 7px,#0000 16px),
+    radial-gradient(ellipse 80% 60% at 50% 30%,#ffffff0d,#0000 70%),
+    var(--cabinet-shell);
+  border:0;
+  border-radius:12px 12px 0 0;
+  box-shadow:0 0 0 1px #050506,0 -1px 0 1px #ffffff12,inset 1px 0 #ffffff0f,inset -1px 0 #0006,0 -12px 24px -10px #000c;
+}
+:root:not([data-appstyle])[data-layout="upright"] body.cabinet-page .deck-housing {
+  background:linear-gradient(90deg,#0007,#0000 12% 88%,#0007),var(--cabinet-shell);
+  border:1px solid #ffffff14;border-bottom:0;
+  box-shadow:0 0 0 1px #050506,0 -4px 9px #0007,inset 0 2px #ffffff12;
+}
+:root:not([data-appstyle])[data-layout="upright"] body.cabinet-page .deck-housing::after {content:none}
+:root:not([data-appstyle])[data-layout="upright"] body.cabinet-page .deck-housing::before {
+  background:linear-gradient(#ffffff26,#3a3b3f 1px,#1d1e21 3px,#101113 5px);
+}
+
+/* The dust washer: a glossy black disc, flat on the panel, with the boot rising from its middle. */
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-boot {
+  border:0;border-radius:50%;
+  background:
+    radial-gradient(circle at 50% 50%,#0000 0 44%,#ffffff1f 47%,#0000 52%),
+    radial-gradient(ellipse 70% 45% at 40% 22%,#ffffff2e,#0000 70%),
+    radial-gradient(circle at 50% 45%,#2c2d31 0,#151619 58%,#060607 100%);
+  box-shadow:0 1px 0 #ffffff12,0 3px 4px #000a,0 8px 12px #0006,inset 0 1px 1px #ffffff40,inset 0 -2px 3px #000c;
+}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-boot::before {
+  inset:30%;border-radius:50%;
+  background:radial-gradient(circle at 45% 38%,#26272b,#0b0b0d 70%);
+  box-shadow:0 0 0 1px #000,inset 0 2px 3px #000c;
+}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-handle::before {
+  background:linear-gradient(90deg,#0b0b0d,#3b3c41 38%,#1b1c1f 70%,#060607);
+}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-shaft {
+  background:linear-gradient(90deg,#0a0a0b,#45464b 30%,#1e1f22 62%,#050506);
+}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-ball {
+  background:
+    radial-gradient(ellipse 34% 24% at 34% 22%,#fff9 0,#fff3 45%,#0000 100%),
+    radial-gradient(circle at 38% 32%,#ff7d68 0,#de3326 30%,#b01a11 62%,#5e0905 100%);
+  box-shadow:0 6px 10px #0008,0 14px 18px #0004,inset -4px -6px 10px #2a0200a6,inset 0 0 0 1px #4a0503;
+}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-ball::after {
+  left:22%;top:12%;width:26%;height:14%;
+  background:linear-gradient(160deg,#ffffffd9,#fff0);
+}
+
+/* Buttons: a convex plunger in a bezel of the same coloured plastic. Fire is red; a second action is
+   blue at station one and green at station two; an unused cap is a dark blank. */
+:is(#topbar,#kiosk-bar) :is(.arcade-btn,.snes-btn) {--c:#d9302a;--c-hi:#ff8c76;--c-lo:#7a0d07}
+:is(#topbar,#kiosk-bar) :is(.arcade-btn,.snes-btn).alt {--c:#2756c8;--c-hi:#86a8ff;--c-lo:#0f2266}
+:is(#topbar,#kiosk-bar) :is(#deck-p2 .arcade-btn,.snes-pad.second .snes-btn).alt {--c:#139a7a;--c-hi:#74e6c6;--c-lo:#064a3a}
+:is(#topbar,#kiosk-bar) :is(#deck-p1,#deck-p2,#snes-pad,#snes-pad-p2) :is(.arcade-btn,.snes-btn).spare {--c:#34363b;--c-hi:#5d6067;--c-lo:#16171a}
+/* The caps sit straight on the panel, with no plate behind them. */
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.fire-buttons.four,.snes-face.four)::before {content:none}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn,.snes-btn) {
+  border:0;border-radius:50%;opacity:1;
+  background:radial-gradient(circle at 50% 30%,var(--c-hi) 0,var(--c) 42%,var(--c-lo) 100%);
+  box-shadow:0 1px 0 #ffffff14,0 3px 4px #0009,0 7px 12px #0005,inset 0 1px 1px #ffffff73,inset 0 -2px 3px #0008;
+}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn .arcade-btn-cap,.snes-btn > span) {
+  inset:13%;border:0;border-radius:50%;
+  background:
+    radial-gradient(ellipse 55% 40% at 40% 26%,#ffffffa6,#fff0 75%),
+    radial-gradient(circle at 46% 40%,var(--c-hi) 0,var(--c) 46%,var(--c-lo) 100%);
+  box-shadow:0 0 0 1.5px #0000004d,0 2px 3px #0006,inset 0 2px 2px #ffffff4d,inset 0 -3px 5px #0006;
+  transition:transform .05s,filter .05s;
+}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn .arcade-btn-cap,.snes-btn > span)::before {
+  left:24%;top:13%;width:28%;height:16%;
+  background:linear-gradient(160deg,#ffffffe6,#fff0);filter:none;
+}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn,.snes-btn).spare :is(.arcade-btn-cap,span)::before {opacity:.3}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn,.snes-btn)::after {display:none}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn.blip-pressed,.arcade-btn.active,.snes-btn.blip-pressed) {
+  transform:none;
+  box-shadow:0 1px 0 #ffffff14,0 2px 3px #0009,inset 0 1px 1px #ffffff4d,inset 0 -2px 3px #0008;
+}
+:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn.blip-pressed .arcade-btn-cap,.arcade-btn.active .arcade-btn-cap,.snes-btn.blip-pressed > span) {
+  transform:scale(.9);filter:brightness(.82);
+  box-shadow:0 0 0 1.5px #0006,inset 0 3px 6px #0007;
+}
+
+/* The cross: black moulded plastic in a shallow round recess. */
+:root:not([data-appstyle]) .snes-pad .snes-dpad {--dp-s0:#3b3c41;--dp-s1:#202125;--dp-s2:#0e0f11}
+:root:not([data-appstyle]) .snes-pad .snes-dpad.blip-touched,
+:root:not([data-appstyle]) .snes-pad .snes-dpad:has(.snes-dp-seg.blip-pressed) {--dp-s0:#55575d;--dp-s1:#2e3034;--dp-s2:#16171a}
+:root:not([data-appstyle]) .snes-pad .snes-dpad::before {
+  background:radial-gradient(circle at 50% 40%,#141518,#1d1e21 70%,#2a2b2f);
+  box-shadow:inset 0 3px 6px #000c,0 1px 0 #ffffff14;
+}
+
+/* Player lamps: square lit buttons in black bezels, as beside each stick on the cabinet. */
+:root:not([data-appstyle]) :is(.deck-credit-lamp,.deck-second-lamp) {
+  width:34px;height:20px;padding:0;border:0;border-radius:4px;
+  font:700 8px/20px 'Courier New',monospace;letter-spacing:.5px;text-align:center;
+  color:rgb(255 255 255 / calc(.22 + .7 * var(--on)));
+  text-shadow:0 0 calc(4px * var(--on)) rgb(var(--lamp));
+  background:
+    linear-gradient(180deg,#ffffff38,#fff0 45%),
+    radial-gradient(ellipse at 50% 45%,rgb(var(--lamp) / calc(.12 + .78 * var(--on))),rgb(var(--lamp) / calc(.06 + .4 * var(--on))) 80%);
+  background-color:#141517;
+  box-shadow:0 0 0 2px #060607,0 0 0 3px #ffffff1a,0 3px 5px #000b,0 0 calc(12px * var(--on)) rgb(var(--lamp) / .5),inset 0 -2px 3px #0007;
+}
+:root:not([data-appstyle]) :is(.deck-credit-lamp,.deck-second-lamp)::before {content:none}
+:root:not([data-appstyle]) .deck-credit-lamp {--lamp:236 72 52}
+:root:not([data-appstyle]) .deck-second-lamp {--lamp:64 160 255}
+:root[data-seats="1"] .deck-second-lamp {--on:0}
+
+/* Thumb-sized on a phone: two players side by side, each with a stick and two caps a thumb wide,
+   set on a slant like a cabinet's button arc. */
+@media (pointer:coarse) and (max-width:600px) {
+  :root[data-layout="upright"][data-caps="4"][data-controls][data-players] {
+    --cap:clamp(44px,calc(.42 * (50vw - 63px)),58px);
+  }
+}
+@media (max-width:600px) {
+  :root[data-layout="upright"][data-players] :is(#topbar,#kiosk-bar) :is(.snes-face.four,.fire-buttons.four) {
+    grid-template-columns:calc(var(--cap) * 1.3)!important;
+    row-gap:10px;
+  }
+  :root[data-layout="upright"][data-players] :is(#topbar,#kiosk-bar) :is(.snes-face.four,.fire-buttons.four) > :first-child {justify-self:end}
+  :root[data-layout="upright"][data-players] :is(#topbar,#kiosk-bar) :is(.snes-face.four,.fire-buttons.four) > :nth-child(2) {justify-self:start}
+}
+
+/* Pads lie on the panel itself: their shells are cut-outs, not plates of their own. */
+:root:not([data-appstyle])[data-layout="upright"][data-caps] :is(#snes-pad,#snes-pad-p2) .snes-shell {background:none;box-shadow:none;border:0;border-radius:0}
+
+/* The touch deck: a smoked-glass pad set into the panel, and keys in the buttons' plastic. */
+:root:not([data-appstyle]) body.cabinet-page .ts-glass {
+  background:radial-gradient(ellipse 90% 70% at 50% 0,#ffffff0f,#fff0 70%),linear-gradient(#141518,#0b0c0e);
+  box-shadow:0 0 0 1px #000,0 1px 0 1px #ffffff17,inset 0 2px 6px #000c;
+}
+:root:not([data-appstyle]) body.cabinet-page #touch-strip.held .ts-glass {
+  background:radial-gradient(ellipse 90% 70% at 50% 0,#ffffff17,#fff0 70%),linear-gradient(#18191c,#0e0f11);
+}
+:root:not([data-appstyle]) body.cabinet-page :is(.ts-tag,.ts-hint) {color:#9da2aa}
+:root:not([data-appstyle]) body.cabinet-page .ts-demo {background:#ffffff26;box-shadow:0 0 0 1px #ffffff33,0 0 12px #ffffff1a}
+:root:not([data-appstyle]) body.cabinet-page .ts-action {--c:#d9302a;--c-hi:#ff8c76;--c-lo:#7a0d07}
+:root:not([data-appstyle]) body.cabinet-page .ts-action[data-button="2"] {--c:#2756c8;--c-hi:#86a8ff;--c-lo:#0f2266}
+:root:not([data-appstyle]) body.cabinet-page .ts-actions[data-player="1"] .ts-action[data-button="2"] {--c:#139a7a;--c-hi:#74e6c6;--c-lo:#064a3a}
+:root[data-touch="action"]:not([data-appstyle]) body.cabinet-page .ts-action {
+  border:0;border-radius:14px;color:#fff;text-shadow:0 1px 2px #0009;
+  background:
+    linear-gradient(180deg,#ffffff59,#fff0 40%),
+    radial-gradient(ellipse 120% 90% at 50% 30%,var(--c-hi) 0,var(--c) 48%,var(--c-lo) 100%);
+  box-shadow:0 0 0 2px #0008,0 3px 5px #0009,inset 0 1px 1px #ffffff80,inset 0 -3px 5px #0007;
+}
+:root[data-touch="action"]:not([data-appstyle]) body.cabinet-page .ts-action.held {
+  filter:brightness(.8);
+  box-shadow:0 0 0 2px #0008,0 1px 2px #0009,inset 0 3px 6px #0008;
+}
+
+/* ---- The top bar ---- The fascia in the panel's charcoal plastic, with black glossy fittings:
+   round black switches, a slim manual card and a blue power LED. */
+:root:not([data-appstyle]):not([data-machine]) body.cabinet-page {
+  background:radial-gradient(ellipse at 50% 8%,#7f9bc414,#0000 43%),radial-gradient(ellipse at 50% 72%,#4a265012,#0000 60%),#0e0f12;
+}
+:root:not([data-appstyle]) .top-marquee-bar {
+  background:linear-gradient(180deg,#ffffff12,#fff0 40%),var(--cabinet-shell);
+  border-bottom:1px solid #050506;
+  box-shadow:0 1px 0 #ffffff12,0 6px 16px #000b,inset 0 1px #ffffff1f;
+}
+:root:not([data-appstyle]) body:has(#marquee-bar,.top-marquee-bar) .blip-logo.led-logo {border:0;background:none;box-shadow:none}
+:root:not([data-appstyle]) :is(.home-switch,#card-button) {
+  border:0;color:#d7dbe0;
+  background:radial-gradient(circle at 50% 30%,#3a3b40,#16171a 70%,#0b0b0d);
+  box-shadow:0 0 0 1px #000,0 1px 0 1px #ffffff1a,0 2px 4px #000a,inset 0 1px #ffffff40;
+}
+:root:not([data-appstyle]) :is(.home-switch,#card-button):is(:hover,:focus-visible),
+:root:not([data-appstyle])[data-card] #card-button,
+:root:not([data-appstyle]) body:has(#glcanvas) #card-button {
+  color:#fff;background:radial-gradient(circle at 50% 30%,#4b4d53,#1d1e22 70%,#0b0b0d);
+  box-shadow:0 0 0 1px #000,0 0 0 2px #ffffff40,0 0 10px #8fb8ff66,inset 0 1px #ffffff59;
+}
+:root:not([data-appstyle]) .manual-pocket {
+  border:0;border-radius:6px;
+  background:linear-gradient(180deg,#050506,#141518);
+  box-shadow:inset 0 2px 4px #000,0 0 0 1px #000,0 1px 0 1px #ffffff14;
+}
+:root:not([data-appstyle]) .manual-pocket::before {background:linear-gradient(#000c,#0000)}
+:root:not([data-appstyle]) .manual-pocket::after {display:none}
+/* The manual in its pocket shows its spine: navy book cloth, rounded, with gold double fillets at each end,
+   the title in gold foil, a gilt fore-edge and the tail of its red ribbon, in a slot lined with black felt. */
+:root:not([data-appstyle]) .manual-pocket {
+  background:radial-gradient(ellipse 80% 120% at 50% 0,#1a1b22,#050507 70%);
+  box-shadow:inset 0 3px 5px #000,inset 0 -1px #ffffff0d,0 0 0 1px #000,0 1px 0 1px #ffffff17;
+}
+:root:not([data-appstyle]) .cabinet-manual {
+  overflow:visible;border:0;border-radius:3px 5px 5px 3px;
+  background:
+    linear-gradient(180deg,#ffffff2e,#fff0 30% 70%,#0006),
+    repeating-linear-gradient(0deg,#ffffff0a 0 1px,transparent 1px 2px),repeating-linear-gradient(90deg,#00000024 0 1px,transparent 1px 2px),
+    linear-gradient(180deg,#2f4a72,#1f3556 50%,#14243d);
+  box-shadow:0 1px 1px #000,0 3px 5px #000b,inset 0 1px #ffffff40,inset 0 -1px #0009;
+}
+:root:not([data-appstyle]) .cabinet-manual::before {
+  left:12px;right:9px;top:4px;bottom:4px;width:auto;border:0;
+  background:linear-gradient(90deg,#e4c475 0 1px,#0000 1px 3px,#e4c475 3px 4px,#0000 4px calc(100% - 4px),#e4c475 calc(100% - 4px) calc(100% - 3px),#0000 calc(100% - 3px) calc(100% - 1px),#e4c475 calc(100% - 1px));
+  opacity:.85;
+}
+:root:not([data-appstyle]) .cabinet-manual::after {
+  right:-2px;top:2px;bottom:2px;width:3px;border:0;border-radius:0 2px 2px 0;
+  background:repeating-linear-gradient(0deg,#f8e6a8 0 1px,#b98d3f 1px 2px);box-shadow:1px 0 1px #0008;
+}
+:root:not([data-appstyle]) .manual-book-spine {width:9px;border:0;border-radius:3px 0 0 3px;background:linear-gradient(90deg,#0b1424,#1b2e4b 55%,#0e1a2c);box-shadow:inset -1px 0 #e4c47599}
+:root:not([data-appstyle]) .manual-book-copy strong {
+  font:700 8px/1 Georgia,serif;letter-spacing:.2em;text-indent:.2em;
+  background:linear-gradient(180deg,#fff3c8,#e6c06a 45%,#a8792f 56%,#efd28a);-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 1px 0 #000a);text-shadow:none;
+}
+@media(max-width:600px) {
+  :root:not([data-appstyle]) .manual-book-copy strong {font-size:7px;letter-spacing:.04em;text-indent:0}
+  :root:not([data-appstyle]) .manual-book-copy {gap:3px;padding:0 6px 0 2px}
+  :root:not([data-appstyle]) .cabinet-manual::before {left:11px;right:6px;background:linear-gradient(90deg,#e4c475 0 1px,#0000 1px calc(100% - 1px),#e4c475 calc(100% - 1px))}
+}
+/* The spine carries the cover's title: the BLIP plate and MANUAL. A hover lifts it a little out of its slot. */
+:root:not([data-appstyle]) .manual-book-copy {gap:6px}
+:root:not([data-appstyle]) .manual-book-plate {display:block;height:15px;width:auto;filter:drop-shadow(0 1px 1px #000a)}
+:root:not([data-appstyle]) .cabinet-manual {cursor:pointer;transition:transform .2s cubic-bezier(.2,.7,.15,1),box-shadow .2s}
+:root:not([data-appstyle]) .cabinet-manual:is(:hover,:focus-visible) {transform:translateY(-3px);filter:none;box-shadow:0 1px 1px #000,0 7px 9px #000c,inset 0 1px #ffffff40,inset 0 -1px #0009}
+@media(max-width:600px) {:root:not([data-appstyle]) .manual-book-plate {height:11px}:root:not([data-appstyle]) .cabinet-manual::before {display:none}}
+:root:not([data-appstyle]) .manual-page-edges {
+  display:block;position:absolute;right:26%;bottom:-8px;width:5px;height:10px;pointer-events:none;
+  background:linear-gradient(90deg,#7d1a14,#c0372b 50%,#86201a);clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);
+  filter:drop-shadow(0 1px 1px #000a);
+}
+:root:not([data-appstyle]) .blip-power-indicator {
+  border:0;color:#80858d;
+  background:linear-gradient(180deg,#24252a,#0d0e10);
+  box-shadow:0 0 0 1px #000,0 1px 0 1px #ffffff14,0 2px 6px #000a;
+}
+/* The machine is always switched on: its power lamp always burns. */
+:root:not([data-appstyle]) .blip-power-indicator {color:#c9d6e6}
+:root:not([data-appstyle]) .power-bulb {
+  border-color:#0b2a55;background:radial-gradient(circle at 40% 35%,#eaf4ff 0 15%,#5aa8ff 45%,#1d5fd0 80%);
+  box-shadow:0 0 5px 2px #4a9cff99,0 0 14px #3d8bff77,inset 0 0 2px #fff;
+}
+
+/* Sideways, each gutter seats a player: the caps stack beside the stick, a thumb wide, and the
+   player's lamp sits above the ball, clear of the top bar. */
+:root[data-layout="landscape"][data-players="2"] :is(#topbar,#kiosk-bar) {--cap:54px}
+:root[data-layout="landscape"][data-players="2"] :is(#topbar,#kiosk-bar) .fire-buttons.four {
+  grid-template-columns:calc(var(--cap) * 1.3);row-gap:10px;
+}
+:root[data-layout="landscape"][data-players="2"] :is(#topbar,#kiosk-bar) .arcade-btn {width:var(--cap);height:var(--cap)}
+:root[data-layout="landscape"][data-players="2"] :is(#topbar,#kiosk-bar) .fire-buttons.four > :first-child {justify-self:end}
+:root[data-layout="landscape"][data-players="2"] :is(#topbar,#kiosk-bar) .fire-buttons.four > :nth-child(2) {justify-self:start}
+:root[data-layout="landscape"]:not([data-appstyle]) :is(.deck-credit-lamp,.deck-second-lamp) {top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 168px)}
+
+/* Rally's spinners: the knurled knob on a black skirt, in the sticks' washer plastic. */
+:root:not([data-appstyle]) .dial-cap,
+:root:not([data-appstyle]) #paddle-dial-p2.cpu-mode .dial-cap {
+  background:radial-gradient(ellipse 70% 45% at 40% 22%,#ffffff2e,#0000 70%),radial-gradient(circle at 50% 45%,#2c2d31 0,#151619 58%,#060607 100%);
+  box-shadow:inset 0 1px 1px #ffffff40,inset 0 -2px 3px #000c,0 2px 0 #1a1b1e,0 4px 0 #0b0b0d,2px 9px 6px #000c,4px 14px 13px #0007;
+}
+
+/* ---- Up close, in the same room ----
+   On a screen wider than the machine, the arcade's wall shows either side of it: the same lowered ceiling,
+   the same maze mosaic (room-tiles.svg, made from the arcade's own) drawn larger because we stand closer,
+   and the same carpet. The cabinet is a column in its own laminate and trim. */
+@media (min-width:1017px) {
+  :root[data-machine]:not([data-appstyle],[data-amstrad],[data-cabinet-screen],[data-deck-preview],[data-bare]) body {
+    --column:calc(var(--cabinet-width) + 56px);
+    --room-top:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
+    --room-tile:clamp(34px,4.4vh,56px);
+    box-shadow:none;
+    background:
+      linear-gradient(90deg,#0009,transparent 22px calc(100% - 22px),#0009) center top / var(--column) 100% no-repeat,
+      linear-gradient(90deg,var(--trim) 0 6px,#0008 6px 8px,transparent 8px calc(100% - 8px),#0008 calc(100% - 8px) calc(100% - 6px),var(--trim) calc(100% - 6px)) center top / var(--column) 100% no-repeat,
+      linear-gradient(90deg,#ffffff12,transparent 7% 93%,#0000004d) center top / var(--column) 100% no-repeat,
+      linear-gradient(180deg,#24212b,#131117 38%,#0d0c11) center top / var(--column) 100% no-repeat,
+      linear-gradient(90deg,transparent calc(50% - var(--column) / 2 - 56px),#000b calc(50% - var(--column) / 2),#000b calc(50% + var(--column) / 2),transparent calc(50% + var(--column) / 2 + 56px)),
+      linear-gradient(180deg,#000c,#0000 26px) center calc(100% - 9vh) / 100% 26px no-repeat,
+      repeating-linear-gradient(90deg,#6b211c 0 80px,#180b08 80px 160px) center bottom / 100% 9vh no-repeat,
+      linear-gradient(180deg,#2b0d09 0 16%,#d63c31 16%,#c3302a 42%,#8f1d17 72%,#6e140f 74%,#fff3c8 76%,#ffd36b 86%,#e7a23e 100%) 0 var(--room-top) / 100% 46px no-repeat,
+      radial-gradient(ellipse 60% 30% at 50% 0,rgb(255 200 130 / .22),transparent 70%) 0 calc(var(--room-top) + 46px) / 100% 60% no-repeat,
+      url(room-tiles.svg) center calc(var(--room-top) + 46px) / calc(var(--room-tile) * 32) auto repeat-x,
+      linear-gradient(180deg,#b8582f,#8e3720 30%,#561d12 80%,#260a07);
+  }
+  :root[data-machine]:not([data-appstyle],[data-amstrad],[data-cabinet-screen],[data-deck-preview],[data-bare]) .cab-rail {display:none}
+}
+
+/* Rally: the spinners stand a fifth of the way in from each end of the panel, where hands fall, with their
+   lamps under them. */
+:root[data-dials][data-layout="upright"][data-caps][data-controls][data-players] {--ctl-cx:19%}
+:root[data-dials][data-layout="upright"][data-players] .deck-second-lamp {left:calc(100% - var(--ctl-cx))}
+@media (max-width:600px) {
+  :root[data-dials][data-layout="upright"][data-caps][data-controls][data-players] {--ctl-cx:23%}
+}
+
+/* The room moves with the machine: the page being left and the page arriving are scaled about the machine's
+   screen (blipMachineZoom), so the wall, the neighbours and the deck travel with the cabinet as one place
+   seen nearer or farther, rather than one picture fading into another. */
+:is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-old(root) {
+  transform-origin:0 0;animation:machine-room-leave 900ms cubic-bezier(.45,0,.2,1) both;
+}
+:is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-new(root) {
+  transform-origin:0 0;animation:machine-room-arrive 900ms cubic-bezier(.45,0,.2,1) both;
+}
+@keyframes machine-room-leave {
+  0% {transform:none;opacity:1}
+  45% {opacity:1}
+  100% {transform:var(--machine-zoom-old,none);opacity:0}
+}
+@keyframes machine-room-arrive {
+  0% {transform:var(--machine-zoom-new,none);opacity:0}
+  40% {opacity:.6}
+  100% {transform:none;opacity:1}
+}
+@media (prefers-reduced-motion:reduce) {
+  :is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-old(root),
+  :is(:root[data-machine-handoff],:root[data-machine-return])::view-transition-new(root) {animation-duration:.01ms}
+}

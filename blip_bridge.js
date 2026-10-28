@@ -1,0 +1,101 @@
+// Wires Rust (wasm) FFI imports to JS callbacks defined in shell.js.
+// Loaded BEFORE mq_js_bundle.js so `miniquad_add_plugin` is available.
+
+register_plugin = function (importObject) {
+    var queuedKeys = new Set();
+    var keyCodes = { ArrowLeft: 0xff51, ArrowUp: 0xff52, ArrowRight: 0xff53, ArrowDown: 0xff54,
+                     Space: 32, Enter: 0xff0d, Escape: 0xff1b };
+    document.addEventListener('keydown', function (event) {
+        if (event.target.id !== 'glcanvas' || event.repeat) return;
+        var code = /^Key[A-Z]$/.test(event.code) ? event.code.charCodeAt(3) : keyCodes[event.code];
+        if (code !== undefined) queuedKeys.add(code);
+    }, true);
+    importObject.env.blip_input_pressed = function (key) { return queuedKeys.has(key) ? 1 : 0; };
+    importObject.env.blip_input_clear = function () { queuedKeys.clear(); };
+    var drawNames=['glDrawElements','glDrawArrays','glDrawElementsInstanced','glDrawArraysInstanced'],draws={},ready=false;
+    drawNames.forEach(function(name){
+        var original=importObject.env[name];if(typeof original!=='function')return;draws[name]=original;
+        importObject.env[name]=function(){
+            var result=original.apply(this,arguments),count=arguments[name.indexOf('Arrays')>=0?2:1];
+            if(!ready&&count>0&&gl.getParameter(gl.FRAMEBUFFER_BINDING)===null){
+                ready=true;Object.keys(draws).forEach(function(key){importObject.env[key]=draws[key];});
+                requestAnimationFrame(function(){if(typeof window.blipCanvasReady==='function')window.blipCanvasReady();});
+            }
+            return result;
+        };
+    });
+    importObject.env.blip_spend_coin = function () {
+        if (typeof window.blipSpendCoin === 'function') {
+            window.blipSpendCoin();
+        }
+    };
+    importObject.env.blip_set_mode = function (mode) {
+        if (typeof window.blipSetMode === 'function') {
+            window.blipSetMode(mode);
+        }
+    };
+    importObject.env.blip_paddles = function (left, right) {
+        if (typeof window.blipPaddles === 'function') {
+            window.blipPaddles(left, right);
+        }
+    };
+    importObject.env.blip_game_over = function (score) {
+        if (typeof window.blipGameOver === 'function') {
+            window.blipGameOver(score);
+        }
+    };
+    importObject.env.blip_high_score = function () {
+        if (typeof window.blipHighScore === 'function') {
+            return window.blipHighScore() | 0;
+        }
+        return 0;
+    };
+    // Touch play (shell.js): is a finger down in this slot, and where, as a
+    // fraction of the canvas (axis 0 = x, 1 = y).
+    importObject.env.blip_touch_down = function (slot) {
+        return typeof window.blipTouchDown === 'function' ? window.blipTouchDown(slot) | 0 : 0;
+    };
+    importObject.env.blip_touch_pos = function (slot, axis) {
+        return typeof window.blipTouchPos === 'function' ? +window.blipTouchPos(slot, axis) : 0;
+    };
+    // A game opened as an app (home screen, its own icon) draws a clean,
+    // modern picture: no CRT, and at the screen's full pixel density, so
+    // the pixels are scaled up sharp rather than shrunk and blurred.
+    // BASIC draws the same clean game art inside its monitor's glass overlay.
+    var basicRuntime = document.documentElement.hasAttribute('data-basic-runtime');
+    var clean = basicRuntime || document.documentElement.hasAttribute('data-appstyle');
+    importObject.env.blip_crt = function () { return clean ? 0 : 1; };
+    importObject.env.blip_glitch = function () { return !clean && !basicRuntime ? 1 : 0; };
+    var setupCanvas = importObject.env.setup_canvas_size;
+    if (clean && typeof setupCanvas === 'function') {
+        importObject.env.setup_canvas_size = function () { return setupCanvas.call(this, true); };
+    }
+    importObject.env.blip_picture = function (w, h) {
+        window.blipPicture = { w: w, h: h };
+        window.dispatchEvent(new Event('blip-picture'));
+    };
+    // What the player holds: 0 a keyboard, 1 the deck's pad or stick, 2 the
+    // touch surface. A title screen words its prompts by it.
+    importObject.env.blip_controls = function () {
+        var root = basicRuntime ? window.parent.document.documentElement : document.documentElement;
+        if (root.hasAttribute('data-touch')) return 2;
+        return root.hasAttribute('data-has-touch') ? 1 : 0;
+    };
+    importObject.env.blip_haptic = function () {
+        if (typeof window.blipHaptic === 'function') window.blipHaptic();
+    };
+    // Rust hands us a scratch buffer (ptr + capacity) in wasm memory; we
+    // write the record holder's handle as UTF-8 and return the byte count.
+    importObject.env.blip_high_name = function (ptr, cap) {
+        cap = cap | 0;
+        if (cap <= 0 || typeof window.blipHighName !== 'function') return 0;
+        var name = window.blipHighName();
+        if (!name) return 0;
+        var bytes = new TextEncoder().encode(String(name));
+        var n = Math.min(bytes.length, cap);
+        new Uint8Array(wasm_memory.buffer, ptr, n).set(bytes.subarray(0, n));
+        return n;
+    };
+};
+
+miniquad_add_plugin({ register_plugin: register_plugin });
