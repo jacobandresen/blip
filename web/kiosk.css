@@ -2778,7 +2778,7 @@ body.need-coin #kiosk-insert-btn,
 .top-marquee-bar,
 #marquee-bar {
   background:
-    var(--cabinet-wood);
+    var(--cabinet-shell);
   border-bottom-color:rgba(224,183,121,.72);
   box-shadow:0 0 0 1px rgba(224,183,121,.2),0 5px 18px rgba(0,0,0,.68),inset 0 2px rgba(255,239,208,.22),inset 0 -1px rgba(15,8,8,.8);
 }
@@ -2927,7 +2927,7 @@ body.need-coin #kiosk-insert-btn,
   height:calc(var(--cabinet-fascia-height) + env(safe-area-inset-top,0px));
   align-items:center;
   background:
-    var(--cabinet-wood);
+    var(--cabinet-shell);
   border-bottom:2px solid #120c0d;
   box-shadow:0 7px 20px rgba(0,0,0,.76),inset 0 2px rgba(255,239,208,.3),inset 0 -2px #100b0c,inset 0 -4px rgba(196,151,93,.22);
 }
@@ -3019,7 +3019,7 @@ body.need-coin #kiosk-insert-btn,
     var(--bolt-l),var(--bolt-r),
     linear-gradient(115deg,#fff0d315,transparent 32% 68%,#0005),
     linear-gradient(180deg,#fff2 0 1px,#0007 2px 5px,transparent 12px 78%,#0006),
-    var(--cabinet-wood);
+    var(--cabinet-shell);
   border:1px solid var(--cabinet-trim);
   border-bottom:0;
   box-shadow:0 0 0 1.5px #0c090e,0 0 0 2.5px rgba(224,183,121,.3),inset 1px 0 #ffe8ba26,inset -2px 0 #0009,inset 0 2px #fff0d552,inset 0 -5px #100d10,inset 0 -7px #ba946c40,inset 0 -13px 18px #0008,0 -10px 24px -10px #000c;
@@ -3030,7 +3030,7 @@ body.need-coin #kiosk-insert-btn,
     var(--bolt-l),var(--bolt-r),
     linear-gradient(115deg,#fff0d315,transparent 32% 68%,#0005),
     linear-gradient(180deg,#fff2 0 1px,#0007 2px 5px,transparent 12px 78%,#0006),
-    var(--cabinet-wood);
+    var(--cabinet-shell);
   box-shadow:0 0 0 1.5px #0c090e,0 0 0 2.5px rgba(224,183,121,.3),inset 1px 0 #ffe8ba26,inset -2px 0 #0009,inset 0 2px #fff0d552,inset 0 -5px #100d10,inset 0 -7px #ba946c40,inset 0 -13px 18px #0008,0 -10px 24px -10px #000c;
 }
 
@@ -3363,48 +3363,24 @@ body:has(#marquee-bar) .blip-logo:hover { color:#f0e5cd; }
   top:auto;bottom:0;height:56px!important;
 }
 
+/* The badge is the BLIP name plate (blip-logo.svg), the same on every screen. */
 body .blip-logo.led-logo {
   top:calc(6px + env(safe-area-inset-top,0px));left:10px;width:116px;height:40px!important;
-  padding:4px 7px!important;display:inline-flex;align-items:center;justify-content:center;
-  border:1px solid #a18b65;border-radius:5px;background:linear-gradient(110deg,#71604a,#2e2821 45%,#9c8766);
-  box-shadow:0 2px 0 #211b15,0 4px 6px #000a,inset 0 1px #e4cdaa;
-  text-shadow:none;animation:none!important;overflow:visible;
+  padding:0!important;display:inline-flex;align-items:center;justify-content:center;
+  border:0;border-radius:6px;background:none;box-shadow:none;
+  text-shadow:none;animation:none!important;overflow:visible;filter:drop-shadow(0 2px 3px #000a);
 }
-.blip-led-display {width:100%;height:100%;display:block;background:#100d0a;border-radius:2px}
-/* The badge always reads BLIP, lit; credits show on the machines, not here. */
-.blip-led-display .led-on {fill:#ffc17a;filter:drop-shadow(0 0 1px #ff8a30);transition:fill .12s}
-.blip-led-display .led-off {fill:#302017}
-.led-logo .logo-power-wire {position:absolute;left:calc(100% - 1px);top:0;width:32px;height:100%;overflow:visible;pointer-events:none}
-.logo-power-wire path {fill:none;stroke-linecap:round}
-.logo-power-wire .wire-shadow {stroke:#0009;stroke-width:6}
-.logo-power-wire .wire-jacket {stroke:#171513;stroke-width:4.5}
-.logo-power-wire .wire-highlight {stroke:#756a59;stroke-width:.9}
-.logo-power-wire .wire-current {stroke:#e6b071;stroke-width:1.4;stroke-dasharray:5 90;opacity:0}
-:root[data-power-up][data-credit] .wire-current {animation:logo-current-feed .36s linear both}
-:root[data-power-up][data-credit] .blip-led-display .led-on {animation:logo-lamp-start .68s linear both;animation-delay:calc(.2s + var(--led-bank,0)*45ms)}
-@keyframes logo-current-feed {0%{stroke-dashoffset:-62;opacity:0}20%{opacity:.7}85%{opacity:.7}100%{stroke-dashoffset:0;opacity:0}}
-@keyframes logo-lamp-start {0%{opacity:.16}30%{opacity:.78}40%{opacity:.6}62%{opacity:1}72%{opacity:.88}100%{opacity:1}}
-@media(prefers-reduced-motion:reduce) {:root[data-power-up] .wire-current,:root[data-power-up] .blip-led-display .led-on {animation:none}}
-.blip-logo.led-logo::before {
-  content:'';position:absolute;inset:4px 6px;border:1px solid #5e4831;border-radius:3px;pointer-events:none;
-  background:linear-gradient(125deg,#f7d1a018,transparent 40% 65%,#ffe0af08);box-shadow:inset 0 1px 3px #0009;
-}
-.blip-logo.led-logo::after {
-  content:'';position:absolute;left:2px;top:16px;width:2px;height:5px;border-radius:1px;background:#211b13;
-  box-shadow:109px 0 #211b13;pointer-events:none;
-}
+.blip-logo-mark {display:block;width:100%;height:auto}
 @media(max-width:600px) {
-  body .blip-logo.led-logo {top:calc(9px + env(safe-area-inset-top,0px));left:8px;width:86px;height:34px!important;padding:4px 5px!important}
-  .blip-logo.led-logo::before {inset:4px}
-.blip-logo.led-logo::after {top:13px;box-shadow:79px 0 #211b13}
+  body .blip-logo.led-logo {top:calc(9px + env(safe-area-inset-top,0px));left:8px;width:86px;height:34px!important}
 }
 
 :root {--cabinet-width:960px;--dock-clearance:82px;--mechanics-layer-height:54px}
 /* The fascia casts onto the recessed mechanisms without enlarging the bar. */
 .top-marquee-bar::before,#marquee-bar.jukebox-marquee::before {
   content:'';position:absolute;left:0;right:0;bottom:0;height:6px;pointer-events:none;
-  background:linear-gradient(#271a15,#795838 25%,#32231c 45%,#110b0b 85%);
-  box-shadow:inset 0 1px #d5af7755;
+  background:linear-gradient(#15151b,#4b4b5a 25%,#25252e 45%,#0b0b0e 85%);
+  box-shadow:inset 0 1px #ffffff26;
 }
 .top-marquee-bar::after,#marquee-bar.jukebox-marquee::after,.jukebox-transfer::after {
   content:'';position:absolute;left:0;right:0;top:100%;height:36px;pointer-events:none;
@@ -3496,18 +3472,18 @@ body.cabinet-page::after {
       padding: 27px 22px 54px;
       border: 1px solid var(--cabinet-trim);
       border-radius: 22px;
-      background: var(--cabinet-wood);
+      background: var(--cabinet-shell);
       box-shadow:
         0 20px 52px rgba(0,0,0,.72), 0 0 0 5px #0c090e,
-        0 0 0 7px rgba(224,183,121,.34), 0 0 46px rgba(202,99,50,.14),
-        inset 0 2px rgba(255,239,208,.2), inset 0 -9px 18px rgba(0,0,0,.58);
+        0 0 0 7px rgba(255,255,255,.1), 0 0 46px rgba(120,105,196,.12),
+        inset 0 2px rgba(255,255,255,.12), inset 0 -9px 18px rgba(0,0,0,.58);
     }
     .screen-bezel::before {
       content: '';
       position: absolute;
       inset: 12px;
       border-radius: 10px;
-        box-shadow: inset 0 0 26px rgba(0,0,0,.84), inset 0 2px 0 rgba(255,239,208,.2), inset 0 0 0 1px rgba(224,183,121,.18);
+        box-shadow: inset 0 0 26px rgba(0,0,0,.84), inset 0 2px 0 rgba(255,255,255,.12), inset 0 0 0 1px rgba(255,255,255,.08);
       pointer-events: none;
     }
     .screen-bezel::after {
@@ -3516,8 +3492,8 @@ body.cabinet-page::after {
       inset: 12px;
       border-radius: 10px;
         background: linear-gradient(115deg,
-        rgba(255,239,208,.065) 0%, transparent 16%,
-        transparent 82%, rgba(255,196,132,.025) 100%);
+        rgba(255,255,255,.05) 0%, transparent 16%,
+        transparent 82%, rgba(255,255,255,.02) 100%);
       pointer-events: none;
     }
     .screen-bezel .screw {
@@ -3597,23 +3573,21 @@ body.cabinet-page::after {
   right:max(16px, calc((100% - var(--cabinet-width)) / 2));
 }
 
+/* The cabinet's shell: matte charcoal moulded plastic, finely textured, as on a modern two-player cabinet. */
 :root {
-  --cabinet-trim:rgba(197,164,117,.58);
-  --cabinet-wood:
-    repeating-linear-gradient(174deg, transparent 0 13px, rgba(240,207,164,.028) 14px, transparent 16px 28px),
-    linear-gradient(110deg, rgba(255,229,187,.035), transparent 35% 75%, rgba(0,0,0,.12)),
-    linear-gradient(155deg, #50372b 0%, #362720 18%, #211a1c 62%, #100e12 100%);
+  --cabinet-trim:rgba(255,255,255,.1);
+  --plastic-grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --cabinet-shell:
+    var(--plastic-grain),
+    linear-gradient(110deg, rgba(255,255,255,.04), transparent 35% 75%, rgba(0,0,0,.14)),
+    linear-gradient(180deg, #353542 0%, #2a2a36 22%, #22212b 68%, #1a1a22 100%);
 }
-body.cabinet-page .kiosk-bar {
-  --bolt-l:radial-gradient(circle at 12px 11px,#c2aa83 0 .8px,#77644c 1.8px,#241d18 3.2px,#000b 3.9px,transparent 4.8px);
-  --bolt-r:radial-gradient(circle at calc(100% - 12px) 11px,#c2aa83 0 .8px,#77644c 1.8px,#241d18 3.2px,#000b 3.9px,transparent 4.8px);
-}
+body.cabinet-page .kiosk-bar {--bolt-l:none;--bolt-r:none}
 body.cabinet-page .cab-rail {
   background:
-    linear-gradient(90deg,transparent 10%,#dfbd831a 11%,transparent 12% 88%,#dfbd831a 89%,transparent 90%),
-    repeating-linear-gradient(173deg,transparent 0 8px,#ecb67806 9px,transparent 11px 18px),
-    radial-gradient(circle at 50% 0,#a38b64 0 1.4px,#241b16 2px,transparent 3px) 0 44px / 100% 150px repeat-y,
-    linear-gradient(90deg,#51392b,#312420 52%,#151215);
+    var(--plastic-grain),
+    linear-gradient(90deg,#ffffff0d,transparent 14% 80%,#0000004d),
+    linear-gradient(180deg,#2e2f33,#202124 60%,#18191b);
 }
 
 body.cabinet-page :is(#topbar, .kiosk-bar-main) { background:none; border:0; box-shadow:none; }

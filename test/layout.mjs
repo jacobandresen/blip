@@ -300,6 +300,11 @@ for (const device of mine) {
     for (const chapter of ['about', 'controls']) {
       await page.goto(`${origin}/index.html?manual=${chapter}`);
       await page.waitForFunction(() => !document.getElementById('manual-overlay').inert && document.querySelector('.manual-page-content .manual-leaf-sheet'), null, { timeout: 30000 });
+      // A wide screen lands the book closed; open it.
+      if (await page.locator('.manual-cover-closed').count()) {
+        await page.locator('.manual-cover-closed').click();
+        await page.waitForFunction(() => !document.querySelector('.manual-cover') && !document.getElementById('manual-overlay').inert);
+      }
       await page.waitForTimeout(700);
       const shown = await page.evaluate(() => {
         const box = (selector) => [...document.querySelectorAll(selector)].filter((el) => {

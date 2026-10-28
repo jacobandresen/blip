@@ -235,3 +235,6 @@
   background:radial-gradient(ellipse 50% 70% at 50% 100%,rgb(6 2 1 / .55),transparent 72%)}
 #game-grid .room-wrapper {position:absolute;left:104%;top:100%;width:30%;pointer-events:none;overflow:visible;transform-origin:50% 0;
   transform:translateZ(20px) rotateX(-90deg) rotateZ(-14deg)}
+
+/* On a computer the room fills the window: the frame is the window less its margins, not a fixed 960px. */
+:root {--cabinet-width:calc(100vw - 32px)}

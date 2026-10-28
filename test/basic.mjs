@@ -2113,7 +2113,7 @@ test('the BASIC home has no game toolbar and uses the BLIP 64 page title', async
   await page.goto(`${origin}/basic.html`);
   assert.equal(await page.title(), 'BLIP 64');
   // The arcade's own top bar: the BLIP badge and Home Screen.
-  assert.equal(await page.locator('#basic-to-cabinet.blip-logo.led-logo .blip-led-display').count(), 1);
+  assert.equal(await page.locator('#basic-to-cabinet.blip-logo.led-logo .blip-logo-mark').count(), 1);
   assert.equal(await page.locator('#basic-to-home.home-switch').getAttribute('aria-label'), 'Switch to the home screen');
   assert.equal(await page.locator('.top-marquee-bar').isVisible(), true, 'the arcade’s top bar');
   assert.equal(await page.locator('.quick-bar, #maximize-screen, [data-command="GAMES"]').count(), 0);

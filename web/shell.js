@@ -78,6 +78,9 @@ function returnToCabinet(event) {
     try { sessionStorage.setItem('blip-home-return', JSON.stringify(departure)); } catch (e) {}
   } else {
     try { departure.frame = canvas.toDataURL('image/png'); } catch (e) {}
+    var screen = document.getElementById('arcade-bezel').getBoundingClientRect();
+    departure.screen = { x:screen.left, y:screen.top, w:screen.width, h:screen.height };
+    departure.native = 'onpageswap' in window && 'onpagereveal' in window && CSS.supports('view-transition-name', 'machine-monitor');
     try { sessionStorage.setItem('blip-cabinet-return', JSON.stringify(departure)); } catch (e) {}
   }
   location.href = blipFrontendUrl();
@@ -704,11 +707,22 @@ function refit() {
 // A machine started from the arcade zooms into its screen; the game page opens on that same picture, where the
 // game will draw, and lets the first frame come up through it (blip-cabinet-launch, set by the arcade).
 var cabinetTransition = null;
-window.addEventListener('pageswap',function(event){if(event.viewTransition)event.viewTransition.skipTransition();});
+// Back to the arcade, the machine's parts are named as this page is captured, so they move back into its cabinet.
+window.addEventListener('pageswap',function(event){
+  if(!event.viewTransition)return;
+  if(returningToCabinet&&document.documentElement.hasAttribute('data-machine'))document.documentElement.setAttribute('data-machine-leaving','');
+  else event.viewTransition.skipTransition();
+});
+window.addEventListener('pageshow',function(){document.documentElement.removeAttribute('data-machine-leaving');});
 window.addEventListener('pagereveal',function(event){
   fillCanvas();
   if(!event.viewTransition){document.documentElement.removeAttribute('data-machine-handoff');return;}
   if(!document.documentElement.hasAttribute('data-machine-handoff')){event.viewTransition.skipTransition();return;}
+  try {
+    var from=JSON.parse(sessionStorage.getItem('blip-machine-screen')||'null'),screen=document.getElementById('arcade-bezel').getBoundingClientRect();
+    sessionStorage.removeItem('blip-machine-screen');
+    if(from&&from.vw===innerWidth&&from.vh===innerHeight)blipMachineZoom(from,{x:screen.left,y:screen.top,w:screen.width,h:screen.height},false);
+  } catch(e) {}
   cabinetTransition=event.viewTransition.finished.catch(function(){});
   cabinetTransition.then(function(){document.documentElement.removeAttribute('data-machine-handoff');});
 });
@@ -861,9 +875,9 @@ window.blipCanvasReady=function(){
           }
           if(getCoins()<=0 || document.querySelector('.blip-hs-modal')){dropLaunchFrame();return;}
           canvas.focus({preventScroll:true});
+          // One press, past the title: a game with a fighter select opens on it, so the player picks their own.
           pressStart();
-          if(slug==='brawler')setTimeout(pressStart,320);
-          setTimeout(dropLaunchFrame,slug==='brawler'?700:400);
+          setTimeout(dropLaunchFrame,400);
         }
         setTimeout(beginCabinetPlay,180);
       }
