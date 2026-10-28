@@ -11,6 +11,8 @@
   <style>
     html { background:#100d0b; }
     :root[data-cabinet-arranging] body { opacity:0; pointer-events:none; }
+    /* Back from a machine, its parts move back into the aisle: the room is shown as it is laid out. */
+    :root[data-cabinet-arranging][data-machine-return] body { opacity:1; }
   </style>
   <script>
     // Every visit starts in the arcade, whatever was open last; the Home
@@ -19,16 +21,19 @@
     try { sessionStorage.setItem('blip-freeplay', '0'); } catch (e) {}   // this session plays the cabinet's way
     document.documentElement.setAttribute('data-cabinet-arranging', '');
   </script>
+  <!-- The first frame waits for the whole page to be parsed: a machine coming back from its game is named by the
+       page's script before that frame is shown and captured. -->
+  <link rel="expect" href="#arcade-parsed" blocking="render">
   <link rel="manifest" href="manifest.json">
-  <link rel="icon" type="image/x-icon" href="favicon.ico?v=2">
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=2">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=2">
-  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
+  <link rel="icon" type="image/x-icon" href="favicon.ico?v=3">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=3">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=3">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
   <link rel="stylesheet" href="marquee.css?v=1">
-  <link rel="stylesheet" href="kiosk.css?v=158">
-  <link rel="stylesheet" href="wear.css?v=13">
-  <link rel="stylesheet" href="book.css?v=1">
-  <link rel="stylesheet" href="manual.css?v=50">
+  <link rel="stylesheet" href="kiosk.css?v=159">
+  <link rel="stylesheet" href="wear.css?v=14">
+  <link rel="stylesheet" href="book.css?v=2">
+  <link rel="stylesheet" href="manual.css?v=56">
   <!-- Match the shared cabinet controls before first paint. -->
   <script>
     if (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
@@ -38,8 +43,16 @@
       var departure = JSON.parse(sessionStorage.getItem('blip-cabinet-return') || 'null');
       sessionStorage.removeItem('blip-cabinet-return');
       if (departure && Date.now() - departure.at < 15000 && /^[a-z_]+$/.test(departure.slug)) {
-        window.blipCabinetReturn = departure;
-        document.documentElement.setAttribute('data-cabinet-return', '');
+        // A browser that carries the machine across pages steps back from it (blipMachineReturn); otherwise the
+        // aisle rolls back in over the game's last frame.
+        if (departure.native && 'onpagereveal' in window) {
+          window.blipMachineReturn = departure;
+          document.documentElement.setAttribute('data-machine-return', '');
+        }
+        else {
+          window.blipCabinetReturn = departure;
+          document.documentElement.setAttribute('data-cabinet-return', '');
+        }
       }
     } catch (e) {}
 
@@ -562,18 +575,20 @@
     body.cabinet-page .screen-bezel {bottom:0!important}
     :root[data-layout="landscape"] body.cabinet-page .screen-bezel {bottom:env(safe-area-inset-bottom,0px)!important}
 
-    /* The shared deck slopes out from the monitor; its front apron faces the player. */
-    .machine-controls {position:absolute;z-index:5;left:-4%;right:-4%;top:48%;height:calc(var(--deck-height,125px) + 10px);border:0;border-radius:0;clip-path:none;
+    /* The shared deck slopes out from the monitor; its front apron faces the player. It is the game page's deck as a
+       computer shows it (a 1000 × 800 page), scaled to the cabinet's width, so it keeps the game page's proportions. */
+    .machine-controls {position:absolute;z-index:5;left:-4%;right:-4%;top:48%;height:calc(var(--deck-height,42px) + 10px);border:0;border-radius:0;clip-path:none;
       background:none;box-shadow:none;transform-style:preserve-3d;transform-origin:50% 0;transform:rotateX(32deg) scaleX(.98);}
-    .machine-controls::before {content:'';position:absolute;left:0;right:0;top:0;height:var(--deck-height,125px);border-radius:7px 7px 0 0;
+    .machine-controls::before {content:'';position:absolute;left:0;right:0;top:0;height:var(--deck-height,42px);border-radius:7px 7px 0 0;
       background:#1b181b;box-shadow:0 -3px 5px #000b,inset 1px 0 #fff3,inset -1px 0 #000b;transform:translateZ(-1px)}
-    .machine-controls::after {content:'';position:absolute;left:0;right:0;top:var(--deck-height,125px);height:22px;transform-origin:50% 0;transform:rotateX(-32deg);border-radius:0 0 4px 4px;
+    .machine-controls::after {content:'';position:absolute;left:0;right:0;top:var(--deck-height,42px);height:22px;transform-origin:50% 0;transform:rotateX(-32deg);border-radius:0 0 4px 4px;
       background:linear-gradient(180deg,color-mix(in srgb,var(--trim) 65%,#fff) 0 1px,var(--trim) 2px 5px,color-mix(in srgb,var(--trim) 55%,#000) 7px,#151318 9px,#252229 11px,#100e13 100%);
       box-shadow:inset 1px 0 #fff2,inset -1px 0 #0009,0 8px 10px #000b}
-    .machine-deck {position:absolute;left:0;right:0;top:0;height:var(--deck-height,125px);overflow:hidden;pointer-events:none}
-    .machine-deck iframe {position:absolute;left:0;top:0;width:390px;height:844px;border:0;background:transparent;
-      transform-origin:0 0;transform:scale(var(--deck-scale,.831)) translateY(-694px)}
-    .machine-deck-cheek {position:absolute;top:0;left:0;width:calc(var(--deck-height,125px) * .45);height:var(--deck-height,125px);transform-origin:0 0;transform:rotateY(90deg);
+    .machine-deck {position:absolute;left:0;right:0;top:0;height:var(--deck-height,42px);overflow:hidden;pointer-events:none}
+    .machine-deck iframe[data-loaded] {opacity:1}
+    .machine-deck iframe {opacity:0;transition:opacity .35s;position:absolute;left:0;top:0;width:1000px;height:800px;border:0;background:transparent;
+      transform-origin:0 0;transform:scale(var(--deck-scale,.324)) translateY(-672px)}
+    .machine-deck-cheek {position:absolute;top:0;left:0;width:calc(var(--deck-height,42px) * .45);height:var(--deck-height,42px);transform-origin:0 0;transform:rotateY(90deg);
       clip-path:polygon(0 0,0 100%,100% 72%);background:linear-gradient(90deg,#393039,#17131a 35%,#0b090e);pointer-events:none}
     .machine-deck-cheek.right {left:100%;background:linear-gradient(90deg,#211c24,#0b090e 80%)}
     /* On a small screen the cabinet shrinks but Start does not: it stays a thumb wide (30px tall at least). */
@@ -646,12 +661,12 @@
       .machine-coinbox.coin-inserting .machine-coin-slot::after {animation:none}
     }
   </style>
-  <link rel="stylesheet" href="arcade-room.css?v=14">
-  <link rel="stylesheet" href="machine.css?v=2">
+  <link rel="stylesheet" href="arcade-room.css?v=15">
+  <link rel="stylesheet" href="machine.css?v=4">
 </head>
 <body class="cabinet-page">
 
-  <a class="blip-logo led-logo" href="index.html" aria-label="BLIP — cabinet"><svg class="blip-led-display" viewBox="0 0 100 32" aria-hidden="true"><circle class="led-on" cx="4" cy="4" r="1.35"/><circle class="led-on" cx="8" cy="4" r="1.35"/><circle class="led-on" cx="12" cy="4" r="1.35"/><circle class="led-on" cx="16" cy="4" r="1.35"/><circle class="led-off" cx="20" cy="4" r="1.35"/><circle class="led-on" cx="4" cy="8" r="1.35"/><circle class="led-off" cx="8" cy="8" r="1.35"/><circle class="led-off" cx="12" cy="8" r="1.35"/><circle class="led-off" cx="16" cy="8" r="1.35"/><circle class="led-on" cx="20" cy="8" r="1.35"/><circle class="led-on" cx="4" cy="12" r="1.35"/><circle class="led-off" cx="8" cy="12" r="1.35"/><circle class="led-off" cx="12" cy="12" r="1.35"/><circle class="led-off" cx="16" cy="12" r="1.35"/><circle class="led-on" cx="20" cy="12" r="1.35"/><circle class="led-on" cx="4" cy="16" r="1.35"/><circle class="led-on" cx="8" cy="16" r="1.35"/><circle class="led-on" cx="12" cy="16" r="1.35"/><circle class="led-on" cx="16" cy="16" r="1.35"/><circle class="led-off" cx="20" cy="16" r="1.35"/><circle class="led-on" cx="4" cy="20" r="1.35"/><circle class="led-off" cx="8" cy="20" r="1.35"/><circle class="led-off" cx="12" cy="20" r="1.35"/><circle class="led-off" cx="16" cy="20" r="1.35"/><circle class="led-on" cx="20" cy="20" r="1.35"/><circle class="led-on" cx="4" cy="24" r="1.35"/><circle class="led-off" cx="8" cy="24" r="1.35"/><circle class="led-off" cx="12" cy="24" r="1.35"/><circle class="led-off" cx="16" cy="24" r="1.35"/><circle class="led-on" cx="20" cy="24" r="1.35"/><circle class="led-on" cx="4" cy="28" r="1.35"/><circle class="led-on" cx="8" cy="28" r="1.35"/><circle class="led-on" cx="12" cy="28" r="1.35"/><circle class="led-on" cx="16" cy="28" r="1.35"/><circle class="led-off" cx="20" cy="28" r="1.35"/><circle class="led-on" cx="28" cy="4" r="1.35"/><circle class="led-off" cx="32" cy="4" r="1.35"/><circle class="led-off" cx="36" cy="4" r="1.35"/><circle class="led-off" cx="40" cy="4" r="1.35"/><circle class="led-off" cx="44" cy="4" r="1.35"/><circle class="led-on" cx="28" cy="8" r="1.35"/><circle class="led-off" cx="32" cy="8" r="1.35"/><circle class="led-off" cx="36" cy="8" r="1.35"/><circle class="led-off" cx="40" cy="8" r="1.35"/><circle class="led-off" cx="44" cy="8" r="1.35"/><circle class="led-on" cx="28" cy="12" r="1.35"/><circle class="led-off" cx="32" cy="12" r="1.35"/><circle class="led-off" cx="36" cy="12" r="1.35"/><circle class="led-off" cx="40" cy="12" r="1.35"/><circle class="led-off" cx="44" cy="12" r="1.35"/><circle class="led-on" cx="28" cy="16" r="1.35"/><circle class="led-off" cx="32" cy="16" r="1.35"/><circle class="led-off" cx="36" cy="16" r="1.35"/><circle class="led-off" cx="40" cy="16" r="1.35"/><circle class="led-off" cx="44" cy="16" r="1.35"/><circle class="led-on" cx="28" cy="20" r="1.35"/><circle class="led-off" cx="32" cy="20" r="1.35"/><circle class="led-off" cx="36" cy="20" r="1.35"/><circle class="led-off" cx="40" cy="20" r="1.35"/><circle class="led-off" cx="44" cy="20" r="1.35"/><circle class="led-on" cx="28" cy="24" r="1.35"/><circle class="led-off" cx="32" cy="24" r="1.35"/><circle class="led-off" cx="36" cy="24" r="1.35"/><circle class="led-off" cx="40" cy="24" r="1.35"/><circle class="led-off" cx="44" cy="24" r="1.35"/><circle class="led-on" cx="28" cy="28" r="1.35"/><circle class="led-on" cx="32" cy="28" r="1.35"/><circle class="led-on" cx="36" cy="28" r="1.35"/><circle class="led-on" cx="40" cy="28" r="1.35"/><circle class="led-on" cx="44" cy="28" r="1.35"/><circle class="led-on" cx="52" cy="4" r="1.35"/><circle class="led-on" cx="56" cy="4" r="1.35"/><circle class="led-on" cx="60" cy="4" r="1.35"/><circle class="led-on" cx="64" cy="4" r="1.35"/><circle class="led-on" cx="68" cy="4" r="1.35"/><circle class="led-off" cx="52" cy="8" r="1.35"/><circle class="led-off" cx="56" cy="8" r="1.35"/><circle class="led-on" cx="60" cy="8" r="1.35"/><circle class="led-off" cx="64" cy="8" r="1.35"/><circle class="led-off" cx="68" cy="8" r="1.35"/><circle class="led-off" cx="52" cy="12" r="1.35"/><circle class="led-off" cx="56" cy="12" r="1.35"/><circle class="led-on" cx="60" cy="12" r="1.35"/><circle class="led-off" cx="64" cy="12" r="1.35"/><circle class="led-off" cx="68" cy="12" r="1.35"/><circle class="led-off" cx="52" cy="16" r="1.35"/><circle class="led-off" cx="56" cy="16" r="1.35"/><circle class="led-on" cx="60" cy="16" r="1.35"/><circle class="led-off" cx="64" cy="16" r="1.35"/><circle class="led-off" cx="68" cy="16" r="1.35"/><circle class="led-off" cx="52" cy="20" r="1.35"/><circle class="led-off" cx="56" cy="20" r="1.35"/><circle class="led-on" cx="60" cy="20" r="1.35"/><circle class="led-off" cx="64" cy="20" r="1.35"/><circle class="led-off" cx="68" cy="20" r="1.35"/><circle class="led-off" cx="52" cy="24" r="1.35"/><circle class="led-off" cx="56" cy="24" r="1.35"/><circle class="led-on" cx="60" cy="24" r="1.35"/><circle class="led-off" cx="64" cy="24" r="1.35"/><circle class="led-off" cx="68" cy="24" r="1.35"/><circle class="led-on" cx="52" cy="28" r="1.35"/><circle class="led-on" cx="56" cy="28" r="1.35"/><circle class="led-on" cx="60" cy="28" r="1.35"/><circle class="led-on" cx="64" cy="28" r="1.35"/><circle class="led-on" cx="68" cy="28" r="1.35"/><circle class="led-on" cx="76" cy="4" r="1.35"/><circle class="led-on" cx="80" cy="4" r="1.35"/><circle class="led-on" cx="84" cy="4" r="1.35"/><circle class="led-on" cx="88" cy="4" r="1.35"/><circle class="led-off" cx="92" cy="4" r="1.35"/><circle class="led-on" cx="76" cy="8" r="1.35"/><circle class="led-off" cx="80" cy="8" r="1.35"/><circle class="led-off" cx="84" cy="8" r="1.35"/><circle class="led-off" cx="88" cy="8" r="1.35"/><circle class="led-on" cx="92" cy="8" r="1.35"/><circle class="led-on" cx="76" cy="12" r="1.35"/><circle class="led-off" cx="80" cy="12" r="1.35"/><circle class="led-off" cx="84" cy="12" r="1.35"/><circle class="led-off" cx="88" cy="12" r="1.35"/><circle class="led-on" cx="92" cy="12" r="1.35"/><circle class="led-on" cx="76" cy="16" r="1.35"/><circle class="led-on" cx="80" cy="16" r="1.35"/><circle class="led-on" cx="84" cy="16" r="1.35"/><circle class="led-on" cx="88" cy="16" r="1.35"/><circle class="led-off" cx="92" cy="16" r="1.35"/><circle class="led-on" cx="76" cy="20" r="1.35"/><circle class="led-off" cx="80" cy="20" r="1.35"/><circle class="led-off" cx="84" cy="20" r="1.35"/><circle class="led-off" cx="88" cy="20" r="1.35"/><circle class="led-off" cx="92" cy="20" r="1.35"/><circle class="led-on" cx="76" cy="24" r="1.35"/><circle class="led-off" cx="80" cy="24" r="1.35"/><circle class="led-off" cx="84" cy="24" r="1.35"/><circle class="led-off" cx="88" cy="24" r="1.35"/><circle class="led-off" cx="92" cy="24" r="1.35"/><circle class="led-on" cx="76" cy="28" r="1.35"/><circle class="led-off" cx="80" cy="28" r="1.35"/><circle class="led-off" cx="84" cy="28" r="1.35"/><circle class="led-off" cx="88" cy="28" r="1.35"/><circle class="led-off" cx="92" cy="28" r="1.35"/></svg></a>
+  <a class="blip-logo led-logo" href="index.html" aria-label="BLIP — cabinet"><img class="blip-logo-mark" src="blip-logo.svg" alt=""></a>
   <button type="button" class="home-switch" id="home-switch-btn" aria-label="Switch to the home screen" title="Home screen"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="4" height="4" rx="1.2"/><rect x="7" y="1" width="4" height="4" rx="1.2"/><rect x="1" y="7" width="4" height="4" rx="1.2"/><rect x="7" y="7" width="4" height="4" rx="1.2"/></svg></button>
   <button type="button" class="home-switch basic-switch" id="basic-switch-btn" aria-label="Switch to BLIP" title="BLIP">B</button>
   <div class="top-marquee-bar"><span id="marquee-name" class="marquee-empty" aria-label="No game selected"><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span><span class="marquee-letter">&nbsp;</span></span></div>
@@ -887,6 +902,7 @@
 
   <!-- The landing page's controls let the player walk the aisle and start a machine. -->
   <div class="manual-overlay" id="manual-overlay" hidden role="dialog" aria-modal="true" aria-label="BLIP Arcade Manual">
+    <a class="book-logo" href="index.html" aria-label="BLIP — cabinet"><img src="blip-logo.svg" alt=""></a>
     <div class="manual-open-book" role="document">
       <section class="manual-open-page manual-open-left" id="manual-contents-page" aria-label="Manual left page">
         <i class="manual-tear" aria-hidden="true"></i>
@@ -949,13 +965,13 @@
     </div>
     </div>
   </template>
-  <script src="deck.js?v=17"></script>
+  <script src="deck.js?v=19"></script>
   <script src="book.js?v=3"></script>
-  <script src="manual-motion.js?v=3"></script>
+  <script src="manual-motion.js?v=8"></script>
 
   <script src="howler.min.js"></script>
-  <script src="blip_core.js?v=9"></script>
-  <script src="kiosk.js?v=101"></script>
+  <script src="blip_core.js?v=10"></script>
+  <script src="kiosk.js?v=102"></script>
   <script src="aisle.js?v=2"></script>
   <script>
     /* ------------------------------------------------------------------ */
@@ -1043,7 +1059,7 @@
     updateCreditsDisplay(); // initialise dimming to match coins on page load
 
     // Start opens the selected machine; its credit is spent by the game after the first frame.
-    var cardInFlight = false, pendingCard = null, focusArcadeCard = null, arcadeStepBack = null;
+    var cardInFlight = false, pendingCard = null, focusArcadeCard = null, arcadeStepBack = null, arcadeStepIn = null;
     document.querySelectorAll('#game-grid .card').forEach(function(card){var tray=card.querySelector('.card-shot-wrap'),image=tray.querySelector('.card-shot'),rom=document.createElement('div');rom.className='game-rom';rom.append(image);tray.appendChild(rom);});
     document.querySelectorAll('#game-grid .card').forEach(function(card){
       var title=card.querySelector('.card-title'),slug=(card.getAttribute('data-game-url')||'').split('/')[0];
@@ -1061,7 +1077,7 @@
       controls.innerHTML='<button type="button" class="machine-start" aria-label="Start '+name+'"><span class="machine-start-cap">START</span></button>';
       // The deck is the game page's own, built by deck.js, so the cabinet's controls are the ones the player will use.
       var deck=document.createElement('div');deck.className='machine-deck';
-      deck.innerHTML='<iframe src="machine-deck.html?game='+slug+'" tabindex="-1" aria-hidden="true" title=""></iframe>';
+      deck.innerHTML='<iframe src="machine-deck.html?game='+slug+'" tabindex="-1" aria-hidden="true" title="" onload="this.dataset.loaded=\'\'"></iframe>';
       controls.appendChild(deck);
       ['left','right'].forEach(function(side){var cheek=document.createElement('span');cheek.className='machine-deck-cheek '+side;cheek.setAttribute('aria-hidden','true');controls.appendChild(cheek);});
       card.appendChild(controls.querySelector('.machine-start'));
@@ -1501,6 +1517,8 @@
       try { sessionStorage.setItem('blip-cabinet-launch',JSON.stringify({slug:machineSlug,at:Date.now(),art:new URL(art,location.href).href,native:nativeTransition})); } catch(e) {}
       // Cross-document transitions snapshot the same cabinet parts on both pages, with no estimated endpoint.
       if(nativeTransition){
+        // Lean in at once while the game page loads; the move carries on from wherever the lean has got to.
+        if(typeof arcadeStepIn==='function')arcadeStepIn();
         requestAnimationFrame(function(){window.location.href=gameCardUrl(card);});
         return;
       }
@@ -1521,7 +1539,28 @@
     }
     var LAUNCH_MS=760;
     window.addEventListener('pageswap',function(event){
-      if(event.viewTransition&&!document.querySelector('.card-launching'))event.viewTransition.skipTransition();
+      if(!event.viewTransition)return;
+      var launching=document.querySelector('#game-grid .card-launching .card-shot-wrap');
+      if(!launching){event.viewTransition.skipTransition();return;}
+      var r=launching.getBoundingClientRect();
+      try{sessionStorage.setItem('blip-machine-screen',JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height,vw:innerWidth,vh:innerHeight}));}catch(e){}
+    });
+    // Back from a game: the machine's parts are named, its screen holds the game's last frame, and the page's
+    // view steps back from it into the aisle.
+    window.addEventListener('pagereveal',function(event){
+      var back=window.blipMachineReturn;window.blipMachineReturn=null;
+      if(!event.viewTransition){document.documentElement.removeAttribute('data-machine-return');return;}
+      var card=back&&document.querySelector('#game-grid .card[data-game-url^="'+back.slug+'/"]');
+      if(!card){document.documentElement.removeAttribute('data-machine-return');event.viewTransition.skipTransition();return;}
+      card.classList.add('card-launching');
+      if(back.screen){var r=card.querySelector('.card-shot-wrap').getBoundingClientRect();blipMachineZoom({x:r.left,y:r.top,w:r.width,h:r.height},back.screen,true);}
+      var shot=card.querySelector('.card-shot');
+      if(shot&&/^data:image\/png;base64,/.test(back.frame||'')){shot.dataset.still=shot.getAttribute('src');shot.src=back.frame;}
+      event.viewTransition.finished.catch(function(){}).then(function(){
+        document.documentElement.removeAttribute('data-machine-return');
+        card.classList.remove('card-launching');
+        if(shot&&shot.dataset.still){shot.src=shot.dataset.still;delete shot.dataset.still;}
+      });
     });
     // A picture of this shape, letterboxed in a box, as the game draws itself.
     function fitPicture(box,aspect) {
@@ -1967,6 +2006,7 @@
         if(steppedUp)setStepped(false);
       }
       arcadeStepBack=stepBack;
+      arcadeStepIn=function(){if(!steppedUp)setStepped(true);};
       function setStepped(on) {
         steppedUp=on;
         grid.toggleAttribute('data-stepped-up',on);
@@ -2179,5 +2219,6 @@
       });
     }, {once:true});
   </script>
+<i id="arcade-parsed" hidden></i>
 </body>
 </html>

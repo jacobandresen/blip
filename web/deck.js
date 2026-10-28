@@ -19,7 +19,6 @@
 
   var root = document.documentElement;
   if (game && root.hasAttribute('data-deck-preview')) root.setAttribute('data-machine', game.slug);
-  if (game) root.setAttribute('data-deck-wear', game.slug);
   root.setAttribute('data-caps', String(CAPS));
   // Every deck seats two, as a two-player cabinet does; a one-player game's second station takes no input.
   root.setAttribute('data-players', '2');
@@ -28,8 +27,8 @@
   // The manual, in its pocket on the top bar: opened in place where the page has it, else in a new tab.
   function pocketBook(game) {
     var book=el(document.getElementById('manual-overlay')?'button':'a','cabinet-manual',
-      '<span class="manual-book-spine" aria-hidden="true"></span><span class="manual-book-copy"><strong>MANUAL</strong><small>BLIP · OPERATOR’S COPY</small></span><span class="manual-page-edges" aria-hidden="true"></span>',
-      {id:'manual-book','data-page-card':'true','aria-label':'Lift the BLIP Arcade Manual'});
+      '<span class="manual-book-spine" aria-hidden="true"></span><span class="manual-book-copy"><img class="manual-book-plate" src="'+(game?'../':'')+'blip-logo.svg" alt=""><strong>MANUAL</strong><small>BLIP · OPERATOR’S COPY</small></span><span class="manual-page-edges" aria-hidden="true"></span>',
+      {id:'manual-book','data-page-card':'true','aria-label':'Lift the BLIP Arcade Manual',title:'Open the BLIP manual'});
     if(book.tagName==='BUTTON')book.type='button';
     else {
       book.href=(game?'../':'')+'index.html?manual=controls'+(game?'&game='+game.slug:'');

@@ -407,3 +407,104 @@ body.info-page .manual-leaf .page img {filter:grayscale(1) contrast(.9)}
 .manual-turn {cursor:pointer}
 .manual-turn:disabled {cursor:default}
 .manual-turn:focus-visible {outline:1px dotted #77766b;outline-offset:-6px}
+
+/* ---- The BASIC book's edition ----
+   The manual is printed as a companion to the BLIP BASIC programming book: the same tan cloth, cream paper,
+   navy sans headings over red eyebrows, Georgia text, Courier tables and dark pill tabs. */
+.manual-overlay {
+  --paper:#f4ebd4;--ink:#26241f;--ink-soft:#5f5848;--red:#8f3a2e;--blue:#2f4a66;--head:#1f2a36;
+  --display:"Helvetica Neue",Arial,sans-serif;
+  --cloth:repeating-linear-gradient(0deg,#ffffff0d 0 1px,transparent 1px 3px),repeating-linear-gradient(90deg,#0000000f 0 1px,transparent 1px 3px);
+  --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .36 0 0 0 0 .28 0 0 0 0 .16 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background:radial-gradient(ellipse 75% 65% at 50% 40%,#4b4337 0,#2b261f 55%,#141210 100%) #1c1915;
+}
+.manual-open-book > :not(.manual-flip):not(.manual-cover),.manual-flip-face,.manual-cover-back,.manual-page-content,
+.manual-page-content img,.manual-figure img,body.info-page .manual-leaf {filter:none!important}
+.manual-open-book {border:0;border-radius:7px;background:var(--cloth),linear-gradient(90deg,#8d7448,#c4a86f 3%,#d2b77e 50%,#c4a86f 97%,#8d7448);
+  box-shadow:0 34px 44px -18px #000d,0 10px 18px #0007,inset 0 0 0 1px #5d4a2c,inset 2px 2px 3px #fff3d455}
+.manual-open-book::before {border:0;background:repeating-linear-gradient(0deg,#f7efda 0 1px,#cdbf9a 1px 2px);box-shadow:0 1px 2px #0004}
+.manual-open-book::after {background:none}
+.manual-open-page,.manual-open-left {color:var(--ink);background:var(--grain),radial-gradient(ellipse at 60% 8%,#fffaea80,transparent 50%),var(--paper);box-shadow:none}
+.manual-open-left {box-shadow:inset -1px 0 #9d8c6488}
+.manual-open-left::after {content:'';position:absolute;inset:0;z-index:3;pointer-events:none;background:linear-gradient(270deg,#3b2a1050 0,#3b2a1018 3%,#3b2a1000 10%),linear-gradient(90deg,#4b3a1a1c,#0000 5%)}
+.manual-open-right::after {background:linear-gradient(90deg,#3b2a1050 0,#3b2a1018 3%,#3b2a1000 10%),linear-gradient(270deg,#4b3a1a1c,#0000 5%);opacity:1}
+.manual-open-spine {background:linear-gradient(90deg,#c9b78f,#8c7a55 40%,#5f5039 50%,#8c7a55 60%,#c9b78f);box-shadow:none}
+.manual-open-left::before,.manual-open-right::before {background:repeating-linear-gradient(90deg,#f7efda 0 1px,#cdbf9a 1px 2px)}
+.manual-page-corner {background:linear-gradient(135deg,transparent 48%,#2a221626 50%,#fbf4df 52%,#e3d4ad)}
+
+/* Running heads, folios and the contents */
+.manual-paper-mark,.manual-page-number,.manual-page-number b {color:#7a705a;font:700 7.5px/1 var(--display);letter-spacing:.22em}
+.manual-page-number {border-bottom-color:#8f846655}
+.manual-folio {color:#6f6550;font:italic 11px/1 Georgia,serif}
+.manual-open-left h2 {color:var(--head);font:800 30px/1 var(--display);letter-spacing:.16em}
+.manual-open-left h2 + .manual-contents {margin-top:16px;padding-top:6px;border-top:3px double #5f5848}
+.manual-contents button {color:var(--ink);font:700 10px/1.3 var(--display);letter-spacing:.07em;text-transform:uppercase}
+.manual-contents button i {border-bottom:1px dotted #8a7b58}
+.manual-contents button b {color:var(--red);font:italic 400 12px/1 Georgia,serif}
+.manual-contents button:hover > span,.manual-contents button[aria-current] > span {color:var(--red);text-decoration:none}
+.manual-contents button:focus-visible {outline:1px dotted var(--red)}
+.manual-game-contents button {font:italic 12px/1.3 Georgia,serif;letter-spacing:0;text-transform:none;color:var(--ink-soft)}
+.manual-game-index-title {color:var(--red);font:700 8.5px/1 var(--display);letter-spacing:.26em;text-transform:uppercase}
+.manual-stamp {border-color:var(--red);color:var(--red);opacity:.5}
+.manual-footnote {color:#8a7f66}
+
+/* Chapter type: a red eyebrow, a navy sans title over a rule, an italic lead, Georgia text. */
+.manual-page-content .manual-chapter-number,.manual-page-content .manual-first-edition {color:var(--red);font:700 8.5px/1 var(--display);font-style:normal;letter-spacing:.26em;text-transform:uppercase}
+.manual-page-content h1,.manual-page-content .manual-subchapter-title,.manual-page-content .manual-first-edition + h2 {
+  padding-bottom:10px;border-bottom:1px solid #8f846688;color:var(--head);font:800 clamp(22px,2.6vw,30px)/1.08 var(--display);letter-spacing:.005em;text-shadow:none}
+.manual-page-content .manual-chapter-deck,.manual-page-content .manual-first-intro {color:#3a362d;font:italic 15px/1.45 Georgia,serif}
+.manual-page-content h2 {color:var(--red);font:700 9px/1.4 var(--display);letter-spacing:.2em}
+.manual-page-content h3,.manual-controls-title {margin:16px 0 6px;padding:0;border:0;color:var(--blue);font:700 10px/1.2 var(--display);letter-spacing:.16em;text-transform:uppercase}
+.manual-page-content .section-label,.manual-page-content .thoughts-label,.manual-page-content .impl-label {color:var(--red);font:700 9px/1.3 var(--display);letter-spacing:.18em;text-transform:uppercase}
+.manual-page-content p,.manual-page-content li {color:var(--ink);font-family:Georgia,serif}
+.manual-page-content a {color:var(--red)}
+.manual-page-content .divider {background:#8f846688}
+.manual-page-content table {font:700 11px/1.5 'Courier New',monospace;border-top:1px solid #6e5f3c55}
+.manual-page-content td {border-bottom-color:#6e5f3c40;color:#1b2430}
+.manual-page-content kbd {border-color:#8f8466;border-bottom-width:2px;border-radius:3px;background:#fffaea;color:#1d3550}
+.manual-page-content .studio-name,.manual-page-content .game-title {color:var(--head);font:800 16px/1.2 var(--display)}
+.manual-page-content .studio-dates,.manual-page-content .game-origin {color:var(--red)}
+.manual-game-blurb::first-letter {color:var(--red);font-family:var(--display);font-weight:800}
+.manual-figure img {border-color:#5d4a2c;background:#1b1a20;filter:none!important}
+.manual-figure figcaption {color:var(--ink-soft)}
+.manual-notes {background:repeating-linear-gradient(0deg,transparent 0 33px,#8f846655 33px 34px)}
+.manual-notes p,.manual-tip p {color:#7a705a!important;font:700 8px/1 var(--display)!important;letter-spacing:.24em}
+.manual-notes q,.manual-tip q {color:#1c2550}
+.manual-tip {border-top-color:#8f846688}
+.manual-page-content .manual-operators .manual-operators-title {border-bottom-color:#5f5848;color:var(--head);font:800 1.7em/1.1 var(--display)}
+.manual-page-content .manual-operators td.operator {border-color:#8f8466;background:#fffaea80}
+.manual-page-content .manual-operators .operators-pitch {border-color:var(--red);background:#8f3a2e0d}
+
+/* Tabs and buttons: the BASIC book's dark pills. */
+.manual-contents-tab,.manual-close {top:-14px;height:30px;padding:0 15px;border:1px solid #ffffff24;border-radius:15px;color:#eadcbb;background:#2b261f;
+  box-shadow:0 3px 8px #0008;font:700 9px/28px var(--display);letter-spacing:.14em;text-transform:uppercase}
+.manual-contents-tab:hover,.manual-close:hover {border-color:#ffffff44;background:#3a3329}
+.manual-contents-tab:focus-visible,.manual-close:focus-visible {outline:2px solid #dfc47e;outline-offset:2px}
+
+/* The closed book that lifts from the pocket and opens: its front is the printed cover. */
+:is(.manual-cover-book,.manual-transit) {background:url(blip-manual-cover.svg) center/100% 100% no-repeat!important;border:0!important;border-radius:2px 7px 7px 2px!important}
+:is(.manual-cover-book,.manual-transit) > *,:is(.manual-cover-book,.manual-transit)::before,:is(.manual-cover-book,.manual-transit)::after {display:none!important}
+/* The tabs sit together at the right, clear of the BLIP plate in the top-left corner. */
+.manual-contents-tab {left:auto;right:172px}
+@media(max-width:700px) {.manual-contents-tab {right:170px}}
+/* The book in flight: its spine leaves the pocket, then the closed book itself is carried to the table. */
+.manual-lift {position:fixed;z-index:20002;margin:0;pointer-events:none;transition:none;transform-origin:50% 100%}
+.manual-transit {position:fixed;z-index:20001;margin:0;pointer-events:none;will-change:transform,opacity;backface-visibility:hidden}
+.manual-cover-front .manual-cover-book {box-shadow:inset 0 0 0 1px #5d4a2c,inset 3px 0 6px #0005}
+/* Landed closed: the front cover waits to be opened, and lifts a little at its edge under the pointer. */
+.manual-cover-closed {cursor:pointer}
+.manual-cover-closed .manual-cover-front {transition:transform .25s ease-out;transform-origin:left center}
+.manual-cover-closed:hover .manual-cover-front {transform:perspective(1600px) rotateY(-7deg)}
+.manual-cover-closed:focus-visible {outline:none}
+.manual-cover-closed::after {content:'Click to open';position:absolute;left:calc(var(--cw,100%) / 2);bottom:-34px;translate:-50% 0;padding:7px 14px;border:1px solid #ffffff24;border-radius:15px;
+  color:#eadcbb;background:#2b261f;font:700 9px/1 "Helvetica Neue",Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;pointer-events:none}
+/* The contents and its footnote share the front page: rows a little tighter, the footnote below the last. */
+@media(min-width:701px) {
+  .manual-contents button {min-height:24px;padding:3px 0}
+  .manual-game-index-title {margin:14px 0 6px}
+  .manual-open-left h2 + .manual-contents {margin-top:12px}
+}
+/* A closed book: the cover over a block of cream page edges, a little thick at the fore-edge and the foot. */
+.manual-cover-closed .manual-cover-front {box-shadow:1px 0 0 #fbf4df,2px 1px 0 #cdbf9a,3px 1px 0 #f7efda,4px 2px 0 #cdbf9a,5px 2px 0 #f7efda,6px 3px 0 #b9a77c,0 24px 40px #000b}
+/* A short screen has no room above the book: the tabs sit just inside its top edge. */
+@media(max-height:520px) {.manual-contents-tab,.manual-close {top:4px}}

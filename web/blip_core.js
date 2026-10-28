@@ -69,6 +69,17 @@ function blipApplyControls() {
   if (touch) root.setAttribute('data-touch', game.touch.kind);
   else root.removeAttribute('data-touch');
 }
+/* The whole room moves with a machine between the arcade and its page: scaled about its screen, so the cabinet's
+ * screen (from) lands on the game page's (to). The arcade grows onto the game going in, and shrinks from it
+ * coming back. Read by machine.css's root view-transition animations. */
+function blipMachineZoom(from, to, leaving) {
+  var k = to.w / from.w, fx = from.x + from.w / 2, fy = from.y + from.h / 2, tx = to.x + to.w / 2, ty = to.y + to.h / 2;
+  var grow = 'translate(' + (tx - k * fx) + 'px,' + (ty - k * fy) + 'px) scale(' + k + ')';
+  var shrink = 'translate(' + (fx - tx / k) + 'px,' + (fy - ty / k) + 'px) scale(' + (1 / k) + ')';
+  var style = document.documentElement.style;
+  style.setProperty('--machine-zoom-old', leaving ? shrink : grow);
+  style.setProperty('--machine-zoom-new', leaving ? grow : shrink);
+}
 function blipSetControls(choice) {
   if (!blipHasTouch() || !/^(touch|stick|pad)$/.test(choice)) return;
   var game = blipGameFromPath(location.pathname);

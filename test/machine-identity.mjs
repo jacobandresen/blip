@@ -49,7 +49,11 @@ for (const engine of ['chromium', 'webkit']) {
         await gamePage.waitForFunction(() => document.querySelector('#marquee-name .machine-marquee-name') &&
           (!blipHasTouch() || !BLIP_GAMES[document.documentElement.dataset.machine].touch || document.getElementById('touch-strip')));
         await gamePage.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
-        assert.deepEqual(await gamePage.evaluate(cabinetSurfaces), overview, `${game}: physical cabinet surfaces`);
+        // Up close the cabinet's laminate is a column in the arcade's room: every layer of it is on the page.
+        const near = await gamePage.evaluate(cabinetSurfaces);
+        for (const layer of overview.body.split(/, (?=linear-gradient)/))
+          assert.ok(near.body.includes(layer), `${game}: the cabinet's laminate ${layer} is on its page`);
+        assert.deepEqual({ ...near, body: overview.body }, overview, `${game}: physical cabinet surfaces`);
         const liveHardware = await gamePage.evaluate(deckHardware);
         // Input feedback adds inline widths and transforms only after the live shell wires the shared strip.
         if (hardware.strip) {

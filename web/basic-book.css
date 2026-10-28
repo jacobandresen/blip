@@ -164,7 +164,7 @@ code { color:#1d3550; font:700 .9em/1 var(--mono); }
 
 /* One page at a time on a phone; the book keeps its boards, page block and fore-edge. */
 @media(max-width:860px) {
-  .book-layout { justify-content:flex-start; padding:14px 12px 28px; }
+  .book-layout { justify-content:flex-start; padding:calc(56px + env(safe-area-inset-top,0px)) 12px 28px; }
   .book-frame { width:min(100%,560px); height:auto; }
   .book-stage,.book-body { position:relative; width:auto; height:auto; transform:none; }
   .book-body { padding:10px 12px 10px 0; }

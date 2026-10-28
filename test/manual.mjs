@@ -15,9 +15,11 @@ for (const width of [1280, 390]) {
     const pocket = await book.boundingBox();
     assert.ok(pocket.x > width / 2, 'the book is stored on the right of the fascia');
 
-    const flight = (keyframe) => page.locator('.manual-transit').evaluate((el, which) => {
-      const frames = el.getAnimations()[0].effect.getKeyframes();
-      return frames.at(which);
+    // A wide screen picks the book up: its spine rises from the pocket. A narrow one flies the book itself.
+    const flight = (keyframe) => page.evaluate((which) => {
+      const lift = document.querySelector('.manual-lift');
+      if (lift) return { left: lift.style.left, top: lift.style.top };
+      return document.querySelector('.manual-transit').getAnimations()[0].effect.getKeyframes().at(which);
     }, keyframe);
     const atPocket = (frame) =>
       Math.abs(parseFloat(frame.left) - pocket.x) < 1 && Math.abs(parseFloat(frame.top) - pocket.y) < 1;
@@ -29,7 +31,7 @@ for (const width of [1280, 390]) {
     assert.equal(await book.evaluate((el) => getComputedStyle(el).visibility), 'hidden', 'the pocket is empty while it is open');
 
     await page.getByRole('button', { name: 'Close manual', exact: true }).click();
-    await page.waitForSelector('.manual-transit');
+    await page.waitForSelector(width > 700 ? '.manual-lift' : '.manual-transit');
     assert.ok(atPocket(await flight(-1)), 'it returns to the pocket');
     await page.waitForFunction(() => document.getElementById('manual-overlay').hidden);
     assert.equal(await book.evaluate((el) => getComputedStyle(el).visibility), 'visible');
@@ -66,6 +68,11 @@ async function openManual(t, query, { width = 1280, height = 844 } = {}) {
   await page.waitForFunction(() => document.querySelector('.manual-page-content .manual-leaf-sheet')
     && document.getElementById('manual-page-count').textContent.split('/')[1].trim() !== '01'
     && !document.getElementById('manual-overlay').inert);
+  // On a wide screen the book lands closed, its front cover up; open it.
+  if (width > 700) {
+    await page.locator('.manual-cover-closed').click();
+    await page.waitForFunction(() => !document.querySelector('.manual-cover') && !document.getElementById('manual-overlay').inert);
+  }
   return page;
 }
 
@@ -105,7 +112,7 @@ for (const [width, height] of [[1280, 844], [390, 844], [320, 720]]) {
       for (const leaf of spread) {
         assert.equal(leaf.scrolls, false, 'a leaf scrolls');
         assert.equal(leaf.textInside, true, 'a leaf\'s text leaves the page');
-        for (const portrait of leaf.portraits) assert.equal(portrait, 'true', 'operator photos are black and white');
+        for (const portrait of leaf.portraits) assert.equal(portrait, 'false', 'operator photos are printed in colour');
         portraits += leaf.portraits.length;
         shown++;
       }
@@ -140,7 +147,7 @@ test('the contents are inside the front cover only; turning a page leaves conten
 });
 
 for (const slug of SLUGS) {
-  test(`${slug} gets a spread: its screen in black and white and a blurb on the left, its controls on the right`, async (t) => {
+  test(`${slug} gets a spread: its screen in colour and a blurb on the left, its controls on the right`, async (t) => {
     const page = await openManual(t, 'controls');
     await page.evaluate((game) => showManualPage(manualGameStarts[game], 0), slug);
     await page.waitForFunction((game) => document.querySelector(`#manual-left-content [data-manual-game="${game}"]`), slug);
@@ -149,7 +156,7 @@ for (const slug of SLUGS) {
       const blurb = document.querySelector('#manual-left-content .manual-game-blurb');
       return {
         screenshot: figure && figure.naturalWidth > 0,
-        grey: figure && getComputedStyle(figure).filter.includes('grayscale(1)'),
+        colour: figure && !getComputedStyle(figure).filter.includes('grayscale'),
         blurb: blurb ? blurb.textContent.length : 0,
         caption: document.querySelector('#manual-left-content figcaption')?.textContent.startsWith('Fig. '),
         controls: document.querySelectorAll('#manual-page-content [data-side="right"] .keytable tr').length,
@@ -158,7 +165,7 @@ for (const slug of SLUGS) {
       };
     });
     assert.deepEqual({ ...spread, blurb: spread.blurb > 60, controls: spread.controls > 0 },
-      { screenshot: true, grey: true, blurb: true, caption: true, controls: true, sides: ['left', 'right'] });
+      { screenshot: true, colour: true, blurb: true, caption: true, controls: true, sides: ['left', 'right'] });
   });
 }
 
@@ -343,7 +350,7 @@ for (const [width, height] of [[1280, 800], [800, 600], [390, 844]]) {
   });
 }
 
-test('on a wide screen the cover swings open about the spine, and the book is whole again at the end', async (t) => {
+test('on a wide screen the book lands closed, its cover swings open about the spine, and the book is whole again at the end', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
   await page.goto(`${origin}/index.html`);
   await page.waitForSelector('.card-focused');
@@ -351,10 +358,13 @@ test('on a wide screen the cover swings open about the spine, and the book is wh
   await page.evaluate(() => {
     window.__covers = 0;
     new MutationObserver(() => { if (document.querySelector('.manual-cover')) window.__covers++; })
-      .observe(document.querySelector('.manual-open-book'), { childList: true });
+      .observe(document.getElementById('manual-overlay'), { childList: true, subtree: true });
   });
   await page.evaluate(() => document.getElementById('manual-book').click());
-  await page.waitForFunction(() => !document.getElementById('manual-overlay').inert && !document.getElementById('manual-overlay').hidden, null, { timeout: 8000 });
+  await page.waitForSelector('.manual-cover-closed', { timeout: 8000 });
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.manual-open-book')).opacity), '0', 'closed, it is only the book');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => !document.querySelector('.manual-cover') && !document.getElementById('manual-overlay').inert, null, { timeout: 8000 });
   assert.ok(await page.evaluate(() => window.__covers) >= 1, 'a cover swung open');
   assert.equal(await page.locator('.manual-cover').count(), 0, 'the cover is gone once it lies open');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.manual-open-left')).visibility), 'visible', 'the left page is back');

@@ -99,7 +99,7 @@ var WIDE = '(min-width: 700px) and (min-height: 600px)';
 function buildDock() {
   dockRow.textContent = '';
   var wide = matchMedia(WIDE).matches;
-  dockRow.appendChild(systemApp('arcade', 'BLIP Home', '<img src="icon.svg?v=1" alt="">', toCabinet));
+  dockRow.appendChild(systemApp('arcade', 'BLIP Home', '<img src="icon.svg?v=2" alt="">', toCabinet));
   dockRow.appendChild(systemApp('amstrad', 'BLIP', '<img src="blip-computer-icon.svg" alt="">', toAmstrad));
   // The Guide's icon is the one it has as an app of its own.
   dockRow.appendChild(systemApp('guide', 'Guide', '<img src="guide-icon-192.png?v=1" alt="">', toGuide));

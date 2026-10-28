@@ -41,14 +41,8 @@ function buildPowerIndicators() {
 }
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',buildPowerIndicators,{once:true});
 else buildPowerIndicators();
-var cabinetPowerTimer=null;
 function updateCoinsHud() {
-  var root=document.documentElement,powered=blipPowered(),wasPowered=root.hasAttribute('data-credit');
-  root.toggleAttribute('data-credit',powered);
-  if(powered&&!wasPowered){
-    clearTimeout(cabinetPowerTimer);root.setAttribute('data-power-up','');
-    cabinetPowerTimer=setTimeout(function(){root.removeAttribute('data-power-up');},1200);
-  }else if(!powered){clearTimeout(cabinetPowerTimer);root.removeAttribute('data-power-up');}
+  document.documentElement.toggleAttribute('data-credit',blipPowered());
   blipUpdateCabinetHum();
 }
 
@@ -502,26 +496,7 @@ function insertCoin() {
   }
 }
 
-function wireCabinetLogo() {
-  document.querySelectorAll('.led-logo').forEach(function(logo){
-    if(logo.querySelector('.logo-power-wire'))return;
-    var wire=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    wire.setAttribute('class','logo-power-wire');wire.setAttribute('viewBox','0 0 32 40');wire.setAttribute('aria-hidden','true');
-    wire.innerHTML='<circle cx="27" cy="11" r="4.5" fill="#211c16" stroke="#9e8764" stroke-width="1.5"/>'+
-      '<path class="wire-shadow" d="M0 22 H7 C14 22 10 34 20 34 C30 34 27 23 27 11"/>'+
-      '<path class="wire-jacket" d="M0 20 H7 C14 20 10 32 20 32 C30 32 27 21 27 11"/>'+
-      '<path class="wire-highlight" d="M0 19 H7 C14 19 10 31 20 31 C30 31 27 20 27 11"/>'+
-      '<path class="wire-current" d="M0 19 H7 C14 19 10 31 20 31 C30 31 27 20 27 11"/>'+
-      '<rect x="-2" y="16" width="7" height="8" rx="1.5" fill="#40372b" stroke="#aa9270" stroke-width=".8"/>';
-    logo.appendChild(wire);
-    logo.querySelectorAll('.led-on').forEach(function(lamp){lamp.style.setProperty('--led-bank',3-Math.floor(Number(lamp.getAttribute('cx'))/24));});
-    var display=logo.querySelector('.blip-led-display'),brand=document.createElementNS('http://www.w3.org/2000/svg','g');
-    brand.setAttribute('class','led-blip');
-    while(display.firstChild)brand.appendChild(display.firstChild);display.appendChild(brand);
-  });
-}
 function wireCoinSlot() {
-  wireCabinetLogo();
   var slot=document.getElementById('kiosk-insert-btn');
   if(slot)slot.addEventListener('click',insertCoin);
   updateCoinsHud();

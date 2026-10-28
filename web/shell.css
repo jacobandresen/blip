@@ -1016,8 +1016,7 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 :root[data-appstyle] .marquee-bulbs,
 :root[data-appstyle] .jukebox-receiver,
 :root[data-appstyle] #card-sleeve,
-:root[data-appstyle] .logo-power-wire,
-:root[data-appstyle] .blip-led-display { display: none !important; }
+:root[data-appstyle] .blip-logo-mark { display: none !important; }
 :root[data-appstyle] #arcade-bezel { background: #000; border: 0; box-shadow: none; border-radius: 0; }
 :root[data-appstyle] #arcade-bezel::before, :root[data-appstyle] #arcade-bezel::after { display: none; }
 

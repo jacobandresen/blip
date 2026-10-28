@@ -50,7 +50,7 @@ for (const engine of ['chromium', 'webkit']) {
       for (const part of ['monitor', 'picture', 'title', 'name', 'deck']) {
         const group = result.groups.find(g => g.pseudo === `::view-transition-group(machine-${part})`);
         assert.ok(group, `${part} has a native geometry transition: ${JSON.stringify({reveal:result.reveal,all:result.all})}`);
-        assert.equal(group.duration, 760);
+        assert.equal(group.duration, 900);
         assert.ok(group.frames.length >= 2, `${part} has start and destination keyframes`);
       }
       assert.match(result.art, /data:image\/png;base64,/, 'the same frozen attract frame survives navigation');
