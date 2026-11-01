@@ -1,12 +1,10 @@
 # Blip Engine Arcade
 
-Step inside, pick a machine, and chase that next high score! Blip packs nine arcade games, a fresh iOS-style Home Screen, and a programmable retro computer into your browser. The games run on the Rust `blip` engine, compiled to WebAssembly.
+Step inside, pick a machine, and chase that next high score! Blip packs nine arcade games, an iOS-style Home Screen, and a programmable retro computer into your browser. The games run on the Rust `blip` engine, compiled to WebAssembly.
 
 **[Play in the browser →](https://jacobandresen.github.io/blip/)**
 
-[![The Blip arcade front, with glowing marquees, playable cabinets, and a tiled arcade backdrop](docs/screenshots/arcade-front.png)](https://jacobandresen.github.io/blip/)
-
-*The current arcade front, captured from the local build on 26 October 2026. Pick a cabinet and let the buttons do the talking.*
+[![The Blip arcade front: Rally between Adder and Bouncer, in front of a tiled maze wall with neon signs](docs/screenshots/arcade-front.png)](https://jacobandresen.github.io/blip/)
 
 **[Explore the Blip API →](https://jacobandresen.github.io/blip/api.html)** — see how the games use the engine, then try making one with Rust or an AI coding agent such as Claude Code or Codex.
 
@@ -19,18 +17,18 @@ Step inside, pick a machine, and chase that next high score! Blip packs nine arc
 - **[Defender](https://jacobandresen.github.io/blip/defender/)** — take on alien formations and their motherships. They brought friends.
 - **[Meteors](https://jacobandresen.github.io/blip/meteors/)** — thrust, turn, and blast through drifting asteroids.
 - **[Raider](https://jacobandresen.github.io/blip/raider/)** — fly into formations, flak, and bosses in a vertical shooter.
-- **[Brawler](https://jacobandresen.github.io/blip/brawler/)** — choose from 15 fighters and climb a 14-match ladder, in Rust or BLIP BASIC.
+- **[Brawler](https://jacobandresen.github.io/blip/brawler/)** — choose from 15 fighters and climb a 14-match ladder, alone or against a friend.
 - **[Bubbler](https://jacobandresen.github.io/blip/bubbler/)** — bubble-blowing platform action for one or two players. Trap trouble, then pop it!
 
 ## A little arcade in your pocket
 
-The new **[iOS-style Home Screen](https://jacobandresen.github.io/blip/home.html)** puts every game behind a colorful app icon, with a dock, search, and long-press menus. Rearrange your favorites, tap straight into free play, or add a game to your device's Home Screen for a quick rematch. The dock takes you back to the cabinet aisle whenever the neon calls.
+The **[iOS-style Home Screen](https://jacobandresen.github.io/blip/home.html)** puts every game behind a colorful app icon, with a dock, search, and long-press menus. Rearrange your favorites, tap straight into free play, or add a game to your device's Home Screen for a quick rematch. The dock takes you back to the cabinet aisle whenever the neon calls.
 
 <a href="https://jacobandresen.github.io/blip/home.html"><img src="docs/screenshots/ios-home.png" width="320" alt="Blip's iOS-style Home Screen with all nine game icons, two-player badges, search, and a dock"></a>
 
 ## Meet BLIP BASIC
 
-Fancy making the machine do your bidding? **[BLIP BASIC](https://jacobandresen.github.io/blip/basic.html)** is an Amiga-inspired BASIC playground inside a retro computer, complete with game cassettes, a console, and an editor. Load a numbered game tape, peek at its code, change the rules, and run it again. Brawler even brings its full 15-fighter ladder to BASIC.
+Fancy making the machine do your bidding? **[BLIP BASIC](https://jacobandresen.github.io/blip/basic.html)** is an Amiga-inspired BASIC playground inside a retro computer, complete with game cassettes, a console, and an editor. All nine games come as numbered tapes: load one, peek at its code, change the rules, and run it again.
 
 The interpreter runs in Rust and shares drawing, math, and effects with the Blip engine. Start with the **[BLIP BASIC programming book](https://jacobandresen.github.io/blip/basic-book.html)**, then dig into the [language and engine guide](crates/blip_basic/README.md). Your next arcade obsession could be one you write yourself.
 
