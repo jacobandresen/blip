@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const GAMES: [&str; 9] = [
+const GAMES: [&str; 10] = [
     "serpent", "bouncer", "defender", "rally", "meteors", "raider", "brawler", "bubbler", "adder",
+    "warlock",
 ];
 
 fn rustup_path(tool: &str) -> Option<PathBuf> {

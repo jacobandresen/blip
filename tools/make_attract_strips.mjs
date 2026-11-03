@@ -19,10 +19,10 @@ import { fileURLToPath } from 'node:url';
 import { displayCommand } from './lib/process.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const GAMES = ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder'];
+const GAMES = ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder', 'warlock'];
 const FRAMES = 12, EVERY = 0.25, WIDTH = 240, LIMIT = 60 * 1024;
 // Where the loop starts, past each game's title screen and into play.
-const FROM = { rally: 6, bouncer: 6, defender: 8, bubbler: 8, raider: 8, meteors: 3, serpent: 6, brawler: 10, adder: 8 };
+const FROM = { rally: 6, bouncer: 6, defender: 8, bubbler: 8, raider: 8, meteors: 3, serpent: 6, brawler: 10, adder: 8, warlock: 4 };
 
 const args = process.argv.slice(2), fallbacksOnly = args.includes('--fallbacks-only');
 const only = args.filter((arg) => arg !== '--fallbacks-only');

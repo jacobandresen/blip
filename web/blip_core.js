@@ -146,7 +146,16 @@ var BLIP_GAMES = {
                          buttons: [{ key: ' ', code: 'Space', label: 'START' }],
                          keys: Object.assign({}, TWO_PLAYER_KEYS, { p2button2: TWO_PLAYER_KEYS.p2button1 }),
                          touch: { kind: 'drag', hint: 'Drag left/right to steer &middot; tap to start',
-                                  mouseHint: 'Point left/right to steer &middot; click to start' } }
+                                  mouseHint: 'Point left/right to steer &middot; click to start' } },
+  // A maze shooter in the spirit of Wizard of Wor: 4-way stick, A casts a
+  // bolt down the corridor, B casts reveal. Two caps on a snappable stick.
+  warlock:            { name: 'WARLOCK', accent: '150, 60, 200', touchControls: [['MOVE',['STICK']],['BOLT',['A']],['REVEAL',['B']]], controls: [['MOVE',['←','↑','↓','→'],['W','A','S','D']],['BOLT',['SPACE'],['F']],['REVEAL',['Z'],['G']],['2ND PLAYER',['J','K']]],
+                         players: 2,
+                         touch: { kind: 'action', hint: 'Stick to move &middot; A bolt &middot; B reveal', actions: ['BOLT', 'REVEAL'] },
+                         buttons: [{ key: 'f', code: 'KeyF', label: 'BOLT' },
+                                   { key: 'g', code: 'KeyG', label: 'REVEAL' }],
+                         keys: TWO_PLAYER_KEYS,
+                         stick: { engage: 10, release: 6, maxR: 54, hyst: 10 } }
 };
 
 // Pick out the game slug from a shell-page URL, e.g. "/blip/serpent/index.html"

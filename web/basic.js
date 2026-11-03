@@ -214,7 +214,8 @@ var tapePrograms=[
   {file:'METEORS.BLIP',command:'METEORS',slug:'meteors',title:'METEORS'},
   {file:'RALLY.BLIP',command:'RALLY',slug:'rally',title:'RALLY'},
   {file:'SERPENT.BLIP',command:'SERPENT',slug:'serpent',title:'SERPENT'},
-  {file:'RAIDER.BLIP',command:'RAIDER',slug:'raider',title:'RAIDER'}
+  {file:'RAIDER.BLIP',command:'RAIDER',slug:'raider',title:'RAIDER'},
+  {file:'WARLOCK.BLIP',command:'WARLOCK',slug:'warlock',title:'WARLOCK'}
 ];
 var tapeReady=fetch('TAPE/manifest.json').then(function(response){if(!response.ok)throw Error('TAPE DIRECTORY UNAVAILABLE');return response.json();}).then(function(names){if(!Array.isArray(names))throw Error('BAD TAPE MANIFEST');tapeNames=names.filter(function(name){return tapePrograms.some(function(tape){return tape.file===name;});});}).catch(function(error){tapeLoadError=error.message;});
 // Each tape's own folder, /TAPE/<GAME>/ASSETS: its pictures, sounds and tunes, listed once.

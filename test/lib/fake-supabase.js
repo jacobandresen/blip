@@ -5,7 +5,7 @@
 (function () {
   'use strict';
   var KEY = 'fake-sb';
-  var GAMES = ['serpent', 'bouncer', 'defender', 'meteors', 'raider', 'bubbler', 'brawler', 'adder'];
+  var GAMES = ['serpent', 'bouncer', 'defender', 'meteors', 'raider', 'bubbler', 'brawler', 'adder', 'warlock'];
 
   function load() {
     var d = {};
