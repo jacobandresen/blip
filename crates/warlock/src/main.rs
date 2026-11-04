@@ -8,9 +8,15 @@
 mod tunes;
 #[cfg(not(target_arch = "wasm32"))]
 mod bot;
+#[cfg(not(target_arch = "wasm32"))]
+mod scene;
 mod levels;
+mod art;
+mod magic;
+mod runes;
 
 use levels::*;
+use magic::Magic;
 
 use blip::input::{
     coin_start, key_held, key_pressed, play_again, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
@@ -19,38 +25,39 @@ use blip::input::{
 };
 use blip::{
     lerp, rand_int, web, window_conf, Blip, BlipColor, Fx, GAME_OVER_MIN_WAIT, Jukebox,
-    Session, Timer, BLIP_BLACK, BLIP_GRAY, BLIP_RED, BLIP_WHITE, BLIP_YELLOW,
+    Session, Timer, BLIP_BLACK, BLIP_GRAY, BLIP_WHITE, BLIP_YELLOW,
 };
 
 // ---- layout ---------------------------------------------------------------
-const CELL: i32 = 24;
+/// A chamber's title card: on screen this long, holding play for the first part.
+const INTRO_SECS: f32 = 2.0;
+const INTRO_HOLD: f32 = 1.1;
+const CELL: i32 = 32;
 pub const HUD_H: i32 = 28;
+/// The carved panel under the cellar: chamber name, scrying glass, lives.
+const PANEL_H: i32 = 96;
 const WIN_W: i32 = COLS as i32 * CELL;
-const WIN_H: i32 = ROWS as i32 * CELL + HUD_H;
+const WIN_H: i32 = ROWS as i32 * CELL + HUD_H + PANEL_H;
 
 // ---- dungeon palette ------------------------------------------------------
-const WALL: BlipColor = BlipColor { r: 0.18, g: 0.11, b: 0.28, a: 1.0 };
-const WALL_HI: BlipColor = BlipColor { r: 0.27, g: 0.18, b: 0.40, a: 1.0 };
-const FLOOR: BlipColor = BlipColor { r: 0.06, g: 0.04, b: 0.11, a: 1.0 };
-const FLOOR_GRID: BlipColor = BlipColor { r: 0.11, g: 0.08, b: 0.18, a: 1.0 };
 const TORCH: BlipColor = BlipColor { r: 1.0, g: 0.62, b: 0.22, a: 1.0 };
 const WIZ_ROBE: BlipColor = BlipColor { r: 0.20, g: 0.90, b: 0.78, a: 1.0 };
-const WIZ_HAT: BlipColor = BlipColor { r: 0.10, g: 0.34, b: 0.42, a: 1.0 };
 const WIZ_ROBE2: BlipColor = BlipColor { r: 0.98, g: 0.55, b: 0.25, a: 1.0 };
-const WIZ_HAT2: BlipColor = BlipColor { r: 0.42, g: 0.22, b: 0.12, a: 1.0 };
-const BOLT: BlipColor = BlipColor { r: 1.0, g: 0.90, b: 0.45, a: 1.0 };
 const REVEAL_C: BlipColor = BlipColor { r: 0.62, g: 0.90, b: 1.0, a: 1.0 };
 const IMP: BlipColor = BlipColor { r: 1.0, g: 0.32, b: 0.22, a: 1.0 };
 const WRAITH: BlipColor = BlipColor { r: 0.66, g: 0.78, b: 1.0, a: 1.0 };
 const HOUND: BlipColor = BlipColor { r: 1.0, g: 0.70, b: 0.30, a: 1.0 };
 const GARGOYLE: BlipColor = BlipColor { r: 0.42, g: 0.82, b: 0.44, a: 1.0 };
 const WARLOCK_C: BlipColor = BlipColor { r: 0.82, g: 0.34, b: 0.94, a: 1.0 };
-const RUNE_CURSED: BlipColor = BlipColor { r: 0.55, g: 0.20, b: 0.65, a: 1.0 };
 const RUNE_CLEAN: BlipColor = BlipColor { r: 1.0, g: 0.85, b: 0.35, a: 1.0 };
 const GATE_C: BlipColor = BlipColor { r: 0.40, g: 0.85, b: 1.0, a: 1.0 };
 const EXIT_C: BlipColor = BlipColor { r: 0.5, g: 1.0, b: 0.6, a: 1.0 };
 const FIREBALL: BlipColor = BlipColor { r: 1.0, g: 0.45, b: 0.15, a: 1.0 };
-const PROTECT: BlipColor = BlipColor { r: 0.9, g: 0.95, b: 1.0, a: 1.0 };
+const LANCE_C: BlipColor = BlipColor { r: 1.0, g: 0.85, b: 0.55, a: 1.0 };
+const POTION_HASTE: BlipColor = BlipColor { r: 0.35, g: 0.85, b: 1.0, a: 1.0 };
+const POTION_GOLD: BlipColor = BlipColor { r: 1.0, g: 0.82, b: 0.3, a: 1.0 };
+const POTION_LIFE: BlipColor = BlipColor { r: 1.0, g: 0.3, b: 0.45, a: 1.0 };
+const BOLT_TRAIL: BlipColor = BlipColor { r: 0.55, g: 0.8, b: 1.0, a: 1.0 };
 
 // ---- directions -----------------------------------------------------------
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -127,6 +134,8 @@ enum EnemyKind {
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum Proj {
     Bolt,
+    /// bolt cast straight after reveal: the two spells combine and it pierces
+    Lance,
     Fireball,
     Warlock,
 }
@@ -149,6 +158,8 @@ struct Enemy {
     charge: f32,
     shot_cd: f32,
     gone: bool,
+    /// Last horizontal heading, so a side-view sprite keeps facing it.
+    face_left: bool,
 }
 
 struct Projectile {
@@ -196,6 +207,24 @@ struct Warlock {
     aim_from: Cell,
 }
 
+/// A potion left by a slain monster: walk over it to drink.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum PotionKind {
+    /// quick feet for a while
+    Haste,
+    /// worth points
+    Gold,
+    /// a spare hat: one more life
+    Life,
+}
+
+#[derive(Clone, Copy)]
+struct Potion {
+    tile: Cell,
+    kind: PotionKind,
+    t: f32,
+}
+
 struct Wizard {
     tile: Cell,
     from: Cell,
@@ -207,6 +236,12 @@ struct Wizard {
     bolt_cd: f32,
     reveal_cd: f32,
     reveal_t: f32,
+    /// Counts down after a bolt: the staff is thrust out and flares.
+    cast_t: f32,
+    /// Seconds of haste left from a draught.
+    haste: f32,
+    /// Just after a reveal: a bolt cast now combines with it into a lance.
+    combo_t: f32,
 }
 
 impl Wizard {
@@ -222,8 +257,24 @@ impl Wizard {
             bolt_cd: 0.0,
             reveal_cd: 0.0,
             reveal_t: 0.0,
+            cast_t: 0.0,
+            haste: 0.0,
+            combo_t: 0.0,
         }
     }
+}
+
+/// A dragon whelp: it bolts through the corridors once a chamber's
+/// monsters are gone and flies off when its time runs out. Strike it and
+/// the next chamber pays double.
+struct Whelp {
+    tile: Cell,
+    from: Cell,
+    lerp: f32,
+    step_t: f32,
+    dir: Dir,
+    left: f32,
+    face_left: bool,
 }
 
 struct Bonus {
@@ -254,6 +305,10 @@ enum Sfx {
     Chamber,
     Ward,
     Warlock,
+    Fire,
+    Pulse,
+    Whelp,
+    Potion,
 }
 
 struct Sounds {
@@ -266,6 +321,10 @@ struct Sounds {
     chamber: blip::BlipSound,
     ward: blip::BlipSound,
     warlock: blip::BlipSound,
+    fire: blip::BlipSound,
+    pulse: blip::BlipSound,
+    whelp: blip::BlipSound,
+    potion: blip::BlipSound,
 }
 
 struct Game {
@@ -296,6 +355,23 @@ struct Game {
     died_this_room: bool,
     cleared_no_death: i32,
     sfx: Option<Sounds>,
+    magic: Magic,
+    /// Bumped whenever the walls change, so baked torchlight is redone.
+    room_stamp: u32,
+    whelp: Option<Whelp>,
+    potions: Vec<Potion>,
+    /// The lance has been named once this game.
+    lance_named: bool,
+    /// The whelp has had its turn in this chamber.
+    whelp_done: bool,
+    /// This chamber's points count twice (the whelp was struck last chamber).
+    double: bool,
+    double_next: bool,
+    /// Monsters the chamber started with, and the heartbeat's clock.
+    start_monsters: usize,
+    pulse_t: f32,
+    /// The chamber's title card: counts down from INTRO_SECS as it fades.
+    intro: f32,
 }
 
 impl Game {
@@ -328,6 +404,17 @@ impl Game {
             died_this_room: false,
             cleared_no_death: 0,
             sfx: None,
+            magic: Magic::default(),
+            room_stamp: 0,
+            whelp: None,
+            potions: Vec::new(),
+            lance_named: false,
+            whelp_done: false,
+            double: false,
+            double_next: false,
+            start_monsters: 0,
+            pulse_t: 0.0,
+            intro: 0.0,
         }
     }
 
@@ -344,13 +431,22 @@ impl Game {
             Chamber => &sounds.chamber,
             Ward => &sounds.ward,
             Warlock => &sounds.warlock,
+            Fire => &sounds.fire,
+            Pulse => &sounds.pulse,
+            Whelp => &sounds.whelp,
+            Potion => &sounds.potion,
         };
         blip::play_sfx(target);
     }
 
     fn track(&self) -> usize {
+        if self.state == State::Title {
+            return 2;
+        }
         if matches!(self.state, State::Play | State::Dead) && self.warlock.is_some() {
             1
+        } else if self.sess.level > ROOMS.len() as i32 {
+            3
         } else {
             0
         }
@@ -387,6 +483,7 @@ impl Game {
             charge: 0.0,
             shot_cd: if kind == EnemyKind::Gargoyle { rand_int(0, 150) as f32 / 100.0 } else { 0.0 },
             gone: false,
+            face_left: dir == Dir::Left,
         };
 
         let mut enemies = Vec::new();
@@ -403,13 +500,21 @@ impl Game {
             enemies.push(mk(c, r, EnemyKind::Gargoyle, Dir::Down));
         }
         // Later wings get extra imps to keep the corridors busy.
-        let extra = (self.sess.level - 6).max(0) as usize;
+        let extra = (self.sess.level - 6).clamp(0, 5) as usize;
         for _ in 0..extra {
             if let Some((c, r)) = self.random_open_cell() {
                 enemies.push(mk(c, r, EnemyKind::Imp, Dir::Right));
             }
         }
         self.enemies = enemies;
+        self.start_monsters = self.enemies.len().max(1);
+        self.intro = INTRO_SECS;
+        self.double = self.double_next;
+        self.double_next = false;
+        self.whelp = None;
+        self.whelp_done = false;
+        self.potions.clear();
+        self.pulse_t = 0.5;
 
         self.gates = room
             .gates
@@ -447,6 +552,8 @@ impl Game {
             self.place_wizard(1, self.second_spawn());
         }
         self.torches = self.find_torches();
+        self.room_stamp = self.room_stamp.wrapping_add(1);
+        self.magic.clear();
         self.bonus = None;
         blip::bot::set("level", self.sess.level as f64);
     }
@@ -455,18 +562,18 @@ impl Game {
         random_open_cell(&self.walls, self.player_spawn, self.exit)
     }
 
+    /// Sconces hang on wall faces that look down onto floor, spaced apart.
     fn find_torches(&self) -> Vec<Cell> {
-        let mut out = Vec::new();
-        for r in 1..ROWS as i32 - 1 {
+        let mut out: Vec<Cell> = Vec::new();
+        for r in 0..ROWS as i32 - 1 {
             for c in 1..COLS as i32 - 1 {
-                if self.walls.get(c, r) {
-                    let n = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-                        .iter()
-                        .filter(|&&(dc, dr)| self.walls.floor(c + dc, r + dr))
-                        .count();
-                    if n >= 2 && (c * 7 + r * 13) % 4 == 0 {
-                        out.push(Cell { c, r });
-                    }
+                if !self.walls.get(c, r) || !self.walls.floor(c, r + 1) {
+                    continue;
+                }
+                let cell = Cell { c, r };
+                let spaced = out.iter().all(|o| (o.c - c).abs() + (o.r - r).abs() >= 5);
+                if spaced && (c * 7 + r * 13) % 3 == 0 {
+                    out.push(cell);
                 }
             }
         }
@@ -505,6 +612,7 @@ impl Game {
         self.two_player = false;
         self.dead_index = None;
         self.cleared_no_death = 0;
+        self.double_next = false;
         self.load_room();
         self.state = State::Play;
         self.fx.clear();
@@ -516,10 +624,22 @@ impl Game {
         if self.two_player || !key_pressed(BLIP_KEY_J) {
             return;
         }
+        self.join();
+    }
+
+    /// J on the title: a two-player start, both wizards in from the first chamber.
+    fn start_two(&mut self) {
+        web::spend_coin();
+        self.start_game();
+        self.join();
+    }
+
+    fn join(&mut self) {
         self.two_player = true;
         self.active[1] = true;
         self.lives[1] = LIVES_START;
         self.place_wizard(1, self.second_spawn());
+        self.banner = Some(("FRIENDLY FIRE IS OFF. YOU'RE WELCOME".to_string(), 2.0));
         blip::bot::add("join", 1.0);
         web::spend_coin();
         web::set_mode(true);
@@ -623,14 +743,29 @@ impl Game {
 
     // ---- play update ------------------------------------------------------
 
+    /// While the title card holds the screen the cellar waits.
+    fn in_intro(&self) -> bool {
+        self.intro > INTRO_SECS - INTRO_HOLD
+    }
+
     fn update_play(&mut self, dt: f32) {
         self.fx.update(dt);
+        self.update_ambience(dt);
+        if self.intro > 0.0 {
+            self.intro = (self.intro - dt).max(0.0);
+            if self.in_intro() {
+                return;
+            }
+        }
         for i in 0..2 {
             if self.active[i] {
                 self.update_wizard(i, dt);
             }
         }
+        self.update_potions(dt);
         self.update_enemies(dt);
+        self.update_whelp(dt);
+        self.update_pulse(dt);
         self.check_contact();
         self.update_projectiles(dt);
         self.update_warlock(dt);
@@ -655,6 +790,7 @@ impl Game {
             w.protect = (w.protect - dt).max(0.0);
             w.bolt_cd = (w.bolt_cd - dt).max(0.0);
             w.reveal_cd = (w.reveal_cd - dt).max(0.0);
+            w.cast_t = (w.cast_t - dt).max(0.0);
             if w.reveal_t > 0.0 {
                 w.reveal_t = (w.reveal_t - dt).max(0.0);
             }
@@ -673,6 +809,7 @@ impl Game {
 
         let mut reach_exit = false;
         let mut reach_gate = None;
+        let step_secs = if self.wizards[idx].haste > 0.0 { MOVE_SECS * HASTE_MOVE } else { MOVE_SECS };
 
         let next = if moving {
             let ns = step_t - dt;
@@ -684,13 +821,13 @@ impl Game {
                 }
                 Some((cur, cur, 0.0, 1.0, false, facing))
             } else {
-                Some((cur, from, ns, (lerp + dt / MOVE_SECS).min(1.0), true, facing))
+                Some((cur, from, ns, (lerp + dt / step_secs).min(1.0), true, facing))
             }
         } else if let Some(dir) = held {
             let (dc, dr) = dir.delta();
             let n = Cell { c: cur.c + dc, r: cur.r + dr };
             if self.walls.floor(n.c, n.r) && !self.step_blocked(n, idx) {
-                Some((n, cur, MOVE_SECS, 0.0, true, dir))
+                Some((n, cur, step_secs, 0.0, true, dir))
             } else {
                 Some((cur, cur, 0.0, 1.0, false, dir))
             }
@@ -725,11 +862,11 @@ impl Game {
             return;
         }
         let (x, y) = self.wizard_px(idx);
-        self.fx.ring(x, y, CELL as f32 * 0.9, 0.35, GATE_C);
+        self.magic.warp(x, y, GATE_C);
         self.gates[gi].cooldown = GATE_CD;
         self.place_wizard(idx, dest);
         let (x, y) = center(dest);
-        self.fx.ring(x, y, CELL as f32 * 0.9, 0.35, GATE_C);
+        self.magic.warp(x, y, GATE_C);
         blip::bot::add("gate", 1.0);
     }
 
@@ -739,9 +876,10 @@ impl Game {
         }
         self.wizards[idx].reveal_cd = REVEAL_CD;
         self.wizards[idx].reveal_t = 0.55;
+        self.wizards[idx].combo_t = LANCE_WINDOW;
         blip::bot::add("reveal", 1.0);
         let (x, y) = self.wizard_px(idx);
-        self.fx.ring(x, y, CELL as f32 * 6.0, 0.5, REVEAL_C);
+        self.magic.reveal(x, y, REVEAL_C);
         // expose wraiths, leave a last-seen outline
         let mut newly = Vec::new();
         for e in &mut self.enemies {
@@ -763,14 +901,15 @@ impl Game {
         }
         // cleanse a stone beside this wizard
         let mut cleansed = false;
-        for r in &mut self.runes {
-            if !r.cleansed && distance_lt(self.wizards[idx].tile, r.tile, 1.5) {
-                r.cleansed = true;
+        for i in 0..self.runes.len() {
+            let r = self.runes[i].tile;
+            if !self.runes[i].cleansed && distance_lt(self.wizards[idx].tile, r, 1.5) {
+                self.runes[i].cleansed = true;
                 cleansed = true;
-                self.sess.add_score(SCORE_RUNE);
-                let (rx, ry) = center(r.tile);
-                self.fx.ring(rx, ry, CELL as f32 * 1.4, 0.4, RUNE_CLEAN);
-                self.fx.popup(rx, ry - 6.0, &format!("+{SCORE_RUNE}"), RUNE_CLEAN);
+                self.add_points(SCORE_RUNE);
+                let (rx, ry) = center(r);
+                self.magic.cleanse(rx, ry, RUNE_CLEAN);
+                self.fx.popup(rx, ry - 22.0, &format!("+{SCORE_RUNE}"), RUNE_CLEAN);
                 blip::bot::add("cleanse", 1.0);
             }
         }
@@ -788,9 +927,28 @@ impl Game {
             return;
         }
         self.wizards[idx].bolt_cd = BOLT_RATE;
+        self.wizards[idx].cast_t = 0.16;
+        let (x, y) = self.wizard_px(idx);
+        let (tx, ty) = art::staff_tip(&self.wizards[idx]);
+        let (dc, dr) = self.wizards[idx].facing.delta();
+        let col = if idx == 0 { REVEAL_C } else { WIZ_ROBE2 };
+        self.magic.cast(x + tx, y + ty, dc as f32, dr as f32, col);
         let tile = self.wizards[idx].tile;
+        // reveal, then bolt: the spells combine into a lance that pierces
+        let lance = self.wizards[idx].combo_t > 0.0;
+        self.wizards[idx].combo_t = 0.0;
+        if lance {
+            self.magic.splash(x + tx, y + ty, LANCE_C);
+            self.magic.splash(x + tx, y + ty, col);
+            self.magic.shake = self.magic.shake.max(0.25);
+            if !self.lance_named {
+                self.lance_named = true;
+                self.banner = Some(("REVEAL + BOLT: ARCANE LANCE!".to_string(), 1.6));
+            }
+            blip::bot::add("lance", 1.0);
+        }
         self.bolts.push(Projectile {
-            proj: Proj::Bolt,
+            proj: if lance { Proj::Lance } else { Proj::Bolt },
             tile,
             from: tile,
             lerp: 0.0,
@@ -840,7 +998,10 @@ impl Game {
             if self.enemies[i].step_t > 0.0 {
                 continue;
             }
-            let interval = enemy_step(&e);
+            // the last few monsters hurry, as the heartbeat does
+            let alive = occupied.len() as f32;
+            let pace = 0.75 + 0.25 * (alive / self.start_monsters.max(1) as f32).min(1.0);
+            let interval = enemy_step(&e) * pace;
             let decision = if e.lunging {
                 let target = (0..2)
                     .filter(|&k| self.active[k])
@@ -854,6 +1015,11 @@ impl Game {
                 decide_patrol(&self.walls, &occupied, &e)
             };
             if let Some((next, dir)) = decision {
+                match dir {
+                    Dir::Left => self.enemies[i].face_left = true,
+                    Dir::Right => self.enemies[i].face_left = false,
+                    _ => {}
+                }
                 self.enemies[i].from = e.tile;
                 self.enemies[i].tile = next;
                 self.enemies[i].dir = dir;
@@ -883,7 +1049,9 @@ impl Game {
                     });
                     self.enemies[i].shot_cd = GARGOYLE_CD;
                     let (x, y) = center(e.tile);
-                    self.fx.burst(x, y, 6, 60.0, FIREBALL);
+                    self.magic.burst(x, y - 2.0, 12, 90.0, FIREBALL, magic::Kind::Spark);
+                    self.magic.flash(x, y, 80.0, 0.3, FIREBALL);
+                    self.sfx(Sfx::Fire);
                 }
             } else {
                 self.enemies[i].shot_cd -= dt;
@@ -901,26 +1069,40 @@ impl Game {
     fn update_projectiles(&mut self, dt: f32) {
         let mut kills = Vec::new();
         let mut warlock_hit = false;
+        let mut whelp_hit = false;
         for i in 0..self.bolts.len() {
             let b = &mut self.bolts[i];
             if b.gone {
                 continue;
             }
-            b.lerp += dt / BOLT_INTERVAL;
+            b.lerp += dt / if b.proj == Proj::Lance { BOLT_INTERVAL * 0.7 } else { BOLT_INTERVAL };
+            let (px, py) = art::proj_px(b);
+            self.magic.trail(px, py, BOLT_TRAIL);
             if b.lerp < 1.0 {
                 continue;
             }
             b.from = b.tile;
             let (dc, dr) = b.dir.delta();
             let next = Cell { c: b.tile.c + dc, r: b.tile.r + dr };
-            if self.walls.get(next.c, next.r) {
+            if self.walls.get(next.c, next.r) || !Walls::in_bounds(next.c, next.r) {
                 b.gone = true;
+                let (x, y) = center(b.tile);
+                self.magic.splash(x + dc as f32 * 14.0, y + dr as f32 * 14.0, BOLT_TRAIL);
                 continue;
             }
             b.tile = next;
             b.lerp = 0.0;
             if let Some(idx) = self.enemies.iter().position(|e| !e.gone && e.tile == b.tile) {
-                kills.push(idx);
+                if !kills.contains(&idx) {
+                    kills.push(idx);
+                }
+                if b.proj != Proj::Lance {
+                    b.gone = true;
+                    continue;
+                }
+            }
+            if self.whelp.as_ref().is_some_and(|w| w.tile == b.tile || w.from == b.tile) {
+                whelp_hit = true;
                 b.gone = true;
                 continue;
             }
@@ -938,6 +1120,9 @@ impl Game {
         if warlock_hit {
             self.hit_warlock();
         }
+        if whelp_hit {
+            self.strike_whelp();
+        }
 
         let mut hit_idx = None;
         for i in 0..self.fires.len() {
@@ -947,14 +1132,19 @@ impl Game {
             }
             let interval = GARGOYLE_SHOT_STEP;
             f.lerp += dt / interval;
+            let (px, py) = art::proj_px(f);
+            let ember = if f.proj == Proj::Warlock { WARLOCK_C } else { FIREBALL };
+            self.magic.cinders(px, py, ember);
             if f.lerp < 1.0 {
                 continue;
             }
             f.from = f.tile;
             let (dc, dr) = f.dir.delta();
             let next = Cell { c: f.tile.c + dc, r: f.tile.r + dr };
-            if self.walls.get(next.c, next.r) {
+            if self.walls.get(next.c, next.r) || !Walls::in_bounds(next.c, next.r) {
                 f.gone = true;
+                let (x, y) = center(f.tile);
+                self.magic.splash(x + dc as f32 * 14.0, y + dr as f32 * 14.0, ember);
                 continue;
             }
             f.tile = next;
@@ -973,6 +1163,57 @@ impl Game {
         }
     }
 
+    fn drop_potion(&mut self, tile: Cell, kind: PotionKind) {
+        if self.potions.iter().any(|p| p.tile == tile) {
+            return;
+        }
+        self.potions.push(Potion { tile, kind, t: 0.0 });
+    }
+
+    /// Potions age and seep away; a wizard standing on one drinks it.
+    fn update_potions(&mut self, dt: f32) {
+        for w in &mut self.wizards {
+            w.haste = (w.haste - dt).max(0.0);
+            w.combo_t = (w.combo_t - dt).max(0.0);
+        }
+        for p in &mut self.potions {
+            p.t += dt;
+        }
+        self.potions.retain(|p| p.t < POTION_SECS);
+        let mut i = 0;
+        while i < self.potions.len() {
+            let p = self.potions[i];
+            if let Some(w) = (0..2).find(|&w| self.active[w] && self.wizards[w].tile == p.tile) {
+                self.potions.remove(i);
+                self.drink(w, p);
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    fn drink(&mut self, w: usize, p: Potion) {
+        let (x, y) = center(p.tile);
+        let (text, col) = match p.kind {
+            PotionKind::Haste => {
+                self.wizards[w].haste = HASTE_SECS;
+                ("HASTE!".to_string(), POTION_HASTE)
+            }
+            PotionKind::Gold => {
+                self.add_points(SCORE_GOLD);
+                (format!("+{}", if self.double { SCORE_GOLD * 2 } else { SCORE_GOLD }), POTION_GOLD)
+            }
+            PotionKind::Life => {
+                self.lives[w] = (self.lives[w] + 1).min(LIVES_MAX);
+                ("A SPARE HAT!".to_string(), POTION_LIFE)
+            }
+        };
+        self.fx.popup(x, y - 22.0, &text, col);
+        self.magic.splash(x, y, col);
+        blip::bot::add("potion", 1.0);
+        self.sfx(Sfx::Potion);
+    }
+
     fn kill_enemy(&mut self, idx: usize) {
         let e = self.enemies[idx];
         if e.gone {
@@ -985,12 +1226,30 @@ impl Game {
             EnemyKind::Spellhound => SCORE_HOUND,
             EnemyKind::Gargoyle => SCORE_GARGOYLE,
         };
-        self.sess.add_score(pts);
-        let (x, y) = center(e.tile);
-        self.fx.burst(x, y, 14, 130.0, WRAITH);
-        self.fx.popup(x, y - 6.0, &format!("+{pts}"), BLIP_WHITE);
+        self.add_points(pts);
+        let (x, y) = self.enemy_px(&e);
+        let col = match e.kind {
+            EnemyKind::Imp => IMP,
+            EnemyKind::Wraith => WRAITH,
+            EnemyKind::Spellhound => HOUND,
+            EnemyKind::Gargoyle => FIREBALL,
+        };
+        self.magic.dissolve(x, y, col);
+        let (sc, sr) = match e.kind {
+            EnemyKind::Imp => (0, 2),
+            EnemyKind::Wraith => (2, 2),
+            EnemyKind::Spellhound => (4, 2),
+            EnemyKind::Gargoyle => (0, 3),
+        };
+        self.magic.corpse(x, y, sc, sr, e.face_left, 0.8, col);
+        self.fx.popup(x, y - 22.0, &format!("+{pts}"), BLIP_WHITE);
+        if rand_int(0, 99) < POTION_CHANCE {
+            let roll = rand_int(0, 9);
+            self.drop_potion(e.tile, if roll == 0 { PotionKind::Life } else if roll <= 4 { PotionKind::Haste } else { PotionKind::Gold });
+        }
         blip::bot::add("kill", 1.0);
         self.sfx(Sfx::Kill);
+        self.maybe_whelp();
         self.check_exit();
     }
 
@@ -1058,6 +1317,18 @@ impl Game {
         }
         wl.state = WState::Materializing;
         wl.timer = 0.7;
+        let (x, y) = center(wl.circles[wl.circle]);
+        self.magic.summon(x, y, WARLOCK_C);
+        const LINES: [&str; 7] = [
+            "You will not leave.",
+            "Burn, little wizard.",
+            "I am NOT a vampire.",
+            "My tower, my rules.",
+            "Is that your best spell?",
+            "Mind your robes.",
+            "Again!",
+        ];
+        self.taunt = Some((LINES[rand_int(0, LINES.len() as i32 - 1) as usize].to_string(), 1.8));
     }
 
     fn hit_warlock(&mut self) {
@@ -1071,9 +1342,9 @@ impl Game {
         let wards_left = wl.wards;
         // `wl` is no longer used past here, so the borrow ends and the rest
         // of the method is free to touch other parts of `self`.
-        self.sess.add_score(SCORE_WARD);
+        self.add_points(SCORE_WARD);
         let (x, y) = center(tile);
-        self.fx.burst(x, y, 18, 160.0, WARLOCK_C);
+        self.magic.shatter(x, y, WARLOCK_C);
         self.fx.popup(x, y - 8.0, &format!("+{SCORE_WARD}"), WARLOCK_C);
         blip::bot::add("ward", 1.0);
         self.sfx(Sfx::Ward);
@@ -1120,11 +1391,14 @@ impl Game {
             return;
         }
         let (x, y) = self.wizard_px(idx);
-        self.fx.burst(x, y, 16, 150.0, BLIP_RED);
+        self.magic.fall(x, y, if idx == 0 { REVEAL_C } else { WIZ_ROBE2 });
+        self.magic.corpse(x, y, 0, idx as u32, false, 1.1, if idx == 0 { REVEAL_C } else { WIZ_ROBE2 });
         blip::bot::add("death", 1.0);
         self.sfx(Sfx::Death);
         self.died_this_room = true;
         self.lives[idx] -= 1;
+        const QUIPS: [&str; 5] = ["THAT WAS NOT A HEAL SPELL", "WIZARDS ARE NOT FIREPROOF", "REVIVE! REVIVE!", "OOPS", "MAGICK HAS ITS PRICE"];
+        self.banner = Some((QUIPS[rand_int(0, QUIPS.len() as i32 - 1) as usize].to_string(), 1.6));
         if self.lives[idx] > 0 {
             self.dead_index = Some(idx);
             self.dead_timer.start(RESPAWN_PROTECT);
@@ -1165,18 +1439,131 @@ impl Game {
         }
     }
 
+    fn add_points(&mut self, pts: i32) {
+        self.sess.add_score(if self.double { pts * 2 } else { pts });
+    }
+
+    /// The last monster down: a whelp may burst in for its few seconds.
+    fn maybe_whelp(&mut self) {
+        if self.whelp_done || self.warlock.is_some() || self.sess.level < 2 || self.enemies.iter().any(|e| !e.gone) {
+            return;
+        }
+        self.whelp_done = true;
+        let far = (0..40)
+            .filter_map(|_| self.random_open_cell())
+            .map(|(c, r)| Cell { c, r })
+            .max_by_key(|cl| (cl.c - self.wizards[0].tile.c).abs() + (cl.r - self.wizards[0].tile.r).abs());
+        let Some(tile) = far else { return };
+        self.whelp = Some(Whelp { tile, from: tile, lerp: 1.0, step_t: 0.4, dir: Dir::Left, left: WHELP_SECS, face_left: true });
+        let (x, y) = center(tile);
+        self.magic.summon(x, y, FIREBALL);
+        self.magic.burst(x, y, 20, 140.0, FIREBALL, magic::Kind::Spark);
+        self.banner = Some(("A DRAGON WHELP!".to_string(), 1.8));
+        self.sfx(Sfx::Whelp);
+        blip::bot::add("whelp", 1.0);
+    }
+
+    fn update_whelp(&mut self, dt: f32) {
+        let Some(w) = &mut self.whelp else { return };
+        w.left -= dt;
+        w.lerp = (w.lerp + dt / WHELP_STEP).min(1.0);
+        if w.left <= 0.0 {
+            let (x, y) = center(w.tile);
+            self.whelp = None;
+            self.magic.burst(x, y, 16, 100.0, FIREBALL, magic::Kind::Mote);
+            self.magic.wave(x, y, 30.0, 0.4, 2.0, FIREBALL, false);
+            self.banner = Some(("IT FLEW AWAY".to_string(), 1.2));
+            self.check_exit();
+            return;
+        }
+        w.step_t -= dt;
+        if w.step_t > 0.0 {
+            return;
+        }
+        w.step_t = WHELP_STEP;
+        // prefer straight on, never straight back unless cornered
+        let back = match w.dir { Dir::Up => Dir::Down, Dir::Down => Dir::Up, Dir::Left => Dir::Right, Dir::Right => Dir::Left };
+        let mut opts: Vec<Dir> = DIRS.iter().copied().filter(|&d| {
+            let (dc, dr) = d.delta();
+            d != back && self.walls.floor(w.tile.c + dc, w.tile.r + dr)
+        }).collect();
+        if opts.is_empty() {
+            opts.push(back);
+        }
+        let d = if opts.contains(&w.dir) && rand_int(0, 3) > 0 { w.dir } else { opts[rand_int(0, opts.len() as i32 - 1) as usize] };
+        let (dc, dr) = d.delta();
+        w.from = w.tile;
+        w.tile = Cell { c: w.tile.c + dc, r: w.tile.r + dr };
+        w.lerp = 0.0;
+        w.dir = d;
+        match d {
+            Dir::Left => w.face_left = true,
+            Dir::Right => w.face_left = false,
+            _ => {}
+        }
+        if rand_int(0, 4) == 0 {
+            let (x, y) = center(w.from);
+            self.magic.cinders(x, y, FIREBALL);
+        }
+    }
+
+    fn whelp_px(&self) -> Option<(f32, f32)> {
+        let w = self.whelp.as_ref()?;
+        let a = center(w.from);
+        let b = center(w.tile);
+        Some((lerp(a.0, b.0, w.lerp), lerp(a.1, b.1, w.lerp)))
+    }
+
+    fn strike_whelp(&mut self) {
+        let Some((x, y)) = self.whelp_px() else { return };
+        self.whelp = None;
+        self.add_points(SCORE_WHELP);
+        self.double_next = true;
+        self.magic.dissolve(x, y, FIREBALL);
+        self.magic.corpse(x, y, 0, 4, false, 0.8, FIREBALL);
+        self.magic.wave(x, y, 80.0, 0.7, 3.0, RUNE_CLEAN, true);
+        self.fx.popup(x, y - 22.0, &format!("+{SCORE_WHELP}"), RUNE_CLEAN);
+        self.banner = Some(("NEXT CHAMBER PAYS DOUBLE".to_string(), 2.0));
+        self.sfx(Sfx::Chamber);
+        blip::bot::add("whelp_hit", 1.0);
+        self.check_exit();
+    }
+
+    /// The cellar's heartbeat quickens as the chamber empties.
+    fn update_pulse(&mut self, dt: f32) {
+        if self.warlock.is_some() {
+            return;
+        }
+        let alive = self.enemies.iter().filter(|e| !e.gone).count();
+        if alive == 0 && self.whelp.is_none() {
+            return;
+        }
+        self.pulse_t -= dt;
+        if self.pulse_t <= 0.0 {
+            let k = alive as f32 / self.start_monsters as f32;
+            self.pulse_t = if self.whelp.is_some() { 0.38 } else { 0.55 + 0.75 * k };
+            self.sfx(Sfx::Pulse);
+        }
+    }
+
     fn check_exit(&mut self) {
-        let monsters_alive = self.enemies.iter().any(|e| !e.gone);
+        let monsters_alive = self.enemies.iter().any(|e| !e.gone) || self.whelp.is_some();
         let warlock_alive = self.warlock.as_ref().map_or(false, |wl| wl.wards > 0);
         let runes_left = self.runes.iter().any(|r| !r.cleansed);
+        let was_open = self.exit_open;
         self.exit_open = !monsters_alive && !warlock_alive && !runes_left;
+        if self.exit_open && !was_open {
+            let (x, y) = center(self.exit);
+            self.magic.open(x, y, RUNE_CLEAN);
+            self.banner = Some(("THE WAY DOWN IS OPEN".to_string(), 2.2));
+        }
     }
 
     fn finish_chamber(&mut self) {
         self.cleared_no_death += 1;
         if !self.died_this_room {
             let pts = SCORE_CLEAR_NODEATH;
-            self.sess.add_score(pts);
+            self.add_points(pts);
             let (x, y) = center(self.wizards[0].tile);
             self.fx.popup(x, y - 8.0, &format!("+{pts}"), BLIP_YELLOW);
         }
@@ -1213,6 +1600,8 @@ impl Game {
         self.runes.clear();
         self.exit_open = false;
         self.torches = self.find_torches();
+        self.room_stamp = self.room_stamp.wrapping_add(1);
+        self.magic.clear();
         let stones: Vec<Cell> = [(3, 1), (11, 1), (3, 11), (11, 11)]
             .iter()
             .map(|&(c, r)| Cell { c, r })
@@ -1240,6 +1629,7 @@ impl Game {
 
     fn update_bonus(&mut self, dt: f32) {
         self.fx.update(dt);
+        self.update_ambience(dt);
         self.update_wizard(0, dt);
         self.wizards[0].reveal_cd = (self.wizards[0].reveal_cd - dt).max(0.0);
         if self.wizards[0].reveal_t > 0.0 {
@@ -1279,7 +1669,7 @@ impl Game {
         match hit {
             Some(k) if k == seq[expect] => {
                 let pts = 100 * (expect as i32 + 1);
-                self.sess.add_score(pts);
+                self.add_points(pts);
                 let (sx, sy) = center(stones[k]);
                 self.fx.ring(sx, sy, CELL as f32 * 1.3, 0.4, RUNE_CLEAN);
                 self.fx.popup(sx, sy - 6.0, &format!("+{pts}"), RUNE_CLEAN);
@@ -1307,8 +1697,28 @@ impl Game {
 
     // ---- transitions ------------------------------------------------------
 
+    /// Embers rising from the torches and the spells' own update.
+    fn update_ambience(&mut self, dt: f32) {
+        self.magic.update(dt);
+        // dust and ash hanging in the air, catching the light
+        if rand_int(0, 1000) < (dt * 9000.0) as i32 {
+            let x = rand_int(0, WIN_W) as f32;
+            let y = (HUD_H + rand_int(0, ROWS as i32 * CELL)) as f32;
+            let c = BlipColor { r: 1.0, g: 0.8, b: 0.55, a: 0.3 };
+            self.magic.spawn(magic::Kind::Mote, x, y, rand_int(-8, 8) as f32, rand_int(-4, 6) as f32, 3.0, 0.7, c);
+        }
+        for &tc in &self.torches {
+            if rand_int(0, 1000) < (dt * 2500.0) as i32 {
+                let (x, y) = art::torch_flame(tc);
+                let vx = rand_int(-20, 20) as f32;
+                self.magic.spawn(magic::Kind::Mote, x, y - 4.0, vx, -30.0, 1.0 + rand_int(0, 80) as f32 / 100.0, 0.9, TORCH);
+            }
+        }
+    }
+
     fn update_dead(&mut self, dt: f32) {
         self.fx.update(dt);
+        self.update_ambience(dt);
         if self.dead_timer.tick(dt) {
             self.respawn();
         }
@@ -1430,9 +1840,31 @@ fn decide_patrol(walls: &Walls, blocked: &[Cell], e: &Enemy) -> Option<(Cell, Di
     Some(candidates[rand_int(0, candidates.len() as i32 - 1) as usize])
 }
 
-/// A short original line the Warlock drops between chambers.
+/// Each chamber's name, shown on the panel.
+fn room_name(level: i32) -> &'static str {
+    let n = (level - 1).rem_euclid(6);
+    let deep = (level - 1) / 6;
+    if deep > 0 {
+        return ["THE DEEP UNDERCROFT", "THE DROWNED CRYPT", "THE ASH KENNELS", "THE SHIFTING HALL", "THE BURNING GALLERY", "THE LOWER SANCTUM"][n as usize];
+    }
+    ["THE UNDERCROFT", "THE BONE CRYPT", "THE KENNELS", "THE HALL OF GATES", "THE GARGOYLE GALLERY", "THE WARLOCK'S SANCTUM"][n as usize]
+}
+
+/// A short original line the Warlock drops between chambers; once the
+/// tower has been cleared he gets chattier (and stranger).
 fn room_taunt(level: i32) -> String {
     let n = (level - 1).rem_euclid(6);
+    if level > 6 {
+        return [
+            "Back again? Bring friends.",
+            "Mind the friendly fire.",
+            "I am NOT a vampire.",
+            "Haste will not save you.",
+            "Combine your elements, child.",
+            "Again? Very well.",
+        ][n as usize]
+            .to_string();
+    }
     [
         "Who wanders my tower?",
         "Mind the ghosts.",
@@ -1444,321 +1876,21 @@ fn room_taunt(level: i32) -> String {
         .to_string()
 }
 
-// ---- drawing --------------------------------------------------------------
-
-fn draw_maze(blip: &Blip, g: &Game, t: f32) {
-    for r in 0..ROWS as i32 {
-        for c in 0..COLS as i32 {
-            let x = (c * CELL) as f32;
-            let y = (HUD_H + r * CELL) as f32;
-            if g.walls.get(c, r) {
-                blip.fill_rect(x, y, CELL as f32, CELL as f32, WALL);
-                blip.fill_rect(x, y, CELL as f32, 2.0, WALL_HI);
-            } else {
-                blip.fill_rect(x, y, CELL as f32, CELL as f32, FLOOR);
-                blip.draw_rect(x, y, CELL as f32, CELL as f32, FLOOR_GRID);
-            }
-        }
-    }
-    for &cell in &g.torches {
-        let (tx, ty) = center(cell);
-        let flick = 0.7 + 0.3 * (t * 9.0 + (cell.c * 3 + cell.r * 5) as f32).sin();
-        blip.fill_glow_circle(tx, ty, 4.0 * flick, TORCH);
-        blip.fill_circle(tx, ty, 2.0 * flick, BlipColor { r: 1.0, g: 0.9, b: 0.6, a: 1.0 });
-    }
-}
-
-fn draw_wizard(blip: &Blip, g: &Game, idx: usize) {
-    if !g.active[idx] {
-        return;
-    }
-    let w = &g.wizards[idx];
-    if g.state == State::Dead && g.dead_index == Some(idx) && (g.dead_timer.remaining() / 0.12) as i32 % 2 == 0 {
-        return;
-    }
-    let (x, y) = g.wizard_px(idx);
-    let s = CELL as f32 * 0.36;
-    let robe = if idx == 0 { WIZ_ROBE } else { WIZ_ROBE2 };
-    let hat = if idx == 0 { WIZ_HAT } else { WIZ_HAT2 };
-    if w.protect > 0.0 && (w.protect * 8.0) as i32 % 2 == 0 {
-        blip.fill_circle(x, y, s + 4.0, PROTECT);
-    }
-    blip.fill_circle(x, y + 2.0, s, robe);
-    blip.fill_capsule(x, y - s, x, y - s - s * 1.1, s * 0.55, s * 0.30, hat);
-    blip.fill_circle(x, y - s * 0.2, s * 0.62, hat);
-    let (dx, dy) = w.facing.delta();
-    let (sx, sy) = (x + dx as f32 * s * 1.6, y + dy as f32 * s * 1.6);
-    blip.draw_line_ex(x, y, sx, sy, 2.0, hat);
-    blip.fill_glow_circle(sx, sy, 3.4, REVEAL_C);
-    blip.fill_circle(sx, sy, 2.0, BlipColor { r: 1.0, g: 1.0, b: 0.9, a: 1.0 });
-    let (ex, ey) = match w.facing {
-        Dir::Left => (x - s * 0.3, y - s * 0.1),
-        Dir::Right => (x + s * 0.3, y - s * 0.1),
-        Dir::Up => (x, y - s * 0.4),
-        Dir::Down => (x, y + s * 0.1),
-    };
-    blip.fill_rect(ex - 1.2, ey - 1.2, 2.4, 2.4, BLIP_BLACK);
-}
-
-fn draw_imp(blip: &Blip, g: &Game, e: &Enemy, t: f32) {
-    let (x, y) = g.enemy_px(e);
-    let s = CELL as f32 * 0.3;
-    let bob = (t * 6.0).sin() * 1.5;
-    let (dx, _) = e.dir.delta();
-    blip.fill_capsule(x - dx as f32 * 4.0, y - s, x - dx as f32 * 8.0, y - s * 2.0, 1.5, 1.0, IMP);
-    blip.fill_capsule(x + dx as f32 * 4.0, y - s, x + dx as f32 * 8.0, y - s * 2.0, 1.5, 1.0, IMP);
-    blip.fill_circle(x, y + bob * 0.3, s, IMP);
-    blip.fill_rect(x - 3.0, y - 2.0, 2.4, 2.4, BLIP_BLACK);
-    blip.fill_rect(x + 1.0, y - 2.0, 2.4, 2.4, BLIP_BLACK);
-}
-
-fn draw_wraith(blip: &Blip, g: &Game, e: &Enemy, t: f32) {
-    if !e.visible {
-        return;
-    }
-    let (x, y) = g.enemy_px(e);
-    let s = CELL as f32 * 0.34;
-    let a = if e.lunging {
-        if e.charge > 0.0 {
-            // materializing: fade in across the charge beat
-            0.35 + 0.65 * (1.0 - e.charge / WRAITH_CHARGE)
-        } else {
-            1.0
-        }
-    } else {
-        0.75 + 0.25 * (t * 8.0).sin()
-    };
-    let c = BlipColor { a, ..WRAITH };
-    blip.fill_circle(x, y, s, c);
-    for k in 0..4 {
-        let hx = x - s + (k as f32 + 0.5) * s * 2.0 / 4.0;
-        let hy = y + s * 0.7 + if k % 2 == 0 { 2.0 } else { -2.0 };
-        blip.fill_circle(hx, hy, 2.5, c);
-    }
-    blip.fill_rect(x - 3.0, y - 3.0, 2.4, 2.4, BLIP_BLACK);
-    blip.fill_rect(x + 0.6, y - 3.0, 2.4, 2.4, BLIP_BLACK);
-}
-
-fn draw_hound(blip: &Blip, g: &Game, e: &Enemy) {
-    let (x, y) = g.enemy_px(e);
-    let s = CELL as f32 * 0.3;
-    let ears = if e.hunting { s * 1.6 } else { s * 0.9 };
-    blip.fill_capsule(x - s, y, x + s, y, s, s, HOUND);
-    blip.fill_capsule(x - s * 0.5, y - s, x - s * 0.5, y - ears, 2.0, 1.5, HOUND);
-    blip.fill_capsule(x + s * 0.5, y - s, x + s * 0.5, y - ears, 2.0, 1.5, HOUND);
-    blip.fill_circle(x + s, y, s * 0.6, HOUND);
-    blip.fill_rect(x + s, y - 2.0, 2.4, 2.4, BLIP_BLACK);
-}
-
-fn draw_gargoyle(blip: &Blip, g: &Game, e: &Enemy) {
-    let (x, y) = g.enemy_px(e);
-    let s = CELL as f32 * 0.34;
-    let wing = if e.windup > 0.0 {
-        let k = 1.0 - e.windup / GARGOYLE_TELL;
-        s * (0.4 + 1.2 * k)
-    } else {
-        s * 0.4
-    };
-    blip.fill_capsule(x - s, y - wing, x - s * 1.8, y - wing * 1.4, 2.0, 1.0, GARGOYLE);
-    blip.fill_capsule(x + s, y - wing, x + s * 1.8, y - wing * 1.4, 2.0, 1.0, GARGOYLE);
-    blip.fill_circle(x, y, s, GARGOYLE);
-    blip.fill_rect(x - 3.0, y - 3.0, 2.4, 2.4, BLIP_BLACK);
-    blip.fill_rect(x + 0.6, y - 3.0, 2.4, 2.4, BLIP_BLACK);
-}
-
-fn draw_warlock(blip: &Blip, g: &Game, t: f32) {
-    let Some(wl) = &g.warlock else { return };
-    if wl.wards <= 0 {
-        return;
-    }
-    const CIRC: BlipColor = BlipColor { r: 0.4, g: 0.2, b: 0.5, a: 1.0 };
-    for (i, c) in wl.circles.iter().enumerate() {
-        let (x, y) = center(*c);
-        if wl.sealed[i] {
-            blip.draw_circle(x, y, CELL as f32 * 0.3, 1.0, BLIP_GRAY);
-        } else if i == wl.circle {
-            let pulse = 1.0 + 0.3 * (t * 6.0).sin();
-            blip.draw_circle(x, y, CELL as f32 * 0.32 * pulse, 2.0, WARLOCK_C);
-        } else {
-            blip.draw_circle(x, y, CELL as f32 * 0.3, 1.0, CIRC);
-        }
-    }
-    if wl.state == WState::Aiming || wl.state == WState::Casting {
-        let mut p = wl.aim_from;
-        let (dc, dr) = wl.aim_dir.delta();
-        for _ in 0..GARGOYLE_RANGE {
-            p = Cell { c: p.c + dc, r: p.r + dr };
-            if g.walls.get(p.c, p.r) {
-                break;
-            }
-            let (lx, ly) = center(p);
-            blip.fill_rect(lx - 6.0, ly - 1.0, 12.0, 2.0, BlipColor { a: 0.5, ..WARLOCK_C });
-        }
-    }
-    let (x, y) = center(wl.circles[wl.circle]);
-    let fade = match wl.state {
-        WState::Materializing => (1.0 - wl.timer / 0.7).clamp(0.0, 1.0),
-        _ => 1.0,
-    };
-    let c = BlipColor { a: fade, ..WARLOCK_C };
-    let s = CELL as f32 * 0.36;
-    blip.fill_circle(x, y + 2.0, s, c);
-    blip.fill_capsule(x, y - s, x, y - s * 2.0, s * 0.5, s * 0.25, c);
-    let (dx, dy) = wl.aim_dir.delta();
-    blip.fill_glow_circle(x + dx as f32 * s * 1.6, y + dy as f32 * s * 1.6, 3.0, WARLOCK_C);
-    blip.fill_rect(x - 3.0, y - 3.0, 2.4, 2.4, BLIP_BLACK);
-    blip.fill_rect(x + 0.6, y - 3.0, 2.4, 2.4, BLIP_BLACK);
-}
-
-fn draw_projectile(blip: &Blip, p: &Projectile) {
-    let a = center(p.from);
-    let b = center(p.tile);
-    let t = p.lerp;
-    let (x, y) = (lerp(a.0, b.0, t), lerp(a.1, b.1, t));
-    match p.proj {
-        Proj::Bolt => {
-            blip.fill_glow_circle(x, y, 3.0, BOLT);
-            let (dx, dy) = p.dir.delta();
-            blip.draw_line_ex(x - dx as f32 * 8.0, y - dy as f32 * 8.0, x, y, 2.0, BOLT);
-        }
-        _ => {
-            blip.fill_glow_circle(x, y, 4.0, FIREBALL);
-            blip.fill_circle(x, y, 2.5, BlipColor { r: 1.0, g: 0.9, b: 0.5, a: 1.0 });
-        }
-    }
-}
-
-fn draw_runes(blip: &Blip, g: &Game, t: f32) {
-    for r in &g.runes {
-        let (x, y) = center(r.tile);
-        if r.cleansed {
-            let pulse = 1.0 + 0.2 * (t * 4.0).sin();
-            blip.draw_circle(x, y, CELL as f32 * 0.32 * pulse, 2.0, RUNE_CLEAN);
-            blip.fill_glow_circle(x, y, 3.0, RUNE_CLEAN);
-        } else {
-            blip.draw_circle(x, y, CELL as f32 * 0.3, 1.5, RUNE_CURSED);
-            blip.fill_circle(x, y, 2.0, RUNE_CURSED);
-        }
-    }
-}
-
-fn draw_gates(blip: &Blip, g: &Game) {
-    for gate in &g.gates {
-        let closed = gate.cooldown > 0.0;
-        for c in [gate.a, gate.b] {
-            let (x, y) = center(c);
-            let color = if closed { BLIP_GRAY } else { GATE_C };
-            blip.draw_circle(x, y, CELL as f32 * 0.36, 2.0, color);
-            blip.draw_circle(x, y, CELL as f32 * 0.18, 1.5, color);
-        }
-    }
-}
-
-fn draw_exit(blip: &Blip, g: &Game, t: f32) {
-    let (x, y) = center(g.exit);
-    if g.exit_open {
-        let pulse = 1.0 + 0.25 * (t * 5.0).sin();
-        blip.draw_circle(x, y, CELL as f32 * 0.4 * pulse, 3.0, EXIT_C);
-        blip.fill_glow_circle(x, y, 4.0, EXIT_C);
-    } else {
-        blip.draw_circle(x, y, CELL as f32 * 0.34, 1.5, BlipColor { a: 0.5, ..BLIP_GRAY });
-    }
-}
-
-fn draw_sightings(blip: &Blip, g: &Game) {
-    for s in &g.sightings {
-        let k = s.t / SIGHTING_FADE;
-        let c = BlipColor { a: (1.0 - k) * 0.8, ..WRAITH };
-        let (x, y) = center(s.tile);
-        blip.draw_rect(x + 3.0, y + 3.0, (CELL - 6) as f32, (CELL - 6) as f32, c);
-    }
-}
-
-fn draw_reveal(blip: &Blip, g: &Game) {
-    for idx in 0..2 {
-        if !g.active[idx] || g.wizards[idx].reveal_t <= 0.0 {
-            continue;
-        }
-        let k = 1.0 - g.wizards[idx].reveal_t / 0.55;
-        let (x, y) = g.wizard_px(idx);
-        let r = CELL as f32 * (1.0 + k * 7.0);
-        blip.draw_circle(x, y, r, 2.0, BlipColor { a: (1.0 - k) * 0.9, ..REVEAL_C });
-    }
-}
-
-fn draw_counters(blip: &Blip, g: &Game) {
-    let monsters = g.enemies.iter().filter(|e| !e.gone).count();
-    let warlock = g.warlock.as_ref().map_or(false, |wl| wl.wards > 0);
-    let all = (monsters + if warlock { 1 } else { 0 }) as i32;
-    let runes_left = g.runes.iter().filter(|r| !r.cleansed).count() as i32;
-    let cy = HUD_H as f32 + 10.0;
-    let ty = HUD_H as f32 + 4.0;
-    // Counters draw as glyphs echoing the sprites, so the numbers read at a
-    // glance: a horned monster, then the rune it is safe to cleanse.
-    let mut x = 10.0;
-    blip.fill_circle(x, cy, 4.0, IMP);
-    blip.fill_rect(x - 1.8, cy - 2.6, 1.8, 1.8, BLIP_BLACK);
-    blip.fill_rect(x + 0.6, cy - 2.6, 1.8, 1.8, BLIP_BLACK);
-    x += 12.0;
-    blip.draw_number(all, x, ty, 2.0, BLIP_WHITE);
-    x += all.to_string().len().max(1) as f32 * 12.0 + 16.0;
-    blip.draw_circle(x, cy, 4.0, 1.5, RUNE_CURSED);
-    blip.fill_circle(x, cy, 1.6, RUNE_CURSED);
-    x += 12.0;
-    blip.draw_number(runes_left, x, ty, 2.0, BLIP_WHITE);
-    // reveal cooldown readout: a ring that refills beside the counts
-    let cx = x + runes_left.to_string().len().max(1) as f32 * 12.0 + 16.0;
-    blip.draw_circle(cx, cy, 7.0, 2.0, BLIP_GRAY);
-    let cd = g.wizards[0].reveal_cd;
-    if cd <= 0.0 {
-        blip.fill_circle(cx, cy, 3.5, REVEAL_C);
-    } else {
-        let frac = 1.0 - cd / REVEAL_CD;
-        blip.fill_circle(cx, cy - 7.0 + 14.0 * frac, 2.0, REVEAL_C);
-    }
-}
+// ---- drawing (the rest lives in art.rs) ----------------------------------
 
 fn draw_taunt(blip: &Blip, g: &Game) {
     if let Some((text, t)) = &g.taunt {
         if *t > 0.0 {
-            blip.draw_centered(text, HUD_H as f32 + 22.0, 2.0, WARLOCK_C);
+            blip.draw_centered_outlined(text, WIN_W as f32 / 2.0, HUD_H as f32 + 10.0, 2.0, WARLOCK_C, BLIP_BLACK);
         }
     }
     if let Some((text, t)) = &g.banner {
         if *t > 0.0 {
-            blip.draw_centered(text, WIN_H as f32 / 2.0, 4.0, BLIP_YELLOW);
+            let k = (*t * 3.0).min(1.0);
+            let sz = if text.chars().count() * 18 <= WIN_W as usize - 16 { 3.0 } else { 2.0 };
+            blip.draw_centered_outlined(text, WIN_W as f32 / 2.0, (HUD_H + ROWS as i32 * CELL / 2 - 10) as f32, sz, BlipColor { a: k, ..RUNE_CLEAN }, BlipColor { a: k, ..BLIP_BLACK });
         }
     }
-}
-
-fn draw_world(blip: &Blip, g: &Game, t: f32) {
-    draw_maze(blip, g, t);
-    draw_gates(blip, g);
-    draw_runes(blip, g, t);
-    draw_exit(blip, g, t);
-    draw_sightings(blip, g);
-    draw_warlock(blip, g, t);
-    for e in &g.enemies {
-        if e.gone {
-            continue;
-        }
-        match e.kind {
-            EnemyKind::Imp => draw_imp(blip, g, e, t),
-            EnemyKind::Wraith => draw_wraith(blip, g, e, t),
-            EnemyKind::Spellhound => draw_hound(blip, g, e),
-            EnemyKind::Gargoyle => draw_gargoyle(blip, g, e),
-        }
-    }
-    for b in &g.bolts {
-        draw_projectile(blip, b);
-    }
-    for f in &g.fires {
-        draw_projectile(blip, f);
-    }
-    draw_reveal(blip, g);
-    draw_wizard(blip, g, 0);
-    draw_wizard(blip, g, 1);
-    g.fx.draw(blip);
 }
 
 fn hud_lives(g: &Game) -> i32 {
@@ -1767,48 +1899,6 @@ fn hud_lives(g: &Game) -> i32 {
     } else {
         g.lives[0]
     }
-}
-
-fn draw_play(blip: &Blip, g: &Game, t: f32) {
-    draw_world(blip, g, t);
-    draw_counters(blip, g);
-    draw_taunt(blip, g);
-    blip.draw_hud(g.sess.score, hud_lives(g));
-    if g.two_player && (g.state == State::Play || g.state == State::Dead) {
-        blip.draw_text(&format!("P1 {}  P2 {}", g.lives[0], g.lives[1]), WIN_W as f32 - 96.0, HUD_H as f32 + 4.0, 2.0, BLIP_WHITE);
-    }
-}
-
-fn draw_title(blip: &Blip, t: f32) {
-    blip.draw_centered("WARLOCK", WIN_H as f32 * 0.20, 6.0, WARLOCK_C);
-    let hi = web::high_score();
-    blip.draw_hi(&hi, WIN_H as f32 * 0.20 + 46.0, BLIP_YELLOW);
-    let x = (t * 40.0).rem_euclid(WIN_W as f32 + 60.0) - 30.0;
-    let y = WIN_H as f32 * 0.62;
-    blip.fill_circle(x, y, 10.0, WRAITH);
-    let by = web::controls();
-    blip.draw_centered(
-        by.pick("PRESS FIRE", "PRESS FIRE", "TAP TO START"),
-        WIN_H as f32 * 0.50,
-        3.0,
-        BLIP_WHITE,
-    );
-    blip.draw_centered(
-        by.pick(
-            "ARROWS/WASD MOVE  SPACE BOLT  Z REVEAL",
-            "STICK MOVE  A BOLT  B REVEAL",
-            "STICK MOVE  TAP BOLT",
-        ),
-        WIN_H as f32 * 0.60,
-        2.0,
-        BLIP_GRAY,
-    );
-    blip.draw_centered(
-        by.pick("J TO JOIN A SECOND WIZARD", "2ND STATION JOINS WITH A", "2ND PLAYER JOINS ON THE DECK"),
-        WIN_H as f32 * 0.68,
-        2.0,
-        WIZ_ROBE2,
-    );
 }
 
 fn draw_over(blip: &Blip, g: &Game) {
@@ -1827,30 +1917,6 @@ fn draw_over(blip: &Blip, g: &Game) {
         2.0,
         BLIP_GRAY,
     );
-}
-
-fn draw_bonus(blip: &Blip, g: &Game, t: f32) {
-    draw_maze(blip, g, t);
-    let Some(b) = &g.bonus else { return };
-    for (i, s) in b.stones.iter().enumerate() {
-        let (x, y) = center(*s);
-        let lit = b.showing && i == b.seq[b.show_i];
-        if lit {
-            blip.draw_circle(x, y, CELL as f32 * 0.42, 3.0, RUNE_CLEAN);
-            blip.fill_glow_circle(x, y, 5.0, RUNE_CLEAN);
-        } else {
-            blip.draw_circle(x, y, CELL as f32 * 0.32, 1.5, RUNE_CURSED);
-            blip.fill_circle(x, y, 2.0, RUNE_CURSED);
-        }
-    }
-    draw_wizard(blip, g, 0);
-    draw_wizard(blip, g, 1);
-    g.fx.draw(blip);
-    draw_taunt(blip, g);
-    blip.draw_hud(g.sess.score, hud_lives(g));
-    if !b.showing {
-        blip.draw_centered("REPEAT THE LIGHTS", (HUD_H + 16) as f32, 2.0, BLIP_WHITE);
-    }
 }
 
 // ---- entry ----------------------------------------------------------------
@@ -1875,16 +1941,42 @@ async fn main() {
         chamber: blip::audio::load_sound(blip::wav!("chamber")).await,
         ward: blip::audio::load_sound(blip::wav!("ward")).await,
         warlock: blip::audio::load_sound(blip::wav!("warlock")).await,
+        fire: blip::audio::load_sound(blip::wav!("fire")).await,
+        pulse: blip::audio::load_sound(blip::wav!("pulse")).await,
+        whelp: blip::audio::load_sound(blip::wav!("whelp")).await,
+        potion: blip::audio::load_sound(blip::wav!("potion")).await,
     });
-    let mut music = Jukebox::new("WARLOCK", &["DUNGEON", "TOWER"]);
+    let mut music = Jukebox::new("WARLOCK", &["DUNGEON", "TOWER", "THEME", "DEPTHS"]);
+    let mut art = art::Art::new();
+    // the title shows the first cellar, torchlit and empty
+    g.load_room();
 
     if blip.screenshot_mode {
         g.start_game();
+        #[cfg(not(target_arch = "wasm32"))]
+        scene::setup(&mut g);
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut frame: u32 = 0;
 
     loop {
-        let dt = blip.delta_time;
-        let t = blip::macroquad::time::get_time() as f32;
+        #[cfg(not(target_arch = "wasm32"))]
+        if blip.screenshot_mode {
+            frame += 1;
+            scene::tick(&mut g, frame);
+        }
+        #[allow(unused_mut)]
+        let mut dt = blip.delta_time;
+        #[cfg(not(target_arch = "wasm32"))]
+        if blip.screenshot_mode && std::env::var_os("WARLOCK_SCENE").is_some() {
+            dt = 1.0 / 60.0;
+        }
+        #[allow(unused_mut)]
+        let mut t = blip::macroquad::time::get_time() as f32;
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(at) = std::env::var("WARLOCK_T").ok().and_then(|v| v.parse::<f32>().ok()) {
+            t = at + frame as f32 / 60.0;
+        }
 
         #[cfg(not(target_arch = "wasm32"))]
         if blip::bot::active() {
@@ -1894,15 +1986,17 @@ async fn main() {
         let was_playing = g.state == State::Play;
         match g.state {
             State::Title => {
-                g.try_join();
-                if coin_start() {
+                g.update_ambience(dt);
+                if key_pressed(BLIP_KEY_J) {
+                    g.start_two();
+                } else if coin_start() {
                     g.start_game();
                 }
             }
             State::Play => {
                 g.try_join();
                 for i in 0..2 {
-                    if !g.active[i] {
+                    if !g.active[i] || g.in_intro() {
                         continue;
                     }
                     if g.bolt_pressed(i) || (g.bolt_held(i) && g.wizards[i].bolt_cd <= 0.0) {
@@ -1925,12 +2019,7 @@ async fn main() {
         music.play(g.track());
 
         blip.clear(BLIP_BLACK);
-        match g.state {
-            State::Title => draw_title(&blip, t),
-            State::Over => draw_over(&blip, &g),
-            State::Play | State::Dead => draw_play(&blip, &g, t),
-            State::Bonus => draw_bonus(&blip, &g, t),
-        }
+        art.draw_frame(&blip, &g, t);
 
         blip.next_frame(60).await;
     }
@@ -2055,6 +2144,74 @@ mod tests {
     }
 
     #[test]
+    fn reveal_then_bolt_casts_a_lance_that_pierces() {
+        let mut g = Game::new();
+        g.start_game();
+        g.intro = 0.0;
+        // clear a row and line up three imps along it
+        let w = g.wizards[0].tile;
+        for c in w.c + 1..w.c + 5 {
+            g.walls.set(c, w.r, false);
+        }
+        g.enemies.truncate(3);
+        for (k, e) in g.enemies.iter_mut().enumerate() {
+            e.kind = EnemyKind::Imp;
+            e.tile = Cell { c: w.c + 2 + k as i32, r: w.r };
+            e.from = e.tile;
+            e.step_t = 1000.0;
+        }
+        g.wizards[0].facing = Dir::Right;
+        g.reveal(0);
+        g.cast_bolt(0);
+        assert!(g.bolts[0].proj == Proj::Lance);
+        for _ in 0..40 {
+            g.update_projectiles(0.02);
+        }
+        assert!(g.enemies.iter().all(|e| e.gone), "the lance goes through all three");
+        // a plain bolt stops at the first
+        let mut g = Game::new();
+        g.start_game();
+        g.wizards[0].reveal_cd = 0.0;
+        g.cast_bolt(0);
+        assert!(g.bolts[0].proj == Proj::Bolt);
+    }
+
+    #[test]
+    fn potions_haste_gild_and_add_a_hat() {
+        let mut g = Game::new();
+        g.start_game();
+        g.intro = 0.0;
+        let here = g.wizards[0].tile;
+        g.drop_potion(here, PotionKind::Haste);
+        g.update_potions(0.01);
+        assert!(g.potions.is_empty(), "standing on it drinks it");
+        assert!(g.wizards[0].haste > 0.0);
+        let before = g.sess.score;
+        g.drop_potion(here, PotionKind::Gold);
+        g.update_potions(0.01);
+        assert_eq!(g.sess.score, before + SCORE_GOLD);
+        g.lives[0] = LIVES_MAX;
+        g.drop_potion(here, PotionKind::Life);
+        g.update_potions(0.01);
+        assert_eq!(g.lives[0], LIVES_MAX, "hats are capped");
+        // one left lying seeps away
+        g.drop_potion(Cell { c: here.c + 50, r: here.r }, PotionKind::Gold);
+        g.update_potions(POTION_SECS + 0.1);
+        assert!(g.potions.is_empty());
+    }
+
+    #[test]
+    fn j_on_the_title_starts_a_two_player_game() {
+        let mut g = Game::new();
+        g.start_two();
+        assert!(g.state == State::Play);
+        assert!(g.two_player);
+        assert_eq!(g.active, [true, true]);
+        assert_eq!(g.lives, [LIVES_START, LIVES_START]);
+        assert_ne!(g.wizards[1].tile, g.wizards[0].tile);
+    }
+
+    #[test]
     fn joining_adds_a_second_wizard_with_her_own_lives() {
         let mut g = Game::new();
         g.start_game();
@@ -2125,6 +2282,7 @@ mod tests {
             charge: 0.0,
             shot_cd: 0.0,
             gone: false,
+            face_left: true,
         });
         // the wraith starts a step onto the wizard's tile: its body is still
         // a whole cell away, so no contact yet
@@ -2180,5 +2338,66 @@ mod tests {
             near.is_some_and(|w| w.visible),
             "a cleansed rune should force the wraith beside it visible"
         );
+    }
+
+    #[test]
+    fn the_last_monster_brings_a_whelp_that_holds_the_stairs() {
+        let mut g = Game::new();
+        g.sess.level = 2;
+        g.load_room();
+        for r in &mut g.runes {
+            r.cleansed = true;
+        }
+        let n = g.enemies.len();
+        for i in 0..n {
+            g.kill_enemy(i);
+        }
+        assert!(g.whelp.is_some(), "clearing a chamber from room 2 on should call a whelp");
+        assert!(!g.exit_open, "the stairs wait while the whelp is loose");
+        // left alone, it flies off and the stairs open
+        for _ in 0..((WHELP_SECS + 1.0) * 60.0) as i32 {
+            g.update_whelp(1.0 / 60.0);
+        }
+        assert!(g.whelp.is_none(), "the whelp should leave when its time runs out");
+        assert!(g.exit_open, "the stairs open once the whelp has gone");
+        assert!(!g.double_next, "an escaped whelp pays nothing");
+    }
+
+    #[test]
+    fn striking_the_whelp_doubles_the_next_chamber() {
+        let mut g = Game::new();
+        g.sess.level = 2;
+        g.load_room();
+        for r in &mut g.runes {
+            r.cleansed = true;
+        }
+        let n = g.enemies.len();
+        for i in 0..n {
+            g.kill_enemy(i);
+        }
+        g.strike_whelp();
+        assert!(g.whelp.is_none());
+        assert!(g.exit_open);
+        g.finish_chamber();
+        assert!(g.double, "the chamber after a struck whelp pays double");
+        let before = g.sess.score;
+        g.add_points(100);
+        assert_eq!(g.sess.score - before, 200);
+        g.finish_chamber();
+        assert!(!g.double, "the double lasts one chamber");
+    }
+
+    #[test]
+    fn no_whelp_in_the_first_chamber_or_the_sanctum() {
+        for level in [1, 6] {
+            let mut g = Game::new();
+            g.sess.level = level;
+            g.load_room();
+            let n = g.enemies.len();
+            for i in 0..n {
+                g.kill_enemy(i);
+            }
+            assert!(g.whelp.is_none(), "level {level} should not call a whelp");
+        }
     }
 }

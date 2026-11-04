@@ -39,12 +39,21 @@ fn los(g: &Game, dir: Dir) -> bool {
                 return true;
             }
         }
+        if g.whelp.as_ref().is_some_and(|w| w.tile == c) {
+            return true;
+        }
     }
 }
 
 pub fn drive(g: &Game) {
     match g.state {
         State::Title | State::Over => {
+            // WARLOCK_BOT_TITLE holds the title for that many seconds first (the attract loop shows it)
+            let wait: f32 = std::env::var("WARLOCK_BOT_TITLE").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+            if g.state == State::Title && blip::bot::clock() < wait {
+                blip::bot::hold(&[]);
+                return;
+            }
             blip::bot::hold(&[BLIP_KEY_SPACE]);
             return;
         }
@@ -60,8 +69,10 @@ pub fn drive(g: &Game) {
     }
 
     // cleanse an adjacent rune
+    // (a held key only casts once: let go while the spell recharges, so
+    // the next press is a fresh one)
     if g.runes.iter().any(|r| !r.cleansed && distance_lt(g.wizards[0].tile, r.tile, 1.5)) {
-        blip::bot::hold(&[BLIP_KEY_G]);
+        blip::bot::hold(if g.wizards[0].reveal_cd <= 0.0 { &[BLIP_KEY_G] } else { &[] });
         return;
     }
     // cast reveal to flush out a hidden wraith, so it can be seen and shot
@@ -95,7 +106,9 @@ pub fn drive(g: &Game) {
 
 fn bot_path(g: &Game) -> Option<(Cell, Dir)> {
     let blocked = blocked_cells(g);
-    let goal = g
+    // a potion close by is worth the detour
+    let near_potion = g.potions.iter().map(|p| p.tile).filter(|&t| manhattan(g.wizards[0].tile, t) <= 5).min_by_key(|&t| manhattan(g.wizards[0].tile, t));
+    let goal = near_potion.or_else(|| g
         .runes
         .iter()
         .filter(|r| !r.cleansed)
@@ -108,7 +121,10 @@ fn bot_path(g: &Game) -> Option<(Cell, Dir)> {
                 .min_by_key(|e| manhattan(g.wizards[0].tile, e.tile))
                 .map(|e| e.tile)
         })
+        .or_else(|| g.whelp.as_ref().map(|w| w.tile)))
         .unwrap_or(g.exit);
+    // the goal itself may be a monster's tile; the bot fires before it would step in
+    let blocked: Vec<Cell> = blocked.into_iter().filter(|&c| c != goal).collect();
     bfs_next(&g.walls, &blocked, g.wizards[0].tile, goal)
 }
 

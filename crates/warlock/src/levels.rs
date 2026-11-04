@@ -14,6 +14,7 @@ pub const BOLT_INTERVAL: f32 = 0.05; // a bolt crosses a tile in 50ms
 pub const BOLT_MAX: usize = 3; // live bolts, so firing can't fill a corridor
 pub const BOLT_RATE: f32 = 0.16; // hold A: a bolt every 160ms
 pub const REVEAL_CD: f32 = 2.5; // reveal cooldown, shown as a ring
+pub const LANCE_WINDOW: f32 = 0.45; // bolt this soon after reveal and the two combine
 pub const REVEAL_SECS: f32 = 3.5; // how long a revealed wraith stays visible
 pub const RUNE_LIGHT: f32 = 2.4; // a cleansed stone forces wraiths visible within this
 pub const SIGHTING_FADE: f32 = 2.5; // a reveal's "last seen" outline lingers this long
@@ -43,6 +44,19 @@ pub const SCORE_GARGOYLE: i32 = 300;
 pub const SCORE_RUNE: i32 = 150;
 pub const SCORE_CLEAR_NODEATH: i32 = 1000;
 pub const SCORE_WARD: i32 = 500;
+pub const SCORE_WHELP: i32 = 1000;
+
+// ---- the dragon whelp (the bonus after a chamber's last monster) ------------
+// Potions: a slain monster sometimes leaves one where it fell.
+pub const POTION_CHANCE: i32 = 18; // percent of kills
+pub const POTION_SECS: f32 = 9.0; // before it seeps into the floor (blinks the last 2s)
+pub const HASTE_SECS: f32 = 6.0; // a haste draught's quickness
+pub const HASTE_MOVE: f32 = 0.62; // step time while hasted
+pub const SCORE_GOLD: i32 = 500;
+pub const LIVES_MAX: i32 = 6;
+
+pub const WHELP_SECS: f32 = 7.0; // how long it stays before flying off
+pub const WHELP_STEP: f32 = 0.17; // a step every 170ms: quick, but catchable
 
 // ---- starting conditions ---------------------------------------------------
 pub const LIVES_START: i32 = 3;
@@ -244,10 +258,46 @@ pub static ROOMS: &[Room] = &[
 ];
 
 /// The room for a given 1-based level. Six authored rooms, then the wings
-/// cycle back through the set from level 7 with the same layouts (the mazes
-/// are reusable; difficulty is scaled in main.rs by speed and extra imps).
+/// cycle back through the set from level 7, mirrored on every other pass
+/// (difficulty is scaled in main.rs by speed and extra imps).
 pub fn room_for(level: i32) -> &'static Room {
-    &ROOMS[((level - 1).rem_euclid(ROOMS.len() as i32)) as usize]
+    let n = ROOMS.len() as i32;
+    let i = ((level - 1).rem_euclid(n)) as usize;
+    // every other pass through the wings, the rooms are mirrored left to right
+    if ((level - 1).div_euclid(n)) % 2 == 1 {
+        &mirrored()[i]
+    } else {
+        &ROOMS[i]
+    }
+}
+
+/// The authored rooms flipped left to right: the same lessons, new corridors to learn.
+fn mirrored() -> &'static [Room] {
+    static MIRRORED: std::sync::OnceLock<Vec<Room>> = std::sync::OnceLock::new();
+    MIRRORED.get_or_init(|| {
+        fn leak<T>(v: Vec<T>) -> &'static [T] {
+            Box::leak(v.into_boxed_slice())
+        }
+        let m = |(c, r): (i32, i32)| (COLS as i32 - 1 - c, r);
+        let ms = |v: &[(i32, i32)]| leak(v.iter().map(|&p| m(p)).collect());
+        ROOMS
+            .iter()
+            .map(|room| Room {
+                maze: leak(room.maze.iter().map(|row| &*Box::leak(row.chars().rev().collect::<String>().into_boxed_str())).collect()),
+                player: m(room.player),
+                runes: ms(room.runes),
+                exit: m(room.exit),
+                imps: ms(room.imps),
+                wraiths: ms(room.wraiths),
+                hounds: ms(room.hounds),
+                gargoyles: ms(room.gargoyles),
+                gates: leak(room.gates.iter().map(|&(a, b)| (m(a), m(b))).collect()),
+                warlock: room.warlock,
+                warlock_circles: ms(room.warlock_circles),
+                warlock_wards: room.warlock_wards,
+            })
+            .collect()
+    })
 }
 
 /// Parse a room's maze into a wall bitmap (`true` = wall).
@@ -277,7 +327,7 @@ pub mod tests {
     /// softlock in the shipped game.
     #[test]
     fn every_room_is_rectangular_bordered_and_connected() {
-        for (i, room) in ROOMS.iter().enumerate() {
+        for (i, room) in ROOMS.iter().chain(mirrored().iter()).enumerate() {
             let tag = format!("room {}", i + 1);
             assert_eq!(room.maze.len(), ROWS, "{tag}: wrong row count");
             for (r, row) in room.maze.iter().enumerate() {

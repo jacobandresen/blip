@@ -1,4 +1,4 @@
-var CACHE = "blip-v803";
+var CACHE = "blip-v806";
 
 var ASSETS = [
   "/blip/machine.css",
@@ -39,6 +39,7 @@ var ASSETS = [
   "/blip/TAPE/RALLY.BLIP",
   "/blip/TAPE/SERPENT.BLIP",
   "/blip/TAPE/RAIDER.BLIP",
+  "/blip/TAPE/WARLOCK.BLIP",
   "/blip/TAPE/manifest.json",
   "/blip/blip-tape-load.mp3",
   "/blip/blip-wordmark.svg",
@@ -194,6 +195,7 @@ var ASSETS = [
   "/blip/warlock/screenshot.png",
   "/blip/warlock/attract.webp",
   "/blip/warlock/attract.png",
+  "/blip/warlock/card.png",
 ];
 
 self.addEventListener("install", function (e) {

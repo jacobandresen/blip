@@ -25,10 +25,22 @@ const server = createServer(async (request, response) => {
     return;
   }
   try {
-    const info = await stat(file);
+    let path = file;
+    let info = await stat(path);
+    if (info.isDirectory()) {
+      // a game's folder (the home screen launches `warlock/`): its index.html,
+      // with the slash a relative page needs
+      if (!pathname.endsWith('/')) {
+        const query = new URL(request.url, 'http://localhost').search;
+        response.writeHead(301, { Location: `${pathname}/${query}` }).end();
+        return;
+      }
+      path = resolve(file, 'index.html');
+      info = await stat(path);
+    }
     if (!info.isFile()) { response.writeHead(404).end('Not found'); return; }
-    response.writeHead(200, { 'Content-Type': types.get(extname(file).toLowerCase()) ?? 'application/octet-stream' });
-    createReadStream(file).pipe(response);
+    response.writeHead(200, { 'Content-Type': types.get(extname(path).toLowerCase()) ?? 'application/octet-stream' });
+    createReadStream(path).pipe(response);
   } catch {
     response.writeHead(404).end('Not found');
   }

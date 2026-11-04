@@ -2136,7 +2136,7 @@ test('the game tapes read as a physical overlapping cassette stack', async (t) =
     shadows: tapes.every((tape) => getComputedStyle(tape).getPropertyValue('--tape-shadow-blur').endsWith('px')),
     images: tapes.map((tape) => ({ src: tape.querySelector('.game-tape-art').getAttribute('src'), naturalWidth: tape.querySelector('.game-tape-art').naturalWidth, complete: tape.querySelector('.game-tape-art').complete })),
   }));
-  assert.equal(pile.count, 9);
+  assert.equal(pile.count, 10);
   assert.equal(pile.overlap, true);
   assert.equal(pile.labels, true);
   assert.ok(pile.artwork, JSON.stringify(pile.images));

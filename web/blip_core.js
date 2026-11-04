@@ -149,7 +149,7 @@ var BLIP_GAMES = {
                                   mouseHint: 'Point left/right to steer &middot; click to start' } },
   // A maze shooter in the spirit of Wizard of Wor: 4-way stick, A casts a
   // bolt down the corridor, B casts reveal. Two caps on a snappable stick.
-  warlock:            { name: 'WARLOCK', accent: '150, 60, 200', touchControls: [['MOVE',['STICK']],['BOLT',['A']],['REVEAL',['B']]], controls: [['MOVE',['←','↑','↓','→'],['W','A','S','D']],['BOLT',['SPACE'],['F']],['REVEAL',['Z'],['G']],['2ND PLAYER',['J','K']]],
+  warlock:            { name: 'WARLOCK', accent: '150, 60, 200', cabinetTitle: true, touchControls: [['MOVE',['STICK']],['BOLT',['A']],['REVEAL',['B']]], controls: [['MOVE',['←','↑','↓','→'],['W','A','S','D']],['BOLT',['SPACE'],['F']],['REVEAL',['Z'],['G']],['2ND PLAYER',['J','K']]],
                          players: 2,
                          touch: { kind: 'action', hint: 'Stick to move &middot; A bolt &middot; B reveal', actions: ['BOLT', 'REVEAL'] },
                          buttons: [{ key: 'f', code: 'KeyF', label: 'BOLT' },
@@ -165,7 +165,7 @@ function blipGameFromPath(pathname) {
   var g = m && BLIP_GAMES[m[1]];
   return g ? { slug: m[1], name: g.name, accent: g.accent, controls: g.controls, touchControls: g.touchControls, buttons: g.buttons,
                keys: g.keys, players: g.players || 1, stick: g.stick,
-               touch: g.touch || null } : null;
+               touch: g.touch || null, cabinetTitle: !!g.cabinetTitle } : null;
 }
 
 // Before first paint, so no controller flashes. data-has-touch shows the
