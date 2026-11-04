@@ -1,4 +1,4 @@
-var CACHE = "blip-v801";
+var CACHE = "blip-v806";
 
 var ASSETS = [
   "/blip/machine.css",
@@ -39,6 +39,7 @@ var ASSETS = [
   "/blip/TAPE/RALLY.BLIP",
   "/blip/TAPE/SERPENT.BLIP",
   "/blip/TAPE/RAIDER.BLIP",
+  "/blip/TAPE/WARLOCK.BLIP",
   "/blip/TAPE/manifest.json",
   "/blip/blip-tape-load.mp3",
   "/blip/blip-wordmark.svg",
@@ -184,6 +185,17 @@ var ASSETS = [
   "/blip/adder/screenshot.png",
   "/blip/adder/attract.webp",
   "/blip/adder/attract.png",
+  "/blip/warlock/index.html",
+  "/blip/warlock/index.wasm",
+  "/blip/warlock/manifest.json",
+  "/blip/warlock/icon-180.png",
+  "/blip/warlock/icon-192.png",
+  "/blip/warlock/icon-512.png",
+  "/blip/warlock/icon-maskable-512.png",
+  "/blip/warlock/screenshot.png",
+  "/blip/warlock/attract.webp",
+  "/blip/warlock/attract.png",
+  "/blip/warlock/card.png",
 ];
 
 self.addEventListener("install", function (e) {

@@ -19,10 +19,14 @@ import { fileURLToPath } from 'node:url';
 import { displayCommand } from './lib/process.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const GAMES = ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder'];
+const GAMES = ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder', 'warlock'];
 const FRAMES = 12, EVERY = 0.25, WIDTH = 240, LIMIT = 60 * 1024;
 // Where the loop starts, past each game's title screen and into play.
-const FROM = { rally: 6, bouncer: 6, defender: 8, bubbler: 8, raider: 8, meteors: 3, serpent: 6, brawler: 10, adder: 8 };
+const FROM = { rally: 6, bouncer: 6, defender: 8, bubbler: 8, raider: 8, meteors: 3, serpent: 6, brawler: 10, adder: 8, warlock: 5 };
+// Games whose loop opens on their title screen: that many frames of it, then play.
+// The game's bot waits on the title (WARLOCK_BOT_TITLE) while they are taken; the
+// middle title frame is also the cabinet's still, web/<game>/card.png.
+const TITLE = { warlock: 4 };
 
 const args = process.argv.slice(2), fallbacksOnly = args.includes('--fallbacks-only');
 const only = args.filter((arg) => arg !== '--fallbacks-only');
@@ -42,14 +46,17 @@ for (const slug of GAMES.filter((g) => !only.length || only.includes(g))) {
   if (!existsSync(bin)) throw new Error(`${bin} is missing: cargo build --release -p ${slug}`);
   const shots = mkdtempSync(path.join(tmpdir(), `blip-attract-${slug}-`));
   try {
-    const from = FROM[slug];
+    const titled = TITLE[slug] ?? 0;
+    const hold = titled ? 1 + titled * EVERY + 0.1 : 0;
+    const from = FROM[slug] + hold;
     const [command, args] = displayCommand(bin, [], { cwd: ROOT, screen: '1024x900x24' });
     try {
       execFileSync(command, args, {
         stdio: ['ignore', 'ignore', 'inherit'], timeout: 120000,
         // Bubbler plays with an autopilot of its own; BLIP_BOT still takes the shots.
         env: { ...process.env, BLIP_BOT: '1', BLIP_CRT: '0', BLIP_SILENT: '1', BLIP_BOT_SHOTS: shots, BLIP_BOT_SHOT_EVERY: String(EVERY), BLIP_BOT_MAXT: String(from + FRAMES * EVERY + 2),
-          ...(slug === 'bubbler' ? { BUBBLER_BOT: '1' } : {}) },
+          ...(slug === 'bubbler' ? { BUBBLER_BOT: '1' } : {}),
+          ...(slug === 'warlock' && titled ? { WARLOCK_BOT_TITLE: String(hold) } : {}) },
       });
     } catch (error) {
       if (error.code === 'ETIMEDOUT') throw error; // the autopilot ends its run with a status of its own
@@ -57,7 +64,12 @@ for (const slug of GAMES.filter((g) => !only.length || only.includes(g))) {
     // Shots are taken from 1 s on, one every EVERY seconds.
     const first = Math.round((from - 1) / EVERY) + 1;
     const names = readdirSync(shots).filter((f) => f.endsWith('.png')).sort();
-    const picked = names.slice(first - 1, first - 1 + FRAMES).map((f) => path.join(shots, f));
+    const picked = [...names.slice(0, titled), ...names.slice(first - 1, first - 1 + FRAMES - titled)].map((f) => path.join(shots, f));
+    if (titled) {
+      const card = path.join(ROOT, 'web', slug, 'card.png');
+      execFileSync('magick', [picked[Math.floor(titled / 2)], '-strip', card]);
+      console.log(`${path.relative(ROOT, card)}: ${(statSync(card).size / 1024).toFixed(1)} KB`);
+    }
     if (picked.length < FRAMES) throw new Error(`${slug}: only ${names.length} frames`);
     const [w, h] = execFileSync('magick', ['identify', '-format', '%w %h', picked[0]]).toString().split(' ').map(Number);
     const out = path.join(ROOT, 'web', slug, 'attract.webp');
@@ -69,9 +81,11 @@ for (const slug of GAMES.filter((g) => !only.length || only.includes(g))) {
       if (size <= LIMIT) break;
       if (quality > 50) quality -= 5;
       else if (width > 160) width -= 20;
+      else if (quality > 30) quality -= 5;
+      else if (width > 140) width -= 20;
       else throw new Error(`${slug}: ${size} bytes at ${width}px and quality ${quality}, over ${LIMIT}`);
     }
-    console.log(`${slug}: ${FRAMES} frames of ${w}x${h} from ${from} s, ${width}px at quality ${quality}, ${(size / 1024).toFixed(1)} KB`);
+    console.log(`${slug}: ${FRAMES} frames of ${w}x${h}${titled ? `, ${titled} of the title,` : ''} from ${from} s, ${width}px at quality ${quality}, ${(size / 1024).toFixed(1)} KB`);
     writeFallback(picked, path.join(ROOT, 'web', slug, 'attract.png'), width);
   } finally {
     rmSync(shots, { recursive: true, force: true });

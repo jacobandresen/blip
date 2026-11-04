@@ -14,6 +14,7 @@ const GAMES = [
   ['serpent', 'SERPENT'],
   ['brawler', 'BRAWLER'],
   ['adder', 'ADDER'],
+  ['warlock', 'WARLOCK'],
 ];
 
 async function openArcade(t, width = 390, height = 844) {
@@ -246,6 +247,15 @@ for (const [index, [slug, title]] of GAMES.entries()) {
     assert.ok(game.controls > 0, `${title} has a touch control guide`);
     assert.deepEqual([game.screen, game.deck, game.move, game.action], [true, true, true, true],
       `${title} started with a screen and usable controls: ${JSON.stringify(game)}`);
+    // a game that shows its title at the cabinet waits for the player's own Fire, which spends the credit
+    if (await page.evaluate(() => !!BLIP_GAMES[blipGameFromPath(location.pathname)?.slug]?.cabinetTitle)) {
+      assert.equal(await page.evaluate(() => getCoins()), 1, `${title} waits on its title with the credit in`);
+      await page.locator('#glcanvas').focus();
+      for (let k = 0; k < 10 && await page.evaluate(() => getCoins()) > 0; k++) {
+        await page.keyboard.press('Space');
+        await page.waitForTimeout(500);
+      }
+    }
     await page.waitForFunction(() => getCoins() === 0, null, { timeout: 5000 });
     assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-start')), null,
       `${title} consumed the cabinet Start action`);
@@ -414,7 +424,7 @@ test('the machines are silent until the first key, then the nearest is loudest a
   await page.waitForFunction(() => blipArcadeSound.state().running);
   const heard = (await room(page)).machines;
   const by = Object.fromEntries(heard.map((m) => [m.slug, m]));
-  assert.deepEqual(heard.map((m) => m.slug).sort(), ['adder', 'bouncer', 'brawler', 'defender', 'rally'],
+  assert.deepEqual(heard.map((m) => m.slug).sort(), ['adder', 'bouncer', 'defender', 'rally', 'warlock'],
     'the faced machine and two either side');
   assert.equal(by.rally.level, 1);
   assert.equal(by.rally.pan, 0);
@@ -495,7 +505,7 @@ test('only the machines near you fetch and play their attract loops', async (t) 
   await page.goto(`${origin}/index.html`);
   await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') && !document.documentElement.hasAttribute('data-cabinet-arranging'));
   await page.waitForFunction(() => document.querySelectorAll('#game-grid .card[data-loop-ready]').length === 5);
-  assert.deepEqual([...fetched].sort(), ['adder', 'bouncer', 'brawler', 'defender', 'rally']);
+  assert.deepEqual([...fetched].sort(), ['adder', 'bouncer', 'defender', 'rally', 'warlock']);
   const strip = await page.evaluate(() => {
     const card = document.querySelector('.card[data-machine="rally"]'), img = card.querySelector('.card-loop-strip');
     return { frames: img.naturalHeight / (img.naturalWidth / (480 / 540)), playing: getComputedStyle(card.querySelector('.card-loop-frame')).animationPlayState,
@@ -504,6 +514,19 @@ test('only the machines near you fetch and play their attract loops', async (t) 
   assert.ok(Math.abs(strip.frames - 12) < 0.5, `${strip.frames} frames`);
   assert.equal(strip.playing, 'running');
   assert.equal(strip.shown, 'visible');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.card[data-machine="raider"] .card-loop')).visibility), 'hidden');
+  await page.keyboard.press('ArrowRight');
+  await aisleStill(page);
+  await page.waitForFunction(() => document.querySelector('.card[data-machine="bubbler"][data-loop-ready]'));
+  assert.ok(fetched.includes('bubbler'), 'walking on fetches the next one');
+  assert.ok(!fetched.includes('raider') && !fetched.includes('serpent'), `and only that: ${fetched}`);
+  assert.equal(await page.evaluate(() => document.querySelector('.card[data-machine="adder"]').hasAttribute('data-loop')), false, 'the machine left behind stops');
+  // back along the aisle to Adder, which stands beside Brawler
+  for (let k = 0; k < 3; k++) {
+    await page.keyboard.press('ArrowLeft');
+    await aisleStill(page);
+  }
+  await page.waitForFunction(() => document.querySelector('.card[data-machine="brawler"][data-loop-ready]'));
   const brawlerFill = await page.evaluate(() => {
     const card = document.querySelector('.card[data-machine="brawler"]');
     const rom = card.querySelector('.game-rom').getBoundingClientRect();
@@ -516,13 +539,6 @@ test('only the machines near you fetch and play their attract loops', async (t) 
     `Brawler's attract loop fills its CRT without the poster showing around it: ${JSON.stringify(brawlerFill)}`);
   assert.equal(brawlerFill.still, 'hidden', 'Brawler uses its attract video instead of the Ryuka and Brutus startup still');
   assert.equal(brawlerFill.loop, 'visible');
-  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.card[data-machine="raider"] .card-loop')).visibility), 'hidden');
-  await page.keyboard.press('ArrowRight');
-  await aisleStill(page);
-  await page.waitForFunction(() => document.querySelector('.card[data-machine="bubbler"][data-loop-ready]'));
-  assert.ok(fetched.includes('bubbler'), 'walking on fetches the next one');
-  assert.ok(!fetched.includes('raider') && !fetched.includes('serpent'), `and only that: ${fetched}`);
-  assert.equal(await page.evaluate(() => document.querySelector('.card[data-machine="brawler"]').hasAttribute('data-loop')), false, 'the machine left behind stops');
 });
 
 test('Escape leaves a game for the arcade, once the controls card it may have open is put away', async (t) => {

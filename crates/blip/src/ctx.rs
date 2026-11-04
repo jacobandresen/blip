@@ -371,6 +371,16 @@ impl Blip {
         set_camera(&cam);
     }
 
+    /// Shift everything drawn after this by `(dx, dy)` canvas pixels, for a
+    /// screen shake; `set_offset(0.0, 0.0)` restores the normal view.
+    pub fn set_offset(&self, dx: f32, dy: f32) {
+        let mut cam = Camera2D::from_display_rect(
+            Rect::new(-dx, -dy, self.width as f32, self.height as f32),
+        );
+        cam.render_target = Some(self.rt.clone());
+        set_camera(&cam);
+    }
+
     /// Letterboxed screen rect `(x, y, w, h)` for the current window size.
     fn viewport(&self) -> (f32, f32, f32, f32) {
         let sw = screen_width();

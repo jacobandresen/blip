@@ -11,6 +11,7 @@
 [data-machine="brawler"] {--machine-trim:#e0362a;--marquee-ink:#fff3c4;--marquee-art:repeating-conic-gradient(from 0deg at 50% 120%,#fff1 0 6deg,transparent 6deg 12deg)}
 [data-machine="bubbler"] {--machine-trim:#45b6f0;--marquee-ink:#ffffff;--marquee-art:radial-gradient(circle at 12% 40%,transparent 0 7px,#fff9 8px 9px,transparent 10px),radial-gradient(circle at 90% 62%,transparent 0 5px,#fff9 6px 7px,transparent 8px)}
 [data-machine="adder"] {--machine-trim:#e09a2a;--marquee-ink:#fff5d8;--marquee-art:repeating-linear-gradient(45deg,transparent 0 14px,#fff2 14px 16px)}
+[data-machine="warlock"] {--machine-trim:#9a46d6;--marquee-ink:#f6ecff;--marquee-art:radial-gradient(circle at 50% 45%,transparent 0 8px,#fff4 9px 11px,transparent 12px),radial-gradient(circle at 50% 45%,transparent 0 22px,#fff2 23px 25px,transparent 26px)}
 
 .machine-marquee,#game-grid .card-title.machine-marquee {
   /* !important where the arcade's older card rules force a plain title. */

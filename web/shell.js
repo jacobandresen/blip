@@ -200,7 +200,7 @@ function markGameLoaded(game, bar) {
   blipSetMarquee(game.name, false);
   document.documentElement.removeAttribute('data-card-loading');
   try {
-    var selectionOrder = ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder'];
+    var selectionOrder = ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder', 'warlock'];
     var code = 'A' + (selectionOrder.indexOf(game.slug) + 1);
     var rom={
       slug: game.slug, name: game.name, code: code,
@@ -744,8 +744,9 @@ var launchFrame = (function () {
   if(launch.native)document.documentElement.setAttribute('data-machine-handoff','');
   var frame = document.createElement('div');
   frame.id = 'launch-frame';
-  // Started with a coin in: the picture stays until the game is playing, so its title screen never shows.
-  try { if (sessionStorage.getItem('blip-cabinet-start') === GAME.slug && getCoins() > 0) frame.dataset.hold = ''; } catch (e) {}
+  // Started with a coin in: the picture stays until the game is playing, so its title screen never shows
+  // (unless the game shows its title at the cabinet: BLIP_GAMES cabinetTitle).
+  try { if (sessionStorage.getItem('blip-cabinet-start') === GAME.slug && getCoins() > 0 && !GAME.cabinetTitle) frame.dataset.hold = ''; } catch (e) {}
   frame.setAttribute('aria-hidden', 'true');
   frame.style.backgroundImage = 'url(' + JSON.stringify(art) + ')';
   document.body.appendChild(frame);
@@ -862,6 +863,8 @@ window.blipCanvasReady=function(){
         cabinetStart=sessionStorage.getItem('blip-cabinet-start')===slug;
         sessionStorage.removeItem('blip-cabinet-start');
       } catch(e) {}
+      // A game that shows its title at the cabinet waits there for the player's own Fire.
+      if(GAME && GAME.cabinetTitle) cabinetStart=false;
       if(!(cabinetStart && getCoins()>0)) dropLaunchFrame();
       if(cabinetStart && getCoins()>0) {
         function pressStart() {

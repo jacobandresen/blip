@@ -186,6 +186,7 @@
     .card-brawler    { --c: #dc3c28;        }
     .card-bubbler    { --c: #78d2ff;        }
     .card-adder      { --c: #e0a034;        }
+    .card-warlock    { --c: #9a46d6;        }
 
     .card::before, .card::after { border-color: var(--c); }
 
@@ -654,6 +655,7 @@
     #game-grid .card-brawler {--side-art:repeating-conic-gradient(from 0deg at 50% 45%,#ffd84a33 0 8deg,transparent 8deg 16deg),radial-gradient(circle at 50% 45%,#ffd84a 0 14%,transparent 15%)}
     #game-grid .card-bubbler {--side-art:radial-gradient(circle at 30% 30%,#fff6 0 3px,transparent 4px,transparent 0 24px,#fffb 25px 28px,transparent 29px),radial-gradient(circle at 66% 58%,transparent 0 18px,#fff9 19px 21px,transparent 22px),radial-gradient(circle at 40% 80%,transparent 0 11px,#fff8 12px 14px,transparent 15px)}
     #game-grid .card-adder {--side-art:radial-gradient(ellipse 60% 30% at 40% 30%,transparent 0 62%,#ffe08a 63% 70%,transparent 71%),radial-gradient(ellipse 50% 40% at 60% 64%,transparent 0 62%,#7ad8ff 63% 70%,transparent 71%)}
+    #game-grid .card-warlock {--side-art:radial-gradient(circle at 50% 45%,transparent 0 10px,#fff4 11px 13px,transparent 14px),radial-gradient(circle at 50% 45%,transparent 0 24px,#fff2 25px 27px,transparent 28px),radial-gradient(circle at 50% 45%,transparent 0 38px,#fff1 39px 41px,transparent 42px)}
     :root[data-layout="landscape"] #game-grid .card {flex-direction:column;gap:0}
     @media (prefers-reduced-motion:reduce) {
       #game-grid .card {transition:none!important}
@@ -896,6 +898,14 @@
       <div class="card-title">ADDER</div>
     </article>
 
+    <!-- WARLOCK -->
+    <article class="card card-warlock" data-game-url="warlock/index.html">
+      <div class="card-shot-wrap">
+        <img class="card-shot" src="warlock/card.png?v=1" alt="Warlock: the hooded sorcerer in his arch, a young wizard raising his staff">
+      </div>
+      <div class="card-title">WARLOCK</div>
+    </article>
+
   </div>
     </div>
   </div>
@@ -1067,7 +1077,7 @@
       var players=slug==='rally'||BLIP_GAMES[slug]&&BLIP_GAMES[slug].players===2?2:1,name=title?title.textContent.trim():'';
       card.dataset.machine=slug;title.classList.add('machine-marquee');
       title.textContent='';var titleName=document.createElement('b');titleName.className='machine-marquee-name';titleName.textContent=name;title.appendChild(titleName);
-      var legend={rally:'BAT · SERVE',bouncer:'MOVE · LAUNCH',defender:'MOVE · FIRE',bubbler:'RUN · BUBBLE · JUMP',raider:'STEER · FIRE',meteors:'TURN · THRUST · FIRE',serpent:'STEER',brawler:'MOVE · PUNCH · KICK',adder:'TURN LEFT · RIGHT'};
+      var legend={rally:'BAT · SERVE',bouncer:'MOVE · LAUNCH',defender:'MOVE · FIRE',bubbler:'RUN · BUBBLE · JUMP',raider:'STEER · FIRE',meteors:'TURN · THRUST · FIRE',serpent:'STEER',brawler:'MOVE · PUNCH · KICK',adder:'TURN LEFT · RIGHT',warlock:'MOVE · BOLT · REVEAL'};
       var screen=card.querySelector('.card-shot-wrap');
       var instructions=document.createElement('span');instructions.className='machine-instructions';instructions.setAttribute('aria-hidden','true');instructions.textContent=(players>1?'1 OR 2 PLAYERS · ':'')+(legend[slug]||'');screen.appendChild(instructions);
       var attract=document.createElement('span');attract.className='machine-attract';attract.setAttribute('aria-hidden','true');attract.innerHTML='<b>PRESS START</b><span class="machine-credit">CREDIT 0</span>';card.querySelector('.game-rom').appendChild(attract);

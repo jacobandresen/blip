@@ -7,12 +7,12 @@ const GAMES = [
   ['ADDER', 'adder'], ['BOUNCER', 'bouncer'], ['BRAWLER', 'brawler'],
   ['BUBBLER', 'bubbler'], ['DEFENDER', 'defender'],
   ['METEORS', 'meteors'], ['RALLY', 'rally'], ['SERPENT', 'serpent'],
-  ['RAIDER', 'raider'],
+  ['RAIDER', 'raider'], ['WARLOCK', 'warlock'],
 ];
 const MOVE_KEY = {
   ADDER: 'ArrowLeft', BOUNCER: 'ArrowLeft', BRAWLER: 'd', BUBBLER: 'ArrowRight',
   DEFENDER: 'ArrowLeft', METEORS: 'ArrowLeft', RALLY: 'ArrowUp',
-  SERPENT: 'ArrowUp', RAIDER: 'ArrowUp',
+  SERPENT: 'ArrowUp', RAIDER: 'ArrowUp', WARLOCK: 'ArrowDown',
 };
 const START_CHANGE_MIN = { METEORS: .02, RALLY: .01, SERPENT: .03 };
 // At 85 px/s Adder adds about 120 trail pixels during the 350 ms input sample.
