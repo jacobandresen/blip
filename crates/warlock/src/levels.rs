@@ -27,6 +27,7 @@ pub const WRAITH_FLASH_ON: f32 = 0.18; // brief visible flash, every cycle
 pub const WRAITH_FLASH_OFF: f32 = 1.0; // invisible stretch between flashes
 pub const WRAITH_LUNGE_RANGE: f32 = 2.3; // becomes fully visible this close, then pounces
 pub const WRAITH_LUNGE_STEP: f32 = 0.20;
+pub const WRAITH_CHARGE: f32 = 0.35; // visible pause before a wraith pounces
 pub const HOUND_WANDER_STEP: f32 = 0.55;
 pub const HOUND_HUNT_STEP: f32 = 0.26;
 pub const GARGOYLE_TELL: f32 = 0.9; // wings rise this long before the shot

@@ -146,6 +146,7 @@ struct Enemy {
     target: Cell,
     lunging: bool,
     windup: f32,
+    charge: f32,
     shot_cd: f32,
     gone: bool,
 }
@@ -383,6 +384,7 @@ impl Game {
             target: Cell { c, r },
             lunging: false,
             windup: 0.0,
+            charge: 0.0,
             shot_cd: if kind == EnemyKind::Gargoyle { rand_int(0, 150) as f32 / 100.0 } else { 0.0 },
             gone: false,
         };
@@ -629,6 +631,7 @@ impl Game {
             }
         }
         self.update_enemies(dt);
+        self.check_contact();
         self.update_projectiles(dt);
         self.update_warlock(dt);
         if self.warlock.as_ref().is_some_and(|w| w.wards <= 0) {
@@ -810,7 +813,13 @@ impl Game {
                     e.flash -= period;
                 }
                 let near = (0..2).any(|k| self.active[k] && distance_lt(e.tile, self.wizards[k].tile, WRAITH_LUNGE_RANGE));
+                // A fresh lunge first materializes: visible, but still, for a
+                // beat — so the reveal is a warning, not an instant pounce.
+                if near && !e.lunging {
+                    e.charge = WRAITH_CHARGE;
+                }
                 e.lunging = near;
+                e.charge = (e.charge - dt).max(0.0);
                 e.visible = e.revealed > 0.0
                     || near
                     || e.flash < WRAITH_FLASH_ON
@@ -823,6 +832,9 @@ impl Game {
             let e = self.enemies[i];
             if e.gone || e.kind == EnemyKind::Gargoyle {
                 continue;
+            }
+            if e.kind == EnemyKind::Wraith && e.charge > 0.0 {
+                continue; // materializing: visible, but not yet moving
             }
             self.enemies[i].step_t -= dt;
             if self.enemies[i].step_t > 0.0 {
@@ -849,16 +861,6 @@ impl Game {
                 self.enemies[i].step_t = interval;
             } else {
                 self.enemies[i].step_t = interval;
-            }
-            let mut contact = None;
-            for k in 0..2 {
-                if self.active[k] && self.enemies[i].tile == self.wizards[k].tile {
-                    contact = Some(k);
-                    break;
-                }
-            }
-            if let Some(k) = contact {
-                self.hit_wizard(k);
             }
         }
         // gargoyles: raise wings, then cast
@@ -1079,6 +1081,37 @@ impl Game {
             self.warlock_advance();
         } else {
             self.check_exit();
+        }
+    }
+
+    /// A monster only hurts a wizard once its body has actually reached her:
+    /// tile bookkeeping alone would let a ghost kill from a whole cell away,
+    /// so this measures the real, interpolated positions of both. Runs every
+    /// frame, after wizards and enemies have moved.
+    fn check_contact(&mut self) {
+        let r = CELL as f32 * 0.45;
+        let r2 = r * r;
+        let mut victim = None;
+        for e in self.enemies.iter().filter(|e| !e.gone) {
+            let (ex, ey) = self.enemy_px(e);
+            for k in 0..2 {
+                if !self.active[k] {
+                    continue;
+                }
+                let (wx, wy) = self.wizard_px(k);
+                let dx = ex - wx;
+                let dy = ey - wy;
+                if dx * dx + dy * dy <= r2 {
+                    victim = Some(k);
+                    break;
+                }
+            }
+            if victim.is_some() {
+                break;
+            }
+        }
+        if let Some(k) = victim {
+            self.hit_wizard(k);
         }
     }
 
@@ -1485,7 +1518,16 @@ fn draw_wraith(blip: &Blip, g: &Game, e: &Enemy, t: f32) {
     }
     let (x, y) = g.enemy_px(e);
     let s = CELL as f32 * 0.34;
-    let a = if e.lunging { 1.0 } else { 0.75 + 0.25 * (t * 8.0).sin() };
+    let a = if e.lunging {
+        if e.charge > 0.0 {
+            // materializing: fade in across the charge beat
+            0.35 + 0.65 * (1.0 - e.charge / WRAITH_CHARGE)
+        } else {
+            1.0
+        }
+    } else {
+        0.75 + 0.25 * (t * 8.0).sin()
+    };
     let c = BlipColor { a, ..WRAITH };
     blip.fill_circle(x, y, s, c);
     for k in 0..4 {
@@ -1647,13 +1689,25 @@ fn draw_reveal(blip: &Blip, g: &Game) {
 fn draw_counters(blip: &Blip, g: &Game) {
     let monsters = g.enemies.iter().filter(|e| !e.gone).count();
     let warlock = g.warlock.as_ref().map_or(false, |wl| wl.wards > 0);
-    let all = monsters + if warlock { 1 } else { 0 };
-    let runes_left = g.runes.iter().filter(|r| !r.cleansed).count();
-    let line = format!("{all}X  {runes_left}R");
-    blip.draw_text(&line, 6.0, HUD_H as f32 + 4.0, 2.0, BLIP_WHITE);
-    // reveal cooldown readout: a ring that refills beside the counts
-    let cx = 6.0 + line.chars().count() as f32 * 12.0 + 16.0;
+    let all = (monsters + if warlock { 1 } else { 0 }) as i32;
+    let runes_left = g.runes.iter().filter(|r| !r.cleansed).count() as i32;
     let cy = HUD_H as f32 + 10.0;
+    let ty = HUD_H as f32 + 4.0;
+    // Counters draw as glyphs echoing the sprites, so the numbers read at a
+    // glance: a horned monster, then the rune it is safe to cleanse.
+    let mut x = 10.0;
+    blip.fill_circle(x, cy, 4.0, IMP);
+    blip.fill_rect(x - 1.8, cy - 2.6, 1.8, 1.8, BLIP_BLACK);
+    blip.fill_rect(x + 0.6, cy - 2.6, 1.8, 1.8, BLIP_BLACK);
+    x += 12.0;
+    blip.draw_number(all, x, ty, 2.0, BLIP_WHITE);
+    x += all.to_string().len().max(1) as f32 * 12.0 + 16.0;
+    blip.draw_circle(x, cy, 4.0, 1.5, RUNE_CURSED);
+    blip.fill_circle(x, cy, 1.6, RUNE_CURSED);
+    x += 12.0;
+    blip.draw_number(runes_left, x, ty, 2.0, BLIP_WHITE);
+    // reveal cooldown readout: a ring that refills beside the counts
+    let cx = x + runes_left.to_string().len().max(1) as f32 * 12.0 + 16.0;
     blip.draw_circle(cx, cy, 7.0, 2.0, BLIP_GRAY);
     let cd = g.wizards[0].reveal_cd;
     if cd <= 0.0 {
@@ -2046,6 +2100,63 @@ mod tests {
             g.update_projectiles(BOLT_INTERVAL);
         }
         assert_eq!(g.lives[1], LIVES_START, "a friendly bolt must not harm the other wizard");
+    }
+
+    #[test]
+    fn a_ghost_does_not_kill_until_its_body_reaches_the_wizard() {
+        let mut g = Game::new();
+        g.start_game();
+        let w = g.wizards[0].tile;
+        g.enemies.clear();
+        g.enemies.push(Enemy {
+            kind: EnemyKind::Wraith,
+            tile: Cell { c: w.c + 1, r: w.r },
+            from: Cell { c: w.c + 1, r: w.r },
+            lerp: 0.0,
+            step_t: 100.0,
+            dir: Dir::Left,
+            visible: true,
+            revealed: 0.0,
+            flash: 0.0,
+            hunting: false,
+            target: Cell { c: 0, r: 0 },
+            lunging: true,
+            windup: 0.0,
+            charge: 0.0,
+            shot_cd: 0.0,
+            gone: false,
+        });
+        // the wraith starts a step onto the wizard's tile: its body is still
+        // a whole cell away, so no contact yet
+        g.enemies[0].from = g.enemies[0].tile;
+        g.enemies[0].tile = w;
+        g.enemies[0].lerp = 0.0;
+        g.check_contact();
+        assert_eq!(g.lives[0], LIVES_START, "a ghost killed from a whole cell away");
+        // once it has visually arrived, the touch is real
+        g.enemies[0].lerp = 1.0;
+        g.check_contact();
+        assert_eq!(g.lives[0], LIVES_START - 1, "an arrived ghost did not connect");
+    }
+
+    #[test]
+    fn a_wraith_pauses_visibly_before_its_first_lunge() {
+        let mut g = Game::new();
+        g.sess.level = 2;
+        g.load_room();
+        let wraith_tile = {
+            let e = g.enemies.iter_mut().find(|e| e.kind == EnemyKind::Wraith).unwrap();
+            e.lunging = false;
+            e.charge = 0.0;
+            e.step_t = 100.0;
+            e.tile
+        };
+        // put a wizard beside it, then run one visibility pass
+        g.place_wizard(0, Cell { c: wraith_tile.c + 1, r: wraith_tile.r });
+        g.update_enemies(0.0);
+        let e = g.enemies.iter().find(|e| e.kind == EnemyKind::Wraith).unwrap();
+        assert!(e.lunging, "the wraith should now be lunging");
+        assert!(e.charge > 0.0, "a fresh lunge should telegraph before it moves");
     }
 
     #[test]

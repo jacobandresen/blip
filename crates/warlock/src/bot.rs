@@ -64,6 +64,15 @@ pub fn drive(g: &Game) {
         blip::bot::hold(&[BLIP_KEY_G]);
         return;
     }
+    // cast reveal to flush out a hidden wraith, so it can be seen and shot
+    let hidden_wraith = g
+        .enemies
+        .iter()
+        .any(|e| !e.gone && e.kind == EnemyKind::Wraith && !e.visible);
+    if hidden_wraith && g.wizards[0].reveal_cd <= 0.0 {
+        blip::bot::hold(&[BLIP_KEY_G]);
+        return;
+    }
     // fire down a facing that already lines up
     if los(g, g.wizards[0].facing) {
         blip::bot::hold(&[BLIP_KEY_F]);
