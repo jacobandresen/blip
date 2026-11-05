@@ -21,4 +21,5 @@ const codes = await Promise.all(LANES.map((lane) => new Promise((done) => {
     done(code);
   });
 })));
-process.exit(codes.some((code) => code !== 0) ? 1 : 0);
+// exitCode, not exit(): a piped stdout must drain the last lane's report first
+process.exitCode = codes.some((code) => code !== 0) ? 1 : 0;

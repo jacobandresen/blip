@@ -19,7 +19,7 @@ use levels::*;
 use magic::Magic;
 
 use blip::input::{
-    coin_start, key_held, key_pressed, play_again, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
+    key_held, key_pressed, BLIP_KEY_A, BLIP_KEY_BUTTON2, BLIP_KEY_D,
     BLIP_KEY_DOWN, BLIP_KEY_F, BLIP_KEY_G, BLIP_KEY_J, BLIP_KEY_K, BLIP_KEY_LEFT, BLIP_KEY_RIGHT,
     BLIP_KEY_S, BLIP_KEY_SPACE, BLIP_KEY_UP, BLIP_KEY_W,
 };
@@ -1725,9 +1725,20 @@ impl Game {
     }
 
     fn check_over_again(&mut self, dt: f32) {
-        if play_again(&mut self.dead_timer, dt) {
+        self.dead_timer.tick(dt);
+        if !self.dead_timer.active() && self.fire_start() {
             self.start_game();
         }
+    }
+
+    /// Player one's bolt (F, Space, or the deck's first button) starts a game
+    /// from the title or the game-over screen, for the coin it costs.
+    fn fire_start(&self) -> bool {
+        if !self.bolt_pressed(0) {
+            return false;
+        }
+        web::spend_coin();
+        true
     }
 }
 
@@ -1913,7 +1924,8 @@ fn draw_over(blip: &Blip, g: &Game) {
     );
     blip.draw_centered(
         &format!("WINGS CLEARED {}", g.cleared_no_death),
-        WIN_H as f32 * 0.66,
+        // under the best score, above the engine's PRESS FIRE at two thirds
+        WIN_H as f32 / 2.0 + 52.0,
         2.0,
         BLIP_GRAY,
     );
@@ -1989,7 +2001,7 @@ async fn main() {
                 g.update_ambience(dt);
                 if key_pressed(BLIP_KEY_J) {
                     g.start_two();
-                } else if coin_start() {
+                } else if g.fire_start() {
                     g.start_game();
                 }
             }

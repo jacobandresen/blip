@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
+import { TAPES } from './lib/games.mjs';
 import { openPage, startPage } from './lib/harness.mjs';
 import { instrumentBasicSound } from './lib/basic-runtime.mjs';
 
@@ -943,7 +944,8 @@ test('RAIDER reaches its Rust boss threshold, defeats the boss, and advances the
   await page.evaluate(() => {
     // Sixty kills already: the boss comes at once and takes a round each frame.
     BlipBasic.lines.set(85, 'START_GAME:LIVES=99:KILLS=60');
-    BlipBasic.lines.set(175, 'IF BOSS_ON AND BOSS_IN THEN SHOT(1)=1:SHOT_X(1)=BOSS_X+BOSS_W/2:SHOT_Y(1)=BOSS_Y+5');
+    // below the boss's middle: a slow frame's longest step (0.05 s of flight) still ends inside it
+    BlipBasic.lines.set(175, 'IF BOSS_ON AND BOSS_IN THEN SHOT(1)=1:SHOT_X(1)=BOSS_X+BOSS_W/2:SHOT_Y(1)=BOSS_Y+BOSS_H/2+8');
     BlipBasic.lines.set(165, 'IF BOSS_ON THEN FILL_RECT(8,4,24,22,"#00FF00")');
     BlipBasic.lines.set(166, 'IF LEVEL=2 THEN FILL_RECT(8,4,24,22,"#FF00FF")');
     BlipBasic.submit('RUN');
@@ -964,7 +966,8 @@ test('RAIDER reaches its Rust boss threshold, defeats the boss, and advances the
     return count;
   }, (await canvas.screenshot()).toString('base64'));
   let marker = 0;
-  for (let frame = 0; frame < 35 && marker < 8; frame++) {
+  // the fight takes a set number of game frames: give a busy machine as long as it needs to draw them
+  for (const until = Date.now() + 90000; Date.now() < until && marker < 8;) {
     await page.waitForTimeout(200);
     assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'boss bullets and wave progression should remain error-free');
     marker = await levelMarker();
@@ -1462,7 +1465,9 @@ test('BOUNCER aims the ball off the paddle and returns it upward', async (t) => 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const canvas = await openTape(page, origin, 'BOUNCER', {
     85: 'START_GAME:STATE$="PLAY":BALL_X(1)=PAD_X+20:BALL_Y(1)=PAD_Y-30:BALL_VX(1)=0:BALL_VY(1)=150',
-    165: statusMarker('BALL_VY(1)<0 AND BALL_VX(1)<0'),
+    // latched: a busy machine's long frames can carry the ball past the moment it heads up and left
+    164: 'IF BALL_VY(1)<0 AND BALL_VX(1)<0 THEN WENT_UP_LEFT=1',
+    165: statusMarker('WENT_UP_LEFT'),
   });
   assert.match(await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.blipBasicSource),
     /AIM=CLAMP\(\(\(BALL_X\(K\)\+BALL\/2-PAD_X\)\/PAD_W-0\.5\)\*2,-1,1\)\*1\.15/);
@@ -1884,7 +1889,8 @@ test('DEFENDER divers smash through shield blocks', async (t) => {
         85: 'START_GAME:LEVEL=4:START_WAVE:BOMB_WAIT=99:UFO_WAIT=99:SHIP_X=600' + (diving ? ':DIVER=1:DIVER_KIND=1:DIVER_X=SHIELD_X(2):DIVER_Y=SHIELD_Y-40' : ''),
         165: defenderMarker('SHIELD(2,1,2)=1'),
       });
-      await page.waitForTimeout(400);
+      // a smashed block stays smashed: wait for the colour this case expects, however slowly the frames come
+      await waitForPixels(page, canvas, DEFENDER_MARKER, diving ? 'red' : 'green', 40);
       assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'the shield dive should not produce an interpreter error');
       const shot = await canvas.screenshot();
       return { red: await countGamePixels(page, shot, DEFENDER_MARKER, 'red'), green: await countGamePixels(page, shot, DEFENDER_MARKER, 'green') };
@@ -2022,7 +2028,7 @@ test('the BASIC book turns one readable page at a time on a phone', async (t) =>
   await page.waitForFunction(() => document.body.dataset.bookState === 'open', undefined, { timeout: 5000 });
   const opened = await page.locator('.opening-spread').screenshot();
   assert.notDeepEqual(opened, opening, 'the same hard cover should swing open to reveal the printed contents');
-  assert.equal(await page.locator('a').count(), 0, 'the programming manual is a book, without browser-style links');
+  assert.equal(await page.locator('a:not(.book-logo)').count(), 0, 'the programming manual is a book, without browser-style links (only the BLIP badge leads out)');
   assert.equal(await page.locator('h1').textContent(), 'CONTENTS');
   assert.equal(await page.locator('.cover-front img').getAttribute('src'), 'blip-basic-cover.svg');
   assert.ok(await page.locator('.cover-front img').evaluate((img) => img.complete && img.naturalWidth > 0));
@@ -2136,7 +2142,7 @@ test('the game tapes read as a physical overlapping cassette stack', async (t) =
     shadows: tapes.every((tape) => getComputedStyle(tape).getPropertyValue('--tape-shadow-blur').endsWith('px')),
     images: tapes.map((tape) => ({ src: tape.querySelector('.game-tape-art').getAttribute('src'), naturalWidth: tape.querySelector('.game-tape-art').naturalWidth, complete: tape.querySelector('.game-tape-art').complete })),
   }));
-  assert.equal(pile.count, 10);
+  assert.equal(pile.count, TAPES.length);
   assert.equal(pile.overlap, true);
   assert.equal(pile.labels, true);
   assert.ok(pile.artwork, JSON.stringify(pile.images));

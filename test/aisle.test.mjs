@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { AISLE, GAME_SLUGS } from './lib/games.mjs';
 import { createRequire } from 'node:module';
 
 const Aisle = createRequire(import.meta.url)('../web/aisle.js');
@@ -175,7 +176,7 @@ test('every machine has an attract strip of twelve frames, small enough to fetch
   const { readFileSync, statSync } = await import('node:fs');
   const web = new URL('../web/', import.meta.url);
   const sw = readFileSync(new URL('sw.js', web), 'utf8');
-  for (const slug of ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder']) {
+  for (const slug of GAME_SLUGS) {
     const file = new URL(`${slug}/attract.webp`, web);
     const bytes = readFileSync(file);
     assert.equal(bytes.toString('latin1', 8, 12), 'WEBP', `${slug} is a WebP`);
@@ -187,4 +188,12 @@ test('every machine has an attract strip of twelve frames, small enough to fetch
     assert.equal(png.readUInt32BE(20) % 12, 0, `${slug}'s PNG contains twelve equal-height frames`);
     assert.ok(sw.includes(`"/blip/${slug}/attract.png"`), `${slug}'s PNG fallback is cached offline`);
   }
+});
+
+test('the jukebox numbers the machines in the aisle\'s own order', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shell = readFileSync(new URL('../web/shell.js', import.meta.url), 'utf8');
+  const order = JSON.parse(shell.match(/var selectionOrder = (\[[^\]]*\])/)[1].replace(/'/g, '"'));
+  assert.deepEqual(order, AISLE);
+  assert.deepEqual([...AISLE].sort(), [...GAME_SLUGS].sort(), 'every game has one machine in the aisle');
 });

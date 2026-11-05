@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage } from './lib/harness.mjs';
+import { openPage, gameReady } from './lib/harness.mjs';
 import { holdHalfway, imageDifference } from './lib/arcade-room.mjs';
 
 // Every room layer and where it shows, by #66's visibility contract: phone portrait, landscape, the rest.
@@ -446,7 +446,7 @@ test('OPEN lights with a credit and goes dark again once a game spends it', asyn
   assert.equal(await openLit(page), 1, 'lit with a credit');
   await page.locator('.card-focused .machine-start').click();
   await page.waitForURL(`${origin}/rally/index.html`);
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await gameReady(page);
   await page.goto(`${origin}/index.html`);
   await arcade();
   assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-credit')), false);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage } from './lib/harness.mjs';
+import { openPage, gameReady } from './lib/harness.mjs';
 
 async function features(page, image) {
   return page.evaluate(async (encoded) => {
@@ -51,7 +51,7 @@ async function runBasic(page, origin, trial) {
 
 async function runRust(page, origin, trial) {
   await page.goto(`${origin}/adder/index.html?amstrad=1&playtest=${trial}`);
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), undefined, { timeout: 20000 });
+  await gameReady(page, 20000);
   if (await page.locator('#need-coin-overlay').evaluate((el) => el.classList.contains('visible'))) {
     await page.evaluate(() => document.getElementById('insert-coin-btn').click());
     await page.waitForFunction(() => !document.querySelector('#need-coin-overlay').classList.contains('visible'));

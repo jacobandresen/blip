@@ -2,29 +2,27 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage } from './lib/harness.mjs';
+import { openPage, gameReady, arcadeArranged } from './lib/harness.mjs';
+import { AISLE, GAMES as ALL_GAMES } from './lib/games.mjs';
 
-const GAMES = [
-  ['rally', 'RALLY'],
-  ['bouncer', 'BOUNCER'],
-  ['defender', 'DEFENDER'],
-  ['bubbler', 'BUBBLER'],
-  ['raider', 'RAIDER'],
-  ['meteors', 'METEORS'],
-  ['serpent', 'SERPENT'],
-  ['brawler', 'BRAWLER'],
-  ['adder', 'ADDER'],
-  ['warlock', 'WARLOCK'],
-];
+const GAMES_BY_SLUG = Object.fromEntries(ALL_GAMES.map((game) => [game.slug, game]));
+
+// [slug, NAME] in the aisle's order: the tests walk to each machine with the arrow keys.
+const GAMES = AISLE.map((slug) => [slug, GAMES_BY_SLUG[slug].name]);
 
 async function openArcade(t, width = 390, height = 844) {
   const { page, origin } = await openPage(t, 'chromium', {
     hasTouch: width < 700, viewport: { width, height },
   });
   await page.goto(`${origin}/index.html`);
-  await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') &&
-    !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  await machineReady(page);
   return { page, origin };
+}
+
+// The arcade has laid out its aisle and focused a machine whose Start can be pressed.
+function machineReady(page) {
+  return page.waitForFunction(() => document.querySelector('.card-focused .machine-start') &&
+    !document.documentElement.hasAttribute('data-cabinet-arranging'));
 }
 
 const selectedSlug = (page) => page.locator('.card-focused').getAttribute('data-game-url');
@@ -106,7 +104,7 @@ test('returning from a game restores its machine without loading a hidden second
   await page.locator('.card-focused .machine-coinbox').tap();
   await page.locator('.card-focused .machine-start').tap();
   await page.waitForURL(`${origin}/rally/index.html`);
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await gameReady(page);
   await page.locator('.blip-logo').click();
   await page.waitForURL(`${origin}/index.html`);
   await page.waitForFunction(() => !window.blipCabinetReturn &&
@@ -123,7 +121,7 @@ test('a tap on the chosen machine’s screen starts it, paying its own coin', as
   assert.equal(await page.locator('.card-focused .machine-attract b').textContent(), 'PRESS START');
   await page.locator('.card-focused .card-shot-wrap').tap({ force: true });
   await page.waitForURL(`${origin}/rally/index.html`);
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await gameReady(page);
   await page.waitForFunction(() => getCoins() === 0);
 });
 
@@ -134,7 +132,7 @@ test('desktop keyboard walking and physical Start begin play at the chosen machi
   await page.locator('.card-focused .machine-coinbox').click();
   await page.locator('.card-focused .machine-start').click();
   await page.waitForURL(`${origin}/bouncer/index.html`);
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await gameReady(page);
   await page.waitForFunction(() => getCoins() === 0);
   assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'CANVAS');
   await page.evaluate(() => {
@@ -183,7 +181,7 @@ test('gamepad Select inserts a coin at the machine, then Start launches it', asy
   await page.evaluate(() => { window.__cabinetPadButtons[8].pressed = false; });
   await page.evaluate(() => { window.__cabinetPadButtons[9].pressed = true; });
   await page.waitForURL(`${origin}/rally/index.html`);
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await gameReady(page);
   await page.waitForFunction(() => getCoins() === 0);
 });
 
@@ -224,7 +222,7 @@ for (const [index, [slug, title]] of GAMES.entries()) {
     // Without a credit, Start drops the coin itself.
     await machine.locator('.machine-start').tap();
     await page.waitForURL(`${origin}/${slug}/index.html`, { timeout: 30000 });
-    await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout: 30000 });
+    await gameReady(page, 30000);
     const game = await page.evaluate(() => {
       const visible = (selector) => [...document.querySelectorAll(selector)].some((el) => {
         const r = el.getBoundingClientRect(), style = getComputedStyle(el);
@@ -250,11 +248,13 @@ for (const [index, [slug, title]] of GAMES.entries()) {
     // a game that shows its title at the cabinet waits for the player's own Fire, which spends the credit
     if (await page.evaluate(() => !!BLIP_GAMES[blipGameFromPath(location.pathname)?.slug]?.cabinetTitle)) {
       assert.equal(await page.evaluate(() => getCoins()), 1, `${title} waits on its title with the credit in`);
-      await page.locator('#glcanvas').focus();
-      for (let k = 0; k < 10 && await page.evaluate(() => getCoins()) > 0; k++) {
-        await page.keyboard.press('Space');
-        await page.waitForTimeout(500);
-      }
+    }
+    // the title's Fire, or a fighter select's pick, spends the credit
+    await page.waitForTimeout(500);
+    await page.locator('#glcanvas').focus();
+    for (let k = 0; k < 10 && await page.evaluate(() => getCoins()) > 0; k++) {
+      await page.keyboard.press('Space');
+      await page.waitForTimeout(500);
     }
     await page.waitForFunction(() => getCoins() === 0, null, { timeout: 5000 });
     assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-start')), null,
@@ -266,7 +266,10 @@ for (const [index, [slug, title]] of GAMES.entries()) {
     });
     const mode = await page.evaluate(() => blipControls());
     if (slug === 'rally') await page.locator('#paddle-dial').tap({ timeout: 3000 });
-    else if (mode === 'touch') {
+    else if (mode === 'touch' && await page.evaluate(() => BLIP_GAMES[blipGameFromPath(location.pathname).slug]?.touch?.kind === 'action')) {
+      // action games steer on the trackpad and fire from their own touch button
+      await page.locator('#touch-strip .ts-action[data-button="1"]').first().tap({ timeout: 3000 });
+    } else if (mode === 'touch') {
       const strip = await page.locator('#touch-strip .ts-glass').boundingBox();
       assert.ok(strip, `${title} exposes its touch surface`);
       await page.touchscreen.tap(strip.x + strip.width * .2, strip.y + strip.height * .7);
@@ -282,7 +285,7 @@ test('a game opened in the arcade after a visit to BASIC returns to the arcade f
   await page.goto(`${origin}/basic.html`);
   await page.evaluate(() => localStorage.setItem('blip-frontend', 'basic'));
   await page.goto(`${origin}/index.html?cabinet`);
-  await page.waitForFunction(() => !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  await arcadeArranged(page);
   await page.goto(`${origin}/serpent/index.html`);
   await page.locator('.blip-logo').click();
   await page.waitForURL((url) => !url.pathname.includes('/serpent/'));
@@ -297,7 +300,7 @@ test('every visit starts in the arcade, whichever front end was open last', asyn
   for (const last of ['basic', 'home']) {
     await page.goto(`${origin}/${last}.html`);
     await page.goto(`${origin}/index.html`);
-    await page.waitForFunction(() => !document.documentElement.hasAttribute('data-cabinet-arranging'));
+    await arcadeArranged(page);
     assert.equal(new URL(page.url()).pathname, '/index.html', `after ${last}, BLIP opened somewhere else`);
     assert.equal(await page.evaluate(() => blipFrontend()), 'cabinet');
   }
@@ -380,7 +383,7 @@ test('a gamepad stick walks at the pace it is pushed', async (t) => {
       navigator.getGamepads = () => [pad];
     }, push);
     await page.goto(`${origin}/index.html`);
-    await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') && !document.documentElement.hasAttribute('data-cabinet-arranging'));
+    await machineReady(page);
     await page.evaluate((x) => { window.__pad.axes[0] = x; }, push);
     // Its pace once up to speed, timed by the page's own clock.
     await page.waitForFunction(() => document.getElementById('game-grid').hasAttribute('data-aisle-moving'));
@@ -478,7 +481,7 @@ test('a machine started from the arcade opens its game on the same screen pictur
   assert.match(seen.art, /data:image\/png;base64,|rally\/screenshot\.png/);
   assert.equal(seen.ready, false, 'the picture waits for the game');
   assert.equal(seen.over, true, 'exactly where the game will draw');
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await gameReady(page);
   await page.waitForFunction(() => !document.getElementById('launch-frame'));
   assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-launch')), null);
 });
@@ -503,7 +506,7 @@ test('only the machines near you fetch and play their attract loops', async (t) 
   const fetched = [];
   page.on('request', (r) => { const m = r.url().match(/\/(\w+)\/attract\.webp$/); if (m) fetched.push(m[1]); });
   await page.goto(`${origin}/index.html`);
-  await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') && !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  await machineReady(page);
   await page.waitForFunction(() => document.querySelectorAll('#game-grid .card[data-loop-ready]').length === 5);
   assert.deepEqual([...fetched].sort(), ['adder', 'bouncer', 'defender', 'rally', 'warlock']);
   const strip = await page.evaluate(() => {
@@ -582,7 +585,7 @@ test('the step into a machine ends on the screen of its game page, which is that
   });
   assert.equal(screen.machine, 'bouncer', 'the game page wears its machine\'s colours');
   await page.goto(`${origin}/index.html`);
-  await page.waitForFunction(() => document.querySelector('.card-focused .machine-start') && !document.documentElement.hasAttribute('data-cabinet-arranging'));
+  await machineReady(page);
   const aim = await page.evaluate(() => { const b = launchScreen(); return [b.left, b.top, b.width, b.height]; });
   aim.forEach((v, i) => assert.ok(Math.abs(v - screen.box[i]) < 1, `the zoom aims at ${aim}, the screen is at ${screen.box}`));
 });

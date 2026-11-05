@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { TAPES } from './lib/games.mjs';
 import { openPage } from './lib/harness.mjs';
 
 for (const viewport of [
@@ -10,7 +11,7 @@ for (const viewport of [
 ]) test(`BASIC mobile layout fits ${viewport.width}×${viewport.height}`, async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport });
   await page.goto(`${origin}/basic.html`);
-  await page.waitForFunction(() => document.querySelectorAll('.game-tape').length === 9);
+  await page.waitForFunction((count) => document.querySelectorAll('.game-tape').length === count, TAPES.length);
   const layout = await page.evaluate(() => ({
     width: document.documentElement.scrollWidth,
     height: document.documentElement.scrollHeight,
@@ -31,7 +32,7 @@ test('BASIC cassette strip swipes sideways on touch without selecting a tape', a
     hasTouch: true, viewport: { width: 390, height: 844 },
   });
   await page.goto(`${origin}/basic.html`);
-  await page.waitForFunction(() => document.querySelectorAll('.game-tape').length === 9);
+  await page.waitForFunction((count) => document.querySelectorAll('.game-tape').length === count, TAPES.length);
   const tape = await page.locator('.game-tape').first().boundingBox();
   const cdp = await page.context().newCDPSession(page);
   const y = tape.y + tape.height / 2;
@@ -44,7 +45,7 @@ test('BASIC cassette strip swipes sideways on touch without selecting a tape', a
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.waitForFunction(() => document.querySelector('#tape-pile').scrollLeft > 50);
   assert.equal(await page.locator('body').getAttribute('data-tape-selecting'), null);
-  assert.equal(await page.locator('.game-tape').count(), 9);
+  assert.equal(await page.locator('.game-tape').count(), TAPES.length);
 });
 
 test('a running BASIC game keeps its playfield between the side controls in landscape', async (t) => {

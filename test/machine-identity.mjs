@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage } from './lib/harness.mjs';
+import { openPage, gameReady, gotoPage } from './lib/harness.mjs';
 
 function cabinetSurfaces(card) {
   const root = card || document.documentElement;
@@ -44,11 +44,11 @@ for (const engine of ['chromium', 'webkit']) {
         const frame = await (await card.locator('iframe').elementHandle()).contentFrame();
         await frame.waitForSelector('.deck-panel', { state: 'attached' });
         const hardware = await frame.evaluate(deckHardware);
-        await gamePage.goto(`${origin}/${game}/index.html`);
+        await gotoPage(gamePage, `${origin}/${game}/index.html`);
         await gamePage.waitForSelector('html[data-machine] .machine-speaker', { state: 'attached' });
         await gamePage.waitForFunction(() => document.querySelector('#marquee-name .machine-marquee-name') &&
           (!blipHasTouch() || !BLIP_GAMES[document.documentElement.dataset.machine].touch || document.getElementById('touch-strip')));
-        await gamePage.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+        await gameReady(gamePage, 60000);
         // Up close the cabinet's laminate is a column in the arcade's room: every layer of it is on the page.
         const near = await gamePage.evaluate(cabinetSurfaces);
         for (const layer of overview.body.split(/, (?=linear-gradient)/))
@@ -62,7 +62,7 @@ for (const engine of ['chromium', 'webkit']) {
         }
         assert.deepEqual(liveHardware, hardware, `${game}: controller type, caps, strip and wear`);
         if (game === 'rally' || game === 'brawler') {
-          await gamePage.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+          await gameReady(gamePage, 60000);
           await gamePage.screenshot({ path: new URL(`${game}.png`, dir).pathname });
         }
       }

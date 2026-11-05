@@ -766,7 +766,7 @@ test(`a big touch screen gets a deck sized for a finger`, async (t) => {
   }
 });
 
-test(`a second player joins through their own touch buttons despite a legacy stick query`, async (t) => {
+test(`a second player joins by touch through their own buttons on the stick or the pad deck`, async (t) => {
   // Tested by touch: a real tap on station two's own button against the real
   // wasm. The page's part is that station two is reachable while the title is
   // up (it is dead during a one-player match).
@@ -794,8 +794,8 @@ test(`a second player joins through their own touch buttons despite a legacy sti
     assert.equal(s.players, '2', `${controls}: the waiting title screen did not show both stations`);
     assert.ok(s.open, `${controls}: the second station is not open on the title screen`);
 
-    assert.equal(await page.evaluate(() => blipControls()), 'pad', `${controls}: a touchscreen uses the pad`);
-    const sel = '#snes-pad-p2 .snes-btn';
+    assert.equal(await page.evaluate(() => blipControls()), controls, `${controls}: a touchscreen keeps the deck it was asked for`);
+    const sel = controls === 'stick' ? '#fire-buttons-p2 .arcade-btn' : '#snes-pad-p2 .snes-btn';
     const box = await (await page.$(sel)).boundingBox();
     assert.ok(box, `${controls}: player two's join control is not visible`);
     await page.evaluate(() => {

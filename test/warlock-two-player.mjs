@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage } from './lib/harness.mjs';
+import { openPage, gameReady } from './lib/harness.mjs';
 
 // J (station two's first button) on Warlock's title starts a two-player game;
 // in play it joins a second wizard. Each costs a credit.
@@ -8,7 +8,7 @@ async function warlockAt(t) {
   const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1000, height: 900 } });
   await page.addInitScript(() => sessionStorage.setItem('blip-coins', '4'));
   await page.goto(`${origin}/warlock/index.html`);
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await gameReady(page);
   await page.locator('#glcanvas').focus();
   // the game reads keys from its first frames on; let it settle on the title
   await page.waitForTimeout(1500);

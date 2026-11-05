@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage } from './lib/harness.mjs';
+import { openPage, gameReady } from './lib/harness.mjs';
 
 for (const engine of ['chromium', 'webkit']) {
   test(`fullscreen kiosk cabinets retain every physical control deck in ${engine}`, async (t) => {
@@ -44,7 +44,7 @@ test('a kiosk keeps fullscreen through a real Start and a simulated two-minute i
   await page.waitForFunction(() => !!document.fullscreenElement);
   await page.locator('.card-focused .machine-start').click();
   await page.waitForURL((url) => url.pathname.includes('/rally/'));
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await gameReady(page);
   assert.equal(await page.locator('html').getAttribute('data-fullscreen'), '');
   await page.keyboard.press('ArrowUp');
   await page.waitForFunction(() => !!document.fullscreenElement);

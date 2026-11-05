@@ -89,6 +89,26 @@ export async function loadRallyAt(cdp, origin) {
   }
 }
 
+/** Wait until a game page's wasm has drawn its first frame. */
+export function gameReady(page, timeout) {
+  return page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, timeout ? { timeout } : {});
+}
+
+/** Navigate, retrying once when WebKit reports its intermittent "internal error" for a page that loads fine. */
+export async function gotoPage(page, url, opts) {
+  try {
+    return await page.goto(url, opts);
+  } catch (error) {
+    if (!/WebKit encountered an internal error/.test(error.message)) throw error;
+    return page.goto(url, opts);
+  }
+}
+
+/** Wait until the arcade has laid out its machines. */
+export function arcadeArranged(page) {
+  return page.waitForFunction(() => !document.documentElement.hasAttribute('data-cabinet-arranging'));
+}
+
 export async function openPage(t, engine = 'chromium', opts = {}) {
   const handle = await startPage(engine, opts);
   t.after(async () => {

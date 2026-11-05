@@ -16,4 +16,5 @@ const codes = await Promise.all(Array.from({ length: count }, (_, shard) => new 
     done(code);
   });
 })));
-process.exit(codes.some((code) => code !== 0) ? 1 : 0);
+// exitCode, not exit(): a piped stdout must drain the last shard's report first
+process.exitCode = codes.some((code) => code !== 0) ? 1 : 0;
