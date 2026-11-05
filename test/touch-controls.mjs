@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openPage, gameReady } from './lib/harness.mjs';
+import { GAMES } from './lib/games.mjs';
 
 for (const engine of ['webkit', 'chromium']) {
   test(`touchscreen control selection uses gesture strips, preserving Rally, in ${engine}`, async (t) => {
@@ -216,3 +217,21 @@ test('control choices and card fit an iPhone landscape safe area', async (t) => 
     }
   }
 });
+
+// Brawler and Warlock: two seats, and their own touch buttons on the trackpad's right.
+for (const { slug } of GAMES.filter((game) => game.players === 2 && game.touch?.kind === 'action')) {
+  for (const [shape, viewport] of [['upright', { width: 390, height: 844 }], ['sideways', { width: 844, height: 390 }]]) {
+    test(`${slug}: 2P JOIN stays clear of the touch buttons on an iPhone held ${shape}`, async (t) => {
+      const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, isMobile: true, viewport });
+      await page.route('**/*.wasm', () => {});          // the deck belongs to the shell; no game needs to run
+      await page.goto(`${origin}/${slug}/index.html`);
+      await page.evaluate(() => document.documentElement.setAttribute('data-open', ''));
+      const join = await page.locator('#touch-strip .ts-join, body > .ts-join').first().boundingBox();
+      const buttons = await page.locator('#touch-strip .ts-actions[data-player="0"]').boundingBox();
+      assert.ok(join && buttons, 'both 2P JOIN and the touch buttons show');
+      const apart = join.x + join.width <= buttons.x || buttons.x + buttons.width <= join.x ||
+        join.y + join.height <= buttons.y || buttons.y + buttons.height <= join.y;
+      assert.ok(apart, `2P JOIN ${JSON.stringify(join)} lies over the touch buttons ${JSON.stringify(buttons)}`);
+    });
+  }
+}
