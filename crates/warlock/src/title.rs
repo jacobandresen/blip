@@ -685,14 +685,15 @@ fn hand_model() -> Vec<Seg> {
             rr = rq;
         }
     }
-    // the thumb, from the heel of the hand, below the index finger and nearest us
-    let t0 = at(6.0, -6.0, -2.5);
-    let t1 = at(12.0, -8.0, -6.0);
-    let t2 = at(16.5, -8.2, -9.5);
-    let t3 = at(19.5, -7.4, -12.5);
-    segs.push(Seg { a: t0, b: t1, ra: 4.0 * S, rb: 3.2 * S, w, flat: 0.8, finger: 5, joint: 0 });
-    segs.push(Seg { a: t1, b: t2, ra: 3.0 * S, rb: 2.6 * S, w, flat: 0.8, finger: 5, joint: 1 });
-    segs.push(Seg { a: t2, b: t3, ra: 2.5 * S, rb: 2.1 * S, w, flat: 0.8, finger: 5, joint: 2 });
+    // the thumb: from the heel of the hand forward along the index finger's
+    // near side, a little below it, its tip resting by the index's middle joint
+    let t0 = at(3.0, -4.5, -2.0);
+    let t1 = at(14.0, -9.2, -3.4);
+    let t2 = at(23.0, -10.4, -4.2);
+    let t3 = at(29.5, -9.4, -3.6);
+    segs.push(Seg { a: t0, b: t1, ra: 5.2 * S, rb: 3.2 * S, w, flat: 0.7, finger: 5, joint: 0 });
+    segs.push(Seg { a: t1, b: t2, ra: 3.0 * S, rb: 2.7 * S, w, flat: 0.8, finger: 5, joint: 1 });
+    segs.push(Seg { a: t2, b: t3, ra: 2.6 * S, rb: 2.1 * S, w, flat: 0.8, finger: 5, joint: 2 });
     segs
 }
 
@@ -763,7 +764,8 @@ fn arm(img: &mut [V3]) {
                 best = (di, i, t);
             }
             // skin webs a little between bones; fingers stay apart past their first joint
-            let k = if s.joint == 0 { 1.4 } else { 0.5 };
+            // and the thumb's base is one with the palm, the web of skin to the index
+            let k = if s.finger == 5 && s.joint == 0 { 3.5 } else if s.joint == 0 { 1.4 } else { 0.5 };
             d = if d == f32::MAX { di } else { smin(d, di, k) };
         }
         (d, best.1, best.2)

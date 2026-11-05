@@ -1,11 +1,12 @@
 import { spawn } from 'node:child_process';
+import { TAPES } from './lib/games.mjs';
 
 const gameArg = process.argv.indexOf('--game');
 const selectedGame = gameArg >= 0 ? process.argv[gameArg + 1] : process.env.BLIP_VISUAL_GAME;
 const artifacts = process.argv.includes('--artifacts') || process.env.BLIP_VISUAL_ARTIFACTS === '1';
 const games = selectedGame
   ? [selectedGame]
-  : ['ADDER', 'BOUNCER', 'BRAWLER', 'BUBBLER', 'DEFENDER', 'METEORS', 'RALLY', 'SERPENT', 'RAIDER'];
+  : TAPES;
 
 const failures = [];
 for (const game of games) {

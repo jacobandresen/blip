@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { TAPES } from './lib/games.mjs';
 import { openPage } from './lib/harness.mjs';
 import { instrumentBasicSound } from './lib/basic-runtime.mjs';
 
-const ALL_GAMES = ['ADDER', 'BOUNCER', 'BRAWLER', 'BUBBLER', 'DEFENDER', 'METEORS', 'RALLY', 'SERPENT', 'RAIDER'];
+const ALL_GAMES = TAPES;
 const GAMES = process.env.BLIP_CONTROL_GAME ? ALL_GAMES.filter((game) => game === process.env.BLIP_CONTROL_GAME) : ALL_GAMES;
-const WASD_DECK = new Set(['ADDER', 'BRAWLER', 'BUBBLER']);
+const WASD_DECK = new Set(['ADDER', 'BRAWLER', 'BUBBLER', 'WARLOCK']);
+// The games whose two buttons are F and G (the others fire with Space).
+const FG_BUTTONS = new Set(['BRAWLER', 'BUBBLER', 'WARLOCK']);
 
 async function probe(t, touch) {
   const handle = await openPage(t, 'chromium', {
@@ -22,8 +25,8 @@ async function probe(t, touch) {
       await page.evaluate((game) => { BlipBasic.submit('CD /TAPE'); BlipBasic.submit(`LOAD ${game}`); }, game);
       await page.waitForFunction((game) => document.querySelector('#basic-output').textContent.includes(`LOADED /TAPE/${game}.BLIP`), game);
       const keys = WASD_DECK.has(game) ? ['A', 'D', 'W', 'S'] : ['LEFT', 'RIGHT', 'UP', 'DOWN'];
-      keys.push(game === 'BUBBLER' || game === 'BRAWLER' ? 'F' : 'SPACE');
-      keys.push(game === 'BUBBLER' || game === 'BRAWLER' ? 'G' : game === 'METEORS' ? 'Z' : 'SPACE');
+      keys.push(FG_BUTTONS.has(game) ? 'F' : 'SPACE');
+      keys.push(FG_BUTTONS.has(game) ? 'G' : game === 'METEORS' ? 'Z' : 'SPACE');
       if (game === 'ADDER' || game === 'BUBBLER') keys.push('LEFT', 'RIGHT', 'J', game === 'ADDER' ? 'J' : 'K', 'UP', 'DOWN');
       await page.evaluate((keys) => {
         BlipBasic.lines.clear();
@@ -91,8 +94,8 @@ test('BASIC touch movement and buttons remain independent for every deck', async
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     }));
     const point = { x: box.x + box.width * .9, y: box.y + box.height / 2 };
-    const primary = game === 'BUBBLER' || game === 'BRAWLER' || game === 'METEORS' ? 16 : 48;
-    const alternate = game === 'BUBBLER' || game === 'BRAWLER' || game === 'METEORS' ? 32 : 48;
+    const primary = FG_BUTTONS.has(game) || game === 'METEORS' ? 16 : 48;
+    const alternate = FG_BUTTONS.has(game) || game === 'METEORS' ? 32 : 48;
     await touch('touchStart', 1, point); await p.mask(2);
     await touch('touchStart', 2, buttons[0]); await p.mask(2 + primary);
     await touch('touchEnd', 1); await p.mask(primary);

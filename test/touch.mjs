@@ -5,16 +5,17 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage } from './lib/harness.mjs';
+import { openPage, gameReady } from './lib/harness.mjs';
+import { GAME_SLUGS } from './lib/games.mjs';
 
-/** A game page on a 390x844 phone, played by touch (the home screen's controller), with five coins in and the
- * canvas's keys recorded. */
-async function phone(t, slug) {
+/** A game page on a 390x844 phone, played by touch (the home screen's controller) or another deck controller, with
+ * five coins in and the canvas's keys recorded. */
+async function phone(t, slug, controls = 'touch') {
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 390, height: 844 } });
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
-  await page.goto(`${origin}/${slug}/index.html?controls=touch`);
+  await page.goto(`${origin}/${slug}/index.html?controls=${controls}`);
   await page.waitForFunction(() =>
     typeof BlipController === 'object' && document.getElementById('loader').style.display === 'none', null, { timeout: 30000 });
   await page.evaluate(() => {
@@ -143,7 +144,7 @@ test('Bubbler: the whole strip stays with player one until player two joins', as
 });
 
 test('Meteors: one finger holds the d-pad while another taps the buttons', async (t) => {
-  const p = await phone(t, 'meteors');
+  const p = await phone(t, 'meteors', 'pad');
   const pad = await p.page.evaluate(() => {
     const centre = (selector) => [...document.querySelectorAll(selector)]
       .filter((el) => el.getBoundingClientRect().width > 0).map((el) => {
@@ -216,7 +217,7 @@ for (const held of [true, false]) {
   });
 }
 
-for (const slug of ['serpent', 'bouncer', 'rally', 'defender', 'meteors', 'raider', 'brawler', 'bubbler', 'adder']) {
+for (const slug of GAME_SLUGS) {
   test(`${slug} keeps running when the clock jumps back and then a long way forward`, async (t) => {
     const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 390, height: 844 } });
     await page.goto(`${origin}/${slug}/index.html`);
@@ -260,7 +261,7 @@ test('the end of a touch wakes a sleeping audio context, as iOS requires', async
 test('on a PC a click on the coin wall inserts a coin and leaves the game focused', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
   await page.goto(`${origin}/meteors/index.html`);
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), null, { timeout: 60000 });
+  await gameReady(page, 60000);
   await page.waitForTimeout(1500);
   assert.equal(await page.evaluate(() => document.getElementById('need-coin-overlay').classList.contains('visible')), true);
   await page.mouse.click(640, 300);
@@ -274,7 +275,7 @@ async function cardSettled(page) {
   await page.waitForFunction(() => document.getElementById('controls-card').getAnimations().length === 0);
 }
 
-const SLUGS = ['serpent', 'bouncer', 'rally', 'defender', 'meteors', 'raider', 'brawler', 'bubbler', 'adder'];
+const SLUGS = GAME_SLUGS;
 for (const [label, phoneish] of [['a PC', false], ['a phone', true]]) {
   test(`on ${label} the controls card stays away until its button is pressed, then shows every control`, async (t) => {
     const size = phoneish ? { width: 390, height: 844 } : { width: 1280, height: 800 };

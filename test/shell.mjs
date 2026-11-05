@@ -4,6 +4,7 @@
 //
 //   node --test --test-concurrency=1 test/shell.mjs
 
+import { GAMES } from './lib/games.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluate, sleep, waitFor } from './lib/playwright-utils.mjs';
@@ -167,7 +168,7 @@ test('the game shell', async (t) => {
     const catalogue = JSON.parse(await evaluate(cdp, `JSON.stringify((function(){var cards=[].slice.call(document.querySelectorAll('.card'));
       return {count:cards.length,slugs:cards.map(function(c){return c.getAttribute('data-game-url').split('/')[0]}),
         machines:cards.every(function(c){return !!c.querySelector('.machine-coinbox,.machine-start')})};})())`));
-    assert.equal(catalogue.count, 9);
+    assert.equal(catalogue.count, GAMES.length);
     assert.equal(catalogue.machines, true, 'every game has cabinet controls');
     assert.equal(await evaluate(cdp, "document.querySelectorAll('.lang-switcher,.left-badges').length"), 0,
       'the cabinet has no language or page badges');

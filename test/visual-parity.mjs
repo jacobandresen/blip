@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage } from './lib/harness.mjs';
+import { openPage, gameReady } from './lib/harness.mjs';
 
 const GAMES = [
   ['ADDER', 'adder'], ['BOUNCER', 'bouncer'], ['BRAWLER', 'brawler'],
@@ -234,7 +234,7 @@ for (const [name, slug] of GAMES.filter(([name]) => !process.env.BLIP_VISUAL_GAM
     const basicTimes = await page.evaluate(() => document.querySelector('#basic-wasm-frame').contentWindow.__blipDrawTimes || []);
 
     await page.goto(`${origin}/${slug}/index.html?amstrad=1`);
-    await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'), undefined, { timeout: 20000 });
+    await gameReady(page, 20000);
     if (await page.locator('#need-coin-overlay').evaluate((overlay) => overlay.classList.contains('visible'))) {
       await page.evaluate(() => document.getElementById('insert-coin-btn').click());
       await page.waitForFunction(() => !document.querySelector('#need-coin-overlay').classList.contains('visible'));

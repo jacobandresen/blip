@@ -6,6 +6,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openPage } from './lib/harness.mjs';
+import { GAME_SLUGS } from './lib/games.mjs';
 
 for (const width of [1280, 390]) {
   test(`the book flies out of its pocket and back at ${width}px`, async (t) => {
@@ -60,7 +61,7 @@ for (const [slug, title] of [['about', 'about blip'], ['controls', 'controls'], 
   });
 }
 
-const SLUGS = ['adder', 'bouncer', 'brawler', 'bubbler', 'defender', 'meteors', 'raider', 'rally', 'serpent'];
+const SLUGS = [...GAME_SLUGS].sort();
 
 async function openManual(t, query, { width = 1280, height = 844 } = {}) {
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: width < 700, viewport: { width, height } });

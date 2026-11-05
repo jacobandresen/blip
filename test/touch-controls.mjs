@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage } from './lib/harness.mjs';
+import { openPage, gameReady } from './lib/harness.mjs';
 
 for (const engine of ['webkit', 'chromium']) {
   test(`touchscreen control selection uses gesture strips, preserving Rally, in ${engine}`, async (t) => {
@@ -116,7 +116,7 @@ test('action touch zones steer and hold game buttons without a pad', async (t) =
 test('Brawler gives both touch players independent movement and attacks', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 810, height: 1080 } });
   await page.goto(`${origin}/brawler/index.html`);
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await gameReady(page);
   await page.evaluate(() => document.getElementById('insert-coin-btn').click());
   const result = await page.evaluate(() => {
     blipSetMode(1);
@@ -150,7 +150,7 @@ test('two real touch contacts keep Brawler steering and attacking together', asy
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 810, height: 1080, deviceScaleFactor: 2, mobile: true });
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true });
   await page.goto(`${origin}/brawler/index.html`);
-  await page.waitForFunction(() => document.documentElement.hasAttribute('data-game-ready'));
+  await gameReady(page);
   await page.evaluate(() => {
     document.getElementById('insert-coin-btn').click();
     blipSetMode(1);

@@ -50,8 +50,11 @@ BASIC tapes and their shared APIs are documented in
    ordered, and use `CONTROL_TEXT$` for platform-specific control hints.
 5. Add a card crop in `tools/make_game_icons.mjs` and an attract capture
    setup in `tools/make_attract_strips.mjs`. Add the game to
-   `test/visual-parity.mjs` and `test/run-visual.mjs`; add focused tests and
-   place browser tests in the appropriate lane in `test/run-web.mjs`.
+   `test/visual-parity.mjs`; add focused tests and place browser tests in the
+   appropriate lane in `test/run-web.mjs`. Suites take the game and tape lists
+   from `test/lib/games.mjs` (read from `BLIP_GAMES` and `web/TAPE`), never
+   their own count. A game that reports scores also needs a Supabase
+   migration adding its slug to `submit_score`.
 6. Build with `cargo build-web`; generate icons and attract art; verify the
    Rust package, BASIC tape if present, web page, and relevant browser tests.
    Read [`test/visual-parity.md`](test/visual-parity.md) before judging
@@ -92,7 +95,7 @@ npm test
 npm run test:visual
 ```
 
-`cargo build-web` builds all nine Rust games and the BASIC runtime for the
+`cargo build-web` builds every Rust game and the BASIC runtime for the
 `wasm32-unknown-unknown` target. Install that target once with
 `rustup target add wasm32-unknown-unknown`. `npm test` runs the fast unit
 suites. `npm run test:visual` checks all games in muted headless Chromium;

@@ -46,6 +46,11 @@ async function fight(t, { setup = '', cpu = false, menu = false, initialPick, kn
   return {
     ...handle, frame, canvas,
     state: () => frame.evaluate(() => window.__brawler),
+    /** The probe's bits once they read `expected` (a busy machine draws slowly), or what they read after 3 s. */
+    async bits(expected) {
+      await frame.waitForFunction((b) => window.__brawler?.bits === b, expected, { timeout: 3000 }).catch(() => {});
+      return (await this.state()).bits;
+    },
     async press(key, ms = 70) {
       await page.keyboard.down(key);
       await page.waitForTimeout(ms);
@@ -65,20 +70,17 @@ test('BASIC Start opens selection and a held Start cannot also confirm RYUKA', a
   assert.equal((await p.state()).bits, 1, 'right arrow does not choose a fighter from the title');
   await p.page.keyboard.down('f');
   await p.page.waitForTimeout(650);
-  assert.equal((await p.state()).bits, 17, 'held Start stays on fighter selection');
+  assert.equal(await p.bits(17), 17, 'held Start stays on fighter selection');
   await p.page.keyboard.up('f');
   await p.page.waitForTimeout(180);
   await p.press('d');
-  await p.frame.waitForFunction(() => window.__brawler?.bits === 18, undefined, { timeout: 1500 });
-  assert.equal((await p.state()).bits, 18, 'right highlights BRUTUS');
+  assert.equal(await p.bits(18), 18, 'right highlights BRUTUS');
   await p.page.waitForTimeout(180);
   await p.press('ArrowDown');
-  await p.frame.waitForFunction(() => window.__brawler?.bits === 26, undefined, { timeout: 1500 });
-  assert.equal((await p.state()).bits, 26, 'down selects the fighter below in the other row');
+  assert.equal(await p.bits(26), 26, 'down selects the fighter below in the other row');
   await p.page.waitForTimeout(180);
   await p.press('ArrowUp');
-  await p.frame.waitForFunction(() => window.__brawler?.bits === 18, undefined, { timeout: 1500 });
-  assert.equal((await p.state()).bits, 18, 'up returns to the same column');
+  assert.equal(await p.bits(18), 18, 'up returns to the same column');
   await p.press('f');
   await p.frame.waitForFunction(() => (window.__brawler.bits & 32) !== 0);
   assert.equal((await p.state()).bits & 15, 2, 'the selected fighter starts the fight');
@@ -134,9 +136,9 @@ test('BASIC touch D-pad selects a fighter without starting from the title', asyn
     await p.page.waitForTimeout(140);
   };
   await tap('#snes-pad .snes-btn:first-child');
-  assert.equal((await p.state()).bits, 17, 'punch opens selection');
+  assert.equal(await p.bits(17), 17, 'punch opens selection');
   await tap('#snes-pad .dp-right');
-  assert.equal((await p.state()).bits, 18, 'right highlights BRUTUS without starting play');
+  assert.equal(await p.bits(18), 18, 'right highlights BRUTUS without starting play');
   await tap('#snes-pad .snes-btn:first-child');
   await p.frame.waitForFunction(() => (window.__brawler.bits & 32) !== 0);
   assert.equal((await p.state()).bits & 15, 2, 'touch punch confirms the highlighted fighter');
@@ -214,7 +216,7 @@ test('BASIC selects MACK with his named special and THE HOOD home stage', async 
     probe: '1000+PICK+16*(STATE$="SELECT")+32*(SPECIAL_KIND(PICK)=5)+64*(SPECIAL_NAME$(PICK)="YO! HOMIES!")+128*(HOME(PICK)=8)+256*(POWER_DESC$(PICK)="LOWRIDER DRIVE-BY")',
   });
   await p.press('f');
-  assert.equal((await p.state()).bits, 511, 'selection must identify MACK, his drive-by, and THE HOOD');
+  assert.equal(await p.bits(511), 511, 'selection must identify MACK, his drive-by, and THE HOOD');
   const still = await p.canvas.screenshot();
   await p.page.waitForTimeout(300);
   assert.notDeepEqual(await p.canvas.screenshot(), still, 'MACK should keep his fighter-specific idle animation moving while selected');

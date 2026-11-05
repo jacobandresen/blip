@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage } from './lib/harness.mjs';
+import { openPage, arcadeArranged } from './lib/harness.mjs';
 
 for (const engine of ['chromium', 'webkit']) {
   for (const { phone, game } of [{phone:false,game:'rally'},{phone:true,game:'rally'},{phone:false,game:'brawler'},{phone:true,game:'brawler'}]) {
@@ -32,7 +32,7 @@ for (const engine of ['chromium', 'webkit']) {
       await page.waitForFunction(game=>document.querySelector('.card-focused[data-loop-ready]')?.dataset.machine===game&&
         !document.getElementById('game-grid').hasAttribute('data-aisle-moving'),game);
       await page.waitForSelector('.card-focused[data-loop-ready]');
-      await page.waitForFunction(() => !document.documentElement.hasAttribute('data-cabinet-arranging'));
+      await arcadeArranged(page);
       // A stale geometry cache from a different machine must not determine the destination.
       await page.evaluate(() => localStorage.setItem('blip-screen-box', JSON.stringify({
         w: innerWidth, h: innerHeight, box: [0, 0, 20, 20], deck: 500,

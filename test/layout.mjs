@@ -7,6 +7,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { GAME_SLUGS } from './lib/games.mjs';
 import { openPage } from './lib/harness.mjs';
 
 // CSS pixels; the insets are what the notch, the island and the home bar take.
@@ -35,7 +36,7 @@ const DEVICES = [
 ];
 
 const TWO_SEATS = ['rally', 'brawler', 'bubbler', 'adder'];
-const GAMES = ['serpent', 'bouncer', 'rally', 'defender', 'meteors', 'raider', 'brawler', 'bubbler', 'adder'];
+const GAMES = GAME_SLUGS;
 
 // The pieces of interface that must each have their own space.
 const PIECES = {
@@ -287,7 +288,7 @@ for (const device of mine) {
       }
     }
     const icons = result.boxes.filter((b) => b.key === 'icon');
-    if (icons.length !== 9) failures.push(`${icons.length} icons show, not 9`);
+    if (icons.length !== GAMES.length) failures.push(`${icons.length} icons show, not ${GAMES.length}`);
     if (!device.desktop) for (const i of icons) if (i.right - i.left < 44) failures.push(`${i.name} is ${Math.round(i.right - i.left)}px, too small for a thumb`);
     assert.deepEqual(failures, []);
   });

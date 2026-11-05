@@ -3,6 +3,7 @@
 //
 //   node --test test/home.mjs        (after cargo build-web and node tools/make_game_icons.mjs)
 
+import { GAME_SLUGS } from './lib/games.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -12,7 +13,7 @@ import { chromium } from 'playwright';
 import { createFileServer, openPage, WEB_DIR, listenOn } from './lib/harness.mjs';
 import { chromiumBinary } from './lib/chromium-binary.mjs';
 
-const GAMES = ['serpent', 'bouncer', 'defender', 'rally', 'meteors', 'raider', 'brawler', 'bubbler', 'adder', 'warlock'];
+const GAMES = GAME_SLUGS;
 
 /** A phone with the games' wasm held back: these tests read the pages, not play them. */
 async function phone(t, opts = {}) {
@@ -314,7 +315,7 @@ test('the Guide sets the manual\'s own chapters as an iOS guide, without the cab
   await page.locator('#guide[data-ready]').waitFor();
   const groups = await page.locator('#toc .group-title').allTextContents();
   assert.deepEqual(groups, ['Getting started', 'Games', 'History', 'About', 'This guide']);
-  assert.equal(await page.locator('#toc a[href^="#/t/game-"]').count(), 10);
+  assert.equal(await page.locator('#toc a[href^="#/t/game-"]').count(), GAME_SLUGS.length);
   const titles = await page.locator('#toc .row').allTextContents();
   assert.ok(titles.some((x) => /Play on iPhone and iPad/.test(x)), 'the app\'s own section');
   assert.ok(!titles.some((x) => /Choosing a game/.test(x)), 'the cabinet\'s card rack is left out');

@@ -39,6 +39,7 @@ const ALL = {
   brawler:           { fire: F, presses: 7 },
   bubbler:           { fire: F, presses: 2 },
   adder:             { fire: SPACE, presses: 1 },
+  warlock:           { fire: F, presses: 1 },
 };
 const only = (process.env.GAMES || '').split(',').filter(Boolean);
 const GAMES = Object.entries(ALL).filter(([slug]) => !only.length || only.includes(slug));
