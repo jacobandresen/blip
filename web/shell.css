@@ -680,7 +680,6 @@ canvas {
 :root[data-touch="action"][data-versus] .ts-actions { width: 20%; }
 :root[data-touch="action"][data-versus] .ts-actions[data-player="0"] { right: 52%; }
 :root[data-touch="action"][data-versus] .ts-actions[data-player="1"] { display: flex; right: 2%; }
-:root[data-touch="action"][data-open] .ts-join { left: 10px; right: auto; }
 @media (max-width: 500px) {
   :root[data-touch="action"][data-versus] .ts-actions { flex-direction: column; width: 23%; gap: 4px; }
 }
@@ -850,6 +849,9 @@ canvas {
   bottom: auto;
   z-index: 210;
 }
+/* Action games keep their own buttons at the right of the trackpad: upright, 2P JOIN waits on the left,
+   below the P1 tag. After the general rule above, which has the same specificity. */
+:root[data-touch="action"][data-open]:not([data-layout="landscape"]) .ts-join { left: 10px; right: auto; top: 26px; }
 .ts-join:active { transform: scale(0.96); }
 .tj-plus { font-size: 14px; line-height: 1; font-weight: 500; }
 @keyframes tj-glow {
