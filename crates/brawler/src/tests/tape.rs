@@ -70,7 +70,7 @@ fn basic_cassette_ships_the_original_walkout_and_hood_music() {
 
 #[test]
 fn basic_uses_the_alternate_kick_and_whiff_stumble_pose_rows() {
-    assert!(TAPE.contains("IF ALT_KICK(P)=1 AND MV(P)=4 THEN ROW=18"));
+    assert!(TAPE.contains("IF ALT_KICK(P)=1 AND ATTACK_MOVE(P)=4 THEN ROW=18"));
     assert!(TAPE.contains("STUMBLE_T(P)=18"));
     assert!(TAPE.contains("ROW=4:CELL=MIN(5,INT((18-STUMBLE_T(P))*6/18))"));
     assert_eq!(crate::export::POSES.len(), 19);

@@ -359,7 +359,7 @@ var cardApi = (function () {
   if (!GAME) return null;
   var appStyle = document.documentElement.hasAttribute('data-appstyle');
   var exitLabel = blipAppMode() ? 'BACK TO THE TITLE' : appStyle ? 'HOME' : 'ANOTHER GAME';
-  function cardLegend() {
+  function cardLegend(noExit) {
     var touch = !noTouch && blipControls() === 'touch';
     var list = (noTouch ? GAME.controls : GAME.touchControls).slice();
     if (!noTouch && !touch) {
@@ -372,7 +372,7 @@ var cardApi = (function () {
       });
     }
     // A game in its own app has no Home to tap, only Escape or Backspace back to its title.
-    if (noTouch || !blipAppMode()) list.push([exitLabel, noTouch ? ['ESC'] : [appStyle ? 'TAP ‹ HOME' : 'TAP BLIP LOGO'], noTouch ? ['BACKSPACE'] : null]);
+    if (!noExit && (noTouch || !blipAppMode())) list.push([exitLabel, noTouch ? ['ESC'] : [appStyle ? 'TAP ‹ HOME' : 'TAP BLIP LOGO'], noTouch ? ['BACKSPACE'] : null]);
     return legendHtml(list);
   }
   var canChoose = !noTouch && GAME.slug !== 'rally';
@@ -399,6 +399,7 @@ var cardApi = (function () {
         e.stopPropagation();
         blipSetControls(button.dataset.controlChoice);
         card.querySelector('.pc-legend').innerHTML = cardLegend();
+        wallLegend();
         Array.prototype.forEach.call(card.querySelectorAll('[data-control-choice]'), function (item) {
           item.setAttribute('aria-pressed', String(item === button));
         });
@@ -406,6 +407,13 @@ var cardApi = (function () {
       });
     });
   }
+  // The coin wall teaches the same keys before the first coin.
+  function wallLegend() {
+    var wall = document.querySelector('#need-coin-overlay .nco-legend');
+    if (wall) wall.innerHTML = cardLegend(true);
+  }
+  wallLegend();
+  window.addEventListener('blip-controls-changed', wallLegend);
   return api;
 }());
 

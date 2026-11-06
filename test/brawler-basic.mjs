@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { openPage } from './lib/harness.mjs';
 import { instrumentBasicSound } from './lib/basic-runtime.mjs';
 
-async function fight(t, { setup = '', cpu = false, menu = false, initialPick, knockAt = 0, sample = 'X(1)/100', volume = 'HEALTH(2)/MAX(1,MAX_HP(WHO(2)))', probe = '1000+MV(1)+16*(ACT$(1)="ATTACK")+32*(FACING(1)<0)+64*(Y(1)<FLOOR_Y)', view } = {}) {
+async function fight(t, { setup = '', cpu = false, menu = false, initialPick, knockAt = 0, sample = 'X(1)/100', volume = 'HEALTH(2)/MAX(1,MAX_HP(WHO(2)))', probe = '1000+ATTACK_MOVE(1)+16*(ACT$(1)="ATTACK")+32*(FACING(1)<0)+64*(Y(1)<FLOOR_Y)', view } = {}) {
   const handle = await openPage(t, 'chromium', { viewport: view || { width: 1000, height: 900 }, hasTouch: !!view });
   const { page, origin } = handle;
   await instrumentBasicSound(page, `function(f,s,v){
@@ -148,7 +148,7 @@ test('BASIC touch Punch lands an attack during a match', async (t) => {
   const p = await fight(t, {
     view: { width: 390, height: 844 },
     setup: 'CPU_DELAY=999',
-    probe: '1000+MV(1)+16*(ACT$(1)="ATTACK")',
+    probe: '1000+ATTACK_MOVE(1)+16*(ACT$(1)="ATTACK")',
     sample: 'HEALTH(2)/MAX(1,MAX_HP(WHO(2)))',
   });
   const button = p.page.locator('#snes-pad .snes-btn:first-child');
@@ -166,7 +166,7 @@ test('BASIC simultaneous touch Punch and Kick trigger MACK’s drive-by', async 
   const p = await fight(t, {
     view: { width: 390, height: 844 },
     setup: 'WHO(1)=15:X(1)=240:X(2)=500:CPU_DELAY=999',
-    probe: '1000+MV(1)+16*(ACT$(1)="ATTACK")+32*DRIVEBY_ACTIVE(1)',
+    probe: '1000+ATTACK_MOVE(1)+16*(ACT$(1)="ATTACK")+32*DRIVEBY_ACTIVE(1)',
   });
   const caps = p.page.locator('#snes-pad .snes-btn');
   const punch = await caps.nth(0).boundingBox();
@@ -246,7 +246,7 @@ test('BASIC MACK drive-by lands a three-shot burst without a knockdown lockout',
 test('BASIC MACK parks, bounces, fires in three beats, then exits the stage', async (t) => {
   const p = await fight(t, {
     setup: 'WHO(1)=15:X(1)=240:X(2)=500:CPU_DELAY=999',
-    probe: '1000+T(1)+1000*DRIVEBY_SHOTS(1)+5000*(ACT$(1)="ATTACK")',
+    probe: '1000+ACT_FRAME(1)+1000*DRIVEBY_SHOTS(1)+5000*(ACT$(1)="ATTACK")',
     sample: 'CAR_Y/400',
     volume: 'MIN(1,MAX(0,CAR_X/1000))',
   });
@@ -434,7 +434,7 @@ test('BASIC two active punches trade rather than favouring player one', async (t
 });
 
 test('BASIC remembers a kick pressed just before jab recovery ends', async (t) => {
-  const p = await fight(t, { sample: 'T(1)/100' });
+  const p = await fight(t, { sample: 'ACT_FRAME(1)/100' });
   await p.press('f');
   await p.frame.waitForFunction(() => window.__brawler.x >= 8 && window.__brawler.x <= 12);
   await p.press('g');

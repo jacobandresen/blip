@@ -29,8 +29,12 @@ live in `/TAPE/<GAME>/ASSETS/`; use `DRAW_TEXTURE`, `PLAY_SFX` and
 name. User replacements live in `/USER/<GAME>/ASSETS/`.
 
 Games draw on a 640 × 400 screen by default. `CANVAS(width,height)` selects a
-different size. `TIME()` reads the engine clock. Use `CONTROL_TEXT$` for the
-game's platform-specific control labels.
+different size. `TIME()` reads the engine clock.
+`CONTROL_TEXT$(keys$,pad$,touch$)` picks a control label for what the player
+holds: a keyboard, a pad or stick, or a game's touch surface. BASIC on a phone
+plays on its two on-screen pads, so it shows the pad label.
+`FIRE_PROMPT$("TO START")` is the arcade games' own prompt: PRESS SPACE TO START on a keyboard, PRESS FIRE TO START on a pad, or
+TAP TO START on a touch screen.
 
 ## Shared helpers
 
@@ -52,7 +56,11 @@ These functions call the same Rust helpers as native games. Geometry uses
 `name(row,index,0..1)` and optionally uses column 2 to mark alternate-color
 segments. `DRAW_LINE`, `DRAW_CIRCLE`, `FILL_RECT` and `FILL_CIRCLE` use the
 shared renderer. `FX_CLEAR`, `FX_UPDATE`, `FX_DRAW`, `FX_BURST`, `FX_POPUP`
-and `FX_RING` use the shared effects layer.
+and `FX_RING` use the shared effects layer. `HSV(hue,saturation,value[,alpha])`
+makes a colour on the arcade games' wheel (`blip::hsv`), hue 0 to 1.
+`DRAW_GAME_OVER(score,ready[,note$[,headline,best,prompt]])` draws the arcade's
+game-over screen: the score, the best on the board, the game's own note line,
+and, once `ready` is true, the prompt to play again for what the player holds.
 
 ## Brawler parity
 

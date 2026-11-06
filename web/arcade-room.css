@@ -216,7 +216,17 @@
 #game-grid .cord-box-front {position:absolute;left:100%;top:57%;width:7px;height:24px;pointer-events:none;transform:translateZ(-34px);
   background:linear-gradient(90deg,#4a4950,#26252b);border-radius:1px}
 #game-grid .cord-drop {position:absolute;left:100%;top:calc(57% + 22px);width:24px;bottom:0;pointer-events:none;overflow:visible;transform:translateZ(-52px)}
-#game-grid .cord-floor {position:absolute;left:92%;top:100%;width:56%;height:215px;pointer-events:none;overflow:visible;transform-origin:50% 0;transform:rotateX(-90deg)}
+#game-grid .cord-floor {
+  position:absolute;
+  left:92%;
+  top:100%;
+  width:56%;
+  height:215px;
+  pointer-events:none;
+  overflow:visible;
+  transform-origin:50% 0;
+  transform:rotateX(-90deg);
+}
 #game-grid .cord-wall {position:absolute;left:92%;bottom:0;width:56%;height:100px;pointer-events:none;overflow:visible;transform:translateZ(-214px)}
 #game-grid :is(.cord-floor,.cord-wall,.cord-drop) .cord-wire {fill:none;stroke:#0b0a0c;stroke-width:4.2;stroke-linecap:round;stroke-linejoin:round}
 #game-grid :is(.cord-floor,.cord-wall,.cord-drop) .cord-shine {fill:none;stroke:#7a655c;stroke-width:1.1;stroke-linecap:round;opacity:.6}

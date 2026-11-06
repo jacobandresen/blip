@@ -15,7 +15,6 @@ use blip::{
 // The effects and music are made by build.rs; the tests check them here.
 #[cfg(test)]
 mod tunes;
-#[cfg(not(target_arch = "wasm32"))]
 mod bot;
 mod levels;
 
@@ -483,6 +482,7 @@ fn collect_pickups(g: &mut Game, h: Cell, sfx: &Sounds) {
 /// the shears and the bonus.
 fn eat_food(g: &mut Game, h: Cell, sfx: &Sounds) -> (bool, bool) {
     play_sfx(&sfx.eat);
+    blip::bot::add("food", 1.0);
     g.gulps.push(0.0);
     g.streak = if g.steps_since_food <= STREAK_STEPS { (g.streak + 1).min(STREAK_MAX) } else { 1 };
     g.steps_since_food = 0;
@@ -507,8 +507,6 @@ fn next_level(g: &mut Game, sfx: &Sounds) {
     g.sess.next_level();
     g.raise_obstacles();
     g.banner_t = 0.0;
-    blip::bot::set("level", g.sess.level as f64);
-    blip::bot::set(&format!("t_level{}", g.sess.level), blip::bot::clock() as f64);
     play_sfx(&sfx.level);
     g.foods_eaten = 0;
 }
@@ -699,7 +697,7 @@ fn draw_title(blip: &Blip, hi: &web::HighScore) {
     // SERPENT is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
     let by = web::controls();
-    blip.draw_centered(by.pick("PRESS FIRE", "PRESS FIRE", "TAP TO START"), (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
+    blip.draw_start_prompt((WIN_H / 2) as f32);
     blip.draw_centered(by.pick("ARROW KEYS OR WASD", "STEER WITH THE PAD", "SWIPE TO STEER"),
         (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
     draw_title_snake(blip, blip::macroquad::time::get_time() as f32);
@@ -725,18 +723,9 @@ fn draw_title_snake(blip: &Blip, t: f32) {
 }
 
 fn draw_over(blip: &Blip, g: &Game, hi: &web::HighScore) {
-    if g.snake_len + g.obstacle_count == MAX_LEN {
-        blip.draw_centered("FIELD CLEARED", (WIN_H / 4) as f32, 5.0, BLIP_GREEN);
-        blip.draw_hi(hi, (WIN_H / 4 + 52) as f32, BLIP_YELLOW);
-        blip.draw_centered(&format!("SCORE {}", g.sess.score), (WIN_H / 2 + 4) as f32, 3.0, BLIP_WHITE);
-        if !g.dead_timer.active() {
-            blip.draw_centered("PRESS FIRE TO PLAY AGAIN", (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
-        }
-        return;
-    }
-    blip.draw_game_over(g.sess.score, hi, BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active());
-    blip.draw_centered(&format!("LEVEL {}   LENGTH {}", g.sess.level, g.snake_len),
-        (WIN_H / 2 + 54) as f32, 2.0, BLIP_GRAY);
+    let (title, colour) = if g.snake_len + g.obstacle_count == MAX_LEN { ("FIELD CLEARED", BLIP_GREEN) } else { ("GAME OVER", BLIP_RED) };
+    blip.draw_end_screen(title, g.sess.score, hi, colour, BLIP_GREEN, BLIP_YELLOW, !g.dead_timer.active());
+    blip.draw_game_over_note(&format!("LEVEL {}   LENGTH {}", g.sess.level, g.snake_len), BLIP_GRAY);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -745,6 +734,7 @@ fn conf() -> blip::macroquad::window::Conf {
 
 #[blip::macroquad::main(conf)]
 async fn main() {
+    blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
@@ -766,7 +756,6 @@ async fn main() {
     loop {
         let dt = blip.delta_time;
 
-        #[cfg(not(target_arch = "wasm32"))]
         if blip::bot::active() { bot::drive(&g); }
         let was_playing = g.state == State::Play;
         match g.state {

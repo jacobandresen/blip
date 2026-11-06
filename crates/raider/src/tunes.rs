@@ -924,7 +924,7 @@ fn enemy_gun_sfx() -> Vec<u8> {
 fn backfire_sfx() -> Vec<u8> {
     let sr = SAMPLE_RATE as f32;
     let n = ms_to_samples(280.0);
-    let mut rng = Rng(0xBAC_F1);
+    let mut rng = Rng(0x0B_ACF1);
     let mut buf = vec![0.0f32; n];
     let (mut lp, mut crack) = (0.0f32, 0.0f32);
     for (i, out) in buf.iter_mut().enumerate() {

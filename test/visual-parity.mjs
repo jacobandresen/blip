@@ -2,13 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { openPage, gameReady } from './lib/harness.mjs';
+import { TAPES } from './lib/games.mjs';
 
-const GAMES = [
-  ['ADDER', 'adder'], ['BOUNCER', 'bouncer'], ['BRAWLER', 'brawler'],
-  ['BUBBLER', 'bubbler'], ['DEFENDER', 'defender'],
-  ['METEORS', 'meteors'], ['RALLY', 'rally'], ['SERPENT', 'serpent'],
-  ['RAIDER', 'raider'], ['WARLOCK', 'warlock'],
-];
+// Every tape against its Rust game: the tape's name in lower case is the game's slug.
+const GAMES = TAPES.map((name) => [name, name.toLowerCase()]);
 const MOVE_KEY = {
   ADDER: 'ArrowLeft', BOUNCER: 'ArrowLeft', BRAWLER: 'd', BUBBLER: 'ArrowRight',
   DEFENDER: 'ArrowLeft', METEORS: 'ArrowLeft', RALLY: 'ArrowUp',

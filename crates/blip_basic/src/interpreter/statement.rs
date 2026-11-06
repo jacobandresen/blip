@@ -3,6 +3,7 @@
 use super::{
     block::block_condition,
     color::paper_color,
+    graphics::DRAW_COMMANDS,
     procedure::leading_name,
     syntax::{assignment_eq, matching_else, method_call, print_items, split_args, split_statements, top_level_then},
     ForLoop, Program, Value,
@@ -23,8 +24,12 @@ impl Program {
         if source.is_empty() || source.starts_with('\'') {
             return Ok(());
         }
-        let command = method_call(source).map(|(name, args)| format!("{name} {args}"));
-        let command = command.as_deref().unwrap_or(source);
+        // FILL_RECT(1,2,3,4,C) is FILL_RECT 1,2,3,4,C: a drawing command, whatever its arguments hold,
+        // unless the program has a SUB of that name.
+        if let Some((name, args)) = method_call(source).filter(|(name, _)| !self.is_procedure(&name.to_ascii_uppercase())) {
+            return self.draw_statement(&format!("{name} {args}"), blip, textures);
+        }
+        let command = source;
         let (keyword, rest) = command.split_once(char::is_whitespace).unwrap_or((command, ""));
         let rest = rest.trim();
 
@@ -101,7 +106,9 @@ impl Program {
                 sounds.stop_music();
                 Ok(())
             }
+            // A program's own SUB of the same name comes first.
             _ if self.is_bare_call(command) => self.call_procedure(command, blip),
+            word if DRAW_COMMANDS.contains(&word) => self.draw_statement(command, blip, textures),
             _ => match assignment_eq(command) {
                 Some(eq) => self.assign(command, eq, blip),
                 None => self.draw_statement(command, blip, textures),

@@ -172,20 +172,20 @@ pub(crate) fn draw_banner(blip: &Blip, g: &Game) {
             blip.draw_centered(text, cy, 4.0, col);
             blip.draw_centered(&format!("{a} - {b}"), cy + 46.0, 3.0, BLIP_WHITE);
             if !g.phase.active() {
-                blip.draw_centered("PRESS TO PLAY AGAIN", cy + 84.0, 2.0, BLIP_YELLOW);
+                blip.draw_centered("PRESS PUNCH TO PLAY AGAIN", cy + 84.0, 2.0, BLIP_YELLOW);
             }
         }
         State::Over => {
             stamp(blip, "GAME OVER", cy, 5.0, BlipColor { r: 0.95, g: 0.3, b: 0.3, a: 1.0 });
             let s = format!("SCORE {}", g.sess.score);
             stamp(blip, &s, cy + 50.0, 2.0, BLIP_WHITE);
-            if !g.phase.active() { blip.draw_centered("PRESS FIRE", cy + 86.0, 2.0, BLIP_YELLOW); }
+            if !g.phase.active() { blip.draw_centered(web::controls().pick("PRESS SPACE", "PRESS PUNCH", "PRESS PUNCH"), cy + 86.0, 2.0, BLIP_YELLOW); }
         }
         State::Won => {
             stamp(blip, "CHAMPION", cy, 5.0, BLIP_YELLOW);
             let s = format!("SCORE {}", g.sess.score);
             stamp(blip, &s, cy + 50.0, 2.0, BLIP_WHITE);
-            if !g.phase.active() { blip.draw_centered("PRESS FIRE", cy + 86.0, 2.0, BLIP_YELLOW); }
+            if !g.phase.active() { blip.draw_centered(web::controls().pick("PRESS SPACE", "PRESS PUNCH", "PRESS PUNCH"), cy + 86.0, 2.0, BLIP_YELLOW); }
         }
         _ => {}
     }

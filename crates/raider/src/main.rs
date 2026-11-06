@@ -21,7 +21,6 @@ mod tunes;
 // The pictures are made by build.rs; the tests check them here.
 #[cfg(test)]
 mod gfx;
-#[cfg(not(target_arch = "wasm32"))]
 mod bot;
 mod land;
 mod levels;
@@ -766,7 +765,11 @@ impl Game {
 
     fn start_game(&mut self) {
         self.sess.reset(LIVES_START);
-        self.weapon_level = 1;
+        self.sess.level = self.sess.level.min(MAX_LEVEL);
+        blip::bot::levels(MAX_LEVEL as usize);
+        blip::bot::reached_level(self.sess.level);
+        // A bot run that starts past level 1 is armed like a player who got there.
+        self.weapon_level = self.sess.level.min(MAX_WEAPON_LEVEL);
         self.start_round();
     }
 
@@ -1596,7 +1599,7 @@ fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
         g.respawn_grace.start(0.4);
         g.spawn_timer.start(1.5);
         g.state = State::Play;
-        // Native playtest controls: `RAIDER_BOSS`, `RAIDER_HP`, `RAIDER_BARRIER`, `RAIDER_ISLAND` and `RAIDER_LEVEL`.
+        // Native playtest controls: `RAIDER_BOSS`, `RAIDER_HP`, `RAIDER_BARRIER`, and `RAIDER_ISLAND`; `BLIP_BOT_LEVEL` picks the level.
         #[cfg(not(target_arch = "wasm32"))]
         {
             let env = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<i32>().ok());
@@ -1611,11 +1614,6 @@ fn update_launch(g: &mut Game, dt: f32, sfx: &Sounds) {
             }
             if let Some(hp) = env("RAIDER_HP") { g.health = hp.clamp(1, PLAYER_HEALTH_MAX); }
             if let Some(n) = env("RAIDER_ISLAND") { spawn_island_sized(g, n.clamp(0, 2) as u8); }
-            if let Some(n) = env("RAIDER_LEVEL") {
-                g.sess.level = n.clamp(1, MAX_LEVEL);
-                g.wave_target = wave_target_for(g.sess.level);
-                if g.sess.level == MAX_LEVEL { g.batteries = land::lay_batteries(); }
-            }
             if env("RAIDER_BARRIER").is_some() {
                 g.sess.level = g.sess.level.max(BARRIER_MIN_LEVEL);
                 g.barrier_timer.start(1.0);
@@ -1632,6 +1630,132 @@ fn round_hits_rect(from: (f32, f32), round: &Round, x: f32, y: f32, w: f32, h: f
         x - width * 0.5, y - BULLET_H * 0.5,
         w + width, h + BULLET_H,
     )
+}
+
+/// The player's rounds against the enemies, the boss and the barrier: each one
+/// shoots a plane down, glances off one (once), or chips at the boss.
+fn hit_with_bullets(g: &mut Game, sfx: &Sounds, bullet_starts: &[(f32, f32); MAX_PLAYER_BULLETS],
+                    bullet_left_screen: &mut [bool; MAX_PLAYER_BULLETS]) {
+    for bi in 0..MAX_PLAYER_BULLETS {
+        if !g.bullets[bi].active { continue; }
+        let bw = g.bullets[bi].r * 2.0 + 2.0;
+        let (bx, by) = (g.bullets[bi].x - bw / 2.0, g.bullets[bi].y);
+        let mut consumed = false;
+        let mut ricocheted = false;
+        for ei in 0..MAX_ENEMIES {
+            if !g.enemies[ei].active { continue; }
+            let (ex, ey) = (g.enemies[ei].x, g.enemies[ei].y);
+            if round_hits_rect(bullet_starts[bi], &g.bullets[bi],
+                ex, ey, ENEMY_W as f32, ENEMY_H as f32) {
+                if !g.bullets[bi].bounced && rand_range_f32(0.0, 1.0) < RICOCHET_CHANCE {
+                    // Glances off: a spark, and away at 35-80 degrees to
+                    // one side, a little slower, the plane unharmed.
+                    let b = &mut g.bullets[bi];
+                    let side = if rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
+                    let a = 0.6 + rand_range_f32(0.0, 1.0) * 0.8;
+                    let v = BULLET_SPEED * 0.8;
+                    b.vx = side * v * a.sin();
+                    b.vy = v * a.cos();
+                    b.bounced = true;
+                    bullet_left_screen[bi] = false;
+                    ricocheted = true;
+                    let (sx, sy) = (b.x, b.y);
+                    g.spawn_explosion(sx, sy, 0.18, BlipColor::new(1.0, 0.95, 0.7, 1.0));
+                    let take = &sfx.ricochet[(rand() % sfx.ricochet.len() as u32) as usize];
+                    play_sfx_volume(take, 0.7);
+                    break;
+                }
+                shoot_down(g, ei, sfx, rand_range_f32(0.0, 1.0) < FLAMES_CHANCE);
+                consumed = true;
+                break;
+            }
+        }
+        if consumed {
+            g.bullets[bi].active = false;
+            continue;
+        }
+        if ricocheted { continue; }
+        let (bossw, bossh) = boss_size(g.boss.tier);
+        if g.boss.active && round_hits_rect(bullet_starts[bi], &g.bullets[bi],
+            g.boss.x, g.boss.y, bossw, bossh) {
+            g.bullets[bi].active = false;
+            hit_boss(g, bx, by, sfx);
+        }
+
+        // Boats don't fight back — a quick bonus target for a stray shot.
+        if g.bullets[bi].active {
+            for boi in 0..MAX_BOATS {
+                if !g.boats[boi].active { continue; }
+                let (boat_x, boat_y) = (g.boats[boi].x, g.boats[boi].y);
+                if round_hits_rect(bullet_starts[bi], &g.bullets[bi],
+                    boat_x, boat_y, BOAT_W as f32, BOAT_H as f32) {
+                    g.bullets[bi].active = false;
+                    g.boats[boi].active = false;
+                    blip::bot::add("boats", 1.0);
+                    g.spawn_explosion(boat_x + BOAT_W as f32 / 2.0, boat_y + BOAT_H as f32 / 2.0, 1.3, EXPLOSION_ORANGE);
+                    g.score_at(boat_x + BOAT_W as f32 / 2.0, boat_y, 40 * g.sess.level);
+                    play_take(&sfx.enemy_explode, 1.0);
+                    break;
+                }
+            }
+        }
+
+        // Flak batteries on land.
+        if g.bullets[bi].active && land::hit_battery(g, bx + bw / 2.0, by, sfx) {
+            g.bullets[bi].active = false;
+        }
+
+        // Islands take several hits before the turret goes down — unlike the
+        // boats, this one shoots back, so knocking it out is worth a lot more.
+        if g.bullets[bi].active {
+            for isi in 0..MAX_ISLANDS {
+                if !g.islands[isi].active { continue; }
+                let (iw, ih) = ISLAND_SIZES[g.islands[isi].size as usize];
+                let (ix, iy) = (g.islands[isi].x, g.islands[isi].y);
+                if round_hits_rect(bullet_starts[bi], &g.bullets[bi],
+                    ix, iy, iw as f32, ih as f32) {
+                    g.bullets[bi].active = false;
+                    g.islands[isi].hp -= 1;
+                    g.spawn_explosion(bx, by, 0.5, EXPLOSION_ORANGE);
+                    if g.islands[isi].hp <= 0 {
+                        g.islands[isi].active = false;
+                        blip::bot::add("islands", 1.0);
+                        let (cx, cy) = (ix + iw as f32 / 2.0, iy + ih as f32 / 2.0);
+                        g.spawn_explosion(cx, cy, 1.9, EXPLOSION_ORANGE);
+                        g.score_at(cx, cy, ISLAND_SCORE[g.islands[isi].size as usize]);
+                        play_take(&sfx.boss_explode, 1.0);
+                    } else {
+                        play_take(&sfx.enemy_explode, 1.0);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // The laser barrier's motor — the only part of it that's shootable,
+        // and not shootable at all while it's still warming up (matches the
+        // beam itself not being able to hurt the player yet either).
+        if g.bullets[bi].active && g.barrier.active && !g.barrier.warmup.active() {
+            let (mx, my) = (g.barrier.motor_x - MOTOR_W / 2.0, g.barrier.y - MOTOR_H / 2.0);
+            if round_hits_rect(bullet_starts[bi], &g.bullets[bi], mx, my, MOTOR_W, MOTOR_H) {
+                g.bullets[bi].active = false;
+                g.barrier.hp -= 1;
+                g.spawn_explosion(bx, by, 0.6, EXPLOSION_ORANGE);
+                if g.barrier.hp <= 0 {
+                    g.barrier.active = false;
+                    blip::bot::add("barriers", 1.0);
+                    stop_sound(&sfx.barrier_hum);
+                    stop_sound(&sfx.barrier_hum2);
+                    g.spawn_explosion(g.barrier.motor_x, g.barrier.y, 2.0, EXPLOSION_ORANGE);
+                    let (mx, my) = (g.barrier.motor_x, g.barrier.y);
+                    g.score_at(mx, my, 300 * g.sess.level);
+                    play_take(&sfx.boss_explode, 1.0);
+                } else {
+                    play_take(&sfx.enemy_explode, 1.0);
+                }
+            }
+        }
+    }
 }
 
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
@@ -1723,124 +1847,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         }
     }
 
-    // ---- player bullets vs enemies / boss ----
-    for bi in 0..MAX_PLAYER_BULLETS {
-        if !g.bullets[bi].active { continue; }
-        let bw = g.bullets[bi].r * 2.0 + 2.0;
-        let (bx, by) = (g.bullets[bi].x - bw / 2.0, g.bullets[bi].y);
-        let mut consumed = false;
-        let mut ricocheted = false;
-        for ei in 0..MAX_ENEMIES {
-            if !g.enemies[ei].active { continue; }
-            let (ex, ey) = (g.enemies[ei].x, g.enemies[ei].y);
-            if round_hits_rect(bullet_starts[bi], &g.bullets[bi],
-                ex, ey, ENEMY_W as f32, ENEMY_H as f32) {
-                if !g.bullets[bi].bounced && rand_range_f32(0.0, 1.0) < RICOCHET_CHANCE {
-                    // Glances off: a spark, and away at 35-80 degrees to
-                    // one side, a little slower, the plane unharmed.
-                    let b = &mut g.bullets[bi];
-                    let side = if rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
-                    let a = 0.6 + rand_range_f32(0.0, 1.0) * 0.8;
-                    let v = BULLET_SPEED * 0.8;
-                    b.vx = side * v * a.sin();
-                    b.vy = v * a.cos();
-                    b.bounced = true;
-                    bullet_left_screen[bi] = false;
-                    ricocheted = true;
-                    let (sx, sy) = (b.x, b.y);
-                    g.spawn_explosion(sx, sy, 0.18, BlipColor::new(1.0, 0.95, 0.7, 1.0));
-                    let take = &sfx.ricochet[(rand() % sfx.ricochet.len() as u32) as usize];
-                    play_sfx_volume(take, 0.7);
-                    break;
-                }
-                shoot_down(g, ei, sfx, rand_range_f32(0.0, 1.0) < FLAMES_CHANCE);
-                consumed = true;
-                break;
-            }
-        }
-        if consumed {
-            g.bullets[bi].active = false;
-            continue;
-        }
-        if ricocheted { continue; }
-        let (bossw, bossh) = boss_size(g.boss.tier);
-        if g.boss.active && round_hits_rect(bullet_starts[bi], &g.bullets[bi],
-            g.boss.x, g.boss.y, bossw, bossh) {
-            g.bullets[bi].active = false;
-            hit_boss(g, bx, by, sfx);
-        }
-
-        // Boats don't fight back — a quick bonus target for a stray shot.
-        if g.bullets[bi].active {
-            for boi in 0..MAX_BOATS {
-                if !g.boats[boi].active { continue; }
-                let (boat_x, boat_y) = (g.boats[boi].x, g.boats[boi].y);
-                if round_hits_rect(bullet_starts[bi], &g.bullets[bi],
-                    boat_x, boat_y, BOAT_W as f32, BOAT_H as f32) {
-                    g.bullets[bi].active = false;
-                    g.boats[boi].active = false;
-                    g.spawn_explosion(boat_x + BOAT_W as f32 / 2.0, boat_y + BOAT_H as f32 / 2.0, 1.3, EXPLOSION_ORANGE);
-                    g.score_at(boat_x + BOAT_W as f32 / 2.0, boat_y, 40 * g.sess.level);
-                    play_take(&sfx.enemy_explode, 1.0);
-                    break;
-                }
-            }
-        }
-
-        // Flak batteries on land.
-        if g.bullets[bi].active && land::hit_battery(g, bx + bw / 2.0, by, sfx) {
-            g.bullets[bi].active = false;
-        }
-
-        // Islands take several hits before the turret goes down — unlike the
-        // boats, this one shoots back, so knocking it out is worth a lot more.
-        if g.bullets[bi].active {
-            for isi in 0..MAX_ISLANDS {
-                if !g.islands[isi].active { continue; }
-                let (iw, ih) = ISLAND_SIZES[g.islands[isi].size as usize];
-                let (ix, iy) = (g.islands[isi].x, g.islands[isi].y);
-                if round_hits_rect(bullet_starts[bi], &g.bullets[bi],
-                    ix, iy, iw as f32, ih as f32) {
-                    g.bullets[bi].active = false;
-                    g.islands[isi].hp -= 1;
-                    g.spawn_explosion(bx, by, 0.5, EXPLOSION_ORANGE);
-                    if g.islands[isi].hp <= 0 {
-                        g.islands[isi].active = false;
-                        let (cx, cy) = (ix + iw as f32 / 2.0, iy + ih as f32 / 2.0);
-                        g.spawn_explosion(cx, cy, 1.9, EXPLOSION_ORANGE);
-                        g.score_at(cx, cy, ISLAND_SCORE[g.islands[isi].size as usize]);
-                        play_take(&sfx.boss_explode, 1.0);
-                    } else {
-                        play_take(&sfx.enemy_explode, 1.0);
-                    }
-                    break;
-                }
-            }
-        }
-
-        // The laser barrier's motor — the only part of it that's shootable,
-        // and not shootable at all while it's still warming up (matches the
-        // beam itself not being able to hurt the player yet either).
-        if g.bullets[bi].active && g.barrier.active && !g.barrier.warmup.active() {
-            let (mx, my) = (g.barrier.motor_x - MOTOR_W / 2.0, g.barrier.y - MOTOR_H / 2.0);
-            if round_hits_rect(bullet_starts[bi], &g.bullets[bi], mx, my, MOTOR_W, MOTOR_H) {
-                g.bullets[bi].active = false;
-                g.barrier.hp -= 1;
-                g.spawn_explosion(bx, by, 0.6, EXPLOSION_ORANGE);
-                if g.barrier.hp <= 0 {
-                    g.barrier.active = false;
-                    stop_sound(&sfx.barrier_hum);
-                    stop_sound(&sfx.barrier_hum2);
-                    g.spawn_explosion(g.barrier.motor_x, g.barrier.y, 2.0, EXPLOSION_ORANGE);
-                    let (mx, my) = (g.barrier.motor_x, g.barrier.y);
-                    g.score_at(mx, my, 300 * g.sess.level);
-                    play_take(&sfx.boss_explode, 1.0);
-                } else {
-                    play_take(&sfx.enemy_explode, 1.0);
-                }
-            }
-        }
-    }
+    hit_with_bullets(g, sfx, &bullet_starts, &mut bullet_left_screen);
 
     for (i, &left_screen) in bullet_left_screen.iter().enumerate() {
         if left_screen { g.bullets[i].active = false; }
@@ -1856,6 +1863,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         };
         if caught(g, player_before, (from_x, from_y), (g.powerups[i].x, g.powerups[i].y), POW_W, POW_H) {
             g.powerups[i].active = false;
+            blip::bot::add("powerups", 1.0);
             let (cx, cy) = (g.powerups[i].x + POW_W / 2.0, g.powerups[i].y + POW_H / 2.0);
             if g.weapon_level < MAX_WEAPON_LEVEL {
                 g.weapon_level += 1;
@@ -1978,6 +1986,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             hit = true;
             g.health = 1;
         }
+        // BLIP_BOT_GOD=1: hits are counted, not felt, to reach the late game.
+        if hit && blip::bot::flag("GOD") { g.health = PLAYER_HEALTH_MAX; hit = false; }
         if hit { hurt_plane(g, px, py, sfx); }
     }
     for (i, &left_screen) in enemy_bullet_left_screen.iter().enumerate() {
@@ -2154,6 +2164,7 @@ fn hit_boss(g: &mut Game, bx: f32, by: f32, sfx: &Sounds) {
     if g.boss.hp <= 0 {
         let (cx, cy) = (g.boss.x + bossw / 2.0, g.boss.y + bossh / 2.0);
         g.boss.active = false;
+        blip::bot::add("bosses", 1.0);
         // A bigger, longer death for a bigger boss.
         let burst = 1.6 + g.boss.tier as f32 * 0.3;
         g.spawn_explosion(cx, cy, burst, EXPLOSION_ORANGE);
@@ -2164,15 +2175,12 @@ fn hit_boss(g: &mut Game, bx: f32, by: f32, sfx: &Sounds) {
         if g.sess.level >= MAX_LEVEL {
             // The final boss is down — the game is won.
             g.sess.add_score(2000);
-            blip::bot::set("score", g.sess.score as f64);
             blip::bot::finish("won");
             play_sfx(&sfx.victory);
             g.over_timer.start(OVER_MIN_WAIT);
             g.state = State::Won;
         } else {
-            blip::bot::set(&format!("t_boss{}", g.sess.level), blip::bot::clock() as f64);
             g.sess.next_level();
-            blip::bot::set("level", g.sess.level as f64);
             g.wave_kills = 0;
             g.wave_target = wave_target_for(g.sess.level);
             g.win_timer.start(WIN_PAUSE);
@@ -2220,6 +2228,7 @@ fn caught(g: &Game, before: (f32, f32), from: (f32, f32), to: (f32, f32), w: f32
 fn shoot_down(g: &mut Game, ei: usize, sfx: &Sounds, flames: bool) {
     let e = g.enemies[ei];
     g.enemies[ei].active = false;
+    blip::bot::add("planes", 1.0);
     let (ecx, ecy) = (e.x + ENEMY_W as f32 / 2.0, e.y + ENEMY_H as f32 / 2.0);
     if flames && pool_iter(&g.wrecks).count() < MAX_WRECKS {
         g.spawn_explosion(ecx, ecy, 0.45, EXPLOSION_ORANGE);
@@ -3279,7 +3288,7 @@ fn draw_title(
     blip.draw_hi(hi, (WIN_H / 4 + 43) as f32, BLIP_YELLOW);
     let px = (WIN_W as f32 - PLAYER_W as f32 * 2.0) / 2.0;
     blip.draw_texture(player_tex, px, (WIN_H / 2 - 70) as f32, PLAYER_W as f32 * 2.0, PLAYER_H as f32 * 2.0);
-    blip.draw_centered("PRESS FIRE TO START", (WIN_H * 2 / 3) as f32, 3.0, BLIP_WHITE);
+    blip.draw_start_prompt((WIN_H * 2 / 3) as f32);
     let hint = BlipColor::new(0.68, 0.76, 0.9, 1.0);
     blip.draw_centered("UP THROTTLE  DOWN SLOW", (WIN_H * 2 / 3 + 30) as f32, 2.0, hint);
     blip.draw_centered("TOO SLOW AND YOU STALL", (WIN_H * 2 / 3 + 48) as f32, 2.0, hint);
@@ -3292,12 +3301,8 @@ fn draw_win(blip: &Blip, level: i32) {
 }
 
 fn draw_won(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
-    let buf = format!("SCORE {score}");
-    blip.draw_centered("YOU WON!!",           (WIN_H / 4) as f32,      6.0, BLIP_YELLOW);
-    blip.draw_centered("ALL 7 WAVES CLEARED", (WIN_H / 2 - 20) as f32, 3.0, BLIP_GREEN);
-    blip.draw_centered(&buf,                  (WIN_H / 2 + 14) as f32, 3.0, BLIP_WHITE);
-    blip.draw_best(score, hi, (WIN_H / 2 + 40) as f32, BLIP_GREEN);
-    if !waiting { blip.draw_centered("PRESS FIRE", (WIN_H * 2 / 3) as f32, 3.0, BLIP_CYAN); }
+    blip.draw_end_screen("YOU WON!!", score, hi, BLIP_YELLOW, BLIP_GREEN, BLIP_YELLOW, !waiting);
+    blip.draw_game_over_note(&format!("ALL {MAX_LEVEL} WAVES CLEARED"), BLIP_GREEN);
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -3339,6 +3344,7 @@ const ENGINE_WAV: [&[u8]; 5] = [
 
 #[blip::macroquad::main(conf)]
 async fn main() {
+    blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
@@ -3401,8 +3407,7 @@ async fn main() {
 
         music.rotate(dt);
 
-        #[cfg(not(target_arch = "wasm32"))]
-        if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }
+        if blip::bot::active() { bot::drive(&g); }
         let prev_state = g.state;
         match g.state {
             State::Title  => update_title(&mut g),

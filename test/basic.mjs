@@ -1353,7 +1353,7 @@ test('BUBBLER chains five trapped enemies into the Rust score and five candy dro
 test('BUBBLER trapped enemies are defeated when a player pops their bubble', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
-    `${BUBBLER_PLAY}:BUB_ON(1)=1:BUB_HOLDS(1)=1:TOY_ON(1)=0:BUB_PHASE(1)=FLOATING:BUB_X(1)=PX(1)+14:BUB_Y(1)=PY(1)+11`,
+    `${BUBBLER_PLAY}:BUB_ON(1)=1:BUB_HOLDS(1)=1:TOY_ON(1)=0:BUB_PHASE(1)=FLOATING:BUB_X(1)=PLAYER_X(1)+14:BUB_Y(1)=PLAYER_Y(1)+11`,
     { 165: statusMarker('SCORE(1)>=1000 AND BUB_ON(1)=0 AND TOY_ON(1)=0') }));
   assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'touching a caught toy should pop it for points');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'popping a trapped enemy should run without a BASIC error');
@@ -1364,7 +1364,7 @@ test('BUBBLER physical controls trap a monster, pop it, and collect its candy', 
   const { page, origin } = await openPage(t, 'chromium');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
-    `${BUBBLER_PLAY}:FOR I=2 TO TOY_COUNT:TOY_ON(I)=0:NEXT I:TOY_X(1)=PX(1)+20:TOY_Y(1)=PY(1)+2:TOY_KIND(1)=1:PACE=0.001`,
+    `${BUBBLER_PLAY}:FOR I=2 TO TOY_COUNT:TOY_ON(I)=0:NEXT I:TOY_X(1)=PLAYER_X(1)+20:TOY_Y(1)=PLAYER_Y(1)+2:TOY_KIND(1)=1:PACE=0.001`,
     // The candy hops back to the dragon instead of off to a random side.
     { [tapeLine('BUBBLER', 'CANDY_VX(I)=RND(220)-110')]: 'CANDY_VX(I)=-60', 165: statusMarker('SCORE(1)=1500') }));
   await canvas.focus();
@@ -1416,7 +1416,7 @@ test('BUBBLER round two mixes walkers, hoppers, and floating ghosts', async (t) 
 
 test('BUBBLER co-op gives player two their own movement, jump, and bubble attack', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
-  const canvas = await openTape(page, origin, 'BUBBLER', { 165: statusMarker('JOINED(2) AND PX(2)<SPAWN_X(2)') });
+  const canvas = await openTape(page, origin, 'BUBBLER', { 165: statusMarker('JOINED(2) AND PLAYER_X(2)<SPAWN_X(2)') });
   await canvas.focus();
   await page.keyboard.press('j');
   await page.waitForTimeout(2200);
@@ -1444,7 +1444,7 @@ test('BUBBLER round four ghosts launch aimed sparks with the original sound', as
 test('BUBBLER round three walkers roll rocks at players on their platform', async (t) => {
   const { page, origin } = await openPage(t, 'chromium');
   const canvas = await openTape(page, origin, 'BUBBLER', quietBubbler(
-    'START_GAME:LOAD_ROUND 3:SHOW "PLAY":TOY_X(1)=PX(1)+150:TOY_Y(1)=PY(1)+2:TOY_KIND(1)=1:TOY_SHOT_WAIT(1)=0',
+    'START_GAME:LOAD_ROUND 3:SHOW "PLAY":TOY_X(1)=PLAYER_X(1)+150:TOY_Y(1)=PLAYER_Y(1)+2:TOY_KIND(1)=1:TOY_SHOT_WAIT(1)=0',
     { 165: 'FOR I=1 TO MAX_SHOTS:IF SHOT_ON(I) AND NOT SHOT_SPARK(I) THEN ROLLED=1', 166: 'NEXT I', 167: statusMarker('ROLLED') }));
   assert.ok(await waitForPixels(page, canvas, STATUS_MARKER, 'green', 20, { size: BUBBLER_SIZE }) > 20, 'a walker in line with a player should wind up and roll a rock');
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null, 'rolling rocks should run without BASIC or runtime errors');
@@ -2039,7 +2039,7 @@ test('the BASIC book turns one readable page at a time on a phone', async (t) =>
   assert.match(await page.locator('.reader-page:visible').innerText(), /YOUR FIRST PROGRAM/);
   for (let turn = 0; turn < 20 && !(await page.locator('.reader-page:visible').innerText()).includes('DRAW WITH BLIP'); turn += 1) await page.locator('[data-turn="next"]').click();
   assert.equal(await page.locator('.reader-page:visible').count(), 1);
-  assert.equal(await page.locator('.reader-page:visible .primitive-list > div').count(), 16);
+  assert.equal(await page.locator('.reader-page:visible .primitive-list > div').count(), 17);
   for (let turn = 0; turn < 20 && !(await page.locator('.reader-page:visible').innerText()).includes('OPEN A GAME'); turn += 1) await page.locator('[data-turn="next"]').click();
   assert.match(await page.locator('.reader-page:visible').innerText(), /LOAD \/TAPE\/BOUNCER\.BLIP[\s\S]*RUN/);
   await page.locator('[data-turn="next"]').click();

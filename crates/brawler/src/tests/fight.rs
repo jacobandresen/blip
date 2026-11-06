@@ -562,3 +562,39 @@ pub(crate) fn the_finishing_blow_plays_in_slow_motion_and_the_bar_drains_after_i
     for _ in 0..100 { drain_ghosts(&mut g, 0.1); }
     assert_eq!(g.ghost[1], 20.0);
 }
+
+/// How often the playtest bot takes a round off each rung of the ladder:
+/// `cargo test --release -p brawler bot_round_wins_up_the_ladder -- --ignored --nocapture`.
+#[test]
+#[ignore = "a measurement, printed; takes a while"]
+fn bot_round_wins_up_the_ladder() {
+    let _sim = super::balance::simulating(7);
+    let mut total = 0;
+    for rung in 0..RUNGS {
+        let (mut won, mut fought) = (0, 0);
+        for _ in 0..30 {
+            let mut g = Game::new();
+            g.start_match(rung);
+            g.state = State::Fight;
+            let mut frames = 0;
+            while g.p[0].rounds + g.p[1].rounds == 0 && frames < 8100 {
+                let p = bot::fight(&g, F);
+                let cpu = cpu_turn(&mut g, 1, F);
+                step_fight(&mut g, F, p, cpu);
+                frames += 1;
+            }
+            fought += 1;
+            if g.p[0].rounds > 0 { won += 1; }
+        }
+        total += won;
+        eprintln!("rung {:2} {:>8}: bot won {won}/{fought} rounds", rung + 1, FIGHTERS[foe_at(rung)].name);
+    }
+    eprintln!("in all: {total} of {} rounds", 30 * RUNGS);
+}
+
+/// Who the ladder puts up at `rung`.
+fn foe_at(rung: usize) -> usize {
+    let mut g = Game::new();
+    g.start_match(rung);
+    g.p[1].who
+}

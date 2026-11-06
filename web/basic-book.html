@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#1c1915">
   <title>BLIP BASIC · Programming Manual</title>
-  <link rel="stylesheet" href="book.css?v=2">
-  <link rel="stylesheet" href="basic-book.css?v=14">
+  <link rel="stylesheet" href="book.css?v=3">
+  <link rel="stylesheet" href="basic-book.css?v=15">
   <script src="book.js?v=3" defer></script>
   <script src="basic-book.js?v=5" defer></script>
 </head>
@@ -160,10 +160,10 @@
                 <div><code>FILL_CIRCLE(CX,CY,R,COLOR)</code><p>A filled circle from centre and radius.</p></div><div><code>DRAW_CIRCLE(CX,CY,R,COLOR[,WIDTH])</code><p>A ring: the outline of a circle.</p></div><div><code>FILL_CAPSULE(X1,Y1,X2,Y2,R1,R2,COLOR)</code><p>A tapered capsule between two points.</p></div>
                 <div><code>FILL_SUNBURST(CX,CY,RAYS,TURN,REACH,COLOR_A,COLOR_B)</code><p>Alternating rays; TURN is radians.</p></div><div><code>FILL_GLOW_CIRCLE(CX,CY,R,COLOR)</code><p>A soft halo around a bright core.</p></div>
                 <div><code>DRAW_CHAR(CHAR,X,Y,SIZE,COLOR)</code><p>One character in the BLIP pixel font.</p></div><div><code>DRAW_TEXT(TEXT,X,Y,SIZE,COLOR[,ALIGN[,OUTLINE]])</code><p>ALIGN is LEFT or CENTER; OUTLINE adds an ink colour.</p></div>
-                <div><code>DRAW_NUMBER(N,X,Y,SIZE,COLOR)</code><p>Draw an integer directly.</p></div><div><code>DRAW_HUD(SCORE,LIVES)</code><p>The standard BLIP score and lives bar.</p></div>
+                <div><code>DRAW_NUMBER(N,X,Y,SIZE,COLOR)</code><p>Draw an integer directly.</p></div><div><code>DRAW_HUD(SCORE,LIVES)</code><p>The standard BLIP score and lives bar.</p></div><div><code>DRAW_GAME_OVER(SCORE,READY[,NOTE$])</code><p>The arcade's game-over screen, with a line of your own; the prompt to play again shows once READY is true.</p></div>
                 <div><code>TEXT_CX(TEXT,SIZE)</code><p>The x coordinate that centres text.</p></div>
               </div>
-              <p>A colour is a name like <code>"BLIP_CYAN"</code>, a palette number 0–7, <code>COLOR(R,G,B[,A])</code> from 0 to 1, or hex <code>"#36A9D6"</code>.</p>
+              <p>A colour is a name like <code>"BLIP_CYAN"</code>, a palette number 0–7, <code>COLOR(R,G,B[,A])</code> from 0 to 1, <code>HSV(HUE,SAT,VALUE[,A])</code> with the hue going once round the wheel from 0 to 1, or hex <code>"#36A9D6"</code>.</p>
               <div class="page-number">10</div>
             </section>
             <section class="page chapter" id="sound" style="--ch:6">

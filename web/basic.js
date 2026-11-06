@@ -43,7 +43,9 @@ window.addEventListener('resize',fitKeyLegends);
 var output = document.getElementById('basic-output');
 var form = document.getElementById('basic-form');
 var input = document.getElementById('basic-input');
-var editorPanel=document.getElementById('basic-editor'),editorFile=document.getElementById('editor-file'),editorCode=document.getElementById('editor-code'),editorMode=document.getElementById('editor-mode'),editorMessage=document.getElementById('editor-message');
+var editorPanel = document.getElementById('basic-editor'), editorFile = document.getElementById('editor-file');
+var editorCode = document.getElementById('editor-code'), editorMode = document.getElementById('editor-mode');
+var editorMessage = document.getElementById('editor-message');
 if (blipHasTouch()) input.readOnly = true;
 var canvas = document.getElementById('basic-graphics');
 var wasmFrame=document.getElementById('basic-wasm-frame'),basicWasmPlaying=false,basicWasmReady=false,basicWasmSource='',basicWasmRunId=0;
@@ -182,11 +184,33 @@ BlipController.bindDial(rallyDialP2, {
   up: { key: 'i', code: 'KeyI' }, down: { key: 'k', code: 'KeyK' }, tap: { key: 'i', code: 'KeyI' }
 });
 window.addEventListener('blur', function () { BlipController.releaseAll(); });
-function updatePlayClearance(){
-  var controls=document.body.hasAttribute('data-rally')?[rallyDialP1,rallyDialP2]:[controlDeck].concat(controlPads);
-  var boxes=controls.map(function(el){return el.getBoundingClientRect();}).filter(function(box){return box.width>0&&box.height>0;});
-  var top=Math.min.apply(Math,[document.documentElement.clientHeight].concat(boxes.map(function(box){return box.top;})));
-  document.documentElement.style.setProperty('--amstrad-control-clearance',Math.max(0,document.documentElement.clientHeight-top)+'px');
+// The monitor sits clear of the deck: above it when upright, between its two stations when sideways.
+// basic.css sizes the monitor from these, and from its frame round the screen.
+function updatePlayClearance() {
+  var root = document.documentElement, height = root.clientHeight, width = root.clientWidth;
+  var controls = document.body.hasAttribute('data-rally') ? [rallyDialP1, rallyDialP2]
+    : Array.from(controlDeck.querySelectorAll('.snes-dpad, .snes-btn:not(.spare), .amstrad-rally-dial'));
+  var boxes = controls.map(function (el) { return el.getBoundingClientRect(); })
+    .filter(function (box) { return box.width > 0 && box.height > 0; });
+  var px = function (value) { return Math.ceil(Math.max(0, value)) + 'px'; };
+  if (root.getAttribute('data-layout') === 'landscape') {
+    var side = Math.max.apply(Math, [0].concat(boxes.map(function (box) {
+      return box.left < width / 2 ? box.right : width - box.left;
+    })));
+    root.style.setProperty('--amstrad-control-clearance', '0px');
+    root.style.setProperty('--amstrad-side-clearance', px(side));
+  } else {
+    var top = Math.min.apply(Math, [height, controlDeck.getBoundingClientRect().top || height]
+      .concat(boxes.map(function (box) { return box.top; })));
+    root.style.setProperty('--amstrad-control-clearance', px(height - top));
+    root.style.setProperty('--amstrad-side-clearance', '0px');
+  }
+  var monitor = document.querySelector('.monitor').getBoundingClientRect();
+  var screen = document.getElementById('basic-screen').getBoundingClientRect();
+  if (screen.width > 0) {
+    root.style.setProperty('--monitor-chrome-x', px(monitor.width - screen.width));
+    root.style.setProperty('--monitor-chrome-y', px(monitor.height - screen.height));
+  }
 }
 updatePlayClearance();
 window.addEventListener('resize',updatePlayClearance);
@@ -205,28 +229,37 @@ var FS_STORE = 'blip-basic-filesystem';
 var LEGACY_STORE = 'blip-basic-programs';
 var CURRENT_FILE_STORE = 'blip-basic-current-file';
 var tapeFiles=Object.create(null),assetNames=Object.create(null),tapeNames=[],tapeLoadError=null,tapeBusy=false,tapeLoading=false;
-var tapePrograms=[
-  {file:'ADDER.BLIP',command:'ADDER',slug:'adder',title:'ADDER',players:2},
-  {file:'BOUNCER.BLIP',command:'BOUNCER',slug:'bouncer',title:'BOUNCER'},
-  {file:'BRAWLER.BLIP',command:'BRAWLER',slug:'brawler',title:'BRAWLER'},
-  {file:'BUBBLER.BLIP',command:'BUBBLER',slug:'bubbler',title:'BUBBLER',players:2},
-  {file:'DEFENDER.BLIP',command:'DEFENDER',slug:'defender',title:'DEFENDER'},
-  {file:'METEORS.BLIP',command:'METEORS',slug:'meteors',title:'METEORS'},
-  {file:'RALLY.BLIP',command:'RALLY',slug:'rally',title:'RALLY'},
-  {file:'SERPENT.BLIP',command:'SERPENT',slug:'serpent',title:'SERPENT'},
-  {file:'RAIDER.BLIP',command:'RAIDER',slug:'raider',title:'RAIDER'},
-  {file:'WARLOCK.BLIP',command:'WARLOCK',slug:'warlock',title:'WARLOCK'}
-];
-var tapeReady=fetch('TAPE/manifest.json').then(function(response){if(!response.ok)throw Error('TAPE DIRECTORY UNAVAILABLE');return response.json();}).then(function(names){if(!Array.isArray(names))throw Error('BAD TAPE MANIFEST');tapeNames=names.filter(function(name){return tapePrograms.some(function(tape){return tape.file===name;});});}).catch(function(error){tapeLoadError=error.message;});
+// One tape per game, from the registry: /TAPE/<NAME>.BLIP, A to Z, seating two where the game does.
+var tapePrograms = Object.keys(BLIP_GAMES).sort().map(function (slug) {
+  var name = slug.toUpperCase();
+  return { file: name + '.BLIP', command: name, slug: slug, title: BLIP_GAMES[slug].name, players: BLIP_GAMES[slug].players };
+});
+/** A folder's manifest.json: the list of its files' names. */
+function fetchList(url, unavailable, malformed) {
+  return fetch(url).then(function (response) {
+    if (!response.ok) throw Error(unavailable);
+    return response.json();
+  }).then(function (names) {
+    if (!Array.isArray(names)) throw Error(malformed);
+    return names;
+  });
+}
+var tapeReady = fetchList('TAPE/manifest.json', 'TAPE DIRECTORY UNAVAILABLE', 'BAD TAPE MANIFEST').then(function (names) {
+  tapeNames = names.filter(function (name) { return tapePrograms.some(function (tape) { return tape.file === name; }); });
+}).catch(function (error) { tapeLoadError = error.message; });
 // Each tape's own folder, /TAPE/<GAME>/ASSETS: its pictures, sounds and tunes, listed once.
 var assetLists=Object.create(null);
 function assetsReady(tape){
   if(!tape)return Promise.resolve();
   var game=tape.command;
-  return assetLists[game]||(assetLists[game]=fetch('TAPE/'+game+'/ASSETS/manifest.json').then(function(response){return response.ok?response.json():[];}).then(function(names){assetNames[game]=Array.isArray(names)?names:[];}).catch(function(){assetNames[game]=[];}));
+  return assetLists[game] || (assetLists[game] = fetchList('TAPE/' + game + '/ASSETS/manifest.json')
+    .catch(function () { return []; })
+    .then(function (names) { assetNames[game] = names; }));
 }
 var romTunes=[];
-var romTunesReady=fetch('ROM/TUNES/manifest.json').then(function(response){if(!response.ok)throw Error('ROM TUNES unavailable');return response.json();}).then(function(files){if(Array.isArray(files))romTunes=files.filter(function(name){return typeof name==='string'&&/\.xm$/i.test(name);});}).catch(function(){});
+var romTunesReady = fetchList('ROM/TUNES/manifest.json').then(function (files) {
+  romTunes = files.filter(function (name) { return typeof name === 'string' && /\.xm$/i.test(name); });
+}).catch(function () {});
 var currentDir = '/USER';
 var currentFile = null;
 var editor=null;
@@ -236,7 +269,12 @@ function readFilesystem(){
     var saved=JSON.parse(localStorage.getItem(FS_STORE)||'null');
     if(saved&&Array.isArray(saved.dirs)&&saved.files&&typeof saved.files==='object'){
       state.dirs=state.dirs.concat(saved.dirs.filter(function(path){return typeof path==='string'&&path.indexOf('/USER/')===0;}).map(function(path){return path.toUpperCase();}));
-      Object.keys(saved.files).forEach(function(path){if(path.toUpperCase().indexOf('/USER/')===0&&typeof saved.files[path]==='string'){var value=saved.files[path];state.files[path.toUpperCase()]=value.indexOf('data:image/png;')===0?value:value.toUpperCase();}});
+      // Programs are upper case; a picture keeps its data URL as it is.
+      Object.keys(saved.files).forEach(function (path) {
+        var value = saved.files[path];
+        if (path.toUpperCase().indexOf('/USER/') !== 0 || typeof value !== 'string') return;
+        state.files[path.toUpperCase()] = value.indexOf('data:image/png;') === 0 ? value : value.toUpperCase();
+      });
     }
     var legacy=JSON.parse(localStorage.getItem(LEGACY_STORE)||'{}');
     Object.keys(legacy).forEach(function(name){
@@ -296,22 +334,53 @@ function isFileAvailable(path){
 function tapeForPath(path){return tapePrograms.find(function(tape){return ('/TAPE/'+tape.file).toLowerCase()===String(path).toLowerCase();})||null;}
 var tapeOrder=tapePrograms.slice();
 var tapeNodes=Object.create(null),insertedTape=null,insertedTapeNode=null,tapePlaceholder=null;
-function makeTapeNode(tape,index){
-  var game=BLIP_GAMES[tape.slug],item=document.createElement('div'),caseEl=document.createElement('span'),art=document.createElement('img'),label=document.createElement('span'),title=document.createElement('strong'),reels=document.createElement('span'),film=document.createElement('i');
-  item.className='game-tape';item.dataset.tape=tape.command;item.tabIndex=0;item.setAttribute('role','button');item.setAttribute('aria-label','Load '+tape.title+' game tape');item.style.setProperty('--tape-accent','rgb('+game.accent+')');item.style.setProperty('--tape-index',String(index));
-  caseEl.className='game-tape-case';art.className='game-tape-art';art.src=tape.slug+'/screenshot.png';art.alt='';label.className='game-tape-label';title.textContent=tape.title;reels.className='game-tape-reels';reels.innerHTML='<i class="tape-spool supply"></i><i class="tape-spool takeup"></i>';film.className='game-tape-film';
-  label.append(title);caseEl.append(art,label,reels,film);item.append(caseEl);item.addEventListener('click',function(){if(!tapeDragged)startTape(tape,item);});item.addEventListener('keydown',function(event){if(event.key==='Enter'||event.key===' '){event.preventDefault();startTape(tape,item);}});return item;
+function element(tag, className, attributes) {
+  var node = document.createElement(tag);
+  if (className) node.className = className;
+  Object.keys(attributes || {}).forEach(function (name) { node.setAttribute(name, attributes[name]); });
+  return node;
 }
-function tapeAngle(index){return Math.sin((index+1)*1.618)*2.2+Math.sin(index*.73)*.65;}
-function updateTapeStackGeometry(){
-  var pile=document.getElementById('tape-pile');if(!pile)return;
-  var vertical=window.matchMedia('(min-width:820px) and (min-height:501px)').matches,overlap=vertical?68:(window.matchMedia('(max-width:650px)').matches?116:24),previousDelta=0;
-  Array.from(pile.children).forEach(function(item,index){
-    var angle=tapeAngle(Number(item.style.getPropertyValue('--tape-index'))||index),radians=angle*Math.PI/180,width=item.offsetWidth,height=item.offsetHeight;
-    var extent=vertical?height*Math.abs(Math.cos(radians))+width*Math.abs(Math.sin(radians)):width*Math.abs(Math.cos(radians))+height*Math.abs(Math.sin(radians));
-    var delta=extent-(vertical?height:width),adjustment=(previousDelta+delta)/2-overlap;
-    item.style.marginTop=vertical&&index?adjustment+'px':'0px';item.style.marginLeft=!vertical&&index?adjustment+'px':'0px';
-    item.style.setProperty('--tape-shadow-x',(2+angle*.25).toFixed(2)+'px');item.style.setProperty('--tape-shadow-y',(3+Math.abs(angle)*.45).toFixed(2)+'px');item.style.setProperty('--tape-shadow-blur',(2+Math.abs(angle)*.18).toFixed(2)+'px');previousDelta=delta;
+/** A cassette for the pile: the game's picture and name on its label, two spools behind the window. */
+function makeTapeNode(tape, index) {
+  var item = element('div', 'game-tape', { role: 'button', tabindex: '0', 'aria-label': 'Load ' + tape.title + ' game tape' });
+  item.dataset.tape = tape.command;
+  item.style.setProperty('--tape-accent', 'rgb(' + BLIP_GAMES[tape.slug].accent + ')');
+  item.style.setProperty('--tape-index', String(index));
+  var label = element('span', 'game-tape-label'), title = element('strong');
+  title.textContent = tape.title;
+  label.append(title);
+  var reels = element('span', 'game-tape-reels');
+  reels.innerHTML = '<i class="tape-spool supply"></i><i class="tape-spool takeup"></i>';
+  var caseEl = element('span', 'game-tape-case');
+  caseEl.append(element('img', 'game-tape-art', { src: tape.slug + '/screenshot.png', alt: '' }), label, reels, element('i', 'game-tape-film'));
+  item.append(caseEl);
+  item.addEventListener('click', function () { if (!tapeDragged) startTape(tape, item); });
+  item.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    startTape(tape, item);
+  });
+  return item;
+}
+// Each cassette lies at its own small, repeatable angle.
+function tapeAngle(index) { return Math.sin((index + 1) * 1.618) * 2.2 + Math.sin(index * .73) * .65; }
+/** Overlap the tilted cassettes by the same amount, whatever their angle: down the pile, or along it on a phone. */
+function updateTapeStackGeometry() {
+  var pile = document.getElementById('tape-pile');
+  if (!pile) return;
+  var vertical = window.matchMedia('(min-width:820px) and (min-height:501px)').matches;
+  var overlap = vertical ? 68 : window.matchMedia('(max-width:650px)').matches ? 116 : 24, previousDelta = 0;
+  Array.from(pile.children).forEach(function (item, index) {
+    var angle = tapeAngle(Number(item.style.getPropertyValue('--tape-index')) || index), radians = angle * Math.PI / 180;
+    var along = vertical ? item.offsetHeight : item.offsetWidth, across = vertical ? item.offsetWidth : item.offsetHeight;
+    var delta = along * Math.abs(Math.cos(radians)) + across * Math.abs(Math.sin(radians)) - along;
+    var adjustment = (previousDelta + delta) / 2 - overlap;
+    item.style.marginTop = vertical && index ? adjustment + 'px' : '0px';
+    item.style.marginLeft = !vertical && index ? adjustment + 'px' : '0px';
+    item.style.setProperty('--tape-shadow-x', (2 + angle * .25).toFixed(2) + 'px');
+    item.style.setProperty('--tape-shadow-y', (3 + Math.abs(angle) * .45).toFixed(2) + 'px');
+    item.style.setProperty('--tape-shadow-blur', (2 + Math.abs(angle) * .18).toFixed(2) + 'px');
+    previousDelta = delta;
   });
 }
 function renderTapePile(){
@@ -329,33 +398,73 @@ function renderTapePile(){
 }
 window.addEventListener('resize',function(){renderTapePile();seatBox(document.querySelector('.deck-bay'));});
 function reducedTapeMotion(){return window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;}
-function waitForMotion(ms){return new Promise(function(resolve){setTimeout(resolve,reducedTapeMotion()?0:ms);});}
-function openDeck(){pressDeckKey('eject');document.body.setAttribute('data-deck-open','');return waitForMotion(380);}
-function closeDeck(){document.body.removeAttribute('data-deck-open');return waitForMotion(300);}
-function pressDeckKey(key){document.body.setAttribute('data-deck-key',key);setTimeout(function(){if(document.body.getAttribute('data-deck-key')===key)document.body.removeAttribute('data-deck-key');},180);}
-function leavePile(tape,node){
-  var pile=document.getElementById('tape-pile'),index=tapeOrder.indexOf(tape),next=tapeOrder.slice(index+1).map(function(nextTape){return tapeNodes[nextTape.command];}).find(function(nextNode){return nextNode&&nextNode.parentElement===pile;});
-  tapePlaceholder=document.createElement('div');tapePlaceholder.className='game-tape tape-placeholder';tapePlaceholder.dataset.tape=tape.command;tapePlaceholder.setAttribute('aria-hidden','true');tapePlaceholder.style.cssText=node.style.cssText;pile.insertBefore(tapePlaceholder,next||null);
+function waitForMotion(ms) {
+  return new Promise(function (resolve) { setTimeout(resolve, reducedTapeMotion() ? 0 : ms); });
+}
+function openDeck() {
+  pressDeckKey('eject');
+  document.body.setAttribute('data-deck-open', '');
+  return waitForMotion(380);
+}
+function closeDeck() {
+  document.body.removeAttribute('data-deck-open');
+  return waitForMotion(300);
+}
+// A deck key stays down for a moment after its press.
+function pressDeckKey(key) {
+  document.body.setAttribute('data-deck-key', key);
+  setTimeout(function () {
+    if (document.body.getAttribute('data-deck-key') === key) document.body.removeAttribute('data-deck-key');
+  }, 180);
+}
+// A tape leaves its gap in the pile, so the others stay where they lie.
+function leavePile(tape, node) {
+  var pile = document.getElementById('tape-pile');
+  var next = tapeOrder.slice(tapeOrder.indexOf(tape) + 1)
+    .map(function (nextTape) { return tapeNodes[nextTape.command]; })
+    .find(function (nextNode) { return nextNode && nextNode.parentElement === pile; });
+  tapePlaceholder = element('div', 'game-tape tape-placeholder', { 'aria-hidden': 'true' });
+  tapePlaceholder.dataset.tape = tape.command;
+  tapePlaceholder.style.cssText = node.style.cssText;
+  pile.insertBefore(tapePlaceholder, next || null);
 }
 // Unrotated box of a tape: its centre on screen, its layout size and its tilt in the pile.
-function tapeBox(node){var rect=node.getBoundingClientRect(),matrix=new DOMMatrixReadOnly(getComputedStyle(node).transform);return {x:rect.left+rect.width/2,y:rect.top+rect.height/2,w:node.offsetWidth,h:node.offsetHeight,angle:Math.atan2(matrix.b,matrix.a)*180/Math.PI};}
+function tapeBox(node) {
+  var rect = node.getBoundingClientRect(), matrix = new DOMMatrixReadOnly(getComputedStyle(node).transform);
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, w: node.offsetWidth, h: node.offsetHeight,
+    angle: Math.atan2(matrix.b, matrix.a) * 180 / Math.PI };
+}
 // Measure the seat inside the tilted computer, so the flying tape meets the actual bay.
-function seatBox(bay){
-  bay.style.setProperty('--tape-seat-width',Math.min(bay.clientWidth*.84,bay.clientHeight*.67*1.58)+'px');
-  var rect=bay.querySelector('.deck-seat').getBoundingClientRect();
-  return {x:rect.left+rect.width/2,y:rect.top+rect.height/2,w:rect.width,h:rect.height,angle:0};
+function seatBox(bay) {
+  bay.style.setProperty('--tape-seat-width', Math.min(bay.clientWidth * .84, bay.clientHeight * .67 * 1.58) + 'px');
+  var rect = bay.querySelector('.deck-seat').getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, w: rect.width, h: rect.height, angle: 0 };
 }
-function setFlightBox(node,box){
-  node.classList.add('game-tape-flight');node.style.left=(box.x-box.w/2)+'px';node.style.top=(box.y-box.h/2)+'px';node.style.width=box.w+'px';node.style.height=box.h+'px';document.body.append(node);
+var FLIGHT_BOX = ['left', 'top', 'width', 'height'];
+function setFlightBox(node, box) {
+  node.classList.add('game-tape-flight');
+  [box.x - box.w / 2, box.y - box.h / 2, box.w, box.h].forEach(function (value, i) { node.style[FLIGHT_BOX[i]] = value + 'px'; });
+  document.body.append(node);
 }
-function clearFlightBox(node){node.classList.remove('game-tape-flight');['left','top','width','height'].forEach(function(prop){node.style.removeProperty(prop);});}
+function clearFlightBox(node) {
+  node.classList.remove('game-tape-flight');
+  FLIGHT_BOX.forEach(function (prop) { node.style.removeProperty(prop); });
+}
 // Each pose: offset from the flight box, scale, turn, tilt of the top edge towards the viewer, height above the desk (0-1).
-function flyTape(node,poses,duration){
-  if(reducedTapeMotion()||!node.animate)return waitForMotion(0);
-  var caseEl=node.querySelector('.game-tape-case');
-  var body=node.animate(poses.map(function(p){return {offset:p.at,easing:p.ease||'ease-in-out',transform:'translate('+p.x.toFixed(1)+'px,'+p.y.toFixed(1)+'px) rotate('+p.r.toFixed(2)+'deg) scale('+p.s.toFixed(4)+')'};}),{duration:duration,fill:'forwards'});
-  var tilt=caseEl.animate(poses.map(function(p){var l=p.lift;return {offset:p.at,easing:p.ease||'ease-in-out',transform:'perspective(520px) rotateX('+p.tilt.toFixed(1)+'deg)',boxShadow:'inset 0 1px 2px #ffffff9c,inset 0 -4px 7px #000b,'+(l*7).toFixed(1)+'px '+(2+l*20).toFixed(1)+'px '+(3+l*22).toFixed(1)+'px rgba(0,0,0,'+(.75-l*.3).toFixed(2)+')'};}),{duration:duration,fill:'forwards'});
-  return Promise.all([body.finished,tilt.finished]).catch(function(){}).then(function(){return [body,tilt];});
+function flyTape(node, poses, duration) {
+  if (reducedTapeMotion() || !node.animate) return waitForMotion(0);
+  var timing = { duration: duration, fill: 'forwards' };
+  var body = node.animate(poses.map(function (p) {
+    return { offset: p.at, easing: p.ease || 'ease-in-out',
+      transform: 'translate(' + p.x.toFixed(1) + 'px,' + p.y.toFixed(1) + 'px) rotate(' + p.r.toFixed(2) + 'deg) scale(' + p.s.toFixed(4) + ')' };
+  }), timing);
+  // The case tips toward the viewer as it lifts, and its shadow spreads and fades with the height.
+  var tilt = node.querySelector('.game-tape-case').animate(poses.map(function (p) {
+    var lift = p.lift, shadow = (lift * 7).toFixed(1) + 'px ' + (2 + lift * 20).toFixed(1) + 'px ' + (3 + lift * 22).toFixed(1) + 'px rgba(0,0,0,' + (.75 - lift * .3).toFixed(2) + ')';
+    return { offset: p.at, easing: p.ease || 'ease-in-out', transform: 'perspective(520px) rotateX(' + p.tilt.toFixed(1) + 'deg)',
+      boxShadow: 'inset 0 1px 2px #ffffff9c,inset 0 -4px 7px #000b,' + shadow };
+  }), timing);
+  return Promise.all([body.finished, tilt.finished]).catch(function () {}).then(function () { return [body, tilt]; });
 }
 async function returnTapeToPile(keepOpen){
   if(!insertedTapeNode||!insertedTape)return;
@@ -432,13 +541,20 @@ async function playInsertedTape(){
 document.querySelector('.tape-buttons [data-key=play]').addEventListener('click',function(){playInsertedTape().catch(function(error){fail(error.message);});});
 function shuffleTapePile(){
   var old=tapeOrder.map(function(tape){return tape.file;}).join(',');
-  do{for(var i=tapeOrder.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));[tapeOrder[i],tapeOrder[j]]=[tapeOrder[j],tapeOrder[i]];}}while(tapeOrder.map(function(tape){return tape.file;}).join(',')===old);
+  // Fisher-Yates, again until the order is a new one.
+  do {
+    for (var i = tapeOrder.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      [tapeOrder[i], tapeOrder[j]] = [tapeOrder[j], tapeOrder[i]];
+    }
+  } while (tapeOrder.map(function (tape) { return tape.file; }).join(',') === old);
   renderTapePile();
 }
 document.getElementById('tape-pile').addEventListener('pointerdown',function(event){
   var item=event.target.closest('.game-tape');if(!item||tapeBusy)return;
   var pile=document.getElementById('tape-pile');
-  tapeDrag={id:event.pointerId,x:event.clientX,y:event.clientY,item:item,pile:pile,scroll:pile.scrollLeft,horizontal:!window.matchMedia('(min-width:820px) and (min-height:501px)').matches,scrolling:false};
+  tapeDrag = { id: event.pointerId, x: event.clientX, y: event.clientY, item: item, pile: pile, scroll: pile.scrollLeft,
+    horizontal: !window.matchMedia('(min-width:820px) and (min-height:501px)').matches, scrolling: false };
   try{item.setPointerCapture(event.pointerId);}catch(e){}
 });
 document.getElementById('tape-pile').addEventListener('pointermove',function(event){
@@ -498,7 +614,11 @@ function programSource(){
   return Array.from(lines).sort(function(a,b){return a[0]-b[0];}).map(function(row){return row[0]+' '+row[1].toUpperCase();}).join('\n');
 }
 function saveProgram(name){
-  var path=name?(String(name).charAt(0)==='/'?programPath(name):programPath('/USER/'+name)):(currentFile&&currentFile.indexOf('/TAPE/')===0?'/USER/'+currentFile.slice(currentFile.lastIndexOf('/')+1).toUpperCase():(currentFile||'').toUpperCase());
+  // A name is saved in /USER unless it gives a path; with none, a tape's program is saved to /USER under its own name.
+  var path;
+  if (name) path = programPath(String(name).charAt(0) === '/' ? name : '/USER/' + name);
+  else if (currentFile && currentFile.indexOf('/TAPE/') === 0) path = '/USER/' + currentFile.slice(currentFile.lastIndexOf('/') + 1).toUpperCase();
+  else path = (currentFile || '').toUpperCase();
   if(!path)throw Error('SAVE needs a name');
   if(path.indexOf('/USER/')!==0)throw Error('Only /USER is writable');
   var parent=path.slice(0,path.lastIndexOf('/'));
@@ -590,9 +710,20 @@ function beginTapeLoad(tape){
   return choreography.then(function(){
     if(needsInsertion){document.body.setAttribute('data-tape-seated','');playTapeSeatClick();}
     return waitForMotion(needsInsertion?220:0).then(function(){
-      document.body.removeAttribute('data-tape-seated');if(insertedTapeNode){insertedTapeNode.classList.remove('game-tape-inserting');insertedTapeNode.classList.add('deck-inserted-tape');insertedTapeNode.dataset.wound='';}document.body.setAttribute('data-loading-tape','');document.body.setAttribute('data-tape-name',tape.command);
+      document.body.removeAttribute('data-tape-seated');
+      if (insertedTapeNode) {
+        insertedTapeNode.classList.remove('game-tape-inserting');
+        insertedTapeNode.classList.add('deck-inserted-tape');
+        insertedTapeNode.dataset.wound = '';
+      }
+      document.body.setAttribute('data-loading-tape', '');
+      document.body.setAttribute('data-tape-name', tape.command);
       if(!blipMuted()){try{tapeLoadingAudio.volume=.9;tapeLoadingAudio.currentTime=0;var playback=tapeLoadingAudio.play();if(playback)playback.catch(function(){});}catch(e){}}
-      return new Promise(function(resolve){setTimeout(function(){document.body.removeAttribute('data-loading-tape');document.body.setAttribute('data-tape-loaded','');resolve();},reducedTapeMotion()?0:7300);});
+      // The loading tone runs 7.3 seconds.
+      return waitForMotion(7300).then(function () {
+        document.body.removeAttribute('data-loading-tape');
+        document.body.setAttribute('data-tape-loaded', '');
+      });
     });
   });
 }
@@ -610,13 +741,36 @@ async function showSource(name){
   source.split(/\r?\n/).forEach(print);
 }
 function editorEscapeHtml(value){return String(value).replace(/[&<>"']/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch];});}
-var editorKeywords=new Set(('PRINT INPUT LET IF THEN ELSE FOR TO STEP NEXT GOTO GOSUB RETURN SUB CALL EXIT LOCAL STATIC ELSEIF WHILE WEND DEF FN END STOP REM DATA READ RESTORE DIM AND OR NOT MOD ABS INT RND SQR SIN COS TAN ATN LOG EXP LEN STR$ VAL CHR$ ASC LEFT$ RIGHT$ MID$ CLEAR COLOR FILL_RECT DRAW_RECT DRAW_LINE DRAW_LINE_EX DRAW_POLYLINE DRAW_GLOW_LINE FX_CLEAR FX_UPDATE FX_DRAW FX_BURST FX_POPUP FX_RING CIRCLE DRAW_CIRCLE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_CAPSULE FILL_SUNBURST DRAW_TEXT DRAW_CHAR DRAW_NUMBER DRAW_HUD DRAW_TEXTURE TEXT_CX KEY_ACTIVE KEY_HELD KEY_PRESSED LOAD SAVE DIR CD MKDIR DEL MOVE EJECT TUNE').split(' ').concat(basicMathNames));
-function highlightEditorText(value){
-  var pattern=/"[^\"]*"|\bREM\b.*$|\b[A-Z_][A-Z0-9_$]*\b|\b\d+(?:\.\d+)?\b/gi,out='',last=0,match;
-  while((match=pattern.exec(value))){out+=editorEscapeHtml(value.slice(last,match.index));var token=match[0],upper=token.toUpperCase(),kind=token[0]==='"'?'editor-string':/^REM\b/i.test(token)?'editor-comment':/^\d/.test(token)?'editor-number':/^\b(?:BLIP_|NEON_)/i.test(token)?'editor-constant':editorKeywords.has(upper)?'editor-keyword':'';out+=kind?'<span class="'+kind+'">'+editorEscapeHtml(token)+'</span>':editorEscapeHtml(token);last=pattern.lastIndex;if(/^REM\b/i.test(token))break;}
-  return out+editorEscapeHtml(value.slice(last));
+// The words BLIP BASIC knows, for the editor's colours and its Tab completion (the first word, A to Z, that a prefix starts).
+var basicWords=[
+  'ABS AND ASC ATN CALL CANVAS CD CHR$ CIRCLE CLEAR COLOR CONTROL_TEXT$ COS DATA DEF DEL DIM DIR',
+  'DRAW_CHAR DRAW_CIRCLE DRAW_GAME_OVER DRAW_GLOW_LINE DRAW_HUD DRAW_LINE DRAW_LINE_EX DRAW_NUMBER DRAW_POLYLINE',
+  'DRAW_RECT DRAW_TEXT DRAW_TEXTURE EJECT ELSE ELSEIF END EXIT EXP FILL_CAPSULE',
+  'FILL_CIRCLE FILL_GLOW_CIRCLE FILL_RECT FILL_SUNBURST FIRE_PROMPT$ FN FOR FX_BURST FX_CLEAR FX_DRAW FX_POPUP',
+  'FX_RING FX_UPDATE GOSUB GOTO HSV IF INPUT INT KEY_ACTIVE KEY_HELD KEY_PRESSED LEFT$ LEN LET LOAD',
+  'LOCAL LOG MID$ MKDIR MOD MOVE NEXT NOT OR PLAY_MUSIC PLAY_SFX PRINT READ REM RESTORE RETURN RIGHT$',
+  'RND SAVE SIN SQR STATIC STEP STOP STOP_MUSIC STR$ SUB TAN TEXT_CX THEN TIME TO TUNE VAL WEND WHILE'
+].join(' ').split(' ').concat(basicMathNames).sort();
+var editorKeywords=new Set(basicWords);
+/** What a token is, for its colour: a string, the rest of the line after REM, a number, a colour name or a BASIC word. */
+function editorTokenKind(token) {
+  if (token[0] === '"') return 'editor-string';
+  if (/^REM\b/i.test(token)) return 'editor-comment';
+  if (/^\d/.test(token)) return 'editor-number';
+  if (/^(?:BLIP_|NEON_)/i.test(token)) return 'editor-constant';
+  return editorKeywords.has(token.toUpperCase()) ? 'editor-keyword' : '';
 }
-var editorCompletions=('CALL DEF ELSE ELSEIF EXIT LOCAL RESTORE SUB WEND WHILE FX_CLEAR FX_UPDATE FX_DRAW FX_BURST FX_POPUP FX_RING DRAW_POLYLINE ABS AND CIRCLE DRAW_CIRCLE CD CLEAR COLOR COS DATA DEL DIR DRAW_CHAR DRAW_GLOW_LINE DRAW_HUD DRAW_LINE DRAW_LINE_EX DRAW_NUMBER DRAW_RECT DRAW_SUNBURST DRAW_TEXT DRAW_TEXTURE EJECT END EXP FILL_CAPSULE FILL_CIRCLE FILL_GLOW_CIRCLE FILL_RECT FILL_SUNBURST FOR GOSUB GOTO IF INPUT INT KEY_ACTIVE KEY_HELD KEY_PRESSED LEFT$ LEN LET LOAD LOG MID$ MKDIR MOD MOVE NEXT NOT OR PRINT READ RETURN RIGHT$ RND SAVE SIN SQR STEP STR$ TAN TEXT_CX THEN TO TUNE VAL').split(' ').concat(basicMathNames);
+function highlightEditorText(value) {
+  var pattern = /"[^"]*"|\bREM\b.*$|\b[A-Z_][A-Z0-9_$]*\b|\b\d+(?:\.\d+)?\b/gi, out = '', last = 0, match;
+  while ((match = pattern.exec(value))) {
+    var token = match[0], kind = editorTokenKind(token), text = editorEscapeHtml(token);
+    out += editorEscapeHtml(value.slice(last, match.index)) + (kind ? '<span class="' + kind + '">' + text + '</span>' : text);
+    last = pattern.lastIndex;
+    if (kind === 'editor-comment') break;
+  }
+  return out + editorEscapeHtml(value.slice(last));
+}
+var editorCompletions=basicWords;
 function editorCompletion(){
   var before=(editor.rows[editor.row]||'').slice(0,editor.column);
   if((before.match(/"/g)||[]).length%2)return null;
@@ -645,9 +799,27 @@ function renderEditor(message){
     }else content=highlightEditorText(row);
     return '<div class="editor-line'+(current?' current':'')+'" data-row="'+index+'"><span class="editor-gutter">'+String(index+1).padStart(3,' ')+'</span>'+content+'</div>';
   }).join('');
-  var active=editorCode.children[editor.row];if(active){var top=active.offsetTop,bottom=top+active.offsetHeight;if(top<editorCode.scrollTop)editorCode.scrollTop=top;else if(bottom>editorCode.scrollTop+editorCode.clientHeight)editorCode.scrollTop=bottom-editorCode.clientHeight;}
-  output.textContent=editor.rows.map(function(row,index){var marker=index===editor.row?'▶':' ';var value=index===editor.row?row.slice(0,editor.column)+'█'+row.slice(Math.min(row.length,editor.column+1)):row;return marker+String(index+1).padStart(3,' ')+' '+value;}).join('\n')+'\nAUTO-SAVE'+(message?' '+message:'');
-  var caret=editorCode.querySelector('.editor-caret');if(caret){var box=caret.getBoundingClientRect(),view=editorCode.getBoundingClientRect();if(box.right>view.right)editorCode.scrollLeft+=box.right-view.right+8;else if(box.left<view.left)editorCode.scrollLeft-=view.left-box.left+8;}
+  scrollEditorToCaret();
+  // The same listing as text, for screen readers and the console's own output.
+  output.textContent = editor.rows.map(function (row, index) {
+    var current = index === editor.row;
+    var value = current ? row.slice(0, editor.column) + '█' + row.slice(Math.min(row.length, editor.column + 1)) : row;
+    return (current ? '▶' : ' ') + String(index + 1).padStart(3, ' ') + ' ' + value;
+  }).join('\n') + '\nAUTO-SAVE' + (message ? ' ' + message : '');
+}
+/** Keep the current line in view, and the caret within it. */
+function scrollEditorToCaret() {
+  var active = editorCode.children[editor.row];
+  if (active) {
+    var top = active.offsetTop, bottom = top + active.offsetHeight;
+    if (top < editorCode.scrollTop) editorCode.scrollTop = top;
+    else if (bottom > editorCode.scrollTop + editorCode.clientHeight) editorCode.scrollTop = bottom - editorCode.clientHeight;
+  }
+  var caret = editorCode.querySelector('.editor-caret');
+  if (!caret) return;
+  var box = caret.getBoundingClientRect(), view = editorCode.getBoundingClientRect();
+  if (box.right > view.right) editorCode.scrollLeft += box.right - view.right + 8;
+  else if (box.left < view.left) editorCode.scrollLeft -= view.left - box.left + 8;
 }
 function openEditor(name){
   var path=programPath(name),source=filesystem.files[path];
@@ -684,12 +856,32 @@ function editorInsertKey(key){
   if(key==='End'){editor.column=row.length;renderEditor();return;}
   if(key==='Tab'){
     var completion=editorCompletion();
-    if(completion){editor.rows[editor.row]=row.slice(0,editor.column)+completion.suffix+row.slice(editor.column);editor.column+=completion.suffix.length;editor.dirty=true;editor.saved=false;renderEditor('COMPLETED '+completion.word);return;}
+    if (completion) {
+      editor.rows[editor.row] = row.slice(0, editor.column) + completion.suffix + row.slice(editor.column);
+      editor.column += completion.suffix.length;
+      editor.dirty = true;
+      editor.saved = false;
+      renderEditor('COMPLETED ' + completion.word);
+      return;
+    }
     key='    ';
   }
   if(key.length===1||key==='    '){editor.rows[editor.row]=row.slice(0,editor.column)+key+row.slice(editor.column);editor.column+=key.length;editor.dirty=true;editor.saved=false;renderEditor();}
 }
-function closeEditor(){editor=null;editorPanel.hidden=true;document.body.removeAttribute('data-editor');clear();print('BLIP 64K COLOUR PERSONAL COMPUTER');print('BLIP BASIC 1.0');print('EDITOR CLOSED');ready();input.focus({preventScroll:true});}
+function printBanner() {
+  print('BLIP 64K COLOUR PERSONAL COMPUTER');
+  print('BLIP BASIC 1.0');
+}
+function closeEditor() {
+  editor = null;
+  editorPanel.hidden = true;
+  document.body.removeAttribute('data-editor');
+  clear();
+  printBanner();
+  print('EDITOR CLOSED');
+  ready();
+  input.focus({ preventScroll: true });
+}
 function basicAudio(){
   var Audio=window.AudioContext||window.webkitAudioContext;
   if(!Audio)throw Error('Web Audio is not available');
@@ -784,10 +976,34 @@ function print(s) {
   output.scrollTop = output.scrollHeight;
 }
 function clear() { output.textContent = ''; gfx.fillStyle = palette[paper]; gfx.fillRect(0, 0, 320, 200); }
-function blipKeyCode(name){var key=String(name||'').toUpperCase();return ({LEFT:'ArrowLeft',RIGHT:'ArrowRight',UP:'ArrowUp',DOWN:'ArrowDown',SPACE:' ',FIRE:' ',BUTTON2:'z',ESC:'Escape',ENTER:'Enter'})[key]||(/^[A-Z]$/.test(key)?key.toLowerCase():key);}
+// A BASIC key name as the browser's KeyboardEvent.key: arrows and named keys, or a letter.
+var BASIC_KEYS = { LEFT: 'ArrowLeft', RIGHT: 'ArrowRight', UP: 'ArrowUp', DOWN: 'ArrowDown', SPACE: ' ', FIRE: ' ', BUTTON2: 'z', ESC: 'Escape', ENTER: 'Enter' };
+// The shifted character of each key on the touch keyboard's editor.
+var SHIFTED_KEYS = {'1':'!','2':'"','3':'#','4':'$','5':'%','6':'&','7':'\'','8':'(','9':')','0':'_','-':'=','=':'+','[':'{',']':'}',';':':',"'":'"',',':'<','.':'>','/':'?'};
+function recallHistory(at) {
+  historyAt = at;
+  input.value = history[historyAt] || '';
+  input.focus({ preventScroll: true });
+  input.setSelectionRange(input.value.length, input.value.length);
+  rememberCaret();
+}
+function blipKeyCode(name) {
+  var key = String(name || '').toUpperCase();
+  return BASIC_KEYS[key] || (/^[A-Z]$/.test(key) ? key.toLowerCase() : key);
+}
 function ready() { if (!run) print('Ready'); }
 function fail(message) { run = null; pendingInput = null; document.body.removeAttribute('data-basic-running'); print('? ' + message); ready(); }
-function stopProgram(){run=null;pendingInput=null;input.placeholder='';document.body.removeAttribute('data-basic-running');heldKeys=Object.create(null);pressedKeys=Object.create(null);clear();ready();input.focus({preventScroll:true});}
+function stopProgram() {
+  run = null;
+  pendingInput = null;
+  input.placeholder = '';
+  document.body.removeAttribute('data-basic-running');
+  heldKeys = Object.create(null);
+  pressedKeys = Object.create(null);
+  clear();
+  ready();
+  input.focus({ preventScroll: true });
+}
 function splitStatements(s) {
   var out = [], part = '', quoted = false;
   for (var i=0;i<s.length;i++) {
@@ -861,7 +1077,7 @@ function dataUrl(buffer,type){
 async function escapeFromBasicGame(){
   if(!basicWasmPlaying||copyingGame)return;
   var tape=tapeForPath(currentFile),destination=tape?'/USER/'+tape.command+'/'+tape.file:currentFile;
-  if(!destination||destination.indexOf('/USER/')!==0){stopBouncerWasm();return;}
+  if(!destination||destination.indexOf('/USER/')!==0){stopTapeRuntime();return;}
   copyingGame=true;
   try{
     if(tape&&filesystem.files[destination]===undefined){
@@ -869,44 +1085,124 @@ async function escapeFromBasicGame(){
       ensureUserDirectory(to.slice(0,-1));
       await assetsReady(tape);
       var pictures=(assetNames[tape.command]||[]).filter(function(name){return /\.PNG$/.test(name);});
-      await Promise.all(pictures.map(function(name){return fetch(from.slice(1)+name).then(function(response){return response.arrayBuffer();}).then(function(buffer){filesystem.files[to+name]=dataUrl(buffer,'image/png');});}));
+      await Promise.all(pictures.map(function (name) {
+        return fetch(from.slice(1) + name)
+          .then(function (response) { return response.arrayBuffer(); })
+          .then(function (buffer) { filesystem.files[to + name] = dataUrl(buffer, 'image/png'); });
+      }));
       filesystem.files[destination]=programSource().replaceAll(from,to);
       writeFilesystem();
     }
     currentFile=destination;storeDraft();
-    stopBouncerWasm();openEditor(currentFile);
-  }catch(error){stopBouncerWasm();print('? GAME COPY FAILED: '+error.message);}
+    stopTapeRuntime();openEditor(currentFile);
+  }catch(error){stopTapeRuntime();print('? GAME COPY FAILED: '+error.message);}
   copyingGame=false;
 }
-function exitActiveProgram(){if(basicWasmPlaying)stopBouncerWasm();else if(run)stopProgram();}
-/** The user's pictures and sounds, for the runtime: every /USER PNG and WAV. */
-function userFiles(){
-  return Object.keys(filesystem.files).filter(function(path){var data=filesystem.files[path];return /^\/USER\/.*\.(PNG|WAV)$/i.test(path)&&typeof data==='string'&&data.indexOf('data:')===0;}).map(function(path){return {path:path,data:filesystem.files[path]};});
+function exitActiveProgram() {
+  if (basicWasmPlaying) stopTapeRuntime();
+  else if (run) stopProgram();
 }
-function postBasicWasmSource(){if(basicWasmReady&&wasmFrame.contentWindow)wasmFrame.contentWindow.postMessage({type:'blip-basic-source',source:basicWasmSource,files:userFiles()},location.origin);}
-function focusBasicWasmCanvas(){try{wasmFrame.contentWindow.focus();wasmFrame.contentDocument.getElementById('glcanvas').focus();}catch(e){}}
+/** The user's pictures and sounds, for the runtime: every /USER PNG and WAV. */
+function userFiles() {
+  return Object.keys(filesystem.files).filter(function (path) {
+    var data = filesystem.files[path];
+    return /^\/USER\/.*\.(PNG|WAV)$/i.test(path) && typeof data === 'string' && data.indexOf('data:') === 0;
+  }).map(function (path) { return { path: path, data: filesystem.files[path] }; });
+}
+// The runtime frame speaks postMessage, same origin only.
+function postToRuntime(message) {
+  if (basicWasmReady && wasmFrame.contentWindow) wasmFrame.contentWindow.postMessage(message, location.origin);
+}
+function postBasicWasmSource() {
+  postToRuntime({ type: 'blip-basic-source', source: basicWasmSource, files: userFiles() });
+}
+function focusBasicWasmCanvas() {
+  try {
+    wasmFrame.contentWindow.focus();
+    wasmFrame.contentDocument.getElementById('glcanvas').focus();
+  } catch (e) {}
+}
 function runBlipInWasm(){
   configureBasicControls();
   basicWasmRunId++;
-  basicWasmSource=Array.from(lines.keys()).sort(function(a,b){return a-b;}).map(function(n){return n+' '+lines.get(n);}).join('\n')+'\nREM RUN '+basicWasmRunId;
-  basicWasmPlaying=true;document.body.setAttribute('data-wasm-playing','');updatePlayClearance();document.body.removeAttribute('data-wasm-error');document.body.removeAttribute('data-wasm-running');output.textContent='';clear();wasmFrame.hidden=false;
-  if(!wasmFrame.hasAttribute('src')){wasmFrame.addEventListener('load',function loaded(){wasmFrame.removeEventListener('load',loaded);basicWasmReady=true;postBasicWasmSource();focusBasicWasmCanvas();},{once:true});wasmFrame.src='basic-runtime.html?v=19';}
-  else {postBasicWasmSource();focusBasicWasmCanvas();}
+  // The run number makes every RUN a new source, so the runtime restarts even the same program.
+  basicWasmSource = Array.from(lines.keys()).sort(function (a, b) { return a - b; })
+    .map(function (n) { return n + ' ' + lines.get(n); }).join('\n') + '\nREM RUN ' + basicWasmRunId;
+  basicWasmPlaying = true;
+  document.body.setAttribute('data-wasm-playing', '');
+  document.body.removeAttribute('data-wasm-error');
+  document.body.removeAttribute('data-wasm-running');
+  updatePlayClearance();
+  output.textContent = '';
+  clear();
+  wasmFrame.hidden = false;
+  if (wasmFrame.hasAttribute('src')) {
+    postBasicWasmSource();
+    focusBasicWasmCanvas();
+    return;
+  }
+  wasmFrame.addEventListener('load', function () {
+    basicWasmReady = true;
+    postBasicWasmSource();
+    focusBasicWasmCanvas();
+  }, { once: true });
+  wasmFrame.src = 'basic-runtime.html?v=19';
 }
-var blipPrimitiveNames='canvas clear fill_rect draw_rect draw_line draw_line_ex draw_polyline draw_glow_line fx_clear fx_update fx_draw fx_burst fx_popup fx_ring fill_circle draw_circle fill_capsule fill_sunburst fill_glow_circle draw_texture draw_texture_region draw_texture_cell draw_texture_tinted draw_char draw_text draw_text_outlined draw_centered_outlined draw_number draw_centered draw_hud'.split(' ');
+// The runtime's drawing commands (DRAW_COMMANDS in crates/blip_basic/src/interpreter/graphics.rs).
+var blipPrimitiveNames='canvas clear circle draw_char draw_circle draw_game_over draw_glow_line draw_hud draw_line draw_line_ex draw_number draw_polyline draw_rect draw_text draw_texture fill_capsule fill_circle fill_glow_circle fill_rect fill_sunburst fx_burst fx_clear fx_draw fx_popup fx_ring fx_update'.split(' ');
 function programUsesBlipPrimitives(){
   var call=new RegExp('\\b(?:'+blipPrimitiveNames.join('|')+')\\s*\\(','i');
-  return Array.from(lines.values()).some(function(source){return /\b(?:PLAY_SFX|PLAY_MUSIC|STOP_MUSIC|TEXT_CX)\b/i.test(source)||/\b(?:SUB|CALL|ELSE|ELSEIF|END\s+IF|WHILE|WEND|EXIT\s+FOR|DEF\s+FN\w*)\b|\bTHEN\s*$/i.test(source.replace(/"(?:[^"]|"")*"/g,'""'))||splitStatements(source).some(function(part){return call.test(part.trim());});});
+  // Sounds, procedures, blocks and drawing calls are the runtime's; the console runs only the simplest programs.
+  var runtimeWords = /\b(?:PLAY_SFX|PLAY_MUSIC|STOP_MUSIC|TEXT_CX)\b/i;
+  var structure = /\b(?:SUB|CALL|ELSE|ELSEIF|END\s+IF|WHILE|WEND|EXIT\s+FOR|DEF\s+FN\w*)\b|\bTHEN\s*$/i;
+  return Array.from(lines.values()).some(function (source) {
+    return runtimeWords.test(source) || structure.test(source.replace(/"(?:[^"]|"")*"/g, '""'))
+      || splitStatements(source).some(function (part) { return call.test(part.trim()); });
+  });
 }
-function stopBouncerWasm(){if(!basicWasmPlaying)return;releaseBasicRallyDials();showBasicSecondPlayer(false);basicWasmSource='';postBasicWasmSource();basicWasmPlaying=false;document.body.removeAttribute('data-wasm-playing');document.body.removeAttribute('data-wasm-running');document.body.removeAttribute('data-rally');updatePlayClearance();wasmFrame.hidden=true;clear();output.textContent='';print('BLIP 64K COLOUR PERSONAL COMPUTER');print('BLIP BASIC 1.0');ready();input.focus({preventScroll:true});}
-function sendBasicWasmKey(key,code,down){var message={type:'blip-basic-key',key:key,code:code,down:!!down};if(basicWasmReady&&wasmFrame.contentWindow)wasmFrame.contentWindow.postMessage(message,location.origin);}
+/** Stop the running tape (an empty source halts the runtime) and bring the console back. */
+function stopTapeRuntime() {
+  if (!basicWasmPlaying) return;
+  releaseBasicRallyDials();
+  showBasicSecondPlayer(false);
+  basicWasmSource = '';
+  postBasicWasmSource();
+  basicWasmPlaying = false;
+  ['data-wasm-playing', 'data-wasm-running', 'data-rally'].forEach(function (name) { document.body.removeAttribute(name); });
+  updatePlayClearance();
+  wasmFrame.hidden = true;
+  clear();
+  output.textContent = '';
+  printBanner();
+  ready();
+  input.focus({ preventScroll: true });
+}
+function sendBasicWasmKey(key, code, down) {
+  postToRuntime({ type: 'blip-basic-key', key: key, code: code, down: !!down });
+}
 window.addEventListener('message', function (event) {
-  if(event.origin!==location.origin||!event.data)return;
-  if(event.data.type==='blip-basic-wasm-ready'){basicWasmReady=true;postBasicWasmSource();if(basicWasmPlaying)focusBasicWasmCanvas();}
-  if(event.data.type==='blip-basic-program-loaded'&&basicWasmPlaying){document.body.setAttribute('data-wasm-running','');focusBasicWasmCanvas();}
-  if(event.data.type==='blip-basic-runtime-error')document.body.setAttribute('data-wasm-error',event.data.message||'error');
-  if(event.data.type==='blip-basic-escape')escapeFromBasicGame();
-  if(event.data.type==='blip-basic-stop')stopBouncerWasm();
+  if (event.origin !== location.origin || !event.data) return;
+  switch (event.data.type) {
+    case 'blip-basic-wasm-ready':
+      basicWasmReady = true;
+      postBasicWasmSource();
+      if (basicWasmPlaying) focusBasicWasmCanvas();
+      break;
+    case 'blip-basic-program-loaded':
+      if (!basicWasmPlaying) break;
+      document.body.setAttribute('data-wasm-running', '');
+      focusBasicWasmCanvas();
+      break;
+    case 'blip-basic-runtime-error':
+      document.body.setAttribute('data-wasm-error', event.data.message || 'error');
+      break;
+    case 'blip-basic-escape':
+      escapeFromBasicGame();
+      break;
+    case 'blip-basic-stop':
+      stopTapeRuntime();
+      break;
+  }
 });
 exitGameButton.addEventListener('click', exitActiveProgram);
 function statement(s) {
@@ -936,7 +1232,12 @@ function statement(s) {
   if(upper==='END'||upper==='STOP'){run=null;document.body.removeAttribute('data-basic-running');ready();return;}
   if(upper==='CLS'){clear();return;}
   if(upper==='CLEAR'){vars=Object.create(null);arrays=Object.create(null);pendingInput=null;clear();return;}
-  if((m=/^SOUND\s+(.+)$/i.exec(command))){var tone=splitArgs(m[1]);if(tone.length<2||tone.length>3)throw Error('SOUND needs frequency,duration[,volume]');sound(evalExpr(tone[0]),evalExpr(tone[1]),tone.length===3?evalExpr(tone[2]):undefined);return;}
+  if ((m = /^SOUND\s+(.+)$/i.exec(command))) {
+    var tone = splitArgs(m[1]);
+    if (tone.length < 2 || tone.length > 3) throw Error('SOUND needs frequency,duration[,volume]');
+    sound(evalExpr(tone[0]), evalExpr(tone[1]), tone.length === 3 ? evalExpr(tone[2]) : undefined);
+    return;
+  }
   if(/^PLAY_SFX\s+/i.test(command))throw Error('PLAY_SFX is provided by the Rust Blip runtime; enter it in a numbered program and RUN');
   if((m=/^REST\s+(.+)$/i.exec(command))){rest(evalExpr(m[1]));return;}
   if(new RegExp('\\b(?:'+blipPrimitiveNames.join('|')+')\\s*\\(','i').test(command))throw Error('BLIP drawing calls run through the Rust runtime; enter numbered lines and RUN');
@@ -971,7 +1272,11 @@ function statement(s) {
   }
   if((m=/^TEXT\s+(.+)$/i.exec(command))){
     var tx=splitArgs(m[1]);if(tx.length!==3)throw Error('TEXT needs x,y,string');
-    gfx.fillStyle=palette[pen];gfx.font='10px "Courier New",monospace';gfx.textBaseline='top';gfx.fillText(String(evalExpr(tx[2])).toUpperCase(),Number(evalExpr(tx[0])),199-Number(evalExpr(tx[1])));return;
+    gfx.fillStyle = palette[pen];
+    gfx.font = '10px "Courier New",monospace';
+    gfx.textBaseline = 'top';
+    gfx.fillText(String(evalExpr(tx[2])).toUpperCase(), Number(evalExpr(tx[0])), 199 - Number(evalExpr(tx[1])));
+    return;
   }
   if((m=/^FILLSPLINE\s+(.+)$/i.exec(command))){
     var fs=splitArgs(m[1]);if(fs.length<8||(fs.length-2)%6)throw Error('FILLSPLINE needs a start point and cubic curve groups');
@@ -989,8 +1294,26 @@ function statement(s) {
   }
   if((m=/^(?:PEN|INK)\s+(.+)$/i.exec(command))){pen=((Number(evalExpr(m[1]))%palette.length)+palette.length)%palette.length;return;}
   if((m=/^PAPER\s+(.+)$/i.exec(command))){paper=((Number(evalExpr(m[1]))%palette.length)+palette.length)%palette.length;clear();return;}
-  if((m=/^PLOT\s+(.+)$/i.exec(command))){var a=splitArgs(m[1]);gx=Number(evalExpr(a[0]));gy=Number(evalExpr(a[1]));gfx.fillStyle=palette[pen];gfx.fillRect(Math.round(gx),199-Math.round(gy),1,1);return;}
-  if((m=/^DRAW\s+(.+)$/i.exec(command))){var p=splitArgs(m[1]),x=Number(evalExpr(p[0])),y=Number(evalExpr(p[1]));gfx.strokeStyle=palette[pen];gfx.beginPath();gfx.moveTo(gx+.5,199-gy+.5);gfx.lineTo(x+.5,199-y+.5);gfx.stroke();gx=x;gy=y;return;}
+  // The console's own screen is 320 x 200, with y counting up from the bottom.
+  if ((m = /^PLOT\s+(.+)$/i.exec(command))) {
+    var a = splitArgs(m[1]);
+    gx = Number(evalExpr(a[0]));
+    gy = Number(evalExpr(a[1]));
+    gfx.fillStyle = palette[pen];
+    gfx.fillRect(Math.round(gx), 199 - Math.round(gy), 1, 1);
+    return;
+  }
+  if ((m = /^DRAW\s+(.+)$/i.exec(command))) {
+    var p = splitArgs(m[1]), x = Number(evalExpr(p[0])), y = Number(evalExpr(p[1]));
+    gfx.strokeStyle = palette[pen];
+    gfx.beginPath();
+    gfx.moveTo(gx + .5, 199 - gy + .5);
+    gfx.lineTo(x + .5, 199 - y + .5);
+    gfx.stroke();
+    gx = x;
+    gy = y;
+    return;
+  }
   if((m=/^INPUT\s+(?:"([^"]*)"\s*[,;]\s*)?([A-Z][A-Z0-9_]*\$?)$/i.exec(command))){pendingInput=m[2].toUpperCase();print(m[1]||'?');input.placeholder=pendingInput+'?';input.focus();return;}
   if((m=/^WAIT\s+(.+)$/i.exec(command))){if(!run)throw Error('WAIT requires RUN');run.waitUntil=performance.now()+Math.max(0,Math.min(10000,Number(evalExpr(m[1]))));return;}
   throw Error('Unknown command: '+command.split(/\s/)[0]);
@@ -1024,17 +1347,46 @@ function submit(raw) {
   if(numbered){var number=Number(numbered[1]);if(numbered[2])lines.set(number,numbered[2]);else lines.delete(number);storeDraft();return;}
   try {
     var m;
-    if((m=/^PAINT(?:\s+(.+))?$/i.exec(s))){if(typeof startPaint!=='function')throw Error('PAINT is unavailable');if(run||basicWasmPlaying)exitActiveProgram();startPaint(m[1]?pathArgument(m[1]):null);return;}
-    if((m=/^TUNE(?:\s+(.+))?$/i.exec(s))){var xm=m[1]?resolvePath(pathArgument(m[1])):null;if(xm&&!/^\/(TAPE\/[A-Z0-9_]+\/ASSETS|ROM\/TUNES)\/[^/]+\.XM$/i.test(xm))throw Error('TUNE OPENS AN .XM IN /TAPE OR /ROM; USE IMPORT XM FOR YOUR OWN');if(typeof startTune!=='function')throw Error('TUNE is unavailable');if(run||basicWasmPlaying)exitActiveProgram();startTune(xm&&xm.toUpperCase());return;}
+    if ((m = /^PAINT(?:\s+(.+))?$/i.exec(s))) {
+      if (typeof startPaint !== 'function') throw Error('PAINT is unavailable');
+      if (run || basicWasmPlaying) exitActiveProgram();
+      startPaint(m[1] ? pathArgument(m[1]) : null);
+      return;
+    }
+    if ((m = /^TUNE(?:\s+(.+))?$/i.exec(s))) {
+      var xm = m[1] ? resolvePath(pathArgument(m[1])) : null;
+      if (xm && !/^\/(TAPE\/[A-Z0-9_]+\/ASSETS|ROM\/TUNES)\/[^/]+\.XM$/i.test(xm)) throw Error('TUNE OPENS AN .XM IN /TAPE OR /ROM; USE IMPORT XM FOR YOUR OWN');
+      if (typeof startTune !== 'function') throw Error('TUNE is unavailable');
+      if (run || basicWasmPlaying) exitActiveProgram();
+      startTune(xm && xm.toUpperCase());
+      return;
+    }
     if(s.toUpperCase()==='RUN'){
       if(!lines.size)throw Error('No program');
       if(programUsesBlipPrimitives()){runBlipInWasm();return;}
-      vars=Object.create(null);arrays=Object.create(null);run={numbers:Array.from(lines.keys()).sort(function(a,b){return a-b;}),index:0,statement:0,calls:[],fors:[],waitUntil:0};document.body.setAttribute('data-basic-running','');clear();input.blur();return;
+      vars = Object.create(null);
+      arrays = Object.create(null);
+      run = { numbers: Array.from(lines.keys()).sort(function (a, b) { return a - b; }), index: 0, statement: 0, calls: [], fors: [], waitUntil: 0 };
+      document.body.setAttribute('data-basic-running', '');
+      clear();
+      input.blur();
+      return;
     }
     if(s.toUpperCase()==='LIST'){Array.from(lines.keys()).sort(function(a,b){return a-b;}).forEach(function(k){print(k+' '+lines.get(k));});ready();return;}
     if((m=/^SOURCE(?:\s+(.+))?$/i.exec(s))){showSource(m[1]?pathArgument(m[1]):null).then(ready).catch(function(error){fail(error.message);});return;}
     if((m=/^EDIT\s+(.+)$/i.exec(s))){openEditor(pathArgument(m[1]));return;}
-    if(s.toUpperCase()==='NEW'){run=null;document.body.removeAttribute('data-basic-running');lines.clear();vars=Object.create(null);arrays=Object.create(null);currentFile=null;storeDraft();clear();ready();return;}
+    if (s.toUpperCase() === 'NEW') {
+      run = null;
+      document.body.removeAttribute('data-basic-running');
+      lines.clear();
+      vars = Object.create(null);
+      arrays = Object.create(null);
+      currentFile = null;
+      storeDraft();
+      clear();
+      ready();
+      return;
+    }
     if(s.toUpperCase()==='HELP'){
       clear();
       print('BLIP BASIC · HELP');
@@ -1060,7 +1412,14 @@ function submit(raw) {
     if(s==='EJECT')return ejectTape().then(ready).catch(function(error){fail(error.message);});
     if(s.toUpperCase()==='STOP'){run=null;pendingInput=null;document.body.removeAttribute('data-basic-running');ready();return;}
     if((m=/^DIR(?:\s+(.+))?$/i.exec(s))){showDirectory(m[1]?resolvePath(pathArgument(m[1])):currentDir).then(ready).catch(function(error){fail(error.message);});return;}
-    if((m=/^CD(?:\s+(.+))?$/i.exec(s))){var dest=canonicalDirectory(m[1]?resolvePath(pathArgument(m[1])):'/USER');if(!isDirectory(dest))throw Error('Directory not found: '+dest);currentDir=dest;print(currentDir);ready();return;}
+    if ((m = /^CD(?:\s+(.+))?$/i.exec(s))) {
+      var dest = canonicalDirectory(m[1] ? resolvePath(pathArgument(m[1])) : '/USER');
+      if (!isDirectory(dest)) throw Error('Directory not found: ' + dest);
+      currentDir = dest;
+      print(currentDir);
+      ready();
+      return;
+    }
     if((m=/^MKDIR\s+(.+)$/i.exec(s))){makeDirectory(pathArgument(m[1]));ready();return;}
     if((m=/^SAVE(?:\s+(.+))?$/i.exec(s))){saveProgram(m[1]?pathArgument(m[1]):null);ready();return;}
     if((m=/^DEL(?:\s+(.+))?$/i.exec(s))){deleteUserFile(m[1]?pathArgument(m[1]):null);ready();return;}
@@ -1069,7 +1428,16 @@ function submit(raw) {
     splitStatements(s).forEach(statement);ready();
   }catch(e){fail(e.message);}
 }
-form.addEventListener('submit',function(e){e.preventDefault();var value=input.value;input.value='';virtualCaret={start:0,end:0};submit(value);if(basicWasmPlaying||run&&!pendingInput)input.blur();else input.focus();});
+form.addEventListener('submit', function (e) {
+  e.preventDefault();
+  var value = input.value;
+  input.value = '';
+  virtualCaret = { start: 0, end: 0 };
+  submit(value);
+  // A running game or program takes the keys; the console keeps them while it waits for INPUT.
+  if (basicWasmPlaying || run && !pendingInput) input.blur();
+  else input.focus();
+});
 input.addEventListener('keydown',function(e){
   if(editor){
     if(e.key==='Escape'){e.preventDefault();closeEditor();return;}
@@ -1085,7 +1453,15 @@ var shiftLatched=false,ctrlLatched=false;
 var virtualCaret=null;
 function rememberCaret(){virtualCaret={start:input.selectionStart==null?input.value.length:input.selectionStart,end:input.selectionEnd==null?input.value.length:input.selectionEnd};}
 input.addEventListener('blur',rememberCaret);
-input.addEventListener('input',function(){var start=input.selectionStart,end=input.selectionEnd,upper=input.value.toUpperCase();if(upper!==input.value){input.value=upper;input.setSelectionRange(start,end);}rememberCaret();});
+// BASIC is upper case as it is typed, the caret where it was.
+input.addEventListener('input', function () {
+  var start = input.selectionStart, end = input.selectionEnd, upper = input.value.toUpperCase();
+  if (upper !== input.value) {
+    input.value = upper;
+    input.setSelectionRange(start, end);
+  }
+  rememberCaret();
+});
 input.addEventListener('select',rememberCaret);
 function keyLatch(name,on){
   document.querySelectorAll('[data-key-label="'+name+'"]').forEach(function(key){key.classList.toggle('latched',on);key.setAttribute('aria-pressed',String(on));});
@@ -1113,7 +1489,7 @@ function virtualKey(label){
     var editorKeys={'SPACE':' ','RETURN':'Enter','↵':'Enter','DEL':'Backspace','TAB':'Tab','←':'ArrowLeft','→':'ArrowRight','↑':'ArrowUp','↓':'ArrowDown'};
     var editorChar=label.length===1?label:'';
     if(editorChar&&/[a-z]/i.test(editorChar))editorChar=editorChar.toUpperCase();
-    else if(shiftLatched&&editorChar){var shiftedEditor={'1':'!','2':'"','3':'#','4':'$','5':'%','6':'&','7':'\'','8':'(','9':')','0':'_','-':'=','=':'+','[':'{',']':'}',';':':',"'":'"',',':'<','.':'>','/':'?'};editorChar=shiftedEditor[editorChar]||editorChar;}
+    else if (shiftLatched && editorChar) editorChar = SHIFTED_KEYS[editorChar] || editorChar;
     editorInsertKey(editorKeys[label]||editorChar);
     if(shiftLatched){shiftLatched=false;keyLatch('SHIFT',false);}
     return;
@@ -1147,7 +1523,8 @@ function virtualKey(label){
   }
   if(label==='ESC'){if(run){stopProgram();}else input.value='';}
   else if(label==='DEL'){
-    var start=virtualCaret?virtualCaret.start:(input.selectionStart==null?input.value.length:input.selectionStart),end=virtualCaret?virtualCaret.end:(input.selectionEnd==null?start:input.selectionEnd);
+    var start = virtualCaret ? virtualCaret.start : input.selectionStart == null ? input.value.length : input.selectionStart;
+    var end = virtualCaret ? virtualCaret.end : input.selectionEnd == null ? start : input.selectionEnd;
     if(start===end&&start>0)start--;
     input.focus({preventScroll:true});input.setRangeText('',start,end,'end');rememberCaret();
   }
@@ -1156,8 +1533,8 @@ function virtualKey(label){
   else if(label==='SPACE')insertAtCaret(' ');
   else if(label==='←')moveCaret(-1);
   else if(label==='→')moveCaret(1);
-  else if(label==='↑'){historyAt=Math.max(0,historyAt-1);input.value=history[historyAt]||'';input.focus({preventScroll:true});input.setSelectionRange(input.value.length,input.value.length);rememberCaret();}
-  else if(label==='↓'){historyAt=Math.min(history.length,historyAt+1);input.value=history[historyAt]||'';input.focus({preventScroll:true});input.setSelectionRange(input.value.length,input.value.length);rememberCaret();}
+  else if (label === '↑') recallHistory(Math.max(0, historyAt - 1));
+  else if (label === '↓') recallHistory(Math.min(history.length, historyAt + 1));
   else if(label==='COPY'){
     var pos=virtualCaret?virtualCaret.start:(input.selectionStart==null?input.value.length:input.selectionStart);
     var char=input.value.charAt(pos)||input.value.charAt(pos-1);
@@ -1177,15 +1554,43 @@ keyboard.addEventListener('click',function(event){
   if(key)virtualKey(key.dataset.keyLabel);
 });
 keyboard.addEventListener('pointerdown',function(event){if(event.target.closest('[data-key-label]'))event.preventDefault();});
-window.addEventListener('keydown',function(e){if(basicWasmPlaying){if(e.key==='Escape'){e.preventDefault();escapeFromBasicGame();return;}sendBasicWasmKey(e.key,e.code,true);e.preventDefault();return;}if(e.target===input){if(run&&e.key==='Escape'){e.preventDefault();stopProgram();}return;}heldKeys[e.key]=true;if(!e.repeat)pressedKeys[e.key]=true;lastKey=e.key.length===1?e.key.toUpperCase():e.key==='ArrowLeft'?'A':e.key==='ArrowRight'?'D':e.key==='ArrowUp'?'W':e.key==='ArrowDown'?'S':'';if(run&&['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();if(run&&e.key==='Escape'){e.preventDefault();stopProgram();}},true);
-window.addEventListener('keyup',function(e){if(basicWasmPlaying){sendBasicWasmKey(e.key,e.code,false);return;}delete heldKeys[e.key];},true);
-window.addEventListener('blur',function(){heldKeys=Object.create(null);pressedKeys=Object.create(null);});
+// Keys go to a running tape; otherwise to the console's own programs (INKEY$ reads lastKey: arrows as WASD).
+var ARROW_LETTERS = { ArrowLeft: 'A', ArrowRight: 'D', ArrowUp: 'W', ArrowDown: 'S' };
+var GAME_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '];
+window.addEventListener('keydown', function (e) {
+  if (basicWasmPlaying) {
+    e.preventDefault();
+    if (e.key === 'Escape') escapeFromBasicGame();
+    else sendBasicWasmKey(e.key, e.code, true);
+    return;
+  }
+  if (run && e.key === 'Escape') {
+    e.preventDefault();
+    stopProgram();
+    return;
+  }
+  if (e.target === input) return;
+  heldKeys[e.key] = true;
+  if (!e.repeat) pressedKeys[e.key] = true;
+  lastKey = e.key.length === 1 ? e.key.toUpperCase() : ARROW_LETTERS[e.key] || '';
+  if (run && GAME_KEYS.includes(e.key)) e.preventDefault();
+}, true);
+window.addEventListener('keyup', function (e) {
+  if (basicWasmPlaying) sendBasicWasmKey(e.key, e.code, false);
+  else delete heldKeys[e.key];
+}, true);
+window.addEventListener('blur', function () {
+  heldKeys = Object.create(null);
+  pressedKeys = Object.create(null);
+});
 document.querySelectorAll('[data-command]').forEach(function(button){button.addEventListener('click',function(){submit(button.dataset.command);if(button.dataset.command!=='RUN')input.focus();});});
 document.getElementById('basic-screen').addEventListener('click',function(){input.focus();});
-restoreDraft();clear();print('BLIP 64K COLOUR PERSONAL COMPUTER');print('BLIP BASIC 1.0');print('');if(lines.size)print(lines.size+' program lines recovered.');ready();
+restoreDraft();clear();printBanner();print('');if(lines.size)print(lines.size+' program lines recovered.');ready();
 if(!blipHasTouch())input.focus();
 requestAnimationFrame(tick);
-window.BlipBasic={submit:submit,lines:lines,output:output,filesystem:filesystem,resolvePath:resolvePath,isDirectory:isDirectory,isFileAvailable:isFileAvailable,writeFilesystem:writeFilesystem,refreshTextures:postBasicWasmSource};
+// For the tests and the PAINT and TUNE editors.
+window.BlipBasic = { submit: submit, lines: lines, output: output, filesystem: filesystem, resolvePath: resolvePath, isDirectory: isDirectory,
+  isFileAvailable: isFileAvailable, writeFilesystem: writeFilesystem, refreshTextures: postBasicWasmSource };
 }());
 
 // The book in the corner is picked up: it straightens and comes to where basic-book.html lays it, closed.

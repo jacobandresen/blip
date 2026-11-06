@@ -278,7 +278,10 @@ test('the game shell', async (t) => {
     await open(cdp, 'meteors/index.html', 6000);
     assert.equal(await evaluate(cdp, "document.activeElement.id"), 'glcanvas', 'the game does not have focus');
     const shown = await evaluate(cdp, "[...document.querySelectorAll('#need-coin-overlay .nco-go span')].find((s) => s.offsetParent)?.textContent");
-    assert.equal(shown, 'PRESS SPACE TO INSERT A COIN');
+    assert.equal(shown, 'PRESS SPACE TO PLAY');
+    // A first-timer learns the keys before the first coin.
+    const legend = await evaluate(cdp, "[...document.querySelectorAll('#need-coin-overlay .nco-legend .pc-label')].map((l) => l.textContent).join()");
+    assert.equal(legend, 'TURN,THRUST,FIRE,HYPERSPACE');
   });
 
   await t.test('coins need no mouse: fire at the wall, 5 at any time', async (t) => {

@@ -544,6 +544,7 @@ fn call_round(g: &mut Game) {
         // wins 100-99.
         if g.result == RoundResult::P1 { g.sess.add_score(1000 + g.p[0].health * 20); }
         let side = match g.result { RoundResult::P1 => "won", RoundResult::P2 => "lost", RoundResult::Draw => "drew" };
+        blip::bot::add(&format!("rounds_{side}"), 1.0);
         blip::bot::add(&format!("round_{side}_vs{}_{}", g.opponent_index, if ko { "ko" } else { "time" }), 1.0);
     }
 }

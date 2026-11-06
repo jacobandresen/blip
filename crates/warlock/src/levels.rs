@@ -64,6 +64,9 @@ pub const LIVES_START: i32 = 3;
 /// One authored room: a maze (`#` wall, `.` floor), the player's start, the
 /// cursed rune stones, the exit, the monsters, and where relevant a gate pair
 /// or the Warlock's casting circles. Coordinates are `(col, row)`.
+/// A maze cell, (column, row).
+pub type Tile = (i32, i32);
+
 pub struct Room {
     pub maze: &'static [&'static str],
     pub player: (i32, i32),
@@ -74,7 +77,7 @@ pub struct Room {
     pub hounds: &'static [(i32, i32)],
     pub gargoyles: &'static [(i32, i32)],
     /// Matching floor sigils: entering one emerges at its partner.
-    pub gates: &'static [((i32, i32), (i32, i32))],
+    pub gates: &'static [(Tile, Tile)],
     pub warlock: bool,
     pub warlock_circles: &'static [(i32, i32)],
     pub warlock_wards: i32,

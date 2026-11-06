@@ -69,7 +69,7 @@ pub(crate) fn nobody_strikes_over_the_head_of_a_smaller_opponent() {
     for a in 0..FIGHTERS.len() {
         for d in 0..FIGHTERS.len() {
             for mv in [MoveId::LowPunch, MoveId::HighPunch, MoveId::LowKick, MoveId::HighKick,
-                       MoveId::Sweep, MoveId::Throw] {
+                       MoveId::Sweep, MoveId::Throw, MoveId::Hook, MoveId::Roundhouse] {
                 let mut p = [at(a, 200.0, 1.0), at(d, 300.0, -1.0)];
                 face_off(&mut p);
                 p[1].x = p[0].x + attack_range(&p[0], mv) - 3.0;

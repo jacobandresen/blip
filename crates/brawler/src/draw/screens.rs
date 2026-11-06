@@ -265,7 +265,8 @@ pub(crate) fn draw_select(blip: &Blip, g: &Game) {
     // The rules a player cannot find by pressing buttons, put where there is
     // nothing else to do but read them.
     blip.draw_centered("BACK GUARDS   BOTH BUTTONS: SPECIAL", 348.0, 2.0, grey);
-    let prompt = if !versus { "PRESS FIRE TO START" }
+    let keys = web::controls() == web::Controls::Keys;
+    let prompt = if !versus { if keys { "ARROWS CHOOSE  F OR SPACE START" } else { "PRESS PUNCH TO START" } }
         else if !g.locked[0] || !g.locked[1] { "PRESS TO LOCK IN" }
         else { "FIGHT" };
     blip.draw_centered(prompt, 374.0, 2.0, BLIP_WHITE);
@@ -508,7 +509,7 @@ pub(crate) fn draw_ending(blip: &Blip, g: &Game) {
     stamp(blip, ENDINGS[g.pick], 162.0, 1.0, BLIP_WHITE);
     stamp(blip, &run, 148.0, 1.0, if g.continues == 0 { BLIP_YELLOW } else { BlipColor { r: 0.8, g: 0.8, b: 0.86, a: 1.0 } });
     if !g.phase.active() && (g.now * 2.0) as i32 % 2 == 0 {
-        stamp(blip, "PRESS FIRE", 372.0, 2.0, BLIP_YELLOW);
+        stamp(blip, web::controls().pick("PRESS SPACE", "PRESS PUNCH", "PRESS PUNCH"), 372.0, 2.0, BLIP_YELLOW);
     }
 }
 

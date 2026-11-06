@@ -191,7 +191,7 @@ fn wind(buf: &mut [f32], at: usize, dur: f32, f0: f32, f1: f32, vol: f32, rng: &
 /// A stone cellar: four damped combs into two all-passes (Schroeder), mixed
 /// back under the dry signal. `size` scales the delays, `wet` the level.
 fn cellar(buf: &mut Vec<f32>, size: f32, wet: f32, tail: f32) {
-    buf.extend(std::iter::repeat(0.0).take(secs(tail)));
+    buf.extend(std::iter::repeat_n(0.0, secs(tail)));
     let combs = [1557usize, 1617, 1491, 1422].map(|d| (d as f32 * size) as usize);
     let mut out = vec![0.0f32; buf.len()];
     for &d in &combs {
@@ -261,7 +261,7 @@ pub fn dungeon() -> Vec<u8> {
     let bars = 16;
     let body = secs(bar * bars as f32);
     let mut buf = vec![0.0f32; body + secs(4.0)];
-    let mut rng = Rng(0x51ab_1e5);
+    let mut rng = Rng(0x051a_b1e5);
     // the ostinato: six eighths a bar, root-fifth-octave and a turn
     let fig = [0, 7, 12, 3, 7, 0];
     // the solo string sings the title's horn call, turned into the dirge's 3/4

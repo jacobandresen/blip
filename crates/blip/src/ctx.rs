@@ -293,7 +293,9 @@ impl Blip {
         .ok();
 
         // Unseeded, every game deals the same food, rocks and drops each time.
-        macroquad::rand::srand((macroquad::miniquad::date::now() * 1000.0) as u64);
+        // A bot run draws the same numbers every time, so its result repeats.
+        let seed = crate::bot::seed().unwrap_or((macroquad::miniquad::date::now() * 1000.0) as u64);
+        macroquad::rand::srand(seed);
         let mut rng = Lcg(0xdead_beef);
         // Stagger initial cooldowns so effects don't all fire at once.
         let tear_cd   = 20.0 + rng.next() * 30.0;
@@ -445,7 +447,6 @@ impl Blip {
             }
         }
 
-        #[cfg(not(target_arch = "wasm32"))]
         crate::bot::before_present();
 
         next_frame().await;
@@ -456,7 +457,6 @@ impl Blip {
 
         let raw = get_frame_time();
         self.delta_time = if raw > 0.1 { 0.1 } else { raw };
-        #[cfg(not(target_arch = "wasm32"))]
         if let Some(fixed) = crate::bot::after_present() { self.delta_time = fixed; }
         self.update_fx_level(raw);
         self.update_glitch(self.delta_time);
@@ -992,40 +992,29 @@ impl Blip {
             return; // no clear room (tiny canvas or a very long live score)
         }
 
-        let head = format!("HI {} ", hi.score); // trailing space sits before the name
-        let mut name: String = hi.name.chars().take(12).collect();
-        let width_of =
-            |n: &str, sz: f32| (head.chars().count() + n.chars().count()) as f32 * 6.0 * sz;
-
-        // Shrink the text, then trim the name, until the whole label fits.
-        let mut sz = 1.5_f32;
-        while width_of(&name, sz) > avail {
-            if sz > 1.0 {
-                sz -= 0.1;
-            } else if name.chars().count() > 3 {
-                name.pop();
-            } else {
-                break;
-            }
+        // Whole-size text: the name is trimmed to fit, then dropped, then the line.
+        let head = format!("HI {}", hi.score);
+        let cw = 12.0;
+        let head_w = head.chars().count() as f32 * cw;
+        if head_w > avail {
+            return;
         }
-        let head_str = head.trim_end();
-        if head_str.chars().count() as f32 * 6.0 * sz > avail {
-            return; // even "HI <score>" alone won't fit without crowding
-        }
-
-        let cw = 6.0 * sz;
-        let total_w = width_of(&name, sz);
-        let x0 = lo + (avail - total_w).max(0.0) / 2.0;
-        self.draw_text(head_str, x0, ty, sz, BLIP_WHITE);
+        let room = ((avail - head_w) / cw) as usize;
+        let name: String = if room > 3 { hi.name.chars().take((room - 1).min(12)).collect() } else { String::new() };
+        let total_w = head_w + if name.is_empty() { 0.0 } else { (name.chars().count() + 1) as f32 * cw };
+        let x0 = lo + (avail - total_w) / 2.0;
+        self.draw_text(&head, x0, ty, 2.0, BLIP_WHITE);
         if !name.is_empty() {
-            font::draw_text_glow(
-                &name,
-                x0 + head.chars().count() as f32 * cw,
-                ty,
-                sz,
-                NEON_CYAN,
-            );
+            font::draw_text_glow(&name, x0 + head_w + cw, ty, 2.0, NEON_CYAN);
         }
+    }
+
+    /// The title screen's start prompt, the same in every game: PRESS SPACE TO
+    /// START, PRESS FIRE TO START or TAP TO START, white at size 3, outlined so
+    /// it reads over artwork too.
+    pub fn draw_start_prompt(&self, y: f32) {
+        let prompt = crate::web::fire_prompt("TO START");
+        self.draw_centered_outlined(&prompt, self.width as f32 / 2.0, y, 3.0, BLIP_WHITE, BLIP_BLACK);
     }
 
     /// Centred `HI 12345 NAME` line for a title screen — drawn only when the
@@ -1037,21 +1026,43 @@ impl Blip {
     }
 
     /// Draw the shared game-over screen over the game's chosen backdrop.
-    /// `ready` controls PRESS FIRE after [`crate::GAME_OVER_MIN_WAIT`].
+    /// `ready` shows the prompt to play again, after [`crate::GAME_OVER_MIN_WAIT`].
     pub fn draw_game_over(&self, score: i32, hi: &crate::web::HighScore, headline: Color, best: Color, prompt: Color, ready: bool) {
+        self.draw_end_screen("GAME OVER", score, hi, headline, best, prompt, ready);
+    }
+
+    /// The screen a game ends on, won or lost: `title` (GAME OVER, YOU WON),
+    /// the score, the best, and the prompt to play again once `ready`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_end_screen(&self, title: &str, score: i32, hi: &crate::web::HighScore, headline: Color, best: Color, prompt: Color, ready: bool) {
         let h = self.height as f32;
-        self.draw_centered("GAME OVER", h / 4.0, 5.0, headline);
+        self.draw_centered(title, h / 4.0, 5.0, headline);
         self.draw_centered(&format!("SCORE {score}"), h / 2.0, 3.0, BLIP_WHITE);
         self.draw_best(score, hi, h / 2.0 + 28.0, best);
         if ready {
-            self.draw_centered("PRESS FIRE", h * 2.0 / 3.0, 3.0, prompt);
+            let again = crate::web::controls().pick("PRESS SPACE", "PRESS FIRE", "TAP TO PLAY");
+            self.draw_centered(again, Self::game_over_prompt_y(h), 3.0, prompt);
         }
     }
 
+    /// A game's own line on its game-over screen (the round reached, the
+    /// length grown): between the best score and the prompt to play again.
+    pub fn draw_game_over_note(&self, text: &str, color: Color) {
+        let h = self.height as f32;
+        let best_end = h / 2.0 + 28.0 + 16.0;
+        self.draw_centered(text, (best_end + Self::game_over_prompt_y(h)) / 2.0 - 8.0, 2.0, color);
+    }
+
+    /// Two thirds down, or lower on a short screen, to leave the note its line.
+    fn game_over_prompt_y(h: f32) -> f32 {
+        (h * 2.0 / 3.0).max(h / 2.0 + 80.0)
+    }
+
     /// Centred end-of-game line: `NEW BEST!` in `new_color` when this run beat
-    /// (or tied) the leaderboard, otherwise `BEST 12345 NAME` in grey.
+    /// (or tied) the leaderboard, otherwise `BEST 12345 NAME` in grey; nothing
+    /// while no best is known (no board, no game played here yet).
     pub fn draw_best(&self, score: i32, hi: &crate::web::HighScore, y: f32, new_color: Color) {
-        if score > 0 && score >= hi.score {
+        if hi.score > 0 && score >= hi.score {
             self.draw_centered("NEW BEST!", y, 2.0, new_color);
         } else if hi.score > 0 {
             self.draw_centered(&hi.label("BEST"), y, 2.0, BLIP_GRAY);

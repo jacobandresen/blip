@@ -442,6 +442,8 @@ impl Game {
     /// stage, the difficulty, round one.
     pub(crate) fn start_match(&mut self, opponent_index: usize) {
         self.opponent_index = opponent_index;
+        blip::bot::levels(RUNGS);
+        blip::bot::reached_level(opponent_index as i32 + 1);
         let foe = self.build_ladder()[opponent_index];
         self.stage = home_of(foe);
         // Below zero the CPU also hesitates (see cpu_think): the first fights

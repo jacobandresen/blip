@@ -2,7 +2,8 @@
 
 ## Adder
 
-The BASIC tape uses the native 480 × 540 pit and the same generated pit art.
+The BASIC tape draws a 620 × 350 pit on BASIC's 640 × 400 screen, where Rust's
+is 460 × 492, with the same generated pit art.
 Both versions draw trails through `blip::draw_polyline` and use the engine's
 segment/circle collision helper, popups, and spark bursts.
 
@@ -38,10 +39,16 @@ their layouts differ even though the spawn-clearance rules match.
 
 ## Rally
 
-The BASIC game now keeps Rust's 480 × 540 playfield, 72-pixel paddles,
-300-pixel-per-second movement, and 275-to-450 ball speed ramp. Paddle spin,
-swept collisions, wall overshoot, CPU tracking, first-to-seven scoring, and
-point and match pauses use the native rules and dimensions.
+The BASIC court is 640 × 400 (Rust's is 480 × 540), so the tape scales the ball
+by the width: Rust's 275-to-450 speed ramp in steps of 15 is 360 to 600 in
+steps of 20, and a rally crosses the court in the same time. Paddle spin,
+swept collisions, wall overshoot, first-to-seven scoring, and point and match
+pauses follow the native rules.
+
+The paddles are not scaled the same way: 64 pixels at 320 pixels a second, and
+a CPU that tracks at 170, on a court 368 pixels tall. Measured in courts per
+rally the paddles are half again as quick as Rust's and the CPU two thirds quicker (72 pixels at 300, CPU 145,
+on 512), so the BASIC CPU is the harder opponent.
 
 Rust's ball integrator lives in `crates/rally/src/physics.rs`. The browser
 comparison in `test/rally-parity.mjs` runs the actual BASIC tape against that
@@ -76,3 +83,9 @@ checks in `test/basic-game-controls.mjs`. Their renamed user copies preserve
 controls through `REM GAME:` metadata. The remaining games still need the same
 deterministic rule comparisons as Adder and Rally; visual smoke checks alone do not
 establish gameplay parity.
+
+The pictures follow the arcade's where the screen allows: Meteors' rock
+colours (`HSV`) and glow lines, Defender's ground line and streak strip,
+Raider's sea and plane shadows, Brawler's K.O. and PERFECT calls, and the
+shared game-over screen (`DRAW_GAME_OVER`). Warlock's bottom panel becomes
+two side panels, because BASIC's screen is wider than it is tall.

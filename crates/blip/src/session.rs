@@ -27,24 +27,29 @@ impl Session {
     /// Add `pts` to the score.
     pub fn add_score(&mut self, pts: i32) {
         self.score = self.score.saturating_add(pts);
+        crate::bot::set("score", self.score as f64);
     }
 
     /// Decrement lives by one and report whether the game should end.
     pub fn lose_life(&mut self) -> LifeResult {
         self.lives -= 1;
+        crate::bot::add("deaths", 1.0);
         if self.lives <= 0 { LifeResult::GameOver } else { LifeResult::StillAlive }
     }
 
     /// Advance to the next level (increments the level counter only).
     pub fn next_level(&mut self) {
         self.level += 1;
+        crate::bot::reached_level(self.level);
     }
 
     /// Reset for a fresh game: zero the score, and restore lives and level.
+    /// A bot run with `BLIP_BOT_LEVEL=n` starts at level n.
     pub fn reset(&mut self, lives: i32) {
         self.score = 0;
-        self.level = 1;
+        self.level = 1 + crate::bot::level(i32::MAX as usize) as i32;
         self.lives = lives;
+        crate::bot::reached_level(self.level);
     }
 }
 

@@ -64,22 +64,30 @@
     return who === 0 && i < 2 ? 'button1' : null;
   }
 
-  // Caps carry no lettering (a label is kept as the accessible name only).
+  // Caps carry no lettering; what each does is printed on the panel beside
+  // it (spec.label, else the game's capLabel, else FIRE).
+  function legendFor(spec) {
+    return spec && game ? spec.label || game.capLabel || 'FIRE' : '';
+  }
+  function legend(spec) {
+    var text = legendFor(spec);
+    return text ? '<small class="cap-legend" aria-hidden="true">' + text + '</small>' : '';
+  }
   function stickCap(st, who, i) {
     var spec = specFor(who, i), name = spec && capName(st, who, i);
     var b = el('div', 'arcade-btn lettered' + (spec ? '' : ' spare'),
-      '<span class="arcade-btn-cap"></span>');
+      '<span class="arcade-btn-cap"></span>' + legend(spec));
     if (name && game) b.setAttribute('data-blip', name);
-    if (spec && spec.label) b.setAttribute('aria-label', spec.label);
+    if (legendFor(spec)) b.setAttribute('aria-label', legendFor(spec));
     if (buttons.length === 2 && i === 1) b.classList.add('alt');
     return b;
   }
   function padCap(st, who, i) {
     var spec = specFor(who, i), name = spec && capName(st, who, i);
     var b = el('button', 'snes-btn cap' + (i + 1) + (spec ? '' : ' spare'),
-      '<span></span>', { type: 'button' });
+      '<span></span>' + legend(spec), { type: 'button' });
     if (name) b.setAttribute('data-blip', name);
-    if (spec && spec.label) b.setAttribute('aria-label', spec.label);
+    if (legendFor(spec)) b.setAttribute('aria-label', legendFor(spec));
     // A game with two different actions (Meteors: fire / hyperspace) gets a
     // blue second cap; a one-button game's two caps are both fire.
     if (buttons.length === 2 && i === 1) b.classList.add('alt');

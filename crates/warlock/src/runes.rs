@@ -37,8 +37,11 @@ const CY: f32 = 176.0;
 const R: f32 = 89.0;
 const SIZE: f32 = 6.0;
 
-/// Every stroke of the inscription in picture pixels: (letter index, from, to).
-pub fn strokes() -> Vec<(usize, (f32, f32), (f32, f32))> {
+/// One pen stroke: the letter it belongs to, from, to.
+pub type Stroke = (usize, (f32, f32), (f32, f32));
+
+/// Every stroke of the inscription in picture pixels.
+pub fn strokes() -> Vec<Stroke> {
     let n = TEXT.len();
     let (a0, a1) = (std::f32::consts::PI + 0.16, std::f32::consts::TAU - 0.5);
     let mut out = Vec::new();

@@ -489,7 +489,7 @@ test(`a phone on its side puts the controls beside the picture`, async (t) => {
       await waitFor(cdp, "document.querySelectorAll('.arcade-btn').length > 0", 15000);
       await sleep(250);
       return evaluate(cdp, `(function () {
-        var bar = document.querySelector('#topbar, #kiosk-bar, .kiosk-bar');
+        var bar = document.querySelector('#topbar, .kiosk-bar');
         var ball = document.querySelector('.stick-ball').getBoundingClientRect();
         var cap = document.querySelector('.arcade-btn').getBoundingClientRect();
         return {

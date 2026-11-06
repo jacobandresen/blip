@@ -19,7 +19,7 @@ for (const touch of [false, true]) test(`Bubbler BASIC players move, jump, join,
     BlipBasic.lines.set(80, 'REM NO MUSIC');
     BlipBasic.lines.set(85, 'START_GAME:SHOW "PLAY":FOR I=1 TO TOY_COUNT:TOY_ON(I)=0:NEXT I');
     BlipBasic.lines.set(Number(roundWon), 'REM THE ROUND NEVER ENDS');
-    BlipBasic.lines.set(165, 'SOUND 1000+TWO+2*(PX(1)>SPAWN_X(1)+10)+4*(PY(1)<SPAWN_Y(1)-10)+8*(PX(2)<SPAWN_X(2)-10)+16*(PY(2)<SPAWN_Y(2)-10)+32*(BLOW_WAIT(1)>0)+64*(BLOW_WAIT(2)>0),0,0');
+    BlipBasic.lines.set(165, 'SOUND 1000+TWO+2*(PLAYER_X(1)>SPAWN_X(1)+10)+4*(PLAYER_Y(1)<SPAWN_Y(1)-10)+8*(PLAYER_X(2)<SPAWN_X(2)-10)+16*(PLAYER_Y(2)<SPAWN_Y(2)-10)+32*(BLOW_WAIT(1)>0)+64*(BLOW_WAIT(2)>0),0,0');
     BlipBasic.submit('SAVE MY_BUBBLES');
     BlipBasic.submit('RUN');
   }, roundWon);
@@ -83,5 +83,29 @@ test('Rally BASIC touch dials move both real paddles independently', async (t) =
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     await frame.waitForFunction((bits) => window.__paddleFlags === bits, bits, { timeout: 3000 });
   }
+  assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
+});
+
+test('Warlock BASIC seats the second pad: its A starts a game for two wizards', async (t) => {
+  const { page, origin } = await openPage(t, 'chromium', { hasTouch: true, viewport: { width: 390, height: 844 } });
+  await instrumentBasicSound(page, 'function(f,s,v){window.__wizards=f-1000;}');
+  await page.goto(`${origin}/basic.html`);
+  await page.evaluate(() => { BlipBasic.submit('LOAD /TAPE/WARLOCK.BLIP'); });
+  await page.waitForFunction(() => document.querySelector('#basic-output').textContent.includes('LOADED /TAPE/WARLOCK.BLIP'));
+  await page.evaluate(() => {
+    BlipBasic.lines.set(18, 'REM NO MUSIC');
+    BlipBasic.lines.set(185, 'IF STATE$="PLAY" THEN SOUND 1001+TWO_PLAYER,0,0');
+    BlipBasic.submit('RUN');
+  });
+  await page.waitForFunction(() => document.body.hasAttribute('data-wasm-running'));
+  assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-open')), true, 'station two takes input');
+  const frame = page.frames().find((frame) => frame.url().includes('basic-runtime.html'));
+  const button = await page.locator('#topbar [data-blip="p2button1"]').boundingBox();
+  const cdp = await page.context().newCDPSession(page);
+  const at = { x: button.x + button.width / 2, y: button.y + button.height / 2 };
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, ...at }] });
+  await page.waitForTimeout(120);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await frame.waitForFunction(() => window.__wizards === 2, null, { timeout: 5000 });
   assert.equal(await page.locator('body').getAttribute('data-wasm-error'), null);
 });

@@ -277,7 +277,7 @@ fn floor_decor(kind: u32) -> Image {
             for k in 0..14 {
                 let x = 4.0 + hash(k, 1, 91) * 24.0;
                 let y = 4.0 + hash(k, 2, 91) * 24.0;
-                let a = hash(k, 3, 91) * 6.28;
+                let a = hash(k, 3, 91) * std::f32::consts::TAU;
                 line(&mut img, (x, y), (x + a.cos() * 3.0, y + a.sin() * 3.0), 1.0, rgb(0x5a4a2e));
             }
             disc(&mut img, 24.0, 8.0, 2.0, shade(STONE, 0.9));
@@ -416,7 +416,7 @@ pub fn flagstones(w: u32, h: u32, seed: u32) -> Image {
     for k in 0..40 {
         let mut x = hash(k, 1, seed + 9) * w as f32;
         let mut y = hash(k, 2, seed + 9) * h as f32;
-        let dir = hash(k, 3, seed + 9) * 6.28;
+        let dir = hash(k, 3, seed + 9) * std::f32::consts::TAU;
         for j in 0..(4 + (hash(k, 4, seed) * 8.0) as i32) {
             let a = dir + (hash(k, j, seed + 11) - 0.5) * 1.4;
             x += a.cos() * 1.3;

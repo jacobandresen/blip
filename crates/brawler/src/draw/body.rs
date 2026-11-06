@@ -28,6 +28,8 @@ pub(crate) fn mood_of(f: &Fighter) -> Mood {
         Act::Attack => Mood::Shout,
         Act::Hitstun | Act::Knockdown | Act::Defeat => Mood::Hurt,
         Act::Victory => Mood::Happy,
+        // Rocked, and it shows on the face too.
+        _ if f.stagger > 0.0 => Mood::Hurt,
         _ => Mood::Calm,
     }
 }

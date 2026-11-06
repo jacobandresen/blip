@@ -6,14 +6,6 @@
 /* Cabinet accent — "r, g, b" so rgba(var(--cab), a) works. shell.js overrides
    this per game (see BLIP_GAMES in kiosk.js); this green is just the default
    before that runs. */
-:root {
-  --cab: 50, 200, 50;
-  /* Height of the marquee strip, and so of the BLIP logo and coin slot
-     mounted on its ends; one variable so they cannot drift apart. Redefined
-     per breakpoint below. */
-  --marquee-h: var(--cabinet-fascia-height);
-  --marquee-gap: 8px;
-}
 
 html {
   /* overflow:hidden only on html, not body — iOS Safari anchors position:fixed
@@ -217,7 +209,10 @@ canvas {
 }
 #need-coin-overlay.visible {display:grid}
 .nco-panel {text-align:center;font-family:'Courier New',monospace;text-transform:uppercase;letter-spacing:.14em}
-.nco-msg {color:#7d3025;font-size:clamp(18px,4vw,30px);font-weight:900;letter-spacing:.2em}
+.nco-msg {color:#e8b04a;font-size:clamp(16px,3vw,24px);font-weight:900;letter-spacing:.2em}
+.nco-legend {max-width:560px;margin:18px auto 0}
+.nco-legend .pc-label {color:#c6b89d}
+.nco-legend .pc-keys i {color:#8d7a5c}
 .nco-sub {margin-top:13px;font-size:11px;font-weight:700}
 .nco-how {color:#777064;font-size:9px;letter-spacing:.08em}
 .nco-go {margin-top:22px;color:#f1e3c0;font-size:clamp(13px,2.2vw,18px);animation:nco-blink 1.2s steps(2,jump-none) infinite}
@@ -273,7 +268,10 @@ canvas {
 
 /* Rally: the same panel as every game, the dials in the cross's slots and
    the cross's size. Its sticks, pads and caps are hidden, not removed. */
-:root { --dial: var(--dpad, 58px); --ctl-cx: 36px; }
+:root { --cab: 50, 200, 50; /* Height of the marquee strip, and so of the BLIP logo and coin slot
+     mounted on its ends; one variable so they cannot drift apart. Redefined
+     per breakpoint below. */
+  --marquee-h: var(--cabinet-fascia-height); --marquee-gap: 8px; --dial: var(--dpad, 58px); --ctl-cx: 36px; }
 :root[data-dials] #paddle-dial, :root[data-dials] #paddle-dial-p2 { display: block; }
 :root[data-dials] :is(.deck-side, .snes-dpad, .snes-face, .snes-wordmark, .snes-pad.second) { display: none !important; }
 :root[data-dials] #snes-pad { left: 0; right: 0; width: 100%; }
@@ -915,7 +913,9 @@ canvas {
 :root[data-card-loading] canvas {visibility:hidden}
 
 /* The cabinet's screen stays fixed behind the selector. */
-:root[data-cabinet-screen] :is(.blip-logo,#insert-coin-btn,#topbar,#marquee-bar,#arcade-bezel,.cabinet-glass,.cab-rail,#need-coin-overlay,#loader) {display:none!important}
+:root[data-cabinet-screen] :is(.blip-logo,#insert-coin-btn,#topbar,#marquee-bar,#arcade-bezel,.cabinet-glass,.cab-rail,#need-coin-overlay,#loader) {
+  display:none!important;
+}
 :root[data-cabinet-screen] canvas {clip-path:none}
 
 /* The shared cabinet skin gives the deck a body background after its
@@ -930,7 +930,9 @@ canvas {
 
 /* Amstrad mode is a game inside the CPC monitor; the host keeps the case. */
 :root[data-amstrad] body::after,
-:root[data-amstrad] :is(.blip-logo,#insert-coin-btn,#topbar,#controls-card,#marquee-bar,#arcade-bezel,.cabinet-glass,.cab-rail,#need-coin-overlay) { display:none!important; }
+:root[data-amstrad] :is(.blip-logo,#insert-coin-btn,#topbar,#controls-card,#marquee-bar,#arcade-bezel,.cabinet-glass,.cab-rail,#need-coin-overlay) {
+  display:none!important;
+}
 :root[data-amstrad] body { background:#000; }
 :root[data-amstrad] canvas { clip-path:none; }
 :root[data-amstrad] .app-back { display:none!important; }
@@ -1164,7 +1166,13 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 :root[data-appstyle]:not([data-layout="landscape"]) .cc-install { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 :root[data-appstyle] #cc-guide { background: rgba(118, 118, 128, .3); }
 /* The "?" is the bar's trailing button, as in an iOS navigation bar. */
-:root[data-appstyle] #card-button { left: auto !important; right: calc(env(safe-area-inset-right, 0px) + 16px) !important; width: 26px; height: 26px; top: calc((var(--cabinet-fascia-height) - 26px) / 2 + env(safe-area-inset-top, 0px)); }
+:root[data-appstyle] #card-button {
+  left: auto !important;
+  right: calc(env(safe-area-inset-right, 0px) + 16px) !important;
+  width: 26px;
+  height: 26px;
+  top: calc((var(--cabinet-fascia-height) - 26px) / 2 + env(safe-area-inset-top, 0px));
+}
 
 /* The launch screen's copy, fading into the game's first frame. */
 .launch-fade {
@@ -1195,8 +1203,21 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
   background: rgba(37, 37, 41, .86); -webkit-backdrop-filter: blur(40px) saturate(1.8); backdrop-filter: blur(40px) saturate(1.8);
   box-shadow: 0 10px 40px rgba(0, 0, 0, .4); color: #fff; font-family: var(--app-font);
 }
-:root[data-appstyle] .blip-hs-title { font: 600 17px/1.3 var(--app-font); letter-spacing: 0; color: #fff; text-shadow: none; text-transform: lowercase; margin-bottom: 4px; }
-:root[data-appstyle] .blip-hs-sub { font: 400 13px/1.35 var(--app-font); letter-spacing: 0; color: rgba(235, 235, 245, .6); text-transform: lowercase; margin: 2px 0 10px; }
+:root[data-appstyle] .blip-hs-title {
+  font: 600 17px/1.3 var(--app-font);
+  letter-spacing: 0;
+  color: #fff;
+  text-shadow: none;
+  text-transform: lowercase;
+  margin-bottom: 4px;
+}
+:root[data-appstyle] .blip-hs-sub {
+  font: 400 13px/1.35 var(--app-font);
+  letter-spacing: 0;
+  color: rgba(235, 235, 245, .6);
+  text-transform: lowercase;
+  margin: 2px 0 10px;
+}
 :root[data-appstyle] .blip-hs-title::first-letter, :root[data-appstyle] .blip-hs-sub::first-letter { text-transform: uppercase; }
 :root[data-appstyle] .blip-hs-err { font: 400 13px/1.3 var(--app-font); color: #ff453a; }
 :root[data-appstyle] .blip-hs-input {
@@ -1266,7 +1287,10 @@ body.cabinet-page .ts-demo {background:#e8cea42b;box-shadow:0 0 0 1px #e8cea43b,
 }
 @media (max-width:520px) {
   :root:not([data-appstyle]) #marquee-bar.jukebox-marquee #marquee-name.machine-marquee {padding:0 4px 0 14px}
-  :root:not([data-appstyle]) .machine-marquee-name {font-size:12px;text-shadow:-1px -1px #120c18,1px -1px #120c18,-1px 1px #120c18,1px 1px #120c18,2px 2px 0 color-mix(in srgb,var(--trim) 70%,#000)}
+  :root:not([data-appstyle]) .machine-marquee-name {
+    font-size:12px;
+    text-shadow:-1px -1px #120c18,1px -1px #120c18,-1px 1px #120c18,1px 1px #120c18,2px 2px 0 color-mix(in srgb,var(--trim) 70%,#000);
+  }
 }
 
 /* The arcade's zoom ends on the machine's screen; the game page opens on the same picture, where the game will

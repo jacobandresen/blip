@@ -7,11 +7,11 @@
   <title>BLIP 64</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <script src="blip_core.js?v=10"></script>
-  <link rel="stylesheet" href="kiosk.css?v=494">
-  <link rel="stylesheet" href="basic.css?v=57">
-  <link rel="stylesheet" href="paint.css?v=4">
-  <link rel="stylesheet" href="tune.css?v=1">
+  <script src="blip_core.js?v=11"></script>
+  <link rel="stylesheet" href="kiosk.css?v=498">
+  <link rel="stylesheet" href="basic.css?v=61">
+  <link rel="stylesheet" href="paint.css?v=5">
+  <link rel="stylesheet" href="tune.css?v=2">
 </head>
 <body>
   <div class="top-marquee-bar" aria-hidden="true"></div>
@@ -25,7 +25,7 @@
       <button type="button" id="monitor-fullscreen" aria-label="Maximize monitor" title="Maximize monitor" aria-pressed="false">⤢</button>
       <div class="monitor-shell">
         <div class="monitor-ridge"></div>
-        <div class="screen-bezel">
+        <div class="crt-bezel">
           <div class="screen" id="basic-screen">
             <canvas id="basic-graphics" width="320" height="200" aria-hidden="true"></canvas>
             <iframe id="basic-wasm-frame" title="BLIP BASIC WebAssembly display" hidden allow="autoplay"></iframe>
@@ -90,7 +90,7 @@
   </main>
   <a href="basic-book.html" id="basic-book-peek" aria-label="Open the BLIP BASIC programming book"><img src="blip-basic-cover.svg" alt="BLIP BASIC programming book"></a>
   <button type="button" id="exit-game" class="game-exit">EXIT GAME</button>
-  <div id="kiosk-bar" class="kiosk-bar amstrad-controls" aria-label="BLIP game controls">
+  <div id="topbar" class="kiosk-bar amstrad-controls" aria-label="BLIP game controls">
     <div class="deck-panel">
       <div id="amstrad-rally-dial-p1" class="amstrad-rally-dial" aria-label="Player 1 paddle dial">
         <div class="amstrad-dial-cap"><div class="amstrad-dial-hand"></div></div><span>P1</span>
@@ -100,10 +100,10 @@
       </div>
     </div>
   </div>
-  <script src="deck.js?v=18"></script>
-  <script src="basic-language.js?v=4"></script>
+  <script src="deck.js?v=19"></script>
+  <script src="basic-language.js?v=5"></script>
   <script src="blip_controller.js?v=12"></script>
-  <script src="basic.js?v=96"></script>
+  <script src="basic.js?v=100"></script>
   <script src="paint.js?v=4"></script>
   <script src="tune.js?v=7"></script>
 </body>

@@ -226,3 +226,13 @@ fn a_sound_is_named_by_its_file_wav_when_none_is_given() {
     // A tune saved from TUNE plays its sound.
     assert_eq!(sound_path("/USER/MUSIC/THEME.TUNE"), "/USER/MUSIC/THEME.WAV");
 }
+
+#[test]
+fn every_drawing_command_has_its_case() {
+    let source = include_str!("graphics.rs");
+    let handled = |name: &str| source.contains(&format!("\"{name}\" if")) || source.contains(&format!("\"{name}\" =>"));
+    for name in super::graphics::DRAW_COMMANDS {
+        assert!(handled(name), "{name} is listed but draw_statement has no case for it");
+    }
+    assert_eq!(method_call("draw_game_over(1,2)"), Some(("draw_game_over".into(), "1,2".into())));
+}

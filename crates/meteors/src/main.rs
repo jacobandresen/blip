@@ -17,7 +17,6 @@ use blip::{
 // The effects and music are made by build.rs; the tests check them here.
 #[cfg(test)]
 mod tunes;
-#[cfg(not(target_arch = "wasm32"))]
 mod bot;
 mod levels;
 
@@ -419,6 +418,7 @@ fn landing_spot(g: &Game) -> (f32, f32) {
 }
 
 fn hyperspace(g: &mut Game, sfx: &Sounds) {
+    blip::bot::add("hyperspace", 1.0);
     play_sfx(&sfx.hyperspace);
     (g.ship.x, g.ship.y) = landing_spot(g);
     g.ship.vx = 0.0;
@@ -701,6 +701,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
                 let c = rock_color(&a, g.sess.level, blip::macroquad::time::get_time() as f32);
                 burst(g, a.x, a.y, a.vx, a.vy, 5, size.radius() * 0.5, 60.0, c);
                 award(g, sfx, size.points());
+                blip::bot::add(if size == ASize::Small { "rocks_dust" } else { "rocks_split" }, 1.0);
                 match size {
                     ASize::Large  => play_sfx(&sfx.bang_large),
                     ASize::Medium => play_sfx(&sfx.bang_medium),
@@ -733,6 +734,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
             if hit {
                 g.bullets[bi].active = false;
                 g.saucer.active = false;
+                blip::bot::add("saucers", 1.0);
                 let (sx, sy, svx) = (g.saucer.x, g.saucer.y, g.saucer.vx);
                 burst(g, sx, sy, svx, 0.0, 6, r, 90.0, NEON_PINK);
                 let pts = if g.saucer.big { 200 } else { 1000 };
@@ -749,9 +751,7 @@ fn update_world(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     if pool_iter(&g.asteroids).count() == 0 {
-        blip::bot::set(&format!("t_wave{}", g.sess.level), blip::bot::clock() as f64);
         g.sess.next_level();
-        blip::bot::set("level", g.sess.level as f64);
         g.start_wave();
     }
 }
@@ -1106,9 +1106,9 @@ fn draw_title(blip: &Blip, hi: &web::HighScore, art: &[Texture2D; 4]) {
     blip.draw_centered("METEORS", (WIN_H / 4) as f32, 6.0, NEON_CYAN);
     // METEORS is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4) as f32 + 50.0, NEON_YELLOW);
-    blip.draw_centered("PRESS FIRE", (WIN_H / 2) as f32, 3.0, NEON_YELLOW);
     // No touch surface here: a phone plays on the pad.
     let keys = web::controls() == web::Controls::Keys;
+    blip.draw_start_prompt((WIN_H / 2) as f32);
     let (l1, l2) = if keys { ("ARROWS/WASD ROTATE+THRUST", "SPACE FIRE  ·  Z HYPERSPACE") }
         else { ("PAD TURNS   UP THRUSTS", "BUTTONS FIRE AND HYPERSPACE") };
     blip.draw_centered(l1, (WIN_H * 2 / 3) as f32, 2.0, BLIP_GRAY);
@@ -1132,6 +1132,7 @@ fn conf() -> blip::macroquad::window::Conf {
 
 #[blip::macroquad::main(conf)]
 async fn main() {
+    blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
     let blot = Texture2D::from_file_with_format(blip::png!("soft_glow"), Some(blip::macroquad::prelude::ImageFormat::Png));
@@ -1182,8 +1183,7 @@ async fn main() {
 
         music.play(if g.state != State::Title && g.sess.level >= STORM_WAVE { 1 } else { 0 });
 
-        #[cfg(not(target_arch = "wasm32"))]
-        if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }
+        if blip::bot::active() { bot::drive(&g); }
         match g.state {
             State::Title => update_title(&mut g),
             State::Play  => update_play(&mut g, dt, &mut sfx, &mut thrust_snd_t),
