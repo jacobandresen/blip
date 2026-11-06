@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en" data-basic-runtime>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000}#glcanvas{display:block;width:100%;height:100%;outline:0;touch-action:none}</style>
+</head>
+<body>
+  <canvas id="glcanvas" tabindex="0"></canvas>
+  <script src="mq_js_bundle.js?v=2"></script>
+  <script src="blip_bridge.js?v=20"></script>
+  <script>
+    'use strict';
+    window.blipBasicSource = '';
+    window.blipBasicFiles = [];
+    window.blipBasicSoundEvents = 0;
+    window.blipBasicSoundTimes = [];
+    var encoder = new TextEncoder();
+    var decoder = new TextDecoder();
+    var audioContext;
+    // The user's files, as data URLs: decoded once, when first copied in.
+    function fileEntry(index) { return window.blipBasicFiles[index] || {}; }
+    function fileBytes(index) {
+      var item=fileEntry(index);
+      if(item.bytes)return item.bytes;
+      var encoded=String(item.data||'').split(',')[1]||'',binary=atob(encoded),bytes=new Uint8Array(binary.length);
+      for(var i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+      item.bytes=bytes;return bytes;
+    }
+    function playBasicTone(frequency, seconds, volume) {
+      window.blipBasicSoundEvents++;
+      window.blipBasicSoundTimes.push(performance.now());
+      if (frequency <= 0 || seconds <= 0 || volume <= 0) return;
+      var AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      audioContext = audioContext || new AudioContext();
+      if (audioContext.state === 'suspended') audioContext.resume().catch(function () {});
+      var now = audioContext.currentTime, oscillator = audioContext.createOscillator(), gain = audioContext.createGain();
+      oscillator.type = 'square';
+      oscillator.frequency.setValueAtTime(frequency, now);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(volume * 0.18, now + 0.006);
+      gain.gain.setTargetAtTime(0.0001, now + Math.max(0.01, seconds * 0.72), Math.max(0.008, seconds * 0.08));
+      oscillator.connect(gain); gain.connect(audioContext.destination);
+      oscillator.start(now); oscillator.stop(now + seconds);
+    }
+    miniquad_add_plugin({register_plugin:function(imports){
+      imports.env.blip_basic_source_len=function(){return encoder.encode(window.blipBasicSource).length;};
+      imports.env.blip_basic_source_copy=function(ptr,capacity){var bytes=encoder.encode(window.blipBasicSource),size=Math.min(bytes.length,capacity),memory=window.wasm_memory;if(!memory)return 0;new Uint8Array(memory.buffer,ptr,size).set(bytes.subarray(0,size));return size;};
+      imports.env.blip_basic_file_count=function(){return window.blipBasicFiles.length;};
+      imports.env.blip_basic_file_name_len=function(index){return encoder.encode(String(fileEntry(index).path||'')).length;};
+      imports.env.blip_basic_file_name_copy=function(index,ptr,capacity){var bytes=encoder.encode(String(fileEntry(index).path||'')),size=Math.min(bytes.length,capacity),memory=window.wasm_memory;if(!memory)return 0;new Uint8Array(memory.buffer,ptr,size).set(bytes.subarray(0,size));return size;};
+      imports.env.blip_basic_file_bytes_len=function(index){return fileBytes(index).length;};
+      imports.env.blip_basic_file_bytes_copy=function(index,ptr,capacity){var bytes=fileBytes(index),size=Math.min(bytes.length,capacity),memory=window.wasm_memory;if(!memory)return 0;new Uint8Array(memory.buffer,ptr,size).set(bytes.subarray(0,size));return size;};
+      imports.env.blip_basic_ready=function(){window.parent.postMessage({type:'blip-basic-wasm-ready'},location.origin);};
+      imports.env.blip_basic_program_loaded=function(){window.parent.postMessage({type:'blip-basic-program-loaded'},location.origin);};
+      imports.env.blip_basic_runtime_error=function(ptr,len){var message=decoder.decode(new Uint8Array(window.wasm_memory.buffer,ptr,len));window.parent.postMessage({type:'blip-basic-runtime-error',message:message},location.origin);};
+      imports.env.blip_basic_sound=playBasicTone;
+      imports.env.blip_basic_audio_event=function(){window.blipBasicSoundEvents++;};
+      imports.env.blip_basic_file_available=function(ptr,len){var path=decoder.decode(new Uint8Array(window.wasm_memory.buffer,ptr,len));return window.parent.BlipBasic&&window.parent.BlipBasic.isFileAvailable(path)?1:0;};
+    }});
+    window.addEventListener('message',function(event){
+      if(event.origin!==location.origin||!event.data)return;
+      if(event.data.type==='blip-basic-source'){window.blipBasicSource=String(event.data.source||'');window.blipBasicFiles=Array.isArray(event.data.files)?event.data.files:[];}
+      if(event.data.type==='blip-basic-key'){
+        var canvas=document.getElementById('glcanvas'),type=event.data.down?'keydown':'keyup';
+        canvas.dispatchEvent(new KeyboardEvent(type,{key:event.data.key,code:event.data.code,bubbles:true,cancelable:true}));
+      }
+    });
+    window.addEventListener('keydown',function(event){if(event.key==='Escape'){event.preventDefault();window.parent.postMessage({type:'blip-basic-escape'},location.origin);}});
+    load('basic-runtime.wasm');
+  </script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="silver" cx="32%" cy="22%" r="78%">
+      <stop stop-color="#fff"/><stop offset=".35" stop-color="#d9d9d4"/>
+      <stop offset=".72" stop-color="#858781"/><stop offset="1" stop-color="#e9e9df"/>
+    </radialGradient>
+    <linearGradient id="relief" x2=".8" y2="1">
+      <stop stop-color="#f4f2e9"/><stop offset="1" stop-color="#777a75"/>
+    </linearGradient>
+    <path id="title-arc" d="M 9,29 A 24,24 0 0 1 55,29"/>
+  </defs>
+  <circle cx="32" cy="32" r="30.5" fill="#666963"/>
+  <circle cx="32" cy="32" r="28.5" fill="url(#silver)" stroke="#faf9f1" stroke-width="1.2"/>
+  <circle cx="32" cy="32" r="25" fill="none" stroke="#777a74" stroke-width=".8"/>
+  <g fill="#666963" font-family="serif" font-size="4.5" font-weight="bold" letter-spacing=".65">
+    <text><textPath href="#title-arc" startOffset="50%" text-anchor="middle">LIBERTY</textPath></text>
+  </g>
+  <path d="M19 25c1-5 6-8 12-7l5 2 3 5-2 4 2 3-2 2-1 5-4 2-1 7-4 1-2-8-5-4-2-6z"
+        fill="url(#relief)" stroke="#686b66" stroke-width=".8"/>
+  <path d="m31 20 6 2 2 4-3 2 2 3-3 1-2-3-5 1-3-3 2-5z" fill="#aaa99f"/>
+  <path d="M19 31c4-2 8-2 12 0m-14 3c4-2 8-2 13 0m-10 4 8 1" fill="none" stroke="#686b66" stroke-width=".7"/>
+  <path d="M39 39 47 43l2 4-10-2m-8 1 7 6" fill="none" stroke="#696c67" stroke-width="1"/>
+  <g fill="#555852" font-family="serif" text-anchor="middle">
+    <text x="48" y="34" font-size="4.1" font-weight="bold">IN GOD</text>
+    <text x="48" y="39" font-size="4.1" font-weight="bold">WE TRUST</text>
+    <text x="32" y="57" font-size="5.2" font-weight="bold" letter-spacing="1">1964</text>
+  </g>
+  <circle cx="32" cy="32" r="27.5" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width=".6" stroke-dasharray=".8 1.2"/>
+</svg>
