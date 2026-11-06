@@ -17,14 +17,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { displayCommand } from './lib/process.mjs';
+import { GAME_SLUGS as GAMES } from '../test/lib/games.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const GAMES = ['rally', 'bouncer', 'defender', 'bubbler', 'raider', 'meteors', 'serpent', 'brawler', 'adder', 'warlock'];
 const FRAMES = 12, EVERY = 0.25, WIDTH = 240, LIMIT = 60 * 1024;
 // Where the loop starts, past each game's title screen and into play.
 const FROM = { rally: 6, bouncer: 6, defender: 8, bubbler: 8, raider: 8, meteors: 3, serpent: 6, brawler: 10, adder: 8, warlock: 5 };
 // Games whose loop opens on their title screen: that many frames of it, then play.
-// The game's bot waits on the title (WARLOCK_BOT_TITLE) while they are taken; the
+// The game's bot waits on the title (BLIP_BOT_TITLE) while they are taken; the
 // middle title frame is also the cabinet's still, web/<game>/card.png.
 const TITLE = { warlock: 4 };
 
@@ -53,10 +53,8 @@ for (const slug of GAMES.filter((g) => !only.length || only.includes(g))) {
     try {
       execFileSync(command, args, {
         stdio: ['ignore', 'ignore', 'inherit'], timeout: 120000,
-        // Bubbler plays with an autopilot of its own; BLIP_BOT still takes the shots.
         env: { ...process.env, BLIP_BOT: '1', BLIP_CRT: '0', BLIP_SILENT: '1', BLIP_BOT_SHOTS: shots, BLIP_BOT_SHOT_EVERY: String(EVERY), BLIP_BOT_MAXT: String(from + FRAMES * EVERY + 2),
-          ...(slug === 'bubbler' ? { BUBBLER_BOT: '1' } : {}),
-          ...(slug === 'warlock' && titled ? { WARLOCK_BOT_TITLE: String(hold) } : {}) },
+          ...(titled ? { BLIP_BOT_TITLE: String(hold) } : {}) },
       });
     } catch (error) {
       if (error.code === 'ETIMEDOUT') throw error; // the autopilot ends its run with a status of its own

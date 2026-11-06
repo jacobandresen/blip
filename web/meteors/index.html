@@ -33,7 +33,7 @@
   </script>
   <style>:root[data-launching] body{visibility:hidden}</style>
   <script src="../howler.min.js"></script>
-  <script src="../blip_core.js?v=10"></script>
+  <script src="../blip_core.js?v=11"></script>
   <script>(function () {
     var g = blipGameFromPath(location.pathname);
     if (!g) return;
@@ -43,13 +43,13 @@
     document.querySelector('meta[name=apple-mobile-web-app-title]').content = name;
   }());</script>
   <script src="../kiosk.js?v=102"></script>
-  <link rel="stylesheet" href="../marquee.css?v=1">
-  <link rel="stylesheet" href="../kiosk.css?v=159">
-  <link rel="stylesheet" href="../shell.css?v=110">
+  <link rel="stylesheet" href="../marquee.css?v=2">
+  <link rel="stylesheet" href="../kiosk.css?v=163">
+  <link rel="stylesheet" href="../shell.css?v=113">
   <link rel="stylesheet" href="../wear.css?v=14">
-  <link rel="stylesheet" href="../machine.css?v=4">
+  <link rel="stylesheet" href="../machine.css?v=7">
   <script>if (document.documentElement.hasAttribute('data-appstyle')) document.querySelector('link[href*="wear.css"]').disabled = true;</script>
-  <script src="../shell.js?v=141" defer blocking="render"></script>
+  <script src="../shell.js?v=142" defer blocking="render"></script>
 </head>
 <body class="cabinet-page">
 
@@ -83,13 +83,14 @@
    </div>
 
   </div>
-  <script src="../deck.js?v=19"></script>
+  <script src="../deck.js?v=20"></script>
 
   <div id="need-coin-overlay">
     <div class="nco-panel">
-      <div class="nco-msg">POWER OFF</div>
-      <div class="nco-sub nco-go"><span class="nco-pc">PRESS <kbd>SPACE</kbd> TO INSERT A COIN</span><span class="nco-touch">TAP HERE TO INSERT A COIN</span></div>
-      <div class="nco-sub nco-how"><span class="nco-pc">Or click here, or press 5</span><span class="nco-touch">Controls resume when credit is added</span></div>
+      <div class="nco-msg">HOW TO PLAY</div>
+      <div class="pc-legend nco-legend"></div>
+      <div class="nco-sub nco-go"><span class="nco-pc">PRESS <kbd>SPACE</kbd> TO PLAY</span><span class="nco-touch">TAP HERE TO INSERT A COIN</span></div>
+      <div class="nco-sub nco-how"><span class="nco-pc">Space inserts a coin and starts · or press 5 for a coin</span><span class="nco-touch">Then tap again to start</span></div>
     </div>
   </div>
 

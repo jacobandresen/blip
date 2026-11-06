@@ -23,6 +23,24 @@ pub type Chord = (i32, [i32; 3]);
 pub const fn major(root: i32) -> Chord { (root, [0, 4, 7]) }
 pub const fn minor(root: i32) -> Chord { (root, [0, 3, 7]) }
 
+/// The chords the games' tunes share, each rooted in the bass octave the
+/// games use (E2 to D3); `SM` is sharp minor.
+pub mod chords {
+    use super::{major, minor, Chord};
+    pub const CSM: Chord = minor(37);
+    pub const E: Chord = major(40);
+    pub const EM: Chord = minor(40);
+    pub const F: Chord = major(41);
+    pub const FS: Chord = major(42);
+    pub const G: Chord = major(43);
+    pub const GSM: Chord = minor(44);
+    pub const AM: Chord = minor(45);
+    pub const B: Chord = major(47);
+    pub const C: Chord = major(48);
+    pub const D: Chord = major(50);
+    pub const DM: Chord = minor(50);
+}
+
 /// How the drums play under each bar.
 #[derive(Clone, Copy, PartialEq)]
 pub enum Groove {

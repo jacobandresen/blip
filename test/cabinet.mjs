@@ -44,7 +44,7 @@ test('the aisle shows one complete, selectable cabinet for every game', async (t
     cards.map((card) => getComputedStyle(card).getPropertyValue('--marquee-art').trim()));
   assert.equal(new Set(marqueeArt).size, GAMES.length, 'each machine has its own printed marquee motif');
   assert.ok(marqueeArt.every((art) => art.includes('gradient')));
-  assert.equal(await page.locator('#kiosk-bar').isVisible(), false, 'the controls belong to the machines');
+  assert.equal(await page.locator('body > .kiosk-bar').count(), 0, 'the controls belong to the machines');
   assert.equal(await page.locator('#kiosk-insert-btn').isVisible(), false, 'the coin doors belong to the machines');
   assert.equal(await page.locator('#card-button,#controls-card').count(), 0, 'no "?" and no operator’s card on the arcade');
   assert.equal(await page.locator('.jukebox-storage,.jukebox-module').count(), 0,

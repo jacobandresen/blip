@@ -6,7 +6,6 @@
 
 #[cfg(test)]
 mod tunes;
-#[cfg(not(target_arch = "wasm32"))]
 mod bot;
 #[cfg(not(target_arch = "wasm32"))]
 mod scene;
@@ -284,7 +283,12 @@ struct Bonus {
     showing: bool,
     show_i: usize,
     show_t: f32,
+    /// Seconds left to repeat the sequence; the round ends when they run out.
+    left: f32,
 }
+
+/// Time to repeat the spell circle's sequence, so an idle round never stalls the game.
+const BONUS_TIME: f32 = 20.0;
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum State {
@@ -555,7 +559,6 @@ impl Game {
         self.room_stamp = self.room_stamp.wrapping_add(1);
         self.magic.clear();
         self.bonus = None;
-        blip::bot::set("level", self.sess.level as f64);
     }
 
     fn random_open_cell(&self) -> Option<(i32, i32)> {
@@ -607,6 +610,7 @@ impl Game {
 
     fn start_game(&mut self) {
         self.sess.reset(LIVES_START);
+        blip::bot::levels(levels::ROOMS.len());
         self.lives = [LIVES_START, LIVES_START];
         self.active = [true, false];
         self.two_player = false;
@@ -680,7 +684,7 @@ impl Game {
             || self.gates.iter().any(|g| g.cooldown > 0.0 && (g.a == next || g.b == next))
             || self.enemy_occupied(next)
             || self.wizard_occupies(next, idx)
-            || self.warlock.as_ref().map_or(false, |wl| {
+            || self.warlock.as_ref().is_some_and(|wl| {
                 wl.wards > 0 && wl.state != WState::Materializing && wl.circles[wl.circle] == next
             })
     }
@@ -857,7 +861,7 @@ impl Game {
         let dest = if self.wizards[idx].tile == gate.a { gate.b } else { gate.a };
         if self.enemy_occupied(dest)
             || self.wizard_occupies(dest, idx)
-            || self.warlock.as_ref().map_or(false, |wl| wl.wards > 0 && wl.circles[wl.circle] == dest)
+            || self.warlock.as_ref().is_some_and(|wl| wl.wards > 0 && wl.circles[wl.circle] == dest)
         {
             return;
         }
@@ -1393,7 +1397,7 @@ impl Game {
         let (x, y) = self.wizard_px(idx);
         self.magic.fall(x, y, if idx == 0 { REVEAL_C } else { WIZ_ROBE2 });
         self.magic.corpse(x, y, 0, idx as u32, false, 1.1, if idx == 0 { REVEAL_C } else { WIZ_ROBE2 });
-        blip::bot::add("death", 1.0);
+        blip::bot::add("deaths", 1.0);
         self.sfx(Sfx::Death);
         self.died_this_room = true;
         self.lives[idx] -= 1;
@@ -1548,7 +1552,7 @@ impl Game {
 
     fn check_exit(&mut self) {
         let monsters_alive = self.enemies.iter().any(|e| !e.gone) || self.whelp.is_some();
-        let warlock_alive = self.warlock.as_ref().map_or(false, |wl| wl.wards > 0);
+        let warlock_alive = self.warlock.as_ref().is_some_and(|wl| wl.wards > 0);
         let runes_left = self.runes.iter().any(|r| !r.cleansed);
         let was_open = self.exit_open;
         self.exit_open = !monsters_alive && !warlock_alive && !runes_left;
@@ -1622,18 +1626,24 @@ impl Game {
             showing: true,
             show_i: 0,
             show_t: 0.0,
+            left: BONUS_TIME,
         });
         self.banner = Some(("SPELL CIRCLE".to_string(), 2.0));
+        self.taunt = None;
         blip::bot::set("wing", self.cleared_no_death as f64);
     }
 
     fn update_bonus(&mut self, dt: f32) {
         self.fx.update(dt);
         self.update_ambience(dt);
-        self.update_wizard(0, dt);
-        self.wizards[0].reveal_cd = (self.wizards[0].reveal_cd - dt).max(0.0);
-        if self.wizards[0].reveal_t > 0.0 {
-            self.wizards[0].reveal_t = (self.wizards[0].reveal_t - dt).max(0.0);
+        // Either wizard may stand on the stones.
+        for i in 0..2 {
+            if i == 1 && !self.active[1] { continue; }
+            self.update_wizard(i, dt);
+            self.wizards[i].reveal_cd = (self.wizards[i].reveal_cd - dt).max(0.0);
+            if self.wizards[i].reveal_t > 0.0 {
+                self.wizards[i].reveal_t = (self.wizards[i].reveal_t - dt).max(0.0);
+            }
         }
         if let Some((_, t)) = &mut self.banner {
             *t -= dt;
@@ -1654,18 +1664,24 @@ impl Game {
                 }
                 return;
             }
-            (b.stones.clone(), b.seq.clone(), b.expect)
+            b.left -= dt;
+            (b.stones.clone(), b.seq.clone(), b.expect, b.left)
         };
-        let (stones, seq, expect) = repeat_state;
-
-        if !(self.reveal_pressed(0) && self.wizards[0].reveal_cd <= 0.0) {
+        let (stones, seq, expect, left) = repeat_state;
+        if left <= 0.0 {
+            self.banner = Some(("THE CIRCLE FADES".to_string(), 1.6));
+            self.leave_bonus();
             return;
         }
-        self.wizards[0].reveal_cd = REVEAL_CD;
-        self.wizards[0].reveal_t = 0.45;
-        let (x, y) = self.wizard_px(0);
+
+        let Some(who) = (0..2).find(|&i| (i == 0 || self.active[1]) && self.reveal_pressed(i) && self.wizards[i].reveal_cd <= 0.0) else {
+            return;
+        };
+        self.wizards[who].reveal_cd = REVEAL_CD;
+        self.wizards[who].reveal_t = 0.45;
+        let (x, y) = self.wizard_px(who);
         self.fx.ring(x, y, CELL as f32 * 2.0, 0.4, REVEAL_C);
-        let hit = stones.iter().position(|s| distance_lt(self.wizards[0].tile, *s, 1.5));
+        let hit = stones.iter().position(|s| distance_lt(self.wizards[who].tile, *s, 1.5));
         match hit {
             Some(k) if k == seq[expect] => {
                 let pts = 100 * (expect as i32 + 1);
@@ -1691,6 +1707,8 @@ impl Game {
 
     fn leave_bonus(&mut self) {
         self.bonus = None;
+        // Back to play, or the next chamber is drawn but never updated.
+        self.state = State::Play;
         self.sess.next_level();
         self.load_room();
     }
@@ -1889,7 +1907,23 @@ fn room_taunt(level: i32) -> String {
 
 // ---- drawing (the rest lives in art.rs) ----------------------------------
 
+/// The spell circle says what it wants: watch, then stand on each stone in turn and reveal.
+fn draw_bonus_hint(blip: &Blip, g: &Game) {
+    let Some(b) = &g.bonus else { return };
+    let y = (HUD_H + ROWS as i32 * CELL - 46) as f32;
+    let cx = WIN_W as f32 / 2.0;
+    if b.showing {
+        blip.draw_centered_outlined("WATCH THE STONES", cx, y, 2.0, RUNE_CLEAN, BLIP_BLACK);
+        return;
+    }
+    blip.draw_centered_outlined("STEP ON THE STONES IN ORDER", cx, y, 2.0, RUNE_CLEAN, BLIP_BLACK);
+    let press = web::controls().pick("PRESS Z ON EACH", "PRESS REVEAL ON EACH", "PRESS REVEAL ON EACH");
+    let count = format!("{press}   {}/{}   {}", b.expect, b.seq.len(), b.left.ceil().max(0.0) as i32);
+    blip.draw_centered_outlined(&count, cx, y + 18.0, 2.0, BLIP_WHITE, BLIP_BLACK);
+}
+
 fn draw_taunt(blip: &Blip, g: &Game) {
+    draw_bonus_hint(blip, g);
     if let Some((text, t)) = &g.taunt {
         if *t > 0.0 {
             blip.draw_centered_outlined(text, WIN_W as f32 / 2.0, HUD_H as f32 + 10.0, 2.0, WARLOCK_C, BLIP_BLACK);
@@ -1922,13 +1956,7 @@ fn draw_over(blip: &Blip, g: &Game) {
         BLIP_WHITE,
         !g.dead_timer.active(),
     );
-    blip.draw_centered(
-        &format!("WINGS CLEARED {}", g.cleared_no_death),
-        // under the best score, above the engine's PRESS FIRE at two thirds
-        WIN_H as f32 / 2.0 + 52.0,
-        2.0,
-        BLIP_GRAY,
-    );
+    blip.draw_game_over_note(&format!("WINGS CLEARED {}", g.cleared_no_death), BLIP_GRAY);
 }
 
 // ---- entry ----------------------------------------------------------------
@@ -1939,6 +1967,7 @@ fn conf() -> blip::macroquad::window::Conf {
 
 #[blip::macroquad::main(conf)]
 async fn main() {
+    blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
     // Leave the second station available for a mid-game co-op join.
@@ -1990,7 +2019,6 @@ async fn main() {
             t = at + frame as f32 / 60.0;
         }
 
-        #[cfg(not(target_arch = "wasm32"))]
         if blip::bot::active() {
             bot::drive(&g);
         }
@@ -2040,6 +2068,19 @@ async fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn leaving_the_spell_circle_returns_to_play() {
+        let mut g = Game::new();
+        g.start_game();
+        let level = g.sess.level;
+        g.state = State::Bonus;
+        g.start_bonus();
+        g.leave_bonus();
+        assert!(g.state == State::Play, "the spell circle never handed back to play");
+        assert!(g.bonus.is_none());
+        assert_eq!(g.sess.level, level + 1);
+    }
 
     #[test]
     fn a_bolt_stops_at_a_wall_and_not_before() {

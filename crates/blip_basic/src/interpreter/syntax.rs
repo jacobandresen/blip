@@ -135,41 +135,11 @@ pub(super) fn method_call(command: &str) -> Option<(String, String)> {
     if !command.ends_with(')') {
         return None;
     }
-    let raw = command[..start].trim();
-    let name = raw.to_ascii_lowercase();
-    let methods = [
-        "canvas",
-        "clear",
-        "fill_rect",
-        "draw_rect",
-        "draw_line",
-        "draw_line_ex",
-        "draw_polyline",
-        "fx_clear",
-        "fx_update",
-        "fx_draw",
-        "fx_burst",
-        "fx_popup",
-        "fx_ring",
-        "draw_glow_line",
-        "fill_circle",
-        "draw_circle",
-        "fill_capsule",
-        "fill_sunburst",
-        "fill_glow_circle",
-        "draw_texture",
-        "draw_texture_region",
-        "draw_texture_cell",
-        "draw_texture_tinted",
-        "draw_char",
-        "draw_text",
-        "draw_text_outlined",
-        "draw_centered_outlined",
-        "draw_number",
-        "draw_centered",
-        "draw_hud",
-    ];
-    methods.contains(&name.as_str()).then(|| (name, command[start + 1..command.len() - 1].to_string()))
+    let name = command[..start].trim();
+    super::graphics::DRAW_COMMANDS
+        .iter()
+        .any(|known| known.eq_ignore_ascii_case(name))
+        .then(|| (name.to_ascii_lowercase(), command[start + 1..command.len() - 1].to_string()))
 }
 pub(super) fn assignment_eq(source: &str) -> Option<usize> {
     let bytes = source.as_bytes();

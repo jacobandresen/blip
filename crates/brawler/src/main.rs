@@ -18,7 +18,6 @@ mod shots;
 mod draw;
 #[cfg(not(target_arch = "wasm32"))]
 mod export;
-#[cfg(not(target_arch = "wasm32"))]
 mod bot;
 
 use blip::macroquad::input::KeyCode;
@@ -69,6 +68,7 @@ fn main_conf() -> blip::macroquad::window::Conf { window_conf("BRAWLER", WIN_W, 
 
 #[blip::macroquad::main(main_conf)]
 async fn main() {
+    blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
     // Whole lit scenes, not lines on black: at full bloom every fighter
     // wears a halo and the names smear.
@@ -112,8 +112,7 @@ async fn main() {
             }
         }
 
-        #[cfg(not(target_arch = "wasm32"))]
-        if blip::bot::active() { bot::menus(&mut g, blip::bot::clock()); }
+        if blip::bot::active() { bot::menus(&mut g); }
         match g.state {
             State::Title | State::Select => {
                 let m = read_menu(&mut g);
@@ -150,16 +149,12 @@ async fn main() {
                 // Here comes a new challenger: player two's punch button, in
                 // a game they are not in.
                 let solo = g.mode == Mode::Solo && !g.demo && !blip.screenshot_mode;
-                #[cfg(not(target_arch = "wasm32"))]
                 let solo = solo && !blip::bot::active();
                 if solo && any_pressed(P2.punch) { challenge(&mut g); } else { update_fight(&mut g, dt); }
             }
             State::Challenger => update_challenger(&mut g, dt),
             State::Bonus => {
-                #[cfg(not(target_arch = "wasm32"))]
                 let inp = if blip::bot::active() { bot::fight(&g, dt) } else { human_input(&mut g, 0) };
-                #[cfg(target_arch = "wasm32")]
-                let inp = human_input(&mut g, 0);
                 let was_done = g.bonus_done > 0.0;
                 match update_bonus(&mut g, dt, inp) {
                     Some(true) => { g.snd(Sfx::Smash); g.snd_at(Sfx::Cheer, 0.5); }

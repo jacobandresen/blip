@@ -1,17 +1,13 @@
 // Compiled by build.rs, and by the game for its tests: each uses part of this file.
 #![allow(dead_code)]
 
-use blip::song::{major, minor, Chord, Groove, Song, H, R};
+use blip::song::{Groove, Song, H, R};
 
 // Two device-synthesized E Lydian tracks: DRIFT for early waves, STORM from wave 5.
 use blip::cosy::{self, Tone, Voice};
 use blip::Asset;
+use blip::song::chords::{E, FS, GSM, CSM, B};
 
-const E: Chord = major(40);
-const FS: Chord = major(42);
-const GSM: Chord = minor(44);
-const CSM: Chord = minor(37);
-const B: Chord = major(47);
 
 /// Slow and spacious: long glass notes that hang in the air.
 pub fn drift_song() -> Song<'static> {

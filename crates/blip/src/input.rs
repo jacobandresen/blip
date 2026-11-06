@@ -12,12 +12,14 @@ pub struct PressBuffer {
 }
 
 impl PressBuffer {
+    /// Forget every press, waiting or current (a new screen starts clean).
     pub fn clear(&mut self) {
         self.pending.clear();
         self.current.clear();
         crate::web::clear_buffered_keys();
     }
 
+    /// Collect this frame's presses, to be seen at the next step. Call once a frame.
     pub fn capture(&mut self) {
         self.pending.extend(macroquad::input::get_keys_pressed());
         use KeyCode::*;
@@ -28,14 +30,17 @@ impl PressBuffer {
         crate::web::clear_buffered_keys();
     }
 
+    /// Start a logical update: the presses captured since the last one become current.
     pub fn begin_step(&mut self) {
         self.current = std::mem::take(&mut self.pending);
     }
 
+    /// Pressed since the last step (or by the playtest bot).
     pub fn pressed(&self, key: KeyCode) -> bool {
         self.current.contains(&key) || crate::bot::pressed(key)
     }
 
+    /// Held now, or tapped since the last step: a tap shorter than a step still counts.
     pub fn active(&self, key: KeyCode) -> bool {
         key_held(key) || self.pressed(key)
     }

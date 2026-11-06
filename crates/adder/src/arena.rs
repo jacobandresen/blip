@@ -495,6 +495,7 @@ impl World {
             let mut alive = self.snakes.iter_mut().filter(|s| s.alive);
             if let (Some(w), None) = (alive.next(), alive.next()) {
                 w.score += ROUND_POINTS;
+                if w.human { blip::bot::add("rounds_won", 1.0); }
                 self.events.push(Event::RoundWin);
             }
             self.round_wait = ROUND_WAIT;
@@ -511,7 +512,7 @@ impl World {
         self.snakes[i].score += pts;
         self.fx.popup(at.x, at.y - 14.0, &format!("+{pts}"), self.snakes[i].colour());
         self.events.push(Event::Through);
-        blip::bot::add("through", 1.0);
+        if self.snakes[i].human { blip::bot::add("through", 1.0); }
     }
 
     fn eliminate(&mut self, i: usize, killer: Option<usize>) {
@@ -526,10 +527,11 @@ impl World {
         if let Some(k) = killer {
             if k != i {
                 self.snakes[k].score += KILL_POINTS;
+                if self.snakes[k].human { blip::bot::add("kills", 1.0); }
                 self.events.push(Event::Kill);
             }
         }
-        blip::bot::add("deaths", 1.0);
+        if self.snakes[i].human { blip::bot::add("deaths", 1.0); }
     }
 
     /// Once every person in the pit is down, the CPUs' finish is only waiting.
@@ -559,7 +561,7 @@ impl World {
         if self.snakes.len() < MAX_SNAKES {
             self.join(self.snakes.len(), false);
         }
-        blip::bot::set("round", self.round as f64);
+        blip::bot::reached_level(self.round);
     }
 }
 

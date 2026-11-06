@@ -23,7 +23,9 @@ are generated from the Rust asset sources.
 - Brawler's BASIC pose sheets, stages, card, and poster:
   `node tools/make_brawler_art.mjs`
 
-Changes under `web/` require a cache version bump in `web/sw.js`.
+Changes under `web/` require a cache version bump in `web/sw.js` and new `?v=`
+links for the changed files: `node tools/bump_web_versions.mjs` does both, once
+per commit; then run `cargo build-web` to copy `shell.html` to the game pages.
 
 ## Start a new game
 
@@ -36,9 +38,11 @@ BASIC tapes and their shared APIs are documented in
    manifest with workspace package metadata, `macroquad` and `blip`
    dependencies, plus `blip` as a build dependency with default features off.
 2. Add `build.rs` containing `blip::build_script!();`, then implement
-   `src/main.rs`, `src/gfx.rs`, and `src/tunes.rs`. Add `src/levels.rs` for
-   authored progression data and `src/bot.rs` for a native playtest bot when
-   the game needs them. Keep game rules and rendering in the Rust crate;
+   `src/main.rs`, `src/gfx.rs`, `src/tunes.rs`, and `src/bot.rs`: every game
+   has a native playtest bot that can reach each level (`BLIP_BOT_LEVEL`) and
+   lists `PLAYTHROUGHS` named after the game's themes (see below). Add
+   `src/levels.rs` for authored progression data. Keep score, lives and level
+   in `blip::Session`. Keep game rules and rendering in the Rust crate;
    reusable engine behavior belongs in `crates/blip`.
 3. Register the slug in `crates/blip_build/src/main.rs` so `cargo build-web`
    builds and copies its WASM. Register its title, accent, and controls in
@@ -93,6 +97,7 @@ cargo test --release -p <game>
 cargo build-web
 npm test
 npm run test:visual
+npm run test:playthrough
 ```
 
 `cargo build-web` builds every Rust game and the BASIC runtime for the
@@ -119,10 +124,29 @@ On Linux, `xvfb-run` can provide a hidden display for native playtests. It is
 optional on Windows and macOS, and on Linux with an available desktop display.
 The web build and browser tests do not need a visible window.
 
+Each game's `src/bot.rs` says how to play it, built on the shared toolkit in
+`crates/blip/src/bot/`: a `Pad` for the controls (`steer`, `tap_fire`,
+`press_start`, ...), `grid` path finding and `predict` for bounces and
+wrap-around. Keep each tactic a small named function and the module comment a
+plain description of the gameplay. Its `PLAYTHROUGHS` are named runs, such as
+"the snake eats food and grows into level 2", with a start level, a time limit,
+settings and goals on the bot's stats; a run ends as soon as its goals are met.
+Bot runs are deterministic: each playthrough has a seed, and `BLIP_BOT_SEED=n`
+overrides it; check a new playthrough on several seeds before relying on it.
+`npm run test:playthrough` runs every playthrough of every game, one at a
+time, as a test named after it; `BLIP_PLAYTHROUGH_GAME=serpent` selects games.
+Record gameplay events with `blip::bot::add`; `Session` already records
+`score`, `deaths` and `level`, and `web::report_score` ends a run at game over
+(call `blip::bot::finish("won")` first when the game was won).
+
 For a Rust game's bot, run a release build with `BLIP_BOT=1`; it plays through
-normal inputs and prints a `RESULT` line. Set `BLIP_BOT_SHOTS=<dir>` to save
-frames or `BLIP_BOT_FUZZ=<seed>` to exercise random inputs. See the game bot
-and test files for supported variables.
+normal inputs and prints a `RESULT` line. Set `BLIP_BOT_LEVEL=<n>` to start at
+level n, `BLIP_BOT_SHOTS=<dir>` to save frames or `BLIP_BOT_FUZZ=<seed>` to
+exercise random inputs. A game's own switches are `BLIP_BOT_<NAME>`, read with
+`blip::bot::num`, `flag` or `is`; see its `bot.rs`. `Session` reports the
+`level` stat; a game with authored levels also calls `blip::bot::levels(n)`.
+`node tools/playtest_levels.mjs [game ...]` plays every level of every game in
+turn and fails on a panic or a level the bot cannot start.
 
 ## Code and review conventions
 
@@ -131,6 +155,9 @@ and test files for supported variables.
 - Draw pixel text at whole-number sizes. Avoid sizes below 2 for text that
   must remain readable on a phone.
 - Generate changing visual details at runtime; PNGs are still images.
+- Keep CSS rules short enough to read on one screen line; `node tools/format_css.mjs <file.css>`
+  expands longer one-line rules to one declaration per line; `node tools/fold_css.mjs`
+  finds rules a later rule with the same selector makes redundant.
 - Keep comments brief and factual. Explain measured constants or constraints,
   not the code that follows.
 - Keep generated artifacts in their designated output paths and regenerate

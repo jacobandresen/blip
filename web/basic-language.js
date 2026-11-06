@@ -50,6 +50,14 @@
       const [r, g, b, a = 1] = args.map(Number);
       return { blipColor: true, r, g, b, a };
     },
+    // The same wheel as blip::hsv: hue 0..1 from red through green and blue back to red.
+    HSV(...args) {
+      if (args.length < 3 || args.length > 4) throw Error('HSV needs hue,saturation,value[,alpha]');
+      const [h, s, v, a = 1] = args.map(Number), sector = (((h % 1) + 1) % 1) * 6;
+      const c = v * s, x = c * (1 - Math.abs((sector % 2) - 1)), m = v - c;
+      const [r, g, b] = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][Math.min(5, Math.floor(sector))];
+      return { blipColor: true, r: r + m, g: g + m, b: b + m, a };
+    },
   };
 
   function tokenize(source) {

@@ -36,8 +36,20 @@ pub(crate) const FIRST_HIT: i32 = 500;
 pub(crate) const DAZE_AT: f32 = 46.0;
 pub(crate) const DAZE_DRAIN: f32 = 9.0;
 pub(crate) const DIZZY_SECS: f32 = 1.5;
-/// A punch within this long of the last one is thrown with the other hand.
+/// A punch within this long of the last one is thrown with the other hand,
+/// and the third of a run is the hook.
 pub(crate) const CHAIN_PUNCH: f32 = 0.5;
+/// A low kick within this long of the last one comes round off the back
+/// leg: the roundhouse, which lands in the other stance.
+pub(crate) const CHAIN_KICK: f32 = 0.5;
+/// A clean blow this heavy leaves the one it lands on staggering: off
+/// balance for STAGGER_SECS after the hitstun, walking at STAGGER_PACE of
+/// their speed, still able to guard and hit back.
+pub(crate) const STAGGER_FROM: i32 = 12;
+pub(crate) const STAGGER_SECS: f32 = 1.4;
+pub(crate) const STAGGER_PACE: f32 = 0.55;
+/// Down tapped twice within this long changes the leg in front.
+pub(crate) const SWITCH_TAP: f32 = 0.25;
 /// What a guarded laser still costs.
 pub(crate) const LASER_CHIP: i32 = 9;
 /// A web holds for this long, or until this many blows have landed on it;
@@ -77,7 +89,7 @@ pub(crate) enum Level { Low, Mid, Overhead }
 /// Every attack there is.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) enum MoveId { LowPunch, HighPunch, LowKick, HighKick, Sweep, Uppercut, JumpPunch, JumpKick,
-    FlyingKick, Special, Throw }
+    FlyingKick, Special, Throw, Hook, Roundhouse }
 
 /// One attack, in frames: `startup` before it can hit, `active` while it can,
 /// `recovery` helpless afterwards. The gap between reach and recovery is its
@@ -135,6 +147,12 @@ pub(crate) fn move_data(id: MoveId) -> MoveData {
         // frames of recovery inside your opponent's range is the price
         // of the one move a guard cannot answer.
         MoveId::Throw     => mv(3.0,  2.0, 20.0, 18,  0.0,  0.0,  40.0, 58.0, 26.0, Level::Mid,      true),
+        // The end of a run of punches: shorter and slower than a straight
+        // punch, harder, and guarded high or low alike.
+        MoveId::Hook      => mv(8.0,  3.0, 18.0, 12,  18.0, 11.0, 40.0, 62.0, 16.0, Level::Mid,      false),
+        // The second of two quick low kicks, off the back leg at the ribs:
+        // more reach and weight than the snap kick, and more to pay if it misses.
+        MoveId::Roundhouse => mv(9.0, 4.0, 18.0, 12,  18.0, 11.0, 66.0, 48.0, 18.0, Level::Mid,      false),
     }
 }
 

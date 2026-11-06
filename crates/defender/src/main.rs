@@ -18,7 +18,6 @@ use blip::{
 // The effects and music are made by build.rs; the tests check them here.
 #[cfg(test)]
 mod tunes;
-#[cfg(not(target_arch = "wasm32"))]
 mod bot;
 mod levels;
 
@@ -669,6 +668,7 @@ fn update_ufo(
                 g.spawn_explosion(kill_x, UFO_Y);
                 g.bullets[bi].active = false;
                 g.bullets[UFO_BOMB_IDX].active = false;
+                blip::bot::add("saucers", 1.0);
                 let bonus = rand_int(1, 6) * 50;
                 g.sess.add_score(bonus);
                 g.ufo_score = bonus;
@@ -840,6 +840,7 @@ fn hit_boss(g: &mut Game, sfx: &Sounds, bullet_starts: &[(f32, f32); N_BULLETS])
         if g.boss_hp <= 0 {
             g.boss_active = false;
             g.boss_done = true;
+            blip::bot::add("motherships", 1.0);
             g.sess.add_score(BOSS_KILL_SCORE * g.sess.level);
             g.spawn_player_death(bx + BOSS_W / 2.0 - ALIEN_W as f32 / 2.0, by + BOSS_H / 2.0);
             g.spawn_explosion_ex(bx + BOSS_W * 0.2, by, EXPLOSION_TTL * 2.0, 2.2);
@@ -1196,6 +1197,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                 g.spawn_explosion(ax, ay);
                 g.aliens[ai].alive = false;
                 g.bullets[bi].active = false;
+                blip::bot::add("invaders", 1.0);
                 g.streak += 1;
                 let times = streak_multiple(g.streak);
                 let pts = match kind { 0 => 30, 1 => 20, _ => 10 } * g.sess.level * times;
@@ -1220,6 +1222,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
                                 d.x, d.y, ALIEN_W as f32, ALIEN_H as f32) {
                 g.bullets[bi].active = false;
                 g.diver = None;
+                blip::bot::add("divers", 1.0);
                 play_sfx(&sfx.explosion);
                 g.spawn_explosion(d.x, d.y);
                 g.streak += 1;
@@ -1353,9 +1356,7 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
             blip::play_alert(&sfx.ufo_siren);
         } else {
             play_sfx(&sfx.level_clear);
-            blip::bot::set(&format!("t_clear{}", g.sess.level), blip::bot::clock() as f64);
             g.sess.next_level();
-            blip::bot::set("level", g.sess.level as f64);
             g.dead_timer.start(1.5);
             g.state = State::Win;
         }
@@ -1554,8 +1555,7 @@ fn draw_title(blip: &Blip, alien: &[[Texture2D; 2]; 3], hi: &web::HighScore) {
     blip.draw_centered("30 PTS",        row0,                 2.0, BLIP_MAGENTA);
     blip.draw_centered("20 PTS",        row1,                 2.0, BLIP_CYAN);
     blip.draw_centered("10 PTS",        row2,                 2.0, BLIP_GREEN);
-    let prompt = web::controls().pick("PRESS FIRE", "PRESS FIRE", "TAP TO START");
-    blip.draw_centered(prompt, (WIN_H * 2 / 3) as f32, 3.0, BLIP_WHITE);
+    blip.draw_start_prompt((WIN_H * 2 / 3) as f32);
     // A patrol steps across the foot of the screen, a stride per beat.
     let sweep = 5i64;
     let pos = beat.rem_euclid(sweep * 2);
@@ -1579,6 +1579,7 @@ fn conf() -> blip::macroquad::window::Conf {
 
 #[blip::macroquad::main(conf)]
 async fn main() {
+    blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
@@ -1621,8 +1622,7 @@ async fn main() {
 
         music.play(if g.state != State::Title && g.is_boss_level() { 1 } else { 0 });
         g.touch_x = blip.touch(0).map(|p| p.x);
-        #[cfg(not(target_arch = "wasm32"))]
-        if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }
+        if blip::bot::active() { bot::drive(&g); }
         let prev_state = g.state;
         match g.state {
             State::Title => update_title(&mut g),

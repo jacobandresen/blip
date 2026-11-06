@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import '../web/basic-language.js';
 import { numberedTape } from './lib/basic-tape.mjs';
 
@@ -22,6 +23,7 @@ test('console expressions preserve precedence, unary operators, and string escap
     ['VAL("12.5KG")+VAL("X")', 12.5], ['ASC("A")', 65], ['MID$("AB",9)+LEFT$("AB",99)', 'AB'],
   ]) assert.equal(evaluate(source), expected, source);
   assert.deepEqual(evaluate('COLOR(0.1,0.2,0.3)'), { blipColor: true, r: 0.1, g: 0.2, b: 0.3, a: 1 });
+  assert.deepEqual(evaluate('HSV(0.5,1,1,0.5)'), { blipColor: true, r: 0, g: 1, b: 1, a: 0.5 });
 });
 
 test('console function arguments reach the host in evaluation order', () => {
@@ -51,4 +53,11 @@ test('numbered tape parsing rejects duplicate or out-of-order lines', () => {
   assert.throws(() => numberedTape('10 GOTO 20\n10 WAIT 0'), /unique and ascending/);
   assert.throws(() => numberedTape('20 WAIT 0\n10 END'), /unique and ascending/);
   assert.throws(() => numberedTape('INVALID'), /invalid numbered tape line/);
+});
+
+test('the console knows the runtime\'s drawing commands', () => {
+  const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+  const rust = read('../crates/blip_basic/src/interpreter/graphics.rs').match(/DRAW_COMMANDS: \[&str; \d+\] = \[([^\]]*)\]/)[1].match(/[A-Z_]+/g);
+  const console = read('../web/basic.js').match(/var blipPrimitiveNames='([^']*)'/)[1].toUpperCase().split(' ');
+  assert.deepEqual(console.sort(), rust.sort());
 });

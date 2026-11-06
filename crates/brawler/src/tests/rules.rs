@@ -465,3 +465,39 @@ pub(crate) fn down_and_punch_is_the_uppercut_and_it_is_for_whoever_jumps_in() {
         assert!(u.recovery > move_data(other).recovery, "{other:?} recovers slower");
     }
 }
+
+#[test]
+pub(crate) fn a_heavy_clean_blow_leaves_a_fighter_staggering_for_a_while() {
+    let blow = |mv: MoveId, guard: bool| {
+        let mut p = [at(0, 200.0, 1.0), at(1, 300.0, -1.0)];
+        face_off(&mut p);
+        p[1].x = p[0].x + attack_range(&p[0], mv) - 3.0;
+        wind_to_active(&mut p[0], mv);
+        let [atk, def] = &mut p;
+        let hold = if guard { back_input(def.facing, mv == MoveId::LowKick) } else { Input::default() };
+        resolve_hit(atk, def, hold);
+        p[1]
+    };
+    assert!(blow(MoveId::HighKick, false).stagger > 0.0, "a clean high kick staggers");
+    assert_eq!(blow(MoveId::LowPunch, false).stagger, 0.0, "a jab does not");
+    assert_eq!(blow(MoveId::HighKick, true).stagger, 0.0, "nor does a blow that was guarded");
+
+    // Staggering, the fighter walks slower, and it wears off after the hitstun.
+    let mut f = blow(MoveId::HighKick, false);
+    while f.act == Act::Hitstun { advance(&mut f, F); }
+    assert!(f.stagger > STAGGER_SECS - 0.1, "the stagger waits for the hitstun to end");
+    let walk = |f: &mut Fighter| { let x = f.x; apply_input(f, Input { right: f.facing > 0.0, left: f.facing < 0.0, ..Input::default() }, false, F); f.x - x };
+    let slow = walk(&mut f).abs();
+    for _ in 0..((STAGGER_SECS / F) as usize + 2) { advance(&mut f, F); }
+    assert_eq!(f.stagger, 0.0);
+    let steady = walk(&mut f).abs();
+    assert!(slow < steady * 0.7, "staggering walks {slow:.2}px a frame, steady {steady:.2}px");
+
+    // And it shows: the staggering pose is not the steady one.
+    let mut s = at(0, 300.0, 1.0);
+    let steady = draw::pose_now(1.0, &s, 0);
+    s.stagger = 1.0;
+    let rocked = draw::pose_now(1.0, &s, 0);
+    assert!((rocked.head.f - steady.head.f).abs() + (rocked.lead_hand.u - steady.lead_hand.u).abs() > 8.0,
+        "a staggering fighter looks no different");
+}

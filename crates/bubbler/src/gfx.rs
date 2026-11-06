@@ -75,7 +75,7 @@ fn title_text(image: &mut Image, text: &str, y: i32, color: [u8; 4]) {
 
 fn title_info(mode: usize) -> Vec<u8> {
     let mut image = Image::new(624, 92);
-    let join = if mode == 0 { "P2 PRESS J TO JOIN" } else { "P2 TOUCH TO JOIN" };
+    let join = ["P2 PRESS J TO JOIN", "P2 PRESS BUBBLE TO JOIN", "P2 TOUCH TO JOIN"][mode];
     title_text(&mut image, join, 6, [165, 215, 255, 255]);
     let hints = [
         ["MOVE A D   JUMP W   BUBBLE F", "HOLD JUMP TO RIDE BUBBLES"],
@@ -90,7 +90,7 @@ fn title_info(mode: usize) -> Vec<u8> {
 
 fn title_start(mode: usize) -> Vec<u8> {
     let mut image = Image::new(624, 40);
-    let text = if mode == 2 { "P1 TOUCH TO START" } else { "P1 PRESS BUBBLE" };
+    let text = ["P1 PRESS SPACE", "P1 PRESS BUBBLE", "P1 TOUCH TO START"][mode];
     title_panel(&mut image, 4.0, text.len() as f32 * 12.0 + 24.0, 32.0, [170, 240, 190, 230]);
     title_text(&mut image, text, 13, [170, 240, 190, 255]);
     image.encode_png()
@@ -191,7 +191,10 @@ fn dragon(body: (u8, u8, u8)) -> Vec<u8> {
     img.encode_png()
 }
 
-const TILES: [((u8, u8, u8), (u8, u8, u8), (u8, u8, u8)); 8] = [
+type Rgb = (u8, u8, u8);
+
+/// Each round's brick: its face, its lit edge and its shadow.
+const TILES: [(Rgb, Rgb, Rgb); 8] = [
     ((240, 120, 180), (255, 190, 225), (160, 60, 120)),
     ((80, 200, 230), (170, 240, 255), (30, 110, 150)),
     ((250, 180, 60), (255, 230, 150), (170, 100, 20)),

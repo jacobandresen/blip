@@ -103,19 +103,20 @@ function blipSetControls(choice) {
 // `buttons` map deck caps; `stick` accepts engage/release and maxR pixels plus hysteresis degrees.
 // `touch.kind`: drag follows a finger, swipe steers by flick, paddles split bats,
 // platform runs/blows/jumps, action steers by dragging and has holdable actions.
+// `capLabel` is printed on the panel by a one-button game's caps (default FIRE; a two-button game labels its `buttons`).
 // `controls` is the key legend a PC sees after the first coin: [label, keys, alternative keys]; `hint` labels the touch strip; `mouseHint` labels a touchscreen laptop's mouse controls.
 var BLIP_GAMES = {
-  serpent:            { name: 'SERPENT',  accent: '50, 200, 50', touchControls: [['STEER',['SWIPE']],['START',['TAP']]], controls: [['STEER',['↑','←','↓','→'],['W','A','S','D']],['START',['SPACE']]],
+  serpent:            { name: 'SERPENT',  accent: '50, 200, 50', capLabel: 'START', touchControls: [['STEER',['SWIPE']],['START',['TAP']]], controls: [['STEER',['↑','←','↓','→'],['W','A','S','D']],['START',['SPACE']]],
                          touch: { kind: 'swipe', hint: 'Swipe to steer', mouseHint: 'Click and drag to steer' } },
-  bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200', touchControls: [['MOVE',['DRAG']],['LAUNCH',['TAP']]], controls: [['MOVE',['←','→'],['A','D']],['LAUNCH',['SPACE']]],
+  bouncer:            { name: 'BOUNCER',  accent: '0, 200, 200', capLabel: 'LAUNCH', touchControls: [['MOVE',['DRAG']],['LAUNCH',['TAP']]], controls: [['MOVE',['←','→'],['A','D']],['LAUNCH',['SPACE']]],
                          touch: { kind: 'drag', hint: 'Tap to launch', mouseHint: 'Point to move &middot; Click to launch' } },
   defender:  { name: 'DEFENDER', accent: '200, 50, 200', touchControls: [['MOVE',['DRAG']],['FIRE',['HOLD']]], controls: [['MOVE',['←','→'],['A','D']],['FIRE',['SPACE']]],
                          touch: { kind: 'drag', hint: 'Hold to fire', mouseHint: 'Point to move &middot; Hold the button to fire' } },
-  rally:              { name: 'RALLY',    accent: '220, 50, 50', touchControls: [['1 PLAYER',['TAP LEFT']],['2 PLAYERS',['TAP RIGHT']],['MOVE BAT',['DRAG']]], controls: [['1 PLAYER',['W','S'],['↑','↓']],['2 PLAYERS',['I','K']],['START AND SERVE',['SPACE']]],
+  rally:              { name: 'RALLY',    accent: '220, 50, 50', touchControls: [['1 PLAYER',['TAP LEFT']],['2 PLAYERS',['TAP RIGHT']],['MOVE BAT',['DRAG']]], controls: [['YOUR BAT',['W','S'],['↑','↓']],['2ND PLAYER',['I','K']],['SERVE',['SPACE']]],
                          touch: { kind: 'paddles', hint: 'Drag up or down', mouseHint: 'Point up or down &middot; Click to serve' } },
   meteors:            { name: 'METEORS',  accent: '180, 180, 180', touchControls: [['TURN AND THRUST',['DRAG']],['FIRE',['TOUCH FIRE']],['HYPERSPACE',['TOUCH HYPERSPACE']]], controls: [['TURN',['←','→'],['A','D']],['THRUST',['↑'],['W']],['FIRE',['SPACE']],['HYPERSPACE',['Z']]],
                          touch: { kind: 'action', hint: 'Drag to turn and thrust', actions: ['FIRE', 'HYPER'] },
-                         buttons: [{ key: ' ', code: 'Space' }, { key: 'z', code: 'KeyZ' }] },
+                         buttons: [{ key: ' ', code: 'Space', label: 'FIRE' }, { key: 'z', code: 'KeyZ', label: 'HYPER' }] },
   // Two caps; holding toward hits high. `players: 2` enables the second station; `keys` maps P1 to WASD.
   brawler:            { name: 'BRAWLER', accent: '220, 60, 40', touchControls: [['MOVE',['DRAG']],['PUNCH',['TOUCH PUNCH']],['KICK',['TOUCH KICK']]], controls: [['MOVE',['←','→'],['A','D']],['PUNCH',['SPACE'],['F']],['KICK',['Z'],['G']]],
                          players: 2,
@@ -164,7 +165,7 @@ function blipGameFromPath(pathname) {
   var m = /\/([a-z_]+)\/(?:index\.html)?$/i.exec(pathname || '');
   var g = m && BLIP_GAMES[m[1]];
   return g ? { slug: m[1], name: g.name, accent: g.accent, controls: g.controls, touchControls: g.touchControls, buttons: g.buttons,
-               keys: g.keys, players: g.players || 1, stick: g.stick,
+               keys: g.keys, players: g.players || 1, stick: g.stick, capLabel: g.capLabel,
                touch: g.touch || null, cabinetTitle: !!g.cabinetTitle } : null;
 }
 

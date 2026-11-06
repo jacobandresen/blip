@@ -3,10 +3,9 @@ mod interpreter;
 mod shared_math;
 mod sounds;
 
-use blip::{Blip, BLIP_BLACK};
+use blip::{Blip, BlipTex, BLIP_BLACK};
 use host::*;
 use interpreter::Program;
-use blip::BlipTex;
 use macroquad::texture::Texture2D;
 use sounds::Sounds;
 use std::collections::HashMap;
@@ -22,17 +21,11 @@ fn conf() -> macroquad::window::Conf {
 #[blip::macroquad::main(conf)]
 async fn main() {
     #[cfg(target_arch = "wasm32")]
-    std::panic::set_hook(Box::new(|error| {
-        let message = error.to_string();
-        unsafe { blip_basic_runtime_error(message.as_ptr(), message.len() as i32); }
-    }));
+    std::panic::set_hook(Box::new(|error| report_error(&error.to_string())));
     let mut blip = Blip::new(WIDTH, HEIGHT);
     blip.set_frame_retention(true);
     blip.show_committed(true);
-    #[cfg(target_arch = "wasm32")]
-    unsafe {
-        blip_basic_ready();
-    }
+    report_ready();
     let mut textures = HashMap::new();
     let mut sounds = Sounds::default();
     let mut program = Program::new();
@@ -71,20 +64,12 @@ async fn main() {
             program.error = Some(error);
             program.active = false;
         }
-        #[cfg(target_arch = "wasm32")]
         if let Some((frequency, seconds, volume)) = program.sound_request.take() {
-            unsafe {
-                blip_basic_sound(frequency, seconds, volume);
-            }
+            play_tone(frequency, seconds, volume);
         }
-        #[cfg(target_arch = "wasm32")]
-        if let Some(error) = &program.error {
-            if *error != reported_error {
-                reported_error = error.clone();
-                unsafe {
-                    blip_basic_runtime_error(error.as_ptr(), error.len() as i32);
-                }
-            }
+        if let Some(error) = program.error.as_ref().filter(|error| **error != reported_error) {
+            reported_error = error.clone();
+            report_error(error);
         }
         if !program.active {
             blip.clear(BLIP_BLACK);
@@ -97,10 +82,7 @@ async fn main() {
         blip.next_frame(60).await;
         if program_loaded {
             program_loaded = false;
-            #[cfg(target_arch = "wasm32")]
-            unsafe {
-                blip_basic_program_loaded();
-            }
+            report_program_loaded();
         }
     }
 }

@@ -332,11 +332,12 @@ pub(crate) fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
 
     enum Shape { Punch(bool), Kick(bool, f32), Upper, Fly, Sweep, Throw, Bolt, Laser, Rush, Call }
     let shape = match f.mv {
-        MoveId::LowPunch | MoveId::HighPunch => Shape::Punch(false),
+        MoveId::LowPunch | MoveId::HighPunch | MoveId::Hook => Shape::Punch(false),
         MoveId::JumpPunch => Shape::Punch(true),
         MoveId::Uppercut => Shape::Upper,
         MoveId::LowKick => Shape::Kick(false, 0.7),
         MoveId::HighKick => Shape::Kick(false, 1.25),
+        MoveId::Roundhouse => Shape::Kick(false, 0.95),
         MoveId::JumpKick => Shape::Kick(true, 1.0),
         MoveId::FlyingKick => Shape::Fly,
         MoveId::Sweep => Shape::Sweep,
@@ -409,6 +410,15 @@ pub(crate) fn attack_pose(q: &mut Pose, f: &Fighter, m: &MoveData, ext: f32) {
                 q.lead_hand = q.lead_hand.to(tip, ext);
                 // The shoulder comes through with the hip.
                 q.twist = e;
+            }
+            if f.mv == MoveId::Hook {
+                // A hook comes round, not straight: the fist swings out and
+                // up on its way in, and the body turns hard behind it.
+                let swing = (std::f32::consts::PI * e).sin();
+                q.lead_hand.u += 10.0 * swing;
+                q.lead_hand.f -= 6.0 * swing;
+                q.hip.f += 3.0 * e;
+                q.twist = 1.0f32.min(q.twist + 0.4 * e);
             }
             // The back foot turns over onto its ball as the hip comes through.
             q.rear_heel += 0.5 * e;
@@ -847,10 +857,35 @@ pub(crate) fn pose_now(now: f32, f: &Fighter, idx: usize) -> Pose {
         q.lead_foot.f -= 9.0 * sway;
         q.rear_foot.f += 6.0 * sway;
     }
-    // The other foot forward: a high kick can switch lead legs. (A walk is
-    // already on both; the bow and the end of the round stand square.)
-    let kick = f.mv == MoveId::HighKick;
-    let far_leads = f.far_leads ^ (f.act == Act::Attack && kick && !f.airborne() && f.alt_kick);
+    // Staggering: rocked off balance. The body sways slowly back and forth
+    // over the feet and bobs out of time with it, the guard sags, and the
+    // feet shuffle to catch the weight; it all settles as the stagger ends.
+    if f.stagger > 0.0 && !f.airborne()
+        && matches!(f.act, Act::Idle | Act::Walk | Act::Crouch | Act::Block | Act::Attack) {
+        let left = (f.stagger / 0.5).min(1.0);
+        let k = if f.act == Act::Attack { 0.4 * left } else { left };
+        let (sway, bob) = ((now * 5.2).sin(), (now * 8.3 + 1.0).sin());
+        q.hip.f += 6.0 * sway * k;
+        q.hip.u -= (3.0 + 2.0 * bob) * k;
+        q.head.f += 13.0 * sway * k;
+        q.head.u -= (4.0 + 3.0 * bob) * k;
+        q.lead_hand.u -= 14.0 * k;
+        q.lead_hand.f -= 4.0 * k;
+        q.rear_hand.u -= 10.0 * k;
+        q.rear_hand.f += 5.0 * sway * k;
+        q.lead_foot.f += 5.0 * sway * k;
+        q.rear_foot.f -= 4.0 * sway * k;
+        q.lead_heel = q.lead_heel.max(0.4 * (sway.max(0.0)) * k);
+    }
+    // The other foot forward: a high kick can switch lead legs, and the
+    // roundhouse comes off the back one. (A walk is already on both; the bow
+    // and the end of the round stand square.)
+    let switched = match f.mv {
+        MoveId::HighKick => f.alt_kick,
+        MoveId::Roundhouse => true,
+        _ => false,
+    };
+    let far_leads = f.far_leads ^ (f.act == Act::Attack && switched && !f.airborne());
     if far_leads && !f.airborne()
         && matches!(f.act, Act::Idle | Act::Crouch | Act::Block | Act::Hitstun | Act::Attack) {
         std::mem::swap(&mut q.lead_foot, &mut q.rear_foot);

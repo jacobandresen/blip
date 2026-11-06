@@ -5,9 +5,18 @@ use super::{
     syntax::split_args,
     Program, Value,
 };
-use blip::{Blip, BlipTex, BLIP_RED, BLIP_WHITE};
+use blip::{Blip, BlipTex, BLIP_GRAY, BLIP_GREEN, BLIP_RED, BLIP_WHITE, BLIP_YELLOW};
 use macroquad::color::Color;
 use std::collections::HashMap;
+
+/// The drawing commands, as statements (FILL_RECT 1,2,3,4,C) or calls (FILL_RECT(1,2,3,4,C)).
+/// Each is a case of `draw_statement` below; web/basic.js keeps the same list.
+pub(super) const DRAW_COMMANDS: [&str; 26] = [
+    "CANVAS", "CLEAR", "CIRCLE", "DRAW_CHAR", "DRAW_CIRCLE", "DRAW_GAME_OVER", "DRAW_GLOW_LINE", "DRAW_HUD",
+    "DRAW_LINE", "DRAW_LINE_EX", "DRAW_NUMBER", "DRAW_POLYLINE", "DRAW_RECT", "DRAW_TEXT", "DRAW_TEXTURE",
+    "FILL_CAPSULE", "FILL_CIRCLE", "FILL_GLOW_CIRCLE", "FILL_RECT", "FILL_SUNBURST", "FX_BURST", "FX_CLEAR",
+    "FX_DRAW", "FX_POPUP", "FX_RING", "FX_UPDATE",
+];
 
 impl Program {
     pub(super) fn draw_statement(
@@ -88,6 +97,17 @@ impl Program {
                 blip.fill_sunburst(n(0), n(1), n(2).max(1.0) as usize, n(3), n(4), [c(5), c(6)])
             }
             "DRAW_HUD" if vals.len() == 2 => blip.draw_hud(n(0) as i32, n(1) as i32),
+            // The arcade's game-over screen: DRAW_GAME_OVER(score,ready[,note$[,headline,best,prompt]]).
+            "DRAW_GAME_OVER" if [2, 3, 6].contains(&vals.len()) => {
+                let colour = |i: usize, default: Color| if vals.len() > i { c(i) } else { default };
+                let ready = vals[1].number() != 0.0;
+                let (headline, best, prompt) = (colour(3, BLIP_RED), colour(4, BLIP_GREEN), colour(5, BLIP_YELLOW));
+                blip.draw_game_over(n(0) as i32, &blip::web::high_score(), headline, best, prompt, ready);
+                let note = vals.get(2).map(Value::string).unwrap_or_default();
+                if !note.is_empty() {
+                    blip.draw_game_over_note(&note, BLIP_GRAY);
+                }
+            }
             // A negative width mirrors the picture, in the box a positive one would fill.
             "DRAW_TEXTURE" if (5..=6).contains(&vals.len()) => {
                 let tint = if vals.len() == 6 { c(5) } else { BLIP_WHITE };

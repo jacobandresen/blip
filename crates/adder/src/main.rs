@@ -8,6 +8,7 @@ mod tunes;
 mod arena;
 mod cpu;
 mod levels;
+mod bot;
 
 use blip::input::{
     coin_start, play_again, key_active, key_pressed, BLIP_KEY_A, BLIP_KEY_D,
@@ -59,6 +60,9 @@ impl Game {
 
     fn start_game(&mut self) {
         self.world = World::new(self.humans);
+        // A bot run with `BLIP_BOT_LEVEL=n` starts at round n.
+        self.world.round = 1 + blip::bot::level(i32::MAX as usize) as i32;
+        blip::bot::reached_level(self.world.round);
         self.state = State::Play;
     }
 
@@ -101,7 +105,7 @@ fn steer_person(seat: usize, solo: bool) -> Steer {
 /// Intent for every seat this frame: the human seats answer to their keys and
 /// everything else to a brain.
 fn gather(g: &Game) -> [Steer; SEATS] {
-    autopilot(&g.world);
+    if blip::bot::active() { bot::drive(&g.world); }
     let mut steers = [Steer::default(); SEATS];
     for (i, s) in g.world.snakes.iter().enumerate() {
         if !s.alive { continue; }
@@ -120,30 +124,11 @@ fn cpu_steers(w: &World) -> [Steer; SEATS] {
     steers
 }
 
-/// The native autopilot holds only turn keys, through the normal input path.
-#[cfg(not(target_arch = "wasm32"))]
-fn autopilot(w: &World) {
-    if !blip::bot::active() { return; }
-    let mut held = Vec::new();
-    for (i, s) in w.snakes.iter().enumerate() {
-        if !s.human || !s.alive { continue; }
-        let st = cpu::steer_cpu(w, i);
-        let [left, right, _] = seat_keys(s.seat);
-        if st.turn < -0.15 { held.push(left); }
-        if st.turn > 0.15 { held.push(right); }
-    }
-    blip::bot::hold(&held);
-}
-
-#[cfg(target_arch = "wasm32")]
-fn autopilot(_w: &World) {}
-
 // ---- the loop ------------------------------------------------------------
 fn update_title(g: &mut Game, dt: f32) {
     g.demo.step(dt, &cpu_steers(&g.demo));
     g.demo.events.clear();
-    #[cfg(not(target_arch = "wasm32"))]
-    if blip::bot::active() { blip::bot::hold(&[BLIP_KEY_SPACE]); }
+    if blip::bot::active() { bot::title(); }
     if coin_start() { g.start_game(); }
 }
 
@@ -187,6 +172,7 @@ fn conf() -> blip::macroquad::window::Conf {
 
 #[blip::macroquad::main(conf)]
 async fn main() {
+    blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
     // Leave station two available for a mid-game join from the title screen.
@@ -311,7 +297,7 @@ fn draw_title(blip: &Blip, g: &Game, pit: &Texture2D) {
     blip.draw_text_outlined("ADDER", 96.0, 62.0, 6.0, arena::seat_colour(0), BLIP_BLACK);
     blip.draw_hi(&web::high_score(), 116.0, HOLE);
     let by = web::controls();
-    blip.draw_centered(by.pick("SPACE TO START", "PRESS FIRE TO START", "TAP TO START"), 404.0, 3.0, BLIP_WHITE);
+    blip.draw_start_prompt(404.0);
     blip.draw_centered(by.pick("GREEN VIPER: A/D TURN", "GREEN VIPER: STICK LEFT/RIGHT", "GREEN VIPER: DRAG LEFT/RIGHT"),
         430.0, 2.0, SAND);
     blip.draw_centered("CONSTANT MOVEMENT", 450.0, 2.0, SAND);
@@ -323,6 +309,6 @@ fn draw_title(blip: &Blip, g: &Game, pit: &Texture2D) {
 fn draw_over(blip: &Blip, g: &Game) {
     blip.draw_game_over(g.world.score_of(0), &web::high_score(), BLIP_RED, arena::seat_colour(0), HOLE,
         !g.timer.active());
-    blip.draw_centered(&format!("ROUND {}   LENGTH {}", g.world.round, g.world.snakes.first().map_or(0, |s| s.len_s)),
-        (WIN_H / 2 + 54) as f32, 2.0, SAND);
+    let length = g.world.snakes.first().map_or(0, |s| s.len_s);
+    blip.draw_game_over_note(&format!("ROUND {}   LENGTH {length}", g.world.round), SAND);
 }

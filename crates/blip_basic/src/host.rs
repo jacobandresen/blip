@@ -4,11 +4,11 @@
 extern "C" {
     pub(crate) fn blip_basic_source_len() -> i32;
     pub(crate) fn blip_basic_source_copy(ptr: *mut u8, capacity: i32) -> i32;
-    pub(crate) fn blip_basic_ready();
+    fn blip_basic_ready();
     fn blip_basic_file_available(ptr: *const u8, len: i32) -> i32;
-    pub(crate) fn blip_basic_program_loaded();
-    pub(crate) fn blip_basic_runtime_error(ptr: *const u8, len: i32);
-    pub(crate) fn blip_basic_sound(frequency: f32, seconds: f32, volume: f32);
+    fn blip_basic_program_loaded();
+    fn blip_basic_runtime_error(ptr: *const u8, len: i32);
+    fn blip_basic_sound(frequency: f32, seconds: f32, volume: f32);
     pub(crate) fn blip_basic_audio_event();
     fn blip_basic_file_count() -> i32;
     fn blip_basic_file_name_len(index: i32) -> i32;
@@ -72,11 +72,40 @@ pub(crate) fn tape_url(path: &str) -> String {
     }
 }
 
+/// Call a browser import on the web; natively there is no page to tell.
+macro_rules! on_web {
+    ($call:expr) => {{
+        #[cfg(target_arch = "wasm32")]
+        unsafe {
+            $call;
+        }
+    }};
+}
+
+/// The runtime is up and waiting for a program.
+pub(crate) fn report_ready() {
+    on_web!(blip_basic_ready());
+}
+
+/// The program's first frame is on screen.
+pub(crate) fn report_program_loaded() {
+    on_web!(blip_basic_program_loaded());
+}
+
+/// A runtime error, for the console to print.
+pub(crate) fn report_error(message: &str) {
+    let _ = message;
+    on_web!(blip_basic_runtime_error(message.as_ptr(), message.len() as i32));
+}
+
+/// A SOUND tone, played by the page's Web Audio.
+pub(crate) fn play_tone(frequency: f32, seconds: f32, volume: f32) {
+    let _ = (frequency, seconds, volume);
+    on_web!(blip_basic_sound(frequency, seconds, volume));
+}
+
 pub(crate) fn audio_event() {
-    #[cfg(target_arch = "wasm32")]
-    unsafe {
-        blip_basic_audio_event();
-    }
+    on_web!(blip_basic_audio_event());
 }
 
 /// Cached textures still obey the browser's current filesystem mount.

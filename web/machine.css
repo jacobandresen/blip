@@ -47,7 +47,9 @@ body > .machine-speaker {
   left:20%;right:20%;height:10px;border-radius:2px;background:var(--machine-speaker);
   box-shadow:inset 0 1px 2px #000,0 1px #ffffff1c;
 }
-:is(:root[data-layout="landscape"],:root[data-appstyle],:root[data-amstrad],:root[data-cabinet-screen],:root[data-bare],:root[data-fullscreen]:not([data-has-touch])) body > .machine-speaker {display:none}
+:is(:root[data-layout="landscape"],:root[data-appstyle],:root[data-amstrad],:root[data-cabinet-screen],:root[data-bare],:root[data-fullscreen]:not([data-has-touch])) body > .machine-speaker {
+  display:none;
+}
 :root[data-machine]:not([data-appstyle])[data-layout="upright"] #topbar .deck-housing {
   border-inline:3px solid var(--trim);border-top-color:#060608;
   box-shadow:0 0 0 1px #0a080b,0 -4px 9px #0007,inset 1px 0 #fff2,inset -1px 0 #0009;
@@ -127,7 +129,7 @@ body > .machine-speaker {
 }
 
 /* The dust washer: a glossy black disc, flat on the panel, with the boot rising from its middle. */
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-boot {
+:root:not([data-appstyle]) #topbar .stick-boot {
   border:0;border-radius:50%;
   background:
     radial-gradient(circle at 50% 50%,#0000 0 44%,#ffffff1f 47%,#0000 52%),
@@ -135,42 +137,42 @@ body > .machine-speaker {
     radial-gradient(circle at 50% 45%,#2c2d31 0,#151619 58%,#060607 100%);
   box-shadow:0 1px 0 #ffffff12,0 3px 4px #000a,0 8px 12px #0006,inset 0 1px 1px #ffffff40,inset 0 -2px 3px #000c;
 }
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-boot::before {
+:root:not([data-appstyle]) #topbar .stick-boot::before {
   inset:30%;border-radius:50%;
   background:radial-gradient(circle at 45% 38%,#26272b,#0b0b0d 70%);
   box-shadow:0 0 0 1px #000,inset 0 2px 3px #000c;
 }
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-handle::before {
+:root:not([data-appstyle]) #topbar .stick-handle::before {
   background:linear-gradient(90deg,#0b0b0d,#3b3c41 38%,#1b1c1f 70%,#060607);
 }
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-shaft {
+:root:not([data-appstyle]) #topbar .stick-shaft {
   background:linear-gradient(90deg,#0a0a0b,#45464b 30%,#1e1f22 62%,#050506);
 }
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-ball {
+:root:not([data-appstyle]) #topbar .stick-ball {
   background:
     radial-gradient(ellipse 34% 24% at 34% 22%,#fff9 0,#fff3 45%,#0000 100%),
     radial-gradient(circle at 38% 32%,#ff7d68 0,#de3326 30%,#b01a11 62%,#5e0905 100%);
   box-shadow:0 6px 10px #0008,0 14px 18px #0004,inset -4px -6px 10px #2a0200a6,inset 0 0 0 1px #4a0503;
 }
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) .stick-ball::after {
+:root:not([data-appstyle]) #topbar .stick-ball::after {
   left:22%;top:12%;width:26%;height:14%;
   background:linear-gradient(160deg,#ffffffd9,#fff0);
 }
 
 /* Buttons: a convex plunger in a bezel of the same coloured plastic. Fire is red; a second action is
    blue at station one and green at station two; an unused cap is a dark blank. */
-:is(#topbar,#kiosk-bar) :is(.arcade-btn,.snes-btn) {--c:#d9302a;--c-hi:#ff8c76;--c-lo:#7a0d07}
-:is(#topbar,#kiosk-bar) :is(.arcade-btn,.snes-btn).alt {--c:#2756c8;--c-hi:#86a8ff;--c-lo:#0f2266}
-:is(#topbar,#kiosk-bar) :is(#deck-p2 .arcade-btn,.snes-pad.second .snes-btn).alt {--c:#139a7a;--c-hi:#74e6c6;--c-lo:#064a3a}
-:is(#topbar,#kiosk-bar) :is(#deck-p1,#deck-p2,#snes-pad,#snes-pad-p2) :is(.arcade-btn,.snes-btn).spare {--c:#34363b;--c-hi:#5d6067;--c-lo:#16171a}
+#topbar :is(.arcade-btn,.snes-btn) {--c:#d9302a;--c-hi:#ff8c76;--c-lo:#7a0d07}
+#topbar :is(.arcade-btn,.snes-btn).alt {--c:#2756c8;--c-hi:#86a8ff;--c-lo:#0f2266}
+#topbar :is(#deck-p2 .arcade-btn,.snes-pad.second .snes-btn).alt {--c:#139a7a;--c-hi:#74e6c6;--c-lo:#064a3a}
+#topbar :is(#deck-p1,#deck-p2,#snes-pad,#snes-pad-p2) :is(.arcade-btn,.snes-btn).spare {--c:#34363b;--c-hi:#5d6067;--c-lo:#16171a}
 /* The caps sit straight on the panel, with no plate behind them. */
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.fire-buttons.four,.snes-face.four)::before {content:none}
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn,.snes-btn) {
+:root:not([data-appstyle]) #topbar :is(.fire-buttons.four,.snes-face.four)::before {content:none}
+:root:not([data-appstyle]) #topbar :is(.arcade-btn,.snes-btn) {
   border:0;border-radius:50%;opacity:1;
   background:radial-gradient(circle at 50% 30%,var(--c-hi) 0,var(--c) 42%,var(--c-lo) 100%);
   box-shadow:0 1px 0 #ffffff14,0 3px 4px #0009,0 7px 12px #0005,inset 0 1px 1px #ffffff73,inset 0 -2px 3px #0008;
 }
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn .arcade-btn-cap,.snes-btn > span) {
+:root:not([data-appstyle]) #topbar :is(.arcade-btn .arcade-btn-cap,.snes-btn > span) {
   inset:13%;border:0;border-radius:50%;
   background:
     radial-gradient(ellipse 55% 40% at 40% 26%,#ffffffa6,#fff0 75%),
@@ -178,17 +180,17 @@ body > .machine-speaker {
   box-shadow:0 0 0 1.5px #0000004d,0 2px 3px #0006,inset 0 2px 2px #ffffff4d,inset 0 -3px 5px #0006;
   transition:transform .05s,filter .05s;
 }
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn .arcade-btn-cap,.snes-btn > span)::before {
+:root:not([data-appstyle]) #topbar :is(.arcade-btn .arcade-btn-cap,.snes-btn > span)::before {
   left:24%;top:13%;width:28%;height:16%;
   background:linear-gradient(160deg,#ffffffe6,#fff0);filter:none;
 }
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn,.snes-btn).spare :is(.arcade-btn-cap,span)::before {opacity:.3}
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn,.snes-btn)::after {display:none}
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn.blip-pressed,.arcade-btn.active,.snes-btn.blip-pressed) {
+:root:not([data-appstyle]) #topbar :is(.arcade-btn,.snes-btn).spare :is(.arcade-btn-cap,span)::before {opacity:.3}
+:root:not([data-appstyle]) #topbar :is(.arcade-btn,.snes-btn)::after {display:none}
+:root:not([data-appstyle]) #topbar :is(.arcade-btn.blip-pressed,.arcade-btn.active,.snes-btn.blip-pressed) {
   transform:none;
   box-shadow:0 1px 0 #ffffff14,0 2px 3px #0009,inset 0 1px 1px #ffffff4d,inset 0 -2px 3px #0008;
 }
-:root:not([data-appstyle]) :is(#topbar,#kiosk-bar) :is(.arcade-btn.blip-pressed .arcade-btn-cap,.arcade-btn.active .arcade-btn-cap,.snes-btn.blip-pressed > span) {
+:root:not([data-appstyle]) #topbar :is(.arcade-btn.blip-pressed .arcade-btn-cap,.arcade-btn.active .arcade-btn-cap,.snes-btn.blip-pressed > span) {
   transform:scale(.9);filter:brightness(.82);
   box-shadow:0 0 0 1.5px #0006,inset 0 3px 6px #0007;
 }
@@ -227,12 +229,12 @@ body > .machine-speaker {
   }
 }
 @media (max-width:600px) {
-  :root[data-layout="upright"][data-players] :is(#topbar,#kiosk-bar) :is(.snes-face.four,.fire-buttons.four) {
+  :root[data-layout="upright"][data-players] #topbar :is(.snes-face.four,.fire-buttons.four) {
     grid-template-columns:calc(var(--cap) * 1.3)!important;
     row-gap:10px;
   }
-  :root[data-layout="upright"][data-players] :is(#topbar,#kiosk-bar) :is(.snes-face.four,.fire-buttons.four) > :first-child {justify-self:end}
-  :root[data-layout="upright"][data-players] :is(#topbar,#kiosk-bar) :is(.snes-face.four,.fire-buttons.four) > :nth-child(2) {justify-self:start}
+  :root[data-layout="upright"][data-players] #topbar :is(.snes-face.four,.fire-buttons.four) > :first-child {justify-self:end}
+  :root[data-layout="upright"][data-players] #topbar :is(.snes-face.four,.fire-buttons.four) > :nth-child(2) {justify-self:start}
 }
 
 /* Pads lie on the panel itself: their shells are cut-outs, not plates of their own. */
@@ -285,16 +287,13 @@ body > .machine-speaker {
   color:#fff;background:radial-gradient(circle at 50% 30%,#4b4d53,#1d1e22 70%,#0b0b0d);
   box-shadow:0 0 0 1px #000,0 0 0 2px #ffffff40,0 0 10px #8fb8ff66,inset 0 1px #ffffff59;
 }
-:root:not([data-appstyle]) .manual-pocket {
-  border:0;border-radius:6px;
-  background:linear-gradient(180deg,#050506,#141518);
-  box-shadow:inset 0 2px 4px #000,0 0 0 1px #000,0 1px 0 1px #ffffff14;
-}
 :root:not([data-appstyle]) .manual-pocket::before {background:linear-gradient(#000c,#0000)}
 :root:not([data-appstyle]) .manual-pocket::after {display:none}
 /* The manual in its pocket shows its spine: navy book cloth, rounded, with gold double fillets at each end,
    the title in gold foil, a gilt fore-edge and the tail of its red ribbon, in a slot lined with black felt. */
 :root:not([data-appstyle]) .manual-pocket {
+  border:0;
+  border-radius:6px;
   background:radial-gradient(ellipse 80% 120% at 50% 0,#1a1b22,#050507 70%);
   box-shadow:inset 0 3px 5px #000,inset 0 -1px #ffffff0d,0 0 0 1px #000,0 1px 0 1px #ffffff17;
 }
@@ -315,7 +314,13 @@ body > .machine-speaker {
   right:-2px;top:2px;bottom:2px;width:3px;border:0;border-radius:0 2px 2px 0;
   background:repeating-linear-gradient(0deg,#f8e6a8 0 1px,#b98d3f 1px 2px);box-shadow:1px 0 1px #0008;
 }
-:root:not([data-appstyle]) .manual-book-spine {width:9px;border:0;border-radius:3px 0 0 3px;background:linear-gradient(90deg,#0b1424,#1b2e4b 55%,#0e1a2c);box-shadow:inset -1px 0 #e4c47599}
+:root:not([data-appstyle]) .manual-book-spine {
+  width:9px;
+  border:0;
+  border-radius:3px 0 0 3px;
+  background:linear-gradient(90deg,#0b1424,#1b2e4b 55%,#0e1a2c);
+  box-shadow:inset -1px 0 #e4c47599;
+}
 :root:not([data-appstyle]) .manual-book-copy strong {
   font:700 8px/1 Georgia,serif;letter-spacing:.2em;text-indent:.2em;
   background:linear-gradient(180deg,#fff3c8,#e6c06a 45%,#a8792f 56%,#efd28a);-webkit-background-clip:text;background-clip:text;color:transparent;
@@ -324,26 +329,37 @@ body > .machine-speaker {
 @media(max-width:600px) {
   :root:not([data-appstyle]) .manual-book-copy strong {font-size:7px;letter-spacing:.04em;text-indent:0}
   :root:not([data-appstyle]) .manual-book-copy {gap:3px;padding:0 6px 0 2px}
-  :root:not([data-appstyle]) .cabinet-manual::before {left:11px;right:6px;background:linear-gradient(90deg,#e4c475 0 1px,#0000 1px calc(100% - 1px),#e4c475 calc(100% - 1px))}
 }
 /* The spine carries the cover's title: the BLIP plate and MANUAL. A hover lifts it a little out of its slot. */
 :root:not([data-appstyle]) .manual-book-copy {gap:6px}
 :root:not([data-appstyle]) .manual-book-plate {display:block;height:15px;width:auto;filter:drop-shadow(0 1px 1px #000a)}
 :root:not([data-appstyle]) .cabinet-manual {cursor:pointer;transition:transform .2s cubic-bezier(.2,.7,.15,1),box-shadow .2s}
-:root:not([data-appstyle]) .cabinet-manual:is(:hover,:focus-visible) {transform:translateY(-3px);filter:none;box-shadow:0 1px 1px #000,0 7px 9px #000c,inset 0 1px #ffffff40,inset 0 -1px #0009}
-@media(max-width:600px) {:root:not([data-appstyle]) .manual-book-plate {height:11px}:root:not([data-appstyle]) .cabinet-manual::before {display:none}}
+:root:not([data-appstyle]) .cabinet-manual:is(:hover,:focus-visible) {
+  transform:translateY(-3px);
+  filter:none;
+  box-shadow:0 1px 1px #000,0 7px 9px #000c,inset 0 1px #ffffff40,inset 0 -1px #0009;
+}
+@media(max-width:600px) {
+  :root:not([data-appstyle]) .manual-book-plate { height:11px; }
+  :root:not([data-appstyle]) .cabinet-manual::before {
+    left:11px;
+    right:6px;
+    background:linear-gradient(90deg,#e4c475 0 1px,#0000 1px calc(100% - 1px),#e4c475 calc(100% - 1px));
+    display:none;
+  }
+}
 :root:not([data-appstyle]) .manual-page-edges {
   display:block;position:absolute;right:26%;bottom:-8px;width:5px;height:10px;pointer-events:none;
   background:linear-gradient(90deg,#7d1a14,#c0372b 50%,#86201a);clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);
   filter:drop-shadow(0 1px 1px #000a);
 }
+/* The machine is always switched on: its power lamp always burns. */
 :root:not([data-appstyle]) .blip-power-indicator {
-  border:0;color:#80858d;
+  border:0;
   background:linear-gradient(180deg,#24252a,#0d0e10);
   box-shadow:0 0 0 1px #000,0 1px 0 1px #ffffff14,0 2px 6px #000a;
+  color:#c9d6e6;
 }
-/* The machine is always switched on: its power lamp always burns. */
-:root:not([data-appstyle]) .blip-power-indicator {color:#c9d6e6}
 :root:not([data-appstyle]) .power-bulb {
   border-color:#0b2a55;background:radial-gradient(circle at 40% 35%,#eaf4ff 0 15%,#5aa8ff 45%,#1d5fd0 80%);
   box-shadow:0 0 5px 2px #4a9cff99,0 0 14px #3d8bff77,inset 0 0 2px #fff;
@@ -351,13 +367,13 @@ body > .machine-speaker {
 
 /* Sideways, each gutter seats a player: the caps stack beside the stick, a thumb wide, and the
    player's lamp sits above the ball, clear of the top bar. */
-:root[data-layout="landscape"][data-players="2"] :is(#topbar,#kiosk-bar) {--cap:54px}
-:root[data-layout="landscape"][data-players="2"] :is(#topbar,#kiosk-bar) .fire-buttons.four {
+:root[data-layout="landscape"][data-players="2"] #topbar {--cap:54px}
+:root[data-layout="landscape"][data-players="2"] #topbar .fire-buttons.four {
   grid-template-columns:calc(var(--cap) * 1.3);row-gap:10px;
 }
-:root[data-layout="landscape"][data-players="2"] :is(#topbar,#kiosk-bar) .arcade-btn {width:var(--cap);height:var(--cap)}
-:root[data-layout="landscape"][data-players="2"] :is(#topbar,#kiosk-bar) .fire-buttons.four > :first-child {justify-self:end}
-:root[data-layout="landscape"][data-players="2"] :is(#topbar,#kiosk-bar) .fire-buttons.four > :nth-child(2) {justify-self:start}
+:root[data-layout="landscape"][data-players="2"] #topbar .arcade-btn {width:var(--cap);height:var(--cap)}
+:root[data-layout="landscape"][data-players="2"] #topbar .fire-buttons.four > :first-child {justify-self:end}
+:root[data-layout="landscape"][data-players="2"] #topbar .fire-buttons.four > :nth-child(2) {justify-self:start}
 :root[data-layout="landscape"]:not([data-appstyle]) :is(.deck-credit-lamp,.deck-second-lamp) {top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 168px)}
 
 /* Rally's spinners: the knurled knob on a black skirt, in the sticks' washer plastic. */

@@ -19,7 +19,6 @@ use blip::{
 // The effects and music are made by build.rs; the tests check them here.
 #[cfg(test)]
 mod tunes;
-#[cfg(not(target_arch = "wasm32"))]
 mod bot;
 mod levels;
 
@@ -236,7 +235,7 @@ impl Game {
     /// game doesn't settle into repeating the same pattern from level 3 on.
     fn build_bricks(&mut self) {
         let mut bombs = 0;
-        let pattern = (self.sess.level - 1).rem_euclid(8);
+        let pattern = (self.sess.level - 1).rem_euclid(LAYOUTS);
         let center_col = (BRICK_COLS - 1) as f32 / 2.0;
         for r in 0..BRICK_ROWS {
             for c in 0..BRICK_COLS {
@@ -333,6 +332,7 @@ impl Game {
 
     fn start_game(&mut self) {
         self.sess.reset(LIVES_START);
+        blip::bot::levels(LAYOUTS as usize);
         self.ball_speed = BALL_SPEED_0;
         self.reset_drops();
         self.pad_x = ((WIN_W - PAD_W) / 2) as f32;
@@ -453,7 +453,6 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if let Some(b) = g.extra.pop() {
             g.set_ball(b);
         } else {
-            blip::bot::add("lives_lost", 1.0);
             blip::bot::add(&format!("lost_at_speed{}", (g.ball_vx.hypot(g.ball_vy) / 50.0) as i32 * 50), 1.0);
             play_sfx(&sfx.life_lost);
             g.reset_drops();
@@ -470,8 +469,6 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     }
 
     if g.bricks_alive() == 0 {
-        blip::bot::set("cleared", g.sess.level as f64);
-        blip::bot::set(&format!("t_clear{}", g.sess.level), blip::bot::clock() as f64);
         play_sfx(&sfx.win);
         g.dead_timer.start(1.5);
         g.state = State::Win;
@@ -705,6 +702,7 @@ fn break_brick(g: &mut Game, i: usize, speed: f32, sfx: &Sounds, blasted: bool) 
     let (mx, my) = (bx + BRICK_W as f32 / 2.0, by + BRICK_H as f32 / 2.0);
     g.bricks[i].alive = false;
     g.since_break = 0.0;
+    blip::bot::add(if blasted { "bricks_blasted" } else { "bricks" }, 1.0);
     g.chain += 1;
     let times = g.chain.min(CHAIN_MAX);
     let points = (BRICK_ROWS - row) * 10 * g.sess.level * times;
@@ -804,6 +802,7 @@ fn hit_bricks(g: &mut Game, speed: f32, sfx: &Sounds) {
             // Steel brick survived — the cracked texture warns the next hit
             // finishes it.
             g.bricks[i].kind = BRICK_STEEL_CRACKED;
+            blip::bot::add("steel_cracked", 1.0);
             g.fx.burst(mx, my, 5, 70.0, BRICK_COLORS[BRICK_STEEL]);
             play_variant(&sfx.brick_hit, speed);
         }
@@ -830,6 +829,7 @@ fn move_drops(g: &mut Game, dt: f32, sfx: &Sounds) {
             PAD_H as f32 + DROP_H,
         ) {
             d.active = false;
+            blip::bot::add("drops", 1.0);
             blip::bot::add(["got_wide", "got_narrow", "got_slow", "got_life", "got_multi"][d.kind as usize], 1.0);
             let (label, c) = match d.kind {
                 DropKind::Wide => ("WIDE", BLIP_GREEN),
@@ -979,7 +979,7 @@ fn draw_title(blip: &Blip, hi: &web::HighScore, paddle: &Texture2D, ball: &Textu
     // BOUNCER is sz=6 (42px tall) — clear its bottom by a real margin.
     blip.draw_hi(hi, (WIN_H / 4 + 50) as f32, BLIP_YELLOW);
     let by = web::controls();
-    blip.draw_centered(by.pick("PRESS FIRE", "PRESS FIRE", "TAP TO START"), (WIN_H / 2) as f32, 3.0, BLIP_WHITE);
+    blip.draw_start_prompt((WIN_H / 2) as f32);
     let lines = [
         by.pick("LEFT RIGHT ARROW OR AD", "PAD LEFT AND RIGHT", "DRAG TO MOVE"),
         by.pick("SPACE TO LAUNCH", "FIRE TO LAUNCH", "TAP TO LAUNCH"),
@@ -1036,6 +1036,7 @@ async fn load_takes(wavs: &[&'static [u8]; 3]) -> [blip::BlipSound; 3] {
 
 #[blip::macroquad::main(conf)]
 async fn main() {
+    blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
@@ -1078,8 +1079,7 @@ async fn main() {
         music.play(if g.state == State::Title { 0 } else { (g.sess.level as usize + 1) % 2 });
 
         g.touch_x = blip.touch(0).map(|p| p.x);
-        #[cfg(not(target_arch = "wasm32"))]
-        if blip::bot::active() { bot::drive(&g, blip::bot::clock()); }
+        if blip::bot::active() { bot::drive(&g); }
         match g.state {
             State::Title  => update_title(&mut g),
             State::Launch => update_launch(&mut g, dt),
@@ -1098,7 +1098,7 @@ async fn main() {
                 draw_play(&blip, &g, &paddle, &ball, &ball_shade, &brick, &drops);
                 // The ball waits on the paddle after every lost life; say so.
                 if g.state == State::Launch && (blip::macroquad::time::get_time() * 2.0) as i64 % 2 == 0 {
-                    let prompt = web::controls().pick("PRESS FIRE", "PRESS FIRE", "TAP TO LAUNCH");
+                    let prompt = web::controls().pick("PRESS SPACE", "PRESS FIRE", "TAP TO LAUNCH");
                     blip.draw_centered(prompt, (PAD_Y - 90) as f32, 3.0, BLIP_WHITE);
                 }
             }

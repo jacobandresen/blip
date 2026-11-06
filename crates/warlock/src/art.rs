@@ -458,13 +458,6 @@ impl Art {
                 if g.intro > 0.0 && g.state == State::Play {
                     self.draw_title_card(blip, g);
                 }
-                if g.state == State::Bonus {
-                    if let Some(b) = &g.bonus {
-                        if !b.showing {
-                            blip.draw_centered_outlined("REPEAT THE LIGHTS", WIN_W as f32 / 2.0, (HUD_H + 10) as f32, 2.0, RUNE_CLEAN, BLIP_BLACK);
-                        }
-                    }
-                }
             }
         }
     }
@@ -1454,7 +1447,7 @@ impl Art {
         self.glow(hx, hy, 60.0 * swell, c(0.55, 0.12, 0.9, 0.35));
         self.glow(hx, hy, 24.0 * swell, c(0.8, 0.35, 1.0, 0.7));
         for k in 0..14 {
-            let p = ((t * 0.7 + k as f32 / 14.0) % 1.0) as f32;
+            let p = (t * 0.7 + k as f32 / 14.0) % 1.0;
             let a = k as f32 * 2.4 + p * 5.0;
             let r = 34.0 * (1.0 - p) + 8.0;
             self.glow(hx + a.cos() * r, hy + a.sin() * r * 0.8, 2.6, c(0.85, 0.55, 1.0, p.min(1.0 - p) * 2.0));
@@ -1584,7 +1577,7 @@ impl Art {
         }
         let by = web::controls();
         if (t * 2.0) as i32 % 2 == 0 {
-            blip.draw_centered_outlined(by.pick("PRESS FIRE", "PRESS FIRE", "TAP TO START"), WIN_W as f32 / 2.0, 470.0, 3.0, BLIP_WHITE, BLIP_BLACK);
+            blip.draw_start_prompt(470.0);
         }
         blip.draw_centered_outlined(
             by.pick("ARROWS MOVE  SPACE BOLT  Z REVEAL", "STICK MOVE  A BOLT  B REVEAL", "STICK MOVE  A BOLT  B REVEAL"),
@@ -1604,7 +1597,11 @@ impl Art {
             "REVEAL THEN BOLT: A LANCE",
             "MONSTERS MAY DROP POTIONS",
         ];
-        let tip = if (t / 4.0) as usize % TIPS.len() == 0 { by.pick(TIPS[0], "2ND STATION JOINS WITH A", "2ND PLAYER JOINS ON THE DECK") } else { TIPS[((t / 4.0) as usize) % TIPS.len()] };
+        // A new tip every four seconds; the first says how the second player joins.
+        let tip = match (t / 4.0) as usize % TIPS.len() {
+            0 => by.pick(TIPS[0], "2ND STATION JOINS WITH A", "2ND PLAYER JOINS ON THE DECK"),
+            n => TIPS[n],
+        };
         let fade = ((t / 4.0).fract() * 8.0).min(1.0).min((1.0 - (t / 4.0).fract()) * 8.0);
         blip.draw_centered_outlined(tip, WIN_W as f32 / 2.0, 522.0, 2.0, c(0.86, 0.66, 0.3, fade), with_a(BLIP_BLACK, fade));
     }

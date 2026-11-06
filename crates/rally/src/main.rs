@@ -16,7 +16,6 @@ use blip::{
 // The effects and music are made by build.rs; the tests check them here.
 #[cfg(test)]
 mod tunes;
-#[cfg(not(target_arch = "wasm32"))]
 mod bot;
 
 // ---- layout -----------------------------------------------------------
@@ -221,6 +220,8 @@ fn award_point(g: &mut Game, left_scored: bool, sound: &blip::BlipSound) {
         g.score_r += 1;
         g.serve_dir = -1.0;
     }
+    blip::bot::set("points_won", g.score_l as f64);
+    blip::bot::set("points_lost", g.score_r as f64);
     play_sfx(sound);
 
     let score = if left_scored { g.score_l } else { g.score_r };
@@ -299,7 +300,7 @@ fn draw_serve(blip: &Blip, g: &Game) {
     blip.clear(BLIP_BLACK);
     draw_field(blip, g);
     blip.fill_rect(g.ball_x, g.ball_y, BALL_SZ, BALL_SZ, BLIP_WHITE);
-    let prompt = web::controls().pick("PRESS FIRE", "PRESS FIRE", "TAP TO SERVE");
+    let prompt = web::controls().pick("PRESS SPACE", "PRESS FIRE", "TAP TO SERVE");
     blip.draw_centered(prompt, PLAY_T + PLAY_H * 0.5 + 54.0, 2.0, BLIP_GRAY);
 }
 
@@ -341,6 +342,7 @@ fn conf() -> blip::macroquad::window::Conf {
 
 #[blip::macroquad::main(conf)]
 async fn main() {
+    blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
     let mut g = Game::new();
 
@@ -353,8 +355,7 @@ async fn main() {
     };
     // Five loops in rotation.
     let mut jukebox = Jukebox::new("RALLY", &["LOOP1", "LOOP2", "LOOP3", "LOOP4", "LOOP5"]);
-    #[cfg(not(target_arch = "wasm32"))]
-    let mut autopilot = bot::Bot { err: 0.0, last_vx: 0.0, hits: 0 };
+    let mut autopilot = bot::Bot::default();
 
     loop {
         let dt = blip.delta_time;
@@ -362,8 +363,7 @@ async fn main() {
         jukebox.rotate(dt);
         g.touch = [blip.touch(0), blip.touch(1)];
         g.pressed = [blip.touch_pressed(0), blip.touch_pressed(1)];
-        #[cfg(not(target_arch = "wasm32"))]
-        if blip::bot::active() { bot::drive(&g, &mut autopilot, blip::bot::clock()); }
+        if blip::bot::active() { bot::drive(&g, &mut autopilot); }
         match g.state {
             State::Title => update_title(&mut g),
             State::Serve => update_serve(&mut g, dt),

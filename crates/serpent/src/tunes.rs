@@ -1,20 +1,15 @@
 // Compiled by build.rs, and by the game for its tests: each uses part of this file.
 #![allow(dead_code)]
 
-use blip::song::{major, minor, Chord, Groove, Song, H, R};
+use blip::song::{Groove, Song, H, R};
 
 // ---- music: two tunes on the marimba -------------------------------------
 // Synthesised on the device (see `song`): A minor pentatonic, the notes a
 // snake winds through. SLITHER plays the early levels, FRENZY from level 5.
 use blip::cosy::{self, Voice, H as HOLD};
 use blip::Asset;
+use blip::song::chords::{AM, C, DM, EM, F, G};
 
-const AM: Chord = minor(45);
-const C: Chord = major(48);
-const DM: Chord = minor(50);
-const EM: Chord = minor(40);
-const F: Chord = major(41);
-const G: Chord = major(43);
 
 /// The calm tune: stepwise, winding, a little sly.
 pub fn slither_song() -> Song<'static> {

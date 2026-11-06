@@ -27,6 +27,11 @@ impl Program {
     }
 }
 
+/// BASIC's true is 1, false 0.
+fn truth(value: bool) -> Value {
+    Value::Num(value as u8 as f64)
+}
+
 struct Expr<'p, 'b> {
     tokens: Arc<[Token]>,
     at: usize,
@@ -70,14 +75,14 @@ impl Expr<'_, '_> {
                     let (a, b) = (left.number(), right.number());
                     Value::Num(a - b * (a / b).floor())
                 }
-                "=" | "==" => Value::Num((left == right) as u8 as f64),
-                "<>" => Value::Num((left != right) as u8 as f64),
-                "<" => Value::Num((left.number() < right.number()) as u8 as f64),
-                ">" => Value::Num((left.number() > right.number()) as u8 as f64),
-                "<=" => Value::Num((left.number() <= right.number()) as u8 as f64),
-                ">=" => Value::Num((left.number() >= right.number()) as u8 as f64),
-                "AND" => Value::Num((left.number() != 0.0 && right.number() != 0.0) as u8 as f64),
-                "OR" => Value::Num((left.number() != 0.0 || right.number() != 0.0) as u8 as f64),
+                "=" | "==" => truth(left == right),
+                "<>" => truth(left != right),
+                "<" => truth(left.number() < right.number()),
+                ">" => truth(left.number() > right.number()),
+                "<=" => truth(left.number() <= right.number()),
+                ">=" => truth(left.number() >= right.number()),
+                "AND" => truth(left.number() != 0.0 && right.number() != 0.0),
+                "OR" => truth(left.number() != 0.0 || right.number() != 0.0),
                 _ => unreachable!(),
             };
         }
@@ -103,7 +108,7 @@ impl Expr<'_, '_> {
     }
     fn name(&mut self, name: &str) -> Result<Value, String> {
         match name {
-            "NOT" => return Ok(Value::Num((self.atom()?.number() == 0.0) as u8 as f64)),
+            "NOT" => return Ok(truth(self.atom()?.number() == 0.0)),
             "INKEY$" => {
                 return Ok(Value::Str(
                     if self.program.input.pressed(blip::input::BLIP_KEY_SPACE) { " " } else { "" }.into(),
@@ -151,6 +156,7 @@ impl Expr<'_, '_> {
             "CONTROL_TEXT$" if args.len() == 3 => Value::Str(
                 blip::web::controls().pick(&args[0].string(), &args[1].string(), &args[2].string()).to_string(),
             ),
+            "FIRE_PROMPT$" if args.len() <= 1 => Value::Str(blip::web::fire_prompt(&args.first().map(Value::string).unwrap_or_default())),
             "INT" => Value::Num(first.number().floor()),
             "ABS" => Value::Num(first.number().abs()),
             "SQR" => Value::Num(first.number().sqrt()),
@@ -179,6 +185,13 @@ impl Expr<'_, '_> {
                     args.get(3).map(Value::number).unwrap_or(1.0) as f32,
                 ))
             }
+            "HSV" => {
+                if !(3..=4).contains(&args.len()) {
+                    return Err("HSV needs hue,saturation,value[,alpha]".into());
+                }
+                let n = |i: usize| args[i].number() as f32;
+                Value::Color(blip::hsv(n(0), n(1), n(2), args.get(3).map(Value::number).unwrap_or(1.0) as f32))
+            }
             "KEY_ACTIVE" | "KEY_HELD" | "KEY_PRESSED" => {
                 let key = key_code(&first.string().to_ascii_uppercase())?;
                 let down = match name {
@@ -186,7 +199,7 @@ impl Expr<'_, '_> {
                     "KEY_HELD" => blip::input::key_held(key),
                     _ => self.program.input.pressed(key),
                 };
-                Value::Num(down as u8 as f64)
+                truth(down)
             }
             "TEXT_CX" => {
                 if args.len() != 2 {

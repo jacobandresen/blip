@@ -18,6 +18,7 @@ mod tunes;
 mod gfx;
 mod art;
 mod levels;
+mod bot;
 use levels::{LEVELS, PALETTES, ROCKS_FROM, ROUNDS, ROWS, SPARKS_FROM};
 
 // ---- layout -----------------------------------------------------------
@@ -366,15 +367,19 @@ struct Game {
     extend: bool, // the last clear gave a life back
 }
 
-/// A one-player game's score goes to the high-score board; a game player
-/// two joined sets none.
+/// The game has ended (Over or Won). A one-player game.s score goes to the
+/// high-score board; a game player two joined sets none. A bot run ends here.
 fn report_score(g: &Game) {
+    blip::bot::finish(if g.state == State::Won { "won" } else { "over" });
     if !g.two_up {
         web::report_score(g.p[0].score);
     }
 }
 
-fn level_spawns(round: usize) -> ((f32, f32), (f32, f32), Vec<(Kind, f32, f32)>) {
+/// Where a round starts: each player's spot, and each enemy's kind and spot.
+type Spawns = ((f32, f32), (f32, f32), Vec<(Kind, f32, f32)>);
+
+fn level_spawns(round: usize) -> Spawns {
     let mut a = (TILE + 2.0, HUD + 16.0 * TILE + TILE - P_H);
     let mut b = a;
     let mut es = Vec::new();
@@ -425,6 +430,8 @@ impl Game {
 
     fn load_round(&mut self, round: usize) {
         self.round = round;
+        blip::bot::levels(ROUNDS);
+        blip::bot::reached_level(round as i32 + 1);
         for (r, row) in LEVELS[round].iter().enumerate() {
             for (c, ch) in row.chars().enumerate() {
                 self.tiles[r][c] = ch == '#';
@@ -484,15 +491,7 @@ impl Game {
         }
         self.two_up = two;
         web::set_players(if two { 1 } else { 2 });
-        // Playtest, native only: BUBBLER_ROUND=1..8 starts at that round.
-        #[cfg(not(target_arch = "wasm32"))]
-        let first = std::env::var("BUBBLER_ROUND")
-            .ok()
-            .and_then(|v| v.parse::<usize>().ok())
-            .map_or(0, |r| r.clamp(1, ROUNDS) - 1);
-        #[cfg(target_arch = "wasm32")]
-        let first = 0;
-        self.load_round(first);
+        self.load_round(blip::bot::level(ROUNDS));
         self.state = State::Intro;
         self.state_t = 0.0;
     }
@@ -1318,8 +1317,7 @@ fn hurt_players(
     player_starts: [(f32, f32); 2],
     enemy_starts: &[(f32, f32)],
 ) {
-    #[cfg(not(target_arch = "wasm32"))]
-    if std::env::var_os("BUBBLER_GOD").is_some() {
+    if blip::bot::flag("GOD") {
         if g.skull.active && g.p.iter().any(|p| p.alive && (g.skull.x - p.cx()).hypot(g.skull.y - p.cy()) < 18.0) {
             g.stats.deaths_skull += 1; // would have been caught
         }
@@ -1382,8 +1380,7 @@ fn hurt_players(
             if let Some(k) = killer {
                 g.stats.deaths_by[k as usize] += 1;
             }
-            #[cfg(not(target_arch = "wasm32"))]
-            if std::env::var_os("BUBBLER_BOT").is_some() {
+            if blip::bot::active() {
                 let p = &g.p[pi];
                 let e = g
                     .enemies
@@ -1936,121 +1933,101 @@ fn draw_title(blip: &Blip, art: &art::Art, g: &Game, hi: &web::HighScore) {
     let _ = g;
 }
 
-/// Native playtest bot (`BUBBLER_BOT=1` or `2`); targets nearby enemies and avoids hazards.
+/// The cabinet card: two dragons mid-round, bubbles up, a chain ready.
+fn stage_cabinet_card(g: &mut Game) {
+    g.start_game(true);
+    g.state = State::Play;
+    g.p[0].x = 150.0;
+    g.p[0].y = HUD + 19.0 * TILE - P_H;
+    g.p[0].mouth = 10.0;
+    g.p[0].safe = 0.0;
+    g.p[1].x = 360.0;
+    g.p[1].y = HUD + 15.0 * TILE - P_H;
+    g.p[1].face = -1.0;
+    g.p[1].safe = 0.0;
+    for (k, e) in g.enemies.iter_mut().enumerate() {
+        if k < 3 {
+            e.active = false;
+        }
+        e.pop_in = 1.0;
+    }
+    for (k, (x, y)) in
+        [(282.0, 70.0), (306.0, 72.0), (330.0, 70.0), (200.0, 260.0), (230.0, 390.0)].iter().enumerate()
+    {
+        g.bubbles.push(Bubble {
+            x: *x,
+            y: *y,
+            vx: 0.0,
+            age: 1.0,
+            phase: if k < 3 { Phase::Top } else { Phase::Float },
+            owner: k % 2,
+            trapped: if k < 3 { Some((Kind::Walker, false)) } else { None },
+            active: true,
+            wob: k as f32,
+            squish: 0.0,
+        });
+    }
+    // one of each treat on the floor
+    for (kind, x) in [(0usize, 150.0f32), (1, 196.0), (2, 410.0), (3, 456.0)] {
+        g.fruits.push(Fruit {
+            x,
+            y: HUD + 23.0 * TILE - 16.0,
+            vx: 0.0,
+            vy: 0.0,
+            kind,
+            t: 1.0,
+            on_ground: true,
+            active: true,
+        });
+    }
+}
+
+/// Native-only: BUBBLER_SCENE=intro|play|hurry|chain|solo|clear|over|won
+/// jumps to that screen and freezes it, for checking the text.
 #[cfg(not(target_arch = "wasm32"))]
-fn bot_input(g: &Game, pi: usize, mem: &mut [f32; 4]) -> Input {
-    let mut k = Input::default();
-    let passive = std::env::var_os("BUBBLER_PASSIVE").is_some();
-    let p = &g.p[pi];
-    if !p.joined || !p.alive || p.dead_t > 0.0 {
-        return k;
+fn stage_scene(g: &mut Game, scene: &str) {
+    if scene != "title" {
+        g.start_game(true);
+        g.state = State::Play;
     }
-    let (px, py) = (p.cx(), p.cy());
-    mem[0] -= 1.0 / 60.0;
-    // danger: a monster about to walk into us
-    let danger = g
-        .enemies
-        .iter()
-        .filter(|e| e.active)
-        .map(|e| (e.x + E_W / 2.0 - px, e.y + E_H / 2.0 - py))
-        .find(|(dx, dy)| dx.abs() < 34.0 && dy.abs() < 22.0);
-    // trapped bubbles are the priority: go and pop them
-    let trapped =
-        g.bubbles.iter().filter(|b| b.trapped.is_some()).min_by(|a, b| (a.x - px).abs().total_cmp(&(b.x - px).abs()));
-    let fruit = g
-        .fruits
-        .iter()
-        .filter(|f| f.on_ground && (f.y + 8.0 - py).abs() < 30.0)
-        .min_by(|a, b| (a.x - px).abs().total_cmp(&(b.x - px).abs()));
-    let target = if let Some(b) = trapped {
-        Some((b.x, b.y, true))
-    } else if let Some(f) = fruit.filter(|f| (f.x - px).abs() < 160.0) {
-        Some((f.x + 8.0, py, true))
-    } else {
-        g.enemies
-            .iter()
-            .filter(|e| e.active && e.pop_in >= 1.0)
-            .min_by(|a, b| ((a.x - px).hypot((a.y - py) * 1.6)).total_cmp(&(b.x - px).hypot((b.y - py) * 1.6)))
-            .map(|e| (e.x + E_W / 2.0, e.y + E_H / 2.0, false))
-    };
-    // in the air over a monster: steer clear of it
-    if !p.on_ground {
-        if let Some(e) = g
-            .enemies
-            .iter()
-            .filter(|e| e.active)
-            .find(|e| (e.x + E_W / 2.0 - px).abs() < 30.0 && e.y > py && e.y - py < 90.0)
-        {
-            let away = if e.x + E_W / 2.0 > px { -1.0 } else { 1.0 };
-            k.left = away < 0.0;
-            k.right = away > 0.0;
-            return k;
-        }
+    for e in g.enemies.iter_mut() {
+        e.pop_in = 1.0;
     }
-    if let Some((dx, _)) = danger {
-        // hop away / over
-        k.left = dx > 0.0;
-        k.right = dx < 0.0;
-        if p.on_ground && blip::rand_range_f32(0.0, 1.0) < 0.25 {
-            k.jump = true;
-        }
-        // and bubble it if we face it
-        if (dx > 0.0) == (p.face > 0.0) && !passive {
-            k.blow = true;
-        }
-        k.jump_held = true;
-        return k;
+    for p in g.p.iter_mut() {
+        p.safe = 0.0;
+        p.score = 128_450;
     }
-    if let Some((tx, ty, is_bubble)) = target {
-        let dx = tx - px;
-        let dy = ty - py;
-        if is_bubble {
-            if dx.abs() > 10.0 {
-                k.left = dx < 0.0;
-                k.right = dx > 0.0;
-            }
-            if p.on_ground && (dy < -20.0 || dx.abs() < 40.0) && mem[0] <= 0.0 {
-                k.jump = true;
-                mem[0] = 0.3;
-            }
-            k.jump_held = false; // bump into it, do not ride it
-        } else {
-            let level = dy.abs() < 18.0;
-            if level && dx.abs() < 150.0 {
-                // face it and blow
-                if (dx > 0.0) != (p.face > 0.0) {
-                    k.left = dx < 0.0;
-                    k.right = dx > 0.0;
-                } else if blip::rand_range_f32(0.0, 1.0) < 0.5 && !passive {
-                    k.blow = true;
-                }
-                if dx.abs() > 70.0 {
-                    k.left = dx < 0.0;
-                    k.right = dx > 0.0;
-                }
-            } else {
-                if dx.abs() > 30.0 || dy > 0.0 {
-                    // head for it; to go down walk off an edge, to go up jump
-                    let wander = if mem[1] > 0.0 { mem[2] } else { 0.0 };
-                    let dir = if wander != 0.0 { wander } else { dx.signum() };
-                    k.left = dir < 0.0;
-                    k.right = dir > 0.0;
-                }
-                if dy < -30.0 && p.on_ground && mem[0] <= 0.0 && blip::rand_range_f32(0.0, 1.0) < 0.12 {
-                    k.jump = true;
-                    mem[0] = 0.4;
-                }
-            }
+    g.p[1].score = 97_320;
+    match scene {
+        "intro" => {
+            g.state = State::Intro;
+            g.state_t = 1.2;
         }
-        // stuck against a wall or under a ledge: wander a bit
-        mem[1] -= 1.0 / 60.0;
-        if (p.vx.abs() < 5.0 && (k.left || k.right)) && mem[1] <= 0.0 {
-            mem[1] = 0.8;
-            mem[2] = if blip::rand_range_f32(0.0, 1.0) < 0.5 { -1.0 } else { 1.0 };
+        "hurry" => {
+            g.round_t = hurry_at(g.round) + 0.1;
+            g.hurry = true;
         }
+        "chain" => {
+            g.chain = (3, 1.0);
+        }
+        "solo" => {
+            g.p[1].joined = false;
+            g.two_up = false;
+        }
+        "clear" => {
+            g.state = State::Clear;
+            g.state_t = 0.8;
+        }
+        "over" => {
+            g.state = State::Over;
+            g.state_t = 3.0;
+        }
+        "won" => {
+            g.state = State::Won;
+            g.state_t = 3.0;
+        }
+        _ => {}
     }
-    k.jump_held = k.jump_held || k.jump;
-    k
 }
 
 fn conf() -> blip::macroquad::window::Conf {
@@ -2059,6 +2036,7 @@ fn conf() -> blip::macroquad::window::Conf {
 
 #[blip::macroquad::main(conf)]
 async fn main() {
+    blip::bot::playthroughs(bot::PLAYTHROUGHS);
     let mut blip = Blip::new(WIN_W, WIN_H);
     let art = art::Art::load();
     // Bright filled blocks twitter under the full interlace (see Brawler).
@@ -2088,122 +2066,25 @@ async fn main() {
     let mut shot_frame = 0u32;
     #[cfg(not(target_arch = "wasm32"))]
     let mut scene_set = false;
-    #[cfg(not(target_arch = "wasm32"))]
-    let bot: u32 = std::env::var("BUBBLER_BOT").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
-    #[cfg(not(target_arch = "wasm32"))]
-    let speed: u32 = std::env::var("BUBBLER_SPEED").ok().and_then(|v| v.parse().ok()).unwrap_or(1);
-    #[cfg(not(target_arch = "wasm32"))]
-    let (mut bot_mem, mut bot_clock, mut bot_rounds) = ([[0.0f32; 4]; 2], 0.0f32, Vec::<u32>::new());
+    let mut minds: [bot::Mind; 2] = Default::default();
 
     loop {
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            bot_clock += blip.delta_time;
-        }
         let dt = blip.delta_time;
         g.state_t += dt;
         let hi = web::high_score();
 
-        // The cabinet card: two dragons mid-round, bubbles up, a chain ready.
         if blip.screenshot_mode {
             shot_frame += 1;
             if shot_frame == 1 {
-                g.start_game(true);
-                g.state = State::Play;
-                g.p[0].x = 150.0;
-                g.p[0].y = HUD + 19.0 * TILE - P_H;
-                g.p[0].mouth = 10.0;
-                g.p[0].safe = 0.0;
-                g.p[1].x = 360.0;
-                g.p[1].y = HUD + 15.0 * TILE - P_H;
-                g.p[1].face = -1.0;
-                g.p[1].safe = 0.0;
-                for (k, e) in g.enemies.iter_mut().enumerate() {
-                    if k < 3 {
-                        e.active = false;
-                    }
-                    e.pop_in = 1.0;
-                }
-                for (k, (x, y)) in
-                    [(282.0, 70.0), (306.0, 72.0), (330.0, 70.0), (200.0, 260.0), (230.0, 390.0)].iter().enumerate()
-                {
-                    g.bubbles.push(Bubble {
-                        x: *x,
-                        y: *y,
-                        vx: 0.0,
-                        age: 1.0,
-                        phase: if k < 3 { Phase::Top } else { Phase::Float },
-                        owner: k % 2,
-                        trapped: if k < 3 { Some((Kind::Walker, false)) } else { None },
-                        active: true,
-                        wob: k as f32,
-                        squish: 0.0,
-                    });
-                }
-                // one of each treat on the floor
-                for (kind, x) in [(0usize, 150.0f32), (1, 196.0), (2, 410.0), (3, 456.0)] {
-                    g.fruits.push(Fruit {
-                        x,
-                        y: HUD + 23.0 * TILE - 16.0,
-                        vx: 0.0,
-                        vy: 0.0,
-                        kind,
-                        t: 1.0,
-                        on_ground: true,
-                        active: true,
-                    });
-                }
+                stage_cabinet_card(&mut g);
             }
         }
 
-        // Native-only: BUBBLER_SCENE=intro|play|hurry|chain|clear|over|won
-        // jumps to that screen and freezes it, for checking the text.
         #[cfg(not(target_arch = "wasm32"))]
         let frozen = if let Ok(scene) = std::env::var("BUBBLER_SCENE") {
             if !scene_set {
                 scene_set = true;
-                if scene != "title" {
-                    g.start_game(true);
-                    g.state = State::Play;
-                }
-                for e in g.enemies.iter_mut() {
-                    e.pop_in = 1.0;
-                }
-                for p in g.p.iter_mut() {
-                    p.safe = 0.0;
-                    p.score = 128_450;
-                }
-                g.p[1].score = 97_320;
-                match scene.as_str() {
-                    "intro" => {
-                        g.state = State::Intro;
-                        g.state_t = 1.2;
-                    }
-                    "hurry" => {
-                        g.round_t = hurry_at(g.round) + 0.1;
-                        g.hurry = true;
-                    }
-                    "chain" => {
-                        g.chain = (3, 1.0);
-                    }
-                    "solo" => {
-                        g.p[1].joined = false;
-                        g.two_up = false;
-                    }
-                    "clear" => {
-                        g.state = State::Clear;
-                        g.state_t = 0.8;
-                    }
-                    "over" => {
-                        g.state = State::Over;
-                        g.state_t = 3.0;
-                    }
-                    "won" => {
-                        g.state = State::Won;
-                        g.state_t = 3.0;
-                    }
-                    _ => {}
-                }
+                stage_scene(&mut g, &scene);
             }
             true
         } else {
@@ -2211,43 +2092,13 @@ async fn main() {
         };
         #[cfg(target_arch = "wasm32")]
         let frozen = false;
+        if blip::bot::active() {
+            bot::drive(&g, &mut minds);
+            bot::report(&g);
+        }
         let solo = !g.two_up;
-        #[allow(unused_mut)]
-        let mut inp = [read(if solo { &SOLO } else { &P1_KEYS }), read(&P2_KEYS)];
-        #[allow(unused_mut)]
-        let mut p2_start = key_pressed(BLIP_KEY_J) || key_pressed(BLIP_KEY_K);
-        #[cfg(not(target_arch = "wasm32"))]
-        if bot > 0
-            && std::env::var("BUBBLER_MAXT").ok().and_then(|v| v.parse::<f32>().ok()).is_some_and(|m| bot_clock > m)
-        {
-            g.state = State::Over;
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        if bot > 0 {
-            match g.state {
-                State::Title => {
-                    if bot == 2 {
-                        p2_start = true;
-                    } else {
-                        inp[0].blow = true;
-                    }
-                }
-                State::Over | State::Won => {
-                    let st = &g.stats;
-                    println!("RESULT state={} round={} time={:.0}s score={}+{} traps={} escapes={} pops={} kills={} chains={:?} fruit={} deaths_enemy={} deaths_skull={} hurries={} skulls={} bounces={} by_kind(w,h,g)={:?} by_round={:?} rounds={:?}",
-                            if g.state == State::Won { "won" } else { "over" }, g.round + 1, bot_clock, g.p[0].score, g.p[1].score,
-                            st.traps, st.escapes, st.pops, st.kills, st.chains, st.fruit, st.deaths_enemy, st.deaths_skull,
-                            st.hurries, st.skulls, st.bounces, st.deaths_by, st.deaths_round, bot_rounds);
-                    std::process::exit(0);
-                }
-                _ => {
-                    inp = [bot_input(&g, 0, &mut bot_mem[0]), bot_input(&g, 1, &mut bot_mem[1])];
-                }
-            }
-            if g.state == State::Clear && g.state_t < dt * 1.5 {
-                bot_rounds.push(g.round_t as u32);
-            }
-        }
+        let inp = [read(if solo { &SOLO } else { &P1_KEYS }), read(&P2_KEYS)];
+        let p2_start = key_pressed(BLIP_KEY_J) || key_pressed(BLIP_KEY_K);
 
         if !frozen {
             match g.state {
@@ -2283,16 +2134,6 @@ async fn main() {
                     }
                     if !blip.screenshot_mode || shot_frame > 400 {
                         update_play(&mut g, dt, inp, &sfx);
-                    }
-                    #[cfg(not(target_arch = "wasm32"))]
-                    for _ in 1..speed {
-                        if g.state != State::Play {
-                            break;
-                        }
-                        let extra = [bot_input(&g, 0, &mut bot_mem[0]), bot_input(&g, 1, &mut bot_mem[1])];
-                        update_play(&mut g, dt, extra, &sfx);
-                        update_fx(&mut g, dt);
-                        bot_clock += dt;
                     }
                 }
                 State::Clear => {

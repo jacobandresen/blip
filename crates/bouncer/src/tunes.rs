@@ -1,20 +1,15 @@
 // Compiled by build.rs, and by the game for its tests: each uses part of this file.
 #![allow(dead_code)]
 
-use blip::song::{major, minor, Chord, Groove, Song, H, R};
+use blip::song::{Groove, Song, H, R};
 
 // ---- music: two tunes on the glockenspiel -------------------------------
 // Synthesised on the device (see `song`). Octave leaps for the ball's
 // bounce; the game alternates the two by level.
 use blip::cosy::{self, Tone, Voice};
 use blip::Asset;
+use blip::song::chords::{C, D, F, G, AM, EM};
 
-const C: Chord = major(48);
-const D: Chord = major(50);
-const F: Chord = major(41);
-const G: Chord = major(43);
-const AM: Chord = minor(45);
-const EM: Chord = minor(40);
 
 /// Odd levels: C major, bouncing up the octave and skipping back down.
 pub fn bounce_song() -> Song<'static> {

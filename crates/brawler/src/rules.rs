@@ -197,6 +197,8 @@ pub(crate) fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
     if toward && !f.was_toward { f.parry_t = IMPACT_WINDOW; }
     else if f.parry_t > 0.0 { f.parry_t -= dt; }
     f.was_toward = toward;
+    if inp.down && !f.was_down { f.tap_down(); }
+    f.was_down = inp.down;
 
     if f.buffer_t > 0.0 {
         f.buffer_t -= dt;
@@ -287,7 +289,7 @@ pub(crate) fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
         f.act = Act::Block;
         f.crouch_block = crouch;
         f.t = 0.0;
-        let speed = f.arch().back_walk;
+        let speed = f.arch().back_walk * f.pace();
         if !crouch { f.x -= f.facing * speed * dt; }
         return;
     }
@@ -299,7 +301,7 @@ pub(crate) fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
     let toward = (inp.right && f.facing > 0.0) || (inp.left && f.facing < 0.0);
     if toward {
         f.act = Act::Walk;
-        f.x += f.facing * f.arch().walk * dt;
+        f.x += f.facing * f.arch().walk * f.pace() * dt;
     } else {
         f.act = Act::Idle;
     }
@@ -308,12 +310,16 @@ pub(crate) fn apply_input(f: &mut Fighter, inp: Input, close: bool, dt: f32) {
 /// Advance one fighter's physics and action timer.
 pub(crate) fn advance(f: &mut Fighter, dt: f32) {
     f.stumble = (f.stumble - dt).max(0.0);
+    // A stagger wears off once the fighter is back on their feet.
+    if f.act != Act::Hitstun && f.act != Act::Knockdown { f.stagger = (f.stagger - dt).max(0.0); }
     if f.land > 0.0 { f.land = (f.land - dt).max(0.0); }
     if f.throw_rest > 0.0 { f.throw_rest = (f.throw_rest - dt).max(0.0); }
     f.daze = (f.daze - DAZE_DRAIN * dt).max(0.0);
     // The stars last as long as the stun does, whatever ends it.
     f.dizzy = if f.act == Act::Hitstun { (f.dizzy - dt).max(0.0) } else { 0.0 };
     f.since_punch += dt;
+    f.since_kick += dt;
+    f.down_tap += dt;
     if f.act == Act::Walk && !f.airborne() { f.far_leads = draw::far_foot_leads(f); }
     if f.web_rest > 0.0 { f.web_rest = (f.web_rest - dt).max(0.0); }
     if f.webbed > 0.0 {
@@ -385,6 +391,8 @@ pub(crate) fn advance(f: &mut Fighter, dt: f32) {
             } else { (m.startup + m.active + m.recovery) * F };
             if !f.airborne() && f.t >= total {
                 if !f.hit_done && f.stumble_roll < 4 { f.stumble = 0.34; }
+                // The roundhouse's kicking leg comes down in front.
+                if f.mv == MoveId::Roundhouse { f.far_leads = !f.far_leads; }
                 f.act = Act::Idle; f.t = 0.0; f.vx = 0.0;
             }
             // In the air a flier's attack ends on its own clock, not on landing.
@@ -534,6 +542,11 @@ pub(crate) fn resolve_hit(attacker: &mut Fighter, defender: &mut Fighter, hold: 
             defender.daze = 0.0;
             defender.dizzy = DIZZY_SECS;
             defender.stun = DIZZY_SECS;
+        }
+        // A heavy clean blow rocks them: a stagger once the hitstun is over.
+        if damage >= STAGGER_FROM && defender.dizzy <= 0.0 && defender.health > 0 {
+            if defender.stagger <= 0.0 { blip::bot::add("staggers", 1.0); }
+            defender.stagger = STAGGER_SECS;
         }
     }
     (damage, false, floored)

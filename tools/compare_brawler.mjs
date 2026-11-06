@@ -85,7 +85,7 @@ function basicScene(who, pose, foe, altKick, compareMode) {
     const home = Number(roster[who === 14 ? who : foe][9]);
     const setup = [`PICK=${who + 1}`, 'START_GAME', `WHO(2)=${foe + 1}`, `STAGE=${home}`,
       `CLOCK=${compareClock}`, 'INTRO=0', `X(1)=${x}`, 'X(2)=400', `Y(1)=${y}`,
-      `ACT$(1)="${acts[pose]}"`, `MV(1)=${move}`, `T(1)=${ticks}`,
+      `ACT$(1)="${acts[pose]}"`, `ATTACK_MOVE(1)=${move}`, `ACT_FRAME(1)=${ticks}`,
       ...(altKick ? ['ALT_KICK(1)=1'] : []),
       `VY(1)=${(-500 + frames * 200) / 60}`, 'HEALTH(2)=MAX_HP(2)', 'GHOST(2)=HEALTH(2)'];
     if (pose === 11 && who === 14 && compareTick !== null) {

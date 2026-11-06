@@ -124,6 +124,14 @@ impl Controls {
     }
 }
 
+/// The prompt to press on, for what the player holds: `fire_prompt("TO START")`
+/// is PRESS SPACE TO START on a keyboard, PRESS FIRE on a deck, TAP TO START on a touch screen.
+pub fn fire_prompt(then: &str) -> String {
+    let press = controls().pick("PRESS SPACE", "PRESS FIRE", "TAP");
+    if then.is_empty() { press.to_string() } else { format!("{press} {then}") }
+}
+
+/// What the player holds: the page's deck or touch surface on the web, `BLIP_CONTROLS` natively.
 pub fn controls() -> Controls {
     #[cfg(target_arch = "wasm32")]
     let code = unsafe { blip_controls() };

@@ -79,24 +79,24 @@ const TORCH: V3 = [9.4, 1.5, 3.4];
 /// A maze of brick blocks: long walls with gaps across the view, and some
 /// running away from it, like a cabinet's playfield seen from above.
 fn wall_at(i: i32, j: i32) -> bool {
-    if i < 0 || i >= MAZE_W {
+    if !(0..MAZE_W).contains(&i) {
         return true;
     }
-    if j < 0 || j >= MAZE_D {
+    if !(0..MAZE_D).contains(&j) {
         return j >= MAZE_D;
     }
     // a corridor runs away from the viewer between two long walls with
     // gaps, crossed by walls further off; past that, a random warren
-    let near = match (i, j) {
-        (4, 2..=7) | (4, 10..=15) => true,
-        (9, 3..=6) | (9, 9..=14) => true,
-        (0..=2, 9) | (1..=2, 4..=5) => true,
-        (6..=7, 12) | (11..=13, 11) => true,
-        (2..=6, 18) | (8..=12, 18) => true,
-        (6, 19..=22) | (10, 20..=23) => true,
-        (1..=4, 24) | (7..=11, 25) => true,
-        _ => false,
-    };
+    let near = matches!(
+        (i, j),
+        (4, 2..=7) | (4, 10..=15)
+            | (9, 3..=6) | (9, 9..=14)
+            | (0..=2, 9) | (1..=2, 4..=5)
+            | (6..=7, 12) | (11..=13, 11)
+            | (2..=6, 18) | (8..=12, 18)
+            | (6, 19..=22) | (10, 20..=23)
+            | (1..=4, 24) | (7..=11, 25)
+    );
     if j < 26 {
         return near || i == 0 || i == MAZE_W - 1;
     }
@@ -660,7 +660,8 @@ fn hand_model() -> Vec<Seg> {
     segs.push(Seg { a: at(4.0, -3.4, 0.3), b: at(25.0, -4.8, 0.6), ra: 4.8 * S, rb: 4.4 * S, w, flat: 0.5, finger: 0, joint: 0 });
     segs.push(Seg { a: at(4.0, 3.2, 0.0), b: at(24.0, 4.8, -0.2), ra: 4.6 * S, rb: 4.0 * S, w, flat: 0.5, finger: 0, joint: 0 });
     // the fingers: knuckle across-position, along-position, bone lengths, base radius, and each joint's bend
-    let fingers: [(f32, f32, [f32; 3], f32, [f32; 3]); 4] = [
+    type Finger = (f32, f32, [f32; 3], f32, [f32; 3]);
+    let fingers: [Finger; 4] = [
         (-6.9, 26.5, [12.5, 8.0, 6.5], 2.7, [0.12, 0.16, 0.1]),
         (-2.3, 26.5, [13.0, 8.5, 6.5], 2.8, [0.3, 0.42, 0.25]),
         (2.3, 25.5, [12.0, 8.0, 6.0], 2.65, [0.4, 0.5, 0.28]),

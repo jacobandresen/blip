@@ -40,6 +40,16 @@ pub(crate) fn compare(g: &mut Game) {
     }
     let mut f = crate::export::sample(who, row, frame);
     f.alt_kick = std::env::var("BLIP_COMPARE_ALT_KICK").is_ok_and(|value| value == "1");
+    // BLIP_COMPARE_MOVE=Hook|Roundhouse: a move the BASIC pose table has no row for, at its active frame.
+    let extra = match std::env::var("BLIP_COMPARE_MOVE").as_deref() { Ok("Hook") => Some(MoveId::Hook), Ok("Roundhouse") => Some(MoveId::Roundhouse), _ => None };
+    // BLIP_COMPARE_STAGGER=1: rocked by a heavy blow.
+    if std::env::var_os("BLIP_COMPARE_STAGGER").is_some() { f.stagger = 1.0; }
+    if let Some(mv) = extra {
+        let m = f.scaled(move_data(mv));
+        f.act = Act::Attack;
+        f.mv = mv;
+        f.t = (m.startup + m.active * 0.5) * F;
+    }
     let timeline = number("BLIP_COMPARE_TICK", 0) as f32 / 60.0;
     if row == 11 && who == 14 && std::env::var("BLIP_COMPARE_TICK").is_ok() {
         f.t = timeline;

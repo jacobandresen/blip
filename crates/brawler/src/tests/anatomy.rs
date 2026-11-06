@@ -176,7 +176,7 @@ pub(crate) fn what_you_see_is_what_can_hit_you() {
     let mut bad = vec![];
     for who in 0..FIGHTERS.len() {
         for mv in [MoveId::LowPunch, MoveId::LowKick, MoveId::HighKick,
-                   MoveId::HighPunch, MoveId::Sweep, MoveId::Throw] {
+                   MoveId::HighPunch, MoveId::Sweep, MoveId::Throw, MoveId::Hook, MoveId::Roundhouse] {
             let mut f = Fighter::new(who, 300.0, 1.0);
             f.act = Act::Attack;
             f.mv = mv;
@@ -187,14 +187,16 @@ pub(crate) fn what_you_see_is_what_can_hit_you() {
                 let Some((hx, _, hw, _)) = f.hit_box() else { continue };
                 let k = drawn(&f);
                 let leg = matches!(mv, MoveId::LowKick | MoveId::HighKick
-                    | MoveId::Sweep);
+                    | MoveId::Sweep | MoveId::Roundhouse);
                 // The tip is the end of the foot or the front of the fist,
                 // scaled with the fighter like the drawing.
                 let size = f.size();
                 let bulk = FIGHTERS[who].bulk * size;
                 let tip = if leg {
-                    let (dx, _, _) = draw::foot_dir(k.knee_lead, k.ankle_lead, f.facing, f.y, size);
-                    k.ankle_lead.0 + dx * draw::FOOT * bulk
+                    // The roundhouse comes off the back leg.
+                    let (knee, ankle) = if mv == MoveId::Roundhouse { (k.knee_rear, k.ankle_rear) } else { (k.knee_lead, k.ankle_lead) };
+                    let (dx, _, _) = draw::foot_dir(knee, ankle, f.facing, f.y, size);
+                    ankle.0 + dx * draw::FOOT * bulk
                 } else {
                     k.hand_lead.0 + draw::FIST * bulk
                 };
@@ -1244,4 +1246,64 @@ pub(crate) fn no_leg_is_curled_up_behind_the_back() {
     bad.dedup();
     assert!(bad.is_empty(), "legs folded up behind the back:\n  {}",
         bad.iter().take(6).cloned().collect::<Vec<_>>().join("\n  "));
+}
+
+#[test]
+pub(crate) fn a_run_of_punches_ends_in_a_hook_and_two_quick_kicks_in_a_roundhouse() {
+    let mut f = at(0, 300.0, 1.0);
+    let quick = |f: &mut Fighter| for _ in 0..12 { advance(f, F); };
+    for (n, want) in [MoveId::LowPunch, MoveId::LowPunch, MoveId::Hook, MoveId::LowPunch].into_iter().enumerate() {
+        f.act = Act::Idle;
+        f.start_attack(MoveId::LowPunch);
+        assert_eq!(f.mv, want, "punch {} of a quick run", n + 1);
+        quick(&mut f);
+    }
+    // A pause starts the run again.
+    for _ in 0..(CHAIN_PUNCH / F) as usize + 2 { advance(&mut f, F); }
+    f.act = Act::Idle;
+    f.start_attack(MoveId::LowPunch);
+    f.act = Act::Idle;
+    f.start_attack(MoveId::LowPunch);
+    assert_eq!(f.mv, MoveId::LowPunch, "two punches after a pause are not yet a hook");
+
+    let mut f = at(0, 300.0, 1.0);
+    f.start_attack(MoveId::LowKick);
+    assert_eq!(f.mv, MoveId::LowKick);
+    quick(&mut f);
+    f.act = Act::Idle;
+    let front = f.far_leads;
+    f.start_attack(MoveId::LowKick);
+    assert_eq!(f.mv, MoveId::Roundhouse, "a second quick low kick comes round");
+    let m = f.scaled(move_data(MoveId::Roundhouse));
+    for _ in 0..((m.startup + m.active + m.recovery) as usize + 2) { advance(&mut f, F); }
+    assert_eq!(f.act, Act::Idle);
+    assert_ne!(f.far_leads, front, "the roundhouse lands in the other stance");
+    f.start_attack(MoveId::LowKick);
+    assert_eq!(f.mv, MoveId::LowKick, "and the next kick starts a new run");
+}
+
+#[test]
+pub(crate) fn down_tapped_twice_changes_the_front_leg() {
+    let mut f = at(0, 300.0, 1.0);
+    let front = f.far_leads;
+    let mut press = |f: &mut Fighter, frames: usize| {
+        apply_input(f, Input { down: true, ..Input::default() }, false, F);
+        for _ in 0..frames { apply_input(f, Input::default(), false, F); advance(f, F); }
+    };
+    press(&mut f, 4);
+    assert_eq!(f.far_leads, front, "one tap is only a crouch");
+    press(&mut f, 4);
+    assert_ne!(f.far_leads, front, "a second tap straight after switches the legs");
+    // Taps too far apart do nothing.
+    let front = f.far_leads;
+    press(&mut f, (SWITCH_TAP / F) as usize + 4);
+    press(&mut f, (SWITCH_TAP / F) as usize + 4);
+    assert_eq!(f.far_leads, front);
+    // The kick then comes off the new front leg.
+    let mut g = at(0, 300.0, 1.0);
+    g.far_leads = !front;
+    wind_to_active(&mut g, MoveId::LowKick);
+    let k = bones_of(&g);
+    let (kicking, standing) = if g.far_leads { (k.ankle_rear, k.ankle_lead) } else { (k.ankle_lead, k.ankle_rear) };
+    assert!(kicking.0 > standing.0 + 20.0, "the low kick comes off the front leg");
 }

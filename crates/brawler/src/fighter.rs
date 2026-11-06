@@ -94,7 +94,17 @@ pub(crate) struct Fighter {
     pub(crate) alt_kick: bool,
     pub(crate) stumble_roll: u8,
     pub(crate) stumble: f32,
+    /// Seconds left of a stagger: rocked by a heavy blow, unsteady on the feet.
+    pub(crate) stagger: f32,
     pub(crate) since_punch: f32,
+    /// Punches in the current run (the third is the hook), and the time
+    /// since the last low kick (a second one soon after is the roundhouse).
+    pub(crate) punch_run: u8,
+    pub(crate) since_kick: f32,
+    /// When down was last tapped, and whether it is held: twice quickly
+    /// changes the leg in front.
+    pub(crate) down_tap: f32,
+    pub(crate) was_down: bool,
     /// The far leg is the one in front: whichever foot a walk stopped on.
     /// Kicks come off the front leg.
     pub(crate) far_leads: bool,
@@ -164,8 +174,8 @@ impl Fighter {
             blend_len: POSE_BLEND, land: 0.0, land_force: 0.0,
             soar: 0.0, stomp: false, parry_t: 0.0, throw_rest: 0.0,
             webbed: 0.0, web_hits: 0, web_rest: 0.0, called: false, calling: false, aim: None,
-            alt_punch: false, alt_kick: false, stumble_roll: 0, stumble: 0.0,
-            since_punch: 9.0, far_leads: false,
+            alt_punch: false, alt_kick: false, stumble_roll: 0, stumble: 0.0, stagger: 0.0,
+            since_punch: 9.0, far_leads: false, punch_run: 0, since_kick: 9.0, down_tap: 9.0, was_down: false,
             daze: 0.0, dizzy: 0.0, dazed: false, was_toward: false, countered: false, turned: false,
             foe_size: FIGHTERS[who].size,
         }
@@ -255,6 +265,11 @@ impl Fighter {
         (self.x - w / 2.0, self.y - h, w, h)
     }
 
+    /// How fast this fighter can walk just now: slower while staggering.
+    pub(crate) fn pace(&self) -> f32 {
+        if self.stagger > 0.0 { STAGGER_PACE } else { 1.0 }
+    }
+
     /// Can this fighter act at all right now?
     pub(crate) fn free(&self) -> bool {
         matches!(self.act, Act::Idle | Act::Walk | Act::Crouch | Act::Block)
@@ -293,9 +308,45 @@ impl Fighter {
         Some((x, self.y - m.height - m.thickness / 2.0, len, m.thickness))
     }
 
+    /// What a press becomes in a run: the third quick punch is the hook, and
+    /// a second quick low kick the roundhouse.
+    fn in_a_run(&mut self, id: MoveId) -> MoveId {
+        match id {
+            MoveId::LowPunch | MoveId::HighPunch => {
+                self.punch_run = if self.since_punch < CHAIN_PUNCH { self.punch_run + 1 } else { 1 };
+                if self.punch_run < 3 { return id; }
+                self.punch_run = 0;
+                blip::bot::add("hooks", 1.0);
+                MoveId::Hook
+            }
+            MoveId::LowKick => {
+                let quick = self.since_kick < CHAIN_KICK;
+                // After a roundhouse the next kick starts a new run.
+                self.since_kick = if quick { 9.0 } else { 0.0 };
+                if !quick { return id; }
+                blip::bot::add("roundhouses", 1.0);
+                MoveId::Roundhouse
+            }
+            _ => id,
+        }
+    }
+
+    /// Down pressed: twice within SWITCH_TAP, standing free, changes the leg
+    /// in front. Kicks come off the front leg, so it changes how they come.
+    pub(crate) fn tap_down(&mut self) {
+        if self.down_tap < SWITCH_TAP && self.free() && !self.airborne() {
+            self.far_leads = !self.far_leads;
+            self.down_tap = 9.0;
+            blip::bot::add("stance_switches", 1.0);
+        } else {
+            self.down_tap = 0.0;
+        }
+    }
+
     /// Begin move `id`: reset the clocks, and set what depends on how it
     /// started (the chain hand, the call, the lunge, the flying arc).
     pub(crate) fn start_attack(&mut self, id: MoveId) {
+        let id = self.in_a_run(id);
         self.stumble_roll = self.stumble_roll.wrapping_mul(5).wrapping_add(3) % 17;
         // A turtle's first special of the round calls the others in.
         self.calling = id == MoveId::Special && self.arch().build == Build::Turtle && !self.called;
@@ -305,6 +356,8 @@ impl Fighter {
             self.alt_punch = self.since_punch < CHAIN_PUNCH && !self.alt_punch;
             self.since_punch = 0.0;
         }
+        // The hook is thrown with the near hand, after the cross.
+        if id == MoveId::Hook { self.alt_punch = false; }
         if id == MoveId::HighKick {
             self.alt_kick = !self.alt_kick;
         }

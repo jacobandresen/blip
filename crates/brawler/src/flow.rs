@@ -278,12 +278,14 @@ pub(crate) fn update_match_end(g: &mut Game, dt: f32) {
         return;
     }
     let won = g.p[0].rounds > g.p[1].rounds;
+    blip::bot::add(if won { "fights_won" } else { "fights_lost" }, 1.0);
     if !won {
         g.state = State::Continue;
         g.phase.start(CONTINUE_SECS);
         return;
     }
     if BONUS_AFTER.contains(&g.opponent_index) {
+        blip::bot::add("bonus_rounds", 1.0);
         g.start_bonus();
     } else if g.opponent_index + 1 < RUNGS {
         g.p[0].rounds = 0;
@@ -292,6 +294,7 @@ pub(crate) fn update_match_end(g: &mut Game, dt: f32) {
         g.announce();
     } else {
         g.sess.add_score(5000);
+        blip::bot::finish("won");
         web::report_score(g.sess.score);
         g.state = State::Won;
         g.phase.start(1.2);

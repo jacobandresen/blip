@@ -2,18 +2,10 @@
 #![allow(dead_code)]
 
 use blip::cosy::{self, Tone, Voice};
-use blip::song::{major, minor, Chord, Groove, Song, H, R};
+use blip::song::{Groove, Song, H, R};
 use blip::Asset;
+use blip::song::chords::{EM, AM, DM, B, E, C, D, F, G};
 
-const EM: Chord = minor(40);
-const AM: Chord = minor(45);
-const DM: Chord = minor(50);
-const B: Chord = major(47);
-const E: Chord = major(40);
-const C: Chord = major(48);
-const D: Chord = major(50);
-const F: Chord = major(41);
-const G: Chord = major(43);
 
 /// The invasion: E minor, a march, the flat sixth (F) for the alien touch.
 pub fn invasion_song() -> Song<'static> {
