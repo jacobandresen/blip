@@ -1,4 +1,7 @@
-var CACHE = "blip-v837";
+var CACHE = "blip-v838";
+
+// The control deck, from jsDelivr at a pinned tag (github.com/jacobandresen/blip-deck): cached like our own files.
+var DECK = "https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v1.0.0/";
 
 var ASSETS = [
   "/blip/",
@@ -24,13 +27,14 @@ var ASSETS = [
   "/blip/history.html",
   "/blip/controls.html",
   "/blip/manifest.json",
+  DECK + "blip-deck.css",
+  DECK + "dist/blip-deck.js",
   "/blip/deck.css",
   "/blip/blip.css",
   "/blip/blip_core.js",
   "/blip/cabinet.js",
   "/blip/aisle.js",
-  "/blip/deck.js",
-  "/blip/machine-deck.html",
+    "/blip/machine-deck.html",
   "/blip/press-start-2p.woff2",
   "/blip/caveat.woff2",
   "/blip/mrs-saint-delafield.woff2",
@@ -185,12 +189,12 @@ self.addEventListener("activate", function (e) {
   self.clients.claim();
 });
 
-// Cache-first for same-origin assets only. Cross-origin requests bypass the
-// cache entirely so they always hit the network.
+// Cache-first for same-origin assets and the pinned deck. Other cross-origin
+// requests bypass the cache entirely so they always hit the network.
 self.addEventListener("fetch", function (e) {
   if (e.request.method !== "GET") return;
   var url = new URL(e.request.url);
-  if (url.origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin && url.href.indexOf(DECK) !== 0) return;
   // PR previews live inside this worker's scope; cache-first would pin a
   // preview to its first version.
   if (url.pathname.indexOf("/pr-preview/") !== -1) return;

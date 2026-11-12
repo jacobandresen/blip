@@ -59,6 +59,33 @@ function getKioskAudio() {
   return _kioskAudioCtx;
 }
 
+/* A deck press (blip-deck's click option): a soft plastic clack, its weight by the part. */
+function blipDeckClick(kind) {
+  var ctx = getKioskAudio(), t = ctx.currentTime;
+  var spec = ({
+    face:     { hp: 1900, ng: 0.16, nd: 0.020, thk: 128, tg: 0.10, td: 0.045 },
+    dpad:     { hp: 1400, ng: 0.11, nd: 0.028, thk: 92,  tg: 0.09, td: 0.055 },
+    shoulder: { hp: 1200, ng: 0.13, nd: 0.024, thk: 78,  tg: 0.11, td: 0.060 },
+    menu:     { hp: 2600, ng: 0.10, nd: 0.014, thk: 180, tg: 0.05, td: 0.030 }
+  })[kind];
+  // the contact transient: a very short filtered-noise tick
+  var src = blipNoise(ctx, spec.nd, function (t, p) { return 1 - p; });
+  var hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = spec.hp;
+  var ng = ctx.createGain();
+  ng.gain.setValueAtTime(spec.ng, t);
+  ng.gain.exponentialRampToValueAtTime(0.0006, t + spec.nd);
+  src.connect(hp); hp.connect(ng); ng.connect(blipOut(ctx));
+  src.start(t); src.stop(t + spec.nd + 0.01);
+  // the muted thock of the cap bottoming out
+  var osc = ctx.createOscillator(), og = ctx.createGain();
+  osc.type = 'sine'; osc.frequency.setValueAtTime(spec.thk, t);
+  osc.frequency.exponentialRampToValueAtTime(spec.thk * 0.6, t + spec.td);
+  og.gain.setValueAtTime(spec.tg, t);
+  og.gain.exponentialRampToValueAtTime(0.0006, t + spec.td);
+  osc.connect(og); og.connect(blipOut(ctx));
+  osc.start(t); osc.stop(t + spec.td + 0.02);
+}
+
 var cabinetHum=null;
 function blipUpdateCabinetHum(unlock) {
   var powered=blipPowered()&&!document.hidden&&!document.documentElement.hasAttribute('data-cabinet-screen');
@@ -613,8 +640,6 @@ function pollGamepad(onDown, onUp) {
     if (!document.hidden) unlockAudio();
   });
 }());
-
-/* The deck itself is built by deck.js, the same on every page. */
 
 /* The side badges and flags sit 16px above the page's deck, whose height
    changes with the controller, layout and player count, or 16px off the

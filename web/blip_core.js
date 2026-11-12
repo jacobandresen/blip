@@ -165,6 +165,41 @@ function blipGameFromPath(pathname) {
   return g ? Object.assign({ slug: m[1], players: 1, touch: null, cabinetTitle: false }, g) : null;
 }
 
+/* The game's control deck (<blip-deck>, from blip-deck.js), set up from BLIP_GAMES where the page's deck ends, before
+ * blip-deck.js loads. A cabinet in the arcade's aisle shows its game's deck (machine-deck.html?game=<slug>). */
+function blipBuildDeck() {
+  var deck = document.querySelector('blip-deck'), root = document.documentElement;
+  var game = blipGameFromPath(window.BLIP_DECK_GAME ? '/' + window.BLIP_DECK_GAME + '/' : location.pathname);
+  if (!game) return;
+  if (root.hasAttribute('data-deck-preview')) root.setAttribute('data-machine', game.slug);
+  deck.buttons = game.buttons || [{}];
+  deck.capLabel = game.capLabel;
+  deck.seats = game.players;
+  if (game.touch && blipHasTouch()) deck.parentElement.appendChild(blipTouchStrip(game.touch, game.players));
+}
+
+/* The touch strip: a glass trackpad in place of the deck, halves for two players, action buttons and a 2P JOIN. */
+function blipTouchStrip(touch, seats) {
+  var kind = touch.kind;
+  var twoTouch = seats === 2 && (kind === 'drag' || kind === 'action');
+  var halves = kind === 'paddles' || kind === 'platform' || twoTouch ? ['P1', '2P'] : [''];
+  var actions = kind === 'action' ? Array.from({ length: twoTouch ? 2 : 1 }, function (_, player) {
+    return '<div class="ts-actions" data-player="' + player + '">' + touch.actions.map(function (label, i) {
+      return '<div class="ts-action" data-button="' + (i + 1) + '">' + label + '</div>';
+    }).join('') + '</div>';
+  }).join('') : '';
+  var strip = document.createElement('div');
+  strip.id = 'touch-strip';
+  strip.setAttribute('aria-hidden', 'true');
+  strip.innerHTML = '<div class="ts-glass">' + halves.map(function (label, i) {
+    return '<div class="ts-half" data-slot="' + i + '">' + (label ? '<span class="ts-tag">' + label + '</span>' : '') + '</div>';
+  }).join('') + actions + '<span class="ts-demo"></span><span class="ts-thumb"></span><span class="ts-arrow"></span>' +
+    '<span class="ts-hint for-touch">' + (kind === 'drag' ? 'Drag to move &middot; ' : '') + touch.hint + '</span>' +
+    '<span class="ts-hint for-mouse">' + (touch.mouseHint || touch.hint) + '</span>' +
+    (kind === 'platform' || twoTouch ? '<button class="ts-join" type="button"><span class="tj-plus">+</span>2P JOIN</button>' : '') + '</div>';
+  return strip;
+}
+
 // Before first paint, so no controller flashes. data-has-touch shows the
 // TOUCH badges on the landing page.
 blipApplyControls();

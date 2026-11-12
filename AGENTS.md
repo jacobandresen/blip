@@ -14,7 +14,7 @@ wrappers. Do not publish or push unless asked.
 | Game page | `web/game.html` (copied to each `web/<game>/index.html`), `web/game.js` |
 | Styles shared by the arcade, game pages and decks | `web/blip.css` |
 | The arcade room and its manual | `web/index.html`, `web/arcade.css`, `web/arcade.js`, `web/aisle.js`, `web/cabinet.js` |
-| The control deck (stick, pad, caps, input) | `web/deck.js`, `web/deck.css`, `web/machine-deck.html` |
+| The control deck (stick, pad, caps, input) | `<blip-deck>` from jsDelivr (the blip-deck repo), blip's dressing in `web/deck.css`, `blipBuildDeck` in `web/blip_core.js`, `web/machine-deck.html` |
 | Home Screen and Guide | `web/home.*`, `web/guide.*` |
 | Manual pages | `web/controls.html`, `history.html`, `about.html` (read by both the arcade's manual and the Guide; `data-guide="cabinet"` or `"app"` marks copy for one) |
 | Tests | `test/*.mjs` (`node:test`), helpers in `test/lib/` |
@@ -22,9 +22,11 @@ wrappers. Do not publish or push unless asked.
 
 ## The shared deck
 
-`web/deck.js` and `web/deck.css` are also breadbin's pad (its `tools/blip-deck/sync.mjs` copies them). Keep them
-free of blip's pages: `BlipDeck.build(panel, spec)`, `BlipDeck.bindStick` and `BlipController` take what they need
-as arguments; only the short start-up block at the end of `deck.js` reads `BLIP_GAMES`.
+The deck is the `<blip-deck>` element of the separate blip-deck repository (Lit; breadbin uses it too). Change it
+there and tag a release; the pages (`game.html`, `machine-deck.html`, `index.html`) and `sw.js` (`DECK`) load
+`dist/blip-deck.js` and `blip-deck.css` from jsDelivr at that tag, and the service worker caches them. Blip's own
+parts stay here: `blipBuildDeck` sets the deck up from `BLIP_GAMES` and adds the touch strip, and `web/deck.css`
+dresses it (housing, dials, touch strip, lamps, cabinet and app styles).
 
 ## Generated files
 

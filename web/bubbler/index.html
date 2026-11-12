@@ -33,7 +33,7 @@
   </script>
   <style>:root[data-launching] body{visibility:hidden}</style>
   <script src="../howler.min.js"></script>
-  <script src="../blip_core.js?v=13"></script>
+  <script src="../blip_core.js?v=14"></script>
   <script>(function () {
     var g = blipGameFromPath(location.pathname);
     if (!g) return;
@@ -42,16 +42,16 @@
     document.title = name + ' \u00b7 BLIP';
     document.querySelector('meta[name=apple-mobile-web-app-title]').content = name;
   }());</script>
-  <script src="../cabinet.js?v=105"></script>
-  <link rel="stylesheet" href="../deck.css?v=8">
+  <script src="../cabinet.js?v=106"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v1.0.0/blip-deck.css">
+  <link rel="stylesheet" href="../deck.css?v=9">
   <link rel="stylesheet" href="../blip.css?v=173">
-  <script src="../game.js?v=5" defer blocking="render"></script>
+  <script src="../game.js?v=6" defer blocking="render"></script>
 </head>
 <body class="cabinet-page">
 
   <a class="blip-logo" href="../index.html" aria-label="BLIP — cabinet"><img class="blip-logo-mark" src="../blip-logo.svg" alt=""></a>
 
-  <!-- deck.js mounts the shared coin mechanism beside the controls. -->
   <button id="insert-coin-btn" class="kiosk-btn"></button>
 
 
@@ -62,9 +62,10 @@
   </div>
 
   <!-- The fixed bar has no transform (iOS Safari clips a transformed fixed
-       box); .deck-panel inside it carries the tilt. -->
+       box); the deck inside it (blip-deck.js, class deck-panel) carries the tilt. -->
   <div id="topbar" class="kiosk-bar">
-   <div class="deck-panel">
+   <div class="deck-housing" aria-hidden="true"></div>
+   <blip-deck>
     <!-- Paddle dials: rally only. Mounted in the deck like the stick —
          two spinner knobs on the tilted panel, P1 left / P2 right.
          game.js reveals them and wires the touch spin. -->
@@ -76,10 +77,10 @@
       <div class="dial-cap"><div id="dial-hand-p2"></div></div>
       <div id="dial-label-p2">2P</div>
     </div>
-   </div>
-
+   </blip-deck>
   </div>
-  <script src="../deck.js?v=24"></script>
+  <script>blipBuildDeck();</script>
+  <script src="https://cdn.jsdelivr.net/gh/jacobandresen/blip-deck@v1.0.0/dist/blip-deck.js"></script>
 
   <div id="need-coin-overlay">
     <div class="nco-panel">

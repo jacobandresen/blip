@@ -199,6 +199,19 @@ test('every file the service worker caches offline exists', async () => {
   assert.deepEqual(files.filter((f) => !existsSync(new URL(f, web))), []);
 });
 
+test('the deck from jsDelivr is cached offline at the tag the pages load', async () => {
+  const { readFileSync } = await import('node:fs');
+  const web = new URL('../web/', import.meta.url);
+  const sw = readFileSync(new URL('sw.js', web), 'utf8');
+  const deck = sw.match(/var DECK = "([^"]+)"/)[1];
+  const cached = [...sw.matchAll(/DECK \+ "([^"]+)"/g)].map((m) => deck + m[1]);
+  for (const page of ['index.html', 'game.html', 'machine-deck.html']) {
+    const urls = [...readFileSync(new URL(page, web), 'utf8').matchAll(/"(https:\/\/cdn\.jsdelivr\.net\/[^"]+)"/g)].map((m) => m[1]);
+    assert.equal(urls.length, 2, `${page} loads the deck's script and styles`);
+    assert.deepEqual(urls.filter((u) => !cached.includes(u)), [], `${page}'s deck is cached by sw.js`);
+  }
+});
+
 test('the jukebox numbers the machines in the aisle\'s own order', async () => {
   const { readFileSync } = await import('node:fs');
   const shell = readFileSync(new URL('../web/game.js', import.meta.url), 'utf8');

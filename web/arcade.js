@@ -431,7 +431,7 @@ document.querySelectorAll('#game-grid .card').forEach(function(card){
   ['left','right'].forEach(function(side){var panelSide=document.createElement('span');panelSide.className='machine-side '+side;panelSide.setAttribute('aria-hidden','true');panelSide.innerHTML='<b>'+name+'</b>';card.appendChild(panelSide);});
   var controls=document.createElement('div');controls.className='machine-controls';
   controls.innerHTML='<button type="button" class="machine-start" aria-label="Start '+name+'"><span class="machine-start-cap">START</span></button>';
-  // The deck is the game page's own, built by deck.js, so the cabinet's controls are the ones the player will use.
+  // The deck is the game page's own, the same <blip-deck>, so the cabinet's controls are the ones the player will use.
   var deck=document.createElement('div');deck.className='machine-deck';
   deck.innerHTML='<iframe src="machine-deck.html?game='+slug+'" tabindex="-1" aria-hidden="true" title="" onload="this.dataset.loaded=\'\'"></iframe>';
   controls.appendChild(deck);

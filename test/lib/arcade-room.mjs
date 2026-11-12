@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
 export const ROOM_SOURCES = ['index.html', 'arcade.css', 'blip.css', 'blip_core.js', 'game.js', 'history.html', 'sw.js',
-  'aisle.js', 'machine-deck.html', 'deck.js', 'cabinet.js'];
+  'aisle.js', 'machine-deck.html', 'cabinet.js'];
 
 export function currentRoomHash() {
   const hash = createHash('sha256');
