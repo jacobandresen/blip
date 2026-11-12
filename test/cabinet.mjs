@@ -2,7 +2,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, gameReady, arcadeArranged } from './lib/harness.mjs';
+import { openPage, gameReady, arcadeArranged, arrivedAt } from './lib/harness.mjs';
 import { AISLE, GAMES as ALL_GAMES } from './lib/games.mjs';
 
 const GAMES_BY_SLUG = Object.fromEntries(ALL_GAMES.map((game) => [game.slug, game]));
@@ -103,15 +103,14 @@ test('returning from a game restores its machine without loading a hidden second
   const { page, origin } = await openArcade(t);
   await page.locator('.card-focused .machine-coinbox').tap();
   await page.locator('.card-focused .machine-start').tap();
-  await page.waitForURL(`${origin}/rally/index.html`);
+  await arrivedAt(page, `${origin}/rally/index.html`);
   await gameReady(page);
   await page.locator('.blip-logo').click();
-  await page.waitForURL(`${origin}/index.html`);
+  await arrivedAt(page, `${origin}/index.html`);
   await page.waitForFunction(() => !window.blipCabinetReturn &&
     !document.documentElement.hasAttribute('data-cabinet-arranging'));
   assert.equal(await selectedSlug(page), 'rally/index.html');
   assert.equal(await page.locator('#cabinet-game-screen').count(), 0);
-  assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-loaded-card')), null);
   await page.keyboard.press('ArrowRight');
   await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
 });
@@ -120,7 +119,7 @@ test('a tap on the chosen machine’s screen starts it, paying its own coin', as
   const { page, origin } = await openArcade(t, 390);
   assert.equal(await page.locator('.card-focused .machine-attract b').textContent(), 'PRESS START');
   await page.locator('.card-focused .card-shot-wrap').tap({ force: true });
-  await page.waitForURL(`${origin}/rally/index.html`);
+  await arrivedAt(page, `${origin}/rally/index.html`);
   await gameReady(page);
   await page.waitForFunction(() => getCoins() === 0);
 });
@@ -131,7 +130,7 @@ test('desktop keyboard walking and physical Start begin play at the chosen machi
   await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'bouncer/index.html');
   await page.locator('.card-focused .machine-coinbox').click();
   await page.locator('.card-focused .machine-start').click();
-  await page.waitForURL(`${origin}/bouncer/index.html`);
+  await arrivedAt(page, `${origin}/bouncer/index.html`);
   await gameReady(page);
   await page.waitForFunction(() => getCoins() === 0);
   assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'CANVAS');
@@ -180,7 +179,7 @@ test('gamepad Select inserts a coin at the machine, then Start launches it', asy
   assert.equal(await page.locator('.card-focused .machine-credit').textContent(), 'CREDIT 1');
   await page.evaluate(() => { window.__cabinetPadButtons[8].pressed = false; });
   await page.evaluate(() => { window.__cabinetPadButtons[9].pressed = true; });
-  await page.waitForURL(`${origin}/rally/index.html`);
+  await arrivedAt(page, `${origin}/rally/index.html`);
   await gameReady(page);
   await page.waitForFunction(() => getCoins() === 0);
 });
@@ -221,8 +220,8 @@ for (const [index, [slug, title]] of GAMES.entries()) {
     }
     // Without a credit, Start drops the coin itself.
     await machine.locator('.machine-start').tap();
-    await page.waitForURL(`${origin}/${slug}/index.html`, { timeout: 30000 });
-    await gameReady(page, 30000);
+    await arrivedAt(page, `${origin}/${slug}/index.html`, { timeout: 30000 });
+    await gameReady(page);
     const game = await page.evaluate(() => {
       const visible = (selector) => [...document.querySelectorAll(selector)].some((el) => {
         const r = el.getBoundingClientRect(), style = getComputedStyle(el);
@@ -279,17 +278,16 @@ for (const [index, [slug, title]] of GAMES.entries()) {
   });
 }
 
-test('a game opened in the arcade after a visit to BASIC returns to the arcade from the BLIP badge', async (t) => {
+test('a game opened in the arcade after a visit to the home screen returns to the arcade from the BLIP badge', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 900 } });
   await page.route('**/*.wasm', () => {});
-  await page.goto(`${origin}/basic.html`);
-  await page.evaluate(() => localStorage.setItem('blip-frontend', 'basic'));
+  await page.goto(`${origin}/home.html`);
   await page.goto(`${origin}/index.html?cabinet`);
   await arcadeArranged(page);
   await page.goto(`${origin}/serpent/index.html`);
   await page.locator('.blip-logo').click();
-  await page.waitForURL((url) => !url.pathname.includes('/serpent/'));
-  assert.equal(new URL(page.url()).pathname, '/index.html', 'the badge leads back to the arcade, not to BASIC');
+  await arrivedAt(page, (url) => !url.pathname.includes('/serpent/'));
+  assert.equal(new URL(page.url()).pathname, '/index.html', 'the badge leads back to the arcade, not to the home screen');
   await page.waitForTimeout(500);
   assert.equal(new URL(page.url()).pathname, '/index.html', 'and the arcade stays');
 });
@@ -297,13 +295,11 @@ test('a game opened in the arcade after a visit to BASIC returns to the arcade f
 test('every visit starts in the arcade, whichever front end was open last', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 900 } });
   await page.route('**/*.wasm', () => {});
-  for (const last of ['basic', 'home']) {
-    await page.goto(`${origin}/${last}.html`);
-    await page.goto(`${origin}/index.html`);
-    await arcadeArranged(page);
-    assert.equal(new URL(page.url()).pathname, '/index.html', `after ${last}, BLIP opened somewhere else`);
-    assert.equal(await page.evaluate(() => blipFrontend()), 'cabinet');
-  }
+  await page.goto(`${origin}/home.html`);
+  await page.goto(`${origin}/index.html`);
+  await arcadeArranged(page);
+  assert.equal(new URL(page.url()).pathname, '/index.html', 'after home, BLIP opened somewhere else');
+  assert.equal(await page.evaluate(() => blipFrontend()), 'cabinet');
 });
 
 // ---- Walking: the aisle's position is a decimal (data-aisle-pos); data-aisle-moving is set while it moves. ----
@@ -469,7 +465,7 @@ test('a machine started from the arcade opens its game on the same screen pictur
   await page.route('**/*.wasm', async (route) => { await new Promise((r) => setTimeout(r, 1500)); await route.continue(); });
   await page.locator('.card-focused .machine-coinbox').click();
   await page.locator('.card-focused .machine-start').click();
-  await page.waitForURL(`${origin}/rally/index.html`);
+  await arrivedAt(page, `${origin}/rally/index.html`);
   const shown = await page.waitForFunction(() => {
     const frame = document.getElementById('launch-frame'), canvas = document.getElementById('glcanvas');
     if (!frame) return null;
@@ -555,7 +551,7 @@ test('Escape leaves a game for the arcade, once the controls card it may have op
   await page.waitForFunction(() => !document.documentElement.hasAttribute('data-card'));
   assert.equal(new URL(page.url()).pathname, '/meteors/index.html', 'the first Escape only closes the card');
   await page.keyboard.press('Escape');
-  await page.waitForURL(`${origin}/index.html`);
+  await arrivedAt(page, `${origin}/index.html`);
   await page.waitForFunction(() => document.querySelector('.card-focused')?.dataset.gameUrl === 'meteors/index.html');
 });
 

@@ -28,15 +28,20 @@ export async function launchEngine(engineName, { headless = true, hasTouch = fal
   }
 
   const browser = await engine.launch({ headless, args, ...(engineName === 'chromium' ? { executablePath: chromiumBinary() } : {}) });
-  const page = await (await browser.newContext({ hasTouch, ...(viewport ? { viewport } : {}),
+  const context = await browser.newContext({ hasTouch, ...(viewport ? { viewport } : {}),
     ...(deviceScaleFactor === undefined ? {} : { deviceScaleFactor }), ...(userAgent ? { userAgent } : {}),
-    ...(isMobile === undefined ? {} : { isMobile }) })).newPage();
+    ...(isMobile === undefined ? {} : { isMobile }) });
+  // WebKit now and then fails a load with "WebKit encountered an internal error": mark the page, so a wait for
+  // the game can tell that fault from a game that did not start (harness.mjs gameReady).
+  context.on('requestfailed', (request) => {
+    if (/internal error/i.test(request.failure()?.errorText || '')) { const page = request.frame()?.page(); if (page) page.webkitFault = true; }
+  });
+  const page = await context.newPage();
   return { browser, page, cdp: wrapPage(page, engineName) };
 }
 
-/** The CDP-shaped adapter itself — also usable against a Playwright page
- * created some other way. */
-export function wrapPage(page, engineName = 'unknown') {
+/** A CDP-shaped adapter over a Playwright page, for the suites that drive pages through send(). */
+function wrapPage(page, engineName = 'unknown') {
   return {
     kind: engineName,
     page,

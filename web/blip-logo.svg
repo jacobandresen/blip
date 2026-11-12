@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 32" role="img" aria-labelledby="title">
   <title id="title">BLIP</title>
   <!-- The BLIP name plate: an arcade marquee's slanted chrome letters, extruded and outlined, on the C64's
-       start-up blue inside its light-blue border, lit by an Amiga copper bar and fine scanlines, with the
-       rainbow stripes from the BASIC book's cover. -->
+       start-up blue inside its light-blue border, lit by an Amiga copper bar and fine scanlines, with
+       rainbow stripes. -->
   <defs>
     <linearGradient id="copper" x2="0" y2="1">
       <stop offset="0" stop-color="#271d66"/><stop offset=".22" stop-color="#40318d"/><stop offset=".34" stop-color="#6f60cc"/>

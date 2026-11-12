@@ -166,9 +166,9 @@ pub fn sounds() -> Vec<Asset> {
     ]
 }
 
-/// The music: each tune as a WAV to play and an XM of its notes for TUNE.
+/// The music: each tune as a WAV to play.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::xm::tunes(&[
+    blip::wav::tunes(&[
         ("SLITHER", &|| slither_song().render()),
         ("FRENZY", &|| frenzy_song().render()),
     ])

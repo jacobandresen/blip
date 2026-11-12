@@ -45,7 +45,7 @@ body {
 }
 
 /* ---- Panes: one at a time on a phone, side by side on an iPad ---- */
-.guide { position: relative; height: 100vh; height: 100dvh; overflow: hidden; }
+.guide { position: relative;  height: 100dvh; overflow: hidden; }
 .pane { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); }
 .scroller {
   flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;

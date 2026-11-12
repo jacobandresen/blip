@@ -1,11 +1,11 @@
 // Touch input in the games: what a finger on the touch strip or the deck sends
 // to the canvas.
 //
-//   node --test --test-concurrency=1 test/touch.mjs        (after cargo build-web)
+//   node --test --test-concurrency=1 test/touch.mjs        (after npm run build:web)
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, gameReady } from './lib/harness.mjs';
+import { openPage, gameReady, arrivedAt } from './lib/harness.mjs';
 import { GAME_SLUGS } from './lib/games.mjs';
 
 /** A game page on a 390x844 phone, played by touch (the home screen's controller) or another deck controller, with
@@ -212,7 +212,7 @@ for (const held of [true, false]) {
       await new Promise((resolve) => setTimeout(resolve, 1500));
       assert.match(p.page.url(), /defender/);
     } else {
-      await p.page.waitForURL((url) => !url.pathname.includes('defender'), { timeout: 10000 });
+      await arrivedAt(p.page, (url) => !url.pathname.includes('defender'), { timeout: 10000 });
     }
   });
 }
@@ -261,7 +261,7 @@ test('the end of a touch wakes a sleeping audio context, as iOS requires', async
 test('on a PC a click on the coin wall inserts a coin and leaves the game focused', async (t) => {
   const { page, origin } = await openPage(t, 'chromium', { viewport: { width: 1280, height: 800 } });
   await page.goto(`${origin}/meteors/index.html`);
-  await gameReady(page, 60000);
+  await gameReady(page);
   await page.waitForTimeout(1500);
   assert.equal(await page.evaluate(() => document.getElementById('need-coin-overlay').classList.contains('visible')), true);
   await page.mouse.click(640, 300);

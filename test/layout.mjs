@@ -1,7 +1,7 @@
 // Nothing overlaps and nothing is pushed off screen: every page of the cabinet on a spread of real
 // devices, with their notches, in portrait and landscape, with each controller.
 //
-//   node --test --test-concurrency=1 test/layout.mjs        (after cargo build-web)
+//   node --test --test-concurrency=1 test/layout.mjs        (after npm run build:web)
 //   LAYOUT=iPad node --test test/layout.mjs                  (only the devices whose name has "iPad")
 //   node test/shard.mjs 2 test/layout.mjs                    (the devices shared between two processes)
 
@@ -162,7 +162,7 @@ async function check(page, device, insets, label, failures) {
       if (!el) return null;
       const r = el.getBoundingClientRect();
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      return hit && !hit.closest('.card, #glcanvas, #need-coin-overlay, #loader, .blip-hs-modal, #rotate-hint') ? hit.tagName + '.' + String(hit.className).slice(0, 30) : null;
+      return hit && !hit.closest('.card, #glcanvas, #need-coin-overlay, #loader, #rotate-hint') ? hit.tagName + '.' + String(hit.className).slice(0, 30) : null;
     };
     // In the arcade, the middle of the room: a machine, or the wall between two when you stand between them.
     const grid = document.getElementById('game-grid');
@@ -244,13 +244,6 @@ for (const device of mine) {
     const close = await page.evaluate(() => document.getElementById('game-grid').hasAttribute('data-close'));
     for (const part of reach) if (!(close && part === '.machine-coinbox')) failures.push(`stepped up, the machine's ${part.slice(9)} leaves the window`);
     await page.keyboard.press('ArrowDown');
-
-    await page.evaluate(() => sessionStorage.setItem('blip-loaded-card',
-      JSON.stringify({ slug: 'bouncer', name: 'BOUNCER', code: 'A2', art: 'bouncer/screenshot.png' })));
-    await page.goto(`${origin}/index.html`);
-    await settle();
-    await check(page, device, insets, 'cabinet with a ROM seated', failures);
-    await page.evaluate(() => sessionStorage.clear());
 
     // Exercise each game with the controls offered on this device.
     for (const slug of GAMES) {

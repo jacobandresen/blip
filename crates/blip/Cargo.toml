@@ -12,6 +12,5 @@ default = ["engine"]
 engine = ["dep:macroquad"]
 
 [dependencies]
-blip_font = { workspace = true }
 macroquad = { workspace = true, optional = true }
 png = { workspace = true }

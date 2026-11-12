@@ -16,12 +16,6 @@ pub fn wrapped(a: f32, b: f32, span: f32) -> f32 {
     if d > span / 2.0 { d - span } else { d }
 }
 
-/// When something moving at `speed` toward a line `gap` away gets there;
-/// `None` if it is moving away or standing still.
-pub fn time_to(gap: f32, speed: f32) -> Option<f32> {
-    (speed != 0.0 && gap / speed >= 0.0).then(|| gap / speed)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -38,7 +32,5 @@ mod tests {
     fn the_short_way_round_a_wrapping_screen() {
         assert_eq!(wrapped(10.0, 90.0, 100.0), -20.0);
         assert_eq!(wrapped(90.0, 10.0, 100.0), 20.0);
-        assert_eq!(time_to(100.0, 50.0), Some(2.0));
-        assert_eq!(time_to(100.0, -50.0), None);
     }
 }

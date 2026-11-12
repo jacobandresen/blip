@@ -93,7 +93,7 @@ fn steer_person(seat: usize, solo: bool) -> Steer {
         (false, true) => 1.0,
         _ => 0.0,
     };
-    // By touch, alone the whole strip is player one's; two playing, each has a half of it (shell.js).
+    // By touch, alone the whole strip is player one's; two playing, each has a half of it (game.js).
     if (seat == 0 || !solo) && web::controls() == web::Controls::Touch {
         if let Some((x, _, _)) = web::touch_fraction(seat) {
             turn = if x < 0.45 { -1.0 } else if x > 0.55 { 1.0 } else { 0.0 };
@@ -180,12 +180,12 @@ async fn main() {
     let pit = blip::load_png(blip::png!("pit"));
 
     let sfx = Sounds {
-        through: blip::audio::load_sound(blip::wav!("through")).await,
-        kill: blip::audio::load_sound(blip::wav!("strike")).await,
-        round: blip::audio::load_sound(blip::wav!("pit")).await,
-        game_over: blip::audio::load_sound(blip::wav!("game_over")).await,
+        through: blip::sound!("through"),
+        kill: blip::sound!("strike"),
+        round: blip::sound!("pit"),
+        game_over: blip::sound!("game_over"),
     };
-    let mut music = Jukebox::new("ADDER", &["COIL", "HUNT"]);
+    let mut music = Jukebox::new("adder", &["COIL", "HUNT"]);
 
     if blip.screenshot_mode {
         g.start_game();
@@ -295,7 +295,7 @@ fn draw_title(blip: &Blip, g: &Game, pit: &Texture2D) {
     blip.fill_rect(0.0, 46.0, WIN_W as f32, 92.0, veil);
     blip.fill_rect(0.0, 384.0, WIN_W as f32, 136.0, veil);
     blip.draw_text_outlined("ADDER", 96.0, 62.0, 6.0, arena::seat_colour(0), BLIP_BLACK);
-    blip.draw_hi(&web::high_score(), 116.0, HOLE);
+    blip.draw_hi(web::high_score(), 116.0, HOLE);
     let by = web::controls();
     blip.draw_start_prompt(404.0);
     blip.draw_centered(by.pick("GREEN VIPER: A/D TURN", "GREEN VIPER: STICK LEFT/RIGHT", "GREEN VIPER: DRAG LEFT/RIGHT"),
@@ -307,7 +307,7 @@ fn draw_title(blip: &Blip, g: &Game, pit: &Texture2D) {
 }
 
 fn draw_over(blip: &Blip, g: &Game) {
-    blip.draw_game_over(g.world.score_of(0), &web::high_score(), BLIP_RED, arena::seat_colour(0), HOLE,
+    blip.draw_game_over(g.world.score_of(0), web::high_score(), BLIP_RED, arena::seat_colour(0), HOLE,
         !g.timer.active());
     let length = g.world.snakes.first().map_or(0, |s| s.len_s);
     blip.draw_game_over_note(&format!("ROUND {}   LENGTH {length}", g.world.round), SAND);

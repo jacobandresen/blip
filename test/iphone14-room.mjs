@@ -8,6 +8,8 @@ import { openPage } from './lib/harness.mjs';
 import { attractMask, holdHalfway, imageDifference, currentRoomHash } from './lib/arcade-room.mjs';
 
 const DIR = new URL('artifacts/iphone14-room/', import.meta.url);
+// BLIP_ROOM_ARTIFACTS=1 also saves a screenshot of every pass for the gallery (slow at DPR 3).
+const ARTIFACTS = process.env.BLIP_ROOM_ARTIFACTS === '1';
 const steps = [
   { name: 'portrait', width: 390, height: 844, mode: 'full' },
   { name: 'landscape', width: 844, height: 390, mode: 'full' },
@@ -121,7 +123,7 @@ for (const engine of ['webkit', 'chromium']) {
           if (paint.lit >= 10) assert.ok(paint.fraction > .2, `${config.name}, passing ${region.machine}: ${JSON.stringify(paint)}`);
           report.push({ orientation: config.name, mode: config.mode, insets, position: 'half', machine: region.machine, ...paint });
         }
-        await page.screenshot({ path: fileURLToPath(new URL(`${engine}-${config.name}-${config.mode}-${i}-half.png`, DIR)) });
+        if (ARTIFACTS) await page.screenshot({ path: fileURLToPath(new URL(`${engine}-${config.name}-${config.mode}-${i}-half.png`, DIR)) });
         await page.evaluate(() => {
           for (const strip of document.querySelectorAll('.card-loop-frame')) for (const animation of strip.getAnimations()) animation.play();
         });

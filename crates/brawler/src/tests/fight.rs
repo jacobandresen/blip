@@ -216,13 +216,13 @@ pub(crate) fn nobody_gets_stuck_in_a_state_they_cannot_leave() {
     // — a state machine with a dead end is a game that freezes.
     let mut mash = |frame: usize, _p: &[Fighter; 2]| {
         let mut a = Input::default();
-        a.punch_low = frame % 3 == 0;
-        a.kick_high = frame % 5 == 0;
+        a.punch_low = frame.is_multiple_of(3);
+        a.kick_high = frame.is_multiple_of(5);
         a.down = frame % 7 < 3;
-        a.up = frame % 31 == 0;
+        a.up = frame.is_multiple_of(31);
         a.right = frame % 11 < 5;
         a.left = frame % 13 < 4;
-        a.special = frame % 97 == 0;
+        a.special = frame.is_multiple_of(97);
         [a, a]
     };
     let mut p = spar(0, 2, 200.0, 60 * 12, &mut mash);

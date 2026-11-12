@@ -1,7 +1,7 @@
 // The games the site offers, read from their one registry (BLIP_GAMES in
 // web/blip_core.js), so suites never keep their own count or list.
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
@@ -31,7 +31,5 @@ function registry() {
 /** Every game, { slug, name, ... } in the registry's order. */
 export const GAMES = Object.entries(registry()).map(([slug, game]) => ({ ...game, slug }));
 export const GAME_SLUGS = GAMES.map((game) => game.slug);
-/** The BASIC tapes on the shelf (web/TAPE/<NAME>.BLIP), by uppercase name. */
-export const TAPES = readdirSync(path.join(WEB_DIR, 'TAPE')).filter((f) => f.endsWith('.BLIP')).map((f) => f.slice(0, -5)).sort();
 /** The arcade aisle's machines, left to right, as web/index.html lays out their cards. */
 export const AISLE = [...readFileSync(path.join(WEB_DIR, 'index.html'), 'utf8').matchAll(/data-game-url="([a-z]+)\//g)].map((m) => m[1]);

@@ -15,7 +15,7 @@ for (const engine of ['webkit', 'chromium']) {
     // Exercise the shared first-paint policy over every game, front end and legacy override.
     const policies = await page.evaluate(() => {
       const results = [];
-      for (const frontend of ['home', 'basic', 'cabinet']) {
+      for (const frontend of ['home', 'cabinet']) {
         blipSetFrontend(frontend);
         for (const slug of Object.keys(BLIP_GAMES)) {
           for (const query of ['', '?controls=stick', '?controls=pad']) {
@@ -30,7 +30,7 @@ for (const engine of ['webkit', 'chromium']) {
     });
     for (const state of policies) {
       if (state.slug === 'rally') {
-        if (state.query === '') assert.equal(state.selected, { cabinet: 'stick', home: 'touch', basic: 'pad' }[state.frontend], 'Rally retains its front-end selection');
+        if (state.query === '') assert.equal(state.selected, { cabinet: 'stick', home: 'touch' }[state.frontend], 'Rally retains its front-end selection');
         if (state.query === '?controls=pad') assert.equal(state.selected, 'pad');
         continue;
       }

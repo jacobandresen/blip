@@ -20,7 +20,6 @@ function cabinetSurfaces(card) {
 function deckHardware() {
   const root = document.documentElement;
   return { controls: root.dataset.controls, touch: root.dataset.touch || null, dials: root.hasAttribute('data-dials'),
-    wear: root.dataset.deckWear,
     caps: [...document.querySelectorAll('.arcade-btn')].map(el => ({ spare: el.classList.contains('spare'), alt: el.classList.contains('alt') })),
     strip: document.querySelector('#touch-strip')?.innerHTML || null,
     panel: getComputedStyle(document.querySelector('.deck-panel')).backgroundImage };
@@ -45,10 +44,12 @@ for (const engine of ['chromium', 'webkit']) {
         await frame.waitForSelector('.deck-panel', { state: 'attached' });
         const hardware = await frame.evaluate(deckHardware);
         await gotoPage(gamePage, `${origin}/${game}/index.html`);
+        // WebKit can hold back the frames of a tab behind another: the game draws only in front.
+        await gamePage.bringToFront();
         await gamePage.waitForSelector('html[data-machine] .machine-speaker', { state: 'attached' });
         await gamePage.waitForFunction(() => document.querySelector('#marquee-name .machine-marquee-name') &&
           (!blipHasTouch() || !BLIP_GAMES[document.documentElement.dataset.machine].touch || document.getElementById('touch-strip')));
-        await gameReady(gamePage, 60000);
+        await gameReady(gamePage);
         // Up close the cabinet's laminate is a column in the arcade's room: every layer of it is on the page.
         const near = await gamePage.evaluate(cabinetSurfaces);
         for (const layer of overview.body.split(/, (?=linear-gradient)/))
@@ -60,9 +61,9 @@ for (const engine of ['chromium', 'webkit']) {
           const content = html => html.replace(/ style="[^"]*"/g, '');
           hardware.strip = content(hardware.strip); liveHardware.strip = content(liveHardware.strip);
         }
-        assert.deepEqual(liveHardware, hardware, `${game}: controller type, caps, strip and wear`);
+        assert.deepEqual(liveHardware, hardware, `${game}: controller type, caps and strip`);
         if (game === 'rally' || game === 'brawler') {
-          await gameReady(gamePage, 60000);
+          await gameReady(gamePage);
           await gamePage.screenshot({ path: new URL(`${game}.png`, dir).pathname });
         }
       }

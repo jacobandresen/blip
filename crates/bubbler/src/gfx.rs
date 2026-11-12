@@ -233,7 +233,7 @@ fn tile(round: usize, border: bool) -> Vec<u8> {
     img.encode_png()
 }
 
-/// Sprites used by the Rust game and BASIC tape.
+/// The game's sprites.
 pub fn generate() -> Vec<Asset> {
     let mut assets = vec![
         ("images/TITLE_SKY.png", title_sky()),

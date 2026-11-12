@@ -1758,6 +1758,56 @@ fn hit_with_bullets(g: &mut Game, sfx: &Sounds, bullet_starts: &[(f32, f32); MAX
     }
 }
 
+/// A power-up the plane flew through this frame: one more weapon level, or a bonus at the top.
+fn catch_powerups(g: &mut Game, player_before: (f32, f32), starts: &[(f32, f32); MAX_POWERUPS], was_active: &[bool; MAX_POWERUPS], sfx: &Sounds) {
+    for i in 0..MAX_POWERUPS {
+        if !g.powerups[i].active { continue; }
+        let (from_x, from_y) = if was_active[i] {
+            starts[i]
+        } else {
+            (g.powerups[i].x, g.powerups[i].y)
+        };
+        if caught(g, player_before, (from_x, from_y), (g.powerups[i].x, g.powerups[i].y), POW_W, POW_H) {
+            g.powerups[i].active = false;
+            blip::bot::add("powerups", 1.0);
+            let (cx, cy) = (g.powerups[i].x + POW_W / 2.0, g.powerups[i].y + POW_H / 2.0);
+            if g.weapon_level < MAX_WEAPON_LEVEL {
+                g.weapon_level += 1;
+                g.spawn_powerup_burst(cx, cy, g.weapon_level, weapon_tier_color(g.weapon_level));
+                play_sfx(&sfx.powerup_up[(g.weapon_level - 2) as usize]);
+                g.sess.add_score(30 * g.weapon_level);
+                if g.weapon_level == MAX_WEAPON_LEVEL {
+                    g.max_power_banner.start(MAX_POWER_BANNER_TIME);
+                }
+            } else {
+                // Already at max: a small sparkle and a score bonus instead.
+                g.spawn_explosion(cx, cy, 1.1, weapon_tier_color(MAX_WEAPON_LEVEL));
+                play_sfx(&sfx.powerup_up[0]);
+                g.sess.add_score(150);
+            }
+        }
+    }
+}
+
+/// A health pickup the plane flew through this frame.
+fn catch_health(g: &mut Game, player_before: (f32, f32), starts: &[(f32, f32); MAX_HEALTH_PICKUPS], was_active: &[bool; MAX_HEALTH_PICKUPS], sfx: &Sounds) {
+    for i in 0..MAX_HEALTH_PICKUPS {
+        if !g.health_pickups[i].active { continue; }
+        let (from_x, from_y) = if was_active[i] {
+            starts[i]
+        } else {
+            (g.health_pickups[i].x, g.health_pickups[i].y)
+        };
+        if caught(g, player_before, (from_x, from_y), (g.health_pickups[i].x, g.health_pickups[i].y), HEALTH_W, HEALTH_H) {
+            g.health_pickups[i].active = false;
+            let (cx, cy) = (g.health_pickups[i].x + HEALTH_W / 2.0, g.health_pickups[i].y + HEALTH_H / 2.0);
+            g.health = (g.health + HEALTH_RESTORE).min(PLAYER_HEALTH_MAX);
+            g.spawn_explosion(cx, cy, 1.0, BLIP_GREEN);
+            play_sfx(&sfx.health_pickup);
+        }
+    }
+}
+
 fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
     let player_before = (g.player_x, g.player_y);
     let powerup_starts: [(f32, f32); MAX_POWERUPS] =
@@ -1853,51 +1903,8 @@ fn update_play(g: &mut Game, dt: f32, sfx: &Sounds) {
         if left_screen { g.bullets[i].active = false; }
     }
 
-    // ---- power-up catch ----
-    for i in 0..MAX_POWERUPS {
-        if !g.powerups[i].active { continue; }
-        let (from_x, from_y) = if powerup_was_active[i] {
-            powerup_starts[i]
-        } else {
-            (g.powerups[i].x, g.powerups[i].y)
-        };
-        if caught(g, player_before, (from_x, from_y), (g.powerups[i].x, g.powerups[i].y), POW_W, POW_H) {
-            g.powerups[i].active = false;
-            blip::bot::add("powerups", 1.0);
-            let (cx, cy) = (g.powerups[i].x + POW_W / 2.0, g.powerups[i].y + POW_H / 2.0);
-            if g.weapon_level < MAX_WEAPON_LEVEL {
-                g.weapon_level += 1;
-                g.spawn_powerup_burst(cx, cy, g.weapon_level, weapon_tier_color(g.weapon_level));
-                play_sfx(&sfx.powerup_up[(g.weapon_level - 2) as usize]);
-                g.sess.add_score(30 * g.weapon_level);
-                if g.weapon_level == MAX_WEAPON_LEVEL {
-                    g.max_power_banner.start(MAX_POWER_BANNER_TIME);
-                }
-            } else {
-                // Already at max: a small sparkle and a score bonus instead.
-                g.spawn_explosion(cx, cy, 1.1, weapon_tier_color(MAX_WEAPON_LEVEL));
-                play_sfx(&sfx.powerup_up[0]);
-                g.sess.add_score(150);
-            }
-        }
-    }
-
-    // ---- health pickup catch ----
-    for i in 0..MAX_HEALTH_PICKUPS {
-        if !g.health_pickups[i].active { continue; }
-        let (from_x, from_y) = if health_was_active[i] {
-            health_starts[i]
-        } else {
-            (g.health_pickups[i].x, g.health_pickups[i].y)
-        };
-        if caught(g, player_before, (from_x, from_y), (g.health_pickups[i].x, g.health_pickups[i].y), HEALTH_W, HEALTH_H) {
-            g.health_pickups[i].active = false;
-            let (cx, cy) = (g.health_pickups[i].x + HEALTH_W / 2.0, g.health_pickups[i].y + HEALTH_H / 2.0);
-            g.health = (g.health + HEALTH_RESTORE).min(PLAYER_HEALTH_MAX);
-            g.spawn_explosion(cx, cy, 1.0, BLIP_GREEN);
-            play_sfx(&sfx.health_pickup);
-        }
-    }
+    catch_powerups(g, player_before, &powerup_starts, &powerup_was_active, sfx);
+    catch_health(g, player_before, &health_starts, &health_was_active, sfx);
     for (i, &expired) in powerup_expired.iter().enumerate() {
         if expired { g.powerups[i].active = false; }
     }
@@ -3277,7 +3284,7 @@ fn draw_bottom_hud(blip: &Blip, g: &Game, player_tex: &Texture2D) {
 }
 
 fn draw_title(
-    blip: &Blip, backdrop: &Texture2D, player_tex: &Texture2D, hi: &web::HighScore,
+    blip: &Blip, backdrop: &Texture2D, player_tex: &Texture2D, hi: i32,
 ) {
     blip.draw_texture(backdrop, 0.0, 0.0, WIN_W as f32, WIN_H as f32);
     blip.draw_centered_outlined(
@@ -3300,7 +3307,7 @@ fn draw_win(blip: &Blip, level: i32) {
     blip.draw_centered(&buf,          (WIN_H / 2) as f32, 3.0, BLIP_YELLOW);
 }
 
-fn draw_won(blip: &Blip, score: i32, hi: &web::HighScore, waiting: bool) {
+fn draw_won(blip: &Blip, score: i32, hi: i32, waiting: bool) {
     blip.draw_end_screen("YOU WON!!", score, hi, BLIP_YELLOW, BLIP_GREEN, BLIP_YELLOW, !waiting);
     blip.draw_game_over_note(&format!("ALL {MAX_LEVEL} WAVES CLEARED"), BLIP_GREEN);
 }
@@ -3368,35 +3375,35 @@ async fn main() {
         shoot,
         enemy_explode:  load_takes(&ENEMY_EXPLODE_WAV).await.try_into().unwrap(),
         player_explode: load_takes(&PLAYER_EXPLODE_WAV).await.try_into().unwrap(),
-        player_hit:     blip::audio::load_sound(blip::wav!("player_hit")).await,
+        player_hit:     blip::sound!("player_hit"),
         ricochet:       load_takes(&RICOCHET_WAV).await.try_into().unwrap(),
         boss_explode:   load_takes(&BOSS_EXPLODE_WAV).await.try_into().unwrap(),
-        boss_warning:   blip::audio::load_sound(blip::wav!("boss_warning")).await,
+        boss_warning:   blip::sound!("boss_warning"),
         powerup_up: [
-            blip::audio::load_sound(blip::wav!("powerup2")).await,
-            blip::audio::load_sound(blip::wav!("powerup3")).await,
-            blip::audio::load_sound(blip::wav!("powerup4")).await,
-            blip::audio::load_sound(blip::wav!("max_power")).await,
+            blip::sound!("powerup2"),
+            blip::sound!("powerup3"),
+            blip::sound!("powerup4"),
+            blip::sound!("max_power"),
         ],
-        health_pickup:  blip::audio::load_sound(blip::wav!("health_pickup")).await,
-        stage_clear:    blip::audio::load_sound(blip::wav!("stage_clear")).await,
-        victory:        blip::audio::load_sound(blip::wav!("victory")).await,
-        game_over:      blip::audio::load_sound(blip::wav!("game_over")).await,
-        turret_fire:    blip::audio::load_sound(blip::wav!("turret_fire")).await,
-        flak_burst:     blip::audio::load_sound(blip::wav!("flak_burst")).await,
-        laser_charge:   blip::audio::load_sound(blip::wav!("laser_charge")).await,
-        laser_fire:     blip::audio::load_sound(blip::wav!("laser_fire")).await,
-        barrier_hum:    blip::audio::load_sound(blip::wav!("barrier_hum")).await,
-        barrier_hum2:   blip::audio::load_sound(blip::wav!("barrier_hum2")).await,
-        engine_start:   blip::audio::load_sound(blip::wav!("engine_start")).await,
-        engine_splutter: blip::audio::load_sound(blip::wav!("engine_splutter")).await,
-        enemy_gun:      blip::audio::load_sound(blip::wav!("enemy_gun")).await,
-        backfire:       blip::audio::load_sound(blip::wav!("backfire")).await,
+        health_pickup:  blip::sound!("health_pickup"),
+        stage_clear:    blip::sound!("stage_clear"),
+        victory:        blip::sound!("victory"),
+        game_over:      blip::sound!("game_over"),
+        turret_fire:    blip::sound!("turret_fire"),
+        flak_burst:     blip::sound!("flak_burst"),
+        laser_charge:   blip::sound!("laser_charge"),
+        laser_fire:     blip::sound!("laser_fire"),
+        barrier_hum:    blip::sound!("barrier_hum"),
+        barrier_hum2:   blip::sound!("barrier_hum2"),
+        engine_start:   blip::sound!("engine_start"),
+        engine_splutter: blip::sound!("engine_splutter"),
+        enemy_gun:      blip::sound!("enemy_gun"),
+        backfire:       blip::sound!("backfire"),
         engine:         load_takes(&ENGINE_WAV).await.try_into().unwrap(),
     };
     // Two loops in rotation,
     // so a long level doesn't hear the same ~40s on repeat.
-    let mut music = Jukebox::new("RAIDER", &["LOOP1", "LOOP2"]);
+    let mut music = Jukebox::new("raider", &["LOOP1", "LOOP2"]);
 
     if blip.screenshot_mode {
         g.start_game();
@@ -3443,11 +3450,11 @@ async fn main() {
 
         blip.clear(BLIP_BLACK);
         match g.state {
-            State::Title  => draw_title(&blip, &title_backdrop, &player_tex, &web::high_score()),
+            State::Title  => draw_title(&blip, &title_backdrop, &player_tex, web::high_score()),
             State::Launch => draw_launch(&blip, &g, &player_tex, &enemy_tex, &carrier_tex, &boat_tex, &cloud_tex, &island_tex),
             State::Win    => draw_win(&blip, g.sess.level),
-            State::Won    => draw_won(&blip, g.sess.score, &web::high_score(), g.over_timer.active()),
-            State::Over   => blip.draw_game_over(g.sess.score, &web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.over_timer.active()),
+            State::Won    => draw_won(&blip, g.sess.score, web::high_score(), g.over_timer.active()),
+            State::Over   => blip.draw_game_over(g.sess.score, web::high_score(), BLIP_RED, BLIP_GREEN, BLIP_YELLOW, !g.over_timer.active()),
             State::Play | State::Dead => {
                 draw_play(&blip, &g, &player_tex, &enemy_tex, &boss_tex, &powerup_tex, &health_tex, &boss_name_ja_tex, &boat_tex, &cloud_tex, &island_tex);
             }

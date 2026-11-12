@@ -68,7 +68,7 @@ impl Threat {
     /// Where it is `s` seconds from now, if it is there yet.
     fn at(&self, s: f32) -> Option<(f32, f32)> {
         let t = s - self.from;
-        (t >= 0.0).then(|| (self.x + self.vx * t, self.y + self.vy * t))
+        (t >= 0.0).then_some((self.x + self.vx * t, self.y + self.vy * t))
     }
 }
 

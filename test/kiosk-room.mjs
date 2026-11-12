@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { openPage, gameReady } from './lib/harness.mjs';
+import { openPage, gameReady, arrivedAt } from './lib/harness.mjs';
 
 for (const engine of ['chromium', 'webkit']) {
   test(`fullscreen kiosk cabinets retain every physical control deck in ${engine}`, async (t) => {
@@ -37,20 +37,20 @@ test('a kiosk keeps fullscreen through a real Start and a simulated two-minute i
   await page.locator('#set-fullscreen').check();
   await page.waitForFunction(() => !!document.fullscreenElement);
   await page.locator('#set-cabinet').click();
-  await page.waitForURL((url) => url.pathname.endsWith('/index.html'));
+  await arrivedAt(page, (url) => url.pathname.endsWith('/index.html'));
   await page.waitForSelector('.card-focused[data-loop-ready]');
   assert.equal(await page.locator('html').getAttribute('data-fullscreen'), '');
   await page.locator('.card-focused .machine-coinbox').click();
   await page.waitForFunction(() => !!document.fullscreenElement);
   await page.locator('.card-focused .machine-start').click();
-  await page.waitForURL((url) => url.pathname.includes('/rally/'));
+  await arrivedAt(page, (url) => url.pathname.includes('/rally/'));
   await gameReady(page);
   assert.equal(await page.locator('html').getAttribute('data-fullscreen'), '');
   await page.keyboard.press('ArrowUp');
   await page.waitForFunction(() => !!document.fullscreenElement);
   await page.clock.install();
   await page.clock.fastForward(125000);
-  await page.waitForURL((url) => url.pathname.endsWith('/index.html') && !url.pathname.includes('/rally/'));
+  await arrivedAt(page, (url) => url.pathname.endsWith('/index.html') && !url.pathname.includes('/rally/'));
   await page.waitForSelector('.card-focused[data-loop-ready]');
   assert.equal(await page.locator('html').getAttribute('data-fullscreen'), '');
   assert.equal(await page.evaluate(() => localStorage.getItem('blip-fullscreen')), '1');

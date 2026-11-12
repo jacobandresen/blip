@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openPage, HTTP_PORT } from './lib/harness.mjs';
+import { openPage, gameReady } from './lib/harness.mjs';
 
 const PHONES = [
   { name: 'iPhone 14', width: 390, height: 844 },
@@ -19,8 +19,7 @@ for (const phone of PHONES) {
       const page = await context.newPage();
       t.after(() => context.close());
       await page.goto(`${origin}/rally/index.html?controls=touch`);
-      await page.waitForFunction(() => document.querySelector('#glcanvas') &&
-        getComputedStyle(document.querySelector('#loader')).display === 'none');
+      await gameReady(page);
       await page.evaluate(() => document.getElementById('insert-coin-btn').click());
       await page.evaluate(() => document.getElementById('insert-coin-btn').click());
       await page.waitForFunction(() => !document.querySelector('#need-coin-overlay').classList.contains('visible'));
@@ -73,8 +72,7 @@ for (const phone of PHONES) {
       const page = await context.newPage();
       t.after(() => context.close());
       await page.goto(`${origin}/brawler/index.html?controls=pad`);
-      await page.waitForFunction(() => document.querySelector('#glcanvas') &&
-        getComputedStyle(document.querySelector('#loader')).display === 'none');
+      await gameReady(page);
       if (await page.locator('#need-coin-overlay.visible').count()) {
         await page.evaluate(() => document.getElementById('insert-coin-btn').click());
       }

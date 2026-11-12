@@ -174,6 +174,11 @@ pub fn env(i: usize, n: usize, attack: usize, release: usize) -> f32 {
     }
 }
 
+/// A game's tunes as files, `music/NAME.wav`, for its build script.
+pub fn tunes(list: &[(&str, &dyn Fn() -> Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
+    list.iter().map(|(name, make)| (format!("music/{name}.wav"), make())).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -5,34 +5,21 @@
 //! a choir pad, a plucked harp, war drums, bells, and a stone-cellar reverb
 //! over all of it. Dark fantasy in D minor; the melodies are our own.
 
-use blip::wav::{encode_pcm16_half, encode_pcm16_music, low_pass, soft_limit_to_pcm16, Rng, MIX_KNEE, SAMPLE_RATE};
-use blip::xm::{heard, tempo, Part, KICK, SNARE};
+use blip::cosy::{midi_hz, SR};
+use blip::wav::{encode_pcm16_half, encode_pcm16_music, low_pass, mix_into_f32, soft_limit_to_pcm16, Rng, MIX_KNEE};
 use blip::Asset;
 use std::f32::consts::TAU;
 
-const SR: f32 = SAMPLE_RATE as f32;
-
-fn hz(midi: i32) -> f32 {
-    440.0 * 2f32.powf((midi - 69) as f32 / 12.0)
-}
-
 fn secs(s: f32) -> usize {
     (s * SR) as usize
-}
-
-fn add(buf: &mut [f32], i: usize, v: f32) {
-    if let Some(s) = buf.get_mut(i) {
-        *s += v;
-    }
 }
 
 // ---- instruments ---------------------------------------------------------------
 
 /// A bowed string: two detuned saws through a soft low-pass, bow-swelled,
 /// with vibrato that arrives once the note has settled.
-fn bowed(buf: &mut [f32], at: usize, dur: f32, midi: i32, vol: f32, bright: f32, part: Part) {
-    heard(at, midi, part);
-    let f = hz(midi);
+fn bowed(buf: &mut [f32], at: usize, dur: f32, midi: i32, vol: f32, bright: f32) {
+    let f = midi_hz(midi);
     let n = secs(dur);
     let rel = secs(0.35);
     let att = secs(0.06 + 0.1 * (1.0 - bright));
@@ -53,14 +40,13 @@ fn bowed(buf: &mut [f32], at: usize, dur: f32, midi: i32, vol: f32, bright: f32,
         } else {
             0.85 * (1.0 - (i - n) as f32 / rel as f32)
         };
-        add(buf, at + i, lp2 * e * vol);
+        mix_into_f32(buf, at + i, lp2 * e * vol);
     }
 }
 
 /// A short, biting string stroke for driving ostinatos (spiccato).
-fn stroke(buf: &mut [f32], at: usize, midi: i32, vol: f32, part: Part) {
-    heard(at, midi, part);
-    let f = hz(midi);
+fn stroke(buf: &mut [f32], at: usize, midi: i32, vol: f32) {
+    let f = midi_hz(midi);
     let n = secs(0.16);
     let (mut p, mut lp) = (0.0f32, 0.0f32);
     let cut = 2.0 * TAU * 1400.0 / SR;
@@ -69,14 +55,13 @@ fn stroke(buf: &mut [f32], at: usize, midi: i32, vol: f32, part: Part) {
         p = (p + f / SR).fract();
         lp += cut * ((2.0 * p - 1.0) - lp);
         let e = (t / 0.006).min(1.0) * (-t * 16.0).exp();
-        add(buf, at + i, lp * e * vol);
+        mix_into_f32(buf, at + i, lp * e * vol);
     }
 }
 
 /// A wordless choir: stacked soft voices, each a little detuned, slow to swell.
 fn choir(buf: &mut [f32], at: usize, dur: f32, midi: i32, vol: f32) {
-    heard(at, midi, Part::Harmony);
-    let f = hz(midi);
+    let f = midi_hz(midi);
     let n = secs(dur);
     let rel = secs(0.8);
     let att = secs(0.45);
@@ -99,14 +84,13 @@ fn choir(buf: &mut [f32], at: usize, dur: f32, midi: i32, vol: f32) {
         } else {
             1.0 - (i - n) as f32 / rel as f32
         };
-        add(buf, at + i, s * e * vol / 3.0);
+        mix_into_f32(buf, at + i, s * e * vol / 3.0);
     }
 }
 
 /// A harp string (Karplus-Strong): bright attack, warm decay.
 fn harp(buf: &mut [f32], at: usize, midi: i32, vol: f32, rng: &mut Rng) {
-    heard(at, midi, Part::Tune);
-    let f = hz(midi);
+    let f = midi_hz(midi);
     let period = (SR / f).max(2.0) as usize;
     let mut line: Vec<f32> = (0..period).map(|_| rng.next_f32() * 2.0 - 1.0).collect();
     for i in 1..period {
@@ -118,13 +102,12 @@ fn harp(buf: &mut [f32], at: usize, midi: i32, vol: f32, rng: &mut Rng) {
         let nxt = (i + 1) % period;
         let out = line[idx];
         line[idx] = (line[idx] + line[nxt]) * 0.5 * 0.998;
-        add(buf, at + i, out * vol * (1.0 - i as f32 / n as f32));
+        mix_into_f32(buf, at + i, out * vol * (1.0 - i as f32 / n as f32));
     }
 }
 
 /// A war drum: a deep skin that drops in pitch, a thud of felt on top.
 fn drum(buf: &mut [f32], at: usize, f0: f32, vol: f32, decay: f32, rng: &mut Rng) {
-    heard(at, KICK, Part::Drums);
     let n = secs(decay * 2.0);
     let mut ph = 0.0f32;
     let mut lp = 0.0f32;
@@ -135,13 +118,12 @@ fn drum(buf: &mut [f32], at: usize, f0: f32, vol: f32, decay: f32, rng: &mut Rng
         let body = (TAU * ph).sin() * (-t / decay).exp();
         lp += 0.08 * ((rng.next_f32() * 2.0 - 1.0) - lp);
         let thud = lp * (-t * 40.0).exp() * 2.5;
-        add(buf, at + i, (body + thud) * vol);
+        mix_into_f32(buf, at + i, (body + thud) * vol);
     }
 }
 
 /// A frame drum or rim: a bright, short slap for the faster pieces.
 fn slap(buf: &mut [f32], at: usize, vol: f32, rng: &mut Rng) {
-    heard(at, SNARE, Part::Drums);
     let n = secs(0.18);
     let (mut lp, mut hp) = (0.0f32, 0.0f32);
     for i in 0..n {
@@ -150,14 +132,13 @@ fn slap(buf: &mut [f32], at: usize, vol: f32, rng: &mut Rng) {
         lp += 0.35 * (w - lp);
         hp = lp - hp * 0.2;
         let tone = (TAU * 190.0 * t).sin() * (-t * 30.0).exp();
-        add(buf, at + i, (hp * 0.8 + tone) * (-t * 22.0).exp() * vol);
+        mix_into_f32(buf, at + i, (hp * 0.8 + tone) * (-t * 22.0).exp() * vol);
     }
 }
 
 /// A tolling bell: inharmonic partials, each fading at its own pace.
 fn bell(buf: &mut [f32], at: usize, midi: i32, vol: f32, ring: f32) {
-    heard(at, midi, Part::Tune);
-    let f = hz(midi);
+    let f = midi_hz(midi);
     let partials = [(1.0f32, 1.0f32, 1.0f32), (2.0, 0.6, 0.7), (2.76, 0.5, 0.45), (5.4, 0.3, 0.25), (8.93, 0.18, 0.15)];
     let n = secs(ring);
     for i in 0..n {
@@ -166,7 +147,7 @@ fn bell(buf: &mut [f32], at: usize, midi: i32, vol: f32, ring: f32) {
         for &(m, a, d) in &partials {
             s += (TAU * f * m * t).sin() * a * (-t / (ring * d * 0.5)).exp();
         }
-        add(buf, at + i, s * vol * (t / 0.002).min(1.0));
+        mix_into_f32(buf, at + i, s * vol * (t / 0.002).min(1.0));
     }
 }
 
@@ -182,7 +163,7 @@ fn wind(buf: &mut [f32], at: usize, dur: f32, f0: f32, f1: f32, vol: f32, rng: &
         a += g * (w - a);
         b += g * (a - b);
         let e = (k * 6.0).min(1.0) * (1.0 - k).powf(1.4);
-        add(buf, at + i, (a - b) * 3.0 * e * vol);
+        mix_into_f32(buf, at + i, (a - b) * 3.0 * e * vol);
     }
 }
 
@@ -255,7 +236,6 @@ const ROUND: [(i32, bool); 8] = [(38, true), (38, true), (34, false), (34, false
 /// half, and a bell tolls the start of every round.
 pub fn dungeon() -> Vec<u8> {
     let bpm = 80.0;
-    tempo(bpm * 4.0 / 3.0);
     let beat = 60.0 / bpm;
     let bar = beat * 3.0;
     let bars = 16;
@@ -277,7 +257,7 @@ pub fn dungeon() -> Vec<u8> {
         for (k, iv) in fig.iter().enumerate() {
             let at = secs(t0 + k as f32 * beat / 2.0);
             let accent = if k == 0 { 1.0 } else { 0.7 };
-            bowed(&mut buf, at, beat * 0.45, root + iv, 1400.0 * accent, 0.35, Part::Bass);
+            bowed(&mut buf, at, beat * 0.45, root + iv, 1400.0 * accent, 0.35);
         }
         // the choir and low strings hold the chord through every two bars
         if b % 2 == 0 {
@@ -285,7 +265,7 @@ pub fn dungeon() -> Vec<u8> {
             for iv in [12, 12 + third, 19] {
                 choir(&mut buf, secs(t0), bar * 2.0 - 0.1, root + iv, 1100.0);
             }
-            bowed(&mut buf, secs(t0), bar * 2.0 - 0.2, root - 12 + 12, 900.0, 0.2, Part::Bass);
+            bowed(&mut buf, secs(t0), bar * 2.0 - 0.2, root - 12 + 12, 900.0, 0.2);
         }
         // drums: a deep stroke on one, a softer pair leading into the next bar
         drum(&mut buf, secs(t0), 52.0, 9000.0, 0.45, &mut rng);
@@ -308,7 +288,7 @@ pub fn dungeon() -> Vec<u8> {
     let mut t = bar * 8.0;
     for &(m, beats) in &tune {
         if beats > 0.0 {
-            bowed(&mut buf, secs(t), beats * beat - 0.04, m, 1600.0, 0.6, Part::Tune);
+            bowed(&mut buf, secs(t), beats * beat - 0.04, m, 1600.0, 0.6);
         }
         t += beats * beat;
     }
@@ -321,7 +301,6 @@ pub fn dungeon() -> Vec<u8> {
 /// drums and choir stabs, a high string line that will not settle.
 pub fn tower() -> Vec<u8> {
     let bpm = 132.0;
-    tempo(bpm);
     let beat = 60.0 / bpm;
     let bar = beat * 4.0;
     let bars = 16;
@@ -335,7 +314,7 @@ pub fn tower() -> Vec<u8> {
         let t0 = b as f32 * bar;
         for (k, iv) in pat.iter().enumerate() {
             let acc = if k % 4 == 0 { 1.0 } else { 0.6 };
-            stroke(&mut buf, secs(t0 + k as f32 * beat / 4.0), root + iv, 3200.0 * acc, Part::Bass);
+            stroke(&mut buf, secs(t0 + k as f32 * beat / 4.0), root + iv, 3200.0 * acc);
         }
         drum(&mut buf, secs(t0), 50.0, 9000.0, 0.35, &mut rng);
         drum(&mut buf, secs(t0 + beat * 1.5), 56.0, 6000.0, 0.25, &mut rng);
@@ -364,7 +343,7 @@ pub fn tower() -> Vec<u8> {
     ];
     let mut t = 0.0;
     for &(m, beats) in &line {
-        bowed(&mut buf, secs(t), beats * beat - 0.03, m, 1500.0, 0.7, Part::Tune);
+        bowed(&mut buf, secs(t), beats * beat - 0.03, m, 1500.0, 0.7);
         t += beats * beat;
     }
     // in the second half the horns take up the wizard's call, as if in answer
@@ -384,8 +363,7 @@ pub fn tower() -> Vec<u8> {
 
 /// A horn: two saws whose filter opens with the breath, then settles warm.
 fn horn(buf: &mut [f32], at: usize, dur: f32, midi: i32, vol: f32, rng: &mut Rng) {
-    heard(at, midi, Part::Tune);
-    let f = hz(midi);
+    let f = midi_hz(midi);
     let n = secs(dur);
     let rel = secs(0.25);
     let (mut p1, mut p2, mut p3, mut lp, mut lp2) = (0.0f32, 0.5f32, 0.25f32, 0.0f32, 0.0f32);
@@ -405,7 +383,7 @@ fn horn(buf: &mut [f32], at: usize, dur: f32, midi: i32, vol: f32, rng: &mut Rng
         // a breath of air at the lip as the note speaks
         let breath = (rng.next_f32() * 2.0 - 1.0) * (-t * 30.0).exp() * 0.35;
         let e = if i < n { (t / 0.05).min(1.0) * (0.8 + 0.2 * (-t * 4.0).exp()) } else { 0.8 * (1.0 - (i - n) as f32 / rel as f32) };
-        add(buf, at + i, (lp2 + breath) * e * vol);
+        mix_into_f32(buf, at + i, (lp2 + breath) * e * vol);
     }
 }
 
@@ -414,7 +392,6 @@ fn horn(buf: &mut [f32], at: usize, dur: f32, midi: i32, vol: f32, rng: &mut Rng
 /// great bell on the downbeat of each half, and a dark wind swelling at the turn.
 pub fn theme() -> Vec<u8> {
     let bpm = 96.0;
-    tempo(bpm);
     let beat = 60.0 / bpm;
     let bar = beat * 4.0;
     let bars = 24;
@@ -438,11 +415,11 @@ pub fn theme() -> Vec<u8> {
                 harp(&mut buf, at, root + 12 + iv, 2000.0 * acc, &mut rng);
             } else {
                 harp(&mut buf, at, root + 12 + iv, 1500.0 * acc, &mut rng);
-                stroke(&mut buf, at, root + iv, 2400.0 * acc, Part::Bass);
+                stroke(&mut buf, at, root + iv, 2400.0 * acc);
             }
         }
         // low strings and choir hold the chord
-        bowed(&mut buf, secs(t0), bar - 0.1, root, 1000.0, 0.25, Part::Bass);
+        bowed(&mut buf, secs(t0), bar - 0.1, root, 1000.0, 0.25);
         let lift = if b >= 8 { 1.3 } else { 1.0 };
         for iv in [12, 12 + third, 19, 24] {
             choir(&mut buf, secs(t0), bar - 0.05, root + iv, 800.0 * lift);
@@ -482,7 +459,7 @@ pub fn theme() -> Vec<u8> {
         let second = t >= bar * 8.0;
         horn(&mut buf, secs(t), dur, m - 12, if second { 1400.0 } else { 1800.0 }, &mut rng);
         if second {
-            bowed(&mut buf, secs(t), dur, m, 1300.0, 0.75, Part::Harmony);
+            bowed(&mut buf, secs(t), dur, m, 1300.0, 0.75);
         }
         t += beats * beat;
     }
@@ -494,7 +471,7 @@ pub fn theme() -> Vec<u8> {
     ];
     let mut t = bar * 8.0;
     for &(m, beats) in &answer {
-        bowed(&mut buf, secs(t), beats * beat - 0.05, m - 12, 1100.0, 0.5, Part::Harmony);
+        bowed(&mut buf, secs(t), beats * beat - 0.05, m - 12, 1100.0, 0.5);
         t += beats * beat;
     }
     for b in 8..16 {
@@ -522,8 +499,8 @@ pub fn theme() -> Vec<u8> {
     for k in 0..8 {
         let t0 = b0 + k as f32 * bar;
         if k % 2 == 0 {
-            bowed(&mut buf, secs(t0), bar * 2.0 - 0.1, 26, 1300.0, 0.2, Part::Bass);
-            bowed(&mut buf, secs(t0), bar * 2.0 - 0.1, 33, 900.0, 0.2, Part::Bass);
+            bowed(&mut buf, secs(t0), bar * 2.0 - 0.1, 26, 1300.0, 0.2);
+            bowed(&mut buf, secs(t0), bar * 2.0 - 0.1, 33, 900.0, 0.2);
             bell(&mut buf, secs(t0), 38, 2600.0, 5.0);
         }
         drum(&mut buf, secs(t0), 46.0, 6000.0, 0.6, &mut rng);
@@ -558,7 +535,6 @@ pub fn theme() -> Vec<u8> {
 /// heard again, slower, as if from far below.
 pub fn depths() -> Vec<u8> {
     let bpm = 104.0;
-    tempo(bpm);
     let beat = 60.0 / bpm;
     let bar = beat * 4.0;
     let bars = 16;
@@ -574,7 +550,7 @@ pub fn depths() -> Vec<u8> {
         for k in 0..12 {
             let iv = [0, 0, 1, 0, 0, 7, 0, 1, 0, 12, 7, 1][k];
             let acc = if k % 3 == 0 { 1.0 } else { 0.55 };
-            stroke(&mut buf, secs(t0 + k as f32 * beat / 3.0), root + iv, 2600.0 * acc, Part::Bass);
+            stroke(&mut buf, secs(t0 + k as f32 * beat / 3.0), root + iv, 2600.0 * acc);
         }
         drum(&mut buf, secs(t0), 48.0, 8000.0, 0.45, &mut rng);
         drum(&mut buf, secs(t0 + beat * 2.0 + beat / 3.0), 54.0, 5000.0, 0.3, &mut rng);
@@ -598,7 +574,7 @@ pub fn depths() -> Vec<u8> {
     ];
     let mut t = 0.0;
     for &(m, beats) in &call {
-        bowed(&mut buf, secs(t), beats * beat - 0.05, m, 1500.0, 0.45, Part::Tune);
+        bowed(&mut buf, secs(t), beats * beat - 0.05, m, 1500.0, 0.45);
         t += beats * beat;
     }
     cellar(&mut buf, 1.3, 0.9, 0.0);
@@ -624,7 +600,7 @@ fn bolt_sfx() -> Vec<u8> {
         ph = (ph + f / SR).fract();
         let crackle = if rng.next_f32() < 0.08 { rng.next_f32() * 2.0 - 1.0 } else { 0.0 };
         let s = ((TAU * ph).sin() + 0.4 * (TAU * ph * 2.01).sin()) * (-t * 14.0).exp() + crackle * 0.7 * (-t * 10.0).exp();
-        add(&mut b, i, s * 7000.0);
+        mix_into_f32(&mut b, i, s * 7000.0);
     }
     cellar(&mut b, 0.6, 0.6, 0.2);
     finish_sfx(b, 2.0)
@@ -672,9 +648,9 @@ fn death_sfx() -> Vec<u8> {
     let mut b = fx(2.4);
     let mut rng = Rng(0xdea7);
     bell(&mut b, 0, 38, 4500.0, 2.4);
-    bowed(&mut b, 0, 0.5, 57, 3500.0, 0.5, Part::Tune);
-    bowed(&mut b, secs(0.45), 0.5, 53, 3500.0, 0.45, Part::Tune);
-    bowed(&mut b, secs(0.9), 0.9, 50, 3800.0, 0.4, Part::Tune);
+    bowed(&mut b, 0, 0.5, 57, 3500.0, 0.5);
+    bowed(&mut b, secs(0.45), 0.5, 53, 3500.0, 0.45);
+    bowed(&mut b, secs(0.9), 0.9, 50, 3800.0, 0.4);
     drum(&mut b, 0, 45.0, 8000.0, 0.5, &mut rng);
     cellar(&mut b, 1.2, 0.8, 0.5);
     finish_sfx(b, 2.0)
@@ -689,7 +665,7 @@ fn over_sfx() -> Vec<u8> {
         for m in [a, c, d] {
             choir(&mut b, t, 1.05, m, 1800.0);
         }
-        bowed(&mut b, t, 1.0, [46, 45, 38][k], 2200.0, 0.3, Part::Bass);
+        bowed(&mut b, t, 1.0, [46, 45, 38][k], 2200.0, 0.3);
     }
     bell(&mut b, secs(2.2), 50, 3000.0, 2.2);
     cellar(&mut b, 1.3, 0.9, 0.3);
@@ -701,7 +677,7 @@ fn chamber_sfx() -> Vec<u8> {
     let mut b = fx(2.0);
     let mut rng = Rng(0xc1ea);
     for (k, &(m, d)) in [(62, 0.14), (69, 0.14), (74, 0.6)].iter().enumerate() {
-        bowed(&mut b, secs(k as f32 * 0.15), d, m, 3500.0, 0.8, Part::Tune);
+        bowed(&mut b, secs(k as f32 * 0.15), d, m, 3500.0, 0.8);
     }
     for m in [62, 66, 69, 74] {
         choir(&mut b, secs(0.3), 0.8, m, 1800.0);
@@ -739,7 +715,7 @@ fn warlock_sfx() -> Vec<u8> {
         let cut = 2.0 * TAU * (900.0 - 600.0 * t / 0.7) / SR;
         lp += cut * (raw - lp);
         let e = (t / 0.05).min(1.0) * (1.0 - t / 0.7);
-        add(&mut b, i, lp * e * 9000.0 * (1.0 + 0.3 * (TAU * 7.0 * t).sin()));
+        mix_into_f32(&mut b, i, lp * e * 9000.0 * (1.0 + 0.3 * (TAU * 7.0 * t).sin()));
     }
     choir(&mut b, 0, 0.6, 50, 1500.0);
     cellar(&mut b, 1.2, 0.8, 0.3);
@@ -778,7 +754,7 @@ fn whelp_sfx() -> Vec<u8> {
         let raw = (2.0 * ph - 1.0) + (rng.next_f32() - 0.5) * 0.6;
         lp += 0.3 * (raw - lp);
         let e = (t / 0.03).min(1.0) * (1.0 - t / 0.55);
-        add(&mut b, i, lp * e * 9000.0);
+        mix_into_f32(&mut b, i, lp * e * 9000.0);
     }
     cellar(&mut b, 0.9, 0.7, 0.3);
     finish_sfx(b, 2.0)
@@ -815,7 +791,7 @@ pub fn sounds() -> Vec<Asset> {
     ]
 }
 
-/// The music: each tune as a WAV to play and an XM of its notes for TUNE.
+/// The music: each tune as a WAV to play.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::xm::tunes(&[("DUNGEON", &dungeon), ("TOWER", &tower), ("THEME", &theme), ("DEPTHS", &depths)])
+    blip::wav::tunes(&[("DUNGEON", &dungeon), ("TOWER", &tower), ("THEME", &theme), ("DEPTHS", &depths)])
 }

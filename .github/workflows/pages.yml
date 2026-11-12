@@ -15,40 +15,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The live database takes the new migrations before the site that needs
-  # them goes out. db push applies only those missing from its history.
-  migrate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: supabase/setup-cli@v3
-        with:
-          version: latest
-      - name: Apply new migrations
-        env:
-          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: |
-          if [ -z "$SUPABASE_DB_URL" ]; then
-            echo "::warning::No SUPABASE_DB_URL secret: new migrations were not applied."
-            exit 0
-          fi
-          supabase db push --db-url "$SUPABASE_DB_URL" --include-all
-
   deploy:
-    needs: migrate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # web/blip_config.js is git-ignored; write it from repo secrets so the
-      # Supabase URL + anon key live only in the deployed site, not the repo.
-      # Missing secrets → blank config → the leaderboard just stays disabled.
-      - name: Inject Supabase config
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          printf "window.BLIP_SUPABASE = { url: '%s', anonKey: '%s' };\n" \
-            "$SUPABASE_URL" "$SUPABASE_ANON_KEY" > web/blip_config.js
       - uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: web

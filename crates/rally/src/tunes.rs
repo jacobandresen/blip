@@ -26,7 +26,6 @@ impl Loop {
     /// Sixteenth-note steps at `bpm`, with a quarter second of tail.
     fn new(bpm: f32, steps: usize, rng: Rng) -> Self {
         let step_ms = 60_000.0 / bpm / 4.0;
-        blip::xm::tempo(bpm);
         let step_samples = (SAMPLE_RATE as f32 * step_ms / 1000.0) as usize;
         let buf = vec![0f32; step_samples * steps + SAMPLE_RATE as usize / 4];
         Loop { buf, rng, step_ms, step_samples, kick_offsets: Vec::new() }
@@ -284,9 +283,9 @@ pub fn sounds() -> Vec<Asset> {
     ]
 }
 
-/// The music: each tune as a WAV to play and an XM of its notes for TUNE.
+/// The music: each tune as a WAV to play.
 pub fn music() -> Vec<(String, Vec<u8>)> {
-    blip::xm::tunes(&[
+    blip::wav::tunes(&[
         ("LOOP1", &loop1_wav),
         ("LOOP2", &loop2_wav),
         ("LOOP3", &loop3_wav),

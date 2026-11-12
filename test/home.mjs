@@ -1,7 +1,7 @@
 // The home screen: games as apps, the switch to and from the cabinet, free
 // play, and each game saved as its own home-screen app.
 //
-//   node --test test/home.mjs        (after cargo build-web and node tools/make_game_icons.mjs)
+//   node --test test/home.mjs        (after npm run build:web and node tools/make_game_icons.mjs)
 
 import { GAME_SLUGS } from './lib/games.mjs';
 import test from 'node:test';
@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { createFileServer, openPage, WEB_DIR, listenOn } from './lib/harness.mjs';
+import { createFileServer, openPage, WEB_DIR, listenOn, arrivedAt } from './lib/harness.mjs';
 import { chromiumBinary } from './lib/chromium-binary.mjs';
 
 const GAMES = GAME_SLUGS;
@@ -47,23 +47,16 @@ test('the home screen shows every game as an app with its own icon, and nothing 
   assert.ok(await page.locator('#dock-arcade').isVisible(), 'the dock has the way back to BLIP Home');
   assert.equal(await page.locator('#dock-arcade').getAttribute('aria-label'), 'BLIP Home');
   assert.match(await page.locator('#dock-arcade img').getAttribute('src'), /^icon\.svg/);
-  assert.equal(await page.locator('#dock-amstrad').getAttribute('aria-label'), 'BLIP');
-  assert.match(await page.locator('#dock-amstrad img').getAttribute('src'), /^blip-computer-icon\.svg/);
-  await page.waitForFunction(() => document.querySelector('#dock-amstrad img').complete && document.querySelector('#dock-amstrad img').naturalWidth > 0);
-  const cabinet = requested.filter((p) => /kiosk\.(js|css)|wear\.css|deck\.js|manual|howler|blip_controller/.test(p));
+  const cabinet = requested.filter((p) => /cabinet\.js|blip\.css|deck\.js|manual|howler|game\.js/.test(p));
   assert.deepEqual(cabinet, [], 'the home screen loads none of the cabinet');
   const sideways = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   assert.equal(sideways, 0);
   await page.setViewportSize({ width: 320, height: 568 });
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, 'the five dock icons fit a small phone');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), 0, 'the dock icons fit a small phone');
   const dockBounds = await page.locator('#dock-row .app-icon').evaluateAll(icons => icons.map(icon => {
     const r = icon.getBoundingClientRect(); return [r.left, r.right];
   }));
   assert.ok(dockBounds.every(([left, right]) => left >= 0 && right <= 320), 'every dock icon stays on screen');
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator('#dock-amstrad').click();
-  await page.waitForURL(`${origin}/basic.html`);
-  assert.equal(await page.evaluate(() => blipFrontend()), 'basic');
 });
 
 test('API examples return to the API after opening a game', async (t) => {
@@ -73,12 +66,12 @@ test('API examples return to the API after opening a game', async (t) => {
     [...new Set(links.map((link) => link.getAttribute('href').split('/')[0]))].sort());
   assert.deepEqual(games, ['bouncer', 'bubbler', 'meteors', 'serpent']);
   await page.getByRole('link', { name: 'Play Serpent' }).click();
-  await page.waitForURL(`${origin}/serpent/index.html?from=api`);
+  await arrivedAt(page, `${origin}/serpent/index.html?from=api`);
   const back = page.locator('.app-back');
   assert.equal(await back.getAttribute('href'), '../api.html');
   assert.match(await back.textContent(), /API/);
   await back.click();
-  await page.waitForURL(`${origin}/api.html`);
+  await arrivedAt(page, `${origin}/api.html`);
 });
 
 test('the Guide can open the API and return to its source chapter', async (t) => {
@@ -88,11 +81,11 @@ test('the Guide can open the API and return to its source chapter', async (t) =>
   const link = page.locator('#pane-detail a[href="api.html?from=guide"]');
   await link.waitFor();
   await link.click();
-  await page.waitForURL(`${origin}/api.html?from=guide`);
+  await arrivedAt(page, `${origin}/api.html?from=guide`);
   const back = page.locator('.api-bar a').first();
   assert.match(await back.textContent(), /Guide/);
   await back.click();
-  await page.waitForURL(`${origin}/guide.html#/t/build-with-blip`);
+  await arrivedAt(page, `${origin}/guide.html#/t/build-with-blip`);
   await page.locator('#guide[data-ready]').waitFor();
 
   await page.goto(`${origin}/guide.html?embed#/t/build-with-blip`);
@@ -116,7 +109,7 @@ test('Search finds a game by name, and Enter opens it', async (t) => {
   assert.equal(await page.locator('#search-input').inputValue(), 'r');
   await page.locator('#search-input').fill('raid');
   await page.locator('#search-input').press('Enter');
-  await page.waitForURL(`${origin}/raider/`);
+  await arrivedAt(page, `${origin}/raider/`);
 });
 
 test('the context menu sits beside its icon and inside the screen', async (t) => {
@@ -161,7 +154,7 @@ test('a tap on an icon starts the game on free play, and the logo brings it back
   const { page, origin } = await phone(t);
   await page.goto(`${origin}/home.html`);
   await page.locator('[data-slug="serpent"]').first().tap();
-  await page.waitForURL(`${origin}/serpent/`);
+  await arrivedAt(page, `${origin}/serpent/`);
   await page.waitForFunction(() => typeof BlipController === 'object');
   assert.equal(await coinWall(page), false, 'no coin wall');
   assert.equal(await page.evaluate(() => document.documentElement.hasAttribute('data-freeplay')), true);
@@ -172,7 +165,7 @@ test('a tap on an icon starts the game on free play, and the logo brings it back
   assert.equal(await page.locator('.blip-logo').isVisible(), false);
   assert.equal(await page.locator('#marquee-name').evaluate((el) => getComputedStyle(el, '::after').content), '"Serpent"');
   await page.locator('.app-back').click();
-  await page.waitForURL(`${origin}/home.html`);
+  await arrivedAt(page, `${origin}/home.html`);
   assert.equal(await page.evaluate(() => sessionStorage.getItem('blip-cabinet-return')), null, 'no handoff to the cabinet');
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('blip-recent'))[0]), 'serpent');
   assert.equal(await page.locator('#dock-row [data-slug="serpent"]').count(), 1, 'the game just played is in the dock');
@@ -182,13 +175,13 @@ test('the cabinet switches to the home screen, BLIP still opens in the arcade, a
   const { page, origin } = await phone(t);
   await page.goto(`${origin}/index.html`);
   await page.locator('#home-switch-btn').click();
-  await page.waitForURL(`${origin}/home.html`);
+  await arrivedAt(page, `${origin}/home.html`);
   await page.goto(`${origin}/index.html`);
   assert.equal(new URL(page.url()).pathname, '/index.html', 'every visit starts in the arcade');
 
   await page.goto(`${origin}/home.html`);
   await page.locator('#dock-arcade').click();
-  await page.waitForURL(`${origin}/index.html?cabinet`);
+  await arrivedAt(page, `${origin}/index.html?cabinet`);
   await page.goto(`${origin}/index.html`);
   assert.equal(new URL(page.url()).pathname, '/index.html', 'the cabinet is the choice again');
   await page.goto(`${origin}/rally/index.html`);
@@ -204,7 +197,7 @@ test('a long press offers Add to Home Screen, which shows how on the game page',
   await page.locator('#action-sheet').waitFor();
   assert.match(await page.locator('#action-title').textContent(), /^Brawler · 1 or 2 players$/);
   await page.locator('#action-sheet [data-action="install"]').click();
-  await page.waitForURL(/\/brawler\/\?app$/);
+  await arrivedAt(page, /\/brawler\/\?app$/);
   await page.locator('#install-sheet').waitFor();
   assert.match(await page.locator('#install-title').textContent(), /Add Brawler to your Home Screen/);
   await page.locator('#install-sheet .install-close').click();
@@ -245,7 +238,7 @@ test('any game can start in app mode: from a link with ?app, or once the home sc
     assert.equal(await coinWall(page), false, `${slug}: free to play`);
   }
   await page.locator('.app-back').click();
-  await page.waitForURL(`${origin}/home.html`);
+  await arrivedAt(page, `${origin}/home.html`);
 
   // A new session, straight to a game: the home screen is the choice, so app mode.
   await page.evaluate(() => sessionStorage.clear());
@@ -303,7 +296,7 @@ test('a game opened as an app draws a clean, sharp picture: no CRT, full pixel d
 
   await page.goto(`${origin}/home.html`);
   await page.locator('[data-slug="serpent"]').first().click();
-  await page.waitForURL(`${origin}/serpent/`);
+  await arrivedAt(page, `${origin}/serpent/`);
   await page.waitForFunction(() => window.__crt !== undefined, null, { timeout: 30000 });
   assert.equal(await page.evaluate(() => window.__crt), 0);
   await page.waitForFunction(() => { const c = document.getElementById('glcanvas'); return c.width === Math.floor(c.clientWidth * 3); }, null, { timeout: 10000 });
@@ -369,7 +362,7 @@ test('over a game, Guide opens a sheet at that game, and Done puts it away', asy
   const { page, origin } = await phone(t, { reducedMotion: 'reduce' });
   await page.goto(`${origin}/home.html`);
   await page.locator('[data-slug="bouncer"]').first().tap();
-  await page.waitForURL(`${origin}/bouncer/`);
+  await arrivedAt(page, `${origin}/bouncer/`);
   await page.evaluate(() => document.getElementById('card-button').click());
   await page.locator('#cc-guide').click();
   const frame = page.frameLocator('#guide-sheet iframe');
@@ -402,7 +395,7 @@ test('app mode on a PC needs no deck; a tablet drops it for a gamepad until touc
   await page.goto(`${origin}/serpent/?app`);
   await page.waitForFunction(() => typeof BlipController === 'object');
   assert.equal((await deck(page)).deck, true, 'a phone plays on its deck');
-  await page.evaluate(() => document.documentElement.setAttribute('data-pad', 'active'));   // as kiosk.js marks a pad
+  await page.evaluate(() => document.documentElement.setAttribute('data-pad', 'active'));   // as cabinet.js marks a pad
   await page.waitForFunction(() => document.documentElement.hasAttribute('data-bare'));
   assert.equal((await deck(page)).deck, false, 'a gamepad in hand needs no deck');
   await page.touchscreen.tap(195, 300);
@@ -444,7 +437,7 @@ test('an icon\'s menu opens the game\'s page in the Guide', async (t) => {
   await page.goto(`${origin}/home.html`);
   await page.locator('#app-grid [data-slug="adder"]').dispatchEvent('contextmenu');
   await page.locator('[data-action="guide"]').click();
-  await page.waitForURL(`${origin}/guide.html#/t/game-adder`);
+  await arrivedAt(page, `${origin}/guide.html#/t/game-adder`);
   await page.locator('#guide[data-ready]').waitFor();
   assert.equal(await page.locator('#article .large-title').textContent(), 'Adder');
 });
@@ -486,7 +479,7 @@ test('each game page names itself and links its own manifest and icon', async (t
 
 test('Chrome finds each game installable as its own app', async (t) => {
   // The service worker caches /blip/...: serve web/ there, as GitHub Pages does.
-  const server = createFileServer({ basePath: '/blip', blankMissingConfig: true });
+  const server = createFileServer({ basePath: '/blip' });
   await listenOn(server, 0);
   const origin = `http://127.0.0.1:${server.address().port}`;
   const context = await chromium.launchPersistentContext('', { executablePath: chromiumBinary(), headless: true, args: ['--mute-audio'] });

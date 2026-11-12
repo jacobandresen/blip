@@ -956,13 +956,6 @@ fn dist_to_cuff(p: V3) -> f32 {
     dot(sub3(CUFF, p), ax)
 }
 
-/// Where the index finger ends (the orb hovers just beyond it).
-#[allow(dead_code)]
-pub fn index_tip() -> (f32, f32) {
-    let m = hand_model();
-    (m[5].b[0], m[5].b[1])
-}
-
 /// The young wizard, seen from behind, ray-marched like the Warlock's arm:
 /// a broad felt hat whose crown has slumped and bent back with age, a band
 /// of old gold round it; a sapphire wool cloak hanging from his shoulders in
@@ -1265,11 +1258,6 @@ fn circle(img: &mut [V3]) {
     }
 }
 
-/// The Warlock's eyes, and his fingertips.
-#[allow(dead_code)]
-pub const WARLOCK_EYES: [(f32, f32); 2] = [(387.0, 192.0), (405.0, 192.0)];
-#[allow(dead_code)]
-pub const WARLOCK_HAND: (f32, f32) = ORB;
 /// The void he holds out, just past his fingertip.
 pub const ORB: (f32, f32) = (190.0, 300.0);
 

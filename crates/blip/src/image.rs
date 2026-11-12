@@ -48,8 +48,8 @@ impl Image {
     /// Rasterize the runtime's pixel font into an asset without a graphics context.
     pub fn text(&mut self, text: &str, x: i32, y: i32, size: i32, color: [u8; 4]) {
         for (i, ch) in text.chars().enumerate() {
-            let Some(glyph) = blip_font::glyph_index(ch) else { continue; };
-            for (row, bits) in blip_font::FONT[glyph].iter().enumerate() {
+            let Some(glyph) = crate::glyphs::glyph_index(ch) else { continue; };
+            for (row, bits) in crate::glyphs::FONT[glyph].iter().enumerate() {
                 for column in 0..5 {
                     if bits & (1 << (4 - column)) == 0 { continue; }
                     for dy in 0..size {

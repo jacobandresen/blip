@@ -12,7 +12,7 @@ var actionSheet = document.getElementById('action-sheet');
 var settingsSheet = document.getElementById('settings-sheet');
 var REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 var RECENT_KEY = 'blip-recent';
-var DOCK_GAMES = 1;   // one recent game fits beside the four fixed apps on a phone
+var DOCK_GAMES = 1;   // beside the arcade, the Guide and Settings: four in a phone's dock
 
 // Being here is the choice: a game played from here comes back here.
 blipSetFrontend('home');
@@ -100,7 +100,6 @@ function buildDock() {
   dockRow.textContent = '';
   var wide = matchMedia(WIDE).matches;
   dockRow.appendChild(systemApp('arcade', 'BLIP Home', '<img src="icon.svg?v=2" alt="">', toCabinet));
-  dockRow.appendChild(systemApp('amstrad', 'BLIP', '<img src="blip-computer-icon.svg" alt="">', toAmstrad));
   // The Guide's icon is the one it has as an app of its own.
   dockRow.appendChild(systemApp('guide', 'Guide', '<img src="guide-icon-192.png?v=1" alt="">', toGuide));
   if (wide) {
@@ -336,13 +335,6 @@ function toCabinet() {
   blipSetFrontend('cabinet');
   location.href = 'index.html?cabinet';
 }
-function toAmstrad() {
-  if (leaving) return;
-  leaving = true;
-  blipSetFrontend('basic');
-  location.href = 'basic.html';
-}
-document.getElementById('basic-switch').addEventListener('click', function () { blipSetFrontend('basic'); });
 
 /* ---- Sheets ---- */
 var openSheet = null, returnFocus = null;

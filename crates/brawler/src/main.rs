@@ -76,8 +76,8 @@ async fn main() {
     // And the interlace's rows swap half as far, or the lit scenes twitter.
     blip.set_interlace(0.5);
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(folder) = std::env::var_os("BLIP_EXPORT_BASIC") {
-        export::tape_art(&blip, std::path::Path::new(&folder));
+    if let Some(folder) = std::env::var_os("BLIP_EXPORT_ART") {
+        export::pose_art(&blip, std::path::Path::new(&folder));
         return;
     }
     let mut g = Game::new();
@@ -87,7 +87,7 @@ async fn main() {
     web::set_players(TITLE_OPEN);
 
     let sfx = Sounds::load().await;
-    let mut music = Jukebox::new("BRAWLER", &["DOCK", "TEMPLE", "SELECT", "AIRBASE", "BATHHOUSE", "VILLAGE", "FORTRESS", "ROOFTOP", "HOOD", "WALKOUT"]);
+    let mut music = Jukebox::new("brawler", &["DOCK", "TEMPLE", "SELECT", "AIRBASE", "BATHHOUSE", "VILLAGE", "FORTRESS", "ROOFTOP", "HOOD", "WALKOUT"]);
     /// The theme of each stage, in stage order.
     const STAGE_TRACK: [usize; STAGES] = [0, 1, 3, 4, 5, 6, 7, 8];
     /// The title and select screens have a loop of their own: silence in
@@ -239,8 +239,6 @@ async fn main() {
         if let Some(track) = want { music.play(track); }
 
         if g.fade > 0.0 { g.fade -= dt; }
-        #[cfg(not(target_arch = "wasm32"))]
-        if blip.screenshot_mode { shots::compare(&mut g); }
         blip.clear(BLIP_BLACK);
         draw::draw(&blip, &g);
         blip.next_frame(60).await;

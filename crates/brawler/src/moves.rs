@@ -161,7 +161,7 @@ pub(crate) const DRIVEBY_SHOT_TIMES: [f32; 3] = [56.0 / 60.0, 71.0 / 60.0, 86.0 
 pub(crate) const DRIVEBY_DEPART: f32 = 1.70;
 pub(crate) const DRIVEBY_TOTAL: f32 = 3.05;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(test)]
 pub(crate) fn driveby_car_x(f: &Fighter, t: f32) -> f32 {
     driveby_car_x_at(f.x, f.facing, t)
 }

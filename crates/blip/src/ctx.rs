@@ -1,7 +1,7 @@
 //! Central game context: fixed-size canvas, frame loop and CRT post-processing.
 //! Games draw through `Blip` and read `delta_time` each frame.
 
-use macroquad::camera::{set_camera, set_default_camera, Camera2D};
+use macroquad::camera::{set_camera, Camera2D};
 use macroquad::color::{Color, WHITE};
 use macroquad::material::{
     gl_use_default_material, gl_use_material, load_material, Material, MaterialParams,
@@ -11,7 +11,7 @@ use macroquad::miniquad::{ShaderSource, UniformDesc, UniformType};
 use macroquad::shapes::draw_rectangle;
 use macroquad::texture::{
     draw_texture_ex, render_target_ex, DrawTextureParams, FilterMode,
-    RenderTarget, RenderTargetParams, Texture2D,
+    RenderTarget, RenderTargetParams,
 };
 use macroquad::time::get_frame_time;
 use macroquad::window::{clear_background, get_internal_gl, next_frame, screen_height, screen_width, Conf};
@@ -194,10 +194,6 @@ pub struct Blip {
     pub height:     i32,
     pub delta_time: f32,
     rt:             RenderTarget,
-    retain_frame:   bool,
-    /// The last finished picture, shown while the next is still being drawn.
-    shown:          Option<RenderTarget>,
-    show_committed: bool,
     rng:            Lcg,
     crt_look:       bool, // a CRT's picture, or a clean one (crate::web::crt)
     // ---- glitch: horizontal tear ----
@@ -316,7 +312,7 @@ impl Blip {
 
         let b = Self {
             width, height, delta_time: 1.0 / 60.0,
-            rt, retain_frame: false, shown: None, show_committed: false, rng, crt_look: crate::web::crt(),
+            rt, rng, crt_look: crate::web::crt(),
             tear_cd,  tear_t: 0.0, tear_y: 0.5, tear_dx: 0.0,
             roll_cd,  roll_t: 0.0, roll_dy: 0.0, roll_spd: 0.0,
             chroma_cd, chroma_t: 0.0, chroma_dx: 0.0,
@@ -341,25 +337,6 @@ impl Blip {
         b.apply_camera();
         crate::web::picture(width, height);
         b
-    }
-
-    /// Change the logical canvas and its render target together.
-    pub fn resize_canvas(&mut self, width: i32, height: i32) {
-        assert!(width > 0 && height > 0);
-        if (self.width, self.height) == (width, height) { return; }
-        // Flush queued draws before releasing their render pass.
-        set_default_camera();
-        retire(std::mem::replace(&mut self.rt, render_target_ex(width as u32, height as u32, RenderTargetParams {
-            sample_count: 0,
-            ..Default::default()
-        })));
-        self.rt.texture.set_filter(FilterMode::Nearest);
-        self.width = width;
-        self.height = height;
-        self.rt_blended = false;
-        self.apply_camera();
-        clear_background(BLIP_BLACK);
-        crate::web::picture(width, height);
     }
 
     /// Point the camera at the render target so subsequent game draws land there.
@@ -453,7 +430,7 @@ impl Blip {
 
         // Prepare render target for the next game frame.
         self.apply_camera();
-        if !self.retain_frame { clear_background(macroquad::color::BLACK); }
+        clear_background(macroquad::color::BLACK);
 
         let raw = get_frame_time();
         self.delta_time = if raw > 0.1 { 0.1 } else { raw };
@@ -568,7 +545,7 @@ impl Blip {
         // BLIP_SCREENSHOT_FX is set, which keeps the full pipeline (handy for
         // eyeballing the curved-glass shader from a headless capture).
         if self.screenshot_mode && std::env::var_os("BLIP_SCREENSHOT_FX").is_none() {
-            let tex = self.display_texture();
+            let tex = self.rt.texture.clone();
             draw_texture_ex(&tex, vx, vy, WHITE, DrawTextureParams {
                 dest_size: Some(vec2(vw, vh)),
                 ..Default::default()
@@ -637,12 +614,11 @@ impl Blip {
         // Shrunk (a phone shows Meteors at half size), nearest sampling
         // drops every other pixel and one-pixel lines break up: blend then.
         // Enlarged, pixels stay crisp.
-        let tex = self.display_texture();
+        let tex = self.rt.texture.clone();
         if (scale < 1.0) != self.rt_blended {
             self.rt_blended = scale < 1.0;
             let filter = if self.rt_blended { FilterMode::Linear } else { FilterMode::Nearest };
             self.rt.texture.set_filter(filter);
-            if let Some(shown) = &self.shown { shown.texture.set_filter(filter); }
         }
 
         let roll_on   = self.roll_t  > 0.0;
@@ -747,14 +723,6 @@ impl Blip {
             }
         }
 
-        // Debug: outline the exact canvas edge so overscan can be eyeballed.
-        if std::env::var_os("BLIP_DEBUG_EDGE").is_some() {
-            let t = 2.0;
-            draw_rectangle(vx, vy, vw, t, BLIP_MAGENTA);
-            draw_rectangle(vx, vy + vh - t, vw, t, BLIP_MAGENTA);
-            draw_rectangle(vx, vy, t, vh, BLIP_MAGENTA);
-            draw_rectangle(vx + vw - t, vy, t, vh, BLIP_MAGENTA);
-        }
     }
 
     // ----- drawing helpers — see blip::draw and blip::font for full docs -----
@@ -775,45 +743,6 @@ impl Blip {
     /// Set the strength of the screen's phosphor bloom, 0.0 (none) to 1.0
     /// (the default, tuned for bright lines on a black field).
     pub fn set_bloom(&mut self, k: f32) { self.bloom = k.clamp(0.0, 1.0); }
-
-    /// Keep the last picture visible while an interpreter waits to redraw it.
-    pub fn set_frame_retention(&mut self, retain: bool) { self.retain_frame = retain; }
-
-    /// Show only pictures passed to [`Self::commit_frame`], so a frame that
-    /// takes longer than one display frame to draw never shows half done.
-    pub fn show_committed(&mut self, on: bool) { self.show_committed = on; }
-
-    /// The canvas as it stands becomes the picture on screen.
-    pub fn commit_frame(&mut self) {
-        let (w, h) = (self.width as u32, self.height as u32);
-        let fits = self.shown.as_ref().is_some_and(|s| (s.texture.width() as u32, s.texture.height() as u32) == (w, h));
-        if !fits {
-            if let Some(old) = self.shown.take() { retire(old); }
-            let shown = render_target_ex(w, h, RenderTargetParams { sample_count: 0, ..Default::default() });
-            shown.texture.set_filter(if self.rt_blended { FilterMode::Linear } else { FilterMode::Nearest });
-            self.shown = Some(shown);
-        }
-        let shown = self.shown.clone().unwrap();
-        let mut cam = Camera2D::from_display_rect(Rect::new(0.0, 0.0, w as f32, h as f32));
-        cam.render_target = Some(shown);
-        set_camera(&cam);
-        clear_background(BLIP_BLACK);
-        // One render target into another turns the picture over; turn it back.
-        draw_texture_ex(&self.rt.texture, 0.0, 0.0, WHITE, DrawTextureParams {
-            dest_size: Some(vec2(w as f32, h as f32)),
-            flip_y: true,
-            ..Default::default()
-        });
-        self.apply_camera();
-    }
-
-    /// Cloning a texture handle is cheap (it's just a GPU ID).
-    fn display_texture(&self) -> Texture2D {
-        match &self.shown {
-            Some(shown) if self.show_committed => shown.texture.clone(),
-            _ => self.rt.texture.clone(),
-        }
-    }
 
     /// Fill the canvas with a solid colour. Call this at the start of your draw pass.
     #[inline]
@@ -951,7 +880,7 @@ impl Blip {
         font::draw_centered(self.width, text, y, sz, color);
     }
 
-    /// Draw SCORE, the leading score and holder, and LIVES across the top.
+    /// Draw SCORE, the best score and LIVES across the top.
     /// The high-score field is clipped between the left and right fields.
     pub fn draw_hud(&self, score: i32, lives: i32) {
         let hud_h = 28.0;
@@ -981,32 +910,20 @@ impl Blip {
         self.draw_text("LIVES", lives_left, ty, 2.0, BLIP_ORANGE);
         self.draw_number(lives, lives_x as f32, ty, 2.0, BLIP_WHITE);
 
-        // ---- HI <score> <NAME>, centred in the gap ----
+        // ---- HI <score>, centred in the gap ----
         let hi = crate::web::high_score();
-        if hi.score <= 0 {
+        if hi <= 0 {
             return;
         }
         let lo = score_right + 16.0;
         let avail = lives_left - 16.0 - lo;
-        if avail < 44.0 {
-            return; // no clear room (tiny canvas or a very long live score)
-        }
-
-        // Whole-size text: the name is trimmed to fit, then dropped, then the line.
-        let head = format!("HI {}", hi.score);
-        let cw = 12.0;
-        let head_w = head.chars().count() as f32 * cw;
+        let head = format!("HI {hi}");
+        let head_w = head.chars().count() as f32 * 12.0;
+        // No clear room (a tiny canvas or a very long live score): no line.
         if head_w > avail {
             return;
         }
-        let room = ((avail - head_w) / cw) as usize;
-        let name: String = if room > 3 { hi.name.chars().take((room - 1).min(12)).collect() } else { String::new() };
-        let total_w = head_w + if name.is_empty() { 0.0 } else { (name.chars().count() + 1) as f32 * cw };
-        let x0 = lo + (avail - total_w) / 2.0;
-        self.draw_text(&head, x0, ty, 2.0, BLIP_WHITE);
-        if !name.is_empty() {
-            font::draw_text_glow(&name, x0 + head_w + cw, ty, 2.0, NEON_CYAN);
-        }
+        self.draw_text(&head, lo + (avail - head_w) / 2.0, ty, 2.0, BLIP_WHITE);
     }
 
     /// The title screen's start prompt, the same in every game: PRESS SPACE TO
@@ -1017,24 +934,24 @@ impl Blip {
         self.draw_centered_outlined(&prompt, self.width as f32 / 2.0, y, 3.0, BLIP_WHITE, BLIP_BLACK);
     }
 
-    /// Centred `HI 12345 NAME` line for a title screen — drawn only when the
-    /// leaderboard has a score. `color` is the game's own accent.
-    pub fn draw_hi(&self, hi: &crate::web::HighScore, y: f32, color: Color) {
-        if hi.score > 0 {
-            self.draw_centered(&hi.label("HI"), y, 2.0, color);
+    /// Centred `HI 12345` line for a title screen, once there is a best.
+    /// `color` is the game's own accent.
+    pub fn draw_hi(&self, hi: i32, y: f32, color: Color) {
+        if hi > 0 {
+            self.draw_centered(&format!("HI {hi}"), y, 2.0, color);
         }
     }
 
     /// Draw the shared game-over screen over the game's chosen backdrop.
     /// `ready` shows the prompt to play again, after [`crate::GAME_OVER_MIN_WAIT`].
-    pub fn draw_game_over(&self, score: i32, hi: &crate::web::HighScore, headline: Color, best: Color, prompt: Color, ready: bool) {
+    pub fn draw_game_over(&self, score: i32, hi: i32, headline: Color, best: Color, prompt: Color, ready: bool) {
         self.draw_end_screen("GAME OVER", score, hi, headline, best, prompt, ready);
     }
 
     /// The screen a game ends on, won or lost: `title` (GAME OVER, YOU WON),
     /// the score, the best, and the prompt to play again once `ready`.
     #[allow(clippy::too_many_arguments)]
-    pub fn draw_end_screen(&self, title: &str, score: i32, hi: &crate::web::HighScore, headline: Color, best: Color, prompt: Color, ready: bool) {
+    pub fn draw_end_screen(&self, title: &str, score: i32, hi: i32, headline: Color, best: Color, prompt: Color, ready: bool) {
         let h = self.height as f32;
         self.draw_centered(title, h / 4.0, 5.0, headline);
         self.draw_centered(&format!("SCORE {score}"), h / 2.0, 3.0, BLIP_WHITE);
@@ -1059,13 +976,13 @@ impl Blip {
     }
 
     /// Centred end-of-game line: `NEW BEST!` in `new_color` when this run beat
-    /// (or tied) the leaderboard, otherwise `BEST 12345 NAME` in grey; nothing
-    /// while no best is known (no board, no game played here yet).
-    pub fn draw_best(&self, score: i32, hi: &crate::web::HighScore, y: f32, new_color: Color) {
-        if hi.score > 0 && score >= hi.score {
+    /// (or tied) the best, otherwise `BEST 12345` in grey; nothing while no
+    /// best is known.
+    pub fn draw_best(&self, score: i32, hi: i32, y: f32, new_color: Color) {
+        if hi > 0 && score >= hi {
             self.draw_centered("NEW BEST!", y, 2.0, new_color);
-        } else if hi.score > 0 {
-            self.draw_centered(&hi.label("BEST"), y, 2.0, BLIP_GRAY);
+        } else if hi > 0 {
+            self.draw_centered(&format!("BEST {hi}"), y, 2.0, BLIP_GRAY);
         }
     }
 }
