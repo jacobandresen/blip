@@ -1,4 +1,4 @@
-/* The game page: the bridge to the game's wasm, and the page around it (input comes through deck.js's BlipController).
+/* The game page: the bridge to the game's wasm, and the page around it (input comes through blip-deck.js's BlipController).
  * Deferred: it runs once the page is parsed, after mq_js_bundle.js and before index.wasm loads. */
 
 // ---- The bridge ---- Wires Rust (wasm) FFI imports to the page's callbacks below.
@@ -955,7 +955,7 @@ window.addEventListener('keydown', function (e) {
   var game = GAME;
   var buttonSpecs = (game && game.buttons) || [{ key: ' ', code: 'Space' }];
   var primary = buttonSpecs[0] || { key: ' ', code: 'Space' };
-  // deck.js has built the deck (two stations, stick and pad each, caps from
+  // <blip-deck> has built the deck (two stations, stick and pad each, caps from
   // BLIP_GAMES) and set data-players / data-caps / data-seats. Rally has
   // dials instead of the stick and pad, and hides them below.
   var twoUp = !isRally;
@@ -1035,6 +1035,7 @@ window.addEventListener('keydown', function (e) {
     keys: (game && game.keys) || null,
     gate: coinGated,
     feedback: feedbackTick,
+    click: blipDeckClick,
     onInput: reflectInput,
     onStart: tapPrimary,
     onSelect: leaveGame
@@ -1561,7 +1562,7 @@ window.addEventListener('keydown', function (e) {
   }
 
   // ---- The game pad ----
-  // One pad per station (built by deck.js), wired to that station's names.
+  // One pad per station (built by <blip-deck>), wired to that station's names.
   stations.forEach(function (st, who) {
     var pad = document.getElementById(who ? 'snes-pad-p2' : 'snes-pad');
     if (!pad) return;
@@ -1595,7 +1596,7 @@ window.addEventListener('keydown', function (e) {
     rotateHint();
   };
 
-  // Both stations stay on the panel in every mode (deck.js), so player two can join at any time.
+  // Both stations stay on the panel in every mode (<blip-deck>), so player two can join at any time.
   var open = false;
 
   var hint = null, hintDismissed = false;
@@ -1621,7 +1622,7 @@ window.addEventListener('keydown', function (e) {
   window.addEventListener('resize', rotateHint);
 
   // ---- Fire buttons (joystick mode) ----
-  // The caps were built by deck.js; a cap the game does not declare has no
+  // The caps were built by <blip-deck>; a cap the game does not declare has no
   // logical name and does nothing.
   stations.forEach(function (st) {
     if (!st.fire) return;
@@ -1636,7 +1637,7 @@ window.addEventListener('keydown', function (e) {
     requestAnimationFrame(fillCanvas);
   }
 
-  // ---- The 8-way restrictor-gate joystick (deck.js) ----
+  // ---- The 8-way restrictor-gate joystick (blip-deck.js) ----
   stations.forEach(function (st, who) {
     BlipDeck.bindStick(st, { who: who, split: stations.length > 1, tuning: game && game.stick,
       active: function () { return blipControls() === 'stick'; } });
